@@ -329,13 +329,15 @@ CREATE TABLE legal_forms (
 
 ```sql
 CREATE TABLE effectif_ranges (
-    code           TEXT PRIMARY KEY,          -- INSEE: '00', '01', '02', '03', '11', '12', ...
+    code           TEXT PRIMARY KEY,          -- INSEE: 'NN', '00', '01', '02', '03', '11', '12', ...
     label          TEXT NOT NULL,             -- '0 salarié', '1-2 salariés', etc.
-    min_employees  INT NOT NULL,
+    min_employees  INT,                       -- NULL pour 'NN' uniquement
     max_employees  INT,                       -- NULL = no upper bound
-    size_category  TEXT NOT NULL              -- 'tpe', 'pme', 'eti', 'ge'
+    size_category  TEXT NOT NULL              -- default fallback : 'artisan'|'commercant'|'tpe'|'pme'|'eti'|'ge'
 );
+-- Seed des 16 codes INSEE officiels (incluant 'NN' = effectif non employeur ou inconnu)
 INSERT INTO effectif_ranges VALUES
+  ('NN','Effectif non employeur ou inconnu',NULL,NULL,'tpe'),
   ('00','0 salarié',0,0,'tpe'),
   ('01','1-2 salariés',1,2,'tpe'),
   ('02','3-5 salariés',3,5,'tpe'),
@@ -351,6 +353,21 @@ INSERT INTO effectif_ranges VALUES
   ('51','2000-4999 salariés',2000,4999,'eti'),
   ('52','5000-9999 salariés',5000,9999,'ge'),
   ('53','10000+ salariés',10000,NULL,'ge');
+
+COMMENT ON COLUMN effectif_ranges.size_category IS 'Catégorie indicative fallback. La vraie catégorie d''une entreprise est calculée par compute_size_category() qui combine NAF + RM/RCS + statut juridique + effectif.';
+
+-- §3bis — Référentiel NAF artisans + commerçants (P0 — 6 catégories taille)
+-- Permet à compute_size_category() de distinguer artisan vs commercant vs tpe classique.
+
+CREATE TABLE naf_artisanat_flags (
+    naf_subclass_code TEXT PRIMARY KEY REFERENCES naf_subclasses(code),
+    is_artisanal      BOOLEAN NOT NULL DEFAULT false,    -- métiers manuels CMA
+    is_commercial     BOOLEAN NOT NULL DEFAULT false,    -- commerce/distribution
+    notes             TEXT
+);
+CREATE INDEX idx_naf_artisanat_flags_artisan ON naf_artisanat_flags (is_artisanal) WHERE is_artisanal = true;
+CREATE INDEX idx_naf_artisanat_flags_commercant ON naf_artisanat_flags (is_commercial) WHERE is_commercial = true;
+COMMENT ON TABLE naf_artisanat_flags IS 'Seedé via app:import-naf-artisanat (liste officielle CMA + INSEE divisions 45-47 commerce). ~250 codes artisan + ~600 codes commerce.';
 ```
 
 ### `axion_offer_targets`
@@ -430,12 +447,18 @@ CREATE TABLE companies (
     naf_subclass_code        TEXT REFERENCES naf_subclasses(code),
     creation_date            DATE,
 
-    -- Effectif & taille
+    -- Effectif & taille (6 catégories : artisan/commercant/tpe/pme/eti/ge)
     effectif_range_code      TEXT REFERENCES effectif_ranges(code),
     effectif_min             INT,
     effectif_max             INT,
-    size_category            TEXT,                 -- 'tpe'|'pme'|'eti'|'ge'
-    revenue_eur              NUMERIC(14,2),
+    effectif_estimated       INT,                  -- estimation hors tranche INSEE (scrape site corp, LinkedIn, etc.)
+    size_category            TEXT CHECK (size_category IN ('artisan','commercant','tpe','pme','eti','ge')),
+    is_artisan               BOOLEAN NOT NULL DEFAULT false,
+    is_commercant            BOOLEAN NOT NULL DEFAULT false,
+    rm_immatriculation       TEXT,                 -- ex: "000 000 000 RM 75" (Répertoire des Métiers, CMA)
+    rcs_immatriculation      TEXT,                 -- ex: "RCS Paris 000 000 000" (Registre du Commerce et des Sociétés, CCI)
+    revenue_eur              NUMERIC(14,2),        -- chiffre d'affaires HT consolidé
+    ca_eur                   NUMERIC(14,2) GENERATED ALWAYS AS (revenue_eur) STORED,  -- alias FR usuel
     revenue_year             INT,
     is_public_company        BOOLEAN NOT NULL DEFAULT false,
     is_listed                BOOLEAN NOT NULL DEFAULT false,        -- coté Euronext etc.
@@ -486,13 +509,25 @@ CREATE TABLE companies (
     updated_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
     deleted_at               TIMESTAMPTZ,
 
+    -- Hash secondaire pour entreprises sans SIREN (futur international BE/CH/DE)
+    name_city_hash           TEXT GENERATED ALWAYS AS (
+        encode(sha256(
+            (normalize_name(coalesce(legal_name,'')) || '|' ||
+             normalize_name(coalesce(city_insee,'')) || '|' ||
+             coalesce(country_code,''))::bytea
+        ), 'hex')
+    ) STORED,
+
     -- Anti-doublon HARD
-    CONSTRAINT companies_workspace_siren_unique UNIQUE (workspace_id, siren) DEFERRABLE INITIALLY DEFERRED
+    CONSTRAINT companies_workspace_siren_unique UNIQUE (workspace_id, siren) DEFERRABLE INITIALLY DEFERRED,
+    CONSTRAINT companies_workspace_name_city_hash_unique UNIQUE (workspace_id, name_city_hash) DEFERRABLE INITIALLY DEFERRED
 );
 
 CREATE INDEX idx_companies_workspace ON companies (workspace_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_companies_siren ON companies (siren) WHERE siren IS NOT NULL AND deleted_at IS NULL;
 CREATE INDEX idx_companies_size_priority ON companies (workspace_id, size_category, priority_label) WHERE deleted_at IS NULL;
+CREATE INDEX idx_companies_artisan ON companies (workspace_id, is_artisan) WHERE is_artisan = true AND deleted_at IS NULL;
+CREATE INDEX idx_companies_commercant ON companies (workspace_id, is_commercant) WHERE is_commercant = true AND deleted_at IS NULL;
 CREATE INDEX idx_companies_quality ON companies (workspace_id, quality_score, prospection_status) WHERE deleted_at IS NULL;
 CREATE INDEX idx_companies_naf ON companies (workspace_id, naf_subclass_code) WHERE deleted_at IS NULL;
 CREATE INDEX idx_companies_city ON companies (workspace_id, city_insee) WHERE deleted_at IS NULL;
@@ -865,6 +900,8 @@ UPDATE partman.part_config SET retention = '90 days', retention_keep_table = fal
 CREATE INDEX idx_runs_workspace_started ON scraper_runs (workspace_id, started_at DESC);
 CREATE INDEX idx_runs_source_status ON scraper_runs (source, status, started_at DESC);
 CREATE INDEX idx_runs_target ON scraper_runs (target_id, target_type) WHERE target_id IS NOT NULL;
+-- P0 audit : index dédié pour la query dedup niveau 3 (shouldScrape : target+source+status+freshness)
+CREATE INDEX idx_runs_dedup ON scraper_runs (target_id, source, completed_at DESC) WHERE status = 'ok';
 ```
 
 ### `scraper_targets` (file d'attente persistée)
@@ -1467,6 +1504,194 @@ CREATE TABLE ai_act_register (
 
 ---
 
+## §11bis — Anomalies (monitoring & alertes — P0 audit)
+
+```sql
+CREATE TABLE anomalies (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace_id    UUID REFERENCES workspaces(id) ON DELETE CASCADE,  -- NULL = global (infra)
+    kind            TEXT NOT NULL,             -- 'scraper_error_spike'|'proxy_degradation'|'llm_cost_spike'|'enrichment_quality_drop'|'queue_backlog'|'captcha_burst'|...
+    severity        TEXT NOT NULL,             -- 'info'|'warning'|'critical'
+    message         TEXT NOT NULL,
+    detected_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    metadata        JSONB NOT NULL DEFAULT '{}'::jsonb,
+    acknowledged_by UUID REFERENCES users(id),
+    acknowledged_at TIMESTAMPTZ,
+    resolved_at     TIMESTAMPTZ,
+    resolved_by     UUID REFERENCES users(id),
+    auto_resolved   BOOLEAN NOT NULL DEFAULT false,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (workspace_id, kind, COALESCE((metadata->>'fingerprint'), ''), detected_at)
+);
+CREATE INDEX idx_anomalies_workspace_active ON anomalies (workspace_id, severity) WHERE resolved_at IS NULL;
+CREATE INDEX idx_anomalies_detected ON anomalies (detected_at DESC);
+COMMENT ON TABLE anomalies IS 'Inserted by AnomalyDetector job (15 min interval) + listeners business events. Page admin "Anomalies & alertes" affiche les active.';
+```
+
+---
+
+## §11ter — Fonctions SQL Phase 1 (P0 audit : déplacées de Phase 2)
+
+### `compute_size_category` — classification 6 catégories
+
+```sql
+CREATE OR REPLACE FUNCTION compute_size_category(p_company_id UUID)
+RETURNS TEXT AS $$
+DECLARE
+    c             RECORD;
+    naf_flags     RECORD;
+    eff           INT;
+    out_category  TEXT;
+BEGIN
+    SELECT c.*, ef.size_category AS eff_fallback
+      INTO c
+      FROM companies c
+      LEFT JOIN effectif_ranges ef ON ef.code = c.effectif_range_code
+     WHERE c.id = p_company_id;
+    IF NOT FOUND THEN RETURN NULL; END IF;
+
+    SELECT is_artisanal, is_commercial INTO naf_flags
+      FROM naf_artisanat_flags WHERE naf_subclass_code = c.naf_subclass_code;
+
+    eff := COALESCE(c.effectif_max, c.effectif_min, c.effectif_estimated, 0);
+
+    -- Artisan : immatriculation RM OU NAF artisanal + effectif ≤ 19
+    IF (c.rm_immatriculation IS NOT NULL OR COALESCE(naf_flags.is_artisanal, false))
+       AND eff <= 19 THEN
+        out_category := 'artisan';
+    -- Commerçant : NAF commerce/distribution + effectif ≤ 19 + pas immatriculé RM uniquement
+    ELSIF COALESCE(naf_flags.is_commercial, false)
+          AND eff <= 19
+          AND c.rm_immatriculation IS NULL THEN
+        out_category := 'commercant';
+    -- Sinon : barème INSEE effectif standard
+    ELSIF eff <= 19 THEN
+        out_category := 'tpe';
+    ELSIF eff <= 249 THEN
+        out_category := 'pme';
+    ELSIF eff <= 4999 THEN
+        out_category := 'eti';
+    ELSE
+        out_category := 'ge';
+    END IF;
+
+    UPDATE companies
+       SET size_category = out_category,
+           is_artisan    = (out_category = 'artisan'),
+           is_commercant = (out_category = 'commercant'),
+           updated_at    = now()
+     WHERE id = p_company_id;
+
+    RETURN out_category;
+END$$ LANGUAGE plpgsql;
+```
+
+### `recompute_company_quality_score` (déplacée de Phase 2 — P0 audit)
+
+```sql
+CREATE OR REPLACE FUNCTION recompute_company_quality_score(p_company_id UUID)
+RETURNS TEXT AS $$
+DECLARE
+    has_email_valid  BOOLEAN;
+    has_director     BOOLEAN;
+    has_phone        BOOLEAN;
+    has_linkedin     BOOLEAN;
+    has_social       BOOLEAN;        -- pour assouplissement artisan : autres réseaux comptent
+    cat              TEXT;
+    score            TEXT;
+BEGIN
+    SELECT size_category INTO cat FROM companies WHERE id = p_company_id;
+
+    SELECT EXISTS (
+        SELECT 1 FROM email_verifications ev
+        JOIN contacts ctc ON ctc.id = ev.contact_id
+        WHERE ctc.company_id = p_company_id
+          AND ev.validation_status IN ('valid','catch_all')
+          AND ev.score >= 70
+    ) INTO has_email_valid;
+
+    SELECT EXISTS (
+        SELECT 1 FROM contacts
+        WHERE company_id = p_company_id
+          AND (is_legal_director = true OR seniority_level IN ('c_level','director'))
+          AND deleted_at IS NULL
+    ) INTO has_director;
+
+    SELECT EXISTS (
+        SELECT 1 FROM company_phones
+        WHERE company_id = p_company_id AND is_active = true
+    ) INTO has_phone;
+
+    SELECT linkedin_url IS NOT NULL FROM companies WHERE id = p_company_id INTO has_linkedin;
+
+    SELECT EXISTS (
+        SELECT 1 FROM company_social_handles
+        WHERE company_id = p_company_id AND is_active = true
+    ) INTO has_social;
+
+    -- P1 audit : critères 🟢 assouplis pour artisans (LinkedIn rarement présent)
+    IF cat = 'artisan' THEN
+        IF has_email_valid AND has_director AND has_phone AND (has_linkedin OR has_social) THEN
+            score := 'complete';
+        ELSIF (has_email_valid OR has_phone) AND has_director THEN
+            score := 'partial';
+        ELSE
+            score := 'basic';
+        END IF;
+    ELSE
+        IF has_email_valid AND has_director AND has_phone AND has_linkedin THEN
+            score := 'complete';
+        ELSIF (has_email_valid OR has_linkedin) AND has_director THEN
+            score := 'partial';
+        ELSE
+            score := 'basic';
+        END IF;
+    END IF;
+
+    UPDATE companies
+       SET quality_score = score,
+           quality_recomputed_at = now()
+     WHERE id = p_company_id;
+
+    RETURN score;
+END$$ LANGUAGE plpgsql;
+```
+
+### Triggers auto-recompute (P1 audit)
+
+```sql
+-- Trigger sur INSERT/UPDATE contacts → recompute quality du parent
+CREATE OR REPLACE FUNCTION trg_recompute_quality_from_contact()
+RETURNS TRIGGER AS $$
+BEGIN
+    PERFORM recompute_company_quality_score(NEW.company_id);
+    RETURN NEW;
+END$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER recompute_quality_on_contact
+    AFTER INSERT OR UPDATE OF primary_email, primary_email_status, primary_email_score, linkedin_url, seniority_level
+    ON contacts FOR EACH ROW
+    EXECUTE FUNCTION trg_recompute_quality_from_contact();
+
+CREATE OR REPLACE FUNCTION trg_recompute_quality_from_verif()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.contact_id IS NOT NULL THEN
+        PERFORM recompute_company_quality_score((SELECT company_id FROM contacts WHERE id = NEW.contact_id));
+    ELSIF NEW.company_id IS NOT NULL THEN
+        PERFORM recompute_company_quality_score(NEW.company_id);
+    END IF;
+    RETURN NEW;
+END$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER recompute_quality_on_verif
+    AFTER INSERT OR UPDATE OF validation_status, score
+    ON email_verifications FOR EACH ROW
+    EXECUTE FUNCTION trg_recompute_quality_from_verif();
+```
+
+---
+
 ## §12 — RLS policies
 
 Activation RLS sur les tables sensibles + politiques. Activées via session variable `app.current_workspace_id`.
@@ -1516,6 +1741,12 @@ ALTER TABLE auto_tag_definitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE axion_offer_targets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invitations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_workspaces ENABLE ROW LEVEL SECURITY;
+ALTER TABLE anomalies ENABLE ROW LEVEL SECURITY;
+
+-- Anomalies : workspace_id NULL = anomalies infra globales, lisibles uniquement par superadmin/owner.
+CREATE POLICY anomaly_workspace_isolation ON anomalies
+    USING (workspace_id IS NULL OR workspace_id = current_setting('app.current_workspace_id', true)::uuid)
+    WITH CHECK (workspace_id = current_setting('app.current_workspace_id', true)::uuid);
 
 -- Macro pour générer les policies (à exécuter pour chaque table avec workspace_id)
 DO $$
@@ -1574,7 +1805,7 @@ CREATE POLICY workspace_isolation ON prompt_template_versions
 |---|-----------|--------|---------------|
 | 1 | Multi-tenant/auth/audit | 9 | `audit_logs` |
 | 2 | Référentiels géo | 4 | — |
-| 3 | Référentiels secteurs & business | 8 | — |
+| 3 | Référentiels secteurs & business | 9 (+ `naf_artisanat_flags`) | — |
 | 4 | Entités scrapées | 10 | — |
 | 5 | Email finder & validation | 3 | — |
 | 6 | Scraping operations | 6 | `scraper_runs` |
@@ -1582,10 +1813,11 @@ CREATE POLICY workspace_isolation ON prompt_template_versions
 | 8 | Rotations & proxies | 9 | `proxy_usage_log` |
 | 9 | LLM Router | 5 | `llm_usage` |
 | 10 | Coverage tracking | 2 (dont 1 MV) | — |
-| 11 | RGPD | 3 | — |
-| **Total** | | **63 tables Phase 1** | **5 partitionnées** |
+| 11 | Anomalies (P0 audit) | 1 | — |
+| 12 | RGPD | 3 | — |
+| **Total** | | **65 tables Phase 1** | **5 partitionnées** |
 
-> Le prompt parlait de « ~32 tables ». Le compte réel (63) reflète les sous-tables nécessaires (NAF 5 niveaux, social handles séparé, signals séparé, etc.). Cohérent avec la complexité métier.
+> Le prompt parlait de « ~32 tables ». Le compte réel (65 v1.1, vs 63 v1.0) reflète les sous-tables nécessaires (NAF 5 niveaux, social handles séparé, signals séparé, anomalies, naf_artisanat_flags pour 6 catégories taille). Cohérent avec la complexité métier.
 
 ---
 
@@ -1612,7 +1844,8 @@ Ordre d'exécution recommandé (sera matérialisé en `database/migrations/` Pha
 2026_05_16_000230_create_naf_classes.php
 2026_05_16_000240_create_naf_subclasses.php
 2026_05_16_000250_create_legal_forms.php
-2026_05_16_000260_create_effectif_ranges.php        -- + seed
+2026_05_16_000260_create_effectif_ranges.php        -- + seed 16 codes (incl. NN)
+2026_05_16_000265_create_naf_artisanat_flags.php    -- P0 audit : 6 catégories taille
 2026_05_16_000270_create_axion_offer_targets.php
 2026_05_16_000280_create_strategic_keywords.php
 2026_05_16_000290_create_auto_tag_definitions.php
@@ -1656,6 +1889,8 @@ Ordre d'exécution recommandé (sera matérialisé en `database/migrations/` Pha
 2026_05_16_001000_create_data_processing_log.php
 2026_05_16_001010_create_gdpr_requests.php
 2026_05_16_001020_create_ai_act_register.php
+2026_05_16_001100_create_anomalies.php              -- P0 audit
+2026_05_16_001200_create_sql_functions_phase1.php   -- compute_size_category + recompute_company_quality_score + triggers
 2026_05_16_001900_enable_rls_policies.php           -- toutes les ENABLE RLS + CREATE POLICY
 ```
 

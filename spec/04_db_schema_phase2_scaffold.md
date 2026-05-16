@@ -813,58 +813,10 @@ CREATE TRIGGER email_verif_sync_contact
     FOR EACH ROW EXECUTE FUNCTION trg_sync_contact_email_status();
 ```
 
-### Auto-recompute `companies.quality_score` lors d'enrichissement (Phase 1 actif)
+### Auto-recompute `companies.quality_score` — déplacée en Phase 1
 
-```sql
-CREATE OR REPLACE FUNCTION recompute_company_quality_score(p_company_id UUID)
-RETURNS TEXT AS $$
-DECLARE
-    has_email_valid  BOOLEAN;
-    has_director     BOOLEAN;
-    has_phone        BOOLEAN;
-    has_linkedin     BOOLEAN;
-    score            TEXT;
-BEGIN
-    SELECT EXISTS (
-        SELECT 1 FROM email_verifications ev
-        JOIN contacts c ON c.id = ev.contact_id
-        WHERE c.company_id = p_company_id
-          AND ev.validation_status IN ('valid','catch_all')
-          AND ev.score >= 70
-    ) INTO has_email_valid;
-
-    SELECT EXISTS (
-        SELECT 1 FROM contacts
-        WHERE company_id = p_company_id
-          AND (is_legal_director = true OR seniority_level IN ('c_level','director'))
-          AND deleted_at IS NULL
-    ) INTO has_director;
-
-    SELECT EXISTS (
-        SELECT 1 FROM company_phones
-        WHERE company_id = p_company_id AND is_active = true
-    ) INTO has_phone;
-
-    SELECT linkedin_url IS NOT NULL FROM companies WHERE id = p_company_id INTO has_linkedin;
-
-    IF has_email_valid AND has_director AND has_phone AND has_linkedin THEN
-        score := 'complete';
-    ELSIF (has_email_valid OR has_linkedin) AND has_director THEN
-        score := 'partial';
-    ELSE
-        score := 'basic';
-    END IF;
-
-    UPDATE companies
-       SET quality_score = score,
-           quality_recomputed_at = now()
-     WHERE id = p_company_id;
-
-    RETURN score;
-END$$ LANGUAGE plpgsql;
-```
-
-Cette fonction est appelée à la fin de chaque `enrichment_runs` et à chaque INSERT/UPDATE significatif (contact, email_verification).
+> **P0 audit corrigé v1.1** : la fonction `recompute_company_quality_score()` + ses triggers + la fonction `compute_size_category()` sont maintenant définies dans `03_db_schema_phase1.md` § 11ter (Phase 1).
+> Raison : ces fonctions sont utilisées dès le waterfall enrichissement Phase 1, leur placement initial en Phase 2 scaffold créait une dépendance d'ordre de migration cassée.
 
 ---
 

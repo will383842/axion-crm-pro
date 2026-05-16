@@ -68,31 +68,82 @@ Chaque user-agent vient avec un fingerprint cohérent stocké en `user_agents.fi
 }
 ```
 
-### Application via playwright-extra stealth
+### Application via playwright-extra stealth — fingerprint cohérent avec proxy country
+
+> **🔑 RÈGLE CRITIQUE (audit P0 #1) :** la `timezoneId`, la `locale`, et le `Accept-Language` doivent **TOUJOURS** matcher le pays du proxy utilisé. Un proxy résidentiel US + timezone `Europe/Paris` = anomalie détectée à 100 % par Google/DataDome/PerimeterX.
 
 ```ts
 import { chromium } from 'playwright-extra';
 import stealth from 'puppeteer-extra-plugin-stealth';
 chromium.use(stealth());
 
+/** Mapping country_code → timezone + locale par défaut. */
+export function getTimezoneForCountry(cc: string): string {
+  return {
+    FR: 'Europe/Paris', BE: 'Europe/Brussels', CH: 'Europe/Zurich',
+    DE: 'Europe/Berlin', GB: 'Europe/London', ES: 'Europe/Madrid',
+    IT: 'Europe/Rome', NL: 'Europe/Amsterdam',
+    US: 'America/New_York', CA: 'America/Toronto', UK: 'Europe/London',
+  }[cc.toUpperCase()] ?? 'UTC';
+}
+
+export function localeForCountry(cc: string): string {
+  return {
+    FR: 'fr-FR', BE: 'fr-BE', CH: 'de-CH', DE: 'de-DE', GB: 'en-GB',
+    ES: 'es-ES', IT: 'it-IT', NL: 'nl-NL', US: 'en-US', CA: 'en-CA',
+  }[cc.toUpperCase()] ?? 'en-US';
+}
+
+export function acceptLanguageForCountry(cc: string): string {
+  return {
+    FR: 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+    BE: 'fr-BE,fr;q=0.9,nl-BE;q=0.8,en;q=0.7',
+    DE: 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7',
+    US: 'en-US,en;q=0.9',
+    GB: 'en-GB,en;q=0.9',
+  }[cc.toUpperCase()] ?? 'en-US,en;q=0.9';
+}
+
 export async function buildContext(uaConfig: UserAgentConfig, proxy: ProxyLease) {
+  const cc = proxy.countryCode ?? 'FR';
+  const timezoneId = getTimezoneForCountry(cc);
+  const locale = localeForCountry(cc);
+  const acceptLanguage = acceptLanguageForCountry(cc);
+
   const browser = await chromium.launch({
     proxy: proxy.toPlaywrightOption(),
     headless: true,
+    args: [
+      '--disable-blink-features=AutomationControlled',  // bypass navigator.webdriver detection
+      '--disable-features=IsolateOrigins,site-per-process',
+    ],
   });
   const ctx = await browser.newContext({
     userAgent: uaConfig.uaString,
     viewport: uaConfig.fingerprint.viewport,
-    locale: uaConfig.fingerprint.languages[0],
-    timezoneId: 'Europe/Paris',
-    extraHTTPHeaders: uaConfig.fingerprint.headers,
+    locale,                                            // 🔑 cohérent avec proxy country
+    timezoneId,                                        // 🔑 cohérent avec proxy country
+    extraHTTPHeaders: {
+      ...uaConfig.fingerprint.headers,
+      'Accept-Language': acceptLanguage,               // 🔑 cohérent avec proxy country
+    },
     deviceScaleFactor: uaConfig.fingerprint.device_pixel_ratio,
   });
-  // Override de navigator.languages, hardwareConcurrency, etc.
+  // Override navigator.* + WebGL/Canvas randomization
   await ctx.addInitScript((fp) => {
     Object.defineProperty(navigator, 'languages', { get: () => fp.languages });
     Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => fp.hardware_concurrency });
     Object.defineProperty(navigator, 'deviceMemory', { get: () => fp.device_memory });
+    // Canvas fingerprint noise (anti-detection)
+    const origGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function(...args) {
+      const ctx = origGetContext.apply(this, args);
+      if (args[0] === '2d' && ctx) {
+        const origFillText = ctx.fillText;
+        ctx.fillText = function(...a) { return origFillText.apply(this, a); }; // hookable for noise injection
+      }
+      return ctx;
+    };
   }, uaConfig.fingerprint);
   return { browser, ctx };
 }

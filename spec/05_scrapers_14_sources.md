@@ -230,38 +230,78 @@ foreach ($response->json()['records'] as $rec) {
 ## SOURCE 6 — Google Maps
 
 - **Objectif :** téléphone + site web + horaires + avis + photos + coordonnées GPS.
-- **Méthode :** **Playwright stealth** (pas d'API officielle accessible sans clé payante).
+- **Méthode :** **Playwright stealth + CapSolver (captcha solving) + timezone aligné proxy** (pas d'API officielle accessible sans clé payante).
 - **URL pattern :** `https://www.google.com/maps/search/{query}/@{lat},{lng},14z`
 - **Rate limits :** 1-3 req/min/IP (très strict). **Proxies résidentiels obligatoires.**
-- **Proxies :** Smartproxy résidentiel premium (rotation aggressive).
+- **Proxies :** Smartproxy résidentiel premium (rotation agressive, session sticky 30 min).
 - **Pagination :** SANS LIMITE. On scroll jusqu'à "Aucun résultat supplémentaire" (Google retourne ~120 résultats max/recherche). **Checkpoint** : on stocke `last_page_scraped` + dernière coordonnée vue.
-- **Anti-bot :** captcha reCAPTCHA → si détecté, dead_letter le run, cooldown la zone 24h.
+- **Anti-bot :** stratégie 4 couches :
+  1. **Playwright stealth + cohérence fingerprint** (timezone, locale, viewport, accept-language alignés sur `proxies.country_code` — cf fichier 10 §2bis)
+  2. **Mouse humanization** via `ghost-cursor` (mouvements courbes Bezier, vitesse variable 200-800 ms)
+  3. **Scroll velocity progressive** (5-15 px/frame variable, pas `scrollIntoViewIfNeeded` brut)
+  4. **CapSolver pour reCAPTCHA v2/v3 + hCaptcha** — résolution automatique au lieu d'abandon
+- **CapSolver intégration :** API `https://api.capsolver.com/createTask`. Coût ~0,5 $/1000 captchas ≈ **30 €/mois budget initial**, plafonné à 100 €/mois via env `CAPSOLVER_MONTHLY_HARD_CAP_EUR`. Si dépassement → bascule en mode `banned` + cooldown zone (comportement V0 conservé en mode dégradé).
+- **PoC empirique obligatoire avant Sprint 4** : tester 100 résultats "Boulangerie Paris 75" sur 1 worker pendant 2 jours. Go/no-go : taux captcha < 5 %, taux ban IP < 1 %, latence p95 < 12 s. Si échec, voir fichier `AUDIT_v1.md` §10 plan de repli (Apify Actor Google Maps ~50 $/mois).
 - **TS Worker :**
 
 ```ts
+import { createCursor } from 'ghost-cursor';
+import { CapSolver } from '@/lib/capsolver-client';
+import { getTimezoneForCountry } from '@/lib/timezone-by-country';
+
 export const gmapsScraper: WorkerPlugin = {
   key: 'gmaps',
   async execute(req) {
     const { searchQuery, city } = req.payload;
-    const proxy = await getProxy({ residential: true });
-    const browser = await chromium.launch({ proxy });
-    const ctx = await browser.newContext({ userAgent: await getUA(), locale: 'fr-FR' });
+    const proxy = await getProxy({ residential: true, stickySession: true });
+    const ua = await getUA();
+    const tz = getTimezoneForCountry(proxy.countryCode); // ex: 'America/New_York' si proxy US
+    const locale = localeForCountry(proxy.countryCode);  // ex: 'en-US' si proxy US
+
+    const browser = await chromium.launch({ proxy: proxy.toPlaywrightOption() });
+    const ctx = await browser.newContext({
+      userAgent: ua.uaString,
+      locale,
+      timezoneId: tz,                                    // 🔑 doit matcher le pays du proxy
+      viewport: ua.fingerprint.viewport,
+      extraHTTPHeaders: ua.fingerprint.headers,
+    });
     const page = await ctx.newPage();
-    await page.goto(`https://www.google.com/maps/search/${encodeURIComponent(searchQuery)}+${encodeURIComponent(city)}`);
-    if (await page.$('#captcha-form, [src*="recaptcha"]')) {
-      await browser.close();
-      return { status: 'banned', payload: { reason: 'captcha' } } as ScrapeResult;
+    const cursor = createCursor(page, { x: 100, y: 100 }); // mouvements humains
+
+    await page.goto(`https://www.google.com/maps/search/${encodeURIComponent(searchQuery)}+${encodeURIComponent(city)}`,
+      { waitUntil: 'domcontentloaded' });
+
+    // 1. Détection + résolution captcha automatique
+    const captchaSelector = '#captcha-form, [src*="recaptcha"], iframe[src*="hcaptcha"]';
+    if (await page.$(captchaSelector)) {
+      const solved = await CapSolver.solveOnPage(page, {
+        type: 'recaptchav2',
+        siteKey: await page.$eval('[data-sitekey]', el => el.getAttribute('data-sitekey')),
+        url: page.url(),
+      });
+      if (!solved) {
+        await browser.close();
+        return { status: 'banned', payload: { reason: 'captcha_solve_failed' } } as ScrapeResult;
+      }
     }
+
+    // 2. Scroll humain progressif (pas instantané)
     const businesses = [];
-    let lastCount = 0;
-    while (true) {
+    let lastCount = 0, stableIterations = 0;
+    while (stableIterations < 3) {
       const cards = await page.$$('[role="feed"] > div > div[jsaction]');
-      if (cards.length === lastCount) break; // fin pagination réelle
-      lastCount = cards.length;
-      await cards[cards.length - 1].scrollIntoViewIfNeeded();
-      await page.waitForTimeout(2000 + Math.random() * 1500);
+      if (cards.length === lastCount) { stableIterations++; }
+      else { stableIterations = 0; lastCount = cards.length; }
+
+      // scroll progressif via cursor (5-15 px/frame, vitesse variable)
+      await cursor.scroll({ x: 0, y: 300 + Math.random() * 400, durationMs: 800 + Math.random() * 1200 });
+      await page.waitForTimeout(1500 + Math.random() * 2000); // pause humaine variable
     }
+
     for (const card of await page.$$('[role="feed"] > div > div[jsaction]')) {
+      // mouseover via cursor humain avant lecture (mimick interaction)
+      await cursor.moveTo(await card.boundingBox());
       businesses.push({
         name: await card.$eval('.fontHeadlineSmall', el => el.textContent),
         phone: await card.$eval('[aria-label^="Téléphone"]', el => el.textContent).catch(() => null),

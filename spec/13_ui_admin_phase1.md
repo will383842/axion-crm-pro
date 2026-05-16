@@ -78,13 +78,15 @@ Flow :
 │  ║ └─────────┘ └─────────┘ └─────────┘ └─────────┘ └──────────┘  ║ │
 │  ╚══════════════════════════════════════════════════════════════════╝ │
 │                                                                       │
-│  Distribution par taille                  Throughput dernières 24h    │
-│  ┌──────────────────────┐                ┌────────────────────────┐  │
-│  │  TPE     ████ 35%    │                │ ◢◣◢◣◢◣◢◣◢◣◢◣◢◣◢◣◢◣◢◣ │  │
-│  │  PME     ██   18%    │                │                          │  │
-│  │  ETI     █    8%     │                │                          │  │
-│  │  Grandes ▪    2%     │                │                          │  │
-│  └──────────────────────┘                └────────────────────────┘  │
+│  Distribution par taille (6 cat. v1.1)    Throughput dernières 24h    │
+│  ┌──────────────────────────┐            ┌────────────────────────┐  │
+│  │ 🔨 Artisan    ████  22%  │            │ ◢◣◢◣◢◣◢◣◢◣◢◣◢◣◢◣◢◣◢◣ │  │
+│  │ 🛍️ Commerçant ███   18%  │            │                          │  │
+│  │ 👥 TPE         ██    14%  │            │                          │  │
+│  │ 🏢 PME         ███   20%  │            │                          │  │
+│  │ 🏬 ETI         █     8%   │            │                          │  │
+│  │ 🏛️ Grandes     ▪     2%   │            │                          │  │
+│  └──────────────────────────┘            └────────────────────────┘  │
 │                                                                       │
 │  Coûts ventilés                          Activité scraper             │
 │  ┌──────────────────────┐                ┌────────────────────────┐  │
@@ -115,18 +117,22 @@ Couvert dans `11_carte_france_interactive.md`. Une seule page combinant :
 ┌──────────────────────────────────────────────────────────────────────┐
 │ Entreprises                                                          │
 │ ┌─────────────────────────────────────────────────────────────────┐  │
-│ │ Filtres avancés (10 dimensions) :                                │  │
-│ │ [Qualité: 🟢 ▼] [Taille: tous ▼] [NAF: tous ▼] [Région: tous ▼] │  │
+│ │ Filtres avancés (11 dimensions v1.1) :                          │  │
+│ │ [Qualité: 🟢 ▼] [Taille: tous ▼ : artisan/commerçant/TPE/PME/  │  │
+│ │  ETI/Grandes] [NAF: tous ▼] [Région: tous ▼]                    │  │
 │ │ [Discovery source: tous ▼] [Signal: tous ▼] [Priorité: tous ▼]  │  │
+│ │ [Artisan☐] [Commerçant☐] [Avec LinkedIn☐] [Avec email validé☐]  │  │
 │ │ [Tags: ___] [Recherche: __________]  [⚡ Prêt cold email]        │  │
 │ │                                          Actions ▼  Export CSV/XLSX│  │
 │ ├─────────────────────────────────────────────────────────────────┤  │
-│ │ ☐ │ Quali │ Taille │ Raison sociale     │ Ville  │ Decideur     │  │
-│ │ ──┼───────┼────────┼─────────────────────┼────────┼──────────────│  │
-│ │ ☐ │  🟢   │  PME   │ AXION-IA OÜ        │ Tallinn│ W. Jullin    │  │
-│ │ ☐ │  🟢   │  ETI   │ EXEMPLE Industries │ Lyon   │ M. Dupont    │  │
-│ │ ☐ │  🟡   │  TPE   │ SARL TEST          │ Paris  │ J. Martin    │  │
-│ │ ☐ │  🔴   │  TPE   │ EI Démo            │ Lille  │ —            │  │
+│ │ ☐ │ Quali │ Taille (6 cat. v1.1)   │ Raison sociale     │ Décideur  │
+│ │ ──┼───────┼─────────────────────────┼─────────────────────┼──────────│
+│ │ ☐ │  🟢   │ 🏢 PME                  │ AXION-IA OÜ        │ W. Jullin│
+│ │ ☐ │  🟢   │ 🏬 ETI                  │ EXEMPLE Industries │ M. Dupont│
+│ │ ☐ │  🟡   │ 👥 TPE                  │ SARL TEST          │ J. Martin│
+│ │ ☐ │  🔴   │ 🔨 Artisan              │ Plomberie Démo     │ —        │
+│ │ ☐ │  🟡   │ 🛍️ Commerçant            │ Boulangerie Démo   │ A. Petit │
+│ │ ☐ │  🔴   │ 🏛️ Grande               │ MEGA INDUSTRIES SA │ —        │
 │ └─────────────────────────────────────────────────────────────────┘  │
 │                                       ◀ Précédent   1 2 3...   Suivant ▶│
 └──────────────────────────────────────────────────────────────────────┘
@@ -204,6 +210,7 @@ Filtres :
   [Seniority: tous▼: c_level | director | manager | other]
   [Discovery: tous▼: legal_director | direction_finder | linkedin_finder | manual]
   [Email status: tous▼: valid | catch_all | invalid | unknown]
+  [Taille entreprise: tous▼: artisan/commerçant/TPE/PME/ETI/Grande]   <-- P0 audit v1.1
   [Score ≥: __]   [Recherche: __________]
 ```
 
@@ -503,7 +510,35 @@ export const QualityBadge = ({ score }: Props) => {
 }
 ```
 
-### `<DiscoverySourceBadge />`, `<SizeCategoryBadge />`, `<PrioritySelect />`, `<NafSelector />`, `<DateRangePicker />`, ...
+### `<SizeCategoryBadge />` (P0 audit v1.1 — 6 catégories)
+
+```tsx
+type Size = 'artisan'|'commercant'|'tpe'|'pme'|'eti'|'ge'
+
+const SIZE_CONFIG: Record<Size, { label: string; emoji: string; bg: string }> = {
+  artisan:    { label: 'Artisan',     emoji: '🔨', bg: 'bg-amber-50 text-amber-900 border-amber-200' },
+  commercant: { label: 'Commerçant',  emoji: '🛍️', bg: 'bg-rose-50 text-rose-900 border-rose-200' },
+  tpe:        { label: 'TPE',         emoji: '👥', bg: 'bg-sky-50 text-sky-900 border-sky-200' },
+  pme:        { label: 'PME',         emoji: '🏢', bg: 'bg-indigo-50 text-indigo-900 border-indigo-200' },
+  eti:        { label: 'ETI',         emoji: '🏬', bg: 'bg-purple-50 text-purple-900 border-purple-200' },
+  ge:         { label: 'Grande',      emoji: '🏛️', bg: 'bg-slate-100 text-slate-900 border-slate-300' },
+}
+
+export const SizeCategoryBadge = ({ size, isArtisan, isCommercant }: { size: Size; isArtisan?: boolean; isCommercant?: boolean }) => {
+  // Bonus visuel : si is_artisan true mais size_category='tpe' (cas limite), afficher "TPE (artisanal)"
+  const cfg = SIZE_CONFIG[size]
+  let suffix = ''
+  if (size === 'tpe' && isArtisan)    suffix = ' (artisanal)'
+  if (size === 'tpe' && isCommercant) suffix = ' (commercial)'
+  return (
+    <span className={`px-2 py-1 rounded text-xs font-medium border ${cfg.bg}`}>
+      {cfg.emoji} {cfg.label}{suffix}
+    </span>
+  )
+}
+```
+
+### `<DiscoverySourceBadge />`, `<PrioritySelect />`, `<NafSelector />`, `<DateRangePicker />`, ...
 
 ---
 

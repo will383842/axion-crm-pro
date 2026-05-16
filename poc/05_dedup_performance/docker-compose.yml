@@ -1,0 +1,32 @@
+version: '3.9'
+name: axion-poc-05
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: axion
+      POSTGRES_PASSWORD: poc_local_only
+      POSTGRES_DB: axion_poc05
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql:ro
+    command: >-
+      postgres
+        -c shared_buffers=512MB
+        -c effective_cache_size=2GB
+        -c work_mem=16MB
+        -c maintenance_work_mem=256MB
+        -c max_connections=100
+        -c log_min_duration_statement=100
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U axion -d axion_poc05"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

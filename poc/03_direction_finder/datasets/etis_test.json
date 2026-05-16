@@ -1,0 +1,25 @@
+{
+  "_README": "20 ETI françaises test pour POC #3. Modifiable selon focus secteur souhaité.",
+  "etis": [
+    { "name": "TotalEnergies",        "siren": "542051180", "website": "https://totalenergies.com",        "is_listed": true,  "sector": "Énergie" },
+    { "name": "Veolia",               "siren": "403210032", "website": "https://www.veolia.com",            "is_listed": true,  "sector": "Environnement" },
+    { "name": "Sanofi",               "siren": "395030844", "website": "https://www.sanofi.com",            "is_listed": true,  "sector": "Pharma" },
+    { "name": "Carrefour",            "siren": "652014051", "website": "https://www.carrefour.com",         "is_listed": true,  "sector": "Distribution" },
+    { "name": "BNP Paribas",          "siren": "662042449", "website": "https://group.bnpparibas",          "is_listed": true,  "sector": "Banque" },
+    { "name": "Capgemini",            "siren": "330703844", "website": "https://www.capgemini.com",         "is_listed": true,  "sector": "IT Services" },
+    { "name": "Atos",                 "siren": "323623603", "website": "https://atos.net",                   "is_listed": true,  "sector": "IT Services" },
+    { "name": "Dassault Systèmes",    "siren": "322306440", "website": "https://www.3ds.com",                "is_listed": true,  "sector": "Logiciel" },
+    { "name": "Vinci",                "siren": "552037806", "website": "https://www.vinci.com",              "is_listed": true,  "sector": "BTP" },
+    { "name": "Bouygues",             "siren": "572015246", "website": "https://www.bouygues.com",          "is_listed": true,  "sector": "Conglomérat" },
+    { "name": "L'Oréal",              "siren": "632012100", "website": "https://www.loreal.com",            "is_listed": true,  "sector": "Cosmétique" },
+    { "name": "Saint-Gobain",         "siren": "542039532", "website": "https://www.saint-gobain.com",      "is_listed": true,  "sector": "Matériaux" },
+    { "name": "Air Liquide",          "siren": "552096281", "website": "https://www.airliquide.com",         "is_listed": true,  "sector": "Gaz industriels" },
+    { "name": "Schneider Electric",   "siren": "542048574", "website": "https://www.se.com",                 "is_listed": true,  "sector": "Énergie/Auto" },
+    { "name": "Thales",               "siren": "552059024", "website": "https://www.thalesgroup.com",       "is_listed": true,  "sector": "Défense" },
+    { "name": "Safran",               "siren": "562082909", "website": "https://www.safran-group.com",       "is_listed": true,  "sector": "Aéronautique" },
+    { "name": "Pernod Ricard",        "siren": "582041943", "website": "https://www.pernod-ricard.com",     "is_listed": true,  "sector": "Spiritueux" },
+    { "name": "Sodexo",               "siren": "301940219", "website": "https://www.sodexo.com",            "is_listed": true,  "sector": "Restauration collective" },
+    { "name": "Accor",                "siren": "602036444", "website": "https://group.accor.com",            "is_listed": true,  "sector": "Hôtellerie" },
+    { "name": "Publicis",             "siren": "542080601", "website": "https://www.publicisgroupe.com",     "is_listed": true,  "sector": "Communication" }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "name": "axion-crm-pro-poc-01-google-maps",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "POC #1 — Google Maps scraping anti-ban (1000 entreprises × 7 jours)",
+  "scripts": {
+    "test": "tsx src/main.ts --test",
+    "run": "tsx src/main.ts",
+    "synthesize": "tsx src/synthesize.ts"
+  },
+  "dependencies": {
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "playwright": "^1.49.0",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "@types/node": "^22.10.1"
+  }
+}

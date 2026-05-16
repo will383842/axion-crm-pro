@@ -1,0 +1,7 @@
+node_modules/
+.env
+RESULTS.md
+results/
+.cookie-warehouse/
+*.log
+playwright-cache/

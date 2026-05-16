@@ -1,0 +1,25 @@
+{
+  "name": "axion-crm-pro-poc-02-google-search",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "POC #2 — Google Search Wrapper anti-captcha (500 queries/jour × 5 jours, rotation 3 moteurs + 2captcha)",
+  "scripts": {
+    "test": "tsx src/main.ts --test",
+    "run": "tsx src/main.ts",
+    "synthesize": "tsx src/synthesize.ts"
+  },
+  "dependencies": {
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "puppeteer-extra-plugin-recaptcha": "^3.6.8",
+    "playwright": "^1.49.0",
+    "undici": "^6.21.0",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "@types/node": "^22.10.1"
+  }
+}

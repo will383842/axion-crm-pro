@@ -244,16 +244,40 @@ class ProxyRouter
 
 ### Mapping domaine → providers (RUNTIME-CONFIG dans `scraping_sources.proxy_pool`)
 
-| Domaine | Providers prioritaires |
-|---------|------------------------|
-| `google.com`, `google.fr` | IPRoyal résidentiel → Smartproxy résidentiel |
-| `bing.com` | IPRoyal résidentiel → Webshare datacenter (Bing plus tolérant) |
-| `duckduckgo.com` | Webshare datacenter |
-| `*.linkedin.com` | (interdit en Phase 1 — pas de scraping LinkedIn) |
-| `pagesjaunes.fr` | IPRoyal résidentiel |
-| `google.com/maps`, `maps.google.com` | IPRoyal résidentiel → Smartproxy |
-| `crunchbase.com` | IPRoyal résidentiel |
-| `*.fr`, `*` (sites web entreprises) | Webshare datacenter (suffisant 90% du temps) |
+> **P0 audit v1.1** : la stratégie a basculé vers « datacenter dominant + résidentiel ciblé ». Le résidentiel ne sert QUE pour les 3 sources les plus protégées. Tous les sites corporate (Direction Finder Phase 1, sites web entreprises) → datacenter Webshare.
+
+| Domaine | Providers prioritaires | Type | Justification |
+|---------|------------------------|------|---------------|
+| `google.com`, `google.fr` | IPRoyal résidentiel sticky → Smartproxy résidentiel | Résidentiel | Google bannit aggro datacenter |
+| `google.com/maps`, `maps.google.com` | IPRoyal résidentiel sticky → Smartproxy | Résidentiel | Même protection que Google Search |
+| `bing.com` | Webshare datacenter → IPRoyal résidentiel | Mixed | Bing plus tolérant DC |
+| `duckduckgo.com` | Webshare datacenter | DC | DDG très permissif |
+| `pagesjaunes.fr` | Webshare datacenter → IPRoyal si bloqué | Mixed | Cloudflare modéré |
+| `crunchbase.com` | IPRoyal résidentiel sticky | Résidentiel | Cloudflare strict |
+| **`*` sites corporate ETI/Grandes (Direction Finder)** | **Webshare datacenter** | **DC** | **Sites publics, WAF rare, datacenter suffisant 95 %. P0 audit corrigé.** |
+| `*.fr`, `*` (sites web TPE/PME) | Webshare datacenter | DC | 95 % suffit |
+| `infogreffe.fr`, `societe.com` | Webshare datacenter → IPRoyal fallback | Mixed | Cloudflare présent mais pas strict |
+| `*.linkedin.com` | (INTERDIT Phase 1 — uniquement URLs publiques via Google Search) | — | Doctrine |
+| `bodacc-datafluide.echanges.dila.gouv.fr` | (pas de proxy, API officielle) | — | |
+| `api.francetravail.io`, `recherche-entreprises.api.gouv.fr` | (pas de proxy, API officielle) | — | |
+
+### Budget impact (P0 audit v1.1)
+
+**Volume mensuel réel ventilé :**
+
+| Source | Bandwidth/mois | Provider | Coût €/mois |
+|--------|----------------|----------|--------------|
+| Google Search Wrapper (résidentiel sticky) | ~50 GB | IPRoyal | 175-300 |
+| Google Maps (résidentiel) | ~120 GB | IPRoyal | 420-700 |
+| Crunchbase (résidentiel, volume faible) | ~5 GB | IPRoyal | 20-35 |
+| Direction Finder pages corporate (**DC, P0 audit**) | ~80 GB | Webshare DC | 10-25 |
+| Direction Finder PDFs rapports annuels (DC) | ~30 GB | Webshare DC | 5-15 |
+| Pages Jaunes (DC) | ~40 GB | Webshare DC | 5-10 |
+| Sites web TPE/PME (DC) | ~200 GB | Webshare DC | 10-30 |
+| Infogreffe / Societe.com (DC) | ~20 GB | Webshare DC | 5 |
+| **Total réaliste** | **~545 GB** | | **~650-1100 €/mois** |
+
+**Mitigation P0 audit :** sampling 80/20 stricte au démarrage = top 50k entreprises ciblées (vs 200k discoverables). Budget proxies cible : **300-500 €/mo**.
 
 ---
 

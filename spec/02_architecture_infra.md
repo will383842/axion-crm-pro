@@ -253,11 +253,18 @@ CREATE EXTENSION IF NOT EXISTS unaccent;      -- normalisation accents
 CREATE EXTENSION IF NOT EXISTS btree_gin;     -- indexes GIN sur tableaux
 ```
 
-**Redis 7 config (`redis.conf` overrides) :**
+**Redis 7 — split queues vs cache (P0 audit corrigé v1.1) :**
+
+> **Problème v1.0** : une seule instance Redis avec `maxmemory-policy allkeys-lru` risque d'évincer des jobs en queue sous pression mémoire. Les queues BullMQ ne doivent JAMAIS être évincées.
+> **Correction v1.1** : 2 instances Redis séparées, eviction policies adaptées.
+
+**Instance 1 — `redis-queues` (jobs critiques, no eviction) :**
 
 ```ini
-maxmemory 2gb
-maxmemory-policy allkeys-lru
+# /etc/redis/redis-queues.conf
+port 6379
+maxmemory 1gb
+maxmemory-policy noeviction              # CRITIQUE — jamais évincer
 save 900 1
 save 300 10
 save 60 10000
@@ -266,14 +273,72 @@ appendfsync everysec
 tcp-keepalive 60
 timeout 0
 
-# Réservé queues
-databases 16
-# DB 0 = queues Laravel (Horizon)
+# Bases :
+# DB 0 = queues Laravel Horizon
 # DB 1 = queues BullMQ (Node workers)
-# DB 2 = cache Laravel
-# DB 3 = sessions Laravel
-# DB 4 = rate limiting
-# DB 5 = LLM cache
+# DB 3 = sessions Laravel (persistance critique)
+# DB 4 = rate limiting (acceptable de perdre en cas de crash)
+```
+
+**Instance 2 — `redis-cache` (caches volatils, LRU OK) :**
+
+```ini
+# /etc/redis/redis-cache.conf
+port 6380
+maxmemory 1gb
+maxmemory-policy allkeys-lru             # OK d'évincer
+appendonly no                             # cache pur, pas de persistance
+save ""                                   # no RDB snapshot
+tcp-keepalive 60
+
+# Bases :
+# DB 0 = cache Laravel (config, query cache)
+# DB 1 = cache LLM (clés sha256, TTL via use_cases)
+# DB 2 = cache MX lookup (TTL 1h)
+# DB 3 = cache catch-all detection (TTL 7j)
+# DB 4 = cache opt_out lookup (TTL 1h)
+# DB 5 = cache coverage (TTL 60s)
+```
+
+**docker-compose.data.yml** (extrait) :
+
+```yaml
+services:
+  redis-queues:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis-queues.conf
+    volumes:
+      - redis-queues-data:/data
+      - ./redis-queues.conf:/usr/local/etc/redis/redis-queues.conf:ro
+    ports: ["10.0.0.30:6379:6379"]
+    deploy: { resources: { limits: { memory: 1.5G } } }
+
+  redis-cache:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis-cache.conf
+    volumes:
+      - ./redis-cache.conf:/usr/local/etc/redis/redis-cache.conf:ro
+    ports: ["10.0.0.30:6380:6380"]
+    deploy: { resources: { limits: { memory: 1.5G } } }
+```
+
+**Config Laravel `config/database.php` :**
+
+```php
+'redis' => [
+    'default' => ['host' => '10.0.0.30', 'port' => 6379, 'database' => 0],   // queues Horizon
+    'sessions' => ['host' => '10.0.0.30', 'port' => 6379, 'database' => 3],
+    'rate_limiter' => ['host' => '10.0.0.30', 'port' => 6379, 'database' => 4],
+
+    'cache' => ['host' => '10.0.0.30', 'port' => 6380, 'database' => 0],
+    'llm_cache' => ['host' => '10.0.0.30', 'port' => 6380, 'database' => 1],
+    'mx_cache' => ['host' => '10.0.0.30', 'port' => 6380, 'database' => 2],
+    'catchall_cache' => ['host' => '10.0.0.30', 'port' => 6380, 'database' => 3],
+    'optout_cache' => ['host' => '10.0.0.30', 'port' => 6380, 'database' => 4],
+    'coverage_cache' => ['host' => '10.0.0.30', 'port' => 6380, 'database' => 5],
+],
 ```
 
 **Backups pgbackrest :**
@@ -291,16 +356,40 @@ databases 16
 
 **Workload split :**
 
-**Worker-1** — Sources « masse » (volume élevé, par-cible):
-- Google Maps (concurrency 4)
-- Pages Jaunes (concurrency 3)
-- Sites web (concurrency 6)
+> **P0 audit corrigé v1.1** : concurrences initiales abaissées (Chromium réel = 300-600 MB par instance + leaks). CPX31 8 GB RAM ne tient pas 13 sessions concurrentes comme dans la v1.0.
 
-**Worker-2** — Sources « ciblées » (faible volume, LLM-heavy ou rate-limit strict):
-- Google Search Wrapper (concurrency 3)
-- Direction Finder (concurrency 2)
-- Crunchbase (concurrency 2)
-- Social light (concurrency 4)
+**Worker-1** — Sources « masse » :
+- Google Maps (concurrency **2**, vs 4 v1.0)
+- Pages Jaunes (concurrency **2**, vs 3 v1.0)
+- Sites web (concurrency **4**, vs 6 v1.0)
+- **Total : 8 sessions concurrentes max ≈ 4.5 GB RAM Chromium + 1 GB Node + 2 GB système**
+
+**Worker-2** — Sources « ciblées » :
+- Google Search Wrapper (concurrency **2**, vs 3 v1.0)
+- Direction Finder (concurrency **2**)
+- Crunchbase (concurrency **1**, vs 2 v1.0)
+- Social light (concurrency **3**, vs 4 v1.0)
+- **Total : 8 sessions concurrentes max**
+
+**Restart périodique anti-leak (P0 audit) :**
+
+```typescript
+// workers/src/main.ts — ajout
+let jobsProcessed = 0
+const MAX_JOBS_BEFORE_RESTART = 500
+
+worker.on('completed', () => {
+  jobsProcessed++
+  if (jobsProcessed >= MAX_JOBS_BEFORE_RESTART) {
+    logger.info('reached restart threshold, exiting cleanly')
+    shutdown().catch(() => process.exit(1))
+  }
+})
+```
+
+Combiné à `restart: unless-stopped` Docker, ça fait redémarrer le container automatiquement après 500 jobs (~2-4h selon source). Évite OOM.
+
+**Mesure réelle à faire en POC** : observer RAM Chromium sur 24h à concurrence initiale. Ajuster ensuite par bisection.
 
 **Configuration runtime par worker :**
 
@@ -374,16 +463,27 @@ uptime-kuma      :3001   — uptime monitoring externe
 - Domaine `staging.axion-pro.com`
 - Workers en mode `--dry-run` (pas de scraping réel, mock fixtures)
 
-### GPU-Ollama (optionnel)
+### GPU-Ollama (optionnel) — P0 audit corrigé v1.1
 
-**Activation :** Lorsque coût LLM API > 60 €/mois OU latence Claude/OpenAI > 3 sec P95.
+**Activation :** Lorsque coût LLM API > 300 €/mois OU latence Claude/OpenAI > 3 sec P95.
 
-**Modèles :**
-- Llama 3.3 70B Q4_K_M (~40 GB VRAM) → use case `crm_lead_scoring`, `reply_intent_detection`
-- Mistral 7B Q5_K_M (~5 GB VRAM) → use case `sector_classification` haut volume
-- Phi-3 mini Q4 (~2.5 GB VRAM) → tâches très courtes/fréquentes
+**ATTENTION — Correction v1.1 :** La spec v1.0 mentionnait Llama 3.3 70B Q4_K_M sur GEX44 (RTX 4000 SFF 20 GB VRAM). **C'est techniquement faux** — 70B Q4_K_M nécessite ~40 GB VRAM. Spec corrigée ci-dessous.
 
-**GEX44** = GPU RTX 4000 SFF (20 GB VRAM). Insuffisant pour Llama 70B full précision mais OK Q4_K_M. Si besoin Llama 405B = passer à GEX130 (RTX 4090, ~€800/mois) → non recommandé Phase 1.
+**Options réalistes :**
+
+| Modèle | VRAM | GPU requis | Hetzner option | € HT/mois |
+|--------|------|------------|----------------|------------|
+| Phi-3 mini Q4 | ~2.5 GB | RTX 4000 SFF 20 GB | GEX44 | 184,90 |
+| Mistral 7B Q5_K_M | ~5 GB | idem | GEX44 | 184,90 |
+| Llama 3.1 8B Q5_K_M | ~6 GB | idem | GEX44 | 184,90 |
+| **Mistral Small 22B Q5_K_M** | ~16 GB | RTX 4090 24 GB | **AX52** (avec RTX 4090) ou bare metal Hetzner | ~280-340 |
+| Llama 3.3 70B Q4_K_M | ~40 GB | A100 80GB OU 2× RTX 4090 | Bare metal AX102 ou cloud GCP/AWS | ~800-1500 |
+
+**Recommandation Phase 1 :** activer **GEX44 + Mistral 7B + Phi-3 mini** si LLM API explose. Cible : déporter `sector_classification`, `linkedin_url_matching_scoring`, `detect_email_pattern` (use cases volumétrie haute, qualité acceptable avec petit modèle).
+
+**Conserver Anthropic Claude Haiku 4.5 API pour les use cases qualité-critique** (`extract_team_from_page`, `business_signal_detection`, `axion_offer_match`).
+
+**Ne PAS prévoir Llama 70B local Phase 1.** Si volume justifie en An 2, bascule cloud GPU (Lambda Labs, RunPod) ou bare metal Hetzner dédié.
 
 ---
 
@@ -407,15 +507,25 @@ uptime-kuma      :3001   — uptime monitoring externe
 | Domaines (crm.axion-pro.com + api) | — | — | — | — | 0,83 | S1 |
 | Cloudflare Free | — | — | — | — | 0 | S1 |
 | Backblaze B2 (~50 GB backups réplication) | — | — | — | 50 GB | 0,21 | S3 |
-| Captcha 2captcha (optionnel) | — | — | — | — | 20 | S6 |
-| Proxies Webshare datacenter | — | — | — | — | 10 | S3 |
-| Proxies IPRoyal résidentiels | — | — | — | — | 30 | S6 |
-| LLM APIs (Claude+Mistral) | — | — | — | — | 60 | S2 |
-| **Sous-total services tiers** | | | | | **~121,04** | |
-| **TOTAL Phase 1 (hors GPU)** | | | | | **~222 €/mois** | |
-| **TOTAL Phase 1 + GPU Ollama** | | | | | **~407 €/mois** | |
+| Captcha 2captcha (OBLIGATOIRE, P0 audit) | — | — | — | — | 50 | S6 |
+| Proxies Webshare datacenter (DOMINANT) | — | — | — | — | 25 | S3 |
+| Proxies IPRoyal résidentiels (résiduel ciblé GSW + DF + Crunchbase) | — | — | — | — | 350 | S6 |
+| LLM APIs (Claude+Mistral, optimisé P0 audit) | — | — | — | — | 250 | S2 |
+| **Sous-total services tiers** | | | | | **~676** | |
+| **TOTAL Phase 1 (hors GPU) — révisé P0 audit** | | | | | **~777 €/mois** | |
+| **TOTAL Phase 1 + GPU Ollama Mistral 7B** | | | | | **~962 €/mois** | |
 
-**Note :** Le prompt v6 cible ~265 €/mois. Le delta provient principalement des proxies résidentiels et captcha solving, activés selon usage réel (peuvent être démarrés à 0 et scalés). Cible réaliste S12 sans GPU : **240-280 €/mois**.
+> **P0 audit corrigé v1.1** — La spec v1.0 sous-estimait fortement deux postes :
+>
+> 1. **Proxies résidentiels** : 30 €/mo annoncés vs réalité 350-500 €/mo (volume 600-1200 GB/mois × 5-8 $/GB). Voir détail recalcul dans `21_couts_roadmap.md` § 1.
+> 2. **LLM** : 60 €/mo annoncés vs réalité 250-400 €/mo (1.8M appels/mois). Optimisations P0 audit (LinkedIn matching règles déterministes + merge use cases) ramènent à 250 €/mo.
+>
+> **Cible réaliste révisée S12 stable : 700-900 €/mois.** Vs 265 €/mo affichés v1.0 (irréaliste).
+>
+> Mitigations pour rester sous 500 €/mo si nécessaire :
+> - Sampling stratégie 80/20 (top 50k entreprises max, pas 200k)
+> - Datacenter quasi-100 % (accept higher ban rate)
+> - GPU Ollama pour absorber 80 % LLM volume
 
 ---
 

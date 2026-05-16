@@ -22,9 +22,124 @@ vSwitch ID `axion-crm-pro-vswitch` (10.0.0.0/16 private).
 
 ---
 
-## §2 — Bootstrap initial
+## §2 — Bootstrap initial (Terraform + script bash) — P1 audit v1.1
 
-### Script `infra/bootstrap.sh`
+> **P1 audit v1.1** : la spec v1.0 n'avait qu'un script bash impératif. Pour reproductibilité + DR, **Terraform obligatoire dès S1**.
+
+### Option A (recommandée v1.1) — Terraform module Hetzner Cloud
+
+```hcl
+# infra/terraform/main.tf
+terraform {
+  required_version = ">= 1.7"
+  required_providers {
+    hcloud = { source = "hetznercloud/hcloud", version = "~> 1.49" }
+    cloudflare = { source = "cloudflare/cloudflare", version = "~> 4.40" }
+  }
+  backend "s3" {
+    bucket   = "axion-crm-pro-tfstate"
+    key      = "prod/terraform.tfstate"
+    endpoint = "fsn1.your-objectstorage.com"
+    region   = "fsn1"
+    encrypt  = true
+    skip_credentials_validation = true
+    skip_region_validation = true
+  }
+}
+
+variable "hcloud_token" { type = string, sensitive = true }
+variable "ssh_key_name"  { type = string, default = "axion-crm-pro-key" }
+variable "ip_home_will" { type = string, sensitive = true }
+
+provider "hcloud" { token = var.hcloud_token }
+
+resource "hcloud_network" "vswitch" {
+  name     = "axion-crm-pro-vswitch"
+  ip_range = "10.0.0.0/16"
+}
+
+resource "hcloud_network_subnet" "main" {
+  network_id   = hcloud_network.vswitch.id
+  type         = "cloud"
+  network_zone = "eu-central"
+  ip_range     = "10.0.0.0/24"
+}
+
+locals {
+  servers = {
+    edge      = { type = "cax21", location = "fsn1" }
+    app       = { type = "cpx31", location = "fsn1" }
+    data      = { type = "ccx13", location = "fsn1" }
+    worker-1  = { type = "cpx31", location = "fsn1" }
+    worker-2  = { type = "cpx31", location = "fsn1" }
+    observability = { type = "cpx21", location = "fsn1" }
+    staging   = { type = "ccx13", location = "fsn1" }
+  }
+}
+
+resource "hcloud_server" "this" {
+  for_each    = local.servers
+  name        = each.key
+  server_type = each.value.type
+  image       = "debian-12"
+  location    = each.value.location
+  ssh_keys    = [var.ssh_key_name]
+  labels      = { tag = each.key, project = "axion-crm-pro" }
+  network { network_id = hcloud_network.vswitch.id }
+  firewall_ids = [hcloud_firewall.main.id]
+  delete_protection = true
+  rebuild_protection = true
+}
+
+resource "hcloud_firewall" "main" {
+  name = "axion-crm-pro-fw"
+  rule {
+    direction  = "in"
+    protocol   = "tcp"
+    port       = "22"
+    source_ips = ["${var.ip_home_will}/32"]
+  }
+  rule {
+    direction  = "in"
+    protocol   = "tcp"
+    port       = "80"
+    source_ips = ["0.0.0.0/0", "::/0"]
+  }
+  rule {
+    direction  = "in"
+    protocol   = "tcp"
+    port       = "443"
+    source_ips = ["0.0.0.0/0", "::/0"]
+  }
+}
+
+resource "hcloud_floating_ip" "edge_v4" {
+  type          = "ipv4"
+  home_location = "fsn1"
+  name          = "edge-ipv4"
+}
+
+resource "hcloud_floating_ip_assignment" "edge_v4" {
+  floating_ip_id = hcloud_floating_ip.edge_v4.id
+  server_id      = hcloud_server.this["edge"].id
+}
+
+output "edge_ipv4" { value = hcloud_floating_ip.edge_v4.ip_address }
+output "vswitch_id" { value = hcloud_network.vswitch.id }
+```
+
+**Workflow Terraform :**
+
+```bash
+cd infra/terraform
+terraform init                              # initial (1x)
+terraform plan -out=plan.tfplan             # avant chaque modif
+terraform apply plan.tfplan                 # appliquer
+```
+
+**Avantage DR :** recréer toute l'infra ailleurs (autre datacenter, autre fournisseur ARM) en < 1 h via `terraform apply` sur un nouveau backend.
+
+### Option B (fallback uniquement) — Script `infra/bootstrap.sh`
 
 ```bash
 #!/usr/bin/env bash

@@ -492,20 +492,222 @@ class WorkspaceContextProcessor
 
 ---
 
-## §10 — Tempo (tracing distribué)
+## §10 — Tempo + OpenTelemetry (tracing distribué — P1 audit v1.1 durci)
 
-Sampling 10%. OpenTelemetry SDK PHP et Node.
+> **P1 audit v1.1** : OpenTelemetry SDK PHP + JS + Node intégrés **dès S1**, pas en bout de Sprint 12. Sans OTel dès jour 1, debug en prod = devine.
 
-### Span types
+Sampling adaptatif : 100 % pour erreurs, 10 % requêtes normales, 1 % requêtes haute fréquence (`/up`, métriques).
 
-- `http.server.request` (Laravel route)
-- `db.query` (PostgreSQL via DBSpan)
-- `cache.redis` (Redis ops)
-- `llm.call` (with use_case, provider, model)
-- `scraper.run` (with source, duration, status)
-- `playwright.navigation` (Node worker)
+### Setup OpenTelemetry PHP (Laravel)
 
-Permet de drill-down d'une lente requête API → quel scraper a pris du temps → quel LLM call a timeouté.
+```bash
+composer require open-telemetry/sdk open-telemetry/opentelemetry-auto-laravel \
+                 open-telemetry/exporter-otlp open-telemetry/transport-grpc
+```
+
+```php
+// bootstrap/otel.php (chargé en début de bootstrap)
+use OpenTelemetry\SDK\Trace\TracerProvider;
+use OpenTelemetry\SDK\Trace\SpanProcessor\BatchSpanProcessor;
+use OpenTelemetry\Contrib\Otlp\SpanExporter;
+use OpenTelemetry\Contrib\Grpc\GrpcTransportFactory;
+
+$transport = (new GrpcTransportFactory())->create('http://10.0.0.50:4317');
+$exporter = new SpanExporter($transport);
+$tracerProvider = TracerProvider::builder()
+    ->addSpanProcessor(new BatchSpanProcessor($exporter, sampler: $adaptiveSampler))
+    ->setResource(\OpenTelemetry\SDK\Resource\ResourceInfoFactory::defaultResource()
+        ->merge(\OpenTelemetry\SDK\Resource\ResourceInfo::create(\OpenTelemetry\SDK\Common\Attribute\Attributes::create([
+            'service.name' => 'axion-crm-pro-laravel',
+            'service.version' => config('app.version'),
+            'deployment.environment' => config('app.env'),
+        ])))
+    )->build();
+
+\OpenTelemetry\SDK\Trace\TracerProviderFactory::getInstance()->register($tracerProvider);
+```
+
+Auto-instrumentation : Laravel HTTP, DB Eloquent, Redis, Guzzle (HTTP client) via `open-telemetry/opentelemetry-auto-laravel`.
+
+### Setup OpenTelemetry Node (workers)
+
+```typescript
+// workers/src/otel.ts (importé en tout début de main.ts)
+import { NodeSDK } from '@opentelemetry/sdk-node'
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc'
+import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node'
+import { Resource } from '@opentelemetry/resources'
+import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions'
+
+const sdk = new NodeSDK({
+  resource: new Resource({
+    [SemanticResourceAttributes.SERVICE_NAME]: `axion-worker-${process.env.WORKER_TYPE}`,
+    [SemanticResourceAttributes.SERVICE_VERSION]: process.env.APP_VERSION ?? '0.0.0',
+  }),
+  traceExporter: new OTLPTraceExporter({ url: 'http://10.0.0.50:4317' }),
+  instrumentations: [getNodeAutoInstrumentations({
+    '@opentelemetry/instrumentation-fs': { enabled: false },     // bruyant
+  })],
+})
+sdk.start()
+process.on('SIGTERM', () => sdk.shutdown())
+```
+
+### Setup OpenTelemetry React (browser)
+
+```typescript
+// frontend/src/otel.ts
+import { WebTracerProvider } from '@opentelemetry/sdk-trace-web'
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http'
+import { registerInstrumentations } from '@opentelemetry/instrumentation'
+import { FetchInstrumentation } from '@opentelemetry/instrumentation-fetch'
+import { DocumentLoadInstrumentation } from '@opentelemetry/instrumentation-document-load'
+
+const provider = new WebTracerProvider()
+provider.addSpanProcessor(new BatchSpanProcessor(new OTLPTraceExporter({
+  url: 'https://api.axion-pro.com/otel/traces',
+})))
+provider.register()
+registerInstrumentations({ instrumentations: [
+  new FetchInstrumentation({ propagateTraceHeaderCorsUrls: [/api\.axion-pro\.com/] }),
+  new DocumentLoadInstrumentation(),
+]})
+```
+
+### Span types métier custom
+
+- `http.server.request` (auto)
+- `db.query` (auto)
+- `cache.redis` (auto)
+- `llm.call` (custom — attributs : `llm.use_case`, `llm.provider`, `llm.model`, `llm.tokens_input`, `llm.tokens_output`, `llm.cost_eur`)
+- `scraper.run` (custom — attributs : `scraper.source`, `scraper.target_id`, `scraper.proxy_id`, `scraper.user_agent_hash`)
+- `playwright.navigation` (custom — attributs : `playwright.url`, `playwright.duration_ms`, `playwright.captcha_detected`)
+- `enrichment.waterfall.step` (custom — attributs : `step.name`, `step.status`)
+
+### Drill-down debug
+
+UI Grafana → click trace ID dans une slow query log → Tempo affiche le span tree complet : API call → DB → Redis → scraper dispatch → Playwright nav → LLM call. Permet de debug une requête lente en 2 min vs 2h sans tracing.
+
+---
+
+## §10bis — Langfuse (evals LLM — P1 audit v1.1)
+
+> **P1 audit v1.1** : sans evals automatiques, on ne peut pas détecter quand un prompt template régresse après modification. Langfuse self-hosted gratuit, déjà l'observabilité standard 2026 pour les apps IA.
+
+### Stack additionnelle observability server
+
+```yaml
+# docker-compose.observability.yml addition
+services:
+  langfuse:
+    image: langfuse/langfuse:2
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://langfuse:${LANGFUSE_DB_PASSWORD}@postgres:5432/langfuse
+      NEXTAUTH_URL: https://langfuse.axion-pro.com
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET}
+      SALT: ${LANGFUSE_SALT}
+      TELEMETRY_ENABLED: "false"
+    ports: ["127.0.0.1:3050:3000"]
+    depends_on: [postgres]
+```
+
+### Intégration LLMClient
+
+```php
+// app/Services/LLM/LLMRouterService.php — addition v1.1
+private function logToLangfuse(LLMRequestData $req, LLMResponseData $resp, LlmUseCase $uc): void
+{
+    if (!config('langfuse.enabled')) return;
+    Http::baseUrl(config('langfuse.url'))
+        ->withBasicAuth(config('langfuse.public_key'), config('langfuse.secret_key'))
+        ->timeout(2)        // best-effort, no block
+        ->post('/api/public/ingestion', [
+            'batch' => [[
+                'id' => Str::uuid(),
+                'type' => 'observation-create',
+                'timestamp' => now()->toIso8601String(),
+                'body' => [
+                    'traceId'      => Str::uuid(),
+                    'name'         => "llm.{$req->useCaseSlug}",
+                    'type'         => 'GENERATION',
+                    'input'        => $req->variables,
+                    'output'       => $resp->text,
+                    'model'        => $resp->modelUsed,
+                    'modelParameters' => ['temperature' => $uc->temperature, 'max_tokens' => $uc->max_tokens],
+                    'promptName'   => $req->useCaseSlug,
+                    'promptVersion'=> $resp->promptTemplateVersion,
+                    'usage'        => ['input' => $resp->tokensInput, 'output' => $resp->tokensOutput, 'totalCost' => $resp->costEur],
+                    'metadata'     => ['workspace_id' => $req->workspaceId, 'cache_hit' => $resp->cacheHit],
+                ],
+            ]],
+        ]);
+}
+```
+
+### Workflow evals
+
+1. Dataset de référence créé manuellement (50-100 examples par use case avec output attendu).
+2. Job hebdo `app:llm-evals` rejoue dataset sur prompt courant.
+3. Comparaison output vs référence via LLM-as-judge (Claude Sonnet 4.6 scoring 0-100).
+4. Alerte Slack si moyenne score < 80 (régression détectée).
+
+### Page admin "LLM Evals"
+
+Affiche pour chaque use case :
+- Score moyen 7 derniers jours
+- Régression vs version précédente prompt
+- Bouton "Re-run evals manuellement"
+
+---
+
+## §11 — Métriques business — durci P1 audit v1.1
+
+Ajout obligatoire (cf. AUDIT_v1 § 10.3) :
+
+```
+axion_crm_fresh_complete_prospects_gauge{workspace}
+  -- entreprises quality_score=complete, jamais contactées (prospection_status='enriched'),
+  -- last_enriched_at < 7j
+  -- → "combien de prospects fraîchement enrichis dispo pour cold email demain ?"
+
+axion_crm_aged_complete_prospects_gauge{workspace, age_bucket="7-30d|30-90d|90d+"}
+  -- complete vieilles, ré-enrichissement potentiellement utile
+
+axion_crm_pipeline_health_score_gauge{workspace}
+  -- composite : fresh_complete / target_daily_outreach_volume
+  -- > 1.0 = OK, < 0.5 = disette imminente
+
+axion_crm_enrichment_velocity_per_day_gauge{workspace}
+  -- entreprises enrichies à quality=complete sur 7 derniers jours / 7
+  -- vs cible 7 000/jour
+
+axion_crm_size_category_distribution{workspace, size_category}
+  -- répartition artisan/commerçant/tpe/pme/eti/ge en gauge (composantes %)
+
+axion_crm_axion_offer_match_distribution{workspace, offer_code}
+  -- combien d'entreprises matchées par offre Axion-IA
+
+axion_crm_signals_velocity_per_day_gauge{workspace, signal_type}
+  -- nouveaux signaux business détectés / 7j
+```
+
+### Alertes business
+
+```yaml
+- alert: ProspectsPipelineDisette
+  expr: axion_crm_fresh_complete_prospects_gauge < 100
+  for: 24h
+  labels: { severity: warning }
+  annotations:
+    summary: "Moins de 100 prospects 🟢 fraîchement enrichis disponibles depuis 24h"
+    runbook: "Vérifier scraper_runs erreurs + lancer enrichissement zone faible coverage"
+
+- alert: EnrichmentVelocityDrop
+  expr: axion_crm_enrichment_velocity_per_day_gauge < 3500
+  for: 2d
+  labels: { severity: warning }
+```
 
 ---
 

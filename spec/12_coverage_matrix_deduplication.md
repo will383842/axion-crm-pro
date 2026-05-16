@@ -202,7 +202,7 @@ Consulté AVANT :
 Pour entreprises sans SIREN identique, détection quasi-doublons via similarité trigram.
 
 ```sql
--- Jobs nightly app:detect-duplicate-flags
+-- Jobs nightly app:detect-duplicate-flags (v1.1 P1 audit : exclure rows sans city_insee → évite O(N²))
 INSERT INTO duplicate_flags (workspace_id, entity_type, entity_a_id, entity_b_id, fuzzy_score, match_fields)
 SELECT
     a.workspace_id,
@@ -215,8 +215,11 @@ FROM companies a
 JOIN companies b ON
     a.workspace_id = b.workspace_id
     AND a.id < b.id
+    AND a.city_insee IS NOT NULL                              -- P1 audit : exclure rows sans ville → évite full scan O(N²)
+    AND b.city_insee IS NOT NULL
     AND a.city_insee = b.city_insee
-    AND a.legal_name_normalized % b.legal_name_normalized   -- trigram operator
+    AND a.legal_name_normalized % b.legal_name_normalized     -- trigram operator
+    AND a.deleted_at IS NULL AND b.deleted_at IS NULL
 WHERE
     similarity(a.legal_name_normalized, b.legal_name_normalized) >= 0.85
     AND NOT EXISTS (
@@ -226,6 +229,17 @@ WHERE
           AND ((df.entity_a_id = a.id AND df.entity_b_id = b.id) OR (df.entity_a_id = b.id AND df.entity_b_id = a.id))
     )
 ON CONFLICT DO NOTHING;
+
+-- Second pass : entreprises SANS city_insee (volume résiduel ~5%) traitées séparément avec name_city_hash collision uniquement
+-- (déjà couvert par contrainte UNIQUE companies_workspace_name_city_hash_unique, donc juste audit ici)
+SELECT a.id, b.id, 1.0 AS exact_hash_collision
+  FROM companies a JOIN companies b
+    ON a.workspace_id = b.workspace_id
+   AND a.id < b.id
+   AND a.name_city_hash = b.name_city_hash
+   AND a.city_insee IS NULL AND b.city_insee IS NULL
+ WHERE a.deleted_at IS NULL AND b.deleted_at IS NULL;
+-- → ces cas devraient être bloqués par la contrainte UNIQUE. Si présent ici = bug.
 ```
 
 ### Seuils

@@ -613,6 +613,10 @@ uptime-kuma      :3001   — uptime monitoring externe
 | date-fns | 4.x | Dates |
 | sonner | 1.x | Toast notifications |
 | cmdk | 1.x | Command palette (⌘K) |
+| **i18next** | **24.x** | **i18n core (P1 audit v1.1 — dès S1)** |
+| **react-i18next** | **15.x** | **Hooks `useTranslation()` + `<Trans />`** |
+| **i18next-browser-languagedetector** | **8.x** | **Détection langue navigateur** |
+| **i18next-http-backend** | **3.x** | **Chargement async messages JSON** |
 | vitest | 2.x | Tests unitaires |
 | @testing-library/react | 16.x | Tests composants |
 | @playwright/test | 1.49+ | Tests E2E |

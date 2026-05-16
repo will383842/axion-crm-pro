@@ -552,14 +552,60 @@ export const SizeCategoryBadge = ({ size, isArtisan, isCommercant }: { size: Siz
 
 ---
 
-## §26 — Accessibilité
+## §26 — Accessibilité — durci P1 audit v1.1 (WCAG 2.2 AA)
 
-- WCAG 2.1 AA cible
-- Tous les inputs ont `<label>` associé
+> **P1 audit v1.1** : passage de WCAG 2.1 AA → 2.2 AA (publié 2023, ratifié 2024). 9 nouveaux critères pertinents.
+
+**Cible : WCAG 2.2 AA**
+
+### Critères WCAG 2.2 nouveaux à appliquer
+
+| Critère | Niveau | Application |
+|---------|--------|-------------|
+| 2.4.11 Focus Not Obscured (Minimum) | AA | Focus jamais caché par sticky header/sidebar. Tester en zoom 200 % |
+| 2.4.12 Focus Not Obscured (Enhanced) | AAA | Idéal mais non bloquant |
+| 2.4.13 Focus Appearance | AAA | Idéal |
+| 2.5.7 Dragging Movements | AA | Drag-and-drop kanban CRM Phase 2 doit avoir alternative click/keyboard |
+| 2.5.8 Target Size (Minimum) | AA | Targets cliquables ≥ 24×24 px (sauf liens dans texte) |
+| 3.2.6 Consistent Help | A | Lien aide/contact toujours au même endroit (footer + sidebar bas) |
+| 3.3.7 Redundant Entry | A | Pas redemander info déjà saisie dans le même flow (ex: pas re-saisir email à 2FA setup) |
+| 3.3.8 Accessible Authentication (Minimum) | AA | Pas d'épreuve cognitive (puzzles, OCR captcha). Magic link + TOTP OK |
+| 3.3.9 Accessible Authentication (Enhanced) | AAA | Idéal |
+
+### Implémentation continue (héritée + complétée v1.1)
+
+- Tous les inputs ont `<label>` associé (htmlFor)
 - Toutes les icônes décoratives : `aria-hidden="true"`
-- Toutes les actions ont `aria-label` si emoji-only
-- Focus rings visibles (`focus-visible:ring-2`)
+- Toutes les actions ont `aria-label` si emoji-only ou icône-only
+- Focus rings visibles (`focus-visible:ring-2 ring-offset-2`)
 - Skip link `<a href="#main-content">` en début page
+- Contrastes 4.5:1 texte normal, 3:1 texte large (Tailwind tokens validés en CI)
+- Annonces aria-live pour changements dynamiques (toast notifications, état chargement)
+- Pas de seul critère couleur pour information (QualityBadge a 🟢/🟡/🔴 EMOJI + label texte)
+- Reduced motion respecté (`prefers-reduced-motion`)
+- Drag-and-drop (Phase 2 CRM kanban) : alternative clavier obligatoire (Space pour pick up, flèches déplacer, Enter pour drop)
+
+### Tests automatisés a11y (CI)
+
+```yaml
+# .github/workflows/a11y.yml
+jobs:
+  a11y:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install
+      - run: pnpm build
+      - run: pnpm exec axe-playwright --target=https://staging.axion-pro.com --output a11y-report.json
+      - uses: actions/upload-artifact@v4
+        with: { name: a11y-report, path: a11y-report.json }
+```
+
+Outils :
+- `@axe-core/playwright` — tests automatiques sur chaque page E2E
+- `@storybook/addon-a11y` — tests par composant en Storybook
+- Manuel : NVDA (Windows) + VoiceOver (macOS) sur les pages critiques 1×/release
 
 ---
 

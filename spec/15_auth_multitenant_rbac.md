@@ -474,6 +474,178 @@ public function destroy(Request $req): Response
 
 ---
 
+## §10bis — Bootstrap owner user (seeder initial — v1.1)
+
+> **Sécurité durcie** : le mot de passe owner n'est **jamais** stocké dans le code Git, ni en clair, ni en hash bcrypt. Lecture obligatoire depuis env var au moment du seed. Le password env var n'est jamais loggé.
+
+### Workspace + user owner
+
+```php
+// database/seeders/OwnerUserSeeder.php
+namespace Database\Seeders;
+
+use App\Models\Workspace;
+use App\Models\User;
+use App\Models\UserWorkspace;
+use App\Models\Role;
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
+
+class OwnerUserSeeder extends Seeder
+{
+    public function run(): void
+    {
+        $email = env('OWNER_INITIAL_EMAIL');
+        $password = env('OWNER_INITIAL_PASSWORD');
+        $name = env('OWNER_INITIAL_NAME', 'Owner');
+
+        // Garde-fous stricts — refuse de seed sans creds explicites
+        if (! $email || ! $password) {
+            $this->command->error('OwnerUserSeeder: variables OWNER_INITIAL_EMAIL et OWNER_INITIAL_PASSWORD obligatoires.');
+            $this->command->error('Injectez via Doppler/Infisical au moment du seed. Ne JAMAIS committer ces valeurs Git.');
+            return;
+        }
+
+        if (strlen($password) < 12) {
+            $this->command->error('OwnerUserSeeder: OWNER_INITIAL_PASSWORD doit faire ≥ 12 caractères.');
+            return;
+        }
+
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->command->error('OwnerUserSeeder: OWNER_INITIAL_EMAIL invalide.');
+            return;
+        }
+
+        // Vérification HIBP (Have I Been Pwned) avant accept
+        if ($this->isPwnedPassword($password)) {
+            $this->command->error('OwnerUserSeeder: ce mot de passe apparaît dans des fuites publiques HIBP. Refus.');
+            return;
+        }
+
+        $ws = Workspace::firstOrCreate(['slug' => 'axion-ia'], [
+            'name' => 'Axion-IA',
+            'cost_cap_eur' => 500.00,
+            'is_active' => true,
+        ]);
+
+        $user = User::firstOrCreate(['email' => $email], [
+            'name' => $name,
+            'password_hash' => Hash::make($password),    // bcrypt rounds 12 (config Laravel default)
+            'locale' => 'fr',
+            'timezone' => 'Europe/Paris',
+            'email_verified_at' => now(),
+            // PAS de totp_secret au seed : forcé d'activer 2FA au 1er login
+        ]);
+
+        // Rôle owner
+        $ownerRole = Role::firstOrCreate([
+            'workspace_id' => $ws->id, 'slug' => 'owner', 'guard_name' => 'web',
+        ], ['name' => 'Owner']);
+
+        UserWorkspace::firstOrCreate(['user_id' => $user->id, 'workspace_id' => $ws->id], [
+            'role_slug' => 'owner',
+            'joined_at' => now(),
+        ]);
+
+        $this->command->info("✅ Owner user seeded: {$email} on workspace 'axion-ia'.");
+        $this->command->warn("⚠️  ACTIONS OBLIGATOIRES au 1er login :");
+        $this->command->warn("    1. Activer 2FA TOTP (Google Authenticator / Authy)");
+        $this->command->warn("    2. Changer le password via UI (Settings → Profile)");
+        $this->command->warn("    3. Sauvegarder les 8 codes de recovery dans gestionnaire de pwd");
+        $this->command->warn("    4. Supprimer OWNER_INITIAL_PASSWORD de Doppler/Infisical après usage");
+
+        // Audit log immédiat
+        \App\Models\AuditLog::record('user.bootstrap_seeded', $user, [
+            'workspace_id' => $ws->id,
+            'role' => 'owner',
+            'requires_2fa_setup' => true,
+            'requires_password_change' => true,
+        ]);
+    }
+
+    private function isPwnedPassword(string $password): bool
+    {
+        try {
+            $hash = strtoupper(sha1($password));
+            $prefix = substr($hash, 0, 5);
+            $suffix = substr($hash, 5);
+            $resp = \Illuminate\Support\Facades\Http::timeout(5)
+                ->withHeaders(['Add-Padding' => 'true'])
+                ->get("https://api.pwnedpasswords.com/range/{$prefix}");
+            if ($resp->failed()) return false;   // best-effort, ne bloque pas si HIBP down
+            foreach (explode("\n", $resp->body()) as $line) {
+                [$lineSuffix, ] = explode(':', trim($line));
+                if (strtoupper($lineSuffix) === $suffix) return true;
+            }
+            return false;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+}
+```
+
+### Workflow déploiement S1 sécurisé
+
+```bash
+# 1. Stockage dans Doppler (jamais Git)
+doppler secrets set OWNER_INITIAL_EMAIL=williamsjullin@gmail.com
+doppler secrets set OWNER_INITIAL_PASSWORD='<random 32 chars, généré par gestionnaire pwd>'
+doppler secrets set OWNER_INITIAL_NAME='Williams Jullin'
+
+# 2. Run seeder une seule fois en S1, via Doppler injecteur
+doppler run -- php artisan db:seed --class=OwnerUserSeeder
+
+# 3. Au 1er login UI :
+#    - Setup 2FA TOTP obligatoire (Google Authenticator)
+#    - Sauvegarder 8 recovery codes affichés UNE FOIS
+#    - Aller dans Settings → Profile → Change Password → entrer NOUVEAU password fort
+#
+# 4. Après confirmation tout OK : SUPPRIMER les secrets Doppler bootstrap :
+doppler secrets delete OWNER_INITIAL_EMAIL
+doppler secrets delete OWNER_INITIAL_PASSWORD
+doppler secrets delete OWNER_INITIAL_NAME
+# ↑ ces secrets ne servent qu'au bootstrap initial. Le user existe maintenant en DB.
+```
+
+### Force first-login 2FA setup
+
+Middleware appliqué à toutes les routes sauf /two-factor/setup et /logout :
+
+```php
+// app/Http/Middleware/EnforceFirstLoginSetup.php
+class EnforceFirstLoginSetup
+{
+    public function handle($req, Closure $next)
+    {
+        $u = $req->user();
+        if (! $u) return $next($req);
+        if (! $u->totp_enabled_at && ! $req->routeIs('two-factor.setup', 'logout')) {
+            return redirect()->route('two-factor.setup')
+                ->with('warning', '2FA TOTP obligatoire avant utilisation. Configurez maintenant.');
+        }
+        // Force password change si flag user.requires_password_change=true (seeders/admin actions)
+        if (($u->metadata['requires_password_change'] ?? false)
+            && ! $req->routeIs('password.change', 'logout', 'two-factor.setup')) {
+            return redirect()->route('password.change')
+                ->with('warning', 'Vous devez changer votre mot de passe avant d''utiliser la plateforme.');
+        }
+        return $next($req);
+    }
+}
+```
+
+### Identifiants Axion CRM Pro Phase 1
+
+| Donnée | Valeur Git-safe |
+|--------|----------------|
+| Email owner | `williamsjullin@gmail.com` (committed OK) |
+| Workspace slug | `axion-ia` (committed OK) |
+| Rôle | `owner` (committed OK) |
+| Password | **JAMAIS committé.** Injecté via `OWNER_INITIAL_PASSWORD` Doppler au seed-time. Rotaté immédiatement au 1er login via UI. |
+
+---
+
 ## §11 — Tests acceptance
 
 ```php

@@ -1,0 +1,42 @@
+# Axion CRM Pro — overlay tests CI isolated
+# Usage : docker compose -f docker-compose.yml -f docker-compose.test.yml up -d
+# Réécrit en : Postgres database axion_crm_test, MOCK_MODE=true partout,
+# sessions en array, queue sync (jobs exécutés inline pour Pest feature tests).
+
+services:
+  postgres:
+    environment:
+      POSTGRES_DB: axion_crm_test
+
+  api:
+    environment:
+      APP_ENV: testing
+      MOCK_MODE: "true"
+      MOCK_LLM: "true"
+      MOCK_PROXIES: "true"
+      MOCK_SCRAPERS: "true"
+      MOCK_SMTP: "true"
+      MOCK_INSEE: "true"
+      MOCK_ANNUAIRE_ENTREPRISES: "true"
+      MOCK_BODACC: "true"
+      MOCK_BAN: "true"
+      MOCK_FRANCE_TRAVAIL: "true"
+      DB_DATABASE: axion_crm_test
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
+      TELESCOPE_ENABLED: "false"
+
+  horizon:
+    profiles: ["disabled-in-tests"]
+
+  scheduler:
+    profiles: ["disabled-in-tests"]
+
+  worker-google-maps:
+    profiles: ["disabled-in-tests"]
+  worker-pages-jaunes:
+    profiles: ["disabled-in-tests"]
+  worker-google-search:
+    profiles: ["disabled-in-tests"]

@@ -45,6 +45,7 @@ COPY workers/package.json workers/pnpm-lock.yaml* ./
 RUN pnpm install --prod --frozen-lockfile || pnpm install --prod
 COPY --from=builder /srv/workers/dist ./dist
 USER pwuser
+EXPOSE 9100
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-    CMD node dist/healthcheck.js || exit 1
+    CMD wget -qO- http://localhost:9100/healthz || exit 1
 CMD ["node", "dist/main.js"]

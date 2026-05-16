@@ -9,7 +9,11 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
 {
     public function register(): void
     {
-        // Telescope est désactivé en production via .env (TELESCOPE_ENABLED=false).
+        // Telescope chargé seulement en local / testing ; .env TELESCOPE_ENABLED=false coupe en prod.
+        if (! $this->app->environment('local', 'testing')) {
+            return;
+        }
+        parent::register();
     }
 
     protected function gate(): void

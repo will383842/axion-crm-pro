@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
             PermissionsAndRolesSeeder::class,
             CountriesSeeder::class,
             FrenchRegionsSeeder::class,
+            CitiesLargeSeeder::class,
             EffectifRangesSeeder::class,
             AxionOfferTargetsSeeder::class,
             SearchEnginesSeeder::class,

@@ -15,7 +15,7 @@
 | 7 P1 audit corrigés | ✅ 100 % | OTel, Langfuse, i18next, Terraform, WCAG 2.2, fuzzy filter, métriques business |
 | Frontend design system | ✅ 100 % | Responsive full mobile→desktop, 13 sections UX |
 | POCs codés | ✅ 100 % | 50 fichiers TypeScript prêts dans `./poc/` |
-| **POCs exécutés en réel** | ❌ **0 %** | À faire par Will, voir §1 |
+| **POCs exécutés en réel** | 🟡 **1/5** | POC #5 ✅ VALIDÉ 2026-05-16. POC #4/#3/#1/#2 en attente credentials Will, voir §1 |
 | **Code Sprint 1 (Bootstrap)** | ❌ **0 %** | À faire APRÈS POCs verts, voir §2 |
 | Conformité avant prod | 🟡 partielle | DPIA + DPA + pentest à produire, voir §3 |
 | Décisions stratégiques | 🟡 4 ouvertes | STOP & ASK, voir §4 |
@@ -26,14 +26,16 @@
 
 Ordre du moins cher au plus coûteux.
 
-### POC #5 — Anti-doublon perf 1 M rows (0 €, 15 min)
+### POC #5 — Anti-doublon perf 1 M rows ✅ VALIDÉ 2026-05-16
 
-- [ ] Installer Docker Desktop
-- [ ] `cd poc/05_dedup_performance && pnpm install`
-- [ ] `pnpm run start`
-- [ ] Lire `RESULTS.md`
+- [x] Docker Desktop installé (winget upgrade 4.70 → 4.73)
+- [x] `cd poc/05_dedup_performance && pnpm install`
+- [x] `pnpm run docker:up` + `db:migrate` + `db:seed` (10M rows) + `benchmark`
+- [x] `RESULTS.md` généré + commit GitHub + tag `poc05-validated-2026-05-16`
 
-Critère GO : p95 < 50 ms à 10 M rows.
+**Résultat : 🟢 GO** — p95 **35.94 ms** < 50 ms cible, idx_runs_dedup utilisé, 0 seq scan.
+
+Voir `poc/SYNTHESIS.md` § POC #5.
 
 ### POC #4 — SMTP validation (0-5 €, 1-2 j)
 

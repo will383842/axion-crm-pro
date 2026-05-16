@@ -1,0 +1,106 @@
+# Axion CRM Pro — stack observabilité auto-hébergée
+# Usage : `docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d`
+# 6 services : Prometheus + Grafana + Loki + Tempo + GlitchTip + Uptime Kuma
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: axion-crm-prometheus
+    volumes:
+      - ./infra/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    networks: [axion-crm]
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: axion-crm-alertmanager
+    volumes:
+      - ./infra/monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9093:9093"
+    networks: [axion-crm]
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: axion-crm-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-axion_grafana_dev}
+      GF_INSTALL_PLUGINS: grafana-piechart-panel,redis-datasource
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    networks: [axion-crm]
+
+  loki:
+    image: grafana/loki:3.2.0
+    container_name: axion-crm-loki
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki-data:/loki
+    ports:
+      - "3100:3100"
+    networks: [axion-crm]
+
+  promtail:
+    image: grafana/promtail:3.2.0
+    container_name: axion-crm-promtail
+    volumes:
+      - ./infra/monitoring/promtail/promtail.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks: [axion-crm]
+    depends_on: [loki]
+
+  tempo:
+    image: grafana/tempo:2.6.0
+    container_name: axion-crm-tempo
+    command: ['-config.file=/etc/tempo.yaml']
+    volumes:
+      - ./infra/monitoring/tempo/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/tmp/tempo
+    ports:
+      - "3200:3200"
+      - "4317:4317"  # OTLP gRPC
+      - "4318:4318"  # OTLP HTTP
+    networks: [axion-crm]
+
+  glitchtip:
+    image: glitchtip/glitchtip:v4.2
+    container_name: axion-crm-glitchtip
+    environment:
+      DATABASE_URL: postgres://axion:axion_dev_only@postgres:5432/glitchtip
+      SECRET_KEY: ${GLITCHTIP_SECRET_KEY:-axion-glitchtip-dev-secret}
+      EMAIL_URL: consolemail://
+      GLITCHTIP_DOMAIN: http://glitchtip.localhost
+      DEFAULT_FROM_EMAIL: noreply@axion-crm.local
+    ports:
+      - "8080:8080"
+    networks: [axion-crm]
+    depends_on: [postgres]
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1.23
+    container_name: axion-crm-uptime-kuma
+    volumes:
+      - uptime-data:/app/data
+    ports:
+      - "3001:3001"
+    networks: [axion-crm]
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  loki-data:
+  tempo-data:
+  uptime-data:

@@ -1,0 +1,68 @@
+groups:
+  - name: axion-crm-business
+    interval: 1m
+    rules:
+      - alert: ScrapingFailureRateHigh
+        expr: |
+          sum(rate(scraper_runs_total{status="failed"}[5m]))
+          / sum(rate(scraper_runs_total[5m])) > 0.15
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Taux d'échec scraping > 15 % depuis 10 min"
+          description: "Vérifier proxies + captcha solver + détection ban Google/PJ."
+
+      - alert: LLMCostNearCap
+        expr: |
+          sum by (workspace_id) (llm_usage_cost_eur_monthly) /
+          on (workspace_id) llm_cost_cap_eur > 0.8
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Coût LLM > 80 % du cap mensuel workspace"
+
+      - alert: EmailValidationInvalidRateHigh
+        expr: sum(rate(email_validations_total{status="invalid"}[15m])) /
+              sum(rate(email_validations_total[15m])) > 0.30
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "Taux email invalid > 30 % depuis 15 min"
+
+  - name: axion-crm-infra
+    interval: 30s
+    rules:
+      - alert: ApiDown
+        expr: up{job="laravel-api"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "API Laravel down depuis 2 min"
+
+      - alert: PostgresDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "PostgreSQL down"
+
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Redis down"
+
+      - alert: ApiLatencyP95High
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job="laravel-api"}[5m]))) > 1.0
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "API p95 latency > 1s"
+
+      - alert: HorizonQueueBacklog
+        expr: horizon_pending_jobs > 1000
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Horizon queue backlog > 1000 jobs"

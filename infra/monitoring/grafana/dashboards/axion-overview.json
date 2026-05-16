@@ -1,0 +1,41 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "title": "Axion CRM Pro — Overview",
+  "tags": ["axion", "overview"],
+  "timezone": "Europe/Paris",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "title": "API up", "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "targets": [{ "expr": "up{job=\"laravel-api\"}" }]
+    },
+    {
+      "id": 2, "title": "Scraper runs (5m, by status)", "type": "timeseries",
+      "gridPos": { "x": 4, "y": 0, "w": 10, "h": 8 },
+      "targets": [{ "expr": "sum by (status) (rate(scraper_runs_total[5m]))" }]
+    },
+    {
+      "id": 3, "title": "LLM cost EUR (24h)", "type": "stat",
+      "gridPos": { "x": 14, "y": 0, "w": 5, "h": 4 },
+      "targets": [{ "expr": "sum(increase(llm_usage_cost_eur_total[24h]))" }]
+    },
+    {
+      "id": 4, "title": "Queue backlog Horizon", "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 6 },
+      "targets": [{ "expr": "horizon_pending_jobs" }]
+    },
+    {
+      "id": 5, "title": "Companies enriched (24h)", "type": "stat",
+      "gridPos": { "x": 12, "y": 8, "w": 6, "h": 6 },
+      "targets": [{ "expr": "sum(increase(companies_enriched_total[24h]))" }]
+    }
+  ]
+}

@@ -15,8 +15,10 @@
 | 7 P1 audit corrigés | ✅ 100 % | OTel, Langfuse, i18next, Terraform, WCAG 2.2, fuzzy filter, métriques business |
 | Frontend design system | ✅ 100 % | Responsive full mobile→desktop, 13 sections UX |
 | POCs codés | ✅ 100 % | 50 fichiers TypeScript prêts dans `./poc/` |
-| **POCs exécutés en réel** | 🟡 **1/5** | POC #5 ✅ VALIDÉ 2026-05-16. POC #4/#3/#1/#2 en attente credentials Will, voir §1 |
-| **Code Sprint 1 (Bootstrap)** | ❌ **0 %** | À faire APRÈS POCs verts, voir §2 |
+| **POCs exécutés en réel** | 🟡 **1/5** | POC #5 ✅ VALIDÉ 2026-05-16. POC #4/#3/#1/#2 reportés post-dev (stratégie mocks adoptée) |
+| **Stratégie mocks adoptée** | ✅ 2026-05-16 | Tous services externes via mocks. `MOCKS-STRATEGY.md` créé. Basculement réel en 1 ligne via `MOCK_MODE=false` |
+| **Prompt autopilot Sprint 1→12 prêt** | ✅ 2026-05-16 | `_PROMPTS/PROMPT_AUTOPILOT_SPRINT_1_TO_12.md` à coller dans nouvelle conv Claude Code |
+| **Code Sprint 1 → S12** | ❌ **0 %** | Démarrage immédiat possible en autopilot avec mocks |
 | Conformité avant prod | 🟡 partielle | DPIA + DPA + pentest à produire, voir §3 |
 | Décisions stratégiques | 🟡 4 ouvertes | STOP & ASK, voir §4 |
 

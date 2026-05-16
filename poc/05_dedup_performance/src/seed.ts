@@ -41,7 +41,7 @@ async function seedCompanies(c: Client, companyIds: string[]): Promise<void> {
   for (let i = 0; i < TOTAL_COMPANIES; i++) {
     const id = randomUUID()
     companyIds.push(id)
-    const siren = String(100000000 + Math.floor(Math.random() * 900000000))
+    const siren = String(100000000 + i)   // séquentiel → unique garanti (vs random → collisions)
     const name = `TEST Company ${i}`
     const city = String(75000 + Math.floor(Math.random() * 20000)).slice(0, 5)
     rows.push(`${id},${WORKSPACE_ID},${siren},${name},${city}\n`)

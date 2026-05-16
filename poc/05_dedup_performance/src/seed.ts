@@ -6,10 +6,8 @@
  */
 import 'dotenv/config'
 import { Client } from 'pg'
-import { from as copyFrom } from 'pg-copy-streams' // sera installé via deps
+import { from as copyFrom } from 'pg-copy-streams'
 import { randomUUID } from 'node:crypto'
-import { pipeline } from 'node:stream/promises'
-import { Readable } from 'node:stream'
 
 const TOTAL_ROWS = parseInt(process.env.SEED_ROWS_TOTAL ?? '10000000')
 const TOTAL_COMPANIES = parseInt(process.env.SEED_COMPANIES ?? '100000')
@@ -30,42 +28,59 @@ function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length
 async function seedCompanies(c: Client, companyIds: string[]): Promise<void> {
   console.log(`Seeding ${TOTAL_COMPANIES} companies...`)
   const t0 = Date.now()
-  await c.query('BEGIN')
-  const stmt = await c.query(`DEALLOCATE ALL`).catch(() => {})
-  // Use COPY for speed
-  const stream = c.query(copyFrom(
+  const stream: any = c.query(copyFrom(
     `COPY companies (id, workspace_id, siren, legal_name, city_insee) FROM STDIN WITH (FORMAT csv, DELIMITER ',')`
   ))
-  const rows: Readable = new Readable({ read() {} })
-  let count = 0
   for (let i = 0; i < TOTAL_COMPANIES; i++) {
     const id = randomUUID()
     companyIds.push(id)
-    const siren = String(100000000 + i)   // séquentiel → unique garanti (vs random → collisions)
+    const siren = String(100000000 + i)
     const name = `TEST Company ${i}`
     const city = String(75000 + Math.floor(Math.random() * 20000)).slice(0, 5)
-    rows.push(`${id},${WORKSPACE_ID},${siren},${name},${city}\n`)
-    count++
-    if (count % 10000 === 0) {
-      // Pace pour éviter saturation memory
-      await new Promise(r => setImmediate(r))
-    }
+    const ok = stream.write(`${id},${WORKSPACE_ID},${siren},${name},${city}\n`)
+    if (!ok) await new Promise<void>(resolve => stream.once('drain', resolve))
   }
-  rows.push(null)
-  await pipeline(rows, stream as unknown as NodeJS.WritableStream)
-  await c.query('COMMIT')
+  await new Promise<void>((resolve, reject) => {
+    stream.end()
+    stream.once('finish', resolve)
+    stream.once('error', reject)
+  })
   console.log(`  → ${TOTAL_COMPANIES} companies seeded in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
 }
 
-async function seedScraperRuns(c: Client, companyIds: string[]): Promise<void> {
-  console.log(`Seeding ${TOTAL_ROWS} scraper_runs (COPY FROM STDIN)...`)
+async function dropIndexesForBulkLoad(c: Client): Promise<void> {
+  console.log('Dropping indexes on scraper_runs for fast COPY (will recreate after)...')
+  // Drop all secondary indexes on parent (cascades to partitions). Garde uniquement la PK.
+  await c.query('DROP INDEX IF EXISTS idx_runs_workspace_started CASCADE').catch(() => { /* ignore */ })
+  await c.query('DROP INDEX IF EXISTS idx_runs_source_status CASCADE').catch(() => { /* ignore */ })
+  await c.query('DROP INDEX IF EXISTS idx_runs_target CASCADE').catch(() => { /* ignore */ })
+  await c.query('DROP INDEX IF EXISTS idx_runs_dedup CASCADE').catch(() => { /* ignore */ })
+}
+
+async function recreateIndexes(c: Client): Promise<void> {
+  console.log('Recreating indexes (post-COPY)...')
   const t0 = Date.now()
-  await c.query('BEGIN')
-  const stream = c.query(copyFrom(
+  await c.query(`CREATE INDEX idx_runs_workspace_started ON scraper_runs (workspace_id, started_at DESC)`)
+  console.log(`  idx_runs_workspace_started ✅ (${((Date.now() - t0) / 1000).toFixed(1)}s)`)
+  const t1 = Date.now()
+  await c.query(`CREATE INDEX idx_runs_source_status ON scraper_runs (source, status, started_at DESC)`)
+  console.log(`  idx_runs_source_status ✅ (${((Date.now() - t1) / 1000).toFixed(1)}s)`)
+  const t2 = Date.now()
+  await c.query(`CREATE INDEX idx_runs_target ON scraper_runs (target_id, target_type) WHERE target_id IS NOT NULL`)
+  console.log(`  idx_runs_target ✅ (${((Date.now() - t2) / 1000).toFixed(1)}s)`)
+  const t3 = Date.now()
+  await c.query(`CREATE INDEX idx_runs_dedup ON scraper_runs (target_id, source, completed_at DESC) WHERE status = 'ok'`)
+  console.log(`  idx_runs_dedup ✅ (${((Date.now() - t3) / 1000).toFixed(1)}s)  [INDEX CRITIQUE POC]`)
+}
+
+async function seedScraperRuns(c: Client, companyIds: string[]): Promise<void> {
+  console.log(`Seeding ${TOTAL_ROWS} scraper_runs (COPY FROM STDIN, indexes dropped, direct write + backpressure)...`)
+  const t0 = Date.now()
+  const stream: any = c.query(copyFrom(
     `COPY scraper_runs (workspace_id, source, target_id, target_type, started_at, completed_at, status, duration_ms) FROM STDIN WITH (FORMAT csv, DELIMITER ',')`
   ))
-  const rows: Readable = new Readable({ read() {} })
 
+  // Écriture directe sur stream Writable avec drain handling = pas d'OOM même à 100M rows.
   for (let i = 0; i < TOTAL_ROWS; i++) {
     const targetId = companyIds[Math.floor(Math.random() * companyIds.length)]!
     const source = pick(SOURCES)
@@ -73,15 +88,21 @@ async function seedScraperRuns(c: Client, companyIds: string[]): Promise<void> {
     const startedAt = randomDateInPastMonths(SEED_MONTHS).toISOString()
     const duration = 1000 + Math.floor(Math.random() * 30000)
     const completedAt = new Date(new Date(startedAt).getTime() + duration).toISOString()
-    rows.push(`${WORKSPACE_ID},${source},${targetId},company,${startedAt},${completedAt},${status},${duration}\n`)
-    if (i % 100000 === 0 && i > 0) {
-      console.log(`  ${(i / 1_000_000).toFixed(1)} M rows pushed (${((Date.now() - t0) / 1000).toFixed(0)}s)`)
-      await new Promise(r => setImmediate(r))
+    const ok = stream.write(`${WORKSPACE_ID},${source},${targetId},company,${startedAt},${completedAt},${status},${duration}\n`)
+    if (!ok) {
+      await new Promise<void>(resolve => stream.once('drain', resolve))
+    }
+    if (i > 0 && i % 200000 === 0) {
+      const elapsed = (Date.now() - t0) / 1000
+      const rate = Math.round(i / elapsed)
+      console.log(`  ${(i / 1_000_000).toFixed(1)} M rows written (${elapsed.toFixed(0)}s, ${rate} rows/s)`)
     }
   }
-  rows.push(null)
-  await pipeline(rows, stream as unknown as NodeJS.WritableStream)
-  await c.query('COMMIT')
+  await new Promise<void>((resolve, reject) => {
+    stream.end()
+    stream.once('finish', resolve)
+    stream.once('error', reject)
+  })
   console.log(`  → ${TOTAL_ROWS} scraper_runs seeded in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
 }
 
@@ -98,7 +119,9 @@ async function main() {
 
   const companyIds: string[] = []
   await seedCompanies(c, companyIds)
+  await dropIndexesForBulkLoad(c)
   await seedScraperRuns(c, companyIds)
+  await recreateIndexes(c)
   await analyze(c)
 
   const { rows: countRows } = await c.query('SELECT COUNT(*) AS c FROM scraper_runs')

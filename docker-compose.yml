@@ -1,0 +1,211 @@
+# Axion CRM Pro — orchestration locale (mode mocks par défaut)
+# Démarrage : `docker compose up -d`
+# Reverse proxy Caddy expose https://api.localhost + https://app.localhost
+# (certificat local auto Caddy ; ajouter au store de confiance via Caddy CA si besoin)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: axion-crm-postgres
+    environment:
+      POSTGRES_DB: axion_crm
+      POSTGRES_USER: axion
+      POSTGRES_PASSWORD: axion_dev_only
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U axion -d axion_crm"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - axion-crm
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: axion-crm-redis
+    command: >
+      redis-server
+      --appendonly yes
+      --save 60 1000
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    ports:
+      - "56379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - axion-crm
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.laravel
+      target: dev
+    container_name: axion-crm-api
+    env_file: .env
+    environment:
+      APP_URL: https://api.localhost
+      DB_HOST: postgres
+      REDIS_HOST: redis
+    volumes:
+      - ./backend:/var/www/html:cached
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - axion-crm
+
+  horizon:
+    build:
+      context: .
+      dockerfile: Dockerfile.laravel
+      target: dev
+    container_name: axion-crm-horizon
+    command: php artisan horizon
+    env_file: .env
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+    volumes:
+      - ./backend:/var/www/html:cached
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - axion-crm
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.laravel
+      target: dev
+    container_name: axion-crm-scheduler
+    command: php artisan schedule:work
+    env_file: .env
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+    volumes:
+      - ./backend:/var/www/html:cached
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - axion-crm
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      target: dev
+    container_name: axion-crm-app
+    env_file: .env
+    environment:
+      VITE_API_BASE_URL: https://api.localhost
+    volumes:
+      - ./frontend:/srv/app:cached
+      - frontend-node-modules:/srv/app/node_modules
+    networks:
+      - axion-crm
+
+  worker-google-maps:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      target: dev
+    container_name: axion-crm-worker-google-maps
+    env_file: .env
+    environment:
+      WORKER_TYPE: google-maps
+      WORKER_REDIS_URL: redis://redis:6379/1
+      WORKER_INTERNAL_RESULT_URL: http://api/internal/scraper-result
+    volumes:
+      - ./workers:/srv/workers:cached
+      - workers-node-modules:/srv/workers/node_modules
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - axion-crm
+
+  worker-pages-jaunes:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      target: dev
+    container_name: axion-crm-worker-pages-jaunes
+    env_file: .env
+    environment:
+      WORKER_TYPE: pages-jaunes
+    volumes:
+      - ./workers:/srv/workers:cached
+      - workers-node-modules:/srv/workers/node_modules
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - axion-crm
+
+  worker-google-search:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      target: dev
+    container_name: axion-crm-worker-google-search
+    env_file: .env
+    environment:
+      WORKER_TYPE: google-search
+    volumes:
+      - ./workers:/srv/workers:cached
+      - workers-node-modules:/srv/workers/node_modules
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - axion-crm
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: axion-crm-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+      - app
+    networks:
+      - axion-crm
+
+networks:
+  axion-crm:
+    name: axion-crm
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  caddy-data:
+  caddy-config:
+  frontend-node-modules:
+  workers-node-modules:

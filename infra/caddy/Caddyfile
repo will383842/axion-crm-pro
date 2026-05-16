@@ -1,0 +1,31 @@
+# Axion CRM Pro — Caddy reverse proxy local
+# api.localhost  → backend Laravel
+# app.localhost  → frontend Vite dev / nginx prod
+{
+    auto_https off
+    local_certs
+}
+
+api.localhost {
+    encode zstd gzip
+    reverse_proxy api:80 {
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Real-IP {remote_host}
+    }
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+}
+
+app.localhost {
+    encode zstd gzip
+    reverse_proxy app:5173 {
+        header_up X-Forwarded-Proto {scheme}
+        # WebSocket HMR
+        header_up Connection {>Connection}
+        header_up Upgrade {>Upgrade}
+    }
+}

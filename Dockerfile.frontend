@@ -1,0 +1,46 @@
+# Axion CRM Pro — Dockerfile React 19 + Vite 6 multi-stage
+
+ARG NODE_VERSION=22-alpine
+
+# -----------------------------------------------------------------------------
+# 1) deps : install pnpm + node_modules
+# -----------------------------------------------------------------------------
+FROM node:${NODE_VERSION} AS deps
+RUN corepack enable && corepack prepare pnpm@9 --activate
+WORKDIR /srv/app
+COPY frontend/package.json frontend/pnpm-lock.yaml* ./
+RUN pnpm install --frozen-lockfile || pnpm install
+
+# -----------------------------------------------------------------------------
+# 2) dev : vite dev server (HMR)
+# -----------------------------------------------------------------------------
+FROM node:${NODE_VERSION} AS dev
+RUN corepack enable && corepack prepare pnpm@9 --activate
+WORKDIR /srv/app
+COPY --from=deps /srv/app/node_modules ./node_modules
+COPY frontend/ ./
+ENV NODE_ENV=development
+EXPOSE 5173
+CMD ["pnpm", "dev", "--host", "0.0.0.0"]
+
+# -----------------------------------------------------------------------------
+# 3) builder : build SSG static
+# -----------------------------------------------------------------------------
+FROM node:${NODE_VERSION} AS builder
+RUN corepack enable && corepack prepare pnpm@9 --activate
+WORKDIR /srv/app
+COPY --from=deps /srv/app/node_modules ./node_modules
+COPY frontend/ ./
+ENV NODE_ENV=production
+RUN pnpm build
+
+# -----------------------------------------------------------------------------
+# 4) prod : nginx static + brotli
+# -----------------------------------------------------------------------------
+FROM nginx:1.27-alpine AS prod
+COPY infra/nginx/frontend.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /srv/app/dist /usr/share/nginx/html
+EXPOSE 80
+HEALTHCHECK --interval=30s --timeout=5s --retries=5 \
+    CMD wget -qO- http://localhost/healthz || exit 1
+CMD ["nginx", "-g", "daemon off;"]

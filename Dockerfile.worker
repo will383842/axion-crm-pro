@@ -1,0 +1,50 @@
+# Axion CRM Pro — Dockerfile Worker Node 22 + Playwright multi-stage
+# Chrome stable préinstallé via image officielle Playwright
+
+ARG PLAYWRIGHT_VERSION=v1.49.0-noble
+
+# -----------------------------------------------------------------------------
+# 1) deps : install pnpm + node_modules
+# -----------------------------------------------------------------------------
+FROM mcr.microsoft.com/playwright:${PLAYWRIGHT_VERSION} AS deps
+RUN corepack enable && corepack prepare pnpm@9 --activate
+WORKDIR /srv/workers
+COPY workers/package.json workers/pnpm-lock.yaml* ./
+RUN pnpm install --frozen-lockfile || pnpm install
+
+# -----------------------------------------------------------------------------
+# 2) dev : tsx watch
+# -----------------------------------------------------------------------------
+FROM mcr.microsoft.com/playwright:${PLAYWRIGHT_VERSION} AS dev
+RUN corepack enable && corepack prepare pnpm@9 --activate
+WORKDIR /srv/workers
+COPY --from=deps /srv/workers/node_modules ./node_modules
+COPY workers/ ./
+ENV NODE_ENV=development
+CMD ["pnpm", "dev"]
+
+# -----------------------------------------------------------------------------
+# 3) builder : tsc → dist/
+# -----------------------------------------------------------------------------
+FROM mcr.microsoft.com/playwright:${PLAYWRIGHT_VERSION} AS builder
+RUN corepack enable && corepack prepare pnpm@9 --activate
+WORKDIR /srv/workers
+COPY --from=deps /srv/workers/node_modules ./node_modules
+COPY workers/ ./
+ENV NODE_ENV=production
+RUN pnpm build
+
+# -----------------------------------------------------------------------------
+# 4) prod : node minimal + dist/ + Playwright browsers seulement
+# -----------------------------------------------------------------------------
+FROM mcr.microsoft.com/playwright:${PLAYWRIGHT_VERSION} AS prod
+RUN corepack enable && corepack prepare pnpm@9 --activate
+WORKDIR /srv/workers
+ENV NODE_ENV=production
+COPY workers/package.json workers/pnpm-lock.yaml* ./
+RUN pnpm install --prod --frozen-lockfile || pnpm install --prod
+COPY --from=builder /srv/workers/dist ./dist
+USER pwuser
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD node dist/healthcheck.js || exit 1
+CMD ["node", "dist/main.js"]

@@ -1,0 +1,55 @@
+# Axion CRM Pro — overlay production
+# Usage : `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`
+# Construit en stage `prod` (multi-stage), retire volumes bind, ajoute healthchecks renforcés.
+
+services:
+  api:
+    build:
+      target: prod
+    restart: unless-stopped
+    volumes: []
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost/up || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  horizon:
+    build:
+      target: prod
+    restart: unless-stopped
+    volumes: []
+
+  scheduler:
+    build:
+      target: prod
+    restart: unless-stopped
+    volumes: []
+
+  app:
+    build:
+      target: prod
+    restart: unless-stopped
+    volumes: []
+
+  worker-google-maps:
+    build:
+      target: prod
+    restart: unless-stopped
+    volumes: []
+
+  worker-pages-jaunes:
+    build:
+      target: prod
+    restart: unless-stopped
+    volumes: []
+
+  worker-google-search:
+    build:
+      target: prod
+    restart: unless-stopped
+    volumes: []

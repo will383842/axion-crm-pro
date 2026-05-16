@@ -1,0 +1,79 @@
+# Axion CRM Pro — Dockerfile Laravel 12 + PHP 8.3 multi-stage
+# Stages : composer-deps → php-base → dev → builder → prod
+
+ARG PHP_VERSION=8.3
+ARG COMPOSER_VERSION=2.7
+
+# -----------------------------------------------------------------------------
+# 1) composer-deps : cache des dépendances vendor/
+# -----------------------------------------------------------------------------
+FROM composer:${COMPOSER_VERSION} AS composer-deps
+WORKDIR /app
+COPY backend/composer.json backend/composer.lock* ./
+RUN composer install \
+        --no-dev \
+        --no-scripts \
+        --no-autoloader \
+        --no-interaction \
+        --prefer-dist \
+    || composer install --no-scripts --no-autoloader --no-interaction --prefer-dist
+
+# -----------------------------------------------------------------------------
+# 2) php-base : PHP-FPM + extensions communes
+# -----------------------------------------------------------------------------
+FROM php:${PHP_VERSION}-fpm-alpine AS php-base
+
+RUN apk add --no-cache \
+        bash curl git icu-dev libpng-dev libjpeg-turbo-dev libwebp-dev \
+        oniguruma-dev libzip-dev libxml2-dev postgresql-dev nodejs npm \
+        autoconf g++ make linux-headers \
+    && docker-php-ext-configure intl \
+    && docker-php-ext-install -j$(nproc) \
+        intl pdo pdo_pgsql pgsql opcache bcmath pcntl exif zip gd mbstring \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apk del autoconf g++ make linux-headers \
+    && rm -rf /var/cache/apk/*
+
+COPY --from=composer:2.7 /usr/bin/composer /usr/local/bin/composer
+
+WORKDIR /var/www/html
+
+# -----------------------------------------------------------------------------
+# 3) dev : montage volume bind, opcache off
+# -----------------------------------------------------------------------------
+FROM php-base AS dev
+ENV APP_ENV=local APP_DEBUG=true
+RUN echo "opcache.enable=0" > /usr/local/etc/php/conf.d/zz-opcache-dev.ini
+EXPOSE 80
+# La commande par défaut sera fournie par docker-compose (php-fpm ou artisan).
+CMD ["php", "-S", "0.0.0.0:80", "-t", "public"]
+
+# -----------------------------------------------------------------------------
+# 4) builder : compose autoload + cache config + build front public assets
+# -----------------------------------------------------------------------------
+FROM php-base AS builder
+ENV APP_ENV=production APP_DEBUG=false
+COPY backend/ /var/www/html/
+COPY --from=composer-deps /app/vendor /var/www/html/vendor
+RUN composer dump-autoload --classmap-authoritative --optimize \
+    && php artisan storage:link || true \
+    && php artisan config:cache || true \
+    && php artisan route:cache || true \
+    && php artisan view:cache || true \
+    && chown -R www-data:www-data storage bootstrap/cache
+
+# -----------------------------------------------------------------------------
+# 5) prod : runtime minimal, opcache on
+# -----------------------------------------------------------------------------
+FROM php-base AS prod
+ENV APP_ENV=production APP_DEBUG=false
+RUN echo "opcache.enable=1" > /usr/local/etc/php/conf.d/zz-opcache-prod.ini \
+    && echo "opcache.validate_timestamps=0" >> /usr/local/etc/php/conf.d/zz-opcache-prod.ini \
+    && echo "opcache.preload=/var/www/html/preload.php" >> /usr/local/etc/php/conf.d/zz-opcache-prod.ini
+COPY --from=builder /var/www/html /var/www/html
+USER www-data
+EXPOSE 80
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 \
+    CMD curl -fsS http://localhost/up || exit 1
+CMD ["php", "-S", "0.0.0.0:80", "-t", "public"]

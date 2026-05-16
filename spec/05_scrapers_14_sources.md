@@ -849,46 +849,168 @@ class GoogleSearchWrapper {
 }
 ```
 
-### Scoring de matching (use case LLM `linkedin_url_matching_scoring`)
+### Scoring de matching — règles déterministes puis LLM fallback (P0 audit v1.1)
 
-Évite les homonymes :
+> **Problème v1.0** : 600 k appels LLM/mois pour scorer 3 résultats × 200 k entreprises = ~480 €/mois (dépasse cap LLM workspace).
+> **Correction v1.1** : règles déterministes d'abord (50-70 % des cas résolus), LLM uniquement pour les cas ambigus (estimé 200 k appels/mois, ~160 €/mois économisés).
 
 ```typescript
 async function scoreLinkedinMatch(target: SearchQuery, result: SerpResult): Promise<number> {
+  // === Phase 1 : règles déterministes (zéro coût LLM) ===
   let score = 0
   const urlSegment = result.url.toLowerCase()
   const snippet = result.snippet.toLowerCase()
-  const companyLow = target.companyName.toLowerCase()
+  const companyLow = normalize(target.companyName)
+  const companyTokens = companyLow.split(/\s+/).filter(t => t.length > 3)
 
-  // 1. Company name in snippet
+  // 1. Company exact match dans snippet → +40
   if (snippet.includes(companyLow)) score += 40
+  // 1b. Tokens entreprise dans snippet (au moins 2 tokens significatifs)
+  else if (companyTokens.filter(t => snippet.includes(t)).length >= 2) score += 25
 
   // 2. Person name in URL
-  if (target.firstName && urlSegment.includes(target.firstName.toLowerCase())) score += 15
-  if (target.lastName && urlSegment.includes(target.lastName.toLowerCase())) score += 25
+  if (target.firstName && urlSegment.includes(normalize(target.firstName))) score += 15
+  if (target.lastName && urlSegment.includes(normalize(target.lastName))) score += 25
 
   // 3. Person name in snippet
-  if (target.lastName && snippet.includes(target.lastName.toLowerCase())) score += 10
+  if (target.lastName && snippet.includes(normalize(target.lastName))) score += 10
 
   // 4. City in snippet (if available)
-  if (target.city && snippet.includes(target.city.toLowerCase())) score += 5
+  if (target.city && snippet.includes(normalize(target.city))) score += 5
 
-  // 5. LLM final scoring (covers nuances : société proche, ex-employé, etc.)
+  // === Cas évident : 85+ ou ≤30 → décision sans LLM ===
+  if (score >= 85) return Math.min(100, score)         // match certain
+  if (score <= 30) return score                          // rejet certain
+  if (target.target === 'company' && score >= 70) return score  // company match plus tolerant
+
+  // === Phase 2 : LLM uniquement pour la zone grise (35-84) ===
+  // Use case Mistral Small + cache fort. Estimé 30-40 % des résultats.
   const llmScore = await llmClient.complete({
-    useCase: 'linkedin_url_matching_scoring',
-    variables: { target, result },
+    useCaseSlug: 'linkedin_url_matching_scoring',
+    variables: { target, result, deterministic_score: score },
+    bypassCache: false,
   })
-  score += parseInt(llmScore.text) * 0.05  // boost ou pénalité LLM jusqu'à ±5
+  const adjust = parseInt(llmScore.text) - 50   // LLM retourne 0-100, on convertit en delta -50..+50
+  score = Math.max(0, Math.min(100, score + adjust * 0.3))   // bornage et atténuation
 
-  return Math.min(100, Math.max(0, score))
+  return score
+}
+
+function normalize(s: string): string {
+  return s.toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')   // unaccent
+    .replace(/[^\w\s]/g,'')
+    .replace(/\s+/g,' ')
+    .trim()
 }
 ```
 
-### Détection captcha & rotation
+**Impact budget LLM (P0 audit) :**
+- Avant : 600 k appels Mistral Small × ~0.0008 € = 480 €/mois
+- Après : ~200 k appels (35 % zone grise) = 160 €/mois
+- **Économie : 320 €/mois.**
 
-États moteur (`search_engines.state`):
+### Anti-bot durci (P0 audit v1.1)
+
+> **Problème v1.0** : la spec ne mentionnait que stealth + UA rotation + cool-down. Insuffisant face à Google qui utilise Canvas/WebGL/Audio fingerprinting + reCAPTCHA v3 invisible + "unusual traffic" interstitiels non-captcha.
+
+**Configuration browser context durcie :**
+
+```typescript
+// workers/src/scrapers/utils/google-context.ts
+import { chromium } from 'playwright-extra'
+import stealth from 'puppeteer-extra-plugin-stealth'
+import recaptcha from 'puppeteer-extra-plugin-recaptcha'
+import anonymizeUA from 'puppeteer-extra-plugin-anonymize-ua'
+import fingerprintRandomizer from 'puppeteer-extra-plugin-fingerprint-randomizer'
+
+chromium.use(stealth())
+chromium.use(anonymizeUA())
+chromium.use(fingerprintRandomizer({
+  canvas: { randomize: true },          // P0 audit : Canvas FP
+  webgl:  { randomize: true },          // P0 audit : WebGL FP
+  audio:  { randomize: true },          // P0 audit : Audio FP
+}))
+chromium.use(recaptcha({
+  provider: { id: '2captcha', token: process.env.CAPTCHA_TOKEN },
+  visualFeedback: false,
+}))
+
+export async function buildGoogleContext(ua: UserAgent, proxy: ProxyData, sessionId: string) {
+  const browser = await chromium.launch({ proxy: { server: proxy.proxyUrl } })
+
+  // P0 audit : cookie warehouse persistance par sticky session (30 min IPRoyal)
+  const storagePath = `/app/cookie-warehouse/${sessionId}.json`
+  const storageState = await fileExists(storagePath)
+    ? JSON.parse(await fs.readFile(storagePath, 'utf8'))
+    : undefined
+
+  return await browser.newContext({
+    userAgent: ua.userAgent,
+    locale: 'fr-FR',
+    timezoneId: 'Europe/Paris',
+    viewport: { width: 1920, height: 1080 },
+    storageState,                         // restaure cookies si dispo
+    extraHTTPHeaders: {
+      'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+      'Sec-Ch-Ua-Platform': '"Windows"',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-User': '?1',
+      'Sec-Fetch-Dest': 'document',
+      'Upgrade-Insecure-Requests': '1',
+      'DNT': '1',
+    },
+  })
+}
+
+// Mouse movements simulés avant click
+export async function humanClick(page: Page, selector: string): Promise<void> {
+  const box = await page.locator(selector).first().boundingBox()
+  if (!box) throw new Error('selector_not_visible')
+  const target = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+  // Mouvement en 20-30 étapes avec micro-pauses
+  await page.mouse.move(target.x + 200, target.y - 150)
+  await page.waitForTimeout(rand(80, 200))
+  await page.mouse.move(target.x, target.y, { steps: rand(20, 35) })
+  await page.waitForTimeout(rand(50, 150))
+  await page.mouse.click(target.x, target.y)
+}
+
+// Sauvegarde cookies en fin de session (cookie warehouse)
+export async function persistCookies(ctx: BrowserContext, sessionId: string) {
+  const state = await ctx.storageState()
+  await fs.writeFile(`/app/cookie-warehouse/${sessionId}.json`, JSON.stringify(state))
+}
+```
+
+**Détection "unusual traffic" (P0 audit) :**
+
+```typescript
+async function detectAntiBot(page: Page): Promise<'ok'|'captcha_v2'|'captcha_v3'|'unusual_traffic'|'cf_challenge'> {
+  if (await page.locator('form[action*="captcha"]').isVisible({timeout:500}).catch(()=>false))   return 'captcha_v2'
+  if (await page.locator('.g-recaptcha[data-size="invisible"]').count() > 0)                       return 'captcha_v3'
+  if (await page.locator('text=Our systems have detected unusual traffic').isVisible({timeout:500}).catch(()=>false)) return 'unusual_traffic'
+  if (await page.locator('text=Trafic inhabituel détecté').isVisible({timeout:500}).catch(()=>false))                 return 'unusual_traffic'
+  if (await page.locator('.cf-browser-verification, #cf-challenge').isVisible({timeout:500}).catch(()=>false))        return 'cf_challenge'
+  return 'ok'
+}
+```
+
+**Si `unusual_traffic` détecté :** marque moteur en `captcha_challenge` immédiatement + cooldown 60 min (vs 30 min captcha v2). Le pattern revient toutes les ~50 requêtes par IP, donc nécessite IP fraîche.
+
+**2captcha intégration OBLIGATOIRE (P0 audit) :**
+- Budget estimé : 30-50 €/mois (vs "optionnel" v1.0)
+- Auto-résolution reCAPTCHA v2 visible (90 % cases)
+- reCAPTCHA v3 invisible : pas résolu par 2captcha, seule rotation IP fonctionne
+
+### États moteur (`search_engines.state`)
+
 - `active` — utilisable
-- `captcha_challenge` — captcha détecté, cooldown 30 min
+- `captcha_v2_solving` — captcha v2 en cours résolution 2captcha (~30s)
+- `captcha_v3_blocked` — captcha v3 invisible détecté, cooldown 60 min
+- `unusual_traffic` — interstitiel Google, cooldown 60 min
+- `cf_challenge` — Cloudflare JS challenge, fallback proxy résidentiel premium
 - `rate_limited` — 429 détecté, cooldown 15 min
 - `cooldown` — manual disable
 - `disabled` — disabled forever
@@ -1387,12 +1509,35 @@ function dedupCLevel(found: TeamMember[]): TeamMember[] {
 - `contacts` (UPSERT C-level trouvés, `discovery_source = 'direction_finder'`)
 - `linkedin_url_searches` (transitif via Google Search Wrapper)
 
-### Taux de succès attendu
+### Robustesse durcie (P0/P1 audit v1.1)
 
-| Taille | Sans DF | Avec DF |
-|--------|---------|---------|
-| ETI 250-4999 | 5-15% | **25-40%** |
-| Grandes 5000+ | 2-8% | **8-15%** |
+> **P0** : utiliser **Webshare datacenter** pour les sites corporate (95 % cas suffisant, sites publics). Résidentiel uniquement pour les Source 4 (Google Search étendu). Économie ~700 €/mo proxies.
+
+> **P0** : cap download PDF rapport annuel à **10 MB** (`Content-Length` header check, abort si dépasse). Évite de tirer un PDF de 200 MB qui plombe la bande passante.
+
+```typescript
+async function downloadPdf(url: string): Promise<Buffer | null> {
+  const head = await undici.fetch(url, { method: 'HEAD' })
+  const len = parseInt(head.headers.get('content-length') ?? '0')
+  if (len > 10 * 1024 * 1024) {
+    logger.warn({ url, sizeBytes: len }, 'pdf_too_large_skipped')
+    return null
+  }
+  const resp = await undici.fetch(url)
+  return Buffer.from(await resp.arrayBuffer())
+}
+```
+
+> **P1** : fallback explicite « no directory page found ». Si les 25 paths corporate testés retournent tous 404 ou page sans `.team-member` parsable, marquer `direction_finder_runs.status = 'ok'` avec `metadata.fallback_used = 'no_directory_page'` et passer directement à la Source 4 (Google Search étendu). Marquer l'entreprise `needs_manual_review = true` si même Source 4 ne trouve rien.
+
+### Taux de succès attendu (à valider POC #3)
+
+| Taille | Sans DF | Avec DF (cible v1.0 optimiste) | Avec DF (cible v1.1 prudente) |
+|--------|---------|--------------------------------|-------------------------------|
+| ETI 250-4999 | 5-15% | 25-40% | **20-30%** |
+| Grandes 5000+ | 2-8% | 8-15% | **5-12%** |
+
+> **POC #3 obligatoire** (cf. `AUDIT_v1.md` § 13) : valider taux réel sur 20 ETI test avant chiffrer.
 
 ---
 

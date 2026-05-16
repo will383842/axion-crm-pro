@@ -151,7 +151,7 @@ Pas commercialisé. Pas SaaS. 100 % interne. RGPD + AI Act-friendly (intérêt l
 - **Conservation données scraping** : 90 jours max après dernière utilisation, auto-purge.
 - **Droit accès/suppression** : transaction multi-tables atomique, < 30 j (cf. `17_rgpd_aiact_owasp.md`).
 - **DPO** : `contact@axion-ia.com`.
-- **AI Act** : tous les use cases de profilage automatisé (`fiche_quality_scoring`, `ia_maturity_scoring`, `axion_offer_match`) documentés en table `ai_act_register`.
+- **AI Act** : tous les use cases de profilage automatisé (`classify_company_axion` v1.1 mergé, anciennement `ia_maturity_scoring` + `axion_offer_match` v1.0) documentés en table `ai_act_register`. Le scoring qualité de fiche (🟢/🟡/🔴) est **déterministe SQL**, pas LLM, donc pas concerné par AI Act profilage automatisé.
 
 ### Pour le futur Phase 2
 

@@ -187,52 +187,53 @@ class ClassifierService
 {
     public function classify(Company $company): array
     {
-        $context = $this->buildContext($company);   // company + signals + keywords + website excerpt
+        // P0 audit v1.1 : recalcule d'abord la catégorie taille (6 catégories)
+        DB::statement('SELECT compute_size_category(?::uuid)', [$company->id]);
+        $company->refresh();
 
-        // 1. Maturité IA
-        $maturity = $this->llm->complete(new LLMRequestData(
-            useCaseSlug: 'ia_maturity_scoring',
+        $context = $this->buildContext($company);   // company + signals + keywords + ext_website_excerpt
+
+        // 1. Classification Axion mergée (v1.1) : maturité + offre + priorité en 1 appel
+        $classify = $this->llm->complete(new LLMRequestData(
+            useCaseSlug: 'classify_company_axion',
             variables: $context,
         ));
-        $maturityData = json_decode($maturity->text, true);
+        $classifyData = json_decode($classify->text, true);
+        $maturityData = $classifyData['ia_maturity'];
+        $offerData    = $classifyData['axion_offer_match'];
+        $priority     = $classifyData['priority'];
 
-        // 2. Offre Axion-IA matchée
-        $offer = $this->llm->complete(new LLMRequestData(
-            useCaseSlug: 'axion_offer_match',
-            variables: array_merge($context, ['maturity' => $maturityData]),
-        ));
-        $offerData = json_decode($offer->text, true);
-
-        // 3. Auto tags
+        // 2. Auto tags
         $tags = $this->llm->complete(new LLMRequestData(
             useCaseSlug: 'auto_tag_generation',
             variables: array_merge($context, ['maturity' => $maturityData, 'offer' => $offerData]),
         ));
         $tagsArr = json_decode($tags->text, true);
 
-        // 4. Mots-clés stratégiques
+        // 3. Mots-clés stratégiques
         $kw = $this->llm->complete(new LLMRequestData(
             useCaseSlug: 'extract_strategic_keywords',
             variables: $context,
         ));
         $kwArr = json_decode($kw->text, true);
 
-        // Save
+        // Save (v1.1 : priorité directement depuis LLM, pas dérivée du score)
         $company->update([
             'ia_maturity_score'        => $maturityData['score'],
             'ia_maturity_label'        => $maturityData['label'],
             'axion_offer_match_code'   => $offerData['offer_code'],
             'axion_offer_match_score'  => $offerData['score'],
-            'priority_label'           => $this->priorityFromOffer($offerData['score']),
+            'priority_label'           => $priority,
             'auto_tags'                => $tagsArr['tags'] ?? [],
         ]);
 
         // INSERT mots-clés stratégiques détectés
         $this->saveStrategicKeywords($company, $kwArr);
 
-        return compact('maturityData', 'offerData', 'tagsArr', 'kwArr');
+        return compact('maturityData', 'offerData', 'priority', 'tagsArr', 'kwArr');
     }
 
+    // v1.1 : priorité directement depuis LLM (cf. classify_company_axion). Méthode conservée comme fallback.
     private function priorityFromOffer(int $score): string
     {
         return match (true) {

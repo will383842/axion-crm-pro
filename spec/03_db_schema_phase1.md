@@ -674,14 +674,29 @@ CREATE TABLE auto_tag_definitions (
 
 ### `companies`
 
+> **Audit P0 #4 — Multi-country ready dès V1.** L'identifiant national n'est plus `siren CHAR(9)` hardcodé format INSEE FR, mais un couple `country_id + national_id` portable :
+> - 🇫🇷 FR : `national_id = SIREN` (9 chiffres) — column virtuelle `siren` calculée pour rétrocompatibilité requêtes
+> - 🇧🇪 BE : `national_id = BCE` (10 chiffres avec points : `0123.456.789`)
+> - 🇨🇭 CH : `national_id = IDE` (`CHE-123.456.789`)
+> - 🇩🇪 DE : `national_id = HRB / VAT-DE` selon contexte
+> - 🇪🇸 ES : `national_id = NIF/CIF`
+>
+> Ainsi V1 fonctionne en FR (default workspace) sans changement applicatif, mais l'extension Belgique/Suisse/Allemagne en Phase 2 = 0 refactor DB.
+
 ```sql
 CREATE TABLE companies (
   id                  BIGSERIAL PRIMARY KEY,
   uuid                UUID NOT NULL DEFAULT uuid_generate_v4() UNIQUE,
   workspace_id        BIGINT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  siren               CHAR(9) UNIQUE,
-  siret_head          CHAR(14),
-  vat_number          VARCHAR(20),
+  country_id          BIGINT NOT NULL REFERENCES countries(id) DEFAULT 1, -- FR = id 1 seeded
+  national_id         VARCHAR(20),                       -- SIREN (FR), BCE (BE), IDE (CH), HRB (DE)...
+  national_id_format  VARCHAR(20) NOT NULL DEFAULT 'siren-fr',  -- 'siren-fr' | 'bce-be' | 'ide-ch' | 'hrb-de' | ...
+  -- Column virtuelle SIREN pour rétrocompatibilité requêtes FR (les seuls workspaces V1)
+  siren               CHAR(9) GENERATED ALWAYS AS (
+                        CASE WHEN national_id_format = 'siren-fr' THEN LEFT(national_id, 9) ELSE NULL END
+                      ) STORED,
+  siret_head          CHAR(14),                          -- spécifique FR, NULL hors FR
+  vat_number          VARCHAR(20),                       -- portable EU (FRxx, BExx, DExx...)
   legal_name          VARCHAR(255) NOT NULL,
   trade_name          VARCHAR(255),
   legal_form_id       BIGINT REFERENCES legal_forms(id),
@@ -689,10 +704,11 @@ CREATE TABLE companies (
   effectif_estimated  INTEGER,
   revenue_eur         BIGINT,                            -- dernier CA connu
   revenue_year        SMALLINT,
-  naf_subclass_id     BIGINT REFERENCES naf_subclasses(id),
+  -- Classification métier : NAF FR ou NACE EU (préparation Phase 2)
+  naf_subclass_id     BIGINT REFERENCES naf_subclasses(id),   -- NULL hors FR (utiliser nace_code)
   naf_code            VARCHAR(7),
+  nace_code           VARCHAR(8),                        -- NACE Rev. 2 européen (5+ caractères) — Phase 2 portabilité
   city_id             BIGINT REFERENCES cities(id),
-  country_id          BIGINT NOT NULL REFERENCES countries(id) DEFAULT 1, -- FR
   registered_at       DATE,
   website             VARCHAR(255),
   description         TEXT,
@@ -721,7 +737,11 @@ CREATE TABLE companies (
   deleted_at          TIMESTAMPTZ
 );
 CREATE INDEX companies_ws_idx ON companies (workspace_id) WHERE deleted_at IS NULL;
-CREATE INDEX companies_siren_idx ON companies (siren) WHERE siren IS NOT NULL;
+-- Identifiant national portable (FR/BE/CH/DE/ES/...)
+CREATE UNIQUE INDEX companies_country_national_id_idx ON companies (country_id, national_id) WHERE national_id IS NOT NULL AND deleted_at IS NULL;
+CREATE INDEX companies_siren_idx ON companies (siren) WHERE siren IS NOT NULL;  -- rétrocompat FR
+CREATE INDEX companies_vat_idx ON companies (vat_number) WHERE vat_number IS NOT NULL;
+CREATE INDEX companies_nace_idx ON companies (nace_code) WHERE nace_code IS NOT NULL;
 CREATE INDEX companies_city_idx ON companies (city_id);
 CREATE INDEX companies_naf_idx ON companies (naf_subclass_id);
 CREATE INDEX companies_offer_priority_idx ON companies (workspace_id, axion_offer, priority_score)

@@ -77,8 +77,9 @@
 | 22 | `21_couts_roadmap.md` | Tableau coûts mensuels détaillé + roadmap 12 semaines avec critères « done » | ~600 |
 | 23 | `22_risques_mitigations.md` | Top 15 risques techniques + légaux + opérationnels avec mitigation chacun | ~700 |
 | 24 | `23_interfaces_phase2_execution_pack.md` | Interfaces Phase 2 + Code Gen Roadmap 12 étapes + Tests AC + Seeders + 12 prompts Claude Code prêts à l'emploi | ~2000 |
+| 25 | `24_frontend_design_system.md` (**v1.2**) | Design tokens + empty/loading states + error boundaries + toast + form patterns + responsive mobile/tablette/desktop + onboarding + saved views + notifications + ⌘K + print PDF | ~1500 |
 
-**Volume total estimé :** ~20 000 lignes / ~60 000 mots de spec dense.
+**Volume total estimé v1.2 :** ~22 000 lignes / ~67 000 mots de spec dense.
 
 ---
 

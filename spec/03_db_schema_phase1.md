@@ -1504,6 +1504,35 @@ CREATE TABLE ai_act_register (
 
 ---
 
+## §11bis-pre — Saved views utilisateur (v1.2 — frontend)
+
+```sql
+CREATE TABLE user_saved_views (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace_id    UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    page_slug       TEXT NOT NULL,                       -- 'companies'|'contacts'|'scraper_runs'|...
+    label           TEXT NOT NULL,
+    filters         JSONB NOT NULL,                      -- structure URL params Spatie Query Builder
+    columns         TEXT[],                              -- columns visibles
+    sort            TEXT,                                -- ex: '-updated_at'
+    is_default      BOOLEAN NOT NULL DEFAULT false,
+    is_shared       BOOLEAN NOT NULL DEFAULT false,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (workspace_id, user_id, page_slug, label)
+);
+CREATE INDEX idx_saved_views_user_page ON user_saved_views (user_id, page_slug);
+CREATE INDEX idx_saved_views_shared ON user_saved_views (workspace_id, page_slug) WHERE is_shared = true;
+
+ALTER TABLE user_saved_views ENABLE ROW LEVEL SECURITY;
+CREATE POLICY workspace_isolation ON user_saved_views
+    USING (workspace_id = current_setting('app.current_workspace_id', true)::uuid)
+    WITH CHECK (workspace_id = current_setting('app.current_workspace_id', true)::uuid);
+```
+
+---
+
 ## §11bis — Anomalies (monitoring & alertes — P0 audit)
 
 ```sql
@@ -1814,8 +1843,9 @@ CREATE POLICY workspace_isolation ON prompt_template_versions
 | 9 | LLM Router | 5 | `llm_usage` |
 | 10 | Coverage tracking | 2 (dont 1 MV) | — |
 | 11 | Anomalies (P0 audit) | 1 | — |
+| 11bis | Saved views (v1.2 frontend) | 1 | — |
 | 12 | RGPD | 3 | — |
-| **Total** | | **65 tables Phase 1** | **5 partitionnées** |
+| **Total** | | **66 tables Phase 1** | **5 partitionnées** |
 
 > Le prompt parlait de « ~32 tables ». Le compte réel (65 v1.1, vs 63 v1.0) reflète les sous-tables nécessaires (NAF 5 niveaux, social handles séparé, signals séparé, anomalies, naf_artisanat_flags pour 6 catégories taille). Cohérent avec la complexité métier.
 
@@ -1890,6 +1920,7 @@ Ordre d'exécution recommandé (sera matérialisé en `database/migrations/` Pha
 2026_05_16_001010_create_gdpr_requests.php
 2026_05_16_001020_create_ai_act_register.php
 2026_05_16_001100_create_anomalies.php              -- P0 audit
+2026_05_16_001150_create_user_saved_views.php       -- v1.2 frontend
 2026_05_16_001200_create_sql_functions_phase1.php   -- compute_size_category + recompute_company_quality_score + triggers
 2026_05_16_001900_enable_rls_policies.php           -- toutes les ENABLE RLS + CREATE POLICY
 ```

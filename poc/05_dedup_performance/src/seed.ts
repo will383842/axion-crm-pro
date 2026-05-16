@@ -8,6 +8,8 @@ import 'dotenv/config'
 import { Client } from 'pg'
 import { from as copyFrom } from 'pg-copy-streams'
 import { randomUUID } from 'node:crypto'
+import { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
 
 const TOTAL_ROWS = parseInt(process.env.SEED_ROWS_TOTAL ?? '10000000')
 const TOTAL_COMPANIES = parseInt(process.env.SEED_COMPANIES ?? '100000')
@@ -18,33 +20,39 @@ const STATUSES_WEIGHTED = ['ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'failed', '
 const WORKSPACE_ID = '11111111-1111-1111-1111-111111111111'
 
 function randomDateInPastMonths(months: number): Date {
+  // Garde 1 mois de marge pour rester dans les partitions créées (Postgres ne crée pas auto la partition manquante).
   const now = Date.now()
-  const offset = Math.random() * months * 30 * 24 * 3600 * 1000
+  const maxDays = Math.max(1, (months - 1)) * 28          // 28 jours/mois pour rester safe
+  const offset = Math.random() * maxDays * 24 * 3600 * 1000
   return new Date(now - offset)
 }
 
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]! }
 
 async function seedCompanies(c: Client, companyIds: string[]): Promise<void> {
-  console.log(`Seeding ${TOTAL_COMPANIES} companies...`)
+  console.log(`Seeding ${TOTAL_COMPANIES} companies (Readable + pipeline) ...`)
   const t0 = Date.now()
   const stream: any = c.query(copyFrom(
     `COPY companies (id, workspace_id, siren, legal_name, city_insee) FROM STDIN WITH (FORMAT csv, DELIMITER ',')`
   ))
-  for (let i = 0; i < TOTAL_COMPANIES; i++) {
-    const id = randomUUID()
-    companyIds.push(id)
-    const siren = String(100000000 + i)
-    const name = `TEST Company ${i}`
-    const city = String(75000 + Math.floor(Math.random() * 20000)).slice(0, 5)
-    const ok = stream.write(`${id},${WORKSPACE_ID},${siren},${name},${city}\n`)
-    if (!ok) await new Promise<void>(resolve => stream.once('drain', resolve))
-  }
-  await new Promise<void>((resolve, reject) => {
-    stream.end()
-    stream.once('finish', resolve)
-    stream.once('error', reject)
+  let i = 0
+  const reader = new Readable({
+    read() {
+      // Push par chunks de 5000 lignes pour amortir overhead
+      const chunk: string[] = []
+      const target = Math.min(i + 5000, TOTAL_COMPANIES)
+      for (; i < target; i++) {
+        const id = randomUUID()
+        companyIds.push(id)
+        const siren = String(100000000 + i)
+        const city = String(75000 + Math.floor(Math.random() * 20000)).slice(0, 5)
+        chunk.push(`${id},${WORKSPACE_ID},${siren},TEST Company ${i},${city}\n`)
+      }
+      if (chunk.length > 0) this.push(chunk.join(''))
+      if (i >= TOTAL_COMPANIES) this.push(null)
+    },
   })
+  await pipeline(reader, stream)
   console.log(`  → ${TOTAL_COMPANIES} companies seeded in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
 }
 
@@ -74,35 +82,37 @@ async function recreateIndexes(c: Client): Promise<void> {
 }
 
 async function seedScraperRuns(c: Client, companyIds: string[]): Promise<void> {
-  console.log(`Seeding ${TOTAL_ROWS} scraper_runs (COPY FROM STDIN, indexes dropped, direct write + backpressure)...`)
+  console.log(`Seeding ${TOTAL_ROWS} scraper_runs (Readable chunks + pipeline, indexes dropped) ...`)
   const t0 = Date.now()
   const stream: any = c.query(copyFrom(
     `COPY scraper_runs (workspace_id, source, target_id, target_type, started_at, completed_at, status, duration_ms) FROM STDIN WITH (FORMAT csv, DELIMITER ',')`
   ))
-
-  // Écriture directe sur stream Writable avec drain handling = pas d'OOM même à 100M rows.
-  for (let i = 0; i < TOTAL_ROWS; i++) {
-    const targetId = companyIds[Math.floor(Math.random() * companyIds.length)]!
-    const source = pick(SOURCES)
-    const status = pick(STATUSES_WEIGHTED)
-    const startedAt = randomDateInPastMonths(SEED_MONTHS).toISOString()
-    const duration = 1000 + Math.floor(Math.random() * 30000)
-    const completedAt = new Date(new Date(startedAt).getTime() + duration).toISOString()
-    const ok = stream.write(`${WORKSPACE_ID},${source},${targetId},company,${startedAt},${completedAt},${status},${duration}\n`)
-    if (!ok) {
-      await new Promise<void>(resolve => stream.once('drain', resolve))
-    }
-    if (i > 0 && i % 200000 === 0) {
-      const elapsed = (Date.now() - t0) / 1000
-      const rate = Math.round(i / elapsed)
-      console.log(`  ${(i / 1_000_000).toFixed(1)} M rows written (${elapsed.toFixed(0)}s, ${rate} rows/s)`)
-    }
-  }
-  await new Promise<void>((resolve, reject) => {
-    stream.end()
-    stream.once('finish', resolve)
-    stream.once('error', reject)
+  let i = 0
+  let lastLog = 0
+  const reader = new Readable({
+    read() {
+      const chunk: string[] = []
+      const target = Math.min(i + 10000, TOTAL_ROWS)
+      for (; i < target; i++) {
+        const targetId = companyIds[Math.floor(Math.random() * companyIds.length)]!
+        const source = pick(SOURCES)
+        const status = pick(STATUSES_WEIGHTED)
+        const startedAt = randomDateInPastMonths(SEED_MONTHS).toISOString()
+        const duration = 1000 + Math.floor(Math.random() * 30000)
+        const completedAt = new Date(new Date(startedAt).getTime() + duration).toISOString()
+        chunk.push(`${WORKSPACE_ID},${source},${targetId},company,${startedAt},${completedAt},${status},${duration}\n`)
+      }
+      if (chunk.length > 0) this.push(chunk.join(''))
+      if (i >= TOTAL_ROWS) this.push(null)
+      if (i - lastLog >= 500000 || i >= TOTAL_ROWS) {
+        const elapsed = (Date.now() - t0) / 1000
+        const rate = Math.round(i / Math.max(0.1, elapsed))
+        console.log(`  ${(i / 1_000_000).toFixed(1)} M rows pushed (${elapsed.toFixed(0)}s, ${rate} rows/s)`)
+        lastLog = i
+      }
+    },
   })
+  await pipeline(reader, stream)
   console.log(`  → ${TOTAL_ROWS} scraper_runs seeded in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
 }
 

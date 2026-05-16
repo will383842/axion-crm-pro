@@ -39,6 +39,10 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // Healthcheck HTTP server (port 9100, /healthz /readyz /metrics)
+  const { startHealthcheckServer } = await import('./healthcheck-server');
+  startHealthcheckServer();
+
   log.info({ type, mockMode: process.env['MOCK_MODE'] }, 'Worker booting');
   await factory();
 }

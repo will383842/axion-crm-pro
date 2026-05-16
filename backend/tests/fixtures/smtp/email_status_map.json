@@ -1,0 +1,12 @@
+{
+  "marie.dupont@example.com": "valid",
+  "jean.martin@example.com": "valid",
+  "contact@example.com": "role",
+  "info@example.com": "role",
+  "noreply@example.com": "role",
+  "user@mailinator.com": "disposable",
+  "test@trashmail.com": "disposable",
+  "bounce@example.com": "invalid",
+  "unknown@catchall-domain.com": "catchall",
+  "axion-ia-test@axion-ia.com": "valid"
+}

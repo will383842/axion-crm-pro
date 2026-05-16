@@ -1,0 +1,5 @@
+{
+  "text": "{\"ia_maturity\":{\"score\":62,\"label\":\"en_cours\",\"justification\":\"Site mentions cloud migration + ML keywords\"},\"axion_offer_match\":{\"offer_code\":\"mission_pme\",\"score\":78,\"justification\":\"PME 50-100 employees in tech sector — Mission PME fit\"},\"priority\":\"haute\"}",
+  "tokens_input": 1200,
+  "tokens_output": 180
+}

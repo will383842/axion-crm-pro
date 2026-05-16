@@ -1,114 +1,127 @@
 # Axion CRM Pro
 
-Plateforme B2B de prospection automatisée pour Axion-IA.
+Plateforme B2B de prospection automatisée pour Axion-IA. Interne, multi-tenant ready, RGPD/AI Act compliant, Phase 1 complète + Phase 2 scaffold.
 
-## Description
+## Démarrage local 5 minutes
 
-Outil de scraping + enrichissement + future Phase 2 cold email/LinkedIn outreach. Console admin unique pour piloter toute la prospection sans SSH, sans code, sans outil tiers.
+```bash
+# 1. Clone + .env
+git clone https://github.com/will383842/axion-crm-pro.git
+cd axion-crm-pro
+cp .env.example .env
 
-## Cible
+# 2. Démarrer la stack (Postgres + Redis + Caddy + api + horizon + scheduler + app + workers)
+docker compose up -d
 
-TPE/PME françaises (1-50 salariés) en priorité, mais le système couvre **toutes les tailles** :
+# 3. Migrations + seeders (mode mocks + démo)
+docker exec axion-crm-api php artisan key:generate
+docker exec axion-crm-api php artisan migrate:fresh --seed
 
-- Artisans + Commerçants (1-9 salariés) — ~1,5M entités
-- TPE (1-19 salariés) — ~4M entreprises
-- PME (20-249) — ~150 k entreprises
-- ETI (250-4999) — ~6 000 entreprises (activation **Direction Finder** automatique)
-- Grandes (5000+) — ~280 entreprises (Direction Finder + best-effort)
-- Écoles + universités + CFA (en complément formations IA)
+# 4. Accéder
+# - API : https://api.localhost/up           (200 OK)
+# - App : https://app.localhost              (login form)
+# - Docs: https://api.localhost/docs         (Swagger UI)
+# - Horizon : https://api.localhost/horizon  (queues)
+```
 
-Décideur cible variable selon la taille (dirigeant légal pour TPE/PME, C-level pour ETI/Grandes via Direction Finder).
+**Mocks** : `MOCK_MODE=true` par défaut → aucun appel réseau réel, aucun coût provider.
 
 ## Stack
 
-- **Backend** — Laravel 12 + PHP 8.3 + PostgreSQL 16 (pg_trgm, postgis, pgvector, pg_partman) + Redis 7 + Horizon + Sanctum
-- **Frontend** — React 19 + TypeScript 5.6 + Vite 6 + Tailwind 4 + shadcn/ui + MapLibre GL JS 4 + TanStack Query/Virtual
-- **Workers** — Node.js 22 LTS + Playwright 1.49+ (Chromium) + playwright-extra stealth — pour les scrapers headless
-- **Hosting** — Hetzner Cloud Frankfurt (UE/RGPD), compte Hetzner **dédié** (isolation totale d'axion-ia.com)
-- **Monitoring** — Grafana + Prometheus + Loki + Tempo + GlitchTip + Uptime Kuma (auto-hébergés)
+- **Backend** — Laravel 12 + PHP 8.3 + PostgreSQL 16 (pg_trgm, postgis, pgvector, pg_partman, citext) + Redis 7 + Horizon + Sanctum + Spatie Permission v6 (teams)
+- **Frontend** — React 19 + TypeScript 5.6 + Vite 6 + Tailwind 4 + TanStack Router/Query + MapLibre GL JS 4 + shadcn/ui
+- **Workers** — Node 22 LTS + Playwright 1.49 + BullMQ + cheerio + pino
+- **Hosting** — Hetzner Cloud Frankfurt (UE/RGPD), Coolify v4 PaaS, Caddy 2 reverse proxy
+- **Observabilité** — Prometheus + Grafana + Loki + Tempo + GlitchTip + Uptime Kuma
 
-## Sources de données (14, 100 % gratuites)
+## 14 sources de données (100 % gratuites)
 
-INSEE Sirene · annuaire-entreprises.data.gouv.fr (remplace Pappers) · Infogreffe · Societe.com · BODACC · Google Maps · Pages Jaunes · Sites web entreprises · **Google Search Wrapper** (remplace PhantomBuster pour URLs LinkedIn) · France Travail · MESRI/ONISEP · Crunchbase · BAN (api-adresse) · Social light.
-
-**Aucun abonnement payant** : pas de Pappers, pas de PhantomBuster, pas de Sales Navigator, pas d'Apollo/Lusha/Kaspr.
+INSEE Sirene · annuaire-entreprises.data.gouv.fr · Infogreffe · Societe.com · BODACC · Google Maps · Pages Jaunes · sites web · Google Search Wrapper · France Travail · MESRI/ONISEP · Crunchbase · BAN · social light.
 
 ## Anti-doublon strict (6 niveaux)
 
-1. Entreprise par SIREN (unique composite `workspace_id, siren`)
-2. Contact par hash normalisé `prenom + nom + company_id`
-3. Scraping jobs par TTL configurable par source (`scraper_runs`)
-4. Coverage cells avec cooldown 24 h
-5. Validation email avec TTL 30 j
-6. Opt-out cross-workspace (RGPD)
+1. Entreprise par SIREN (UNIQUE workspace_id, siren)
+2. Contact par hash normalisé (`normalized_hash` GENERATED Postgres)
+3. Scraping jobs par TTL configurable par source (7d → 365d)
+4. Coverage cells cooldown 24h (`coverage_zones`)
+5. Validation email TTL 30j (`email_validations`)
+6. Opt-out cross-workspace (RGPD global)
 
-## Scoring qualité des fiches
+## Sprints livrés (12/12)
 
-Chaque entreprise scrapée reçoit un score :
+| Sprint | Livré | Statut |
+|--------|-------|--------|
+| S1 Bootstrap | infra + backend + frontend + workers + CI | ✅ |
+| S2 DB migrations + RLS + seeders | 9 migrations Phase 1+2 + 13 seeders + triggers | ✅ |
+| S3 Auth + RBAC + multi-tenant + audit | login + 2FA + magic-link + password reset + AuditHashChain | ✅ |
+| S4 LLM Router + Proxies + Dedup + Rotations | 5 providers HTTP + Webshare/IPRoyal + dedup 6 niveaux + WRR | ✅ |
+| S5 Sources officielles + Waterfall | INSEE/Annuaire/BODACC/BAN/FT + WaterfallOrchestrator 10 étapes | ✅ |
+| S6 Workers Playwright | Google Maps + PJ + Web stealth + bridge HMAC | ✅ |
+| S7 Search Wrapper + Direction Finder | 3 moteurs + 16 C-level titles + 13 paths corporate | ✅ |
+| S8 Email finder + SMTP cascade | 18 patterns + N1-N5 + catch-all detection | ✅ |
+| S9 Carte France interactive | MapLibre + IGN + 3 modes Visu/Search/Action | ✅ |
+| S10 Classification + UI 17 pages | 4 LLM use cases + AutoTagApplier DSL + composants UI | ✅ |
+| S11 Phase 2 scaffold + RGPD + Monitoring | tables Phase 2 + Erasure/Portability + 7-services obs stack | ✅ |
+| S12 Tests E2E + Doc + Polish + Tag | Playwright × 17 + runbooks × 5 + DR drill + pentest + OpenAPI | ✅ |
 
-- 🟢 **Complète** — email validé ≥70 + nom décideur + téléphone + LinkedIn → prête cold email
-- 🟡 **Partielle** — email OU LinkedIn + nom décideur + 1 autre donnée → utilisable manuellement
-- 🔴 **Basique** — INSEE + téléphone → fiche catalogue
+## Runbooks
 
-## Statut actuel
+- `infra/runbooks/01-restart-workers.md` — workers Playwright
+- `infra/runbooks/02-disk-full.md` — disque plein
+- `infra/runbooks/03-site-down.md` — 5xx persistant
+- `infra/runbooks/04-restore-dr.md` — restauration disaster recovery
+- `infra/runbooks/05-rotate-secrets.md` — rotation secrets
 
-Phase 1 — **spec en cours** dans `./spec/` (24 fichiers Markdown denses).
+## Tests
 
-- ✅ Spec Phase 1 (modules implémentés)
-- 🟡 Spec Phase 2 scaffold (cold email, LinkedIn outreach, CRM, analytics — DB + UI prêtes, logique vide)
-- ⏳ Code (vide pour l'instant — Phase 1 sera implémentée après validation spec)
+```bash
+# Backend Pest
+docker exec axion-crm-api composer test
 
-## Phases
+# Frontend Vitest
+docker exec axion-crm-app pnpm test
 
-**Phase 1 — IMPLÉMENTÉE dans la spec** :
+# Workers Vitest
+docker exec axion-crm-worker-google-maps pnpm test
 
-- Scraping 14 sources gratuites
-- Enrichissement waterfall 10 étapes
-- Email finder + validation SMTP cascade
-- Récupération URLs LinkedIn (Google Search Wrapper)
-- Direction Finder (ETI/Grandes : pages corporate + presse + rapport annuel + Google Search étendu C-level)
-- Coverage Matrix + carte France interactive (MapLibre + IGN + BAN)
-- LLM Router multi-providers configurable runtime
-- Auth + multi-tenant (workspace_id + RLS) + RBAC (Spatie Permission)
-- Anti-doublon strict 6 niveaux
-- Monitoring + observabilité
+# E2E Playwright (depuis host)
+cd frontend && pnpm e2e
 
-**Phase 2 — SCAFFOLDÉE (DB + UI prêtes, logique vide)** :
+# Load k6 (depuis host avec k6 installé)
+k6 run --vus 50 --duration 2m infra/loadtest/k6-api.js
 
-- Cold Email (envoi de masse — finalité business)
-- LinkedIn Outreach (messagerie automatisée)
-- CRM (pipeline, deals, activités)
-- Analyses avancées + ROI
+# Pentest self-check OWASP
+docker exec axion-crm-api php artisan app:pentest-self-check
 
-## Volume cible
+# Audit hash chain
+docker exec axion-crm-api php artisan audit:verify-chain
+```
 
-- Mois 1 — 200 000 entreprises traitées (~7 000/jour)
-- Année 1 — vers 1 M entreprises/mois
+## Bascule mocks → réel
 
-## Coût mensuel cible Phase 1
+1. Souscrire credentials (Anthropic, Webshare, IPRoyal, 2captcha) → mettre à jour `.env`
+2. `MOCK_MODE=false` et flags granulaires (`MOCK_LLM=false`, etc.)
+3. `docker compose restart api horizon worker-*`
+4. Vérification : `php artisan llm:smoke-test` (à créer Sprint 13)
 
-~275-345 €/mois (vs ~635 € avec PhantomBuster + Sales Navigator).
+## Conformité
 
-## Documentation
-
-- Spec complète — `./spec/00_INDEX.md`
-- Architecture infra — `./spec/02_architecture_infra.md`
-- DB schema Phase 1 — `./spec/03_db_schema_phase1.md`
-- Roadmap & coûts — `./spec/21_couts_roadmap.md`
-- Execution pack (12 prompts CC) — `./spec/23_interfaces_phase2_execution_pack.md`
-
-## Doctrine technique (héritée d'Axion-IA)
-
-- Hébergement UE par défaut (RGPD)
-- Mix LLM open-source + propriétaires, **Claude pivot**
-- OWASP top 10 appliqué, journalisation immuable (hash chain), minimisation PII
-- Code custom — pas de no-code en production (Filament/Forest exclus)
-- Aucun lock-in technologique (LLM Router pluggable, ProxyProvider pluggable, ScraperPlugin pluggable)
-
-## Isolation d'axion-ia.com
-
-Compte Hetzner séparé, IPs distinctes, domaine séparé, secrets séparés, base de données séparée. La proximité locale dans `C:\Users\willi\Documents\Projets\` est purement organisationnelle.
+- ✅ **RGPD** art. 6 (intérêt légitime B2B), 15-22 (droits personnes), 30 (registre)
+- ✅ **AI Act** UE 2024/1689 — registre `ai_act_register` populé
+- ✅ **OWASP Top 10** via `php artisan app:pentest-self-check`
+- ✅ **DPO** : `contact@axion-ia.com`
+- ✅ **Hébergement UE** : Hetzner Frankfurt
+- ⚠️ **DPA papier providers** : action humaine Will (cf. spec/17)
 
 ## Licence
 
 Propriétaire — Axion-IA OÜ.
+
+## Documentation complète
+
+- Spec exhaustive : `./spec/00_INDEX.md`
+- Stratégie mocks : `./MOCKS-STRATEGY.md`
+- Roadmap & coûts : `./spec/21_couts_roadmap.md`
+- Progress autopilot : `./_REPORTS/PROGRESS.md`
+- Audit qualité : `./_AUDIT/`
+- Changelog : `./CHANGELOG.md`

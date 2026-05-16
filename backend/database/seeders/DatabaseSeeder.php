@@ -21,6 +21,8 @@ class DatabaseSeeder extends Seeder
             UserAgentsSeeder::class,
             LlmUseCasesSeeder::class,
             OwnerUserSeeder::class,
+            AiActRegisterSeeder::class,
+            DemoCompaniesSeeder::class,
         ]);
     }
 }

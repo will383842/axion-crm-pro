@@ -1213,6 +1213,45 @@ CREATE INDEX target_zones_ws_status_idx ON target_zones (workspace_id, status, p
 
 ---
 
+## 8bis. Monitoring & Anomalies (audit P0 #7)
+
+### `monitoring_anomalies`
+
+> Référencée par fichier 16 §5 anomaly detection, n'était pas créée dans le schéma initial. Audit P0 #7 — résolu.
+
+```sql
+CREATE TABLE monitoring_anomalies (
+  id            BIGSERIAL PRIMARY KEY,
+  workspace_id  BIGINT REFERENCES workspaces(id) ON DELETE CASCADE,
+  metric        VARCHAR(80) NOT NULL,                    -- 'companies_enriched_per_hour', 'llm_cost_per_hour', ...
+  current_value NUMERIC(20,4) NOT NULL,
+  baseline_mean NUMERIC(20,4) NOT NULL,
+  baseline_stddev NUMERIC(20,4) NOT NULL,
+  deviation_sigma NUMERIC(6,2) NOT NULL,                 -- z-score : (current - mean) / stddev
+  severity      VARCHAR(10) NOT NULL CHECK (severity IN ('low','medium','high','critical')),
+  status        VARCHAR(20) NOT NULL DEFAULT 'open'
+                CHECK (status IN ('open','acknowledged','resolved','muted')),
+  rationale     TEXT,                                    -- explication auto-générée
+  payload       JSONB,                                   -- contexte (time range, dimensions...)
+  detected_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  acknowledged_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  acknowledged_at TIMESTAMPTZ,
+  resolved_by   BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  resolved_at   TIMESTAMPTZ,
+  resolution_notes TEXT
+);
+CREATE INDEX monitoring_anomalies_ws_status_idx ON monitoring_anomalies (workspace_id, status, detected_at DESC);
+CREATE INDEX monitoring_anomalies_metric_idx ON monitoring_anomalies (metric, detected_at DESC);
+
+ALTER TABLE monitoring_anomalies ENABLE ROW LEVEL SECURITY;
+CREATE POLICY monitoring_anomalies_tenant_isolation ON monitoring_anomalies
+  USING (workspace_id IS NULL OR workspace_id = app_workspace_id())
+  WITH CHECK (workspace_id IS NULL OR workspace_id = app_workspace_id());
+COMMENT ON TABLE monitoring_anomalies IS 'Anomalies détectées par DetectAnomaliesJob nightly (z-score > 2.5σ sur 7j glissants). Workflow open → acknowledged → resolved. Affichage page admin /alerts (fichier 13 §17).';
+```
+
+---
+
 ## 9. RGPD + AI Act
 
 ### `data_processing_log`
@@ -1308,7 +1347,8 @@ CREATE TABLE ai_act_register (
 | Scraping operations | `scraping_sources`, `scraper_targets`, `scraper_runs` (part.), `enrichment_runs`, `duplicate_flags` |
 | Coverage tracking | `coverage_matrix_cells` (mat. view), `target_zones` |
 | RGPD + AI Act | `data_processing_log`, `gdpr_requests`, `ai_act_register` |
-| **TOTAL Phase 1** | **~52 tables + 1 mat. view** |
+| Monitoring (audit P0 #7) | `monitoring_anomalies` |
+| **TOTAL Phase 1** | **~53 tables + 1 mat. view** |
 
 ---
 

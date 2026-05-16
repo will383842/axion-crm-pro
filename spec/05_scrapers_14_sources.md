@@ -339,8 +339,69 @@ export const gmapsScraper: WorkerPlugin = {
 
 - **Objectif :** **EMAILS** (nominatifs + génériques classifiés exhaustivement) + équipe + comptes sociaux + mots-clés stratégiques + pattern email entreprise.
 - **Méthode :** Playwright (pages JS-rendered) + cheerio (HTML statique pour speed).
-- **URL d'entrée :** `companies.website`.
+- **URL d'entrée :** `companies.website` — **DOIT être validée par `UrlSsrfGuard` avant tout fetch** (cf §SSRF ci-dessous).
 - **Profondeur de crawl :** 2-3 niveaux sur le domaine principal.
+
+### 🛡️ SSRF Protection (audit P0 #3 — OWASP A10)
+
+> **Risque :** `companies.website` peut être saisi manuellement par un admin (ou injecté via une source scraping compromise). Sans validation, un attaquant peut faire scraper `http://10.20.0.30:5432` (Postgres interne), `http://localhost:9090/metrics` (Prometheus), `http://169.254.169.254/` (metadata cloud), etc.
+
+**Validation côté API Laravel (avant écriture DB) :**
+
+```php
+namespace App\Modules\Security;
+
+final class UrlSsrfGuard
+{
+    private const BLOCKED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '::1'];
+    private const BLOCKED_TLDS = ['local', 'internal', 'lan', 'corp'];
+
+    /**
+     * @throws SsrfBlockedException
+     */
+    public function validate(string $url): string
+    {
+        // 1. Scheme : https only (http accepté pour TPE rares mais loggé)
+        $parsed = parse_url($url);
+        if (!$parsed || !in_array($parsed['scheme'] ?? '', ['https', 'http'])) {
+            throw new SsrfBlockedException('Only https/http schemes allowed');
+        }
+        // 2. Host blocklist
+        $host = strtolower($parsed['host'] ?? '');
+        if (in_array($host, self::BLOCKED_HOSTS)) {
+            throw new SsrfBlockedException('Blocked host');
+        }
+        // 3. TLD blocklist
+        $tld = pathinfo($host, PATHINFO_EXTENSION);
+        if (in_array($tld, self::BLOCKED_TLDS)) {
+            throw new SsrfBlockedException('Blocked TLD');
+        }
+        // 4. DNS résolution : refuser IPs privées RFC1918 + loopback + link-local + cloud metadata
+        $ips = gethostbynamel($host) ?: [];
+        foreach ($ips as $ip) {
+            if ($this->isPrivateIp($ip)) {
+                throw new SsrfBlockedException("Host resolves to private IP {$ip}");
+            }
+        }
+        // 5. Port restriction (80/443 only, refuse 5432/6379/22 etc.)
+        $port = $parsed['port'] ?? null;
+        if ($port !== null && !in_array($port, [80, 443])) {
+            throw new SsrfBlockedException("Port {$port} not allowed");
+        }
+        return $url;
+    }
+
+    private function isPrivateIp(string $ip): bool
+    {
+        return !filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+    }
+}
+```
+
+**Application :**
+- **API Laravel** : Form Request `UpdateCompanyRequest` valide `website` via `UrlSsrfGuard` → 422 si bloqué (cf fichier 14 §4)
+- **Workers Node** : double check côté worker avant `chromium.goto(url)` via lib `ssrf-req-filter` ou ré-appel `GET /api/internal/url-ssrf-validate` (defense in depth)
+- **Test fuzzing** dans CI : payloads `http://10.0.0.1`, `http://169.254.169.254`, `http://localhost:5432` → tous DOIVENT être rejetés
 - **Pages prioritaires :** `/contact`, `/equipe`, `/team`, `/about`, `/a-propos`, `/mentions-legales`, `/qui-sommes-nous`, `/who-we-are`, `/leadership`, `/management`, `/direction`, `/staff`, `/our-team`, `/notre-equipe`, `/founders`, `/people`, `/cgu`, `/legal`.
 - **Pagination :** N/A (ce n'est pas un annuaire).
 - **Proxies :** datacenter Webshare.

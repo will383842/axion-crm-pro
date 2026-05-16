@@ -86,6 +86,46 @@
 | `GET` | `/api/companies/{uuid}/business-signals` | — | viewer | Liste signaux |
 | `GET` | `/api/companies/{uuid}/audit-log` | — | admin | Liste audit_logs liées |
 
+### 🛡️ Validation SSRF sur `companies.website` (audit P0 #3)
+
+> Toute route POST/PUT qui accepte `website` DOIT le valider via `UrlSsrfGuard` (cf fichier 05 §SOURCE 8) avant écriture DB.
+
+```php
+// app/Http/Requests/CompanyRequest.php
+public function rules(): array {
+    return [
+        'website' => ['nullable', 'url', new SsrfSafeUrl()],   // règle custom
+        // ...
+    ];
+}
+
+// app/Rules/SsrfSafeUrl.php
+final class SsrfSafeUrl implements ValidationRule {
+    public function validate(string $attr, mixed $value, Closure $fail): void {
+        try {
+            app(\App\Modules\Security\UrlSsrfGuard::class)->validate($value);
+        } catch (\App\Modules\Security\SsrfBlockedException $e) {
+            $fail("URL bloquée pour raison de sécurité : {$e->getMessage()}");
+        }
+    }
+}
+```
+
+**Test fuzzing requis en CI** (Pest) :
+```php
+test('website field rejects private IPs and metadata endpoints', function () {
+    $blocked = [
+        'http://10.0.0.1', 'http://192.168.1.1', 'http://172.16.0.1',
+        'http://127.0.0.1', 'http://localhost', 'http://169.254.169.254',
+        'http://[::1]', 'http://example.local', 'http://db:5432',
+    ];
+    foreach ($blocked as $url) {
+        $this->putJson("/api/companies/{$this->company->uuid}", ['website' => $url])
+            ->assertStatus(422);
+    }
+});
+```
+
 ---
 
 ## 5. CONTACTS (`/api/contacts/*`)
@@ -197,6 +237,45 @@
 | `POST` | `/api/proxies/providers/{provider_key}/health-check` | Force health check |
 | `GET` | `/api/proxies/{id}` | Détail proxy individuel + stats |
 | `PUT` | `/api/proxies/{id}` | Update status manuellement (cooldown / disabled / active) |
+
+---
+
+## 11bis. ROUTES INTERNES MACHINE-TO-MACHINE (audit P0 #7)
+
+> **Auth :** ces routes ne sont PAS protégées par Sanctum cookie SPA. Elles utilisent **token machine-to-machine** via header `X-Internal-Token: <secret>` (vault), uniquement accessibles depuis le vSwitch privé `10.20.0.0/16` (firewall Hetzner). Aucune exposition Internet.
+
+| Method | Path | Body / Reply | Consommé par |
+|---|---|---|---|
+| `GET` | `/api/internal/proxies/next` | `?target_domain=google.com&preferred_type=residential` → `ProxyLease` | Workers Node Playwright |
+| `POST` | `/api/internal/proxies/{id}/report` | `{ "status": "success" \| "failure", "latency_ms": int, "bytes": int, "reason": str? }` | Workers Node |
+| `GET` | `/api/internal/user-agents/next` | `?country_code=FR` → `UserAgent` avec fingerprint complet | Workers Node |
+| `POST` | `/api/internal/url-ssrf-validate` | `{ "url": str }` → `{ "ok": bool, "reason": str? }` | Workers Node (defense-in-depth) |
+| `POST` | `/api/internal/scrape-results/{source_key}` | DTO selon source. Alternative au bridge BullMQ. | Workers Node (option) |
+| `POST` | `/api/internal/llm-route-feedback` | `{ "use_case": str, "tokens_in": int, "tokens_out": int, "cost_eur_micro": int, "status": str }` | Workers Node si appels LLM directs (rare) |
+
+**Middleware Laravel `InternalTokenAuth` :**
+
+```php
+final class InternalTokenAuth
+{
+    public function handle(Request $request, Closure $next)
+    {
+        $expected = config('axion.internal_token');
+        $actual = $request->header('X-Internal-Token');
+        if (!$expected || !$actual || !hash_equals($expected, $actual)) {
+            abort(401, 'internal_auth_required');
+        }
+        // Bonus : check IP source dans range vSwitch
+        $ip = $request->ip();
+        if (!str_starts_with($ip, '10.20.')) {
+            abort(403, 'internal_route_off_vswitch');
+        }
+        return $next($request);
+    }
+}
+```
+
+Routes enregistrées dans `routes/internal.php`, jamais préfixées `/api/` sur l'edge Caddy public (Caddy refuse `/api/internal/*` depuis Internet via rule explicit deny).
 
 ---
 

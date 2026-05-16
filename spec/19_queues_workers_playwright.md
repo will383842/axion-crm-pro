@@ -194,11 +194,29 @@ events.on('failed', ({ jobId, failedReason }) => {
   log.error({ jobId, failedReason }, 'website-crawl job failed');
 });
 
+import { validateUrlSsrfSafe } from '../lib/ssrf-guard';
+
 const worker = new Worker(
   'website-crawl',
   async (job) => {
     const { workspaceId, companyId, website } = job.data;
     log.info({ jobId: job.id, companyId, website }, 'website-crawl: start');
+
+    // 🛡️ SSRF defense-in-depth côté worker (audit P0 #3)
+    // Belt-and-braces : même si l'API Laravel a déjà validé, on re-check ici
+    // au cas où la donnée vient d'une source scraping (annu-ent, gmaps) sans validation
+    try {
+      await validateUrlSsrfSafe(website);
+    } catch (e) {
+      log.warn({ companyId, website, reason: e.message }, 'website-crawl: SSRF blocked, skip');
+      await publishResult('scrape-results', {
+        status: 'skipped', sourceKey: 'website', companyId, workspaceId,
+        payload: { reason: 'ssrf_blocked', detail: e.message },
+        contactsFound: 0, contactsNew: 0, emailsFound: 0, emailsValidated: 0,
+        costEurMicro: 0, durationMs: 0,
+      });
+      return { status: 'skipped' };
+    }
 
     const proxy = await getProxy(website);
     const ua = await getUserAgent();
@@ -220,10 +238,21 @@ const worker = new Worker(
   },
   {
     connection: redis,
-    concurrency: parseInt(process.env.WEBSITE_CRAWL_CONCURRENCY ?? '12', 10),
+    // ⚠️ Audit P0 #6 — passé de 12 à 6 (12 × 300MB Chromium = 3,6Go sur worker 8Go RAM = OOM)
+    concurrency: parseInt(process.env.WEBSITE_CRAWL_CONCURRENCY ?? '6', 10),
     limiter: { max: 30, duration: 60_000 },  // 30 jobs/min/worker
   },
 );
+
+// Restart worker après 100 jobs traités (mitigation memory leak Chromium)
+let jobsProcessed = 0;
+worker.on('completed', () => {
+  jobsProcessed++;
+  if (jobsProcessed >= 100) {
+    log.info('Worker reached 100 jobs, gracefully restarting to avoid Chromium memory leak');
+    worker.close().then(() => process.exit(0));   // PM2/Docker restart will respawn
+  }
+});
 
 process.on('SIGTERM', async () => {
   log.info('SIGTERM received, gracefully closing worker');

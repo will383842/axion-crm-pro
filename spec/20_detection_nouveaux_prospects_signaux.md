@@ -291,33 +291,86 @@ final class PollFranceTravailClevelJob implements ShouldQueue
 
 ---
 
-## 5. Job `ScrapeFrTechNewsJob`
+## 5. Job `ScrapeFrTechNewsJob` (SOURCE PRIMAIRE LEVÉES TECH FR)
 
-Crawler hebdo Playwright sur frenchweb.fr + maddyness.com pour matchs avec mots-clés "levée", "fonds", "tour de table", "M€", "Series A/B/C".
+> **Audit P0 #2 :** ce job est désormais **la SSOT levées de fonds Tech FR** (Crunchbase devient secondaire/optionnel, cf fichier 05 source 12). Doctrine : ne jamais dépendre d'une source unique non-officielle qui peut être bloquée du jour au lendemain.
+
+**Stratégie multi-sources cascadée (par fiabilité décroissante) :**
+
+1. **Flux RSS officiels** (gratuits, légaux, fiables) :
+   - `https://www.maddyness.com/feed/` (flux RSS complet, ~50 articles/jour)
+   - `https://www.frenchweb.fr/feed/` (flux RSS, ~30 articles/jour)
+   - `https://www.usine-digitale.fr/rss` (focus tech industrielle)
+   - `https://siecledigital.fr/feed/`
+   - `https://www.lesnumeriques.com/rss.xml`
+2. **Scraping web** (si flux RSS incomplet) : fallback sur HTML cheerio avec UA rotation, pas de Playwright nécessaire (sites éditoriaux peu protégés).
+3. **Plan B :** API NewsAPI.org (gratuite 100 req/jour) avec query "France levée fonds" — à activer si flux RSS HS.
+
+**Avantages flux RSS :**
+- Aucun risque de ban (légal et encouragé)
+- Latence < 100 ms par fetch
+- Données structurées (title + link + pubDate + description)
+- Pas de proxy nécessaire
+- 0€ coût
 
 ```php
 final class ScrapeFrTechNewsJob implements ShouldQueue
 {
     public int $timeout = 1800;
 
-    public function handle(FrTechNewsCrawler $crawler, LlmRouter $llm, BusinessSignalCreator $creator): void
+    private const RSS_FEEDS = [
+        'maddyness' => 'https://www.maddyness.com/feed/',
+        'frenchweb' => 'https://www.frenchweb.fr/feed/',
+        'usine_digitale' => 'https://www.usine-digitale.fr/rss',
+        'siecle_digital' => 'https://siecledigital.fr/feed/',
+        'les_numeriques' => 'https://www.lesnumeriques.com/rss.xml',
+    ];
+
+    private const KEYWORDS = [
+        'levée', 'levee', 'fonds', 'tour de table', 'series a', 'series b', 'series c',
+        'pre-seed', 'seed', 'amorçage', 'levee de fonds', 'venture capital',
+    ];
+
+    public function handle(RssFeedFetcher $rss, FrTechNewsCrawler $crawler, LlmRouter $llm, BusinessSignalCreator $creator): void
     {
-        $articles = $crawler->fetchRecentArticles([
-            'sources' => ['frenchweb.fr', 'maddyness.com'],
-            'keywords' => ['levée', 'levee', 'fonds', 'tour de table', 'series a', 'series b', 'series c'],
-            'days' => 7,
-        ]);
+        $articles = [];
+
+        // 1. PRIMARY : RSS feeds (gratuit, fiable)
+        foreach (self::RSS_FEEDS as $key => $url) {
+            try {
+                $items = $rss->fetch($url, sinceDays: 7);
+                $filtered = collect($items)->filter(fn ($i) => $this->matchesKeywords($i['title'].' '.$i['description']));
+                $articles = array_merge($articles, $filtered->all());
+            } catch (\Throwable $e) {
+                Log::warning("RSS fetch failed for {$key}", ['error' => $e->getMessage()]);
+            }
+        }
+
+        // 2. FALLBACK : si RSS retourne < 5 articles → news scraping HTML
+        if (count($articles) < 5) {
+            Log::warning('RSS feeds returned few articles, falling back to HTML scraping');
+            $articles = array_merge($articles, $crawler->fetchRecentArticles([
+                'sources' => ['frenchweb.fr', 'maddyness.com'],
+                'keywords' => self::KEYWORDS,
+                'days' => 7,
+            ]));
+        }
+
+        // 3. PLAN B : si toujours rien → NewsAPI.org (gratuit 100 req/jour)
+        if (count($articles) === 0) {
+            Log::warning('All news sources failed, trying NewsAPI fallback');
+            $articles = $this->fetchFromNewsApiFallback();
+        }
 
         foreach ($articles as $a) {
             // Extraction via LLM : entreprise + montant
             $extraction = $llm->generate('business_signal_detection', [
                 'article_title' => $a['title'],
-                'article_body' => $a['excerpt'],
+                'article_body' => $a['excerpt'] ?? $a['description'] ?? '',
             ], workspaceId: null);
 
             if (empty($extraction->structured['company_name']) || empty($extraction->structured['amount_eur'])) continue;
 
-            // Match SIREN approximatif
             $company = Company::query()
                 ->whereRaw("similarity(LOWER(unaccent(legal_name)), LOWER(unaccent(?))) >= 0.85", [$extraction->structured['company_name']])
                 ->first();
@@ -329,15 +382,26 @@ final class ScrapeFrTechNewsJob implements ShouldQueue
                 'signal_type' => 'leve_fonds',
                 'signal_severity' => $amount >= 1_000_000 ? 'critical' : 'high',
                 'source' => 'news_fr',
-                'source_ref' => $a['url'],
-                'occurred_at' => $a['published_at'],
+                'source_ref' => $a['url'] ?? $a['link'] ?? null,
+                'occurred_at' => $a['published_at'] ?? $a['pubDate'] ?? now(),
                 'expires_at' => now()->addDays(365),
                 'payload' => array_merge($a, ['llm_extraction' => $extraction->structured]),
             ]);
         }
     }
+
+    private function matchesKeywords(string $text): bool
+    {
+        $text = strtolower($text);
+        foreach (self::KEYWORDS as $kw) {
+            if (str_contains($text, $kw)) return true;
+        }
+        return false;
+    }
 }
 ```
+
+**Couverture estimée :** ~85-90 % des levées de fonds FR Tech > 500 k€ (les fonds < 500 k€ sont moins couverts par les médias mais sont des cibles moins prioritaires pour Axion-IA de toute façon).
 
 ---
 

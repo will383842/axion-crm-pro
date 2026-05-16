@@ -196,12 +196,18 @@ export const infogreffeScraper: WorkerPlugin = {
 ## SOURCE 4 — Societe.com (FALLBACK)
 
 - **Objectif :** fallback dirigeants si annuaire-entreprises est insuffisant.
-- **Méthode :** scraping Playwright stealth.
+- **Méthode :** **double stack** : `curl-impersonate` Node pour requêtes HTML simples (bypass TLS fingerprint JA3/JA4), Playwright stealth + ghost-cursor pour pages JS-rendered avec captcha.
 - **URL base :** `https://www.societe.com/societe/`
 - **Rate limits :** 20 req/min (anti-bot agressif → backoff).
-- **Proxies :** **résidentiel obligatoire** (datacenter banni). IPRoyal ou Smartproxy.
-- **Anti-bot :** Cloudflare + DataDome → stealth + résidentiel + simulation human-like (mouse moves, scrolls).
+- **Proxies :** **résidentiel obligatoire** (datacenter banni 100 %). IPRoyal ou Smartproxy + session sticky 30 min.
+- **Anti-bot :** Cloudflare BM + DataDome + reCAPTCHA conditionnel → stratégie 5 couches :
+  1. **TLS fingerprint bypass** via `curl-impersonate-chrome` ou lib Node `tls-client` (Playwright Chromium expose un JA3 hash détectable, on l'évite pour les fetch HTML simples)
+  2. **Cookie jar persistant inter-sessions** (`storageState` Playwright sauvegardé Redis 24h par session sticky)
+  3. **Playwright stealth + fingerprint cohérent** (timezone + locale + headers selon `proxies.country_code` — cf fichier 10 §2)
+  4. **Mouse humanization** via `ghost-cursor` + scroll velocity progressive
+  5. **CapSolver** pour reCAPTCHA si déclenché — résolution automatique
 - **Mapping DB :** `contacts` (avec `source = 'societe'`).
+- **PoC empirique avant Sprint 7** : 50 SIREN connus, mesurer taux succès. Si > 20 % d'échecs persistants → escalation BrightData mobile.
 
 ---
 
@@ -490,13 +496,21 @@ $this->linkedinRotator->incrementUsage($account->id);
 ## SOURCE 12 — Crunchbase
 
 - **Objectif :** levées de fonds Tech (signal d'achat majeur).
-- **Méthode :** **Scraping prudent Playwright stealth** (pas d'API gratuite Crunchbase pour FR).
+- **Statut :** ⚠️ **SOURCE SECONDAIRE** — la source PRIMAIRE pour les levées Tech FR est désormais le scraping news (frenchweb.fr + maddyness.com RSS — cf fichier 20 §5). Crunchbase est gardé en complément optionnel.
+- **Méthode :** **Scraping prudent multi-couches** (Cloudflare Bot Management + PerimeterX + JS challenge sont combinés en 2026 → playwright-extra stealth seul NE SUFFIT PAS).
 - **URL pattern :** `https://www.crunchbase.com/discover/funding_round/f.location_country_code=FR/f.announced_on=last_90_days`
-- **Rate limits :** 1 req/min/IP, anti-bot agressif (Cloudflare Bot Management).
-- **Proxies :** **résidentiel premium** Smartproxy/BrightData.
+- **Rate limits :** 1 req/min/IP, anti-bot agressif (Cloudflare BM + PerimeterX + JS challenge).
+- **Proxies :** **résidentiel premium** Smartproxy/BrightData mobile (rotation agressive + session sticky 30 min).
 - **Pagination :** SANS LIMITE (scroll infini + checkpoint).
-- **Anti-pattern :** Crunchbase a déjà banni des scrapers — accepter run quotidien limité (~50 levées/jour).
+- **Stratégie anti-bot Crunchbase :**
+  1. TLS fingerprint bypass via `curl-impersonate-chrome` pour les requêtes API JSON
+  2. Cookie jar persistant + session sticky proxy 30 min
+  3. Playwright stealth + ghost-cursor + scroll progressive
+  4. CapSolver pour Cloudflare Turnstile + reCAPTCHA + PerimeterX
+  5. **Plan B chemin critique** : si scraping bloqué > 3 jours consécutifs → bascule auto sur **news scraping** (cf fichier 20) qui couvre 80 %+ des levées FR Tech > 500 k€
+- **Plan C (escalation max)** : Crunchbase API Pro officielle ~50 $/mois (à activer SI les sources gratuites sont insuffisantes — décision Will après S13)
 - **Mapping DB :** `company_business_signals` avec `signal_type = 'leve_fonds'`, montant, investisseurs.
+- **Anti-pattern :** ne JAMAIS dépendre de Crunchbase comme source unique levées Tech. Le news scraping FR est désormais la SSOT levées de fonds.
 
 ---
 

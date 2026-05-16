@@ -1,0 +1,45 @@
+{
+  "app": {
+    "name": "Axion CRM Pro",
+    "tagline": "Console interne de prospection B2B automatisée"
+  },
+  "auth": {
+    "login": {
+      "title": "Connexion",
+      "email": "Adresse e-mail",
+      "password": "Mot de passe",
+      "submit": "Se connecter",
+      "magicLink": "Recevoir un lien magique",
+      "forgot": "Mot de passe oublié ?"
+    },
+    "twoFactor": {
+      "title": "Code à 6 chiffres",
+      "submit": "Vérifier"
+    }
+  },
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "companies": "Entreprises",
+    "contacts": "Contacts",
+    "coverage": "Couverture France",
+    "scraperRuns": "Scraper runs",
+    "users": "Utilisateurs",
+    "settings": "Paramètres"
+  },
+  "phase2": {
+    "stub": {
+      "title": "Phase 2 — bientôt disponible",
+      "description": "Ce module est scaffoldé : DB + UI prêtes, logique métier reportée à la Phase 2."
+    }
+  },
+  "common": {
+    "loading": "Chargement…",
+    "empty": "Aucun résultat",
+    "error": "Une erreur est survenue.",
+    "retry": "Réessayer",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "search": "Rechercher"
+  }
+}

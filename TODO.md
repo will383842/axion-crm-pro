@@ -18,7 +18,7 @@
 | **POCs exécutés en réel** | 🟡 **1/5** | POC #5 ✅ VALIDÉ 2026-05-16. POC #4/#3/#1/#2 reportés post-dev (stratégie mocks adoptée) |
 | **Stratégie mocks adoptée** | ✅ 2026-05-16 | Tous services externes via mocks. `MOCKS-STRATEGY.md` créé. Basculement réel en 1 ligne via `MOCK_MODE=false` |
 | **Prompt autopilot Sprint 1→12 prêt** | ✅ 2026-05-16 | `_PROMPTS/PROMPT_AUTOPILOT_SPRINT_1_TO_12.md` à coller dans nouvelle conv Claude Code |
-| **Code Sprint 1 → S12** | ❌ **0 %** | Démarrage immédiat possible en autopilot avec mocks |
+| **Code Sprint 1 → S12** | 🟡 **Sprint 1 en cours** | Autopilot démarré 2026-05-16. Voir `_REPORTS/PROGRESS.md`. |
 | Conformité avant prod | 🟡 partielle | DPIA + DPA + pentest à produire, voir §3 |
 | Décisions stratégiques | 🟡 4 ouvertes | STOP & ASK, voir §4 |
 

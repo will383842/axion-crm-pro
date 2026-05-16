@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+/* Axion CRM Pro — design tokens (cf. spec/24_frontend_design_system.md) */
+@theme {
+  --color-brand-50:  oklch(0.97 0.02 250);
+  --color-brand-100: oklch(0.93 0.05 250);
+  --color-brand-200: oklch(0.85 0.10 250);
+  --color-brand-300: oklch(0.75 0.15 250);
+  --color-brand-400: oklch(0.66 0.18 250);
+  --color-brand-500: oklch(0.55 0.21 250);
+  --color-brand-600: oklch(0.45 0.20 250);
+  --color-brand-700: oklch(0.36 0.17 250);
+  --color-brand-800: oklch(0.27 0.13 250);
+  --color-brand-900: oklch(0.18 0.08 250);
+
+  --color-success: oklch(0.65 0.18 145);
+  --color-warning: oklch(0.78 0.18 85);
+  --color-danger:  oklch(0.60 0.22 25);
+  --color-info:    oklch(0.66 0.16 220);
+
+  --font-sans: "Inter", "ui-sans-serif", "system-ui", sans-serif;
+  --font-mono: "JetBrains Mono", "ui-monospace", monospace;
+  --font-serif: "Source Serif Pro", "ui-serif", serif;
+
+  --radius-card: 0.75rem;
+  --radius-button: 0.5rem;
+  --radius-input: 0.5rem;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+/* Skip-link a11y */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+}
+.skip-link:focus {
+  left: 1rem;
+  top: 1rem;
+  z-index: 9999;
+}
+
+/* Print-PDF utilitaire (cf. spec/24) */
+@media print {
+  .no-print { display: none !important; }
+}

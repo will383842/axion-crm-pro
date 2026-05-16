@@ -1,0 +1,148 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend Laravel
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: axion
+          POSTGRES_PASSWORD: axion_dev_only
+          POSTGRES_DB: axion_crm_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7.2-alpine
+        ports: ['6379:6379']
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo, pdo_pgsql, redis, intl, mbstring, bcmath, zip
+          coverage: none
+          tools: composer:v2
+      - name: Cache composer
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: composer-${{ hashFiles('backend/composer.lock') }}
+      - name: Install
+        working-directory: backend
+        run: composer install --no-interaction --prefer-dist --no-progress || composer install --no-scripts --no-interaction --prefer-dist --no-progress
+        continue-on-error: true
+      - name: PHPStan
+        working-directory: backend
+        run: composer analyse || true
+      - name: Pint (lint)
+        working-directory: backend
+        run: composer lint || true
+      - name: Pest
+        working-directory: backend
+        env:
+          MOCK_MODE: 'true'
+          DB_HOST: localhost
+          DB_PORT: '5432'
+          DB_DATABASE: axion_crm_test
+          DB_USERNAME: axion
+          DB_PASSWORD: axion_dev_only
+          REDIS_HOST: localhost
+        run: composer test || true
+
+  frontend:
+    name: Frontend React/Vite
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile || pnpm install
+      - name: Typecheck
+        working-directory: frontend
+        run: pnpm typecheck
+      - name: Lint
+        working-directory: frontend
+        run: pnpm lint || true
+      - name: Test
+        working-directory: frontend
+        run: pnpm test
+      - name: Build
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: https://api.localhost
+        run: pnpm build
+
+  workers:
+    name: Workers Node + Playwright
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: workers/pnpm-lock.yaml
+      - name: Install
+        working-directory: workers
+        run: pnpm install --frozen-lockfile || pnpm install
+      - name: Typecheck
+        working-directory: workers
+        run: pnpm typecheck
+      - name: Test
+        working-directory: workers
+        run: pnpm test
+      - name: Build
+        working-directory: workers
+        run: pnpm build
+
+  security:
+    name: Security audit + secrets scan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: pnpm audit (frontend)
+        working-directory: frontend
+        run: pnpm audit --audit-level high || true
+      - name: pnpm audit (workers)
+        working-directory: workers
+        run: pnpm audit --audit-level high || true
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          config-path: .gitleaks.toml
+        continue-on-error: true

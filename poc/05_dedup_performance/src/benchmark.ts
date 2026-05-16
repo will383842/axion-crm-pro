@@ -68,8 +68,13 @@ async function main() {
   console.log('\n--- EXPLAIN ANALYZE sample query ---')
   const explainOutput = await explainOne(pool, targetIds[0]!, SOURCES[0]!)
   explainOutput.forEach(l => console.log(l))
-  const usesIndex = explainOutput.some(l => l.includes('idx_runs_dedup'))
-  const hasSeqScan = explainOutput.some(l => l.includes('Seq Scan on scraper_runs'))
+  // Note : sur table partitionnée, l'index parent `idx_runs_dedup` est cascadé en index par partition
+  // nommés `scraper_runs_YYYY_MM_target_id_source_completed_at_idx`. On cherche les 2 patterns.
+  const usesIndex = explainOutput.some(l =>
+    l.includes('idx_runs_dedup') ||
+    /scraper_runs_\d{4}_\d{2}_target_id_source_completed_at_idx/.test(l)
+  )
+  const hasSeqScan = explainOutput.some(l => /Seq Scan on scraper_runs(_\d{4}_\d{2})?/.test(l))
   console.log(`\nUses idx_runs_dedup: ${usesIndex ? '✅ YES' : '❌ NO'}`)
   console.log(`Has seq scan       : ${hasSeqScan ? '❌ YES (BAD)' : '✅ NO (GOOD)'}`)
 

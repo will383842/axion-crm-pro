@@ -257,7 +257,8 @@ infra/
 ### Notes de dimensionnement
 
 - **app-01/app-02 en CCX23 dedicated** : Octane consomme du CPU constant, on évite shared. 4 vCPU × 2 = capacité ~600 req/s sur API CRUD basique, largement suffisant en V1.
-- **db-01 en CCX33 dedicated** : critical path. 32 Go RAM permettent un `shared_buffers = 8 Go`, `effective_cache_size = 24 Go`, `work_mem = 32 Mo`. Tient ~50M lignes sans souci.
+- **db-01 en CCX33 dedicated** : critical path. 32 Go RAM permettent un `shared_buffers = 8 Go`, `effective_cache_size = 24 Go`, `work_mem = 128 Mo` (relevé suite audit P0 #5). Tient ~50M lignes sans souci.
+- **🔑 PgBouncer co-localisé sur `db-01`** (container Docker dédié, port 6432) — audit P0 #5. Mode `transaction pooling`, `MAX_CLIENT_CONN=500`, `DEFAULT_POOL_SIZE=25`. Multiplexe ~500 connexions clientes Octane/Horizon vers ~25 connexions Postgres réelles. Sans ce pooler, `max_connections=100` Postgres saturait dès S6 avec 32 workers Horizon + Octane + scheduler.
 - **redis-01 en CCX13** : Redis est I/O-bound léger. 8 Go RAM permet de stocker tous les jobs en queue + le cache TanStack Query côté serveur. Persistance AOF activée.
 - **worker-php-01 CCX23** : PHP-FPM tient bien sur dedicated. 32 workers Horizon concurrent par défaut.
 - **worker-node-01/02 en CPX31 (AMD shared)** : Playwright Chromium consomme de la RAM (~300 Mo par contexte), 8 Go = ~24 contextes parallèles confortables. AMD shared OK car les bursts sont courts (page load, scroll, attente network).

@@ -120,6 +120,44 @@ services:
     networks: [axion-crm-net]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U axion_crm_app"]
+    # ⚠️ Postgres NE DOIT PAS être joignable directement par l'app — toujours via pgbouncer
+    # Exposer uniquement au container pgbouncer
+    expose: ["5432"]
+
+  # 🔑 Audit P0 #5 — PgBouncer transaction pooling OBLIGATOIRE
+  # Sans pooler, Laravel Octane Swoole + 32 Horizon workers + scheduler saturent
+  # max_connections=100 défaut Postgres. PgBouncer multiplexe ~500 client conns → ~25 server conns.
+  pgbouncer:
+    image: edoburu/pgbouncer:1.23
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: axion_crm_app
+      DB_PASSWORD_FILE: /run/secrets/postgres_password
+      DB_NAME: axion_crm_pro
+      POOL_MODE: transaction                       # transaction pooling (critical pour Octane)
+      MAX_CLIENT_CONN: 500                         # 500 connexions clientes simultanées
+      DEFAULT_POOL_SIZE: 25                        # 25 connexions vers Postgres réutilisées
+      RESERVE_POOL_SIZE: 5
+      RESERVE_POOL_TIMEOUT: 3
+      SERVER_IDLE_TIMEOUT: 60
+      SERVER_LIFETIME: 3600
+      QUERY_WAIT_TIMEOUT: 30
+      IGNORE_STARTUP_PARAMETERS: extra_float_digits
+      # ⚠️ En mode transaction pooling, certaines features Postgres sont incompatibles :
+      # - prepared statements côté serveur (Laravel doit utiliser PDO::ATTR_EMULATE_PREPARES=true)
+      # - SET LOCAL pour RLS workspace_id OK (transaction-scoped)
+      # - LISTEN/NOTIFY → utiliser canal direct postgres si besoin Phase 2
+    ports: ["6432:6432"]
+    secrets: [postgres_password]
+    networks: [axion-crm-net]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "psql -h localhost -p 6432 -U axion_crm_app -d pgbouncer -c 'SHOW POOLS;' || exit 1"]
+      interval: 30s
 
   redis:
     image: redis:7-alpine
@@ -549,13 +587,15 @@ APP_DEBUG=false
 LOG_CHANNEL=loki
 LOG_LEVEL=info
 
-# DB
+# DB — ⚠️ Audit P0 #5 : connexion via PgBouncer (transaction pooling) PAS directement Postgres
 DB_CONNECTION=pgsql
-DB_HOST=postgres
-DB_PORT=5432
+DB_HOST=pgbouncer                                 # ← pas 'postgres' direct
+DB_PORT=6432                                       # ← port PgBouncer, pas 5432
 DB_DATABASE=axion_crm_pro
 DB_USERNAME=axion_crm_app
 DB_PASSWORD=CHANGEME
+# Required avec PgBouncer transaction pooling :
+DB_PREPARE_STATEMENTS=false                        # PDO::ATTR_EMULATE_PREPARES=true côté Laravel
 
 # Redis
 REDIS_HOST=redis

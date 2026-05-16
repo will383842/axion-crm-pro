@@ -23,7 +23,7 @@ Les workers Node communiquent leur résultat à Laravel via une queue de retour 
 | `enrichment-orchestrator` | PHP Horizon | 4 | high | 3 | exp 30s | Orchestrateur waterfall (chain + batch) |
 | `gmaps-scrape` | Node BullMQ | 4 | medium | 5 | exp 60s | Google Maps Playwright stealth |
 | `pj-scrape` | Node BullMQ | 4 | medium | 5 | exp 60s | Pages Jaunes Playwright |
-| `website-crawl` | Node BullMQ | 12 | high | 3 | exp 30s | Crawl sites web + extraction emails |
+| `website-crawl` | Node BullMQ | **6** | high | 3 | exp 30s | Crawl sites web + extraction emails (audit P0 #6 — 12→6, 12×300MB Chromium=OOM sur 8Go RAM) |
 | `linkedin-pb-find` | PHP Horizon | 2 | medium | 3 | exp 120s | PhantomBuster (long polling) |
 | `crunchbase-scrape` | Node BullMQ | 2 | low | 3 | exp 300s | Crunchbase Playwright (très lent) |
 | `social-light-scrape` | Node BullMQ | 4 | low | 3 | exp 120s | Handles sociaux |
@@ -401,9 +401,22 @@ export const config = {
     rateLimits: {
       gmaps: { max: 3, duration: 60_000 },
       pj: { max: 5, duration: 60_000 },
-      website: { max: 30, duration: 60_000 },
+      website: { max: 30, duration: 60_000 },          // ✓ rate global OK
       crunchbase: { max: 1, duration: 60_000 },
     },
+    // ⚠️ Audit P0 #6 — concurrences ajustées RAM-aware (8 Go par worker-node)
+    // Budget RAM Chromium par worker = ~5 Go (laisse 3 Go buffer Node + OS)
+    // 6 × 300MB + 4 × 250MB + 4 × 250MB + 2 × 350MB + 4 × 200MB = 5,4 Go (max parallèle théorique)
+    // En pratique on dédie 1 worker par scraper type → reste tenable
+    chromiumMaxConcurrencyPerWorker: {
+      website: 6,      // était 12 avant audit
+      gmaps: 4,
+      pj: 4,
+      crunchbase: 2,
+      social_light: 4,
+    },
+    // Restart worker après N jobs (mitigation Chromium memory leak)
+    jobsBeforeRestart: 100,
     timeouts: {
       gmaps: 180_000,
       pj: 60_000,

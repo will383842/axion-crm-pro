@@ -54,6 +54,63 @@ INSERT INTO data_processing_log (workspace_id, processing_purpose, legal_basis, 
 - Email verifications : 365 jours après validated_at
 - Données utilisateurs plateforme : durée du contrat + 6 mois
 
+### Sous-processeurs documentés (P0 audit v1.1)
+
+Chaque appel LLM = transfert PII potentiel (extrait HTML de site corporate peut contenir noms employés). Documentation obligatoire RGPD article 28.
+
+| Sous-processeur | Service | Hébergement | DPA disponible | Statut Axion CRM Pro |
+|------------------|---------|--------------|-----------------|------------------------|
+| **Anthropic, PBC** | API Claude (Haiku 4.5, Sonnet 4.6) | US (data centers AWS US-East/West) | ✅ via Trust Center anthropic.com/legal/trust-center | À signer avant prod |
+| **OpenAI, LLC** | API GPT-4o (optionnel, fallback) | US (data centers Azure US) | ✅ via openai.com/policies/data-processing-addendum | À signer si OpenAI activé |
+| **Mistral AI SAS** | API mistral-small-latest | UE (France/Suède) | ✅ via mistral.ai/terms#data-processing-addendum | À signer — préférable UE-centric |
+| **OpenRouter, Inc.** | Umbrella API multi-providers | US (routing) | ⚠️ peut router vers providers tiers non-DPA — UTILISER UNIQUEMENT pour use cases non-PII | Restriction : pas pour `extract_team_from_page`, `business_signal_detection` |
+| **2captcha, Ltd** | Solving CAPTCHA externe | Russie (⚠️ hors UE, hors zones adéquates) | ⚠️ pas de DPA standard | À évaluer juridiquement : envoie image captcha (généralement sans PII), risque RGPD limité mais à documenter |
+| **Webshare Proxies, LLC** | Proxies datacenter | US (passage traffic) | ✅ via webshare.io/dpa | À signer |
+| **IPRoyal Inc.** | Proxies résidentiels | US (entité juridique) | ✅ via iproyal.com/legal/dpa | À signer |
+| **Hetzner Online GmbH** | Hébergement infra | UE (Frankfurt) | ✅ inclus contrat standard | ✅ |
+| **Cloudflare, Inc.** | CDN / WAF / DNS | US (mais infra europe) | ✅ via cloudflare.com/cloudflare-customer-dpa | À signer |
+| **Backblaze, Inc.** | Backups offsite | US | ✅ via backblaze.com/company/dpa | À signer |
+
+**Mitigation transferts hors UE :** clauses contractuelles types (CCT 2021) annexées à chaque contrat. Pour les use cases LLM les plus sensibles (extract_team_from_page), routing prioritaire vers **Mistral (UE)** dans la `fallback_chain` `llm_use_cases`.
+
+**Restriction concrète v1.1 :** dans `07_llm_router.md` § 9, `extract_team_from_page` voit son provider principal basculé d'Anthropic vers Mistral en cas de demande client UE-stricte (configurable workspace).
+
+---
+
+### DPIA — Analyse d'impact sur la protection des données (P0 audit v1.1)
+
+> **Produire avant promotion prod publique.** Modèle CNIL gratuit. Effort 4-8h rédaction.
+
+**Pourquoi obligatoire ici** : article 35 RGPD impose une DPIA pour les traitements susceptibles d'engendrer un risque élevé. Critères atteints :
+1. **Profilage automatisé à grande échelle** (200 k personnes/mois classifiées maturité IA + offre Axion-IA).
+2. **Croisement de données** issues de multiples sources (INSEE + annuaire + Google Maps + sites + LinkedIn + presse).
+3. **Données traitées de personnes vulnérables** : non applicable ici (B2B uniquement).
+
+**Plan de la DPIA** (à produire dans `_DOCS/DPIA-2026.md` séparé) :
+
+1. Description systématique du traitement
+   - Finalités : prospection commerciale B2B
+   - Catégories de données : nom, fonction, email pro, téléphone pro, URL LinkedIn publique
+   - Catégories de personnes : dirigeants légaux + C-level d'entreprises FR
+   - Durées de conservation : cf. § Conservation
+   - Sous-processeurs : cf. tableau ci-dessus
+2. Évaluation nécessité et proportionnalité
+   - Base légale : intérêt légitime art. 6.1.f
+   - Test de mise en balance (LIA) : produit dans annexe DPIA
+   - Mesures de minimisation : pas d'emails personnels, pas de scraping LinkedIn direct, opt-out global
+3. Évaluation des risques pour les droits et libertés
+   - Risque 1 : profilage erroné menant à ciblage inapproprié → mitigation : override humain UI + transparency notice + LLM bornes documentées
+   - Risque 2 : fuite cross-workspace → mitigation : RLS + audit hash chain
+   - Risque 3 : violation données → mitigation : chiffrement at-rest + in-transit + backups encrypted + procédure incident < 72h
+4. Mesures envisagées pour faire face aux risques
+   - Toutes les mesures techniques + organisationnelles de la § 7-8
+   - Procédure exercice droits art. 15-22 : cf. § 2
+5. Consultation
+   - DPO Axion-IA (Williams Jullin) — consultation interne
+   - Pas de consultation CNIL préalable nécessaire (pas de high-risk caractérisé après mesures)
+
+**Statut :** DPIA à produire avant **S12 promotion prod**. Bloquant.
+
 ---
 
 ## §2 — Droit d'accès & suppression (procédure)
@@ -223,35 +280,40 @@ Job nightly `app:audit-chain-verify` → si erreur détecté, alerte critique + 
 ```sql
 INSERT INTO ai_act_register (workspace_id, ai_system_name, use_case_slug, purpose, risk_category, is_profiling, human_oversight, accuracy_metrics, transparency_notice) VALUES
 
+-- v1.1 : ia_maturity_scoring + axion_offer_match mergés en classify_company_axion
 ((SELECT id FROM workspaces WHERE slug='axion-ia'),
- 'ia_maturity_scoring',
- 'ia_maturity_scoring',
- 'Estimer la maturité IA d''une entreprise pour prioriser la prospection',
+ 'classify_company_axion',
+ 'classify_company_axion',
+ 'Estimer la maturité IA + match offre Axion-IA + priorité de prospection en 1 appel LLM (Haiku 4.5)',
  'limited',
  true,
- 'Humain peut override scores via UI admin. Algorithme transparent (LLM Haiku 4.5 + prompt versionné). Logs des décisions tracés.',
- '{"avg_human_override_rate":"15%","prompt_version":3}',
- 'Score basé sur indices publics (site web, recrutements, signaux) — pas de discrimination protégée'),
+ 'Humain peut override scores et priorité via UI admin (champs priority_override + axion_offer_match_code editable). Algorithme transparent (LLM + prompt versionné). Logs des décisions tracés dans llm_usage + audit_logs.',
+ '{"avg_human_override_rate":"15%","prompt_version":1}',
+ 'Score basé sur indices publics (site web, recrutements, signaux business) — pas de discrimination protégée. Profilage d''entité morale (entreprise), pas de personne physique sauf croisement avec contacts.'),
 
 ((SELECT id FROM workspaces WHERE slug='axion-ia'),
- 'fiche_quality_scoring',
- 'fiche_quality_scoring',
- 'Classifier les fiches entreprises en complète/partielle/basique',
+ 'extract_team_from_page',
+ 'extract_team_from_page',
+ 'Extraire la liste des membres d''équipe depuis HTML scrapé (Direction Finder)',
+ 'limited',
+ true,
+ 'LLM ne crée pas de scoring de personne, juste extraction structurée. Données vérifiables par retour à la source (page corporate publique).',
+ '{}',
+ 'Extraction de données publiquement disponibles sur pages corporate'),
+
+((SELECT id FROM workspaces WHERE slug='axion-ia'),
+ 'auto_tag_generation',
+ 'auto_tag_generation',
+ 'Génération auto de tags business pour catégorisation prospection',
  'minimal',
  false,
- 'Score calculé par formule SQL déterministe sur données collectées. Pas de profilage personne.',
+ 'Tags suggérés modifiables manuellement. Complément des règles déterministes auto_tag_definitions.',
  '{}',
- 'Score qualité technique de la fiche'),
+ 'Catégorisation technique des fiches entreprises');
 
-((SELECT id FROM workspaces WHERE slug='axion-ia'),
- 'axion_offer_match',
- 'axion_offer_match',
- 'Recommander une offre Axion-IA selon profil entreprise',
- 'limited',
- true,
- 'Humain peut override match. Recommendation indicative, pas décisionnelle.',
- '{}',
- 'Recommandation B2B, pas profilage individuel');
+-- Note v1.1 : fiche_quality_scoring (anciennement listé) RETIRÉ.
+-- Le scoring qualité 🟢/🟡/🔴 est calculé par la fonction SQL déterministe recompute_company_quality_score()
+-- (cf. 03_db_schema_phase1.md § 11ter), donc PAS un système d'IA au sens AI Act.
 ```
 
 ### Transparency notice (UI)
@@ -392,11 +454,87 @@ WHERE created_at < now() - INTERVAL '30 days'
 - ✅ Alertes critiques Slack + Telegram
 - ✅ GlitchTip error tracking
 
-### A10:2021 — Server-Side Request Forgery (SSRF)
+### A10:2021 — Server-Side Request Forgery (SSRF) — durci P0 audit v1.1
+
+> **Problème v1.0** : la spec disait "whitelist URLs" mais le scraping de sites web entreprises (source 8) prend l'URL depuis `companies.website_url` qui vient elle-même de Google Maps (source externe). Donc URL = *user-fed indirect*. Risque SSRF si Google Maps retourne `http://10.0.0.30:5432/...` ou `http://169.254.169.254/latest/meta-data/` (AWS metadata endpoint).
+
+**Protection v1.1 — résolution DNS + check IP avant fetch :**
+
+```typescript
+// workers/src/scrapers/utils/ssrf-guard.ts
+import { resolve4, resolve6 } from 'node:dns/promises'
+import { isIP } from 'node:net'
+
+const BLOCKED_CIDRS = [
+  '10.0.0.0/8',         // RFC1918
+  '172.16.0.0/12',      // RFC1918
+  '192.168.0.0/16',     // RFC1918
+  '127.0.0.0/8',        // loopback
+  '169.254.0.0/16',     // link-local + cloud metadata (AWS/GCP/Azure)
+  '100.64.0.0/10',      // shared address space CGNAT
+  '0.0.0.0/8',          // current network
+  '224.0.0.0/4',        // multicast
+  '240.0.0.0/4',        // reserved
+  '::1/128',            // IPv6 loopback
+  'fc00::/7',           // IPv6 ULA
+  'fe80::/10',          // IPv6 link-local
+]
+
+export async function ssrfGuard(url: string): Promise<{ allowed: boolean; reason?: string }> {
+  let parsed: URL
+  try { parsed = new URL(url) } catch { return { allowed: false, reason: 'invalid_url' } }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) return { allowed: false, reason: 'bad_protocol' }
+
+  // Bloquer IP littérale en hostname
+  if (isIP(parsed.hostname)) {
+    if (isBlockedIp(parsed.hostname)) return { allowed: false, reason: 'private_ip_literal' }
+    // IP publique en littéral : suspect mais autorisé avec warning
+  }
+
+  // Résoudre le hostname
+  let addresses: string[] = []
+  try {
+    const v4 = await resolve4(parsed.hostname).catch(() => [])
+    const v6 = await resolve6(parsed.hostname).catch(() => [])
+    addresses = [...v4, ...v6]
+  } catch { return { allowed: false, reason: 'dns_failure' } }
+
+  if (addresses.length === 0) return { allowed: false, reason: 'no_dns_resolution' }
+
+  // Tous les A/AAAA records doivent être publics
+  for (const ip of addresses) {
+    if (isBlockedIp(ip)) return { allowed: false, reason: `private_ip_resolved:${ip}` }
+  }
+
+  return { allowed: true }
+}
+
+function isBlockedIp(ip: string): boolean {
+  // Implémentation via lib 'ip-cidr' ou check manuel
+  return BLOCKED_CIDRS.some(cidr => ipInCidr(ip, cidr))
+}
+```
+
+**Usage obligatoire avant tout fetch externe non-API :**
+
+```typescript
+// Dans tous les scrapers sites web + Direction Finder
+const guard = await ssrfGuard(targetUrl)
+if (!guard.allowed) {
+  logger.warn({ url: targetUrl, reason: guard.reason }, 'ssrf_blocked')
+  Anomaly::create({ kind: 'ssrf_attempt_blocked', severity: 'warning', ... })
+  return { status: 'failed', error: { code: 'ssrf_blocked', message: guard.reason } }
+}
+await page.goto(targetUrl, ...)
+```
+
+**Outbound firewall complémentaire :** Hetzner Cloud Firewall règles outbound bloquent le vSwitch privé `10.0.0.0/16` depuis les workers (sauf vers `10.0.0.30:6379/6380/5432/6432` pour Redis/Postgres et `10.0.0.20:80` pour endpoint /internal/scraper-result).
 
 - ✅ Whitelist URLs scrapées (regex pattern matching)
-- ✅ Pas de fetch user-supplied URL côté serveur (les seules requests sortantes sont via proxies whitelistés)
-- ✅ Outbound firewall (Hetzner Cloud Firewall, only known providers)
+- ✅ DNS resolution + IP check obligatoire avant fetch (P0 audit v1.1)
+- ✅ Pas de fetch user-supplied URL côté serveur
+- ✅ Outbound firewall Hetzner Cloud Firewall (only known providers + intra-vSwitch restreint)
 
 ---
 

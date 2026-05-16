@@ -29,42 +29,56 @@
 |---------|------|------|------------|
 | gpu-ollama | GEX44 RTX4000 SFF | Si LLM API > 60€/mois | 184,90 |
 
-### Services tiers
+### Services tiers (P0 audit v1.1 — budget révisé honnête)
 
-| Service | Démarrage | Croissance | Note |
-|---------|-----------|------------|------|
-| Domaines (axion-pro.com + secondaires) | 0,83 €/mo | 1,50 €/mo | Namecheap/OVH |
-| Cloudflare Free | 0 | 0 | DNS, WAF de base, SSL |
-| Backblaze B2 (~50 GB backups réplication) | 0,21 €/mo | 0,50 €/mo | 5 $/TB |
-| Hetzner OBS (~50 GB) | 0,24 €/mo | 0,40 €/mo | 4,90 €/TB |
-| Proxies Webshare (datacenter, 100 IPs) | 10 $/mo | 10 $/mo | Démarrage S3 |
-| Proxies IPRoyal (résidentiel, ~2 GB/mo) | 30 $/mo | 30-50 $/mo | S6 dès Google Search Wrapper |
-| Captcha 2captcha (optionnel) | 0 | 20 $/mo | S6 si nécessaire |
-| LLM Claude + Mistral APIs | 20 €/mo | 60 €/mo | Cible Phase 1 |
-| GlitchTip self-hosted | 0 | 0 | inclus observability server |
-| **Sous-total services** | **~60 €** | **~120 €** | |
+> **v1.0 sous-estimait dramatiquement** les coûts proxies résidentiels et LLM. Réalité audit :
+> - Proxies résidentiels à 200 k entreprises/mois : 1 200 GB × 5-8 $/GB = **5 000-8 500 $/mois** sans mitigation.
+> - LLM 1.8 M appels/mois : ~770 €/mois en v1.0 (vs 60 € annoncés).
+>
+> **Stratégies de mitigation appliquées v1.1** (cf. `09_proxy_pluggable_system.md` + `07_llm_router.md`) :
+> 1. Datacenter Webshare dominant pour 60-70 % du volume (Direction Finder, sites web, Pages Jaunes, BAN, etc.)
+> 2. Résidentiel IPRoyal ciblé uniquement Google Search + Google Maps + Crunchbase
+> 3. Sampling 80/20 : top 50 k entreprises max au démarrage (vs 200 k discoverables)
+> 4. LinkedIn matching : règles déterministes avant LLM (économie 320 €/mo)
+> 5. Use cases mergés (`classify_company_axion` économie 80 €/mo)
 
-### Total Phase 1 sans GPU
+| Service | Démarrage | S12 stable | Note v1.1 |
+|---------|-----------|------------|-----------|
+| Domaines (axion-pro.com + 3-5 secondaires Phase 2) | 0,83 €/mo | 5 €/mo | Namecheap/OVH |
+| Cloudflare Free | 0 | 0 | DNS, WAF base, SSL |
+| Backblaze B2 (~50 GB backups réplication) | 0,21 €/mo | 0,50 €/mo | |
+| Hetzner OBS (~50 GB) | 0,24 €/mo | 0,40 €/mo | |
+| Proxies Webshare (datacenter, ~50 IPs, ~400 GB/mo) | 10 $/mo | 25 $/mo | Volume dominant |
+| Proxies IPRoyal (résidentiel, ~150-300 GB/mo selon sampling) | 50 $/mo | **300-500 $/mo** | **Réalité honnête** |
+| **2captcha (OBLIGATOIRE P0 audit, pas optionnel)** | 20 $/mo | **50 $/mo** | Indispensable Google Search |
+| LLM APIs (Claude Haiku + Mistral, post-optimisations P0 audit) | 80 €/mo | **250 €/mo** | Volume + use cases mergés |
+| GlitchTip + Loki + Tempo (self-hosted) | 0 | 0 | inclus observability server |
+| **Sous-total services tiers révisé v1.1** | **~165 €** | **~635 €** | |
+
+### Total Phase 1 sans GPU — révisé v1.1
 
 | Mois | Configuration | Coût € HT/mois |
 |------|---------------|----------------|
-| Mois 1 (S1-S4) | core + Webshare + LLM léger | ~150 € |
-| Mois 2 (S5-S8) | + worker-2 + IPRoyal + LLM modéré | ~220 € |
-| Mois 3 (S9-S12) | + observability + LLM full + captcha | ~265 € |
+| Mois 1 (S1-S4) | core Hetzner + Webshare DC + LLM léger | ~250 € |
+| Mois 2 (S5-S8) | + worker-2 + IPRoyal résidentiel + LLM en montée | ~500 € |
+| Mois 3 (S9-S12) | + observability + LLM full optimisé + 2captcha + sampling | **~750 €** |
 
-**Cible S12 stable :** **~265 €/mois** ✅
+> **Cible S12 stable honnête v1.1 : ~750 €/mo** (vs 265 € v1.0 irréaliste).
+> Si budget contraint à 500 €/mo strict → activer sampling 80/20 plus agressif (top 30 k entreprises) + cap proxies résidentiels manuel.
 
 ### Total Phase 1 + GPU Ollama
 
 ~450 €/mois (si activé S10+ pour réduire LLM API).
 
-### Coût par entreprise enrichie
+### Coût par entreprise enrichie (révisé v1.1)
+
+Avec sampling 80/20 (top 50 k entreprises max vs 200 k discoverables) :
 
 ```
-265 €/mois ÷ 200 000 enrichissements/mois = 0.00133 € / entreprise
+750 €/mois ÷ 50 000 enrichissements ciblés/mois = 0.015 € / entreprise
 ```
 
-→ **~0,0015 € / entreprise enrichie complète** (cible Phase 1).
+→ **~0,015 € / entreprise enrichie complète** (réalité v1.1, vs 0,0015 € v1.0 sous-estimé d'un facteur 10).
 
 ### Économie vs version PhantomBuster + Sales Navigator
 
@@ -187,20 +201,26 @@ S12  ── Monitoring complet, anomaly detection, polish UI, doc, tests E2E
 
 **Effort estimé :** 8 jours.
 
-### S6 — Google Search Wrapper + Direction Finder + France Travail + MESRI
+### S6 — Google Search Wrapper + Direction Finder + France Travail + MESRI (v1.1 durci)
 
 **Done quand :**
 - ✅ Worker `worker-google-search` 3 moteurs (Google/Bing/DuckDuckGo) rotation
-- ✅ Détection captcha + cool-down 30 min + bascule auto
-- ✅ Scoring matching LLM (use case `linkedin_url_matching_scoring`)
+- ✅ **Détection captcha v2 + v3 invisible + "unusual traffic" + Cloudflare challenge (P0 audit v1.1)**
+- ✅ **2captcha intégré OBLIGATOIRE pour captcha v2 (P0 audit v1.1)**
+- ✅ **Fingerprinting Canvas/WebGL/Audio randomization (P0 audit v1.1)**
+- ✅ **Cookie warehouse persistance par sticky session 30 min (P0 audit v1.1)**
+- ✅ Cool-down 60 min sur captcha v3 / unusual_traffic
+- ✅ Scoring matching LLM **règles déterministes d'abord, LLM zone grise uniquement (P0 audit v1.1)**
 - ✅ Worker `worker-direction-finder` (concurrence 2)
+- ✅ **Datacenter Webshare DOMINANT pour pages corporate (P0 audit v1.1, économie 700 €/mo proxies)**
 - ✅ 4 sources DF (corporate pages 25 URLs + presse + rapport annuel PDF + Google Search étendu)
+- ✅ **Cap download PDF 10 MB (P0 audit v1.1)**
+- ✅ **Fallback "no_directory_page" + needs_manual_review (P1 audit v1.1)**
 - ✅ Cache `corporate_pages_crawled` TTL 30j
-- ✅ INSERT `direction_finder_runs` + `press_releases_indexed` + `annual_reports_indexed`
 - ✅ pdf-parse fonctionnel pour rapports annuels
 - ✅ Worker `worker-france-travail` API (signal hiring_surge)
 - ✅ Scraper MESRI/ONISEP écoles (table `schools` seedée ~3500 entités)
-- ✅ Smoke : 10 ETI testées → ≥ 3 C-level trouvés moyenne
+- ✅ Smoke : 10 ETI testées → ≥ 3 C-level trouvés moyenne (post-POC #3 validation)
 
 **Effort estimé :** 12 jours (le plus chargé).
 
@@ -269,7 +289,7 @@ S12  ── Monitoring complet, anomaly detection, polish UI, doc, tests E2E
 
 **Effort estimé :** 5 jours.
 
-### S12 — Monitoring + Polish + E2E
+### S12 — Monitoring + Polish + E2E + Pentest (P0 audit v1.1)
 
 **Done quand :**
 - ✅ Observability stack déployé (Prometheus + Grafana + Loki + Tempo + GlitchTip + Uptime Kuma)
@@ -279,15 +299,22 @@ S12  ── Monitoring complet, anomaly detection, polish UI, doc, tests E2E
 - ✅ Tests E2E Playwright 50+ scénarios (auth, CRUD, scraping, RGPD)
 - ✅ Tests load (k6) : 100 req/s API tient sans dégradation
 - ✅ Documentation finale (OpenAPI auto-doc, runbooks, prompts CC pour future maintenance)
+- ✅ **Pentest interne OBLIGATOIRE avant promotion prod (P0 audit v1.1)** :
+  - Burp Suite Community (passive scan + manual session testing)
+  - OWASP ZAP (active scan against staging)
+  - Nmap (network exposure check)
+  - Manual : tests SSRF (cf. `17_rgpd_aiact_owasp.md` § A10), prompt injection (cf. `07_llm_router.md` § 4)
+  - **Conclusion attendue : aucune vulnérabilité High/Critical**
+- ✅ **DPIA produite et signée DPO (P0 audit v1.1)** — cf. `17_rgpd_aiact_owasp.md` § DPIA
+- ✅ **DPA sous-processeurs LLM signés** (Anthropic, Mistral minimum) — cf. `17_rgpd_aiact_owasp.md` § Sous-processeurs
 - ✅ Promotion staging → prod
 - ✅ Cloudflare orange clouds + HSTS preload 12 mois
 - ✅ DNSSEC actif
 - ✅ Smoke prod : tous les scénarios métier critiques OK
-- ✅ Penetration test "first pass" interne
 
-**Effort estimé :** 8 jours.
+**Effort estimé révisé v1.1 :** **10 jours** (vs 8 v1.0 ; +1j pentest interne, +1j DPIA + DPA).
 
-### Récap effort total
+### Récap effort total — révisé v1.1
 
 | Semaine | Jours dev | Jours Claude Code | Note |
 |---------|-----------|--------------------|------|
@@ -302,26 +329,30 @@ S12  ── Monitoring complet, anomaly detection, polish UI, doc, tests E2E
 | S9 | 7 | 9 | Carte |
 | S10 | 8 | 10 | Classification + Proxy UI |
 | S11 | 5 | 7 | Scaffold Phase 2 |
-| S12 | 8 | 10 | Monitoring + Polish |
-| **Total** | **91 jours dev** | **124 jours CC** | |
+| S12 | **10** | 12 | Monitoring + Polish + **Pentest + DPIA + DPA** |
+| **+5 POCs avant code** | **16 j** | — | parallélisables 2 sem (cf. AUDIT_v1 § 13) |
+| **Total honnête v1.1** | **109 jours dev** | **126 jours CC** | |
 
-Avec Claude Code en autopilote + dev senior (Will) en review/orchestration : **~12 semaines réalistes**.
+Avec Claude Code en autopilote + dev senior (Will) en review/orchestration : **~14-16 semaines réalistes** (vs 12 v1.0).
 
 ---
 
 ## §3 — Critères "GO/NO-GO" fin S12
 
-✅ **GO** si :
+✅ **GO** si (critères révisés v1.1 honnêtes) :
 
-- 50 000 fiches 🟢 (quality_complete) dans le workspace `axion-ia`
-- Throughput soutenu ≥ 7 000 entreprises enrichies/jour
+- ≥ 50 000 fiches 🟢 (quality_complete) dans le workspace `axion-ia` (cible inchangée)
+- Throughput soutenu ≥ 7 000 entreprises enrichies/jour avec sampling 80/20
 - Latence enrichissement P95 < 30s (TPE/PME), < 90s (ETI/Grandes)
-- Cost LLM mensuel ≤ 60 €
-- Cost total mensuel ≤ 280 €
+- Cost LLM mensuel ≤ **300 €** (vs 60 v1.0 — honnête)
+- Cost total mensuel ≤ **800 €** (vs 280 v1.0 — honnête)
 - 0 incident sécu P0/P1
 - 0 plainte RGPD non traitée
 - Audit hash chain valide
 - DR drill effectué avec RTO < 4h
+- **Pentest interne sans High/Critical (P0 audit v1.1)**
+- **DPIA signée + DPA Anthropic/Mistral signés (P0 audit v1.1)**
+- **5 POCs validés en pré-S1 (P0 audit v1.1)**
 
 ❌ **NO-GO** déclenche correctif Sprint 13 (1-2 semaines additionnelles).
 

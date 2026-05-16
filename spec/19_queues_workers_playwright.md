@@ -425,15 +425,57 @@ Horizon Laravel (côté app server) :
 'maxTime' => 3600,           // restart after 1h
 ```
 
-### Node BullMQ workers
+### Node BullMQ workers + restart périodique (P0 audit v1.1)
+
+> **Problème v1.0** : Chromium fuit la mémoire. Sans restart périodique, OOM garanti après 24-48h. La spec v1.0 ne le mentionnait pas.
+> **Correction v1.1** : compteur jobs + restart automatique tous les 500 jobs (~2-4h selon source).
 
 ```typescript
-// Cf. workers/src/main.ts
-process.on('SIGTERM', async () => {
-  await worker.close()          // attend les jobs en cours, max 600s (lockDuration)
-  await connection.quit()
-  process.exit(0)
+// workers/src/main.ts
+let jobsProcessed = 0
+const MAX_JOBS_BEFORE_RESTART = parseInt(process.env.MAX_JOBS_BEFORE_RESTART ?? '500')
+
+worker.on('completed', () => {
+  jobsProcessed++
+  if (jobsProcessed >= MAX_JOBS_BEFORE_RESTART) {
+    logger.info({ jobsProcessed }, 'restart_threshold_reached, exiting cleanly for fresh container')
+    void shutdown()
+  }
 })
+
+worker.on('failed', () => {
+  jobsProcessed++  // count failed too (browser may have leaked)
+})
+
+async function shutdown() {
+  logger.info('shutdown signal received')
+  try { await worker.close() } catch (e) { logger.error(e) }
+  try { await connection.quit() } catch (e) { logger.error(e) }
+  process.exit(0)            // exit code 0 → docker restart unless-stopped reprend
+}
+process.on('SIGTERM', shutdown)
+process.on('SIGINT', shutdown)
+
+// Mesure mémoire toutes les 60s + force shutdown si > 80 % limite container
+setInterval(() => {
+  const heap = process.memoryUsage().heapUsed / 1024 / 1024
+  const rss = process.memoryUsage().rss / 1024 / 1024
+  logger.debug({ heapMB: heap, rssMB: rss, jobsProcessed }, 'memory_check')
+  // Container limit 6 GB. Si RSS > 4.8 GB → shutdown préventif.
+  if (rss > 4800) {
+    logger.warn({ rssMB: rss }, 'memory_threshold_exceeded, preemptive_shutdown')
+    void shutdown()
+  }
+}, 60_000)
+```
+
+### Docker stop_grace_period suffisant
+
+```yaml
+services:
+  worker:
+    stop_grace_period: 10m        # attend jobs en cours, max 600s (lockDuration)
+    restart: unless-stopped        # auto-restart après shutdown
 ```
 
 ### Docker Compose

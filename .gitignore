@@ -1,0 +1,136 @@
+# =====================
+# Laravel
+# =====================
+/vendor/
+/node_modules/
+.env
+.env.backup
+.env.production
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+auth.json
+npm-debug.log
+yarn-error.log
+/.fleet
+/.idea
+/.vscode
+
+/public/build/
+/public/hot
+/public/storage
+/storage/*.key
+/storage/app/public/*
+!/storage/app/public/.gitkeep
+/storage/framework/cache/data/*
+!/storage/framework/cache/data/.gitkeep
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitkeep
+/storage/framework/views/*
+!/storage/framework/views/.gitkeep
+/storage/logs/*
+!/storage/logs/.gitkeep
+/bootstrap/cache/*.php
+
+# =====================
+# Node / React / Vite
+# =====================
+node_modules/
+dist/
+build/
+.vite/
+*.local
+.eslintcache
+
+# Vite manifest
+/public/manifest.json
+
+# Workers Playwright
+/workers/node_modules/
+/workers/dist/
+/workers/.playwright/
+/workers/playwright-report/
+/workers/test-results/
+
+# =====================
+# PHP / Composer
+# =====================
+*.cache
+composer.phar
+.php_cs.cache
+.php-cs-fixer.cache
+.phpstan.cache
+.psalm/
+
+# =====================
+# Logs
+# =====================
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# =====================
+# OS / Editors
+# =====================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+.directory
+.Trash-*
+
+# =====================
+# IDE
+# =====================
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# =====================
+# Secrets / Env
+# =====================
+.env*
+!.env.example
+*.pem
+*.key
+secrets/
+.secrets/
+api-tokens.env
+
+# =====================
+# Backups DB
+# =====================
+*.sql
+*.dump
+*.bak
+db-backups/
+
+# =====================
+# Docker / Infra runtime
+# =====================
+docker-volumes/
+postgres-data/
+redis-data/
+loki-data/
+grafana-data/
+prometheus-data/
+minio-data/
+
+# =====================
+# Tests / Coverage
+# =====================
+/coverage/
+.nyc_output/
+*.lcov
+
+# =====================
+# Tools
+# =====================
+.tool-versions

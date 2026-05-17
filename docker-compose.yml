@@ -117,7 +117,7 @@ services:
     container_name: axion-crm-app
     env_file: .env
     environment:
-      VITE_API_BASE_URL: https://api.localhost
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://api.localhost}
     volumes:
       - ./frontend:/srv/app:cached
       - frontend-node-modules:/srv/app/node_modules

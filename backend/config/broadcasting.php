@@ -1,5 +1,21 @@
 <?php
 
+/*
+|--------------------------------------------------------------------------
+| Helper : driver de broadcast sûr au boot
+|--------------------------------------------------------------------------
+|
+| Sprint 18.9 — défensif : si BROADCAST_CONNECTION=reverb mais que les
+| credentials REVERB_APP_* sont absents, on bascule sur 'log' pour ne pas
+| crasher au boot (Pusher\Pusher::__construct lève si key/secret/app_id null).
+| Permet de déployer la stack sans Reverb provisionné.
+*/
+$broadcastDefault = env('BROADCAST_CONNECTION', 'log');
+if ($broadcastDefault === 'reverb'
+    && (empty(env('REVERB_APP_KEY')) || empty(env('REVERB_APP_SECRET')) || empty(env('REVERB_APP_ID')))) {
+    $broadcastDefault = 'log';
+}
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -12,7 +28,8 @@ return [
     */
     // Default 'log' (safe, ne nécessite pas de config Reverb au boot).
     // En prod : set BROADCAST_CONNECTION=reverb + REVERB_APP_* dans .env.
-    'default' => env('BROADCAST_CONNECTION', 'log'),
+    // Fallback automatique sur 'log' si REVERB_APP_* incomplets.
+    'default' => $broadcastDefault,
 
     'connections' => [
         'reverb' => [

@@ -1,6 +1,7 @@
 # Axion CRM Pro — Caddy reverse proxy
 # Dev local : api.localhost / app.localhost (cert auto-signe via tls internal)
-# Prod : api.axion-crm-pro.com / app.axion-crm-pro.com (Let's Encrypt auto)
+# Prod : app.axion-crm-pro.com (single origin : /api + /sanctum -> backend, reste -> frontend)
+#        api.axion-crm-pro.com (backend direct pour curl/debug)
 
 {
     email williamsjullin@gmail.com
@@ -53,12 +54,29 @@ app.localhost {
     }
 }
 
-# --- PROD : API Laravel (api.axion-crm-pro.com, Let's Encrypt auto) ---------
-api.axion-crm-pro.com {
+# --- PROD : app.axion-crm-pro.com — SINGLE ORIGIN (frontend + API path-routed)
+# Evite les third-party cookies (Chrome 2026 default block).
+app.axion-crm-pro.com {
     encode zstd gzip
-    reverse_proxy api:80 {
-        header_up X-Real-IP {remote_host}
+
+    # Routes API -> backend Laravel
+    @api {
+        path /api/* /sanctum/* /docs /docs/* /up /broadcasting/*
     }
+    handle @api {
+        reverse_proxy api:80 {
+            header_up X-Real-IP {remote_host}
+        }
+    }
+
+    # Tout le reste -> frontend Vite
+    handle {
+        reverse_proxy app:5173 {
+            header_up Connection {>Connection}
+            header_up Upgrade {>Upgrade}
+        }
+    }
+
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
         X-Frame-Options "DENY"
@@ -67,12 +85,11 @@ api.axion-crm-pro.com {
     }
 }
 
-# --- PROD : Frontend SPA (app.axion-crm-pro.com, Let's Encrypt auto) --------
-app.axion-crm-pro.com {
+# --- PROD : api.axion-crm-pro.com — backend direct (curl/debug)
+api.axion-crm-pro.com {
     encode zstd gzip
-    reverse_proxy app:5173 {
-        header_up Connection {>Connection}
-        header_up Upgrade {>Upgrade}
+    reverse_proxy api:80 {
+        header_up X-Real-IP {remote_host}
     }
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"

@@ -3,10 +3,7 @@ import react from '@vitejs/plugin-react-swc';
 import path from 'node:path';
 
 export default defineConfig({
-  // vitest 2.x bundles vite 5; workspace runs vite 6 — Plugin<any> types diverge
-  // sous exactOptionalPropertyTypes. Bug type connu, sans impact runtime.
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-expect-error vite 5 (vitest bundled) vs vite 6 (workspace) type mismatch
+  // pnpm.overrides force vite@6 partout (cf package.json), pas de mismatch type.
   plugins: [react()],
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },

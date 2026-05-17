@@ -15,6 +15,7 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     hmr: { clientPort: 443 },
+    allowedHosts: ['app.axion-crm-pro.com', '.axion-crm-pro.com', 'localhost', 'app.localhost'],
   },
   preview: {
     host: '0.0.0.0',

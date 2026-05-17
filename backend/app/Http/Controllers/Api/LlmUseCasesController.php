@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Models\LlmUseCase;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class LlmUseCasesController extends ApiController
 {
@@ -13,7 +15,20 @@ class LlmUseCasesController extends ApiController
      *     security={{"sanctumCookie":{}}},
      *     @OA\Response(response=200, description="OK"))
      */
-    public function index(Request $r): JsonResponse { return $this->ok(['data' => []]); }
+    public function index(Request $r): JsonResponse
+    {
+        if (! Schema::hasTable('llm_use_cases')) {
+            return $this->ok(['data' => []]);
+        }
+
+        try {
+            return $this->ok(['data' => LlmUseCase::query()->orderBy('slug')->limit(50)->get()]);
+        } catch (\Throwable $e) {
+            Log::error('llm.use-cases.index failed', ['exception' => $e->getMessage()]);
+            report($e);
+            return $this->ok(['data' => [], 'degraded' => true]);
+        }
+    }
 
     /**
      * @OA\Put(path="/llm/use-cases/{useCase}", tags={"LLM"}, summary="Update config use case (Sprint 4)",

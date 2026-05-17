@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Models\Tag;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class TagsController extends ApiController
 {
@@ -13,7 +15,25 @@ class TagsController extends ApiController
      *     security={{"sanctumCookie":{}}},
      *     @OA\Response(response=200, description="OK"))
      */
-    public function index(Request $r): JsonResponse { return $this->ok(['data' => []]); }
+    public function index(Request $r): JsonResponse
+    {
+        if (! Schema::hasTable('tags')) {
+            return $this->ok(['data' => []]);
+        }
+
+        try {
+            $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
+            $q = Tag::query()->orderBy('name');
+            if ($workspaceId) {
+                $q->where('workspace_id', $workspaceId);
+            }
+            return $this->ok(['data' => $q->limit(500)->get()]);
+        } catch (\Throwable $e) {
+            Log::error('tags.index failed', ['exception' => $e->getMessage()]);
+            report($e);
+            return $this->ok(['data' => [], 'degraded' => true]);
+        }
+    }
 
     /**
      * @OA\Post(path="/tags", tags={"Tags"}, summary="Crée un tag (Sprint 10)",

@@ -7,6 +7,8 @@ use App\Services\Rgpd\GdprErasureService;
 use App\Services\Rgpd\GdprPortabilityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 class RgpdRequestsController extends ApiController
@@ -24,11 +26,22 @@ class RgpdRequestsController extends ApiController
      */
     public function index(Request $r): JsonResponse
     {
-        $rows = RgpdRequest::query()
-            ->when($r->query('status'), fn ($q, $s) => $q->where('status', $s))
-            ->orderByDesc('requested_at')
-            ->paginate(25);
-        return $this->ok($rows);
+        // Sprint 18.9 — defensive : tables RGPD peuvent ne pas exister en env partielle
+        if (! Schema::hasTable('rgpd_requests')) {
+            return $this->ok(['data' => [], 'meta' => ['total' => 0]]);
+        }
+
+        try {
+            $rows = RgpdRequest::query()
+                ->when($r->query('status'), fn ($q, $s) => $q->where('status', $s))
+                ->orderByDesc('requested_at')
+                ->paginate(25);
+            return $this->ok($rows);
+        } catch (\Throwable $e) {
+            Log::error('rgpd.requests.index failed', ['exception' => $e->getMessage()]);
+            report($e);
+            return $this->ok(['data' => [], 'meta' => ['total' => 0], 'degraded' => true]);
+        }
     }
 
     /**

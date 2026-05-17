@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Models\ProxyProvider;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class ProxyProvidersController extends ApiController
 {
@@ -13,7 +15,20 @@ class ProxyProvidersController extends ApiController
      *     security={{"sanctumCookie":{}}},
      *     @OA\Response(response=200, description="OK"))
      */
-    public function index(Request $r): JsonResponse { return $this->ok(['data' => []]); }
+    public function index(Request $r): JsonResponse
+    {
+        if (! Schema::hasTable('proxy_providers_config')) {
+            return $this->ok(['data' => []]);
+        }
+
+        try {
+            return $this->ok(['data' => ProxyProvider::query()->orderBy('slug')->limit(50)->get()]);
+        } catch (\Throwable $e) {
+            Log::error('proxy-providers.index failed', ['exception' => $e->getMessage()]);
+            report($e);
+            return $this->ok(['data' => [], 'degraded' => true]);
+        }
+    }
 
     /**
      * @OA\Put(path="/proxy-providers/{p}", tags={"LLM"}, summary="Update config provider (Sprint 4)",

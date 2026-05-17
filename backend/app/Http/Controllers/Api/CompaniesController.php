@@ -8,6 +8,8 @@ use App\Services\Waterfall\WaterfallOrchestrator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -35,28 +37,47 @@ class CompaniesController extends ApiController
     public function index(Request $r): JsonResponse
     {
         $perPage = min(100, max(1, (int) $r->query('per_page', 25)));
-        $query = QueryBuilder::for(Company::query()->whereNull('deleted_at'))
-            ->allowedFilters([
-                AllowedFilter::exact('naf'),
-                AllowedFilter::exact('size_category'),
-                AllowedFilter::exact('priority'),
-                AllowedFilter::exact('discovery_source'),
-                AllowedFilter::partial('denomination'),
-                AllowedFilter::partial('postcode'),
-            ])
-            ->allowedSorts(['quality_score', 'enriched_at', 'denomination', 'created_at'])
-            ->defaultSort('-quality_score');
 
-        $page = $query->paginate($perPage);
-        return $this->ok([
-            'data' => $page->items(),
-            'meta' => [
-                'total'        => $page->total(),
-                'per_page'     => $page->perPage(),
-                'current_page' => $page->currentPage(),
-                'last_page'    => $page->lastPage(),
-            ],
-        ]);
+        // Sprint 18.9 — defensive : table absente en env fraîche → liste vide
+        if (! Schema::hasTable('companies')) {
+            return $this->ok([
+                'data' => [],
+                'meta' => ['total' => 0, 'per_page' => $perPage, 'current_page' => 1, 'last_page' => 1],
+            ]);
+        }
+
+        try {
+            $query = QueryBuilder::for(Company::query()->whereNull('deleted_at'))
+                ->allowedFilters([
+                    AllowedFilter::exact('naf'),
+                    AllowedFilter::exact('size_category'),
+                    AllowedFilter::exact('priority'),
+                    AllowedFilter::exact('discovery_source'),
+                    AllowedFilter::partial('denomination'),
+                    AllowedFilter::partial('postcode'),
+                ])
+                ->allowedSorts(['quality_score', 'enriched_at', 'denomination', 'created_at'])
+                ->defaultSort('-quality_score');
+
+            $page = $query->paginate($perPage);
+            return $this->ok([
+                'data' => $page->items(),
+                'meta' => [
+                    'total'        => $page->total(),
+                    'per_page'     => $page->perPage(),
+                    'current_page' => $page->currentPage(),
+                    'last_page'    => $page->lastPage(),
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('companies.index failed', ['exception' => $e->getMessage()]);
+            report($e);
+            return $this->ok([
+                'data' => [],
+                'meta' => ['total' => 0, 'per_page' => $perPage, 'current_page' => 1, 'last_page' => 1],
+                'degraded' => true,
+            ]);
+        }
     }
 
     /**

@@ -50,6 +50,53 @@ Recommandé : activer 1 source, smoke test 24h, monitor, puis suivante.
 5. **Direction Finder** : idem
 6. **Website scraper** : idem
 
+### Phase C (SMTP probing) — après Phase A stable
+
+Active la vérification SMTP des emails générés par l'Email Finder (étape 7
+du waterfall). Rate-limité à 50 probes/h/domain par défaut.
+
+⚠️ **Pré-requis** : IP serveur (Hetzner Helsinki) non blacklistée Spamhaus.
+Vérifier sur https://check.spamhaus.org avant activation. Le sprint Hardening
+introduit l'option Hunter.io en alternative (zéro risque blacklist IP).
+
+```bash
+ssh root@axion-crm-pro
+cd /opt/axion-crm-pro
+
+# Vérifier IP non blacklistée
+docker compose exec -T api php artisan tinker --execute='
+$ip = trim(shell_exec("curl -s ifconfig.me"));
+echo "Serveur IP: $ip\n";
+'
+# → coller le résultat sur check.spamhaus.org
+
+# Activer SMTP probing
+sed -i 's/^MOCK_SMTP=.*/MOCK_SMTP=false/' .env
+docker compose restart api horizon
+
+# Smoke test sur 1 contact connu
+docker compose exec -T api php artisan tinker --execute='
+$finder = app(\App\Services\Email\EmailFinderService::class);
+$r = $finder->find("john", "doe", "stripe.com");
+foreach ($r as $probe) { echo $probe->email . " => " . $probe->status . " (" . $probe->score . ")\n"; }
+'
+
+# Override rate limit ponctuel (pour campagne bulk)
+docker compose exec -T api php artisan tinker --execute='
+\Illuminate\Support\Facades\Redis::set("smtp_probe_rate:stripe.com", 0);
+echo "Reset done\n";
+'
+
+# Rollback : retour à mode mock
+sed -i 's/^MOCK_SMTP=.*/MOCK_SMTP=true/' .env
+docker compose restart api horizon
+```
+
+**Surveillance** :
+- Bounces / refus 550 : si > 10% sur 24h → repasse en mock + investigate
+- Quota Spamhaus : check journalier
+- Alternative recommandée (Hardening sprint) : passage à Hunter.io API
+
 ## POC charge (avant prod full)
 
 Script : `backend/scripts/load-poc.sh`

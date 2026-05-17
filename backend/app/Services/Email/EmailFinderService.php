@@ -5,14 +5,35 @@ namespace App\Services\Email;
 use App\Contracts\SmtpProber;
 use App\Data\Email\SmtpProbeResult;
 use App\Services\Dedup\DeduplicationService;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Str;
 
 /**
  * Email finder — génère 18 patterns candidats puis cascade SMTP N1-N5.
  * Score 0-100 retourné. Cf. spec/06_email_finder_validation.md.
+ *
+ * Hardening Sprint Pipeline 360° (2026-05-17) :
+ * - Rate limit Redis 50 probes/h/domain (clef `smtp_probe_rate:{domain}`).
+ * - Skip blacklist gros providers (toujours catchall, infos inutiles).
+ * - Catch \Throwable autour de chaque probe → mark invalid au lieu de crash.
  */
 class EmailFinderService
 {
+    /**
+     * Providers grand public → toujours catchall, probe inutile.
+     */
+    public const CATCHALL_PROVIDERS = [
+        'gmail.com', 'outlook.fr', 'outlook.com',
+        'yahoo.fr', 'yahoo.com',
+        'free.fr', 'orange.fr', 'wanadoo.fr',
+        'hotmail.fr', 'hotmail.com', 'laposte.net',
+        'live.fr', 'live.com', 'icloud.com',
+    ];
+
+    private const PROBE_RATE_LIMIT_PER_HOUR = 50;
+
+    private const PROBE_RATE_LIMIT_TTL_SECONDS = 3600;
     public const PATTERNS = [
         '{first}.{last}@{domain}',
         '{f}.{last}@{domain}',
@@ -48,6 +69,11 @@ class EmailFinderService
             return [];
         }
 
+        // Skip blacklist gros providers grand public — toujours catchall, infos inutiles
+        if (in_array(strtolower($domain), self::CATCHALL_PROVIDERS, true)) {
+            return [];
+        }
+
         $candidates = $knownPattern
             ? [$this->renderPattern($knownPattern, $firstName, $lastName, $domain)]
             : $this->generateCandidates($firstName, $lastName, $domain);
@@ -73,7 +99,30 @@ class EmailFinderService
                 );
                 continue;
             }
-            $probe = $this->prober->probe($email);
+
+            // Rate limit Redis 50 probes/h/domain
+            if (! $this->canProbeDomain($domain)) {
+                Log::info('EmailFinder rate limit reached', ['domain' => $domain]);
+                break;
+            }
+
+            try {
+                $probe = $this->prober->probe($email);
+            } catch (\Throwable $e) {
+                Log::warning('SMTP probe threw, marking invalid', [
+                    'email' => $email, 'error' => $e->getMessage(),
+                ]);
+                $probe = new SmtpProbeResult(
+                    email: $email,
+                    status: 'invalid',
+                    score: 0,
+                    mxHost: null,
+                    isCatchAll: false,
+                    isDisposable: false,
+                    isRole: false,
+                );
+            }
+
             $this->dedup->setEmailValidationCache(
                 $email, $probe->status, $probe->score, $probe->mxHost,
                 $probe->isCatchAll, $probe->isDisposable, $probe->isRole,
@@ -86,6 +135,27 @@ class EmailFinderService
 
         usort($results, fn ($a, $b) => $b->score <=> $a->score);
         return $results;
+    }
+
+    /**
+     * Vérifie + incrémente le rate limit Redis (50 probes/h/domain).
+     * Fail-open : si Redis KO, on autorise (mieux que bloquer le pipeline).
+     */
+    private function canProbeDomain(string $domain): bool
+    {
+        $key = 'smtp_probe_rate:' . strtolower($domain);
+        try {
+            $count = (int) Redis::incr($key);
+            if ($count === 1) {
+                Redis::expire($key, self::PROBE_RATE_LIMIT_TTL_SECONDS);
+            }
+            return $count <= self::PROBE_RATE_LIMIT_PER_HOUR;
+        } catch (\Throwable $e) {
+            Log::debug('Redis rate limit check failed, fail-open', [
+                'domain' => $domain, 'error' => $e->getMessage(),
+            ]);
+            return true;
+        }
     }
 
     /** @return list<string> */

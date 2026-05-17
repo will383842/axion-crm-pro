@@ -1,0 +1,22 @@
+# Copie ce fichier en `terraform.tfvars` puis remplis les valeurs.
+# terraform.tfvars est gitignored — NE JAMAIS commit avec des credentials réels.
+
+# Token Hetzner Cloud (génère sur console.hetzner.cloud → Project → Security → API Tokens)
+hcloud_token = "PASTE_HETZNER_TOKEN_HERE"
+
+# Token Cloudflare (déjà créé étape 1 — Edit zone DNS template)
+cloudflare_api_token = "PASTE_CLOUDFLARE_TOKEN_HERE"
+cloudflare_zone_id   = "64ce9366e5eda11e7ac6f1b5b4229b2c"
+
+# Clé SSH publique (contenu de ~/.ssh/axion_hetzner.pub)
+# Affiche-la côté PC : Get-Content $HOME\.ssh\axion_hetzner.pub
+deploy_ssh_public_key = "ssh-ed25519 AAAA...PASTE_FULL_PUBKEY axion-deploy"
+
+# Datacenter cible (Helsinki par défaut)
+hetzner_location = "hel1"
+
+# CIDRs IP autorisés à SSH (recommandé : ton IP fixe perso ou VPN)
+# Trouve ton IP : curl ifconfig.me
+ssh_allowed_cidrs = [
+  # "203.0.113.42/32",   # ton IP fixe ici
+]

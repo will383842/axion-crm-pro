@@ -4,6 +4,7 @@ namespace App\Services\FranceTravail;
 
 use App\Contracts\FranceTravailClient;
 use App\Data\Sources\JobOfferData;
+use App\Services\Http\SsrfGuard;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
@@ -17,6 +18,7 @@ class HttpFranceTravailClient implements FranceTravailClient
 
     public function fetchOffersBySiren(string $siren): array
     {
+        SsrfGuard::ensure(self::BASE_URL);
         $token = $this->getToken();
         $resp = Http::withToken($token)
             ->timeout(15)

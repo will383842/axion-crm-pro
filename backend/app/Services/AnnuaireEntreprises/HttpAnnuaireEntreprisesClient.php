@@ -4,6 +4,7 @@ namespace App\Services\AnnuaireEntreprises;
 
 use App\Contracts\AnnuaireEntreprisesClient;
 use App\Data\Sources\AnnuaireEntrepriseData;
+use App\Services\Http\SsrfGuard;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -16,6 +17,7 @@ class HttpAnnuaireEntreprisesClient implements AnnuaireEntreprisesClient
 
     public function fetchBySiren(string $siren): ?AnnuaireEntrepriseData
     {
+        SsrfGuard::ensure(self::BASE_URL);
         $resp = Http::timeout(15)
             ->retry(2, 1000)
             ->get(self::BASE_URL . '/search', ['q' => $siren, 'page' => 1, 'per_page' => 1]);

@@ -4,6 +4,7 @@ namespace App\Services\Insee;
 
 use App\Contracts\InseeClient;
 use App\Data\Sources\InseeCompanyData;
+use App\Services\Http\SsrfGuard;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 
@@ -17,6 +18,7 @@ class HttpInseeClient implements InseeClient
 
     public function fetchBySiren(string $siren): ?InseeCompanyData
     {
+        SsrfGuard::ensure(self::BASE_URL);
         $token = $this->getToken();
         $resp = Http::withToken($token)
             ->timeout(15)

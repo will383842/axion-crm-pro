@@ -19,13 +19,17 @@ class Company extends Model
 {
     use HasFactory;
 
+    // ATTENTION : `denomination_normalized` et `quality_badge` sont GENERATED COLUMNS
+    // côté Postgres (migration 000003) — exclues de fillable → toute tentative
+    // INSERT/UPDATE sur ces colonnes lèvera une erreur Postgres.
     protected $fillable = [
-        'workspace_id', 'siren', 'siret', 'denomination', 'denomination_normalized',
-        'naf', 'legal_form', 'effectif_range', 'size_category',
+        'workspace_id', 'siren', 'siret', 'denomination',
+        'naf', 'legal_form', 'effectif_range', 'effectif_min', 'effectif_max',
+        'size_category', 'is_artisan',
         'address', 'postcode', 'city', 'insee', 'lat', 'lon',
         'website', 'phone', 'linkedin_url',
         'quality_score', 'priority', 'discovery_source',
-        'signals', 'metadata', 'enriched_at',
+        'signals', 'metadata', 'enriched_at', 'last_seen_at',
     ];
 
     protected function casts(): array

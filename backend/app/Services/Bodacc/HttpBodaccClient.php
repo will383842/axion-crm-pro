@@ -4,6 +4,7 @@ namespace App\Services\Bodacc;
 
 use App\Contracts\BodaccClient;
 use App\Data\Sources\BodaccAnnouncementData;
+use App\Services\Http\SsrfGuard;
 use Illuminate\Support\Facades\Http;
 
 class HttpBodaccClient implements BodaccClient
@@ -12,6 +13,7 @@ class HttpBodaccClient implements BodaccClient
 
     public function fetchAnnouncementsBySiren(string $siren): array
     {
+        SsrfGuard::ensure(self::BASE_URL);
         $resp = Http::timeout(15)
             ->get(self::BASE_URL . '/search/', [
                 'dataset' => 'annonces-commerciales',

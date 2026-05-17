@@ -6,28 +6,34 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * @property int $id
+ * @property string $id    UUID
  * @property string $name
  * @property string $slug
- * @property ?string $logo_url
  * @property array $settings
  */
 class Workspace extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'slug', 'logo_url', 'settings'];
+    protected $keyType = 'string';
+    public $incrementing = false;
+
+    protected $fillable = ['id', 'name', 'slug', 'settings', 'cost_cap_eur', 'is_active'];
 
     protected function casts(): array
     {
-        return ['settings' => 'array'];
+        return [
+            'settings'     => 'array',
+            'is_active'    => 'boolean',
+            'cost_cap_eur' => 'decimal:2',
+        ];
     }
 
     public function users()
     {
-        return $this->belongsToMany(User::class, 'workspace_user')
-            ->withTimestamps()
-            ->withPivot('role');
+        return $this->belongsToMany(User::class, 'user_workspaces')
+            ->withTimestamps(false)
+            ->withPivot(['role_slug', 'invited_at', 'joined_at', 'revoked_at']);
     }
 
     public function companies()

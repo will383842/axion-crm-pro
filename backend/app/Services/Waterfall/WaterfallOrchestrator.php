@@ -91,18 +91,25 @@ class WaterfallOrchestrator
         $company->save();
 
         foreach ($data->representatives as $rep) {
-            DB::table('contacts')->upsert([[
-                'workspace_id'      => $company->workspace_id,
-                'company_id'        => $company->id,
-                'first_name'        => $rep['first_name'] ?? null,
-                'last_name'         => $rep['last_name'],
-                'role'              => $rep['role'] ?? 'dirigeant',
-                'discovery_source'  => 'annuaire-entreprises',
-                'sources'           => json_encode(['annuaire-entreprises']),
-                'metadata'          => json_encode($rep),
-                'created_at'        => now(),
-                'updated_at'        => now(),
-            ]], ['workspace_id', 'normalized_hash'], ['updated_at']);
+            // ATTENTION : `normalized_hash` est une GENERATED COLUMN Postgres → ne pas l'envoyer
+            // dans l'INSERT. La contrainte UNIQUE (workspace_id, normalized_hash) bloquera
+            // automatiquement les doublons via le hash calculé côté DB.
+            try {
+                DB::table('contacts')->insertOrIgnore([[
+                    'workspace_id'      => $company->workspace_id,
+                    'company_id'        => $company->id,
+                    'first_name'        => $rep['first_name'] ?? null,
+                    'last_name'         => $rep['last_name'],
+                    'role'              => $rep['role'] ?? 'dirigeant',
+                    'discovery_source'  => 'annuaire-entreprises',
+                    'sources'           => json_encode(['annuaire-entreprises']),
+                    'metadata'          => json_encode($rep),
+                    'created_at'        => now(),
+                    'updated_at'        => now(),
+                ]]);
+            } catch (\Throwable $e) {
+                \Log::warning('contact insert failed', ['rep' => $rep, 'error' => $e->getMessage()]);
+            }
         }
         $this->recordRun($company, 'annuaire-entreprises', 'success');
     }
@@ -130,9 +137,13 @@ class WaterfallOrchestrator
         if (env('MOCK_MODE', true)) {
             return;
         }
-        $sources = ['google-maps', 'pages-jaunes', 'website', 'google-search'];
-        foreach ($sources as $src) {
-            \Queue::push(new \App\Jobs\DispatchScrapeJob($company->id, $src), '', "scrape:{$src}");
+        $context = [
+            'siren'        => $company->siren,
+            'denomination' => $company->denomination,
+            'naf'          => $company->naf,
+        ];
+        foreach (['google-maps', 'pages-jaunes', 'website', 'google-search'] as $src) {
+            \App\Jobs\DispatchScrapeJob::dispatch($company->id, $src, $context, $company->website);
         }
     }
 

@@ -16,11 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // statefulApi() prepend EnsureFrontendRequestsAreStateful sur les routes api/* déjà.
+        // Ne pas le réajouter manuellement sur web (double-bind = double-exec).
         $middleware->statefulApi();
-
-        $middleware->web(append: [
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-        ]);
 
         $middleware->api(append: [
             SetCurrentWorkspace::class,

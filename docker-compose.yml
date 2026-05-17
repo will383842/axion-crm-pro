@@ -5,7 +5,11 @@
 
 services:
   postgres:
-    image: postgres:16-alpine
+    # Sprint 19.3 : image custom GHCR (pgvector + pg_partman + postgis), fallback build local
+    image: ${POSTGRES_IMAGE:-ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman}
+    build:
+      context: .
+      dockerfile: Dockerfile.postgres
     container_name: axion-crm-postgres
     environment:
       POSTGRES_DB: axion_crm

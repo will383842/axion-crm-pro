@@ -1,0 +1,54 @@
+# syntax=docker/dockerfile:1.7
+# ============================================================================
+# Axion CRM Pro — image Postgres custom (Sprint 19.3)
+# ============================================================================
+# Base : postgis/postgis:16-3.5 (Postgres 16 + PostGIS 3.5)
+# Adds : pgvector (semantic search), pg_partman (audit_logs partition mgmt)
+#
+# Build :
+#   docker build -f Dockerfile.postgres -t ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman .
+#
+# Push (CI) :
+#   docker push ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman
+# ============================================================================
+
+FROM postgis/postgis:16-3.5
+
+ARG PGVECTOR_VERSION=0.8.0
+ARG PG_PARTMAN_VERSION=5.1.0
+
+# Build deps + extensions installation
+USER root
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        git \
+        ca-certificates \
+        postgresql-server-dev-16; \
+    # --- pgvector ---
+    cd /tmp; \
+    git clone --branch v${PGVECTOR_VERSION} --depth 1 https://github.com/pgvector/pgvector.git; \
+    cd pgvector; \
+    make OPTFLAGS=""; \
+    make install; \
+    cd /tmp; \
+    rm -rf pgvector; \
+    # --- pg_partman ---
+    git clone --branch v${PG_PARTMAN_VERSION} --depth 1 https://github.com/pgpartman/pg_partman.git; \
+    cd pg_partman; \
+    make NO_BGW=1; \
+    make install; \
+    cd /tmp; \
+    rm -rf pg_partman; \
+    # --- Cleanup ---
+    apt-get purge -y --auto-remove build-essential git postgresql-server-dev-16; \
+    apt-get clean; \
+    rm -rf /var/lib/apt/lists/*
+
+# Expose extensions au shared_preload_libraries via custom config
+# pg_partman a un BGW (background worker) optionnel. On le désactive via NO_BGW=1 build flag,
+# car on n'utilise pas le maintenance worker (le cron de partition mgmt sera Laravel scheduler).
+COPY infra/postgres/init/ /docker-entrypoint-initdb.d/
+
+USER postgres

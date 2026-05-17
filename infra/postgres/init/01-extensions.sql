@@ -10,5 +10,6 @@ CREATE EXTENSION IF NOT EXISTS "citext";         -- emails case-insensitive
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";      -- uuid v4 (compat)
 CREATE EXTENSION IF NOT EXISTS "postgis";        -- géocodage + carte France
 CREATE EXTENSION IF NOT EXISTS "vector";         -- pgvector (futur embeddings)
--- pg_partman + pg_cron : nécessitent shared_preload_libraries + privilèges superuser
--- (provisionnés via Coolify image custom — cf. spec/02).
+-- pg_partman activé via image custom Dockerfile.postgres (Sprint 19.3).
+-- Necessite l'image ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman.
+CREATE EXTENSION IF NOT EXISTS "pg_partman";     -- partitioning audit_logs (Sprint 17)

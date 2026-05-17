@@ -1,0 +1,55 @@
+# Sprint 19.3 — build image Postgres custom (pgvector + pg_partman + postgis)
+# Trigger : manual + changement Dockerfile.postgres + tag release.
+# Output : ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman
+
+name: build-postgres-image
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'Dockerfile.postgres'
+      - 'infra/postgres/init/**'
+      - '.github/workflows/build-postgres-image.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/axion-crm-pro-postgres
+          tags: |
+            type=raw,value=16-3.5-vector-partman
+            type=raw,value=latest
+            type=sha,prefix=16-3.5-,format=short
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.postgres
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

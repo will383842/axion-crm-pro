@@ -18,8 +18,16 @@ return new class extends Migration
             CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
             CREATE EXTENSION IF NOT EXISTS postgis;
             CREATE EXTENSION IF NOT EXISTS vector;
-            -- pg_partman + pg_cron : provisionnés au niveau infra (shared_preload_libraries)
-            -- voir spec/02_architecture_infra.md
+            -- pg_partman activé via image custom Dockerfile.postgres (Sprint 19.3).
+            -- Si l'extension n'est pas dispo (image base sans pg_partman), le DO $$ skip silencieusement.
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'pg_partman') THEN
+                    EXECUTE 'CREATE EXTENSION IF NOT EXISTS pg_partman';
+                END IF;
+            EXCEPTION WHEN OTHERS THEN
+                RAISE NOTICE 'pg_partman not available, skipping (will be retried in image custom build)';
+            END $$;
 
             -- Fonction helper de normalisation des noms (dedup contacts)
             CREATE OR REPLACE FUNCTION normalize_name(input TEXT) RETURNS TEXT AS $$

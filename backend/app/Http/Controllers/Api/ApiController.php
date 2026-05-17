@@ -30,6 +30,13 @@ use Illuminate\Routing\Controller;
  * @OA\Tag(name="LLM", description="LLM Router 9 use cases + 5 providers")
  * @OA\Tag(name="RGPD", description="Requêtes RGPD art. 15-22 + AI Act register")
  * @OA\Tag(name="Phase 2", description="Campaigns / Cold email / LinkedIn / CRM / Analytics (501)")
+ * @OA\Tag(name="Notifications", description="Notifications in-app + WebSocket Reverb")
+ * @OA\Tag(name="Tags", description="Tags utilisateurs + auto-tags")
+ * @OA\Tag(name="Users", description="Users du workspace + invitations")
+ * @OA\Tag(name="Workspace", description="Workspace courant + recherche globale ⌘K")
+ * @OA\Tag(name="AuditLogs", description="Audit logs hash-chained SHA-256")
+ * @OA\Tag(name="SavedViews", description="Vues sauvegardées (filtres)")
+ * @OA\Tag(name="Rotations", description="Rotation LLM use cases")
  */
 abstract class ApiController extends Controller
 {

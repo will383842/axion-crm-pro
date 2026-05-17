@@ -12,6 +12,16 @@ class AuthController extends ApiController
 {
     public function __construct(private readonly AuthService $auth) {}
 
+    /**
+     * @OA\Post(path="/auth/login", tags={"Auth"}, summary="Login Sanctum SPA (email + password)",
+     *     @OA\RequestBody(required=true, @OA\JsonContent(required={"email","password"},
+     *         @OA\Property(property="email", type="string", format="email"),
+     *         @OA\Property(property="password", type="string", minLength=12),
+     *         @OA\Property(property="remember", type="boolean", default=false))),
+     *     @OA\Response(response=200, description="Loggé (vérifier requires_2fa)"),
+     *     @OA\Response(response=422, description="Credentials invalides ou locked"),
+     *     @OA\Response(response=429, description="Throttle"))
+     */
     public function login(LoginRequest $request): JsonResponse
     {
         $result = $this->auth->attemptLogin(
@@ -27,12 +37,23 @@ class AuthController extends ApiController
         ]);
     }
 
+    /**
+     * @OA\Post(path="/auth/logout", tags={"Auth"}, summary="Logout (invalide session)",
+     *     security={{"sanctumCookie":{}}},
+     *     @OA\Response(response=204, description="Déconnecté"))
+     */
     public function logout(Request $request): JsonResponse
     {
         $this->auth->logout($request);
         return response()->json(['ok' => true], 204);
     }
 
+    /**
+     * @OA\Get(path="/auth/me", tags={"Auth"}, summary="User courant + rôles",
+     *     security={{"sanctumCookie":{}}},
+     *     @OA\Response(response=200, description="OK"),
+     *     @OA\Response(response=401, description="Unauthenticated"))
+     */
     public function me(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -48,6 +69,12 @@ class AuthController extends ApiController
     /**
      * Sprint 18.4 — marque le tour d'onboarding comme vu.
      * Endpoint sécurité-sensible mais idempotent.
+     */
+    /**
+     * @OA\Post(path="/auth/onboarding/complete", tags={"Auth"}, summary="Marque l'onboarding tour comme vu (idempotent)",
+     *     security={{"sanctumCookie":{}}},
+     *     @OA\Response(response=200, description="OK"),
+     *     @OA\Response(response=401, description="Unauthenticated"))
      */
     public function completeOnboardingTour(Request $request): JsonResponse
     {

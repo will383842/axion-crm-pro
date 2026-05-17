@@ -8,6 +8,11 @@ use Illuminate\Http\Request;
 
 class LinkedInController extends ApiController
 {
+    /**
+     * @OA\Get(path="/phase2/linkedin", tags={"Phase 2"}, summary="LinkedIn outreach (Phase 2 — stub 501)",
+     *     security={{"sanctumCookie":{}}},
+     *     @OA\Response(response=501, description="Not implemented"))
+     */
     public function __invoke(Request $r): JsonResponse
     {
         return $this->notImplemented('Phase 2');

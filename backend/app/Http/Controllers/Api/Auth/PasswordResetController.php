@@ -17,6 +17,12 @@ use Illuminate\Validation\ValidationException;
 
 class PasswordResetController extends ApiController
 {
+    /**
+     * @OA\Post(path="/auth/password/forgot", tags={"Auth"}, summary="Envoie email reset password (anti-enum, throttled)",
+     *     @OA\RequestBody(required=true, @OA\JsonContent(required={"email"},
+     *         @OA\Property(property="email", type="string", format="email"))),
+     *     @OA\Response(response=200, description="Envoyé (toujours)"))
+     */
     public function forgot(Request $request): JsonResponse
     {
         $request->validate(['email' => ['required', 'email', 'max:254']]);
@@ -52,6 +58,17 @@ class PasswordResetController extends ApiController
         return $this->ok(['sent' => true]);
     }
 
+    /**
+     * @OA\Post(path="/auth/password/reset", tags={"Auth"}, summary="Reset password via token (vérif HIBP)",
+     *     @OA\RequestBody(required=true, @OA\JsonContent(required={"email","token","password"},
+     *         @OA\Property(property="email", type="string", format="email"),
+     *         @OA\Property(property="token", type="string", maxLength=64),
+     *         @OA\Property(property="password", type="string", minLength=12),
+     *         @OA\Property(property="password_confirmation", type="string"))),
+     *     @OA\Response(response=200, description="Reset OK"),
+     *     @OA\Response(response=401, description="Token invalide/expiré"),
+     *     @OA\Response(response=422, description="Password compromis (HIBP) ou validation"))
+     */
     public function reset(Request $request): JsonResponse
     {
         $request->validate([

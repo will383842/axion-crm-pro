@@ -16,6 +16,12 @@ class RgpdRequestsController extends ApiController
         private readonly GdprPortabilityService $portability,
     ) {}
 
+    /**
+     * @OA\Get(path="/rgpd/requests", tags={"RGPD"}, summary="Liste demandes RGPD (art. 15-22)",
+     *     security={{"sanctumCookie":{}}},
+     *     @OA\Parameter(name="status", in="query", @OA\Schema(type="string", enum={"pending","done","rejected"})),
+     *     @OA\Response(response=200, description="OK"))
+     */
     public function index(Request $r): JsonResponse
     {
         $rows = RgpdRequest::query()
@@ -25,6 +31,16 @@ class RgpdRequestsController extends ApiController
         return $this->ok($rows);
     }
 
+    /**
+     * @OA\Post(path="/rgpd/requests", tags={"RGPD"}, summary="Crée une demande RGPD",
+     *     security={{"sanctumCookie":{}}},
+     *     @OA\RequestBody(required=true, @OA\JsonContent(
+     *         required={"type","subject_email"},
+     *         @OA\Property(property="type", type="string", enum={"access","portability","erasure","rectification","opposition"}),
+     *         @OA\Property(property="subject_email", type="string", format="email"),
+     *         @OA\Property(property="metadata", type="object"))),
+     *     @OA\Response(response=201, description="Créée"))
+     */
     public function store(Request $r): JsonResponse
     {
         $validated = $r->validate([
@@ -44,6 +60,13 @@ class RgpdRequestsController extends ApiController
         return $this->ok($req, 201);
     }
 
+    /**
+     * @OA\Post(path="/rgpd/requests/{req}/process", tags={"RGPD"}, summary="Traite une demande (erasure / portability)",
+     *     security={{"sanctumCookie":{}}},
+     *     @OA\Parameter(name="req", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(response=200, description="Traité"),
+     *     @OA\Response(response=409, description="Déjà traité"))
+     */
     public function process(Request $r, RgpdRequest $req): JsonResponse
     {
         if ($req->status === 'done') {
@@ -66,6 +89,12 @@ class RgpdRequestsController extends ApiController
         return $this->ok(['request' => $req->fresh(), 'result' => $result]);
     }
 
+    /**
+     * @OA\Get(path="/rgpd/export/{token}", tags={"RGPD"}, summary="Télécharge l'export RGPD via token signé",
+     *     @OA\Parameter(name="token", in="path", required=true, @OA\Schema(type="string", maxLength=64)),
+     *     @OA\Response(response=200, description="JSON export"),
+     *     @OA\Response(response=404, description="Token invalide/expiré"))
+     */
     public function export(string $token): JsonResponse
     {
         $json = $this->portability->retrieve($token);

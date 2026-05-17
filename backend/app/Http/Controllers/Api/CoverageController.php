@@ -13,6 +13,12 @@ class CoverageController extends ApiController
 {
     public function __construct(private readonly ZoneRotator $rotator) {}
 
+    /**
+     * @OA\Get(path="/coverage", tags={"Coverage"}, summary="Matrice de couverture France (région / département / ville)",
+     *     security={{"sanctumCookie":{}}},
+     *     @OA\Parameter(name="level", in="query", @OA\Schema(type="string", enum={"region","department","city"}, default="department")),
+     *     @OA\Response(response=200, description="Cells groupées par niveau"))
+     */
     public function index(Request $r): JsonResponse
     {
         $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
@@ -67,6 +73,12 @@ class CoverageController extends ApiController
         return $this->ok(['level' => $level, 'cells' => $cells]);
     }
 
+    /**
+     * @OA\Get(path="/coverage/next-zone", tags={"Coverage"}, summary="Sélectionne la prochaine zone à scraper (rotation déterministe)",
+     *     security={{"sanctumCookie":{}}},
+     *     @OA\Parameter(name="preferred_dept", in="query", @OA\Schema(type="string")),
+     *     @OA\Response(response=200, description="Zone sélectionnée"))
+     */
     public function nextZone(Request $r): JsonResponse
     {
         $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
@@ -77,6 +89,17 @@ class CoverageController extends ApiController
         return $this->ok(['zone' => $zone]);
     }
 
+    /**
+     * @OA\Post(path="/coverage/launch", tags={"Coverage"}, summary="Lance un scraping ciblé département/NAF/taille",
+     *     security={{"sanctumCookie":{}}},
+     *     @OA\RequestBody(required=true, @OA\JsonContent(
+     *         required={"department"},
+     *         @OA\Property(property="department", type="string", maxLength=3),
+     *         @OA\Property(property="naf", type="string", maxLength=5),
+     *         @OA\Property(property="size_category", type="string"),
+     *         @OA\Property(property="limit", type="integer", minimum=1, maximum=1000))),
+     *     @OA\Response(response=200, description="Job queué"))
+     */
     public function launch(Request $r): JsonResponse
     {
         $validated = $r->validate([
@@ -97,6 +120,12 @@ class CoverageController extends ApiController
         return $this->ok(['queued' => true]);
     }
 
+    /**
+     * @OA\Get(path="/coverage/cells/{cell}", tags={"Coverage"}, summary="Détail d'une cellule de couverture",
+     *     security={{"sanctumCookie":{}}},
+     *     @OA\Parameter(name="cell", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(response=200, description="OK"))
+     */
     public function showCell(int $cell): JsonResponse
     {
         return $this->ok(['id' => $cell]);

@@ -50,7 +50,11 @@ export function FranceCoverageMap({
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MlMap | null>(null);
+  const onZoneClickRef = useRef(onZoneClick);
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    onZoneClickRef.current = onZoneClick;
+  }, [onZoneClick]);
 
   useEffect(() => {
     LOG('useEffect:init — container=', containerRef.current, 'cells.length=', cells.length, 'mode=', mode);
@@ -92,7 +96,54 @@ export function FranceCoverageMap({
       const sourceId = (e as { sourceId?: string }).sourceId;
       LOG('event:dataloading — sourceId=', sourceId);
     });
-    map.on('idle', () => LOG('event:idle — map fully rendered'));
+    let idleLogged = false;
+    map.on('idle', () => {
+      if (idleLogged) return;
+      idleLogged = true;
+      const canvas = map.getCanvas();
+      const cContainer = map.getContainer();
+      const cCanvas = window.getComputedStyle(canvas);
+      const bounds = map.getBounds();
+      LOG('event:idle — map fully rendered');
+      LOG('canvas buffer dims — width=', canvas.width, 'height=', canvas.height);
+      LOG('canvas CSS dims — clientW=', canvas.clientWidth, 'clientH=', canvas.clientHeight, 'display=', cCanvas.display, 'position=', cCanvas.position);
+      LOG('canvas style.cssText=', canvas.style.cssText);
+      LOG('mapcontainer children=', cContainer.children.length, 'innerHTML start=', cContainer.innerHTML.slice(0, 200));
+      LOG('viewport bounds — sw=', bounds.getSouthWest().toArray(), 'ne=', bounds.getNorthEast().toArray(), 'center=', map.getCenter().toArray(), 'zoom=', map.getZoom());
+
+      // Inspecte le 1er feature pour vérifier WGS84 (lon ∈ [-5,10], lat ∈ [41,52] pour FR métropole).
+      try {
+        const features = map.querySourceFeatures('departements');
+        if (features.length > 0) {
+          const first = features[0]!;
+          const geom = first.geometry as { type?: string; coordinates?: unknown };
+          // Premier point du premier ring si Polygon, sinon de la 1re polygon du MultiPolygon.
+          let firstCoord: unknown = null;
+          if (geom.type === 'Polygon') {
+            firstCoord = (geom.coordinates as number[][][])[0]?.[0];
+          } else if (geom.type === 'MultiPolygon') {
+            firstCoord = (geom.coordinates as number[][][][])[0]?.[0]?.[0];
+          }
+          LOG('first feature — geom.type=', geom.type, 'firstCoord=', firstCoord, 'properties=', first.properties);
+
+          // Auto-fitBounds sur les features (si elles existent et ont l'air valides WGS84).
+          if (Array.isArray(firstCoord) && firstCoord.length === 2) {
+            const [lon, lat] = firstCoord as [number, number];
+            const isWGS84 = lon > -180 && lon < 180 && lat > -90 && lat < 90;
+            LOG('WGS84 check —', isWGS84 ? '✅ OK' : '⚠️ NOT WGS84 — projection probable Lambert93 ou autre');
+            if (isWGS84) {
+              LOG('forcing fitBounds [[-5, 41], [10, 52]] (France métropole)');
+              map.fitBounds([[-5, 41], [10, 52]], { padding: 20, animate: false });
+              map.resize();
+            }
+          }
+        } else {
+          LOG('⚠️ no features in source departements at idle!');
+        }
+      } catch (err) {
+        LOG('⚠️ querySourceFeatures failed', err);
+      }
+    });
 
     map.on('load', () => {
       LOG('event:load — cancelled=', cancelled);
@@ -159,7 +210,8 @@ export function FranceCoverageMap({
 
       map.on('click', 'dept-fill', (e) => {
         const code = e.features?.[0]?.properties?.['code'] as string | undefined;
-        if (code && onZoneClick) onZoneClick(code);
+        const cb = onZoneClickRef.current;
+        if (code && cb) cb(code);
       });
       map.on('mouseenter', 'dept-fill', () => (map.getCanvas().style.cursor = 'pointer'));
       map.on('mouseleave', 'dept-fill', () => (map.getCanvas().style.cursor = ''));
@@ -184,7 +236,8 @@ export function FranceCoverageMap({
       map.remove();
       mapRef.current = null;
     };
-  }, [onZoneClick]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Met à jour feature-state quand cells change
   useEffect(() => {
@@ -203,8 +256,9 @@ export function FranceCoverageMap({
   }, [cells]);
 
   return (
-    <div className="relative h-[600px] w-full overflow-hidden rounded-xl border border-slate-200">
-      <div ref={containerRef} className="absolute inset-0" aria-label="Carte de couverture France" role="region" />
+    <div className="relative h-[600px] w-full overflow-hidden rounded-xl border border-slate-200" style={{ backgroundColor: '#fbbf24' }}>
+      {/* fond JAUNE debug : si on voit du jaune, le canvas n'a pas de taille. Si on voit blanc, canvas OK mais polygones ne rendent pas. */}
+      <div ref={containerRef} className="absolute inset-0" style={{ width: '100%', height: '100%' }} aria-label="Carte de couverture France" role="region" />
       <div className="pointer-events-none absolute left-3 top-3 rounded-md bg-white/90 px-3 py-1.5 text-xs font-medium shadow-sm">
         Mode : {mode === 'visu' ? 'Visualisation' : mode === 'search' ? 'Recherche' : 'Action'}
       </div>

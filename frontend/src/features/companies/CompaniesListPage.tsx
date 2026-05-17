@@ -58,15 +58,46 @@ const PRIORITY_OPTIONS = [
   { value: 'gelee', label: 'Gelée' },
 ];
 
+const PROSPECTION_TABS = [
+  { value: '', label: 'Tous' },
+  { value: 'ready_for_outreach', label: 'Prospectables' },
+  { value: 'partial_email', label: 'Partiels' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'archived_no_email', label: 'Archivés' },
+];
+
+const SECTOR_OPTIONS = [
+  { value: '', label: 'Tous secteurs' },
+  { value: 'it_saas', label: 'IT / SaaS' },
+  { value: 'btp', label: 'BTP' },
+  { value: 'sante', label: 'Santé' },
+  { value: 'commerce', label: 'Commerce' },
+  { value: 'services_pro', label: 'Services pro' },
+  { value: 'finance_assurance', label: 'Finance / Assurance' },
+  { value: 'industrie', label: 'Industrie' },
+  { value: 'hotellerie_restauration', label: 'Hôtellerie / Restauration' },
+  { value: 'transport', label: 'Transport' },
+  { value: 'agro_alimentaire', label: 'Agro-alimentaire' },
+  { value: 'autre', label: 'Autre' },
+];
+
 interface Filter {
   size: string;
   priority: string;
   search: string;
   naf: string;
   quality: string;
+  // Sprint Pipeline 360°
+  prospection_status: string;
+  department_code: string;
+  region_code: string;
+  sector_main: string;
 }
 
-const EMPTY_FILTER: Filter = { size: '', priority: '', search: '', naf: '', quality: '' };
+const EMPTY_FILTER: Filter = {
+  size: '', priority: '', search: '', naf: '', quality: '',
+  prospection_status: '', department_code: '', region_code: '', sector_main: '',
+};
 
 export function CompaniesListPage() {
   const [page, setPage] = useState(1);
@@ -83,6 +114,10 @@ export function CompaniesListPage() {
         ...(filter.search ? { 'filter[denomination]': filter.search } : {}),
         ...(filter.naf ? { 'filter[naf]': filter.naf } : {}),
         ...(filter.quality ? { 'filter[quality]': filter.quality } : {}),
+        ...(filter.prospection_status ? { 'filter[prospection_status]': filter.prospection_status } : {}),
+        ...(filter.department_code ? { 'filter[department_code]': filter.department_code } : {}),
+        ...(filter.region_code ? { 'filter[region_code]': filter.region_code } : {}),
+        ...(filter.sector_main ? { 'filter[sector_main]': filter.sector_main } : {}),
       });
       const r = await api.get<CompaniesResponse>(`/companies?${params.toString()}`);
       return r.data;
@@ -142,7 +177,14 @@ export function CompaniesListPage() {
     setPage(1);
   };
 
-  const hasActiveFilter = filter.search || filter.size || filter.priority || filter.naf || filter.quality;
+  const hasActiveFilter = filter.search || filter.size || filter.priority || filter.naf
+    || filter.quality || filter.prospection_status || filter.department_code
+    || filter.region_code || filter.sector_main;
+
+  const activeFilterCount = [
+    filter.search, filter.size, filter.priority, filter.naf, filter.quality,
+    filter.prospection_status, filter.department_code, filter.region_code, filter.sector_main,
+  ].filter(Boolean).length;
 
   return (
     <div className="px-6 py-6">
@@ -203,6 +245,28 @@ export function CompaniesListPage() {
         />
       </div>
 
+      {/* Prospection status tabs */}
+      <div className="mb-3 flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-800">
+        {PROSPECTION_TABS.map((tab) => {
+          const active = filter.prospection_status === tab.value;
+          return (
+            <button
+              key={tab.value || 'all'}
+              onClick={() => setFilterAndReset({ prospection_status: tab.value })}
+              className={cn(
+                'px-3 py-2 text-sm font-medium border-b-2 transition',
+                active
+                  ? 'border-slate-900 text-slate-900 dark:border-white dark:text-white'
+                  : 'border-transparent text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white',
+              )}
+              type="button"
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Toolbar */}
       <Toolbar
         left={
@@ -220,6 +284,12 @@ export function CompaniesListPage() {
               ariaLabel="Filtre taille"
             />
             <FilterSelect
+              value={filter.sector_main}
+              onChange={(v) => setFilterAndReset({ sector_main: v })}
+              options={SECTOR_OPTIONS}
+              ariaLabel="Filtre secteur"
+            />
+            <FilterSelect
               value={filter.quality}
               onChange={(v) => setFilterAndReset({ quality: v })}
               options={QUALITY_OPTIONS}
@@ -233,6 +303,14 @@ export function CompaniesListPage() {
             />
             <input
               type="text"
+              value={filter.department_code}
+              onChange={(e) => setFilterAndReset({ department_code: e.target.value.toUpperCase().slice(0, 3) })}
+              placeholder="Dept (75…)"
+              aria-label="Filtre département"
+              className="h-9 w-24 rounded-lg bg-white px-3 font-mono text-xs text-slate-900 ring-1 ring-slate-200 transition placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600"
+            />
+            <input
+              type="text"
               value={filter.naf}
               onChange={(e) => setFilterAndReset({ naf: e.target.value })}
               placeholder="Code NAF…"
@@ -243,9 +321,12 @@ export function CompaniesListPage() {
         }
         right={
           hasActiveFilter ? (
-            <Button variant="ghost" size="sm" onClick={() => { setFilter(EMPTY_FILTER); setPage(1); }}>
-              Réinitialiser les filtres
-            </Button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500">{activeFilterCount} filtre{activeFilterCount > 1 ? 's' : ''} actif{activeFilterCount > 1 ? 's' : ''}</span>
+              <Button variant="ghost" size="sm" onClick={() => { setFilter(EMPTY_FILTER); setPage(1); }}>
+                Réinitialiser
+              </Button>
+            </div>
           ) : null
         }
       />

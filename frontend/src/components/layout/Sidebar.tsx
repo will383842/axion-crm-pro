@@ -56,6 +56,7 @@ const SECTIONS: NavSection[] = [
     items: [
       { to: '/', label: 'Tableau de bord', icon: <LayoutDashboard className="h-4 w-4" />, dataTour: 'nav-dashboard' },
       { to: '/coverage', label: 'Couverture France', icon: <MapIcon className="h-4 w-4" /> },
+      { to: '/campaigns', label: 'Campagnes', icon: <Megaphone className="h-4 w-4" />, dataTour: 'nav-campaigns' },
       { to: '/scraper-runs', label: 'Runs de scraping', icon: <Activity className="h-4 w-4" /> },
     ],
   },
@@ -97,7 +98,6 @@ const SECTIONS: NavSection[] = [
     id: 'phase2',
     title: 'Phase 2',
     items: [
-      { to: '/campaigns', label: 'Campagnes', icon: <Megaphone className="h-4 w-4" />, locked: true },
       { to: '/cold-email', label: 'E-mails à froid', icon: <Mail className="h-4 w-4" />, locked: true },
       { to: '/linkedin', label: 'Prospection LinkedIn', icon: <Linkedin className="h-4 w-4" />, locked: true },
       { to: '/crm', label: 'Pipeline CRM', icon: <KanbanSquare className="h-4 w-4" />, locked: true },

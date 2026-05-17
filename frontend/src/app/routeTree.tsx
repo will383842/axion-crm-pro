@@ -19,8 +19,11 @@ import { AuditLogsPage } from '@/features/rgpd/AuditLogsPage';
 import { UsersPage } from '@/features/users/UsersPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { NotFoundPage } from '@/features/misc/NotFoundPage';
+// Sprint 19.7 — Scraping Campaigns (live)
+import { CampaignsListPage } from '@/features/campaigns/CampaignsListPage';
+import { CampaignWizardPage } from '@/features/campaigns/CampaignWizardPage';
+import { CampaignDetailPage } from '@/features/campaigns/CampaignDetailPage';
 // Phase 2 scaffold stubs
-import { CampaignsStub } from '@/features/phase2-scaffold/CampaignsStub';
 import { ColdEmailStub } from '@/features/phase2-scaffold/ColdEmailStub';
 import { LinkedInStub } from '@/features/phase2-scaffold/LinkedInStub';
 import { CrmStub } from '@/features/phase2-scaffold/CrmStub';
@@ -54,8 +57,11 @@ const auditRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/audi
 const usersRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/users', component: UsersPage });
 const settingsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/settings', component: SettingsPage });
 
+// Sprint 19.7 — Campagnes de scraping (live)
+const campaignsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/campaigns', component: CampaignsListPage });
+const campaignsNewRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/campaigns/new', component: CampaignWizardPage });
+const campaignDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/campaigns/$campaignId', component: CampaignDetailPage });
 // Phase 2 stubs
-const campaignsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/campaigns', component: CampaignsStub });
 const coldEmailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/cold-email', component: ColdEmailStub });
 const linkedInRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/linkedin', component: LinkedInStub });
 const crmRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/crm', component: CrmStub });
@@ -84,6 +90,8 @@ export const routeTree = rootRoute.addChildren([
     usersRoute,
     settingsRoute,
     campaignsRoute,
+    campaignsNewRoute,
+    campaignDetailRoute,
     coldEmailRoute,
     linkedInRoute,
     crmRoute,

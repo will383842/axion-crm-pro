@@ -22,7 +22,7 @@ class AuthController extends ApiController
         );
 
         return $this->ok([
-            'user'         => $result['user']->only(['id', 'email', 'name', 'current_workspace_id', 'totp_enabled_at', 'first_login_completed_at']),
+            'user'         => $result['user']->only(['id', 'email', 'name', 'current_workspace_id', 'totp_enabled_at', 'first_login_completed_at', 'onboarding_tour_completed_at']),
             'requires_2fa' => $result['requires_2fa'],
         ]);
     }
@@ -40,8 +40,27 @@ class AuthController extends ApiController
             return response()->json(['error' => 'unauthenticated'], 401);
         }
         return $this->ok([
-            'user'  => $user->only(['id', 'email', 'name', 'locale', 'timezone', 'current_workspace_id', 'totp_enabled_at', 'first_login_completed_at']),
+            'user'  => $user->only(['id', 'email', 'name', 'locale', 'timezone', 'current_workspace_id', 'totp_enabled_at', 'first_login_completed_at', 'onboarding_tour_completed_at']),
             'roles' => $user->getRoleNames(),
+        ]);
+    }
+
+    /**
+     * Sprint 18.4 — marque le tour d'onboarding comme vu.
+     * Endpoint sécurité-sensible mais idempotent.
+     */
+    public function completeOnboardingTour(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['error' => 'unauthenticated'], 401);
+        }
+        if ($user->onboarding_tour_completed_at === null) {
+            $user->onboarding_tour_completed_at = now();
+            $user->save();
+        }
+        return $this->ok([
+            'onboarding_tour_completed_at' => $user->onboarding_tour_completed_at?->toIso8601String(),
         ]);
     }
 }

@@ -28,7 +28,7 @@ class User extends Authenticatable
 
     protected $fillable = [
         'id', 'name', 'email', 'password_hash', 'current_workspace_id',
-        'two_factor_enabled', 'first_login_completed_at',
+        'two_factor_enabled', 'first_login_completed_at', 'onboarding_tour_completed_at',
         'totp_enabled_at', 'totp_secret', 'two_factor_secret', 'two_factor_recovery_codes',
         'last_login_at', 'last_login_ip', 'last_login_user_agent',
         'failed_login_count', 'locked_until', 'email_verified_at',
@@ -44,8 +44,9 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at'         => 'datetime',
-            'first_login_completed_at'  => 'datetime',
+            'email_verified_at'              => 'datetime',
+            'first_login_completed_at'       => 'datetime',
+            'onboarding_tour_completed_at'   => 'datetime',
             'totp_enabled_at'           => 'datetime',
             'last_login_at'             => 'datetime',
             'locked_until'              => 'datetime',

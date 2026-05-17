@@ -70,3 +70,60 @@ it('skips offres with invalid SIRET', function () {
     $client = new FranceTravailDiscoveryClient(clientId: 'id', clientSecret: 'secret');
     expect($client->searchEntreprisesByDept('75', 10))->toBe([]);
 });
+
+/* ============================================================================
+ * Sprint H3 — Filtre INSEE etatAdministratif='A' actif
+ * ============================================================================ */
+
+it('Sprint H3: filters out radiées entreprises via INSEE check', function () {
+    Http::fake([
+        '*oauth2/access_token*' => Http::response(['access_token' => 'tok'], 200),
+        'api.francetravail.io/*' => Http::response([
+            'resultats' => [
+                ['id' => 'A', 'entreprise' => ['siret' => '11111111100012', 'nom' => 'Active'], 'lieuTravail' => []],
+                ['id' => 'B', 'entreprise' => ['siret' => '22222222200012', 'nom' => 'Radiee'], 'lieuTravail' => []],
+                ['id' => 'C', 'entreprise' => ['siret' => '33333333300012', 'nom' => 'Inconnue'], 'lieuTravail' => []],
+            ],
+        ], 200),
+    ]);
+
+    app()->bind(\App\Contracts\InseeClient::class, fn () => new class implements \App\Contracts\InseeClient {
+        public function fetchBySiren(string $siren): ?\App\Data\Sources\InseeCompanyData {
+            return match ($siren) {
+                '111111111' => new \App\Data\Sources\InseeCompanyData($siren, etatAdministratif: 'A'),
+                '222222222' => new \App\Data\Sources\InseeCompanyData($siren, etatAdministratif: 'C'),
+                default     => null,
+            };
+        }
+        public function searchByCriteria(array $criteria): array { return []; }
+    });
+
+    $client = new FranceTravailDiscoveryClient(clientId: 'id', clientSecret: 'secret');
+    $results = $client->searchEntreprisesByDept('75', 100);
+
+    expect($results)->toHaveCount(1);
+    expect($results[0]->siren)->toBe('111111111');
+});
+
+it('Sprint H3: graceful fallback if InseeClient throws', function () {
+    Http::fake([
+        '*oauth2/access_token*' => Http::response(['access_token' => 'tok'], 200),
+        'api.francetravail.io/*' => Http::response([
+            'resultats' => [
+                ['id' => 'A', 'entreprise' => ['siret' => '44444444400012', 'nom' => 'Whatever'], 'lieuTravail' => []],
+            ],
+        ], 200),
+    ]);
+
+    app()->bind(\App\Contracts\InseeClient::class, fn () => new class implements \App\Contracts\InseeClient {
+        public function fetchBySiren(string $siren): ?\App\Data\Sources\InseeCompanyData {
+            throw new \RuntimeException('INSEE down');
+        }
+        public function searchByCriteria(array $criteria): array { return []; }
+    });
+
+    $client = new FranceTravailDiscoveryClient(clientId: 'id', clientSecret: 'secret');
+    $results = $client->searchEntreprisesByDept('75', 100);
+
+    expect($results)->toHaveCount(1);
+});

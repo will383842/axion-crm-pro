@@ -2,6 +2,7 @@
 
 namespace App\Services\FranceTravail;
 
+use App\Contracts\InseeClient;
 use App\Data\Sources\InseeCompanyData;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -71,12 +72,71 @@ class FranceTravailDiscoveryClient
 
             $offres = $response->json('resultats', []);
 
-            return $this->extractUniqueEntreprises(is_array($offres) ? $offres : []);
+            $candidates = $this->extractUniqueEntreprises(is_array($offres) ? $offres : []);
+
+            // Sprint H3 — Filtre etatAdministratif='A' via INSEE.
+            // Entreprises radiées ne doivent pas être enrichies (waterfall économisé).
+            return $this->filterActiveByInsee($candidates);
         } catch (\Throwable $e) {
+            if (class_exists(\Sentry\State\Hub::class)) {
+                \Sentry\captureException($e);
+            }
             Log::warning('FranceTravailDiscovery exception', ['error' => $e->getMessage()]);
 
             return [];
         }
+    }
+
+    /**
+     * Sprint H3 — Pour chaque candidat France Travail, valide via INSEE que
+     * l'entreprise n'est pas radiée (etatAdministratifUniteLegale='A').
+     *
+     * Si INSEE indisponible (mock désactivé ou clé manquante) → graceful pass-through
+     * (mieux que tout filtrer et perdre 100% du résultat).
+     *
+     * @param  array<int, InseeCompanyData>  $candidates
+     * @return array<int, InseeCompanyData>
+     */
+    private function filterActiveByInsee(array $candidates): array
+    {
+        if (empty($candidates)) {
+            return [];
+        }
+
+        try {
+            $insee = app(InseeClient::class);
+        } catch (\Throwable $e) {
+            Log::debug('FranceTravailDiscovery: InseeClient unavailable, skip filter', ['error' => $e->getMessage()]);
+            return $candidates;
+        }
+
+        $valid = [];
+        foreach ($candidates as $candidate) {
+            try {
+                $data = $insee->fetchBySiren($candidate->siren);
+                if (! $data) {
+                    // Siren inconnu INSEE → skip (probablement erreur de saisie côté offre FT)
+                    continue;
+                }
+                if ($data->etatAdministratif !== null && $data->etatAdministratif !== 'A') {
+                    // Radiée → skip
+                    continue;
+                }
+            } catch (\Throwable $e) {
+                // INSEE error sur un siren → on garde le candidat (graceful) mais log
+                Log::debug('FranceTravailDiscovery INSEE check failed', [
+                    'siren' => $candidate->siren,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+            // On préserve le candidat FT tel quel (FT = source pour la discovery,
+            // INSEE consulté uniquement pour filtrer les radiées). L'enrichissement
+            // INSEE des autres champs (denomination, naf, effectif) se fait plus
+            // tard dans WaterfallOrchestrator::step1_insee.
+            $valid[] = $candidate;
+        }
+
+        return $valid;
     }
 
     /**

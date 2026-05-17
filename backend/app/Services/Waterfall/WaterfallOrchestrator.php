@@ -62,7 +62,17 @@ class WaterfallOrchestrator
     {
         Log::info('Waterfall start', ['company_id' => $company->id, 'siren' => $company->siren]);
 
-        $this->step1_insee($company);
+        // Sprint H3 — Si étape INSEE détecte entreprise radiée → archive + SKIP tout le waterfall
+        // (économie ressources, plus de Brave/Hunter/etc gaspillés)
+        if ($this->step1_insee($company) === 'archived') {
+            $company->enriched_at = now();
+            $company->save();
+            Log::info('Waterfall short-circuit (entreprise radiée)', [
+                'company_id' => $company->id, 'siren' => $company->siren,
+            ]);
+            return;
+        }
+
         $this->step2_annuaire($company);
         $this->step3_bodacc($company);
         $this->step3b_find_domain($company);
@@ -83,15 +93,31 @@ class WaterfallOrchestrator
         Log::info('Waterfall done', ['company_id' => $company->id, 'status' => $company->prospection_status]);
     }
 
-    private function step1_insee(Company $company): void
+    /**
+     * Retourne 'archived' si l'entreprise est radiée (court-circuit waterfall),
+     * 'ok' si active ou état inconnu (poursuite normale).
+     */
+    private function step1_insee(Company $company): string
     {
         if (! $this->dedup->shouldRunScrape((string) $company->workspace_id, 'insee', ['siren' => $company->siren])['should_run']) {
-            return;
+            return 'ok';
         }
         $data = $this->insee->fetchBySiren($company->siren);
         if (! $data) {
-            return;
+            return 'ok';
         }
+
+        // Sprint H3 — Garde-fou état admin : entreprise radiée → archived_no_email + reason
+        if ($data->etatAdministratif !== null && $data->etatAdministratif !== 'A') {
+            $company->forceFill([
+                'denomination'        => $data->denomination ?? $company->denomination,
+                'prospection_status'  => 'archived_no_email',
+                'archive_reason'      => 'entreprise_radiee',
+            ])->save();
+            $this->recordRun($company, 'insee', 'success');
+            return 'archived';
+        }
+
         $company->forceFill([
             'denomination'   => $data->denomination ?? $company->denomination,
             'naf'            => $data->naf ?? $company->naf,
@@ -99,6 +125,7 @@ class WaterfallOrchestrator
             'effectif_range' => $data->effectifRange ?? $company->effectif_range,
         ])->save();
         $this->recordRun($company, 'insee', 'success');
+        return 'ok';
     }
 
     private function step2_annuaire(Company $company): void

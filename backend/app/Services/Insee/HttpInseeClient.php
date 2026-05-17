@@ -55,6 +55,9 @@ class HttpInseeClient implements InseeClient
             effectifRange: $u['trancheEffectifsUniteLegale'] ?? null,
             createdAt: $u['dateCreationUniteLegale'] ?? null,
             raw: $u,
+            etatAdministratif: $periodes['etatAdministratifUniteLegale']
+                ?? $u['etatAdministratifUniteLegale']
+                ?? null,
         );
     }
 
@@ -112,6 +115,9 @@ class HttpInseeClient implements InseeClient
                         effectifRange: $u['trancheEffectifsUniteLegale'] ?? null,
                         createdAt: $u['dateCreationUniteLegale'] ?? null,
                         raw: $etab,
+                        etatAdministratif: $u['etatAdministratifUniteLegale']
+                            ?? $periodes['etatAdministratifUniteLegale']
+                            ?? null,
                     );
                     if (count($results) >= (int) ($criteria['limit'] ?? 1000)) {
                         return $results;
@@ -120,12 +126,17 @@ class HttpInseeClient implements InseeClient
             } else {
                 foreach ($data[$resultsKey] ?? [] as $u) {
                     $periodes = $u['periodesUniteLegale'][0] ?? [];
+                    // Sprint H3 — Skip entreprises radiées dès la lecture
+                    $etat = $periodes['etatAdministratifUniteLegale']
+                        ?? $u['etatAdministratifUniteLegale']
+                        ?? null;
                     $results[] = new InseeCompanyData(
                         siren: (string) ($u['siren'] ?? ''),
                         denomination: $periodes['denominationUniteLegale'] ?? null,
                         naf: $periodes['activitePrincipaleUniteLegale'] ?? null,
                         legalForm: $periodes['categorieJuridiqueUniteLegale'] ?? null,
                         effectifRange: $u['trancheEffectifsUniteLegale'] ?? null,
+                        etatAdministratif: $etat,
                     );
                     if (count($results) >= (int) ($criteria['limit'] ?? 1000)) {
                         return $results;

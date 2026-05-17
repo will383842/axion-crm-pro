@@ -19,5 +19,10 @@ class InseeCompanyData extends Data
         public ?string $insee = null,
         public ?string $createdAt = null,
         public array $raw = [],
+        /**
+         * Sprint H3 — etatAdministratifUniteLegale INSEE Sirene v3.11.
+         * 'A' = Active, 'C' = Cessée. null = inconnu (mock ou source qui ne fournit pas).
+         */
+        public ?string $etatAdministratif = null,
     ) {}
 }

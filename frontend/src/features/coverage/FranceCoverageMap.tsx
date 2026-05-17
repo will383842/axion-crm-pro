@@ -187,6 +187,14 @@ export function FranceCoverageMap({
         generateId: true,
       });
 
+      // Halo de fond doux derrière les départements (effet "carte premium")
+      map.addLayer({
+        id: 'dept-shadow',
+        type: 'fill',
+        source: 'departements',
+        paint: { 'fill-color': '#0f172a', 'fill-opacity': 0.04, 'fill-translate': [0, 4] },
+      });
+
       map.addLayer({
         id: 'dept-fill',
         type: 'fill',
@@ -201,7 +209,11 @@ export function FranceCoverageMap({
             500,  '#0284c7',
             2000, '#075985',
           ],
-          'fill-opacity': 0.85,
+          'fill-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false], 1,
+            0.88,
+          ],
         },
       });
 
@@ -209,23 +221,47 @@ export function FranceCoverageMap({
         id: 'dept-outline',
         type: 'line',
         source: 'departements',
-        paint: { 'line-color': '#475569', 'line-width': 1 },
+        paint: {
+          'line-color': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false], '#0f172a',
+            '#94a3b8',
+          ],
+          'line-width': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false], 2.5,
+            0.8,
+          ],
+        },
       });
-      LOG('layers added — dept-fill + dept-outline');
+      LOG('layers added — dept-shadow + dept-fill + dept-outline');
 
       map.on('click', 'dept-fill', (e) => {
         const code = e.features?.[0]?.properties?.['code'] as string | undefined;
         const cb = onZoneClickRef.current;
         if (code && cb) cb(code);
       });
+      let hoveredId: string | number | null = null;
+      const clearHoverState = () => {
+        if (hoveredId !== null) {
+          map.setFeatureState({ source: 'departements', id: hoveredId }, { hover: false });
+          hoveredId = null;
+        }
+      };
       map.on('mouseenter', 'dept-fill', () => (map.getCanvas().style.cursor = 'pointer'));
       map.on('mouseleave', 'dept-fill', () => {
         map.getCanvas().style.cursor = '';
+        clearHoverState();
         setHover(null);
       });
       map.on('mousemove', 'dept-fill', (e) => {
         const f = e.features?.[0];
         if (!f) return;
+        if (f.id !== undefined && f.id !== hoveredId) {
+          clearHoverState();
+          hoveredId = f.id;
+          map.setFeatureState({ source: 'departements', id: f.id }, { hover: true });
+        }
         const props = f.properties ?? {};
         const code = (props['code'] as string | undefined) ?? '?';
         const name = (props['nom'] as string | undefined) ?? (props['name'] as string | undefined) ?? code;
@@ -278,62 +314,62 @@ export function FranceCoverageMap({
     }
   }, [cells]);
 
-  const totalAll = cells.reduce((s, c) => s + (c.total ?? 0), 0);
-  const deptsCovered = cells.filter((c) => (c.total ?? 0) > 0).length;
+  // mode prop n'est plus utilisé dans le JSX (déplacé en KPI/segmented control parent)
+  // mais on le garde dans la signature pour rétro-compat.
+  void mode;
 
   return (
-    <div className="relative h-[600px] w-full overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <div className="relative h-[640px] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 via-white to-sky-50/30">
       <div ref={containerRef} className="absolute inset-0" style={{ width: '100%', height: '100%' }} aria-label="Carte de couverture France" role="region" />
-      <div className="pointer-events-none absolute left-3 top-3 rounded-md bg-white/95 px-3 py-1.5 text-xs font-medium shadow-sm ring-1 ring-slate-200">
-        Mode : {mode === 'visu' ? 'Visualisation' : mode === 'search' ? 'Recherche' : 'Action'}
-      </div>
-      <div className="pointer-events-none absolute right-3 top-3 rounded-md bg-white/95 px-3 py-2 text-xs shadow-sm ring-1 ring-slate-200">
-        <div className="font-semibold text-slate-700">
-          {deptsCovered}/96 dépts &middot; {totalAll.toLocaleString('fr-FR')} entreprises
+
+      {/* Légende flottante glassmorphism */}
+      <div className="pointer-events-none absolute bottom-4 left-4 rounded-2xl bg-white/85 px-4 py-3 text-[11px] shadow-[0_8px_32px_-8px_rgb(0_0_0/0.12)] ring-1 ring-slate-200/60 backdrop-blur-md">
+        <div className="mb-2 flex items-center gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Entreprises</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {[
+            { color: '#e2e8f0', label: '0' },
+            { color: '#bae6fd', label: '1+' },
+            { color: '#38bdf8', label: '100+' },
+            { color: '#0284c7', label: '500+' },
+            { color: '#075985', label: '2k+' },
+          ].map((i) => (
+            <div key={i.color} className="flex flex-col items-center gap-1">
+              <span className="block h-3 w-7 rounded-md ring-1 ring-slate-200/60" style={{ backgroundColor: i.color }} />
+              <span className="text-[10px] font-medium text-slate-600">{i.label}</span>
+            </div>
+          ))}
         </div>
       </div>
-      <Legend />
+
+      {/* Tooltip moderne ancré sur le curseur, avec offset intelligent */}
       {hover ? (
         <div
-          className="pointer-events-none absolute z-10 rounded-md bg-slate-900/95 px-3 py-2 text-xs text-white shadow-lg"
-          style={{ left: hover.x + 12, top: hover.y + 12 }}
+          className="pointer-events-none absolute z-10 rounded-xl bg-slate-900/95 px-3.5 py-2.5 text-xs text-white shadow-2xl shadow-slate-900/20 ring-1 ring-white/10 backdrop-blur-sm"
+          style={{ left: Math.min(hover.x + 14, 900), top: Math.min(hover.y + 14, 540) }}
         >
-          <div className="font-semibold">{hover.code} &middot; {hover.name}</div>
-          <div className="text-slate-300">
-            {hover.total > 0
-              ? `${hover.total.toLocaleString('fr-FR')} entreprises`
-              : 'Pas encore traité'}
+          <div className="flex items-center gap-2">
+            <span className="rounded-md bg-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-200">{hover.code}</span>
+            <span className="font-semibold tracking-tight">{hover.name}</span>
+          </div>
+          <div className="mt-1 text-[11px] text-slate-300">
+            {hover.total > 0 ? (
+              <>
+                <span className="font-semibold text-white">{hover.total.toLocaleString('fr-FR')}</span> entreprises
+              </>
+            ) : (
+              <span className="text-slate-400">Pas encore traité</span>
+            )}
           </div>
         </div>
       ) : null}
+
       {error ? (
-        <div className="absolute bottom-3 left-3 rounded-md bg-rose-50 px-3 py-1.5 text-xs text-rose-700 shadow-sm">
+        <div className="absolute bottom-4 right-4 rounded-xl bg-rose-50/95 px-3 py-2 text-xs font-medium text-rose-700 shadow-sm ring-1 ring-rose-200 backdrop-blur-sm">
           {error}
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function Legend() {
-  const items: Array<{ color: string; label: string }> = [
-    { color: '#e2e8f0', label: '0 (pas commencé)' },
-    { color: '#bae6fd', label: '1–99' },
-    { color: '#38bdf8', label: '100–499' },
-    { color: '#0284c7', label: '500–1999' },
-    { color: '#075985', label: '2000+' },
-  ];
-  return (
-    <div className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-white/95 px-3 py-2 text-[10px] shadow-sm ring-1 ring-slate-200">
-      <div className="mb-1 font-semibold text-slate-600">Entreprises / dépt</div>
-      <div className="flex flex-col gap-0.5">
-        {items.map((i) => (
-          <div key={i.color} className="flex items-center gap-2">
-            <span className="inline-block h-2.5 w-4 rounded-sm" style={{ backgroundColor: i.color }} />
-            <span className="text-slate-700">{i.label}</span>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

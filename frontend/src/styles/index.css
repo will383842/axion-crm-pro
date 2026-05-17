@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Dark mode via class strategy (toggle DarkModeToggle.tsx) */
+@variant dark (&:where(.dark, .dark *));
+
 /* Axion CRM Pro — design tokens (cf. spec/24_frontend_design_system.md) */
 @theme {
   --color-brand-50:  oklch(0.97 0.02 250);
@@ -30,6 +33,19 @@
 html, body, #root {
   height: 100%;
 }
+
+body {
+  background: oklch(0.98 0.005 250);
+  color: oklch(0.15 0 0);
+}
+.dark body {
+  background: oklch(0.13 0.01 250);
+  color: oklch(0.95 0 0);
+}
+.dark .bg-white { background: oklch(0.20 0.01 250) !important; }
+.dark .bg-slate-50 { background: oklch(0.17 0.01 250) !important; }
+.dark .text-slate-900 { color: oklch(0.95 0 0) !important; }
+.dark .border-slate-200 { border-color: oklch(0.30 0.01 250) !important; }
 
 /* Skip-link a11y */
 .skip-link {

@@ -8,6 +8,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class CoverageController extends ApiController
 {
@@ -27,50 +29,101 @@ class CoverageController extends ApiController
         }
 
         $level = $r->query('level', 'department');
+
+        // Sprint 18.9 — defensive : si la table n'existe pas encore (env fraîche),
+        // on retourne une liste vide plutôt que 500.
+        if (! Schema::hasTable('coverage_matrix_cells')) {
+            return $this->ok(['level' => $level, 'cells' => []]);
+        }
+
         $cacheKey = "coverage:{$workspaceId}:{$level}";
 
-        $cells = Cache::remember($cacheKey, 60, function () use ($workspaceId, $level) {
-            return match ($level) {
-                'region' => DB::select(<<<SQL
-                    SELECT d.region_code AS code, r.name AS name,
-                           SUM(cm.company_count) AS total,
-                           SUM(cm.complete_count) AS complete,
-                           SUM(cm.partial_count)  AS partial
-                    FROM coverage_matrix_cells cm
-                    JOIN departments d ON d.code = cm.dept_code
-                    JOIN regions r ON r.code = d.region_code
-                    WHERE cm.workspace_id = ?
-                    GROUP BY d.region_code, r.name
-                    ORDER BY total DESC NULLS LAST
-                SQL, [$workspaceId]),
+        try {
+            $cells = Cache::remember($cacheKey, 60, function () use ($workspaceId, $level) {
+                return match ($level) {
+                    'region' => DB::select(<<<SQL
+                        SELECT d.region_code AS code, r.name AS name,
+                               SUM(cm.company_count) AS total,
+                               SUM(cm.complete_count) AS complete,
+                               SUM(cm.partial_count)  AS partial
+                        FROM coverage_matrix_cells cm
+                        JOIN departments d ON d.code = cm.dept_code
+                        JOIN regions r ON r.code = d.region_code
+                        WHERE cm.workspace_id = ?
+                        GROUP BY d.region_code, r.name
+                        ORDER BY total DESC NULLS LAST
+                    SQL, [$workspaceId]),
 
-                'city' => DB::select(<<<SQL
-                    SELECT ci.code_insee AS code, ci.name, ci.department, ci.population,
-                           ST_Y(ci.centroid) AS lat, ST_X(ci.centroid) AS lon,
-                           SUM(cm.company_count) AS total
-                    FROM coverage_matrix_cells cm
-                    JOIN cities ci ON LEFT(cm.postcode, 2) = ci.department
-                    WHERE cm.workspace_id = ?
-                    GROUP BY ci.code_insee, ci.name, ci.department, ci.population, ci.centroid
-                    ORDER BY total DESC NULLS LAST
-                    LIMIT 500
-                SQL, [$workspaceId]),
+                    'city' => $this->queryCityCells($workspaceId),
 
-                default => DB::select(<<<SQL
-                    SELECT cm.dept_code AS code, d.name AS name, d.region_code,
-                           SUM(cm.company_count) AS total,
-                           SUM(cm.complete_count) AS complete,
-                           SUM(cm.partial_count)  AS partial
-                    FROM coverage_matrix_cells cm
-                    JOIN departments d ON d.code = cm.dept_code
-                    WHERE cm.workspace_id = ?
-                    GROUP BY cm.dept_code, d.name, d.region_code
-                    ORDER BY total DESC NULLS LAST
-                SQL, [$workspaceId]),
-            };
-        });
+                    default => DB::select(<<<SQL
+                        SELECT cm.dept_code AS code, d.name AS name, d.region_code,
+                               SUM(cm.company_count) AS total,
+                               SUM(cm.complete_count) AS complete,
+                               SUM(cm.partial_count)  AS partial
+                        FROM coverage_matrix_cells cm
+                        JOIN departments d ON d.code = cm.dept_code
+                        WHERE cm.workspace_id = ?
+                        GROUP BY cm.dept_code, d.name, d.region_code
+                        ORDER BY total DESC NULLS LAST
+                    SQL, [$workspaceId]),
+                };
+            });
+        } catch (\Throwable $e) {
+            // Sprint 18.9 — log + fallback empty plutôt que 500 (RLS denied, PostGIS missing, etc.)
+            Log::error('coverage.index failed', [
+                'workspace_id' => $workspaceId,
+                'level'        => $level,
+                'exception'    => $e->getMessage(),
+            ]);
+            report($e);
+            return $this->ok(['level' => $level, 'cells' => [], 'degraded' => true]);
+        }
 
         return $this->ok(['level' => $level, 'cells' => $cells]);
+    }
+
+    /**
+     * Sprint 18.9 — requête city avec détection PostGIS (ST_X/ST_Y).
+     * Si l'extension n'est pas installée sur la DB, on retombe sur une variante
+     * sans coordonnées plutôt que de crasher.
+     */
+    private function queryCityCells(int|string $workspaceId): array
+    {
+        $hasPostgis = false;
+        try {
+            $row = DB::select("SELECT 1 AS ok FROM pg_extension WHERE extname = 'postgis' LIMIT 1");
+            $hasPostgis = ! empty($row);
+        } catch (\Throwable $e) {
+            $hasPostgis = false;
+        }
+
+        if ($hasPostgis) {
+            return DB::select(<<<SQL
+                SELECT ci.code_insee AS code, ci.name, ci.department, ci.population,
+                       ST_Y(ci.centroid) AS lat, ST_X(ci.centroid) AS lon,
+                       SUM(cm.company_count) AS total
+                FROM coverage_matrix_cells cm
+                JOIN cities ci ON LEFT(cm.postcode, 2) = ci.department
+                WHERE cm.workspace_id = ?
+                GROUP BY ci.code_insee, ci.name, ci.department, ci.population, ci.centroid
+                ORDER BY total DESC NULLS LAST
+                LIMIT 500
+            SQL, [$workspaceId]);
+        }
+
+        // PostGIS absent — pas de coordonnées géo, mais le reste fonctionne.
+        return DB::select(<<<SQL
+            SELECT ci.code_insee AS code, ci.name, ci.department, ci.population,
+                   NULL::float AS lat, NULL::float AS lon,
+                   SUM(cm.company_count) AS total
+            FROM coverage_matrix_cells cm
+            JOIN cities ci ON LEFT(cm.postcode, 2) = ci.department
+            WHERE cm.workspace_id = ?
+            GROUP BY ci.code_insee, ci.name, ci.department, ci.population
+            ORDER BY total DESC NULLS LAST
+            LIMIT 500
+        SQL, [$workspaceId]);
     }
 
     /**
@@ -85,8 +138,14 @@ class CoverageController extends ApiController
         if (! $workspaceId) {
             return $this->ok(['zone' => null]);
         }
-        $zone = $this->rotator->pickNextZone((string) $workspaceId, $r->query('preferred_dept'));
-        return $this->ok(['zone' => $zone]);
+        try {
+            $zone = $this->rotator->pickNextZone((string) $workspaceId, $r->query('preferred_dept'));
+            return $this->ok(['zone' => $zone]);
+        } catch (\Throwable $e) {
+            Log::error('coverage.nextZone failed', ['exception' => $e->getMessage()]);
+            report($e);
+            return $this->ok(['zone' => null, 'degraded' => true]);
+        }
     }
 
     /**

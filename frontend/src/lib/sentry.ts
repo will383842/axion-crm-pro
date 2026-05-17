@@ -1,23 +1,34 @@
 /**
- * Sprint 18.9c — Sentry stub no-op.
+ * Sprint 19.6 — Sentry React conditional init.
  *
- * Le SDK @sentry/react n'est pas activé pour le MVP (zéro coût, GlitchTip
- * self-hosted reporté Sprint 19+ cf. _AUDIT/MONITORING.md).
+ * Le SDK @sentry/react est embarqué mais n'est activé que si `VITE_SENTRY_DSN`
+ * est défini dans l'environnement de BUILD (cf. Dockerfile.frontend ARG +
+ * docker-compose service.app.build.args).
  *
- * Quand on voudra activer Sentry/GlitchTip :
- *  1. pnpm add @sentry/react
- *  2. Remettre le vrai code (cf. git history commit `e2beb9f`)
- *  3. Set VITE_SENTRY_DSN dans .env
+ * Si pas de DSN → tous les exports sont no-op (zéro coût runtime, zéro requête
+ * réseau, zéro PII envoyée nulle part).
  */
+import * as Sentry from '@sentry/react';
+
+const DSN: string | undefined = import.meta.env['VITE_SENTRY_DSN'];
 
 export function initSentry(): void {
-  // no-op : Sentry désactivé en MVP.
+  if (!DSN) return;
+  Sentry.init({
+    dsn: DSN,
+    environment: import.meta.env.PROD ? 'production' : 'development',
+    tracesSampleRate: 0.1,
+    replaysSessionSampleRate: 0,
+    replaysOnErrorSampleRate: 1.0,
+  });
 }
 
-export function captureException(_error: unknown, _context?: Record<string, unknown>): void {
-  // no-op
+export function captureException(error: unknown, context?: Record<string, unknown>): void {
+  if (!DSN) return;
+  Sentry.captureException(error, context ? { extra: context } : undefined);
 }
 
-export function setUser(_user: { id: string; email?: string; workspace_id?: string } | null): void {
-  // no-op
+export function setUser(user: { id: string; email?: string; workspace_id?: string } | null): void {
+  if (!DSN) return;
+  Sentry.setUser(user as Sentry.User | null);
 }

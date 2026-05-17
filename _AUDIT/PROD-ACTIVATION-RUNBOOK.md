@@ -12,7 +12,7 @@
 | MISTRAL_API_KEY | console.mistral.ai | `.env` serveur |
 | WEBSHARE_PROXY_USER + PASS | webshare.io (~$5/mo) | `.env` serveur |
 | TWOCAPTCHA_API_KEY | 2captcha.com (~$5/mo) | `.env` serveur |
-| SENTRY_DSN + VITE_SENTRY_DSN | sentry.io ou GlitchTip self-hosted | `.env` serveur |
+| SENTRY_LARAVEL_DSN + VITE_SENTRY_DSN | sentry.io ou GlitchTip self-hosted | `.env` serveur (cf. `config/sentry.php`) |
 | REVERB_APP_KEY + SECRET + ID | générer via `openssl rand -base64 32` | `.env` serveur |
 
 ## Activation source par source (gradual)
@@ -66,9 +66,9 @@ Script : `backend/scripts/load-poc.sh`
 ## Activation Sentry alerting
 
 1. Crée un projet Sentry/GlitchTip (axionia/axion-crm-pro)
-2. Copie DSN dans `.env` :
+2. Copie DSN dans `.env` (backend = `SENTRY_LARAVEL_DSN`, frontend = `VITE_SENTRY_DSN`) :
    ```
-   SENTRY_DSN=https://...@sentry.io/...
+   SENTRY_LARAVEL_DSN=https://...@sentry.io/...
    VITE_SENTRY_DSN=https://...@sentry.io/...
    ```
 3. Rebuild app pour propager `VITE_SENTRY_DSN` au bundle :

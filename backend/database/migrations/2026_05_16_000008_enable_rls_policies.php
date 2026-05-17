@@ -9,6 +9,11 @@ use Illuminate\Support\Facades\DB;
  *
  * La variable de session `app.current_workspace_id` est positionnée par
  * `SetCurrentWorkspace` (cf. backend/app/Http/Middleware/).
+ *
+ * Sprint 19.1 — patch : version DÉFENSIVE qui skip dynamiquement les tables
+ * absentes ou sans workspace_id (cas Phase 2 dont les tables arrivent dans
+ * une migration postérieure). L'autorité finale est la migration
+ * 2026_05_18_000001_apply_rls_dynamic.php qui ré-applique tout proprement.
  */
 return new class extends Migration
 {
@@ -26,11 +31,28 @@ return new class extends Migration
         ];
 
         foreach ($workspaceScopedTables as $table) {
-            DB::statement("ALTER TABLE $table ENABLE ROW LEVEL SECURITY");
+            // Sprint 19.1 : skip si table absente ou pas de workspace_id
+            $tableExists = DB::selectOne(
+                'SELECT 1 AS ok FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = ?',
+                [$table]
+            );
+            if (! $tableExists) {
+                continue;
+            }
+            $columnExists = DB::selectOne(
+                'SELECT 1 AS ok FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?',
+                [$table, 'workspace_id']
+            );
+            if (! $columnExists) {
+                continue;
+            }
+
+            DB::statement("ALTER TABLE \"{$table}\" ENABLE ROW LEVEL SECURITY");
             // NULLIF(..., '') gère le cas où current_setting() retourne '' (missing_ok=true)
             // au lieu de NULL — évite que toutes les rows soient invisibles quand la session
             // var n'est pas positionnée (jobs system / migrations / seeders).
-            DB::statement("CREATE POLICY {$table}_workspace_isolation ON $table
+            DB::statement("DROP POLICY IF EXISTS {$table}_workspace_isolation ON \"{$table}\"");
+            DB::statement("CREATE POLICY {$table}_workspace_isolation ON \"{$table}\"
                 FOR ALL
                 USING (
                     workspace_id IS NULL
@@ -63,8 +85,15 @@ return new class extends Migration
         ];
 
         foreach ($tables as $table) {
-            DB::statement("DROP POLICY IF EXISTS {$table}_workspace_isolation ON $table");
-            DB::statement("ALTER TABLE $table DISABLE ROW LEVEL SECURITY");
+            $tableExists = DB::selectOne(
+                'SELECT 1 AS ok FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = ?',
+                [$table]
+            );
+            if (! $tableExists) {
+                continue;
+            }
+            DB::statement("DROP POLICY IF EXISTS {$table}_workspace_isolation ON \"{$table}\"");
+            DB::statement("ALTER TABLE \"{$table}\" DISABLE ROW LEVEL SECURITY");
         }
     }
 };

@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 class CampaignsController extends ApiController
 {
     /**
-     * @OA\Get(path="/phase2/campaigns", tags={"Phase 2"}, summary="Campaigns (Phase 2 — stub 501)",
+     * @OA\Get(path="/campaigns", tags={"Phase 2"}, summary="Campaigns (Phase 2 — stub 501)",
      *     security={{"sanctumCookie":{}}},
      *     @OA\Response(response=501, description="Not implemented"))
      */

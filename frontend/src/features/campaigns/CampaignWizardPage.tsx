@@ -16,7 +16,9 @@ import { toast } from 'sonner';
 import {
   ChevronLeft, ChevronRight, Check, X, Search,
   Building2, Clock, Gauge, Calendar, Sparkles, ShieldAlert,
+  Database, Briefcase, MapPin, BookOpen, Lock, Info,
 } from 'lucide-react';
+import type { ComponentType, SVGProps } from 'react';
 import { api } from '@/lib/api';
 import {
   Button,
@@ -28,7 +30,6 @@ import {
   StatusPill,
 } from '@/components/ui';
 import {
-  ALL_SOURCES,
   type Campaign,
   type CampaignSource,
   type CampaignZone,
@@ -41,16 +42,68 @@ type ScheduleMode = 'now' | 'later';
 
 interface CoverageCell { code: string; name: string; total?: number; region_code?: string; department?: string }
 
-const SOURCE_STATUS_LABEL: Record<'free' | 'proxies' | 'api_key', string> = {
-  free: 'Gratuit',
-  proxies: 'Proxies requis',
+type DiscoverySourceStatus = 'api_key' | 'proxies_required';
+
+interface DiscoverySource {
+  id: CampaignSource;
+  label: string;
+  description: string;
+  status: DiscoverySourceStatus;
+  activable: boolean;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  unavailableHint?: string;
+}
+
+/**
+ * Sources de DÉCOUVERTE (créent des companies).
+ * Les sources d'ENRICHISSEMENT (annuaire-entreprises, bodacc, ban, mentions légales, LLM Mistral)
+ * sont appliquées automatiquement par WaterfallOrchestrator — pas exposées dans le wizard.
+ */
+const DISCOVERY_SOURCES: DiscoverySource[] = [
+  {
+    id: 'insee',
+    label: 'INSEE Sirene',
+    description: 'Base officielle entreprises FR — toutes les entreprises légales',
+    status: 'api_key',
+    activable: true,
+    icon: Database,
+  },
+  {
+    id: 'france_travail',
+    label: 'France Travail',
+    description: 'Entreprises qui recrutent dans la zone (signal intent fort)',
+    status: 'api_key',
+    activable: true,
+    icon: Briefcase,
+  },
+  {
+    id: 'google_maps',
+    label: 'Google Maps',
+    description: 'Fiches établissement géo-localisées (Phase B)',
+    status: 'proxies_required',
+    activable: false,
+    icon: MapPin,
+    unavailableHint: 'Phase B — Configuration Webshare requise (Settings)',
+  },
+  {
+    id: 'pages_jaunes',
+    label: 'Pages Jaunes',
+    description: 'Annuaire pro FR (Phase B)',
+    status: 'proxies_required',
+    activable: false,
+    icon: BookOpen,
+    unavailableHint: 'Phase B — Configuration Webshare requise (Settings)',
+  },
+];
+
+const SOURCE_STATUS_LABEL: Record<DiscoverySourceStatus, string> = {
   api_key: 'API key requise',
+  proxies_required: 'Proxies requis',
 };
 
-const SOURCE_STATUS_TONE: Record<'free' | 'proxies' | 'api_key', 'success' | 'warning' | 'info'> = {
-  free: 'success',
-  proxies: 'warning',
+const SOURCE_STATUS_TONE: Record<DiscoverySourceStatus, 'success' | 'warning' | 'info'> = {
   api_key: 'info',
+  proxies_required: 'warning',
 };
 
 export function CampaignWizardPage() {
@@ -189,6 +242,8 @@ export function CampaignWizardPage() {
     setSelectedZones((cur) => cur.filter((x) => !(x.code === z.code && x.type === z.type)));
   }
   function toggleSource(s: CampaignSource) {
+    const meta = DISCOVERY_SOURCES.find((m) => m.id === s);
+    if (!meta || !meta.activable) return;
     setSources((cur) => cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]);
   }
 
@@ -523,33 +578,51 @@ function StepSources({
 }) {
   return (
     <div className="space-y-5">
-      <SectionHeading title="Sources de données" hint="Au moins une source obligatoire. Plus de sources = plus de couverture, mais plus de requêtes." />
+      <SectionHeading
+        title="Sources de découverte"
+        hint="Au moins une source obligatoire. Ces sources créent des entreprises ; l'enrichissement est appliqué automatiquement ensuite."
+      />
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-        {ALL_SOURCES.map((src) => {
+        {DISCOVERY_SOURCES.map((src) => {
           const active = sources.includes(src.id);
+          const disabled = !src.activable;
+          const Icon = src.icon;
           return (
             <button
               key={src.id}
               type="button"
               onClick={() => toggleSource(src.id)}
+              disabled={disabled}
+              aria-disabled={disabled}
+              title={disabled ? src.unavailableHint : undefined}
               className={cn(
-                'group flex flex-col items-start gap-2 rounded-2xl p-4 text-left transition',
-                active
+                'group relative flex flex-col items-start gap-2 rounded-2xl p-4 text-left transition',
+                disabled
+                  ? 'cursor-not-allowed bg-white opacity-60 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800'
+                  : active
                   ? 'bg-gradient-to-br from-sky-50 to-blue-50 ring-2 ring-sky-500 dark:from-sky-950/40 dark:to-blue-950/40'
                   : 'bg-white ring-1 ring-slate-200 hover:ring-slate-300 dark:bg-slate-900 dark:ring-slate-800',
               )}
             >
+              {disabled ? (
+                <span
+                  aria-hidden
+                  className="absolute right-3 top-3 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-500 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700"
+                >
+                  <Lock className="h-3.5 w-3.5" />
+                </span>
+              ) : null}
               <div className="flex w-full items-start justify-between gap-2">
                 <div className={cn(
-                  'flex h-9 w-9 items-center justify-center rounded-lg text-lg font-bold',
-                  active
+                  'flex h-9 w-9 items-center justify-center rounded-lg',
+                  active && !disabled
                     ? 'bg-sky-500 text-white'
                     : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400',
                 )}>
-                  {src.label.charAt(0)}
+                  <Icon className="h-4.5 w-4.5" aria-hidden />
                 </div>
-                {active ? (
+                {disabled ? null : active ? (
                   <Check className="h-5 w-5 text-sky-600 dark:text-sky-400" />
                 ) : (
                   <span className="h-5 w-5 rounded-full ring-2 ring-slate-200 dark:ring-slate-700" />
@@ -560,9 +633,24 @@ function StepSources({
                 <div className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">{src.description}</div>
               </div>
               <StatusPill tone={SOURCE_STATUS_TONE[src.status]}>{SOURCE_STATUS_LABEL[src.status]}</StatusPill>
+              {disabled && src.unavailableHint ? (
+                <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+                  <Lock className="h-3 w-3" aria-hidden />
+                  <span>{src.unavailableHint}</span>
+                </div>
+              ) : null}
             </button>
           );
         })}
+      </div>
+
+      <div className="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50/60 p-3 text-xs text-slate-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-slate-200">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden />
+        <p>
+          <strong className="font-semibold">Enrichissement automatique.</strong>{' '}
+          L'enrichissement (Annuaire Entreprises, BODACC, BAN, mentions légales, LLM Mistral) s'applique automatiquement
+          à chaque entreprise découverte. Pas besoin de les activer ici.
+        </p>
       </div>
     </div>
   );

@@ -28,6 +28,8 @@ import { TagsManagerPage } from '@/features/tags/TagsManagerPage';
 import { AudiencesListPage } from '@/features/audiences/AudiencesListPage';
 import { AudienceBuilderPage } from '@/features/audiences/AudienceBuilderPage';
 import { AudienceDetailPage } from '@/features/audiences/AudienceDetailPage';
+// Sprint H4 Hardening — Dashboard observabilité
+import { ObservabilityPage } from '@/features/observability/ObservabilityPage';
 // Phase 2 scaffold stubs
 import { ColdEmailStub } from '@/features/phase2-scaffold/ColdEmailStub';
 import { LinkedInStub } from '@/features/phase2-scaffold/LinkedInStub';
@@ -71,6 +73,8 @@ const tagsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/tags'
 const audiencesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/audiences', component: AudiencesListPage });
 const audiencesNewRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/audiences/new', component: AudienceBuilderPage });
 const audienceDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/audiences/$audienceId', component: AudienceDetailPage });
+// Sprint H4 Hardening — Dashboard observabilité
+const observabilityRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/admin/observability', component: ObservabilityPage });
 // Phase 2 stubs
 const coldEmailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/cold-email', component: ColdEmailStub });
 const linkedInRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/linkedin', component: LinkedInStub });
@@ -106,6 +110,7 @@ export const routeTree = rootRoute.addChildren([
     audiencesRoute,
     audiencesNewRoute,
     audienceDetailRoute,
+    observabilityRoute,
     coldEmailRoute,
     linkedInRoute,
     crmRoute,

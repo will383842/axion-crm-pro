@@ -103,14 +103,19 @@ Route::prefix('v1')->group(function () {
         // Coverage
         Route::get( '/coverage',                   [CoverageController::class, 'index']);
         Route::get( '/coverage/next-zone',         [CoverageController::class, 'nextZone']);
-        Route::post('/coverage/launch',            [CoverageController::class, 'launch']);
+        Route::post('/coverage/launch',            [CoverageController::class, 'launch'])
+            ->middleware('throttle:scraper-launch');
         Route::get( '/coverage/cells/{cell}',      [CoverageController::class, 'showCell']);
 
-        // Scraper runs
-        Route::get( '/scraper-runs',                [ScraperRunsController::class, 'index']);
-        Route::get( '/scraper-runs/{run}',          [ScraperRunsController::class, 'show']);
-        Route::post('/scraper-runs/{run}/cancel',   [ScraperRunsController::class, 'cancel']);
-        Route::post('/scraper-runs/{run}/retry',    [ScraperRunsController::class, 'retry']);
+        // Scraper runs (Sprint 19.6 : rate limiting per-user)
+        Route::get( '/scraper-runs',                [ScraperRunsController::class, 'index'])
+            ->middleware('throttle:scraper-list');
+        Route::get( '/scraper-runs/{run}',          [ScraperRunsController::class, 'show'])
+            ->middleware('throttle:scraper-list');
+        Route::post('/scraper-runs/{run}/cancel',   [ScraperRunsController::class, 'cancel'])
+            ->middleware('throttle:scraper-launch');
+        Route::post('/scraper-runs/{run}/retry',    [ScraperRunsController::class, 'retry'])
+            ->middleware('throttle:scraper-launch');
 
         // LLM
         Route::get( '/llm/use-cases',                       [LlmUseCasesController::class, 'index']);

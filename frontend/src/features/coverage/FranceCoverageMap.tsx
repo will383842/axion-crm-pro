@@ -51,7 +51,12 @@ export function FranceCoverageMap({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MlMap | null>(null);
   const onZoneClickRef = useRef(onZoneClick);
+  const cellsRef = useRef(cells);
   const [error, setError] = useState<string | null>(null);
+  const [hover, setHover] = useState<{ code: string; name: string; total: number; x: number; y: number } | null>(null);
+  useEffect(() => {
+    cellsRef.current = cells;
+  }, [cells]);
   useEffect(() => {
     onZoneClickRef.current = onZoneClick;
   }, [onZoneClick]);
@@ -214,7 +219,25 @@ export function FranceCoverageMap({
         if (code && cb) cb(code);
       });
       map.on('mouseenter', 'dept-fill', () => (map.getCanvas().style.cursor = 'pointer'));
-      map.on('mouseleave', 'dept-fill', () => (map.getCanvas().style.cursor = ''));
+      map.on('mouseleave', 'dept-fill', () => {
+        map.getCanvas().style.cursor = '';
+        setHover(null);
+      });
+      map.on('mousemove', 'dept-fill', (e) => {
+        const f = e.features?.[0];
+        if (!f) return;
+        const props = f.properties ?? {};
+        const code = (props['code'] as string | undefined) ?? '?';
+        const name = (props['nom'] as string | undefined) ?? (props['name'] as string | undefined) ?? code;
+        const cell = cellsRef.current.find((c) => c.code === code);
+        setHover({
+          code,
+          name,
+          total: cell?.total ?? 0,
+          x: e.point.x,
+          y: e.point.y,
+        });
+      });
     });
 
     map.on('error', (e) => {
@@ -255,18 +278,62 @@ export function FranceCoverageMap({
     }
   }, [cells]);
 
+  const totalAll = cells.reduce((s, c) => s + (c.total ?? 0), 0);
+  const deptsCovered = cells.filter((c) => (c.total ?? 0) > 0).length;
+
   return (
-    <div className="relative h-[600px] w-full overflow-hidden rounded-xl border border-slate-200" style={{ backgroundColor: '#fbbf24' }}>
-      {/* fond JAUNE debug : si on voit du jaune, le canvas n'a pas de taille. Si on voit blanc, canvas OK mais polygones ne rendent pas. */}
+    <div className="relative h-[600px] w-full overflow-hidden rounded-xl border border-slate-200 bg-white">
       <div ref={containerRef} className="absolute inset-0" style={{ width: '100%', height: '100%' }} aria-label="Carte de couverture France" role="region" />
-      <div className="pointer-events-none absolute left-3 top-3 rounded-md bg-white/90 px-3 py-1.5 text-xs font-medium shadow-sm">
+      <div className="pointer-events-none absolute left-3 top-3 rounded-md bg-white/95 px-3 py-1.5 text-xs font-medium shadow-sm ring-1 ring-slate-200">
         Mode : {mode === 'visu' ? 'Visualisation' : mode === 'search' ? 'Recherche' : 'Action'}
       </div>
+      <div className="pointer-events-none absolute right-3 top-3 rounded-md bg-white/95 px-3 py-2 text-xs shadow-sm ring-1 ring-slate-200">
+        <div className="font-semibold text-slate-700">
+          {deptsCovered}/96 dépts &middot; {totalAll.toLocaleString('fr-FR')} entreprises
+        </div>
+      </div>
+      <Legend />
+      {hover ? (
+        <div
+          className="pointer-events-none absolute z-10 rounded-md bg-slate-900/95 px-3 py-2 text-xs text-white shadow-lg"
+          style={{ left: hover.x + 12, top: hover.y + 12 }}
+        >
+          <div className="font-semibold">{hover.code} &middot; {hover.name}</div>
+          <div className="text-slate-300">
+            {hover.total > 0
+              ? `${hover.total.toLocaleString('fr-FR')} entreprises`
+              : 'Pas encore traité'}
+          </div>
+        </div>
+      ) : null}
       {error ? (
         <div className="absolute bottom-3 left-3 rounded-md bg-rose-50 px-3 py-1.5 text-xs text-rose-700 shadow-sm">
           {error}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function Legend() {
+  const items: Array<{ color: string; label: string }> = [
+    { color: '#e2e8f0', label: '0 (pas commencé)' },
+    { color: '#bae6fd', label: '1–99' },
+    { color: '#38bdf8', label: '100–499' },
+    { color: '#0284c7', label: '500–1999' },
+    { color: '#075985', label: '2000+' },
+  ];
+  return (
+    <div className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-white/95 px-3 py-2 text-[10px] shadow-sm ring-1 ring-slate-200">
+      <div className="mb-1 font-semibold text-slate-600">Entreprises / dépt</div>
+      <div className="flex flex-col gap-0.5">
+        {items.map((i) => (
+          <div key={i.color} className="flex items-center gap-2">
+            <span className="inline-block h-2.5 w-4 rounded-sm" style={{ backgroundColor: i.color }} />
+            <span className="text-slate-700">{i.label}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

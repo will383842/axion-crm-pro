@@ -1,19 +1,19 @@
-# Axion CRM Pro — Caddy reverse proxy local
-# api.localhost  → backend Laravel
-# app.localhost  → frontend Vite dev / nginx prod
+# Axion CRM Pro — Caddy reverse proxy
+# Dev local : api.localhost / app.localhost (cert auto-signe via tls internal)
+# Prod : api.axion-crm-pro.com / app.axion-crm-pro.com (Let's Encrypt auto)
+
 {
-    auto_https off
-    local_certs
+    email williamsjullin@gmail.com
     servers {
         trusted_proxies static private_ranges
     }
 }
 
-# --- API Laravel ------------------------------------------------------------
+# --- DEV : API Laravel ------------------------------------------------------
 api.localhost {
+    tls internal
     encode zstd gzip
     reverse_proxy api:80 {
-        header_up X-Forwarded-Proto {scheme}
         header_up X-Real-IP {remote_host}
     }
     header {
@@ -22,28 +22,22 @@ api.localhost {
         X-Content-Type-Options "nosniff"
         Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "geolocation=(self), microphone=(), camera=(), interest-cohort=(), browsing-topics=()"
-        # CSP strict pour l'API JSON : pas de script ni style nécessaires (réponses JSON pures).
-        # Si /docs (Swagger UI) renvoie du HTML, exception locale via path matcher.
         Content-Security-Policy "default-src 'none'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
         Cross-Origin-Opener-Policy "same-origin"
         Cross-Origin-Resource-Policy "same-site"
-        # Cache-Control par défaut (override par endpoint Laravel si besoin)
         Cache-Control "no-store"
     }
-
-    # Swagger UI a besoin de script/style inline → CSP relâché localement
     @docs path /docs /docs/*
     header @docs {
         Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:"
     }
 }
 
-# --- Frontend SPA -----------------------------------------------------------
+# --- DEV : Frontend SPA -----------------------------------------------------
 app.localhost {
+    tls internal
     encode zstd gzip
     reverse_proxy app:5173 {
-        header_up X-Forwarded-Proto {scheme}
-        # WebSocket HMR
         header_up Connection {>Connection}
         header_up Upgrade {>Upgrade}
     }
@@ -53,12 +47,37 @@ app.localhost {
         X-Content-Type-Options "nosniff"
         Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "geolocation=(self), microphone=(), camera=(), interest-cohort=(), browsing-topics=()"
-        # CSP strict frontend SPA. En DEV, Vite injecte des scripts inline pour HMR → on
-        # autorise 'unsafe-inline' uniquement sur dev. PROD = build statique sans inline,
-        # géré par nginx avec strict-dynamic + nonce (cf. infra/nginx/frontend.conf).
-        # Mode dev local : tolérant. Le serveur nginx prod sera strict.
         Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; connect-src 'self' https://api.localhost wss://api.localhost https://*.openfreemap.org wss://app.localhost; font-src 'self' data:; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         Cross-Origin-Opener-Policy "same-origin"
         Cross-Origin-Resource-Policy "same-site"
+    }
+}
+
+# --- PROD : API Laravel (api.axion-crm-pro.com, Let's Encrypt auto) ---------
+api.axion-crm-pro.com {
+    encode zstd gzip
+    reverse_proxy api:80 {
+        header_up X-Real-IP {remote_host}
+    }
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+}
+
+# --- PROD : Frontend SPA (app.axion-crm-pro.com, Let's Encrypt auto) --------
+app.axion-crm-pro.com {
+    encode zstd gzip
+    reverse_proxy app:5173 {
+        header_up Connection {>Connection}
+        header_up Upgrade {>Upgrade}
+    }
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
     }
 }

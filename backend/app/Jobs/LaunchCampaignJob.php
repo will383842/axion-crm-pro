@@ -76,6 +76,7 @@ class LaunchCampaignJob implements ShouldQueue
                         null,
                         null,
                         $perCampaignLimit,
+                        $campaign->id, // 6e arg : campaign_id pour rattacher le ScraperRun + companies créées
                     )->delay(now()->addSeconds($offsetSeconds));
                     $runsTotal++;
                 } else {

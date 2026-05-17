@@ -31,7 +31,16 @@ class MentionsLegalesScraperService
 
     private const HTTP_TIMEOUT_SECONDS = 10;
 
-    private const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+    /**
+     * Sprint H1 — Pool d'User-Agents rotation aléatoire pour réduire fingerprint.
+     * Chrome/Safari/Firefox récents 2025 réalistes.
+     */
+    private const USER_AGENTS = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+    ];
 
     private const EMAIL_BLACKLIST_PREFIXES = ['no-reply@', 'noreply@', 'postmaster@', 'abuse@', 'webmaster@'];
 
@@ -100,19 +109,34 @@ class MentionsLegalesScraperService
 
     private function fetch(string $url): ?string
     {
+        $ua = self::USER_AGENTS[array_rand(self::USER_AGENTS)];
+
         try {
             $response = Http::timeout(self::HTTP_TIMEOUT_SECONDS)
                 ->withHeaders([
-                    'User-Agent' => self::USER_AGENT,
+                    'User-Agent' => $ua,
                     'Accept' => 'text/html,application/xhtml+xml',
                 ])
+                ->retry(2, 1000, function (\Throwable $e) {
+                    return $e instanceof \Illuminate\Http\Client\ConnectionException;
+                })
                 ->get($url);
 
             if (! $response->successful()) {
                 return null;
             }
+
+            // Random delay 200-800ms entre paths pour ne pas marteler le serveur.
+            // Skip si test/Http::fake (microsleep mesurable en perf-critical tests).
+            if (app()->environment('production', 'staging')) {
+                usleep(random_int(200_000, 800_000));
+            }
+
             return $response->body();
         } catch (\Throwable $e) {
+            if (class_exists(\Sentry\State\Hub::class)) {
+                \Sentry\captureException($e);
+            }
             Log::debug('MentionsLegales fetch failed', ['url' => $url, 'error' => $e->getMessage()]);
             return null;
         }

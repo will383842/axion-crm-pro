@@ -30,6 +30,10 @@ class Company extends Model
         'website', 'phone', 'linkedin_url',
         'quality_score', 'priority', 'discovery_source',
         'signals', 'metadata', 'enriched_at', 'last_seen_at',
+        // Sprint Prospection Pipeline 360° (2026-05-17)
+        'email_generic', 'prospection_status',
+        'region_code', 'department_code', 'commune_code', 'city_name',
+        'sector_main', 'archive_reason',
     ];
 
     protected function casts(): array

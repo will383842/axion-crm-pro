@@ -34,6 +34,7 @@ import {
   type CampaignZone,
   type ZoneType,
 } from './types';
+import { getReferentialZones } from './fr-zones';
 
 type Step = 1 | 2 | 3 | 4;
 type ScheduleMode = 'now' | 'later';
@@ -67,6 +68,11 @@ export function CampaignWizardPage() {
   const [zoneSearch, setZoneSearch] = useState('');
   const [selectedZones, setSelectedZones] = useState<CampaignZone[]>([]);
 
+  // Source référentielle (hardcodée FR, toujours dispo) — base canonique des zones.
+  const referentialZones = useMemo(() => getReferentialZones(zoneType), [zoneType]);
+
+  // Données coverage (entreprises déjà scrappées) — mergées en option pour afficher
+  // le nombre d'entreprises connues par zone. Si l'endpoint plante ou est vide, fallback silencieux.
   const { data: coverageData } = useQuery({
     queryKey: ['coverage-wizard', zoneType],
     queryFn: async () => {
@@ -74,22 +80,30 @@ export function CampaignWizardPage() {
       return r.data.cells;
     },
     staleTime: 60_000,
+    retry: false,
   });
-  const cells = useMemo<CoverageCell[]>(() => coverageData ?? [], [coverageData]);
+  const coverageMap = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const c of coverageData ?? []) m.set(c.code, c.total ?? 0);
+    return m;
+  }, [coverageData]);
+
+  const cells = useMemo<CoverageCell[]>(
+    () => referentialZones.map((z) => ({ code: z.code, name: z.name, total: coverageMap.get(z.code) ?? 0 })),
+    [referentialZones, coverageMap],
+  );
+
   const filteredCells = useMemo(() => {
     const q = zoneSearch.trim().toLowerCase();
-    if (!q) return cells.slice(0, 60);
+    if (!q) return cells; // afficher TOUS les départements (96+) par défaut
     return cells.filter((c) =>
       c.name?.toLowerCase().includes(q) || c.code?.toLowerCase().includes(q),
-    ).slice(0, 60);
+    );
   }, [cells, zoneSearch]);
 
   const estimatedCompanies = useMemo(() => {
-    return selectedZones.reduce((s, z) => {
-      const cell = cells.find((c) => c.code === z.code);
-      return s + (cell?.total ?? 0);
-    }, 0);
-  }, [selectedZones, cells]);
+    return selectedZones.reduce((s, z) => s + (coverageMap.get(z.code) ?? 0), 0);
+  }, [selectedZones, coverageMap]);
 
   // --- Étape 3 ---
   const [sources, setSources] = useState<CampaignSource[]>(['insee']);
@@ -450,11 +464,19 @@ function StepZones({
         </Card>
       ) : null}
 
+      <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+        <span>
+          {filteredCells.length} {zoneType === 'department' ? 'département' : zoneType === 'region' ? 'région' : 'ville'}{filteredCells.length > 1 ? 's' : ''}
+          {zoneSearch ? <> pour « <span className="font-medium text-slate-700 dark:text-slate-300">{zoneSearch}</span> »</> : null}
+        </span>
+        <span className="text-slate-400">Clic = ajouter / retirer</span>
+      </div>
+
       {/* Liste */}
       <div className="grid max-h-[420px] grid-cols-1 gap-1.5 overflow-y-auto rounded-xl bg-slate-50 p-3 dark:bg-slate-800/40 md:grid-cols-2 lg:grid-cols-3">
         {filteredCells.length === 0 ? (
           <div className="col-span-full px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
-            Aucune zone trouvée pour « {zoneSearch} ».
+            Aucune zone ne correspond à « {zoneSearch} ». Efface la recherche pour voir toutes les zones disponibles.
           </div>
         ) : (
           filteredCells.map((cell) => {

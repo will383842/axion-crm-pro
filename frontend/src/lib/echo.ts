@@ -29,14 +29,20 @@ interface InitOptions {
 
 let echoInstance: Echo<'reverb'> | null = null;
 
-export function initEcho(opts: InitOptions = {}): Echo<'reverb'> {
+export function initEcho(opts: InitOptions = {}): Echo<'reverb'> | null {
   if (echoInstance) return echoInstance;
+
+  const env = (import.meta as { env?: Record<string, string | undefined> }).env ?? {};
+
+  // Sprint 18.9c — Echo désactivé par défaut (Reverb pas activé en MVP).
+  // Activer en posant VITE_ECHO_ENABLED=true + VITE_REVERB_APP_KEY dans .env.
+  if (env['VITE_ECHO_ENABLED'] !== 'true' || !env['VITE_REVERB_APP_KEY']) {
+    return null;
+  }
 
   window.Pusher = Pusher;
 
-  const env = (import.meta as any).env ?? {};
-
-  const appKey   = opts.appKey  ?? env['VITE_REVERB_APP_KEY']  ?? 'axion-crm-key';
+  const appKey   = opts.appKey  ?? env['VITE_REVERB_APP_KEY'];
   const host     = opts.host    ?? env['VITE_REVERB_HOST']     ?? window.location.hostname;
   const port     = opts.port    ?? Number(env['VITE_REVERB_PORT'] ?? 443);
   const scheme   = (opts.scheme ?? env['VITE_REVERB_SCHEME']   ?? 'https') as 'http' | 'https';
@@ -78,6 +84,7 @@ export function disconnectEcho(): void {
  */
 export function subscribeWorkspaceNotifications(workspaceId: string): () => void {
   const echo = initEcho();
+  if (!echo) return () => undefined;  // Echo désactivé, pas de subscribe
   const channel = echo.private(`workspace.${workspaceId}`);
 
   channel.listen('.notification.created', (event: {

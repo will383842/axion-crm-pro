@@ -138,6 +138,17 @@ Route::prefix('v1')->group(function () {
         Route::put( '/tags/{tag}',          [TagsController::class, 'update']);
         Route::delete('/tags/{tag}',        [TagsController::class, 'destroy']);
         Route::apiResource('saved-views',   SavedViewsController::class);
+
+        // Audiences (Sprint Pipeline 360°)
+        Route::get(   '/audiences',                 [\App\Http\Controllers\Api\AudiencesController::class, 'index']);
+        Route::post(  '/audiences',                 [\App\Http\Controllers\Api\AudiencesController::class, 'store']);
+        Route::post(  '/audiences/preview',         [\App\Http\Controllers\Api\AudiencesController::class, 'preview']);
+        Route::get(   '/audiences/{audience}',      [\App\Http\Controllers\Api\AudiencesController::class, 'show']);
+        Route::put(   '/audiences/{audience}',      [\App\Http\Controllers\Api\AudiencesController::class, 'update']);
+        Route::delete('/audiences/{audience}',      [\App\Http\Controllers\Api\AudiencesController::class, 'destroy']);
+        Route::post(  '/audiences/{audience}/refresh', [\App\Http\Controllers\Api\AudiencesController::class, 'refresh']);
+        Route::get(   '/audiences/{audience}/members', [\App\Http\Controllers\Api\AudiencesController::class, 'members']);
+
         Route::get( '/search',              [GlobalSearchController::class, 'index']);
         Route::get( '/notifications',       [NotificationsController::class, 'index']);
         Route::post('/notifications/{n}/read', [NotificationsController::class, 'markRead']);

@@ -36,15 +36,27 @@ return [
             'tries'      => 3,
             'timeout'    => 900,
         ],
+        // Sprint H5 — Supervisor dédié refresh audiences (Bus::batch parallèle)
+        // Dimensionnement : 10 workers max prod = 50K companies / chunk × 10 / 60s ≈ 8M / heure
+        'supervisor-audiences-refresh' => [
+            'connection' => 'redis',
+            'queue'      => ['audiences-refresh'],
+            'balance'    => 'auto',
+            'maxProcesses' => 4,
+            'tries'      => 2,
+            'timeout'    => 600,
+        ],
     ],
     'environments' => [
         'production' => [
-            'supervisor-default'  => ['maxProcesses' => 10, 'balanceMaxShift' => 1, 'balanceCooldown' => 3],
-            'supervisor-scraping' => ['maxProcesses' => 8],
+            'supervisor-default'             => ['maxProcesses' => 10, 'balanceMaxShift' => 1, 'balanceCooldown' => 3],
+            'supervisor-scraping'            => ['maxProcesses' => 8],
+            'supervisor-audiences-refresh'   => ['maxProcesses' => 10],
         ],
         'local' => [
-            'supervisor-default'  => ['maxProcesses' => 3],
-            'supervisor-scraping' => ['maxProcesses' => 2],
+            'supervisor-default'             => ['maxProcesses' => 3],
+            'supervisor-scraping'            => ['maxProcesses' => 2],
+            'supervisor-audiences-refresh'   => ['maxProcesses' => 2],
         ],
     ],
 ];

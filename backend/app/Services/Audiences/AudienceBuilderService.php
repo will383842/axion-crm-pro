@@ -2,11 +2,14 @@
 
 namespace App\Services\Audiences;
 
+use App\Jobs\RefreshAudienceChunkJob;
 use App\Models\AudienceMember;
 use App\Models\Company;
 use App\Models\EmailAudience;
 use App\Support\AuditLogger;
+use Illuminate\Bus\Batch;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -26,6 +29,15 @@ class AudienceBuilderService
     private const REFRESH_CHUNK_SIZE = 500;
 
     /**
+     * Sprint H5 — Au delà de ce seuil, on bascule en Bus::batch parallèle
+     * (10 workers Horizon supervisor audiences-refresh). En dessous, refresh
+     * inline (fast path, évite overhead batch).
+     */
+    private const BATCH_THRESHOLD = 5000;
+
+    private const BATCH_CHUNK_SIZE = 5000;
+
+    /**
      * @return array{companies: int, contacts: int}
      */
     public function preview(string $workspaceId, array $criteria): array
@@ -42,14 +54,25 @@ class AudienceBuilderService
     }
 
     /**
-     * Recalcule tous les members. Idempotent : delete all + reinsert.
-     * Chunk 500 pour éviter de saturer la mémoire.
+     * Sprint H5 — Recalcule tous les members.
+     *
+     * Si total companies > BATCH_THRESHOLD (5000) → bascule en Bus::batch
+     * parallèle (10 workers via supervisor audiences-refresh).
+     * Sinon → refresh inline chunkById 500 (fast path).
+     *
+     * Idempotent : delete all + reinsert (chunk parallèle avec ON CONFLICT DO NOTHING).
      */
     public function refresh(EmailAudience $audience): void
     {
         Log::info('Audience refresh start', ['audience_id' => $audience->id]);
 
         $query = $this->buildQuery($audience->workspace_id, $audience->criteria ?? []);
+        $total = (clone $query)->count();
+
+        if ($total > self::BATCH_THRESHOLD) {
+            $this->refreshViaBatch($audience, $total);
+            return;
+        }
 
         DB::transaction(function () use ($audience) {
             AudienceMember::where('audience_id', $audience->id)->delete();
@@ -111,6 +134,67 @@ class AudienceBuilderService
             'member_count'  => $audience->member_count,
             'name'          => $audience->name,
         ]);
+    }
+
+    /**
+     * Sprint H5 — Path Bus::batch pour audiences > 5K companies.
+     * Dispatch N jobs en parallèle, finalize callback update member_count.
+     */
+    private function refreshViaBatch(EmailAudience $audience, int $total): void
+    {
+        Log::info('Audience refresh via Bus::batch', [
+            'audience_id' => $audience->id,
+            'total'       => $total,
+        ]);
+
+        DB::transaction(function () use ($audience) {
+            AudienceMember::where('audience_id', $audience->id)->delete();
+            $audience->update(['refreshed_at' => null, 'member_count' => 0]);
+        });
+
+        $chunks = (int) ceil($total / self::BATCH_CHUNK_SIZE);
+        $jobs = [];
+        for ($i = 0; $i < $chunks; $i++) {
+            $jobs[] = new RefreshAudienceChunkJob(
+                audienceId: $audience->id,
+                offset: $i * self::BATCH_CHUNK_SIZE,
+                limit: self::BATCH_CHUNK_SIZE,
+            );
+        }
+
+        Bus::batch($jobs)
+            ->name("audience-refresh-{$audience->id}")
+            ->onQueue('audiences-refresh')
+            ->allowFailures()
+            ->finally(function (Batch $batch) use ($audience) {
+                $audience->refresh();
+                $audience->update([
+                    'refreshed_at' => now(),
+                    'member_count' => AudienceMember::where('audience_id', $audience->id)->count(),
+                ]);
+                AuditLogger::log(
+                    $batch->hasFailures() ? 'audience.refresh.failed' : 'audience.refreshed',
+                    [
+                        'workspace_id'  => $audience->workspace_id,
+                        'resource_type' => 'audience',
+                        'resource_id'   => (string) $audience->id,
+                        'member_count'  => $audience->member_count,
+                        'name'          => $audience->name,
+                        'batch_id'      => $batch->id,
+                        'failed_jobs'   => $batch->failedJobs,
+                    ],
+                );
+            })
+            ->dispatch();
+    }
+
+    /**
+     * Sprint H5 — Exposition publique du builder pour RefreshAudienceChunkJob.
+     * Pas d'override de la logique, juste accès au DSL criteria builder.
+     */
+    public function buildPublicQuery(string $workspaceId, array $criteria): Builder
+    {
+        return $this->buildQuery($workspaceId, $criteria);
     }
 
     /**

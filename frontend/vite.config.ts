@@ -10,14 +10,15 @@ import path from 'node:path';
  *  - rien                                → dev local, clientPort 443 (CF Tunnel ou tls Caddy)
  */
 function resolveHmrConfig(): false | Record<string, unknown> {
-  if (process.env['VITE_DISABLE_HMR'] === 'true') return false;
+  // Sprint 18.9c — HMR désactivé par défaut (prod live).
+  // Activer en posant VITE_HMR_PUBLIC=true (via Caddy) ou VITE_DISABLE_HMR=false (dev local).
+  if (process.env['VITE_DISABLE_HMR'] !== 'false') return false;
 
   if (process.env['VITE_HMR_PUBLIC'] === 'true') {
     return {
       protocol: 'wss',
       host: process.env['VITE_HMR_HOST'] ?? 'app.axion-crm-pro.com',
       clientPort: Number(process.env['VITE_HMR_CLIENT_PORT'] ?? 443),
-      // Path explicite pour que Caddy puisse router le WS distinctement du SPA.
       path: process.env['VITE_HMR_PATH'] ?? '/__vite_hmr_websocket',
     };
   }

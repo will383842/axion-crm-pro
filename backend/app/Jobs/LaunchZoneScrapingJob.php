@@ -68,6 +68,8 @@ class LaunchZoneScrapingJob implements ShouldQueue
             ]);
             $companiesFound = count($results);
 
+            $companiesNew = 0;
+            $companiesRefreshed = 0;
             foreach ($results as $data) {
                 $company = Company::query()->updateOrCreate(
                     ['workspace_id' => $this->workspaceId, 'siren' => $data->siren],
@@ -80,20 +82,27 @@ class LaunchZoneScrapingJob implements ShouldQueue
                         'discovery_source'=> $this->campaignId ? 'campaign' : 'coverage_launch',
                     ],
                 );
-                // Si la company vient d'être créée par cette campagne, incrémenter le compteur.
                 if ($company->wasRecentlyCreated) {
-                    $companiesCreated++;
+                    $companiesNew++;
+                } else {
+                    $companiesRefreshed++;
                 }
                 EnrichCompanyJob::dispatch($company->id);
             }
+            // companies_created sur la campagne = TOUTES les entreprises traitées
+            // (nouvelles + rafraîchies via INSEE), pas seulement les inserts.
+            // Sinon le compteur reste à 0 si la zone a déjà été scrappée — UX trompeuse.
+            $companiesCreated = $companiesNew + $companiesRefreshed;
 
-            // 2. Update run : success + payload résultats
+            // 2. Update run : success + payload résultats détaillés
             $run->update([
                 'status'           => 'success',
                 'finished_at'      => now(),
                 'response_payload' => [
-                    'companies_found'   => $companiesFound,
-                    'companies_created' => $companiesCreated,
+                    'companies_found'     => $companiesFound,
+                    'companies_processed' => $companiesCreated, // = new + refreshed
+                    'companies_new'       => $companiesNew,
+                    'companies_refreshed' => $companiesRefreshed,
                 ],
             ]);
 

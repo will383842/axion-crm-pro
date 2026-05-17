@@ -1,0 +1,127 @@
+# Sprint 18.8 — Release tracking via Sentry CLI (compatible GlitchTip)
+#
+# Trigger : tag v* push ou release publishée ou manual.
+# Action : crée une release sur l'instance Sentry/GlitchTip + upload source maps frontend.
+#
+# Variables/secrets requis (set côté GitHub Actions → Settings/Secrets) :
+#   GLITCHTIP_AUTH_TOKEN  — token Sentry CLI (Settings → Auth Tokens GlitchTip)
+#   GLITCHTIP_ORG         — slug organisation GlitchTip (default: axion-ia)
+#   GLITCHTIP_PROJECT     — slug projet (default: axion-crm-pro-frontend)
+#   SENTRY_URL            — endpoint GlitchTip (ex: https://glitchtip.axion-crm-pro.com)
+#
+# Si aucune instance GlitchTip n'est déployée, le workflow no-op (skip clean).
+
+name: release-tracking
+
+on:
+  release:
+    types: [published]
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version override (default = git describe)'
+        required: false
+        type: string
+
+jobs:
+  sentry_release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [ "${{ github.event_name }}" = "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${{ github.ref_name }}"
+          else
+            VERSION="dev-$(git rev-parse --short HEAD)"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "::notice ::Release version = ${VERSION}"
+
+      - name: Skip if no GlitchTip configured
+        id: skip
+        run: |
+          if [ -z "${{ secrets.GLITCHTIP_AUTH_TOKEN }}" ] || [ -z "${{ secrets.SENTRY_URL }}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::warning ::GlitchTip not configured (secrets manquants) → workflow no-op."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node
+        if: steps.skip.outputs.skip == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        if: steps.skip.outputs.skip == 'false'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install frontend deps
+        if: steps.skip.outputs.skip == 'false'
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend (with sourcemaps)
+        if: steps.skip.outputs.skip == 'false'
+        working-directory: frontend
+        env:
+          VITE_SENTRY_RELEASE: ${{ steps.version.outputs.version }}
+        run: pnpm build
+
+      - name: Sentry CLI — create release
+        if: steps.skip.outputs.skip == 'false'
+        working-directory: frontend
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.GLITCHTIP_AUTH_TOKEN }}
+          SENTRY_URL: ${{ secrets.SENTRY_URL }}
+          SENTRY_ORG: ${{ secrets.GLITCHTIP_ORG }}
+          SENTRY_PROJECT: ${{ secrets.GLITCHTIP_PROJECT }}
+        run: |
+          npx --yes @sentry/cli releases new "${{ steps.version.outputs.version }}"
+          npx --yes @sentry/cli releases set-commits "${{ steps.version.outputs.version }}" --auto || true
+
+      - name: Sentry CLI — upload source maps
+        if: steps.skip.outputs.skip == 'false'
+        working-directory: frontend
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.GLITCHTIP_AUTH_TOKEN }}
+          SENTRY_URL: ${{ secrets.SENTRY_URL }}
+          SENTRY_ORG: ${{ secrets.GLITCHTIP_ORG }}
+          SENTRY_PROJECT: ${{ secrets.GLITCHTIP_PROJECT }}
+        run: |
+          npx --yes @sentry/cli releases files "${{ steps.version.outputs.version }}" \
+            upload-sourcemaps ./dist \
+            --rewrite \
+            --strip-prefix dist/ \
+            --url-prefix '~/' \
+            --ignore node_modules
+
+      - name: Sentry CLI — finalize release
+        if: steps.skip.outputs.skip == 'false'
+        working-directory: frontend
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.GLITCHTIP_AUTH_TOKEN }}
+          SENTRY_URL: ${{ secrets.SENTRY_URL }}
+          SENTRY_ORG: ${{ secrets.GLITCHTIP_ORG }}
+          SENTRY_PROJECT: ${{ secrets.GLITCHTIP_PROJECT }}
+        run: |
+          npx --yes @sentry/cli releases finalize "${{ steps.version.outputs.version }}"
+          npx --yes @sentry/cli releases deploys "${{ steps.version.outputs.version }}" new -e production

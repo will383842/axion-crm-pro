@@ -4,8 +4,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider, createRouter } from '@tanstack/react-router';
 import { Toaster } from 'sonner';
 import { routeTree } from './app/routeTree';
+import { initSentry } from './lib/sentry';
 import './styles/index.css';
 import './lib/i18n';
+
+// Sprint 18.8 — Sentry init (compatible GlitchTip self-hosted, no-op si pas de DSN)
+initSentry();
 
 const queryClient = new QueryClient({
   defaultOptions: {

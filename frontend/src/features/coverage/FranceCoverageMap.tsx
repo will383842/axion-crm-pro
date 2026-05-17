@@ -46,9 +46,11 @@ export function FranceCoverageMap({
       if (cancelled) return;
 
       // GeoJSON source des départements.
-      // Sprint 18.9c — fallback CDN public si fichier local /tiles/admin/departements.geojson absent.
+      // Sprint 18.9c — servi localement via /tiles/admin/departements.geojson
+      // (téléchargé via setup script — pas commité au repo pour ne pas alourdir).
+      // Surcharge possible via VITE_DEPARTEMENTS_GEOJSON_URL.
       const geojsonUrl = import.meta.env['VITE_DEPARTEMENTS_GEOJSON_URL']
-        ?? 'https://france-geojson.gregoiredavid.fr/repo/departements.geojson';
+        ?? '/tiles/admin/departements.geojson';
       map.addSource('departements', {
         type: 'geojson',
         data: geojsonUrl,

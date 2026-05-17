@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { PageHeader } from './PageHeader';
 
 export interface PageShellProps {
   title: string;
@@ -7,16 +8,15 @@ export interface PageShellProps {
   children?: ReactNode;
 }
 
+/**
+ * PageShell — kept for backwards compatibility with existing 18 pages.
+ * Delegates rendering to the modern PageHeader (design system 2026).
+ * Prefer importing PageHeader directly for new pages.
+ */
 export function PageShell({ title, subtitle, actions, children }: PageShellProps) {
   return (
     <div className="px-6 py-6">
-      <header className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{title}</h1>
-          {subtitle ? <p className="mt-1 text-sm text-slate-600">{subtitle}</p> : null}
-        </div>
-        {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
-      </header>
+      <PageHeader title={title} subtitle={subtitle} actions={actions} gradient={false} />
       <section>{children}</section>
     </div>
   );

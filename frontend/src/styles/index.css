@@ -28,7 +28,38 @@
   --radius-card: 0.75rem;
   --radius-button: 0.5rem;
   --radius-input: 0.5rem;
+
+  /* Shadows 2026 — softer, layered, premium feel */
+  --shadow-soft:    0 1px 2px -1px rgb(0 0 0 / 0.04), 0 1px 3px 0 rgb(0 0 0 / 0.06);
+  --shadow-card:    0 4px 24px -8px rgb(0 0 0 / 0.06), 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  --shadow-card-hover: 0 8px 32px -8px rgb(0 0 0 / 0.10), 0 2px 4px 0 rgb(0 0 0 / 0.06);
+  --shadow-popover: 0 12px 48px -12px rgb(0 0 0 / 0.18), 0 4px 8px -2px rgb(0 0 0 / 0.08);
+
+  /* Transitions */
+  --tx-default: 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* Animations 2026 */
+@keyframes axion-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes axion-slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes axion-slide-in-right {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes axion-pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(0.85); }
+}
+.axion-fade-in       { animation: axion-fade-in 200ms ease-out; }
+.axion-slide-up      { animation: axion-slide-up 240ms cubic-bezier(0.4, 0, 0.2, 1); }
+.axion-slide-in-right{ animation: axion-slide-in-right 280ms cubic-bezier(0.4, 0, 0.2, 1); }
+.axion-pulse-dot     { animation: axion-pulse-dot 2s ease-in-out infinite; }
 
 html, body, #root {
   height: 100%;

@@ -10,7 +10,9 @@ return [
     | En tests on bascule sur 'null' pour ne pas déclencher de connexions externes.
     |
     */
-    'default' => env('BROADCAST_CONNECTION', 'reverb'),
+    // Default 'log' (safe, ne nécessite pas de config Reverb au boot).
+    // En prod : set BROADCAST_CONNECTION=reverb + REVERB_APP_* dans .env.
+    'default' => env('BROADCAST_CONNECTION', 'log'),
 
     'connections' => [
         'reverb' => [

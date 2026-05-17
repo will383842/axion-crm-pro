@@ -244,7 +244,7 @@ export function CompaniesListPage() {
         right={
           hasActiveFilter ? (
             <Button variant="ghost" size="sm" onClick={() => { setFilter(EMPTY_FILTER); setPage(1); }}>
-              Reset filtres
+              Réinitialiser les filtres
             </Button>
           ) : null
         }

@@ -92,9 +92,9 @@ export function AiActRegisterPage() {
         <KpiCard tone="slate" label="Total registres" value={kpis.total} icon={<Bot className="h-4 w-4" />} />
         <KpiCard
           tone="rose"
-          label="High risk"
+          label="Risque élevé"
           value={kpis.high}
-          sublabel="dont prohibited"
+          sublabel="dont prohibés"
           icon={<ShieldAlert className="h-4 w-4" />}
         />
         <KpiCard
@@ -129,9 +129,9 @@ export function AiActRegisterPage() {
             )}
             style={{ gridTemplateColumns: GRID }}
           >
-            <div>Use case</div>
+            <div>Cas d'usage</div>
             <div>Risque</div>
-            <div>Provider · Modèle</div>
+            <div>Fournisseur · Modèle</div>
             <div>Statut</div>
             <div>Responsable</div>
             <div>Dernière revue</div>
@@ -219,7 +219,7 @@ export function AiActRegisterPage() {
 
             <div className="grid gap-3 sm:grid-cols-2">
               <Card>
-                <CardEyebrow>Provider</CardEyebrow>
+                <CardEyebrow>Fournisseur</CardEyebrow>
                 <p className="mt-1 text-sm">{selected.provider ?? '—'}</p>
               </Card>
               <Card>
@@ -233,7 +233,7 @@ export function AiActRegisterPage() {
                 </p>
               </Card>
               <Card>
-                <CardEyebrow>Route opt-out</CardEyebrow>
+                <CardEyebrow>Route de désinscription</CardEyebrow>
                 <p className="mt-1 font-mono text-xs">
                   {(selected.impact_assessment as { opt_out_route?: string })?.opt_out_route ??
                     '/rgpd/requests'}
@@ -244,7 +244,7 @@ export function AiActRegisterPage() {
             <Card>
               <CardHeader>
                 <div>
-                  <CardEyebrow>Impact assessment</CardEyebrow>
+                  <CardEyebrow>Analyse d'impact</CardEyebrow>
                   <CardTitle className="mt-1 text-base">DPIA complet</CardTitle>
                 </div>
               </CardHeader>

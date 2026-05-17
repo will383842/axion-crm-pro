@@ -39,7 +39,7 @@ test.describe('Navigation smoke', () => {
 
   test('sidebar : dashboard link visible', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('link', { name: /Dashboard/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Tableau de bord/i })).toBeVisible();
   });
 
   test('sidebar : entreprises link', async ({ page }) => {
@@ -64,8 +64,8 @@ test.describe('Navigation smoke', () => {
 
   test('sidebar : RGPD section', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('link', { name: 'RGPD requests' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'AI Act register' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Requêtes RGPD' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Registre AI Act' })).toBeVisible();
   });
 
   test('sidebar : Admin section', async ({ page }) => {
@@ -77,7 +77,7 @@ test.describe('Navigation smoke', () => {
   test('sidebar : Phase 2 section', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('link', { name: 'Campagnes' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'CRM pipeline' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Pipeline CRM' })).toBeVisible();
   });
 
   test('header : recherche globale visible', async ({ page }) => {

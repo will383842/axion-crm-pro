@@ -54,9 +54,9 @@ const SECTIONS: NavSection[] = [
     id: 'pilotage',
     title: 'Pilotage',
     items: [
-      { to: '/', label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" />, dataTour: 'nav-dashboard' },
+      { to: '/', label: 'Tableau de bord', icon: <LayoutDashboard className="h-4 w-4" />, dataTour: 'nav-dashboard' },
       { to: '/coverage', label: 'Couverture France', icon: <MapIcon className="h-4 w-4" /> },
-      { to: '/scraper-runs', label: 'Scraper runs', icon: <Activity className="h-4 w-4" /> },
+      { to: '/scraper-runs', label: 'Runs de scraping', icon: <Activity className="h-4 w-4" /> },
     ],
   },
   {
@@ -80,9 +80,9 @@ const SECTIONS: NavSection[] = [
     id: 'conformite',
     title: 'Conformité',
     items: [
-      { to: '/rgpd/requests', label: 'RGPD requests', icon: <ShieldCheck className="h-4 w-4" /> },
-      { to: '/rgpd/ai-act', label: 'AI Act register', icon: <FileText className="h-4 w-4" /> },
-      { to: '/audit-logs', label: 'Audit logs', icon: <ScrollText className="h-4 w-4" /> },
+      { to: '/rgpd/requests', label: 'Requêtes RGPD', icon: <ShieldCheck className="h-4 w-4" /> },
+      { to: '/rgpd/ai-act', label: 'Registre AI Act', icon: <FileText className="h-4 w-4" /> },
+      { to: '/audit-logs', label: 'Journaux d’audit', icon: <ScrollText className="h-4 w-4" /> },
     ],
   },
   {
@@ -98,10 +98,10 @@ const SECTIONS: NavSection[] = [
     title: 'Phase 2',
     items: [
       { to: '/campaigns', label: 'Campagnes', icon: <Megaphone className="h-4 w-4" />, locked: true },
-      { to: '/cold-email', label: 'Cold email', icon: <Mail className="h-4 w-4" />, locked: true },
-      { to: '/linkedin', label: 'LinkedIn outreach', icon: <Linkedin className="h-4 w-4" />, locked: true },
-      { to: '/crm', label: 'CRM pipeline', icon: <KanbanSquare className="h-4 w-4" />, locked: true },
-      { to: '/analytics', label: 'Analytics', icon: <BarChart3 className="h-4 w-4" />, locked: true },
+      { to: '/cold-email', label: 'E-mails à froid', icon: <Mail className="h-4 w-4" />, locked: true },
+      { to: '/linkedin', label: 'Prospection LinkedIn', icon: <Linkedin className="h-4 w-4" />, locked: true },
+      { to: '/crm', label: 'Pipeline CRM', icon: <KanbanSquare className="h-4 w-4" />, locked: true },
+      { to: '/analytics', label: 'Analytique', icon: <BarChart3 className="h-4 w-4" />, locked: true },
     ],
   },
 ];

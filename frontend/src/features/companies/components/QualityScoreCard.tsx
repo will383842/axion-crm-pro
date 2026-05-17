@@ -37,7 +37,7 @@ export function QualityScoreCard({ score, breakdown }: QualityScoreCardProps) {
     <Card padding="md">
       <CardHeader>
         <div>
-          <CardEyebrow>Quality score</CardEyebrow>
+          <CardEyebrow>Score de qualité</CardEyebrow>
           <CardTitle>Qualité de la donnée</CardTitle>
         </div>
       </CardHeader>

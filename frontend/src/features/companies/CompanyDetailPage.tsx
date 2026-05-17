@@ -104,7 +104,7 @@ export function CompanyDetailPage() {
     <div className="px-6 py-6">
       <Breadcrumbs
         items={[
-          { label: 'Companies', to: '/companies' },
+          { label: 'Entreprises', to: '/companies' },
           { label: name },
         ]}
         className="mb-3"
@@ -144,9 +144,9 @@ export function CompanyDetailPage() {
             loading={enrichMut.isPending}
             onClick={() => enrichMut.mutate()}
           >
-            {enrichMut.isPending ? 'Enrichissement…' : 'Enrich now'}
+            {enrichMut.isPending ? 'Enrichissement…' : 'Enrichir maintenant'}
           </Button>
-          <Button variant="secondary" size="md">Export</Button>
+          <Button variant="secondary" size="md">Exporter</Button>
           <DropdownMenu
             align="right"
             trigger={
@@ -270,7 +270,7 @@ export function CompanyDetailPage() {
                 loading={enrichMut.isPending}
                 onClick={() => enrichMut.mutate()}
               >
-                Enrich now
+                Enrichir maintenant
               </Button>
               <Button variant="secondary" size="md" full>
                 Exporter (vCard / VCF)

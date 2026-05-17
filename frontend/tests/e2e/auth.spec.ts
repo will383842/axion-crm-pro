@@ -16,7 +16,7 @@ test.describe('Auth flow', () => {
 
   test('2FA page shows 6-digit input', async ({ page }) => {
     await page.goto('/2fa');
-    await expect(page.getByLabel(/6-digit code/i)).toBeVisible();
+    await expect(page.getByLabel(/Code à 6 chiffres/i)).toBeVisible();
   });
 
   test('password reset page renders', async ({ page }) => {

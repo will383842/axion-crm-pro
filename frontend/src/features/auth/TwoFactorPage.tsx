@@ -35,7 +35,7 @@ export function TwoFactorPage() {
           maxLength={6}
           value={code}
           onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-          aria-label="6-digit code"
+          aria-label="Code à 6 chiffres"
           autoComplete="one-time-code"
           required
           className="w-full rounded-lg bg-white px-3 py-3 text-center text-2xl font-semibold tracking-[0.5em] text-slate-900 ring-1 ring-slate-200 transition focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700"

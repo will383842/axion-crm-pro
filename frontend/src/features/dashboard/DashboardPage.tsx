@@ -108,11 +108,11 @@ export function DashboardPage() {
     <div className="px-6 py-6">
       <PageHeader
         eyebrow={firstName ? `Bonjour ${firstName} 👋` : 'Bienvenue'}
-        title="Dashboard"
+        title="Tableau de bord"
         subtitle={`Vue d'ensemble · ${stats.period_label ?? PERIOD_LABEL[period]}`}
         actions={
           <>
-            <LiveBadge label="Live" refreshLabel="30s" />
+            <LiveBadge label="En direct" refreshLabel="actualisé toutes les 30s" />
             <SegmentedControl
               size="sm"
               options={PERIOD_OPTIONS}
@@ -126,7 +126,7 @@ export function DashboardPage() {
               onClick={() => refetch()}
               iconLeft={<span aria-hidden>⟳</span>}
             >
-              Rafraîchir
+              Actualiser
             </Button>
           </>
         }
@@ -156,7 +156,7 @@ export function DashboardPage() {
           <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <KpiCard
               tone="sky"
-              label="Companies total"
+              label="Total entreprises"
               value={stats.companies_total.toLocaleString('fr-FR')}
               sublabel="Toutes périodes confondues"
               {...(typeof stats.companies_total_trend_pct === 'number'

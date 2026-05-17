@@ -36,12 +36,12 @@ interface ContactsResponse {
 }
 
 const EMAIL_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: '', label: 'Tous statuts email' },
+  { value: '', label: 'Tous statuts e-mail' },
   { value: 'valid', label: 'Valide' },
   { value: 'catchall', label: 'Catch-all' },
   { value: 'unknown', label: 'Inconnu' },
   { value: 'invalid', label: 'Invalide' },
-  { value: 'role', label: 'Role' },
+  { value: 'role', label: 'Rôle générique' },
   { value: 'disposable', label: 'Jetable' },
 ];
 
@@ -58,6 +58,18 @@ const GRID = 'minmax(220px,1.4fr) minmax(140px,1fr) minmax(220px,1.6fr) 110px mi
 
 function fullName(c: Contact) {
   return [c.first_name, c.last_name].filter(Boolean).join(' ') || c.last_name;
+}
+
+function translateEmailStatus(status: string): string {
+  const map: Record<string, string> = {
+    valid: 'Valide',
+    catchall: 'Catch-all',
+    unknown: 'Inconnu',
+    invalid: 'Invalide',
+    role: 'Rôle générique',
+    disposable: 'Jetable',
+  };
+  return map[status.toLowerCase()] ?? status;
 }
 
 export function ContactsListPage() {
@@ -190,7 +202,7 @@ export function ContactsListPage() {
                         </a>
                         {c.email_status ? (
                           <StatusPill tone={EMAIL_TONE[c.email_status] ?? 'neutral'}>
-                            {c.email_status}
+                            {translateEmailStatus(c.email_status)}
                           </StatusPill>
                         ) : null}
                       </div>

@@ -9,26 +9,26 @@ import { Home } from 'lucide-react';
 import { Breadcrumbs, type Crumb } from '@/components/ui';
 
 const LABELS: Record<string, string> = {
-  '/': 'Dashboard',
+  '/': 'Tableau de bord',
   '/companies': 'Entreprises',
   '/contacts': 'Contacts',
   '/coverage': 'Couverture France',
-  '/scraper-runs': 'Scraper runs',
+  '/scraper-runs': 'Runs de scraping',
   '/llm': 'LLM',
   '/llm/router': 'Router',
   '/llm/proxy-providers': 'Proxies',
   '/llm/rotations': 'Rotations',
   '/rgpd': 'RGPD',
-  '/rgpd/requests': 'Requests',
-  '/rgpd/ai-act': 'AI Act register',
-  '/audit-logs': 'Audit logs',
+  '/rgpd/requests': 'Requêtes',
+  '/rgpd/ai-act': 'Registre AI Act',
+  '/audit-logs': 'Journaux d’audit',
   '/users': 'Utilisateurs',
   '/settings': 'Paramètres',
   '/campaigns': 'Campagnes',
-  '/cold-email': 'Cold email',
-  '/linkedin': 'LinkedIn outreach',
-  '/crm': 'CRM pipeline',
-  '/analytics': 'Analytics',
+  '/cold-email': 'E-mails à froid',
+  '/linkedin': 'Prospection LinkedIn',
+  '/crm': 'Pipeline CRM',
+  '/analytics': 'Analytique',
 };
 
 function humanize(segment: string): string {

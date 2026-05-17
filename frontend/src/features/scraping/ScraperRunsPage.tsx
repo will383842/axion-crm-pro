@@ -315,20 +315,20 @@ export function ScraperRunsPage() {
   });
 
   const tabs: Array<TabItem<Filter>> = [
-    { id: 'all',       label: 'Tous',      count: counts.all },
-    { id: 'running',   label: 'Running',   count: counts.running },
-    { id: 'pending',   label: 'Pending',   count: counts.pending },
-    { id: 'success',   label: 'Completed', count: counts.success },
-    { id: 'failed',    label: 'Failed',    count: counts.failed },
-    { id: 'cancelled', label: 'Cancelled', count: counts.cancelled },
+    { id: 'all',       label: 'Tous',       count: counts.all },
+    { id: 'running',   label: 'En cours',   count: counts.running },
+    { id: 'pending',   label: 'En attente', count: counts.pending },
+    { id: 'success',   label: 'Terminés',   count: counts.success },
+    { id: 'failed',    label: 'Échec',      count: counts.failed },
+    { id: 'cancelled', label: 'Annulés',    count: counts.cancelled },
   ];
 
   return (
     <div className="px-6 py-6" data-testid="scraper-runs-page">
       <PageHeader
-        title="Scraper Runs"
-        subtitle="Monitorage des jobs scraping en temps réel."
-        badge={<LiveBadge label="Live" refreshLabel="refresh 10s" />}
+        title="Runs de scraping"
+        subtitle="Monitoring des jobs de scraping en temps réel."
+        badge={<LiveBadge label="En direct" refreshLabel="actualisé toutes les 10s" />}
         actions={
           <>
             <Button
@@ -339,7 +339,7 @@ export function ScraperRunsPage() {
               disabled={filtered.length === 0}
               data-testid="scraper-runs-export"
             >
-              Export CSV
+              Exporter en CSV
             </Button>
           </>
         }
@@ -355,22 +355,22 @@ export function ScraperRunsPage() {
         />
         <KpiCard
           tone="violet"
-          label="Running"
+          label="En cours"
           value={counts.running}
           sublabel={counts.pending > 0 ? `+ ${counts.pending} en attente` : 'en cours'}
         />
         <KpiCard
           tone="emerald"
-          label="Success rate"
+          label="Taux de succès"
           value={`${successRate}%`}
           sublabel={`${counts.success} OK / ${counts.success + counts.failed + counts.cancelled} clos`}
           progress={successRate}
         />
         <KpiCard
           tone="rose"
-          label="Failed"
+          label="Échecs"
           value={counts.failed}
-          sublabel={counts.failed > 0 ? 'à retry' : 'aucun échec'}
+          sublabel={counts.failed > 0 ? 'à relancer' : 'aucun échec'}
         />
       </div>
 
@@ -700,7 +700,7 @@ function RunDrawerContent({ run }: { run: Run }) {
       {Object.keys(payload).length > 0 ? (
         <details className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200 dark:bg-slate-800/40 dark:ring-slate-800">
           <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Request payload
+            Payload de la requête
           </summary>
           <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] text-slate-700 dark:text-slate-300">
             {JSON.stringify(payload, null, 2)}
@@ -711,7 +711,7 @@ function RunDrawerContent({ run }: { run: Run }) {
       {Object.keys(response).length > 0 ? (
         <details className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200 dark:bg-slate-800/40 dark:ring-slate-800">
           <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Response payload
+            Payload de la réponse
           </summary>
           <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] text-slate-700 dark:text-slate-300">
             {JSON.stringify(response, null, 2)}

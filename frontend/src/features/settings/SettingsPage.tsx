@@ -206,7 +206,7 @@ export function SettingsPage() {
                 <MaskedSecret value="sk-•••••" label={i.env} />
                 <div className="flex items-center gap-1">
                   <Button variant="ghost" size="sm" iconLeft={<RefreshCw className="h-3.5 w-3.5" />}>
-                    Rotate
+                    Renouveler
                   </Button>
                   <Button variant="secondary" size="sm" iconLeft={<KeyRound className="h-3.5 w-3.5" />}>
                     Configurer
@@ -224,7 +224,7 @@ export function SettingsPage() {
             <CardHeader>
               <div>
                 <CardEyebrow>Sentry / GlitchTip</CardEyebrow>
-                <CardTitle className="mt-1 text-base">Error tracking</CardTitle>
+                <CardTitle className="mt-1 text-base">Suivi des erreurs</CardTitle>
               </div>
             </CardHeader>
             <label className="block text-sm">

@@ -89,7 +89,7 @@ export function AuditLogsPage() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="Audit logs"
+        title="Journaux d’audit"
         subtitle="Journal append-only avec chaîne cryptographique SHA-256 vérifiable."
         actions={
           <Button
@@ -109,7 +109,7 @@ export function AuditLogsPage() {
             <SearchInput
               value={search}
               onChange={setSearch}
-              placeholder="Event, path, IP, acteur…"
+              placeholder="Événement, chemin, IP, acteur…"
               className="w-72"
             />
             <select
@@ -120,9 +120,9 @@ export function AuditLogsPage() {
             >
               <option value="">Toutes sévérités</option>
               <option value="info">Info</option>
-              <option value="warning">Warning</option>
-              <option value="error">Error</option>
-              <option value="critical">Critical</option>
+              <option value="warning">Attention</option>
+              <option value="error">Erreur</option>
+              <option value="critical">Critique</option>
             </select>
           </>
         }
@@ -133,7 +133,7 @@ export function AuditLogsPage() {
       ) : rows.length === 0 ? (
         <EmptyState
           icon={<ScrollText className="h-10 w-10" />}
-          title="Aucun log d'audit"
+          title="Aucun journal d'audit"
           description={
             search || severityFilter
               ? 'Aucun log ne correspond aux filtres actuels.'
@@ -151,12 +151,12 @@ export function AuditLogsPage() {
             style={{ gridTemplateColumns: GRID }}
           >
             <div>Quand</div>
-            <div>Event</div>
-            <div>Path</div>
+            <div>Événement</div>
+            <div>Chemin</div>
             <div>Acteur</div>
             <div>Sévérité</div>
             <div>IP</div>
-            <div>Hash</div>
+            <div>Empreinte</div>
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {rows.map((l) => {
@@ -211,15 +211,15 @@ export function AuditLogsPage() {
                 <div>{new Date(selected.created_at).toLocaleString('fr-FR')}</div>
               </div>
               <div>
-                <div className="text-[11px] font-semibold uppercase text-slate-500">Event</div>
+                <div className="text-[11px] font-semibold uppercase text-slate-500">Événement</div>
                 <div className="font-medium">{selected.event_type}</div>
               </div>
               <div>
-                <div className="text-[11px] font-semibold uppercase text-slate-500">Path</div>
+                <div className="text-[11px] font-semibold uppercase text-slate-500">Chemin</div>
                 <div className="font-mono text-xs">{selected.path ?? '—'}</div>
               </div>
               <div>
-                <div className="text-[11px] font-semibold uppercase text-slate-500">Status</div>
+                <div className="text-[11px] font-semibold uppercase text-slate-500">Statut</div>
                 <div className="font-mono text-xs">{selected.status_code ?? '—'}</div>
               </div>
               <div>
@@ -227,7 +227,7 @@ export function AuditLogsPage() {
                 <div>{selected.actor ?? '—'}</div>
               </div>
               <div>
-                <div className="text-[11px] font-semibold uppercase text-slate-500">Target</div>
+                <div className="text-[11px] font-semibold uppercase text-slate-500">Cible</div>
                 <div>{selected.target ?? '—'}</div>
               </div>
               <div>
@@ -242,22 +242,22 @@ export function AuditLogsPage() {
 
             <div>
               <div className="mb-1 text-[11px] font-semibold uppercase text-slate-500">
-                Hash chain
+                Chaîne d'empreintes
               </div>
               <div className="rounded-lg bg-slate-50 p-3 text-xs font-mono dark:bg-slate-800/60">
                 <div>
-                  <span className="text-slate-500">prev:</span>{' '}
+                  <span className="text-slate-500">précédente :</span>{' '}
                   {selected.previous_hash ?? '—'}
                 </div>
                 <div>
-                  <span className="text-slate-500">curr:</span> {selected.current_hash}
+                  <span className="text-slate-500">actuelle :</span> {selected.current_hash}
                 </div>
               </div>
             </div>
 
             <div>
               <div className="mb-1 text-[11px] font-semibold uppercase text-slate-500">
-                Payload (raw)
+                Payload (brut)
               </div>
               <pre className="overflow-auto rounded-lg bg-slate-50 p-3 text-xs dark:bg-slate-800/60">
                 {JSON.stringify(selected.payload ?? selected, null, 2)}

@@ -26,10 +26,10 @@ interface Rotation {
 
 const DIMENSION_LABELS: Record<Dimension, string> = {
   proxy: 'Proxy',
-  user_agent: 'User agent',
-  target: 'Target',
-  search_engine: 'Search engine',
-  llm: 'LLM provider',
+  user_agent: 'User-agent',
+  target: 'Cible',
+  search_engine: 'Moteur de recherche',
+  llm: 'Fournisseur LLM',
 };
 
 const ROW_GRID = 'minmax(180px,1fr) 90px 110px 90px 180px';
@@ -89,11 +89,11 @@ export function RotationsPage() {
                       )}
                       style={{ gridTemplateColumns: ROW_GRID }}
                     >
-                      <div>Slug</div>
+                      <div>Identifiant</div>
                       <div className="text-right">Poids</div>
-                      <div className="text-right">Cooldown</div>
+                      <div className="text-right">Délai d'attente</div>
                       <div>État</div>
-                      <div>Dernier usage</div>
+                      <div>Dernière utilisation</div>
                     </div>
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
                       {items.map((r) => (

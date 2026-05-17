@@ -42,8 +42,8 @@ interface UsageSummary {
 type TabKey = 'use_cases' | 'providers' | 'prompts' | 'usage';
 
 const TABS: Array<TabItem<TabKey>> = [
-  { id: 'use_cases', label: 'Use cases', icon: <Bot className="h-3.5 w-3.5" /> },
-  { id: 'providers', label: 'Providers', icon: <KeyRound className="h-3.5 w-3.5" /> },
+  { id: 'use_cases', label: "Cas d'usage", icon: <Bot className="h-3.5 w-3.5" /> },
+  { id: 'providers', label: 'Fournisseurs', icon: <KeyRound className="h-3.5 w-3.5" /> },
   { id: 'prompts', label: 'Prompts', icon: <FileText className="h-3.5 w-3.5" /> },
   { id: 'usage', label: 'Usage 30j', icon: <Activity className="h-3.5 w-3.5" /> },
 ];
@@ -94,8 +94,8 @@ export function LlmRouterPage() {
         ) : useCasesData.length === 0 ? (
           <EmptyState
             icon={<Bot className="h-10 w-10" />}
-            title="Aucun use case configuré"
-            description="Les use cases LLM sont seedés au déploiement initial (LlmUseCaseSeeder)."
+            title="Aucun cas d'usage configuré"
+            description="Les cas d'usage LLM sont initialisés au déploiement (LlmUseCaseSeeder)."
           />
         ) : (
           <Card padding="none" className="overflow-hidden">
@@ -107,11 +107,11 @@ export function LlmRouterPage() {
               )}
               style={{ gridTemplateColumns: USE_CASES_GRID }}
             >
-              <div>Use case</div>
-              <div>Provider</div>
+              <div>Cas d'usage</div>
+              <div>Fournisseur</div>
               <div>Modèle</div>
-              <div>Fallback chain</div>
-              <div className="text-right">Cost cap €</div>
+              <div>Chaîne de repli</div>
+              <div className="text-right">Plafond €</div>
               <div>État</div>
             </div>
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -151,7 +151,7 @@ export function LlmRouterPage() {
             <Card key={p}>
               <CardHeader>
                 <div>
-                  <CardEyebrow>Provider</CardEyebrow>
+                  <CardEyebrow>Fournisseur</CardEyebrow>
                   <CardTitle className="mt-1 text-base capitalize">{p}</CardTitle>
                 </div>
                 <StatusPill tone="success">Actif</StatusPill>
@@ -164,7 +164,7 @@ export function LlmRouterPage() {
                   </code>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Use cases routés</span>
+                  <span className="text-slate-500">Cas d'usage routés</span>
                   <span className="font-medium">
                     {useCasesData.filter((u) => u.primary_provider === p).length}
                   </span>
@@ -236,7 +236,7 @@ export function LlmRouterPage() {
               />
               <KpiCard
                 tone="amber"
-                label="Use cases actifs"
+                label="Cas d'usage actifs"
                 value={Object.keys(usage.data?.by_use_case ?? {}).length}
                 sublabel="dernières 30j"
               />
@@ -246,7 +246,7 @@ export function LlmRouterPage() {
               <CardHeader>
                 <div>
                   <CardEyebrow>Répartition</CardEyebrow>
-                  <CardTitle className="mt-1 text-base">Coût par provider</CardTitle>
+                  <CardTitle className="mt-1 text-base">Coût par fournisseur</CardTitle>
                 </div>
               </CardHeader>
               <div className="space-y-2">

@@ -28,10 +28,10 @@ interface UserRow {
 }
 
 const ROLE_OPTIONS = [
-  { value: 'viewer', label: 'Viewer (lecture seule)' },
-  { value: 'operator', label: 'Operator (édition)' },
+  { value: 'viewer', label: 'Lecteur (lecture seule)' },
+  { value: 'operator', label: 'Opérateur (édition)' },
   { value: 'admin', label: 'Admin (gestion équipe)' },
-  { value: 'owner', label: 'Owner (propriétaire)' },
+  { value: 'owner', label: 'Propriétaire (owner)' },
 ];
 
 const GRID = 'minmax(220px,1.4fr) minmax(220px,1.6fr) minmax(160px,1fr) 140px 200px';
@@ -41,6 +41,16 @@ function roleToneFor(role: string) {
   if (role === 'admin') return 'warning';
   if (role === 'operator') return 'info';
   return 'neutral';
+}
+
+function roleLabelFor(role: string): string {
+  const map: Record<string, string> = {
+    owner: 'Propriétaire',
+    admin: 'Admin',
+    operator: 'Opérateur',
+    viewer: 'Lecteur',
+  };
+  return map[role.toLowerCase()] ?? role;
 }
 
 export function UsersPage() {
@@ -135,7 +145,7 @@ export function UsersPage() {
                   ) : (
                     (u.roles ?? []).map((r) => (
                       <StatusPill key={r} tone={roleToneFor(r)}>
-                        {r}
+                        {roleLabelFor(r)}
                       </StatusPill>
                     ))
                   )}

@@ -13,6 +13,19 @@ export interface ContactItem {
   discovery_source?: string | null;
 }
 
+function translateEmailStatus(status?: string | null): string {
+  if (!status) return 'Inconnu';
+  const map: Record<string, string> = {
+    valid: 'Valide',
+    catchall: 'Catch-all',
+    unknown: 'Inconnu',
+    invalid: 'Invalide',
+    role: 'Rôle',
+    disposable: 'Jetable',
+  };
+  return map[status.toLowerCase()] ?? status;
+}
+
 export function ContactsCard({ contacts }: { contacts: ContactItem[] }) {
   return (
     <Card padding="md">
@@ -49,7 +62,7 @@ export function ContactsCard({ contacts }: { contacts: ContactItem[] }) {
                       >
                         {ct.email}
                       </a>
-                      <StatusPill tone={tone}>{ct.email_status ?? 'inconnu'}</StatusPill>
+                      <StatusPill tone={tone}>{translateEmailStatus(ct.email_status)}</StatusPill>
                     </div>
                   ) : null}
                   {ct.linkedin_url ? (

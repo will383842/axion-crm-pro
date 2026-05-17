@@ -20,6 +20,28 @@ import { toast } from 'sonner';
 type RgpdType = 'access' | 'portability' | 'erasure' | 'rectification' | 'opposition';
 type RgpdStatus = 'pending' | 'processing' | 'done' | 'rejected' | 'expired';
 
+function translateRgpdStatus(status: string): string {
+  const map: Record<string, string> = {
+    pending: 'En attente',
+    processing: 'En traitement',
+    done: 'Traitée',
+    rejected: 'Rejetée',
+    expired: 'Expirée',
+  };
+  return map[status.toLowerCase()] ?? status;
+}
+
+function translateRgpdType(type: string): string {
+  const map: Record<string, string> = {
+    access: 'Accès',
+    portability: 'Portabilité',
+    erasure: 'Suppression',
+    rectification: 'Rectification',
+    opposition: 'Opposition',
+  };
+  return map[type.toLowerCase()] ?? type;
+}
+
 interface RgpdRequest {
   id: number;
   type: RgpdType;
@@ -154,13 +176,13 @@ export function RgpdRequestsPage() {
                 className="grid items-center gap-3 px-4 py-3 text-sm transition hover:bg-slate-50/70 dark:hover:bg-slate-800/30"
                 style={{ gridTemplateColumns: GRID }}
               >
-                <div className="font-medium capitalize text-slate-900 dark:text-white">
-                  {r.type}
+                <div className="font-medium text-slate-900 dark:text-white">
+                  {translateRgpdType(r.type)}
                 </div>
                 <div className="truncate text-slate-700 dark:text-slate-200">{r.subject_email}</div>
                 <div>
                   <StatusPill tone={mapStatusToTone(r.status)} pulse={r.status === 'processing'}>
-                    {r.status}
+                    {translateRgpdStatus(r.status)}
                   </StatusPill>
                 </div>
                 <div className="text-xs text-slate-500">

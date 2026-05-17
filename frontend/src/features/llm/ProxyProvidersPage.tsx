@@ -42,8 +42,8 @@ export function ProxyProvidersPage() {
   const testMut = useMutation({
     mutationFn: async (id: number) =>
       (await api.post<{ healthy: boolean }>(`/proxy-providers/${id}/test`)).data,
-    onSuccess: (r) => toast.success(r.healthy ? 'Healthy ✓' : 'Unhealthy ✗'),
-    onError: () => toast.error('Test failed'),
+    onSuccess: (r) => toast.success(r.healthy ? 'Opérationnel ✓' : 'Indisponible ✗'),
+    onError: () => toast.error('Échec du test'),
   });
 
   const rows = list.data?.data ?? [];
@@ -51,8 +51,8 @@ export function ProxyProvidersPage() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="Proxy providers"
-        subtitle="Webshare datacenter + IPRoyal résidentiel + Mock — failover automatique selon zone."
+        title="Fournisseurs de proxies"
+        subtitle="Webshare datacenter + IPRoyal résidentiel + Mock — bascule automatique selon zone."
       />
 
       {list.isLoading ? (
@@ -60,7 +60,7 @@ export function ProxyProvidersPage() {
       ) : rows.length === 0 ? (
         <EmptyState
           icon={<Globe className="h-10 w-10" />}
-          title="Aucun provider configuré"
+          title="Aucun fournisseur configuré"
           description="Configure WEBSHARE_API_KEY ou IPROYAL_USERNAME dans .env serveur pour activer les proxies."
           action={
             <Button variant="secondary" iconLeft={<Activity className="h-3.5 w-3.5" />}>
@@ -78,11 +78,11 @@ export function ProxyProvidersPage() {
             )}
             style={{ gridTemplateColumns: GRID }}
           >
-            <div>Slug</div>
+            <div>Identifiant</div>
             <div>Type</div>
             <div>Zone</div>
-            <div className="text-right">Endpoints</div>
-            <div>Health</div>
+            <div className="text-right">Points de sortie</div>
+            <div>État de santé</div>
             <div className="text-right">Poids</div>
             <div className="text-right">Actions</div>
           </div>
@@ -122,7 +122,7 @@ export function ProxyProvidersPage() {
                     loading={testMut.isPending}
                     onClick={() => testMut.mutate(p.id)}
                   >
-                    Test
+                    Tester
                   </Button>
                 </div>
               </div>

@@ -22,6 +22,6 @@ test.describe('RGPD', () => {
       route.fulfill({ json: { data: [] } }),
     );
     await page.goto('/audit-logs');
-    await expect(page.getByRole('heading', { name: /Audit logs/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Journaux d.audit/i })).toBeVisible();
   });
 });

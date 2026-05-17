@@ -3,6 +3,7 @@
 namespace App\Services\Triage;
 
 use App\Models\Company;
+use App\Support\AuditLogger;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -64,8 +65,21 @@ class TriageAutoService
             && $company->archive_reason === $reason) {
             return;
         }
+        $oldStatus = $company->prospection_status;
         $company->prospection_status = $status;
         $company->archive_reason = $reason;
         $company->save();
+
+        // Sprint H4 — Audit transition uniquement vers archived (info la plus exploitable)
+        if ($status === 'archived_no_email' && $oldStatus !== 'archived_no_email') {
+            AuditLogger::log('company.archived', [
+                'workspace_id'   => (string) $company->workspace_id,
+                'resource_type'  => 'company',
+                'resource_id'    => (string) $company->id,
+                'siren'          => $company->siren,
+                'archive_reason' => $reason,
+                'previous_status'=> $oldStatus,
+            ]);
+        }
     }
 }

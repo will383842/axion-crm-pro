@@ -4,6 +4,7 @@ namespace App\Services\Tags;
 
 use App\Models\Company;
 use App\Models\Tag;
+use App\Support\AuditLogger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -92,6 +93,18 @@ class AutoTaggerService
                 'assigned_by'  => $spec['assigned_by'],
             ]);
             $added[] = $slug;
+        }
+
+        // Sprint H4 — Audit log uniquement si delta > 0 (évite spam pour companies stables)
+        if (! empty($added) || ! empty($removed)) {
+            AuditLogger::log('company.tags_synced', [
+                'workspace_id'  => (string) $company->workspace_id,
+                'resource_type' => 'company',
+                'resource_id'   => (string) $company->id,
+                'siren'         => $company->siren,
+                'added'         => $added,
+                'removed'       => $removed,
+            ]);
         }
 
         return ['added' => $added, 'removed' => $removed];

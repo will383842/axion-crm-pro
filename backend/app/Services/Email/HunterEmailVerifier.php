@@ -2,6 +2,7 @@
 
 namespace App\Services\Email;
 
+use App\Support\AuditLogger;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -104,6 +105,18 @@ class HunterEmailVerifier
             ];
 
             $this->logVerification($email, $workspaceId, $result, $data);
+
+            // Sprint H4 — Audit business event (quota tracking + dashboard observability)
+            if ($workspaceId) {
+                AuditLogger::log('email.verified', [
+                    'workspace_id'  => $workspaceId,
+                    'resource_type' => 'email',
+                    'resource_id'   => $email,
+                    'status'        => $result['status'],
+                    'score'         => $result['score'] ?? null,
+                    'provider'      => 'hunter',
+                ]);
+            }
 
             return $result;
         } catch (\Throwable $e) {

@@ -5,6 +5,7 @@ namespace App\Services\Audiences;
 use App\Models\AudienceMember;
 use App\Models\Company;
 use App\Models\EmailAudience;
+use App\Support\AuditLogger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -102,6 +103,14 @@ class AudienceBuilderService
         ]);
 
         Log::info('Audience refresh done', ['audience_id' => $audience->id, 'members' => $audience->member_count]);
+
+        AuditLogger::log('audience.refreshed', [
+            'workspace_id'  => $audience->workspace_id,
+            'resource_type' => 'audience',
+            'resource_id'   => (string) $audience->id,
+            'member_count'  => $audience->member_count,
+            'name'          => $audience->name,
+        ]);
     }
 
     /**

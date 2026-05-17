@@ -27,10 +27,21 @@ return new class extends Migration
 
         foreach ($workspaceScopedTables as $table) {
             DB::statement("ALTER TABLE $table ENABLE ROW LEVEL SECURITY");
+            // NULLIF(..., '') gère le cas où current_setting() retourne '' (missing_ok=true)
+            // au lieu de NULL — évite que toutes les rows soient invisibles quand la session
+            // var n'est pas positionnée (jobs system / migrations / seeders).
             DB::statement("CREATE POLICY {$table}_workspace_isolation ON $table
                 FOR ALL
-                USING (workspace_id IS NULL OR workspace_id::TEXT = current_setting('app.current_workspace_id', true))
-                WITH CHECK (workspace_id IS NULL OR workspace_id::TEXT = current_setting('app.current_workspace_id', true))");
+                USING (
+                    workspace_id IS NULL
+                    OR NULLIF(current_setting('app.current_workspace_id', true), '') IS NULL
+                    OR workspace_id::TEXT = NULLIF(current_setting('app.current_workspace_id', true), '')
+                )
+                WITH CHECK (
+                    workspace_id IS NULL
+                    OR NULLIF(current_setting('app.current_workspace_id', true), '') IS NULL
+                    OR workspace_id::TEXT = NULLIF(current_setting('app.current_workspace_id', true), '')
+                )");
         }
 
         // L'utilisateur SQL applicatif n'est pas superuser → RLS s'applique.

@@ -14,12 +14,17 @@ interface Cell {
   lon?: number;
 }
 
-const TILES_URL = import.meta.env['VITE_MAPLIBRE_TILES_URL'];
+// Sprint 18.9c — on FORCE MINIMAL_STYLE et on ignore VITE_MAPLIBRE_TILES_URL.
+// Raison : openfreemap charge un sprite externe qui plante en AbortError au
+// remount de FranceCoverageMap (TanStack Router preload double-mount), et
+// le tileset externe ajoute ~5 MB + dépend de CSP. Pour MVP V1, fond blanc OK.
+// À réactiver quand on aura : (a) MapLibre upgrade qui gère mieux abort sprite,
+//                              (b) auto-hosted tileserver, (c) CSP autorisée.
+const FORCE_MINIMAL = true;
+const TILES_URL = FORCE_MINIMAL ? undefined : import.meta.env['VITE_MAPLIBRE_TILES_URL'];
 
-// Style minimal sans tileset externe : fond uni + nos polygones GeoJSON.
-// Évite les problèmes CSP/CORS avec tiles.openfreemap.org en prod.
-// Pour avoir un vrai fond de carte, set VITE_MAPLIBRE_TILES_URL et autorise le domaine dans CSP.
-// Pas de `glyphs` : on n'utilise pas de text-layer, donc inutile (et casse si CSP bloque).
+// Style minimal sans tileset externe : fond blanc + nos polygones GeoJSON.
+// Fond blanc (pas gris) pour que les départements gris clair soient bien visibles.
 const MINIMAL_STYLE: StyleSpecification = {
   version: 8,
   sources: {},
@@ -27,7 +32,7 @@ const MINIMAL_STYLE: StyleSpecification = {
     {
       id: 'background',
       type: 'background',
-      paint: { 'background-color': '#f1f5f9' },
+      paint: { 'background-color': '#ffffff' },
     },
   ],
 };
@@ -134,13 +139,13 @@ export function FranceCoverageMap({
           'fill-color': [
             'interpolate', ['linear'],
             ['coalesce', ['feature-state', 'total'], 0],
-            0,    '#f1f5f9',
+            0,    '#e2e8f0', // gris clair distinct du fond blanc → visible quand cells vide
             10,   '#bae6fd',
             100,  '#38bdf8',
             500,  '#0284c7',
             2000, '#075985',
           ],
-          'fill-opacity': 0.7,
+          'fill-opacity': 0.85,
         },
       });
 
@@ -148,8 +153,9 @@ export function FranceCoverageMap({
         id: 'dept-outline',
         type: 'line',
         source: 'departements',
-        paint: { 'line-color': '#1e293b', 'line-width': 0.5 },
+        paint: { 'line-color': '#475569', 'line-width': 1 },
       });
+      LOG('layers added — dept-fill + dept-outline');
 
       map.on('click', 'dept-fill', (e) => {
         const code = e.features?.[0]?.properties?.['code'] as string | undefined;
@@ -160,10 +166,16 @@ export function FranceCoverageMap({
     });
 
     map.on('error', (e) => {
-      const errObj = e?.error as { message?: string; status?: number; url?: string; stack?: string } | undefined;
+      const errObj = e?.error as { message?: string; status?: number; url?: string; stack?: string; name?: string } | undefined;
       const msg = errObj?.message ?? 'Erreur carte';
       LOG('⚠️ event:error — message=', msg, 'status=', errObj?.status, 'url=', errObj?.url, 'fullError=', e?.error);
-      if (!cancelled) setError(msg);
+      // AbortError lors d'un remount (TanStack Router preload, navigation rapide) est bénin :
+      // la map est remplacée, l'ancienne fetch est annulée. Pas d'erreur utilisateur.
+      const isBenignAbort =
+        errObj?.name === 'AbortError' ||
+        msg.includes('aborted') ||
+        msg.includes('AbortError');
+      if (!cancelled && !isBenignAbort) setError(msg);
     });
 
     return () => {

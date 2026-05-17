@@ -30,9 +30,16 @@ class AuditHashChainLogger
         }
 
         try {
+            $userId = optional($request->user())->id;
+            $wsId   = app()->bound('workspace.id') ? app('workspace.id') : null;
+
             $this->chain->record([
-                'workspace_id' => app()->bound('workspace.id') ? app('workspace.id') : null,
-                'user_id'      => optional($request->user())->id,
+                // audit_logs.workspace_id et user_id sont typés UUID en Postgres.
+                // Si la valeur reçue n'est pas un UUID valide (legacy users en INT,
+                // workspace mocké en INT, etc.), on stocke null pour ne pas planter
+                // l'insert. La requête principale reste auditée par path/method/ip.
+                'workspace_id' => self::asUuidOrNull($wsId),
+                'user_id'      => self::asUuidOrNull($userId),
                 'method'       => $request->method(),
                 'path'         => $request->path(),
                 'status'       => $response->getStatusCode(),
@@ -42,9 +49,29 @@ class AuditHashChainLogger
             ]);
         } catch (\Throwable $e) {
             // Ne pas casser la requête sur erreur d'audit ; logger sentry/glitchtip.
-            report($e);
+            // report() peut lui-même lever si Sentry mal configuré : on swallow tout.
+            try { report($e); } catch (\Throwable) { /* swallow */ }
         }
 
         return $response;
+    }
+
+    /**
+     * Retourne la valeur si elle ressemble à un UUID (v1-v8) ou un ULID (26 chars Crockford base32).
+     * Sinon null — utile quand l'ID user/workspace est legacy INT en attente de migration.
+     */
+    private static function asUuidOrNull(mixed $v): ?string
+    {
+        if ($v === null || $v === '') return null;
+        $s = (string) $v;
+        // UUID classique : 8-4-4-4-12 hex
+        if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $s)) {
+            return $s;
+        }
+        // ULID Crockford base32 : 26 caractères [0-9A-HJKMNP-TV-Z]
+        if (preg_match('/^[0-9A-HJKMNP-TV-Z]{26}$/i', $s)) {
+            return $s;
+        }
+        return null;
     }
 }

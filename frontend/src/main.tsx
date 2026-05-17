@@ -1,4 +1,4 @@
-import { StrictMode } from 'react';
+import { StrictMode, Fragment } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider, createRouter } from '@tanstack/react-router';
@@ -40,11 +40,15 @@ declare module '@tanstack/react-router' {
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('Missing #root element');
 
+// Sprint 18.9c — StrictMode désactivé pour MapLibre (double-mount fait AbortError sur fetch geojson).
+// À réactiver Sprint 19 quand on aura ajouté une vraie protection abort dans FranceCoverageMap.
+const Wrapper = import.meta.env['VITE_STRICT_MODE'] === 'true' ? StrictMode : Fragment;
+
 createRoot(rootEl).render(
-  <StrictMode>
+  <Wrapper>
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
       <Toaster richColors closeButton position="top-right" />
     </QueryClientProvider>
-  </StrictMode>,
+  </Wrapper>,
 );

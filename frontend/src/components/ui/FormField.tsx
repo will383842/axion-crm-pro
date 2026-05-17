@@ -1,6 +1,6 @@
 import { forwardRef, type InputHTMLAttributes, type ReactNode } from 'react';
 
-export interface FormFieldProps extends InputHTMLAttributes<HTMLInputElement> {
+export interface FormFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'prefix' | 'suffix'> {
   label: string;
   error?: string | undefined;
   helpText?: string;

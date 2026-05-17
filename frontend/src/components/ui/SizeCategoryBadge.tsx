@@ -9,8 +9,8 @@ const STYLES: Record<Size, { bg: string; fg: string; label: string }> = {
   inconnue:          { bg: 'bg-slate-100',  fg: 'text-slate-600',  label: 'Inconnue' },
 };
 
-export function SizeCategoryBadge({ size }: { size?: string | null }) {
-  const key = (size as Size) ?? 'inconnue';
+export function SizeCategoryBadge({ size }: { size?: string | null | undefined }) {
+  const key = (size as Size | null | undefined) ?? 'inconnue';
   const s = STYLES[key] ?? STYLES.inconnue;
   return (
     <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${s.bg} ${s.fg}`}>

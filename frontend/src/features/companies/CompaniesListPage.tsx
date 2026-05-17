@@ -174,7 +174,7 @@ export function CompaniesListPage() {
                     <div className="font-mono text-xs text-slate-600">{c.siren}</div>
                     <div className="text-slate-700">{c.naf ?? '—'}</div>
                     <div><SizeCategoryBadge size={c.size_category} /></div>
-                    <div><QualityBadge score={c.quality_score ?? undefined} /></div>
+                    <div><QualityBadge score={c.quality_score} /></div>
                     <div className="truncate text-slate-600">
                       {c.city ?? '—'} {c.postcode ? <span className="text-xs text-slate-400">({c.postcode})</span> : null}
                     </div>

@@ -83,7 +83,7 @@ export function CompanyDetailPage() {
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
             <Item label="Taille"><SizeCategoryBadge size={c.size_category} /></Item>
             <Item label="Effectif INSEE">{c.effectif_range ?? '—'}</Item>
-            <Item label="Qualité"><QualityBadge score={c.quality_score ?? undefined} /></Item>
+            <Item label="Qualité"><QualityBadge score={c.quality_score} /></Item>
             <Item label="Priorité">{c.priority ?? '—'}</Item>
             <Item label="Adresse">{[c.address, c.postcode, c.city].filter(Boolean).join(', ') || '—'}</Item>
             <Item label="Site web">{c.website ? <a className="text-brand-600 hover:underline" href={c.website} target="_blank" rel="noopener noreferrer">{c.website}</a> : '—'}</Item>

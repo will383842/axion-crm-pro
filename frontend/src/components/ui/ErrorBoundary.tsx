@@ -4,7 +4,7 @@ interface Props { children: ReactNode; fallback?: ReactNode; level?: 'root' | 'p
 interface State { hasError: boolean; error?: Error }
 
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { hasError: false };
+  override state: State = { hasError: false };
 
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };

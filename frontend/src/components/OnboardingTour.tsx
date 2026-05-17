@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import Joyride, { CallBackProps, Step, STATUS } from 'react-joyride';
+import Joyride, { STATUS, type CallBackProps, type Step } from 'react-joyride';
 import { api } from '@/lib/api';
 
 interface AuthMeResponse {
@@ -72,7 +72,7 @@ const STEPS: Step[] = [
   },
 ];
 
-export function OnboardingTour(): JSX.Element | null {
+export function OnboardingTour(): ReactElement | null {
   const queryClient = useQueryClient();
   const [run, setRun] = useState(false);
 
@@ -97,12 +97,13 @@ export function OnboardingTour(): JSX.Element | null {
 
   // Démarrage automatique si user présent et tour non fait
   useEffect(() => {
-    if (!isSuccess || !data?.user) return;
+    if (!isSuccess || !data?.user) return undefined;
     if (data.user.onboarding_tour_completed_at === null) {
       // Petit délai pour laisser le DOM monter ses data-tour attributes
       const t = setTimeout(() => setRun(true), 800);
       return () => clearTimeout(t);
     }
+    return undefined;
   }, [isSuccess, data]);
 
   const handleCallback = (props: CallBackProps): void => {

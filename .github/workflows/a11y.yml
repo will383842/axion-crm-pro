@@ -1,0 +1,49 @@
+name: Accessibility
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  axe-playwright:
+    name: axe-core Playwright
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: 'pnpm', cache-dependency-path: frontend/pnpm-lock.yaml }
+      - name: Install deps
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile || pnpm install
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run a11y E2E
+        working-directory: frontend
+        env:
+          E2E_BASE_URL: http://app:5173
+        run: pnpm exec playwright test tests/e2e/a11y.spec.ts --reporter=html
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-a11y-report
+          path: frontend/playwright-report/
+
+  lighthouse:
+    name: Lighthouse CI
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - run: npm install -g @lhci/cli@0.13
+      - run: lhci autorun --upload.target=temporary-public-storage --collect.url=https://staging.axion-crm-pro.com
+        continue-on-error: true

@@ -1,0 +1,19 @@
+{
+  "title": "Axion CRM Pro — Scraping by source",
+  "tags": ["axion", "scraping"],
+  "timezone": "Europe/Paris",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    { "id": 1, "title": "Runs/min par source", "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [{ "expr": "sum by (source) (rate(scraper_runs_total[5m]))" }] },
+    { "id": 2, "title": "Failure rate par source", "type": "timeseries",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "targets": [{ "expr": "sum by (source) (rate(scraper_runs_total{status=\"failed\"}[5m])) / sum by (source) (rate(scraper_runs_total[5m]))" }] },
+    { "id": 3, "title": "Latence p95 par source", "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 24, "h": 8 },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum by (le, source) (rate(scraper_run_duration_ms_bucket[5m])))" }] }
+  ]
+}

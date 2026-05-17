@@ -1,0 +1,105 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Tag git ou SHA à déployer'
+        required: true
+      acknowledge_dr:
+        description: 'Tape "OUI" pour confirmer DR drill récent (<7j)'
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  guardrail:
+    name: Guardrails pré-deploy
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Vérifier acknowledge DR
+        if: github.event.inputs.acknowledge_dr != 'OUI'
+        run: |
+          echo "❌ DR drill non confirmé. Lancer infra/scripts/dr-drill.sh d'abord."
+          exit 1
+
+  build-and-push:
+    name: Build + push GHCR PROD
+    runs-on: ubuntu-24.04
+    needs: guardrail
+    strategy:
+      matrix:
+        include:
+          - { image: api,    dockerfile: Dockerfile.laravel,  target: prod }
+          - { image: app,    dockerfile: Dockerfile.frontend, target: prod }
+          - { image: worker, dockerfile: Dockerfile.worker,   target: prod }
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: ${{ github.event.inputs.version }} }
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with: { registry: ghcr.io, username: ${{ github.actor }}, password: ${{ secrets.GITHUB_TOKEN }} }
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.target }}
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/axion-crm-pro/${{ matrix.image }}:prod
+            ghcr.io/${{ github.repository_owner }}/axion-crm-pro/${{ matrix.image }}:${{ github.event.inputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  pentest-self-check:
+    name: Pentest self-check OWASP
+    runs-on: ubuntu-24.04
+    needs: build-and-push
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH staging + run pentest
+        env:
+          STAGING_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          STAGING_KEY: ${{ secrets.STAGING_SSH_KEY }}
+        run: |
+          echo "$STAGING_KEY" > /tmp/key && chmod 600 /tmp/key
+          ssh -i /tmp/key -o StrictHostKeyChecking=no axion@$STAGING_HOST \
+            'docker exec axion-crm-api php artisan app:pentest-self-check'
+
+  deploy:
+    name: Trigger Coolify prod
+    runs-on: ubuntu-24.04
+    needs: pentest-self-check
+    environment:
+      name: production
+      url: https://app.axion-crm-pro.com
+    steps:
+      - name: Webhook Coolify prod
+        run: |
+          curl -fsS -X POST \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_PROD_TOKEN }}" \
+            "${{ secrets.COOLIFY_PROD_WEBHOOK }}"
+
+  smoke-prod:
+    name: Smoke prod
+    runs-on: ubuntu-24.04
+    needs: deploy
+    steps:
+      - run: sleep 90
+      - run: curl -fsS https://api.axion-crm-pro.com/up
+      - run: curl -fsS https://app.axion-crm-pro.com -o /dev/null
+      - name: Audit hash chain verify
+        env:
+          PROD_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_HOST: ${{ secrets.PROD_SSH_HOST }}
+        run: |
+          echo "$PROD_KEY" > /tmp/key && chmod 600 /tmp/key
+          ssh -i /tmp/key -o StrictHostKeyChecking=no axion@$PROD_HOST \
+            'docker exec axion-crm-api php artisan audit:verify-chain'

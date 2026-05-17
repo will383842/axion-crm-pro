@@ -1,0 +1,21 @@
+{
+  "title": "Axion CRM Pro — Business funnel",
+  "tags": ["axion", "business"],
+  "schemaVersion": 39,
+  "refresh": "5m",
+  "time": { "from": "now-30d", "to": "now" },
+  "panels": [
+    { "id": 1, "title": "Entreprises scrapées", "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "targets": [{ "expr": "axion_crm_companies_total" }] },
+    { "id": 2, "title": "Contacts qualifiés (email valid)", "type": "stat",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "targets": [{ "expr": "axion_crm_contacts_email_valid_total" }] },
+    { "id": 3, "title": "Fresh + complete prospects", "type": "stat",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "targets": [{ "expr": "axion_crm_fresh_complete_prospects_gauge" }] },
+    { "id": 4, "title": "Pipeline health score", "type": "gauge",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "targets": [{ "expr": "axion_crm_pipeline_health_score_gauge" }] }
+  ]
+}

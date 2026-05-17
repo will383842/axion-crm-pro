@@ -1,0 +1,18 @@
+{
+  "title": "Axion CRM Pro — Queues & Horizon",
+  "tags": ["axion", "queues", "horizon"],
+  "schemaVersion": 39,
+  "refresh": "15s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    { "id": 1, "title": "Jobs pending par queue", "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [{ "expr": "horizon_pending_jobs" }] },
+    { "id": 2, "title": "Jobs failed (1h)", "type": "stat",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "targets": [{ "expr": "increase(horizon_failed_jobs_total[1h])" }] },
+    { "id": 3, "title": "Throughput jobs/min", "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 24, "h": 8 },
+      "targets": [{ "expr": "rate(horizon_processed_jobs_total[1m]) * 60" }] }
+  ]
+}

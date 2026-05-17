@@ -1,0 +1,21 @@
+{
+  "title": "Axion CRM Pro — LLM cost",
+  "tags": ["axion", "llm", "cost"],
+  "schemaVersion": 39,
+  "refresh": "1m",
+  "time": { "from": "now-30d", "to": "now" },
+  "panels": [
+    { "id": 1, "title": "Coût total EUR (30j)", "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "targets": [{ "expr": "sum(increase(llm_usage_cost_eur_total[30d]))" }] },
+    { "id": 2, "title": "Coût par provider", "type": "piechart",
+      "gridPos": { "x": 6, "y": 0, "w": 9, "h": 8 },
+      "targets": [{ "expr": "sum by (provider) (increase(llm_usage_cost_eur_total[30d]))" }] },
+    { "id": 3, "title": "Coût par use case", "type": "barchart",
+      "gridPos": { "x": 15, "y": 0, "w": 9, "h": 8 },
+      "targets": [{ "expr": "sum by (use_case_slug) (increase(llm_usage_cost_eur_total[30d]))" }] },
+    { "id": 4, "title": "Cache hit rate", "type": "stat",
+      "gridPos": { "x": 0, "y": 8, "w": 6, "h": 4 },
+      "targets": [{ "expr": "sum(rate(llm_usage_total{cache_hit=\"true\"}[1h])) / sum(rate(llm_usage_total[1h]))" }] }
+  ]
+}

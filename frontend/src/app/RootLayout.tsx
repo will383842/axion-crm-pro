@@ -1,15 +1,31 @@
-import { useEffect } from 'react';
-import { Outlet, Link } from '@tanstack/react-router';
+/**
+ * RootLayout 2026 — Axion CRM Pro
+ *
+ * Coquille de TOUTES les pages admin. Style Linear/Notion 2026.
+ *
+ *  - Sidebar 260 px (collapse 64 px) avec sections groupées + workspace selector.
+ *  - Header sticky : breadcrumbs auto + search + notifications + dark mode + user menu.
+ *  - Mobile : sidebar passe en Drawer, search devient IconButton + Modal.
+ *  - OnboardingTour préservé (data-tour="sidebar", "nav-dashboard", "nav-companies",
+ *    "nav-settings", "global-search", "dark-mode").
+ *
+ * Sous-composants dans `@/components/layout/`.
+ */
+import { useEffect, useState } from 'react';
+import { Outlet } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { GlobalSearch } from '@/components/ui/GlobalSearch';
-import { DarkModeToggle } from '@/components/ui/DarkModeToggle';
+import { Drawer, GlobalSearch, Modal } from '@/components/ui';
 import { OnboardingTour } from '@/components/OnboardingTour';
+import { Sidebar } from '@/components/layout/Sidebar';
+import { Header } from '@/components/layout/Header';
 import { api } from '@/lib/api';
 import { subscribeWorkspaceNotifications } from '@/lib/echo';
 
 interface MeResponse {
   user: { id: string; current_workspace_id: string | null };
 }
+
+const SIDEBAR_COLLAPSED_KEY = 'axion-crm:sidebar:collapsed';
 
 export function RootLayout() {
   const { data: me } = useQuery<MeResponse>({
@@ -19,6 +35,7 @@ export function RootLayout() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Realtime notifications channel
   useEffect(() => {
     if (!me?.user?.current_workspace_id) return;
     if (import.meta.env['VITE_ECHO_DISABLED'] === 'true') return;
@@ -26,59 +43,76 @@ export function RootLayout() {
     return cleanup;
   }, [me?.user?.current_workspace_id]);
 
+  // Sidebar collapsed state — persisté en localStorage
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0');
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
+  // Mobile drawer state
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+
   return (
-    <div className="flex min-h-screen bg-slate-50 dark:bg-slate-900">
+    <div className="flex min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
       <a href="#main" className="skip-link">Aller au contenu</a>
 
-      <aside data-tour="sidebar" className="w-60 shrink-0 border-r border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
-        <div className="px-5 py-6 text-xl font-bold tracking-tight text-brand-700">Axion CRM Pro</div>
-        <nav aria-label="Navigation principale" className="flex flex-col gap-1 px-3 text-sm">
-          <NavLink to="/" dataTour="nav-dashboard">Dashboard</NavLink>
-          <NavLink to="/companies" dataTour="nav-companies">Entreprises</NavLink>
-          <NavLink to="/contacts">Contacts</NavLink>
-          <NavLink to="/coverage">Couverture France</NavLink>
-          <NavLink to="/scraper-runs">Scraper runs</NavLink>
-          <div className="mt-4 px-3 text-xs font-semibold uppercase text-slate-400">LLM</div>
-          <NavLink to="/llm/router">LLM Router</NavLink>
-          <NavLink to="/llm/proxy-providers">Proxies</NavLink>
-          <NavLink to="/llm/rotations">Rotations</NavLink>
-          <div className="mt-4 px-3 text-xs font-semibold uppercase text-slate-400">RGPD</div>
-          <NavLink to="/rgpd/requests">RGPD requests</NavLink>
-          <NavLink to="/rgpd/ai-act">AI Act register</NavLink>
-          <NavLink to="/audit-logs">Audit logs</NavLink>
-          <div className="mt-4 px-3 text-xs font-semibold uppercase text-slate-400">Admin</div>
-          <NavLink to="/users">Utilisateurs</NavLink>
-          <NavLink to="/settings" dataTour="nav-settings">Paramètres</NavLink>
-          <div className="mt-4 px-3 text-xs font-semibold uppercase text-slate-400">Phase 2 (scaffold)</div>
-          <NavLink to="/campaigns">Campagnes</NavLink>
-          <NavLink to="/cold-email">Cold email</NavLink>
-          <NavLink to="/linkedin">LinkedIn outreach</NavLink>
-          <NavLink to="/crm">CRM pipeline</NavLink>
-          <NavLink to="/analytics">Analytics</NavLink>
-        </nav>
-      </aside>
+      {/* Desktop sidebar */}
+      <div className="sticky top-0 hidden h-screen lg:flex">
+        <Sidebar collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
+      </div>
 
-      <main id="main" className="flex-1 overflow-x-hidden">
-        <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-slate-200 bg-white/90 px-6 py-2.5 backdrop-blur dark:border-slate-700 dark:bg-slate-800/90">
-          <div data-tour="global-search" className="flex-1"><GlobalSearch /></div>
-          <div data-tour="dark-mode"><DarkModeToggle /></div>
-        </header>
-        <Outlet />
-      </main>
+      {/* Mobile sidebar Drawer */}
+      <Drawer
+        open={mobileSidebarOpen}
+        onClose={() => setMobileSidebarOpen(false)}
+        title="Navigation"
+        width="sm"
+      >
+        <div className="-mx-6 -my-4">
+          <Sidebar collapsed={false} onToggleCollapse={() => setMobileSidebarOpen(false)} />
+        </div>
+      </Drawer>
+
+      {/* Main column */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <Header
+          onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
+          onOpenMobileSearch={() => setMobileSearchOpen(true)}
+        />
+
+        <main id="main" className="flex-1 overflow-x-hidden px-4 py-5 md:px-6 md:py-6 lg:px-10">
+          <Outlet />
+        </main>
+      </div>
+
+      {/* Mobile search modal */}
+      <Modal
+        open={mobileSearchOpen}
+        onClose={() => setMobileSearchOpen(false)}
+        title="Recherche"
+        size="md"
+      >
+        <GlobalSearch />
+      </Modal>
 
       <OnboardingTour />
     </div>
-  );
-}
-
-function NavLink({ to, children, dataTour }: { to: string; children: React.ReactNode; dataTour?: string }) {
-  return (
-    <Link
-      to={to}
-      data-tour={dataTour}
-      className="rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-100 [&.active]:bg-brand-100 [&.active]:text-brand-700 dark:text-slate-200 dark:hover:bg-slate-700"
-    >
-      {children}
-    </Link>
   );
 }

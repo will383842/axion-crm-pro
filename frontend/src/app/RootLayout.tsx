@@ -1,9 +1,31 @@
+import { useEffect } from 'react';
 import { Outlet, Link } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query';
 import { GlobalSearch } from '@/components/ui/GlobalSearch';
 import { DarkModeToggle } from '@/components/ui/DarkModeToggle';
 import { OnboardingTour } from '@/components/OnboardingTour';
+import { api } from '@/lib/api';
+import { subscribeWorkspaceNotifications } from '@/lib/echo';
+
+interface MeResponse {
+  user: { id: string; current_workspace_id: string | null };
+}
 
 export function RootLayout() {
+  const { data: me } = useQuery<MeResponse>({
+    queryKey: ['auth', 'me'],
+    queryFn: async () => (await api.get<MeResponse>('/auth/me')).data,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  useEffect(() => {
+    if (!me?.user?.current_workspace_id) return;
+    if (import.meta.env['VITE_ECHO_DISABLED'] === 'true') return;
+    const cleanup = subscribeWorkspaceNotifications(me.user.current_workspace_id);
+    return cleanup;
+  }, [me?.user?.current_workspace_id]);
+
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-900">
       <a href="#main" className="skip-link">Aller au contenu</a>

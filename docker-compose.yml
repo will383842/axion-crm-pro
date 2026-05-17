@@ -92,6 +92,31 @@ services:
     networks:
       - axion-crm
 
+  # Sprint 18.3 — Reverb WebSocket server (broadcasting temps réel)
+  reverb:
+    build:
+      context: .
+      dockerfile: Dockerfile.laravel
+      target: dev
+    container_name: axion-crm-reverb
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    env_file: .env
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      BROADCAST_CONNECTION: reverb
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/var/www/html:cached
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - axion-crm
+
   scheduler:
     build:
       context: .

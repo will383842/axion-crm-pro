@@ -14,7 +14,8 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     strictPort: true,
-    hmr: { clientPort: 443 },
+    // HMR : false en prod (Caddy ne forward pas le WS upgrade proprement), true en dev local
+    hmr: process.env['VITE_DISABLE_HMR'] === 'true' ? false : { clientPort: 443 },
     allowedHosts: ['app.axion-crm-pro.com', '.axion-crm-pro.com', 'localhost', 'app.localhost'],
   },
   preview: {

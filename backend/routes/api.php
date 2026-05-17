@@ -53,6 +53,23 @@ Route::prefix('v1')->group(function () {
     // --- Routes protégées -------------------------------------------------
     Route::middleware(['auth:sanctum', 'workspace', 'first-login'])->group(function () {
 
+        // Dashboard (stub MVP — endpoints détaillés Sprint 19)
+        Route::get('/dashboard/stats', function () {
+            return response()->json([
+                'companies'      => ['total' => 0, 'enriched' => 0, 'pending' => 0],
+                'contacts'       => ['total' => 0, 'valid_emails' => 0],
+                'scrape_runs'    => ['total' => 0, 'success_rate' => 0],
+                'recent_activity'=> [],
+            ]);
+        });
+        Route::get('/search', function (\Illuminate\Http\Request $request) {
+            return response()->json([
+                'companies' => [],
+                'contacts'  => [],
+                'tags'      => [],
+            ]);
+        });
+
         // Workspace + users
         Route::get( '/workspace',          [WorkspaceController::class, 'show']);
         Route::put( '/workspace',          [WorkspaceController::class, 'update']);

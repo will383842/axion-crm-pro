@@ -14,7 +14,23 @@ interface Cell {
   lon?: number;
 }
 
-const TILES_URL = import.meta.env['VITE_MAPLIBRE_TILES_URL'] ?? 'https://tiles.openfreemap.org/styles/liberty';
+const TILES_URL = import.meta.env['VITE_MAPLIBRE_TILES_URL'];
+
+// Style minimal sans tileset externe : fond uni + nos polygones GeoJSON.
+// Évite les problèmes CSP/CORS avec tiles.openfreemap.org en prod.
+// Pour avoir un vrai fond de carte, set VITE_MAPLIBRE_TILES_URL et autorise le domaine dans CSP.
+const MINIMAL_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {},
+  layers: [
+    {
+      id: 'background',
+      type: 'background',
+      paint: { 'background-color': '#f1f5f9' },
+    },
+  ],
+  glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+};
 
 export function FranceCoverageMap({
   cells,
@@ -35,7 +51,7 @@ export function FranceCoverageMap({
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: TILES_URL as string | StyleSpecification,
+      style: TILES_URL ?? MINIMAL_STYLE,
       center: [2.4, 46.6], // centre métropole
       zoom: 5,
       attributionControl: { compact: true },

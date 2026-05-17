@@ -6,7 +6,6 @@ use App\Contracts\SmtpProber;
 use App\Data\Email\SmtpProbeResult;
 use App\Services\Dedup\DeduplicationService;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Str;
 
 /**
@@ -14,9 +13,11 @@ use Illuminate\Support\Str;
  * Score 0-100 retourné. Cf. spec/06_email_finder_validation.md.
  *
  * Hardening Sprint Pipeline 360° (2026-05-17) :
- * - Rate limit Redis 50 probes/h/domain (clef `smtp_probe_rate:{domain}`).
+ * - Sprint H2 : SmtpProber bound to HunterSmtpProber when MOCK_SMTP=false
+ *   (Hunter.io API au lieu de probe SMTP direct depuis IP Hetzner).
  * - Skip blacklist gros providers (toujours catchall, infos inutiles).
  * - Catch \Throwable autour de chaque probe → mark invalid au lieu de crash.
+ * - Rate limit Redis retiré : Hunter gère son propre quota mensuel.
  */
 class EmailFinderService
 {
@@ -31,9 +32,6 @@ class EmailFinderService
         'live.fr', 'live.com', 'icloud.com',
     ];
 
-    private const PROBE_RATE_LIMIT_PER_HOUR = 50;
-
-    private const PROBE_RATE_LIMIT_TTL_SECONDS = 3600;
     public const PATTERNS = [
         '{first}.{last}@{domain}',
         '{f}.{last}@{domain}',
@@ -58,7 +56,41 @@ class EmailFinderService
     public function __construct(
         private readonly SmtpProber $prober,
         private readonly DeduplicationService $dedup,
+        private readonly ?\App\Services\Email\HunterEmailVerifier $hunterVerifier = null,
     ) {}
+
+    /**
+     * Vérification d'un email connu (typiquement issu de mentions-légales ou input manuel).
+     * Sprint H2 — Délègue à Hunter.io (au lieu de probe SMTP direct).
+     *
+     * Retourne : valid|invalid|catchall|risky|unknown|skipped_catchall_provider
+     */
+    public function verifyEmail(string $email, ?string $workspaceId = null): string
+    {
+        $email = strtolower(trim($email));
+        if (! $this->validEmail($email)) {
+            return 'invalid';
+        }
+
+        $domain = strtolower(substr(strrchr($email, '@') ?: '@', 1));
+        if (in_array($domain, self::CATCHALL_PROVIDERS, true)) {
+            return 'skipped_catchall_provider';
+        }
+
+        // Fallback graceful : pas de Hunter wired → unknown plutôt que faux positif
+        if ($this->hunterVerifier === null) {
+            return 'unknown';
+        }
+
+        $result = $this->hunterVerifier->verify($email, $workspaceId);
+
+        return match ($result['status'] ?? 'unknown') {
+            'deliverable'              => 'valid',
+            'undeliverable', 'invalid' => 'invalid',
+            'risky', 'accept_all'      => 'catchall',
+            default                    => 'unknown',
+        };
+    }
 
     /**
      * @return list<SmtpProbeResult> ordonné par score DESC
@@ -100,12 +132,7 @@ class EmailFinderService
                 continue;
             }
 
-            // Rate limit Redis 50 probes/h/domain
-            if (! $this->canProbeDomain($domain)) {
-                Log::info('EmailFinder rate limit reached', ['domain' => $domain]);
-                break;
-            }
-
+            // Sprint H2 — Rate limit Redis retiré : Hunter gère son propre quota.
             try {
                 $probe = $this->prober->probe($email);
             } catch (\Throwable $e) {
@@ -135,27 +162,6 @@ class EmailFinderService
 
         usort($results, fn ($a, $b) => $b->score <=> $a->score);
         return $results;
-    }
-
-    /**
-     * Vérifie + incrémente le rate limit Redis (50 probes/h/domain).
-     * Fail-open : si Redis KO, on autorise (mieux que bloquer le pipeline).
-     */
-    private function canProbeDomain(string $domain): bool
-    {
-        $key = 'smtp_probe_rate:' . strtolower($domain);
-        try {
-            $count = (int) Redis::incr($key);
-            if ($count === 1) {
-                Redis::expire($key, self::PROBE_RATE_LIMIT_TTL_SECONDS);
-            }
-            return $count <= self::PROBE_RATE_LIMIT_PER_HOUR;
-        } catch (\Throwable $e) {
-            Log::debug('Redis rate limit check failed, fail-open', [
-                'domain' => $domain, 'error' => $e->getMessage(),
-            ]);
-            return true;
-        }
     }
 
     /** @return list<string> */

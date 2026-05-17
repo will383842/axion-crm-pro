@@ -38,3 +38,28 @@ test('detectPatternFromKnownEmails returns dominant pattern', function () {
     );
     expect($pattern)->toBe('{first}.{last}@{domain}');
 });
+
+test('verifyEmail returns skipped_catchall_provider for big mail providers (Sprint H2)', function () {
+    $svc = new EmailFinderService(
+        new \App\Services\Smtp\Mocks\MockSmtpProber(),
+        new \App\Services\Dedup\DeduplicationService(),
+    );
+    expect($svc->verifyEmail('jean@gmail.com'))->toBe('skipped_catchall_provider');
+    expect($svc->verifyEmail('marie@orange.fr'))->toBe('skipped_catchall_provider');
+});
+
+test('verifyEmail returns unknown when no Hunter verifier wired (Sprint H2)', function () {
+    $svc = new EmailFinderService(
+        new \App\Services\Smtp\Mocks\MockSmtpProber(),
+        new \App\Services\Dedup\DeduplicationService(),
+    );
+    expect($svc->verifyEmail('hi@acme-corp.fr'))->toBe('unknown');
+});
+
+test('verifyEmail returns invalid for malformed addresses (Sprint H2)', function () {
+    $svc = new EmailFinderService(
+        new \App\Services\Smtp\Mocks\MockSmtpProber(),
+        new \App\Services\Dedup\DeduplicationService(),
+    );
+    expect($svc->verifyEmail('not-an-email'))->toBe('invalid');
+});

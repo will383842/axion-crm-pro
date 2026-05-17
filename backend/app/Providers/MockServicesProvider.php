@@ -24,6 +24,7 @@ use App\Services\Proxies\WebshareProvider;
 use App\Services\Captcha\TwoCaptchaSolver;
 use App\Services\Captcha\Mocks\MockCaptchaSolver;
 use App\Services\Smtp\RealSmtpProber;
+use App\Services\Smtp\HunterSmtpProber;
 use App\Services\Smtp\Mocks\MockSmtpProber;
 use App\Services\Insee\HttpInseeClient;
 use App\Services\Insee\Mocks\MockInseeClient;
@@ -67,7 +68,9 @@ class MockServicesProvider extends ServiceProvider
 
         $bind(ProxyProvider::class,            WebshareProvider::class,           MockProxyProvider::class,           'MOCK_PROXIES');
         $bind(CaptchaSolver::class,            TwoCaptchaSolver::class,           MockCaptchaSolver::class,           'MOCK_CAPTCHA');
-        $bind(SmtpProber::class,               RealSmtpProber::class,             MockSmtpProber::class,              'MOCK_SMTP');
+        // Sprint H2 — HunterSmtpProber remplace RealSmtpProber (probe direct → ban Spamhaus IP Hetzner).
+        // RealSmtpProber gardé en classe pour fallback manuel mais plus wired par défaut.
+        $bind(SmtpProber::class,               HunterSmtpProber::class,           MockSmtpProber::class,              'MOCK_SMTP');
         $bind(InseeClient::class,              HttpInseeClient::class,            MockInseeClient::class,             'MOCK_INSEE');
         $bind(AnnuaireEntreprisesClient::class,HttpAnnuaireEntreprisesClient::class,MockAnnuaireEntreprisesClient::class,'MOCK_ANNUAIRE_ENTREPRISES');
         $bind(BodaccClient::class,             HttpBodaccClient::class,           MockBodaccClient::class,            'MOCK_BODACC');

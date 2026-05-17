@@ -123,9 +123,9 @@ class LaunchZoneScrapingJob implements ShouldQueue
                 'error'        => $e->getMessage(),
             ]);
             $run->update([
-                'status'        => 'failed',
-                'finished_at'   => now(),
-                'error_message' => mb_substr($e->getMessage(), 0, 500),
+                'status'      => 'failed',
+                'finished_at' => now(),
+                'error'       => mb_substr($e->getMessage(), 0, 500),
             ]);
             // Incrémente quand même runs_completed sur la campagne (sinon coincée)
             if ($this->campaignId !== null) {

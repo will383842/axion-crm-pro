@@ -91,7 +91,9 @@ resource "hcloud_server" "nodes" {
   name        = "axion-crm-${each.key}"
   image       = "ubuntu-24.04"
   server_type = each.value.type
-  location    = "fsn1"
+  # Datacenters UE/RGPD : fsn1 (Falkenstein DE), nbg1 (Nuremberg DE), hel1 (Helsinki FI).
+  # Variable configurable selon la latence souhaitée vers utilisateurs France.
+  location    = var.hetzner_location
   ssh_keys    = [hcloud_ssh_key.axion.id]
   firewall_ids = [hcloud_firewall.axion_fw.id]
 

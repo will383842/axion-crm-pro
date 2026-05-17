@@ -25,3 +25,9 @@ variable "ssh_allowed_cidrs" {
   type        = list(string)
   default     = []
 }
+
+variable "hetzner_location" {
+  description = "Datacenter Hetzner UE/RGPD : fsn1 (Falkenstein DE), nbg1 (Nuremberg DE), hel1 (Helsinki FI)"
+  type        = string
+  default     = "hel1"
+}

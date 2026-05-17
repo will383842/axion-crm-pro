@@ -1,13 +1,15 @@
 import { Card, CardEyebrow, CardHeader, CardTitle, QualityBadge, cn } from '@/components/ui';
 
 export interface QualityScoreCardProps {
-  score?: number | null;
-  breakdown?: {
-    email?: number | null;
-    phone?: number | null;
-    website?: number | null;
-    contact?: number | null;
-  };
+  score?: number | null | undefined;
+  breakdown?:
+    | {
+        email?: number | null | undefined;
+        phone?: number | null | undefined;
+        website?: number | null | undefined;
+        contact?: number | null | undefined;
+      }
+    | undefined;
 }
 
 function Bar({ label, value }: { label: string; value: number }) {

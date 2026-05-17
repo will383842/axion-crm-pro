@@ -1,10 +1,13 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react-swc';
-import type { PluginOption } from 'vite';
 import path from 'node:path';
 
 export default defineConfig({
-  plugins: [react() as PluginOption],
+  // vitest 2.x bundles vite 5; workspace runs vite 6 — Plugin<any> types diverge
+  // sous exactOptionalPropertyTypes. Bug type connu, sans impact runtime.
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-expect-error vite 5 (vitest bundled) vs vite 6 (workspace) type mismatch
+  plugins: [react()],
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
   },
@@ -12,6 +15,7 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],
+    exclude: ['node_modules', 'dist', 'tests/e2e/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],

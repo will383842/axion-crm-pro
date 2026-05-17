@@ -3,9 +3,9 @@ import { Button, cn } from '@/components/ui';
 export interface PaginationProps {
   page: number;
   lastPage: number;
-  total?: number;
+  total?: number | undefined;
   onChange: (page: number) => void;
-  className?: string;
+  className?: string | undefined;
 }
 
 /** Compact page list à la "1 2 3 … 125". */

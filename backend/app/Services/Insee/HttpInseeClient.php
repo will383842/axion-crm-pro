@@ -172,18 +172,23 @@ class HttpInseeClient implements InseeClient
             $parts[] = 'trancheEffectifsUniteLegale:[' . ($criteria['effectif_min'] ?? '01') . ' TO ' . ($criteria['effectif_max'] ?? '53') . ']';
         }
 
-        // Département — seulement endpoint /siret (codeDepartementEtablissement officiel v3.11)
-        // Limite aux établissements actifs + sièges pour ne pas dupliquer les unités légales.
+        // Département — INSEE Sirene v3.11 n'a PAS de champ codeDepartementEtablissement.
+        // Il faut filtrer via codeCommuneEtablissement avec wildcard préfixe.
+        // Codes commune INSEE = 5 chars :
+        //   - métropole : 2 chiffres dept + 3 chiffres commune  (Paris = 75001..75056)
+        //   - DROM      : 3 chiffres dept + 2 chiffres commune  (Mayotte 976)
         if (! empty($criteria['department']) && $forSiretEndpoint) {
-            $dept = preg_replace('/[^0-9A-Z]/i', '', (string) $criteria['department']);
-            $parts[] = 'codeDepartementEtablissement:' . $dept;
+            $dept = preg_replace('/[^0-9A-Za-z]/', '', (string) $criteria['department']);
+            // Corse : codes 2A/2B → INSEE indexe en 2A/2B donc on garde tel quel
+            $parts[] = 'codeCommuneEtablissement:' . $dept . '*';
             $parts[] = 'etablissementSiege:true';
-            $parts[] = 'etatAdministratifEtablissement:A'; // A = Actif (P = fermé)
+            $parts[] = 'etatAdministratifEtablissement:A'; // A = Actif, F = Fermé
         }
 
-        // Commune (code INSEE 5 chars) — endpoint /siret
+        // Commune (code INSEE 5 chars exact) — endpoint /siret
         if (! empty($criteria['commune']) && $forSiretEndpoint) {
-            $parts[] = 'codeCommuneEtablissement:' . $criteria['commune'];
+            $commune = preg_replace('/[^0-9A-Za-z]/', '', (string) $criteria['commune']);
+            $parts[] = 'codeCommuneEtablissement:' . $commune;
             $parts[] = 'etatAdministratifEtablissement:A';
         }
 

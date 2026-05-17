@@ -31,6 +31,9 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Lock,
+  Hash,
+  Users2,
+  Send,
 } from 'lucide-react';
 import { cn, Tooltip } from '@/components/ui';
 import { WorkspaceSelector } from './WorkspaceSelector';
@@ -66,6 +69,16 @@ const SECTIONS: NavSection[] = [
     items: [
       { to: '/companies', label: 'Entreprises', icon: <Building2 className="h-4 w-4" />, dataTour: 'nav-companies' },
       { to: '/contacts', label: 'Contacts', icon: <UsersIcon className="h-4 w-4" /> },
+      { to: '/tags', label: 'Tags', icon: <Hash className="h-4 w-4" /> },
+    ],
+  },
+  {
+    id: 'communication',
+    title: 'Communication',
+    items: [
+      { to: '/audiences', label: 'Audiences', icon: <Users2 className="h-4 w-4" /> },
+      { to: '/email-templates', label: 'Templates email', icon: <Mail className="h-4 w-4" />, locked: true },
+      { to: '/email-sends', label: 'Envois email', icon: <Send className="h-4 w-4" />, locked: true },
     ],
   },
   {

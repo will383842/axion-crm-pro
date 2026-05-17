@@ -23,6 +23,11 @@ import { NotFoundPage } from '@/features/misc/NotFoundPage';
 import { CampaignsListPage } from '@/features/campaigns/CampaignsListPage';
 import { CampaignWizardPage } from '@/features/campaigns/CampaignWizardPage';
 import { CampaignDetailPage } from '@/features/campaigns/CampaignDetailPage';
+// Sprint Pipeline 360° — Tags Manager + Audiences
+import { TagsManagerPage } from '@/features/tags/TagsManagerPage';
+import { AudiencesListPage } from '@/features/audiences/AudiencesListPage';
+import { AudienceBuilderPage } from '@/features/audiences/AudienceBuilderPage';
+import { AudienceDetailPage } from '@/features/audiences/AudienceDetailPage';
 // Phase 2 scaffold stubs
 import { ColdEmailStub } from '@/features/phase2-scaffold/ColdEmailStub';
 import { LinkedInStub } from '@/features/phase2-scaffold/LinkedInStub';
@@ -61,6 +66,11 @@ const settingsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/s
 const campaignsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/campaigns', component: CampaignsListPage });
 const campaignsNewRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/campaigns/new', component: CampaignWizardPage });
 const campaignDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/campaigns/$campaignId', component: CampaignDetailPage });
+// Sprint Pipeline 360° — Tags + Audiences
+const tagsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/tags', component: TagsManagerPage });
+const audiencesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/audiences', component: AudiencesListPage });
+const audiencesNewRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/audiences/new', component: AudienceBuilderPage });
+const audienceDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/audiences/$audienceId', component: AudienceDetailPage });
 // Phase 2 stubs
 const coldEmailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/cold-email', component: ColdEmailStub });
 const linkedInRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/linkedin', component: LinkedInStub });
@@ -92,6 +102,10 @@ export const routeTree = rootRoute.addChildren([
     campaignsRoute,
     campaignsNewRoute,
     campaignDetailRoute,
+    tagsRoute,
+    audiencesRoute,
+    audiencesNewRoute,
+    audienceDetailRoute,
     coldEmailRoute,
     linkedInRoute,
     crmRoute,

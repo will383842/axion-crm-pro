@@ -10,7 +10,7 @@ class ScraperRun extends Model
     use HasFactory;
 
     protected $fillable = [
-        'workspace_id', 'company_id', 'source', 'status',
+        'workspace_id', 'company_id', 'campaign_id', 'source', 'status',
         'started_at', 'finished_at', 'latency_ms', 'error',
         'payload_path', 'request_payload', 'response_payload',
     ];
@@ -28,5 +28,10 @@ class ScraperRun extends Model
     public function company()
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function campaign()
+    {
+        return $this->belongsTo(ScrapingCampaign::class, 'campaign_id');
     }
 }

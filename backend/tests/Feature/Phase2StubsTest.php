@@ -22,10 +22,8 @@ beforeEach(function () {
     $this->actingAs($this->user);
 });
 
-test('Phase 2 campaigns endpoint returns 501', function () {
-    $this->getJson('/api/v1/campaigns')->assertStatus(501)
-        ->assertJsonStructure(['error', 'message', 'sprint']);
-});
+// Sprint 19.7 — /campaigns n'est plus un stub Phase 2, c'est un endpoint complet
+// (Scraping Campaigns). Voir CampaignsTest.php.
 
 test('Phase 2 cold-email endpoint returns 501', function () {
     $this->getJson('/api/v1/cold-email')->assertStatus(501);

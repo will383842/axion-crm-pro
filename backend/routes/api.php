@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\CompaniesController;
 use App\Http\Controllers\Api\ContactsController;
 use App\Http\Controllers\Api\CoverageController;
 use App\Http\Controllers\Api\ScraperRunsController;
+use App\Http\Controllers\Api\ScrapingCampaignsController;
 use App\Http\Controllers\Api\LlmUseCasesController;
 use App\Http\Controllers\Api\LlmUsageController;
 use App\Http\Controllers\Api\ProxyProvidersController;
@@ -23,7 +24,6 @@ use App\Http\Controllers\Api\UsersController;
 use App\Http\Controllers\Api\NotificationsController;
 use App\Http\Controllers\Api\SavedViewsController;
 use App\Http\Controllers\Api\GlobalSearchController;
-use App\Http\Controllers\Api\Phase2\CampaignsController;
 use App\Http\Controllers\Api\Phase2\ColdEmailController;
 use App\Http\Controllers\Api\Phase2\LinkedInController;
 use App\Http\Controllers\Api\Phase2\CrmController;
@@ -153,8 +153,30 @@ Route::prefix('v1')->group(function () {
         Route::get( '/audit-logs',                    [AuditLogsController::class, 'index']);
         Route::get( '/audit-logs/verify-chain',       [AuditLogsController::class, 'verifyChain']);
 
+        // --- Scraping Campaigns (Sprint 19.7) ------------------------------
+        Route::get(   '/campaigns',                 [ScrapingCampaignsController::class, 'index'])
+            ->middleware('throttle:scraper-list');
+        Route::post(  '/campaigns',                 [ScrapingCampaignsController::class, 'store'])
+            ->middleware('throttle:scraper-launch');
+        Route::get(   '/campaigns/{campaign}',       [ScrapingCampaignsController::class, 'show'])
+            ->middleware('throttle:scraper-list');
+        Route::put(   '/campaigns/{campaign}',       [ScrapingCampaignsController::class, 'update'])
+            ->middleware('throttle:scraper-launch');
+        Route::delete('/campaigns/{campaign}',       [ScrapingCampaignsController::class, 'destroy'])
+            ->middleware('throttle:scraper-launch');
+        Route::post(  '/campaigns/{campaign}/start', [ScrapingCampaignsController::class, 'start'])
+            ->middleware('throttle:scraper-launch');
+        Route::post(  '/campaigns/{campaign}/pause', [ScrapingCampaignsController::class, 'pause'])
+            ->middleware('throttle:scraper-launch');
+        Route::post(  '/campaigns/{campaign}/resume',[ScrapingCampaignsController::class, 'resume'])
+            ->middleware('throttle:scraper-launch');
+        Route::post(  '/campaigns/{campaign}/cancel',[ScrapingCampaignsController::class, 'cancel'])
+            ->middleware('throttle:scraper-launch');
+        Route::get(   '/campaigns/{campaign}/stats', [ScrapingCampaignsController::class, 'stats'])
+            ->middleware('throttle:scraper-list');
+
         // --- Phase 2 (stubs, retournent 501 Not Implemented) ---------------
-        Route::any('/campaigns{any?}',   CampaignsController::class)->where('any', '.*');
+        // Note : /campaigns retiré — implémenté en Sprint 19.7 ci-dessus.
         Route::any('/cold-email{any?}',  ColdEmailController::class)->where('any', '.*');
         Route::any('/linkedin{any?}',    LinkedInController::class)->where('any', '.*');
         Route::any('/crm{any?}',         CrmController::class)->where('any', '.*');

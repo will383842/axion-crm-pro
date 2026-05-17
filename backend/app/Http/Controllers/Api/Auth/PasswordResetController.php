@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Api\ApiController;
 use App\Models\User;
+use App\Rules\NotPwnedPassword;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -56,7 +57,7 @@ class PasswordResetController extends ApiController
         $request->validate([
             'email'    => ['required', 'email'],
             'token'    => ['required', 'string', 'size:64'],
-            'password' => ['required', 'string', 'confirmed', Password::min(12)->uncompromised()],
+            'password' => ['required', 'string', 'confirmed', Password::min(12), new NotPwnedPassword()],
         ]);
 
         $email = (string) $request->input('email');

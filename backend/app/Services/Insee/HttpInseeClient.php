@@ -92,7 +92,13 @@ class HttpInseeClient implements InseeClient
 
             if ($hasGeo) {
                 foreach ($data[$resultsKey] ?? [] as $etab) {
+                    // Filtres post-API (Sirene v3.11 ne les accepte pas dans q) :
+                    // 1. Sièges seulement → 1 résultat par entreprise (sinon doublons par établissement)
+                    if (! ($etab['etablissementSiege'] ?? false)) continue;
                     $u = $etab['uniteLegale'] ?? [];
+                    // 2. Unités légales actives uniquement (exclut radiées/cessées)
+                    if (($u['etatAdministratifUniteLegale'] ?? null) !== 'A') continue;
+
                     $periodes = $u['periodesUniteLegale'][0] ?? $u;
                     $siren = (string) ($etab['siren'] ?? $u['siren'] ?? '');
                     if ($siren === '' || isset($seenSirens[$siren])) continue;
@@ -177,19 +183,19 @@ class HttpInseeClient implements InseeClient
         // Codes commune INSEE = 5 chars :
         //   - métropole : 2 chiffres dept + 3 chiffres commune  (Paris = 75001..75056)
         //   - DROM      : 3 chiffres dept + 2 chiffres commune  (Mayotte 976)
+        // IMPORTANT : etablissementSiege + etatAdministratifEtablissement NE SONT PAS
+        // autorisés dans le param `q` de Sirene v3.11 (testé via curl : HTTP 400).
+        // Ils sont filtrés côté PHP après réception dans searchByCriteria().
         if (! empty($criteria['department']) && $forSiretEndpoint) {
             $dept = preg_replace('/[^0-9A-Za-z]/', '', (string) $criteria['department']);
             // Corse : codes 2A/2B → INSEE indexe en 2A/2B donc on garde tel quel
             $parts[] = 'codeCommuneEtablissement:' . $dept . '*';
-            $parts[] = 'etablissementSiege:true';
-            $parts[] = 'etatAdministratifEtablissement:A'; // A = Actif, F = Fermé
         }
 
         // Commune (code INSEE 5 chars exact) — endpoint /siret
         if (! empty($criteria['commune']) && $forSiretEndpoint) {
             $commune = preg_replace('/[^0-9A-Za-z]/', '', (string) $criteria['commune']);
             $parts[] = 'codeCommuneEtablissement:' . $commune;
-            $parts[] = 'etatAdministratifEtablissement:A';
         }
 
         return implode(' AND ', $parts) ?: '*';

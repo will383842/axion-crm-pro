@@ -9,7 +9,11 @@ class Tag extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['workspace_id', 'slug', 'name', 'color', 'description', 'rules'];
+    protected $fillable = [
+        'workspace_id', 'slug', 'name', 'color', 'description', 'rules',
+        // Sprint Pipeline 360° (2026-05-17)
+        'category', 'kind',
+    ];
 
     protected function casts(): array
     {

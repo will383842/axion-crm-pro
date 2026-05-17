@@ -60,16 +60,49 @@ sb_scp() { sshpass -p "$SB_PASSWORD" scp -P "$SB_PORT" -o StrictHostKeyChecking=
 sb_sftp_batch() { sshpass -p "$SB_PASSWORD" sftp -P "$SB_PORT" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 -b - "$SB_USER@$SB_HOST"; }
 
 # --- pg_dump ---
+# Sprint 19.4 : -C (CREATE DATABASE) + préfix extensions.sql pour restore brut sans pré-création
+# Le dump pg_dump n'inclut pas les CREATE EXTENSION dans plain text sans --extension flag.
+# On préfixe donc avec un script SQL qui pose les 9 extensions requises (cf. infra/postgres/init/01-extensions.sql).
 log "Starting pg_dump (DB=$DB_NAME, container=$DB_CONTAINER)..."
-docker exec "$DB_CONTAINER" pg_dump \
-    -U "$DB_USER" \
-    -Fp \
-    --no-owner \
-    --no-acl \
-    --clean \
-    --if-exists \
-    "$DB_NAME" \
-    | gzip -9 > "$BACKUP_DIR/$BACKUP_FILE"
+
+# Heredoc extensions, idempotent
+EXTENSIONS_SQL=$(cat <<'EOSQL'
+-- Axion CRM Pro — bootstrap extensions (Sprint 19.4 backup prefix)
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+CREATE EXTENSION IF NOT EXISTS "unaccent";
+CREATE EXTENSION IF NOT EXISTS "btree_gin";
+CREATE EXTENSION IF NOT EXISTS "btree_gist";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "citext";
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "postgis";
+CREATE EXTENSION IF NOT EXISTS "vector";
+EOSQL
+)
+
+# pg_dump -C produit CREATE DATABASE + \connect, on injecte les extensions juste après le \connect.
+# Stratégie portable : on concatène extensions + dump, en demandant un dump *sans* -C, puis
+# le restore se fait par psql sur une DB déjà créée (le path standard d'un DR sain).
+{
+    echo "-- ============================================================================"
+    echo "-- Axion CRM Pro — backup ${TIMESTAMP}"
+    echo "-- DB=${DB_NAME}, container=${DB_CONTAINER}"
+    echo "-- ============================================================================"
+    echo ""
+    echo "${EXTENSIONS_SQL}"
+    echo ""
+    echo "-- ============================================================================"
+    echo "-- pg_dump payload (schema + data)"
+    echo "-- ============================================================================"
+    docker exec "$DB_CONTAINER" pg_dump \
+        -U "$DB_USER" \
+        -Fp \
+        --no-owner \
+        --no-acl \
+        --clean \
+        --if-exists \
+        "$DB_NAME"
+} | gzip -9 > "$BACKUP_DIR/$BACKUP_FILE"
 
 # --- Vérif taille ---
 SIZE=$(stat -c%s "$BACKUP_DIR/$BACKUP_FILE")

@@ -42,7 +42,12 @@ if (!rootEl) throw new Error('Missing #root element');
 
 // Sprint 18.9c — StrictMode désactivé pour MapLibre (double-mount fait AbortError sur fetch geojson).
 // À réactiver Sprint 19 quand on aura ajouté une vraie protection abort dans FranceCoverageMap.
-const Wrapper = import.meta.env['VITE_STRICT_MODE'] === 'true' ? StrictMode : Fragment;
+const strictModeEnv = import.meta.env['VITE_STRICT_MODE'];
+const Wrapper = strictModeEnv === 'true' ? StrictMode : Fragment;
+// eslint-disable-next-line no-console
+console.log('[Boot] VITE_STRICT_MODE=', strictModeEnv, '→ wrapper=', Wrapper === StrictMode ? 'StrictMode' : 'Fragment');
+// eslint-disable-next-line no-console
+console.log('[Boot] MODE=', import.meta.env.MODE, 'PROD=', import.meta.env.PROD, 'DEV=', import.meta.env.DEV);
 
 createRoot(rootEl).render(
   <Wrapper>

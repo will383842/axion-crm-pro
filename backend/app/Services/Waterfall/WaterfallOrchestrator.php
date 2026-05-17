@@ -17,6 +17,7 @@ use App\Services\Domain\DomainFinderService;
 use App\Services\Legal\MentionsLegalesScraperService;
 use App\Services\Tags\AutoTaggerService;
 use App\Services\Triage\TriageAutoService;
+use App\Support\WaterfallSentry;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -195,6 +196,7 @@ class WaterfallOrchestrator
                 $this->recordRun($company, 'domain-finder', 'success');
             }
         } catch (\Throwable $e) {
+            WaterfallSentry::capture($company, 'domain-finder', $e);
             Log::warning('domain finder failed', ['company_id' => $company->id, 'error' => $e->getMessage()]);
             $this->recordRun($company, 'domain-finder', 'failed');
         }
@@ -209,6 +211,7 @@ class WaterfallOrchestrator
             $found = $this->mentionsLegales->scrape($company);
             $this->recordRun($company, 'mentions-legales', $found ? 'success' : 'partial');
         } catch (\Throwable $e) {
+            WaterfallSentry::capture($company, 'mentions-legales', $e);
             Log::warning('mentions-legales scrape failed', ['company_id' => $company->id, 'error' => $e->getMessage()]);
             $this->recordRun($company, 'mentions-legales', 'failed');
         }
@@ -266,6 +269,7 @@ class WaterfallOrchestrator
                     'updated_at'   => now(),
                 ]);
             } catch (\Throwable $e) {
+                WaterfallSentry::capture($company, 'email-finder', $e);
                 Log::warning('email finder failed', ['contact_id' => $c->id, 'error' => $e->getMessage()]);
             }
         }
@@ -331,6 +335,7 @@ class WaterfallOrchestrator
             DB::statement('SELECT recompute_company_quality_score(?)', [$company->id]);
             $this->recordRun($company, 'llm-classify', 'success');
         } catch (\Throwable $e) {
+            WaterfallSentry::capture($company, 'llm-classify', $e);
             Log::warning('llm classify failed', ['company_id' => $company->id, 'error' => $e->getMessage()]);
             $this->recordRun($company, 'llm-classify', 'failed');
         }
@@ -342,6 +347,7 @@ class WaterfallOrchestrator
             $changed = $this->autoClassifier->classify($company);
             $this->recordRun($company, 'auto-classify', $changed ? 'success' : 'partial');
         } catch (\Throwable $e) {
+            WaterfallSentry::capture($company, 'auto-classify', $e);
             Log::warning('auto-classify failed', ['company_id' => $company->id, 'error' => $e->getMessage()]);
             $this->recordRun($company, 'auto-classify', 'failed');
         }
@@ -354,6 +360,7 @@ class WaterfallOrchestrator
             Log::debug('auto-tag delta', ['company_id' => $company->id, 'delta' => $delta]);
             $this->recordRun($company, 'auto-tag', 'success');
         } catch (\Throwable $e) {
+            WaterfallSentry::capture($company, 'auto-tag', $e);
             Log::warning('auto-tag failed', ['company_id' => $company->id, 'error' => $e->getMessage()]);
             $this->recordRun($company, 'auto-tag', 'failed');
         }
@@ -366,6 +373,7 @@ class WaterfallOrchestrator
             Log::debug('triage result', ['company_id' => $company->id, 'result' => $result]);
             $this->recordRun($company, 'triage-auto', 'success');
         } catch (\Throwable $e) {
+            WaterfallSentry::capture($company, 'triage-auto', $e);
             Log::warning('triage failed', ['company_id' => $company->id, 'error' => $e->getMessage()]);
             $this->recordRun($company, 'triage-auto', 'failed');
         }
@@ -418,6 +426,7 @@ class WaterfallOrchestrator
             }
             $this->recordRun($company, 'auto-segment', 'success');
         } catch (\Throwable $e) {
+            WaterfallSentry::capture($company, 'auto-segment', $e);
             Log::warning('auto-segment failed', ['company_id' => $company->id, 'error' => $e->getMessage()]);
             $this->recordRun($company, 'auto-segment', 'failed');
         }

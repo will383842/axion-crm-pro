@@ -1,0 +1,69 @@
+# =============================================================================
+# Artillery load test — Sprint H5 Hardening (2026-05-17)
+# =============================================================================
+#
+# Usage local (dev MOCK_MODE) :
+#   API_TOKEN=<bearer-token> npx artillery run load-tests/audience-refresh.yml
+#
+# Usage prod (PRUDENCE — affecte vrai serveur) :
+#   API_TOKEN=<token> npx artillery run --target https://app.axion-crm-pro.com \
+#     load-tests/audience-refresh.yml
+#
+# Doc + baselines : load-tests/LOAD-TEST-RUNBOOK.md
+# =============================================================================
+
+config:
+  target: '{{ $processEnvironment.LOAD_TEST_TARGET || "http://localhost" }}'
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      name: warmup
+    - duration: 300
+      arrivalRate: 20
+      name: sustained
+  defaults:
+    headers:
+      Authorization: 'Bearer {{ $processEnvironment.API_TOKEN }}'
+      Accept: 'application/json'
+  http:
+    timeout: 30
+  ensure:
+    p95: 800   # KO si p95 list companies > 800ms
+    maxErrorRate: 1
+
+scenarios:
+  - name: List + filter companies (PME dept 75)
+    weight: 60
+    flow:
+      - get:
+          url: '/api/v1/companies?limit=100&filter[department_code]=75&filter[size_category]=pme'
+          expect:
+            - statusCode: 200
+            - contentType: json
+
+  - name: Preview audience criteria DSL
+    weight: 30
+    flow:
+      - post:
+          url: '/api/v1/audiences/preview'
+          json:
+            criteria:
+              all:
+                - field: prospection_status
+                  op: in
+                  value: ['ready_for_outreach']
+                - field: region_code
+                  op: in
+                  value: ['11']
+          expect:
+            - statusCode: 200
+            - contentType: json
+
+  - name: List tags grouped by category
+    weight: 10
+    flow:
+      - get:
+          url: '/api/v1/tags'
+          expect:
+            - statusCode: 200
+            - contentType: json

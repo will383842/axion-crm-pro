@@ -1,0 +1,126 @@
+name: Deploy direct SSH Hetzner
+
+# Sprint 18.9 — pipeline simple SSH→Hetzner (sans Coolify).
+# Permet à Will de pousser sur main sans devoir SSH manuellement.
+#
+# Trigger : push sur main (auto) + workflow_dispatch (manuel).
+# Secrets requis (à configurer côté GitHub UI, cf. _AUDIT/DEPLOY-PIPELINE.md) :
+#   - HETZNER_SSH_PRIVATE_KEY  → clé privée OpenSSH du compte root@hetzner
+#   - HETZNER_HOST             → IP ou hostname (par défaut 46.62.248.239)
+#   - HETZNER_USER             → utilisateur SSH (par défaut root)
+#   - HETZNER_PROJECT_PATH     → chemin du repo sur le serveur (par défaut /opt/axion-crm-pro)
+#
+# Le job suit la procédure manuelle que Will exécutait jusqu'ici :
+#   git pull → migrate --force → docker compose up -d --force-recreate api app → config:clear
+
+on:
+  push:
+    branches: [main]
+    # On évite de redéployer pour des changements purement docs/_AUDIT.
+    paths-ignore:
+      - '_AUDIT/**'
+      - '_REPORTS/**'
+      - 'spec/**'
+      - 'docs/**'
+      - '**/*.md'
+  workflow_dispatch:
+    inputs:
+      skip_migrate:
+        description: 'Skip php artisan migrate (true/false)'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-direct-ssh
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: SSH Hetzner + pull + migrate + restart
+    runs-on: ubuntu-24.04
+    environment:
+      name: production-direct-ssh
+      url: https://app.axion-crm-pro.com
+    steps:
+      - name: Validate secrets present
+        run: |
+          set -e
+          if [ -z "${{ secrets.HETZNER_SSH_PRIVATE_KEY }}" ]; then
+            echo "::error::Secret HETZNER_SSH_PRIVATE_KEY manquant. Cf. _AUDIT/DEPLOY-PIPELINE.md."
+            exit 1
+          fi
+          if [ -z "${{ secrets.HETZNER_HOST }}" ]; then
+            echo "::error::Secret HETZNER_HOST manquant. Cf. _AUDIT/DEPLOY-PIPELINE.md."
+            exit 1
+          fi
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Trust host key
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy via SSH
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
+          SKIP_MIGRATE: ${{ github.event.inputs.skip_migrate || 'false' }}
+        run: |
+          set -e
+          ssh -o StrictHostKeyChecking=no "$USER@$HOST" bash <<EOF
+            set -euo pipefail
+            cd "$PROJECT_PATH"
+
+            echo "::group::git pull"
+            git fetch --all --prune
+            git reset --hard origin/main
+            echo "::endgroup::"
+
+            echo "::group::docker compose build + up"
+            docker compose pull --ignore-pull-failures || true
+            docker compose up -d --force-recreate --no-deps api app
+            echo "::endgroup::"
+
+            if [ "$SKIP_MIGRATE" != "true" ]; then
+              echo "::group::php artisan migrate --force"
+              docker compose exec -u root -T api php artisan migrate --force || true
+              echo "::endgroup::"
+            fi
+
+            echo "::group::php artisan config:clear + cache:clear + route:clear"
+            docker compose exec -u root -T api php artisan config:clear || true
+            docker compose exec -u root -T api php artisan cache:clear || true
+            docker compose exec -u root -T api php artisan route:clear || true
+            echo "::endgroup::"
+
+            echo "::group::docker ps health"
+            docker compose ps
+            echo "::endgroup::"
+          EOF
+
+      - name: Smoke test prod
+        env:
+          HEALTH_URL: ${{ vars.HEALTH_URL || 'https://api.axion-crm-pro.com/up' }}
+          APP_URL: ${{ vars.APP_URL || 'https://app.axion-crm-pro.com' }}
+        run: |
+          set -e
+          echo "Wait 20s for containers to settle..."
+          sleep 20
+
+          echo "GET $HEALTH_URL"
+          curl -fsS --max-time 10 "$HEALTH_URL" || (echo "::error::Health check failed" && exit 1)
+
+          echo "GET $APP_URL"
+          curl -fsS --max-time 10 -o /dev/null "$APP_URL" || (echo "::error::App URL failed" && exit 1)
+
+          echo "::notice::Deploy OK"

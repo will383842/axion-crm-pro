@@ -3,6 +3,7 @@
 namespace App\Services\Domain;
 
 use App\Models\Company;
+use App\Services\Http\ProxiedHttpClient;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -144,7 +145,8 @@ class DomainFinderService
         $url = sprintf('https://www.pagesjaunes.fr/recherche/%s/%s', $villeSlug, $denomSlug);
 
         try {
-            $response = Http::timeout(self::HTTP_TIMEOUT_SECONDS)
+            // Sprint H1 — Webshare proxy si activé (évite blacklist IP Hetzner sur PJ)
+            $response = app(ProxiedHttpClient::class)->request(self::HTTP_TIMEOUT_SECONDS)
                 ->withHeaders([
                     'User-Agent' => self::USER_AGENT,
                     'Accept'     => 'text/html,application/xhtml+xml',

@@ -38,17 +38,17 @@ use App\Http\Controllers\Internal\ScraperResultController;
 
 Route::prefix('v1')->group(function () {
 
-    // --- Auth (non protégé) -------------------------------------------------
-    Route::post('/auth/login',           [AuthController::class, 'login']);
-    Route::post('/auth/logout',          [AuthController::class, 'logout'])->middleware('auth:sanctum');
-    Route::get( '/auth/me',              [AuthController::class, 'me'])->middleware('auth:sanctum');
-    Route::post('/auth/2fa/verify',      [TwoFactorController::class, 'verify']);
-    Route::post('/auth/2fa/setup',       [TwoFactorController::class, 'setup'])->middleware('auth:sanctum');
-    Route::post('/auth/2fa/confirm',     [TwoFactorController::class, 'confirm'])->middleware('auth:sanctum');
-    Route::post('/auth/magic-link',      [MagicLinkController::class, 'request']);
-    Route::post('/auth/magic-link/verify', [MagicLinkController::class, 'verify']);
-    Route::post('/auth/password/forgot', [PasswordResetController::class, 'forgot']);
-    Route::post('/auth/password/reset',  [PasswordResetController::class, 'reset']);
+    // --- Auth (non protégé, throttle anti brute-force) ----------------------
+    Route::post('/auth/login',             [AuthController::class, 'login'])->middleware('throttle:login');
+    Route::post('/auth/logout',            [AuthController::class, 'logout'])->middleware('auth:sanctum');
+    Route::get( '/auth/me',                [AuthController::class, 'me'])->middleware('auth:sanctum');
+    Route::post('/auth/2fa/verify',        [TwoFactorController::class, 'verify'])->middleware('throttle:login');
+    Route::post('/auth/2fa/setup',         [TwoFactorController::class, 'setup'])->middleware('auth:sanctum');
+    Route::post('/auth/2fa/confirm',       [TwoFactorController::class, 'confirm'])->middleware('auth:sanctum');
+    Route::post('/auth/magic-link',        [MagicLinkController::class, 'request'])->middleware('throttle:magic-link');
+    Route::post('/auth/magic-link/verify', [MagicLinkController::class, 'verify'])->middleware('throttle:magic-link');
+    Route::post('/auth/password/forgot',   [PasswordResetController::class, 'forgot'])->middleware('throttle:magic-link');
+    Route::post('/auth/password/reset',    [PasswordResetController::class, 'reset'])->middleware('throttle:magic-link');
 
     // --- Routes protégées -------------------------------------------------
     Route::middleware(['auth:sanctum', 'workspace', 'first-login'])->group(function () {

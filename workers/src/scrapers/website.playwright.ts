@@ -3,6 +3,7 @@ import * as cheerio from 'cheerio';
 import type { ScraperImplementation, ScrapeRequestJob } from './base';
 import type { ScrapeResult } from '../bridge/result-sender';
 import { extractEmails, extractPhones } from '../utils/extract';
+import { ensureSsrf } from '../utils/ssrf-guard';
 
 const TEAM_PATHS = ['/equipe', '/team', '/about', '/a-propos', '/notre-equipe', '/qui-sommes-nous', '/contact'];
 
@@ -18,7 +19,9 @@ export class PlaywrightWebsiteScraper implements ScraperImplementation {
     const page = await ctx.newPage();
 
     try {
-      const base = new URL(req.target_url);
+      // SSRF guard : refuse 169.254.169.254 (AWS metadata), RFC 1918, link-local.
+      await ensureSsrf(req.target_url ?? '');
+      const base = new URL(req.target_url!);
       const visited = new Set<string>();
       const allEmails = new Set<string>();
       const allPhones = new Set<string>();

@@ -2,6 +2,7 @@ import { createContext } from '../browser/launcher';
 import * as cheerio from 'cheerio';
 import type { ScraperImplementation, ScrapeRequestJob } from './base';
 import type { ScrapeResult } from '../bridge/result-sender';
+import { ensureSsrf } from '../utils/ssrf-guard';
 
 const C_LEVEL_TITLES = [
   'pdg', 'président', 'president', 'ceo', 'directeur général', 'dg',
@@ -52,6 +53,7 @@ export class PlaywrightDirectionFinder implements ScraperImplementation {
       for (const path of candidatePaths) {
         const url = `https://${domain}${path}`;
         try {
+          await ensureSsrf(url);
           const resp = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 12_000 });
           if (!resp || resp.status() >= 400) continue;
           visitedUrls.push(url);

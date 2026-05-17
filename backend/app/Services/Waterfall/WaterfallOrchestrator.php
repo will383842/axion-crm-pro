@@ -36,6 +36,7 @@ class WaterfallOrchestrator
         private readonly BanGeocoder $ban,
         private readonly LLMClient $llm,
         private readonly DeduplicationService $dedup,
+        private readonly \App\Services\Email\EmailFinderService $emailFinder,
     ) {}
 
     public function enrich(Company $company): void
@@ -47,6 +48,7 @@ class WaterfallOrchestrator
         $this->step3_bodacc($company);
         // Étapes 4-6 dispatchent vers BullMQ Node workers (asynchrone, résultats via /internal/scraper-result)
         $this->step4_dispatch_node_scrapes($company);
+        $this->step7_email_finder($company);
         $this->step8_geocode($company);
         $this->step9_france_travail($company);
         $this->step10_classify($company);
@@ -145,6 +147,54 @@ class WaterfallOrchestrator
         foreach (['google-maps', 'pages-jaunes', 'website', 'google-search'] as $src) {
             \App\Jobs\DispatchScrapeJob::dispatch($company->id, $src, $context, $company->website);
         }
+    }
+
+    /**
+     * Étape 7 — Email finder + SMTP cascade.
+     * Pour chaque contact du company sans email validé, génère candidats + probe SMTP.
+     * Met à jour contacts.email + email_status + email_score + email_pattern.
+     */
+    private function step7_email_finder(Company $company): void
+    {
+        $domain = $company->website ? parse_url($company->website, PHP_URL_HOST) : null;
+        if (! $domain) {
+            return;
+        }
+        $domain = preg_replace('/^www\./', '', (string) $domain);
+
+        $contacts = DB::table('contacts')
+            ->where('company_id', $company->id)
+            ->where(function ($q) {
+                $q->whereNull('email')->orWhereNotIn('email_status', ['valid', 'catchall']);
+            })
+            ->whereNotNull('last_name')
+            ->limit(20)
+            ->get();
+
+        foreach ($contacts as $c) {
+            try {
+                $results = $this->emailFinder->find(
+                    (string) ($c->first_name ?? ''),
+                    (string) $c->last_name,
+                    (string) $domain,
+                );
+                if (empty($results)) {
+                    continue;
+                }
+                $best = $results[0];
+                DB::table('contacts')->where('id', $c->id)->update([
+                    'email'        => $best->email,
+                    'email_status' => $best->status,
+                    'email_score'  => $best->score,
+                    'email_pattern'=> str_replace([$company->id . '@'], '@', $best->email),
+                    'last_verified_at' => now(),
+                    'updated_at'   => now(),
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning('email finder failed', ['contact_id' => $c->id, 'error' => $e->getMessage()]);
+            }
+        }
+        $this->recordRun($company, 'email-finder', 'success');
     }
 
     private function step8_geocode(Company $company): void

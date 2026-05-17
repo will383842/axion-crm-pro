@@ -4,8 +4,12 @@
 {
     auto_https off
     local_certs
+    servers {
+        trusted_proxies static private_ranges
+    }
 }
 
+# --- API Laravel ------------------------------------------------------------
 api.localhost {
     encode zstd gzip
     reverse_proxy api:80 {
@@ -17,13 +21,24 @@ api.localhost {
         X-Frame-Options "DENY"
         X-Content-Type-Options "nosniff"
         Referrer-Policy "strict-origin-when-cross-origin"
-        Permissions-Policy "geolocation=(self), microphone=(), camera=(), interest-cohort=()"
-        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.localhost wss://api.localhost; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        Permissions-Policy "geolocation=(self), microphone=(), camera=(), interest-cohort=(), browsing-topics=()"
+        # CSP strict pour l'API JSON : pas de script ni style nécessaires (réponses JSON pures).
+        # Si /docs (Swagger UI) renvoie du HTML, exception locale via path matcher.
+        Content-Security-Policy "default-src 'none'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
         Cross-Origin-Opener-Policy "same-origin"
         Cross-Origin-Resource-Policy "same-site"
+        # Cache-Control par défaut (override par endpoint Laravel si besoin)
+        Cache-Control "no-store"
+    }
+
+    # Swagger UI a besoin de script/style inline → CSP relâché localement
+    @docs path /docs /docs/*
+    header @docs {
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:"
     }
 }
 
+# --- Frontend SPA -----------------------------------------------------------
 app.localhost {
     encode zstd gzip
     reverse_proxy app:5173 {
@@ -31,5 +46,19 @@ app.localhost {
         # WebSocket HMR
         header_up Connection {>Connection}
         header_up Upgrade {>Upgrade}
+    }
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "geolocation=(self), microphone=(), camera=(), interest-cohort=(), browsing-topics=()"
+        # CSP strict frontend SPA. En DEV, Vite injecte des scripts inline pour HMR → on
+        # autorise 'unsafe-inline' uniquement sur dev. PROD = build statique sans inline,
+        # géré par nginx avec strict-dynamic + nonce (cf. infra/nginx/frontend.conf).
+        # Mode dev local : tolérant. Le serveur nginx prod sera strict.
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; connect-src 'self' https://api.localhost wss://api.localhost https://*.openfreemap.org wss://app.localhost; font-src 'self' data:; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        Cross-Origin-Opener-Policy "same-origin"
+        Cross-Origin-Resource-Policy "same-site"
     }
 }

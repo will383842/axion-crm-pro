@@ -69,6 +69,16 @@ app.axion-crm-pro.com {
         }
     }
 
+    # Vite HMR WebSocket path (Sprint 19.5) — explicite pour clarté + upgrade flags
+    @vite_hmr path /__vite_hmr_websocket
+    handle @vite_hmr {
+        reverse_proxy app:5173 {
+            header_up Connection {>Connection}
+            header_up Upgrade {>Upgrade}
+            header_up Host {host}
+        }
+    }
+
     # Tout le reste -> frontend Vite
     handle {
         reverse_proxy app:5173 {

@@ -118,6 +118,15 @@ services:
     env_file: .env
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://api.localhost}
+      # HMR via Caddy (cf. Sprint 19.5). En prod app.axion-crm-pro.com :
+      # VITE_HMR_PUBLIC=true + VITE_HMR_HOST=app.axion-crm-pro.com.
+      # En dev local on garde clientPort 443 par défaut (cf. vite.config.ts).
+      VITE_DISABLE_HMR: ${VITE_DISABLE_HMR:-}
+      VITE_HMR_PUBLIC: ${VITE_HMR_PUBLIC:-}
+      VITE_HMR_HOST: ${VITE_HMR_HOST:-}
+      VITE_HMR_CLIENT_PORT: ${VITE_HMR_CLIENT_PORT:-}
+      VITE_HMR_PATH: ${VITE_HMR_PATH:-}
+      VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
     volumes:
       - ./frontend:/srv/app:cached
       - frontend-node-modules:/srv/app/node_modules

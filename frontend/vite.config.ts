@@ -3,6 +3,28 @@ import react from '@vitejs/plugin-react-swc';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
 
+/**
+ * HMR config — 3 modes :
+ *  - VITE_DISABLE_HMR=true               → désactivé (prod sans WS, par défaut)
+ *  - VITE_HMR_PUBLIC=true                → activé via Caddy WSS public (wss://host:443 -> /__vite_hmr_websocket)
+ *  - rien                                → dev local, clientPort 443 (CF Tunnel ou tls Caddy)
+ */
+function resolveHmrConfig(): false | Record<string, unknown> {
+  if (process.env['VITE_DISABLE_HMR'] === 'true') return false;
+
+  if (process.env['VITE_HMR_PUBLIC'] === 'true') {
+    return {
+      protocol: 'wss',
+      host: process.env['VITE_HMR_HOST'] ?? 'app.axion-crm-pro.com',
+      clientPort: Number(process.env['VITE_HMR_CLIENT_PORT'] ?? 443),
+      // Path explicite pour que Caddy puisse router le WS distinctement du SPA.
+      path: process.env['VITE_HMR_PATH'] ?? '/__vite_hmr_websocket',
+    };
+  }
+
+  return { clientPort: 443 };
+}
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -14,8 +36,7 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     strictPort: true,
-    // HMR : false en prod (Caddy ne forward pas le WS upgrade proprement), true en dev local
-    hmr: process.env['VITE_DISABLE_HMR'] === 'true' ? false : { clientPort: 443 },
+    hmr: resolveHmrConfig(),
     allowedHosts: ['app.axion-crm-pro.com', '.axion-crm-pro.com', 'localhost', 'app.localhost'],
   },
   preview: {

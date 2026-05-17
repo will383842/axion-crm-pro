@@ -57,10 +57,15 @@ Route::prefix('v1')->group(function () {
         // Dashboard (stub MVP — endpoints détaillés Sprint 19)
         Route::get('/dashboard/stats', function () {
             return response()->json([
-                'companies'      => ['total' => 0, 'enriched' => 0, 'pending' => 0],
-                'contacts'       => ['total' => 0, 'valid_emails' => 0],
-                'scrape_runs'    => ['total' => 0, 'success_rate' => 0],
-                'recent_activity'=> [],
+                'companies_total'        => 0,
+                'companies_enriched_24h' => 0,
+                'contacts_qualified'     => 0,
+                'scraper_runs_24h'       => 0,
+                'llm_cost_eur_month'     => 0,
+                'quality_distribution'   => ['complete' => 0, 'partielle' => 0, 'basique' => 0],
+                'size_distribution'      => [
+                    'artisan' => 0, 'tpe' => 0, 'pme' => 0, 'eti' => 0, 'grande_entreprise' => 0,
+                ],
             ]);
         });
         Route::get('/search', function (\Illuminate\Http\Request $request) {

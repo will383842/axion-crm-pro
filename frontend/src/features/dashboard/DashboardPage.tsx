@@ -75,7 +75,7 @@ export function DashboardPage() {
         {(['artisan','tpe','pme','eti','grande_entreprise'] as const).map((s) => (
           <div key={s} className="rounded-xl border border-slate-200 bg-white p-4">
             <p className="text-xs uppercase text-slate-500">{s === 'grande_entreprise' ? 'Grande' : s.toUpperCase()}</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">{data?.size_distribution[s] ?? 0}</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums">{data?.size_distribution?.[s] ?? 0}</p>
           </div>
         ))}
       </div>

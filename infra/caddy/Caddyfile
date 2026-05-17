@@ -56,6 +56,7 @@ app.localhost {
 
 # --- PROD : app.axion-crm-pro.com — SINGLE ORIGIN (frontend + API path-routed)
 # Evite les third-party cookies (Chrome 2026 default block).
+# Sprint 19.6 — frontend en mode prod (Caddy 2 alpine sert dist/), pas de HMR.
 app.axion-crm-pro.com {
     encode zstd gzip
 
@@ -69,21 +70,10 @@ app.axion-crm-pro.com {
         }
     }
 
-    # Vite HMR WebSocket path (Sprint 19.5) — explicite pour clarté + upgrade flags
-    @vite_hmr path /__vite_hmr_websocket
-    handle @vite_hmr {
-        reverse_proxy app:5173 {
-            header_up Connection {>Connection}
-            header_up Upgrade {>Upgrade}
-            header_up Host {host}
-        }
-    }
-
-    # Tout le reste -> frontend Vite
+    # Tout le reste -> frontend (Caddy interne sert dist/ statique)
     handle {
         reverse_proxy app:5173 {
-            header_up Connection {>Connection}
-            header_up Upgrade {>Upgrade}
+            header_up X-Real-IP {remote_host}
         }
     }
 

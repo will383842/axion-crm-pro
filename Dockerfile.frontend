@@ -12,7 +12,7 @@ COPY frontend/package.json frontend/pnpm-lock.yaml* ./
 RUN pnpm install --frozen-lockfile || pnpm install
 
 # -----------------------------------------------------------------------------
-# 2) dev : vite dev server (HMR)
+# 2) dev : vite dev server (HMR) — conservé pour devs locaux
 # -----------------------------------------------------------------------------
 FROM node:${NODE_VERSION} AS dev
 RUN corepack enable && corepack prepare pnpm@9 --activate
@@ -24,20 +24,36 @@ EXPOSE 5173
 CMD ["pnpm", "dev", "--host", "0.0.0.0"]
 
 # -----------------------------------------------------------------------------
-# 3) builder : build SSG static
+# 3) builder : compile typecheck + vite build → dist/
 # -----------------------------------------------------------------------------
 FROM node:${NODE_VERSION} AS builder
 RUN corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /srv/app
 COPY --from=deps /srv/app/node_modules ./node_modules
 COPY frontend/ ./
+ARG VITE_API_BASE_URL
+ARG VITE_SENTRY_DSN
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
 ENV NODE_ENV=production
 RUN pnpm build
 
 # -----------------------------------------------------------------------------
-# 4) prod : nginx static + brotli
+# 4) prod : Caddy 2 alpine sert dist/ sur :5173 (SPA fallback)
+#   Image minimale, zéro Node en runtime, garde le port 5173 attendu par Caddy.
 # -----------------------------------------------------------------------------
-FROM nginx:1.27-alpine AS prod
+FROM caddy:2-alpine AS prod
+WORKDIR /srv/app
+COPY --from=builder /srv/app/dist /srv/app/dist
+COPY frontend/Caddyfile.app /etc/caddy/Caddyfile
+EXPOSE 5173
+HEALTHCHECK --interval=30s --timeout=5s --retries=5 \
+    CMD wget -qO- http://localhost:5173/ || exit 1
+
+# -----------------------------------------------------------------------------
+# 5) prod-nginx : ancien target nginx, conservé pour rollback
+# -----------------------------------------------------------------------------
+FROM nginx:1.27-alpine AS prod-nginx
 COPY infra/nginx/frontend.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /srv/app/dist /usr/share/nginx/html
 EXPOSE 80

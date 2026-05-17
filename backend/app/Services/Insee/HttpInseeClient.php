@@ -60,38 +60,73 @@ class HttpInseeClient implements InseeClient
 
     public function searchByCriteria(array $criteria): array
     {
-        $q = $this->buildQuery($criteria);
+        // Si on filtre par département/commune, on doit utiliser /siret (champs *Etablissement).
+        // Sinon /siren (champs *UniteLegale).
+        $hasGeo = ! empty($criteria['department']) || ! empty($criteria['commune']);
+        $endpoint = $hasGeo ? '/siret' : '/siren';
+        $resultsKey = $hasGeo ? 'etablissements' : 'unitesLegales';
+
+        $q = $this->buildQuery($criteria, $hasGeo);
         $results = [];
         $cursor = '*';
         $pageSize = 100;
+        $seenSirens = []; // un dépt peut renvoyer plusieurs siret pour le même siren (établissements multiples)
 
         do {
             $resp = $this->authHttp()
                 ->timeout(30)
-                ->get(self::BASE_URL . '/siren', [
+                ->get(self::BASE_URL . $endpoint, [
                     'q'       => $q,
                     'curseur' => $cursor,
                     'nombre'  => $pageSize,
-                    'tri'     => 'siren',
+                    'tri'     => $hasGeo ? 'siret' : 'siren',
                 ]);
 
             if ($resp->failed()) {
-                throw new \RuntimeException("INSEE search error {$resp->status()}");
+                $body = mb_substr((string) $resp->body(), 0, 1000);
+                throw new \RuntimeException(
+                    "INSEE search error {$resp->status()} on {$endpoint} (q={$q}) — " . $body
+                );
             }
             $data = $resp->json();
-            foreach ($data['unitesLegales'] ?? [] as $u) {
-                $periodes = $u['periodesUniteLegale'][0] ?? [];
-                $results[] = new InseeCompanyData(
-                    siren: (string) ($u['siren'] ?? ''),
-                    denomination: $periodes['denominationUniteLegale'] ?? null,
-                    naf: $periodes['activitePrincipaleUniteLegale'] ?? null,
-                    legalForm: $periodes['categorieJuridiqueUniteLegale'] ?? null,
-                    effectifRange: $u['trancheEffectifsUniteLegale'] ?? null,
-                );
-                if (count($results) >= (int) ($criteria['limit'] ?? 1000)) {
-                    return $results;
+
+            if ($hasGeo) {
+                foreach ($data[$resultsKey] ?? [] as $etab) {
+                    $u = $etab['uniteLegale'] ?? [];
+                    $periodes = $u['periodesUniteLegale'][0] ?? $u;
+                    $siren = (string) ($etab['siren'] ?? $u['siren'] ?? '');
+                    if ($siren === '' || isset($seenSirens[$siren])) continue;
+                    $seenSirens[$siren] = true;
+                    $results[] = new InseeCompanyData(
+                        siren: $siren,
+                        denomination: $periodes['denominationUniteLegale']
+                            ?? trim(($periodes['prenom1UniteLegale'] ?? '') . ' ' . ($periodes['nomUniteLegale'] ?? '')),
+                        naf: $periodes['activitePrincipaleUniteLegale'] ?? null,
+                        legalForm: $periodes['categorieJuridiqueUniteLegale'] ?? null,
+                        effectifRange: $u['trancheEffectifsUniteLegale'] ?? null,
+                        createdAt: $u['dateCreationUniteLegale'] ?? null,
+                        raw: $etab,
+                    );
+                    if (count($results) >= (int) ($criteria['limit'] ?? 1000)) {
+                        return $results;
+                    }
+                }
+            } else {
+                foreach ($data[$resultsKey] ?? [] as $u) {
+                    $periodes = $u['periodesUniteLegale'][0] ?? [];
+                    $results[] = new InseeCompanyData(
+                        siren: (string) ($u['siren'] ?? ''),
+                        denomination: $periodes['denominationUniteLegale'] ?? null,
+                        naf: $periodes['activitePrincipaleUniteLegale'] ?? null,
+                        legalForm: $periodes['categorieJuridiqueUniteLegale'] ?? null,
+                        effectifRange: $u['trancheEffectifsUniteLegale'] ?? null,
+                    );
+                    if (count($results) >= (int) ($criteria['limit'] ?? 1000)) {
+                        return $results;
+                    }
                 }
             }
+
             $cursor = $data['header']['curseurSuivant'] ?? null;
         } while ($cursor && $cursor !== '*');
 
@@ -112,18 +147,46 @@ class HttpInseeClient implements InseeClient
         return Http::withToken($token);
     }
 
-    private function buildQuery(array $criteria): string
+    /**
+     * Construit la query Lucene INSEE Sirene v3.11.
+     *
+     * @param  array<string,mixed>  $criteria
+     * @param  bool  $forSiretEndpoint  true si endpoint /siret (champs *Etablissement),
+     *                                   false si /siren (champs *UniteLegale)
+     */
+    private function buildQuery(array $criteria, bool $forSiretEndpoint = false): string
     {
         $parts = [];
+
+        // NAF — champ different selon endpoint
         if (! empty($criteria['naf'])) {
-            $parts[] = 'periode(activitePrincipaleUniteLegale:"' . $criteria['naf'] . '")';
+            if ($forSiretEndpoint) {
+                $parts[] = 'activitePrincipaleEtablissement:"' . $criteria['naf'] . '"';
+            } else {
+                $parts[] = 'periode(activitePrincipaleUniteLegale:"' . $criteria['naf'] . '")';
+            }
         }
+
+        // Effectif — uniqueLegale uniquement (les établissements n'ont pas de tranche effectif propre)
         if (! empty($criteria['effectif_min']) || ! empty($criteria['effectif_max'])) {
             $parts[] = 'trancheEffectifsUniteLegale:[' . ($criteria['effectif_min'] ?? '01') . ' TO ' . ($criteria['effectif_max'] ?? '53') . ']';
         }
-        if (! empty($criteria['department'])) {
-            $parts[] = 'codeCommuneEtablissement:' . $criteria['department'] . '*';
+
+        // Département — seulement endpoint /siret (codeDepartementEtablissement officiel v3.11)
+        // Limite aux établissements actifs + sièges pour ne pas dupliquer les unités légales.
+        if (! empty($criteria['department']) && $forSiretEndpoint) {
+            $dept = preg_replace('/[^0-9A-Z]/i', '', (string) $criteria['department']);
+            $parts[] = 'codeDepartementEtablissement:' . $dept;
+            $parts[] = 'etablissementSiege:true';
+            $parts[] = 'etatAdministratifEtablissement:A'; // A = Actif (P = fermé)
         }
+
+        // Commune (code INSEE 5 chars) — endpoint /siret
+        if (! empty($criteria['commune']) && $forSiretEndpoint) {
+            $parts[] = 'codeCommuneEtablissement:' . $criteria['commune'];
+            $parts[] = 'etatAdministratifEtablissement:A';
+        }
+
         return implode(' AND ', $parts) ?: '*';
     }
 

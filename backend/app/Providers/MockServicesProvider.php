@@ -23,7 +23,6 @@ use App\Services\Proxies\Mocks\MockProxyProvider;
 use App\Services\Proxies\WebshareProvider;
 use App\Services\Captcha\TwoCaptchaSolver;
 use App\Services\Captcha\Mocks\MockCaptchaSolver;
-use App\Services\Smtp\RealSmtpProber;
 use App\Services\Smtp\HunterSmtpProber;
 use App\Services\Smtp\Mocks\MockSmtpProber;
 use App\Services\Insee\HttpInseeClient;

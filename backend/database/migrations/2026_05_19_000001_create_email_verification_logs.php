@@ -41,9 +41,14 @@ return new class extends Migration
                 ON email_verification_logs (workspace_id, status);
         SQL);
 
+        // Sprint H2 verif fix (2026-05-18) : date_trunc(timestamptz) n'est pas IMMUTABLE
+        // sous PG (résultat dépend du TimeZone session) → refusé dans CREATE INDEX.
+        // On indexe verified_at brut : la query countHunterMonth utilise un BETWEEN
+        // sur start/end du mois courant (ObservabilityController) qui profite de
+        // l'index range scan tout aussi efficacement.
         DB::statement(<<<'SQL'
-            CREATE INDEX IF NOT EXISTS idx_email_verif_workspace_month
-                ON email_verification_logs (workspace_id, date_trunc('month', verified_at));
+            CREATE INDEX IF NOT EXISTS idx_email_verif_workspace_verified_at
+                ON email_verification_logs (workspace_id, verified_at);
         SQL);
 
         // RLS — chaque workspace ne voit que ses propres logs

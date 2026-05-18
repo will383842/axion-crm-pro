@@ -44,10 +44,15 @@ class ObservabilityController extends Controller
     private function countHunterMonth(string $workspaceId): array
     {
         try {
+            // Sprint H2 verif fix (2026-05-18) : BETWEEN sur début/fin de mois courant
+            // au lieu de date_trunc(timestamptz) — utilise l'index range scan
+            // (workspace_id, verified_at) sans avoir besoin d'index fonctionnel IMMUTABLE.
+            $monthStart = now()->startOfMonth();
+            $monthEnd   = now()->endOfMonth();
             $count = (int) DB::table('email_verification_logs')
                 ->where('workspace_id', $workspaceId)
                 ->where('provider', 'hunter')
-                ->whereRaw("date_trunc('month', verified_at) = date_trunc('month', NOW())")
+                ->whereBetween('verified_at', [$monthStart, $monthEnd])
                 ->count();
         } catch (\Throwable $e) {
             $count = 0;  // table peut être absente avant migrate

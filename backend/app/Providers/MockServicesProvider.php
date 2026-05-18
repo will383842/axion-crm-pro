@@ -61,8 +61,12 @@ class MockServicesProvider extends ServiceProvider
             $this->app->bind($contract, $useMock ? $mock : $real);
         };
 
-        $bind(LLMClient::class,                MockLLMClient::class, MockLLMClient::class, 'MOCK_LLM');
-        // ↑ tant que LLMRouterService n'est pas testé en réseau, on garde mock par défaut.
+        // Sprint H15 (2026-05-18) — Activation LLM réel via LLMRouterService.
+        // Le router gère lui-même la fallback chain (anthropic/mistral/openai)
+        // configurée par use case dans llm_use_cases.fallback_chain.
+        // Si MOCK_LLM=true (default suit MOCK_MODE), on retombe sur MockLLMClient
+        // pour les tests Pest / dev local.
+        $bind(LLMClient::class,                LLMRouterService::class, MockLLMClient::class, 'MOCK_LLM');
         $this->app->bind(LLMRouterService::class, LLMRouterService::class);
 
         $bind(ProxyProvider::class,            WebshareProvider::class,           MockProxyProvider::class,           'MOCK_PROXIES');

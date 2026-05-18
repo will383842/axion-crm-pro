@@ -222,22 +222,40 @@ class WaterfallOrchestrator
     }
 
     /**
-     * Sprint H9 + H12 — Google Places API (server-side).
+     * Sprint H9 + H12 + H14 — Google Places API (server-side, intelligent).
      * Enrichit phone + website + address + lat/lon + horaires + note Google.
      *
-     * H12 — Skip si déjà enrichi (signals.google_places.enriched_at présent)
-     * pour ne pas re-consommer le quota mensuel sur les ré-enrichissements.
-     * Si le quota mensuel est dépassé : marque signals.google_places_pending=true
-     * pour retraitement le mois suivant via `companies:retry-google-places`.
+     * Logique de skip (économiser le quota gratuit Google) :
+     *  1. Déjà enrichi (signals.google_places.enriched_at présent) → skip
+     *  2. Smart skip H14 : entreprise a DÉJÀ email+phone+website → skip
+     *     (les données vitales sont là, pas besoin de gaspiller un crédit Places
+     *     pour récupérer juste la note Google + horaires)
+     *  3. Quota mensuel dépassé → marque pending pour retraitement mois suivant
+     *
+     * Flag de désactivation : services.google.places.smart_skip=false force
+     * l'appel Places sur toutes les entreprises (utile pour les workspaces
+     * qui veulent enrichir avec note Google + photos systématiquement).
      */
     private function step3d_google_places(Company $company): void
     {
         if ($this->googlePlaces === null || ! $company->denomination) {
             return;
         }
-        // Sprint H12 — Skip si déjà enrichi (économise quota)
+        // Skip si déjà enrichi
         $existingSignals = $company->signals ?? [];
         if (! empty($existingSignals['google_places']['enriched_at'])) {
+            return;
+        }
+        // Sprint H14 — Smart skip : l'entreprise a-t-elle déjà toutes les données vitales ?
+        if (config('services.google.places.smart_skip', true) && $this->hasEssentialData($company)) {
+            $signals = $existingSignals;
+            $signals['google_places_skipped'] = [
+                'reason' => 'has_essential_data',
+                'at'     => now()->toIso8601String(),
+            ];
+            unset($signals['google_places_pending']);
+            $company->signals = $signals;
+            $company->save();
             return;
         }
         try {
@@ -325,6 +343,29 @@ class WaterfallOrchestrator
             ]);
             $this->recordRun($company, 'google-places', 'failed');
         }
+    }
+
+    /**
+     * Sprint H14 — Vérifie si l'entreprise a déjà les 3 données vitales pour outreach :
+     * email exploitable (contact valid|catchall|unknown OU email_generic) +
+     * téléphone + site web. Si oui, on n'a pas besoin de Google Places.
+     */
+    private function hasEssentialData(Company $company): bool
+    {
+        $hasPhone   = ! empty($company->phone);
+        $hasWebsite = ! empty($company->website);
+        if (! $hasPhone || ! $hasWebsite) {
+            return false;
+        }
+        if (! empty($company->email_generic)) {
+            return true;
+        }
+        // contact avec email exploitable (cf. doctrine H8)
+        $hasContact = \Illuminate\Support\Facades\DB::table('contacts')
+            ->where('company_id', $company->id)
+            ->whereIn('email_status', \App\Services\Triage\TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
+            ->exists();
+        return $hasContact;
     }
 
     private function step4_dispatch_node_scrapes(Company $company): void

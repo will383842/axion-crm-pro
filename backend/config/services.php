@@ -79,6 +79,14 @@ return [
             // ≈ 11500 Text Search Pro). Au-delà, GooglePlacesClient skip + marque
             // signals.google_places_pending=true pour retraitement le mois suivant.
             'monthly_quota_limit'  => (int) env('GOOGLE_PLACES_MONTHLY_QUOTA_LIMIT', 11500),
+            // Sprint H14 — Smart skip : ne pas appeler Google Places si l'entreprise
+            // a DÉJÀ email exploitable + phone + website. Économise quota sans
+            // perdre de leads exploitables (la note Google + photos sont "nice to
+            // have" mais pas critiques). Default true.
+            'smart_skip'           => filter_var(env('GOOGLE_PLACES_SMART_SKIP', true), FILTER_VALIDATE_BOOL),
+            // Sprint H14 — Seuil au-delà duquel on alerte Will sur le backlog pending
+            // (KpiCard rouge dans /admin/observability). Default 5000.
+            'pending_alert_threshold' => (int) env('GOOGLE_PLACES_PENDING_ALERT_THRESHOLD', 5000),
         ],
     ],
 

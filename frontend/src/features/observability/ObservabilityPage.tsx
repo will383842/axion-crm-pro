@@ -65,13 +65,23 @@ export function ObservabilityPage() {
           label="Quota Google Places (mois)"
           value={`${data.google_places_quota.used} / ${data.google_places_quota.soft_limit}`}
           sublabel={
-            data.google_places_quota.pending_companies > 0
-              ? `${data.google_places_quota.percent}% utilisé · ${data.google_places_quota.pending_companies} en attente`
-              : `${data.google_places_quota.percent}% utilisé`
+            data.google_places_quota.pending_companies > 5000
+              ? `⚠ Backlog ${data.google_places_quota.pending_companies} en attente — augmente le quota ?`
+              : data.google_places_quota.pending_companies > 0
+              ? `${data.google_places_quota.percent}% utilisé · ${data.google_places_quota.pending_companies} en attente (cron 1er du mois)`
+              : `${data.google_places_quota.percent}% utilisé · smart skip actif`
           }
           progress={data.google_places_quota.percent}
           icon={<MapPin className="size-4" />}
-          tone={data.google_places_quota.percent >= 100 ? 'rose' : data.google_places_quota.percent > 80 ? 'amber' : 'sky'}
+          tone={
+            data.google_places_quota.pending_companies > 5000
+              ? 'rose'
+              : data.google_places_quota.percent >= 100
+              ? 'rose'
+              : data.google_places_quota.percent > 80
+              ? 'amber'
+              : 'sky'
+          }
         />
         <KpiCard
           label="Quota Hunter (mois)"

@@ -30,6 +30,7 @@ import {
   StatusPill,
 } from '@/components/ui';
 import {
+  ALL_SOURCES,
   type Campaign,
   type CampaignSource,
   type CampaignZone,
@@ -758,7 +759,7 @@ function StepBudget({
       {showPerSource ? (
         <div className="space-y-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/40">
           {sources.map((s) => {
-            const meta = ALL_SOURCES.find((m) => m.id === s);
+            const meta = ALL_SOURCES.find((m: { id: CampaignSource }) => m.id === s);
             const lim = perSourceLimits[s] ?? {};
             return (
               <div key={s} className="grid grid-cols-1 items-center gap-2 md:grid-cols-[1fr_120px_120px]">

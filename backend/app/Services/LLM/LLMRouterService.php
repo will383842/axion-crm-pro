@@ -201,20 +201,45 @@ class LLMRouterService implements LLMClient
         }, $template) ?? $template;
     }
 
+    /**
+     * Sprint H15 fix (2026-05-18) — Fail-open : si le use case n'a pas de
+     * workspace_id (cas use cases globaux comme classify_company_axion ou
+     * appels tinker/CLI sans context user), on skip silencieusement l'insert
+     * dans llm_usage plutôt que de lever une exception qui fait croire au
+     * router que le provider a échoué (et déclenche un fallback inutile).
+     *
+     * Cohérent avec AuditLogger H4 qui fail-open aussi sur workspace_id manquant.
+     * Le tracking de coût par workspace reste correct quand workspace_id existe.
+     */
     private function recordUsage(LlmUseCase $useCase, LLMResponseData $resp): void
     {
-        DB::table('llm_usage')->insert([
-            'workspace_id'  => $useCase->workspace_id,
-            'use_case_slug' => $useCase->slug,
-            'provider'      => $resp->providerUsed,
-            'model'         => $resp->modelUsed,
-            'tokens_input'  => $resp->tokensInput,
-            'tokens_output' => $resp->tokensOutput,
-            'cost_eur'      => $resp->costEur,
-            'latency_ms'    => $resp->latencyMs,
-            'cache_hit'     => $resp->cacheHit,
-            'request_hash'  => $resp->requestHash,
-            'created_at'    => now(),
-        ]);
+        if (! $useCase->workspace_id) {
+            Log::debug('LLM usage tracking skipped (no workspace_id on use case)', [
+                'use_case' => $useCase->slug,
+                'provider' => $resp->providerUsed,
+                'cost'     => $resp->costEur,
+            ]);
+            return;
+        }
+        try {
+            DB::table('llm_usage')->insert([
+                'workspace_id'  => $useCase->workspace_id,
+                'use_case_slug' => $useCase->slug,
+                'provider'      => $resp->providerUsed,
+                'model'         => $resp->modelUsed,
+                'tokens_input'  => $resp->tokensInput,
+                'tokens_output' => $resp->tokensOutput,
+                'cost_eur'      => $resp->costEur,
+                'latency_ms'    => $resp->latencyMs,
+                'cache_hit'     => $resp->cacheHit,
+                'request_hash'  => $resp->requestHash,
+                'created_at'    => now(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('LLM usage tracking insert failed (non-fatal)', [
+                'use_case' => $useCase->slug,
+                'error'    => $e->getMessage(),
+            ]);
+        }
     }
 }

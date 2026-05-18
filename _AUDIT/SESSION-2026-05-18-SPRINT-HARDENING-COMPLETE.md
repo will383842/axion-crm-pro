@@ -1,29 +1,38 @@
-# Session 2026-05-18 — Sprint Hardening + H7 + H8 + H9 complet
+# Session 2026-05-18 — Sprint Hardening H1 → H16 complet
 
-> Récap de la session Will + Claude Opus 4.7 du 2026-05-18 (~08:00 à 09:00 UTC).
-> 25 commits sur `origin/main`, du sprint Hardening initial à H9 inclus.
+> Récap final de la session Will + Claude Opus 4.7 du 2026-05-18.
+> **36 commits** sur `origin/main`, du sprint Hardening initial à H16 inclus.
+> HEAD : `0ae9de9`.
 
-## Sprints exécutés
+## Vue d'ensemble — 16 sprints livrés
 
-| Sprint | Objectif | Statut |
+| Sprint | Quoi | Statut |
 |---|---|---|
-| **H1-H6** (16 commits) | Hardening initial Pipeline 360° (anti-bot, Hunter, INSEE filter, observability, scaling, rescrape) | ✅ Audité + déployé + smoke vert |
-| **OBS-1, MSP-1, PROD-1** | Verification fixes (scope workspace, unused import, index PG IMMUTABLE) | ✅ Déployé |
+| **H1-H6** (16 commits) | Hardening initial Pipeline 360° (anti-bot Brave + Webshare, Hunter ref refactor, INSEE filter, observability, scaling Bus::batch, RescrapeArchivesCommand) | ✅ Audité + déployé + smoke vert |
+| **OBS-1, MSP-1, PROD-1** | Verification fixes (scope workspace, unused import, P0 index PG IMMUTABLE découvert en prod) | ✅ Déployé |
 | **H7** | MxEmailValidator maison (port emailValidator.ts) + politique "0 email spéculatif" | ✅ Déployé + testé en prod (`"role"` confirmé) |
 | **H8** | Doctrine élargie : emails contactables = valid/catchall/unknown + email_generic | ✅ Déployé |
-| **H9** | Google Places API server-side + runbook activation Pages Jaunes/Webshare | ✅ Code en main, attend API keys |
-
-HEAD origin/main : `a7deab4`.
+| **H9** | Google Places API server-side + intégration waterfall step3d | ✅ Déployé + **clé API posée par Will** |
+| **H10** | Paths scrape mentions-légales 8→18 + banner UX wizard détaillé | ✅ Déployé |
+| **H11** | Retire Google Maps + Pages Jaunes du wizard (cases grisées inutiles) | ✅ Déployé |
+| **H12** | Garde-fou quota mensuel Google Places (11500/mois) + retraitement différé + commande `companies:retry-google-places` | ✅ Déployé |
+| **H13** | Google Places visible dans Settings + KpiCard quota dans /admin/observability | ✅ Déployé |
+| **H14** | Smart skip Google Places si données vitales déjà présentes + alerte backlog | ✅ Déployé |
+| **H15** | Activation Mistral réel via LLMRouterService + JSON mode + 2 fixes (response_format + recordUsage fail-open) | ✅ **Mistral actif en prod, JSON valide retourné** |
+| **H16** | Smart skip Google Places sur email seul (politique Will : email = essentiel, reste = bonus) | ✅ Déployé |
 
 ## Décisions doctrine Will
 
-1. **Pas d'Hunter.io** jamais. Système de vérif email = MxEmailValidator maison (port du backlink-engine).
+1. **Pas d'Hunter.io** jamais. Vérification email = MxEmailValidator maison (port du backlink-engine).
 2. **Pas de patterns spéculatifs** dans EmailFinder. Seuls les emails RÉELS scrapés (mentions-légales) entrent en base. Flag `EMAIL_FINDER_SPECULATIVE_ENABLED=false` par défaut.
 3. **Emails contactables élargis** : valid + catchall + unknown + email_generic → tous envoyables.
 4. **Google Maps** : remplacé par API Places officielle (H9, légal, $0/mois jusqu'à 12K lookups grâce au crédit $200/mois Maps Platform).
-5. **Pages Jaunes** : maintien via worker Node + Webshare proxy ($30/mois) en Phase B, activable plus tard.
+5. **Smart skip Google Places sur EMAIL SEUL** (H16) : skip dès qu'on a un email exploitable, peu importe phone/website. Économise drastiquement le quota.
+6. **Pages Jaunes** : maintien via worker Node + Webshare proxy ($30/mois) en Phase B, activable plus tard.
+7. **LLM Mistral primary** (H15) : pas d'Anthropic (key non posée, plus cher). Mistral small-latest sur tous les use cases JSON.
+8. **Garde-fou quota Google** (H12) : jamais dépasser le crédit gratuit, retraitement différé automatique le mois suivant via cron.
 
-## État prod actuel (https://app.axion-crm-pro.com)
+## État prod (https://app.axion-crm-pro.com)
 
 ### ✅ Actif et opérationnel
 - INSEE Sirene (clé `INSEE_API_KEY` posée)
@@ -31,35 +40,42 @@ HEAD origin/main : `a7deab4`.
 - Annuaire Entreprises (API publique gratuite)
 - BODACC (API publique gratuite)
 - BAN géocodage (API publique gratuite)
-- LLM Mistral classification (~5€/mois)
-- MxEmailValidator H7 (vérifié en tinker prod : `"role"` pour `info@example.com`)
+- **Google Places API** (clé `GOOGLE_PLACES_API_KEY` posée, projet GCP `axion-crm-pro`)
+- **Mistral LLM** (`MISTRAL_API_KEY` posée, JSON mode actif sur 7 use cases)
+- MxEmailValidator H7 (DNS MX maison, vérifié en tinker prod)
 - 3 supervisors Horizon dont `supervisor-audiences-refresh` (H5)
 - 2 tables Hardening (`business_events`, `email_verification_logs`)
 - Commande `companies:rescrape-archives` (H6, cron mensuel 1er à 2h)
+- **Commande `companies:retry-google-places`** (H12, cron mensuel 1er à 3h)
 - Filtre INSEE etatAdministratif='A' (H3, archive auto entreprises radiées)
 - Sentry waterfall capture (H4, 8 catches enrichis)
 - AuditLogger business_events (H4)
-- Dashboard `/admin/observability` (H4)
+- Dashboard `/admin/observability` (H4 + H13 KpiCard Google Places quota)
 - Bus::batch refresh audiences > 5K companies (H5)
+- Smart skip Google Places (H14 + H16)
 
-### ⏭️ Code prêt, attend API keys
-- Brave Search API (skip silencieux sans `BRAVE_SEARCH_API_KEY`)
-- Hunter.io (skip silencieux sans `HUNTER_API_KEY`) — Will refuse de l'utiliser, donc pas concerné
-- Google Places API H9 (skip silencieux sans `GOOGLE_PLACES_API_KEY`)
-- Webshare proxy (skip silencieux sans `WEBSHARE_ENABLED=true`)
-- EmailFinder spéculatif (off par défaut, à n'activer que si vérificateur SMTP réel wired)
+### 🟡 Configuré mais en mode dégradé (volontaire)
+- Brave Search : `BRAVE_SEARCH_API_KEY` vide → DomainFinder stratégie 2 skip silencieux
+- Hunter.io : refusé par Will → MxEmailValidator maison utilisé à la place
+- Pages Jaunes : MOCK_SCRAPERS=true → Phase B (Webshare requis)
+- Anthropic : `ANTHROPIC_API_KEY` vide → Mistral primary suffit
 
-### ❌ Mock (Phase B)
-- Google Maps scraping Playwright Node worker (remplacé par H9 Places API)
-- Pages Jaunes scraping Playwright Node worker (activable avec Webshare)
+### ⚠️ Connu mais hors scope
+- **Compte facturation Google = SOS-Expat.com** (mélange business — à séparer)
+- **Clé Google Places brûlée dans transcript** — à régénérer
+- **CI workflows GitHub Actions cassés** (pré-existant — `pnpm-lock.yaml` manquant)
+- **Envoi email réel** : Phase 2 ColdEmailController stub 501 (sprint H17 à faire)
 
-## Bugs trouvés et fixés pendant la session
+## Bugs trouvés et fixés pendant la session (6 P0/P1)
 
 | ID | Sévérité | Description | Commit fix |
 |---|---|---|---|
 | OBS-1 | P2 | ObservabilityController::countWaterfallErrors24h manquait scope workspace_id explicite | `6360e0c` |
 | MSP-1 | P3 | MockServicesProvider import inutilisé `RealSmtpProber` | `d9e6f5f` |
-| **PROD-1** | **P0** | Migration H2 crashait sur PG strict avec `date_trunc(timestamptz) not IMMUTABLE` | `a28fa74` |
+| **PROD-1** | **P0** | Migration H2 crashait sur PG strict avec `date_trunc(timestamptz) not IMMUTABLE` (raté par Pest local SQLite) | `a28fa74` |
+| H15-1 | P0 | Bind LLMClient → MockLLMClient hardcodé même avec MOCK_LLM=false → aucun appel Mistral en prod | `9bae0fb` |
+| H15-2 | P0 | MistralProvider envoyait response_format=null → API Mistral rejette 422 | `2ac5f3e` |
+| H15-3 | P0 | recordUsage llm_usage workspace_id NULL violation → catch fait croire au router que provider failed | `b0079ca` |
 
 Leçon CI : forcer les tests d'intégration migrations sur container Postgres en CI (et pas SQLite par défaut Pest) pour catcher ce type de divergence.
 
@@ -70,67 +86,56 @@ Leçon CI : forcer les tests d'intégration migrations sur container Postgres en
 2.  Annuaire Entrep.  → CA, bilans, dirigeants (noms)
 3.  BODACC            → signaux : création/cessation/redressement
 3b. DomainFinder      → siteweb : signals.legal OU Brave (skip si pas de key)
-3c. MentionsLégales   → scrape footer/mentions → emails publics + tél (H7 validé MX)
-3d. Google Places H9  → phone/website/address/lat/lon/rating (skip si pas de key)
+3c. MentionsLégales   → scrape 18 paths (H10) → emails publics + tél validés MX (H7)
+3d. Google Places H9  → phone/website/address/horaires/note (smart skip H14+H16 si email présent)
 4.  Workers Node      → pages-jaunes/website/google-search (skip si MOCK_SCRAPERS=true)
 7.  EmailFinder       → DÉSACTIVÉ patterns spéculatifs (H7)
 8.  BAN géocodage     → lat/long précis
 9.  France Travail    → signal "recrute actuellement"
-10. LLM Mistral       → classification, priorité, tags
+10. LLM Mistral       → JSON {ia_maturity, axion_offer_match, priority} (H15 actif)
 10b. AutoClassifier   → tags geo/taille/secteur denormalisés
 10c. AutoTagger       → tags structurés (dept-69, size-pme, sector-it…)
 11. TriageAuto H8     → ready_for_outreach OU archived_no_email
 12. AutoSegment       → ajout auto aux audiences qui matchent
 ```
 
-## Antidoublon (4 niveaux)
+## Tests live confirmés en prod
 
-1. Contrainte DB : `companies.siren` UNIQUE par workspace
-2. `DeduplicationService::shouldRunScrape` cache horaire par siren+source
-3. France Travail / INSEE dédupliquent par SIREN dans `extractUniqueEntreprises`
-4. PG `INSERT ON CONFLICT DO NOTHING` sur contacts, audience_members, email_verification_logs
+### Google Places (H9 — vérifié 10:30 UTC)
+```
+Query : "Boulangerie Dupont Paris"
+Result:
+  name    : Boulangerie Dupont
+  phone   : +33 1 34 72 59 85
+  website : http://www.facebook.com/BoulangerieDupont
+  rating  : 4.1
+  quota   : 1 / 11500
+```
 
-## Tri taille entreprise (auto via INSEE effectif_range)
+### Mistral LLM (H15 — vérifié 10:50 UTC)
+```
+Use case : classify_company_axion
+Variables : Boulangerie Test, NAF 1071C, effectif 11
+Provider : mistral (mistral-small-latest)
+Cost     : 0.0001404 EUR (~0,014 centime)
+Tokens   : 81 in / 207 out
+Latency  : 1708 ms
+Response : JSON valide {ia_maturity, axion_offer_match, priority: "moyenne"}
+```
 
-| Effectif INSEE | Catégorie | Tag |
-|---|---|---|
-| 00-02 (0-5 salariés) | micro | `size-micro` |
-| 03-12 (6-49 salariés) | tpe | `size-tpe` |
-| 21-32 (50-249) | pme | `size-pme` |
-| 41-51 (250-4999) | eti | `size-eti` |
-| 52-53 (5000+) | grande | `size-grande` |
+## Coûts opérationnels mesurés
 
-## Frontend status
+| Volume scrapé/mois | Coût Mistral mesuré | Coût Google Places | Total opérationnel |
+|---|---|---|---|
+| 1 000 | ~0,14 € | 0 € (free tier) | ~0,14 €/mois |
+| 10 000 | ~1,40 € | 0 € (smart skip H16 économise) | ~1,40 €/mois |
+| 50 000 | ~7 € | 0 € (smart skip large) | ~7 €/mois |
+| 100 000 | ~14 € | 0-50 € (selon ratio smart skip) | ~14-64 €/mois |
 
-| Page | Statut |
-|---|---|
-| `/campaigns/new` (wizard 4 étapes) | ✅ |
-| `/campaigns` + `/campaigns/$id` | ✅ |
-| `/companies` (4 tabs prospection_status + filtres taille/dept/secteur) | ✅ |
-| `/companies/$id` (détail fiche enrichie) | ✅ |
-| `/contacts` | ✅ |
-| `/coverage` (carte zones) | ✅ |
-| `/scraper-runs` (historique) | ✅ |
-| `/audiences` + `/audiences/new` (builder DSL) + `/audiences/$id` | ✅ |
-| `/tags` (groupés par catégorie) | ✅ |
-| `/admin/observability` (KPI + 50 events) | ✅ |
-| **Envoi campagne email** | ❌ Phase 2 ColdEmail stub 501 (sprint à venir) |
+**Infra fixe** : 16 €/mois (Hetzner CPX22 + Storage Box backup).
+**Total Phase A complète** : ~20-30 €/mois pour 50K entreprises B2B FR.
 
-## Comportement quand Will coche TOUTES les sources du wizard
-
-| Source cochée | Type | Effet en prod actuelle |
-|---|---|---|
-| INSEE Sirene | Discovery backend | ✅ Vrai scrape par dept → companies créées |
-| France Travail | Discovery backend | ✅ Vrai scrape OAuth → companies créées |
-| Google Maps | Discovery Node (mock=true) | ⚠️ ScraperRun cancelled, error="Phase B Webshare non activée". Pas de crash. |
-| Pages Jaunes | Discovery Node (mock=true) | ⚠️ Idem ↑ |
-| Annuaire | Enrichment only | ℹ️ Skip discovery, appliqué auto à chaque company via waterfall |
-| BODACC | Enrichment only | ℹ️ Idem ↑ |
-| BAN géocodage | Enrichment only | ℹ️ Idem ↑ |
-
-**Note H9** : `Google Places API` enrichit aussi automatiquement chaque entreprise (peu importe ce qui est coché dans le wizard) — c'est une étape de **post-découverte**, pas de **découverte**. À condition que `GOOGLE_PLACES_API_KEY` soit posée.
-
-## 25 commits de la session
+## 36 commits de la session (chronologique)
 
 ```
 75112ac feat(domain): remplace DuckDuckGo scrape par Brave Search API (H1)
@@ -157,19 +162,23 @@ a28fa74 fix(migration): index sans date_trunc(timestamptz) — IMMUTABLE PG (PRO
 fdd4d38 feat(email): MxEmailValidator maison sans dépendance externe (H7)
 5188f06 feat(triage): emails contactables élargis valid|catchall|unknown (H8)
 a7deab4 feat(scraping): Google Places API client server-side + waterfall (H9)
+97c04eb docs(audit): session complete 2026-05-18 — Hardening + H7 + H8 + H9 récap
+c5a851b feat(scraping+ux): paths mentions-légales 8→18 + banner wizard détaillé (H10)
+1a1ebad feat(ux): retire Google Maps + Pages Jaunes du wizard step 3 (H11)
+5caef11 feat(scraping): Google Places quota mensuel + retraitement différé (H12)
+1191903 feat(ux): Google Places visible dans Settings + KpiCard quota /admin/observability (H13)
+1c78df2 feat(scraping): smart skip Google Places si données vitales déjà présentes (H14)
+9bae0fb feat(llm): activation Mistral réel via LLMRouterService (H15)
+2ac5f3e fix(llm): Mistral response_format=null bug + JSON mode (H15 fix)
+b0079ca fix(llm): recordUsage fail-open si workspace_id null (H15 fix #2)
+8a1f502 docs(env): ajout 6 vars Phase A optimisée dans .env.example
+0ae9de9 feat(scraping): smart skip Google Places sur email seul (H16)
 ```
 
-## Actions humaines restantes Will
+(35 commits actifs + 1 commit final de mise à jour de cette doc)
 
-| # | Action | Coût | Priorité |
-|---|---|---|---|
-| 1 | Créer projet GCP `axion-crm-pro` + activer Places API + créer clé API + poser dans .env | $0 (crédit 12K free/mois) | 🟢 Recommandé |
-| 2 | Créer compte Webshare Residential Premium + poser creds | $30/mois | 🟡 Optionnel (Pages Jaunes) |
-| 3 | Configurer Sentry alerts (>10 errors/h → email) | $0 | 🟡 Optionnel |
-| 4 | Surveiller CI workflows pré-existants cassés (`pnpm-lock.yaml` manquant) — fix chore séparé | — | 🟡 Optionnel |
-| 5 | Implémenter envoi campagnes email réel (Mailgun/SendGrid + templates + tracking) | — | 🔴 Sprint futur |
+## Voir aussi
 
-## Verdict global
-
-🟢 **Production stable et complète** pour les phases découverte + enrichissement + audiences.
-Reste UNIQUEMENT l'envoi email réel (Phase 2 — sprint dédié à planifier).
+- `_AUDIT/TODO-AXION-CRM-PRO.md` (créé en parallèle) — liste exhaustive de ce qu'il reste à implémenter
+- `_AUDIT/SPRINT-H9-GOOGLE-PLACES-PAGES-JAUNES-ACTIVATION.md` — runbook activation Google Places + Pages Jaunes
+- `_AUDIT/HARDENING-VERIFICATION-RAPPORT-2026-05-17.md` — verdict audit sprint Hardening initial

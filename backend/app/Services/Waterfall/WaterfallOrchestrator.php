@@ -388,10 +388,12 @@ class WaterfallOrchestrator
         try {
             $audienceIds = $this->audienceBuilder->evaluateForCompany($company);
             foreach ($audienceIds as $audienceId) {
-                // Récupère contacts valid + insère 1 row par contact (ou company-only si aucun)
+                // Sprint H8 — élargi contactable (valid|catchall|unknown).
+                // Récupère contacts contactables + insère 1 row par contact
+                // (ou company-only si aucun mais email_generic présent).
                 $contactIds = DB::table('contacts')
                     ->where('company_id', $company->id)
-                    ->where('email_status', 'valid')
+                    ->whereIn('email_status', \App\Services\Triage\TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
                     ->pluck('id')
                     ->all();
 

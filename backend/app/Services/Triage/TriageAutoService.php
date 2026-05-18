@@ -7,15 +7,30 @@ use App\Support\AuditLogger;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Décide du prospection_status final d'une company après enrichissement complet :
- *  - ready_for_outreach    : au moins 1 contact avec email_status=valid
- *  - partial_email         : email_generic présent (companies.email_generic) OU contact email_status=unknown
- *  - archived_no_email     : aucun email exploitable → archive (re-scrape mensuel)
+ * Décide du prospection_status final d'une company après enrichissement complet.
+ *
+ * Sprint H8 (2026-05-18) — Doctrine Will : un email même incertain est
+ * envoyable. La distinction valid / unknown / catchall ne sert plus à
+ * filtrer l'inclusion en audience, juste à informer le commercial.
+ *
+ *  - ready_for_outreach : ≥ 1 contact dont email_status est CONTACTABLE
+ *                          (valid|catchall|unknown), OU company.email_generic
+ *                          présent (contact@…, info@…, hello@…).
+ *  - partial_email      : statut historique conservé pour rétro-compat mais
+ *                          plus utilisé en logique d'inclusion audience.
+ *  - archived_no_email  : vraiment aucun email — re-scrape mensuel.
  *
  * Si la company est marquée entreprise_radiee en amont, on respecte cet état.
  */
 class TriageAutoService
 {
+    /**
+     * Statuts d'email considérés comme contactables (= envoyables).
+     * Sprint H8 doctrine Will : on inclut les unknown/catchall qui pourraient
+     * bouncer plutôt que de perdre des leads.
+     */
+    public const CONTACTABLE_EMAIL_STATUSES = ['valid', 'catchall', 'unknown'];
+
     /**
      * Retourne le status décidé et l'archive_reason éventuelle.
      *
@@ -29,30 +44,21 @@ class TriageAutoService
             return ['status' => 'archived_no_email', 'archive_reason' => 'entreprise_radiee'];
         }
 
-        // Contacts avec email valide → ready
-        $hasValidContact = DB::table('contacts')
+        // Sprint H8 — un email contactable (valid|catchall|unknown) OU un
+        // email_generic suffit pour passer ready_for_outreach.
+        $hasContactableContact = DB::table('contacts')
             ->where('company_id', $company->id)
-            ->where('email_status', 'valid')
+            ->whereIn('email_status', self::CONTACTABLE_EMAIL_STATUSES)
             ->exists();
-        if ($hasValidContact) {
+        $hasGenericEmail = ! empty($company->email_generic);
+
+        if ($hasContactableContact || $hasGenericEmail) {
             $newStatus = 'ready_for_outreach';
             $this->applyStatus($company, $newStatus, null);
             return ['status' => $newStatus, 'archive_reason' => null];
         }
 
-        // Email générique ou contact unknown → partial
-        $hasGenericEmail = ! empty($company->email_generic);
-        $hasUnknownContact = DB::table('contacts')
-            ->where('company_id', $company->id)
-            ->whereIn('email_status', ['unknown', 'catchall'])
-            ->exists();
-        if ($hasGenericEmail || $hasUnknownContact) {
-            $newStatus = 'partial_email';
-            $this->applyStatus($company, $newStatus, null);
-            return ['status' => $newStatus, 'archive_reason' => null];
-        }
-
-        // Sinon archive (no_email) — rescrape mensuel
+        // Vraiment aucun email → archive (re-scrape mensuel via H6)
         $newStatus = 'archived_no_email';
         $reason = 'no_email';
         $this->applyStatus($company, $newStatus, $reason);

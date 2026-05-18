@@ -6,6 +6,7 @@ use App\Models\AudienceMember;
 use App\Models\Company;
 use App\Models\EmailAudience;
 use App\Services\Audiences\AudienceBuilderService;
+use App\Services\Triage\TriageAutoService;
 use App\Support\WaterfallSentry;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
@@ -69,10 +70,11 @@ class RefreshAudienceChunkJob implements ShouldQueue
                 return;
             }
 
+            // Sprint H8 — élargi contactable (valid|catchall|unknown).
             // INSERT ... ON CONFLICT DO NOTHING via DB direct (~x5 vs Eloquent)
             $contactRows = DB::table('contacts')
                 ->whereIn('company_id', $companyIds)
-                ->where('email_status', 'valid')
+                ->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
                 ->select('id', 'company_id')
                 ->get();
 

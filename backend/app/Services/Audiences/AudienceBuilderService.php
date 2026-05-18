@@ -6,6 +6,7 @@ use App\Jobs\RefreshAudienceChunkJob;
 use App\Models\AudienceMember;
 use App\Models\Company;
 use App\Models\EmailAudience;
+use App\Services\Triage\TriageAutoService;
 use App\Support\AuditLogger;
 use Illuminate\Bus\Batch;
 use Illuminate\Database\Eloquent\Builder;
@@ -45,12 +46,25 @@ class AudienceBuilderService
         $query = $this->buildQuery($workspaceId, $criteria);
 
         $companies = $query->count();
+        // Sprint H8 — contacts contactables (valid|catchall|unknown) + comptage
+        // additionnel des companies ayant un email_generic (sans contact dédié)
+        $contactableCompanyIds = (clone $query)->select('id');
         $contacts = DB::table('contacts')
-            ->whereIn('company_id', (clone $query)->select('id'))
-            ->where('email_status', 'valid')
+            ->whereIn('company_id', $contactableCompanyIds)
+            ->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
+            ->count();
+        $companyOnlyEmails = (clone $query)
+            ->whereNotNull('email_generic')
+            ->whereDoesntHave('contacts', fn ($q) => $q->whereIn(
+                'email_status',
+                TriageAutoService::CONTACTABLE_EMAIL_STATUSES,
+            ))
             ->count();
 
-        return ['companies' => $companies, 'contacts' => $contacts];
+        return [
+            'companies' => $companies,
+            'contacts'  => $contacts + $companyOnlyEmails,
+        ];
     }
 
     /**
@@ -83,10 +97,11 @@ class AudienceBuilderService
             $rows = [];
             $companyIds = $companies->pluck('id')->all();
 
-            // Pour chaque company, on cherche les contacts valid (sinon 1 row company-only)
+            // Sprint H8 — élargissement aux contacts contactables (valid|catchall|unknown).
+            // Si aucun contact contactable mais email_generic présent → company-only entry.
             $contactsByCompany = DB::table('contacts')
                 ->whereIn('company_id', $companyIds)
-                ->where('email_status', 'valid')
+                ->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
                 ->select('id', 'company_id')
                 ->get()
                 ->groupBy('company_id');
@@ -281,22 +296,26 @@ class AudienceBuilderService
             return;
         }
 
-        // Field "has_email" : check contacts
+        // Field "has_email" : Sprint H8 — élargi à tout email contactable
+        // (contact valid|catchall|unknown OU company.email_generic).
         if ($field === 'has_email') {
             if ($op !== 'eq') {
                 return;
             }
             $wantsEmail = (bool) $value;
-            $sub = function ($q) {
+            $contactSub = function ($q) {
                 $q->select(DB::raw(1))
                     ->from('contacts')
                     ->whereColumn('contacts.company_id', 'companies.id')
-                    ->where('contacts.email_status', 'valid');
+                    ->whereIn('contacts.email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES);
             };
             if ($wantsEmail) {
-                $query->whereExists($sub);
+                $query->where(function ($q) use ($contactSub) {
+                    $q->whereExists($contactSub)
+                        ->orWhereNotNull('email_generic');
+                });
             } else {
-                $query->whereNotExists($sub);
+                $query->whereNotExists($contactSub)->whereNull('email_generic');
             }
             return;
         }
@@ -391,7 +410,12 @@ class AudienceBuilderService
             return ! empty(array_intersect($value, $companySlugs));
         }
         if ($field === 'has_email') {
-            $hasEmail = $company->contacts()->where('email_status', 'valid')->exists();
+            // Sprint H8 — élargi : tout email contactable OU email_generic
+            $hasContact = $company->contacts()
+                ->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
+                ->exists();
+            $hasGeneric = ! empty($company->email_generic);
+            $hasEmail = $hasContact || $hasGeneric;
             return $hasEmail === (bool) $value;
         }
 

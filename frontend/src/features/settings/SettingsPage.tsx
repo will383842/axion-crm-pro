@@ -46,13 +46,14 @@ interface Integration {
 }
 
 const INTEGRATIONS: Integration[] = [
-  { name: 'INSEE Sirene', env: 'INSEE_API_KEY', description: 'Base entreprises + données légales', status: 'configured' },
-  { name: 'France Travail', env: 'FRANCE_TRAVAIL_CLIENT_ID', description: 'Offres d\'emploi + intentions de recrutement', status: 'configured' },
-  { name: 'Anthropic Claude', env: 'ANTHROPIC_API_KEY', description: 'LLM premium pour use cases stratégiques', status: 'optional' },
-  { name: 'Mistral AI', env: 'MISTRAL_API_KEY', description: 'LLM principal (FR souverain)', status: 'configured' },
-  { name: 'Webshare proxies', env: 'WEBSHARE_API_KEY', description: 'Proxies datacenter — Sprint scrape Google+', status: 'pending' },
-  { name: 'IPRoyal proxies', env: 'IPROYAL_USERNAME', description: 'Proxies résidentiels — Sprint scrape Google+', status: 'pending' },
-  { name: '2captcha', env: 'TWOCAPTCHA_API_KEY', description: 'Résolution captcha — Sprint scrape Google+', status: 'pending' },
+  { name: 'INSEE Sirene', env: 'INSEE_API_KEY', description: 'Base entreprises + données légales (gratuit, 500 req/min)', status: 'configured' },
+  { name: 'France Travail', env: 'FRANCE_TRAVAIL_CLIENT_ID', description: 'Offres d\'emploi + intentions de recrutement (gratuit)', status: 'configured' },
+  { name: 'Mistral AI', env: 'MISTRAL_API_KEY', description: 'LLM principal classification entreprises (FR souverain, ~5€/mois)', status: 'configured' },
+  { name: 'Anthropic Claude', env: 'ANTHROPIC_API_KEY', description: 'LLM premium pour use cases stratégiques (optionnel)', status: 'optional' },
+  // Sprint H9 + H12 — Google Places API officielle (enrichissement auto, garde-fou quota)
+  { name: 'Google Places API', env: 'GOOGLE_PLACES_API_KEY', description: 'Enrichissement auto téléphone/horaires/site/note Google (gratuit ≤12K/mois via crédit $200, garde-fou quota actif)', status: 'optional' },
+  { name: 'Webshare proxies', env: 'WEBSHARE_USERNAME', description: 'Proxies résidentiels pour Pages Jaunes (~$30/mois, Phase B optionnelle)', status: 'pending' },
+  { name: '2captcha', env: 'TWOCAPTCHA_API_KEY', description: 'Résolution captcha (Phase B, uniquement si scraping Google direct)', status: 'pending' },
 ];
 
 const OBSERVABILITY_LINKS: Array<{ name: string; url: string; description: string }> = [

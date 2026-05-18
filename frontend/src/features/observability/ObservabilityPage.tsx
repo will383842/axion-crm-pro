@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
-import { Activity, AlertTriangle, MailCheck, Archive } from 'lucide-react';
+import { Activity, AlertTriangle, MailCheck, Archive, MapPin } from 'lucide-react';
 import { Card, KpiCard, PageHeader } from '@/components/ui';
 import { api } from '@/lib/api';
 
 interface ObservabilitySummary {
   waterfall_errors_24h: number;
   hunter_quota_month: { used: number; soft_limit: number; percent: number };
+  google_places_quota: { used: number; soft_limit: number; percent: number; pending_companies: number };
   archive_reasons: Record<string, number>;
   audience_failures_7d: number;
   recent_events: Array<{
@@ -53,12 +54,24 @@ export function ObservabilityPage() {
         subtitle="Santé pipeline waterfall, quota Hunter, archivages, échecs audience refresh."
       />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         <KpiCard
           label="Erreurs waterfall (24h)"
           value={data.waterfall_errors_24h}
           icon={<AlertTriangle className="size-4" />}
           tone={data.waterfall_errors_24h > 10 ? 'rose' : 'slate'}
+        />
+        <KpiCard
+          label="Quota Google Places (mois)"
+          value={`${data.google_places_quota.used} / ${data.google_places_quota.soft_limit}`}
+          sublabel={
+            data.google_places_quota.pending_companies > 0
+              ? `${data.google_places_quota.percent}% utilisé · ${data.google_places_quota.pending_companies} en attente`
+              : `${data.google_places_quota.percent}% utilisé`
+          }
+          progress={data.google_places_quota.percent}
+          icon={<MapPin className="size-4" />}
+          tone={data.google_places_quota.percent >= 100 ? 'rose' : data.google_places_quota.percent > 80 ? 'amber' : 'sky'}
         />
         <KpiCard
           label="Quota Hunter (mois)"

@@ -25,11 +25,41 @@ class ObservabilityController extends Controller
             'data' => [
                 'waterfall_errors_24h' => $this->countWaterfallErrors24h($workspaceId),
                 'hunter_quota_month'   => $this->countHunterMonth($workspaceId),
+                'google_places_quota'  => $this->googlePlacesQuotaSummary(),
                 'archive_reasons'      => $this->countArchiveReasons($workspaceId),
                 'audience_failures_7d' => $this->countAudienceFailures7d($workspaceId),
                 'recent_events'        => $this->recentBusinessEvents($workspaceId),
             ],
         ]);
+    }
+
+    /**
+     * Sprint H13 — KPI quota Google Places mensuel (couvre tous workspaces,
+     * c'est un compteur global de l'API key partagée côté infra).
+     *
+     * @return array{used: int, soft_limit: int, percent: float, pending_companies: int}
+     */
+    private function googlePlacesQuotaSummary(): array
+    {
+        try {
+            $client = app(\App\Services\Scraping\GooglePlacesClient::class);
+            $used   = $client->currentMonthUsage();
+            $limit  = $client->monthlyQuotaLimit();
+            $pending = (int) DB::table('companies')
+                ->whereRaw("(signals->'google_places_pending') IS NOT NULL")
+                ->whereRaw("(signals->'google_places'->>'enriched_at') IS NULL")
+                ->count();
+        } catch (\Throwable $e) {
+            $used = 0;
+            $limit = 11500;
+            $pending = 0;
+        }
+        return [
+            'used'              => $used,
+            'soft_limit'        => $limit,
+            'percent'           => $limit > 0 ? min(100, round($used / $limit * 100, 1)) : 0,
+            'pending_companies' => $pending,
+        ];
     }
 
     private function countWaterfallErrors24h(string $workspaceId): int

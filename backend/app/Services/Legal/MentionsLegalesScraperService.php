@@ -19,15 +19,38 @@ use Illuminate\Support\Facades\Log;
  */
 class MentionsLegalesScraperService
 {
+    /**
+     * Sprint H10 (2026-05-18) — Élargi de 8 à 18 paths.
+     * Ordre : pages les plus probables d'avoir email/phone visibles d'abord
+     * (contact > mentions légales > a-propos > home). Early exit dès qu'on a
+     * email_generic + phone (cf. scrape() pour la logique de short-circuit).
+     */
     private const PATHS = [
+        // 1. Pages contact (les plus fréquentes pour email + tel)
+        '/contact',
+        '/contact.html',
+        '/contactez-nous',
+        '/contact-us',
+        '/nous-contacter',
+        '/contact/',
+        // 2. Mentions légales (info juridique + email obligatoire FR)
         '/mentions-legales',
         '/mentions-legales.html',
         '/legal',
         '/imprint',
         '/a-propos/mentions-legales',
+        // 3. À propos / équipe (souvent dirigeants + email)
+        '/a-propos',
+        '/about',
+        '/about-us',
+        '/equipe',
+        '/team',
+        // 4. CGV / CGU (souvent email contact en bas)
         '/cgv',
         '/cgu',
         '/conditions-generales',
+        // 5. Home page (footer contient souvent email + tel)
+        '/',
     ];
 
     private const HTTP_TIMEOUT_SECONDS = 10;
@@ -117,16 +140,30 @@ class MentionsLegalesScraperService
         return $found;
     }
 
+    /**
+     * Sprint H10 — Itère sur les paths, fusionne tous les bodies utiles trouvés
+     * (concat des HTML des pages contact + mentions + about + home) pour avoir
+     * un maximum de signaux email/phone à parser ensuite. Stop early si on a
+     * déjà accumulé suffisamment de contenu (10K chars).
+     */
     private function fetchAnyMentionsLegalesPage(string $website): ?string
     {
         $base = rtrim($website, '/');
+        $accumulated = '';
+        $pagesFound = 0;
         foreach (self::PATHS as $path) {
             $body = $this->fetch($base . $path);
             if ($body !== null && strlen(strip_tags($body)) >= self::MIN_BODY_LENGTH) {
-                return $body;
+                $accumulated .= "\n\n<!-- page: {$path} -->\n" . $body;
+                $pagesFound++;
+                // Early exit : assez de contenu accumulé pour parser
+                // (évite de marteler le site, ~3 pages suffisent largement)
+                if (strlen($accumulated) >= 10000 || $pagesFound >= 4) {
+                    break;
+                }
             }
         }
-        return null;
+        return $accumulated !== '' ? $accumulated : null;
     }
 
     private function fetch(string $url): ?string

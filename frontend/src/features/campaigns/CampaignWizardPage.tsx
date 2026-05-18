@@ -63,7 +63,7 @@ const DISCOVERY_SOURCES: DiscoverySource[] = [
   {
     id: 'insee',
     label: 'INSEE Sirene',
-    description: 'Base officielle entreprises FR — toutes les entreprises légales',
+    description: 'Base officielle entreprises FR (~30M entreprises légales)',
     status: 'api_key',
     activable: true,
     icon: Database,
@@ -71,28 +71,28 @@ const DISCOVERY_SOURCES: DiscoverySource[] = [
   {
     id: 'france_travail',
     label: 'France Travail',
-    description: 'Entreprises qui recrutent dans la zone (signal intent fort)',
+    description: 'Entreprises qui recrutent dans la zone — signal intent fort',
     status: 'api_key',
     activable: true,
     icon: Briefcase,
   },
   {
     id: 'google_maps',
-    label: 'Google Maps',
-    description: 'Fiches établissement géo-localisées (Phase B)',
+    label: 'Google Maps (Phase B)',
+    description: 'Fiches géolocalisées avec photos/horaires (Webshare requis)',
     status: 'proxies_required',
     activable: false,
     icon: MapPin,
-    unavailableHint: 'Phase B — Configuration Webshare requise (Settings)',
+    unavailableHint: 'Phase B — Webshare proxy résidentiel requis (~$30/mois). À configurer dans Settings.',
   },
   {
     id: 'pages_jaunes',
-    label: 'Pages Jaunes',
-    description: 'Annuaire pro FR (Phase B)',
+    label: 'Pages Jaunes (Phase B)',
+    description: 'Annuaire pro FR — TPE/artisans souvent absents INSEE',
     status: 'proxies_required',
     activable: false,
     icon: BookOpen,
-    unavailableHint: 'Phase B — Configuration Webshare requise (Settings)',
+    unavailableHint: 'Phase B — Webshare proxy résidentiel requis (~$30/mois). À configurer dans Settings.',
   },
 ];
 
@@ -646,11 +646,21 @@ function StepSources({
 
       <div className="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50/60 p-3 text-xs text-slate-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-slate-200">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden />
-        <p>
-          <strong className="font-semibold">Enrichissement automatique.</strong>{' '}
-          L'enrichissement (Annuaire Entreprises, BODACC, BAN, mentions légales, LLM Mistral) s'applique automatiquement
-          à chaque entreprise découverte. Pas besoin de les activer ici.
-        </p>
+        <div className="space-y-1">
+          <p>
+            <strong className="font-semibold">Enrichissement automatique.</strong>{' '}
+            Chaque entreprise découverte ci-dessus est ensuite enrichie automatiquement par :
+          </p>
+          <ul className="ml-4 list-disc space-y-0.5">
+            <li><strong>Annuaire Entreprises</strong> — CA, bilans, dirigeants (gratuit)</li>
+            <li><strong>BODACC</strong> — signaux légaux : création, redressement (gratuit)</li>
+            <li><strong>BAN géocodage</strong> — coordonnées GPS précises (gratuit)</li>
+            <li><strong>Mentions légales scrape</strong> — email + téléphone publics (18 URLs explorées par site)</li>
+            <li><strong>Google Places API</strong> — téléphone, horaires, note Google (~$0 grâce au crédit $200/mois)</li>
+            <li><strong>LLM Mistral</strong> — classification, priorité, tags intent</li>
+          </ul>
+          <p className="mt-1 text-slate-500 dark:text-slate-400">Pas besoin d'activer ces sources ici — elles tournent en background.</p>
+        </div>
       </div>
     </div>
   );

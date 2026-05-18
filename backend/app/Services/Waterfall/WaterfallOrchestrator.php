@@ -15,6 +15,7 @@ use App\Services\Classification\AutoClassifierService;
 use App\Services\Dedup\DeduplicationService;
 use App\Services\Domain\DomainFinderService;
 use App\Services\Legal\MentionsLegalesScraperService;
+use App\Services\Scraping\GooglePlacesClient;
 use App\Services\Tags\AutoTaggerService;
 use App\Services\Triage\TriageAutoService;
 use App\Support\WaterfallSentry;
@@ -57,6 +58,8 @@ class WaterfallOrchestrator
         private readonly AutoTaggerService $autoTagger,
         private readonly TriageAutoService $triage,
         private readonly AudienceBuilderService $audienceBuilder,
+        // Sprint H9 — Google Places API (server-side, remplace scrape Google Maps Node)
+        private readonly ?GooglePlacesClient $googlePlaces = null,
     ) {}
 
     public function enrich(Company $company): void
@@ -78,6 +81,7 @@ class WaterfallOrchestrator
         $this->step3_bodacc($company);
         $this->step3b_find_domain($company);
         $this->step3c_mentions_legales($company);
+        $this->step3d_google_places($company);
         $this->step4_dispatch_node_scrapes($company);
         $this->step7_email_finder($company);
         $this->step8_geocode($company);
@@ -217,6 +221,73 @@ class WaterfallOrchestrator
         }
     }
 
+    /**
+     * Sprint H9 — Google Places API (server-side, remplace scrape Google Maps).
+     * Enrichit phone + website + address + lat/lon + horaires + note Google.
+     * Skip silencieux si pas de GOOGLE_PLACES_API_KEY (graceful).
+     */
+    private function step3d_google_places(Company $company): void
+    {
+        if ($this->googlePlaces === null || ! $company->denomination) {
+            return;
+        }
+        try {
+            $ville = $company->city_name ?? $company->city ?? '';
+            $query = trim($company->denomination . ' ' . $ville);
+            $place = $this->googlePlaces->searchText($query, 'FR');
+            if ($place === null) {
+                return;
+            }
+            $data = $this->googlePlaces->flatten($place);
+
+            // Backfill UNIQUEMENT les champs vides (on n'écrase pas l'existant)
+            $touched = false;
+            if (! $company->phone && $data['phone']) {
+                $company->phone = $data['phone'];
+                $touched = true;
+            }
+            if (! $company->website && $data['website']) {
+                $company->website = $data['website'];
+                $touched = true;
+            }
+            if (! $company->address && $data['address']) {
+                $company->address = $data['address'];
+                $touched = true;
+            }
+            if ($company->lat === null && $data['lat'] !== null) {
+                $company->lat = $data['lat'];
+                $company->lon = $data['lon'];
+                $touched = true;
+            }
+
+            // Stocke le payload complet dans signals.google_places pour audit/exploitation
+            $signals = $company->signals ?: [];
+            $signals['google_places'] = [
+                'place_id'         => $data['google_place_id'],
+                'display_name'     => $data['display_name'],
+                'rating'           => $data['rating'],
+                'user_rating_count'=> $data['user_rating_count'],
+                'business_status'  => $data['business_status'],
+                'primary_type'     => $data['primary_type'],
+                'types'            => $data['types'],
+                'opening_hours'    => $data['opening_hours'],
+            ];
+            $company->signals = $signals;
+
+            if ($touched || ! empty($signals['google_places'])) {
+                $company->save();
+            }
+            $this->recordRun($company, 'google-places', 'success');
+        } catch (\Throwable $e) {
+            WaterfallSentry::capture($company, 'google-places', $e);
+            Log::warning('google-places failed', [
+                'company_id' => $company->id,
+                'error'      => $e->getMessage(),
+            ]);
+            $this->recordRun($company, 'google-places', 'failed');
+        }
+    }
+
     private function step4_dispatch_node_scrapes(Company $company): void
     {
         if (env('MOCK_MODE', true) || env('MOCK_SCRAPERS', true)) {
@@ -227,7 +298,10 @@ class WaterfallOrchestrator
             'denomination' => $company->denomination,
             'naf'          => $company->naf,
         ];
-        foreach (['google-maps', 'pages-jaunes', 'website', 'google-search'] as $src) {
+        // Sprint H9 — google-maps retiré : remplacé par GooglePlaces API server-side (step3d).
+        // Reste pour les workers Node : pages-jaunes (Webshare proxy requis si activé),
+        // website scrape, google-search (fallback URL discovery).
+        foreach (['pages-jaunes', 'website', 'google-search'] as $src) {
             \App\Jobs\DispatchScrapeJob::dispatch($company->id, $src, $context, $company->website);
         }
     }

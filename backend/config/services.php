@@ -67,6 +67,18 @@ return [
     ],
 
     /* ---------------------------------------------------------------------
+     | Google Places API (Sprint H9 — 2026-05-18)
+     | https://console.cloud.google.com/ → activer "Places API (New)"
+     | Pricing : $17/1000 requêtes, $200/mois de crédit gratuit (~12K free)
+     | --------------------------------------------------------------------- */
+    'google' => [
+        'places' => [
+            'api_key'        => env('GOOGLE_PLACES_API_KEY'),
+            'cache_ttl_days' => (int) env('GOOGLE_PLACES_CACHE_TTL_DAYS', 30),
+        ],
+    ],
+
+    /* ---------------------------------------------------------------------
      | EmailFinder spéculatif (Sprint H7 — 2026-05-18)
      | Quand FALSE (défaut) : EmailFinderService::find() ne génère plus les 18
      | patterns spéculatifs. Seuls les emails RÉELS scrapés depuis le HTML

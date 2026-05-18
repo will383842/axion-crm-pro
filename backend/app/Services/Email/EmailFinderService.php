@@ -106,6 +106,16 @@ class EmailFinderService
             return [];
         }
 
+        // Sprint H7 (2026-05-18) — Politique Will : on n'accepte que des emails
+        // RÉELS scrapés depuis le HTML des sites web (mentions-légales). On ne
+        // génère plus de patterns spéculatifs sans vérificateur SMTP externe
+        // (Hunter/ZeroBounce/NeverBounce) qui pourrait trancher entre les 18
+        // candidats. Mode "spéculatif" volontairement désactivé pour garantir
+        // la qualité de la base (0 email douteux).
+        if (! config('services.email_finder.speculative_enabled', false)) {
+            return [];
+        }
+
         $candidates = $knownPattern
             ? [$this->renderPattern($knownPattern, $firstName, $lastName, $domain)]
             : $this->generateCandidates($firstName, $lastName, $domain);

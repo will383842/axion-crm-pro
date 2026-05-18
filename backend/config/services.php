@@ -66,4 +66,17 @@ return [
         'mock' => env('MOCK_SCRAPERS', true),
     ],
 
+    /* ---------------------------------------------------------------------
+     | EmailFinder spéculatif (Sprint H7 — 2026-05-18)
+     | Quand FALSE (défaut) : EmailFinderService::find() ne génère plus les 18
+     | patterns spéculatifs. Seuls les emails RÉELS scrapés depuis le HTML
+     | (mentions-légales) sont stockés, validés via MxEmailValidator.
+     |
+     | À activer UNIQUEMENT quand un vérificateur SMTP externe (Hunter,
+     | ZeroBounce, NeverBounce) est wired pour trancher entre les candidats.
+     | --------------------------------------------------------------------- */
+    'email_finder' => [
+        'speculative_enabled' => env('EMAIL_FINDER_SPECULATIVE_ENABLED', false),
+    ],
+
 ];

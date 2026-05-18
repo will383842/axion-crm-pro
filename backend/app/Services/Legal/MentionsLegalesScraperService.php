@@ -3,6 +3,7 @@
 namespace App\Services\Legal;
 
 use App\Models\Company;
+use App\Services\Email\MxEmailValidator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -46,6 +47,10 @@ class MentionsLegalesScraperService
 
     private const MIN_BODY_LENGTH = 500;
 
+    public function __construct(
+        private readonly ?MxEmailValidator $emailValidator = null,
+    ) {}
+
     /**
      * Scrape mentions légales et met à jour la company.
      * Retourne true si au moins une info utile a été trouvée.
@@ -63,12 +68,29 @@ class MentionsLegalesScraperService
 
         $found = false;
 
-        // Email générique
+        // Email générique — Sprint H7 : on n'accepte que les emails validés MX
+        // (filtre les domaines invalides + disposables + role-based).
         if (! $company->email_generic) {
             $email = $this->extractFirstUsableEmail($body);
             if ($email) {
-                $company->email_generic = $email;
-                $found = true;
+                $accept = true;
+                if ($this->emailValidator !== null) {
+                    $status = $this->emailValidator->quickStatus($email);
+                    // role/disposable/invalid → on rejette pour email_generic
+                    // (verified et risky sont OK : un email générique peut être chez
+                    // un free provider légitimement pour une TPE)
+                    if (in_array($status, ['invalid', 'disposable', 'role'], true)) {
+                        $accept = false;
+                        Log::debug('Skipping email_generic via MX validator', [
+                            'email'  => $email,
+                            'status' => $status,
+                        ]);
+                    }
+                }
+                if ($accept) {
+                    $company->email_generic = $email;
+                    $found = true;
+                }
             }
         }
 
@@ -210,6 +232,30 @@ class MentionsLegalesScraperService
             if (empty($candidates)) {
                 continue;
             }
+            // Sprint H7 — Validation MX maison avant insert (pas de pattern spéculatif :
+            // seuls les emails RÉELS trouvés dans le HTML sont stockés, et tagués selon
+            // le résultat MX validator → la base ne contient QUE des emails fiables).
+            $bestEmail = $candidates[0];
+            $emailStatus = 'unknown';
+            $validation = null;
+            if ($this->emailValidator !== null) {
+                $validation = $this->emailValidator->validate($bestEmail);
+                $emailStatus = match ($validation['status']) {
+                    'verified'   => 'valid',
+                    'risky'      => 'catchall',
+                    'role'       => 'role',
+                    'disposable' => 'invalid',
+                    'invalid'    => 'invalid',
+                    default      => 'unknown',
+                };
+                if ($emailStatus === 'invalid') {
+                    Log::debug('Skipping invalid email from mentions-legales', [
+                        'email'  => $bestEmail,
+                        'reason' => $validation['reason'] ?? null,
+                    ]);
+                    continue;
+                }
+            }
             try {
                 DB::table('contacts')->insertOrIgnore([[
                     'workspace_id'      => $company->workspace_id,
@@ -217,11 +263,14 @@ class MentionsLegalesScraperService
                     'first_name'        => $rep['first_name'] ?? null,
                     'last_name'         => $rep['last_name'],
                     'role'              => $rep['role'] ?? 'dirigeant',
-                    'email'             => $candidates[0],
-                    'email_status'      => 'unknown',
+                    'email'             => $bestEmail,
+                    'email_status'      => $emailStatus,
                     'discovery_source'  => 'mentions-legales',
                     'sources'           => json_encode(['mentions-legales']),
-                    'metadata'          => json_encode(['matched_dirigeant' => $rep]),
+                    'metadata'          => json_encode([
+                        'matched_dirigeant' => $rep,
+                        'mx_validation'     => $validation,
+                    ]),
                     'created_at'        => now(),
                     'updated_at'        => now(),
                 ]]);

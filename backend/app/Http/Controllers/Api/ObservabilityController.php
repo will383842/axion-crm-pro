@@ -19,11 +19,11 @@ class ObservabilityController extends Controller
 {
     public function summary(Request $request): JsonResponse
     {
-        $workspaceId = (string) $request->user()->current_workspace_id;
+        $workspaceId = (string) ($request->user()->current_workspace_id ?? '');
 
         return response()->json([
             'data' => [
-                'waterfall_errors_24h' => $this->countWaterfallErrors24h(),
+                'waterfall_errors_24h' => $this->countWaterfallErrors24h($workspaceId),
                 'hunter_quota_month'   => $this->countHunterMonth($workspaceId),
                 'archive_reasons'      => $this->countArchiveReasons($workspaceId),
                 'audience_failures_7d' => $this->countAudienceFailures7d($workspaceId),
@@ -32,9 +32,10 @@ class ObservabilityController extends Controller
         ]);
     }
 
-    private function countWaterfallErrors24h(): int
+    private function countWaterfallErrors24h(string $workspaceId): int
     {
         return (int) DB::table('scraper_runs')
+            ->where('workspace_id', $workspaceId)
             ->where('status', 'failed')
             ->where('created_at', '>', now()->subDay())
             ->count();

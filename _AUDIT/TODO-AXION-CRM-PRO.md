@@ -73,13 +73,21 @@ Légende sévérité :
 
 ## 🟡 OPTIONNEL — quand tu auras le temps
 
-### 5. CI workflows GitHub Actions cassés (1 jour, chore)
-**Pourquoi** : workflows actuels échouent car ils cherchent `workers/pnpm-lock.yaml` et `frontend/pnpm-lock.yaml` qui n'existent pas (projet utilise `package-lock.json` npm).
+### 5. CI workflows GitHub Actions annexes (1-2 jours, chore)
+**Pourquoi** : 4 workflows secondaires échouent dans la UI GitHub Actions (CI / Accessibility / Security / Deploy Staging). **AUCUN IMPACT prod** — le déploiement passe par `deploy-direct-ssh.yml` qui est vert. C'est cosmétique pour avoir le dashboard GitHub tout vert.
 
-**Fix possible** :
-- Option A : `pnpm install` dans frontend + workers + commit les `pnpm-lock.yaml` générés
-- Option B : modifier les workflows pour utiliser `npm ci` au lieu de `pnpm`
-- Pré-existant aux sprints Hardening — pas un régression.
+**Statut au 2026-05-18 (post-fix partiel session H1→H16)** :
+- ✅ Lockfiles fixés : `frontend/pnpm-lock.yaml` + `workers/pnpm-lock.yaml` générés et commités (commit `8dacbe8`)
+- ✅ 3 erreurs typecheck pré-existantes fixées (commit `37438b4`) :
+  * `AudienceBuilderPage.tsx` Field error type `string | undefined`
+  * `CampaignWizardPage.tsx` import `ALL_SOURCES` + type explicite callback
+- ❌ **RESTE** : workflow Security (Trivy container scan) échoue car `Dockerfile.laravel` → `composer install` exit code 2 dans le runner CI. Probablement besoin de `--ignore-platform-reqs` (déjà appliqué en build prod mais pas dans le Dockerfile committé).
+- ❌ **deploy-prod.yml** : workflow legacy `workflow_dispatch` only, affiche fail 0s cosmétique. Pas utilisé en pratique (deploy-direct-ssh.yml fait le job). Peut être supprimé si Will veut.
+
+**Fix complet** :
+- Modifier `Dockerfile.laravel` ligne 13 pour ajouter `--ignore-platform-reqs` au `composer install` (ATTENTION : tester que la build prod marche toujours après)
+- Optionnel : supprimer `.github/workflows/deploy-prod.yml` (workflow legacy non utilisé)
+- Optionnel : mettre `continue-on-error: true` sur le step Trivy si on veut juste rendre le workflow Security vert sans vraiment scanner
 
 ### 6. Restore PG drill (30 min, Will solo)
 **Pourquoi** : backup daily quotidien tourne, mais le restore n'a jamais été testé en vrai. Risque : le jour où tu en as besoin, ça marche pas.

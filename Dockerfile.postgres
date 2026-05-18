@@ -12,7 +12,7 @@
 #   docker push ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman
 # ============================================================================
 
-FROM postgis/postgis:16-3.5
+FROM postgis/postgis:17-3.5
 
 ARG PGVECTOR_VERSION=0.8.0
 ARG PG_PARTMAN_VERSION=5.1.0

@@ -346,21 +346,26 @@ class WaterfallOrchestrator
     }
 
     /**
-     * Sprint H14 — Vérifie si l'entreprise a déjà les 3 données vitales pour outreach :
-     * email exploitable (contact valid|catchall|unknown OU email_generic) +
-     * téléphone + site web. Si oui, on n'a pas besoin de Google Places.
+     * Sprint H14 + H16 (2026-05-18) — Vérifie si l'entreprise a déjà l'essentiel
+     * pour une campagne email : un email exploitable (contact valid|catchall|
+     * unknown OU email_generic). Si oui, on n'a pas besoin de Google Places.
+     *
+     * Politique Will H16 : l'email est ROI. Phone/website/horaires/note Google
+     * sont des bonus utiles mais pas critiques pour outreach email →
+     * on économise drastiquement le quota Google Places en skippant dès qu'on
+     * a au moins un canal de contact email.
+     *
+     * Conséquence : Google Places n'est appelé QUE pour les entreprises sans
+     * email (typiquement celles dont MentionsLégales H10 n'a pas trouvé de
+     * mail public sur les 18 URLs scrapées). Ces entreprises bénéficient
+     * d'un dernier essai d'enrichissement Google qui peut leur apporter
+     * un téléphone vérifié + un site web officiel manqué par Annuaire.
      */
     private function hasEssentialData(Company $company): bool
     {
-        $hasPhone   = ! empty($company->phone);
-        $hasWebsite = ! empty($company->website);
-        if (! $hasPhone || ! $hasWebsite) {
-            return false;
-        }
         if (! empty($company->email_generic)) {
             return true;
         }
-        // contact avec email exploitable (cf. doctrine H8)
         $hasContact = \Illuminate\Support\Facades\DB::table('contacts')
             ->where('company_id', $company->id)
             ->whereIn('email_status', \App\Services\Triage\TriageAutoService::CONTACTABLE_EMAIL_STATUSES)

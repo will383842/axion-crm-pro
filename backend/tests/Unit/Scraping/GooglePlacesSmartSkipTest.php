@@ -38,13 +38,12 @@ beforeEach(function () {
     Config::set('services.google.places.smart_skip', true);
 });
 
-it('skips Google Places when company already has email + phone + website', function () {
+it('skips Google Places when company already has email_generic (H16 doctrine)', function () {
     Http::fake();
     $ws = makeSmartSkipWorkspace();
     $company = makeSmartSkipCompany($ws->id, [
-        'phone'         => '+33 1 23 45 67 89',
-        'website'       => 'https://acme.fr',
         'email_generic' => 'contact@acme.fr',
+        // pas de phone, pas de website → quand même skip car email = essentiel
     ]);
 
     /** @var \App\Services\Waterfall\WaterfallOrchestrator $orch */
@@ -59,7 +58,7 @@ it('skips Google Places when company already has email + phone + website', funct
     expect($company->signals['google_places_skipped']['reason'] ?? null)->toBe('has_essential_data');
 });
 
-it('does NOT skip when company is missing email (only phone+website)', function () {
+it('does NOT skip when company is missing email (H16 — appelle Google)', function () {
     Http::fake([
         'places.googleapis.com/*' => Http::response(['places' => [['id' => 'X']]], 200),
     ]);
@@ -67,7 +66,7 @@ it('does NOT skip when company is missing email (only phone+website)', function 
     $company = makeSmartSkipCompany($ws->id, [
         'phone'   => '+33 1 23 45 67 89',
         'website' => 'https://acme.fr',
-        // pas d'email_generic, pas de contacts
+        // pas d'email → Google Places appelé pour tenter d'enrichir
     ]);
 
     $orch = app(\App\Services\Waterfall\WaterfallOrchestrator::class);
@@ -79,15 +78,12 @@ it('does NOT skip when company is missing email (only phone+website)', function 
     Http::assertSentCount(1);
 });
 
-it('does NOT skip when company is missing phone', function () {
-    Http::fake([
-        'places.googleapis.com/*' => Http::response(['places' => [['id' => 'X']]], 200),
-    ]);
+it('skips Google Places even if phone+website are missing, as long as email exists (H16)', function () {
+    Http::fake();
     $ws = makeSmartSkipWorkspace();
     $company = makeSmartSkipCompany($ws->id, [
-        'website'       => 'https://acme.fr',
-        'email_generic' => 'contact@acme.fr',
-        // pas de phone
+        'email_generic' => 'hello@acme.fr',
+        // ni phone ni website → skip car email = essentiel selon H16
     ]);
 
     $orch = app(\App\Services\Waterfall\WaterfallOrchestrator::class);
@@ -96,7 +92,7 @@ it('does NOT skip when company is missing phone', function () {
     $method->setAccessible(true);
     $method->invoke($orch, $company);
 
-    Http::assertSentCount(1);
+    Http::assertNothingSent();
 });
 
 it('skip is disabled when smart_skip config is false', function () {
@@ -106,8 +102,6 @@ it('skip is disabled when smart_skip config is false', function () {
     ]);
     $ws = makeSmartSkipWorkspace();
     $company = makeSmartSkipCompany($ws->id, [
-        'phone'         => '+33 1 23 45 67 89',
-        'website'       => 'https://acme.fr',
         'email_generic' => 'contact@acme.fr',
     ]);
 
@@ -123,10 +117,7 @@ it('skip is disabled when smart_skip config is false', function () {
 it('considers contact with email_status=valid as sufficient email', function () {
     Http::fake();
     $ws = makeSmartSkipWorkspace();
-    $company = makeSmartSkipCompany($ws->id, [
-        'phone'   => '+33 1 23 45 67 89',
-        'website' => 'https://acme.fr',
-    ]);
+    $company = makeSmartSkipCompany($ws->id, []);
     DB::table('contacts')->insert([
         'workspace_id' => $ws->id,
         'company_id'   => $company->id,

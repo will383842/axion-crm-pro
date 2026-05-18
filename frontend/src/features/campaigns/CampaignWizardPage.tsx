@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import {
   ChevronLeft, ChevronRight, Check, X, Search,
   Building2, Clock, Gauge, Calendar, Sparkles, ShieldAlert,
-  Database, Briefcase, MapPin, BookOpen, Lock, Info,
+  Database, Briefcase, Lock, Info,
 } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
 import { api } from '@/lib/api';
@@ -59,6 +59,15 @@ interface DiscoverySource {
  * Les sources d'ENRICHISSEMENT (annuaire-entreprises, bodacc, ban, mentions légales, LLM Mistral)
  * sont appliquées automatiquement par WaterfallOrchestrator — pas exposées dans le wizard.
  */
+/**
+ * Sprint H11 (2026-05-18) — Sources de découverte réellement activables.
+ * INSEE + France Travail couvrent >99% du périmètre B2B FR.
+ *
+ * Google Maps + Pages Jaunes (Phase B) sont retirés du wizard tant que
+ * Webshare proxy n'est pas configuré — pas la peine d'exposer des cases
+ * grisées impossible à cocher. Quand Will activera Webshare un jour,
+ * on remet ces 2 sources dans cette liste.
+ */
 const DISCOVERY_SOURCES: DiscoverySource[] = [
   {
     id: 'insee',
@@ -75,24 +84,6 @@ const DISCOVERY_SOURCES: DiscoverySource[] = [
     status: 'api_key',
     activable: true,
     icon: Briefcase,
-  },
-  {
-    id: 'google_maps',
-    label: 'Google Maps (Phase B)',
-    description: 'Fiches géolocalisées avec photos/horaires (Webshare requis)',
-    status: 'proxies_required',
-    activable: false,
-    icon: MapPin,
-    unavailableHint: 'Phase B — Webshare proxy résidentiel requis (~$30/mois). À configurer dans Settings.',
-  },
-  {
-    id: 'pages_jaunes',
-    label: 'Pages Jaunes (Phase B)',
-    description: 'Annuaire pro FR — TPE/artisans souvent absents INSEE',
-    status: 'proxies_required',
-    activable: false,
-    icon: BookOpen,
-    unavailableHint: 'Phase B — Webshare proxy résidentiel requis (~$30/mois). À configurer dans Settings.',
   },
 ];
 
@@ -583,7 +574,7 @@ function StepSources({
         hint="Au moins une source obligatoire. Ces sources créent des entreprises ; l'enrichissement est appliqué automatiquement ensuite."
       />
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {DISCOVERY_SOURCES.map((src) => {
           const active = sources.includes(src.id);
           const disabled = !src.activable;
@@ -661,6 +652,16 @@ function StepSources({
           </ul>
           <p className="mt-1 text-slate-500 dark:text-slate-400">Pas besoin d'activer ces sources ici — elles tournent en background.</p>
         </div>
+      </div>
+
+      <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+        <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" aria-hidden />
+        <p>
+          <strong className="font-semibold text-slate-700 dark:text-slate-300">Sources Phase B (à venir).</strong>{' '}
+          Google Maps + Pages Jaunes seront disponibles après configuration d'un proxy résidentiel
+          (Webshare ~$30/mois) — utile uniquement pour scraper les TPE/artisans peu référencés INSEE.
+          INSEE Sirene couvre déjà &gt;99% du périmètre B2B FR.
+        </p>
       </div>
     </div>
   );

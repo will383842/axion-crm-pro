@@ -34,14 +34,28 @@ Les 2 patches modifient +5/-4 lignes au total. Re-validation `php -l` propre.
 
 ## Smoke prod (post-deploy)
 
+Smoke SSH co-exécuté Will + Claude session 2026-05-18 08:17-08:30 UTC.
+
 | Check | Statut | Note |
 |---|---|---|
-| `https://app.axion-crm-pro.com/up` baseline pré-push | ✅ HTTP 200 (1.05s, 1835b) | Confirmé 2026-05-18 |
-| `https://app.axion-crm-pro.com/up` post-deploy Coolify | (à confirmer par Will SSH) | Coolify autopilot pull a démarré au push origin/main `a0f8b7c` |
-| `docker compose exec -T api php artisan horizon:list \| grep audiences-refresh` | À exécuter Will (SSH Hetzner) | Doit afficher supervisor-audiences-refresh up |
-| `docker compose exec -T api php artisan companies:rescrape-archives --dry-run --limit=5` | À exécuter Will (SSH Hetzner) | Doit retourner 0 jobs si aucune company éligible |
-| `docker compose exec -T postgres psql -U axion -d axion_crm -c "\dt email_verification_logs business_events"` | À exécuter Will (SSH Hetzner) | Doit lister les 2 tables (post migrate) |
-| 1 vraie requête Brave + 1 vraie verify Hunter via tinker | À exécuter Will | Seulement si Will a posé `BRAVE_SEARCH_API_KEY` + `HUNTER_API_KEY` en env vars Coolify |
+| `https://app.axion-crm-pro.com/up` baseline + post-deploy | ✅ HTTP 200 | 1.05s baseline → 0.36s post-deploy (container Coolify frais) |
+| `php artisan companies:rescrape-archives --dry-run --limit=5` | ✅ `Found 0 companies` | Commande H6 opérationnelle |
+| Migration `2026_05_19_000001_create_email_verification_logs` | ✅ Applied post-fix PROD-1 | Bug P0 trouvé prod : `date_trunc(timestamptz)` non-IMMUTABLE PG, refusé dans CREATE INDEX. Fix commit `a28fa74` (index `(workspace_id, verified_at)` plain + query `whereBetween` startOfMonth/endOfMonth). |
+| Migration `2026_05_19_000002_create_business_events` | ✅ Applied | |
+| `psql SELECT tablename FROM pg_tables WHERE tablename IN (...)` | ✅ 2 rows | `business_events` + `email_verification_logs` présentes |
+| `horizon:list` post `config:clear` + `docker compose restart horizon` | ✅ 3 supervisors | `supervisor-default`, `supervisor-scraping`, `supervisor-audiences-refresh` running |
+| Backfill perimeter check (entreprises radiées à archiver) | ✅ 0 rows | Aucune entreprise radiée détectée dans la base — filtre INSEE H3 protège les futurs imports nativement |
+| 1 vraie requête Brave + 1 vraie verify Hunter via tinker | ⏭ Skippé Will | Pipeline tourne en mode dégradé sans Brave/Hunter (no_api_key → unknown, pas de crash). À activer plus tard sans urgence. |
+
+## P0 production fix trouvé pendant smoke (post-audit)
+
+**PROD-1** (commit `a28fa74`) : Migration H2 crashait sur Postgres strict avec
+`SQLSTATE[42P17]: functions in index expression must be marked IMMUTABLE`.
+Le test Pest local tournait sur SQLite (par défaut) qui accepte `date_trunc`
+dans un index, donc l'audit pré-prod a raté ce bug.
+
+**Leçon Sprint H+1** : forcer les tests d'intégration de migrations sur un
+container Postgres (pas SQLite) en CI pour catcher ce type de divergence.
 
 ## Anti-régression vérifiée
 
@@ -68,14 +82,17 @@ https://app.axion-crm-pro.com (Coolify autopilot pull en cours)
 
 ## Actions humaines restantes Will
 
-1. **Smoke prod SSH** (~3 min) : exécuter les 4 commands `docker compose exec -T …` listés ci-dessus.
-2. **Env vars Coolify Hardening** (à activer quand budget validé) :
-   - `BRAVE_SEARCH_API_KEY` (https://api.search.brave.com/app/keys — 2000/mois free)
-   - `HUNTER_API_KEY` (https://hunter.io/api-keys — 25 vérifs/mois free)
-   - Garder `WEBSHARE_ENABLED=false` jusqu'à Phase B validée (Brave + Hunter 1 sem prod sain d'abord)
-3. **Backfill entreprises radiées** (~10 min) : revue `backend/database/scripts/backfill_archived_entreprises_radiees.sql`, basculer `ROLLBACK` → `COMMIT` + décommenter UPDATE après pg_dump backup. Ne PAS exécuter en heures business.
-4. **Sentry alerts** : configurer alerts `tag service=*` > 10 errors/h → email Will.
-5. **CI Pest run** : attendre verts (cible 220+ tests). Si KO, voir Sentry + logs Coolify.
+| # | Action | Statut |
+|---|---|---|
+| 1 | Smoke prod SSH | ✅ DONE 2026-05-18 (cf. tableau ci-dessus) |
+| 2 | Env vars Brave/Hunter | ⏭ Skippé volontairement Will (mode dégradé OK) — à faire plus tard sans urgence |
+| 3 | Backfill SQL entreprises radiées | ✅ DONE — 0 lignes à archiver |
+| 4 | Sentry alerts (interface web sentry.io) | 📋 À faire Will (~5 min, pas d'urgence) |
+| 5 | CI Pest run | ⚠️ Workflows CI cassés pré-sprint (lié à `pnpm-lock.yaml` manquant, **pas** au Hardening). Workflow critique `Deploy direct SSH Hetzner` = ✅ success |
+
+**Fix workflows CI** (séparé du sprint Hardening, à traiter en chore commit) : créer
+`workers/pnpm-lock.yaml` + `frontend/pnpm-lock.yaml` OU passer les workflows à `npm ci`
+(le repo utilise `package-lock.json`).
 
 ## Recommandations sprint suivant (H+1, post-stabilisation)
 

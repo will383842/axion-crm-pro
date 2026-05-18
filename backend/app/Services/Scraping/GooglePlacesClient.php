@@ -54,20 +54,32 @@ class GooglePlacesClient
 
     /**
      * Cherche un établissement par texte libre ("Boulangerie Dupont Paris").
-     * Retourne la première place trouvée ou null si absent / erreur.
      *
+     * Sprint H12 — Retourne :
+     *  - array place (succès)
+     *  - null avec context dans le 2e arg byref si pas trouvé / erreur
+     *  - null si quota mensuel free dépassé (et $reason='quota_exceeded')
+     *
+     * @param  string  $query
+     * @param  string|null  $regionCode
+     * @param  string|null  $reason  byref : si null retourné, indique pourquoi
+     *                                ('no_api_key', 'quota_exceeded', 'not_found',
+     *                                'http_error', 'exception')
      * @return array<string,mixed>|null
      */
-    public function searchText(string $query, ?string $regionCode = 'FR'): ?array
+    public function searchText(string $query, ?string $regionCode = 'FR', ?string &$reason = null): ?array
     {
+        $reason = null;
         $query = trim($query);
         if ($query === '') {
+            $reason = 'empty_query';
             return null;
         }
 
         $apiKey = config('services.google.places.api_key');
         if (! $apiKey) {
             Log::debug('GooglePlacesClient skipped (no API key)');
+            $reason = 'no_api_key';
             return null;
         }
 
@@ -75,6 +87,20 @@ class GooglePlacesClient
         $cached = Cache::get($cacheKey);
         if ($cached !== null) {
             return $cached === '__null__' ? null : $cached;
+        }
+
+        // Sprint H12 — Quota mensuel garde-fou : ne dépasse jamais le seuil gratuit
+        // Google Maps Platform ($200/mois crédit ≈ 11500 Place Details "Pro Text Search").
+        // Si dépassé : on ne fait PAS l'appel, on marque la company comme "pending"
+        // côté caller pour retraitement le mois suivant.
+        if ($this->isQuotaExceeded()) {
+            Log::info('GooglePlacesClient quota exceeded, skipping call', [
+                'query' => $query,
+                'used'  => $this->currentMonthUsage(),
+                'limit' => $this->monthlyQuotaLimit(),
+            ]);
+            $reason = 'quota_exceeded';
+            return null;
         }
 
         try {
@@ -95,6 +121,11 @@ class GooglePlacesClient
                     'maxResultCount' => 1,
                 ]);
 
+            // Sprint H12 — Incrémente le compteur quota (même sur 4xx/5xx car Google
+            // peut facturer une requête même rejected). On compte tôt pour ne jamais
+            // sous-estimer notre usage réel.
+            $this->incrementMonthlyUsage();
+
             if (! $response->successful()) {
                 if (class_exists(\Sentry\State\Hub::class)) {
                     \Sentry\captureMessage(
@@ -106,12 +137,14 @@ class GooglePlacesClient
                     'query'  => $query,
                 ]);
                 Cache::put($cacheKey, '__null__', now()->addDays(1));
+                $reason = 'http_error';
                 return null;
             }
 
             $places = $response->json('places', []);
             if (! is_array($places) || empty($places)) {
                 Cache::put($cacheKey, '__null__', now()->addDays(self::CACHE_TTL_DAYS));
+                $reason = 'not_found';
                 return null;
             }
 
@@ -127,8 +160,49 @@ class GooglePlacesClient
                 'query' => $query,
                 'error' => $e->getMessage(),
             ]);
+            $reason = 'exception';
             return null;
         }
+    }
+
+    /**
+     * Sprint H12 — Quota mensuel free tier ($200/mois crédit Maps Platform).
+     * Default 11500 (laisse une marge de 500 sur les 12K free).
+     */
+    public function monthlyQuotaLimit(): int
+    {
+        return (int) config('services.google.places.monthly_quota_limit', 11500);
+    }
+
+    /**
+     * Sprint H12 — Compteur d'appels Google Places effectués ce mois-ci.
+     * Stocké en Redis cache (TTL 35 jours pour couvrir le reset mensuel).
+     */
+    public function currentMonthUsage(): int
+    {
+        $key = $this->monthlyQuotaCacheKey();
+        return (int) (Cache::get($key) ?? 0);
+    }
+
+    public function isQuotaExceeded(): bool
+    {
+        return $this->currentMonthUsage() >= $this->monthlyQuotaLimit();
+    }
+
+    private function incrementMonthlyUsage(): void
+    {
+        $key = $this->monthlyQuotaCacheKey();
+        try {
+            $current = (int) (Cache::get($key) ?? 0);
+            Cache::put($key, $current + 1, now()->addDays(35));
+        } catch (\Throwable $e) {
+            Log::debug('GooglePlaces quota counter update failed', ['error' => $e->getMessage()]);
+        }
+    }
+
+    private function monthlyQuotaCacheKey(): string
+    {
+        return 'gplaces:quota:' . now()->format('Y-m');
     }
 
     /**

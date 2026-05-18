@@ -38,3 +38,13 @@ Schedule::command('companies:rescrape-archives --limit=200')
         // True = skip ce run. Skip si la commande artisan n'existe pas encore.
         return ! array_key_exists('companies:rescrape-archives', Artisan::all());
     });
+
+// Sprint H12 — Retry Google Places pour les companies pending (quota mensuel atteint)
+// Tourne le 1er de chaque mois à 03:00 (1h après rescrape-archives).
+Schedule::command('companies:retry-google-places --limit=500')
+    ->monthlyOn(1, '03:00')
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->skip(function (): bool {
+        return ! array_key_exists('companies:retry-google-places', Artisan::all());
+    });

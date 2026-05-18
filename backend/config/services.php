@@ -73,8 +73,12 @@ return [
      | --------------------------------------------------------------------- */
     'google' => [
         'places' => [
-            'api_key'        => env('GOOGLE_PLACES_API_KEY'),
-            'cache_ttl_days' => (int) env('GOOGLE_PLACES_CACHE_TTL_DAYS', 30),
+            'api_key'              => env('GOOGLE_PLACES_API_KEY'),
+            'cache_ttl_days'       => (int) env('GOOGLE_PLACES_CACHE_TTL_DAYS', 30),
+            // Sprint H12 — Quota mensuel max d'appels (free tier ~$200 crédit/mois
+            // ≈ 11500 Text Search Pro). Au-delà, GooglePlacesClient skip + marque
+            // signals.google_places_pending=true pour retraitement le mois suivant.
+            'monthly_quota_limit'  => (int) env('GOOGLE_PLACES_MONTHLY_QUOTA_LIMIT', 11500),
         ],
     ],
 

@@ -222,20 +222,56 @@ class WaterfallOrchestrator
     }
 
     /**
-     * Sprint H9 — Google Places API (server-side, remplace scrape Google Maps).
+     * Sprint H9 + H12 — Google Places API (server-side).
      * Enrichit phone + website + address + lat/lon + horaires + note Google.
-     * Skip silencieux si pas de GOOGLE_PLACES_API_KEY (graceful).
+     *
+     * H12 — Skip si déjà enrichi (signals.google_places.enriched_at présent)
+     * pour ne pas re-consommer le quota mensuel sur les ré-enrichissements.
+     * Si le quota mensuel est dépassé : marque signals.google_places_pending=true
+     * pour retraitement le mois suivant via `companies:retry-google-places`.
      */
     private function step3d_google_places(Company $company): void
     {
         if ($this->googlePlaces === null || ! $company->denomination) {
             return;
         }
+        // Sprint H12 — Skip si déjà enrichi (économise quota)
+        $existingSignals = $company->signals ?? [];
+        if (! empty($existingSignals['google_places']['enriched_at'])) {
+            return;
+        }
         try {
             $ville = $company->city_name ?? $company->city ?? '';
             $query = trim($company->denomination . ' ' . $ville);
-            $place = $this->googlePlaces->searchText($query, 'FR');
+            $reason = null;
+            $place = $this->googlePlaces->searchText($query, 'FR', $reason);
+
+            // Sprint H12 — Quota épuisé → on marque pending pour retraitement plus tard
+            if ($place === null && $reason === 'quota_exceeded') {
+                $signals = $company->signals ?: [];
+                $signals['google_places_pending'] = [
+                    'reason'     => 'monthly_quota_exceeded',
+                    'queued_at'  => now()->toIso8601String(),
+                ];
+                $company->signals = $signals;
+                $company->save();
+                $this->recordRun($company, 'google-places', 'partial');
+                return;
+            }
+
             if ($place === null) {
+                // 'not_found' / 'http_error' / 'no_api_key' / 'exception'
+                // On marque "skipped" avec la raison pour traçabilité — pas de retry mensuel,
+                // c'est sémantiquement différent du quota.
+                if ($reason !== null && $reason !== 'no_api_key') {
+                    $signals = $company->signals ?: [];
+                    $signals['google_places_skipped'] = [
+                        'reason' => $reason,
+                        'at'     => now()->toIso8601String(),
+                    ];
+                    $company->signals = $signals;
+                    $company->save();
+                }
                 return;
             }
             $data = $this->googlePlaces->flatten($place);
@@ -260,7 +296,8 @@ class WaterfallOrchestrator
                 $touched = true;
             }
 
-            // Stocke le payload complet dans signals.google_places pour audit/exploitation
+            // Stocke le payload complet dans signals.google_places + timestamp d'enrichissement
+            // (Sprint H12 : enriched_at sert au skip ré-enrichissement + traçabilité)
             $signals = $company->signals ?: [];
             $signals['google_places'] = [
                 'place_id'         => $data['google_place_id'],
@@ -271,7 +308,9 @@ class WaterfallOrchestrator
                 'primary_type'     => $data['primary_type'],
                 'types'            => $data['types'],
                 'opening_hours'    => $data['opening_hours'],
+                'enriched_at'      => now()->toIso8601String(),
             ];
+            unset($signals['google_places_pending'], $signals['google_places_skipped']);
             $company->signals = $signals;
 
             if ($touched || ! empty($signals['google_places'])) {

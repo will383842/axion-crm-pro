@@ -25,15 +25,22 @@ class MistralProvider
             throw new \LogicException('MISTRAL_API_KEY not set');
         }
 
+        // Sprint H15 fix (2026-05-18) — Mistral API v1 refuse response_format=null
+        // avec un 422 ("Input should be a valid dictionary or object"). On
+        // n'inclut le paramètre QUE quand JSON mode est demandé.
+        $payload = [
+            'model'       => $this->model,
+            'messages'    => [['role' => 'user', 'content' => $promptTemplate]],
+            'temperature' => (float) ($options['temperature'] ?? 0.2),
+            'max_tokens'  => (int) ($options['max_tokens'] ?? 2048),
+        ];
+        if (! empty($options['json'])) {
+            $payload['response_format'] = ['type' => 'json_object'];
+        }
+
         $resp = Http::withToken($apiKey)
             ->timeout((int) ($options['timeout_s'] ?? 60))
-            ->post('https://api.mistral.ai/v1/chat/completions', [
-                'model'       => $this->model,
-                'messages'    => [['role' => 'user', 'content' => $promptTemplate]],
-                'temperature' => (float) ($options['temperature'] ?? 0.2),
-                'max_tokens'  => (int) ($options['max_tokens'] ?? 2048),
-                'response_format' => isset($options['json']) && $options['json'] ? ['type' => 'json_object'] : null,
-            ]);
+            ->post('https://api.mistral.ai/v1/chat/completions', $payload);
 
         if ($resp->failed()) {
             throw new \RuntimeException('Mistral API error: ' . $resp->status() . ' ' . $resp->body());

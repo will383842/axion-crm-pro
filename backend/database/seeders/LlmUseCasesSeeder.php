@@ -28,6 +28,14 @@ class LlmUseCasesSeeder extends Seeder
             ['classify_priority',             'mistral',   'mistral-small-latest',   '["mistral","anthropic"]',           'Classification priorité contact (chaude/tiede/froide/gelee)'],
         ];
 
+        // Sprint H15 — Use cases retournant du JSON structuré → activer
+        // response_format=json_object pour Mistral/OpenAI/Anthropic.
+        // Les use cases en texte libre (summarize, extract_keywords) gardent {}.
+        $jsonUseCases = [
+            'classify_company_axion', 'sector_classification', 'extract_team_from_page',
+            'detect_email_pattern', 'auto_tag', 'classify_priority', 'normalize_address',
+        ];
+
         foreach ($rows as [$slug, $provider, $model, $fallbackJson, $desc]) {
             DB::table('llm_use_cases')->updateOrInsert(
                 ['workspace_id' => null, 'slug' => $slug],
@@ -37,7 +45,9 @@ class LlmUseCasesSeeder extends Seeder
                     'model'            => $model,
                     'fallback_chain'   => $fallbackJson,
                     'prompt_version'   => 1,
-                    'options'          => '{}',
+                    'options'          => in_array($slug, $jsonUseCases, true)
+                        ? json_encode(['json' => true])
+                        : '{}',
                     'cost_cap_eur'     => 50,
                     'enabled'          => true,
                     'created_at'       => now(),

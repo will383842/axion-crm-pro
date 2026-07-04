@@ -252,6 +252,13 @@ class HttpInseeClient implements InseeClient
             $parts[] = 'trancheEffectifsUniteLegale:[' . ($criteria['effectif_min'] ?? '01') . ' TO ' . ($criteria['effectif_max'] ?? '53') . ']';
         }
 
+        // Sociétés commerciales seulement (cat. jur. 5xxx) — filtré DÈS la requête INSEE
+        // → ~4× moins de fiches à paginer (ex. Isère 797k → 199k). La forme juridique
+        // précise est revérifiée côté PHP (filtre $commercialOnly).
+        if (($criteria['commercial_only'] ?? true) && $forSiretEndpoint) {
+            $parts[] = 'categorieJuridiqueUniteLegale:5*';
+        }
+
         // Département — INSEE Sirene v3.11 n'a PAS de champ codeDepartementEtablissement.
         // Il faut filtrer via codeCommuneEtablissement avec wildcard préfixe.
         // Codes commune INSEE = 5 chars :

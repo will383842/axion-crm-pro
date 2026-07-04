@@ -1,10 +1,12 @@
-name: Prospection — Collecte RÉGION Auvergne-Rhône-Alpes (prod)
+name: Prospection — Collecte FRANCE entière (prod)
 
-# Collecte séquentielle de tous les départements ARA restants (Isère déjà faite),
-# un job par département (matrice max-parallel=1 pour ne pas dépasser 30 req/min INSEE),
+# Collecte séquentielle de TOUS les départements français (Isère déjà faite),
+# ordonnés : Auvergne-Rhône-Alpes → Île-de-France → autres régions.
+# Un job par département (matrice max-parallel=1 pour ne pas dépasser 30 req/min INSEE),
 # puis reclassement (taille/secteur) + purges (non-diffusibles, non-sociétés) + stats.
 #
-# Durée : ~1-2h par département sur le plan gratuit → ~15-18h au total.
+# Sociétés commerciales seulement (filtre 5* dès la requête → ~4× plus rapide).
+# Durée : ~15-25 min par département → ~1,5 jour au total sur le plan gratuit.
 
 on:
   workflow_dispatch:
@@ -30,7 +32,22 @@ jobs:
       fail-fast: false
       max-parallel: 1
       matrix:
-        dept: ['01', '03', '07', '15', '26', '42', '43', '63', '69', '73', '74']
+        # Ordre : Auvergne-Rhône-Alpes (38 déjà faite) → Île-de-France → autres régions.
+        dept:
+          ['01','03','07','15','26','42','43','63','69','73','74',
+           '75','77','78','91','92','93','94','95',
+           '21','25','39','58','70','71','89','90',
+           '22','29','35','56',
+           '18','28','36','37','41','45',
+           '2A','2B',
+           '08','10','51','52','54','55','57','67','68','88',
+           '02','59','60','62','80',
+           '14','27','50','61','76',
+           '16','17','19','23','24','33','40','47','64','79','86','87',
+           '09','11','12','30','31','32','34','46','48','65','66','81','82',
+           '44','49','53','72','85',
+           '04','05','06','13','83','84',
+           '971','972','973','974','976']
     steps:
       - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.9.0

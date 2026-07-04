@@ -35,12 +35,11 @@ jobs:
         run: |
           set -e
           ssh -o StrictHostKeyChecking=no "$USER@$HOST" bash <<EOF
-            set -uo pipefail
+            set -euo pipefail
             cd "$PROJECT_PATH"
-            echo "--- reclassify-size ---"
-            docker compose exec -u root -T api php artisan prospection:reclassify-size 2>&1 || echo "SIZE exit=\$?"
-            echo "--- reclassify-sector ---"
-            docker compose exec -u root -T api php artisan prospection:reclassify-sector 2>&1 || echo "SECTOR exit=\$?"
-            echo "--- stats ---"
-            docker compose exec -u root -T api php artisan prospection:stats 2>&1 || echo "STATS exit=\$?"
+            # « < /dev/null » OBLIGATOIRE : sinon docker compose exec -T lit le reste
+            # du heredoc comme stdin et avale les commandes suivantes.
+            docker compose exec -u root -T api php artisan prospection:reclassify-size < /dev/null
+            docker compose exec -u root -T api php artisan prospection:reclassify-sector < /dev/null
+            docker compose exec -u root -T api php artisan prospection:stats < /dev/null
           EOF

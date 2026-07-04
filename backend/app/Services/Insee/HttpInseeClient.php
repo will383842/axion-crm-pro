@@ -129,6 +129,9 @@ class HttpInseeClient implements InseeClient
                     if (! ($etab['etablissementSiege'] ?? false)) continue;     // sièges seulement
                     $u = $etab['uniteLegale'] ?? [];
                     if (($u['etatAdministratifUniteLegale'] ?? null) !== 'A') continue; // actives
+                    // Diffusibles seulement (RGPD) : exclut les « [ND] » — personnes qui
+                    // ont refusé la diffusion publique de leurs données INSEE.
+                    if (($u['statutDiffusionUniteLegale'] ?? 'O') !== 'O') continue;
                     $periodes = $u['periodesUniteLegale'][0] ?? $u;
                     $siren = (string) ($etab['siren'] ?? $u['siren'] ?? '');
                     if ($siren === '' || isset($seenSirens[$siren])) continue;

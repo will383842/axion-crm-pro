@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Contracts\InseeClient;
 use App\Models\Company;
+use App\Services\Prospection\SectorClassifier;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -67,6 +68,7 @@ class ProspectionCollect extends Command
                     'legal_form'       => $data->legalForm,
                     'effectif_range'   => $data->effectifRange,
                     'size_category'    => $this->sizeFromEffectif($data->effectifRange),
+                    'sector_main'      => SectorClassifier::fromNaf($data->naf),
                     'discovery_source' => 'insee',
                     'department_code'  => $dept,
                 ],

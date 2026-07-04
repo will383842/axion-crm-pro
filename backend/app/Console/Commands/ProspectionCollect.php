@@ -52,48 +52,69 @@ class ProspectionCollect extends Command
         ));
 
         $count = 0;
-        $new = 0;
         $start = microtime(true);
+        $buffer = [];
+
+        // Insertion par LOTS (upsert 500 lignes à la fois) — bien plus rapide que
+        // ligne par ligne. Clé de conflit : (workspace_id, siren).
+        $flush = function () use (&$buffer): void {
+            if ($buffer === []) {
+                return;
+            }
+            DB::table('companies')->upsert(
+                $buffer,
+                ['workspace_id', 'siren'],
+                [
+                    'denomination', 'naf', 'legal_form', 'effectif_range', 'size_category',
+                    'sector_main', 'address', 'postcode', 'city', 'city_name', 'insee',
+                    'siret', 'metadata', 'discovery_source', 'department_code', 'updated_at',
+                ],
+            );
+            $buffer = [];
+        };
 
         foreach ($insee->iterateByCriteria(['department' => $dept, 'req_delay_ms' => $delay]) as $data) {
             if ($data->siren === '') {
                 continue;
             }
-
-            $company = Company::query()->updateOrCreate(
-                ['workspace_id' => $workspaceId, 'siren' => $data->siren],
-                [
-                    'denomination'     => $data->denomination,
-                    'naf'              => $data->naf,
-                    'legal_form'       => $data->legalForm,
-                    'effectif_range'   => $data->effectifRange,
-                    'size_category'    => $this->sizeFromEffectif($data->effectifRange),
-                    'sector_main'      => SectorClassifier::fromNaf($data->naf),
-                    'address'          => $data->address,
-                    'postcode'         => $data->postcode,
-                    'city'             => $data->city,
-                    'city_name'        => $data->city,
-                    'insee'            => $data->insee,
-                    'discovery_source' => 'insee',
-                    'department_code'  => $dept,
-                ],
-            );
-            if ($company->wasRecentlyCreated) {
-                $new++;
-            }
+            $buffer[] = [
+                'workspace_id'     => $workspaceId,
+                'siren'            => $data->siren,
+                'denomination'     => $data->denomination,
+                'naf'              => $data->naf,
+                'legal_form'       => $data->legalForm,
+                'effectif_range'   => $data->effectifRange,
+                'size_category'    => $this->sizeFromEffectif($data->effectifRange),
+                'sector_main'      => SectorClassifier::fromNaf($data->naf),
+                'address'          => $data->address,
+                'postcode'         => $data->postcode,
+                'city'             => $data->city,
+                'city_name'        => $data->city,
+                'insee'            => $data->insee,
+                'siret'            => is_string($data->raw['siret'] ?? null) ? $data->raw['siret'] : null,
+                'metadata'         => json_encode($this->extraInseeFields($data->raw), JSON_UNESCAPED_UNICODE),
+                'discovery_source' => 'insee',
+                'department_code'  => $dept,
+                'created_at'       => now(),
+                'updated_at'       => now(),
+            ];
             $count++;
 
-            if ($count % 1000 === 0) {
-                $elapsed = round(microtime(true) - $start);
-                $this->info("  … {$count} traitées ({$new} nouvelles) — {$elapsed}s");
+            if (count($buffer) >= 500) {
+                $flush();
+                if ($count % 5000 === 0) {
+                    $elapsed = round(microtime(true) - $start);
+                    $this->info("  … {$count} traitées — {$elapsed}s");
+                }
             }
             if ($limit > 0 && $count >= $limit) {
                 break;
             }
         }
+        $flush();
 
         $elapsed = round(microtime(true) - $start);
-        $this->info("✅ Terminé : {$count} entreprises ({$new} nouvelles) pour le dépt {$dept} en {$elapsed}s.");
+        $this->info("✅ Terminé : {$count} entreprises pour le dépt {$dept} en {$elapsed}s.");
         $this->line("Enrichissement (emails/tél/dirigeants) à lancer séparément.");
         return self::SUCCESS;
     }
@@ -103,6 +124,33 @@ class ProspectionCollect extends Command
      * tranche d'effectif INSEE (`trancheEffectifsUniteLegale`). Les tranches
      * non renseignées (NN/null) et 00–03 → TPE (micro, cas le plus fréquent).
      */
+    /**
+     * Champs INSEE supplémentaires utiles (stockés en metadata JSONB) : SIRET,
+     * enseigne, catégorie officielle (TPE/PME/ETI/GE), date de création, forme
+     * juridique, ESS, coordonnées GPS Lambert.
+     *
+     * @param  array<string,mixed>  $raw  établissement INSEE brut
+     * @return array<string,mixed>
+     */
+    private function extraInseeFields(array $raw): array
+    {
+        $u = is_array($raw['uniteLegale'] ?? null) ? $raw['uniteLegale'] : [];
+        $periode = is_array($raw['periodesEtablissement'][0] ?? null) ? $raw['periodesEtablissement'][0] : [];
+        $adr = is_array($raw['adresseEtablissement'] ?? null) ? $raw['adresseEtablissement'] : [];
+
+        return array_filter([
+            'siret'                => $raw['siret'] ?? null,
+            'sigle'                => $u['sigleUniteLegale'] ?? null,
+            'enseigne'             => $periode['enseigne1Etablissement'] ?? null,
+            'categorie_entreprise' => $u['categorieEntreprise'] ?? null,      // TPE/PME/ETI/GE officiel INSEE
+            'date_creation'        => $u['dateCreationUniteLegale'] ?? null,
+            'forme_juridique'      => $u['categorieJuridiqueUniteLegale'] ?? null,
+            'ess'                  => $u['economieSocialeSolidaireUniteLegale'] ?? null,
+            'gps_lambert_x'        => $adr['coordonneeLambertAbscisseEtablissement'] ?? null,
+            'gps_lambert_y'        => $adr['coordonneeLambertOrdonneeEtablissement'] ?? null,
+        ], static fn ($v) => $v !== null && $v !== '');
+    }
+
     private function sizeFromEffectif(?string $tranche): string
     {
         $t = trim((string) $tranche);

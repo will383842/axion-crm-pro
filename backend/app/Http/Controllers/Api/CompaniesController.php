@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CompaniesController extends ApiController
 {
@@ -47,15 +48,7 @@ class CompaniesController extends ApiController
         }
 
         try {
-            $query = QueryBuilder::for(Company::query()->whereNull('deleted_at'))
-                ->allowedFilters([
-                    AllowedFilter::exact('naf'),
-                    AllowedFilter::exact('size_category'),
-                    AllowedFilter::exact('priority'),
-                    AllowedFilter::exact('discovery_source'),
-                    AllowedFilter::partial('denomination'),
-                    AllowedFilter::partial('postcode'),
-                ])
+            $query = $this->buildFilteredQuery()
                 ->allowedSorts(['quality_score', 'enriched_at', 'denomination', 'created_at'])
                 ->defaultSort('-quality_score');
 
@@ -78,6 +71,103 @@ class CompaniesController extends ApiController
                 'degraded' => true,
             ]);
         }
+    }
+
+    /**
+     * Query filtrée partagée entre la liste (index) et l'export.
+     * Applique les MÊMES filtres → l'export = exactement la liste affichée.
+     * (Les 4 derniers filtres étaient envoyés par le front mais absents ici → ignorés.)
+     */
+    private function buildFilteredQuery(): QueryBuilder
+    {
+        return QueryBuilder::for(Company::query()->whereNull('deleted_at'))
+            ->allowedFilters([
+                AllowedFilter::exact('naf'),
+                AllowedFilter::exact('size_category'),
+                AllowedFilter::exact('priority'),
+                AllowedFilter::exact('discovery_source'),
+                AllowedFilter::exact('prospection_status'),
+                AllowedFilter::exact('department_code'),
+                AllowedFilter::exact('region_code'),
+                AllowedFilter::exact('sector_main'),
+                AllowedFilter::exact('quality', 'quality_badge'),
+                AllowedFilter::partial('denomination'),
+                AllowedFilter::partial('postcode'),
+            ]);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/companies/export",
+     *     tags={"Companies"},
+     *     summary="Exporte en CSV la liste filtrée (emails, téléphones, dirigeants) pour transfert/emailing",
+     *     security={{"sanctumCookie":{}}},
+     *     @OA\Response(response=200, description="Fichier CSV (streamé)"),
+     * )
+     */
+    public function export(Request $r): StreamedResponse
+    {
+        $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
+        $filename = 'entreprises-' . now()->format('Y-m-d') . '.csv';
+        $header = ['SIREN', 'Dénomination', 'NAF', 'Taille', 'Département', 'Ville', 'Email', 'Téléphone', 'Site web', 'Contacts / dirigeants', 'Spécialité(s) santé'];
+        $hasSante = Schema::hasTable('health_practitioners');
+
+        // Table absente ou pas de workspace → CSV vide (jamais 500, jamais de fuite).
+        if (! Schema::hasTable('companies') || $workspaceId === null) {
+            return response()->streamDownload(function () use ($header) {
+                $out = fopen('php://output', 'w');
+                fwrite($out, "\xEF\xBB\xBF");
+                fputcsv($out, $header);
+                fclose($out);
+            }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }
+
+        // Scope EXPLICITE par workspace (défense principale : pas de fuite entre
+        // tenants, indépendamment de l'état RLS pendant le streaming).
+        $query = $this->buildFilteredQuery()
+            ->where('workspace_id', $workspaceId)
+            ->with($hasSante ? ['contacts', 'healthPractitioners'] : ['contacts']);
+
+        return response()->streamDownload(function () use ($query, $header, $hasSante) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF"); // BOM UTF-8 → Excel FR lit les accents
+            fputcsv($out, $header);
+            // chunkById(id) = pagination stable en mémoire bornée (gros volumes OK).
+            $query->chunkById(1000, function ($companies) use ($out) {
+                foreach ($companies as $c) {
+                    $contacts = $c->contacts
+                        ->map(function ($ct) {
+                            $name = trim(($ct->first_name ?? '') . ' ' . ($ct->last_name ?? ''));
+                            $bits = array_filter([
+                                $name,
+                                $ct->role ? "({$ct->role})" : '',
+                                $ct->email ?? '',
+                                $ct->phone ?? '',
+                            ]);
+                            return trim(implode(' ', $bits));
+                        })
+                        ->filter()
+                        ->implode(' | ');
+                    $specialites = $hasSante
+                        ? $c->healthPractitioners->pluck('specialite')->filter()->unique()->implode(', ')
+                        : '';
+                    fputcsv($out, [
+                        $c->siren,
+                        $c->denomination,
+                        $c->naf,
+                        $c->size_category,
+                        $c->department_code,
+                        $c->city_name,
+                        $c->email_generic,
+                        $c->phone,
+                        $c->website,
+                        $contacts,
+                        $specialites,
+                    ]);
+                }
+            });
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     /**
@@ -125,7 +215,11 @@ class CompaniesController extends ApiController
      */
     public function show(Company $company): JsonResponse
     {
-        return $this->ok($company->load(['contacts', 'tags']));
+        $relations = ['contacts', 'tags'];
+        if (Schema::hasTable('health_practitioners')) {
+            $relations[] = 'healthPractitioners';
+        }
+        return $this->ok($company->load($relations));
     }
 
     /**

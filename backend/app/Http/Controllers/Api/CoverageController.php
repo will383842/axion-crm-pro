@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Jobs\EnrichCompanyJob;
 use App\Jobs\LaunchZoneScrapingJob;
+use App\Models\Company;
 use App\Services\Rotations\ZoneRotator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -156,7 +158,8 @@ class CoverageController extends ApiController
      *         @OA\Property(property="department", type="string", maxLength=3),
      *         @OA\Property(property="naf", type="string", maxLength=5),
      *         @OA\Property(property="size_category", type="string"),
-     *         @OA\Property(property="limit", type="integer", minimum=1, maximum=1000))),
+     *         @OA\Property(property="limit", type="integer", minimum=1, maximum=1000),
+     *         @OA\Property(property="enrich", type="boolean", description="false = récupérer seulement (pas d'enrichissement chaîné)"))),
      *     @OA\Response(response=200, description="Job queué"))
      */
     public function launch(Request $r): JsonResponse
@@ -166,17 +169,76 @@ class CoverageController extends ApiController
             'naf'           => ['nullable', 'string', 'max:5'],
             'size_category' => ['nullable', 'string', 'max:32'],
             'limit'         => ['nullable', 'integer', 'min:1', 'max:1000'],
+            'enrich'        => ['nullable', 'boolean'],
         ]);
 
         LaunchZoneScrapingJob::dispatch(
-            (string) (app()->bound('workspace.id') ? app('workspace.id') : ''),
-            $validated['department'],
-            $validated['naf'] ?? null,
-            $validated['size_category'] ?? null,
-            (int) ($validated['limit'] ?? 100),
+            workspaceId: (string) (app()->bound('workspace.id') ? app('workspace.id') : ''),
+            department: $validated['department'],
+            naf: $validated['naf'] ?? null,
+            sizeCategory: $validated['size_category'] ?? null,
+            limit: (int) ($validated['limit'] ?? 100),
+            enrich: $validated['enrich'] ?? true,
         );
 
         return $this->ok(['queued' => true]);
+    }
+
+    /**
+     * @OA\Post(path="/coverage/enrich", tags={"Coverage"}, summary="Enrichit les entreprises DÉJÀ récupérées d'un département (bouton « Enrichir »)",
+     *     security={{"sanctumCookie":{}}},
+     *     @OA\RequestBody(required=true, @OA\JsonContent(
+     *         required={"department"},
+     *         @OA\Property(property="department", type="string", maxLength=3),
+     *         @OA\Property(property="size_category", type="string"),
+     *         @OA\Property(property="naf", type="string", maxLength=5),
+     *         @OA\Property(property="only_pending", type="boolean", description="true (défaut) = seulement les non-enrichies"))),
+     *     @OA\Response(response=200, description="Jobs d'enrichissement queués"))
+     */
+    public function enrich(Request $r): JsonResponse
+    {
+        $validated = $r->validate([
+            'department'    => ['required', 'string', 'max:3'],
+            'size_category' => ['nullable', 'string', 'max:32'],
+            'naf'           => ['nullable', 'string', 'max:5'],
+            'only_pending'  => ['nullable', 'boolean'],
+            'limit'         => ['nullable', 'integer', 'min:1', 'max:50000'],
+        ]);
+
+        $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
+        if (! $workspaceId) {
+            return $this->ok(['queued' => 0]);
+        }
+
+        // Enrichit les entreprises DÉJÀ en base pour ce département (pas de re-découverte).
+        // Filtre géo sur department_code (colonne dénormalisée), pas postcode.
+        $query = Company::query()
+            ->where('workspace_id', $workspaceId)
+            ->where('department_code', $validated['department']);
+
+        if (($validated['only_pending'] ?? true) === true) {
+            $query->whereNull('enriched_at');
+        }
+        if (! empty($validated['size_category'])) {
+            $query->where('size_category', $validated['size_category']);
+        }
+        if (! empty($validated['naf'])) {
+            $query->where('naf', $validated['naf']);
+        }
+
+        $cap = (int) ($validated['limit'] ?? 50000);
+        $queued = 0;
+        $query->select('id')->chunkById(500, function ($companies) use (&$queued, $cap) {
+            foreach ($companies as $company) {
+                if ($queued >= $cap) {
+                    return false;
+                }
+                EnrichCompanyJob::dispatch($company->id);
+                $queued++;
+            }
+        });
+
+        return $this->ok(['queued' => $queued]);
     }
 
     /**

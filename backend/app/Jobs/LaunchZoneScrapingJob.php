@@ -47,6 +47,7 @@ class LaunchZoneScrapingJob implements ShouldQueue
         public readonly int $limit,
         public readonly ?int $campaignId = null,
         public readonly string $source = 'insee',
+        public readonly bool $enrich = true,
     ) {}
 
     public function handle(InseeClient $insee, FranceTravailDiscoveryClient $ftDiscovery): void
@@ -93,7 +94,11 @@ class LaunchZoneScrapingJob implements ShouldQueue
                 } else {
                     $companiesRefreshed++;
                 }
-                EnrichCompanyJob::dispatch($company->id);
+                // Enrichissement chaîné seulement si demandé (bouton « Récupérer »
+                // seul → enrich=false ; « Enrichir » séparé via /coverage/enrich).
+                if ($this->enrich) {
+                    EnrichCompanyJob::dispatch($company->id);
+                }
             }
             $companiesCreated = $companiesNew + $companiesRefreshed;
 

@@ -14,6 +14,7 @@ import {
   cn,
 } from '@/components/ui';
 import { api } from '@/lib/api';
+import { toast } from 'sonner';
 import { CompanyRow, COMPANY_ROW_GRID, type CompanyRowData } from './components/CompanyRow';
 import { Pagination } from './components/Pagination';
 
@@ -102,6 +103,45 @@ const EMPTY_FILTER: Filter = {
 export function CompaniesListPage() {
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState<Filter>(EMPTY_FILTER);
+  const [exporting, setExporting] = useState(false);
+
+  // Construit les mêmes params de filtre que la liste (hors pagination).
+  function filterParams(): URLSearchParams {
+    return new URLSearchParams({
+      ...(filter.size ? { 'filter[size_category]': filter.size } : {}),
+      ...(filter.priority ? { 'filter[priority]': filter.priority } : {}),
+      ...(filter.search ? { 'filter[denomination]': filter.search } : {}),
+      ...(filter.naf ? { 'filter[naf]': filter.naf } : {}),
+      ...(filter.quality ? { 'filter[quality]': filter.quality } : {}),
+      ...(filter.prospection_status ? { 'filter[prospection_status]': filter.prospection_status } : {}),
+      ...(filter.department_code ? { 'filter[department_code]': filter.department_code } : {}),
+      ...(filter.region_code ? { 'filter[region_code]': filter.region_code } : {}),
+      ...(filter.sector_main ? { 'filter[sector_main]': filter.sector_main } : {}),
+    });
+  }
+
+  // Export CSV de la liste filtrée (streamé côté serveur) → transfert/emailing.
+  async function exportCsv() {
+    setExporting(true);
+    try {
+      const r = await api.get<Blob>(`/companies/export?${filterParams().toString()}`, {
+        responseType: 'blob',
+      });
+      const url = URL.createObjectURL(r.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `entreprises-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success('Export CSV téléchargé');
+    } catch {
+      toast.error("Erreur lors de l'export");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const { data, isLoading } = useQuery<CompaniesResponse>({
     queryKey: ['companies', page, filter],
@@ -202,8 +242,14 @@ export function CompaniesListPage() {
             <Button variant="secondary" size="md" iconLeft={<UploadIcon />}>
               Importer
             </Button>
-            <Button variant="secondary" size="md" iconLeft={<DownloadIcon />}>
-              Exporter
+            <Button
+              variant="secondary"
+              size="md"
+              iconLeft={<DownloadIcon />}
+              onClick={() => void exportCsv()}
+              disabled={exporting}
+            >
+              {exporting ? 'Export…' : 'Exporter'}
             </Button>
             <Link
               to="/coverage"

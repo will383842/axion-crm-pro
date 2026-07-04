@@ -103,4 +103,16 @@ return [
         'speculative_enabled' => env('EMAIL_FINDER_SPECULATIVE_ENABLED', false),
     ],
 
+    /* ---------------------------------------------------------------------
+     | Santé / RPPS (Annuaire Santé « PS LibreAccès »)
+     | ---------------------------------------------------------------------
+     | Verticale santé : apporte la spécialité médicale + tél des pros de
+     | santé. Donnée nominative de SANTÉ (RGPD art. 9) → l'import réel
+     | (`rpps:import`) est REFUSÉ tant que `ingestion_enabled` est false.
+     | N'activer qu'APRÈS validation de l'AIPD dédiée.
+     | --------------------------------------------------------------------- */
+    'sante' => [
+        'ingestion_enabled' => filter_var(env('SANTE_INGESTION_ENABLED', false), FILTER_VALIDATE_BOOL),
+    ],
+
 ];

@@ -66,4 +66,10 @@ class Company extends Model
     {
         return $this->belongsToMany(Tag::class);
     }
+
+    /** Verticale santé — praticiens (RPPS) rattachés par SIREN/company_id. */
+    public function healthPractitioners()
+    {
+        return $this->hasMany(HealthPractitioner::class);
+    }
 }

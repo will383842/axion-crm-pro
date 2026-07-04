@@ -66,6 +66,7 @@ class ProspectionCollect extends Command
                     'naf'              => $data->naf,
                     'legal_form'       => $data->legalForm,
                     'effectif_range'   => $data->effectifRange,
+                    'size_category'    => $this->sizeFromEffectif($data->effectifRange),
                     'discovery_source' => 'insee',
                     'department_code'  => $dept,
                 ],
@@ -88,5 +89,21 @@ class ProspectionCollect extends Command
         $this->info("✅ Terminé : {$count} entreprises ({$new} nouvelles) pour le dépt {$dept} en {$elapsed}s.");
         $this->line("Enrichissement (emails/tél/dirigeants) à lancer séparément.");
         return self::SUCCESS;
+    }
+
+    /**
+     * Dérive la catégorie de taille (tpe/pme/eti/grande_entreprise) depuis la
+     * tranche d'effectif INSEE (`trancheEffectifsUniteLegale`). Les tranches
+     * non renseignées (NN/null) et 00–03 → TPE (micro, cas le plus fréquent).
+     */
+    private function sizeFromEffectif(?string $tranche): string
+    {
+        $t = trim((string) $tranche);
+        return match (true) {
+            in_array($t, ['11', '12', '21', '22', '31'], true) => 'pme',               // 10–249
+            in_array($t, ['32', '41', '42', '51'], true)       => 'eti',               // 250–4999
+            in_array($t, ['52', '53'], true)                   => 'grande_entreprise',  // 5000+
+            default                                            => 'tpe',               // 00–03, NN, null
+        };
     }
 }

@@ -23,11 +23,14 @@ use League\Csv\Reader;
  */
 class ImportRpps extends Command
 {
+    // NB : ne PAS mettre « | » comme valeur par défaut dans la signature — Laravel
+    // le prend pour un séparateur de raccourci d'option (casse artisan). Défaut géré
+    // dans le code (delimiterOrDefault()).
     protected $signature = 'rpps:import '
         . '{--file=storage/app/sante/ps-libreacces.txt} '
-        . '{--workspace= : UUID du workspace cible (défaut = 1er workspace)} '
+        . '{--workspace= : UUID du workspace cible (defaut = 1er workspace)} '
         . '{--mock : seed de praticiens fictifs} '
-        . '{--delimiter=| : délimiteur CSV}';
+        . '{--delimiter= : delimiteur CSV (| par defaut)}';
 
     protected $description = 'Importe l\'Annuaire Santé / RPPS (spécialité + tél). Gaté par SANTE_INGESTION_ENABLED.';
 
@@ -66,7 +69,7 @@ class ImportRpps extends Command
     private function importCsv(string $path, string $workspaceId): int
     {
         $csv = Reader::createFromPath($path, 'r');
-        $csv->setDelimiter((string) $this->option('delimiter'));
+        $csv->setDelimiter(((string) $this->option('delimiter')) ?: '|');
         $csv->setHeaderOffset(0);
 
         $map = $this->mapColumns($csv->getHeader());

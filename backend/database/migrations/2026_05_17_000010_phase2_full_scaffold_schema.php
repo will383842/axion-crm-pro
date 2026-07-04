@@ -268,7 +268,16 @@ return new class extends Migration
                     'analytics_funnels','analytics_cohorts','analytics_attribution','analytics_kpis'
                 ])
                 LOOP
+                    -- Défensif (calqué sur 2026_05_18_000001) : skip si la table
+                    -- n'existe pas ou n'a pas de colonne workspace_id (sinon
+                    -- « column workspace_id does not exist » casse migrate:fresh).
+                    CONTINUE WHEN NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_schema = current_schema()
+                          AND table_name = t AND column_name = 'workspace_id'
+                    );
                     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+                    EXECUTE format('DROP POLICY IF EXISTS %I_workspace_isolation ON %I', t, t);
                     EXECUTE format(
                         'CREATE POLICY %I_workspace_isolation ON %I FOR ALL USING (
                             workspace_id IS NULL

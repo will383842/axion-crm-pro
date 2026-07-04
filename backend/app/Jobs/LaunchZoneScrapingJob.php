@@ -87,6 +87,10 @@ class LaunchZoneScrapingJob implements ShouldQueue
                         'effectif_range'  => $data->effectifRange,
                         'size_category'   => $this->sizeCategory,
                         'discovery_source'=> $this->source,
+                        // Tampon du département dès la découverte (la zone est connue)
+                        // → permet « Enrichir par département » sans attendre la
+                        // classification. La classification confirmera la même valeur.
+                        'department_code' => $this->department,
                     ],
                 );
                 if ($company->wasRecentlyCreated) {

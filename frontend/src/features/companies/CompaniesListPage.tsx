@@ -1,7 +1,7 @@
-import { useRef, useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { useRef, useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Button,
   Card,
@@ -12,11 +12,11 @@ import {
   SearchInput,
   Toolbar,
   cn,
-} from '@/components/ui';
-import { api } from '@/lib/api';
-import { toast } from 'sonner';
-import { CompanyRow, COMPANY_ROW_GRID, type CompanyRowData } from './components/CompanyRow';
-import { Pagination } from './components/Pagination';
+} from "@/components/ui";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
+import { CompanyRow, COMPANY_ROW_GRID, type CompanyRowData } from "./components/CompanyRow";
+import { Pagination } from "./components/Pagination";
 
 type Company = CompanyRowData & {
   discovery_source?: string | null;
@@ -36,50 +36,54 @@ const ROW_HEIGHT = 56;
 const GRID = COMPANY_ROW_GRID;
 
 const SIZE_OPTIONS = [
-  { value: '', label: 'Toutes tailles' },
-  { value: 'artisan', label: 'Artisan' },
-  { value: 'tpe', label: 'TPE' },
-  { value: 'pme', label: 'PME' },
-  { value: 'eti', label: 'ETI' },
-  { value: 'grande_entreprise', label: 'Grande entreprise' },
+  { value: "", label: "Toutes tailles" },
+  { value: "artisan", label: "Artisan" },
+  { value: "tpe", label: "TPE" },
+  { value: "pme", label: "PME" },
+  { value: "eti", label: "ETI" },
+  { value: "grande_entreprise", label: "Grande entreprise" },
 ];
 
 const QUALITY_OPTIONS = [
-  { value: '', label: 'Toutes qualités' },
-  { value: 'complete', label: '🟢 Complète (≥ 90)' },
-  { value: 'partielle', label: '🟡 Partielle (50-89)' },
-  { value: 'basique', label: '🔴 Basique (< 50)' },
+  { value: "", label: "Toutes qualités" },
+  { value: "complete", label: "🟢 Complète (≥ 90)" },
+  { value: "partielle", label: "🟡 Partielle (50-89)" },
+  { value: "basique", label: "🔴 Basique (< 50)" },
 ];
 
 const PRIORITY_OPTIONS = [
-  { value: '', label: 'Toutes priorités' },
-  { value: 'haute', label: 'Haute' },
-  { value: 'moyenne', label: 'Moyenne' },
-  { value: 'basse', label: 'Basse' },
-  { value: 'gelee', label: 'Gelée' },
+  { value: "", label: "Toutes priorités" },
+  { value: "haute", label: "Haute" },
+  { value: "moyenne", label: "Moyenne" },
+  { value: "basse", label: "Basse" },
+  { value: "gelee", label: "Gelée" },
 ];
 
 const PROSPECTION_TABS = [
-  { value: '', label: 'Tous' },
-  { value: 'ready_for_outreach', label: 'Prospectables' },
-  { value: 'partial_email', label: 'Partiels' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'archived_no_email', label: 'Archivés' },
+  { value: "", label: "Tous" },
+  { value: "ready_for_outreach", label: "Prospectables" },
+  { value: "partial_email", label: "Partiels" },
+  { value: "pending", label: "Pending" },
+  { value: "archived_no_email", label: "Archivés" },
 ];
 
 const SECTOR_OPTIONS = [
-  { value: '', label: 'Tous secteurs' },
-  { value: 'it_saas', label: 'IT / SaaS' },
-  { value: 'btp', label: 'BTP' },
-  { value: 'sante', label: 'Santé' },
-  { value: 'commerce', label: 'Commerce' },
-  { value: 'services_pro', label: 'Services pro' },
-  { value: 'finance_assurance', label: 'Finance / Assurance' },
-  { value: 'industrie', label: 'Industrie' },
-  { value: 'hotellerie_restauration', label: 'Hôtellerie / Restauration' },
-  { value: 'transport', label: 'Transport' },
-  { value: 'agro_alimentaire', label: 'Agro-alimentaire' },
-  { value: 'autre', label: 'Autre' },
+  { value: "", label: "Tous secteurs" },
+  { value: "it_saas", label: "IT / SaaS" },
+  { value: "btp", label: "BTP" },
+  { value: "sante", label: "Santé" },
+  { value: "commerce", label: "Commerce" },
+  { value: "services_pro", label: "Services pro" },
+  { value: "finance_assurance", label: "Finance / Assurance" },
+  { value: "industrie", label: "Industrie" },
+  { value: "hotellerie_restauration", label: "Hôtellerie / Restauration" },
+  { value: "transport", label: "Transport" },
+  { value: "agro_alimentaire", label: "Agro-alimentaire" },
+  { value: "immobilier", label: "Immobilier" },
+  { value: "enseignement", label: "Enseignement / Formation" },
+  { value: "services_personnels", label: "Services aux particuliers" },
+  { value: "arts_loisirs", label: "Arts / Loisirs / Sport" },
+  { value: "autre", label: "Autre" },
 ];
 
 interface Filter {
@@ -96,8 +100,15 @@ interface Filter {
 }
 
 const EMPTY_FILTER: Filter = {
-  size: '', priority: '', search: '', naf: '', quality: '',
-  prospection_status: '', department_code: '', region_code: '', sector_main: '',
+  size: "",
+  priority: "",
+  search: "",
+  naf: "",
+  quality: "",
+  prospection_status: "",
+  department_code: "",
+  region_code: "",
+  sector_main: "",
 };
 
 export function CompaniesListPage() {
@@ -108,15 +119,17 @@ export function CompaniesListPage() {
   // Construit les mêmes params de filtre que la liste (hors pagination).
   function filterParams(): URLSearchParams {
     return new URLSearchParams({
-      ...(filter.size ? { 'filter[size_category]': filter.size } : {}),
-      ...(filter.priority ? { 'filter[priority]': filter.priority } : {}),
-      ...(filter.search ? { 'filter[denomination]': filter.search } : {}),
-      ...(filter.naf ? { 'filter[naf]': filter.naf } : {}),
-      ...(filter.quality ? { 'filter[quality]': filter.quality } : {}),
-      ...(filter.prospection_status ? { 'filter[prospection_status]': filter.prospection_status } : {}),
-      ...(filter.department_code ? { 'filter[department_code]': filter.department_code } : {}),
-      ...(filter.region_code ? { 'filter[region_code]': filter.region_code } : {}),
-      ...(filter.sector_main ? { 'filter[sector_main]': filter.sector_main } : {}),
+      ...(filter.size ? { "filter[size_category]": filter.size } : {}),
+      ...(filter.priority ? { "filter[priority]": filter.priority } : {}),
+      ...(filter.search ? { "filter[denomination]": filter.search } : {}),
+      ...(filter.naf ? { "filter[naf]": filter.naf } : {}),
+      ...(filter.quality ? { "filter[quality]": filter.quality } : {}),
+      ...(filter.prospection_status
+        ? { "filter[prospection_status]": filter.prospection_status }
+        : {}),
+      ...(filter.department_code ? { "filter[department_code]": filter.department_code } : {}),
+      ...(filter.region_code ? { "filter[region_code]": filter.region_code } : {}),
+      ...(filter.sector_main ? { "filter[sector_main]": filter.sector_main } : {}),
     });
   }
 
@@ -125,17 +138,17 @@ export function CompaniesListPage() {
     setExporting(true);
     try {
       const r = await api.get<Blob>(`/companies/export?${filterParams().toString()}`, {
-        responseType: 'blob',
+        responseType: "blob",
       });
       const url = URL.createObjectURL(r.data);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = `entreprises-${new Date().toISOString().slice(0, 10)}.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      toast.success('Export CSV téléchargé');
+      toast.success("Export CSV téléchargé");
     } catch {
       toast.error("Erreur lors de l'export");
     } finally {
@@ -144,20 +157,22 @@ export function CompaniesListPage() {
   }
 
   const { data, isLoading } = useQuery<CompaniesResponse>({
-    queryKey: ['companies', page, filter],
+    queryKey: ["companies", page, filter],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: String(page),
-        per_page: '100',
-        ...(filter.size ? { 'filter[size_category]': filter.size } : {}),
-        ...(filter.priority ? { 'filter[priority]': filter.priority } : {}),
-        ...(filter.search ? { 'filter[denomination]': filter.search } : {}),
-        ...(filter.naf ? { 'filter[naf]': filter.naf } : {}),
-        ...(filter.quality ? { 'filter[quality]': filter.quality } : {}),
-        ...(filter.prospection_status ? { 'filter[prospection_status]': filter.prospection_status } : {}),
-        ...(filter.department_code ? { 'filter[department_code]': filter.department_code } : {}),
-        ...(filter.region_code ? { 'filter[region_code]': filter.region_code } : {}),
-        ...(filter.sector_main ? { 'filter[sector_main]': filter.sector_main } : {}),
+        per_page: "100",
+        ...(filter.size ? { "filter[size_category]": filter.size } : {}),
+        ...(filter.priority ? { "filter[priority]": filter.priority } : {}),
+        ...(filter.search ? { "filter[denomination]": filter.search } : {}),
+        ...(filter.naf ? { "filter[naf]": filter.naf } : {}),
+        ...(filter.quality ? { "filter[quality]": filter.quality } : {}),
+        ...(filter.prospection_status
+          ? { "filter[prospection_status]": filter.prospection_status }
+          : {}),
+        ...(filter.department_code ? { "filter[department_code]": filter.department_code } : {}),
+        ...(filter.region_code ? { "filter[region_code]": filter.region_code } : {}),
+        ...(filter.sector_main ? { "filter[sector_main]": filter.sector_main } : {}),
       });
       const r = await api.get<CompaniesResponse>(`/companies?${params.toString()}`);
       return r.data;
@@ -187,12 +202,12 @@ export function CompaniesListPage() {
     const enrichedPct = count > 0 ? Math.round((enriched / count) * 100) : 0;
 
     const bySize = list.reduce<Record<string, number>>((acc, c) => {
-      const k = c.size_category ?? 'inconnue';
+      const k = c.size_category ?? "inconnue";
       acc[k] = (acc[k] ?? 0) + 1;
       return acc;
     }, {});
     const topSize = Object.entries(bySize).sort((a, b) => b[1] - a[1])[0];
-    const topSizeLabel = topSize ? topSize[0].toUpperCase() : '—';
+    const topSizeLabel = topSize ? topSize[0].toUpperCase() : "—";
     const topSizePct = topSize && count > 0 ? Math.round((topSize[1] / count) * 100) : 0;
 
     const byNaf = list.reduce<Record<string, number>>((acc, c) => {
@@ -207,7 +222,7 @@ export function CompaniesListPage() {
       enrichedPct,
       topSizeLabel,
       topSizePct,
-      topNaf: topNaf ? topNaf[0] : '—',
+      topNaf: topNaf ? topNaf[0] : "—",
       topNafCount: topNaf ? topNaf[1] : 0,
     };
   }, [rows, total]);
@@ -217,13 +232,27 @@ export function CompaniesListPage() {
     setPage(1);
   };
 
-  const hasActiveFilter = filter.search || filter.size || filter.priority || filter.naf
-    || filter.quality || filter.prospection_status || filter.department_code
-    || filter.region_code || filter.sector_main;
+  const hasActiveFilter =
+    filter.search ||
+    filter.size ||
+    filter.priority ||
+    filter.naf ||
+    filter.quality ||
+    filter.prospection_status ||
+    filter.department_code ||
+    filter.region_code ||
+    filter.sector_main;
 
   const activeFilterCount = [
-    filter.search, filter.size, filter.priority, filter.naf, filter.quality,
-    filter.prospection_status, filter.department_code, filter.region_code, filter.sector_main,
+    filter.search,
+    filter.size,
+    filter.priority,
+    filter.naf,
+    filter.quality,
+    filter.prospection_status,
+    filter.department_code,
+    filter.region_code,
+    filter.sector_main,
   ].filter(Boolean).length;
 
   return (
@@ -232,9 +261,11 @@ export function CompaniesListPage() {
         title="Entreprises"
         subtitle={
           <>
-            Pipeline de prospection · <span className="font-semibold tabular-nums text-slate-700 dark:text-slate-200">
-              {(total ?? 0).toLocaleString('fr-FR')}
-            </span> entreprises actives
+            Pipeline de prospection ·{" "}
+            <span className="font-semibold text-slate-700 tabular-nums dark:text-slate-200">
+              {(total ?? 0).toLocaleString("fr-FR")}
+            </span>{" "}
+            entreprises actives
           </>
         }
         actions={
@@ -249,7 +280,7 @@ export function CompaniesListPage() {
               onClick={() => void exportCsv()}
               disabled={exporting}
             >
-              {exporting ? 'Export…' : 'Exporter'}
+              {exporting ? "Export…" : "Exporter"}
             </Button>
             <Link
               to="/coverage"
@@ -266,7 +297,7 @@ export function CompaniesListPage() {
         <KpiCard
           tone="sky"
           label="Total"
-          value={(total ?? 0).toLocaleString('fr-FR')}
+          value={(total ?? 0).toLocaleString("fr-FR")}
           sublabel={`Page ${page} · ${rows.length} affichées`}
         />
         <KpiCard
@@ -287,7 +318,7 @@ export function CompaniesListPage() {
           tone="amber"
           label="Top NAF"
           value={kpis.topNaf}
-          sublabel={kpis.topNafCount ? `${kpis.topNafCount} sociétés` : '—'}
+          sublabel={kpis.topNafCount ? `${kpis.topNafCount} sociétés` : "—"}
         />
       </div>
 
@@ -297,13 +328,13 @@ export function CompaniesListPage() {
           const active = filter.prospection_status === tab.value;
           return (
             <button
-              key={tab.value || 'all'}
+              key={tab.value || "all"}
               onClick={() => setFilterAndReset({ prospection_status: tab.value })}
               className={cn(
-                'px-3 py-2 text-sm font-medium border-b-2 transition',
+                "border-b-2 px-3 py-2 text-sm font-medium transition",
                 active
-                  ? 'border-slate-900 text-slate-900 dark:border-white dark:text-white'
-                  : 'border-transparent text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white',
+                  ? "border-slate-900 text-slate-900 dark:border-white dark:text-white"
+                  : "border-transparent text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
               )}
               type="button"
             >
@@ -350,10 +381,12 @@ export function CompaniesListPage() {
             <input
               type="text"
               value={filter.department_code}
-              onChange={(e) => setFilterAndReset({ department_code: e.target.value.toUpperCase().slice(0, 3) })}
+              onChange={(e) =>
+                setFilterAndReset({ department_code: e.target.value.toUpperCase().slice(0, 3) })
+              }
               placeholder="Dept (75…)"
               aria-label="Filtre département"
-              className="h-9 w-24 rounded-lg bg-white px-3 font-mono text-xs text-slate-900 ring-1 ring-slate-200 transition placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600"
+              className="h-9 w-24 rounded-lg bg-white px-3 font-mono text-xs text-slate-900 ring-1 ring-slate-200 transition placeholder:text-slate-400 focus:ring-2 focus:ring-slate-300 focus:outline-none dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600"
             />
             <input
               type="text"
@@ -361,15 +394,25 @@ export function CompaniesListPage() {
               onChange={(e) => setFilterAndReset({ naf: e.target.value })}
               placeholder="Code NAF…"
               aria-label="Filtre NAF"
-              className="h-9 w-28 rounded-lg bg-white px-3 font-mono text-xs text-slate-900 ring-1 ring-slate-200 transition placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600"
+              className="h-9 w-28 rounded-lg bg-white px-3 font-mono text-xs text-slate-900 ring-1 ring-slate-200 transition placeholder:text-slate-400 focus:ring-2 focus:ring-slate-300 focus:outline-none dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600"
             />
           </>
         }
         right={
           hasActiveFilter ? (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500">{activeFilterCount} filtre{activeFilterCount > 1 ? 's' : ''} actif{activeFilterCount > 1 ? 's' : ''}</span>
-              <Button variant="ghost" size="sm" onClick={() => { setFilter(EMPTY_FILTER); setPage(1); }}>
+              <span className="text-xs text-slate-500">
+                {activeFilterCount} filtre{activeFilterCount > 1 ? "s" : ""} actif
+                {activeFilterCount > 1 ? "s" : ""}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setFilter(EMPTY_FILTER);
+                  setPage(1);
+                }}
+              >
                 Réinitialiser
               </Button>
             </div>
@@ -385,8 +428,8 @@ export function CompaniesListPage() {
           title="Aucune entreprise"
           description={
             hasActiveFilter
-              ? 'Aucune entreprise ne correspond à ces filtres. Réinitialise pour voir plus de résultats.'
-              : 'Lance un scraping depuis la carte de couverture France pour découvrir des entreprises.'
+              ? "Aucune entreprise ne correspond à ces filtres. Réinitialise pour voir plus de résultats."
+              : "Lance un scraping depuis la carte de couverture France pour découvrir des entreprises."
           }
           action={
             <Link
@@ -403,8 +446,8 @@ export function CompaniesListPage() {
           <div
             role="row"
             className={cn(
-              'sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-600 backdrop-blur',
-              'dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400',
+              "sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-[11px] font-semibold tracking-wider text-slate-600 uppercase backdrop-blur",
+              "dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400",
             )}
             style={{ gridTemplateColumns: GRID }}
           >
@@ -426,7 +469,7 @@ export function CompaniesListPage() {
             role="rowgroup"
             aria-rowcount={rows.length}
           >
-            <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
+            <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
               {rowVirtualizer.getVirtualItems().map((vrow) => {
                 const c = rows[vrow.index];
                 if (!c) return null;
@@ -435,10 +478,10 @@ export function CompaniesListPage() {
                     key={c.id}
                     aria-rowindex={vrow.index + 1}
                     style={{
-                      position: 'absolute',
+                      position: "absolute",
                       top: 0,
                       left: 0,
-                      width: '100%',
+                      width: "100%",
                       transform: `translateY(${vrow.start}px)`,
                       height: `${vrow.size}px`,
                     }}
@@ -452,12 +495,7 @@ export function CompaniesListPage() {
         </Card>
       )}
 
-      <Pagination
-        page={page}
-        lastPage={lastPage}
-        total={total}
-        onChange={setPage}
-      />
+      <Pagination page={page} lastPage={lastPage} total={total} onChange={setPage} />
     </div>
   );
 }
@@ -478,10 +516,12 @@ function FilterSelect({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       aria-label={ariaLabel}
-      className="h-9 rounded-lg bg-white px-2 pr-7 text-sm text-slate-900 ring-1 ring-slate-200 transition focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600"
+      className="h-9 rounded-lg bg-white px-2 pr-7 text-sm text-slate-900 ring-1 ring-slate-200 transition focus:ring-2 focus:ring-slate-300 focus:outline-none dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600"
     >
       {options.map((o) => (
-        <option key={o.value} value={o.value}>{o.label}</option>
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
       ))}
     </select>
   );
@@ -489,7 +529,14 @@ function FilterSelect({
 
 function UploadIcon() {
   return (
-    <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+    <svg
+      viewBox="0 0 20 20"
+      className="h-3.5 w-3.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden
+    >
       <path d="M10 14V4M5 9l5-5 5 5M4 16h12" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
@@ -497,7 +544,14 @@ function UploadIcon() {
 
 function DownloadIcon() {
   return (
-    <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+    <svg
+      viewBox="0 0 20 20"
+      className="h-3.5 w-3.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden
+    >
       <path d="M10 4v10M5 9l5 5 5-5M4 16h12" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );

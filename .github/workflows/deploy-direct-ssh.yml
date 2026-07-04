@@ -102,7 +102,9 @@ jobs:
 
             echo "::group::docker compose build + up"
             docker compose pull --ignore-pull-failures || true
-            docker compose up -d --force-recreate --no-deps api app
+            # --build : reconstruit aussi le frontend (app) — sinon les changements
+            # frontend (boutons, filtres…) ne sont jamais déployés (image bakée).
+            docker compose up -d --build --force-recreate --no-deps api app
             echo "::endgroup::"
 
             if [ "$SKIP_MIGRATE" != "true" ]; then

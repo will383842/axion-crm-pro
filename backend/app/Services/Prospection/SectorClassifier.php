@@ -24,6 +24,10 @@ class SectorClassifier
         'finance_assurance'       => ['64', '65', '66'],
         'services_pro'            => ['69', '70', '71', '72', '73', '74', '77', '78', '80', '81', '82'],
         'sante'                   => ['75', '86', '87', '88'],
+        'immobilier'              => ['68'],
+        'enseignement'            => ['85'],
+        'services_personnels'     => ['95', '96'],
+        'arts_loisirs'            => ['90', '91', '92', '93'],
     ];
 
     /** Renvoie le secteur d'une entreprise depuis son NAF (ou 'autre'). */

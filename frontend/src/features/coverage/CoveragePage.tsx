@@ -34,7 +34,7 @@ export function CoveragePage() {
     refetchInterval: 60_000,
   });
 
-  const cells = data ?? [];
+  const cells = useMemo(() => data ?? [], [data]);
 
   const stats = useMemo(() => {
     const totalAll = cells.reduce((s, c) => s + (c.total ?? 0), 0);
@@ -48,12 +48,28 @@ export function CoveragePage() {
 
   const selectedCell = selected ? cells.find((c) => c.code === selected) ?? null : null;
 
-  async function launch(dept: string) {
+  // Étape 1 — Récupérer : découverte seule (pas d'enrichissement chaîné).
+  async function recuperer(dept: string) {
     try {
-      await api.post('/coverage/launch', { department: dept, limit: 100 });
-      toast.success(`Scraping lancé · département ${dept}`);
+      await api.post('/coverage/launch', { department: dept, limit: 100, enrich: false });
+      toast.success(`Récupération lancée · département ${dept}`);
     } catch {
-      toast.error('Erreur lors du lancement');
+      toast.error('Erreur lors de la récupération');
+    }
+  }
+
+  // Étape 2 — Enrichir : enrichit les entreprises DÉJÀ récupérées du département.
+  async function enrichir(dept: string) {
+    try {
+      const r = await api.post<{ queued?: number }>('/coverage/enrich', { department: dept });
+      const n = r.data?.queued ?? 0;
+      toast.success(
+        n > 0
+          ? `Enrichissement lancé · ${n.toLocaleString('fr-FR')} entreprise(s) · département ${dept}`
+          : `Aucune entreprise à enrichir pour le département ${dept} (récupérez-les d'abord).`,
+      );
+    } catch {
+      toast.error("Erreur lors de l'enrichissement");
     }
   }
 
@@ -130,7 +146,7 @@ export function CoveragePage() {
             mode={mode}
             onZoneClick={(code) => {
               setSelected(code);
-              if (mode === 'action') void launch(code);
+              if (mode === 'action') void recuperer(code);
             }}
           />
         </div>
@@ -140,7 +156,8 @@ export function CoveragePage() {
             <SelectionCard
               cell={selectedCell}
               mode={mode}
-              onLaunch={() => void launch(selectedCell.code)}
+              onRecuperer={() => void recuperer(selectedCell.code)}
+              onEnrichir={() => void enrichir(selectedCell.code)}
               onClose={() => setSelected(null)}
             />
           ) : (
@@ -244,12 +261,14 @@ function KpiCard({
 function SelectionCard({
   cell,
   mode,
-  onLaunch,
+  onRecuperer,
+  onEnrichir,
   onClose,
 }: {
   cell: Cell;
   mode: CoverageMode;
-  onLaunch: () => void;
+  onRecuperer: () => void;
+  onEnrichir: () => void;
   onClose: () => void;
 }) {
   const isCovered = (cell.total ?? 0) > 0;
@@ -278,13 +297,27 @@ function SelectionCard({
       </div>
 
       <div className="mt-4 flex flex-col gap-2">
+        {/* Étape 1 — Récupérer (découverte seule) */}
         <button
-          onClick={onLaunch}
+          onClick={onRecuperer}
           className="group inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 transition hover:from-slate-800 hover:to-slate-600 active:scale-[0.98]"
         >
-          {isCovered ? 'Relancer un scrape' : 'Lancer le scrape'}
+          {isCovered ? 'Re-récupérer les entreprises' : 'Récupérer les entreprises'}
           <svg viewBox="0 0 20 20" className="h-4 w-4 transition group-hover:translate-x-0.5"><path d="M5 10h10m0 0l-4-4m4 4l-4 4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
+        {/* Étape 2 — Enrichir (emails, téléphones, dirigeants) */}
+        <button
+          onClick={onEnrichir}
+          disabled={!isCovered}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Enrichir (emails · téléphones · dirigeants)
+        </button>
+        <p className="text-center text-xs leading-relaxed text-slate-500">
+          {isCovered
+            ? 'Étape 1 : récupérer les entreprises. Étape 2 : les enrichir (peut être fait plus tard).'
+            : "Récupérez d'abord les entreprises, puis vous pourrez les enrichir."}
+        </p>
         {mode === 'search' ? (
           <p className="text-center text-xs text-slate-500">Le filtre est appliqué à la liste entreprises.</p>
         ) : null}

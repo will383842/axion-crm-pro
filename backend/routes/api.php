@@ -86,6 +86,9 @@ Route::prefix('v1')->group(function () {
 
         // Companies
         Route::get(   '/companies',                       [CompaniesController::class, 'index']);
+        // /companies/export DOIT précéder /companies/{company} (sinon "export" pris pour un id).
+        Route::get(   '/companies/export',                [CompaniesController::class, 'export'])
+            ->middleware('throttle:scraper-list');
         Route::post(  '/companies',                       [CompaniesController::class, 'store']);
         Route::get(   '/companies/{company}',             [CompaniesController::class, 'show']);
         Route::put(   '/companies/{company}',             [CompaniesController::class, 'update']);
@@ -104,6 +107,8 @@ Route::prefix('v1')->group(function () {
         Route::get( '/coverage',                   [CoverageController::class, 'index']);
         Route::get( '/coverage/next-zone',         [CoverageController::class, 'nextZone']);
         Route::post('/coverage/launch',            [CoverageController::class, 'launch'])
+            ->middleware('throttle:scraper-launch');
+        Route::post('/coverage/enrich',            [CoverageController::class, 'enrich'])
             ->middleware('throttle:scraper-launch');
         Route::get( '/coverage/cells/{cell}',      [CoverageController::class, 'showCell']);
 

@@ -47,6 +47,7 @@ class LaunchZoneScrapingJob implements ShouldQueue
         public readonly int $limit,
         public readonly ?int $campaignId = null,
         public readonly string $source = 'insee',
+        public readonly bool $enrich = true,
     ) {}
 
     public function handle(InseeClient $insee, FranceTravailDiscoveryClient $ftDiscovery): void
@@ -86,6 +87,10 @@ class LaunchZoneScrapingJob implements ShouldQueue
                         'effectif_range'  => $data->effectifRange,
                         'size_category'   => $this->sizeCategory,
                         'discovery_source'=> $this->source,
+                        // Tampon du département dès la découverte (la zone est connue)
+                        // → permet « Enrichir par département » sans attendre la
+                        // classification. La classification confirmera la même valeur.
+                        'department_code' => $this->department,
                     ],
                 );
                 if ($company->wasRecentlyCreated) {
@@ -93,7 +98,11 @@ class LaunchZoneScrapingJob implements ShouldQueue
                 } else {
                     $companiesRefreshed++;
                 }
-                EnrichCompanyJob::dispatch($company->id);
+                // Enrichissement chaîné seulement si demandé (bouton « Récupérer »
+                // seul → enrich=false ; « Enrichir » séparé via /coverage/enrich).
+                if ($this->enrich) {
+                    EnrichCompanyJob::dispatch($company->id);
+                }
             }
             $companiesCreated = $companiesNew + $companiesRefreshed;
 

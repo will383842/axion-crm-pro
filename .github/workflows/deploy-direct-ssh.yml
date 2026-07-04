@@ -75,6 +75,7 @@ jobs:
           USER: ${{ secrets.HETZNER_USER || 'root' }}
           PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
           SKIP_MIGRATE: ${{ github.event.inputs.skip_migrate || 'false' }}
+          INSEE_API_KEY: ${{ secrets.INSEE_API_KEY }}
         run: |
           set -e
           ssh -o StrictHostKeyChecking=no "$USER@$HOST" bash <<EOF
@@ -84,6 +85,19 @@ jobs:
             echo "::group::git pull"
             git fetch --all --prune
             git reset --hard origin/main
+            echo "::endgroup::"
+
+            echo "::group::sync INSEE_API_KEY into .env"
+            # Upsert la clé INSEE dans le .env serveur (le deploy ne versionne pas .env).
+            # Doit précéder le restart pour que le conteneur la lise au démarrage.
+            if [ -f .env ] && [ -n "$INSEE_API_KEY" ]; then
+              if grep -q '^INSEE_API_KEY=' .env; then
+                sed -i "s|^INSEE_API_KEY=.*|INSEE_API_KEY=$INSEE_API_KEY|" .env
+              else
+                echo "INSEE_API_KEY=$INSEE_API_KEY" >> .env
+              fi
+              echo "INSEE_API_KEY synchronisée."
+            fi
             echo "::endgroup::"
 
             echo "::group::docker compose build + up"

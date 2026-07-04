@@ -98,6 +98,7 @@ class HttpInseeClient implements InseeClient
         $pageSize = 1000; // max INSEE Sirene v3.11 → 10× moins de requêtes
         $delayMs = (int) ($criteria['req_delay_ms'] ?? 2100);
         $seenSirens = []; // dédup : un dépt renvoie plusieurs siret pour le même siren
+        $retries = 0;     // tentatives sur le curseur courant (429/5xx) — BORNÉ
 
         do {
             $resp = $this->authHttp()
@@ -110,9 +111,21 @@ class HttpInseeClient implements InseeClient
                     'tri'     => $hasGeo ? 'siret' : 'siren',
                 ]);
 
-            // Rate-limit atteint → attendre puis retenter le même curseur.
+            // Rate-limit atteint → attendre puis retenter le même curseur (BORNÉ :
+            // évite une boucle infinie si le quota est saturé durablement).
             if ($resp->status() === 429) {
+                if (++$retries > 30) {
+                    throw new \RuntimeException('INSEE 429 persistant (quota/limite atteint ?) après 30 tentatives.');
+                }
                 sleep(20);
+                continue;
+            }
+            // Erreur serveur transitoire (5xx) → petit backoff + retry borné.
+            if ($resp->serverError()) {
+                if (++$retries > 8) {
+                    throw new \RuntimeException("INSEE {$resp->status()} persistant après 8 tentatives sur {$endpoint}.");
+                }
+                sleep(5);
                 continue;
             }
             if ($resp->failed()) {
@@ -121,6 +134,7 @@ class HttpInseeClient implements InseeClient
                     . mb_substr((string) $resp->body(), 0, 1000)
                 );
             }
+            $retries = 0; // page réussie → on remet le compteur à zéro
             $data = $resp->json();
 
             if ($hasGeo) {

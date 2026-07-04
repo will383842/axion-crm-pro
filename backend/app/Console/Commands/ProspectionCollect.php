@@ -148,6 +148,7 @@ class ProspectionCollect extends Command
             'categorie_entreprise' => $u['categorieEntreprise'] ?? null,      // TPE/PME/ETI/GE officiel INSEE
             'date_creation'        => $u['dateCreationUniteLegale'] ?? null,
             'forme_juridique'      => $u['categorieJuridiqueUniteLegale'] ?? null,
+            'employeur'            => $u['caractereEmployeurUniteLegale'] ?? null,   // O = a des salariés
             'ess'                  => $u['economieSocialeSolidaireUniteLegale'] ?? null,
             'gps_lambert_x'        => $adr['coordonneeLambertAbscisseEtablissement'] ?? null,
             'gps_lambert_y'        => $adr['coordonneeLambertOrdonneeEtablissement'] ?? null,

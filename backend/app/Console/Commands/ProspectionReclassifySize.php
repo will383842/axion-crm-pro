@@ -24,6 +24,14 @@ class ProspectionReclassifySize extends Command
 
         $affected = DB::update(<<<SQL
             UPDATE companies SET size_category = CASE
+                -- Catégorie OFFICIELLE INSEE (calculée sur tout le groupe : effectif
+                -- + CA + bilan) — prioritaire, bien plus juste que le seul effectif du siège.
+                WHEN metadata->>'categorie_entreprise' = 'GE'  THEN 'grande_entreprise'
+                WHEN metadata->>'categorie_entreprise' = 'ETI' THEN 'eti'
+                WHEN metadata->>'categorie_entreprise' = 'PME'
+                     AND effectif_range IN ('11','12','21','22','31') THEN 'pme'
+                WHEN metadata->>'categorie_entreprise' = 'PME' THEN 'tpe'
+                -- Repli sur l'effectif du siège (catégorie absente, fréquent pour les micro).
                 WHEN effectif_range IN ('11','12','21','22','31') THEN 'pme'
                 WHEN effectif_range IN ('32','41','42','51')      THEN 'eti'
                 WHEN effectif_range IN ('52','53')                THEN 'grande_entreprise'

@@ -84,7 +84,10 @@ class ProspectionCollect extends Command
                 'naf'              => $data->naf,
                 'legal_form'       => $data->legalForm,
                 'effectif_range'   => $data->effectifRange,
-                'size_category'    => $this->sizeFromEffectif($data->effectifRange),
+                'size_category'    => $this->sizeFrom(
+                    $data->effectifRange,
+                    is_array($data->raw['uniteLegale'] ?? null) ? ($data->raw['uniteLegale']['categorieEntreprise'] ?? null) : null,
+                ),
                 'sector_main'      => SectorClassifier::fromNaf($data->naf),
                 'address'          => $data->address,
                 'postcode'         => $data->postcode,
@@ -151,14 +154,29 @@ class ProspectionCollect extends Command
         ], static fn ($v) => $v !== null && $v !== '');
     }
 
-    private function sizeFromEffectif(?string $tranche): string
+    /**
+     * Catégorie de taille : priorité à la catégorie OFFICIELLE INSEE
+     * (calculée sur tout le groupe), repli sur la tranche d'effectif du siège.
+     */
+    private function sizeFrom(?string $tranche, ?string $categorie): string
     {
+        $cat = strtoupper(trim((string) $categorie));
+        if ($cat === 'GE') {
+            return 'grande_entreprise';
+        }
+        if ($cat === 'ETI') {
+            return 'eti';
+        }
         $t = trim((string) $tranche);
+        $hasStaff = in_array($t, ['11', '12', '21', '22', '31'], true);
+        if ($cat === 'PME') {
+            return $hasStaff ? 'pme' : 'tpe';
+        }
         return match (true) {
-            in_array($t, ['11', '12', '21', '22', '31'], true) => 'pme',               // 10–249
-            in_array($t, ['32', '41', '42', '51'], true)       => 'eti',               // 250–4999
-            in_array($t, ['52', '53'], true)                   => 'grande_entreprise',  // 5000+
-            default                                            => 'tpe',               // 00–03, NN, null
+            $hasStaff                                    => 'pme',               // 10–249
+            in_array($t, ['32', '41', '42', '51'], true) => 'eti',               // 250–4999
+            in_array($t, ['52', '53'], true)             => 'grande_entreprise',  // 5000+
+            default                                      => 'tpe',               // 00–03, NN, null
         };
     }
 }

@@ -1,0 +1,99 @@
+name: Prospection — Collecte RÉGION Auvergne-Rhône-Alpes (prod)
+
+# Collecte séquentielle de tous les départements ARA restants (Isère déjà faite),
+# un job par département (matrice max-parallel=1 pour ne pas dépasser 30 req/min INSEE),
+# puis reclassement (taille/secteur) + purges (non-diffusibles, non-sociétés) + stats.
+#
+# Durée : ~1-2h par département sur le plan gratuit → ~15-18h au total.
+
+on:
+  workflow_dispatch:
+    inputs:
+      req_delay:
+        description: 'Délai entre requêtes INSEE (ms, 2100 = ~28/min)'
+        required: false
+        default: '2100'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prospection-collect-region
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    name: Collecte ${{ matrix.dept }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        dept: ['01', '03', '07', '15', '26', '42', '43', '63', '69', '73', '74']
+    steps:
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Trust host key
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Collecte département via SSH
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
+          DEPT: ${{ matrix.dept }}
+          REQ_DELAY: ${{ github.event.inputs.req_delay || '2100' }}
+        run: |
+          set -e
+          ssh -o StrictHostKeyChecking=no "$USER@$HOST" bash <<EOF
+            set -euo pipefail
+            cd "$PROJECT_PATH"
+            echo "::group::prospection:collect $DEPT"
+            docker compose exec -u root -T api php artisan prospection:collect "$DEPT" --limit=0 --req-delay="$REQ_DELAY" < /dev/null
+            echo "::endgroup::"
+          EOF
+
+  reclassify:
+    name: Reclassement + purges + stats
+    needs: collect
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Trust host key
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Reclassify + stats via SSH
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
+        run: |
+          set -e
+          ssh -o StrictHostKeyChecking=no "$USER@$HOST" bash <<EOF
+            set -euo pipefail
+            cd "$PROJECT_PATH"
+            docker compose exec -u root -T api php artisan prospection:purge-non-diffusible < /dev/null
+            docker compose exec -u root -T api php artisan prospection:purge-non-commercial < /dev/null
+            docker compose exec -u root -T api php artisan prospection:reclassify-size --all < /dev/null
+            docker compose exec -u root -T api php artisan prospection:reclassify-sector --all < /dev/null
+            docker compose exec -u root -T api php artisan coverage:refresh-matrix < /dev/null || echo "coverage KO (non bloquant)"
+            docker compose exec -u root -T api php artisan prospection:stats < /dev/null
+          EOF

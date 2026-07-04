@@ -97,6 +97,10 @@ class HttpInseeClient implements InseeClient
         $cursor = '*';
         $pageSize = 1000; // max INSEE Sirene v3.11 → 10× moins de requêtes
         $delayMs = (int) ($criteria['req_delay_ms'] ?? 2100);
+        // Entreprises commerciales seulement : garde EI (cat. jur. 1xxx) + sociétés
+        // commerciales (5xxx : SARL, SAS, SA, SNC, SCA…). Exclut SCI (65xx),
+        // associations (9xxx), administrations (7xxx), mutuelles/coopératives (6xxx).
+        $commercialOnly = (bool) ($criteria['commercial_only'] ?? true);
         $seenSirens = []; // dédup : un dépt renvoie plusieurs siret pour le même siren
         $retries = 0;     // tentatives sur le curseur courant (429/5xx) — BORNÉ
 
@@ -147,6 +151,13 @@ class HttpInseeClient implements InseeClient
                     // ont refusé la diffusion publique de leurs données INSEE.
                     if (($u['statutDiffusionUniteLegale'] ?? 'O') !== 'O') continue;
                     $periodes = $u['periodesUniteLegale'][0] ?? $u;
+                    // SOCIÉTÉS commerciales seulement (cat. jur. 5xxx : SARL, SAS, SA, SNC,
+                    // SCA…). Exclut les entrepreneurs individuels/auto-entrepreneurs (1xxx),
+                    // SCI (65xx), associations (9xxx), administrations (7xxx), etc.
+                    if ($commercialOnly) {
+                        $cj = (string) ($periodes['categorieJuridiqueUniteLegale'] ?? $u['categorieJuridiqueUniteLegale'] ?? '');
+                        if ($cj === '' || $cj[0] !== '5') continue;
+                    }
                     $siren = (string) ($etab['siren'] ?? $u['siren'] ?? '');
                     if ($siren === '' || isset($seenSirens[$siren])) continue;
                     $seenSirens[$siren] = true;

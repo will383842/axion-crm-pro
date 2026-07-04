@@ -40,6 +40,7 @@ jobs:
             # « < /dev/null » OBLIGATOIRE : sinon docker compose exec -T lit le reste
             # du heredoc comme stdin et avale les commandes suivantes.
             docker compose exec -u root -T api php artisan prospection:purge-non-diffusible < /dev/null
+            docker compose exec -u root -T api php artisan prospection:purge-non-commercial < /dev/null
             docker compose exec -u root -T api php artisan prospection:reclassify-size --all < /dev/null
             docker compose exec -u root -T api php artisan prospection:reclassify-sector --all < /dev/null
             docker compose exec -u root -T api php artisan coverage:refresh-matrix < /dev/null || echo "coverage refresh KO (non bloquant)"

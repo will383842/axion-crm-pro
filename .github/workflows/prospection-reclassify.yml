@@ -41,5 +41,6 @@ jobs:
             # du heredoc comme stdin et avale les commandes suivantes.
             docker compose exec -u root -T api php artisan prospection:reclassify-size < /dev/null
             docker compose exec -u root -T api php artisan prospection:reclassify-sector --all < /dev/null
+            docker compose exec -u root -T api php artisan coverage:refresh-matrix < /dev/null || echo "coverage refresh KO (non bloquant)"
             docker compose exec -u root -T api php artisan prospection:stats < /dev/null
           EOF

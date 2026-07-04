@@ -161,11 +161,17 @@ class HttpInseeClient implements InseeClient
                 }
             }
 
-            $cursor = $data['header']['curseurSuivant'] ?? null;
-            if ($cursor && $cursor !== '*' && $delayMs > 0) {
+            $nextCursor = $data['header']['curseurSuivant'] ?? null;
+            // Fin de pagination : INSEE renvoie le MÊME curseur (ou null/'*') sur la
+            // DERNIÈRE page. SANS ce test → boucle infinie qui re-traite la dernière page.
+            if ($nextCursor === null || $nextCursor === '' || $nextCursor === '*' || $nextCursor === $cursor) {
+                break;
+            }
+            $cursor = $nextCursor;
+            if ($delayMs > 0) {
                 usleep($delayMs * 1000); // respecte le rate-limit avant la page suivante
             }
-        } while ($cursor && $cursor !== '*');
+        } while (true);
     }
 
     /**

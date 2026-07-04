@@ -1,0 +1,70 @@
+name: Prospection — Collecte département (prod)
+
+# Lance `php artisan prospection:collect <dept>` sur le serveur prod (Helsinki)
+# via SSH. Récupération INSEE SEULE (sans enrichissement). Déclenchement MANUEL.
+# Réutilise les secrets du deploy (HETZNER_SSH_PRIVATE_KEY / HETZNER_HOST).
+
+on:
+  workflow_dispatch:
+    inputs:
+      department:
+        description: 'Code département (ex 38 pour Isère, 2A, 971)'
+        required: true
+      limit:
+        description: 'Nombre max (0 = tout le département)'
+        required: false
+        default: '0'
+      req_delay:
+        description: 'ms entre requêtes INSEE (2100 = 30/min plan public ; 150 = 500/min plan authentifié)'
+        required: false
+        default: '2100'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prospection-collect
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    name: Collecte INSEE sur prod
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Validate secret present
+        run: |
+          if [ -z "${{ secrets.HETZNER_SSH_PRIVATE_KEY }}" ]; then
+            echo "::error::Secret HETZNER_SSH_PRIVATE_KEY manquant."
+            exit 1
+          fi
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Trust host key
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Collect via SSH
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
+          DEPT: ${{ github.event.inputs.department }}
+          LIMIT: ${{ github.event.inputs.limit }}
+          REQ_DELAY: ${{ github.event.inputs.req_delay }}
+        run: |
+          set -e
+          ssh -o StrictHostKeyChecking=no "$USER@$HOST" bash <<EOF
+            set -euo pipefail
+            cd "$PROJECT_PATH"
+            echo "::group::prospection:collect $DEPT (limit=$LIMIT)"
+            docker compose exec -u root -T api php artisan prospection:collect "$DEPT" --limit="$LIMIT" --req-delay="$REQ_DELAY"
+            echo "::endgroup::"
+          EOF

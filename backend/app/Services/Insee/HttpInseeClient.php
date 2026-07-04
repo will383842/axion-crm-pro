@@ -63,21 +63,46 @@ class HttpInseeClient implements InseeClient
 
     public function searchByCriteria(array $criteria): array
     {
-        // Si on filtre par département/commune, on doit utiliser /siret (champs *Etablissement).
-        // Sinon /siren (champs *UniteLegale).
+        $limit = (int) ($criteria['limit'] ?? 1000);
+        $results = [];
+        foreach ($this->iterateByCriteria($criteria) as $company) {
+            $results[] = $company;
+            if ($limit > 0 && count($results) >= $limit) {
+                break;
+            }
+        }
+        return $results;
+    }
+
+    /**
+     * Itère TOUTES les entreprises correspondant aux critères, en paginant par
+     * curseur (générateur → pas de chargement total en mémoire). Permet de
+     * récupérer un DÉPARTEMENT ENTIER avec sauvegarde au fil de l'eau
+     * (cf. commande prospection:collect). Respecte le rate-limit INSEE.
+     *
+     * `$criteria['req_delay_ms']` : délai entre requêtes (défaut 2100ms ≈ 30 req/min,
+     * plan « Accès public »). Baisser si plan « Accès authentifié » (500 req/min).
+     *
+     * @param  array<string,mixed>  $criteria
+     * @return \Generator<int, InseeCompanyData>
+     */
+    public function iterateByCriteria(array $criteria): \Generator
+    {
+        // /siret (champs *Etablissement) si filtre géo, sinon /siren (*UniteLegale).
         $hasGeo = ! empty($criteria['department']) || ! empty($criteria['commune']);
         $endpoint = $hasGeo ? '/siret' : '/siren';
         $resultsKey = $hasGeo ? 'etablissements' : 'unitesLegales';
 
         $q = $this->buildQuery($criteria, $hasGeo);
-        $results = [];
         $cursor = '*';
-        $pageSize = 100;
-        $seenSirens = []; // un dépt peut renvoyer plusieurs siret pour le même siren (établissements multiples)
+        $pageSize = 1000; // max INSEE Sirene v3.11 → 10× moins de requêtes
+        $delayMs = (int) ($criteria['req_delay_ms'] ?? 2100);
+        $seenSirens = []; // dédup : un dépt renvoie plusieurs siret pour le même siren
 
         do {
             $resp = $this->authHttp()
                 ->timeout(30)
+                ->retry(2, 2000, fn ($e) => $e instanceof \Illuminate\Http\Client\ConnectionException)
                 ->get(self::BASE_URL . $endpoint, [
                     'q'       => $q,
                     'curseur' => $cursor,
@@ -85,28 +110,30 @@ class HttpInseeClient implements InseeClient
                     'tri'     => $hasGeo ? 'siret' : 'siren',
                 ]);
 
+            // Rate-limit atteint → attendre puis retenter le même curseur.
+            if ($resp->status() === 429) {
+                sleep(20);
+                continue;
+            }
             if ($resp->failed()) {
-                $body = mb_substr((string) $resp->body(), 0, 1000);
                 throw new \RuntimeException(
-                    "INSEE search error {$resp->status()} on {$endpoint} (q={$q}) — " . $body
+                    "INSEE search error {$resp->status()} on {$endpoint} (q={$q}) — "
+                    . mb_substr((string) $resp->body(), 0, 1000)
                 );
             }
             $data = $resp->json();
 
             if ($hasGeo) {
                 foreach ($data[$resultsKey] ?? [] as $etab) {
-                    // Filtres post-API (Sirene v3.11 ne les accepte pas dans q) :
-                    // 1. Sièges seulement → 1 résultat par entreprise (sinon doublons par établissement)
-                    if (! ($etab['etablissementSiege'] ?? false)) continue;
+                    // Filtres post-API (Sirene v3.11 les refuse dans q) :
+                    if (! ($etab['etablissementSiege'] ?? false)) continue;     // sièges seulement
                     $u = $etab['uniteLegale'] ?? [];
-                    // 2. Unités légales actives uniquement (exclut radiées/cessées)
-                    if (($u['etatAdministratifUniteLegale'] ?? null) !== 'A') continue;
-
+                    if (($u['etatAdministratifUniteLegale'] ?? null) !== 'A') continue; // actives
                     $periodes = $u['periodesUniteLegale'][0] ?? $u;
                     $siren = (string) ($etab['siren'] ?? $u['siren'] ?? '');
                     if ($siren === '' || isset($seenSirens[$siren])) continue;
                     $seenSirens[$siren] = true;
-                    $results[] = new InseeCompanyData(
+                    yield new InseeCompanyData(
                         siren: $siren,
                         denomination: $periodes['denominationUniteLegale']
                             ?? trim(($periodes['prenom1UniteLegale'] ?? '') . ' ' . ($periodes['nomUniteLegale'] ?? '')),
@@ -116,38 +143,29 @@ class HttpInseeClient implements InseeClient
                         createdAt: $u['dateCreationUniteLegale'] ?? null,
                         raw: $etab,
                         etatAdministratif: $u['etatAdministratifUniteLegale']
-                            ?? $periodes['etatAdministratifUniteLegale']
-                            ?? null,
+                            ?? $periodes['etatAdministratifUniteLegale'] ?? null,
                     );
-                    if (count($results) >= (int) ($criteria['limit'] ?? 1000)) {
-                        return $results;
-                    }
                 }
             } else {
                 foreach ($data[$resultsKey] ?? [] as $u) {
                     $periodes = $u['periodesUniteLegale'][0] ?? [];
-                    // Sprint H3 — Skip entreprises radiées dès la lecture
-                    $etat = $periodes['etatAdministratifUniteLegale']
-                        ?? $u['etatAdministratifUniteLegale']
-                        ?? null;
-                    $results[] = new InseeCompanyData(
+                    yield new InseeCompanyData(
                         siren: (string) ($u['siren'] ?? ''),
                         denomination: $periodes['denominationUniteLegale'] ?? null,
                         naf: $periodes['activitePrincipaleUniteLegale'] ?? null,
                         legalForm: $periodes['categorieJuridiqueUniteLegale'] ?? null,
                         effectifRange: $u['trancheEffectifsUniteLegale'] ?? null,
-                        etatAdministratif: $etat,
+                        etatAdministratif: $periodes['etatAdministratifUniteLegale']
+                            ?? $u['etatAdministratifUniteLegale'] ?? null,
                     );
-                    if (count($results) >= (int) ($criteria['limit'] ?? 1000)) {
-                        return $results;
-                    }
                 }
             }
 
             $cursor = $data['header']['curseurSuivant'] ?? null;
+            if ($cursor && $cursor !== '*' && $delayMs > 0) {
+                usleep($delayMs * 1000); // respecte le rate-limit avant la page suivante
+            }
         } while ($cursor && $cursor !== '*');
-
-        return $results;
     }
 
     /**

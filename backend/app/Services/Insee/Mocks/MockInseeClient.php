@@ -33,4 +33,9 @@ class MockInseeClient implements InseeClient
     {
         return [];
     }
+
+    public function iterateByCriteria(array $criteria): \Generator
+    {
+        yield from $this->searchByCriteria($criteria);
+    }
 }

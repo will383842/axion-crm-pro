@@ -35,9 +35,12 @@ jobs:
         run: |
           set -e
           ssh -o StrictHostKeyChecking=no "$USER@$HOST" bash <<EOF
-            set -euo pipefail
+            set -uo pipefail
             cd "$PROJECT_PATH"
-            docker compose exec -u root -T api php artisan prospection:reclassify-size
-            docker compose exec -u root -T api php artisan prospection:reclassify-sector
-            docker compose exec -u root -T api php artisan prospection:stats
+            echo "--- reclassify-size ---"
+            docker compose exec -u root -T api php artisan prospection:reclassify-size 2>&1 || echo "SIZE exit=\$?"
+            echo "--- reclassify-sector ---"
+            docker compose exec -u root -T api php artisan prospection:reclassify-sector 2>&1 || echo "SECTOR exit=\$?"
+            echo "--- stats ---"
+            docker compose exec -u root -T api php artisan prospection:stats 2>&1 || echo "STATS exit=\$?"
           EOF

@@ -32,6 +32,12 @@ class ProspectionStats extends Command
                 $n,
             ));
             if ($n > 0) {
+                // Couverture des champs récupérés (adresse/SIRET/ville).
+                $withAddr = DB::table('companies')->where('workspace_id', $w->id)->whereNotNull('address')->count();
+                $withSiret = DB::table('companies')->where('workspace_id', $w->id)->whereNotNull('siret')->count();
+                $withCity = DB::table('companies')->where('workspace_id', $w->id)->whereNotNull('city')->count();
+                $this->line("      >> avec ADRESSE : {$withAddr} · avec SIRET : {$withSiret} · avec VILLE : {$withCity}");
+
                 $bySize = DB::table('companies')
                     ->where('workspace_id', $w->id)
                     ->selectRaw("COALESCE(size_category, '(non classé)') AS sc, COUNT(*) AS c")

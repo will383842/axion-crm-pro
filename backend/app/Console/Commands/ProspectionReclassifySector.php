@@ -20,20 +20,21 @@ class ProspectionReclassifySector extends Command
     public function handle(): int
     {
         $onlyNull = ! $this->option('all');
-        // Division NAF = 2 premiers chiffres du code nettoyé.
-        $div = "LEFT(regexp_replace(COALESCE(naf, ''), '[^0-9]', '', 'g'), 2)";
-        $nullFilter = $onlyNull ? " AND (sector_main IS NULL OR sector_main = '')" : '';
 
-        $total = 0;
+        // UNE seule passe : CASE sur LEFT(naf, 2) (les 2 premiers chars du NAF =
+        // division, que le code ait un point « 41.20B » ou pas « 4120B »). Pas de
+        // regex → rapide sur 209k lignes (l'ancienne version en 11 passes regex
+        // dépassait le timeout du job).
+        $cases = [];
         foreach (SectorClassifier::DIVISIONS as $sector => $divisions) {
-            $in = "'" . implode("','", $divisions) . "'";
-            $total += DB::update(
-                "UPDATE companies SET sector_main = ? WHERE {$div} IN ({$in}){$nullFilter}",
-                [$sector],
-            );
+            foreach ($divisions as $d) {
+                $cases[] = "WHEN '{$d}' THEN '{$sector}'";
+            }
         }
-        // Tout le reste (NAF présent mais hors mapping) → 'autre'.
-        $total += DB::update("UPDATE companies SET sector_main = 'autre' WHERE naf IS NOT NULL{$nullFilter}");
+        $caseSql = 'CASE LEFT(naf, 2) ' . implode(' ', $cases) . " ELSE 'autre' END";
+        $where = 'naf IS NOT NULL' . ($onlyNull ? " AND (sector_main IS NULL OR sector_main = '')" : '');
+
+        $total = DB::update("UPDATE companies SET sector_main = {$caseSql} WHERE {$where}");
 
         $this->info("✅ {$total} entreprises classées par secteur.");
         foreach (

@@ -136,6 +136,13 @@ class HttpInseeClient implements InseeClient
                     $siren = (string) ($etab['siren'] ?? $u['siren'] ?? '');
                     if ($siren === '' || isset($seenSirens[$siren])) continue;
                     $seenSirens[$siren] = true;
+                    // Adresse de l'établissement (siège) — dispo dès la récupération INSEE.
+                    $adr = $etab['adresseEtablissement'] ?? [];
+                    $rue = trim(implode(' ', array_filter([
+                        $adr['numeroVoieEtablissement'] ?? '',
+                        $adr['typeVoieEtablissement'] ?? '',
+                        $adr['libelleVoieEtablissement'] ?? '',
+                    ])));
                     yield new InseeCompanyData(
                         siren: $siren,
                         denomination: $periodes['denominationUniteLegale']
@@ -143,6 +150,10 @@ class HttpInseeClient implements InseeClient
                         naf: $periodes['activitePrincipaleUniteLegale'] ?? null,
                         legalForm: $periodes['categorieJuridiqueUniteLegale'] ?? null,
                         effectifRange: $u['trancheEffectifsUniteLegale'] ?? null,
+                        address: $rue !== '' ? $rue : null,
+                        postcode: $adr['codePostalEtablissement'] ?? null,
+                        city: $adr['libelleCommuneEtablissement'] ?? null,
+                        insee: $adr['codeCommuneEtablissement'] ?? null,
                         createdAt: $u['dateCreationUniteLegale'] ?? null,
                         raw: $etab,
                         etatAdministratif: $u['etatAdministratifUniteLegale']

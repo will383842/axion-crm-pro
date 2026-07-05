@@ -1,0 +1,93 @@
+name: Prospection — Collecte Paris par arrondissement (prod)
+
+# Paris (75) a échoué en département entier (limite mémoire PHP — trop dense).
+# On le collecte par arrondissement (codes commune 75101→75120), morceaux plus petits,
+# puis stats. Sociétés commerciales seulement (comme le reste).
+
+on:
+  workflow_dispatch:
+    inputs:
+      req_delay:
+        description: 'Délai entre requêtes INSEE (ms)'
+        required: false
+        default: '2100'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prospection-collect-region
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    name: Arrondissement ${{ matrix.arr }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        arr: ['75101', '75102', '75103', '75104', '75105', '75106', '75107',
+              '75108', '75109', '75110', '75111', '75112', '75113', '75114',
+              '75115', '75116', '75117', '75118', '75119', '75120']
+    steps:
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Trust host key
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Collecte arrondissement via SSH
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
+          ARR: ${{ matrix.arr }}
+          REQ_DELAY: ${{ github.event.inputs.req_delay || '2100' }}
+        run: |
+          set -e
+          ssh -o StrictHostKeyChecking=no "$USER@$HOST" bash <<EOF
+            set -euo pipefail
+            cd "$PROJECT_PATH"
+            docker compose exec -u root -T api php artisan prospection:collect "$ARR" --limit=0 --req-delay="$REQ_DELAY" < /dev/null
+          EOF
+
+  finalize:
+    name: Coverage + stats
+    needs: collect
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Trust host key
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Coverage + stats via SSH
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
+        run: |
+          set -e
+          ssh -o StrictHostKeyChecking=no "$USER@$HOST" bash <<EOF
+            set -euo pipefail
+            cd "$PROJECT_PATH"
+            docker compose exec -u root -T api php artisan coverage:refresh-matrix < /dev/null || echo "coverage KO (non bloquant)"
+            docker compose exec -u root -T api php artisan prospection:stats < /dev/null
+          EOF

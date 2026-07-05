@@ -34,6 +34,13 @@ class ProspectionCollect extends Command
             $this->error('Département requis (ex : 38).');
             return self::FAILURE;
         }
+        // Un code commune à 5 chiffres (ex. arrondissement de Paris 75101) déclenche une
+        // collecte par COMMUNE — utile pour les zones trop denses à collecter en dépt entier
+        // (Paris a dépassé la limite mémoire PHP en une seule passe).
+        $isCommune = (bool) preg_match('/^\d{5}$/', $dept);
+        $deptCode = $isCommune
+            ? (str_starts_with($dept, '97') ? substr($dept, 0, 3) : substr($dept, 0, 2))
+            : $dept;
         $limit = (int) $this->option('limit');
         $delay = (int) $this->option('req-delay');
 
@@ -73,7 +80,10 @@ class ProspectionCollect extends Command
             $buffer = [];
         };
 
-        foreach ($insee->iterateByCriteria(['department' => $dept, 'req_delay_ms' => $delay]) as $data) {
+        $criteria = $isCommune
+            ? ['commune' => $dept, 'req_delay_ms' => $delay]
+            : ['department' => $dept, 'req_delay_ms' => $delay];
+        foreach ($insee->iterateByCriteria($criteria) as $data) {
             if ($data->siren === '') {
                 continue;
             }
@@ -97,7 +107,7 @@ class ProspectionCollect extends Command
                 'siret'            => is_string($data->raw['siret'] ?? null) ? $data->raw['siret'] : null,
                 'metadata'         => json_encode($this->extraInseeFields($data->raw), JSON_UNESCAPED_UNICODE),
                 'discovery_source' => 'insee',
-                'department_code'  => $dept,
+                'department_code'  => $deptCode,
                 'created_at'       => now(),
                 'updated_at'       => now(),
             ];

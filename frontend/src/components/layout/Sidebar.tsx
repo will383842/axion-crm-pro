@@ -34,6 +34,8 @@ import {
   Hash,
   Users2,
   Send,
+  Newspaper,
+  Mic,
 } from 'lucide-react';
 import { cn, Tooltip } from '@/components/ui';
 import { WorkspaceSelector } from './WorkspaceSelector';
@@ -70,6 +72,14 @@ const SECTIONS: NavSection[] = [
       { to: '/companies', label: 'Entreprises', icon: <Building2 className="h-4 w-4" />, dataTour: 'nav-companies' },
       { to: '/contacts', label: 'Contacts', icon: <UsersIcon className="h-4 w-4" /> },
       { to: '/tags', label: 'Tags', icon: <Hash className="h-4 w-4" /> },
+    ],
+  },
+  {
+    id: 'medias',
+    title: 'Médias & Presse',
+    items: [
+      { to: '/media', label: 'Médias', icon: <Newspaper className="h-4 w-4" /> },
+      { to: '/journalists', label: 'Journalistes', icon: <Mic className="h-4 w-4" /> },
     ],
   },
   {

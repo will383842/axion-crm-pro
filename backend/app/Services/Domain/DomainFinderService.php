@@ -32,6 +32,10 @@ class DomainFinderService
 
     private const HTTP_TIMEOUT_SECONDS = 10;
 
+    // Vérification de domaine deviné : court + fail-fast (des millions d'entreprises).
+    private const GUESS_TIMEOUT = 5;
+    private const GUESS_CONNECT_TIMEOUT = 3;
+
     private const BRAVE_SEARCH_URL = 'https://api.search.brave.com/res/v1/web/search';
 
     private const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -125,38 +129,36 @@ class DomainFinderService
      */
     private function verifyCandidate(string $domain, Company $company, array $tokens): bool
     {
-        foreach (["https://{$domain}/", "http://{$domain}/"] as $url) {
-            try {
-                $resp = Http::timeout(self::HTTP_TIMEOUT_SECONDS)
-                    ->withHeaders(['User-Agent' => self::USER_AGENT])
-                    ->get($url);
-            } catch (\Throwable $e) {
-                continue;
-            }
-            if (! $resp->successful()) {
-                continue;
-            }
-            $body = mb_strtolower(strip_tags((string) $resp->body()));
-            if (mb_strlen($body) < 200) {
-                return false; // page vide / parking
-            }
-            $siren = (string) $company->siren;
-            if ($siren !== '' && str_contains(preg_replace('/\s+/', '', $body), $siren)) {
-                return true;
-            }
-            $hits = 0;
-            foreach ($tokens as $t) {
-                if (mb_strlen($t) >= 3 && str_contains($body, $t)) {
-                    $hits++;
-                }
-            }
-            $ville = $this->stripAccents(mb_strtolower((string) ($company->city_name ?? $company->city ?? '')));
-            $villeOk = mb_strlen($ville) >= 3 && str_contains($this->stripAccents($body), $ville);
-
-            return $hits >= 2 || ($hits >= 1 && $villeOk);
+        // HTTPS seul + timeouts courts : indispensable pour tenir à l'échelle (4M).
+        try {
+            $resp = Http::timeout(self::GUESS_TIMEOUT)
+                ->connectTimeout(self::GUESS_CONNECT_TIMEOUT)
+                ->withHeaders(['User-Agent' => self::USER_AGENT])
+                ->get("https://{$domain}/");
+        } catch (\Throwable $e) {
+            return false;
         }
+        if (! $resp->successful()) {
+            return false;
+        }
+        $body = mb_strtolower(strip_tags((string) $resp->body()));
+        if (mb_strlen($body) < 200) {
+            return false; // page vide / parking
+        }
+        $siren = (string) $company->siren;
+        if ($siren !== '' && str_contains(preg_replace('/\s+/', '', $body), $siren)) {
+            return true;
+        }
+        $hits = 0;
+        foreach ($tokens as $t) {
+            if (mb_strlen($t) >= 3 && str_contains($body, $t)) {
+                $hits++;
+            }
+        }
+        $ville = $this->stripAccents(mb_strtolower((string) ($company->city_name ?? $company->city ?? '')));
+        $villeOk = mb_strlen($ville) >= 3 && str_contains($this->stripAccents($body), $ville);
 
-        return false;
+        return $hits >= 2 || ($hits >= 1 && $villeOk);
     }
 
     /**

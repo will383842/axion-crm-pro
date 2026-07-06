@@ -57,6 +57,11 @@ export function CompanyRow({ company, onEnrich, onExport, onDelete, className }:
           <div className="truncate text-xs text-slate-500 dark:text-slate-400">
             {c.city ?? '—'}
             {c.postcode ? <span className="ml-1 text-slate-400">({c.postcode})</span> : null}
+            {c.effectif_range ? (
+              <span className="ml-2 font-medium text-brand-600 dark:text-brand-400">
+                · 👥 {effectifLabel(c.effectif_range)}
+              </span>
+            ) : null}
           </div>
         </div>
       </div>
@@ -65,14 +70,7 @@ export function CompanyRow({ company, onEnrich, onExport, onDelete, className }:
 
       <div className="truncate font-mono text-xs text-slate-700 dark:text-slate-300">{c.naf ?? '—'}</div>
 
-      <div>
-        <SizeCategoryBadge size={c.size_category} />
-        {c.effectif_range ? (
-          <div className="mt-0.5 truncate text-[10px] text-slate-400" title="Nombre de salariés (INSEE)">
-            {effectifLabel(c.effectif_range)}
-          </div>
-        ) : null}
-      </div>
+      <div><SizeCategoryBadge size={c.size_category} /></div>
 
       <div><QualityBadge score={c.quality_score} /></div>
 

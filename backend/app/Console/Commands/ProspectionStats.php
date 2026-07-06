@@ -43,6 +43,11 @@ class ProspectionStats extends Command
                     ->whereNotIn('effectif_range', ['NN', ''])
                     ->count();
                 $this->line("      >> avec EFFECTIF salarié déclaré INSEE : {$withEff}");
+                $byEff = DB::table('companies')->where('workspace_id', $w->id)
+                    ->whereNotNull('effectif_range')
+                    ->selectRaw('effectif_range AS e, COUNT(*) AS c')
+                    ->groupBy('e')->orderByDesc('c')->limit(10)->get();
+                $this->line('      effectif top valeurs: ' . $byEff->map(fn ($r) => "[{$r->e}]={$r->c}")->implode(' '));
 
                 $bySize = DB::table('companies')
                     ->where('workspace_id', $w->id)

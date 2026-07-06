@@ -36,12 +36,8 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
 
-      - name: Trust host key
-        env:
-          HOST: ${{ secrets.HETZNER_HOST }}
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+      # ssh-keyscan retire : sature MaxStartups quand d autres jobs SSH tournent
+      # (StrictHostKeyChecking=no + UserKnownHostsFile=/dev/null suffisent)
 
       - name: Enrich via SSH
         env:
@@ -52,7 +48,7 @@ jobs:
           DEPT: ${{ github.event.inputs.department || '38' }}
         run: |
           set -e
-          ssh -o StrictHostKeyChecking=no "$USER@$HOST" bash <<EOF
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$USER@$HOST" bash <<EOF
             set -euo pipefail
             cd "$PROJECT_PATH"
             # Active les sources GRATUITES en réel, garde les payantes en mock.

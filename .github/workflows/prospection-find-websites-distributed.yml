@@ -39,6 +39,11 @@ jobs:
         shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
     env:
       SHARDS: '20'
+      # Telescope est une dépendance de prod ici et loggue chaque commande artisan
+      # en DB (MySQL par défaut) → « Connection refused 3306 » pendant composer
+      # (avant que le .env existe). On le désactive pour TOUT le job.
+      TELESCOPE_ENABLED: 'false'
+      DB_CONNECTION: pgsql
     steps:
       - uses: actions/checkout@v4
 

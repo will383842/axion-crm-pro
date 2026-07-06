@@ -1,0 +1,72 @@
+name: Prospection — Trouver les sites web (devinette)
+
+# Étape 1 du pipeline : trouve le site web de chaque entreprise par devinette
+# (DNS + vérification contenu), marque website_status = found/not_found.
+# REPRENABLE (ne traite que les `pending`). Parallélisable (pas d'API externe limitée).
+
+on:
+  workflow_dispatch:
+    inputs:
+      departments:
+        description: 'Départements espacés (défaut = toute la France)'
+        required: false
+        default: 'all'
+      limit:
+        description: 'Limite par département (0 = tout)'
+        required: false
+        default: '0'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prospection-find-websites
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+    steps:
+      - id: set
+        run: |
+          IN="${{ github.event.inputs.departments || 'all' }}"
+          ALL="01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 21 22 23 24 25 26 27 28 29 2A 2B 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 971 972 973 974 976"
+          if [ "$IN" = "all" ]; then IN="$ALL"; fi
+          echo "matrix=$(echo $IN | tr ' ' '\n' | grep -v '^$' | jq -R -c . | jq -s -c .)" >> "$GITHUB_OUTPUT"
+
+  find:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        dept: ${{ fromJson(needs.prepare.outputs.matrix) }}
+    steps:
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+      - name: Trust host key
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+      - name: Find websites via SSH
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
+          DEPT: ${{ matrix.dept }}
+          LIMIT: ${{ github.event.inputs.limit || '0' }}
+        run: |
+          set -e
+          ssh -o StrictHostKeyChecking=no "$USER@$HOST" bash <<EOF
+            set -euo pipefail
+            cd "$PROJECT_PATH"
+            docker compose exec -u root -T api php artisan prospection:find-websites --department="$DEPT" --limit="$LIMIT" < /dev/null
+          EOF

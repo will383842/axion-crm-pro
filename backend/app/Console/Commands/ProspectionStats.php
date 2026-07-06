@@ -49,6 +49,12 @@ class ProspectionStats extends Command
                     ->groupBy('e')->orderByDesc('c')->limit(10)->get();
                 $this->line('      effectif top valeurs: ' . $byEff->map(fn ($r) => "[{$r->e}]={$r->c}")->implode(' '));
 
+                // Suivi étape « sites web » (found / not_found / pending).
+                $byWeb = DB::table('companies')->where('workspace_id', $w->id)
+                    ->selectRaw("COALESCE(website_status, 'pending') AS s, COUNT(*) AS c")
+                    ->groupBy('s')->orderByDesc('c')->get();
+                $this->line('      >> SITES WEB: ' . $byWeb->map(fn ($r) => "{$r->s}={$r->c}")->implode(' · '));
+
                 $bySize = DB::table('companies')
                     ->where('workspace_id', $w->id)
                     ->selectRaw("COALESCE(size_category, '(non classé)') AS sc, COUNT(*) AS c")

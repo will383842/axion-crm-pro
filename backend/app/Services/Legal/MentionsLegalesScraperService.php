@@ -201,6 +201,12 @@ class MentionsLegalesScraperService
         }
     }
 
+    /** Extensions de fichiers qui matchent le regex email mais sont du bruit (ex. image@2x.png). */
+    private const EMAIL_FALSE_TLDS = [
+        'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp', 'ico', 'css', 'js',
+        'json', 'xml', 'map', 'woff', 'woff2', 'ttf', 'eot', 'mp4', 'webm', 'pdf', 'zip',
+    ];
+
     private function extractFirstUsableEmail(string $body): ?string
     {
         if (! preg_match_all('/\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/', $body, $matches)) {
@@ -208,6 +214,9 @@ class MentionsLegalesScraperService
         }
         foreach ($matches[0] as $email) {
             $lower = strtolower($email);
+            if (! $this->looksLikeRealEmail($lower)) {
+                continue;
+            }
             $skip = false;
             foreach (self::EMAIL_BLACKLIST_PREFIXES as $prefix) {
                 if (str_starts_with($lower, $prefix)) {
@@ -220,6 +229,24 @@ class MentionsLegalesScraperService
             }
         }
         return null;
+    }
+
+    /**
+     * Rejette les faux emails captés dans le HTML : noms d'images (`img@2x.png`),
+     * assets (`x@1x.svg`), et tout ce dont le TLD est une extension de fichier.
+     */
+    private function looksLikeRealEmail(string $email): bool
+    {
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
+        // Motif « retina » : quelque-chose@2x.png / @3x.jpg …
+        if (preg_match('/@\d+x\./', $email)) {
+            return false;
+        }
+        $domain = (string) substr(strrchr($email, '@') ?: '@', 1);
+        $tld = str_contains($domain, '.') ? substr((string) strrchr($domain, '.'), 1) : '';
+        return ! in_array($tld, self::EMAIL_FALSE_TLDS, true);
     }
 
     private function extractFirstPhone(string $body): ?string

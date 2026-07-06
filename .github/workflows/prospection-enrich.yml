@@ -57,8 +57,8 @@ jobs:
             cd "$PROJECT_PATH"
             # Active les sources GRATUITES en réel, garde les payantes en mock.
             set_env() {
-              if grep -q "^\$1=" .env; then
-                sed -i "s|^\$1=.*|\$1=\$2|" .env
+              if grep -qE "^[[:space:]]*\$1[[:space:]]*=" .env; then
+                sed -i -E "s|^[[:space:]]*\$1[[:space:]]*=.*|\$1=\$2|" .env
               else
                 echo "\$1=\$2" >> .env
               fi

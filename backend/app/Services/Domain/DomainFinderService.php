@@ -60,12 +60,130 @@ class DomainFinderService
             return $url;
         }
 
-        // Stratégie 3 : Pages Jaunes — uniquement quand scrapers réels activés
+        // Stratégie 3 : domain-guessing (DNS + HTTP) — 100% GRATUIT, sans clé, scalable.
+        // Devine le domaine depuis le nom + vérifie que le site est bien l'entreprise.
+        $url = $this->guessDomain($company);
+        if ($url) {
+            return $url;
+        }
+
+        // Stratégie 4 : Pages Jaunes — uniquement quand scrapers réels activés
         if (config('services.scrapers.mock', true) === false) {
             return $this->searchPagesJaunes($company->denomination, $ville);
         }
 
         return null;
+    }
+
+    /**
+     * Devine le domaine officiel depuis le nom de l'entreprise, sans aucune API :
+     * génère des candidats (`nomcomplet.fr`, `nom-complet.fr`, `premiermot.fr`…),
+     * vérifie l'existence (DNS) puis que la page mentionne bien l'entreprise
+     * (SIREN, ville, ou ≥2 mots du nom) pour éviter les faux positifs.
+     */
+    private function guessDomain(Company $company): ?string
+    {
+        $tokens = $this->nameTokens((string) $company->denomination);
+        if (count($tokens) === 0) {
+            return null;
+        }
+        $joined = implode('', $tokens);
+        $hyphen = implode('-', $tokens);
+        $first = $tokens[0];
+
+        $candidates = [];
+        foreach (['fr', 'com'] as $tld) {
+            $candidates[] = "{$joined}.{$tld}";
+            if ($hyphen !== $joined) {
+                $candidates[] = "{$hyphen}.{$tld}";
+            }
+            if (count($tokens) > 1 && mb_strlen($first) >= 4) {
+                $candidates[] = "{$first}.{$tld}";
+            }
+        }
+
+        foreach (array_unique($candidates) as $domain) {
+            if (mb_strlen($domain) < 5 || $this->isBlacklisted($domain)) {
+                continue;
+            }
+            if (! @checkdnsrr($domain, 'A') && ! @checkdnsrr($domain, 'AAAA')) {
+                continue; // le domaine n'existe pas
+            }
+            if ($this->verifyCandidate($domain, $company, $tokens)) {
+                return $this->canonicalize("https://{$domain}/");
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Récupère la page d'accueil et confirme qu'elle appartient bien à l'entreprise :
+     * SIREN présent, OU ≥2 mots du nom, OU (1 mot du nom + la ville). Anti-parking.
+     *
+     * @param  list<string>  $tokens
+     */
+    private function verifyCandidate(string $domain, Company $company, array $tokens): bool
+    {
+        foreach (["https://{$domain}/", "http://{$domain}/"] as $url) {
+            try {
+                $resp = Http::timeout(self::HTTP_TIMEOUT_SECONDS)
+                    ->withHeaders(['User-Agent' => self::USER_AGENT])
+                    ->get($url);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            if (! $resp->successful()) {
+                continue;
+            }
+            $body = mb_strtolower(strip_tags((string) $resp->body()));
+            if (mb_strlen($body) < 200) {
+                return false; // page vide / parking
+            }
+            $siren = (string) $company->siren;
+            if ($siren !== '' && str_contains(preg_replace('/\s+/', '', $body), $siren)) {
+                return true;
+            }
+            $hits = 0;
+            foreach ($tokens as $t) {
+                if (mb_strlen($t) >= 3 && str_contains($body, $t)) {
+                    $hits++;
+                }
+            }
+            $ville = $this->stripAccents(mb_strtolower((string) ($company->city_name ?? $company->city ?? '')));
+            $villeOk = mb_strlen($ville) >= 3 && str_contains($this->stripAccents($body), $ville);
+
+            return $hits >= 2 || ($hits >= 1 && $villeOk);
+        }
+
+        return false;
+    }
+
+    /**
+     * Découpe le nom en mots normalisés (sans accents, sans forme juridique).
+     *
+     * @return list<string>
+     */
+    private function nameTokens(string $name): array
+    {
+        $s = $this->stripAccents(mb_strtolower($name));
+        $s = preg_replace('/[^a-z0-9]+/', ' ', $s);
+        $stop = [
+            'sarl', 'sas', 'sasu', 'sa', 'eurl', 'snc', 'sci', 'sarlu', 'scop',
+            'earl', 'gie', 'sccv', 'et', 'de', 'du', 'des', 'la', 'le', 'les', 'l', 'd',
+        ];
+        $words = array_filter(
+            explode(' ', (string) $s),
+            fn ($w) => $w !== '' && mb_strlen($w) >= 2 && ! in_array($w, $stop, true),
+        );
+        return array_values(array_slice($words, 0, 4));
+    }
+
+    private function stripAccents(string $s): string
+    {
+        $from = ['à', 'â', 'ä', 'á', 'ã', 'å', 'é', 'è', 'ê', 'ë', 'î', 'ï', 'í', 'ì', 'ô', 'ö', 'ò', 'ó', 'õ', 'ù', 'û', 'ü', 'ú', 'ç', 'ñ'];
+        $to = ['a', 'a', 'a', 'a', 'a', 'a', 'e', 'e', 'e', 'e', 'i', 'i', 'i', 'i', 'o', 'o', 'o', 'o', 'o', 'u', 'u', 'u', 'u', 'c', 'n'];
+        return str_replace($from, $to, $s);
     }
 
     /**

@@ -56,6 +56,16 @@ jobs:
           key: composer-${{ hashFiles('backend/composer.lock') }}
           restore-keys: composer-
 
+      - name: Prepare Laravel runtime dirs
+        working-directory: backend
+        run: |
+          mkdir -p bootstrap/cache \
+                   storage/framework/cache/data \
+                   storage/framework/sessions \
+                   storage/framework/views \
+                   storage/logs
+          chmod -R 0777 bootstrap/cache storage
+
       - name: Install PHP deps
         working-directory: backend
         run: composer install --no-interaction --prefer-dist --no-progress --no-dev || composer install --no-scripts --no-interaction --prefer-dist --no-progress --no-dev
@@ -84,13 +94,32 @@ jobs:
         run: |
           set -euo pipefail
 
-          SSH="ssh -o StrictHostKeyChecking=no"
+          # Étale les démarrages : 20 runners qui se connectent en même temps
+          # dépassent MaxStartups de sshd (« Connection closed by port 22 »).
+          sleep $(( SHARD * 3 ))
 
-          # 1) Récupère les identifiants DB depuis le conteneur api du VPS (au runtime,
-          #    jamais stockés). Masque-les dans les logs GitHub.
-          DB_DATABASE=$($SSH "$USER@$HOST" "cd '$PROJECT_PATH' && docker compose exec -T api printenv DB_DATABASE" | tr -d '\r')
-          DB_USERNAME=$($SSH "$USER@$HOST" "cd '$PROJECT_PATH' && docker compose exec -T api printenv DB_USERNAME" | tr -d '\r')
-          DB_PASSWORD=$($SSH "$USER@$HOST" "cd '$PROJECT_PATH' && docker compose exec -T api printenv DB_PASSWORD" | tr -d '\r')
+          # ControlMaster : une SEULE connexion TCP par runner, réutilisée pour le
+          # fetch des creds ET le tunnel → ~1 connexion/runner au lieu de 4.
+          CM="$HOME/.ssh/cm-%h-%p-%r"
+          SSHOPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=30 \
+                   -o ServerAliveInterval=30 -o ServerAliveCountMax=1000 \
+                   -o ControlMaster=auto -o ControlPath=$CM -o ControlPersist=600"
+
+          retry_ssh() {
+            local a
+            for a in 1 2 3 4 5 6; do
+              if ssh $SSHOPTS "$USER@$HOST" "$@"; then return 0; fi
+              echo "ssh échec (tentative $a) — retry…" >&2
+              sleep $(( a * 5 ))
+            done
+            return 1
+          }
+
+          # 1) Identifiants DB lus au runtime depuis le conteneur api (1 seul appel).
+          CREDS=$(retry_ssh "cd '$PROJECT_PATH' && docker compose exec -T api printenv | grep -E '^DB_(DATABASE|USERNAME|PASSWORD)='" | tr -d '\r')
+          DB_DATABASE=$(printf '%s\n' "$CREDS" | sed -n 's/^DB_DATABASE=//p')
+          DB_USERNAME=$(printf '%s\n' "$CREDS" | sed -n 's/^DB_USERNAME=//p')
+          DB_PASSWORD=$(printf '%s\n' "$CREDS" | sed -n 's/^DB_PASSWORD=//p')
           echo "::add-mask::$DB_PASSWORD"
           echo "::add-mask::$DB_USERNAME"
           if [ -z "$DB_DATABASE" ] || [ -z "$DB_USERNAME" ] || [ -z "$DB_PASSWORD" ]; then
@@ -98,11 +127,10 @@ jobs:
             exit 1
           fi
 
-          # 2) Tunnel SSH vers Postgres (publié sur l'hôte VPS en 55432). Keepalive
-          #    pour tenir plusieurs heures.
-          $SSH -fN -o ExitOnForwardFailure=yes \
-               -o ServerAliveInterval=30 -o ServerAliveCountMax=1000 \
-               -L 15432:127.0.0.1:55432 "$USER@$HOST"
+          # 2) Tunnel SSH vers Postgres (publié sur l'hôte VPS en 55432), sur la même
+          #    connexion maître. Keepalive pour tenir plusieurs heures.
+          ssh $SSHOPTS -fN -o ExitOnForwardFailure=yes \
+              -L 15432:127.0.0.1:55432 "$USER@$HOST"
 
           # 3) .env minimal (pas de Redis/queue au boot). Les DB_* passent par l'env
           #    du process (exportés ci-dessous), pas par le .env.

@@ -80,12 +80,9 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
 
-      - name: Trust host key
-        env:
-          HOST: ${{ secrets.HETZNER_HOST }}
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+      # Pas d'étape ssh-keyscan : 20 runners qui la lancent en même temps saturent
+      # MaxStartups de sshd (échec exit 1 sous `bash -e`). Tous les ssh ci-dessous
+      # utilisent StrictHostKeyChecking=no + UserKnownHostsFile=/dev/null.
 
       - name: Find websites (guessing on runner, DB via SSH tunnel)
         working-directory: backend
@@ -106,7 +103,8 @@ jobs:
           # ControlMaster : une SEULE connexion TCP par runner, réutilisée pour le
           # fetch des creds ET le tunnel → ~1 connexion/runner au lieu de 4.
           CM="$HOME/.ssh/cm-%h-%p-%r"
-          SSHOPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=30 \
+          SSHOPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                   -o ConnectTimeout=30 \
                    -o ServerAliveInterval=30 -o ServerAliveCountMax=1000 \
                    -o ControlMaster=auto -o ControlPath=$CM -o ControlPersist=600"
 

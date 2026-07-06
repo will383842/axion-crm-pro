@@ -38,6 +38,12 @@ class ProspectionStats extends Command
                 $withCity = DB::table('companies')->where('workspace_id', $w->id)->whereNotNull('city')->count();
                 $this->line("      >> avec ADRESSE : {$withAddr} · avec SIRET : {$withSiret} · avec VILLE : {$withCity}");
 
+                $withEff = DB::table('companies')->where('workspace_id', $w->id)
+                    ->whereNotNull('effectif_range')
+                    ->whereNotIn('effectif_range', ['NN', ''])
+                    ->count();
+                $this->line("      >> avec EFFECTIF salarié déclaré INSEE : {$withEff}");
+
                 $bySize = DB::table('companies')
                     ->where('workspace_id', $w->id)
                     ->selectRaw("COALESCE(size_category, '(non classé)') AS sc, COUNT(*) AS c")

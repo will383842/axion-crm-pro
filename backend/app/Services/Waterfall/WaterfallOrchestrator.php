@@ -66,25 +66,30 @@ class WaterfallOrchestrator
     {
         Log::info('Waterfall start', ['company_id' => $company->id, 'siren' => $company->siren]);
 
-        // Sprint H3 — Si étape INSEE détecte entreprise radiée → archive + SKIP tout le waterfall
-        // (économie ressources, plus de Brave/Hunter/etc gaspillés)
-        if ($this->step1_insee($company) === 'archived') {
-            $company->enriched_at = now();
-            $company->save();
-            Log::info('Waterfall short-circuit (entreprise radiée)', [
-                'company_id' => $company->id, 'siren' => $company->siren,
-            ]);
-            return;
+        // Sprint H3 — Si étape INSEE détecte entreprise radiée → archive + SKIP tout le waterfall.
+        // RÉSILIENCE : un échec INSEE (ex. IP TLS-bloquée) ne doit PAS tuer le waterfall —
+        // on a déjà les données INSEE de la collecte, l'enrichissement n'en dépend pas.
+        try {
+            if ($this->step1_insee($company) === 'archived') {
+                $company->enriched_at = now();
+                $company->save();
+                Log::info('Waterfall short-circuit (entreprise radiée)', [
+                    'company_id' => $company->id, 'siren' => $company->siren,
+                ]);
+                return;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('step1 insee failed (skipped)', ['company_id' => $company->id, 'error' => $e->getMessage()]);
         }
 
-        $this->step2_annuaire($company);
-        $this->step3_bodacc($company);
+        $this->safe(fn () => $this->step2_annuaire($company), 'step2_annuaire', $company);
+        $this->safe(fn () => $this->step3_bodacc($company), 'step3_bodacc', $company);
         $this->step3b_find_domain($company);
         $this->step3c_mentions_legales($company);
         $this->step3d_google_places($company);
         $this->step4_dispatch_node_scrapes($company);
         $this->step7_email_finder($company);
-        $this->step8_geocode($company);
+        $this->safe(fn () => $this->step8_geocode($company), 'step8_geocode', $company);
         $this->step9_france_travail($company);
         $this->step10_classify($company);
         $this->step10b_auto_classify($company);
@@ -590,6 +595,19 @@ class WaterfallOrchestrator
             WaterfallSentry::capture($company, 'auto-segment', $e);
             Log::warning('auto-segment failed', ['company_id' => $company->id, 'error' => $e->getMessage()]);
             $this->recordRun($company, 'auto-segment', 'failed');
+        }
+    }
+
+    /** Exécute une étape en isolant ses erreurs — ne casse JAMAIS le waterfall. */
+    private function safe(callable $fn, string $step, Company $company): void
+    {
+        try {
+            $fn();
+        } catch (\Throwable $e) {
+            Log::warning("{$step} failed (skipped)", [
+                'company_id' => $company->id,
+                'error'      => $e->getMessage(),
+            ]);
         }
     }
 

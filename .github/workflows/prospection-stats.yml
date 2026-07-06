@@ -20,12 +20,8 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
 
-      - name: Trust host key
-        env:
-          HOST: ${{ secrets.HETZNER_HOST }}
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+      # ssh-keyscan retire : sature MaxStartups quand d autres jobs SSH tournent
+      # (StrictHostKeyChecking=no + UserKnownHostsFile=/dev/null suffisent)
 
       - name: Stats via SSH
         env:
@@ -34,7 +30,7 @@ jobs:
           PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
         run: |
           set -e
-          ssh -o StrictHostKeyChecking=no "$USER@$HOST" bash <<EOF
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$USER@$HOST" bash <<EOF
             set -euo pipefail
             cd "$PROJECT_PATH"
             docker compose exec -u root -T api php artisan prospection:stats

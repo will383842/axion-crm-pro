@@ -1,0 +1,144 @@
+name: Prospection — Trouver les sites web (DISTRIBUÉ ~20×)
+
+# Version DISTRIBUÉE de la recherche de sites web : au lieu que 10 jobs fassent
+# tous SSH vers l'unique conteneur `api` du VPS (goulot = un seul serveur), chaque
+# job GitHub fait le domain-guessing SUR SA PROPRE MACHINE (runner), puis écrit en
+# base via un tunnel SSH vers Postgres. 20 shards `id % 20 == k` (partition sans
+# chevauchement) → débit ≈ ×20, MÊME code, MÊME qualité.
+#
+# Les identifiants Postgres NE sont PAS stockés en secret : ils sont lus au runtime
+# depuis le conteneur `api` du VPS (via l'accès SSH existant) et masqués dans les logs.
+
+on:
+  workflow_dispatch:
+    inputs:
+      retry:
+        description: 'Pass 2 : reprend les not_found avec variantes étendues (true/false)'
+        required: false
+        default: 'false'
+      limit:
+        description: 'Limite par shard (0 = tout ; ex. 300 pour un test rapide)'
+        required: false
+        default: '0'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prospection-find-websites-distributed
+  cancel-in-progress: false
+
+jobs:
+  find:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    env:
+      SHARDS: '20'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo, pdo_pgsql, redis, intl, mbstring, bcmath, zip
+          coverage: none
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install PHP deps
+        working-directory: backend
+        run: composer install --no-interaction --prefer-dist --no-progress --no-dev || composer install --no-scripts --no-interaction --prefer-dist --no-progress --no-dev
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Trust host key
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Find websites (guessing on runner, DB via SSH tunnel)
+        working-directory: backend
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
+          SHARD: ${{ matrix.shard }}
+          LIMIT: ${{ github.event.inputs.limit || '0' }}
+          RETRY: ${{ github.event.inputs.retry || 'false' }}
+        run: |
+          set -euo pipefail
+
+          SSH="ssh -o StrictHostKeyChecking=no"
+
+          # 1) Récupère les identifiants DB depuis le conteneur api du VPS (au runtime,
+          #    jamais stockés). Masque-les dans les logs GitHub.
+          DB_DATABASE=$($SSH "$USER@$HOST" "cd '$PROJECT_PATH' && docker compose exec -T api printenv DB_DATABASE" | tr -d '\r')
+          DB_USERNAME=$($SSH "$USER@$HOST" "cd '$PROJECT_PATH' && docker compose exec -T api printenv DB_USERNAME" | tr -d '\r')
+          DB_PASSWORD=$($SSH "$USER@$HOST" "cd '$PROJECT_PATH' && docker compose exec -T api printenv DB_PASSWORD" | tr -d '\r')
+          echo "::add-mask::$DB_PASSWORD"
+          echo "::add-mask::$DB_USERNAME"
+          if [ -z "$DB_DATABASE" ] || [ -z "$DB_USERNAME" ] || [ -z "$DB_PASSWORD" ]; then
+            echo "Échec récupération identifiants DB depuis le VPS" >&2
+            exit 1
+          fi
+
+          # 2) Tunnel SSH vers Postgres (publié sur l'hôte VPS en 55432). Keepalive
+          #    pour tenir plusieurs heures.
+          $SSH -fN -o ExitOnForwardFailure=yes \
+               -o ServerAliveInterval=30 -o ServerAliveCountMax=1000 \
+               -L 15432:127.0.0.1:55432 "$USER@$HOST"
+
+          # 3) .env minimal (pas de Redis/queue au boot). Les DB_* passent par l'env
+          #    du process (exportés ci-dessous), pas par le .env.
+          cat > .env <<'ENVEOF'
+          APP_NAME="Axion CRM Pro"
+          APP_ENV=production
+          APP_KEY=
+          APP_DEBUG=false
+          APP_URL=https://api.axion-crm-pro.com
+          APP_TIMEZONE=Europe/Paris
+          LOG_CHANNEL=stderr
+          LOG_LEVEL=warning
+          DB_CONNECTION=pgsql
+          DB_SCHEMA=public
+          CACHE_STORE=array
+          QUEUE_CONNECTION=sync
+          SESSION_DRIVER=array
+          BROADCAST_CONNECTION=null
+          FILESYSTEM_DISK=local
+          TELESCOPE_ENABLED=false
+          MOCK_MODE=true
+          MOCK_LLM=true
+          MOCK_PROXIES=true
+          MOCK_SCRAPERS=true
+          MOCK_SMTP=true
+          MOCK_CAPTCHA=true
+          ENVEOF
+
+          export DB_HOST=127.0.0.1
+          export DB_PORT=15432
+          export DB_DATABASE DB_USERNAME DB_PASSWORD
+
+          php artisan key:generate --force
+
+          RETRY_FLAG=""
+          if [ "$RETRY" = "true" ]; then RETRY_FLAG="--retry"; fi
+
+          php artisan prospection:find-websites \
+            --shards="$SHARDS" --shard="$SHARD" --limit="$LIMIT" $RETRY_FLAG

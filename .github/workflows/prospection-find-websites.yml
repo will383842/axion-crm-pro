@@ -15,6 +15,10 @@ on:
         description: 'Limite par département (0 = tout)'
         required: false
         default: '0'
+      retry:
+        description: 'Pass 2 : reprend les not_found avec variantes étendues (true/false)'
+        required: false
+        default: 'false'
 
 permissions:
   contents: read
@@ -63,10 +67,13 @@ jobs:
           PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
           DEPT: ${{ matrix.dept }}
           LIMIT: ${{ github.event.inputs.limit || '0' }}
+          RETRY: ${{ github.event.inputs.retry || 'false' }}
         run: |
           set -e
+          RETRY_FLAG=""
+          if [ "$RETRY" = "true" ]; then RETRY_FLAG="--retry"; fi
           ssh -o StrictHostKeyChecking=no "$USER@$HOST" bash <<EOF
             set -euo pipefail
             cd "$PROJECT_PATH"
-            docker compose exec -u root -T api php artisan prospection:find-websites --department="$DEPT" --limit="$LIMIT" < /dev/null
+            docker compose exec -u root -T api php artisan prospection:find-websites --department="$DEPT" --limit="$LIMIT" $RETRY_FLAG < /dev/null
           EOF

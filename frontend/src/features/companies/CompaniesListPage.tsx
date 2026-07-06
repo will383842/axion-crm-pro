@@ -16,6 +16,7 @@ import {
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { CompanyRow, COMPANY_ROW_GRID, type CompanyRowData } from "./components/CompanyRow";
+import { EFFECTIF_OPTIONS } from "./effectif";
 import { Pagination } from "./components/Pagination";
 
 type Company = CompanyRowData & {
@@ -88,6 +89,7 @@ const SECTOR_OPTIONS = [
 
 interface Filter {
   size: string;
+  effectif: string;
   priority: string;
   search: string;
   naf: string;
@@ -101,6 +103,7 @@ interface Filter {
 
 const EMPTY_FILTER: Filter = {
   size: "",
+  effectif: "",
   priority: "",
   search: "",
   naf: "",
@@ -120,6 +123,7 @@ export function CompaniesListPage() {
   function filterParams(): URLSearchParams {
     return new URLSearchParams({
       ...(filter.size ? { "filter[size_category]": filter.size } : {}),
+      ...(filter.effectif ? { "filter[effectif]": filter.effectif } : {}),
       ...(filter.priority ? { "filter[priority]": filter.priority } : {}),
       ...(filter.search ? { "filter[denomination]": filter.search } : {}),
       ...(filter.naf ? { "filter[naf]": filter.naf } : {}),
@@ -163,6 +167,7 @@ export function CompaniesListPage() {
         page: String(page),
         per_page: "100",
         ...(filter.size ? { "filter[size_category]": filter.size } : {}),
+        ...(filter.effectif ? { "filter[effectif]": filter.effectif } : {}),
         ...(filter.priority ? { "filter[priority]": filter.priority } : {}),
         ...(filter.search ? { "filter[denomination]": filter.search } : {}),
         ...(filter.naf ? { "filter[naf]": filter.naf } : {}),
@@ -235,6 +240,7 @@ export function CompaniesListPage() {
   const hasActiveFilter =
     filter.search ||
     filter.size ||
+    filter.effectif ||
     filter.priority ||
     filter.naf ||
     filter.quality ||
@@ -246,6 +252,7 @@ export function CompaniesListPage() {
   const activeFilterCount = [
     filter.search,
     filter.size,
+    filter.effectif,
     filter.priority,
     filter.naf,
     filter.quality,
@@ -359,6 +366,12 @@ export function CompaniesListPage() {
               onChange={(v) => setFilterAndReset({ size: v })}
               options={SIZE_OPTIONS}
               ariaLabel="Filtre taille"
+            />
+            <FilterSelect
+              value={filter.effectif}
+              onChange={(v) => setFilterAndReset({ effectif: v })}
+              options={EFFECTIF_OPTIONS}
+              ariaLabel="Filtre effectif (nombre de salariés)"
             />
             <FilterSelect
               value={filter.sector_main}

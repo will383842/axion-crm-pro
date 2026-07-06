@@ -84,6 +84,7 @@ class CompaniesController extends ApiController
             ->allowedFilters([
                 AllowedFilter::exact('naf'),
                 AllowedFilter::exact('size_category'),
+                AllowedFilter::exact('effectif', 'effectif_range'),
                 AllowedFilter::exact('priority'),
                 AllowedFilter::exact('discovery_source'),
                 AllowedFilter::exact('prospection_status'),

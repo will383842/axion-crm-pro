@@ -89,10 +89,14 @@ class DomainFinderService
      * Génère les domaines candidats pour un jeu de mots (nomcomplet.fr, nom-complet.fr,
      * premiermot.fr, + .com), filtrés (longueur, blacklist).
      *
+     * Mode `$extended` = 2e passage (pass 2) sur les `not_found` : ajoute des variantes
+     * secondaires (TLD alternatifs .com/.net/.eu, hyphen.com, premier mot .com, deux
+     * premiers mots collés, acronyme des initiales) pour remonter la couverture.
+     *
      * @param  list<string>  $tokens
      * @return list<string>
      */
-    private function candidateDomains(array $tokens): array
+    private function candidateDomains(array $tokens, bool $extended = false): array
     {
         if (count($tokens) === 0) {
             return [];
@@ -100,8 +104,7 @@ class DomainFinderService
         $joined = implode('', $tokens);
         $hyphen = implode('-', $tokens);
         $first = $tokens[0];
-        // 4 candidats les plus probables (priorité). Les autres variantes seront
-        // retentées lors d'un 2e passage sur les `not_found` (suivi par statut).
+        // 4 candidats les plus probables (priorité, pass 1).
         $out = ["{$joined}.fr"];
         if ($hyphen !== $joined) {
             $out[] = "{$hyphen}.fr";
@@ -110,6 +113,31 @@ class DomainFinderService
         if (count($tokens) > 1 && mb_strlen($first) >= 4) {
             $out[] = "{$first}.fr";
         }
+
+        if ($extended) {
+            // Variantes secondaires — testées seulement au 2e passage (not_found).
+            if ($hyphen !== $joined) {
+                $out[] = "{$hyphen}.com";
+            }
+            $out[] = "{$joined}.net";
+            $out[] = "{$joined}.eu";
+            if (count($tokens) > 1 && mb_strlen($first) >= 4) {
+                $out[] = "{$first}.com";
+            }
+            if (count($tokens) >= 2) {
+                $two = $tokens[0] . $tokens[1];
+                $out[] = "{$two}.fr";
+                $out[] = "{$two}.com";
+            }
+            if (count($tokens) >= 3) {
+                $acr = implode('', array_map(static fn ($t) => mb_substr($t, 0, 1), $tokens));
+                if (mb_strlen($acr) >= 3) {
+                    $out[] = "{$acr}.fr";
+                    $out[] = "{$acr}.com";
+                }
+            }
+        }
+
         return array_values(array_filter(
             array_unique($out),
             fn ($d) => mb_strlen($d) >= 5 && ! $this->isBlacklisted($d),
@@ -137,20 +165,31 @@ class DomainFinderService
      * vite (connectTimeout court). 1 requête par domaine = crawl poli.
      *
      * @param  iterable<Company>  $companies
+     * @param  bool  $extended  2e passage (pass 2) : teste les variantes secondaires.
      * @return array<int, string|null>  id entreprise => url trouvée (ou null)
      */
-    public function guessDomainsBatch(iterable $companies): array
+    public function guessDomainsBatch(iterable $companies, bool $extended = false): array
     {
         $result = [];
         $reqs = [];
         $n = 0;
         foreach ($companies as $c) {
             $result[$c->id] = null;
-            foreach ($this->candidateDomains($this->nameTokens((string) $c->denomination)) as $domain) {
+            $tokens = $this->nameTokens((string) $c->denomination);
+            foreach ($this->candidateDomains($tokens, $extended) as $domain) {
+                // Pré-filtre DNS : on n'ouvre une connexion HTTP que si le domaine
+                // EXISTE réellement. À l'échelle (des millions), la plupart des
+                // candidats devinés sont des NXDOMAIN ; sans ce filtre ils saturent
+                // le pool (sockets + resolver) et plombent le débit. checkdnsrr est
+                // résolu localement (cache resolver), bien plus rapide qu'une tentative
+                // de connexion HTTP qui attend le connectTimeout.
+                if (! @checkdnsrr($domain, 'A') && ! @checkdnsrr($domain, 'AAAA')) {
+                    continue;
+                }
                 $reqs['k' . ($n++)] = [
                     'c'      => $c,
                     'domain' => $domain,
-                    'tokens' => $this->nameTokens((string) $c->denomination),
+                    'tokens' => $tokens,
                 ];
             }
         }

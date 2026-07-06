@@ -56,6 +56,13 @@ Schedule::command('media:extract-from-companies')
     ->withoutOverlapping()
     ->onOneServer();
 
+// Anti-divergence : les médias liés à une entreprise héritent de son site/email/tél
+// (l'entreprise = source de vérité). Tourne après l'extraction.
+Schedule::command('media:sync-from-companies')
+    ->dailyAt('05:15')
+    ->withoutOverlapping()
+    ->onOneServer();
+
 // Recherche des sites web manquants — toutes les 30 min, BORNÉE en mémoire (--limit
 // évite la fuite du DomainFinderService sur de gros volumes), withoutOverlapping (pas
 // d'empilement) + runInBackground (process isolé). Le conteneur `scheduler` relance

@@ -35,6 +35,10 @@ class MediaFindWebsites extends Command
                 ->where('website_status', 'pending')
                 ->whereNull('website')
                 ->whereNotNull('name')
+                // Anti-divergence : les médias LIÉS à une entreprise héritent du site
+                // de celle-ci (media:sync-from-companies). On ne devine QUE pour les
+                // médias autonomes (titres CPPAP, agences) sans entreprise.
+                ->whereNull('company_id')
                 ->limit($batch)
                 ->get();
             if ($medias->isEmpty()) {

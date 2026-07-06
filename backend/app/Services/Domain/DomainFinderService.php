@@ -177,15 +177,11 @@ class DomainFinderService
             $result[$c->id] = null;
             $tokens = $this->nameTokens((string) $c->denomination);
             foreach ($this->candidateDomains($tokens, $extended) as $domain) {
-                // Pré-filtre DNS : on n'ouvre une connexion HTTP que si le domaine
-                // EXISTE réellement. À l'échelle (des millions), la plupart des
-                // candidats devinés sont des NXDOMAIN ; sans ce filtre ils saturent
-                // le pool (sockets + resolver) et plombent le débit. checkdnsrr est
-                // résolu localement (cache resolver), bien plus rapide qu'une tentative
-                // de connexion HTTP qui attend le connectTimeout.
-                if (! @checkdnsrr($domain, 'A') && ! @checkdnsrr($domain, 'AAAA')) {
-                    continue;
-                }
+                // PAS de pré-filtre DNS ici (checkdnsrr) : mesuré en prod, il DIVISE
+                // le débit par ~2,5 (~1/s/job au lieu de ~2,6/s). Le resolver du serveur
+                // est lent et checkdnsrr est séquentiel → 4 lookups bloquants/entreprise
+                // dominent. Le pool HTTP gère mieux : les NXDOMAIN échouent vite au
+                // resolve (bien avant le connectTimeout) sans sérialiser.
                 $reqs['k' . ($n++)] = [
                     'c'      => $c,
                     'domain' => $domain,

@@ -72,7 +72,15 @@ jobs:
           set -e
           RETRY_FLAG=""
           if [ "$RETRY" = "true" ]; then RETRY_FLAG="--retry"; fi
-          ssh -o StrictHostKeyChecking=no "$USER@$HOST" bash <<EOF
+          # Keepalive SSH : un lot lent peut rester silencieux plusieurs minutes ;
+          # sans keepalive la session tombe (« client_loop: send disconnect: Broken
+          # pipe », exit 255) et le job du dépt s'arrête à mi-parcours. On tolère
+          # jusqu'à ~10 min sans réponse serveur avant d'abandonner.
+          ssh -o StrictHostKeyChecking=no \
+              -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=20 \
+              -o TCPKeepAlive=yes \
+              "$USER@$HOST" bash <<EOF
             set -euo pipefail
             cd "$PROJECT_PATH"
             docker compose exec -u root -T api php artisan prospection:find-websites --department="$DEPT" --limit="$LIMIT" $RETRY_FLAG < /dev/null

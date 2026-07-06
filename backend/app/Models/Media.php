@@ -41,6 +41,15 @@ class Media extends Model
         'enriched_at' => 'datetime',
     ];
 
+    /**
+     * Alias `denomination` → `name` : permet de réutiliser le DomainFinderService
+     * (moteur de devinette de domaine des entreprises) tel quel sur un média.
+     */
+    public function getDenominationAttribute(): ?string
+    {
+        return $this->name;
+    }
+
     public function workspace()
     {
         return $this->belongsTo(Workspace::class);

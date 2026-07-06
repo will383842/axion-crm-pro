@@ -47,6 +47,8 @@ return new class extends Migration
                 postcode         VARCHAR(10) NULL,
                 website          TEXT NULL,
                 website_status   VARCHAR(16) NULL,        -- pending|found|not_found|exhausted (même moteur que companies)
+                website_method   VARCHAR(16) NULL,        -- guess|guess2|… (méthode de découverte du site)
+                website_checked_at TIMESTAMPTZ NULL,
                 email            CITEXT NULL,             -- email rédaction générique (contact@, redaction@)
                 phone            VARCHAR(32) NULL,
                 socials          JSONB NULL,              -- {twitter,linkedin,facebook,instagram,youtube,tiktok}
@@ -68,6 +70,7 @@ return new class extends Migration
         DB::statement('CREATE INDEX IF NOT EXISTS media_company_idx ON media (company_id)');
         DB::statement('CREATE INDEX IF NOT EXISTS media_parent_idx ON media (parent_media_id)');
         DB::statement('CREATE INDEX IF NOT EXISTS media_enrich_status_idx ON media (workspace_id, enrich_status)');
+        DB::statement('CREATE INDEX IF NOT EXISTS media_website_status_idx ON media (website_status)');
         // Déduplication : un même titre CPPAP / un même média nommé par workspace.
         DB::statement('CREATE UNIQUE INDEX IF NOT EXISTS media_workspace_cppap_uidx ON media (workspace_id, cppap_number) WHERE cppap_number IS NOT NULL');
 

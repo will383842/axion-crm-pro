@@ -3,6 +3,7 @@
 namespace App\Services\Domain;
 
 use App\Models\Company;
+use App\Models\Media;
 use App\Services\Http\ProxiedHttpClient;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -252,7 +253,7 @@ class DomainFinderService
      *
      * @param  list<string>  $tokens
      */
-    private function verifyBody(string $rawBody, Company $company, array $tokens): bool
+    private function verifyBody(string $rawBody, Company|Media $company, array $tokens): bool
     {
         $body = mb_strtolower(strip_tags($rawBody));
         if (mb_strlen($body) < 200) {

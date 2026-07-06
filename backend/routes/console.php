@@ -48,3 +48,25 @@ Schedule::command('companies:retry-google-places --limit=500')
     ->skip(function (): bool {
         return ! array_key_exists('companies:retry-google-places', Artisan::all());
     });
+
+// --- Chantier base médias : rafraîchissement automatique (« set & forget ») ---
+// Extraction des nouveaux médias (par NAF) depuis companies — idempotent, quotidien.
+Schedule::command('media:extract-from-companies')
+    ->dailyAt('05:00')
+    ->withoutOverlapping()
+    ->onOneServer();
+
+// Recherche des sites web manquants — toutes les 30 min, BORNÉE en mémoire (--limit
+// évite la fuite du DomainFinderService sur de gros volumes), withoutOverlapping (pas
+// d'empilement) + runInBackground (process isolé). Le conteneur `scheduler` relance
+// le job à l'heure suivante → SURVIT aux redéploiements (robustesse sans systemd).
+Schedule::command('media:find-websites --limit=20000')
+    ->everyThirtyMinutes()
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->onOneServer();
+
+// Rafraîchissement hebdomadaire des registres officiels CPPAP (lundi tôt).
+Schedule::command('media:import-opendatasoft cppap')->weeklyOn(1, '02:15')->withoutOverlapping()->onOneServer();
+Schedule::command('media:import-opendatasoft spel')->weeklyOn(1, '02:30')->withoutOverlapping()->onOneServer();
+Schedule::command('media:import-opendatasoft agences')->weeklyOn(1, '02:45')->withoutOverlapping()->onOneServer();

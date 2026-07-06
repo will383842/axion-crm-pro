@@ -33,8 +33,8 @@ class DomainFinderService
     private const HTTP_TIMEOUT_SECONDS = 10;
 
     // Vérification de domaine deviné : court + fail-fast (des millions d'entreprises).
-    private const GUESS_TIMEOUT = 5;
-    private const GUESS_CONNECT_TIMEOUT = 3;
+    private const GUESS_TIMEOUT = 4;
+    private const GUESS_CONNECT_TIMEOUT = 2;
 
     private const BRAVE_SEARCH_URL = 'https://api.search.brave.com/res/v1/web/search';
 
@@ -85,40 +85,111 @@ class DomainFinderService
      * vérifie l'existence (DNS) puis que la page mentionne bien l'entreprise
      * (SIREN, ville, ou ≥2 mots du nom) pour éviter les faux positifs.
      */
-    private function guessDomain(Company $company): ?string
+    /**
+     * Génère les domaines candidats pour un jeu de mots (nomcomplet.fr, nom-complet.fr,
+     * premiermot.fr, + .com), filtrés (longueur, blacklist).
+     *
+     * @param  list<string>  $tokens
+     * @return list<string>
+     */
+    private function candidateDomains(array $tokens): array
     {
-        $tokens = $this->nameTokens((string) $company->denomination);
         if (count($tokens) === 0) {
-            return null;
+            return [];
         }
         $joined = implode('', $tokens);
         $hyphen = implode('-', $tokens);
         $first = $tokens[0];
-
-        $candidates = [];
-        foreach (['fr', 'com'] as $tld) {
-            $candidates[] = "{$joined}.{$tld}";
-            if ($hyphen !== $joined) {
-                $candidates[] = "{$hyphen}.{$tld}";
-            }
-            if (count($tokens) > 1 && mb_strlen($first) >= 4) {
-                $candidates[] = "{$first}.{$tld}";
-            }
+        // 4 candidats les plus probables (priorité). Les autres variantes seront
+        // retentées lors d'un 2e passage sur les `not_found` (suivi par statut).
+        $out = ["{$joined}.fr"];
+        if ($hyphen !== $joined) {
+            $out[] = "{$hyphen}.fr";
         }
+        $out[] = "{$joined}.com";
+        if (count($tokens) > 1 && mb_strlen($first) >= 4) {
+            $out[] = "{$first}.fr";
+        }
+        return array_values(array_filter(
+            array_unique($out),
+            fn ($d) => mb_strlen($d) >= 5 && ! $this->isBlacklisted($d),
+        ));
+    }
 
-        foreach (array_unique($candidates) as $domain) {
-            if (mb_strlen($domain) < 5 || $this->isBlacklisted($domain)) {
-                continue;
-            }
+    private function guessDomain(Company $company): ?string
+    {
+        $tokens = $this->nameTokens((string) $company->denomination);
+        foreach ($this->candidateDomains($tokens) as $domain) {
             if (! @checkdnsrr($domain, 'A') && ! @checkdnsrr($domain, 'AAAA')) {
-                continue; // le domaine n'existe pas
+                continue;
             }
             if ($this->verifyCandidate($domain, $company, $tokens)) {
                 return $this->canonicalize("https://{$domain}/");
             }
         }
-
         return null;
+    }
+
+    /**
+     * Version CONCURRENTE (Http::pool) : teste les domaines de PLUSIEURS entreprises
+     * EN PARALLÈLE — indispensable à l'échelle (4M en quelques heures). Pas de DNS
+     * séquentiel : le pool gère résolution + connexion, les domaines morts échouent
+     * vite (connectTimeout court). 1 requête par domaine = crawl poli.
+     *
+     * @param  iterable<Company>  $companies
+     * @return array<int, string|null>  id entreprise => url trouvée (ou null)
+     */
+    public function guessDomainsBatch(iterable $companies): array
+    {
+        $result = [];
+        $reqs = [];
+        $n = 0;
+        foreach ($companies as $c) {
+            $result[$c->id] = null;
+            foreach ($this->candidateDomains($this->nameTokens((string) $c->denomination)) as $domain) {
+                $reqs['k' . ($n++)] = [
+                    'c'      => $c,
+                    'domain' => $domain,
+                    'tokens' => $this->nameTokens((string) $c->denomination),
+                ];
+            }
+        }
+        if ($reqs === []) {
+            return $result;
+        }
+
+        foreach (array_chunk($reqs, 400, true) as $chunk) {
+            $responses = Http::pool(function ($pool) use ($chunk) {
+                $out = [];
+                foreach ($chunk as $key => $it) {
+                    $out[] = $pool->as($key)
+                        ->timeout(self::GUESS_TIMEOUT)
+                        ->connectTimeout(self::GUESS_CONNECT_TIMEOUT)
+                        ->withHeaders(['User-Agent' => self::USER_AGENT])
+                        ->get("https://{$it['domain']}/");
+                }
+                return $out;
+            });
+
+            foreach ($chunk as $key => $it) {
+                $cid = $it['c']->id;
+                if ($result[$cid] !== null) {
+                    continue; // déjà trouvé pour cette entreprise
+                }
+                $resp = $responses[$key] ?? null;
+                if (! $resp || $resp instanceof \Throwable) {
+                    continue;
+                }
+                try {
+                    if ($resp->successful() && $this->verifyBody((string) $resp->body(), $it['c'], $it['tokens'])) {
+                        $result[$cid] = $this->canonicalize("https://{$it['domain']}/");
+                    }
+                } catch (\Throwable $e) {
+                    // réponse illisible → ignore
+                }
+            }
+        }
+        return $result;
     }
 
     /**
@@ -129,7 +200,6 @@ class DomainFinderService
      */
     private function verifyCandidate(string $domain, Company $company, array $tokens): bool
     {
-        // HTTPS seul + timeouts courts : indispensable pour tenir à l'échelle (4M).
         try {
             $resp = Http::timeout(self::GUESS_TIMEOUT)
                 ->connectTimeout(self::GUESS_CONNECT_TIMEOUT)
@@ -138,12 +208,20 @@ class DomainFinderService
         } catch (\Throwable $e) {
             return false;
         }
-        if (! $resp->successful()) {
-            return false;
-        }
-        $body = mb_strtolower(strip_tags((string) $resp->body()));
+        return $resp->successful() && $this->verifyBody((string) $resp->body(), $company, $tokens);
+    }
+
+    /**
+     * Confirme qu'une page HTML appartient bien à l'entreprise (anti-faux-positif) :
+     * SIREN présent, OU ≥2 mots du nom, OU (1 mot + la ville). Écarte pages vides/parking.
+     *
+     * @param  list<string>  $tokens
+     */
+    private function verifyBody(string $rawBody, Company $company, array $tokens): bool
+    {
+        $body = mb_strtolower(strip_tags($rawBody));
         if (mb_strlen($body) < 200) {
-            return false; // page vide / parking
+            return false;
         }
         $siren = (string) $company->siren;
         if ($siren !== '' && str_contains(preg_replace('/\s+/', '', $body), $siren)) {

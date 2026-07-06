@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Company;
 use App\Services\Domain\DomainFinderService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Étape 1 du pipeline d'enrichissement : trouver le SITE WEB de chaque entreprise
@@ -15,7 +16,7 @@ use Illuminate\Console\Command;
  */
 class ProspectionFindWebsites extends Command
 {
-    protected $signature = 'prospection:find-websites {--department=} {--limit=0} {--batch=300}';
+    protected $signature = 'prospection:find-websites {--department=} {--limit=0} {--batch=100}';
 
     protected $description = 'Trouve le site web des entreprises (devinette) + marque le statut. Reprenable.';
 
@@ -42,31 +43,30 @@ class ProspectionFindWebsites extends Command
                 break;
             }
 
-            foreach ($companies as $c) {
-                $url = null;
-                try {
-                    $url = $finder->find($c);
-                } catch (\Throwable $e) {
-                    // réseau/TLS d'un site tiers → traité comme non trouvé, on continue.
-                }
-                $c->website = $url ?: null;
-                $c->website_status = $url ? 'found' : 'not_found';
-                $c->website_method = $url ? 'guess' : null;
-                $c->website_checked_at = now();
-                $c->save();
+            // Devinette CONCURRENTE (Http::pool) : tout le lot testé en parallèle.
+            $urls = $finder->guessDomainsBatch($companies);
 
+            $now = now();
+            foreach ($companies as $c) {
+                $url = $urls[$c->id] ?? null;
+                DB::table('companies')->where('id', $c->id)->update([
+                    'website'            => $url,
+                    'website_status'     => $url ? 'found' : 'not_found',
+                    'website_method'     => $url ? 'guess' : null,
+                    'website_checked_at' => $now,
+                    'updated_at'         => $now,
+                ]);
                 $processed++;
                 if ($url) {
                     $found++;
                 }
-                if ($limit > 0 && $processed >= $limit) {
-                    break 2;
-                }
             }
 
             $elapsed = max(1, (int) round(microtime(true) - $start));
-            $rate = round($processed / $elapsed, 1);
-            $this->info("  … {$processed} traités · {$found} sites trouvés · {$rate}/s");
+            $this->info("  … {$processed} traités · {$found} sites · " . round($processed / $elapsed, 1) . '/s');
+            if ($limit > 0 && $processed >= $limit) {
+                break;
+            }
         }
 
         $pct = $processed > 0 ? round($found / $processed * 100, 1) : 0;

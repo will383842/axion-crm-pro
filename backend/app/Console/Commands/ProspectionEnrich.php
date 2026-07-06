@@ -1,0 +1,85 @@
+<?php
+
+namespace App\Console\Commands;
+
+use App\Models\Company;
+use App\Services\Waterfall\WaterfallOrchestrator;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * Enrichit N entreprises de façon SYNCHRONE (test) via le waterfall :
+ * dirigeants + CA (annuaire-entreprises), site web (DomainFinder), email/tél
+ * (mentions légales), GPS (BAN). Affiche la config MOCK réelle + un résumé.
+ */
+class ProspectionEnrich extends Command
+{
+    protected $signature = 'prospection:enrich {--count=20} {--department=} {--workspace=}';
+
+    protected $description = 'Enrichit N entreprises (dirigeants, site, email, tél, GPS) — test synchrone.';
+
+    public function handle(WaterfallOrchestrator $orch): int
+    {
+        $this->info('Config MOCK réelle (false = source réelle) :');
+        foreach ([
+            'MOCK_MODE', 'MOCK_INSEE', 'MOCK_ANNUAIRE_ENTREPRISES', 'MOCK_BODACC',
+            'MOCK_BAN', 'MOCK_SCRAPERS', 'MOCK_SMTP', 'MOCK_LLM', 'MOCK_PROXIES',
+        ] as $f) {
+            $v = env($f);
+            $this->line("  {$f} = " . ($v === null ? '(défaut)' : var_export($v, true)));
+        }
+        $this->line('');
+
+        $count = max(1, (int) $this->option('count'));
+        $q = Company::query()->whereNull('enriched_at');
+        if ($dept = $this->option('department')) {
+            $q->where('department_code', $dept);
+        }
+        if ($ws = $this->option('workspace')) {
+            $q->where('workspace_id', $ws);
+        }
+        // Priorité aux entreprises avec des salariés (plus susceptibles d'avoir un site).
+        $companies = $q->whereNotNull('effectif_range')
+            ->whereNotIn('effectif_range', ['NN', '00', '01'])
+            ->limit($count)->get();
+        if ($companies->isEmpty()) {
+            $companies = $q->limit($count)->get();
+        }
+
+        $this->info("Enrichissement de {$companies->count()} entreprises…");
+        $site = 0; $tel = 0; $mail = 0; $dir = 0;
+
+        foreach ($companies as $c) {
+            try {
+                $orch->enrich($c);
+            } catch (\Throwable $e) {
+                $this->warn("  {$c->siren} ERREUR: " . mb_substr($e->getMessage(), 0, 120));
+                continue;
+            }
+            $c->refresh();
+            $nbDir = DB::table('contacts')->where('company_id', $c->id)->count();
+            $email = $c->email_generic
+                ?: DB::table('contacts')->where('company_id', $c->id)->whereNotNull('email')->value('email');
+            if ($c->website) { $site++; }
+            if ($c->phone) { $tel++; }
+            if ($email) { $mail++; }
+            if ($nbDir > 0) { $dir++; }
+
+            $this->line(sprintf(
+                '  • %-28s | site:%-3s tel:%-3s mail:%-24s dirigeants:%d',
+                mb_substr((string) ($c->denomination ?? $c->siren), 0, 28),
+                $c->website ? 'OUI' : '—',
+                $c->phone ? 'OUI' : '—',
+                $email ? mb_substr((string) $email, 0, 24) : '—',
+                $nbDir,
+            ));
+        }
+
+        $n = max(1, $companies->count());
+        $this->info(sprintf(
+            'RÉSUMÉ : site %d/%d · tél %d/%d · email %d/%d · dirigeants %d/%d',
+            $site, $n, $tel, $n, $mail, $n, $dir, $n,
+        ));
+        return self::SUCCESS;
+    }
+}

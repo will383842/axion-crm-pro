@@ -1,0 +1,75 @@
+name: Prospection — Enrichissement (test gratuit)
+
+# Enrichit N entreprises via le waterfall, en sources GRATUITES uniquement :
+# - réel : INSEE, annuaire-entreprises (dirigeants/CA), BODACC, BAN (GPS),
+#          DomainFinder (site, HTTP), MentionsLégales (email/tél, HTTP)
+# - mock/off : scrapers Playwright, Hunter (SMTP), LLM, proxy, captcha (payants)
+# Ne coûte rien. Google Places reste off (pas de clé).
+
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: 'Nombre d''entreprises à enrichir'
+        required: false
+        default: '20'
+      department:
+        description: 'Département (ex : 38). Vide = toutes.'
+        required: false
+        default: '38'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prospection-collect-region
+  cancel-in-progress: false
+
+jobs:
+  enrich:
+    name: Enrichissement test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Trust host key
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Enrich via SSH
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
+          COUNT: ${{ github.event.inputs.count || '20' }}
+          DEPT: ${{ github.event.inputs.department || '38' }}
+        run: |
+          set -e
+          ssh -o StrictHostKeyChecking=no "$USER@$HOST" bash <<EOF
+            set -euo pipefail
+            cd "$PROJECT_PATH"
+            # Active les sources GRATUITES en réel, garde les payantes en mock.
+            set_env() {
+              if grep -q "^\$1=" .env; then
+                sed -i "s|^\$1=.*|\$1=\$2|" .env
+              else
+                echo "\$1=\$2" >> .env
+              fi
+            }
+            set_env MOCK_MODE false
+            set_env MOCK_SCRAPERS true
+            set_env MOCK_SMTP true
+            set_env MOCK_LLM true
+            set_env MOCK_PROXIES true
+            set_env MOCK_CAPTCHA true
+            set_env MOCK_FRANCE_TRAVAIL true
+            docker compose exec -u root -T api php artisan config:clear < /dev/null
+            docker compose exec -u root -T api php artisan prospection:enrich --count="$COUNT" --department="$DEPT" < /dev/null
+          EOF

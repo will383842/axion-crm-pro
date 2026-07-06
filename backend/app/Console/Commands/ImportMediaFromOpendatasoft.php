@@ -67,7 +67,11 @@ class ImportMediaFromOpendatasoft extends Command
             return self::FAILURE;
         }
 
-        $url = self::PORTAL . "/api/explore/v2.1/catalog/datasets/{$cfg['dataset']}/exports/json";
+        // On ne récupère QUE les champs utilisés (via ?select=) : exclut notamment
+        // les polygones `geom`/`centroid` (dataset publications de presse) qui font
+        // exploser le payload → timeout. Payload minimal = import rapide et fiable.
+        $select = implode(',', array_values(array_unique($cfg['map'])));
+        $url = self::PORTAL . "/api/explore/v2.1/catalog/datasets/{$cfg['dataset']}/exports/json?select=" . rawurlencode($select);
         $this->info("Téléchargement {$cfg['dataset']} …");
 
         $resp = Http::timeout(120)->retry(2, 2000)->acceptJson()->get($url);

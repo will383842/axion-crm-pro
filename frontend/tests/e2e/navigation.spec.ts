@@ -35,6 +35,12 @@ test.describe('Navigation smoke', () => {
     await page.route('**/api/v1/scraper-runs*', (route) =>
       route.fulfill({ json: { data: [], meta: { total: 0 } } }),
     );
+    await page.route('**/api/v1/media*', (route) =>
+      route.fulfill({ json: { data: [], meta: { total: 0, last_page: 1, current_page: 1, per_page: 100 } } }),
+    );
+    await page.route('**/api/v1/journalists*', (route) =>
+      route.fulfill({ json: { data: [], meta: { total: 0, last_page: 1, current_page: 1, per_page: 100 } } }),
+    );
   });
 
   test('sidebar : dashboard link visible', async ({ page }) => {
@@ -50,6 +56,21 @@ test.describe('Navigation smoke', () => {
   test('sidebar : contacts link', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('link', { name: 'Contacts' })).toBeVisible();
+  });
+
+  test('sidebar : médias link', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('link', { name: 'Médias' })).toBeVisible();
+  });
+
+  test('sidebar : journalistes link', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('link', { name: 'Journalistes' })).toBeVisible();
+  });
+
+  test('page médias : se charge sans erreur', async ({ page }) => {
+    await page.goto('/media');
+    await expect(page.getByRole('heading', { name: 'Médias' })).toBeVisible();
   });
 
   test('sidebar : couverture France link', async ({ page }) => {

@@ -8,6 +8,9 @@ import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { CompaniesListPage } from '@/features/companies/CompaniesListPage';
 import { CompanyDetailPage } from '@/features/companies/CompanyDetailPage';
 import { ContactsListPage } from '@/features/contacts/ContactsListPage';
+import { MediaListPage } from '@/features/media/MediaListPage';
+import { MediaDetailPage } from '@/features/media/MediaDetailPage';
+import { JournalistsListPage } from '@/features/media/JournalistsListPage';
 import { CoveragePage } from '@/features/coverage/CoveragePage';
 import { ScraperRunsPage } from '@/features/scraping/ScraperRunsPage';
 import { LlmRouterPage } from '@/features/llm/LlmRouterPage';
@@ -53,6 +56,9 @@ const dashboardRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/
 const companiesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/companies', component: CompaniesListPage });
 const companyDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/companies/$companyId', component: CompanyDetailPage });
 const contactsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/contacts', component: ContactsListPage });
+const mediaRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/media', component: MediaListPage });
+const mediaDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/media/$mediaId', component: MediaDetailPage });
+const journalistsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/journalists', component: JournalistsListPage });
 const coverageRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/coverage', component: CoveragePage });
 const scraperRunsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/scraper-runs', component: ScraperRunsPage });
 const llmRouterRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/llm/router', component: LlmRouterPage });
@@ -93,6 +99,9 @@ export const routeTree = rootRoute.addChildren([
     companiesRoute,
     companyDetailRoute,
     contactsRoute,
+    mediaRoute,
+    mediaDetailRoute,
+    journalistsRoute,
     coverageRoute,
     scraperRunsRoute,
     llmRouterRoute,

@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\Auth\MagicLinkController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
 use App\Http\Controllers\Api\CompaniesController;
 use App\Http\Controllers\Api\ContactsController;
+use App\Http\Controllers\Api\MediaController;
+use App\Http\Controllers\Api\JournalistsController;
 use App\Http\Controllers\Api\CoverageController;
 use App\Http\Controllers\Api\ScraperRunsController;
 use App\Http\Controllers\Api\ScrapingCampaignsController;
@@ -102,6 +104,20 @@ Route::prefix('v1')->group(function () {
         Route::get(   '/contacts/{contact}', [ContactsController::class, 'show']);
         Route::put(   '/contacts/{contact}', [ContactsController::class, 'update']);
         Route::delete('/contacts/{contact}', [ContactsController::class, 'destroy']);
+
+        // Médias & Journalistes (chantier base médias)
+        // /media/export DOIT précéder /media/{media} (sinon "export" pris pour un id).
+        Route::get(   '/media',                            [MediaController::class, 'index']);
+        Route::get(   '/media/export',                     [MediaController::class, 'export'])
+            ->middleware('throttle:scraper-list');
+        Route::get(   '/media/{media}',                    [MediaController::class, 'show']);
+
+        Route::get(   '/journalists',                      [JournalistsController::class, 'index']);
+        Route::get(   '/journalists/export',               [JournalistsController::class, 'export'])
+            ->middleware('throttle:scraper-list');
+        Route::get(   '/journalists/{journalist}',         [JournalistsController::class, 'show']);
+        Route::post(  '/journalists/{journalist}/opt-out', [JournalistsController::class, 'optOut']);
+        Route::delete('/journalists/{journalist}',         [JournalistsController::class, 'destroy']);
 
         // Coverage
         Route::get( '/coverage',                   [CoverageController::class, 'index']);

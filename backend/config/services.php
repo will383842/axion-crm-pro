@@ -115,4 +115,17 @@ return [
         'ingestion_enabled' => filter_var(env('SANTE_INGESTION_ENABLED', false), FILTER_VALIDATE_BOOL),
     ],
 
+    /* ---------------------------------------------------------------------
+     | Médias / Journalistes
+     | ---------------------------------------------------------------------
+     | Extraction des contacts rédaction (directeur de publication, etc.)
+     | depuis les mentions légales des sites médias. DONNÉE PERSONNELLE (RGPD).
+     | Base légale = intérêt légitime B2B relations presse. Le scraping
+     | (`journalists:scrape-ours`) est REFUSÉ tant que `journalists_enabled`
+     | est false. `source_url` tracé, `opt_out` + effacement disponibles.
+     | --------------------------------------------------------------------- */
+    'media' => [
+        'journalists_enabled' => filter_var(env('MEDIA_JOURNALISTS_ENABLED', false), FILTER_VALIDATE_BOOL),
+    ],
+
 ];

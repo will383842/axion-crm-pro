@@ -23,6 +23,8 @@ on:
       - 'spec/**'
       - 'docs/**'
       - '**/*.md'
+      # Un changement purement CI/workflow ne doit pas redéployer l'app.
+      - '.github/workflows/**'
   workflow_dispatch:
     inputs:
       skip_migrate:

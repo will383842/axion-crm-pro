@@ -1,0 +1,80 @@
+name: Diag — Website status (read-only)
+
+# Diagnostic LECTURE SEULE : état conteneurs + service scraping + compteurs sites web.
+# Interroge Postgres directement (marche même si le conteneur `api` est arrêté).
+# Ne modifie RIEN sur le serveur. Déclenchement MANUEL uniquement.
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  diag:
+    name: Diagnostic sites web prod
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Trust host key
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Diagnostic via SSH
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
+        run: |
+          set -e
+          ssh -o StrictHostKeyChecking=no "$USER@$HOST" bash <<'EOF'
+            set -uo pipefail
+            cd /opt/axion-crm-pro
+            PSQL="docker exec axion-crm-postgres psql -U axion -d axion_crm -t -A"
+
+            echo "==================== 1. CONTENEURS ===================="
+            docker compose ps -a 2>&1 || docker ps -a 2>&1
+
+            echo ""
+            echo "==================== 2. SERVICE SCRAPING (systemd) ===================="
+            systemctl is-active axion-find-websites 2>&1
+            systemctl is-enabled axion-find-websites 2>&1
+            systemctl status axion-find-websites --no-pager 2>&1 | head -12
+
+            echo ""
+            echo "==================== 3. LOGS SCRAPING (5 dernieres lignes) ===================="
+            tail -n 5 /var/log/axion-find/*.log 2>/dev/null || echo "(pas de /var/log/axion-find)"
+            tail -n 3 /opt/axion-crm-pro/storage/logs/find-ws*.log 2>/dev/null || echo "(pas de find-ws logs)"
+
+            echo ""
+            echo "==================== 4. RESSOURCES ===================="
+            echo "-- disque --"; df -h / | tail -1
+            echo "-- memoire --"; free -h | head -2
+            echo "-- load --"; uptime
+
+            echo ""
+            echo "==================== 5. COMPTEURS SITES WEB (Postgres direct) ===================="
+            echo "-- total entreprises --"
+            \$PSQL -c "SELECT count(*) FROM companies;" 2>&1
+            echo "-- repartition website_status --"
+            \$PSQL -F' | ' -c "SELECT COALESCE(website_status,'(null)'), count(*) FROM companies GROUP BY 1 ORDER BY 2 DESC;" 2>&1
+            echo "-- entreprises avec une URL de site --"
+            \$PSQL -c "SELECT count(*) FROM companies WHERE website IS NOT NULL AND website <> '';" 2>&1
+            echo "-- dernier check (le scraping tourne-t-il ?) --"
+            \$PSQL -c "SELECT max(website_checked_at) FROM companies;" 2>&1
+            echo "-- checks dans la derniere heure --"
+            \$PSQL -c "SELECT count(*) FROM companies WHERE website_checked_at > now() - interval '1 hour';" 2>&1
+            echo "-- checks dernieres 24h --"
+            \$PSQL -c "SELECT count(*) FROM companies WHERE website_checked_at > now() - interval '24 hours';" 2>&1
+
+            echo ""
+            echo "==================== FIN DIAG ===================="
+          EOF

@@ -25,9 +25,9 @@ use Illuminate\Support\Facades\DB;
  */
 class ProspectionFindWebsites extends Command
 {
-    protected $signature = 'prospection:find-websites {--department=} {--limit=0} {--batch=100} {--retry} {--shard=} {--shards=}';
+    protected $signature = 'prospection:find-websites {--department=} {--limit=0} {--batch=100} {--retry} {--revalidate} {--shard=} {--shards=}';
 
-    protected $description = 'Trouve le site web des entreprises (devinette) + marque le statut. Reprenable. --retry = pass 2 ; --shard/--shards = exécution distribuée.';
+    protected $description = 'Trouve le site web des entreprises (devinette) + marque le statut. Reprenable. --retry = pass 2 ; --revalidate = pass 3 (re-teste les sites found → dead si morts) ; --shard/--shards = exécution distribuée.';
 
     public function handle(DomainFinderService $finder): int
     {
@@ -35,6 +35,7 @@ class ProspectionFindWebsites extends Command
         $batch = max(50, (int) $this->option('batch'));
         $dept = $this->option('department');
         $retry = (bool) $this->option('retry');
+        $revalidate = (bool) $this->option('revalidate');
 
         // Sharding optionnel : id % shards == shard (partition sans chevauchement).
         $shards = $this->option('shards') !== null ? max(1, (int) $this->option('shards')) : null;
@@ -43,6 +44,11 @@ class ProspectionFindWebsites extends Command
             $this->error("--shard doit être dans [0, {$shards}-1] quand --shards est fourni.");
 
             return self::FAILURE;
+        }
+
+        // Pass 3 (--revalidate) : re-teste les sites déjà `found`. Prioritaire sur --retry.
+        if ($revalidate) {
+            return $this->handleRevalidate($finder, $dept, $limit, $batch, $shards, $shard);
         }
 
         // Pass 1 = pending → found/not_found. Pass 2 (--retry) = not_found → found/exhausted.
@@ -91,6 +97,118 @@ class ProspectionFindWebsites extends Command
         $this->info("✅ Terminé ({$pass}, {$scope}) : {$processed} traités · {$found} sites trouvés ({$pct}%).");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * PASSE 3 — RE-VALIDATION des sites déjà trouvés (`website_status = 'found'`).
+     *
+     * Re-teste chaque URL existante : VIVANT (n'importe quelle réponse HTTP) →
+     * horodate `website_revalidated_at` (statut inchangé). MORT (échec connexion /
+     * DNS / timeout) → `website_status = 'dead'` (+ horodatage, website conservé
+     * pour audit). REPRENABLE : ne sélectionne que `website_revalidated_at IS NULL`,
+     * donc chaque lot traité sort de la source → la boucle termine.
+     */
+    private function handleRevalidate(
+        DomainFinderService $finder,
+        ?string $dept,
+        int $limit,
+        int $batch,
+        ?int $shards,
+        ?int $shard,
+    ): int {
+        $processed = 0;
+        $dead = 0;
+        $start = microtime(true);
+
+        while (true) {
+            $q = Company::query()
+                ->where('website_status', 'found')
+                ->whereNotNull('website')
+                ->whereNull('website_revalidated_at');
+            if ($dept) {
+                $q->where('department_code', $dept);
+            }
+            if ($shards !== null) {
+                $q->whereRaw('id % ? = ?', [$shards, $shard]);
+            }
+            $companies = $q->limit($batch)->get();
+            if ($companies->isEmpty()) {
+                break;
+            }
+
+            // Re-test CONCURRENT (Http::pool) : tout le lot re-validé en parallèle.
+            $aliveById = $finder->revalidateBatch($companies);
+
+            [$batchProcessed, $batchAlive, $batchDead] = $this->flushRevalidate($companies, $aliveById);
+            $processed += $batchProcessed;
+            $dead += $batchDead;
+
+            $elapsed = max(1, (int) round(microtime(true) - $start));
+            $this->info("  … {$processed} revalidés · {$batchAlive} vivants · {$batchDead} morts · " . round($processed / $elapsed, 1) . '/s');
+            if ($limit > 0 && $processed >= $limit) {
+                break;
+            }
+        }
+
+        $scope = $shards !== null ? "shard {$shard}/{$shards}" : 'dépt ' . ($dept ?: 'tous');
+        $this->info("✅ Terminé (pass 3 revalidation, {$scope}) : {$processed} traités · {$dead} morts.");
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Flush RE-VALIDATION en UN bulk UPDATE (même logique VALUES que flushBatch).
+     *   - VIVANT → website_revalidated_at = now() (statut inchangé, reste 'found')
+     *   - MORT   → website_status = 'dead' + website_revalidated_at = now()
+     *              (website conservé pour audit)
+     *
+     * @param  \Illuminate\Support\Collection<int, Company>  $companies
+     * @param  array<int, bool>  $aliveById
+     * @return array{0:int,1:int,2:int}  [traités, vivants, morts]
+     */
+    private function flushRevalidate($companies, array $aliveById): array
+    {
+        $now = now()->format('Y-m-d H:i:sP');
+        $rows = [];
+        $bindings = [$now, $now];
+        $processed = 0;
+        $alive = 0;
+        $dead = 0;
+
+        foreach ($companies as $c) {
+            // Absent de la map (entreprise sans website skippée par le service) → on
+            // ne se prononce pas ; sécurité, la source garantit website non-null.
+            if (! array_key_exists($c->id, $aliveById)) {
+                continue;
+            }
+            $isAlive = $aliveById[$c->id];
+            $rows[] = '(?::bigint, ?::text)';
+            $bindings[] = $c->id;
+            $bindings[] = $isAlive ? 'found' : 'dead';
+            $processed++;
+            if ($isAlive) {
+                $alive++;
+            } else {
+                $dead++;
+            }
+        }
+
+        if ($rows === []) {
+            return [0, 0, 0];
+        }
+
+        $values = implode(',', $rows);
+        // 2 placeholders timestamp (SET) AVANT ceux du FROM (VALUES) : ordre des
+        // bindings = [now, now, ...lignes]. website n'est PAS touché (audit).
+        $sql = "UPDATE companies AS c
+                SET website_status = v.status,
+                    website_revalidated_at = ?::timestamptz,
+                    updated_at = ?::timestamptz
+                FROM (VALUES {$values}) AS v(id, status)
+                WHERE c.id = v.id";
+        DB::update($sql, $bindings);
+
+        return [$processed, $alive, $dead];
     }
 
     /**

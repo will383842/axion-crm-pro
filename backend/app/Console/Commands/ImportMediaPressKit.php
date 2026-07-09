@@ -41,7 +41,7 @@ class ImportMediaPressKit extends Command
 
     private const SOURCE = 'press-kit';
 
-    private const DATA_DIR = 'database/data/press-kit';
+    private const DATA_DIR = 'data/press-kit';
 
     private MxEmailValidator $validator;
 

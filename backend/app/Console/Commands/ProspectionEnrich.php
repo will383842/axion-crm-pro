@@ -15,7 +15,10 @@ use Illuminate\Support\Facades\DB;
 class ProspectionEnrich extends Command
 {
     protected $signature = 'prospection:enrich {--count=20} {--department=} {--workspace=} '
-        . '{--refresh-incomplete : reprend aussi les fiches déjà enrichies mais incomplètes (pas de lat/lon, aucun email, ou Google Places en attente)}';
+        . '{--refresh-incomplete : reprend aussi les fiches déjà enrichies mais incomplètes (pas de lat/lon, aucun email, ou Google Places en attente)} '
+        . '{--with-website : ne sélectionne que les entreprises ayant déjà un site VIVANT (ROI email max)} '
+        . '{--shard= : index de partition (0..shards-1) pour exécution distribuée} '
+        . '{--shards= : nombre total de partitions (id % shards == shard)}';
 
     protected $description = 'Enrichit N entreprises (dirigeants, site, email, tél, GPS) — test synchrone.';
 
@@ -32,6 +35,18 @@ class ProspectionEnrich extends Command
         $this->line('');
 
         $count = max(1, (int) $this->option('count'));
+
+        // Sharding optionnel (run parallèle supervisé, cf. prospection:find-websites) :
+        // partitionne la sélection par id % shards == shard, sans chevauchement entre
+        // instances → N runs simultanés sur des machines distinctes, débit ≈ ×N.
+        $shards = $this->option('shards') !== null ? max(1, (int) $this->option('shards')) : null;
+        $shard = $this->option('shard') !== null ? (int) $this->option('shard') : null;
+        if ($shards !== null && ($shard === null || $shard < 0 || $shard >= $shards)) {
+            $this->error("--shard doit être dans [0, {$shards}-1] quand --shards est fourni.");
+
+            return self::FAILURE;
+        }
+
         $q = Company::query();
         if ($this->option('refresh-incomplete')) {
             // Élargit la sélection : jamais enrichie OU enrichie mais incomplète.
@@ -73,6 +88,19 @@ class ProspectionEnrich extends Command
         }
         if ($ws = $this->option('workspace')) {
             $q->where('workspace_id', $ws);
+        }
+        // --with-website : restreint aux entreprises ayant déjà un site VIVANT
+        // (website non vide + statut != 'dead'). Priorise les ~801k fiches avec site
+        // (ROI email maximal). Sans le flag → sélection inchangée.
+        if ($this->option('with-website')) {
+            $q->whereNotNull('website')
+                ->where('website', '<>', '')
+                ->where('website_status', '<>', 'dead');
+        }
+        // Sharding : ne conserve que les id de cette partition (appliqué au MÊME $q,
+        // donc valable aussi pour la sélection --refresh-incomplete et le fallback).
+        if ($shards !== null) {
+            $q->whereRaw('id % ? = ?', [$shards, $shard]);
         }
         // Priorité aux entreprises avec des salariés (plus susceptibles d'avoir un site).
         $companies = $q->whereNotNull('effectif_range')

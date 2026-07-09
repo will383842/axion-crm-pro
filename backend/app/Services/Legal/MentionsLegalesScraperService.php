@@ -179,6 +179,24 @@ class MentionsLegalesScraperService
     }
 
     /**
+     * Récupère le TEXTE brut agrégé des pages ours/contact/mentions-légales/équipe
+     * d'un site (mêmes 18 paths, rotation UA, délais polis, early-exit). Réutilisé
+     * par `journalists:scrape-ours` pour envoyer ce texte à l'extraction LLM.
+     *
+     * Retourne null si aucune page exploitable (≥ 500 octets de texte) n'est trouvée.
+     */
+    public function fetchPagesText(string $website): ?string
+    {
+        $html = $this->fetchAnyMentionsLegalesPage($website);
+        if ($html === null) {
+            return null;
+        }
+        $text = trim((string) preg_replace('/\s+/', ' ', strip_tags($html)));
+
+        return $text !== '' ? $text : null;
+    }
+
+    /**
      * Sprint H10 — Itère sur les paths, fusionne tous les bodies utiles trouvés
      * (concat des HTML des pages contact + mentions + about + home) pour avoir
      * un maximum de signaux email/phone à parser ensuite. Stop early si on a

@@ -63,6 +63,28 @@ Schedule::command('media:sync-from-companies')
     ->withoutOverlapping()
     ->onOneServer();
 
+// Héritage émission→chaîne : les émissions TV/radio héritent site/email/tél de leur
+// chaîne parente. Tourne APRÈS media:sync-from-companies (05:15) pour que les chaînes
+// aient déjà hérité de leur entreprise avant que les émissions n'héritent d'elles.
+Schedule::command('media:sync-emissions-from-parent')
+    ->dailyAt('05:20')
+    ->withoutOverlapping()
+    ->onOneServer();
+
+// Rattachement SÛR des médias autonomes à leur entreprise éditrice (SIREN/nom exact
+// unique). Hebdo (dimanche tôt) : opération ensembliste sur ~4,3M companies.
+Schedule::command('media:link-to-companies')
+    ->weeklyOn(0, '04:00')
+    ->withoutOverlapping()
+    ->onOneServer();
+
+// Statut actuel/disparu des émissions Wikidata (date de fin P582). Hebdo, borné en
+// mémoire (--limit) + reprenable : les runs successifs balaient tout le stock.
+Schedule::command('media:tag-emissions-status --limit=20000')
+    ->weeklyOn(0, '04:15')
+    ->withoutOverlapping()
+    ->runInBackground();
+
 // Recherche des sites web manquants — toutes les 30 min, BORNÉE en mémoire (--limit
 // évite la fuite du DomainFinderService sur de gros volumes), withoutOverlapping (pas
 // d'empilement) + runInBackground (process isolé). Le conteneur `scheduler` relance

@@ -181,6 +181,13 @@ class LLMRouterService implements LLMClient
             'classify_company_axion'  => 'Tu es expert en classification d\'entreprises B2B. Analyse cette entreprise et retourne un JSON {"ia_maturity":{...},"axion_offer_match":{...},"priority":"haute|moyenne|basse|gelee"}. Entreprise : {{denomination}} (NAF {{naf}}, {{effectif_range}}). Site : {{ext_website_text}}',
             'sector_classification'   => 'Classifie le secteur métier de cette entreprise selon notre taxonomie. Retourne JSON {"secteur_metier_axion":"...","maturite_ia_visible":"absente|emergente|en_cours|avancee|leader"}. Données : {{ext_company_data}}',
             'extract_team_from_page'  => 'Extrais les membres de l\'équipe dirigeante. Retourne JSON array [{name,title,linkedin_url?,confidence}]. Page : {{ext_page_text}}',
+            'extract_journalists_from_page' => 'Tu extrais les contacts de la RÉDACTION d\'un média français à partir du texte brut de ses pages « ours » / mentions légales / équipe. '
+                . 'Retourne UNIQUEMENT un objet JSON strict de la forme {"journalists":[{"first_name":"","last_name":"","role":"","beat":""}]}. '
+                . 'Règles STRICTES : n\'invente RIEN ; ne liste QUE des personnes physiques explicitement nommées (prénom + nom) associées à une fonction média '
+                . '(directeur/directrice de la publication, rédacteur/rédactrice en chef, journaliste, chef de rubrique, reporter, correspondant, pigiste, secrétaire de rédaction). '
+                . '"role" = la fonction exacte mentionnée. "beat" = la rubrique si visible (politique, sport, économie, tech, culture, faits divers, …), sinon "". '
+                . 'IGNORE les raisons sociales, sociétés éditrices, hébergeurs, prestataires techniques, agences web, numéros SIREN/RCS/CPPAP et les fonctions non éditoriales (directeur technique/commercial). '
+                . 'Si aucune personne nommée avec une fonction média n\'apparaît, retourne {"journalists":[]}. TEXTE : {{ext_page_text}}',
             'detect_email_pattern'    => 'Détecte le pattern email de l\'entreprise depuis ces exemples : {{ext_known_emails}}. Retourne JSON {"pattern":"{first}.{last}@{domain}","confidence":80}',
             'auto_tag'                => 'Suggère 3-5 tags pertinents. Retourne JSON {"tags":["..."]}. Entreprise : {{denomination}} {{ext_summary}}',
             default                   => 'Retourne JSON valide. Input : {{ext_input}}',

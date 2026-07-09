@@ -110,7 +110,7 @@ class CompaniesController extends ApiController
     {
         $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
         $filename = 'entreprises-' . now()->format('Y-m-d') . '.csv';
-        $header = ['SIREN', 'Dénomination', 'NAF', 'Taille', 'Département', 'Ville', 'Email', 'Téléphone', 'Site web', 'Contacts / dirigeants', 'Spécialité(s) santé'];
+        $header = ['SIREN', 'Dénomination', 'Enseigne', 'NAF', 'Taille', 'Département', 'Ville', 'Email', 'Téléphone', 'Site web', 'Google Maps', 'Contacts / dirigeants', 'Spécialité(s) santé'];
         $hasSante = Schema::hasTable('health_practitioners');
 
         // Table absente ou pas de workspace → CSV vide (jamais 500, jamais de fuite).
@@ -152,9 +152,18 @@ class CompaniesController extends ApiController
                     $specialites = $hasSante
                         ? $c->healthPractitioners->pluck('specialite')->filter()->unique()->implode(', ')
                         : '';
+                    // Lien Google Maps : coordonnées GPS si dispo (précis), sinon
+                    // requête textuelle sur l'adresse postale.
+                    if ($c->lat !== null && $c->lon !== null) {
+                        $mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' . $c->lat . ',' . $c->lon;
+                    } else {
+                        $mapsUrl = 'https://www.google.com/maps/search/?api=1&query='
+                            . rawurlencode(trim(($c->address ?? '') . ', ' . ($c->postcode ?? '') . ' ' . ($c->city_name ?? $c->city ?? '')));
+                    }
                     fputcsv($out, [
                         $c->siren,
                         $c->denomination,
+                        $c->enseigne,
                         $c->naf,
                         $c->size_category,
                         $c->department_code,
@@ -162,6 +171,7 @@ class CompaniesController extends ApiController
                         $c->email_generic,
                         $c->phone,
                         $c->website,
+                        $mapsUrl,
                         $contacts,
                         $specialites,
                     ]);

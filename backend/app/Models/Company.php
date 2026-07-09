@@ -26,7 +26,7 @@ class Company extends Model
         'workspace_id', 'siren', 'siret', 'denomination',
         'naf', 'legal_form', 'effectif_range', 'effectif_min', 'effectif_max',
         'size_category', 'is_artisan',
-        'address', 'postcode', 'city', 'insee', 'lat', 'lon',
+        'address', 'postcode', 'city', 'insee', 'lat', 'lon', 'enseigne',
         'website', 'phone', 'linkedin_url',
         'quality_score', 'priority', 'discovery_source',
         'signals', 'metadata', 'enriched_at', 'last_seen_at',

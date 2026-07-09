@@ -44,6 +44,25 @@ class HttpAnnuaireEntreprisesClient implements AnnuaireEntreprisesClient
         $finances = $entry['finances'] ?? [];
         $lastYear = ! empty($finances) ? max(array_keys($finances)) : null;
 
+        // Adresse du siège : l'API expose `siege` avec soit `geo_adresse` (chaîne
+        // complète normalisée) soit les composants numero_voie/type_voie/libelle_voie.
+        $siege = is_array($entry['siege'] ?? null) ? $entry['siege'] : [];
+        $address = null;
+        if (! empty($siege['geo_adresse'])) {
+            $address = trim((string) $siege['geo_adresse']);
+        } elseif (! empty($siege['adresse'])) {
+            $address = trim((string) $siege['adresse']);
+        } else {
+            $voie = trim(implode(' ', array_filter([
+                $siege['numero_voie'] ?? null,
+                $siege['type_voie'] ?? null,
+                $siege['libelle_voie'] ?? null,
+            ], static fn ($v) => $v !== null && trim((string) $v) !== '')));
+            $address = $voie !== '' ? $voie : null;
+        }
+        $postcode = ! empty($siege['code_postal']) ? (string) $siege['code_postal'] : null;
+        $city = ! empty($siege['libelle_commune']) ? (string) $siege['libelle_commune'] : null;
+
         return new AnnuaireEntrepriseData(
             siren: $siren,
             denomination: $entry['nom_complet'] ?? $entry['nom_raison_sociale'] ?? null,
@@ -52,6 +71,9 @@ class HttpAnnuaireEntreprisesClient implements AnnuaireEntreprisesClient
             chiffreAffaires: $lastYear ? (float) ($finances[$lastYear]['ca'] ?? 0) : null,
             resultatNet: $lastYear ? (int) ($finances[$lastYear]['resultat_net'] ?? 0) : null,
             bilansLastYear: $lastYear ? (string) $lastYear : null,
+            address: $address,
+            postcode: $postcode,
+            city: $city,
             raw: $entry,
         );
     }

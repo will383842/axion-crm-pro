@@ -338,6 +338,7 @@ class ImportMediaEmissionsFromWikidata extends Command
             'name'          => mb_substr($broadcaster, 0, 240),
             'media_type'    => $channelType,
             'diffusion_zone' => 'national',
+            'website_status' => 'pending',
             'enrich_status' => 'pending',
             'source'        => 'wikidata',
             'created_at'    => $now,

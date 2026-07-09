@@ -19,8 +19,7 @@ return new class extends Migration
             UPDATE companies
                SET enseigne = metadata->>'enseigne'
              WHERE enseigne IS NULL
-               AND (metadata ? 'enseigne')
-               AND metadata->>'enseigne' IS NOT NULL
+                              AND metadata->>'enseigne' IS NOT NULL
                AND metadata->>'enseigne' <> '';
         SQL);
     }

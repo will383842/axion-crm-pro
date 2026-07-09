@@ -321,6 +321,7 @@ class ImportMediaFromArcom extends Command
                 'region_code'     => $dept ? self::regionFromDept($dept) : null,
                 'city'            => $city !== '' ? mb_substr($city, 0, 160) : null,
                 'postcode'        => $postcode !== '' ? mb_substr($postcode, 0, 10) : null,
+                'website_status'  => 'pending',
                 'enrich_status'   => 'pending',
                 'source'          => 'arcom',
                 'created_at'      => $now,

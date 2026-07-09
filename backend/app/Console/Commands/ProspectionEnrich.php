@@ -37,23 +37,37 @@ class ProspectionEnrich extends Command
             // Élargit la sélection : jamais enrichie OU enrichie mais incomplète.
             // Reste reprenable (enrich() repose enriched_at ; les fiches encore
             // incomplètes seront re-sélectionnées aux prochains passages).
+            //
+            // Garde-fou anti-churn : les conditions « incomplète » (pas de lat/lon,
+            // aucun email, Google Places en attente) ne re-sélectionnent une fiche
+            // que si elle n'a pas été touchée depuis > 7 jours. Sans cette borne,
+            // une fiche non réparable (ex. lat IS NULL définitif) serait re-choisie
+            // en boucle à chaque run sans jamais progresser.
             $q->where(function ($w) {
                 $w->whereNull('enriched_at')
-                    ->orWhereNull('lat')
-                    ->orWhere(function ($e) {
-                        $e->whereNull('email_generic')
-                            ->whereNotExists(function ($sub) {
-                                $sub->selectRaw('1')
-                                    ->from('contacts')
-                                    ->whereColumn('contacts.company_id', 'companies.id')
-                                    ->whereNotNull('contacts.email');
+                    ->orWhere(function ($stale) {
+                        $stale->whereRaw("enriched_at < now() - interval '7 days'")
+                            ->where(function ($e) {
+                                $e->whereNull('lat')
+                                    ->orWhere(function ($mail) {
+                                        $mail->whereNull('email_generic')
+                                            ->whereNotExists(function ($sub) {
+                                                $sub->selectRaw('1')
+                                                    ->from('contacts')
+                                                    ->whereColumn('contacts.company_id', 'companies.id')
+                                                    ->whereNotNull('contacts.email');
+                                            });
+                                    })
+                                    ->orWhereRaw("jsonb_exists(signals, 'google_places_pending')");
                             });
-                    })
-                    ->orWhereRaw("jsonb_exists(signals, 'google_places_pending')");
+                    });
             });
         } else {
             $q->whereNull('enriched_at');
         }
+        // Progression déterministe + évite un ordre non déterministe qui
+        // re-brasserait le même sous-ensemble d'un run à l'autre.
+        $q->orderBy('id');
         if ($dept = $this->option('department')) {
             $q->where('department_code', $dept);
         }

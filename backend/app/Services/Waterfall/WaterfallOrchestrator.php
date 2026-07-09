@@ -95,6 +95,7 @@ class WaterfallOrchestrator
         $this->step10b_auto_classify($company);
         $this->step10c_auto_tag($company);
         $this->step11_triage_auto($company);
+        $this->step11b_recompute_quality($company);
         $this->step12_auto_segment($company);
 
         $company->enriched_at = now();
@@ -551,7 +552,6 @@ class WaterfallOrchestrator
                 $company->signals = $signals;
                 $company->save();
             }
-            DB::statement('SELECT recompute_company_quality_score(?)', [$company->id]);
             $this->recordRun($company, 'llm-classify', 'success');
         } catch (\Throwable $e) {
             WaterfallSentry::capture($company, 'llm-classify', $e);
@@ -595,6 +595,26 @@ class WaterfallOrchestrator
             WaterfallSentry::capture($company, 'triage-auto', $e);
             Log::warning('triage failed', ['company_id' => $company->id, 'error' => $e->getMessage()]);
             $this->recordRun($company, 'triage-auto', 'failed');
+        }
+    }
+
+    /**
+     * Recalcule TOUJOURS le quality_score après le triage final — indépendant
+     * de l'étape LLM (step10) qui peut throw (pas de crédit/timeout) et dont le
+     * catch avalait auparavant le recompute → score bloqué à 0 → badge
+     * « basique » même pour une fiche parfaite. Recalculé ici, APRÈS que le
+     * statut/contacts finaux soient posés, il reflète l'état réel de la fiche.
+     * Ne casse JAMAIS le waterfall.
+     */
+    private function step11b_recompute_quality(Company $company): void
+    {
+        try {
+            DB::statement('SELECT recompute_company_quality_score(?)', [$company->id]);
+        } catch (\Throwable $e) {
+            Log::warning('recompute quality score failed', [
+                'company_id' => $company->id,
+                'error'      => $e->getMessage(),
+            ]);
         }
     }
 

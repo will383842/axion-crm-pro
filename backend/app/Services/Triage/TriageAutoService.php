@@ -29,7 +29,7 @@ class TriageAutoService
      * Sprint H8 doctrine Will : on inclut les unknown/catchall qui pourraient
      * bouncer plutôt que de perdre des leads.
      */
-    public const CONTACTABLE_EMAIL_STATUSES = ['valid', 'catchall', 'unknown'];
+    public const CONTACTABLE_EMAIL_STATUSES = ['valid', 'catchall', 'unknown', 'role'];
 
     /**
      * Retourne le status décidé et l'archive_reason éventuelle.

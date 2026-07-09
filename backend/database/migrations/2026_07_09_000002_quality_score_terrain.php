@@ -56,7 +56,7 @@ return new class extends Migration
               SELECT count(*) INTO row_count
               FROM contacts ct
               WHERE ct.company_id = c_id
-                AND ct.email_status IN ('valid', 'catchall', 'unknown');
+                AND ct.email_status IN ('valid', 'catchall', 'unknown', 'role');
               IF row_count > 0 THEN score := score + 20; END IF;
 
               IF score > 100 THEN score := 100; END IF;

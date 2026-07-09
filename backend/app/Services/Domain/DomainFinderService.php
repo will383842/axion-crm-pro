@@ -229,6 +229,64 @@ class DomainFinderService
     }
 
     /**
+     * PASSE 3 — RE-VALIDATION concurrente des sites déjà trouvés (Http::pool).
+     *
+     * Re-teste l'URL EXISTANTE `$company->website` de chaque entreprise (1 requête
+     * par entreprise) pour détecter les sites disparus (domaine expiré, hébergement
+     * coupé). Même pattern concurrent + timeouts courts que `guessDomainsBatch`.
+     *
+     * RÈGLE « vivant » CONSERVATRICE : l'entreprise est VIVANTE dès qu'on obtient
+     * N'IMPORTE QUELLE réponse HTTP (l'objet réponse existe — même 4xx/5xx = le
+     * serveur répond). Elle est MORTE seulement si la requête LÈVE une exception
+     * (connexion refusée / DNS introuvable / timeout) → pas de réponse du tout.
+     * On préfère un faux « vivant » à un faux « mort » (on ne jette pas un lead).
+     *
+     * @param  iterable<Company>  $companies
+     * @return array<int, bool>  id entreprise => vivant (true) / mort (false)
+     */
+    public function revalidateBatch(iterable $companies): array
+    {
+        $result = [];
+        $reqs = [];
+        $n = 0;
+        foreach ($companies as $c) {
+            $url = is_string($c->website) ? trim($c->website) : '';
+            if ($url === '') {
+                continue; // pas de site à re-valider → on ne se prononce pas
+            }
+            $result[$c->id] = false;
+            $reqs['k' . ($n++)] = ['id' => $c->id, 'url' => $url];
+        }
+        if ($reqs === []) {
+            return $result;
+        }
+
+        foreach (array_chunk($reqs, 400, true) as $chunk) {
+            $responses = Http::pool(function ($pool) use ($chunk) {
+                $out = [];
+                foreach ($chunk as $key => $it) {
+                    $out[] = $pool->as($key)
+                        ->timeout(self::GUESS_TIMEOUT)
+                        ->connectTimeout(self::GUESS_CONNECT_TIMEOUT)
+                        ->withHeaders(['User-Agent' => self::USER_AGENT])
+                        ->get($it['url']);
+                }
+                return $out;
+            });
+
+            foreach ($chunk as $key => $it) {
+                $resp = $responses[$key] ?? null;
+                // Une exception (ConnectionException, DNS, timeout) arrive ici sous
+                // forme de Throwable dans le pool → MORT. Un objet réponse (2xx…5xx)
+                // = le serveur a répondu → VIVANT (règle conservatrice).
+                $result[$it['id']] = ($resp !== null && ! $resp instanceof \Throwable);
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Récupère la page d'accueil et confirme qu'elle appartient bien à l'entreprise :
      * SIREN présent, OU ≥2 mots du nom, OU (1 mot du nom + la ville). Anti-parking.
      *

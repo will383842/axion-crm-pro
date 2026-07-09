@@ -1,0 +1,1739 @@
+[
+    {
+        "chaine": "BFM Business",
+        "chaine_email": "contact@bfmbusiness.bfmtv.com",
+        "emission": "Good Morning Business",
+        "creneau": "06h00–09h00",
+        "presentateur": "Stéphane Soumier / Laure Closier / Christophe Jakubyszyn",
+        "angle": "Matinale éco n°1 France. Invite plateau : Williams Jullin sur 87% des PME sans IA, plan Osez l'IA, AI Act. Chronique \"entrepreneur qui change les règles\" à 8h. Contact : gmb@bfmtv.com",
+        "email": "gmb@bfmtv.com"
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": "contact@bfmbusiness.bfmtv.com",
+        "emission": "Les Experts",
+        "creneau": "09h00–10h00",
+        "presentateur": "Nicolas Doze",
+        "angle": "Débat éco quotidien 4 experts. Angle parfait : IA et compétitivité PME françaises, urgence plan Osez l'IA, AI Act. Williams Jullin expert idéal. Contacter lesexperts@bfmtv.com",
+        "email": "lesexperts@bfmtv.com"
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": "contact@bfmbusiness.bfmtv.com",
+        "emission": "Intégrale Placements",
+        "creneau": "10h00–12h00",
+        "presentateur": "Cédric Decoeur / Guillaume Sommerer",
+        "angle": "Finance et investissement. Angle : IA comme levier de performance financière pour les PME/ETI. Impact sur la valorisation des entreprises. IA Booster Bpifrance.",
+        "email": "contact@bfmbusiness.bfmtv.com"
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": "contact@bfmbusiness.bfmtv.com",
+        "emission": "12H — L'Heure H",
+        "creneau": "12h00–13h00",
+        "presentateur": "Hedwige Chevrillon / Christophe Jakubyszyn",
+        "angle": "Grand entretien mi-journée. Proposer Williams Jullin sur la transformation IA des entreprises françaises. Format 15 min idéal.",
+        "email": "contact@bfmbusiness.bfmtv.com"
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": "contact@bfmbusiness.bfmtv.com",
+        "emission": "Intégrale Bourse",
+        "creneau": "13h00–16h00",
+        "presentateur": "Cédric Decoeur",
+        "angle": "Marchés. Angle : IA et valorisation des PME, impact sur la compétitivité des ETI. Plan Osez l'IA et ses effets sur les marchés.",
+        "email": "contact@bfmbusiness.bfmtv.com"
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": "contact@bfmbusiness.bfmtv.com",
+        "emission": "BFM Éco",
+        "creneau": "16h00–18h00",
+        "presentateur": "Stéphanie Coleau",
+        "angle": "Actualité éco de l'après-midi. Inviter Williams Jullin pour analyse du retard IA des PME françaises.",
+        "email": "contact@bfmbusiness.bfmtv.com"
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": "contact@bfmbusiness.bfmtv.com",
+        "emission": "Inside Business",
+        "creneau": "18h00–20h00",
+        "presentateur": "Annie Lemoine",
+        "angle": "Débat éco plateau. Angle : 87% des PME sans IA alors que l'État investit 200M€. Pourquoi ce paradoxe ? Axion-IA.com la solution.",
+        "email": "contact@bfmbusiness.bfmtv.com"
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": "contact@bfmbusiness.bfmtv.com",
+        "emission": "Tech & Co",
+        "creneau": "20h00–22h00",
+        "presentateur": "Sébastien Couasnon",
+        "angle": "IA opérationnelle pour PME et ETI. Rubrique \"IA en entreprise\". Angle parfait Axion-IA.com. techco@bfmtv.com",
+        "email": "techco@bfmtv.com"
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": "contact@bfmbusiness.bfmtv.com",
+        "emission": "Culture Éco",
+        "creneau": "Plages variables",
+        "presentateur": "Sandra Gandoin",
+        "angle": "Chronique culture économique. Angle accessible : comment l'IA change le quotidien des patrons de PME.",
+        "email": "contact@bfmbusiness.bfmtv.com"
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": "contact@bfmbusiness.bfmtv.com",
+        "emission": "Morning Business",
+        "creneau": "22h00–00h00",
+        "presentateur": "Stéphanie Coleau",
+        "angle": "Rediffusion des meilleures séquences. Pertinent si passage en journée — rediffusé le soir même.",
+        "email": "contact@bfmbusiness.bfmtv.com"
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": null,
+        "emission": "PME Stories",
+        "creneau": "Sam 12h / Dim 10h",
+        "presentateur": "Linda Labidi",
+        "angle": "FORMAT IDÉAL. Émission 100% PME. Williams Jullin + patron PME transformée. Angle : avant/après concret, chiffres réels. pme@bfmtv.com",
+        "email": "pme@bfmtv.com"
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": null,
+        "emission": "Le Défi ETI",
+        "creneau": "Sam 11h / Dim 6h",
+        "presentateur": "Fabrice Lundy",
+        "angle": "Émission ETI. Transformation IA des ETI, financement Bpifrance, conformité AI Act. defieti@bfmtv.com",
+        "email": "defieti@bfmtv.com"
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": null,
+        "emission": "La France a Tout pour Réussir",
+        "creneau": "Sam 6h30 / Sam 13h30",
+        "presentateur": "Jérôme Tichit",
+        "angle": "Portrait entrepreneur. Williams Jullin idéal. 30 ans d'entrepreneuriat, révolutions tech, IA comme défi national.",
+        "email": null
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": null,
+        "emission": "BFM Stratégie",
+        "creneau": "Sam 12h30 / Dim 14h",
+        "presentateur": "Frédéric Simottel / Xavier Fontanet",
+        "angle": "Stratégie d'entreprise. Comment structurer la transformation IA d'une PME ou ETI, financement, ROI chiffré.",
+        "email": null
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": null,
+        "emission": "01 Business Forum",
+        "creneau": "Sam 9h / Dim 17h",
+        "presentateur": "Frédéric Simottel",
+        "angle": "Tech et business. IA opérationnelle pour TPE et PME, retours concrets, ROI mesurable, automatisations.",
+        "email": null
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": null,
+        "emission": "Good Morning Business Week-end",
+        "creneau": "Sam-Dim 6h-9h",
+        "presentateur": "Stéphanie Coleau",
+        "angle": "Version week-end. Format plus calme, plus facile d'y passer comme invité. Angle IA et économie du week-end.",
+        "email": null
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": null,
+        "emission": "Club Média RH",
+        "creneau": "Sam 14h / Dim 11h",
+        "presentateur": "Alexandre Lichan",
+        "angle": "RH et management. AI Act et obligations formation des équipes — qu'est-ce que ça change pour les DRH ?",
+        "email": null
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": null,
+        "emission": "Innover pour le Commerce",
+        "creneau": "Sam 8h30 / Dim 9h",
+        "presentateur": "Karine Vergniol",
+        "angle": "Innovation commerciale. IA pour commerçants, distributeurs, enseignes. commerce@bfmtv.com",
+        "email": "commerce@bfmtv.com"
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": null,
+        "emission": "Focus Retail",
+        "creneau": "Sam 19h30 / Dim 10h30",
+        "presentateur": "Céline Bosquet",
+        "angle": "Retail et commerce. IA pour enseignes et commerces de proximité : commandes auto, stocks, SAV 24h/24.",
+        "email": null
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": null,
+        "emission": "BFM Patrimoine",
+        "creneau": "Sam 15h / Dim 12h",
+        "presentateur": "Céline Renoux",
+        "angle": "Finance et patrimoine. Valorisation des PME par la transformation IA. Financement Bpifrance et aides État.",
+        "email": null
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": null,
+        "emission": "Les Décideurs",
+        "creneau": "Sam 10h / Dim 8h",
+        "presentateur": "Divers",
+        "angle": "Interviews décideurs. Williams Jullin comme décideur de l'économie numérique française.",
+        "email": null
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": null,
+        "emission": "Start & Co",
+        "creneau": "Sam 17h / Dim 15h",
+        "presentateur": "Divers",
+        "angle": "Startups et innovation. Axion-IA.com comme modèle de cabinet opérationnel IA nouvelle génération.",
+        "email": null
+    },
+    {
+        "chaine": "BFM Business",
+        "chaine_email": null,
+        "emission": "Business Club",
+        "creneau": "Sam 19h / Dim 19h",
+        "presentateur": "Divers",
+        "angle": "Réseau dirigeants. Williams Jullin invité sur sa vision de l'IA en entreprise.",
+        "email": null
+    },
+    {
+        "chaine": "BFM TV",
+        "chaine_email": "contact@bfmtv.com",
+        "emission": "Le 20H BFM",
+        "creneau": "20h00",
+        "presentateur": "Julie Hammett",
+        "angle": "JT prime time. Sujet éco : 87% PME sans IA, plan Osez l'IA, Axion-IA.com terrain. Chiffre + humain obligatoire.",
+        "email": "contact@bfmtv.com"
+    },
+    {
+        "chaine": "BFM TV",
+        "chaine_email": "contact@bfmtv.com",
+        "emission": "BFM Matin",
+        "creneau": "06h00–09h00",
+        "presentateur": "Apolline de Malherbe",
+        "angle": "Matinale info. Chronique éco 7h. 87% PME sans IA pendant que leurs concurrents automatisent. Urgence compétitivité.",
+        "email": "contact@bfmtv.com"
+    },
+    {
+        "chaine": "BFM TV",
+        "chaine_email": "contact@bfmtv.com",
+        "emission": "BFM Matin Week-end",
+        "creneau": "06h00–10h00",
+        "presentateur": "Divers",
+        "angle": "Format plus détendu. Plus facile de passer comme invité. Angle portrait entrepreneur ou dossier fond IA PME.",
+        "email": "contact@bfmtv.com"
+    },
+    {
+        "chaine": "BFM TV",
+        "chaine_email": "contact@bfmtv.com",
+        "emission": "Le Club BFM",
+        "creneau": "Ven 20h00–22h00",
+        "presentateur": "Paola Puerari",
+        "angle": "Débat éco fin de semaine. IA et avenir des PME françaises, plan Osez l'IA, AI Act. Débat avec experts. clubbfm@bfmtv.com",
+        "email": "clubbfm@bfmtv.com"
+    },
+    {
+        "chaine": "BFM TV",
+        "chaine_email": "contact@bfmtv.com",
+        "emission": "BFM Midi",
+        "creneau": "12h00–14h00",
+        "presentateur": "Divers",
+        "angle": "Sujet éco court en direct. Proposer VTR depuis Grenoble ou interview plateau Williams Jullin.",
+        "email": "contact@bfmtv.com"
+    },
+    {
+        "chaine": "BFM TV",
+        "chaine_email": "contact@bfmtv.com",
+        "emission": "BFM Story",
+        "creneau": "17h00–20h00",
+        "presentateur": "Divers",
+        "angle": "Sujets éco en direct. Angle : 87% PME françaises sans IA alors que leurs concurrents européens avancent.",
+        "email": "contact@bfmtv.com"
+    },
+    {
+        "chaine": "BFM TV",
+        "chaine_email": "contact@bfmtv.com",
+        "emission": "BFM Non-stop",
+        "creneau": "Plages nuit/we",
+        "presentateur": "Divers",
+        "angle": "Si passage en journée, rediffusé la nuit. Audience moins forte mais continue 24h/24.",
+        "email": "contact@bfmtv.com"
+    },
+    {
+        "chaine": "BFM TV",
+        "chaine_email": "contact@bfmtv.com",
+        "emission": "Le 20H BFM Week-end",
+        "creneau": "Sam-Dim 20h",
+        "presentateur": "Divers",
+        "angle": "JT week-end. Format moins chargé = plus facile de faire passer un sujet éco original comme l'IA PME.",
+        "email": "contact@bfmtv.com"
+    },
+    {
+        "chaine": "BFM TV",
+        "chaine_email": "contact@bfmtv.com",
+        "emission": "180 Minutes Info",
+        "creneau": "09h00–12h00",
+        "presentateur": "Divers",
+        "angle": "Sujets société/économie. Angle grand public : l'IA, ce que ça change pour les entreprises de votre quartier.",
+        "email": "contact@bfmtv.com"
+    },
+    {
+        "chaine": "LCI",
+        "chaine_email": "contact@lci.fr",
+        "emission": "Le 6/9 LCI",
+        "creneau": "06h00–09h00",
+        "presentateur": "Jean-Baptiste Boursier (entouré de : François Clemenceau, Soazig Quémener, Pascal Perri éco, Ségolène Alunni)",
+        "angle": "Matinale info. Chronique éco Pascal Perri \"Dans le viseur de Perri\". Angle 87% PME sans IA. Williams Jullin invité ideal.",
+        "email": "contact@lci.fr"
+    },
+    {
+        "chaine": "LCI",
+        "chaine_email": "contact@lci.fr",
+        "emission": "On ne plaisante pas avec l'info",
+        "creneau": "09h00–12h00",
+        "presentateur": "Amélie Carrouër (+ Claire Fournier, Xavier de Giacomoni, Yaël Goosz, Nivin Potros)",
+        "angle": "Débat fond. Invités experts lundi-vendredi : lun Nicolas Bouzou, mar Henri Guaino, mer Luc Ferry, jeu Pierre Servent, ven Dominique Reynié. Williams Jullin comme expert éco IA.",
+        "email": "contact@lci.fr"
+    },
+    {
+        "chaine": "LCI",
+        "chaine_email": "contact@lci.fr",
+        "emission": "LCI Midi",
+        "creneau": "12h00–15h00",
+        "presentateur": "Christophe Moulin",
+        "angle": "Grand rendez-vous mi-journée. 3h d'info, débats, humeurs. Angle économique : IA et compétitivité des entreprises françaises.",
+        "email": "contact@lci.fr"
+    },
+    {
+        "chaine": "LCI",
+        "chaine_email": "contact@lci.fr",
+        "emission": "LCI Direct",
+        "creneau": "15h00–17h00",
+        "presentateur": "Magali Lunel",
+        "angle": "2h d'analyse et débat. Experts : Sylvie Bermann, Isabelle Dufour, Patrice Duhamel. Williams Jullin expert IA entreprises.",
+        "email": "contact@lci.fr"
+    },
+    {
+        "chaine": "LCI",
+        "chaine_email": "contact@lci.fr",
+        "emission": "Le Grand Dossier",
+        "creneau": "17h00–18h00",
+        "presentateur": "Marie-Aline Méliyi",
+        "angle": "1h sur un thème précis. Angle : AI Act en France, plan Osez l'IA, transformation IA des entreprises françaises.",
+        "email": "contact@lci.fr"
+    },
+    {
+        "chaine": "LCI",
+        "chaine_email": "contact@lci.fr",
+        "emission": "24H Pujadas",
+        "creneau": "18h00–20h00",
+        "presentateur": "David Pujadas (+ Ruth Elkrief, François Lenglet, Abnousse Shalmani, Pascal Perri aux \"Partis Pris\")",
+        "angle": "Leader chaînes info ce créneau. Grand entretien. Angle : 87% PME sans IA, urgence économique nationale, plan Osez l'IA.",
+        "email": "contact@lci.fr"
+    },
+    {
+        "chaine": "LCI",
+        "chaine_email": "contact@lci.fr",
+        "emission": "24H",
+        "creneau": "Ven 18h00–20h00",
+        "presentateur": "David Doukhan",
+        "angle": "Version vendredi du 24H. Même format, même audience. David Doukhan plus accessible que Pujadas.",
+        "email": "contact@lci.fr"
+    },
+    {
+        "chaine": "LCI",
+        "chaine_email": "contact@lci.fr",
+        "emission": "Face à Darius Rochebin",
+        "creneau": "20h00–22h00",
+        "presentateur": "Darius Rochebin",
+        "angle": "Grand entretien soirée. Leaders politiques et économiques. Williams Jullin sur la révolution IA des PME, enjeux nationaux.",
+        "email": "contact@lci.fr"
+    },
+    {
+        "chaine": "LCI",
+        "chaine_email": "contact@lci.fr",
+        "emission": "Darius Rochebin (2ème partie)",
+        "creneau": "22h00–00h00",
+        "presentateur": "Darius Rochebin",
+        "angle": "Débat 2ème partie soirée. Éditorialistes et experts. Michel Goya, Elsa Vidal, Didier François réguliers.",
+        "email": "contact@lci.fr"
+    },
+    {
+        "chaine": "LCI",
+        "chaine_email": "contact@lci.fr",
+        "emission": "18H Calvi",
+        "creneau": "Ven 18h00 (variable)",
+        "presentateur": "Ruth Elkrief",
+        "angle": "Grand débat vendredi soir. Angle AI Act et obligations légales des entreprises françaises face à l'IA.",
+        "email": "contact@lci.fr"
+    },
+    {
+        "chaine": "LCI",
+        "chaine_email": "contact@lci.fr",
+        "emission": "LCI Matins Week-end",
+        "creneau": "06h00–10h00",
+        "presentateur": "Anne-Chloé Bottet / Margot Haddad",
+        "angle": "Matinale week-end. Plus accessible pour proposer un invité. Angle IA et économie du week-end.",
+        "email": "contact@lci.fr"
+    },
+    {
+        "chaine": "LCI",
+        "chaine_email": "contact@lci.fr",
+        "emission": "L'Événement du dimanche",
+        "creneau": "Dim 10h00–11h00",
+        "presentateur": "Marie Chantrait",
+        "angle": "Grand entretien dominical. Entourée de François Lenglet, Ruth Elkrief, Nicolas Domenach. Williams Jullin expert IA.",
+        "email": "contact@lci.fr"
+    },
+    {
+        "chaine": "LCI",
+        "chaine_email": "contact@lci.fr",
+        "emission": "LCI Midi Week-end",
+        "creneau": "12h00–14h00",
+        "presentateur": "Marie Chantrait",
+        "angle": "Magazine info week-end. François Lenglet éco régulier. Angle accessible : 87% PME sans IA, plan Osez l'IA.",
+        "email": "contact@lci.fr"
+    },
+    {
+        "chaine": "LCI",
+        "chaine_email": "contact@lci.fr",
+        "emission": "Grand Reportage LCI",
+        "creneau": "Sam-Dim 14h00–15h00",
+        "presentateur": "Éric Brunet",
+        "angle": "Reportages de fond. Angle : la France des PME qui adopte l'IA — les pionniers et leur transformation.",
+        "email": "contact@lci.fr"
+    },
+    {
+        "chaine": "LCI",
+        "chaine_email": "contact@lci.fr",
+        "emission": "Face à Margot Haddad",
+        "creneau": "20h00–22h00",
+        "presentateur": "Margot Haddad",
+        "angle": "Grand entretien 2h. Margot Haddad interroge les personnalités de l'actualité nationale et internationale.",
+        "email": "contact@lci.fr"
+    },
+    {
+        "chaine": "LCI",
+        "chaine_email": "contact@lci.fr",
+        "emission": "Les Vérificateurs",
+        "creneau": "Dim 11h00–12h00",
+        "presentateur": "Paola Puerari",
+        "angle": "Fact-checking. Angle : les promesses de l'IA en entreprise — mythe ou réalité ? Les chiffres sourcés d'Axion-IA.com.",
+        "email": "contact@lci.fr"
+    },
+    {
+        "chaine": "LCI",
+        "chaine_email": "contact@lci.fr",
+        "emission": "Débat Dimanche",
+        "creneau": "Dim 17h00–18h00",
+        "presentateur": "Marie Chantrait",
+        "angle": "Débat politique et économique. Angle : IA et souveraineté économique de la France. Plan Osez l'IA.",
+        "email": "contact@lci.fr"
+    },
+    {
+        "chaine": "LCI",
+        "chaine_email": "contact@lci.fr",
+        "emission": "18H David Doukhan",
+        "creneau": "Sam 18h00–20h00",
+        "presentateur": "David Doukhan",
+        "angle": "Info du soir. Angle économique et sociétal. IA et transformation des PME françaises.",
+        "email": "contact@lci.fr"
+    },
+    {
+        "chaine": "LCI",
+        "chaine_email": "contact@lci.fr",
+        "emission": "18H Darius Rochebin",
+        "creneau": "Dim 18h00–20h00",
+        "presentateur": "Darius Rochebin",
+        "angle": "Grand entretien dominical. Williams Jullin idéal : portrait entrepreneur + enjeux IA nationaux.",
+        "email": "contact@lci.fr"
+    },
+    {
+        "chaine": "LCI",
+        "chaine_email": "contact@lci.fr",
+        "emission": "Brunet Sans Filtre",
+        "creneau": "Sam 15h-18h / Dim 15h-17h",
+        "presentateur": "Éric Brunet",
+        "angle": "Libre parole. Angle opinion : la France qui rêve d'IA vs la réalité des PME. Souveraineté numérique.",
+        "email": "contact@lci.fr"
+    },
+    {
+        "chaine": "LCI",
+        "chaine_email": "contact@lci.fr",
+        "emission": "22H Nivat-Cérin",
+        "creneau": "22h00–00h00",
+        "presentateur": "Anne Nivat / Guillaume Cérin",
+        "angle": "Débat international et économique. Audience restreinte mais qualifiée. IA et compétitivité mondiale.",
+        "email": "contact@lci.fr"
+    },
+    {
+        "chaine": "France 2",
+        "chaine_email": "info@france2.fr",
+        "emission": "Télématin",
+        "creneau": "06h30–09h30",
+        "presentateur": "Thomas Sotto / Marie Portolano",
+        "angle": "Matinale. Chronique éco 8h15 environ. Portrait entrepreneur ou sujet pratico-pratique IA en PME. telematin@france2.fr",
+        "email": "telematin@france2.fr"
+    },
+    {
+        "chaine": "France 2",
+        "chaine_email": "info@france2.fr",
+        "emission": "JT 13h",
+        "creneau": "13h00",
+        "presentateur": "Marie-Sophie Lacarrau",
+        "angle": "Sujet éco 2-3 min. Une PME transformée par l'IA — avant/après, chiffres, témoignage patron. Reportage terrain Grenoble ideal.",
+        "email": "info@france2.fr"
+    },
+    {
+        "chaine": "France 2",
+        "chaine_email": "info@france2.fr",
+        "emission": "JT 20h",
+        "creneau": "20h00",
+        "presentateur": "Léa Salamé",
+        "angle": "Sujet éco grand public. 87% des PME françaises sans IA. Angle humain prioritaire. Le patron, sa PME, sa transformation.",
+        "email": "info@france2.fr"
+    },
+    {
+        "chaine": "France 2",
+        "chaine_email": "info@france2.fr",
+        "emission": "Envoyé Spécial",
+        "creneau": "Jeu 21h10",
+        "presentateur": "Élise Lucet",
+        "angle": "FORMAT IDÉAL pour grand reportage. La révolution IA dans les PME françaises. Terrain disponible chez clients. envoye-special@france2.fr — contacter 6-8 semaines à l'avance.",
+        "email": "envoye-special@france2.fr"
+    },
+    {
+        "chaine": "France 2",
+        "chaine_email": "info@france2.fr",
+        "emission": "Complément d'enquête",
+        "creneau": "Jeu 23h00",
+        "presentateur": "Tristan Waleckx",
+        "angle": "Enquête fond. AI Act, obligations cachées des PME, qui les aide à se conformer ? Axion-IA.com sur le terrain. complement-enquete@france2.fr",
+        "email": "complement-enquete@france2.fr"
+    },
+    {
+        "chaine": "France 2",
+        "chaine_email": "info@france2.fr",
+        "emission": "C à Vous",
+        "creneau": "19h00 (France 5)",
+        "presentateur": "Anne-Élisabeth Lemoine",
+        "angle": "Plateau invité convivial. Portrait Williams Jullin. Angle humain et accessible. cavousprod@france5.fr",
+        "email": "cavousprod@france5.fr"
+    },
+    {
+        "chaine": "France 2",
+        "chaine_email": "info@france2.fr",
+        "emission": "L'Événement",
+        "creneau": "Jeu 22h30",
+        "presentateur": "Léa Salamé",
+        "angle": "Grand entretien. IA et avenir de l'économie française, PME en retard, Axion-IA.com la solution.",
+        "email": "info@france2.fr"
+    },
+    {
+        "chaine": "France 2",
+        "chaine_email": "info@france2.fr",
+        "emission": "Cash Investigation",
+        "creneau": "Mar 21h00",
+        "presentateur": "Élise Lucet",
+        "angle": "Enquête économique grand format. Angle : AI Act — les entreprises qui se préparent vs celles qui ignorent les obligations. cash.investigation@france2.fr",
+        "email": "cash.investigation@france2.fr"
+    },
+    {
+        "chaine": "France 2",
+        "chaine_email": "info@france2.fr",
+        "emission": "Dimanche en politique",
+        "creneau": "Dim matin variable",
+        "presentateur": "Divers",
+        "angle": "Politique économique. AI Act, plan Osez l'IA, Williams Jullin comme expert sur les politiques publiques IA.",
+        "email": "info@france2.fr"
+    },
+    {
+        "chaine": "France 2",
+        "chaine_email": "info@france2.fr",
+        "emission": "13h15 le samedi",
+        "creneau": "Sam 13h15",
+        "presentateur": "Maya Lauqué",
+        "angle": "Magazine société. Angle humain : un entrepreneur et sa PME transformée par l'IA. Histoire concrète.",
+        "email": "info@france2.fr"
+    },
+    {
+        "chaine": "France 2",
+        "chaine_email": "info@france2.fr",
+        "emission": "JT Week-end 20h",
+        "creneau": "Sam-Dim 20h",
+        "presentateur": "Damien Thévenot",
+        "angle": "JT week-end. Moins chargé = plus facile de faire passer un sujet éco fort comme 87% PME sans IA.",
+        "email": "info@france2.fr"
+    },
+    {
+        "chaine": "France 2",
+        "chaine_email": "info@france2.fr",
+        "emission": "Infrarouge",
+        "creneau": "Mar 23h30",
+        "presentateur": "Divers",
+        "angle": "Documentaires société. France des PME face à la révolution IA. infrarouge@france2.fr",
+        "email": "infrarouge@france2.fr"
+    },
+    {
+        "chaine": "France 2",
+        "chaine_email": "info@france2.fr",
+        "emission": "Pièces à conviction",
+        "creneau": "Mer 21h00 (France 3)",
+        "presentateur": "Divers",
+        "angle": "Enquête France 3. Angle : AI Act et ses conséquences sur les PME françaises. pecaviction@france3.fr",
+        "email": "pecaviction@france3.fr"
+    },
+    {
+        "chaine": "France 5",
+        "chaine_email": "contact@france5.fr",
+        "emission": "C dans l'air",
+        "creneau": "17h45",
+        "presentateur": "Caroline Roux (et alternants)",
+        "angle": "Débat fond 1h. Angle : AI Act, plan Osez l'IA, IA en entreprise. Williams Jullin expert idéal. cdanslair@france5.fr",
+        "email": "cdanslair@france5.fr"
+    },
+    {
+        "chaine": "France 5",
+        "chaine_email": "contact@france5.fr",
+        "emission": "C à Vous",
+        "creneau": "19h00",
+        "presentateur": "Anne-Élisabeth Lemoine",
+        "angle": "Plateau convivial. Portrait Williams Jullin. Angle humain et accessible grand public. cavousprod@france5.fr",
+        "email": "cavousprod@france5.fr"
+    },
+    {
+        "chaine": "France 5",
+        "chaine_email": "contact@france5.fr",
+        "emission": "C Ce Soir",
+        "creneau": "22h30",
+        "presentateur": "Karim Rissouli",
+        "angle": "Débat société. L'IA transforme-t-elle vraiment les entreprises françaises ? Pour ou contre l'automatisation.",
+        "email": "contact@france5.fr"
+    },
+    {
+        "chaine": "France 5",
+        "chaine_email": "contact@france5.fr",
+        "emission": "C à Vous la suite",
+        "creneau": "20h00",
+        "presentateur": "Patrick Cohen",
+        "angle": "Suite de C à Vous. Format actu. Angle économique et sociétal en prolongation du sujet de 19h.",
+        "email": "contact@france5.fr"
+    },
+    {
+        "chaine": "France 5",
+        "chaine_email": "contact@france5.fr",
+        "emission": "La Quotidienne",
+        "creneau": "12h00",
+        "presentateur": "Agathe Lecaron",
+        "angle": "Magazine société. Comment financer la transformation IA de son entreprise. Angle pratico-pratique et concret.",
+        "email": "contact@france5.fr"
+    },
+    {
+        "chaine": "France 5",
+        "chaine_email": "contact@france5.fr",
+        "emission": "C Politique",
+        "creneau": "Dim 18h00",
+        "presentateur": "Laure Adler",
+        "angle": "Mag politique. AI Act et politiques publiques IA France. Plan Osez l'IA, son impact sur les PME et ETI.",
+        "email": "contact@france5.fr"
+    },
+    {
+        "chaine": "France 5",
+        "chaine_email": "contact@france5.fr",
+        "emission": "C Médiatique",
+        "creneau": "Dim 12h15",
+        "presentateur": "Raphaëlle Duchemin",
+        "angle": "Médias et société. Comment Axion-IA.com communique, son approche IA en entreprise, la révolution silencieuse des PME.",
+        "email": "contact@france5.fr"
+    },
+    {
+        "chaine": "France 5",
+        "chaine_email": "contact@france5.fr",
+        "emission": "La Grande Librairie",
+        "creneau": "Mer 21h00",
+        "presentateur": "Augustin Trapenard",
+        "angle": "Si Williams Jullin publie un ouvrage. Angle culture et société. lgl@france5.fr",
+        "email": "lgl@france5.fr"
+    },
+    {
+        "chaine": "France 5",
+        "chaine_email": "contact@france5.fr",
+        "emission": "Si on lisait à haute voix",
+        "creneau": "Variable soirée",
+        "presentateur": "Divers",
+        "angle": "Lecture et culture. Non pertinent directement mais audience qualifiée. À éviter sauf angle culture entrepreneuriale.",
+        "email": "contact@france5.fr"
+    },
+    {
+        "chaine": "France Info TV",
+        "chaine_email": "contact@franceinfo.fr",
+        "emission": "Les flashs éco",
+        "creneau": "24h/24",
+        "presentateur": "Divers journalistes",
+        "angle": "Chiffre choc : 87% PME sans IA alors que l'État investit 200M€. Information courte, sourcée, impactante. 1 info = 1 chiffre + 1 explication.",
+        "email": "contact@franceinfo.fr"
+    },
+    {
+        "chaine": "France Info TV",
+        "chaine_email": "contact@franceinfo.fr",
+        "emission": "La Matinale France Info",
+        "creneau": "06h00–09h00",
+        "presentateur": "Marc Fauvelle / Mathieu Netter",
+        "angle": "Chronique éco matinale. Angle 87% PME sans IA. Williams Jullin en duplex ou en plateau.",
+        "email": "contact@franceinfo.fr"
+    },
+    {
+        "chaine": "France Info TV",
+        "chaine_email": "contact@franceinfo.fr",
+        "emission": "Les Informés",
+        "creneau": "17h00",
+        "presentateur": "Divers",
+        "angle": "Magazine société. Angle pratico-pratique : comment financer la transformation IA de son entreprise en 2026.",
+        "email": "contact@franceinfo.fr"
+    },
+    {
+        "chaine": "France Info TV",
+        "chaine_email": "contact@franceinfo.fr",
+        "emission": "Le Débat France Info",
+        "creneau": "Variable",
+        "presentateur": "Divers",
+        "angle": "Débat éco. AI Act, plan Osez l'IA, que font vraiment les entreprises françaises ?",
+        "email": "contact@franceinfo.fr"
+    },
+    {
+        "chaine": "France Info TV",
+        "chaine_email": "contact@franceinfo.fr",
+        "emission": "Eco & co",
+        "creneau": "07h15",
+        "presentateur": "Stéphane Bazin",
+        "angle": "Chronique économique courte 3 min. Angle : 87% PME sans IA — le chiffre qui résume le retard français.",
+        "email": "contact@franceinfo.fr"
+    },
+    {
+        "chaine": "France Info TV",
+        "chaine_email": "contact@franceinfo.fr",
+        "emission": "Docs France Info",
+        "creneau": "Variable soirée",
+        "presentateur": "Divers",
+        "angle": "Mini-docs. Angle : 3 minutes pour comprendre ce qu'Axion-IA.com fait pour les PME françaises.",
+        "email": "contact@franceinfo.fr"
+    },
+    {
+        "chaine": "TF1",
+        "chaine_email": "reportages@tf1.fr",
+        "emission": "Sept à Huit",
+        "creneau": "Dim 19h10",
+        "presentateur": "Harry Roselmack",
+        "angle": "FORMAT PRIORITAIRE. Portrait + reportage terrain. Williams Jullin et sa mission. sept-a-huit@tf1.fr — contacter 5-6 semaines à l'avance.",
+        "email": "sept-a-huit@tf1.fr"
+    },
+    {
+        "chaine": "TF1",
+        "chaine_email": "reportages@tf1.fr",
+        "emission": "JT 20h",
+        "creneau": "20h00",
+        "presentateur": "Gilles Bouleau",
+        "angle": "Sujet éco d'intérêt général. 87% PME sans IA. L'humain avant la technique — un patron, sa PME, sa transformation. 2-3 minutes.",
+        "email": "reportages@tf1.fr"
+    },
+    {
+        "chaine": "TF1",
+        "chaine_email": "reportages@tf1.fr",
+        "emission": "JT 13h",
+        "creneau": "13h00",
+        "presentateur": "Marie-Sophie Lacarrau",
+        "angle": "Sujet éco concret. PME transformée par l'IA, avant/après, chiffres. Format 2-3 min idéal. jt13@tf1.fr",
+        "email": "jt13@tf1.fr"
+    },
+    {
+        "chaine": "TF1",
+        "chaine_email": "reportages@tf1.fr",
+        "emission": "Reportages Découverte",
+        "creneau": "Dim 13h15",
+        "presentateur": "Divers",
+        "angle": "Grand reportage. Suivre une PME pendant sa transformation IA de A à Z. reportages@tf1.fr — contacter 4-6 semaines à l'avance.",
+        "email": "reportages@tf1.fr"
+    },
+    {
+        "chaine": "TF1",
+        "chaine_email": "reportages@tf1.fr",
+        "emission": "Bonjour TF1",
+        "creneau": "06h00–09h00",
+        "presentateur": "Bruce Toussaint",
+        "angle": "Matinale. Interview entrepreneur 7h30. Williams Jullin sur l'IA des PME françaises.",
+        "email": "reportages@tf1.fr"
+    },
+    {
+        "chaine": "TF1",
+        "chaine_email": "reportages@tf1.fr",
+        "emission": "Les 4 Vérités",
+        "creneau": "07h30",
+        "presentateur": "Bruce Toussaint",
+        "angle": "Grand entretien matinal. Williams Jullin, entrepreneur qui démocratise l'IA pour les PME françaises.",
+        "email": "reportages@tf1.fr"
+    },
+    {
+        "chaine": "TF1",
+        "chaine_email": "reportages@tf1.fr",
+        "emission": "Grands Reportages",
+        "creneau": "Sam 14h00",
+        "presentateur": "Divers",
+        "angle": "Grand format reportage. La France des PME qui adopte l'IA — les pionniers. grandsreportages@tf1.fr",
+        "email": "grandsreportages@tf1.fr"
+    },
+    {
+        "chaine": "TF1",
+        "chaine_email": "reportages@tf1.fr",
+        "emission": "JT Week-end 20h",
+        "creneau": "Sam-Dim 20h",
+        "presentateur": "Divers",
+        "angle": "JT moins chargé. Plus facile de faire passer sujet éco original. 87% PME sans IA — angle national.",
+        "email": "reportages@tf1.fr"
+    },
+    {
+        "chaine": "TF1",
+        "chaine_email": "reportages@tf1.fr",
+        "emission": "Automoto",
+        "creneau": "Dim 11h30",
+        "presentateur": "Divers",
+        "angle": "Industrie automobile. IA dans les usines, maintenance prédictive, automatisation des chaînes. Non prioritaire mais pertinent si client auto.",
+        "email": "reportages@tf1.fr"
+    },
+    {
+        "chaine": "TF1",
+        "chaine_email": "reportages@tf1.fr",
+        "emission": "Ushuaïa TV",
+        "creneau": "Variable",
+        "presentateur": "Divers",
+        "angle": "Environnement et innovation. IA et développement durable des entreprises. Très secondaire.",
+        "email": "reportages@tf1.fr"
+    },
+    {
+        "chaine": "M6",
+        "chaine_email": "capitale@m6.fr",
+        "emission": "Capitale",
+        "creneau": "Dim 21h00",
+        "presentateur": "Xavier de Moulins",
+        "angle": "FORMAT IDÉAL. Reportage terrain chez PME transformée par l'IA. capitale@m6.fr — contacter 6 semaines à l'avance. Proposer reportage Grenoble ou Paris.",
+        "email": "capitale@m6.fr"
+    },
+    {
+        "chaine": "M6",
+        "chaine_email": "capitale@m6.fr",
+        "emission": "Zone Interdite",
+        "creneau": "Dim 21h (alternance)",
+        "presentateur": "Mélissa Theuriau",
+        "angle": "Grands reportages société. France qui innove, PME et IA face à la concurrence internationale. zoneinterdite@m6.fr",
+        "email": "zoneinterdite@m6.fr"
+    },
+    {
+        "chaine": "M6",
+        "chaine_email": "capitale@m6.fr",
+        "emission": "66 Minutes",
+        "creneau": "Dim 13h00",
+        "presentateur": "Xavier de Moulins",
+        "angle": "Magazine société. Angle grand public : l'IA, qu'est-ce que ça change pour le patron de PME ? 66min@m6.fr",
+        "email": "66min@m6.fr"
+    },
+    {
+        "chaine": "M6",
+        "chaine_email": "capitale@m6.fr",
+        "emission": "JT M6 19h45",
+        "creneau": "19h45",
+        "presentateur": "Julien Arnaud",
+        "angle": "JT. Sujet éco très concret et chiffré. 87% des PME sans IA. Angle accessible, sans jargon technique.",
+        "email": "capitale@m6.fr"
+    },
+    {
+        "chaine": "M6",
+        "chaine_email": "capitale@m6.fr",
+        "emission": "Enquête exclusive",
+        "creneau": "Dim soir",
+        "presentateur": "Bernard de la Villardière",
+        "angle": "Enquête fond. Les entreprises françaises face au retard IA — ce qui se passe vraiment sur le terrain.",
+        "email": "capitale@m6.fr"
+    },
+    {
+        "chaine": "M6",
+        "chaine_email": "capitale@m6.fr",
+        "emission": "M6 Info",
+        "creneau": "Flashs horaires",
+        "presentateur": "Divers",
+        "angle": "Flashs info. 87% PME sans IA = chiffre idéal pour un flash de 30 secondes.",
+        "email": "capitale@m6.fr"
+    },
+    {
+        "chaine": "M6",
+        "chaine_email": "capitale@m6.fr",
+        "emission": "Quelle Époque !",
+        "creneau": "Sam soir variable",
+        "presentateur": "Léa Salamé",
+        "angle": "Magazine société samedi. Angle transformation IA et futur du travail. Non prioritaire mais audience large.",
+        "email": "capitale@m6.fr"
+    },
+    {
+        "chaine": "CNews",
+        "chaine_email": "contact@cnews.fr",
+        "emission": "L'Heure des Pros",
+        "creneau": "09h00–10h35",
+        "presentateur": "Pascal Praud",
+        "angle": "Débat 90 min. Angle : IA et compétitivité de la France, souveraineté numérique, 87% PME en retard. Simulcast Europe 1.",
+        "email": "contact@cnews.fr"
+    },
+    {
+        "chaine": "CNews",
+        "chaine_email": "contact@cnews.fr",
+        "emission": "L'Heure des Pros 2",
+        "creneau": "20h05–21h00",
+        "presentateur": "Pascal Praud (Ven : Julien Pasquet)",
+        "angle": "2ème édition quotidienne. Même angle, même audience. Plus difficile de passer mais reste pertinent.",
+        "email": "contact@cnews.fr"
+    },
+    {
+        "chaine": "CNews",
+        "chaine_email": "contact@cnews.fr",
+        "emission": "L'Heure des Pros Week-end",
+        "creneau": "20h05 (var.)",
+        "presentateur": "Eliot Deval",
+        "angle": "Version week-end. Format plus détendu. Eliot Deval du vendredi au dimanche soir.",
+        "email": "contact@cnews.fr"
+    },
+    {
+        "chaine": "CNews",
+        "chaine_email": "contact@cnews.fr",
+        "emission": "Punchline",
+        "creneau": "18h00–20h00",
+        "presentateur": "Laurence Ferrari",
+        "angle": "Débat soirée. Angle économique et sociétal. IA et futur de l'emploi en France. punchline@cnews.fr",
+        "email": "punchline@cnews.fr"
+    },
+    {
+        "chaine": "CNews",
+        "chaine_email": "contact@cnews.fr",
+        "emission": "Face à l'info",
+        "creneau": "21h00–22h00",
+        "presentateur": "Christine Kelly",
+        "angle": "Plateau débat. Angle : l'IA va-t-elle supprimer des emplois ou en créer dans les PME françaises ?",
+        "email": "contact@cnews.fr"
+    },
+    {
+        "chaine": "CNews",
+        "chaine_email": "contact@cnews.fr",
+        "emission": "CNews Midi",
+        "creneau": "12h00–14h00",
+        "presentateur": "Pierre de Vilno / Gauthier Le Bret",
+        "angle": "Info mi-journée. Sujet éco court. 87% PME sans IA — chiffre d'accroche puissant.",
+        "email": "contact@cnews.fr"
+    },
+    {
+        "chaine": "CNews",
+        "chaine_email": "contact@cnews.fr",
+        "emission": "La Matinale CNews",
+        "creneau": "06h00–09h00",
+        "presentateur": "Divers",
+        "angle": "Chronique éco matinale. 87% PME sans IA + urgence AI Act. Format 2 min idéal.",
+        "email": "contact@cnews.fr"
+    },
+    {
+        "chaine": "CNews",
+        "chaine_email": "contact@cnews.fr",
+        "emission": "Face à Philippe de Villiers",
+        "creneau": "Ven 21h00",
+        "presentateur": "Philippe de Villiers",
+        "angle": "Grand entretien vendredi. Angle souveraineté numérique, IA française vs dépendance aux GAFAM américains.",
+        "email": "contact@cnews.fr"
+    },
+    {
+        "chaine": "CNews",
+        "chaine_email": "contact@cnews.fr",
+        "emission": "Le Grand Soir CNews",
+        "creneau": "23h00",
+        "presentateur": "Divers",
+        "angle": "Débat tardif. Audience restreinte mais qualifiée. IA et avenir du travail en France.",
+        "email": "contact@cnews.fr"
+    },
+    {
+        "chaine": "LCP / Public Sénat",
+        "chaine_email": "redaction@lcp.fr",
+        "emission": "Sens Public",
+        "creneau": "22h00",
+        "presentateur": "Divers",
+        "angle": "Magazine politique et économique. AI Act, plan Osez l'IA, rôle de l'État face à la transformation IA des PME.",
+        "email": "redaction@lcp.fr"
+    },
+    {
+        "chaine": "LCP / Public Sénat",
+        "chaine_email": "redaction@lcp.fr",
+        "emission": "Questions d'Info",
+        "creneau": "Variable",
+        "presentateur": "Divers",
+        "angle": "Questions économiques de fond. Williams Jullin expert sur la transformation IA des entreprises. Angle institutionnel.",
+        "email": "redaction@lcp.fr"
+    },
+    {
+        "chaine": "LCP / Public Sénat",
+        "chaine_email": "redaction@lcp.fr",
+        "emission": "Sénat 360",
+        "creneau": "Variable",
+        "presentateur": "Divers",
+        "angle": "Actualité législative. AI Act, conformité, plan Osez l'IA — ce que les élus votent et ce que ça change pour les PME.",
+        "email": "redaction@lcp.fr"
+    },
+    {
+        "chaine": "LCP / Public Sénat",
+        "chaine_email": "redaction@lcp.fr",
+        "emission": "L'Info en questions",
+        "creneau": "",
+        "presentateur": "Divers",
+        "angle": "Débats fond. IA et souveraineté économique française. Williams Jullin expert pertinent.",
+        "email": "redaction@lcp.fr"
+    },
+    {
+        "chaine": "LCP / Public Sénat",
+        "chaine_email": "redaction@lcp.fr",
+        "emission": "Docs LCP",
+        "creneau": "Soirée variable",
+        "presentateur": "Production externe",
+        "angle": "Documentaires politiques et économiques. Angle plan Osez l'IA et ses acteurs de terrain.",
+        "email": "redaction@lcp.fr"
+    },
+    {
+        "chaine": "Arte",
+        "chaine_email": "docs@arte.tv",
+        "emission": "Xenius",
+        "creneau": "07h10",
+        "presentateur": "Emilie Langlade / Adrian Pflug",
+        "angle": "Sciences et innovations. IA et PME françaises et allemandes. Comparatif franco-allemand des entreprises qui se transforment.",
+        "email": "docs@arte.tv"
+    },
+    {
+        "chaine": "Arte",
+        "chaine_email": "docs@arte.tv",
+        "emission": "28 Minutes",
+        "creneau": "20h05",
+        "presentateur": "Élisabeth Quin",
+        "angle": "Magazine culturel et société. Débat sur l'IA, ses enjeux pour les entreprises, le futur du travail. 28min@arte.tv",
+        "email": "28min@arte.tv"
+    },
+    {
+        "chaine": "Arte",
+        "chaine_email": "docs@arte.tv",
+        "emission": "Docs éco Arte",
+        "creneau": "21h00 prime",
+        "presentateur": "Production externe",
+        "angle": "Grands documentaires éco. Proposer angle franco-allemand : PME françaises vs PME allemandes face à l'IA. docs@arte.tv",
+        "email": "docs@arte.tv"
+    },
+    {
+        "chaine": "Arte",
+        "chaine_email": "docs@arte.tv",
+        "emission": "Arte Journal",
+        "creneau": "19h45",
+        "presentateur": "Divers",
+        "angle": "JT franco-allemand. Angle européen : le retard IA des PME françaises vs l'Allemagne qui avance.",
+        "email": "docs@arte.tv"
+    },
+    {
+        "chaine": "Arte",
+        "chaine_email": "docs@arte.tv",
+        "emission": "Square — Géopolitique",
+        "creneau": "Dim 19h30",
+        "presentateur": "Divers",
+        "angle": "Géopolitique économique. IA, souveraineté numérique européenne, rôle des cabinets français vs GAFAM.",
+        "email": "docs@arte.tv"
+    },
+    {
+        "chaine": "B Smart 4Change",
+        "chaine_email": "contact@bsmart.fr",
+        "emission": "Be Smart",
+        "creneau": "Matin quotidien",
+        "presentateur": "Stéphane Soumier",
+        "angle": "Magazine éco dirigeants. Williams Jullin invité : transformation IA des PME, AI Act, ROI chiffré, financement. contact@bsmart.fr",
+        "email": "contact@bsmart.fr"
+    },
+    {
+        "chaine": "B Smart 4Change",
+        "chaine_email": "contact@bsmart.fr",
+        "emission": "Smart Up",
+        "creneau": "Variable",
+        "presentateur": "Divers",
+        "angle": "Startups et croissance. Angle : Axion-IA.com modèle de cabinet IA opérationnel nouvelle génération en France.",
+        "email": "contact@bsmart.fr"
+    },
+    {
+        "chaine": "B Smart 4Change",
+        "chaine_email": "contact@bsmart.fr",
+        "emission": "Smart Tech",
+        "creneau": "Variable",
+        "presentateur": "Divers",
+        "angle": "Tech en entreprise. IA opérationnelle pour PME et ETI. Cas concrets, ROI, avant/après. smarttech@bsmart.fr",
+        "email": "smarttech@bsmart.fr"
+    },
+    {
+        "chaine": "B Smart 4Change",
+        "chaine_email": "contact@bsmart.fr",
+        "emission": "Smart Impact",
+        "creneau": "Variable",
+        "presentateur": "Divers",
+        "angle": "RSE et impact. IA et productivité des équipes, libérer les collaborateurs des tâches répétitives.",
+        "email": "contact@bsmart.fr"
+    },
+    {
+        "chaine": "B Smart 4Change",
+        "chaine_email": "contact@bsmart.fr",
+        "emission": "Be My Coach",
+        "creneau": "Variable",
+        "presentateur": "Divers",
+        "angle": "Accompagnement dirigeants. Comment adopter l'IA en entreprise sans expertise technique. Angle accessible.",
+        "email": "contact@bsmart.fr"
+    },
+    {
+        "chaine": "B Smart 4Change",
+        "chaine_email": "contact@bsmart.fr",
+        "emission": "Good Morning Business B Smart",
+        "creneau": "Matin",
+        "presentateur": "Divers",
+        "angle": "Reprise de Good Morning Business BFM. Même audience dirigeants. Angle identique.",
+        "email": "contact@bsmart.fr"
+    },
+    {
+        "chaine": "RMC Story",
+        "chaine_email": "contact@rmcstory.fr",
+        "emission": "Good Morning Business",
+        "creneau": "Matin",
+        "presentateur": "Stéphane Soumier",
+        "angle": "Rediffusion de BFM Business. Si passage dans GMB, automatiquement sur RMC Story aussi. Double couverture.",
+        "email": "contact@rmcstory.fr"
+    },
+    {
+        "chaine": "RMC Story",
+        "chaine_email": "contact@rmcstory.fr",
+        "emission": "Apolline Matin",
+        "creneau": "06h30",
+        "presentateur": "Apolline de Malherbe",
+        "angle": "Matinale. Chronique éco. Angle 87% PME sans IA pendant que leurs concurrents automatisent.",
+        "email": "contact@rmcstory.fr"
+    },
+    {
+        "chaine": "RMC Story",
+        "chaine_email": "contact@rmcstory.fr",
+        "emission": "Les GG",
+        "creneau": "Midi",
+        "presentateur": "Divers",
+        "angle": "Débat. Moins pertinent pour Axion-IA.com mais audience large.",
+        "email": "contact@rmcstory.fr"
+    },
+    {
+        "chaine": "W9 / TMC / TFX",
+        "chaine_email": null,
+        "emission": "TMC",
+        "creneau": "Soir 22h30",
+        "presentateur": "Quotidien",
+        "angle": "Talk-show grand public. Angle humoristique/sociétal sur l'IA en entreprise. Non prioritaire.",
+        "email": null
+    },
+    {
+        "chaine": "W9 / TMC / TFX",
+        "chaine_email": null,
+        "emission": "W9",
+        "creneau": "Variable",
+        "presentateur": "Mag société",
+        "angle": "Magazines société. Non prioritaire mais audience large.",
+        "email": null
+    },
+    {
+        "chaine": "W9 / TMC / TFX",
+        "chaine_email": null,
+        "emission": "TFX",
+        "creneau": "Variable",
+        "presentateur": "Mag éco variable",
+        "angle": "Secondaire. Contacter seulement si prioritaires refus.",
+        "email": null
+    },
+    {
+        "chaine": "C8 / CStar",
+        "chaine_email": null,
+        "emission": "TPMP — Touche pas à mon poste",
+        "creneau": "19h00",
+        "presentateur": "Cyril Hanouna",
+        "angle": "Grand public. Non prioritaire. Si l'IA devient un sujet grand public viral, possibilité d'angle 1 min dans le débat.",
+        "email": null
+    },
+    {
+        "chaine": "C8 / CStar",
+        "chaine_email": null,
+        "emission": "Docs C8",
+        "creneau": "Soirée",
+        "presentateur": "Divers",
+        "angle": "Documentaires société. Non prioritaire mais audience large. Angle : l'IA qui transforme le quotidien des PME.",
+        "email": null
+    },
+    {
+        "chaine": "France 3 National",
+        "chaine_email": null,
+        "emission": "Pièces à conviction",
+        "creneau": "Mer 21h00",
+        "presentateur": "Guilaine Chenu / Stéphanie Sy",
+        "angle": "Enquête fond. AI Act et ses conséquences sur les PME françaises. piecesaconviction@france3.fr — contacter 6 semaines à l'avance.",
+        "email": "piecesaconviction@france3.fr"
+    },
+    {
+        "chaine": "France 3 National",
+        "chaine_email": null,
+        "emission": "Soir 3",
+        "creneau": "23h00",
+        "presentateur": "Divers",
+        "angle": "JT tardif national. Bilan éco : plan Osez l'IA, acteurs de terrain comme Axion-IA.com. Audience plus restreinte mais qualifiée.",
+        "email": null
+    },
+    {
+        "chaine": "France 3 National",
+        "chaine_email": null,
+        "emission": "Des racines et des ailes",
+        "creneau": "Mer 21h (variable)",
+        "presentateur": "Nagui",
+        "angle": "Documentaires patrimoine et territoire. Non directement pertinent mais si angle PME locales innovantes dans un territoire.",
+        "email": null
+    },
+    {
+        "chaine": "France 3 National",
+        "chaine_email": null,
+        "emission": "Un si grand soleil",
+        "creneau": "20h45",
+        "presentateur": "Divers (feuilleton)",
+        "angle": "Non pertinent directement. Mais si le feuilleton traite de PME/IA, possibilité de proposition de conseil technique. Non prioritaire.",
+        "email": null
+    },
+    {
+        "chaine": "France 3 National",
+        "chaine_email": null,
+        "emission": "On n'est pas que des cobayes",
+        "creneau": "Variable",
+        "presentateur": "Tamara Alkhory",
+        "angle": "Sciences et technologie. Angle IA pour les PME : comment ça marche, est-ce que ça marche vraiment ? Format vulgarisation.",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "JT Régional 19h",
+        "creneau": "19h00–20h00",
+        "presentateur": "Journaliste éco local",
+        "angle": "Sujet reportage local 2-4 min. \"Une entreprise de [département] transformée par l'IA.\" Terrain disponible avec Axion-IA.com.",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "JT Régional 12h30",
+        "creneau": "12h30",
+        "presentateur": "Journaliste éco local",
+        "angle": "Sujet éco local court 1-2 min. Même angle que le 19h, format plus bref. Chiffre local + PME locale.",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "Magazines éco régionaux",
+        "creneau": "Variable selon antenne",
+        "presentateur": "Journaliste éco local",
+        "angle": "Magazine 10-20 min sur éco locale. Reportage complet : transformation IA des entreprises de la région. Terrain disponible.",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "Émissions éco dimanche matin",
+        "creneau": "Dim matin variable",
+        "presentateur": "Journaliste éco local",
+        "angle": "Magazines éco dimanche matin sur certaines antennes. Vérifier programme local avant d'appeler.",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Alpes",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Alsace",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Aquitaine",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Auvergne",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Bourgogne",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Bretagne",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Centre-Val de Loire",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Champagne-Ardenne",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Corse Via Stella",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Côte d'Azur",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Franche-Comté",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Languedoc-Roussillon",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Limousin",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Lorraine",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Midi-Pyrénées",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Nord-Pas-de-Calais",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Normandie",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Pays de la Loire",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Picardie",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Poitou-Charentes",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 PACA",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Rhône-Alpes",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 Île-de-France",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "France 3",
+        "chaine_email": null,
+        "emission": "France 3 La Réunion",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "",
+        "email": null
+    },
+    {
+        "chaine": "BFM Régions",
+        "chaine_email": null,
+        "emission": "BFM Paris",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT Paris éco · Matinale éco · Magazine PME parisiennes · Reportage terrain IDF",
+        "email": null
+    },
+    {
+        "chaine": "BFM Régions",
+        "chaine_email": null,
+        "emission": "BFM Lyon",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT Lyon éco · Magazine entreprises lyonnaises · Reportage PME industrie",
+        "email": null
+    },
+    {
+        "chaine": "BFM Régions",
+        "chaine_email": null,
+        "emission": "BFM Marseille",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT éco · PME marseillaises · Port et logistique + IA",
+        "email": null
+    },
+    {
+        "chaine": "BFM Régions",
+        "chaine_email": null,
+        "emission": "BFM Toulouse",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT éco · Sous-traitants aéronautiques + IA · French Tech Toulouse",
+        "email": null
+    },
+    {
+        "chaine": "BFM Régions",
+        "chaine_email": null,
+        "emission": "BFM Nice Côte d'Azur",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT éco · PME Côte d'Azur · Tourisme et IA",
+        "email": null
+    },
+    {
+        "chaine": "BFM Régions",
+        "chaine_email": null,
+        "emission": "BFM Bordeaux",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT éco · PME bordelaises · Viticulture, nautisme et IA",
+        "email": null
+    },
+    {
+        "chaine": "BFM Régions",
+        "chaine_email": null,
+        "emission": "BFM Grand Lille",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT éco · Industrie Nord et IA · PME manufacturières",
+        "email": null
+    },
+    {
+        "chaine": "BFM Régions",
+        "chaine_email": null,
+        "emission": "BFM Normande",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT éco · PME normandes · Agro et industrie",
+        "email": null
+    },
+    {
+        "chaine": "BFM Régions",
+        "chaine_email": null,
+        "emission": "BFM Alsace",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT éco · PME transfrontalières · IA vs concurrence allemande",
+        "email": null
+    },
+    {
+        "chaine": "BFM Régions",
+        "chaine_email": null,
+        "emission": "BFM Toulon Var",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT éco · PME varoise · Tourisme et maritime + IA",
+        "email": null
+    },
+    {
+        "chaine": "BFM Régions",
+        "chaine_email": null,
+        "emission": "BFM Pays de la Loire",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT éco · PME ligériennes · Agro et nautisme",
+        "email": null
+    },
+    {
+        "chaine": "BFM Régions",
+        "chaine_email": null,
+        "emission": "BFM Grand Littoral",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT éco · PME Côte d'Opale · Industries et logistique",
+        "email": null
+    },
+    {
+        "chaine": "BFM Régions",
+        "chaine_email": null,
+        "emission": "BFM DICI Alpes Sud",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT éco · PME Hautes-Alpes · Tourisme montagne et IA",
+        "email": null
+    },
+    {
+        "chaine": "TV locales indépendantes",
+        "chaine_email": null,
+        "emission": "TéléGrenoble Isère (TG+)",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT local 19h + Magazine éco Isère hebdo + Chroniques entreprises. PRIORITÉ ABSOLUE — territoire Axion-IA.com.",
+        "email": null
+    },
+    {
+        "chaine": "TV locales indépendantes",
+        "chaine_email": null,
+        "emission": "Télénantes",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT local + Chroniques éco + Magazine hebdo PME nantaises.",
+        "email": null
+    },
+    {
+        "chaine": "TV locales indépendantes",
+        "chaine_email": null,
+        "emission": "TVR Rennes",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT local + Magazine hebdo éco. Forte audience dirigeants Bretagne.",
+        "email": null
+    },
+    {
+        "chaine": "TV locales indépendantes",
+        "chaine_email": null,
+        "emission": "TL7 Saint-Étienne",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT local + Chroniques éco industrielles. Zone industrielle = industries et IA très pertinent.",
+        "email": null
+    },
+    {
+        "chaine": "TV locales indépendantes",
+        "chaine_email": null,
+        "emission": "Angers TV",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT local + Magazine éco. Forte économie PME et agricole en transition numérique.",
+        "email": null
+    },
+    {
+        "chaine": "TV locales indépendantes",
+        "chaine_email": null,
+        "emission": "8 Mont-Blanc",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT local + Chroniques éco. PME touristiques et industrielles en forte croissance.",
+        "email": null
+    },
+    {
+        "chaine": "TV locales indépendantes",
+        "chaine_email": null,
+        "emission": "Alsace 20",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT local + Éco transfrontalier. Compétitivité franco-allemande + IA.",
+        "email": null
+    },
+    {
+        "chaine": "TV locales indépendantes",
+        "chaine_email": null,
+        "emission": "Mirabelle TV",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT local + Magazine éco. Zone industrielle, PME et ETI nombreuses.",
+        "email": null
+    },
+    {
+        "chaine": "TV locales indépendantes",
+        "chaine_email": null,
+        "emission": "TV Vendée",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT local. Forte économie TPE et PME, territoire très entrepreneurial.",
+        "email": null
+    },
+    {
+        "chaine": "TV locales indépendantes",
+        "chaine_email": null,
+        "emission": "LMtv Sarthe",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT local. Industries automobiles et PME sous-traitantes.",
+        "email": null
+    },
+    {
+        "chaine": "TV locales indépendantes",
+        "chaine_email": null,
+        "emission": "Canal 31",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "TV locale toulousaine. Économie locale aéronautique et French Tech.",
+        "email": null
+    },
+    {
+        "chaine": "TV locales indépendantes",
+        "chaine_email": null,
+        "emission": "Tébéo",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT local breton. Industries navales et agroalimentaires + IA.",
+        "email": null
+    },
+    {
+        "chaine": "TV locales indépendantes",
+        "chaine_email": null,
+        "emission": "TébéSud",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT local. Forte économie touristique et PME locales.",
+        "email": null
+    },
+    {
+        "chaine": "TV locales indépendantes",
+        "chaine_email": null,
+        "emission": "Vosges TV",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT local. Industries textiles et PME en mutation numérique.",
+        "email": null
+    },
+    {
+        "chaine": "TV locales indépendantes",
+        "chaine_email": null,
+        "emission": "Via Stella",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT corse. PME et ETI locales en transition numérique.",
+        "email": null
+    },
+    {
+        "chaine": "TV locales indépendantes",
+        "chaine_email": null,
+        "emission": "TVPI Bayonne",
+        "creneau": "",
+        "presentateur": "",
+        "angle": "JT local basque. PME transfrontalières France-Espagne et IA.",
+        "email": null
+    }
+]

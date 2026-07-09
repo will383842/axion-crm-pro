@@ -1,0 +1,3474 @@
+[
+    {
+        "name": "BFM Business",
+        "media_type_hint": "Télévision nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@bfmbusiness.bfmtv.com"
+    },
+    {
+        "name": "BFM TV",
+        "media_type_hint": "Télévision nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@bfmtv.com"
+    },
+    {
+        "name": "M6 Capitale",
+        "media_type_hint": "Télévision nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "capitale@m6.fr"
+    },
+    {
+        "name": "B Smart 4Change",
+        "media_type_hint": "Télévision nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@bsmart.fr"
+    },
+    {
+        "name": "France 2",
+        "media_type_hint": "Télévision nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "info@france2.fr"
+    },
+    {
+        "name": "LCI",
+        "media_type_hint": "Télévision nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@lci.fr"
+    },
+    {
+        "name": "CNews",
+        "media_type_hint": "Télévision nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@cnews.fr"
+    },
+    {
+        "name": "TF1",
+        "media_type_hint": "Télévision nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "reportages@tf1.fr"
+    },
+    {
+        "name": "France 5",
+        "media_type_hint": "Télévision nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@france5.fr"
+    },
+    {
+        "name": "France Info TV",
+        "media_type_hint": "Télévision nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@franceinfo.fr"
+    },
+    {
+        "name": "LCP / Public Sénat",
+        "media_type_hint": "Télévision nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@lcp.fr"
+    },
+    {
+        "name": "Arte",
+        "media_type_hint": "Télévision nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "docs@arte.tv"
+    },
+    {
+        "name": "RMC Découverte",
+        "media_type_hint": "Télévision nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@rmcdecouverte.fr"
+    },
+    {
+        "name": "T18",
+        "media_type_hint": "Télévision nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@t18.fr"
+    },
+    {
+        "name": "Novo19",
+        "media_type_hint": "Télévision nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@novo19.fr"
+    },
+    {
+        "name": "France Info Radio",
+        "media_type_hint": "Radio nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@franceinfo.fr"
+    },
+    {
+        "name": "BFM Radio",
+        "media_type_hint": "Radio nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "bfmradio@bfmtv.com"
+    },
+    {
+        "name": "France Inter",
+        "media_type_hint": "Radio nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@radiofrance.fr"
+    },
+    {
+        "name": "RTL",
+        "media_type_hint": "Radio nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@rtl.fr"
+    },
+    {
+        "name": "Europe 1",
+        "media_type_hint": "Radio nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "europe1@europe1.fr"
+    },
+    {
+        "name": "RMC",
+        "media_type_hint": "Radio nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "rmcinfo@rmc.fr"
+    },
+    {
+        "name": "France Culture",
+        "media_type_hint": "Radio nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "culture@radiofrance.fr"
+    },
+    {
+        "name": "Sud Radio",
+        "media_type_hint": "Radio nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@sudradio.fr"
+    },
+    {
+        "name": "Radio Classique",
+        "media_type_hint": "Radio nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@radioclassique.fr"
+    },
+    {
+        "name": "Les Échos",
+        "media_type_hint": "Presse quotidienne nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@lesechos.fr"
+    },
+    {
+        "name": "Le Monde",
+        "media_type_hint": "Presse quotidienne nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "eco@lemonde.fr"
+    },
+    {
+        "name": "La Tribune",
+        "media_type_hint": "Presse quotidienne nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@latribune.fr"
+    },
+    {
+        "name": "Le Figaro",
+        "media_type_hint": "Presse quotidienne nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "economie@lefigaro.fr"
+    },
+    {
+        "name": "Libération",
+        "media_type_hint": "Presse quotidienne nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@liberation.fr"
+    },
+    {
+        "name": "Le Parisien",
+        "media_type_hint": "Presse quotidienne nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "leparisien@leparisien.fr"
+    },
+    {
+        "name": "Les Echos Week-end",
+        "media_type_hint": "Presse quotidienne nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "weekend@lesechos.fr"
+    },
+    {
+        "name": "20 Minutes",
+        "media_type_hint": "Presse quotidienne nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@20minutes.fr"
+    },
+    {
+        "name": "La Croix",
+        "media_type_hint": "Presse quotidienne nationale",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@la-croix.com"
+    },
+    {
+        "name": "Capital",
+        "media_type_hint": "Magazines nationaux",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@capital.fr"
+    },
+    {
+        "name": "Challenges",
+        "media_type_hint": "Magazines nationaux",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@challenges.fr"
+    },
+    {
+        "name": "L'Express",
+        "media_type_hint": "Magazines nationaux",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@lexpress.fr"
+    },
+    {
+        "name": "L'Obs",
+        "media_type_hint": "Magazines nationaux",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@nouvelobs.com"
+    },
+    {
+        "name": "Le Point",
+        "media_type_hint": "Magazines nationaux",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@lepoint.fr"
+    },
+    {
+        "name": "Marianne",
+        "media_type_hint": "Magazines nationaux",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@marianne.net"
+    },
+    {
+        "name": "Investir / Le Journal des Finances",
+        "media_type_hint": "Magazines nationaux",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@investir.fr"
+    },
+    {
+        "name": "Management",
+        "media_type_hint": "Magazines nationaux",
+        "territoire": "national",
+        "department_code": null,
+        "email": "management@prisma.fr"
+    },
+    {
+        "name": "Chef d'Entreprise Magazine",
+        "media_type_hint": "Magazines nationaux",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@chefdentreprise.com"
+    },
+    {
+        "name": "Entreprendre",
+        "media_type_hint": "Magazines nationaux",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@entreprendre.fr"
+    },
+    {
+        "name": "Sciences et Avenir",
+        "media_type_hint": "Magazines nationaux",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@sciencesetavenir.fr"
+    },
+    {
+        "name": "L'Usine Nouvelle",
+        "media_type_hint": "Presse professionnelle et sectorielle",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@usinenouvelle.com"
+    },
+    {
+        "name": "L'Usine Digitale",
+        "media_type_hint": "Presse professionnelle et sectorielle",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@usine-digitale.fr"
+    },
+    {
+        "name": "Décideurs Magazine",
+        "media_type_hint": "Presse professionnelle et sectorielle",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@decideurs-magazine.com"
+    },
+    {
+        "name": "Harvard Business Review France",
+        "media_type_hint": "Presse professionnelle et sectorielle",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@hbrfrance.fr"
+    },
+    {
+        "name": "Le Journal des Entreprises",
+        "media_type_hint": "Presse professionnelle et sectorielle",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@lejournaldesentreprises.com"
+    },
+    {
+        "name": "LSA (Libre Service Actualités)",
+        "media_type_hint": "Presse professionnelle et sectorielle",
+        "territoire": "national",
+        "department_code": null,
+        "email": "lsa@lsa.fr"
+    },
+    {
+        "name": "Supply Chain Magazine",
+        "media_type_hint": "Presse professionnelle et sectorielle",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@supplychainmagazine.fr"
+    },
+    {
+        "name": "Industries & Technologies",
+        "media_type_hint": "Presse professionnelle et sectorielle",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@industrie-techno.com"
+    },
+    {
+        "name": "RH Info",
+        "media_type_hint": "Presse professionnelle et sectorielle",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@rhinfo.com"
+    },
+    {
+        "name": "Infopro Digital",
+        "media_type_hint": "Presse professionnelle et sectorielle",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@infopro-digital.com"
+    },
+    {
+        "name": "Le Moniteur",
+        "media_type_hint": "Presse professionnelle et sectorielle",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@lemoniteur.fr"
+    },
+    {
+        "name": "Néo Restauration",
+        "media_type_hint": "Presse professionnelle et sectorielle",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@neorestauration.com"
+    },
+    {
+        "name": "Décision Achats",
+        "media_type_hint": "Presse professionnelle et sectorielle",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@decision-achats.fr"
+    },
+    {
+        "name": "Logistiques Magazine",
+        "media_type_hint": "Presse professionnelle et sectorielle",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@logistiquesmagazine.fr"
+    },
+    {
+        "name": "Siècle Digital",
+        "media_type_hint": "Pure players web — Backlinks SEO",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@siecle-digital.fr"
+    },
+    {
+        "name": "Journal du Net (JDN)",
+        "media_type_hint": "Pure players web — Backlinks SEO",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@journaldunet.com"
+    },
+    {
+        "name": "01net",
+        "media_type_hint": "Pure players web — Backlinks SEO",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@01net.com"
+    },
+    {
+        "name": "Bpifrance Le Lab",
+        "media_type_hint": "Pure players web — Backlinks SEO",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@bpifrance.fr"
+    },
+    {
+        "name": "BDM Blog du Modérateur",
+        "media_type_hint": "Pure players web — Backlinks SEO",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@blogdumoderateur.com"
+    },
+    {
+        "name": "FrenchWeb",
+        "media_type_hint": "Pure players web — Backlinks SEO",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@frenchweb.fr"
+    },
+    {
+        "name": "Maddyness",
+        "media_type_hint": "Pure players web — Backlinks SEO",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@maddyness.com"
+    },
+    {
+        "name": "L'ADN",
+        "media_type_hint": "Pure players web — Backlinks SEO",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@ladn.eu"
+    },
+    {
+        "name": "Numerama",
+        "media_type_hint": "Pure players web — Backlinks SEO",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@numerama.com"
+    },
+    {
+        "name": "L'Informé",
+        "media_type_hint": "Pure players web — Backlinks SEO",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@linformeditions.fr"
+    },
+    {
+        "name": "Morning",
+        "media_type_hint": "Pure players web — Backlinks SEO",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@morning.fr"
+    },
+    {
+        "name": "Le Big Data",
+        "media_type_hint": "Pure players web — Backlinks SEO",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@lebigdata.fr"
+    },
+    {
+        "name": "Widoobiz",
+        "media_type_hint": "Pure players web — Backlinks SEO",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@widoobiz.com"
+    },
+    {
+        "name": "Usbek & Rica",
+        "media_type_hint": "Pure players web — Backlinks SEO",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@usbeketrica.com"
+    },
+    {
+        "name": "Welcome to the Jungle Media",
+        "media_type_hint": "Pure players web — Backlinks SEO",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@welcometothejungle.com"
+    },
+    {
+        "name": "Clubic",
+        "media_type_hint": "Pure players web — Backlinks SEO",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@clubic.com"
+    },
+    {
+        "name": "AFP (Agence France-Presse)",
+        "media_type_hint": "Agences de presse — PRIORITÉ ABSOLUE",
+        "territoire": "national",
+        "department_code": null,
+        "email": "redaction@afp.com"
+    },
+    {
+        "name": "Reuters France",
+        "media_type_hint": "Agences de presse — PRIORITÉ ABSOLUE",
+        "territoire": "national",
+        "department_code": null,
+        "email": "france@reuters.com"
+    },
+    {
+        "name": "Morning Tech (Les Échos)",
+        "media_type_hint": "Newsletters B2B influentes",
+        "territoire": "national",
+        "department_code": null,
+        "email": "morningtech@lesechos.fr"
+    },
+    {
+        "name": "The Brief (FrenchWeb)",
+        "media_type_hint": "Newsletters B2B influentes",
+        "territoire": "national",
+        "department_code": null,
+        "email": "thebrief@frenchweb.fr"
+    },
+    {
+        "name": "Pépites Tech",
+        "media_type_hint": "Newsletters B2B influentes",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@pepitestech.fr"
+    },
+    {
+        "name": "La Lettre (The Family)",
+        "media_type_hint": "Newsletters B2B influentes",
+        "territoire": "national",
+        "department_code": null,
+        "email": "newsletter@thefamily.co"
+    },
+    {
+        "name": "Newsletter JDN",
+        "media_type_hint": "Newsletters B2B influentes",
+        "territoire": "national",
+        "department_code": null,
+        "email": "newsletter@journaldunet.com"
+    },
+    {
+        "name": "Numerama Shift",
+        "media_type_hint": "Newsletters B2B influentes",
+        "territoire": "national",
+        "department_code": null,
+        "email": "shift@numerama.com"
+    },
+    {
+        "name": "Big Picture (Les Échos)",
+        "media_type_hint": "Newsletters B2B influentes",
+        "territoire": "national",
+        "department_code": null,
+        "email": "bigpicture@lesechos.fr"
+    },
+    {
+        "name": "La Lettre A",
+        "media_type_hint": "Newsletters B2B influentes",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@lalettrea.fr"
+    },
+    {
+        "name": "GDIY — Génération Do It Yourself",
+        "media_type_hint": "Podcasts & YouTube — Audience dirigeants",
+        "territoire": "national",
+        "department_code": null,
+        "email": "gdiy@gdiy.fr"
+    },
+    {
+        "name": "La Martingale",
+        "media_type_hint": "Podcasts & YouTube — Audience dirigeants",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@lamartingale.fr"
+    },
+    {
+        "name": "Underscore_",
+        "media_type_hint": "Podcasts & YouTube — Audience dirigeants",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@underscore.fr"
+    },
+    {
+        "name": "Comptoir IA (Nicolas Guyon)",
+        "media_type_hint": "Podcasts & YouTube — Audience dirigeants",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@comptoiria.fr"
+    },
+    {
+        "name": "AI Experience (Julien Redelsperger)",
+        "media_type_hint": "Podcasts & YouTube — Audience dirigeants",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@aiexperience.fr"
+    },
+    {
+        "name": "Data Driven 101 (Marc Sanselme)",
+        "media_type_hint": "Podcasts & YouTube — Audience dirigeants",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@datadrive101.fr"
+    },
+    {
+        "name": "Entrepreneur Libre (Antoine BM)",
+        "media_type_hint": "Podcasts & YouTube — Audience dirigeants",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@entreprendrelibre.fr"
+    },
+    {
+        "name": "Growth Makers",
+        "media_type_hint": "Podcasts & YouTube — Audience dirigeants",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@growthmakers.fr"
+    },
+    {
+        "name": "Parlez-moi de votre boîte",
+        "media_type_hint": "Podcasts & YouTube — Audience dirigeants",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@pmdb.fr"
+    },
+    {
+        "name": "BFM Business Podcasts",
+        "media_type_hint": "Podcasts & YouTube — Audience dirigeants",
+        "territoire": "national",
+        "department_code": null,
+        "email": "podcasts@bfmbusiness.com"
+    },
+    {
+        "name": "Cash Out",
+        "media_type_hint": "Podcasts & YouTube — Audience dirigeants",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@cashoutpodcast.fr"
+    },
+    {
+        "name": "IA sans Bullshit (Denis Atlan)",
+        "media_type_hint": "Podcasts & YouTube — Audience dirigeants",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@iasansbullshit.fr"
+    },
+    {
+        "name": "Start to Scale (Eric Seclet)",
+        "media_type_hint": "Podcasts & YouTube — Audience dirigeants",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@starttoscale.fr"
+    },
+    {
+        "name": "Changement d'époque (Converteo)",
+        "media_type_hint": "Podcasts & YouTube — Audience dirigeants",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@converteo.com"
+    },
+    {
+        "name": "Les Rois du Scale",
+        "media_type_hint": "Podcasts & YouTube — Audience dirigeants",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@lesroisduscale.com"
+    },
+    {
+        "name": "Le Fil IA",
+        "media_type_hint": "Podcasts & YouTube — Audience dirigeants",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@lefilai.fr"
+    },
+    {
+        "name": "Grow Fast Now What (EY)",
+        "media_type_hint": "Podcasts & YouTube — Audience dirigeants",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@ey.com"
+    },
+    {
+        "name": "Comment t'as fait ?",
+        "media_type_hint": "Podcasts & YouTube — Audience dirigeants",
+        "territoire": "national",
+        "department_code": null,
+        "email": "contact@commenttasfait.fr"
+    },
+    {
+        "name": "Le Progrès Ain",
+        "media_type_hint": "Presse",
+        "territoire": "Ain",
+        "department_code": "01",
+        "email": "redaction@leprogres.fr"
+    },
+    {
+        "name": "France 3 Rhône-Alpes",
+        "media_type_hint": "TV",
+        "territoire": "Ain",
+        "department_code": "01",
+        "email": "redaction.rhonealpes@france3.fr"
+    },
+    {
+        "name": "France Bleu Ain",
+        "media_type_hint": "Radio",
+        "territoire": "Ain",
+        "department_code": "01",
+        "email": "francebleu.ain@radiofrance.fr"
+    },
+    {
+        "name": "L'Union",
+        "media_type_hint": "Presse",
+        "territoire": "Aisne",
+        "department_code": "02",
+        "email": "redaction@lunion.fr"
+    },
+    {
+        "name": "France 3 Picardie",
+        "media_type_hint": "TV",
+        "territoire": "Aisne",
+        "department_code": "02",
+        "email": "redaction.picardie@france3.fr"
+    },
+    {
+        "name": "France Bleu Picardie",
+        "media_type_hint": "Radio",
+        "territoire": "Aisne",
+        "department_code": "02",
+        "email": "francebleu.picardie@radiofrance.fr"
+    },
+    {
+        "name": "La Montagne",
+        "media_type_hint": "Presse",
+        "territoire": "Allier",
+        "department_code": "03",
+        "email": "redaction@lamontagne.fr"
+    },
+    {
+        "name": "France 3 Auvergne",
+        "media_type_hint": "TV",
+        "territoire": "Allier",
+        "department_code": "03",
+        "email": "redaction.auvergne@france3.fr"
+    },
+    {
+        "name": "France Bleu Pays d'Auvergne",
+        "media_type_hint": "Radio",
+        "territoire": "Allier",
+        "department_code": "03",
+        "email": "francebleu.auvergne@radiofrance.fr"
+    },
+    {
+        "name": "La Provence",
+        "media_type_hint": "Presse",
+        "territoire": "Alpes-de-Haute-Provence",
+        "department_code": "04",
+        "email": "redaction@laprovence.com"
+    },
+    {
+        "name": "France 3 PACA",
+        "media_type_hint": "TV",
+        "territoire": "Alpes-de-Haute-Provence",
+        "department_code": "04",
+        "email": "redaction.paca@france3.fr"
+    },
+    {
+        "name": "BFM DICI Alpes Sud",
+        "media_type_hint": "TV",
+        "territoire": "Alpes-de-Haute-Provence",
+        "department_code": "04",
+        "email": "bfmdici@bfmtv.com"
+    },
+    {
+        "name": "Le Dauphiné Libéré",
+        "media_type_hint": "Presse",
+        "territoire": "Hautes-Alpes",
+        "department_code": "05",
+        "email": "redaction@ledauphine.com"
+    },
+    {
+        "name": "France 3 PACA",
+        "media_type_hint": "TV",
+        "territoire": "Hautes-Alpes",
+        "department_code": "05",
+        "email": "redaction.paca@france3.fr"
+    },
+    {
+        "name": "BFM DICI Alpes Sud",
+        "media_type_hint": "TV",
+        "territoire": "Hautes-Alpes",
+        "department_code": "05",
+        "email": "bfmdici@bfmtv.com"
+    },
+    {
+        "name": "Nice-Matin",
+        "media_type_hint": "Presse",
+        "territoire": "Alpes-Maritimes",
+        "department_code": "06",
+        "email": "redaction@nicematin.fr"
+    },
+    {
+        "name": "BFM Nice Côte d'Azur",
+        "media_type_hint": "TV",
+        "territoire": "Alpes-Maritimes",
+        "department_code": "06",
+        "email": "bfmnice@bfmtv.com"
+    },
+    {
+        "name": "France 3 Côte d'Azur",
+        "media_type_hint": "TV",
+        "territoire": "Alpes-Maritimes",
+        "department_code": "06",
+        "email": "redaction.cotedazur@france3.fr"
+    },
+    {
+        "name": "France Bleu Azur",
+        "media_type_hint": "Radio",
+        "territoire": "Alpes-Maritimes",
+        "department_code": "06",
+        "email": "francebleu.azur@radiofrance.fr"
+    },
+    {
+        "name": "Côte d'Azur News (web)",
+        "media_type_hint": "Web",
+        "territoire": "Alpes-Maritimes",
+        "department_code": "06",
+        "email": "contact@cotedazurnews.fr"
+    },
+    {
+        "name": "Tribune de Nice (web)",
+        "media_type_hint": "Web",
+        "territoire": "Alpes-Maritimes",
+        "department_code": "06",
+        "email": "redaction@tribunedenice.fr"
+    },
+    {
+        "name": "Le Dauphiné Libéré",
+        "media_type_hint": "Presse",
+        "territoire": "Ardèche",
+        "department_code": "07",
+        "email": "redaction@ledauphine.com"
+    },
+    {
+        "name": "France 3 Rhône-Alpes",
+        "media_type_hint": "TV",
+        "territoire": "Ardèche",
+        "department_code": "07",
+        "email": "redaction.rhonealpes@france3.fr"
+    },
+    {
+        "name": "France Bleu Drôme Ardèche",
+        "media_type_hint": "Radio",
+        "territoire": "Ardèche",
+        "department_code": "07",
+        "email": "francebleu.dromeardeche@radiofrance.fr"
+    },
+    {
+        "name": "L'Ardennais",
+        "media_type_hint": "Presse",
+        "territoire": "Ardennes",
+        "department_code": "08",
+        "email": "redaction@lardennais.fr"
+    },
+    {
+        "name": "France 3 Grand Est",
+        "media_type_hint": "TV",
+        "territoire": "Ardennes",
+        "department_code": "08",
+        "email": "redaction.grandest@france3.fr"
+    },
+    {
+        "name": "France Bleu Champagne",
+        "media_type_hint": "Radio",
+        "territoire": "Ardennes",
+        "department_code": "08",
+        "email": "francebleu.champagne@radiofrance.fr"
+    },
+    {
+        "name": "La Dépêche du Midi",
+        "media_type_hint": "Presse",
+        "territoire": "Ariège",
+        "department_code": "09",
+        "email": "redaction@ladepeche.fr"
+    },
+    {
+        "name": "France 3 Midi-Pyrénées",
+        "media_type_hint": "TV",
+        "territoire": "Ariège",
+        "department_code": "09",
+        "email": "redaction.midipyrenees@france3.fr"
+    },
+    {
+        "name": "France Bleu Occitanie",
+        "media_type_hint": "Radio",
+        "territoire": "Ariège",
+        "department_code": "09",
+        "email": "francebleu.occitanie@radiofrance.fr"
+    },
+    {
+        "name": "L'Est Éclair",
+        "media_type_hint": "Presse",
+        "territoire": "Aube",
+        "department_code": "10",
+        "email": "redaction@esteclair.fr"
+    },
+    {
+        "name": "France 3 Grand Est",
+        "media_type_hint": "TV",
+        "territoire": "Aube",
+        "department_code": "10",
+        "email": "redaction.grandest@france3.fr"
+    },
+    {
+        "name": "France Bleu Champagne",
+        "media_type_hint": "Radio",
+        "territoire": "Aube",
+        "department_code": "10",
+        "email": "francebleu.champagne@radiofrance.fr"
+    },
+    {
+        "name": "L'Indépendant",
+        "media_type_hint": "Presse",
+        "territoire": "Aude",
+        "department_code": "11",
+        "email": "redaction@lindependant.fr"
+    },
+    {
+        "name": "France 3 Languedoc",
+        "media_type_hint": "TV",
+        "territoire": "Aude",
+        "department_code": "11",
+        "email": "redaction.languedoc@france3.fr"
+    },
+    {
+        "name": "France Bleu Hérault",
+        "media_type_hint": "Radio",
+        "territoire": "Aude",
+        "department_code": "11",
+        "email": "francebleu.herault@radiofrance.fr"
+    },
+    {
+        "name": "Centre Presse Aveyron",
+        "media_type_hint": "Presse",
+        "territoire": "Aveyron",
+        "department_code": "12",
+        "email": "redaction@centrepresseaveyron.fr"
+    },
+    {
+        "name": "France 3 Midi-Pyrénées",
+        "media_type_hint": "TV",
+        "territoire": "Aveyron",
+        "department_code": "12",
+        "email": "redaction.midipyrenees@france3.fr"
+    },
+    {
+        "name": "France Bleu Occitanie",
+        "media_type_hint": "Radio",
+        "territoire": "Aveyron",
+        "department_code": "12",
+        "email": "francebleu.occitanie@radiofrance.fr"
+    },
+    {
+        "name": "La Provence",
+        "media_type_hint": "Presse",
+        "territoire": "Bouches-du-Rhône",
+        "department_code": "13",
+        "email": "redaction@laprovence.com"
+    },
+    {
+        "name": "BFM Marseille",
+        "media_type_hint": "TV",
+        "territoire": "Bouches-du-Rhône",
+        "department_code": "13",
+        "email": "bfmmarseille@bfmtv.com"
+    },
+    {
+        "name": "France 3 PACA",
+        "media_type_hint": "TV",
+        "territoire": "Bouches-du-Rhône",
+        "department_code": "13",
+        "email": "redaction.paca@france3.fr"
+    },
+    {
+        "name": "France Bleu Provence",
+        "media_type_hint": "Radio",
+        "territoire": "Bouches-du-Rhône",
+        "department_code": "13",
+        "email": "francebleu.provence@radiofrance.fr"
+    },
+    {
+        "name": "Made in Marseille",
+        "media_type_hint": "Web local",
+        "territoire": "Bouches-du-Rhône",
+        "department_code": "13",
+        "email": "contact@madeinmarseille.net"
+    },
+    {
+        "name": "Maritima Radio",
+        "media_type_hint": "Radio",
+        "territoire": "Bouches-du-Rhône",
+        "department_code": "13",
+        "email": "contact@maritima.info"
+    },
+    {
+        "name": "Marsactu (web)",
+        "media_type_hint": "Web",
+        "territoire": "Bouches-du-Rhône",
+        "department_code": "13",
+        "email": "contact@marsactu.fr"
+    },
+    {
+        "name": "Ouest-France",
+        "media_type_hint": "Presse",
+        "territoire": "Calvados",
+        "department_code": "14",
+        "email": "redaction@ouest-france.fr"
+    },
+    {
+        "name": "France 3 Normandie",
+        "media_type_hint": "TV",
+        "territoire": "Calvados",
+        "department_code": "14",
+        "email": "redaction.normandie@france3.fr"
+    },
+    {
+        "name": "France Bleu Normandie",
+        "media_type_hint": "Radio",
+        "territoire": "Calvados",
+        "department_code": "14",
+        "email": "francebleu.normandie@radiofrance.fr"
+    },
+    {
+        "name": "Liberté Caen",
+        "media_type_hint": "Presse",
+        "territoire": "Calvados",
+        "department_code": "14",
+        "email": "redaction@libertecaen.fr"
+    },
+    {
+        "name": "La Montagne",
+        "media_type_hint": "Presse",
+        "territoire": "Cantal",
+        "department_code": "15",
+        "email": "redaction@lamontagne.fr"
+    },
+    {
+        "name": "France 3 Auvergne",
+        "media_type_hint": "TV",
+        "territoire": "Cantal",
+        "department_code": "15",
+        "email": "redaction.auvergne@france3.fr"
+    },
+    {
+        "name": "France Bleu Pays d'Auvergne",
+        "media_type_hint": "Radio",
+        "territoire": "Cantal",
+        "department_code": "15",
+        "email": "francebleu.auvergne@radiofrance.fr"
+    },
+    {
+        "name": "La Charente Libre",
+        "media_type_hint": "Presse",
+        "territoire": "Charente",
+        "department_code": "16",
+        "email": "redaction@charentelibre.fr"
+    },
+    {
+        "name": "France 3 Poitou-Charentes",
+        "media_type_hint": "TV",
+        "territoire": "Charente",
+        "department_code": "16",
+        "email": "redaction.poitoucharentes@france3.fr"
+    },
+    {
+        "name": "France Bleu La Rochelle",
+        "media_type_hint": "Radio",
+        "territoire": "Charente",
+        "department_code": "16",
+        "email": "francebleu.larochelle@radiofrance.fr"
+    },
+    {
+        "name": "Sud Ouest",
+        "media_type_hint": "Presse",
+        "territoire": "Charente-Maritime",
+        "department_code": "17",
+        "email": "redaction@sudouest.fr"
+    },
+    {
+        "name": "France 3 Nouvelle-Aquitaine",
+        "media_type_hint": "TV",
+        "territoire": "Charente-Maritime",
+        "department_code": "17",
+        "email": "redaction.na@france3.fr"
+    },
+    {
+        "name": "France Bleu La Rochelle",
+        "media_type_hint": "Radio",
+        "territoire": "Charente-Maritime",
+        "department_code": "17",
+        "email": "francebleu.larochelle@radiofrance.fr"
+    },
+    {
+        "name": "Le Berry Républicain",
+        "media_type_hint": "Presse",
+        "territoire": "Cher",
+        "department_code": "18",
+        "email": "redaction@berryrepublicain.fr"
+    },
+    {
+        "name": "France 3 Centre-Val de Loire",
+        "media_type_hint": "TV",
+        "territoire": "Cher",
+        "department_code": "18",
+        "email": "redaction.centre@france3.fr"
+    },
+    {
+        "name": "France Bleu Berry",
+        "media_type_hint": "Radio",
+        "territoire": "Cher",
+        "department_code": "18",
+        "email": "francebleu.berry@radiofrance.fr"
+    },
+    {
+        "name": "La Montagne",
+        "media_type_hint": "Presse",
+        "territoire": "Corrèze",
+        "department_code": "19",
+        "email": "redaction@lamontagne.fr"
+    },
+    {
+        "name": "France 3 Limousin",
+        "media_type_hint": "TV",
+        "territoire": "Corrèze",
+        "department_code": "19",
+        "email": "redaction.limousin@france3.fr"
+    },
+    {
+        "name": "France Bleu Limousin",
+        "media_type_hint": "Radio",
+        "territoire": "Corrèze",
+        "department_code": "19",
+        "email": "francebleu.limousin@radiofrance.fr"
+    },
+    {
+        "name": "Le Bien Public",
+        "media_type_hint": "Presse",
+        "territoire": "Côte-d'Or",
+        "department_code": "21",
+        "email": "redaction@bienpublic.com"
+    },
+    {
+        "name": "France 3 Bourgogne",
+        "media_type_hint": "TV",
+        "territoire": "Côte-d'Or",
+        "department_code": "21",
+        "email": "redaction.bourgogne@france3.fr"
+    },
+    {
+        "name": "France Bleu Bourgogne",
+        "media_type_hint": "Radio",
+        "territoire": "Côte-d'Or",
+        "department_code": "21",
+        "email": "francebleu.bourgogne@radiofrance.fr"
+    },
+    {
+        "name": "Infos Dijon (web)",
+        "media_type_hint": "Web",
+        "territoire": "Côte-d'Or",
+        "department_code": "21",
+        "email": "contact@infos-dijon.com"
+    },
+    {
+        "name": "Le Télégramme",
+        "media_type_hint": "Presse",
+        "territoire": "Côtes-d'Armor",
+        "department_code": "22",
+        "email": "redaction@letelegramme.fr"
+    },
+    {
+        "name": "France 3 Bretagne",
+        "media_type_hint": "TV",
+        "territoire": "Côtes-d'Armor",
+        "department_code": "22",
+        "email": "redaction.bretagne@france3.fr"
+    },
+    {
+        "name": "France Bleu Armorique",
+        "media_type_hint": "Radio",
+        "territoire": "Côtes-d'Armor",
+        "department_code": "22",
+        "email": "francebleu.armorique@radiofrance.fr"
+    },
+    {
+        "name": "La Creuse",
+        "media_type_hint": "Presse",
+        "territoire": "Creuse",
+        "department_code": "23",
+        "email": "redaction@lacreuse.fr"
+    },
+    {
+        "name": "France 3 Limousin",
+        "media_type_hint": "TV",
+        "territoire": "Creuse",
+        "department_code": "23",
+        "email": "redaction.limousin@france3.fr"
+    },
+    {
+        "name": "France Bleu Creuse",
+        "media_type_hint": "Radio",
+        "territoire": "Creuse",
+        "department_code": "23",
+        "email": "francebleu.creuse@radiofrance.fr"
+    },
+    {
+        "name": "Sud Ouest Périgord",
+        "media_type_hint": "Presse",
+        "territoire": "Dordogne",
+        "department_code": "24",
+        "email": "redaction@sudouest.fr"
+    },
+    {
+        "name": "France 3 Nouvelle-Aquitaine",
+        "media_type_hint": "TV",
+        "territoire": "Dordogne",
+        "department_code": "24",
+        "email": "redaction.na@france3.fr"
+    },
+    {
+        "name": "France Bleu Périgord",
+        "media_type_hint": "Radio",
+        "territoire": "Dordogne",
+        "department_code": "24",
+        "email": "francebleu.perigord@radiofrance.fr"
+    },
+    {
+        "name": "Le Pays",
+        "media_type_hint": "Presse",
+        "territoire": "Doubs",
+        "department_code": "25",
+        "email": "redaction@le-pays.fr"
+    },
+    {
+        "name": "France 3 Franche-Comté",
+        "media_type_hint": "TV",
+        "territoire": "Doubs",
+        "department_code": "25",
+        "email": "redaction.franchecomte@france3.fr"
+    },
+    {
+        "name": "France Bleu Besançon",
+        "media_type_hint": "Radio",
+        "territoire": "Doubs",
+        "department_code": "25",
+        "email": "francebleu.besancon@radiofrance.fr"
+    },
+    {
+        "name": "Le Dauphiné Libéré",
+        "media_type_hint": "Presse",
+        "territoire": "Drôme",
+        "department_code": "26",
+        "email": "redaction@ledauphine.com"
+    },
+    {
+        "name": "France 3 Rhône-Alpes",
+        "media_type_hint": "TV",
+        "territoire": "Drôme",
+        "department_code": "26",
+        "email": "redaction.rhonealpes@france3.fr"
+    },
+    {
+        "name": "France Bleu Drôme Ardèche",
+        "media_type_hint": "Radio",
+        "territoire": "Drôme",
+        "department_code": "26",
+        "email": "francebleu.dromeardeche@radiofrance.fr"
+    },
+    {
+        "name": "Paris-Normandie",
+        "media_type_hint": "Presse",
+        "territoire": "Eure",
+        "department_code": "27",
+        "email": "redaction@paris-normandie.fr"
+    },
+    {
+        "name": "France 3 Normandie",
+        "media_type_hint": "TV",
+        "territoire": "Eure",
+        "department_code": "27",
+        "email": "redaction.normandie@france3.fr"
+    },
+    {
+        "name": "France Bleu Normandie",
+        "media_type_hint": "Radio",
+        "territoire": "Eure",
+        "department_code": "27",
+        "email": "francebleu.normandie@radiofrance.fr"
+    },
+    {
+        "name": "L'Écho Républicain",
+        "media_type_hint": "Presse",
+        "territoire": "Eure-et-Loir",
+        "department_code": "28",
+        "email": "redaction@lechorepublicain.fr"
+    },
+    {
+        "name": "France 3 Centre-Val de Loire",
+        "media_type_hint": "TV",
+        "territoire": "Eure-et-Loir",
+        "department_code": "28",
+        "email": "redaction.centre@france3.fr"
+    },
+    {
+        "name": "France Bleu Chartres",
+        "media_type_hint": "Radio",
+        "territoire": "Eure-et-Loir",
+        "department_code": "28",
+        "email": "francebleu.chartres@radiofrance.fr"
+    },
+    {
+        "name": "Le Télégramme",
+        "media_type_hint": "Presse",
+        "territoire": "Finistère",
+        "department_code": "29",
+        "email": "redaction@letelegramme.fr"
+    },
+    {
+        "name": "France 3 Bretagne",
+        "media_type_hint": "TV",
+        "territoire": "Finistère",
+        "department_code": "29",
+        "email": "redaction.bretagne@france3.fr"
+    },
+    {
+        "name": "France Bleu Breizh Izel",
+        "media_type_hint": "Radio",
+        "territoire": "Finistère",
+        "department_code": "29",
+        "email": "francebleu.breizh@radiofrance.fr"
+    },
+    {
+        "name": "Tébéo TV",
+        "media_type_hint": "TV locale",
+        "territoire": "Finistère",
+        "department_code": "29",
+        "email": "redaction@tebeo.bzh"
+    },
+    {
+        "name": "Midi Libre",
+        "media_type_hint": "Presse",
+        "territoire": "Gard",
+        "department_code": "30",
+        "email": "redaction@midilibre.fr"
+    },
+    {
+        "name": "France 3 Languedoc",
+        "media_type_hint": "TV",
+        "territoire": "Gard",
+        "department_code": "30",
+        "email": "redaction.languedoc@france3.fr"
+    },
+    {
+        "name": "France Bleu Gard Lozère",
+        "media_type_hint": "Radio",
+        "territoire": "Gard",
+        "department_code": "30",
+        "email": "francebleu.gardlozere@radiofrance.fr"
+    },
+    {
+        "name": "La Dépêche du Midi",
+        "media_type_hint": "Presse",
+        "territoire": "Haute-Garonne",
+        "department_code": "31",
+        "email": "redaction@ladepeche.fr"
+    },
+    {
+        "name": "BFM Toulouse",
+        "media_type_hint": "TV",
+        "territoire": "Haute-Garonne",
+        "department_code": "31",
+        "email": "bfmtoulouse@bfmtv.com"
+    },
+    {
+        "name": "France 3 Midi-Pyrénées",
+        "media_type_hint": "TV",
+        "territoire": "Haute-Garonne",
+        "department_code": "31",
+        "email": "redaction.midipyrenees@france3.fr"
+    },
+    {
+        "name": "France Bleu Toulouse",
+        "media_type_hint": "Radio",
+        "territoire": "Haute-Garonne",
+        "department_code": "31",
+        "email": "francebleu.toulouse@radiofrance.fr"
+    },
+    {
+        "name": "Toulouse Business",
+        "media_type_hint": "Web",
+        "territoire": "Haute-Garonne",
+        "department_code": "31",
+        "email": "redaction@toulousebusiness.com"
+    },
+    {
+        "name": "ActivitésToulouse (web)",
+        "media_type_hint": "Web",
+        "territoire": "Haute-Garonne",
+        "department_code": "31",
+        "email": "contact@activitestoulouse.fr"
+    },
+    {
+        "name": "La Dépêche du Midi",
+        "media_type_hint": "Presse",
+        "territoire": "Gers",
+        "department_code": "32",
+        "email": "redaction@ladepeche.fr"
+    },
+    {
+        "name": "France 3 Midi-Pyrénées",
+        "media_type_hint": "TV",
+        "territoire": "Gers",
+        "department_code": "32",
+        "email": "redaction.midipyrenees@france3.fr"
+    },
+    {
+        "name": "France Bleu Gascogne",
+        "media_type_hint": "Radio",
+        "territoire": "Gers",
+        "department_code": "32",
+        "email": "francebleu.gascogne@radiofrance.fr"
+    },
+    {
+        "name": "Sud Ouest",
+        "media_type_hint": "Presse",
+        "territoire": "Gironde",
+        "department_code": "33",
+        "email": "redaction@sudouest.fr"
+    },
+    {
+        "name": "BFM Bordeaux",
+        "media_type_hint": "TV",
+        "territoire": "Gironde",
+        "department_code": "33",
+        "email": "bfmbordeaux@bfmtv.com"
+    },
+    {
+        "name": "France 3 Nouvelle-Aquitaine",
+        "media_type_hint": "TV",
+        "territoire": "Gironde",
+        "department_code": "33",
+        "email": "redaction.na@france3.fr"
+    },
+    {
+        "name": "France Bleu Gironde",
+        "media_type_hint": "Radio",
+        "territoire": "Gironde",
+        "department_code": "33",
+        "email": "francebleu.gironde@radiofrance.fr"
+    },
+    {
+        "name": "Aqui.fr (web)",
+        "media_type_hint": "Web local",
+        "territoire": "Gironde",
+        "department_code": "33",
+        "email": "redaction@aqui.fr"
+    },
+    {
+        "name": "La Tribune Bordeaux",
+        "media_type_hint": "Web",
+        "territoire": "Gironde",
+        "department_code": "33",
+        "email": "bordeaux@latribune.fr"
+    },
+    {
+        "name": "Midi Libre",
+        "media_type_hint": "Presse",
+        "territoire": "Hérault",
+        "department_code": "34",
+        "email": "redaction@midilibre.fr"
+    },
+    {
+        "name": "France 3 Languedoc",
+        "media_type_hint": "TV",
+        "territoire": "Hérault",
+        "department_code": "34",
+        "email": "redaction.languedoc@france3.fr"
+    },
+    {
+        "name": "France Bleu Hérault",
+        "media_type_hint": "Radio",
+        "territoire": "Hérault",
+        "department_code": "34",
+        "email": "francebleu.herault@radiofrance.fr"
+    },
+    {
+        "name": "Hérault Tribune (web)",
+        "media_type_hint": "Web",
+        "territoire": "Hérault",
+        "department_code": "34",
+        "email": "contact@hlt-tribune.fr"
+    },
+    {
+        "name": "Ouest-France",
+        "media_type_hint": "Presse",
+        "territoire": "Ille-et-Vilaine",
+        "department_code": "35",
+        "email": "redaction@ouest-france.fr"
+    },
+    {
+        "name": "France 3 Bretagne",
+        "media_type_hint": "TV",
+        "territoire": "Ille-et-Vilaine",
+        "department_code": "35",
+        "email": "redaction.bretagne@france3.fr"
+    },
+    {
+        "name": "France Bleu Armorique",
+        "media_type_hint": "Radio",
+        "territoire": "Ille-et-Vilaine",
+        "department_code": "35",
+        "email": "francebleu.armorique@radiofrance.fr"
+    },
+    {
+        "name": "TVR Rennes",
+        "media_type_hint": "TV locale",
+        "territoire": "Ille-et-Vilaine",
+        "department_code": "35",
+        "email": "contact@tvr.bzh"
+    },
+    {
+        "name": "La Nouvelle République",
+        "media_type_hint": "Presse",
+        "territoire": "Indre",
+        "department_code": "36",
+        "email": "redaction@nrco.fr"
+    },
+    {
+        "name": "France 3 Centre-Val de Loire",
+        "media_type_hint": "TV",
+        "territoire": "Indre",
+        "department_code": "36",
+        "email": "redaction.centre@france3.fr"
+    },
+    {
+        "name": "France Bleu Berry",
+        "media_type_hint": "Radio",
+        "territoire": "Indre",
+        "department_code": "36",
+        "email": "francebleu.berry@radiofrance.fr"
+    },
+    {
+        "name": "La Nouvelle République",
+        "media_type_hint": "Presse",
+        "territoire": "Indre-et-Loire",
+        "department_code": "37",
+        "email": "redaction@nrco.fr"
+    },
+    {
+        "name": "France 3 Centre-Val de Loire",
+        "media_type_hint": "TV",
+        "territoire": "Indre-et-Loire",
+        "department_code": "37",
+        "email": "redaction.centre@france3.fr"
+    },
+    {
+        "name": "France Bleu Touraine",
+        "media_type_hint": "Radio",
+        "territoire": "Indre-et-Loire",
+        "department_code": "37",
+        "email": "francebleu.touraine@radiofrance.fr"
+    },
+    {
+        "name": "Le Dauphiné Libéré",
+        "media_type_hint": "Presse",
+        "territoire": "Isère",
+        "department_code": "38",
+        "email": "redaction@ledauphine.com"
+    },
+    {
+        "name": "Présences Grenoble (CCI)",
+        "media_type_hint": "Magazine éco",
+        "territoire": "Isère",
+        "department_code": "38",
+        "email": "presences@grenoble.cci.fr"
+    },
+    {
+        "name": "Les Affiches de Grenoble",
+        "media_type_hint": "Presse",
+        "territoire": "Isère",
+        "department_code": "38",
+        "email": "redaction@affichesgrenoble.fr"
+    },
+    {
+        "name": "TéléGrenoble Isère (TG+)",
+        "media_type_hint": "TV locale",
+        "territoire": "Isère",
+        "department_code": "38",
+        "email": "presse@telegrenoble.net"
+    },
+    {
+        "name": "France 3 Alpes",
+        "media_type_hint": "TV",
+        "territoire": "Isère",
+        "department_code": "38",
+        "email": "redaction.alpes@france3.fr"
+    },
+    {
+        "name": "France Bleu Isère",
+        "media_type_hint": "Radio",
+        "territoire": "Isère",
+        "department_code": "38",
+        "email": "francebleu.isere@radiofrance.fr"
+    },
+    {
+        "name": "Place Gre'net (web)",
+        "media_type_hint": "Web local",
+        "territoire": "Isère",
+        "department_code": "38",
+        "email": "redaction@placegrenet.fr"
+    },
+    {
+        "name": "La Tribune AuRA",
+        "media_type_hint": "Web/Presse",
+        "territoire": "Isère",
+        "department_code": "38",
+        "email": "grenoble@latribune.fr"
+    },
+    {
+        "name": "Le Journal des Entreprises AuRA",
+        "media_type_hint": "Presse éco",
+        "territoire": "Isère",
+        "department_code": "38",
+        "email": "redaction@lejournaldesentreprises.com"
+    },
+    {
+        "name": "Innovation24.fr",
+        "media_type_hint": "Web tech",
+        "territoire": "Isère",
+        "department_code": "38",
+        "email": "contact@innovation24.fr"
+    },
+    {
+        "name": "Grenoble-Tribune.fr",
+        "media_type_hint": "Web local",
+        "territoire": "Isère",
+        "department_code": "38",
+        "email": "redaction@grenoble-tribune.fr"
+    },
+    {
+        "name": "France Bleu Drôme Ardèche",
+        "media_type_hint": "Radio",
+        "territoire": "Isère",
+        "department_code": "38",
+        "email": "francebleu.dromeardeche@radiofrance.fr"
+    },
+    {
+        "name": "CCI Grenoble (newsletter)",
+        "media_type_hint": "Newsletter",
+        "territoire": "Isère",
+        "department_code": "38",
+        "email": "communication@grenoble.cci.fr"
+    },
+    {
+        "name": "French Tech Grenoble",
+        "media_type_hint": "Newsletter",
+        "territoire": "Isère",
+        "department_code": "38",
+        "email": "contact@frenchtech-grenoble.fr"
+    },
+    {
+        "name": "Actu.fr Grenoble",
+        "media_type_hint": "Web",
+        "territoire": "Isère",
+        "department_code": "38",
+        "email": "grenoble@actu.fr"
+    },
+    {
+        "name": "L'Essor (Isère)",
+        "media_type_hint": "Presse",
+        "territoire": "Isère",
+        "department_code": "38",
+        "email": "contact@lessor.fr"
+    },
+    {
+        "name": "Le Progrès",
+        "media_type_hint": "Presse",
+        "territoire": "Jura",
+        "department_code": "39",
+        "email": "redaction@leprogres.fr"
+    },
+    {
+        "name": "France 3 Franche-Comté",
+        "media_type_hint": "TV",
+        "territoire": "Jura",
+        "department_code": "39",
+        "email": "redaction.franchecomte@france3.fr"
+    },
+    {
+        "name": "France Bleu Besançon",
+        "media_type_hint": "Radio",
+        "territoire": "Jura",
+        "department_code": "39",
+        "email": "francebleu.besancon@radiofrance.fr"
+    },
+    {
+        "name": "Sud Ouest",
+        "media_type_hint": "Presse",
+        "territoire": "Landes",
+        "department_code": "40",
+        "email": "redaction@sudouest.fr"
+    },
+    {
+        "name": "France 3 Nouvelle-Aquitaine",
+        "media_type_hint": "TV",
+        "territoire": "Landes",
+        "department_code": "40",
+        "email": "redaction.na@france3.fr"
+    },
+    {
+        "name": "France Bleu Gascogne",
+        "media_type_hint": "Radio",
+        "territoire": "Landes",
+        "department_code": "40",
+        "email": "francebleu.gascogne@radiofrance.fr"
+    },
+    {
+        "name": "La Nouvelle République",
+        "media_type_hint": "Presse",
+        "territoire": "Loir-et-Cher",
+        "department_code": "41",
+        "email": "redaction@nrco.fr"
+    },
+    {
+        "name": "France 3 Centre-Val de Loire",
+        "media_type_hint": "TV",
+        "territoire": "Loir-et-Cher",
+        "department_code": "41",
+        "email": "redaction.centre@france3.fr"
+    },
+    {
+        "name": "France Bleu Berry",
+        "media_type_hint": "Radio",
+        "territoire": "Loir-et-Cher",
+        "department_code": "41",
+        "email": "francebleu.berry@radiofrance.fr"
+    },
+    {
+        "name": "Le Progrès",
+        "media_type_hint": "Presse",
+        "territoire": "Loire",
+        "department_code": "42",
+        "email": "redaction@leprogres.fr"
+    },
+    {
+        "name": "France 3 Rhône-Alpes",
+        "media_type_hint": "TV",
+        "territoire": "Loire",
+        "department_code": "42",
+        "email": "redaction.rhonealpes@france3.fr"
+    },
+    {
+        "name": "France Bleu Loire",
+        "media_type_hint": "Radio",
+        "territoire": "Loire",
+        "department_code": "42",
+        "email": "francebleu.loire@radiofrance.fr"
+    },
+    {
+        "name": "TL7 Saint-Étienne",
+        "media_type_hint": "TV locale",
+        "territoire": "Loire",
+        "department_code": "42",
+        "email": "contact@tl7.fr"
+    },
+    {
+        "name": "L'Éveil de la Haute-Loire",
+        "media_type_hint": "Presse",
+        "territoire": "Haute-Loire",
+        "department_code": "43",
+        "email": "redaction@leveil.fr"
+    },
+    {
+        "name": "France 3 Auvergne",
+        "media_type_hint": "TV",
+        "territoire": "Haute-Loire",
+        "department_code": "43",
+        "email": "redaction.auvergne@france3.fr"
+    },
+    {
+        "name": "France Bleu Pays d'Auvergne",
+        "media_type_hint": "Radio",
+        "territoire": "Haute-Loire",
+        "department_code": "43",
+        "email": "francebleu.auvergne@radiofrance.fr"
+    },
+    {
+        "name": "Ouest-France",
+        "media_type_hint": "Presse",
+        "territoire": "Loire-Atlantique",
+        "department_code": "44",
+        "email": "redaction@ouest-france.fr"
+    },
+    {
+        "name": "France 3 Pays de la Loire",
+        "media_type_hint": "TV",
+        "territoire": "Loire-Atlantique",
+        "department_code": "44",
+        "email": "redaction.paysdeloire@france3.fr"
+    },
+    {
+        "name": "France Bleu Loire Océan",
+        "media_type_hint": "Radio",
+        "territoire": "Loire-Atlantique",
+        "department_code": "44",
+        "email": "francebleu.loireocean@radiofrance.fr"
+    },
+    {
+        "name": "Presse Océan",
+        "media_type_hint": "Presse",
+        "territoire": "Loire-Atlantique",
+        "department_code": "44",
+        "email": "contact@presseocean.fr"
+    },
+    {
+        "name": "Télénantes",
+        "media_type_hint": "TV locale",
+        "territoire": "Loire-Atlantique",
+        "department_code": "44",
+        "email": "redaction@telenantes.com"
+    },
+    {
+        "name": "Nantes.fr / Info Nantes",
+        "media_type_hint": "Web",
+        "territoire": "Loire-Atlantique",
+        "department_code": "44",
+        "email": "contact@nantes.fr"
+    },
+    {
+        "name": "La République du Centre",
+        "media_type_hint": "Presse",
+        "territoire": "Loiret",
+        "department_code": "45",
+        "email": "redaction@larep.fr"
+    },
+    {
+        "name": "France 3 Centre-Val de Loire",
+        "media_type_hint": "TV",
+        "territoire": "Loiret",
+        "department_code": "45",
+        "email": "redaction.centre@france3.fr"
+    },
+    {
+        "name": "France Bleu Orléans",
+        "media_type_hint": "Radio",
+        "territoire": "Loiret",
+        "department_code": "45",
+        "email": "francebleu.orleans@radiofrance.fr"
+    },
+    {
+        "name": "La Dépêche du Midi",
+        "media_type_hint": "Presse",
+        "territoire": "Lot",
+        "department_code": "46",
+        "email": "redaction@ladepeche.fr"
+    },
+    {
+        "name": "France 3 Midi-Pyrénées",
+        "media_type_hint": "TV",
+        "territoire": "Lot",
+        "department_code": "46",
+        "email": "redaction.midipyrenees@france3.fr"
+    },
+    {
+        "name": "France Bleu Occitanie",
+        "media_type_hint": "Radio",
+        "territoire": "Lot",
+        "department_code": "46",
+        "email": "francebleu.occitanie@radiofrance.fr"
+    },
+    {
+        "name": "Sud Ouest",
+        "media_type_hint": "Presse",
+        "territoire": "Lot-et-Garonne",
+        "department_code": "47",
+        "email": "redaction@sudouest.fr"
+    },
+    {
+        "name": "France 3 Nouvelle-Aquitaine",
+        "media_type_hint": "TV",
+        "territoire": "Lot-et-Garonne",
+        "department_code": "47",
+        "email": "redaction.na@france3.fr"
+    },
+    {
+        "name": "France Bleu Gascogne",
+        "media_type_hint": "Radio",
+        "territoire": "Lot-et-Garonne",
+        "department_code": "47",
+        "email": "francebleu.gascogne@radiofrance.fr"
+    },
+    {
+        "name": "Midi Libre",
+        "media_type_hint": "Presse",
+        "territoire": "Lozère",
+        "department_code": "48",
+        "email": "redaction@midilibre.fr"
+    },
+    {
+        "name": "France 3 Languedoc",
+        "media_type_hint": "TV",
+        "territoire": "Lozère",
+        "department_code": "48",
+        "email": "redaction.languedoc@france3.fr"
+    },
+    {
+        "name": "France Bleu Gard Lozère",
+        "media_type_hint": "Radio",
+        "territoire": "Lozère",
+        "department_code": "48",
+        "email": "francebleu.gardlozere@radiofrance.fr"
+    },
+    {
+        "name": "Courrier de l'Ouest",
+        "media_type_hint": "Presse",
+        "territoire": "Maine-et-Loire",
+        "department_code": "49",
+        "email": "redaction@courrierdelouest.fr"
+    },
+    {
+        "name": "France 3 Pays de la Loire",
+        "media_type_hint": "TV",
+        "territoire": "Maine-et-Loire",
+        "department_code": "49",
+        "email": "redaction.paysdeloire@france3.fr"
+    },
+    {
+        "name": "France Bleu Maine",
+        "media_type_hint": "Radio",
+        "territoire": "Maine-et-Loire",
+        "department_code": "49",
+        "email": "francebleu.maine@radiofrance.fr"
+    },
+    {
+        "name": "Angers TV",
+        "media_type_hint": "TV locale",
+        "territoire": "Maine-et-Loire",
+        "department_code": "49",
+        "email": "contact@angerstele.fr"
+    },
+    {
+        "name": "Ouest-France",
+        "media_type_hint": "Presse",
+        "territoire": "Manche",
+        "department_code": "50",
+        "email": "redaction@ouest-france.fr"
+    },
+    {
+        "name": "France 3 Normandie",
+        "media_type_hint": "TV",
+        "territoire": "Manche",
+        "department_code": "50",
+        "email": "redaction.normandie@france3.fr"
+    },
+    {
+        "name": "France Bleu Cotentin",
+        "media_type_hint": "Radio",
+        "territoire": "Manche",
+        "department_code": "50",
+        "email": "francebleu.cotentin@radiofrance.fr"
+    },
+    {
+        "name": "L'Union",
+        "media_type_hint": "Presse",
+        "territoire": "Marne",
+        "department_code": "51",
+        "email": "redaction@lunion.fr"
+    },
+    {
+        "name": "France 3 Grand Est",
+        "media_type_hint": "TV",
+        "territoire": "Marne",
+        "department_code": "51",
+        "email": "redaction.grandest@france3.fr"
+    },
+    {
+        "name": "France Bleu Champagne",
+        "media_type_hint": "Radio",
+        "territoire": "Marne",
+        "department_code": "51",
+        "email": "francebleu.champagne@radiofrance.fr"
+    },
+    {
+        "name": "Haute-Marne Libérée",
+        "media_type_hint": "Presse",
+        "territoire": "Haute-Marne",
+        "department_code": "52",
+        "email": "redaction@hautemarnelib.fr"
+    },
+    {
+        "name": "France 3 Grand Est",
+        "media_type_hint": "TV",
+        "territoire": "Haute-Marne",
+        "department_code": "52",
+        "email": "redaction.grandest@france3.fr"
+    },
+    {
+        "name": "France Bleu Champagne",
+        "media_type_hint": "Radio",
+        "territoire": "Haute-Marne",
+        "department_code": "52",
+        "email": "francebleu.champagne@radiofrance.fr"
+    },
+    {
+        "name": "Ouest-France",
+        "media_type_hint": "Presse",
+        "territoire": "Mayenne",
+        "department_code": "53",
+        "email": "redaction@ouest-france.fr"
+    },
+    {
+        "name": "France 3 Pays de la Loire",
+        "media_type_hint": "TV",
+        "territoire": "Mayenne",
+        "department_code": "53",
+        "email": "redaction.paysdeloire@france3.fr"
+    },
+    {
+        "name": "France Bleu Maine",
+        "media_type_hint": "Radio",
+        "territoire": "Mayenne",
+        "department_code": "53",
+        "email": "francebleu.maine@radiofrance.fr"
+    },
+    {
+        "name": "L'Est Républicain",
+        "media_type_hint": "Presse",
+        "territoire": "Meurthe-et-Moselle",
+        "department_code": "54",
+        "email": "redaction@estrepublicain.fr"
+    },
+    {
+        "name": "France 3 Lorraine",
+        "media_type_hint": "TV",
+        "territoire": "Meurthe-et-Moselle",
+        "department_code": "54",
+        "email": "redaction.lorraine@france3.fr"
+    },
+    {
+        "name": "France Bleu Sud Lorraine",
+        "media_type_hint": "Radio",
+        "territoire": "Meurthe-et-Moselle",
+        "department_code": "54",
+        "email": "francebleu.sudlorraine@radiofrance.fr"
+    },
+    {
+        "name": "L'Est Républicain",
+        "media_type_hint": "Presse",
+        "territoire": "Meuse",
+        "department_code": "55",
+        "email": "redaction@estrepublicain.fr"
+    },
+    {
+        "name": "France 3 Lorraine",
+        "media_type_hint": "TV",
+        "territoire": "Meuse",
+        "department_code": "55",
+        "email": "redaction.lorraine@france3.fr"
+    },
+    {
+        "name": "France Bleu Sud Lorraine",
+        "media_type_hint": "Radio",
+        "territoire": "Meuse",
+        "department_code": "55",
+        "email": "francebleu.sudlorraine@radiofrance.fr"
+    },
+    {
+        "name": "Le Télégramme",
+        "media_type_hint": "Presse",
+        "territoire": "Morbihan",
+        "department_code": "56",
+        "email": "redaction@letelegramme.fr"
+    },
+    {
+        "name": "France 3 Bretagne",
+        "media_type_hint": "TV",
+        "territoire": "Morbihan",
+        "department_code": "56",
+        "email": "redaction.bretagne@france3.fr"
+    },
+    {
+        "name": "France Bleu Breizh Izel",
+        "media_type_hint": "Radio",
+        "territoire": "Morbihan",
+        "department_code": "56",
+        "email": "francebleu.breizh@radiofrance.fr"
+    },
+    {
+        "name": "TébéSud",
+        "media_type_hint": "TV locale",
+        "territoire": "Morbihan",
+        "department_code": "56",
+        "email": "redaction@tebesud.bzh"
+    },
+    {
+        "name": "Le Républicain Lorrain",
+        "media_type_hint": "Presse",
+        "territoire": "Moselle",
+        "department_code": "57",
+        "email": "redaction@republicain-lorrain.fr"
+    },
+    {
+        "name": "France 3 Lorraine",
+        "media_type_hint": "TV",
+        "territoire": "Moselle",
+        "department_code": "57",
+        "email": "redaction.lorraine@france3.fr"
+    },
+    {
+        "name": "France Bleu Lorraine Nord",
+        "media_type_hint": "Radio",
+        "territoire": "Moselle",
+        "department_code": "57",
+        "email": "francebleu.lorrainenord@radiofrance.fr"
+    },
+    {
+        "name": "Mirabelle TV",
+        "media_type_hint": "TV locale",
+        "territoire": "Moselle",
+        "department_code": "57",
+        "email": "redaction@mirabelle.tv"
+    },
+    {
+        "name": "Le Journal du Centre",
+        "media_type_hint": "Presse",
+        "territoire": "Nièvre",
+        "department_code": "58",
+        "email": "redaction@lejdc.fr"
+    },
+    {
+        "name": "France 3 Bourgogne",
+        "media_type_hint": "TV",
+        "territoire": "Nièvre",
+        "department_code": "58",
+        "email": "redaction.bourgogne@france3.fr"
+    },
+    {
+        "name": "France Bleu Bourgogne",
+        "media_type_hint": "Radio",
+        "territoire": "Nièvre",
+        "department_code": "58",
+        "email": "francebleu.bourgogne@radiofrance.fr"
+    },
+    {
+        "name": "La Voix du Nord",
+        "media_type_hint": "Presse",
+        "territoire": "Nord",
+        "department_code": "59",
+        "email": "redaction@lavoixdunord.fr"
+    },
+    {
+        "name": "BFM Grand Lille",
+        "media_type_hint": "TV",
+        "territoire": "Nord",
+        "department_code": "59",
+        "email": "bfmlille@bfmtv.com"
+    },
+    {
+        "name": "France 3 Hauts-de-France",
+        "media_type_hint": "TV",
+        "territoire": "Nord",
+        "department_code": "59",
+        "email": "redaction.nordpasdecalais@france3.fr"
+    },
+    {
+        "name": "France Bleu Nord",
+        "media_type_hint": "Radio",
+        "territoire": "Nord",
+        "department_code": "59",
+        "email": "francebleu.nord@radiofrance.fr"
+    },
+    {
+        "name": "La Tribune Lille",
+        "media_type_hint": "Web",
+        "territoire": "Nord",
+        "department_code": "59",
+        "email": "lille@latribune.fr"
+    },
+    {
+        "name": "Le Courrier Picard",
+        "media_type_hint": "Presse",
+        "territoire": "Oise",
+        "department_code": "60",
+        "email": "redaction@courrier-picard.fr"
+    },
+    {
+        "name": "France 3 Picardie",
+        "media_type_hint": "TV",
+        "territoire": "Oise",
+        "department_code": "60",
+        "email": "redaction.picardie@france3.fr"
+    },
+    {
+        "name": "France Bleu Picardie",
+        "media_type_hint": "Radio",
+        "territoire": "Oise",
+        "department_code": "60",
+        "email": "francebleu.picardie@radiofrance.fr"
+    },
+    {
+        "name": "Ouest-France",
+        "media_type_hint": "Presse",
+        "territoire": "Orne",
+        "department_code": "61",
+        "email": "redaction@ouest-france.fr"
+    },
+    {
+        "name": "France 3 Normandie",
+        "media_type_hint": "TV",
+        "territoire": "Orne",
+        "department_code": "61",
+        "email": "redaction.normandie@france3.fr"
+    },
+    {
+        "name": "France Bleu Normandie",
+        "media_type_hint": "Radio",
+        "territoire": "Orne",
+        "department_code": "61",
+        "email": "francebleu.normandie@radiofrance.fr"
+    },
+    {
+        "name": "La Voix du Nord",
+        "media_type_hint": "Presse",
+        "territoire": "Pas-de-Calais",
+        "department_code": "62",
+        "email": "redaction@lavoixdunord.fr"
+    },
+    {
+        "name": "France 3 Hauts-de-France",
+        "media_type_hint": "TV",
+        "territoire": "Pas-de-Calais",
+        "department_code": "62",
+        "email": "redaction.nordpasdecalais@france3.fr"
+    },
+    {
+        "name": "BFM Grand Littoral",
+        "media_type_hint": "TV",
+        "territoire": "Pas-de-Calais",
+        "department_code": "62",
+        "email": "bfmlittoral@bfmtv.com"
+    },
+    {
+        "name": "France Bleu Nord",
+        "media_type_hint": "Radio",
+        "territoire": "Pas-de-Calais",
+        "department_code": "62",
+        "email": "francebleu.nord@radiofrance.fr"
+    },
+    {
+        "name": "La Montagne",
+        "media_type_hint": "Presse",
+        "territoire": "Puy-de-Dôme",
+        "department_code": "63",
+        "email": "redaction@lamontagne.fr"
+    },
+    {
+        "name": "France 3 Auvergne",
+        "media_type_hint": "TV",
+        "territoire": "Puy-de-Dôme",
+        "department_code": "63",
+        "email": "redaction.auvergne@france3.fr"
+    },
+    {
+        "name": "France Bleu Pays d'Auvergne",
+        "media_type_hint": "Radio",
+        "territoire": "Puy-de-Dôme",
+        "department_code": "63",
+        "email": "francebleu.auvergne@radiofrance.fr"
+    },
+    {
+        "name": "Sud Ouest",
+        "media_type_hint": "Presse",
+        "territoire": "Pyrénées-Atlantiques",
+        "department_code": "64",
+        "email": "redaction@sudouest.fr"
+    },
+    {
+        "name": "France 3 Nouvelle-Aquitaine",
+        "media_type_hint": "TV",
+        "territoire": "Pyrénées-Atlantiques",
+        "department_code": "64",
+        "email": "redaction.na@france3.fr"
+    },
+    {
+        "name": "France Bleu Pays Basque",
+        "media_type_hint": "Radio",
+        "territoire": "Pyrénées-Atlantiques",
+        "department_code": "64",
+        "email": "francebleu.paysbasque@radiofrance.fr"
+    },
+    {
+        "name": "La Dépêche du Midi",
+        "media_type_hint": "Presse",
+        "territoire": "Hautes-Pyrénées",
+        "department_code": "65",
+        "email": "redaction@ladepeche.fr"
+    },
+    {
+        "name": "France 3 Midi-Pyrénées",
+        "media_type_hint": "TV",
+        "territoire": "Hautes-Pyrénées",
+        "department_code": "65",
+        "email": "redaction.midipyrenees@france3.fr"
+    },
+    {
+        "name": "France Bleu Occitanie",
+        "media_type_hint": "Radio",
+        "territoire": "Hautes-Pyrénées",
+        "department_code": "65",
+        "email": "francebleu.occitanie@radiofrance.fr"
+    },
+    {
+        "name": "L'Indépendant",
+        "media_type_hint": "Presse",
+        "territoire": "Pyrénées-Orientales",
+        "department_code": "66",
+        "email": "redaction@lindependant.fr"
+    },
+    {
+        "name": "France 3 Languedoc",
+        "media_type_hint": "TV",
+        "territoire": "Pyrénées-Orientales",
+        "department_code": "66",
+        "email": "redaction.languedoc@france3.fr"
+    },
+    {
+        "name": "France Bleu Roussillon",
+        "media_type_hint": "Radio",
+        "territoire": "Pyrénées-Orientales",
+        "department_code": "66",
+        "email": "francebleu.roussillon@radiofrance.fr"
+    },
+    {
+        "name": "DNA - Dernières Nouvelles d'Alsace",
+        "media_type_hint": "Presse",
+        "territoire": "Bas-Rhin",
+        "department_code": "67",
+        "email": "redaction@dna.fr"
+    },
+    {
+        "name": "France 3 Alsace",
+        "media_type_hint": "TV",
+        "territoire": "Bas-Rhin",
+        "department_code": "67",
+        "email": "redaction.alsace@france3.fr"
+    },
+    {
+        "name": "France Bleu Alsace",
+        "media_type_hint": "Radio",
+        "territoire": "Bas-Rhin",
+        "department_code": "67",
+        "email": "francebleu.alsace@radiofrance.fr"
+    },
+    {
+        "name": "BFM Alsace",
+        "media_type_hint": "TV",
+        "territoire": "Bas-Rhin",
+        "department_code": "67",
+        "email": "bfmalsace@bfmtv.com"
+    },
+    {
+        "name": "Alsace 20",
+        "media_type_hint": "TV locale",
+        "territoire": "Bas-Rhin",
+        "department_code": "67",
+        "email": "redaction@alsace20.tv"
+    },
+    {
+        "name": "Actu Strasbourg (web)",
+        "media_type_hint": "Web",
+        "territoire": "Bas-Rhin",
+        "department_code": "67",
+        "email": "strasbourg@actu.fr"
+    },
+    {
+        "name": "L'Alsace",
+        "media_type_hint": "Presse",
+        "territoire": "Haut-Rhin",
+        "department_code": "68",
+        "email": "redaction@lalsace.fr"
+    },
+    {
+        "name": "France 3 Alsace",
+        "media_type_hint": "TV",
+        "territoire": "Haut-Rhin",
+        "department_code": "68",
+        "email": "redaction.alsace@france3.fr"
+    },
+    {
+        "name": "France Bleu Alsace",
+        "media_type_hint": "Radio",
+        "territoire": "Haut-Rhin",
+        "department_code": "68",
+        "email": "francebleu.alsace@radiofrance.fr"
+    },
+    {
+        "name": "Alsace 20",
+        "media_type_hint": "TV locale",
+        "territoire": "Haut-Rhin",
+        "department_code": "68",
+        "email": "redaction@alsace20.tv"
+    },
+    {
+        "name": "Le Progrès",
+        "media_type_hint": "Presse",
+        "territoire": "Rhône",
+        "department_code": "69",
+        "email": "redaction@leprogres.fr"
+    },
+    {
+        "name": "BFM Lyon",
+        "media_type_hint": "TV",
+        "territoire": "Rhône",
+        "department_code": "69",
+        "email": "lyon@bfmtv.com"
+    },
+    {
+        "name": "France 3 Rhône-Alpes",
+        "media_type_hint": "TV",
+        "territoire": "Rhône",
+        "department_code": "69",
+        "email": "redaction.rhonealpes@france3.fr"
+    },
+    {
+        "name": "France Bleu Lyon",
+        "media_type_hint": "Radio",
+        "territoire": "Rhône",
+        "department_code": "69",
+        "email": "francebleu.lyon@radiofrance.fr"
+    },
+    {
+        "name": "Lyon Mag",
+        "media_type_hint": "Presse/Web",
+        "territoire": "Rhône",
+        "department_code": "69",
+        "email": "contact@lyonmag.com"
+    },
+    {
+        "name": "Tribune de Lyon",
+        "media_type_hint": "Web",
+        "territoire": "Rhône",
+        "department_code": "69",
+        "email": "contact@tribunedelyon.fr"
+    },
+    {
+        "name": "Mag2Lyon",
+        "media_type_hint": "Web",
+        "territoire": "Rhône",
+        "department_code": "69",
+        "email": "contact@mag2lyon.com"
+    },
+    {
+        "name": "La Tribune Lyon",
+        "media_type_hint": "Web",
+        "territoire": "Rhône",
+        "department_code": "69",
+        "email": "lyon@latribune.fr"
+    },
+    {
+        "name": "Actu Lyon (web)",
+        "media_type_hint": "Web",
+        "territoire": "Rhône",
+        "department_code": "69",
+        "email": "lyon@actu.fr"
+    },
+    {
+        "name": "L'Est Républicain",
+        "media_type_hint": "Presse",
+        "territoire": "Haute-Saône",
+        "department_code": "70",
+        "email": "redaction@estrepublicain.fr"
+    },
+    {
+        "name": "France 3 Franche-Comté",
+        "media_type_hint": "TV",
+        "territoire": "Haute-Saône",
+        "department_code": "70",
+        "email": "redaction.franchecomte@france3.fr"
+    },
+    {
+        "name": "France Bleu Besançon",
+        "media_type_hint": "Radio",
+        "territoire": "Haute-Saône",
+        "department_code": "70",
+        "email": "francebleu.besancon@radiofrance.fr"
+    },
+    {
+        "name": "Le Journal de Saône-et-Loire",
+        "media_type_hint": "Presse",
+        "territoire": "Saône-et-Loire",
+        "department_code": "71",
+        "email": "redaction@lejsl.com"
+    },
+    {
+        "name": "France 3 Bourgogne",
+        "media_type_hint": "TV",
+        "territoire": "Saône-et-Loire",
+        "department_code": "71",
+        "email": "redaction.bourgogne@france3.fr"
+    },
+    {
+        "name": "France Bleu Bourgogne",
+        "media_type_hint": "Radio",
+        "territoire": "Saône-et-Loire",
+        "department_code": "71",
+        "email": "francebleu.bourgogne@radiofrance.fr"
+    },
+    {
+        "name": "Le Maine Libre",
+        "media_type_hint": "Presse",
+        "territoire": "Sarthe",
+        "department_code": "72",
+        "email": "redaction@lemainelibere.fr"
+    },
+    {
+        "name": "France 3 Pays de la Loire",
+        "media_type_hint": "TV",
+        "territoire": "Sarthe",
+        "department_code": "72",
+        "email": "redaction.paysdeloire@france3.fr"
+    },
+    {
+        "name": "France Bleu Maine",
+        "media_type_hint": "Radio",
+        "territoire": "Sarthe",
+        "department_code": "72",
+        "email": "francebleu.maine@radiofrance.fr"
+    },
+    {
+        "name": "LMtv Sarthe",
+        "media_type_hint": "TV locale",
+        "territoire": "Sarthe",
+        "department_code": "72",
+        "email": "contact@lmtvsarthe.fr"
+    },
+    {
+        "name": "Le Dauphiné Libéré",
+        "media_type_hint": "Presse",
+        "territoire": "Savoie",
+        "department_code": "73",
+        "email": "redaction@ledauphine.com"
+    },
+    {
+        "name": "France 3 Alpes",
+        "media_type_hint": "TV",
+        "territoire": "Savoie",
+        "department_code": "73",
+        "email": "redaction.alpes@france3.fr"
+    },
+    {
+        "name": "France Bleu Pays de Savoie",
+        "media_type_hint": "Radio",
+        "territoire": "Savoie",
+        "department_code": "73",
+        "email": "francebleu.savoie@radiofrance.fr"
+    },
+    {
+        "name": "8 Mont-Blanc",
+        "media_type_hint": "TV locale",
+        "territoire": "Savoie",
+        "department_code": "73",
+        "email": "redaction@8montblanc.tv"
+    },
+    {
+        "name": "Le Dauphiné Libéré",
+        "media_type_hint": "Presse",
+        "territoire": "Haute-Savoie",
+        "department_code": "74",
+        "email": "redaction@ledauphine.com"
+    },
+    {
+        "name": "France 3 Alpes",
+        "media_type_hint": "TV",
+        "territoire": "Haute-Savoie",
+        "department_code": "74",
+        "email": "redaction.alpes@france3.fr"
+    },
+    {
+        "name": "France Bleu Pays de Savoie",
+        "media_type_hint": "Radio",
+        "territoire": "Haute-Savoie",
+        "department_code": "74",
+        "email": "francebleu.savoie@radiofrance.fr"
+    },
+    {
+        "name": "8 Mont-Blanc",
+        "media_type_hint": "TV locale",
+        "territoire": "Haute-Savoie",
+        "department_code": "74",
+        "email": "redaction@8montblanc.tv"
+    },
+    {
+        "name": "Le Parisien",
+        "media_type_hint": "Presse",
+        "territoire": "Paris",
+        "department_code": "75",
+        "email": "leparisien@leparisien.fr"
+    },
+    {
+        "name": "BFM Paris",
+        "media_type_hint": "TV",
+        "territoire": "Paris",
+        "department_code": "75",
+        "email": "bfmparis@bfmtv.com"
+    },
+    {
+        "name": "France 3 Île-de-France",
+        "media_type_hint": "TV",
+        "territoire": "Paris",
+        "department_code": "75",
+        "email": "redaction.iledefrance@france3.fr"
+    },
+    {
+        "name": "France Bleu Île-de-France",
+        "media_type_hint": "Radio",
+        "territoire": "Paris",
+        "department_code": "75",
+        "email": "francebleu.idf@radiofrance.fr"
+    },
+    {
+        "name": "La Tribune Paris",
+        "media_type_hint": "Web/Presse",
+        "territoire": "Paris",
+        "department_code": "75",
+        "email": "paris@latribune.fr"
+    },
+    {
+        "name": "Actu Paris (web)",
+        "media_type_hint": "Web",
+        "territoire": "Paris",
+        "department_code": "75",
+        "email": "paris@actu.fr"
+    },
+    {
+        "name": "Le Journal du Grand Paris",
+        "media_type_hint": "Presse éco",
+        "territoire": "Paris",
+        "department_code": "75",
+        "email": "redaction@lejournaldugrandparis.fr"
+    },
+    {
+        "name": "Time Out Paris (éco)",
+        "media_type_hint": "Web",
+        "territoire": "Paris",
+        "department_code": "75",
+        "email": "paris@timeout.com"
+    },
+    {
+        "name": "Paris-Normandie",
+        "media_type_hint": "Presse",
+        "territoire": "Seine-Maritime",
+        "department_code": "76",
+        "email": "redaction@paris-normandie.fr"
+    },
+    {
+        "name": "France 3 Normandie",
+        "media_type_hint": "TV",
+        "territoire": "Seine-Maritime",
+        "department_code": "76",
+        "email": "redaction.normandie@france3.fr"
+    },
+    {
+        "name": "BFM Normande",
+        "media_type_hint": "TV",
+        "territoire": "Seine-Maritime",
+        "department_code": "76",
+        "email": "bfmnormande@bfmtv.com"
+    },
+    {
+        "name": "France Bleu Normandie",
+        "media_type_hint": "Radio",
+        "territoire": "Seine-Maritime",
+        "department_code": "76",
+        "email": "francebleu.normandie@radiofrance.fr"
+    },
+    {
+        "name": "Le Parisien 77",
+        "media_type_hint": "Presse",
+        "territoire": "Seine-et-Marne",
+        "department_code": "77",
+        "email": "leparisien@leparisien.fr"
+    },
+    {
+        "name": "France 3 Île-de-France",
+        "media_type_hint": "TV",
+        "territoire": "Seine-et-Marne",
+        "department_code": "77",
+        "email": "redaction.iledefrance@france3.fr"
+    },
+    {
+        "name": "France Bleu Île-de-France",
+        "media_type_hint": "Radio",
+        "territoire": "Seine-et-Marne",
+        "department_code": "77",
+        "email": "francebleu.idf@radiofrance.fr"
+    },
+    {
+        "name": "Le Parisien 78",
+        "media_type_hint": "Presse",
+        "territoire": "Yvelines",
+        "department_code": "78",
+        "email": "leparisien@leparisien.fr"
+    },
+    {
+        "name": "France 3 Île-de-France",
+        "media_type_hint": "TV",
+        "territoire": "Yvelines",
+        "department_code": "78",
+        "email": "redaction.iledefrance@france3.fr"
+    },
+    {
+        "name": "France Bleu Île-de-France",
+        "media_type_hint": "Radio",
+        "territoire": "Yvelines",
+        "department_code": "78",
+        "email": "francebleu.idf@radiofrance.fr"
+    },
+    {
+        "name": "La Nouvelle République",
+        "media_type_hint": "Presse",
+        "territoire": "Deux-Sèvres",
+        "department_code": "79",
+        "email": "redaction@nrco.fr"
+    },
+    {
+        "name": "France 3 Poitou-Charentes",
+        "media_type_hint": "TV",
+        "territoire": "Deux-Sèvres",
+        "department_code": "79",
+        "email": "redaction.poitoucharentes@france3.fr"
+    },
+    {
+        "name": "France Bleu Poitou",
+        "media_type_hint": "Radio",
+        "territoire": "Deux-Sèvres",
+        "department_code": "79",
+        "email": "francebleu.poitou@radiofrance.fr"
+    },
+    {
+        "name": "Le Courrier Picard",
+        "media_type_hint": "Presse",
+        "territoire": "Somme",
+        "department_code": "80",
+        "email": "redaction@courrier-picard.fr"
+    },
+    {
+        "name": "France 3 Picardie",
+        "media_type_hint": "TV",
+        "territoire": "Somme",
+        "department_code": "80",
+        "email": "redaction.picardie@france3.fr"
+    },
+    {
+        "name": "France Bleu Picardie",
+        "media_type_hint": "Radio",
+        "territoire": "Somme",
+        "department_code": "80",
+        "email": "francebleu.picardie@radiofrance.fr"
+    },
+    {
+        "name": "La Dépêche du Midi",
+        "media_type_hint": "Presse",
+        "territoire": "Tarn",
+        "department_code": "81",
+        "email": "redaction@ladepeche.fr"
+    },
+    {
+        "name": "France 3 Midi-Pyrénées",
+        "media_type_hint": "TV",
+        "territoire": "Tarn",
+        "department_code": "81",
+        "email": "redaction.midipyrenees@france3.fr"
+    },
+    {
+        "name": "France Bleu Occitanie",
+        "media_type_hint": "Radio",
+        "territoire": "Tarn",
+        "department_code": "81",
+        "email": "francebleu.occitanie@radiofrance.fr"
+    },
+    {
+        "name": "La Dépêche du Midi",
+        "media_type_hint": "Presse",
+        "territoire": "Tarn-et-Garonne",
+        "department_code": "82",
+        "email": "redaction@ladepeche.fr"
+    },
+    {
+        "name": "France 3 Midi-Pyrénées",
+        "media_type_hint": "TV",
+        "territoire": "Tarn-et-Garonne",
+        "department_code": "82",
+        "email": "redaction.midipyrenees@france3.fr"
+    },
+    {
+        "name": "France Bleu Occitanie",
+        "media_type_hint": "Radio",
+        "territoire": "Tarn-et-Garonne",
+        "department_code": "82",
+        "email": "francebleu.occitanie@radiofrance.fr"
+    },
+    {
+        "name": "Var-Matin",
+        "media_type_hint": "Presse",
+        "territoire": "Var",
+        "department_code": "83",
+        "email": "redaction@varmatin.com"
+    },
+    {
+        "name": "France 3 PACA",
+        "media_type_hint": "TV",
+        "territoire": "Var",
+        "department_code": "83",
+        "email": "redaction.paca@france3.fr"
+    },
+    {
+        "name": "BFM Toulon Var",
+        "media_type_hint": "TV",
+        "territoire": "Var",
+        "department_code": "83",
+        "email": "bfmvar@bfmtv.com"
+    },
+    {
+        "name": "France Bleu Provence",
+        "media_type_hint": "Radio",
+        "territoire": "Var",
+        "department_code": "83",
+        "email": "francebleu.provence@radiofrance.fr"
+    },
+    {
+        "name": "La Provence",
+        "media_type_hint": "Presse",
+        "territoire": "Vaucluse",
+        "department_code": "84",
+        "email": "redaction@laprovence.com"
+    },
+    {
+        "name": "France 3 PACA",
+        "media_type_hint": "TV",
+        "territoire": "Vaucluse",
+        "department_code": "84",
+        "email": "redaction.paca@france3.fr"
+    },
+    {
+        "name": "France Bleu Vaucluse",
+        "media_type_hint": "Radio",
+        "territoire": "Vaucluse",
+        "department_code": "84",
+        "email": "francebleu.vaucluse@radiofrance.fr"
+    },
+    {
+        "name": "Ouest-France",
+        "media_type_hint": "Presse",
+        "territoire": "Vendée",
+        "department_code": "85",
+        "email": "redaction@ouest-france.fr"
+    },
+    {
+        "name": "France 3 Pays de la Loire",
+        "media_type_hint": "TV",
+        "territoire": "Vendée",
+        "department_code": "85",
+        "email": "redaction.paysdeloire@france3.fr"
+    },
+    {
+        "name": "France Bleu Vendée",
+        "media_type_hint": "Radio",
+        "territoire": "Vendée",
+        "department_code": "85",
+        "email": "francebleu.vendee@radiofrance.fr"
+    },
+    {
+        "name": "TV Vendée",
+        "media_type_hint": "TV locale",
+        "territoire": "Vendée",
+        "department_code": "85",
+        "email": "contact@tvvendee.fr"
+    },
+    {
+        "name": "La Nouvelle République",
+        "media_type_hint": "Presse",
+        "territoire": "Vienne",
+        "department_code": "86",
+        "email": "redaction@nrco.fr"
+    },
+    {
+        "name": "France 3 Poitou-Charentes",
+        "media_type_hint": "TV",
+        "territoire": "Vienne",
+        "department_code": "86",
+        "email": "redaction.poitoucharentes@france3.fr"
+    },
+    {
+        "name": "France Bleu Poitou",
+        "media_type_hint": "Radio",
+        "territoire": "Vienne",
+        "department_code": "86",
+        "email": "francebleu.poitou@radiofrance.fr"
+    },
+    {
+        "name": "Le Populaire du Centre",
+        "media_type_hint": "Presse",
+        "territoire": "Haute-Vienne",
+        "department_code": "87",
+        "email": "redaction@lepopulaire.fr"
+    },
+    {
+        "name": "France 3 Limousin",
+        "media_type_hint": "TV",
+        "territoire": "Haute-Vienne",
+        "department_code": "87",
+        "email": "redaction.limousin@france3.fr"
+    },
+    {
+        "name": "France Bleu Limousin",
+        "media_type_hint": "Radio",
+        "territoire": "Haute-Vienne",
+        "department_code": "87",
+        "email": "francebleu.limousin@radiofrance.fr"
+    },
+    {
+        "name": "Vosges Matin",
+        "media_type_hint": "Presse",
+        "territoire": "Vosges",
+        "department_code": "88",
+        "email": "redaction@vosgesmatin.fr"
+    },
+    {
+        "name": "France 3 Lorraine",
+        "media_type_hint": "TV",
+        "territoire": "Vosges",
+        "department_code": "88",
+        "email": "redaction.lorraine@france3.fr"
+    },
+    {
+        "name": "France Bleu Lorraine Nord",
+        "media_type_hint": "Radio",
+        "territoire": "Vosges",
+        "department_code": "88",
+        "email": "francebleu.lorrainenord@radiofrance.fr"
+    },
+    {
+        "name": "Vosges TV",
+        "media_type_hint": "TV locale",
+        "territoire": "Vosges",
+        "department_code": "88",
+        "email": "redaction@vosgestele.fr"
+    },
+    {
+        "name": "L'Yonne Républicaine",
+        "media_type_hint": "Presse",
+        "territoire": "Yonne",
+        "department_code": "89",
+        "email": "redaction@lyonne.fr"
+    },
+    {
+        "name": "France 3 Bourgogne",
+        "media_type_hint": "TV",
+        "territoire": "Yonne",
+        "department_code": "89",
+        "email": "redaction.bourgogne@france3.fr"
+    },
+    {
+        "name": "France Bleu Bourgogne",
+        "media_type_hint": "Radio",
+        "territoire": "Yonne",
+        "department_code": "89",
+        "email": "francebleu.bourgogne@radiofrance.fr"
+    },
+    {
+        "name": "L'Est Républicain",
+        "media_type_hint": "Presse",
+        "territoire": "Territoire de Belfort",
+        "department_code": "90",
+        "email": "redaction@estrepublicain.fr"
+    },
+    {
+        "name": "France 3 Franche-Comté",
+        "media_type_hint": "TV",
+        "territoire": "Territoire de Belfort",
+        "department_code": "90",
+        "email": "redaction.franchecomte@france3.fr"
+    },
+    {
+        "name": "France Bleu Belfort Montbéliard",
+        "media_type_hint": "Radio",
+        "territoire": "Territoire de Belfort",
+        "department_code": "90",
+        "email": "francebleu.belfort@radiofrance.fr"
+    },
+    {
+        "name": "Le Parisien 91",
+        "media_type_hint": "Presse",
+        "territoire": "Essonne",
+        "department_code": "91",
+        "email": "leparisien@leparisien.fr"
+    },
+    {
+        "name": "France 3 Île-de-France",
+        "media_type_hint": "TV",
+        "territoire": "Essonne",
+        "department_code": "91",
+        "email": "redaction.iledefrance@france3.fr"
+    },
+    {
+        "name": "France Bleu Île-de-France",
+        "media_type_hint": "Radio",
+        "territoire": "Essonne",
+        "department_code": "91",
+        "email": "francebleu.idf@radiofrance.fr"
+    },
+    {
+        "name": "Le Parisien 92",
+        "media_type_hint": "Presse",
+        "territoire": "Hauts-de-Seine",
+        "department_code": "92",
+        "email": "leparisien@leparisien.fr"
+    },
+    {
+        "name": "France 3 Île-de-France",
+        "media_type_hint": "TV",
+        "territoire": "Hauts-de-Seine",
+        "department_code": "92",
+        "email": "redaction.iledefrance@france3.fr"
+    },
+    {
+        "name": "France Bleu Île-de-France",
+        "media_type_hint": "Radio",
+        "territoire": "Hauts-de-Seine",
+        "department_code": "92",
+        "email": "francebleu.idf@radiofrance.fr"
+    },
+    {
+        "name": "Le Parisien 93",
+        "media_type_hint": "Presse",
+        "territoire": "Seine-Saint-Denis",
+        "department_code": "93",
+        "email": "leparisien@leparisien.fr"
+    },
+    {
+        "name": "France 3 Île-de-France",
+        "media_type_hint": "TV",
+        "territoire": "Seine-Saint-Denis",
+        "department_code": "93",
+        "email": "redaction.iledefrance@france3.fr"
+    },
+    {
+        "name": "France Bleu Île-de-France",
+        "media_type_hint": "Radio",
+        "territoire": "Seine-Saint-Denis",
+        "department_code": "93",
+        "email": "francebleu.idf@radiofrance.fr"
+    },
+    {
+        "name": "Le Parisien 94",
+        "media_type_hint": "Presse",
+        "territoire": "Val-de-Marne",
+        "department_code": "94",
+        "email": "leparisien@leparisien.fr"
+    },
+    {
+        "name": "France 3 Île-de-France",
+        "media_type_hint": "TV",
+        "territoire": "Val-de-Marne",
+        "department_code": "94",
+        "email": "redaction.iledefrance@france3.fr"
+    },
+    {
+        "name": "France Bleu Île-de-France",
+        "media_type_hint": "Radio",
+        "territoire": "Val-de-Marne",
+        "department_code": "94",
+        "email": "francebleu.idf@radiofrance.fr"
+    },
+    {
+        "name": "Le Parisien 95",
+        "media_type_hint": "Presse",
+        "territoire": "Val-d'Oise",
+        "department_code": "95",
+        "email": "leparisien@leparisien.fr"
+    },
+    {
+        "name": "France 3 Île-de-France",
+        "media_type_hint": "TV",
+        "territoire": "Val-d'Oise",
+        "department_code": "95",
+        "email": "redaction.iledefrance@france3.fr"
+    },
+    {
+        "name": "France Bleu Île-de-France",
+        "media_type_hint": "Radio",
+        "territoire": "Val-d'Oise",
+        "department_code": "95",
+        "email": "francebleu.idf@radiofrance.fr"
+    },
+    {
+        "name": "France-Antilles",
+        "media_type_hint": "Presse",
+        "territoire": "Guadeloupe",
+        "department_code": "971",
+        "email": "redaction@france-antilles.fr"
+    },
+    {
+        "name": "France 3 Guadeloupe",
+        "media_type_hint": "TV",
+        "territoire": "Guadeloupe",
+        "department_code": "971",
+        "email": "france3guadeloupe@radiofrance.fr"
+    },
+    {
+        "name": "France Bleu Guadeloupe",
+        "media_type_hint": "Radio",
+        "territoire": "Guadeloupe",
+        "department_code": "971",
+        "email": "francebleu.guadeloupe@radiofrance.fr"
+    },
+    {
+        "name": "France-Antilles",
+        "media_type_hint": "Presse",
+        "territoire": "Martinique",
+        "department_code": "972",
+        "email": "redaction@france-antilles.fr"
+    },
+    {
+        "name": "France 3 Martinique",
+        "media_type_hint": "TV",
+        "territoire": "Martinique",
+        "department_code": "972",
+        "email": "france3martinique@radiofrance.fr"
+    },
+    {
+        "name": "France Bleu Martinique",
+        "media_type_hint": "Radio",
+        "territoire": "Martinique",
+        "department_code": "972",
+        "email": "francebleu.martinique@radiofrance.fr"
+    },
+    {
+        "name": "France Guyane",
+        "media_type_hint": "Presse",
+        "territoire": "Guyane",
+        "department_code": "973",
+        "email": "contact@franceguyane.fr"
+    },
+    {
+        "name": "France 3 Guyane",
+        "media_type_hint": "TV",
+        "territoire": "Guyane",
+        "department_code": "973",
+        "email": "france3guyane@radiofrance.fr"
+    },
+    {
+        "name": "France Bleu Guyane",
+        "media_type_hint": "Radio",
+        "territoire": "Guyane",
+        "department_code": "973",
+        "email": "francebleu.guyane@radiofrance.fr"
+    },
+    {
+        "name": "Clicanoo",
+        "media_type_hint": "Presse",
+        "territoire": "La Réunion",
+        "department_code": "974",
+        "email": "contact@clicanoo.re"
+    },
+    {
+        "name": "France 3 La Réunion",
+        "media_type_hint": "TV",
+        "territoire": "La Réunion",
+        "department_code": "974",
+        "email": "redaction.reunion@france3.fr"
+    },
+    {
+        "name": "France Bleu La Réunion",
+        "media_type_hint": "Radio",
+        "territoire": "La Réunion",
+        "department_code": "974",
+        "email": "francebleu.reunion@radiofrance.fr"
+    },
+    {
+        "name": "Mayotte Hebdo",
+        "media_type_hint": "Presse",
+        "territoire": "Mayotte",
+        "department_code": "976",
+        "email": "contact@mayottehebdo.com"
+    },
+    {
+        "name": "France Bleu Mayotte",
+        "media_type_hint": "Radio",
+        "territoire": "Mayotte",
+        "department_code": "976",
+        "email": "francebleu.mayotte@radiofrance.fr"
+    },
+    {
+        "name": "Le Dauphiné Libéré",
+        "media_type_hint": "Presse quotidienne & magazine régional",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "redaction@ledauphine.com"
+    },
+    {
+        "name": "Présences Grenoble",
+        "media_type_hint": "Presse quotidienne & magazine régional",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "presences@grenoble.cci.fr"
+    },
+    {
+        "name": "Les Affiches de Grenoble et du Dauphiné",
+        "media_type_hint": "Presse quotidienne & magazine régional",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "redaction@affichesgrenoble.fr"
+    },
+    {
+        "name": "Place Gre'net",
+        "media_type_hint": "Presse quotidienne & magazine régional",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "redaction@placegrenet.fr"
+    },
+    {
+        "name": "Le Journal des Entreprises — édition AuRA",
+        "media_type_hint": "Presse quotidienne & magazine régional",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "redaction@lejournaldesentreprises.com"
+    },
+    {
+        "name": "La Tribune Grenoble / AuRA",
+        "media_type_hint": "Presse quotidienne & magazine régional",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "grenoble@latribune.fr"
+    },
+    {
+        "name": "L'Essor (hebdo catholique Isère)",
+        "media_type_hint": "Presse quotidienne & magazine régional",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "contact@lessor.fr"
+    },
+    {
+        "name": "TéléGrenoble Isère (TG+)",
+        "media_type_hint": "Télévision — nationale et locale",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "presse@telegrenoble.net"
+    },
+    {
+        "name": "France 3 Alpes",
+        "media_type_hint": "Télévision — nationale et locale",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "redaction.alpes@france3.fr"
+    },
+    {
+        "name": "BFM Business",
+        "media_type_hint": "Télévision — nationale et locale",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "contact@bfmbusiness.bfmtv.com"
+    },
+    {
+        "name": "B Smart 4Change",
+        "media_type_hint": "Télévision — nationale et locale",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "contact@bsmart.fr"
+    },
+    {
+        "name": "France 3 Rhône-Alpes",
+        "media_type_hint": "Télévision — nationale et locale",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "redaction.rhonealpes@france3.fr"
+    },
+    {
+        "name": "France Bleu Isère",
+        "media_type_hint": "Radio",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "francebleu.isere@radiofrance.fr"
+    },
+    {
+        "name": "France Bleu Drôme Ardèche",
+        "media_type_hint": "Radio",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "francebleu.dromeardeche@radiofrance.fr"
+    },
+    {
+        "name": "France Info Radio",
+        "media_type_hint": "Radio",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "contact@franceinfo.fr"
+    },
+    {
+        "name": "Radio Gresivaudan",
+        "media_type_hint": "Radio",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "contact@radiogresivaudan.fr"
+    },
+    {
+        "name": "Grenoble-Tribune.fr",
+        "media_type_hint": "Médias web locaux & newsletters économiques",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "redaction@grenoble-tribune.fr"
+    },
+    {
+        "name": "Innovation24.fr",
+        "media_type_hint": "Médias web locaux & newsletters économiques",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "contact@innovation24.fr"
+    },
+    {
+        "name": "Actu.fr — Grenoble / Isère",
+        "media_type_hint": "Médias web locaux & newsletters économiques",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "grenoble@actu.fr"
+    },
+    {
+        "name": "Métro Actu (Grenoble)",
+        "media_type_hint": "Médias web locaux & newsletters économiques",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "contact@metroactu.fr"
+    },
+    {
+        "name": "CCI Grenoble (newsletter)",
+        "media_type_hint": "Médias web locaux & newsletters économiques",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "communication@grenoble.cci.fr"
+    },
+    {
+        "name": "Grenoble Alpes Métropole (newsletter éco)",
+        "media_type_hint": "Médias web locaux & newsletters économiques",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "presse@lametro.fr"
+    },
+    {
+        "name": "Ouvertures.net",
+        "media_type_hint": "Médias web locaux & newsletters économiques",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "contact@ouvertures.net"
+    },
+    {
+        "name": "CCI Grenoble",
+        "media_type_hint": "Relais institutionnels & réseaux économiques",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "contact@grenoble.cci.fr"
+    },
+    {
+        "name": "Grenoble Alpes Innovation",
+        "media_type_hint": "Relais institutionnels & réseaux économiques",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "contact@grenoble-alpes-innovation.com"
+    },
+    {
+        "name": "French Tech Grenoble",
+        "media_type_hint": "Relais institutionnels & réseaux économiques",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "contact@frenchtech-grenoble.fr"
+    },
+    {
+        "name": "BNI Grenoble (réseau dirigeants)",
+        "media_type_hint": "Relais institutionnels & réseaux économiques",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "contact@bni-grenoble.fr"
+    },
+    {
+        "name": "MEDEF Isère",
+        "media_type_hint": "Relais institutionnels & réseaux économiques",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": "contact@medef38.fr"
+    },
+    {
+        "name": "TéléGrenoble + France 3 Alpes",
+        "media_type_hint": "Récapitulatif — ordre d'envoi recommandé",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": null
+    },
+    {
+        "name": "Le Dauphiné Libéré + Présences",
+        "media_type_hint": "Récapitulatif — ordre d'envoi recommandé",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": null
+    },
+    {
+        "name": "France Bleu Isère",
+        "media_type_hint": "Récapitulatif — ordre d'envoi recommandé",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": null
+    },
+    {
+        "name": "TéléGrenoble + France 3 Alpes",
+        "media_type_hint": "Récapitulatif — ordre d'envoi recommandé",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": null
+    },
+    {
+        "name": "Affiches de Grenoble + Place Gre'net + La Tribune",
+        "media_type_hint": "Récapitulatif — ordre d'envoi recommandé",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": null
+    },
+    {
+        "name": "CCI Grenoble + French Tech Grenoble",
+        "media_type_hint": "Récapitulatif — ordre d'envoi recommandé",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": null
+    },
+    {
+        "name": "Relance si pas de réponse",
+        "media_type_hint": "Récapitulatif — ordre d'envoi recommandé",
+        "territoire": "Isère (Grenoble)",
+        "department_code": "38",
+        "email": null
+    }
+]

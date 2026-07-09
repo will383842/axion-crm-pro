@@ -77,3 +77,13 @@ Schedule::command('media:find-websites --limit=20000')
 Schedule::command('media:import-opendatasoft cppap')->weeklyOn(1, '02:15')->withoutOverlapping()->onOneServer();
 Schedule::command('media:import-opendatasoft spel')->weeklyOn(1, '02:30')->withoutOverlapping()->onOneServer();
 Schedule::command('media:import-opendatasoft agences')->weeklyOn(1, '02:45')->withoutOverlapping()->onOneServer();
+
+// Émissions TV/radio FR + présentateurs via Wikidata SPARQL (hebdo, dimanche tôt).
+Schedule::command('media:import-emissions-wikidata')->weekly()->sundays()->at('03:00')->withoutOverlapping()->runInBackground();
+
+// Radios FM + chaînes TV autorisées par l'ARCOM (niveau station, zone géo) — hebdo.
+Schedule::command('media:import-arcom')->weekly()->sundays()->at('03:30')->withoutOverlapping()->runInBackground();
+
+// Emails rédaction déterministes (redaction@/contact@) validés MX pour les médias sans email.
+// Reprenable + borné en mémoire (--limit) ; toutes les 2h pour rattraper le backlog.
+Schedule::command('media:generate-redaction-emails --limit=20000')->everyTwoHours()->withoutOverlapping()->runInBackground();

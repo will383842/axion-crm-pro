@@ -10,6 +10,7 @@ it('extracts email and phone from mentions-legales page', function () {
 
     Http::fake([
         'acme.fr/mentions-legales' => Http::response($body, 200),
+        '*' => Http::response('', 404),
     ]);
 
     $c = new Company(['website' => 'https://acme.fr/', 'denomination' => 'Acme']);
@@ -27,7 +28,10 @@ it('extracts email and phone from mentions-legales page', function () {
 it('skips technical email prefixes', function () {
     $body = str_repeat('Lorem ipsum ', 100)
         . ' no-reply@foo.fr et hello@foo.fr';
-    Http::fake(['foo.fr/mentions-legales' => Http::response($body, 200)]);
+    Http::fake([
+        'foo.fr/mentions-legales' => Http::response($body, 200),
+        '*' => Http::response('', 404),
+    ]);
 
     $c = new Company(['website' => 'https://foo.fr', 'denomination' => 'Foo']);
     $c->id = 2;
@@ -53,9 +57,14 @@ it('returns false when website missing', function () {
 });
 
 it('tries fallback path when first 404', function () {
-    Http::fakeSequence()
-        ->push('', 404)
-        ->push(str_repeat('Lorem ipsum ', 100) . ' info@bar.fr', 200);
+    // Le pool tape les 8 paths en parallèle : /contact 404, mais /contact.html
+    // répond → l'email de secours est bien capturé. (Http::fake par URL car le
+    // pool concurrent n'a pas d'ordre déterministe pour fakeSequence.)
+    Http::fake([
+        'bar.fr/contact' => Http::response('', 404),
+        'bar.fr/contact.html' => Http::response(str_repeat('Lorem ipsum ', 100) . ' info@bar.fr', 200),
+        '*' => Http::response('', 404),
+    ]);
 
     $c = new Company(['website' => 'https://bar.fr', 'denomination' => 'Bar']);
     $c->id = 4;
@@ -70,7 +79,10 @@ it('captures ALL emails and ALL phones (not just the first)', function () {
         . ' Nos services : commercial@acme.fr, compta@acme.fr, contact@acme.fr '
         . ' Tel 01 23 45 67 89 ou 04.11.22.33.44 ou +33 6 12 34 56 78 ';
 
-    Http::fake(['acme.fr/contact' => Http::response($body, 200)]);
+    Http::fake([
+        'acme.fr/contact' => Http::response($body, 200),
+        '*' => Http::response('', 404),
+    ]);
 
     $c = new Company(['website' => 'https://acme.fr/', 'denomination' => 'Acme']);
     $c->id = 10;
@@ -91,7 +103,10 @@ it('captures ALL emails and ALL phones (not just the first)', function () {
 
 it('deduces service roles and picks a service email as generic', function () {
     $body = str_repeat('Lorem ipsum ', 80) . ' rh@corp.fr et commercial@corp.fr ';
-    Http::fake(['corp.fr/contact' => Http::response($body, 200)]);
+    Http::fake([
+        'corp.fr/contact' => Http::response($body, 200),
+        '*' => Http::response('', 404),
+    ]);
 
     $c = new Company(['website' => 'https://corp.fr', 'denomination' => 'Corp']);
     $c->id = 11;

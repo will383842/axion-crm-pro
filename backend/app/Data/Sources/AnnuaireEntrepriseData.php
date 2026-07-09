@@ -18,6 +18,11 @@ class AnnuaireEntrepriseData extends Data
         public ?float $chiffreAffaires = null,
         public ?int $resultatNet = null,
         public ?string $bilansLastYear = null,
+        // Adresse du siège (recherche-entreprises.api.gouv.fr → `siege`), utilisée
+        // pour backfill quand l'adresse INSEE de collecte est absente.
+        public ?string $address = null,
+        public ?string $postcode = null,
+        public ?string $city = null,
         public array $raw = [],
     ) {}
 }

@@ -74,7 +74,7 @@ class ProspectionCollect extends Command
                 [
                     'denomination', 'naf', 'legal_form', 'effectif_range', 'size_category',
                     'sector_main', 'address', 'postcode', 'city', 'city_name', 'insee',
-                    'siret', 'metadata', 'discovery_source', 'department_code', 'updated_at',
+                    'siret', 'enseigne', 'metadata', 'discovery_source', 'department_code', 'updated_at',
                 ],
             );
             $buffer = [];
@@ -87,6 +87,7 @@ class ProspectionCollect extends Command
             if ($data->siren === '') {
                 continue;
             }
+            $extra = $this->extraInseeFields($data->raw);
             $buffer[] = [
                 'workspace_id'     => $workspaceId,
                 'siren'            => $data->siren,
@@ -105,7 +106,8 @@ class ProspectionCollect extends Command
                 'city_name'        => $data->city,
                 'insee'            => $data->insee,
                 'siret'            => is_string($data->raw['siret'] ?? null) ? $data->raw['siret'] : null,
-                'metadata'         => json_encode($this->extraInseeFields($data->raw), JSON_UNESCAPED_UNICODE),
+                'enseigne'         => $extra['enseigne'] ?? null,
+                'metadata'         => json_encode($extra, JSON_UNESCAPED_UNICODE),
                 'discovery_source' => 'insee',
                 'department_code'  => $deptCode,
                 'created_at'       => now(),

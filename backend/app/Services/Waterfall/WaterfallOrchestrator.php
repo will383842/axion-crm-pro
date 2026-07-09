@@ -152,6 +152,22 @@ class WaterfallOrchestrator
             'dirigeants'       => $data->representatives,
         ];
         $company->signals = $signals;
+
+        // Backfill adresse du siège quand la collecte INSEE n'a rien posé —
+        // ne remplace JAMAIS une valeur existante.
+        if (empty($company->address) && ! empty($data->address)) {
+            $company->address = $data->address;
+            if (empty($company->postcode) && ! empty($data->postcode)) {
+                $company->postcode = $data->postcode;
+            }
+            if (empty($company->city) && ! empty($data->city)) {
+                $company->city = $data->city;
+                if (empty($company->city_name)) {
+                    $company->city_name = $data->city;
+                }
+            }
+        }
+
         $company->save();
 
         foreach ($data->representatives as $rep) {
@@ -317,6 +333,12 @@ class WaterfallOrchestrator
                 $company->lat = $data['lat'];
                 $company->lon = $data['lon'];
                 $touched = true;
+                // Peuple aussi geo_point (PostGIS) comme le fait step8_geocode() —
+                // uniquement quand lat/lon viennent d'être posés depuis Google Places.
+                DB::statement(
+                    'UPDATE companies SET geo_point = ST_SetSRID(ST_MakePoint(?, ?), 4326) WHERE id = ?',
+                    [$data['lon'], $data['lat'], $company->id],
+                );
             }
 
             // Stocke le payload complet dans signals.google_places + timestamp d'enrichissement
@@ -447,6 +469,7 @@ class WaterfallOrchestrator
         }
         $result = $this->ban->geocode((string) $company->address, $company->postcode);
         if (! $result) {
+            $this->step8_lambert_fallback($company);
             return;
         }
         $company->lat = $result->lat;
@@ -468,6 +491,38 @@ class WaterfallOrchestrator
         );
         $company->save();
         $this->recordRun($company, 'ban', 'success');
+    }
+
+    /**
+     * Fallback géocodage quand la BAN ne renvoie aucun résultat : on tente de
+     * reconstruire lat/lon depuis les coordonnées Lambert-93 INSEE stockées en
+     * `companies.metadata` (clés `gps_lambert_x` / `gps_lambert_y`, écrites en
+     * ProspectionCollect::extraInseeFields()). PostGIS convertit Lambert-93
+     * (SRID 2154) → WGS84 (SRID 4326). Ne casse jamais le waterfall.
+     */
+    private function step8_lambert_fallback(Company $company): void
+    {
+        $meta = $company->metadata ?: [];
+        $x = $meta['gps_lambert_x'] ?? null;
+        $y = $meta['gps_lambert_y'] ?? null;
+        if (! is_numeric($x) || ! is_numeric($y)) {
+            return;
+        }
+        try {
+            DB::statement(
+                'UPDATE companies SET lat = ST_Y(g), lon = ST_X(g), geo_point = g '
+                . 'FROM (SELECT ST_Transform(ST_SetSRID(ST_MakePoint(?, ?), 2154), 4326) AS g) t '
+                . 'WHERE companies.id = ?',
+                [(float) $x, (float) $y, $company->id],
+            );
+            $company->refresh();
+            $this->recordRun($company, 'lambert-fallback', 'success');
+        } catch (\Throwable $e) {
+            Log::warning('lambert-fallback failed', [
+                'company_id' => $company->id,
+                'error'      => $e->getMessage(),
+            ]);
+        }
     }
 
     private function step9_france_travail(Company $company): void

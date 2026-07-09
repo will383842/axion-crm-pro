@@ -9,11 +9,19 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Scrape la page « Mentions Légales » (ou variantes) d'un site web pour extraire :
- *  - email contact générique (companies.email_generic)
- *  - téléphone (companies.phone)
- *  - éventuellement contacts dirigeants (table contacts via insertOrIgnore)
- *    si le nom matche un dirigeant remonté par AnnuaireEntreprises.
+ * Scrape la page « Mentions Légales » (ou variantes) d'un site web pour extraire,
+ * de façon EXHAUSTIVE (Sprint H17, 2026-07-08) :
+ *  - TOUS les emails visibles (plus seulement le 1er), chacun devenant une fiche
+ *    contact : dirigeant connu, personne nommée, ou boîte « service »
+ *    (commercial@, compta@, rh@…) avec un rôle déduit.
+ *  - TOUS les téléphones visibles (format national 0X… et international +33…).
+ *  - email contact générique (companies.email_generic) + téléphone principal
+ *    (companies.phone) pour rétro-compat.
+ *  - La liste COMPLETE des emails/téléphones dans signals.contact_channels
+ *    (aucun canal perdu, même s'il ne devient pas une fiche contact).
+ *
+ * Doctrine « 0 email douteux » : chaque email est validé (MX), les invalides et
+ * jetables sont rejetés. 100 % gratuit (HTTP + DNS), aucun crédit consommé.
  *
  * Skip silently pages JS-rendered (< 500 octets de texte parsé).
  */
@@ -23,7 +31,7 @@ class MentionsLegalesScraperService
      * Sprint H10 (2026-05-18) — Élargi de 8 à 18 paths.
      * Ordre : pages les plus probables d'avoir email/phone visibles d'abord
      * (contact > mentions légales > a-propos > home). Early exit dès qu'on a
-     * email_generic + phone (cf. scrape() pour la logique de short-circuit).
+     * accumulé assez de contenu (cf. fetchAnyMentionsLegalesPage()).
      */
     private const PATHS = [
         // 1. Pages contact (les plus fréquentes pour email + tel)
@@ -66,17 +74,39 @@ class MentionsLegalesScraperService
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
     ];
 
+    /** Boîtes techniques inutiles pour la prospection — jamais capturées. */
     private const EMAIL_BLACKLIST_PREFIXES = ['no-reply@', 'noreply@', 'postmaster@', 'abuse@', 'webmaster@'];
 
     private const MIN_BODY_LENGTH = 500;
+
+    /**
+     * Sprint H17 — Déduction du rôle d'une boîte « service » depuis le préfixe
+     * (partie avant le @). Ordre significatif : Commercial avant Communication
+     * (sinon « commercial » matcherait « comm »). Les mots-clés courts (< 4)
+     * exigent une égalité exacte pour éviter les faux positifs (ex. « dg » dans
+     * « budget »).
+     *
+     * @var array<string, array<int, string>>
+     */
+    private const SERVICE_ROLE_MAP = [
+        'Commercial'             => ['commercial', 'commerciale', 'sales', 'vente', 'ventes', 'devis'],
+        'Comptabilité'           => ['compta', 'comptabilite', 'facturation', 'facture', 'billing', 'finance', 'finances'],
+        'Ressources humaines'    => ['rh', 'recrut', 'recrutement', 'emploi', 'job', 'jobs', 'career', 'careers', 'candidature'],
+        'Direction'              => ['direction', 'ceo', 'gerance', 'gerant', 'pdg', 'dg', 'president', 'presidente'],
+        'Support / SAV'          => ['sav', 'support', 'aide', 'help', 'assistance', 'serviceclient', 'service-client'],
+        'Communication / Presse' => ['presse', 'press', 'media', 'medias', 'communication', 'comm'],
+        'Marketing'              => ['marketing', 'mkt', 'digital'],
+        'Achats'                 => ['achat', 'achats', 'purchasing', 'procurement', 'fournisseur', 'fournisseurs'],
+        'Contact général'        => ['contact', 'info', 'infos', 'information', 'accueil', 'hello', 'bonjour', 'welcome', 'mail', 'societe'],
+    ];
 
     public function __construct(
         private readonly ?MxEmailValidator $emailValidator = null,
     ) {}
 
     /**
-     * Scrape mentions légales et met à jour la company.
-     * Retourne true si au moins une info utile a été trouvée.
+     * Scrape le site et capture TOUS les emails + téléphones.
+     * Retourne true si au moins un canal utile (email ou téléphone) a été trouvé.
      */
     public function scrape(Company $company): bool
     {
@@ -89,62 +119,88 @@ class MentionsLegalesScraperService
             return false;
         }
 
-        $found = false;
+        $emails = $this->extractAllUsableEmails($body);
+        $phones = $this->extractAllPhones($body);
 
-        // Email générique — Sprint H7 : on n'accepte que les emails validés MX
-        // (filtre les domaines invalides + disposables + role-based).
-        if (! $company->email_generic) {
-            $email = $this->extractFirstUsableEmail($body);
-            if ($email) {
-                $accept = true;
-                if ($this->emailValidator !== null) {
-                    $status = $this->emailValidator->quickStatus($email);
-                    // role/disposable/invalid → on rejette pour email_generic
-                    // (verified et risky sont OK : un email générique peut être chez
-                    // un free provider légitimement pour une TPE)
-                    if (in_array($status, ['invalid', 'disposable', 'role'], true)) {
-                        $accept = false;
-                        Log::debug('Skipping email_generic via MX validator', [
-                            'email'  => $email,
-                            'status' => $status,
-                        ]);
-                    }
-                }
-                if ($accept) {
-                    $company->email_generic = $email;
-                    $found = true;
-                }
-            }
-        }
-
-        // Téléphone
-        if (! $company->phone) {
-            $phone = $this->extractFirstPhone($body);
-            if ($phone) {
-                $company->phone = $phone;
-                $found = true;
-            }
-        }
-
-        if ($found) {
-            $company->save();
-        }
-
-        // Contacts dirigeants : si on a déjà des noms (signals.legal.dirigeants) on les match
         $signals = $company->signals ?? [];
         $dirigeants = $signals['legal']['dirigeants'] ?? [];
-        if (! empty($dirigeants) && is_array($dirigeants)) {
-            $this->matchEmailsToContacts($company, $body, $dirigeants);
+        if (! is_array($dirigeants)) {
+            $dirigeants = [];
         }
 
-        return $found;
+        $acceptedEmails = [];   // tous les emails validés (fiches + liste complète)
+        $genericEmail = null;   // 1er email « service » → email_generic (rétro-compat)
+
+        foreach ($emails as $email) {
+            // Validation MX — on ne garde JAMAIS un email invalide/jetable.
+            $emailStatus = 'unknown';
+            $validation = null;
+            if ($this->emailValidator !== null) {
+                $validation = $this->emailValidator->validate($email);
+                if (in_array($validation['status'], ['invalid', 'disposable'], true)) {
+                    continue;
+                }
+                $emailStatus = $this->mapMxStatus($validation['status']);
+            }
+
+            $class = $this->classifyEmail($email, $dirigeants);
+            $this->persistContact($company, $email, $emailStatus, $validation, $class);
+
+            $acceptedEmails[] = $email;
+            if ($genericEmail === null && $class['kind'] === 'service') {
+                $genericEmail = $email;
+            }
+        }
+
+        // Fallback email_generic : à défaut de boîte « service », le 1er accepté.
+        if ($genericEmail === null && ! empty($acceptedEmails)) {
+            $genericEmail = $acceptedEmails[0];
+        }
+
+        // Backfill company-level — n'écrase jamais l'existant.
+        if (! $company->email_generic && $genericEmail) {
+            $company->email_generic = $genericEmail;
+        }
+        if (! $company->phone && ! empty($phones)) {
+            $company->phone = $phones[0];
+        }
+
+        // Liste COMPLETE conservée — aucun email/téléphone perdu.
+        $channels = $signals['contact_channels'] ?? [];
+        $channels['emails'] = array_values(array_unique(array_merge($channels['emails'] ?? [], $acceptedEmails)));
+        $channels['phones'] = array_values(array_unique(array_merge($channels['phones'] ?? [], $phones)));
+        $channels['scraped_at'] = now()->toIso8601String();
+        $signals['contact_channels'] = $channels;
+        $company->signals = $signals;
+
+        $company->save();
+
+        return ! empty($acceptedEmails) || ! empty($phones);
+    }
+
+    /**
+     * Récupère le TEXTE brut agrégé des pages ours/contact/mentions-légales/équipe
+     * d'un site (mêmes 18 paths, rotation UA, délais polis, early-exit). Réutilisé
+     * par `journalists:scrape-ours` pour envoyer ce texte à l'extraction LLM.
+     *
+     * Retourne null si aucune page exploitable (≥ 500 octets de texte) n'est trouvée.
+     */
+    public function fetchPagesText(string $website): ?string
+    {
+        $html = $this->fetchAnyMentionsLegalesPage($website);
+        if ($html === null) {
+            return null;
+        }
+        $text = trim((string) preg_replace('/\s+/', ' ', strip_tags($html)));
+
+        return $text !== '' ? $text : null;
     }
 
     /**
      * Sprint H10 — Itère sur les paths, fusionne tous les bodies utiles trouvés
      * (concat des HTML des pages contact + mentions + about + home) pour avoir
      * un maximum de signaux email/phone à parser ensuite. Stop early si on a
-     * déjà accumulé suffisamment de contenu (10K chars).
+     * déjà accumulé suffisamment de contenu (10K chars) ou 4 pages.
      */
     private function fetchAnyMentionsLegalesPage(string $website): ?string
     {
@@ -207,28 +263,35 @@ class MentionsLegalesScraperService
         'json', 'xml', 'map', 'woff', 'woff2', 'ttf', 'eot', 'mp4', 'webm', 'pdf', 'zip',
     ];
 
-    private function extractFirstUsableEmail(string $body): ?string
+    /**
+     * Extrait TOUS les emails exploitables du body (dédupliqués, minuscules),
+     * en filtrant le bruit (assets image) et les boîtes techniques blacklistées.
+     *
+     * @return array<int, string>
+     */
+    private function extractAllUsableEmails(string $body): array
     {
         if (! preg_match_all('/\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/', $body, $matches)) {
-            return null;
+            return [];
         }
-        foreach ($matches[0] as $email) {
-            $lower = strtolower($email);
-            if (! $this->looksLikeRealEmail($lower)) {
+        $out = [];
+        foreach ($matches[0] as $raw) {
+            $email = strtolower($raw);
+            if (isset($out[$email]) || ! $this->looksLikeRealEmail($email)) {
                 continue;
             }
             $skip = false;
             foreach (self::EMAIL_BLACKLIST_PREFIXES as $prefix) {
-                if (str_starts_with($lower, $prefix)) {
+                if (str_starts_with($email, $prefix)) {
                     $skip = true;
                     break;
                 }
             }
             if (! $skip) {
-                return $lower;
+                $out[$email] = true;
             }
         }
-        return null;
+        return array_keys($out);
     }
 
     /**
@@ -249,100 +312,158 @@ class MentionsLegalesScraperService
         return ! in_array($tld, self::EMAIL_FALSE_TLDS, true);
     }
 
-    private function extractFirstPhone(string $body): ?string
+    /**
+     * Extrait TOUS les téléphones (dédupliqués, normalisés en 0XXXXXXXXX) :
+     * format national 0X XX XX XX XX + format international +33 X XX XX XX XX.
+     *
+     * @return array<int, string>
+     */
+    private function extractAllPhones(string $body): array
     {
-        if (preg_match('/\b0[1-9](?:[\s.\-]?\d{2}){4}\b/', $body, $m)) {
-            return preg_replace('/[\s.\-]/', '', $m[0]);
+        $out = [];
+        // Format national : 0X XX XX XX XX (séparateurs espace/point/tiret tolérés)
+        if (preg_match_all('/\b0[1-9](?:[\s.\-]?\d{2}){4}\b/', $body, $m)) {
+            foreach ($m[0] as $raw) {
+                $out[(string) preg_replace('/[\s.\-]/', '', $raw)] = true;
+            }
+        }
+        // Format international : +33 X XX XX XX XX → normalisé en 0X…
+        if (preg_match_all('/\+33[\s.\-]?[1-9](?:[\s.\-]?\d{2}){4}\b/', $body, $m2)) {
+            foreach ($m2[0] as $raw) {
+                $digits = (string) preg_replace('/\D/', '', $raw);      // 33XXXXXXXXX
+                $digits = (string) preg_replace('/^33/', '0', $digits); // 0XXXXXXXXX
+                $out[$digits] = true;
+            }
+        }
+        return array_keys($out);
+    }
+
+    /**
+     * Classe un email : dirigeant connu, personne nommée, ou boîte service.
+     *
+     * @param  array<int, array{first_name?: string|null, last_name?: string, role?: string}>  $dirigeants
+     * @return array{first_name: string|null, last_name: string, role: string, kind: string}
+     */
+    private function classifyEmail(string $email, array $dirigeants): array
+    {
+        $local = strtolower(strstr($email, '@', true) ?: '');
+
+        // 1. Dirigeant connu (nom ou prénom présent dans le préfixe).
+        foreach ($dirigeants as $rep) {
+            $first = strtolower((string) ($rep['first_name'] ?? ''));
+            $last = strtolower((string) ($rep['last_name'] ?? ''));
+            if (($last !== '' && strlen($last) >= 3 && str_contains($local, $last))
+                || ($first !== '' && strlen($first) >= 3 && str_contains($local, $first))) {
+                return [
+                    'first_name' => $rep['first_name'] ?? null,
+                    'last_name'  => (string) ($rep['last_name'] ?? 'Dirigeant'),
+                    'role'       => $rep['role'] ?? 'dirigeant',
+                    'kind'       => 'dirigeant',
+                ];
+            }
+        }
+
+        // 2. Boîte service (commercial@, compta@, rh@…).
+        $roleLabel = $this->roleLabelFromLocalPart($local);
+        if ($roleLabel !== null) {
+            return [
+                'first_name' => null,
+                'last_name'  => ucfirst($local),
+                'role'       => $roleLabel,
+                'kind'       => 'service',
+            ];
+        }
+
+        // 3. Personne nommée (jean.dupont, m.martin).
+        $person = $this->parsePersonName($local);
+        if ($person !== null) {
+            return [
+                'first_name' => $person['first_name'],
+                'last_name'  => $person['last_name'],
+                'role'       => 'à qualifier',
+                'kind'       => 'person',
+            ];
+        }
+
+        // 4. Fallback : boîte générique non catégorisée.
+        return [
+            'first_name' => null,
+            'last_name'  => ucfirst($local),
+            'role'       => 'Service',
+            'kind'       => 'service',
+        ];
+    }
+
+    /** Déduit un libellé de rôle depuis le préfixe email, ou null si ce n'est pas une boîte service connue. */
+    private function roleLabelFromLocalPart(string $local): ?string
+    {
+        foreach (self::SERVICE_ROLE_MAP as $label => $keywords) {
+            foreach ($keywords as $kw) {
+                if ($local === $kw) {
+                    return $label;
+                }
+                if (strlen($kw) >= 4 && str_contains($local, $kw)) {
+                    return $label;
+                }
+            }
         }
         return null;
     }
 
     /**
-     * Si un dirigeant connu (depuis annuaire) apparaît dans le HTML avec un email proche,
-     * créer le contact correspondant.
+     * Parse un préfixe « prénom.nom » (séparateurs . _ -) en nom exploitable.
      *
-     * @param  array<int, array{first_name?: string, last_name: string, role?: string}>  $dirigeants
+     * @return array{first_name: string, last_name: string}|null
      */
-    private function matchEmailsToContacts(Company $company, string $body, array $dirigeants): void
+    private function parsePersonName(string $local): ?array
     {
-        if (! preg_match_all('/\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/', $body, $emailMatches)) {
-            return;
+        if (preg_match('/^([a-zà-ÿ]+)[._\-]([a-zà-ÿ]{2,})$/u', $local, $m)) {
+            return ['first_name' => ucfirst($m[1]), 'last_name' => ucfirst($m[2])];
         }
-        $emails = array_unique(array_map('strtolower', $emailMatches[0]));
+        return null;
+    }
 
-        foreach ($dirigeants as $rep) {
-            $first = strtolower((string) ($rep['first_name'] ?? ''));
-            $last = strtolower((string) ($rep['last_name'] ?? ''));
-            if (! $last) {
-                continue;
-            }
-            $candidates = [];
-            foreach ($emails as $email) {
-                $local = strtolower(strstr($email, '@', true) ?: '');
-                if ($local === '') {
-                    continue;
-                }
-                $skip = false;
-                foreach (self::EMAIL_BLACKLIST_PREFIXES as $prefix) {
-                    if (str_starts_with($email, $prefix)) { $skip = true; break; }
-                }
-                if ($skip) { continue; }
-                if ($first && str_contains($local, $first)) {
-                    $candidates[] = $email;
-                } elseif (str_contains($local, $last)) {
-                    $candidates[] = $email;
-                }
-            }
-            if (empty($candidates)) {
-                continue;
-            }
-            // Sprint H7 — Validation MX maison avant insert (pas de pattern spéculatif :
-            // seuls les emails RÉELS trouvés dans le HTML sont stockés, et tagués selon
-            // le résultat MX validator → la base ne contient QUE des emails fiables).
-            $bestEmail = $candidates[0];
-            $emailStatus = 'unknown';
-            $validation = null;
-            if ($this->emailValidator !== null) {
-                $validation = $this->emailValidator->validate($bestEmail);
-                $emailStatus = match ($validation['status']) {
-                    'verified'   => 'valid',
-                    'risky'      => 'catchall',
-                    'role'       => 'role',
-                    'disposable' => 'invalid',
-                    'invalid'    => 'invalid',
-                    default      => 'unknown',
-                };
-                if ($emailStatus === 'invalid') {
-                    Log::debug('Skipping invalid email from mentions-legales', [
-                        'email'  => $bestEmail,
-                        'reason' => $validation['reason'] ?? null,
-                    ]);
-                    continue;
-                }
-            }
-            try {
-                DB::table('contacts')->insertOrIgnore([[
-                    'workspace_id'      => $company->workspace_id,
-                    'company_id'        => $company->id,
-                    'first_name'        => $rep['first_name'] ?? null,
-                    'last_name'         => $rep['last_name'],
-                    'role'              => $rep['role'] ?? 'dirigeant',
-                    'email'             => $bestEmail,
-                    'email_status'      => $emailStatus,
-                    'discovery_source'  => 'mentions-legales',
-                    'sources'           => json_encode(['mentions-legales']),
-                    'metadata'          => json_encode([
-                        'matched_dirigeant' => $rep,
-                        'mx_validation'     => $validation,
-                    ]),
-                    'created_at'        => now(),
-                    'updated_at'        => now(),
-                ]]);
-            } catch (\Throwable $e) {
-                Log::warning('contact insert from mentions-legales failed', [
-                    'rep' => $rep, 'error' => $e->getMessage(),
-                ]);
-            }
+    /** Mappe le statut du validateur MX vers l'enum contacts.email_status. */
+    private function mapMxStatus(string $status): string
+    {
+        return match ($status) {
+            'verified' => 'valid',
+            'risky'    => 'catchall',
+            'role'     => 'role',
+            default    => 'unknown',
+        };
+    }
+
+    /**
+     * Insère une fiche contact (idempotent via UNIQUE(workspace_id, normalized_hash)).
+     *
+     * @param  array{first_name: string|null, last_name: string, role: string, kind: string}  $class
+     */
+    private function persistContact(Company $company, string $email, string $emailStatus, ?array $validation, array $class): void
+    {
+        try {
+            DB::table('contacts')->insertOrIgnore([[
+                'workspace_id'     => $company->workspace_id,
+                'company_id'       => $company->id,
+                'first_name'       => $class['first_name'],
+                'last_name'        => $class['last_name'],
+                'role'             => $class['role'],
+                'email'            => $email,
+                'email_status'     => $emailStatus,
+                'discovery_source' => 'mentions-legales',
+                'sources'          => json_encode(['mentions-legales']),
+                'metadata'         => json_encode([
+                    'kind'          => $class['kind'],
+                    'mx_validation' => $validation,
+                ]),
+                'created_at'       => now(),
+                'updated_at'       => now(),
+            ]]);
+        } catch (\Throwable $e) {
+            Log::warning('contact insert (all-channels) failed', [
+                'email' => $email,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 }

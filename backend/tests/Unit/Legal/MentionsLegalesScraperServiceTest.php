@@ -64,3 +64,42 @@ it('tries fallback path when first 404', function () {
     expect((new MentionsLegalesScraperService())->scrape($c))->toBeTrue();
     expect($c->email_generic)->toBe('info@bar.fr');
 });
+
+it('captures ALL emails and ALL phones (not just the first)', function () {
+    $body = str_repeat('Lorem ipsum dolor ', 60)
+        . ' Nos services : commercial@acme.fr, compta@acme.fr, contact@acme.fr '
+        . ' Tel 01 23 45 67 89 ou 04.11.22.33.44 ou +33 6 12 34 56 78 ';
+
+    Http::fake(['acme.fr/contact' => Http::response($body, 200)]);
+
+    $c = new Company(['website' => 'https://acme.fr/', 'denomination' => 'Acme']);
+    $c->id = 10;
+    $c->workspace_id = '00000000-0000-0000-0000-000000000000';
+
+    expect((new MentionsLegalesScraperService())->scrape($c))->toBeTrue();
+
+    $channels = $c->signals['contact_channels'] ?? [];
+    // Les 3 emails sont conservés (aucun perdu).
+    expect($channels['emails'])->toContain('commercial@acme.fr')
+        ->toContain('compta@acme.fr')
+        ->toContain('contact@acme.fr');
+    // Les 3 téléphones (national x2 + international normalisé) sont conservés.
+    expect($channels['phones'])->toContain('0123456789')
+        ->toContain('0411223344')
+        ->toContain('0612345678');
+});
+
+it('deduces service roles and picks a service email as generic', function () {
+    $body = str_repeat('Lorem ipsum ', 80) . ' rh@corp.fr et commercial@corp.fr ';
+    Http::fake(['corp.fr/contact' => Http::response($body, 200)]);
+
+    $c = new Company(['website' => 'https://corp.fr', 'denomination' => 'Corp']);
+    $c->id = 11;
+    $c->workspace_id = '00000000-0000-0000-0000-000000000000';
+
+    expect((new MentionsLegalesScraperService())->scrape($c))->toBeTrue();
+    // email_generic = une boîte service (le 1er accepté), pas vide.
+    expect($c->email_generic)->not->toBeNull();
+    expect($c->signals['contact_channels']['emails'])->toContain('rh@corp.fr')
+        ->toContain('commercial@corp.fr');
+});

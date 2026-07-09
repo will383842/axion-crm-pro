@@ -26,6 +26,7 @@ class LlmUseCasesSeeder extends Seeder
             ['summarize_signals',             'mistral',   'mistral-small-latest',   '["mistral"]',                       'Synthèse signaux business (levées/news/recrutement)'],
             ['normalize_address',             'mistral',   'mistral-small-latest',   '["mistral"]',                       'Normalisation adresse vers format BAN'],
             ['classify_priority',             'mistral',   'mistral-small-latest',   '["mistral","anthropic"]',           'Classification priorité contact (chaude/tiede/froide/gelee)'],
+            ['extract_journalists_from_page', 'mistral',   'mistral-small-latest',   '["mistral"]',                       'Extraction journalistes (dir. publication / rédac chef) depuis pages ours/mentions-légales'],
         ];
 
         // Sprint H15 — Use cases retournant du JSON structuré → activer
@@ -34,6 +35,7 @@ class LlmUseCasesSeeder extends Seeder
         $jsonUseCases = [
             'classify_company_axion', 'sector_classification', 'extract_team_from_page',
             'detect_email_pattern', 'auto_tag', 'classify_priority', 'normalize_address',
+            'extract_journalists_from_page',
         ];
 
         foreach ($rows as [$slug, $provider, $model, $fallbackJson, $desc]) {

@@ -61,7 +61,10 @@ class MentionsLegalesScraperService
         '/',
     ];
 
-    private const HTTP_TIMEOUT_SECONDS = 10;
+    private const HTTP_TIMEOUT_SECONDS = 6;
+
+    /** Timeout d'établissement de connexion (TCP/TLS) — coupe vite les sites morts. */
+    private const HTTP_CONNECT_TIMEOUT = 3;
 
     /**
      * Sprint H1 — Pool d'User-Agents rotation aléatoire pour réduire fingerprint.
@@ -197,28 +200,73 @@ class MentionsLegalesScraperService
     }
 
     /**
-     * Sprint H10 — Itère sur les paths, fusionne tous les bodies utiles trouvés
-     * (concat des HTML des pages contact + mentions + about + home) pour avoir
-     * un maximum de signaux email/phone à parser ensuite. Stop early si on a
-     * déjà accumulé suffisamment de contenu (10K chars) ou 4 pages.
+     * Sprint H-SPEED — Récupère EN PARALLÈLE (Http::pool) les 8 paths les plus
+     * utiles (contact + mentions-légales) en une seule salve concurrente, au lieu
+     * de la boucle séquentielle historique. On tape le site une seule fois par run
+     * (8 requêtes concurrentes, timeouts courts) → ~2-4x plus rapide par entreprise.
+     *
+     * Fusionne tous les bodies utiles (concat des HTML) dans l'ORDRE des paths,
+     * chacun préfixé de `<!-- page: {path} -->`, jusqu'à ~10 000 chars. Le format
+     * accumulé reste IDENTIQUE à l'ancien (extractAll*() parsent le texte concaténé).
+     * Rotation User-Agent conservée (un UA par requête). Une réponse en erreur/
+     * exception du pool est simplement ignorée (pas de crash).
+     *
+     * Retourne le body accumulé, ou null si aucune page exploitable
+     * (≥ MIN_BODY_LENGTH octets de texte parsé).
      */
     private function fetchAnyMentionsLegalesPage(string $website): ?string
     {
         $base = rtrim($website, '/');
-        $accumulated = '';
-        $pagesFound = 0;
-        foreach (self::PATHS as $path) {
-            $body = $this->fetch($base . $path);
-            if ($body !== null && strlen(strip_tags($body)) >= self::MIN_BODY_LENGTH) {
-                $accumulated .= "\n\n<!-- page: {$path} -->\n" . $body;
-                $pagesFound++;
-                // Early exit : assez de contenu accumulé pour parser
-                // (évite de marteler le site, ~3 pages suffisent largement)
-                if (strlen($accumulated) >= 10000 || $pagesFound >= 4) {
-                    break;
+        $paths = array_slice(self::PATHS, 0, 8);
+
+        try {
+            $responses = Http::pool(function ($pool) use ($base, $paths) {
+                $out = [];
+                foreach ($paths as $i => $path) {
+                    $ua = self::USER_AGENTS[array_rand(self::USER_AGENTS)];
+                    $out[] = $pool->as((string) $i)
+                        ->timeout(self::HTTP_TIMEOUT_SECONDS)
+                        ->connectTimeout(self::HTTP_CONNECT_TIMEOUT)
+                        ->withHeaders([
+                            'User-Agent' => $ua,
+                            'Accept' => 'text/html,application/xhtml+xml',
+                        ])
+                        ->get($base . $path);
                 }
+                return $out;
+            });
+        } catch (\Throwable $e) {
+            if (class_exists(\Sentry\State\Hub::class)) {
+                \Sentry\captureException($e);
+            }
+            Log::debug('MentionsLegales pool failed', ['website' => $website, 'error' => $e->getMessage()]);
+            return null;
+        }
+
+        $accumulated = '';
+        foreach ($paths as $i => $path) {
+            $resp = $responses[(string) $i] ?? null;
+            // Une réponse absente OU une exception de connexion = ignorée.
+            if (! $resp || $resp instanceof \Throwable) {
+                continue;
+            }
+            try {
+                if (! $resp->successful()) {
+                    continue;
+                }
+                $body = (string) $resp->body();
+            } catch (\Throwable $e) {
+                continue; // réponse illisible → ignore
+            }
+            if (strlen(strip_tags($body)) < self::MIN_BODY_LENGTH) {
+                continue;
+            }
+            $accumulated .= "\n\n<!-- page: {$path} -->\n" . $body;
+            if (strlen($accumulated) >= 10000) {
+                break; // assez de contenu accumulé pour parser
             }
         }
+
         return $accumulated !== '' ? $accumulated : null;
     }
 
@@ -228,11 +276,12 @@ class MentionsLegalesScraperService
 
         try {
             $response = Http::timeout(self::HTTP_TIMEOUT_SECONDS)
+                ->connectTimeout(self::HTTP_CONNECT_TIMEOUT)
                 ->withHeaders([
                     'User-Agent' => $ua,
                     'Accept' => 'text/html,application/xhtml+xml',
                 ])
-                ->retry(2, 1000, function (\Throwable $e) {
+                ->retry(1, 500, function (\Throwable $e) {
                     return $e instanceof \Illuminate\Http\Client\ConnectionException;
                 })
                 ->get($url);
@@ -241,10 +290,10 @@ class MentionsLegalesScraperService
                 return null;
             }
 
-            // Random delay 200-800ms entre paths pour ne pas marteler le serveur.
+            // Random delay 100-300ms entre paths pour ne pas marteler le serveur.
             // Skip si test/Http::fake (microsleep mesurable en perf-critical tests).
             if (app()->environment('production', 'staging')) {
-                usleep(random_int(200_000, 800_000));
+                usleep(random_int(100_000, 300_000));
             }
 
             return $response->body();

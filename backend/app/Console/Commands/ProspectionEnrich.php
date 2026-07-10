@@ -103,7 +103,10 @@ class ProspectionEnrich extends Command
             $q->whereRaw('id % ? = ?', [$shards, $shard]);
         }
         // Priorité aux entreprises avec des salariés (plus susceptibles d'avoir un site).
-        $companies = $q->whereNotNull('effectif_range')
+        // `clone` obligatoire : le builder est mutable, donc sans lui les contraintes
+        // `effectif_range` resteraient posées sur $q et le fallback ci-dessous rejouerait
+        // la même requête restreinte — il ne s'élargirait jamais aux NN/00/01.
+        $companies = (clone $q)->whereNotNull('effectif_range')
             ->whereNotIn('effectif_range', ['NN', '00', '01'])
             ->limit($count)->get();
         if ($companies->isEmpty()) {

@@ -56,16 +56,27 @@ export function MediaDetailPage() {
     );
   }
 
+  const familyLabel =
+    data.media_family === "audiovisual_production"
+      ? "Production audiovisuelle"
+      : data.media_family === "editorial"
+        ? "Rédactionnel"
+        : null;
+
   const rows: Array<[string, string | null | undefined]> = [
     ["Type", typeLabel(data.media_type)],
+    ["Famille", familyLabel],
     ["Périodicité", data.periodicity],
     ["Thème éditorial", data.editorial_theme],
     ["Zone de diffusion", data.diffusion_zone],
     ["Éditeur", data.publisher],
     ["Département", data.department_code],
+    ["Région", data.region_code],
     ["Ville", data.city],
+    ["Code postal", data.postcode],
     ["SIREN", data.siren],
     ["N° CPPAP", data.cppap_number],
+    ["N° ARCOM", data.arcom_id],
     ["Source", data.source],
   ];
 
@@ -83,6 +94,18 @@ export function MediaDetailPage() {
         <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">
           {typeLabel(data.media_type)}
         </span>
+        {data.parent ? (
+          <span className="text-xs">
+            Chaîne :{" "}
+            <Link
+              to="/media/$mediaId"
+              params={{ mediaId: String(data.parent.id) }}
+              className="font-medium text-brand-600 hover:underline dark:text-brand-400"
+            >
+              {data.parent.name}
+            </Link>
+          </span>
+        ) : null}
         {data.enrich_status ? <span className="text-xs">enrichissement : {data.enrich_status}</span> : null}
       </div>
 
@@ -116,9 +139,24 @@ export function MediaDetailPage() {
               )}
             </li>
             <li>
-              <span className="text-xs text-slate-500">Email</span>
+              <span className="text-xs text-slate-500">Email rédaction</span>
               <br />
               <span className="text-slate-800 dark:text-slate-200">{data.email || "—"}</span>
+              {data.email_confidence ? (
+                <span
+                  className={cn(
+                    "ml-2 rounded px-1.5 py-0.5 text-[11px] font-semibold",
+                    data.email_confidence === "A"
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                      : data.email_confidence === "B"
+                        ? "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
+                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+                  )}
+                  title="Confiance : A = email sur le domaine du site, B = domaine pro, C = boîte grand public"
+                >
+                  Confiance {data.email_confidence}
+                </span>
+              ) : null}
             </li>
             <li>
               <span className="text-xs text-slate-500">Téléphone</span>
@@ -157,7 +195,8 @@ export function MediaDetailPage() {
           </table>
         ) : (
           <p className="text-sm text-slate-500">
-            Aucun journaliste rattaché pour l'instant (l'extraction des rédactions arrive en Phase 3).
+            Aucun journaliste rattaché. Le contact presse fiable reste l'email rédaction ci-dessus (+ le
+            directeur de publication en mentions légales).
           </p>
         )}
       </Card>

@@ -201,6 +201,27 @@ class MentionsLegalesScraperService
     }
 
     /**
+     * Récolte brute des canaux de contact (emails + téléphones) depuis le site d'une
+     * entité NON-Company (média, etc.), SANS persistance. Réutilise EXACTEMENT les mêmes
+     * extracteurs que scrape() → même qualité, même filtrage anti-assets. La validation
+     * MX et le choix de l'email principal restent à la charge de l'appelant.
+     *
+     * @return array{emails: list<string>, phones: list<string>}
+     */
+    public function harvestFromWebsite(string $website): array
+    {
+        $body = $this->fetchAnyMentionsLegalesPage($website);
+        if ($body === null) {
+            return ['emails' => [], 'phones' => []];
+        }
+
+        return [
+            'emails' => $this->extractAllUsableEmails($body),
+            'phones' => $this->extractAllPhones($body),
+        ];
+    }
+
+    /**
      * Sprint H-SPEED — Récupère EN PARALLÈLE (Http::pool) les 8 paths les plus
      * utiles (contact + mentions-légales) en une seule salve concurrente, au lieu
      * de la boucle séquentielle historique. On tape le site une seule fois par run

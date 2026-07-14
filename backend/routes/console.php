@@ -130,3 +130,7 @@ Schedule::command('prospection:score-email-confidence')->dailyAt('04:45')->witho
 
 // Rétention : purge des scraper_runs de plus de 90 jours — quotidien.
 Schedule::command('retention:prune-scraper-runs --days=90')->dailyAt('04:20')->withoutOverlapping()->onOneServer();
+
+// Enrichissement direct des médias (scrape site → emails/tél) — rattrapage continu borné.
+// Le gros run initial se lance en systemd shardé ; ici on rattrape les nouveaux médias.
+Schedule::command('media:enrich --limit=5000')->everyThreeHours()->withoutOverlapping()->runInBackground();

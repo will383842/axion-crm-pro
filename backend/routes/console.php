@@ -113,8 +113,11 @@ Schedule::command('media:generate-redaction-emails --limit=20000')->everyTwoHour
 // ── Correctifs audit 2026-07-14 ────────────────────────────────────────────────
 
 // Acquisition des JOURNALISTES (extraction LLM Mistral des pages ours/mentions légales).
-// Gaté par MEDIA_JOURNALISTS_ENABLED (la commande se refuse d'elle-même si le flag est off).
-Schedule::command('journalists:scrape-ours --limit=200')->dailyAt('05:40')->withoutOverlapping()->runInBackground();
+// Ciblé sur la presse ÉDITORIALE (pas les boîtes de prod). Gaté par MEDIA_JOURNALISTS_ENABLED.
+Schedule::command('journalists:scrape-ours --editorial --limit=300')->dailyAt('05:40')->withoutOverlapping()->runInBackground();
+
+// Confiance email A/B/C des médias (même barème que les contacts) — quotidien.
+Schedule::command('media:score-confidence')->dailyAt('05:25')->withoutOverlapping()->onOneServer();
 
 // Rattachement des émissions TV orphelines à leur chaîne (fallback nom normalisé) — hebdo.
 Schedule::command('media:link-emissions-to-channels')->weeklyOn(0, '04:30')->withoutOverlapping()->runInBackground();

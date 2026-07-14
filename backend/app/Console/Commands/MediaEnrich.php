@@ -42,11 +42,14 @@ class MediaEnrich extends Command
      * hashs) et domaines de PARKING/revente (le site est garé → l'email n'est pas celui
      * du média). Cf. audit-cartographie-crm-pro : « 19 % d'emails parasites ».
      */
-    private const PARASITE_PATTERNS = [
+    public const PARASITE_PATTERNS = [
         '/[0-9a-f]{16,}@/i',                                   // boîte = hash (tracking)
         '/@[0-9a-f]{16,}/i',
-        '/(wixpress|sentry|sentry-next)/i',                    // artefacts Wix/Sentry
-        '/@(solidnames|sedoparking|parkingcrew|bodis|above\.com|dan\.com)/i', // parking/revente
+        '/(wixpress|sentry)/i',                                // artefacts Wix/Sentry
+        // Domaines de PARKING / revente de noms de domaine.
+        '/@(solidnames|sedoparking|parkingcrew|bodis|above\.com|dan\.com|domainmarket|hugedomains|afternic|sedo\.com|godaddy|namecheap)\b/i',
+        // Plateformes / builders / éditeurs de thèmes (email = plateforme, pas le média).
+        '/(unitedthemes|readymag|myshopify|squarespace|webflow|weebly|jimdo|wixsite|websitebuilder|wordpress\.com|hostinger|wpengine|kinsta|shopify)/i',
         '/scaled_jpg|@2x/i',                                   // assets image
         '/\.(png|jpe?g|gif|svg|webp|avif)(@|$)/i',
     ];

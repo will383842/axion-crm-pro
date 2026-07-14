@@ -11,10 +11,11 @@ use Illuminate\Support\Facades\DB;
  * Deux fléaux repérés (mêmes que sur la base entreprises, qui a demandé 5 passes) :
  *  1. PARASITES : artefacts tracking/assets/parking (Sentry/Wix, hashs, domainmarket,
  *     readymag, unitedthemes…). Mêmes motifs que MediaEnrich::PARASITE_PATTERNS.
- *  2. SUR-PARTAGÉS : un même email présent sur > --threshold médias distincts = une
- *     PLATEFORME (DSN Sentry commun à tous les sites Wix, email d'un builder/registrar),
- *     jamais le vrai contact d'un média. Heuristique robuste (attrape la longue traîne
- *     sans blocklist exhaustive).
+ *  2. SUR-PARTAGÉS (grand public UNIQUEMENT) : un même email GRAND PUBLIC (gmail, orange…)
+ *     présent sur > --threshold médias = démo/placeholder (jean.dupont@gmail.com).
+ *     ⚠️ On NE touche PAS les emails PRO sur-partagés : reportages@tf1.fr, docs@arte.tv,
+ *     info@france2.fr sont légitimement partagés (les émissions héritent de l'email de
+ *     leur chaîne, + kits presse). Nuller ces domaines détruirait la donnée.
  *
  * Action : media.email → NULL, retrait de socials.contact_channels.emails, et
  * enrich_status → 'pending' si le média n'a plus aucun signal (ni email ni téléphone).
@@ -26,19 +27,30 @@ class MediaCleanEmails extends Command
 
     protected $description = 'Purge les emails médias parasites ou sur-partagés (plateformes/parking).';
 
+    /** Fournisseurs grand public : un email de ce type sur-partagé = démo/placeholder. */
+    private const CONSUMER_DOMAINS = [
+        'gmail.', 'orange.fr', 'free.fr', 'wanadoo.fr', 'hotmail.', 'outlook.',
+        'live.', 'yahoo.', 'laposte.net', 'sfr.fr', 'gmx.', 'icloud.com',
+        'protonmail.', 'proton.me', 'aol.', 'bbox.fr', 'neuf.fr',
+    ];
+
     public function handle(): int
     {
         $threshold = max(2, (int) $this->option('threshold'));
         $dry = (bool) $this->option('dry-run');
 
-        // 1) Emails sur-partagés (> threshold médias distincts).
-        $shared = DB::table('media')
+        // 1) Emails sur-partagés (> threshold médias) MAIS uniquement sur domaine grand
+        //    public → placeholders/démos. Les emails PRO sur-partagés (chaînes, kits
+        //    presse) sont LÉGITIMES et préservés.
+        $shared = collect(DB::table('media')
             ->select('email')
             ->whereNotNull('email')
             ->whereNull('deleted_at')
             ->groupBy('email')
             ->havingRaw('count(*) > ?', [$threshold])
-            ->pluck('email')
+            ->pluck('email'))
+            ->filter(fn ($e) => $this->isConsumerDomain((string) $e))
+            ->values()
             ->all();
 
         // 2) Emails parasites (motifs). On les récupère pour les nuller aussi.
@@ -124,6 +136,21 @@ class MediaCleanEmails extends Command
     {
         foreach (MediaEnrich::PARASITE_PATTERNS as $rx) {
             if (preg_match($rx, $email) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isConsumerDomain(string $email): bool
+    {
+        $domain = strtolower((string) substr((string) strrchr($email, '@'), 1));
+        if ($domain === '') {
+            return false;
+        }
+        foreach (self::CONSUMER_DOMAINS as $c) {
+            if (str_contains($domain, $c)) {
                 return true;
             }
         }

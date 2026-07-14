@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             OwnerUserSeeder::class,
             AiActRegisterSeeder::class,
             DemoCompaniesSeeder::class,
+            DefaultAudiencesSeeder::class,
         ]);
     }
 }

@@ -19,7 +19,7 @@ class AudienceBuilderService
     public const WHITELIST_FIELDS = [
         'prospection_status', 'department_code', 'region_code', 'commune_code',
         'size_category', 'sector_main', 'priority', 'quality_score',
-        'tags', 'has_email', 'enriched_at',
+        'tags', 'has_email', 'enriched_at', 'best_email_confidence',
     ];
 
     public const WHITELIST_OPS = [

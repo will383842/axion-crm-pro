@@ -109,3 +109,24 @@ Schedule::command('media:import-arcom')->weekly()->sundays()->at('03:30')->witho
 // Emails rédaction déterministes (redaction@/contact@) validés MX pour les médias sans email.
 // Reprenable + borné en mémoire (--limit) ; toutes les 2h pour rattraper le backlog.
 Schedule::command('media:generate-redaction-emails --limit=20000')->everyTwoHours()->withoutOverlapping()->runInBackground();
+
+// ── Correctifs audit 2026-07-14 ────────────────────────────────────────────────
+
+// Acquisition des JOURNALISTES (extraction LLM Mistral des pages ours/mentions légales).
+// Gaté par MEDIA_JOURNALISTS_ENABLED (la commande se refuse d'elle-même si le flag est off).
+Schedule::command('journalists:scrape-ours --limit=200')->dailyAt('05:40')->withoutOverlapping()->runInBackground();
+
+// Rattachement des émissions TV orphelines à leur chaîne (fallback nom normalisé) — hebdo.
+Schedule::command('media:link-emissions-to-channels')->weeklyOn(0, '04:30')->withoutOverlapping()->runInBackground();
+
+// Backfill périodicité médias (no-op tant qu'aucune source fiable n'est branchée) — hebdo.
+Schedule::command('media:backfill-periodicity')->weeklyOn(1, '03:15')->withoutOverlapping()->onOneServer();
+
+// Blogs curés (media_type=blog) — hebdo.
+Schedule::command('media:import-blogs')->weeklyOn(1, '03:30')->withoutOverlapping()->onOneServer();
+
+// Scoring de confiance email A/B/C (déterministe, sans SMTP) — quotidien.
+Schedule::command('prospection:score-email-confidence')->dailyAt('04:45')->withoutOverlapping()->onOneServer();
+
+// Rétention : purge des scraper_runs de plus de 90 jours — quotidien.
+Schedule::command('retention:prune-scraper-runs --days=90')->dailyAt('04:20')->withoutOverlapping()->onOneServer();

@@ -134,3 +134,6 @@ Schedule::command('retention:prune-scraper-runs --days=90')->dailyAt('04:20')->w
 // Enrichissement direct des médias (scrape site → emails/tél) — rattrapage continu borné.
 // Le gros run initial se lance en systemd shardé ; ici on rattrape les nouveaux médias.
 Schedule::command('media:enrich --limit=5000')->everyThreeHours()->withoutOverlapping()->runInBackground();
+
+// Purge des emails médias parasites/sur-partagés (plateformes/parking) — quotidien.
+Schedule::command('media:clean-emails --threshold=10')->dailyAt('05:05')->withoutOverlapping()->onOneServer();

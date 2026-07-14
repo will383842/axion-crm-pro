@@ -147,7 +147,11 @@ class MediaEnrich extends Command
                 $update = ['socials' => json_encode($socials), 'updated_at' => now()];
 
                 if (! $m->email && ! empty($validEmails)) {
-                    $update['email'] = $this->pickBestEmail($validEmails, (string) $m->website);
+                    $best = $this->pickBestEmail($validEmails, (string) $m->website);
+                    $update['email'] = $best;
+                    if ($this->confidence !== null) {
+                        $update['email_confidence'] = $this->confidence->score($best, (string) $m->website);
+                    }
                 }
                 if (! $m->phone && ! empty($phones)) {
                     $update['phone'] = $phones[0];

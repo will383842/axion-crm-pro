@@ -33,7 +33,13 @@ use Illuminate\Support\Facades\Log;
  */
 class JournalistsScrapeOurs extends Command
 {
-    protected $signature = 'journalists:scrape-ours {--limit=200} {--batch=25}';
+    protected $signature = 'journalists:scrape-ours {--limit=200} {--batch=25} {--editorial : Cible uniquement la presse éditoriale (journal/revue/portail/agence/tv/radio/blog), pas les boîtes de production}';
+
+    /** Types de médias où l'on trouve des journalistes/signatures (exclut prod. audiovisuelle + émissions). */
+    private const EDITORIAL_TYPES = [
+        'presse_journal', 'presse_revue', 'presse_autre', 'portail_web',
+        'agence_presse', 'tv', 'radio', 'blog',
+    ];
 
     protected $description = 'Extrait les journalistes (dir. publication / rédac chef / …) des pages ours/mentions légales des médias via LLM Mistral (RGPD, gaté).';
 
@@ -59,9 +65,19 @@ class JournalistsScrapeOurs extends Command
         $processed = 0;
         $created = 0;
 
-        $medias = Media::query()
+        $query = Media::query()
             ->whereNotNull('website')
-            ->doesntHave('journalists')
+            ->doesntHave('journalists');
+
+        if ($this->option('editorial')) {
+            // Cible la vraie presse : là où il y a des signatures. Exclut les boîtes de
+            // production (media_family='audiovisual_production') et les émissions.
+            $query->where('media_family', 'editorial')
+                ->whereIn('media_type', self::EDITORIAL_TYPES);
+        }
+
+        $medias = $query
+            ->orderByRaw("CASE media_type WHEN 'presse_journal' THEN 1 WHEN 'agence_presse' THEN 2 WHEN 'presse_revue' THEN 3 WHEN 'portail_web' THEN 4 ELSE 5 END")
             ->limit($limit)
             ->get();
 

@@ -32,7 +32,7 @@ class Media extends Model
         'workspace_id', 'company_id', 'parent_media_id', 'siren',
         'name', 'media_type', 'media_family', 'periodicity', 'editorial_theme', 'diffusion_zone', 'publisher',
         'department_code', 'region_code', 'city', 'postcode',
-        'website', 'website_status', 'email', 'phone', 'socials',
+        'website', 'website_status', 'email', 'email_confidence', 'phone', 'socials',
         'cppap_number', 'arcom_id', 'enrich_status', 'enriched_at', 'source',
     ];
 

@@ -64,6 +64,7 @@ class MediaController extends ApiController
             ->allowedFilters([
                 AllowedFilter::exact('media_type'),
                 AllowedFilter::exact('media_family'),
+                AllowedFilter::exact('email_confidence'),
                 AllowedFilter::exact('periodicity'),
                 AllowedFilter::exact('editorial_theme'),
                 AllowedFilter::exact('diffusion_zone'),
@@ -89,7 +90,7 @@ class MediaController extends ApiController
     {
         $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
         $filename = 'medias-' . now()->format('Y-m-d') . '.csv';
-        $header = ['Nom', 'Type', 'Famille', 'Périodicité', 'Thème', 'Zone', 'Département', 'Région', 'Ville', 'Éditeur', 'Site web', 'Email rédaction', 'Téléphone', 'N° CPPAP', 'N° ARCOM'];
+        $header = ['Nom', 'Type', 'Famille', 'Périodicité', 'Thème', 'Zone', 'Département', 'Région', 'Ville', 'Éditeur', 'Site web', 'Email rédaction', 'Confiance email', 'Téléphone', 'N° CPPAP', 'N° ARCOM'];
 
         if (! Schema::hasTable('media') || $workspaceId === null) {
             return response()->streamDownload(function () use ($header) {
@@ -122,6 +123,7 @@ class MediaController extends ApiController
                         $m->publisher,
                         $m->website,
                         $m->email,
+                        $m->email_confidence,
                         $m->phone,
                         $m->cppap_number,
                         $m->arcom_id,

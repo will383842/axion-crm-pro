@@ -9,16 +9,20 @@ export interface MediaItem {
   id: number;
   name: string;
   media_type: string | null;
+  media_family: string | null;
   periodicity: string | null;
   editorial_theme: string | null;
   diffusion_zone: string | null;
   department_code: string | null;
+  region_code: string | null;
   city: string | null;
   publisher: string | null;
   website: string | null;
   email: string | null;
+  email_confidence: string | null;
   phone: string | null;
   cppap_number: string | null;
+  arcom_id: string | null;
   enrich_status: string | null;
 }
 
@@ -56,19 +60,58 @@ const SITE_OPTIONS = [
   { value: "false", label: "Sans site web" },
 ];
 
+const FAMILY_OPTIONS = [
+  { value: "", label: "Toutes familles" },
+  { value: "editorial", label: "📝 Rédactionnel" },
+  { value: "audiovisual_production", label: "🎥 Production audiovisuelle" },
+];
+
+const EMAIL_OPTIONS = [
+  { value: "", label: "Email : tous" },
+  { value: "true", label: "Avec email" },
+  { value: "false", label: "Sans email" },
+];
+
+const CONFIDENCE_OPTIONS = [
+  { value: "", label: "Confiance : toutes" },
+  { value: "A", label: "A · email = domaine du site" },
+  { value: "B", label: "B · domaine pro" },
+  { value: "C", label: "C · boîte grand public" },
+];
+
 interface Filter {
   search: string;
   media_type: string;
+  media_family: string;
   periodicity: string;
   department_code: string;
+  region_code: string;
   has_website: string;
+  has_email: string;
+  email_confidence: string;
 }
 
-const EMPTY_FILTER: Filter = { search: "", media_type: "", periodicity: "", department_code: "", has_website: "" };
+const EMPTY_FILTER: Filter = {
+  search: "",
+  media_type: "",
+  media_family: "",
+  periodicity: "",
+  department_code: "",
+  region_code: "",
+  has_website: "",
+  has_email: "",
+  email_confidence: "",
+};
 
 function typeLabel(v: string | null): string {
   return MEDIA_TYPE_OPTIONS.find((o) => o.value === v)?.label ?? v ?? "—";
 }
+
+const CONFIDENCE_STYLE: Record<string, string> = {
+  A: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  B: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
+  C: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+};
 
 export function MediaListPage() {
   const [page, setPage] = useState(1);
@@ -79,9 +122,13 @@ export function MediaListPage() {
     return {
       ...(filter.search ? { "filter[name]": filter.search } : {}),
       ...(filter.media_type ? { "filter[media_type]": filter.media_type } : {}),
+      ...(filter.media_family ? { "filter[media_family]": filter.media_family } : {}),
       ...(filter.periodicity ? { "filter[periodicity]": filter.periodicity } : {}),
       ...(filter.department_code ? { "filter[department_code]": filter.department_code } : {}),
+      ...(filter.region_code ? { "filter[region_code]": filter.region_code } : {}),
       ...(filter.has_website ? { "filter[has_website]": filter.has_website } : {}),
+      ...(filter.has_email ? { "filter[has_email]": filter.has_email } : {}),
+      ...(filter.email_confidence ? { "filter[email_confidence]": filter.email_confidence } : {}),
     };
   }
 
@@ -142,7 +189,15 @@ export function MediaListPage() {
     setPage(1);
   };
   const hasActiveFilter =
-    filter.search || filter.media_type || filter.periodicity || filter.department_code || filter.has_website;
+    filter.search ||
+    filter.media_type ||
+    filter.media_family ||
+    filter.periodicity ||
+    filter.department_code ||
+    filter.region_code ||
+    filter.has_website ||
+    filter.has_email ||
+    filter.email_confidence;
 
   return (
     <div className="px-6 py-6">
@@ -178,9 +233,12 @@ export function MediaListPage() {
           placeholder="Rechercher un média…"
           className="w-72"
         />
+        <Select value={filter.media_family} onChange={(v) => setFilterAndReset({ media_family: v })} options={FAMILY_OPTIONS} ariaLabel="Filtre famille" />
         <Select value={filter.media_type} onChange={(v) => setFilterAndReset({ media_type: v })} options={MEDIA_TYPE_OPTIONS} ariaLabel="Filtre type" />
         <Select value={filter.periodicity} onChange={(v) => setFilterAndReset({ periodicity: v })} options={PERIODICITY_OPTIONS} ariaLabel="Filtre périodicité" />
         <Select value={filter.has_website} onChange={(v) => setFilterAndReset({ has_website: v })} options={SITE_OPTIONS} ariaLabel="Filtre site web" />
+        <Select value={filter.has_email} onChange={(v) => setFilterAndReset({ has_email: v })} options={EMAIL_OPTIONS} ariaLabel="Filtre email" />
+        <Select value={filter.email_confidence} onChange={(v) => setFilterAndReset({ email_confidence: v })} options={CONFIDENCE_OPTIONS} ariaLabel="Filtre confiance email" />
         <input
           type="text"
           value={filter.department_code}
@@ -216,11 +274,12 @@ export function MediaListPage() {
                 <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold tracking-wider text-slate-600 uppercase dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
                   <th className="px-4 py-3 text-left">Média</th>
                   <th className="px-4 py-3 text-left">Type</th>
-                  <th className="px-4 py-3 text-left">Périodicité</th>
                   <th className="px-4 py-3 text-left">Dept</th>
                   <th className="px-4 py-3 text-left">Ville</th>
                   <th className="px-4 py-3 text-left">Site</th>
                   <th className="px-4 py-3 text-left">Email</th>
+                  <th className="px-4 py-3 text-left">Conf.</th>
+                  <th className="px-4 py-3 text-left">Téléphone</th>
                 </tr>
               </thead>
               <tbody>
@@ -232,7 +291,6 @@ export function MediaListPage() {
                       </Link>
                     </td>
                     <td className="px-4 py-2.5 text-slate-600 dark:text-slate-300">{typeLabel(m.media_type)}</td>
-                    <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400">{m.periodicity ?? "—"}</td>
                     <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{m.department_code ?? "—"}</td>
                     <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400">{m.city ?? "—"}</td>
                     <td className="px-4 py-2.5">
@@ -245,6 +303,16 @@ export function MediaListPage() {
                       )}
                     </td>
                     <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400">{m.email ?? "—"}</td>
+                    <td className="px-4 py-2.5">
+                      {m.email_confidence ? (
+                        <span className={cn("rounded px-1.5 py-0.5 text-[11px] font-semibold", CONFIDENCE_STYLE[m.email_confidence] ?? "")}>
+                          {m.email_confidence}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-slate-500 dark:text-slate-400">{m.phone ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>

@@ -32,6 +32,26 @@ class GdprErasureService
             $deleted['notifications'] = DB::table('notifications')->whereRaw('body ILIKE ?', ['%' . $email . '%'])->delete();
             $deleted['magic_links'] = DB::table('magic_links')->where('email', $email)->delete();
 
+            // Journalistes (données personnelles B2B) : anonymisation + opt-out + soft-delete
+            // plutôt que suppression dure, pour conserver la traçabilité de l'effacement.
+            $deleted['journalists'] = DB::table('journalists')
+                ->whereNull('deleted_at')
+                ->where(function ($q) use ($email, $phone) {
+                    $q->where('email', $email);
+                    if ($phone !== null && $phone !== '') {
+                        $q->orWhere('phone', $phone);
+                    }
+                })
+                ->update([
+                    'email'      => null,
+                    'phone'      => null,
+                    'opt_out'    => true,
+                    'deleted_at' => now(),
+                ]);
+
+            // Médias : neutralise un email de contact rédaction correspondant au sujet.
+            $deleted['media_email'] = DB::table('media')->where('email', $email)->update(['email' => null]);
+
             // Audit log — la suppression elle-même
             $this->audit->record([
                 'workspace_id' => null,

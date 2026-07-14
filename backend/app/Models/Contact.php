@@ -11,7 +11,7 @@ class Contact extends Model
 
     protected $fillable = [
         'workspace_id', 'company_id', 'first_name', 'last_name', 'normalized_hash',
-        'title', 'role', 'email', 'email_status', 'email_score',
+        'title', 'role', 'email', 'email_status', 'email_score', 'email_confidence',
         'phone', 'linkedin_url', 'twitter_url',
         'sources', 'discovery_source', 'metadata',
     ];

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Jobs\EnrichCompanyJob;
 use App\Models\Company;
+use App\Services\Email\EmailConfidenceService;
 use App\Services\Waterfall\WaterfallOrchestrator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -92,6 +93,7 @@ class CompaniesController extends ApiController
                 AllowedFilter::exact('region_code'),
                 AllowedFilter::exact('sector_main'),
                 AllowedFilter::exact('quality', 'quality_badge'),
+                AllowedFilter::exact('best_email_confidence'),
                 AllowedFilter::partial('denomination'),
                 AllowedFilter::partial('postcode'),
             ]);
@@ -110,7 +112,7 @@ class CompaniesController extends ApiController
     {
         $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
         $filename = 'entreprises-' . now()->format('Y-m-d') . '.csv';
-        $header = ['SIREN', 'Dénomination', 'Enseigne', 'NAF', 'Taille', 'Département', 'Ville', 'Email', 'Téléphone', 'Site web', 'Google Maps', 'Contacts / dirigeants', 'Spécialité(s) santé'];
+        $header = ['SIREN', 'Dénomination', 'Enseigne', 'NAF', 'Taille', 'Département', 'Ville', 'Email', 'Confiance email', 'Téléphone', 'Site web', 'Google Maps', 'Contacts / dirigeants', 'Spécialité(s) santé'];
         $hasSante = Schema::hasTable('health_practitioners');
 
         // Table absente ou pas de workspace → CSV vide (jamais 500, jamais de fuite).
@@ -129,12 +131,14 @@ class CompaniesController extends ApiController
             ->where('workspace_id', $workspaceId)
             ->with($hasSante ? ['contacts', 'healthPractitioners'] : ['contacts']);
 
-        return response()->streamDownload(function () use ($query, $header, $hasSante) {
+        $confidenceScorer = new EmailConfidenceService();
+
+        return response()->streamDownload(function () use ($query, $header, $hasSante, $confidenceScorer) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // BOM UTF-8 → Excel FR lit les accents
             fputcsv($out, $header);
             // chunkById(id) = pagination stable en mémoire bornée (gros volumes OK).
-            $query->chunkById(1000, function ($companies) use ($out) {
+            $query->chunkById(1000, function ($companies) use ($out, $confidenceScorer) {
                 foreach ($companies as $c) {
                     $contacts = $c->contacts
                         ->map(function ($ct) {
@@ -169,6 +173,7 @@ class CompaniesController extends ApiController
                         $c->department_code,
                         $c->city_name,
                         $c->email_generic,
+                        $this->resolveBestConfidence($c, $confidenceScorer),
                         $c->phone,
                         $c->website,
                         $mapsUrl,
@@ -179,6 +184,36 @@ class CompaniesController extends ApiController
             });
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /**
+     * Confiance email A/B/C à afficher pour une société dans l'export.
+     * Utilise `best_email_confidence` s'il est déjà calculé (cron
+     * prospection:score-email-confidence) ; sinon recalcule à la volée depuis
+     * les contacts déjà eager-loaded + email_generic (aucune requête N+1).
+     */
+    private function resolveBestConfidence(Company $c, EmailConfidenceService $scorer): ?string
+    {
+        if (! empty($c->best_email_confidence)) {
+            return $c->best_email_confidence;
+        }
+
+        $rank = ['A' => 1, 'B' => 2, 'C' => 3];
+        $best = null;
+        $consider = function (?string $conf) use (&$best, $rank): void {
+            if ($conf !== null && isset($rank[$conf]) && ($best === null || $rank[$conf] < $rank[$best])) {
+                $best = $conf;
+            }
+        };
+
+        foreach ($c->contacts as $ct) {
+            $consider($ct->email_confidence ?? ($ct->email ? $scorer->score((string) $ct->email, $c->website) : null));
+        }
+        if (! empty($c->email_generic)) {
+            $consider($scorer->score((string) $c->email_generic, $c->website));
+        }
+
+        return $best;
     }
 
     /**

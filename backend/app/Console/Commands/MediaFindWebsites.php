@@ -74,7 +74,9 @@ class MediaFindWebsites extends Command
     {
         $now = now()->format('Y-m-d H:i:sP');
         $rows = [];
-        $bindings = [$now, $now];
+        // Trois placeholders de tête (ordre du SQL) : website_checked_at,
+        // enriched_at, updated_at.
+        $bindings = [$now, $now, $now];
         $processed = 0;
         $found = 0;
 
@@ -96,11 +98,15 @@ class MediaFindWebsites extends Command
         }
 
         $values = implode(',', $rows);
+        // Un site trouvé ⇒ média enrichi (COALESCE conserve le 1er enriched_at) ;
+        // un not_found ne change pas enrich_status. Cohérent avec le backfill migration.
         $sql = "UPDATE media AS m
                 SET website = v.website,
                     website_status = v.status,
                     website_method = v.method,
                     website_checked_at = ?::timestamptz,
+                    enrich_status = CASE WHEN v.status = 'found' THEN 'enriched' ELSE m.enrich_status END,
+                    enriched_at = CASE WHEN v.status = 'found' THEN COALESCE(m.enriched_at, ?::timestamptz) ELSE m.enriched_at END,
                     updated_at = ?::timestamptz
                 FROM (VALUES {$values}) AS v(id, website, status, method)
                 WHERE m.id = v.id";

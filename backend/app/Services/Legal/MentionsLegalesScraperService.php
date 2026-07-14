@@ -3,6 +3,7 @@
 namespace App\Services\Legal;
 
 use App\Models\Company;
+use App\Services\Email\EmailConfidenceService;
 use App\Services\Email\MxEmailValidator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -197,6 +198,27 @@ class MentionsLegalesScraperService
         $text = trim((string) preg_replace('/\s+/', ' ', strip_tags($html)));
 
         return $text !== '' ? $text : null;
+    }
+
+    /**
+     * Récolte brute des canaux de contact (emails + téléphones) depuis le site d'une
+     * entité NON-Company (média, etc.), SANS persistance. Réutilise EXACTEMENT les mêmes
+     * extracteurs que scrape() → même qualité, même filtrage anti-assets. La validation
+     * MX et le choix de l'email principal restent à la charge de l'appelant.
+     *
+     * @return array{emails: list<string>, phones: list<string>}
+     */
+    public function harvestFromWebsite(string $website): array
+    {
+        $body = $this->fetchAnyMentionsLegalesPage($website);
+        if ($body === null) {
+            return ['emails' => [], 'phones' => []];
+        }
+
+        return [
+            'emails' => $this->extractAllUsableEmails($body),
+            'phones' => $this->extractAllPhones($body),
+        ];
     }
 
     /**
@@ -499,6 +521,9 @@ class MentionsLegalesScraperService
                 'role'             => $class['role'],
                 'email'            => $email,
                 'email_status'     => $emailStatus,
+                // Score de confiance A/B/C (déterministe, sans SMTP) posé dès la
+                // capture — priorise l'envoi via ESP. Additif : n'altère rien.
+                'email_confidence' => (new EmailConfidenceService())->score($email, $company->website),
                 'discovery_source' => 'mentions-legales',
                 'sources'          => json_encode(['mentions-legales']),
                 'metadata'         => json_encode([

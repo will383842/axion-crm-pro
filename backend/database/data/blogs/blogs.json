@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Le Blog du Modérateur",
+    "website": "https://www.blogdumoderateur.com",
+    "editorial_theme": "tech",
+    "department_code": "75",
+    "region_code": "11",
+    "city": "Paris"
+  },
+  {
+    "name": "Presse-citron",
+    "website": "https://www.presse-citron.net",
+    "editorial_theme": "tech",
+    "department_code": "75",
+    "region_code": "11",
+    "city": "Paris"
+  },
+  {
+    "name": "Le Journal du Geek",
+    "website": "https://www.journaldugeek.com",
+    "editorial_theme": "tech",
+    "department_code": "75",
+    "region_code": "11",
+    "city": "Paris"
+  }
+]

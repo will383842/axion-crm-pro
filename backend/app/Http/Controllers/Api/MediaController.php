@@ -63,6 +63,7 @@ class MediaController extends ApiController
         return QueryBuilder::for(Media::query()->whereNull('deleted_at'))
             ->allowedFilters([
                 AllowedFilter::exact('media_type'),
+                AllowedFilter::exact('media_family'),
                 AllowedFilter::exact('periodicity'),
                 AllowedFilter::exact('editorial_theme'),
                 AllowedFilter::exact('diffusion_zone'),
@@ -88,7 +89,7 @@ class MediaController extends ApiController
     {
         $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
         $filename = 'medias-' . now()->format('Y-m-d') . '.csv';
-        $header = ['Nom', 'Type', 'Périodicité', 'Thème', 'Zone', 'Département', 'Ville', 'Éditeur', 'Site web', 'Email rédaction', 'Téléphone', 'N° CPPAP'];
+        $header = ['Nom', 'Type', 'Famille', 'Périodicité', 'Thème', 'Zone', 'Département', 'Région', 'Ville', 'Éditeur', 'Site web', 'Email rédaction', 'Téléphone', 'N° CPPAP', 'N° ARCOM'];
 
         if (! Schema::hasTable('media') || $workspaceId === null) {
             return response()->streamDownload(function () use ($header) {
@@ -111,16 +112,19 @@ class MediaController extends ApiController
                     fputcsv($out, [
                         $m->name,
                         $m->media_type,
+                        $m->media_family === 'audiovisual_production' ? 'Production audiovisuelle' : 'Rédactionnel',
                         $m->periodicity,
                         $m->editorial_theme,
                         $m->diffusion_zone,
                         $m->department_code,
+                        $m->region_code,
                         $m->city,
                         $m->publisher,
                         $m->website,
                         $m->email,
                         $m->phone,
                         $m->cppap_number,
+                        $m->arcom_id,
                     ]);
                 }
             });

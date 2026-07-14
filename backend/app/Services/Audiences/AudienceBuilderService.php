@@ -19,7 +19,7 @@ class AudienceBuilderService
     public const WHITELIST_FIELDS = [
         'prospection_status', 'department_code', 'region_code', 'commune_code',
         'size_category', 'sector_main', 'priority', 'quality_score',
-        'tags', 'has_email', 'enriched_at',
+        'tags', 'has_email', 'enriched_at', 'best_email_confidence',
     ];
 
     public const WHITELIST_OPS = [
@@ -282,25 +282,55 @@ class AudienceBuilderService
             return;
         }
 
-        // Field "tags" : pivot via whereHas
-        if ($field === 'tags') {
-            if ($op !== 'contains_any' || ! is_array($value) || empty($value)) {
-                return;
-            }
-            $slugs = array_values(array_filter($value, 'is_string'));
-            if ($combinator === 'not') {
-                $query->whereDoesntHave('tags', fn ($q) => $q->whereIn('slug', $slugs));
-            } else {
-                $query->whereHas('tags', fn ($q) => $q->whereIn('slug', $slugs));
-            }
-            return;
+        // On construit le prédicat POSITIF (closure), PUIS on applique le
+        // combinateur de façon uniforme. Fix audit 2026-07-14 : auparavant le
+        // combinateur `not` sur un champ direct appliquait la condition en
+        // POSITIF (bug → membres jamais retirés / audience incohérente avec la
+        // version in-memory). Désormais where / orWhere / whereNot sont
+        // symétriques et cohérents avec companyMatchesCriteria().
+        $positive = $this->buildPositive($field, $op, $value);
+        if ($positive === null) {
+            return; // condition invalide (op/valeur incompatible) → ignorée
         }
 
-        // Field "has_email" : Sprint H8 — élargi à tout email contactable
-        // (contact valid|catchall|unknown OU company.email_generic).
+        match ($combinator) {
+            'or'    => $query->orWhere($positive),
+            'not'   => $query->whereNot($positive),
+            default => $query->where($positive),
+        };
+    }
+
+    /**
+     * Construit la closure du prédicat POSITIF d'une condition (à appliquer via
+     * where / orWhere / whereNot selon le combinateur), ou null si la condition
+     * est invalide. Centralise la logique SQL pour qu'elle reste STRICTEMENT
+     * alignée avec la version in-memory evalCondition().
+     *
+     * @return (\Closure(\Illuminate\Contracts\Database\Query\Builder): void)|null
+     */
+    private function buildPositive(string $field, string $op, mixed $value): ?\Closure
+    {
+        // Field "tags" : pivot via whereHas (négation gérée par whereNot au caller).
+        if ($field === 'tags') {
+            if ($op !== 'contains_any' || ! is_array($value) || empty($value)) {
+                return null;
+            }
+            $slugs = array_values(array_filter($value, 'is_string'));
+            if (empty($slugs)) {
+                return null;
+            }
+            return function ($q) use ($slugs) {
+                $q->whereHas('tags', fn ($t) => $t->whereIn('slug', $slugs));
+            };
+        }
+
+        // Field "has_email" : Sprint H8 — email contactable (contact
+        // valid|catchall|unknown OU company.email_generic). La négation
+        // (has_email=false, ou condition sous `not`) est gérée par whereNot au
+        // caller → symétrique avec la version in-memory.
         if ($field === 'has_email') {
             if ($op !== 'eq') {
-                return;
+                return null;
             }
             $wantsEmail = (bool) $value;
             $contactSub = function ($q) {
@@ -309,46 +339,38 @@ class AudienceBuilderService
                     ->whereColumn('contacts.company_id', 'companies.id')
                     ->whereIn('contacts.email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES);
             };
-            if ($wantsEmail) {
-                $query->where(function ($q) use ($contactSub) {
-                    $q->whereExists($contactSub)
-                        ->orWhereNotNull('email_generic');
-                });
-            } else {
-                $query->whereNotExists($contactSub)->whereNull('email_generic');
-            }
-            return;
+
+            return function ($q) use ($wantsEmail, $contactSub) {
+                if ($wantsEmail) {
+                    $q->where(function ($qq) use ($contactSub) {
+                        $qq->whereExists($contactSub)->orWhereNotNull('email_generic');
+                    });
+                } else {
+                    $q->whereNotExists($contactSub)->whereNull('email_generic');
+                }
+            };
         }
 
-        // Champs directs sur companies
-        $apply = function ($q) use ($field, $op, $value) {
+        // Opérateurs tableau : valeur doit être un tableau, sinon condition ignorée.
+        if (in_array($op, ['in', 'not_in'], true) && ! is_array($value)) {
+            return null;
+        }
+
+        // Champs directs sur companies.
+        return function ($q) use ($field, $op, $value) {
             switch ($op) {
-                case 'eq':       $q->where($field, '=', $value); break;
-                case 'neq':      $q->where($field, '!=', $value); break;
-                case 'in':       if (is_array($value)) $q->whereIn($field, $value); break;
-                case 'not_in':   if (is_array($value)) $q->whereNotIn($field, $value); break;
-                case 'gt':       $q->where($field, '>', $value); break;
-                case 'lt':       $q->where($field, '<', $value); break;
-                case 'gte':      $q->where($field, '>=', $value); break;
-                case 'lte':      $q->where($field, '<=', $value); break;
-                case 'is_null':  $q->whereNull($field); break;
+                case 'eq':          $q->where($field, '=', $value); break;
+                case 'neq':         $q->where($field, '!=', $value); break;
+                case 'in':          $q->whereIn($field, $value); break;
+                case 'not_in':      $q->whereNotIn($field, $value); break;
+                case 'gt':          $q->where($field, '>', $value); break;
+                case 'lt':          $q->where($field, '<', $value); break;
+                case 'gte':         $q->where($field, '>=', $value); break;
+                case 'lte':         $q->where($field, '<=', $value); break;
+                case 'is_null':     $q->whereNull($field); break;
                 case 'is_not_null': $q->whereNotNull($field); break;
             }
         };
-
-        if ($combinator === 'not') {
-            $query->where(function ($q) use ($apply) { $apply($q); }, null, null, 'and');
-            // Inversion : on encapsule dans une NOT clause via whereRaw NOT (...)
-            // Plus simple : ne supporter NOT que pour les conditions simples — on prend l'opposé direct
-            // Fallback : utiliser whereNotIn / != selon op
-            // Pour rester simple : on n'autorise NOT que sur in/eq → inverser dans le caller
-            return;  // Note : "not" est géré au niveau du caller via op inverse (not_in, neq)
-        }
-        if ($combinator === 'or') {
-            $query->orWhere(function ($q) use ($apply) { $apply($q); });
-        } else {
-            $apply($query);
-        }
     }
 
     /**

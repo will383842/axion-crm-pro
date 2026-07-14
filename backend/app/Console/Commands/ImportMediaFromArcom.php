@@ -30,6 +30,15 @@ use Illuminate\Support\Facades\Http;
  *   I Pays du siège
  *   J/K Propriétaires directs/indirects (non ingérés)
  *
+ * ── Identifiant ARCOM (arcom_id) ─────────────────────────────────────────────
+ * Le fichier de transparence des médias NE porte PAS de n° de déclaration /
+ * d'autorisation exploitable (aucune des colonnes A..K n'est un identifiant
+ * stable). On synthétise donc un `arcom_id` STABLE et déterministe à partir du
+ * nom + type + catégorie normalisés (cf. {@see self::arcomStableId()}) : même
+ * service → même id d'un run à l'autre (traçabilité / clé de rapprochement),
+ * borné à VARCHAR(60). Si l'ARCOM publie un jour une colonne identifiant, il
+ * suffira de la mapper ici à la place du synthétique.
+ *
  * ── Pourquoi cette source et pas l'ANFR ─────────────────────────────────────
  * L'open data ANFR (« installations radioélectriques > 5 W ») est au niveau
  * ANTENNE/ÉMETTEUR (~172 000 lignes techniques) : c'est du bruit, sans nom de
@@ -315,12 +324,14 @@ class ImportMediaFromArcom extends Command
                 'workspace_id'    => $workspaceId,
                 'name'            => mb_substr($name, 0, 240),
                 'media_type'      => $type,
+                'media_family'    => 'editorial',
                 'diffusion_zone'  => self::zoneFromCategory($type, $category),
                 'publisher'       => $publisher !== '' ? mb_substr($publisher, 0, 240) : null,
                 'department_code' => $dept,
                 'region_code'     => $dept ? self::regionFromDept($dept) : null,
                 'city'            => $city !== '' ? mb_substr($city, 0, 160) : null,
                 'postcode'        => $postcode !== '' ? mb_substr($postcode, 0, 10) : null,
+                'arcom_id'        => self::arcomStableId($name, $type, $category),
                 'website_status'  => 'pending',
                 'enrich_status'   => 'pending',
                 'source'          => 'arcom',
@@ -483,6 +494,20 @@ class ImportMediaFromArcom extends Command
     private static function dedupKey(string $name, string $type): string
     {
         return self::normalizeForMatch($name) . '|' . $type;
+    }
+
+    /**
+     * Identifiant ARCOM STABLE et déterministe (le fichier ne fournit pas de n° de
+     * déclaration). Forme lisible « arcom:{type}:{catégorie}:{hash(nom normalisé)} »
+     * bornée à VARCHAR(60) : même service ⇒ même id d'un run à l'autre.
+     */
+    public static function arcomStableId(string $name, string $type, string $category): string
+    {
+        $cat = strtolower(trim($category));
+        $cat = $cat !== '' ? preg_replace('/[^a-z0-9]+/', '', $cat) : 'na';
+        $hash = substr(md5(self::normalizeForMatch($name)), 0, 24);
+
+        return mb_substr("arcom:{$type}:{$cat}:{$hash}", 0, 60);
     }
 
     /** Normalisation légère (minuscule, sans accents, espaces compactés). */

@@ -61,6 +61,18 @@ class ImportMediaEmissionsFromWikidata extends Command
     /** Cache des chaînes résolues cette exécution : nom normalisé → id media. */
     private array $channelCache = [];
 
+    /**
+     * Index chaînes tv/radio par nom AGRESSIVEMENT normalisé → id, construit une
+     * fois par workspace (clé « workspaceId|aggNorm »). Alimenté aussi à la volée
+     * quand on crée une chaîne, pour ne jamais recréer un doublon dans le même run.
+     *
+     * @var array<string,int>
+     */
+    private array $channelIndex = [];
+
+    /** Workspaces dont l'index chaînes a déjà été chargé. @var array<string,bool> */
+    private array $channelIndexBuilt = [];
+
     public function handle(): int
     {
         $limit = max(0, (int) $this->option('limit'));
@@ -326,6 +338,13 @@ class ImportMediaEmissionsFromWikidata extends Command
             $existing = $this->matchChannelInPhp($broadcaster, $channelType, $workspaceId);
         }
 
+        // Dernier recours avant de créer une chaîne fantôme : match sur nom
+        // AGRESSIVEMENT normalisé (sans articles « la/le/les », sans suffixe
+        // « (chaîne de télévision) », sans ponctuation) contre toutes les tv/radio.
+        if (! $existing) {
+            $existing = $this->matchChannelAggressive($broadcaster, $workspaceId);
+        }
+
         if ($existing) {
             $this->channelCache[$cacheKey] = (int) $existing;
 
@@ -337,6 +356,7 @@ class ImportMediaEmissionsFromWikidata extends Command
             'workspace_id'  => $workspaceId,
             'name'          => mb_substr($broadcaster, 0, 240),
             'media_type'    => $channelType,
+            'media_family'  => 'editorial',
             'diffusion_zone' => 'national',
             'website_status' => 'pending',
             'enrich_status' => 'pending',
@@ -346,8 +366,74 @@ class ImportMediaEmissionsFromWikidata extends Command
         ]);
         $stats['channels_new']++;
         $this->channelCache[$cacheKey] = (int) $id;
+        // Alimente l'index agressif pour éviter tout doublon plus loin dans le run.
+        $agg = $this->aggressiveNormalize($broadcaster);
+        if ($agg !== '') {
+            $this->channelIndex[$workspaceId . '|' . $agg] = (int) $id;
+        }
 
         return (int) $id;
+    }
+
+    /**
+     * Match d'une chaîne sur nom AGRESSIVEMENT normalisé, via un index chargé une
+     * fois par workspace. Retire accents/ponctuation, articles de tête (la/le/les/l')
+     * et suffixes parenthétiques (« (chaîne de télévision) », « (radio) »…).
+     */
+    private function matchChannelAggressive(string $broadcaster, string $workspaceId): ?int
+    {
+        $this->buildChannelIndex($workspaceId);
+        $agg = $this->aggressiveNormalize($broadcaster);
+        if ($agg === '') {
+            return null;
+        }
+
+        return $this->channelIndex[$workspaceId . '|' . $agg] ?? null;
+    }
+
+    /** Charge (une fois par workspace) l'index tv/radio → id sur nom agressif. */
+    private function buildChannelIndex(string $workspaceId): void
+    {
+        if (isset($this->channelIndexBuilt[$workspaceId])) {
+            return;
+        }
+        $this->channelIndexBuilt[$workspaceId] = true;
+
+        DB::table('media')
+            ->select('id', 'name')
+            ->where('workspace_id', $workspaceId)
+            ->whereIn('media_type', ['tv', 'radio'])
+            ->whereNull('deleted_at')
+            ->orderBy('id')
+            ->chunk(2000, function ($rows) use ($workspaceId) {
+                foreach ($rows as $r) {
+                    $agg = $this->aggressiveNormalize((string) $r->name);
+                    if ($agg === '') {
+                        continue;
+                    }
+                    // Premier arrivé gagne (id le plus petit = plus ancien/canonique).
+                    $this->channelIndex[$workspaceId . '|' . $agg] ??= (int) $r->id;
+                }
+            });
+    }
+
+    /**
+     * Normalisation AGRESSIVE d'un nom de chaîne pour le rapprochement :
+     * minuscules, sans accents, sans suffixe parenthétique, sans article de tête,
+     * alphanumérique compacté (espaces supprimés).
+     */
+    private function aggressiveNormalize(string $s): string
+    {
+        $s = $this->normalize($s); // minuscule, sans accents, alphanum + espaces
+        // Retire un suffixe descriptif type « la chaine (chaine de television) »
+        // (le parenthésé a déjà été aplati en mots par normalize()).
+        $s = preg_replace('/\b(chaine|station|radio|television|tv) de (television|radio)\b/', ' ', $s) ?? $s;
+        // Retire l'article de tête.
+        $s = preg_replace('/^(la|le|les|l|the)\s+/', '', $s) ?? $s;
+        // Compacte tout (les variantes d'espacement ne doivent pas départager).
+        $s = preg_replace('/[^a-z0-9]+/', '', $s) ?? '';
+
+        return trim($s);
     }
 
     /**
@@ -415,9 +501,16 @@ class ImportMediaEmissionsFromWikidata extends Command
             'parent_media_id' => $channelId,
             'name'            => mb_substr($emission['name'], 0, 240),
             'media_type'      => 'tv_emission',
+            'media_family'    => 'editorial',
             'editorial_theme' => $emission['genre'],
             'diffusion_zone'  => 'national',
-            'socials'         => json_encode(['wikidata_id' => $emission['qid']], JSON_UNESCAPED_UNICODE),
+            // On conserve le label diffuseur brut : il permet à
+            // media:link-emissions-to-channels de rattacher a posteriori une
+            // émission restée orpheline (chaîne pas encore en base au 1er import).
+            'socials'         => json_encode(array_filter([
+                'wikidata_id' => $emission['qid'],
+                'broadcaster' => $emission['broadcaster'] ?? null,
+            ], static fn ($v) => $v !== null && $v !== ''), JSON_UNESCAPED_UNICODE),
             'enrich_status'   => 'pending',
             'source'          => 'wikidata',
             'created_at'      => $now,

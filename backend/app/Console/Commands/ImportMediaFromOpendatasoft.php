@@ -17,8 +17,18 @@ use Illuminate\Support\Facades\Http;
  * Idempotent = full-refresh PAR SOURCE (DELETE source=… puis ré-insertion) →
  * relançable sans doublon. Récupère TOUT le dataset via l'endpoint /exports/json.
  *
- * ⚠️ Périodicité (quotidien/hebdo/mensuel) NON fournie par ces jeux de données →
- * reste NULL à ce stade (à affiner plus tard).
+ * ⚠️ PÉRIODICITÉ — enquête 2026-07-14 (audit).
+ * Le dataset `liste-des-publications-de-presse` (data.culture.gouv.fr) expose
+ * UNIQUEMENT : titre, editeur, forme_juridique, departement, ndeg_cppap, geom,
+ * centroid. AUCUN champ périodicité/rythme/parution. La seule piste restante est
+ * la LETTRE du n° CPPAP (ex. « 1028 G 81012 »), mais après vérification cette
+ * lettre encode le RÉGIME (postal/fiscal, cat. de la publication) et NON la
+ * périodicité — aucun mapping lettre→périodicité fiable n'a pu être confirmé.
+ * Décision : on laisse `periodicity` = NULL plutôt que de fabriquer un classement
+ * faux (un faux quotidien/hebdo est pire qu'un NULL honnête). Le point de
+ * dérivation est centralisé dans {@see self::derivePeriodicity()} : si une source
+ * fiable apparaît un jour, on ne modifie que cette méthode + on relance
+ * `media:backfill-periodicity`.
  */
 class ImportMediaFromOpendatasoft extends Command
 {
@@ -96,13 +106,16 @@ class ImportMediaFromOpendatasoft extends Command
                 continue;
             }
             $website = isset($cfg['map']['website']) ? $this->normalizeUrl($rec[$cfg['map']['website']] ?? null) : null;
+            $cppap = isset($cfg['map']['cppap']) ? mb_substr(trim((string) ($rec[$cfg['map']['cppap']] ?? '')), 0, 40) ?: null : null;
             $rows[] = [
                 'workspace_id'    => $workspaceId,
                 'name'            => mb_substr($name, 0, 240),
                 'media_type'      => $cfg['media_type'],
+                'media_family'    => 'editorial',
+                'periodicity'     => self::derivePeriodicity($cppap, $rec),
                 'publisher'       => isset($cfg['map']['publisher']) ? mb_substr(trim((string) ($rec[$cfg['map']['publisher']] ?? '')), 0, 240) ?: null : null,
                 'department_code' => isset($cfg['map']['department']) ? mb_substr(trim((string) ($rec[$cfg['map']['department']] ?? '')), 0, 5) ?: null : null,
-                'cppap_number'    => isset($cfg['map']['cppap']) ? mb_substr(trim((string) ($rec[$cfg['map']['cppap']] ?? '')), 0, 40) ?: null : null,
+                'cppap_number'    => $cppap,
                 'website'         => $website,
                 'website_status'  => $website ? 'found' : 'pending',
                 'enrich_status'   => 'pending',
@@ -132,6 +145,71 @@ class ImportMediaFromOpendatasoft extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Valeurs normalisées de périodicité (SSOT) — utilisées si une source fiable
+     * devient disponible. Ordre = fréquence décroissante.
+     *
+     * @var list<string>
+     */
+    public const PERIODICITIES = [
+        'quotidien', 'hebdomadaire', 'bimensuel', 'mensuel',
+        'bimestriel', 'trimestriel', 'semestriel', 'annuel', 'autre',
+    ];
+
+    /**
+     * Dérive la périodicité normalisée d'un titre CPPAP/SPEL.
+     *
+     * ⚠️ ÉTAT 2026-07-14 : AUCUNE source fiable disponible (cf. docblock de classe).
+     *  - Le dataset ne porte pas de champ périodicité (on tolère malgré tout un champ
+     *    `periodicite`/`rythme`/`parution` dans $rec au cas où l'API l'ajouterait un
+     *    jour ; il serait alors normalisé via {@see self::normalizePeriodicity()}).
+     *  - La lettre du n° CPPAP encode le RÉGIME, pas la périodicité → NON utilisée.
+     * → Retour NULL par défaut (on refuse de fabriquer un faux classement).
+     *
+     * @param  array<string,mixed>  $rec  enregistrement source brut (best-effort)
+     */
+    public static function derivePeriodicity(?string $cppap, array $rec = []): ?string
+    {
+        // Cas 1 (futur-proof) : l'API expose enfin un champ périodicité explicite.
+        foreach (['periodicite', 'rythme', 'parution', 'frequence', 'periodicity'] as $field) {
+            if (isset($rec[$field]) && trim((string) $rec[$field]) !== '') {
+                $norm = self::normalizePeriodicity((string) $rec[$field]);
+                if ($norm !== null) {
+                    return $norm;
+                }
+            }
+        }
+
+        // Cas 2 : dérivation depuis la lettre du n° CPPAP — NON FIABLE (régime, pas
+        // périodicité) → volontairement laissé NULL. Ne PAS deviner ici.
+        unset($cppap);
+
+        return null;
+    }
+
+    /**
+     * Mappe un libellé de périodicité brut (FR) vers le vocabulaire SSOT, ou null.
+     */
+    public static function normalizePeriodicity(string $raw): ?string
+    {
+        $s = mb_strtolower(trim($raw));
+        if ($s === '') {
+            return null;
+        }
+
+        return match (true) {
+            str_contains($s, 'quotidien') || str_contains($s, 'journalier')        => 'quotidien',
+            str_contains($s, 'hebdomadaire') || str_contains($s, 'hebdo')          => 'hebdomadaire',
+            str_contains($s, 'bimensuel')                                          => 'bimensuel',
+            str_contains($s, 'bimestriel')                                         => 'bimestriel',
+            str_contains($s, 'trimestriel')                                        => 'trimestriel',
+            str_contains($s, 'semestriel')                                         => 'semestriel',
+            str_contains($s, 'mensuel')                                            => 'mensuel',
+            str_contains($s, 'annuel') || str_contains($s, 'annuelle')             => 'annuel',
+            default                                                                => 'autre',
+        };
     }
 
     private function normalizeUrl(?string $raw): ?string

@@ -49,7 +49,10 @@ class MediaEnrich extends Command
         // Domaines de PARKING / revente de noms de domaine.
         '/@(solidnames|sedoparking|parkingcrew|bodis|above\.com|dan\.com|domainmarket|hugedomains|afternic|sedo\.com|godaddy|namecheap)\b/i',
         // Plateformes / builders / éditeurs de thèmes (email = plateforme, pas le média).
-        '/(unitedthemes|readymag|myshopify|squarespace|webflow|weebly|jimdo|wixsite|websitebuilder|wordpress\.com|hostinger|wpengine|kinsta|shopify)/i',
+        '/(unitedthemes|readymag|myshopify|squarespace|webflow|weebly|jimdo|wixsite|websitebuilder|wordpress\.com|hostinger|wpengine|kinsta|shopify|webador|monsite)/i',
+        // Placeholders / exemples de démo (jamais un vrai contact).
+        '/^(your|votre|user|utilisateur|test|nom|prenom|email|exemple|example)@/i',
+        '/@(email\.com|domain\.com|domaine\.|exemple\.|example\.|mail\.com|societe\.|votresite\.)/i',
         '/scaled_jpg|@2x/i',                                   // assets image
         '/\.(png|jpe?g|gif|svg|webp|avif)(@|$)/i',
     ];

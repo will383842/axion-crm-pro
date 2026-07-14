@@ -36,7 +36,8 @@ return new class extends Migration
     public function up(): void
     {
         // ── 1. Nouvelle famille média (rédactionnel vs production audiovisuelle) ──
-        DB::statement("ALTER TABLE media ADD COLUMN IF NOT EXISTS media_family VARCHAR(20) NOT NULL DEFAULT 'editorial'");
+        // VARCHAR(30) : 'audiovisual_production' = 22 caractères (20 était trop court → 22001).
+        DB::statement("ALTER TABLE media ADD COLUMN IF NOT EXISTS media_family VARCHAR(30) NOT NULL DEFAULT 'editorial'");
 
         // Backfill : la production audiovisuelle (NAF 5911/5912) sort de l'éditorial.
         DB::statement("UPDATE media SET media_family = 'audiovisual_production' WHERE media_type = 'production_audiovisuelle'");

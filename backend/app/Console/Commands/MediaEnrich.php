@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\Email\EmailConfidenceService;
 use App\Services\Email\MxEmailValidator;
 use App\Services\Legal\MentionsLegalesScraperService;
 use Illuminate\Console\Command;
@@ -35,11 +36,39 @@ class MediaEnrich extends Command
     /** Boîtes « rédaction » préférées pour l'email principal d'un média. */
     private const PREFERRED_LOCALPARTS = ['redaction', 'redac', 'presse', 'contact', 'info', 'journal'];
 
+    /**
+     * Emails PARASITES à rejeter (mêmes fléaux que l'enrichissement entreprises, qui a
+     * demandé 5 passes de nettoyage) : artefacts tracking/assets (Sentry/Wix, images,
+     * hashs) et domaines de PARKING/revente (le site est garé → l'email n'est pas celui
+     * du média). Cf. audit-cartographie-crm-pro : « 19 % d'emails parasites ».
+     */
+    private const PARASITE_PATTERNS = [
+        '/[0-9a-f]{16,}@/i',                                   // boîte = hash (tracking)
+        '/@[0-9a-f]{16,}/i',
+        '/(wixpress|sentry|sentry-next)/i',                    // artefacts Wix/Sentry
+        '/@(solidnames|sedoparking|parkingcrew|bodis|above\.com|dan\.com)/i', // parking/revente
+        '/scaled_jpg|@2x/i',                                   // assets image
+        '/\.(png|jpe?g|gif|svg|webp|avif)(@|$)/i',
+    ];
+
     public function __construct(
         private readonly MentionsLegalesScraperService $scraper,
         private readonly ?MxEmailValidator $mx = null,
+        private readonly ?EmailConfidenceService $confidence = null,
     ) {
         parent::__construct();
+    }
+
+    /** Un email « parasite » (tracking/asset/parking) ne doit jamais être stocké. */
+    private function isParasite(string $email): bool
+    {
+        foreach (self::PARASITE_PATTERNS as $rx) {
+            if (preg_match($rx, $email) === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function handle(): int
@@ -85,6 +114,9 @@ class MediaEnrich extends Command
 
                 $validEmails = [];
                 foreach ($harvest['emails'] as $email) {
+                    if ($this->isParasite($email)) {
+                        continue;
+                    }
                     if ($this->mx !== null) {
                         $status = $this->mx->validate($email)['status'] ?? 'unknown';
                         if (in_array($status, ['invalid', 'disposable'], true)) {
@@ -109,7 +141,7 @@ class MediaEnrich extends Command
                 $update = ['socials' => json_encode($socials), 'updated_at' => now()];
 
                 if (! $m->email && ! empty($validEmails)) {
-                    $update['email'] = $this->pickBestEmail($validEmails);
+                    $update['email'] = $this->pickBestEmail($validEmails, (string) $m->website);
                 }
                 if (! $m->phone && ! empty($phones)) {
                     $update['phone'] = $phones[0];
@@ -133,11 +165,22 @@ class MediaEnrich extends Command
         return self::SUCCESS;
     }
 
-    /** Préfère une boîte rédaction/contact/presse, sinon le premier email valide. */
-    private function pickBestEmail(array $emails): string
+    /**
+     * Choisit l'email principal du média :
+     *  1. PRIORITÉ au même domaine que le site (confiance A) → le vrai email du média,
+     *     pas celui de l'agence web / du registrar de parking ;
+     *  2. dans ce pool, préfère une boîte rédaction/presse/contact ;
+     *  3. sinon, premier email valide.
+     */
+    private function pickBestEmail(array $emails, ?string $website): string
     {
+        $sameDomain = $this->confidence !== null && $website
+            ? array_values(array_filter($emails, fn ($e) => $this->confidence->score((string) $e, $website) === 'A'))
+            : [];
+        $pool = ! empty($sameDomain) ? $sameDomain : array_values($emails);
+
         foreach (self::PREFERRED_LOCALPARTS as $pref) {
-            foreach ($emails as $e) {
+            foreach ($pool as $e) {
                 $local = strtolower((string) strstr((string) $e, '@', true));
                 if ($local !== '' && str_contains($local, $pref)) {
                     return $e;
@@ -145,6 +188,6 @@ class MediaEnrich extends Command
             }
         }
 
-        return $emails[0];
+        return $pool[0];
     }
 }

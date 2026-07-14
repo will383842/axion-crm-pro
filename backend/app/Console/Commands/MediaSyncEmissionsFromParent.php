@@ -50,6 +50,8 @@ class MediaSyncEmissionsFromParent extends Command
         $emailSynced = DB::affectingStatement(<<<'SQL'
             UPDATE media m
             SET email = COALESCE(NULLIF(m.email, ''), p.email),
+                enrich_status = 'enriched',
+                enriched_at = COALESCE(m.enriched_at, now()),
                 updated_at = now()
             FROM media p
             WHERE m.media_type = 'tv_emission'
@@ -66,6 +68,8 @@ class MediaSyncEmissionsFromParent extends Command
             SET website = COALESCE(NULLIF(m.website, ''), p.website),
                 website_status = COALESCE(m.website_status, p.website_status, 'found'),
                 website_method = COALESCE(m.website_method, 'parent-sync'),
+                enrich_status = 'enriched',
+                enriched_at = COALESCE(m.enriched_at, now()),
                 updated_at = now()
             FROM media p
             WHERE m.media_type = 'tv_emission'

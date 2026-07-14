@@ -28,7 +28,7 @@ class ExtractMediaFromCompanies extends Command
     {
         $sql = <<<'SQL'
             INSERT INTO media (
-                workspace_id, company_id, siren, name, media_type,
+                workspace_id, company_id, siren, name, media_type, media_family,
                 department_code, region_code, city, postcode,
                 website, website_status, email, phone,
                 enrich_status, source, created_at, updated_at
@@ -45,6 +45,8 @@ class ExtractMediaFromCompanies extends Command
                     WHEN c.n LIKE '6312%' THEN 'portail_web'
                     WHEN c.n LIKE '5911%' OR c.n LIKE '5912%' THEN 'production_audiovisuelle'
                 END,
+                -- media_family : la prod audiovisuelle (5911/5912) sort de l'éditorial.
+                CASE WHEN c.n ~ '^(5911|5912)' THEN 'audiovisual_production' ELSE 'editorial' END,
                 c.department_code, c.region_code, c.city_name, c.postcode,
                 c.website,
                 CASE WHEN c.website IS NOT NULL THEN 'found' ELSE 'pending' END,

@@ -3,6 +3,7 @@
 namespace App\Services\Legal;
 
 use App\Models\Company;
+use App\Services\Email\EmailConfidenceService;
 use App\Services\Email\MxEmailValidator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -499,6 +500,9 @@ class MentionsLegalesScraperService
                 'role'             => $class['role'],
                 'email'            => $email,
                 'email_status'     => $emailStatus,
+                // Score de confiance A/B/C (déterministe, sans SMTP) posé dès la
+                // capture — priorise l'envoi via ESP. Additif : n'altère rien.
+                'email_confidence' => (new EmailConfidenceService())->score($email, $company->website),
                 'discovery_source' => 'mentions-legales',
                 'sources'          => json_encode(['mentions-legales']),
                 'metadata'         => json_encode([

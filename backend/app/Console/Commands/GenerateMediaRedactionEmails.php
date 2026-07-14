@@ -171,7 +171,9 @@ class GenerateMediaRedactionEmails extends Command
     {
         $now = now()->format('Y-m-d H:i:sP');
         $rows = [];
-        $bindings = [$now];
+        // Deux placeholders de tête (dans l'ordre d'apparition dans le SQL) :
+        // enriched_at puis updated_at.
+        $bindings = [$now, $now];
 
         foreach ($updates as $id => $email) {
             $rows[] = '(?::bigint, ?::text)';
@@ -180,8 +182,12 @@ class GenerateMediaRedactionEmails extends Command
         }
 
         $values = implode(',', $rows);
+        // Un email rédaction validé ⇒ média enrichi (COALESCE conserve le 1er
+        // enriched_at). Cohérent avec le backfill de la migration taxonomy.
         $sql = "UPDATE media AS m
                 SET email = v.email,
+                    enrich_status = 'enriched',
+                    enriched_at = COALESCE(m.enriched_at, ?::timestamptz),
                     updated_at = ?::timestamptz
                 FROM (VALUES {$values}) AS v(id, email)
                 WHERE m.id = v.id

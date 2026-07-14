@@ -33,6 +33,8 @@ class MediaSyncFromCompanies extends Command
                 website_status = 'found',
                 website_method = COALESCE(m.website_method, 'company-sync'),
                 website_checked_at = now(),
+                enrich_status = 'enriched',
+                enriched_at = COALESCE(m.enriched_at, now()),
                 updated_at = now()
             FROM companies c
             WHERE m.company_id = c.id
@@ -45,6 +47,14 @@ class MediaSyncFromCompanies extends Command
             UPDATE media m
             SET email = COALESCE(NULLIF(m.email, ''), c.email_generic),
                 phone = COALESCE(NULLIF(m.phone, ''), c.phone),
+                -- Un email posé (hérité ou déjà présent) ⇒ média enrichi. Le
+                -- téléphone seul ne suffit pas (cohérent avec le backfill migration).
+                enrich_status = CASE
+                    WHEN COALESCE(NULLIF(m.email, ''), c.email_generic) IS NOT NULL THEN 'enriched'
+                    ELSE m.enrich_status END,
+                enriched_at = CASE
+                    WHEN COALESCE(NULLIF(m.email, ''), c.email_generic) IS NOT NULL THEN COALESCE(m.enriched_at, now())
+                    ELSE m.enriched_at END,
                 updated_at = now()
             FROM companies c
             WHERE m.company_id = c.id

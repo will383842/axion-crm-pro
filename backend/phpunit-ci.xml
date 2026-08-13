@@ -13,6 +13,12 @@
   sur tout le reste (352 tests) : un test vert aujourd'hui qui casse demain
   arrête la CI, donc le déploiement.
 
+  Deuxième différence : `executionOrder="default"` au lieu de `random`. Deux
+  exécutions du MÊME commit ont donné 262 verts puis 48 rouges — du couplage
+  entre tests, pas une régression. Un gate qui change d'avis sans changement de
+  code ne vaut rien. L'ordre aléatoire reste actif en local (phpunit.xml) pour
+  continuer à débusquer ces couplages.
+
   Règles (détail dans tests/QUARANTAINE.md) :
     - la liste ne peut que DÉCROÎTRE, tout ajout doit être justifié et daté ;
     - tout NOUVEAU test est bloquant d'office ;
@@ -23,7 +29,7 @@
          xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/11.4/phpunit.xsd"
          bootstrap="vendor/autoload.php"
          colors="true"
-         executionOrder="random"
+         executionOrder="default"
          cacheDirectory=".phpunit.cache"
          beStrictAboutCoverageMetadata="true"
          beStrictAboutOutputDuringTests="true"

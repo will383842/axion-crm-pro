@@ -68,6 +68,20 @@ jobs:
           path: backend/vendor
           key: composer-${{ hashFiles('backend/composer.json') }}
 
+      - name: Préparer l'arborescence Laravel inscriptible
+        # Ni `bootstrap/cache` ni `storage/**` ne sont versionnés : sans eux,
+        # `composer install` échoue dès `artisan package:discover`
+        # (« bootstrap/cache directory must be present and writable »).
+        run: |
+          set -euo pipefail
+          mkdir -p backend/bootstrap/cache \
+                   backend/storage/app/private \
+                   backend/storage/framework/cache/data \
+                   backend/storage/framework/sessions \
+                   backend/storage/framework/testing \
+                   backend/storage/framework/views \
+                   backend/storage/logs
+
       - name: Install (BLOQUANT)
         working-directory: backend
         run: composer install --no-interaction --prefer-dist --no-progress

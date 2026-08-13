@@ -10,12 +10,15 @@ const STEALTH_INIT = `
   window.chrome = { runtime: {} };
 `;
 
+// `| undefined` explicite : avec `exactOptionalPropertyTypes`, les appelants
+// passent des valeurs issues de la config (`string | undefined`) — sans cette
+// annotation, chaque appel de `createContext` ne compile pas.
 export interface LaunchOpts {
-  proxyUrl?: string;
-  userAgent?: string;
-  locale?: string;
-  timezone?: string;
-  blockResources?: ('image' | 'media' | 'font' | 'stylesheet')[];
+  proxyUrl?: string | undefined;
+  userAgent?: string | undefined;
+  locale?: string | undefined;
+  timezone?: string | undefined;
+  blockResources?: ('image' | 'media' | 'font' | 'stylesheet')[] | undefined;
 }
 
 let _browser: Browser | null = null;
@@ -37,7 +40,9 @@ export async function getBrowser(): Promise<Browser> {
 export async function createContext(opts: LaunchOpts = {}): Promise<BrowserContext> {
   const browser = await getBrowser();
   const ctx = await browser.newContext({
-    proxy: opts.proxyUrl ? { server: opts.proxyUrl } : undefined,
+    // Propriété OMISE quand il n'y a pas de proxy (au lieu de `proxy: undefined`) :
+    // même comportement Playwright, mais compatible `exactOptionalPropertyTypes`.
+    ...(opts.proxyUrl ? { proxy: { server: opts.proxyUrl } } : {}),
     userAgent:
       opts.userAgent ??
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',

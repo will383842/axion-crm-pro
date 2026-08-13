@@ -25,6 +25,17 @@ jobs:
           extensions: pdo, pdo_pgsql, redis, intl, mbstring, bcmath, zip
           coverage: none
           tools: composer:v2
+      - name: Préparer l'arborescence Laravel inscriptible
+        run: |
+          set -euo pipefail
+          mkdir -p backend/bootstrap/cache \
+                   backend/storage/app/private \
+                   backend/storage/framework/cache/data \
+                   backend/storage/framework/sessions \
+                   backend/storage/framework/testing \
+                   backend/storage/framework/views \
+                   backend/storage/logs
+
       - name: Install
         working-directory: backend
         run: composer install --no-interaction --prefer-dist --no-progress

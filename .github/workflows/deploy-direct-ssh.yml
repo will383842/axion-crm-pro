@@ -3,15 +3,30 @@ name: Deploy direct SSH Hetzner
 # Sprint 18.9 — pipeline simple SSH→Hetzner (sans Coolify).
 # Permet à Will de pousser sur main sans devoir SSH manuellement.
 #
+# ============================================================================
+# DURCI le 2026-08-13 (PR « fix/ci-reelle », Gate 0 autopilot CRM)
+# ============================================================================
+# AVANT : le déploiement partait sur tout push main SANS dépendre de la CI, et
+# `php artisan migrate --force || true` laissait un déploiement VERT alors que
+# la migration avait échoué (piège consigné en mémoire).
+# MAINTENANT :
+#   1. le job `ci` (workflow réutilisable `ci.yml`) doit être VERT — `needs`
+#      + `if: needs.ci.result == 'success'` sur le job `deploy` ;
+#   2. le serveur est remis EXACTEMENT sur le SHA qui a passé la CI (plus de
+#      `reset --hard origin/main` non déterministe), et le SHA servi est vérifié ;
+#   3. `migrate --force` est BLOQUANT : migration en échec = déploiement en échec ;
+#   4. vérification post-déploiement : conteneurs vitaux `running` (et jamais
+#      `unhealthy`) + `migrate:status` sans aucune migration `Pending`, sinon le
+#      job échoue ;
+#   5. smoke HTTP final inchangé (api /up + app).
+# ============================================================================
+#
 # Trigger : push sur main (auto) + workflow_dispatch (manuel).
 # Secrets requis (à configurer côté GitHub UI, cf. _AUDIT/DEPLOY-PIPELINE.md) :
 #   - HETZNER_SSH_PRIVATE_KEY  → clé privée OpenSSH du compte root@hetzner
 #   - HETZNER_HOST             → IP ou hostname (par défaut 46.62.248.239)
 #   - HETZNER_USER             → utilisateur SSH (par défaut root)
 #   - HETZNER_PROJECT_PATH     → chemin du repo sur le serveur (par défaut /opt/axion-crm-pro)
-#
-# Le job suit la procédure manuelle que Will exécutait jusqu'ici :
-#   git pull → migrate --force → docker compose up -d --force-recreate api app → config:clear
 
 on:
   push:
@@ -40,8 +55,24 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # GATE — la CI complète (Pest + PHPStan + Pint + front + workers) doit passer
+  # AVANT toute action sur la production. `needs` ne fonctionnant qu'à
+  # l'intérieur d'un même workflow, ci.yml est appelé ici comme workflow
+  # réutilisable (`workflow_call`).
+  # ---------------------------------------------------------------------------
+  ci:
+    name: CI (gate bloquant)
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      packages: read
+    secrets: inherit
+
   deploy:
     name: SSH Hetzner + pull + migrate + restart
+    needs: [ci]
+    if: ${{ needs.ci.result == 'success' }}
     runs-on: ubuntu-24.04
     environment:
       name: production-direct-ssh
@@ -71,60 +102,113 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Deploy via SSH
+      - name: Deploy via SSH (+ vérification post-déploiement)
         env:
           HOST: ${{ secrets.HETZNER_HOST }}
           USER: ${{ secrets.HETZNER_USER || 'root' }}
           PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
           SKIP_MIGRATE: ${{ github.event.inputs.skip_migrate || 'false' }}
           INSEE_API_KEY: ${{ secrets.INSEE_API_KEY }}
+          EXPECTED_SHA: ${{ github.sha }}
         run: |
-          set -e
-          ssh -o StrictHostKeyChecking=no "$USER@$HOST" bash <<EOF
-            set -euo pipefail
-            cd "$PROJECT_PATH"
+          set -euo pipefail
+          # Heredoc QUOTÉ : le script part tel quel sur le serveur (aucune
+          # expansion locale surprise). Les valeurs voyagent en arguments.
+          ssh -o StrictHostKeyChecking=no "$USER@$HOST" 'bash -s' -- \
+            "$PROJECT_PATH" "$SKIP_MIGRATE" "$EXPECTED_SHA" "$INSEE_API_KEY" <<'REMOTE'
+          set -euo pipefail
+          PROJECT_PATH="$1"
+          SKIP_MIGRATE="$2"
+          EXPECTED_SHA="$3"
+          INSEE_API_KEY="${4:-}"
 
-            echo "::group::git pull"
-            git fetch --all --prune
-            git reset --hard origin/main
-            echo "::endgroup::"
+          cd "$PROJECT_PATH"
 
-            echo "::group::sync INSEE_API_KEY into .env"
-            # Upsert la clé INSEE dans le .env serveur (le deploy ne versionne pas .env).
-            # Doit précéder le restart pour que le conteneur la lise au démarrage.
-            if [ -f .env ] && [ -n "$INSEE_API_KEY" ]; then
-              if grep -q '^INSEE_API_KEY=' .env; then
-                sed -i "s|^INSEE_API_KEY=.*|INSEE_API_KEY=$INSEE_API_KEY|" .env
-              else
-                echo "INSEE_API_KEY=$INSEE_API_KEY" >> .env
-              fi
-              echo "INSEE_API_KEY synchronisée."
+          echo "::group::git fetch + reset sur le SHA validé par la CI"
+          git fetch --all --prune
+          # On déploie EXACTEMENT le commit qui vient de passer la CI.
+          git reset --hard "$EXPECTED_SHA"
+          DEPLOYED_SHA="$(git rev-parse HEAD)"
+          echo "SHA déployé : $DEPLOYED_SHA"
+          if [ "$DEPLOYED_SHA" != "$EXPECTED_SHA" ]; then
+            echo "::error::SHA servi ($DEPLOYED_SHA) != SHA attendu ($EXPECTED_SHA)"
+            exit 1
+          fi
+          echo "::endgroup::"
+
+          echo "::group::sync INSEE_API_KEY into .env"
+          # Upsert la clé INSEE dans le .env serveur (le deploy ne versionne pas .env).
+          # Doit précéder le restart pour que le conteneur la lise au démarrage.
+          if [ -f .env ] && [ -n "$INSEE_API_KEY" ]; then
+            if grep -q '^INSEE_API_KEY=' .env; then
+              sed -i "s|^INSEE_API_KEY=.*|INSEE_API_KEY=$INSEE_API_KEY|" .env
+            else
+              echo "INSEE_API_KEY=$INSEE_API_KEY" >> .env
             fi
-            echo "::endgroup::"
+            echo "INSEE_API_KEY synchronisée."
+          fi
+          echo "::endgroup::"
 
-            echo "::group::docker compose build + up"
-            docker compose pull --ignore-pull-failures || true
-            # --build : reconstruit aussi le frontend (app) — sinon les changements
-            # frontend (boutons, filtres…) ne sont jamais déployés (image bakée).
-            docker compose up -d --build --force-recreate --no-deps api app
-            echo "::endgroup::"
+          echo "::group::docker compose build + up"
+          # Best effort : les services construits localement n'ont pas d'image à
+          # tirer, un échec de pull ne doit pas arrêter le déploiement.
+          docker compose pull --ignore-pull-failures || true
+          # --build : reconstruit aussi le frontend (app) — sinon les changements
+          # frontend (boutons, filtres…) ne sont jamais déployés (image bakée).
+          docker compose up -d --build --force-recreate --no-deps api app
+          echo "::endgroup::"
 
-            if [ "$SKIP_MIGRATE" != "true" ]; then
-              echo "::group::php artisan migrate --force"
-              docker compose exec -u root -T api php artisan migrate --force || true
-              echo "::endgroup::"
+          if [ "$SKIP_MIGRATE" != "true" ]; then
+            echo "::group::php artisan migrate --force (BLOQUANT)"
+            # Plus de `|| true` : une migration en échec DOIT casser le déploiement.
+            docker compose exec -u root -T api php artisan migrate --force
+            echo "::endgroup::"
+          fi
+
+          echo "::group::php artisan config:clear + cache:clear + route:clear"
+          docker compose exec -u root -T api php artisan config:clear
+          docker compose exec -u root -T api php artisan cache:clear
+          docker compose exec -u root -T api php artisan route:clear
+          echo "::endgroup::"
+
+          echo "::group::vérification post-déploiement — santé des conteneurs"
+          docker compose ps --format '{{.Service}}|{{.State}}|{{.Status}}'
+          PS_OUT="$(docker compose ps --format '{{.Service}}|{{.State}}|{{.Status}}')"
+          for svc in api app postgres redis caddy; do
+            line="$(printf '%s\n' "$PS_OUT" | awk -F'|' -v s="$svc" '$1 == s { print $0 }')"
+            if [ -z "$line" ]; then
+              echo "::error::conteneur $svc absent après déploiement"
+              exit 1
             fi
+            state="$(printf '%s' "$line" | cut -d'|' -f2)"
+            status="$(printf '%s' "$line" | cut -d'|' -f3)"
+            if [ "$state" != "running" ]; then
+              echo "::error::conteneur $svc non démarré (état: $state)"
+              docker compose logs --tail=50 "$svc"
+              exit 1
+            fi
+            case "$status" in
+              *unhealthy*)
+                echo "::error::conteneur $svc unhealthy ($status)"
+                docker compose logs --tail=50 "$svc"
+                exit 1
+                ;;
+            esac
+            echo "OK — $svc : $state ($status)"
+          done
+          echo "::endgroup::"
 
-            echo "::group::php artisan config:clear + cache:clear + route:clear"
-            docker compose exec -u root -T api php artisan config:clear || true
-            docker compose exec -u root -T api php artisan cache:clear || true
-            docker compose exec -u root -T api php artisan route:clear || true
-            echo "::endgroup::"
-
-            echo "::group::docker ps health"
-            docker compose ps
-            echo "::endgroup::"
-          EOF
+          echo "::group::vérification post-déploiement — migrations appliquées"
+          MIGRATE_STATUS="$(docker compose exec -u root -T api php artisan migrate:status --no-ansi)"
+          printf '%s\n' "$MIGRATE_STATUS" | tail -20
+          if printf '%s\n' "$MIGRATE_STATUS" | grep -qw 'Pending'; then
+            echo "::error::des migrations sont encore en attente après le déploiement"
+            printf '%s\n' "$MIGRATE_STATUS" | grep -w 'Pending'
+            exit 1
+          fi
+          echo "Aucune migration en attente."
+          echo "::endgroup::"
+          REMOTE
 
       - name: Smoke test prod
         env:

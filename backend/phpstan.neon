@@ -12,7 +12,5 @@ parameters:
         - vendor
         - storage
         - bootstrap/cache
-    checkMissingIterableValueType: false
-    checkGenericClassInNonGenericObjectType: false
     ignoreErrors:
         - identifier: missingType.generics

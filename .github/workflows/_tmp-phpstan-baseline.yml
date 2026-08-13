@@ -1,0 +1,44 @@
+name: TMP — génération baseline PHPStan
+
+# FICHIER TEMPORAIRE — supprimé avant la fusion de la PR « fix/ci-reelle ».
+# Objectif unique : produire, dans l'environnement EXACT de la CI (PHP 8.3,
+# dépendances résolues par composer), la baseline PHPStan qui fige la dette
+# existante, et la publier en artefact pour la commiter ensuite.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    name: Générer phpstan-baseline.neon
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo, pdo_pgsql, redis, intl, mbstring, bcmath, zip
+          coverage: none
+          tools: composer:v2
+      - name: Install
+        working-directory: backend
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Compte des erreurs (avant baseline)
+        working-directory: backend
+        continue-on-error: true
+        run: php vendor/bin/phpstan analyse --no-progress --error-format=github --memory-limit=2G
+      - name: Génération de la baseline
+        working-directory: backend
+        continue-on-error: true
+        run: php vendor/bin/phpstan analyse --no-progress --memory-limit=2G --generate-baseline=phpstan-baseline.neon
+      - name: Publication de l'artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phpstan-baseline
+          path: backend/phpstan-baseline.neon
+          if-no-files-found: error

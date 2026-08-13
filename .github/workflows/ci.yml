@@ -135,7 +135,11 @@ jobs:
             echo "::notice::Image GHCR indisponible — reconstruction locale depuis Dockerfile.postgres"
             docker build -f Dockerfile.postgres -t "$IMG" .
           fi
+          # --shm-size : le /dev/shm de 64 Mo par défaut fait tomber Postgres en
+          # cours de suite (« server closed the connection unexpectedly »), ce
+          # qui faisait échouer en cascade tous les tests suivants.
           docker run -d --name axion-ci-postgres \
+            --shm-size=1g \
             -e POSTGRES_USER=axion \
             -e POSTGRES_PASSWORD=axion_dev_only \
             -e POSTGRES_DB=axion_crm_test \
@@ -182,6 +186,10 @@ jobs:
           MOCK_BAN: 'true'
           MOCK_FRANCE_TRAVAIL: 'true'
         run: composer test
+
+      - name: Journaux Postgres (diagnostic si la suite échoue)
+        if: failure()
+        run: docker logs axion-ci-postgres 2>&1 | tail -80
 
   frontend:
     name: Frontend React/Vite

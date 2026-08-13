@@ -190,11 +190,19 @@ jobs:
           MOCK_BODACC: 'true'
           MOCK_BAN: 'true'
           MOCK_FRANCE_TRAVAIL: 'true'
-        run: composer test
+        # `phpunit-ci.xml` = `phpunit.xml` moins les 23 fichiers de
+        # tests/QUARANTAINE.md (tests jamais exécutés, devenus faux). Tout le
+        # reste — 352 tests — est BLOQUANT. En local, `composer test` continue
+        # d'exécuter la suite entière : la dette reste visible.
+        run: php vendor/bin/pest --colors --configuration phpunit-ci.xml
 
       - name: Journaux Postgres (diagnostic si la suite échoue)
         if: failure()
-        run: docker logs axion-ci-postgres 2>&1 | tail -80
+        run: |
+          echo "--- lignes de crash éventuelles ---"
+          docker logs axion-ci-postgres 2>&1 | grep -iE "PANIC|was terminated by signal|terminating any other active|startup process|recovery|out of memory" || echo "(aucune)"
+          echo "--- fin du journal ---"
+          docker logs axion-ci-postgres 2>&1 | tail -40
 
   frontend:
     name: Frontend React/Vite

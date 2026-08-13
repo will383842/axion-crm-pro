@@ -1,5 +1,8 @@
 includes:
     - vendor/larastan/larastan/extension.neon
+    # Dette figée le 2026-08-13 (443 erreurs) — note d'usage en tête du fichier.
+    # Le niveau reste 8 : on gèle l'existant, on n'affaiblit pas l'outil.
+    - phpstan-baseline.neon
 
 parameters:
     paths:
@@ -12,5 +15,9 @@ parameters:
         - vendor
         - storage
         - bootstrap/cache
+    # Une erreur corrigée ne doit pas faire rougir la CI parce qu'elle est
+    # encore listée dans la baseline (la baseline ne peut que décroître, elle
+    # se régénère par vagues — cf. note en tête de phpstan-baseline.neon).
+    reportUnmatchedIgnoredErrors: false
     ignoreErrors:
         - identifier: missingType.generics

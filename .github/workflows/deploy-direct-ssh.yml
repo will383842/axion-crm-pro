@@ -114,8 +114,13 @@ jobs:
           set -euo pipefail
           # Heredoc QUOTÉ : le script part tel quel sur le serveur (aucune
           # expansion locale surprise). Les valeurs voyagent en arguments.
+          # ⚠️ Chaque `docker compose exec -T` DOIT lire sur /dev/null : sinon il
+          # consomme le reste du script (qui arrive par l'entrée standard) et tout
+          # ce qui suit est silencieusement AVALÉ. C'est ce qui s'est passé au
+          # déploiement b84100f : ni config:clear ni les vérifications
+          # post-déploiement ne se sont exécutés, et le job est resté vert.
           ssh -o StrictHostKeyChecking=no "$USER@$HOST" 'bash -s' -- \
-            "$PROJECT_PATH" "$SKIP_MIGRATE" "$EXPECTED_SHA" "$INSEE_API_KEY" <<'REMOTE'
+            "$PROJECT_PATH" "$SKIP_MIGRATE" "$EXPECTED_SHA" "$INSEE_API_KEY" <<'REMOTE' | tee /tmp/deploy-remote.log
           set -euo pipefail
           PROJECT_PATH="$1"
           SKIP_MIGRATE="$2"
@@ -161,14 +166,14 @@ jobs:
           if [ "$SKIP_MIGRATE" != "true" ]; then
             echo "::group::php artisan migrate --force (BLOQUANT)"
             # Plus de `|| true` : une migration en échec DOIT casser le déploiement.
-            docker compose exec -u root -T api php artisan migrate --force
+            docker compose exec -u root -T api php artisan migrate --force </dev/null
             echo "::endgroup::"
           fi
 
           echo "::group::php artisan config:clear + cache:clear + route:clear"
-          docker compose exec -u root -T api php artisan config:clear
-          docker compose exec -u root -T api php artisan cache:clear
-          docker compose exec -u root -T api php artisan route:clear
+          docker compose exec -u root -T api php artisan config:clear </dev/null
+          docker compose exec -u root -T api php artisan cache:clear </dev/null
+          docker compose exec -u root -T api php artisan route:clear </dev/null
           echo "::endgroup::"
 
           echo "::group::vérification post-déploiement — santé des conteneurs"
@@ -199,7 +204,7 @@ jobs:
           echo "::endgroup::"
 
           echo "::group::vérification post-déploiement — migrations appliquées"
-          MIGRATE_STATUS="$(docker compose exec -u root -T api php artisan migrate:status --no-ansi)"
+          MIGRATE_STATUS="$(docker compose exec -u root -T api php artisan migrate:status --no-ansi </dev/null)"
           printf '%s\n' "$MIGRATE_STATUS" | tail -20
           if printf '%s\n' "$MIGRATE_STATUS" | grep -qw 'Pending'; then
             echo "::error::des migrations sont encore en attente après le déploiement"
@@ -208,7 +213,16 @@ jobs:
           fi
           echo "Aucune migration en attente."
           echo "::endgroup::"
+
+          # Sentinelle : prouve que le script distant est allé jusqu'au bout,
+          # donc que les vérifications ci-dessus ont VRAIMENT tourné.
+          echo "AXION_DEPLOY_SCRIPT_COMPLETE"
           REMOTE
+
+          if ! grep -q 'AXION_DEPLOY_SCRIPT_COMPLETE' /tmp/deploy-remote.log; then
+            echo "::error::le script distant s'est interrompu avant la fin — les vérifications post-déploiement n'ont pas toutes tourné"
+            exit 1
+          fi
 
       - name: Smoke test prod
         env:

@@ -6,12 +6,10 @@ use App\Services\Auth\AuthService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Tests\TestCase;
 
-uses(TestCase::class, RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function authUser(string $email, string $password = 'OkPassword!1234', array $extra = []): User
 {
@@ -20,6 +18,7 @@ function authUser(string $email, string $password = 'OkPassword!1234', array $ex
         'slug' => 'auth-' . Str::random(6),
         'name' => 'Auth WS',
     ]);
+
     return User::create(array_merge([
         'id' => (string) Str::uuid(),
         'email' => $email,

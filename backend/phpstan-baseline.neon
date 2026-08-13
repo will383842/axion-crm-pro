@@ -1,0 +1,2057 @@
+# =============================================================================
+# BASELINE PHPStan — dette figée le 2026-08-13
+# =============================================================================
+# 339 entrées / 443 erreurs PHPStan niveau 8 constatées le 2026-08-13, lors du
+# durcissement de la CI (PR « fix/ci-reelle », Gate 0 de l'autopilot CRM).
+#
+# Pourquoi ce fichier existe : jusqu'à cette date PHPStan n'avait JAMAIS analysé
+# le dépôt. `phpstan.neon` contenait deux clés supprimées en PHPStan 2
+# (`checkMissingIterableValueType`, `checkGenericClassInNonGenericObjectType`) :
+# l'outil s'arrêtait sur « Invalid configuration » à chaque exécution, et la CI
+# masquait l'échec avec un `|| true`.
+#
+# Règles d'usage :
+#   - le NIVEAU N'EST PAS BAISSÉ (toujours 8) et l'outil n'est pas neutralisé ;
+#   - le NOUVEAU code doit être propre : toute erreur absente de cette baseline
+#     fait rougir la CI ;
+#   - ce fichier ne doit que DÉCROÎTRE. Ne jamais le régénérer pour faire taire
+#     de nouvelles erreurs : corriger le code. Après une vague de corrections,
+#     régénérer proprement :
+#       php vendor/bin/phpstan analyse --generate-baseline=phpstan-baseline.neon
+# =============================================================================
+
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Parameter \#1 \$string of method Illuminate\\Console\\Command\:\:warn\(\) expects string, string\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Console/Commands/AnomalyDetect.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\EmailAudience\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Console/Commands/AudiencesFullRefreshCommand.php
+
+		-
+			message: '#^Cannot access property \$member_count on App\\Models\\EmailAudience\|null\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Console/Commands/AudiencesFullRefreshCommand.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Console/Commands/BlacklistsCheck.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Media\:\:\$website\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/GenerateMediaRedactionEmails.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 2
+			path: app/Console/Commands/ImportIgnAdminExpress.php
+
+		-
+			message: '#^Parameter \#1 \$json of function json_decode expects string, string\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Console/Commands/ImportIgnAdminExpress.php
+
+		-
+			message: '#^Property App\\Console\\Commands\\ImportMediaEmissionsFromWikidata\:\:\$channelCache type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Console/Commands/ImportMediaEmissionsFromWikidata.php
+
+		-
+			message: '#^Property App\\Console\\Commands\\ImportMediaEmissionsFromWikidata\:\:\$channelIndexBuilt type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Console/Commands/ImportMediaEmissionsFromWikidata.php
+
+		-
+			message: '#^Parameter \#1 \$string of function mb_substr expects string, string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Console/Commands/ImportMediaFromArcom.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Media\:\:\$department_code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/ImportMediaPressKit.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Media\:\:\$diffusion_zone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/ImportMediaPressKit.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Media\:\:\$email\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Console/Commands/ImportMediaPressKit.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Media\:\:\$socials\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/ImportMediaPressKit.php
+
+		-
+			message: '#^Parameter \#1 \$string of function mb_substr expects string, string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Console/Commands/ImportMediaPressKit.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Console/Commands/ImportNaf.php
+
+		-
+			message: '#^Parameter \#1 \$path of function base_path expects string, string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Console/Commands/ImportNaf.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 2
+			path: app/Console/Commands/ImportRpps.php
+
+		-
+			message: '#^Parameter \#1 \$path of function base_path expects string, string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Console/Commands/ImportRpps.php
+
+		-
+			message: '#^Parameter \#1 \$string of function strlen expects string, string\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Console/Commands/ImportRpps.php
+
+		-
+			message: '#^Parameter \#1 \$string of function substr expects string, string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Console/Commands/ImportRpps.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Media\:\:\$website\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Console/Commands/JournalistsScrapeOurs.php
+
+		-
+			message: '#^Relation ''journalists'' is not found in App\\Models\\Media model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Console/Commands/JournalistsScrapeOurs.php
+
+		-
+			message: '#^Called ''pluck'' on Laravel collection, but could have been retrieved as a query\.$#'
+			identifier: larastan.noUnnecessaryCollectionCall
+			count: 1
+			path: app/Console/Commands/MediaCleanEmails.php
+
+		-
+			message: '#^Method App\\Console\\Commands\\MediaEnrich\:\:pickBestEmail\(\) has parameter \$emails with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Console/Commands/MediaEnrich.php
+
+		-
+			message: '#^Offset ''status'' on array\{status\: string, email\: string, reason\: string\|null, mx_records\: array\<int, string\>, is_disposable\: bool, is_role\: bool, is_free_provider\: bool, has_mx_records\: bool\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Console/Commands/MediaEnrich.php
+
+		-
+			message: '#^Parameter \#1 \$companies of method App\\Services\\Domain\\DomainFinderService\:\:guessDomainsBatch\(\) expects iterable\<App\\Models\\Company\>, Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Media\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Console/Commands/MediaFindWebsites.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Console/Commands/PentestSelfCheck.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between array\{\} and array\{\} will always evaluate to true\.$#'
+			identifier: identical.alwaysTrue
+			count: 1
+			path: app/Console/Commands/ProspectionCollect.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: app/Console/Commands/ProspectionCollect.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$email_generic\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/ProspectionEnrich.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$phone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/ProspectionEnrich.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$website\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/ProspectionEnrich.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Console/Commands/ProspectionEnrich.php
+
+		-
+			message: '#^Parameter \#1 \$query of static method Illuminate\\Database\\Connection\:\:selectOne\(\) expects string, string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Console/Commands/RetentionPurge.php
+
+		-
+			message: '#^Parameter \#3 \$subject of function preg_replace expects array\<float\|int\|string\>\|string, string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Console/Commands/RetentionPurge.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Console/Commands/SignalsNightlyScan.php
+
+		-
+			message: '#^Method App\\Events\\CompanyEnriched\:\:__construct\(\) has parameter \$fieldsEnriched with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Events/CompanyEnriched.php
+
+		-
+			message: '#^Method App\\Events\\CompanyEnriched\:\:broadcastWith\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Events/CompanyEnriched.php
+
+		-
+			message: '#^Method App\\Events\\NotificationCreated\:\:broadcastWith\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Events/NotificationCreated.php
+
+		-
+			message: '#^Method App\\Events\\ScrapeJobCompleted\:\:broadcastWith\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Events/ScrapeJobCompleted.php
+
+		-
+			message: '#^Method App\\Events\\ScraperRunCancelled\:\:broadcastWith\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Events/ScraperRunCancelled.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\EmailAudience\:\:\$workspace_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/AudiencesController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$onboarding_tour_completed_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Auth/AuthController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$totp_enabled_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Auth/MagicLinkController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$failed_login_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Auth/PasswordResetController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$locked_until\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Auth/PasswordResetController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$password_hash\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Auth/PasswordResetController.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Http/Controllers/Api/Auth/PasswordResetController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$contacts\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$website\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$city_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$contacts\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$denomination\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$department_code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$email_generic\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$enseigne\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$healthPractitioners\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$lat\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$lon\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$naf\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$phone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$siren\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$size_category\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$website\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Anonymous function has an unused use \$hasSante\.$#'
+			identifier: closure.unusedUse
+			count: 1
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Cannot call method load\(\) on App\\Models\\Company\|null\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Parameter \#1 \$c of method App\\Http\\Controllers\\Api\\CompaniesController\:\:resolveBestConfidence\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Parameter \#1 \$stream of function fclose expects resource, resource\|false given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Parameter \#1 \$stream of function fputcsv expects resource, resource\|false given\.$#'
+			identifier: argument.type
+			count: 3
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Parameter \#1 \$stream of function fwrite expects resource, resource\|false given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Undefined variable\: \$hasSante$#'
+			identifier: variable.undefined
+			count: 1
+			path: app/Http/Controllers/Api/CompaniesController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Api\\CoverageController\:\:queryCityCells\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/Api/CoverageController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$beat\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/JournalistsController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$email\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/JournalistsController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$first_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/JournalistsController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$last_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/JournalistsController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$media\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/JournalistsController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$opt_out\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/JournalistsController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$phone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/JournalistsController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$role\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/JournalistsController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$source\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/JournalistsController.php
+
+		-
+			message: '#^Parameter \#1 \$stream of function fclose expects resource, resource\|false given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Api/JournalistsController.php
+
+		-
+			message: '#^Parameter \#1 \$stream of function fputcsv expects resource, resource\|false given\.$#'
+			identifier: argument.type
+			count: 3
+			path: app/Http/Controllers/Api/JournalistsController.php
+
+		-
+			message: '#^Parameter \#1 \$stream of function fwrite expects resource, resource\|false given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Api/JournalistsController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$arcom_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/MediaController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$city\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/MediaController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$cppap_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/MediaController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$department_code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/MediaController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$diffusion_zone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/MediaController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$editorial_theme\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/MediaController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$email\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/MediaController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$email_confidence\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/MediaController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$media_family\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/MediaController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$media_type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/MediaController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/MediaController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$periodicity\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/MediaController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$phone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/MediaController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$publisher\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/MediaController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$region_code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/MediaController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$website\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/MediaController.php
+
+		-
+			message: '#^Parameter \#1 \$stream of function fclose expects resource, resource\|false given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Api/MediaController.php
+
+		-
+			message: '#^Parameter \#1 \$stream of function fputcsv expects resource, resource\|false given\.$#'
+			identifier: argument.type
+			count: 3
+			path: app/Http/Controllers/Api/MediaController.php
+
+		-
+			message: '#^Parameter \#1 \$stream of function fwrite expects resource, resource\|false given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Api/MediaController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Api\\ObservabilityController\:\:countHunterMonth\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/Api/ObservabilityController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Api\\ObservabilityController\:\:recentBusinessEvents\(\) should return list\<array\<string, mixed\>\> but returns array\<int, array\{id\: mixed, action\: mixed, resource_type\: mixed, resource_id\: mixed, context\: mixed, created_at\: mixed\}\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/Api/ObservabilityController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\RgpdRequest\:\:\$metadata\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/RgpdRequestsController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\RgpdRequest\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/RgpdRequestsController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\RgpdRequest\:\:\$subject_email\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/RgpdRequestsController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\RgpdRequest\:\:\$type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/RgpdRequestsController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ScraperRun\:\:\$company_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/ScraperRunsController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ScraperRun\:\:\$error\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/ScraperRunsController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ScraperRun\:\:\$request_payload\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/ScraperRunsController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ScraperRun\:\:\$source\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/ScraperRunsController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ScraperRun\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/ScraperRunsController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ScraperRun\:\:\$workspace_id\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Http/Controllers/Api/ScraperRunsController.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between mixed and null will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: app/Http/Controllers/Api/ScrapingCampaignsController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Tag\:\:\$companies_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/TagsController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Tag\:\:\$kind\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/TagsController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Tag\:\:\$workspace_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/TagsController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$currentWorkspace\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/WorkspaceController.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Http/Controllers/Internal/ScraperResultController.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\EmailAudienceResource\:\:\$auto_refresh\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/EmailAudienceResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\EmailAudienceResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/EmailAudienceResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\EmailAudienceResource\:\:\$created_by\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/EmailAudienceResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\EmailAudienceResource\:\:\$description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/EmailAudienceResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\EmailAudienceResource\:\:\$is_active\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/EmailAudienceResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\EmailAudienceResource\:\:\$member_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/EmailAudienceResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\EmailAudienceResource\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/EmailAudienceResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\EmailAudienceResource\:\:\$refreshed_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/EmailAudienceResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\EmailAudienceResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/EmailAudienceResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\EmailAudienceResource\:\:\$workspace_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/EmailAudienceResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ScrapingCampaignResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ScrapingCampaignResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ScrapingCampaignResource\:\:\$runs\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ScrapingCampaignResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ScrapingCampaignResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ScrapingCampaignResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\TagResource\:\:\$color\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/TagResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\TagResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/TagResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\TagResource\:\:\$description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/TagResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\TagResource\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/TagResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\TagResource\:\:\$slug\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/TagResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\TagResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/TagResource.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Jobs/LaunchCampaignJob.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Jobs/LaunchZoneScrapingJob.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\EmailAudience\:\:\$criteria\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Jobs/RefreshAudienceChunkJob.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\EmailAudience\:\:\$workspace_id\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Jobs/RefreshAudienceChunkJob.php
+
+		-
+			message: '#^Method App\\Models\\AudienceMember\:\:audience\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/AudienceMember.php
+
+		-
+			message: '#^Method App\\Models\\AudienceMember\:\:company\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/AudienceMember.php
+
+		-
+			message: '#^Method App\\Models\\AudienceMember\:\:contact\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/AudienceMember.php
+
+		-
+			message: '#^Class App\\Models\\Company has PHPDoc tag @property for property \$signals with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Models/Company.php
+
+		-
+			message: '#^Method App\\Models\\Company\:\:contacts\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Company.php
+
+		-
+			message: '#^Method App\\Models\\Company\:\:healthPractitioners\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Company.php
+
+		-
+			message: '#^Method App\\Models\\Company\:\:scraperRuns\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Company.php
+
+		-
+			message: '#^Method App\\Models\\Company\:\:tags\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Company.php
+
+		-
+			message: '#^Method App\\Models\\Company\:\:workspace\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Company.php
+
+		-
+			message: '#^Method App\\Models\\Contact\:\:company\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Contact.php
+
+		-
+			message: '#^Method App\\Models\\EmailAudience\:\:creator\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/EmailAudience.php
+
+		-
+			message: '#^Method App\\Models\\EmailAudience\:\:members\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/EmailAudience.php
+
+		-
+			message: '#^Method App\\Models\\EmailAudience\:\:workspace\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/EmailAudience.php
+
+		-
+			message: '#^Method App\\Models\\HealthPractitioner\:\:company\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/HealthPractitioner.php
+
+		-
+			message: '#^Method App\\Models\\HealthPractitioner\:\:workspace\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/HealthPractitioner.php
+
+		-
+			message: '#^Method App\\Models\\Journalist\:\:company\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Journalist.php
+
+		-
+			message: '#^Method App\\Models\\Journalist\:\:media\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Journalist.php
+
+		-
+			message: '#^Method App\\Models\\Journalist\:\:workspace\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Journalist.php
+
+		-
+			message: '#^Method App\\Models\\Media\:\:children\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Media.php
+
+		-
+			message: '#^Method App\\Models\\Media\:\:company\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Media.php
+
+		-
+			message: '#^Method App\\Models\\Media\:\:journalists\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Media.php
+
+		-
+			message: '#^Method App\\Models\\Media\:\:parent\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Media.php
+
+		-
+			message: '#^Method App\\Models\\Media\:\:workspace\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Media.php
+
+		-
+			message: '#^Method App\\Models\\ScraperRun\:\:campaign\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/ScraperRun.php
+
+		-
+			message: '#^Method App\\Models\\ScraperRun\:\:company\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/ScraperRun.php
+
+		-
+			message: '#^Class App\\Models\\ScrapingCampaign has PHPDoc tag @property for property \$per_source_limits with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Models/ScrapingCampaign.php
+
+		-
+			message: '#^Class App\\Models\\ScrapingCampaign has PHPDoc tag @property for property \$sources with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Models/ScrapingCampaign.php
+
+		-
+			message: '#^Class App\\Models\\ScrapingCampaign has PHPDoc tag @property for property \$zones with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Models/ScrapingCampaign.php
+
+		-
+			message: '#^Method App\\Models\\ScrapingCampaign\:\:creator\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/ScrapingCampaign.php
+
+		-
+			message: '#^Method App\\Models\\ScrapingCampaign\:\:runs\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/ScrapingCampaign.php
+
+		-
+			message: '#^Method App\\Models\\ScrapingCampaign\:\:workspace\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/ScrapingCampaign.php
+
+		-
+			message: '#^Method App\\Models\\Tag\:\:companies\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Tag.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$password_hash\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:currentWorkspace\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:workspaces\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Property App\\Models\\User\:\:\$guard_name has no type specified\.$#'
+			identifier: missingType.property
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Class App\\Models\\Workspace has PHPDoc tag @property for property \$settings with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Models/Workspace.php
+
+		-
+			message: '#^Method App\\Models\\Workspace\:\:companies\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Workspace.php
+
+		-
+			message: '#^Method App\\Models\\Workspace\:\:users\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Workspace.php
+
+		-
+			message: '#^Method App\\Policies\\BasePolicy\:\:delete\(\) has parameter \$model with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Policies/BasePolicy.php
+
+		-
+			message: '#^Method App\\Policies\\BasePolicy\:\:sameWorkspace\(\) has parameter \$model with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Policies/BasePolicy.php
+
+		-
+			message: '#^Method App\\Policies\\BasePolicy\:\:update\(\) has parameter \$model with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Policies/BasePolicy.php
+
+		-
+			message: '#^Method App\\Policies\\BasePolicy\:\:view\(\) has parameter \$model with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Policies/BasePolicy.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 2
+			path: app/Providers/MockServicesProvider.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 3
+			path: app/Providers/RouteServiceProvider.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 2
+			path: app/Providers/TelescopeServiceProvider.php
+
+		-
+			message: '#^Cannot call method getBreachCount\(\) on App\\Services\\Auth\\HibpChecker\|null\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Rules/NotPwnedPassword.php
+
+		-
+			message: '#^Parameter \#1 \.\.\.\$arg1 of function max expects non\-empty\-array, list\<int\|string\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/AnnuaireEntreprises/HttpAnnuaireEntreprisesClient.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$tags\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Audiences/AudienceBuilderService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\EmailAudience\:\:\$criteria\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Audiences/AudienceBuilderService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\EmailAudience\:\:\$member_count\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/Audiences/AudienceBuilderService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\EmailAudience\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Audiences/AudienceBuilderService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\EmailAudience\:\:\$workspace_id\.$#'
+			identifier: property.notFound
+			count: 5
+			path: app/Services/Audiences/AudienceBuilderService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/Audiences/AudienceBuilderService.php
+
+		-
+			message: '#^Method App\\Services\\Audiences\\AudienceBuilderService\:\:applyCondition\(\) has parameter \$cond with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/Audiences/AudienceBuilderService.php
+
+		-
+			message: '#^Method App\\Services\\Audiences\\AudienceBuilderService\:\:applyCondition\(\) has parameter \$query with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Services/Audiences/AudienceBuilderService.php
+
+		-
+			message: '#^Method App\\Services\\Audiences\\AudienceBuilderService\:\:buildPublicQuery\(\) has parameter \$criteria with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/Audiences/AudienceBuilderService.php
+
+		-
+			message: '#^Method App\\Services\\Audiences\\AudienceBuilderService\:\:buildQuery\(\) has parameter \$criteria with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/Audiences/AudienceBuilderService.php
+
+		-
+			message: '#^Method App\\Services\\Audiences\\AudienceBuilderService\:\:companyMatchesCriteria\(\) has parameter \$criteria with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/Audiences/AudienceBuilderService.php
+
+		-
+			message: '#^Method App\\Services\\Audiences\\AudienceBuilderService\:\:evalCondition\(\) has parameter \$cond with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/Audiences/AudienceBuilderService.php
+
+		-
+			message: '#^Method App\\Services\\Audiences\\AudienceBuilderService\:\:preview\(\) has parameter \$criteria with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/Audiences/AudienceBuilderService.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Services/Audit/AuditHashChain.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$failed_login_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Auth/AuthService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$locked_until\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Auth/AuthService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$password_hash\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Auth/AuthService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$totp_enabled_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Auth/AuthService.php
+
+		-
+			message: '#^Method App\\Services\\Auth\\AuthService\:\:attemptLogin\(\) should return array\{user\: App\\Models\\User, requires_2fa\: bool\} but returns array\{user\: App\\Models\\User\|null, requires_2fa\: bool\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Auth/AuthService.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Services/Auth/MagicLinkService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$totp_secret\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Auth/TwoFactorService.php
+
+		-
+			message: '#^Method App\\Services\\Auth\\TwoFactorService\:\:startEnrolment\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/Auth/TwoFactorService.php
+
+		-
+			message: '#^Parameter \#1 \$string of function sha1 expects string, string\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Captcha/Mocks/MockCaptchaSolver.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$city\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Classification/AutoClassifierService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$city_name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Classification/AutoClassifierService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$commune_code\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Classification/AutoClassifierService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$department_code\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/Classification/AutoClassifierService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$effectif_range\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Classification/AutoClassifierService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$insee\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Classification/AutoClassifierService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$postcode\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Classification/AutoClassifierService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$region_code\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Classification/AutoClassifierService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$sector_main\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Classification/AutoClassifierService.php
+
+		-
+			message: '#^PHPDoc tag @var for constant App\\Services\\Classification\\AutoClassifierService\:\:DEPT_TO_REGION with type array\<string, string\> is not subtype of value array\{''01''\: ''84'', ''03''\: ''84'', ''07''\: ''84'', 15\: ''84'', 26\: ''84'', 38\: ''84'', 42\: ''84'', 43\: ''84'', \.\.\.\}\.$#'
+			identifier: classConstant.phpDocType
+			count: 1
+			path: app/Services/Classification/AutoClassifierService.php
+
+		-
+			message: '#^PHPDoc tag @var for constant App\\Services\\Classification\\AutoClassifierService\:\:EFFECTIF_TO_SIZE with type array\<string, string\> is not subtype of value array\{''00''\: ''micro'', ''01''\: ''micro'', ''02''\: ''micro'', ''03''\: ''tpe'', 11\: ''tpe'', 12\: ''tpe'', 21\: ''pme'', 22\: ''pme'', \.\.\.\}\.$#'
+			identifier: classConstant.phpDocType
+			count: 1
+			path: app/Services/Classification/AutoClassifierService.php
+
+		-
+			message: '#^PHPDoc tag @var for constant App\\Services\\Classification\\AutoClassifierService\:\:NAF_TO_SECTOR with type array\<string, string\> is not subtype of value array\{62\: ''it_saas'', 63\: ''it_saas'', 58\: ''media_edition'', 59\: ''media_edition'', 60\: ''media_edition'', 41\: ''btp'', 42\: ''btp'', 43\: ''btp'', \.\.\.\}\.$#'
+			identifier: classConstant.phpDocType
+			count: 1
+			path: app/Services/Classification/AutoClassifierService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Tag\:\:\$rules\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Classification/AutoTagApplier.php
+
+		-
+			message: '#^Argument of an invalid type list\<string\>\|false supplied for foreach, only iterables are supported\.$#'
+			identifier: foreach.nonIterable
+			count: 1
+			path: app/Services/Classification/AutoTagApplier.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between non\-empty\-string and null will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Services/Classification/AutoTagApplier.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$effectif_range\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Classification/ClassifierService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$priority\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Classification/ClassifierService.php
+
+		-
+			message: '#^Method App\\Services\\Dedup\\DeduplicationService\:\:buildDedupKey\(\) has parameter \$context with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/Dedup/DeduplicationService.php
+
+		-
+			message: '#^Method App\\Services\\Dedup\\DeduplicationService\:\:shouldRunScrape\(\) has parameter \$context with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/Dedup/DeduplicationService.php
+
+		-
+			message: '#^Parameter \#1 \$string of function md5 expects string, string\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Dedup/DeduplicationService.php
+
+		-
+			message: '#^Parameter \#1 \$string of function trim expects string, string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Dedup/DeduplicationService.php
+
+		-
+			message: '#^Parameter \#3 \$subject of function preg_replace expects array\<float\|int\|string\>\|string, string\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/Dedup/DeduplicationService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$website\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Domain/DomainFinderService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\|App\\Models\\Media\:\:\$siren\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Domain/DomainFinderService.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\<non\-falsy\-string\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: app/Services/Domain/DomainFinderService.php
+
+		-
+			message: '#^Parameter \#1 \$haystack of function str_contains expects string, string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Domain/DomainFinderService.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$is_catchall\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Email/EmailFinderService.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$is_disposable\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Email/EmailFinderService.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$is_role\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Email/EmailFinderService.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$mx_host\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Email/EmailFinderService.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$score\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Email/EmailFinderService.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Email/EmailFinderService.php
+
+		-
+			message: '#^Anonymous function has an unused use \$domain\.$#'
+			identifier: closure.unusedUse
+			count: 1
+			path: app/Services/Email/EmailFinderService.php
+
+		-
+			message: '#^Method App\\Services\\Email\\EmailFinderService\:\:detectPatternFromKnownEmails\(\) has parameter \$emails with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/Email/EmailFinderService.php
+
+		-
+			message: '#^Offset ''status'' on array\{status\: string, score\?\: int, mx_records\?\: bool, smtp_check\?\: bool, webmail\?\: bool, disposable\?\: bool, reason\?\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Email/EmailFinderService.php
+
+		-
+			message: '#^Offset 0 on non\-empty\-list\<string\> on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Email/EmailFinderService.php
+
+		-
+			message: '#^Offset ''score'' on array\{status\: string, score\: int, mx_records\: bool, smtp_check\: bool, webmail\: bool, disposable\: bool\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Email/HunterEmailVerifier.php
+
+		-
+			message: '#^Offset 0 on non\-empty\-list\<string\> on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Email/MxEmailValidator.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 2
+			path: app/Services/FranceTravail/FranceTravailDiscoveryClient.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 2
+			path: app/Services/FranceTravail/HttpFranceTravailClient.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Services/Http/SsrfGuard.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 3
+			path: app/Services/Insee/HttpInseeClient.php
+
+		-
+			message: '#^Parameter \#1 \$json of function json_decode expects string, string\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Insee/Mocks/MockInseeClient.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\LlmUseCase\:\:\$model\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/LLM/LLMRouterService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\LlmUseCase\:\:\$options\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/LLM/LLMRouterService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\LlmUseCase\:\:\$primary_provider\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/LLM/LLMRouterService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\LlmUseCase\:\:\$prompt_version\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/LLM/LLMRouterService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\LlmUseCase\:\:\$slug\.$#'
+			identifier: property.notFound
+			count: 10
+			path: app/Services/LLM/LLMRouterService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\LlmUseCase\:\:\$workspace_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/LLM/LLMRouterService.php
+
+		-
+			message: '#^Call to an undefined method object\:\:complete\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Services/LLM/LLMRouterService.php
+
+		-
+			message: '#^Call to an undefined method object\:\:lastUsage\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Services/LLM/LLMRouterService.php
+
+		-
+			message: '#^Method App\\Services\\LLM\\LLMRouterService\:\:sanitizeExternalInputs\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/LLM/LLMRouterService.php
+
+		-
+			message: '#^Method App\\Services\\LLM\\LLMRouterService\:\:sortRecursively\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Services/LLM/LLMRouterService.php
+
+		-
+			message: '#^Parameter \#2 \$callback of function preg_replace_callback expects callable\(array\<string\>\)\: string, Closure\(mixed\)\: \(string\|false\) given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/LLM/LLMRouterService.php
+
+		-
+			message: '#^Unable to resolve the template type T in call to function array_values$#'
+			identifier: argument.templateType
+			count: 1
+			path: app/Services/LLM/LLMRouterService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>content" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/LLM/LLMRouterService.php
+
+		-
+			message: '#^Method App\\Services\\LLM\\Mocks\\MockLLMClient\:\:genericText\(\) should return string but returns string\|false\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/LLM/Mocks/MockLLMClient.php
+
+		-
+			message: '#^Parameter \#1 \$json of function json_decode expects string, string\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/LLM/Mocks/MockLLMClient.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Services/LLM/Providers/AnthropicProvider.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Services/LLM/Providers/GroqProvider.php
+
+		-
+			message: '#^Method App\\Services\\LLM\\Providers\\GroqProvider\:\:complete\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/LLM/Providers/GroqProvider.php
+
+		-
+			message: '#^Method App\\Services\\LLM\\Providers\\GroqProvider\:\:lastUsage\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/LLM/Providers/GroqProvider.php
+
+		-
+			message: '#^Property App\\Services\\LLM\\Providers\\GroqProvider\:\:\$lastUsage type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/LLM/Providers/GroqProvider.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Services/LLM/Providers/MistralProvider.php
+
+		-
+			message: '#^Method App\\Services\\LLM\\Providers\\MistralProvider\:\:complete\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/LLM/Providers/MistralProvider.php
+
+		-
+			message: '#^Method App\\Services\\LLM\\Providers\\MistralProvider\:\:lastUsage\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/LLM/Providers/MistralProvider.php
+
+		-
+			message: '#^Property App\\Services\\LLM\\Providers\\MistralProvider\:\:\$lastUsage type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/LLM/Providers/MistralProvider.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Services/LLM/Providers/OpenAIProvider.php
+
+		-
+			message: '#^Method App\\Services\\LLM\\Providers\\OpenAIProvider\:\:complete\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/LLM/Providers/OpenAIProvider.php
+
+		-
+			message: '#^Method App\\Services\\LLM\\Providers\\OpenAIProvider\:\:lastUsage\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/LLM/Providers/OpenAIProvider.php
+
+		-
+			message: '#^Property App\\Services\\LLM\\Providers\\OpenAIProvider\:\:\$lastUsage type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/LLM/Providers/OpenAIProvider.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Services/LLM/Providers/TogetherProvider.php
+
+		-
+			message: '#^Method App\\Services\\LLM\\Providers\\TogetherProvider\:\:complete\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/LLM/Providers/TogetherProvider.php
+
+		-
+			message: '#^Method App\\Services\\LLM\\Providers\\TogetherProvider\:\:lastUsage\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/LLM/Providers/TogetherProvider.php
+
+		-
+			message: '#^Property App\\Services\\LLM\\Providers\\TogetherProvider\:\:\$lastUsage type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/LLM/Providers/TogetherProvider.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$email_generic\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Legal/MentionsLegalesScraperService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$phone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Legal/MentionsLegalesScraperService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$website\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Legal/MentionsLegalesScraperService.php
+
+		-
+			message: '#^Method App\\Services\\Legal\\MentionsLegalesScraperService\:\:fetch\(\) is unused\.$#'
+			identifier: method.unused
+			count: 1
+			path: app/Services/Legal/MentionsLegalesScraperService.php
+
+		-
+			message: '#^Method App\\Services\\Legal\\MentionsLegalesScraperService\:\:harvestFromWebsite\(\) should return array\{emails\: list\<string\>, phones\: list\<string\>\} but returns array\{emails\: array\<int, string\>, phones\: array\<int, string\>\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Legal/MentionsLegalesScraperService.php
+
+		-
+			message: '#^Method App\\Services\\Legal\\MentionsLegalesScraperService\:\:persistContact\(\) has parameter \$validation with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/Legal/MentionsLegalesScraperService.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 2
+			path: app/Services/Proxies/IPRoyalProvider.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Services/Proxies/WebshareProvider.php
+
+		-
+			message: '#^Method App\\Services\\Rgpd\\GdprPortabilityService\:\:export\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/Rgpd/GdprPortabilityService.php
+
+		-
+			message: '#^Parameter \#1 \$value of static method Illuminate\\Support\\Facades\\Crypt\:\:encryptString\(\) expects string, string\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Rgpd/GdprPortabilityService.php
+
+		-
+			message: '#^Method App\\Services\\Rotations\\SearchEngineRotator\:\:pick\(\) should return array\{slug\: string, name\: string, base_url\: string, weight\: int\}\|null but returns array\.$#'
+			identifier: return.type
+			count: 2
+			path: app/Services/Rotations/SearchEngineRotator.php
+
+		-
+			message: '#^Method App\\Services\\Rotations\\ZoneRotator\:\:pickNextZone\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/Rotations/ZoneRotator.php
+
+		-
+			message: '#^Offset ''status'' on array\{status\: string, score\?\: int, mx_records\?\: bool, smtp_check\?\: bool, webmail\?\: bool, disposable\?\: bool, reason\?\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Smtp/HunterSmtpProber.php
+
+		-
+			message: '#^Parameter \#1 \$json of function json_decode expects string, string\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Smtp/Mocks/MockSmtpProber.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 3
+			path: app/Services/Smtp/RealSmtpProber.php
+
+		-
+			message: '#^Method App\\Services\\Smtp\\RealSmtpProber\:\:expect\(\) has parameter \$fp with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Services/Smtp/RealSmtpProber.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$department_code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Tags/AutoTaggerService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$region_code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Tags/AutoTaggerService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$sector_main\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Tags/AutoTaggerService.php
+
+		-
+			message: '#^Parameter \#1 \$workspaceId of method App\\Services\\Tags\\AutoTaggerService\:\:ensureTag\(\) expects string, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Tags/AutoTaggerService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$archive_reason\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/Triage/TriageAutoService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$prospection_status\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Services/Triage/TriageAutoService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$address\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Services/Waterfall/WaterfallOrchestrator.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$city\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Waterfall/WaterfallOrchestrator.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$city_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Waterfall/WaterfallOrchestrator.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$effectif_range\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Waterfall/WaterfallOrchestrator.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$enriched_at\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Waterfall/WaterfallOrchestrator.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$insee\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Waterfall/WaterfallOrchestrator.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$lat\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Waterfall/WaterfallOrchestrator.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$legal_form\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Waterfall/WaterfallOrchestrator.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$lon\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Waterfall/WaterfallOrchestrator.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$metadata\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Waterfall/WaterfallOrchestrator.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$phone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Waterfall/WaterfallOrchestrator.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$postcode\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/Waterfall/WaterfallOrchestrator.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$priority\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Waterfall/WaterfallOrchestrator.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$prospection_status\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Waterfall/WaterfallOrchestrator.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Company\:\:\$website\.$#'
+			identifier: property.notFound
+			count: 5
+			path: app/Services/Waterfall/WaterfallOrchestrator.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 2
+			path: app/Services/Waterfall/WaterfallOrchestrator.php
+
+		-
+			message: '#^Offset ''google_places'' on non\-empty\-array\<mixed, mixed\> in empty\(\) always exists and is not falsy\.$#'
+			identifier: empty.offset
+			count: 1
+			path: app/Services/Waterfall/WaterfallOrchestrator.php
+
+		-
+			message: '#^Offset ''role'' on array\{role\: string, first_name\: string\|null, last_name\: string, birth_date\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Waterfall/WaterfallOrchestrator.php
+
+		-
+			message: '#^Result of \|\| is always true\.$#'
+			identifier: booleanOr.alwaysTrue
+			count: 1
+			path: app/Services/Waterfall/WaterfallOrchestrator.php
+
+		-
+			message: '#^Parameter \#1 \$title of static method Illuminate\\Support\\Str\:\:slug\(\) expects string, bool\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: config/database.php
+
+		-
+			message: '#^Property Illuminate\\Database\\Migrations\\Migration@anonymous/database/migrations/2026_05_18_000001_apply_rls_dynamic\.php\:24\:\:\$workspaceScopedTables type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: database/migrations/2026_05_18_000001_apply_rls_dynamic.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: database/seeders/DemoCompaniesSeeder.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: database/seeders/OwnerUserSeeder.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between non\-empty\-string and null will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: database/seeders/OwnerUserSeeder.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between string\|true and null will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: database/seeders/OwnerUserSeeder.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Illuminate\\Console\\Command\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 7
+			path: database/seeders/OwnerUserSeeder.php

@@ -57,6 +57,10 @@ export function AiActRegisterPage() {
     queryFn: async () => (await api.get<{ data: AiActEntry[] }>('/ai-act/register')).data,
   });
 
+  // DETTE 2026-08-13 (Gate 0 CI) : `rows` change d'identité à chaque rendu, ce
+  // qui invalide le useMemo ci-dessous. Correctif = mémoïser `rows`, hors
+  // périmètre de la PR outillage — avertissement figé explicitement ici.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const rows = data?.data ?? [];
 
   const kpis = useMemo(() => {

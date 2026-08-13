@@ -17,7 +17,7 @@ function syncParentWorkspace(): Workspace
     ]);
 }
 
-function insertMedia(string $ws, array $attrs): int
+function insertSyncParentMedia(string $ws, array $attrs): int
 {
     return DB::table('media')->insertGetId(array_merge([
         'workspace_id' => $ws,
@@ -31,7 +31,7 @@ function insertMedia(string $ws, array $attrs): int
 it('fait hériter l\'émission sans email/site/tél de sa chaîne parente', function () {
     $ws = syncParentWorkspace();
 
-    $channel = insertMedia($ws->id, [
+    $channel = insertSyncParentMedia($ws->id, [
         'name' => 'Canal+',
         'media_type' => 'tv',
         'email' => 'contact@canalplus.fr',
@@ -39,7 +39,7 @@ it('fait hériter l\'émission sans email/site/tél de sa chaîne parente', func
         'phone' => '0180001000',
     ]);
 
-    $emission = insertMedia($ws->id, [
+    $emission = insertSyncParentMedia($ws->id, [
         'name' => 'Le Grand Journal',
         'media_type' => 'tv_emission',
         'parent_media_id' => $channel,
@@ -56,14 +56,14 @@ it('fait hériter l\'émission sans email/site/tél de sa chaîne parente', func
 it('N\'ÉCRASE PAS un champ déjà rempli sur l\'émission', function () {
     $ws = syncParentWorkspace();
 
-    $channel = insertMedia($ws->id, [
+    $channel = insertSyncParentMedia($ws->id, [
         'name' => 'France 2',
         'email' => 'redaction@france2.fr',
         'website' => 'https://www.france2.fr',
         'phone' => '0140002000',
     ]);
 
-    $emission = insertMedia($ws->id, [
+    $emission = insertSyncParentMedia($ws->id, [
         'name' => 'Télématin',
         'media_type' => 'tv_emission',
         'parent_media_id' => $channel,
@@ -83,8 +83,8 @@ it('N\'ÉCRASE PAS un champ déjà rempli sur l\'émission', function () {
 
 it('est idempotent : un 2e run n\'affecte aucune ligne', function () {
     $ws = syncParentWorkspace();
-    $channel = insertMedia($ws->id, ['name' => 'RTL', 'media_type' => 'radio', 'email' => 'contact@rtl.fr']);
-    insertMedia($ws->id, ['name' => 'On refait le monde', 'media_type' => 'tv_emission', 'parent_media_id' => $channel]);
+    $channel = insertSyncParentMedia($ws->id, ['name' => 'RTL', 'media_type' => 'radio', 'email' => 'contact@rtl.fr']);
+    insertSyncParentMedia($ws->id, ['name' => 'On refait le monde', 'media_type' => 'tv_emission', 'parent_media_id' => $channel]);
 
     $this->artisan('media:sync-emissions-from-parent')->assertExitCode(0);
     // 2e run : plus rien à hériter (IS DISTINCT FROM), aucune erreur.
@@ -95,8 +95,8 @@ it('est idempotent : un 2e run n\'affecte aucune ligne', function () {
 
 it('--dry-run ne persiste rien', function () {
     $ws = syncParentWorkspace();
-    $channel = insertMedia($ws->id, ['name' => 'Europe 1', 'media_type' => 'radio', 'email' => 'contact@europe1.fr']);
-    $emission = insertMedia($ws->id, ['name' => 'Matinale', 'media_type' => 'tv_emission', 'parent_media_id' => $channel]);
+    $channel = insertSyncParentMedia($ws->id, ['name' => 'Europe 1', 'media_type' => 'radio', 'email' => 'contact@europe1.fr']);
+    $emission = insertSyncParentMedia($ws->id, ['name' => 'Matinale', 'media_type' => 'tv_emission', 'parent_media_id' => $channel]);
 
     $this->artisan('media:sync-emissions-from-parent', ['--dry-run' => true])->assertExitCode(0);
 

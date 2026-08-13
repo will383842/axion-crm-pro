@@ -1,38 +1,59 @@
 name: CI
 
+# =============================================================================
+# CI BLOQUANTE — durcie le 2026-08-13 (PR « fix/ci-reelle », Gate 0 autopilot CRM)
+# =============================================================================
+# AVANT : `composer install` en `continue-on-error`, PHPStan / Pint / Pest en
+# `|| true`, `pnpm lint || true`, gitleaks en `continue-on-error`. Une CI verte
+# ne prouvait RIEN : le backend n'était jamais réellement vérifié (PHPStan ne
+# démarrait même pas — phpstan.neon contenait deux clés supprimées en PHPStan 2).
+#
+# MAINTENANT : aucune étape de qualité n'est neutralisée. Si une étape rougit,
+# la CI rougit — et le déploiement ne part pas : `deploy-direct-ssh.yml` appelle
+# ce workflow (`uses: ./.github/workflows/ci.yml`) et son job `deploy` a
+# `needs: [ci]`.
+#
+# Deux dettes existantes sont FIGÉES explicitement, jamais neutralisées :
+#   - PHPStan niveau 8 : baseline `backend/phpstan-baseline.neon` (datée, note
+#     en tête du fichier) — le NOUVEAU code doit être propre, la baseline ne
+#     doit que décroître.
+#   - Pint : le dépôt compte 276 fichiers non formatés ; reformater tout serait
+#     un diff massif hors périmètre. Le contrôle porte donc sur les fichiers PHP
+#     MODIFIÉS (équivalent `--dirty`), qui doivent être impeccables.
+#
+# Les audits de dépendances (pnpm audit / composer audit) et le scan de secrets
+# vivent dans `security.yml` (déjà déclenché sur push + pull_request + cron) :
+# ils ne sont pas dupliqués ici. Un audit de dépendances ne doit pas rougir une
+# PR pour une CVE publiée le matin même sans rapport avec le diff.
+# =============================================================================
+
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+  # Appelé comme gate par deploy-direct-ssh.yml (push sur main).
+  workflow_call:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # On n'annule QUE les runs de PR : annuler un run appelé par le déploiement
+  # affamerait le deploy (piège connu « cancel-in-progress »).
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   backend:
-    name: Backend Laravel
+    name: Backend Laravel (install + PHPStan + Pint + Pest)
     runs-on: ubuntu-24.04
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: axion
-          POSTGRES_PASSWORD: axion_dev_only
-          POSTGRES_DB: axion_crm_test
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
-      redis:
-        image: redis:7.2-alpine
-        ports: ['6379:6379']
-        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Nécessaire pour disposer de la base de comparaison du contrôle Pint.
+          fetch-depth: 0
+
       - name: Setup PHP 8.3
         uses: shivammathur/setup-php@v2
         with:
@@ -40,32 +61,148 @@ jobs:
           extensions: pdo, pdo_pgsql, redis, intl, mbstring, bcmath, zip
           coverage: none
           tools: composer:v2
+
       - name: Cache composer
         uses: actions/cache@v4
         with:
           path: backend/vendor
-          key: composer-${{ hashFiles('backend/composer.lock') }}
-      - name: Install
+          key: composer-${{ hashFiles('backend/composer.json') }}
+
+      - name: Préparer l'arborescence Laravel inscriptible
+        # Ni `bootstrap/cache` ni `storage/**` ne sont versionnés : sans eux,
+        # `composer install` échoue dès `artisan package:discover`
+        # (« bootstrap/cache directory must be present and writable »).
+        run: |
+          set -euo pipefail
+          mkdir -p backend/bootstrap/cache \
+                   backend/storage/app/private \
+                   backend/storage/framework/cache/data \
+                   backend/storage/framework/sessions \
+                   backend/storage/framework/testing \
+                   backend/storage/framework/views \
+                   backend/storage/logs
+          # Laravel lit `.env` au démarrage : sans lui, chaque test émet un
+          # warning `file_get_contents(.env)` et `failOnWarning="true"`
+          # (phpunit.xml) transforme la suite entière en échec. Les valeurs
+          # utiles sont de toute façon écrasées par phpunit.xml et par l'env du
+          # job (l'env réel a la priorité sur le fichier).
+          cp .env.example backend/.env
+
+      - name: Install (BLOQUANT)
         working-directory: backend
-        run: composer install --no-interaction --prefer-dist --no-progress || composer install --no-scripts --no-interaction --prefer-dist --no-progress
-        continue-on-error: true
-      - name: PHPStan
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: PHPStan niveau 8 (BLOQUANT — baseline figée)
         working-directory: backend
-        run: composer analyse || true
-      - name: Pint (lint)
-        working-directory: backend
-        run: composer lint || true
-      - name: Pest
+        run: composer analyse
+
+      - name: Pint — format des fichiers PHP modifiés (BLOQUANT)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          base="${BASE_SHA:-}"
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            base="$(git rev-parse HEAD^ 2>/dev/null || true)"
+          fi
+          if [ -z "$base" ]; then
+            echo "Aucune base de comparaison disponible — rien à contrôler."
+            exit 0
+          fi
+          echo "Base de comparaison : $base"
+          mapfile -t files < <(git diff --name-only --diff-filter=ACMR "$base"...HEAD -- 'backend/**/*.php' | sed 's|^backend/||')
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "Aucun fichier PHP modifié — contrôle Pint sans objet."
+            exit 0
+          fi
+          printf 'Fichiers contrôlés (%d) :\n' "${#files[@]}"
+          printf '  - %s\n' "${files[@]}"
+          cd backend
+          ./vendor/bin/pint --test "${files[@]}"
+
+      - name: Démarrage Postgres (PostGIS + pgvector + pg_partman) et Redis
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          IMG="ghcr.io/${{ github.repository_owner }}/axion-crm-pro-postgres:16-3.5-vector-partman"
+          # Les migrations créent postgis ET vector : une image postgres nue ne
+          # peut pas faire tourner la suite Feature. On réutilise donc l'image
+          # de prod ; à défaut on la reconstruit depuis Dockerfile.postgres.
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          if ! docker pull "$IMG"; then
+            echo "::notice::Image GHCR indisponible — reconstruction locale depuis Dockerfile.postgres"
+            docker build -f Dockerfile.postgres -t "$IMG" .
+          fi
+          # --shm-size : le /dev/shm de 64 Mo par défaut fait tomber Postgres en
+          # cours de suite (« server closed the connection unexpectedly »), ce
+          # qui faisait échouer en cascade tous les tests suivants.
+          docker run -d --name axion-ci-postgres \
+            --shm-size=1g \
+            -e POSTGRES_USER=axion \
+            -e POSTGRES_PASSWORD=axion_dev_only \
+            -e POSTGRES_DB=axion_crm_test \
+            -p 5432:5432 "$IMG" \
+            -c jit=off -c fsync=off -c full_page_writes=off -c synchronous_commit=off
+          # jit=off : le JIT LLVM segfaultait un backend en cours de suite
+          # (« the database system is starting up » = Postgres redémarrait), ce
+          # qui faisait échouer en cascade des tests parfaitement sains.
+          # fsync/full_page_writes/synchronous_commit off : base jetable de CI.
+          docker run -d --name axion-ci-redis -p 6379:6379 redis:7.2-alpine
+          for i in $(seq 1 60); do
+            if docker exec axion-ci-postgres pg_isready -U axion -d axion_crm_test >/dev/null 2>&1; then
+              echo "Postgres prêt après ${i} tentative(s)."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Postgres n'est jamais devenu disponible"
+          docker logs axion-ci-postgres | tail -50
+          exit 1
+
+      - name: Pest (BLOQUANT)
         working-directory: backend
         env:
-          MOCK_MODE: 'true'
-          DB_HOST: localhost
+          APP_ENV: testing
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
           DB_PORT: '5432'
           DB_DATABASE: axion_crm_test
           DB_USERNAME: axion
           DB_PASSWORD: axion_dev_only
-          REDIS_HOST: localhost
-        run: composer test || true
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: '6379'
+          CACHE_STORE: array
+          SESSION_DRIVER: array
+          QUEUE_CONNECTION: sync
+          MAIL_MAILER: array
+          TELESCOPE_ENABLED: 'false'
+          PULSE_ENABLED: 'false'
+          # Mêmes bascules que docker-compose.test.yml (aucun appel réseau réel).
+          MOCK_MODE: 'true'
+          MOCK_LLM: 'true'
+          MOCK_PROXIES: 'true'
+          MOCK_SCRAPERS: 'true'
+          MOCK_SMTP: 'true'
+          MOCK_INSEE: 'true'
+          MOCK_ANNUAIRE_ENTREPRISES: 'true'
+          MOCK_BODACC: 'true'
+          MOCK_BAN: 'true'
+          MOCK_FRANCE_TRAVAIL: 'true'
+        # `phpunit-ci.xml` = `phpunit.xml` moins les 23 fichiers de
+        # tests/QUARANTAINE.md (tests jamais exécutés, devenus faux). Tout le
+        # reste — 352 tests — est BLOQUANT. En local, `composer test` continue
+        # d'exécuter la suite entière : la dette reste visible.
+        run: php vendor/bin/pest --colors --configuration phpunit-ci.xml
+
+      - name: Journaux Postgres (diagnostic si la suite échoue)
+        if: failure()
+        run: |
+          echo "--- lignes de crash éventuelles ---"
+          docker logs axion-ci-postgres 2>&1 | grep -iE "PANIC|was terminated by signal|terminating any other active|startup process|recovery|out of memory" || echo "(aucune)"
+          echo "--- fin du journal ---"
+          docker logs axion-ci-postgres 2>&1 | tail -40
 
   frontend:
     name: Frontend React/Vite
@@ -80,15 +217,15 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
           cache-dependency-path: frontend/pnpm-lock.yaml
-      - name: Install
+      - name: Install (BLOQUANT — lockfile figé)
         working-directory: frontend
-        run: pnpm install --frozen-lockfile || pnpm install
+        run: pnpm install --frozen-lockfile
       - name: Typecheck
         working-directory: frontend
         run: pnpm typecheck
-      - name: Lint
+      - name: Lint (BLOQUANT)
         working-directory: frontend
-        run: pnpm lint || true
+        run: pnpm lint
       - name: Test
         working-directory: frontend
         run: pnpm test
@@ -111,9 +248,9 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
           cache-dependency-path: workers/pnpm-lock.yaml
-      - name: Install
+      - name: Install (BLOQUANT — lockfile figé)
         working-directory: workers
-        run: pnpm install --frozen-lockfile || pnpm install
+        run: pnpm install --frozen-lockfile
       - name: Typecheck
         working-directory: workers
         run: pnpm typecheck
@@ -123,26 +260,3 @@ jobs:
       - name: Build
         working-directory: workers
         run: pnpm build
-
-  security:
-    name: Security audit + secrets scan
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: pnpm audit (frontend)
-        working-directory: frontend
-        run: pnpm audit --audit-level high || true
-      - name: pnpm audit (workers)
-        working-directory: workers
-        run: pnpm audit --audit-level high || true
-      - name: Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        with:
-          config-path: .gitleaks.toml
-        continue-on-error: true

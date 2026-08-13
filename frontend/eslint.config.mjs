@@ -29,4 +29,10 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'error',
     },
   },
+  // Fichiers HORS projet TypeScript (configs JS/MJS, playwright.config.ts) :
+  // les règles typées y plantaient l'exécution entière d'ESLint
+  // (« You have used a rule which requires type information »), ce qui rendait
+  // `pnpm lint` inexploitable — masqué jusqu'ici par un `|| true` en CI.
+  { files: ['**/*.{js,mjs,cjs}'], ...tseslint.configs.disableTypeChecked },
+  { files: ['playwright.config.ts'], ...tseslint.configs.disableTypeChecked },
 );

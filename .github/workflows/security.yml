@@ -25,6 +25,9 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: gitleaks/gitleaks-action@v2
         env:
+          # Requis depuis gitleaks-action v2 pour scanner une pull request :
+          # sans lui le job échoue avant même de scanner (constaté le 2026-08-13).
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
   semgrep:

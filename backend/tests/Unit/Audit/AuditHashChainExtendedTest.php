@@ -4,12 +4,11 @@ use App\Services\Audit\AuditHashChain;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Tests\TestCase;
 
-uses(TestCase::class, RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('AuditHashChain record retourne un id positif', function () {
-    $chain = new AuditHashChain();
+    $chain = new AuditHashChain;
     $id = $chain->record([
         'workspace_id' => (string) Str::uuid(),
         'method' => 'GET',
@@ -21,18 +20,18 @@ test('AuditHashChain record retourne un id positif', function () {
 });
 
 test('AuditHashChain verifyChain retourne true sur chaîne vide', function () {
-    $chain = new AuditHashChain();
+    $chain = new AuditHashChain;
     expect($chain->verifyChain())->toBeTrue();
 });
 
 test('AuditHashChain verifyChain retourne true sur 1 record', function () {
-    $chain = new AuditHashChain();
+    $chain = new AuditHashChain;
     $chain->record(['method' => 'GET', 'path' => '/test', 'status' => 200]);
     expect($chain->verifyChain())->toBeTrue();
 });
 
 test('AuditHashChain verifyChain retourne true sur 10 records', function () {
-    $chain = new AuditHashChain();
+    $chain = new AuditHashChain;
     for ($i = 0; $i < 10; $i++) {
         $chain->record(['method' => 'POST', 'path' => "/test/{$i}", 'status' => 201]);
     }
@@ -40,7 +39,7 @@ test('AuditHashChain verifyChain retourne true sur 10 records', function () {
 });
 
 test('AuditHashChain verifyChain détecte tampering manuel', function () {
-    $chain = new AuditHashChain();
+    $chain = new AuditHashChain;
     $chain->record(['method' => 'GET', 'path' => '/a', 'status' => 200]);
     $chain->record(['method' => 'GET', 'path' => '/b', 'status' => 200]);
 
@@ -51,7 +50,7 @@ test('AuditHashChain verifyChain détecte tampering manuel', function () {
 });
 
 test('AuditHashChain canonical respecte l\'ordre des clés', function () {
-    $chain = new AuditHashChain();
+    $chain = new AuditHashChain;
     $id1 = $chain->record([
         'method' => 'GET',
         'path' => '/x',
@@ -65,7 +64,7 @@ test('AuditHashChain canonical respecte l\'ordre des clés', function () {
 });
 
 test('AuditHashChain enchaine prev_hash correctement', function () {
-    $chain = new AuditHashChain();
+    $chain = new AuditHashChain;
     $id1 = $chain->record(['method' => 'GET', 'path' => '/a', 'status' => 200]);
     $id2 = $chain->record(['method' => 'GET', 'path' => '/b', 'status' => 200]);
 
@@ -77,7 +76,7 @@ test('AuditHashChain enchaine prev_hash correctement', function () {
 
 test('AuditHashChain premier record a prev_hash = 0*64', function () {
     DB::table('audit_logs')->truncate();
-    $chain = new AuditHashChain();
+    $chain = new AuditHashChain;
     $id = $chain->record(['method' => 'GET', 'path' => '/first', 'status' => 200]);
     $row = DB::table('audit_logs')->find($id);
     expect($row->prev_hash)->toBe(str_repeat('0', 64));

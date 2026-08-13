@@ -81,6 +81,12 @@ jobs:
                    backend/storage/framework/testing \
                    backend/storage/framework/views \
                    backend/storage/logs
+          # Laravel lit `.env` au démarrage : sans lui, chaque test émet un
+          # warning `file_get_contents(.env)` et `failOnWarning="true"`
+          # (phpunit.xml) transforme la suite entière en échec. Les valeurs
+          # utiles sont de toute façon écrasées par phpunit.xml et par l'env du
+          # job (l'env réel a la priorité sur le fichier).
+          cp .env.example backend/.env
 
       - name: Install (BLOQUANT)
         working-directory: backend

@@ -143,7 +143,12 @@ jobs:
             -e POSTGRES_USER=axion \
             -e POSTGRES_PASSWORD=axion_dev_only \
             -e POSTGRES_DB=axion_crm_test \
-            -p 5432:5432 "$IMG"
+            -p 5432:5432 "$IMG" \
+            -c jit=off -c fsync=off -c full_page_writes=off -c synchronous_commit=off
+          # jit=off : le JIT LLVM segfaultait un backend en cours de suite
+          # (« the database system is starting up » = Postgres redémarrait), ce
+          # qui faisait échouer en cascade des tests parfaitement sains.
+          # fsync/full_page_writes/synchronous_commit off : base jetable de CI.
           docker run -d --name axion-ci-redis -p 6379:6379 redis:7.2-alpine
           for i in $(seq 1 60); do
             if docker exec axion-ci-postgres pg_isready -U axion -d axion_crm_test >/dev/null 2>&1; then

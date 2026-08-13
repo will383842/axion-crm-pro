@@ -135,21 +135,25 @@ jobs:
             echo "::notice::Image GHCR indisponible — reconstruction locale depuis Dockerfile.postgres"
             docker build -f Dockerfile.postgres -t "$IMG" .
           fi
-          # --shm-size : le /dev/shm de 64 Mo par défaut fait tomber Postgres en
-          # cours de suite (« server closed the connection unexpectedly »), ce
-          # qui faisait échouer en cascade tous les tests suivants.
+          # --network host : PAS de publication de port. Avec `-p 5432:5432`, la
+          # suite (qui ouvre une connexion PDO par test) traversait le proxy
+          # userland de Docker, qui lâchait quelques connexions par exécution
+          # (« server closed the connection unexpectedly ») — alors que les
+          # journaux Postgres ne montraient AUCUN crash. Résultat : une CI qui
+          # rougissait au hasard, donc un gate sans valeur. En réseau hôte,
+          # Postgres écoute directement sur 127.0.0.1:5432.
+          # --shm-size : /dev/shm de 64 Mo par défaut, trop juste.
+          # fsync/full_page_writes/synchronous_commit off : base jetable de CI.
           docker run -d --name axion-ci-postgres \
+            --network host \
             --shm-size=1g \
             -e POSTGRES_USER=axion \
             -e POSTGRES_PASSWORD=axion_dev_only \
             -e POSTGRES_DB=axion_crm_test \
-            -p 5432:5432 "$IMG" \
-            -c jit=off -c fsync=off -c full_page_writes=off -c synchronous_commit=off
-          # jit=off : le JIT LLVM segfaultait un backend en cours de suite
-          # (« the database system is starting up » = Postgres redémarrait), ce
-          # qui faisait échouer en cascade des tests parfaitement sains.
-          # fsync/full_page_writes/synchronous_commit off : base jetable de CI.
-          docker run -d --name axion-ci-redis -p 6379:6379 redis:7.2-alpine
+            "$IMG" \
+            -c fsync=off -c full_page_writes=off -c synchronous_commit=off \
+            -c max_connections=300
+          docker run -d --name axion-ci-redis --network host redis:7.2-alpine
           for i in $(seq 1 60); do
             if docker exec axion-ci-postgres pg_isready -U axion -d axion_crm_test >/dev/null 2>&1; then
               echo "Postgres prêt après ${i} tentative(s)."

@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Http;
  * Règle CONSERVATRICE : toute réponse HTTP (même 4xx/5xx) = VIVANT ; seule une
  * exception de connexion (DNS / refus / timeout) = MORT.
  */
-function makeCompany(int $id, ?string $website): Company
+function makeRevalidateCompany(int $id, ?string $website): Company
 {
     $c = new Company(['denomination' => "Co {$id}", 'website' => $website]);
     $c->id = $id;
@@ -22,8 +22,8 @@ function makeCompany(int $id, ?string $website): Company
 it('marque VIVANT un site qui répond 200', function () {
     Http::fake(['alive.test/*' => Http::response('<html>ok</html>', 200)]);
 
-    $result = (new DomainFinderService())->revalidateBatch([
-        makeCompany(1, 'https://alive.test/'),
+    $result = (new DomainFinderService)->revalidateBatch([
+        makeRevalidateCompany(1, 'https://alive.test/'),
     ]);
 
     expect($result)->toBe([1 => true]);
@@ -35,9 +35,9 @@ it('marque VIVANT même un 404/500 (le serveur répond = hébergement vivant)', 
         'broken.test/*' => Http::response('server error', 500),
     ]);
 
-    $result = (new DomainFinderService())->revalidateBatch([
-        makeCompany(1, 'https://gone.test/'),
-        makeCompany(2, 'https://broken.test/'),
+    $result = (new DomainFinderService)->revalidateBatch([
+        makeRevalidateCompany(1, 'https://gone.test/'),
+        makeRevalidateCompany(2, 'https://broken.test/'),
     ]);
 
     expect($result)->toBe([1 => true, 2 => true]);
@@ -46,8 +46,8 @@ it('marque VIVANT même un 404/500 (le serveur répond = hébergement vivant)', 
 it('marque MORT un site dont la requête lève une ConnectionException', function () {
     Http::fake(['dead.test/*' => fn () => throw new ConnectionException('Connection refused')]);
 
-    $result = (new DomainFinderService())->revalidateBatch([
-        makeCompany(1, 'https://dead.test/'),
+    $result = (new DomainFinderService)->revalidateBatch([
+        makeRevalidateCompany(1, 'https://dead.test/'),
     ]);
 
     expect($result)->toBe([1 => false]);
@@ -59,9 +59,9 @@ it('mélange vivant + mort dans un même lot', function () {
         'dead.test/*' => fn () => throw new ConnectionException('DNS fail'),
     ]);
 
-    $result = (new DomainFinderService())->revalidateBatch([
-        makeCompany(1, 'https://alive.test/'),
-        makeCompany(2, 'https://dead.test/'),
+    $result = (new DomainFinderService)->revalidateBatch([
+        makeRevalidateCompany(1, 'https://alive.test/'),
+        makeRevalidateCompany(2, 'https://dead.test/'),
     ]);
 
     expect($result)->toBe([1 => true, 2 => false]);
@@ -70,9 +70,9 @@ it('mélange vivant + mort dans un même lot', function () {
 it('ignore (skip) les entreprises sans website', function () {
     Http::preventStrayRequests();
 
-    $result = (new DomainFinderService())->revalidateBatch([
-        makeCompany(1, null),
-        makeCompany(2, '   '),
+    $result = (new DomainFinderService)->revalidateBatch([
+        makeRevalidateCompany(1, null),
+        makeRevalidateCompany(2, '   '),
     ]);
 
     expect($result)->toBe([]);

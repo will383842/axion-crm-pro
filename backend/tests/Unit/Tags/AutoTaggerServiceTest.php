@@ -15,10 +15,11 @@ beforeEach(function () {
         'id' => Str::uuid()->toString(),
         'name' => 'Test', 'slug' => 'test-' . uniqid(),
     ]);
-    $this->service = new AutoTaggerService();
+    $this->service = new AutoTaggerService;
 });
 
-function makeCompany(string $workspaceId, array $attrs = []): Company {
+function makeTaggerCompany(string $workspaceId, array $attrs = []): Company
+{
     return Company::create(array_merge([
         'workspace_id' => $workspaceId,
         'siren' => str_pad((string) random_int(1, 999999999), 9, '0', STR_PAD_LEFT),
@@ -26,7 +27,7 @@ function makeCompany(string $workspaceId, array $attrs = []): Company {
 }
 
 it('creates dept and region tags from geo attributes', function () {
-    $c = makeCompany($this->workspace->id, [
+    $c = makeTaggerCompany($this->workspace->id, [
         'department_code' => '75', 'region_code' => '11',
     ]);
 
@@ -37,7 +38,7 @@ it('creates dept and region tags from geo attributes', function () {
 });
 
 it('creates size and sector tags', function () {
-    $c = makeCompany($this->workspace->id, [
+    $c = makeTaggerCompany($this->workspace->id, [
         'size_category' => 'pme', 'sector_main' => 'it_saas',
     ]);
 
@@ -48,7 +49,7 @@ it('creates size and sector tags', function () {
 });
 
 it('imports LLM classification tags as intent category', function () {
-    $c = makeCompany($this->workspace->id, [
+    $c = makeTaggerCompany($this->workspace->id, [
         'signals' => ['llm_classification' => ['tags' => ['Cible chaude', 'Scale-up']]],
     ]);
 
@@ -61,7 +62,7 @@ it('imports LLM classification tags as intent category', function () {
 });
 
 it('preserves manual tags on resync', function () {
-    $c = makeCompany($this->workspace->id, ['department_code' => '75']);
+    $c = makeTaggerCompany($this->workspace->id, ['department_code' => '75']);
 
     // Manual tag créé par user
     $manualTag = Tag::create([
@@ -87,7 +88,7 @@ it('preserves manual tags on resync', function () {
 });
 
 it('removes auto-rule tag when attribute changes', function () {
-    $c = makeCompany($this->workspace->id, ['department_code' => '75']);
+    $c = makeTaggerCompany($this->workspace->id, ['department_code' => '75']);
     $this->service->syncTags($c);
     expect($c->fresh()->tags->pluck('slug')->all())->toContain('dept-75');
 
@@ -103,7 +104,7 @@ it('removes auto-rule tag when attribute changes', function () {
 });
 
 it('idempotent on second call', function () {
-    $c = makeCompany($this->workspace->id, [
+    $c = makeTaggerCompany($this->workspace->id, [
         'department_code' => '75', 'size_category' => 'pme',
     ]);
 

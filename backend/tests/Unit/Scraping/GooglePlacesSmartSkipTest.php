@@ -2,20 +2,20 @@
 
 use App\Models\Company;
 use App\Models\Workspace;
+use App\Services\Waterfall\WaterfallOrchestrator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Tests\TestCase;
 
-uses(TestCase::class, RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function makeSmartSkipWorkspace(): Workspace
 {
     return Workspace::create([
-        'id'   => (string) Str::uuid(),
+        'id' => (string) Str::uuid(),
         'slug' => 'ws-' . Str::random(6),
         'name' => 'WS Smart Skip',
     ]);
@@ -24,11 +24,11 @@ function makeSmartSkipWorkspace(): Workspace
 function makeSmartSkipCompany(string $workspaceId, array $overrides = []): Company
 {
     return Company::create(array_merge([
-        'id'           => (string) Str::uuid(),
+        'id' => (string) Str::uuid(),
         'workspace_id' => $workspaceId,
-        'siren'        => str_pad((string) random_int(100000000, 999999999), 9, '0', STR_PAD_LEFT),
+        'siren' => str_pad((string) random_int(100000000, 999999999), 9, '0', STR_PAD_LEFT),
         'denomination' => 'Acme SA',
-        'city_name'    => 'Paris',
+        'city_name' => 'Paris',
     ], $overrides));
 }
 
@@ -46,8 +46,8 @@ it('skips Google Places when company already has email_generic (H16 doctrine)', 
         // pas de phone, pas de website → quand même skip car email = essentiel
     ]);
 
-    /** @var \App\Services\Waterfall\WaterfallOrchestrator $orch */
-    $orch = app(\App\Services\Waterfall\WaterfallOrchestrator::class);
+    /** @var WaterfallOrchestrator $orch */
+    $orch = app(WaterfallOrchestrator::class);
     $reflection = new ReflectionClass($orch);
     $method = $reflection->getMethod('step3d_google_places');
     $method->setAccessible(true);
@@ -64,12 +64,12 @@ it('does NOT skip when company is missing email (H16 — appelle Google)', funct
     ]);
     $ws = makeSmartSkipWorkspace();
     $company = makeSmartSkipCompany($ws->id, [
-        'phone'   => '+33 1 23 45 67 89',
+        'phone' => '+33 1 23 45 67 89',
         'website' => 'https://acme.fr',
         // pas d'email → Google Places appelé pour tenter d'enrichir
     ]);
 
-    $orch = app(\App\Services\Waterfall\WaterfallOrchestrator::class);
+    $orch = app(WaterfallOrchestrator::class);
     $reflection = new ReflectionClass($orch);
     $method = $reflection->getMethod('step3d_google_places');
     $method->setAccessible(true);
@@ -86,7 +86,7 @@ it('skips Google Places even if phone+website are missing, as long as email exis
         // ni phone ni website → skip car email = essentiel selon H16
     ]);
 
-    $orch = app(\App\Services\Waterfall\WaterfallOrchestrator::class);
+    $orch = app(WaterfallOrchestrator::class);
     $reflection = new ReflectionClass($orch);
     $method = $reflection->getMethod('step3d_google_places');
     $method->setAccessible(true);
@@ -105,7 +105,7 @@ it('skip is disabled when smart_skip config is false', function () {
         'email_generic' => 'contact@acme.fr',
     ]);
 
-    $orch = app(\App\Services\Waterfall\WaterfallOrchestrator::class);
+    $orch = app(WaterfallOrchestrator::class);
     $reflection = new ReflectionClass($orch);
     $method = $reflection->getMethod('step3d_google_places');
     $method->setAccessible(true);
@@ -120,15 +120,15 @@ it('considers contact with email_status=valid as sufficient email', function () 
     $company = makeSmartSkipCompany($ws->id, []);
     DB::table('contacts')->insert([
         'workspace_id' => $ws->id,
-        'company_id'   => $company->id,
-        'last_name'    => 'Dupont',
-        'email'        => 'jean.dupont@acme.fr',
+        'company_id' => $company->id,
+        'last_name' => 'Dupont',
+        'email' => 'jean.dupont@acme.fr',
         'email_status' => 'valid',
-        'created_at'   => now(),
-        'updated_at'   => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
     ]);
 
-    $orch = app(\App\Services\Waterfall\WaterfallOrchestrator::class);
+    $orch = app(WaterfallOrchestrator::class);
     $reflection = new ReflectionClass($orch);
     $method = $reflection->getMethod('step3d_google_places');
     $method->setAccessible(true);

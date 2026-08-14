@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToWorkspace;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Tag extends Model
 {
@@ -32,7 +33,8 @@ class Tag extends Model
         return $this->belongsToMany(Company::class);
     }
 
-    public function candidates()
+    /** @return BelongsToMany<Candidate, $this> */
+    public function candidates(): BelongsToMany
     {
         return $this->belongsToMany(Candidate::class, 'candidate_tag');
     }

@@ -5,8 +5,10 @@ namespace App\Models;
 use App\Crm\Taxonomy;
 use App\Models\Concerns\BelongsToWorkspace;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 /**
  * Univers VIVIER — fiche candidat.
@@ -27,6 +29,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $last_name
  * @property string $relation_type
  * @property string $lifecycle_stage
+ * @property ?string $consent_version
+ * @property ?Carbon $consent_at
+ * @property ?Carbon $consent_vivier_at
+ * @property ?Carbon $derniere_interaction_at
+ * @property ?Carbon $vivier_info_sent_at
+ * @property bool $opt_out
  */
 class Candidate extends Model
 {
@@ -59,7 +67,8 @@ class Candidate extends Model
         ];
     }
 
-    public function workspace()
+    /** @return BelongsTo<Workspace, $this> */
+    public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
     }

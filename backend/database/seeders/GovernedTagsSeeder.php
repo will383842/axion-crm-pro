@@ -48,6 +48,14 @@ class GovernedTagsSeeder extends Seeder
         'src:site-formulaire-support-client' => ['name' => 'Formulaire — support client', 'category' => 'intent'],
         'src:site-formulaire-autre' => ['name' => 'Formulaire — autre', 'category' => 'intent'],
         'src:site-formulaire-podcast' => ['name' => 'Formulaire — podcast', 'category' => 'intent'],
+        // Manquaient au premier jet : le namespace `src:` n'est PAS dérivable
+        // (à la différence de `geo:` / `sect:`), donc un slug absent d'ici est
+        // silencieusement IGNORÉ par `SiteSyncIngestService::resolveTagId()` —
+        // la fiche est bien créée, mais elle perd sa provenance, et rien ne le
+        // signale. Le test « chaque type de formulaire a un tag de provenance »
+        // rougit désormais si l'un des deux référentiels bouge seul.
+        'src:site-formulaire-recrutement' => ['name' => 'Formulaire — recrutement', 'category' => 'intent'],
+        'src:site-formulaire-simulateur-roi' => ['name' => 'Simulateur de gains', 'category' => 'intent'],
         'src:calendly' => ['name' => 'RDV Calendly', 'category' => 'intent'],
         'src:newsletter' => ['name' => 'Newsletter', 'category' => 'intent'],
         'src:chatbot' => ['name' => 'Chatbot', 'category' => 'intent'],
@@ -83,6 +91,14 @@ class GovernedTagsSeeder extends Seeder
      * @var array<string, array{name: string, category: string}>
      */
     private const VIVIER_TAGS = [
+        // Provenance des candidatures. Elles vivent ici et non dans les tags
+        // business parce que `run()` seede chaque liste dans SON workspace :
+        // placées côté business, elles n'auraient jamais été pré-créées dans le
+        // vivier, seul univers où l'ingestion les pose. `src:` reste catégorisé
+        // `intent` — la catégorie suit le NAMESPACE, pas l'univers.
+        'src:site-candidature-offre' => ['name' => 'Candidature — offre publiée', 'category' => 'intent'],
+        'src:site-candidature-commerciale' => ['name' => 'Candidature — tunnel commercial', 'category' => 'intent'],
+
         'cand-b2b:0' => ['name' => 'B2B — aucune expérience', 'category' => 'candidate'],
         'cand-b2b:1-3' => ['name' => 'B2B — 1 à 3 ans', 'category' => 'candidate'],
         'cand-b2b:3-5' => ['name' => 'B2B — 3 à 5 ans', 'category' => 'candidate'],

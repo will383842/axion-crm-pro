@@ -151,4 +151,20 @@ return [
         'batch_size' => (int) env('CRM_OUTBOUND_BATCH', 100),
     ],
 
+    /*
+    | L6 — console CRM v2 (plan §2.11, conception UX v2 « 3 espaces »).
+    |
+    | À false (défaut), les routes `/v1/crm/*` de la console répondent **404**,
+    | et `GET /v1/config/features` annonce `console_v2: false` — le frontend
+    | n'affiche alors RIEN de neuf. L'inertie est donc observable des deux
+    | côtés, et le rollback est « remettre le drapeau à OFF ».
+    |
+    | Pourquoi 404 et pas 503 : un 503 dit « réessaie plus tard », ce qui a du
+    | sens pour un canal d'ingestion dont l'émetteur doit rejouer sa ligne
+    | (L2/L3). La console n'a rien à rejouer : tant que le drapeau est fermé,
+    | ces routes n'existent pas — c'est exactement ce que dit un 404, et cela
+    | ne divulgue pas l'existence d'une surface non ouverte.
+    */
+    'console_v2' => env('CRM_CONSOLE_V2_ENABLED', false),
+
 ];

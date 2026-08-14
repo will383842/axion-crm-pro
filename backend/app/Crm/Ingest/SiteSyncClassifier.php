@@ -226,6 +226,39 @@ final class SiteSyncClassifier
     }
 
     /**
+     * Arbitrage du cycle de vie VIVIER : même règle « on ne recule jamais »,
+     * appliquée à la séquence du plan §2.2b
+     * (`nouveau → preselection → entretien → retenu | vivier | refuse`).
+     *
+     * Les trois issues (`retenu`, `vivier`, `refuse`) sont de même rang : ce
+     * sont des SORTIES du tri, pas des degrés. On peut donc passer de l'une à
+     * l'autre — un candidat refusé puis rappelé existe — mais jamais revenir en
+     * arrière vers `nouveau` ou `preselection`, ce qui reviendrait à effacer un
+     * tri humain déjà fait. C'est cette règle que l'action de masse du lot L6
+     * refuse d'enfreindre.
+     */
+    public function mergeCandidateLifecycleStage(?string $current, string $incoming): string
+    {
+        if ($current === null || $current === '') {
+            return $incoming;
+        }
+
+        $order = [
+            'nouveau' => 0,
+            'preselection' => 1,
+            'entretien' => 2,
+            'retenu' => 3,
+            'vivier' => 3,
+            'refuse' => 3,
+        ];
+
+        $rankCurrent = $order[$current] ?? 0;
+        $rankIncoming = $order[$incoming] ?? 0;
+
+        return $rankIncoming >= $rankCurrent ? $incoming : $current;
+    }
+
+    /**
      * Base légale : `precontractual` et `consent` (la personne s'est
      * manifestée) l'emportent sur `legitimate_interest_b2b` (fiche collectée).
      * On ne redescend jamais vers une base moins protectrice.

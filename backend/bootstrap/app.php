@@ -1,18 +1,19 @@
 <?php
 
+use App\Http\Middleware\AuditHashChainLogger;
+use App\Http\Middleware\EnforceFirstLoginSetup;
+use App\Http\Middleware\EnsureCrmConsoleV2;
+use App\Http\Middleware\SetCurrentWorkspace;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use App\Http\Middleware\SetCurrentWorkspace;
-use App\Http\Middleware\EnforceFirstLoginSetup;
-use App\Http\Middleware\AuditHashChainLogger;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
-        web: __DIR__.'/../routes/web.php',
-        api: __DIR__.'/../routes/api.php',
-        commands: __DIR__.'/../routes/console.php',
-        channels: __DIR__.'/../routes/channels.php',
+        web: __DIR__ . '/../routes/web.php',
+        api: __DIR__ . '/../routes/api.php',
+        commands: __DIR__ . '/../routes/console.php',
+        channels: __DIR__ . '/../routes/channels.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
@@ -27,9 +28,11 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->alias([
-            'workspace'   => SetCurrentWorkspace::class,
+            'workspace' => SetCurrentWorkspace::class,
             'first-login' => EnforceFirstLoginSetup::class,
-            'audit'       => AuditHashChainLogger::class,
+            'audit' => AuditHashChainLogger::class,
+            // Lot L6 : drapeau de la console CRM v2 (404 tant qu'il est fermé).
+            'crm-console' => EnsureCrmConsoleV2::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

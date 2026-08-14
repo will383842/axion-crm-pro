@@ -5,7 +5,30 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToWorkspace;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property int $id
+ * @property string $workspace_id UUID
+ * @property ?int $company_id
+ * @property ?string $first_name
+ * @property string $last_name
+ * @property ?string $email
+ * @property ?string $phone
+ * @property ?string $role
+ * @property ?string $email_confidence
+ * @property ?string $normalized_hash
+ *
+ * Lot L1 — taxonomie CRM (migration 2026_08_14_000002) :
+ * @property ?string $person_key
+ * @property ?string $external_ref
+ * @property ?string $legal_basis
+ * @property ?string $consent_version
+ * @property ?Carbon $consent_at
+ * @property ?string $consent_text_ref
+ * @property-read ?Company $company
+ */
 class Contact extends Model
 {
     use BelongsToWorkspace;
@@ -23,7 +46,8 @@ class Contact extends Model
         return ['sources' => 'array', 'metadata' => 'array'];
     }
 
-    public function company()
+    /** @return BelongsTo<Company, $this> */
+    public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
     }

@@ -10,6 +10,12 @@ use App\Http\Controllers\Api\Auth\TwoFactorController;
 use App\Http\Controllers\Api\CompaniesController;
 use App\Http\Controllers\Api\ContactsController;
 use App\Http\Controllers\Api\CoverageController;
+use App\Http\Controllers\Api\Crm\ArbitrageController;
+use App\Http\Controllers\Api\Crm\BulkController;
+use App\Http\Controllers\Api\Crm\CandidatesController;
+use App\Http\Controllers\Api\Crm\ContactsHubController;
+use App\Http\Controllers\Api\Crm\PersonTimelineController;
+use App\Http\Controllers\Api\FeaturesController;
 use App\Http\Controllers\Api\GlobalSearchController;
 use App\Http\Controllers\Api\JournalistsController;
 use App\Http\Controllers\Api\LlmUsageController;
@@ -214,8 +220,42 @@ Route::prefix('v1')->group(function () {
         Route::get('/campaigns/{campaign}/stats', [ScrapingCampaignsController::class, 'stats'])
             ->middleware('throttle:scraper-list');
 
+        // --- Lot L6 — Console CRM v2 ---------------------------------------
+        //
+        // 🔴 ORDRE CRITIQUE : ces routes DOIVENT précéder le stub Phase 2
+        // `Route::any('/crm{any?}')` déclaré plus bas, qui capture tout
+        // `/v1/crm/*` et répond 501. Laravel résout par ordre de déclaration :
+        // les déplacer après reviendrait à livrer une console qui répond
+        // « non implémenté » sur chacun de ses appels, drapeau ouvert compris.
+        //
+        // Drapeau `crm.console_v2` (défaut false) → 404 sur tout ce groupe.
+        // `GET /config/features` est délibérément HORS du groupe : c'est lui qui
+        // annonce l'état du drapeau, le mettre derrière serait circulaire.
+        Route::get('/config/features', [FeaturesController::class, 'index']);
+
+        Route::middleware('crm-console')->prefix('crm')->group(function () {
+            Route::get('/contacts-hub', [ContactsHubController::class, 'index']);
+            Route::get('/contacts-hub/counts', [ContactsHubController::class, 'counts']);
+
+            Route::get('/candidates', [CandidatesController::class, 'index']);
+            Route::get('/candidates/counts', [CandidatesController::class, 'counts']);
+
+            Route::get('/persons/{personKey}/timeline', [PersonTimelineController::class, 'show']);
+
+            // `/arbitrage/{activityId}/…` : les segments fixes précèdent, aucun
+            // conflit possible avec un identifiant numérique.
+            Route::get('/arbitrage', [ArbitrageController::class, 'index']);
+            Route::post('/arbitrage/{activityId}/attach', [ArbitrageController::class, 'attach'])
+                ->whereNumber('activityId');
+            Route::post('/arbitrage/{activityId}/dismiss', [ArbitrageController::class, 'dismiss'])
+                ->whereNumber('activityId');
+
+            Route::post('/bulk', BulkController::class);
+        });
+
         // --- Phase 2 (stubs, retournent 501 Not Implemented) ---------------
         // Note : /campaigns retiré — implémenté en Sprint 19.7 ci-dessus.
+        // Note : /crm est PARTIELLEMENT capté au-dessus par la console v2.
         Route::any('/cold-email{any?}', ColdEmailController::class)->where('any', '.*');
         Route::any('/linkedin{any?}', LinkedInController::class)->where('any', '.*');
         Route::any('/crm{any?}', CrmController::class)->where('any', '.*');

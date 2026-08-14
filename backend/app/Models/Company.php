@@ -3,18 +3,47 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToWorkspace;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
- * @property int $workspace_id
+ * @property string $workspace_id UUID — jamais un entier (cf. WorkspaceContext)
  * @property string $siren
  * @property ?string $denomination
  * @property ?string $naf
  * @property ?string $size_category
  * @property ?int $quality_score
  * @property array $signals
+ * @property ?string $city
+ * @property ?string $city_name
+ * @property ?string $postcode
+ * @property ?string $department_code
+ * @property ?string $region_code
+ * @property ?string $email_generic
+ * @property ?string $best_email_confidence
+ * @property ?string $website
+ * @property ?float $lat
+ * @property ?float $lon
+ * @property ?string $address
+ * @property ?string $enseigne
+ * @property ?string $phone
+ * @property ?Carbon $updated_at
+ * @property ?Carbon $created_at
+ *
+ * Lot L1 — taxonomie CRM (migration 2026_08_14_000002) :
+ * @property string $relation_type
+ * @property string $lifecycle_stage
+ * @property ?string $legal_basis
+ * @property ?string $external_ref
+ * @property-read Collection<int, Contact> $contacts
+ * @property-read Collection<int, Tag> $tags
+ * @property-read Collection<int, HealthPractitioner> $healthPractitioners
  */
 class Company extends Model
 {
@@ -49,28 +78,36 @@ class Company extends Model
         ];
     }
 
-    public function workspace()
+    /** @return BelongsTo<Workspace, $this> */
+    public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
     }
 
-    public function contacts()
+    /** @return HasMany<Contact, $this> */
+    public function contacts(): HasMany
     {
         return $this->hasMany(Contact::class);
     }
 
-    public function scraperRuns()
+    /** @return HasMany<ScraperRun, $this> */
+    public function scraperRuns(): HasMany
     {
         return $this->hasMany(ScraperRun::class);
     }
 
-    public function tags()
+    /** @return BelongsToMany<Tag, $this> */
+    public function tags(): BelongsToMany
     {
         return $this->belongsToMany(Tag::class);
     }
 
-    /** Verticale santé — praticiens (RPPS) rattachés par SIREN/company_id. */
-    public function healthPractitioners()
+    /**
+     * Verticale santé — praticiens (RPPS) rattachés par SIREN/company_id.
+     *
+     * @return HasMany<HealthPractitioner, $this>
+     */
+    public function healthPractitioners(): HasMany
     {
         return $this->hasMany(HealthPractitioner::class);
     }

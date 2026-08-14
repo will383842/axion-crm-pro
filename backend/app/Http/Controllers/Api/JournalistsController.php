@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Crm\Outbound\ConsentOutboundRecorder;
 use App\Models\Journalist;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -38,15 +39,16 @@ class JournalistsController extends ApiController
             return $this->ok([
                 'data' => $page->items(),
                 'meta' => [
-                    'total'        => $page->total(),
-                    'per_page'     => $page->perPage(),
+                    'total' => $page->total(),
+                    'per_page' => $page->perPage(),
                     'current_page' => $page->currentPage(),
-                    'last_page'    => $page->lastPage(),
+                    'last_page' => $page->lastPage(),
                 ],
             ]);
         } catch (\Throwable $e) {
             Log::error('journalists.index failed', ['exception' => $e->getMessage()]);
             report($e);
+
             return $this->ok([
                 'data' => [],
                 'meta' => ['total' => 0, 'per_page' => $perPage, 'current_page' => 1, 'last_page' => 1],
@@ -126,7 +128,35 @@ class JournalistsController extends ApiController
      */
     public function optOut(Journalist $journalist): JsonResponse
     {
+        $email = $journalist->email;
+
         $journalist->update(['opt_out' => true]);
+
+        // Lot L5 — l'opposition décidée DANS la console doit converger vers le
+        // site : sans cela le site continuerait d'adresser une personne que le
+        // CRM a opposée, et la prochaine synchro site → CRM la « rouvrirait ».
+        // Sans email, il n'y a pas de hash — donc rien que le site puisse
+        // rapprocher : on ne met rien en file plutôt qu'un message inexploitable.
+        if (is_string($email) && trim($email) !== '') {
+            try {
+                app(ConsentOutboundRecorder::class)->recordForEmail(
+                    'consent_optout',
+                    $email,
+                    'business',
+                    payload: ['surface' => 'console:journalists', 'journalist_id' => $journalist->id],
+                );
+            } catch (\Throwable $e) {
+                // Une panne de la mini-outbox ne fait pas échouer un droit
+                // d'opposition déjà acté en base. Journalisé, jamais avalé.
+                Log::error('crm.outbound.record_failed', [
+                    'event_type' => 'consent_optout',
+                    'journalist_id' => $journalist->id,
+                    'exception' => $e->getMessage(),
+                ]);
+                report($e);
+            }
+        }
+
         return $this->ok($journalist);
     }
 
@@ -134,6 +164,7 @@ class JournalistsController extends ApiController
     public function destroy(Journalist $journalist): JsonResponse
     {
         $journalist->delete();
+
         return response()->json(null, 204);
     }
 }

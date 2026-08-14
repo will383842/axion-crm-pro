@@ -120,4 +120,35 @@ return [
     */
     'purges_enabled' => env('CRM_PURGE_ENABLED', false),
 
+    /*
+    | L5 — mini-outbox CRM → site (convergence BIDIRECTIONNELLE des
+    | consentements, plan « Synchro BIDIRECTIONNELLE »).
+    |
+    | `outbound_enabled` : à false (défaut), `crm:flush-outbound` REFUSE et le
+    | scheduler la SAUTE — double verrou, comme les purges de L4. Le producteur
+    | (`ConsentOutboundRecorder`), lui, n'est PAS gaté : il remplit un journal
+    | local qui ne sort pas du serveur et ne change aucune réponse d'API. Le
+    | drapeau garde la seule chose observable de l'extérieur, l'émission HTTP.
+    |
+    | `site_webhook_url` : endpoint webhook du site (`POST /api/internal/
+    | crm-webhook`). Vide = la commande refuse : on ne devine pas une
+    | destination.
+    |
+    | Le secret de signature n'est PAS dupliqué ici : c'est le MÊME
+    | `SITE_SYNC_HMAC_SECRET` que le canal site → CRM (cf. `ingest.hmac_secret`).
+    | Un seul secret à faire tourner, un seul à ne pas perdre — deux secrets
+    | pour un même couple de systèmes finissent toujours par diverger.
+    |
+    | `max_attempts` : essais CONSOMMÉS avant `gave_up`. Un 503 du site n'en
+    | consomme aucun (cf. CrmFlushOutbound).
+    */
+    'outbound_enabled' => env('CRM_OUTBOUND_ENABLED', false),
+
+    'outbound' => [
+        'site_webhook_url' => env('SITE_CRM_WEBHOOK_URL', ''),
+        'max_attempts' => (int) env('CRM_OUTBOUND_MAX_ATTEMPTS', 8),
+        'timeout_seconds' => (int) env('CRM_OUTBOUND_TIMEOUT', 10),
+        'batch_size' => (int) env('CRM_OUTBOUND_BATCH', 100),
+    ],
+
 ];

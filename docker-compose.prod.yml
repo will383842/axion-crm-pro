@@ -36,20 +36,3 @@ services:
     restart: unless-stopped
     volumes: []
 
-  worker-google-maps:
-    build:
-      target: prod
-    restart: unless-stopped
-    volumes: []
-
-  worker-pages-jaunes:
-    build:
-      target: prod
-    restart: unless-stopped
-    volumes: []
-
-  worker-google-search:
-    build:
-      target: prod
-    restart: unless-stopped
-    volumes: []

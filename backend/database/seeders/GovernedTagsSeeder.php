@@ -61,15 +61,10 @@ class GovernedTagsSeeder extends Seeder
         'src:chatbot' => ['name' => 'Chatbot', 'category' => 'intent'],
         'src:avis-client' => ['name' => 'Avis client', 'category' => 'intent'],
 
-        // Source d'acquisition — COLLECTE (multi-valué : une fiche touchée par
-        // trois collecteurs porte les trois tags).
-        'src:scraping-insee' => ['name' => 'Collecte — INSEE', 'category' => 'intent'],
-        'src:scraping-annuaire' => ['name' => 'Collecte — annuaire administration', 'category' => 'intent'],
-        'src:scraping-mentions-legales' => ['name' => 'Collecte — mentions légales', 'category' => 'intent'],
-        'src:scraping-gplaces' => ['name' => 'Collecte — Google Places', 'category' => 'intent'],
-        'src:scraping-gmaps' => ['name' => 'Collecte — Google Maps', 'category' => 'intent'],
-        'src:scraping-pagesjaunes' => ['name' => 'Collecte — Pages Jaunes', 'category' => 'intent'],
-        'src:scraping-google-search' => ['name' => 'Collecte — Google Search', 'category' => 'intent'],
+        // Source d'acquisition — COLLECTE : depuis le lot L3, ces tags sont
+        // DÉRIVÉS du registre `scraping_sources` (un tag `src:scraping-<slug>`
+        // par source), plus aucune liste en dur ici — cf. `referential()`.
+        // Le registre est lui-même la liste fermée : c'est lui qui gouverne.
 
         // Service d'intérêt
         'svc:audit' => ['name' => 'Intérêt — audit', 'category' => 'intent'],
@@ -125,7 +120,7 @@ class GovernedTagsSeeder extends Seeder
             ->pluck('id');
 
         foreach ($businessIds as $workspaceId) {
-            $this->upsert((string) $workspaceId, self::BUSINESS_TAGS);
+            $this->upsert((string) $workspaceId, self::BUSINESS_TAGS + self::scrapingTags());
         }
 
         if ($vivierId !== null) {
@@ -160,12 +155,29 @@ class GovernedTagsSeeder extends Seeder
     }
 
     /**
-     * Le référentiel complet, pour les tests de gouvernance.
+     * Le référentiel complet, pour les tests de gouvernance et le résolveur
+     * de tags de l'ingestion. Les tags de COLLECTE sont dérivés du registre
+     * des sources (lot L3) : une source approuvée au registre = son tag,
+     * automatiquement — plus jamais deux listes à maintenir en parallèle.
      *
      * @return array<string, array{name: string, category: string}>
      */
     public static function referential(): array
     {
-        return self::BUSINESS_TAGS + self::VIVIER_TAGS;
+        return self::BUSINESS_TAGS + self::scrapingTags() + self::VIVIER_TAGS;
+    }
+
+    /** @return array<string, array{name: string, category: string}> */
+    private static function scrapingTags(): array
+    {
+        $tags = [];
+        foreach (ScrapingSourcesSeeder::referential() as $slug => $source) {
+            $tags['src:scraping-' . $slug] = [
+                'name' => 'Collecte — ' . $source['name'],
+                'category' => 'intent',
+            ];
+        }
+
+        return $tags;
     }
 }

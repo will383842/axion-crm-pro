@@ -2,10 +2,12 @@
 
 namespace App\Providers;
 
+use App\Models\PersonalAccessToken;
+use App\Support\WorkspaceContext;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
-use App\Models\PersonalAccessToken;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -23,5 +25,18 @@ class AppServiceProvider extends ServiceProvider
         // Sanctum : tokenable_id UUID (migration 000002) → custom PAT model
         // qui force `morphTo()` à utiliser User UUID.
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+
+        // Lot L0 — un worker Horizon garde sa connexion Postgres ouverte entre
+        // deux jobs. Sans ce nettoyage, le contexte workspace d'un job fuirait
+        // sur le suivant (un job « vivier » lirait la base business, ou
+        // l'inverse). On repart donc systématiquement d'un contexte VIDE :
+        // chaque job doit poser le sien explicitement (trait RunsInWorkspace).
+        Queue::looping(function (): void {
+            try {
+                WorkspaceContext::clear();
+            } catch (\Throwable) {
+                // Une connexion DB indisponible ne doit pas tuer la boucle du worker.
+            }
+        });
     }
 }

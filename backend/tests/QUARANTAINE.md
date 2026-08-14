@@ -41,10 +41,16 @@ pour PHPStan : **figer la dette explicitement, jamais neutraliser l'outil**.
 2. Tout **nouveau** test est bloquant d'office (il n'est pas dans la liste).
 3. `Tests\Feature\RlsTest` doit sortir de la quarantaine **au lot L1**
    (durcissement RLS) — c'est le premier travail de ce lot.
+   → ✅ **FAIT le 2026-08-14** (lot L0 de l'autopilot, PR `feat/crm-L0-rls`).
+   Le fichier a été RÉÉCRIT : ses deux tests d'origine ne prouvaient rien
+   (l'un échouait, l'autre CERTIFIAIT le trou — « RLS bypass quand session var
+   vide »). Il compte désormais 15 tests d'étanchéité qui passent par le rôle
+   applicatif non-propriétaire `axion_app`, seul moyen de prouver quoi que ce
+   soit : le rôle historique `axion` est SUPERUSER + BYPASSRLS.
 
-## Liste au 2026-08-13 (23 fichiers)
+## Liste au 2026-08-14 (22 fichiers)
 
-### tests/Feature (11)
+### tests/Feature (10)
 
 - `Auth/LoginTest.php`
 - `Auth/OnboardingTourTest.php`
@@ -55,7 +61,6 @@ pour PHPStan : **figer la dette explicitement, jamais neutraliser l'outil**.
 - `Controllers/Phase2StubsExtendedTest.php`
 - `Phase2StubsTest.php`
 - `Rgpd/RgpdRequestsControllerTest.php`
-- `RlsTest.php` — **à traiter en L1**
 - `Seeders/OwnerUserSeederTest.php`
 
 ### tests/Unit (12)

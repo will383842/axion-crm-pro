@@ -52,4 +52,37 @@ return [
     */
     'strict_workspace_scope' => env('CRM_STRICT_WORKSPACE_SCOPE', false),
 
+    /*
+    | L2 — ingestion site → CRM (`POST /api/internal/site-sync`).
+    |
+    | `enabled` : drapeau MAÎTRE. À false (défaut), l'endpoint répond 503
+    | `ingest_disabled` et n'écrit RIEN — la route existe, le code est livré,
+    | mais la tuyauterie est inerte. Rollback = remettre à false.
+    |
+    | `candidates_enabled` : second verrou, propre à l'univers VIVIER. Les flux
+    | candidats ne s'ouvrent qu'APRÈS que les textes de consentement v2 sont
+    | servis en production sur le site (séquencement croisé imposé par l'ordre
+    | de mission). Même avec ce drapeau à true, une fiche candidat sans version
+    | de consentement v2 est REJETÉE — le drapeau ouvre le flux, il ne dispense
+    | jamais de la preuve du consentement.
+    |
+    | `hmac_secret` : secret partagé du canal site→CRM (64 hex). Absent =
+    | aucune requête ne peut être authentifiée (l'endpoint répond 401), ce qui
+    | est le bon état par défaut d'un serveur qui n'a pas encore reçu le secret.
+    |
+    | `business_workspace` : slug du workspace commercial de destination. Le
+    | site n'a PAS à connaître les workspaces du CRM : la destination est une
+    | décision du CRM, pas une donnée du payload (sinon un appelant compromis
+    | choisirait l'univers d'atterrissage de ses fiches, vivier compris).
+    */
+    'ingest' => [
+        'enabled' => env('CRM_INGEST_ENABLED', false),
+        'candidates_enabled' => env('CRM_INGEST_CANDIDATES_ENABLED', false),
+        'hmac_secret' => env('SITE_SYNC_HMAC_SECRET', ''),
+        'business_workspace' => env('CRM_INGEST_BUSINESS_WORKSPACE', 'axion-ia'),
+        // Fenêtre de tolérance de l'horodatage signé (anti-rejeu). 0 = contrôle
+        // désactivé (le site ne signe pas encore d'horodatage).
+        'max_clock_skew_seconds' => (int) env('CRM_INGEST_MAX_CLOCK_SKEW', 300),
+    ],
+
 ];

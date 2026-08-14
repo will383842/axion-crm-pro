@@ -601,6 +601,39 @@ test('rejouer une candidature ne crée pas un second candidat', function () {
     expect(DB::table('candidates')->count())->toBe(1);
 });
 
+test('integration du STOCK (information + 30 j sans opposition) entre au vivier avec sa version dédiée', function () {
+    config(['crm.ingest.candidates_enabled' => true]);
+
+    // C'est l'événement que le site émet au J+30 pour le stock d'avant-v2 :
+    // version FERME `vivier-stock-2026-08-14`, jamais la v1 de la fiche.
+    siteSyncPost(siteSyncEvent([
+        'event_type' => 'application_submitted',
+        'form_type' => null,
+        'consent' => [
+            'version' => 'vivier-stock-2026-08-14',
+            'at' => '2026-08-14T09:29:00+02:00',
+            'text_ref' => 'vivier-information-email',
+            'vivier_at' => '2026-09-13T09:29:00+02:00',
+        ],
+        'candidate' => ['family' => 'candidat_commercial'],
+    ]))->assertOk()->assertJsonPath('result.subject_type', 'candidate');
+
+    $candidate = DB::table('candidates')->first();
+    expect($candidate->consent_version)->toBe('vivier-stock-2026-08-14')
+        ->and($candidate->legal_basis)->toBe('consent');
+
+    // Et la v1 du stock reste REFUSÉE : la nouvelle version n'ouvre pas une
+    // brèche générale, elle énumère UN acte juridique précis.
+    siteSyncPost(siteSyncEvent([
+        'event_type' => 'application_submitted',
+        'form_type' => null,
+        'consent' => ['version' => 'careers-v1-2026-06-09'],
+        'candidate' => ['family' => 'candidat_commercial'],
+        'person' => ['person_key' => hash('sha256', 'autre@example.invalid'), 'email' => 'autre@example.invalid'],
+        'subject_ref' => 'site:job_application:autre-1',
+    ]))->assertStatus(422)->assertJsonPath('error', 'candidate_consent_v2_required');
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 7. OPPOSITION — anti-réinsertion, par univers
 // ─────────────────────────────────────────────────────────────────────────────

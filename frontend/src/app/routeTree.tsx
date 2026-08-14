@@ -33,6 +33,14 @@ import { AudienceBuilderPage } from '@/features/audiences/AudienceBuilderPage';
 import { AudienceDetailPage } from '@/features/audiences/AudienceDetailPage';
 // Sprint H4 Hardening — Dashboard observabilité
 import { ObservabilityPage } from '@/features/observability/ObservabilityPage';
+// Lot L6 — Console CRM v2 (derrière le drapeau runtime CRM_CONSOLE_V2_ENABLED).
+// Préfixe `/console` et non `/crm` : `/crm` est déjà pris par le stub Phase 2
+// (`crmRoute` plus bas), et écraser une route existante pour un lot gaté aurait
+// remplacé un écran qui répond par un écran qui n'affiche rien.
+import { ContactsHubPage } from '@/features/crm-console/ContactsHubPage';
+import { CandidatesPage } from '@/features/crm-console/CandidatesPage';
+import { ArbitragePage } from '@/features/crm-console/ArbitragePage';
+import { PersonTimelinePage } from '@/features/crm-console/PersonTimelinePage';
 // Phase 2 scaffold stubs
 import { ColdEmailStub } from '@/features/phase2-scaffold/ColdEmailStub';
 import { LinkedInStub } from '@/features/phase2-scaffold/LinkedInStub';
@@ -81,6 +89,11 @@ const audiencesNewRoute = createRoute({ getParentRoute: () => layoutRoute, path:
 const audienceDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/audiences/$audienceId', component: AudienceDetailPage });
 // Sprint H4 Hardening — Dashboard observabilité
 const observabilityRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/admin/observability', component: ObservabilityPage });
+// Lot L6 — Console CRM v2
+const consoleContactsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/contacts', component: ContactsHubPage });
+const consoleVivierRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/vivier', component: CandidatesPage });
+const consoleArbitrageRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/arbitrage', component: ArbitragePage });
+const consolePersonRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/personnes/$personKey', component: PersonTimelinePage });
 // Phase 2 stubs
 const coldEmailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/cold-email', component: ColdEmailStub });
 const linkedInRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/linkedin', component: LinkedInStub });
@@ -120,6 +133,10 @@ export const routeTree = rootRoute.addChildren([
     audiencesNewRoute,
     audienceDetailRoute,
     observabilityRoute,
+    consoleContactsRoute,
+    consoleVivierRoute,
+    consoleArbitrageRoute,
+    consolePersonRoute,
     coldEmailRoute,
     linkedInRoute,
     crmRoute,

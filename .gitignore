@@ -10,6 +10,10 @@
 /storage/framework/testing/*
 /storage/app/private/*
 /bootstrap/cache/*.php
+# Le code Laravel vit sous backend/ : le motif ancré ci-dessus ne l'attrapait
+# pas, et les caches generes par `php artisan` y devenaient des fichiers
+# NON SUIVIS proposes au commit (constate au lot L6).
+/backend/bootstrap/cache/*.php
 .phpunit.cache
 .phpunit.result.cache
 auth.json

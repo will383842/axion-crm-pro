@@ -6,13 +6,13 @@ use App\Jobs\EnrichCompanyJob;
 use App\Models\Company;
 use App\Services\Email\EmailConfidenceService;
 use App\Services\Waterfall\WaterfallOrchestrator;
+use App\Support\CompanyQueryFilters;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
-use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -26,12 +26,14 @@ class CompaniesController extends ApiController
      *     tags={"Companies"},
      *     summary="Liste paginée des entreprises du workspace courant",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="per_page", in="query", @OA\Schema(type="integer", default=25, maximum=100)),
      *     @OA\Parameter(name="filter[naf]", in="query", @OA\Schema(type="string", example="6201Z")),
      *     @OA\Parameter(name="filter[size_category]", in="query", @OA\Schema(type="string", enum={"tpe","pme","eti","ge"})),
      *     @OA\Parameter(name="filter[priority]", in="query", @OA\Schema(type="string", enum={"haute","moyenne","basse","gelee"})),
      *     @OA\Parameter(name="filter[denomination]", in="query", @OA\Schema(type="string")),
      *     @OA\Parameter(name="sort", in="query", @OA\Schema(type="string", example="-quality_score")),
+     *
      *     @OA\Response(response=200, description="Liste paginée"),
      *     @OA\Response(response=401, description="Unauthenticated"),
      * )
@@ -54,18 +56,20 @@ class CompaniesController extends ApiController
                 ->defaultSort('-quality_score');
 
             $page = $query->paginate($perPage);
+
             return $this->ok([
                 'data' => $page->items(),
                 'meta' => [
-                    'total'        => $page->total(),
-                    'per_page'     => $page->perPage(),
+                    'total' => $page->total(),
+                    'per_page' => $page->perPage(),
                     'current_page' => $page->currentPage(),
-                    'last_page'    => $page->lastPage(),
+                    'last_page' => $page->lastPage(),
                 ],
             ]);
         } catch (\Throwable $e) {
             Log::error('companies.index failed', ['exception' => $e->getMessage()]);
             report($e);
+
             return $this->ok([
                 'data' => [],
                 'meta' => ['total' => 0, 'per_page' => $perPage, 'current_page' => 1, 'last_page' => 1],
@@ -81,22 +85,11 @@ class CompaniesController extends ApiController
      */
     private function buildFilteredQuery(): QueryBuilder
     {
+        // Liste PARTAGÉE avec la console v2 (lot L6) : deux listes jumelles
+        // finissent toujours par diverger, et l'écart se découvre par un export
+        // qui ne correspond plus à la liste affichée.
         return QueryBuilder::for(Company::query()->whereNull('deleted_at'))
-            ->allowedFilters([
-                AllowedFilter::exact('naf'),
-                AllowedFilter::exact('size_category'),
-                AllowedFilter::exact('effectif', 'effectif_range'),
-                AllowedFilter::exact('priority'),
-                AllowedFilter::exact('discovery_source'),
-                AllowedFilter::exact('prospection_status'),
-                AllowedFilter::exact('department_code'),
-                AllowedFilter::exact('region_code'),
-                AllowedFilter::exact('sector_main'),
-                AllowedFilter::exact('quality', 'quality_badge'),
-                AllowedFilter::exact('best_email_confidence'),
-                AllowedFilter::partial('denomination'),
-                AllowedFilter::partial('postcode'),
-            ]);
+            ->allowedFilters(CompanyQueryFilters::allowed());
     }
 
     /**
@@ -105,6 +98,7 @@ class CompaniesController extends ApiController
      *     tags={"Companies"},
      *     summary="Exporte en CSV la liste filtrée (emails, téléphones, dirigeants) pour transfert/emailing",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Response(response=200, description="Fichier CSV (streamé)"),
      * )
      */
@@ -131,9 +125,9 @@ class CompaniesController extends ApiController
             ->where('workspace_id', $workspaceId)
             ->with($hasSante ? ['contacts', 'healthPractitioners'] : ['contacts']);
 
-        $confidenceScorer = new EmailConfidenceService();
+        $confidenceScorer = new EmailConfidenceService;
 
-        return response()->streamDownload(function () use ($query, $header, $hasSante, $confidenceScorer) {
+        return response()->streamDownload(function () use ($query, $header, $confidenceScorer) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // BOM UTF-8 → Excel FR lit les accents
             fputcsv($out, $header);
@@ -149,6 +143,7 @@ class CompaniesController extends ApiController
                                 $ct->email ?? '',
                                 $ct->phone ?? '',
                             ]);
+
                             return trim(implode(' ', $bits));
                         })
                         ->filter()
@@ -222,12 +217,15 @@ class CompaniesController extends ApiController
      *     tags={"Companies"},
      *     summary="Crée une entreprise manuellement (SIREN obligatoire)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\RequestBody(required=true, @OA\JsonContent(
      *         required={"siren"},
+     *
      *         @OA\Property(property="siren", type="string", example="123456789"),
      *         @OA\Property(property="denomination", type="string"),
      *         @OA\Property(property="discovery_source", type="string"),
      *     )),
+     *
      *     @OA\Response(response=201, description="Créée"),
      *     @OA\Response(response=422, description="Validation"),
      * )
@@ -235,16 +233,17 @@ class CompaniesController extends ApiController
     public function store(Request $r): JsonResponse
     {
         $validated = $r->validate([
-            'siren'            => ['required', 'string', 'size:9', 'regex:/^\d{9}$/'],
-            'denomination'     => ['nullable', 'string', 'max:255'],
+            'siren' => ['required', 'string', 'size:9', 'regex:/^\d{9}$/'],
+            'denomination' => ['nullable', 'string', 'max:255'],
             'discovery_source' => ['nullable', 'string', 'max:64'],
         ]);
         $company = Company::create([
-            'workspace_id'     => app()->bound('workspace.id') ? app('workspace.id') : null,
-            'siren'            => $validated['siren'],
-            'denomination'     => $validated['denomination'] ?? null,
+            'workspace_id' => app()->bound('workspace.id') ? app('workspace.id') : null,
+            'siren' => $validated['siren'],
+            'denomination' => $validated['denomination'] ?? null,
             'discovery_source' => $validated['discovery_source'] ?? 'manual',
         ]);
+
         return $this->ok($company, 201);
     }
 
@@ -254,7 +253,9 @@ class CompaniesController extends ApiController
      *     tags={"Companies"},
      *     summary="Détail d'une entreprise (contacts + tags inclus)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="company", in="path", required=true, @OA\Schema(type="integer")),
+     *
      *     @OA\Response(response=200, description="OK"),
      *     @OA\Response(response=404, description="Not found"),
      * )
@@ -265,6 +266,7 @@ class CompaniesController extends ApiController
         if (Schema::hasTable('health_practitioners')) {
             $relations[] = 'healthPractitioners';
         }
+
         return $this->ok($company->load($relations));
     }
 
@@ -274,27 +276,32 @@ class CompaniesController extends ApiController
      *     tags={"Companies"},
      *     summary="Met à jour une entreprise (champs éditables côté commercial)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="company", in="path", required=true, @OA\Schema(type="integer")),
+     *
      *     @OA\RequestBody(@OA\JsonContent(
+     *
      *         @OA\Property(property="priority", type="string", enum={"haute","moyenne","basse","gelee"}),
      *         @OA\Property(property="denomination", type="string"),
      *         @OA\Property(property="website", type="string", format="url"),
      *         @OA\Property(property="phone", type="string"),
      *         @OA\Property(property="linkedin_url", type="string", format="url"),
      *     )),
+     *
      *     @OA\Response(response=200, description="Updated"),
      * )
      */
     public function update(Request $r, Company $company): JsonResponse
     {
         $validated = $r->validate([
-            'priority'     => ['nullable', Rule::in(['haute', 'moyenne', 'basse', 'gelee'])],
+            'priority' => ['nullable', Rule::in(['haute', 'moyenne', 'basse', 'gelee'])],
             'denomination' => ['nullable', 'string', 'max:255'],
-            'website'      => ['nullable', 'url', 'max:255'],
-            'phone'        => ['nullable', 'string', 'max:32'],
+            'website' => ['nullable', 'url', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:32'],
             'linkedin_url' => ['nullable', 'url', 'max:255'],
         ]);
         $company->update($validated);
+
         return $this->ok($company);
     }
 
@@ -304,13 +311,16 @@ class CompaniesController extends ApiController
      *     tags={"Companies"},
      *     summary="Soft-delete une entreprise (deleted_at posé)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="company", in="path", required=true, @OA\Schema(type="integer")),
+     *
      *     @OA\Response(response=204, description="No content"),
      * )
      */
     public function destroy(Company $company): JsonResponse
     {
         $company->delete();
+
         return response()->json(null, 204);
     }
 
@@ -320,13 +330,16 @@ class CompaniesController extends ApiController
      *     tags={"Companies"},
      *     summary="Déclenche l'enrichissement waterfall (NAF→SIRENE→LLM→scrape)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="company", in="path", required=true, @OA\Schema(type="integer")),
+     *
      *     @OA\Response(response=200, description="Entreprise enrichie"),
      * )
      */
     public function enrich(Company $company): JsonResponse
     {
         $this->waterfall->enrich($company);
+
         return $this->ok($company->fresh()->load('contacts'));
     }
 
@@ -336,10 +349,13 @@ class CompaniesController extends ApiController
      *     tags={"Companies"},
      *     summary="Enrichit en bulk jusqu'à 500 entreprises via job Horizon",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\RequestBody(required=true, @OA\JsonContent(
      *         required={"ids"},
+     *
      *         @OA\Property(property="ids", type="array", maxItems=500, @OA\Items(type="integer")),
      *     )),
+     *
      *     @OA\Response(response=200, description="Jobs queués"),
      * )
      */
@@ -349,6 +365,7 @@ class CompaniesController extends ApiController
         foreach ($ids as $id) {
             EnrichCompanyJob::dispatch((int) $id);
         }
+
         return $this->ok(['queued' => count($ids)]);
     }
 
@@ -358,13 +375,16 @@ class CompaniesController extends ApiController
      *     tags={"Companies"},
      *     summary="Recalcule le quality_score (fonction Postgres)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="company", in="path", required=true, @OA\Schema(type="integer")),
+     *
      *     @OA\Response(response=200, description="Score recalculé"),
      * )
      */
     public function recomputeScore(Company $company): JsonResponse
     {
         DB::statement('SELECT recompute_company_quality_score(?)', [$company->id]);
+
         return $this->ok($company->fresh());
     }
 }

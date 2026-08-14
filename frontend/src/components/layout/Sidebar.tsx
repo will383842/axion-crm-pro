@@ -36,9 +36,13 @@ import {
   Send,
   Newspaper,
   Mic,
+  Scale,
+  GraduationCap,
 } from 'lucide-react';
 import { cn, Tooltip } from '@/components/ui';
 import { WorkspaceSelector } from './WorkspaceSelector';
+import { useConsoleFeatures } from '@/features/crm-console/useConsoleFeatures';
+import type { ConsoleFeatures } from '@/features/crm-console/useConsoleFeatures';
 
 interface NavItem {
   to: string;
@@ -129,6 +133,30 @@ const SECTIONS: NavSection[] = [
   },
 ];
 
+/**
+ * Lot L6 — section « Console CRM », construite au RUNTIME.
+ *
+ * Elle n'apparaît que si l'API annonce le drapeau ouvert, et l'entrée « Vivier
+ * candidats » que si l'utilisateur est membre de cet univers. C'est une règle
+ * de conception, pas une commodité (§2.2) : une entrée de navigation qui mène à
+ * un 403 n'a pas à exister — l'étanchéité se LIT dans la navigation, elle ne se
+ * découvre pas au clic.
+ */
+function consoleSection(features: ConsoleFeatures): NavSection | null {
+  if (!features.console_v2) return null;
+
+  const items: NavItem[] = [
+    { to: '/console/contacts', label: 'Contacts', icon: <Users2 className="h-4 w-4" /> },
+    { to: '/console/arbitrage', label: 'À arbitrer', icon: <Scale className="h-4 w-4" /> },
+  ];
+
+  if (features.universes.vivier) {
+    items.push({ to: '/console/vivier', label: 'Vivier candidats', icon: <GraduationCap className="h-4 w-4" /> });
+  }
+
+  return { id: 'console-v2', title: 'Console CRM', items };
+}
+
 export interface SidebarProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
@@ -136,6 +164,9 @@ export interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const router = useRouterState({ select: (s) => s.location.pathname });
+  const features = useConsoleFeatures();
+  const console2 = consoleSection(features);
+  const sections = console2 === null ? SECTIONS : [console2, ...SECTIONS];
 
   return (
     <aside
@@ -172,7 +203,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
 
       {/* Navigation groups */}
       <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label="Navigation principale">
-        {SECTIONS.map((section) => (
+        {sections.map((section) => (
           <NavSectionBlock key={section.id} section={section} collapsed={collapsed} currentPath={router} />
         ))}
       </nav>

@@ -40,7 +40,10 @@ final class SiteSyncIngestService
      */
     private const DERIVABLE_TAG_NAMESPACES = ['geo', 'sect', 'cand-offre', 'cand-zone'];
 
-    public function __construct(private readonly SiteSyncClassifier $classifier) {}
+    public function __construct(
+        private readonly SiteSyncClassifier $classifier,
+        private readonly ContactUpserter $contacts,
+    ) {}
 
     public function ingest(SiteSyncEvent $event): IngestOutcome
     {
@@ -249,133 +252,32 @@ final class SiteSyncIngestService
     }
 
     /**
-     * Déduplication PERSONNE, dans l'ordre du plan §2.4 et de l'audit §B.4.2 :
-     * `external_ref` (même enregistrement source) → `person_key` (email hashé,
-     * la seule clé qui traverse les deux systèmes) → email → nom + entreprise
-     * (`normalized_hash`, la dédup historique du scraping).
+     * Déduplication PERSONNE. La logique vit dans `ContactUpserter` — extraite
+     * au lot L6 pour que l'ARBITRAGE manuel (rattacher a posteriori un
+     * événement resté sans entreprise) dédoublonne EXACTEMENT comme
+     * l'ingestion automatique. Deux implémentations auraient fini par diverger,
+     * c'est-à-dire par créer des doublons depuis l'écran censé les résoudre.
      *
      * @return array{0: int, 1: string}|null [contact_id, statut] — null si la
      *                                       personne n'est pas identifiable.
      */
     private function upsertContact(SiteSyncEvent $event, string $workspaceId, int $companyId): ?array
     {
-        $email = $event->email();
-        $lastName = $event->str('person', 'last_name');
-        $firstName = $event->str('person', 'first_name');
-
-        $existing = DB::table('contacts')
-            ->where('workspace_id', $workspaceId)
-            ->where('external_ref', $event->subjectRef)
-            ->first();
-
-        $existing ??= DB::table('contacts')
-            ->where('workspace_id', $workspaceId)
-            ->where('person_key', $event->personKey())
-            ->first();
-
-        if ($existing === null && $email !== null) {
-            $existing = DB::table('contacts')
-                ->where('workspace_id', $workspaceId)
-                ->whereRaw('lower(email::text) = ?', [$email])
-                ->orderByRaw('CASE WHEN company_id = ? THEN 0 ELSE 1 END', [$companyId])
-                ->first();
-        }
-
-        if ($existing === null && $lastName !== null) {
-            $hash = $this->normalizedHash($firstName, $lastName, $companyId);
-            $existing = DB::table('contacts')
-                ->where('workspace_id', $workspaceId)
-                ->where('normalized_hash', $hash)
-                ->first();
-        }
-
-        $legalBasis = $this->classifier->legalBasis($event);
-
-        if ($existing === null) {
-            // `contacts.last_name` est NOT NULL. Plutôt que de fabriquer un nom
-            // depuis l'adresse électronique (ce que fait le scraping et que
-            // l'audit relève comme une faiblesse), on renonce à créer la fiche
-            // personne : l'événement reste dans la timeline de l'entreprise.
-            if ($lastName === null) {
-                return null;
-            }
-
-            $id = (int) DB::table('contacts')->insertGetId([
-                'workspace_id' => $workspaceId,
-                'company_id' => $companyId,
-                'first_name' => $firstName,
-                'last_name' => $lastName,
-                'email' => $email,
-                'phone' => $event->str('person', 'phone'),
-                'discovery_source' => 'site',
-                'sources' => json_encode(['site'], JSON_THROW_ON_ERROR),
-                'metadata' => '{}',
-                'person_key' => $event->personKey(),
-                'external_ref' => $event->subjectRef,
-                'legal_basis' => $legalBasis,
-                'consent_version' => $event->consentVersion(),
-                'consent_at' => $event->consentAt(),
-                'consent_text_ref' => $event->str('consent', 'text_ref'),
-                'field_origins' => $this->declaredOrigins(['first_name', 'last_name', 'email', 'phone']),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            return [$id, IngestOutcome::CREATED];
-        }
-
-        $update = [
-            'person_key' => $event->personKey(),
-            'legal_basis' => $this->classifier->mergeLegalBasis(
-                is_string($existing->legal_basis ?? null) ? $existing->legal_basis : null,
-                $legalBasis,
-            ),
-            'updated_at' => now(),
-        ];
-
-        $origins = $this->decodeOrigins($existing->field_origins ?? null);
-
-        foreach (['email' => $email, 'phone' => $event->str('person', 'phone')] as $column => $value) {
-            if ($value !== null) {
-                $update[$column] = $value;
-                $origins[$column] = 'declared';
-            }
-        }
-
-        // Le nom alimente une colonne GÉNÉRÉE (`normalized_hash`) porteuse d'un
-        // index UNIQUE : le modifier peut entrer en collision avec une autre
-        // fiche de la même entreprise. On vérifie AVANT d'écrire plutôt que de
-        // faire échouer toute la transaction sur un homonyme.
-        if ($lastName !== null) {
-            $target = $this->normalizedHash($firstName, $lastName, (int) $existing->company_id);
-            $collision = DB::table('contacts')
-                ->where('workspace_id', $workspaceId)
-                ->where('normalized_hash', $target)
-                ->where('id', '!=', $existing->id)
-                ->exists();
-
-            if (! $collision) {
-                $update['first_name'] = $firstName;
-                $update['last_name'] = $lastName;
-                $origins['first_name'] = 'declared';
-                $origins['last_name'] = 'declared';
-            }
-        }
-
-        if ($existing->external_ref === null) {
-            $update['external_ref'] = $event->subjectRef;
-        }
-        if ($event->consentVersion() !== null) {
-            $update['consent_version'] = $event->consentVersion();
-            $update['consent_at'] = $event->consentAt();
-            $update['consent_text_ref'] = $event->str('consent', 'text_ref');
-        }
-
-        $update['field_origins'] = json_encode($origins, JSON_THROW_ON_ERROR);
-
-        DB::table('contacts')->where('id', $existing->id)->update($update);
-
-        return [(int) $existing->id, IngestOutcome::UPDATED];
+        return $this->contacts->upsert(
+            workspaceId: $workspaceId,
+            companyId: $companyId,
+            personKey: $event->personKey(),
+            externalRef: $event->subjectRef,
+            email: $event->email(),
+            firstName: $event->str('person', 'first_name'),
+            lastName: $event->str('person', 'last_name'),
+            phone: $event->str('person', 'phone'),
+            legalBasis: $this->classifier->legalBasis($event),
+            consentVersion: $event->consentVersion(),
+            consentAt: $event->consentAt(),
+            consentTextRef: $event->str('consent', 'text_ref'),
+            discoverySource: 'site',
+        );
     }
 
     // ── Univers VIVIER ──────────────────────────────────────────────────────
@@ -600,13 +502,36 @@ final class SiteSyncIngestService
 
         if ($subjectId === null) {
             // Matière première de l'écran d'arbitrage : ce qu'on sait de
-            // l'entreprise, sans avoir jamais deviné à quelle fiche l'attacher.
-            $payload['pending_match'] = array_filter([
+            // l'entreprise ET de la personne, sans avoir jamais deviné à quelle
+            // fiche l'attacher.
+            //
+            // Le bloc `person` est ici pour une raison précise (lot L6) : au
+            // moment où l'opérateur rattache enfin l'événement à une entreprise,
+            // la fiche personne doit pouvoir être créée. Sans nom conservé, le
+            // rattachement produirait une entreprise sans interlocuteur — et
+            // l'information serait définitivement perdue, puisque le site n'a
+            // aucune raison de rejouer un événement déjà accusé réception.
+            $pendingMatch = array_filter([
                 'denomination' => $event->str('company', 'name'),
                 'postcode' => $event->str('company', 'postcode'),
                 'city' => $event->str('company', 'city'),
+                'website' => $event->str('company', 'website'),
                 'email' => $event->email(),
+                'first_name' => $event->str('person', 'first_name'),
+                'last_name' => $event->str('person', 'last_name'),
+                'phone' => $event->str('person', 'phone'),
+                'subject_ref' => $event->subjectRef,
+                'legal_basis' => $this->classifier->legalBasis($event),
+                'consent_version' => $event->consentVersion(),
+                'consent_text_ref' => $event->str('consent', 'text_ref'),
             ], static fn (?string $v): bool => $v !== null);
+
+            $consentAt = $event->consentAt();
+            if ($consentAt !== null) {
+                $pendingMatch['consent_at'] = $consentAt->format(DATE_ATOM);
+            }
+
+            $payload['pending_match'] = $pendingMatch;
         }
 
         return (int) DB::table('activities')->insertGetId([
@@ -654,21 +579,6 @@ final class SiteSyncIngestService
         }
 
         return (string) $id;
-    }
-
-    /**
-     * `normalized_hash` est une colonne GÉNÉRÉE côté Postgres — on la recalcule
-     * avec la MÊME expression (fonction SQL `normalize_name` comprise), jamais
-     * avec une approximation PHP qui divergerait au premier accent.
-     */
-    private function normalizedHash(?string $firstName, string $lastName, int $companyId): string
-    {
-        $row = DB::selectOne(
-            "SELECT encode(digest(normalize_name(coalesce(?, '') || '_' || ?) || '_' || ?::TEXT, 'sha256'), 'hex') AS h",
-            [$firstName, $lastName, $companyId],
-        );
-
-        return (string) ($row->h ?? '');
     }
 
     /** @param  list<string>  $columns */

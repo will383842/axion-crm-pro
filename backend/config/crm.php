@@ -85,4 +85,32 @@ return [
         'max_clock_skew_seconds' => (int) env('CRM_INGEST_MAX_CLOCK_SKEW', 300),
     ],
 
+    /*
+    | L3 — funnel d'ingestion de la COLLECTE (schéma pivot ScrapedRecord).
+    |
+    | `enabled` : à false (défaut), `POST /internal/scraper-result` garde son
+    | comportement HISTORIQUE (log-only, 200 `ingested: true`) — le funnel est
+    | livré mais inerte, fusion sans risque. À true, le même endpoint valide le
+    | pivot, ingère (registre → idempotence → dédup → backfill-only → tags →
+    | timeline) et répond avec l'outcome. Les autres portes (waterfall PHP,
+    | `scraping:ingest-file`) ne dépendent PAS de ce drapeau : elles n'ont pas
+    | de comportement historique à préserver.
+    |
+    | `validate_mx` : validation DNS des emails collectés (« jamais confiance
+    | au collecteur »). false en tests — aucun appel réseau réel, même règle
+    | que les MOCK_*.
+    */
+    'scrape_funnel' => [
+        'enabled' => env('CRM_SCRAPE_FUNNEL_ENABLED', false),
+        'validate_mx' => env('CRM_SCRAPE_VALIDATE_MX', true),
+    ],
+
+    /*
+    | Backfill des tags `src:scraping-*` sur le stock (4,29 M de companies,
+    | décision 2 de l'audit scraping). DERNIER acte de la mission (ordre de
+    | mission §5) : la commande `scraping:backfill-src-tags` refuse tant que ce
+    | drapeau n'est pas à true.
+    */
+    'backfill_enabled' => env('CRM_BACKFILL_ENABLED', false),
+
 ];

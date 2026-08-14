@@ -154,62 +154,12 @@ services:
     networks:
       - axion-crm
 
-  worker-google-maps:
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
-      target: dev
-    container_name: axion-crm-worker-google-maps
-    env_file: .env
-    environment:
-      WORKER_TYPE: google-maps
-      WORKER_REDIS_URL: redis://redis:6379/1
-      WORKER_INTERNAL_RESULT_URL: http://api/internal/scraper-result
-    volumes:
-      - ./workers:/srv/workers:cached
-      - workers-node-modules:/srv/workers/node_modules
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - axion-crm
-
-  worker-pages-jaunes:
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
-      target: dev
-    container_name: axion-crm-worker-pages-jaunes
-    env_file: .env
-    environment:
-      WORKER_TYPE: pages-jaunes
-    volumes:
-      - ./workers:/srv/workers:cached
-      - workers-node-modules:/srv/workers/node_modules
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - axion-crm
-
-  worker-google-search:
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
-      target: dev
-    container_name: axion-crm-worker-google-search
-    env_file: .env
-    environment:
-      WORKER_TYPE: google-search
-    volumes:
-      - ./workers:/srv/workers:cached
-      - workers-node-modules:/srv/workers/node_modules
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - axion-crm
-
+  # Workers Playwright (google-maps / pages-jaunes / google-search) RETIRÉS le
+  # 2026-08-14 (lot L3, décision 1 de l'audit scraping, actée par Will) :
+  # conteneurs fantômes — leurs résultats n'étaient jamais ingérés (le
+  # récepteur /internal/scraper-result ne faisait que logger). Le CODE est
+  # conservé (workers/) et le job CI `workers` continue de le tester sur
+  # runner GitHub. Réactivation = redéclarer les services ici + compose up.
   caddy:
     image: caddy:2-alpine
     container_name: axion-crm-caddy
@@ -238,4 +188,3 @@ volumes:
   caddy-data:
   caddy-config:
   frontend-node-modules:
-  workers-node-modules:

@@ -21,8 +21,9 @@ restart: down up ## Restart complet
 build: ## Rebuild images (multi-stage)
 	docker compose build --pull
 
-logs: ## Tail des logs API + workers
-	docker compose logs -f --tail=100 api horizon worker-google-maps worker-pages-jaunes
+logs: ## Tail des logs API + Horizon
+	# Workers Playwright retirés du compose (2026-08-14, lot L3 décision 1).
+	docker compose logs -f --tail=100 api horizon
 
 ps: ## Liste services + healthchecks
 	docker compose ps
@@ -47,7 +48,9 @@ test: test-backend test-frontend test-workers ## Lance tous les tests unit/integ
 
 test-backend:  ; docker exec axion-crm-api composer test
 test-frontend: ; docker exec axion-crm-app pnpm test
-test-workers:  ; docker exec axion-crm-worker-google-maps pnpm test
+# Workers désactivés en prod (2026-08-14, lot L3 décision 1) : le code est
+# conservé et testé HORS conteneur (même chose que le job CI `workers`).
+test-workers:  ; cd workers && pnpm test
 
 test-e2e: ## Lance les E2E Playwright (3 projets : chromium/firefox/mobile-safari)
 	cd frontend && pnpm e2e
@@ -56,11 +59,11 @@ test-e2e: ## Lance les E2E Playwright (3 projets : chromium/firefox/mobile-safar
 lint:
 	docker exec axion-crm-api composer lint
 	docker exec axion-crm-app pnpm lint
-	docker exec axion-crm-worker-google-maps pnpm lint
+	cd workers && pnpm lint
 
 typecheck:
 	docker exec axion-crm-app pnpm typecheck
-	docker exec axion-crm-worker-google-maps pnpm typecheck
+	cd workers && pnpm typecheck
 
 # --- Sécurité --------------------------------------------------------------
 audit: ## audit:verify-chain

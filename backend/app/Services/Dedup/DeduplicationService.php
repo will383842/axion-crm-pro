@@ -23,20 +23,20 @@ class DeduplicationService
 {
     /** TTL revalidation par source (en jours). */
     public const SOURCE_TTL_DAYS = [
-        'insee'                 => 90,
-        'annuaire-entreprises'  => 30,
-        'bodacc'                => 30,
-        'google-maps'           => 60,
-        'pages-jaunes'          => 90,
-        'website'               => 60,
-        'google-search'         => 30,
-        'direction-finder'      => 90,
-        'france-travail'        => 7,
-        'mesri'                 => 365,
-        'crunchbase'            => 90,
-        'infogreffe'            => 180,
-        'societe-com'           => 180,
-        'social-light'          => 90,
+        'insee' => 90,
+        'annuaire-entreprises' => 30,
+        'bodacc' => 30,
+        'google-maps' => 60,
+        'pages-jaunes' => 90,
+        'website' => 60,
+        'google-search' => 30,
+        'direction-finder' => 90,
+        'france-travail' => 7,
+        'mesri' => 365,
+        'crunchbase' => 90,
+        'infogreffe' => 180,
+        'societe-com' => 180,
+        'social-light' => 90,
     ];
 
     /** Niveau 1 : entreprise existe-t-elle déjà dans le workspace ? */
@@ -53,6 +53,7 @@ class DeduplicationService
     {
         // normalized_hash GENERATED côté Postgres = encode(digest(normalize_name(first || '_' || last) || '_' || company_id, 'sha256'), 'hex')
         $hash = $this->computeContactHash($firstName, $lastName, $companyId);
+
         return Contact::query()
             ->where('workspace_id', $workspaceId)
             ->where('normalized_hash', $hash)
@@ -64,14 +65,15 @@ class DeduplicationService
         // Doit matcher exactement la GENERATED COLUMN côté Postgres (migration 000003).
         // On utilise une approximation côté PHP — la source de vérité reste la DB.
         $normFirst = $this->normalize($firstName ?? '');
-        $normLast  = $this->normalize($lastName);
+        $normLast = $this->normalize($lastName);
+
         return hash('sha256', "{$normFirst}_{$normLast}_{$companyId}");
     }
 
     /** Niveau 3 : un scraping de cette source pour ce target est-il encore "frais" ? */
     public function isScrapeFresh(string $workspaceId, string $source, string $dedupKey): bool
     {
-        $ttlDays = self::SOURCE_TTL_DAYS[$source] ?? 30;
+        $ttlDays = $this->ttlDays($source);
         $cutoff = now()->subDays($ttlDays);
 
         return ScraperRun::query()
@@ -87,19 +89,33 @@ class DeduplicationService
     public function buildDedupKey(string $source, array $context): string
     {
         $canonical = match ($source) {
-            'insee', 'annuaire-entreprises', 'bodacc', 'societe-com', 'infogreffe', 'france-travail', 'crunchbase'
-                => $source . ':siren:' . ($context['siren'] ?? ''),
-            'google-maps'
-                => $source . ':query:' . md5(($context['query'] ?? '') . '|' . ($context['lat'] ?? '') . ',' . ($context['lon'] ?? '')),
-            'pages-jaunes', 'website'
-                => $source . ':url:' . md5((string) ($context['url'] ?? '')),
-            'google-search', 'direction-finder'
-                => $source . ':query:' . md5((string) ($context['query'] ?? '')),
-            default
-                => $source . ':' . md5(json_encode($context)),
+            'insee', 'annuaire-entreprises', 'bodacc', 'societe-com', 'infogreffe', 'france-travail', 'crunchbase' => $source . ':siren:' . ($context['siren'] ?? ''),
+            'google-maps' => $source . ':query:' . md5(($context['query'] ?? '') . '|' . ($context['lat'] ?? '') . ',' . ($context['lon'] ?? '')),
+            'pages-jaunes', 'website' => $source . ':url:' . md5((string) ($context['url'] ?? '')),
+            'google-search', 'direction-finder' => $source . ':query:' . md5((string) ($context['query'] ?? '')),
+            default => $source . ':' . md5(json_encode($context)),
         };
 
         return substr($canonical, 0, 255);
+    }
+
+    /**
+     * TTL d'une source : le REGISTRE (`scraping_sources`, lot L3) fait foi —
+     * modifiable sans redéploiement ; la constante n'est plus qu'un repli pour
+     * les sources pas encore enregistrées (et les suites de tests sans seed).
+     */
+    public function ttlDays(string $source): int
+    {
+        try {
+            // Pas de cache process : un Horizon vit des heures, un TTL changé
+            // au registre doit mordre au prochain job, pas au prochain deploy.
+            $ttl = DB::table('scraping_sources')->where('slug', $source)->value('ttl_days');
+        } catch (\Throwable) {
+            // Table absente (migration pas encore passée) : repli code.
+            $ttl = null;
+        }
+
+        return (int) ($ttl ?? self::SOURCE_TTL_DAYS[$source] ?? 30);
     }
 
     /** Niveau 4 : zone (department × naf × size) est-elle en cooldown ? */
@@ -119,10 +135,10 @@ class DeduplicationService
         DB::table('coverage_zones')->updateOrInsert(
             ['workspace_id' => $workspaceId, 'department' => $department, 'naf' => $naf, 'size_category' => $size],
             [
-                'attempted_at'    => now(),
-                'cooldown_until'  => now()->addHours($cooldownHours),
-                'metadata'        => '{}',
-                'created_at'      => now(),
+                'attempted_at' => now(),
+                'cooldown_until' => now()->addHours($cooldownHours),
+                'metadata' => '{}',
+                'created_at' => now(),
             ],
         );
     }
@@ -141,14 +157,14 @@ class DeduplicationService
         DB::table('email_validations')->updateOrInsert(
             ['email' => strtolower(trim($email))],
             [
-                'status'        => $status,
-                'score'         => $score,
-                'mx_host'       => $mxHost,
-                'is_catchall'   => $catchall,
+                'status' => $status,
+                'score' => $score,
+                'mx_host' => $mxHost,
+                'is_catchall' => $catchall,
                 'is_disposable' => $disposable,
-                'is_role'       => $role,
-                'checked_at'    => now(),
-                'expires_at'    => now()->addDays(30),
+                'is_role' => $role,
+                'checked_at' => now(),
+                'expires_at' => now()->addDays(30),
             ],
         );
     }
@@ -159,6 +175,7 @@ class DeduplicationService
         if (! $email && ! $phone) {
             return false;
         }
+
         return DB::table('opt_out')
             ->when($email !== null, fn ($q) => $q->orWhere('email', strtolower(trim($email))))
             ->when($phone !== null, fn ($q) => $q->orWhere('phone', preg_replace('/[\s.-]/', '', $phone)))
@@ -168,16 +185,17 @@ class DeduplicationService
     public function addOptOut(?string $email, ?string $phone, string $source, ?string $reason = null): void
     {
         DB::table('opt_out')->insert([
-            'email'      => $email ? strtolower(trim($email)) : null,
-            'phone'      => $phone ? preg_replace('/[\s.-]/', '', $phone) : null,
-            'source'     => $source,
-            'reason'     => $reason,
+            'email' => $email ? strtolower(trim($email)) : null,
+            'phone' => $phone ? preg_replace('/[\s.-]/', '', $phone) : null,
+            'source' => $source,
+            'reason' => $reason,
             'created_at' => now(),
         ]);
     }
 
     /**
      * Décide si un job de scraping doit être créé / skippé pour respecter les 6 niveaux.
+     *
      * @return array{should_run: bool, reason: ?string}
      */
     public function shouldRunScrape(string $workspaceId, string $source, array $context): array
@@ -199,6 +217,7 @@ class DeduplicationService
             )) {
             return ['should_run' => false, 'reason' => 'zone_in_cooldown'];
         }
+
         return ['should_run' => true, 'reason' => null];
     }
 
@@ -208,6 +227,7 @@ class DeduplicationService
         $input = preg_replace('/\s+/u', ' ', $input);
         // Approximation unaccent côté PHP (la vraie référence reste Postgres unaccent extension).
         $input = preg_replace('/\\b(de|du|la|le|les|d|l)\\b\\s+/iu', '', $input);
+
         return trim((string) $input);
     }
 }

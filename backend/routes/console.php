@@ -156,3 +156,15 @@ Schedule::command('rgpd:purge-business-prospects')
     ->withoutOverlapping()
     ->onOneServer()
     ->skip(fn (): bool => ! filter_var(config('crm.purges_enabled', false), FILTER_VALIDATE_BOOLEAN));
+
+// Lot L5 (2026-08-14) — mini-outbox CRM → site : les oppositions nées dans la
+// console convergent vers le site (sinon les deux systèmes se réécrivent à des
+// opposés). Construite INERTE : le skip() saute le run tant que
+// CRM_OUTBOUND_ENABLED n'est pas à true, et la commande elle-même refuse
+// (double verrou, comme les purges). withoutOverlapping : deux passages
+// concurrents rejoueraient les mêmes lignes dues.
+Schedule::command('crm:flush-outbound')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->skip(fn (): bool => ! filter_var(config('crm.outbound_enabled', false), FILTER_VALIDATE_BOOLEAN));

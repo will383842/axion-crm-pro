@@ -13,14 +13,15 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * pour la traçabilité (transparence CNIL), `opt_out` pour le droit d'opposition,
  * soft-delete pour le droit à l'effacement.
  *
- * @property int     $id
- * @property string  $workspace_id
- * @property ?int    $media_id
+ * @property int $id
+ * @property string $workspace_id
+ * @property ?int $media_id
  * @property ?string $first_name
  * @property ?string $last_name
  * @property ?string $role
  * @property ?string $beat
- * @property bool    $opt_out
+ * @property ?string $email
+ * @property bool $opt_out
  */
 class Journalist extends Model
 {

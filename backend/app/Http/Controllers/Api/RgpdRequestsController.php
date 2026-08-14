@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Crm\Outbound\ConsentOutboundRecorder;
 use App\Models\RgpdRequest;
 use App\Services\Rgpd\GdprErasureService;
 use App\Services\Rgpd\GdprPortabilityService;
@@ -21,7 +22,9 @@ class RgpdRequestsController extends ApiController
     /**
      * @OA\Get(path="/rgpd/requests", tags={"RGPD"}, summary="Liste demandes RGPD (art. 15-22)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="status", in="query", @OA\Schema(type="string", enum={"pending","done","rejected"})),
+     *
      *     @OA\Response(response=200, description="OK"))
      */
     public function index(Request $r): JsonResponse
@@ -36,10 +39,12 @@ class RgpdRequestsController extends ApiController
                 ->when($r->query('status'), fn ($q, $s) => $q->where('status', $s))
                 ->orderByDesc('requested_at')
                 ->paginate(25);
+
             return $this->ok($rows);
         } catch (\Throwable $e) {
             Log::error('rgpd.requests.index failed', ['exception' => $e->getMessage()]);
             report($e);
+
             return $this->ok(['data' => [], 'meta' => ['total' => 0], 'degraded' => true]);
         }
     }
@@ -47,36 +52,42 @@ class RgpdRequestsController extends ApiController
     /**
      * @OA\Post(path="/rgpd/requests", tags={"RGPD"}, summary="Crée une demande RGPD",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\RequestBody(required=true, @OA\JsonContent(
      *         required={"type","subject_email"},
+     *
      *         @OA\Property(property="type", type="string", enum={"access","portability","erasure","rectification","opposition"}),
      *         @OA\Property(property="subject_email", type="string", format="email"),
      *         @OA\Property(property="metadata", type="object"))),
+     *
      *     @OA\Response(response=201, description="Créée"))
      */
     public function store(Request $r): JsonResponse
     {
         $validated = $r->validate([
-            'type'          => ['required', Rule::in(['access', 'portability', 'erasure', 'rectification', 'opposition'])],
+            'type' => ['required', Rule::in(['access', 'portability', 'erasure', 'rectification', 'opposition'])],
             'subject_email' => ['required', 'email', 'max:254'],
-            'metadata'      => ['nullable', 'array'],
+            'metadata' => ['nullable', 'array'],
         ]);
 
         $req = RgpdRequest::create([
-            'workspace_id'  => app()->bound('workspace.id') ? app('workspace.id') : null,
-            'type'          => $validated['type'],
-            'status'        => 'pending',
+            'workspace_id' => app()->bound('workspace.id') ? app('workspace.id') : null,
+            'type' => $validated['type'],
+            'status' => 'pending',
             'subject_email' => $validated['subject_email'],
-            'requested_at'  => now(),
-            'metadata'      => $validated['metadata'] ?? [],
+            'requested_at' => now(),
+            'metadata' => $validated['metadata'] ?? [],
         ]);
+
         return $this->ok($req, 201);
     }
 
     /**
      * @OA\Post(path="/rgpd/requests/{req}/process", tags={"RGPD"}, summary="Traite une demande (erasure / portability)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="req", in="path", required=true, @OA\Schema(type="integer")),
+     *
      *     @OA\Response(response=200, description="Traité"),
      *     @OA\Response(response=409, description="Déjà traité"))
      */
@@ -87,24 +98,65 @@ class RgpdRequestsController extends ApiController
         }
 
         $result = match ($req->type) {
-            'erasure'     => $this->erasure->erase($req->subject_email),
+            'erasure' => $this->erasure->erase($req->subject_email),
             'portability' => $this->portability->export($req->subject_email),
-            default       => ['noop' => true],
+            default => ['noop' => true],
         };
 
+        if ($req->type === 'erasure') {
+            // Lot L5 — l'effacement décidé DANS la console CRM doit remonter au
+            // site : sinon le site continue d'adresser une personne que le CRM
+            // a effacée. Mise en file locale, jamais un POST synchrone : la
+            // réussite d'un droit art. 17 ne dépend pas de la disponibilité du
+            // site (l'émission est portée par `crm:flush-outbound`).
+            $this->queueOutboundErasure($req->subject_email, $req->id);
+        }
+
         $req->update([
-            'status'       => 'done',
+            'status' => 'done',
             'processed_at' => now(),
             'processed_by' => $r->user()?->id,
-            'metadata'     => array_merge((array) $req->metadata, ['result' => $result]),
+            'metadata' => array_merge((array) $req->metadata, ['result' => $result]),
         ]);
 
         return $this->ok(['request' => $req->fresh(), 'result' => $result]);
     }
 
     /**
+     * Met en file l'événement d'effacement à destination du site (lot L5).
+     *
+     * Enveloppé : une panne de la mini-outbox ne doit JAMAIS faire échouer un
+     * droit RGPD déjà exécuté en base. L'échec est journalisé — pas avalé — et
+     * le batch de réconciliation quotidien (plan §2.9) rattrape la divergence.
+     */
+    private function queueOutboundErasure(string $email, int $requestId): void
+    {
+        try {
+            app(ConsentOutboundRecorder::class)->recordForEmail(
+                'erasure',
+                $email,
+                // L'effacement console porte sur le stock commercial
+                // (contacts / journalistes / médias). Le vivier a son propre
+                // canal, `POST /internal/site-sync/gdpr`, dont l'origine est le
+                // SITE — et qui, lui, ne doit rien réémettre.
+                'business',
+                payload: ['surface' => 'console:rgpd_requests', 'rgpd_request_id' => $requestId],
+            );
+        } catch (\Throwable $e) {
+            Log::error('crm.outbound.record_failed', [
+                'event_type' => 'erasure',
+                'rgpd_request_id' => $requestId,
+                'exception' => $e->getMessage(),
+            ]);
+            report($e);
+        }
+    }
+
+    /**
      * @OA\Get(path="/rgpd/export/{token}", tags={"RGPD"}, summary="Télécharge l'export RGPD via token signé",
+     *
      *     @OA\Parameter(name="token", in="path", required=true, @OA\Schema(type="string", maxLength=64)),
+     *
      *     @OA\Response(response=200, description="JSON export"),
      *     @OA\Response(response=404, description="Token invalide/expiré"))
      */
@@ -114,6 +166,7 @@ class RgpdRequestsController extends ApiController
         if (! $json) {
             return response()->json(['error' => 'invalid_or_expired_token'], 404);
         }
+
         return response()->json(json_decode($json, true), 200, [
             'Content-Disposition' => 'attachment; filename="gdpr-export.json"',
         ]);

@@ -122,7 +122,7 @@ docker compose ps | tee -a "$LOG"
 # --- 8. Migrations + seeders ------------------------------------------------
 log "[8/8] Migrations + seeders…"
 if docker exec axion-crm-api php artisan --version >/dev/null 2>&1; then
-  docker exec axion-crm-api php artisan migrate --force 2>&1 | tee -a "$LOG" || log "⚠️  Migrations failed — voir logs"
+  docker exec axion-crm-api php artisan migrate --force --database=pgsql_owner 2>&1 | tee -a "$LOG" || log "⚠️  Migrations failed — voir logs"
   docker exec axion-crm-api php artisan db:seed --force 2>&1 | tee -a "$LOG" || log "⚠️  Seeders failed — voir logs"
 else
   log "⚠️  artisan pas dispo encore — peut-être que api n'est pas healthy. Vérifier docker compose logs api"

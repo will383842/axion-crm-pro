@@ -166,7 +166,14 @@ jobs:
           if [ "$SKIP_MIGRATE" != "true" ]; then
             echo "::group::php artisan migrate --force (BLOQUANT)"
             # Plus de `|| true` : une migration en échec DOIT casser le déploiement.
-            docker compose exec -u root -T api php artisan migrate --force </dev/null
+            # --database=pgsql_owner (lot L0, 2026-08-14) : les migrations doivent
+            # tourner avec le rôle PROPRIÉTAIRE des tables. Tant que le drapeau
+            # CRM_DB_APP_ROLE_ENABLED est à false, `pgsql_owner` a exactement les
+            # mêmes identifiants que `pgsql` — le changement est donc sans effet
+            # aujourd'hui. Il devient indispensable le jour où l'application
+            # bascule sur le rôle applicatif non-propriétaire `axion_app`, qui
+            # n'a AUCUN droit DDL.
+            docker compose exec -u root -T api php artisan migrate --force --database=pgsql_owner </dev/null
             echo "::endgroup::"
           fi
 
@@ -204,7 +211,7 @@ jobs:
           echo "::endgroup::"
 
           echo "::group::vérification post-déploiement — migrations appliquées"
-          MIGRATE_STATUS="$(docker compose exec -u root -T api php artisan migrate:status --no-ansi </dev/null)"
+          MIGRATE_STATUS="$(docker compose exec -u root -T api php artisan migrate:status --no-ansi --database=pgsql_owner </dev/null)"
           printf '%s\n' "$MIGRATE_STATUS" | tail -20
           if printf '%s\n' "$MIGRATE_STATUS" | grep -qw 'Pending'; then
             echo "::error::des migrations sont encore en attente après le déploiement"

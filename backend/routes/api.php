@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\TagsController;
 use App\Http\Controllers\Api\UsersController;
 use App\Http\Controllers\Api\WorkspaceController;
 use App\Http\Controllers\Internal\ScraperResultController;
+use App\Http\Controllers\Internal\SiteGdprController;
 use App\Http\Controllers\Internal\SiteSyncController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -232,4 +233,10 @@ Route::prefix('internal')->group(function () {
     Route::post('/site-sync', [SiteSyncController::class, 'store'])
         ->middleware('throttle:internal')
         ->name('internal.site-sync');
+
+    // Lot L4 — volet RGPD du même canal : art. 15/17 en une action sur les
+    // deux systèmes. Même HMAC, même drapeau (503 tant que fermé).
+    Route::post('/site-sync/gdpr', [SiteGdprController::class, 'store'])
+        ->middleware('throttle:internal')
+        ->name('internal.site-sync.gdpr');
 });

@@ -113,4 +113,11 @@ return [
     */
     'backfill_enabled' => env('CRM_BACKFILL_ENABLED', false),
 
+    /*
+    | L4 — purges automatiques par univers (plan §2.8.3). À false, les
+    | commandes `rgpd:purge-vivier` / `rgpd:purge-business-prospects` refusent
+    | et le scheduler les saute : construites, testées, inertes.
+    */
+    'purges_enabled' => env('CRM_PURGE_ENABLED', false),
+
 ];

@@ -180,6 +180,12 @@ final class Taxonomy
     public const CANDIDATE_CONSENT_VERSIONS_V2 = [
         'careers-v2-2026-08-13',
         'memo-v2-2026-08-13',
+        // Entrée du STOCK d'avant-v2 (option (b) du plan §2.3, décision actée) :
+        // l'acte juridique n'est pas une case cochée mais l'email d'information
+        // « vivier-information » + 30 jours sans opposition. Le site émet cette
+        // version au J+30 (VIVIER_STOCK_CONSENT_VERSION, src/server/vivier) —
+        // les deux listes bougent ENSEMBLE, sinon 422 en masse à l'intégration.
+        'vivier-stock-2026-08-14',
     ];
 
     /**

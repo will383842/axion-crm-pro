@@ -228,8 +228,10 @@ return new class extends Migration
      */
     private function createApplicationRole(): void
     {
-        $role = (string) (env('DB_APP_USERNAME') ?: 'axion_app');
-        $password = (string) (env('DB_APP_PASSWORD') ?: '');
+        // Lu depuis la CONFIG et non env() : `config:cache` est actif en prod,
+        // où env() renverrait null (règle larastan.noEnvCallsOutsideOfConfig).
+        $role = (string) (config('database.connections.pgsql_app.username') ?: 'axion_app');
+        $password = (string) (config('database.connections.pgsql_app.password') ?: '');
 
         if (! preg_match('/^[a-z_][a-z0-9_]{0,62}$/', $role)) {
             throw new RuntimeException("Nom de rôle applicatif invalide : « {$role} ».");

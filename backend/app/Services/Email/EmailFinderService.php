@@ -6,7 +6,6 @@ use App\Contracts\SmtpProber;
 use App\Data\Email\SmtpProbeResult;
 use App\Services\Dedup\DeduplicationService;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 /**
  * Email finder — génère 18 patterns candidats puis cascade SMTP N1-N5.
@@ -56,7 +55,7 @@ class EmailFinderService
     public function __construct(
         private readonly SmtpProber $prober,
         private readonly DeduplicationService $dedup,
-        private readonly ?\App\Services\Email\HunterEmailVerifier $hunterVerifier = null,
+        private readonly ?HunterEmailVerifier $hunterVerifier = null,
     ) {}
 
     /**
@@ -85,10 +84,10 @@ class EmailFinderService
         $result = $this->hunterVerifier->verify($email, $workspaceId);
 
         return match ($result['status'] ?? 'unknown') {
-            'deliverable'              => 'valid',
+            'deliverable' => 'valid',
             'undeliverable', 'invalid' => 'invalid',
-            'risky', 'accept_all'      => 'catchall',
-            default                    => 'unknown',
+            'risky', 'accept_all' => 'catchall',
+            default => 'unknown',
         };
     }
 
@@ -139,6 +138,7 @@ class EmailFinderService
                     isDisposable: (bool) $cached->is_disposable,
                     isRole: (bool) $cached->is_role,
                 );
+
                 continue;
             }
 
@@ -161,8 +161,13 @@ class EmailFinderService
             }
 
             $this->dedup->setEmailValidationCache(
-                $email, $probe->status, $probe->score, $probe->mxHost,
-                $probe->isCatchAll, $probe->isDisposable, $probe->isRole,
+                $email,
+                $probe->status,
+                $probe->score,
+                $probe->mxHost,
+                $probe->isCatchAll,
+                $probe->isDisposable,
+                $probe->isRole,
             );
             $results[] = $probe;
             if ($probe->status === 'valid' && $probe->score >= 90) {
@@ -171,23 +176,24 @@ class EmailFinderService
         }
 
         usort($results, fn ($a, $b) => $b->score <=> $a->score);
+
         return $results;
     }
 
     /** @return list<string> */
     public function generateCandidates(string $firstName, string $lastName, string $domain): array
     {
-        $first  = $this->normalize($firstName);
-        $last   = $this->normalize($lastName);
-        $f      = $first ? mb_substr($first, 0, 1) : '';
-        $last2  = mb_substr($last, 0, 2);
-        $last3  = mb_substr($last, 0, 3);
+        $first = $this->normalize($firstName);
+        $last = $this->normalize($lastName);
+        $f = $first ? mb_substr($first, 0, 1) : '';
+        $last2 = mb_substr($last, 0, 2);
+        $last3 = mb_substr($last, 0, 3);
 
         $vars = [
             '{first}' => $first, '{last}' => $last,
-            '{f}'     => $f,
+            '{f}' => $f,
             '{last2}' => $last2, '{last3}' => $last3,
-            '{domain}'=> $domain,
+            '{domain}' => $domain,
         ];
 
         $out = [];
@@ -197,6 +203,7 @@ class EmailFinderService
                 $out[] = $email;
             }
         }
+
         return array_values(array_unique($out));
     }
 
@@ -204,19 +211,20 @@ class EmailFinderService
     {
         return strtolower(strtr($pattern, [
             '{first}' => $this->normalize($firstName),
-            '{last}'  => $this->normalize($lastName),
-            '{f}'     => mb_substr($this->normalize($firstName), 0, 1),
+            '{last}' => $this->normalize($lastName),
+            '{f}' => mb_substr($this->normalize($firstName), 0, 1),
             '{last2}' => mb_substr($this->normalize($lastName), 0, 2),
             '{last3}' => mb_substr($this->normalize($lastName), 0, 3),
-            '{domain}'=> $domain,
+            '{domain}' => $domain,
         ]));
     }
 
     public function detectPatternFromKnownEmails(array $emails, string $domain): ?string
     {
         // Si on a au moins 2 emails connus, on détecte le pattern dominant.
-        $candidates = array_count_values(array_filter(array_map(function ($email) use ($domain) {
+        $candidates = array_count_values(array_filter(array_map(function ($email) {
             $local = explode('@', $email)[0] ?? '';
+
             // Identifier les délimiteurs : . _ -
             return preg_match('/^[a-z]\.?[a-z]+$/i', $local) ? '{f}.{last}@{domain}'
                 : (preg_match('/^[a-z]+\.[a-z]+$/i', $local) ? '{first}.{last}@{domain}'
@@ -224,6 +232,7 @@ class EmailFinderService
                 : null));
         }, $emails)));
         arsort($candidates);
+
         return array_key_first($candidates);
     }
 

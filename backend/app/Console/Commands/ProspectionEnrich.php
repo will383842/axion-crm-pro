@@ -127,23 +127,35 @@ class ProspectionEnrich extends Command
         }
 
         $this->info("Enrichissement de {$companies->count()} entreprises…");
-        $site = 0; $tel = 0; $mail = 0; $dir = 0;
+        $site = 0;
+        $tel = 0;
+        $mail = 0;
+        $dir = 0;
 
         foreach ($companies as $c) {
             try {
                 $orch->enrich($c);
             } catch (\Throwable $e) {
                 $this->warn("  {$c->siren} ERREUR: " . mb_substr($e->getMessage(), 0, 120));
+
                 continue;
             }
             $c->refresh();
             $nbDir = DB::table('contacts')->where('company_id', $c->id)->count();
             $email = $c->email_generic
                 ?: DB::table('contacts')->where('company_id', $c->id)->whereNotNull('email')->value('email');
-            if ($c->website) { $site++; }
-            if ($c->phone) { $tel++; }
-            if ($email) { $mail++; }
-            if ($nbDir > 0) { $dir++; }
+            if ($c->website) {
+                $site++;
+            }
+            if ($c->phone) {
+                $tel++;
+            }
+            if ($email) {
+                $mail++;
+            }
+            if ($nbDir > 0) {
+                $dir++;
+            }
 
             $this->line(sprintf(
                 '  • %-28s | site:%-3s tel:%-3s mail:%-24s dirigeants:%d',
@@ -158,8 +170,16 @@ class ProspectionEnrich extends Command
         $n = max(1, $companies->count());
         $this->info(sprintf(
             'RÉSUMÉ : site %d/%d · tél %d/%d · email %d/%d · dirigeants %d/%d',
-            $site, $n, $tel, $n, $mail, $n, $dir, $n,
+            $site,
+            $n,
+            $tel,
+            $n,
+            $mail,
+            $n,
+            $dir,
+            $n,
         ));
+
         return self::SUCCESS;
     }
 }

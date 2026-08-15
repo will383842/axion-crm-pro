@@ -28,12 +28,20 @@ use Illuminate\Support\Facades\DB;
  * On sépare donc par une définition CALCULÉE, toujours fraîche, que l'écran
  * utilise aujourd'hui et que le moteur d'envoi reprendra telle quelle demain.
  *
- * ⚠️ CE QUE CETTE DÉFINITION NE COUVRE PAS ENCORE (à compléter avant le
- * premier envoi réel) : l'historique de rebonds et de plaintes. Les tables
- * `dnc_entries` et `unsubscribes` que le plan supposait présentes N'EXISTENT
- * PAS en base (vérifié le 2026-08-15). Tant qu'elles n'existent pas, un envoi
- * de masse ne doit pas se lancer sur cette seule base — c'est écrit ici plutôt
- * que découvert plus tard.
+ * ── Ce qui est couvert ───────────────────────────────────────────────────
+ * Opposition volontaire (`opt_out`) ET suppression technique
+ * (`email_suppressions` : rebond dur, plainte, rebonds temporaires répétés).
+ * Les tables `dnc_entries` / `unsubscribes` que le plan supposait présentes
+ * n'ont jamais existé ; `email_suppressions` les remplace, avec un vocabulaire
+ * fermé et les deux univers étanches.
+ *
+ * ── Ce qui reste à faire AVANT un envoi réel ─────────────────────────────
+ * Cette définition dit qui l'on a le DROIT de contacter. Elle ne remplace pas
+ * la mécanique d'envoi elle-même (lot L7, reporté) : domaine dédié, SPF/DKIM/
+ * DMARC, réception des retours du fournisseur pour ALIMENTER cette liste, et
+ * désinscription un clic (RFC 8058). Une liste de suppression que personne ne
+ * remplit reste vide, donc muette — c'est le raccordement des webhooks qui la
+ * rendra vivante.
  */
 final class EligibiliteCampagne
 {
@@ -70,11 +78,23 @@ final class EligibiliteCampagne
             $query->whereIn('best_email_confidence', array_values(array_intersect($paliers, self::PALIERS)));
         }
 
-        // Opposition : comparaison sur l'adresse elle-même (colonne `citext`,
-        // donc insensible à la casse) ET sur son empreinte, parce que les
-        // oppositions venues du site arrivent hachées — une opposition qui ne
-        // serait reconnue que sous une seule des deux formes ne garde rien.
-        return $query->whereNotExists(function (\Illuminate\Database\Query\Builder $sub): void {
+        // DEUX portes, et il faut passer les deux :
+        //
+        //  1. OPPOSITION (`opt_out`) — la personne a dit non. C'est une
+        //     VOLONTÉ : elle a une valeur juridique et ne s'efface jamais.
+        //  2. SUPPRESSION (`email_suppressions`) — rebond dur, plainte,
+        //     rebonds temporaires répétés. C'est un FAIT technique.
+        //
+        // Les deux sont séparées à dessein : les confondre rendrait impossible
+        // de répondre à « cette personne s'est-elle opposée ? », la seule
+        // question que pose la CNIL. Mais pour l'ENVOI, l'une comme l'autre
+        // interdit d'écrire.
+        //
+        // Comparaison sur l'adresse (colonne `citext`, insensible à la casse)
+        // ET sur son empreinte : les signaux venus du site arrivent hachés,
+        // ceux d'un fournisseur d'envoi arrivent en clair. Une garde qui ne
+        // reconnaîtrait qu'une seule forme serait aveugle une fois sur deux.
+        $query->whereNotExists(function (\Illuminate\Database\Query\Builder $sub): void {
             $sub->select(DB::raw('1'))
                 ->from('opt_out')
                 ->where('opt_out.scope', 'business')
@@ -86,6 +106,16 @@ final class EligibiliteCampagne
                         // ici — un `trim` oublié, un sel ajouté — produirait
                         // une garde silencieusement inopérante.
                         ->orWhereRaw("opt_out.email_hash = encode(digest(btrim(lower(companies.email_generic)), 'sha256'), 'hex')");
+                });
+        });
+
+        return $query->whereNotExists(function (\Illuminate\Database\Query\Builder $sub): void {
+            $sub->select(DB::raw('1'))
+                ->from('email_suppressions')
+                ->where('email_suppressions.scope', 'business')
+                ->where(function (\Illuminate\Database\Query\Builder $su): void {
+                    $su->whereColumn('email_suppressions.email', 'companies.email_generic')
+                        ->orWhereRaw("email_suppressions.email_hash = encode(digest(btrim(lower(companies.email_generic)), 'sha256'), 'hex')");
                 });
         });
     }

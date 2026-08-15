@@ -20,7 +20,9 @@ export interface HeaderProps {
 export function Header({ onOpenMobileSidebar, onOpenMobileSearch }: HeaderProps) {
   return (
     <header
-      className="sticky top-0 z-20 flex items-center gap-2 border-b border-slate-200 bg-white/90 px-4 py-2.5 backdrop-blur md:px-6 dark:border-slate-800 dark:bg-slate-900/90"
+      // Bleu profond, comme la barre latérale : navigation et repères se lisent
+      // d'un bloc, le contenu reste la seule zone claire de l'écran.
+      className="sticky top-0 z-20 flex items-center gap-2 border-b border-sidebar-border bg-sidebar px-4 py-2.5 md:px-6"
       role="banner"
     >
       {/* Mobile : hamburger */}
@@ -29,7 +31,7 @@ export function Header({ onOpenMobileSidebar, onOpenMobileSearch }: HeaderProps)
         onClick={onOpenMobileSidebar}
         variant="ghost"
         size="sm"
-        className="lg:hidden"
+        className="lg:hidden text-sidebar-fg hover:bg-white/10 hover:text-white"
       >
         <Menu className="h-4 w-4" />
       </IconButton>
@@ -51,13 +53,19 @@ export function Header({ onOpenMobileSidebar, onOpenMobileSearch }: HeaderProps)
           onClick={onOpenMobileSearch}
           variant="ghost"
           size="sm"
+          className="text-sidebar-fg hover:bg-white/10 hover:text-white"
         >
           <SearchIcon className="h-4 w-4" />
         </IconButton>
       </div>
 
       {/* Notifications */}
-      <IconButton label="Notifications" variant="ghost" size="sm">
+      <IconButton
+        label="Notifications"
+        variant="ghost"
+        size="sm"
+        className="text-sidebar-fg hover:bg-white/10 hover:text-white"
+      >
         <Bell className="h-4 w-4" />
       </IconButton>
 

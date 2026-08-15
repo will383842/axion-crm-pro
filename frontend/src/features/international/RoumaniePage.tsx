@@ -47,6 +47,7 @@ type CompanyRow = {
   phone: string | null;
   email_generic: string | null;
   entity_nature: string | null;
+  prospection_status: string | null;
   siren: string | null;
 };
 
@@ -57,16 +58,21 @@ type ListResponse = {
 
 export function RoumaniePage() {
   const [nature, setNature] = useState('');
+  const [onlyContactable, setOnlyContactable] = useState(false);
   const [page, setPage] = useState(1);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['roumanie', nature, page],
+    queryKey: ['roumanie', nature, onlyContactable, page],
     queryFn: async () => {
       const params = new URLSearchParams({
         'filter[country_code]': 'RO',
         page: String(page),
         per_page: '50',
         ...(nature ? { 'filter[entity_nature]': nature } : {}),
+        // `ready_for_outreach` est le statut que le CRM pose lui-même dès
+        // qu'une fiche a un canal e-mail exploitable : c'est LA liste de
+        // départ d'une campagne, par opposition aux fiches sans adresse.
+        ...(onlyContactable ? { 'filter[prospection_status]': 'ready_for_outreach' } : {}),
       });
 
       return (await api.get<ListResponse>(`/companies?${params.toString()}`)).data;
@@ -77,6 +83,11 @@ export function RoumaniePage() {
     setNature(value);
     // Sans ce reset, passer d'un onglet volumineux à un onglet court laisse
     // l'utilisateur sur une page 7 vide, qui se lit comme « aucun résultat ».
+    setPage(1);
+  }
+
+  function toggleContactable(checked: boolean) {
+    setOnlyContactable(checked);
     setPage(1);
   }
 
@@ -109,6 +120,16 @@ export function RoumaniePage() {
         ))}
       </div>
 
+      <label className="mb-4 flex w-fit items-center gap-2 text-sm text-slate-700">
+        <input
+          type="checkbox"
+          checked={onlyContactable}
+          onChange={(e) => toggleContactable(e.target.checked)}
+          className="h-4 w-4 rounded border-slate-300"
+        />
+        Contactables uniquement (avec e-mail)
+      </label>
+
       {isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
       {isError && <p className="text-sm text-red-600">Impossible de charger le vivier Roumanie.</p>}
 
@@ -128,6 +149,7 @@ export function RoumaniePage() {
                   <th className="px-3 py-2">E-mail</th>
                   <th className="px-3 py-2">Téléphone</th>
                   <th className="px-3 py-2">Site</th>
+                  <th className="px-3 py-2">Statut</th>
                 </tr>
               </thead>
               <tbody>
@@ -160,11 +182,20 @@ export function RoumaniePage() {
                         '—'
                       )}
                     </td>
+                    <td className="px-3 py-2">
+                      {row.prospection_status === 'ready_for_outreach' ? (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                          Contactable
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">Sans e-mail</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-3 py-6 text-center text-slate-500">
+                    <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
                       Aucune fiche pour cette nature.
                     </td>
                   </tr>

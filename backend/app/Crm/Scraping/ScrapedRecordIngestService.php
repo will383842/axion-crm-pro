@@ -2,6 +2,8 @@
 
 namespace App\Crm\Scraping;
 
+use App\Models\Company;
+use App\Services\Tags\AutoTaggerService;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -148,6 +150,22 @@ final class ScrapedRecordIngestService
         }
 
         $tags = $this->attachSourceTag($record, $workspaceId, $companyId);
+
+        // Le tag `implantation-<pays>` n'est JAMAIS posé à la main : il est
+        // DÉRIVÉ de `signals.implantations` par l'AutoTagger (sinon la resync
+        // de l'enrichissement le supprimerait, cf. AutoTaggerService). On
+        // déclenche la synchro tout de suite pour que la fiche soit classée
+        // dès l'import, sans attendre une passe d'enrichissement.
+        if ($record->implantations !== []) {
+            $company = Company::query()->find($companyId);
+            if ($company !== null) {
+                $tags = array_values(array_unique(array_merge(
+                    $tags,
+                    (new AutoTaggerService)->syncTags($company)['added'],
+                )));
+            }
+        }
+
         $activityId = $this->recordActivity($record, $workspaceId, $companyId, pendingMatch: false);
 
         $outcome = new ScrapeIngestOutcome(
@@ -186,7 +204,7 @@ final class ScrapedRecordIngestService
                 'siren' => $record->siren,
                 'discovery_source' => $record->source,
                 'quality_score' => 0,
-                'signals' => $this->encodeObject($this->channelSignals($record, [])),
+                'signals' => $this->encodeObject($this->implantationSignals($record, $this->channelSignals($record, []))),
                 'metadata' => '{}',
                 'relation_type' => 'prospect',
                 'lifecycle_stage' => 'nouveau',
@@ -233,7 +251,7 @@ final class ScrapedRecordIngestService
             $written[] = $column;
         }
 
-        $signals = $this->channelSignals($record, $this->decodeSignals($existing->signals ?? null));
+        $signals = $this->implantationSignals($record, $this->channelSignals($record, $this->decodeSignals($existing->signals ?? null)));
         $update['signals'] = $this->encodeObject($signals);
         $update['field_origins'] = $this->encodeObject($origins);
         $update['last_seen_at'] = now();
@@ -272,6 +290,43 @@ final class ScrapedRecordIngestService
      * cumulée sans doublon — même emplacement que le scraper mentions légales
      * existant, donc consommable par les mêmes écrans.
      *
+     * @param  array<string, mixed>  $signals
+     * @return array<string, mixed>
+     */
+    /**
+     * Fusionne les implantations à l'étranger dans `signals.implantations`
+     * (objet clef = code pays ISO2). Même verrou que le reste du funnel :
+     * BACKFILL-ONLY — une valeur déjà présente n'est jamais écrasée, une
+     * nouvelle collecte ne fait que compléter les trous.
+     *
+     * @param  array<string, mixed>  $signals
+     * @return array<string, mixed>
+     */
+    private function implantationSignals(ScrapedRecord $record, array $signals): array
+    {
+        if ($record->implantations === []) {
+            return $signals;
+        }
+
+        $existing = is_array($signals['implantations'] ?? null) ? $signals['implantations'] : [];
+
+        foreach ($record->implantations as $implantation) {
+            $country = $implantation['country'];
+            $current = is_array($existing[$country] ?? null) ? $existing[$country] : [];
+            foreach (['name_local', 'city', 'registry_id'] as $key) {
+                if (($current[$key] ?? '') === '' && ($implantation[$key] ?? '') !== '') {
+                    $current[$key] = $implantation[$key];
+                }
+            }
+            $existing[$country] = $current === [] ? (object) [] : $current;
+        }
+
+        $signals['implantations'] = $existing;
+
+        return $signals;
+    }
+
+    /**
      * @param  array<string, mixed>  $signals
      * @return array<string, mixed>
      */

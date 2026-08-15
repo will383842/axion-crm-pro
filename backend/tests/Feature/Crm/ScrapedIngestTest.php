@@ -4,12 +4,16 @@ use App\Crm\Scraping\ScrapedRecord;
 use App\Crm\Scraping\ScrapedRecordIngestService;
 use App\Crm\Scraping\ScrapeIngestOutcome;
 use App\Crm\Scraping\ScrapeIngestRejection;
+use App\Models\Company;
+use App\Services\Tags\AutoTaggerService;
+use App\Support\CompanyQueryFilters;
 use Database\Seeders\GovernedTagsSeeder;
 use Database\Seeders\ScrapingSourcesSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Spatie\QueryBuilder\QueryBuilder;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -502,3 +506,119 @@ function zzCheckFixture(string $ws): array
 
     return [$companyId, $tagId];
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8. IMPLANTATIONS À L'ÉTRANGER — campagne « entreprises FR implantées en
+//    Roumanie » : signals.implantations + tag geo `implantation-<pays>` dérivé
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('implantations : un code pays invalide ou une clé inconnue rejettent le message', function () {
+    expect(fn () => ingestScrape(scrapedRecord([
+        'company' => ['implantations' => [['country' => 'ROU']]],
+    ])))->toThrow(ScrapeIngestRejection::class, 'ISO 3166-1');
+
+    expect(fn () => ingestScrape(scrapedRecord([
+        'company' => ['implantations' => [['country' => 'RO', 'cui' => 'RO123']]],
+    ])))->toThrow(ScrapeIngestRejection::class);
+});
+
+test('une implantation est fusionnée dans signals et le tag implantation-<pays> est posé DÈS l\'import', function () {
+    $outcome = ingestScrape(scrapedRecord([
+        'source' => 'implantations-fr-etranger',
+        'company' => [
+            'implantations' => [[
+                'country' => 'ro',
+                'name_local' => 'ZZ Scrape Romania SRL',
+                'city' => 'Bucarest',
+                'registry_id' => 'RO12345678',
+            ]],
+        ],
+    ]));
+
+    expect($outcome->status)->toBe('created');
+
+    $company = DB::table('companies')->where('siren', '900000202')->first();
+    $signals = json_decode((string) $company->signals, true);
+    // Le code pays est NORMALISÉ en majuscules à la porte du pivot.
+    expect($signals['implantations']['RO']['name_local'])->toBe('ZZ Scrape Romania SRL')
+        ->and($signals['implantations']['RO']['city'])->toBe('Bucarest')
+        ->and($signals['implantations']['RO']['registry_id'])->toBe('RO12345678');
+
+    $tags = DB::table('company_tag')
+        ->join('tags', 'tags.id', '=', 'company_tag.tag_id')
+        ->where('company_tag.company_id', $company->id)
+        ->select('tags.slug', 'tags.category', 'tags.kind')
+        ->get();
+    $slugs = $tags->pluck('slug')->all();
+
+    // Classement complet dès l'import : provenance + géographie d'implantation.
+    expect($slugs)->toContain('src:scraping-implantations-fr-etranger')
+        ->and($slugs)->toContain('implantation-ro');
+
+    $geoTag = $tags->firstWhere('slug', 'implantation-ro');
+    expect($geoTag->category)->toBe('geo')
+        ->and($geoTag->kind)->toBe('auto');
+});
+
+test('BACKFILL-ONLY sur les implantations : une valeur existante n\'est jamais écrasée', function () {
+    ingestScrape(scrapedRecord([
+        'source' => 'implantations-fr-etranger',
+        'company' => ['implantations' => [['country' => 'RO', 'name_local' => 'ZZ Scrape Romania SRL']]],
+    ]));
+
+    ingestScrape(scrapedRecord([
+        'source' => 'implantations-fr-etranger',
+        'run_id' => (string) Str::uuid(),
+        'company' => ['implantations' => [['country' => 'RO', 'name_local' => 'AUTRE NOM SRL', 'city' => 'Cluj-Napoca']]],
+    ]));
+
+    $signals = json_decode((string) DB::table('companies')->where('siren', '900000202')->value('signals'), true);
+    // Le nom existant survit, le trou (ville) est comblé.
+    expect($signals['implantations']['RO']['name_local'])->toBe('ZZ Scrape Romania SRL')
+        ->and($signals['implantations']['RO']['city'])->toBe('Cluj-Napoca');
+});
+
+test('la resync AutoTagger ne supprime NI le tag src: NI le tag implantation- (le tag est dérivé des données)', function () {
+    ingestScrape(scrapedRecord([
+        'source' => 'implantations-fr-etranger',
+        'company' => ['implantations' => [['country' => 'RO']]],
+    ]));
+
+    $company = Company::query()->where('siren', '900000202')->firstOrFail();
+    // Une passe d'enrichissement rejoue la synchro : rien de ce qui classe la
+    // fiche ne doit disparaître (le défaut exact que corrige la garde src:).
+    (new AutoTaggerService)->syncTags($company);
+
+    $slugs = DB::table('company_tag')
+        ->join('tags', 'tags.id', '=', 'company_tag.tag_id')
+        ->where('company_tag.company_id', $company->id)
+        ->pluck('tags.slug')->all();
+
+    expect($slugs)->toContain('src:scraping-implantations-fr-etranger')
+        ->and($slugs)->toContain('implantation-ro');
+});
+
+test('filter[tag] retrouve le segment implantation-ro dans la liste (et donc l\'export, qui partage la query)', function () {
+    ingestScrape(scrapedRecord([
+        'source' => 'implantations-fr-etranger',
+        'company' => ['implantations' => [['country' => 'RO']]],
+    ]));
+    // Une fiche témoin SANS implantation, qui ne doit pas ressortir.
+    ingestScrape(scrapedRecord([
+        'run_id' => (string) Str::uuid(),
+        'company' => ['siren' => '900000203', 'fields' => ['denomination' => 'ZZ TEMOIN SARL']],
+        'persons' => [],
+    ]));
+
+    $found = QueryBuilder::for(Company::query()->whereNull('deleted_at'))
+        ->allowedFilters(CompanyQueryFilters::allowed())
+        ->get();
+    expect($found)->toHaveCount(2);
+
+    request()->merge(['filter' => ['tag' => 'implantation-ro']]);
+    $filtered = QueryBuilder::for(Company::query()->whereNull('deleted_at'))
+        ->allowedFilters(CompanyQueryFilters::allowed())
+        ->get();
+    expect($filtered)->toHaveCount(1)
+        ->and($filtered->first()->siren)->toBe('900000202');
+});

@@ -129,6 +129,13 @@ class ScrapingSourcesSeeder extends Seeder
             'dedup_key_pattern' => 'url',
             'legal_note' => 'Mentions légales : publication OBLIGATOIRE (LCEN art. 6-III) des coordonnées de l\'éditeur professionnel.',
         ],
+        'implantations-fr-etranger' => [
+            'name' => 'Implantations françaises à l\'étranger (annuaires publics)',
+            'kind' => 'import',
+            'ttl_days' => 180,
+            'dedup_key_pattern' => 'siren',
+            'legal_note' => 'Annuaires publics d\'organismes officiels et para-publics (CCI françaises à l\'étranger — pages publiques, DG Trésor, CCEF, Team France Export) et communication institutionnelle des entreprises elles-mêmes. Données d\'identification d\'entreprises B2B, SIREN résolu via l\'API publique recherche-entreprises (data.gouv). Aucune PII au-delà des dirigeants publiés au registre.',
+        ],
         'gplaces' => [
             'name' => 'Google Places API',
             'kind' => 'api',

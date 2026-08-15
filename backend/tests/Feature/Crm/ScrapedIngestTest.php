@@ -6,6 +6,7 @@ use App\Crm\Scraping\ScrapeIngestOutcome;
 use App\Crm\Scraping\ScrapeIngestRejection;
 use Database\Seeders\GovernedTagsSeeder;
 use Database\Seeders\ScrapingSourcesSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -411,3 +412,93 @@ test('un email au domaine non résolvable est rejeté : pas de fiche sur une adr
     expect($outcome->emailsRejectedMx)->toBe(1)
         ->and(DB::table('contacts')->count())->toBe(0);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RÉGRESSION PRODUCTION 2026-08-15 — le backfill a été refusé par le CHECK de
+// `company_tag.assigned_by` (vocabulaire fermé). La valeur dédiée
+// `backfill-src` est ce qui rend le rollback CHIRURGICAL : sans elle, annuler
+// le backfill effacerait aussi les étiquettes posées par l'ingestion.
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('le marqueur backfill-src est accepté et rend le rollback CHIRURGICAL', function () {
+    $ws = scrapeWorkspaceId();
+    [$companyId, $tagId] = zzCheckFixture($ws);
+
+    // Deux tags distincts : la PK de company_tag est (company_id, tag_id),
+    // une même paire ne peut pas porter deux provenances.
+    $tagIngestion = (int) DB::table('tags')->insertGetId([
+        'workspace_id' => $ws,
+        'slug' => 'src:site-formulaire-audit',
+        'name' => 'Formulaire — audit',
+        'category' => 'intent',
+        'kind' => 'auto',
+        'rules' => '{}',
+        'is_locked' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    // Les deux provenances coexistent…
+    DB::table('company_tag')->insert([
+        ['company_id' => $companyId, 'tag_id' => $tagId, 'workspace_id' => $ws, 'assigned_by' => 'backfill-src', 'assigned_at' => now()],
+        ['company_id' => $companyId, 'tag_id' => $tagIngestion, 'workspace_id' => $ws, 'assigned_by' => 'auto-rule', 'assigned_at' => now()],
+    ]);
+
+    // …et annuler le backfill ne touche PAS ce que l'ingestion a posé.
+    // C'est TOUTE la raison d'être du marqueur dédié : avec `auto-rule`
+    // partout, le rollback du backfill effacerait aussi les étiquettes des
+    // fiches réellement ingérées.
+    DB::table('company_tag')->where('assigned_by', 'backfill-src')->delete();
+
+    expect(DB::table('company_tag')->where('assigned_by', 'auto-rule')->count())->toBe(1)
+        ->and(DB::table('company_tag')->where('assigned_by', 'backfill-src')->count())->toBe(0);
+});
+
+test('le vocabulaire de assigned_by reste FERMÉ : une valeur inventée est refusée', function () {
+    // ⚠️ Test isolé : une violation de contrainte AVORTE la transaction de
+    // RefreshDatabase (SQLSTATE 25P02) — toute assertion qui suivrait dans le
+    // même test échouerait pour cette raison, pas pour la bonne.
+    $ws = scrapeWorkspaceId();
+    [$companyId, $tagId] = zzCheckFixture($ws);
+
+    expect(fn () => DB::table('company_tag')->insert([
+        'company_id' => $companyId,
+        'tag_id' => $tagId,
+        'workspace_id' => $ws,
+        'assigned_by' => 'valeur-inventee',
+        'assigned_at' => now(),
+    ]))->toThrow(QueryException::class);
+});
+
+/**
+ * @return array{0: int, 1: int} [company_id, tag_id]
+ */
+function zzCheckFixture(string $ws): array
+{
+    $companyId = (int) DB::table('companies')->insertGetId([
+        'workspace_id' => $ws,
+        'siren' => '900000707',
+        'denomination' => 'ZZ CHECK SAS',
+        'signals' => '{}',
+        'metadata' => '{}',
+        'quality_score' => 0,
+        'relation_type' => 'prospect',
+        'lifecycle_stage' => 'nouveau',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $tagId = (int) DB::table('tags')->insertGetId([
+        'workspace_id' => $ws,
+        'slug' => 'src:scraping-insee',
+        'name' => 'Collecte — INSEE',
+        'category' => 'intent',
+        'kind' => 'auto',
+        'rules' => '{}',
+        'is_locked' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    return [$companyId, $tagId];
+}

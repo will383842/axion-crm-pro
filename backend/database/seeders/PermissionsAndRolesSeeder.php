@@ -26,6 +26,13 @@ class PermissionsAndRolesSeeder extends Seeder
             ['name' => 'users.manage',          'description' => 'Gérer utilisateurs'],
             ['name' => 'audit.view',            'description' => 'Voir audit log'],
             ['name' => 'data.export',           'description' => 'Exporter données'],
+            // Voir les coordonnées COMPLÈTES en liste (§2.10). Déclarée ICI en
+            // plus de la migration 2026_08_15_000005 : la migration sert les
+            // bases DÉJÀ semées (production), ce seeder sert les installations
+            // fraîches et les tests, où les rôles n'existent pas encore quand
+            // les migrations passent. Les deux chemins doivent donner le même
+            // résultat, sinon la garde dépend de l'ordre d'installation.
+            ['name' => 'contacts.view_pii',     'description' => 'Voir les coordonnées complètes'],
         ];
 
         foreach ($permissions as $perm) {
@@ -55,9 +62,9 @@ class PermissionsAndRolesSeeder extends Seeder
             'owner' => array_column($permissions, 'name'),
             'admin' => ['companies.view', 'companies.create', 'companies.update', 'companies.delete',
                 'scraping.run', 'scraping.config', 'llm.config', 'llm.view_usage',
-                'proxies.config', 'rgpd.view', 'rgpd.handle', 'users.manage', 'audit.view', 'data.export'],
+                'proxies.config', 'rgpd.view', 'rgpd.handle', 'users.manage', 'audit.view', 'data.export', 'contacts.view_pii'],
             'operator' => ['companies.view', 'companies.create', 'companies.update',
-                'scraping.run', 'llm.view_usage', 'rgpd.view', 'data.export'],
+                'scraping.run', 'llm.view_usage', 'rgpd.view', 'data.export', 'contacts.view_pii'],
             'viewer' => ['companies.view', 'llm.view_usage', 'rgpd.view'],
         ];
 

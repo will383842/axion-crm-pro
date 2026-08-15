@@ -7,6 +7,8 @@ use App\Models\Company;
 use App\Services\Email\EmailConfidenceService;
 use App\Services\Waterfall\WaterfallOrchestrator;
 use App\Support\CompanyQueryFilters;
+use App\Support\MasquageCoordonnees;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -50,15 +52,55 @@ class CompaniesController extends ApiController
             ]);
         }
 
+        // 🔴 Scope EXPLICITE, comme `export()` le porte déjà. Cette liste ne
+        // s'appuyait QUE sur la RLS : la défense en profondeur du lot L0 vaut
+        // pour les DEUX couches, pas pour l'une OU l'autre. Un test
+        // d'étanchéité (`EtancheiteUniversTest`) l'a découvert — un membre du
+        // seul vivier obtenait des fiches commerciales dès que la RLS n'était
+        // pas la couche active.
+        $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
+
+        if ($workspaceId === null) {
+            return $this->ok([
+                'data' => [],
+                'meta' => ['total' => 0, 'per_page' => $perPage, 'current_page' => 1, 'last_page' => 1],
+            ]);
+        }
+
         try {
+            // Les méthodes de `QueryBuilder` (allowedSorts/defaultSort) AVANT
+            // le `where` Eloquent : l'ordre inverse perd le type et le scope
+            // ne compilerait pas.
             $query = $this->buildFilteredQuery()
                 ->allowedSorts(['quality_score', 'enriched_at', 'denomination', 'created_at'])
-                ->defaultSort('-quality_score');
+                ->defaultSort('-quality_score')
+                ->where('workspace_id', $workspaceId);
 
             $page = $query->paginate($perPage);
 
+            // Masquage des coordonnées pour les comptes en lecture seule
+            // (§2.10). On ne transforme la sortie QUE dans ce cas : pour les
+            // autres rôles, la forme de la réponse reste rigoureusement celle
+            // d'avant — un masquage ne doit pas devenir une refonte d'API.
+            $lignes = MasquageCoordonnees::requis()
+                // Le paginateur est typé `Model` : on ne présume pas de la
+                // classe concrète, on masque les colonnes si elles existent.
+                ? array_map(static function (Model $ligne): Model {
+                    $ligne->setAttribute(
+                        'email_generic',
+                        MasquageCoordonnees::email($ligne->getAttribute('email_generic')),
+                    );
+                    $ligne->setAttribute(
+                        'phone',
+                        MasquageCoordonnees::telephone($ligne->getAttribute('phone')),
+                    );
+
+                    return $ligne;
+                }, $page->items())
+                : $page->items();
+
             return $this->ok([
-                'data' => $page->items(),
+                'data' => $lignes,
                 'meta' => [
                     'total' => $page->total(),
                     'per_page' => $page->perPage(),

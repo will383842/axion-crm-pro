@@ -102,7 +102,10 @@ function CandidatesContent() {
       />
 
       <div className="mt-4">
-        {list.isLoading ? (
+        {/* Même raison qu'au hub de contacts : sous `placeholderData`,
+            `isLoading` reste faux au changement de vue et l'état vide de la vue
+            PRÉCÉDENTE s'affiche pendant le chargement de la suivante. */}
+        {list.isLoading || list.isPlaceholderData ? (
           <ConsoleListSkeleton />
         ) : rows.length === 0 ? (
           <EmptyState

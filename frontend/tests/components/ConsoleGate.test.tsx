@@ -73,3 +73,27 @@ describe('ConsoleGate', () => {
     expect(screen.getByText('Contenu de la console')).toBeInTheDocument();
   });
 });
+
+/**
+ * « Console non activée » est une AFFIRMATION. Tant que `/config/features` n'a
+ * pas répondu, on n'en sait rien : la console reste fermée (fail-closed), mais
+ * elle se tait. Ce message s'affichait à chaque ouverture de page, plusieurs
+ * secondes, y compris sur un serveur où la console EST activée.
+ */
+describe('ConsoleGate — tant que le drapeau n’a pas répondu', () => {
+  it('reste muet et fermé pendant le chargement', () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+
+    const { container } = render(
+      <QueryClientProvider client={client}>
+        <ConsoleGate>
+          <p>Contenu de la console</p>
+        </ConsoleGate>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.queryByText('Contenu de la console')).not.toBeInTheDocument();
+    expect(screen.queryByText('Console non activée')).not.toBeInTheDocument();
+    expect(container.querySelector('[aria-hidden="true"]')).not.toBeNull();
+  });
+});

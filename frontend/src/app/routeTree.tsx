@@ -7,6 +7,7 @@ import { PasswordResetPage } from '@/features/auth/PasswordResetPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { CompaniesListPage } from '@/features/companies/CompaniesListPage';
 import { CompanyDetailPage } from '@/features/companies/CompanyDetailPage';
+import { RoumaniePage } from '@/features/international/RoumaniePage';
 import { ContactsListPage } from '@/features/contacts/ContactsListPage';
 import { MediaListPage } from '@/features/media/MediaListPage';
 import { MediaDetailPage } from '@/features/media/MediaDetailPage';
@@ -64,6 +65,7 @@ const dashboardRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/
 const companiesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/companies', component: CompaniesListPage });
 const companyDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/companies/$companyId', component: CompanyDetailPage });
 const contactsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/contacts', component: ContactsListPage });
+const roumanieRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/international/roumanie', component: RoumaniePage });
 const mediaRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/media', component: MediaListPage });
 const mediaDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/media/$mediaId', component: MediaDetailPage });
 const journalistsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/journalists', component: JournalistsListPage });
@@ -112,6 +114,7 @@ export const routeTree = rootRoute.addChildren([
     companiesRoute,
     companyDetailRoute,
     contactsRoute,
+    roumanieRoute,
     mediaRoute,
     mediaDetailRoute,
     journalistsRoute,

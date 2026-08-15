@@ -68,6 +68,26 @@ const PROSPECTION_TABS = [
   { value: "archived_no_email", label: "Archivés" },
 ];
 
+// Prospection internationale : sans ces deux filtres, les fiches étrangères
+// restent noyées dans les 4,29 M de fiches françaises et aucune campagne ne
+// peut les viser. « Tous pays » laisse le comportement historique inchangé.
+const COUNTRY_OPTIONS = [
+  { value: "", label: "Tous pays" },
+  { value: "FR", label: "France" },
+  { value: "RO", label: "Roumanie" },
+];
+
+const NATURE_OPTIONS = [
+  { value: "", label: "Toutes natures" },
+  { value: "entreprise", label: "Entreprises" },
+  { value: "association", label: "Associations" },
+  { value: "cci", label: "Chambres de commerce" },
+  { value: "enseignement", label: "Enseignement" },
+  { value: "cabinet", label: "Cabinets (conseil, avocats)" },
+  { value: "institution", label: "Institutions" },
+  { value: "media", label: "Médias" },
+];
+
 const SECTOR_OPTIONS = [
   { value: "", label: "Tous secteurs" },
   { value: "it_saas", label: "IT / SaaS" },
@@ -99,6 +119,8 @@ interface Filter {
   department_code: string;
   region_code: string;
   sector_main: string;
+  country_code: string;
+  entity_nature: string;
 }
 
 const EMPTY_FILTER: Filter = {
@@ -112,6 +134,8 @@ const EMPTY_FILTER: Filter = {
   department_code: "",
   region_code: "",
   sector_main: "",
+  country_code: "",
+  entity_nature: "",
 };
 
 export function CompaniesListPage() {
@@ -134,6 +158,8 @@ export function CompaniesListPage() {
       ...(filter.department_code ? { "filter[department_code]": filter.department_code } : {}),
       ...(filter.region_code ? { "filter[region_code]": filter.region_code } : {}),
       ...(filter.sector_main ? { "filter[sector_main]": filter.sector_main } : {}),
+      ...(filter.country_code ? { "filter[country_code]": filter.country_code } : {}),
+      ...(filter.entity_nature ? { "filter[entity_nature]": filter.entity_nature } : {}),
     });
   }
 
@@ -178,6 +204,8 @@ export function CompaniesListPage() {
         ...(filter.department_code ? { "filter[department_code]": filter.department_code } : {}),
         ...(filter.region_code ? { "filter[region_code]": filter.region_code } : {}),
         ...(filter.sector_main ? { "filter[sector_main]": filter.sector_main } : {}),
+      ...(filter.country_code ? { "filter[country_code]": filter.country_code } : {}),
+      ...(filter.entity_nature ? { "filter[entity_nature]": filter.entity_nature } : {}),
       });
       const r = await api.get<CompaniesResponse>(`/companies?${params.toString()}`);
       return r.data;
@@ -247,7 +275,9 @@ export function CompaniesListPage() {
     filter.prospection_status ||
     filter.department_code ||
     filter.region_code ||
-    filter.sector_main;
+    filter.sector_main ||
+    filter.country_code ||
+    filter.entity_nature;
 
   const activeFilterCount = [
     filter.search,
@@ -260,6 +290,8 @@ export function CompaniesListPage() {
     filter.department_code,
     filter.region_code,
     filter.sector_main,
+    filter.country_code,
+    filter.entity_nature,
   ].filter(Boolean).length;
 
   return (
@@ -378,6 +410,18 @@ export function CompaniesListPage() {
               onChange={(v) => setFilterAndReset({ sector_main: v })}
               options={SECTOR_OPTIONS}
               ariaLabel="Filtre secteur"
+            />
+            <FilterSelect
+              value={filter.country_code}
+              onChange={(v) => setFilterAndReset({ country_code: v })}
+              options={COUNTRY_OPTIONS}
+              ariaLabel="Filtre pays d'immatriculation"
+            />
+            <FilterSelect
+              value={filter.entity_nature}
+              onChange={(v) => setFilterAndReset({ entity_nature: v })}
+              options={NATURE_OPTIONS}
+              ariaLabel="Filtre nature d'entité"
             />
             <FilterSelect
               value={filter.quality}

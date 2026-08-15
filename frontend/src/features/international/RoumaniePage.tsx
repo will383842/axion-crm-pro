@@ -39,6 +39,21 @@ const NATURE_TABS: NatureTab[] = [
   { value: 'media', label: 'Médias' },
 ];
 
+/**
+ * Statut de prospection — MÊME vocabulaire et MÊMES libellés que la liste
+ * Entreprises (`PROSPECTION_TABS` de CompaniesListPage). Deux listes jumelles
+ * finissent toujours par diverger ; ici on reprend la convention maison
+ * plutôt que d'inventer un « contactable / pas contactable » local qui
+ * désignerait la même chose sous un autre nom.
+ */
+const STATUS_TABS: NatureTab[] = [
+  { value: '', label: 'Tous' },
+  { value: 'ready_for_outreach', label: 'Prospectables' },
+  { value: 'partial_email', label: 'Partiels' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'archived_no_email', label: 'Archivés' },
+];
+
 type CompanyRow = {
   id: number;
   denomination: string | null;
@@ -58,11 +73,11 @@ type ListResponse = {
 
 export function RoumaniePage() {
   const [nature, setNature] = useState('');
-  const [onlyContactable, setOnlyContactable] = useState(false);
+  const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['roumanie', nature, onlyContactable, page],
+    queryKey: ['roumanie', nature, status, page],
     queryFn: async () => {
       const params = new URLSearchParams({
         'filter[country_code]': 'RO',
@@ -72,7 +87,7 @@ export function RoumaniePage() {
         // `ready_for_outreach` est le statut que le CRM pose lui-même dès
         // qu'une fiche a un canal e-mail exploitable : c'est LA liste de
         // départ d'une campagne, par opposition aux fiches sans adresse.
-        ...(onlyContactable ? { 'filter[prospection_status]': 'ready_for_outreach' } : {}),
+        ...(status ? { 'filter[prospection_status]': status } : {}),
       });
 
       return (await api.get<ListResponse>(`/companies?${params.toString()}`)).data;
@@ -86,8 +101,8 @@ export function RoumaniePage() {
     setPage(1);
   }
 
-  function toggleContactable(checked: boolean) {
-    setOnlyContactable(checked);
+  function selectStatus(value: string) {
+    setStatus(value);
     setPage(1);
   }
 
@@ -120,15 +135,32 @@ export function RoumaniePage() {
         ))}
       </div>
 
-      <label className="mb-4 flex w-fit items-center gap-2 text-sm text-slate-700">
-        <input
-          type="checkbox"
-          checked={onlyContactable}
-          onChange={(e) => toggleContactable(e.target.checked)}
-          className="h-4 w-4 rounded border-slate-300"
-        />
-        Contactables uniquement (avec e-mail)
-      </label>
+      {/* Statut de prospection — même rendu que la liste Entreprises. */}
+      <div
+        className="mb-4 flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-800"
+        role="tablist"
+        aria-label="Statut de prospection"
+      >
+        {STATUS_TABS.map((tab) => {
+          const active = status === tab.value;
+          return (
+            <button
+              key={tab.value || 'all'}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => selectStatus(tab.value)}
+              className={
+                active
+                  ? 'border-b-2 border-slate-900 px-3 py-2 text-sm font-medium text-slate-900 transition dark:border-white dark:text-white'
+                  : 'border-b-2 border-transparent px-3 py-2 text-sm font-medium text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+              }
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
       {isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
       {isError && <p className="text-sm text-red-600">Impossible de charger le vivier Roumanie.</p>}

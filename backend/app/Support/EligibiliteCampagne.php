@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Company;
+use App\Models\Contact;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -78,46 +79,108 @@ final class EligibiliteCampagne
             $query->whereIn('best_email_confidence', array_values(array_intersect($paliers, self::PALIERS)));
         }
 
-        // DEUX portes, et il faut passer les deux :
-        //
-        //  1. OPPOSITION (`opt_out`) — la personne a dit non. C'est une
-        //     VOLONTÉ : elle a une valeur juridique et ne s'efface jamais.
-        //  2. SUPPRESSION (`email_suppressions`) — rebond dur, plainte,
-        //     rebonds temporaires répétés. C'est un FAIT technique.
-        //
-        // Les deux sont séparées à dessein : les confondre rendrait impossible
-        // de répondre à « cette personne s'est-elle opposée ? », la seule
-        // question que pose la CNIL. Mais pour l'ENVOI, l'une comme l'autre
-        // interdit d'écrire.
-        //
-        // Comparaison sur l'adresse (colonne `citext`, insensible à la casse)
-        // ET sur son empreinte : les signaux venus du site arrivent hachés,
-        // ceux d'un fournisseur d'envoi arrivent en clair. Une garde qui ne
-        // reconnaîtrait qu'une seule forme serait aveugle une fois sur deux.
-        $query->whereNotExists(function (\Illuminate\Database\Query\Builder $sub): void {
-            $sub->select(DB::raw('1'))
-                ->from('opt_out')
-                ->where('opt_out.scope', 'business')
-                ->where(function (\Illuminate\Database\Query\Builder $ou): void {
-                    $ou->whereColumn('opt_out.email', 'companies.email_generic')
-                        // Empreinte IDENTIQUE à celle que calcule l'ingestion
-                        // (`SiteSyncEvent::emailHash()` : sha256 hex de
-                        // l'adresse en minuscules, sans sel). Toute divergence
-                        // ici — un `trim` oublié, un sel ajouté — produirait
-                        // une garde silencieusement inopérante.
-                        ->orWhereRaw("opt_out.email_hash = encode(digest(btrim(lower(companies.email_generic)), 'sha256'), 'hex')");
-                });
-        });
+        return self::appliquerPortes($query, 'companies.email_generic');
+    }
 
-        return $query->whereNotExists(function (\Illuminate\Database\Query\Builder $sub): void {
-            $sub->select(DB::raw('1'))
-                ->from('email_suppressions')
-                ->where('email_suppressions.scope', 'business')
-                ->where(function (\Illuminate\Database\Query\Builder $su): void {
-                    $su->whereColumn('email_suppressions.email', 'companies.email_generic')
-                        ->orWhereRaw("email_suppressions.email_hash = encode(digest(btrim(lower(companies.email_generic)), 'sha256'), 'hex')");
-                });
-        });
+    /**
+     * Les PERSONNES joignables — `contacts.email`.
+     *
+     * 🔴 Ce n'est pas un raffinement : 410 481 contacts portent une adresse,
+     * contre 255 290 génériques d'entreprise. Les personnes sont donc 1,6 fois
+     * plus nombreuses que les entreprises côté adresses. Une garde qui ne
+     * couvrait que `companies.email_generic` laissait la MAJORITÉ des envois
+     * possibles hors de toute protection.
+     *
+     * @param  Builder<Contact>  $query
+     * @return Builder<Contact>
+     */
+    public static function appliquerContacts(Builder $query): Builder
+    {
+        $query->whereNotNull('email')->whereNull('deleted_at');
+
+        return self::appliquerPortes($query, 'contacts.email');
+    }
+
+    /**
+     * LA question, posée sur une adresse seule : « a-t-on le droit d'écrire
+     * ici ? »
+     *
+     * C'est le point de passage OBLIGÉ du futur moteur d'envoi. Une audience
+     * est une PHOTO : entre sa constitution et l'envoi, une opposition peut
+     * arriver. Filtrer la liste ne suffit donc pas — il faut re-poser la
+     * question juste avant d'écrire, adresse par adresse. C'est cette méthode
+     * qui doit être appelée là, et elle vaut pour TOUTE source : entreprise,
+     * personne, journaliste, import ponctuel.
+     */
+    public static function peutRecevoir(string $email, string $scope = 'business'): bool
+    {
+        $normalise = mb_strtolower(trim($email));
+        if ($normalise === '') {
+            return false;
+        }
+
+        $empreinte = hash('sha256', $normalise);
+
+        $oppose = DB::table('opt_out')
+            ->where('scope', $scope)
+            ->where(function ($q) use ($normalise, $empreinte): void {
+                $q->where('email', $normalise)->orWhere('email_hash', $empreinte);
+            })
+            ->exists();
+
+        if ($oppose) {
+            return false;
+        }
+
+        return ! ListeSuppression::estSupprimee($normalise, $scope);
+    }
+
+    /**
+     * Les DEUX portes, écrites UNE SEULE FOIS et appliquées à la colonne
+     * d'adresse qu'on lui donne.
+     *
+     * Recopier ce bloc par table aurait garanti la divergence : le jour où une
+     * troisième liste de suppression apparaît, une des copies l'oublierait, et
+     * personne ne s'en apercevrait — une garde qui ne garde plus ne fait aucun
+     * bruit.
+     *
+     *  1. OPPOSITION (`opt_out`) — la personne a dit non. C'est une VOLONTÉ :
+     *     valeur juridique, elle ne s'efface jamais.
+     *  2. SUPPRESSION (`email_suppressions`) — rebond dur, plainte, rebonds
+     *     temporaires répétés. C'est un FAIT technique.
+     *
+     * Les deux restent séparées à dessein : les confondre rendrait impossible
+     * de répondre à « cette personne s'est-elle opposée ? », la seule question
+     * que pose la CNIL. Pour l'ENVOI en revanche, l'une comme l'autre interdit.
+     *
+     * Comparaison sur l'adresse (colonnes `citext`, insensibles à la casse) ET
+     * sur son empreinte : les signaux venus du site arrivent hachés, ceux d'un
+     * fournisseur d'envoi arrivent en clair. Une garde qui ne reconnaîtrait
+     * qu'une seule forme serait aveugle une fois sur deux.
+     *
+     * @template TModel of \Illuminate\Database\Eloquent\Model
+     *
+     * @param  Builder<TModel>  $query
+     * @param  string  $colonneEmail  Colonne QUALIFIÉE (`table.colonne`)
+     * @return Builder<TModel>
+     */
+    private static function appliquerPortes(Builder $query, string $colonneEmail, string $scope = 'business'): Builder
+    {
+        $empreinte = "encode(digest(btrim(lower({$colonneEmail})), 'sha256'), 'hex')";
+
+        foreach (['opt_out', 'email_suppressions'] as $table) {
+            $query->whereNotExists(function (\Illuminate\Database\Query\Builder $sub) use ($table, $colonneEmail, $empreinte, $scope): void {
+                $sub->select(DB::raw('1'))
+                    ->from($table)
+                    ->where($table . '.scope', $scope)
+                    ->where(function (\Illuminate\Database\Query\Builder $inner) use ($table, $colonneEmail, $empreinte): void {
+                        $inner->whereColumn($table . '.email', $colonneEmail)
+                            ->orWhereRaw($table . '.email_hash = ' . $empreinte);
+                    });
+            });
+        }
+
+        return $query;
     }
 
     /**

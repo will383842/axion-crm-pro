@@ -131,7 +131,16 @@ function ContactsHubContent() {
       />
 
       <div className="mt-4">
-        {list.isLoading ? (
+        {/* `isLoading` NE SUFFIT PAS ici : `placeholderData` garde les lignes de
+            la vue précédente pendant le chargement de la suivante, donc React
+            Query considère qu'il y a déjà des données et `isLoading` reste faux.
+            Quand la vue précédente était LÉGITIMEMENT vide (« Contacts actifs »
+            l'est tant qu'aucune fiche n'a de provenance hors collecte), on
+            affichait « Aucun contact dans cette vue » pendant toute la requête
+            suivante — soit un mensonge de plusieurs secondes sur une base de
+            4,29 M de fiches. `isPlaceholderData` est vrai exactement pendant ce
+            créneau : c'est lui qui doit déclencher le squelette. */}
+        {list.isLoading || list.isPlaceholderData ? (
           <ConsoleListSkeleton />
         ) : rows.length === 0 ? (
           <EmptyState

@@ -8,7 +8,7 @@
  */
 import type { ReactNode } from 'react';
 import { EmptyState, Skeleton } from '@/components/ui';
-import { useConsoleFeatures } from './useConsoleFeatures';
+import { CONSOLE_FEATURES_CLOSED, useConsoleFeaturesQuery } from './useConsoleFeatures';
 
 export function ConsoleGate({
   children,
@@ -17,7 +17,20 @@ export function ConsoleGate({
   children: ReactNode;
   requiresVivier?: boolean;
 }) {
-  const features = useConsoleFeatures();
+  const { data, isPending } = useConsoleFeaturesQuery();
+  const features = data ?? CONSOLE_FEATURES_CLOSED;
+
+  // Tant que la réponse n'est pas revenue, la console reste fermée — mais on ne
+  // l'ANNONCE pas. « Console non activée » pendant qu'on interroge encore le
+  // serveur est une affirmation fausse, et elle s'affichait à chaque ouverture
+  // de page. Fermé par défaut, muet tant qu'on ne sait pas.
+  if (isPending) {
+    return (
+      <div className="px-6 py-6">
+        <ConsoleListSkeleton rows={4} />
+      </div>
+    );
+  }
 
   if (!features.console_v2) {
     return (

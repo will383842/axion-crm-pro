@@ -20,15 +20,20 @@ export interface ConsoleFeatures {
   universes: { business: boolean; vivier: boolean };
 }
 
-const CLOSED: ConsoleFeatures = {
+export const CONSOLE_FEATURES_CLOSED: ConsoleFeatures = {
   console_v2: false,
   universes: { business: false, vivier: false },
 };
 
 export const CONSOLE_FEATURES_KEY = ['crm', 'features'] as const;
 
-export function useConsoleFeatures(): ConsoleFeatures {
-  const { data } = useQuery<ConsoleFeatures>({
+/**
+ * La requête brute — exposée pour distinguer « on SAIT que c'est fermé » de
+ * « on ne sait pas ENCORE ». Les deux ferment la console, mais on ne dit pas
+ * la même chose à l'écran (cf. `ConsoleGate`).
+ */
+export function useConsoleFeaturesQuery() {
+  return useQuery<ConsoleFeatures>({
     queryKey: CONSOLE_FEATURES_KEY,
     queryFn: async () => (await api.get<ConsoleFeatures>('/config/features')).data,
     // Pas de réessai : si l'endpoint n'existe pas encore sur ce serveur (image
@@ -37,8 +42,12 @@ export function useConsoleFeatures(): ConsoleFeatures {
     retry: false,
     staleTime: 5 * 60 * 1000,
   });
+}
+
+export function useConsoleFeatures(): ConsoleFeatures {
+  const { data } = useConsoleFeaturesQuery();
 
   // FERMÉ par défaut : tant qu'on ne sait pas, on n'affiche rien. Un drapeau
   // dont l'état inconnu vaut « ouvert » n'est pas un drapeau.
-  return data ?? CLOSED;
+  return data ?? CONSOLE_FEATURES_CLOSED;
 }

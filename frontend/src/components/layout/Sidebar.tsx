@@ -31,6 +31,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Lock,
+  Globe,
   Hash,
   Users2,
   Send,
@@ -76,6 +77,13 @@ const SECTIONS: NavSection[] = [
       { to: '/companies', label: 'Entreprises', icon: <Building2 className="h-4 w-4" />, dataTour: 'nav-companies' },
       { to: '/contacts', label: 'Contacts', icon: <UsersIcon className="h-4 w-4" /> },
       { to: '/tags', label: 'Tags', icon: <Hash className="h-4 w-4" /> },
+    ],
+  },
+  {
+    id: 'international',
+    title: 'International',
+    items: [
+      { to: '/international/roumanie', label: 'Roumanie', icon: <Globe className="h-4 w-4" /> },
     ],
   },
   {

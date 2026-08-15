@@ -622,3 +622,138 @@ test('filter[tag] retrouve le segment implantation-ro dans la liste (et donc l\'
     expect($filtered)->toHaveCount(1)
         ->and($filtered->first()->siren)->toBe('900000202');
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 9. ENTITÉS SANS SIREN — prospection internationale (associations, CCI,
+//    écoles, cabinets roumains). Le SIREN était une CLÉ DE DÉDUP, pas un
+//    besoin métier : on la généralise à (country_code, foreign_id).
+// ─────────────────────────────────────────────────────────────────────────────
+
+function orgRecord(array $overrides = []): array
+{
+    $base = scrapedRecord([
+        'source' => 'implantations-fr-etranger',
+        'company' => [
+            'foreign_id' => 'ccifer:asociatia-zz-test',
+            'country' => 'RO',
+            'nature' => 'association',
+            'fields' => [
+                'denomination' => 'ASOCIATIA ZZ TEST',
+                'website' => 'https://zz-asociatia.example.invalid',
+                'city' => 'Bucarest',
+            ],
+        ],
+        'persons' => [],
+    ]);
+    // scrapedRecord() pose un siren par défaut : une entité étrangère n'en a pas.
+    unset($base['company']['siren']);
+
+    return array_replace_recursive($base, $overrides);
+}
+
+test('une entité SANS siren est créée, ancrée sur (pays, foreign_id)', function () {
+    $outcome = ingestScrape(orgRecord());
+
+    expect($outcome->status)->toBe('created');
+
+    $company = DB::table('companies')->where('foreign_id', 'ccifer:asociatia-zz-test')->first();
+    expect($company)->not->toBeNull()
+        ->and($company->siren)->toBeNull()
+        ->and($company->country_code)->toBe('RO')
+        ->and($company->entity_nature)->toBe('association')
+        ->and($company->denomination)->toBe('ASOCIATIA ZZ TEST')
+        ->and($company->website)->toBe('https://zz-asociatia.example.invalid')
+        // Un scrapé naît FROID, entité étrangère ou non.
+        ->and($company->relation_type)->toBe('prospect')
+        ->and($company->lifecycle_stage)->toBe('nouveau')
+        ->and($company->legal_basis)->toBe('legitimate_interest_b2b');
+});
+
+test('les tags pays et nature sont posés : cibler les associations de Roumanie', function () {
+    ingestScrape(orgRecord());
+
+    $company = DB::table('companies')->where('foreign_id', 'ccifer:asociatia-zz-test')->first();
+    $tags = DB::table('company_tag')
+        ->join('tags', 'tags.id', '=', 'company_tag.tag_id')
+        ->where('company_tag.company_id', $company->id)
+        ->select('tags.slug', 'tags.category')
+        ->get();
+    $slugs = $tags->pluck('slug')->all();
+
+    expect($slugs)->toContain('pays-ro')
+        ->and($slugs)->toContain('nature-association')
+        ->and($slugs)->toContain('src:scraping-implantations-fr-etranger')
+        ->and($tags->firstWhere('slug', 'pays-ro')->category)->toBe('geo');
+});
+
+test('rejouer la MÊME entité ne crée pas de doublon (dédup par foreign_id)', function () {
+    ingestScrape(orgRecord());
+    // Autre run_id : l'idempotence par run ne joue pas, c'est bien l'ancre
+    // (pays, foreign_id) qui doit empêcher le doublon.
+    $second = ingestScrape(orgRecord(['run_id' => (string) Str::uuid()]));
+
+    expect($second->status)->toBe('updated')
+        ->and(DB::table('companies')->where('foreign_id', 'ccifer:asociatia-zz-test')->count())->toBe(1);
+});
+
+test('deux entités étrangères DIFFÉRENTES coexistent (siren NULL ne les confond pas)', function () {
+    ingestScrape(orgRecord());
+    ingestScrape(orgRecord([
+        'run_id' => (string) Str::uuid(),
+        'company' => [
+            'foreign_id' => 'ccifer:fundatia-zz-test',
+            'nature' => 'cci',
+            'fields' => ['denomination' => 'FUNDATIA ZZ TEST'],
+        ],
+    ]));
+
+    expect(DB::table('companies')->whereNull('siren')->where('country_code', 'RO')->count())->toBe(2);
+});
+
+test('BACKFILL-ONLY : une nature déjà posée n\'est jamais réécrite', function () {
+    ingestScrape(orgRecord());
+    ingestScrape(orgRecord([
+        'run_id' => (string) Str::uuid(),
+        'company' => ['nature' => 'entreprise'],
+    ]));
+
+    expect(DB::table('companies')->where('foreign_id', 'ccifer:asociatia-zz-test')->value('entity_nature'))
+        ->toBe('association');
+});
+
+test('foreign_id sans country est REFUSÉ : un identifiant sans registre est indédupliquable', function () {
+    expect(fn () => ingestScrape(orgRecord(['company' => ['country' => null]])))
+        ->toThrow(ScrapeIngestRejection::class, 'indédupliquable');
+});
+
+test('une nature inventée est REFUSÉE (liste fermée, alignée sur le CHECK SQL)', function () {
+    expect(fn () => ingestScrape(orgRecord(['company' => ['nature' => 'startup']])))
+        ->toThrow(ScrapeIngestRejection::class, 'nature inconnue');
+});
+
+test('un siren annoncé avec un pays non-FR est REFUSÉ (contradiction)', function () {
+    expect(fn () => ingestScrape(scrapedRecord([
+        'company' => ['country' => 'RO'],
+    ])))->toThrow(ScrapeIngestRejection::class, 'contradictoire');
+});
+
+test('ni siren ni foreign_id ni match_hint : refusé à la porte', function () {
+    expect(fn () => ingestScrape(orgRecord([
+        'company' => ['foreign_id' => null, 'country' => null],
+    ])))->toThrow(ScrapeIngestRejection::class, 'au moins une clé de rattachement');
+});
+
+test('les fiches FRANÇAISES existantes gardent country_code FR et aucun tag pays', function () {
+    ingestScrape(scrapedRecord());
+
+    $company = DB::table('companies')->where('siren', '900000202')->first();
+    expect($company->country_code)->toBe('FR')
+        ->and($company->foreign_id)->toBeNull();
+
+    $slugs = DB::table('company_tag')
+        ->join('tags', 'tags.id', '=', 'company_tag.tag_id')
+        ->where('company_tag.company_id', $company->id)
+        ->pluck('tags.slug')->all();
+    // `pays-fr` serait un tag universel sur 4,29 M de fiches : sans pouvoir de tri.
+    expect($slugs)->not->toContain('pays-fr');
+});

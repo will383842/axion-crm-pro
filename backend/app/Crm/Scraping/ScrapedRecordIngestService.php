@@ -111,9 +111,11 @@ final class ScrapedRecordIngestService
         }
 
         // ── Rattachement entreprise ─────────────────────────────────────────
-        if ($record->siren === null) {
-            // Pas de SIREN : rapprocher par dénomination est une PROPOSITION,
-            // jamais une certitude. L'événement part en file d'arbitrage.
+        // Deux ancres possibles : le SIREN (France) ou le couple
+        // (pays, foreign_id) pour une entité étrangère. Sans l'une des deux,
+        // rapprocher par dénomination reste une PROPOSITION, jamais une
+        // certitude → file d'arbitrage.
+        if ($record->siren === null && $record->foreignId === null) {
             $activityId = $this->recordActivity($record, $workspaceId, null, pendingMatch: true);
             $this->recordRun($record, $workspaceId, null, $record->status, new ScrapeIngestOutcome(status: ScrapeIngestOutcome::PENDING_MATCH), $dedupKey);
 
@@ -156,7 +158,7 @@ final class ScrapedRecordIngestService
         // de l'enrichissement le supprimerait, cf. AutoTaggerService). On
         // déclenche la synchro tout de suite pour que la fiche soit classée
         // dès l'import, sans attendre une passe d'enrichissement.
-        if ($record->implantations !== []) {
+        if ($record->implantations !== [] || $record->entityNature !== null || $record->countryCode !== null) {
             $company = Company::query()->find($companyId);
             if ($company !== null) {
                 $tags = array_values(array_unique(array_merge(
@@ -192,16 +194,27 @@ final class ScrapedRecordIngestService
      */
     private function upsertCompany(ScrapedRecord $record, string $workspaceId): array
     {
-        $existing = DB::table('companies')
-            ->where('workspace_id', $workspaceId)
-            ->where('siren', $record->siren)
-            ->first();
+        // Recherche par l'ancre effectivement portée par le message : SIREN
+        // (France) ou (pays, foreign_id) pour une entité étrangère. Chercher
+        // sur `siren = NULL` ne ramènerait JAMAIS rien et créerait un doublon
+        // à chaque passage.
+        $lookup = DB::table('companies')->where('workspace_id', $workspaceId);
+        if ($record->siren !== null) {
+            $lookup->where('siren', $record->siren);
+        } else {
+            $lookup->where('country_code', $record->countryCode)
+                ->where('foreign_id', $record->foreignId);
+        }
+        $existing = $lookup->first();
 
         if ($existing === null) {
             // Fiche née de la collecte : FROIDE par définition (règle B.2).
             $insert = [
                 'workspace_id' => $workspaceId,
                 'siren' => $record->siren,
+                'country_code' => $record->countryCode ?? 'FR',
+                'foreign_id' => $record->foreignId,
+                'entity_nature' => $record->entityNature,
                 'discovery_source' => $record->source,
                 'quality_score' => 0,
                 'signals' => $this->encodeObject($this->implantationSignals($record, $this->channelSignals($record, []))),
@@ -249,6 +262,14 @@ final class ScrapedRecordIngestService
             $update[$column] = $value;
             $origins[$column] = 'collected';
             $written[] = $column;
+        }
+
+        // La nature de l'entité suit la même règle que le reste :
+        // BACKFILL-ONLY. Une fiche déjà qualifiée « association » ne devient
+        // pas « entreprise » parce qu'une seconde source en a décidé autrement.
+        if ($record->entityNature !== null && ($existing->entity_nature ?? null) === null) {
+            $update['entity_nature'] = $record->entityNature;
+            $written[] = 'entity_nature';
         }
 
         $signals = $this->implantationSignals($record, $this->channelSignals($record, $this->decodeSignals($existing->signals ?? null)));

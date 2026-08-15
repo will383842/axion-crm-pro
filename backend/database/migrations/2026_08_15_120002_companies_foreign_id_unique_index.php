@@ -26,7 +26,7 @@ return new class extends Migration
         DB::statement(
             'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS companies_workspace_foreign_id_unique '
             . 'ON companies (workspace_id, country_code, foreign_id) '
-            . 'WHERE foreign_id IS NOT NULL'
+            . 'WHERE foreign_id IS NOT NULL',
         );
 
         // Recherche par nature (« tous les organismes de Roumanie ») : sans
@@ -34,7 +34,7 @@ return new class extends Migration
         DB::statement(
             'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_companies_workspace_country_nature '
             . 'ON companies (workspace_id, country_code, entity_nature) '
-            . "WHERE country_code <> 'FR'"
+            . "WHERE country_code <> 'FR'",
         );
     }
 

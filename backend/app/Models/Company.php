@@ -65,6 +65,9 @@ class Company extends Model
         'email_generic', 'prospection_status',
         'region_code', 'department_code', 'commune_code', 'city_name',
         'sector_main', 'archive_reason',
+        // Prospection internationale (2026-08-15) : une entité sans SIREN
+        // s'ancre sur (country_code, foreign_id) — cf. migration 120001.
+        'country_code', 'foreign_id', 'entity_nature',
     ];
 
     protected function casts(): array

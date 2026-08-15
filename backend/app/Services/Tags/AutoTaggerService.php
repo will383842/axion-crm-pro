@@ -41,6 +41,17 @@ class AutoTaggerService
         'RO' => 'Roumanie',
     ];
 
+    /** Libellés FR des natures d'entité (cf. companies.entity_nature). */
+    private const ENTITY_NATURE_LABELS = [
+        'entreprise' => 'Entreprise',
+        'association' => 'Association',
+        'cci' => 'Chambre de commerce',
+        'enseignement' => 'Enseignement',
+        'cabinet' => 'Cabinet (conseil, avocats)',
+        'institution' => 'Institution',
+        'media' => 'Média',
+    ];
+
     /**
      * Synchronise les tags auto pour une company.
      * Retourne le delta : ['added' => [...], 'removed' => [...]]
@@ -148,6 +159,34 @@ class AutoTaggerService
             $tags[$slug] = [
                 'name' => 'Région ' . $company->region_code,
                 'category' => 'geo',
+                'kind' => 'auto',
+                'assigned_by' => 'auto-rule',
+            ];
+        }
+
+        // Pays d'immatriculation, pour les entités NON françaises : sans lui,
+        // une association roumaine serait indiscernable d'une fiche Sirene
+        // dans une campagne. (Les 4,29 M de fiches FR ne sont pas taguées :
+        // ce serait un tag universel, donc sans pouvoir de tri.)
+        $country = strtoupper((string) ($company->country_code ?? 'FR'));
+        if ($country !== 'FR' && preg_match('/^[A-Z]{2}$/', $country) === 1) {
+            $slug = 'pays-' . strtolower($country);
+            $tags[$slug] = [
+                'name' => 'Pays : ' . (self::IMPLANTATION_COUNTRY_LABELS[$country] ?? $country),
+                'category' => 'geo',
+                'kind' => 'auto',
+                'assigned_by' => 'auto-rule',
+            ];
+        }
+
+        // Nature de l'entité — c'est ELLE qui permet de viser « les
+        // associations » ou « les chambres de commerce » sans les mélanger
+        // aux entreprises dans une campagne.
+        $nature = $company->entity_nature ?? null;
+        if (is_string($nature) && isset(self::ENTITY_NATURE_LABELS[$nature])) {
+            $tags['nature-' . $nature] = [
+                'name' => self::ENTITY_NATURE_LABELS[$nature],
+                'category' => 'custom',
                 'kind' => 'auto',
                 'assigned_by' => 'auto-rule',
             ];

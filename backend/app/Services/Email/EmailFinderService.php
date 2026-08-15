@@ -230,8 +230,48 @@ class EmailFinderService
     private function normalize(string $input): string
     {
         $input = preg_replace('/[^\p{L}-]+/u', '', $input) ?? '';
-        $input = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $input) ?: $input;
-        return strtolower(str_replace(['-', "'"], ['', ''], $input));
+        $input = self::versAscii($input);
+
+        // Filet FINAL, après translittération : on ne garde que des lettres
+        // ASCII. La ponctuation à retirer n'est pas seulement celle de l'entrée
+        // — c'est aussi celle que la translittération peut INTRODUIRE. Ce filet
+        // rend la fonction juste quelle que soit la bibliothèque disponible.
+        return strtolower(preg_replace('/[^A-Za-z]/', '', $input) ?? '');
+    }
+
+    /**
+     * Translittération vers l'ASCII — via ICU (`intl`), PAS via `iconv`.
+     *
+     * 🔴 `iconv('UTF-8', 'ASCII//TRANSLIT')` délègue à la libc, et son résultat
+     * DIFFÈRE selon la libc. Mesuré le 2026-08-15 sur « Hélène O'Reilly » :
+     *   - glibc (Ubuntu, ce que voit la CI) → « Helene O'Reilly »
+     *   - musl  (Alpine, l'image de PRODUCTION) → « H'el`ene O'Reilly »
+     * La production fabriquait donc des adresses candidates du type
+     * `hel`ene.oreilly@…` pour tout prénom accentué — sur une base française,
+     * c'est-à-dire en permanence. La CI ne pouvait pas le voir : elle ne tourne
+     * pas sur la libc de production.
+     *
+     * ICU donne le même résultat partout, et `intl` est installé dans l'image
+     * (`docker-php-ext-install … intl …`). Repli sur `iconv` si jamais
+     * l'extension venait à manquer : le filet ASCII de `normalize()` rattrape
+     * alors ce que la libc aurait introduit.
+     */
+    private static function versAscii(string $input): string
+    {
+        static $translitterateur = null;
+
+        if ($translitterateur === null) {
+            $translitterateur = \Transliterator::create('Any-Latin; Latin-ASCII') ?? false;
+        }
+
+        if ($translitterateur !== false) {
+            $sortie = $translitterateur->transliterate($input);
+            if (is_string($sortie)) {
+                return $sortie;
+            }
+        }
+
+        return iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $input) ?: $input;
     }
 
     private function validEmail(string $email): bool

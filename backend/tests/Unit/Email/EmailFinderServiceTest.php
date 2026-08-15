@@ -65,10 +65,19 @@ test('les initiales aussi sont ASCII (motif {f}.{last})', function () {
         new \App\Services\Dedup\DeduplicationService(),
     );
 
-    // Sous musl, `É` devenait «'E» : l'initiale extraite était une APOSTROPHE,
-    // et l'adresse commençait par un caractère interdit.
-    expect($svc->renderPattern('{f}.{last}@{domain}', 'Étienne', 'Martin', 'example.com'))
+    // ⚠️ Le prénom choisi ici DÉCIDE si ce test garde quelque chose.
+    // Sous musl : `É` → «'E», mais l'apostrophe était DÉJÀ retirée par l'ancien
+    // code — « Étienne » passait donc, et ce test ne rougissait pas.
+    // `È` → «`E» : le backtick, lui, n'était retiré par personne, et devenait
+    // le PREMIER caractère de l'adresse. C'est ce cas-là qu'il faut tenir.
+    expect($svc->renderPattern('{f}.{last}@{domain}', 'Ève', 'Martin', 'example.com'))
         ->toBe('e.martin@example.com');
+
+    // Circonflexe et tréma, mêmes victimes silencieuses.
+    expect($svc->renderPattern('{f}.{last}@{domain}', 'Ângela', 'Dupont', 'example.com'))
+        ->toBe('a.dupont@example.com');
+    expect($svc->renderPattern('{f}.{last}@{domain}', 'Öz', 'Yilmaz', 'example.com'))
+        ->toBe('o.yilmaz@example.com');
 });
 
 test('detectPatternFromKnownEmails returns dominant pattern', function () {

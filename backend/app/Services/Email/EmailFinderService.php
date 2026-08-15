@@ -6,7 +6,6 @@ use App\Contracts\SmtpProber;
 use App\Data\Email\SmtpProbeResult;
 use App\Services\Dedup\DeduplicationService;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 /**
  * Email finder — génère 18 patterns candidats puis cascade SMTP N1-N5.
@@ -56,7 +55,7 @@ class EmailFinderService
     public function __construct(
         private readonly SmtpProber $prober,
         private readonly DeduplicationService $dedup,
-        private readonly ?\App\Services\Email\HunterEmailVerifier $hunterVerifier = null,
+        private readonly ?HunterEmailVerifier $hunterVerifier = null,
     ) {}
 
     /**
@@ -85,10 +84,10 @@ class EmailFinderService
         $result = $this->hunterVerifier->verify($email, $workspaceId);
 
         return match ($result['status'] ?? 'unknown') {
-            'deliverable'              => 'valid',
+            'deliverable' => 'valid',
             'undeliverable', 'invalid' => 'invalid',
-            'risky', 'accept_all'      => 'catchall',
-            default                    => 'unknown',
+            'risky', 'accept_all' => 'catchall',
+            default => 'unknown',
         };
     }
 
@@ -139,6 +138,7 @@ class EmailFinderService
                     isDisposable: (bool) $cached->is_disposable,
                     isRole: (bool) $cached->is_role,
                 );
+
                 continue;
             }
 
@@ -161,8 +161,13 @@ class EmailFinderService
             }
 
             $this->dedup->setEmailValidationCache(
-                $email, $probe->status, $probe->score, $probe->mxHost,
-                $probe->isCatchAll, $probe->isDisposable, $probe->isRole,
+                $email,
+                $probe->status,
+                $probe->score,
+                $probe->mxHost,
+                $probe->isCatchAll,
+                $probe->isDisposable,
+                $probe->isRole,
             );
             $results[] = $probe;
             if ($probe->status === 'valid' && $probe->score >= 90) {
@@ -171,23 +176,24 @@ class EmailFinderService
         }
 
         usort($results, fn ($a, $b) => $b->score <=> $a->score);
+
         return $results;
     }
 
     /** @return list<string> */
     public function generateCandidates(string $firstName, string $lastName, string $domain): array
     {
-        $first  = $this->normalize($firstName);
-        $last   = $this->normalize($lastName);
-        $f      = $first ? mb_substr($first, 0, 1) : '';
-        $last2  = mb_substr($last, 0, 2);
-        $last3  = mb_substr($last, 0, 3);
+        $first = $this->normalize($firstName);
+        $last = $this->normalize($lastName);
+        $f = $first ? mb_substr($first, 0, 1) : '';
+        $last2 = mb_substr($last, 0, 2);
+        $last3 = mb_substr($last, 0, 3);
 
         $vars = [
             '{first}' => $first, '{last}' => $last,
-            '{f}'     => $f,
+            '{f}' => $f,
             '{last2}' => $last2, '{last3}' => $last3,
-            '{domain}'=> $domain,
+            '{domain}' => $domain,
         ];
 
         $out = [];
@@ -197,6 +203,7 @@ class EmailFinderService
                 $out[] = $email;
             }
         }
+
         return array_values(array_unique($out));
     }
 
@@ -204,19 +211,20 @@ class EmailFinderService
     {
         return strtolower(strtr($pattern, [
             '{first}' => $this->normalize($firstName),
-            '{last}'  => $this->normalize($lastName),
-            '{f}'     => mb_substr($this->normalize($firstName), 0, 1),
+            '{last}' => $this->normalize($lastName),
+            '{f}' => mb_substr($this->normalize($firstName), 0, 1),
             '{last2}' => mb_substr($this->normalize($lastName), 0, 2),
             '{last3}' => mb_substr($this->normalize($lastName), 0, 3),
-            '{domain}'=> $domain,
+            '{domain}' => $domain,
         ]));
     }
 
     public function detectPatternFromKnownEmails(array $emails, string $domain): ?string
     {
         // Si on a au moins 2 emails connus, on détecte le pattern dominant.
-        $candidates = array_count_values(array_filter(array_map(function ($email) use ($domain) {
+        $candidates = array_count_values(array_filter(array_map(function ($email) {
             $local = explode('@', $email)[0] ?? '';
+
             // Identifier les délimiteurs : . _ -
             return preg_match('/^[a-z]\.?[a-z]+$/i', $local) ? '{f}.{last}@{domain}'
                 : (preg_match('/^[a-z]+\.[a-z]+$/i', $local) ? '{first}.{last}@{domain}'
@@ -224,14 +232,55 @@ class EmailFinderService
                 : null));
         }, $emails)));
         arsort($candidates);
+
         return array_key_first($candidates);
     }
 
     private function normalize(string $input): string
     {
         $input = preg_replace('/[^\p{L}-]+/u', '', $input) ?? '';
-        $input = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $input) ?: $input;
-        return strtolower(str_replace(['-', "'"], ['', ''], $input));
+        $input = self::versAscii($input);
+
+        // Filet FINAL, après translittération : on ne garde que des lettres
+        // ASCII. La ponctuation à retirer n'est pas seulement celle de l'entrée
+        // — c'est aussi celle que la translittération peut INTRODUIRE. Ce filet
+        // rend la fonction juste quelle que soit la bibliothèque disponible.
+        return strtolower(preg_replace('/[^A-Za-z]/', '', $input) ?? '');
+    }
+
+    /**
+     * Translittération vers l'ASCII — via ICU (`intl`), PAS via `iconv`.
+     *
+     * 🔴 `iconv('UTF-8', 'ASCII//TRANSLIT')` délègue à la libc, et son résultat
+     * DIFFÈRE selon la libc. Mesuré le 2026-08-15 sur « Hélène O'Reilly » :
+     *   - glibc (Ubuntu, ce que voit la CI) → « Helene O'Reilly »
+     *   - musl  (Alpine, l'image de PRODUCTION) → « H'el`ene O'Reilly »
+     * La production fabriquait donc des adresses candidates du type
+     * `hel`ene.oreilly@…` pour tout prénom accentué — sur une base française,
+     * c'est-à-dire en permanence. La CI ne pouvait pas le voir : elle ne tourne
+     * pas sur la libc de production.
+     *
+     * ICU donne le même résultat partout, et `intl` est installé dans l'image
+     * (`docker-php-ext-install … intl …`). Repli sur `iconv` si jamais
+     * l'extension venait à manquer : le filet ASCII de `normalize()` rattrape
+     * alors ce que la libc aurait introduit.
+     */
+    private static function versAscii(string $input): string
+    {
+        static $translitterateur = null;
+
+        if ($translitterateur === null) {
+            $translitterateur = \Transliterator::create('Any-Latin; Latin-ASCII') ?? false;
+        }
+
+        if ($translitterateur !== false) {
+            $sortie = $translitterateur->transliterate($input);
+            if (is_string($sortie)) {
+                return $sortie;
+            }
+        }
+
+        return iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $input) ?: $input;
     }
 
     private function validEmail(string $email): bool

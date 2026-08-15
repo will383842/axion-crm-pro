@@ -17,6 +17,7 @@ class ProspectionEnrich extends Command
 {
     protected $signature = 'prospection:enrich {--count=20} {--department=} {--workspace=} '
         . '{--tag= : slug de tag — restreint la sélection à un segment tagué (ex. implantation-ro)} '
+        . '{--force : repasse sur les fiches DÉJÀ enrichies (après un changement de donnée d\'entrée, ex. site web backfillé). Exige un périmètre.} '
         . '{--refresh-incomplete : reprend aussi les fiches déjà enrichies mais incomplètes (pas de lat/lon, aucun email, ou Google Places en attente)} '
         . '{--with-website : ne sélectionne que les entreprises ayant déjà un site VIVANT (ROI email max)} '
         . '{--shard= : index de partition (0..shards-1) pour exécution distribuée} '
@@ -67,7 +68,21 @@ class ProspectionEnrich extends Command
         }
 
         $q = Company::query();
-        if ($this->option('refresh-incomplete')) {
+        if ($this->option('force')) {
+            // AUCUN filtre sur enriched_at : on repasse sur les fiches déjà
+            // enrichies. Réservé au cas où une DONNÉE D'ENTRÉE a changé — un
+            // site web vient d'être backfillé, par exemple : sans site, l'étape
+            // mentions légales retourne immédiatement, donc la fiche a été
+            // « enrichie » sans que la recherche d'email ait jamais tourné.
+            // La garde anti-churn des 7 jours resterait bloquante ici, alors
+            // qu'un nouveau passage a cette fois de quoi trouver.
+            // À utiliser AVEC --tag : sans filtre, ce serait toute la base.
+            if (! $this->option('tag') && ! $this->option('department') && ! $this->option('workspace')) {
+                $this->error('--force exige un périmètre (--tag, --department ou --workspace) : sinon la sélection couvre toute la base.');
+
+                return self::FAILURE;
+            }
+        } elseif ($this->option('refresh-incomplete')) {
             // Élargit la sélection : jamais enrichie OU enrichie mais incomplète.
             // Reste reprenable (enrich() repose enriched_at ; les fiches encore
             // incomplètes seront re-sélectionnées aux prochains passages).

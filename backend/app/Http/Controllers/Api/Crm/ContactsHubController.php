@@ -6,6 +6,7 @@ use App\Crm\Taxonomy;
 use App\Models\Company;
 use App\Models\Contact;
 use App\Support\CompanyQueryFilters;
+use App\Support\MasquageCoordonnees;
 use Illuminate\Contracts\Database\Eloquent\Builder as BuilderContract;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -61,11 +62,15 @@ class ContactsHubController extends ConsoleController
 
         $query = $this->buildQuery($workspaceId, $validated);
 
+        // Décidé UNE fois par requête : la permission ne change pas d'une
+        // ligne à l'autre.
+        $masquer = MasquageCoordonnees::requis();
+
         $page = $query->cursorPaginate($perPage);
 
         return $this->ok([
             'data' => array_map(
-                fn (Company $company): array => $this->present($company),
+                fn (Company $company): array => $this->present($company, $masquer),
                 $page->items(),
             ),
             'meta' => [
@@ -269,7 +274,7 @@ class ContactsHubController extends ConsoleController
      *
      * @return array<string, mixed>
      */
-    private function present(Company $company): array
+    private function present(Company $company, bool $masquer): array
     {
         return [
             'id' => $company->id,
@@ -281,15 +286,17 @@ class ContactsHubController extends ConsoleController
             'city_name' => $company->city_name ?? $company->city,
             'department_code' => $company->department_code,
             'size_category' => $company->size_category,
-            'email_generic' => $company->email_generic,
+            'email_generic' => $masquer
+                ? MasquageCoordonnees::email($company->email_generic)
+                : $company->email_generic,
             'updated_at' => $company->updated_at,
             'tags' => $company->tags->pluck('slug')->values()->all(),
             'contacts' => $company->contacts->map(static fn (Contact $contact): array => [
                 'id' => $contact->id,
                 'first_name' => $contact->first_name,
                 'last_name' => $contact->last_name,
-                'email' => $contact->email,
-                'phone' => $contact->phone,
+                'email' => $masquer ? MasquageCoordonnees::email($contact->email) : $contact->email,
+                'phone' => $masquer ? MasquageCoordonnees::telephone($contact->phone) : $contact->phone,
                 'person_key' => $contact->person_key,
             ])->values()->all(),
         ];

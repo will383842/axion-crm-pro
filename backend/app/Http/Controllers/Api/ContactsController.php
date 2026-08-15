@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\Contact;
 use App\Support\ContactQueryFilters;
+use App\Support\MasquageCoordonnees;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -38,6 +39,8 @@ class ContactsController extends ApiController
             return $this->ok(['data' => [], 'meta' => $this->meta(0, $perPage, 1, 1)]);
         }
 
+        $masquer = MasquageCoordonnees::requis();
+
         try {
             $page = QueryBuilder::for(
                 Contact::query()
@@ -58,7 +61,7 @@ class ContactsController extends ApiController
                 ->appends($r->query());
 
             return $this->ok([
-                'data' => array_map(fn (Contact $c): array => $this->present($c), $page->items()),
+                'data' => array_map(fn (Contact $c): array => $this->present($c, $masquer), $page->items()),
                 'meta' => $this->meta($page->total(), $page->perPage(), $page->currentPage(), $page->lastPage()),
             ]);
         } catch (\Throwable $e) {
@@ -87,17 +90,20 @@ class ContactsController extends ApiController
      *
      * @return array<string, mixed>
      */
-    private function present(Contact $c): array
+    private function present(Contact $c, bool $masquer): array
     {
         return [
             'id' => $c->id,
             'first_name' => $c->first_name,
             'last_name' => $c->last_name,
             'role' => $c->role,
-            'email' => $c->email,
+            // Coordonnées masquées pour les comptes en lecture seule (§2.10).
+            // Le masquage est décidé UNE fois par requête, pas par ligne : sur
+            // 50 lignes, cinquante vérifications de permission identiques.
+            'email' => $masquer ? MasquageCoordonnees::email($c->email) : $c->email,
             'email_status' => $c->email_status,
             'email_score' => $c->email_score,
-            'phone' => $c->phone,
+            'phone' => $masquer ? MasquageCoordonnees::telephone($c->phone) : $c->phone,
             'linkedin_url' => $c->linkedin_url,
             'discovery_source' => $c->discovery_source,
             'company_id' => $c->company_id,

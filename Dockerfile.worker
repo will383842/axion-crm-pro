@@ -7,16 +7,24 @@ ARG PLAYWRIGHT_VERSION=v1.49.0-noble
 # 1) deps : install pnpm + node_modules
 # -----------------------------------------------------------------------------
 FROM mcr.microsoft.com/playwright:${PLAYWRIGHT_VERSION} AS deps
-RUN corepack enable && corepack prepare pnpm@9 --activate
+# `npm install -g corepack@latest` D'ABORD : npm a fait tourner ses clés de
+# signature (2026), et le corepack embarqué dans l'image ne connaît que les
+# anciennes — `corepack prepare` échoue alors sur « Cannot find matching
+# keyid », quel que soit le paquet demandé. Un corepack à jour connaît les
+# deux jeux de clés.
+RUN npm install -g corepack@latest && corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /srv/workers
-COPY workers/package.json workers/pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile || pnpm install
+# Lock SANS joker : le joker rendait le lock facultatif, et le repli plus bas
+# résolvait alors « les dernières versions » en silence (même défaut que le
+# Dockerfile Laravel, corrigé le même jour). Lock absent = build en échec.
+COPY workers/package.json workers/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
 # -----------------------------------------------------------------------------
 # 2) dev : tsx watch
 # -----------------------------------------------------------------------------
 FROM mcr.microsoft.com/playwright:${PLAYWRIGHT_VERSION} AS dev
-RUN corepack enable && corepack prepare pnpm@9 --activate
+RUN npm install -g corepack@latest && corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /srv/workers
 COPY --from=deps /srv/workers/node_modules ./node_modules
 COPY workers/ ./
@@ -27,7 +35,7 @@ CMD ["pnpm", "dev"]
 # 3) builder : tsc → dist/
 # -----------------------------------------------------------------------------
 FROM mcr.microsoft.com/playwright:${PLAYWRIGHT_VERSION} AS builder
-RUN corepack enable && corepack prepare pnpm@9 --activate
+RUN npm install -g corepack@latest && corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /srv/workers
 COPY --from=deps /srv/workers/node_modules ./node_modules
 COPY workers/ ./
@@ -38,10 +46,13 @@ RUN pnpm build
 # 4) prod : node minimal + dist/ + Playwright browsers seulement
 # -----------------------------------------------------------------------------
 FROM mcr.microsoft.com/playwright:${PLAYWRIGHT_VERSION} AS prod
-RUN corepack enable && corepack prepare pnpm@9 --activate
+RUN npm install -g corepack@latest && corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /srv/workers
 ENV NODE_ENV=production
-COPY workers/package.json workers/pnpm-lock.yaml* ./
+# Lock SANS joker : le joker rendait le lock facultatif, et le repli plus bas
+# résolvait alors « les dernières versions » en silence (même défaut que le
+# Dockerfile Laravel, corrigé le même jour). Lock absent = build en échec.
+COPY workers/package.json workers/pnpm-lock.yaml ./
 RUN pnpm install --prod --frozen-lockfile || pnpm install --prod
 COPY --from=builder /srv/workers/dist ./dist
 USER pwuser

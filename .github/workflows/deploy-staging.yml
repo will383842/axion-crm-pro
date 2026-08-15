@@ -45,10 +45,23 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # L'environnement staging Coolify N'EXISTE PAS (secrets jamais posés : le
+  # webhook partait vers l'URL vide "" avec « Bearer  » — curl exit 3). Ce
+  # workflow avait donc échoué 100 fois sur 100 depuis sa création, et ce rouge
+  # PERPÉTUEL masquait les échecs réels : le 2026-08-15, deux vrais défauts de
+  # build (lock composer, corepack) ont dû être triés au milieu de ce bruit.
+  # Un état rouge qui ne peut jamais passer au vert ne signale rien.
+  #
+  # Les jobs webhook + smoke sont donc CONDITIONNÉS à l'existence des secrets :
+  # le jour où un staging existe, poser COOLIFY_STAGING_TOKEN +
+  # COOLIFY_STAGING_WEBHOOK suffit à les réactiver, sans toucher au YAML.
+  # Le job de build, lui, garde toute sa valeur (images :staging et :sha sur
+  # GHCR à chaque push main) et reste inconditionnel.
   trigger-coolify:
     name: Trigger Coolify pull
     runs-on: ubuntu-24.04
     needs: build-and-push
+    if: vars.COOLIFY_STAGING_ENABLED == 'true'
     steps:
       - name: Webhook Coolify staging
         run: |
@@ -60,6 +73,7 @@ jobs:
     name: Smoke staging
     runs-on: ubuntu-24.04
     needs: trigger-coolify
+    if: vars.COOLIFY_STAGING_ENABLED == 'true'
     steps:
       - name: Wait for staging
         run: sleep 60

@@ -36,6 +36,15 @@ final class CompanyQueryFilters
             AllowedFilter::exact('best_email_confidence'),
             AllowedFilter::partial('denomination'),
             AllowedFilter::partial('postcode'),
+            // `filter[tag]=implantation-ro` (multi : `filter[tag]=a,b` = ET
+            // logique) — indispensable pour retrouver un SEGMENT taggé (ex.
+            // campagne « implantations Roumanie ») dans la liste, l'export ET
+            // le hub, qui partagent cette même liste de filtres.
+            AllowedFilter::callback('tag', function ($query, $value): void {
+                foreach (array_filter(array_map('strval', (array) $value)) as $slug) {
+                    $query->whereHas('tags', fn ($q) => $q->where('slug', $slug));
+                }
+            }),
         ];
     }
 

@@ -42,7 +42,7 @@ final class ScrapedRecord
         'payload', 'emails', 'phones', 'error', 'latency_ms',
     ];
 
-    private const COMPANY_KEYS = ['siren', 'match_hint', 'fields'];
+    private const COMPANY_KEYS = ['siren', 'match_hint', 'fields', 'implantations'];
 
     private const MATCH_HINT_KEYS = ['denomination', 'postcode', 'city', 'address'];
 
@@ -50,6 +50,14 @@ final class ScrapedRecord
         'denomination', 'website', 'phone', 'email_generic', 'address',
         'postcode', 'city', 'linkedin_url',
     ];
+
+    /**
+     * Implantation à l'ÉTRANGER d'une entreprise française (filiale, usine,
+     * bureau). `country` = ISO 3166-1 alpha-2 obligatoire ; le reste décrit
+     * l'entité locale (raison sociale, ville, identifiant du registre local —
+     * ex. CUI roumain). Aucune PII : données d'identification d'entreprise.
+     */
+    private const IMPLANTATION_KEYS = ['country', 'name_local', 'city', 'registry_id'];
 
     private const PERSON_KEYS = [
         'first_name', 'last_name', 'role', 'email', 'phone', 'linkedin_url', 'kind',
@@ -62,6 +70,7 @@ final class ScrapedRecord
     /**
      * @param  array<string, mixed>  $matchHint
      * @param  array<string, string>  $companyFields
+     * @param  list<array<string, string>>  $implantations
      * @param  list<array<string, string>>  $persons
      * @param  list<string>  $channelEmails
      * @param  list<string>  $channelPhones
@@ -75,6 +84,7 @@ final class ScrapedRecord
         public readonly ?string $siren,
         public readonly array $matchHint,
         public readonly array $companyFields,
+        public readonly array $implantations,
         public readonly array $persons,
         public readonly array $channelEmails,
         public readonly array $channelPhones,
@@ -129,6 +139,27 @@ final class ScrapedRecord
             );
         }
 
+        $implantations = [];
+        $rawImplantations = $company['implantations'] ?? [];
+        if (! is_array($rawImplantations)) {
+            throw ScrapeIngestRejection::invalid('invalid_type', '« company.implantations » doit être une liste.');
+        }
+        foreach ($rawImplantations as $i => $implantation) {
+            if (! is_array($implantation)) {
+                throw ScrapeIngestRejection::invalid('invalid_type', "« company.implantations[{$i}] » doit être un objet.");
+            }
+            $clean = self::stringSection($implantation, self::IMPLANTATION_KEYS, "company.implantations[{$i}]");
+            $country = strtoupper($clean['country'] ?? '');
+            if (preg_match('/^[A-Z]{2}$/', $country) !== 1) {
+                throw ScrapeIngestRejection::invalid(
+                    'invalid_implantation_country',
+                    "company.implantations[{$i}].country doit être un code ISO 3166-1 alpha-2 (ex. RO).",
+                );
+            }
+            $clean['country'] = $country;
+            $implantations[] = $clean;
+        }
+
         $persons = [];
         $rawPersons = $raw['persons'] ?? [];
         if (! is_array($rawPersons)) {
@@ -159,6 +190,7 @@ final class ScrapedRecord
             siren: $siren,
             matchHint: $matchHint,
             companyFields: $companyFields,
+            implantations: $implantations,
             persons: $persons,
             channelEmails: self::stringList($channels['emails'] ?? [], 'channels.emails'),
             channelPhones: self::stringList($channels['phones'] ?? [], 'channels.phones'),

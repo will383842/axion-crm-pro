@@ -1,0 +1,2878 @@
+{
+  "total": 568,
+  "matched_sirens": 100,
+  "matched_local_entities": 104,
+  "pending": 305,
+  "excluded": 159,
+  "pending_list": [
+    {
+      "name": "APARTE REISER AS S.R.L.",
+      "base": "APARTE REISER AS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SAS SCIADO",
+      "base": "SAS SCIADO",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "108 REAL ESTATE ADVISORY ROMANIA S.R.L.",
+      "base": "108 REAL ESTATE ADVISORY",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "3D CONSEIL SRL",
+      "base": "3D CONSEIL",
+      "reason": "nom générique : arbitrage humain requis"
+    },
+    {
+      "name": "A_BEST COMPACT GROUP SRL",
+      "base": "A BEST COMPACT GROUP",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ACVATOT SRL",
+      "base": "ACVATOT",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "AERO PART EXPERT SRL",
+      "base": "AERO PART EXPERT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "AGS BUCAREST S.R.L.",
+      "base": "AGS",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "ALFA ROM CARPATI INDUSTRIAL GRUP SRL",
+      "base": "ALFA ROM CARPATI INDUSTRIAL GRUP",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "AMA NOEL CONSULT SRL",
+      "base": "AMA NOEL CONSULT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "AMIA INTERNATIONAL IMPORT EXPORT S.R.L.",
+      "base": "AMIA INTERNATIONAL IMPORT EXPORT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "AP STUDIO MANAGEMENT S.R.L.",
+      "base": "AP STUDIO MANAGEMENT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "APERIO INTELLIGENCE ROMANIA SRL",
+      "base": "APERIO INTELLIGENCE",
+      "reason": "nom générique : arbitrage humain requis"
+    },
+    {
+      "name": "APEX ALLIANCE PROPERTY 4 SRL",
+      "base": "APEX ALLIANCE PROPERTY 4",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "APEX TEAM INTERNATIONAL SRL",
+      "base": "APEX TEAM INTERNATIONAL",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ARCLIFFE PARTNERS S.R.L.",
+      "base": "ARCLIFFE PARTNERS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ARDELEAN & CO SRL",
+      "base": "ARDELEAN & CO",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ARGONAUTICA EDU S.R.L.",
+      "base": "ARGONAUTICA EDU",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ARHI DESIGN SRL",
+      "base": "ARHI DESIGN",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ARHI REVOLUTION S.R.L.",
+      "base": "ARHI REVOLUTION",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ARNIA SOFTWARE SRL",
+      "base": "ARNIA SOFTWARE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ARTA GRAFICA SRL",
+      "base": "ARTA GRAFICA",
+      "reason": "nom générique : arbitrage humain requis"
+    },
+    {
+      "name": "ARTEM GROUP TRADE & CONSULT S.R.L.",
+      "base": "ARTEM GROUP TRADE & CONSULT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ASES INTERNATIONAL SRL",
+      "base": "ASES INTERNATIONAL",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ATS EXPRESS SOLUTION SRL",
+      "base": "ATS EXPRESS SOLUTION",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "AUTOMECANICA SA",
+      "base": "AUTOMECANICA",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "AVALON MEDIA SRL",
+      "base": "AVALON MEDIA",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "AXXON COMPOSITES SRL",
+      "base": "AXXON COMPOSITES",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "AZOC-STAR SRL",
+      "base": "AZOC-STAR",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "B.B.S.C. COMMUNICATIONS SYSTEMS SRL",
+      "base": "B B S C COMMUNICATIONS SYSTEMS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "BACIU DESIGN S.R.L.",
+      "base": "BACIU DESIGN",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "BACKSTAGE PRODUCTION GROUP INTERNATIONAL S.R.L.",
+      "base": "BACKSTAGE PRODUCTION GROUP INTERNATIONAL",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "BC INOX - INDUSTRIE SRL",
+      "base": "BC INOX - INDUSTRIE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "BFS INTERNATIONAL SPORTS S.R.L.",
+      "base": "BFS INTERNATIONAL SPORTS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "BIT SOFTWARE S.R.L.",
+      "base": "BIT SOFTWARE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "BLACK SQUARE SRL",
+      "base": "BLACK SQUARE",
+      "reason": "nom générique : arbitrage humain requis"
+    },
+    {
+      "name": "BOURBON TECH SOLUTIONS S.R.L.",
+      "base": "BOURBON TECH SOLUTIONS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "BPI MANAGEMENT CONSULTING ROMANIA SRL",
+      "base": "BPI MANAGEMENT CONSULTING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "BRAINSPOTTING SRL",
+      "base": "BRAINSPOTTING",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "BRISK GROUP CONSULTING & DEVELOPMENT SRL",
+      "base": "BRISK GROUP CONSULTING & DEVELOPMENT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "BUREDO PRODUCTION SRL",
+      "base": "BUREDO PRODUCTION",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "CALOMFIRESCU, CIOCAN SI ASOCIATII S.R.L.",
+      "base": "CALOMFIRESCU CIOCAN SI ASOCIATII",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "CAPITAL DECISIONS S.R.L.",
+      "base": "CAPITAL DECISIONS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "CARBONTOOL S.R.L.",
+      "base": "CARBONTOOL",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "CAREGIVERS SRL",
+      "base": "CAREGIVERS",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "CATINVEST EASTERN EUROPE SRL",
+      "base": "CATINVEST",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "CC TAX ADVISORY SRL",
+      "base": "CC TAX ADVISORY",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "CELLUTEC ROM SRL",
+      "base": "CELLUTEC ROM",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "CENTRAL EUROPE TECHNOLOGIES SRL",
+      "base": "CENTRAL EUROPE TECHNOLOGIES",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "CENTRUL MEDICAL UNIREA SRL",
+      "base": "CENTRUL MEDICAL UNIREA",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "CERASUS AVIUM SRL",
+      "base": "CERASUS AVIUM",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "CEREALCOM DOLJ SRL",
+      "base": "CEREALCOM DOLJ",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "CHIMSPORT S.A.",
+      "base": "CHIMSPORT",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "CL ACCOUNTING REPORTING S.R.L.",
+      "base": "CL ACCOUNTING REPORTING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "CLA ROMANIA CORPORATE S.R.L.",
+      "base": "CLA ROMANIA CORPORATE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "CMB INTERNATIONAL EXIMP SRL",
+      "base": "CMB INTERNATIONAL EXIMP",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "COACHING PARTNERS SRL",
+      "base": "COACHING PARTNERS",
+      "reason": "nom générique : arbitrage humain requis"
+    },
+    {
+      "name": "CODE PRODUCTION SRL",
+      "base": "CODE PRODUCTION",
+      "reason": "nom générique : arbitrage humain requis"
+    },
+    {
+      "name": "COLESTATE DEVELOPMENT SRL",
+      "base": "COLESTATE DEVELOPMENT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "CON-A OPERATIONS S.R.L.",
+      "base": "CON-A OPERATIONS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "CONCELEX SRL",
+      "base": "CONCELEX",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "CONSULTEX 2003 SRL",
+      "base": "CONSULTEX 2003",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "COROM EXPORT SRL",
+      "base": "COROM EXPORT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "CORPORATE OFFICE SOLUTIONS SRL",
+      "base": "CORPORATE OFFICE SOLUTIONS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "CREATIVE MAKER SRL",
+      "base": "CREATIVE MAKER",
+      "reason": "nom générique : arbitrage humain requis"
+    },
+    {
+      "name": "DATAMEDIA EAST EUROPE SRL",
+      "base": "DATAMEDIA",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "DECOMAR LOGISTIC SRL",
+      "base": "DECOMAR LOGISTIC",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "DEFIRO S.R.L.",
+      "base": "DEFIRO",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "DELTA ROM TECHNOLOGIES S.A.",
+      "base": "DELTA ROM TECHNOLOGIES",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "DENTOTAL INVESTMENT SRL",
+      "base": "DENTOTAL INVESTMENT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "DESIGN IN ARK FREELANCERS SRL",
+      "base": "DESIGN IN ARK FREELANCERS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "DEVEHO SOFTWARE CONSULTING SRL",
+      "base": "DEVEHO SOFTWARE CONSULTING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "DGL CONSULTING S.R.L.",
+      "base": "DGL CONSULTING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "DIGIDEMAT SRL",
+      "base": "DIGIDEMAT",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "DISTRISTOC COMPREST SRL",
+      "base": "DISTRISTOC COMPREST",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "DOCTOR TOM",
+      "base": "DOCTOR TOM",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "DOMENIUL COROANEI SEGARCEA SRL",
+      "base": "DOMENIUL COROANEI SEGARCEA",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "DORM FACILITIES S.R.L.",
+      "base": "DORM FACILITIES",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "DR PASLARU ORTOPEDICUS PRO-CONSULT S.R.L.",
+      "base": "DR PASLARU ORTOPEDICUS PRO-CONSULT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "E-NGEN S.R.L.",
+      "base": "E-NGEN",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "EAGLE CONSULT & SERVICES SRL",
+      "base": "EAGLE CONSULT & SERVICES",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ECONOS SUSTAINABLE GROWTH S.R.L.",
+      "base": "ECONOS SUSTAINABLE GROWTH",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "EDITURA GAMA SRL",
+      "base": "EDITURA GAMA",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "EDITURA PARALELA 45 S.R.L.",
+      "base": "EDITURA PARALELA 45",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "EEU SOFTWARE SRL",
+      "base": "EEU SOFTWARE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "EFFICIENCE ASSOCIATE SRL",
+      "base": "EFFICIENCE ASSOCIATE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ELDOMIR TOUR SRL",
+      "base": "ELDOMIR TOUR",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ELECTRO-ALFA INTERNATIONAL S.A.",
+      "base": "ELECTRO-ALFA INTERNATIONAL",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ELEMENT INDUSTRIAL S.R.L.",
+      "base": "ELEMENT INDUSTRIAL",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ELEVATHOR CONSULTING S.R.L.",
+      "base": "ELEVATHOR CONSULTING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ELNET SECURITY SRL",
+      "base": "ELNET SECURITY",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ELVIN COSMETIC SRL",
+      "base": "ELVIN COSMETIC",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "EMI EQUIPEMENT MAINTENANCE INDUSTRIE S.A.",
+      "base": "EMI EQUIPEMENT MAINTENANCE INDUSTRIE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "EPCD RO DISTRIBUTION SRL",
+      "base": "EPCD RO DISTRIBUTION",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ESSENDI ROMANIA S.R.L.",
+      "base": "ESSENDI",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "EURL DZ CONSULTING",
+      "base": "EURL DZ CONSULTING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "EUVALUE BUSINESS CONSULTING S.R.L.",
+      "base": "EUVALUE BUSINESS CONSULTING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "EVA VR RO S.R.L.",
+      "base": "EVA VR",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "EVENT AGE CONSULTING S.R.L.",
+      "base": "EVENT AGE CONSULTING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "EVEREST LANGUAGES & CONSULTING S.R.L.",
+      "base": "EVEREST LANGUAGES & CONSULTING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "EVIDEN TECHNOLOGIES S.R.L.",
+      "base": "EVIDEN TECHNOLOGIES",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "EVOS INNOVATION SRL",
+      "base": "EVOS INNOVATION",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "EXACT FORESTALL S.R.L.",
+      "base": "EXACT FORESTALL",
+      "reason": "nom générique : arbitrage humain requis"
+    },
+    {
+      "name": "EXCENT INGENIERIE ROUMANIE S.R.L.",
+      "base": "EXCENT INGENIERIE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "EXPAND HEALTH ROUMANIA FILIALA SRL",
+      "base": "EXPAND HEALTH ROUMANIA",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "EXPERT PETROLEUM SOLUTIONS SRL",
+      "base": "EXPERT PETROLEUM SOLUTIONS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "EXPUR SA",
+      "base": "EXPUR",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "FACONNAGE MECANIQUE DE LA BRESLE PLASTICS SRL",
+      "base": "FACONNAGE MECANIQUE DE LA BRESLE PLASTICS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "FEEL IT SRL",
+      "base": "FEEL IT",
+      "reason": "nom générique : arbitrage humain requis"
+    },
+    {
+      "name": "FENEC RUBBER EASTERN EUROPE SRL",
+      "base": "FENEC RUBBER",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "FEPRA WASTE MANAGEMENT S.R.L.",
+      "base": "FEPRA WASTE MANAGEMENT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "FILDAS TRADING SRL",
+      "base": "FILDAS TRADING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "FINEXPERT - BOSCOLO CONSULTING S.R.L.",
+      "base": "FINEXPERT - BOSCOLO CONSULTING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "FLEXITECH RO SRL",
+      "base": "FLEXITECH",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "FOCUS TRAINING & COACHING SRL",
+      "base": "FOCUS TRAINING & COACHING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "FORMENS SRL",
+      "base": "FORMENS",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "FORTIM TRUSTED ADVISORS S.A.",
+      "base": "FORTIM TRUSTED ADVISORS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "FORVIS MAZARS CONSULTING S.R.L.",
+      "base": "FORVIS MAZARS CONSULTING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "FREYROM SA",
+      "base": "FREYROM",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "GAC INNOVATION EAST EUROPE S.R.L.",
+      "base": "GAC INNOVATION",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "GAZ INTEGRAL SRL",
+      "base": "GAZ INTEGRAL",
+      "reason": "nom générique : arbitrage humain requis"
+    },
+    {
+      "name": "GEOSTUD SRL",
+      "base": "GEOSTUD",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "GFS ENGINEERING & TECHNICAL CONSULTING S.R.L.",
+      "base": "GFS ENGINEERING & TECHNICAL CONSULTING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "GIRON PRODUCT SRL",
+      "base": "GIRON PRODUCT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "GIVE EXPERIENCE SRL",
+      "base": "GIVE EXPERIENCE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "GLOBAL TECHIN S.R.L.",
+      "base": "GLOBAL TECHIN",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "GLOBAL WEALTH ADVISORS & ASSOCIES SA",
+      "base": "GLOBAL WEALTH ADVISORS & ASSOCIES",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "GLUCK LAURENT DORIAN - ISTRATS",
+      "base": "GLUCK LAURENT DORIAN - ISTRATS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "GONZALES MECANICA DE PRECIZIE S.R.L.",
+      "base": "GONZALES MECANICA DE PRECIZIE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "GRAPHEE DATA FLOW S.R.L.",
+      "base": "GRAPHEE DATA FLOW",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "GREENPOINT MANAGEMENT S.A.",
+      "base": "GREENPOINT MANAGEMENT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "GROUPAMA ASIGURARI S.A.",
+      "base": "GROUPAMA ASSURANCES MUTUELLES",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "GSE ROMANIA SRL",
+      "base": "GSE",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "GTB CONSULT SERVICES TRADING SRL",
+      "base": "GTB CONSULT SERVICES TRADING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "GTS GLOBAL INTELLIGENCE S.A.",
+      "base": "GTS GLOBAL INTELLIGENCE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "H2AIR DEZVOLTARE S.R.L.",
+      "base": "H2AIR DEZVOLTARE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "HATWIT S.R.L.",
+      "base": "HATWIT",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "HELEXIA SERVICII ENERGETICE S.R.L.",
+      "base": "HELEXIA SERVICII ENERGETICE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "HIGH ENTERTAINMENT CONCEPT SRL",
+      "base": "HIGH ENTERTAINMENT CONCEPT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "HORYZON HUB S.R.L.",
+      "base": "HORYZON HUB",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "HR SPECIALISTS SRL",
+      "base": "HR SPECIALISTS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "HYPERICUM SRL",
+      "base": "HYPERICUM",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "ICEBERG PLUS S.R.L.",
+      "base": "ICEBERG PLUS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "IDEOGRAF SRL",
+      "base": "IDEOGRAF",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "IDL BUCHAREST S.R.L.",
+      "base": "IDL",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "IMPRIMERIA ARTA GRAFICA S.R.L.",
+      "base": "IMPRIMERIA ARTA GRAFICA",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "IMSAT SA",
+      "base": "IMSAT",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "INDUSTRIAL MONTAJ S.R.L.",
+      "base": "INDUSTRIAL MONTAJ",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "INGENIERIE MANAGEMENT ASSISTANCE S.R.L.",
+      "base": "INGENIERIE MANAGEMENT ASSISTANCE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "INSPET SA",
+      "base": "INSPET",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "INTERACT BUSINESS COMMUNICATIONS SRL",
+      "base": "INTERACT BUSINESS COMMUNICATIONS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "INTERMEDICAS WORLDWIDE SRL",
+      "base": "INTERMEDICAS WORLDWIDE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "INTERNATIONAL WORK FINDER S.R.L.",
+      "base": "INTERNATIONAL WORK FINDER",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "IO PARTNERS S.R.L.",
+      "base": "IO PARTNERS",
+      "reason": "nom générique : arbitrage humain requis"
+    },
+    {
+      "name": "IPS INDUSTRIAL PROJECTS SERVICES ROMANIA SRL",
+      "base": "IPS INDUSTRIAL PROJECTS SERVICES",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "IPSO SRL",
+      "base": "IPSO",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "ISITEC SYSTEM ROMANIA S.R.L.",
+      "base": "ISITEC SYSTEM",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "IUS SA",
+      "base": "IUS",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "JUICE MARKET S.R.L.",
+      "base": "JUICE MARKET",
+      "reason": "nom générique : arbitrage humain requis"
+    },
+    {
+      "name": "KALIZEA BOROMIR S.A.",
+      "base": "KALIZEA BOROMIR",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "KOGNITIVE MANUFACTURING TECH S.R.L.",
+      "base": "KOGNITIVE MANUFACTURING TECH",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "LALEMANT ROMANIA S.R.L.",
+      "base": "LALEMANT",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "LANDMARK MANAGEMENT SRL",
+      "base": "LANDMARK MANAGEMENT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "LAPROM TRADING SRL",
+      "base": "LAPROM TRADING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "LEA BROKER DE ASIGURARE SRL",
+      "base": "LEA BROKER DE ASIGURARE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "LEOHR S.R.L.",
+      "base": "LEOHR",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "LEVIATAN DESIGN SRL",
+      "base": "LEVIATAN DESIGN",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "LIFE AS A GIFT SRL",
+      "base": "LIFE AS A GIFT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "LINGUA TRANSCRIPT SRL",
+      "base": "LINGUA TRANSCRIPT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "LPR - LA PALETTE ROUGE ROMANIA S.R.L.",
+      "base": "LA PALETTE ROUGE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "LUIZ DESIGN&ARCHITECTURE S.R.L.",
+      "base": "LUIZ DESIGN&ARCHITECTURE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "LUNOX INTERNATIONAL HOLDING S.E.",
+      "base": "LUNOX INTERNATIONAL HOLDING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "LUTZ & ASSOCIATES ACCOUNTING SRL",
+      "base": "LUTZ & ASSOCIATES ACCOUNTING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "M.A.C.V.R. INTERNATIONAL SRL",
+      "base": "M A C V R INTERNATIONAL",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "MAISADOUR SEMENCES ROMANIA SRL",
+      "base": "MAISADOUR SEMENCES",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "MARVICON SRL",
+      "base": "MARVICON",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "MCI SMARTPACK S.R.L.",
+      "base": "MCI SMARTPACK",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ME SERAN MARIA-ELIZA",
+      "base": "ME SERAN MARIA-ELIZA",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "MEDIA KOMPASS SRL",
+      "base": "MEDIA KOMPASS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "MELI MELO FASHION SRL",
+      "base": "MELI MELO FASHION",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "MENSAVE S.R.L.",
+      "base": "MENSAVE",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "METAL PRODUCTION INDUSTRIES SRL",
+      "base": "METAL PRODUCTION INDUSTRIES",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "METALIMPEX ROMANIA SRL",
+      "base": "METALIMPEX",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "METAPLAST SRL",
+      "base": "METAPLAST",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "MI-GSO PMO S.R.L.",
+      "base": "MI-GSO PMO",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "MIRA GREEN PLANET S.R.L.",
+      "base": "MIRA GREEN PLANET",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "N.E.L.L. EXPERT S.R.L.",
+      "base": "N E L L EXPERT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "NATURAL PARIS SRL",
+      "base": "NATURAL",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "NEW KOPEL ROMANIA SRL",
+      "base": "NEW KOPEL",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "NEW LINK CONSULTING GRUP S.R.L.",
+      "base": "NEW LINK CONSULTING GRUP",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "NEXTEAM BRANESTI MACHINING S.R.L.",
+      "base": "NEXTEAM BRANESTI MACHINING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "NOA TAX ADVISORS S.R.L.",
+      "base": "NOA TAX ADVISORS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "NORMANDIA SRL",
+      "base": "NORMANDIA",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "NOVARES AUTOMOTIVE ROMANIA SRL",
+      "base": "NOVARES AUTOMOTIVE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "OAMENI SI COMPANII SRL",
+      "base": "OAMENI SI COMPANII",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "OCEANUL INDIAN S.A.",
+      "base": "OCEANUL INDIAN",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "OMA VISION PROJECTS S.R.L.",
+      "base": "OMA VISION PROJECTS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ONE TOOL SRL",
+      "base": "ONE TOOL",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ONE UNITED MANAGEMENT SERVICES S.R.L.",
+      "base": "ONE UNITED MANAGEMENT SERVICES",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "OPEN DIGITAL SERVICES ROUMANIE S.R.L.",
+      "base": "OPEN DIGITAL SERVICES",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "OPERATIONAL PERFORMANCE SOLUTIONS S.R.L.",
+      "base": "OPERATIONAL PERFORMANCE SOLUTIONS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "OPUS TEAM SRL",
+      "base": "OPUS TEAM",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ORBIT TRANSPORTURI INTERNATIONALE SRL",
+      "base": "ORBIT TRANSPORTURI INTERNATIONALE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ORGANISATION CONSULTING PROD SRL",
+      "base": "ORGANISATION CONSULTING PROD",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "OSCAR DOWNSTREAM SRL",
+      "base": "OSCAR DOWNSTREAM",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "OXYLIFE S.R.L.",
+      "base": "OXYLIFE",
+      "reason": "nom générique : arbitrage humain requis"
+    },
+    {
+      "name": "PAPA JACQUES - SPECIALTY COFFEE ROASTERS",
+      "base": "PAPA JACQUES - SPECIALTY COFFEE ROASTERS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "PARCURI INDUSTRIALE MARAMURES S.A.",
+      "base": "PARCURI INDUSTRIALE MARAMURES",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "PLAMETCO SRL",
+      "base": "PLAMETCO",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "PLASTIC OMNIUM AUTO INERGY ROMANIA SRL",
+      "base": "COMPAGNIE PLASTIC OMNIUM",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "PLEXIROM SRL",
+      "base": "PLEXIROM",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "POLIAC DEVELOPMENT SRL",
+      "base": "POLIAC DEVELOPMENT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "PORTANT PUBLIC AFFAIRS S.R.L.",
+      "base": "PORTANT PUBLIC AFFAIRS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "POS MEDIA ROMANIA SHOPPER ACTIVATION AGENCY S.R.L.",
+      "base": "POS MEDIA ROMANIA SHOPPER ACTIVATION AGENCY",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "POTEZ AERONAUTIC ROMANIA S.R.L.",
+      "base": "POTEZ AERONAUTIQUE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "PRIVILEG CATERING SRL",
+      "base": "PRIVILEG CATERING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "PRO TOBY SRL",
+      "base": "PRO TOBY",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "PROMPT SRL",
+      "base": "PROMPT",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "PROTELCO SA",
+      "base": "PROTELCO",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "PUBLIC AFFAIRS SOLUTIONS S.R.L.",
+      "base": "PUBLIC AFFAIRS SOLUTIONS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "QUADRA ESTATE S.R.L.",
+      "base": "QUADRA ESTATE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "RADIO FRANCE INTERNATIONALE ROMANIA SRL",
+      "base": "RADIO FRANCE INTERNATIONALE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "RAMIRA SA",
+      "base": "RAMIRA",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "RECICLADOR S.A.",
+      "base": "RECICLADOR",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "RECOMMERCE DEVICES AND SOLUTIONS RO S.R.L.",
+      "base": "RECOMMERCE DEVICES AND SOLUTIONS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "RECRUITIFY & TRAINIFY S.R.L.",
+      "base": "RECRUITIFY & TRAINIFY",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "REDBEE SOFTWARE S.R.L.",
+      "base": "REDBEE SOFTWARE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "REO MEDICAL APARATURA MEDICALA SRL",
+      "base": "REO MEDICAL APARATURA MEDICALA",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ROA3 KM43 PARC EFIL S.R.L.",
+      "base": "ROA3 KM43 PARC EFIL",
+      "reason": "nom générique : arbitrage humain requis"
+    },
+    {
+      "name": "RODAGRIA PRODUCE COOPERATIVA AGRICOLA",
+      "base": "RODAGRIA PRODUCE COOPERATIVA AGRICOLA",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ROMCARTON S.A.",
+      "base": "ROMCARTON",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "ROMCIM S.A.",
+      "base": "ROMCIM",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "ROMRECYCLING SRL",
+      "base": "ROMRECYCLING",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "ROSMAN TALENT SOLUTIONS SRL",
+      "base": "ROSMAN TALENT SOLUTIONS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ROUMASPORT SRL",
+      "base": "ROUMASPORT",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "SA PRIVE SA",
+      "base": "SA PRIVE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SADE INGENIERIE S.R.L.",
+      "base": "SADE INGENIERIE",
+      "reason": "nom générique : arbitrage humain requis"
+    },
+    {
+      "name": "SAFETY AND SECURITY SYSTEMS SRL",
+      "base": "SAFETY AND SECURITY SYSTEMS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SAS ACSE - ADVISE CONSULT SECURITY ENGIN",
+      "base": "SAS ACSE - ADVISE CONSULT SECURITY ENGIN",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SAS CGFI CONSEIL",
+      "base": "SAS CGFI CONSEIL",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SAS EURASIAN HORIZONS",
+      "base": "SAS EURASIAN HORIZONS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SAS INDUSTRIAL FILTRATION TECHNOLOGIE",
+      "base": "SAS INDUSTRIAL FILTRATION TECHNOLOGIE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SAS MOBIWIRE",
+      "base": "SAS MOBIWIRE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SAS PURE PSYCHOLOGY",
+      "base": "SAS PURE PSYCHOLOGY",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SAS SYSTEMES ET TECHNOLOGIES IDENTIFICAT",
+      "base": "SAS SYSTEMES ET TECHNOLOGIES IDENTIFICAT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SAS VENT D'EST",
+      "base": "SAS VENT D'EST",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SASU INLIGHT DYNAMICS",
+      "base": "SASU INLIGHT DYNAMICS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SASU MARKET PAY",
+      "base": "SASU MARKET PAY",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SAYDAN DIGITAL SOLUTIONS S.R.L.",
+      "base": "SAYDAN DIGITAL SOLUTIONS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SCOP SANISPHERE",
+      "base": "SCOP SANISPHERE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SERVE CEPTURA SRL",
+      "base": "SERVE CEPTURA",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SII IT & C SERVICES SRL",
+      "base": "SII IT & C SERVICES",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SKB PROD SYSTEMS SRL",
+      "base": "SKB PROD SYSTEMS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SMART BUSINESS & TECHNOLOGIES SOLUTIONS SRL",
+      "base": "SMART BUSINESS & TECHNOLOGIES SOLUTIONS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SMART WOOD ROMANIA S.R.L.",
+      "base": "SMART WOOD",
+      "reason": "nom générique : arbitrage humain requis"
+    },
+    {
+      "name": "SOCIETATE PROFESIONALA GRIGORESCU STEFANICA SI ASOCIATII",
+      "base": "SOCIETATE PROFESIONALA GRIGORESCU STEFANICA SI ASOCIATII",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SOCIETATEA COMPANIILOR HOTELIERE GRAND SRL",
+      "base": "SOCIETATEA COMPANIILOR HOTELIERE GRAND",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SONOVISION ROMANIA SRL",
+      "base": "SONOVISION",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "SOPEMA SRL",
+      "base": "SOPEMA",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "SOUFFLET MALT ROMANIA SA",
+      "base": "MALTERIES SOUFFLET",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SPOTING SA",
+      "base": "SPOTING",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "STALFORT INNOVATION & GRANTS S.R.L.",
+      "base": "STALFORT INNOVATION & GRANTS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "STARLANCER SRL",
+      "base": "STARLANCER",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "STEJARII UNIVERSE S.R.L.",
+      "base": "STEJARII UNIVERSE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "STICKER INTERNATIONAL MEDIA SRL",
+      "base": "STICKER INTERNATIONAL MEDIA",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "STUDIUM GREEN SRL",
+      "base": "STUDIUM GREEN",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "SUPERTREE S.R.L.",
+      "base": "SUPERTREE",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "SYNERGETIC PEOPLE DEVELOPMENT S.R.L.",
+      "base": "SYNERGETIC PEOPLE DEVELOPMENT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "TALENT STREAM SRL",
+      "base": "TALENT STREAM",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "TARGET ROMANIA SRL",
+      "base": "TARGET",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "TD REAL ESTATE CONSULTANCY S.R.L.",
+      "base": "TD REAL ESTATE CONSULTANCY",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "TDM TRANSFORMATION DECOUPAGE DE METAUX SRL",
+      "base": "TDM TRANSFORMATION DECOUPAGE DE METAUX",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "TECHWISE ELECTRONICS S.R.L.",
+      "base": "TECHWISE ELECTRONICS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "TELESERVICES WORLDWIDE S.R.L.",
+      "base": "TELESERVICES WORLDWIDE",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "TERMOLINE SRL",
+      "base": "TERMOLINE",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "TESTER GRUP SRL",
+      "base": "TESTER GRUP",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "TEX ACCES MCV S.R.L.",
+      "base": "TEX ACCES MCV",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "TGS ROMANIA ASSURANCE & ADVISORY BUSINESS SERVICES S.R.L.",
+      "base": "TGS ROMANIA ASSURANCE & ADVISORY BUSINESS SERVICES",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "THIRARD BALCANI SRL",
+      "base": "THIRARD BALCANI",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "TIAB SA",
+      "base": "TIAB",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "TIPLOG S.R.L.",
+      "base": "TIPLOG",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "TIPOMAR PACKAGING S.R.L.",
+      "base": "TIPOMAR PACKAGING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "TOTALENERGIES GLOBAL SERVICES BUCHAREST S.R.L.",
+      "base": "TOTALENERGIES GLOBAL SERVICES",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "TPA ADMIN SRL",
+      "base": "TPA ADMIN",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "TRANSPARENT DESIGN S.R.L.",
+      "base": "TRANSPARENT DESIGN",
+      "reason": "nom générique : arbitrage humain requis"
+    },
+    {
+      "name": "TREND CONSULT SRL",
+      "base": "TREND CONSULT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "TRIHAUS ARGHEZI S.R.L.",
+      "base": "TRIHAUS ARGHEZI",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "TRK PROFESSIONAL SRL",
+      "base": "TRK PROFESSIONAL",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "TRUST MOTORS SRL",
+      "base": "TRUST MOTORS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "UNIMEC SRL",
+      "base": "UNIMEC",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "UP ROMANIA S.R.L.",
+      "base": "UP",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "URBAN CONNECT SRL",
+      "base": "URBAN CONNECT",
+      "reason": "nom générique : arbitrage humain requis"
+    },
+    {
+      "name": "VAPRO SUBSIDY SERVICES SRL",
+      "base": "VAPRO SUBSIDY SERVICES",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "VECTOR INTERNATIONAL SRL",
+      "base": "VECTOR INTERNATIONAL",
+      "reason": "nom générique : arbitrage humain requis"
+    },
+    {
+      "name": "VECTR MANAGEMENT ROMANIA S.R.L.",
+      "base": "VECTR MANAGEMENT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "VERBAL KINT MANAGEMENT S.R.L.",
+      "base": "VERBAL KINT MANAGEMENT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "VIAROM CONSTRUCT SRL",
+      "base": "VIAROM CONSTRUCT",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "VILMAR SA",
+      "base": "VILMAR",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    },
+    {
+      "name": "VITALIA SERVICII PENTRU MEDIU - TRATAREA DESEURILOR SRL",
+      "base": "VITALIA SERVICII PENTRU MEDIU - TRATAREA DESEURILOR",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "VITICOLA CORCOVA S.R.L.",
+      "base": "VITICOLA CORCOVA",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "WEBHELP ROMANIA SRL",
+      "base": "WEBHELP",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "WIN OUTSOURCING S.R.L.",
+      "base": "WIN OUTSOURCING",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "WISE FINANCE SOLUTIONS SRL",
+      "base": "WISE FINANCE SOLUTIONS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "WOLF-E ROBOTICS S.R.L.",
+      "base": "WOLF-E ROBOTICS",
+      "reason": "aucune correspondance française fiable"
+    },
+    {
+      "name": "ZESTIFYER ROMANIA S.R.L.",
+      "base": "ZESTIFYER",
+      "reason": "nom mono-token non distinctif : arbitrage humain requis"
+    }
+  ],
+  "excluded_list": [
+    {
+      "name": "MONSIEUR FRANCOIS PATEY",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "IORDACHE SI ASOCIATII - SOCIETATE CIVILA DE AVOCATI",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "BOGARU CRISTIAN - CABINET DE AVOCAT",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "BUJU, STANCIU & ASOCIATII - SOCIETATE CIVILA DE AVOCATI",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ENACHE PIRTEA & ASOCIATII - SOCIETATE PROFESIONALA DE AVOCATI",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "MUSAT & ASOCIATII - SOCIETATE PROFESIONALA DE AVOCATI",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "PETERKA SI ASOCIATII - SOCIETATE PROFESIONALA DE AVOCATI",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "RADULESCU & MUSOI - SOCIETATE PROFESIONALA DE AVOCATI",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "SUCIU SI ASOCIATII - SOCIETATE PROFESIONALA DE AVOCATI",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ACADEMIA DE STUDII ECONOMICE",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ACT LEGAL ROMANIA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ADECCO RESURSE UMANE SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "AKKODIS ROMANIA S.R.L.",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ANA HOTELS S.R.L.",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "AON ROMANIA BROKER DE ASIGURARE-REASIGURARE SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA AFB (ACCUEIL FRANCAIS ET FRANCOPHONE DE BUCAREST)",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA DARUIESTE ARIPI",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA HABITAT FOR HUMANITY ROMANIA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA KINETO BEBE",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA VALENTINA ROMANIA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA DARUIESTE VIATA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA AIDER AGRICULTURA INTEGRATA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA ATELIERE FARA FRONTIERE",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA AUTISM VOICE",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA BEYOND BUSINESS SCHOOL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA CED ROMANIA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA CLIMATO SFERA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA CULTURALA EASTWARDS PROSPECTUS",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA DE TURISM ZIMBRUL CARPATIN",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA ECOTIC",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA EDU ACT",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA EEMATICO",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA ENVISIA BOARDS OF ELITE",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA F.R.E.E.",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA FRENCH TECH BUCHAREST",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA GO-AHEAD",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA HANDS ACROSS ROMANIA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA IMAGO MUNDI",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA INSPIRACTION",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA JUNIOR ACHIEVEMENT OF ROMANIA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA KICKSTART",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA MERCI CHARITY BOUTIQUE",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA NICIODATA SINGUR",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA PASTEL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA PENTRU VALORI IN EDUCATIE",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA PROFESIONISTILOR IN SUSTENABILITATE",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA ROMANA ANTI-SIDA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA SAMAS",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA SE POATE",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA SPORTS HUB",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA TECH STATION",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA THE SOCIAL INCUBATOR",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA NOI VENIM DIN VIITOR",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA CENTRUL PENTRU DEZVOLTARE DURABILA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA CLUB SPORTIV CLIMB AGAIN",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA HARSOVA 3D",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA TECH LOUNGE",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA INTRE VECINI",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ASOCIATIA SCOALA INCREDERII",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "AUTONOM SERVICES S.A.",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "BANCA TRANSILVANIA SA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "BAYER SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "BIO-CIRCLE SURFACE TECHNOLOGY SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "BITDEFENDER SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "BOLLHOFF SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "CABINET INDIVIDUAL DE AVOCATURA - GABRIEL MANEA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "CBRE REAL ESTATE CONSULTANCY SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "CONNECTIONS CONSULT S.A.",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "CTP INVEST BUCHAREST SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "DANTE INTERNATIONAL SA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "DELOITTE CONSULTANTA SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "DOCPROCESS S.A.",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "DR. PENDL & DR. PISWANGER ROMANIA SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "DR.MAX S.R.L.",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "DYNAMIC PARCEL DISTRIBUTION SA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "EBS INTEGRATOR",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ECOLE FRANCAISE INTERNATIONALE BUCAREST S.R.L.",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ERNST & YOUNG SUPPORT SERVICES SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ETA2U SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "EUROFINS FOOD TESTING SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "FUNDATIA PARADA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "FUNDATIA POLISANO",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "FUNDATIA CMU - REGINA MARIA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "FUNDATIA HOSPICE CASA SPERANTEI",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "FUNDATIA LYCEE FRANCAIS ANNA DE NOAILLES",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "FUNDATIA MARE",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "FUNDATIA MATEAS",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "FUNDATIA SF. DIMITRIE",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "FUNDATIA UIPATH FOUNDATION",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "FUNDATIA WORLD VISION ROMANIA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "FUNDATIA ALATURI DE VOI ROMANIA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "FUNDATIA PENTRU EDUCATIE DIGITALA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "FUNDATIA PROGRESS BISTRITA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "GOODWILL CONSULTING GWC SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "GOSSELIN MOBILITY ROMANIA SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "GRADINITA LA MAISON BLEUE",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "GRANT THORNTON AUDIT SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "GRUIA DUFAUT SI ASOCIATII - SOCIETATE CIVILA DE AVOCATI",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "HAPPY TOUR SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "HUMANGEST GROUP SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ICAP OUTSOURCING SOLUTIONS",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "IFM ELECTRONIC SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "INSTITUT FRANCAIS DE ROUMANIE",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "JOY LEARNING CENTRE S.R.L.",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "JUST ONE",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "KINSTELLAR SARL LUXEMBURG SUCURSALA BUCURESTI",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "KPMG ROMANIA SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "LA PETITE MATERNELLE SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "MARSH BROKER DE ASIGURARE-REASIGURARE SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "MED LIFE SA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "MEDICOVER SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "MET ROMANIA ENERGY S.R.L.",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "NEMES VOICU BILAN - SOCIETATE CIVILA DE AVOCATI",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "NESTLE ROMANIA SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "NET BRINEL SA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "NOKIA NETWORKS S.R.L.",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "OLX ONLINE SERVICES SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "OMV PETROM SA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "PETROLEUM EQUIPMENT AND SUPPLIES FZE JEBEL ALI - SUCURSALA BUCURESTI",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "PFEIFFER VACUUM ROMANIA SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "POPECI UTILAJ GREU SA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "PORR CONSTRUCT SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "PRICEWATERHOUSECOOPERS SERVICII SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "RAIFFEISEN BANK SA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "RALUCA ML CURELEA - CABINET DE AVOCAT",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "RAMONA-ELISABETA CIRLIG - CABINET DE AVOCAT",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "ROLLAND JEAN-LUC PERSOANA FIZICA AUTORIZATA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "RSM ROMANIA SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "SANTA FE RELOCATION SERVICES SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "SCHWARZ GRUPPE INT SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "SD WORX ROMANIA S.R.L.",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "SGS ROMANIA SA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "SMARTREE HRTECH S.A.",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "SOCIETATE CIVILA DE AVOCATI BONDOC SI ASOCIATII",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "SOCIETATE CIVILA DE AVOCATI DRAGNE SI ASOCIATII",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "SOCIETATE CIVILA DE AVOCATI POPOVICI NITU STOICA & ASOCIATII",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "SOCIETATE CIVILA PROFESIONALA DE AVOCATI MARKO & UDREA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "SOCIETATEA CIVILA DE AVOCATI EVERSHEDS LINA SI GUIA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "SOCIETATEA CIVILA DE AVOCATI LEROY SI ASOCIATII",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "SOCIETATEA CIVILA DE AVOCATI RADU TARACILA PADURARI RETEVOESCU",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "SOCIETATEA CIVILA DE AVOCATI ROIBU SI ASOCIATII",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "SOCIETATEA CIVILA DE AVOCATI TUCA ZBARCEA & ASOCIATII",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "SOCIETATEA CIVILA PROFESIONALA DLA PIPER DINU",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "SOCIETATEA CIVILA PROFESIONALA DE AVOCATI CEPARU SI IRIMIA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "SOCIETATEA NATIONALA DE CRUCE ROSIE - FILIALA SECTOR 6",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "SOGEFI AIR&COOLING SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "TOADER SI ASOCIATII - SOCIETATE CIVILA DE AVOCATURA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "TOTAL SOFT S.A.",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "TREMEND SOFTWARE CONSULTING SRL",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "TURISM LOTUS FELIX SA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "UNICREDIT BANK S.A.",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "UNIVERSITATEA DE VEST DIN TIMISOARA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "UNIVERSITATEA POLITEHNICA TIMISOARA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "UNIVERSITATEA TEHNICA DE CONSTRUCTII BUCURESTI",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "VATASOIU ANCA-COSMINA - CABINET DE AVOCAT",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "VISTA BANK (ROMANIA) S.A.",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "WAREHOUSES DE PAUW ROMANIA S.R.L.",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "WILLIS TOWERS WATSON ROMANIA - BROKER DE ASIGURARE",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    },
+    {
+      "name": "WORLD TRADE CENTER BUCURESTI SA",
+      "reason": "hors-cible (ONG/cabinet/université ou groupe non français connu)"
+    }
+  ],
+  "matched_list": [
+    {
+      "siren": "753226430",
+      "fr": "ACENSI SANA",
+      "ro": [
+        "ACENSI ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "420495178",
+      "fr": "SOCIETE AIR FRANCE",
+      "ro": [
+        "AIR FRANCE BUCURESTI"
+      ]
+    },
+    {
+      "siren": "314119504",
+      "fr": "AIR LIQUIDE FRANCE INDUSTRIE",
+      "ro": [
+        "AIR LIQUIDE ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "352383715",
+      "fr": "AIRBUS HELICOPTERS",
+      "ro": [
+        "AIRBUS HELICOPTERS ROMANIA S.A."
+      ]
+    },
+    {
+      "siren": "344844998",
+      "fr": "AKWEL SA (AKWEL)",
+      "ro": [
+        "AKWEL TIMISOARA ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "417689395",
+      "fr": "AYVENS",
+      "ro": [
+        "ALD AUTOMOTIVE SRL"
+      ]
+    },
+    {
+      "siren": "421218132",
+      "fr": "ALLIANCE HEALTHCARE REPARTITION (AHR)",
+      "ro": [
+        "ALLIANCE HEALTHCARE ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "421380866",
+      "fr": "ALSTEF AUTOMATION SA",
+      "ro": [
+        "ALSTEF ROUMANIE S.R.L."
+      ]
+    },
+    {
+      "siren": "389191982",
+      "fr": "ALSTOM TRANSPORT SA",
+      "ro": [
+        "ALSTOM TRANSPORT SA"
+      ]
+    },
+    {
+      "siren": "437574452",
+      "fr": "AMUNDI ASSET MANAGEMENT (AMUNDI AM)",
+      "ro": [
+        "AMUNDI ASSET MANAGEMENT S.A.I. S.A."
+      ]
+    },
+    {
+      "siren": "403210032",
+      "fr": "VEOLIA ENVIRONNEMENT (VE)",
+      "ro": [
+        "APA NOVA BUCURESTI SA",
+        "APA NOVA PLOIESTI SRL",
+        "VEOLIA ROMANIA SOLUTII INTEGRATE S.A."
+      ]
+    },
+    {
+      "siren": "389192030",
+      "fr": "ARABELLE SOLUTIONS FRANCE",
+      "ro": [
+        "ARABELLE SOLUTIONS ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "388452443",
+      "fr": "ARTHUR HUNT CONSULTING",
+      "ro": [
+        "ARTHUR HUNT SRL"
+      ]
+    },
+    {
+      "siren": "352256424",
+      "fr": "ARVAL SERVICE LEASE (ARVAL)",
+      "ro": [
+        "ARVAL SERVICE LEASE ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "347538043",
+      "fr": "AS 24",
+      "ro": [
+        "AS24 TANKSERVICE SRL"
+      ]
+    },
+    {
+      "siren": "399506641",
+      "fr": "ATALIAN PROPRETE",
+      "ro": [
+        "ATALIAN ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "323623603",
+      "fr": "ATOS GROUP",
+      "ro": [
+        "ATOS GLOBAL DELIVERY CENTER S.R.L."
+      ]
+    },
+    {
+      "siren": "410409460",
+      "fr": "AUCHAN HYPERMARCHE",
+      "ro": [
+        "AUCHAN ROMANIA SA"
+      ]
+    },
+    {
+      "siren": "441639465",
+      "fr": "RENAULT",
+      "ro": [
+        "AUTOMOBILE-DACIA SA",
+        "RENAULT COMMERCIAL ROUMANIE SRL"
+      ]
+    },
+    {
+      "siren": "352893200",
+      "fr": "AXERIA IARD",
+      "ro": [
+        "AXERIA IARD SA LYON - SUCURSALA BUCURESTI"
+      ]
+    },
+    {
+      "siren": "509491858",
+      "fr": "AXWAY",
+      "ro": [
+        "AXWAY ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "305635609",
+      "fr": "BANQUE BANORIENT FRANCE",
+      "ro": [
+        "BANQUE BANORIENT FRANCE S.A. SUCURSALA ROMANIA"
+      ]
+    },
+    {
+      "siren": "793562430",
+      "fr": "BNP PARIBAS LEASING SOLUTIONS SPA",
+      "ro": [
+        "BNP PARIBAS LEASING SOLUTIONS IFN S.A."
+      ]
+    },
+    {
+      "siren": "662042449",
+      "fr": "BNP PARIBAS (HELLO BANK!)",
+      "ro": [
+        "BNP PARIBAS S.A. PARIS SUCURSALA BUCURESTI"
+      ]
+    },
+    {
+      "siren": "956501258",
+      "fr": "BOCCARD FRANCE",
+      "ro": [
+        "BOCCARD ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "552120222",
+      "fr": "SOCIETE GENERALE (SG)",
+      "ro": [
+        "BRD - GROUPE SOCIETE GENERALE SA",
+        "SOCIETE GENERALE GLOBAL SOLUTION CENTRE S.A."
+      ]
+    },
+    {
+      "siren": "642058739",
+      "fr": "BULL SAS",
+      "ro": [
+        "BULL ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "479766842",
+      "fr": "CAPGEMINI TECHNOLOGY SERVICES",
+      "ro": [
+        "CAPGEMINI SERVICES ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "451321335",
+      "fr": "CARREFOUR HYPERMARCHES",
+      "ro": [
+        "CARREFOUR ROMANIA SA"
+      ]
+    },
+    {
+      "siren": "993059351",
+      "fr": "GROUPE CAT",
+      "ro": [
+        "CAT AUTOLOGISTICS ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "348940255",
+      "fr": "CEGEDIM SANTE (SOFILOCA) (ABREVIATION CHS)",
+      "ro": [
+        "CEGEDIM RX SRL"
+      ]
+    },
+    {
+      "siren": "552088536",
+      "fr": "CEVA AIR & OCEAN INTERNATIONAL",
+      "ro": [
+        "CEVA AIR & OCEAN ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "789791464",
+      "fr": "CEVA LOGISTICS GROUND & RAIL FRANCE",
+      "ro": [
+        "CEVA LOGISTICS SRL"
+      ]
+    },
+    {
+      "siren": "562024422",
+      "fr": "CMA CGM",
+      "ro": [
+        "CMA CGM ROMANIA SA"
+      ]
+    },
+    {
+      "siren": "499189017",
+      "fr": "CMA SHIPS",
+      "ro": [
+        "CMA SHIPS ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "851127142",
+      "fr": "COFACE SA",
+      "ro": [
+        "COFACE ROMANIA SERVICES S.R.L."
+      ]
+    },
+    {
+      "siren": "058501107",
+      "fr": "COTHERM",
+      "ro": [
+        "COTHERM ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "542016381",
+      "fr": "CREDIT INDUSTRIEL ET COMMERCIAL (CIC)",
+      "ro": [
+        "CREDIT INDUSTRIEL ET COMMERCIAL - REPREZENTANTA"
+      ]
+    },
+    {
+      "siren": "393135298",
+      "fr": "CS GROUP - FRANCE",
+      "ro": [
+        "CS GROUP - ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "672039971",
+      "fr": "DANONE PRODUITS FRAIS FRANCE (D.P.F.F.)",
+      "ro": [
+        "DANONE - PRODUCTIE SI DISTRIBUTIE DE PRODUSE ALIMENTARE SRL"
+      ]
+    },
+    {
+      "siren": "433968187",
+      "fr": "ECOCERT FRANCE",
+      "ro": [
+        "ECOCERT SRL"
+      ]
+    },
+    {
+      "siren": "393365135",
+      "fr": "EDENRED FRANCE",
+      "ro": [
+        "EDENRED ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "702027376",
+      "fr": "EGIS",
+      "ro": [
+        "EGIS ROMANIA SA"
+      ]
+    },
+    {
+      "siren": "552046955",
+      "fr": "ENGIE ENERGIE SERVICES (ENGIE E.S.)",
+      "ro": [
+        "ENGIE ROMANIA S.A."
+      ]
+    },
+    {
+      "siren": "392527404",
+      "fr": "EUROMASTER FRANCE",
+      "ro": [
+        "EUROMASTER TYRE & SERVICES ROMANIA S.A."
+      ]
+    },
+    {
+      "siren": "381983568",
+      "fr": "EVERIENCE (EVERIENCE)",
+      "ro": [
+        "EVERIENCE ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "404271470",
+      "fr": "EXPLEO FRANCE",
+      "ro": [
+        "EXPLEO ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "393162433",
+      "fr": "FAURECIA SIEGES D'AUTOMOBILE",
+      "ro": [
+        "FAURECIA ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "452228596",
+      "fr": "FM LOGISTIC CORPORATE",
+      "ro": [
+        "FM ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "379041395",
+      "fr": "FRAMATOME",
+      "ro": [
+        "FRAMATOME SAS - REPREZENTANTA"
+      ]
+    },
+    {
+      "siren": "791356066",
+      "fr": "GESTION GROUPE CORDANI (G.G.C) (G G C)",
+      "ro": [
+        "GESTION GROUPE CORDANI"
+      ]
+    },
+    {
+      "siren": "851194712",
+      "fr": "GROUP ALLIO ROMANIA",
+      "ro": [
+        "GROUP ALLIO ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "378393417",
+      "fr": "GROUPE ATLANTIC SYNERGY",
+      "ro": [
+        "GROUPE ATLANTIC ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "988287488",
+      "fr": "GROUPE BBL",
+      "ro": [
+        "GROUPE BBL ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "531238400",
+      "fr": "GUILLIN",
+      "ro": [
+        "GUILLIN ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "332822485",
+      "fr": "HAULOTTE GROUP (HAULOTTE GROUP)",
+      "ro": [
+        "HAULOTTE ARGES SRL"
+      ]
+    },
+    {
+      "siren": "314397696",
+      "fr": "HUTCHINSON SNC",
+      "ro": [
+        "HUTCHINSON SRL"
+      ]
+    },
+    {
+      "siren": "308197185",
+      "fr": "IPSEN PHARMA (SCRAS)",
+      "ro": [
+        "IPSEN PHARMA ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "327733432",
+      "fr": "ISAGRI (ISAGRI, AGIRIS, TERRE-NET, SO'NEO, PROMIZE, C2J INFO, I-CONE)",
+      "ro": [
+        "ISAGRI ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "343294195",
+      "fr": "LACTALIS LOGISTIQUE",
+      "ro": [
+        "LACTALIS ROMANIA S.A."
+      ]
+    },
+    {
+      "siren": "542095336",
+      "fr": "LAGARDERE TRAVEL RETAIL FRANCE (COFEC - RELAY, RELAY STORE, RELAY SHOP, RELAY WEB, RELAY INTERNATIONAL)",
+      "ro": [
+        "LAGARDERE TRAVEL RETAIL SRL"
+      ]
+    },
+    {
+      "siren": "384560942",
+      "fr": "LEROY MERLIN FRANCE",
+      "ro": [
+        "LEROY MERLIN ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "434011458",
+      "fr": "LESAFFRE INTERNATIONAL",
+      "ro": [
+        "LESAFFRE ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "423296250",
+      "fr": "LIDEA FRANCE (LIDEA)",
+      "ro": [
+        "LIDEA ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "542009824",
+      "fr": "LIMAGRAIN EUROPE",
+      "ro": [
+        "LIMAGRAIN ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "451846968",
+      "fr": "PUBLICIS GROUPE SERVICES",
+      "ro": [
+        "LION COMMUNICATION SERVICES S.A."
+      ]
+    },
+    {
+      "siren": "632012100",
+      "fr": "L'OREAL (KERASTASE ; MIZANI ; L'OREAL PROFESSIONNEL PARIS ; ESSIE PROFESSIONNEL ; BAXTER OF CALIFORNIA ; BIOL)",
+      "ro": [
+        "LOREAL ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "331648014",
+      "fr": "MEDIAPOSTE",
+      "ro": [
+        "MEDIAPOSTE HIT MAIL S.A."
+      ]
+    },
+    {
+      "siren": "855200507",
+      "fr": "MANUFACTURE FRANCAISE DES PNEUMATIQUES MICHELIN",
+      "ro": [
+        "MICHELIN ROMANIA S.A."
+      ]
+    },
+    {
+      "siren": "534886411",
+      "fr": "NHOOD SERVICES FRANCE",
+      "ro": [
+        "NHOOD SERVICES ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "325821072",
+      "fr": "NTN EUROPE (NTN EUROPE) (NTN EU)",
+      "ro": [
+        "NTN-SNR RULMENTI SRL"
+      ]
+    },
+    {
+      "siren": "380129866",
+      "fr": "ORANGE",
+      "ro": [
+        "ORANGE ROMANIA SA"
+      ]
+    },
+    {
+      "siren": "303656375",
+      "fr": "PERNOD RICARD FRANCE (LILLET FRERES)",
+      "ro": [
+        "PERNOD RICARD ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "813713815",
+      "fr": "PIERRE MENAT CONSEIL (PMC CONSEIL) (PMC)",
+      "ro": [
+        "PIERRE MENAT CONSEIL"
+      ]
+    },
+    {
+      "siren": "400753760",
+      "fr": "PIRIOU NAVAL SERVICES",
+      "ro": [
+        "PIRIOU ATG ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "412842239",
+      "fr": "PIROUX INDUSTRIE",
+      "ro": [
+        "PIROUX INDUSTRIE ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "340393065",
+      "fr": "PLUXEE FRANCE",
+      "ro": [
+        "PLUXEE ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "832792964",
+      "fr": "QAIR INTERNATIONAL (QAIR)",
+      "ro": [
+        "QAIR RENEWABLES S.R.L."
+      ]
+    },
+    {
+      "siren": "306523358",
+      "fr": "RCI BANQUE (MOBILIZE FINANCIAL SERVICES)",
+      "ro": [
+        "RCI LEASING ROMANIA IFN SA"
+      ]
+    },
+    {
+      "siren": "998269211",
+      "fr": "SAINT GOBAIN GLASS FRANCE",
+      "ro": [
+        "SAINT-GOBAIN GLASS ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "429884703",
+      "fr": "SAMSIC FACILITY MANAGEMENT",
+      "ro": [
+        "SAMSIC FACILITY ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "775662257",
+      "fr": "SANOFI WINTHROP INDUSTRIE",
+      "ro": [
+        "SANOFI ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "400012928",
+      "fr": "SAS DENIS",
+      "ro": [
+        "SAS DENIS"
+      ]
+    },
+    {
+      "siren": "712030154",
+      "fr": "SOLETANCHE BACHY FRANCE",
+      "ro": [
+        "SBR SOLETANCHE BACHY FUNDATII SRL"
+      ]
+    },
+    {
+      "siren": "421106709",
+      "fr": "SCHNEIDER ELECTRIC FRANCE",
+      "ro": [
+        "SCHNEIDER ELECTRIC ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "672041902",
+      "fr": "SEBIA",
+      "ro": [
+        "SEBIA ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "402222483",
+      "fr": "LES LABORATOIRES SERVIER INDUSTRIE",
+      "ro": [
+        "SERVIER PHARMA SRL"
+      ]
+    },
+    {
+      "siren": "824484653",
+      "fr": "SONEPAR FRANCE DISTRIBUTION",
+      "ro": [
+        "SONEPAR ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "706980182",
+      "fr": "SOUFFLET AGRICULTURE",
+      "ro": [
+        "SOUFFLET AGRO ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "533297768",
+      "fr": "STREAMWIDE FRANCE",
+      "ro": [
+        "STREAMWIDE ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "844687749",
+      "fr": "THALES DIS FRANCE SAS",
+      "ro": [
+        "THALES DIS ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "552059024",
+      "fr": "THALES",
+      "ro": [
+        "THALES ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "632050191",
+      "fr": "TIMAC AGRO",
+      "ro": [
+        "TIMAC AGRO ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "531680445",
+      "fr": "TOTALENERGIES MARKETING FRANCE",
+      "ro": [
+        "TOTALENERGIES MARKETING ROMANIA S.A."
+      ]
+    },
+    {
+      "siren": "309103877",
+      "fr": "TRACTEBEL ENGINEERING (TRACTEBEL ENGINEERING / COYNE ET BELLIER)",
+      "ro": [
+        "TRACTEBEL ENGINEERING SA"
+      ]
+    },
+    {
+      "siren": "562047050",
+      "fr": "TRESCAL",
+      "ro": [
+        "TRESCAL ROMANIA SRL"
+      ]
+    },
+    {
+      "siren": "501430532",
+      "fr": "UBISOFT INTERNATIONAL",
+      "ro": [
+        "UBISOFT SRL"
+      ]
+    },
+    {
+      "siren": "485182448",
+      "fr": "VOLTALIA",
+      "ro": [
+        "VOLTALIA ROMANIA S.R.L."
+      ]
+    },
+    {
+      "siren": "900616186",
+      "fr": "WIRQUIN",
+      "ro": [
+        "WIRQUIN ROMANIA SA"
+      ]
+    },
+    {
+      "siren": "552030967",
+      "fr": "VALEO",
+      "ro": [
+        "VALEO"
+      ]
+    }
+  ]
+}

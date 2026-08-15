@@ -45,7 +45,7 @@ export function AutoBreadcrumbs() {
   const crumbs: Crumb[] = [{ label: 'Accueil', to: '/', icon: <Home className="h-3 w-3" /> }];
 
   if (pathname === '/' || pathname === '') {
-    return <Breadcrumbs items={crumbs} />;
+    return <Breadcrumbs items={crumbs} tone="inverse" />;
   }
 
   const segments = pathname.split('/').filter(Boolean);
@@ -62,5 +62,5 @@ export function AutoBreadcrumbs() {
     });
   });
 
-  return <Breadcrumbs items={crumbs} />;
+  return <Breadcrumbs items={crumbs} tone="inverse" />;
 }

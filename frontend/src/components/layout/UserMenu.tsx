@@ -83,7 +83,7 @@ export function UserMenu() {
           aria-label={`Menu utilisateur — ${name}`}
         >
           <Avatar name={name} size="sm" />
-          <span className="hidden text-sm font-medium text-slate-700 dark:text-slate-200 lg:inline">{name}</span>
+          <span className="hidden text-sm font-medium text-sidebar-fg lg:inline">{name}</span>
         </span>
       }
     />

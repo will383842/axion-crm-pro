@@ -14,6 +14,12 @@ import {
   cn,
 } from "@/components/ui";
 import { api } from "@/lib/api";
+import {
+  CONFIANCE_EMAIL_OPTIONS,
+  COUNTRY_OPTIONS,
+  ELIGIBILITE_OPTIONS,
+  NATURE_OPTIONS,
+} from "@/lib/prospection-referentiels";
 import { toast } from "sonner";
 import { CompanyRow, COMPANY_ROW_GRID, type CompanyRowData } from "./components/CompanyRow";
 import { EFFECTIF_OPTIONS } from "./effectif";
@@ -71,23 +77,6 @@ const PROSPECTION_TABS = [
 // Prospection internationale : sans ces deux filtres, les fiches étrangères
 // restent noyées dans les 4,29 M de fiches françaises et aucune campagne ne
 // peut les viser. « Tous pays » laisse le comportement historique inchangé.
-const COUNTRY_OPTIONS = [
-  { value: "", label: "Tous pays" },
-  { value: "FR", label: "France" },
-  { value: "RO", label: "Roumanie" },
-];
-
-const NATURE_OPTIONS = [
-  { value: "", label: "Toutes natures" },
-  { value: "entreprise", label: "Entreprises" },
-  { value: "association", label: "Associations" },
-  { value: "cci", label: "Chambres de commerce" },
-  { value: "enseignement", label: "Enseignement" },
-  { value: "cabinet", label: "Cabinets (conseil, avocats)" },
-  { value: "institution", label: "Institutions" },
-  { value: "media", label: "Médias" },
-];
-
 const SECTOR_OPTIONS = [
   { value: "", label: "Tous secteurs" },
   { value: "it_saas", label: "IT / SaaS" },
@@ -120,6 +109,8 @@ interface Filter {
   region_code: string;
   sector_main: string;
   country_code: string;
+  best_email_confidence: string;
+  eligible_campagne: string;
   entity_nature: string;
 }
 
@@ -135,6 +126,8 @@ const EMPTY_FILTER: Filter = {
   region_code: "",
   sector_main: "",
   country_code: "",
+  best_email_confidence: "",
+  eligible_campagne: "",
   entity_nature: "",
 };
 
@@ -159,6 +152,12 @@ export function CompaniesListPage() {
       ...(filter.region_code ? { "filter[region_code]": filter.region_code } : {}),
       ...(filter.sector_main ? { "filter[sector_main]": filter.sector_main } : {}),
       ...(filter.country_code ? { "filter[country_code]": filter.country_code } : {}),
+      ...(filter.best_email_confidence
+        ? { "filter[best_email_confidence]": filter.best_email_confidence }
+        : {}),
+      ...(filter.eligible_campagne
+        ? { "filter[eligible_campagne]": filter.eligible_campagne }
+        : {}),
       ...(filter.entity_nature ? { "filter[entity_nature]": filter.entity_nature } : {}),
     });
   }
@@ -205,6 +204,12 @@ export function CompaniesListPage() {
         ...(filter.region_code ? { "filter[region_code]": filter.region_code } : {}),
         ...(filter.sector_main ? { "filter[sector_main]": filter.sector_main } : {}),
       ...(filter.country_code ? { "filter[country_code]": filter.country_code } : {}),
+      ...(filter.best_email_confidence
+        ? { "filter[best_email_confidence]": filter.best_email_confidence }
+        : {}),
+      ...(filter.eligible_campagne
+        ? { "filter[eligible_campagne]": filter.eligible_campagne }
+        : {}),
       ...(filter.entity_nature ? { "filter[entity_nature]": filter.entity_nature } : {}),
       });
       const r = await api.get<CompaniesResponse>(`/companies?${params.toString()}`);
@@ -277,6 +282,8 @@ export function CompaniesListPage() {
     filter.region_code ||
     filter.sector_main ||
     filter.country_code ||
+    filter.best_email_confidence ||
+    filter.eligible_campagne ||
     filter.entity_nature;
 
   const activeFilterCount = [
@@ -291,6 +298,8 @@ export function CompaniesListPage() {
     filter.region_code,
     filter.sector_main,
     filter.country_code,
+    filter.best_email_confidence,
+    filter.eligible_campagne,
     filter.entity_nature,
   ].filter(Boolean).length;
 
@@ -416,6 +425,24 @@ export function CompaniesListPage() {
               onChange={(v) => setFilterAndReset({ country_code: v })}
               options={COUNTRY_OPTIONS}
               ariaLabel="Filtre pays d'immatriculation"
+            />
+            {/* « Prêt pour une campagne » : la définition CALCULÉE
+                (`EligibiliteCampagne` côté serveur), pas un bac figé — une
+                fiche sort d'elle-même de la liste le jour où l'adresse
+                s'oppose. Le PALIER, lui, cible : A = adresse sur le domaine
+                du site (165 587 fiches), c'est par là qu'une campagne
+                commence, pas par les 255 290 d'un bloc. */}
+            <FilterSelect
+              value={filter.eligible_campagne}
+              onChange={(v) => setFilterAndReset({ eligible_campagne: v })}
+              options={ELIGIBILITE_OPTIONS}
+              ariaLabel="Filtre prêt pour une campagne"
+            />
+            <FilterSelect
+              value={filter.best_email_confidence}
+              onChange={(v) => setFilterAndReset({ best_email_confidence: v })}
+              options={CONFIANCE_EMAIL_OPTIONS}
+              ariaLabel="Filtre qualité de l'adresse e-mail"
             />
             <FilterSelect
               value={filter.entity_nature}

@@ -7,6 +7,7 @@ use App\Http\Middleware\SetCurrentWorkspace;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Spatie\Permission\Middleware\PermissionMiddleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -33,6 +34,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'audit' => AuditHashChainLogger::class,
             // Lot L6 : drapeau de la console CRM v2 (404 tant qu'il est fermé).
             'crm-console' => EnsureCrmConsoleV2::class,
+            // §2.10 du plan — les exports de données sont réservés aux
+            // détenteurs de la permission `data.export` (owner, admin,
+            // opérateur ; PAS viewer). Sans cette garde, n'importe quel compte
+            // authentifié pouvait exporter les 4,29 M de fiches en CSV.
+            'permission' => PermissionMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

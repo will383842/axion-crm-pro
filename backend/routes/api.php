@@ -100,7 +100,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/companies', [CompaniesController::class, 'index']);
         // /companies/export DOIT précéder /companies/{company} (sinon "export" pris pour un id).
         Route::get('/companies/export', [CompaniesController::class, 'export'])
-            ->middleware('throttle:scraper-list');
+            // §2.10 : un export emporte 4,29 M de fiches nominatives hors du
+            // système. Le throttle limitait la CADENCE, pas le DROIT.
+            ->middleware(['throttle:scraper-list', 'permission:data.export']);
         Route::post('/companies', [CompaniesController::class, 'store']);
         Route::get('/companies/{company}', [CompaniesController::class, 'show']);
         Route::put('/companies/{company}', [CompaniesController::class, 'update']);
@@ -119,12 +121,12 @@ Route::prefix('v1')->group(function () {
         // /media/export DOIT précéder /media/{media} (sinon "export" pris pour un id).
         Route::get('/media', [MediaController::class, 'index']);
         Route::get('/media/export', [MediaController::class, 'export'])
-            ->middleware('throttle:scraper-list');
+            ->middleware(['throttle:scraper-list', 'permission:data.export']);
         Route::get('/media/{media}', [MediaController::class, 'show']);
 
         Route::get('/journalists', [JournalistsController::class, 'index']);
         Route::get('/journalists/export', [JournalistsController::class, 'export'])
-            ->middleware('throttle:scraper-list');
+            ->middleware(['throttle:scraper-list', 'permission:data.export']);
         Route::get('/journalists/{journalist}', [JournalistsController::class, 'show']);
         Route::post('/journalists/{journalist}/opt-out', [JournalistsController::class, 'optOut']);
         Route::delete('/journalists/{journalist}', [JournalistsController::class, 'destroy']);

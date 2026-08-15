@@ -16,6 +16,7 @@ import { Link } from '@tanstack/react-router';
 import { Card, EmptyState, KpiCard, PageHeader, SearchInput, Tabs, Toolbar, cn } from '@/components/ui';
 import type { TabItem } from '@/components/ui';
 import { api } from '@/lib/api';
+import { COUNTRY_OPTIONS, PROSPECTION_STATUS_OPTIONS } from '@/lib/prospection-referentiels';
 import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
 import {
   LIFECYCLE_LABELS,
@@ -27,6 +28,9 @@ import {
   type HubCompany,
   type RelationType,
 } from './types';
+
+const SELECT_CLS =
+  'h-9 rounded-lg bg-white px-3 text-xs text-slate-900 ring-1 ring-slate-200 transition focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700';
 
 type TabId = 'tous' | RelationType;
 type Temperature = 'actifs' | 'froids' | 'tous';
@@ -49,6 +53,11 @@ function ContactsHubContent() {
   const [tab, setTab] = useState<TabId>('tous');
   const [temperature, setTemperature] = useState<Temperature>('actifs');
   const [search, setSearch] = useState('');
+  // Pays et statut de prospection : l'API les acceptait DÉJÀ
+  // (`CompanyQueryFilters`), seul l'écran ne les proposait pas — donc les
+  // fiches étrangères restaient introuvables depuis la console.
+  const [country, setCountry] = useState('');
+  const [prospection, setProspection] = useState('');
 
   const counts = useQuery<CountsResponse>({
     queryKey: ['crm', 'contacts-hub', 'counts'],
@@ -56,11 +65,13 @@ function ContactsHubContent() {
   });
 
   const list = useQuery<CursorResponse<HubCompany>>({
-    queryKey: ['crm', 'contacts-hub', tab, temperature, search],
+    queryKey: ['crm', 'contacts-hub', tab, temperature, search, country, prospection],
     queryFn: async () => {
       const params = new URLSearchParams({ temperature, per_page: '50' });
       if (tab !== 'tous') params.set('relation_type', tab);
       if (search.trim().length > 0) params.set('q', search.trim());
+      if (country) params.set('filter[country_code]', country);
+      if (prospection) params.set('filter[prospection_status]', prospection);
       return (await api.get<CursorResponse<HubCompany>>(`/crm/contacts-hub?${params.toString()}`)).data;
     },
     placeholderData: (previous) => previous,
@@ -101,12 +112,38 @@ function ContactsHubContent() {
 
       <Toolbar
         left={
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="Nom d'entreprise, SIREN, personne…"
-            className="w-72"
-          />
+          <>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Nom d'entreprise, SIREN, personne…"
+              className="w-72"
+            />
+            <select
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              aria-label="Filtre pays"
+              className={SELECT_CLS}
+            >
+              {COUNTRY_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={prospection}
+              onChange={(e) => setProspection(e.target.value)}
+              aria-label="Filtre statut de prospection"
+              className={SELECT_CLS}
+            >
+              {PROSPECTION_STATUS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </>
         }
         right={
           <div className="flex items-center gap-1">

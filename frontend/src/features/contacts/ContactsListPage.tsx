@@ -14,6 +14,7 @@ import {
   cn,
 } from '@/components/ui';
 import { api } from '@/lib/api';
+import { COUNTRY_OPTIONS, PROSPECTION_STATUS_OPTIONS } from '@/lib/prospection-referentiels';
 
 interface Contact {
   id: number;
@@ -72,23 +73,35 @@ function translateEmailStatus(status: string): string {
   return map[status.toLowerCase()] ?? status;
 }
 
+const SELECT_CLS =
+  'h-9 rounded-lg bg-white px-3 text-sm text-slate-900 ring-1 ring-slate-200 transition focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700';
+
 export function ContactsListPage() {
   const [emailStatus, setEmailStatus] = useState('');
+  const [country, setCountry] = useState('');
+  const [prospection, setProspection] = useState('');
   const [search, setSearch] = useState('');
 
-  const { data, isLoading } = useQuery<ContactsResponse>({
-    queryKey: ['contacts', emailStatus, search],
+  const { data, isLoading, isPlaceholderData } = useQuery<ContactsResponse>({
+    queryKey: ['contacts', emailStatus, country, prospection, search],
     queryFn: async () => {
       const params = new URLSearchParams({ per_page: '50' });
       if (emailStatus) params.set('filter[email_status]', emailStatus);
+      if (country) params.set('filter[country_code]', country);
+      if (prospection) params.set('filter[prospection_status]', prospection);
       if (search) params.set('filter[last_name]', search);
       return (await api.get<ContactsResponse>(`/contacts?${params}`)).data;
     },
+    // Garde les lignes précédentes pendant le chargement du filtre suivant :
+    // sans quoi chaque frappe vide l'écran. `isPlaceholderData` distingue alors
+    // « on charge » de « c'est vraiment vide » — le défaut corrigé sur le hub
+    // le même jour (#66), qui affichait « aucun contact » sur 4,29 M de fiches.
+    placeholderData: (previous) => previous,
   });
 
   const total = data?.meta.total;
   const rows = data?.data ?? [];
-  const hasFilter = Boolean(emailStatus || search);
+  const hasFilter = Boolean(emailStatus || country || prospection || search);
 
   return (
     <div className="px-6 py-6">
@@ -125,11 +138,40 @@ export function ContactsListPage() {
                 </option>
               ))}
             </select>
+
+            {/* Pays et statut de prospection vivent sur l'ENTREPRISE rattachée.
+                Sans eux, les 605 contacts roumains restaient noyés dans 1,3 M
+                de fiches françaises : visibles, mais introuvables. */}
+            <select
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              aria-label="Filtre pays"
+              className={SELECT_CLS}
+            >
+              {COUNTRY_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={prospection}
+              onChange={(e) => setProspection(e.target.value)}
+              aria-label="Filtre statut de prospection"
+              className={SELECT_CLS}
+            >
+              {PROSPECTION_STATUS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
           </>
         }
       />
 
-      {isLoading ? (
+      {isLoading || isPlaceholderData ? (
         <CompaniesTableSkeleton rows={6} />
       ) : rows.length === 0 ? (
         <EmptyState

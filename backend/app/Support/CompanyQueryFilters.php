@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use Illuminate\Database\Eloquent\Builder;
 use Spatie\QueryBuilder\AllowedFilter;
 
 /**
@@ -34,6 +35,27 @@ final class CompanyQueryFilters
             AllowedFilter::exact('sector_main'),
             AllowedFilter::exact('quality', 'quality_badge'),
             AllowedFilter::exact('best_email_confidence'),
+
+            // « Éligible campagne » — la définition UNIQUE (`EligibiliteCampagne`),
+            // celle que le futur moteur d'envoi reprendra telle quelle. On ne
+            // sépare pas les fiches complètes dans un bac : on les CALCULE, sans
+            // quoi l'ensemble périmerait au premier enrichissement et
+            // continuerait d'arroser une adresse qui s'est opposée entre-temps.
+            // `filter[eligible_campagne]=1` → prêtes · `=0` → le reste à faire.
+            AllowedFilter::callback('eligible_campagne', function (Builder $query, mixed $value): void {
+                $demande = is_string($value) ? trim($value) : '';
+                if ($demande === '') {
+                    return;
+                }
+
+                if (in_array($demande, ['0', 'false', 'non'], true)) {
+                    EligibiliteCampagne::appliquerNonEligibles($query);
+
+                    return;
+                }
+
+                EligibiliteCampagne::appliquer($query);
+            }),
             AllowedFilter::partial('denomination'),
             AllowedFilter::partial('postcode'),
             // Prospection internationale : cibler « les associations de

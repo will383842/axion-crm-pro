@@ -18,15 +18,23 @@ use App\Models\Company;
 use App\Models\HealthPractitioner;
 use App\Models\User;
 use App\Models\Workspace;
+use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function () {
+    // L'export est desormais garde par `permission:data.export` : sans role,
+    // ce test recevrait un 403 et ne testerait plus l'export mais la garde.
+    // C'est CI qui l'a attrape a l'ajout de la garde — la preuve que le test
+    // exerce bien la route et pas un raccourci.
+    $this->seed(PermissionsAndRolesSeeder::class);
+
     $this->workspace = Workspace::create([
         'id' => (string) Str::uuid(), 'slug' => 'ws-export', 'name' => 'WS', 'settings' => [],
     ]);
@@ -36,6 +44,12 @@ beforeEach(function () {
         'current_workspace_id' => $this->workspace->id,
         'first_login_completed_at' => now(),
     ]);
+
+    // Spatie « teams » : l'attribution exige le contexte d'equipe, que
+    // `SetCurrentWorkspace` pose en requete reelle.
+    app(PermissionRegistrar::class)->setPermissionsTeamId($this->workspace->id);
+    $this->user->assignRole('owner');
+
     $this->actingAs($this->user);
 });
 

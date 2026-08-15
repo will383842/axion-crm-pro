@@ -318,3 +318,61 @@ test('drapeau db_app_role à OFF : la connexion par défaut reste le rôle histo
     expect(config('database.connections.pgsql.username'))
         ->toBe(config('database.connections.pgsql_owner.username'));
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RÉGRESSION PRODUCTION 2026-08-15 02:30 — le backfill des tags `src:` a
+// échoué sous RLS active : `SQLSTATE[42501] new row violates row-level
+// security policy for table "tags"`. Cause : la commande lisait et écrivait
+// SANS contexte workspace. Sous le rôle applicatif, la RLS rend alors les tags
+// INVISIBLES (le SELECT renvoie null ⇒ la commande croit devoir les créer)
+// puis REFUSE l'insertion. Ce test fige les deux moitiés du symptôme.
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('sans contexte, un tag EXISTANT est invisible et son insertion est REFUSÉE (le symptôme du backfill)', function () {
+    [$wsA] = rlsSeedTwoWorkspaces();
+
+    // Le tag existe, posé par le propriétaire (comme le fait le seeder).
+    rlsOwner()->table('tags')->insert([
+        'workspace_id' => $wsA,
+        'slug' => 'src:scraping-insee',
+        'name' => 'Collecte — INSEE',
+        'category' => 'intent',
+        'kind' => 'auto',
+        'rules' => '{}',
+        'is_locked' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    // 1re moitié : SANS contexte, la lecture ne le voit pas.
+    WorkspaceContext::clear(rlsApp());
+    $invisible = rlsApp()->table('tags')->where('workspace_id', $wsA)->where('slug', 'src:scraping-insee')->value('id');
+    expect($invisible)->toBeNull();
+
+    // 2e moitié : et l'insertion « de rattrapage » est refusée par la policy.
+    expect(fn () => rlsApp()->table('tags')->insertOrIgnore([
+        'workspace_id' => $wsA,
+        'slug' => 'src:scraping-insee',
+        'name' => 'Collecte — INSEE',
+        'category' => 'intent',
+        'kind' => 'auto',
+        'rules' => '{}',
+        'is_locked' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]))->toThrow(QueryException::class);
+
+    // AVEC contexte : le tag redevient visible, donc aucune insertion n'est
+    // tentée — c'est exactement ce que le correctif rétablit.
+    rlsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $wsA]);
+    $visible = rlsApp()->table('tags')->where('workspace_id', $wsA)->where('slug', 'src:scraping-insee')->value('id');
+    expect($visible)->not->toBeNull();
+});
+
+test('la commande de backfill pose bien son contexte workspace (correctif du 2026-08-15)', function () {
+    // Garde structurelle : sans `WorkspaceContext::run`, la commande retombe
+    // dans la panne ci-dessus dès que le rôle applicatif est actif.
+    $source = file_get_contents(app_path('Console/Commands/ScrapingBackfillSrcTags.php'));
+
+    expect($source)->toContain('WorkspaceContext::run(');
+});

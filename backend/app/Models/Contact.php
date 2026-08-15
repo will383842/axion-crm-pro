@@ -20,6 +20,17 @@ use Illuminate\Support\Carbon;
  * @property ?string $email_confidence
  * @property ?string $normalized_hash
  *
+ * Colonnes de qualification e-mail et de provenance — présentes en base et
+ * dans `$fillable` depuis l'origine, mais jamais documentées ici : elles
+ * n'étaient lues nulle part tant que la liste des contacts était un bouchon
+ * vide. PHPStan les a signalées dès qu'on a branché l'écran.
+ * @property ?string $email_status
+ * @property ?int $email_score
+ * @property ?string $linkedin_url
+ * @property ?string $twitter_url
+ * @property ?string $title
+ * @property ?string $discovery_source
+ *
  * Lot L1 — taxonomie CRM (migration 2026_08_14_000002) :
  * @property ?string $person_key
  * @property ?string $external_ref

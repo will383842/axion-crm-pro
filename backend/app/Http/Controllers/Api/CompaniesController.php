@@ -127,12 +127,17 @@ class CompaniesController extends ApiController
 
         $confidenceScorer = new EmailConfidenceService;
 
-        return response()->streamDownload(function () use ($query, $header, $confidenceScorer) {
+        // `$hasSante` doit traverser les DEUX fermetures : il est décidé ici
+        // (la table `health_practitioners` existe-t-elle ?) mais relu tout au
+        // fond, à la ligne des spécialités. Il manquait des deux `use` : la
+        // colonne « Spécialité(s) santé » était donc TOUJOURS vide à l'export,
+        // et PHP lisait une variable indéfinie à chaque ligne.
+        return response()->streamDownload(function () use ($query, $header, $confidenceScorer, $hasSante) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // BOM UTF-8 → Excel FR lit les accents
             fputcsv($out, $header);
             // chunkById(id) = pagination stable en mémoire bornée (gros volumes OK).
-            $query->chunkById(1000, function ($companies) use ($out, $confidenceScorer) {
+            $query->chunkById(1000, function ($companies) use ($out, $confidenceScorer, $hasSante) {
                 foreach ($companies as $c) {
                     $contacts = $c->contacts
                         ->map(function ($ct) {

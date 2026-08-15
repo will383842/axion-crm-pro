@@ -14,6 +14,7 @@ import {
   cn,
 } from "@/components/ui";
 import { api } from "@/lib/api";
+import { COUNTRY_OPTIONS, NATURE_OPTIONS } from "@/lib/prospection-referentiels";
 import { toast } from "sonner";
 import { CompanyRow, COMPANY_ROW_GRID, type CompanyRowData } from "./components/CompanyRow";
 import { EFFECTIF_OPTIONS } from "./effectif";
@@ -71,23 +72,6 @@ const PROSPECTION_TABS = [
 // Prospection internationale : sans ces deux filtres, les fiches étrangères
 // restent noyées dans les 4,29 M de fiches françaises et aucune campagne ne
 // peut les viser. « Tous pays » laisse le comportement historique inchangé.
-const COUNTRY_OPTIONS = [
-  { value: "", label: "Tous pays" },
-  { value: "FR", label: "France" },
-  { value: "RO", label: "Roumanie" },
-];
-
-const NATURE_OPTIONS = [
-  { value: "", label: "Toutes natures" },
-  { value: "entreprise", label: "Entreprises" },
-  { value: "association", label: "Associations" },
-  { value: "cci", label: "Chambres de commerce" },
-  { value: "enseignement", label: "Enseignement" },
-  { value: "cabinet", label: "Cabinets (conseil, avocats)" },
-  { value: "institution", label: "Institutions" },
-  { value: "media", label: "Médias" },
-];
-
 const SECTOR_OPTIONS = [
   { value: "", label: "Tous secteurs" },
   { value: "it_saas", label: "IT / SaaS" },

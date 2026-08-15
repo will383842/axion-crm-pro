@@ -157,6 +157,87 @@ test('recherche par nom : préfixe, insensible à la casse, et JAMAIS « contien
     expect($r->json('data.0.last_name'))->toBe('Duponchel');
 });
 
+/**
+ * L'ASYMÉTRIE SIGNALÉE PAR WILL (2026-08-15).
+ *
+ * Le pays et le statut de prospection vivent sur l'ENTREPRISE. Sans ces
+ * filtres, les 605 contacts roumains restent noyés dans 1,3 M de fiches
+ * françaises : visibles, mais impossibles à isoler. « Traités comme les
+ * autres » ne doit pas vouloir dire « introuvables comme les autres ».
+ */
+test('filtre par pays — via l’entreprise rattachée', function () {
+    $ro = Company::create([
+        'workspace_id' => $this->workspace->id, 'siren' => '111111111',
+        'denomination' => 'SC BUCAREST SRL', 'country_code' => 'RO',
+        'signals' => [], 'metadata' => [],
+    ]);
+    $fr = Company::create([
+        'workspace_id' => $this->workspace->id, 'siren' => '222222222',
+        'denomination' => 'SAS LYON', 'country_code' => 'FR',
+        'signals' => [], 'metadata' => [],
+    ]);
+
+    creerContact($this->workspace->id, ['company_id' => $ro->id, 'last_name' => 'Ionescu']);
+    creerContact($this->workspace->id, ['company_id' => $fr->id, 'last_name' => 'Durand']);
+
+    $r = $this->getJson('/api/v1/contacts?filter[country_code]=RO')->assertOk();
+
+    expect($r->json('meta.total'))->toBe(1);
+    expect($r->json('data.0.last_name'))->toBe('Ionescu');
+    expect($r->json('data.0.company.denomination'))->toBe('SC BUCAREST SRL');
+});
+
+test('filtre par statut de prospection — « contactables » ne ramène que l’exploitable', function () {
+    $pret = Company::create([
+        'workspace_id' => $this->workspace->id, 'siren' => '333333333',
+        'denomination' => 'PRETE', 'prospection_status' => 'ready_for_outreach',
+        'signals' => [], 'metadata' => [],
+    ]);
+    $collecte = Company::create([
+        'workspace_id' => $this->workspace->id, 'siren' => '444444444',
+        'denomination' => 'JUSTE COLLECTEE', 'prospection_status' => 'pending',
+        'signals' => [], 'metadata' => [],
+    ]);
+
+    creerContact($this->workspace->id, ['company_id' => $pret->id, 'last_name' => 'Contactable']);
+    creerContact($this->workspace->id, ['company_id' => $collecte->id, 'last_name' => 'PasEncore']);
+
+    $r = $this->getJson('/api/v1/contacts?filter[prospection_status]=ready_for_outreach')->assertOk();
+
+    expect($r->json('meta.total'))->toBe(1);
+    expect($r->json('data.0.last_name'))->toBe('Contactable');
+});
+
+test('pays et statut se COMBINENT — c’est le cas d’usage réel', function () {
+    $roPret = Company::create([
+        'workspace_id' => $this->workspace->id, 'siren' => '555555555',
+        'denomination' => 'RO PRETE', 'country_code' => 'RO',
+        'prospection_status' => 'ready_for_outreach', 'signals' => [], 'metadata' => [],
+    ]);
+    $roPas = Company::create([
+        'workspace_id' => $this->workspace->id, 'siren' => '666666666',
+        'denomination' => 'RO PAS PRETE', 'country_code' => 'RO',
+        'prospection_status' => 'pending', 'signals' => [], 'metadata' => [],
+    ]);
+    $frPret = Company::create([
+        'workspace_id' => $this->workspace->id, 'siren' => '777777777',
+        'denomination' => 'FR PRETE', 'country_code' => 'FR',
+        'prospection_status' => 'ready_for_outreach', 'signals' => [], 'metadata' => [],
+    ]);
+
+    creerContact($this->workspace->id, ['company_id' => $roPret->id, 'last_name' => 'Cible']);
+    creerContact($this->workspace->id, ['company_id' => $roPas->id, 'last_name' => 'TropTot']);
+    creerContact($this->workspace->id, ['company_id' => $frPret->id, 'last_name' => 'AutrePays']);
+
+    $r = $this->getJson('/api/v1/contacts?filter[country_code]=RO&filter[prospection_status]=ready_for_outreach')
+        ->assertOk();
+
+    // Un filtre qui ne se combine pas ne sert à rien : « les contactables DE
+    // Roumanie » est la question qu'on pose réellement.
+    expect($r->json('meta.total'))->toBe(1);
+    expect($r->json('data.0.last_name'))->toBe('Cible');
+});
+
 test('la pagination est bornée : per_page=1000 ne ramène pas 1000 lignes', function () {
     foreach (range(1, 5) as $i) {
         creerContact($this->workspace->id, ['last_name' => 'Nom' . $i]);

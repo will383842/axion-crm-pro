@@ -6,6 +6,7 @@ use App\Support\WorkspaceContext;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -44,6 +45,19 @@ class SetCurrentWorkspace
         $workspaceId = WorkspaceContext::validIdOrNull($user->current_workspace_id ?? null);
 
         if ($workspaceId !== null) {
+            // 🔴 Spatie « teams » est ACTIVÉ (`config/permission.php` :
+            // `'teams' => true`) et les rôles sont attribués PAR workspace
+            // (`model_has_roles.team_id` = l'UUID du workspace, NOT NULL).
+            // Or `setPermissionsTeamId()` n'était appelé NULLE PART : sans
+            // contexte d'équipe, Spatie cherche les rôles de l'équipe `null` et
+            // n'en trouve aucun. Les trois gardes existantes
+            // (`AuditLogPolicy`, accès Horizon, accès Telescope) répondaient
+            // donc « non » à tout le monde, y compris au propriétaire — et
+            // toute garde de permission ajoutée l'aurait fait aussi.
+            // Le contexte d'équipe suit le workspace courant : c'est la même
+            // frontière que la RLS, posée au même endroit.
+            app(PermissionRegistrar::class)->setPermissionsTeamId($workspaceId);
+
             try {
                 WorkspaceContext::set($workspaceId);
             } catch (\Throwable $e) {

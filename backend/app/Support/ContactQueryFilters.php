@@ -2,7 +2,9 @@
 
 namespace App\Support;
 
+use App\Models\Contact;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Spatie\QueryBuilder\AllowedFilter;
 
 /**
@@ -24,6 +26,22 @@ final class ContactQueryFilters
             AllowedFilter::exact('discovery_source'),
             AllowedFilter::exact('company_id'),
 
+            // Pays et statut de prospection vivent sur l'ENTREPRISE, pas sur la
+            // personne. Sans ces deux filtres, les 605 contacts roumains
+            // restent noyés dans 1,3 M de fiches françaises et rien ne permet
+            // de les isoler — l'asymétrie signalée par Will le 2026-08-15.
+            //
+            // `whereExists` plutôt que `whereHas` : même sémantique, mais on
+            // choisit explicitement la sous-requête et les colonnes, ce qui
+            // laisse le planificateur attaquer par `companies` (446 fiches RO)
+            // au lieu de balayer les contacts.
+            AllowedFilter::callback('country_code', function (Builder $query, mixed $value): void {
+                self::surEntreprise($query, 'country_code', $value);
+            }),
+            AllowedFilter::callback('prospection_status', function (Builder $query, mixed $value): void {
+                self::surEntreprise($query, 'prospection_status', $value);
+            }),
+
             // Recherche par nom : PRÉFIXE (`x%`), jamais `%x%`.
             // Un `%x%` interdit tout index et impose la lecture des 1,3 M de
             // lignes à chaque frappe. Le préfixe s'appuie sur l'index
@@ -38,5 +56,30 @@ final class ContactQueryFilters
                 $query->whereRaw('lower(last_name) LIKE ?', [mb_strtolower($terme) . '%']);
             }),
         ];
+    }
+
+    /**
+     * Filtre une colonne portée par l'ENTREPRISE rattachée.
+     *
+     * Le scope workspace n'est PAS repris ici : la requête appelante le porte
+     * déjà sur `contacts`, et `contacts.company_id` ne peut pointer que vers
+     * une entreprise du même workspace (RLS + contrainte). L'ajouter
+     * doublerait la condition sans rien garder de plus.
+     *
+     * @param  Builder<Contact>  $query
+     */
+    private static function surEntreprise(Builder $query, string $colonne, mixed $value): void
+    {
+        $valeur = is_string($value) ? trim($value) : '';
+        if ($valeur === '') {
+            return;
+        }
+
+        $query->whereExists(function (\Illuminate\Database\Query\Builder $sub) use ($colonne, $valeur): void {
+            $sub->select(DB::raw('1'))
+                ->from('companies')
+                ->whereColumn('companies.id', 'contacts.company_id')
+                ->where('companies.' . $colonne, $valeur);
+        });
     }
 }

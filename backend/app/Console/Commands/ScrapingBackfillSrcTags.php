@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Crm\Taxonomy;
+use App\Support\WorkspaceContext;
 use Database\Seeders\ScrapingSourcesSeeder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -79,8 +80,28 @@ class ScrapingBackfillSrcTags extends Command
         return self::SUCCESS;
     }
 
-    /** @param  list<string>  $sources */
+    /**
+     * 🔴 TOUT le travail d'un workspace s'exécute SOUS son contexte
+     * (`WorkspaceContext::run`). Sans lui, une fois `CRM_DB_APP_ROLE_ENABLED`
+     * actif, la RLS rend les `tags` du workspace INVISIBLES en lecture (le
+     * SELECT renvoie null, la commande croit le tag manquant) puis REFUSE
+     * l'insertion : `SQLSTATE[42501] new row violates row-level security
+     * policy for table "tags"`. Constaté en production le 2026-08-15 à 02:30 —
+     * la commande a échoué en 492 ms, AVANT toute écriture (aucun état
+     * partiel), ce qui est exactement le comportement voulu d'un échec
+     * bruyant. Le correctif est le contexte, pas un contournement de la RLS.
+     *
+     * @param  list<string>  $sources
+     */
     private function backfillWorkspace(string $workspaceId, array $sources, int $chunk, int $sleep, bool $dryRun): void
+    {
+        WorkspaceContext::run($workspaceId, function () use ($workspaceId, $sources, $chunk, $sleep, $dryRun): void {
+            $this->backfillWorkspaceScoped($workspaceId, $sources, $chunk, $sleep, $dryRun);
+        });
+    }
+
+    /** @param  list<string>  $sources */
+    private function backfillWorkspaceScoped(string $workspaceId, array $sources, int $chunk, int $sleep, bool $dryRun): void
     {
         $this->info("Workspace {$workspaceId} :");
 

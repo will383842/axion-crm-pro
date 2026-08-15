@@ -56,11 +56,13 @@ export function WorkspaceSelector() {
     <DropdownMenu
       align="left"
       items={items}
+      // Ce sélecteur vit DANS la barre latérale : il suit ses jetons, pas ceux
+      // du contenu — sinon il ressort comme une tache claire sur le fond coloré.
       trigger={
-        <span className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-slate-100 dark:hover:bg-slate-800">
+        <span className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-white/10">
           <Avatar name={workspaceName} size="xs" />
-          <span className="flex-1 truncate text-xs font-medium text-slate-700 dark:text-slate-300">{workspaceName}</span>
-          <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+          <span className="flex-1 truncate text-xs font-medium text-sidebar-fg">{workspaceName}</span>
+          <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-sidebar-fg-muted" />
         </span>
       }
     />

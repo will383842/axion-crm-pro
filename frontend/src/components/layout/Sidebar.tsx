@@ -180,14 +180,13 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
     <aside
       data-tour="sidebar"
       className={cn(
-        'flex h-screen shrink-0 flex-col border-r border-slate-200 bg-white transition-[width] duration-200 ease-out',
-        'dark:border-slate-800 dark:bg-slate-900',
+        'flex h-screen shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-out',
         collapsed ? 'w-16' : 'w-[260px]',
       )}
       aria-label="Navigation latérale"
     >
       {/* Logo + workspace */}
-      <div className={cn('flex flex-col gap-2 border-b border-slate-100 px-3 py-4 dark:border-slate-800', collapsed && 'items-center px-2')}>
+      <div className={cn('flex flex-col gap-2 border-b border-sidebar-border px-3 py-4', collapsed && 'items-center px-2')}>
         {collapsed ? (
           <Link
             to="/"
@@ -202,7 +201,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-700 text-sm font-bold text-white shadow-sm">
                 A
               </span>
-              <span className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Axion CRM Pro</span>
+              <span className="text-sm font-bold tracking-tight text-white">Axion CRM Pro</span>
             </Link>
             <WorkspaceSelector />
           </>
@@ -217,13 +216,13 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
       </nav>
 
       {/* Collapse toggle */}
-      <div className="border-t border-slate-100 p-2 dark:border-slate-800">
+      <div className="border-t border-sidebar-border p-2">
         <button
           type="button"
           onClick={onToggleCollapse}
           className={cn(
-            'inline-flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 transition',
-            'hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white',
+            'inline-flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-sidebar-fg-muted transition',
+            'hover:bg-white/10 hover:text-white',
             collapsed && 'justify-center',
           )}
           aria-label={collapsed ? 'Étendre la barre latérale' : 'Réduire la barre latérale'}
@@ -249,7 +248,7 @@ function NavSectionBlock({
   return (
     <div className="mb-3 last:mb-0">
       {!collapsed && (
-        <h3 className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+        <h3 className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-sidebar-fg-muted">
           {section.title}
         </h3>
       )}
@@ -283,21 +282,21 @@ function SidebarNavLink({
       className={cn(
         'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium transition',
         active
-          ? 'bg-slate-100 text-slate-900 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-white dark:ring-slate-700'
-          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white',
+          ? 'bg-sidebar-active text-white ring-1 ring-white/15'
+          : 'text-sidebar-fg hover:bg-white/10 hover:text-white',
         item.locked && 'opacity-60',
         collapsed && 'justify-center px-2',
       )}
       aria-current={active ? 'page' : undefined}
     >
-      <span className={cn('shrink-0', active ? 'text-brand-600 dark:text-brand-400' : 'text-slate-400 dark:text-slate-500')}>
+      <span className={cn('shrink-0', active ? 'text-brand-300' : 'text-sidebar-fg-muted')}>
         {item.icon}
       </span>
       {!collapsed && (
         <>
           <span className="flex-1 truncate">{item.label}</span>
           {item.locked && (
-            <Lock className="h-3 w-3 shrink-0 text-slate-400 dark:text-slate-500" aria-label="Bientôt disponible" />
+            <Lock className="h-3 w-3 shrink-0 text-sidebar-fg-muted" aria-label="Bientôt disponible" />
           )}
         </>
       )}

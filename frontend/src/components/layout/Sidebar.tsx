@@ -7,7 +7,7 @@
  * Important : préserve les `data-tour` attributes pour l'onboarding Joyride
  * (data-tour="sidebar", "nav-dashboard", "nav-companies", "nav-settings").
  */
-import type { ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Link, useRouterState } from '@tanstack/react-router';
 import {
   LayoutDashboard,
@@ -29,6 +29,7 @@ import {
   KanbanSquare,
   BarChart3,
   ChevronsLeft,
+  ChevronRight,
   ChevronsRight,
   Lock,
   Globe,
@@ -176,6 +177,29 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const console2 = consoleSection(features);
   const sections = console2 === null ? SECTIONS : [console2, ...SECTIONS];
 
+  // UNE seule section ouverte à la fois : ouvrir la suivante referme la
+  // précédente. Sur neuf sections dépliées en permanence, la navigation
+  // devenait un mur de liens où plus rien ne se distinguait.
+  //
+  // L'état de départ n'est PAS arbitraire : on ouvre la section qui contient
+  // la page courante. Arriver sur un écran dont l'entrée de menu est repliée
+  // donnerait l'impression d'avoir quitté l'application.
+  const sectionDeLaPage = sections.find((s) =>
+    s.items.some((i) => (i.to === '/' ? router === '/' : router === i.to || router.startsWith(`${i.to}/`))),
+  );
+  const [sectionOuverte, setSectionOuverte] = useState<string | null>(sectionDeLaPage?.id ?? sections[0]?.id ?? null);
+
+  // La navigation peut aussi venir d'ailleurs (recherche globale, lien
+  // interne, retour arrière) : la section suit alors la page, sinon le menu
+  // dirait le contraire de l'écran.
+  const derniereSectionSuivie = useRef<string | null>(sectionDeLaPage?.id ?? null);
+  if (sectionDeLaPage !== undefined && derniereSectionSuivie.current !== sectionDeLaPage.id) {
+    derniereSectionSuivie.current = sectionDeLaPage.id;
+    if (sectionOuverte !== sectionDeLaPage.id) {
+      setSectionOuverte(sectionDeLaPage.id);
+    }
+  }
+
   return (
     <aside
       data-tour="sidebar"
@@ -211,7 +235,16 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
       {/* Navigation groups */}
       <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label="Navigation principale">
         {sections.map((section) => (
-          <NavSectionBlock key={section.id} section={section} collapsed={collapsed} currentPath={router} />
+          <NavSectionBlock
+            key={section.id}
+            section={section}
+            collapsed={collapsed}
+            currentPath={router}
+            ouverte={sectionOuverte === section.id}
+            onBasculer={() =>
+              setSectionOuverte((actuelle) => (actuelle === section.id ? null : section.id))
+            }
+          />
         ))}
       </nav>
 
@@ -240,19 +273,44 @@ function NavSectionBlock({
   section,
   collapsed,
   currentPath,
+  ouverte,
+  onBasculer,
 }: {
   section: NavSection;
   collapsed: boolean;
   currentPath: string;
+  ouverte: boolean;
+  onBasculer: () => void;
 }) {
+  // Barre réduite : il n'y a plus de titre sur lequel cliquer, et masquer les
+  // icônes ne laisserait rien du tout. On affiche donc tout — l'accordéon n'a
+  // de sens que quand les libellés sont là.
+  const deplie = collapsed || ouverte;
+  const idListe = `nav-section-${section.id}`;
+
   return (
     <div className="mb-3 last:mb-0">
       {!collapsed && (
-        <h3 className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-sidebar-fg-muted">
-          {section.title}
+        <h3 className="mb-1">
+          <button
+            type="button"
+            onClick={onBasculer}
+            aria-expanded={ouverte}
+            aria-controls={idListe}
+            className={cn(
+              'flex w-full items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition',
+              'text-sidebar-fg-muted hover:bg-white/10 hover:text-white',
+            )}
+          >
+            <ChevronRight
+              aria-hidden="true"
+              className={cn('h-3 w-3 shrink-0 transition-transform duration-150', ouverte && 'rotate-90')}
+            />
+            <span className="flex-1 truncate text-left">{section.title}</span>
+          </button>
         </h3>
       )}
-      <ul className="flex flex-col gap-0.5">
+      <ul id={idListe} className={cn('flex flex-col gap-0.5', !deplie && 'hidden')}>
         {section.items.map((item) => (
           <li key={item.to}>
             <SidebarNavLink item={item} collapsed={collapsed} currentPath={currentPath} />

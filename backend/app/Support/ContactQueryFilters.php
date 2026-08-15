@@ -42,6 +42,21 @@ final class ContactQueryFilters
                 self::surEntreprise($query, 'prospection_status', $value);
             }),
 
+            // « Joignable » au sens des campagnes, appliqué à l'adresse de la
+            // PERSONNE. 410 481 contacts en portent une, contre 255 290
+            // génériques d'entreprise : sans ce filtre, la majorité des envois
+            // possibles échappait à toute vérification d'opposition et de
+            // rebond. Même définition que les entreprises, écrite une seule
+            // fois dans `EligibiliteCampagne`.
+            AllowedFilter::callback('joignable', function (Builder $query, mixed $value): void {
+                $demande = is_string($value) ? trim($value) : '';
+                if ($demande === '' || in_array($demande, ['0', 'false', 'non'], true)) {
+                    return;
+                }
+
+                EligibiliteCampagne::appliquerContacts($query);
+            }),
+
             // Recherche par nom : PRÉFIXE (`x%`), jamais `%x%`.
             // Un `%x%` interdit tout index et impose la lecture des 1,3 M de
             // lignes à chaque frappe. Le préfixe s'appuie sur l'index

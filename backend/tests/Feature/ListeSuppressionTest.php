@@ -15,6 +15,7 @@
  */
 
 use App\Models\Company;
+use App\Models\Contact;
 use App\Models\Workspace;
 use App\Support\EligibiliteCampagne;
 use App\Support\ListeSuppression;
@@ -167,4 +168,89 @@ test('opposition ET suppression ferment chacune la porte, indépendamment', func
     // Les deux listes restent SÉPARÉES — l'une dit une volonté, l'autre un
     // fait technique — mais pour l'envoi, l'une comme l'autre interdit.
     expect(noms($this->workspace->id))->toBe(['OK']);
+});
+
+/**
+ * ── LA COUVERTURE : « ça marche pour TOUS les contacts ? » (question de Will)
+ *
+ * Non, pas au départ. La garde ne couvrait que `companies.email_generic`
+ * (255 290 adresses) et laissait de côté `contacts.email` — 410 481 adresses,
+ * soit 1,6 fois plus. La MAJORITÉ des envois possibles échappait donc à toute
+ * vérification d'opposition et de rebond.
+ */
+test('les adresses de PERSONNES sont protégées comme celles des entreprises', function () {
+    $entreprise = Company::create([
+        'workspace_id' => $this->workspace->id,
+        'siren' => (string) random_int(100000000, 999999999),
+        'denomination' => 'HOTE', 'signals' => [], 'metadata' => [],
+    ]);
+
+    $joignable = Contact::create([
+        'workspace_id' => $this->workspace->id, 'company_id' => $entreprise->id,
+        'last_name' => 'JOIGNABLE', 'email' => 'ok@acme.fr', 'sources' => [], 'metadata' => [],
+    ]);
+    Contact::create([
+        'workspace_id' => $this->workspace->id, 'company_id' => $entreprise->id,
+        'last_name' => 'REBONDIE', 'email' => 'morte@acme.fr', 'sources' => [], 'metadata' => [],
+    ]);
+
+    ListeSuppression::inscrire('morte@acme.fr', ListeSuppression::REBOND_DUR, 'esp');
+
+    $restants = EligibiliteCampagne::appliquerContacts(
+        Contact::query()->where('workspace_id', $this->workspace->id),
+    )->pluck('last_name')->all();
+
+    expect($restants)->toBe(['JOIGNABLE']);
+    expect($joignable->email)->toBe('ok@acme.fr');
+});
+
+test('une opposition retire aussi une PERSONNE', function () {
+    $entreprise = Company::create([
+        'workspace_id' => $this->workspace->id,
+        'siren' => (string) random_int(100000000, 999999999),
+        'denomination' => 'HOTE', 'signals' => [], 'metadata' => [],
+    ]);
+    Contact::create([
+        'workspace_id' => $this->workspace->id, 'company_id' => $entreprise->id,
+        'last_name' => 'OPPOSEE', 'email' => 'non@acme.fr', 'sources' => [], 'metadata' => [],
+    ]);
+
+    DB::table('opt_out')->insert([
+        'email' => 'non@acme.fr', 'scope' => 'business', 'source' => 'site', 'created_at' => now(),
+    ]);
+
+    expect(EligibiliteCampagne::appliquerContacts(
+        Contact::query()->where('workspace_id', $this->workspace->id),
+    )->count())->toBe(0);
+});
+
+/**
+ * 🔴 LE POINT DE PASSAGE OBLIGÉ du futur moteur d'envoi.
+ *
+ * Une audience est une PHOTO : entre sa constitution et l'envoi, une
+ * opposition peut arriver. Filtrer la liste ne suffit donc pas — il faut
+ * re-poser la question juste avant d'écrire, adresse par adresse. Cette
+ * méthode vaut pour TOUTE source : entreprise, personne, journaliste, import
+ * ponctuel, ligne collée à la main.
+ */
+test('peutRecevoir répond sur une adresse seule, quelle que soit sa provenance', function () {
+    ListeSuppression::inscrire('rebond@acme.fr', ListeSuppression::REBOND_DUR, 'esp');
+    DB::table('opt_out')->insert([
+        'email' => 'oppose@acme.fr', 'scope' => 'business', 'source' => 'site', 'created_at' => now(),
+    ]);
+
+    expect(EligibiliteCampagne::peutRecevoir('libre@acme.fr'))->toBeTrue();
+    expect(EligibiliteCampagne::peutRecevoir('rebond@acme.fr'))->toBeFalse();
+    expect(EligibiliteCampagne::peutRecevoir('oppose@acme.fr'))->toBeFalse();
+
+    // Casse et espaces ne doivent ouvrir aucune brèche : une adresse collée
+    // depuis un tableur arrive rarement propre.
+    expect(EligibiliteCampagne::peutRecevoir('  REBOND@Acme.FR '))->toBeFalse();
+
+    // Univers étanches jusqu'ici aussi.
+    expect(EligibiliteCampagne::peutRecevoir('rebond@acme.fr', 'vivier'))->toBeTrue();
+
+    // Une adresse vide n'est jamais joignable — un envoi « à personne » doit
+    // échouer franchement, pas partir dans le vide.
+    expect(EligibiliteCampagne::peutRecevoir(''))->toBeFalse();
 });

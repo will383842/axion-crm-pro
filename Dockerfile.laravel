@@ -9,14 +9,30 @@ ARG COMPOSER_VERSION=2.7
 # -----------------------------------------------------------------------------
 FROM composer:${COMPOSER_VERSION} AS composer-deps
 WORKDIR /app
-COPY backend/composer.json backend/composer.lock* ./
+
+# `composer.lock` SANS joker : le joker rendait le lock facultatif, et Composer
+# se rabattait alors sur « résoudre les dernières versions » — deux builds du
+# MÊME commit pouvaient embarquer des dépendances différentes. Un lock absent
+# doit faire échouer le build, pas le rendre imprévisible.
+COPY backend/composer.json backend/composer.lock ./
+
+# `--ignore-platform-reqs` : cette étape TÉLÉCHARGE les paquets, elle n'exécute
+# rien. L'image `composer` n'a ni pgsql, ni redis, ni intl, ni pcntl — c'est
+# `php-base` qui les porte, et c'est là que l'autoload et les commandes artisan
+# tournent réellement. Sans ce drapeau, l'étape échoue sur des extensions dont
+# elle n'a aucun usage.
+#
+# Le repli `|| composer install` (sans `--no-dev`) qui existait ici a été
+# RETIRÉ : au moindre échec, il réinstallait silencieusement les dépendances de
+# DÉVELOPPEMENT dans une image de production. Un repli qui dégrade la sécurité
+# sans le dire est pire que l'échec qu'il masque.
 RUN composer install \
         --no-dev \
         --no-scripts \
         --no-autoloader \
         --no-interaction \
         --prefer-dist \
-    || composer install --no-scripts --no-autoloader --no-interaction --prefer-dist
+        --ignore-platform-reqs
 
 # -----------------------------------------------------------------------------
 # 2) php-base : PHP-FPM + extensions communes

@@ -72,6 +72,17 @@ FROM php-base AS builder
 ENV APP_ENV=production APP_DEBUG=false
 COPY backend/ /var/www/html/
 COPY --from=composer-deps /app/vendor /var/www/html/vendor
+# `bootstrap/cache` et `storage/*` sont des dossiers VIDES : git ne les suit
+# pas, donc le checkout CI ne les a pas — alors qu'ils existent sur tout poste
+# de dev. Sans eux, `package:discover` (déclenché par dump-autoload) échoue sur
+# « bootstrap/cache must be present and writable ». Un build qui ne passe que
+# là où le dépôt a déjà servi n'est pas un build.
+RUN mkdir -p bootstrap/cache \
+        storage/app/public \
+        storage/framework/cache/data \
+        storage/framework/sessions \
+        storage/framework/views \
+        storage/logs
 RUN composer dump-autoload --classmap-authoritative --optimize \
     && php artisan storage:link || true \
     && php artisan config:cache || true \

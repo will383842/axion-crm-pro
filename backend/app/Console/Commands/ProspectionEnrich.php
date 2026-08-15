@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Company;
 use App\Services\Waterfall\WaterfallOrchestrator;
+use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -24,6 +25,23 @@ class ProspectionEnrich extends Command
     protected $description = 'Enrichit N entreprises (dirigeants, site, email, tél, GPS) — test synchrone.';
 
     public function handle(WaterfallOrchestrator $orch): int
+    {
+        // Lot L0 : hors requête HTTP, le contexte workspace doit être posé
+        // EXPLICITEMENT (WorkspaceScope strict + RLS), sinon la sélection
+        // Eloquent jette MissingWorkspaceContextException. Même défaut de
+        // résolution que prospection:collect : --workspace sinon 1er créé.
+        $workspaceId = (string) ($this->option('workspace')
+            ?: DB::table('workspaces')->orderBy('created_at')->value('id'));
+        if ($workspaceId === '') {
+            $this->error('Aucun workspace cible (--workspace=UUID).');
+
+            return self::FAILURE;
+        }
+
+        return (int) WorkspaceContext::run($workspaceId, fn (): int => $this->enrichBatch($orch));
+    }
+
+    private function enrichBatch(WaterfallOrchestrator $orch): int
     {
         $this->info('Config MOCK réelle (false = source réelle) :');
         foreach ([

@@ -42,7 +42,18 @@ final class ScrapedRecord
         'payload', 'emails', 'phones', 'error', 'latency_ms',
     ];
 
-    private const COMPANY_KEYS = ['siren', 'match_hint', 'fields', 'implantations'];
+    private const COMPANY_KEYS = ['siren', 'foreign_id', 'country', 'nature', 'match_hint', 'fields', 'implantations'];
+
+    /**
+     * Natures d'entité — liste FERMÉE, alignée sur le CHECK SQL posé par la
+     * migration `2026_08_15_120001`. Une valeur inventée ici passerait la
+     * validation applicative pour mourir en base : les deux listes bougent
+     * ENSEMBLE.
+     */
+    public const ENTITY_NATURES = [
+        'entreprise', 'association', 'cci', 'enseignement',
+        'cabinet', 'institution', 'media',
+    ];
 
     private const MATCH_HINT_KEYS = ['denomination', 'postcode', 'city', 'address'];
 
@@ -82,6 +93,9 @@ final class ScrapedRecord
         public readonly ?DateTimeImmutable $fetchedAt,
         public readonly string $status,
         public readonly ?string $siren,
+        public readonly ?string $foreignId,
+        public readonly ?string $countryCode,
+        public readonly ?string $entityNature,
         public readonly array $matchHint,
         public readonly array $companyFields,
         public readonly array $implantations,
@@ -130,12 +144,64 @@ final class ScrapedRecord
         $matchHint = self::stringSection($company['match_hint'] ?? [], self::MATCH_HINT_KEYS, 'company.match_hint');
         $companyFields = self::stringSection($company['fields'] ?? [], self::COMPANY_FIELD_KEYS, 'company.fields');
 
-        // Au moins UNE clé de rattachement : sans SIREN ni indice, le funnel ne
+        // ── Entités SANS SIREN (prospection internationale) ─────────────────
+        // Le SIREN n'est pas un besoin métier : c'est une CLÉ DE DÉDUP. Une
+        // entité étrangère porte la sienne (`foreign_id`), qui n'a de sens que
+        // rapportée à un registre — d'où `country` obligatoire avec elle.
+        $foreignId = null;
+        if (isset($company['foreign_id'])) {
+            if (! is_string($company['foreign_id']) || trim($company['foreign_id']) === '') {
+                throw ScrapeIngestRejection::invalid('invalid_foreign_id', 'company.foreign_id doit être une chaîne non vide.');
+            }
+            $foreignId = trim($company['foreign_id']);
+        }
+
+        $countryCode = null;
+        if (isset($company['country'])) {
+            $candidate = is_string($company['country']) ? strtoupper(trim($company['country'])) : '';
+            if (preg_match('/^[A-Z]{2}$/', $candidate) !== 1) {
+                throw ScrapeIngestRejection::invalid(
+                    'invalid_country',
+                    'company.country doit être un code ISO 3166-1 alpha-2 (ex. RO).',
+                );
+            }
+            $countryCode = $candidate;
+        }
+
+        if ($foreignId !== null && $countryCode === null) {
+            throw ScrapeIngestRejection::invalid(
+                'missing_country',
+                'company.foreign_id exige company.country : un identifiant de registre sans son pays est indédupliquable.',
+            );
+        }
+
+        // Un SIREN est français par définition : annoncer un autre pays avec
+        // lui est une contradiction, pas une précision.
+        if ($siren !== null && $countryCode !== null && $countryCode !== 'FR') {
+            throw ScrapeIngestRejection::invalid(
+                'country_siren_mismatch',
+                "company.siren est français par définition : country « {$countryCode} » est contradictoire.",
+            );
+        }
+
+        $entityNature = null;
+        if (isset($company['nature'])) {
+            $candidate = is_string($company['nature']) ? trim($company['nature']) : '';
+            if (! in_array($candidate, self::ENTITY_NATURES, true)) {
+                throw ScrapeIngestRejection::invalid(
+                    'invalid_entity_nature',
+                    'company.nature inconnue : « ' . $candidate . ' » (attendu : ' . implode(', ', self::ENTITY_NATURES) . ').',
+                );
+            }
+            $entityNature = $candidate;
+        }
+
+        // Au moins UNE clé de rattachement : sans ancre ni indice, le funnel ne
         // pourrait qu'inventer un rattachement — refusé à la porte.
-        if ($siren === null && $matchHint === []) {
+        if ($siren === null && $foreignId === null && $matchHint === []) {
             throw ScrapeIngestRejection::invalid(
                 'missing_company_anchor',
-                'company doit porter un siren OU un match_hint (au moins une clé de rattachement).',
+                'company doit porter un siren, un foreign_id OU un match_hint (au moins une clé de rattachement).',
             );
         }
 
@@ -188,6 +254,9 @@ final class ScrapedRecord
                 : null,
             status: $status,
             siren: $siren,
+            foreignId: $foreignId,
+            countryCode: $countryCode,
+            entityNature: $entityNature,
             matchHint: $matchHint,
             companyFields: $companyFields,
             implantations: $implantations,

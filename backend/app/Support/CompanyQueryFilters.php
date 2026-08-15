@@ -36,6 +36,10 @@ final class CompanyQueryFilters
             AllowedFilter::exact('best_email_confidence'),
             AllowedFilter::partial('denomination'),
             AllowedFilter::partial('postcode'),
+            // Prospection internationale : cibler « les associations de
+            // Roumanie » sans les mélanger aux 4,29 M de fiches françaises.
+            AllowedFilter::exact('country_code'),
+            AllowedFilter::exact('entity_nature'),
             // `filter[tag]=implantation-ro` (multi : `filter[tag]=a,b` = ET
             // logique) — indispensable pour retrouver un SEGMENT taggé (ex.
             // campagne « implantations Roumanie ») dans la liste, l'export ET

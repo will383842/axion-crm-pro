@@ -25,6 +25,16 @@ use Sentry\State\Hub;
  * email_verification_logs (audit + tracking quota mensuel).
  *
  * Graceful : si HUNTER_API_KEY absent → renvoie status='unknown', pas de crash.
+ *
+ * @phpstan-type VerdictHunter array{
+ *     status: string,
+ *     score?: int,
+ *     mx_records?: bool,
+ *     smtp_check?: bool,
+ *     webmail?: bool,
+ *     disposable?: bool,
+ *     reason?: string
+ * }
  */
 class HunterEmailVerifier
 {
@@ -35,15 +45,7 @@ class HunterEmailVerifier
     private const HTTP_TIMEOUT_SECONDS = 20;
 
     /**
-     * @return array{
-     *     status: string,
-     *     score?: int,
-     *     mx_records?: bool,
-     *     smtp_check?: bool,
-     *     webmail?: bool,
-     *     disposable?: bool,
-     *     reason?: string
-     * }
+     * @return VerdictHunter
      */
     public function verify(string $email, ?string $workspaceId = null): array
     {
@@ -55,6 +57,12 @@ class HunterEmailVerifier
         }
 
         $cacheKey = "hunter:verify:{$email}";
+
+        // `Cache::get()` rend `mixed` : sans cette annotation, PHPStan ne peut
+        // pas savoir que le cache ne contient que des verdicts Hunter. C'est
+        // l'ancien `Cache::remember()` qui portait l'information, via le type
+        // de retour de sa fermeture.
+        /** @var VerdictHunter|null $cached */
         $cached = Cache::get($cacheKey);
         if (is_array($cached)) {
             return $cached;

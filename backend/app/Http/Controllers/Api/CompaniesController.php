@@ -163,9 +163,25 @@ class CompaniesController extends ApiController
 
         // Scope EXPLICITE par workspace (défense principale : pas de fuite entre
         // tenants, indépendamment de l'état RLS pendant le streaming).
+        // 🔴 LES CONTACTS OPPOSÉS NE SORTENT PAS DANS LE CSV.
+        //
+        // Cet export embarquait `nom prénom (rôle) email téléphone` de CHAQUE
+        // contact, y compris ceux inscrits en `opt_out` ou en
+        // `email_suppressions` — sur 4,29 M de fiches. La garde d'éligibilité
+        // existait (`EligibiliteCampagne`) mais n'était appliquée que si
+        // l'appelant passait `filter[eligible_campagne]` ; l'export ne le
+        // passait pas. Constaté le 2026-08-16.
+        //
+        // Exporter un CSV de prospects EST un usage de prospection : une
+        // personne qui s'y est opposée ne doit pas y figurer, même sans son
+        // adresse. On filtre donc au chargement de la relation.
+        $chargeContacts = fn ($q) => EligibiliteCampagne::exclureOpposes($q, 'contacts.email');
+
         $query = $this->buildFilteredQuery()
             ->where('workspace_id', $workspaceId)
-            ->with($hasSante ? ['contacts', 'healthPractitioners'] : ['contacts']);
+            ->with($hasSante
+                ? ['contacts' => $chargeContacts, 'healthPractitioners']
+                : ['contacts' => $chargeContacts]);
 
         $confidenceScorer = new EmailConfidenceService;
 

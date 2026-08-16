@@ -32,7 +32,7 @@ class MediaController extends ApiController
 
         try {
             $page = $this->buildFilteredQuery()
-                ->allowedSorts(['name', 'enriched_at', 'created_at', 'media_type'])
+                ->allowedSorts(...['name', 'enriched_at', 'created_at', 'media_type'])
                 ->defaultSort('name')
                 ->paginate($perPage);
 
@@ -63,7 +63,7 @@ class MediaController extends ApiController
     private function buildFilteredQuery(): QueryBuilder
     {
         return QueryBuilder::for(Media::query()->whereNull('deleted_at'))
-            ->allowedFilters([
+            ->allowedFilters(...[
                 AllowedFilter::exact('media_type'),
                 AllowedFilter::exact('media_family'),
                 AllowedFilter::exact('email_confidence'),

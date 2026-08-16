@@ -123,8 +123,21 @@ final class SiteGdprService
                             })
                             ->delete();
 
+                        // 🔴 PRATICIENS DE SANTÉ — ARTICLE 9.
+                        // Table visée par aucun effacement jusqu'au 2026-08-16.
+                        // Suppression ferme : `nom`, `prenom`, `specialite`,
+                        // `address` et `rpps` rendent la personne identifiable
+                        // même sans email ni téléphone — et c'est justement la
+                        // donnée de santé. Rattachée par `workspace_id`, donc
+                        // couverte par le contexte posé ci-dessus.
+                        $praticiens = DB::table('health_practitioners')
+                            ->where('workspace_id', $businessId)
+                            ->whereRaw('lower(email::text) = ?', [$email])
+                            ->delete();
+
                         return [
                             'contacts' => $contacts,
+                            'health_practitioners' => $praticiens,
                             'activities' => $this->deleteActivities($businessId, $personKey),
                         ];
                     }),

@@ -74,7 +74,7 @@ class CompaniesController extends ApiController
             // le `where` Eloquent : l'ordre inverse perd le type et le scope
             // ne compilerait pas.
             $query = $this->buildFilteredQuery()
-                ->allowedSorts(['quality_score', 'enriched_at', 'denomination', 'created_at'])
+                ->allowedSorts(...['quality_score', 'enriched_at', 'denomination', 'created_at'])
                 ->defaultSort('-quality_score')
                 ->where('workspace_id', $workspaceId);
 
@@ -133,7 +133,7 @@ class CompaniesController extends ApiController
         // finissent toujours par diverger, et l'écart se découvre par un export
         // qui ne correspond plus à la liste affichée.
         return QueryBuilder::for(Company::query()->whereNull('deleted_at'))
-            ->allowedFilters(CompanyQueryFilters::allowed());
+            ->allowedFilters(...CompanyQueryFilters::allowed());
     }
 
     /**

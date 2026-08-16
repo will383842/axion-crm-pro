@@ -64,6 +64,18 @@ services:
     restart: unless-stopped
     volumes: !override
       - api-storage:/var/www/html/storage
+    # 🔴 Le HEALTHCHECK de l'image `prod` est `curl http://localhost/up` — il
+    # convient a l'API, pas a un consommateur de files : `php artisan horizon`
+    # n'ouvre AUCUN port HTTP. En basculant ce service sur la cible `prod`
+    # (2026-08-16), il a herite de ce controle et est devenu `unhealthy` EN
+    # PERMANENCE. Verifie en production le meme jour.
+    # On teste ce que ce service fait vraiment : Horizon est-il en marche ?
+    healthcheck:
+      test: ['CMD-SHELL', 'php artisan horizon:status | grep -q running || exit 1']
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
 
   scheduler:
     build:
@@ -71,6 +83,12 @@ services:
     restart: unless-stopped
     volumes: !override
       - api-storage:/var/www/html/storage
+    # Meme cause que `horizon` : `schedule:work` ne sert pas de HTTP. Il n'y a
+    # pas de commande fiable pour interroger son etat, donc on RETIRE le
+    # controle plutot que d'en garder un qui ment. Un controle absent est
+    # honnete ; un controle qui rougit toujours apprend a ignorer les rouges.
+    healthcheck:
+      disable: true
 
   app:
     build:
@@ -82,6 +100,17 @@ services:
         VITE_BUILD_CIBLE: prod
     restart: unless-stopped
     volumes: !override []
+
+  # 🔴 `postgres` et `redis` n'avaient AUCUNE politique de redemarrage, alors
+  # que les quatre services applicatifs en ont une. Apres un redemarrage du
+  # serveur ou du demon Docker, l'API, le frontend, Horizon et le scheduler se
+  # relevaient donc SANS leur base ni leur Redis — et bouclaient sur une base
+  # absente. Les conteneurs qui redemarrent masquaient la cause.
+  postgres:
+    restart: unless-stopped
+
+  redis:
+    restart: unless-stopped
 
 volumes:
   # `storage/` est le seul dossier que l'application ÉCRIT. Sans ce volume, les

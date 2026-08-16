@@ -157,7 +157,7 @@ class ContactsHubController extends ConsoleController
         $column = self::SORTS[$sortKey] ?? 'updated_at';
 
         $builder = QueryBuilder::for($base)
-            ->allowedFilters(CompanyQueryFilters::allowedWithTaxonomy());
+            ->allowedFilters(...CompanyQueryFilters::allowedWithTaxonomy());
 
         // La pagination par curseur EXIGE un ordre total : sans `id` en
         // départage, deux lignes de même `updated_at` peuvent s'échanger entre

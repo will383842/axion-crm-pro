@@ -169,23 +169,65 @@ class DeduplicationService
         );
     }
 
-    /** Niveau 6 : opt-out cross-workspace (RGPD). */
+    /**
+     * Niveau 6 : opt-out cross-workspace (RGPD).
+     *
+     * 🔴 INTERROGE LES DEUX FORMES, ET C'EST INDISPENSABLE.
+     *
+     * `opt_out` porte deux écritures de nature différente :
+     *   · l'email EN CLAIR, pour une opposition ordinaire ;
+     *   · l'`email_hash` SEUL, pour une opposition née d'un EFFACEMENT — c'est
+     *     tout l'intérêt : opposer sans conserver l'adresse
+     *     (`SiteGdprService::optOut()` écrit délibérément `'email' => null`).
+     *
+     * Cette méthode ne regardait que la colonne en clair. **Toute opposition
+     * née du site était donc invisible** ici — et `isOptedOut()` est consultée
+     * en amont de l'enrichissement (`EmailFinderService::find()`) et de la
+     * décision de scraper (`shouldRunScrape()`). Constaté le 2026-08-16.
+     *
+     * Le patron correct existait déjà dans `EligibiliteCampagne::peutRecevoir()` ;
+     * on l'applique ici.
+     */
     public function isOptedOut(?string $email = null, ?string $phone = null): bool
     {
         if (! $email && ! $phone) {
             return false;
         }
 
+        $emailNormalise = $email !== null ? strtolower(trim($email)) : null;
+
         return DB::table('opt_out')
-            ->when($email !== null, fn ($q) => $q->orWhere('email', strtolower(trim($email))))
+            ->when($emailNormalise !== null, fn ($q) => $q
+                ->orWhere('email', $emailNormalise)
+                ->orWhere('email_hash', hash('sha256', $emailNormalise)))
             ->when($phone !== null, fn ($q) => $q->orWhere('phone', preg_replace('/[\s.-]/', '', $phone)))
             ->exists();
     }
 
+    /**
+     * 🔴 ÉCRIT L'EMPREINTE, PAS SEULEMENT L'ADRESSE.
+     *
+     * Sans `email_hash`, la garde anti-réinsertion du funnel de collecte
+     * (`ScrapedRecordIngestService`, qui interroge UNIQUEMENT `email_hash`) ne
+     * voyait pas les oppositions écrites ici — c'est-à-dire **toutes celles
+     * nées d'un effacement depuis la console** (`GdprErasureService`).
+     *
+     * Conséquence mesurée le 2026-08-16 : une personne effacée était
+     * RÉ-INSÉRÉE au prochain re-scrape. Le commentaire de la garde promettait
+     * que « le hash survit à l'effacement » ; l'écriture ne produisait pas ce
+     * hash. La promesse et le code se contredisaient depuis l'origine.
+     *
+     * `scope` est laissé au DEFAULT SQL (`'business'`) : cette méthode ne sert
+     * que l'univers business. Une opposition « vivier » passe par
+     * `SiteGdprService`, qui pose le scope explicitement.
+     */
     public function addOptOut(?string $email, ?string $phone, string $source, ?string $reason = null): void
     {
+        $emailNormalise = $email ? strtolower(trim($email)) : null;
+
         DB::table('opt_out')->insert([
-            'email' => $email ? strtolower(trim($email)) : null,
+            'email' => $emailNormalise,
+            'email_hash' => $emailNormalise !== null ? hash('sha256', $emailNormalise) : null,
             'phone' => $phone ? preg_replace('/[\s.-]/', '', $phone) : null,
             'source' => $source,
             'reason' => $reason,

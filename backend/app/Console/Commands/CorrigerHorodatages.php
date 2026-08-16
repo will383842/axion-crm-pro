@@ -114,6 +114,7 @@ class CorrigerHorodatages extends Command
         $this->newLine();
 
         $total = 0;
+        $dejaReprises = 0;
         $manuelles = [];
 
         foreach ($cibles as $table => $colonnes) {
@@ -130,6 +131,33 @@ class CorrigerHorodatages extends Command
             }
 
             $aCorriger = $this->compter($table, $colonnes);
+
+            // 🔴 LA SIMULATION DOIT LIRE LE JOURNAL, ELLE AUSSI.
+            //
+            // Le compte ci-dessus ne mesure PAS « ce qui reste à faire » : il
+            // mesure « ce que l'application a écrit ». Or une ligne corrigée
+            // reste à la seconde pleine — le discriminant la compte donc
+            // encore. Constaté en production le 2026-08-16 : la reprise de
+            // 17,7 M de lignes terminée, la simulation réaffichait
+            // 14 566 816. Le mode écriture, lui, refusait correctement les 25
+            // tables : la garde était bonne, c'est l'AFFICHAGE qui mentait.
+            //
+            // Une simulation qui annonce du travail déjà fait pousse à le
+            // refaire — et la transformation n'est pas idempotente.
+            $etat = $this->journalReprise($table);
+
+            if ($etat?->termine_at !== null) {
+                $dejaReprises++;
+                $this->line(sprintf(
+                    '%-32s %-8s DÉJÀ REPRISE le %s',
+                    $table,
+                    '(' . count($colonnes) . ' col.)',
+                    $etat->termine_at,
+                ));
+
+                continue;
+            }
+
             $total += $aCorriger;
 
             $this->line(sprintf(
@@ -145,7 +173,11 @@ class CorrigerHorodatages extends Command
         }
 
         $this->newLine();
-        $this->info('Total de lignes concernées : ' . number_format($total, 0, ',', ' '));
+        $this->info('Total de lignes RESTANT à reprendre : ' . number_format($total, 0, ',', ' '));
+
+        if ($dejaReprises > 0) {
+            $this->info($dejaReprises . ' table(s) déjà reprise(s), ignorée(s) — cf. `horodatages_reprise`.');
+        }
 
         if ($manuelles !== []) {
             $this->newLine();
@@ -418,6 +450,13 @@ class CorrigerHorodatages extends Command
      */
     private function journalReprise(string $table): ?object
     {
+        // Le journal n'est créé qu'au premier `--appliquer` : en simulation sur
+        // une base qui n'a jamais été reprise, il n'existe pas. On répond
+        // « rien de connu » plutôt que d'échouer sur une table absente.
+        if (! $this->db()->getSchemaBuilder()->hasTable('horodatages_reprise')) {
+            return null;
+        }
+
         /** @var object{dernier_id: string|null, termine_at: string|null}|null $ligne */
         $ligne = $this->db()->selectOne(
             'SELECT dernier_id, termine_at FROM horodatages_reprise WHERE table_name = ?',

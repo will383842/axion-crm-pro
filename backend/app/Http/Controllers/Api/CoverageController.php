@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Jobs\EnrichCompanyJob;
 use App\Jobs\LaunchZoneScrapingJob;
 use App\Models\Company;
+use App\Services\Dedup\DeduplicationService;
 use App\Services\Rotations\ZoneRotator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,12 +16,17 @@ use Illuminate\Support\Facades\Schema;
 
 class CoverageController extends ApiController
 {
-    public function __construct(private readonly ZoneRotator $rotator) {}
+    public function __construct(
+        private readonly ZoneRotator $rotator,
+        private readonly DeduplicationService $dedup,
+    ) {}
 
     /**
      * @OA\Get(path="/coverage", tags={"Coverage"}, summary="Matrice de couverture France (région / département / ville)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="level", in="query", @OA\Schema(type="string", enum={"region","department","city"}, default="department")),
+     *
      *     @OA\Response(response=200, description="Cells groupées par niveau"))
      */
     public function index(Request $r): JsonResponse
@@ -43,7 +49,7 @@ class CoverageController extends ApiController
         try {
             $cells = Cache::remember($cacheKey, 60, function () use ($workspaceId, $level) {
                 return match ($level) {
-                    'region' => DB::select(<<<SQL
+                    'region' => DB::select(<<<'SQL'
                         SELECT d.region_code AS code, r.name AS name,
                                SUM(cm.company_count) AS total,
                                SUM(cm.complete_count) AS complete,
@@ -58,7 +64,7 @@ class CoverageController extends ApiController
 
                     'city' => $this->queryCityCells($workspaceId),
 
-                    default => DB::select(<<<SQL
+                    default => DB::select(<<<'SQL'
                         SELECT cm.dept_code AS code, d.name AS name, d.region_code,
                                SUM(cm.company_count) AS total,
                                SUM(cm.complete_count) AS complete,
@@ -75,10 +81,11 @@ class CoverageController extends ApiController
             // Sprint 18.9 — log + fallback empty plutôt que 500 (RLS denied, PostGIS missing, etc.)
             Log::error('coverage.index failed', [
                 'workspace_id' => $workspaceId,
-                'level'        => $level,
-                'exception'    => $e->getMessage(),
+                'level' => $level,
+                'exception' => $e->getMessage(),
             ]);
             report($e);
+
             return $this->ok(['level' => $level, 'cells' => [], 'degraded' => true]);
         }
 
@@ -101,7 +108,7 @@ class CoverageController extends ApiController
         }
 
         if ($hasPostgis) {
-            return DB::select(<<<SQL
+            return DB::select(<<<'SQL'
                 SELECT ci.code_insee AS code, ci.name, ci.department, ci.population,
                        ST_Y(ci.centroid) AS lat, ST_X(ci.centroid) AS lon,
                        SUM(cm.company_count) AS total
@@ -115,7 +122,7 @@ class CoverageController extends ApiController
         }
 
         // PostGIS absent — pas de coordonnées géo, mais le reste fonctionne.
-        return DB::select(<<<SQL
+        return DB::select(<<<'SQL'
             SELECT ci.code_insee AS code, ci.name, ci.department, ci.population,
                    NULL::float AS lat, NULL::float AS lon,
                    SUM(cm.company_count) AS total
@@ -131,7 +138,9 @@ class CoverageController extends ApiController
     /**
      * @OA\Get(path="/coverage/next-zone", tags={"Coverage"}, summary="Sélectionne la prochaine zone à scraper (rotation déterministe)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="preferred_dept", in="query", @OA\Schema(type="string")),
+     *
      *     @OA\Response(response=200, description="Zone sélectionnée"))
      */
     public function nextZone(Request $r): JsonResponse
@@ -142,10 +151,12 @@ class CoverageController extends ApiController
         }
         try {
             $zone = $this->rotator->pickNextZone((string) $workspaceId, $r->query('preferred_dept'));
+
             return $this->ok(['zone' => $zone]);
         } catch (\Throwable $e) {
             Log::error('coverage.nextZone failed', ['exception' => $e->getMessage()]);
             report($e);
+
             return $this->ok(['zone' => null, 'degraded' => true]);
         }
     }
@@ -153,27 +164,32 @@ class CoverageController extends ApiController
     /**
      * @OA\Post(path="/coverage/launch", tags={"Coverage"}, summary="Lance un scraping ciblé département/NAF/taille",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\RequestBody(required=true, @OA\JsonContent(
      *         required={"department"},
+     *
      *         @OA\Property(property="department", type="string", maxLength=3),
      *         @OA\Property(property="naf", type="string", maxLength=5),
      *         @OA\Property(property="size_category", type="string"),
      *         @OA\Property(property="limit", type="integer", minimum=1, maximum=1000),
      *         @OA\Property(property="enrich", type="boolean", description="false = récupérer seulement (pas d'enrichissement chaîné)"))),
+     *
      *     @OA\Response(response=200, description="Job queué"))
      */
     public function launch(Request $r): JsonResponse
     {
         $validated = $r->validate([
-            'department'    => ['required', 'string', 'max:3'],
-            'naf'           => ['nullable', 'string', 'max:5'],
+            'department' => ['required', 'string', 'max:3'],
+            'naf' => ['nullable', 'string', 'max:5'],
             'size_category' => ['nullable', 'string', 'max:32'],
-            'limit'         => ['nullable', 'integer', 'min:1', 'max:1000'],
-            'enrich'        => ['nullable', 'boolean'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:1000'],
+            'enrich' => ['nullable', 'boolean'],
         ]);
 
+        $workspaceId = (string) (app()->bound('workspace.id') ? app('workspace.id') : '');
+
         LaunchZoneScrapingJob::dispatch(
-            workspaceId: (string) (app()->bound('workspace.id') ? app('workspace.id') : ''),
+            workspaceId: $workspaceId,
             department: $validated['department'],
             naf: $validated['naf'] ?? null,
             sizeCategory: $validated['size_category'] ?? null,
@@ -181,28 +197,78 @@ class CoverageController extends ApiController
             enrich: $validated['enrich'] ?? true,
         );
 
+        // 🔴 LE COOLDOWN DE ZONE N'ÉTAIT JAMAIS POSÉ.
+        //
+        // `ZoneRotator::pickNextZone()` filtre sur
+        // `cz.cooldown_until IS NULL OR cz.cooldown_until < now()`, en `LEFT JOIN`
+        // sur `coverage_zones`. Mais `markZoneAttempted()` n'avait AUCUN
+        // appelant : la table restait vide, le `LEFT JOIN` rendait toujours
+        // `NULL`, et la condition était donc **tautologiquement vraie**.
+        // Le garde anti-répétition était nul et non avenu — `next-zone` pouvait
+        // proposer indéfiniment la même cellule, et rien n'empêchait de
+        // re-scraper la même zone en boucle (coût proxy et quota).
+        // Constaté le 2026-08-16.
+        //
+        // On marque ICI et pas dans `nextZone()` : `next-zone` ne fait que
+        // SUGGÉRER une zone, l'écran peut l'interroger plusieurs fois sans rien
+        // lancer. C'est `launch()` qui attaque réellement la zone — c'est donc
+        // lui qui doit consommer le cooldown.
+        // ⚠️ ON VÉRIFIE AVANT D'ÉCRIRE, ON NE RATTRAPE PAS APRÈS.
+        //
+        // `coverage_zones.department` porte une clé étrangère vers
+        // `departments`, alors que cette route ne valide `department` que par
+        // `string|max:3`. Un code inexistant fait donc échouer l'insertion.
+        //
+        // Un `try/catch` ne suffit PAS : sous PostgreSQL, une instruction en
+        // échec AVORTE toute la transaction en cours (`SQLSTATE 25P02`) — tout
+        // ce qui suit échoue jusqu'au rollback, y compris hors du `try`. Le
+        // rattrapage arriverait trop tard dès que cet appel se retrouve
+        // enveloppé dans une transaction. Constaté en test le 2026-08-16.
+        //
+        // On teste donc la précondition. Le cooldown est une optimisation, pas
+        // une condition de correction : un département inconnu ne doit pas
+        // empêcher le lancement, qui passait très bien avant ce marquage.
+        $departementConnu = $workspaceId !== ''
+            && DB::table('departments')->where('code', $validated['department'])->exists();
+
+        if ($departementConnu) {
+            $this->dedup->markZoneAttempted(
+                $workspaceId,
+                $validated['department'],
+                $validated['naf'] ?? null,
+                $validated['size_category'] ?? null,
+            );
+        } elseif ($workspaceId !== '') {
+            Log::warning('coverage.launch : cooldown non posé, département inconnu', [
+                'department' => $validated['department'],
+            ]);
+        }
+
         return $this->ok(['queued' => true]);
     }
 
     /**
      * @OA\Post(path="/coverage/enrich", tags={"Coverage"}, summary="Enrichit les entreprises DÉJÀ récupérées d'un département (bouton « Enrichir »)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\RequestBody(required=true, @OA\JsonContent(
      *         required={"department"},
+     *
      *         @OA\Property(property="department", type="string", maxLength=3),
      *         @OA\Property(property="size_category", type="string"),
      *         @OA\Property(property="naf", type="string", maxLength=5),
      *         @OA\Property(property="only_pending", type="boolean", description="true (défaut) = seulement les non-enrichies"))),
+     *
      *     @OA\Response(response=200, description="Jobs d'enrichissement queués"))
      */
     public function enrich(Request $r): JsonResponse
     {
         $validated = $r->validate([
-            'department'    => ['required', 'string', 'max:3'],
+            'department' => ['required', 'string', 'max:3'],
             'size_category' => ['nullable', 'string', 'max:32'],
-            'naf'           => ['nullable', 'string', 'max:5'],
-            'only_pending'  => ['nullable', 'boolean'],
-            'limit'         => ['nullable', 'integer', 'min:1', 'max:50000'],
+            'naf' => ['nullable', 'string', 'max:5'],
+            'only_pending' => ['nullable', 'boolean'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:50000'],
         ]);
 
         $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
@@ -244,7 +310,9 @@ class CoverageController extends ApiController
     /**
      * @OA\Get(path="/coverage/cells/{cell}", tags={"Coverage"}, summary="Détail d'une cellule de couverture",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="cell", in="path", required=true, @OA\Schema(type="integer")),
+     *
      *     @OA\Response(response=200, description="OK"))
      */
     public function showCell(int $cell): JsonResponse

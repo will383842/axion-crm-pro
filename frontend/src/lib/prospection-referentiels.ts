@@ -81,3 +81,30 @@ export const PROSPECTION_STATUS_OPTIONS: OptionReferentiel[] = [
   { value: 'pending', label: 'Collectés, pas encore enrichis' },
   { value: 'archived_no_email', label: 'Sans e-mail (archivés)' },
 ];
+
+/**
+ * Référentiels géographiques — servis par l'API (`/referentiels/geo`), PAS
+ * recopiés ici.
+ *
+ * 102 départements et 18 régions recopiés dans le frontend, ce sont 120
+ * occasions de diverger de la base — et c'est la base qui décide ce qu'un
+ * filtre peut trouver. Un département qui existerait ici sans exister là
+ * rendrait une liste vide qui se lit comme « aucun résultat ».
+ */
+export interface EntreeGeo {
+  code: string;
+  name: string;
+}
+
+export interface ReferentielsGeo {
+  regions: EntreeGeo[];
+  departments: EntreeGeo[];
+}
+
+/** Transforme le référentiel en options, préfixées du code (« 75 — Paris »). */
+export function versOptions(entrees: EntreeGeo[], libelleVide: string): OptionReferentiel[] {
+  return [
+    { value: '', label: libelleVide },
+    ...entrees.map((e) => ({ value: e.code, label: `${e.code} — ${e.name}` })),
+  ];
+}

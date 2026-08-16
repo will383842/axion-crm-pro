@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Spatie\QueryBuilder\AllowedFilter;
 
@@ -35,6 +36,23 @@ final class CompanyQueryFilters
             AllowedFilter::exact('sector_main'),
             AllowedFilter::exact('quality', 'quality_badge'),
             AllowedFilter::exact('best_email_confidence'),
+
+            // FENÊTRE DE DATES sur l'entrée de la fiche dans le CRM.
+            // Adossées à l'index `(workspace_id, created_at DESC)` posé par la
+            // migration 000006 : sans lui, la même requête met 3 487 ms
+            // (scan séquentiel de 4,29 M de lignes pour en trouver 150) — un
+            // filtre plus lent que pas de filtre paraît cassé, et on cherche
+            // la cause ailleurs.
+            //
+            // Bornes SÉPARÉES plutôt qu'un intervalle unique : « tout ce qui
+            // est arrivé depuis lundi » est la question la plus fréquente, et
+            // elle n'a pas de borne haute.
+            AllowedFilter::callback('cree_apres', function (Builder $query, mixed $value): void {
+                self::borneDate($query, 'created_at', $value, '>=');
+            }),
+            AllowedFilter::callback('cree_avant', function (Builder $query, mixed $value): void {
+                self::borneDate($query, 'created_at', $value, '<=');
+            }),
 
             // « Éligible campagne » — la définition UNIQUE (`EligibiliteCampagne`),
             // celle que le futur moteur d'envoi reprendra telle quelle. On ne
@@ -87,5 +105,34 @@ final class CompanyQueryFilters
             AllowedFilter::exact('lifecycle_stage'),
             AllowedFilter::exact('legal_basis'),
         ]);
+    }
+
+    /**
+     * Applique une borne de date, en refusant SILENCIEUSEMENT ce qui n'est pas
+     * une date.
+     *
+     * Pourquoi ne pas lever une erreur : ces filtres viennent de l'URL. Une
+     * valeur abîmée (copier-coller, lien partagé, robot) doit rendre la liste
+     * NON FILTRÉE, jamais une 500. Mais elle ne doit pas non plus filtrer au
+     * hasard — d'où le rejet plutôt qu'une interprétation approximative.
+     *
+     * Une borne HAUTE porte sur la journée ENTIÈRE : « avant le 15 » inclut le
+     * 15 au soir. L'inverse surprendrait tout le monde et ferait disparaître
+     * les fiches du jour demandé.
+     */
+    private static function borneDate(Builder $query, string $colonne, mixed $value, string $operateur): void
+    {
+        $brut = is_string($value) ? trim($value) : '';
+        if ($brut === '') {
+            return;
+        }
+
+        try {
+            $date = Carbon::parse($brut);
+        } catch (\Throwable) {
+            return;
+        }
+
+        $query->where($colonne, $operateur, $operateur === '<=' ? $date->endOfDay() : $date->startOfDay());
     }
 }

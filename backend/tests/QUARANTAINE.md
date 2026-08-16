@@ -1,4 +1,18 @@
-# Quarantaine de tests — dette figée le 2026-08-13
+# Quarantaine de tests — ARCHIVE (ouverte le 2026-08-13, **levée le 2026-08-16**)
+
+> ## ⛔ Ce document n'est plus une liste active
+>
+> **Le 2026-08-16, la quarantaine a été levée en totalité.** `phpunit-ci.xml`
+> n'écarte plus aucun fichier : la CI exécute la suite entière, et tout test
+> rouge bloque le déploiement. Les 23 fichiers listés plus bas ont été soit
+> réparés, soit supprimés — la sortie de quarantaine a d'ailleurs révélé
+> **9 défauts réels** en production (cf. PR #89 et suivantes), dont un appel
+> facturé mort depuis Laravel 11 et une route de portabilité RGPD inutilisable.
+>
+> Ce fichier est conservé comme **archive du pourquoi**, pas comme registre à
+> consulter. Ne rien y ajouter : réintroduire une exclusion demande une
+> justification datée dans `phpunit-ci.xml`, précisément parce que c'est ce
+> mécanisme-là qui avait laissé 61 tests non exécutés pendant des mois.
 
 ## Ce qui s'est passé
 

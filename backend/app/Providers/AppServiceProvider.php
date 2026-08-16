@@ -3,6 +3,9 @@
 namespace App\Providers;
 
 use App\Models\PersonalAccessToken;
+use App\Services\Email\EmailConfidenceService;
+use App\Services\Email\HunterEmailVerifier;
+use App\Services\Email\MxEmailValidator;
 use App\Services\Scraping\GooglePlacesClient;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\Queue;
@@ -25,6 +28,48 @@ class AppServiceProvider extends ServiceProvider
         // Ce binding explicite rétablit l'injection. Ne pas le retirer sans rendre
         // la dépendance non-nullable dans le constructeur de l'orchestrateur.
         $this->app->singleton(GooglePlacesClient::class);
+
+        // ── LE MÊME PIÈGE, À TROIS AUTRES ENDROITS (constaté le 2026-08-16) ──
+        //
+        // Google Places n'était pas un cas isolé. Sonde exécutée EN PRODUCTION,
+        // par réflexion sur les instances résolues par le conteneur :
+        //
+        //   MentionsLegalesScraperService::$emailValidator   NULL
+        //   EmailFinderService::$hunterVerifier              NULL
+        //   MediaEnrich::$mx                                 NULL
+        //   MediaEnrich::$confidence                         NULL
+        //
+        // Ce que ces `null` coûtaient réellement :
+        //
+        // · `MentionsLegalesScraperService:141-148` — le bloc de validation MX
+        //   est gardé par `if ($this->emailValidator !== null)`. Il n'a JAMAIS
+        //   été exécuté : chaque contact issu du scraping mentions-légales est
+        //   persisté avec `email_status = 'unknown'` figé, sans filtrage des
+        //   adresses invalides ou jetables. La doctrine « 0 email douteux »,
+        //   citée dans `config/services.php` et dans les docblocks, n'était pas
+        //   appliquée sur le chemin d'enrichissement principal.
+        //
+        // · `MediaEnrich` tourne toutes les 3 h sur 5 000 médias
+        //   (`routes/console.php`). Sans `$mx` : aucun rejet des jetables.
+        //   Sans `$confidence` : `email_confidence` jamais écrit. Et
+        //   `pickBestEmail()` retombait toujours sur le pool brut, la priorité
+        //   « même domaine que le site » — celle qui écarte les agences web et
+        //   les domaines de parking — ne s'appliquant jamais.
+        //
+        // ⚠️ Aucun de ces trois services n'appelle d'API facturée :
+        // `MxEmailValidator` fait des résolutions DNS, `EmailConfidenceService`
+        // est du calcul pur. La leçon de Google Places — « rallumer un appel
+        // FACTURÉ ne doit jamais être l'effet de bord d'une réparation » — a
+        // été revérifiée ici avant de poser ces bindings.
+        //
+        // ⚠️ `HunterEmailVerifier`, lui, EST facturé. Il est bindé pour la
+        // cohérence du conteneur, mais reste sans effet opérationnel :
+        // `EmailFinderService::verifyEmail()` n'a AUCUN appelant applicatif
+        // (le chemin Hunter réellement emprunté passe par `HunterSmtpProber`,
+        // dont la dépendance est non-nullable et donc déjà injectée).
+        $this->app->singleton(MxEmailValidator::class);
+        $this->app->singleton(EmailConfidenceService::class);
+        $this->app->singleton(HunterEmailVerifier::class);
     }
 
     public function boot(): void

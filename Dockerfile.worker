@@ -77,8 +77,17 @@ COPY workers/package.json workers/pnpm-lock.yaml ./
 # dans pnpm lui-même et ses dépendances embarquées. Un outil de BUILD conservé
 # dans une image d'EXÉCUTION. Le conteneur ne lance que `node dist/main.js` :
 # pnpm n'y sert plus une fois l'installation faite.
+#
+# Même raisonnement pour npm : les 8 findings restants (dont 1 CRITICAL,
+# `brace-expansion`) sont dans `usr/lib/node_modules/npm/node_modules/`, donc
+# dans le npm groupé avec l'image de base. Le conteneur ne lance que
+# `node dist/main.js` — ni npm ni npx n'y servent une fois l'installation
+# faite. La commande de démarrage et le HEALTHCHECK (wget) ont été vérifiés :
+# aucun n'appelle un gestionnaire de paquets.
 RUN pnpm install --prod --frozen-lockfile \
-    && rm -rf /root/.cache/node /root/.npm /usr/local/share/.cache
+    && rm -rf /root/.cache/node /root/.npm /usr/local/share/.cache \
+    && rm -rf /usr/lib/node_modules/npm /usr/local/lib/node_modules/npm \
+    && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/bin/npm /usr/bin/npx
 COPY --from=builder /srv/workers/dist ./dist
 USER pwuser
 EXPOSE 9100

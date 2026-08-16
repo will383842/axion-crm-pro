@@ -19,7 +19,8 @@ use Illuminate\Support\Facades\Schema;
  *
  *  1) Recompute companies_created via count(distinct companies.id) joined sur runs.campaign_id
  *     (best-effort : si la table companies n'a pas de campaign_id direct on count via runs.company_id).
- *  2) Recompute duration_seconds_used = sum(EXTRACT(EPOCH FROM (finished_at - started_at))) sur les runs de la campagne.
+ *  2) Recompute duration_seconds_used = sum(GREATEST(0, EXTRACT(EPOCH FROM (finished_at - started_at)))) sur les runs
+ *     de la campagne — la borne à zéro n'est pas cosmétique, voir le commentaire dans la requête.
  *  3) Recompute runs_completed = runs ayant status ∈ (success|completed|failed|cancelled).
  *  4) Si shouldAutoPause() ≠ null → pause auto (status=paused, paused_reason=…).
  *  5) Si runs_completed === runs_total et runs_total > 0 → status=completed.
@@ -30,6 +31,7 @@ class MonitorCampaignProgressJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 1;
+
     public int $timeout = 60;
 
     public function __construct(public readonly int $campaignId) {}
@@ -53,26 +55,39 @@ class MonitorCampaignProgressJob implements ShouldQueue
                 $row = DB::selectOne(
                     "SELECT
                         COUNT(*) FILTER (WHERE status IN ('success','completed','failed','cancelled'))::INTEGER AS runs_completed,
+                        -- GREATEST(0, …) : `started_at` et `finished_at` ne sont
+                        -- PAS toujours les deux bornes d'une même durée.
+                        -- `ScrapedRecordIngestService` écrit
+                        -- `started_at = fetchedAt` (heure de collecte CHEZ LE
+                        -- PRODUCTEUR) et `finished_at = now()` (heure
+                        -- d'ingestion par le CRM) : leur ordre n'est pas garanti.
+                        -- Mesuré en production le 2026-08-16 : 646 lignes de la
+                        -- collecte `implantations-fr-etranger` portent un
+                        -- `fetchedAt` constant (10:00) postérieur à leur
+                        -- ingestion (06:51), soit −11 320 s chacune.
+                        -- Sans cette borne, un import RETRANCHE de la durée
+                        -- consommée d'une campagne — un compteur de quota qui
+                        -- décroît, donc un plafond qui se relâche tout seul.
                         COALESCE(SUM(
                             CASE WHEN started_at IS NOT NULL AND finished_at IS NOT NULL
-                                 THEN EXTRACT(EPOCH FROM (finished_at - started_at))
+                                 THEN GREATEST(0, EXTRACT(EPOCH FROM (finished_at - started_at)))
                                  ELSE 0 END
                         ),0)::INTEGER AS duration_seconds_used,
                         COUNT(DISTINCT company_id) FILTER (WHERE company_id IS NOT NULL)::INTEGER AS companies_created
                      FROM scraper_runs
                      WHERE campaign_id = ?",
-                    [$campaign->id]
+                    [$campaign->id],
                 );
                 if ($row) {
-                    $aggregates['runs_completed']        = (int) ($row->runs_completed ?? 0);
+                    $aggregates['runs_completed'] = (int) ($row->runs_completed ?? 0);
                     $aggregates['duration_seconds_used'] = (int) ($row->duration_seconds_used ?? 0);
-                    $aggregates['companies_created']     = (int) ($row->companies_created ?? 0);
+                    $aggregates['companies_created'] = (int) ($row->companies_created ?? 0);
                 }
             }
         } catch (\Throwable $e) {
             Log::warning('MonitorCampaignProgressJob: aggregates failed', [
                 'campaign_id' => $campaign->id,
-                'exception'   => $e->getMessage(),
+                'exception' => $e->getMessage(),
             ]);
         }
 
@@ -83,23 +98,25 @@ class MonitorCampaignProgressJob implements ShouldQueue
         $reason = $campaign->shouldAutoPause();
         if ($reason !== null) {
             $campaign->update([
-                'status'        => 'paused',
-                'paused_at'     => now(),
+                'status' => 'paused',
+                'paused_at' => now(),
                 'paused_reason' => $reason,
             ]);
             Log::info('Campaign auto-paused', [
                 'campaign_id' => $campaign->id,
-                'reason'      => $reason,
+                'reason' => $reason,
             ]);
+
             return;
         }
 
         // 5) Tous les runs terminés ?
         if ($campaign->runs_total > 0 && $campaign->runs_completed >= $campaign->runs_total) {
             $campaign->update([
-                'status'      => 'completed',
+                'status' => 'completed',
                 'finished_at' => now(),
             ]);
+
             return;
         }
 

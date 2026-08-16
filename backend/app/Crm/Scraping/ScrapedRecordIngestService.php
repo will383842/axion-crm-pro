@@ -556,6 +556,27 @@ final class ScrapedRecordIngestService
         return [$slug];
     }
 
+    /**
+     * ⚠️ ICI, `started_at` ET `finished_at` NE SONT PAS LES DEUX BORNES D'UNE
+     * MÊME DURÉE — et leur nom le laisse pourtant croire.
+     *
+     * `started_at` reçoit le `fetchedAt` du PRODUCTEUR (worker Node, fichier
+     * d'import) : l'heure à laquelle la donnée a été collectée à la source.
+     * `finished_at` reçoit `now()` : l'heure à laquelle le CRM l'a ingérée.
+     * Rien ne garantit leur ordre — un import rejoué, un fichier daté à la
+     * main, un producteur mal réglé, et `finished_at < started_at`.
+     *
+     * Constaté en production le 2026-08-16 : 646 lignes de la collecte
+     * `implantations-fr-etranger` portent un `fetchedAt` constant (10:00)
+     * antérieur de… −11 320 s à leur ingestion (06:51). Ce n'était pas un
+     * horodatage faux, c'était ce contresens.
+     *
+     * Conséquence en aval, corrigée le même jour : `MonitorCampaignProgressJob`
+     * sommait `finished_at - started_at` pour alimenter `duration_seconds_used`
+     * — un import pouvait donc RETRANCHER de la durée consommée d'une
+     * campagne. Toute nouvelle lecture de ces deux colonnes comme une durée
+     * doit borner à zéro.
+     */
     private function recordRun(
         ScrapedRecord $record,
         string $workspaceId,

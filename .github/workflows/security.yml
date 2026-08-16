@@ -11,6 +11,7 @@ on:
 permissions:
   contents: read
   security-events: write
+  issues: write # pour le job `alerte` en fin de fichier
 
 concurrency:
   group: security-${{ github.ref }}
@@ -219,3 +220,71 @@ jobs:
           target: ${{ vars.ZAP_TARGET_URL }}
           rules_file_name: .zap/rules.tsv
           cmd_options: '-a'
+
+  # ===========================================================================
+  # ALERTE — le chaînon qui manquait
+  # ===========================================================================
+  # ⚠️ 2026-08-16. Le défaut de fond de ce workflow n'était pas « rien ne
+  # bloque », c'était « PERSONNE N'EST PRÉVENU ». Preuve mesurée le même jour :
+  # le job ZAP a échoué CINQ semaines de suite (13/07 → 10/08) sans qu'aucun
+  # humain ne le sache. Un rouge que personne ne regarde ne vaut pas mieux
+  # qu'un vert menteur.
+  #
+  # Pourquoi une ISSUE plutôt qu'un blocage du déploiement : une CVE publiée en
+  # amont à 3 h du matin n'a rien à voir avec le code qu'on veut livrer. Bloquer
+  # la production dessus, c'est empêcher un correctif urgent au nom d'un
+  # problème que ce correctif ne cause pas. L'issue réveille un humain sans
+  # rien casser.
+  #
+  # Pourquoi une issue plutôt que Telegram : ce dépôt n'a aucun jeton Telegram,
+  # et y recopier celui du site élargirait son exposition pour un gain nul.
+  # `GITHUB_TOKEN` suffit — aucun secret nouveau à créer ni à faire tourner.
+  #
+  # ⚠️ PAS sur les `pull_request` : là, le rouge est déjà sous les yeux de son
+  # auteur. On n'alerte que sur ce que personne ne regarde : le cron et `main`.
+  alerte:
+    name: Alerte si une analyse de sécurité échoue
+    runs-on: ubuntu-24.04
+    needs: [gitleaks, semgrep, trivy, trivy-images-tirees, composer-audit, pnpm-audit]
+    if: failure() && github.event_name != 'pull_request'
+    steps:
+      - name: Ouvrir ou compléter l'issue de suivi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPOT: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DECLENCHEUR: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          TITRE='🔴 Analyse de sécurité en échec'
+          # Corps écrit dans un FICHIER, ligne par ligne : une chaîne bash
+          # multiligne conserve ses espaces de tête, et quatre espaces en début
+          # de ligne valent un bloc de code en markdown — l'issue serait
+          # illisible. `printf '%s\n'` évite aussi tout piège d'échappement.
+          printf '%s\n' \
+            'Le workflow **Security** a échoué.' \
+            '' \
+            'Ouvrir le job rouge : la garde Trivy affiche un **tableau lisible**' \
+            'dans son journal — paquet, CVE, version installée, version corrigée.' \
+            '' \
+            'Rappels utiles :' \
+            '' \
+            "- \`security.yml\` n'est **pas** dans la chaîne de déploiement : la" \
+            "  production n'est donc pas bloquée, et c'est délibéré." \
+            '- Les exceptions connues et **datées** vivent dans `.trivyignore.yaml`.' \
+            "- Refermer cette issue une fois traitée : elle est réutilisée tant" \
+            "  qu'elle reste ouverte, donc une issue ouverte = un problème vivant." \
+            '' \
+            '---' \
+            '' > corps-alerte.md
+          printf 'Déclencheur : `%s`\n\n%s\n' "$DECLENCHEUR" "$RUN_URL" >> corps-alerte.md
+          # Une SEULE issue vivante : sans cette recherche, un cron hebdomadaire
+          # durablement en échec en ouvrirait une par semaine — et ce bruit
+          # reproduirait exactement le problème qu'on corrige ici.
+          EXISTANTE="$(gh issue list --repo "$DEPOT" --state open --label securite --json number --jq '.[0].number // empty')"
+          if [ -n "$EXISTANTE" ]; then
+            echo "Issue #$EXISTANTE déjà ouverte — ajout de cette occurrence."
+            gh issue comment "$EXISTANTE" --repo "$DEPOT" --body-file corps-alerte.md
+          else
+            gh issue create --repo "$DEPOT" --title "$TITRE" --label securite --body-file corps-alerte.md
+          fi

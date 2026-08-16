@@ -58,7 +58,29 @@ services:
     container_name: axion-crm-api
     env_file: .env
     environment:
-      APP_URL: https://api.localhost
+      # 🔴 `${APP_URL:-…}` ET NON UNE VALEUR EN DUR.
+      #
+      # `environment:` l'emporte sur `env_file:`. Écrite en dur, cette ligne
+      # rendait le `.env` du serveur INOPÉRANT pour cette clé : la production
+      # tournait avec `APP_URL=https://api.localhost`, quoi qu'on y mette.
+      # Mesuré le 2026-08-16 :
+      #
+      #   API      : APP_URL = https://api.localhost
+      #   horizon  : APP_URL = https://api.axion-crm-pro.com
+      #   .env     : APP_URL = https://api.axion-crm-pro.com
+      #
+      # `horizon` et `scheduler` n'ont pas cette ligne — ils lisaient donc la
+      # bonne valeur. **Le même code produisait deux URLs différentes** selon
+      # qu'il tournait dans l'API ou dans un job : liens de réinitialisation de
+      # mot de passe, URLs signées, `route()` absolus, hôte de la doc Swagger.
+      #
+      # La forme `${VAR:-défaut}` est interpolée par Compose, qui lit le `.env`
+      # du répertoire de projet : le `.env` gagne, et le défaut ne sert que
+      # quand la clé est absente — c'est-à-dire en développement.
+      APP_URL: ${APP_URL:-https://api.localhost}
+      # Ces deux-là restent en dur À DESSEIN : ce sont les noms de services du
+      # réseau Docker, ils DOIVENT écraser le `.env` (qui porte `localhost`
+      # pour un usage hors conteneur).
       DB_HOST: postgres
       REDIS_HOST: redis
     volumes:

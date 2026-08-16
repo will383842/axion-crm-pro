@@ -28,10 +28,37 @@ function authUser(string $email, string $password = 'OkPassword!1234', array $ex
     ], $extra));
 }
 
+/**
+ * Construit la requête passée à AuthService::attemptLogin().
+ *
+ * Le service régénère l'identifiant de session juste après `Auth::login()`
+ * (`$request->session()->regenerate()`) : c'est la protection contre la
+ * fixation de session, elle DOIT rester inconditionnelle côté code — la rendre
+ * facultative (`if ($request->hasSession())`) la ferait disparaître en silence
+ * le jour où le store manque en production.
+ *
+ * En HTTP réel, c'est le middleware `StartSession` qui attache le store à la
+ * requête. Un test unitaire qui fabrique sa requête avec `Request::create()`
+ * n'a pas ce middleware : à lui de fournir le store, sinon Laravel lève
+ * `RuntimeException: Session store not set on request.` — c'était la cause des
+ * 4 échecs de ce fichier, une fixture incomplète, pas un défaut du service.
+ */
+function authServiceRequest(array $server = []): Request
+{
+    $request = Request::create('/login', 'POST', server: array_merge(
+        ['REMOTE_ADDR' => '127.0.0.1'],
+        $server,
+    ));
+
+    $request->setLaravelSession(app('session.store'));
+
+    return $request;
+}
+
 test('AuthService::attemptLogin avec bons credentials retourne user + requires_2fa', function () {
     $user = authUser('auth1@test.local');
     $service = app(AuthService::class);
-    $request = Request::create('/login', 'POST', server: ['REMOTE_ADDR' => '127.0.0.1']);
+    $request = authServiceRequest();
 
     $result = $service->attemptLogin($request, 'auth1@test.local', 'OkPassword!1234');
     expect($result)
@@ -45,7 +72,7 @@ test('AuthService::attemptLogin avec totp_enabled_at retourne requires_2fa=true'
         'totp_enabled_at' => now(),
     ]);
     $service = app(AuthService::class);
-    $request = Request::create('/login', 'POST', server: ['REMOTE_ADDR' => '127.0.0.1']);
+    $request = authServiceRequest();
 
     $result = $service->attemptLogin($request, 'auth2@test.local', 'OkPassword!1234');
     expect($result['requires_2fa'])->toBeTrue();
@@ -54,7 +81,7 @@ test('AuthService::attemptLogin avec totp_enabled_at retourne requires_2fa=true'
 test('AuthService::attemptLogin avec mauvais password lance ValidationException', function () {
     authUser('auth3@test.local');
     $service = app(AuthService::class);
-    $request = Request::create('/login', 'POST', server: ['REMOTE_ADDR' => '10.20.30.40']);
+    $request = authServiceRequest(['REMOTE_ADDR' => '10.20.30.40']);
 
     expect(fn () => $service->attemptLogin($request, 'auth3@test.local', 'WrongPassword!'))
         ->toThrow(ValidationException::class);
@@ -65,7 +92,7 @@ test('AuthService::attemptLogin reset failed_login_count après login OK', funct
         'failed_login_count' => 3,
     ]);
     $service = app(AuthService::class);
-    $request = Request::create('/login', 'POST', server: ['REMOTE_ADDR' => '127.0.0.1']);
+    $request = authServiceRequest();
 
     $service->attemptLogin($request, 'auth4@test.local', 'OkPassword!1234');
     expect($user->fresh()->failed_login_count)->toBe(0);
@@ -76,7 +103,7 @@ test('AuthService::attemptLogin rejette account avec locked_until future', funct
         'locked_until' => now()->addHours(2),
     ]);
     $service = app(AuthService::class);
-    $request = Request::create('/login', 'POST', server: ['REMOTE_ADDR' => '127.0.0.1']);
+    $request = authServiceRequest();
 
     expect(fn () => $service->attemptLogin($request, 'auth5@test.local', 'OkPassword!1234'))
         ->toThrow(ValidationException::class);
@@ -85,7 +112,7 @@ test('AuthService::attemptLogin rejette account avec locked_until future', funct
 test('AuthService::attemptLogin trace last_login_ip + user_agent', function () {
     $user = authUser('auth6@test.local');
     $service = app(AuthService::class);
-    $request = Request::create('/login', 'POST', server: [
+    $request = authServiceRequest([
         'REMOTE_ADDR' => '203.0.113.42',
         'HTTP_USER_AGENT' => 'Test/1.0',
     ]);

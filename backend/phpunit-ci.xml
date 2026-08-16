@@ -40,32 +40,10 @@
         <testsuite name="Unit">
             <directory>tests/Unit</directory>
             <!-- quarantaine 2026-08-13 -->
-            <exclude>tests/Unit/Audiences/AudienceBuilderServiceTest.php</exclude>
-            <exclude>tests/Unit/Audit/AuditHashChainExtendedTest.php</exclude>
-            <exclude>tests/Unit/Audit/AuditHashChainTest.php</exclude>
-            <exclude>tests/Unit/Auth/AuthServiceTest.php</exclude>
-            <exclude>tests/Unit/Classification/AutoClassifierServiceTest.php</exclude>
-            <exclude>tests/Unit/Email/HunterEmailVerifierTest.php</exclude>
-            <exclude>tests/Unit/Email/SmtpProberTest.php</exclude>
-            <exclude>tests/Unit/Http/SsrfGuardTest.php</exclude>
-            <exclude>tests/Unit/Legal/MentionsLegalesScraperServiceTest.php</exclude>
-            <exclude>tests/Unit/Rotations/WeightedRoundRobinTest.php</exclude>
-            <exclude>tests/Unit/Scraping/GooglePlacesSmartSkipTest.php</exclude>
-            <exclude>tests/Unit/Tags/AutoTaggerServiceTest.php</exclude>
         </testsuite>
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
             <!-- quarantaine 2026-08-13 -->
-            <exclude>tests/Feature/Auth/LoginTest.php</exclude>
-            <exclude>tests/Feature/Auth/OnboardingTourTest.php</exclude>
-            <exclude>tests/Feature/CampaignsTest.php</exclude>
-            <exclude>tests/Feature/Commands/GenerateMediaRedactionEmailsTest.php</exclude>
-            <exclude>tests/Feature/Commands/JournalistsScrapeLlmTest.php</exclude>
-            <exclude>tests/Feature/Commands/RescrapeArchivesCommandTest.php</exclude>
-            <exclude>tests/Feature/Controllers/Phase2StubsExtendedTest.php</exclude>
-            <exclude>tests/Feature/Phase2StubsTest.php</exclude>
-            <exclude>tests/Feature/Rgpd/RgpdRequestsControllerTest.php</exclude>
-            <exclude>tests/Feature/Seeders/OwnerUserSeederTest.php</exclude>
         </testsuite>
     </testsuites>
     <source>
@@ -74,11 +52,11 @@
         </include>
     </source>
     <php>
-        <env name="APP_ENV" value="testing"/>
+        <env name="APP_ENV" value="testing" force="true"/>
         <env name="APP_KEY" value="base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="/>
         <env name="MOCK_MODE" value="true"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
-        <env name="CACHE_STORE" value="array"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
         <env name="DB_CONNECTION" value="pgsql"/>
         <env name="DB_DATABASE" value="axion_crm_test"/>
         <!-- Lot L0 : rôle applicatif non-propriétaire. Mot de passe de TEST
@@ -86,8 +64,8 @@
              du serveur et dans l'environnement de la CI, jamais ici. -->
         <env name="DB_APP_USERNAME" value="axion_app"/>
         <env name="DB_APP_PASSWORD" value="axion_app_test_only"/>
-        <env name="SESSION_DRIVER" value="array"/>
-        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="SESSION_DRIVER" value="array" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>

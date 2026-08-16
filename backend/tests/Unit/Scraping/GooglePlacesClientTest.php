@@ -6,12 +6,18 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
+    // Ces tests exercent le chemin RÉEL du client : ils doivent donc sortir
+    // explicitement du mode simulé. `MOCK_SCRAPERS` vaut `true` par défaut —
+    // c'est ce qui protège la production d'appels facturés déclenchés par
+    // mégarde, et un test ne doit pas hériter de cette protection en silence.
+    config()->set('services.scrapers.mock', false);
+
     Cache::flush();
 });
 
 it('returns null when API key is missing', function () {
     Config::set('services.google.places.api_key', null);
-    $client = new GooglePlacesClient();
+    $client = new GooglePlacesClient;
     expect($client->searchText('Boulangerie Dupont Paris'))->toBeNull();
 });
 
@@ -21,23 +27,23 @@ it('returns first place when API responds with results', function () {
         'places.googleapis.com/*' => Http::response([
             'places' => [
                 [
-                    'id'                          => 'ChIJfake123',
-                    'displayName'                 => ['text' => 'Boulangerie Dupont'],
-                    'formattedAddress'            => '12 rue de Paris, 75001 Paris',
-                    'location'                    => ['latitude' => 48.8566, 'longitude' => 2.3522],
-                    'businessStatus'              => 'OPERATIONAL',
-                    'types'                       => ['bakery', 'food'],
-                    'primaryType'                 => 'bakery',
-                    'internationalPhoneNumber'    => '+33 1 23 45 67 89',
-                    'websiteUri'                  => 'https://boulangerie-dupont.fr/',
-                    'rating'                      => 4.6,
-                    'userRatingCount'             => 142,
+                    'id' => 'ChIJfake123',
+                    'displayName' => ['text' => 'Boulangerie Dupont'],
+                    'formattedAddress' => '12 rue de Paris, 75001 Paris',
+                    'location' => ['latitude' => 48.8566, 'longitude' => 2.3522],
+                    'businessStatus' => 'OPERATIONAL',
+                    'types' => ['bakery', 'food'],
+                    'primaryType' => 'bakery',
+                    'internationalPhoneNumber' => '+33 1 23 45 67 89',
+                    'websiteUri' => 'https://boulangerie-dupont.fr/',
+                    'rating' => 4.6,
+                    'userRatingCount' => 142,
                 ],
             ],
         ], 200),
     ]);
 
-    $client = new GooglePlacesClient();
+    $client = new GooglePlacesClient;
     $place = $client->searchText('Boulangerie Dupont Paris');
 
     expect($place)->not->toBeNull()
@@ -52,8 +58,8 @@ it('caches result for 30 days to avoid quota waste', function () {
             'places' => [['id' => 'ChIJfake', 'displayName' => ['text' => 'Acme']]],
         ], 200),
     ]);
-    $client = new GooglePlacesClient();
-    $first  = $client->searchText('Acme Lyon');
+    $client = new GooglePlacesClient;
+    $first = $client->searchText('Acme Lyon');
     $second = $client->searchText('Acme Lyon');
     expect($first)->toBe($second);
     Http::assertSentCount(1);
@@ -64,7 +70,7 @@ it('returns null on HTTP error', function () {
     Http::fake([
         'places.googleapis.com/*' => Http::response([], 503),
     ]);
-    $client = new GooglePlacesClient();
+    $client = new GooglePlacesClient;
     expect($client->searchText('Acme'))->toBeNull();
 });
 
@@ -73,12 +79,12 @@ it('returns null on empty places array', function () {
     Http::fake([
         'places.googleapis.com/*' => Http::response(['places' => []], 200),
     ]);
-    $client = new GooglePlacesClient();
+    $client = new GooglePlacesClient;
     expect($client->searchText('Nothing Found Co Mars'))->toBeNull();
 });
 
 it('flatten returns null-safe payload when place is null', function () {
-    $client = new GooglePlacesClient();
+    $client = new GooglePlacesClient;
     $flat = $client->flatten(null);
     expect($flat)->toHaveKeys([
         'phone', 'website', 'address', 'lat', 'lon', 'rating',
@@ -91,7 +97,7 @@ it('flatten returns null-safe payload when place is null', function () {
 });
 
 it('flatten extracts phone with fallback international → national', function () {
-    $client = new GooglePlacesClient();
+    $client = new GooglePlacesClient;
     $flat1 = $client->flatten(['internationalPhoneNumber' => '+33 1 23 45 67 89']);
     expect($flat1['phone'])->toBe('+33 1 23 45 67 89');
 
@@ -100,7 +106,7 @@ it('flatten extracts phone with fallback international → national', function (
 });
 
 it('flatten extracts opening hours weekday descriptions', function () {
-    $client = new GooglePlacesClient();
+    $client = new GooglePlacesClient;
     $flat = $client->flatten([
         'regularOpeningHours' => [
             'weekdayDescriptions' => [

@@ -17,11 +17,10 @@ uses(TestCase::class, RefreshDatabase::class);
  * `journalists:scrape-ours` — extraction LLM (Mistral) qui remplace la regex.
  * Le LLM est mocké (JSON déterministe) ; le fetch HTTP des pages ours est faké.
  */
-
 function makeJournoWorkspace(): Workspace
 {
     return Workspace::create([
-        'id'   => (string) Str::uuid(),
+        'id' => (string) Str::uuid(),
         'slug' => 'jl-' . Str::random(6),
         'name' => 'WS Journalists',
     ]);
@@ -31,16 +30,19 @@ function makeJournoMedia(Workspace $ws): Media
 {
     return Media::create([
         'workspace_id' => $ws->id,
-        'name'         => 'Le Média Test',
-        'media_type'   => 'presse_quotidien',
-        'website'      => 'https://media-test.example',
+        'name' => 'Le Média Test',
+        'media_type' => 'presse_quotidien',
+        'website' => 'https://media-test.example',
     ]);
 }
 
 /** Bind un LLMClient qui renvoie toujours le même texte JSON. */
 function fakeLlmReturning(string $jsonText): void
 {
-    test()->app->instance(LLMClient::class, new class($jsonText) implements LLMClient {
+    // `test()->app` est INACCESSIBLE : `$app` est `protected` sur TestCase.
+    // `app()` résout le MÊME conteneur que `$this->app` pendant un test Laravel.
+    app()->instance(LLMClient::class, new class($jsonText) implements LLMClient
+    {
         public function __construct(private string $jsonText) {}
 
         public function complete(LLMRequestData $request): LLMResponseData

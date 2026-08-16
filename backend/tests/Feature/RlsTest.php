@@ -72,9 +72,23 @@ function rlsSiren(): string
     return str_pad((string) random_int(0, 999999999), 9, '0', STR_PAD_LEFT);
 }
 
+/**
+ * ⚠️ Ce nettoyage n'est pas une politesse : c'est la SEULE chose qui empêche ce
+ * fichier de polluer toute la suite. Les lignes semées le sont sur
+ * `pgsql_owner`, en AUTO-COMMIT — la transaction de `RefreshDatabase` ne les
+ * annule pas. Un seul chemin qui l'oublie laisse 2 entreprises et 2 workspaces
+ * commités pour le reste de l'exécution, et n'importe quel test ultérieur qui
+ * compte `companies` rougit. Comme Pest tire un ordre au hasard, ce n'est
+ * jamais le même fichier qui tombe : le symptôme ressemble à de la fragilité
+ * alors que la cause est ici. Constaté et corrigé le 2026-08-16.
+ *
+ * Les tags sont retirés AVANT les workspaces : `tags.workspace_id` les
+ * référence, la suppression du workspace échouerait sur la clé étrangère.
+ */
 function rlsCleanup(array $workspaceIds): void
 {
     rlsOwner()->table('companies')->whereIn('workspace_id', $workspaceIds)->delete();
+    rlsOwner()->table('tags')->whereIn('workspace_id', $workspaceIds)->delete();
     rlsOwner()->table('workspaces')->whereIn('id', $workspaceIds)->delete();
 }
 
@@ -329,44 +343,51 @@ test('drapeau db_app_role à OFF : la connexion par défaut reste le rôle histo
 // ─────────────────────────────────────────────────────────────────────────────
 
 test('sans contexte, un tag EXISTANT est invisible et son insertion est REFUSÉE (le symptôme du backfill)', function () {
-    [$wsA] = rlsSeedTwoWorkspaces();
+    [$wsA, $wsB] = rlsSeedTwoWorkspaces();
 
-    // Le tag existe, posé par le propriétaire (comme le fait le seeder).
-    rlsOwner()->table('tags')->insert([
-        'workspace_id' => $wsA,
-        'slug' => 'src:scraping-insee',
-        'name' => 'Collecte — INSEE',
-        'category' => 'intent',
-        'kind' => 'auto',
-        'rules' => '{}',
-        'is_locked' => true,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    try {
+        // Le tag existe, posé par le propriétaire (comme le fait le seeder).
+        rlsOwner()->table('tags')->insert([
+            'workspace_id' => $wsA,
+            'slug' => 'src:scraping-insee',
+            'name' => 'Collecte — INSEE',
+            'category' => 'intent',
+            'kind' => 'auto',
+            'rules' => '{}',
+            'is_locked' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
-    // 1re moitié : SANS contexte, la lecture ne le voit pas.
-    WorkspaceContext::clear(rlsApp());
-    $invisible = rlsApp()->table('tags')->where('workspace_id', $wsA)->where('slug', 'src:scraping-insee')->value('id');
-    expect($invisible)->toBeNull();
+        // 1re moitié : SANS contexte, la lecture ne le voit pas.
+        WorkspaceContext::clear(rlsApp());
+        $invisible = rlsApp()->table('tags')->where('workspace_id', $wsA)->where('slug', 'src:scraping-insee')->value('id');
+        expect($invisible)->toBeNull();
 
-    // 2e moitié : et l'insertion « de rattrapage » est refusée par la policy.
-    expect(fn () => rlsApp()->table('tags')->insertOrIgnore([
-        'workspace_id' => $wsA,
-        'slug' => 'src:scraping-insee',
-        'name' => 'Collecte — INSEE',
-        'category' => 'intent',
-        'kind' => 'auto',
-        'rules' => '{}',
-        'is_locked' => true,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]))->toThrow(QueryException::class);
+        // 2e moitié : et l'insertion « de rattrapage » est refusée par la policy.
+        expect(fn () => rlsApp()->table('tags')->insertOrIgnore([
+            'workspace_id' => $wsA,
+            'slug' => 'src:scraping-insee',
+            'name' => 'Collecte — INSEE',
+            'category' => 'intent',
+            'kind' => 'auto',
+            'rules' => '{}',
+            'is_locked' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]))->toThrow(QueryException::class);
 
-    // AVEC contexte : le tag redevient visible, donc aucune insertion n'est
-    // tentée — c'est exactement ce que le correctif rétablit.
-    rlsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $wsA]);
-    $visible = rlsApp()->table('tags')->where('workspace_id', $wsA)->where('slug', 'src:scraping-insee')->value('id');
-    expect($visible)->not->toBeNull();
+        // AVEC contexte : le tag redevient visible, donc aucune insertion n'est
+        // tentée — c'est exactement ce que le correctif rétablit.
+        rlsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $wsA]);
+        $visible = rlsApp()->table('tags')->where('workspace_id', $wsA)->where('slug', 'src:scraping-insee')->value('id');
+        expect($visible)->not->toBeNull();
+    } finally {
+        // Ce `finally` manquait : ce test était le SEUL des sept semeurs à ne
+        // pas nettoyer. Ses 2 entreprises restaient commitées pour toute la
+        // suite (cf. `rlsCleanup`).
+        rlsCleanup([$wsA, $wsB]);
+    }
 });
 
 test('la commande de backfill pose bien son contexte workspace (correctif du 2026-08-15)', function () {

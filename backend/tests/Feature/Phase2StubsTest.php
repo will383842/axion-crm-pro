@@ -41,7 +41,12 @@ test('Phase 2 analytics endpoint returns 501', function () {
     $this->getJson('/api/v1/analytics')->assertStatus(501);
 });
 
+// ⚠️ Ce cas interrogeait `/api/v1/campaigns`, qui n'est plus un bouchon depuis
+// le Sprint 19.7 (endpoint complet Scraping Campaigns, cf. CampaignsTest.php) :
+// il ne renvoie donc plus de marqueur `sprint`. On vérifie le marqueur sur un
+// endpoint réellement encore bouchonné.
 test('501 response includes sprint Phase 2 marker', function () {
-    $r = $this->getJson('/api/v1/campaigns');
+    $r = $this->getJson('/api/v1/cold-email');
+    $r->assertStatus(501);
     expect($r->json('sprint'))->toBe('Phase 2');
 });

@@ -24,7 +24,12 @@ class RealSmtpProber implements SmtpProber
         'help', 'billing', 'service', 'team', 'staff', 'office', 'hello', 'press',
     ];
 
-    private const DISPOSABLE_DOMAINS = [
+    /**
+     * Publique : `MockSmtpProber` s'appuie DESSUS pour appliquer exactement la
+     * même règle. Un doublon de liste dériverait, et le mock finirait par
+     * qualifier « valid » une adresse que la prod rejette.
+     */
+    public const DISPOSABLE_DOMAINS = [
         'mailinator.com', 'trashmail.com', 'guerrillamail.com', '10minutemail.com',
         'tempmail.com', 'yopmail.com', 'temp-mail.org', 'throwaway.email', 'fakeinbox.com',
     ];
@@ -39,7 +44,7 @@ class RealSmtpProber implements SmtpProber
         }
         [$local, $domain] = explode('@', $email, 2);
 
-        $isRole       = in_array($local, self::ROLE_LOCAL_PARTS, true);
+        $isRole = in_array($local, self::ROLE_LOCAL_PARTS, true);
         $isDisposable = in_array($domain, self::DISPOSABLE_DOMAINS, true);
         if ($isDisposable) {
             return new SmtpProbeResult($email, 'disposable', 0, isDisposable: true);
@@ -62,8 +67,12 @@ class RealSmtpProber implements SmtpProber
 
         // N5 Scoring composite
         $score = 95;
-        if ($isCatchAll) $score = 60;
-        if ($isRole)     $score = min($score, 50);
+        if ($isCatchAll) {
+            $score = 60;
+        }
+        if ($isRole) {
+            $score = min($score, 50);
+        }
 
         return new SmtpProbeResult(
             email: $email,
@@ -85,6 +94,7 @@ class RealSmtpProber implements SmtpProber
                 return null;
             }
             array_multisort($weights, SORT_ASC, $mx);
+
             return $mx[0] ?? null;
         });
     }
@@ -101,14 +111,21 @@ class RealSmtpProber implements SmtpProber
         stream_set_timeout($fp, $timeoutS);
 
         try {
-            if (! $this->expect($fp, '220')) return false;
-            fwrite($fp, "EHLO " . parse_url((string) env('APP_URL', 'localhost'), PHP_URL_HOST) . "\r\n");
-            if (! $this->expect($fp, '250')) return false;
+            if (! $this->expect($fp, '220')) {
+                return false;
+            }
+            fwrite($fp, 'EHLO ' . parse_url((string) env('APP_URL', 'localhost'), PHP_URL_HOST) . "\r\n");
+            if (! $this->expect($fp, '250')) {
+                return false;
+            }
             fwrite($fp, "MAIL FROM:<{$fromEmail}>\r\n");
-            if (! $this->expect($fp, '250')) return false;
+            if (! $this->expect($fp, '250')) {
+                return false;
+            }
             fwrite($fp, "RCPT TO:<{$email}>\r\n");
             $accept = $this->expect($fp, '250');
             fwrite($fp, "QUIT\r\n");
+
             return $accept;
         } finally {
             fclose($fp);
@@ -119,6 +136,7 @@ class RealSmtpProber implements SmtpProber
     {
         return Cache::remember("catchall:{$domain}", 604800, function () use ($domain, $mxHost) {
             $fakeEmail = 'axion-probe-' . bin2hex(random_bytes(6)) . '@' . $domain;
+
             return $this->smtpRcptCheck($mxHost, $fakeEmail);
         });
     }
@@ -128,10 +146,15 @@ class RealSmtpProber implements SmtpProber
         $resp = '';
         while (! feof($fp)) {
             $line = fgets($fp, 1024);
-            if ($line === false) return false;
+            if ($line === false) {
+                return false;
+            }
             $resp .= $line;
-            if (preg_match('/^\d{3} /', $line)) break;
+            if (preg_match('/^\d{3} /', $line)) {
+                break;
+            }
         }
+
         return str_starts_with(trim($resp), $code);
     }
 }

@@ -16,6 +16,7 @@ function makePhase2User(): User
         'slug' => 'p2-' . Str::random(6),
         'name' => 'P2 WS',
     ]);
+
     return User::create([
         'id' => (string) Str::uuid(),
         'email' => 'p2-' . Str::random(4) . '@test.local',
@@ -26,6 +27,12 @@ function makePhase2User(): User
     ]);
 }
 
+// ⚠️ Sprint 19.7 : `/api/v1/campaigns` N'EST PLUS un bouchon Phase 2. La route
+// est désormais servie par ScrapingCampaignsController (cf. routes/api.php,
+// « Note : /campaigns retiré — implémenté en Sprint 19.7 »). Les deux cas qui
+// attendaient un 501 sur cet endpoint testaient donc un comportement supprimé
+// volontairement : ils vérifient à présent le comportement RÉEL.
+
 test('Phase2 stubs sans auth retournent 401', function () {
     $this->getJson('/api/v1/campaigns')->assertUnauthorized();
     $this->getJson('/api/v1/cold-email')->assertUnauthorized();
@@ -34,9 +41,15 @@ test('Phase2 stubs sans auth retournent 401', function () {
     $this->getJson('/api/v1/analytics')->assertUnauthorized();
 });
 
-test('Phase2 campaigns avec auth → 501', function () {
+test('campaigns n\'est plus un bouchon Phase 2 : 200 + liste paginée', function () {
     $u = makePhase2User();
-    $this->actingAs($u)->getJson('/api/v1/campaigns')->assertStatus(501);
+
+    $this->actingAs($u)->getJson('/api/v1/campaigns')
+        ->assertOk()
+        ->assertJsonStructure(['data', 'meta' => ['total', 'per_page', 'current_page', 'last_page']])
+        // Aucune trace du contrat de bouchon ne doit subsister.
+        ->assertJsonMissingPath('sprint')
+        ->assertJsonMissingPath('error');
 });
 
 test('Phase2 cold-email avec auth → 501', function () {
@@ -59,8 +72,14 @@ test('Phase2 analytics avec auth → 501', function () {
     $this->actingAs($u)->getJson('/api/v1/analytics')->assertStatus(501);
 });
 
+// Le contrat de forme du bouchon (error/message/sprint) est inchangé : on le
+// vérifie désormais sur un endpoint TOUJOURS bouchonné (`/cold-email`) puisque
+// `/campaigns` a été implémenté.
 test('Phase2 response shape inclus sprint metadata', function () {
     $u = makePhase2User();
-    $resp = $this->actingAs($u)->getJson('/api/v1/campaigns');
-    $resp->assertStatus(501)->assertJsonStructure(['error', 'message', 'sprint']);
+    $resp = $this->actingAs($u)->getJson('/api/v1/cold-email');
+    $resp->assertStatus(501)
+        ->assertJsonStructure(['error', 'message', 'sprint'])
+        ->assertJsonPath('error', 'not_implemented')
+        ->assertJsonPath('sprint', 'Phase 2');
 });

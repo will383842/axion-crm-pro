@@ -9,10 +9,26 @@ uses(RefreshDatabase::class);
 
 function seedRotation(string $workspaceId, string $dimension, int $weight = 1, array $extra = []): int
 {
+    // `rotations.workspace_id` porte une FK vers `workspaces(id)` : sans ligne
+    // workspace, l'insert est rejeté par `rotations_workspace_id_fkey`.
+    DB::table('workspaces')->insertOrIgnore([
+        'id' => $workspaceId,
+        'slug' => 'wrr-' . substr($workspaceId, 0, 8),
+        'name' => 'WRR test workspace',
+        'settings' => '{}',
+        'cost_cap_eur' => 100,
+        'is_active' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
     return (int) DB::table('rotations')->insertGetId(array_merge([
         'workspace_id' => $workspaceId,
         'dimension' => $dimension,
-        'identifier' => 'item-' . Str::random(6),
+        // La colonne réelle est `slug` (migration 2026_05_16_000004, contrainte
+        // UNIQUE (workspace_id, dimension, slug)). `identifier` n'a jamais
+        // existé dans ce schéma : c'était la fixture qui inventait la colonne.
+        'slug' => 'item-' . Str::random(6),
         'enabled' => true,
         'weight' => $weight,
         'cooldown_seconds' => 0,

@@ -21,6 +21,8 @@ use Illuminate\Support\Str;
  *  - Retire les tags kind=auto sur la company qui ne matchent plus les attributs actuels
  *  - Ajoute les tags qui matchent et qui ne sont pas déjà attachés
  *  - Ne touche jamais aux tags kind=manual (gestion utilisateur)
+ *  - Ne retire jamais un tag de provenance `src:` ni un tag VERROUILLÉ
+ *    (`tags.is_locked`) : ce sont des faits constatés, pas des dérivés
  */
 class AutoTaggerService
 {
@@ -79,7 +81,7 @@ class AutoTaggerService
         $currentlyAttached = DB::table('company_tag as ct')
             ->join('tags as t', 't.id', '=', 'ct.tag_id')
             ->where('ct.company_id', $company->id)
-            ->select('ct.tag_id', 't.slug', 't.kind', 'ct.assigned_by')
+            ->select('ct.tag_id', 't.slug', 't.kind', 't.is_locked', 'ct.assigned_by')
             ->get();
 
         $added = [];
@@ -95,6 +97,19 @@ class AutoTaggerService
             // retirer effacerait silencieusement l'origine de la fiche à la
             // première passe d'enrichissement. On ne touche pas au namespace src:.
             if (str_starts_with((string) $row->slug, 'src:')) {
+                continue;
+            }
+            // Même raisonnement, un cran plus large : un tag VERROUILLÉ
+            // (`tags.is_locked`, référentiel gouverné du GovernedTagsSeeder)
+            // décrit un fait constaté que cette synchro ne sait pas re-dériver
+            // des attributs de la fiche — `svc:audit` (l'entreprise a demandé
+            // un audit, posé par SiteSyncIngestService), `cand-offre:*`… Ils ne
+            // sont donc JAMAIS « désirés » ici, et la boucle de retrait les
+            // emportait à la première passe d'enrichissement, alors que l'API
+            // refuse déjà de les retirer (CompanyTagsBulkController → 422
+            // « tag_verrouille »). Le retrait d'un tag gouverné passe par une
+            // action explicite, jamais par un recalcul.
+            if ((bool) $row->is_locked) {
                 continue;
             }
             if (! in_array($row->slug, $desiredSlugs, true)) {

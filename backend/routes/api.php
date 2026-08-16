@@ -65,6 +65,21 @@ Route::prefix('v1')->group(function () {
     Route::post('/auth/password/forgot', [PasswordResetController::class, 'forgot'])->middleware('throttle:magic-link');
     Route::post('/auth/password/reset', [PasswordResetController::class, 'reset'])->middleware('throttle:magic-link');
 
+    // ── PORTABILITÉ RGPD (article 20) ────────────────────────────────────
+    // Lien de TÉLÉCHARGEMENT remis à la PERSONNE CONCERNÉE, qui n'a par
+    // définition aucun compte dans le CRM. Cette route vivait dans le groupe
+    // authentifié : la portabilité était donc inutilisable par son unique
+    // destinataire, et le jeton ne servait à rien puisqu'il fallait déjà une
+    // session pour l'employer.
+    //
+    // Le modèle de sécurité est la POSSESSION du jeton, et il tient : 48
+    // caractères aléatoires (~285 bits), stocké HACHÉ en base, expiration à
+    // 7 jours, et un jeton inconnu rend 404 — jamais 401, qui révélerait
+    // l'existence de la ressource. Throttle posé : un secret ne se devine pas,
+    // mais on ne laisse pas non plus marteler la porte.
+    Route::get('/rgpd/export/{token}', [RgpdRequestsController::class, 'export'])
+        ->middleware('throttle:magic-link');
+
     // --- Routes protégées -------------------------------------------------
     Route::middleware(['auth:sanctum', 'workspace', 'first-login'])->group(function () {
 
@@ -199,7 +214,6 @@ Route::prefix('v1')->group(function () {
         Route::get('/rgpd/requests', [RgpdRequestsController::class, 'index']);
         Route::post('/rgpd/requests', [RgpdRequestsController::class, 'store']);
         Route::post('/rgpd/requests/{req}/process', [RgpdRequestsController::class, 'process']);
-        Route::get('/rgpd/export/{token}', [RgpdRequestsController::class, 'export']);
         Route::get('/ai-act/register', [AiActRegisterController::class, 'index']);
         Route::post('/ai-act/register', [AiActRegisterController::class, 'store']);
         Route::get('/audit-logs', [AuditLogsController::class, 'index']);

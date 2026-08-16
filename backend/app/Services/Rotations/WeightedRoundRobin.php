@@ -3,7 +3,6 @@
 namespace App\Services\Rotations;
 
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Cache;
 
 /**
  * Weighted Round-Robin sur n'importe quelle dimension (`rotations.dimension`).
@@ -25,8 +24,16 @@ class WeightedRoundRobin
             ->where('dimension', $dimension)
             ->where('enabled', true)
             ->where(function ($q) {
-                $q->whereNull('last_used_at')
-                  ->orWhereRaw("last_used_at + (cooldown_seconds * INTERVAL '1 second') < now()");
+                // 1) cooldown_seconds = 0 signifie « pas de cooldown » : l'item
+                //    doit rester immédiatement réutilisable.
+                // 2) clock_timestamp() et NON now() : now() est figé à l'ouverture
+                //    de la transaction. Un worker qui pioche plusieurs items dans
+                //    une même transaction voyait donc `last_used_at` (heure réelle,
+                //    postérieure) toujours > now() — tout item déjà servi devenait
+                //    définitivement inéligible, y compris sans cooldown.
+                $q->where('cooldown_seconds', '<=', 0)
+                    ->orWhereNull('last_used_at')
+                    ->orWhereRaw("last_used_at + (cooldown_seconds * INTERVAL '1 second') <= clock_timestamp()");
             })
             ->orderByRaw('COALESCE((metadata->>\'count\')::int, 0)::float / GREATEST(weight, 1)')
             ->limit(1)
@@ -43,8 +50,8 @@ class WeightedRoundRobin
             ->where('id', $items->id)
             ->update([
                 'last_used_at' => now(),
-                'metadata'     => json_encode($current),
-                'updated_at'   => now(),
+                'metadata' => json_encode($current),
+                'updated_at' => now(),
             ]);
 
         return (array) $items;

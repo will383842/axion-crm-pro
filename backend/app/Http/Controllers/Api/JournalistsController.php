@@ -31,8 +31,8 @@ class JournalistsController extends ApiController
 
         try {
             $page = $this->buildFilteredQuery()
-                ->allowedIncludes(['media'])
-                ->allowedSorts(['last_name', 'created_at'])
+                ->allowedIncludes(...['media'])
+                ->allowedSorts(...['last_name', 'created_at'])
                 ->defaultSort('last_name')
                 ->paginate($perPage);
 
@@ -60,7 +60,7 @@ class JournalistsController extends ApiController
     private function buildFilteredQuery(): QueryBuilder
     {
         return QueryBuilder::for(Journalist::query()->whereNull('deleted_at'))
-            ->allowedFilters([
+            ->allowedFilters(...[
                 AllowedFilter::exact('media_id'),
                 AllowedFilter::exact('beat'),
                 AllowedFilter::exact('opt_out'),

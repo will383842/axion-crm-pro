@@ -50,8 +50,8 @@ class ContactsController extends ApiController
                     ->whereNull('deleted_at')
                     ->with('company:id,denomination'),
             )
-                ->allowedFilters(ContactQueryFilters::allowed())
-                ->allowedSorts(['last_name', 'email_score', 'created_at'])
+                ->allowedFilters(...ContactQueryFilters::allowed())
+                ->allowedSorts(...['last_name', 'email_score', 'created_at'])
                 // Tri par défaut sur `id` DÉCROISSANT, adossé à l'index
                 // `(workspace_id, id DESC)` : un tri sur `last_name` aurait
                 // imposé un tri sur disque de 1,3 M de lignes pour en afficher

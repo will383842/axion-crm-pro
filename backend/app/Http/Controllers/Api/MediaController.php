@@ -31,22 +31,23 @@ class MediaController extends ApiController
 
         try {
             $page = $this->buildFilteredQuery()
-                ->allowedSorts(['name', 'enriched_at', 'created_at', 'media_type'])
+                ->allowedSorts(...['name', 'enriched_at', 'created_at', 'media_type'])
                 ->defaultSort('name')
                 ->paginate($perPage);
 
             return $this->ok([
                 'data' => $page->items(),
                 'meta' => [
-                    'total'        => $page->total(),
-                    'per_page'     => $page->perPage(),
+                    'total' => $page->total(),
+                    'per_page' => $page->perPage(),
                     'current_page' => $page->currentPage(),
-                    'last_page'    => $page->lastPage(),
+                    'last_page' => $page->lastPage(),
                 ],
             ]);
         } catch (\Throwable $e) {
             Log::error('media.index failed', ['exception' => $e->getMessage()]);
             report($e);
+
             return $this->ok([
                 'data' => [],
                 'meta' => ['total' => 0, 'per_page' => $perPage, 'current_page' => 1, 'last_page' => 1],
@@ -61,7 +62,7 @@ class MediaController extends ApiController
     private function buildFilteredQuery(): QueryBuilder
     {
         return QueryBuilder::for(Media::query()->whereNull('deleted_at'))
-            ->allowedFilters([
+            ->allowedFilters(...[
                 AllowedFilter::exact('media_type'),
                 AllowedFilter::exact('media_family'),
                 AllowedFilter::exact('email_confidence'),

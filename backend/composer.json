@@ -33,7 +33,7 @@
         "open-telemetry/opentelemetry": "^1.0",
         "open-telemetry/exporter-otlp": "^1.0",
         "open-telemetry/sdk": "^1.0",
-        "darkaonline/l5-swagger": "^9.0",
+        "darkaonline/l5-swagger": "^11.1",
         "sentry/sentry-laravel": "^4.10"
     },
     "require-dev": {

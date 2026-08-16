@@ -47,6 +47,52 @@ $pgsqlBase = [
     'prefix_indexes' => true,
     'search_path' => env('DB_SCHEMA', 'public'),
     'sslmode' => env('DB_SSLMODE', 'prefer'),
+
+    // 🔴 LE DÉCALAGE DE 2 HEURES — corrigé le 2026-08-16.
+    //
+    // Trois réglages se contredisaient :
+    //   · `app.timezone` = Europe/Paris → Carbon vit à Paris ;
+    //   · aucune `timezone` ici → la session Postgres restait sur le défaut
+    //     serveur, `Etc/UTC` ;
+    //   · `PostgresGrammar::getDateFormat()` = `Y-m-d H:i:s`, donc SANS
+    //     décalage.
+    //
+    // Une écriture applicative partait en `"2026-08-16 07:22:56"` nu, que
+    // Postgres lisait comme 07:22:56 **UTC**, soit 09:22:56 à Paris :
+    // l'instant stocké était postérieur de 2 h à l'instant réel (1 h en heure
+    // d'hiver — l'erreur vaut toujours le décalage de Paris à cette date).
+    // Relu, l'horodatage revenait +120 min. Mesuré, pas déduit.
+    //
+    // Conséquence la plus coûteuse : `ScrapingCampaign::elapsed_minutes`
+    // compare un `started_at` relu (2 h dans le futur) à `now()` (réel), donc
+    // `durée_réelle − 120`. Une campagne plafonnée à 3 h en tournait 5.
+    // Le défaut était déjà décrit dans `tests/Feature/CampaignsTest.php`, avec
+    // la consigne de ne pas ajouter de `->refresh()` — les tests d'auto-pause
+    // ne passaient que parce qu'ils ne traversaient jamais la base.
+    //
+    // `PostgresConnector::configureTimezone()` émet `SET TIME ZONE` à la
+    // connexion : Postgres lit désormais l'heure nue comme une heure de Paris,
+    // c'est-à-dire ce que l'application voulait dire. Ce que Postgres écrit
+    // lui-même (`DEFAULT now()`) était déjà juste et le reste.
+    //
+    // ⚠️ INERTE PAR DÉFAUT, ET C'EST VOULU.
+    //
+    // Non renseignée, la clé vaut `null` : `configureTimezone()` teste
+    // `isset()`, donc n'émet rien et le comportement actuel est INCHANGÉ.
+    // La bascule se fait en posant `DB_TIMEZONE=Europe/Paris` côté Coolify.
+    //
+    // Pourquoi une variable plutôt qu'un défaut en dur : l'ordre des opérations
+    // n'est pas négociable. Les lignes déjà stockées sont décalées ; il faut
+    // les reprendre (`php artisan horodatages:corriger`) AVANT que
+    // l'application se mette à écrire juste. Sinon les nouvelles lignes justes
+    // et les anciennes fausses deviennent indistinguables — Laravel écrit
+    // toujours à la seconde pleine, dans les deux cas — et le discriminant sur
+    // lequel repose la reprise disparaît. Une variable rend cet ordre au
+    // pilote ; un défaut en dur le lui volerait au premier déploiement.
+    //
+    // Les tests, eux, tournent AVEC (cf. `phpunit.xml`) : c'est ce qui rend
+    // `HorodatagesFuseauTest` capable de rougir.
+    'timezone' => env('DB_TIMEZONE'),
 ];
 
 return [

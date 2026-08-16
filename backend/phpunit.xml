@@ -31,6 +31,11 @@
         <env name="CACHE_STORE" value="array"/>
         <env name="DB_CONNECTION" value="pgsql"/>
         <env name="DB_DATABASE" value="axion_crm_test"/>
+        <!-- Aligne la session Postgres sur `app.timezone`. En production la
+             variable est posée par Coolify APRÈS la reprise des données ; ici
+             elle est toujours active, sans quoi `HorodatagesFuseauTest` ne
+             pourrait pas garder le correctif. -->
+        <env name="DB_TIMEZONE" value="Europe/Paris"/>
         <!-- Lot L0 : rôle applicatif non-propriétaire. Mot de passe de TEST
              uniquement (base jetable) — le secret de prod vit dans le .env
              du serveur et dans l'environnement de la CI, jamais ici. -->

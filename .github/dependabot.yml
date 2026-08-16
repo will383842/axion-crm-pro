@@ -1,12 +1,47 @@
+# Dependabot — configuration.
+#
+# ── CE QUI A ÉTÉ APPRIS LE 2026-08-16 ────────────────────────────────────────
+#
+# Treize PR datant du 17-18 mai sont restées ouvertes trois mois. Toutes
+# rougissaient — mais pour des raisons PÉRIMÉES (Gitleaks sans jeton, axe-core
+# visant un hôte inexistant, typages workers depuis corrigés). Régénérées contre
+# `main`, neuf sur dix sont passées vertes du premier coup.
+#
+# 🔴 Le vrai coût n'était pas ces PR : `open-pull-requests-limit` était SATURÉ
+# (5/5 frontend, 3/3 workers). Dependabot avait donc cessé de proposer quoi que
+# ce soit — **y compris les correctifs de sécurité**. Une file bouchée par des
+# rouges périmés ferme le canal de sécurité en silence.
+#
+# 🔑 D'où les deux réglages ci-dessous.
+#
+# 1. `groups` limité aux versions MINEURES et CORRECTIVES.
+#    Le groupe `laravel-ecosystem` bundlait `laravel/*`, `spatie/*` et
+#    `pragmarx/*`. Résultat, la PR #95 embarquait d'un bloc :
+#      · `spatie/laravel-query-builder` 6 → 7, dont les méthodes
+#        `allowedFilters()` / `allowedSorts()` / `allowedIncludes()` deviennent
+#        VARIADIQUES — une douzaine de contrôleurs à réécrire ;
+#      · `spatie/laravel-permission` 6 → 8, deux majeures sur le paquet qui
+#        gouverne TOUTES les habilitations.
+#    Le lot entier était donc bloqué par le plus difficile, et le plus risqué
+#    serait passé en silence avec les autres. Une majeure doit arriver SEULE,
+#    avec son propre signal CI et son propre revert.
+#
+# 2. Plafonds relevés, pour qu'un blocage cesse de fermer le canal.
+#
+# ⚠️ Un `open-pull-requests-limit` saturé est SILENCIEUX : rien ne le signale.
+# Si la file se remplit à nouveau, la traiter est prioritaire — pas parce que
+# les montées pressent, mais parce que les correctifs de sécurité, eux, ne
+# seront plus proposés.
 version: 2
 updates:
   - package-ecosystem: composer
     directory: /backend
     schedule: { interval: weekly, day: monday, time: '06:00' }
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 8
     groups:
       laravel-ecosystem:
         patterns: ['laravel/*', 'spatie/*', 'pragmarx/*']
+        update-types: ['minor', 'patch']
       security-patches:
         applies-to: security-updates
         patterns: ['*']
@@ -14,17 +49,19 @@ updates:
   - package-ecosystem: npm
     directory: /frontend
     schedule: { interval: weekly, day: monday, time: '06:00' }
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 8
     groups:
       tanstack:
         patterns: ['@tanstack/*']
+        update-types: ['minor', 'patch']
       react:
         patterns: ['react', 'react-dom', '@types/react*']
+        update-types: ['minor', 'patch']
 
   - package-ecosystem: npm
     directory: /workers
     schedule: { interval: weekly, day: monday, time: '06:00' }
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 5
 
   - package-ecosystem: github-actions
     directory: /
@@ -33,3 +70,11 @@ updates:
   - package-ecosystem: docker
     directory: /
     schedule: { interval: weekly, day: monday, time: '06:00' }
+    # ⚠️ Postgres est ici, et une montée de version MAJEURE de Postgres n'est
+    # pas une montée de dépendance : `postgis/postgis:16-3.5` → `17-3.5` ne
+    # migre pas le répertoire de données, Postgres 17 REFUSE de démarrer
+    # dessus. La PR #14 a été fermée pour cette raison. Toute majeure Postgres
+    # est un chantier `pg_upgrade`, à traiter en dehors de Dependabot.
+    ignore:
+      - dependency-name: 'postgis/postgis'
+        update-types: ['version-update:semver-major']

@@ -79,7 +79,14 @@ $pgsqlBase = [
     //
     // Non renseignée, la clé vaut `null` : `configureTimezone()` teste
     // `isset()`, donc n'émet rien et le comportement actuel est INCHANGÉ.
-    // La bascule se fait en posant `DB_TIMEZONE=Europe/Paris` côté Coolify.
+    // La bascule se fait en ajoutant `DB_TIMEZONE=Europe/Paris` à
+    // `/opt/axion-crm-pro/.env` sur le serveur HETZNER, puis
+    // `docker compose up -d --force-recreate --no-deps api horizon scheduler`.
+    // ⚠️ `docker compose restart` NE RELIT PAS `env_file`, et le déploiement
+    // automatique ne recrée que `api` + `app` : sans ce `--force-recreate`,
+    // horizon et scheduler continueraient d'écrire dans l'ancienne convention.
+    // (Ce dépôt n'est pas déployé par Coolify — c'est le site Axion-IA qui
+    // l'est. Une première rédaction disait « côté Coolify » : c'était faux.)
     //
     // Pourquoi une variable plutôt qu'un défaut en dur : l'ordre des opérations
     // n'est pas négociable. Les lignes déjà stockées sont décalées ; il faut

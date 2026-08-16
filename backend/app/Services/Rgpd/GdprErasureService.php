@@ -43,24 +43,47 @@ class GdprErasureService
                     }
                 })
                 ->update([
-                    'email'      => null,
-                    'phone'      => null,
-                    'opt_out'    => true,
+                    'email' => null,
+                    'phone' => null,
+                    'opt_out' => true,
                     'deleted_at' => now(),
                 ]);
 
             // Médias : neutralise un email de contact rédaction correspondant au sujet.
             $deleted['media_email'] = DB::table('media')->where('email', $email)->update(['email' => null]);
 
+            // 🔴 PRATICIENS DE SANTÉ — DONNÉE DE L'ARTICLE 9 (catégorie particulière).
+            //
+            // Cette table était visée par AUCUN des deux services d'effacement,
+            // AUCUNE purge, AUCUNE politique de rétention. Constaté le
+            // 2026-08-16. Sa propre migration l'annonce pourtant :
+            // « ⚠️ Donnée nominative de SANTÉ (RGPD art. 9) ».
+            //
+            // SUPPRESSION FERME, et non anonymisation comme pour `journalists` :
+            // la ligne porte `nom`, `prenom`, `specialite`, `address`,
+            // `postcode`, `city` et `rpps`. Nullifier l'email et le téléphone
+            // laisserait un praticien parfaitement identifiable — nom + spécialité
+            // + adresse, c'est-à-dire précisément la donnée de santé.
+            // Le modèle utilise `SoftDeletes` ; on passe donc par le
+            // constructeur de requêtes, qui supprime réellement la ligne.
+            $deleted['health_practitioners'] = DB::table('health_practitioners')
+                ->where(function ($q) use ($email, $phone) {
+                    $q->where('email', $email);
+                    if ($phone !== null && $phone !== '') {
+                        $q->orWhere('phone', $phone);
+                    }
+                })
+                ->delete();
+
             // Audit log — la suppression elle-même
             $this->audit->record([
                 'workspace_id' => null,
-                'user_id'      => null,
-                'method'       => 'GDPR_ERASURE',
-                'path'         => '/internal/gdpr/erase',
-                'status'       => 200,
-                'ip'           => null,
-                'user_agent'   => null,
+                'user_id' => null,
+                'method' => 'GDPR_ERASURE',
+                'path' => '/internal/gdpr/erase',
+                'status' => 200,
+                'ip' => null,
+                'user_agent' => null,
                 'payload_hash' => hash('sha256', $email . '|' . ($phone ?? '')),
             ]);
 

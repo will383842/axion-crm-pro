@@ -288,6 +288,34 @@ jobs:
       - name: Install (BLOQUANT — lockfile figé)
         working-directory: workers
         run: pnpm install --frozen-lockfile
+
+      # ⚠️ 2026-08-16 — garde contre une dérive SILENCIEUSE.
+      # `Dockerfile.worker` était resté sur l'image Playwright v1.49.0 alors
+      # que `workers/package.json` demandait ^1.62.1 : 13 révisions d'écart.
+      # Playwright refuse de démarrer si les binaires de navigateur de l'image
+      # ne correspondent pas à la bibliothèque. Rien ne l'avait vu, parce que
+      # rien ne comparait les deux — et Dependabot remonte `playwright`
+      # régulièrement, donc l'écart se recrée tout seul à chaque bump.
+      - name: Le tag de l'image Playwright suit-il la bibliothèque ?
+        run: |
+          set -euo pipefail
+          # Version RÉELLEMENT installée (le lock fait foi, pas l'intervalle
+          # `^1.62.1` de package.json qui ne dit pas ce qui est résolu).
+          lib="$(node -p "require('./workers/node_modules/playwright/package.json').version")"
+          tag="$(sed -n 's/^ARG PLAYWRIGHT_VERSION=v\([0-9.]*\)-.*$/\1/p' Dockerfile.worker)"
+          echo "bibliothèque : $lib"
+          echo "image        : $tag"
+          if [ -z "$tag" ]; then
+            echo "::error::PLAYWRIGHT_VERSION introuvable dans Dockerfile.worker (format attendu : ARG PLAYWRIGHT_VERSION=vX.Y.Z-suffixe)"
+            exit 1
+          fi
+          if [ "$lib" != "$tag" ]; then
+            echo "::error::Écart Playwright — la bibliothèque est en $lib, l'image en $tag."
+            echo "::error::Corriger ARG PLAYWRIGHT_VERSION dans Dockerfile.worker (v${lib}-noble) DANS LE MÊME COMMIT."
+            exit 1
+          fi
+          echo "Versions alignées."
+
       - name: Typecheck
         working-directory: workers
         run: pnpm typecheck

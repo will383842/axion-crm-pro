@@ -1,7 +1,19 @@
 # Axion CRM Pro — Dockerfile Worker Node 22 + Playwright multi-stage
 # Chrome stable préinstallé via image officielle Playwright
 
-ARG PLAYWRIGHT_VERSION=v1.49.0-noble
+# ⚠️ CETTE VERSION DOIT SUIVRE `playwright` DANS `workers/package.json`.
+# Playwright refuse de démarrer si les binaires de navigateur de l'image ne
+# correspondent pas à la bibliothèque qui les pilote — l'image embarque les
+# navigateurs dans un chemin versionné, et la bibliothèque cherche le sien.
+#
+# Constaté le 2026-08-16 : l'image était restée en v1.49.0 alors que
+# `package.json` demandait `^1.62.1` (13 révisions d'écart). Le défaut était
+# DORMANT — aucun service `worker` n'est déclaré dans `docker-compose.yml`
+# depuis le retrait du 2026-08-14 — mais il aurait cassé au premier
+# `chromium.launch()` le jour d'une réactivation.
+#
+# En cas de montée de `playwright` : monter ce tag dans le MÊME commit.
+ARG PLAYWRIGHT_VERSION=v1.62.1-noble
 
 # -----------------------------------------------------------------------------
 # 1) deps : install pnpm + node_modules

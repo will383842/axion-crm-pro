@@ -50,7 +50,7 @@ jobs:
            '971','972','973','974','976']
     steps:
       - name: Setup SSH agent
-        uses: webfactory/ssh-agent@v0.9.0
+        uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
 
@@ -82,7 +82,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Setup SSH agent
-        uses: webfactory/ssh-agent@v0.9.0
+        uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
 

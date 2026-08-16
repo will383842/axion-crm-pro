@@ -87,7 +87,17 @@ class CorrigerHorodatages extends Command
             return self::FAILURE;
         }
 
-        $cibles = $this->colonnesACorriger((array) $this->option('table'));
+        // `option('table')` est typé `array<int, string|null>` : on normalise
+        // avant de le passer, plutôt que d'affaiblir la signature en face.
+        $filtre = array_values(array_filter(
+            array_map(
+                static fn ($t): string => (string) $t,
+                (array) $this->option('table'),
+            ),
+            static fn (string $t): bool => $t !== '',
+        ));
+
+        $cibles = $this->colonnesACorriger($filtre);
 
         if ($cibles === []) {
             $this->warn('Aucune colonne à traiter.');

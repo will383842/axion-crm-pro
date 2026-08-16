@@ -45,6 +45,35 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # ⚠️ 2026-08-16 — garde née d'un incident grave et parfaitement silencieux.
+  # `infra/scripts/backup-postgres.sh` était committé en `100644` (sans bit
+  # d'exécution). La tâche cron de sauvegarde quotidienne de la PRODUCTION
+  # échouait donc sur « Permission denied » — 91 exécutions, 91 échecs, 100 %,
+  # depuis le 2026-05-17. Le dossier de sauvegardes était VIDE. Personne ne
+  # l'a vu, parce que cron écrit dans un journal que personne ne lit.
+  #
+  # Un `chmod +x` sur le serveur n'aurait pas suffi : le mode vient de git, il
+  # serait revenu à 644 au premier déploiement suivant. C'est le mode DANS GIT
+  # qui compte, et c'est donc lui qu'on vérifie ici.
+  scripts-executables:
+    name: Les scripts d'infra sont-ils exécutables ?
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -euo pipefail
+          # `git ls-files -s` donne le mode ENREGISTRÉ, pas celui du disque —
+          # c'est la seule mesure qui survive à un clone.
+          fautifs="$(git ls-files -s infra/scripts/*.sh | awk '$1 != "100755" { print $4 }')"
+          if [ -n "$fautifs" ]; then
+            echo "::error::Scripts d'infra sans bit d'exécution dans git :"
+            printf '::error::  - %s\n' $fautifs
+            echo "::error::Corriger avec : git update-index --chmod=+x <fichier>"
+            echo "::error::Un script d'infra non exécutable échoue en silence sous cron."
+            exit 1
+          fi
+          echo "Tous les scripts d'infra sont en 100755."
+
   backend:
     name: Backend Laravel (install + PHPStan + Pint + Pest)
     runs-on: ubuntu-24.04

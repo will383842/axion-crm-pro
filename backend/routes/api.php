@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\Phase2\ColdEmailController;
 use App\Http\Controllers\Api\Phase2\CrmController;
 use App\Http\Controllers\Api\Phase2\LinkedInController;
 use App\Http\Controllers\Api\ProxyProvidersController;
+use App\Http\Controllers\Api\ReferentielsGeoController;
 use App\Http\Controllers\Api\RgpdRequestsController;
 use App\Http\Controllers\Api\RotationsController;
 use App\Http\Controllers\Api\SavedViewsController;
@@ -234,6 +235,11 @@ Route::prefix('v1')->group(function () {
         // `GET /config/features` est délibérément HORS du groupe : c'est lui qui
         // annonce l'état du drapeau, le mettre derrière serait circulaire.
         Route::get('/config/features', [FeaturesController::class, 'index']);
+
+        // Référentiels géographiques (régions, départements) : alimentent les
+        // listes déroulantes de filtre. Servis depuis la BASE, pas recopiés
+        // dans le frontend — une liste recopiée finit toujours par diverger.
+        Route::get('/referentiels/geo', [ReferentielsGeoController::class, 'index']);
 
         Route::middleware('crm-console')->prefix('crm')->group(function () {
             Route::get('/contacts-hub', [ContactsHubController::class, 'index']);

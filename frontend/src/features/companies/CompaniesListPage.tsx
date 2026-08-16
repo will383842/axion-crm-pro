@@ -15,6 +15,8 @@ import {
 } from "@/components/ui";
 import { api } from "@/lib/api";
 import {
+  versOptions,
+  type ReferentielsGeo,
   CONFIANCE_EMAIL_OPTIONS,
   COUNTRY_OPTIONS,
   ELIGIBILITE_OPTIONS,
@@ -112,6 +114,9 @@ interface Filter {
   best_email_confidence: string;
   eligible_campagne: string;
   entity_nature: string;
+  tag: string;
+  cree_apres: string;
+  cree_avant: string;
 }
 
 const EMPTY_FILTER: Filter = {
@@ -129,9 +134,25 @@ const EMPTY_FILTER: Filter = {
   best_email_confidence: "",
   eligible_campagne: "",
   entity_nature: "",
+  tag: "",
+  cree_apres: "",
+  cree_avant: "",
 };
 
 export function CompaniesListPage() {
+  // Référentiel géographique servi par l'API : 102 départements et 18 régions
+  // recopiés dans le frontend seraient 120 occasions de diverger de la base.
+  // `staleTime` long : ces référentiels changent au rythme des réformes
+  // territoriales, pas à celui des ouvertures d'écran.
+  const geo = useQuery<ReferentielsGeo>({
+    queryKey: ["referentiels", "geo"],
+    queryFn: async () => (await api.get<ReferentielsGeo>("/referentiels/geo")).data,
+    staleTime: 60 * 60 * 1000,
+  });
+
+  const optionsRegions = versOptions(geo.data?.regions ?? [], "Toutes régions");
+  const optionsDepartements = versOptions(geo.data?.departments ?? [], "Tous départements");
+
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState<Filter>(EMPTY_FILTER);
   const [exporting, setExporting] = useState(false);
@@ -158,6 +179,10 @@ export function CompaniesListPage() {
       ...(filter.eligible_campagne
         ? { "filter[eligible_campagne]": filter.eligible_campagne }
         : {}),
+      ...(filter.region_code ? { "filter[region_code]": filter.region_code } : {}),
+      ...(filter.tag ? { "filter[tag]": filter.tag } : {}),
+      ...(filter.cree_apres ? { "filter[cree_apres]": filter.cree_apres } : {}),
+      ...(filter.cree_avant ? { "filter[cree_avant]": filter.cree_avant } : {}),
       ...(filter.entity_nature ? { "filter[entity_nature]": filter.entity_nature } : {}),
     });
   }
@@ -210,6 +235,10 @@ export function CompaniesListPage() {
       ...(filter.eligible_campagne
         ? { "filter[eligible_campagne]": filter.eligible_campagne }
         : {}),
+      ...(filter.region_code ? { "filter[region_code]": filter.region_code } : {}),
+      ...(filter.tag ? { "filter[tag]": filter.tag } : {}),
+      ...(filter.cree_apres ? { "filter[cree_apres]": filter.cree_apres } : {}),
+      ...(filter.cree_avant ? { "filter[cree_avant]": filter.cree_avant } : {}),
       ...(filter.entity_nature ? { "filter[entity_nature]": filter.entity_nature } : {}),
       });
       const r = await api.get<CompaniesResponse>(`/companies?${params.toString()}`);
@@ -284,6 +313,9 @@ export function CompaniesListPage() {
     filter.country_code ||
     filter.best_email_confidence ||
     filter.eligible_campagne ||
+    filter.tag ||
+    filter.cree_apres ||
+    filter.cree_avant ||
     filter.entity_nature;
 
   const activeFilterCount = [
@@ -300,6 +332,9 @@ export function CompaniesListPage() {
     filter.country_code,
     filter.best_email_confidence,
     filter.eligible_campagne,
+    filter.tag,
+    filter.cree_apres,
+    filter.cree_avant,
     filter.entity_nature,
   ].filter(Boolean).length;
 
@@ -462,15 +497,22 @@ export function CompaniesListPage() {
               options={PRIORITY_OPTIONS}
               ariaLabel="Filtre priorité"
             />
-            <input
-              type="text"
+            {/* Liste plutôt que saisie libre : taper « 075 » ou « 7 5 » rendait
+                une liste vide qui se lit comme « aucun résultat », sans jamais
+                dire que le code était faux. */}
+            <FilterSelect
               value={filter.department_code}
-              onChange={(e) =>
-                setFilterAndReset({ department_code: e.target.value.toUpperCase().slice(0, 3) })
-              }
-              placeholder="Dept (75…)"
-              aria-label="Filtre département"
-              className="h-9 w-24 rounded-lg bg-white px-3 font-mono text-xs text-slate-900 ring-1 ring-slate-200 transition placeholder:text-slate-400 focus:ring-2 focus:ring-slate-300 focus:outline-none dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600"
+              onChange={(v) => setFilterAndReset({ department_code: v })}
+              options={optionsDepartements}
+              ariaLabel="Filtre département"
+            />
+            {/* `region_code` était DÉCLARÉ dans l'état sans aucun contrôle :
+                un filtre qu'on ne peut pas régler est du code mort. */}
+            <FilterSelect
+              value={filter.region_code}
+              onChange={(v) => setFilterAndReset({ region_code: v })}
+              options={optionsRegions}
+              ariaLabel="Filtre région"
             />
             <input
               type="text"
@@ -479,6 +521,32 @@ export function CompaniesListPage() {
               placeholder="Code NAF…"
               aria-label="Filtre NAF"
               className="h-9 w-28 rounded-lg bg-white px-3 font-mono text-xs text-slate-900 ring-1 ring-slate-200 transition placeholder:text-slate-400 focus:ring-2 focus:ring-slate-300 focus:outline-none dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600"
+            />
+            {/* Retrouver un SEGMENT constitué (campagne, import, sélection) :
+                l'API l'acceptait déjà, rien ne permettait de le demander. */}
+            <input
+              type="text"
+              value={filter.tag}
+              onChange={(e) => setFilterAndReset({ tag: e.target.value })}
+              placeholder="Tag (implantation-ro…)"
+              aria-label="Filtre tag"
+              className="h-9 w-44 rounded-lg bg-white px-3 text-xs text-slate-900 ring-1 ring-slate-200 transition placeholder:text-slate-400 focus:ring-2 focus:ring-slate-300 focus:outline-none dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600"
+            />
+            {/* « Ce qui est arrivé depuis lundi » — la question la plus
+                fréquente, impossible à poser jusqu'ici. */}
+            <input
+              type="date"
+              value={filter.cree_apres}
+              onChange={(e) => setFilterAndReset({ cree_apres: e.target.value })}
+              aria-label="Fiches créées après le"
+              className="h-9 rounded-lg bg-white px-3 text-xs text-slate-900 ring-1 ring-slate-200 transition focus:ring-2 focus:ring-slate-300 focus:outline-none dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600"
+            />
+            <input
+              type="date"
+              value={filter.cree_avant}
+              onChange={(e) => setFilterAndReset({ cree_avant: e.target.value })}
+              aria-label="Fiches créées avant le"
+              className="h-9 rounded-lg bg-white px-3 text-xs text-slate-900 ring-1 ring-slate-200 transition focus:ring-2 focus:ring-slate-300 focus:outline-none dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600"
             />
           </>
         }

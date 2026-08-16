@@ -33,6 +33,12 @@ function makeSmartSkipCompany(string $workspaceId, array $overrides = []): Compa
 }
 
 beforeEach(function () {
+    // Ces tests exercent le chemin RÉEL du client : ils doivent donc sortir
+    // explicitement du mode simulé. `MOCK_SCRAPERS` vaut `true` par défaut —
+    // c'est ce qui protège la production d'appels facturés déclenchés par
+    // mégarde, et un test ne doit pas hériter de cette protection en silence.
+    config()->set('services.scrapers.mock', false);
+
     Cache::flush();
     Config::set('services.google.places.api_key', 'fake-key');
     Config::set('services.google.places.smart_skip', true);

@@ -2,9 +2,11 @@
 
 namespace App\Services\Scraping;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Sentry\State\Hub;
 
 /**
  * Google Places API (New) — wrapper officiel server-side (Sprint H9 — 2026-05-18).
@@ -60,11 +62,9 @@ class GooglePlacesClient
      *  - null avec context dans le 2e arg byref si pas trouvé / erreur
      *  - null si quota mensuel free dépassé (et $reason='quota_exceeded')
      *
-     * @param  string  $query
-     * @param  string|null  $regionCode
      * @param  string|null  $reason  byref : si null retourné, indique pourquoi
-     *                                ('no_api_key', 'quota_exceeded', 'not_found',
-     *                                'http_error', 'exception')
+     *                               ('no_api_key', 'quota_exceeded', 'not_found',
+     *                               'http_error', 'exception')
      * @return array<string,mixed>|null
      */
     public function searchText(string $query, ?string $regionCode = 'FR', ?string &$reason = null): ?array
@@ -73,6 +73,28 @@ class GooglePlacesClient
         $query = trim($query);
         if ($query === '') {
             $reason = 'empty_query';
+
+            return null;
+        }
+
+        // 🔴 MODE SIMULÉ — ce client était le SEUL scraper à ne pas l'honorer.
+        //
+        // Découvert le 2026-08-16 en réparant les tests exclus de la CI :
+        // l'injection de ce client était morte depuis le passage à Laravel 11
+        // (le conteneur rend la valeur par défaut `null` quand la classe n'est
+        // pas explicitement liée), donc l'enrichissement Google Places ne
+        // tournait plus du tout. En rétablissant la liaison, on rallumait d'un
+        // coup des appels FACTURÉS en production — sans que personne l'ait
+        // décidé, puisque `MOCK_SCRAPERS=true` y est posé et que tous les
+        // autres scrapers s'y conforment.
+        //
+        // Rallumer un appel payant ne doit jamais être l'effet de bord d'une
+        // correction de tests : c'est une décision, elle se prend en changeant
+        // `MOCK_SCRAPERS`.
+        if ((bool) config('services.scrapers.mock', true)) {
+            Log::debug('GooglePlacesClient ignoré (MOCK_SCRAPERS=true)');
+            $reason = 'mock_mode';
+
             return null;
         }
 
@@ -80,6 +102,7 @@ class GooglePlacesClient
         if (! $apiKey) {
             Log::debug('GooglePlacesClient skipped (no API key)');
             $reason = 'no_api_key';
+
             return null;
         }
 
@@ -96,28 +119,29 @@ class GooglePlacesClient
         if ($this->isQuotaExceeded()) {
             Log::info('GooglePlacesClient quota exceeded, skipping call', [
                 'query' => $query,
-                'used'  => $this->currentMonthUsage(),
+                'used' => $this->currentMonthUsage(),
                 'limit' => $this->monthlyQuotaLimit(),
             ]);
             $reason = 'quota_exceeded';
+
             return null;
         }
 
         try {
             $response = Http::timeout(self::HTTP_TIMEOUT_SECONDS)
                 ->withHeaders([
-                    'X-Goog-Api-Key'    => (string) $apiKey,
-                    'X-Goog-FieldMask'  => implode(',', self::FIELDS),
-                    'Accept'            => 'application/json',
-                    'Content-Type'      => 'application/json',
+                    'X-Goog-Api-Key' => (string) $apiKey,
+                    'X-Goog-FieldMask' => implode(',', self::FIELDS),
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/json',
                 ])
                 ->retry(2, 1000, function (\Throwable $e) {
-                    return $e instanceof \Illuminate\Http\Client\ConnectionException;
+                    return $e instanceof ConnectionException;
                 })
                 ->post(self::SEARCH_TEXT_ENDPOINT, [
-                    'textQuery'    => $query,
+                    'textQuery' => $query,
                     'languageCode' => 'fr',
-                    'regionCode'   => $regionCode ?? 'FR',
+                    'regionCode' => $regionCode ?? 'FR',
                     'maxResultCount' => 1,
                 ]);
 
@@ -127,17 +151,18 @@ class GooglePlacesClient
             $this->incrementMonthlyUsage();
 
             if (! $response->successful()) {
-                if (class_exists(\Sentry\State\Hub::class)) {
+                if (class_exists(Hub::class)) {
                     \Sentry\captureMessage(
-                        "GooglePlaces HTTP {$response->status()} for query: {$query}"
+                        "GooglePlaces HTTP {$response->status()} for query: {$query}",
                     );
                 }
                 Log::warning('GooglePlaces HTTP error', [
                     'status' => $response->status(),
-                    'query'  => $query,
+                    'query' => $query,
                 ]);
                 Cache::put($cacheKey, '__null__', now()->addDays(1));
                 $reason = 'http_error';
+
                 return null;
             }
 
@@ -145,6 +170,7 @@ class GooglePlacesClient
             if (! is_array($places) || empty($places)) {
                 Cache::put($cacheKey, '__null__', now()->addDays(self::CACHE_TTL_DAYS));
                 $reason = 'not_found';
+
                 return null;
             }
 
@@ -153,7 +179,7 @@ class GooglePlacesClient
 
             return $place;
         } catch (\Throwable $e) {
-            if (class_exists(\Sentry\State\Hub::class)) {
+            if (class_exists(Hub::class)) {
                 \Sentry\captureException($e);
             }
             Log::warning('GooglePlaces exception', [
@@ -161,6 +187,7 @@ class GooglePlacesClient
                 'error' => $e->getMessage(),
             ]);
             $reason = 'exception';
+
             return null;
         }
     }
@@ -181,6 +208,7 @@ class GooglePlacesClient
     public function currentMonthUsage(): int
     {
         $key = $this->monthlyQuotaCacheKey();
+
         return (int) (Cache::get($key) ?? 0);
     }
 
@@ -242,32 +270,32 @@ class GooglePlacesClient
         $location = $place['location'] ?? [];
 
         return [
-            'phone'             => is_string($phone) ? $phone : null,
-            'website'           => isset($place['websiteUri']) && is_string($place['websiteUri'])
+            'phone' => is_string($phone) ? $phone : null,
+            'website' => isset($place['websiteUri']) && is_string($place['websiteUri'])
                 ? $place['websiteUri']
                 : null,
-            'address'           => isset($place['formattedAddress']) && is_string($place['formattedAddress'])
+            'address' => isset($place['formattedAddress']) && is_string($place['formattedAddress'])
                 ? $place['formattedAddress']
                 : null,
-            'lat'               => isset($location['latitude']) ? (float) $location['latitude'] : null,
-            'lon'               => isset($location['longitude']) ? (float) $location['longitude'] : null,
-            'rating'            => isset($place['rating']) ? (float) $place['rating'] : null,
+            'lat' => isset($location['latitude']) ? (float) $location['latitude'] : null,
+            'lon' => isset($location['longitude']) ? (float) $location['longitude'] : null,
+            'rating' => isset($place['rating']) ? (float) $place['rating'] : null,
             'user_rating_count' => isset($place['userRatingCount']) ? (int) $place['userRatingCount'] : null,
-            'business_status'   => isset($place['businessStatus']) && is_string($place['businessStatus'])
+            'business_status' => isset($place['businessStatus']) && is_string($place['businessStatus'])
                 ? $place['businessStatus']
                 : null,
-            'primary_type'      => isset($place['primaryType']) && is_string($place['primaryType'])
+            'primary_type' => isset($place['primaryType']) && is_string($place['primaryType'])
                 ? $place['primaryType']
                 : null,
-            'types'             => isset($place['types']) && is_array($place['types'])
+            'types' => isset($place['types']) && is_array($place['types'])
                 ? array_values(array_filter($place['types'], 'is_string'))
                 : [],
-            'opening_hours'     => isset($place['regularOpeningHours']['weekdayDescriptions'])
+            'opening_hours' => isset($place['regularOpeningHours']['weekdayDescriptions'])
                 && is_array($place['regularOpeningHours']['weekdayDescriptions'])
                 ? array_values(array_filter($place['regularOpeningHours']['weekdayDescriptions'], 'is_string'))
                 : [],
-            'google_place_id'   => isset($place['id']) && is_string($place['id']) ? $place['id'] : null,
-            'display_name'      => isset($place['displayName']['text']) && is_string($place['displayName']['text'])
+            'google_place_id' => isset($place['id']) && is_string($place['id']) ? $place['id'] : null,
+            'display_name' => isset($place['displayName']['text']) && is_string($place['displayName']['text'])
                 ? $place['displayName']['text']
                 : null,
         ];

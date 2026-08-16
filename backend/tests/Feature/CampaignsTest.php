@@ -16,33 +16,34 @@ uses(TestCase::class, RefreshDatabase::class);
 function makeCampaignUser(string $slug = 'cm'): array
 {
     $workspace = Workspace::create([
-        'id'   => (string) Str::uuid(),
+        'id' => (string) Str::uuid(),
         'slug' => $slug . '-' . Str::random(6),
         'name' => 'WS ' . $slug,
     ]);
     $user = User::create([
-        'id'                       => (string) Str::uuid(),
-        'email'                    => $slug . Str::random(4) . '@test.local',
-        'name'                     => 'User ' . $slug,
-        'password_hash'            => Hash::make('SomePass!1234'),
-        'current_workspace_id'     => $workspace->id,
+        'id' => (string) Str::uuid(),
+        'email' => $slug . Str::random(4) . '@test.local',
+        'name' => 'User ' . $slug,
+        'password_hash' => Hash::make('SomePass!1234'),
+        'current_workspace_id' => $workspace->id,
         'first_login_completed_at' => now(),
     ]);
+
     return [$user, $workspace];
 }
 
 function validCampaignPayload(array $overrides = []): array
 {
     return array_merge([
-        'name'                    => 'Ma campagne test',
-        'description'             => 'Test description',
-        'sources'                 => ['insee', 'pages_jaunes'],
-        'zones'                   => [
+        'name' => 'Ma campagne test',
+        'description' => 'Test description',
+        'sources' => ['insee', 'pages_jaunes'],
+        'zones' => [
             ['type' => 'department', 'code' => '75'],
             ['type' => 'department', 'code' => '92'],
         ],
-        'max_companies'           => 500,
-        'max_duration_minutes'    => 120,
+        'max_companies' => 500,
+        'max_duration_minutes' => 120,
         'max_requests_per_minute' => 20,
     ], $overrides);
 }
@@ -229,7 +230,7 @@ test('resume — paused → running + monitor dispatched', function () {
         'name' => 'C', 'status' => 'paused',
         'sources' => ['insee'], 'zones' => [['type' => 'department', 'code' => '75']],
         'started_at' => now()->subMinutes(10),
-        'paused_at'  => now(),
+        'paused_at' => now(),
         'paused_reason' => 'manual',
     ]);
     Queue::fake();
@@ -251,10 +252,10 @@ test('cancel — running → cancelled + runs cancelled', function () {
     ]);
     $run = ScraperRun::create([
         'workspace_id' => $w->id,
-        'campaign_id'  => $c->id,
-        'source'       => 'insee',
-        'status'       => 'pending',
-        'started_at'   => now(),
+        'campaign_id' => $c->id,
+        'source' => 'insee',
+        'status' => 'pending',
+        'started_at' => now(),
     ]);
 
     $this->actingAs($u)
@@ -304,16 +305,35 @@ test('start cross-workspace → 404', function () {
 // =================================================================
 // Auto-pause logic (unitaire model)
 // =================================================================
+//
+// ⚠️ CAUSE DE L'ÉCHEC HISTORIQUE (« attendu quota_duration, obtenu
+// quota_companies ») : ce n'était PAS un ordre de priorité inversé.
+// `ScrapingCampaign::create()` ne renvoie QUE les attributs explicitement
+// fournis — les colonnes non passées (`max_companies NOT NULL DEFAULT 1000`,
+// `companies_created NOT NULL DEFAULT 0`) restaient `null` EN MÉMOIRE. Or
+// `0 >= null` et `null >= null` valent `true` en PHP : le premier test de
+// `shouldAutoPause()` déclenchait donc toujours, quel que soit le scénario.
+// Correctif : chaque fixture renseigne désormais TOUTES les entrées lues par la
+// méthode (status, max_companies, companies_created, max_duration_minutes,
+// started_at). L'ordre companies-puis-durée du modèle est conservé tel quel : il
+// est correct, les deux critères étant indépendants.
+//
+// ⚠️ NE PAS « améliorer » ces cas avec un `->refresh()`. Un aller-retour en base
+// décale actuellement TOUT timestamp de +2 h (voir la note de restitution) :
+// `APP_TIMEZONE=Europe/Paris` (défaut de config/app.php) alors que la session
+// Postgres est en `Etc/UTC` et que le driver sérialise en naïf `Y-m-d H:i:s`.
+// `started_at` relu revient 2 h dans le FUTUR et `elapsed_minutes` retombe à 0.
 
 test('shouldAutoPause — quota companies atteint', function () {
     [$u, $w] = makeCampaignUser();
     $c = ScrapingCampaign::create([
-        'workspace_id'      => $w->id, 'created_by' => $u->id,
-        'name'              => 'C', 'status' => 'running',
-        'sources'           => ['insee'], 'zones' => [['type' => 'department', 'code' => '75']],
-        'max_companies'     => 100,
+        'workspace_id' => $w->id, 'created_by' => $u->id,
+        'name' => 'C', 'status' => 'running',
+        'sources' => ['insee'], 'zones' => [['type' => 'department', 'code' => '75']],
+        'max_companies' => 100,
         'companies_created' => 100,
-        'started_at'        => now()->subMinutes(5),
+        'max_duration_minutes' => 180,
+        'started_at' => now()->subMinutes(5),
     ]);
 
     expect($c->shouldAutoPause())->toBe('quota_companies');
@@ -322,11 +342,16 @@ test('shouldAutoPause — quota companies atteint', function () {
 test('shouldAutoPause — quota duration atteint', function () {
     [$u, $w] = makeCampaignUser();
     $c = ScrapingCampaign::create([
-        'workspace_id'         => $w->id, 'created_by' => $u->id,
-        'name'                 => 'C', 'status' => 'running',
-        'sources'              => ['insee'], 'zones' => [['type' => 'department', 'code' => '75']],
+        'workspace_id' => $w->id, 'created_by' => $u->id,
+        'name' => 'C', 'status' => 'running',
+        'sources' => ['insee'], 'zones' => [['type' => 'department', 'code' => '75']],
+        // Quota entreprises volontairement LOIN d'être atteint : seule la durée
+        // doit déclencher, ce qui vérifie aussi que le 1er critère ne masque
+        // plus le second.
+        'max_companies' => 1000,
+        'companies_created' => 0,
         'max_duration_minutes' => 5,
-        'started_at'           => now()->subMinutes(10),
+        'started_at' => now()->subMinutes(10),
     ]);
 
     expect($c->shouldAutoPause())->toBe('quota_duration');
@@ -335,13 +360,13 @@ test('shouldAutoPause — quota duration atteint', function () {
 test('shouldAutoPause — sous quotas → null', function () {
     [$u, $w] = makeCampaignUser();
     $c = ScrapingCampaign::create([
-        'workspace_id'         => $w->id, 'created_by' => $u->id,
-        'name'                 => 'C', 'status' => 'running',
-        'sources'              => ['insee'], 'zones' => [['type' => 'department', 'code' => '75']],
-        'max_companies'        => 1000,
+        'workspace_id' => $w->id, 'created_by' => $u->id,
+        'name' => 'C', 'status' => 'running',
+        'sources' => ['insee'], 'zones' => [['type' => 'department', 'code' => '75']],
+        'max_companies' => 1000,
         'max_duration_minutes' => 180,
-        'companies_created'    => 50,
-        'started_at'           => now()->subMinutes(10),
+        'companies_created' => 50,
+        'started_at' => now()->subMinutes(10),
     ]);
 
     expect($c->shouldAutoPause())->toBeNull();
@@ -350,12 +375,15 @@ test('shouldAutoPause — sous quotas → null', function () {
 test('shouldAutoPause — campagne paused → null (pas de double pause)', function () {
     [$u, $w] = makeCampaignUser();
     $c = ScrapingCampaign::create([
-        'workspace_id'      => $w->id, 'created_by' => $u->id,
-        'name'              => 'C', 'status' => 'paused',
-        'sources'           => ['insee'], 'zones' => [['type' => 'department', 'code' => '75']],
-        'max_companies'     => 100,
+        'workspace_id' => $w->id, 'created_by' => $u->id,
+        'name' => 'C', 'status' => 'paused',
+        'sources' => ['insee'], 'zones' => [['type' => 'department', 'code' => '75']],
+        'max_companies' => 100,
         'companies_created' => 200,
+        'max_duration_minutes' => 5,
+        'started_at' => now()->subMinutes(120),
     ]);
 
+    // Les DEUX quotas sont dépassés : seul le statut « paused » doit primer.
     expect($c->shouldAutoPause())->toBeNull();
 });

@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\PersonalAccessToken;
+use App\Services\Scraping\GooglePlacesClient;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\URL;
@@ -13,7 +14,17 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        // `WaterfallOrchestrator` déclare `?GooglePlacesClient $googlePlaces = null`.
+        // Depuis Laravel 11, `Container::resolveClass()` rend la VALEUR PAR DÉFAUT
+        // dès qu'un défaut existe et que la classe n'est pas explicitement bindée —
+        // il n'auto-résout plus (avant, il tentait `make()` d'abord et ne retombait
+        // sur le défaut qu'en cas de BindingResolutionException). Résultat : la
+        // dépendance valait TOUJOURS null, et `step3d_google_places()` sortait à la
+        // première ligne — l'enrichissement Google Places (Sprint H9, qui remplace
+        // le scrape Google Maps Node) était mort en production, en silence.
+        // Ce binding explicite rétablit l'injection. Ne pas le retirer sans rendre
+        // la dépendance non-nullable dans le constructeur de l'orchestrateur.
+        $this->app->singleton(GooglePlacesClient::class);
     }
 
     public function boot(): void

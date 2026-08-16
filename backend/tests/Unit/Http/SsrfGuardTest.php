@@ -5,6 +5,21 @@ use App\Services\Http\SsrfGuard;
 test('blocks AWS metadata endpoint', function () {
     $r = SsrfGuard::check('http://169.254.169.254/latest/meta-data/');
     expect($r['ok'])->toBeFalse();
+    // L'IP metadata AWS figure aussi dans DENY_HOSTS, évaluée AVANT les plages
+    // CIDR : le motif rendu est donc `deny_host:…` et non plus `deny_cidr:…`.
+    // La liste de noms est un raccourci qui S'AJOUTE au filtre CIDR — elle ne le
+    // remplace pas ; le test suivant verrouille ce point (une liste de noms se
+    // contourne, un CIDR non).
+    expect($r['reason'])->toBe('deny_host:169.254.169.254');
+});
+
+test('blocks the whole link-local range 169.254/16 by CIDR (not by hostname list)', function () {
+    // 169.254.1.1 n'est PAS dans DENY_HOSTS : seule la règle CIDR 169.254.0.0/16
+    // peut le bloquer. Ce test rougit si quelqu'un remplace la plage par des
+    // entrées nominatives — un contournement trivial (169.254.169.254 a des
+    // milliers d'alias décimaux/octaux et de rebinding DNS possibles).
+    $r = SsrfGuard::check('http://169.254.1.1/latest/meta-data/');
+    expect($r['ok'])->toBeFalse();
     expect($r['reason'])->toStartWith('deny_cidr');
 });
 
@@ -56,7 +71,7 @@ test('blocks file scheme', function () {
 
 test('ensure throws when blocked', function () {
     expect(fn () => SsrfGuard::ensure('http://169.254.169.254/'))
-        ->toThrow(\RuntimeException::class, 'SSRF guard');
+        ->toThrow(RuntimeException::class, 'SSRF guard');
 });
 
 test('invalid URL is rejected', function () {

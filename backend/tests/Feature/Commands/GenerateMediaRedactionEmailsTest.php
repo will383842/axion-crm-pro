@@ -12,7 +12,7 @@ uses(TestCase::class, RefreshDatabase::class);
 function makeRedactionWorkspace(): Workspace
 {
     return Workspace::create([
-        'id'   => (string) Str::uuid(),
+        'id' => (string) Str::uuid(),
         'slug' => 'red-' . Str::random(6),
         'name' => 'WS Rédaction',
     ]);
@@ -21,16 +21,16 @@ function makeRedactionWorkspace(): Workspace
 function insertMedia(string $workspaceId, string $name, ?string $website, string $websiteStatus = 'found'): int
 {
     return DB::table('media')->insertGetId([
-        'workspace_id'   => $workspaceId,
-        'name'           => $name,
-        'media_type'     => 'presse_quotidien',
-        'website'        => $website,
+        'workspace_id' => $workspaceId,
+        'name' => $name,
+        'media_type' => 'presse_quotidien',
+        'website' => $website,
         'website_status' => $website ? $websiteStatus : 'pending',
-        'email'          => null,
-        'enrich_status'  => 'pending',
-        'source'         => 'naf-extract',
-        'created_at'     => now(),
-        'updated_at'     => now(),
+        'email' => null,
+        'enrich_status' => 'pending',
+        'source' => 'naf-extract',
+        'created_at' => now(),
+        'updated_at' => now(),
     ]);
 }
 
@@ -51,11 +51,17 @@ function bindFakeValidator(): void
             if ($domain !== 'presse-libre.test') {
                 return ['status' => 'invalid', 'email' => $email];
             }
+
             // redaction@ = 1er candidat testé → verified sur ce domaine.
             return ['status' => $local === 'redaction' ? 'verified' : 'role', 'email' => $email];
         });
 
-    test()->app->instance(MxEmailValidator::class, $mock);
+    // `test()->app` est INACCESSIBLE depuis une closure Pest : `$app` est une
+    // propriété `protected` de TestCase et la closure n'est pas liée à la classe
+    // au moment où cette fonction (hors closure de test) s'exécute.
+    // `app()` résout le MÊME conteneur (Container::getInstance()) que `$this->app`
+    // pendant un test Laravel — le binding est donc bien posé sur l'app du test.
+    app()->instance(MxEmailValidator::class, $mock);
 }
 
 it('écrit redaction@ sur un domaine qui a des MX et laisse null les domaines morts', function () {

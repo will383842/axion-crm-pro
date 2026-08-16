@@ -74,85 +74,114 @@ class GenerateMediaRedactionEmails extends Command
         // et surtout on ne relance jamais 2× le même lookup dans un run.
         $mxCache = [];
 
-        while (true) {
-            // REPRENABLE : les emails déjà écrits sortent du périmètre (email null).
-            $medias = Media::query()
-                ->where('workspace_id', $workspaceId)
-                ->whereNull('email')
-                ->whereNotNull('website')
-                ->where('website', '<>', '')
-                // On privilégie les sites confirmés, mais on n'exclut pas les autres
-                // s'ils ont malgré tout une URL exploitable.
-                ->orderByRaw("CASE WHEN website_status = 'found' THEN 0 ELSE 1 END")
-                ->limit($batch)
-                ->get(['id', 'website', 'website_status']);
+        // ⚠️ BOUCLE INFINIE corrigée (2026-08-16). L'ancienne pagination relisait
+        // à chaque tour la MÊME première page (`limit($batch)` sans curseur) en
+        // comptant sur le fait que les médias traités sortent du périmètre une
+        // fois leur email écrit. Or un média SANS candidat valide (domaine sans
+        // MX, URL non exploitable…) garde `email IS NULL` : il ressortait
+        // indéfiniment, `$medias` n'était jamais vide et la commande tournait
+        // sans fin — cas nominal en production, où les domaines morts abondent.
+        // Le `--dry-run` avait déjà son rustine (break après un chunk) : c'était
+        // le même défaut, corrigé à moitié.
+        //
+        // On pagine désormais par CURSEUR sur `id` : chaque média n'est examiné
+        // qu'une seule fois, écrit ou non. La préférence « sites confirmés
+        // d'abord » (ex-`ORDER BY CASE website_status='found'`) est conservée en
+        // scannant en DEUX PASSES, ce qui garde une mémoire constante.
+        $stop = false;
 
-            if ($medias->isEmpty()) {
+        foreach ([true, false] as $confirmedOnly) {
+            if ($stop) {
                 break;
             }
 
-            $updates = []; // [mediaId => email]
+            $lastId = 0;
 
-            foreach ($medias as $media) {
-                $processed++;
+            while (true) {
+                // REPRENABLE : les emails déjà écrits sortent du périmètre (email null).
+                $medias = Media::query()
+                    ->where('workspace_id', $workspaceId)
+                    ->whereNull('email')
+                    ->whereNotNull('website')
+                    ->where('website', '<>', '')
+                    ->when(
+                        $confirmedOnly,
+                        fn ($q) => $q->where('website_status', 'found'),
+                        fn ($q) => $q->where(
+                            fn ($w) => $w->where('website_status', '<>', 'found')
+                                ->orWhereNull('website_status'),
+                        ),
+                    )
+                    ->where('id', '>', $lastId)
+                    ->orderBy('id')
+                    ->limit($batch)
+                    ->get(['id', 'website', 'website_status']);
 
-                $domain = $this->extractDomain($media->website);
-                if ($domain === null) {
-                    $rejected++;
-                    continue;
+                if ($medias->isEmpty()) {
+                    break;
                 }
 
-                // Pré-check MX (1 seul lookup par domaine) : si le domaine n'a AUCUN
-                // MX, aucun candidat ne peut passer → on évite 5 lookups inutiles.
-                if (! array_key_exists($domain, $mxCache)) {
-                    $mxCache[$domain] = $validator->resolveMxRecords($domain);
-                }
-                if ($mxCache[$domain] === []) {
-                    $rejected++;
-                    continue;
-                }
+                $lastId = (int) $medias->last()->id;
+                $updates = []; // [mediaId => email]
 
-                $chosen = null;
-                foreach (self::CANDIDATES as $prefix) {
-                    $candidate = $prefix . '@' . $domain;
-                    $status = $validator->validate($candidate)['status'];
-                    // Doctrine « 0 email douteux » : on rejette invalid/disposable,
-                    // on garde verified/risky/role/unknown (boîte générique légitime).
-                    if ($status !== 'invalid' && $status !== 'disposable') {
-                        $chosen = $candidate;
+                foreach ($medias as $media) {
+                    $processed++;
+
+                    $domain = $this->extractDomain($media->website);
+                    if ($domain === null) {
+                        $rejected++;
+
+                        continue;
+                    }
+
+                    // Pré-check MX (1 seul lookup par domaine) : si le domaine n'a AUCUN
+                    // MX, aucun candidat ne peut passer → on évite 5 lookups inutiles.
+                    if (! array_key_exists($domain, $mxCache)) {
+                        $mxCache[$domain] = $validator->resolveMxRecords($domain);
+                    }
+                    if ($mxCache[$domain] === []) {
+                        $rejected++;
+
+                        continue;
+                    }
+
+                    $chosen = null;
+                    foreach (self::CANDIDATES as $prefix) {
+                        $candidate = $prefix . '@' . $domain;
+                        $status = $validator->validate($candidate)['status'];
+                        // Doctrine « 0 email douteux » : on rejette invalid/disposable,
+                        // on garde verified/risky/role/unknown (boîte générique légitime).
+                        if ($status !== 'invalid' && $status !== 'disposable') {
+                            $chosen = $candidate;
+                            break;
+                        }
+                    }
+
+                    if ($chosen === null) {
+                        $rejected++;
+
+                        continue;
+                    }
+
+                    $updates[$media->id] = $chosen;
+                    $written++;
+
+                    if ($limit > 0 && $processed >= $limit) {
                         break;
                     }
                 }
 
-                if ($chosen === null) {
-                    $rejected++;
-                    continue;
+                if (! $dryRun && $updates !== []) {
+                    $this->flush($updates);
                 }
 
-                $updates[$media->id] = $chosen;
-                $written++;
+                $elapsed = max(1, (int) round(microtime(true) - $start));
+                $this->info("  … {$processed} traités · {$written} emails · {$rejected} rejetés · " . round($processed / $elapsed, 1) . '/s');
 
                 if ($limit > 0 && $processed >= $limit) {
+                    $stop = true;
                     break;
                 }
-            }
-
-            if (! $dryRun && $updates !== []) {
-                $this->flush($updates);
-            }
-
-            $elapsed = max(1, (int) round(microtime(true) - $start));
-            $this->info("  … {$processed} traités · {$written} emails · {$rejected} rejetés · " . round($processed / $elapsed, 1) . '/s');
-
-            if ($limit > 0 && $processed >= $limit) {
-                break;
-            }
-
-            // Sur dry-run, les emails ne sont pas écrits → la même page ressortirait
-            // en boucle. On borne alors la boucle à un seul chunk représentatif.
-            if ($dryRun && $limit === 0) {
-                $this->warn('  (dry-run sans --limit : un seul chunk échantillon traité pour éviter la boucle infinie)');
-                break;
             }
         }
 

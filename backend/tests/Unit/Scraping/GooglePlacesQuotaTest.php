@@ -6,6 +6,12 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
+    // Ces tests exercent le chemin RÉEL du client : ils doivent donc sortir
+    // explicitement du mode simulé. `MOCK_SCRAPERS` vaut `true` par défaut —
+    // c'est ce qui protège la production d'appels facturés déclenchés par
+    // mégarde, et un test ne doit pas hériter de cette protection en silence.
+    config()->set('services.scrapers.mock', false);
+
     Cache::flush();
 });
 
@@ -19,7 +25,7 @@ it('skips API call when monthly quota is exceeded', function () {
 
     Http::fake();  // si appel HTTP est fait, on le saura
 
-    $client = new GooglePlacesClient();
+    $client = new GooglePlacesClient;
     $reason = null;
     $result = $client->searchText('Boulangerie Dupont Paris', 'FR', $reason);
 
@@ -41,7 +47,7 @@ it('allows API call when under monthly quota', function () {
         ], 200),
     ]);
 
-    $client = new GooglePlacesClient();
+    $client = new GooglePlacesClient;
     $reason = null;
     $result = $client->searchText('Acme Paris', 'FR', $reason);
 
@@ -59,7 +65,7 @@ it('increments monthly usage counter after successful call', function () {
         ], 200),
     ]);
 
-    $client = new GooglePlacesClient();
+    $client = new GooglePlacesClient;
     expect($client->currentMonthUsage())->toBe(0);
 
     $client->searchText('A query Paris');
@@ -71,7 +77,7 @@ it('increments monthly usage counter after successful call', function () {
 
 it('isQuotaExceeded reflects current_month_usage vs limit', function () {
     Config::set('services.google.places.monthly_quota_limit', 50);
-    $client = new GooglePlacesClient();
+    $client = new GooglePlacesClient;
 
     Cache::put('gplaces:quota:' . now()->format('Y-m'), 49, now()->addDays(35));
     expect($client->isQuotaExceeded())->toBeFalse();
@@ -93,7 +99,7 @@ it('does not increment quota when call uses cache hit', function () {
         ], 200),
     ]);
 
-    $client = new GooglePlacesClient();
+    $client = new GooglePlacesClient;
     $client->searchText('Cached query');
     expect($client->currentMonthUsage())->toBe(1);
 
@@ -105,7 +111,7 @@ it('does not increment quota when call uses cache hit', function () {
 });
 
 it('quota counter is per-month (key includes YYYY-MM)', function () {
-    $client = new GooglePlacesClient();
+    $client = new GooglePlacesClient;
     $expectedKey = 'gplaces:quota:' . now()->format('Y-m');
 
     // Simule l'increment

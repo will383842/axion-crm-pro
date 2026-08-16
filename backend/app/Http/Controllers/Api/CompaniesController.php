@@ -7,8 +7,10 @@ use App\Models\Company;
 use App\Services\Email\EmailConfidenceService;
 use App\Services\Waterfall\WaterfallOrchestrator;
 use App\Support\CompanyQueryFilters;
+use App\Support\EligibiliteCampagne;
 use App\Support\MasquageCoordonnees;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -175,7 +177,13 @@ class CompaniesController extends ApiController
         // Exporter un CSV de prospects EST un usage de prospection : une
         // personne qui s'y est opposée ne doit pas y figurer, même sans son
         // adresse. On filtre donc au chargement de la relation.
-        $chargeContacts = fn ($q) => EligibiliteCampagne::exclureOpposes($q, 'contacts.email');
+        // La fermeture reçoit une `HasMany`, pas un `Builder` : on passe donc
+        // `getQuery()`, qui EST la requête de la relation — les contraintes
+        // s'y appliquent bien. C'est aussi ce qui rend le type générique
+        // résoluble par l'analyse statique.
+        $chargeContacts = static function (Relation $relation): void {
+            EligibiliteCampagne::exclureOpposes($relation->getQuery(), 'contacts.email');
+        };
 
         $query = $this->buildFilteredQuery()
             ->where('workspace_id', $workspaceId)

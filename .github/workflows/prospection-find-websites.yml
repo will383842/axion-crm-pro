@@ -54,12 +54,8 @@ jobs:
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
-      - name: Trust host key
-        env:
-          HOST: ${{ secrets.HETZNER_HOST }}
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+      # ssh-keyscan retire : sature MaxStartups quand d autres jobs SSH tournent
+      # (StrictHostKeyChecking=no + UserKnownHostsFile=/dev/null suffisent)
       - name: Find websites via SSH
         env:
           HOST: ${{ secrets.HETZNER_HOST }}
@@ -76,7 +72,7 @@ jobs:
           # sans keepalive la session tombe (« client_loop: send disconnect: Broken
           # pipe », exit 255) et le job du dépt s'arrête à mi-parcours. On tolère
           # jusqu'à ~10 min sans réponse serveur avant d'abandonner.
-          ssh -o StrictHostKeyChecking=no \
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               -o ServerAliveInterval=30 \
               -o ServerAliveCountMax=20 \
               -o TCPKeepAlive=yes \

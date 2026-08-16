@@ -194,12 +194,16 @@ class DeduplicationService
             return false;
         }
 
+        // On calcule l'empreinte ICI plutôt que dans la fermeture : à
+        // l'intérieur d'un `when()`, l'analyse statique ne sait pas que
+        // `$emailNormalise` est non-nul, et `hash()` refuse un `null`.
         $emailNormalise = $email !== null ? strtolower(trim($email)) : null;
+        $empreinte = $emailNormalise !== null ? hash('sha256', $emailNormalise) : null;
 
         return DB::table('opt_out')
             ->when($emailNormalise !== null, fn ($q) => $q
                 ->orWhere('email', $emailNormalise)
-                ->orWhere('email_hash', hash('sha256', $emailNormalise)))
+                ->orWhere('email_hash', $empreinte))
             ->when($phone !== null, fn ($q) => $q->orWhere('phone', preg_replace('/[\s.-]/', '', $phone)))
             ->exists();
     }

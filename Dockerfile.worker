@@ -49,11 +49,26 @@ FROM mcr.microsoft.com/playwright:${PLAYWRIGHT_VERSION} AS prod
 RUN npm install -g corepack@latest && corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /srv/workers
 ENV NODE_ENV=production
-# Lock SANS joker : le joker rendait le lock facultatif, et le repli plus bas
-# résolvait alors « les dernières versions » en silence (même défaut que le
-# Dockerfile Laravel, corrigé le même jour). Lock absent = build en échec.
+# ⚠️ 2026-08-16 — mises à jour de sécurité de l'image de base. L'analyse Trivy
+# (jusqu'ici jamais exécutée sur cette image : elle était construite puis jetée)
+# a relevé 10 vulnérabilités HIGH corrigées en amont mais absentes de l'image :
+# openssl (débordement de tas), git (exécution de code arbitraire), GnuPG,
+# libtiff. Ce sont des correctifs de niveau correctif sur les MÊMES versions
+# amont — pas une montée de version.
+USER root
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+# ⚠️ Le repli `|| pnpm install --prod` a été RETIRÉ. Le commentaire ci-dessous
+# affirmait déjà que « le joker rendait le lock facultatif » — mais le repli,
+# lui, était resté : si l'installation verrouillée échouait, la suivante
+# résolvait « les dernières versions » EN SILENCE. Le commentaire décrivait
+# donc une correction qui n'avait jamais été appliquée à cette ligne, et
+# l'image de production pouvait embarquer des dépendances que personne n'a
+# choisies. Lock absent ou périmé = build en échec, comme annoncé.
 COPY workers/package.json workers/pnpm-lock.yaml ./
-RUN pnpm install --prod --frozen-lockfile || pnpm install --prod
+RUN pnpm install --prod --frozen-lockfile
 COPY --from=builder /srv/workers/dist ./dist
 USER pwuser
 EXPOSE 9100

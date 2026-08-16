@@ -47,6 +47,16 @@ RUN pnpm build
 #   Image minimale, zéro Node en runtime, garde le port 5173 attendu par Caddy.
 # -----------------------------------------------------------------------------
 FROM caddy:2-alpine AS prod
+# ⚠️ 2026-08-16 — mises à jour de sécurité des paquets Alpine. L'analyse
+# Trivy (jusqu'ici jamais exécutée sur cette image : elle était construite
+# puis jetée) a relevé 5 vulnérabilités HIGH corrigées en amont mais absentes
+# de l'image : c-ares (usage après libération), curl et libcurl (transfert de
+# fichier erroné sur SMB, fuite de cookie entre hôtes).
+#
+# ⚠️ Ceci ne corrige PAS les 14 HIGH du binaire Caddy lui-même (bibliothèque
+# standard Go, golang.org/x/net, grpc) : seul un Caddy reconstruit en amont
+# les résout. Voir `.trivyignore`.
+RUN apk --no-cache upgrade
 WORKDIR /srv/app
 COPY --from=builder /srv/app/dist /srv/app/dist
 COPY frontend/Caddyfile.app /etc/caddy/Caddyfile

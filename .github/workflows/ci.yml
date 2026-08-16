@@ -206,10 +206,11 @@ jobs:
           MOCK_BODACC: 'true'
           MOCK_BAN: 'true'
           MOCK_FRANCE_TRAVAIL: 'true'
-        # `phpunit-ci.xml` = `phpunit.xml` moins les 23 fichiers de
-        # tests/QUARANTAINE.md (tests jamais exécutés, devenus faux). Tout le
-        # reste — 352 tests — est BLOQUANT. En local, `composer test` continue
-        # d'exécuter la suite entière : la dette reste visible.
+        # ⚠️ 2026-08-16 — la quarantaine est LEVÉE : `phpunit-ci.xml` n'écarte
+        # plus aucun test, la suite ENTIÈRE est bloquante ici. Il ne reste
+        # qu'une différence avec `phpunit.xml` : `executionOrder="default"`,
+        # pour qu'un gate ne change pas d'avis à code constant. L'ordre
+        # aléatoire reste actif en local pour débusquer le couplage.
         run: php vendor/bin/pest --colors --configuration phpunit-ci.xml
 
       - name: Journaux Postgres (diagnostic si la suite échoue)

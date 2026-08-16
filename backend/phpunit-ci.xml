@@ -3,26 +3,21 @@
   ==========================================================================
   Configuration PHPUnit/Pest utilisée UNIQUEMENT par la CI (Gate 0, 2026-08-13)
   ==========================================================================
-  Identique à phpunit.xml, à une chose près : elle écarte les fichiers de tests
-  listés dans tests/QUARANTAINE.md — des tests écrits puis JAMAIS exécutés (la
-  suite ne pouvait pas démarrer) et devenus faux au fil de l'évolution du schéma.
+  ⚠️ 2026-08-16 — LA QUARANTAINE EST LEVÉE. Ce fichier n'écarte plus AUCUN test :
+  les 23 fichiers de tests/QUARANTAINE.md ont été réparés ou supprimés, et la CI
+  exécute désormais la suite entière. Le document reste en place comme archive de
+  ce qui s'est passé, plus comme liste active.
 
-  Pourquoi un second fichier plutôt qu'une modification de phpunit.xml :
-  en local, `composer test` continue d'exécuter la suite ENTIÈRE et de montrer
-  les 61 échecs — la vérité reste visible pour qui développe. La CI, elle, bloque
-  sur tout le reste (352 tests) : un test vert aujourd'hui qui casse demain
-  arrête la CI, donc le déploiement.
-
-  Deuxième différence : `executionOrder="default"` au lieu de `random`. Deux
-  exécutions du MÊME commit ont donné 262 verts puis 48 rouges — du couplage
+  Il subsiste donc UNE seule différence avec phpunit.xml, et c'est la raison
+  d'être de ce fichier : `executionOrder="default"` au lieu de `random`. Deux
+  exécutions du MÊME commit avaient donné 262 verts puis 48 rouges — du couplage
   entre tests, pas une régression. Un gate qui change d'avis sans changement de
   code ne vaut rien. L'ordre aléatoire reste actif en local (phpunit.xml) pour
   continuer à débusquer ces couplages.
 
-  Règles (détail dans tests/QUARANTAINE.md) :
-    - la liste ne peut que DÉCROÎTRE, tout ajout doit être justifié et daté ;
-    - tout NOUVEAU test est bloquant d'office ;
-    - Tests\Feature\RlsTest doit en sortir au lot L1 (durcissement RLS).
+  Règle qui subsiste : tout NOUVEAU test est bloquant d'office. Réintroduire une
+  exclusion ici demande une justification datée — c'est exactement le mécanisme
+  qui avait laissé 61 tests non exécutés pendant des mois.
   ==========================================================================
 -->
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -39,11 +34,9 @@
     <testsuites>
         <testsuite name="Unit">
             <directory>tests/Unit</directory>
-            <!-- quarantaine 2026-08-13 -->
         </testsuite>
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
-            <!-- quarantaine 2026-08-13 -->
         </testsuite>
     </testsuites>
     <source>

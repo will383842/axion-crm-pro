@@ -1,34 +1,59 @@
 # Axion CRM Pro — overlay production
-# Usage : `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`
-# Construit en stage `prod` (multi-stage), retire volumes bind, ajoute healthchecks renforcés.
-
+#
+# Usage OBLIGATOIRE (les deux fichiers, dans cet ordre) :
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# ── POURQUOI CET OVERLAY EXISTE, ET CE QU'IL CORRIGE (2026-08-16) ────────────
+#
+# Il était dans le dépôt depuis l'origine et n'était utilisé NULLE PART : le
+# workflow de déploiement lançait `docker compose up` sans `-f`. La production
+# tournait donc sur la cible `dev`, avec le montage bind du dépôt du serveur.
+#
+# 🔴 Conséquence mesurée le 2026-08-16 : `/opt/axion-crm-pro/backend/vendor`
+# datait du **17 mai** et le déploiement ne contient AUCUN `composer install`.
+# Le montage masquait le `vendor` de l'image. `composer.lock` annonçait
+# `predis v3.5.1`, la production exécutait `v2.4.1` — trois mois de mises à
+# jour PHP, correctifs de sécurité compris, jamais installés.
+#
+# Le piège était silencieux DANS LES DEUX SENS : une PR utilisant une API
+# récente passait la CI (qui fait `composer install`) et aurait cassé en
+# production.
+#
+# Ici, `volumes: []` retire le montage : le code ET le `vendor` viennent de
+# l'image, versionnés ensemble. C'est le point entier de cet overlay.
 services:
   api:
     build:
       target: prod
     restart: unless-stopped
-    volumes: []
+    # Retire le montage bind hérité de docker-compose.yml. Le code exécuté est
+    # celui de l'image, avec son `vendor` construit par `composer install
+    # --no-dev` à l'étape `composer-deps`.
+    volumes:
+      - api-storage:/var/www/html/storage
     environment:
       APP_ENV: production
-      APP_DEBUG: "false"
+      APP_DEBUG: 'false'
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost/up || exit 1"]
+      test: ['CMD-SHELL', 'curl -fsS http://localhost/up || exit 1']
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 30s
+      start_period: 40s
 
   horizon:
     build:
       target: prod
     restart: unless-stopped
-    volumes: []
+    volumes:
+      - api-storage:/var/www/html/storage
 
   scheduler:
     build:
       target: prod
     restart: unless-stopped
-    volumes: []
+    volumes:
+      - api-storage:/var/www/html/storage
 
   app:
     build:
@@ -36,3 +61,13 @@ services:
     restart: unless-stopped
     volumes: []
 
+volumes:
+  # `storage/` est le seul dossier que l'application ÉCRIT. Sans ce volume, les
+  # journaux et le lien `storage:link` disparaîtraient à chaque recréation de
+  # conteneur. Partagé entre api, horizon et scheduler : ils écrivent dans le
+  # même journal, comme aujourd'hui.
+  #
+  # ⚠️ `storage/logs` pesait **968 Mo** sur le serveur au 2026-08-16, jamais
+  # tourné (`LOG_CHANNEL=stack`, `LOG_LEVEL=debug`). Le volume ne règle pas ça —
+  # la rotation reste à traiter, séparément.
+  api-storage:

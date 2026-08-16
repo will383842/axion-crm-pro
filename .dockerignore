@@ -1,0 +1,76 @@
+# =============================================================================
+# Contexte de build Docker — ce qui ne doit JAMAIS y entrer.
+# =============================================================================
+#
+# 🔴 Ce fichier n'existait pas jusqu'au 2026-08-16. Deux conséquences, mesurées :
+#
+# 1. FUITE DE SECRETS. `Dockerfile.laravel` fait `COPY backend/ /var/www/html/`.
+#    Sans exclusion, le `.env` de la machine de build se retrouvait DANS l'image
+#    (constaté : `/var/www/html/.env`, 7 345 octets). Une image poussée sur un
+#    registre aurait emporté les secrets avec elle.
+#
+#    Et à l'exécution c'est pire qu'inutile : l'overlay de production retire le
+#    montage bind, donc le `.env` lu par Laravel serait celui de la machine de
+#    BUILD. Les variables injectées par `env_file` gagnent sur les clés
+#    communes, mais toute clé présente seulement dans le `.env` cuit
+#    s'appliquerait en silence.
+#
+# 2. CONTEXTE OBÈSE. Le déploiement construit depuis `/opt/axion-crm-pro`, qui
+#    contient `backend/storage/logs` (968 Mo au 2026-08-16) et un `backend/vendor`
+#    de mai. Tout partait au démon Docker à chaque build.
+#
+# ⚠️ `backend/vendor` est exclu À DESSEIN : l'étape `composer-deps` l'installe
+# proprement avec `--no-dev`. Copier celui de la machine de build reviendrait à
+# embarquer ses dépendances de développement.
+
+# --- Secrets : jamais, sous aucune forme ---
+**/.env
+**/.env.*
+!**/.env.example
+**/*.pem
+**/*.key
+**/id_rsa*
+
+# --- Dépendances : reconstruites dans l'image ---
+**/node_modules
+backend/vendor
+frontend/dist
+frontend/.vite
+
+# --- Volumineux et sans valeur pour le build ---
+.git
+.github
+backend/storage/logs
+backend/storage/framework/cache
+backend/storage/framework/sessions
+backend/storage/framework/views
+backend/bootstrap/cache/*.php
+**/.pnpm-store
+frontend/playwright-report
+frontend/test-results
+# ⚠️ NE PAS écrire `**/coverage` : ce motif exclut aussi
+# `frontend/src/features/coverage/`, qui est du CODE — `routeTree.tsx` en
+# importe `CoveragePage`, et le build frontend échoue sur
+# « Cannot find module '@/features/coverage/CoveragePage' ».
+# Attrapé par la porte Trivy le 2026-08-16. On désigne les chemins réels des
+# rapports de couverture, jamais un motif attrape-tout.
+frontend/coverage
+backend/coverage
+workers/coverage
+
+# --- Documentation et travaux hors-code ---
+_AUDIT
+_IMPORTS
+_PLANS
+_REPORTS
+_SESSIONS
+docs
+spec
+**/*.md
+!README.md
+
+# --- Divers ---
+**/.DS_Store
+**/Thumbs.db
+**/.idea
+**/.vscode

@@ -83,11 +83,18 @@ RUN mkdir -p bootstrap/cache \
         storage/framework/sessions \
         storage/framework/views \
         storage/logs
+# 🔴 NE PAS remettre `config:cache` / `route:cache` / `view:cache` ICI.
+#
+# Au build, il n'y a pas de `.env` : ni `DB_HOST`, ni `DB_PASSWORD`, ni
+# `REDIS_HOST`, ni `DB_TIMEZONE`. Un `config:cache` fige donc les valeurs par
+# défaut (`DB_HOST=127.0.0.1`…), et sous config mise en cache `env()` retourne
+# NUL — plus rien ne relit le `.env` au démarrage. La base devient injoignable.
+# Piège déjà payé sur ce projet le 2026-08-14.
+#
+# Ces trois caches sont désormais construits par `infra/docker/entrypoint-prod.sh`
+# au DÉMARRAGE du conteneur, quand l'environnement réel est injecté.
 RUN composer dump-autoload --classmap-authoritative --optimize \
     && php artisan storage:link || true \
-    && php artisan config:cache || true \
-    && php artisan route:cache || true \
-    && php artisan view:cache || true \
     && chown -R www-data:www-data storage bootstrap/cache
 
 # -----------------------------------------------------------------------------
@@ -95,12 +102,20 @@ RUN composer dump-autoload --classmap-authoritative --optimize \
 # -----------------------------------------------------------------------------
 FROM php-base AS prod
 ENV APP_ENV=production APP_DEBUG=false
+# `opcache.preload` a été RETIRÉ : il pointait sur `/var/www/html/preload.php`,
+# un fichier qui n'existe pas dans le dépôt. PHP émettait donc une erreur de
+# démarrage à chaque lancement. On ne déclare pas un préchargement sans le
+# fichier qui va avec.
 RUN echo "opcache.enable=1" > /usr/local/etc/php/conf.d/zz-opcache-prod.ini \
-    && echo "opcache.validate_timestamps=0" >> /usr/local/etc/php/conf.d/zz-opcache-prod.ini \
-    && echo "opcache.preload=/var/www/html/preload.php" >> /usr/local/etc/php/conf.d/zz-opcache-prod.ini
+    && echo "opcache.validate_timestamps=0" >> /usr/local/etc/php/conf.d/zz-opcache-prod.ini
 COPY --from=builder /var/www/html /var/www/html
+COPY infra/docker/entrypoint-prod.sh /usr/local/bin/entrypoint-prod
+RUN chmod +x /usr/local/bin/entrypoint-prod
 USER www-data
 EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 \
     CMD curl -fsS http://localhost/up || exit 1
+# L'entrypoint construit config/route/view caches avec l'environnement RÉEL,
+# puis passe la main à la commande (serveur web, horizon, scheduler…).
+ENTRYPOINT ["/usr/local/bin/entrypoint-prod"]
 CMD ["php", "-S", "0.0.0.0:80", "-t", "public"]

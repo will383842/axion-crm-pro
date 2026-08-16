@@ -75,6 +75,11 @@ services:
   app:
     build:
       target: prod
+      args:
+        # Arme la garde `VITE_API_BASE_URL` de `vite.config.ts` : ce bundle-ci
+        # est SERVI, une base d'API locale doit faire rougir le build et non
+        # se découvrir dans le navigateur.
+        VITE_BUILD_CIBLE: prod
     restart: unless-stopped
     volumes: !override []
 

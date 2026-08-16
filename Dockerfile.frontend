@@ -33,8 +33,12 @@ COPY --from=deps /srv/app/node_modules ./node_modules
 COPY frontend/ ./
 ARG VITE_API_BASE_URL
 ARG VITE_SENTRY_DSN
+# Signal explicite « ce bundle part en production » : seul l overlay prod le
+# pose. Il arme la garde de `vite.config.ts` contre une base d API locale.
+ARG VITE_BUILD_CIBLE
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
+ENV VITE_BUILD_CIBLE=$VITE_BUILD_CIBLE
 ENV NODE_ENV=production
 RUN pnpm build
 

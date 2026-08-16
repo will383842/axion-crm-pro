@@ -147,7 +147,11 @@ services:
       dockerfile: Dockerfile.frontend
       target: ${TARGET_FRONTEND:-prod}
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://app.axion-crm-pro.com/api}
+        # ⚠️ ORIGINE NUE, sans `/api` : le client SPA ajoute lui-même
+        # `/api/v1` (`frontend/src/lib/api.ts`). Le défaut portait le suffixe
+        # → il aurait fabriqué `/api/api/v1`. Il ne mordait pas parce que la
+        # variable est définie sur le serveur — une mine, pas un bug actif.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://app.axion-crm-pro.com}
         VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
     container_name: axion-crm-app
     restart: unless-stopped

@@ -46,9 +46,17 @@ backend/storage/framework/sessions
 backend/storage/framework/views
 backend/bootstrap/cache/*.php
 **/.pnpm-store
-**/playwright-report
-**/test-results
-**/coverage
+frontend/playwright-report
+frontend/test-results
+# ⚠️ NE PAS écrire `**/coverage` : ce motif exclut aussi
+# `frontend/src/features/coverage/`, qui est du CODE — `routeTree.tsx` en
+# importe `CoveragePage`, et le build frontend échoue sur
+# « Cannot find module '@/features/coverage/CoveragePage' ».
+# Attrapé par la porte Trivy le 2026-08-16. On désigne les chemins réels des
+# rapports de couverture, jamais un motif attrape-tout.
+frontend/coverage
+backend/coverage
+workers/coverage
 
 # --- Documentation et travaux hors-code ---
 _AUDIT

@@ -1,70 +1,184 @@
 #!/usr/bin/env bash
-# Axion CRM Pro — DR drill trimestriel
-# Vérifie : backups récupérables, RPO ≤ 1h, RTO ≤ 4h
-# Usage : ./infra/scripts/dr-drill.sh [--no-cleanup]
+# =============================================================================
+# Axion CRM Pro — exercice de restauration (DR drill)
+# =============================================================================
+# ⚠️ RÉÉCRIT LE 2026-08-16. La version précédente n'a JAMAIS pu s'exécuter, et
+# ce n'était pas un détail : c'est en tentant de la lancer qu'on a découvert que
+# la sauvegarde de production n'était ni produite ni restaurable.
+#
+# Ce qu'elle avait de faux :
+#   - elle lisait `s3cmd ls s3://axion-crm-backups/` — du stockage S3 — alors
+#     que `backup-postgres.sh` écrit en SFTP sur une Storage Box Hetzner. Deux
+#     backends sans rapport ;
+#   - `s3cmd` n'est pas installé sur le serveur : le script s'arrêtait à la
+#     première ligne utile ;
+#   - elle exigeait un RPO ≤ 1 h alors que la sauvegarde est QUOTIDIENNE : elle
+#     aurait échoué même avec des sauvegardes parfaites ;
+#   - elle restaurait dans `postgres:16-alpine`, sans PostGIS : la restauration
+#     serait morte au premier `CREATE EXTENSION`.
+#
+# ---------------------------------------------------------------------------
+# CE QUE CE SCRIPT VÉRIFIE, ET POURQUOI CHAQUE POINT COMPTE
+# ---------------------------------------------------------------------------
+#   1. la copie HORS-SITE se récupère et son empreinte correspond
+#      → si le serveur brûle, c'est elle qui sauve, pas la copie locale ;
+#   2. la restauration se termine SANS ERREUR
+#      → mesuré le 2026-08-16 : 17 erreurs suffisaient à rendre une base VIDE ;
+#   3. les COMPTAGES restaurés égalent la production
+#      → une restauration « sans erreur » mais à 0 ligne reste un échec ;
+#   4. le RTO reste sous la cible.
+#
+# ⚠️ La restauration NE SE FAIT PAS sur le serveur de production : la base pèse
+# 16 Go pour 14 Go libres. Ce script attend donc un hôte Docker disposant de la
+# place, et refuse de tourner si elle manque.
+#
+# Usage :
+#   ./infra/scripts/dr-drill.sh                 # depuis un poste ayant l'accès SSH
+#   ./infra/scripts/dr-drill.sh --no-cleanup    # garde la base restaurée
+# =============================================================================
 
 set -euo pipefail
 
-NO_CLEANUP=${1:-}
-SCRATCH=/tmp/axion-crm-dr-drill
-NOW=$(date +%s)
+NO_CLEANUP="${1:-}"
+DEBUT=$(date +%s)
+
+SRV="${SRV:-root@46.62.248.239}"
+SRV_BACKUPS="${SRV_BACKUPS:-/var/backups/axion-crm}"
+SB_HOST="${SB_HOST:-u595329.your-storagebox.de}"
+SB_USER="${SB_USER:-u595329}"
+SB_PORT="${SB_PORT:-23}"
+SB_PATH="${SB_PATH:-/home/axion-crm-backups}"
+
+PG_CONTENEUR="${PG_CONTENEUR:-axion-crm-postgres}"
+BASE_DRILL="${BASE_DRILL:-axion_crm_dr}"
+SCRATCH="${SCRATCH:-/tmp/axion-crm-dr-drill}"
+
+# Cible RTO : 4 h. Mesure de référence du 2026-08-16 : 21 min pour 16 Go.
+RTO_CIBLE_S=14400
+# La sauvegarde est QUOTIDIENNE (cron 03:00). On tolère 36 h pour absorber un
+# décalage d'exécution sans crier au loup — mais pas deux jours de silence.
+RPO_CIBLE_S=129600
+
+echo "=== Exercice de restauration — $(date -Iseconds) ==="
+
+# --- 0. Place disponible ----------------------------------------------------
+# Refuser tôt plutôt que remplir un disque à mi-restauration.
+LIBRE_GO=$(df -Pk /var/lib/docker 2>/dev/null | awk 'NR==2{print int($4/1048576)}' || echo 0)
+if [ "${LIBRE_GO:-0}" -lt 25 ]; then
+    echo "❌ Moins de 25 Go libres pour Docker (${LIBRE_GO} Go) — la base restaurée en pèse ~16." >&2
+    echo "   Lancer l'exercice depuis un hôte qui a la place." >&2
+    exit 1
+fi
+
+# --- 1. La copie hors-site est-elle récupérable ET intacte ? -----------------
+echo "[1/5] Récupération de la dernière sauvegarde depuis la Storage Box…"
 mkdir -p "$SCRATCH"
 
-echo "=== Axion CRM Pro — DR drill $(date -Iseconds) ==="
-
-# 1. Vérifier la disponibilité des backups
-echo "[1/5] Listing backups Hetzner Object Storage…"
-s3cmd ls s3://axion-crm-backups/postgres/ | tail -10
-
-LAST_BACKUP=$(s3cmd ls s3://axion-crm-backups/postgres/ | sort | tail -1 | awk '{print $NF}')
-LAST_BACKUP_TS=$(s3cmd info "$LAST_BACKUP" | grep 'Last mod' | awk '{print $3, $4, $5, $6}' | xargs -I{} date -d "{}" +%s)
-AGE=$(( (NOW - LAST_BACKUP_TS) / 60 ))
-echo "  Dernier backup : ${AGE} min"
-
-if (( AGE > 60 )); then
-  echo "  ❌ RPO violé : backup > 1h"
-  exit 1
+DERNIER=$(ssh "$SRV" "ls -1t ${SRV_BACKUPS}/*.sql.gz 2>/dev/null | head -1 | xargs -r basename")
+if [ -z "$DERNIER" ]; then
+    echo "❌ Aucune sauvegarde locale sur le serveur — la sauvegarde ne tourne pas." >&2
+    exit 1
 fi
-echo "  ✓ RPO OK"
+echo "  Dernière archive : $DERNIER"
 
-# 2. Restaurer dans un Postgres éphémère
-echo "[2/5] Restauration test sur Postgres éphémère…"
-START_RESTORE=$(date +%s)
-docker run --rm --name axion-crm-dr-pg -d -e POSTGRES_PASSWORD=test postgres:16-alpine
-sleep 5
-s3cmd get "$LAST_BACKUP" - | gunzip | docker exec -i axion-crm-dr-pg psql -U postgres -d postgres
-RESTORE_DUR=$(( $(date +%s) - START_RESTORE ))
-echo "  Restauration en ${RESTORE_DUR}s"
-
-# 3. Vérification intégrité (chaîne audit)
-echo "[3/5] Vérification chaîne audit hash…"
-HASH_OK=$(docker exec axion-crm-dr-pg psql -U postgres -d postgres -tA -c "
-  WITH chain AS (
-    SELECT id, prev_hash, current_hash,
-           LAG(current_hash) OVER (ORDER BY id) AS prev_in_db
-    FROM audit_logs
-  )
-  SELECT COUNT(*) FROM chain WHERE prev_hash <> COALESCE(prev_in_db, 'GENESIS')
-")
-if [[ "$HASH_OK" != "0" ]]; then
-  echo "  ❌ Chaîne audit corrompue : $HASH_OK rows mismatched"
-  exit 2
-fi
-echo "  ✓ Chaîne audit OK"
-
-# 4. Calcul RTO simulé
-TOTAL_DUR=$(( $(date +%s) - NOW ))
-echo "[4/5] RTO simulé : ${TOTAL_DUR}s ($((TOTAL_DUR / 60)) min)"
-if (( TOTAL_DUR > 14400 )); then
-  echo "  ❌ RTO violé : > 4h"
-  exit 3
-fi
-echo "  ✓ RTO OK"
-
-# 5. Cleanup
-if [[ "$NO_CLEANUP" != "--no-cleanup" ]]; then
-  docker rm -f axion-crm-dr-pg
-  rm -rf "$SCRATCH"
+# Âge : le RPO se mesure sur ce qui EXISTE, pas sur ce qui est planifié.
+AGE_S=$(ssh "$SRV" "echo \$(( \$(date +%s) - \$(stat -c %Y ${SRV_BACKUPS}/${DERNIER}) ))")
+echo "  Âge : $((AGE_S / 3600)) h"
+if [ "$AGE_S" -gt "$RPO_CIBLE_S" ]; then
+    echo "❌ RPO violé : la dernière sauvegarde a plus de $((RPO_CIBLE_S / 3600)) h." >&2
+    exit 1
 fi
 
-echo "=== DR drill PASSED ==="
+# Empreinte de la copie locale, puis de la copie RAPATRIÉE depuis le hors-site.
+# Comparer les deux est le seul moyen de prouver que le transfert n'a pas
+# silencieusement tronqué l'archive.
+EMPREINTE_LOCALE=$(ssh "$SRV" "sha256sum ${SRV_BACKUPS}/${DERNIER} | cut -d' ' -f1")
+ssh "$SRV" "set -a; . <(grep -E '^SB_' /opt/axion-crm-pro/.env); set +a; \
+    mkdir -p ${SCRATCH} && cd ${SCRATCH} && \
+    sshpass -p \"\$SB_PASSWORD\" sftp -o StrictHostKeyChecking=no -P ${SB_PORT} \
+        ${SB_USER}@${SB_HOST}:${SB_PATH}/${DERNIER} . >/dev/null"
+EMPREINTE_DISTANTE=$(ssh "$SRV" "sha256sum ${SCRATCH}/${DERNIER} | cut -d' ' -f1")
+
+if [ "$EMPREINTE_LOCALE" != "$EMPREINTE_DISTANTE" ]; then
+    echo "❌ La copie hors-site DIFFÈRE de la copie locale." >&2
+    echo "   locale=$EMPREINTE_LOCALE" >&2
+    echo "   distante=$EMPREINTE_DISTANTE" >&2
+    exit 2
+fi
+echo "  ✓ Copie hors-site récupérée, empreinte identique"
+
+# --- 2. Comptages de RÉFÉRENCE, pris en production AVANT la restauration ----
+echo "[2/5] Relevé des comptages de production…"
+REFERENCE=$(ssh "$SRV" "docker exec ${PG_CONTENEUR} psql -U axion -d axion_crm -tAc \"
+    SELECT 'companies='||count(*) FROM companies
+    UNION ALL SELECT 'contacts='||count(*) FROM contacts
+    UNION ALL SELECT 'scraper_runs='||count(*) FROM scraper_runs
+    UNION ALL SELECT 'company_tag='||count(*) FROM company_tag
+    UNION ALL SELECT 'journalists='||count(*) FROM journalists\" | sort")
+echo "$REFERENCE" | sed 's/^/    /'
+
+# --- 3. Restauration --------------------------------------------------------
+echo "[3/5] Restauration dans « ${BASE_DRILL} »…"
+scp "$SRV:${SCRATCH}/${DERNIER}" "$SCRATCH/" >/dev/null
+DEBUT_RESTAURE=$(date +%s)
+
+docker exec "$PG_CONTENEUR" psql -U axion -d postgres -q \
+    -c "DROP DATABASE IF EXISTS ${BASE_DRILL} WITH (FORCE);" \
+    -c "CREATE DATABASE ${BASE_DRILL} OWNER axion;"
+
+# Le journal est CONSERVÉ : c'est lui qui a permis d'identifier la panne du
+# 2026-08-16 (`function unaccent(text) does not exist`).
+JOURNAL="$SCRATCH/restauration.log"
+zcat "$SCRATCH/${DERNIER}" \
+    | docker exec -i "$PG_CONTENEUR" psql -U axion -d "$BASE_DRILL" -q \
+    > "$JOURNAL" 2>&1 || true
+DUREE_RESTAURE=$(( $(date +%s) - DEBUT_RESTAURE ))
+
+ERREURS=$(grep -c '^ERROR' "$JOURNAL" || true)
+echo "  Restauration en ${DUREE_RESTAURE}s — ${ERREURS} erreur(s)"
+if [ "$ERREURS" -gt 0 ]; then
+    echo "  Erreurs distinctes :" >&2
+    grep '^ERROR' "$JOURNAL" | sort | uniq -c | sort -rn | head -10 | sed 's/^/    /' >&2
+    echo "❌ Restauration en erreur — journal complet : $JOURNAL" >&2
+    exit 3
+fi
+echo "  ✓ Restauration sans erreur"
+
+# --- 4. Les comptages correspondent-ils ? -----------------------------------
+# LE test. Une restauration « sans erreur » mais vide reste un échec : c'est
+# exactement ce qui s'est produit le 2026-08-16 avant le correctif search_path.
+echo "[4/5] Comparaison des comptages…"
+RESTAURE=$(docker exec "$PG_CONTENEUR" psql -U axion -d "$BASE_DRILL" -tAc "
+    SELECT 'companies='||count(*) FROM companies
+    UNION ALL SELECT 'contacts='||count(*) FROM contacts
+    UNION ALL SELECT 'scraper_runs='||count(*) FROM scraper_runs
+    UNION ALL SELECT 'company_tag='||count(*) FROM company_tag
+    UNION ALL SELECT 'journalists='||count(*) FROM journalists" | sort)
+
+if [ "$REFERENCE" != "$RESTAURE" ]; then
+    echo "❌ ÉCART entre production et restauration :" >&2
+    diff <(echo "$REFERENCE") <(echo "$RESTAURE") | sed 's/^/    /' >&2
+    exit 4
+fi
+echo "$RESTAURE" | sed 's/^/    /'
+echo "  ✓ Comptages identiques à la production"
+
+# --- 5. RTO -----------------------------------------------------------------
+DUREE_TOTALE=$(( $(date +%s) - DEBUT ))
+echo "[5/5] RTO simulé : ${DUREE_TOTALE}s ($((DUREE_TOTALE / 60)) min)"
+if [ "$DUREE_TOTALE" -gt "$RTO_CIBLE_S" ]; then
+    echo "❌ RTO violé : > $((RTO_CIBLE_S / 3600)) h" >&2
+    exit 5
+fi
+echo "  ✓ RTO sous la cible"
+
+# --- Nettoyage --------------------------------------------------------------
+if [ "$NO_CLEANUP" != "--no-cleanup" ]; then
+    docker exec "$PG_CONTENEUR" psql -U axion -d postgres -q \
+        -c "DROP DATABASE IF EXISTS ${BASE_DRILL} WITH (FORCE);"
+    ssh "$SRV" "rm -rf ${SCRATCH}"
+    rm -rf "$SCRATCH"
+    echo "Nettoyage fait (--no-cleanup pour conserver la base restaurée)."
+fi
+
+echo "=== EXERCICE RÉUSSI ==="

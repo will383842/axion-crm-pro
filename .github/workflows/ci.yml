@@ -131,9 +131,29 @@ jobs:
           # peut pas faire tourner la suite Feature. On réutilise donc l'image
           # de prod ; à défaut on la reconstruit depuis Dockerfile.postgres.
           echo "$GHCR_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          if ! docker pull "$IMG"; then
+          # ⚠️ 2026-08-16 — ce repli faisait dépendre un gate BLOQUANT de la
+          # joignabilité de `deb.debian.org` et de deux clones GitHub :
+          # `Dockerfile.postgres` compile pgvector et pg_partman depuis les
+          # sources. Une PR Dependabot est tombée dessus (« Failed to fetch
+          # libstdc++-10-dev … Connection reset by peer ») et a été signalée
+          # rouge alors que le diff ne touchait qu'un paquet frontend. Un gate
+          # qui rougit pour une raison étrangère au diff finit ignoré — c'est
+          # le même piège que la police téléchargée au build.
+          #
+          # On retente donc, le tirage étant transitoire : d'abord le `pull`
+          # (le chemin normal, ~10 s), puis le build de repli.
+          reessayer() { # reessayer <tentatives> <commande...>
+            local n=$1; shift
+            for i in $(seq 1 "$n"); do
+              if "$@"; then return 0; fi
+              echo "::warning::échec de « $* » (tentative $i/$n)"
+              sleep $((i * 10))
+            done
+            return 1
+          }
+          if ! reessayer 3 docker pull "$IMG"; then
             echo "::notice::Image GHCR indisponible — reconstruction locale depuis Dockerfile.postgres"
-            docker build -f Dockerfile.postgres -t "$IMG" .
+            reessayer 2 docker build -f Dockerfile.postgres -t "$IMG" .
           fi
           # --network host : PAS de publication de port. Avec `-p 5432:5432`, la
           # suite (qui ouvre une connexion PDO par test) traversait le proxy

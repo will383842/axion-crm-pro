@@ -128,17 +128,39 @@ log "Rotation distante (>$RETENTION_REMOTE_DAYS jours)..."
 CUTOFF_TIMESTAMP=$(date -u -d "$RETENTION_REMOTE_DAYS days ago" +%Y%m%dT%H%M%SZ)
 log "  Cutoff: garder uniquement les fichiers > $CUTOFF_TIMESTAMP"
 
-# Liste les fichiers .sql.gz via sftp ls
-REMOTE_LIST=$(sshpass -p "$SB_PASSWORD" sftp -P "$SB_PORT" -o StrictHostKeyChecking=accept-new "$SB_USER@$SB_HOST" <<EOF 2>/dev/null | grep '\.sql\.gz$' | awk '{print $NF}' || true
+# Liste les fichiers .sql.gz via sftp.
+#
+# ⚠️ `ls` (sans -1) affiche EN COLONNES, chaque colonne complétée par des
+# espaces : aucune ligne ne se termine par « .sql.gz », donc le
+# `grep '\.sql\.gz$'` d'origine ne retenait RIEN. Mesuré le 2026-08-16 :
+# REMOTE_LIST était vide, la rotation distante n'avait jamais supprimé un seul
+# fichier depuis sa création — l'archive du 17 mai était toujours là, trois mois
+# après une rétention annoncée à 30 jours.
+#
+# Ce n'est pas cosmétique : à 692 Mo par nuit, une Storage Box qui ne tourne
+# jamais finit pleine, l'envoi échoue, et on retombe sur la panne silencieuse
+# de #136 — une sauvegarde locale sans copie hors-site.
+#
+# `ls -1` force une entrée par ligne, sans remplissage.
+REMOTE_LIST=$(sshpass -p "$SB_PASSWORD" sftp -P "$SB_PORT" -o StrictHostKeyChecking=accept-new "$SB_USER@$SB_HOST" <<EOF 2>/dev/null | sed -nE 's/^(axion_crm_[0-9]+T[0-9]+Z\.sql\.gz)[[:space:]]*$/\1/p' || true
 cd $SB_PATH
-ls
+ls -1
 EOF
 )
 
+NB_DISTANTS=$(printf '%s\n' "$REMOTE_LIST" | grep -c . || true)
+log "  $NB_DISTANTS archive(s) hors-site listée(s)"
+
+# Filet : ne JAMAIS supprimer la plus récente, même si elle a dépassé la
+# rétention. Si la sauvegarde s'arrête (c'est arrivé : 91 échecs sur 91), une
+# rotation purement calendaire viderait le hors-site et laisserait ZÉRO copie.
+PLUS_RECENTE=$(printf '%s\n' "$REMOTE_LIST" | grep . | sort | tail -1)
+
 # Pour chaque fichier, parse le timestamp dans le nom et supprime si trop ancien
 DELETED_COUNT=0
-echo "$REMOTE_LIST" | while IFS= read -r filename; do
+while IFS= read -r filename; do
     [ -z "$filename" ] && continue
+    [ "$filename" = "$PLUS_RECENTE" ] && continue
     # Extract timestamp from "axion_crm_YYYYMMDDTHHMMSSZ.sql.gz"
     ts=$(echo "$filename" | sed -nE 's/^axion_crm_([0-9]+T[0-9]+Z)\.sql\.gz$/\1/p')
     if [ -n "$ts" ] && [ "$ts" \< "$CUTOFF_TIMESTAMP" ]; then
@@ -149,8 +171,8 @@ rm $filename
 EOF
         DELETED_COUNT=$((DELETED_COUNT + 1))
     fi
-done
-log "  Rotation distante : terminée"
+done <<< "$REMOTE_LIST"
+log "  Rotation distante : terminée ($DELETED_COUNT supprimée(s))"
 
 # --- Inventory ---
 log "Backups locaux actuels :"

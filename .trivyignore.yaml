@@ -1,0 +1,85 @@
+# =============================================================================
+# Exceptions Trivy — DATÉES, donc temporaires par construction
+# =============================================================================
+# Chaque entrée porte un `expired_at`. Passée cette date, l'exception cesse de
+# s'appliquer et la garde redevient rouge : c'est ce qui force le réexamen.
+# Une exception sans date ne s'enlève jamais — elle devient un trou permanent
+# qu'on oublie avoir creusé.
+#
+# -----------------------------------------------------------------------------
+# Binaire Caddy (`usr/bin/caddy`) — 13 vulnérabilités HIGH, aucune corrigeable ici
+# -----------------------------------------------------------------------------
+# Constaté le 2026-08-16, à l'occasion du premier scan réel de l'image `app`
+# (elle était construite puis jetée sans analyse depuis toujours).
+#
+# `caddy:2-alpine` est aujourd'hui Caddy v2.11.4, image publiée le 2026-06-22 et
+# compilée avec Go 1.26.3. Les correctifs exigent Go 1.25.11 / 1.26.4 ou plus.
+# Autrement dit : SEUL un Caddy reconstruit en amont les résout. Vérifié — aucun
+# tag plus récent ne le fait, et `apk upgrade` n'y peut rien (le binaire Go
+# embarque ses dépendances).
+#
+# ⚠️ CE QUE CETTE EXCEPTION NE DIT PAS : que le risque est nul.
+# Le conteneur `app` sert des fichiers statiques sur un port interne, DERRIÈRE le
+# proxy de bordure — exposition faible. Mais le proxy de bordure
+# (`axion-crm-caddy`) est LE MÊME BINAIRE, publié sur 0.0.0.0:80 et :443, et il
+# termine le TLS. Les CVE `crypto/tls`, `crypto/x509` et `net/http` le concernent
+# pleinement. Il n'entre pas dans cette exception : il n'était tout simplement
+# jamais analysé, étant une image TIRÉE et non construite. Un job d'inventaire a
+# été ajouté pour qu'il cesse d'être un angle mort.
+#
+# À faire au réexamen : vérifier si `caddy:2-alpine` a été republié avec un Go
+# corrigé ; si oui, un simple rebuild suffit et ce bloc entier disparaît.
+# -----------------------------------------------------------------------------
+vulnerabilities:
+  - id: CVE-2026-27145
+    paths: ["usr/bin/caddy"]
+    statement: "crypto/x509 — dans le binaire Caddy v2.11.4 (Go 1.26.3). Seul un Caddy reconstruit en amont corrige."
+    expired_at: 2026-10-01
+  - id: CVE-2026-33818
+    paths: ["usr/bin/caddy"]
+    statement: "encoding/asn1 — idem : corrigeable uniquement par un rebuild amont de Caddy."
+    expired_at: 2026-10-01
+  - id: CVE-2026-39821
+    paths: ["usr/bin/caddy"]
+    statement: "golang.org/x/net/idna — idem : corrigeable uniquement par un rebuild amont de Caddy."
+    expired_at: 2026-10-01
+  - id: CVE-2026-39822
+    paths: ["usr/bin/caddy"]
+    statement: "os.Root (traversée par lien symbolique) — idem : corrigeable uniquement par un rebuild amont de Caddy."
+    expired_at: 2026-10-01
+  - id: CVE-2026-42504
+    paths: ["usr/bin/caddy"]
+    statement: "mime — idem : corrigeable uniquement par un rebuild amont de Caddy."
+    expired_at: 2026-10-01
+  - id: CVE-2026-46600
+    paths: ["usr/bin/caddy"]
+    statement: "golang.org/x/net/dns — idem : corrigeable uniquement par un rebuild amont de Caddy."
+    expired_at: 2026-10-01
+  - id: CVE-2026-56852
+    paths: ["usr/bin/caddy"]
+    statement: "golang.org/x/text — idem : corrigeable uniquement par un rebuild amont de Caddy."
+    expired_at: 2026-10-01
+  - id: CVE-2026-56853
+    paths: ["usr/bin/caddy"]
+    statement: "net/http — idem : corrigeable uniquement par un rebuild amont de Caddy."
+    expired_at: 2026-10-01
+  - id: CVE-2026-56858
+    paths: ["usr/bin/caddy"]
+    statement: "html/template — idem : corrigeable uniquement par un rebuild amont de Caddy."
+    expired_at: 2026-10-01
+  - id: CVE-2026-56859
+    paths: ["usr/bin/caddy"]
+    statement: "encoding/xml — idem : corrigeable uniquement par un rebuild amont de Caddy."
+    expired_at: 2026-10-01
+  - id: CVE-2026-56860
+    paths: ["usr/bin/caddy"]
+    statement: "net/url — idem : corrigeable uniquement par un rebuild amont de Caddy."
+    expired_at: 2026-10-01
+  - id: CVE-2026-56862
+    paths: ["usr/bin/caddy"]
+    statement: "crypto/tls — idem : corrigeable uniquement par un rebuild amont de Caddy."
+    expired_at: 2026-10-01
+  - id: GHSA-hrxh-6v49-42gf
+    paths: ["usr/bin/caddy"]
+    statement: "google.golang.org/grpc (xDS RBAC) — idem : corrigeable uniquement par un rebuild amont de Caddy."
+    expired_at: 2026-10-01

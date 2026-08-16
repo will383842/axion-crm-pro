@@ -114,7 +114,57 @@ jobs:
           format: table
           severity: CRITICAL,HIGH
           ignore-unfixed: true
+          trivyignores: .trivyignore.yaml # exceptions DATÉES, cf. le fichier
           exit-code: '1' # BLOQUANT — plus de `continue-on-error`
+
+  # ⚠️ 2026-08-16 — angle mort découvert en instruisant le job ci-dessus.
+  # Le scan ne portait QUE sur les images que l'on construit. Or la production
+  # fait tourner des images TIRÉES telles quelles, dont `caddy:2-alpine` : c'est
+  # le proxy de bordure `axion-crm-caddy`, publié sur 0.0.0.0:80 et :443, et
+  # c'est lui qui TERMINE LE TLS. Il porte exactement les 13 vulnérabilités HIGH
+  # du binaire Caddy relevées dans l'image `app` — sauf que là, elles sont sur
+  # le chemin exposé. Rien ne les regardait.
+  #
+  # Ce job est délibérément NON BLOQUANT, et la raison n'est pas la même que le
+  # `continue-on-error` qu'on vient de retirer : ces images, on ne les construit
+  # pas. La seule action possible est de monter la version quand l'amont
+  # republie — bloquer les PR en attendant ne ferait qu'un rouge permanent. Ce
+  # que ce job apporte, c'est de SAVOIR : l'inventaire remonte dans l'onglet
+  # Security, et le jour où l'amont corrige, on le voit.
+  trivy-images-tirees:
+    name: Scan images tirées (inventaire)
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { nom: caddy-bordure, ref: 'caddy:2-alpine' }
+          - { nom: redis, ref: 'redis:7.2-alpine' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ matrix.ref }}
+          format: sarif
+          output: trivy-${{ matrix.nom }}.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always() && hashFiles(format('trivy-{0}.sarif', matrix.nom)) != ''
+        with:
+          sarif_file: trivy-${{ matrix.nom }}.sarif
+          category: trivy-${{ matrix.nom }}
+      # Le tableau dans le journal, pour que l'inventaire soit lisible sans
+      # ouvrir un onglet — c'est ce qui fait la différence entre « consultable »
+      # et « consulté ».
+      - name: Inventaire lisible
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ matrix.ref }}
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '0'
 
   composer-audit:
     name: PHP deps audit

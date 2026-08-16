@@ -63,12 +63,33 @@ echo "=== Exercice de restauration — $(date -Iseconds) ==="
 
 # --- 0. Place disponible ----------------------------------------------------
 # Refuser tôt plutôt que remplir un disque à mi-restauration.
-LIBRE_GO=$(df -Pk /var/lib/docker 2>/dev/null | awk 'NR==2{print int($4/1048576)}' || echo 0)
-if [ "${LIBRE_GO:-0}" -lt 25 ]; then
-    echo "❌ Moins de 25 Go libres pour Docker (${LIBRE_GO} Go) — la base restaurée en pèse ~16." >&2
-    echo "   Lancer l'exercice depuis un hôte qui a la place." >&2
+#
+# ⚠️ On mesure DEPUIS LE CONTENEUR, pas depuis l'hôte. La version du 2026-08-16
+# lisait `df /var/lib/docker` côté hôte : ce chemin n'existe ni sous Docker
+# Desktop (Windows/macOS, le démon tourne dans une VM) ni sous Docker distant.
+# `df` échouait, `awk` ne recevait rien, LIBRE_GO valait "" → 0 → le script
+# refusait de tourner sur le SEUL poste qui avait la place. Une garde qui
+# bloque tout le monde ne garde rien.
+#
+# Le volume de données du conteneur est exactement le système de fichiers qui
+# va recevoir les ~16 Go restaurés : c'est lui qu'il faut interroger.
+if ! docker inspect -f '{{.State.Running}}' "$PG_CONTENEUR" 2>/dev/null | grep -q true; then
+    echo "❌ Le conteneur « $PG_CONTENEUR » ne tourne pas — démarre-le avant l'exercice." >&2
     exit 1
 fi
+# Le chemin passe par `sh -c` et non en argument direct : sous Git Bash (MSYS),
+# tout argument commençant par « / » est réécrit en chemin Windows avant d'être
+# remis à docker — `/var/lib/postgresql/data` devenait
+# « C:/Program Files/Git/var/lib/postgresql/data ». Enfermé dans la chaîne du
+# `sh -c`, l'argument ne commence plus par « / » et traverse intact.
+LIBRE_GO=$(docker exec "$PG_CONTENEUR" sh -c 'df -Pk /var/lib/postgresql/data' \
+    | awk 'NR==2{print int($4/1048576)}')
+if [ "${LIBRE_GO:-0}" -lt 25 ]; then
+    echo "❌ Moins de 25 Go libres sur le volume de « $PG_CONTENEUR » (${LIBRE_GO:-0} Go)" >&2
+    echo "   — la base restaurée en pèse ~16. Lancer l'exercice depuis un hôte qui a la place." >&2
+    exit 1
+fi
+echo "  Place disponible sur le volume de restauration : ${LIBRE_GO} Go"
 
 # --- 1. La copie hors-site est-elle récupérable ET intacte ? -----------------
 echo "[1/5] Récupération de la dernière sauvegarde depuis la Storage Box…"

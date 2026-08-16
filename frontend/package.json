@@ -52,7 +52,7 @@
     "@axe-core/playwright": "^4.10.0",
     "@playwright/test": "^1.49.0",
     "@sentry/cli": "^2.39.0",
-    "@tailwindcss/vite": "^4.0.0",
+    "@tailwindcss/vite": "^4.3.3",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.0",
     "@testing-library/react": "^16.0.0",

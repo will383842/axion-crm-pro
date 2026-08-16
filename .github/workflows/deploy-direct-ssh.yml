@@ -186,6 +186,17 @@ jobs:
           # à exécuter l'image précédente — et, depuis le passage à l'overlay de
           # production, ils exécuteraient un `vendor` différent de celui de
           # l'API. Deux versions du même code dans le même système.
+          # ⚠️ `reverb` est VOLONTAIREMENT absent de cette liste.
+          # Il est arrêté depuis 5 semaines, et il ne sert personne : Echo est
+          # désactivé côté frontend (`echo.ts:37-40`, tant que
+          # `VITE_ECHO_ENABLED` et `VITE_REVERB_APP_KEY` sont absents — elles ne
+          # sont déclarées nulle part), et le Caddyfile n'a aucune route
+          # WebSocket vers `reverb:8080`.
+          # L'ajouter ici le DÉMARRERAIT — en cible `dev`, avec le montage bind
+          # qui masque le vendor de l'image. On réintroduirait précisément le
+          # défaut corrigé le 2026-08-16. Rallumer le temps réel est une
+          # décision produit : elle passe par l'overlay de prod, pas par cette
+          # ligne.
           docker compose up -d --build --force-recreate --no-deps api app horizon scheduler
           echo "::endgroup::"
 
@@ -218,7 +229,7 @@ jobs:
           echo "::group::vérification post-déploiement — santé des conteneurs"
           docker compose ps --format '{{.Service}}|{{.State}}|{{.Status}}'
           PS_OUT="$(docker compose ps --format '{{.Service}}|{{.State}}|{{.Status}}')"
-          for svc in api app postgres redis caddy; do
+          for svc in api app horizon postgres redis caddy; do
             line="$(printf '%s\n' "$PS_OUT" | awk -F'|' -v s="$svc" '$1 == s { print $0 }')"
             if [ -z "$line" ]; then
               echo "::error::conteneur $svc absent après déploiement"

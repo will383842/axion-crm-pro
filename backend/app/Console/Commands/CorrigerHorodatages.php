@@ -106,6 +106,11 @@ class CorrigerHorodatages extends Command
         }
 
         $this->line($appliquer ? '⚠️  MODE ÉCRITURE' : 'Mode simulation — aucune écriture.');
+
+        if ($appliquer) {
+            $this->preparerJournal();
+        }
+
         $this->newLine();
 
         $total = 0;
@@ -266,22 +271,47 @@ class CorrigerHorodatages extends Command
 
         $avant = (int) $this->db()->selectOne("SELECT count(*) AS n FROM {$this->q($table)}")->n;
 
+        $etat = $this->journalReprise($table);
+
+        if ($etat !== null && $etat->termine_at !== null) {
+            // ⚠️ SANS CE GARDE, ON DÉCALERAIT DEUX FOIS.
+            // La transformation N'EST PAS IDEMPOTENTE : l'appliquer deux fois
+            // recule de 4 h. Et une ligne déjà corrigée reste à la seconde
+            // pleine — le discriminant ne sait donc PAS la distinguer d'une
+            // ligne jamais reprise. Seul ce journal le sait.
+            $this->line("    → {$table} : DÉJÀ REPRISE le {$etat->termine_at}, ignorée.");
+
+            return;
+        }
+
         $declencheurs = $this->declencheursUtilisateur($table);
 
-        $this->db()->transaction(function () use ($table, $cle, $set, $taille, $avant, $declencheurs) {
-            // Suspension DANS la transaction : une annulation les rétablit
-            // d'office, il n'existe donc aucun chemin où la table ressort sans
-            // ses déclencheurs. Sans cette suspension, `trg_set_updated_at`
-            // écraserait la date de modification de chaque ligne reprise, et le
-            // recalcul de score partirait sur des millions de fiches.
-            if ($declencheurs !== []) {
-                $this->db()->statement("ALTER TABLE {$this->q($table)} DISABLE TRIGGER USER");
-                $this->line('    · déclencheurs suspendus : ' . implode(', ', $declencheurs));
-            }
+        // Les déclencheurs sont suspendus HORS des transactions de tranche, et
+        // rétablis dans un `finally`. C'est le prix du découpage : sur les
+        // tables volumineuses (companies 7 Go, scraper_runs 3,5 Go), une seule
+        // transaction garderait toutes les anciennes versions de lignes sur le
+        // disque jusqu'au COMMIT — plusieurs Go de gonflement, plus le WAL, sur
+        // un serveur qui n'a que 27 Go libres.
+        //
+        // Contrepartie assumée : pendant la reprise, une écriture concurrente
+        // n'exécuterait pas les déclencheurs. D'où la fenêtre de maintenance
+        // (`docker compose stop horizon scheduler`), qui n'est pas une
+        // précaution mais une CONDITION.
+        if ($declencheurs !== []) {
+            $this->db()->statement("ALTER TABLE {$this->q($table)} DISABLE TRIGGER USER");
+            $this->line('    · déclencheurs suspendus : ' . implode(', ', $declencheurs));
+            $this->line("    · si ce processus est tué, rétablir à la main :\n"
+                . "      ALTER TABLE {$this->q($table)} ENABLE TRIGGER USER;");
+        }
 
-            $dernier = null;
-            $traitees = 0;
+        $dernier = $etat?->dernier_id;
+        $traitees = 0;
 
+        if ($dernier !== null) {
+            $this->line("    · REPRISE après interruption, à partir de {$cle} > {$dernier}");
+        }
+
+        try {
             while (true) {
                 $borne = $this->db()->select(
                     sprintf(
@@ -304,31 +334,43 @@ class CorrigerHorodatages extends Command
                         : sprintf('%s > ? AND %s <= ?', $this->q($cle), $this->q($cle)));
 
                 $liens = array_values(array_filter([$dernier, $haut], fn ($v) => $v !== null));
+                $borneHaute = $haut;
+                $fini = $haut === null;
 
-                $traitees += $this->db()->update("UPDATE {$this->q($table)} SET {$set} WHERE {$where}", $liens);
+                // La tranche ET son avancement sont validés ENSEMBLE : le
+                // journal ne peut jamais mentir sur ce qui a été écrit.
+                $traitees += (int) $this->db()->transaction(
+                    fn () => tap(
+                        $this->db()->update("UPDATE {$this->q($table)} SET {$set} WHERE {$where}", $liens),
+                        fn () => $this->marquerAvancement($table, $borneHaute, $fini),
+                    ),
+                );
 
-                if ($haut === null) {
+                if ($fini) {
                     break;
                 }
                 $dernier = $haut;
             }
-
-            $apres = (int) $this->db()->selectOne("SELECT count(*) AS n FROM {$this->q($table)}")->n;
-
-            // Ceinture ET bretelles : la commande ne supprime rien, mais on
-            // refuse de valider une transaction où le compte a bougé.
-            if ($apres !== $avant) {
-                throw new \RuntimeException(
-                    "ANNULATION {$table} : {$avant} lignes avant, {$apres} après. Aucune écriture validée.",
-                );
-            }
-
+        } finally {
             if ($declencheurs !== []) {
                 $this->db()->statement("ALTER TABLE {$this->q($table)} ENABLE TRIGGER USER");
             }
+        }
 
-            $this->line("    → {$table} : {$traitees} mises à jour, {$apres} lignes (inchangé).");
-        });
+        $apres = (int) $this->db()->selectOne("SELECT count(*) AS n FROM {$this->q($table)}")->n;
+
+        // La commande n'insère ni ne supprime : le compte NE PEUT PAS bouger.
+        // S'il bouge, c'est qu'une écriture concurrente a eu lieu — donc que la
+        // fenêtre de maintenance n'était pas fermée, donc que des déclencheurs
+        // ont été contournés. On le dit fort.
+        if ($apres !== $avant) {
+            throw new \RuntimeException(
+                "ALERTE {$table} : {$avant} lignes avant, {$apres} après. Une écriture concurrente a eu lieu "
+                . 'pendant la reprise — vérifier que horizon et scheduler sont bien arrêtés.',
+            );
+        }
+
+        $this->line("    → {$table} : {$traitees} mises à jour, {$apres} lignes (inchangé).");
 
         // Contrôle APRÈS commit : les déclencheurs doivent être revenus. Une
         // table qui ressortirait sans les siens serait un dégât silencieux —
@@ -339,6 +381,62 @@ class CorrigerHorodatages extends Command
                 "ALERTE {$table} : les déclencheurs n'ont PAS été rétablis. Intervention manuelle requise.",
             );
         }
+    }
+
+    /**
+     * Journal d'avancement — la seule chose qui rende cette reprise sûre.
+     *
+     * 🔴 La transformation N'EST PAS IDEMPOTENTE : l'appliquer deux fois recule
+     * de 4 h. Or une ligne déjà corrigée reste à la seconde pleine : le
+     * discriminant des microsecondes ne sait PAS la distinguer d'une ligne
+     * jamais reprise. Sans mémoire externe, une interruption au milieu de
+     * `scraper_runs` (7,6 M de lignes) laisserait la table à moitié corrigée
+     * SANS AUCUN MOYEN DE SAVOIR OÙ — et toute relance décalerait deux fois ce
+     * qui l'avait déjà été.
+     *
+     * Chaque tranche et son avancement sont donc validés dans la MÊME
+     * transaction : le journal ne peut pas mentir sur ce qui a été écrit.
+     *
+     * Table d'exploitation, volontairement hors migrations : elle n'a de sens
+     * que le temps de cette reprise, et un `DROP TABLE horodatages_reprise`
+     * la retire une fois l'opération soldée.
+     */
+    private function preparerJournal(): void
+    {
+        $this->db()->statement(
+            'CREATE TABLE IF NOT EXISTS horodatages_reprise (
+                table_name text PRIMARY KEY,
+                dernier_id text,
+                demarre_at timestamptz NOT NULL DEFAULT now(),
+                termine_at timestamptz
+            )',
+        );
+    }
+
+    /**
+     * @return object{dernier_id: string|null, termine_at: string|null}|null
+     */
+    private function journalReprise(string $table): ?object
+    {
+        /** @var object{dernier_id: string|null, termine_at: string|null}|null $ligne */
+        $ligne = $this->db()->selectOne(
+            'SELECT dernier_id, termine_at FROM horodatages_reprise WHERE table_name = ?',
+            [$table],
+        );
+
+        return $ligne;
+    }
+
+    private function marquerAvancement(string $table, mixed $dernierId, bool $termine): void
+    {
+        $this->db()->statement(
+            'INSERT INTO horodatages_reprise (table_name, dernier_id, termine_at)
+             VALUES (?, ?, CASE WHEN ?::boolean THEN now() ELSE NULL END)
+             ON CONFLICT (table_name) DO UPDATE
+                SET dernier_id = EXCLUDED.dernier_id,
+                    termine_at = EXCLUDED.termine_at',
+            [$table, $dernierId === null ? null : (string) $dernierId, $termine],
+        );
     }
 
     /** @return array<int,string> */

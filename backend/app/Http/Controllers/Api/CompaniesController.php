@@ -7,8 +7,10 @@ use App\Models\Company;
 use App\Services\Email\EmailConfidenceService;
 use App\Services\Waterfall\WaterfallOrchestrator;
 use App\Support\CompanyQueryFilters;
+use App\Support\EligibiliteCampagne;
 use App\Support\MasquageCoordonnees;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -163,9 +165,31 @@ class CompaniesController extends ApiController
 
         // Scope EXPLICITE par workspace (défense principale : pas de fuite entre
         // tenants, indépendamment de l'état RLS pendant le streaming).
+        // 🔴 LES CONTACTS OPPOSÉS NE SORTENT PAS DANS LE CSV.
+        //
+        // Cet export embarquait `nom prénom (rôle) email téléphone` de CHAQUE
+        // contact, y compris ceux inscrits en `opt_out` ou en
+        // `email_suppressions` — sur 4,29 M de fiches. La garde d'éligibilité
+        // existait (`EligibiliteCampagne`) mais n'était appliquée que si
+        // l'appelant passait `filter[eligible_campagne]` ; l'export ne le
+        // passait pas. Constaté le 2026-08-16.
+        //
+        // Exporter un CSV de prospects EST un usage de prospection : une
+        // personne qui s'y est opposée ne doit pas y figurer, même sans son
+        // adresse. On filtre donc au chargement de la relation.
+        // La fermeture reçoit une `HasMany`, pas un `Builder` : on passe donc
+        // `getQuery()`, qui EST la requête de la relation — les contraintes
+        // s'y appliquent bien. C'est aussi ce qui rend le type générique
+        // résoluble par l'analyse statique.
+        $chargeContacts = static function (Relation $relation): void {
+            EligibiliteCampagne::exclureOpposes($relation->getQuery(), 'contacts.email');
+        };
+
         $query = $this->buildFilteredQuery()
             ->where('workspace_id', $workspaceId)
-            ->with($hasSante ? ['contacts', 'healthPractitioners'] : ['contacts']);
+            ->with($hasSante
+                ? ['contacts' => $chargeContacts, 'healthPractitioners']
+                : ['contacts' => $chargeContacts]);
 
         $confidenceScorer = new EmailConfidenceService;
 

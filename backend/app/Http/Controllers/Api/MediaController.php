@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\Media;
+use App\Support\EligibiliteCampagne;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -103,7 +104,17 @@ class MediaController extends ApiController
         }
 
         // Scope EXPLICITE workspace (défense principale contre fuite inter-tenants).
-        $query = $this->buildFilteredQuery()->where('workspace_id', $workspaceId);
+        //
+        // 🔴 Et les portes d'opposition, qui manquaient entièrement ici.
+        // Cet export sort « Email rédaction » et « Téléphone » ; il ne
+        // consultait NI `opt_out` NI `email_suppressions`. Une rédaction qui
+        // s'est opposée y figurait quand même. Constaté le 2026-08-16 — c'est
+        // le seul des trois exports qui n'avait aucun filtre d'opposition,
+        // même approximatif.
+        $query = EligibiliteCampagne::exclureOpposes(
+            $this->buildFilteredQuery()->where('workspace_id', $workspaceId),
+            'media.email',
+        );
 
         return response()->streamDownload(function () use ($query, $header) {
             $out = fopen('php://output', 'w');

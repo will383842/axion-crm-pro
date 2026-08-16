@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Crm\Outbound\ConsentOutboundRecorder;
 use App\Models\Journalist;
+use App\Support\EligibiliteCampagne;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -88,11 +89,23 @@ class JournalistsController extends ApiController
             }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
         }
 
-        // Export = seulement ceux qui ne se sont PAS opposés (RGPD).
-        $query = $this->buildFilteredQuery()
-            ->where('workspace_id', $workspaceId)
-            ->where('opt_out', false)
-            ->with('media');
+        // 🔴 `opt_out` EST UNE COLONNE LOCALE, PAS LES TABLES D'OPPOSITION.
+        //
+        // `journalists.opt_out` n'enregistre qu'une opposition signalée sur la
+        // fiche elle-même. Elle ignore `opt_out` et `email_suppressions` — les
+        // tables où atterrissent les oppositions venues du site et les
+        // effacements RGPD. Une personne qui s'est opposée par le site, et qui
+        // est aussi journaliste, SORTAIT dans ce CSV avec nom, email et
+        // téléphone. Constaté le 2026-08-16.
+        //
+        // On garde le filtre local (il dit quelque chose de vrai) et on ajoute
+        // les deux portes partagées.
+        $query = EligibiliteCampagne::exclureOpposes(
+            $this->buildFilteredQuery()
+                ->where('workspace_id', $workspaceId)
+                ->where('opt_out', false),
+            'journalists.email',
+        )->with('media');
 
         return response()->streamDownload(function () use ($query, $header) {
             $out = fopen('php://output', 'w');

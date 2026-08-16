@@ -102,6 +102,37 @@ final class EligibiliteCampagne
     }
 
     /**
+     * LES DEUX PORTES SEULES, sans les conditions d'éligibilité à une campagne.
+     *
+     * 🔴 Pourquoi cette méthode existe : les EXPORTS CSV ne passaient par
+     * aucune garde. Constaté le 2026-08-16 — `CompaniesController::export()`
+     * embarquait `nom prénom (rôle) email téléphone` de chaque contact, y
+     * compris ceux inscrits en `opt_out` ou en `email_suppressions`. Sur
+     * 4,29 M de fiches, permission `data.export`. C'était la fuite la plus
+     * large du système.
+     *
+     * `appliquerContacts()` ne convenait pas ici : elle impose
+     * `email IS NOT NULL`, ce qui aurait retiré de l'export des contacts sans
+     * adresse — qui n'ont commis aucune opposition. Une garde ne doit pas
+     * emporter plus que ce qu'elle protège.
+     *
+     * ⚠️ Un contact SANS email traverse la garde, et c'est correct : les deux
+     * comparaisons (adresse en clair et empreinte) sont fausses sur `NULL`,
+     * donc `whereNotExists` est vrai. Personne n'est exclu pour une adresse
+     * qu'il n'a pas.
+     *
+     * @template TModel of \Illuminate\Database\Eloquent\Model
+     *
+     * @param  Builder<TModel>  $query
+     * @param  string  $colonneEmail  Colonne QUALIFIÉE (`table.colonne`)
+     * @return Builder<TModel>
+     */
+    public static function exclureOpposes(Builder $query, string $colonneEmail, string $scope = 'business'): Builder
+    {
+        return self::appliquerPortes($query, $colonneEmail, $scope);
+    }
+
+    /**
      * LA question, posée sur une adresse seule : « a-t-on le droit d'écrire
      * ici ? »
      *

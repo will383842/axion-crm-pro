@@ -68,7 +68,17 @@ RUN apt-get update \
 # l'image de production pouvait embarquer des dépendances que personne n'a
 # choisies. Lock absent ou périmé = build en échec, comme annoncé.
 COPY workers/package.json workers/pnpm-lock.yaml ./
-RUN pnpm install --prod --frozen-lockfile
+# ⚠️ Le cache corepack est purgé DANS LA MÊME COUCHE : sinon il resterait dans
+# l'image finale même supprimé plus tard.
+#
+# Les 79 findings Node relevés sur cette image — dont les 4 CRITICAL — ne
+# venaient PAS de l'application : ils étaient tous sous
+# `root/.cache/node/corepack/v1/pnpm/9.12.0/dist/node_modules/`, c'est-à-dire
+# dans pnpm lui-même et ses dépendances embarquées. Un outil de BUILD conservé
+# dans une image d'EXÉCUTION. Le conteneur ne lance que `node dist/main.js` :
+# pnpm n'y sert plus une fois l'installation faite.
+RUN pnpm install --prod --frozen-lockfile \
+    && rm -rf /root/.cache/node /root/.npm /usr/local/share/.cache
 COPY --from=builder /srv/workers/dist ./dist
 USER pwuser
 EXPOSE 9100

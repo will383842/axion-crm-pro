@@ -25,11 +25,27 @@ jobs:
       - name: Install Playwright browsers
         working-directory: frontend
         run: pnpm exec playwright install --with-deps chromium
+      # La cible doit EXISTER sur le runner. `http://app:5173` était le nom de
+      # service du docker-compose local : sur un runner GitHub il ne résout pas
+      # (`net::ERR_NAME_NOT_RESOLVED`), et `webServer` est neutralisé quand
+      # `CI=true`. Depuis la création de ce job, les 4 pages échouaient donc
+      # AVANT le premier contrôle axe : la porte n'a jamais mesuré une seule
+      # règle d'accessibilité, elle a seulement toujours rougi.
+      # On construit l'application et on la sert réellement ; c'est
+      # `playwright.config.ts` qui démarre et arrête `vite preview`.
+      - name: Build frontend (la cible que la porte doit mesurer)
+        working-directory: frontend
+        run: pnpm build
       - name: Run a11y E2E
         working-directory: frontend
         env:
-          E2E_BASE_URL: http://app:5173
-        run: pnpm exec playwright test tests/e2e/a11y.spec.ts --reporter=html
+          E2E_PREVIEW: 'true'
+          E2E_BASE_URL: http://127.0.0.1:4173
+        # `--project=chromium` : seul navigateur installé ci-dessus. L'ancienne
+        # commande lançait les 3 projets, dont firefox et webkit absents du
+        # cache — 24 échecs « Executable doesn't exist » qui noyaient le vrai
+        # défaut. Élargir à firefox/webkit suppose de les installer ici d'abord.
+        run: pnpm exec playwright test tests/e2e/a11y.spec.ts --project=chromium --reporter=html
       - uses: actions/upload-artifact@v4
         if: always()
         with:

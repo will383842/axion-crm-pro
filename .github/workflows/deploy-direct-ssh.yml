@@ -129,6 +129,26 @@ jobs:
 
           cd "$PROJECT_PATH"
 
+          # 🔴 L'OVERLAY DE PRODUCTION, ENFIN BRANCHÉ (2026-08-16).
+          #
+          # Jusqu'ici ce script lançait `docker compose` SANS `-f`. La production
+          # tournait donc sur `docker-compose.yml` seul : cible `dev`, et surtout
+          # le montage bind `/opt/axion-crm-pro/backend -> /var/www/html`, qui
+          # MASQUE le `vendor` de l'image.
+          #
+          # Or aucune étape de ce déploiement ne fait `composer install`. Mesuré
+          # le 2026-08-16 : `backend/vendor` sur le serveur datait du **17 mai**.
+          # `composer.lock` annonçait `predis v3.5.1`, la production exécutait
+          # `v2.4.1` — trois mois de mises à jour PHP, correctifs de sécurité
+          # compris, jamais installés. Et le décalage était silencieux dans les
+          # deux sens : une PR utilisant une API récente passait la CI (qui fait
+          # `composer install`) et aurait cassé ici.
+          #
+          # `COMPOSE_FILE` s'applique à TOUS les `docker compose` du script — on
+          # ne peut donc pas en oublier un, contrairement à des `-f` recopiés.
+          export COMPOSE_FILE="docker-compose.yml:docker-compose.prod.yml"
+          echo "COMPOSE_FILE = $COMPOSE_FILE"
+
           echo "::group::git fetch + reset sur le SHA validé par la CI"
           git fetch --all --prune
           # On déploie EXACTEMENT le commit qui vient de passer la CI.
@@ -160,7 +180,13 @@ jobs:
           docker compose pull --ignore-pull-failures || true
           # --build : reconstruit aussi le frontend (app) — sinon les changements
           # frontend (boutons, filtres…) ne sont jamais déployés (image bakée).
-          docker compose up -d --build --force-recreate --no-deps api app
+          # ⚠️ `horizon` et `scheduler` DOIVENT être recréés eux aussi.
+          # Ils ne l'étaient pas : constaté en direct le 2026-08-16, `api` avait
+          # 3 minutes quand `horizon` en avait 28 heures. Ils continuaient donc
+          # à exécuter l'image précédente — et, depuis le passage à l'overlay de
+          # production, ils exécuteraient un `vendor` différent de celui de
+          # l'API. Deux versions du même code dans le même système.
+          docker compose up -d --build --force-recreate --no-deps api app horizon scheduler
           echo "::endgroup::"
 
           if [ "$SKIP_MIGRATE" != "true" ]; then
@@ -177,10 +203,16 @@ jobs:
             echo "::endgroup::"
           fi
 
-          echo "::group::php artisan config:clear + cache:clear + route:clear"
-          docker compose exec -u root -T api php artisan config:clear </dev/null
+          echo "::group::php artisan cache:clear"
+          # ⚠️ `config:clear` et `route:clear` ont été RETIRÉS d'ici.
+          # Depuis le passage à l'image `prod`, c'est `entrypoint-prod.sh` qui
+          # construit ces deux caches au démarrage, avec l'environnement réel.
+          # Les vider juste après annulerait son travail : le conteneur
+          # repartirait sans cache de configuration ni de routes, plus lent, et
+          # pour rien.
+          # `cache:clear` reste : il purge le cache APPLICATIF (Redis), ce qui
+          # est légitime après une migration.
           docker compose exec -u root -T api php artisan cache:clear </dev/null
-          docker compose exec -u root -T api php artisan route:clear </dev/null
           echo "::endgroup::"
 
           echo "::group::vérification post-déploiement — santé des conteneurs"

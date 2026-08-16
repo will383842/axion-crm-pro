@@ -1,5 +1,5 @@
 import { useRef, useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
@@ -149,6 +149,48 @@ export function CompaniesListPage() {
     queryFn: async () => (await api.get<ReferentielsGeo>("/referentiels/geo")).data,
     staleTime: 60 * 60 * 1000,
   });
+
+  // Sélection multiple. Un `Set` d'identifiants VISIBLES : on n'agit jamais
+  // sur « tout ce qui correspond au filtre » — sur 4,29 M de fiches, une case
+  // cochée par mégarde deviendrait irréversible.
+  const queryClient = useQueryClient();
+  const [selection, setSelection] = useState<Set<number>>(new Set());
+  const [tagAction, setTagAction] = useState("");
+  const [messageMasse, setMessageMasse] = useState<string | null>(null);
+
+  const actionDeMasse = useMutation({
+    mutationFn: async ({ tag, action }: { tag: string; action: "add" | "remove" }) => {
+      const { data } = await api.post<{ modifiees: number; ignorees: number }>(
+        "/companies/tags/bulk",
+        { ids: [...selection], tag, action },
+      );
+      return data;
+    },
+    onSuccess: (resultat) => {
+      // On ANNONCE le compte réel, y compris les lignes écartées : une action
+      // qui dit « fait » en ayant ignoré la moitié de la sélection est pire
+      // qu'une erreur franche.
+      const ignorees = resultat.ignorees > 0 ? `, ${resultat.ignorees} ignorée(s)` : "";
+      setMessageMasse(`${resultat.modifiees} fiche(s) modifiée(s)${ignorees}.`);
+      setSelection(new Set());
+      void queryClient.invalidateQueries({ queryKey: ["companies"] });
+    },
+    onError: (erreur: unknown) => {
+      // Le serveur explique POURQUOI il refuse (tag verrouillé, tag inconnu) :
+      // on relaie son message plutôt qu'un « échec » qui n'apprend rien.
+      const axiosErreur = erreur as { response?: { data?: { message?: string } } };
+      setMessageMasse(axiosErreur.response?.data?.message ?? "L'action de masse a échoué.");
+    },
+  });
+
+  const basculerSelection = (id: number) => {
+    setSelection((actuelle) => {
+      const suivante = new Set(actuelle);
+      if (suivante.has(id)) suivante.delete(id);
+      else suivante.add(id);
+      return suivante;
+    });
+  };
 
   const optionsRegions = versOptions(geo.data?.regions ?? [], "Toutes régions");
   const optionsDepartements = versOptions(geo.data?.departments ?? [], "Tous départements");
@@ -594,6 +636,47 @@ export function CompaniesListPage() {
         />
       ) : (
         <Card padding="none" className="overflow-hidden">
+          {/* Barre d'action de masse — n'apparaît QUE s'il y a une sélection.
+              Toujours visible, elle inviterait à cliquer sans savoir sur quoi. */}
+          {selection.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-brand-50/60 px-4 py-2 text-sm dark:border-slate-800 dark:bg-slate-800/60">
+              <span className="font-medium text-slate-700 dark:text-slate-200">
+                {selection.size} sélectionnée{selection.size > 1 ? "s" : ""}
+              </span>
+              <input
+                type="text"
+                value={tagAction}
+                onChange={(e) => setTagAction(e.target.value)}
+                placeholder="Tag existant (campagne-ro…)"
+                aria-label="Tag à poser ou retirer"
+                className="h-8 w-56 rounded-lg bg-white px-3 text-xs text-slate-900 ring-1 ring-slate-200 focus:ring-2 focus:ring-slate-300 focus:outline-none dark:bg-slate-900 dark:text-white dark:ring-slate-700"
+              />
+              <Button
+                size="sm"
+                disabled={tagAction.trim() === "" || actionDeMasse.isPending}
+                onClick={() => actionDeMasse.mutate({ tag: tagAction.trim(), action: "add" })}
+              >
+                Poser le tag
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={tagAction.trim() === "" || actionDeMasse.isPending}
+                onClick={() => actionDeMasse.mutate({ tag: tagAction.trim(), action: "remove" })}
+              >
+                Retirer
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setSelection(new Set())}>
+                Annuler la sélection
+              </Button>
+              {messageMasse !== null && (
+                <span role="status" className="text-xs text-slate-600 dark:text-slate-300">
+                  {messageMasse}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Sticky header — must share GRID with CompanyRow */}
           <div
             role="row"
@@ -603,6 +686,20 @@ export function CompaniesListPage() {
             )}
             style={{ gridTemplateColumns: GRID }}
           >
+            {/* Tout cocher ne porte que sur la PAGE affichée : « toutes les
+                fiches du filtre » se compterait en millions et ne pourrait pas
+                être annulé à la main. */}
+            <div className="flex items-center justify-center">
+              <input
+                type="checkbox"
+                checked={rows.length > 0 && rows.every((r) => selection.has(r.id))}
+                onChange={(e) =>
+                  setSelection(e.target.checked ? new Set(rows.map((r) => r.id)) : new Set())
+                }
+                aria-label="Sélectionner toutes les fiches affichées"
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-600"
+              />
+            </div>
             <div>Entreprise</div>
             <div className="font-mono">SIREN</div>
             <div>NAF</div>
@@ -638,7 +735,11 @@ export function CompaniesListPage() {
                       height: `${vrow.size}px`,
                     }}
                   >
-                    <CompanyRow company={c} />
+                    <CompanyRow
+                      company={c}
+                      selectionnee={selection.has(c.id)}
+                      onBasculerSelection={basculerSelection}
+                    />
                   </div>
                 );
               })}

@@ -18,19 +18,32 @@ export interface CompanyRowData {
 
 export interface CompanyRowProps {
   company: CompanyRowData;
+  /** Sélection multiple — absente si l'écran n'en propose pas. */
+  selectionnee?: boolean;
+  onBasculerSelection?: (id: number) => void;
   onEnrich?: (id: number) => void;
   onExport?: (id: number) => void;
   onDelete?: (id: number) => void;
   className?: string;
 }
 
-const GRID = '2fr 110px 90px 110px 140px 1.1fr 100px 36px';
+// Colonne de sélection EN TÊTE : l'en-tête collant de la liste partage cette
+// même grille — la modifier d'un seul côté désaligne tout le tableau.
+const GRID = '32px 2fr 110px 90px 110px 140px 1.1fr 100px 36px';
 
 /**
  * Single virtualised row in the companies list.
  * Layout is grid-based so the sticky header in CompaniesListPage stays aligned.
  */
-export function CompanyRow({ company, onEnrich, onExport, onDelete, className }: CompanyRowProps) {
+export function CompanyRow({
+  company,
+  selectionnee = false,
+  onBasculerSelection,
+  onEnrich,
+  onExport,
+  onDelete,
+  className,
+}: CompanyRowProps) {
   const c = company;
   const name = c.denomination ?? c.siren;
 
@@ -44,6 +57,19 @@ export function CompanyRow({ company, onEnrich, onExport, onDelete, className }:
       )}
       style={{ gridTemplateColumns: GRID }}
     >
+      {/* Case de sélection. Rendue même sans gestionnaire (désactivée) : la
+          grille est PARTAGÉE avec l'en-tête collant, une colonne qui
+          apparaîtrait par intermittence désalignerait le tableau entier. */}
+      <div className="flex items-center justify-center">
+        <input
+          type="checkbox"
+          checked={selectionnee}
+          disabled={onBasculerSelection === undefined}
+          onChange={() => onBasculerSelection?.(c.id)}
+          aria-label={`Sélectionner ${name}`}
+          className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 disabled:opacity-30 dark:border-slate-600"
+        />
+      </div>
       <div className="flex min-w-0 items-center gap-3">
         <Avatar name={name} size="sm" />
         <div className="min-w-0">

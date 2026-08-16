@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Auth\MagicLinkController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
 use App\Http\Controllers\Api\Auth\TwoFactorController;
 use App\Http\Controllers\Api\CompaniesController;
+use App\Http\Controllers\Api\CompanyTagsBulkController;
 use App\Http\Controllers\Api\ContactsController;
 use App\Http\Controllers\Api\CoverageController;
 use App\Http\Controllers\Api\Crm\ArbitrageController;
@@ -171,6 +172,12 @@ Route::prefix('v1')->group(function () {
         Route::post('/tags', [TagsController::class, 'store']);
         Route::put('/tags/{tag}', [TagsController::class, 'update']);
         Route::delete('/tags/{tag}', [TagsController::class, 'destroy']);
+
+        // Action de MASSE : poser ou retirer un tag sur une sélection.
+        // `companies.update` exigée — un compte en lecture seule ne modifie
+        // rien, et le throttle limite la cadence, pas le droit.
+        Route::post('/companies/tags/bulk', CompanyTagsBulkController::class)
+            ->middleware('permission:companies.update');
         Route::apiResource('saved-views', SavedViewsController::class);
 
         // Audiences (Sprint Pipeline 360°)

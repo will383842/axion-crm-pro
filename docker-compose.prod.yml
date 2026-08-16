@@ -19,8 +19,25 @@
 # récente passait la CI (qui fait `composer install`) et aurait cassé en
 # production.
 #
-# Ici, `volumes: []` retire le montage : le code ET le `vendor` viennent de
-# l'image, versionnés ensemble. C'est le point entier de cet overlay.
+# ── 🔴 POURQUOI `!override` ET PAS SIMPLEMENT UNE LISTE ──────────────────────
+#
+# Docker Compose FUSIONNE les listes `volumes` entre fichiers, il ne les
+# remplace pas. Le `volumes: []` d'origine était donc un NO-OP : le montage bind
+# de `docker-compose.yml` survivait. Cet overlay ne pouvait pas fonctionner,
+# même une fois branché.
+#
+# Constaté en production le 2026-08-16, APRÈS la première bascule : le conteneur
+# portait le nouvel entrypoint ET le nouveau volume — donc l'overlay était bien
+# appliqué — mais aussi, toujours, `bind /opt/axion-crm-pro/backend`. Le
+# `vendor` du 17 mai continuait de masquer celui de l'image.
+#
+# `!override` remplace la valeur au lieu de la fusionner. Vérifiable sans
+# déployer, et à vérifier avant tout déploiement :
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml config
+#
+# ⚠️ Sous Windows le séparateur de `COMPOSE_FILE` est `;`, sous Linux `:`.
+# Le workflow tourne sur Linux : `:` y est correct.
 services:
   api:
     build:
@@ -29,7 +46,7 @@ services:
     # Retire le montage bind hérité de docker-compose.yml. Le code exécuté est
     # celui de l'image, avec son `vendor` construit par `composer install
     # --no-dev` à l'étape `composer-deps`.
-    volumes:
+    volumes: !override
       - api-storage:/var/www/html/storage
     environment:
       APP_ENV: production
@@ -45,21 +62,21 @@ services:
     build:
       target: prod
     restart: unless-stopped
-    volumes:
+    volumes: !override
       - api-storage:/var/www/html/storage
 
   scheduler:
     build:
       target: prod
     restart: unless-stopped
-    volumes:
+    volumes: !override
       - api-storage:/var/www/html/storage
 
   app:
     build:
       target: prod
     restart: unless-stopped
-    volumes: []
+    volumes: !override []
 
 volumes:
   # `storage/` est le seul dossier que l'application ÉCRIT. Sans ce volume, les

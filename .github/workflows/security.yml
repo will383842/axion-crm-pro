@@ -42,27 +42,129 @@ jobs:
         if: always()
         with: { sarif_file: semgrep.sarif }
 
+  # ⚠️ 2026-08-16 — ce job avait TROIS défauts, tous du même genre : il avait
+  # l'apparence d'une garde sans en être une.
+  #
+  #  1. `continue-on-error: true` annulait `exit-code: '1'` : une vulnérabilité
+  #     CRITICAL ou HIGH n'a JAMAIS pu faire rougir une PR. Le résultat partait
+  #     dans l'onglet Security, que personne ne consulte.
+  #  2. trois images étaient construites, UNE SEULE était analysée. Les images
+  #     `app` et `worker` coûtaient leur temps de build puis étaient jetées —
+  #     le nom du job promettait pourtant « container scan » au pluriel.
+  #  3. l'envoi du SARIF n'était pas conditionné à l'existence du fichier :
+  #     quand Trivy échouait avant de l'écrire, le job rougissait sur
+  #     « Path does not exist », donc pour une raison qui n'a rien à voir
+  #     avec la sécurité — un rouge qui n'apprend rien finit ignoré.
+  #
+  # Armé alors que le dépôt comptait ZÉRO alerte ouverte (12 corrigées) :
+  # allumer la garde ne bloque donc rien au moment où on l'allume.
   trivy:
     name: Container scan (Trivy)
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false # une image vulnérable ne doit pas masquer l'état des deux autres
+      matrix:
+        include:
+          - image: api
+            dockerfile: Dockerfile.laravel
+          - image: app
+            dockerfile: Dockerfile.frontend
+          - image: worker
+            dockerfile: Dockerfile.worker
     steps:
       - uses: actions/checkout@v4
-      - name: Build images
-        run: |
-          docker build -t axion-crm/api:scan -f Dockerfile.laravel --target prod .
-          docker build -t axion-crm/app:scan -f Dockerfile.frontend --target prod .
-          docker build -t axion-crm/worker:scan -f Dockerfile.worker --target prod .
-      - uses: aquasecurity/trivy-action@master
+      - name: Build ${{ matrix.image }}
+        run: docker build -t axion-crm/${{ matrix.image }}:scan -f ${{ matrix.dockerfile }} --target prod .
+      # 1) SARIF pour l'onglet Security : l'INVENTAIRE COMPLET, y compris ce qui
+      #    n'a pas encore de correctif. Non bloquant — c'est la mémoire, pas la
+      #    garde. Épinglé sur une version : `@master` fait dépendre la sécurité
+      #    du dépôt de ce qu'un tiers pousse aujourd'hui.
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: axion-crm/api:scan
+          image-ref: axion-crm/${{ matrix.image }}:scan
           format: sarif
-          output: trivy-api.sarif
+          output: trivy-${{ matrix.image }}.sarif
           severity: CRITICAL,HIGH
-          exit-code: '1'
-        continue-on-error: true
+          exit-code: '0'
       - uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with: { sarif_file: trivy-api.sarif }
+        # `always()` seul faisait rougir le job quand le fichier manquait.
+        if: always() && hashFiles(format('trivy-{0}.sarif', matrix.image)) != ''
+        with:
+          sarif_file: trivy-${{ matrix.image }}.sarif
+          category: trivy-${{ matrix.image }}
+
+      # 2) LA GARDE. Deux choix qui la rendent utilisable plutôt que décorative :
+      #
+      #  - `format: table` : une garde qui sort en 1 sans dire CE QU'ELLE A TROUVÉ
+      #    n'est pas exploitable. Le SARIF part dans un onglet ; le tableau, lui,
+      #    est dans le journal du job, sous les yeux de qui lit le rouge.
+      #
+      #  - `ignore-unfixed: true` : ne bloque QUE sur ce qui a un correctif
+      #    disponible. Les images de base (Ubuntu 24.04 côté worker) traînent en
+      #    permanence des CVE sans correctif amont ; bloquer dessus rendrait la
+      #    garde rouge en permanence, et une garde toujours rouge se contourne
+      #    puis s'ignore — exactement l'état d'où l'on sort. Les vulnérabilités
+      #    non corrigeables restent visibles dans l'onglet Security via le SARIF
+      #    ci-dessus : on les CONNAÎT, on ne bloque simplement pas sur ce que
+      #    personne ne peut corriger ici.
+      - name: Garde — vulnérabilités CORRIGEABLES (bloquant)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: axion-crm/${{ matrix.image }}:scan
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          trivyignores: .trivyignore.yaml # exceptions DATÉES, cf. le fichier
+          exit-code: '1' # BLOQUANT — plus de `continue-on-error`
+
+  # ⚠️ 2026-08-16 — angle mort découvert en instruisant le job ci-dessus.
+  # Le scan ne portait QUE sur les images que l'on construit. Or la production
+  # fait tourner des images TIRÉES telles quelles, dont `caddy:2-alpine` : c'est
+  # le proxy de bordure `axion-crm-caddy`, publié sur 0.0.0.0:80 et :443, et
+  # c'est lui qui TERMINE LE TLS. Il porte exactement les 13 vulnérabilités HIGH
+  # du binaire Caddy relevées dans l'image `app` — sauf que là, elles sont sur
+  # le chemin exposé. Rien ne les regardait.
+  #
+  # Ce job est délibérément NON BLOQUANT, et la raison n'est pas la même que le
+  # `continue-on-error` qu'on vient de retirer : ces images, on ne les construit
+  # pas. La seule action possible est de monter la version quand l'amont
+  # republie — bloquer les PR en attendant ne ferait qu'un rouge permanent. Ce
+  # que ce job apporte, c'est de SAVOIR : l'inventaire remonte dans l'onglet
+  # Security, et le jour où l'amont corrige, on le voit.
+  trivy-images-tirees:
+    name: Scan images tirées (inventaire)
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { nom: caddy-bordure, ref: 'caddy:2-alpine' }
+          - { nom: redis, ref: 'redis:7.2-alpine' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ matrix.ref }}
+          format: sarif
+          output: trivy-${{ matrix.nom }}.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always() && hashFiles(format('trivy-{0}.sarif', matrix.nom)) != ''
+        with:
+          sarif_file: trivy-${{ matrix.nom }}.sarif
+          category: trivy-${{ matrix.nom }}
+      # Le tableau dans le journal, pour que l'inventaire soit lisible sans
+      # ouvrir un onglet — c'est ce qui fait la différence entre « consultable »
+      # et « consulté ».
+      - name: Inventaire lisible
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ matrix.ref }}
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '0'
 
   composer-audit:
     name: PHP deps audit
@@ -89,14 +191,31 @@ jobs:
       - working-directory: ${{ matrix.path }}
         run: pnpm audit --audit-level=high || true
 
+  # ⚠️ 2026-08-16 — ce job visait `https://staging.axion-crm-pro.com`, qui
+  # N'EXISTE PAS (NXDOMAIN). Il échouait donc TOUTES les semaines depuis au
+  # moins le 2026-07-13 — cinq échecs consécutifs qu'aucun humain n'a vus,
+  # parce qu'un job planifié qui rougit n'alerte personne. Il n'y a pas
+  # d'environnement de préproduction : ce dépôt déploie directement en prod.
+  #
+  # Deux issues, et le choix appartient à Will :
+  #   a) poser la variable de dépôt `ZAP_TARGET_URL` (Settings → Secrets and
+  #      variables → Actions → Variables) sur l'URL à analyser. Le job se
+  #      rallume tout seul. ⚠️ la pointer sur la PRODUCTION signifie envoyer
+  #      un spider + une analyse passive sur un service vivant chaque lundi
+  #      04:00 UTC ; c'est légitime sur son propre service, mais ça se décide,
+  #      et Cloudflare peut y répondre par un challenge ;
+  #   b) supprimer ce job si l'analyse dynamique n'est pas voulue.
+  #
+  # Tant que la variable est vide, le job ne s'exécute pas — plutôt qu'un rouge
+  # hebdomadaire qui n'apprend rien et anesthésie la lecture des échecs.
   zap-baseline:
     name: OWASP ZAP baseline
     runs-on: ubuntu-24.04
-    if: github.event_name == 'schedule'
+    if: github.event_name == 'schedule' && vars.ZAP_TARGET_URL != ''
     steps:
       - uses: actions/checkout@v4
       - uses: zaproxy/action-baseline@v0.14.0
         with:
-          target: https://staging.axion-crm-pro.com
+          target: ${{ vars.ZAP_TARGET_URL }}
           rules_file_name: .zap/rules.tsv
           cmd_options: '-a'

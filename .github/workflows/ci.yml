@@ -59,7 +59,7 @@ jobs:
     name: Les scripts d'infra sont-ils exécutables ?
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: |
           set -euo pipefail
           # `git ls-files -s` donne le mode ENREGISTRÉ, pas celui du disque —
@@ -78,7 +78,7 @@ jobs:
     name: Backend Laravel (install + PHPStan + Pint + Pest)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Nécessaire pour disposer de la base de comparaison du contrôle Pint.
           fetch-depth: 0
@@ -274,7 +274,7 @@ jobs:
     name: Frontend React/Vite
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 9
@@ -305,7 +305,7 @@ jobs:
     name: Workers Node + Playwright
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 9

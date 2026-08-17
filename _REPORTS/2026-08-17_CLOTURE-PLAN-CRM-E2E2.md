@@ -33,10 +33,18 @@ Ce qui ne l'est pas :
    dédiée ») et n'a été joué que **le 17 août — aujourd'hui**. Le contrôle qui
    devait autoriser la mise en service a eu lieu trois jours après elle.
 
-2. **L'E2E n°2 a trouvé deux défauts réels du produit**, dont un défaut RGPD
-   bloquant qui rendait l'anti-réinsertion inopérante (§3). Ils sont corrigés
-   (PR #142, #143), mais leur existence signifie que le feu vert n°2 n'était pas
-   acquis d'avance.
+2. **L'E2E n°2 a trouvé quatre défauts réels du produit** (§3), dont **deux
+   bloquants** :
+   - un défaut RGPD qui rendait l'anti-réinsertion inopérante — corrigé,
+     PR #142 et #143 ;
+   - **le formulaire de contact du site refusait de partir sans rien dire**
+     (§3.4) — trouvé en production, dans un vrai navigateur ; correctif écrit,
+     prouvé rouge d'abord, en cours de fusion.
+
+   S'y ajoutent l'adresse en clair dans la liste d'opposition (§3.3) et
+   **l'horodatage du site en retard de 2 h sur des lignes créées aujourd'hui**
+   (§3.5). Leur existence signifie que le feu vert n°2 n'était pas acquis
+   d'avance.
 
 3. **Le §E ne peut pas être coché intégralement**, parce que le montage décrit
    au §A n'est **pas exécutable tel qu'il est écrit** : la moitié « site » de
@@ -45,6 +53,14 @@ Ce qui ne l'est pas :
    authentifiable en local (§4, défauts D-07, D-11, D-13). Ce n'est pas un
    renoncement de l'opérateur : c'est le résultat que l'E2E n°2 est fait pour
    produire — **mesurer si la documentation suffit. Elle ne suffit pas.**
+
+   ✅ **Contournement trouvé, et il a payé** : les parcours du site ont été
+   joués **directement sur la production, dans un vrai navigateur**. C'est ainsi
+   que B.1 et B.8 sont passés au vert — et que le défaut §3.4 a été démasqué.
+   **Le banc local n'était pas la seule voie ; c'est la production qui a
+   tranché.** Restent injouables par cette voie : B.9 (widget éteint en prod,
+   coupe-circuit délibéré) et B.10 → B.12, qui exigent la base du site ou le
+   secret de signature — accès non ouvert à cette session.
 
 4. **Un piège majeur connu depuis le 14 août n'a jamais été reporté dans le
    document d'exécution** : `docker compose restart` ne relit pas `env_file`.
@@ -158,15 +174,15 @@ d'émission du site. La distinction est portée dans chaque ligne.
 
 | # | Scénario | Contrat CRM | Geste site | Détail |
 |---|---|---|---|---|
-| B.1 | Formulaire unifié, 12 types | 🟢 | 🔴 non joué | **13 des 14 valeurs de `CRM_FORM_TYPES` acceptées (200)** ; `recrutement` → 422 consentement, ce qui **confirme** la bascule vers l'univers vivier annoncée comme contre-intuitive. Type inconnu → **422 `unknown_form_type`**. Rejeu → `noop_idempotent`, 0 doublon. Avec SIREN → `created`, tag `src:site-formulaire-devis` posé. |
+| B.1 | Formulaire unifié, 12 types | 🟢 | 🟢 **JOUÉ EN PRODUCTION** — et **il a démasqué un défaut bloquant** : le formulaire refusait de partir **sans rien dire** (§3.4). Après contournement, chaîne complète vérifiée : outbox du site (`sent`, `attempts=1`, `200`, `crm_result=pending_match`, `universe=business`) → activité CRM `1198`. Donnée purgée. | **13 des 14 valeurs de `CRM_FORM_TYPES` acceptées (200)** ; `recrutement` → 422 consentement, ce qui **confirme** la bascule vers l'univers vivier annoncée comme contre-intuitive. Type inconnu → **422 `unknown_form_type`**. Rejeu → `noop_idempotent`, 0 doublon. Avec SIREN → `created`, tag `src:site-formulaire-devis` posé. |
 | B.2 | Podcast | 🟢 | 🔴 | `podcast` accepté, `relation_type` reste `prospect` (aucune valeur « podcast »). |
 | B.3 | Simulateur de gains | 🟢 | 🔴 | **`simulateur_roi` accepté (200)** — la non-régression du défaut qui perdait tous les leads du simulateur tient. |
 | B.4 | Lettre d'information | 🟡 | 🔴 | `newsletter_optin` / `optout` acceptés, opposition `scope = business` ✔, `email_hash` posé ✔ — **mais l'adresse est aussi stockée EN CLAIR** (§3.3). Double opt-in non vérifiable sans le site. |
 | B.5 | Avis client | 🟡 | 🔴 | `review_posted` accepté ; `relationType()` rend bien `client`, seul événement entrant à porter cette qualité. La garantie « le contenu de l'avis reste sur le site » est une propriété de **l'émission**, non vérifiable ici. |
 | B.6 | Calendly ×4 | 🟡 | 🔴 | Les 4 `kind` distincts sont créés pour une même personne. La garde « vrai changement de statut » est côté site : non jouée. |
 | B.7 | Candidature offre | 🟢 | 🔴 | **a** : `created`, workspace `vivier-candidats` **exclusivement**, `relation_type = candidat_commercial`, `consent_version = careers-v2-2026-08-13`, `consent_vivier_at` **renseigné**, tags `src:site-candidature-offre` + `cand-offre:<slug>`, `cv_ref` = une **référence**. **b** : mêmes gestes sans la case → `consent_vivier_at` **NULL**. **Le contraste a/b est prouvé.** **c** : consentement v1 → **422 `candidate_consent_v2_required`**. **d** : clé `workspace` forgée → **422 `unknown_field`**. |
-| B.8 | Tunnel Mémo | 🔴 | 🔴 | Wizard 10 écrans : impossible sans le site. |
-| B.9 | Chatbot | 🔴 | 🔴 | L'émetteur transactionnel est une propriété du site. |
+| B.8 | Tunnel Mémo | 🟢 | 🟢 **JOUÉ EN PRODUCTION** | Les **9 étapes** parcourues dans un vrai navigateur sur `axion-ia.com` (la doc §B.8 en annonce « 10 » : accueil + 9 — **écart de libellé**). Réf. `d58cfdbf-…`. Activité CRM `1199` **4 s** plus tard, workspace **« Vivier candidats »** (≠ business), `subject_ref = site:submission:…` (une *Submission*, comme la doc l'exige), `source_slug = site-candidature-commerciale`, `relation_type = candidat_commercial`, `offer_slug = commercial-memo`, `consent_version = memo-v2-2026-08-13`, `consent_text_ref = commercial-tunnel`, `consent_vivier_at` renseigné. **Contre-test mené : TOUS les champs facultatifs laissés vides** — rien ne bloque (cf. §3.4). |
+| B.9 | Chatbot | ⛔ | ⛔ **INJOUABLE EN PROD** | `GET /api/chatbot/widget-config` → `{"enabled":false}` : le widget est **éteint en production**. C'est un coupe-circuit **délibéré** et documenté (env `CHATBOT_ENABLED` + `ChatTenant.actif`), donc **pas un défaut** — mais le plan §B.9 ne le dit pas, et **aucun lead chatbot n'est capté aujourd'hui**. L'allumer est une décision de Will, pas un geste d'audit. |
 | B.10 | Opposition vivier | 🔴 **DÉFAUT** | 🔴 | **Rouge, deux fois** : opposition inscrite en `business` au lieu de `vivier`, anti-réinsertion inopérante. Voir §3.1. Corrigé (PR #143). |
 | B.11 | RGPD art. 15 | 🔴 | 🔴 | Le parcours self-service part du site. |
 | B.12 | RGPD art. 17 | 🔴 | 🔴 | Idem. |
@@ -308,6 +324,109 @@ des lignes existantes ne l'est pas. **Non corrigé — arbitrage Will.**
 
 **En production, cette table est vide** (`opt_out = 0`) : aucune donnée réelle
 n'est aujourd'hui exposée.
+
+---
+
+### 3.4 🔴 BLOQUANT — le formulaire de contact refusait de partir SANS RIEN DIRE
+
+Trouvé **en production, dans un vrai navigateur**, en jouant le smoke réduit du
+runbook §4. Dépôt SITE, branche `fix/contact-champs-optionnels`.
+
+Le visiteur choisit « Audit IA », remplit les six champs requis, coche le
+consentement, clique « Envoyer ma demande » — **et rien ne se passe**. Aucun
+message. Un simple liseré rouge sur un menu déroulant de la section
+« Aller plus loin (**recommandé**) », révélé **un champ à la fois** : d'abord
+« Taille (INSEE) », puis « Timing souhaité ». Il faut deviner **deux fois** qu'un
+champ présenté comme *recommandé* est en réalité **bloquant**.
+
+```ts
+companySize: z.enum(COMPANY_SIZES).optional(),   // accepte undefined, PAS ""
+timingWeeks: z.enum(TIMING_WEEKS).optional(),
+```
+
+Le `<select>` porte `<option value="">—</option>` : laisser le choix par défaut
+envoie `""`, que le schéma refuse. **Un champ déclaré optionnel était impossible
+à laisser vide.** Le commentaire du fichier disait « 5 champs optionnels », le
+schéma disait `.optional()`, le formulaire bloquait : les trois se
+contredisaient.
+
+Correctif : `emptyToUndefined()` traduit le vide en « non renseigné », sans
+assouplir la contrainte sur les valeurs non vides. **5 tests, vus rouges
+d'abord** puis verts.
+
+🔑 **Ce que ça explique peut-être** : la production ne portait qu'**un seul**
+événement issu du site en trois jours d'activation. Ce n'était peut-être pas le
+trafic — c'était le formulaire qui refusait les envois **en silence**.
+
+🔑 **Leçon de méthode, la plus coûteuse de la session** : j'ai d'abord accusé mon
+propre harnais d'essai pendant des heures et écrit que la cause était « non
+attribuée ». **Le geste à la main dans un vrai navigateur a tranché en cinq
+minutes.** Second angle mort : `:invalid` ne voit que la validation **native** —
+avec react-hook-form + zod, un formulaire paraît valide alors qu'il refuse de
+partir.
+
+### 3.5 🔴 CORRIGÉ — le CRM reculait de 2 heures toute date reçue du site
+
+⚠️ **Ce n'est pas le chantier « décalage +2 h » clos le 16/08** — celui-là portait
+sur la reprise des 17,7 M lignes historiques, et il est soldé. Ce qui suit est
+une mesure **neuve, sur des lignes créées aujourd'hui**.
+
+Instant réel de l'envoi B.8, lu à l'horloge du navigateur : **16:47:54 UTC**.
+
+| Colonne | Valeur | |
+|---|---|---|
+| `activities.created_at` (posé par le CRM) | `16:47:58+00` | ✅ juste, 4 s |
+| `activities.occurred_at` (fourni par le SITE) | `14:47:58+00` | 🔴 **−2 h** |
+| `candidates.consent_at` / `consent_vivier_at` / `vivier_info_sent_at` | `14:47:58+00` | 🔴 **−2 h** |
+
+**Systématique, pas ponctuel** — l'autre événement issu du site montre
+exactement le même écart :
+
+```
+id  |kind                 |occurred_at            |created_at             |ecart_h
+1199|application_submitted|2026-08-17 14:47:58+00 |2026-08-17 16:47:58+00 |2.0000
+1197|form_submission      |2026-08-16 13:21:08+00 |2026-08-16 15:21:09+00 |2.0003
+```
+
+⚠️ **Rectification.** Une première rédaction de ce paragraphe attribuait le
+décalage à **l'émission côté site**. **C'était faux**, et une fausse attribution
+envoie réparer le mauvais dépôt. La cause a ensuite été **isolée par la mesure**,
+pas déduite.
+
+**L'essai qui tranche** : envoi signé de contrôle portant
+`occurred_at = 2026-08-17T10:00:00Z`. La base a stocké **`08:00:00+00`**.
+**Le site émet juste ; c'est le CRM qui décale à l'écriture.**
+
+**La cause exacte** : le correctif du 2026-08-16 (`DB_TIMEZONE=Europe/Paris`,
+cf. l'en-tête de `config/database.php`) fait lire à Postgres les heures **nues**
+comme des heures de Paris. C'est juste pour tout ce que l'application produit
+elle-même — `now()` rend un Carbon parisien, donc « 12:00:00 » nu *veut dire*
+midi à Paris. Mais le site n'émet pas en heure de Paris : `toISOString()` rend
+toujours de l'UTC, `new DateTimeImmutable("…Z")` conserve ce fuseau, et Laravel
+sérialise avec le fuseau porté par l'objet. « 10:00:00 » nu *veut dire* 10 h UTC,
+et Postgres le relit comme 10 h à Paris.
+
+🔑 **Le correctif du 16/08 a réparé le chemin `now()` et ouvert celui des dates
+ingérées. Les deux sont le même défaut vu par deux bouts** — ce qui explique
+pourquoi `created_at` (écrit par `DEFAULT now()` de Postgres) est resté juste
+pendant que `occurred_at` et `consent_at` reculaient.
+
+**Pourquoi ça compte** : `consent_at` est la date qui **prouve le
+consentement**. Elle était archivée deux heures avant l'acte réel. Pour une
+preuve RGPD, un horodatage faux est un horodatage sans valeur probante.
+
+✅ **CORRIGÉ — PR #170**, `fix/horodatage-ingestion-utc`.
+`SiteSyncEvent::parseDate()` ramène toute date entrante dans le fuseau de
+l'application avant persistance ; l'instant ne bouge pas, seule sa
+représentation devient celle que Postgres attend. C'est le **seul** point
+d'entrée des dates extérieures par la synchro site (`occurred_at`, `consent.at`,
+`consent.vivier_at`).
+
+**Preuve par la rougeur** : test ajouté au verrou existant `HorodatagesFuseauTest`,
+écrit avant le correctif et vu rouge — `Failed asserting that 7200.0 is less
+than 2` (7 200 s = 2 h exactement), **pendant que les 4 verrous existants
+restaient verts**. C'est ce contraste qui prouve l'attribution. Après correctif :
+5 verts, puis **107 verts** sur les suites d'ingestion et RGPD.
 
 ---
 

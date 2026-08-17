@@ -63,7 +63,7 @@ class AudienceBuilderService
 
         return [
             'companies' => $companies,
-            'contacts'  => $contacts + $companyOnlyEmails,
+            'contacts' => $contacts + $companyOnlyEmails,
         ];
     }
 
@@ -85,6 +85,7 @@ class AudienceBuilderService
 
         if ($total > self::BATCH_THRESHOLD) {
             $this->refreshViaBatch($audience, $total);
+
             return;
         }
 
@@ -111,20 +112,20 @@ class AudienceBuilderService
                 if ($contacts->isEmpty()) {
                     // Company-level entry (utile si email_generic présent)
                     $rows[] = [
-                        'audience_id'  => $audience->id,
-                        'company_id'   => $company->id,
-                        'contact_id'   => null,
+                        'audience_id' => $audience->id,
+                        'company_id' => $company->id,
+                        'contact_id' => null,
                         'workspace_id' => $audience->workspace_id,
-                        'added_at'     => now(),
+                        'added_at' => now(),
                     ];
                 } else {
                     foreach ($contacts as $contact) {
                         $rows[] = [
-                            'audience_id'  => $audience->id,
-                            'company_id'   => $company->id,
-                            'contact_id'   => $contact->id,
+                            'audience_id' => $audience->id,
+                            'company_id' => $company->id,
+                            'contact_id' => $contact->id,
                             'workspace_id' => $audience->workspace_id,
-                            'added_at'     => now(),
+                            'added_at' => now(),
                         ];
                     }
                 }
@@ -143,11 +144,11 @@ class AudienceBuilderService
         Log::info('Audience refresh done', ['audience_id' => $audience->id, 'members' => $audience->member_count]);
 
         AuditLogger::log('audience.refreshed', [
-            'workspace_id'  => $audience->workspace_id,
+            'workspace_id' => $audience->workspace_id,
             'resource_type' => 'audience',
-            'resource_id'   => (string) $audience->id,
-            'member_count'  => $audience->member_count,
-            'name'          => $audience->name,
+            'resource_id' => (string) $audience->id,
+            'member_count' => $audience->member_count,
+            'name' => $audience->name,
         ]);
     }
 
@@ -159,7 +160,7 @@ class AudienceBuilderService
     {
         Log::info('Audience refresh via Bus::batch', [
             'audience_id' => $audience->id,
-            'total'       => $total,
+            'total' => $total,
         ]);
 
         DB::transaction(function () use ($audience) {
@@ -190,13 +191,13 @@ class AudienceBuilderService
                 AuditLogger::log(
                     $batch->hasFailures() ? 'audience.refresh.failed' : 'audience.refreshed',
                     [
-                        'workspace_id'  => $audience->workspace_id,
+                        'workspace_id' => $audience->workspace_id,
                         'resource_type' => 'audience',
-                        'resource_id'   => (string) $audience->id,
-                        'member_count'  => $audience->member_count,
-                        'name'          => $audience->name,
-                        'batch_id'      => $batch->id,
-                        'failed_jobs'   => $batch->failedJobs,
+                        'resource_id' => (string) $audience->id,
+                        'member_count' => $audience->member_count,
+                        'name' => $audience->name,
+                        'batch_id' => $batch->id,
+                        'failed_jobs' => $batch->failedJobs,
                     ],
                 );
             })
@@ -233,6 +234,7 @@ class AudienceBuilderService
                 $matched[] = $audience->id;
             }
         }
+
         return $matched;
     }
 
@@ -272,7 +274,7 @@ class AudienceBuilderService
     private function applyCondition($query, array $cond, string $combinator): void
     {
         $field = $cond['field'] ?? null;
-        $op    = $cond['op'] ?? null;
+        $op = $cond['op'] ?? null;
         $value = $cond['value'] ?? null;
 
         if (! is_string($field) || ! in_array($field, self::WHITELIST_FIELDS, true)) {
@@ -294,10 +296,50 @@ class AudienceBuilderService
         }
 
         match ($combinator) {
-            'or'    => $query->orWhere($positive),
-            'not'   => $query->whereNot($positive),
+            'or' => $query->orWhere($positive),
+            'not' => $query->where($this->negate($positive, $field, $op)),
             default => $query->where($positive),
         };
+    }
+
+    /**
+     * Ops dont le prédicat vaut UNKNOWN (et non FALSE) quand la colonne est
+     * NULL. Sous `where` cela ne se voit pas — UNKNOWN élimine la ligne, comme
+     * FALSE. Sous `NOT`, en revanche, `NOT UNKNOWN` reste UNKNOWN : la ligne
+     * est éliminée **alors qu'elle aurait dû être gardée**.
+     *
+     * `evalCondition()` répond FALSE pour tous ces cas (`eq`/`in` par
+     * comparaison lâche, les quatre comparateurs par leur garde explicite
+     * `$actual !== null &&`). Cette liste est donc le miroir exact de la
+     * version en mémoire, pas un choix de confort.
+     *
+     * `neq` et `not_in` en sont ABSENTS à dessein : en mémoire ils répondent
+     * TRUE sur NULL, et `NOT UNKNOWN` élimine la ligne — les deux évaluateurs
+     * s'accordent déjà. `is_null` / `is_not_null` ne sont jamais UNKNOWN.
+     */
+    private const NULL_SENSITIVE_OPS = ['eq', 'in', 'gt', 'lt', 'gte', 'lte'];
+
+    /**
+     * Négation d'un prédicat, alignée sur `companyMatchesCriteria()` : une
+     * fiche est retirée par `not` si et seulement si `evalCondition()` répond
+     * VRAI pour elle.
+     *
+     * @param  \Closure(\Illuminate\Contracts\Database\Query\Builder): void  $positive
+     * @return \Closure(\Illuminate\Contracts\Database\Query\Builder): void
+     */
+    private function negate(\Closure $positive, string $field, string $op): \Closure
+    {
+        // `tags` et `has_email` ne sont pas des colonnes : leurs prédicats sont
+        // bâtis sur EXISTS, qui vaut toujours TRUE ou FALSE, jamais UNKNOWN.
+        $isRealColumn = ! in_array($field, ['tags', 'has_email'], true);
+
+        if ($isRealColumn && in_array($op, self::NULL_SENSITIVE_OPS, true)) {
+            return function ($q) use ($positive, $field) {
+                $q->whereNot($positive)->orWhereNull($field);
+            };
+        }
+
+        return fn ($q) => $q->whereNot($positive);
     }
 
     /**
@@ -310,15 +352,22 @@ class AudienceBuilderService
      */
     private function buildPositive(string $field, string $op, mixed $value): ?\Closure
     {
-        // Field "tags" : pivot via whereHas (négation gérée par whereNot au caller).
+        // Field "tags" : pivot via whereHas (négation gérée par negate() au caller).
+        //
+        // 🔴 Une condition `tags` inexploitable ne vise PERSONNE — elle n'est
+        // pas ignorée. Rendre `null` ici la ferait retirer de la requête, et
+        // « porte un de ces tags » avec une liste vide rendrait alors TOUT le
+        // workspace : l'envoi partirait à tout le monde. `evalCondition()`
+        // répond déjà FALSE dans ce cas ; le SQL doit dire la même chose.
         if ($field === 'tags') {
-            if ($op !== 'contains_any' || ! is_array($value) || empty($value)) {
-                return null;
-            }
-            $slugs = array_values(array_filter($value, 'is_string'));
+            $slugs = $op === 'contains_any' && is_array($value)
+                ? array_values(array_filter($value, 'is_string'))
+                : [];
+
             if (empty($slugs)) {
-                return null;
+                return fn ($q) => $q->whereRaw('1 = 0');
             }
+
             return function ($q) use ($slugs) {
                 $q->whereHas('tags', fn ($t) => $t->whereIn('slug', $slugs));
             };
@@ -359,16 +408,26 @@ class AudienceBuilderService
         // Champs directs sur companies.
         return function ($q) use ($field, $op, $value) {
             switch ($op) {
-                case 'eq':          $q->where($field, '=', $value); break;
-                case 'neq':         $q->where($field, '!=', $value); break;
-                case 'in':          $q->whereIn($field, $value); break;
-                case 'not_in':      $q->whereNotIn($field, $value); break;
-                case 'gt':          $q->where($field, '>', $value); break;
-                case 'lt':          $q->where($field, '<', $value); break;
-                case 'gte':         $q->where($field, '>=', $value); break;
-                case 'lte':         $q->where($field, '<=', $value); break;
-                case 'is_null':     $q->whereNull($field); break;
-                case 'is_not_null': $q->whereNotNull($field); break;
+                case 'eq':          $q->where($field, '=', $value);
+                    break;
+                case 'neq':         $q->where($field, '!=', $value);
+                    break;
+                case 'in':          $q->whereIn($field, $value);
+                    break;
+                case 'not_in':      $q->whereNotIn($field, $value);
+                    break;
+                case 'gt':          $q->where($field, '>', $value);
+                    break;
+                case 'lt':          $q->where($field, '<', $value);
+                    break;
+                case 'gte':         $q->where($field, '>=', $value);
+                    break;
+                case 'lte':         $q->where($field, '<=', $value);
+                    break;
+                case 'is_null':     $q->whereNull($field);
+                    break;
+                case 'is_not_null': $q->whereNotNull($field);
+                    break;
             }
         };
     }
@@ -417,7 +476,7 @@ class AudienceBuilderService
     private function evalCondition(Company $company, array $cond): bool
     {
         $field = $cond['field'] ?? null;
-        $op    = $cond['op'] ?? null;
+        $op = $cond['op'] ?? null;
         $value = $cond['value'] ?? null;
 
         if (! is_string($field) || ! in_array($field, self::WHITELIST_FIELDS, true)) {
@@ -429,6 +488,7 @@ class AudienceBuilderService
                 return false;
             }
             $companySlugs = $company->tags->pluck('slug')->all();
+
             return ! empty(array_intersect($value, $companySlugs));
         }
         if ($field === 'has_email') {
@@ -438,22 +498,24 @@ class AudienceBuilderService
                 ->exists();
             $hasGeneric = ! empty($company->email_generic);
             $hasEmail = $hasContact || $hasGeneric;
+
             return $hasEmail === (bool) $value;
         }
 
         $actual = $company->{$field} ?? null;
+
         return match ($op) {
-            'eq'          => $actual == $value,
-            'neq'         => $actual != $value,
-            'in'          => is_array($value) && in_array($actual, $value, false),
-            'not_in'      => is_array($value) && ! in_array($actual, $value, false),
-            'gt'          => $actual !== null && $actual > $value,
-            'lt'          => $actual !== null && $actual < $value,
-            'gte'         => $actual !== null && $actual >= $value,
-            'lte'         => $actual !== null && $actual <= $value,
-            'is_null'     => $actual === null,
+            'eq' => $actual == $value,
+            'neq' => $actual != $value,
+            'in' => is_array($value) && in_array($actual, $value, false),
+            'not_in' => is_array($value) && ! in_array($actual, $value, false),
+            'gt' => $actual !== null && $actual > $value,
+            'lt' => $actual !== null && $actual < $value,
+            'gte' => $actual !== null && $actual >= $value,
+            'lte' => $actual !== null && $actual <= $value,
+            'is_null' => $actual === null,
             'is_not_null' => $actual !== null,
-            default       => false,
+            default => false,
         };
     }
 }

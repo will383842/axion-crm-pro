@@ -1,0 +1,191 @@
+name: Surveillance des sauvegardes
+
+# =============================================================================
+# ⚠️ POURQUOI CE WORKFLOW EXISTE
+#
+# Le 2026-08-16 : la sauvegarde de production n'avait JAMAIS tourné. 91
+# exécutions cron, 91 échecs, trois mois durant. Les correctifs #136→#139 ont
+# réparé la sauvegarde, sa restaurabilité et sa rotation.
+#
+# Aucun d'eux n'a réparé la raison pour laquelle personne ne s'en était aperçu :
+# cron écrit dans `/var/log/axion-backup.log`, que personne ne lit. Une panne
+# silencieuse ne devient visible que le jour où on a besoin de la sauvegarde —
+# c'est-à-dire le pire jour possible.
+#
+# 🔑 CE WORKFLOW TOURNE DEPUIS GITHUB, PAS DEPUIS LE SERVEUR — et c'est
+# délibéré. Une surveillance hébergée sur la machine qu'elle surveille meurt
+# avec elle : serveur éteint, disque plein, SSH cassé, et la garde se tait
+# exactement quand elle devrait crier. Ici, un serveur injoignable fait ÉCHOUER
+# le job, donc ouvre une issue. L'absence de signal est traitée comme un signal.
+#
+# Ce qui reste hors de portée, en toute honnêteté : si GitHub Actions cesse de
+# déclencher les tâches planifiées, plus personne ne surveille. Aucune garde ne
+# se surveille elle-même ; on déplace le point aveugle, on ne le supprime pas.
+# =============================================================================
+
+on:
+  schedule:
+    # 05:00 UTC — deux heures après la sauvegarde de 03:00 UTC. La marge absorbe
+    # un dump long (mesuré : ~3 min 30 pour 692 Mo) sans lever de fausse alerte.
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+    inputs:
+      seuil_age_h:
+        description: "Âge maximum de la dernière sauvegarde hors-site, en heures (36 par défaut). Mettre 0 pour VÉRIFIER QUE LA GARDE ROUGIT."
+        required: false
+        default: '36'
+      seuil_taille_mo:
+        description: "Taille minimale attendue, en Mo (100 par défaut). Mettre 999999 pour vérifier que la garde rougit."
+        required: false
+        default: '100'
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: surveillance-sauvegarde
+  cancel-in-progress: false
+
+jobs:
+  verifier:
+    name: La sauvegarde d'hier soir a-t-elle eu lieu ?
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Trust host key
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Contrôler la copie hors-site
+        id: controle
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
+          SEUIL_AGE_H: ${{ github.event.inputs.seuil_age_h || '36' }}
+          SEUIL_TAILLE_MO: ${{ github.event.inputs.seuil_taille_mo || '100' }}
+        run: |
+          set -euo pipefail
+          # Le contrôle vit dans un SCRIPT du dépôt, pas dans ce YAML : il se
+          # rejoue à la main sur le serveur, et c'est comme ça qu'on a pu
+          # prouver qu'il rougit dans les deux sens avant de le mettre en place.
+          set +e
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$USER@$HOST" \
+            "SEUIL_AGE_H='$SEUIL_AGE_H' SEUIL_TAILLE_MO='$SEUIL_TAILLE_MO' \
+             bash '$PROJECT_PATH/infra/scripts/verifier-sauvegarde.sh'" \
+            > rapport.txt 2>&1
+          CODE=$?
+          set -e
+
+          cat rapport.txt
+
+          # Un serveur injoignable ne renvoie pas le code du script : ssh sort
+          # en 255. On ne veut surtout pas confondre « tout va bien » avec
+          # « je n'ai pas pu demander ».
+          if [ "$CODE" -eq 255 ]; then
+            echo "::error::Serveur injoignable en SSH — impossible de vérifier la sauvegarde."
+            echo "SERVEUR INJOIGNABLE (ssh code 255) — la sauvegarde n'a PAS pu être vérifiée." >> rapport.txt
+          fi
+
+          # Le rapport voyage jusqu'au job d'alerte, pour que l'issue porte la
+          # RAISON et pas seulement un lien vers un job rouge.
+          {
+            echo 'rapport<<FIN_RAPPORT'
+            cat rapport.txt
+            echo 'FIN_RAPPORT'
+            echo "echec=$([ "$CODE" -ne 0 ] && echo true || echo false)"
+          } >> "$GITHUB_OUTPUT"
+
+          # ⚠️ Cette étape ne fait PAS échouer le job : c'est l'étape suivante
+          # qui s'en charge. Les sorties d'une étape en échec ne remontent pas
+          # de façon fiable au job qui en dépend, et l'issue arriverait alors
+          # avec un rapport VIDE — une alerte sans sa raison fait perdre le
+          # temps qu'elle prétend faire gagner.
+
+      - name: Verdict
+        if: steps.controle.outputs.echec == 'true'
+        run: |
+          echo "::error::La sauvegarde de production n'est pas fiable — voir le rapport ci-dessus."
+          exit 1
+
+    outputs:
+      rapport: ${{ steps.controle.outputs.rapport }}
+
+  alerte:
+    name: Ouvrir une issue si la sauvegarde n'est pas fiable
+    runs-on: ubuntu-24.04
+    needs: [verifier]
+    if: failure()
+    steps:
+      - name: Ouvrir ou compléter l'issue de suivi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPOT: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RAPPORT: ${{ needs.verifier.outputs.rapport }}
+        run: |
+          set -euo pipefail
+          TITRE="🔴 La sauvegarde de production n'est pas fiable"
+          # Corps écrit ligne par ligne dans un fichier : une chaîne bash
+          # multiligne garde ses espaces de tête, et quatre espaces valent un
+          # bloc de code en markdown — l'issue serait illisible.
+          printf '%s\n' \
+            'Le contrôle quotidien de la sauvegarde a **échoué**.' \
+            '' \
+            '> Rappel de contexte : cette garde existe parce que la sauvegarde de' \
+            '> production a échoué **91 fois sur 91** sans que personne ne le voie,' \
+            "> du 2026-05-17 au 2026-08-16. Une issue ouverte ici veut dire que la" \
+            '> base de production **n'"'"'est peut-être pas récupérable aujourd'"'"'hui**.' \
+            '' \
+            '## Rapport du contrôle' \
+            '' \
+            '```' > corps-alerte.md
+          printf '%s\n' "$RAPPORT" >> corps-alerte.md
+          printf '%s\n' \
+            '```' \
+            '' \
+            '## Quoi vérifier, dans cet ordre' \
+            '' \
+            '1. `ssh root@<serveur>` puis `tail -30 /var/log/axion-backup.log`' \
+            '   — le journal du cron de 03:00 UTC.' \
+            '2. `ls -l /opt/axion-crm-pro/infra/scripts/backup-postgres.sh`' \
+            '   — le bit d'"'"'exécution ; s'"'"'il a sauté, vérifier le mode **dans git**' \
+            '   (`git ls-files -s`), pas seulement sur le disque.' \
+            '3. `df -h /` — un disque plein arrête le dump sans bruit.' \
+            '4. Storage Box pleine ? La rotation à 30 j est censée faire le ménage.' \
+            '' \
+            '## Rejouer le contrôle à la main' \
+            '' \
+            '```sh' \
+            'bash /opt/axion-crm-pro/infra/scripts/verifier-sauvegarde.sh' \
+            '```' \
+            '' \
+            'Et pour vérifier que la restauration fonctionne toujours (≈ 47 min,' \
+            'depuis un poste ayant 25 Go libres — pas le serveur) :' \
+            '' \
+            '```sh' \
+            './infra/scripts/dr-drill.sh' \
+            '```' \
+            '' \
+            '---' \
+            '' >> corps-alerte.md
+          printf '%s\n' "$RUN_URL" >> corps-alerte.md
+
+          # Une SEULE issue vivante : sans cette recherche, une panne durable en
+          # ouvrirait une par jour, et ce bruit reproduirait exactement le
+          # problème qu'on corrige — des alertes que plus personne ne lit.
+          EXISTANTE="$(gh issue list --repo "$DEPOT" --state open --label sauvegarde --json number --jq '.[0].number // empty')"
+          if [ -n "$EXISTANTE" ]; then
+            echo "Issue #$EXISTANTE déjà ouverte — ajout de cette occurrence."
+            gh issue comment "$EXISTANTE" --repo "$DEPOT" --body-file corps-alerte.md
+          else
+            gh issue create --repo "$DEPOT" --title "$TITRE" --label sauvegarde --body-file corps-alerte.md
+          fi

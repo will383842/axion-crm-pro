@@ -406,15 +406,41 @@ class AudienceBuilderService
         }
 
         // Champs directs sur companies.
+        //
+        // 🔴 `neq` et `not_in` acceptent EXPLICITEMENT les colonnes NULL.
+        //
+        // En SQL, `colonne != 'x'` vaut UNKNOWN quand la colonne est NULL, et
+        // UNKNOWN élimine la ligne. `evalCondition()` — l'évaluateur EN MÉMOIRE
+        // des mêmes critères (chemin waterfall step12) — répond l'inverse :
+        // `null != 'x'` est VRAI en PHP, donc la fiche est gardée.
+        //
+        // Une audience « tout ce qui n'est pas X » perdait donc EN SILENCE
+        // toutes les fiches dont le champ n'est pas renseigné — c'est-à-dire
+        // l'essentiel d'une base de prospection collectée. Pire : le contenu de
+        // l'audience dépendait du chemin qui l'avait calculée, `refresh()` en
+        // SQL n'en retenant pas les mêmes que step12 en mémoire.
+        //
+        // On aligne le SQL sur la mémoire, comme l'engagement écrit plus haut
+        // l'exige (« STRICTEMENT alignée avec evalCondition »). Sémantique
+        // retenue : NULL vaut « inconnu », et « inconnu ≠ x » est VRAI.
+        //
+        // ⚠️ Cela ÉLARGIT les audiences bâties sur `neq` / `not_in` : les fiches
+        // au champ vide y entrent désormais. C'est la bonne réponse à « tout
+        // sauf X » — mais c'en est une, et elle est assumée ici plutôt que
+        // subie selon le chemin de calcul.
+        //
+        // Sous le combinateur `not`, rien ne change : `negate()` enveloppe ce
+        // prédicat, `NOT (… OR … IS NULL)` rend FALSE sur NULL, et la version
+        // en mémoire exclut elle aussi. Un test garde cette symétrie.
         return function ($q) use ($field, $op, $value) {
             switch ($op) {
                 case 'eq':          $q->where($field, '=', $value);
                     break;
-                case 'neq':         $q->where($field, '!=', $value);
+                case 'neq':         $q->where(fn ($qq) => $qq->where($field, '!=', $value)->orWhereNull($field));
                     break;
                 case 'in':          $q->whereIn($field, $value);
                     break;
-                case 'not_in':      $q->whereNotIn($field, $value);
+                case 'not_in':      $q->where(fn ($qq) => $qq->whereNotIn($field, $value)->orWhereNull($field));
                     break;
                 case 'gt':          $q->where($field, '>', $value);
                     break;

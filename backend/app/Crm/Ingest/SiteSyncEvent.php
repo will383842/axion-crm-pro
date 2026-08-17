@@ -4,6 +4,7 @@ namespace App\Crm\Ingest;
 
 use App\Crm\Taxonomy;
 use DateTimeImmutable;
+use DateTimeZone;
 use Exception;
 
 /**
@@ -385,12 +386,47 @@ final class SiteSyncEvent
         return trim($value) === '' ? null : trim($value);
     }
 
+    /**
+     * 🔴 LE SECOND VISAGE DU DÉCALAGE DE 2 HEURES — mesuré en production le 2026-08-17.
+     *
+     * Le correctif du 2026-08-16 (`DB_TIMEZONE=Europe/Paris`, cf. l'en-tête de
+     * `config/database.php`) fait lire à Postgres les heures NUES comme des
+     * heures de Paris. C'est juste pour tout ce que l'application produit
+     * elle-même : `now()` rend un Carbon parisien, donc « 12:00:00 » nu VEUT
+     * DIRE midi à Paris, et Postgres le comprend ainsi.
+     *
+     * Mais le site n'émet pas en heure de Paris. `Date.toISOString()` rend
+     * TOUJOURS de l'UTC (« 2026-08-17T10:00:00.000Z »).
+     * `new DateTimeImmutable("…Z")` conserve ce fuseau, et Laravel sérialise
+     * avec le fuseau porté par l'objet — donc « 10:00:00 » nu, qui VEUT DIRE
+     * 10 h UTC. Postgres, lui, le relit comme 10 h à Paris : **l'instant stocké
+     * recule de 2 heures.**
+     *
+     * Constaté sur des lignes RÉELLES de production : un envoi de formulaire à
+     * 16:47:54 UTC ressortait avec `occurred_at = 14:47:58+00`, et les deux
+     * seuls événements issus du site montraient exactement 2,0000 h d'écart.
+     * Ce qui compte le plus : `consent.at` subissait le même sort — or c'est la
+     * date qui **PROUVE le consentement**. Un horodatage faux est un
+     * horodatage sans valeur probante.
+     *
+     * On ramène donc toute date entrante dans le fuseau de l'application AVANT
+     * qu'elle ne soit persistée. **L'instant ne bouge pas** — `setTimezone()`
+     * ne change que la représentation — mais cette représentation devient celle
+     * que Postgres attend. Vérifié par `HorodatagesFuseauTest`, qui échouait sur
+     * « 7200.0 » secondes avant ce correctif.
+     *
+     * ⚠️ Ce point d'entrée est le SEUL endroit où des dates venues de
+     * l'extérieur entrent dans le CRM par la synchro site : `occurred_at`,
+     * `consent.at` et `consent.vivier_at` passent tous les trois par ici.
+     */
     private static function parseDate(string $value, string $where): DateTimeImmutable
     {
         try {
-            return new DateTimeImmutable($value);
+            $date = new DateTimeImmutable($value);
         } catch (Exception) {
             throw SiteSyncRejection::invalid('invalid_date', "« {$where} » n'est pas une date ISO 8601 valide.");
         }
+
+        return $date->setTimezone(new DateTimeZone((string) config('app.timezone', 'UTC')));
     }
 }

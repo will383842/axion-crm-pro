@@ -1,5 +1,6 @@
 <?php
 
+use App\Crm\Ingest\SiteSyncEvent;
 use App\Models\ScrapingCampaign;
 use App\Models\User;
 use App\Models\Workspace;
@@ -106,4 +107,54 @@ test('ce que Postgres écrit lui-même reste juste', function () {
     $valeur = DB::table('tz_controle')->value('ecrit_par_pg');
 
     expect(abs(now()->diffInSeconds(Carbon::parse($valeur), false)))->toBeLessThan(5);
+});
+
+test('une date reçue en UTC par l’ingestion survit à l’aller-retour en base', function () {
+    // 🔴 LE DEUXIÈME VISAGE DU DÉCALAGE, mesuré en PRODUCTION le 2026-08-17.
+    //
+    // Le correctif du 16/08 (`DB_TIMEZONE=Europe/Paris`) fait lire à Postgres
+    // les heures NUES comme des heures de Paris. C'est juste pour tout ce que
+    // l'application produit elle-même : `now()` rend un Carbon parisien, donc
+    // « 12:00:00 » nu VEUT DIRE midi à Paris.
+    //
+    // Mais le site n'émet pas en heure de Paris : `Date.toISOString()` rend
+    // TOUJOURS de l'UTC. `new DateTimeImmutable("…Z")` conserve ce fuseau, et
+    // Laravel sérialise avec le fuseau de l'objet — donc « 10:00:00 » nu, qui
+    // VEUT DIRE 10 h UTC. Postgres, lui, le relit comme 10 h à Paris : l'instant
+    // stocké recule de 2 h.
+    //
+    // Constaté en production sur des lignes réelles : un envoi de formulaire à
+    // 16:47:54 UTC ressortait avec `occurred_at = 14:47:58+00`. `consent_at`
+    // subissait le même sort — or c'est la date qui PROUVE le consentement.
+    //
+    // Le correctif ramène toute date entrante dans le fuseau de l'application
+    // AVANT persistance. L'instant ne bouge pas ; seule sa représentation change,
+    // et elle devient celle que Postgres attend.
+    $evenement = SiteSyncEvent::fromArray([
+        'schema_version' => 1,
+        'event_id' => 'tz-' . Str::random(8),
+        'event_type' => 'form_submission',
+        'occurred_at' => '2026-08-17T10:00:00.000Z',
+        'form_type' => 'autre',
+        'subject_ref' => 'site:submission:tz-controle',
+        'person' => [
+            'person_key' => hash('sha256', 'tz-controle@test.local'),
+            'email' => 'tz-controle@test.local',
+            'first_name' => 'Tz',
+            'last_name' => 'Controle',
+        ],
+        'consent' => ['at' => '2026-08-17T10:00:00.000Z', 'version' => 'contact-v1'],
+    ]);
+
+    DB::statement('CREATE TEMP TABLE tz_ingestion (quand timestamptz, consenti timestamptz)');
+    DB::table('tz_ingestion')->insert([
+        'quand' => $evenement->occurredAt,
+        'consenti' => $evenement->consentAt(),
+    ]);
+
+    $ligne = DB::table('tz_ingestion')->first();
+    $attendu = Carbon::parse('2026-08-17T10:00:00Z');
+
+    expect(abs($attendu->diffInSeconds(Carbon::parse($ligne->quand), false)))->toBeLessThan(2)
+        ->and(abs($attendu->diffInSeconds(Carbon::parse($ligne->consenti), false)))->toBeLessThan(2);
 });

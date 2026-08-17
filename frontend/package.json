@@ -41,7 +41,7 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-hook-form": "^7.53.0",
-    "react-i18next": "^15.1.0",
+    "react-i18next": "^17.0.11",
     "react-joyride": "^2.9.0",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.6.0",

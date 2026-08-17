@@ -22,7 +22,7 @@
 -->
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/11.4/phpunit.xsd"
-         bootstrap="vendor/autoload.php"
+         bootstrap="tests/bootstrap.php"
          colors="true"
          executionOrder="default"
          cacheDirectory=".phpunit.cache"
@@ -50,8 +50,11 @@
         <env name="MOCK_MODE" value="true"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array" force="true"/>
-        <env name="DB_CONNECTION" value="pgsql"/>
-        <env name="DB_DATABASE" value="axion_crm_test"/>
+        <!-- `force="true"` : cf. la note detaillee dans phpunit.xml. Necessaire mais
+             PAS suffisant (PHPUnit n'ecrit pas $_SERVER) — c'est
+             `tests/bootstrap.php` qui epingle reellement la base. -->
+        <env name="DB_CONNECTION" value="pgsql" force="true"/>
+        <env name="DB_DATABASE" value="axion_crm_test" force="true"/>
         <!-- Voir phpunit.xml : la session Postgres est alignée sur
              `app.timezone` pour que le verrou du décalage puisse rougir. -->
         <env name="DB_TIMEZONE" value="Europe/Paris"/>

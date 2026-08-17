@@ -1,0 +1,42 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# SURCOUCHE DE DÉVELOPPEMENT — jamais chargée en production.
+#
+# Docker Compose ne charge automatiquement que `docker-compose.yml` et
+# `docker-compose.override.yml`. Ce fichier-ci porte un autre nom À DESSEIN :
+# il n'entre en jeu que si on le passe explicitement.
+#
+#     docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+#
+# La production, elle, lance `-f docker-compose.yml -f docker-compose.prod.yml`
+# (vérifié sur le serveur via le label `com.docker.compose.project.config_files`)
+# et ne verra donc jamais ce qui suit.
+#
+# ── POURQUOI ────────────────────────────────────────────────────────────────
+# Le service `api` ne publie AUCUN port : sa seule porte d'entrée est Caddy, en
+# `https://api.localhost`. Or, mesuré le 2026-08-17 :
+#
+#     node -e "require('dns').lookup('api.localhost', console.log)"   → ENOTFOUND
+#     curl  https://api.localhost/up                                   → 200
+#
+# Les navigateurs (et curl) traitent `*.localhost` spécialement ; **Node ne le
+# fait pas**, il passe par le résolveur du système. Le site Next.js ne peut donc
+# pas émettre vers le CRM. Le remède documenté jusqu'ici — ajouter deux lignes à
+# `C:\Windows\System32\drivers\etc\hosts` — exige une **élévation
+# administrateur**, que ni l'autopilote ni un montage scripté n'ont.
+#
+# Publier le port règle les trois problèmes d'un coup : Node résout `localhost`,
+# il n'y a plus de certificat auto-signé à contourner (donc plus besoin de
+# `NODE_TLS_REJECT_UNAUTHORIZED=0`, qui ne devrait jamais exister), et aucun
+# fichier système n'est touché.
+#
+# ── CE QU'IL FAUT METTRE CÔTÉ SITE ──────────────────────────────────────────
+#     CRM_SYNC_URL=http://localhost:58080/api/internal/site-sync
+#
+# 58080 : port haut, hors des plages usuelles, aligné sur la convention déjà
+# suivie par ce dépôt (postgres 55432, redis 56379).
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  api:
+    ports:
+      - "58080:80"

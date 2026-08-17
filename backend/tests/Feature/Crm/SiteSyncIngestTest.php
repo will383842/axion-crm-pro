@@ -167,11 +167,45 @@ test('drapeau candidats à OFF : le flux vivier reste fermé (503), rien n’est
 });
 
 test('valeurs par défaut des drapeaux : tout est fermé', function () {
-    // On relit la configuration livrée, pas celle du beforeEach.
-    $defaults = require config_path('crm.php');
+    // On relit la configuration LIVRÉE, pas celle du beforeEach.
+    //
+    // 🔴 `config/crm.php` appelle `env()`. Sur un poste de développement dont le
+    // `.env` porte `CRM_INGEST_ENABLED=true` — c'est ce que le §A.1 des
+    // scénarios E2E fait poser — la variable arrive dans le conteneur par
+    // `env_file:` et ce test répondait selon LE POSTE, pas selon le code livré.
+    // Il pouvait donc rougir sur un code sain, ou verdir sur un code fautif.
+    // On retire les deux clés de l'environnement le temps de la lecture : ce
+    // qu'on veut mesurer, c'est le DÉFAUT écrit dans `config/crm.php`.
+    // Il faut vider LES TROIS emplacements : le dépôt de variables de Laravel
+    // interroge `$_SERVER` en premier, et `Env::getRepository()->clear()` seul
+    // n'y touche pas (même cause que `tests/bootstrap.php`).
+    $cles = ['CRM_INGEST_ENABLED', 'CRM_INGEST_CANDIDATES_ENABLED'];
+    $avant = [];
+    foreach ($cles as $cle) {
+        $avant[$cle] = [$_SERVER[$cle] ?? null, $_ENV[$cle] ?? null, getenv($cle)];
+        unset($_SERVER[$cle], $_ENV[$cle]);
+        putenv($cle);
+    }
 
-    expect($defaults['ingest']['enabled'])->toBeFalse()
-        ->and($defaults['ingest']['candidates_enabled'])->toBeFalse();
+    try {
+        $defaults = require config_path('crm.php');
+
+        expect($defaults['ingest']['enabled'])->toBeFalse()
+            ->and($defaults['ingest']['candidates_enabled'])->toBeFalse();
+    } finally {
+        foreach ($cles as $cle) {
+            [$serveur, $env, $getenv] = $avant[$cle];
+            if ($serveur !== null) {
+                $_SERVER[$cle] = $serveur;
+            }
+            if ($env !== null) {
+                $_ENV[$cle] = $env;
+            }
+            if ($getenv !== false) {
+                putenv("{$cle}={$getenv}");
+            }
+        }
+    }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

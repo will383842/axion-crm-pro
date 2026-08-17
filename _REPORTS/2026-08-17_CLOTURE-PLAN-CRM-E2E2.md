@@ -342,11 +342,29 @@ du poste de travail**, la troisième est un risque de fuite de secret :
   `docker compose up -d …` au §A.1 **et** dans le Geste A du runbook. Sans
   cela, la séquence d'activation en 14 étapes ne pose, littéralement, aucun
   drapeau.
-- **D-09** — ajouter `force="true"` à la ligne 33 de `backend/phpunit.xml`.
-  Une ligne. Elle sépare « je lance les tests » de « je vide ma base de
-  développement ».
+- **D-09** — ⚠️ **CORRECTION de ce rapport (2026-08-17, après vérification) :
+  `force="true"` seul NE SUFFIT PAS.** J'avais écrit « une ligne » ; c'était
+  faux, et l'épreuve l'a montré. PHPUnit, avec `force`, écrit `$_ENV` et
+  `putenv()` — **mais pas `$_SERVER`**. Or le dépôt de variables de Laravel
+  interroge `$_SERVER` en premier, et `variables_order = EGPCS` y place les
+  variables du conteneur. Mesuré, `force="true"` posé :
+  `getenv='axion_crm' | $_ENV='axion_crm' | $_SERVER='axion_crm'`, et la suite
+  visait toujours la base de développement.
+  Le correctif réel tient en trois pièces : `backend/tests/bootstrap.php`
+  (épingle le nom dans les **trois** emplacements avant tout démarrage de
+  l'application), les deux configurations PHPUnit qui pointent ce bootstrap
+  (`phpunit.xml` **et** `phpunit-ci.xml` — la CI utilise la seconde), et une
+  garde dans `Tests\TestCase::setUp()` qui **refuse de démarrer** si la
+  connexion réelle ne porte pas une base de test.
 - **D-15** — ancrer les motifs `storage/` sous `backend/` dans le `.gitignore`.
-  **Fait dans la PR qui porte ce rapport.**
+  **Fait.**
+
+**État au 2026-08-17 (soir)** : D-01 à D-05, D-07, D-08, D-09, D-10, D-12, D-13,
+D-14 et D-15 sont **traités** (code + réécriture du §A et du Geste A du
+runbook). Restent **D-06** (deux fichiers `.env` pour un seul service, constat
+sans remède évident) et **D-11** (console non authentifiable en local — le
+correctif touche `infra/caddy/Caddyfile`, partagé avec la production, et demande
+une surcouche locale dédiée).
 
 ---
 
@@ -455,22 +473,45 @@ silence est celui du trafic ; sinon, un point de capture est muet. **À faire.**
 
 ### 8.2 Ce qu'il faut faire pour pouvoir écrire « PRODUCTION READY »
 
-1. **Corriger D-05 et D-09** (deux lignes, l'une dans le runbook, l'autre dans
-   `phpunit.xml`). Ce sont les deux qui mordent hors du poste de travail.
-2. **Rendre le §A exécutable** : ajouter `OwnerUserSeeder`, le geste de remise à
-   zéro de la base, la création de la base du site, l'identifiant de console,
-   l'étape TOTP, et **trancher la question `app.localhost` / `api.localhost`**
-   (le plus simple : servir le SPA et l'API sous un seul hôte en local, ce qui
-   supprime d'un coup D-07, D-11 et le besoin de `NODE_TLS_REJECT_UNAUTHORIZED`).
-3. **Rejouer le §E** une fois le montage réparé — en particulier B.8 à B.12,
-   les 7 pannes du §D, et les 6 écrans manquants.
-4. **Mesurer le §F.6** (100 000+ lignes, p95 < 500 ms).
-5. **Trancher les deux arbitrages nommés** : divergence `neq`/`not_in` sur NULL
+**Mise à jour du 2026-08-17 (soir)** — les points 1, 2 et 6 sont **faits**.
+
+1. ✅ **D-05 et D-09 corrigés.**
+   - D-05 : le Geste A du runbook et le §A.1 prescrivent désormais
+     `up -d --force-recreate --no-deps` au lieu de `restart`, avec la mesure à
+     l'appui et un avertissement explicite (« une sortie vide ne veut pas dire
+     rien à signaler »).
+   - D-09 : `tests/bootstrap.php` épingle la base dans `$_SERVER`, `$_ENV` et
+     `putenv()` ; les **deux** configurations PHPUnit y pointent ; et
+     `Tests\TestCase::setUp()` **refuse de démarrer** si la connexion réelle ne
+     porte pas une base de test. Vérifié en réinjectant la fuite :
+     `-e DB_DATABASE=axion_crm` → la suite vise quand même `axion_crm_test`.
+
+2. ✅ **§A rendu exécutable** : remise à zéro de la base documentée,
+   `PermissionsAndRolesSeeder` + `OwnerUserSeeder` intercalés avant
+   `GovernedTagsSeeder` (avec le contrôle « 14 tags »), mot de passe de console,
+   étape TOTP, bruit Telescope, clés réelles de `config/crm.php`, création de la
+   base du site, `.env.local` au lieu de `.env`, et nom correct du worktree.
+   **La question `api.localhost` est tranchée** : `docker-compose.local.yml`
+   publie `api` sur `58080` — Node joint le CRM (HTTP 401 mesuré), et
+   `NODE_TLS_REJECT_UNAUTHORIZED=0` **disparaît du protocole**. Ce fichier n'est
+   jamais chargé en production.
+
+3. ⛔ **Rejouer le §E** une fois D-11 levé — B.8 à B.12, les 4 pannes non
+   simulées (§D.1, D.5, D.6, D.7) et les 6 écrans manquants.
+
+4. ⛔ **Mesurer le §F.6** (100 000+ lignes, p95 < 500 ms).
+
+5. ⛔ **Trancher les deux arbitrages** : divergence `neq`/`not_in` sur NULL
    (§3.2), et adresse en clair dans `opt_out` (§3.3).
-6. **Fusionner #142 et #143** — CI verte, 17 contrôles au vert, 0 échec.
-   ⚠️ Fusionner déclenche le déploiement en production ; ces deux PR n'ont pas
-   été fusionnées, le §F du plan plaçant l'activation *après* les feux verts,
-   pas pendant.
+
+6. ✅ **#142, #143 et #144 fusionnées et déployées** — `main = 369c3af`, code
+   servi vérifié sur le serveur, 5 comptages identiques avant/après.
+
+7. ⛔ **D-11 — la console en local.** Seul blocage structurel restant. Le
+   correctif propre est de servir le SPA **et** l'API sous une seule origine en
+   local ; il touche `infra/caddy/Caddyfile`, **partagé avec la production**
+   (vérifié : `docker-compose.prod.yml` ne le surcharge pas). À faire par une
+   surcouche locale dédiée, sur le modèle de `docker-compose.local.yml`.
 
 ### 8.3 Hors périmètre, rappelé pour mémoire
 

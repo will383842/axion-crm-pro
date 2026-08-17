@@ -1,0 +1,85 @@
+
+   PASS  Tests\Unit\Dedup\OptOutTest
+  ✓ isOptedOut returns false when no opt_out entry                      46.72s  
+  ✓ isOptedOut returns true after addOptOut                              0.65s  
+  ✓ isOptedOut normalizes email (trim + lowercase)                       0.94s  
+  ✓ isOptedOut cross-workspace (table sans workspace_id)                 0.53s  
+  ✓ isOptedOut normalizes phone (strip separators)                       0.45s  
+
+   PASS  Tests\Feature\Rgpd\ExportsRespectentOppositionsTest
+  ✓ un contact opposé par ADRESSE EN CLAIR est exclu                     5.90s  
+
+   FAIL  Tests\Feature\Rgpd\AntiReinsertionTest
+  ✓ une opposition née du SITE (hash seul, sans email) est vue par isOp… 1.40s  
+  ⨯ un effacement écrit l’EMPREINTE, que la garde du scraping sait lire  3.72s  
+  ✓ la normalisation de casse et d’espaces vaut pour l’empreinte comme…  0.49s  
+  ✓ une adresse jamais opposée reste scrapable                           0.44s  
+[2026-08-17 12:20:15] local.INFO: GDPR erasure complete {"email":"","deleted":{"contacts":0,"email_validations":0,"rgpd_requests":0,"notifications":0,"magic_links":0,"journalists":0,"media_email":0,"health_practitioners":0}} 
+[2026-08-17 12:20:16] local.INFO: GDPR erasure complete {"email":"subject@example.com","deleted":{"contacts":0,"email_validations":0,"rgpd_requests":0,"notifications":0,"magic_links":0,"journalists":0,"media_email":0,"health_practitioners":0}} 
+[2026-08-17 12:20:16] local.INFO: GDPR erasure complete {"email":"marie.dupont@example.com","deleted":{"contacts":1,"email_validations":0,"rgpd_requests":0,"notifications":0,"magic_links":0,"journalists":0,"media_email":0,"health_practitioners":0}} 
+[2026-08-17 12:20:17] local.INFO: GDPR erasure complete {"email":"cached@example.com","deleted":{"contacts":0,"email_validations":1,"rgpd_requests":0,"notifications":0,"magic_links":0,"journalists":0,"media_email":0,"health_practitioners":0}} 
+
+   FAIL  Tests\Feature\Rgpd\GdprErasureTest
+  ✓ erasure runs in atomic transaction (rollback on failure)             0.99s  
+  ⨯ erasure adds opt_out entry                                           0.72s  
+  ✓ erasure deletes contacts matching email                              0.66s  
+  ✓ erasure deletes email_validations entry                              0.57s  
+
+   FAIL  Tests\Feature\Crm\SiteSyncIngestTest
+  ⨯ une opposition n’écrit JAMAIS l’adresse en clair                     5.36s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Rgpd\AntiReinsertionTest > un effacement écrit l’EM…   
+  Failed asserting that 'efface@example.com' is null.
+
+  at tests/Feature/Rgpd/AntiReinsertionTest.php:43
+     39▕     expect($ligne)->not->toBeNull()
+     40▕         ->and($ligne->email_hash)->toBe(hash('sha256', $email))
+     41▕         // 🔴 L'adresse d'une personne EFFACÉE n'est pas conservée en clair dans
+     42▕         // la table qui enregistre son opposition.
+  ➜  43▕         ->and($ligne->email)->toBeNull()
+     44▕         // La garde du funnel filtre sur ce scope : sans lui, elle ne voit rien.
+     45▕         ->and($ligne->scope)->toBe('business');
+     46▕ 
+     47▕     // Reproduction EXACTE de la requête de `ScrapedRecordIngestService` :
+
+  1   tests/Feature/Rgpd/AntiReinsertionTest.php:43
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Rgpd\GdprErasureTest > erasure adds opt_out entry      
+  Failed asserting that 1 is identical to 0.
+
+  at tests/Feature/Rgpd/GdprErasureTest.php:49
+     45▕     $service->erase('subject@example.com');
+     46▕ 
+     47▕     // Par l'EMPREINTE : l'effacement ne conserve plus l'adresse en clair.
+     48▕     expect(DB::table('opt_out')->where('email_hash', hash('sha256', 'subject@example.com'))->exists())->toBeTrue()
+  ➜  49▕         ->and(DB::table('opt_out')->whereNotNull('email')->count())->toBe(0);
+     50▕ });
+     51▕ 
+     52▕ test('erasure runs in atomic transaction (rollback on failure)', function () {
+     53▕     // Test conceptuel : si une table erreur, toutes les autres restent intactes.
+
+  1   tests/Feature/Rgpd/GdprErasureTest.php:49
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Crm\SiteSyncIngestTest > une opposition n’écrit JAM…   
+  Failed asserting that 'zz.test@example.invalid' is null.
+
+  at tests/Feature/Crm/SiteSyncIngestTest.php:772
+    768▕ 
+    769▕     $ligne = DB::table('opt_out')->first();
+    770▕ 
+    771▕     expect($ligne)->not->toBeNull()
+  ➜ 772▕         ->and($ligne->email)->toBeNull()
+    773▕         ->and($ligne->email_hash)->toBe(hash('sha256', 'zz.test@example.invalid'));
+    774▕ 
+    775▕     // Et la garde continue de voir l'opposition : c'est l'empreinte qu'elle lit.
+    776▕     expect(DB::table('opt_out')->where('email_hash', hash('sha256', 'zz.test@example.invalid'))->exists())
+
+  1   tests/Feature/Crm/SiteSyncIngestTest.php:772
+
+
+  Tests:    3 failed, 12 passed (23 assertions)
+  Duration: 120.08s
+  Random Order Seed: 1786961920
+

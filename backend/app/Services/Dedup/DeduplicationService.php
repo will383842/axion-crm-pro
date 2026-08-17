@@ -224,13 +224,34 @@ class DeduplicationService
      * `scope` est laissé au DEFAULT SQL (`'business'`) : cette méthode ne sert
      * que l'univers business. Une opposition « vivier » passe par
      * `SiteGdprService`, qui pose le scope explicitement.
+     *
+     * 🔴 ET ELLE N'ÉCRIT PLUS L'ADRESSE EN CLAIR (2026-08-17, E2E n°2).
+     *
+     * Son unique appelant en production est `GdprErasureService` : les lignes
+     * nées ici sont donc celles de personnes qui ont demandé leur EFFACEMENT.
+     * Garder leur adresse en clair dans la table qui enregistre leur
+     * opposition, c'est conserver précisément ce qu'on vient de leur promettre
+     * d'effacer — et le hachage à côté ne protégeait alors plus rien.
+     *
+     * Le voisin le faisait déjà bien : `SiteGdprService::optOut()` écrit
+     * `'email' => null` avec ce commentaire — « le hash suffit à
+     * l'anti-réinsertion, c'est tout l'intérêt ». Deux chemins d'effacement,
+     * deux comportements opposés ; celui-ci s'aligne sur l'autre.
+     *
+     * Sans effet sur la garde : `isOptedOut()` interroge `email` **OU**
+     * `email_hash`. Les nouvelles lignes sont trouvées par l'empreinte, les
+     * anciennes (antérieures à `email_hash`) restent trouvées par l'adresse.
+     *
+     * ⚠️ `phone` reste en clair : il n'existe pas de colonne d'empreinte pour
+     * lui, et `isOptedOut()` le compare directement. Le corriger demande une
+     * migration — consigné, non traité ici.
      */
     public function addOptOut(?string $email, ?string $phone, string $source, ?string $reason = null): void
     {
         $emailNormalise = $email ? strtolower(trim($email)) : null;
 
         DB::table('opt_out')->insert([
-            'email' => $emailNormalise,
+            'email' => null,
             'email_hash' => $emailNormalise !== null ? hash('sha256', $emailNormalise) : null,
             'phone' => $phone ? preg_replace('/[\s.-]/', '', $phone) : null,
             'source' => $source,

@@ -30,10 +30,17 @@ test('un effacement écrit l’EMPREINTE, que la garde du scraping sait lire', f
 
     app(DeduplicationService::class)->addOptOut($email, null, source: 'gdpr_erasure');
 
-    $ligne = DB::table('opt_out')->where('email', $email)->first();
+    // On cherche par l'EMPREINTE, comme le fait la production. Chercher par
+    // l'adresse en clair reviendrait à vérifier une colonne que le code de
+    // production n'interroge pas — un test peut alors rester vert alors que la
+    // garde, elle, ne voit rien.
+    $ligne = DB::table('opt_out')->where('email_hash', hash('sha256', $email))->first();
 
     expect($ligne)->not->toBeNull()
         ->and($ligne->email_hash)->toBe(hash('sha256', $email))
+        // 🔴 L'adresse d'une personne EFFACÉE n'est pas conservée en clair dans
+        // la table qui enregistre son opposition.
+        ->and($ligne->email)->toBeNull()
         // La garde du funnel filtre sur ce scope : sans lui, elle ne voit rien.
         ->and($ligne->scope)->toBe('business');
 

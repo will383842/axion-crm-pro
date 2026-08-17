@@ -309,7 +309,7 @@ n'est aujourd'hui exposée.
 
 ---
 
-## 4. DÉFAUTS DE DOCUMENTATION (14)
+## 4. DÉFAUTS DE DOCUMENTATION ET D'HYGIÈNE (15)
 
 Le §E.1.4 pose la règle : « toute divergence entre le runbook et la réalité est
 un défaut, même mineure ». Détail intégral dans
@@ -331,9 +331,10 @@ un défaut, même mineure ». Détail intégral dans
 | D-12 | La **double authentification est obligatoire** au premier accès (`first_login_required`) ; le §A ne le mentionne pas | bloquant pour §E.4 |
 | D-13 | **La base de données du site n'existe pas** (`role "axion_ia" does not exist`) et le §A.2 ne la mentionne jamais. Tranche au passage le §G.2 : le fichier est `.env.local`, et il ne porte **aucune** des 5 variables demandées | 🔴 bloquant |
 | D-14 | Divergences mineures : `app` sert un **build de production** (Caddy) et non Vite ; le tableau §1.1 du runbook déclare non fusionnées des branches qui le sont ; le `event_id` d'exemple n'est pas un UUID valide et est pourtant accepté | mineur |
+| **D-15** | **Le mot de passe administrateur en clair n'était ni suivi ni ignoré.** `OwnerUserSeeder` dépose `backend/storage/app/private/seeders/owner-initial-password.txt` ; les motifs `/storage/…` du `.gitignore` sont ancrés à la **racine** et ne couvrent pas `backend/storage/…`. Le fichier était donc **proposé au premier `git add -A`**. Le `.gitignore` porte déjà, quelques lignes plus haut, un commentaire décrivant exactement ce piège — il n'avait été refermé que pour `bootstrap/cache`. **Corrigé dans cette PR.** | 🔴 sécurité |
 
-**Deux corrections à porter en priorité, parce qu'elles touchent la
-production** :
+**Trois corrections à porter en priorité** — les deux premières mordent **hors
+du poste de travail**, la troisième est un risque de fuite de secret :
 
 - **D-05** — remplacer `docker compose restart …` par
   `docker compose up -d …` au §A.1 **et** dans le Geste A du runbook. Sans
@@ -342,6 +343,8 @@ production** :
 - **D-09** — ajouter `force="true"` à la ligne 33 de `backend/phpunit.xml`.
   Une ligne. Elle sépare « je lance les tests » de « je vide ma base de
   développement ».
+- **D-15** — ancrer les motifs `storage/` sous `backend/` dans le `.gitignore`.
+  **Fait dans la PR qui porte ce rapport.**
 
 ---
 

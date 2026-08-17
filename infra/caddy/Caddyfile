@@ -38,10 +38,41 @@ api.localhost {
 app.localhost {
     tls internal
     encode zstd gzip
-    reverse_proxy app:5173 {
-        header_up Connection {>Connection}
-        header_up Upgrade {>Upgrade}
+
+    # SINGLE ORIGIN — exactement comme `app.axion-crm-pro.com` plus bas.
+    #
+    # 🔴 Ce bloc envoyait TOUT au frontend : le SPA devait donc appeler l'API
+    # sur une AUTRE origine (`api.localhost`), et la console était alors
+    # inutilisable en local. Deux impasses, mesurées le 2026-08-17 :
+    #   · `SESSION_DOMAIN=.localhost` → le cookie de session est REFUSÉ par les
+    #     navigateurs (`localhost` est un domaine de premier niveau) → 401 ;
+    #   · cookie host-only sur `api.localhost` → le SPA servi depuis
+    #     `app.localhost` ne peut plus LIRE `XSRF-TOKEN` (lecture JS
+    #     inter-hôtes impossible) → 419 CSRF token mismatch.
+    #
+    # La production ne connaît pas ce problème : elle est en origine unique
+    # depuis le sprint 19.6 (« Evite les third-party cookies »). La décision
+    # n'avait simplement jamais été répercutée ici. Le local doit RESSEMBLER à
+    # la production, pas diverger d'elle — sinon il ne prouve rien.
+    #
+    # Poser côté `.env` local, en regard : `VITE_API_BASE_URL=https://app.localhost`
+    # et `SESSION_DOMAIN=` (vide → cookie host-only sur `app.localhost`).
+    @api {
+        path /api/* /sanctum/* /docs /docs/* /up /broadcasting/*
     }
+    handle @api {
+        reverse_proxy api:80 {
+            header_up X-Real-IP {remote_host}
+        }
+    }
+
+    handle {
+        reverse_proxy app:5173 {
+            header_up Connection {>Connection}
+            header_up Upgrade {>Upgrade}
+        }
+    }
+
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
         X-Frame-Options "DENY"

@@ -690,3 +690,92 @@ test('une désinscription newsletter inscrit l’opposition côté business', fu
 
     expect(DB::table('activities')->where('kind', 'newsletter_optout')->count())->toBe(1);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7 bis. OPPOSITION VIVIER — le clic d'un candidat, INGÉRÉ (et non pré-inséré)
+//
+// 🔴 Les trois tests ci-dessus n'exercent jamais ce chemin : celui qui vérifie
+// l'étanchéité entre univers PRÉ-INSÈRE lui-même la ligne `scope = vivier`
+// dont il a besoin. Aucun test ne demandait donc à l'ingestion de la PRODUIRE
+// — et elle ne le faisait pas. Constaté en E2E le 2026-08-17.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * L'événement que `syncVivierOppositionToCrm()` émet côté site.
+ *
+ * Sans section `company` : le clic d'opposition d'un candidat ne porte aucune
+ * donnée d'entreprise, et en laisser une ferait créer une fiche business par
+ * l'événement même qui demande à être oublié.
+ */
+function siteSyncOppositionVivier(array $overrides = []): array
+{
+    $event = siteSyncEvent(array_replace_recursive([
+        'event_type' => 'opt_out',
+        'form_type' => null,
+        'source_slug' => 'site-vivier-opposition',
+        'subject_ref' => 'site:job_application:zz-opposition-1',
+        'payload' => ['scope' => 'vivier'],
+    ], $overrides));
+
+    unset($event['company'], $event['consent']);
+
+    return $event;
+}
+
+test('une opposition VIVIER est inscrite en scope vivier, pas business', function () {
+    config(['crm.ingest.candidates_enabled' => true]);
+
+    siteSyncPost(siteSyncOppositionVivier())->assertOk();
+
+    $optOut = DB::table('opt_out')->first();
+    expect($optOut)->not->toBeNull()
+        // `SiteSyncClassifier::universe()` répond `business` pour un `opt_out`
+        // (ce n'est ni une candidature ni un formulaire `recrutement`). Sans
+        // lecture du scope déclaré, l'opposition d'un candidat atterrissait
+        // dans la liste COMMERCIALE.
+        ->and($optOut->scope)->toBe('vivier');
+
+    expect(DB::table('opt_out')->where('scope', 'business')->count())->toBe(0);
+});
+
+test('une opposition VIVIER empêche le retour au vivier', function () {
+    config(['crm.ingest.candidates_enabled' => true]);
+
+    siteSyncPost(siteSyncOppositionVivier())->assertOk();
+
+    // La même personne redépose une candidature : l'opposition prime.
+    siteSyncPost(siteSyncEvent([
+        'event_type' => 'application_submitted',
+        'form_type' => null,
+        'consent' => ['version' => 'careers-v2-2026-08-13'],
+        'candidate' => ['family' => 'candidat_commercial'],
+        'subject_ref' => 'site:job_application:zz-opposition-1-bis',
+    ]))->assertOk()->assertJsonPath('result.status', 'opted_out');
+
+    expect(DB::table('candidates')->count())->toBe(0);
+});
+
+test('une opposition VIVIER ne désinscrit pas des communications business', function () {
+    config(['crm.ingest.candidates_enabled' => true]);
+
+    siteSyncPost(siteSyncOppositionVivier())->assertOk();
+
+    // Se retirer d'un vivier de recrutement n'est pas se désinscrire d'une
+    // lettre d'information : les deux listes sont distinctes par construction.
+    siteSyncPost(siteSyncEvent())->assertOk()->assertJsonPath('result.status', 'created');
+
+    expect(DB::table('companies')->count())->toBe(1);
+});
+
+test('un opt_out ne peut pas se DÉCLARER vivier sans viser une candidature', function () {
+    config(['crm.ingest.candidates_enabled' => true]);
+
+    // Le payload confirme une déduction, il ne la choisit pas (plan §B.7.d) :
+    // un `subject_ref` de newsletter reste une opposition commerciale, même si
+    // l'émetteur écrit « vivier » dans le corps du message.
+    siteSyncPost(siteSyncOppositionVivier([
+        'subject_ref' => 'site:newsletter_subscriber:zz-1',
+    ]))->assertOk();
+
+    expect(DB::table('opt_out')->first()->scope)->toBe('business');
+});

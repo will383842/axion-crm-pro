@@ -109,7 +109,7 @@ final class SiteSyncIngestService
             );
         }
 
-        $scope = $universe === 'vivier' ? 'vivier' : 'business';
+        $scope = $this->oppositionScope($event, $universe);
         if (! $this->isOppositionEvent($event) && $this->hasOpposed($event, $scope)) {
             return new IngestOutcome(status: IngestOutcome::OPTED_OUT);
         }
@@ -449,6 +449,47 @@ final class SiteSyncIngestService
     private function isOppositionEvent(SiteSyncEvent $event): bool
     {
         return in_array($event->eventType, ['opt_out', 'newsletter_optout'], true);
+    }
+
+    /**
+     * Univers d'une OPPOSITION — qui n'est pas celui de l'événement.
+     *
+     * 🔴 `SiteSyncClassifier::universe()` ne rend `vivier` que pour une
+     * `application_submitted` ou un formulaire de type `recrutement`. Un
+     * `opt_out` n'est ni l'un ni l'autre : il retombait donc TOUJOURS en
+     * `business`, y compris l'opposition d'un candidat à sa conservation au
+     * vivier. Deux effets, tous deux constatés en E2E le 2026-08-17 :
+     *
+     *  1. l'opposition était inscrite en `scope = business` → `hasOpposed()`,
+     *     qui interroge `scope = vivier` pour une candidature, ne la voyait
+     *     pas : **la fiche revenait au vivier au dépôt suivant** ;
+     *  2. la personne se trouvait désinscrite des communications COMMERCIALES
+     *     qu'elle n'avait jamais demandé à quitter.
+     *
+     * Le site le dit déjà dans le corps du message (`syncVivierOppositionToCrm`
+     * pose `payload.scope = "vivier"`, avec le commentaire « pour que le CRM
+     * n'ait pas à le déduire de l'univers »). Il le dit UNE SECONDE FOIS par le
+     * `subject_ref`, qui désigne la candidature d'origine.
+     *
+     * On exige **les deux** : la valeur déclarée doit appartenir à la liste
+     * fermée `business|vivier`, ET être corroborée par le `subject_ref`. Le
+     * payload ne CHOISIT donc pas sa destination — il confirme une déduction
+     * que le CRM fait lui-même, ce qui préserve la règle du plan §B.7.d (« la
+     * classification est une décision du CRM, sinon un émetteur compromis
+     * choisirait l'univers d'atterrissage »).
+     */
+    private function oppositionScope(SiteSyncEvent $event, string $universe): string
+    {
+        if ($event->eventType === 'opt_out') {
+            $declared = $event->str('payload', 'scope');
+            $viseVivier = str_starts_with($event->subjectRef, 'site:job_application:');
+
+            if ($declared === 'vivier' && $viseVivier) {
+                return 'vivier';
+            }
+        }
+
+        return $universe === 'vivier' ? 'vivier' : 'business';
     }
 
     private function hasOpposed(SiteSyncEvent $event, string $scope): bool

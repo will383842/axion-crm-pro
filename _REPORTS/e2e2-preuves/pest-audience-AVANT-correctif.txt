@@ -1,0 +1,127 @@
+[2026-08-17 05:58:10] local.INFO: Audience refresh start {"audience_id":1} 
+[2026-08-17 05:58:10] local.INFO: Audience refresh done {"audience_id":1,"members":1} 
+[2026-08-17 05:58:16] local.INFO: Audience refresh start {"audience_id":4} 
+[2026-08-17 05:58:16] local.INFO: Audience refresh via Bus::batch {"audience_id":4,"total":5001} 
+[2026-08-17 05:58:18] local.INFO: Audience refresh start {"audience_id":5} 
+[2026-08-17 05:58:19] local.INFO: Audience refresh done {"audience_id":5,"members":5000} 
+[2026-08-17 05:58:20] local.INFO: Audience refresh start {"audience_id":6} 
+[2026-08-17 05:58:20] local.INFO: Audience refresh done {"audience_id":6,"members":2} 
+[2026-08-17 05:58:20] local.INFO: Audience refresh start {"audience_id":6} 
+[2026-08-17 05:58:20] local.INFO: Audience refresh done {"audience_id":6,"members":2} 
+[2026-08-17 05:58:27] local.INFO: Audience refresh start {"audience_id":11} 
+[2026-08-17 05:58:27] local.INFO: Audience refresh via Bus::batch {"audience_id":11,"total":5001} 
+
+   FAIL  Tests\Unit\Audiences\AudienceBuilderServiceTest
+  ✓ it refresh populates audience_members                               23.67s  
+  ✓ it filters by quality_score range                                    0.84s  
+  ⨯ it tags contains_any avec une liste VIDE ne vise personne            1.25s  
+  ✓ it tags : SQL et evaluateur en memoire donnent le MEME nombre        0.66s  
+  ⨯ it not : SQL et evaluateur en memoire donnent le MEME nombre (champ… 0.45s  
+  ✓ it refresh bascule en Bus::batch au-dela de 5 000 fiches             1.67s  
+  ✓ it refresh reste en ligne a exactement 5 000 fiches (le seuil est s… 2.40s  
+  ⨯ it not + in sur un champ NULL garde la fiche, comme en memoire       0.53s  
+  ✓ it refresh is idempotent (run twice = same count)                    0.62s  
+  ✓ it not + neq sur un champ NULL exclut la fiche, des deux cotes       0.78s  
+  ✓ it filters by has_email contacts                                     0.50s  
+  ✓ it skips invalid fields/ops silently                                 0.63s  
+  ✓ it preview returns count for simple criteria                         0.76s  
+  ✓ it preview uses any combinator (OR)                                  1.03s  
+  ⨯ it tags avec un operateur non supporte ne vise personne              0.47s  
+  ✓ it not + tags contains_any garde les fiches SANS le tag              0.41s  
+  ✓ it tags contains_any ne retient que les fiches portant un des slugs  0.53s  
+  ✓ it evaluateForCompany returns matching audience IDs                  0.47s  
+  ✓ it le chemin batch remet l audience a zero AVANT de dispatcher       1.16s  
+  ✓ it not exclut les fiches qui matchent la condition                   0.46s  
+  ⨯ it not sur un champ NULL garde la fiche : inconnu n est pas egal     0.65s  
+  ✓ it tags contains_any accepte plusieurs slugs (union, pas intersecti… 0.87s  
+  ✓ it not : is_not_null garde les fiches dont le champ est NULL         0.65s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\Audiences\AudienceBuilderServiceTest > it tags contain…   
+  Failed asserting that 3 is identical to 0.
+
+  at tests/Unit/Audiences/AudienceBuilderServiceTest.php:378
+    374▕     $preview = $this->service->preview($this->ws->id, [
+    375▕         'all' => [['field' => 'tags', 'op' => 'contains_any', 'value' => []]],
+    376▕     ]);
+    377▕ 
+  ➜ 378▕     expect($preview['companies'])->toBe(0);
+    379▕ });
+    380▕ 
+    381▕ it('tags avec un operateur non supporte ne vise personne', function () {
+    382▕     // `eq` n'est pas un opérateur valide sur le pivot `tags` : l'évaluateur en
+
+  1   tests/Unit/Audiences/AudienceBuilderServiceTest.php:378
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\Audiences\AudienceBuilderServiceTest > it not : SQL et…   
+  Failed asserting that 1 is identical to 2.
+
+  at tests/Unit/Audiences/AudienceBuilderServiceTest.php:264
+    260▕ 
+    261▕     $sql      = $this->service->preview($this->ws->id, $criteria)['companies'];
+    262▕     $inMemory = countInMemory($this->service, $this->ws->id, $criteria);
+    263▕ 
+  ➜ 264▕     expect($sql)->toBe($inMemory);
+    265▕ });
+    266▕ 
+    267▕ it('not + in sur un champ NULL garde la fiche, comme en memoire', function () {
+    268▕     // Même piège que `eq`, avec l'opérateur de liste : une fiche sans région
+
+  1   tests/Unit/Audiences/AudienceBuilderServiceTest.php:264
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\Audiences\AudienceBuilderServiceTest > it not + in sur…   
+  Failed asserting that 1 is identical to 2.
+
+  at tests/Unit/Audiences/AudienceBuilderServiceTest.php:278
+    274▕ 
+    275▕     $criteria = ['not' => [['field' => 'region_code', 'op' => 'in', 'value' => ['11']]]];
+    276▕ 
+    277▕     expect($this->service->preview($this->ws->id, $criteria)['companies'])
+  ➜ 278▕         ->toBe(2)
+    279▕         ->toBe(countInMemory($this->service, $this->ws->id, $criteria));
+    280▕ });
+    281▕ 
+    282▕ it('not + neq sur un champ NULL exclut la fiche, des deux cotes', function () {
+
+  1   tests/Unit/Audiences/AudienceBuilderServiceTest.php:278
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\Audiences\AudienceBuilderServiceTest > it tags avec un…   
+  Failed asserting that 2 is identical to 0.
+
+  at tests/Unit/Audiences/AudienceBuilderServiceTest.php:391
+    387▕ 
+    388▕     $criteria = ['all' => [['field' => 'tags', 'op' => 'eq', 'value' => 'zz-cible']]];
+    389▕ 
+    390▕     expect($this->service->preview($this->ws->id, $criteria)['companies'])
+  ➜ 391▕         ->toBe(0)
+    392▕         ->toBe(countInMemory($this->service, $this->ws->id, $criteria));
+    393▕ });
+    394▕ 
+    395▕ // ═══════════════════════════════════════════════════════════════════════════
+
+  1   tests/Unit/Audiences/AudienceBuilderServiceTest.php:391
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\Audiences\AudienceBuilderServiceTest > it not sur un c…   
+  Failed asserting that 1 is identical to 2.
+
+  at tests/Unit/Audiences/AudienceBuilderServiceTest.php:252
+    248▕     ]);
+    249▕ 
+    250▕     // SQL : « NOT (department_code = '75') » vaut UNKNOWN quand la colonne est
+    251▕     // NULL, et UNKNOWN élimine la ligne. La fiche disparaît en silence.
+  ➜ 252▕     expect($preview['companies'])->toBe(2);
+    253▕ });
+    254▕ 
+    255▕ it('not : SQL et evaluateur en memoire donnent le MEME nombre (champ NULL)', function () {
+    256▕     mkCompany($this->ws->id, ['department_code' => '92']);
+
+  1   tests/Unit/Audiences/AudienceBuilderServiceTest.php:252
+
+
+  Tests:    5 failed, 18 passed (37 assertions)
+  Duration: 54.15s
+  Random Order Seed: 1786939058
+

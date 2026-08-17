@@ -14,6 +14,19 @@
 # pas, et les caches generes par `php artisan` y devenaient des fichiers
 # NON SUIVIS proposes au commit (constate au lot L6).
 /backend/bootstrap/cache/*.php
+# Meme cause, consequence plus lourde (constate a l'E2E n°2, 2026-08-17) :
+# `OwnerUserSeeder` depose le mot de passe administrateur EN CLAIR dans
+# `backend/storage/app/private/seeders/owner-initial-password.txt`. Les motifs
+# `/storage/...` ci-dessus sont ancres a la RACINE et ne l'attrapaient pas :
+# le fichier etait non suivi ET non ignore, donc propose au premier
+# `git add -A`. Les memes chemins, ancres sous `backend/`.
+/backend/storage/*.key
+/backend/storage/logs/*.log
+/backend/storage/framework/cache/*
+/backend/storage/framework/sessions/*
+/backend/storage/framework/views/*
+/backend/storage/framework/testing/*
+/backend/storage/app/private/*
 .phpunit.cache
 .phpunit.result.cache
 auth.json

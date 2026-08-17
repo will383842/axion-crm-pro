@@ -1,0 +1,146 @@
+[
+  {
+    "vp": "desktop-1440",
+    "etape": "connexion",
+    "erreur": "TimeoutError: page.waitForURL: Timeout 60000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================"
+  },
+  {
+    "vp": "desktop-1440",
+    "etape": "apres-connexion",
+    "url": "https://app.localhost/login"
+  },
+  {
+    "vp": "desktop-1440",
+    "ecran": "01-espace-business",
+    "chemin": "/console/contacts",
+    "url": "https://app.localhost/console/contacts",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu A Axion CRM Pro MW Mon workspace PILOTAGE Tableau de bord Couverture France Campagnes Runs de scraping DATA INTERNATIONAL MÉDIAS & PRESSE COMMUNICATION IA CONFORMITÉ ADMIN PHASE 2 Réduire Accueil / Console / Contacts 🔍 Rechercher ⌘K ☀ ⚙ ☾ U Utilisateur"
+  },
+  {
+    "vp": "desktop-1440",
+    "ecran": "02-espace-vivier",
+    "chemin": "/console/vivier",
+    "url": "https://app.localhost/console/vivier",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu A Axion CRM Pro MW Mon workspace PILOTAGE Tableau de bord Couverture France Campagnes Runs de scraping DATA INTERNATIONAL MÉDIAS & PRESSE COMMUNICATION IA CONFORMITÉ ADMIN PHASE 2 Réduire Accueil / Console / Vivier 🔍 Rechercher ⌘K ☀ ⚙ ☾ U Utilisateur"
+  },
+  {
+    "vp": "desktop-1440",
+    "ecran": "03-base-froide",
+    "chemin": "/companies",
+    "url": "https://app.localhost/companies",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu A Axion CRM Pro MW Mon workspace PILOTAGE DATA Entreprises Contacts Tags INTERNATIONAL MÉDIAS & PRESSE COMMUNICATION IA CONFORMITÉ ADMIN PHASE 2 Réduire Accueil / Entreprises 🔍 Rechercher ⌘K ☀ ⚙ ☾ U Utilisateur Entreprises Pipeline de prospection · 0 entreprises actives Importer Exporter Lancer scraping → TOTAL 0 Page 1 · 0 affichées ENRICHIES 0% dont email + téléphone vérifiés"
+  },
+  {
+    "vp": "desktop-1440",
+    "ecran": "04-fiche-360",
+    "chemin": "/console/personnes/12a0a2fc726bce432cd8a857924d579da7a179ab135ed4dfe7ed911aa2225eaa",
+    "url": "https://app.localhost/console/personnes/12a0a2fc726bce432cd8a857924d579da7a179ab135ed4dfe7ed911aa2225eaa",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu A Axion CRM Pro MW Mon workspace PILOTAGE Tableau de bord Couverture France Campagnes Runs de scraping DATA INTERNATIONAL MÉDIAS & PRESSE COMMUNICATION IA CONFORMITÉ ADMIN PHASE 2 Réduire Accueil / Console / Personnes / 12a0a2fc726bce432cd8a857924d579da7a179ab135ed4dfe7ed911aa2225eaa 🔍 Rechercher ⌘K ☀ ⚙ ☾ U Utilisateur"
+  },
+  {
+    "vp": "desktop-1440",
+    "ecran": "05-file-arbitrage",
+    "chemin": "/console/arbitrage",
+    "url": "https://app.localhost/console/arbitrage",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu A Axion CRM Pro MW Mon workspace PILOTAGE Tableau de bord Couverture France Campagnes Runs de scraping DATA INTERNATIONAL MÉDIAS & PRESSE COMMUNICATION IA CONFORMITÉ ADMIN PHASE 2 Réduire Accueil / Console / Arbitrage 🔍 Rechercher ⌘K ☀ ⚙ ☾ U Utilisateur"
+  },
+  {
+    "vp": "desktop-1440",
+    "ecran": "06-actions-de-masse",
+    "chemin": "/console/contacts",
+    "url": "https://app.localhost/console/contacts",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu A Axion CRM Pro MW Mon workspace PILOTAGE Tableau de bord Couverture France Campagnes Runs de scraping DATA INTERNATIONAL MÉDIAS & PRESSE COMMUNICATION IA CONFORMITÉ ADMIN PHASE 2 Réduire Accueil / Console / Contacts 🔍 Rechercher ⌘K ☀ ⚙ ☾ U Utilisateur"
+  },
+  {
+    "vp": "desktop-1440",
+    "ecran": "07-recherche-globale",
+    "chemin": "/contacts",
+    "url": "https://app.localhost/contacts",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu A Axion CRM Pro MW Mon workspace PILOTAGE DATA Entreprises Contacts Tags INTERNATIONAL MÉDIAS & PRESSE COMMUNICATION IA CONFORMITÉ ADMIN PHASE 2 Réduire Accueil / Contacts 🔍 Rechercher ⌘K ☀ ⚙ ☾ U Utilisateur Contacts … décideurs identifiés (waterfall + Direction Finder) Tous statuts e-mail Valide Catch-all Inconnu Invalide Rôle générique Jetable Tous pays France Roumanie Tous s"
+  },
+  {
+    "vp": "desktop-1440",
+    "erreurs_console": [
+      "Failed to load resource: the server responded with a status of 419 ()"
+    ]
+  },
+  {
+    "vp": "mobile-390",
+    "etape": "connexion",
+    "erreur": "TimeoutError: page.waitForURL: Timeout 60000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================"
+  },
+  {
+    "vp": "mobile-390",
+    "etape": "apres-connexion",
+    "url": "https://app.localhost/login"
+  },
+  {
+    "vp": "mobile-390",
+    "ecran": "01-espace-business",
+    "chemin": "/console/contacts",
+    "url": "https://app.localhost/console/contacts",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu Accueil / Console / Contacts ☀ ⚙ ☾ U"
+  },
+  {
+    "vp": "mobile-390",
+    "ecran": "02-espace-vivier",
+    "chemin": "/console/vivier",
+    "url": "https://app.localhost/console/vivier",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu Accueil / Console / Vivier ☀ ⚙ ☾ U"
+  },
+  {
+    "vp": "mobile-390",
+    "ecran": "03-base-froide",
+    "chemin": "/companies",
+    "url": "https://app.localhost/companies",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu Accueil / Entreprises ☀ ⚙ ☾ U Entreprises Pipeline de prospection · 0 entreprises actives Importer Exporter Lancer scraping → TOTAL 0 Page 1 · 0 affichées ENRICHIES 0% dont email + téléphone vérifiés TOP TAILLE — 0% de l'échantillon TOP NAF — — Tous Prospectables Partiels Pending Archivés Toutes tailles Artisan TPE PME ETI Grande entreprise Tous effectifs 0 salarié 1 à 2 salarié"
+  },
+  {
+    "vp": "mobile-390",
+    "ecran": "04-fiche-360",
+    "chemin": "/console/personnes/12a0a2fc726bce432cd8a857924d579da7a179ab135ed4dfe7ed911aa2225eaa",
+    "url": "https://app.localhost/console/personnes/12a0a2fc726bce432cd8a857924d579da7a179ab135ed4dfe7ed911aa2225eaa",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu Accueil / Console / Personnes / 12a0a2fc726bce432cd8a857924d579da7a179ab135ed4dfe7ed911aa2225eaa ☀ ⚙ ☾ U"
+  },
+  {
+    "vp": "mobile-390",
+    "ecran": "05-file-arbitrage",
+    "chemin": "/console/arbitrage",
+    "url": "https://app.localhost/console/arbitrage",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu Accueil / Console / Arbitrage ☀ ⚙ ☾ U"
+  },
+  {
+    "vp": "mobile-390",
+    "ecran": "06-actions-de-masse",
+    "chemin": "/console/contacts",
+    "url": "https://app.localhost/console/contacts",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu Accueil / Console / Contacts ☀ ⚙ ☾ U"
+  },
+  {
+    "vp": "mobile-390",
+    "ecran": "07-recherche-globale",
+    "chemin": "/contacts",
+    "url": "https://app.localhost/contacts",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu Accueil / Contacts ☀ ⚙ ☾ U Contacts … décideurs identifiés (waterfall + Direction Finder) Tous statuts e-mail Valide Catch-all Inconnu Invalide Rôle générique Jetable Tous pays France Roumanie Tous statuts Contactables (e-mail exploitable) Partiels (e-mail incertain) Collectés, pas encore enrichis Sans e-mail (archivés)"
+  },
+  {
+    "vp": "mobile-390",
+    "erreurs_console": [
+      "Failed to load resource: the server responded with a status of 419 ()"
+    ]
+  }
+]

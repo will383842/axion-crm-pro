@@ -1,0 +1,111 @@
+[2026-08-17 06:22:40] local.WARNING: site-sync refusé {"code":"candidate_consent_v2_required","message":"Fiche candidat refusée : consentement v2 requis (careers-v2-2026-08-13 | memo-v2-2026-08-13 | vivier-stock-2026-08-14), reçu : v1-2026-05-24."} 
+[2026-08-17 06:22:43] local.WARNING: site-sync refusé {"code":"invalid_tag","message":"Tag mal formé : 'promo-ete' (attendu : namespace:valeur, minuscules, sans accent)."} 
+[2026-08-17 06:22:43] local.WARNING: site-sync refusé {"code":"ungoverned_tag_namespace","message":"Namespace de tag hors référentiel gouverné : « marketing »."} 
+[2026-08-17 06:22:45] local.WARNING: site-sync rejeté (signature invalide) {"ip":"127.0.0.1"} 
+[2026-08-17 06:22:46] local.WARNING: site-sync refusé {"code":"candidates_ingest_disabled","message":"Les flux candidats sont fermés (CRM_INGEST_CANDIDATES_ENABLED). La ligne reste en attente côté site."} 
+[2026-08-17 06:22:46] local.WARNING: site-sync refusé {"code":"candidate_consent_v2_required","message":"Fiche candidat refusée : consentement v2 requis (careers-v2-2026-08-13 | memo-v2-2026-08-13 | vivier-stock-2026-08-14), reçu : careers-v1-2026-06-09."} 
+[2026-08-17 06:22:47] local.WARNING: site-sync refusé {"code":"unknown_field","message":"Champ(s) inconnu(s) dans « racine » : relation_type."} 
+[2026-08-17 06:22:49] local.WARNING: site-sync refusé {"code":"unknown_event_type","message":"Type d'événement inconnu : « peu_importe »."} 
+[2026-08-17 06:22:49] local.WARNING: site-sync refusé {"code":"unknown_form_type","message":"Type de formulaire inconnu : « inconnu »."} 
+[2026-08-17 06:22:49] local.WARNING: site-sync refusé {"code":"invalid_person_key","message":"person.person_key est obligatoire et doit être un sha256 hexadécimal de 64 caractères (calculé côté site AVANT chiffrement)."} 
+[2026-08-17 06:22:49] local.WARNING: site-sync refusé {"code":"invalid_siren","message":"company.siren doit comporter exactement 9 chiffres."} 
+[2026-08-17 06:22:50] local.WARNING: site-sync refusé {"code":"candidate_consent_v2_required","message":"Fiche candidat refusée : consentement v2 requis (careers-v2-2026-08-13 | memo-v2-2026-08-13 | vivier-stock-2026-08-14), reçu : careers-v1-2026-06-09."} 
+[2026-08-17 06:22:52] local.WARNING: site-sync refusé {"code":"unknown_field","message":"Champ(s) inconnu(s) dans « racine » : workspace."} 
+[2026-08-17 06:22:52] local.WARNING: site-sync refusé {"code":"unknown_field","message":"Champ(s) inconnu(s) dans « person » : relation_type."} 
+[2026-08-17 06:22:53] local.WARNING: site-sync rejeté (signature invalide) {"ip":"127.0.0.1"} 
+[2026-08-17 06:22:56] local.WARNING: site-sync rejeté (horodatage hors fenêtre) {"ip":"127.0.0.1"} 
+
+   FAIL  Tests\Feature\Crm\SiteSyncIngestTest
+  ✓ rejouer une candidature ne crée pas un second candidat              32.19s  
+  ✓ fiche SCRAPÉE puis lead ENTRANT : fusion, pas de doublon, le déclar… 0.87s  
+  ✓ une inscription newsletter porte la base légale CONSENTEMENT         0.42s  
+  ✓ une candidature sans AUCUN consentement est REJETÉE                  0.80s  
+  ✓ une demande d’audit crée une fiche classée, taguée et horodatée      1.97s  
+  ✓ rejouer le MÊME événement ne crée pas de doublon                     0.71s  
+  ✓ un tag hors namespace gouverné est refusé                            0.62s  
+  ✓ une candidature v2 entre dans le VIVIER, jamais dans la base commer… 0.98s  
+  ✓ signature invalide : 401 et aucune écriture                          0.57s  
+  ✓ drapeau candidats à OFF : le flux vivier reste fermé (503), rien n’… 0.59s  
+  ✓ une candidature SANS consentement v2 est REJETÉE                     0.43s  
+  ✓ deux événements distincts de la même personne alimentent UNE fiche   0.63s  
+  ✓ un champ inconnu fait REJETER le message (schéma strict)             0.50s  
+  ✓ les slugs de provenance envoyés par le site sont tous gouvernés      0.39s  
+  ⨯ une opposition VIVIER ne désinscrit pas des communications business  0.94s  
+  ✓ type d’événement, type de formulaire et person_key sont contrôlés    0.49s  
+  ⨯ une opposition VIVIER est inscrite en scope vivier, pas business     0.39s  
+  ✓ integration du STOCK (information + 30 j sans opposition) entre au…  0.50s  
+  ✓ une personne opposée n’est jamais réinsérée                          0.79s  
+  ⨯ une opposition VIVIER empêche le retour au vivier                    0.47s  
+  ✓ un lead SANS SIREN ne crée aucune fiche : il part en arbitrage       0.68s  
+  ✓ le site ne peut pas choisir le type de relation ni le workspace      0.36s  
+  ✓ secret absent côté CRM : aucune requête ne passe                     0.33s  
+  ✓ drapeau maître à OFF : 503 et aucune écriture                        0.50s  
+  ✓ chaque type de formulaire accepté a un tag de provenance GOUVERNÉ    0.48s  
+  ✓ valeurs par défaut des drapeaux : tout est fermé                     0.42s  
+  ✓ l’opposition d’un univers ne ferme pas l’autre                       0.57s  
+  ✓ un lead du simulateur de gains est accepté et porte sa provenance    0.58s  
+  ✓ une désinscription newsletter inscrit l’opposition côté business     0.52s  
+  ✓ le cycle de vie ne RECULE jamais                                     0.38s  
+  ✓ signature valide mais horodatage périmé : 401 (anti-rejeu)           0.40s  
+  ✓ un opt_out ne peut pas se DÉCLARER vivier sans viser une candidatur… 0.38s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Crm\SiteSyncIngestTest > une opposition VIVIER ne d…   
+  Failed asserting that two strings are identical.
+  -'created'
+  +'opted_out'
+  
+
+  at tests/Feature/Crm/SiteSyncIngestTest.php:765
+    761▕     siteSyncPost(siteSyncOppositionVivier())->assertOk();
+    762▕ 
+    763▕     // Se retirer d'un vivier de recrutement n'est pas se désinscrire d'une
+    764▕     // lettre d'information : les deux listes sont distinctes par construction.
+  ➜ 765▕     siteSyncPost(siteSyncEvent())->assertOk()->assertJsonPath('result.status', 'created');
+    766▕ 
+    767▕     expect(DB::table('companies')->count())->toBe(1);
+    768▕ });
+    769▕
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Crm\SiteSyncIngestTest > une opposition VIVIER est…    
+  Failed asserting that two strings are identical.
+  -'vivier'
+  +'business'
+  
+
+  at tests/Feature/Crm/SiteSyncIngestTest.php:736
+    732▕         // `SiteSyncClassifier::universe()` répond `business` pour un `opt_out`
+    733▕         // (ce n'est ni une candidature ni un formulaire `recrutement`). Sans
+    734▕         // lecture du scope déclaré, l'opposition d'un candidat atterrissait
+    735▕         // dans la liste COMMERCIALE.
+  ➜ 736▕         ->and($optOut->scope)->toBe('vivier');
+    737▕ 
+    738▕     expect(DB::table('opt_out')->where('scope', 'business')->count())->toBe(0);
+    739▕ });
+    740▕
+
+  1   tests/Feature/Crm/SiteSyncIngestTest.php:736
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Crm\SiteSyncIngestTest > une opposition VIVIER empê…   
+  Failed asserting that two strings are identical.
+  -'opted_out'
+  +'created'
+  
+
+  at tests/Feature/Crm/SiteSyncIngestTest.php:753
+    749▕         'form_type' => null,
+    750▕         'consent' => ['version' => 'careers-v2-2026-08-13'],
+    751▕         'candidate' => ['family' => 'candidat_commercial'],
+    752▕         'subject_ref' => 'site:job_application:zz-opposition-1-bis',
+  ➜ 753▕     ]))->assertOk()->assertJsonPath('result.status', 'opted_out');
+    754▕ 
+    755▕     expect(DB::table('candidates')->count())->toBe(0);
+    756▕ });
+    757▕
+
+
+  Tests:    3 failed, 29 passed (182 assertions)
+  Duration: 60.86s
+  Random Order Seed: 1786940518
+

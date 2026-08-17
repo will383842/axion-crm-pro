@@ -27,7 +27,7 @@
         "spatie/laravel-data": "^4.10",
         "spatie/laravel-permission": "^6.10",
         "spatie/laravel-model-states": "^2.8",
-        "spatie/laravel-query-builder": "^6.2",
+        "spatie/laravel-query-builder": "^7.3",
         "league/csv": "^9.16",
         "smalot/pdfparser": "^2.10",
         "open-telemetry/opentelemetry": "^1.0",

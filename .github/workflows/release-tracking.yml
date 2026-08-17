@@ -70,7 +70,7 @@ jobs:
 
       - name: Setup pnpm
         if: steps.skip.outputs.skip == 'false'
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 9
 

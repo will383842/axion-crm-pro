@@ -126,8 +126,10 @@ checklist B.1 → B.12, ni les croisements du §E.3, ni les 26 captures du §E.4
 
 ### 2.2 E2E n°2 — regard neuf (2026-08-17, cette session)
 
-Journal : `_SESSIONS/2026-08-17_E2E-2-REGARD-NEUF-CRM.md`.
-Preuves : `_REPORTS/e2e2-preuves/`.
+Journal : `_REPORTS/e2e2-preuves/journal-session-E2E2.md` — copie versionnée de
+`Axion-IA/_SESSIONS/2026-08-17_E2E-2-REGARD-NEUF-CRM.md`, dont le répertoire
+d'origine **n'est pas un dépôt Git** (le journal n'existait donc que sur un
+disque). Preuves : `_REPORTS/e2e2-preuves/`.
 
 **Contrainte cardinale respectée** : le journal de l'E2E n°1 n'a été ouvert
 qu'**après** l'achèvement du §E. Le montage n'a suivi que le §A, le runbook et

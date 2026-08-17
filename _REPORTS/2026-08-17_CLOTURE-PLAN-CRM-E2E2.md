@@ -669,3 +669,70 @@ de ce qui manque est finie et courte. Mais le plan exige un rapport
 non vus, cinq scénarios non joués, quatre pannes non simulées et un critère de
 performance non mesuré. **Un rapport de clôture qui tait un manque est pire
 qu'une absence de rapport.**
+
+---
+
+## 10. REPRISE DU 17/08 AU SOIR — CE QUI A ÉTÉ LIVRÉ DEPUIS
+
+### 10.1 Ce qui est fusionné ET déployé
+
+| PR | Dépôt | Objet | État |
+|---|---|---|---|
+| #170 | CRM | le CRM reculait de 2 h toute date reçue du site | ✅ fusionnée, déployée, **vérifiée en production** |
+| #171 | CRM | mise à jour de ce rapport | ✅ fusionnée |
+| #172 | CRM | alignement préventif du pivot de scraping | ⏳ CI |
+| #707 | SITE | le formulaire de contact refusait de partir sans rien dire | ✅ fusionnée (4 gates vertes) · ⏳ **déploiement retardé, voir ci-dessous** |
+
+🔴 **Piège vérifié une fois de plus : FUSIONNÉ ≠ DÉPLOYÉ.** Le déploiement
+déclenché par la fusion de #707 (commit `0baf078`) a été **annulé** —
+`cancel-in-progress` : chaque nouvelle fusion sur `main` tue le build en cours.
+Trois fusions se sont enchaînées en moins de trente minutes, et trois
+déploiements se sont annulés mutuellement. C'est la **famine de déploiement**
+déjà documentée.
+
+Le correctif **est bien sur `main`** (`0baf078` vérifié ancêtre de `main`), mais
+**la production ne le sert pas tant qu'un build n'aboutit pas**. Ne pas conclure
+d'une PR verte et fusionnée que le défaut est réparé pour l'utilisateur : le seul
+contrôle qui vaut est le **geste réel sur le site en ligne**.
+
+**Vérification du #170 en production** — même essai signé qu'au diagnostic :
+`occurred_at` émis à `10:00:00Z` → stocké **`10:00:00+00`**. Avant correctif, la
+même requête donnait `08:00:00+00`. Ligne de contrôle purgée (activités
+revenues à 647). Conteneurs `api`, `horizon` et `scheduler` recréés, `/up` = 200.
+
+La PR #707 embarque un **second commit sans rapport avec le formulaire** mais
+qui débloquait tout le monde : la PR 598 (lot L2) avait ajouté
+`syncCalendlyEventToCrm` à une route sans donner son mock au test. La synchro
+partait *pour de vrai* pendant les tests, **le hook de pré-push refusait donc
+tout push, sur toute branche**. Vérifié pré-existant en rejouant sur
+`origin/main` sans mes commits.
+
+### 10.2 Un périmètre MESURÉ, pas supposé
+
+Le défaut du formulaire (§3.4) appelait la question : *combien d'autres
+formulaires sont exposés ?* La réponse est **bornée**, et le critère intuitif
+est le mauvais :
+
+- `z.enum(...).optional()` apparaît des **dizaines** de fois dans le dépôt site.
+  Ce n'est **pas** le discriminant.
+- 🔑 **Le discriminant est : qui construit la charge utile.** Les formulaires de
+  la console l'assemblent à la main et **omettent la clé** quand la valeur est
+  vide (`...(taille ? { taille } : {})`) — le `""` n'atteint jamais le schéma.
+- Seuls **DEUX** formulaires passent les valeurs **brutes du DOM** à un
+  `zodResolver` : `UnifiedContactForm` (le défaut, corrigé) et `NewsletterForm`
+  (email + consentement seulement, ni enum optionnel ni menu → sain).
+
+**Aucun autre formulaire n'est exposé.** Chercher `zodResolver`, pas
+`z.enum().optional()`.
+
+### 10.3 Ce qui reste, et pourquoi
+
+| Reste | Pourquoi ce n'est pas fait |
+|---|---|
+| **B.9** — chatbot | Widget **éteint en production** (coupe-circuit délibéré à deux verrous). L'allumer est une décision de Will. |
+| **B.10 → B.12** — opposition vivier, RGPD export et effacement | Exigent la **base du site** ou son **secret de signature**, ou la boîte aux lettres qui reçoit le jeton. La connexion au serveur du site a été **refusée par le classificateur** : la consigne n'ouvrait explicitement que le serveur CRM. Non contourné. |
+| **Pannes §D.1, D.5, D.6, D.7** | Dépendent de l'outbox du **site**, donc du même accès. |
+| **1 ligne de production à corriger** | `UPDATE activities SET occurred_at = occurred_at + interval '2 hours' WHERE id = 1197;` — l'unique formulaire réel du 16/08. L'`UPDATE` en production a été **refusé par le classificateur**. Vérifié : **aucune autre ligne** n'est concernée. |
+
+Ces quatre lignes ne sont pas des tâches en attente d'exécution : ce sont des
+**décisions ou des accès qui appartiennent à Will**. Le reste est fait.

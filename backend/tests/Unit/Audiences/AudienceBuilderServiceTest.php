@@ -304,6 +304,46 @@ it('not : is_not_null garde les fiches dont le champ est NULL', function () {
         ->toBe(countInMemory($this->service, $this->ws->id, $criteria));
 });
 
+it('neq garde les fiches dont le champ est NULL, comme en memoire', function () {
+    // « tout ce qui n'est pas le 75 » : une fiche collectee sans departement
+    // n'EST PAS dans le 75. En SQL, `departement != '75'` vaut UNKNOWN sur NULL
+    // et la ligne disparait ; `evalCondition()` la garde. L'audience dependait
+    // donc du chemin qui l'avait calculee.
+    mkCompany($this->ws->id, ['department_code' => '75']);
+    mkCompany($this->ws->id, ['department_code' => '92']);
+    mkCompany($this->ws->id);                       // department_code = NULL
+
+    $criteria = ['all' => [['field' => 'department_code', 'op' => 'neq', 'value' => '75']]];
+
+    expect($this->service->preview($this->ws->id, $criteria)['companies'])
+        ->toBe(2)
+        ->toBe(countInMemory($this->service, $this->ws->id, $criteria));
+});
+
+it('not_in garde les fiches dont le champ est NULL, comme en memoire', function () {
+    // Le classique `NOT IN` + NULL : sans garde, la liste d'exclusion emporte
+    // aussi tout ce qu'elle ne connait pas.
+    mkCompany($this->ws->id, ['region_code' => '11']);
+    mkCompany($this->ws->id, ['region_code' => '84']);
+    mkCompany($this->ws->id);                       // region_code = NULL
+
+    $criteria = ['all' => [['field' => 'region_code', 'op' => 'not_in', 'value' => ['11']]]];
+
+    expect($this->service->preview($this->ws->id, $criteria)['companies'])
+        ->toBe(2)
+        ->toBe(countInMemory($this->service, $this->ws->id, $criteria));
+});
+
+it('neq sur un champ renseigne ne change pas de comportement', function () {
+    // Contre-epreuve : l'elargissement ne concerne QUE les champs vides.
+    mkCompany($this->ws->id, ['department_code' => '75']);
+    mkCompany($this->ws->id, ['department_code' => '92']);
+
+    $criteria = ['all' => [['field' => 'department_code', 'op' => 'neq', 'value' => '75']]];
+
+    expect($this->service->preview($this->ws->id, $criteria)['companies'])->toBe(1);
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // tags / contains_any — le SEUL opérateur admis sur le champ `tags`, et le
 // seul qui passe par le pivot (whereHas) au lieu d'une colonne.

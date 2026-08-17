@@ -520,7 +520,16 @@ final class SiteSyncIngestService
         }
 
         DB::table('opt_out')->insert([
-            'email' => $event->email(),
+            // 🔴 JAMAIS l'adresse en clair (plan §B.4 et §B.10 : « email_hash
+            // renseigné, email jamais en clair »). Le voisin le faisait déjà
+            // bien — `SiteGdprService::optOut()` écrit `null` avec le motif :
+            // « le hash suffit à l'anti-réinsertion, c'est tout l'intérêt ».
+            // Ici l'adresse était conservée À CÔTÉ du hachage, qui ne protégeait
+            // donc rien. Aucun lecteur ne s'en sert : les trois interrogent
+            // `email_hash` (`hasOpposed`, `ScrapedRecordIngestService`,
+            // `SiteGdprService`), et l'export RGPD ne renvoie même pas la
+            // colonne.
+            'email' => null,
             'email_hash' => $hash,
             'scope' => $scope,
             'source' => 'site-sync:' . $event->eventType,

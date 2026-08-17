@@ -756,6 +756,27 @@ function siteSyncOppositionVivier(array $overrides = []): array
     return $event;
 }
 
+test('une opposition n’écrit JAMAIS l’adresse en clair', function () {
+    // Plan §B.4 et §B.10, mot pour mot : « `email_hash` renseigné, email jamais
+    // en clair ». L'adresse était conservée À CÔTÉ du hachage — qui ne
+    // protégeait donc rien. Aucun lecteur ne s'en sert : les trois interrogent
+    // `email_hash`.
+    siteSyncPost(siteSyncEvent([
+        'event_type' => 'newsletter_optout',
+        'form_type' => null,
+    ]))->assertOk();
+
+    $ligne = DB::table('opt_out')->first();
+
+    expect($ligne)->not->toBeNull()
+        ->and($ligne->email)->toBeNull()
+        ->and($ligne->email_hash)->toBe(hash('sha256', 'zz.test@example.invalid'));
+
+    // Et la garde continue de voir l'opposition : c'est l'empreinte qu'elle lit.
+    expect(DB::table('opt_out')->where('email_hash', hash('sha256', 'zz.test@example.invalid'))->exists())
+        ->toBeTrue();
+});
+
 test('une opposition VIVIER est inscrite en scope vivier, pas business', function () {
     config(['crm.ingest.candidates_enabled' => true]);
 

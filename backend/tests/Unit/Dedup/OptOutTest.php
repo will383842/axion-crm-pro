@@ -33,6 +33,8 @@ test('isOptedOut normalizes phone (strip separators)', function () {
 test('isOptedOut cross-workspace (table sans workspace_id)', function () {
     $svc = new DeduplicationService;
     $svc->addOptOut('blocked@example.com', null, 'rgpd_erasure');
-    // Vérifie que la table opt_out est globale (pas scoped)
-    expect(DB::table('opt_out')->where('email', 'blocked@example.com')->exists())->toBeTrue();
+    // Vérifie que la table opt_out est globale (pas scoped). On interroge
+    // l'EMPREINTE : c'est ce que fait la production, et l'adresse en clair
+    // n'est plus conservée.
+    expect(DB::table('opt_out')->where('email_hash', hash('sha256', 'blocked@example.com'))->exists())->toBeTrue();
 });

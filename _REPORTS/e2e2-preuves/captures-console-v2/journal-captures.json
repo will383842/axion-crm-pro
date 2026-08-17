@@ -1,0 +1,146 @@
+[
+  {
+    "vp": "desktop-1440",
+    "etape": "connexion",
+    "login": 200,
+    "tour": 200,
+    "me": 200
+  },
+  {
+    "vp": "desktop-1440",
+    "etape": "apres-connexion",
+    "url": "https://app.localhost/login"
+  },
+  {
+    "vp": "desktop-1440",
+    "ecran": "01-espace-business",
+    "chemin": "/console/contacts",
+    "url": "https://app.localhost/console/contacts",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu A Axion CRM Pro W2 Workspace 20cd81 CONSOLE CRM Contacts À arbitrer PILOTAGE DATA INTERNATIONAL MÉDIAS & PRESSE COMMUNICATION IA CONFORMITÉ ADMIN PHASE 2 Réduire Accueil / Console / Contacts 🔍 Rechercher ⌘K ☀ ⚙ ☾ WJ Williams Jullin Contacts Tous les types — Contacts actifs CLIENTS 0 PROSPECTS 3 OPPORTUNITÉS 3 DORMANTS 0 Tous 4 Prospects 3 Clients 0 Presse & médias 1 Partenaires"
+  },
+  {
+    "vp": "desktop-1440",
+    "ecran": "02-espace-vivier",
+    "chemin": "/console/vivier",
+    "url": "https://app.localhost/console/vivier",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu A Axion CRM Pro W2 Workspace 20cd81 CONSOLE CRM PILOTAGE Tableau de bord Couverture France Campagnes Runs de scraping DATA INTERNATIONAL MÉDIAS & PRESSE COMMUNICATION IA CONFORMITÉ ADMIN PHASE 2 Réduire Accueil / Console / Vivier 🔍 Rechercher ⌘K ☀ ⚙ ☾ WJ Williams Jullin Univers vivier candidats non accessible L'accès au vivier suppose d'être membre de cet univers. Demandez à un "
+  },
+  {
+    "vp": "desktop-1440",
+    "ecran": "03-base-froide",
+    "chemin": "/companies",
+    "url": "https://app.localhost/companies",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu A Axion CRM Pro W2 Workspace 20cd81 CONSOLE CRM PILOTAGE DATA Entreprises Contacts Tags INTERNATIONAL MÉDIAS & PRESSE COMMUNICATION IA CONFORMITÉ ADMIN PHASE 2 Réduire Accueil / Entreprises 🔍 Rechercher ⌘K ☀ ⚙ ☾ WJ Williams Jullin Entreprises Pipeline de prospection · 4 entreprises actives Importer Exporter Lancer scraping → TOTAL 4 Page 1 · 4 affichées ENRICHIES 0% dont email "
+  },
+  {
+    "vp": "desktop-1440",
+    "ecran": "04-fiche-360",
+    "chemin": "/console/personnes/7a0d636a93b4c52e320eafa8c2e63aa102bc294e5b00c728070a6b8f5a89c50f",
+    "url": "https://app.localhost/console/personnes/7a0d636a93b4c52e320eafa8c2e63aa102bc294e5b00c728070a6b8f5a89c50f",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu A Axion CRM Pro W2 Workspace 20cd81 CONSOLE CRM PILOTAGE Tableau de bord Couverture France Campagnes Runs de scraping DATA INTERNATIONAL MÉDIAS & PRESSE COMMUNICATION IA CONFORMITÉ ADMIN PHASE 2 Réduire Accueil / Console / Personnes / 7a0d636a93b4c52e320eafa8c2e63aa102bc294e5b00c728070a6b8f5a89c50f 🔍 Rechercher ⌘K ☀ ⚙ ☾ WJ Williams Jullin ZZ CONSOLE audit Fiche 360° — tous les t"
+  },
+  {
+    "vp": "desktop-1440",
+    "ecran": "05-file-arbitrage",
+    "chemin": "/console/arbitrage",
+    "url": "https://app.localhost/console/arbitrage",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu A Axion CRM Pro W2 Workspace 20cd81 CONSOLE CRM Contacts À arbitrer PILOTAGE DATA INTERNATIONAL MÉDIAS & PRESSE COMMUNICATION IA CONFORMITÉ ADMIN PHASE 2 Réduire Accueil / Console / Arbitrage 🔍 Rechercher ⌘K ☀ ⚙ ☾ WJ Williams Jullin Rapprochements à arbitrer 0 événement(s) reçus sans SIREN — à rattacher ou à écarter. Rien à arbitrer Tous les événements entrants ont trouvé leur"
+  },
+  {
+    "vp": "desktop-1440",
+    "ecran": "06-actions-de-masse",
+    "chemin": "/console/contacts",
+    "url": "https://app.localhost/console/contacts",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu A Axion CRM Pro W2 Workspace 20cd81 CONSOLE CRM Contacts À arbitrer PILOTAGE DATA INTERNATIONAL MÉDIAS & PRESSE COMMUNICATION IA CONFORMITÉ ADMIN PHASE 2 Réduire Accueil / Console / Contacts 🔍 Rechercher ⌘K ☀ ⚙ ☾ WJ Williams Jullin Contacts Tous les types — Contacts actifs CLIENTS 0 PROSPECTS 3 OPPORTUNITÉS 3 DORMANTS 0 Tous 4 Prospects 3 Clients 0 Presse & médias 1 Partenaires"
+  },
+  {
+    "vp": "desktop-1440",
+    "ecran": "07-recherche-globale",
+    "chemin": "/contacts",
+    "url": "https://app.localhost/contacts",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu A Axion CRM Pro W2 Workspace 20cd81 CONSOLE CRM PILOTAGE DATA Entreprises Contacts Tags INTERNATIONAL MÉDIAS & PRESSE COMMUNICATION IA CONFORMITÉ ADMIN PHASE 2 Réduire Accueil / Contacts 🔍 Rechercher ⌘K ☀ ⚙ ☾ WJ Williams Jullin Contacts 4 décideurs identifiés (waterfall + Direction Finder) Tous statuts e-mail Valide Catch-all Inconnu Invalide Rôle générique Jetable Tous pays Fr"
+  },
+  {
+    "vp": "desktop-1440",
+    "erreurs_console": []
+  },
+  {
+    "vp": "mobile-390",
+    "etape": "connexion",
+    "login": 200,
+    "tour": 200,
+    "me": 200
+  },
+  {
+    "vp": "mobile-390",
+    "etape": "apres-connexion",
+    "url": "https://app.localhost/login"
+  },
+  {
+    "vp": "mobile-390",
+    "ecran": "01-espace-business",
+    "chemin": "/console/contacts",
+    "url": "https://app.localhost/console/contacts",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu Accueil / Console / Contacts ☀ ⚙ ☾ WJ Contacts Tous les types — Contacts actifs CLIENTS 0 PROSPECTS 3 OPPORTUNITÉS 3 DORMANTS 0 Tous 4 Prospects 3 Clients 0 Presse & médias 1 Partenaires 0 Investisseurs 0 Conférences 0 Newsletter 0 Fournisseurs 0 Tous pays France Roumanie Tous statuts Contactables (e-mail exploitable) Partiels (e-mail incertain) Collectés, pas encore enrichis Sa"
+  },
+  {
+    "vp": "mobile-390",
+    "ecran": "02-espace-vivier",
+    "chemin": "/console/vivier",
+    "url": "https://app.localhost/console/vivier",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu Accueil / Console / Vivier ☀ ⚙ ☾ WJ Univers vivier candidats non accessible L'accès au vivier suppose d'être membre de cet univers. Demandez à un administrateur de vous y rattacher."
+  },
+  {
+    "vp": "mobile-390",
+    "ecran": "03-base-froide",
+    "chemin": "/companies",
+    "url": "https://app.localhost/companies",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu Accueil / Entreprises ☀ ⚙ ☾ WJ Entreprises Pipeline de prospection · 4 entreprises actives Importer Exporter Lancer scraping → TOTAL 4 Page 1 · 4 affichées ENRICHIES 0% dont email + téléphone vérifiés TOP TAILLE INCONNUE 100% de l'échantillon TOP NAF — — Tous Prospectables Partiels Pending Archivés Toutes tailles Artisan TPE PME ETI Grande entreprise Tous effectifs 0 salarié 1 à"
+  },
+  {
+    "vp": "mobile-390",
+    "ecran": "04-fiche-360",
+    "chemin": "/console/personnes/7a0d636a93b4c52e320eafa8c2e63aa102bc294e5b00c728070a6b8f5a89c50f",
+    "url": "https://app.localhost/console/personnes/7a0d636a93b4c52e320eafa8c2e63aa102bc294e5b00c728070a6b8f5a89c50f",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu Accueil / Console / Personnes / 7a0d636a93b4c52e320eafa8c2e63aa102bc294e5b00c728070a6b8f5a89c50f ☀ ⚙ ☾ WJ ZZ CONSOLE audit Fiche 360° — tous les touchpoints connus de cette personne. Identité ZZ CONSOLE audit zz-c-audit@example.invalid ZZ CONSOLE SARL 1 Univers Business Fiche présente Vivier candidats Aucune fiche Timeline 2026-08-17 09:30:00+00 Formulaire — audit Business · sit"
+  },
+  {
+    "vp": "mobile-390",
+    "ecran": "05-file-arbitrage",
+    "chemin": "/console/arbitrage",
+    "url": "https://app.localhost/console/arbitrage",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu Accueil / Console / Arbitrage ☀ ⚙ ☾ WJ Rapprochements à arbitrer 0 événement(s) reçus sans SIREN — à rattacher ou à écarter. Rien à arbitrer Tous les événements entrants ont trouvé leur entreprise."
+  },
+  {
+    "vp": "mobile-390",
+    "ecran": "06-actions-de-masse",
+    "chemin": "/console/contacts",
+    "url": "https://app.localhost/console/contacts",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu Accueil / Console / Contacts ☀ ⚙ ☾ WJ Contacts Tous les types — Contacts actifs CLIENTS 0 PROSPECTS 3 OPPORTUNITÉS 3 DORMANTS 0 Tous 4 Prospects 3 Clients 0 Presse & médias 1 Partenaires 0 Investisseurs 0 Conférences 0 Newsletter 0 Fournisseurs 0 Tous pays France Roumanie Tous statuts Contactables (e-mail exploitable) Partiels (e-mail incertain) Collectés, pas encore enrichis Sa"
+  },
+  {
+    "vp": "mobile-390",
+    "ecran": "07-recherche-globale",
+    "chemin": "/contacts",
+    "url": "https://app.localhost/contacts",
+    "titre": "Axion CRM Pro",
+    "extrait": "Aller au contenu Accueil / Contacts ☀ ⚙ ☾ WJ Contacts 4 décideurs identifiés (waterfall + Direction Finder) Tous statuts e-mail Valide Catch-all Inconnu Invalide Rôle générique Jetable Tous pays France Roumanie Tous statuts Contactables (e-mail exploitable) Partiels (e-mail incertain) Collectés, pas encore enrichis Sans e-mail (archivés) CONTACT RÔLE EMAIL SCORE TÉLÉPHONE SOURCE ZC ZZ CONSOLE pr"
+  },
+  {
+    "vp": "mobile-390",
+    "erreurs_console": []
+  }
+]

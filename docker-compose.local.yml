@@ -40,3 +40,16 @@ services:
   api:
     ports:
       - "58080:80"
+    volumes:
+      # Opcache — voir l'en-tête de `infra/php/opcache-local.ini`. Sans lui,
+      # démarrer Laravel coûte 26 s d'horloge par requête sur un bind-mount
+      # Windows (dont 1,3 s de CPU : le reste est de l'attente disque).
+      - ./infra/php/opcache-local.ini:/usr/local/etc/php/conf.d/zz-opcache-local.ini:ro
+
+  horizon:
+    volumes:
+      - ./infra/php/opcache-local.ini:/usr/local/etc/php/conf.d/zz-opcache-local.ini:ro
+
+  scheduler:
+    volumes:
+      - ./infra/php/opcache-local.ini:/usr/local/etc/php/conf.d/zz-opcache-local.ini:ro

@@ -39,7 +39,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: semgrep ci --config=p/owasp-top-ten --config=p/security-audit --config=p/laravel --config=p/typescript --sarif --output semgrep.sarif
         continue-on-error: true
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@v4
         if: always()
         with: { sarif_file: semgrep.sarif }
 
@@ -87,7 +87,7 @@ jobs:
           output: trivy-${{ matrix.image }}.sarif
           severity: CRITICAL,HIGH
           exit-code: '0'
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@v4
         # `always()` seul faisait rougir le job quand le fichier manquait.
         if: always() && hashFiles(format('trivy-{0}.sarif', matrix.image)) != ''
         with:
@@ -150,7 +150,7 @@ jobs:
           output: trivy-${{ matrix.nom }}.sarif
           severity: CRITICAL,HIGH
           exit-code: '0'
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@v4
         if: always() && hashFiles(format('trivy-{0}.sarif', matrix.nom)) != ''
         with:
           sarif_file: trivy-${{ matrix.nom }}.sarif

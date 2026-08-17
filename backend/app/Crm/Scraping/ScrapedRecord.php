@@ -3,6 +3,7 @@
 namespace App\Crm\Scraping;
 
 use DateTimeImmutable;
+use DateTimeZone;
 use Exception;
 
 /**
@@ -375,12 +376,33 @@ final class ScrapedRecord
         return $value;
     }
 
+    /**
+     * ALIGNEMENT PRÉVENTIF sur `SiteSyncEvent::parseDate()` (2026-08-17).
+     *
+     * Même motif, même piège potentiel. `DB_TIMEZONE=Europe/Paris` fait lire à
+     * Postgres les heures NUES comme des heures de Paris ; une date reçue avec
+     * un fuseau explicite (« …Z », « +00:00 ») est conservée dans CE fuseau par
+     * `DateTimeImmutable`, puis sérialisée nue par Laravel — et relue comme une
+     * heure de Paris. L'instant stocké recule alors du décalage de Paris.
+     *
+     * ⚠️ Honnêteté sur la portée : contrairement au chemin site-sync, **aucun
+     * décalage n'a été MESURÉ ici** — le pivot de scraping n'a pas été rejoué
+     * avec une valeur connue. C'est un alignement de cohérence, pas la
+     * correction d'un défaut constaté. Il est sans risque : `setTimezone()` ne
+     * déplace pas l'instant, il n'en change que la représentation, et l'opération
+     * est neutre pour une date déjà exprimée dans le fuseau de l'application.
+     *
+     * Le laisser diverger, en revanche, garantit que le même défaut ressortira
+     * ici le jour où une source enverra de l'UTC explicite.
+     */
     private static function parseDate(string $value, string $where): DateTimeImmutable
     {
         try {
-            return new DateTimeImmutable($value);
+            $date = new DateTimeImmutable($value);
         } catch (Exception) {
             throw ScrapeIngestRejection::invalid('invalid_date', "« {$where} » n'est pas une date ISO 8601 valide.");
         }
+
+        return $date->setTimezone(new DateTimeZone((string) config('app.timezone', 'UTC')));
     }
 }

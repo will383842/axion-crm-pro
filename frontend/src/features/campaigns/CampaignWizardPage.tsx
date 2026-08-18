@@ -245,7 +245,7 @@ export function CampaignWizardPage() {
         title="Nouvelle campagne"
         subtitle="Configure ta campagne en 4 étapes : identité, zones, sources, budget."
         breadcrumbs={[
-          { label: 'Campagnes', to: '/campaigns' },
+          { label: 'Collectes', to: '/campaigns' },
           { label: 'Nouvelle' },
         ]}
       />

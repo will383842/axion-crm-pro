@@ -118,7 +118,7 @@ export function CampaignsListPage() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="Campagnes de scraping"
+        title="Collectes"
         subtitle="Lance et supervise des campagnes multi-sources avec budgets et auto-pause anti-blacklist."
         badge={<LiveBadge label="En direct" refreshLabel="actualisé toutes les 10s" />}
         actions={

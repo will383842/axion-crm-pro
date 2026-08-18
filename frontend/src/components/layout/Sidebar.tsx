@@ -24,8 +24,6 @@ import {
   UserCog,
   Settings as SettingsIcon,
   Megaphone,
-  Mail,
-  Linkedin,
   ChevronsLeft,
   ChevronRight,
   ChevronsRight,
@@ -33,7 +31,6 @@ import {
   Globe,
   Hash,
   Users2,
-  Send,
   Newspaper,
   Mic,
   Scale,
@@ -58,57 +55,50 @@ interface NavSection {
   items: NavItem[];
 }
 
-const SECTIONS: NavSection[] = [
+/**
+ * Étape 0, ligne 3 bis (F17) — la barre RANGÉE, avant d'y ajouter le moindre
+ * écran du chantier « CRM cible » (cahier des charges §23.3).
+ *
+ * Ce qui a changé et pourquoi :
+ *  - neuf sections → six, dans l'ordre de la journée : Aujourd'hui · Contacts ·
+ *    Collecte · Pilotage · Conformité · Réglages. « Conformité » reste un
+ *    groupe à part tant que « Réglages » n'a pas de sous-groupes (cible :
+ *    « Données et conformité », étape 2) ;
+ *  - une SEULE entrée « Contacts » : le hub `/console/contacts` quand la
+ *    console v2 est ouverte, l'ancienne liste `/contacts` sinon — jamais les
+ *    deux (voir `sectionContacts`) ;
+ *  - « Campagnes » → « Collectes », « Runs de scraping » → « Journaux de
+ *    collecte » : le mot « campagne » est réservé aux e-mails à venir (L7),
+ *    la collision aurait été garantie ;
+ *  - plus AUCUNE entrée verrouillée (🔒) : « Templates email », « Envois
+ *    email », « E-mails à froid », « Prospection LinkedIn » menaient à un
+ *    cadenas ou à un bouchon 501. Un menu ne promet pas ce qui n'existe pas ;
+ *    les routes `/cold-email` et `/linkedin` restent joignables par URL ;
+ *  - l'outillage de collecte (LLM router, proxies, rotations, Roumanie) quitte
+ *    le premier niveau ; « Data » devient « Contacts » ; « Audiences »
+ *    (constructeur de segments) descend sous Pilotage.
+ *
+ * Les `data-tour` de la visite guidée sont préservés (nav-dashboard,
+ * nav-companies, nav-settings, nav-campaigns) — la visite est refaite une fois
+ * sur cette barre (OnboardingTour.tsx).
+ */
+const SECTIONS_APRES_CONTACTS: NavSection[] = [
   {
-    id: 'pilotage',
-    title: 'Pilotage',
+    id: 'collecte',
+    title: 'Collecte',
     items: [
-      { to: '/', label: 'Tableau de bord', icon: <LayoutDashboard className="h-4 w-4" />, dataTour: 'nav-dashboard' },
       { to: '/coverage', label: 'Couverture France', icon: <MapIcon className="h-4 w-4" /> },
-      { to: '/campaigns', label: 'Campagnes', icon: <Megaphone className="h-4 w-4" />, dataTour: 'nav-campaigns' },
-      { to: '/scraper-runs', label: 'Runs de scraping', icon: <Activity className="h-4 w-4" /> },
-    ],
-  },
-  {
-    id: 'data',
-    title: 'Data',
-    items: [
-      { to: '/companies', label: 'Entreprises', icon: <Building2 className="h-4 w-4" />, dataTour: 'nav-companies' },
-      { to: '/contacts', label: 'Contacts', icon: <UsersIcon className="h-4 w-4" /> },
-      { to: '/tags', label: 'Tags', icon: <Hash className="h-4 w-4" /> },
-    ],
-  },
-  {
-    id: 'international',
-    title: 'International',
-    items: [
+      { to: '/campaigns', label: 'Collectes', icon: <Megaphone className="h-4 w-4" />, dataTour: 'nav-campaigns' },
+      { to: '/scraper-runs', label: 'Journaux de collecte', icon: <Activity className="h-4 w-4" /> },
       { to: '/international/roumanie', label: 'Roumanie', icon: <Globe className="h-4 w-4" /> },
     ],
   },
   {
-    id: 'medias',
-    title: 'Médias & Presse',
+    id: 'pilotage',
+    title: 'Pilotage',
     items: [
-      { to: '/media', label: 'Médias', icon: <Newspaper className="h-4 w-4" /> },
-      { to: '/journalists', label: 'Journalistes', icon: <Mic className="h-4 w-4" /> },
-    ],
-  },
-  {
-    id: 'communication',
-    title: 'Communication',
-    items: [
-      { to: '/audiences', label: 'Audiences', icon: <Users2 className="h-4 w-4" /> },
-      { to: '/email-templates', label: 'Templates email', icon: <Mail className="h-4 w-4" />, locked: true },
-      { to: '/email-sends', label: 'Envois email', icon: <Send className="h-4 w-4" />, locked: true },
-    ],
-  },
-  {
-    id: 'ia',
-    title: 'IA',
-    items: [
-      { to: '/llm/router', label: 'LLM Router', icon: <Bot className="h-4 w-4" /> },
-      { to: '/llm/proxy-providers', label: 'Proxies', icon: <Network className="h-4 w-4" /> },
-      { to: '/llm/rotations', label: 'Rotations', icon: <RotateCw className="h-4 w-4" /> },
+      { to: '/audiences', label: 'Audiences (segments)', icon: <Users2 className="h-4 w-4" /> },
+      { to: '/admin/observability', label: 'Observabilité', icon: <Activity className="h-4 w-4" /> },
     ],
   },
   {
@@ -121,48 +111,54 @@ const SECTIONS: NavSection[] = [
     ],
   },
   {
-    id: 'admin',
-    title: 'Admin',
+    id: 'reglages',
+    title: 'Réglages',
     items: [
       { to: '/users', label: 'Utilisateurs', icon: <UserCog className="h-4 w-4" /> },
       { to: '/settings', label: 'Paramètres', icon: <SettingsIcon className="h-4 w-4" />, dataTour: 'nav-settings' },
-    ],
-  },
-  {
-    id: 'phase2',
-    title: 'Phase 2',
-    items: [
-      { to: '/cold-email', label: 'E-mails à froid', icon: <Mail className="h-4 w-4" />, locked: true },
-      { to: '/linkedin', label: 'Prospection LinkedIn', icon: <Linkedin className="h-4 w-4" />, locked: true },
-      // F7 — « Pipeline CRM » (/crm) et « Analytique » (/analytics) retirés :
-      // les deux écrans bouchons ont été supprimés, et une entrée de navigation
-      // qui mène à un 404 n'a pas à exister.
+      { to: '/tags', label: 'Tags', icon: <Hash className="h-4 w-4" /> },
+      { to: '/llm/router', label: 'LLM Router', icon: <Bot className="h-4 w-4" /> },
+      { to: '/llm/proxy-providers', label: 'Proxies', icon: <Network className="h-4 w-4" /> },
+      { to: '/llm/rotations', label: 'Rotations', icon: <RotateCw className="h-4 w-4" /> },
     ],
   },
 ];
 
+const SECTION_AUJOURDHUI: NavSection = {
+  id: 'aujourdhui',
+  title: "Aujourd'hui",
+  items: [
+    { to: '/', label: 'Tableau de bord', icon: <LayoutDashboard className="h-4 w-4" />, dataTour: 'nav-dashboard' },
+  ],
+};
+
 /**
- * Lot L6 — section « Console CRM », construite au RUNTIME.
+ * Section « Contacts » — construite au RUNTIME, comme l'ancienne « Console CRM ».
  *
- * Elle n'apparaît que si l'API annonce le drapeau ouvert, et l'entrée « Vivier
- * candidats » que si l'utilisateur est membre de cet univers. C'est une règle
- * de conception, pas une commodité (§2.2) : une entrée de navigation qui mène à
- * un 403 n'a pas à exister — l'étanchéité se LIT dans la navigation, elle ne se
- * découvre pas au clic.
+ * Une seule entrée « Contacts » : le hub de la console v2 si l'API annonce le
+ * drapeau ouvert, l'ancienne liste `/contacts` sinon. « Vivier candidats »
+ * n'apparaît que si l'utilisateur est membre de cet univers : une entrée de
+ * navigation qui mène à un 403 n'a pas à exister — l'étanchéité se LIT dans la
+ * navigation, elle ne se découvre pas au clic (conception §2.2).
  */
-function consoleSection(features: ConsoleFeatures): NavSection | null {
-  if (!features.console_v2) return null;
+function sectionContacts(features: ConsoleFeatures): NavSection {
+  const items: NavItem[] = features.console_v2
+    ? [
+        { to: '/console/contacts', label: 'Contacts', icon: <Users2 className="h-4 w-4" /> },
+        ...(features.universes.vivier
+          ? [{ to: '/console/vivier', label: 'Vivier candidats', icon: <GraduationCap className="h-4 w-4" /> }]
+          : []),
+        { to: '/console/arbitrage', label: 'À arbitrer', icon: <Scale className="h-4 w-4" /> },
+      ]
+    : [{ to: '/contacts', label: 'Contacts', icon: <UsersIcon className="h-4 w-4" /> }];
 
-  const items: NavItem[] = [
-    { to: '/console/contacts', label: 'Contacts', icon: <Users2 className="h-4 w-4" /> },
-    { to: '/console/arbitrage', label: 'À arbitrer', icon: <Scale className="h-4 w-4" /> },
-  ];
+  items.push(
+    { to: '/companies', label: 'Entreprises', icon: <Building2 className="h-4 w-4" />, dataTour: 'nav-companies' },
+    { to: '/journalists', label: 'Journalistes', icon: <Mic className="h-4 w-4" /> },
+    { to: '/media', label: 'Médias (presse)', icon: <Newspaper className="h-4 w-4" /> },
+  );
 
-  if (features.universes.vivier) {
-    items.push({ to: '/console/vivier', label: 'Vivier candidats', icon: <GraduationCap className="h-4 w-4" /> });
-  }
-
-  return { id: 'console-v2', title: 'Console CRM', items };
+  return { id: 'contacts', title: 'Contacts', items };
 }
 
 export interface SidebarProps {
@@ -173,11 +169,10 @@ export interface SidebarProps {
 export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const router = useRouterState({ select: (s) => s.location.pathname });
   const features = useConsoleFeatures();
-  const console2 = consoleSection(features);
-  const sections = console2 === null ? SECTIONS : [console2, ...SECTIONS];
+  const sections = [SECTION_AUJOURDHUI, sectionContacts(features), ...SECTIONS_APRES_CONTACTS];
 
   // UNE seule section ouverte à la fois : ouvrir la suivante referme la
-  // précédente. Sur neuf sections dépliées en permanence, la navigation
+  // précédente. Sur neuf sections (avant l'étape 0) dépliées en permanence, la navigation
   // devenait un mur de liens où plus rien ne se distinguait.
   //
   // L'état de départ n'est PAS arbitraire : on ouvre la section qui contient

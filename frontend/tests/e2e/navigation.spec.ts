@@ -5,6 +5,21 @@ import { test, expect } from '@playwright/test';
  * with mocked /auth/me returning a valid user. Goal is to catch broken routes,
  * not to test full features.
  */
+/**
+ * La barre est un ACCORDÉON depuis la PR #84 : une seule section ouverte à la
+ * fois, celle de la page courante. Un lien d'une autre section n'est donc pas
+ * visible tant qu'on n'a pas ouvert sa section — les assertions ci-dessous
+ * ouvrent d'abord. (Ce fichier n'était pas exécuté en CI ; il était rouge en
+ * silence depuis #84. Étape 0, F17 : corrigé et branché dans `a11y.yml`.)
+ */
+async function ouvrir(page: import('@playwright/test').Page, section: string): Promise<void> {
+  const bouton = page.getByRole('button', { name: section, exact: true });
+  await expect(bouton).toBeVisible();
+  if ((await bouton.getAttribute('aria-expanded')) !== 'true') {
+    await bouton.click();
+  }
+}
+
 test.describe('Navigation smoke', () => {
   test.beforeEach(async ({ page }) => {
     // Mock /auth/me as authenticated user
@@ -50,21 +65,25 @@ test.describe('Navigation smoke', () => {
 
   test('sidebar : entreprises link', async ({ page }) => {
     await page.goto('/');
+    await ouvrir(page, 'Contacts');
     await expect(page.getByRole('link', { name: 'Entreprises' })).toBeVisible();
   });
 
   test('sidebar : contacts link', async ({ page }) => {
     await page.goto('/');
+    await ouvrir(page, 'Contacts');
     await expect(page.getByRole('link', { name: 'Contacts' })).toBeVisible();
   });
 
   test('sidebar : médias link', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('link', { name: 'Médias' })).toBeVisible();
+    await ouvrir(page, 'Contacts');
+    await expect(page.getByRole('link', { name: 'Médias (presse)' })).toBeVisible();
   });
 
   test('sidebar : journalistes link', async ({ page }) => {
     await page.goto('/');
+    await ouvrir(page, 'Contacts');
     await expect(page.getByRole('link', { name: 'Journalistes' })).toBeVisible();
   });
 
@@ -75,35 +94,53 @@ test.describe('Navigation smoke', () => {
 
   test('sidebar : couverture France link', async ({ page }) => {
     await page.goto('/');
+    await ouvrir(page, 'Collecte');
     await expect(page.getByRole('link', { name: /Couverture France/ })).toBeVisible();
   });
 
-  test('sidebar : LLM section avec router', async ({ page }) => {
+  test('sidebar : LLM Router sous Réglages', async ({ page }) => {
     await page.goto('/');
+    await ouvrir(page, 'Réglages');
     await expect(page.getByRole('link', { name: 'LLM Router' })).toBeVisible();
   });
 
-  test('sidebar : RGPD section', async ({ page }) => {
+  test('sidebar : Conformité', async ({ page }) => {
     await page.goto('/');
+    await ouvrir(page, 'Conformité');
     await expect(page.getByRole('link', { name: 'Requêtes RGPD' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Registre AI Act' })).toBeVisible();
   });
 
-  test('sidebar : Admin section', async ({ page }) => {
+  test('sidebar : Réglages', async ({ page }) => {
     await page.goto('/');
+    await ouvrir(page, 'Réglages');
     await expect(page.getByRole('link', { name: 'Utilisateurs' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Paramètres' })).toBeVisible();
   });
 
-  test('sidebar : Phase 2 section', async ({ page }) => {
+  test('sidebar : rangée (étape 0, F17) — six groupes, une seule entrée Contacts, aucun cadenas', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('link', { name: 'Campagnes' })).toBeVisible();
-    // F7 (étape 0) — l'entrée « Pipeline CRM » (/crm) a été RETIRÉE avec son
-    // écran bouchon. On garde une entrée Phase 2 réellement présente, et on
-    // vérifie que les deux retirées ne sont plus proposées.
-    await expect(page.getByRole('link', { name: 'Prospection LinkedIn' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Pipeline CRM' })).toHaveCount(0);
-    await expect(page.getByRole('link', { name: 'Analytique' })).toHaveCount(0);
+    // Les six groupes, dans l'ordre de la journée.
+    for (const titre of ["Aujourd'hui", 'Contacts', 'Collecte', 'Pilotage', 'Conformité', 'Réglages']) {
+      await expect(page.getByRole('button', { name: titre })).toBeVisible();
+    }
+    // Les mots réservés aux e-mails (L7) ne désignent plus la collecte.
+    await ouvrir(page, 'Collecte');
+    await expect(page.getByRole('link', { name: 'Collectes' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Journaux de collecte' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Campagnes' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Runs de scraping' })).toHaveCount(0);
+    // Une seule entrée « Contacts » (le hub ou l'ancienne liste, jamais les deux),
+    // et aucun cadenas nulle part — on ouvre chaque section pour en être sûr.
+    for (const titre of ["Aujourd'hui", 'Contacts', 'Collecte', 'Pilotage', 'Conformité', 'Réglages']) {
+      await ouvrir(page, titre);
+      await expect(page.locator('[aria-label="Bientôt disponible"]')).toHaveCount(0);
+      for (const retire of ['Templates email', 'Envois email', 'E-mails à froid', 'Prospection LinkedIn', 'Pipeline CRM', 'Analytique']) {
+        await expect(page.getByRole('link', { name: retire })).toHaveCount(0);
+      }
+    }
+    await ouvrir(page, 'Contacts');
+    await expect(page.getByRole('link', { name: 'Contacts', exact: true })).toHaveCount(1);
   });
 
   test('header : recherche globale visible', async ({ page }) => {

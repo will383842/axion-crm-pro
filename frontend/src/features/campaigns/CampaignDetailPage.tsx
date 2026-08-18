@@ -117,7 +117,7 @@ export function CampaignDetailPage() {
     <div className="px-6 py-6">
       <PageHeader
         breadcrumbs={[
-          { label: 'Campagnes', to: '/campaigns' },
+          { label: 'Collectes', to: '/campaigns' },
           { label: campaign.name },
         ]}
         badge={

@@ -246,7 +246,7 @@ Sortie obtenue le 2026-08-18 :
 
 ```
 USER_ID=ff845f78-5bbe-4b33-99e6-e487ab9fa8ff
-TOTP_SECRET=S5OMJHGNQBREOYN4
+TOTP_SECRET=<affiché par la commande — NE PAS le recopier ici : la valeur du 18/08 a été publiée par erreur, puis TOURNÉE le soir même>
 ```
 
 > ⏱ **Compter environ 90 secondes.** `php artisan` coûte **79 s d'horloge par
@@ -327,7 +327,7 @@ docker exec axion-crm-postgres psql -U axion -d axion_crm -c \
 ## 6. Lancer le spec de vérification
 
 ```bash
-CI=1 E2E_TOTP_SECRET=S5OMJHGNQBREOYN4 \
+CI=1 E2E_TOTP_SECRET=<affiché par la commande — NE PAS le recopier ici : la valeur du 18/08 a été publiée par erreur, puis TOURNÉE le soir même> \
   pnpm --dir C:/Users/willi/Documents/Projets/crmpro-wt-etape0/frontend \
   exec playwright test tests/e2e/console-locale.spec.ts \
   --project=chromium --reporter=list --retries=0 --workers=1

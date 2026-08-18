@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 /**
  * Sprint 18.7 — Navigation smoke tests : verify each protected route loads
@@ -12,7 +13,7 @@ import { test, expect } from '@playwright/test';
  * ouvrent d'abord. (Ce fichier n'était pas exécuté en CI ; il était rouge en
  * silence depuis #84. Étape 0, F17 : corrigé et branché dans `a11y.yml`.)
  */
-async function ouvrir(page: import('@playwright/test').Page, section: string): Promise<void> {
+async function ouvrir(page: Page, section: string): Promise<void> {
   const bouton = page.getByRole('button', { name: section, exact: true });
   await expect(bouton).toBeVisible();
   if ((await bouton.getAttribute('aria-expanded')) !== 'true') {

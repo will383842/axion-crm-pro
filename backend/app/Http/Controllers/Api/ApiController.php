@@ -10,8 +10,10 @@ use Illuminate\Routing\Controller;
  *     version="1.0.0",
  *     title="Axion CRM Pro API",
  *     description="Plateforme B2B de prospection automatisée — API v1 Sanctum SPA cookie.",
+ *
  *     @OA\Contact(email="contact@axion-ia.com")
  * )
+ *
  * @OA\Server(url="https://api.localhost/api/v1", description="Local dev")
  * @OA\Server(url="https://api.axion-crm-pro.com/api/v1", description="Production")
  *
@@ -52,9 +54,9 @@ abstract class ApiController extends Controller
     protected function notImplemented(string $sprint): JsonResponse
     {
         return response()->json([
-            'error'    => 'not_implemented',
-            'message'  => "Endpoint à implémenter en Sprint $sprint.",
-            'sprint'   => $sprint,
+            'error' => 'not_implemented',
+            'message' => "Endpoint à implémenter en Sprint $sprint.",
+            'sprint' => $sprint,
         ], 501);
     }
 }

@@ -71,37 +71,39 @@ function estOuverte(titre: string): boolean {
   return annonceeOuverte;
 }
 
+// Étape 0, ligne 3 bis (F17) : « Entreprises » vit désormais dans le groupe
+// « Contacts » (id `contacts`) — l'ancien groupe « Data » n'existe plus.
 describe('Barre latérale — accordéon', () => {
   it('ouvre la section de la PAGE COURANTE à l’arrivée', () => {
     afficher('/companies');
 
     // Arriver sur « Entreprises » avec sa section repliée donnerait
     // l'impression d'avoir quitté l'application.
-    expect(estOuverte('Data')).toBe(true);
+    expect(estOuverte('Contacts')).toBe(true);
   });
 
   it('ouvrir une section referme la précédente', async () => {
     const user = userEvent.setup();
     afficher('/companies');
 
-    expect(estOuverte('Data')).toBe(true);
+    expect(estOuverte('Contacts')).toBe(true);
 
     await user.click(screen.getByRole('button', { name: /Pilotage/i }));
 
     // ⬇️ C'est la règle demandée : une seule à la fois.
     expect(estOuverte('Pilotage')).toBe(true);
-    expect(estOuverte('Data')).toBe(false);
+    expect(estOuverte('Contacts')).toBe(false);
   });
 
   it('recliquer sur la section ouverte la referme', async () => {
     const user = userEvent.setup();
     afficher('/companies');
 
-    await user.click(screen.getByRole('button', { name: /Data/i }));
+    await user.click(screen.getByRole('button', { name: /^Contacts$/ }));
 
     // Aucune section n'est alors ouverte : refermer doit rester possible,
     // sinon le repli n'est pas un vrai repli.
-    expect(estOuverte('Data')).toBe(false);
+    expect(estOuverte('Contacts')).toBe(false);
   });
 
   it('les entrées d’une section fermée ne sont pas atteignables au clavier', async () => {
@@ -112,17 +114,17 @@ describe('Barre latérale — accordéon', () => {
 
     // `hidden` retire du flux ET de l'ordre de tabulation : une entrée
     // invisible mais focusable est un piège pour la navigation au clavier.
-    const listeData = document.getElementById('nav-section-data');
-    expect(listeData).not.toBeNull();
-    expect(listeData?.className).toContain('hidden');
+    const listeContacts = document.getElementById('nav-section-contacts');
+    expect(listeContacts).not.toBeNull();
+    expect(listeContacts?.className).toContain('hidden');
   });
 
   it('la section ouverte affiche bien ses entrées', () => {
     const { container } = afficher('/companies');
 
-    const listeData = container.querySelector('#nav-section-data');
-    expect(listeData).not.toBeNull();
-    expect(listeData?.className).not.toContain('hidden');
-    expect(within(listeData as HTMLElement).getByText('Entreprises')).toBeInTheDocument();
+    const listeContacts = container.querySelector('#nav-section-contacts');
+    expect(listeContacts).not.toBeNull();
+    expect(listeContacts?.className).not.toContain('hidden');
+    expect(within(listeContacts as HTMLElement).getByText('Entreprises')).toBeInTheDocument();
   });
 });

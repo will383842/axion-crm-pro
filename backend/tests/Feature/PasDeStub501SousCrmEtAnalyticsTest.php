@@ -77,7 +77,7 @@ const F7_PREFIXES_SURVEILLES = ['api/v1/crm', 'api/v1/analytics'];
  * On compare sur `préfixe` OU `préfixe/…` OU `préfixe{…}` : `api/v1/crm-autre`
  * ne doit pas être capté, mais `api/v1/crm{any?}` doit l'être.
  *
- * @return array<int, \Illuminate\Routing\Route>
+ * @return array<int, Illuminate\Routing\Route>
  */
 function f7RoutesSousPrefixes(): array
 {
@@ -98,7 +98,7 @@ function f7RoutesSousPrefixes(): array
 }
 
 /** Description lisible d'une route, pour que l'échec nomme le coupable. */
-function f7Decrire(\Illuminate\Routing\Route $route): string
+function f7Decrire(Illuminate\Routing\Route $route): string
 {
     return implode('|', $route->methods()) . ' /' . $route->uri() . ' → ' . ($route->getActionName() ?: '?');
 }

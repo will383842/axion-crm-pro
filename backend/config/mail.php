@@ -32,4 +32,17 @@ return [
         'address' => env('MAIL_FROM_ADDRESS', 'noreply@axion-crm.local'),
         'name'    => env('MAIL_FROM_NAME', 'Axion CRM Pro'),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Webhooks du service d'envoi (étape 0, ligne 3 ter — F18)
+    |--------------------------------------------------------------------------
+    | Jeton partagé attendu dans l'URL du webhook ZeptoMail (`?t=`). Absent ⇒
+    | la route répond 503 et n'écrit rien (inertie). Voir
+    | `App\Http\Controllers\Internal\ZeptoMailWebhookController`.
+    */
+    'webhooks' => [
+        'zeptomail_token' => env('MAIL_WEBHOOK_TOKEN'),
+    ],
+
 ];

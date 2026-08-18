@@ -39,6 +39,7 @@ use App\Http\Controllers\Api\WorkspaceController;
 use App\Http\Controllers\Internal\ScraperResultController;
 use App\Http\Controllers\Internal\SiteGdprController;
 use App\Http\Controllers\Internal\SiteSyncController;
+use App\Http\Controllers\Internal\ZeptoMailWebhookController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -317,4 +318,11 @@ Route::prefix('internal')->group(function () {
     Route::post('/site-sync/gdpr', [SiteGdprController::class, 'store'])
         ->middleware('throttle:internal')
         ->name('internal.site-sync.gdpr');
+
+    // Étape 0, ligne 3 ter (F18) — rebonds et plaintes du service d'envoi
+    // transactionnel → liste de suppression. Jeton partagé dans l'URL (`?t=`),
+    // 503 tant que `MAIL_WEBHOOK_TOKEN` est absent, n'envoie rien.
+    Route::post('/email/zeptomail', [ZeptoMailWebhookController::class, 'store'])
+        ->middleware('throttle:internal')
+        ->name('internal.email.zeptomail');
 });

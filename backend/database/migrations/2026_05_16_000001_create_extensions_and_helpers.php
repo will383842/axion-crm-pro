@@ -20,13 +20,75 @@ return new class extends Migration
             CREATE EXTENSION IF NOT EXISTS vector;
             -- pg_partman activé via image custom Dockerfile.postgres (Sprint 19.3).
             -- Si l'extension n'est pas dispo (image base sans pg_partman), le DO $$ skip silencieusement.
+            --
+            -- 🔴 `SCHEMA partman` N'EST PAS COSMÉTIQUE — c'est ce qui rend la base
+            -- RECONSTRUCTIBLE. `PostgresBuilder::dropAllTables()` (Laravel) énumère les
+            -- tables des schémas du `search_path` (`public` ici) et émet UN SEUL
+            -- `DROP TABLE … CASCADE`. Tant que pg_partman vivait dans `public`, ses
+            -- tables internes `part_config` / `part_config_sub` entraient dans ce lot et
+            -- PostgreSQL refusait la commande entière :
+            --     SQLSTATE[2BP01] cannot drop table part_config because extension
+            --     pg_partman requires it
+            -- → `migrate:fresh` et `RefreshDatabase` mouraient AVANT la première
+            -- migration, sur toute base déjà migrée. Mesuré le 2026-08-18, cf.
+            -- `_REPORTS/2026-08-18_RECONSTRUCTION-BASE.md`. Hors du `search_path`,
+            -- `dropAllTables()` ne les voit plus.
+            -- C'est aussi le schéma qu'attend déjà le code de
+            -- `2026_05_17_000011_setup_pg_partman_audit_logs` (`partman.create_parent`).
+            --
+            -- ⚠️ Un `CREATE EXTENSION IF NOT EXISTS … SCHEMA partman` NE SUFFIT PAS :
+            -- `IF NOT EXISTS` ne regarde que le NOM. Sur une base dont le volume
+            -- Postgres a été initialisé par l'ancien `infra/postgres/init/01-extensions.sql`
+            -- (c'est le cas de `axion_crm_test` en CI, créée par `POSTGRES_DB`),
+            -- l'extension existe DÉJÀ dans `public` et la clause `SCHEMA` est
+            -- silencieusement ignorée. Il faut donc relocaliser explicitement — et ici,
+            -- AVANT `000011`, sans quoi `000011` enregistrerait `audit_logs` dans
+            -- `public.part_config` et la relocalisation deviendrait impossible sans
+            -- perte (pg_partman est `relocatable = false` : seul DROP + CREATE marche).
+            -- Le même bloc existe dans `2026_08_18_100001_partman_dans_son_propre_schema`
+            -- pour les bases où 000001 est DÉJÀ enregistrée (dev, préprod, production) —
+            -- les deux doivent rester d'accord.
             DO $$
+            DECLARE
+                v_schema TEXT;
+                v_lignes BIGINT;
             BEGIN
-                IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'pg_partman') THEN
-                    EXECUTE 'CREATE EXTENSION IF NOT EXISTS pg_partman';
+                IF NOT EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'pg_partman') THEN
+                    RAISE NOTICE 'pg_partman not available, skipping (will be retried in image custom build)';
+                    RETURN;
                 END IF;
+
+                SELECT n.nspname
+                INTO   v_schema
+                FROM   pg_extension e
+                JOIN   pg_namespace n ON n.oid = e.extnamespace
+                WHERE  e.extname = 'pg_partman';
+
+                IF v_schema IS NULL THEN
+                    EXECUTE 'CREATE SCHEMA IF NOT EXISTS partman';
+                    EXECUTE 'CREATE EXTENSION pg_partman SCHEMA partman';
+                    RETURN;
+                END IF;
+
+                IF v_schema = 'partman' THEN
+                    RETURN;
+                END IF;
+
+                EXECUTE format('SELECT count(*) FROM %I.part_config', v_schema) INTO v_lignes;
+
+                IF v_lignes > 0 THEN
+                    RAISE WARNING 'pg_partman est dans le schéma % et gère % ensemble(s) de partitions : '
+                        'relocalisation ABANDONNÉE (elle détruirait part_config). '
+                        'La base restera non reconstructible par migrate:fresh.', v_schema, v_lignes;
+                    RETURN;
+                END IF;
+
+                EXECUTE 'DROP EXTENSION pg_partman';
+                EXECUTE 'CREATE SCHEMA IF NOT EXISTS partman';
+                EXECUTE 'CREATE EXTENSION pg_partman SCHEMA partman';
+                RAISE NOTICE 'pg_partman relocalisé de % vers partman.', v_schema;
             EXCEPTION WHEN OTHERS THEN
-                RAISE NOTICE 'pg_partman not available, skipping (will be retried in image custom build)';
+                RAISE NOTICE 'pg_partman: % — on continue sans partitionnement.', SQLERRM;
             END $$;
 
             -- Fonction helper de normalisation des noms (dedup contacts)

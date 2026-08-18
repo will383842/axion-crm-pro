@@ -17,6 +17,23 @@
 - Vitest frontend ≥ 60 % couverture (config dans vitest.config.ts)
 - Axe-core 0 violation critical sur 4 pages clés
 
+## Dépendances — 🧊 GELÉES jusqu'à la fin de l'étape 0 (2026-08-18)
+
+Aucune montée de dépendance n'est fusionnée — ni majeure, ni mineure, ni
+corrective — tant que l'étape 0 (pose du harnais de tests) n'est pas terminée.
+Les mises à jour de **sécurité** ne sont pas gelées.
+
+Le gel est appliqué dans `.github/dependabot.yml` (règles `ignore` /
+`update-types: version-update:semver-*`, aucun `groups:`).
+
+📄 **Décision, inventaire chiffré, procédure de dégel** :
+[`_REPORTS/2026-08-18_POLITIQUE-DEPENDANCES-ETAPE-0.md`](_REPORTS/2026-08-18_POLITIQUE-DEPENDANCES-ETAPE-0.md)
+
+⛔ Ne pas monter une dépendance « au passage » dans une PR fonctionnelle.
+⛔ Ne pas répondre `@dependabot ignore …` sur une PR : la règle créée est
+persistante, stockée hors du dépôt, et survivrait au dégel sans qu'aucun
+fichier ne la mentionne.
+
 ## Sécurité
 
 - **AUCUN secret en clair dans le code ou git** — tout via `.env` (gitignored) ou Doppler

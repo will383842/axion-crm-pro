@@ -193,12 +193,20 @@ jobs:
           # Postgres écoute directement sur 127.0.0.1:5432.
           # --shm-size : /dev/shm de 64 Mo par défaut, trop juste.
           # fsync/full_page_writes/synchronous_commit off : base jetable de CI.
+          # 2026-08-18 (étape 0) — MÊME locale que la production et que
+          # `docker-compose.yml` (`--lc-collate=C --lc-ctype=C`). Sans cet
+          # argument, la base de CI naissait en `en_US.utf8` : `lower()` y
+          # abaisse les majuscules accentuées, pas en prod — la CI validait
+          # une sémantique que la production n'a pas (empreintes d'opposition,
+          # tris). Un test qui décrit la prod y rougissait sans que rien ne
+          # l'explique.
           docker run -d --name axion-ci-postgres \
             --network host \
             --shm-size=1g \
             -e POSTGRES_USER=axion \
             -e POSTGRES_PASSWORD=axion_dev_only \
             -e POSTGRES_DB=axion_crm_test \
+            -e POSTGRES_INITDB_ARGS="--encoding=UTF-8 --lc-collate=C --lc-ctype=C" \
             "$IMG" \
             -c fsync=off -c full_page_writes=off -c synchronous_commit=off \
             -c max_connections=300

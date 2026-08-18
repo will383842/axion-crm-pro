@@ -117,7 +117,10 @@ class AuthController extends ApiController
         }
 
         return $this->ok([
-            'onboarding_tour_completed_at' => $user->onboarding_tour_completed_at?->toIso8601String(),
+            // `->` et non `?->` : la branche ci-dessus vient de garantir la
+            // valeur non nulle. Le `?->` était toléré tant que la propriété
+            // n'était pas déclarée sur le modèle ; elle l'est désormais.
+            'onboarding_tour_completed_at' => $user->onboarding_tour_completed_at->toIso8601String(),
         ]);
     }
 }

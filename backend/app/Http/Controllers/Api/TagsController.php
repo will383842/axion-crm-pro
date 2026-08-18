@@ -16,6 +16,7 @@ class TagsController extends ApiController
     /**
      * @OA\Get(path="/tags", tags={"Tags"}, summary="Liste des tags du workspace",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Response(response=200, description="OK"))
      */
     public function index(Request $r): JsonResponse
@@ -50,13 +51,21 @@ class TagsController extends ApiController
 
             return $this->ok([
                 'data' => TagResource::collection($tags->map(function ($t) use ($counts) {
-                    $t->companies_count = $counts->get($t->id, 0);
+                    // `companies_count` n'est pas une colonne : c'est l'attribut
+                    // que `withCount('companies')` produirait. On l'écrit via
+                    // setAttribute() — strictement équivalent à `$t->x = …`
+                    // (Model::__set délègue à setAttribute) — parce que
+                    // l'affectation directe est vue par PHPStan comme l'écriture
+                    // d'une propriété de comptage de relation, en lecture seule.
+                    $t->setAttribute('companies_count', $counts->get($t->id, 0));
+
                     return $t;
                 })),
             ]);
         } catch (\Throwable $e) {
             Log::error('tags.index failed', ['exception' => $e->getMessage()]);
             report($e);
+
             return $this->ok(['data' => [], 'degraded' => true]);
         }
     }
@@ -64,6 +73,7 @@ class TagsController extends ApiController
     /**
      * @OA\Post(path="/tags", tags={"Tags"}, summary="Crée un tag manuel",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Response(response=201, description="Created"))
      */
     public function store(Request $r): JsonResponse
@@ -74,10 +84,10 @@ class TagsController extends ApiController
         }
 
         $data = $r->validate([
-            'slug'        => ['nullable', 'string', 'max:64', 'regex:/^[a-z0-9\-]+$/'],
-            'name'        => ['required', 'string', 'max:120'],
-            'color'       => ['nullable', 'string', 'max:20'],
-            'category'    => ['nullable', 'string', 'in:geo,sector,size,intent,custom'],
+            'slug' => ['nullable', 'string', 'max:64', 'regex:/^[a-z0-9\-]+$/'],
+            'name' => ['required', 'string', 'max:120'],
+            'color' => ['nullable', 'string', 'max:20'],
+            'category' => ['nullable', 'string', 'in:geo,sector,size,intent,custom'],
             'description' => ['nullable', 'string', 'max:500'],
         ]);
 
@@ -89,13 +99,13 @@ class TagsController extends ApiController
 
         $tag = Tag::create([
             'workspace_id' => $workspaceId,
-            'slug'         => $slug,
-            'name'         => $data['name'],
-            'color'        => $data['color'] ?? 'slate',
-            'category'     => $data['category'] ?? 'custom',
-            'kind'         => 'manual',
-            'description'  => $data['description'] ?? null,
-            'rules'        => [],
+            'slug' => $slug,
+            'name' => $data['name'],
+            'color' => $data['color'] ?? 'slate',
+            'category' => $data['category'] ?? 'custom',
+            'kind' => 'manual',
+            'description' => $data['description'] ?? null,
+            'rules' => [],
         ]);
 
         return $this->ok(['data' => new TagResource($tag)], 201);
@@ -104,6 +114,7 @@ class TagsController extends ApiController
     /**
      * @OA\Put(path="/tags/{tag}", tags={"Tags"}, summary="Update tag",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Response(response=200, description="OK"))
      */
     public function update(Request $r, Tag $tag): JsonResponse
@@ -118,19 +129,21 @@ class TagsController extends ApiController
         }
 
         $data = $r->validate([
-            'name'        => ['sometimes', 'required', 'string', 'max:120'],
-            'color'       => ['sometimes', 'nullable', 'string', 'max:20'],
-            'category'    => ['sometimes', 'nullable', 'string', 'in:geo,sector,size,intent,custom'],
+            'name' => ['sometimes', 'required', 'string', 'max:120'],
+            'color' => ['sometimes', 'nullable', 'string', 'max:20'],
+            'category' => ['sometimes', 'nullable', 'string', 'in:geo,sector,size,intent,custom'],
             'description' => ['sometimes', 'nullable', 'string', 'max:500'],
         ]);
 
         $tag->update($data);
+
         return $this->ok(['data' => new TagResource($tag->fresh())]);
     }
 
     /**
      * @OA\Delete(path="/tags/{tag}", tags={"Tags"}, summary="Delete tag",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Response(response=200, description="OK"))
      */
     public function destroy(Tag $tag): JsonResponse
@@ -143,6 +156,7 @@ class TagsController extends ApiController
             return $this->ok(['error' => 'cannot delete auto/llm tag (will be re-created by AutoTagger)'], 403);
         }
         $tag->delete();
+
         return $this->ok(['ok' => true]);
     }
 }

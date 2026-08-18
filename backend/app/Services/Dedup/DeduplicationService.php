@@ -5,6 +5,7 @@ namespace App\Services\Dedup;
 use App\Models\Company;
 use App\Models\Contact;
 use App\Models\ScraperRun;
+use App\Support\ListeSuppression;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -185,8 +186,22 @@ class DeduplicationService
      * en amont de l'enrichissement (`EmailFinderService::find()`) et de la
      * décision de scraper (`shouldRunScrape()`). Constaté le 2026-08-16.
      *
-     * Le patron correct existait déjà dans `EligibiliteCampagne::peutRecevoir()` ;
-     * on l'applique ici.
+     * 🔴 DEPUIS LE 2026-08-18 : L'EMPREINTE SEULE, ET CALCULÉE PAR LE SSOT.
+     *
+     * Deux changements, et le second n'est pas cosmétique :
+     *
+     *  1. la colonne en clair n'est plus interrogée — elle disparaît au temps 2
+     *     (cf. migration `2026_08_18_000001`), et toute ligne porte désormais
+     *     son empreinte, garantie par une contrainte de table ;
+     *  2. l'empreinte est celle de `ListeSuppression::empreinte()`, c'est-à-dire
+     *     `mb_strtolower`, **et non `strtolower`** comme ici jusqu'à ce jour.
+     *     Les oppositions nées du site sont écrites avec
+     *     `SiteSyncEvent::emailHash()`, qui emploie `mb_strtolower` : sur une
+     *     adresse portant une majuscule accentuée, les deux empreintes
+     *     différaient, et cette garde ne voyait PAS l'opposition. Le repli sur
+     *     la colonne en clair ne rattrapait rien — `citext` se compare lui
+     *     aussi par `lower()`. Resserrer la garde sans aligner la normalisation
+     *     l'aurait rendue plus aveugle, pas moins.
      */
     public function isOptedOut(?string $email = null, ?string $phone = null): bool
     {
@@ -196,14 +211,11 @@ class DeduplicationService
 
         // On calcule l'empreinte ICI plutôt que dans la fermeture : à
         // l'intérieur d'un `when()`, l'analyse statique ne sait pas que
-        // `$emailNormalise` est non-nul, et `hash()` refuse un `null`.
-        $emailNormalise = $email !== null ? strtolower(trim($email)) : null;
-        $empreinte = $emailNormalise !== null ? hash('sha256', $emailNormalise) : null;
+        // `$email` est non-nul.
+        $empreinte = $email !== null ? ListeSuppression::empreinte($email) : null;
 
         return DB::table('opt_out')
-            ->when($emailNormalise !== null, fn ($q) => $q
-                ->orWhere('email', $emailNormalise)
-                ->orWhere('email_hash', $empreinte))
+            ->when($empreinte !== null, fn ($q) => $q->orWhere('email_hash', $empreinte))
             ->when($phone !== null, fn ($q) => $q->orWhere('phone', preg_replace('/[\s.-]/', '', $phone)))
             ->exists();
     }
@@ -248,11 +260,14 @@ class DeduplicationService
      */
     public function addOptOut(?string $email, ?string $phone, string $source, ?string $reason = null): void
     {
-        $emailNormalise = $email ? strtolower(trim($email)) : null;
-
         DB::table('opt_out')->insert([
             'email' => null,
-            'email_hash' => $emailNormalise !== null ? hash('sha256', $emailNormalise) : null,
+            // `ListeSuppression::empreinte()` et non `hash('sha256', strtolower(…))` :
+            // le SSOT emploie `mb_strtolower`, comme `SiteSyncEvent::emailHash()`
+            // côté site. Deux normalisations pour une même adresse, ce sont
+            // deux empreintes — donc une opposition écrite ici que la garde du
+            // site ne heurterait jamais, et réciproquement.
+            'email_hash' => $email !== null && trim($email) !== '' ? ListeSuppression::empreinte($email) : null,
             'phone' => $phone ? preg_replace('/[\s.-]/', '', $phone) : null,
             'source' => $source,
             'reason' => $reason,

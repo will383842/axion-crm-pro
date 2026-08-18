@@ -348,6 +348,22 @@ jobs:
       - name: Typecheck
         working-directory: workers
         run: pnpm typecheck
+
+      # 2026-08-18 — le script `lint` existait depuis toujours dans
+      # `workers/package.json` mais n'était appelé NULLE PART, et il ne pouvait
+      # pas l'être : le paquet n'avait aucun `eslint.config.*`. ESLint remontait
+      # alors l'arborescence à la recherche d'une config — hors du dépôt sur un
+      # poste de développement, nulle part en CI. Config locale ajoutée, étape
+      # branchée, BLOQUANTE.
+      - name: Lint (BLOQUANT)
+        working-directory: workers
+        run: pnpm lint
+
+      # `pnpm test` ne porte plus `--passWithNoTests` : une suite qui ne
+      # collecte AUCUN fichier fait désormais échouer le job au lieu de le
+      # rendre vert. Les globs sont figés dans `workers/vitest.config.ts` — sans
+      # ce fichier, ce qui était exécuté dépendait de répertoires situés en
+      # dehors du dépôt.
       - name: Test
         working-directory: workers
         run: pnpm test

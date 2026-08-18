@@ -30,7 +30,7 @@ const STEPS: Step[] = [
   {
     target: '[data-tour="sidebar"]',
     placement: 'right',
-    content: 'La barre latérale regroupe vos espaces : Entreprises, Contacts, Couverture France, LLM router, RGPD, Admin.',
+    content: "La barre latérale suit votre journée : Aujourd'hui, Contacts, Collecte, Pilotage, Conformité, Réglages. Un mot par notion, toujours au même endroit.",
   },
   {
     target: '[data-tour="global-search"]',

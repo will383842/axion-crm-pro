@@ -72,5 +72,14 @@ export async function closeBrowser(): Promise<void> {
   }
 }
 
-process.on('SIGTERM', () => void closeBrowser());
-process.on('SIGINT', () => void closeBrowser());
+// PAS de gestionnaire de signal ici. Il y en avait un, et il fermait le
+// navigateur IMMÉDIATEMENT à la réception du signal — c'est-à-dire SOUS le job
+// en cours, qui mourait sur un « Target page closed » sans que son résultat
+// parte jamais au CRM. Pire : poser un écouteur supprime la terminaison par
+// défaut de Node, donc le processus survivait et continuait à tirer des jobs
+// jusqu'au SIGKILL.
+//
+// La fermeture est désormais pilotée par `scrapers/base.ts`, qui attend la fin
+// du job en cours AVANT d'appeler `closeBrowser()`. Ne pas réintroduire
+// d'écouteur ici : les deux se courent l'un l'autre, et celui de ce fichier
+// gagne (il est enregistré à l'import, donc en premier).

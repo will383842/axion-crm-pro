@@ -1,4 +1,5 @@
 import { createContext } from '../browser/launcher';
+import type { Page } from 'playwright';
 import type { ScraperImplementation, ScrapeRequestJob } from './base';
 import type { ScrapeResult } from '../bridge/result-sender';
 
@@ -57,7 +58,7 @@ export class PlaywrightSearchScraper implements ScraperImplementation {
     }
   }
 
-  private async extractResults(page: import('playwright').Page, engine: string): Promise<unknown[]> {
+  private async extractResults(page: Page, engine: string): Promise<unknown[]> {
     const selectors: Record<string, { item: string; title: string; link: string; snippet: string }> = {
       google:     { item: 'div.g',          title: 'h3', link: 'a',              snippet: 'div[data-sncf]' },
       bing:       { item: 'li.b_algo',      title: 'h2', link: 'h2 a',           snippet: 'p' },

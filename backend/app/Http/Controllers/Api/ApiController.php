@@ -10,8 +10,10 @@ use Illuminate\Routing\Controller;
  *     version="1.0.0",
  *     title="Axion CRM Pro API",
  *     description="Plateforme B2B de prospection automatisée — API v1 Sanctum SPA cookie.",
+ *
  *     @OA\Contact(email="contact@axion-ia.com")
  * )
+ *
  * @OA\Server(url="https://api.localhost/api/v1", description="Local dev")
  * @OA\Server(url="https://api.axion-crm-pro.com/api/v1", description="Production")
  *
@@ -29,7 +31,11 @@ use Illuminate\Routing\Controller;
  * @OA\Tag(name="Scraping", description="Scraper runs Horizon/BullMQ")
  * @OA\Tag(name="LLM", description="LLM Router 9 use cases + 5 providers")
  * @OA\Tag(name="RGPD", description="Requêtes RGPD art. 15-22 + AI Act register")
- * @OA\Tag(name="Phase 2", description="Campaigns / Cold email / LinkedIn / CRM / Analytics (501)")
+ * @OA\Tag(name="Phase 2", description="Cold email / LinkedIn (501). Campaigns est réel
+ *     depuis le sprint 19.7 ; CRM et Analytics ont été retirés le 2026-08-18 —
+ *     leurs noms entraient en collision avec le chantier CRM cible, et un
+ *     `/crm` qui répond « Not Implemented » à côté de la console v2 réelle est
+ *     un piège de nommage, pas une promesse.")
  * @OA\Tag(name="Notifications", description="Notifications in-app + WebSocket Reverb")
  * @OA\Tag(name="Tags", description="Tags utilisateurs + auto-tags")
  * @OA\Tag(name="Users", description="Users du workspace + invitations")
@@ -48,9 +54,9 @@ abstract class ApiController extends Controller
     protected function notImplemented(string $sprint): JsonResponse
     {
         return response()->json([
-            'error'    => 'not_implemented',
-            'message'  => "Endpoint à implémenter en Sprint $sprint.",
-            'sprint'   => $sprint,
+            'error' => 'not_implemented',
+            'message' => "Endpoint à implémenter en Sprint $sprint.",
+            'sprint' => $sprint,
         ], 501);
     }
 }

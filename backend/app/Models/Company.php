@@ -17,14 +17,24 @@ use Illuminate\Support\Carbon;
  * @property string $siren
  * @property ?string $denomination
  * @property ?string $naf
+ * @property ?string $legal_form
+ * @property ?string $effectif_range
+ * @property ?string $insee
  * @property ?string $size_category
  * @property ?int $quality_score
- * @property array $signals
+ * @property ?string $priority haute|moyenne|basse|gelee (CHECK en base)
+ * @property array<string, mixed> $signals
+ * @property array<string, mixed> $metadata
+ * @property ?Carbon $enriched_at
  * @property ?string $city
  * @property ?string $city_name
  * @property ?string $postcode
  * @property ?string $department_code
  * @property ?string $region_code
+ * @property ?string $commune_code
+ * @property ?string $sector_main
+ * @property ?string $archive_reason
+ * @property string $prospection_status NOT NULL, défaut 'pending' (migration 2026_05_18_000006)
  * @property ?string $email_generic
  * @property ?string $best_email_confidence
  * @property ?string $website

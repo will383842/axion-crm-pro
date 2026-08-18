@@ -1,8 +1,35 @@
 # =============================================================================
-# BASELINE PHPStan — dette figée le 2026-08-13
+# BASELINE PHPStan — dette figée le 2026-08-13, dégonflée le 2026-08-18
 # =============================================================================
-# 339 entrées / 443 erreurs PHPStan niveau 8 constatées le 2026-08-13, lors du
-# durcissement de la CI (PR « fix/ci-reelle », Gate 0 de l'autopilot CRM).
+# ÉTAT COURANT (2026-08-18) : 211 entrées / 248 erreurs, niveau 8.
+# Ces deux nombres sont FIGÉS dans un test Pest — cf.
+# tests/Unit/PhpstanBaselineNeGrossitPasTest.php. Ils ne peuvent que DÉCROÎTRE ;
+# quand tu les fais baisser, mets à jour le test dans le MÊME commit.
+#
+# Historique :
+#   - 2026-08-13 : 339 entrées / 443 erreurs constatées au durcissement de la CI
+#     (PR « fix/ci-reelle », Gate 0 de l'autopilot CRM).
+#   - (entre les deux) : deux entrées ont disparu sans que rien ne le signale —
+#     cet en-tête annonçait encore 339/443 alors que le fichier en contenait
+#     337/441. Personne ne pouvait le voir : `reportUnmatchedIgnoredErrors`
+#     valait `false`, donc une entrée obsolète ne faisait RIEN rougir.
+#   - 2026-08-18 : `reportUnmatchedIgnoredErrors` passé à `true` (Étape 0,
+#     ligne 6 des préalables). 38 entrées ORPHELINES révélées d'un coup
+#     (erreurs corrigées depuis le 13/08, entrées jamais retirées) → 337 → 299.
+#     Puis une vague de déclaration de types, sans aucun changement de
+#     comportement : blocs `@property` et types de retour de relations sur
+#     Company, Tag (qui n'en avait AUCUN), User, EmailAudience, ScraperRun,
+#     LlmUseCase et Media → 299 → 211 entrées, 441 → 248 erreurs.
+#     À noter : un `@property` sur un modèle solde aussi les erreurs de ses
+#     Resources (Larastan résout `$this->resource`) — le bloc de Tag a soldé
+#     6 entrées de `TagResource` sans qu'on y touche.
+#
+# Piège à connaître : déclarer une colonne JSONB castée `array` rend « toujours
+# vrai » les `is_array()` défensifs qui la lisent, et PHPStan le signale. Trois
+# colonnes sont donc VOLONTAIREMENT laissées hors des blocs `@property` :
+# `Tag::$rules`, `EmailAudience::$criteria`, `Media::$socials` — retirer leur
+# garde-fou changerait le comportement (un JSONB scalaire se décode en scalaire).
+# La note est écrite dans chacun des trois modèles.
 #
 # Pourquoi ce fichier existe : jusqu'à cette date PHPStan n'avait JAMAIS analysé
 # le dépôt. `phpstan.neon` contenait deux clés supprimées en PHPStan 2
@@ -18,6 +45,11 @@
 #     de nouvelles erreurs : corriger le code. Après une vague de corrections,
 #     régénérer proprement :
 #       php vendor/bin/phpstan analyse --generate-baseline=phpstan-baseline.neon
+#   - CHEMINS INTERDITS : aucune entrée ne peut viser `app/Crm/**`,
+#     `app/Http/Controllers/Api/Crm/**` ni les modèles Contact / Candidate /
+#     Company / Activity / Tag. Ce socle a été écrit APRÈS le gel et est propre
+#     au niveau 8 — le code neuf n'entre pas dans la baseline. Garde :
+#     tests/Unit/PhpstanBaselineNeGrossitPasTest.php.
 # =============================================================================
 
 parameters:
@@ -27,12 +59,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: app/Console/Commands/AnomalyDetect.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\EmailAudience\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Console/Commands/AudiencesFullRefreshCommand.php
 
 		-
 			message: '#^Cannot access property \$member_count on App\\Models\\EmailAudience\|null\.$#'
@@ -45,12 +71,6 @@ parameters:
 			identifier: larastan.noEnvCallsOutsideOfConfig
 			count: 1
 			path: app/Console/Commands/BlacklistsCheck.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Media\:\:\$website\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/GenerateMediaRedactionEmails.php
 
 		-
 			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
@@ -81,24 +101,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: app/Console/Commands/ImportMediaFromArcom.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Media\:\:\$department_code\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/ImportMediaPressKit.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Media\:\:\$diffusion_zone\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/ImportMediaPressKit.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Media\:\:\$email\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Console/Commands/ImportMediaPressKit.php
 
 		-
 			message: '#^Access to an undefined property App\\Models\\Media\:\:\$socials\.$#'
@@ -149,18 +151,6 @@ parameters:
 			path: app/Console/Commands/ImportRpps.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\Media\:\:\$website\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Console/Commands/JournalistsScrapeOurs.php
-
-		-
-			message: '#^Relation ''journalists'' is not found in App\\Models\\Media model\.$#'
-			identifier: larastan.relationExistence
-			count: 1
-			path: app/Console/Commands/JournalistsScrapeOurs.php
-
-		-
 			message: '#^Called ''pluck'' on Laravel collection, but could have been retrieved as a query\.$#'
 			identifier: larastan.noUnnecessaryCollectionCall
 			count: 1
@@ -201,24 +191,6 @@ parameters:
 			identifier: deadCode.unreachable
 			count: 1
 			path: app/Console/Commands/ProspectionCollect.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$email_generic\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/ProspectionEnrich.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$phone\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/ProspectionEnrich.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$website\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/ProspectionEnrich.php
 
 		-
 			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
@@ -275,58 +247,10 @@ parameters:
 			path: app/Events/ScraperRunCancelled.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\EmailAudience\:\:\$workspace_id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/AudiencesController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\User\:\:\$onboarding_tour_completed_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/Auth/AuthController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\User\:\:\$totp_enabled_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/Auth/MagicLinkController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\User\:\:\$failed_login_count\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/Auth/PasswordResetController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\User\:\:\$locked_until\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/Auth/PasswordResetController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\User\:\:\$password_hash\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/Auth/PasswordResetController.php
-
-		-
 			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
 			identifier: larastan.noEnvCallsOutsideOfConfig
 			count: 1
 			path: app/Http/Controllers/Api/Auth/PasswordResetController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$contacts\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/CompaniesController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$website\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/CompaniesController.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$city_name\.$#'
@@ -647,160 +571,16 @@ parameters:
 			path: app/Http/Controllers/Api/ObservabilityController.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\RgpdRequest\:\:\$metadata\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/RgpdRequestsController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\RgpdRequest\:\:\$status\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/RgpdRequestsController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\RgpdRequest\:\:\$subject_email\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/RgpdRequestsController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\RgpdRequest\:\:\$type\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/RgpdRequestsController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\ScraperRun\:\:\$company_id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/ScraperRunsController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\ScraperRun\:\:\$error\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/ScraperRunsController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\ScraperRun\:\:\$request_payload\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/ScraperRunsController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\ScraperRun\:\:\$source\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/ScraperRunsController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\ScraperRun\:\:\$status\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/ScraperRunsController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\ScraperRun\:\:\$workspace_id\.$#'
-			identifier: property.notFound
-			count: 4
-			path: app/Http/Controllers/Api/ScraperRunsController.php
-
-		-
 			message: '#^Strict comparison using \!\=\= between mixed and null will always evaluate to true\.$#'
 			identifier: notIdentical.alwaysTrue
 			count: 1
 			path: app/Http/Controllers/Api/ScrapingCampaignsController.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\Tag\:\:\$companies_count\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/TagsController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Tag\:\:\$kind\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/TagsController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Tag\:\:\$workspace_id\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/TagsController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\User\:\:\$currentWorkspace\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/WorkspaceController.php
-
-		-
 			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
 			identifier: larastan.noEnvCallsOutsideOfConfig
 			count: 1
 			path: app/Http/Controllers/Internal/ScraperResultController.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\EmailAudienceResource\:\:\$auto_refresh\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/EmailAudienceResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\EmailAudienceResource\:\:\$created_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/EmailAudienceResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\EmailAudienceResource\:\:\$created_by\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/EmailAudienceResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\EmailAudienceResource\:\:\$description\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/EmailAudienceResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\EmailAudienceResource\:\:\$is_active\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/EmailAudienceResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\EmailAudienceResource\:\:\$member_count\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/EmailAudienceResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\EmailAudienceResource\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/EmailAudienceResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\EmailAudienceResource\:\:\$refreshed_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/EmailAudienceResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\EmailAudienceResource\:\:\$updated_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/EmailAudienceResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\EmailAudienceResource\:\:\$workspace_id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/EmailAudienceResource.php
 
 		-
 			message: '#^Access to an undefined property App\\Http\\Resources\\ScrapingCampaignResource\:\:\$created_at\.$#'
@@ -821,42 +601,6 @@ parameters:
 			path: app/Http/Resources/ScrapingCampaignResource.php
 
 		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\TagResource\:\:\$color\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/TagResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\TagResource\:\:\$created_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/TagResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\TagResource\:\:\$description\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/TagResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\TagResource\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/TagResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\TagResource\:\:\$slug\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/TagResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\TagResource\:\:\$updated_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/TagResource.php
-
-		-
 			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
 			identifier: larastan.noEnvCallsOutsideOfConfig
 			count: 1
@@ -872,12 +616,6 @@ parameters:
 			message: '#^Access to an undefined property App\\Models\\EmailAudience\:\:\$criteria\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Jobs/RefreshAudienceChunkJob.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\EmailAudience\:\:\$workspace_id\.$#'
-			identifier: property.notFound
-			count: 3
 			path: app/Jobs/RefreshAudienceChunkJob.php
 
 		-
@@ -897,66 +635,6 @@ parameters:
 			identifier: missingType.return
 			count: 1
 			path: app/Models/AudienceMember.php
-
-		-
-			message: '#^Class App\\Models\\Company has PHPDoc tag @property for property \$signals with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Models/Company.php
-
-		-
-			message: '#^Method App\\Models\\Company\:\:contacts\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Company.php
-
-		-
-			message: '#^Method App\\Models\\Company\:\:healthPractitioners\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Company.php
-
-		-
-			message: '#^Method App\\Models\\Company\:\:scraperRuns\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Company.php
-
-		-
-			message: '#^Method App\\Models\\Company\:\:tags\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Company.php
-
-		-
-			message: '#^Method App\\Models\\Company\:\:workspace\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Company.php
-
-		-
-			message: '#^Method App\\Models\\Contact\:\:company\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Contact.php
-
-		-
-			message: '#^Method App\\Models\\EmailAudience\:\:creator\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/EmailAudience.php
-
-		-
-			message: '#^Method App\\Models\\EmailAudience\:\:members\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/EmailAudience.php
-
-		-
-			message: '#^Method App\\Models\\EmailAudience\:\:workspace\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/EmailAudience.php
 
 		-
 			message: '#^Method App\\Models\\HealthPractitioner\:\:company\(\) has no return type specified\.$#'
@@ -987,48 +665,6 @@ parameters:
 			identifier: missingType.return
 			count: 1
 			path: app/Models/Journalist.php
-
-		-
-			message: '#^Method App\\Models\\Media\:\:children\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Media.php
-
-		-
-			message: '#^Method App\\Models\\Media\:\:company\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Media.php
-
-		-
-			message: '#^Method App\\Models\\Media\:\:journalists\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Media.php
-
-		-
-			message: '#^Method App\\Models\\Media\:\:parent\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Media.php
-
-		-
-			message: '#^Method App\\Models\\Media\:\:workspace\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Media.php
-
-		-
-			message: '#^Method App\\Models\\ScraperRun\:\:campaign\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/ScraperRun.php
-
-		-
-			message: '#^Method App\\Models\\ScraperRun\:\:company\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/ScraperRun.php
 
 		-
 			message: '#^Class App\\Models\\ScrapingCampaign has PHPDoc tag @property for property \$per_source_limits with no value type specified in iterable type array\.$#'
@@ -1065,36 +701,6 @@ parameters:
 			identifier: missingType.return
 			count: 1
 			path: app/Models/ScrapingCampaign.php
-
-		-
-			message: '#^Method App\\Models\\Tag\:\:companies\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Tag.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\User\:\:\$password_hash\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Models/User.php
-
-		-
-			message: '#^Method App\\Models\\User\:\:currentWorkspace\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/User.php
-
-		-
-			message: '#^Method App\\Models\\User\:\:workspaces\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/User.php
-
-		-
-			message: '#^Property App\\Models\\User\:\:\$guard_name has no type specified\.$#'
-			identifier: missingType.property
-			count: 1
-			path: app/Models/User.php
 
 		-
 			message: '#^Class App\\Models\\Workspace has PHPDoc tag @property for property \$settings with no value type specified in iterable type array\.$#'
@@ -1169,33 +775,9 @@ parameters:
 			path: app/Services/AnnuaireEntreprises/HttpAnnuaireEntreprisesClient.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$tags\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Audiences/AudienceBuilderService.php
-
-		-
 			message: '#^Access to an undefined property App\\Models\\EmailAudience\:\:\$criteria\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Services/Audiences/AudienceBuilderService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\EmailAudience\:\:\$member_count\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Services/Audiences/AudienceBuilderService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\EmailAudience\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/Audiences/AudienceBuilderService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\EmailAudience\:\:\$workspace_id\.$#'
-			identifier: property.notFound
-			count: 5
 			path: app/Services/Audiences/AudienceBuilderService.php
 
 		-
@@ -1253,30 +835,6 @@ parameters:
 			path: app/Services/Audit/AuditHashChain.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\User\:\:\$failed_login_count\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Auth/AuthService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\User\:\:\$locked_until\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/Auth/AuthService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\User\:\:\$password_hash\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Auth/AuthService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\User\:\:\$totp_enabled_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Auth/AuthService.php
-
-		-
 			message: '#^Method App\\Services\\Auth\\AuthService\:\:attemptLogin\(\) should return array\{user\: App\\Models\\User, requires_2fa\: bool\} but returns array\{user\: App\\Models\\User\|null, requires_2fa\: bool\}\.$#'
 			identifier: return.type
 			count: 1
@@ -1289,12 +847,6 @@ parameters:
 			path: app/Services/Auth/MagicLinkService.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\User\:\:\$totp_secret\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/Auth/TwoFactorService.php
-
-		-
 			message: '#^Method App\\Services\\Auth\\TwoFactorService\:\:startEnrolment\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -1305,60 +857,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: app/Services/Captcha/Mocks/MockCaptchaSolver.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$city\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Classification/AutoClassifierService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$city_name\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/Classification/AutoClassifierService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$commune_code\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/Classification/AutoClassifierService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$department_code\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Services/Classification/AutoClassifierService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$effectif_range\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Classification/AutoClassifierService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$insee\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Classification/AutoClassifierService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$postcode\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Classification/AutoClassifierService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$region_code\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/Classification/AutoClassifierService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$sector_main\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/Classification/AutoClassifierService.php
 
 		-
 			message: '#^PHPDoc tag @var for constant App\\Services\\Classification\\AutoClassifierService\:\:DEPT_TO_REGION with type array\<string, string\> is not subtype of value array\{''01''\: ''84'', ''03''\: ''84'', ''07''\: ''84'', 15\: ''84'', 26\: ''84'', 38\: ''84'', 42\: ''84'', 43\: ''84'', \.\.\.\}\.$#'
@@ -1397,18 +895,6 @@ parameters:
 			path: app/Services/Classification/AutoTagApplier.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$effectif_range\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/Classification/ClassifierService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$priority\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Classification/ClassifierService.php
-
-		-
 			message: '#^Method App\\Services\\Dedup\\DeduplicationService\:\:buildDedupKey\(\) has parameter \$context with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -1427,28 +913,10 @@ parameters:
 			path: app/Services/Dedup/DeduplicationService.php
 
 		-
-			message: '#^Parameter \#1 \$string of function trim expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/Dedup/DeduplicationService.php
-
-		-
 			message: '#^Parameter \#3 \$subject of function preg_replace expects array\<float\|int\|string\>\|string, string\|null given\.$#'
 			identifier: argument.type
 			count: 2
 			path: app/Services/Dedup/DeduplicationService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$website\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Domain/DomainFinderService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\|App\\Models\\Media\:\:\$siren\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Domain/DomainFinderService.php
 
 		-
 			message: '#^Parameter \#1 \$array \(list\<non\-falsy\-string\>\) of array_values is already a list, call has no effect\.$#'
@@ -1495,12 +963,6 @@ parameters:
 		-
 			message: '#^Access to an undefined property object\:\:\$status\.$#'
 			identifier: property.notFound
-			count: 1
-			path: app/Services/Email/EmailFinderService.php
-
-		-
-			message: '#^Anonymous function has an unused use \$domain\.$#'
-			identifier: closure.unusedUse
 			count: 1
 			path: app/Services/Email/EmailFinderService.php
 
@@ -1565,42 +1027,6 @@ parameters:
 			path: app/Services/Insee/Mocks/MockInseeClient.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\LlmUseCase\:\:\$model\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Services/LLM/LLMRouterService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\LlmUseCase\:\:\$options\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/LLM/LLMRouterService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\LlmUseCase\:\:\$primary_provider\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/LLM/LLMRouterService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\LlmUseCase\:\:\$prompt_version\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Services/LLM/LLMRouterService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\LlmUseCase\:\:\$slug\.$#'
-			identifier: property.notFound
-			count: 10
-			path: app/Services/LLM/LLMRouterService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\LlmUseCase\:\:\$workspace_id\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/LLM/LLMRouterService.php
-
-		-
 			message: '#^Call to an undefined method object\:\:complete\(\)\.$#'
 			identifier: method.notFound
 			count: 1
@@ -1627,12 +1053,6 @@ parameters:
 		-
 			message: '#^Parameter \#2 \$callback of function preg_replace_callback expects callable\(array\<string\>\)\: string, Closure\(mixed\)\: \(string\|false\) given\.$#'
 			identifier: argument.type
-			count: 1
-			path: app/Services/LLM/LLMRouterService.php
-
-		-
-			message: '#^Unable to resolve the template type T in call to function array_values$#'
-			identifier: argument.templateType
 			count: 1
 			path: app/Services/LLM/LLMRouterService.php
 
@@ -1757,24 +1177,6 @@ parameters:
 			path: app/Services/LLM/Providers/TogetherProvider.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$email_generic\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Legal/MentionsLegalesScraperService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$phone\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Legal/MentionsLegalesScraperService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$website\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/Legal/MentionsLegalesScraperService.php
-
-		-
 			message: '#^Method App\\Services\\Legal\\MentionsLegalesScraperService\:\:fetch\(\) is unused\.$#'
 			identifier: method.unused
 			count: 1
@@ -1853,139 +1255,13 @@ parameters:
 			path: app/Services/Smtp/RealSmtpProber.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$department_code\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Tags/AutoTaggerService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$region_code\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Tags/AutoTaggerService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$sector_main\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Tags/AutoTaggerService.php
-
-		-
-			message: '#^Parameter \#1 \$workspaceId of method App\\Services\\Tags\\AutoTaggerService\:\:ensureTag\(\) expects string, int given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/Tags/AutoTaggerService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$archive_reason\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Services/Triage/TriageAutoService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$prospection_status\.$#'
-			identifier: property.notFound
-			count: 4
-			path: app/Services/Triage/TriageAutoService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$address\.$#'
-			identifier: property.notFound
-			count: 4
-			path: app/Services/Waterfall/WaterfallOrchestrator.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$city\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Waterfall/WaterfallOrchestrator.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$city_name\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Waterfall/WaterfallOrchestrator.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$effectif_range\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/Waterfall/WaterfallOrchestrator.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$enriched_at\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/Waterfall/WaterfallOrchestrator.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$insee\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/Waterfall/WaterfallOrchestrator.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$lat\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/Waterfall/WaterfallOrchestrator.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$legal_form\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Waterfall/WaterfallOrchestrator.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$lon\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/Waterfall/WaterfallOrchestrator.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$metadata\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Waterfall/WaterfallOrchestrator.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$phone\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Waterfall/WaterfallOrchestrator.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$postcode\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Services/Waterfall/WaterfallOrchestrator.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$priority\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/Waterfall/WaterfallOrchestrator.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$prospection_status\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/Waterfall/WaterfallOrchestrator.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Company\:\:\$website\.$#'
-			identifier: property.notFound
-			count: 5
-			path: app/Services/Waterfall/WaterfallOrchestrator.php
-
-		-
 			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
 			identifier: larastan.noEnvCallsOutsideOfConfig
 			count: 2
 			path: app/Services/Waterfall/WaterfallOrchestrator.php
 
 		-
-			message: '#^Offset ''google_places'' on non\-empty\-array\<mixed, mixed\> in empty\(\) always exists and is not falsy\.$#'
+			message: '#^Offset ''google_places'' on non\-empty\-array\<string, mixed\> in empty\(\) always exists and is not falsy\.$#'
 			identifier: empty.offset
 			count: 1
 			path: app/Services/Waterfall/WaterfallOrchestrator.php

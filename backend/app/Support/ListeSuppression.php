@@ -73,15 +73,18 @@ final class ListeSuppression
 
         $existante = DB::table('email_suppressions')
             ->where('scope', $scope)
-            ->where(function ($q) use ($normalise, $empreinte): void {
-                $q->where('email', $normalise)->orWhere('email_hash', $empreinte);
-            })
+            ->where('email_hash', $empreinte)
             ->first();
 
         if ($existante === null) {
             DB::table('email_suppressions')->insert([
                 'scope' => $scope,
-                'email' => $normalise,
+                // 🔴 JAMAIS l'adresse en clair (décision du 2026-08-18, temps 1).
+                // Une liste de suppression recense des adresses auxquelles on
+                // n'écrit plus ; en garder la forme lisible ne sert AUCUNE
+                // lecture — les quatre points de lecture interrogent
+                // l'empreinte, et elle seule, depuis cette même décision.
+                'email' => null,
                 'email_hash' => $empreinte,
                 'reason' => $raison,
                 'source' => $source,
@@ -100,10 +103,10 @@ final class ListeSuppression
                 'occurrences' => $existante->occurrences + 1,
                 'last_seen_at' => $maintenant,
                 'reason' => self::raisonLaPlusGrave((string) $existante->reason, $raison),
-                // L'adresse en clair peut arriver APRÈS le hash (signal site
-                // puis signal fournisseur) : on complète, on n'écrase jamais.
-                'email' => $existante->email ?? $normalise,
-                'email_hash' => $existante->email_hash ?? $empreinte,
+                // ⚠️ L'adresse en clair d'une ligne ANCIENNE n'est ni écrasée
+                // ni complétée : elle part au temps 2 (`DROP COLUMN`), et la
+                // rétablir ici ferait revenir la donnée qu'on retire.
+                'email_hash' => $empreinte,
             ]);
     }
 
@@ -146,13 +149,15 @@ final class ListeSuppression
             return false;
         }
 
-        $empreinte = self::empreinte($normalise);
-
+        // L'EMPREINTE SEULE (décision du 2026-08-18, temps 1). La colonne en
+        // clair disparaît au temps 2 ; toute ligne en porte désormais
+        // l'empreinte — la migration de remplissage l'a calculée pour les
+        // anciennes, et une contrainte de table interdit qu'il en naisse une
+        // sans. Interroger encore le clair reviendrait à faire dépendre la
+        // garde d'une colonne condamnée.
         return DB::table('email_suppressions')
             ->where('scope', $scope)
-            ->where(function ($q) use ($normalise, $empreinte): void {
-                $q->where('email', $normalise)->orWhere('email_hash', $empreinte);
-            })
+            ->where('email_hash', self::empreinte($normalise))
             ->exists();
     }
 

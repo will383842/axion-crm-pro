@@ -229,9 +229,16 @@ class GenerateMediaRedactionEmails extends Command
      * Extrait le domaine d'une URL de média (parse_url, retire le `www.`).
      * Retourne null si l'URL ne donne pas un domaine exploitable.
      */
-    private function extractDomain(string $website): ?string
+    /**
+     * Le paramètre est `?string` depuis que `Media::$website` est déclaré tel
+     * quel sur le modèle. La requête appelante filtre `whereNotNull('website')`,
+     * donc `null` n'arrive jamais en pratique — mais PHPStan ne peut pas le
+     * savoir, et le rendre nullable ne change rien au comportement : `null`
+     * emprunte la même sortie que la chaîne vide.
+     */
+    private function extractDomain(?string $website): ?string
     {
-        $website = trim($website);
+        $website = trim($website ?? '');
         if ($website === '') {
             return null;
         }

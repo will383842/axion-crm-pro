@@ -46,6 +46,16 @@ jobs:
         # cache — 24 échecs « Executable doesn't exist » qui noyaient le vrai
         # défaut. Élargir à firefox/webkit suppose de les installer ici d'abord.
         run: pnpm exec playwright test tests/e2e/a11y.spec.ts --project=chromium --reporter=html
+      # Étape 0, F17 (2026-08-18) — `navigation.spec.ts` n'était exécuté NULLE
+      # PART : rouge en silence depuis l'accordéon de la PR #84. Il garde la
+      # structure de la barre (six groupes, une seule entrée Contacts, aucun
+      # cadenas) ; il tourne ici, sur le même `vite preview`, et il est BLOQUANT.
+      - name: Run navigation E2E (BLOQUANT)
+        working-directory: frontend
+        env:
+          E2E_PREVIEW: 'true'
+          E2E_BASE_URL: http://127.0.0.1:4173
+        run: pnpm exec playwright test tests/e2e/navigation.spec.ts --project=chromium --reporter=line
       - uses: actions/upload-artifact@v4
         if: always()
         with:

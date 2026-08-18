@@ -1,0 +1,7 @@
+# 2026-08-18 — secret TOTP d'un utilisateur de TEST LOCAL (console-locale@axion-ia.test,
+# base Docker locale, jamais en production), écrit par erreur dans le runbook au commit 4030dda.
+# Traitement : la valeur a été TOURNÉE le soir même (tinker, nouveau secret) — celle du dépôt
+# est morte — et le fichier a été caviardé (commit suivant). L'historique la porte encore ;
+# on l'ignore par empreinte, on ne réécrit pas l'histoire d'une branche partagée.
+4030dda29a98161baa79f2723f2b72db73a0e281:_REPORTS/RUNBOOK-CONSOLE-LOCALE.md:generic-api-key:249
+4030dda29a98161baa79f2723f2b72db73a0e281:_REPORTS/RUNBOOK-CONSOLE-LOCALE.md:generic-api-key:330

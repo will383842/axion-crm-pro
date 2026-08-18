@@ -1,6 +1,113 @@
 # Dependabot — configuration.
 #
-# ── CE QUI A ÉTÉ APPRIS LE 2026-08-16 ────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# 🧊 GEL DES MONTÉES DE VERSION — décidé le 2026-08-18, jusqu'à la fin de
+#    l'ÉTAPE 0 du chantier CRM (pose du harnais de tests).
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Politique écrite complète, chiffrée et datée :
+#   _REPORTS/2026-08-18_POLITIQUE-DEPENDANCES-ETAPE-0.md
+#
+# ── POURQUOI ─────────────────────────────────────────────────────────────────
+#
+# 1. 🔴 PRÉCÉDENT DE PRODUCTION, 2026-08-18, dépôt du site (axionia).
+#    Deux montées Dependabot fusionnées SÉPARÉMENT ajoutaient chacune la même
+#    clé (`baseline-browser-mapping@2.11.14`) au lockfile pnpm. Chaque PR était
+#    verte seule ; leur FUSION a produit un lockfile à clé dupliquée →
+#    `ERR_PNPM_BROKEN_LOCKFILE` dès le premier step d'installation → plus AUCUN
+#    déploiement possible. Ce fut un incident de PRODUCTION, pas de CI.
+#    🔑 Les gates testent chaque PR SÉPARÉMENT, jamais leur fusion. Aucune
+#    quantité de vert par-PR ne prouve que deux PR fusionnent proprement.
+#
+# 2. Passer 20 montées une par une PENDANT que l'étape 0 pose le harnais de
+#    tests reviendrait à mesurer un socle qui bouge sous les pieds : impossible
+#    de dire si un rouge vient du harnais ou de la dépendance montée.
+#
+# 3. Le plan de préalables accepte explicitement cette option — critère de
+#    sortie : « 0 PR Dependabot ouverte, OU politique écrite figé jusqu'à fin
+#    de chantier ». C'est la seconde branche qui est retenue.
+#
+# ── CE QUI EST GELÉ / CE QUI NE L'EST PAS ────────────────────────────────────
+#
+# GELÉ    : toutes les montées de VERSION (`version-update:semver-major`,
+#           `-minor`, `-patch`), tous écosystèmes.
+# PAS GELÉ: les mises à jour de SÉCURITÉ Dependabot. Un gel ne doit JAMAIS
+#           bloquer un correctif de faille.
+#
+# 🔑 C'est la seule subtilité de ce fichier, et elle est VÉRIFIÉE, pas supposée.
+#    Deux mécanismes permettaient de suspendre les montées ; ils ne se valent
+#    pas de la même manière ici :
+#
+#    (a) `open-pull-requests-limit: 0`. La doc GitHub affirme que ce réglage
+#        n'affecte pas les mises à jour de sécurité (« Security update pull
+#        requests are not subject to this limit and do not count toward it »).
+#        ⚠️ MAIS ce dépôt a une expérience CONTRAIRE, consignée ci-dessous en
+#        « ce qui a été appris le 2026-08-16 » : un `open-pull-requests-limit`
+#        SATURÉ a coupé le canal de sécurité EN SILENCE. Le mécanisme du
+#        plafond a donc déjà fait ce dégât ici. On ne s'y fie pas.
+#
+#    (b) `ignore` + `update-types: version-update:semver-*` — RETENU.
+#        Réserve explicite et sans ambiguïté dans la doc GitHub :
+#        « this feature only applies to version updates. If you have security
+#        updates enabled, you will still get pull requests updating you to the
+#        minimum patched version. »
+#        Source : https://github.blog/changelog/2021-05-21-dependabot-version-updates-can-now-ignore-major-minor-patch-releases/
+#        et https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference
+#
+#    ⚠️ La réserve ne vaut QUE pour les conditions `ignore` exprimées en
+#    `update-types`. Une condition `ignore` exprimée en `versions:` (plage de
+#    versions), elle, s'applique AUSSI aux mises à jour de sécurité. Ne jamais
+#    convertir les règles ci-dessous en plages de versions.
+#
+# ⚠️ PRÉREQUIS NON REMPLI, mesuré le 2026-08-18 :
+#    `GET /repos/will383842/axion-crm-pro/vulnerability-alerts` → 404, et
+#    `security_and_analysis.dependabot_security_updates.status` → "disabled".
+#    Les alertes Dependabot sont DÉSACTIVÉES sur ce dépôt : il n'y a donc,
+#    à ce jour, AUCUN canal de mise à jour de sécurité à préserver. La
+#    précaution ci-dessus est correcte mais INERTE tant que Will n'a pas activé
+#    Settings → Advanced Security → Dependabot alerts + Dependabot security
+#    updates. Voir la politique écrite, section « reste Will ».
+#
+# ── AUCUN `groups:`, JAMAIS ──────────────────────────────────────────────────
+#
+# Tous les `groups:` ont été RETIRÉS le 2026-08-18. Regrouper des montées entre
+# elles est exactement le geste qui a produit l'incident du site : un lot
+# groupé, ce sont plusieurs écritures de lockfile dans une seule PR, avec un
+# seul signal CI et un seul revert pour l'ensemble. Une montée doit arriver
+# SEULE, avec son propre signal et son propre revert — y compris les montées de
+# sécurité (l'ancien groupe `security-patches` est supprimé pour cette raison).
+#
+# ── PROCÉDURE DE DÉGEL (à la fin de l'étape 0, dans CET ordre) ────────────────
+#
+# Critère d'entrée du dégel — les trois, cumulativement :
+#   · l'étape 0 est déclarée terminée (harnais de tests posé et VERT sur `main`
+#     deux exécutions consécutives, hors PR de dépendances) ;
+#   · les alertes Dependabot sont ACTIVES sur le dépôt (cf. prérequis ci-dessus) ;
+#   · un `pnpm install --frozen-lockfile` (frontend + workers) et un
+#     `composer validate --strict` (backend) passent sur `main`.
+#
+# Étapes, une par une, PAS de retrait en bloc :
+#   1. Retirer le bloc `ignore` de UN SEUL écosystème — commencer par
+#      `github-actions` (aucun lockfile, donc aucun risque de clé dupliquée ;
+#      c'est l'écosystème d'échauffement).
+#   2. Laisser Dependabot ouvrir ses PR. Les traiter UNE PAR UNE :
+#      fusionner, attendre que `main` soit vert, puis seulement passer à la
+#      suivante. ⛔ Ne JAMAIS fusionner deux PR de dépendances dans la même
+#      fenêtre sans avoir vu `main` vert entre les deux.
+#   3. Écosystèmes à lockfile ensuite, dans cet ordre de risque croissant :
+#      `docker` (pas de lockfile), puis `npm /workers`, puis `npm /frontend`,
+#      puis `composer /backend`.
+#   4. 🔴 Pour tout écosystème à lockfile : avant CHAQUE fusion, vérifier que
+#      le lockfile résultant de la FUSION n'a pas de clé dupliquée. `git
+#      merge-tree` NE VALIDE PAS un lockfile — il faut vérifier l'UNICITÉ DES
+#      CLÉS du fichier fusionné, pas les specifiers.
+#   5. Les MAJEURES restent hors dégel automatique : chacune est un chantier
+#      avec sa propre PR, son propre plan de test et son propre revert. Voir la
+#      politique écrite pour la liste des 16 majeures en attente.
+#   6. Une fois un écosystème stabilisé, remettre `ignore` si le chantier
+#      suivant l'exige — le gel est un outil réutilisable, pas une exception.
+#
+# ── CE QUI A ÉTÉ APPRIS LE 2026-08-16 (conservé — toujours valable) ───────────
 #
 # Treize PR datant du 17-18 mai sont restées ouvertes trois mois. Toutes
 # rougissaient — mais pour des raisons PÉRIMÉES (Gitleaks sans jeton, axe-core
@@ -12,69 +119,75 @@
 # ce soit — **y compris les correctifs de sécurité**. Une file bouchée par des
 # rouges périmés ferme le canal de sécurité en silence.
 #
-# 🔑 D'où les deux réglages ci-dessous.
-#
-# 1. `groups` limité aux versions MINEURES et CORRECTIVES.
-#    Le groupe `laravel-ecosystem` bundlait `laravel/*`, `spatie/*` et
-#    `pragmarx/*`. Résultat, la PR #95 embarquait d'un bloc :
-#      · `spatie/laravel-query-builder` 6 → 7, dont les méthodes
-#        `allowedFilters()` / `allowedSorts()` / `allowedIncludes()` deviennent
-#        VARIADIQUES — une douzaine de contrôleurs à réécrire ;
-#      · `spatie/laravel-permission` 6 → 8, deux majeures sur le paquet qui
-#        gouverne TOUTES les habilitations.
-#    Le lot entier était donc bloqué par le plus difficile, et le plus risqué
-#    serait passé en silence avec les autres. Une majeure doit arriver SEULE,
-#    avec son propre signal CI et son propre revert.
-#
-# 2. Plafonds relevés, pour qu'un blocage cesse de fermer le canal.
-#
 # ⚠️ Un `open-pull-requests-limit` saturé est SILENCIEUX : rien ne le signale.
-# Si la file se remplit à nouveau, la traiter est prioritaire — pas parce que
-# les montées pressent, mais parce que les correctifs de sécurité, eux, ne
-# seront plus proposés.
+# C'est pourquoi les plafonds ci-dessous sont laissés à une valeur NON NULLE
+# malgré le gel : le gel est porté par `ignore`, pas par le plafond, et le
+# plafond reste large pour que le canal de sécurité ne puisse pas se boucher.
+# (Les PR de sécurité ne comptent de toute façon pas dans ce plafond.)
 version: 2
 updates:
   - package-ecosystem: composer
     directory: /backend
     schedule: { interval: weekly, day: monday, time: '06:00' }
     open-pull-requests-limit: 8
-    groups:
-      laravel-ecosystem:
-        patterns: ['laravel/*', 'spatie/*', 'pragmarx/*']
-        update-types: ['minor', 'patch']
-      security-patches:
-        applies-to: security-updates
-        patterns: ['*']
+    # 🧊 GEL 2026-08-18 — montées de version suspendues, sécurité préservée.
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - 'version-update:semver-major'
+          - 'version-update:semver-minor'
+          - 'version-update:semver-patch'
 
   - package-ecosystem: npm
     directory: /frontend
     schedule: { interval: weekly, day: monday, time: '06:00' }
     open-pull-requests-limit: 8
-    groups:
-      tanstack:
-        patterns: ['@tanstack/*']
-        update-types: ['minor', 'patch']
-      react:
-        patterns: ['react', 'react-dom', '@types/react*']
-        update-types: ['minor', 'patch']
+    # 🧊 GEL 2026-08-18 — montées de version suspendues, sécurité préservée.
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - 'version-update:semver-major'
+          - 'version-update:semver-minor'
+          - 'version-update:semver-patch'
 
   - package-ecosystem: npm
     directory: /workers
     schedule: { interval: weekly, day: monday, time: '06:00' }
     open-pull-requests-limit: 5
+    # 🧊 GEL 2026-08-18 — montées de version suspendues, sécurité préservée.
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - 'version-update:semver-major'
+          - 'version-update:semver-minor'
+          - 'version-update:semver-patch'
 
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly, day: monday, time: '06:00' }
+    # 🧊 GEL 2026-08-18 — premier écosystème à dégeler (aucun lockfile).
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - 'version-update:semver-major'
+          - 'version-update:semver-minor'
+          - 'version-update:semver-patch'
 
   - package-ecosystem: docker
     directory: /
     schedule: { interval: weekly, day: monday, time: '06:00' }
-    # ⚠️ Postgres est ici, et une montée de version MAJEURE de Postgres n'est
-    # pas une montée de dépendance : `postgis/postgis:16-3.5` → `17-3.5` ne
-    # migre pas le répertoire de données, Postgres 17 REFUSE de démarrer
-    # dessus. La PR #14 a été fermée pour cette raison. Toute majeure Postgres
-    # est un chantier `pg_upgrade`, à traiter en dehors de Dependabot.
     ignore:
+      # 🧊 GEL 2026-08-18 — montées de version suspendues, sécurité préservée.
+      - dependency-name: '*'
+        update-types:
+          - 'version-update:semver-major'
+          - 'version-update:semver-minor'
+          - 'version-update:semver-patch'
+      # ⚠️ RÈGLE PERMANENTE — à NE PAS retirer au dégel.
+      # Postgres est ici, et une montée de version MAJEURE de Postgres n'est
+      # pas une montée de dépendance : `postgis/postgis:16-3.5` → `17-3.5` ne
+      # migre pas le répertoire de données, Postgres 17 REFUSE de démarrer
+      # dessus. La PR #14 a été fermée pour cette raison. Toute majeure Postgres
+      # est un chantier `pg_upgrade`, à traiter en dehors de Dependabot.
       - dependency-name: 'postgis/postgis'
         update-types: ['version-update:semver-major']

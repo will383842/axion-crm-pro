@@ -66,12 +66,19 @@ test('sans adresse, une fiche n’est jamais éligible', function () {
     expect(eligibles($this->workspace->id))->toBe(['AVEC']);
 });
 
-test('une opposition retire la fiche — comparaison sur l’adresse', function () {
+test('une opposition retire la fiche — comparaison sur l’empreinte', function () {
+    // 🔴 Ce test comparait autrefois sur l'ADRESSE EN CLAIR. Elle a été
+    // retirée le 2026-08-18 (temps 1 sur 2 : remplissage + gardes maintenant,
+    // `DROP COLUMN` ensuite) : `opt_out` recense des personnes dont le seul
+    // geste enregistré est un refus, et conserver leur adresse lisible n'est
+    // plus justifiable. La ligne ci-dessous est désormais celle qu'écrivent
+    // RÉELLEMENT les trois points d'écriture du système.
     fiche($this->workspace->id, ['denomination' => 'OPPOSEE', 'email_generic' => 'stop@acme.fr']);
     fiche($this->workspace->id, ['denomination' => 'OK', 'email_generic' => 'oui@acme.fr']);
 
     DB::table('opt_out')->insert([
-        'email' => 'stop@acme.fr', 'scope' => 'business', 'source' => 'test', 'created_at' => now(),
+        'email' => null, 'email_hash' => hash('sha256', 'stop@acme.fr'),
+        'scope' => 'business', 'source' => 'test', 'created_at' => now(),
     ]);
 
     expect(eligibles($this->workspace->id))->toBe(['OK']);
@@ -100,7 +107,8 @@ test('une opposition de l’univers VIVIER ne retire pas une fiche business', fu
     fiche($this->workspace->id, ['denomination' => 'BUSINESS', 'email_generic' => 'x@acme.fr']);
 
     DB::table('opt_out')->insert([
-        'email' => 'x@acme.fr', 'scope' => 'vivier', 'source' => 'test', 'created_at' => now(),
+        'email' => null, 'email_hash' => hash('sha256', 'x@acme.fr'),
+        'scope' => 'vivier', 'source' => 'test', 'created_at' => now(),
     ]);
 
     expect(eligibles($this->workspace->id))->toBe(['BUSINESS']);
@@ -139,7 +147,8 @@ test('🔴 la définition est FRAÎCHE : une opposition postérieure retire auss
     expect(eligibles($this->workspace->id))->toBe(['CIBLE']);
 
     DB::table('opt_out')->insert([
-        'email' => 'cible@acme.fr', 'scope' => 'business', 'source' => 'desinscription', 'created_at' => now(),
+        'email' => null, 'email_hash' => hash('sha256', 'cible@acme.fr'),
+        'scope' => 'business', 'source' => 'desinscription', 'created_at' => now(),
     ]);
 
     // ⬇️ C'est LA raison de ne pas figer un bac : aucun ensemble recopié ne

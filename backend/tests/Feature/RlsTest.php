@@ -215,46 +215,33 @@ test('le rôle applicatif n’est ni superutilisateur ni BYPASSRLS ni propriéta
     expect($owner->tableowner)->not->toBe($role);
 });
 
-test('les tables scopées portent FORCE ROW LEVEL SECURITY', function () {
-    $rows = rlsOwner()->select(
-        "SELECT c.relname AS name, c.relrowsecurity, c.relforcerowsecurity
-           FROM pg_class c
-           JOIN pg_namespace n ON n.oid = c.relnamespace
-           JOIN pg_attribute a ON a.attrelid = c.oid AND a.attname = 'workspace_id'
-                              AND a.attnum > 0 AND NOT a.attisdropped
-          WHERE n.nspname = current_schema()
-            AND c.relkind = 'r'
-            AND NOT c.relispartition
-            AND c.relname NOT IN ('sessions', 'user_workspaces', 'audit_logs_default')",
-    );
-
-    expect($rows)->not->toBeEmpty();
-
-    $manquantes = [];
-    foreach ($rows as $row) {
-        if (! $row->relrowsecurity || ! $row->relforcerowsecurity) {
-            $manquantes[] = $row->name;
-        }
-    }
-
-    expect($manquantes)->toBe([]);
-});
-
-test('aucune policy ne conserve le fallback permissif « pas de contexte ⇒ tout voir »', function () {
-    $fautives = rlsOwner()->select(
-        "SELECT tablename, policyname, qual
-           FROM pg_policies
-          WHERE schemaname = current_schema()
-            AND qual LIKE '%current_setting%'
-            AND qual LIKE '%IS NULL%'
-            AND tablename <> 'llm_use_cases'",
-    );
-
-    // `llm_use_cases` est la seule table à lignes globales (workspace_id NULL
-    // légitime, 10 lignes en prod) : sa policy garde la branche
-    // `workspace_id IS NULL`, jamais la branche `current_setting(...) IS NULL`.
-    expect(array_map(fn ($r) => $r->tablename . '.' . $r->policyname, $fautives))->toBe([]);
-});
+// ⚠️ 2026-08-18 — LES DEUX CONTRÔLES STRUCTURELS ONT DÉMÉNAGÉ.
+//
+// Ils vivaient ici : « les tables scopées portent FORCE ROW LEVEL SECURITY » et
+// « aucune policy ne conserve le fallback permissif ». Ils sont maintenant dans
+// `tests/Feature/EtancheiteParTableTest.php`, adossés à
+// `Tests\Support\EtancheiteWorkspace`. Deux raisons MESURÉES, pas une
+// préférence de rangement :
+//
+//  1. LEUR LISTE D'EXCLUSION AVAIT DIVERGÉ de celle de la migration de
+//     durcissement. Ici : `('sessions','user_workspaces','audit_logs_default')`.
+//     Là-bas : ces trois-là PLUS `audit_logs`. La divergence ne se voyait pas
+//     parce que `audit_logs` est une table PARTITIONNÉE (`relkind='p'`) que le
+//     scan `relkind='r'` n'atteint jamais — exclusion TACITE, indistinguable
+//     d'un oubli. Il n'y a désormais qu'une seule liste, et un test qui la
+//     compare au source de la migration.
+//
+//  2. LE DÉTECTEUR DE REPLI PERMISSIF ÉTAIT AVEUGLE à une forme d'écriture.
+//     Il cherchait `qual LIKE '%IS NULL%'` ; il ne voyait donc pas
+//     `COALESCE(NULLIF(current_setting(...), ''), workspace_id::text)`, qui a
+//     exactement le même effet. C'est cette policy-là qui a survécu au
+//     durcissement sur `email_verification_logs` (nom raccourci → le
+//     `DROP POLICY` de la migration l'a manquée), et cette table rend
+//     aujourd'hui TOUTES ses lignes sans contexte. Mesuré, pas déduit.
+//
+// Ce fichier garde ce qu'il prouve le mieux : la barrière en situation sur
+// `companies` et `tags`, la configuration du rôle, la ceinture applicative et
+// l'inertie des drapeaux.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 3. Ceinture applicative : échec BRUYANT hors requête HTTP

@@ -111,7 +111,13 @@ test('deux signaux ne créent pas deux lignes — ils incrémentent', function (
     ListeSuppression::inscrire('rep@acme.fr', ListeSuppression::REBOND_DUR, 'esp');
     ListeSuppression::inscrire('rep@acme.fr', ListeSuppression::REBOND_DUR, 'esp');
 
-    $lignes = DB::table('email_suppressions')->where('email', 'rep@acme.fr')->get();
+    // 🔴 On interroge l'EMPREINTE, pas l'adresse : depuis le 2026-08-18
+    // (temps 1 du retrait de la colonne en clair), la table n'en porte plus.
+    // Chercher par une colonne que la production n'écrit ni ne lit plus
+    // rendrait ce test vert sur une table vide.
+    $lignes = DB::table('email_suppressions')
+        ->where('email_hash', ListeSuppression::empreinte('rep@acme.fr'))
+        ->get();
 
     expect($lignes)->toHaveCount(1);
     expect((int) $lignes->first()->occurrences)->toBe(2);
@@ -124,7 +130,9 @@ test('🔴 une plainte ne se fait JAMAIS rétrograder par un rebond', function (
     // Une plainte engage la réputation du domaine. Si un rebond mou arrivé
     // plus tard écrasait la raison, on perdrait la seule information qui
     // justifie de ne PLUS JAMAIS écrire à cette adresse.
-    $ligne = DB::table('email_suppressions')->where('email', 'grave@acme.fr')->first();
+    $ligne = DB::table('email_suppressions')
+        ->where('email_hash', ListeSuppression::empreinte('grave@acme.fr'))
+        ->first();
 
     expect($ligne->reason)->toBe(ListeSuppression::PLAINTE);
 });
@@ -161,7 +169,8 @@ test('opposition ET suppression ferment chacune la porte, indépendamment', func
     ficheAvecEmail($this->workspace->id, 'ok@acme.fr', 'OK');
 
     DB::table('opt_out')->insert([
-        'email' => 'oppose@acme.fr', 'scope' => 'business', 'source' => 'site', 'created_at' => now(),
+        'email' => null, 'email_hash' => hash('sha256', 'oppose@acme.fr'),
+        'scope' => 'business', 'source' => 'site', 'created_at' => now(),
     ]);
     ListeSuppression::inscrire('rebond@acme.fr', ListeSuppression::REBOND_DUR, 'esp');
 
@@ -216,7 +225,8 @@ test('une opposition retire aussi une PERSONNE', function () {
     ]);
 
     DB::table('opt_out')->insert([
-        'email' => 'non@acme.fr', 'scope' => 'business', 'source' => 'site', 'created_at' => now(),
+        'email' => null, 'email_hash' => hash('sha256', 'non@acme.fr'),
+        'scope' => 'business', 'source' => 'site', 'created_at' => now(),
     ]);
 
     expect(EligibiliteCampagne::appliquerContacts(
@@ -236,7 +246,8 @@ test('une opposition retire aussi une PERSONNE', function () {
 test('peutRecevoir répond sur une adresse seule, quelle que soit sa provenance', function () {
     ListeSuppression::inscrire('rebond@acme.fr', ListeSuppression::REBOND_DUR, 'esp');
     DB::table('opt_out')->insert([
-        'email' => 'oppose@acme.fr', 'scope' => 'business', 'source' => 'site', 'created_at' => now(),
+        'email' => null, 'email_hash' => hash('sha256', 'oppose@acme.fr'),
+        'scope' => 'business', 'source' => 'site', 'created_at' => now(),
     ]);
 
     expect(EligibiliteCampagne::peutRecevoir('libre@acme.fr'))->toBeTrue();

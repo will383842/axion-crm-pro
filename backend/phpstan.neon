@@ -15,9 +15,15 @@ parameters:
         - vendor
         - storage
         - bootstrap/cache
-    # Une erreur corrigée ne doit pas faire rougir la CI parce qu'elle est
-    # encore listée dans la baseline (la baseline ne peut que décroître, elle
-    # se régénère par vagues — cf. note en tête de phpstan-baseline.neon).
-    reportUnmatchedIgnoredErrors: false
+    # 2026-08-18 — passé de `false` à `true` (Étape 0, ligne 6 des préalables).
+    # Avec `false`, une entrée de baseline qui ne correspondait plus à aucune
+    # erreur ne faisait RIEN rougir : la baseline pouvait contenir n'importe
+    # quoi. Le passage à `true` a immédiatement révélé 38 entrées orphelines
+    # (erreurs corrigées entre le 13/08 et le 18/08, entrées jamais retirées)
+    # — elles ont été supprimées dans le même geste.
+    # Conséquence à connaître : quand on corrige une erreur, il faut désormais
+    # RETIRER son entrée de la baseline dans le même commit, sinon la CI rougit.
+    # C'est voulu : c'est ce qui garantit que la baseline ne peut que décroître.
+    reportUnmatchedIgnoredErrors: true
     ignoreErrors:
         - identifier: missingType.generics

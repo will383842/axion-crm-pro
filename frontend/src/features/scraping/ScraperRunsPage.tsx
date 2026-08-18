@@ -326,7 +326,7 @@ export function ScraperRunsPage() {
   return (
     <div className="px-6 py-6" data-testid="scraper-runs-page">
       <PageHeader
-        title="Runs de scraping"
+        title="Journaux de collecte"
         subtitle="Monitoring des jobs de scraping en temps réel."
         badge={<LiveBadge label="En direct" refreshLabel="actualisé toutes les 10s" />}
         actions={

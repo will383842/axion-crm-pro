@@ -79,13 +79,18 @@ test.describe('Phase 2 pages (stubs)', () => {
     await expect(page).toHaveURL(/linkedin/);
   });
 
-  test('crm page loads', async ({ page }) => {
+  // F7 (étape 0) — les écrans bouchons `/crm` et `/analytics` ont été
+  // SUPPRIMÉS : leurs noms sont ceux du chantier CRM cible. Les deux cas qui
+  // vérifiaient qu'ils « chargeaient » testaient un comportement retiré
+  // volontairement. On vérifie désormais l'inverse : ces deux adresses ne
+  // servent plus d'écran bouchon, elles tombent sur le 404 applicatif.
+  test('/crm ne sert plus d’écran bouchon', async ({ page }) => {
     await page.goto('/crm');
-    await expect(page).toHaveURL(/crm/);
+    await expect(page.getByText(/CRM pipeline/i)).toHaveCount(0);
   });
 
-  test('analytics page loads', async ({ page }) => {
+  test('/analytics ne sert plus d’écran bouchon', async ({ page }) => {
     await page.goto('/analytics');
-    await expect(page).toHaveURL(/analytics/);
+    await expect(page.getByText(/^Analytics$/)).toHaveCount(0);
   });
 });

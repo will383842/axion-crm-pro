@@ -24,9 +24,7 @@ use App\Http\Controllers\Api\LlmUseCasesController;
 use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\NotificationsController;
 use App\Http\Controllers\Api\ObservabilityController;
-use App\Http\Controllers\Api\Phase2\AnalyticsController;
 use App\Http\Controllers\Api\Phase2\ColdEmailController;
-use App\Http\Controllers\Api\Phase2\CrmController;
 use App\Http\Controllers\Api\Phase2\LinkedInController;
 use App\Http\Controllers\Api\ProxyProvidersController;
 use App\Http\Controllers\Api\ReferentielsGeoController;
@@ -41,6 +39,7 @@ use App\Http\Controllers\Api\WorkspaceController;
 use App\Http\Controllers\Internal\ScraperResultController;
 use App\Http\Controllers\Internal\SiteGdprController;
 use App\Http\Controllers\Internal\SiteSyncController;
+use App\Http\Controllers\Internal\ZeptoMailWebhookController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -246,11 +245,11 @@ Route::prefix('v1')->group(function () {
 
         // --- Lot L6 — Console CRM v2 ---------------------------------------
         //
-        // 🔴 ORDRE CRITIQUE : ces routes DOIVENT précéder le stub Phase 2
-        // `Route::any('/crm{any?}')` déclaré plus bas, qui capture tout
-        // `/v1/crm/*` et répond 501. Laravel résout par ordre de déclaration :
-        // les déplacer après reviendrait à livrer une console qui répond
-        // « non implémenté » sur chacun de ses appels, drapeau ouvert compris.
+        // Historique : ces routes devaient impérativement précéder le stub
+        // Phase 2 `Route::any('/crm{any?}')`, qui capturait tout `/v1/crm/*`
+        // et répondait 501. Ce fourre-tout a été RETIRÉ (F7, étape 0) : le
+        // groupe ci-dessous est désormais le seul propriétaire de `/v1/crm/*`,
+        // et toute sous-route non déclarée répond 404 — plus 501.
         //
         // Drapeau `crm.console_v2` (défaut false) → 404 sur tout ce groupe.
         // `GET /config/features` est délibérément HORS du groupe : c'est lui qui
@@ -284,11 +283,22 @@ Route::prefix('v1')->group(function () {
 
         // --- Phase 2 (stubs, retournent 501 Not Implemented) ---------------
         // Note : /campaigns retiré — implémenté en Sprint 19.7 ci-dessus.
-        // Note : /crm est PARTIELLEMENT capté au-dessus par la console v2.
+        //
+        // 🔴 F7 — `/crm{any?}` et `/analytics{any?}` RETIRÉS (préalable étape 0).
+        // Ces deux noms sont ceux du chantier CRM cible : un fourre-tout qui
+        // répond « non implémenté » sous le vocabulaire même du chantier à
+        // venir est un piège de nommage — il capturait silencieusement toute
+        // sous-route `/crm/*` non encore déclarée par la console v2, et un
+        // futur endpoint CRM oublié dans le groupe `crm-console` aurait répondu
+        // 501 au lieu de 404. Désormais : ce qui n'est pas déclaré est 404.
+        // Le groupe `crm-console` ci-dessus reste l'UNIQUE propriétaire de
+        // `/v1/crm/*`. Garde : `tests/Feature/PasDeStub501SousCrmEtAnalyticsTest.php`.
+        //
+        // `/cold-email` et `/linkedin` sont CONSERVÉS à dessein : ces noms
+        // n'entrent en collision avec aucun nom du cahier des charges, et le
+        // lot campagnes est hors périmètre.
         Route::any('/cold-email{any?}', ColdEmailController::class)->where('any', '.*');
         Route::any('/linkedin{any?}', LinkedInController::class)->where('any', '.*');
-        Route::any('/crm{any?}', CrmController::class)->where('any', '.*');
-        Route::any('/analytics{any?}', AnalyticsController::class)->where('any', '.*');
     });
 });
 
@@ -308,4 +318,11 @@ Route::prefix('internal')->group(function () {
     Route::post('/site-sync/gdpr', [SiteGdprController::class, 'store'])
         ->middleware('throttle:internal')
         ->name('internal.site-sync.gdpr');
+
+    // Étape 0, ligne 3 ter (F18) — rebonds et plaintes du service d'envoi
+    // transactionnel → liste de suppression. Jeton partagé dans l'URL (`?t=`),
+    // 503 tant que `MAIL_WEBHOOK_TOKEN` est absent, n'envoie rien.
+    Route::post('/email/zeptomail', [ZeptoMailWebhookController::class, 'store'])
+        ->middleware('throttle:internal')
+        ->name('internal.email.zeptomail');
 });

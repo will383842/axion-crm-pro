@@ -13,7 +13,7 @@ const LABELS: Record<string, string> = {
   '/companies': 'Entreprises',
   '/contacts': 'Contacts',
   '/coverage': 'Couverture France',
-  '/scraper-runs': 'Runs de scraping',
+  '/scraper-runs': 'Journaux de collecte',
   '/llm': 'LLM',
   '/llm/router': 'Router',
   '/llm/proxy-providers': 'Proxies',
@@ -24,11 +24,10 @@ const LABELS: Record<string, string> = {
   '/audit-logs': 'Journaux d’audit',
   '/users': 'Utilisateurs',
   '/settings': 'Paramètres',
-  '/campaigns': 'Campagnes',
+  '/campaigns': 'Collectes',
   '/cold-email': 'E-mails à froid',
   '/linkedin': 'Prospection LinkedIn',
-  '/crm': 'Pipeline CRM',
-  '/analytics': 'Analytique',
+  // F7 — `/crm` et `/analytics` retirés du routeur : plus de libellé à mapper.
 };
 
 function humanize(segment: string): string {

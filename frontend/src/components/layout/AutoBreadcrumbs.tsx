@@ -27,8 +27,7 @@ const LABELS: Record<string, string> = {
   '/campaigns': 'Campagnes',
   '/cold-email': 'E-mails à froid',
   '/linkedin': 'Prospection LinkedIn',
-  '/crm': 'Pipeline CRM',
-  '/analytics': 'Analytique',
+  // F7 — `/crm` et `/analytics` retirés du routeur : plus de libellé à mapper.
 };
 
 function humanize(segment: string): string {

@@ -26,8 +26,6 @@ import {
   Megaphone,
   Mail,
   Linkedin,
-  KanbanSquare,
-  BarChart3,
   ChevronsLeft,
   ChevronRight,
   ChevronsRight,
@@ -136,8 +134,9 @@ const SECTIONS: NavSection[] = [
     items: [
       { to: '/cold-email', label: 'E-mails à froid', icon: <Mail className="h-4 w-4" />, locked: true },
       { to: '/linkedin', label: 'Prospection LinkedIn', icon: <Linkedin className="h-4 w-4" />, locked: true },
-      { to: '/crm', label: 'Pipeline CRM', icon: <KanbanSquare className="h-4 w-4" />, locked: true },
-      { to: '/analytics', label: 'Analytique', icon: <BarChart3 className="h-4 w-4" />, locked: true },
+      // F7 — « Pipeline CRM » (/crm) et « Analytique » (/analytics) retirés :
+      // les deux écrans bouchons ont été supprimés, et une entrée de navigation
+      // qui mène à un 404 n'a pas à exister.
     ],
   },
 ];

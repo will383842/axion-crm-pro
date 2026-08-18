@@ -98,7 +98,12 @@ test.describe('Navigation smoke', () => {
   test('sidebar : Phase 2 section', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('link', { name: 'Campagnes' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Pipeline CRM' })).toBeVisible();
+    // F7 (étape 0) — l'entrée « Pipeline CRM » (/crm) a été RETIRÉE avec son
+    // écran bouchon. On garde une entrée Phase 2 réellement présente, et on
+    // vérifie que les deux retirées ne sont plus proposées.
+    await expect(page.getByRole('link', { name: 'Prospection LinkedIn' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Pipeline CRM' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Analytique' })).toHaveCount(0);
   });
 
   test('header : recherche globale visible', async ({ page }) => {

@@ -33,12 +33,16 @@ function makePhase2User(): User
 // attendaient un 501 sur cet endpoint testaient donc un comportement supprimé
 // volontairement : ils vérifient à présent le comportement RÉEL.
 
+// ⚠️ F7 (étape 0) : `/api/v1/crm` et `/api/v1/analytics` ne sont plus des
+// bouchons Phase 2 non plus — les deux `Route::any(...)` fourre-tout ont été
+// retirés (collision de nommage avec le chantier CRM cible). `/api/v1/crm`
+// existe encore, mais seulement via ses sous-routes RÉELLES (console v2), et
+// `/api/v1/analytics` n'existe plus du tout.
+
 test('Phase2 stubs sans auth retournent 401', function () {
     $this->getJson('/api/v1/campaigns')->assertUnauthorized();
     $this->getJson('/api/v1/cold-email')->assertUnauthorized();
     $this->getJson('/api/v1/linkedin')->assertUnauthorized();
-    $this->getJson('/api/v1/crm')->assertUnauthorized();
-    $this->getJson('/api/v1/analytics')->assertUnauthorized();
 });
 
 test('campaigns n\'est plus un bouchon Phase 2 : 200 + liste paginée', function () {
@@ -62,15 +66,8 @@ test('Phase2 linkedin avec auth → 501', function () {
     $this->actingAs($u)->getJson('/api/v1/linkedin')->assertStatus(501);
 });
 
-test('Phase2 crm avec auth → 501', function () {
-    $u = makePhase2User();
-    $this->actingAs($u)->getJson('/api/v1/crm')->assertStatus(501);
-});
-
-test('Phase2 analytics avec auth → 501', function () {
-    $u = makePhase2User();
-    $this->actingAs($u)->getJson('/api/v1/analytics')->assertStatus(501);
-});
+// Les deux cas « crm → 501 » et « analytics → 501 » ont été retirés avec les
+// routes qu'ils décrivaient (F7). Voir PasDeStub501SousCrmEtAnalyticsTest.
 
 // Le contrat de forme du bouchon (error/message/sprint) est inchangé : on le
 // vérifie désormais sur un endpoint TOUJOURS bouchonné (`/cold-email`) puisque

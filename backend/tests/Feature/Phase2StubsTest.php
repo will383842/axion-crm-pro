@@ -33,13 +33,12 @@ test('Phase 2 linkedin endpoint returns 501', function () {
     $this->getJson('/api/v1/linkedin')->assertStatus(501);
 });
 
-test('Phase 2 crm endpoint returns 501', function () {
-    $this->getJson('/api/v1/crm')->assertStatus(501);
-});
-
-test('Phase 2 analytics endpoint returns 501', function () {
-    $this->getJson('/api/v1/analytics')->assertStatus(501);
-});
+// F7 (étape 0) — `/crm` et `/analytics` NE SONT PLUS des bouchons Phase 2 :
+// les deux fourre-tout `Route::any(...)` ont été retirés de routes/api.php,
+// parce que ces noms sont ceux du chantier CRM cible. Les deux cas qui
+// attendaient un 501 testaient donc un comportement supprimé volontairement.
+// Le comportement RÉEL attendu est vérifié par
+// tests/Feature/PasDeStub501SousCrmEtAnalyticsTest.php.
 
 // ⚠️ Ce cas interrogeait `/api/v1/campaigns`, qui n'est plus un bouchon depuis
 // le Sprint 19.7 (endpoint complet Scraping Campaigns, cf. CampaignsTest.php) :

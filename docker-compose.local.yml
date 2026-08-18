@@ -11,45 +11,147 @@
 # (vérifié sur le serveur via le label `com.docker.compose.project.config_files`)
 # et ne verra donc jamais ce qui suit.
 #
-# ── POURQUOI ────────────────────────────────────────────────────────────────
-# Le service `api` ne publie AUCUN port : sa seule porte d'entrée est Caddy, en
-# `https://api.localhost`. Or, mesuré le 2026-08-17 :
+# ── CE QUE CETTE SURCOUCHE RÈGLE ────────────────────────────────────────────
+#   §1  Le site Next.js ne peut pas joindre le CRM depuis Node
+#   §2  Laravel démarre en 26 s par requête sur bind-mount Windows
+#   §3  La console v2 est inutilisable en local (défaut D-11)
 #
-#     node -e "require('dns').lookup('api.localhost', console.log)"   → ENOTFOUND
-#     curl  https://api.localhost/up                                   → 200
-#
-# Les navigateurs (et curl) traitent `*.localhost` spécialement ; **Node ne le
-# fait pas**, il passe par le résolveur du système. Le site Next.js ne peut donc
-# pas émettre vers le CRM. Le remède documenté jusqu'ici — ajouter deux lignes à
-# `C:\Windows\System32\drivers\etc\hosts` — exige une **élévation
-# administrateur**, que ni l'autopilote ni un montage scripté n'ont.
-#
-# Publier le port règle les trois problèmes d'un coup : Node résout `localhost`,
-# il n'y a plus de certificat auto-signé à contourner (donc plus besoin de
-# `NODE_TLS_REJECT_UNAUTHORIZED=0`, qui ne devrait jamais exister), et aucun
-# fichier système n'est touché.
-#
-# ── CE QU'IL FAUT METTRE CÔTÉ SITE ──────────────────────────────────────────
-#     CRM_SYNC_URL=http://localhost:58080/api/internal/site-sync
-#
-# 58080 : port haut, hors des plages usuelles, aligné sur la convention déjà
-# suivie par ce dépôt (postgres 55432, redis 56379).
+# Mode d'emploi complet : `_REPORTS/RUNBOOK-CONSOLE-LOCALE.md`
 # ─────────────────────────────────────────────────────────────────────────────
+
+# ── §2 + §3 : le socle commun à `api`, `horizon` et `scheduler` ──────────────
+#
+# §3 — ORIGINE UNIQUE (défaut D-11)
+# Le bloc `app.localhost` du Caddyfile sert le SPA **et** l'API sous une seule
+# origine depuis la PR #166. Trois valeurs doivent lui répondre en regard, sans
+# quoi la console reste inutilisable en local :
+#
+#   APP_URL              → l'origine que Laravel met dans les URL absolues
+#   SESSION_DOMAIN vide  → cookie host-only sur `app.localhost` (un cookie
+#                          `Domain=.localhost` est REFUSÉ par les navigateurs)
+#   VITE_API_BASE_URL    → l'origine que le SPA appelle (build-arg, plus bas)
+#
+# Elles sont posées ICI, en `environment:`, et non laissées au `.env` : le
+# `.env` d'un poste est un fichier personnel, non versionné, qu'aucune revue ne
+# relit. Celui de cette machine portait encore, le 2026-08-18,
+# `APP_URL=https://api.localhost` et `SESSION_DOMAIN=.localhost` — les deux
+# valeurs exactes qui produisent le 401 puis le 419 mesurés le 2026-08-17 — et
+# il lui manquait les 16 drapeaux `CRM_*` ajoutés depuis à `.env.example`.
+# `environment:` l'emporte sur `env_file:` : la surcouche corrige donc un poste
+# mal configuré au lieu d'en dépendre.
+#
+# `horizon` et `scheduler` exécutent le MÊME code hors requête HTTP. Leur
+# laisser un autre `APP_URL` que l'API, c'est fabriquer deux URL différentes
+# pour un même lien selon qu'il naît dans une réponse ou dans un job — le
+# défaut mesuré le 2026-08-16 et consigné dans `docker-compose.yml`.
+x-socle-local: &socle-local
+  environment:
+    APP_URL: https://app.localhost
+    SESSION_DOMAIN: ""
+    SESSION_SECURE_COOKIE: "false"
+    SANCTUM_STATEFUL_DOMAINS: app.localhost,localhost,127.0.0.1
+    FRONTEND_URL: https://app.localhost
+    # Le lot L6 est livré et gaté. Sans ce drapeau, `/api/v1/crm/*` répond 404
+    # et `GET /config/features` annonce `console_v2:false` : les quatre écrans
+    # de la console v2 ne s'affichent tout simplement pas. Le défaut `false` de
+    # `.env.example` vise la PRODUCTION ; en local, ne pas l'ouvrir revient à ne
+    # jamais pouvoir vérifier ce qu'on écrit.
+    CRM_CONSOLE_V2_ENABLED: "true"
+    # 🔴 `laravel/telescope` est une dépendance DURE (`composer.json:21`) et son
+    # défaut est `enabled = true`. Or ses migrations ne sont **jamais publiées**
+    # dans ce dépôt : `backend/database/migrations/` n'en contient aucune, et
+    # `.env.example` ne mentionnait pas la clé. Mesuré le 2026-08-18 sur une base
+    # locale à jour (54 migrations passées, 0 en attente) :
+    #
+    #     select count(*) … table_name like 'telescope%'   → 0
+    #     GET /api/v1/config/features                       → 500
+    #     php artisan migrate:status                        → 500 à la terminaison
+    #
+    # Telescope enregistre à la TERMINAISON de chaque requête et de chaque
+    # commande : l'échec arrive donc APRÈS le travail utile, ce qui casse tout
+    # sans jamais rien empêcher de s'exécuter — la trace parle de `terminate()`,
+    # pas de la route. C'est une cause de panne locale DISTINCTE de D-11, et
+    # elle frappe la première requête de n'importe quelle installation neuve.
+    TELESCOPE_ENABLED: "false"
+    # Noms de services du réseau Docker : ils doivent écraser le `.env`, qui
+    # porte `localhost` pour un usage hors conteneur. `docker-compose.yml` les
+    # pose déjà sur `api` ; il faut les répéter ici parce que `horizon` et
+    # `scheduler` réutilisent ce bloc et ne les ont pas.
+    DB_HOST: postgres
+    REDIS_HOST: redis
+  volumes:
+    - ./backend:/var/www/html:cached
+    # §2 — Opcache. Voir l'en-tête de `infra/php/opcache-local.ini`. Sans lui,
+    # démarrer Laravel coûte 26 s d'horloge par requête sur un bind-mount
+    # Windows (dont 1,3 s de CPU : le reste est de l'attente disque).
+    - ./infra/php/opcache-local.ini:/usr/local/etc/php/conf.d/zz-opcache-local.ini:ro
 
 services:
   api:
+    <<: *socle-local
+    # ── §1 : POURQUOI PUBLIER UN PORT ────────────────────────────────────────
+    # Le service `api` ne publie AUCUN port dans `docker-compose.yml` : sa seule
+    # porte d'entrée est Caddy, en `https://api.localhost`. Or, mesuré le
+    # 2026-08-17 :
+    #
+    #     node -e "require('dns').lookup('api.localhost', console.log)"  → ENOTFOUND
+    #     curl  https://api.localhost/up                                  → 200
+    #
+    # Les navigateurs (et curl) traitent `*.localhost` spécialement ; **Node ne
+    # le fait pas**, il passe par le résolveur du système. Le site Next.js ne
+    # peut donc pas émettre vers le CRM. Le remède documenté jusqu'ici — ajouter
+    # deux lignes à `C:\Windows\System32\drivers\etc\hosts` — exige une
+    # **élévation administrateur**, que ni l'autopilote ni un montage scripté
+    # n'ont.
+    #
+    # Publier le port règle les trois problèmes d'un coup : Node résout
+    # `localhost`, il n'y a plus de certificat auto-signé à contourner (donc
+    # plus besoin de `NODE_TLS_REJECT_UNAUTHORIZED=0`, qui ne devrait jamais
+    # exister), et aucun fichier système n'est touché.
+    #
+    # Côté site : CRM_SYNC_URL=http://localhost:58080/api/internal/site-sync
+    # 58080 : port haut, hors des plages usuelles, aligné sur la convention déjà
+    # suivie par ce dépôt (postgres 55432, redis 56379).
+    #
+    # `ports:` est porté par `api` SEUL et non par l'ancre : Compose concatène
+    # les listes de ports au lieu de les fusionner par clé — dans l'ancre, il
+    # ferait échouer `horizon` et `scheduler` en tentant de lier 58080 trois
+    # fois.
     ports:
       - "58080:80"
-    volumes:
-      # Opcache — voir l'en-tête de `infra/php/opcache-local.ini`. Sans lui,
-      # démarrer Laravel coûte 26 s d'horloge par requête sur un bind-mount
-      # Windows (dont 1,3 s de CPU : le reste est de l'attente disque).
-      - ./infra/php/opcache-local.ini:/usr/local/etc/php/conf.d/zz-opcache-local.ini:ro
 
   horizon:
-    volumes:
-      - ./infra/php/opcache-local.ini:/usr/local/etc/php/conf.d/zz-opcache-local.ini:ro
+    <<: *socle-local
 
   scheduler:
-    volumes:
-      - ./infra/php/opcache-local.ini:/usr/local/etc/php/conf.d/zz-opcache-local.ini:ro
+    <<: *socle-local
+
+  # `reverb` reçoit le même socle sans en avoir besoin pour lui-même : il ne
+  # fabrique pas d'URL. Le lui donner quand même évite qu'un `docker compose
+  # config` affiche DEUX `APP_URL` différentes dans la même pile — la seconde
+  # vérité étant précisément ce qui a rendu le défaut du 2026-08-16 invisible
+  # pendant des mois.
+  reverb:
+    <<: *socle-local
+
+  # ── LE SPA EN LOCAL ────────────────────────────────────────────────────────
+  # `docker-compose.yml` construit `app` avec, PAR DÉFAUT :
+  #
+  #     VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://app.axion-crm-pro.com}
+  #
+  # Ce défaut est celui de la PRODUCTION. Un poste dont le `.env` ne porte pas
+  # la clé fabrique donc, en silence, une console locale qui parle à l'API de
+  # PRODUCTION avec les cookies du navigateur. Rien ne le signale : la console
+  # s'ouvre, se connecte, et affiche de vraies fiches.
+  #
+  # La surcouche fige l'origine locale. La variable d'échappement porte un nom
+  # DIFFÉRENT (`VITE_API_BASE_URL_LOCAL`) à dessein : `VITE_API_BASE_URL` est
+  # déjà posée dans les `.env` existants avec une valeur périmée
+  # (`https://api.localhost`), et s'y adosser rejouerait le défaut.
+  app:
+    build:
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL_LOCAL:-https://app.localhost}
+        # `VITE_BUILD_CIBLE` reste VIDE en local : c'est lui qui arme la garde
+        # de `frontend/vite.config.ts` refusant une base d'API `localhost`. Le
+        # poser ici rendrait tout build local impossible.

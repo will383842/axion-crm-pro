@@ -116,10 +116,10 @@ final class EligibiliteCampagne
      * adresse — qui n'ont commis aucune opposition. Une garde ne doit pas
      * emporter plus que ce qu'elle protège.
      *
-     * ⚠️ Un contact SANS email traverse la garde, et c'est correct : les deux
-     * comparaisons (adresse en clair et empreinte) sont fausses sur `NULL`,
-     * donc `whereNotExists` est vrai. Personne n'est exclu pour une adresse
-     * qu'il n'a pas.
+     * ⚠️ Un contact SANS email traverse la garde, et c'est correct : la
+     * comparaison d'empreintes est fausse sur `NULL` (`digest(NULL)` vaut
+     * NULL), donc `whereNotExists` est vrai. Personne n'est exclu pour une
+     * adresse qu'il n'a pas.
      *
      * @template TModel of \Illuminate\Database\Eloquent\Model
      *
@@ -150,13 +150,13 @@ final class EligibiliteCampagne
             return false;
         }
 
-        $empreinte = hash('sha256', $normalise);
-
+        // 🔴 L'empreinte, et elle seule (décision du 2026-08-18, temps 1) —
+        // calculée par le SSOT, jamais réécrite ici : `ListeSuppression` et
+        // `SiteSyncEvent::emailHash()` doivent rendre le MÊME hachage, sans
+        // quoi la garde serait aveugle aux signaux venus du site.
         $oppose = DB::table('opt_out')
             ->where('scope', $scope)
-            ->where(function ($q) use ($normalise, $empreinte): void {
-                $q->where('email', $normalise)->orWhere('email_hash', $empreinte);
-            })
+            ->where('email_hash', ListeSuppression::empreinte($normalise))
             ->exists();
 
         if ($oppose) {
@@ -184,10 +184,36 @@ final class EligibiliteCampagne
      * de répondre à « cette personne s'est-elle opposée ? », la seule question
      * que pose la CNIL. Pour l'ENVOI en revanche, l'une comme l'autre interdit.
      *
-     * Comparaison sur l'adresse (colonnes `citext`, insensibles à la casse) ET
-     * sur son empreinte : les signaux venus du site arrivent hachés, ceux d'un
-     * fournisseur d'envoi arrivent en clair. Une garde qui ne reconnaîtrait
-     * qu'une seule forme serait aveugle une fois sur deux.
+     * ── 🔴 COMPARAISON SUR L'EMPREINTE SEULE (2026-08-18, temps 1) ────────
+     * Jusqu'ici cette méthode interrogeait LES DEUX formes, et c'était juste :
+     * les signaux venus du site arrivaient hachés, ceux d'un fournisseur
+     * d'envoi en clair, et une garde borgne l'aurait été une fois sur deux.
+     *
+     * La décision du 2026-08-18 retire l'adresse en clair de `opt_out` et
+     * `email_suppressions` — c'est une exigence de conformité : ces tables
+     * recensent des personnes dont le seul geste enregistré est un refus. La
+     * séquence est en DEUX temps, et l'ordre est ce qui la rend sûre :
+     *   1. remplir l'empreinte manquante de TOUTE ligne, et interdire par
+     *      contrainte de table qu'il en naisse une sans (migration
+     *      `2026_08_18_000001`) ; cesser d'écrire et de lire le clair ;
+     *   2. `DROP COLUMN`, dans un déploiement SÉPARÉ, une fois le remplissage
+     *      constaté sur les données réelles.
+     * L'inverse — supprimer d'abord — rendrait invisibles les oppositions qui
+     * n'ont que l'adresse en clair, c'est-à-dire recontacterait des gens qui
+     * s'y sont opposés. Le correctif de conformité, mal séquencé, produirait
+     * le dommage qu'il prétend éviter.
+     *
+     * ⚠️ RÉSIDU MESURÉ, à ne pas croire refermé : l'empreinte est ici calculée
+     * EN SQL sur la colonne du sujet (`encode(digest(btrim(lower(…))))`), alors
+     * que les lignes d'opposition portent une empreinte calculée EN PHP
+     * (`mb_strtolower(trim(…))`). Les deux coïncident sur l'ASCII — la
+     * totalité des adresses réelles — mais PAS sur une majuscule non-ASCII :
+     * la base est en `lc_ctype=C`, où `lower('É')` rend `'É'` quand
+     * `mb_strtolower` rend `'é'`. Cet écart PRÉEXISTE (la comparaison `citext`
+     * sur le clair, qui se replie elle aussi sur `lower()`, était aveugle au
+     * même endroit) ; il n'est ni créé ni aggravé ici. Consigné dans
+     * `_REPORTS/2026-08-18_OPT-OUT-DROP-COLUMN-TEMPS-2.md`, gardé par
+     * `tests/Feature/Rgpd/EmpreinteSqlEtPhpTest.php`.
      *
      * @template TModel of \Illuminate\Database\Eloquent\Model
      *
@@ -200,14 +226,11 @@ final class EligibiliteCampagne
         $empreinte = "encode(digest(btrim(lower({$colonneEmail})), 'sha256'), 'hex')";
 
         foreach (['opt_out', 'email_suppressions'] as $table) {
-            $query->whereNotExists(function (\Illuminate\Database\Query\Builder $sub) use ($table, $colonneEmail, $empreinte, $scope): void {
+            $query->whereNotExists(function (\Illuminate\Database\Query\Builder $sub) use ($table, $empreinte, $scope): void {
                 $sub->select(DB::raw('1'))
                     ->from($table)
                     ->where($table . '.scope', $scope)
-                    ->where(function (\Illuminate\Database\Query\Builder $inner) use ($table, $colonneEmail, $empreinte): void {
-                        $inner->whereColumn($table . '.email', $colonneEmail)
-                            ->orWhereRaw($table . '.email_hash = ' . $empreinte);
-                    });
+                    ->whereRaw($table . '.email_hash = ' . $empreinte);
             });
         }
 

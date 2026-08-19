@@ -1,0 +1,8 @@
+############################################################
+# G43 — CONCURRENCE COUCHE BASE, base axion_crm_g43 (300 000 fiches)
+# role axion_app (RLS ARMEE = configuration de PRODUCTION, CRM_DB_APP_ROLE_ENABLED=true)
+# scenario mixte : 50% liste hub, 20% compteurs, 20% recherche, 10% timeline
+# date : 2026-08-19T12:42:02Z
+############################################################
+
+--- WARMUP 20 s, c=4 (non compte) ---

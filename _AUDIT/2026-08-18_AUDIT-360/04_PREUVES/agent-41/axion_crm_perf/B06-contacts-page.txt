@@ -1,0 +1,35 @@
+############ B06-contacts-page
+### base   : axion_crm_perf   (datcollate = C)
+### date   : 2026-08-19T14:42:28+02:00
+### SQL    :
+select * from "contacts" where "workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168' and "deleted_at" is null order by "id" desc limit 50 offset 0;
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                                    QUERY PLAN                                                                     
+---------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.29..3.51 rows=50 width=643) (actual time=12.545..12.867 rows=50 loops=1)
+   Buffers: shared read=5 dirtied=2
+   ->  Index Scan Backward using contacts_pkey on contacts  (cost=0.29..3221.29 rows=50000 width=643) (actual time=12.540..12.853 rows=50 loops=1)
+         Filter: ((deleted_at IS NULL) AND (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid))
+         Buffers: shared read=5 dirtied=2
+ Planning:
+   Buffers: shared hit=398 read=12
+ Planning Time: 95.325 ms
+ Execution Time: 16.899 ms
+(9 rows)
+
+
+===== CHAUD (4e exécution) =====
+                                                                   QUERY PLAN                                                                    
+-------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.29..3.51 rows=50 width=643) (actual time=0.029..0.071 rows=50 loops=1)
+   Buffers: shared hit=5
+   ->  Index Scan Backward using contacts_pkey on contacts  (cost=0.29..3221.29 rows=50000 width=643) (actual time=0.026..0.062 rows=50 loops=1)
+         Filter: ((deleted_at IS NULL) AND (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid))
+         Buffers: shared hit=5
+ Planning:
+   Buffers: shared hit=410
+ Planning Time: 2.821 ms
+ Execution Time: 0.174 ms
+(9 rows)
+

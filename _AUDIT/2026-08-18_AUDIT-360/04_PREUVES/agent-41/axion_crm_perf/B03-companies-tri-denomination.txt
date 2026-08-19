@@ -1,0 +1,55 @@
+############ B03-companies-tri-denomination
+### base   : axion_crm_perf   (datcollate = C)
+### date   : 2026-08-19T14:40:23+02:00
+### SQL    :
+select * from "companies" where "deleted_at" is null and "workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168' order by "denomination" asc limit 100 offset 0;
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                                    QUERY PLAN                                                                     
+---------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=17547.93..17559.60 rows=100 width=2047) (actual time=1911.487..1922.242 rows=100 loops=1)
+   Buffers: shared hit=84 read=10204 written=47
+   ->  Gather Merge  (cost=17547.93..46716.64 rows=250000 width=2047) (actual time=1911.483..1922.227 rows=100 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=84 read=10204 written=47
+         ->  Sort  (cost=16547.91..16860.41 rows=125000 width=2047) (actual time=954.077..954.085 rows=67 loops=3)
+               Sort Key: denomination
+               Sort Method: top-N heapsort  Memory: 73kB
+               Buffers: shared hit=84 read=10204 written=47
+               Worker 0:  Sort Method: top-N heapsort  Memory: 64kB
+               Worker 1:  Sort Method: top-N heapsort  Memory: 64kB
+               ->  Parallel Seq Scan on companies  (cost=0.00..11770.50 rows=125000 width=2047) (actual time=142.401..751.998 rows=100000 loops=3)
+                     Filter: ((deleted_at IS NULL) AND (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid))
+                     Buffers: shared hit=4 read=10204 written=47
+ Planning:
+   Buffers: shared hit=803
+ Planning Time: 35.546 ms
+ Execution Time: 1927.806 ms
+(19 rows)
+
+
+===== CHAUD (4e exécution) =====
+                                                                   QUERY PLAN                                                                    
+-------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=17547.93..17559.60 rows=100 width=2047) (actual time=1245.546..1256.419 rows=100 loops=1)
+   Buffers: shared hit=80 read=10208
+   ->  Gather Merge  (cost=17547.93..46716.64 rows=250000 width=2047) (actual time=1245.499..1256.331 rows=100 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=80 read=10208
+         ->  Sort  (cost=16547.91..16860.41 rows=125000 width=2047) (actual time=841.916..841.947 rows=75 loops=3)
+               Sort Key: denomination
+               Sort Method: top-N heapsort  Memory: 73kB
+               Buffers: shared hit=80 read=10208
+               Worker 0:  Sort Method: top-N heapsort  Memory: 50kB
+               Worker 1:  Sort Method: top-N heapsort  Memory: 50kB
+               ->  Parallel Seq Scan on companies  (cost=0.00..11770.50 rows=125000 width=2047) (actual time=3.657..424.360 rows=100000 loops=3)
+                     Filter: ((deleted_at IS NULL) AND (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid))
+                     Buffers: shared read=10208
+ Planning:
+   Buffers: shared hit=773 read=30
+ Planning Time: 459.856 ms
+ Execution Time: 1256.708 ms
+(19 rows)
+

@@ -1,0 +1,7 @@
+############ B07-contacts-tri-last-name
+### base   : axion_crm_perf   (datcollate = C)
+### date   : 2026-08-19T14:42:59+02:00
+### SQL    :
+select * from "contacts" where "workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168' and "deleted_at" is null order by "last_name" asc limit 50 offset 0;
+
+===== FROID (1re exécution de cette requête, session neuve) =====

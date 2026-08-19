@@ -86,7 +86,7 @@ pour que le reste soit utilisable.
 | **P1** fan-out | ⚠️ **34 rapports rendus sur 46 agents** |
 | **P2** consolidation | ✅ — puis **révisée** après la critique de complétude |
 | **P3** correction | ❌ **0 correctif, 0 PR, 0 test vu rouge en correction** |
-| **P4** vérification | ❌ — *mais une vérification croisée réelle a eu lieu dès P1 : le chef de chantier a été **corrigé six fois*** |
+| **P4** vérification | ❌ — *mais une vérification croisée réelle a eu lieu dès P1 : le chef de chantier a été **corrigé sept fois*** |
 | **P5** adversariale | ❌ **jamais lancée** |
 | **P6** regard neuf | ❌ **jamais lancée** |
 | **P7** clôture | ⚠️ ce document, `08` et `09` **absents** |
@@ -109,7 +109,7 @@ rapport dénonce.*
 
 # CE QUE L'AUDIT S'EST TROMPÉ, ET COMMENT IL L'A SU
 
-Six corrections du chef de chantier, **toutes conservées dans le registre avec leur énoncé d'origine** :
+Sept corrections du chef de chantier, **toutes conservées dans le registre avec leur énoncé d'origine** :
 
 | Constat | L'erreur | Ce qui l'a levée |
 |---|---|---|
@@ -119,8 +119,9 @@ Six corrections du chef de chantier, **toutes conservées dans le registre avec 
 | **Hypothèse RGPD** | **Morte** : les lignes de journal venaient de **la suite de tests**, qui écrit dans le même fichier. *J'avais pris la preuve qu'une garde fonctionne pour la preuve d'un défaut* | agent 13 |
 | **A-011 cas 5** | Le cas fondateur du mandat **n'en était pas un** → devenu `A-013` | agent 6 |
 | **`02bis` §5** | 🔴 **J'ai reproduit `A-013` dans le document qui le dénonce** | agent 50 |
+| **Décompte S0** | J'annonçais **12** puis **16** défauts S0. Recompté ligne à ligne : **26**. Les deux chiffres dataient d'avant quatre rendus d'agents et **je les avais laissés courir** — *sous-évaluer un décompte de S0 dans une synthèse est littéralement le défaut de clôture que ce rapport dénonce* | re-comptage du chef de chantier |
 
-**Quatre sur six viennent d'avoir généralisé une mesure au-delà de ce qu'elle mesurait.** C'est le
+**Quatre sur sept viennent d'avoir généralisé une mesure au-delà de ce qu'elle mesurait.** C'est le
 catalogue exact que la doctrine énumère — et les avoir commises malgré cela dit qu'énumérer ne suffit
 pas.
 
@@ -144,5 +145,5 @@ L'ordonnancement complet et raisonné est au **§4 de `02bis`**. En trois lignes
 des gardes du même genre que celles qu'il corrige.*
 
 **Ce qui revient au dirigeant** est dans `06_RESTE-WILL.md` — une page, dont **un geste qui bloque la
-publication de ce dossier** : le dépôt est **public**, et ce rapport décrit **seize défauts S0 ouverts**
+publication de ce dossier** : le dépôt est **public**, et ce rapport décrit **vingt-six défauts S0 ouverts**
 sur une production qui porte **1 319 567 personnes**.

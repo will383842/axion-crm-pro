@@ -9,7 +9,7 @@
 
 ---
 
-## 1. Le dédoublonnage — 21 constats S0 rendus, **15 défauts distincts**
+## 1. Le dédoublonnage — **27 constats S0 rendus, 26 défauts distincts**
 
 > ⚠️ **Mis à jour** après les rendus des agents 15, 22, 33, 37 et 49. Quatre S0 nouveaux —
 > `B15-001`, le trio `B15-003`/`B15-006`/`B15-010`, et `D22-001` — et surtout **deux qui passent
@@ -42,7 +42,35 @@ Six groupes de constats décrivent le **même** défaut vu par des agents diffé
 | `A07-003` | Le **runbook de rotation des secrets** prescrit `docker compose restart` : **un secret réputé tourné ne l'est pas** |
 | `A08-008` | La sauvegarde restaure **les données mais pas les droits** (`--no-acl`) : une restauration de secours livre **une application incapable de lire** — et le script annonce « Restore complet » |
 
-**16 défauts S0 distincts** (voir le §6 pour les quatre ajouts et les deux requalifications).
+**Le décompte exact, recompté, est au §1 bis ci-dessous — il corrige ce chiffre vers le haut.**
+
+---
+
+## 1 bis. Le décompte S0 exact — **recompté, et je l'avais sous-évalué**
+
+⚠️ **Ce document annonçait « 12 » puis « 15 » défauts S0. Les deux chiffres étaient trop bas.**
+Ils dataient d'avant les rendus des agents 15, 22, 36 et 37. **Recompté ligne à ligne sur le registre :
+27 constats sont classés S0 par leur agent ; après dédoublonnage, ils décrivent 26 défauts distincts,
+dont 1 réfuté pour la production.**
+
+*Corriger ce chiffre plutôt que de le laisser courir est la moindre des choses : sous-évaluer un
+décompte de S0 dans un document de synthèse est **exactement** le défaut de clôture que ce même
+document dénonce sous `A-013`.*
+
+| Groupe | Défauts distincts | Les constats |
+|---|---:|---|
+| **G1 — le journal d'audit ne prouve rien** | **3** | tronquable par la queue sans détection (`B16-002`) · horodatage **hors du hachage** (`B16-003`) · **aucune RLS**, lisible tous espaces (`B16-004` + `F36-004`, confirmé en session réelle) |
+| **G2 — le cloisonnement s'arrête à la porte** | **3** | 26 tâches planifiées sur 33 sans contexte (`B11-001`) · 5 jobs sur 6 (`B11-002`) · fiche d'un autre locataire rendue (`B12-001` + `F36-005`) |
+| **G3 — l'effacement n'efface pas** | **5** | `erasure` sans effet (`B14-002` + `E31-001`) · export sur **4 tables sur 31** (`B15-003`) · adresse et téléphone **en clair dans 6 tables** après effacement (`B15-006`) · `candidates` **ni exportée ni effacée** (`B10-004`) · **retour au vivier** d'une personne effacée (`B15-001`) |
+| **G4 — personne ne peut entrer** | **3** | `MAIL_MAILER` défini nulle part (`F40-002`) · enrôlement 2FA sur colonnes inexistantes (`A07-001`) · **aucun écran ne l'expose** (`D22-001`) |
+| **G5 — la production ne peut pas porter le produit** | **1** | `php -S` mono-processus, requêtes sérialisées (`A-010`) |
+| **G6 — l'autorisation n'existe pas** | **5** | 11 policies **jamais invoquées** (`F36-001`) · `authorize()` **fatal** dans 35 contrôleurs (`F36-002`) · un `viewer` **supprime définitivement** (`F36-003` + `B12-003`) · un `viewer` **exporte 4 295 349 fiches** (`F36-011`) · routes RGPD **sans aucune permission** (`B15-010`) |
+| **Isolés** | **6** | signature HMAC **forgeable en production** (`F37-001`, ex-`B12-004`) · **6 services mockés en production** (`C18-016` / `F37-002`) · base légale sans mise en balance ni art. 14 (`C19-007`) · **aucune route ne crée une fiche personne** (`I48-001`) · runbook de rotation qui ne tourne rien (`A07-003`) · sauvegarde qui **ne restaure pas les droits** (`A08-008`) |
+| **Réfuté pour la production** | *(1)* | `B16-001` — secret de chaîne d'audit **vide en local, 64 caractères en production** |
+
+**→ 26 défauts S0 distincts et ouverts.** Et deux d'entre eux — `F37-001` et `C18-016`/`F37-002` —
+ne sont pas des défauts de conception à corriger posément : **ce sont deux portes ouvertes sur la base
+de production, mesurées sur le serveur qui tourne.**
 
 ---
 

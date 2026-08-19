@@ -1,1 +1,9 @@
 ### admin-nav:routes-check
+
+> axion-ia@0.1.0 admin-nav:routes-check C:\Users\willi\Documents\Projets\Axion-IA\axionia
+> tsx scripts/check-admin-nav-routes.ts
+
+✅ [admin-nav:routes] OK — 153 entrées, toutes résolues.
+EXIT=0
+
+### qualiopi:isolation-check

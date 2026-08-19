@@ -39,6 +39,28 @@ qui n'est pas encore corrigée.**
 **Ce que j'ai fait de mon côté** : rien retiré, rien fusionné. J'ai mesuré, consigné (`D-024`), et
 **mis cet agent hors service** — il ne reprend que si on lui écrit, et personne ne lui écrira.
 
+
+**⚠️ Complément du soir — la PR #191 n'est PAS fusionnable en l'état.** La contre-vérification
+adversariale est rendue. Trois blocages, tous petits, **~1 h 30 de reprise** :
+
+1. 🔴 **Le correctif du journal d'audit ne fait que la moitié du chemin** : un **admin de l'espace A
+   lit toujours le journal de l'espace B**. Et le test écrit pour prouver la correction **certifie
+   ce qui reste ouvert** — il n'assert que `pas 403`, ce qui passe sur un 200 qui rend le journal
+   d'autrui. *J'ai vérifié cette assertion moi-même dans le diff publié.*
+2. Le lot **casse un test du dépôt** qu'il n'a pas mis à jour (`NotificationsControllerTest`).
+   **Ce rouge-là est une bonne nouvelle** : c'est la preuve que la garde marche. *Il faut donner un
+   rôle au test, surtout pas relâcher la route.*
+3. Le `set -e` ajouté à `definir-mot-de-passe-crm.sh` rend ses messages d'erreur **inatteignables** :
+   sur un compte inexistant, tu ne verrais **rien**. C'est le script qui te rend l'accès au CRM.
+   **Correction : 2 minutes.**
+
+✅ **Et la bonne nouvelle, mesurée en 8 étapes** : l'enchaînement **compte neuf → connexion →
+enrôlement 2FA → écran d'accueil** est franchissable **de bout en bout**. Ce que je craignais — que
+le correctif ferme la console au lieu de l'ouvrir — **n'a pas eu lieu**.
+
+**Donc : ne fusionne pas #191 aujourd'hui, mais ne la ferme pas non plus.** Elle vaut le coup, il
+lui manque une heure et demie.
+
 **Ce que je te dois** : ce n'est pas la faute de l'agent, c'est la mienne. J'avais identifié trois
 fois qu'il sortait de son mandat, je l'avais écrit trois fois, **et je n'ai jamais corrigé ma façon
 de le mandater.** J'ai diagnostiqué le problème et je ne l'ai pas réparé — le reproche exact que ce

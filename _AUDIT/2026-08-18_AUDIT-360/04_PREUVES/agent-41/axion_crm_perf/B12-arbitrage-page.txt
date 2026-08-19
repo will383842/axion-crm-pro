@@ -1,0 +1,53 @@
+############ B12-arbitrage-page
+### base   : axion_crm_perf   (datcollate = C)
+### date   : 2026-08-19T14:46:34+02:00
+### SQL    :
+select * from "activities" where "workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168' and "subject_id" is null and payload -> 'pending_match' IS NOT NULL and payload -> 'arbitrage_dismissed' IS NULL order by "occurred_at" asc, "id" asc limit 50;
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                                                                            QUERY PLAN                                                                                                            
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=20129.94..20129.95 rows=1 width=299) (actual time=321.899..334.153 rows=0 loops=1)
+   Buffers: shared hit=283 read=15207 written=48
+   ->  Sort  (cost=20129.94..20129.95 rows=1 width=299) (actual time=321.897..334.150 rows=0 loops=1)
+         Sort Key: occurred_at, id
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=283 read=15207 written=48
+         ->  Gather  (cost=1000.00..20129.93 rows=1 width=299) (actual time=321.828..334.079 rows=0 loops=1)
+               Workers Planned: 2
+               Workers Launched: 2
+               Buffers: shared hit=277 read=15207 written=48
+               ->  Parallel Seq Scan on activities  (cost=0.00..19129.83 rows=1 width=299) (actual time=281.535..281.536 rows=0 loops=3)
+                     Filter: ((subject_id IS NULL) AND ((payload -> 'pending_match'::text) IS NOT NULL) AND ((payload -> 'arbitrage_dismissed'::text) IS NULL) AND (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid))
+                     Rows Removed by Filter: 166667
+                     Buffers: shared hit=277 read=15207 written=48
+ Planning:
+   Buffers: shared hit=245 read=1 dirtied=1
+ Planning Time: 3.553 ms
+ Execution Time: 334.230 ms
+(18 rows)
+
+
+===== CHAUD (4e exécution) =====
+                                                                                                            QUERY PLAN                                                                                                            
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=20129.94..20129.95 rows=1 width=299) (actual time=190.377..217.764 rows=0 loops=1)
+   Buffers: shared hit=393 read=15097
+   ->  Sort  (cost=20129.94..20129.95 rows=1 width=299) (actual time=190.372..217.757 rows=0 loops=1)
+         Sort Key: occurred_at, id
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=393 read=15097
+         ->  Gather  (cost=1000.00..20129.93 rows=1 width=299) (actual time=190.246..217.625 rows=0 loops=1)
+               Workers Planned: 2
+               Workers Launched: 2
+               Buffers: shared hit=387 read=15097
+               ->  Parallel Seq Scan on activities  (cost=0.00..19129.83 rows=1 width=299) (actual time=174.701..174.704 rows=0 loops=3)
+                     Filter: ((subject_id IS NULL) AND ((payload -> 'pending_match'::text) IS NOT NULL) AND ((payload -> 'arbitrage_dismissed'::text) IS NULL) AND (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid))
+                     Rows Removed by Filter: 166667
+                     Buffers: shared hit=387 read=15097
+ Planning:
+   Buffers: shared hit=246
+ Planning Time: 2.320 ms
+ Execution Time: 217.916 ms
+(18 rows)
+

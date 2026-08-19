@@ -25,7 +25,7 @@ qui est du code mort.** Ce n'est pas un jugement : c'est ce que rendent les comm
 
 | # | Le fait | La preuve, en un chiffre |
 |---|---|---|
-| **1** | **Personne ne s'est jamais connecté au CRM en production.** Trois verrous se referment l'un sur l'autre : mot de passe initial jamais reçu, `MAIL_MAILER` défini nulle part (donc ni lien magique ni réinitialisation), et l'enrôlement 2FA **écrit trois colonnes qui n'existent pas** — qu'aucun écran n'expose. | 1 compte · **0 session** · **0 jeton**, depuis le 2026-05-17. Flux rejoué : login **200** → écran **403** → 2FA **500** |
+| **1** | **Personne ne s'est jamais connecté au CRM en production.** **Quatre** verrous se referment l'un sur l'autre : mot de passe initial jamais reçu · `MAIL_MAILER` défini nulle part (donc ni lien magique ni réinitialisation) · enrôlement 2FA **sur trois colonnes qui n'existent pas**, qu'**aucun écran n'expose** · et, **derrière les trois autres**, l'écran d'accueil qui **s'efface entièrement — barre latérale comprise — dès qu'`audit_logs` contient une ligne. *Et la connexion elle-même en écrit une.* | 1 compte · **0 session** · **0 jeton**, depuis le 2026-05-17. Flux rejoué : login **200** → écran **403** → 2FA **500**. Et **64 lignes** déjà dans `audit_logs` en production, pour une colonne `event_type` que le code lit `action` |
 | **2** | **La couche d'autorisation est inerte.** Aucune des 11 policies n'est jamais appelée. | Les 11 policies **réécrites en refus total** : l'API répond **à l'identique**, **15 tests restent verts**. **118/118 routes sans policy** |
 | **3** | **La production ne peut pas porter dix utilisateurs.** Elle sert l'API par `php -S`, **un seul processus** : les requêtes sont **sérialisées**. | Escalier de **15 ms** sur 12 requêtes simultanées ; témoin séquentiel **plat**. Principe 8 et critère 17 **inatteignables par construction** |
 | **4** | **Le canal ne crée aucune fiche.** Aucun émetteur du site ne transmet de SIREN, et aucun formulaire n'en collecte. | **100 %** des leads en arbitrage manuel · **0 fiche en 5 jours** · **0 contact sur 1 319 567** porte une `person_key` |
@@ -145,5 +145,5 @@ L'ordonnancement complet et raisonné est au **§4 de `02bis`**. En trois lignes
 des gardes du même genre que celles qu'il corrige.*
 
 **Ce qui revient au dirigeant** est dans `06_RESTE-WILL.md` — une page, dont **un geste qui bloque la
-publication de ce dossier** : le dépôt est **public**, et ce rapport décrit **vingt-six défauts S0 ouverts**
+publication de ce dossier** : le dépôt est **public**, et ce rapport décrit **vingt-sept défauts S0 ouverts**
 sur une production qui porte **1 319 567 personnes**.

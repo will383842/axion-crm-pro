@@ -1,0 +1,30 @@
+############ B13-timeline-activites
+### base   : axion_crm_perf   (datcollate = C)
+### date   : 2026-08-19T14:46:59+02:00
+### SQL    :
+select * from "activities" where "workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168' and "person_key" = (select person_key from contacts where person_key is not null limit 1) order by "occurred_at" desc, "id" desc limit 200;
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                                            QUERY PLAN                                                                             
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=24.58..24.61 rows=10 width=299) (actual time=51.555..51.563 rows=10 loops=1)
+   Buffers: shared hit=6 read=14 dirtied=9
+   InitPlan 1 (returns $0)
+     ->  Limit  (cost=0.00..0.05 rows=1 width=65) (actual time=0.042..0.045 rows=1 loops=1)
+           Buffers: shared read=1
+           ->  Seq Scan on contacts  (cost=0.00..2287.00 rows=50000 width=65) (actual time=0.041..0.042 rows=1 loops=1)
+                 Filter: (person_key IS NOT NULL)
+                 Buffers: shared read=1
+   ->  Sort  (cost=24.54..24.56 rows=10 width=299) (actual time=51.552..51.553 rows=10 loops=1)
+         Sort Key: activities.occurred_at DESC, activities.id DESC
+         Sort Method: quicksort  Memory: 27kB
+         Buffers: shared hit=6 read=14 dirtied=9
+         ->  Index Scan using idx_activities_workspace_person_key on activities  (cost=0.42..24.37 rows=10 width=299) (actual time=50.842..51.231 rows=10 loops=1)
+               Index Cond: ((workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid) AND (person_key = $0))
+               Buffers: shared read=14 dirtied=9
+ Planning:
+   Buffers: shared hit=460 read=1
+ Planning Time: 3.559 ms
+ Execution Time: 51.703 ms
+(19 rows)
+

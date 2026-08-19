@@ -2400,3 +2400,37 @@ place du dirigeant** — ils sont à porter au cahier des charges, pas au produi
 - « **reçus** » : **acquitté**, ou **ayant produit une fiche** ? *Tant que ce mot n'est pas tranché,
   le critère 18 serait **vert sur un CRM qui n'a créé aucune fiche** — c'est-à-dire exactement l'état
   que `B13-001` a mesuré.*
+
+---
+
+### [A-015] 🔴 Le quatrième verrou : même une fois entré, le propriétaire tomberait sur un écran **entièrement blanc**
+- **Sévérité**      : **S0**
+- **Domaine**       : interface
+- **Référence**     : `e8924b8` — production mesurée en lecture seule
+- **Emplacement**   : `frontend/src/features/dashboard/ActivityFeed.tsx:19` — lit `log.action` · table `audit_logs`, colonne réelle **`event_type`**
+- **Constat**       : l'écran d'accueil **s'efface entièrement — barre latérale comprise — dès que `audit_logs` contient une seule ligne**. Le composant lit un champ **qui n'existe pas** ; l'exception remonte, et **aucun `errorComponent` n'est posé** (`D24-008` : `ErrorBoundary` est écrit, exporté, **monté nulle part**).
+- **Preuve — la mesure que l'agent 24 demandait, jouée en production** :
+  ```
+  audit_logs = 64                                          <- 64 lignes, DEJA
+  colonnes   = id, workspace_id, user_id, event_type, path, status_code,
+               ip, user_agent, payload_hash, prev_hash, current_hash, created_at
+               -> il n'y a AUCUNE colonne "action"
+  ```
+- **Témoin positif** : la même session rend `companies = 4 295 349` — la base répond, la mesure n'est pas un artefact.
+- **Témoin décisif de l'agent 24** : la **même ligne**, mais avec un champ `action`, **et l'écran se monte**. La variable est donc isolée : c'est bien le nom du champ, pas la présence de données.
+
+- 🔑 **Ce que cela change au récit, et c'est le quatrième verrou de `A-012`.** On croyait trois
+  serrures : mot de passe jamais reçu, courriel de récupération muet, enrôlement 2FA sur colonnes
+  inexistantes. **Il y en a une quatrième, et elle est derrière les trois autres** :
+  > **le jour où quelqu'un franchira les trois premières, il tombera sur une page blanche.**
+
+  Et la boucle est parfaite : **le middleware audite `POST /auth/login`**. *La connexion écrit
+  elle-même une ligne de plus dans la table qui casse l'écran où elle dépose l'utilisateur.*
+  Avec **64 lignes déjà en production**, l'écran est **cassé aujourd'hui**, avant même que quiconque
+  essaie.
+
+- **Impact**        : c'est le **seul** des quatre verrous qui aurait été **invisible jusqu'à la première connexion réussie** — et donc celui qui serait apparu au pire moment : après avoir cru le problème réglé. Il explique aussi pourquoi corriger `A07-001` seul **ne suffira pas** : les trois correctifs doivent partir ensemble, et celui-ci avec eux.
+- **Correctif**     : lire `event_type` au lieu de `action` (**~15 min**), **et** monter un `errorComponent` sur les routes — sans quoi le prochain champ renommé effacera de nouveau l'application entière. Le test qui l'accompagne doit **rougir sur une ligne d'`audit_logs` réelle**, pas sur une fixture fabriquée avec un champ `action` (ce serait le piège 19 une onzième fois).
+- **Statut**        : **ouvert** — **rejoint le lot G4, en tête de P3**
+- **Vérifié par**   : agent 24 (mesure d'origine et témoin) ; **compte de production mesuré par le chef de chantier**
+- Réfuté par / Passe 3 : —

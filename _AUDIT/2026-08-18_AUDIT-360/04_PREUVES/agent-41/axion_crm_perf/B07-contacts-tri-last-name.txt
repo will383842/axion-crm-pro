@@ -5,3 +5,39 @@
 select * from "contacts" where "workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168' and "deleted_at" is null order by "last_name" asc limit 50 offset 0;
 
 ===== FROID (1re exécution de cette requête, session neuve) =====
+                                                          QUERY PLAN                                                           
+-------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=4072.96..4073.09 rows=50 width=643) (actual time=14545.301..14545.316 rows=50 loops=1)
+   Buffers: shared hit=3 read=1787 written=283
+   ->  Sort  (cost=4072.96..4197.96 rows=50000 width=643) (actual time=14545.298..14545.305 rows=50 loops=1)
+         Sort Key: last_name
+         Sort Method: top-N heapsort  Memory: 66kB
+         Buffers: shared hit=3 read=1787 written=283
+         ->  Seq Scan on contacts  (cost=0.00..2412.00 rows=50000 width=643) (actual time=0.031..14489.538 rows=50000 loops=1)
+               Filter: ((deleted_at IS NULL) AND (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid))
+               Buffers: shared read=1787 written=283
+ Planning:
+   Buffers: shared hit=407 read=1
+ Planning Time: 3.137 ms
+ Execution Time: 14545.426 ms
+(13 rows)
+
+
+===== CHAUD (4e exécution) =====
+                                                         QUERY PLAN                                                          
+-----------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=4072.96..4073.09 rows=50 width=643) (actual time=185.099..185.118 rows=50 loops=1)
+   Buffers: shared hit=3 read=1787
+   ->  Sort  (cost=4072.96..4197.96 rows=50000 width=643) (actual time=185.094..185.101 rows=50 loops=1)
+         Sort Key: last_name
+         Sort Method: top-N heapsort  Memory: 66kB
+         Buffers: shared hit=3 read=1787
+         ->  Seq Scan on contacts  (cost=0.00..2412.00 rows=50000 width=643) (actual time=0.041..133.131 rows=50000 loops=1)
+               Filter: ((deleted_at IS NULL) AND (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid))
+               Buffers: shared read=1787
+ Planning:
+   Buffers: shared hit=372 read=36
+ Planning Time: 26.137 ms
+ Execution Time: 185.324 ms
+(13 rows)
+

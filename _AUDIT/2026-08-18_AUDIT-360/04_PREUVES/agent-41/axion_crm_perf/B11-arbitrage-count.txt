@@ -1,0 +1,45 @@
+############ B11-arbitrage-count
+### base   : axion_crm_perf   (datcollate = C)
+### date   : 2026-08-19T14:46:10+02:00
+### SQL    :
+select count(*) as aggregate from "activities" where "workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168' and "subject_id" is null and payload -> 'pending_match' IS NOT NULL and payload -> 'arbitrage_dismissed' IS NULL;
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                                                                         QUERY PLAN                                                                                                         
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=20129.94..20129.95 rows=1 width=8) (actual time=3436.298..3517.673 rows=1 loops=1)
+   Buffers: shared read=15484
+   ->  Gather  (cost=1000.00..20129.93 rows=1 width=0) (actual time=3436.288..3517.660 rows=0 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared read=15484
+         ->  Parallel Seq Scan on activities  (cost=0.00..19129.83 rows=1 width=0) (actual time=3357.760..3357.761 rows=0 loops=3)
+               Filter: ((subject_id IS NULL) AND ((payload -> 'pending_match'::text) IS NOT NULL) AND ((payload -> 'arbitrage_dismissed'::text) IS NULL) AND (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid))
+               Rows Removed by Filter: 166667
+               Buffers: shared read=15484
+ Planning:
+   Buffers: shared hit=132 read=8
+ Planning Time: 7.125 ms
+ Execution Time: 3517.799 ms
+(14 rows)
+
+
+===== CHAUD (4e exécution) =====
+                                                                                                         QUERY PLAN                                                                                                         
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=20129.94..20129.95 rows=1 width=8) (actual time=211.251..215.311 rows=1 loops=1)
+   Buffers: shared hit=181 read=15303
+   ->  Gather  (cost=1000.00..20129.93 rows=1 width=0) (actual time=211.242..215.299 rows=0 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=181 read=15303
+         ->  Parallel Seq Scan on activities  (cost=0.00..19129.83 rows=1 width=0) (actual time=184.125..184.126 rows=0 loops=3)
+               Filter: ((subject_id IS NULL) AND ((payload -> 'pending_match'::text) IS NOT NULL) AND ((payload -> 'arbitrage_dismissed'::text) IS NULL) AND (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid))
+               Rows Removed by Filter: 166667
+               Buffers: shared hit=181 read=15303
+ Planning:
+   Buffers: shared hit=140
+ Planning Time: 0.968 ms
+ Execution Time: 215.441 ms
+(14 rows)
+

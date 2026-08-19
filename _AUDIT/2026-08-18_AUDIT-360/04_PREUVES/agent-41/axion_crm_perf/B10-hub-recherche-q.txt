@@ -1,0 +1,75 @@
+############ B10-hub-recherche-q
+### base   : axion_crm_perf   (datcollate = C)
+### date   : 2026-08-19T14:45:42+02:00
+### SQL    :
+select * from "companies" where "deleted_at" is null and "workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168' and ("lifecycle_stage" != 'nouveau' or exists (select 1 from "company_tag" inner join "tags" on "tags"."id" = "company_tag"."tag_id" where "company_tag"."company_id" = "companies"."id" and "tags"."slug" not like 'src:scraping-%' and "tags"."slug" like 'src:%')) and ("denomination" ilike 'marti%' or exists (select * from "contacts" where "companies"."id" = "contacts"."company_id" and ("last_name" ilike 'marti%' or "email" ilike 'marti%'))) order by "updated_at" desc, "id" desc limit 51;
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                                           QUERY PLAN                                                                            
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.42..3545.73 rows=51 width=2047) (actual time=1830.040..4861.061 rows=51 loops=1)
+   Buffers: shared hit=2232 read=1787
+   ->  Index Scan using idx_companies_ws_updated_id on companies  (cost=0.42..5950969.11 rows=85606 width=2047) (actual time=1830.036..4861.006 rows=51 loops=1)
+         Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+         Filter: (((denomination ~~* 'marti%'::text) OR (hashed SubPlan 4)) AND ((lifecycle_stage <> 'nouveau'::text) OR (hashed SubPlan 2)))
+         Rows Removed by Filter: 454
+         Buffers: shared hit=2232 read=1787
+         SubPlan 4
+           ->  Seq Scan on contacts  (cost=0.00..2537.00 rows=5324 width=8) (actual time=0.248..1354.493 rows=5000 loops=1)
+                 Filter: ((last_name ~~* 'marti%'::text) OR (email ~~* 'marti%'::citext))
+                 Rows Removed by Filter: 45000
+                 Buffers: shared hit=19 read=1768
+         SubPlan 2
+           ->  Hash Join  (cost=3.18..6055.23 rows=136842 width=8) (actual time=315.782..369.298 rows=50000 loops=1)
+                 Hash Cond: (company_tag.tag_id = tags.id)
+                 Buffers: shared hit=2208
+                 ->  Seq Scan on company_tag  (cost=0.00..5206.00 rows=300000 width=16) (actual time=0.168..292.608 rows=300000 loops=1)
+                       Buffers: shared hit=2206
+                 ->  Hash  (cost=2.85..2.85 rows=26 width=8) (actual time=0.100..0.103 rows=20 loops=1)
+                       Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                       Buffers: shared hit=2
+                       ->  Seq Scan on tags  (cost=0.00..2.85 rows=26 width=8) (actual time=0.020..0.054 rows=20 loops=1)
+                             Filter: ((slug !~~ 'src:scraping-%'::text) AND (slug ~~ 'src:%'::text))
+                             Rows Removed by Filter: 39
+                             Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=1197
+ Planning Time: 47.327 ms
+ Execution Time: 4883.725 ms
+(29 rows)
+
+
+===== CHAUD (4e exécution) =====
+                                                                          QUERY PLAN                                                                           
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.42..3545.73 rows=51 width=2047) (actual time=117.375..730.715 rows=51 loops=1)
+   Buffers: shared hit=4019
+   ->  Index Scan using idx_companies_ws_updated_id on companies  (cost=0.42..5950969.11 rows=85606 width=2047) (actual time=117.371..730.687 rows=51 loops=1)
+         Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+         Filter: (((denomination ~~* 'marti%'::text) OR (hashed SubPlan 4)) AND ((lifecycle_stage <> 'nouveau'::text) OR (hashed SubPlan 2)))
+         Rows Removed by Filter: 454
+         Buffers: shared hit=4019
+         SubPlan 4
+           ->  Seq Scan on contacts  (cost=0.00..2537.00 rows=5324 width=8) (actual time=0.042..83.905 rows=5000 loops=1)
+                 Filter: ((last_name ~~* 'marti%'::text) OR (email ~~* 'marti%'::citext))
+                 Rows Removed by Filter: 45000
+                 Buffers: shared hit=1787
+         SubPlan 2
+           ->  Hash Join  (cost=3.18..6055.23 rows=136842 width=8) (actual time=131.212..184.006 rows=50000 loops=1)
+                 Hash Cond: (company_tag.tag_id = tags.id)
+                 Buffers: shared hit=2208
+                 ->  Seq Scan on company_tag  (cost=0.00..5206.00 rows=300000 width=16) (actual time=0.200..85.481 rows=300000 loops=1)
+                       Buffers: shared hit=2206
+                 ->  Hash  (cost=2.85..2.85 rows=26 width=8) (actual time=0.225..0.229 rows=20 loops=1)
+                       Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                       Buffers: shared hit=2
+                       ->  Seq Scan on tags  (cost=0.00..2.85 rows=26 width=8) (actual time=0.098..0.142 rows=20 loops=1)
+                             Filter: ((slug !~~ 'src:scraping-%'::text) AND (slug ~~ 'src:%'::text))
+                             Rows Removed by Filter: 39
+                             Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=1197
+ Planning Time: 38.776 ms
+ Execution Time: 745.105 ms
+(29 rows)
+

@@ -1,0 +1,63 @@
+############ B09-hub-liste-actifs
+### base   : axion_crm_perf   (datcollate = C)
+### date   : 2026-08-19T14:44:49+02:00
+### SQL    :
+select * from "companies" where "deleted_at" is null and "workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168' and ("lifecycle_stage" != 'nouveau' or exists (select 1 from "company_tag" inner join "tags" on "tags"."id" = "company_tag"."tag_id" where "company_tag"."company_id" = "companies"."id" and "tags"."slug" not like 'src:scraping-%' and "tags"."slug" like 'src:%')) order by "updated_at" desc, "id" desc limit 51;
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                                            QUERY PLAN                                                                            
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.42..1030.12 rows=51 width=2047) (actual time=4143.487..4154.448 rows=51 loops=1)
+   Buffers: shared read=2213 dirtied=1
+   ->  Index Scan using idx_companies_ws_updated_id on companies  (cost=0.42..3456469.11 rows=171195 width=2047) (actual time=4143.482..4154.428 rows=51 loops=1)
+         Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+         Filter: ((lifecycle_stage <> 'nouveau'::text) OR (hashed SubPlan 2))
+         Buffers: shared read=2213 dirtied=1
+         SubPlan 2
+           ->  Hash Join  (cost=3.18..6055.23 rows=136842 width=8) (actual time=2120.868..2626.429 rows=50000 loops=1)
+                 Hash Cond: (company_tag.tag_id = tags.id)
+                 Buffers: shared read=2208 dirtied=1
+                 ->  Seq Scan on company_tag  (cost=0.00..5206.00 rows=300000 width=16) (actual time=1.632..2544.840 rows=300000 loops=1)
+                       Buffers: shared read=2206 dirtied=1
+                 ->  Hash  (cost=2.85..2.85 rows=26 width=8) (actual time=11.566..11.572 rows=20 loops=1)
+                       Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                       Buffers: shared read=2
+                       ->  Seq Scan on tags  (cost=0.00..2.85 rows=26 width=8) (actual time=9.911..11.376 rows=20 loops=1)
+                             Filter: ((slug !~~ 'src:scraping-%'::text) AND (slug ~~ 'src:%'::text))
+                             Rows Removed by Filter: 39
+                             Buffers: shared read=2
+ Planning:
+   Buffers: shared hit=938 read=62
+ Planning Time: 458.874 ms
+ Execution Time: 4157.807 ms
+(23 rows)
+
+
+===== CHAUD (4e exécution) =====
+                                                                            QUERY PLAN                                                                            
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.42..1030.12 rows=51 width=2047) (actual time=2313.730..2313.806 rows=51 loops=1)
+   Buffers: shared hit=2213
+   ->  Index Scan using idx_companies_ws_updated_id on companies  (cost=0.42..3456469.11 rows=171195 width=2047) (actual time=2313.728..2313.799 rows=51 loops=1)
+         Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+         Filter: ((lifecycle_stage <> 'nouveau'::text) OR (hashed SubPlan 2))
+         Buffers: shared hit=2213
+         SubPlan 2
+           ->  Hash Join  (cost=3.18..6055.23 rows=136842 width=8) (actual time=325.500..394.647 rows=50000 loops=1)
+                 Hash Cond: (company_tag.tag_id = tags.id)
+                 Buffers: shared hit=2208
+                 ->  Seq Scan on company_tag  (cost=0.00..5206.00 rows=300000 width=16) (actual time=0.048..331.649 rows=300000 loops=1)
+                       Buffers: shared hit=2206
+                 ->  Hash  (cost=2.85..2.85 rows=26 width=8) (actual time=0.083..0.084 rows=20 loops=1)
+                       Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                       Buffers: shared hit=2
+                       ->  Seq Scan on tags  (cost=0.00..2.85 rows=26 width=8) (actual time=0.015..0.042 rows=20 loops=1)
+                             Filter: ((slug !~~ 'src:scraping-%'::text) AND (slug ~~ 'src:%'::text))
+                             Rows Removed by Filter: 39
+                             Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=1000
+ Planning Time: 48.225 ms
+ Execution Time: 2315.099 ms
+(23 rows)
+

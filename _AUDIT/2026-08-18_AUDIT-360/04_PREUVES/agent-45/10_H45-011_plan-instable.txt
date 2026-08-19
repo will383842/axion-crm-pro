@@ -1,0 +1,24 @@
+# AGENT 45 — H45-011 : la garde de plan des compteurs rougit SANS cause.
+# Extrait brut du tirage S04-bis (le sabotage ne touchait que BulkController).
+
+   FAILED  Tests\Feature\Crm\CompteursHubTest > les compteurs sont servis pa…   
+  Expected: HashAggregate  (cost=8.15..8.16 rows=1 width=72)\n
+    Group Key: relation_type, lifecycle_stage\n
+    ->  Index Scan using idx_companies_workspace_relation_type on companies  (cost=0.12..8.14 rows=1 width=64)\n
+  ... (2 more lines)
+
+  To contain: Index Only Scan using idx_companies_ws_counts
+
+  at tests/Feature/Crm/CompteursHubTest.php:141
+    137▕     ))->map(static fn ($ligne): string => (string) reset($ligne))->implode(PHP_EOL);
+    138▕ 
+    139▕     DB::statement('SET enable_seqscan = on');
+    140▕ 
+  ➜ 141▕     expect($plan)->toContain('Index Only Scan using idx_companies_ws_counts');
+    142▕     expect($plan)->not->toContain('Seq Scan on companies');
+    143▕ });
+    144▕ 
+    145▕ // ── 2. CACHE — le calcul sort du chemin d'affichage ──────────────────────────
+
+  1   tests/Feature/Crm/CompteursHubTest.php:141
+

@@ -1,5 +1,0 @@
-ContactsListPage (NON virtualisé) | 0 | 2171 | 0 | 44 | 61 Mo
-ContactsListPage (NON virtualisé) | 1 | 1532 | 2 | 70 | 60 Mo
-ContactsListPage (NON virtualisé) | 100 | 1276 | 101 | 2545 | 87 Mo
-ContactsListPage (NON virtualisé) | 10000 | 36236 | 10001 | 250045 | 1516 Mo
-CompaniesListPage (VIRTUALISÉ) | 0 | 978 | 0 | 147 | 1546 Mo

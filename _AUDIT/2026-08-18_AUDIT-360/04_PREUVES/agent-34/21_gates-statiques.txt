@@ -7,3 +7,8 @@
 EXIT=0
 
 ### qualiopi:isolation-check
+
+> axion-ia@0.1.0 qualiopi:isolation-check C:\Users\willi\Documents\Projets\Axion-IA\axionia
+> tsx scripts/qualiopi/isolation-check.ts
+
+ ELIFECYCLE  Command failed with exit code 4294967295.

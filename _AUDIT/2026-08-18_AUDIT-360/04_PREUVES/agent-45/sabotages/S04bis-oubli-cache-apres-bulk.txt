@@ -13,58 +13,13 @@
                  });
              }
          }
-######## SUITE COMPLETE ########
-[2026-08-19 14:30:34] local.WARNING: HibpChecker: connection error {"error":"connect timeout"} 
-[2026-08-19 14:30:35] local.WARNING: HibpChecker: guzzle error {"error":"Server error: `GET https://api.pwnedpasswords.com/range/8867C` resulted in a `503 Service Unavailable` response:
-service unavailable
-"} 
-
-   PASS  Tests\Unit\Auth\HibpCheckerTest
-  ✓ HibpChecker retourne 0 pour password vide sans appel API             2.91s  
-  ✓ HibpChecker fail-open en cas d'erreur réseau                         0.60s  
-  ✓ HibpChecker retourne le count si suffix trouvé                       0.08s  
-  ✓ HibpChecker isBreached respecte le threshold                         0.08s  
-  ✓ HibpChecker parse correctement les newlines mixtes                   0.27s  
-  ✓ HibpChecker met en cache le résultat 24h                             0.47s  
-  ✓ HibpChecker returns 0 quand suffix absent                            0.23s  
-  ✓ HibpChecker fail-open sur status non-200                             0.15s  
-
-   PASS  Tests\Unit\Http\ProxiedHttpClientTest
-  ✓ it builds a PendingRequest without proxy option when disabled        0.42s  
-  ✓ it applies proxy option when enabled with credentials                0.12s  
-  ✓ it skips proxy option when enabled but credentials missing           0.13s  
-  ✓ it reports proxy enabled when flag set                               0.29s  
-  ✓ it reports proxy disabled by default                                 0.47s  
-[2026-08-19 14:30:40] local.DEBUG: FranceTravailDiscovery INSEE check failed {"siren":"123456789","error":"INSEE auth requires either INSEE_API_KEY (plan public) or INSEE_CLIENT_ID + INSEE_CLIENT_SECRET (plan authentifié)."} 
-[2026-08-19 14:30:40] local.DEBUG: FranceTravailDiscovery INSEE check failed {"siren":"987654321","error":"INSEE auth requires either INSEE_API_KEY (plan public) or INSEE_CLIENT_ID + INSEE_CLIENT_SECRET (plan authentifié)."} 
-[2026-08-19 14:30:40] local.DEBUG: FranceTravailDiscovery INSEE check failed {"siren":"444444444","error":"INSEE down"} 
-[2026-08-19 14:30:40] local.WARNING: FranceTravailDiscovery: OAuth token unavailable, returning empty  
-
-   PASS  Tests\Unit\FranceTravail\FranceTravailDiscoveryClientTest
-  ✓ it skips offres with invalid SIRET                                   0.98s  
-  ✓ it Sprint H3: filters out radiées entreprises via INSEE check        0.27s  
-  ✓ it returns deduplicated entreprises from offres                      2.05s  
-  ✓ it Sprint H3: graceful fallback if InseeClient throws                0.10s  
-  ✓ it returns empty when client credentials missing                     0.08s  
-  ✓ it returns empty on 204 No Content                                   0.10s  
-[2026-08-19 14:31:57] local.INFO: Remplissage des empreintes d’opposition {"table":"opt_out","empreintes_calculees":0} 
-[2026-08-19 14:31:57] local.INFO: Remplissage des empreintes d’opposition {"table":"email_suppressions","empreintes_calculees":0} 
-
-   PASS  Tests\Unit\Dedup\OptOutTest
-  ✓ isOptedOut normalizes phone (strip separators)                      78.35s  
-  ✓ isOptedOut returns true after addOptOut                              0.42s  
-  ✓ isOptedOut returns false when no opt_out entry                       0.12s  
-  ✓ isOptedOut normalizes email (trim + lowercase)                       0.14s  
-  ✓ isOptedOut cross-workspace (table sans workspace_id)                 0.12s  
-
-   PASS  Tests\Unit\Classification\AutoClassifierServiceTest
-  ✓ it maps NAF 6201Z to it_saas                                         0.90s  
-  ✓ it extracts dept 2B for Haute-Corse postcode 20200                   0.28s  
-  ✓ it classifies effectif_range 52 as grande entreprise                 0.18s  
-  ✓ it maps NAF 4321A to btp                                             0.39s  
-  ✓ it falls back to "autre" for unknown NAF prefix                      0.78s  
-  ✓ it extracts dept 2A for Corse-du-Sud postcode 20000                  0.34s  
-  ✓ it extracts commune code and city name from signals.ban              0.78s  
-  ✓ it classifies effectif_range 21 as PME                               0.29s  
-  ✓ it extracts dept 971 for DOM postcode 97110                          0.27s  
-  ✓ it extracts dept 75 from postcode 75008                              0.23s  
+  ⨯ une action de masse fait bouger la pastille tout de suite            0.89s  
+  ⨯ les compteurs sont servis par un index couvrant, jamais par un bala… 0.29s  
+  ⨯ POST /coverage/launch accepte body valide                            0.58s  
+   FAILED  Tests\Feature\Crm\CompteursHubTest > une action de masse fait bou…   
+   FAILED  Tests\Feature\Crm\CompteursHubTest > les compteurs sont servis pa…   
+   FAILED  Tests\Feature\Controllers\CoverageControllerTest > POST /coverage…   
+  Tests:    3 failed, 1 skipped, 776 passed (6490 assertions)
+######## CODE PEST : 1 ########
+######## RESTAURATION ########
+RESTAURE-IDENTIQUE: app/Http/Controllers/Api/Crm/BulkController.php

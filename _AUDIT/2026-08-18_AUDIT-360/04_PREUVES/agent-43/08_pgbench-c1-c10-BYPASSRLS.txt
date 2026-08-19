@@ -1,0 +1,2 @@
+### G43 — MEME scenario, MEME base, role axion (BYPASSRLS = configuration de l'\''ATELIER LOCAL) ###
+--- warmup c=4, 20 s ---

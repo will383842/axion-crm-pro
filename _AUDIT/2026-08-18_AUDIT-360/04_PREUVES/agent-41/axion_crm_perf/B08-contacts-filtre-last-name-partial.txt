@@ -1,0 +1,37 @@
+############ B08-contacts-filtre-last-name-partial
+### base   : axion_crm_perf   (datcollate = C)
+### date   : 2026-08-19T14:44:19+02:00
+### SQL    :
+select * from "contacts" where "workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168' and "deleted_at" is null and LOWER("contacts"."last_name") LIKE '%mar%' order by "id" desc limit 50 offset 0;
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                                    QUERY PLAN                                                                    
+--------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.29..87.07 rows=50 width=643) (actual time=2.873..4.270 rows=50 loops=1)
+   Buffers: shared hit=20 read=3 dirtied=17
+   ->  Index Scan Backward using contacts_pkey on contacts  (cost=0.29..3471.29 rows=2000 width=643) (actual time=2.864..4.246 rows=50 loops=1)
+         Filter: ((deleted_at IS NULL) AND (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid) AND (lower(last_name) ~~ '%mar%'::text))
+         Rows Removed by Filter: 445
+         Buffers: shared hit=20 read=3 dirtied=17
+ Planning:
+   Buffers: shared hit=382 read=31
+ Planning Time: 148.029 ms
+ Execution Time: 4.519 ms
+(10 rows)
+
+
+===== CHAUD (4e exécution) =====
+                                                                    QUERY PLAN                                                                    
+--------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.29..87.07 rows=50 width=643) (actual time=0.071..0.578 rows=50 loops=1)
+   Buffers: shared hit=23
+   ->  Index Scan Backward using contacts_pkey on contacts  (cost=0.29..3471.29 rows=2000 width=643) (actual time=0.069..0.564 rows=50 loops=1)
+         Filter: ((deleted_at IS NULL) AND (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid) AND (lower(last_name) ~~ '%mar%'::text))
+         Rows Removed by Filter: 445
+         Buffers: shared hit=23
+ Planning:
+   Buffers: shared hit=413
+ Planning Time: 224.286 ms
+ Execution Time: 0.703 ms
+(10 rows)
+

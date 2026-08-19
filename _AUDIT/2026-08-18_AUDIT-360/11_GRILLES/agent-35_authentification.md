@@ -168,10 +168,18 @@ requête `GET /api/v1/auth/me` avec `Accept: text/html` :
 
 | état | (A) `redirectGuestsTo(null)` | (B) `shouldRenderJsonWhen` | résultat |
 |---|---|---|---|
-| 0 — tel quel sur `e8924b8` | non | non | **500** |
-| 1 — (B) seul | non | oui | 500 |
-| 2 — (A) seul | oui | non | 500 |
-| 3 — les deux | oui | oui | **401** |
+| 0 — tel quel sur `e8924b8` | non | non | **500** (mesuré) |
+| 1 — (B) seul | non | oui | 500 attendu — (A) plante en amont, dans `Authenticate` |
+| 2 — (A) seul | oui | non | 500 attendu — (B) rappelle `route('login')` dans le handler |
+| 3 — les deux | oui | oui | **401** attendu |
+
+⚠️ **Piège rencontré, à connaître avant de rejouer ce test** : dans le banc de test, le
+gestionnaire d'exceptions est celui de **Collision**
+(`NunoMaduro\Collision\Adapters\Laravel\ExceptionHandler`), qui **n'a pas** de méthode
+`shouldRenderJsonWhen()` — un appel direct rend
+`Error: Call to undefined method ... ::shouldRenderJsonWhen()`. Il faut reposer le vrai
+gestionnaire avant de le configurer :
+`$this->app->instance(ExceptionHandler::class, tap(new \Illuminate\Foundation\Exceptions\Handler($this->app), fn ($h) => $h->shouldRenderJsonWhen(...)));`
 
 Le test **échoue sur `e8924b8`** (`assertSame(500, $etat0)` sert de témoin négatif, puis
 `assertSame(401, $etat3)`), et passe une fois `bootstrap/app.php` corrigé. Version à poser

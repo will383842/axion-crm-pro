@@ -6,3 +6,853 @@
 ############################################################
 
 --- WARMUP 20 s, c=4 (non compte) ---
+latency average = 1529.985 ms
+tps = 2.614405 (without initial connection time)
+ - latency average = 1396.918 ms
+ - latency average = 1531.300 ms
+ - latency average = 1705.283 ms
+ - latency average = 1721.341 ms
+
+=========== RUN A — TEMOIN : 1 utilisateur (c=1), 40 s ===========
+pgbench: pghost: 127.0.0.1 pgport: 5432 nclients: 1 duration: 40 dbName: axion_crm_g43
+pgbench (16.9 (Debian 16.9-1.pgdg110+1))
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 9995 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 20295 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 3373 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 26279 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 24848 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 3735 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 5120 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 22488 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 20264 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 5554 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+transaction type: multiple scripts
+scaling factor: 1
+query mode: simple
+number of clients: 1
+number of threads: 1
+maximum number of tries: 1
+duration: 40 s
+number of transactions actually processed: 57
+number of failed transactions: 0 (0.000%)
+latency average = 711.833 ms
+initial connection time = 22.090 ms
+tps = 1.404824 (without initial connection time)
+SQL script 1: /tmp/g43/s1_liste.sql
+ - weight: 50 (targets 50.0% of total)
+ - 27 transactions (47.4% of total, tps = 0.665443)
+ - number of failed transactions: 0 (0.000%)
+ - latency average = 843.079 ms
+ - latency stddev = 566.380 ms
+SQL script 2: /tmp/g43/s2_compteurs.sql
+ - weight: 20 (targets 20.0% of total)
+ - 11 transactions (19.3% of total, tps = 0.271106)
+ - number of failed transactions: 0 (0.000%)
+ - latency average = 675.461 ms
+ - latency stddev = 373.169 ms
+SQL script 3: /tmp/g43/s3_recherche.sql
+ - weight: 20 (targets 20.0% of total)
+ - 9 transactions (15.8% of total, tps = 0.221814)
+ - number of failed transactions: 0 (0.000%)
+ - latency average = 610.816 ms
+ - latency stddev = 203.810 ms
+SQL script 4: /tmp/g43/s4_timeline.sql
+ - weight: 10 (targets 10.0% of total)
+ - 10 transactions (17.5% of total, tps = 0.246460)
+ - number of failed transactions: 0 (0.000%)
+ - latency average = 488.069 ms
+ - latency stddev = 351.855 ms
+
+=========== RUN B — CRITERE 17 : 10 utilisateurs simultanes (c=10), 40 s ===========
+pgbench: pghost: 127.0.0.1 pgport: 5432 nclients: 10 duration: 40 dbName: axion_crm_g43
+pgbench (16.9 (Debian 16.9-1.pgdg110+1))
+pgbench: pgbench:pgbench:  client 9 executing script "/tmp/g43/s2_compteurs.sql"
+client 5 executing script "/tmp/g43/s1_liste.sql"
+client 3 executing script "/tmp/g43/s3_recherche.sql"
+pgbench:pgbench:pgbench:  pgbench:pgbench: client 9 sending SET app.current_workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168';
+ client 6 executing script "/tmp/g43/s1_liste.sql"
+ client 7 executing script "/tmp/g43/s1_liste.sql"
+pgbench: pgbench: client 1 executing script "/tmp/g43/s1_liste.sql"
+pgbench:pgbench: client 1 sending SET app.current_workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168';
+ client 0 executing script "/tmp/g43/s4_timeline.sql"
+client 7 sending SET app.current_workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168';
+client 4 executing script "/tmp/g43/s2_compteurs.sql"
+client 3 sending SET app.current_workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168';
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+pgbench: pgbench: client 1 sending SELECT companies.* FROM companies
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 6044 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+client 4 sending SET app.current_workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168';
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+pgbench: pgbench:client 5 receiving
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 1857 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+ client 6 receiving
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 29235 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 25616 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 13705 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 16832 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 407 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 15756 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 32603 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+pgbench: pgbench: client 8 receiving
+client 9 receiving
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 797 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 28700 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 38857 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 4780 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 9293 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 21859 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+  AND person_key = (SELECT person_key FROM contacts ORDER BY id OFFSET 1398 LIMIT 1)
+ORDER BY occurred_at DESC LIMIT 100;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+GROUP BY relation_type, lifecycle_stage;
+WHERE workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid AND deleted_at IS NULL
+  AND denomination ILIKE 'Cabinet Mar%' ORDER BY updated_at DESC LIMIT 20;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+WHERE deleted_at IS NULL AND workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid
+  AND (lifecycle_stage <> 'nouveau' OR EXISTS (SELECT 1 FROM company_tag JOIN tags ON tags.id = company_tag.tag_id
+       WHERE company_tag.company_id = companies.id AND tags.slug NOT LIKE 'src:scraping-%' AND tags.slug LIKE 'src:%'))
+ORDER BY updated_at DESC, id DESC LIMIT 51;
+transaction type: multiple scripts
+scaling factor: 1
+query mode: simple
+number of clients: 10
+number of threads: 10
+maximum number of tries: 1
+duration: 40 s
+number of transactions actually processed: 190
+number of failed transactions: 0 (0.000%)
+latency average = 2196.430 ms
+initial connection time = 245.701 ms
+tps = 4.552842 (without initial connection time)
+SQL script 1: /tmp/g43/s1_liste.sql
+ - weight: 50 (targets 50.0% of total)
+ - 99 transactions (52.1% of total, tps = 2.372271)
+ - number of failed transactions: 0 (0.000%)
+ - latency average = 2465.741 ms
+ - latency stddev = 1790.911 ms
+SQL script 2: /tmp/g43/s2_compteurs.sql
+ - weight: 20 (targets 20.0% of total)
+ - 39 transactions (20.5% of total, tps = 0.934531)
+ - number of failed transactions: 0 (0.000%)
+ - latency average = 1493.377 ms
+ - latency stddev = 614.042 ms
+SQL script 3: /tmp/g43/s3_recherche.sql
+ - weight: 20 (targets 20.0% of total)
+ - 36 transactions (18.9% of total, tps = 0.862644)
+ - number of failed transactions: 0 (0.000%)
+ - latency average = 2202.583 ms
+ - latency stddev = 1008.051 ms
+SQL script 4: /tmp/g43/s4_timeline.sql
+ - weight: 10 (targets 10.0% of total)
+ - 16 transactions (8.4% of total, tps = 0.383397)
+ - number of failed transactions: 0 (0.000%)
+ - latency average = 1713.431 ms
+ - latency stddev = 1488.409 ms

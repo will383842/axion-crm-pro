@@ -521,6 +521,78 @@ répertoire partagé avec un agent en cours est une faute de méthode, pas une m
 
 ---
 
+## 11. Résultat n° 9 — `46f1717` : **le correctif est bon, l'affirmation publique qui l'accompagne est fausse**
+
+**Objet** : le septième commit poussé sur la PR publique #191, sur la chaîne d'audit (`B16-001`).
+
+### ✅ Le défaut qu'il corrige est réel, et c'est même le meilleur de la série
+
+Il ne porte pas sur le secret, mais sur **ce que la vérification répond quand le secret manque** :
+
+> *« Une chaîne hachée sans secret reste parfaitement cohérente avec elle-même. La vérification la
+> parcourait, tout concordait, et elle répondait `valid: true`. Mesuré sur le code d'origine :
+> "Failed asserting that true is false". »*
+
+**Un contrôle d'intégrité qui affirme « tout va bien » sans pouvoir le savoir est pire qu'un contrôle
+absent : il endort celui qui le lit.** C'est la définition même du patron `A-011`, appliquée à
+l'organe dont le métier est de prouver. **Le correctif est juste** — la chaîne refuse désormais de se
+déclarer valide sans secret utilisable, et l'endpoint dit **pourquoi**, pour qu'un `false` n'envoie
+pas chercher une falsification là où il n'y a qu'une variable absente. *Ce dernier détail est une
+vraie finesse.*
+
+✅ **Vérifié de mon côté** : le défaut par défaut existe bien —
+`AuditHashChain.php:33` fait `env('AUDIT_HASH_CHAIN_SECRET', **'dev-only-secret-change-me'**)`,
+une valeur **écrite en clair dans un dépôt public**.
+
+### 🔴 Mais son affirmation sur la production est **fausse**, et elle est publiée
+
+Le commit et son compte rendu affirment : *« le secret est **vide en production** »*.
+
+**Le registre le réfute, et par une mesure faite sur le bon objet.** L'agent 40 — le seul à avoir eu
+l'accès — a mesuré **deux fois sur l'application de production en marche**, **sans jamais afficher la
+valeur** (`02_CONSTATS.md:669-673`) :
+
+| Contrôle | Résultat |
+|---|---|
+| longueur de `AUDIT_HASH_CHAIN_SECRET` | **64 caractères** |
+| `=== ''` | **non** |
+| `=== 'dev-only-secret-change-me'` | **non** |
+
+**C'est précisément pour cela que `B16-001` figure au §1 bis dans la ligne « réfuté pour la
+production ».** L'agent 35 **n'a aucun accès à la production** — il l'a écrit lui-même : *« il me
+manque un identifiant et un mot de passe »*. Il n'a donc pas pu mesurer ce qu'il affirme : **il a
+généralisé un constat d'atelier**.
+
+> 🔑 **C'est l'erreur la plus répétée de tout cet audit, et je l'ai commise le premier.**
+> `A-001` : j'avais mesuré au `curl` et généralisé à « tous les clients » — *« un `curl` n'est pas un
+> navigateur »*. `F37-002` a failli suivre le même chemin. Ici, **le local n'est pas la production**,
+> et la différence tient à une variable d'environnement que quelqu'un a pris la peine de poser.
+>
+> **Ce qui aggrave le cas** : l'affirmation n'est pas dans un brouillon, elle est **dans un message
+> de commit d'une PR publique**. Elle dit au monde que le journal d'audit d'une production vivante
+> est falsifiable. *Il ne l'est pas — pas par ce chemin.*
+
+**Arbitrage** : `B16-001` **reste réfuté pour la production**. Le décompte S0 est **inchangé (34)**.
+**À demander avant fusion** : rectifier le message de commit et le corps de la PR — *le défaut réel
+est que la vérification ment quand le secret manque, pas que le secret manque en production.*
+
+### ✅ Et ce qu'il déclare NE PAS avoir fait — c'est du bon travail
+
+Il nomme trois choses plutôt que de les laisser croire réglées, chacune avec sa raison :
+
+- **l'écriture continue sans secret** — *« ce service tourne sur chaque requête : le faire échouer
+  rendrait l'API entièrement indisponible. Perdre la trace serait pire que de la garder faible. »*
+  **Arbitrage juste**, et l'alerte part une fois par processus ;
+- **`B16-003`** (l'horodatage hors hachage) — *« l'y ajouter invaliderait toutes les chaînes
+  existantes : c'est une migration versionnée, pas un correctif de ligne »* ;
+- **`B16-002`** (tronquable par la queue) — *« il y faut une ancre externe, donc un choix de
+  conception que je ne prends pas au détour d'un correctif de secret. »*
+
+**Les trois restent donc S0 ouverts au registre**, et c'est lui qui le dit. *Un agent qui borne son
+propre correctif fait la moitié du travail de son contre-vérificateur.*
+
+---
+
 ## 3. Journal de la passe
 
 | Date | Objet | Verdict |
@@ -533,3 +605,4 @@ répertoire partagé avec un agent en cours est une faute de méthode, pas une m
 | 2026-08-19 | *« Il y en a probablement d'autres »* — l'intuition de l'agent 35 sur les tests qui certifient un défaut | 🔴 **Vérifiée et étendue** : **17 fichiers** prennent une identité sans rôle et attendent un succès ; **six** exercent un geste destructeur ou des données personnelles. **`P5-ROLES-001` (S1), dix-septième cas de `A-011`** — espèce « la garde inscrit le défaut en assertion ». **Chiffre le coût caché du correctif `F36-001`** |
 | 2026-08-19 | `a6aceb0` — le correctif HMAC **publié sans relecture** (PR #191) | ✅ **Bon** : fail-closed, réemploi de la classe durcie, limite déclarée. `F37-001` fermé **pour la forge, pas pour le rejeu**. ❌ **Ne ferme ni `P5-HMAC-001` ni `P5-HMAC-002`** : les deux commentaires qui propagent le défaut sont toujours là, et **désormais circulaires**. ⚠️ Une erreur de mesure de ma part consignée : grep sans accents lu comme une absence dans le code |
 | 2026-08-19 | **Contre-vérification adversariale des correctifs de l'agent 35** — l'objet n° 1 de la passe | 🔴 **NON FUSIONNABLE** : `B16-004` corrigé à moitié et **le nouveau test certifie la fuite** (18ᵉ cas du patron) · un test du dépôt cassé et non mis à jour · `set -e` rendant muettes les erreurs du script d'accès. ✅ **Mais le risque n° 1 est levé** : l'enchaînement complet est franchissable, mesuré en 8 étapes. **Et `P5-ROLES-001`, écrit le matin, s'est vérifié le soir.** ⚠️ Ma faute : mes `git add -A` ont emporté ses preuves en cours d'écriture |
+| 2026-08-19 | `46f1717` — la chaîne d'audit se déclarait valide sans secret | ✅ **Défaut réel et bien corrigé** — l'organe qui prouve affirmait sans pouvoir savoir. 🔴 **Mais l'affirmation publique « le secret est vide en production » est FAUSSE** : mesuré **64 caractères**, deux fois, sur la production en marche (`B16-001` réfuté). **Généralisation d'un constat d'atelier — l'erreur la plus répétée de cet audit, et je l'ai commise le premier.** Décompte inchangé : **34** |

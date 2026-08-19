@@ -1,0 +1,144 @@
+AGENT 16 — contenu réel de `audit_logs` sur la base de travail `axion_crm`
+Relevé le 2026-08-19 vers 12:00 UTC.
+
+⚠️ AVERTISSEMENT DE TRAÇABILITÉ — ces mesures ne sont plus rejouables telles quelles :
+un agent parallèle de l'audit a relancé un `migrate:fresh` sur `axion_crm` entre 12:05 et
+12:20 UTC. À 12:25, `audit_logs` était momentanément absente, puis recréée VIDE
+(`SELECT count(*) FROM audit_logs` = 0). Le relevé ci-dessous est la transcription des
+sorties `psql` obtenues AVANT cette reconstruction. Les conclusions structurelles
+(cloisonnement, immuabilité, complétude) sont, elles, prouvées sur la base jetable
+`axion_crm_a16` — fichiers 01 et 02 de ce dossier — et rejouables.
+
+────────────────────────────────────────────────────────────────────────────
+COMMANDE
+  docker exec axion-crm-postgres psql -U axion -d axion_crm \
+    -c "SELECT 'ai_act_register' t, count(*) FROM ai_act_register
+        UNION ALL SELECT 'llm_usage', count(*) FROM llm_usage
+        UNION ALL SELECT 'llm_use_cases', count(*) FROM llm_use_cases
+        UNION ALL SELECT 'business_events', count(*) FROM business_events
+        UNION ALL SELECT 'audit_logs', count(*) FROM audit_logs;"
+
+SORTIE
+        t        | count
+ ----------------+-------
+  ai_act_register |     0
+  llm_usage       |     0
+  llm_use_cases   |     1
+  business_events |     0
+  audit_logs      |    80
+
+────────────────────────────────────────────────────────────────────────────
+COMMANDE
+  ... -c "SELECT event_type, count(*) FROM audit_logs GROUP BY 1 ORDER BY 2 DESC;"
+
+SORTIE
+  event_type | count
+ ------------+-------
+  POST       |    80
+
+→ Les 80 lignes du journal sont des POST. Aucun DELETE, aucun PUT, aucun
+  GDPR_ERASURE / GDPR_PURGE_* n'y figure.
+
+────────────────────────────────────────────────────────────────────────────
+COMMANDE
+  ... -c "SELECT path, status_code, count(*) FROM audit_logs
+          GROUP BY 1,2 ORDER BY 3 DESC LIMIT 25;"
+
+SORTIE
+               path               | status_code | count
+ ---------------------------------+-------------+-------
+  api/internal/site-sync          |         200 |    34
+  api/v1/auth/login               |         200 |    20
+  api/internal/site-sync          |         401 |     9
+  api/internal/site-sync          |         422 |     4
+  api/v1/auth/2fa/verify          |         200 |     3
+  api/internal/site-sync          |         503 |     2
+  api/v1/auth/onboarding/complete |         200 |     2
+  api/v1/auth/login               |         419 |     2
+  api/v1/audiences/preview        |         200 |     2
+  api/v1/auth/2fa/setup           |         500 |     1
+  api/v1/auth/login               |         422 |     1
+
+→ 11 chemins distincts pour tout le journal. Les échecs de connexion SONT captés
+  (login 422, login 419), mais uniquement par leur code HTTP.
+
+────────────────────────────────────────────────────────────────────────────
+COMMANDE
+  ... -c "SELECT count(*) FILTER (WHERE workspace_id IS NULL) AS sans_espace,
+                 count(*) FILTER (WHERE user_id IS NULL)      AS sans_acteur,
+                 count(*)                                     AS total
+          FROM audit_logs;"
+
+SORTIE
+  sans_espace | sans_acteur | total
+ -------------+-------------+-------
+           72 |          52 |    80
+
+→ 72 lignes sur 80 (90 %) ne portent AUCUN espace de travail.
+→ 52 lignes sur 80 (65 %) ne portent AUCUN acteur.
+
+────────────────────────────────────────────────────────────────────────────
+COMMANDE
+  ... -c "SELECT workspace_id, user_id, count(*) FROM audit_logs GROUP BY 1,2;"
+
+SORTIE
+              workspace_id             |               user_id                | count
+ --------------------------------------+--------------------------------------+-------
+                                       |                                      |    52
+                                       | 28e75728-8379-4004-a5c9-1ead18b7e0bc |    15
+  20cd81e4-de5d-4875-a759-07d64fe1f168 | 28e75728-8379-4004-a5c9-1ead18b7e0bc |     2
+  20cd81e4-de5d-4875-a759-07d64fe1f168 | ff845f78-5bbe-4b33-99e6-e487ab9fa8ff |     6
+                                       | ff845f78-5bbe-4b33-99e6-e487ab9fa8ff |     5
+ (5 rows)
+
+→ Seules 8 lignes sur 80 portent à la fois un espace et un acteur.
+
+────────────────────────────────────────────────────────────────────────────
+COMMANDE
+  ... -c "SELECT min(created_at), max(created_at) FROM audit_logs;"
+
+SORTIE
+           min           |          max
+  2026-08-17 05:32:50+00 | 2026-08-18 13:03:06+00
+
+→ Le journal ne couvre que 32 heures. Il a donc déjà été détruit/reconstruit
+  au moins une fois par un `migrate:fresh` — ce qu'un journal d'audit n'est,
+  par construction, pas censé pouvoir subir.
+
+────────────────────────────────────────────────────────────────────────────
+COMMANDE (état de la table `ai_act_register` sur `axion_crm`)
+  ... -c "\d ai_act_register" -c "SELECT count(*) FROM ai_act_register;"
+
+SORTIE (extrait)
+  Colonnes : id, workspace_id, system_name, purpose, risk_class, provider,
+             model, dpia_url, impact_assessment, created_at, updated_at
+  Contrainte : risk_class IN ('prohibited','high','limited','minimal')
+  Policies (forced row security enabled):
+      POLICY "ai_act_register_workspace_isolation" …
+  count = 0
+
+→ Le registre AI Act contient ZÉRO ligne, alors que l'espace `axion-ia`
+  (que `AiActRegisterSeeder` exige) existe bien :
+    ... -c "SELECT slug FROM workspaces;"  →  vivier-candidats, axion-ia
+→ La table N'A PAS les colonnes `responsible`, `status`, `last_review_at`
+  que l'écran `frontend/src/features/rgpd/AiActRegisterPage.tsx` affiche.
+
+────────────────────────────────────────────────────────────────────────────
+CONTRÔLE DE PRIVILÈGE — le rôle applicatif contourne toute RLS
+COMMANDE
+  ... -c "SELECT rolname, rolsuper, rolbypassrls FROM pg_roles WHERE rolname='axion';"
+SORTIE
+  rolname | rolsuper | rolbypassrls
+  axion   | t        | t
+
+  ... -c "grep -E '^DB_USERNAME' .env"  (dans axion-crm-api)  →  DB_USERNAME=axion
+
+→ L'application se connecte avec un rôle SUPERUSER porteur de BYPASSRLS :
+  aucune politique RLS, sur aucune table, ne s'applique à ses requêtes.
+
+────────────────────────────────────────────────────────────────────────────
+ÉTAT APRÈS LA RECONSTRUCTION PAR L'AGENT PARALLÈLE (2026-08-19 ~12:30 UTC)
+  audit_logs      = 0
+  ai_act_register = 0
+  llm_usage       = 0
+  business_events = 0

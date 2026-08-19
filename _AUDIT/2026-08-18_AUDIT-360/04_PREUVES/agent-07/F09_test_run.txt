@@ -1,0 +1,40 @@
+    836▕                 : QueryException::class;
+    837▕ 
+  ➜ 838▕             throw new $exceptionType(
+    839▕                 $this->getNameWithReadWriteType(),
+    840▕                 $query,
+    841▕                 $this->prepareBindings($bindings),
+    842▕                 $e,
+
+      [2m+9 vendor frames [22m
+  10  tests/Support/SemeurTablesScopees.php:206
+  11  tests/Support/SemeurTablesScopees.php:228
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\EtancheiteParTableTest > SANS con…  RuntimeException   
+  Semis impossible dans « linkedin_sequences » : SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "linkedin_sequences" does not exist
+LINE 1: insert into "linkedin_sequences" ("workspace_id", "name", "s...
+                    ^ (Connection: pgsql_owner, Host: postgres, Port: 5432, Database: axion_crm_test, SQL: insert into "linkedin_sequences" ("workspace_id", "name", "steps") values (f1f238b2-28c0-47b8-9283-b65828c17760, ZZ Séquence f1f238b2, [])) — corriger la charge utile dans SemeurTablesScopees::semer(), et surtout ne pas retirer la table du contrôle.
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+    834▕             $exceptionType = $this->isUniqueConstraintError($e)
+    835▕                 ? UniqueConstraintViolationException::class
+    836▕                 : QueryException::class;
+    837▕ 
+  ➜ 838▕             throw new $exceptionType(
+    839▕                 $this->getNameWithReadWriteType(),
+    840▕                 $query,
+    841▕                 $this->prepareBindings($bindings),
+    842▕                 $e,
+
+      [2m+8 vendor frames [22m
+  9   tests/Support/SemeurTablesScopees.php:194
+  10  tests/Support/SemeurTablesScopees.php:437
+
+
+  Tests:    4 failed, 7 passed (36 assertions)
+  Duration: 542.13s
+  Random Order Seed: 1787133023
+
+
+[exited with code 0]

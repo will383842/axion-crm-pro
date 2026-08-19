@@ -1,0 +1,40 @@
+=== D-04 : OwnerUserSeeder + tags src:site-formulaire-* ===
+ActivitesEtMotifsSeeder.php
+AiActRegisterSeeder.php
+AxionOfferTargetsSeeder.php
+CitiesLargeSeeder.php
+CountriesSeeder.php
+DatabaseSeeder.php
+DefaultAudiencesSeeder.php
+DemoAudiencesSeeder.php
+DemoCompaniesSeeder.php
+EffectifRangesSeeder.php
+FrenchRegionsSeeder.php
+GovernedTagsSeeder.php
+LegalFormsSeeder.php
+LlmUseCasesSeeder.php
+NafSectionsSeeder.php
+OwnerUserSeeder.php
+PermissionsAndRolesSeeder.php
+ScrapingSourcesSeeder.php
+SearchEnginesSeeder.php
+UserAgentsSeeder.php
+--- tags en base ---
+ src_site_formulaire | total_tags 
+---------------------+------------
+                   0 |          0
+(1 row)
+
+=== D-05 : runbook prod, restart vs up -d ===
+_REPORTS/RUNBOOK-CONSOLE-LOCALE.md:42:  up -d
+infra/php/opcache-local.ini:43:;   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --force-recreate api
+infra/runbooks/01-restart-workers.md:18:docker compose restart worker-google-maps worker-pages-jaunes worker-google-search
+infra/runbooks/03-site-down.md:36:docker compose up -d --force-recreate api caddy
+infra/runbooks/03-site-down.md:40:Activer la maintenance page via Caddy : `cp infra/caddy/Caddyfile.maintenance /etc/caddy/Caddyfile && docker compose restart caddy`.
+infra/runbooks/04-restore-dr.md:12:# Installer docker + restaurer infra : git clone + docker compose up -d
+infra/runbooks/04-restore-dr.md:24:docker compose restart postgres
+infra/runbooks/05-rotate-secrets.md:19:docker compose restart api horizon scheduler
+infra/runbooks/05-rotate-secrets.md:36:3. `docker compose restart api horizon` workers
+infra/scripts/bootstrap-preprod.sh:120:# ⚠️ Les services sont NOMMÉS explicitement. Un `up -d` global démarrerait aussi
+./infra/runbooks
+./_REPORTS/RUNBOOK-CONSOLE-LOCALE.md

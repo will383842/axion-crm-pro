@@ -1,0 +1,30 @@
+OPPOSITION VIVIER (opposition.ts:66)   univers=business garde-v2=non appelee (univers business)
+    tags=src:site-formulaire-autre
+unified-contact recrutement            univers=vivier   garde-v2=REJET 422 : Fiche candidat refusée : consentement v2 requis (careers-v2-2026-08-13 | memo-v2-2026-08-13 | vivier-stock-2026-08-14), reçu : v1-2026-05-24.
+    tags=src:site-formulaire-recrutement
+job-application careers-v2             univers=vivier   garde-v2=PASSE
+    tags=src:site-candidature-offre
+commercial memo-v2                     univers=vivier   garde-v2=PASSE
+    tags=src:site-candidature-commerciale
+vivier stock J+30                      univers=vivier   garde-v2=PASSE
+    tags=src:site-candidature-offre
+newsletter_optin                       univers=business garde-v2=non appelee (univers business)
+    tags=src:newsletter
+newsletter_optout (aucun consent)      univers=business garde-v2=non appelee (univers business)
+    tags=src:newsletter
+calendly_booked (aucun consent)        univers=business garde-v2=non appelee (univers business)
+    tags=src:calendly
+calendly_canceled                      univers=business garde-v2=non appelee (univers business)
+    tags=src:calendly
+chatbot (aucun consent)                univers=business garde-v2=non appelee (univers business)
+    tags=src:chatbot
+avis client                            univers=business garde-v2=non appelee (univers business)
+    tags=src:avis-client
+simulateur ROI                         univers=business garde-v2=non appelee (univers business)
+    tags=src:site-formulaire-simulateur-roi
+podcast                                univers=business garde-v2=non appelee (univers business)
+    tags=src:site-formulaire-podcast
+
+TEMOIN POSITIF — la garde v2 FORCEE sur l opposition vivier :
+  REJET : Fiche candidat refusée : consentement v2 requis (careers-v2-2026-08-13 | memo-v2-2026-08-13 | vivier-stock-2026-08-14), reçu : careers-v1-2026-06-09.
+  => le controle EST capable de rougir ; il n est simplement jamais atteint sur ce chemin.

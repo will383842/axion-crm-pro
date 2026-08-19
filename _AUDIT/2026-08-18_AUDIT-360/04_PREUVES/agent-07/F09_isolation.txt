@@ -1,0 +1,72 @@
+=== F9 : commentaire permissive si non defini ===
+backend/database/migrations/2026_07_04_000001_create_health_practitioners.php:51:        // RLS — même politique permissive-si-non-défini que les autres tables scoped.
+backend/database/migrations/2026_08_14_000001_harden_workspace_isolation.php:121:        // Retour à l'état antérieur : policy permissive + pas de FORCE.
+--- en base : commentaires de colonnes/tables contenant permissive ---
+ relname | description 
+---------+-------------
+(0 rows)
+
+=== tables avec workspace_id ===
+       table_name        
+-------------------------
+ activities
+ ai_act_register
+ analytics_attribution
+ analytics_cohorts
+ analytics_daily_rollups
+ analytics_funnels
+ analytics_kpis
+ audience_members
+ audit_logs
+ audit_logs_default
+ business_events
+ campaigns
+ candidate_tag
+ candidates
+ companies
+ company_tag
+ contacts
+ coverage_zones
+ crm_lost_reasons
+ crm_notes
+ crm_pipelines
+ crm_tasks
+ deals
+ dnc_lists
+ duplicate_flags
+ email_audiences
+ email_events
+ email_inboxes
+ email_sends
+ email_templates
+ email_threads
+ email_verification_logs
+ email_warmup_pools
+ health_practitioners
+ invitations
+ journalists
+ linkedin_accounts
+ linkedin_invitations
+ linkedin_messages
+ linkedin_profiles_cache
+ linkedin_sequences
+ llm_usage
+ llm_use_cases
+ media
+ notifications
+ pipeline_stages
+ proxy_providers_config
+ proxy_usage_log
+ rgpd_requests
+ rotations
+ saved_views
+ scraper_runs
+ scraping_campaigns
+ sessions
+ strategic_keywords
+ tags
+ unsubscribes
+ user_workspaces
+ web_vital_samples
+(59 rows)
+

@@ -1,0 +1,19 @@
+# Fichier VIDE — et c'est la preuve elle-même.
+#
+# Commande jouée :
+#   docker exec axion-crm-api php -d memory_limit=1G vendor/bin/pest \
+#     --configuration phpunit-ci.xml --testsuite Unit --colors=never
+#
+# Lancée le 2026-08-19 vers 12:24 comme seconde tentative après le SIGKILL (137)
+# de l'exécution complète. Pest bufferise sa sortie par fichier de test : rien
+# n'avait encore été écrit quand je l'ai ARRÊTÉE MOI-MÊME (kill du PID 115 dans
+# le conteneur), après avoir découvert par `ps aux` que trois AUTRES exécutions
+# Pest, lancées par d'autres agents de l'audit 360, tournaient au même instant
+# contre LA MÊME base axion_crm_test — plus deux `php artisan migrate --force`.
+#
+# `tests/bootstrap.php` épingle toutes les exécutions locales sur cette base
+# unique, et `RefreshDatabase` y émet `DROP TABLE ... CASCADE` : ma propre
+# exécution détruisait les mesures des autres autant qu'ils détruisaient la
+# mienne. C'est le constat H44-004.
+#
+# Voir concurrence-conteneur-api.txt pour le `ps aux` complet.

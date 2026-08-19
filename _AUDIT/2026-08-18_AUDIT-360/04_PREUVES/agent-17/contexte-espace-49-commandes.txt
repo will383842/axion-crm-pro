@@ -1,0 +1,51 @@
+# Contexte d'espace de travail — recensement des 49 commandes
+# (grep WorkspaceContext::run / --workspace / workspace_id dans chaque fichier)
+AnomalyDetect.php | workspace_id
+AnonymizeOldIps.php | RIEN
+AudiencesFullRefreshCommand.php | --workspace workspace_id
+AuditVerifyChain.php | RIEN
+BlacklistsCheck.php | RIEN
+CorrigerHorodatages.php | RIEN
+CoverageRefreshMatrix.php | RIEN
+CrmFlushOutbound.php | RIEN
+ExtractMediaFromCompanies.php | workspace_id
+GenerateMediaRedactionEmails.php | --workspace workspace_id
+ImportIgnAdminExpress.php | RIEN
+ImportMediaBlogs.php | --workspace workspace_id
+ImportMediaEmissionsFromWikidata.php | --workspace workspace_id
+ImportMediaFromArcom.php | --workspace workspace_id
+ImportMediaFromOpendatasoft.php | --workspace workspace_id
+ImportMediaPressKit.php | --workspace workspace_id
+ImportNaf.php | RIEN
+ImportRpps.php | --workspace workspace_id
+JournalistsScrapeOurs.php | workspace_id
+MediaBackfillPeriodicity.php | RIEN
+MediaCleanEmails.php | RIEN
+MediaEnrich.php | RIEN
+MediaFindWebsites.php | RIEN
+MediaLinkEmissionsToChannels.php | --workspace workspace_id
+MediaLinkToCompanies.php | workspace_id
+MediaScoreConfidence.php | RIEN
+MediaSyncEmissionsFromParent.php | RIEN
+MediaSyncFromCompanies.php | RIEN
+MediaTagEmissionsStatus.php | --workspace workspace_id
+PentestSelfCheck.php | RIEN
+ProspectionCollect.php | --workspace workspace_id
+ProspectionEnrich.php | WorkspaceContext --workspace workspace_id
+ProspectionFindWebsites.php | RIEN
+ProspectionPurgeNonCommercial.php | RIEN
+ProspectionPurgeNonDiffusible.php | RIEN
+ProspectionReclassifySector.php | RIEN
+ProspectionReclassifySize.php | RIEN
+ProspectionStats.php | workspace_id
+PruneScraperRuns.php | RIEN
+RescrapeArchivesCommand.php | --workspace workspace_id
+RetentionPurge.php | RIEN
+RetryGooglePlacesCommand.php | --workspace workspace_id
+RgpdPurgeBusinessProspects.php | WorkspaceContext workspace_id
+RgpdPurgeVivier.php | WorkspaceContext workspace_id
+ScoreEmailConfidence.php | RIEN
+ScrapingBackfillSrcTags.php | WorkspaceContext workspace_id
+ScrapingIngestFile.php | RIEN
+SignalsNightlyScan.php | RIEN
+StartScheduledCampaignsCommand.php | RIEN

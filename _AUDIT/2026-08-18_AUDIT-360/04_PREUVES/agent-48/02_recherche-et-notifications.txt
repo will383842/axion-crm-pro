@@ -1,0 +1,46 @@
+## 2. RECHERCHE GLOBALE : 200 avec une charge CODEE EN DUR, zero SQL
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class GlobalSearchController extends ApiController
+{
+    /**
+     * @OA\Get(path="/search", tags={"Workspace"}, summary="Recherche globale ⌘K (companies + contacts + tags)",
+     *     security={{"sanctumCookie":{}}},
+     *     @OA\Parameter(name="q", in="query", required=true, @OA\Schema(type="string", minLength=2)),
+     *     @OA\Response(response=200, description="Résultats groupés"))
+     */
+    public function index(Request $r): JsonResponse
+    {
+        return $this->ok(['companies' => [], 'contacts' => [], 'tags' => []]);
+    }
+}
+-- la route /search est declaree DEUX FOIS (fermeture inline l.100, puis controleur l.209) :
+99:        Route::get('/search', function (Request $request) {
+207:        Route::get('/search', [GlobalSearchController::class, 'index']);
+-- le SPA l'appelle bien (barre unique du 18.1) :
+15:  const [search, setSearch] = useState('');
+32:    queryKey: ['global-search', search],
+34:      if (search.length < 2) return { companies: [], contacts: [], tags: [] };
+35:      return (await api.get<SearchResults>(`/search?q=${encodeURIComponent(search)}`)).data;
+37:    enabled: open && search.length >= 2,
+TEMOIN NEGATIF : un controleur qui interroge VRAIMENT sa table, meme fichier de routes
+1
+(ContactsHubController : occurrences de requetes reelles ci-dessus ; GlobalSearchController : )
+0
+
+## 3. NOTIFICATIONS : 0 ecrivain, 0 lecteur, 3 suppresseurs
+backend/app/Console/Commands/RetentionPurge.php:31:                "DELETE FROM notifications WHERE created_at < now() - INTERVAL '90 days'",
+backend/app/Services/Rgpd/GdprErasureService.php:32:            $deleted['notifications'] = DB::table('notifications')->whereRaw('body ILIKE ?', ['%' . $email . '%'])->delete();
+-- le controleur rend une liste vide en dur, les 2 autres verbes 501 :
+15:    public function index(Request $r): JsonResponse { return $this->ok(['data' => []]); }
+23:    public function markRead(int $n): JsonResponse { return $this->notImplemented('10'); }
+30:    public function markAllRead(): JsonResponse { return $this->notImplemented('10'); }
+-- Telegram cote CRM : 2 occurrences, toutes deux des COMMENTAIRES
+backend/app/Console/Commands/AnomalyDetect.php:14: * Si anomalie détectée → notification Telegram + audit_log.
+backend/app/Console/Commands/AnomalyDetect.php:66:        // Sprint 11 : send TelegramAlert::dispatch($anomalies);
+backend/app/Console/Commands/AuditVerifyChain.php:25:        // En prod : envoi Slack/Telegram + ouverture incident.

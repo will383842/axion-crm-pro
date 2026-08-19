@@ -1,0 +1,10 @@
+﻿2026-08-19T09:42:59.5648430Z ##[group]Run pnpm build
+2026-08-19T09:42:59.5648955Z [36;1mpnpm build[0m
+2026-08-19T09:42:59.5689378Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:42:59.5689644Z env:
+2026-08-19T09:42:59.5689905Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-19T09:42:59.5690231Z ##[endgroup]
+2026-08-19T09:42:59.9504900Z 
+2026-08-19T09:42:59.9506072Z > @axion-ia/axion-crm-pro-workers@0.1.0 build /home/runner/work/axion-crm-pro/axion-crm-pro/workers
+2026-08-19T09:42:59.9507033Z > tsc -p tsconfig.build.json
+2026-08-19T09:42:59.9507310Z 

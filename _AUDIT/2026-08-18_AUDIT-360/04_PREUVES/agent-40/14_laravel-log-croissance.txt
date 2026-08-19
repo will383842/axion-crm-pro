@@ -1,0 +1,13 @@
+taille = 267083835 octets
+--- derniers 30 Mo : minutes couvertes ---
+[2026-08-19 04:39
+[2026-08-19 04:40
+[2026-08-19 04:41
+[2026-08-19 12:40
+[2026-08-19 12:41
+[2026-08-19 12:42
+nb minutes distinctes = 484
+--- premiere ligne du fichier ---
+[2026-08-16 13:34:28] production.ERROR: could not find driver (Connection: mysql, Host: 127.0.0.1, Port: 3306, Database: laravel, SQL: insert into `telescope_entries` (`batch_id`, `content`, `created_
+--- nb d entrees ERROR sur les 30 derniers Mo ---
+2824

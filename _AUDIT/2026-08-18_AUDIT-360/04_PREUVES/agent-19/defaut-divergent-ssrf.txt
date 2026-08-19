@@ -1,0 +1,7 @@
+=== Divergence de defaut sur la MEME variable SSRF_GUARD_DENY_PRIVATE ===
+SsrfGuard.php:41            -> env("SSRF_GUARD_DENY_PRIVATE", true)
+PentestSelfCheck.php:71     -> env("SSRF_GUARD_DENY_PRIVATE", false)
+
+(variable ABSENTE)   | garde active = oui   | auto-controle dit active = non   | *** INCOHERENT ***
+"true"               | garde active = oui   | auto-controle dit active = oui   | coherent
+"false"              | garde active = non   | auto-controle dit active = non   | coherent

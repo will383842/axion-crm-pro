@@ -1,0 +1,6 @@
+=== FS non appliquees ===
+2026_08_18_000001_backfill_empreintes_oppositions
+2026_08_18_100001_partman_dans_son_propre_schema
+2026_08_19_000001_companies_hub_counts_index
+2026_08_19_000002_crm_activites_et_motifs
+=== base sans fichier ===

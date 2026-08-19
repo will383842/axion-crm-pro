@@ -1,0 +1,9 @@
+=== roles ===
+                             List of roles
+ Role name |                         Attributes                         
+-----------+------------------------------------------------------------
+ axion     | Superuser, Create role, Create DB, Replication, Bypass RLS
+ axion_app | 
+
+=== migration qui pose email_verif_workspace_isolation ===
+backend/database/migrations/2026_05_19_000001_create_email_verification_logs.php:57:            CREATE POLICY email_verif_workspace_isolation

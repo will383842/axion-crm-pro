@@ -1,0 +1,86 @@
+=== F14-a : capturer-lead.ts, en-tete + stockage ===
+// Tool `capturer_lead` (T-17, ADR-CB-09) — crée un Submission, IDEMPOTENT.
+//
+// Consentement RGPD explicite REQUIS. Idempotence via chat_action_idempotency
+// (cle = sha256(conversationId + "capturer_lead" + payload)) → un retry ne crée
+// jamais de doublon. Le lead porte `source = "chatbot"` (D-LEAD-SOURCE, T-01) →
+// filtrable en console admin.
+
+import { createHash } from "node:crypto";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
+import { syncFormSubmissionToCrm } from "@/server/crm-sync";
+import { sendTelegram } from "@/lib/telegram";
+import { enqueueEmail } from "@/server/queue/queues";
+import { Prisma } from "../../../../prisma/generated/client";
+import type { ToolContext } from "@/server/chatbot/tools/rechercher-offres";
+import { hashEmailForLookup } from "@/lib/security/email-hash";
+import { encryptPii } from "@/lib/pii-crypto";
+
+/**
+ * Notifie l'équipe d'un NOUVEAU lead chatbot (best-effort, fail-soft — ne fait
+ * jamais échouer la capture). Même canal que l'escalade (Telegram via le hub
+ * notify()). No-op silencieux si Telegram non configuré (pas de token).
+ */
+async function notifyNewLead(input: CapturerLeadInput, submissionId: string): Promise<void> {
+  const body = [
+    "🟢 Nouveau lead chatbot",
+    `Nom : ${input.nom}`,
+    `Email : ${input.email}`,
+    input.telephone ? `Tél : ${input.telephone}` : null,
+    input.structure ? `Structure : ${input.structure}` : null,
+    `Besoin : ${input.besoin_resume}`,
+    `Submission #${submissionId}`,
+  ]
+    .filter((l): l is string => l !== null)
+    .join("\n");
+  try {
+    await sendTelegram({ tag: "CONTACT", body, silent: false });
+  } catch (err) {
+    console.warn("[capturer_lead] notification Telegram échouée:", err);
+  }
+}
+
+export const CapturerLeadInputSchema = z
+  .object({
+    nom: z.string().min(1).max(255),
+    email: z.string().email(),
+    telephone: z.string().max(30).optional(),
+    structure: z.string().max(255).optional(),
+    besoin_resume: z.string().min(1).max(2000),
+    /** Consentement RGPD explicite — DOIT être true. */
+    consentement_rgpd: z.literal(true),
+  })
+  .strict();
+
+export type CapturerLeadInput = z.infer<typeof CapturerLeadInputSchema>;
+
+export interface CapturerLeadResult {
+  readonly submissionId: string;
+  /** true si le lead existait déjà (retry idempotent, pas de doublon créé). */
+  readonly idempotent: boolean;
+...
+8:import { createHash } from "node:crypto";
+10:import { prisma } from "@/lib/prisma";
+14:import { Prisma } from "../../../../prisma/generated/client";
+16:import { hashEmailForLookup } from "@/lib/security/email-hash";
+17:import { encryptPii } from "@/lib/pii-crypto";
+28:    `Email : ${input.email}`,
+46:    email: z.string().email(),
+67:    email: input.email.toLowerCase(),
+70:  return createHash("sha256")
+99:  // concurrence — un `create` (pas `upsert`) sur cle conflicte (P2002) si une
+106:    result = await prisma.$transaction(async (tx) => {
+110:      // unifié chiffre depuis 2026-07-01 et que `contact_name` / `contact_phone`
+114:      //  · `encryptPii` est IDEMPOTENT et NO-OP sans `PII_ENCRYPTION_KEY` — les
+120:      //    du chiffrement est aléatoire, donc aucune égalité SQL n'est possible
+121:      //    sur `contact_email`.
+122:      const submission = await tx.submission.create({
+127:          contactName: encryptPii(input.nom),
+128:          contactEmail: encryptPii(input.email),
+129:          contactEmailHash: hashEmailForLookup(input.email),
+130:          ...(input.telephone ? { contactPhone: encryptPii(input.telephone) } : {}),
+138:      await tx.chatActionIdempotency.create({
+161:        person: { email: input.email, fullName: input.nom, phone: input.telephone ?? null },
+191:      await enqueueEmail("chatbot-demande-transmise", input.email, "fr", {
+204:  const existing = await prisma.chatActionIdempotency.findUnique({ where: { cle: key } });

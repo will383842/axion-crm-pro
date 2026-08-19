@@ -1,0 +1,29 @@
+=== zz-docker.conf (ce que php-fpm ecouterait) ===
+[global]
+daemonize = no
+
+; the [www] ini section below is for backwards compatibility and will be removed in 8.6+
+[www]
+
+=== reglages pm de www.conf (non commentes) ===
+user = www-data
+group = www-data
+pm = dynamic
+pm.max_children = 5
+pm.start_servers = 2
+pm.min_spare_servers = 1
+pm.max_spare_servers = 3
+
+=== CMD par defaut de l image de base php:8.3-fpm-alpine ===
+cli
+
+=== /var/www/html est-il ecrivable par www-data ? (1777) ===
+RACINE_ECRIVABLE
+
+=== PHP_CLI_SERVER_WORKERS est-il supporte par ce binaire ? (fork dispo) ===
+pcntl_fork disponible
+
+=== meme mesure sur la preproduction ===
+PID   USER     TIME  COMMAND
+    1 www-data  0:00 php -S 0.0.0.0:80 -t public
+  589 www-data  0:00 ps -ef

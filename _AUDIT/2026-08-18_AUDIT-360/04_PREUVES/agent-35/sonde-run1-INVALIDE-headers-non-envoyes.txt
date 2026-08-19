@@ -1,0 +1,49 @@
+PHPUnit 11.5.50 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.3.32
+Configuration: /tmp/a35/phpunit-a35.xml
+
+
+===== [1] A-001 : etendue exacte du 500-au-lieu-de-401 =====
+APP_ENV=local  APP_DEBUG=false
+routes nommees dans l app : l5-swagger.default.api, l5-swagger.default.docs, l5-swagger.default.asset, l5-swagger.default.oauth2_callback, horizon.stats.index, horizon.workload.index, horizon.masters.index, horizon.monitoring.index, horizon.monitoring.store, horizon.monitoring-tag.paginate, horizon.monitoring-tag.destroy, horizon.jobs-metrics.index, horizon.jobs-metrics.show, horizon.queues-metrics.index, horizon.queues-metrics.show, horizon.jobs-batches.index, horizon.jobs-batches.show, horizon.jobs-batches.retry, horizon.pending-jobs.index, horizon.completed-jobs.index, horizon.silenced-jobs.index, horizon.failed-jobs.index, horizon.failed-jobs.show, horizon.retry-jobs.show, horizon.jobs.show, horizon.index, sanctum.csrf-cookie, saved-views.index, saved-views.store, saved-views.show, saved-views.update, saved-views.destroy, internal.scraper-result, internal.site-sync, internal.site-sync.gdpr, internal.email.zeptomail, storage.local, storage.local.upload
+route('login') existe ? NON
+route                                   aucun Accep navig Accep XHR ( 
+   colonne 1 = aucun en-tete Accept
+   colonne 2 = Accept: */* (curl)
+   colonne 3 = navigateur (text/html)
+   colonne 4 = Accept: application/json
+   colonne 5 = XHR (SPA axios)
+GET /api/v1/auth/me                     500   500   500   500   500   
+POST /api/v1/auth/logout                500   500   500   500   500   
+POST /api/v1/auth/onboarding/complete   500   500   500   500   500   
+POST /api/v1/auth/2fa/setup             500   500   500   500   500   
+POST /api/v1/auth/2fa/confirm           500   500   500   500   500   
+GET /api/v1/contacts                    500   500   500   500   500   
+GET /api/v1/saved-views                 500   500   500   500   500   
+GET /api/v1/users                       500   500   500   500   500   
+exception levee = Symfony\Component\Routing\Exception\RouteNotFoundException :: Route [login] not defined.
+corps 500 (200 premiers octets) = <!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <title>Server Error</title>
+
+        <s
+.
+===== [2] Correctif propose : shouldRenderJsonWhen sur api/* =====
+AVANT correctif : GET /api/v1/auth/me (Accept: text/html) => 500
+E
+===== [3] Sessions : duree, revocation, jeton d API =====
+session.lifetime = 120 min | expire_on_close=false | driver=redis | encrypt=true | http_only=true | same_site=lax | secure=false
+sanctum.expiration = NULL (null = jeton d API SANS expiration)
+sanctum.middleware = authenticate_session, encrypt_cookies, validate_csrf_token
+login => 419 requires_2fa=NULL
+  cookies poses = a35_session(httpOnly=true,secure=false,sameSite=lax,expire=2026-08-19T15:27:46+02:00)
+  lignes en table sessions = 0
+  /auth/me en REJOUANT le cookie (garde videe) => 401
+  logout => 419
+  /auth/me apres logout (cookie de la reponse) => 401
+  lignes en table sessions apres logout = 0

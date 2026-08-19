@@ -1,0 +1,17 @@
+##### TLS (edge) api.axion-crm-pro.com
+  tlsv1.0   curl: unknown --write-out variable: 'ssl_cipher'
+  tlsv1.1   curl: unknown --write-out variable: 'ssl_cipher'
+  tlsv1.2   curl: unknown --write-out variable: 'ssl_cipher'
+  tlsv1.3   curl: unknown --write-out variable: 'ssl_cipher'
+##### TLS (edge) staging-api.axion-crm-pro.com
+  tlsv1.0   curl: unknown --write-out variable: 'ssl_cipher'
+  tlsv1.1   curl: unknown --write-out variable: 'ssl_cipher'
+  tlsv1.2   curl: unknown --write-out variable: 'ssl_cipher'
+  tlsv1.3   curl: unknown --write-out variable: 'ssl_cipher'
+
+##### ORIGINE DIRECTE 46.62.248.239 (contournement Cloudflare)
+  api.axion-crm-pro.com            curl: unknown --write-out variable: 'ssl_cipher'
+  app.axion-crm-pro.com            curl: unknown --write-out variable: 'ssl_cipher'
+  staging-api.axion-crm-pro.com    curl: unknown --write-out variable: 'ssl_cipher'
+  http/80 direct:
+    http=308 redirect=https://api.axion-crm-pro.com/up

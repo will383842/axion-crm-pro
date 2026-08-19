@@ -1,0 +1,31 @@
+=== php-fpm est-il dans l image de production ? ===
+/usr/local/sbin/php-fpm
+-rwxr-xr-x    1 root     root      20991352 Jul 30 22:54 /usr/local/sbin/php-fpm
+PHP 8.3.33 (fpm-fcgi) (built: Jul 30 2026 22:53:33)
+Copyright (c) The PHP Group
+Zend Engine v4.3.33, Copyright (c) Zend Technologies
+
+=== configuration php-fpm presente ? ===
+-rw-r--r--    1 root     root          5356 Jul 30 22:54 /usr/local/etc/php-fpm.conf
+
+/usr/local/etc/php-fpm.d/:
+total 56
+-rw-r--r--    1 root     root           518 Jul 30 22:54 docker.conf
+-rw-r--r--    1 root     root         22097 Jul 30 22:54 www.conf
+-rw-r--r--    1 root     root         22096 Jul 30 22:54 www.conf.default
+-rw-r--r--    1 root     root           120 Jul 30 22:54 zz-docker.conf
+
+=== le port 9000 est-il ECOUTE ou seulement EXPOSE ? ===
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       
+tcp        0      0 127.0.0.11:42057        0.0.0.0:*               LISTEN      
+tcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN      
+
+=== systeme de fichiers en lecture seule ? ===
+ReadonlyRootfs = false | User = www-data
+touch: /var/www/html/public/a40-test: Permission denied
+ECRITURE_REFUSEE
+STORAGE_ECRIVABLE
+uid=82(www-data) gid=82(www-data) groups=82(www-data)
+drwxrwxrwt    1 www-data www-data      4096 Aug 19 08:39 /var/www/html
+drwxr-xr-x    2 root     root          4096 Aug 19 08:40 /var/www/html/public

@@ -1,0 +1,64 @@
+########## PRODUCTION — projet axion-crm-pro
+=== commandes du processus 1 des conteneurs de « axion-crm-pro » ===
+  axion-crm-api                    :: php -S 0.0.0.0:80 -t public 
+      🔴 php -S SANS PHP_CLI_SERVER_WORKERS — une requête à la fois
+  axion-crm-scheduler              :: php artisan schedule:work 
+  axion-crm-horizon                :: php artisan horizon 
+  axion-crm-app                    :: caddy run --config /etc/caddy/Caddyfile --adapter caddyfile 
+  axion-crm-caddy                  :: caddy run --config /etc/caddy/Caddyfile --adapter caddyfile 
+  axion-crm-postgres               :: postgres 
+  axion-crm-redis                  :: redis-server *:6379                                                                           
+
+Conteneurs qui servent HTTP : axion-crm-api axion-crm-app axion-crm-caddy
+
+ÉCHEC : ces conteneurs servent HTTP par le serveur de développement de PHP : axion-crm-api
+
+  « php -S » traite UNE requête à la fois (sauf PHP_CLI_SERVER_WORKERS).
+  Mesuré sur la production le 2026-08-19 : 50 requêtes simultanées sur
+  /up → 1,075 s au total, 0,882 s de latence maximale, contre 0,018 s
+  pour la même requête seule. Constat A-010.
+
+  Correctif de fond — php-fpm est DÉJÀ dans l'image (/usr/local/sbin/php-fpm,
+  PHP 8.3.33 fpm-fcgi), il n'est simplement jamais lancé :
+    · Dockerfile.laravel, cible prod : CMD ["php-fpm"]
+    · php-fpm.d : listen = 0.0.0.0:9000 et pm.max_children ≥ 20
+      (le défaut de l'image est 5 : insuffisant pour dix sessions)
+    · Caddyfile : reverse_proxy api:9000 { transport fastcgi { root /var/www/html/public } }
+    · le healthcheck curl http://localhost/up doit devenir un test fastcgi
+
+  Repli immédiat, sans reconstruire l'image : poser
+  PHP_CLI_SERVER_WORKERS=8 dans l'environnement du service, puis
+  « up -d --force-recreate » (PAS « restart » : il ne relit pas env_file).
+exit=1
+
+########## PREPRODUCTION — projet axion-crm-staging
+=== commandes du processus 1 des conteneurs de « axion-crm-staging » ===
+  axion-crm-staging-scheduler      :: php artisan schedule:work 
+  axion-crm-staging-api            :: php -S 0.0.0.0:80 -t public 
+      🔴 php -S SANS PHP_CLI_SERVER_WORKERS — une requête à la fois
+  axion-crm-staging-horizon        :: php artisan horizon 
+  axion-crm-staging-app            :: caddy run --config /etc/caddy/Caddyfile --adapter caddyfile 
+  axion-crm-staging-redis          :: redis-server *:6379                                                                           
+  axion-crm-staging-postgres       :: postgres 
+
+Conteneurs qui servent HTTP : axion-crm-staging-api axion-crm-staging-app
+
+ÉCHEC : ces conteneurs servent HTTP par le serveur de développement de PHP : axion-crm-staging-api
+
+  « php -S » traite UNE requête à la fois (sauf PHP_CLI_SERVER_WORKERS).
+  Mesuré sur la production le 2026-08-19 : 50 requêtes simultanées sur
+  /up → 1,075 s au total, 0,882 s de latence maximale, contre 0,018 s
+  pour la même requête seule. Constat A-010.
+
+  Correctif de fond — php-fpm est DÉJÀ dans l'image (/usr/local/sbin/php-fpm,
+  PHP 8.3.33 fpm-fcgi), il n'est simplement jamais lancé :
+    · Dockerfile.laravel, cible prod : CMD ["php-fpm"]
+    · php-fpm.d : listen = 0.0.0.0:9000 et pm.max_children ≥ 20
+      (le défaut de l'image est 5 : insuffisant pour dix sessions)
+    · Caddyfile : reverse_proxy api:9000 { transport fastcgi { root /var/www/html/public } }
+    · le healthcheck curl http://localhost/up doit devenir un test fastcgi
+
+  Repli immédiat, sans reconstruire l'image : poser
+  PHP_CLI_SERVER_WORKERS=8 dans l'environnement du service, puis
+  « up -d --force-recreate » (PAS « restart » : il ne relit pas env_file).
+exit=1

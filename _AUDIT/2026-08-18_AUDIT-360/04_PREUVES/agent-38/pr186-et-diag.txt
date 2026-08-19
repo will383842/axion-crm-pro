@@ -1,0 +1,14 @@
+=== PR #186 : fusionnee malgre Security rouge ? ===
+{"head":"docs/cnil-decision","merge":"c0c453d3575bdd7d92f14760f1cfa80bb4399b79","mergedAt":"2026-08-19T09:15:13Z","number":186,"state":"MERGED","title":"docs(cnil): les deux decisions du dirigeant, prises le 2026-08-19"}
+run Security de cette branche : 32236507006 = failure (Trivy worker)
+
+=== .trivyignore.yaml ? ===
+-rw-r--r-- 1 willi 197609 4545 Aug 16 18:51 .trivyignore.yaml
+
+=== diag-website-status : COMPOSE_FILE ? ===
+0
+(0 = la pile de prod serait recreee depuis docker-compose.yml SEUL)
+
+=== docker-compose.yml : ports postgres/redis ===
+23:      - "55432:5432"
+44:      - "56379:6379"

@@ -1,0 +1,25 @@
+=== D-01 : repertoires worktree axionia ===
+/c/Users/willi/Documents/Projets/verif-e2e.txt
+/c/Users/willi/Documents/Projets/verif-e2e-finLaravel Framework 12.62.0
+ments/Projets/verif-e2e-final2.txt
+/c/Users/willi/Documents/Projets/verif-e2e-final3.txt
+=== D-03 : telescope ===
+ existe 
+--------
+ 
+(1 row)
+
+=== D-06 ===
+-rw-r--r-- 1 willi 197609 6426 Aug 17 13:27 .env
+-rw-r--r-- 1 willi 197609 7345 Aug 14 06:06 backend/.env
+=== D-10 ===
+owner-initial-password.txt
+=== D-10/D-12 dans le runbook ===
+9:> 2FA, tous les écrans v2 ouverts, sans `NODE_TLS_REJECT_UNAUTHORIZED=0` ».
+215:$g = new \PragmaRX\Google2FA\Google2FA();
+285:  (`EnforceFirstLoginSetup`) répond **403 `first_login_required`** sur toute
+425:## 7 bis. Vérifier connexion + 2FA en HTTP nu (utile pour trier une panne)
+455:CODE=$(docker exec axion-crm-api php artisan tinker --execute='$u=\App\Models\User::where("email","console-locale@axion-ia.test")->first(); echo (new \PragmaRX\Google2FA\Google2FA())->getCurrentOtp($u->totp_secret);' | tr -d '\r\n')
+500:| — | Connexion (formulaire rempli, renvoi vers 2FA) | `/login` | `00a-login-vers-2fa.png` |
+501:| — | 2FA validée, session ouverte | `/2fa` | `00b-2fa-valide.png` |
+592:### 9.2 🔴 L'enrôlement 2FA par l'interface est mort — il écrit trois colonnes qui n'existent pas

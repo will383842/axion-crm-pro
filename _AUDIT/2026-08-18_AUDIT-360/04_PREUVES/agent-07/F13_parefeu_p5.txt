@@ -1,0 +1,20 @@
+=== F13 : le §5 est-il rempli ? ===
+## 5. CONSTAT MESURÉ — *(VIDE : aucune mesure n'a été faite)*
+
+```
+(à remplir par Will après exécution du §4)
+
+Date de la mesure   :
+Serveur             :
+4.1 ufw status verbose         → [coller]
+4.2 fail2ban-client status     → [coller]
+4.3 ss -tlnp                   → [coller]
+4.4 nc depuis l'extérieur      → [coller]
+4.5 pare-feu Hetzner Cloud     → [oui / non / appliqué à quelles ressources]
+```
+
+---
+
+## 6. Entrée de runbook
+=== mention ufw/fail2ban ailleurs (post 18/08) ===
+_REPORTS/2026-08-18_ETAT-PARE-FEU.md

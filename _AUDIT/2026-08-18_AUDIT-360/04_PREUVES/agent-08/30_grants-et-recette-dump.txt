@@ -1,0 +1,23 @@
+=== La recette de sauvegarde emporte-t-elle les GRANT du role applicatif ? ===
+--- options de pg_dump utilisees en production ---
+97:    docker exec "$DB_CONTAINER" pg_dump \
+98-        -U "$DB_USER" \
+99-        -Fp \
+100-        --no-owner \
+101-        --no-acl \
+102-        --clean \
+103-        --if-exists \
+104-        "$DB_NAME"
+105-} | gzip -9 > "$BACKUP_DIR/$BACKUP_FILE"
+106-
+107-# --- Vérif taille ---
+108-SIZE=$(stat -c%s "$BACKUP_DIR/$BACKUP_FILE")
+109-log "Dump produced: $BACKUP_FILE ($SIZE bytes)"
+
+--- le role axion_app existe-t-il dans le cluster LOCAL ? ---
+axion_app
+
+--- PRODUCTION : les GRANT que axion_app possede aujourd'hui ---
+companies SELECT=true
+companies INSERT=true
+contacts SELECT=true

@@ -1,0 +1,29 @@
+=== 1. Un collecteur lit-il le robots.txt d'un site cible ? ===
+-- recherche 'robots' dans backend/app, workers/src, manifests de dependances --
+(AUCUN RESULTAT)
+
+-- TEMOIN NEGATIF : la meme recherche SAIT trouver 'robots' ailleurs --
+./frontend/dist/robots.txt
+./frontend/public/robots.txt
+10:    <meta name="robots" content="noindex,nofollow" />
+
+=== 2. User-Agent envoyes vers l'exterieur ===
+backend/app/Console/Commands/ImportMediaEmissionsFromWikidata.php:46:    private const USER_AGENT = 'AxionCRM/1.0 (contact@axion-ia.com)';
+backend/app/Console/Commands/ImportMediaEmissionsFromWikidata.php:163:                'User-Agent' => self::USER_AGENT,
+backend/app/Console/Commands/MediaTagEmissionsStatus.php:41:    private const USER_AGENT = 'AxionCRM/1.0 (contact@axion-ia.com)';
+backend/app/Console/Commands/MediaTagEmissionsStatus.php:168:                'User-Agent' => self::USER_AGENT,
+backend/app/Services/Auth/HibpChecker.php:38:                'User-Agent' => 'Axion-CRM-Pro/1.0 (security@axion-crm-pro.com)',
+backend/app/Services/Domain/DomainFinderService.php:42:    private const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+backend/app/Services/Domain/DomainFinderService.php:204:                        ->withHeaders(['User-Agent' => self::USER_AGENT])
+backend/app/Services/Domain/DomainFinderService.php:271:                        ->withHeaders(['User-Agent' => self::USER_AGENT])
+backend/app/Services/Domain/DomainFinderService.php:300:                ->withHeaders(['User-Agent' => self::USER_AGENT])
+backend/app/Services/Domain/DomainFinderService.php:443:                    'User-Agent' => self::USER_AGENT,
+backend/app/Services/Legal/MentionsLegalesScraperService.php:253:                            'User-Agent' => $ua,
+backend/app/Services/Legal/MentionsLegalesScraperService.php:303:                    'User-Agent' => $ua,
+workers/src/browser/launcher.ts:46:    userAgent:
+workers/src/scrapers/direction-finder.playwright.ts:32:      userAgent: req.user_agent,
+workers/src/scrapers/google-maps.playwright.ts:12:      userAgent: req.user_agent,
+workers/src/scrapers/google-search.playwright.ts:16:      userAgent: req.user_agent,
+workers/src/scrapers/http-source.ts:79:      'User-Agent': 'Axion-CRM-Pro/1.0 (+https://axion-crm-pro.com)',
+workers/src/scrapers/pages-jaunes.playwright.ts:12:      userAgent: req.user_agent,
+workers/src/scrapers/website.playwright.ts:16:      userAgent: req.user_agent,

@@ -1,0 +1,21 @@
+﻿2026-08-19T09:42:54.4668826Z ##[group]Run set -euo pipefail
+2026-08-19T09:42:54.4669208Z [36;1mset -euo pipefail[0m
+2026-08-19T09:42:54.4669509Z [36;1mmkdir -p backend/bootstrap/cache \[0m
+2026-08-19T09:42:54.4669856Z [36;1m         backend/storage/app/private \[0m
+2026-08-19T09:42:54.4670195Z [36;1m         backend/storage/framework/cache/data \[0m
+2026-08-19T09:42:54.4670548Z [36;1m         backend/storage/framework/sessions \[0m
+2026-08-19T09:42:54.4670885Z [36;1m         backend/storage/framework/testing \[0m
+2026-08-19T09:42:54.4671214Z [36;1m         backend/storage/framework/views \[0m
+2026-08-19T09:42:54.4671520Z [36;1m         backend/storage/logs[0m
+2026-08-19T09:42:54.4672455Z [36;1m# Laravel lit `.env` au démarrage : sans lui, chaque test émet un[0m
+2026-08-19T09:42:54.4672977Z [36;1m# warning `file_get_contents(.env)` et `failOnWarning="true"`[0m
+2026-08-19T09:42:54.4673478Z [36;1m# (phpunit.xml) transforme la suite entière en échec. Les valeurs[0m
+2026-08-19T09:42:54.4674031Z [36;1m# utiles sont de toute façon écrasées par phpunit.xml et par l'env du[0m
+2026-08-19T09:42:54.4674556Z [36;1m# job (l'env réel a la priorité sur le fichier).[0m
+2026-08-19T09:42:54.4674893Z [36;1mcp .env.example backend/.env[0m
+2026-08-19T09:42:54.4719593Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:42:54.4719879Z env:
+2026-08-19T09:42:54.4720106Z   COMPOSER_PROCESS_TIMEOUT: 0
+2026-08-19T09:42:54.4720389Z   COMPOSER_NO_INTERACTION: 1
+2026-08-19T09:42:54.4720635Z   COMPOSER_NO_AUDIT: 1
+2026-08-19T09:42:54.4720861Z ##[endgroup]

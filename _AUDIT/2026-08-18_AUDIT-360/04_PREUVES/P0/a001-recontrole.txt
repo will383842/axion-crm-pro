@@ -1,0 +1,13 @@
+### Re-mesure de A-001 apres contestation de l'agent 13 — 2026-08-19T10:53:59Z
+L'agent 13 obtient un 401 PROPRE sur /api/v1/crm/arbitrage, en processus (sans Caddy).
+Question : le 500 depend-il de la route, de l'en-tete Accept, ou du chemin HTTP ?
+
+--- A. PRODUCTION, par HTTPS, sans en-tete Accept ---
+  /api/v1/crm/arbitrage            -> 500
+  /api/v1/config/features          -> 500
+  /api/v1/contacts                 -> 500
+
+--- B. PRODUCTION, par HTTPS, AVEC Accept: application/json ---
+  /api/v1/crm/arbitrage            -> 401
+  /api/v1/config/features          -> 401
+  /api/v1/contacts                 -> 401

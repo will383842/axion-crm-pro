@@ -1,0 +1,23 @@
+=== CRITERE 18 : pourquoi il n'est pas mesurable sur les donnees reelles du site ===
+Wed, Aug 19, 2026  1:16:59 PM
+
+--- 1. drapeaux de la synchro dans l'environnement local du site ---
+$ grep -c "^CRM_SYNC" .env.local .env.dev
+.env.local:0
+.env.dev:0
+(0 partout : CRM_SYNC_ENABLED absent => enqueueCrmSyncEvent() rend null, l'outbox est vide PAR CONSTRUCTION)
+
+--- 2. la base de developpement du site n'existe plus ---
+$ docker ps -a | grep axion-ia-postgres
+axion-ia-postgres	Exited (127) 3 weeks ago
+
+--- 3. le port 5433 est pris par un AUTRE service (l'authentification echoue) ---
+psql: error: connection to server at "host.docker.internal" (192.168.65.254), port 5433 failed: FATAL:  password authentication failed for user "axion_ia"
+
+--- 4. TEMOIN NEGATIF : la MEME methode fonctionne contre une base qui existe ---
+$ docker exec axion-crm-postgres psql -U axion -d axion_crm -c "select count(*) from migrations;"
+ migrations 
+------------
+         58
+(1 row)
+

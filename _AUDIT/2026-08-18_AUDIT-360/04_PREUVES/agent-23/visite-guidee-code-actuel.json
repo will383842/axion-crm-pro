@@ -1,0 +1,80 @@
+[
+  {
+    "i": 0,
+    "texte": "Bienvenue dans Axion CRM Pro 👋 On va vous montrer en 30 secondes l'essentiel de l'interface. Vous pouvez quitter à tout moment via la croix. Passer Next (Step ",
+    "spotlight": null,
+    "sousLeProjecteur": null
+  },
+  {
+    "i": 1,
+    "texte": "La barre latérale suit votre journée : Aujourd'hui, Contacts, Collecte, Pilotage, Conformité, Réglages. Un mot par notion, toujours au même endroit. Passer Préc",
+    "spotlight": {
+      "x": -10,
+      "y": -10,
+      "width": 280,
+      "height": 920
+    },
+    "sousLeProjecteur": {
+      "tag": "DIV",
+      "texte": ""
+    }
+  },
+  {
+    "i": 2,
+    "texte": "Recherche globale ultra-rapide. Astuce : appuyez sur ⌘K (ou Ctrl+K) où que vous soyez. Passer Précédent Next (Step 3 of 7)",
+    "spotlight": {
+      "x": 765,
+      "y": 3,
+      "width": 468,
+      "height": 54
+    },
+    "sousLeProjecteur": {
+      "tag": "DIV",
+      "texte": ""
+    }
+  },
+  {
+    "i": 3,
+    "texte": "Le dashboard affiche vos KPIs : entreprises totales, contacts valides, taux de succès des scrapers. Passer Précédent Next (Step 5 of 7)",
+    "spotlight": {
+      "x": -2,
+      "y": 142,
+      "width": 263,
+      "height": 52
+    },
+    "sousLeProjecteur": {
+      "tag": "DIV",
+      "texte": ""
+    }
+  },
+  {
+    "i": 4,
+    "texte": "Mode clair/sombre — la préférence est sauvegardée localement. Passer Précédent Next (Step 6 of 7)",
+    "spotlight": {
+      "x": 1257,
+      "y": 5,
+      "width": 101,
+      "height": 50
+    },
+    "sousLeProjecteur": {
+      "tag": "DIV",
+      "texte": ""
+    }
+  },
+  {
+    "i": 5,
+    "etat": "AUCUNE infobulle — la visite s’est arrêtée"
+  },
+  {
+    "appelsOnboardingComplete": 2,
+    "urls": [
+      "https://api.localhost/api/v1/auth/onboarding/complete",
+      "https://api.localhost/api/v1/auth/onboarding/complete"
+    ],
+    "xhrOnboarding": [
+      "POST https://api.localhost/api/v1/auth/onboarding/complete",
+      "POST https://api.localhost/api/v1/auth/onboarding/complete"
+    ],
+    "nbXhr": 10
+  }
+]

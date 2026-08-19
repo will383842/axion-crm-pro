@@ -1,0 +1,5 @@
+=== PROD : colonnes 'timestamp without time zone' (lecture seule) ===
+failed_jobs.failed_at : timestamp without time zone
+--- total timestamptz vs timestamp ---
+timestamp with time zone = 164
+timestamp without time zone = 1

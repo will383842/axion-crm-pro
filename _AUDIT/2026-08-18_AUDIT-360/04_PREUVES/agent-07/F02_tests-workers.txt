@@ -1,0 +1,21 @@
+=== F2 : tests workers ===
+dist
+eslint.config.mjs
+node_modules
+package.json
+pnpm-lock.yaml
+src
+tests
+tsconfig.build.json
+tsconfig.json
+vitest.config.ts
+--- find tests ---
+workers/tests/base-worker.test.ts
+workers/tests/extract.test.ts
+workers/tests/registre-sources.test.ts
+workers/tests/result-sender.test.ts
+workers/tests/ssrf-guard.test.ts
+workers/tests/ssrf-guard-dns.test.ts
+workers/vitest.config.ts
+--- count ---
+6

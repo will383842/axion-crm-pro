@@ -1,0 +1,33 @@
+﻿2026-08-19T09:42:45.3899183Z Current runner version: '2.336.0'
+2026-08-19T09:42:45.3927034Z ##[group]Runner Image Provisioner
+2026-08-19T09:42:45.3927957Z Hosted Compute Agent
+2026-08-19T09:42:45.3928589Z Version: 20260729.566
+2026-08-19T09:42:45.3929313Z Commit: cf7153fe6e25b664e8693c24944bf2b00355d109
+2026-08-19T09:42:45.3930065Z Build Date: 2026-07-29T19:17:02Z
+2026-08-19T09:42:45.3930805Z Worker ID: {ed95609d-f9cf-4cc1-b998-f76c07dc6959}
+2026-08-19T09:42:45.3931558Z Azure Region: northcentralus
+2026-08-19T09:42:45.3932383Z ##[endgroup]
+2026-08-19T09:42:45.3933853Z ##[group]Operating System
+2026-08-19T09:42:45.3934498Z Ubuntu
+2026-08-19T09:42:45.3935017Z 24.04.4
+2026-08-19T09:42:45.3935624Z LTS
+2026-08-19T09:42:45.3936196Z ##[endgroup]
+2026-08-19T09:42:45.3936794Z ##[group]Runner Image
+2026-08-19T09:42:45.3937427Z Image: ubuntu-24.04
+2026-08-19T09:42:45.3938004Z Version: 20260810.271.1
+2026-08-19T09:42:45.3939133Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260810.271/images/ubuntu/Ubuntu2404-Readme.md
+2026-08-19T09:42:45.3940908Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260810.271
+2026-08-19T09:42:45.3942241Z ##[endgroup]
+2026-08-19T09:42:45.3943459Z ##[group]GITHUB_TOKEN Permissions
+2026-08-19T09:42:45.3945641Z Contents: read
+2026-08-19T09:42:45.3946306Z Metadata: read
+2026-08-19T09:42:45.3946987Z Packages: read
+2026-08-19T09:42:45.3947566Z ##[endgroup]
+2026-08-19T09:42:45.3949645Z Secret source: Actions
+2026-08-19T09:42:45.3950846Z Prepare workflow directory
+2026-08-19T09:42:45.4387270Z Prepare all required actions
+2026-08-19T09:42:45.4440054Z Getting action download info
+2026-08-19T09:42:45.6536762Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-08-19T09:42:46.5664573Z Download action repository 'shivammathur/setup-php@v2' (SHA:f3e473d116dcccaddc5834248c87452386958240)
+2026-08-19T09:42:46.7996903Z Download action repository 'actions/cache@v6' (SHA:55cc8345863c7cc4c66a329aec7e433d2d1c52a9)
+2026-08-19T09:42:47.0077735Z Complete job name: Backend Laravel (install + PHPStan + Pint + Pest)

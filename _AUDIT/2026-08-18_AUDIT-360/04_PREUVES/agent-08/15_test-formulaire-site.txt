@@ -1,0 +1,14 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/willi/Documents/Projets/Axion-IA/axionia[39m
+
+ [32m✓[39m src/lib/schemas/__tests__/unified-contact-schema.test.ts[2m > [22munifiedContactSchema — champs optionnels du bloc « Aller plus loin »[2m > [22maccepte les menus déroulants LAISSÉS VIDES (ce que le formulaire envoie)
+ [32m✓[39m src/lib/schemas/__tests__/unified-contact-schema.test.ts[2m > [22munifiedContactSchema — champs optionnels du bloc « Aller plus loin »[2m > [22maccepte l'absence pure et simple de ces champs
+ [32m✓[39m src/lib/schemas/__tests__/unified-contact-schema.test.ts[2m > [22munifiedContactSchema — champs optionnels du bloc « Aller plus loin »[2m > [22mgarde la contrainte : une valeur non vide doit rester dans l'énumération
+ [32m✓[39m src/lib/schemas/__tests__/unified-contact-schema.test.ts[2m > [22munifiedContactSchema — champs optionnels du bloc « Aller plus loin »[2m > [22maccepte une valeur valide de l'énumération
+ [32m✓[39m src/lib/schemas/__tests__/unified-contact-schema.test.ts[2m > [22munifiedContactSchema — champs optionnels du bloc « Aller plus loin »[2m > [22mles champs texte optionnels acceptent aussi le vide
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m5 passed[39m[22m[90m (5)[39m
+[2m   Start at [22m 12:06:51
+[2m   Duration [22m 62.71s[2m (transform 2.90s, setup 6.38s, collect 2.13s, tests 17ms, environment 45.50s, prepare 3.85s)[22m
+

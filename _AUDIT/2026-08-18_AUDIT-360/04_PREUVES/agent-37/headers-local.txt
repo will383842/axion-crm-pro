@@ -1,0 +1,41 @@
+##### LOCAL http://localhost:58080/up
+curl: (28) Operation timed out after 60016 milliseconds with 0 bytes received
+
+##### LOCAL https://api.localhost/up
+HTTP/1.1 502 Bad Gateway
+Alt-Svc: h3=":443"; ma=2592000
+Cache-Control: no-store
+Content-Security-Policy: default-src 'none'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-site
+Permissions-Policy: geolocation=(self), microphone=(), camera=(), interest-cohort=(), browsing-topics=()
+Referrer-Policy: strict-origin-when-cross-origin
+Server: Caddy
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Date: Wed, 19 Aug 2026 11:30:50 GMT
+Content-Length: 0
+
+
+##### LOCAL https://app.localhost/
+HTTP/1.1 200 OK
+Alt-Svc: h3=":443"; ma=2592000
+Cache-Control: no-store
+Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; connect-src 'self' https://api.localhost wss://api.localhost https://*.openfreemap.org wss://app.localhost; font-src 'self' data:; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+Content-Type: text/html; charset=utf-8
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-site
+Date: Wed, 19 Aug 2026 11:30:51 GMT
+Etag: "dksvrn2lgzcwt3-gzip"
+Last-Modified: Wed, 19 Aug 2026 11:23:38 GMT
+Permissions-Policy: geolocation=(self), microphone=(), camera=(), interest-cohort=(), browsing-topics=()
+Referrer-Policy: strict-origin-when-cross-origin
+Server: Caddy
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+Vary: Accept-Encoding
+Via: 1.1 Caddy
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Transfer-Encoding: chunked
+

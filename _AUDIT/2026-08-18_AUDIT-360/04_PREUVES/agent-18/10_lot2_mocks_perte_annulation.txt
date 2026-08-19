@@ -1,0 +1,38 @@
+BASE=axion_crm_a18
+
+===== [A] MOCK_MODE : semantique reelle de `(bool) env(...)` =====
+  Le provider ne lit QUE cette expression : $master = (bool) env('MOCK_MODE', true);
+  Mesure du DEFAUT sur une clef reellement absente :
+    env('A18_CLEF_ABSENTE_XYZ', true) = true   (bool) = true  ->  BRANCHE MOCK
+  Mesure des valeurs, passees en VRAIES variables d'environnement du processus :
+    A18_V_FALSE      = 'false'   env()=false     (bool)=false  -> REEL
+    A18_V_FALSE_MAJ  = 'FALSE'   env()=false     (bool)=false  -> REEL
+    A18_V_ZERO       = '0'       env()='0'       (bool)=false  -> REEL
+    A18_V_VIDE       = ''        env()=''        (bool)=false  -> REEL
+    A18_V_OFF        = 'off'     env()='off'     (bool)=true   -> MOCK
+    A18_V_NO         = 'no'      env()='no'      (bool)=true   -> MOCK
+    A18_V_TRUE       = 'true'    env()=true      (bool)=true   -> MOCK
+    A18_V_UN         = '1'       env()='1'       (bool)=true   -> MOCK
+  Garde d'environnement dans le provider ? AUCUNE
+  config:cache actif (piege dotenv non charge) ? NON
+
+===== [B] Une personne peut-elle se PERDRE en silence dans le funnel ? =====
+  ingestion 1 (ENTREPRISE A) : {"status":"created","company_id":5,"contacts_created":1,"contacts_updated":0,"persons_skipped_opt_out":0,"emails_rejected_mx":0,"company_fields_written":["denomination"],"tags":["src:scraping-mentions-legales"],"activity_id":11}
+  ingestion 2 (ENTREPRISE B, MEME personne/email) : {"status":"created","company_id":6,"contacts_created":0,"contacts_updated":0,"persons_skipped_opt_out":0,"emails_rejected_mx":0,"company_fields_written":["denomination"],"tags":["src:scraping-mentions-legales"],"activity_id":12}
+  companies=2  contacts=1
+    contact id=4 Paul MARTIN email=paul.martin@a18.example.invalid -> company=ENTREPRISE A
+  => La personne de l'ENTREPRISE B a-t-elle une fiche ? *** NON — perdue ***
+  => Le rapport d'ingestion le signale-t-il ? champs disponibles : status, company_id, contacts_created, contacts_updated, persons_skipped_opt_out, emails_rejected_mx, company_fields_written, tags, activity_id
+     (aucun compteur 'skipped' : contacts_created=0 contacts_updated=0 opt_out=0 mx=0)
+
+===== [C] ARRET D'URGENCE : que stoppe reellement /scraper-runs/{run}/cancel ? =====
+  run cree id=14 status=running
+  jobs en file Redis AVANT annulation : 4
+  jobs en file Redis APRES annulation  : 4   *** LA FILE N'EST PAS PURGEE ***
+  statut du run en base : cancelled
+  Ou atterrit le drapeau d'annulation ?
+    connexion 'default' -> base 0, prefixe 'axion_crm_pro_database_'
+    connexion 'queue'   -> base 1
+    WORKER_REDIS_URL    -> redis://redis:6379/1
+
+=== FIN A18 B2 ===

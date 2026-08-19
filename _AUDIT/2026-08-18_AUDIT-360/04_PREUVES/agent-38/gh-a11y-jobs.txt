@@ -1,0 +1,16 @@
+=== Lighthouse CI job across recent PR runs ===
+--- run 32240894684 ---
+{"completedAt":"2026-08-19T10:05:42Z","conclusion":"success","name":"Lighthouse CI","startedAt":"2026-08-19T10:04:54Z"}
+{"completedAt":"2026-08-19T10:06:10Z","conclusion":"success","name":"axe-core Playwright","startedAt":"2026-08-19T10:04:54Z"}
+--- run 32238995897 ---
+{"completedAt":"2026-08-19T09:44:15Z","conclusion":"success","name":"Lighthouse CI","startedAt":"2026-08-19T09:42:44Z"}
+{"completedAt":"2026-08-19T09:44:05Z","conclusion":"success","name":"axe-core Playwright","startedAt":"2026-08-19T09:42:44Z"}
+--- run 32237636728 ---
+{"completedAt":"2026-08-19T09:29:15Z","conclusion":"success","name":"axe-core Playwright","startedAt":"2026-08-19T09:26:48Z"}
+{"completedAt":"2026-08-19T09:28:30Z","conclusion":"success","name":"Lighthouse CI","startedAt":"2026-08-19T09:26:50Z"}
+--- run 32232084364 ---
+{"completedAt":"2026-08-19T08:21:13Z","conclusion":"success","name":"axe-core Playwright","startedAt":"2026-08-19T08:20:00Z"}
+{"completedAt":"2026-08-19T08:22:29Z","conclusion":"success","name":"Lighthouse CI","startedAt":"2026-08-19T08:20:00Z"}
+--- run 32231284609 ---
+{"completedAt":"2026-08-19T08:11:47Z","conclusion":"success","name":"axe-core Playwright","startedAt":"2026-08-19T08:10:11Z"}
+{"completedAt":"2026-08-19T08:10:48Z","conclusion":"success","name":"Lighthouse CI","startedAt":"2026-08-19T08:10:10Z"}

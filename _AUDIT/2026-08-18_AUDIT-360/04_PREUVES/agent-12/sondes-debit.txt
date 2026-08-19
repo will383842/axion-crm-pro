@@ -1,0 +1,32 @@
+===== LIMITATION DE DEBIT — AGENT 12 =====
+date : 2026-08-19T10:33:40+00:00
+limiteurs declares (RouteServiceProvider) : api=60/min (JAMAIS ATTACHE), login=5/min, magic-link=3/min, internal=600/min, scraper-launch=10/min, scraper-list=60/min
+
+----- TEMOIN POSITIF : route limitee (throttle:login = 5/min) ------
+### POST /api/v1/auth/login
+    POST /api/v1/auth/login  x9
+    codes : 422 422 422 422 422 429 429 429 429
+    un 429 apparait ? OUI
+
+----- ROUTE INTERNE SANS AUCUN throttle ---------------------------
+[2026-08-19 12:35:21] local.WARNING: Internal scraper result rejected (bad HMAC) {"ip":"203.0.113.7"} 
+[2026-08-19 12:35:21] local.WARNING: Internal scraper result rejected (bad HMAC) {"ip":"203.0.113.7"} 
+[2026-08-19 12:35:21] local.WARNING: Internal scraper result rejected (bad HMAC) {"ip":"203.0.113.7"} 
+[2026-08-19 12:35:22] local.WARNING: Internal scraper result rejected (bad HMAC) {"ip":"203.0.113.7"} 
+[2026-08-19 12:35:22] local.WARNING: Internal scraper result rejected (bad HMAC) {"ip":"203.0.113.7"} 
+[2026-08-19 12:35:22] local.WARNING: Internal scraper result rejected (bad HMAC) {"ip":"203.0.113.7"} 
+[2026-08-19 12:35:22] local.WARNING: Internal scraper result rejected (bad HMAC) {"ip":"203.0.113.7"} 
+[2026-08-19 12:35:23] local.WARNING: Internal scraper result rejected (bad HMAC) {"ip":"203.0.113.7"} 
+[2026-08-19 12:35:23] local.WARNING: Internal scraper result rejected (bad HMAC) {"ip":"203.0.113.7"} 
+### POST /api/internal/scraper-result (aucun throttle declare)
+    POST /api/internal/scraper-result  x9
+    codes : 401 401 401 401 401 401 401 401 401
+    un 429 apparait ? NON
+
+----- ROUTE v1 PROTEGEE SANS throttle -----------------------------
+### GET /api/v1/companies (aucun throttle declare)
+    GET /api/v1/companies  x9
+    codes : 401 401 401 401 401 401 401 401 401
+    un 429 apparait ? NON
+
+===== FIN =====

@@ -1,0 +1,134 @@
+########## continue-on-error ##########
+a11y.yml:75:        continue-on-error: true
+ci.yml:6:# AVANT : `composer install` en `continue-on-error`, PHPStan / Pint / Pest en
+ci.yml:7:# `|| true`, `pnpm lint || true`, gitleaks en `continue-on-error`. Une CI verte
+security.yml:41:        continue-on-error: true
+security.yml:49:  #  1. `continue-on-error: true` annulait `exit-code: '1'` : une vulnérabilité
+security.yml:119:          exit-code: '1' # BLOQUANT — plus de `continue-on-error`
+security.yml:130:  # `continue-on-error` qu'on vient de retirer : ces images, on ne les construit
+
+########## || true / || echo / || : ##########
+a11y.yml:24:        run: pnpm install --frozen-lockfile || pnpm install
+ci.yml:7:# `|| true`, `pnpm lint || true`, gitleaks en `continue-on-error`. Une CI verte
+ci.yml:91:          grep -n 'published:' /tmp/merged.yml || echo '(aucune)'
+ci.yml:95:          # `grep -oP … || true` : le jour où `grep -P` n'est pas disponible (ou
+ci.yml:290:            base="$(git rev-parse HEAD^ 2>/dev/null || true)"
+ci.yml:431:          docker logs axion-ci-postgres 2>&1 | grep -iE "PANIC|was terminated by signal|terminating any other active|startup process|recovery|out of memory" || echo "(aucune)"
+deploy-direct-ssh.yml:10:# `php artisan migrate --force || true` laissait un déploiement VERT alors que
+deploy-direct-ssh.yml:180:          docker compose pull --ignore-pull-failures || true
+deploy-direct-ssh.yml:205:            # Plus de `|| true` : une migration en échec DOIT casser le déploiement.
+deploy-staging.yml:176:            || echo "(contrôle des ports en échec — voir ci-dessus)"
+diag-website-status.yml:58:            docker compose ps -a 2>&1 || docker ps -a 2>&1
+diag-website-status.yml:68:            systemctl restart axion-find-websites 2>&1 && echo "restart demande" || echo "(service systemd absent ?)"
+diag-website-status.yml:73:            tail -n 5 /var/log/axion-find/*.log 2>/dev/null || tail -n 5 /opt/axion-crm-pro/storage/logs/find-ws*.log 2>/dev/null || echo "(pas de logs trouves)"
+prospection-collect-paris.yml:83:            docker compose exec -u root -T api php artisan coverage:refresh-matrix < /dev/null || echo "coverage KO (non bloquant)"
+prospection-collect-region.yml:106:            docker compose exec -u root -T api php artisan coverage:refresh-matrix < /dev/null || echo "coverage KO (non bloquant)"
+prospection-reclassify.yml:42:            docker compose exec -u root -T api php artisan coverage:refresh-matrix < /dev/null || echo "coverage refresh KO (non bloquant)"
+release-tracking.yml:99:          npx --yes @sentry/cli releases set-commits "${{ steps.version.outputs.version }}" --auto || true
+security.yml:178:        run: composer audit --no-dev || true
+security.yml:193:        run: pnpm audit --audit-level=high || true
+surveillance-sauvegarde.yml:104:            echo "echec=$([ "$CODE" -ne 0 ] && echo true || echo false)"
+
+########## exit 0 ##########
+ci.yml:294:            exit 0
+ci.yml:300:            exit 0
+ci.yml:383:              exit 0
+
+########## timeout-minutes ##########
+diag-website-status.yml:20:    timeout-minutes: 15
+prospection-collect.yml:33:    timeout-minutes: 180
+prospection-collect-paris.yml:26:    timeout-minutes: 90
+prospection-collect-paris.yml:63:    timeout-minutes: 20
+prospection-collect-region.yml:30:    timeout-minutes: 180
+prospection-collect-region.yml:82:    timeout-minutes: 20
+prospection-enrich.yml:32:    timeout-minutes: 30
+prospection-find-websites.yml:46:    timeout-minutes: 340
+prospection-find-websites-distributed.yml:34:    timeout-minutes: 350
+prospection-reclassify.yml:16:    timeout-minutes: 10
+prospection-stats.yml:16:    timeout-minutes: 10
+
+########## if: (job+step) ##########
+a11y.yml:60:        if: always()
+a11y.yml:68:    if: github.event_name == 'pull_request'
+ci.yml:428:        if: failure()
+deploy-direct-ssh.yml:75:    if: ${{ needs.ci.result == 'success' }}
+prospection-collect-paris.yml:61:    if: always()
+prospection-collect-region.yml:80:    if: always()
+release-tracking.yml:66:        if: steps.skip.outputs.skip == 'false'
+release-tracking.yml:72:        if: steps.skip.outputs.skip == 'false'
+release-tracking.yml:78:        if: steps.skip.outputs.skip == 'false'
+release-tracking.yml:83:        if: steps.skip.outputs.skip == 'false'
+release-tracking.yml:90:        if: steps.skip.outputs.skip == 'false'
+release-tracking.yml:102:        if: steps.skip.outputs.skip == 'false'
+release-tracking.yml:118:        if: steps.skip.outputs.skip == 'false'
+security.yml:43:        if: always()
+security.yml:92:        if: always() && hashFiles(format('trivy-{0}.sarif', matrix.image)) != ''
+security.yml:154:        if: always() && hashFiles(format('trivy-{0}.sarif', matrix.nom)) != ''
+security.yml:215:    if: github.event_name == 'schedule' && vars.ZAP_TARGET_URL != ''
+security.yml:249:    if: failure() && github.event_name != 'pull_request'
+surveillance-sauvegarde.yml:114:        if: steps.controle.outputs.echec == 'true'
+surveillance-sauvegarde.yml:126:    if: failure()
+
+########## vars. / secrets. in if ##########
+deploy-direct-ssh.yml:279:          HEALTH_URL: ${{ vars.HEALTH_URL || 'https://api.axion-crm-pro.com/up' }}
+deploy-direct-ssh.yml:280:          APP_URL: ${{ vars.APP_URL || 'https://app.axion-crm-pro.com' }}
+deploy-staging.yml:53:  # `vars.COOLIFY_STAGING_ENABLED`. Ils n'ont JAMAIS tourné, et pour une raison
+security.yml:215:    if: github.event_name == 'schedule' && vars.ZAP_TARGET_URL != ''
+security.yml:220:          target: ${{ vars.ZAP_TARGET_URL }}
+
+########## needs: ##########
+ci.yml:14:# `needs: [ci]`.
+deploy-direct-ssh.yml:74:    needs: [ci]
+deploy-staging.yml:75:    needs: build-and-push
+prospection-collect-paris.yml:60:    needs: collect
+prospection-collect-region.yml:79:    needs: collect
+prospection-find-websites.yml:44:    needs: prepare
+security.yml:248:    needs: [gitleaks, semgrep, trivy, trivy-images-tirees, composer-audit, pnpm-audit]
+surveillance-sauvegarde.yml:125:    needs: [verifier]
+
+########## on: triggers ##########
+a11y.yml:3:on:
+a11y.yml:4:  push:
+a11y.yml:6:  pull_request:
+build-postgres-image.yml:7:on:
+build-postgres-image.yml:8:  workflow_dispatch:
+build-postgres-image.yml:9:  push:
+ci.yml:30:on:
+ci.yml:31:  pull_request:
+ci.yml:33:  workflow_dispatch:
+ci.yml:35:  workflow_call:
+deploy-direct-ssh.yml:31:on:
+deploy-direct-ssh.yml:32:  push:
+deploy-direct-ssh.yml:43:  workflow_dispatch:
+deploy-staging.yml:3:on:
+deploy-staging.yml:4:  push:
+deploy-staging.yml:6:  workflow_dispatch:
+diag-website-status.yml:10:on:
+diag-website-status.yml:11:  workflow_dispatch: {}
+prospection-collect.yml:7:on:
+prospection-collect.yml:8:  workflow_dispatch:
+prospection-collect-paris.yml:7:on:
+prospection-collect-paris.yml:8:  workflow_dispatch:
+prospection-collect-region.yml:11:on:
+prospection-collect-region.yml:12:  workflow_dispatch:
+prospection-enrich.yml:9:on:
+prospection-enrich.yml:10:  workflow_dispatch:
+prospection-find-websites.yml:7:on:
+prospection-find-websites.yml:8:  workflow_dispatch:
+prospection-find-websites-distributed.yml:12:on:
+prospection-find-websites-distributed.yml:13:  workflow_dispatch:
+prospection-reclassify.yml:6:on:
+prospection-reclassify.yml:7:  workflow_dispatch: {}
+prospection-stats.yml:6:on:
+prospection-stats.yml:7:  workflow_dispatch: {}
+release-tracking.yml:16:on:
+release-tracking.yml:17:  release:
+release-tracking.yml:19:  push:
+release-tracking.yml:22:  workflow_dispatch:
+security.yml:3:on:
+security.yml:4:  push:
+security.yml:6:  pull_request:
+security.yml:8:  schedule:
+surveillance-sauvegarde.yml:26:on:
+surveillance-sauvegarde.yml:27:  schedule:
+surveillance-sauvegarde.yml:31:  workflow_dispatch:

@@ -1,0 +1,50 @@
+=== ECRAN -> BALISAGE RECOPIE (numeros de ligne) ===
+
+login                    TOTAL=  2  EN-TETE DE PAGE recopie=1 (L36)  |  BOUTON recopie (<button> nu)=1 (L110)  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+2fa                      TOTAL=  0  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+magic-link               TOTAL=  0  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+password-reset           TOTAL=  0  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/ dashboard              TOTAL=  2  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=2 (L263,L271)  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/companies               TOTAL=  2  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=1 (L455)  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=1 (L684)  |  OMBRE en dur (jeton double)=0
+/companies/$id           TOTAL=  3  EN-TETE DE PAGE recopie=1 (L117)  |  BOUTON recopie (<button> nu)=1 (L218)  |  CARTE recopiee=0  |  PASTILLE recopiee=1 (L131)  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/contacts                TOTAL=  1  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=1 (L191)  |  OMBRE en dur (jeton double)=0
+/international/roumanie  TOTAL=  5  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=4 (L121,L147,L240,L249)  |  CARTE recopiee=0  |  PASTILLE recopiee=1 (L219)  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/media                   TOTAL=  0  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/media/$id               TOTAL=  2  EN-TETE DE PAGE recopie=1 (L92)  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=1 (L94)  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/journalists             TOTAL=  0  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/coverage                TOTAL= 18  EN-TETE DE PAGE recopie=1 (L85)  |  BOUTON recopie (<button> nu)=5 (L200,L285,L301,L309,L379)  |  CARTE recopiee=5 (L143,L276,L332,L345,L363)  |  PASTILLE recopiee=2 (L81,L244)  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=5 (L143,L243,L276,L363)
+                           >>> REDEFINIT LOCALEMENT DES NOMS DU DS : SegOption@L176, SegmentedControl@L178, KpiCard@L228, Stat@L343   [features/coverage/CoveragePage.tsx]
+/scraper-runs            TOTAL=  0  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/llm/router              TOTAL=  1  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=1 (L105)  |  OMBRE en dur (jeton double)=0
+/llm/proxy-providers     TOTAL=  1  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=1 (L76)  |  OMBRE en dur (jeton double)=0
+/llm/rotations           TOTAL=  0  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/rgpd/requests           TOTAL=  1  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=1 (L159)  |  OMBRE en dur (jeton double)=0
+/rgpd/ai-act             TOTAL=  2  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=1 (L145)  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=1 (L131)  |  OMBRE en dur (jeton double)=0
+/audit-logs              TOTAL=  2  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=1 (L165)  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=1 (L148)  |  OMBRE en dur (jeton double)=0
+/users                   TOTAL=  1  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=1 (L116)  |  OMBRE en dur (jeton double)=0
+/settings                TOTAL=  3  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=2 (L84,L288)  |  CARTE recopiee=1 (L247)  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/campaigns               TOTAL=  1  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=1 (L261)  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/campaigns/new           TOTAL=  7  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=4 (L500,L532,L584,L750)  |  CARTE recopiee=2 (L714,L842)  |  PASTILLE recopiee=1 (L504)  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/campaigns/$id           TOTAL=  0  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/tags                    TOTAL=  1  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=1 (L349)  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/audiences               TOTAL=  2  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=1 (L202)  |  CARTE recopiee=1 (L224)  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/audiences/new           TOTAL=  4  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=1 (L439)  |  CARTE recopiee=1 (L469)  |  PASTILLE recopiee=2 (L444,L470)  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/audiences/$id           TOTAL=  0  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/admin/observability     TOTAL=  0  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/console/contacts        TOTAL=  2  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=1 (L151)  |  CARTE recopiee=0  |  PASTILLE recopiee=1 (L232)  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/console/vivier          TOTAL=  2  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=2 (L141,L160)  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/console/arbitrage       TOTAL=  0  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/console/personnes/$k    TOTAL=  0  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/cold-email              TOTAL=  0  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+/linkedin                TOTAL=  0  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+404                      TOTAL=  1  EN-TETE DE PAGE recopie=1 (L7)  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+
+=== TOTAUX PAR MOTIF ===
+EN-TETE DE PAGE recopie            5 occurrences sur  5 ecrans   (le DS fournit : PageHeader / PageShell)
+BOUTON recopie (<button> nu)      25 occurrences sur 14 ecrans   (le DS fournit : Button / IconButton)
+CARTE recopiee                    12 occurrences sur  6 ecrans   (le DS fournit : Card)
+PASTILLE recopiee                 11 occurrences sur  8 ecrans   (le DS fournit : StatusPill / QualityBadge)
+EN-TETE DE TABLEAU recopie         8 occurrences sur  8 ecrans   (le DS fournit : (aucun composant Table dans le DS))
+OMBRE en dur (jeton double)        5 occurrences sur  1 ecrans   (le DS fournit : shadow-[var(--shadow-*)])
+
+Ecrans qui recopient au moins un motif : 23 / 37

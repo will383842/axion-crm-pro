@@ -1,0 +1,15 @@
+﻿2026-08-19T09:42:58.2088156Z ##[group]Run composer analyse
+2026-08-19T09:42:58.2088491Z [36;1mcomposer analyse[0m
+2026-08-19T09:42:58.2128889Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:42:58.2129177Z env:
+2026-08-19T09:42:58.2129392Z   COMPOSER_PROCESS_TIMEOUT: 0
+2026-08-19T09:42:58.2129656Z   COMPOSER_NO_INTERACTION: 1
+2026-08-19T09:42:58.2129901Z   COMPOSER_NO_AUDIT: 1
+2026-08-19T09:42:58.2130128Z ##[endgroup]
+2026-08-19T09:42:58.7564684Z Note: Using configuration file /home/runner/work/axion-crm-pro/axion-crm-pro/backend/phpstan.neon.
+2026-08-19T09:43:14.4277975Z    0/376 [░░░░░░░░░░░░░░░░░░░░░░░░░░░░]   0%
+2026-08-19T09:43:14.4756554Z  376/376 [▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓] 100%
+2026-08-19T09:43:14.4756876Z 
+2026-08-19T09:43:14.5034387Z 
+2026-08-19T09:43:14.5036241Z  [OK] No errors                                                                 
+2026-08-19T09:43:14.5036683Z 

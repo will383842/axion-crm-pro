@@ -1,0 +1,62 @@
+﻿2026-08-19T09:42:48.9767414Z ##[group]Run set -euo pipefail
+2026-08-19T09:42:48.9768038Z [36;1mset -euo pipefail[0m
+2026-08-19T09:42:48.9768542Z [36;1m# `config` exige un `.env` présent (env_file du service api).[0m
+2026-08-19T09:42:48.9769045Z [36;1mcp .env.example .env[0m
+2026-08-19T09:42:48.9769621Z [36;1mdocker compose -f docker-compose.yml -f docker-compose.prod.yml config > /tmp/merged.yml[0m
+2026-08-19T09:42:48.9770204Z [36;1m[0m
+2026-08-19T09:42:48.9770599Z [36;1mecho "::group::configuration fusionnée — publications de ports"[0m
+2026-08-19T09:42:48.9771210Z [36;1mgrep -n 'published:' /tmp/merged.yml || echo '(aucune)'[0m
+2026-08-19T09:42:48.9771665Z [36;1mecho "::endgroup::"[0m
+2026-08-19T09:42:48.9771985Z [36;1m[0m
+2026-08-19T09:42:48.9772424Z [36;1m# ⚠️ Extraction FAIL-CLOSED. La première version de ce job utilisait[0m
+2026-08-19T09:42:48.9773071Z [36;1m# `grep -oP … || true` : le jour où `grep -P` n'est pas disponible (ou[0m
+2026-08-19T09:42:48.9773691Z [36;1m# échoue sur la locale), la liste ressortait VIDE et le job passait[0m
+2026-08-19T09:42:48.9774588Z [36;1m# VERT sans avoir rien mesuré. Un contrôle qui réussit quand il ne[0m
+2026-08-19T09:42:48.9775250Z [36;1m# peut pas mesurer ne contrôle rien. Constaté en le rejouant à la main[0m
+2026-08-19T09:42:48.9775763Z [36;1m# le 2026-08-19.[0m
+2026-08-19T09:42:48.9776324Z [36;1mpublies="$(awk -F'published: ' '/published: /{gsub(/"/,"",$2); print $2}' /tmp/merged.yml | sort -u)"[0m
+2026-08-19T09:42:48.9776976Z [36;1mecho "Ports publiés : ${publies:-aucun}"[0m
+2026-08-19T09:42:48.9777375Z [36;1m[0m
+2026-08-19T09:42:48.9777772Z [36;1m# TÉMOIN POSITIF — l'extraction a-t-elle seulement fonctionné ?[0m
+2026-08-19T09:42:48.9778392Z [36;1m# La production publie forcément 80 et 443 (Caddy). Si on ne les[0m
+2026-08-19T09:42:48.9778990Z [36;1m# trouve pas, ce n'est pas que tout va bien : c'est que la mesure est[0m
+2026-08-19T09:42:48.9779529Z [36;1m# cassée. On échoue plutôt que de rassurer.[0m
+2026-08-19T09:42:48.9779949Z [36;1mfor attendu in 80 443; do[0m
+2026-08-19T09:42:48.9780388Z [36;1m  if ! echo "$publies" | grep -qx "$attendu"; then[0m
+2026-08-19T09:42:48.9781033Z [36;1m    echo "::error::Témoin positif en échec : le port $attendu (Caddy) n'a PAS été trouvé."[0m
+2026-08-19T09:42:48.9781782Z [36;1m    echo "::error::L'extraction des ports ne fonctionne pas — ce job ne mesure rien."[0m
+2026-08-19T09:42:48.9782498Z [36;1m    echo "::error::Corriger l'extraction avant de croire un résultat vert."[0m
+2026-08-19T09:42:48.9783000Z [36;1m    exit 1[0m
+2026-08-19T09:42:48.9783282Z [36;1m  fi[0m
+2026-08-19T09:42:48.9783546Z [36;1mdone[0m
+2026-08-19T09:42:48.9783818Z [36;1m[0m
+2026-08-19T09:42:48.9784242Z [36;1m# Liste FERMÉE. Publier un port de plus en production est une décision[0m
+2026-08-19T09:42:48.9785414Z [36;1m# d'EXPOSITION : elle doit passer par une modification explicite de ce[0m
+2026-08-19T09:42:48.9785991Z [36;1m# job, jamais se glisser dans un overlay.[0m
+2026-08-19T09:42:48.9786391Z [36;1minattendus=""[0m
+2026-08-19T09:42:48.9786750Z [36;1mfor port in $publies; do[0m
+2026-08-19T09:42:48.9787423Z [36;1m  case "$port" in[0m
+2026-08-19T09:42:48.9787744Z [36;1m    80|443) ;;[0m
+2026-08-19T09:42:48.9788087Z [36;1m    *) inattendus="$inattendus $port" ;;[0m
+2026-08-19T09:42:48.9788471Z [36;1m  esac[0m
+2026-08-19T09:42:48.9788745Z [36;1mdone[0m
+2026-08-19T09:42:48.9789013Z [36;1m[0m
+2026-08-19T09:42:48.9789292Z [36;1mif [ -n "$inattendus" ]; then[0m
+2026-08-19T09:42:48.9789896Z [36;1m  echo "::error::La configuration de PRODUCTION publie des ports non autorisés :$inattendus"[0m
+2026-08-19T09:42:48.9790741Z [36;1m  echo "::error::Un port publié écoute sur 0.0.0.0, et Docker insère ses règles iptables AVANT ufw :"[0m
+2026-08-19T09:42:48.9791560Z [36;1m  echo "::error::le pare-feu annoncera « fermé » pendant que le port répondra depuis internet."[0m
+2026-08-19T09:42:48.9792328Z [36;1m  echo "::error::Fermer avec « ports: !override [] » dans docker-compose.prod.yml,"[0m
+2026-08-19T09:42:48.9793078Z [36;1m  echo "::error::ou, si l'exposition est VOULUE, l'ajouter explicitement à la liste de ce job."[0m
+2026-08-19T09:42:48.9794011Z [36;1m  exit 1[0m
+2026-08-19T09:42:48.9794487Z [36;1mfi[0m
+2026-08-19T09:42:48.9794933Z [36;1m[0m
+2026-08-19T09:42:48.9795365Z [36;1mecho "OK — seuls 80 et 443 sont publiés par la configuration de production."[0m
+2026-08-19T09:42:48.9842827Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:42:48.9843358Z ##[endgroup]
+2026-08-19T09:42:49.5589491Z ##[group]configuration fusionnée — publications de ports
+2026-08-19T09:42:49.5603449Z 179:        published: "80"
+2026-08-19T09:42:49.5604118Z 183:        published: "443"
+2026-08-19T09:42:49.5606958Z ##[endgroup]
+2026-08-19T09:42:49.5645501Z Ports publiés : 443
+2026-08-19T09:42:49.5646221Z 80
+2026-08-19T09:42:49.5683664Z OK — seuls 80 et 443 sont publiés par la configuration de production.

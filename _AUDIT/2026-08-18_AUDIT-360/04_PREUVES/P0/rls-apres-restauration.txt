@@ -1,0 +1,4 @@
+### Survie des policies RLS a une restauration — mesure differee
+Debut d'attente : 2026-08-19T11:36:33Z
+Regle : NE PAS conclure tant que la restauration tourne (les policies sont emises EN DERNIER).
+

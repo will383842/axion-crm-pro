@@ -1,0 +1,24 @@
+# AGENT 45 — « retention:purge --dry-run » MUTE la base. Base jetable axion_crm_a45b.
+# Reference : main e8924b8. Rejoue le 2026-08-19T11:27:59Z.
+
+## 1. Semis : une ligne scraper_runs de 200 jours, avec sa charge utile
+INSERT 0 1
+
+## 2. Etat AVANT le --dry-run
+ id | charge_presente |   payload_path   
+----+-----------------+------------------
+  2 | t               | /tmp/zz-a45.json
+(1 row)
+
+## 3. La commande, avec --dry-run (qui ne doit RIEN modifier)
+Retention purge — dry-run=true
+  - email_validations expirées : 0 lignes seraient affectées
+  - notifications anciennes (>90j) : 0 lignes seraient affectées
+  - scraper_runs payload (>90j) : 0 lignes seraient affectées
+
+## 4. Etat APRES le --dry-run
+ id | charge_presente | payload_path 
+----+-----------------+--------------
+  2 | f               | 
+(1 row)
+

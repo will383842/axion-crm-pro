@@ -1,0 +1,51 @@
+TOTAL_ITEMS 153
+GROUPS 15
+  main (Activité quotidienne) = 7
+  contacts (Boîte de réception) = 12
+  tunnels (Tunnels) = 3
+  content (Contenu) = 8
+  content_gen (Génération de contenu) = 33
+  qualiopi (Formations & prestations) = 32
+  finances (Finances) = 6
+  documents-interventions (Documents) = 8
+  coaching-1to1 (Coaching 1-to-1) = 2
+  image-bank (Banque d'images) = 10
+  presse (Salle de presse) = 4
+  chatbot (Chatbot) = 5
+  engagement (Engagement) = 1
+  ops (Ops & monitoring) = 18
+  system (Système) = 4
+SIDEBAR_VISIBLE(no parent) 141
+HIDDEN(parent set) 12
+TIER_ADVANCED 20
+--- GROUP contacts ---
+ lvl1 | Tout | /fr/admin-xyz/contacts | parent=- | tier=-
+ lvl1 | Appels réservés | /fr/admin-xyz/contacts/appels | parent=- | tier=-
+ lvl1 | Messages | /fr/admin-xyz/contacts/messages | parent=- | tier=-
+ lvl2 | Clients | /fr/admin-xyz/contacts/clients | parent=- | tier=-
+ lvl2 | Presse | /fr/admin-xyz/contacts/presse | parent=- | tier=-
+ lvl2 | Partenariats | /fr/admin-xyz/contacts/partenariats | parent=- | tier=-
+ lvl2 | Investisseurs | /fr/admin-xyz/contacts/investisseurs | parent=- | tier=-
+ lvl2 | Conférences | /fr/admin-xyz/contacts/conferences | parent=- | tier=-
+ lvl2 | Recrutement | /fr/admin-xyz/contacts/commercial | parent=- | tier=-
+ lvl2 | Podcast | /fr/admin-xyz/podcast | parent=- | tier=-
+ lvl2 | Autres | /fr/admin-xyz/contacts/autres | parent=- | tier=-
+ lvl1 | Candidatures | /fr/admin-xyz/contacts/candidatures | parent=- | tier=-
+--- hors groupe contacts, href relationnel ---
+ main | Hub de pilotage | /fr/admin-xyz/planning/hub | parent=-
+ main | Planning | /fr/admin-xyz/planning | parent=-
+ main | Timeline ressources | /fr/admin-xyz/planning/timeline | parent=-
+ main | Charge formateurs | /fr/admin-xyz/planning/charge | parent=-
+ main | Pipeline commercial | /fr/admin-xyz/planning/pipeline | parent=-
+ main | Prévisionnel | /fr/admin-xyz/planning/previsionnel | parent=-
+ content | Avis clients | /fr/admin-xyz/avis | parent=-
+ qualiopi | Formateurs | /fr/admin-xyz/qualiopi/formateurs | parent=-
+ qualiopi | Accès & connexions formateurs | /fr/admin-xyz/coaching/formateurs | parent=-
+ qualiopi | Stagiaires | /fr/admin-xyz/qualiopi/stagiaires | parent=-
+ qualiopi | Clients (CRM) | /fr/admin-xyz/qualiopi/clients | parent=-
+ presse | Vue d'ensemble | /fr/admin-xyz/presse | parent=-
+ presse | Communiqués | /fr/admin-xyz/presse/communiques | parent=-
+ presse | Kit média | /fr/admin-xyz/presse/kit-media | parent=-
+ presse | Couverture médias | /fr/admin-xyz/presse/couverture | parent=-
+ engagement | Newsletter | /fr/admin-xyz/newsletter | parent=-
+ ops | Avis du catalogue | /fr/admin-xyz/qr-codes/avis | parent=-

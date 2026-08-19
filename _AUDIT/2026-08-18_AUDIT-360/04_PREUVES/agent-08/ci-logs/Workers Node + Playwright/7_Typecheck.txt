@@ -1,0 +1,10 @@
+﻿2026-08-19T09:42:52.1472181Z ##[group]Run pnpm typecheck
+2026-08-19T09:42:52.1472483Z [36;1mpnpm typecheck[0m
+2026-08-19T09:42:52.1513904Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:42:52.1514163Z env:
+2026-08-19T09:42:52.1514429Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-19T09:42:52.1514761Z ##[endgroup]
+2026-08-19T09:42:52.5495155Z 
+2026-08-19T09:42:52.5496269Z > @axion-ia/axion-crm-pro-workers@0.1.0 typecheck /home/runner/work/axion-crm-pro/axion-crm-pro/workers
+2026-08-19T09:42:52.5496876Z > tsc --noEmit
+2026-08-19T09:42:52.5497021Z 

@@ -1,0 +1,38 @@
+MESURE EN NAVIGATEUR REEL — https://app.localhost (conteneur `app`), tabId 1780622446
+Reference : main e8924b8
+Objet : les 4 regles `!important` de frontend/src/styles/index.css:88-91 battent-elles les
+        variantes `dark:` ecrites dans les composants ?
+
+src/styles/index.css:88-91
+  .dark .bg-white        { background:   oklch(0.20 0.01 250) !important; }
+  .dark .bg-slate-50     { background:   oklch(0.17 0.01 250) !important; }
+  .dark .text-slate-900  { color:        oklch(0.95 0 0)      !important; }
+  .dark .border-slate-200{ border-color: oklch(0.30 0.01 250) !important; }
+
+--- MESURE (sonde `bg-white dark:bg-slate-900 text-slate-900 dark:text-white
+                border border-slate-200 dark:border-slate-800`, classe .dark posee sur <html>,
+     couleurs resolues en sRGB via canvas 1x1) ---
+
+{
+  "mesure_sombre_sRGB":                     { "bg": "19,22,26",  "color": "238,238,238", "border": "42,46,51" },
+  "valeur_de_la_variante_dark_du_composant":{ "bg": "15,23,43",  "color": "255,255,255", "border": "29,41,61" },
+  "valeur_imposee_par_index_css_L88_91":    { "bg": "19,22,26",  "color": "238,238,238", "border": "42,46,51" },
+  "verdict_bg":     "!important GAGNE — dark:bg-slate-900 neutralisee",
+  "verdict_color":  "!important GAGNE — dark:text-white neutralisee",
+  "verdict_border": "!important GAGNE — dark:border-slate-800 neutralisee"
+}
+
+--- TEMOIN NEGATIF (le dispositif est-il capable de montrer l'inverse ?) ---
+
+{
+  "temoin A — bg-slate-100 dark:bg-slate-800 (utilitaire NON ecrasee)": "29,41,61",
+  "   attendu slate-800":                                              "29,41,61",   <- la variante dark: GAGNE
+  "temoin B — bg-white/80 dark:bg-slate-900/60 (opacite : le selecteur
+              .dark .bg-white ne matche pas .bg-white\\/80)":           "9,14,26",    <- la variante dark: GAGNE
+  "temoin C — bg-white dark:bg-slate-900 (ECRASEE, rappel)":            "19,22,26",
+  "   valeur du !important":                                            "19,22,26"    <- le !important GAGNE
+}
+
+CONCLUSION : le dispositif distingue bien les deux issues. Les variantes `dark:` des trois
+utilitaires ecrasees sont mortes ; celles des utilitaires non listees vivent.
+Cf. 04_override-important.txt pour le decompte : 174 declarations `dark:` neutralisees.

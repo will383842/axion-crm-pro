@@ -1,0 +1,10 @@
+=== index INVALIDES (CREATE INDEX CONCURRENTLY interrompu) ===
+-- axion_crm
+-- axion_crm_perf
+-- axion_crm_perf4m
+-- axion_crm_test
+=== index en DOUBLON exact (memes colonnes, meme table) ===
+ tablename | doublons | indexdef_sansnom 
+-----------+----------+------------------
+(0 rows)
+

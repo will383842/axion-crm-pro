@@ -1,0 +1,61 @@
+=== image du conteneur postgres vs image du tag local ===
+conteneur : sha256:7ec90cff5540804956ec0686efa58a6a20f7b76d863a3d1eba31211adbdbbfe1
+tag local : sha256:7ec90cff5540804956ec0686efa58a6a20f7b76d863a3d1eba31211adbdbbfe1
+digest tire : [ghcr.io/will383842/axion-crm-pro-postgres@sha256:7ec90cff5540804956ec0686efa58a6a20f7b76d863a3d1eba31211adbdbbfe1]
+
+=== idem redis ===
+conteneur : sha256:05a97a479bc73de66f087dc05b569010772880f778cc8671fa6b8aadee32e5c6
+tag local : sha256:05a97a479bc73de66f087dc05b569010772880f778cc8671fa6b8aadee32e5c6
+
+=== idem caddy ===
+conteneur : sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+tag local : sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+
+=== env postgres du conteneur (cles seules + longueurs) ===
+POSTGRES_PASSWORD=<len='>
+POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+POSTGRES_DB=axion_crm
+POSTGRES_USER=axion
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/postgresql/16/bin
+GOSU_VERSION=1.17
+LANG=en_US.utf8
+PG_MAJOR=16
+PG_VERSION=16.9-1.pgdg110+1
+PGDATA=/var/lib/postgresql/data
+POSTGIS_MAJOR=3
+POSTGIS_VERSION=3.5.2+dfsg-1.pgdg110+1
+
+
+=== ce que le fichier fusionne declare pour postgres ===
+  postgres:
+    build:
+      context: /opt/axion-crm-pro
+      dockerfile: Dockerfile.postgres
+    container_name: axion-crm-postgres
+    environment:
+      POSTGRES_DB: axion_crm
+      POSTGRES_INITDB_ARGS: --encoding=UTF-8 --lc-collate=C --lc-ctype=C
+      POSTGRES_PASSWORD: axion_dev_only
+      POSTGRES_USER: axion
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U axion -d axion_crm
+      timeout: 5s
+      interval: 5s
+      retries: 20
+    image: ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman
+    networks:
+      axion-crm: null
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: postgres-data
+        target: /var/lib/postgresql/data
+        volume: {}
+      - type: bind
+        source: /opt/axion-crm-pro/infra/postgres/init
+        target: /docker-entrypoint-initdb.d
+        read_only: true
+        bind: {}
+  redis:

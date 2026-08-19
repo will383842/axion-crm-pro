@@ -1,0 +1,31 @@
+﻿2026-08-19T09:42:48.8827004Z ##[group]Run shivammathur/setup-php@v2
+2026-08-19T09:42:48.8828291Z with:
+2026-08-19T09:42:48.8829156Z   php-version: 8.3
+2026-08-19T09:42:48.8830395Z   extensions: pdo, pdo_pgsql, redis, intl, mbstring, bcmath, zip
+2026-08-19T09:42:48.8832072Z   coverage: none
+2026-08-19T09:42:48.8833016Z   tools: composer:v2
+2026-08-19T09:42:48.8833981Z   ini-file: production
+2026-08-19T09:42:48.8844034Z   github-token: ***
+2026-08-19T09:42:48.8844987Z ##[endgroup]
+2026-08-19T09:42:48.9262434Z [command]/usr/bin/bash /home/runner/work/_actions/shivammathur/setup-php/v2/src/scripts/run.sh
+2026-08-19T09:42:48.9744558Z 
+2026-08-19T09:42:48.9746112Z [90;1m==> [0m[37;1mSetup PHP[0m
+2026-08-19T09:42:52.1189667Z [32;1m✓ [0m[34;1mPHP [0m[90;1mUpdated to PHP 8.3.33[0m
+2026-08-19T09:42:52.1190815Z 
+2026-08-19T09:42:52.1191234Z [90;1m==> [0m[37;1mSetup Extensions[0m
+2026-08-19T09:42:52.1752688Z [32;1m✓ [0m[34;1mpdo [0m[90;1mEnabled[0m
+2026-08-19T09:42:52.1772900Z [32;1m✓ [0m[34;1mpdo_pgsql [0m[90;1mEnabled[0m
+2026-08-19T09:42:52.1818712Z [32;1m✓ [0m[34;1mredis [0m[90;1mEnabled[0m
+2026-08-19T09:42:52.1850123Z [32;1m✓ [0m[34;1mintl [0m[90;1mEnabled[0m
+2026-08-19T09:42:52.1883807Z [32;1m✓ [0m[34;1mmbstring [0m[90;1mEnabled[0m
+2026-08-19T09:42:52.1918714Z [32;1m✓ [0m[34;1mbcmath [0m[90;1mEnabled[0m
+2026-08-19T09:42:52.1953608Z [32;1m✓ [0m[34;1mzip [0m[90;1mEnabled[0m
+2026-08-19T09:42:52.1954104Z 
+2026-08-19T09:42:52.1954499Z [90;1m==> [0m[37;1mSetup Tools[0m
+2026-08-19T09:42:52.5684321Z [32;1m✓ [0m[34;1mcomposer [0m[90;1mAdded composer 2.10.2[0m
+2026-08-19T09:42:52.5685059Z 
+2026-08-19T09:42:52.5685295Z [90;1m==> [0m[37;1mSetup Coverage[0m
+2026-08-19T09:42:52.8295719Z [32;1m✓ [0m[34;1mnone [0m[90;1mDisabled Xdebug and PCOV[0m
+2026-08-19T09:42:52.8296842Z 
+2026-08-19T09:42:52.8297719Z [90;1m==> [0m[37;1mSponsor setup-php[0m
+2026-08-19T09:42:52.8298605Z [32;1m✓ [0m[34;1msetup-php [0m[90;1mhttps://setup-php.com/sponsor[0m

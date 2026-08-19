@@ -1,0 +1,25 @@
+===== [A] MOCK_MODE : semantique reelle de `(bool) env(...)` =====
+  Le provider ne lit QUE cette expression : $master = (bool) env('MOCK_MODE', true);
+  Mesure du DEFAUT sur une clef reellement absente :
+    env('A18_CLEF_ABSENTE_XYZ', true) = true   (bool) = true  ->  BRANCHE MOCK
+  Mesure des valeurs, passees en VRAIES variables d'environnement du processus :
+    A18_V_FALSE      = 'false'   env()=false     (bool)=false  -> REEL
+    A18_V_FALSE_MAJ  = 'FALSE'   env()=false     (bool)=false  -> REEL
+    A18_V_ZERO       = '0'       env()='0'       (bool)=false  -> REEL
+    A18_V_VIDE       = ''        env()=''        (bool)=false  -> REEL
+    A18_V_OFF        = 'off'     env()='off'     (bool)=true   -> MOCK
+    A18_V_NO         = 'no'      env()='no'      (bool)=true   -> MOCK
+    A18_V_TRUE       = 'true'    env()=true      (bool)=true   -> MOCK
+    A18_V_UN         = '1'       env()='1'       (bool)=true   -> MOCK
+  Garde d'environnement dans le provider ? AUCUNE
+  config:cache actif (piege dotenv non charge) ? NON
+
+--- COMPLEMENT : la meme bascule cote Node (voir 05_drapeaux_mock_node.txt) ---
+  valeur        PHP (bool)env()   Node (…) !== 'false'
+  ABSENT        MOCK              MOCK      <- les deux echouent vers le mock
+  'false'       REEL              REEL
+  'FALSE'       REEL              MOCK      <- DIVERGENT
+  '0'           REEL              MOCK      <- DIVERGENT
+  '' (vide)     REEL              MOCK      <- DIVERGENT
+  'off'         MOCK              MOCK
+  'no'          MOCK              MOCK

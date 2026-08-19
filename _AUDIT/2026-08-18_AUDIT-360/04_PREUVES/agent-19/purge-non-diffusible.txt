@@ -1,0 +1,21 @@
+=== JEU joue : prospection:purge-non-diffusible sur axion_crm_a19 ===
+✅ 1 entreprises « [ND] » (non diffusibles) supprimées.
+
+[exited with code 0]
+
+=== APRES la purge — ce qui SURVIT dans axion_crm_a19 ===
+   siren   | denomination_entre_crochets | legal_form 
+-----------+-----------------------------+------------
+ 100000002 | [[ND] [ND]]                 | 1000
+ 100000003 | [Jean [ND]]                 | 1000
+ 100000004 | [[ND] ]                     | 5499
+ 100000005 | [[nd]]                      | 1000
+ 100000006 | (NULL)                      | 1000
+ 100000007 | [BOULANGERIE DUPONT SARL]   | 5499
+(6 rows)
+
+ contacts_restants 
+-------------------
+                 1
+(1 row)
+

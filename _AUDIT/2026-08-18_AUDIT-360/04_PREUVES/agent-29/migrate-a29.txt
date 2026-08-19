@@ -1,0 +1,54 @@
+
+   INFO  Preparing database.  
+
+  Creating migration table ......................................... 41 s DONE
+
+   INFO  Running migrations.  
+
+  2026_05_16_000001_create_extensions_and_helpers .................. 48 s DONE
+  2026_05_16_000002_create_auth_tenant_audit_schema ................. 5 s DONE
+  2026_05_16_000003_create_companies_contacts_scraping_schema ....... 3 s DONE
+  2026_05_16_000004_create_llm_proxies_rotations_schema ............. 2 s DONE
+  2026_05_16_000005_create_referentials_geo_naf_schema .............. 5 s DONE
+  2026_05_16_000006_create_coverage_rgpd_aiact_schema ............... 2 s DONE
+  2026_05_16_000007_create_phase2_scaffold_schema ................... 5 s DONE
+  2026_05_16_000008_enable_rls_policies ............................. 1 s DONE
+  2026_05_16_000009_create_quality_score_triggers .............. 195.77ms DONE
+  2026_05_17_000010_phase2_full_scaffold_schema ..................... 9 s DONE
+  2026_05_17_000011_setup_pg_partman_audit_logs ..................... 8 s DONE
+  2026_05_18_000001_apply_rls_dynamic ............................... 1 s DONE
+  2026_05_18_000002_add_onboarding_tour_to_users ............... 117.11ms DONE
+  2026_05_18_000003_create_scraping_campaigns_table ................. 2 s DONE
+  2026_05_18_000004_fix_scraping_campaigns_workspace_id_type .... 44.34ms DONE
+  2026_05_18_000005_add_updated_at_error_message_to_scraper_runs  136.61ms DONE
+  2026_05_18_000006_add_prospection_fields_to_companies ........ 539.70ms DONE
+  2026_05_18_000007_extend_tags_system ......................... 355.31ms DONE
+  2026_05_18_000008_create_email_audiences ..................... 931.49ms DONE
+  2026_05_19_000001_create_email_verification_logs .................. 2 s DONE
+  2026_05_19_000002_create_business_events ..................... 737.32ms DONE
+  2026_05_19_000003_switch_llm_use_cases_to_mistral_primary .... 234.68ms DONE
+  2026_05_19_000004_enable_llm_json_mode_for_axion_use_cases .... 27.92ms DONE
+  2026_07_04_000001_create_health_practitioners ..................... 1 s DONE
+  2026_07_06_000001_add_website_status_to_companies ............ 186.61ms DONE
+  2026_07_06_000002_create_media_and_journalists .................... 1 s DONE
+  2026_07_08_000001_add_website_revalidated_at_to_companies .... 123.52ms DONE
+  2026_07_09_000001_add_enseigne_to_companies ................... 91.81ms DONE
+  2026_07_09_000001_add_extract_journalists_llm_use_case ....... 127.77ms DONE
+  2026_07_09_000002_quality_score_terrain ...................... 377.54ms DONE
+  2026_07_09_000003_backfill_media_website_status_pending ....... 34.86ms DONE
+  2026_07_09_000004_add_companies_denomination_btree_index ..... 120.26ms DONE
+  2026_07_14_000001_media_taxonomy_hardening ................... 254.06ms DONE
+  2026_07_14_000002_add_email_confidence ....................... 117.18ms DONE
+  2026_07_14_000003_add_email_confidence_to_media ............... 79.94ms DONE
+  2026_08_14_000001_harden_workspace_isolation ...................... 2 s DONE
+  2026_08_14_000002_crm_socle_taxonomie_business ............... 846.03ms DONE
+  2026_08_14_000003_crm_socle_vivier_candidats ...................... 1 s DONE
+  2026_08_14_000004_crm_socle_tags_optout_timeline .................. 1 s DONE
+  2026_08_14_000005_crm_socle_index_concurrents ..................... 2 s DONE
+  2026_08_14_000006_crm_scraping_sources ............................ 1 s DONE
+  2026_08_14_000007_crm_outbound_events ........................ 384.43ms DONE
+  2026_08_15_000001_company_tag_assigned_by_backfill ............ 52.82ms DONE
+  2026_08_15_000002_companies_hub_temperature_index ............ 136.20ms DONE
+  2026_08_15_000003_contacts_liste_console_index ............... 370.23ms DONE
+  2026_08_15_000004_email_suppressions .............................. 3 s DONE
+  2026_08_15_000005_permission_contacts_view_pii 

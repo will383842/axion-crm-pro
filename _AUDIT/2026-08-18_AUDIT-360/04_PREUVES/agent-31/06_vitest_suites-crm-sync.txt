@@ -1,0 +1,27 @@
+[90mstderr[2m | src/server/crm-sync/__tests__/crm-sync-l5.test.ts[2m > [22m[2mbatch de réconciliation[2m > [22m[2maucun écart : le rapport reste émis (signal de vie) et n'alerte pas
+[22m[39m[crm-sync][réconciliation] {"ranAt":"2026-08-19T11:18:00.099Z","since":"2026-08-19T11:18:00.099Z","totalMissing":0,"familles":[{"famille":"submission","sources":1,"manquants":0},{"famille":"job_application","sources":0,"manquants":0,"ignoree":"flux candidats fermé (CRM_SYNC_CANDIDATES_ENABLED)"},{"famille":"calendly_event","sources":0,"manquants":0},{"famille":"newsletter_subscriber","sources":0,"manquants":0},{"famille":"customer_review","sources":0,"manquants":0}]}
+
+ [32m✓[39m src/server/crm-sync/__tests__/crm-sync-l5.test.ts [2m([22m[2m35 tests[22m[2m)[22m[33m 516[2mms[22m[39m
+[90mstderr[2m | src/server/crm-sync/__tests__/crm-sync.test.ts[2m > [22m[2mconstruction de l'événement[2m > [22m[2mne lève JAMAIS, même si l'écriture de l'outbox échoue
+[22m[39m[crm-sync] écriture outbox échouée (événement perdu): Error: base indisponible
+    at [90mC:\Users\willi\Documents\Projets\Axion-IA\axionia\[39msrc\server\crm-sync\__tests__\crm-sync.test.ts:244:38
+    at [90mfile:///C:/Users/willi/Documents/Projets/Axion-IA/axionia/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@2.1.9/node_modules/[4m@vitest/runner[24m/dist/index.js:146:14
+    at [90mfile:///C:/Users/willi/Documents/Projets/Axion-IA/axionia/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@2.1.9/node_modules/[4m@vitest/runner[24m/dist/index.js:533:11
+    at runWithTimeout [90m(file:///C:/Users/willi/Documents/Projets/Axion-IA/axionia/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@2.1.9/node_modules/[4m@vitest/runner[24m/dist/index.js:39:7[90m)[39m
+    at runTest [90m(file:///C:/Users/willi/Documents/Projets/Axion-IA/axionia/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@2.1.9/node_modules/[4m@vitest/runner[24m/dist/index.js:1056:17[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+    at runSuite [90m(file:///C:/Users/willi/Documents/Projets/Axion-IA/axionia/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@2.1.9/node_modules/[4m@vitest/runner[24m/dist/index.js:1205:15[90m)[39m
+    at runSuite [90m(file:///C:/Users/willi/Documents/Projets/Axion-IA/axionia/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@2.1.9/node_modules/[4m@vitest/runner[24m/dist/index.js:1205:15[90m)[39m
+    at runFiles [90m(file:///C:/Users/willi/Documents/Projets/Axion-IA/axionia/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@2.1.9/node_modules/[4m@vitest/runner[24m/dist/index.js:1262:5[90m)[39m
+    at startTests [90m(file:///C:/Users/willi/Documents/Projets/Axion-IA/axionia/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@2.1.9/node_modules/[4m@vitest/runner[24m/dist/index.js:1271:3[90m)[39m
+
+ [32m✓[39m src/server/crm-sync/__tests__/crm-sync.test.ts [2m([22m[2m17 tests[22m[2m)[22m[90m 287[2mms[22m[39m
+ [32m✓[39m src/app/api/internal/crm-webhook/__tests__/route.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 90[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[32m59 passed[39m[22m[90m (59)[39m
+[2m   Start at [22m 13:14:47
+[2m   Duration [22m 445.68s[2m (transform 6.47s, setup 44.95s, collect 175.91s, tests 893ms, environment 191.18s, prepare 12.58s)[22m
+
+
+[exited with code 0]

@@ -1,0 +1,163 @@
++ echo '== reconstruction n1 =='
+== reconstruction n1 ==
++ docker exec -e TELESCOPE_ENABLED=false axion-crm-api php artisan migrate:fresh --force
+
+  Dropping all tables ............................................... 5 s DONE
+
+   INFO  Preparing database.  
+
+  Creating migration table ..................................... 915.31ms DONE
+
+   INFO  Running migrations.  
+
+  2026_05_16_000001_create_extensions_and_helpers ................... 1 s DONE
+  2026_05_16_000002_create_auth_tenant_audit_schema ................. 2 s DONE
+  2026_05_16_000003_create_companies_contacts_scraping_schema ....... 1 s DONE
+  2026_05_16_000004_create_llm_proxies_rotations_schema ............. 1 s DONE
+  2026_05_16_000005_create_referentials_geo_naf_schema .............. 1 s DONE
+  2026_05_16_000006_create_coverage_rgpd_aiact_schema .......... 542.98ms DONE
+  2026_05_16_000007_create_phase2_scaffold_schema .............. 572.53ms DONE
+  2026_05_16_000008_enable_rls_policies ........................ 804.90ms DONE
+  2026_05_16_000009_create_quality_score_triggers ............... 46.74ms DONE
+  2026_05_17_000010_phase2_full_scaffold_schema ..................... 2 s DONE
+  2026_05_17_000011_setup_pg_partman_audit_logs ..................... 2 s DONE
+  2026_05_18_000001_apply_rls_dynamic ............................... 1 s DONE
+  2026_05_18_000002_add_onboarding_tour_to_users ................ 18.52ms DONE
+  2026_05_18_000003_create_scraping_campaigns_table ............ 251.78ms DONE
+  2026_05_18_000004_fix_scraping_campaigns_workspace_id_type .... 15.03ms DONE
+  2026_05_18_000005_add_updated_at_error_message_to_scraper_runs  93.06ms DONE
+  2026_05_18_000006_add_prospection_fields_to_companies ........ 153.56ms DONE
+  2026_05_18_000007_extend_tags_system ......................... 101.72ms DONE
+  2026_05_18_000008_create_email_audiences ..................... 395.66ms DONE
+  2026_05_19_000001_create_email_verification_logs .................. 1 s DONE
+  2026_05_19_000002_create_business_events ..................... 185.28ms DONE
+  2026_05_19_000003_switch_llm_use_cases_to_mistral_primary ...... 8.54ms DONE
+  2026_05_19_000004_enable_llm_json_mode_for_axion_use_cases .... 11.17ms DONE
+  2026_07_04_000001_create_health_practitioners ..................... 1 s DONE
+  2026_07_06_000001_add_website_status_to_companies ............. 40.57ms DONE
+  2026_07_06_000002_create_media_and_journalists ............... 927.20ms DONE
+  2026_07_08_000001_add_website_revalidated_at_to_companies .... 119.58ms DONE
+  2026_07_09_000001_add_enseigne_to_companies ................... 21.37ms DONE
+  2026_07_09_000001_add_extract_journalists_llm_use_case ........ 57.00ms DONE
+  2026_07_09_000002_quality_score_terrain ...................... 119.46ms DONE
+  2026_07_09_000003_backfill_media_website_status_pending ........ 3.61ms DONE
+  2026_07_09_000004_add_companies_denomination_btree_index ..... 147.25ms DONE
+  2026_07_14_000001_media_taxonomy_hardening .................... 93.80ms DONE
+  2026_07_14_000002_add_email_confidence ....................... 164.85ms DONE
+  2026_07_14_000003_add_email_confidence_to_media ............... 84.18ms DONE
+  2026_08_14_000001_harden_workspace_isolation ................. 993.62ms DONE
+  2026_08_14_000002_crm_socle_taxonomie_business ............... 374.33ms DONE
+  2026_08_14_000003_crm_socle_vivier_candidats ................. 892.07ms DONE
+  2026_08_14_000004_crm_socle_tags_optout_timeline ............. 569.41ms DONE
+  2026_08_14_000005_crm_socle_index_concurrents ................ 375.78ms DONE
+  2026_08_14_000006_crm_scraping_sources ....................... 680.57ms DONE
+  2026_08_14_000007_crm_outbound_events ........................ 143.61ms DONE
+  2026_08_15_000001_company_tag_assigned_by_backfill ............ 39.13ms DONE
+  2026_08_15_000002_companies_hub_temperature_index ............ 105.32ms DONE
+  2026_08_15_000003_contacts_liste_console_index ............... 215.63ms DONE
+  2026_08_15_000004_email_suppressions ......................... 634.45ms DONE
+  2026_08_15_000005_permission_contacts_view_pii ................... 15 s DONE
+  2026_08_15_000006_companies_created_at_index .................. 60.08ms DONE
+  2026_08_15_100001_seed_implantations_fr_etranger_source ....... 70.79ms DONE
+  2026_08_15_120001_companies_entites_sans_siren ............... 173.03ms DONE
+  2026_08_15_120002_companies_foreign_id_unique_index .......... 124.86ms DONE
+  2026_08_16_000001_audit_logs_prev_hash_default ................ 17.67ms DONE
+  2026_08_16_200000_fixer_search_path_des_fonctions ............. 15.24ms DONE
+  2026_08_17_000001_companies_hub_tous_index .................... 53.30ms DONE
+  2026_08_18_000001_backfill_empreintes_oppositions [2026-08-19 12:03:14] local.INFO: Remplissage des empreintes d’opposition {"table":"opt_out","empreintes_calculees":0} 
+[2026-08-19 12:03:14] local.INFO: Remplissage des empreintes d’opposition {"table":"email_suppressions","empreintes_calculees":0} 
+................. 7 s DONE
+  2026_08_18_100001_partman_dans_son_propre_schema .............. 27.29ms DONE
+  2026_08_19_000001_companies_hub_counts_index ................. 233.37ms DONE
+  2026_08_19_000002_crm_activites_et_motifs ......................... 1 s DONE
+
++ echo RC1=0
+RC1=0
++ echo '== reconstruction n2 (celle qui echouait) =='
+== reconstruction n2 (celle qui echouait) ==
++ docker exec -e TELESCOPE_ENABLED=false axion-crm-api php artisan migrate:fresh --force
+
+  Dropping all tables ............................................... 9 s DONE
+
+   INFO  Preparing database.  
+
+  Creating migration table ..................................... 613.91ms DONE
+
+   INFO  Running migrations.  
+
+  2026_05_16_000001_create_extensions_and_helpers ................... 2 s DONE
+  2026_05_16_000002_create_auth_tenant_audit_schema ................. 3 s DONE
+  2026_05_16_000003_create_companies_contacts_scraping_schema ....... 1 s DONE
+  2026_05_16_000004_create_llm_proxies_rotations_schema ............. 1 s DONE
+  2026_05_16_000005_create_referentials_geo_naf_schema .............. 1 s DONE
+  2026_05_16_000006_create_coverage_rgpd_aiact_schema ............... 1 s DONE
+  2026_05_16_000007_create_phase2_scaffold_schema ................... 1 s DONE
+  2026_05_16_000008_enable_rls_policies ........................ 682.79ms DONE
+  2026_05_16_000009_create_quality_score_triggers ............... 35.95ms DONE
+  2026_05_17_000010_phase2_full_scaffold_schema ..................... 3 s DONE
+  2026_05_17_000011_setup_pg_partman_audit_logs ..................... 3 s DONE
+  2026_05_18_000001_apply_rls_dynamic .......................... 997.02ms DONE
+  2026_05_18_000002_add_onboarding_tour_to_users ................ 42.05ms DONE
+  2026_05_18_000003_create_scraping_campaigns_table ............ 356.20ms DONE
+  2026_05_18_000004_fix_scraping_campaigns_workspace_id_type .... 30.02ms DONE
+  2026_05_18_000005_add_updated_at_error_message_to_scraper_runs  35.55ms DONE
+  2026_05_18_000006_add_prospection_fields_to_companies ........ 472.69ms DONE
+  2026_05_18_000007_extend_tags_system ......................... 278.07ms DONE
+  2026_05_18_000008_create_email_audiences ..................... 622.76ms DONE
+  2026_05_19_000001_create_email_verification_logs .................. 2 s DONE
+  2026_05_19_000002_create_business_events ..................... 494.83ms DONE
+  2026_05_19_000003_switch_llm_use_cases_to_mistral_primary ...... 6.74ms DONE
+  2026_05_19_000004_enable_llm_json_mode_for_axion_use_cases .... 18.42ms DONE
+  2026_07_04_000001_create_health_practitioners ................ 781.02ms DONE
+  2026_07_06_000001_add_website_status_to_companies ............. 77.87ms DONE
+  2026_07_06_000002_create_media_and_journalists .................... 1 s DONE
+  2026_07_08_000001_add_website_revalidated_at_to_companies ..... 53.18ms DONE
+  2026_07_09_000001_add_enseigne_to_companies ................... 40.01ms DONE
+  2026_07_09_000001_add_extract_journalists_llm_use_case ........ 42.90ms DONE
+  2026_07_09_000002_quality_score_terrain ........................ 7.76ms DONE
+  2026_07_09_000003_backfill_media_website_status_pending ........ 3.33ms DONE
+  2026_07_09_000004_add_companies_denomination_btree_index ..... 208.16ms DONE
+  2026_07_14_000001_media_taxonomy_hardening ................... 141.34ms DONE
+  2026_07_14_000002_add_email_confidence ....................... 174.19ms DONE
+  2026_07_14_000003_add_email_confidence_to_media ............... 71.22ms DONE
+  2026_08_14_000001_harden_workspace_isolation ...................... 1 s DONE
+  2026_08_14_000002_crm_socle_taxonomie_business ............... 537.41ms DONE
+  2026_08_14_000003_crm_socle_vivier_candidats ................. 755.99ms DONE
+  2026_08_14_000004_crm_socle_tags_optout_timeline ............. 417.32ms DONE
+  2026_08_14_000005_crm_socle_index_concurrents ................ 455.80ms DONE
+  2026_08_14_000006_crm_scraping_sources ....................... 427.87ms DONE
+  2026_08_14_000007_crm_outbound_events ........................ 228.60ms DONE
+  2026_08_15_000001_company_tag_assigned_by_backfill ............ 12.52ms DONE
+  2026_08_15_000002_companies_hub_temperature_index ............ 103.29ms DONE
+  2026_08_15_000003_contacts_liste_console_index ............... 297.69ms DONE
+  2026_08_15_000004_email_suppressions ......................... 726.81ms DONE
+  2026_08_15_000005_permission_contacts_view_pii .................... 9 s DONE
+  2026_08_15_000006_companies_created_at_index ................. 121.54ms DONE
+  2026_08_15_100001_seed_implantations_fr_etranger_source ....... 51.44ms DONE
+  2026_08_15_120001_companies_entites_sans_siren ................ 55.51ms DONE
+  2026_08_15_120002_companies_foreign_id_unique_index .......... 170.12ms DONE
+  2026_08_16_000001_audit_logs_prev_hash_default ................ 47.45ms DONE
+  2026_08_16_200000_fixer_search_path_des_fonctions ............. 47.87ms DONE
+  2026_08_17_000001_companies_hub_tous_index ................... 190.06ms DONE
+  2026_08_18_000001_backfill_empreintes_oppositions [2026-08-19 12:08:34] local.INFO: Remplissage des empreintes d’opposition {"table":"opt_out","empreintes_calculees":0} 
+[2026-08-19 12:08:35] local.INFO: Remplissage des empreintes d’opposition {"table":"email_suppressions","empreintes_calculees":0} 
+................ 11 s DONE
+  2026_08_18_100001_partman_dans_son_propre_schema ............... 4.15ms DONE
+  2026_08_19_000001_companies_hub_counts_index ................. 156.95ms DONE
+  2026_08_19_000002_crm_activites_et_motifs ......................... 2 s DONE
+
++ echo RC2=0
+RC2=0
++ echo '== pg_partman hors de public =='
+== pg_partman hors de public ==
++ docker exec axion-crm-postgres psql -U axion -d axion_crm -tAc 'select n.nspname from pg_extension e join pg_namespace n on n.oid = e.extnamespace where e.extname = '\''pg_partman'\'''
+partman
++ docker exec axion-crm-postgres psql -U axion -d axion_crm -tAc 'select count(*) from partman.part_config where parent_table = '\''public.audit_logs'\'''
+1
++ docker exec axion-crm-postgres psql -U axion -d axion_crm -c 'select parent_table, partition_type, partition_interval, premake, retention from partman.part_config;'
+   parent_table    | partition_type | partition_interval | premake | retention 
+-------------------+----------------+--------------------+---------+-----------
+ public.audit_logs | range          | 1 mon              |       6 | 24 months
+(1 row)
+
+EXIT_GLOBAL=0

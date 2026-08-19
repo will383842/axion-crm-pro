@@ -1,0 +1,30 @@
+=== F8 : routes 501 / factices ===
+250:        // et répondait 501. Ce fourre-tout a été RETIRÉ (F7, étape 0) : le
+252:        // et toute sous-route non déclarée répond 404 — plus 501.
+284:        // --- Phase 2 (stubs, retournent 501 Not Implemented) ---------------
+293:        // 501 au lieu de 404. Désormais : ce qui n'est pas déclaré est 404.
+295:        // `/v1/crm/*`. Garde : `tests/Feature/PasDeStub501SousCrmEtAnalyticsTest.php`.
+=== recherche cold-email / linkedin / crm / analytics ===
+287:        // 🔴 F7 — `/crm{any?}` et `/analytics{any?}` RETIRÉS (préalable étape 0).
+297:        // `/cold-email` et `/linkedin` sont CONSERVÉS à dessein : ces noms
+300:        Route::any('/cold-email{any?}', ColdEmailController::class)->where('any', '.*');
+301:        Route::any('/linkedin{any?}', LinkedInController::class)->where('any', '.*');
+=== frontend nav vers 501 ===
+frontend/src/app/routeTree.tsx:42:// et `/analytics` sont LIBRES. Le préfixe `/console` est conservé tel quel —
+frontend/src/app/routeTree.tsx:102:const coldEmailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/cold-email', component: ColdEmailStub });
+frontend/src/app/routeTree.tsx:103:const linkedInRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/linkedin', component: LinkedInStub });
+frontend/src/app/routeTree.tsx:104:// F7 — `/crm` et `/analytics` retirés : les écrans bouchons portaient le
+frontend/src/components/layout/AutoBreadcrumbs.tsx:28:  '/cold-email': 'E-mails à froid',
+frontend/src/components/layout/AutoBreadcrumbs.tsx:29:  '/linkedin': 'Prospection LinkedIn',
+frontend/src/components/layout/AutoBreadcrumbs.tsx:30:  // F7 — `/crm` et `/analytics` retirés du routeur : plus de libellé à mapper.
+frontend/src/components/layout/Sidebar.tsx:76: *    les routes `/cold-email` et `/linkedin` restent joignables par URL ;
+frontend/src/features/companies/CompanyDetailPage.tsx:42:  linkedin_url?: string | null;
+frontend/src/features/companies/CompanyDetailPage.tsx:199:                {c.linkedin_url ? (
+frontend/src/features/companies/CompanyDetailPage.tsx:200:                  <a className="text-brand-600 hover:underline dark:text-sky-400" href={c.linkedin_url} target="_blank" rel="noopener noreferrer">
+frontend/src/features/companies/components/ContactsCard.tsx:12:  linkedin_url?: string | null;
+frontend/src/features/companies/components/ContactsCard.tsx:68:                  {ct.linkedin_url ? (
+frontend/src/features/companies/components/ContactsCard.tsx:70:                      href={ct.linkedin_url}
+frontend/src/features/companies/components/EnrichmentTimeline.tsx:24:    { key: 'linkedin', label: 'LinkedIn' },
+frontend/src/features/contacts/ContactsListPage.tsx:28:  linkedin_url?: string | null;
+frontend/src/features/contacts/ContactsListPage.tsx:276:                    {c.linkedin_url ? (
+frontend/src/features/contacts/ContactsListPage.tsx:278:                        href={c.linkedin_url}

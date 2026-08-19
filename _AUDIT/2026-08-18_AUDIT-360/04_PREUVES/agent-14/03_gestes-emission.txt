@@ -1,0 +1,17 @@
+=== GESTES JOUES — base isolee axion_crm_agent14 (creee pour cet audit ; axion_crm est remis a neuf en continu par les autres agents) ===
+commande : docker exec -e DB_DATABASE=axion_crm_agent14 axion-crm-api php artisan tinker --execute=<script>
+
+workspace=5c01d6a9-b650-46ea-a08f-eceaf51f1171
+journalist=1
+--- GESTE : POST /journalists/{id}/opt-out via le controleur reel ---
+http=200
+--- GESTE : traitement d une demande RGPD erasure ---
+rgpd_request=1
+[2026-08-19 12:16:36] local.INFO: GDPR erasure complete {"email":"agent14-efface@example.test","deleted":{"contacts":0,"email_validations":0,"rgpd_requests":0,"notifications":0,"magic_links":0,"journalists":0,"media_email":0,"health_practitioners":0}} 
+http=200
+--- LIGNES PRODUITES ---
+{"id":1,"event_id":"2bdc1c8d-9b4a-4254-8f31-efbca1d4497a","event_type":"consent_optout","person_key":null,"email_hash":"85331a510bc1a61e00678a485a1394a9dcf8ad4d56affcfea71dbe34c49d0a0e","scope":"business","origin":"crm","payload":"{\"surface\": \"console:journalists\", \"journalist_id\": 1}","status":"pending","attempts":0,"last_error":null,"next_attempt_at":"2026-08-19 12:15:38+00","sent_at":null,"created_at":"2026-08-19 12:15:38+00","updated_at":"2026-08-19 12:15:38+00"}
+{"id":2,"event_id":"846ebf64-98fd-4048-9d1e-e8114b079cce","event_type":"erasure","person_key":null,"email_hash":"e921eeee15f794e9614bb8188d567113fde0cf9477bad6b39b6040c2faa9da36","scope":"business","origin":"crm","payload":"{\"surface\": \"console:rgpd_requests\", \"rgpd_request_id\": 1}","status":"pending","attempts":0,"last_error":null,"next_attempt_at":"2026-08-19 12:16:36+00","sent_at":null,"created_at":"2026-08-19 12:16:36+00","updated_at":"2026-08-19 12:16:36+00"}
+TOTAL=2
+
+[exited with code 0]

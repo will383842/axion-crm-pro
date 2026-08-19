@@ -1,0 +1,15 @@
+##### TLS api.axion-crm-pro.com
+  tls1     curl: try 'curl --help' or 'curl --manual' for more information
+  tls1_1   curl: try 'curl --help' or 'curl --manual' for more information
+  tls1_2   curl: try 'curl --help' or 'curl --manual' for more information
+  tls1_3   curl: try 'curl --help' or 'curl --manual' for more information
+##### TLS app.axion-crm-pro.com
+  tls1     curl: try 'curl --help' or 'curl --manual' for more information
+  tls1_1   curl: try 'curl --help' or 'curl --manual' for more information
+  tls1_2   curl: try 'curl --help' or 'curl --manual' for more information
+  tls1_3   curl: try 'curl --help' or 'curl --manual' for more information
+##### TLS staging-api.axion-crm-pro.com
+  tls1     curl: try 'curl --help' or 'curl --manual' for more information
+  tls1_1   curl: try 'curl --help' or 'curl --manual' for more information
+  tls1_2   curl: try 'curl --help' or 'curl --manual' for more information
+  tls1_3   curl: try 'curl --help' or 'curl --manual' for more information

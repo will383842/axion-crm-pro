@@ -1,0 +1,46 @@
+# Agent 11 — EtancheiteParTableTest joue sur main SANS aucune modification : 4 echecs / 11 tests.
+# (sortie tronquee par le tail de la commande initiale ; deux des quatre echecs sont lisibles)
+# commande : docker exec axion-crm-api php artisan test --filter=EtancheiteParTable
+
+    379▕     // TÉMOIN — le détecteur SAIT voir la forme COALESCE : il trouve bel et bien
+    380▕     // la policy fautive de `email_verification_logs`. Sans ce contrôle, un
+    381▕     // détecteur devenu aveugle (motif mal écrit, colonne renommée) rendrait la
+    382▕     // liste vide et le test vert, exactement comme l'ancien.
+  ➜ 383▕     expect(in_array('email_verification_logs.email_verif_workspace_isolation', $connues, true))->toBeTrue(
+    384▕         'Le détecteur ne trouve plus la policy permissive connue de email_verification_logs. '
+    385▕         . 'Soit elle a été CORRIGÉE — auquel cas retirer la table de EtancheiteWorkspace::DEFAUTS_CONNUS '
+    386▕         . 'et supprimer le test « DÉFAUT CONNU » —, soit le détecteur est devenu AVEUGLE, '
+    387▕         . "et c'est exactement le défaut qu'il remplace.",
+
+  1   tests/Feature/EtancheiteParTableTest.php:383
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\EtancheiteParTableTest > le semeur couvre TOUTES le…   
+  Ces tables portent workspace_id mais ne sont semées par personne : audit_logs. Sans ligne dedans, « aucune ligne visible sans contexte » est vrai par VACUITÉ : le contrôle passerait sans rien prouver. Ajouter la charge utile dans SemeurTablesScopees::semer() et le nom dans ::ORDRE.
+Failed asserting that two arrays are identical.
+  -Array &0 []
+  +Array &0 [
+  +    0 => 'audit_logs',
+  +]
+  
+
+  at tests/Feature/EtancheiteParTableTest.php:208
+    204▕ 
+    205▕     $nonSemees = array_values(array_diff($scannees, $semeesTriees));
+    206▕     $semeesInconnues = array_values(array_diff($semeesTriees, $scannees));
+    207▕ 
+  ➜ 208▕     expect($nonSemees)->toBe(
+    209▕         [],
+    210▕         'Ces tables portent workspace_id mais ne sont semées par personne : ' . implode(', ', $nonSemees)
+    211▕         . '. Sans ligne dedans, « aucune ligne visible sans contexte » est vrai par VACUITÉ : '
+    212▕         . 'le contrôle passerait sans rien prouver. Ajouter la charge utile dans '
+
+  1   tests/Feature/EtancheiteParTableTest.php:208
+
+
+  Tests:    4 failed, 7 passed (48 assertions)
+  Duration: 784.76s
+  Random Order Seed: 1787134200
+
+
+[exited with code 0]

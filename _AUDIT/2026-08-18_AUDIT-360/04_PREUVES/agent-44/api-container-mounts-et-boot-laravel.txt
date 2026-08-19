@@ -1,0 +1,14 @@
+bind C:\Users\willi\Documents\Projets\Axion-CRM-Pro\infra\php\opcache-local.ini -> /usr/local/etc/php/conf.d/zz-opcache-local.ini
+bind C:\Users\willi\Documents\Projets\Axion-CRM-Pro\backend -> /var/www/html
+
+=== timings in container (busy) ===
+1real	0m 0.22s
+user	0m 0.06s
+sys	0m 0.09s
+
+Laravel Framework 12.62.0
+real	3m 12.92s
+user	0m 2.00s
+sys	0m 8.00s
+
+[exited with code 0]

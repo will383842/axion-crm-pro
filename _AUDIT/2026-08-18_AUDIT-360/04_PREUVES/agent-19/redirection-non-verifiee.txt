@@ -1,0 +1,8 @@
+=== PREUVE : la garde ne voit que l URL de depart ; la redirection n est pas re-verifiee ===
+Deux serveurs LOCAUX dans axion-crm-api : 9911 -> 302 -> 9912. Aucune requete vers un site tiers reel.
+
+SsrfGuard::check(URL de depart)  = {"ok":false,"reason":"deny_host:127.0.0.1"}
+Corps recu apres suivi de la 302 = CIBLE-INTERNE-ATTEINTE
+Statut final                     = 200
+
+Conclusion : le client suit la 302 vers un AUTRE hote et l atteint. Aucune re-verification.

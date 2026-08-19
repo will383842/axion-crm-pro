@@ -1,0 +1,75 @@
+=== F35-008 — le mot de passe initial du proprietaire, en clair sur le disque ===
+Reference : main e8924b8 — database/seeders/OwnerUserSeeder.php
+
+--- le fichier existe dans cet atelier (contenu NON reproduit : c'est un secret) ---
+-rw-r--r-- 1 willi 197609 253 Aug 18 14:28 C:/Users/willi/Documents/Projets/Axion-CRM-Pro/backend/storage/app/private/seeders/owner-initial-password.txt
+
+--- le code qui l'ecrit (l.143-161) ---
+    /**
+     * Persiste le password généré sur disk (local, mode 0600) ET log warning.
+     * L'admin peut récupérer le password puis supprimer le fichier.
+     */
+    private function persistGeneratedPassword(string $email, string $password): void
+    {
+        $line = sprintf(
+            "# Axion CRM Pro — owner initial password (généré au seed)\n# Email     : %s\n# Généré le : %s\n# IMPORTANT : copie ce password puis SUPPRIME ce fichier après 1er login.\n%s\n",
+            $email,
+            now()->toIso8601String(),
+            $password,
+        );
+
+        try {
+            Storage::disk('local')->put('seeders/owner-initial-password.txt', $line);
+        } catch (\Throwable $e) {
+            // Pas de Storage dispo (tests ?) → on ne casse pas le seed.
+        }
+
+
+--- et qui l'affiche AUSSI sur la sortie standard du seed (l.162-171) ---
+        // Output stdout (artisan db:seed l'affichera)
+        $this->command?->warn(str_repeat('=', 72));
+        $this->command?->warn('OwnerUserSeeder — password généré automatiquement (OWNER_INITIAL_PASSWORD vide).');
+        $this->command?->warn(sprintf('  Email    : %s', $email));
+        $this->command?->warn(sprintf('  Password : %s', $password));
+        $this->command?->warn('  Fichier  : storage/app/private/seeders/owner-initial-password.txt (mode 0600)');
+        $this->command?->warn('  Action   : copie ce password puis rotate-le après 1er login.');
+        $this->command?->warn(str_repeat('=', 72));
+    }
+}
+
+--- POURQUOI le commentaire « mode 0600 » est FAUX ---
+1) le disque 'local' ne declare aucune visibilite (config/filesystems.php l.7-13) :
+        'local' => [
+            'driver' => 'local',
+            'root'   => storage_path('app/private'),
+            'serve'  => true,
+            'throw'  => false,
+            'report' => false,
+        ],
+2) LocalFilesystemAdapter::writeToFile() n'applique un chmod QUE si l'option
+   'visibility' est passee a put() — elle ne l'est pas ici :
+grep: C:/Users/willi/Documents/Projets/Axion-CRM-Pro/backend/vendor/league/flysystem/src/Local/LocalFilesystemAdapter.php: No such file or directory
+3) sans cette option le fichier prend le umask du processus (022 dans l'image),
+   soit 0644 — lisible par TOUT utilisateur du serveur.
+   (Pour memoire, PortableVisibilityConverter : filePublic 0644, filePrivate 0600.)
+
+--- CONTRE-EPREUVE : ce fichier est-il servi par HTTP ? NON ---
+config/filesystems.php pose 'serve' => true : la route nommee 'storage.local' EXISTE
+(relevee dans la liste des routes nommees de l'application). Mais ServeFile exige
+une signature pour un disque de visibilite 'private' (defaut) :
+    public function __invoke(Request $request, string $path)
+    {
+        abort_unless(
+            $this->hasValidSignature($request),
+            $this->isProduction ? 404 : 403
+        );
+        try {
+    protected function hasValidSignature(Request $request): bool
+    {
+        return ! $request->boolean('upload') && (
+            ($this->config['visibility'] ?? 'private') === 'public' ||
+            $request->hasValidRelativeSignature()
+        );
+    }
+  -> GET /storage/seeders/owner-initial-password.txt sans signature = 403 hors prod, 404 en prod.
+  -> l'exposition est SUR LE DISQUE du serveur, pas par le reseau.

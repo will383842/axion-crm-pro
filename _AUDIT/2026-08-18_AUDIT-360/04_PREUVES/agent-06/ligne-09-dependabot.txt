@@ -1,0 +1,26 @@
+== gh pr list (open) ==
+(fin - vide = 0 PR)
+== branches dependabot sur origin ==
+0
+== branches dependabot locales ==
+20
+== security_and_analysis ==
+{"dependabot_security_updates":{"status":"enabled"},"secret_scanning":{"status":"enabled"},"secret_scanning_non_provider_patterns":{"status":"disabled"},"secret_scanning_push_protection":{"status":"enabled"},"secret_scanning_validity_checks":{"status":"disabled"}}
+== alertes ouvertes par severite ==
+     18 medium	npm	axios
+      6 medium	npm	undici
+      4 high	npm	undici
+      4 critical	npm	vitest
+      3 medium	npm	vite
+      3 high	npm	brace-expansion
+      2 medium	npm	postcss
+      2 low	npm	undici
+      2 low	npm	esbuild
+      2 high	npm	vite
+      2 high	npm	postcss
+      2 high	npm	js-yaml
+      2 high	npm	form-data
+      2 high	npm	axios
+      1 medium	npm	js-yaml
+      1 medium	npm	esbuild
+      1 high	npm	ws

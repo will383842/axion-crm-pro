@@ -1,0 +1,36 @@
+### PONT LARAVEL -> NODE : la clef Redis
+-- 1. Laravel : DispatchScrapeJob->handle() a pousse (mesure precedente)
+   prefix=axion_crm_pro_database_   REDIS_QUEUE_DB=1   WORKER_REDIS_URL=redis://redis:6379/1
+
+-- 2. Clefs presentes en base 1 :
+axion_crm_pro_database_axion:scrape:google-maps
+
+-- 3. Contenu de la clef ecrite par Laravel :
+{"run_id":"2aa0d71665a7a8ba","source":"google-maps","company_id":1,"target_url":null,"context":{"q":"test"},"enqueued_at":"2026-08-19T12:00:54+02:00","attempts":0,"max_attempts":3}
+
+-- 4. TEMOIN NEGATIF : le BRPOP EXACT de workers/src/scrapers/base.ts:159
+   redis.brpop('axion:scrape:google-maps', 30)  -- ici timeout 3s
+
+   ^ vide : le worker ne voit PAS le job de Laravel
+
+-- 5. TEMOIN POSITIF : le meme BRPOP voit un job pousse sur la clef NUE
+1
+axion:scrape:google-maps
+{"temoin":1}
+
+-- 6. Le drapeau d'annulation ecrit par ScraperRunsController::cancel (Redis::setex, connexion DEFAUT)
+   base par defaut REDIS_DB=0, prefixe applique. Aucune lecture cote workers :
+   AUCUNE OCCURRENCE de 'cancel' dans workers/src (7 fichiers, 1363 lignes)
+
+-- 7. PREUVE FINALE : ou atterrissent reellement les drapeaux d'annulation
+   (releve apres avoir rejoue le corps de ScraperRunsController::cancel)
+   redis-cli -n 0 --scan --pattern '*cancelled:scraper-run*' :
+axion_crm_pro_database_cancelled:scraper-run:9
+axion_crm_pro_database_cancelled:scraper-run:78
+axion_crm_pro_database_cancelled:scraper-run:11
+axion_crm_pro_database_cancelled:scraper-run:8
+axion_crm_pro_database_cancelled:scraper-run:4
+axion_crm_pro_database_cancelled:scraper-run:14
+axion_crm_pro_database_cancelled:scraper-run:13
+   -> base 0, PREFIXES. Les jobs, eux, sont en base 1 SANS prefixe.
+   -> le worker (WORKER_REDIS_URL=redis://redis:6379/1) ne peut voir NI l'un NI l'autre.

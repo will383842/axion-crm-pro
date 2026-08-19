@@ -1,0 +1,33 @@
+### CRLF des scripts .sh — MESURE VALIDE (octets 0x0d comptes par od)
+### 2026-08-19. Reference main c0c453d (code identique a HEAD 1145473).
+
+!! CONTROLE ECARTE : `grep -c $'\r'` est AVEUGLE dans ce Git Bash.
+!! Sur un fichier LF fabrique il rend 2 sur 2 lignes, exactement comme sur
+!! un fichier CRLF. Il aurait 'prouve' que TOUS les fichiers sont en CRLF.
+!! C'est le temoin negatif qui l'a demasque. Controle retenu : comptage od.
+
+--- temoin negatif du controle retenu ---
+fichier LF   fabrique (printf '#!/bin/sh\necho ok\n')   -> 18 octets, 0x0d = 0
+fichier CRLF fabrique (printf '#!/bin/sh\r\necho ok\r\n') -> 20 octets, 0x0d = 2
+Le controle distingue donc bien les deux.
+
+--- mesure ---
+backend/database/perf/mesure_reference.sh               CR=29    lignes=29    CRLF
+infra/docker/entrypoint-prod.sh                         CR=51    lignes=51    CRLF
+infra/scripts/backup-postgres.sh                        CR=181   lignes=181   CRLF
+infra/scripts/bootstrap-preprod.sh                      CR=0     lignes=185   LF
+infra/scripts/configure-prod-env.sh                     CR=103   lignes=103   CRLF
+infra/scripts/definir-mot-de-passe-crm.sh               CR=0     lignes=131   LF
+infra/scripts/dr-drill.sh                               CR=205   lignes=205   CRLF
+infra/scripts/fermer-ports-db-prod.sh                   CR=0     lignes=112   LF
+infra/scripts/restore-postgres.sh                       CR=0     lignes=53    LF
+infra/scripts/setup-backup.sh                           CR=116   lignes=116   CRLF
+infra/scripts/setup-hetzner-cpx22.sh                    CR=149   lignes=149   CRLF
+infra/scripts/verifier-ports-publies.sh                 CR=0     lignes=167   LF
+infra/scripts/verifier-sauvegarde.sh                    CR=155   lignes=155   CRLF
+infra/scripts/worktree/artisan-worktree.sh              CR=0     lignes=43    LF
+infra/scripts/worktree/garde-ports-prod.sh              CR=0     lignes=55    LF
+infra/scripts/worktree/pest-worktree.sh                 CR=0     lignes=52    LF
+
+--- bilan ---
+scripts .sh suivis : 16 ; en CRLF dans la copie de travail : 8

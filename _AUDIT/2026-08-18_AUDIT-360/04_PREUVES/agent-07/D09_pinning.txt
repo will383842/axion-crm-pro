@@ -1,0 +1,81 @@
+=== phpunit-ci.xml exclusions ===
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ==========================================================================
+  Configuration PHPUnit/Pest utilisée UNIQUEMENT par la CI (Gate 0, 2026-08-13)
+  ==========================================================================
+  ⚠️ 2026-08-16 — LA QUARANTAINE EST LEVÉE. Ce fichier n'écarte plus AUCUN test :
+  les 23 fichiers de tests/QUARANTAINE.md ont été réparés ou supprimés, et la CI
+  exécute désormais la suite entière. Le document reste en place comme archive de
+  ce qui s'est passé, plus comme liste active.
+
+  Il subsiste donc UNE seule différence avec phpunit.xml, et c'est la raison
+  d'être de ce fichier : `executionOrder="default"` au lieu de `random`. Deux
+  exécutions du MÊME commit avaient donné 262 verts puis 48 rouges — du couplage
+  entre tests, pas une régression. Un gate qui change d'avis sans changement de
+  code ne vaut rien. L'ordre aléatoire reste actif en local (phpunit.xml) pour
+  continuer à débusquer ces couplages.
+
+  Règle qui subsiste : tout NOUVEAU test est bloquant d'office. Réintroduire une
+  exclusion ici demande une justification datée — c'est exactement le mécanisme
+  qui avait laissé 61 tests non exécutés pendant des mois.
+  ==========================================================================
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/11.4/phpunit.xsd"
+         bootstrap="tests/bootstrap.php"
+         colors="true"
+         executionOrder="default"
+         cacheDirectory=".phpunit.cache"
+         beStrictAboutCoverageMetadata="true"
+         beStrictAboutOutputDuringTests="true"
+         failOnDeprecation="false"
+         failOnRisky="true"
+         failOnWarning="true">
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing" force="true"/>
+        <env name="APP_KEY" value="base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="/>
+        <env name="MOCK_MODE" value="true"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
+        <!-- `force="true"` : cf. la note detaillee dans phpunit.xml. Necessaire mais
+             PAS suffisant (PHPUnit n'ecrit pas $_SERVER) — c'est
+             `tests/bootstrap.php` qui epingle reellement la base. -->
+        <env name="DB_CONNECTION" value="pgsql" force="true"/>
+        <env name="DB_DATABASE" value="axion_crm_test" force="true"/>
+        <!-- Voir phpunit.xml : la session Postgres est alignée sur
+             `app.timezone` pour que le verrou du décalage puisse rougir. -->
+        <env name="DB_TIMEZONE" value="Europe/Paris"/>
+
+=== D-09 : pinning bootstrap ===
+9: * `.env` porte `DB_DATABASE=axion_crm` — la base de DÉVELOPPEMENT. Lancer la
+15: * Le `<env name="DB_DATABASE" … force="true"/>` de `phpunit.xml` NE SUFFIT PAS :
+16: * PHPUnit écrit alors `$_ENV` et `putenv()`, **mais pas `$_SERVER`**. Or le
+17: * dépôt de variables de Laravel interroge `ServerConstAdapter` (`$_SERVER`) en
+19: * Mesuré : `getenv='axion_crm' | $_ENV='axion_crm' | $_SERVER='axion_crm'`, et
+27:const TEST_DATABASE_NAME = 'axion_crm_test';
+29:foreach (['DB_DATABASE' => TEST_DATABASE_NAME, 'DB_CONNECTION' => 'pgsql'] as $cle => $valeur) {
+30:    $_SERVER[$cle] = $valeur;
+31:    $_ENV[$cle] = $valeur;
+=== phpunit.xml DB ===
+27:        <env name="APP_ENV" value="testing" force="true"/>
+31:        <env name="CACHE_STORE" value="array" force="true"/>
+32:        <!-- 🔴 `force="true"` OBLIGATOIRE sur les deux clés de connexion.
+35:             en pose une via `env_file: .env` : `DB_DATABASE=axion_crm`.
+43:        <env name="DB_CONNECTION" value="pgsql" force="true"/>
+44:        <env name="DB_DATABASE" value="axion_crm_test" force="true"/>
+58:        <env name="SESSION_DRIVER" value="array" force="true"/>
+59:        <env name="QUEUE_CONNECTION" value="sync" force="true"/>

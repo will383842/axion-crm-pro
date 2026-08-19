@@ -1,0 +1,195 @@
+=== COULEURS CLAIRES SANS VARIANTE dark: + LITERAUX COULEUR — par fichier ===
+
+### features/coverage/CoveragePage.tsx   (classes-sans-dark: 27 occurrences | literaux couleur: 4)
+   L77  MANQUE dark: pour [from-slate-50, via-white, to-slate-50]  << min-h-full bg-gradient-to-br from-slate-50 via-white to-slate-50 px-6 py-6
+   L81  MANQUE dark: pour [bg-sky-50, ring-sky-200]  << mb-1 inline-flex items-center gap-2 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-medium text-sky-700 
+   L143  MANQUE dark: pour [bg-white/80, ring-slate-200/60]  << rounded-2xl bg-white/80 p-1 shadow-[0_8px_32px_-12px_rgb(0_0_0/0.12)] ring-1 ring-slate-200/60 backdrop-blur-s
+   L143  LITERAL rgb(0_0_0/0.12)  << <div className="rounded-2xl bg-white/80 p-1 shadow-[0_8px_32px_-12px_rgb(0_0_0/0.12)] ring-1 ring-slate-200/60
+   L193  MANQUE dark: pour [bg-slate-100, ring-slate-200]  << inline-flex items-center gap-1 rounded-full bg-slate-100 p-1 shadow-inner ring-1 ring-slate-200
+   L194  MANQUE dark: pour [bg-white, ring-slate-200]  << inline-flex items-center gap-1 rounded-lg bg-white p-0.5 ring-1 ring-slate-200
+   L207  MANQUE dark: pour [bg-white, ring-slate-200]  << bg-white text-slate-900 shadow-sm ring-1 ring-slate-200
+   L222  MANQUE dark: pour [ring-sky-200/60]  << ring-sky-200/60
+   L222  MANQUE dark: pour [bg-sky-50]  << bg-sky-50 text-sky-700
+   L223  MANQUE dark: pour [ring-violet-200/60]  << ring-violet-200/60
+   L223  MANQUE dark: pour [bg-violet-50]  << bg-violet-50 text-violet-700
+   L224  MANQUE dark: pour [ring-emerald-200/60]  << ring-emerald-200/60
+   L224  MANQUE dark: pour [bg-emerald-50]  << bg-emerald-50 text-emerald-700
+   L225  MANQUE dark: pour [ring-amber-200/60]  << ring-amber-200/60
+   L225  MANQUE dark: pour [bg-amber-50]  << bg-amber-50 text-amber-700
+   L243  MANQUE dark: pour [bg-white/80]  << group relative overflow-hidden rounded-2xl bg-white/80 p-4 ring-1 ${t.ring} shadow-[0_4px_24px_-8px_rgb(0_0_0/
+   L243  LITERAL rgb(0_0_0/0.06) rgb(0_0_0/0.10)  << <div className={`group relative overflow-hidden rounded-2xl bg-white/80 p-4 ring-1 ${t.ring} shadow-[0_4px_24p
+   L250  MANQUE dark: pour [bg-slate-100]  << mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-100
+   L276  MANQUE dark: pour [bg-white/80, ring-slate-200/60]  << rounded-2xl bg-white/80 p-5 ring-1 ring-slate-200/60 shadow-[0_4px_24px_-8px_rgb(0_0_0/0.06)] backdrop-blur-sm
+   L276  LITERAL rgb(0_0_0/0.06)  << <div className="rounded-2xl bg-white/80 p-5 ring-1 ring-slate-200/60 shadow-[0_4px_24px_-8px_rgb(0_0_0/0.06)] 
+   L281  MANQUE dark: pour [text-white]  << rounded-md bg-slate-900 px-1.5 py-0.5 font-mono text-xs text-white
+   L303  MANQUE dark: pour [text-white]  << group inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 p
+   L312  MANQUE dark: pour [border-slate-300, bg-white]  << inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm 
+   L332  MANQUE dark: pour [bg-white/60, ring-slate-300/80]  << rounded-2xl bg-white/60 p-5 ring-1 ring-dashed ring-slate-300/80 backdrop-blur-sm
+   L345  MANQUE dark: pour [bg-slate-50, ring-slate-100]  << rounded-xl bg-slate-50 p-3 ring-1 ring-slate-100
+   L363  MANQUE dark: pour [bg-white/80, ring-slate-200/60]  << rounded-2xl bg-white/80 p-4 ring-1 ring-slate-200/60 shadow-[0_4px_24px_-8px_rgb(0_0_0/0.06)] backdrop-blur-sm
+   L363  LITERAL rgb(0_0_0/0.06)  << <div className="rounded-2xl bg-white/80 p-4 ring-1 ring-slate-200/60 shadow-[0_4px_24px_-8px_rgb(0_0_0/0.06)] 
+   L369  MANQUE dark: pour [bg-slate-50]  << rounded-xl bg-slate-50 p-4 text-center
+   L383  MANQUE dark: pour [text-white]  << bg-slate-900 text-white
+   L387  MANQUE dark: pour [bg-white/10]  << bg-white/10
+   L387  MANQUE dark: pour [bg-slate-100]  << bg-slate-100 text-slate-600
+
+### features/coverage/FranceCoverageMap.tsx   (classes-sans-dark: 8 occurrences | literaux couleur: 15)
+   L35  LITERAL #ffffff  << paint: { 'background-color': '#ffffff' },
+   L195  LITERAL #0f172a  << paint: { 'fill-color': '#0f172a', 'fill-opacity': 0.04, 'fill-translate': [0, 4] },
+   L206  LITERAL #e2e8f0  << 0,    '#e2e8f0', // gris clair distinct du fond blanc → visible quand cells vide
+   L207  LITERAL #bae6fd  << 10,   '#bae6fd',
+   L208  LITERAL #38bdf8  << 100,  '#38bdf8',
+   L209  LITERAL #0284c7  << 500,  '#0284c7',
+   L210  LITERAL #075985  << 2000, '#075985',
+   L227  LITERAL #0f172a  << ['boolean', ['feature-state', 'hover'], false], '#0f172a',
+   L228  LITERAL #94a3b8  << '#94a3b8',
+   L322  MANQUE dark: pour [from-slate-50, via-white, to-sky-50/30]  << relative h-[640px] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 via-white to-sky-50/30
+   L326  MANQUE dark: pour [bg-white/85, ring-slate-200/60]  << pointer-events-none absolute bottom-4 left-4 rounded-2xl bg-white/85 px-4 py-3 text-[11px] shadow-[0_8px_32px_
+   L326  LITERAL rgb(0_0_0/0.12)  << <div className="pointer-events-none absolute bottom-4 left-4 rounded-2xl bg-white/85 px-4 py-3 text-[11px] sha
+   L332  LITERAL #e2e8f0  << { color: '#e2e8f0', label: '0' },
+   L333  LITERAL #bae6fd  << { color: '#bae6fd', label: '1+' },
+   L334  LITERAL #38bdf8  << { color: '#38bdf8', label: '100+' },
+   L335  LITERAL #0284c7  << { color: '#0284c7', label: '500+' },
+   L336  LITERAL #075985  << { color: '#075985', label: '2k+' },
+   L339  MANQUE dark: pour [ring-slate-200/60]  << block h-3 w-7 rounded-md ring-1 ring-slate-200/60
+   L349  MANQUE dark: pour [text-white, ring-white/10]  << pointer-events-none absolute z-10 rounded-xl bg-slate-900/95 px-3.5 py-2.5 text-xs text-white shadow-2xl shado
+   L353  MANQUE dark: pour [bg-white/10, text-slate-200]  << rounded-md bg-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-200
+   L356  MANQUE dark: pour [text-slate-300]  << mt-1 text-[11px] text-slate-300
+   L359  MANQUE dark: pour [text-white]  << font-semibold text-white
+   L369  MANQUE dark: pour [bg-rose-50/95, ring-rose-200]  << absolute bottom-4 right-4 rounded-xl bg-rose-50/95 px-3 py-2 text-xs font-medium text-rose-700 shadow-sm ring-
+
+### features/international/RoumaniePage.tsx   (classes-sans-dark: 8 occurrences | literaux couleur: 0)
+   L129  MANQUE dark: pour [text-white]  << rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white
+   L130  MANQUE dark: pour [bg-slate-100]  << rounded-md bg-slate-100 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-200
+   L174  MANQUE dark: pour [border-slate-200]  << overflow-x-auto rounded-lg border border-slate-200
+   L176  MANQUE dark: pour [bg-slate-50]  << bg-slate-50 text-left text-xs uppercase text-slate-500
+   L189  MANQUE dark: pour [border-slate-100]  << border-t border-slate-100
+   L219  MANQUE dark: pour [bg-emerald-100]  << rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800
+   L244  MANQUE dark: pour [border-slate-300]  << rounded-md border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-40
+   L253  MANQUE dark: pour [border-slate-300]  << rounded-md border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-40
+
+### components/ui/SizeCategoryBadge.tsx   (classes-sans-dark: 6 occurrences | literaux couleur: 0)
+   L4  MANQUE dark: pour [bg-orange-100]  << bg-orange-100
+   L5  MANQUE dark: pour [bg-sky-100]  << bg-sky-100
+   L6  MANQUE dark: pour [bg-indigo-100]  << bg-indigo-100
+   L7  MANQUE dark: pour [bg-violet-100]  << bg-violet-100
+   L8  MANQUE dark: pour [bg-fuchsia-100]  << bg-fuchsia-100
+   L9  MANQUE dark: pour [bg-slate-100]  << bg-slate-100
+
+### components/layout/Sidebar.tsx   (classes-sans-dark: 4 occurrences | literaux couleur: 0)
+   L211  MANQUE dark: pour [text-white]  << flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-700 text-sm font
+   L219  MANQUE dark: pour [text-white]  << flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-700 text-sm font
+   L222  MANQUE dark: pour [text-white]  << text-sm font-bold tracking-tight text-white
+   L337  MANQUE dark: pour [text-white, ring-white/15]  << bg-sidebar-active text-white ring-1 ring-white/15
+
+### components/OnboardingTour.tsx   (classes-sans-dark: 2 occurrences | literaux couleur: 2)
+   L41  MANQUE dark: pour [bg-slate-100]  << rounded bg-slate-100 px-1 py-0.5 text-xs
+   L42  MANQUE dark: pour [bg-slate-100]  << rounded bg-slate-100 px-1 py-0.5 text-xs
+   L138  LITERAL #7c3aed  << primaryColor: '#7c3aed',
+   L139  LITERAL #0f172a  << textColor: '#0f172a',
+
+### components/ui/Button.tsx   (classes-sans-dark: 4 occurrences | literaux couleur: 0)
+   L19  MANQUE dark: pour [text-white]  << bg-gradient-to-b from-slate-900 to-slate-800 text-white shadow-sm shadow-slate-900/10 
+   L23  MANQUE dark: pour [bg-white, ring-slate-200]  << bg-white text-slate-900 ring-1 ring-slate-200 shadow-sm 
+   L30  MANQUE dark: pour [bg-slate-100]  << bg-slate-100 text-slate-900 hover:bg-slate-200 active:scale-[0.98] focus-visible:ring-slate-300 
+   L33  MANQUE dark: pour [text-white]  << bg-gradient-to-b from-rose-600 to-rose-700 text-white shadow-sm shadow-rose-900/10 
+
+### features/campaigns/CampaignWizardPage.tsx   (classes-sans-dark: 4 occurrences | literaux couleur: 0)
+   L365  MANQUE dark: pour [text-white]  << bg-emerald-500 text-white ring-emerald-500
+   L539  MANQUE dark: pour [text-white]  << bg-sky-500 text-white shadow-sm ring-1 ring-sky-600
+   L549  MANQUE dark: pour [text-white/80]  << text-white/80
+   L612  MANQUE dark: pour [text-white]  << bg-sky-500 text-white
+
+### components/ui/QualityBadge.tsx   (classes-sans-dark: 3 occurrences | literaux couleur: 0)
+   L4  MANQUE dark: pour [bg-emerald-100]  << bg-emerald-100
+   L5  MANQUE dark: pour [bg-amber-100]  << bg-amber-100
+   L6  MANQUE dark: pour [bg-rose-100]  << bg-rose-100
+
+### components/ui/Breadcrumbs.tsx   (classes-sans-dark: 2 occurrences | literaux couleur: 0)
+   L56  MANQUE dark: pour [text-white]  << text-white
+   L64  MANQUE dark: pour [text-white/30]  << text-white/30
+
+### components/ui/ErrorBoundary.tsx   (classes-sans-dark: 2 occurrences | literaux couleur: 0)
+   L27  MANQUE dark: pour [bg-rose-50]  << rounded-xl bg-rose-50 p-${level === 'root' ? 8 : 4} text-rose-900
+   L33  MANQUE dark: pour [text-white]  << mt-3 rounded-md bg-rose-600 px-3 py-1.5 text-sm text-white hover:bg-rose-700
+
+### components/ui/Modal.tsx   (classes-sans-dark: 2 occurrences | literaux couleur: 0)
+   L52  MANQUE dark: pour [bg-white, ring-slate-200]  << relative w-full rounded-2xl bg-white p-6 shadow-[var(--shadow-popover)] ring-1 ring-slate-200
+   L110  MANQUE dark: pour [bg-white, ring-slate-200]  << relative h-full w-full overflow-y-auto bg-white shadow-[var(--shadow-popover)] ring-1 ring-slate-200
+
+### features/companies/CompaniesListPage.tsx   (classes-sans-dark: 2 occurrences | literaux couleur: 0)
+   L631  MANQUE dark: pour [text-white]  << inline-flex h-9 items-center justify-center rounded-lg bg-gradient-to-b from-slate-900 to-slate-800 px-4 text-
+   L684  MANQUE dark: pour [border-slate-200, bg-slate-50/80]  << sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-[11px] font-
+
+### components/ui/DarkModeToggle.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L46  MANQUE dark: pour [text-white]  << bg-brand-600 text-white
+
+### components/ui/DropdownMenu.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L60  MANQUE dark: pour [bg-white, ring-slate-200]  << absolute z-40 mt-1.5 min-w-[180px] rounded-xl bg-white p-1 shadow-[var(--shadow-popover)] ring-1 ring-slate-20
+
+### components/ui/EmptyState.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L15  MANQUE dark: pour [border-slate-200, bg-white]  << flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-white px-6 py-
+
+### components/ui/Input.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L23  MANQUE dark: pour [bg-white]  << h-9 w-full rounded-lg bg-white text-sm text-slate-900 ring-1 transition placeholder:text-slate-400
+
+### components/ui/KpiCard.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L67  MANQUE dark: pour [bg-white/80]  << group relative overflow-hidden rounded-2xl bg-white/80 p-4 backdrop-blur-sm
+
+### components/ui/Skeleton.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L2  MANQUE dark: pour [bg-slate-200]  << animate-pulse rounded bg-slate-200 ${className}
+
+### components/ui/Tabs.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L40  MANQUE dark: pour [bg-white/20]  << bg-white/20
+
+### components/ui/Tooltip.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L58  MANQUE dark: pour [text-white, ring-white/10]  << pointer-events-none absolute z-50 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] font-medium 
+
+### features/audiences/AudienceBuilderPage.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L446  MANQUE dark: pour [text-white]  << bg-sky-500 text-white ring-1 ring-sky-600 shadow-sm
+
+### features/auth/LoginPage.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L128  MANQUE dark: pour [border-slate-300]  << h-4 w-4 rounded border-slate-300
+
+### features/companies/components/CompanyRow.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L54  MANQUE dark: pour [border-slate-100]  << grid items-center gap-3 border-b border-slate-100 px-4 py-2.5 text-sm transition-colors hover:bg-slate-50
+
+### features/contacts/ContactsListPage.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L191  MANQUE dark: pour [border-slate-200, bg-slate-50/80]  << sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-[11px] font-
+
+### features/llm/LlmRouterPage.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L105  MANQUE dark: pour [border-slate-200, bg-slate-50/80]  << sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-[11px] font-
+
+### features/llm/ProxyProvidersPage.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L76  MANQUE dark: pour [border-slate-200, bg-slate-50/80]  << sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-[11px] font-
+
+### features/llm/RotationsPage.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L87  MANQUE dark: pour [bg-slate-50/60]  << grid items-center gap-3 bg-slate-50/60 px-5 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate
+
+### features/media/MediaListPage.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L358  MANQUE dark: pour [bg-white, ring-slate-200]  << h-9 rounded-lg bg-white px-2 pr-7 text-sm text-slate-900 ring-1 ring-slate-200 transition focus:ring-2 focus:r
+
+### features/misc/NotFoundPage.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L6  MANQUE dark: pour [text-slate-300]  << text-5xl font-bold text-slate-300
+
+### features/phase2-scaffold/ColdEmailStub.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L8  MANQUE dark: pour [border-amber-200, bg-amber-50]  << rounded-xl border-2 border-dashed border-amber-200 bg-amber-50 p-6 text-amber-900
+
+### features/phase2-scaffold/LinkedInStub.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L8  MANQUE dark: pour [border-amber-200, bg-amber-50]  << rounded-xl border-2 border-dashed border-amber-200 bg-amber-50 p-6 text-amber-900
+
+### features/rgpd/AiActRegisterPage.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L131  MANQUE dark: pour [border-slate-200, bg-slate-50/80]  << sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-[11px] font-
+
+### features/rgpd/AuditLogsPage.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L148  MANQUE dark: pour [border-slate-200, bg-slate-50/80]  << sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-[11px] font-
+
+### features/rgpd/RgpdRequestsPage.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L159  MANQUE dark: pour [border-slate-200, bg-slate-50/80]  << sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-[11px] font-
+
+### features/users/UsersPage.tsx   (classes-sans-dark: 1 occurrences | literaux couleur: 0)
+   L116  MANQUE dark: pour [border-slate-200, bg-slate-50/80]  << sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-[11px] font-
+
+TOTAL occurrences classes claires sans dark: = 97
+TOTAL lignes avec literaux couleur          = 21
+Fichiers touches                            = 36

@@ -1,0 +1,21 @@
+=== Jobs REELLEMENT executes par la CI (dernier run 32238995760) ===
+success	Le Caddyfile est-il valide ?
+success	Workers Node + Playwright
+success	Frontend React/Vite
+success	Les scripts d'infra sont-ils exécutables ?
+success	La config de production ne publie que 80 et 443
+success	Backend Laravel (install + PHPStan + Pint + Pest)
+
+=== Contextes EXIGES par la protection de branche main ===
+Backend Laravel (install + PHPStan + Pint + Pest)
+Frontend React/Vite
+Workers Node + Playwright
+Secrets scan (Gitleaks)
+
+=== enforce_admins / reviews exiges ===
+enforce_admins=false  required_pull_request_reviews=ABSENT  strict=false
+
+=== ECART : jobs CI qui ne bloquent PAS la fusion ===
+La config de production ne publie que 80 et 443
+Le Caddyfile est-il valide ?
+Les scripts d'infra sont-ils exécutables ?

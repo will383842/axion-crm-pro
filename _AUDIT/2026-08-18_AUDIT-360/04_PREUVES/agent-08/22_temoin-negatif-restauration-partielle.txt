@@ -1,0 +1,11 @@
+=== TEMOIN NEGATIF : comptages sur la base EN COURS de restauration (2026-08-19T10:15:29Z) ===
+Si le controle de comptage etait incapable de distinguer une restauration
+partielle d'une restauration complete, ces nombres egaleraient deja ceux de la production.
+companies=0
+company_tag=0
+contacts=0
+journalists=0
+scraper_runs=0
+
+Rappel production :
+companies=4295349 / company_tag=7501969 / contacts=1319567 / journalists=1257 / scraper_runs=7608196

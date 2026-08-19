@@ -1,0 +1,121 @@
+=== RLS reel : tables avec rowsecurity ===
+         relname         | relrowsecurity | relforcerowsecurity 
+-------------------------+----------------+---------------------
+ activities              | t              | t
+ ai_act_register         | t              | t
+ analytics_attribution   | t              | t
+ analytics_cohorts       | t              | t
+ analytics_daily_rollups | t              | t
+ analytics_funnels       | t              | t
+ analytics_kpis          | t              | t
+ audience_members        | t              | t
+ business_events         | t              | t
+ campaigns               | t              | t
+ candidate_tag           | t              | t
+ candidates              | t              | t
+ companies               | t              | t
+ company_tag             | t              | t
+ contacts                | t              | t
+ coverage_zones          | t              | t
+ crm_lost_reasons        | t              | t
+ crm_notes               | t              | t
+ crm_pipelines           | t              | t
+ crm_tasks               | t              | t
+ deals                   | t              | t
+ dnc_lists               | t              | t
+ duplicate_flags         | t              | t
+ email_audiences         | t              | t
+ email_events            | t              | t
+ email_inboxes           | t              | t
+ email_sends             | t              | t
+ email_templates         | t              | t
+ email_threads           | t              | t
+ email_verification_logs | t              | t
+ email_warmup_pools      | t              | t
+ health_practitioners    | t              | t
+ invitations             | t              | t
+ journalists             | t              | t
+ linkedin_accounts       | t              | t
+ linkedin_invitations    | t              | t
+ linkedin_messages       | t              | t
+ linkedin_profiles_cache | t              | t
+ linkedin_sequences      | t              | t
+ llm_usage               | t              | t
+ llm_use_cases           | t              | t
+ media                   | t              | t
+ notifications           | t              | t
+ pipeline_stages         | t              | t
+ proxy_providers_config  | t              | t
+ proxy_usage_log         | t              | t
+ rgpd_requests           | t              | t
+ rotations               | t              | t
+ saved_views             | t              | t
+ scraper_runs            | t              | t
+ scraping_campaigns      | t              | t
+ strategic_keywords      | t              | t
+ tags                    | t              | t
+ unsubscribes            | t              | t
+ web_vital_samples       | t              | t
+(55 rows)
+
+=== policies health_practitioners ===
+        tablename        |                 policyname                  | permissive |                                                                qual                                                                
+-------------------------+---------------------------------------------+------------+------------------------------------------------------------------------------------------------------------------------------------
+ activities              | activities_workspace_isolation              | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ ai_act_register         | ai_act_register_workspace_isolation         | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ analytics_attribution   | analytics_attribution_workspace_isolation   | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ analytics_cohorts       | analytics_cohorts_workspace_isolation       | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ analytics_daily_rollups | analytics_daily_rollups_workspace_isolation | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ analytics_funnels       | analytics_funnels_workspace_isolation       | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ analytics_kpis          | analytics_kpis_workspace_isolation          | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ audience_members        | audience_members_workspace_isolation        | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ business_events         | business_events_workspace_isolation         | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ campaigns               | campaigns_workspace_isolation               | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ candidate_tag           | candidate_tag_workspace_isolation           | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ candidates              | candidates_workspace_isolation              | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ companies               | companies_workspace_isolation               | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ company_tag             | company_tag_workspace_isolation             | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ contacts                | contacts_workspace_isolation                | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ coverage_zones          | coverage_zones_workspace_isolation          | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ crm_lost_reasons        | crm_lost_reasons_workspace_isolation        | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ crm_notes               | crm_notes_workspace_isolation               | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ crm_pipelines           | crm_pipelines_workspace_isolation           | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ crm_tasks               | crm_tasks_workspace_isolation               | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ deals                   | deals_workspace_isolation                   | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ dnc_lists               | dnc_lists_workspace_isolation               | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ duplicate_flags         | duplicate_flags_workspace_isolation         | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ email_audiences         | email_audiences_workspace_isolation         | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ email_events            | email_events_workspace_isolation            | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ email_inboxes           | email_inboxes_workspace_isolation           | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ email_sends             | email_sends_workspace_isolation             | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ email_templates         | email_templates_workspace_isolation         | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ email_threads           | email_threads_workspace_isolation           | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ email_verification_logs | email_verif_workspace_isolation             | PERMISSIVE | ((workspace_id)::text = COALESCE(NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text), (workspace_id)::text))
+ email_verification_logs | email_verification_logs_workspace_isolation | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ email_warmup_pools      | email_warmup_pools_workspace_isolation      | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ health_practitioners    | health_practitioners_workspace_isolation    | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ invitations             | invitations_workspace_isolation             | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ journalists             | journalists_workspace_isolation             | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ linkedin_accounts       | linkedin_accounts_workspace_isolation       | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ linkedin_invitations    | linkedin_invitations_workspace_isolation    | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ linkedin_messages       | linkedin_messages_workspace_isolation       | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ linkedin_profiles_cache | linkedin_profiles_cache_workspace_isolation | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ linkedin_sequences      | linkedin_sequences_workspace_isolation      | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ llm_usage               | llm_usage_workspace_isolation               | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ llm_use_cases           | llm_use_cases_workspace_isolation           | PERMISSIVE | ((workspace_id IS NULL) OR ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text)))
+ media                   | media_workspace_isolation                   | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ notifications           | notifications_workspace_isolation           | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ pipeline_stages         | pipeline_stages_workspace_isolation         | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ proxy_providers_config  | proxy_providers_config_workspace_isolation  | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ proxy_usage_log         | proxy_usage_log_workspace_isolation         | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ rgpd_requests           | rgpd_requests_workspace_isolation           | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ rotations               | rotations_workspace_isolation               | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ saved_views             | saved_views_workspace_isolation             | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ scraper_runs            | scraper_runs_workspace_isolation            | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ scraping_campaigns      | scraping_campaigns_workspace_isolation      | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ strategic_keywords      | strategic_keywords_workspace_isolation      | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ tags                    | tags_workspace_isolation                    | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ unsubscribes            | unsubscribes_workspace_isolation            | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+ web_vital_samples       | web_vital_samples_workspace_isolation       | PERMISSIVE | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+(56 rows)
+

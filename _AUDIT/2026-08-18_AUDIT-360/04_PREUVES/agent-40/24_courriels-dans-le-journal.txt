@@ -1,0 +1,10 @@
+=== occurrences de messages de courriel ecrits dans le journal ===
+0
+0
+=== en-tetes MIME presents ? ===
+0
+0
+0
+0
+=== extrait (sujets seuls, 5 max) ===
+(aucun sujet)

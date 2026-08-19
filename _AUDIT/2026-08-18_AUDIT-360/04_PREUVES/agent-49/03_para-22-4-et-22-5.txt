@@ -1,0 +1,78 @@
+AGENT 49 — 03 §22.4 LIENS CROISES et §22.5 IDENTITE UNIQUE
+==========================================================
+
+--- §22.4 SENS CRM -> CONSOLE : y a-t-il UN SEUL lien ? ---
+$ grep -rniE 'axion-ia\.(fr|com)|axionia|SITE_ADMIN_URL|VITE_SITE' src/
+[fin — AUCUN resultat : le CRM ne porte aucun lien vers la console axionia]
+
+$ grep -rniE "cr[ée]er un devis|voir le devis|voir la facture|voir la session|voir la r[ée]clamation|lancer la visio" src/
+[fin — AUCUN des 6 libelles exiges par le §22.4]
+
+TEMOIN NEGATIF : le meme grep trouve bien les liens externes QUI existent dans ce frontend —
+src/features/audiences/AudienceDetailPage.tsx:319:          target="_blank"
+src/features/companies/CompanyDetailPage.tsx:192:                  <a className="text-brand-600 hover:underline dark:text-sky-400" href={c.website} target="_blank" rel="noopener noreferrer">
+src/features/companies/CompanyDetailPage.tsx:200:                  <a className="text-brand-600 hover:underline dark:text-sky-400" href={c.linkedin_url} target="_blank" rel="noopener noreferrer">
+src/features/companies/components/ContactsCard.tsx:71:                      target="_blank"
+src/features/contacts/ContactsListPage.tsx:279:                        target="_blank"
+src/features/international/RoumaniePage.tsx:207:                          target="_blank"
+src/features/media/MediaDetailPage.tsx:134:                <a href={data.website} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline dark:text-brand-400">
+src/features/media/MediaListPage.tsx:298:                        <a href={m.website} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline dark:text-brand-400">
+src/features/settings/SettingsPage.tsx:245:                target="_blank"
+
+--- §22.4 SENS CONSOLE -> CRM : confirmation de E32-006 ---
+$ grep -rn 'axion-crm-pro' src/lib src/components/admin
+src/components/admin/ui/AdminSidebarNav.tsx:773:            href="https://app.axion-crm-pro.com"
+[un seul lien, vers la racine]
+        >
+          {/* Accès direct à Axion CRM Pro — outil de prospection dédié (appli séparée,
+              ouverte dans un nouvel onglet). La prospection se pilote là-bas. */}
+          <a
+            href="https://app.axion-crm-pro.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Ouvrir Axion CRM Pro (outil de prospection)"
+            className={cn(
+              "mb-[var(--space-admin-3)] flex items-center gap-[var(--space-admin-4)]",
+              "rounded-[var(--radius-admin-md)] px-[var(--space-admin-3)] py-[var(--space-admin-3)]",
+              "text-[color:var(--color-admin-rail-text)] ring-1 ring-[color:var(--color-admin-rail-border)]",
+              "transition-opacity hover:opacity-80",
+              collapsed && "justify-center",
+
+--- §22.5 CONNEXION UNIQUE : SSO / OIDC / SAML cote CRM ---
+$ grep -rniE '\boidc\b|openid|\bsaml\b|single.sign|\bsso\b|socialite|keycloak' app/ config/ routes/ composer.json
+[fin — AUCUN]
+TEMOIN NEGATIF : le meme grep trouve les mecanismes d'auth qui EXISTENT —
+7:use App\Http\Controllers\Api\Auth\MagicLinkController;
+9:use App\Http\Controllers\Api\Auth\TwoFactorController;
+59:    Route::post('/auth/2fa/verify', [TwoFactorController::class, 'verify'])->middleware('throttle:login');
+$ guards de config/auth.php :
+    'guards' => [
+        'web' => [
+            'driver'   => 'session',
+            'provider' => 'users',
+        ],
+    ],
+
+    'providers' => [
+
+--- §22.5 : l'identite du SITE, pour comparaison ---
+model AdminUser {
+  id                String      @id @default(uuid()) @db.Uuid
+  name              String      @db.VarChar(255)
+  email             String      @unique @db.Citext
+  // argon2id (CLAUDE.md §15 — minimum 12 chars en clair, hash argon2id côté Server Action)
+  passwordHash      String      @map("password_hash") @db.VarChar(255)
+  role              AdminRole   @default(reader)
+  // 2FA TOTP (otplib)
+  twoFactorSecret   String?     @map("two_factor_secret") @db.VarChar(255)
+  twoFactorEnabled  Boolean     @default(false) @map("two_factor_enabled")
+  twoFactorVerified Boolean     @default(false) @map("two_factor_verified")
+  lastLoginAt       DateTime?   @map("last_login_at")
+  lastLoginIp       String?     @map("last_login_ip") @db.VarChar(64)
+$ grep -n '"next-auth"' package.json
+157:    "next-auth": "5.0.0-beta.32",
+
+--- §22.5 'fonctionnement sans console raccordee' ---
+$ grep -rniE "raccord|outil d'engagement|detachable" backend/app frontend/src
+backend/app/Support/EligibiliteCampagne.php:44: * remplit reste vide, donc muette — c'est le raccordement des webhooks qui la
+[une seule occurrence, sans rapport : webhooks de campagne]

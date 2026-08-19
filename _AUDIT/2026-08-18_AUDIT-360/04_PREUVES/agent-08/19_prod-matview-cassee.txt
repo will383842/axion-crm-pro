@@ -1,0 +1,21 @@
+=== PROD : volumetrie 'must be owner of materialized view' ===
+142
+
+=== PROD : la commande qui echoue (contexte) ===
+     71 REFRESH MATERIALIZED VIEW coverage_matrix_cells) {
+     71 REFRESH MATERIALIZED VIEW coverage_matrix_cells) at /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php:838)
+
+=== PROD : premiere ligne d'une occurrence ===
+1374947:[previous exception] [object] (PDOException(code: 42501): SQLSTATE[42501]: Insufficient privilege: 7 ERROR:  must be owner of materialized view coverage_matrix_cells at /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php:584)
+
+=== PROD : fraicheur de la vue materialisee ===
+ lignes  
+---------
+ 1264182
+(1 row)
+
+        relname        | proprietaire | relispopulated 
+-----------------------+--------------+----------------
+ coverage_matrix_cells | axion        | t
+(1 row)
+

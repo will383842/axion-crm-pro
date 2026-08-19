@@ -1,0 +1,61 @@
+=== F13 : pare-feu ===
+# État du pare-feu — Axion CRM Pro (production)
+
+> **Date :** 2026-08-18
+> **Auteur :** agent (ligne 14 du §3 du plan de préalables — volet **F12**)
+> **Statut :** à valider par Will
+> **Objet :** consigner l'état du pare-feu du serveur de production, et poser au
+> runbook la procédure de vérification (`ufw status`, `fail2ban-client status`).
+
+---
+
+## 🔴 AVERTISSEMENT — CE DOCUMENT NE CONSTATE RIEN SUR LE SERVEUR
+
+**L'état réel du pare-feu de production n'a PAS été mesuré, faute d'accès.**
+
+L'agent qui a rédigé ce document **n'a jamais ouvert de session sur le serveur de
+production**. `ssh` vers la production est refusé par le classificateur de
+l'autopilote, et cet accès est de toute façon une habilitation qui appartient à
+Will (cf. `_REPORTS/2026-08-18_ARBITRAGES-PREALABLES-SECTION-4.md`, décision 1).
+
+Par conséquent :
+
+- **aucune** ligne de ce document ne dit ce que le serveur FAIT ;
+- toutes les lignes des §1 et §2 disent ce que **le dépôt PRÉTEND** qu'il devrait
+  faire, et ce que la composition de production **contredit** ;
+- le §4 est la procédure à jouer **par Will, sur le serveur**, pour transformer
+  ces prétentions en constat.
+
+Si vous lisez ce document dans six mois : il n'est **pas** un état des lieux. Il
+le deviendra le jour où quelqu'un aura collé la sortie du §4 dans le §5, qui est
+aujourd'hui **VIDE**.
+
+---
+
+## 1. Ce que le dépôt PRÉTEND
+
+### 1.1 UFW — `infra/scripts/setup-hetzner-cpx22.sh`
+
+Chemin absolu :
+`C:\Users\willi\Documents\Projets\crmpro-wt-etape0\infra\scripts\setup-hetzner-cpx22.sh`
+
+Verbatim, lignes 55-64 :
+
+```bash
+# --- 3. Pare-feu UFW --------------------------------------------------------
+log "[3/8] Configuration UFW…"
+ufw --force reset > /dev/null
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow 22/tcp comment "SSH"
+ufw allow 80/tcp comment "HTTP"
+ufw allow 443/tcp comment "HTTPS"
+ufw --force enable
+ufw status verbose | tee -a "$LOG"
+```
+
+Donc, si ce script a été joué sur le serveur courant : politique par défaut
+`deny incoming`, trois ports ouverts (22, 80, 443), sortie non restreinte.
+
+⚠️ **NON VÉRIFIÉ** : rien ne prouve que ce script a été joué sur le serveur de
+production actuel, ni qu'il l'a été **dans son intégralité** (il est `set -euo

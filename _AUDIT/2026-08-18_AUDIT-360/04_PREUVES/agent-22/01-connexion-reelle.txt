@@ -1,0 +1,31 @@
+=== 1) GET /sanctum/csrf-cookie ===
+status=204
+XSRF-TOKEN: 340 caracteres
+=== 2) POST /api/v1/auth/login (bon mot de passe) ===
+{"user":{"id":"abc586dc-36fa-473f-bcb7-153f20a42de4","email":"audit22@axion.local","name":"Audit Agent 22","current_workspace_id":"b235b23a-ef32-41b2-8071-8ad3fd9f380e","totp_enabled_at":null,"first_login_completed_at":null,"onboarding_tour_completed_at":null},"requires_2fa":false}
+[status=200]
+=== 3) GET /api/v1/auth/me (session ouverte ?) ===
+{"user":{"id":"abc586dc-36fa-473f-bcb7-153f20a42de4","email":"audit22@axion.local","name":"Audit Agent 22","locale":"fr","timezone":"Europe\/Paris","current_workspace_id":"b235b23a-ef32-41b2-8071-8ad3fd9f380e","totp_enabled_at":null,"first_login_completed_at":null,"onboarding_tour_completed_at":null},"roles":["owner"]}
+[status=200]
+=== 4) GET /api/v1/dashboard/stats (premier ecran reel) ===
+{"error":"first_login_required","message":"Vous devez activer la double authentification avant utilisation.","next_step":"\/auth\/2fa\/setup"}
+[status=403]
+=== TEMOIN NEGATIF : mauvais mot de passe ===
+{"message":"auth.failed","errors":{"email":["auth.failed"]}}
+[status=422]
+
+=== A-001 : route auth:sanctum SANS session ===
+GET /api/v1/companies sans session => 401
+=== POST /auth/2fa/setup (endpoint que le SPA n appelle JAMAIS) ===
+{
+    "message": "SQLSTATE[42703]: Undefined column: 7 ERROR:  column \"two_factor_secret\" of relation \"users\" does not exist\nLINE 1: update \"users\" set \"two_factor_secret\" = $1, \"updated_at\" = ...\n                           ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm, SQL: update \"users\" set \"two_factor_secret\" = eyJpdiI6IlJSVkVHZTdjVHpUYUdLNmdaaVkxNHc9PSIsInZhbHVlIjoiNDQ1bHE1Z0ZZTis0b1FhNVhKa1l6UCtpT2JQMW5vOGNDM0Q0VUpRNElHVT0iLCJtYWMiOiI3NDNhMGM4NjU1NDFlYzM5Y2QyZmZjMTQ1ZDlhY2IzY2E2OGE0OTM1N2M0OTZkNWU0ZDVmY2NiOGI1OGU0N2EwIiwidGFnIjoiIn0=, \"updated_at\=== A-001 affine : meme route, avec et sans Accept: application/json ===
+  AVEC Accept: application/json => 401
+  SANS Accept (navigateur)      => 000
+  Accept: text/html             => 000
+     column_name     
+---------------------
+ totp_enabled_at
+ totp_secret
+ totp_recovery_codes
+(3 rows)
+

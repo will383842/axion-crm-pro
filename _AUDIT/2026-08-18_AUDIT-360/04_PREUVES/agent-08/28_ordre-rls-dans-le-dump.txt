@@ -1,0 +1,27 @@
+=== Ou pg_dump place-t-il RLS ? (recette de backup-postgres.sh, base locale axion_crm) ===
+lignes du dump : 11334
+
+--- positions des instructions RLS ---
+1125:ALTER TABLE ONLY public.activities FORCE ROW LEVEL SECURITY;
+1180:ALTER TABLE ONLY public.ai_act_register FORCE ROW LEVEL SECURITY;
+1216:ALTER TABLE ONLY public.analytics_attribution FORCE ROW LEVEL SECURITY;
+1252:ALTER TABLE ONLY public.analytics_cohorts FORCE ROW LEVEL SECURITY;
+1286:ALTER TABLE ONLY public.analytics_daily_rollups FORCE ROW LEVEL SECURITY;
+1332:ALTER TABLE ONLY public.analytics_funnels FORCE ROW LEVEL SECURITY;
+1365:ALTER TABLE ONLY public.analytics_kpis FORCE ROW LEVEL SECURITY;
+1381:ALTER TABLE ONLY public.audience_members FORCE ROW LEVEL SECURITY;
+...
+11309:ALTER TABLE public.unsubscribes ENABLE ROW LEVEL SECURITY;
+11315:CREATE POLICY unsubscribes_workspace_isolation ON public.unsubscribes USING (((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))) WITH CHECK (((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text)));
+11322:ALTER TABLE public.web_vital_samples ENABLE ROW LEVEL SECURITY;
+11328:CREATE POLICY web_vital_samples_workspace_isolation ON public.web_vital_samples USING (((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))) WITH CHECK (((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text)));
+
+--- comptes ---
+ENABLE ROW LEVEL SECURITY : 55
+FORCE ROW LEVEL SECURITY  : 55
+CREATE POLICY             : 56
+
+--- derniere ligne COPY vs premiere ligne RLS ---
+dernier COPY   : ligne 6403
+1re CREATE POLICY : ligne 10619
+1re ENABLE RLS    : ligne 10613

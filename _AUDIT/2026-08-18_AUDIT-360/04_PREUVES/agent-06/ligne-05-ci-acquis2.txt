@@ -1,0 +1,10 @@
+Backend Laravel (install + PHPStan + Pint + Pest)	Pest (BLOQUANT)	2026-08-19T10:05:54.1505875Z [2026-08-19 12:05:54] testing.DEBUG: DomainFinder Brave skipped (no API key)  
+Backend Laravel (install + PHPStan + Pint + Pest)	Pest (BLOQUANT)	2026-08-19T10:05:55.1971170Z [2026-08-19 12:05:55] testing.DEBUG: DomainFinder Brave skipped (no API key)  
+Backend Laravel (install + PHPStan + Pint + Pest)	Pest (BLOQUANT)	2026-08-19T10:05:55.4475085Z [2026-08-19 12:05:55] testing.DEBUG: DomainFinder Brave skipped (no API key)  
+Backend Laravel (install + PHPStan + Pint + Pest)	Pest (BLOQUANT)	2026-08-19T10:05:56.0912771Z   ✓ verifyEmail returns skipped_catchall_provider for big mail provider… 0.01s  
+Backend Laravel (install + PHPStan + Pint + Pest)	Pest (BLOQUANT)	2026-08-19T10:05:57.4946724Z [2026-08-19 12:05:57] testing.DEBUG: GooglePlacesClient skipped (no API key)  
+Backend Laravel (install + PHPStan + Pint + Pest)	Pest (BLOQUANT)	2026-08-19T10:06:17.6488207Z   ✓ ACQUIS 2 — un dump produit avec la recette de production se restaur… 2.44s  
+Backend Laravel (install + PHPStan + Pint + Pest)	Pest (BLOQUANT)	2026-08-19T10:06:17.6491255Z   ✓ ACQUIS 2 (suite) — la surveillance et l’exercice de restauration ex… 0.02s  
+Backend Laravel (install + PHPStan + Pint + Pest)	Pest (BLOQUANT)	2026-08-19T10:06:20.2242020Z   Tests:    780 passed (6503 assertions)
+Frontend React/Vite	UNKNOWN STEP	2026-08-19T10:05:05.5508566Z Lockfile is up to date, resolution step is skipped
+Workers Node + Playwright	Install (BLOQUANT — lockfile figé)	2026-08-19T10:05:07.0514375Z Lockfile is up to date, resolution step is skipped

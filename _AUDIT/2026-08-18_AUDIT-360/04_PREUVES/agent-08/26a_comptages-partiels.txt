@@ -1,0 +1,9 @@
+=== Comptages EXACTS des tables deja restaurees (2026-08-19T10:33:41Z) ===
+(scraper_runs encore en cours de COPY a cet instant)
+companies=4295349
+company_tag=7501969
+contacts=1319567
+journalists=1257
+
+Production (releve 2026-08-19T09:48:50Z) :
+companies=4295349 / company_tag=7501969 / contacts=1319567 / journalists=1257 / scraper_runs=7608196

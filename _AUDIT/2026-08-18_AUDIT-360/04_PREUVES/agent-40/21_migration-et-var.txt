@@ -1,0 +1,32 @@
+ table_failed_jobs | nb_migrations 
+-------------------+---------------
+ failed_jobs       |            59
+(1 row)
+
+
+=== la migration non suivie est-elle enregistree ? ===
+                 migration                  | batch 
+--------------------------------------------+-------
+ 2026_05_17_195529_create_failed_jobs_table |     7
+(1 row)
+
+
+=== repartition /var ===
+37G	/var/lib
+5.1G	/var/log
+4.1G	/var/backups
+172M	/var/cache
+40K	/var/tmp
+32K	/var/spool
+4.0K	/var/snap
+4.0K	/var/opt
+4.0K	/var/mail
+4.0K	/var/local
+
+=== role applicatif : superuser ? ===
+  rolname  | rolsuper | rolbypassrls 
+-----------+----------+--------------
+ axion     | t        | t
+ axion_app | f        | f
+(2 rows)
+

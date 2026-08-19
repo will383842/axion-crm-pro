@@ -1,0 +1,153 @@
+=== DETECTEUR v2 (fenetre +-6 lignes pour absorber les cn() multi-arguments) ===
+
+### features/coverage/CoveragePage.tsx   couleurs-claires-sans-dark=39  literaux=5
+   L77  from-slate-50   << <div className="min-h-full bg-gradient-to-br from-slate-50 via-white to-slate-50 px-6 py-6">
+   L77  via-white   << <div className="min-h-full bg-gradient-to-br from-slate-50 via-white to-slate-50 px-6 py-6">
+   L77  to-slate-50   << <div className="min-h-full bg-gradient-to-br from-slate-50 via-white to-slate-50 px-6 py-6">
+   L81  bg-sky-50   << <div className="mb-1 inline-flex items-center gap-2 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-medium text-sk
+   L81  ring-sky-200   << <div className="mb-1 inline-flex items-center gap-2 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-medium text-sk
+   L143  bg-white/80   << <div className="rounded-2xl bg-white/80 p-1 shadow-[0_8px_32px_-12px_rgb(0_0_0/0.12)] ring-1 ring-slate-200/60 backdrop-
+   L143  ring-slate-200/60   << <div className="rounded-2xl bg-white/80 p-1 shadow-[0_8px_32px_-12px_rgb(0_0_0/0.12)] ring-1 ring-slate-200/60 backdrop-
+   L143  LITERAL rgb(0_0_0/0.12)   << <div className="rounded-2xl bg-white/80 p-1 shadow-[0_8px_32px_-12px_rgb(0_0_0/0.12)] ring-1 ring-slate-200/60 backdrop-
+   L193  bg-slate-100   << ? 'inline-flex items-center gap-1 rounded-full bg-slate-100 p-1 shadow-inner ring-1 ring-slate-200'
+   L193  ring-slate-200   << ? 'inline-flex items-center gap-1 rounded-full bg-slate-100 p-1 shadow-inner ring-1 ring-slate-200'
+   L194  bg-white   << : 'inline-flex items-center gap-1 rounded-lg bg-white p-0.5 ring-1 ring-slate-200'
+   L194  ring-slate-200   << : 'inline-flex items-center gap-1 rounded-lg bg-white p-0.5 ring-1 ring-slate-200'
+   L207  bg-white   << ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
+   L207  ring-slate-200   << ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
+   L222  ring-sky-200/60   << sky:     { ring: 'ring-sky-200/60',     chip: 'bg-sky-50 text-sky-700',         bar: 'from-sky-500 to-blue-600',        
+   L222  bg-sky-50   << sky:     { ring: 'ring-sky-200/60',     chip: 'bg-sky-50 text-sky-700',         bar: 'from-sky-500 to-blue-600',        
+   L223  ring-violet-200/60   << violet:  { ring: 'ring-violet-200/60',  chip: 'bg-violet-50 text-violet-700',   bar: 'from-violet-500 to-fuchsia-600',  
+   L223  bg-violet-50   << violet:  { ring: 'ring-violet-200/60',  chip: 'bg-violet-50 text-violet-700',   bar: 'from-violet-500 to-fuchsia-600',  
+   L224  ring-emerald-200/60   << emerald: { ring: 'ring-emerald-200/60', chip: 'bg-emerald-50 text-emerald-700', bar: 'from-emerald-500 to-teal-600',    
+   L224  bg-emerald-50   << emerald: { ring: 'ring-emerald-200/60', chip: 'bg-emerald-50 text-emerald-700', bar: 'from-emerald-500 to-teal-600',    
+   L225  ring-amber-200/60   << amber:   { ring: 'ring-amber-200/60',   chip: 'bg-amber-50 text-amber-700',     bar: 'from-amber-500 to-orange-600',    
+   L225  bg-amber-50   << amber:   { ring: 'ring-amber-200/60',   chip: 'bg-amber-50 text-amber-700',     bar: 'from-amber-500 to-orange-600',    
+   L243  bg-white/80   << <div className={`group relative overflow-hidden rounded-2xl bg-white/80 p-4 ring-1 ${t.ring} shadow-[0_4px_24px_-8px_rgb
+   L243  LITERAL rgb(0_0_0/0.06)   << <div className={`group relative overflow-hidden rounded-2xl bg-white/80 p-4 ring-1 ${t.ring} shadow-[0_4px_24px_-8px_rgb
+   L243  LITERAL rgb(0_0_0/0.10)   << <div className={`group relative overflow-hidden rounded-2xl bg-white/80 p-4 ring-1 ${t.ring} shadow-[0_4px_24px_-8px_rgb
+   L250  bg-slate-100   << <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+   L276  bg-white/80   << <div className="rounded-2xl bg-white/80 p-5 ring-1 ring-slate-200/60 shadow-[0_4px_24px_-8px_rgb(0_0_0/0.06)] backdrop-b
+   L276  ring-slate-200/60   << <div className="rounded-2xl bg-white/80 p-5 ring-1 ring-slate-200/60 shadow-[0_4px_24px_-8px_rgb(0_0_0/0.06)] backdrop-b
+   L276  LITERAL rgb(0_0_0/0.06)   << <div className="rounded-2xl bg-white/80 p-5 ring-1 ring-slate-200/60 shadow-[0_4px_24px_-8px_rgb(0_0_0/0.06)] backdrop-b
+   L281  text-white   << <span className="rounded-md bg-slate-900 px-1.5 py-0.5 font-mono text-xs text-white">{cell.code}</span>
+   L303  text-white   << className="group inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 
+   L312  border-slate-300   << className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm
+   L312  bg-white   << className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm
+   L332  bg-white/60   << <div className="rounded-2xl bg-white/60 p-5 ring-1 ring-dashed ring-slate-300/80 backdrop-blur-sm">
+   L332  ring-slate-300/80   << <div className="rounded-2xl bg-white/60 p-5 ring-1 ring-dashed ring-slate-300/80 backdrop-blur-sm">
+   L345  bg-slate-50   << <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-100">
+   L345  ring-slate-100   << <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-100">
+   L363  bg-white/80   << <div className="rounded-2xl bg-white/80 p-4 ring-1 ring-slate-200/60 shadow-[0_4px_24px_-8px_rgb(0_0_0/0.06)] backdrop-b
+   L363  ring-slate-200/60   << <div className="rounded-2xl bg-white/80 p-4 ring-1 ring-slate-200/60 shadow-[0_4px_24px_-8px_rgb(0_0_0/0.06)] backdrop-b
+   L363  LITERAL rgb(0_0_0/0.06)   << <div className="rounded-2xl bg-white/80 p-4 ring-1 ring-slate-200/60 shadow-[0_4px_24px_-8px_rgb(0_0_0/0.06)] backdrop-b
+   L369  bg-slate-50   << <div className="rounded-xl bg-slate-50 p-4 text-center">
+   L383  text-white   << active ? 'bg-slate-900 text-white' : 'hover:bg-slate-50',
+   L387  bg-white/10   << <span className={['rounded-md px-1.5 py-0.5 font-mono text-[10px]', active ? 'bg-white/10' : 'bg-slate-100 text-slate-60
+   L387  bg-slate-100   << <span className={['rounded-md px-1.5 py-0.5 font-mono text-[10px]', active ? 'bg-white/10' : 'bg-slate-100 text-slate-60
+
+### features/coverage/FranceCoverageMap.tsx   couleurs-claires-sans-dark=14  literaux=15
+   L35  LITERAL #ffffff   << paint: { 'background-color': '#ffffff' },
+   L195  LITERAL #0f172a   << paint: { 'fill-color': '#0f172a', 'fill-opacity': 0.04, 'fill-translate': [0, 4] },
+   L206  LITERAL #e2e8f0   << 0,    '#e2e8f0', // gris clair distinct du fond blanc → visible quand cells vide
+   L207  LITERAL #bae6fd   << 10,   '#bae6fd',
+   L208  LITERAL #38bdf8   << 100,  '#38bdf8',
+   L209  LITERAL #0284c7   << 500,  '#0284c7',
+   L210  LITERAL #075985   << 2000, '#075985',
+   L227  LITERAL #0f172a   << ['boolean', ['feature-state', 'hover'], false], '#0f172a',
+   L228  LITERAL #94a3b8   << '#94a3b8',
+   L322  from-slate-50   << <div className="relative h-[640px] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 via-white to-sky-5
+   L322  via-white   << <div className="relative h-[640px] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 via-white to-sky-5
+   L322  to-sky-50/30   << <div className="relative h-[640px] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 via-white to-sky-5
+   L326  bg-white/85   << <div className="pointer-events-none absolute bottom-4 left-4 rounded-2xl bg-white/85 px-4 py-3 text-[11px] shadow-[0_8px
+   L326  ring-slate-200/60   << <div className="pointer-events-none absolute bottom-4 left-4 rounded-2xl bg-white/85 px-4 py-3 text-[11px] shadow-[0_8px
+   L326  LITERAL rgb(0_0_0/0.12)   << <div className="pointer-events-none absolute bottom-4 left-4 rounded-2xl bg-white/85 px-4 py-3 text-[11px] shadow-[0_8px
+   L332  LITERAL #e2e8f0   << { color: '#e2e8f0', label: '0' },
+   L333  LITERAL #bae6fd   << { color: '#bae6fd', label: '1+' },
+   L334  LITERAL #38bdf8   << { color: '#38bdf8', label: '100+' },
+   L335  LITERAL #0284c7   << { color: '#0284c7', label: '500+' },
+   L336  LITERAL #075985   << { color: '#075985', label: '2k+' },
+   L339  ring-slate-200/60   << <span className="block h-3 w-7 rounded-md ring-1 ring-slate-200/60" style={{ backgroundColor: i.color }} />
+   L349  text-white   << className="pointer-events-none absolute z-10 rounded-xl bg-slate-900/95 px-3.5 py-2.5 text-xs text-white shadow-2xl shad
+   L349  ring-white/10   << className="pointer-events-none absolute z-10 rounded-xl bg-slate-900/95 px-3.5 py-2.5 text-xs text-white shadow-2xl shad
+   L353  bg-white/10   << <span className="rounded-md bg-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-200">{hover.code}</span>
+   L353  text-slate-200   << <span className="rounded-md bg-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-200">{hover.code}</span>
+   L356  text-slate-300   << <div className="mt-1 text-[11px] text-slate-300">
+   L359  text-white   << <span className="font-semibold text-white">{hover.total.toLocaleString('fr-FR')}</span> entreprises
+   L369  bg-rose-50/95   << <div className="absolute bottom-4 right-4 rounded-xl bg-rose-50/95 px-3 py-2 text-xs font-medium text-rose-700 shadow-sm
+   L369  ring-rose-200   << <div className="absolute bottom-4 right-4 rounded-xl bg-rose-50/95 px-3 py-2 text-xs font-medium text-rose-700 shadow-sm
+
+### features/international/RoumaniePage.tsx   couleurs-claires-sans-dark=8  literaux=0
+   L129  text-white   << ? 'rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white'
+   L130  bg-slate-100   << : 'rounded-md bg-slate-100 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-200'
+   L174  border-slate-200   << <div className="overflow-x-auto rounded-lg border border-slate-200">
+   L176  bg-slate-50   << <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+   L189  border-slate-100   << <tr key={row.id} className="border-t border-slate-100">
+   L219  bg-emerald-100   << <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
+   L244  border-slate-300   << className="rounded-md border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-40"
+   L253  border-slate-300   << className="rounded-md border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-40"
+
+### components/ui/SizeCategoryBadge.tsx   couleurs-claires-sans-dark=6  literaux=0
+   L4  bg-orange-100   << artisan:           { bg: 'bg-orange-100', fg: 'text-orange-800', label: 'Artisan' },
+   L5  bg-sky-100   << tpe:               { bg: 'bg-sky-100',    fg: 'text-sky-800',    label: 'TPE' },
+   L6  bg-indigo-100   << pme:               { bg: 'bg-indigo-100', fg: 'text-indigo-800', label: 'PME' },
+   L7  bg-violet-100   << eti:               { bg: 'bg-violet-100', fg: 'text-violet-800', label: 'ETI' },
+   L8  bg-fuchsia-100   << grande_entreprise: { bg: 'bg-fuchsia-100',fg: 'text-fuchsia-800',label: 'Grande' },
+   L9  bg-slate-100   << inconnue:          { bg: 'bg-slate-100',  fg: 'text-slate-600',  label: 'Inconnue' },
+
+### components/layout/Sidebar.tsx   couleurs-claires-sans-dark=5  literaux=0
+   L211  text-white   << className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-700 text-sm fon
+   L219  text-white   << <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-700 text-
+   L222  text-white   << <span className="text-sm font-bold tracking-tight text-white">Axion CRM Pro</span>
+   L337  text-white   << ? 'bg-sidebar-active text-white ring-1 ring-white/15'
+   L337  ring-white/15   << ? 'bg-sidebar-active text-white ring-1 ring-white/15'
+
+### components/OnboardingTour.tsx   couleurs-claires-sans-dark=2  literaux=2
+   L41  bg-slate-100   << <kbd className="rounded bg-slate-100 px-1 py-0.5 text-xs">⌘K</kbd> (ou{' '}
+   L42  bg-slate-100   << <kbd className="rounded bg-slate-100 px-1 py-0.5 text-xs">Ctrl+K</kbd>) où que vous soyez.
+   L138  LITERAL #7c3aed   << primaryColor: '#7c3aed',
+   L139  LITERAL #0f172a   << textColor: '#0f172a',
+
+### components/ui/QualityBadge.tsx   couleurs-claires-sans-dark=3  literaux=0
+   L4  bg-emerald-100   << complete:  { bg: 'bg-emerald-100', fg: 'text-emerald-800', label: 'Complète',  icon: '🟢' },
+   L5  bg-amber-100   << partielle: { bg: 'bg-amber-100',   fg: 'text-amber-800',   label: 'Partielle', icon: '🟡' },
+   L6  bg-rose-100   << basique:   { bg: 'bg-rose-100',    fg: 'text-rose-800',    label: 'Basique',   icon: '🔴' },
+
+### components/ui/EmptyState.tsx   couleurs-claires-sans-dark=2  literaux=0
+   L15  border-slate-200   << <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-white px
+   L15  bg-white   << <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-white px
+
+### components/ui/ErrorBoundary.tsx   couleurs-claires-sans-dark=2  literaux=0
+   L27  bg-rose-50   << <div className={`rounded-xl bg-rose-50 p-${level === 'root' ? 8 : 4} text-rose-900`}>
+   L33  text-white   << className="mt-3 rounded-md bg-rose-600 px-3 py-1.5 text-sm text-white hover:bg-rose-700"
+
+### components/ui/Tooltip.tsx   couleurs-claires-sans-dark=2  literaux=0
+   L58  text-white   << 'pointer-events-none absolute z-50 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] font-medium text-whit
+   L58  ring-white/10   << 'pointer-events-none absolute z-50 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] font-medium text-whit
+
+### features/phase2-scaffold/ColdEmailStub.tsx   couleurs-claires-sans-dark=2  literaux=0
+   L8  border-amber-200   << <div className="rounded-xl border-2 border-dashed border-amber-200 bg-amber-50 p-6 text-amber-900">
+   L8  bg-amber-50   << <div className="rounded-xl border-2 border-dashed border-amber-200 bg-amber-50 p-6 text-amber-900">
+
+### features/phase2-scaffold/LinkedInStub.tsx   couleurs-claires-sans-dark=2  literaux=0
+   L8  border-amber-200   << <div className="rounded-xl border-2 border-dashed border-amber-200 bg-amber-50 p-6 text-amber-900">
+   L8  bg-amber-50   << <div className="rounded-xl border-2 border-dashed border-amber-200 bg-amber-50 p-6 text-amber-900">
+
+### components/ui/Skeleton.tsx   couleurs-claires-sans-dark=1  literaux=0
+   L2  bg-slate-200   << return <div className={`animate-pulse rounded bg-slate-200 ${className}`} />;
+
+### features/auth/LoginPage.tsx   couleurs-claires-sans-dark=1  literaux=0
+   L128  border-slate-300   << className="h-4 w-4 rounded border-slate-300"
+
+### features/campaigns/CampaignWizardPage.tsx   couleurs-claires-sans-dark=1  literaux=0
+   L549  text-white/80   << selected ? 'text-white/80' : 'text-slate-400',
+
+### features/companies/CompaniesListPage.tsx   couleurs-claires-sans-dark=1  literaux=0
+   L631  text-white   << className="inline-flex h-9 items-center justify-center rounded-lg bg-gradient-to-b from-slate-900 to-slate-800 px-4 text
+
+### features/misc/NotFoundPage.tsx   couleurs-claires-sans-dark=1  literaux=0
+   L6  text-slate-300   << <p className="text-5xl font-bold text-slate-300">404</p>
+
+TOTAL couleurs claires sans dark: = 92
+TOTAL literaux couleur            = 22
+Fichiers touches                  = 17

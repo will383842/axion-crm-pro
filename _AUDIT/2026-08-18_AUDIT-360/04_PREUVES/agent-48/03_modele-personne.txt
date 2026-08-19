@@ -1,0 +1,91 @@
+## 4. LE TYPE VIT SUR L'ORGANISATION, PAS SUR LA PERSONNE
+-- relation_type / lifecycle_stage : sur companies et candidates
+82:        DB::statement("ALTER TABLE companies ADD COLUMN IF NOT EXISTS relation_type TEXT NOT NULL DEFAULT 'prospect'");
+83:        DB::statement("ALTER TABLE companies ADD COLUMN IF NOT EXISTS lifecycle_stage TEXT NOT NULL DEFAULT 'nouveau'");
+-- ce que la migration ajoute a contacts (la SEULE colonne) :
+backend/database/migrations/2026_08_14_000002_crm_socle_taxonomie_business.php:103:        DB::statement('ALTER TABLE contacts ADD COLUMN IF NOT EXISTS person_key TEXT');
+backend/database/migrations/2026_08_14_000002_crm_socle_taxonomie_business.php:104:        DB::statement('ALTER TABLE contacts ADD COLUMN IF NOT EXISTS external_ref TEXT');
+backend/database/migrations/2026_08_14_000002_crm_socle_taxonomie_business.php:105:        DB::statement('ALTER TABLE contacts ADD COLUMN IF NOT EXISTS legal_basis TEXT');
+backend/database/migrations/2026_08_14_000002_crm_socle_taxonomie_business.php:106:        DB::statement('ALTER TABLE contacts ADD COLUMN IF NOT EXISTS consent_version TEXT');
+backend/database/migrations/2026_08_14_000002_crm_socle_taxonomie_business.php:107:        DB::statement('ALTER TABLE contacts ADD COLUMN IF NOT EXISTS consent_at TIMESTAMPTZ');
+backend/database/migrations/2026_08_14_000002_crm_socle_taxonomie_business.php:108:        DB::statement('ALTER TABLE contacts ADD COLUMN IF NOT EXISTS consent_text_ref TEXT');
+backend/database/migrations/2026_08_14_000002_crm_socle_taxonomie_business.php:109:        DB::statement('ALTER TABLE contacts ADD COLUMN IF NOT EXISTS first_info_at TIMESTAMPTZ');
+backend/database/migrations/2026_08_14_000002_crm_socle_taxonomie_business.php:110:        DB::statement("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS field_origins JSONB NOT NULL DEFAULT '{}'::jsonb");
+-- colonnes reelles de contacts a la creation :
+            CREATE TABLE contacts (
+                id                BIGSERIAL PRIMARY KEY,
+                workspace_id      UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+                company_id        BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+                first_name        TEXT,
+                last_name         TEXT NOT NULL,
+                normalized_hash   TEXT GENERATED ALWAYS AS (
+                    encode(digest(normalize_name(coalesce(first_name,'') || '_' || last_name) || '_' || company_id::TEXT, 'sha256'), 'hex')
+                ) STORED,
+                title             TEXT,
+                role              TEXT,
+                email             CITEXT,
+                email_status      TEXT CHECK (email_status IN ('valid','invalid','catchall','unknown','disposable','role')),
+                email_score       INT CHECK (email_score BETWEEN 0 AND 100),
+                email_pattern     TEXT,
+                phone             TEXT,
+                linkedin_url      TEXT,
+                twitter_url       TEXT,
+                discovery_source  TEXT,
+                sources           JSONB NOT NULL DEFAULT '[]'::jsonb,
+                metadata          JSONB NOT NULL DEFAULT '{}'::jsonb,
+                last_verified_at  TIMESTAMPTZ,
+                created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+                updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+                deleted_at        TIMESTAMPTZ,
+                UNIQUE (workspace_id, normalized_hash)
+            );
+
+-- contacts.company_id est NOT NULL : une personne sans organisation est IMPOSSIBLE
+-- contacts.last_name est NOT NULL : contredit le principe 5 et le §1.6 (aucun champ obligatoire)
+
+## 5. UN SEUL TYPE, LE PLUS ENGAGEANT — a l'oppose du §2.2
+
+    /**
+     * Ordre de priorité pour l'« upgrade » automatique du type : une fiche
+     * porte TOUJOURS le type le plus engageant qu'elle a atteint.
+     *
+     * @var list<string>
+     */
+    public const BUSINESS_RELATION_PRIORITY = [
+        'client',
+        'prospect',
+        'investisseur',
+        'partenaire',
+        'presse_media',
+        'conference',
+        'fournisseur',
+        'newsletter',
+    ];
+-- et deux types qui sont des MOTIFS ou des EVENEMENTS dans le CDC :
+    public const BUSINESS_RELATION_TYPES = [
+        'prospect',
+        'client',
+        'presse_media',
+        'partenaire',
+        'investisseur',
+        'conference',
+        'newsletter',
+        'fournisseur',
+    ];
+
+## 6. LE HUB LISTE DES ENTREPRISES, PAS DES PERSONNES
+/**
+ * HUB DE CONTACTS — l'unique moteur de liste de l'univers business (conception
+ * §3a, parti-pris n°2 : « les types ne sont pas des pages différentes, ce sont
+ * des vues préréglées du même écran »).
+ *
+ * Unité de ligne : l'ENTREPRISE avec ses personnes jointes. Ce n'est pas un
+ * choix d'affichage, c'est le modèle du plan §2.2a : le CRM Pro est
+ * company-centrique et `relation_type` / `lifecycle_stage` vivent sur
+ * `companies`. Lister des personnes aurait imposé de dupliquer le type sur
+ * chaque contact — donc de le laisser diverger.
+ *
+ * L'univers VIVIER n'est pas atteignable ici, par construction : la requête est
+ * bornée au workspace business courant, et `candidates` est une autre table
+ * dans un autre workspace (`CandidatesController`).
+ */

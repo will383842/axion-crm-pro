@@ -1,0 +1,28 @@
+=== HEAD au moment de la cloture ===
+e8924b8
+e8924b8 fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)
+9d273cd fix(rgpd+acces): le registre affirmait une chose FAUSSE en sa faveur — rectifié le jour même
+1145473 docs(rgpd): registre des violations, notification non retenue (#188)
+bb60473 docs(rgpd): registre des violations — obligation art. 33-5, et la notification n'aura PAS lieu
+=== phpstan-baseline.neon : etat courant vs b53338c ===
+1321 backend/phpstan-baseline.neon
+1321
+--- diff resume ---
+warning: in the working copy of 'backend/phpstan-baseline.neon', CRLF will be replaced by LF the next time Git touches it
+ backend/phpstan-baseline.neon | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+--- qui l a touche ? (non commite) ---
+warning: in the working copy of 'backend/phpstan-baseline.neon', CRLF will be replaced by LF the next time Git touches it
+diff --git a/backend/phpstan-baseline.neon b/backend/phpstan-baseline.neon
+index 66066fd..4be267c 100644
+--- a/backend/phpstan-baseline.neon
++++ b/backend/phpstan-baseline.neon
+@@ -58,7 +58,7 @@ parameters:
+ 			message: '#^Parameter \#1 \$string of method Illuminate\\Console\\Command\:\:warn\(\) expects string, string\|false given\.$#'
+ 			identifier: argument.type
+ 			count: 1
+-			path: app/Console/Commands/AnomalyDetect.php
++			path: app/Models/Company.php
+ 
+ 		-
+ 			message: '#^Cannot access property \$member_count on App\\Models\\EmailAudience\|null\.$#'

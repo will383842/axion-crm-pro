@@ -1,0 +1,47 @@
+=== F10 : canal site -> CRM, scenarios joues ? ===
+89:| **E2E n°2** | **Correctif RGPD : scope de l'opposition vivier** | **#143** |
+509:| 13 | Confirmation d'opposition vivier | ✖ | ✖ | Idem |
+733:| **B.10 → B.12** — opposition vivier, RGPD export et effacement | Exigent la **base du site** ou son **secret de signature**, ou la boîte aux lettres qui reçoit le jeton. La connexion au serveur du site a été **refusée par le classificateur** : la consigne n'ouvrait explicitement que le serveur CRM. Non contourné. |
+=== session 1a : canal ===
+4:> pièce prouvée, garde vue rouge puis verte, préproduction avant production).
+45:| `a064fd4` | 🔴 **Correctif de sécurité** — la production n'expose plus Postgres ni Redis. |
+78:vérifié une faille de production **alors ouverte** (adresse, ports, mot de passe,
+89:- **Préproduction** : ✅ validée — sur le **VPS CRM existant** (`46.62.248.239`),
+109:| Base `axion_crm_perf4m` | 2 800 000 fiches + index couvrant. **Jetable**, rejouable par `backend/database/perf/seed_volume_production_4m.sql`. |
+157:> sur 300 000, **210 ms**. « la production en porte **4,29 M** dans le même
+192:  séquentiel complet, linéaire avec le stock. La production porte 4,29 M de
+293:La mesure au volume RÉEL de la production (4,29 M) est en cours pour chiffrer le
+295:cache. Jeu de données : `backend/database/perf/seed_volume_production_4m.sql`
+345:| **§0.9 / §29 n°1** — fluidité au volume de référence | index couvrant + cache | `EXPLAIN (ANALYZE, BUFFERS)` avant/après, §2.5-§2.6 ; mesure au volume de production, §2.11 |
+349:### 2.11 Mesure au volume de production — 2 800 000 fiches
+364:volume de référence ; l'écart restant jusqu'à la production est un facteur
+393:   `seed_volume_production_4m.sql`). Aucune donnée utile n'a été perdue — la
+418:### 3.1 🔴 La préproduction N'EXISTE PAS — et le §28.1 la rend obligatoire
+435:vécu en préproduction n'est pas livrable** », et le §28.7 en fait un critère de
+440:**Recommandation** : une application Coolify de préproduction sur le VPS CRM
+485:> Trouvée en inventoriant le serveur **pour préparer la préproduction** (§28.5 :
+493:le confort du poste de développement. Sur le serveur de production, ces
+546:(modifier le pare-feu d'une production). C'est légitime, et c'est donc à toi.
+629:vaut pas « la règle est revenue ». Un redémarrage du serveur de production est
+643:Tant que la production les crée elle-même, c'est sans effet. Mais dès que ④ sera
+694:## 6. Préproduction — l'inventaire, et ce qu'il a RÉFUTÉ de ma propre recommandation
+701:### 6.1 Réfutation n°1 — la production du CRM n'utilise PAS Coolify
+703:J'avais recommandé « une application Coolify de préproduction ». C'est faux dans
+714:mécanisme de déploiement, différent de celui de la production** — donc une
+=== preuves de scenarios RGPD joues apres le 17/08 ===
+_REPORTS/2026-08-17_CLOTURE-PLAN-CRM-E2E2.md
+_REPORTS/2026-08-18_ARBITRAGES-PREALABLES-SECTION-4.md
+_REPORTS/AIPD_2026-08-18.md
+_REPORTS/e2e2-preuves/etat-vivant-E2E2.md
+_REPORTS/e2e2-preuves/journal-session-E2E2.md
+_REPORTS/e2e2-preuves/plan-scenarios-E2E-corrige.md
+_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-07/F10_canal.txt
+_AUDIT/2026-08-18_AUDIT-360/11_GRILLES/agent-05_plan-13-aout.md
+=== ingestion : evenements recus en local ===
+ count 
+-------
+     0
+(1 row)
+
+ public | crm_outbound_events        | table             | axion
+ public | email_inboxes              | table             | axion

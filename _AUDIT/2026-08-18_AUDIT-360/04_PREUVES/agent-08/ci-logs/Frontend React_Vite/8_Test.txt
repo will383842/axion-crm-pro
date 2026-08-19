@@ -1,0 +1,93 @@
+﻿2026-08-19T09:43:19.7876804Z ##[group]Run pnpm test
+2026-08-19T09:43:19.7877103Z [36;1mpnpm test[0m
+2026-08-19T09:43:19.7914280Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:43:19.7914541Z env:
+2026-08-19T09:43:19.7914802Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-19T09:43:19.7915119Z ##[endgroup]
+2026-08-19T09:43:20.1848818Z 
+2026-08-19T09:43:20.1849847Z > @axion-ia/axion-crm-pro-frontend@0.1.0 test /home/runner/work/axion-crm-pro/axion-crm-pro/frontend
+2026-08-19T09:43:20.1850613Z > vitest run
+2026-08-19T09:43:20.1850770Z 
+2026-08-19T09:43:20.5049488Z 
+2026-08-19T09:43:20.5073985Z [1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90m/home/runner/work/axion-crm-pro/axion-crm-pro/frontend[39m
+2026-08-19T09:43:20.5091884Z 
+2026-08-19T09:43:23.6253439Z  [32m✓[39m tests/screens/ContactsHubPage.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 811[2mms[22m[39m
+2026-08-19T09:43:23.6269637Z    [33m[2m✓[22m[39m ContactsHubPage — rendu[2m > [22maffiche les compteurs, les onglets de type et la première page de fiches [33m384[2mms[22m[39m
+2026-08-19T09:43:24.2567594Z  [32m✓[39m tests/screens/DashboardPage.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 1398[2mms[22m[39m
+2026-08-19T09:43:24.2569777Z    [33m[2m✓[22m[39m DashboardPage — rendu[2m > [22maffiche les quatre indicateurs, la couverture et l’activité récente [33m411[2mms[22m[39m
+2026-08-19T09:43:24.2572583Z    [33m[2m✓[22m[39m DashboardPage — parcours[2m > [22m🔴 changer de période ne déclenche AUCUNE requête (clé de cache sans `period`) [33m432[2mms[22m[39m
+2026-08-19T09:43:25.5938535Z  [32m✓[39m tests/screens/PersonTimelinePage.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 426[2mms[22m[39m
+2026-08-19T09:43:26.2614398Z [90mstderr[2m | tests/screens/CompanyDetailPage.test.tsx[2m > [22m[2mCompanyDetailPage — rendu[2m > [22m[2mcharge la fiche de l’entreprise DE L’URL et affiche son identité légale
+2026-08-19T09:43:26.2616626Z [22m[39mIn HTML, <button> cannot be a descendant of <button>.
+2026-08-19T09:43:26.2617464Z This will cause a hydration error.
+2026-08-19T09:43:26.2617825Z 
+2026-08-19T09:43:26.2617988Z   ...
+2026-08-19T09:43:26.2618520Z     <MatchView router={{...}} match={{id:"/layou...", ...}}>
+2026-08-19T09:43:26.2619124Z       <SafeFragment>
+2026-08-19T09:43:26.2619612Z         <SafeFragment fallback={null}>
+2026-08-19T09:43:26.2620696Z           <CatchBoundary getResetKey={function getResetKey} errorComponent={function defaultErrorComponent} ...>
+2026-08-19T09:43:26.2623222Z             <CatchBoundaryImpl getResetKey={function getResetKey} errorComponent={function defaultErrorComponent} ...>
+2026-08-19T09:43:26.2624413Z               <SafeFragment fallback={function fallback}>
+2026-08-19T09:43:26.2625163Z                 <MatchInnerImpl match={{id:"/layou...", ...}}>
+2026-08-19T09:43:26.2625778Z                   <component>
+2026-08-19T09:43:26.2626294Z                     <CompanyDetailPage>
+2026-08-19T09:43:26.2626914Z                       <div className="px-6 py-6">
+2026-08-19T09:43:26.2627511Z                         <Breadcrumbs>
+2026-08-19T09:43:26.2628321Z                         <header className="mb-6 flex ...">
+2026-08-19T09:43:26.2628902Z                           <div>
+2026-08-19T09:43:26.2629443Z                           <div className="flex items...">
+2026-08-19T09:43:26.2630026Z                             <Button>
+2026-08-19T09:43:26.2630545Z                             <Button>
+2026-08-19T09:43:26.2631749Z                             <DropdownMenu align="right" trigger={<ForwardRef(IconButton)>} items={[...]}>
+2026-08-19T09:43:26.2632830Z                               <div ref={{current:null}} className="relative i...">
+2026-08-19T09:43:26.2633605Z >                               <button
+2026-08-19T09:43:26.2634216Z >                                 type="button"
+2026-08-19T09:43:26.2634930Z >                                 onClick={function onClick}
+2026-08-19T09:43:26.2635642Z >                                 aria-haspopup="menu"
+2026-08-19T09:43:26.2636355Z >                                 aria-expanded={false}
+2026-08-19T09:43:26.2637427Z >                                 className="inline-flex"
+2026-08-19T09:43:26.2637950Z >                               >
+2026-08-19T09:43:26.2638687Z                                   <IconButton label={"Plus d'a..."} variant="outline" size="md">
+2026-08-19T09:43:26.2639484Z >                                   <button
+2026-08-19T09:43:26.2640103Z >                                     ref={null}
+2026-08-19T09:43:26.2640841Z >                                     aria-label={"Plus d'actions"}
+2026-08-19T09:43:26.2641969Z >                                     title={"Plus d'actions"}
+2026-08-19T09:43:26.2643149Z >                                     className="inline-flex items-center justify-center rounded-lg transition-[transf..."
+2026-08-19T09:43:26.2644131Z >                                   >
+2026-08-19T09:43:26.2644596Z                         ...
+2026-08-19T09:43:26.2644846Z 
+2026-08-19T09:43:26.2645130Z <button> cannot contain a nested <button>.
+2026-08-19T09:43:26.2645789Z See this log for the ancestor stack trace.
+2026-08-19T09:43:26.2646167Z 
+2026-08-19T09:43:26.9627405Z  [32m✓[39m tests/screens/CompanyDetailPage.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 990[2mms[22m[39m
+2026-08-19T09:43:26.9630090Z    [33m[2m✓[22m[39m CompanyDetailPage — rendu[2m > [22mcharge la fiche de l’entreprise DE L’URL et affiche son identité légale [33m341[2mms[22m[39m
+2026-08-19T09:43:27.5443643Z  [32m✓[39m tests/screens/AudienceBuilderPage.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 4747[2mms[22m[39m
+2026-08-19T09:43:27.5457353Z    [33m[2m✓[22m[39m AudienceBuilderPage — rendu[2m > [22maffiche les cinq blocs de critères, et la création est VERROUILLÉE à l’arrivée [33m522[2mms[22m[39m
+2026-08-19T09:43:27.5473975Z    [33m[2m✓[22m[39m AudienceBuilderPage — parcours[2m > [22mcliquer un département et cocher « a un email » construit les CRITÈRES envoyés à l’aperçu [33m884[2mms[22m[39m
+2026-08-19T09:43:27.5476904Z    [33m[2m✓[22m[39m AudienceBuilderPage — parcours[2m > [22mre-cliquer un département le RETIRE — la puce est une bascule, pas un ajout [33m1409[2mms[22m[39m
+2026-08-19T09:43:27.5488618Z    [33m[2m✓[22m[39m AudienceBuilderPage — parcours[2m > [22mnommer puis créer POSTe l’audience et ATTERRIT sur sa fiche [33m870[2mms[22m[39m
+2026-08-19T09:43:27.5491799Z    [33m[2m✓[22m[39m AudienceBuilderPage — parcours[2m > [22maperçu en échec : l’écran affiche le message du serveur, jamais un compte faux [33m726[2mms[22m[39m
+2026-08-19T09:43:29.0069240Z  [32m✓[39m tests/components/ContactsHubPage.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 467[2mms[22m[39m
+2026-08-19T09:43:29.1107614Z  [32m✓[39m tests/screens/LoginPage.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 1450[2mms[22m[39m
+2026-08-19T09:43:29.1109377Z    [33m[2m✓[22m[39m LoginPage — parcours[2m > [22msaisir puis soumettre POSTe les identifiants et ATTERRIT sur le tableau de bord [33m473[2mms[22m[39m
+2026-08-19T09:43:29.1110592Z    [33m[2m✓[22m[39m LoginPage — parcours[2m > [22maiguille vers /2fa quand le compte exige un second facteur [33m338[2mms[22m[39m
+2026-08-19T09:43:29.9653855Z  [32m✓[39m tests/components/SidebarAccordeon.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 714[2mms[22m[39m
+2026-08-19T09:43:30.9153393Z  [32m✓[39m tests/components/ConsoleGate.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[90m 146[2mms[22m[39m
+2026-08-19T09:43:31.1019658Z  [32m✓[39m tests/lib/msw-contract.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 147[2mms[22m[39m
+2026-08-19T09:43:31.4913306Z  [32m✓[39m tests/lib/echo.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 27[2mms[22m[39m
+2026-08-19T09:43:32.6254671Z  [32m✓[39m tests/components/DarkModeToggle.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[90m 230[2mms[22m[39m
+2026-08-19T09:43:32.8743490Z  [32m✓[39m tests/components/crmConsoleTypes.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 15[2mms[22m[39m
+2026-08-19T09:43:32.9387096Z  [32m✓[39m tests/components/FormField.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[90m 204[2mms[22m[39m
+2026-08-19T09:43:34.0503319Z  [32m✓[39m tests/components/SizeCategoryBadge.extended.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[90m 82[2mms[22m[39m
+2026-08-19T09:43:34.3783144Z  [32m✓[39m tests/lib/api.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 37[2mms[22m[39m
+2026-08-19T09:43:34.4459154Z  [32m✓[39m tests/components/Skeleton.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[90m 76[2mms[22m[39m
+2026-08-19T09:43:35.5523543Z  [32m✓[39m tests/components/QualityBadge.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[90m 81[2mms[22m[39m
+2026-08-19T09:43:35.9409231Z  [32m✓[39m tests/components/SizeCategoryBadge.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[90m 74[2mms[22m[39m
+2026-08-19T09:43:35.9747063Z  [32m✓[39m tests/components/EmptyState.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[90m 184[2mms[22m[39m
+2026-08-19T09:43:36.6529852Z  [32m✓[39m tests/smoke.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 5[2mms[22m[39m
+2026-08-19T09:43:36.6716270Z 
+2026-08-19T09:43:36.6729000Z [2m Test Files [22m [1m[32m21 passed[39m[22m[90m (21)[39m
+2026-08-19T09:43:36.6729942Z [2m      Tests [22m [1m[32m118 passed[39m[22m[90m (118)[39m
+2026-08-19T09:43:36.6742272Z [2m   Start at [22m 09:43:20
+2026-08-19T09:43:36.6750271Z [2m   Duration [22m 16.17s[2m (transform 907ms, setup 9.42s, collect 5.66s, tests 12.31s, environment 13.04s, prepare 2.30s)[22m
+2026-08-19T09:43:36.6751493Z 

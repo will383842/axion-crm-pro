@@ -1,0 +1,137 @@
+activities|r|t|t|1
+ai_act_register|r|t|t|1
+analytics_attribution|r|t|t|1
+analytics_cohorts|r|t|t|1
+analytics_daily_rollups|r|t|t|1
+analytics_funnel_snapshots|r|f|f|0
+analytics_funnels|r|t|t|1
+analytics_kpis|r|t|t|1
+audience_members|r|t|t|1
+audit_logs|p|f|f|0
+audit_logs_default|r|f|f|0
+audit_logs_p20260201|r|f|f|0
+audit_logs_p20260301|r|f|f|0
+audit_logs_p20260401|r|f|f|0
+audit_logs_p20260501|r|f|f|0
+audit_logs_p20260601|r|f|f|0
+audit_logs_p20260701|r|f|f|0
+audit_logs_p20260801|r|f|f|0
+audit_logs_p20260901|r|f|f|0
+audit_logs_p20261001|r|f|f|0
+audit_logs_p20261101|r|f|f|0
+audit_logs_p20261201|r|f|f|0
+audit_logs_p20270101|r|f|f|0
+audit_logs_p20270201|r|f|f|0
+axion_offer_targets|r|f|f|0
+business_events|r|t|t|1
+campaigns|r|t|t|1
+candidate_tag|r|t|t|1
+candidates|r|t|t|1
+cities|r|f|f|0
+companies|r|t|t|1
+company_tag|r|t|t|1
+contacts|r|t|t|1
+countries|r|f|f|0
+coverage_matrix_cells|m|f|f|0
+coverage_zones|r|t|t|1
+crm_activites|r|f|f|0
+crm_lost_reasons|r|t|t|1
+crm_motifs|r|f|f|0
+crm_notes|r|t|t|1
+crm_outbound_events|r|f|f|0
+crm_pipelines|r|t|t|1
+crm_tasks|r|t|t|1
+deal_history|r|f|f|0
+deals|r|t|t|1
+departments|r|f|f|0
+dnc_entries|r|f|f|0
+dnc_lists|r|t|t|1
+duplicate_flags|r|t|t|1
+effectif_ranges|r|f|f|0
+email_audiences|r|t|t|1
+email_events|r|t|t|1
+email_inboxes|r|t|t|1
+email_messages|r|f|f|0
+email_sends|r|t|t|1
+email_sequences|r|f|f|0
+email_suppressions|r|f|f|0
+email_templates|r|t|t|1
+email_threads|r|t|t|1
+email_validations|r|f|f|0
+email_verification_logs|r|t|t|2
+email_warmup_pools|r|t|t|1
+health_practitioners|r|t|t|1
+invitations|r|t|t|1
+journalists|r|t|t|1
+legal_forms|r|f|f|0
+linkedin_accounts|r|t|t|1
+linkedin_health_checks|r|f|f|0
+linkedin_invitations|r|t|t|1
+linkedin_messages|r|t|t|1
+linkedin_profiles_cache|r|t|t|1
+linkedin_sequence_runs|r|f|f|0
+linkedin_sequences|r|t|t|1
+llm_usage|r|t|t|1
+llm_use_cases|r|t|t|1
+magic_links|r|f|f|0
+media|r|t|t|1
+migrations|r|f|f|0
+model_has_permissions|r|f|f|0
+model_has_roles|r|f|f|0
+naf_classes|r|f|f|0
+naf_divisions|r|f|f|0
+naf_groups|r|f|f|0
+naf_sections|r|f|f|0
+naf_subclasses|r|f|f|0
+notifications|r|t|t|1
+opt_out|r|f|f|0
+password_reset_tokens|r|f|f|0
+permissions|r|f|f|0
+personal_access_tokens|r|f|f|0
+pipeline_stages|r|t|t|1
+prompt_template_versions|r|f|f|0
+prompt_templates|r|f|f|0
+proxy_providers_config|r|t|t|1
+proxy_usage_log|r|t|t|1
+regions|r|f|f|0
+rgpd_requests|r|t|t|1
+role_has_permissions|r|f|f|0
+roles|r|f|f|0
+rotations|r|t|t|1
+saved_views|r|t|t|1
+scraper_runs|r|t|t|1
+scraping_campaigns|r|t|t|1
+scraping_sources|r|f|f|0
+search_engines|r|f|f|0
+sessions|r|f|f|0
+spatial_ref_sys|r|f|f|0
+strategic_keywords|r|t|t|1
+tags|r|t|t|1
+unsubscribes|r|t|t|1
+user_agents|r|f|f|0
+user_workspaces|r|f|f|0
+users|r|f|f|0
+web_vital_samples|r|t|t|1
+workspaces|r|f|f|0
+        relname        | relkind | relrowsecurity | relforcerowsecurity 
+-----------------------+---------+----------------+---------------------
+ audit_logs            | p       | f              | f
+ audit_logs_default    | r       | f              | f
+ audit_logs_p20260201  | r       | f              | f
+ audit_logs_p20260301  | r       | f              | f
+ audit_logs_p20260401  | r       | f              | f
+ audit_logs_p20260501  | r       | f              | f
+ audit_logs_p20260601  | r       | f              | f
+ audit_logs_p20260701  | r       | f              | f
+ audit_logs_p20260801  | r       | f              | f
+ audit_logs_p20260901  | r       | f              | f
+ audit_logs_p20261001  | r       | f              | f
+ audit_logs_p20261101  | r       | f              | f
+ audit_logs_p20261201  | r       | f              | f
+ audit_logs_p20270101  | r       | f              | f
+ audit_logs_p20270201  | r       | f              | f
+ coverage_matrix_cells | m       | f              | f
+ sessions              | r       | f              | f
+ user_workspaces       | r       | f              | f
+(18 rows)
+

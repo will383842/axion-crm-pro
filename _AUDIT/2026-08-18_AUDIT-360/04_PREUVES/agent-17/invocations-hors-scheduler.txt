@@ -1,0 +1,37 @@
+# Invocations artisan hors scheduler (workflows GitHub / Makefile)
+.github/workflows/prospection-collect-paris.yml:55:            docker compose exec -u root -T api php artisan prospection:collect "$ARR" --limit=0 --req-delay="$REQ_DELAY" < /dev/null
+.github/workflows/prospection-collect-paris.yml:83:            docker compose exec -u root -T api php artisan coverage:refresh-matrix < /dev/null || echo "coverage KO (non bloquant)"
+.github/workflows/prospection-collect-paris.yml:84:            docker compose exec -u root -T api php artisan prospection:stats < /dev/null
+.github/workflows/prospection-collect-region.yml:73:            docker compose exec -u root -T api php artisan prospection:collect "$DEPT" --limit=0 --req-delay="$REQ_DELAY" < /dev/null
+.github/workflows/prospection-collect-region.yml:102:            docker compose exec -u root -T api php artisan prospection:purge-non-diffusible < /dev/null
+.github/workflows/prospection-collect-region.yml:103:            docker compose exec -u root -T api php artisan prospection:purge-non-commercial < /dev/null
+.github/workflows/prospection-collect-region.yml:104:            docker compose exec -u root -T api php artisan prospection:reclassify-size --all < /dev/null
+.github/workflows/prospection-collect-region.yml:105:            docker compose exec -u root -T api php artisan prospection:reclassify-sector --all < /dev/null
+.github/workflows/prospection-collect-region.yml:106:            docker compose exec -u root -T api php artisan coverage:refresh-matrix < /dev/null || echo "coverage KO (non bloquant)"
+.github/workflows/prospection-collect-region.yml:107:            docker compose exec -u root -T api php artisan prospection:stats < /dev/null
+.github/workflows/prospection-collect.yml:3:# Lance `php artisan prospection:collect <dept>` sur le serveur prod (Helsinki)
+.github/workflows/prospection-collect.yml:64:            docker compose exec -u root -T api php artisan prospection:collect "$DEPT" --limit="$LIMIT" --req-delay="$REQ_DELAY" < /dev/null
+.github/workflows/prospection-enrich.yml:70:            docker compose exec -u root -T api php artisan prospection:enrich --count="$COUNT" --department="$DEPT" < /dev/null
+.github/workflows/prospection-find-websites-distributed.yml:174:          php artisan prospection:find-websites \
+.github/workflows/prospection-find-websites.yml:82:            docker compose exec -u root -T api php artisan prospection:find-websites --department="$DEPT" --limit="$LIMIT" $RETRY_FLAG < /dev/null
+.github/workflows/prospection-reclassify.yml:3:# Lance `php artisan prospection:reclassify-size` + `prospection:stats` sur le
+.github/workflows/prospection-reclassify.yml:38:            docker compose exec -u root -T api php artisan prospection:purge-non-diffusible < /dev/null
+.github/workflows/prospection-reclassify.yml:39:            docker compose exec -u root -T api php artisan prospection:purge-non-commercial < /dev/null
+.github/workflows/prospection-reclassify.yml:40:            docker compose exec -u root -T api php artisan prospection:reclassify-size --all < /dev/null
+.github/workflows/prospection-reclassify.yml:41:            docker compose exec -u root -T api php artisan prospection:reclassify-sector --all < /dev/null
+.github/workflows/prospection-reclassify.yml:42:            docker compose exec -u root -T api php artisan coverage:refresh-matrix < /dev/null || echo "coverage refresh KO (non bloquant)"
+.github/workflows/prospection-reclassify.yml:43:            docker compose exec -u root -T api php artisan prospection:stats < /dev/null
+.github/workflows/prospection-stats.yml:3:# Lance `php artisan prospection:stats` sur le serveur prod via SSH pour voir
+.github/workflows/prospection-stats.yml:36:            docker compose exec -u root -T api php artisan prospection:stats
+Makefile:42:	docker exec axion-crm-api php artisan db:seed
+Makefile:135:	docker exec axion-crm-api php artisan audit:verify-chain
+Makefile:138:	docker exec axion-crm-api php artisan app:pentest-self-check
+Makefile:145:	docker exec axion-crm-api php artisan ign:import-admin-express --year=2026 --layer=all
+Makefile:153:	docker exec axion-crm-api php artisan queue:flush
+
+# gh run list — prospection-reclassify.yml (les deux purges + les deux reclassify --all)
+completed	success	Prospection — Reclasser la taille (prod)	Prospection — Reclasser la taille (prod)	main	workflow_dispatch	28720405493	26s	2026-07-04T21:36:37Z
+completed	success	Prospection — Reclasser la taille (prod)	Prospection — Reclasser la taille (prod)	main	workflow_dispatch	28720234206	59s	2026-07-04T21:29:50Z
+completed	success	Prospection — Reclasser la taille (prod)	Prospection — Reclasser la taille (prod)	main	workflow_dispatch	28718424225	40s	2026-07-04T20:17:38Z
+completed	success	Prospection — Reclasser la taille (prod)	Prospection — Reclasser la taille (prod)	main	workflow_dispatch	28715467700	21s	2026-07-04T18:22:09Z
+completed	success	Prospection — Reclasser la taille (prod)	Prospection — Reclasser la taille (prod)	main	workflow_dispatch	28713453697	25s	2026-07-04T17:05:42Z

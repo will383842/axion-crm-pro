@@ -1,0 +1,27 @@
+# Agent 11 — audit_logs : la chaine d'audit porte workspace_id et n'a AUCUNE RLS
+## base de travail axion_crm
+       relname        | relkind | relispartition | rls | force_rls | policies 
+----------------------+---------+----------------+-----+-----------+----------
+ audit_logs           | p       | f              | f   | f         |        0
+ audit_logs_default   | r       | t              | f   | f         |        0
+ audit_logs_p20260201 | r       | t              | f   | f         |        0
+ audit_logs_p20260301 | r       | t              | f   | f         |        0
+ audit_logs_p20260401 | r       | t              | f   | f         |        0
+ audit_logs_p20260501 | r       | t              | f   | f         |        0
+ audit_logs_p20260601 | r       | t              | f   | f         |        0
+ audit_logs_p20260701 | r       | t              | f   | f         |        0
+ audit_logs_p20260801 | r       | t              | f   | f         |        0
+ audit_logs_p20260901 | r       | t              | f   | f         |        0
+ audit_logs_p20261001 | r       | t              | f   | f         |        0
+ audit_logs_p20261101 | r       | t              | f   | f         |        0
+ audit_logs_p20261201 | r       | t              | f   | f         |        0
+ audit_logs_p20270101 | r       | t              | f   | f         |        0
+ audit_logs_p20270201 | r       | t              | f   | f         |        0
+(15 rows)
+
+## base de test axion_crm_test (fraichement migree par RefreshDatabase)
+ parents | partitions_et_tables | avec_rls | total_policies 
+---------+----------------------+----------+----------------
+       1 |                   14 |        0 |              0
+(1 row)
+

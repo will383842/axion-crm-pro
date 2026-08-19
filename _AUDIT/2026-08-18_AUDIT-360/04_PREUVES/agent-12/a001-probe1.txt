@@ -1,0 +1,15 @@
+=== /up ===
+200
+=== / (web) ===
+200
+=== GET /api/v1/auth/me (sans auth) ===
+HTTP/1.1 401 Unauthorized
+Host: localhost:58080
+Connection: close
+X-Powered-By: PHP/8.3.32
+Cache-Control: no-cache, private
+Date: Wed, 19 Aug 2026 09:50:35 GMT
+Content-Type: application/json
+Vary: Origin
+
+{"message":"Unauthenticated."}

@@ -1,0 +1,950 @@
+FICHIERS SCANNES : 84
+TOTAL CHAINES EN DUR : 741
+FICHIERS UTILISANT i18next : 6
+
+| fichier | chaines en dur | utilise i18next |
+|---|---:|---|
+| features/campaigns/CampaignWizardPage.tsx | 48 | NON |
+| features/campaigns/CampaignDetailPage.tsx | 47 | NON |
+| features/companies/CompaniesListPage.tsx | 36 | NON |
+| features/scraping/ScraperRunsPage.tsx | 36 | NON |
+| features/audiences/AudienceBuilderPage.tsx | 31 | NON |
+| features/rgpd/AuditLogsPage.tsx | 30 | NON |
+| features/companies/CompanyDetailPage.tsx | 29 | NON |
+| features/rgpd/RgpdRequestsPage.tsx | 27 | NON |
+| features/media/MediaListPage.tsx | 25 | NON |
+| features/rgpd/AiActRegisterPage.tsx | 25 | NON |
+| features/settings/SettingsPage.tsx | 24 | NON |
+| features/audiences/AudienceDetailPage.tsx | 21 | NON |
+| features/llm/LlmRouterPage.tsx | 21 | NON |
+| features/coverage/CoveragePage.tsx | 20 | NON |
+| features/international/RoumaniePage.tsx | 20 | NON |
+| features/tags/TagsManagerPage.tsx | 19 | NON |
+| features/campaigns/CampaignsListPage.tsx | 18 | NON |
+| features/media/MediaDetailPage.tsx | 18 | NON |
+| features/media/JournalistsListPage.tsx | 17 | NON |
+| features/users/UsersPage.tsx | 17 | NON |
+| features/observability/ObservabilityPage.tsx | 15 | NON |
+| features/contacts/ContactsListPage.tsx | 14 | NON |
+| features/audiences/AudiencesListPage.tsx | 13 | NON |
+| features/crm-console/ArbitragePage.tsx | 12 | NON |
+| features/crm-console/CandidatesPage.tsx | 11 | NON |
+| features/crm-console/PersonTimelinePage.tsx | 11 | NON |
+| features/llm/ProxyProvidersPage.tsx | 11 | NON |
+| components/ui/GlobalSearch.tsx | 9 | NON |
+| features/crm-console/ContactsHubPage.tsx | 9 | NON |
+| features/dashboard/DashboardPage.tsx | 9 | NON |
+| features/llm/RotationsPage.tsx | 9 | NON |
+| components/OnboardingTour.tsx | 8 | NON |
+| features/auth/PasswordResetPage.tsx | 8 | NON |
+| features/companies/components/Pagination.tsx | 7 | NON |
+| features/companies/components/QualityScoreCard.tsx | 7 | NON |
+| components/layout/Sidebar.tsx | 6 | NON |
+| features/auth/MagicLinkPage.tsx | 6 | oui |
+| features/coverage/FranceCoverageMap.tsx | 4 | NON |
+| features/dashboard/components/QualityDistributionBar.tsx | 4 | NON |
+| app/RootLayout.tsx | 3 | NON |
+| components/layout/Header.tsx | 3 | NON |
+| features/companies/components/ContactsCard.tsx | 3 | NON |
+| features/dashboard/components/ActivityFeed.tsx | 3 | NON |
+| features/dashboard/components/SizeDistributionChart.tsx | 3 | NON |
+| features/dashboard/components/TopDeptsCard.tsx | 3 | NON |
+| components/ui/ErrorBoundary.tsx | 2 | NON |
+| components/ui/Modal.tsx | 2 | NON |
+| features/auth/LoginPage.tsx | 2 | oui |
+| features/auth/TwoFactorPage.tsx | 2 | oui |
+| features/companies/components/EnrichmentTimeline.tsx | 2 | NON |
+| features/crm-console/ConsoleGate.tsx | 2 | NON |
+| features/dashboard/components/NextActions.tsx | 2 | NON |
+| features/misc/NotFoundPage.tsx | 2 | NON |
+| components/ui/Breadcrumbs.tsx | 1 | NON |
+| components/ui/Spinner.tsx | 1 | NON |
+| features/companies/components/CompanyRow.tsx | 1 | NON |
+| features/phase2-scaffold/ColdEmailStub.tsx | 1 | oui |
+| features/phase2-scaffold/LinkedInStub.tsx | 1 | oui |
+| app/routeTree.tsx | 0 | NON |
+| components/layout/AutoBreadcrumbs.tsx | 0 | NON |
+| components/layout/UserMenu.tsx | 0 | NON |
+| components/layout/WorkspaceSelector.tsx | 0 | NON |
+| components/ui/Avatar.tsx | 0 | NON |
+| components/ui/Button.tsx | 0 | NON |
+| components/ui/Card.tsx | 0 | NON |
+| components/ui/DarkModeToggle.tsx | 0 | NON |
+| components/ui/DropdownMenu.tsx | 0 | NON |
+| components/ui/EmptyState.tsx | 0 | NON |
+| components/ui/FormField.tsx | 0 | NON |
+| components/ui/IconButton.tsx | 0 | NON |
+| components/ui/Input.tsx | 0 | NON |
+| components/ui/KpiCard.tsx | 0 | NON |
+| components/ui/PageHeader.tsx | 0 | NON |
+| components/ui/PageShell.tsx | 0 | NON |
+| components/ui/QualityBadge.tsx | 0 | NON |
+| components/ui/SegmentedControl.tsx | 0 | NON |
+| components/ui/SizeCategoryBadge.tsx | 0 | NON |
+| components/ui/Skeleton.tsx | 0 | NON |
+| components/ui/Stat.tsx | 0 | NON |
+| components/ui/StatusPill.tsx | 0 | NON |
+| components/ui/Tabs.tsx | 0 | NON |
+| components/ui/Toolbar.tsx | 0 | NON |
+| components/ui/Tooltip.tsx | 0 | NON |
+| main.tsx | 0 | oui |
+
+
+===== DETAIL =====
+
+--- features/campaigns/CampaignWizardPage.tsx (48) ---
+  245 [attr:title] Nouvelle campagne
+  312 [text] Continuer
+  323 [text] Créer en brouillon
+  401 [attr:title] Identité
+  402 [attr:label] Nom de la campagne
+  404 [attr:placeholder] Ex : Prospection PME Paris IT — semaine 21
+  410 [attr:label] Description (optionnel)
+  413 [attr:placeholder] Notes internes pour l’équipe
+  420 [attr:label] Planification
+  439 [text] Démarrage automatique à la date choisie (cron toutes les minutes).
+  465 [attr:title] Zones cibles
+  492 [text] zone
+  492 [text] sélectionnée
+  517 [text] pour «
+  519 [text] Clic = ajouter / retirer
+  526 [text] Aucune zone ne correspond à «
+  526 [text] ». Efface la recherche pour voir toutes les zones disponibles.
+  574 [attr:title] Sources de découverte
+  643 [text] Enrichissement automatique.
+  644 [text] Chaque entreprise découverte ci-dessus est ensuite enrichie automatiquement par :
+  647 [text] Annuaire Entreprises
+  647 [text] — CA, bilans, dirigeants (gratuit)
+  648 [text] BODACC
+  648 [text] — signaux légaux : création, redressement (gratuit)
+  649 [text] BAN géocodage
+  649 [text] — coordonnées GPS précises (gratuit)
+  650 [text] Mentions légales scrape
+  650 [text] — email + téléphone publics (18 URLs explorées par site)
+  651 [text] Google Places API
+  651 [text] — téléphone, horaires, note Google (~$0 grâce au crédit $200/mois)
+  652 [text] LLM Mistral
+  652 [text] — classification, priorité, tags intent
+  654 [text] Pas besoin d'activer ces sources ici — elles tournent en background.
+  661 [text] Sources Phase B (à venir).
+  662 [text] Google Maps + Pages Jaunes seront disponibles après configuration d'un proxy résidentiel (
+  689 [attr:title] Budget et sécurité anti-blacklist
+  696 [attr:label] Entreprises max
+  706 [attr:label] Durée max (minutes)
+  717 [text] Débit max
+  719 [text] req/min
+  731 [text] Plus c’est bas, moins de risque de blacklist source (Google Maps, Pages Jaunes).
+  741 [text] Budget estimé
+  741 [text] : jusqu’à
+  742 [text] entreprises sur
+  744 [text] req/min
+  756 [text] Limites par source
+  768 [text] RPM
+  784 [text] Daily quota
+
+--- features/campaigns/CampaignDetailPage.tsx (47) ---
+  133 [attr:label] Live
+  140 [text] Lancée
+  140 [text] min écoulées
+  144 [text] entreprises
+  155 [text] Lancer
+  160 [text] Pause
+  165 [text] Reprendre
+  170 [text] Annuler
+  183 [text] Entreprises créées
+  203 [text] Temps écoulé
+  206 [text] min
+  224 [attr:label] Entreprises créées
+  230 [attr:label] Runs
+  237 [attr:label] Débit max
+  285 [text] Aucun événement pour l’instant. La campagne va générer des runs dans quelques secondes.
+  315 [text] Run #
+  341 [text] Source
+  342 [text] Statut
+  343 [text] Runs
+  344 [text] Succès
+  345 [text] Échecs
+  346 [text] Entreprises
+  359 [text] En cours
+  361 [text] Terminé
+  363 [text] En attente
+  388 [text] Type
+  389 [text] Code
+  390 [text] Libellé
+  416 [text] Aucun run généré pour cette campagne.
+  426 [text] Source
+  427 [text] Statut
+  428 [text] Démarré
+  457 [text] Voir →
+  475 [text] Configuration de la campagne
+  477 [text] Dupliquer
+  481 [attr:label] Nom
+  482 [attr:label] Statut
+  483 [attr:label] Description
+  484 [attr:label] Sources
+  485 [attr:label] Zones
+  486 [attr:label] Max entreprises
+  487 [attr:label] Max durée (min)
+  488 [attr:label] Max req/min
+  489 [attr:label] Planifiée
+  490 [attr:label] Expire
+  491 [attr:label] Démarrée
+  492 [attr:label] Terminée
+
+--- features/companies/CompaniesListPage.tsx (36) ---
+  386 [attr:title] Entreprises
+  389 [text] Pipeline de prospection ·
+  393 [text] entreprises actives
+  399 [text] Importer
+  414 [text] Lancer scraping →
+  424 [attr:label] Total
+  430 [attr:label] Enrichies
+  437 [attr:label] Top taille
+  444 [attr:label] Top NAF
+  479 [attr:placeholder] Rechercher une entreprise…
+  563 [attr:placeholder] Code NAF…
+  564 [attr:aria-label] Filtre NAF
+  573 [attr:placeholder] Tag (implantation-ro…)
+  574 [attr:aria-label] Filtre tag
+  583 [attr:aria-label] Fiches créées après le
+  590 [attr:aria-label] Fiches créées avant le
+  599 [text] filtre
+  599 [text] actif
+  610 [text] Réinitialiser
+  622 [attr:title] Aucune entreprise
+  633 [text] Aller à la couverture →
+  644 [text] sélectionnée
+  650 [attr:placeholder] Tag existant (campagne-ro…)
+  651 [attr:aria-label] Tag à poser ou retirer
+  659 [text] Poser le tag
+  667 [text] Retirer
+  670 [text] Annuler la sélection
+  699 [attr:aria-label] Sélectionner toutes les fiches affichées
+  703 [text] Entreprise
+  704 [text] SIREN
+  705 [text] NAF
+  706 [text] Taille
+  707 [text] Qualité
+  708 [text] Ville
+  709 [text] Enrichi
+  710 [text] Actions
+
+--- features/scraping/ScraperRunsPage.tsx (36) ---
+  329 [attr:title] Journaux de collecte
+  331 [attr:label] En direct
+  342 [text] Exporter en CSV
+  352 [attr:label] Total
+  358 [attr:label] En cours
+  364 [attr:label] Taux de succès
+  371 [attr:label] Échecs
+  387 [attr:placeholder] Rechercher source, dept, id…
+  392 [text] run
+  412 [text] Réinitialiser
+  416 [text] Lancer un scrape
+  425 [text] ID
+  426 [text] Source
+  427 [text] Zone
+  428 [text] Statut
+  429 [text] Entreprises
+  430 [text] Démarré
+  431 [text] Actions
+  452 [text] Page
+  454 [text] runs
+  463 [text] ◀ Précédent
+  471 [text] Suivant ▶
+  493 [attr:title] Annuler ce run ?
+  499 [text] Garder
+  507 [text] Annuler le run
+  616 [attr:label] Annuler le run
+  628 [attr:label] Relancer le run
+  641 [attr:label] Actions
+  671 [text] Source · Zone
+  679 [attr:label] Démarré
+  680 [attr:label] Terminé
+  681 [attr:label] Latence
+  683 [attr:label] Entreprises
+  692 [text] Erreur
+  703 [text] Payload de la requête
+  714 [text] Payload de la réponse
+
+--- features/audiences/AudienceBuilderPage.tsx (31) ---
+  206 [attr:title] Nouvelle audience
+  219 [attr:title] Informations
+  220 [attr:label] Nom
+  222 [attr:placeholder] Ex : PME Île-de-France IT — prêtes outreach
+  228 [attr:label] Description (optionnel)
+  231 [attr:placeholder] Pour quelle campagne ? Quel objectif ?
+  240 [attr:title] Géographie
+  241 [attr:label] Départements
+  246 [attr:placeholder] Aucun département
+  249 [attr:label] Régions
+  254 [attr:placeholder] Aucune région
+  261 [attr:title] Taille et secteur
+  262 [attr:label] Tailles d'entreprise
+  267 [attr:placeholder] Toutes tailles
+  270 [attr:label] Secteurs
+  275 [attr:placeholder] Tous secteurs
+  282 [attr:title] Qualité et statut
+  283 [attr:label] Statuts prospection
+  288 [attr:placeholder] Tous statuts
+  313 [text] A au moins un contact avec email
+  319 [attr:title] Tags personnalisés
+  320 [attr:label] Slugs séparés par virgule ou espace (contains_any)
+  322 [attr:placeholder] ex : decisionnaire, growth, fintech
+  335 [text] Preview live
+  345 [attr:label] Entreprises
+  346 [attr:label] Contacts
+  350 [text] Ajoute au moins un critère pour voir la preview.
+  358 [text] Critères (
+  384 [text] Créer l'audience
+  394 [text] Annuler
+  398 [text] Renseigne un nom et au moins un critère pour activer la création.
+
+--- features/rgpd/AuditLogsPage.tsx (30) ---
+  92 [attr:title] Journaux d’audit
+  101 [text] Vérifier la chaîne
+  112 [attr:placeholder] Événement, chemin, IP, acteur…
+  118 [attr:aria-label] Filtre sévérité
+  121 [text] Toutes sévérités
+  122 [text] Info
+  123 [text] Attention
+  124 [text] Erreur
+  125 [text] Critique
+  136 [attr:title] Aucun journal d'audit
+  153 [text] Quand
+  154 [text] Événement
+  155 [text] Chemin
+  156 [text] Acteur
+  157 [text] Sévérité
+  158 [text] IP
+  159 [text] Empreinte
+  203 [attr:title] Détails du log
+  210 [text] Quand
+  214 [text] Événement
+  218 [text] Chemin
+  222 [text] Statut
+  226 [text] Acteur
+  230 [text] Cible
+  234 [text] IP
+  238 [text] User agent
+  245 [text] Chaîne d'empreintes
+  249 [text] précédente :
+  253 [text] actuelle :
+  260 [text] Payload (brut)
+
+--- features/companies/CompanyDetailPage.tsx (29) ---
+  81 [attr:title] Chargement…
+  83 [text] Chargement de la fiche entreprise…
+  90 [attr:title] Entreprise introuvable
+  121 [text] SIREN
+  123 [text] Dept
+  132 [text] Priorité
+  149 [text] Exporter
+  153 [attr:label] Plus d'actions
+  177 [text] Identité légale
+  178 [text] Informations entreprise
+  182 [attr:label] SIREN
+  183 [attr:label] Forme juridique
+  184 [attr:label] NAF
+  188 [attr:label] Effectif INSEE
+  189 [attr:label] Adresse
+  190 [attr:label] Site web
+  197 [attr:label] Téléphone
+  198 [attr:label] LinkedIn
+  201 [text] Voir le profil →
+  205 [attr:label] Date création
+  208 [attr:label] Enrichi le
+  225 [text] Debug
+  226 [text] Données brutes (signals)
+  245 [text] Aucun signal capté.
+  261 [text] Actions rapides
+  262 [text] Workflow
+  273 [text] Enrichir maintenant
+  276 [text] Exporter (vCard / VCF)
+  279 [text] Marquer obsolète
+
+--- features/rgpd/RgpdRequestsPage.tsx (27) ---
+  113 [attr:title] Requêtes RGPD
+  121 [text] Nouvelle requête
+  142 [attr:title] Aucune requête RGPD
+  150 [text] Créer une requête
+  164 [text] Type
+  165 [text] Sujet
+  166 [text] Statut
+  167 [text] Demande
+  168 [text] Traitement
+  169 [text] Actions
+  201 [text] Traiter
+  217 [attr:title] Nouvelle requête RGPD
+  222 [text] Annuler
+  230 [text] Créer
+  237 [text] Type
+  243 [text] Accès (art. 15)
+  244 [text] Portabilité (art. 20)
+  245 [text] Suppression (art. 17)
+  246 [text] Rectification (art. 16)
+  247 [text] Opposition (art. 21)
+  252 [text] Email du sujet
+  258 [attr:placeholder] personne.concernee@exemple.com
+  272 [attr:title] Traiter la requête
+  285 [text] Annuler
+  293 [text] Marquer comme traitée
+  300 [text] Note interne (optionnelle)
+  307 [attr:placeholder] Action effectuée, données purgées, motif de rejet…
+
+--- features/media/MediaListPage.tsx (25) ---
+  205 [attr:title] Médias
+  208 [text] Base médias & presse ·
+  212 [text] médias
+  223 [attr:label] Total
+  224 [attr:label] Avec site web
+  225 [attr:label] Avec email
+  226 [attr:label] Top type
+  233 [attr:placeholder] Rechercher un média…
+  246 [attr:placeholder] Dept (75…)
+  247 [attr:aria-label] Filtre département
+  252 [text] Réinitialiser
+  258 [text] Chargement…
+  262 [attr:title] Aucun média
+  275 [text] Média
+  276 [text] Type
+  277 [text] Dept
+  278 [text] Ville
+  279 [text] Site
+  280 [text] Email
+  281 [text] Conf.
+  282 [text] Téléphone
+  326 [text] Page
+  326 [text] médias
+  330 [text] ← Précédent
+  333 [text] Suivant →
+
+--- features/rgpd/AiActRegisterPage.tsx (25) ---
+  81 [attr:title] Registre AI Act
+  89 [text] Article 9 AI Act
+  89 [text] — tout système classé
+  89 [text] high
+  89 [text] doit être documenté ici avec DPIA, mesures de mitigation, supervision humaine et révision 
+  96 [attr:label] Total registres
+  99 [attr:label] Risque élevé
+  106 [attr:label] En production
+  112 [attr:label] Dernière revue
+  123 [attr:title] Aucun système IA enregistré
+  136 [text] Cas d'usage
+  137 [text] Risque
+  138 [text] Fournisseur · Modèle
+  139 [text] Statut
+  140 [text] Responsable
+  141 [text] Dernière revue
+  205 [text] Risque :
+  217 [text] Finalité
+  218 [text] Objet du traitement
+  226 [text] Fournisseur
+  230 [text] Modèle
+  234 [text] Supervision humaine
+  240 [text] Route de désinscription
+  251 [text] Analyse d'impact
+  252 [text] DPIA complet
+
+--- features/settings/SettingsPage.tsx (24) ---
+  118 [attr:title] Paramètres
+  122 [text] Workspace :
+  135 [text] Workspace
+  136 [text] Identité et limites
+  153 [text] Nom
+  158 [text] Slug (URL)
+  161 [text] Non modifiable
+  165 [text] Plafond LLM mensuel (€)
+  174 [text] Kill-switch automatique LLM quand atteint
+  180 [text] Enregistrer
+  185 [text] Chargement…
+  210 [text] Renouveler
+  213 [text] Configurer
+  227 [text] Sentry / GlitchTip
+  228 [text] Suivi des erreurs
+  232 [text] DSN Sentry
+  233 [attr:placeholder] https://xxx@sentry.io/yyy
+  235 [text] Reporting des erreurs runtime, lié à GlitchTip self-hosted en dev.
+  266 [text] Thème
+  267 [text] Mode clair / sombre
+  271 [text] Le thème est synchronisé avec ta préférence système et persisté localement.
+  279 [text] Densité
+  280 [text] Affichage tables
+  284 [text] Choisis l'espacement par défaut des lignes dans les listes longues.
+
+--- features/audiences/AudienceDetailPage.tsx (21) ---
+  118 [text] Auto-refresh
+  130 [text] Refresh
+  138 [text] Edit
+  151 [text] Supprimer
+  161 [attr:label] Membres
+  167 [attr:label] Dernière refresh
+  173 [attr:label] Statut
+  179 [attr:label] Auto-refresh
+  213 [text] Aucun membre pour l'instant. Lance un refresh pour matérialiser le segment.
+  223 [text] Entreprise
+  224 [text] Dépt
+  225 [text] Taille
+  226 [text] Secteur
+  227 [text] Contact email
+  258 [text] aucun email
+  268 [text] Affichage des 100 premiers membres. Le segment complet contient potentiellement plus.
+  284 [text] Critères (JSON brut)
+  291 [text] Modifier
+  311 [text] Bientôt — envoi de campagne email
+  314 [text] L'envoi de campagnes cold email sur cette audience sera disponible dans un prochain sprint
+  323 [text] Voir roadmap pipeline →
+
+--- features/llm/LlmRouterPage.tsx (21) ---
+  83 [attr:title] LLM Router
+  97 [attr:title] Aucun cas d'usage configuré
+  110 [text] Cas d'usage
+  111 [text] Fournisseur
+  112 [text] Modèle
+  113 [text] Chaîne de repli
+  114 [text] Plafond €
+  115 [text] État
+  154 [text] Fournisseur
+  157 [text] Actif
+  161 [text] Clé API
+  167 [text] Cas d'usage routés
+  184 [attr:title] Aucun prompt
+  202 [text] Modèle
+  221 [attr:label] Coût total 30j
+  227 [attr:label] Tokens in 24h
+  233 [attr:label] Tokens out 24h
+  239 [attr:label] Cas d'usage actifs
+  248 [text] Répartition
+  249 [text] Coût par fournisseur
+  254 [text] Aucune donnée — pas encore d'appel facturé.
+
+--- features/coverage/CoveragePage.tsx (20) ---
+  83 [text] Live · refresh 60s
+  86 [text] Couverture France
+  89 [text] Carte interactive de votre prospection · sélectionnez une zone pour la détailler ou lancer
+  102 [attr:label] Couverture
+  109 [attr:label] Entreprises trouvées
+  115 [attr:label] Mode actif
+  121 [attr:label] Niveau
+  279 [text] Sélection
+  288 [attr:aria-label] Désélectionner
+  295 [attr:label] Entreprises
+  296 [attr:label] Complètes
+  314 [text] Enrichir (emails · téléphones · dirigeants)
+  322 [text] Le filtre est appliqué à la liste entreprises.
+  333 [text] Aucune sélection
+  334 [text] actif
+  336 [text] Cliquez sur un département pour voir ses détails
+  365 [text] Top zones
+  366 [text] Triées · entreprises
+  370 [text] Aucune donnée pour l'instant
+  371 [text] Lancez un premier scrape pour voir les zones se remplir.
+
+--- features/international/RoumaniePage.tsx (20) ---
+  115 [attr:title] Présence française — Roumanie
+  119 [attr:aria-label] Nature d'entité
+  142 [attr:aria-label] Statut de prospection
+  165 [text] Chargement…
+  166 [text] Impossible de charger le vivier Roumanie.
+  171 [text] fiche
+  178 [text] Dénomination
+  179 [text] Nature
+  180 [text] Ville
+  181 [text] E-mail
+  182 [text] Téléphone
+  183 [text] Site
+  184 [text] Statut
+  211 [text] Voir
+  220 [text] Contactable
+  223 [text] Sans e-mail
+  231 [text] Aucune fiche pour cette nature.
+  246 [text] Précédent
+  248 [text] Page
+  255 [text] Suivant
+
+--- features/tags/TagsManagerPage.tsx (19) ---
+  174 [attr:title] Tags
+  178 [text] Nouveau tag
+  185 [attr:label] Total tags
+  186 [attr:label] Auto
+  187 [attr:label] Manuel
+  188 [attr:label] LLM
+  201 [attr:title] Aucun tag
+  205 [text] Créer un tag
+  221 [text] tag
+  240 [attr:title] Nouveau tag
+  243 [attr:label] Nom
+  244 [attr:placeholder] Ex : VIP Client
+  252 [attr:label] Slug (optionnel)
+  253 [attr:placeholder] vip-client
+  261 [text] Catégorie
+  275 [text] Couleur
+  302 [text] Description (optionnel)
+  308 [attr:placeholder] Notes internes…
+  319 [text] Annuler
+
+--- features/campaigns/CampaignsListPage.tsx (18) ---
+  121 [attr:title] Collectes
+  123 [attr:label] En direct
+  131 [text] Nouvelle campagne
+  138 [attr:label] Total
+  139 [attr:label] En cours
+  140 [attr:label] Terminées
+  141 [attr:label] Entreprises créées
+  150 [attr:placeholder] Rechercher par nom…
+  172 [text] Réinitialiser
+  181 [text] Créer une campagne
+  263 [attr:aria-label] Actions
+  320 [text] Entreprises
+  342 [text] Durée
+  346 [text] min
+  360 [text] Pause
+  365 [text] Reprendre
+  370 [text] Annuler
+  378 [text] Voir détails →
+
+--- features/media/MediaDetailPage.tsx (18) ---
+  54 [attr:title] Média introuvable
+  87 [text] Médias
+  99 [text] Chaîne :
+  109 [text] enrichissement :
+  115 [text] Informations
+  128 [text] Contact rédaction
+  131 [text] Site web
+  142 [text] Email rédaction
+  155 [attr:title] Confiance : A = email sur le domaine du site, B = domaine pro, C = boîte grand public
+  157 [text] Confiance
+  162 [text] Téléphone
+  173 [text] Journalistes
+  179 [text] Nom
+  180 [text] Rôle
+  181 [text] Rubrique
+  182 [text] Email
+  198 [text] Aucun journaliste rattaché. Le contact presse fiable reste l'email rédaction ci-dessus (+ 
+  207 [text] Émissions / médias liés (
+
+--- features/media/JournalistsListPage.tsx (17) ---
+  72 [attr:title] Journalistes
+  75 [text] Contacts rédaction ·
+  79 [text] journalistes
+  90 [attr:label] Total
+  91 [attr:label] Avec email
+  92 [attr:label] Opt-out
+  96 [attr:placeholder] Rechercher par nom…
+  100 [text] Chargement…
+  104 [attr:title] Aucun journaliste
+  113 [text] Nom
+  114 [text] Média
+  115 [text] Rôle
+  116 [text] Rubrique
+  117 [text] Email
+  139 [text] Page
+  142 [text] ← Précédent
+  145 [text] Suivant →
+
+--- features/users/UsersPage.tsx (17) ---
+  85 [attr:title] Utilisateurs
+  93 [text] Inviter un utilisateur
+  103 [attr:title] Aucun utilisateur
+  107 [text] Inviter
+  121 [text] Utilisateur
+  122 [text] Email
+  123 [text] Rôles
+  124 [text] 2FA
+  125 [text] Dernière connexion
+  156 [text] Activé
+  160 [text] Non activé
+  178 [attr:title] Inviter un utilisateur
+  183 [text] Annuler
+  191 [text] Envoyer l'invitation
+  198 [text] Email
+  203 [attr:placeholder] prenom.nom@exemple.com
+  208 [text] Rôle
+
+--- features/observability/ObservabilityPage.tsx (15) ---
+  38 [text] Chargement de l'observabilité…
+  43 [text] Impossible de charger les métriques d'observabilité.
+  53 [attr:title] Observabilité
+  59 [attr:label] Erreurs waterfall (24h)
+  65 [attr:label] Quota Google Places (mois)
+  87 [attr:label] Quota Hunter (mois)
+  95 [attr:label] Companies archivées
+  101 [attr:label] Échecs audience refresh (7j)
+  109 [attr:title] Archivages par raison
+  111 [text] Aucun archivage enregistré.
+  129 [attr:title] 50 derniers business events
+  132 [text] Aucun event récent.
+  137 [text] Date
+  138 [text] Action
+  139 [text] Resource
+
+--- features/contacts/ContactsListPage.tsx (14) ---
+  109 [attr:title] Contacts
+  115 [text] décideurs identifiés (waterfall + Direction Finder)
+  126 [attr:placeholder] Nom de famille…
+  132 [attr:aria-label] Filtre statut email
+  148 [attr:aria-label] Filtre pays
+  161 [attr:aria-label] Filtre statut de prospection
+  179 [attr:title] Aucun contact
+  196 [text] Contact
+  197 [text] Rôle
+  198 [text] Email
+  199 [text] Score
+  200 [text] Téléphone
+  201 [text] Source
+  282 [attr:aria-label] Profil LinkedIn
+
+--- features/audiences/AudiencesListPage.tsx (13) ---
+  103 [attr:title] Audiences
+  112 [text] Nouvelle audience
+  119 [attr:label] Total audiences
+  120 [attr:label] Actives
+  121 [attr:label] Membres cumul
+  130 [attr:title] Aucune audience pour l'instant
+  139 [text] Créer une audience
+  204 [attr:aria-label] Actions
+  219 [text] Auto-refresh
+  227 [text] Membres
+  236 [text] Dernière refresh :
+  246 [text] Refresh
+  253 [text] Détails →
+
+--- features/crm-console/ArbitragePage.tsx (12) ---
+  81 [attr:title] Rapprochements à arbitrer
+  89 [attr:title] Rien à arbitrer
+  135 [attr:label] Personne
+  136 [attr:label] E-mail
+  137 [attr:label] Code postal
+  138 [attr:label] Ville
+  143 [text] Identifiant d’entreprise
+  147 [attr:placeholder] ex. 1842
+  158 [text] Rattacher
+  162 [text] Motif d’écartement
+  166 [attr:placeholder] ex. entreprise inexistante au RNE
+  175 [text] Écarter
+
+--- features/crm-console/CandidatesPage.tsx (11) ---
+  83 [attr:title] Vivier candidats
+  90 [attr:label] À qualifier
+  91 [attr:label] Présélection
+  92 [attr:label] Entretien
+  93 [attr:label] Conservés en vivier
+  100 [attr:placeholder] Nom, prénom, e-mail…
+  112 [attr:title] Aucun candidat dans cette vue
+  142 [text] Opposition
+  148 [text] Dernière interaction :
+  150 [text] · Horloge CNIL : purge prévue le
+  152 [text] · CV stocké sur le site
+
+--- features/crm-console/PersonTimelinePage.tsx (11) ---
+  49 [attr:title] Fiche introuvable
+  67 [text] Identité
+  70 [text] Aucune fiche dans les univers auxquels vous avez accès.
+  90 [text] Univers
+  93 [attr:label] Business
+  98 [attr:label] Vivier candidats
+  107 [text] Timeline
+  109 [text] Aucun touchpoint enregistré.
+  143 [text] Aucune fiche
+  145 [text] Fiche présente
+  148 [text] Existe — basculer d’univers pour voir
+
+--- features/llm/ProxyProvidersPage.tsx (11) ---
+  54 [attr:title] Fournisseurs de proxies
+  63 [attr:title] Aucun fournisseur configuré
+  67 [text] Voir la documentation
+  81 [text] Identifiant
+  82 [text] Type
+  83 [text] Zone
+  84 [text] Points de sortie
+  85 [text] État de santé
+  86 [text] Poids
+  87 [text] Actions
+  125 [text] Tester
+
+--- components/ui/GlobalSearch.tsx (9) ---
+  51 [attr:aria-label] Recherche globale
+  54 [text] Rechercher
+  66 [attr:aria-label] Recherche globale
+  76 [attr:placeholder] Rechercher entreprise, contact, tag…
+  79 [text] Esc
+  85 [text] Tape au moins 2 caractères pour rechercher.
+  91 [text] Aucun résultat pour «
+  144 [text] ⌘K pour ouvrir / fermer
+  145 [text] ↑↓ naviguer · ↵ ouvrir
+
+--- features/crm-console/ContactsHubPage.tsx (9) ---
+  98 [attr:title] Contacts
+  103 [attr:label] Clients
+  104 [attr:label] Prospects
+  105 [attr:label] Opportunités
+  108 [attr:label] Dormants
+  119 [attr:placeholder] Nom d'entreprise, SIREN, personne…
+  125 [attr:aria-label] Filtre pays
+  137 [attr:aria-label] Filtre statut de prospection
+  184 [attr:title] Aucun contact dans cette vue
+
+--- features/dashboard/DashboardPage.tsx (9) ---
+  111 [attr:title] Tableau de bord
+  115 [attr:label] En direct
+  129 [text] Actualiser
+  140 [attr:title] Lance ton premier scrape
+  148 [text] Démarrer sur /coverage →
+  159 [attr:label] Total entreprises
+  175 [attr:label] Enrichies 24h
+  190 [attr:label] Nouvelles 7j
+  205 [attr:label] Qualité moyenne
+
+--- features/llm/RotationsPage.tsx (9) ---
+  53 [attr:title] Rotations
+  62 [attr:title] Aucune rotation configurée
+  73 [text] Dimension
+  80 [text] Aucune rotation configurée pour cette dimension.
+  92 [text] Identifiant
+  93 [text] Poids
+  94 [text] Délai d'attente
+  95 [text] État
+  96 [text] Dernière utilisation
+
+--- components/OnboardingTour.tsx (8) ---
+  21 [text] Bienvenue dans Axion CRM Pro 👋
+  23 [text] On va vous montrer en 30 secondes l'essentiel de l'interface. Vous pouvez quitter à tout m
+  40 [text] Recherche globale ultra-rapide. Astuce : appuyez sur
+  41 [text] (ou
+  42 [text] Ctrl+K
+  42 [text] ) où que vous soyez.
+  66 [text] Pensez à activer la double authentification dans les Paramètres pour sécuriser votre compt
+  69 [text] Bon démarrage avec Axion CRM Pro ! 🚀
+
+--- features/auth/PasswordResetPage.tsx (8) ---
+  29 [attr:title] Réinitialiser le mot de passe
+  38 [text] Un lien a été envoyé à
+  41 [text] Vérifie ta boîte mail. Le lien expire dans 60 minutes.
+  47 [text] Retour à la connexion
+  53 [text] Email
+  60 [attr:placeholder] prenom.nom@exemple.com
+  72 [text] Envoyer le lien
+  79 [text] Retour à la connexion
+
+--- features/companies/components/Pagination.tsx (7) ---
+  31 [attr:aria-label] Pagination
+  34 [text] Page
+  35 [text] au total
+  44 [attr:aria-label] Page précédente
+  46 [text] ← Précédent
+  74 [attr:aria-label] Page suivante
+  76 [text] Suivant →
+
+--- features/companies/components/QualityScoreCard.tsx (7) ---
+  40 [text] Score de qualité
+  41 [text] Qualité de la donnée
+  52 [attr:label] Email
+  53 [attr:label] Téléphone
+  54 [attr:label] Site web
+  55 [attr:label] Contacts
+  59 [text] Détail par dimension indisponible pour cette entreprise.
+
+--- components/layout/Sidebar.tsx (6) ---
+  204 [attr:aria-label] Navigation latérale
+  212 [attr:aria-label] Axion CRM Pro — accueil
+  222 [text] Axion CRM Pro
+  230 [attr:aria-label] Navigation principale
+  259 [text] Réduire
+  351 [attr:aria-label] Bientôt disponible
+
+--- features/auth/MagicLinkPage.tsx (6) ---
+  40 [text] Lien envoyé à
+  43 [text] Vérifie ta boîte mail (et les spams). Le lien expire dans 15 minutes.
+  49 [text] Retour à la connexion
+  64 [attr:placeholder] prenom.nom@exemple.com
+  76 [text] Envoyer le lien
+  83 [text] Retour à la connexion
+
+--- features/coverage/FranceCoverageMap.tsx (4) ---
+  323 [attr:aria-label] Carte de couverture France
+  328 [text] Entreprises
+  359 [text] entreprises
+  362 [text] Pas encore traité
+
+--- features/dashboard/components/QualityDistributionBar.tsx (4) ---
+  49 [text] Qualité
+  50 [text] Distribution qualité des fiches
+  54 [text] Score moyen
+  66 [attr:aria-label] Aucune donnée
+
+--- app/RootLayout.tsx (3) ---
+  74 [text] Aller au contenu
+  85 [attr:title] Navigation
+  109 [attr:title] Recherche
+
+--- components/layout/Header.tsx (3) ---
+  30 [attr:label] Ouvrir le menu
+  52 [attr:label] Rechercher
+  64 [attr:label] Notifications
+
+--- features/companies/components/ContactsCard.tsx (3) ---
+  33 [text] Contacts (
+  36 [text] Aucun contact identifié.
+  75 [text] LinkedIn →
+
+--- features/dashboard/components/ActivityFeed.tsx (3) ---
+  51 [text] Temps réel
+  52 [text] Activité récente
+  70 [attr:title] Activité bientôt disponible
+
+--- features/dashboard/components/SizeDistributionChart.tsx (3) ---
+  21 [text] Taille d'entreprise (INSEE)
+  22 [text] Distribution par catégorie
+  26 [text] Total classé
+
+--- features/dashboard/components/TopDeptsCard.tsx (3) ---
+  37 [text] Couverture
+  38 [text] Top 5 départements
+  50 [attr:title] Aucun département couvert
+
+--- components/ui/ErrorBoundary.tsx (2) ---
+  28 [text] Une erreur est survenue.
+  35 [text] Recharger la page
+
+--- components/ui/Modal.tsx (2) ---
+  63 [attr:label] Fermer
+  118 [attr:label] Fermer
+
+--- features/auth/LoginPage.tsx (2) ---
+  32 [text] Axion CRM Pro
+  130 [text] Se souvenir de moi
+
+--- features/auth/TwoFactorPage.tsx (2) ---
+  38 [attr:aria-label] Code à 6 chiffres
+  60 [text] Retour à la connexion
+
+--- features/companies/components/EnrichmentTimeline.tsx (2) ---
+  44 [text] Pipeline d'enrichissement
+  48 [text] Aucune trace d'enrichissement disponible pour le moment.
+
+--- features/crm-console/ConsoleGate.tsx (2) ---
+  39 [attr:title] Console non activée
+  50 [attr:title] Univers vivier candidats non accessible
+
+--- features/dashboard/components/NextActions.tsx (2) ---
+  93 [text] Prochaines étapes
+  94 [text] Que veux-tu faire maintenant ?
+
+--- features/misc/NotFoundPage.tsx (2) ---
+  7 [text] Page introuvable
+  8 [text] Retour au tableau de bord
+
+--- components/ui/Breadcrumbs.tsx (1) ---
+  27 [attr:aria-label] Fil d'Ariane
+
+--- components/ui/Spinner.tsx (1) ---
+  6 [attr:aria-label] Chargement
+
+--- features/companies/components/CompanyRow.tsx (1) ---
+  117 [attr:label] Actions
+
+--- features/phase2-scaffold/ColdEmailStub.tsx (1) ---
+  7 [attr:title] Cold email
+
+--- features/phase2-scaffold/LinkedInStub.tsx (1) ---
+  7 [attr:title] LinkedIn outreach

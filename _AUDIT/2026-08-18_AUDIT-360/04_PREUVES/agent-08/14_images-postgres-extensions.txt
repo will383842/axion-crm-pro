@@ -1,0 +1,17 @@
+=== PROD : extensions DISPONIBLES dans le conteneur postgres ===
+vector dispo=0.8.0 installee=NON
+pg_partman dispo=5.1.0 installee=NON
+postgis dispo=3.5.2 installee=3.5.2
+
+=== PROD : image reelle du conteneur postgres (piege 18) ===
+Image=ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman ImageID=sha256:7ec90cff5540804956ec0686efa58a6a20f7b76d863a3d1eba31211adbdbbfe1 Created=2026-08-19T06:12:15.058385661Z
+Tags=[ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman] ImageCreated=2026-08-18T18:45:43.201810674Z
+
+=== LOCAL : image reelle du conteneur postgres ===
+Image=ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman ImageID=sha256:ac5bbeeeb45a98cea70c32be59e252bbb1133249129d364ef6d172066e4b5398 Created=2026-08-14T11:33:55.596024524Z
+Tags=[ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman] ImageCreated=2026-05-17T12:20:43.356990766Z
+
+=== LOCAL : extensions dispo ===
+vector dispo=0.8.0 installee=0.8.0
+pg_partman dispo=5.1.0 installee=5.1.0
+postgis dispo=3.5.2 installee=3.5.2

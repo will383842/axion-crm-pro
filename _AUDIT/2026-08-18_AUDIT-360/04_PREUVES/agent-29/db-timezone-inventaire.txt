@@ -1,0 +1,17 @@
+### DB_TIMEZONE dans tout le depot (temoin positif : phpunit.xml doit sortir)
+./backend/app/Console/Commands/CorrigerHorodatages.php:201:     * Une fois `DB_TIMEZONE` posé, l'application écrit juste — mais toujours à
+./backend/app/Console/Commands/CorrigerHorodatages.php:217:        $this->error('Le correctif de connexion (DB_TIMEZONE) est donc déjà actif, et');
+./backend/app/Console/Commands/CorrigerHorodatages.php:222:        $this->error('Retirer DB_TIMEZONE, redémarrer, reprendre les données, puis le remettre.');
+./backend/app/Crm/Ingest/SiteSyncEvent.php:392:     * Le correctif du 2026-08-16 (`DB_TIMEZONE=Europe/Paris`, cf. l'en-tête de
+./backend/app/Crm/Scraping/ScrapedRecord.php:382:     * Même motif, même piège potentiel. `DB_TIMEZONE=Europe/Paris` fait lire à
+./backend/config/database.php:82:    // La bascule se fait en ajoutant `DB_TIMEZONE=Europe/Paris` à
+./backend/config/database.php:102:    'timezone' => env('DB_TIMEZONE'),
+./backend/phpunit-ci.xml:60:        <env name="DB_TIMEZONE" value="Europe/Paris"/>
+./backend/phpunit.xml:52:        <env name="DB_TIMEZONE" value="Europe/Paris"/>
+./backend/tests/Feature/HorodatagesFuseauTest.php:21: * `config/database.php`, ou désaligne `DB_TIMEZONE` de `APP_TIMEZONE`.
+./backend/tests/Feature/HorodatagesFuseauTest.php:115:    // Le correctif du 16/08 (`DB_TIMEZONE=Europe/Paris`) fait lire à Postgres
+./backend/tests/Feature/NeDoitPasRegresserTest.php:400:        expect(str_contains($contenu, 'DB_TIMEZONE'))->toBeTrue(
+./backend/tests/Feature/NeDoitPasRegresserTest.php:401:            "« {$fichier} » ne pose plus DB_TIMEZONE : HorodatagesFuseauTest ne peut plus rougir.",
+./backend/tests/Feature/NeDoitPasRegresserTest.php:406:    expect($database)->toContain("'timezone' => env('DB_TIMEZONE')");
+./Dockerfile.laravel:89:# `REDIS_HOST`, ni `DB_TIMEZONE`. Un `config:cache` fige donc les valeurs par
+./infra/docker/entrypoint-prod.sh:10:# ni `DB_TIMEZONE`. Laravel gelait donc un `bootstrap/cache/config.php` rempli

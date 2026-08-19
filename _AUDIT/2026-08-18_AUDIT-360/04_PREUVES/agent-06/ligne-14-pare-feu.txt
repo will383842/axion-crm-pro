@@ -1,0 +1,47 @@
+== le rapport pare-feu est-il dans la PR #174 (e577828) ? ==
+9e81b8a docs(etape0-l14): AIPD refaite pour la SAS, état du pare-feu (F11, F12)
+9e81b8a 2026-08-18 docs(etape0-l14): AIPD refaite pour la SAS, état du pare-feu (F11, F12)
+
+== sections du rapport ==
+11:## 🔴 AVERTISSEMENT — CE DOCUMENT NE CONSTATE RIEN SUR LE SERVEUR
+34:## 1. Ce que le dépôt PRÉTEND
+36:### 1.1 UFW — `infra/scripts/setup-hetzner-cpx22.sh`
+65:### 1.2 fail2ban — même script, lignes 43 et 66-73
+103:### 1.3 Pare-feu Hetzner Cloud — `infra/terraform/main.tf`
+121:### 1.4 La note du 04/07 « pas de firewall » — **INTROUVABLE**
+143:## 2. 🔴 CE QUE LA COMPOSITION DE PRODUCTION CONTREDIT
+147:### 2.1 Les ports réellement publiés
+182:### 2.2 Pourquoi UFW ne protège pas ces ports
+204:### 2.3 🔴 Ce qui aggrave le point 2.1 : le mot de passe
+237:## 3. Synthèse
+253:## 4. PROCÉDURE DE VÉRIFICATION — à jouer par Will, sur le serveur
+258:### 4.0 Se connecter
+264:### 4.1 UFW — le pare-feu est-il seulement actif ?
+293:### 4.2 fail2ban — tourne-t-il, et que garde-t-il ?
+329:### 4.3 🔴 LE CONTRÔLE QUI COMPTE — les ports réellement à l'écoute
+358:### 4.4 Le contrôle DEPUIS L'EXTÉRIEUR — le seul qui prouve
+385:### 4.5 Le pare-feu Hetzner Cloud (couche amont)
+400:### 4.6 Si le §4.3 ou le §4.4 est rouge — comment fermer
+450:### 4.7 À archiver ici
+458:## 5. CONSTAT MESURÉ — *(VIDE : aucune mesure n'a été faite)*
+474:## 6. Entrée de runbook
+499:## 7. Ce que Will doit décider
+
+== §5 (constat reel) ==
+## 5. CONSTAT MESURÉ — *(VIDE : aucune mesure n'a été faite)*
+
+```
+(à remplir par Will après exécution du §4)
+
+Date de la mesure   :
+Serveur             :
+4.1 ufw status verbose         → [coller]
+4.2 fail2ban-client status     → [coller]
+4.3 ss -tlnp                   → [coller]
+4.4 nc depuis l'extérieur      → [coller]
+4.5 pare-feu Hetzner Cloud     → [oui / non / appliqué à quelles ressources]
+```
+
+---
+
+## 6. Entrée de runbook

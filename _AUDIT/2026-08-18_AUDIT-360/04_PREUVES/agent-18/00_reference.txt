@@ -1,0 +1,18 @@
+### REFERENCE (relue, jamais copiee d'un document)
+e8924b8 fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)
+9d273cd fix(rgpd+acces): le registre affirmait une chose FAUSSE en sa faveur — rectifié le jour même
+1145473 docs(rgpd): registre des violations, notification non retenue (#188)
+
+### DOCKER
+axion-crm-horizon	Up About an hour
+axion-crm-scheduler	Up About an hour
+axion-crm-app	Up About an hour (healthy)
+axion-crm-api	Up 34 minutes
+axion-crm-caddy	Up 5 hours
+axion-crm-redis	Up 2 hours (healthy)
+axion-crm-postgres	Up 5 hours (healthy)
+### Mon perimetre a-t-il bouge depuis c0c453d ?
+(vide = aucun fichier de mon perimetre modifie)
+
+HEAD au moment de la redaction :
+e8924b8 fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)

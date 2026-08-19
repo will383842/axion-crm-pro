@@ -1,0 +1,40 @@
+AGENT 22 — QUEL ARTEFACT AI-JE MESURÉ ? (conformité décision D-011)
+Référence : main e8924b8 — 2026-08-19
+
+1) Bundle PÉRIMÉ que servait l'atelier au lancement de l'agent (= D23-001, agent 23)
+   /srv/app/dist/assets/index-DPQz8SpC.js   construit 2026-08-17 07:12:46 UTC
+   commit da97826 (refonte barre latérale)  2026-08-18 17:39:35 +0200  → 34 h APRÈS le bundle
+   témoins : "Runs de scraping" présent · "Journaux de collecte" absent · "Collectes" absent
+   → constaté indépendamment par l'agent 22 avant reconstruction, PUIS écarté.
+
+2) Bundle effectivement BALAYÉ par l'agent 22 (37 écrans)
+   frontend/dist/assets/index-C8i6k4WZ.js   construit 2026-08-19 12:03 (poste)
+   md5 a0b7c4e482730ce1da1386fec79b0ec1
+
+3) Bundle OFFICIEL reconstruit par le chef de chantier
+   /srv/app/dist/assets/index-BVK1vh1a.js
+   md5 824a1421afec637a8cc5c95be5efda9a
+
+4) ÉQUIVALENCE 2) vs 3) sur TOUS les témoins de navigation et d'écran mesurés :
+   témoin                    officiel  balayé
+   Journaux de collecte          3        3
+   Collectes                     5        5
+   Runs de scraping              0        0
+   PHASE 2                       0        0
+   console/personnes             4        4
+   Vivier candidats              3        3
+   Console non activée           1        1
+   Aujourd'hui                   2        2
+   arbitrage                     7        7
+   → les deux artefacts sont FONCTIONNELLEMENT IDENTIQUES sur tout ce que
+     l'agent 22 a mesuré. Le balayage est donc valide au titre de D-011.
+
+5) Re-confirmation en direct sur le bundle OFFICIEL, dans le navigateur :
+   BUNDLE = http://app.localhost:58122/assets/index-BVK1vh1a.js
+   SIDEBAR = Aujourd'hui | Tableau de bord | Contacts | Contacts | Entreprises |
+             Journalistes | Médias (presse) | Collecte | Couverture France |
+             Collectes | Journaux de collecte | Roumanie | Pilotage |
+             Audiences (segments) | Observabilité | Conformité | Requêtes RGPD |
+             Registre AI Act | Journaux d'audit | Réglages | ...
+   /console/contacts => "Console non activée — La console CRM v2 n'est pas
+                         ouverte sur ce serveur."  (alors que CRM_CONSOLE_V2_ENABLED=true)

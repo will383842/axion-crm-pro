@@ -1,0 +1,19 @@
+﻿2026-08-19T09:42:52.9156363Z ##[group]Run actions/cache@v6
+2026-08-19T09:42:52.9156680Z with:
+2026-08-19T09:42:52.9156893Z   path: backend/vendor
+2026-08-19T09:42:52.9157289Z   key: composer-cdedbfa4c6d47abfd87536e56e211c095f68b31e270181da3b2b316855c5a9f6
+2026-08-19T09:42:52.9157798Z   enableCrossOsArchive: false
+2026-08-19T09:42:52.9158152Z   fail-on-cache-miss: false
+2026-08-19T09:42:52.9158443Z   lookup-only: false
+2026-08-19T09:42:52.9158665Z   save-always: false
+2026-08-19T09:42:52.9158874Z env:
+2026-08-19T09:42:52.9159079Z   COMPOSER_PROCESS_TIMEOUT: 0
+2026-08-19T09:42:52.9159396Z   COMPOSER_NO_INTERACTION: 1
+2026-08-19T09:42:52.9159743Z   COMPOSER_NO_AUDIT: 1
+2026-08-19T09:42:52.9159992Z ##[endgroup]
+2026-08-19T09:42:53.1595833Z Cache hit for: composer-cdedbfa4c6d47abfd87536e56e211c095f68b31e270181da3b2b316855c5a9f6
+2026-08-19T09:42:53.8575662Z Received 33576640 of 33576640 (100.0%), 58.2 MBs/sec
+2026-08-19T09:42:53.8576352Z Cache Size: ~32 MB (33576640 B)
+2026-08-19T09:42:53.8610126Z [command]/usr/bin/tar -xf /home/runner/work/_temp/15017360-5d3a-499d-8a4f-90ede88c97b0/cache.tzst -P -C /home/runner/work/axion-crm-pro/axion-crm-pro --use-compress-program unzstd
+2026-08-19T09:42:54.4439782Z Cache restored successfully
+2026-08-19T09:42:54.4535204Z Cache restored from key: composer-cdedbfa4c6d47abfd87536e56e211c095f68b31e270181da3b2b316855c5a9f6

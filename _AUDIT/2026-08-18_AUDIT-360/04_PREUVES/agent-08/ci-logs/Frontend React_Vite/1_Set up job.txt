@@ -1,0 +1,33 @@
+﻿2026-08-19T09:42:45.6564761Z Current runner version: '2.336.0'
+2026-08-19T09:42:45.6591611Z ##[group]Runner Image Provisioner
+2026-08-19T09:42:45.6592716Z Hosted Compute Agent
+2026-08-19T09:42:45.6593375Z Version: 20260729.566
+2026-08-19T09:42:45.6594149Z Commit: cf7153fe6e25b664e8693c24944bf2b00355d109
+2026-08-19T09:42:45.6594961Z Build Date: 2026-07-29T19:17:02Z
+2026-08-19T09:42:45.6595697Z Worker ID: {d988d7b4-29da-4b0a-a521-6d50158a3b72}
+2026-08-19T09:42:45.6596540Z Azure Region: westus3
+2026-08-19T09:42:45.6597173Z ##[endgroup]
+2026-08-19T09:42:45.6599155Z ##[group]Operating System
+2026-08-19T09:42:45.6599876Z Ubuntu
+2026-08-19T09:42:45.6600432Z 24.04.4
+2026-08-19T09:42:45.6601096Z LTS
+2026-08-19T09:42:45.6602029Z ##[endgroup]
+2026-08-19T09:42:45.6602618Z ##[group]Runner Image
+2026-08-19T09:42:45.6603353Z Image: ubuntu-24.04
+2026-08-19T09:42:45.6603945Z Version: 20260810.271.1
+2026-08-19T09:42:45.6605123Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260810.271/images/ubuntu/Ubuntu2404-Readme.md
+2026-08-19T09:42:45.6606904Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260810.271
+2026-08-19T09:42:45.6608028Z ##[endgroup]
+2026-08-19T09:42:45.6609301Z ##[group]GITHUB_TOKEN Permissions
+2026-08-19T09:42:45.6611847Z Contents: read
+2026-08-19T09:42:45.6612511Z Metadata: read
+2026-08-19T09:42:45.6613169Z Packages: read
+2026-08-19T09:42:45.6613825Z ##[endgroup]
+2026-08-19T09:42:45.6615957Z Secret source: Actions
+2026-08-19T09:42:45.6617181Z Prepare workflow directory
+2026-08-19T09:42:45.6989700Z Prepare all required actions
+2026-08-19T09:42:45.7044871Z Getting action download info
+2026-08-19T09:42:46.0572038Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-08-19T09:42:46.2093526Z Download action repository 'pnpm/action-setup@v4' (SHA:b906affcce14559ad1aafd4ab0e942779e9f58b1)
+2026-08-19T09:42:47.1742113Z Download action repository 'actions/setup-node@v7' (SHA:820762786026740c76f36085b0efc47a31fe5020)
+2026-08-19T09:42:47.3676348Z Complete job name: Frontend React/Vite

@@ -1,0 +1,5 @@
+=== le plan qui FAIT FOI existe-t-il, meme en historique ? ===
+(vide = jamais commite)
+=== _PLANS a-t-il jamais existe ? ===
+=== TEMOIN NEGATIF : la meme commande trouve un fichier qui EXISTE ===
+c4323be chore(etape0): les trois rouges de la CI de la PR #174 — Pint, ESLint, Gitleaks

@@ -1,0 +1,9 @@
+# Références mesurées le 2026-08-19
+## dépôt SITE C:/Users/willi/Documents/Projets/Axion-IA/axionia
+eb754332 fix(qualiopi): l'espace stagiaire livrait la pièce d'un tiers, et quatre surfaces affirmaient une certification non délivrée (#739)
+eb7543326386535c49d59f31117db2e3c81708ef
+0
+(0 = copie de travail propre)
+## dépôt CRM C:/Users/willi/Documents/Projets/Axion-CRM-Pro
+e8924b8 fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)
+e8924b81ad64c0b236acd99ac5cbac4cd68eada7

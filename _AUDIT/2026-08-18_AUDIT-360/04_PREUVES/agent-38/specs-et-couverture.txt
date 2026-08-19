@@ -1,0 +1,34 @@
+=== pint present ? ===
+-rwxr-xr-x 1 willi 197609 3330 Aug 15 15:03 backend/vendor/bin/pint
+
+=== specs playwright suivis ===
+frontend/tests/e2e/a11y.spec.ts
+frontend/tests/e2e/audiences-builder.spec.ts
+frontend/tests/e2e/auth.spec.ts
+frontend/tests/e2e/campaigns-wizard.spec.ts
+frontend/tests/e2e/companies.spec.ts
+frontend/tests/e2e/console-locale.spec.ts
+frontend/tests/e2e/coverage.spec.ts
+frontend/tests/e2e/dark-mode.spec.ts
+frontend/tests/e2e/dashboard.spec.ts
+frontend/tests/e2e/global-search.spec.ts
+frontend/tests/e2e/llm.spec.ts
+frontend/tests/e2e/navigation.spec.ts
+frontend/tests/e2e/onboarding.spec.ts
+frontend/tests/e2e/rgpd.spec.ts
+frontend/tests/e2e/settings.spec.ts
+frontend/tests/e2e/tags-manager.spec.ts
+16
+
+=== specs executes par un pipeline ===
+.github/workflows/a11y.yml:48:        run: pnpm exec playwright test tests/e2e/a11y.spec.ts --project=chromium --reporter=html
+.github/workflows/a11y.yml:49:      # Étape 0, F17 (2026-08-18) — `navigation.spec.ts` n'était exécuté NULLE
+.github/workflows/a11y.yml:58:        run: pnpm exec playwright test tests/e2e/navigation.spec.ts --project=chromium --reporter=line
+
+=== coverage: none ===
+245:          coverage: none
+
+=== couverture mesuree quelque part ? ===
+.github/workflows/deploy-staging.yml:120:          CHEMIN="/opt/axion-crm-pro-staging"
+.github/workflows/prospection-collect-paris.yml:59:    name: Coverage + stats
+.github/workflows/prospection-collect-paris.yml:73:      - name: Coverage + stats via SSH

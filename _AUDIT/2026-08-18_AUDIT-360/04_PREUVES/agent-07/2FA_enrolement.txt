@@ -1,0 +1,61 @@
+=== enrolement 2FA : colonnes ecrites vs schema ===
+### 9.2 🔴 L'enrôlement 2FA par l'interface est mort — il écrit trois colonnes qui n'existent pas
+
+`App\Services\Auth\TwoFactorService` écrit `two_factor_secret`
+(`startEnrolment`), puis `two_factor_enabled` et `two_factor_recovery_codes`
+(`confirmEnrolment`). Or la table `users` ne porte **aucune** de ces trois
+colonnes — elle a `totp_secret`, `totp_enabled_at`, `totp_recovery_codes` — et
+**aucune migration ne les crée** (`grep` sur les 54 migrations : zéro
+occurrence). Le modèle `User` les déclare pourtant en `$fillable` et en
+`casts()`, ce qui rend l'incohérence invisible à la lecture du seul modèle.
+
+Enchaînement, et c'est là que ça devient bloquant :
+
+1. `EnforceFirstLoginSetup` répond **403 `first_login_required`** sur tout, tant
+   que `first_login_completed_at` est nul ;
+2. la **seule** ligne de tout le backend qui remplit ce champ est dans
+   `TwoFactorService::confirmEnrolment()` ;
+3. cette méthode ne peut pas aboutir.
+
+**Un utilisateur nouvellement créé ne peut donc jamais finir son premier login
+par le produit.** C'est pourquoi la commande de §5.1 pose
+`first_login_completed_at` et `totp_secret` à la main : ce n'est pas un
+raccourci de confort, c'est le contournement d'un chemin cassé.
+
+**Mesuré**, avec une session fraîchement ouverte
+(`POST /api/v1/auth/2fa/setup`) :
+
+```
+{"message":"SQLSTATE[42703]: Undefined column: 7 ERROR:  column \"two_factor_secret\" of relation \"users\" does not exist
+LINE 1: update \"users\" set \"two_factor_secret\" = $1, \"updated_at\" = ...
+(Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm, SQL: update \"users\" set \"two_factor_secret\" = ...)"}
+```
+
+L'écriture échoue avant tout `COMMIT` : le compte n'est pas abîmé par la
+tentative (`totp_secret` et `totp_enabled_at` inchangés, vérifié après coup).
+=== VERIF sur main b53338c : colonnes two_factor_* dans users ? ===
+       column_name        
+--------------------------
+ first_login_completed_at
+ totp_enabled_at
+ totp_recovery_codes
+ totp_secret
+(4 rows)
+
+=== TwoFactorService ecrit quoi ? ===
+13: * - le `totp_secret` est chiffré au repos (cast `encrypted` côté User)
+29:        $user->two_factor_secret = $secret;
+47:        $secret = $user->two_factor_secret;
+65:            'two_factor_enabled'       => true,
+67:            'two_factor_recovery_codes'=> $hashed,
+68:            'first_login_completed_at' => now(),
+76:        if (! $user->totp_secret && ! $user->two_factor_secret) {
+79:        $secret = $user->two_factor_secret ?? $user->totp_secret;
+86:        $codes = $user->two_factor_recovery_codes ?? [];
+90:                $user->two_factor_recovery_codes = $remaining;
+=== TEMOIN NEGATIF : la meme sonde trouve-t-elle une colonne qui EXISTE ? ===
+ colonnes_users 
+----------------
+             23
+(1 row)
+

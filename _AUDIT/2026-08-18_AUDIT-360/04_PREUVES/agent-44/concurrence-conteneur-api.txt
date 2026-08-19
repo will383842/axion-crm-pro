@@ -1,0 +1,39 @@
+   61 root      0:15 php ./vendor/bin/pest --filter=Etancheite --colors=never
+  115 root      0:15 php -d memory_limit=1G vendor/bin/pest --configuration phpunit-ci.xml --testsuite Unit --colors=never
+  314 root      0:10 /usr/local/bin/php vendor/pestphp/pest/bin/pest --configuration=/var/www/html/phpunit.xml --no-output --filter=CrmOutbound
+  358 root      0:08 /usr/local/bin/php vendor/pestphp/pest/bin/pest --configuration=/var/www/html/phpunit.xml --no-output --filter=EtancheiteParTable
+--- tous les php ---
+    1 root      0:15 php -S 0.0.0.0:80 -t public
+   61 root      0:15 php ./vendor/bin/pest --filter=Etancheite --colors=never
+   67 root      0:00 sh -c php artisan test --filter=EtancheiteParTable > /tmp/a11_red.txt 2>&1; echo exit=$? >> /tmp/a11_red.txt
+   73 root      0:09 php artisan test --filter=EtancheiteParTable
+   74 root      0:00 sh -c php artisan test --filter=CrmOutbound > /tmp/a14tests.txt 2>&1; echo "exit=$?"; cat /tmp/a14tests.txt
+   80 root      0:07 php artisan test --filter=CrmOutbound
+  115 root      0:15 php -d memory_limit=1G vendor/bin/pest --configuration phpunit-ci.xml --testsuite Unit --colors=never
+  130 root      0:00 php -S 127.0.0.1:9911 /tmp/a19srv/hop.php
+  132 root      0:00 php -S 127.0.0.1:9912 /tmp/a19srv/hop.php
+  238 root      0:11 php artisan migrate --force
+  244 root      0:10 php vendor/bin/phpstan analyse --no-progress --memory-limit=2G
+  269 root      0:08 [php]
+  314 root      0:10 /usr/local/bin/php vendor/pestphp/pest/bin/pest --configuration=/var/www/html/phpunit.xml --no-output --filter=CrmOutbound
+  358 root      0:08 /usr/local/bin/php vendor/pestphp/pest/bin/pest --configuration=/var/www/html/phpunit.xml --no-output --filter=EtancheiteParTable
+  369 root      0:08 php artisan tinker --execute=echo "A"; echo file_exists("/tmp/a18_dryrun.php") ? "EXISTS" : "MISSING"; echo "B\n";
+  382 root      0:08 php artisan --version
+  387 root      0:08 php artisan crm:flush-outbound
+  458 root      0:06 php -d memory_limit=512M /var/www/html/storage/app/private/a12d.php
+  464 root      0:06 php artisan --version
+  548 root      0:00 sh -c php artisan tinker --execute="require \"/tmp/a18_dryrun.php\";" > /tmp/a18_out.txt 2>&1; echo DONE >> /tmp/a18_out.txt
+  554 root      0:04 php artisan tinker --execute=require "/tmp/a18_dryrun.php";
+  636 root      0:02 php artisan migrate --force
+  657 root      0:01 php vendor/bin/phpstan analyse --no-progress --memory-limit=2G
+  688 root      0:00 sh -c ps aux | grep "[p]est"; echo "--- tous les php ---"; ps aux | grep "[p]hp"
+
+=== 2026-08-19 — CONTAMINATION MESUREE ===
+Le conteneur axion-crm-api est partage par plusieurs agents de l'audit 360.
+Au moment de ma mesure, 4 processus Pest tournaient SIMULTANEMENT contre la
+MEME base axion_crm_test, plus deux 'php artisan migrate --force'.
+tests/bootstrap.php epingle toutes les executions locales sur cette base unique,
+et RefreshDatabase y emet DROP TABLE ... CASCADE.
+=> ma mesure locale de la suite Pest (echecs + SIGKILL + duree) est INVALIDE
+   comme mesure du harnais ; elle est VALIDE comme demonstration de l'absence
+   d'isolation entre executions locales concurrentes.

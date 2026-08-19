@@ -1,0 +1,10 @@
+ nspname | relkind | count 
+---------+---------+-------
+ partman | r       |     3
+ partman | v       |     1
+ public  | m       |     1
+ public  | p       |     1
+ public  | r       |   113
+ public  | v       |     2
+(6 rows)
+

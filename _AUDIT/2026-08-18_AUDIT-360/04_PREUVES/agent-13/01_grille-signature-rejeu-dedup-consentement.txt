@@ -1,0 +1,286 @@
+
+############ P8. WORKSPACE BUSINESS ABSENT ############
+
+--- workspaces ---
+{"slug":"vivier-candidats"}
+[2026-08-19 12:21:56] local.WARNING: site-sync refusé {"code":"invalid_event_id","message":"event_id doit faire entre 8 et 128 caractères."} 
+
+=== P8.1 événement business, workspace « axion-ia » absent ===
+HTTP 422
+{"error":"invalid_event_id","message":"event_id doit faire entre 8 et 128 caract\u00e8res.","details":[]}
+
+--- P8.1 écritures ---
+{"c":0,"a":0,"k":0}
+
+(workspace axion-ia créé)
+
+############ P1. SIGNATURE ############
+
+=== P1.1 TÉMOIN POSITIF — signature correcte ===
+HTTP 200
+{"ok":true,"result":{"status":"created","subject_type":"company","subject_id":1,"activity_id":1,"tags":["src:site-formulaire-audit","svc:audit"]}}
+
+--- P1.1 société ---
+{"id":1,"siren":"123456789","denomination":"ACME SAS","relation_type":"prospect","lifecycle_stage":"opportunite","legal_basis":"precontractual","consent_version":"site-v1"}
+
+--- P1.1 contact ---
+{"id":1,"first_name":"Jean","last_name":"Dupont","email":"jean.dupont@example.com","person_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","legal_basis":"precontractual"}
+
+--- P1.1 activité ---
+{"id":1,"kind":"form_submission","type":"form_submission","occurred_at":"2026-08-17 12:00:00+00","external_ref":"site:event:audit13-0001","person_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","title":"Formulaire — audit","subject_type":"company","subject_id":1}
+
+--- P1.1 tags posés ---
+{"slug":"src:site-formulaire-audit"}
+{"slug":"svc:audit"}
+[2026-08-19 12:22:07] local.WARNING: site-sync rejeté (signature invalide) {"ip":"127.0.0.1"} 
+
+=== P1.2 TÉMOIN NÉGATIF — signature falsifiée ===
+HTTP 401
+{"error":"bad_signature"}
+[2026-08-19 12:22:07] local.WARNING: site-sync rejeté (signature invalide) {"ip":"127.0.0.1"} 
+
+=== P1.3 TÉMOIN NÉGATIF — aucun en-tête de signature ===
+HTTP 401
+{"error":"bad_signature"}
+[2026-08-19 12:22:07] local.WARNING: site-sync rejeté (signature invalide) {"ip":"127.0.0.1"} 
+
+=== P1.4 corps ALTÉRÉ après signature (le corps est-il signé ?) ===
+HTTP 401
+{"error":"bad_signature"}
+[2026-08-19 12:22:07] local.WARNING: site-sync rejeté (signature invalide) {"ip":"127.0.0.1"} 
+
+=== P1.5 horodatage ALTÉRÉ après signature (l’horodatage est-il signé ?) ===
+HTTP 401
+{"error":"bad_signature"}
+[2026-08-19 12:22:08] local.WARNING: site-sync refusé {"code":"invalid_event_id","message":"event_id doit faire entre 8 et 128 caractères."} 
+
+=== P1.6 préfixe « sha256= » accepté ? ===
+HTTP 422
+{"error":"invalid_event_id","message":"event_id doit faire entre 8 et 128 caract\u00e8res.","details":[]}
+
+--- P1 état après tentatives invalides ---
+{"n":0}
+
+############ P2. REJEU ############
+
+=== P2.1 première ingestion ===
+HTTP 200
+{"ok":true,"result":{"status":"updated","subject_type":"company","subject_id":1,"activity_id":2,"tags":["src:site-formulaire-audit","svc:audit"]}}
+
+=== P2.2 REJEU OCTET POUR OCTET (mêmes en-têtes, même signature) ===
+HTTP 200
+{"ok":true,"result":{"status":"noop_idempotent","subject_type":"company","subject_id":1,"activity_id":2,"tags":[]}}
+
+--- P2 activités pour cet event_id ---
+{"n":1}
+
+--- P2 sociétés ---
+{"n":1}
+[2026-08-19 12:22:08] local.WARNING: site-sync rejeté (horodatage hors fenêtre) {"ip":"127.0.0.1"} 
+
+=== P2.3 horodatage -400 s, signature correcte ===
+HTTP 401
+{"error":"stale_signature"}
+[2026-08-19 12:22:08] local.WARNING: site-sync rejeté (horodatage hors fenêtre) {"ip":"127.0.0.1"} 
+
+=== P2.4 horodatage +400 s, signature correcte ===
+HTTP 401
+{"error":"stale_signature"}
+[2026-08-19 12:22:08] local.WARNING: site-sync refusé {"code":"invalid_event_id","message":"event_id doit faire entre 8 et 128 caractères."} 
+
+=== P2.5 horodatage -290 s (DANS la fenêtre) : rejeu toléré ? ===
+HTTP 422
+{"error":"invalid_event_id","message":"event_id doit faire entre 8 et 128 caract\u00e8res.","details":[]}
+
+NONCE — clés acceptées à la racine du contrat : ["schema_version","event_id","event_type","occurred_at","form_type","source_slug","subject_ref","person","company","consent","candidate","tags","payload"]
+EVENT_TYPES acceptés (10) : ["form_submission","calendly_booked","calendly_completed","calendly_canceled","calendly_no_show","newsletter_optin","newsletter_optout","review_posted","application_submitted","opt_out"]
+ACTIVITY_KINDS du vocabulaire fermé (16) : ["form_submission","calendly_booked","calendly_completed","calendly_no_show","calendly_canceled","review_posted","newsletter_optin","newsletter_optout","application_submitted","stage_changed","reclassified","scraped","enriched","opt_out","gdpr_export","gdpr_erasure"]
+EVENT_TYPES absents de ACTIVITY_KINDS : []
+
+--- table de nonce / anti-rejeu en base ? ---
+
+############ P3. DÉDUPLICATION PERSONNE ############
+
+=== P3.1 MÊME personne, AUTRE événement, AUTRE source (calendly) ===
+HTTP 200
+{"ok":true,"result":{"status":"updated","subject_type":"company","subject_id":1,"activity_id":3,"tags":["src:calendly"]}}
+
+--- P3.1 contacts ---
+{"id":1,"first_name":"Jean","last_name":"Dupont","email":"jean.dupont@example.com","person_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","company_id":1}
+[2026-08-19 12:22:09] local.WARNING: site-sync refusé {"code":"invalid_event_id","message":"event_id doit faire entre 8 et 128 caractères."} 
+
+=== P3.2 MÊME e-mail, person_key DIFFÉRENT, subject_ref différent ===
+HTTP 422
+{"error":"invalid_event_id","message":"event_id doit faire entre 8 et 128 caract\u00e8res.","details":[]}
+
+--- P3.2 contacts ---
+{"id":1,"first_name":"Jean","last_name":"Dupont","email":"jean.dupont@example.com","person_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+[2026-08-19 12:22:09] local.WARNING: site-sync refusé {"code":"invalid_event_id","message":"event_id doit faire entre 8 et 128 caractères."} 
+
+=== P3.3 person_key en MAJUSCULES hexadécimales (casse de la clé) ===
+HTTP 422
+{"error":"invalid_event_id","message":"event_id doit faire entre 8 et 128 caract\u00e8res.","details":[]}
+[2026-08-19 12:22:09] local.WARNING: site-sync refusé {"code":"invalid_person_key","message":"person.person_key est obligatoire et doit être un sha256 hexadécimal de 64 caractères (calculé côté site AVANT chiffrement)."} 
+
+=== P3.4 person_key ABSENT ===
+HTTP 422
+{"error":"invalid_person_key","message":"person.person_key est obligatoire et doit \u00eatre un sha256 hexad\u00e9cimal de 64 caract\u00e8res (calcul\u00e9 c\u00f4t\u00e9 site AVANT chiffrement).","details":[]}
+
+=== P3.5 PIÈGE 10 — même personne, e-mail à MAJUSCULE ACCENTUÉE déjà en base ===
+HTTP 200
+{"ok":true,"result":{"status":"updated","subject_type":"company","subject_id":1,"activity_id":4,"tags":["src:site-formulaire-audit","svc:audit"]}}
+
+--- P3.5 combien de fiches « Martin » ? ---
+{"id":2,"first_name":"José","last_name":"Martin","email":"josé.martin@example.com","person_key":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","discovery_source":"scraping"}
+
+=== P3.6 personne SANS nom de famille ===
+HTTP 200
+{"ok":true,"result":{"status":"created","subject_type":"company","subject_id":2,"activity_id":5,"tags":["src:site-formulaire-audit","svc:audit"]}}
+
+--- P3.6 contacts de BETA ---
+
+############ P4. ÉVÉNEMENT INCONNU ############
+[2026-08-19 12:22:09] local.WARNING: site-sync refusé {"code":"invalid_event_id","message":"event_id doit faire entre 8 et 128 caractères."} 
+
+=== P4.1 event_type inconnu « enrollment_created » ===
+HTTP 422
+{"error":"invalid_event_id","message":"event_id doit faire entre 8 et 128 caract\u00e8res.","details":[]}
+[2026-08-19 12:22:09] local.WARNING: site-sync refusé {"code":"invalid_event_id","message":"event_id doit faire entre 8 et 128 caractères."} 
+
+=== P4.2 form_type inconnu « webinaire » ===
+HTTP 422
+{"error":"invalid_event_id","message":"event_id doit faire entre 8 et 128 caract\u00e8res.","details":[]}
+[2026-08-19 12:22:09] local.WARNING: site-sync refusé {"code":"unknown_field","message":"Champ(s) inconnu(s) dans « racine » : session_id."} 
+
+=== P4.3 champ racine inconnu « session_id » ===
+HTTP 422
+{"error":"unknown_field","message":"Champ(s) inconnu(s) dans \u00ab racine \u00bb : session_id.","details":{"unknown":["session_id"]}}
+[2026-08-19 12:22:09] local.WARNING: site-sync refusé {"code":"unsupported_schema_version","message":"Version de schéma non supportée : NULL (attendu : 1)."} 
+
+=== P4.4 schema_version absent ===
+HTTP 422
+{"error":"unsupported_schema_version","message":"Version de sch\u00e9ma non support\u00e9e : NULL (attendu : 1).","details":[]}
+[2026-08-19 12:22:10] local.WARNING: site-sync refusé {"code":"unsupported_schema_version","message":"Version de schéma non supportée : 2 (attendu : 1)."} 
+
+=== P4.5 schema_version = 2 ===
+HTTP 422
+{"error":"unsupported_schema_version","message":"Version de sch\u00e9ma non support\u00e9e : 2 (attendu : 1).","details":[]}
+[2026-08-19 12:22:10] local.WARNING: site-sync refusé {"code":"invalid_event_id","message":"event_id doit faire entre 8 et 128 caractères."} 
+
+=== P4.6 source_slug non gouverné « qualiopi-portail » ===
+HTTP 422
+{"error":"invalid_event_id","message":"event_id doit faire entre 8 et 128 caract\u00e8res.","details":[]}
+
+--- P4.6 le tag src:qualiopi-portail existe-t-il ? ---
+{"n":0}
+
+--- P4.6 tags de GAMMA ---
+[2026-08-19 12:22:10] local.WARNING: site-sync refusé {"code":"invalid_event_id","message":"event_id doit faire entre 8 et 128 caractères."} 
+
+=== P4.7 tag gouverné MAIS hors référentiel « taille:micro » ===
+HTTP 422
+{"error":"invalid_event_id","message":"event_id doit faire entre 8 et 128 caract\u00e8res.","details":[]}
+
+--- P4.7 tags de DELTA ---
+
+############ P5. HORODATAGE UTC ############
+
+--- P5 occurred_at émis « 2026-08-17T10:00:00.000Z » ---
+{"external_ref":"site:event:audit13-0001","occurred_at":"2026-08-17 12:00:00+00","en_utc":"2026-08-17 12:00:00","ecart_secondes":"7200.000000"}
+
+--- P5 consent_at émis « 2026-08-17T09:59:00.000Z » ---
+{"siren":"123456789","consent_at":"2026-08-17 11:59:00+00","ecart_secondes":"7200.000000"}
+app.timezone = Europe/Paris
+
+############ P9. CONSENTEMENT CANDIDATS ############
+[2026-08-19 12:22:10] local.WARNING: site-sync refusé {"code":"candidate_consent_v2_required","message":"Fiche candidat refusée : consentement v2 requis (careers-v2-2026-08-13 | memo-v2-2026-08-13 | vivier-stock-2026-08-14), reçu : careers-v1-2026-01-01."} 
+
+=== P9 candidature — consent.version = 'careers-v1-2026-01-01' (v1 (ancien texte)) ===
+HTTP 422
+{"error":"candidate_consent_v2_required","message":"Fiche candidat refus\u00e9e : consentement v2 requis (careers-v2-2026-08-13 | memo-v2-2026-08-13 | vivier-stock-2026-08-14), re\u00e7u : careers-v1-2026-01-01.","details":{"received_consent_version":"careers-v1-2026-01-01"}}
+
+=== P9 candidature — consent.version = 'careers-v2-2026-08-13' (v2 attendu) ===
+HTTP 200
+{"ok":true,"result":{"status":"created","subject_type":"candidate","subject_id":1,"activity_id":6,"tags":["src:site-formulaire-autre","cand-offre:dev-php"]}}
+
+=== P9 candidature — consent.version = 'vivier-stock-2026-08-14' (stock J+30) ===
+HTTP 200
+{"ok":true,"result":{"status":"created","subject_type":"candidate","subject_id":2,"activity_id":7,"tags":["src:site-formulaire-autre","cand-offre:dev-php"]}}
+[2026-08-19 12:22:10] local.WARNING: site-sync refusé {"code":"candidate_consent_v2_required","message":"Fiche candidat refusée : consentement v2 requis (careers-v2-2026-08-13 | memo-v2-2026-08-13 | vivier-stock-2026-08-14), reçu : aucun."} 
+
+=== P9 candidature — consent.version = '' (aucun consentement) ===
+HTTP 422
+{"error":"candidate_consent_v2_required","message":"Fiche candidat refus\u00e9e : consentement v2 requis (careers-v2-2026-08-13 | memo-v2-2026-08-13 | vivier-stock-2026-08-14), re\u00e7u : aucun.","details":{"received_consent_version":null}}
+
+--- P9 candidats réellement créés ---
+{"id":1,"last_name":"Idat","email":"p9-32643218@example.com","relation_type":"candidat_tech","legal_basis":"consent","consent_version":"careers-v2-2026-08-13"}
+{"id":2,"last_name":"Idat","email":"p9-42e58c46@example.com","relation_type":"candidat_tech","legal_basis":"consent","consent_version":"vivier-stock-2026-08-14"}
+
+############ P6/P7. REJETS ET JOURNAL ############
+
+--- P6 toute trace persistée d’un événement REFUSÉ ? ---
+{"n":0}
+
+--- P7 journal d’audit (audit_logs) alimenté par l’ingestion ? ---
+{"n":29}
+
+--- P7 activités totales ---
+{"n":7,"kinds":3}
+
+--- P7 arbitrage (pending_match) ---
+[2026-08-19 12:22:11] local.ERROR: SQLSTATE[42601]: Syntax error: 7 ERROR:  syntax error at or near "$1"
+LINE 1: ...omination' as denom from activities where payload $1 'pendin...
+                                                             ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm_audit13, SQL: select id,external_ref,subject_type,subject_id, payload->'pending_match'->>'denomination' as denom from activities where payload ? 'pending_match') {"exception":"[object] (Illuminate\\Database\\QueryException(code: 42601): SQLSTATE[42601]: Syntax error: 7 ERROR:  syntax error at or near \"$1\"
+LINE 1: ...omination' as denom from activities where payload $1 'pendin...
+                                                             ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm_audit13, SQL: select id,external_ref,subject_type,subject_id, payload->'pending_match'->>'denomination' as denom from activities where payload ? 'pending_match') at /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php:838)
+[stacktrace]
+#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(794): Illuminate\\Database\\Connection->runQueryCallback('select id,exter...', Array, Object(Closure))
+#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(411): Illuminate\\Database\\Connection->run('select id,exter...', Array, Object(Closure))
+#2 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php(491): Illuminate\\Database\\Connection->select('select id,exter...')
+#3 /var/www/html/vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php(363): Illuminate\\Database\\DatabaseManager->__call('select', Array)
+#4 /tmp/harness.php(65): Illuminate\\Support\\Facades\\Facade::__callStatic('select', Array)
+#5 /tmp/harness.php(71): q('select id,exter...')
+#6 /tmp/scenario_all.php(187): dump('P7 arbitrage (p...', 'select id,exter...')
+#7 /tmp/harness.php(78): require('/tmp/scenario_a...')
+#8 {main}
+
+[previous exception] [object] (PDOException(code: 42601): SQLSTATE[42601]: Syntax error: 7 ERROR:  syntax error at or near \"$1\"
+LINE 1: ...omination' as denom from activities where payload $1 'pendin...
+                                                             ^ at /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php:425)
+[stacktrace]
+#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(425): PDOStatement->execute()
+#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(827): Illuminate\\Database\\Connection->Illuminate\\Database\\{closure}('select id,exter...', Array)
+#2 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(794): Illuminate\\Database\\Connection->runQueryCallback('select id,exter...', Array, Object(Closure))
+#3 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(411): Illuminate\\Database\\Connection->run('select id,exter...', Array, Object(Closure))
+#4 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php(491): Illuminate\\Database\\Connection->select('select id,exter...')
+#5 /var/www/html/vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php(363): Illuminate\\Database\\DatabaseManager->__call('select', Array)
+#6 /tmp/harness.php(65): Illuminate\\Support\\Facades\\Facade::__callStatic('select', Array)
+#7 /tmp/harness.php(71): q('select id,exter...')
+#8 /tmp/scenario_all.php(187): dump('P7 arbitrage (p...', 'select id,exter...')
+#9 /tmp/harness.php(78): require('/tmp/scenario_a...')
+#10 {main}
+"} 
+
+   Illuminate\Database\QueryException 
+
+  SQLSTATE[42601]: Syntax error: 7 ERROR:  syntax error at or near "$1"
+LINE 1: ...omination' as denom from activities where payload $1 'pendin...
+                                                             ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm_audit13, SQL: select id,external_ref,subject_type,subject_id, payload->'pending_match'->>'denomination' as denom from activities where payload ? 'pending_match')
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+    834▕             $exceptionType = $this->isUniqueConstraintError($e)
+    835▕                 ? UniqueConstraintViolationException::class
+    836▕                 : QueryException::class;
+    837▕ 
+  ➜ 838▕             throw new $exceptionType(
+    839▕                 $this->getNameWithReadWriteType(),
+    840▕                 $query,
+    841▕                 $this->prepareBindings($bindings),
+    842▕                 $e,
+
+      [2m+7 vendor frames [22m
+
+  8   /tmp/harness.php:65
+      Illuminate\Support\Facades\Facade::__callStatic("select")
+  9   /tmp/harness.php:71
+

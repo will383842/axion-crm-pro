@@ -1,0 +1,48 @@
+=== F5 : PR ouvertes ===
+--- nb ---
+0
+=== branches dependabot ===
+20
+=== dependabot config ===
+# Dependabot — configuration.
+#
+# ══════════════════════════════════════════════════════════════════════════════
+# 🧊 GEL DES MONTÉES DE VERSION — décidé le 2026-08-18, jusqu'à la fin de
+#    l'ÉTAPE 0 du chantier CRM (pose du harnais de tests).
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Politique écrite complète, chiffrée et datée :
+#   _REPORTS/2026-08-18_POLITIQUE-DEPENDANCES-ETAPE-0.md
+#
+# ── POURQUOI ─────────────────────────────────────────────────────────────────
+#
+# 1. 🔴 PRÉCÉDENT DE PRODUCTION, 2026-08-18, dépôt du site (axionia).
+#    Deux montées Dependabot fusionnées SÉPARÉMENT ajoutaient chacune la même
+#    clé (`baseline-browser-mapping@2.11.14`) au lockfile pnpm. Chaque PR était
+#    verte seule ; leur FUSION a produit un lockfile à clé dupliquée →
+#    `ERR_PNPM_BROKEN_LOCKFILE` dès le premier step d'installation → plus AUCUN
+#    déploiement possible. Ce fut un incident de PRODUCTION, pas de CI.
+#    🔑 Les gates testent chaque PR SÉPARÉMENT, jamais leur fusion. Aucune
+#    quantité de vert par-PR ne prouve que deux PR fusionnent proprement.
+#
+# 2. Passer 20 montées une par une PENDANT que l'étape 0 pose le harnais de
+#    tests reviendrait à mesurer un socle qui bouge sous les pieds : impossible
+#    de dire si un rouge vient du harnais ou de la dépendance montée.
+#
+# 3. Le plan de préalables accepte explicitement cette option — critère de
+#    sortie : « 0 PR Dependabot ouverte, OU politique écrite figé jusqu'à fin
+#    de chantier ». C'est la seconde branche qui est retenue.
+#
+# ── CE QUI EST GELÉ / CE QUI NE L'EST PAS ────────────────────────────────────
+#
+# GELÉ    : toutes les montées de VERSION (`version-update:semver-major`,
+#           `-minor`, `-patch`), tous écosystèmes.
+# PAS GELÉ: les mises à jour de SÉCURITÉ Dependabot. Un gel ne doit JAMAIS
+#           bloquer un correctif de faille.
+#
+# 🔑 C'est la seule subtilité de ce fichier, et elle est VÉRIFIÉE, pas supposée.
+#    Deux mécanismes permettaient de suspendre les montées ; ils ne se valent
+#    pas de la même manière ici :
+#
+=== alertes ===
+57

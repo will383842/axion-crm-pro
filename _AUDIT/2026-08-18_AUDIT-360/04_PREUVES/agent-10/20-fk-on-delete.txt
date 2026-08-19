@@ -1,0 +1,83 @@
+=== regles ON DELETE des FK vers workspaces ===
+          table          |                  conname                  | confdeltype |                                       def                                       
+-------------------------+-------------------------------------------+-------------+---------------------------------------------------------------------------------
+ ai_act_register         | ai_act_register_workspace_id_fkey         | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ business_events         | business_events_workspace_id_fkey         | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ campaigns               | campaigns_workspace_id_fkey               | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ candidate_tag           | candidate_tag_workspace_id_fkey           | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ candidates              | candidates_workspace_id_fkey              | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ companies               | companies_workspace_id_fkey               | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ contacts                | contacts_workspace_id_fkey                | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ coverage_zones          | coverage_zones_workspace_id_fkey          | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ crm_lost_reasons        | crm_lost_reasons_workspace_id_fkey        | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ crm_pipelines           | crm_pipelines_workspace_id_fkey           | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ deals                   | deals_workspace_id_fkey                   | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ dnc_lists               | dnc_lists_workspace_id_fkey               | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ duplicate_flags         | duplicate_flags_workspace_id_fkey         | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ email_audiences         | email_audiences_workspace_id_fkey         | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ email_events            | email_events_workspace_id_fkey            | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ email_inboxes           | email_inboxes_workspace_id_fkey           | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ email_sends             | email_sends_workspace_id_fkey             | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ email_templates         | email_templates_workspace_id_fkey         | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ email_verification_logs | email_verification_logs_workspace_id_fkey | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ email_warmup_pools      | email_warmup_pools_workspace_id_fkey      | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ health_practitioners    | health_practitioners_workspace_id_fkey    | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ invitations             | invitations_workspace_id_fkey             | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ journalists             | journalists_workspace_id_fkey             | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ linkedin_accounts       | linkedin_accounts_workspace_id_fkey       | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ linkedin_sequences      | linkedin_sequences_workspace_id_fkey      | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ llm_usage               | llm_usage_workspace_id_fkey               | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ llm_use_cases           | llm_use_cases_workspace_id_fkey           | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ media                   | media_workspace_id_fkey                   | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ model_has_permissions   | model_has_permissions_team_id_fkey        | c           | FOREIGN KEY (team_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ model_has_roles         | model_has_roles_team_id_fkey              | c           | FOREIGN KEY (team_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ notifications           | notifications_workspace_id_fkey           | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ pipeline_stages         | pipeline_stages_workspace_id_fkey         | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ proxy_providers_config  | proxy_providers_config_workspace_id_fkey  | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ rgpd_requests           | rgpd_requests_workspace_id_fkey           | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ roles                   | roles_team_id_fkey                        | c           | FOREIGN KEY (team_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ rotations               | rotations_workspace_id_fkey               | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ saved_views             | saved_views_workspace_id_fkey             | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ scraper_runs            | scraper_runs_workspace_id_fkey            | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ scraping_campaigns      | scraping_campaigns_workspace_id_fkey      | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ sessions                | sessions_workspace_id_fkey                | n           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE SET NULL
+ strategic_keywords      | strategic_keywords_workspace_id_fkey      | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ tags                    | tags_workspace_id_fkey                    | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ user_workspaces         | user_workspaces_workspace_id_fkey         | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+ users                   | users_current_workspace_id_fkey           | n           | FOREIGN KEY (current_workspace_id) REFERENCES workspaces(id) ON DELETE SET NULL
+ web_vital_samples       | web_vital_samples_workspace_id_fkey       | c           | FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+(45 rows)
+
+=== repartition globale des regles ON DELETE ===
+ confdeltype | count 
+-------------+-------
+ n           |    36
+ r           |     1
+ a           |    17
+ c           |    85
+(4 rows)
+
+=== FK vers companies/contacts : ON DELETE ===
+         table          |    vers    | confdeltype 
+------------------------+------------+-------------
+ audience_members       | companies  | c
+ company_tag            | companies  | c
+ contacts               | companies  | c
+ deals                  | companies  | c
+ health_practitioners   | companies  | n
+ journalists            | companies  | n
+ media                  | companies  | n
+ scraper_runs           | companies  | c
+ activities             | contacts   | n
+ audience_members       | contacts   | c
+ crm_notes              | contacts   | c
+ crm_tasks              | contacts   | c
+ deals                  | contacts   | n
+ email_sends            | contacts   | c
+ email_threads          | contacts   | c
+ linkedin_invitations   | contacts   | c
+ linkedin_messages      | contacts   | c
+ linkedin_sequence_runs | contacts   | c
+ candidate_tag          | candidates | c
+(19 rows)
+

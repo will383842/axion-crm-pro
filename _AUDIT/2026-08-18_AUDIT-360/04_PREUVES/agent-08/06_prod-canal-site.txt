@@ -1,0 +1,13 @@
+=== PROD : activites issues du canal site (lecture seule) ===
+      kind       |  n  |        premier         |        dernier         |   derniere_ecriture    
+-----------------+-----+------------------------+------------------------+------------------------
+ scraped         | 646 | 2026-08-15 10:00:00+00 | 2026-08-15 14:00:00+00 | 2026-08-15 12:16:07+00
+ form_submission |   3 | 2026-08-16 15:21:08+00 | 2026-08-19 03:25:47+00 | 2026-08-19 03:25:48+00
+(2 rows)
+
+
+=== PROD : 10 dernieres activites du canal, occurred_at vs created_at ===
+ERROR:  column "subject_ref" does not exist
+LINE 2: SELECT id, kind, subject_ref, occurred_at, created_at,
+                         ^
+HINT:  Perhaps you meant to reference the column "activities.subject_id".

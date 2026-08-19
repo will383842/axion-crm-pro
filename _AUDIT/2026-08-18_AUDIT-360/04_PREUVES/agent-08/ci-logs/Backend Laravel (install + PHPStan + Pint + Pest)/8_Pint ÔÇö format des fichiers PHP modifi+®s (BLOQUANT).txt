@@ -1,0 +1,30 @@
+﻿2026-08-19T09:43:14.5311801Z ##[group]Run set -euo pipefail
+2026-08-19T09:43:14.5312489Z [36;1mset -euo pipefail[0m
+2026-08-19T09:43:14.5312751Z [36;1mbase="${BASE_SHA:-}"[0m
+2026-08-19T09:43:14.5313119Z [36;1mif [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] \[0m
+2026-08-19T09:43:14.5313605Z [36;1m   || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then[0m
+2026-08-19T09:43:14.5314015Z [36;1m  base="$(git rev-parse HEAD^ 2>/dev/null || true)"[0m
+2026-08-19T09:43:14.5314329Z [36;1mfi[0m
+2026-08-19T09:43:14.5314542Z [36;1mif [ -z "$base" ]; then[0m
+2026-08-19T09:43:14.5314915Z [36;1m  echo "Aucune base de comparaison disponible — rien à contrôler."[0m
+2026-08-19T09:43:14.5315295Z [36;1m  exit 0[0m
+2026-08-19T09:43:14.5315503Z [36;1mfi[0m
+2026-08-19T09:43:14.5315720Z [36;1mecho "Base de comparaison : $base"[0m
+2026-08-19T09:43:14.5316285Z [36;1mmapfile -t files < <(git diff --name-only --diff-filter=ACMR "$base"...HEAD -- 'backend/**/*.php' | sed 's|^backend/||')[0m
+2026-08-19T09:43:14.5316871Z [36;1mif [ "${#files[@]}" -eq 0 ]; then[0m
+2026-08-19T09:43:14.5317239Z [36;1m  echo "Aucun fichier PHP modifié — contrôle Pint sans objet."[0m
+2026-08-19T09:43:14.5317595Z [36;1m  exit 0[0m
+2026-08-19T09:43:14.5317791Z [36;1mfi[0m
+2026-08-19T09:43:14.5318250Z [36;1mprintf 'Fichiers contrôlés (%d) :\n' "${#files[@]}"[0m
+2026-08-19T09:43:14.5318590Z [36;1mprintf '  - %s\n' "${files[@]}"[0m
+2026-08-19T09:43:14.5318861Z [36;1mcd backend[0m
+2026-08-19T09:43:14.5319111Z [36;1m./vendor/bin/pint --test "${files[@]}"[0m
+2026-08-19T09:43:14.5360143Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:43:14.5360419Z env:
+2026-08-19T09:43:14.5360639Z   COMPOSER_PROCESS_TIMEOUT: 0
+2026-08-19T09:43:14.5360908Z   COMPOSER_NO_INTERACTION: 1
+2026-08-19T09:43:14.5361156Z   COMPOSER_NO_AUDIT: 1
+2026-08-19T09:43:14.5361423Z   BASE_SHA: b53338cd6ba50d7f9e18557e2a725a5f00fe15db
+2026-08-19T09:43:14.5361736Z ##[endgroup]
+2026-08-19T09:43:14.5453405Z Base de comparaison : b53338cd6ba50d7f9e18557e2a725a5f00fe15db
+2026-08-19T09:43:14.5487357Z Aucun fichier PHP modifié — contrôle Pint sans objet.

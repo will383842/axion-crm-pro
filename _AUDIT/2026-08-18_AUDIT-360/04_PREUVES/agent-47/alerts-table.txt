@@ -1,0 +1,58 @@
+#|sev|eco|pkg|manifest|scope|rel|cve|vuln_range|patched|summary
+37|critical|npm|vitest|workers/pnpm-lock.yaml|development|direct|CVE-2026-47429|< 3.2.6|3.2.6|When Vitest UI server is listening, arbitrary file can be read and executed
+34|critical|npm|vitest|workers/package.json|development|direct|CVE-2026-47429|< 3.2.6|3.2.6|When Vitest UI server is listening, arbitrary file can be read and executed
+2|critical|npm|vitest|frontend/pnpm-lock.yaml|development|direct|CVE-2026-47429|< 3.2.6|3.2.6|When Vitest UI server is listening, arbitrary file can be read and executed
+1|critical|npm|vitest|frontend/package.json|development|direct|CVE-2026-47429|< 3.2.6|3.2.6|When Vitest UI server is listening, arbitrary file can be read and executed
+58|high|npm|axios|workers/pnpm-lock.yaml|runtime|direct|GHSA-gcfj-64vw-6mp9|>= 1.15.2, < 1.18.0|1.18.0|Axios Node HTTP adapter can use an inherited proxy after interceptor config cloning
+21|high|npm|axios|frontend/pnpm-lock.yaml|runtime|direct|GHSA-gcfj-64vw-6mp9|>= 1.15.2, < 1.18.0|1.18.0|Axios Node HTTP adapter can use an inherited proxy after interceptor config cloning
+13|high|npm|brace-expansion|frontend/pnpm-lock.yaml|development|transitive|CVE-2026-13149|>= 2.0.0, < 2.1.2|2.1.2|brace-expansion: DoS via exponential-time expansion of consecutive non-expanding {} groups
+12|high|npm|brace-expansion|frontend/pnpm-lock.yaml|development|transitive|CVE-2026-13149|< 1.1.16|1.1.16|brace-expansion: DoS via exponential-time expansion of consecutive non-expanding {} groups
+11|high|npm|brace-expansion|frontend/pnpm-lock.yaml|development|transitive|CVE-2026-13149|>= 3.0.0, < 5.0.7|5.0.7|brace-expansion: DoS via exponential-time expansion of consecutive non-expanding {} groups
+41|high|npm|form-data|workers/pnpm-lock.yaml|runtime|transitive|CVE-2026-12143|>= 4.0.0, < 4.0.6|4.0.6|form-data: CRLF injection in form-data via unescaped multipart field names and filenames
+6|high|npm|form-data|frontend/pnpm-lock.yaml|runtime|transitive|CVE-2026-12143|>= 4.0.0, < 4.0.6|4.0.6|form-data: CRLF injection in form-data via unescaped multipart field names and filenames
+30|high|npm|js-yaml|frontend/pnpm-lock.yaml|development|transitive|GHSA-5p4m-2wfm-xmqj|>= 4.0.0, < 4.3.1|4.3.1|JS-YAML: Quadratic CPU consumption in !!omap resolution (3.x and 4.x) — CVE-2026-59870 fix
+14|high|npm|js-yaml|frontend/pnpm-lock.yaml|development|transitive|CVE-2026-59869|>= 4.0.0, < 4.3.0|4.3.0|js-yaml: YAML merge-key chains can force quadratic CPU consumption
+59|high|npm|postcss|workers/pnpm-lock.yaml|development|transitive|CVE-2026-73646|<= 8.5.17|8.5.18|PostCSS: Path Traversal in Previous Source Map Auto-Loading (sourceMappingURL) leads to Ar
+22|high|npm|postcss|frontend/pnpm-lock.yaml|development|transitive|CVE-2026-73646|<= 8.5.17|8.5.18|PostCSS: Path Traversal in Previous Source Map Auto-Loading (sourceMappingURL) leads to Ar
+61|high|npm|undici|workers/pnpm-lock.yaml|runtime|transitive|CVE-2026-13697|>= 7.0.0, < 7.29.0|7.29.0|undici vulnerable to cross-user information disclosure and parse-time crash via degenerate
+46|high|npm|undici|workers/pnpm-lock.yaml|runtime|transitive|CVE-2026-12151|>= 7.0.0, < 7.28.0|7.28.0|undici WebSocket client vulnerable to denial of service via fragment count bypass
+45|high|npm|undici|workers/pnpm-lock.yaml|runtime|transitive|CVE-2026-6734|>= 7.23.0, < 7.28.0|7.28.0|undici vulnerable to cross-origin request routing via SOCKS5 proxy pool reuse
+43|high|npm|undici|workers/pnpm-lock.yaml|runtime|transitive|CVE-2026-9697|>= 7.23.0, < 7.28.0|7.28.0|undici vulnerable to TLS certificate validation bypass via dropped requestTls in SOCKS5 Pr
+39|high|npm|vite|workers/pnpm-lock.yaml|development|transitive|CVE-2026-53571|<= 6.4.2|6.4.3|vite: `server.fs.deny` bypass on Windows alternate paths
+4|high|npm|vite|frontend/pnpm-lock.yaml|development|direct|CVE-2026-53571|<= 6.4.2|6.4.3|vite: `server.fs.deny` bypass on Windows alternate paths
+3|high|npm|ws|frontend/pnpm-lock.yaml|development|transitive|CVE-2026-48779|>= 8.0.0, < 8.21.0|8.21.0|ws: Memory exhaustion DoS from tiny fragments and data chunks
+57|medium|npm|axios|workers/pnpm-lock.yaml|runtime|direct|GHSA-hcpx-6fm6-wx23|>= 1.15.1, < 1.18.0|1.18.0|Axios form serializer maxDepth bypass via {} metatoken
+56|medium|npm|axios|workers/pnpm-lock.yaml|runtime|direct|GHSA-7q8q-rj6j-mhjq|>= 1.0.0, < 1.18.0|1.18.0|Axios: Nested axios option objects can consume polluted prototype values
+55|medium|npm|axios|workers/pnpm-lock.yaml|runtime|direct|GHSA-mwf2-3pr3-8698|>= 1.13.0, < 1.18.0|1.18.0|Axios: HTTP/2 streamed uploads bypass `maxBodyLength`
+54|medium|npm|axios|workers/pnpm-lock.yaml|runtime|direct|GHSA-jqh4-m9w3-8hp9|>= 1.7.0, < 1.18.0|1.18.0|Axios: Fetch adapter `ReadableStream` uploads bypass `maxBodyLength`
+53|medium|npm|axios|workers/pnpm-lock.yaml|runtime|direct|GHSA-mmx7-hfxf-jppx|>= 1.0.0, < 1.18.0|1.18.0|Axios: Prototype pollution gadgets can alter axios request construction
+52|medium|npm|axios|workers/pnpm-lock.yaml|runtime|direct|GHSA-f4gw-2p7v-4548|>= 1.15.0, < 1.18.0|1.18.0|Axios: NO_PROXY bypass for 0.0.0.0 local addresses in axios
+51|medium|npm|axios|workers/pnpm-lock.yaml|runtime|direct|GHSA-42h9-826w-cgv3|>= 1.0.0, < 1.18.0|1.18.0|Axios: Excessive recursion in formDataToJSON can cause denial of service
+50|medium|npm|axios|workers/pnpm-lock.yaml|runtime|direct|CVE-2026-67314|>= 1.15.2, < 1.18.0|1.18.0|Axios: Prototype pollution auth subfields can inject Basic auth
+49|medium|npm|axios|workers/pnpm-lock.yaml|runtime|direct|GHSA-pmv8-rq9r-6j72|>= 1.0.0, < 1.18.0|1.18.0|Axios: Deep formToJSON Key Recursion Can Cause Denial of Service
+20|medium|npm|axios|frontend/pnpm-lock.yaml|runtime|direct|GHSA-hcpx-6fm6-wx23|>= 1.15.1, < 1.18.0|1.18.0|Axios form serializer maxDepth bypass via {} metatoken
+19|medium|npm|axios|frontend/pnpm-lock.yaml|runtime|direct|GHSA-7q8q-rj6j-mhjq|>= 1.0.0, < 1.18.0|1.18.0|Axios: Nested axios option objects can consume polluted prototype values
+18|medium|npm|axios|frontend/pnpm-lock.yaml|runtime|direct|GHSA-mwf2-3pr3-8698|>= 1.13.0, < 1.18.0|1.18.0|Axios: HTTP/2 streamed uploads bypass `maxBodyLength`
+17|medium|npm|axios|frontend/pnpm-lock.yaml|runtime|direct|GHSA-jqh4-m9w3-8hp9|>= 1.7.0, < 1.18.0|1.18.0|Axios: Fetch adapter `ReadableStream` uploads bypass `maxBodyLength`
+16|medium|npm|axios|frontend/pnpm-lock.yaml|runtime|direct|GHSA-mmx7-hfxf-jppx|>= 1.0.0, < 1.18.0|1.18.0|Axios: Prototype pollution gadgets can alter axios request construction
+15|medium|npm|axios|frontend/pnpm-lock.yaml|runtime|direct|GHSA-f4gw-2p7v-4548|>= 1.15.0, < 1.18.0|1.18.0|Axios: NO_PROXY bypass for 0.0.0.0 local addresses in axios
+10|medium|npm|axios|frontend/pnpm-lock.yaml|runtime|direct|GHSA-42h9-826w-cgv3|>= 1.0.0, < 1.18.0|1.18.0|Axios: Excessive recursion in formDataToJSON can cause denial of service
+9|medium|npm|axios|frontend/pnpm-lock.yaml|runtime|direct|CVE-2026-67314|>= 1.15.2, < 1.18.0|1.18.0|Axios: Prototype pollution auth subfields can inject Basic auth
+8|medium|npm|axios|frontend/pnpm-lock.yaml|runtime|direct|GHSA-pmv8-rq9r-6j72|>= 1.0.0, < 1.18.0|1.18.0|Axios: Deep formToJSON Key Recursion Can Cause Denial of Service
+35|medium|npm|esbuild|workers/pnpm-lock.yaml|development|transitive|GHSA-67mh-4wv8-2f99|<= 0.24.2|0.25.0|esbuild enables any website to send any requests to the development server and read the re
+7|medium|npm|js-yaml|frontend/pnpm-lock.yaml|development|transitive|CVE-2026-53550|>= 4.0.0, <= 4.1.1|4.2.0|JS-YAML: Quadratic-complexity DoS in merge key handling via repeated aliases
+60|medium|npm|postcss|workers/pnpm-lock.yaml|development|transitive|CVE-2026-69153|<= 8.5.22|8.5.23|PostCSS: incomplete fix of GHSA-6g55-p6wh-862q — attacker-controlled sourceMappingURL read
+29|medium|npm|postcss|frontend/pnpm-lock.yaml|development|transitive|CVE-2026-69153|<= 8.5.22|8.5.23|PostCSS: incomplete fix of GHSA-6g55-p6wh-862q — attacker-controlled sourceMappingURL read
+65|medium|npm|undici|workers/pnpm-lock.yaml|runtime|transitive|CVE-2026-15157|>= 7.0.0, < 7.29.0|7.29.0|undici vulnerable to CRLF Injection via blob-like body 'type' property
+64|medium|npm|undici|workers/pnpm-lock.yaml|runtime|transitive|CVE-2026-14643|>= 7.0.0, < 7.29.0|7.29.0|undici vulnerable to cross-user information disclosure via whitespace around equals in Cac
+63|medium|npm|undici|workers/pnpm-lock.yaml|runtime|transitive|CVE-2026-16729|>= 7.0.0, < 7.29.0|7.29.0|undici vulnerable to cookie attribute injection via unsanitized domain and unparsed setCoo
+62|medium|npm|undici|workers/pnpm-lock.yaml|runtime|transitive|CVE-2026-16728|>= 7.0.0, < 7.29.0|7.29.0|undici vulnerable to downstream response desynchronization via retry interceptor
+47|medium|npm|undici|workers/pnpm-lock.yaml|runtime|transitive|CVE-2026-9679|>= 7.0.0, < 7.28.0|7.28.0|undici vulnerable to HTTP header injection via Set-Cookie percent-decoding
+42|medium|npm|undici|workers/pnpm-lock.yaml|runtime|transitive|CVE-2026-9678|>= 7.0.0, < 7.28.0|7.28.0|undici vulnerable to cross-user information disclosure via shared cache whitespace bypass
+40|medium|npm|vite|workers/pnpm-lock.yaml|development|transitive|CVE-2026-53632|<= 6.4.2|6.4.3|launch-editor: NTLMv2 hash disclosure via UNC path handling on Windows
+36|medium|npm|vite|workers/pnpm-lock.yaml|development|transitive|CVE-2026-39365|<= 6.4.1|6.4.2|Vite Vulnerable to Path Traversal in Optimized Deps `.map` Handling
+5|medium|npm|vite|frontend/pnpm-lock.yaml|development|direct|CVE-2026-53632|<= 6.4.2|6.4.3|launch-editor: NTLMv2 hash disclosure via UNC path handling on Windows
+38|low|npm|esbuild|workers/pnpm-lock.yaml|development|transitive|GHSA-g7r4-m6w7-qqqr|>= 0.27.3, < 0.28.1|0.28.1|esbuild allows arbitrary file read when running the development server on Windows
+33|low|npm|esbuild|poc/05_dedup_performance/pnpm-lock.yaml|development|transitive|GHSA-g7r4-m6w7-qqqr|>= 0.27.3, < 0.28.1|0.28.1|esbuild allows arbitrary file read when running the development server on Windows
+48|low|npm|undici|workers/pnpm-lock.yaml|runtime|transitive|CVE-2026-11525|>= 7.0.0, < 7.28.0|7.28.0|undici vulnerable to Set-Cookie SameSite attribute downgrade via permissive substring matc
+44|low|npm|undici|workers/pnpm-lock.yaml|runtime|transitive|CVE-2026-6733|>= 7.0.0, < 7.28.0|7.28.0|undici vulnerable to HTTP response queue poisoning via keep-alive socket reuse

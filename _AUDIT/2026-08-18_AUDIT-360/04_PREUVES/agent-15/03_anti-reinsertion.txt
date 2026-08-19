@@ -1,0 +1,37 @@
+# AGENT 15 — ANTI-REINSERTION DE BOUT EN BOUT (canal du site)
+# Sequence : effacement console (GdprErasureService) PUIS ingestion SiteSyncIngestService
+# CRM_INGEST_ENABLED=true CRM_INGEST_CANDIDATES_ENABLED=true DB=axion_crm_rgpd15
+
+=== E. ETAT DE DEPART ===
+  opt_out: {"scope":"business","email_hash":"7bb3a4c32fc0866c1e4f4d5ac56f6367fc4296bdd023e092980f37ef2106f4a1","source":"gdpr_erasure"}
+  sha256(email efface) = 7bb3a4c32fc0866c1e4f4d5ac56f6367fc4296bdd023e092980f37ef2106f4a1
+  -> UNE SEULE ligne, scope=business. Aucune ligne scope=vivier.
+
+=== TEMOIN NEGATIF : personne JAMAIS effacee, meme canal, memes evenements ===
+  business form_submission     : pending_match
+  contacts(temoin)  = 0
+  vivier application_submitted : created
+  candidates(temoin) = 1
+  -> PREUVE que le canal d'ingestion FONCTIONNE et que le controle sait distinguer.
+
+=== F. SUJET EFFACE — univers BUSINESS (form_submission) ===
+  statut : opted_out
+  contacts = 0        <<< LA GARDE TIENT
+
+=== G. SUJET EFFACE — univers VIVIER (application_submitted) ===
+  statut : created
+  candidates = 1      <<< LA GARDE NE TIENT PAS
+   >>> {"id":3,"email":"jean.dupont@exemple-test.fr","first_name":"Jean","last_name":"Dupont","phone":"+33612345678"}
+
+CONCLUSION : une personne effacee par la console REVIENT, identite complete
+(email + nom + prenom + telephone), des qu'elle repasse par le canal du site
+en univers VIVIER.
+
+CAUSE MESUREE :
+  GdprErasureService:91 -> DeduplicationService::addOptOut() n'ecrit PAS de `scope`
+  -> DEFAULT SQL 'business'.
+  SiteSyncIngestService:113 -> hasOpposed($event, $scope) avec $scope='vivier'
+  pour un application_submitted (SiteSyncIngestService:495-503, WHERE scope=?).
+  Aucune ligne scope='vivier' -> aucune opposition vue -> upsertCandidate().
+  A l'inverse SiteGdprService::erase(scope='both') ecrit LES DEUX scopes (:147,:176).
+  Deux chemins d'effacement, deux comportements.

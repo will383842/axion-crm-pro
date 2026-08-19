@@ -1,0 +1,78 @@
+=== PANNE JOUEE — site injoignable (http://127.0.0.1:59999) sur base isolee axion_crm_agent14 ===
+NOTE : l'atelier est sature (load average hote = 29.6, 11 processus artisan concurrents
+       appartenant a d'autres agents, conteneur api redemarre 2 fois pendant mes mesures).
+
+-- A. drapeau OFF (etat par defaut du produit) : la commande REFUSE --
+CRM_OUTBOUND_ENABLED n'est pas a true — outbox construite mais inerte (activation a la bascule finale). Aucun evenement n'a ete emis.
+code de sortie = 1
+
+-- C. drapeau ON + secret + destination injoignable : etat APRES un passage --
+ id |   event_type   | status | attempts |       created_at       |    next_attempt_at     | attente_programmee |                                           erreur                                           
+----+----------------+--------+----------+------------------------+------------------------+--------------------+--------------------------------------------------------------------------------------------
+  1 | consent_optout | failed |        1 | 2026-08-19 12:15:38+00 | 2026-08-19 12:29:45+00 | 00:14:07           | connexion : cURL error 7: Failed to connect to 127.0.0.1:59999 after 8 ms: Could not conne
+  2 | erasure        | failed |        1 | 2026-08-19 12:16:36+00 | 2026-08-19 12:29:46+00 | 00:13:10           | connexion : cURL error 7: Failed to connect to 127.0.0.1:59999 after 0 ms: Could not conne
+(2 rows)
+
+
+LECTURE : status pending -> failed, attempts 0 -> 1.
+          Le passage a eu lieu a ~12:27:45 ; next_attempt_at = 12:29:45, soit +2 min
+          APRES LE PASSAGE (la colonne attente_programmee ci-dessus est calculee depuis
+          created_at, elle n'est pas le backoff : le backoff est 12:29:45 - 12:27:45 = 2 min).
+          2 min = min(60, 2^1), la formule backoffMinutes() de CrmFlushOutbound:227.
+          Une panne reseau (ConnectionException) CONSOMME donc un essai.
+
+=== SUITE : plafond d'essais, file morte, et reprise (memes lignes, meme base isolee) ===
+commande : docker exec -e DB_DATABASE=axion_crm_agent14 axion-crm-api php artisan tinker --execute='require "/tmp/a14_panne3.php";'
+(sortie ecrite dans un fichier DU CONTENEUR : le tube stdout de docker exec se bloquait
+ sous la charge du poste — charge moyenne 43, processus en etat D)
+
+BASE = axion_crm_agent14
+max_attempts configure = 8
+--- etat de depart (apres 1 panne deja jouee) ---
+id=1 type=consent_optout status=failed   attempts=7 next=2026-08-19 10:34:08.470336+00 sent=NULL err=connexion : cURL error 7: Failed to connect to 127.0.0.1:599
+id=2 type=erasure        status=failed   attempts=7 next=2026-08-19 10:34:08.470336+00 sent=NULL err=connexion : cURL error 7: Failed to connect to 127.0.0.1:599
+
+########## D. passage immediat suivant : la ligne n'est PAS due ##########
+Outbox CRM → site : 0 envoyés, 0 différés (site indisponible), 0 en échec rejouable, 2 abandonnés.
+--- inchange ? (attempts doit rester a 1) ---
+id=1 type=consent_optout status=gave_up  attempts=8 next=NULL sent=NULL err=connexion : cURL error 7: Failed to connect to 127.0.0.1:599
+id=2 type=erasure        status=gave_up  attempts=8 next=NULL sent=NULL err=connexion : cURL error 7: Failed to connect to 127.0.0.1:599
+
+########## E. on positionne attempts=7 (avant-dernier essai) et on rejoue ##########
+Outbox CRM → site : 0 envoyés, 0 différés (site indisponible), 0 en échec rejouable, 2 abandonnés.
+--- FILE MORTE : ou finit un evenement definitivement en echec ---
+id=1 type=consent_optout status=gave_up  attempts=8 next=NULL sent=NULL err=connexion : cURL error 7: Failed to connect to 127.0.0.1:599
+id=2 type=erasure        status=gave_up  attempts=8 next=NULL sent=NULL err=connexion : cURL error 7: Failed to connect to 127.0.0.1:599
+
+########## F. on rend la ligne 'due' et on rejoue : un gave_up repart-il ? ##########
+Outbox CRM → site : rien à émettre.
+--- un gave_up n est JAMAIS repris (etat terminal, aucun rattrapage automatique) ---
+id=1 type=consent_optout status=gave_up  attempts=8 next=2026-08-19 12:39:52+00 sent=NULL err=connexion : cURL error 7: Failed to connect to 127.0.0.1:599
+id=2 type=erasure        status=gave_up  attempts=8 next=2026-08-19 12:39:52+00 sent=NULL err=connexion : cURL error 7: Failed to connect to 127.0.0.1:599
+
+--- ce que ObservabilityController::outboundBacklog() renverrait ---
+{"pending":0,"gave_up":2}
+(et le frontend ne declare ni ne rend ce champ : cf. 02_temoins-negatifs.txt)
+
+--- tables 'alert'/'notification' en base CRM ---
+  notifications
+  (1 table(s) ; aucune ne concerne l'outbox sortante)
+
+--- backoff programme, essai par essai (formule CrmFlushOutbound::backoffMinutes) ---
+  apres l'essai 1 -> 2 min
+  apres l'essai 2 -> 4 min
+  apres l'essai 3 -> 8 min
+  apres l'essai 4 -> 16 min
+  apres l'essai 5 -> 32 min
+  apres l'essai 6 -> 60 min
+  apres l'essai 7 -> 60 min
+  cumul des 7 attentes = 182 min = 3.03 h avant gave_up definitif
+
+LECTURE :
+ - au 8e essai (max_attempts=8) la ligne bascule en gave_up, next_attempt_at=NULL, sent_at=NULL.
+ - remise 'due' de force, un gave_up n'est JAMAIS repris : « rien a emettre »
+   (la requete de la commande filtre whereIn(status,[pending,failed])).
+ - le miroir d'observabilite le voit ({pending:0, gave_up:2}) ; l'ecran, non.
+ - une table 'notifications' EXISTE en base, mais GET /v1/notifications renvoie une liste
+   VIDE en dur et markRead/markAllRead repondent 501 : il n'y a aucun canal de notification
+   utilisable dans le CRM.

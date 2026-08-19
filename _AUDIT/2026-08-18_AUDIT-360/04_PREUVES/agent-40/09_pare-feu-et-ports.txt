@@ -1,0 +1,31 @@
+=== ufw ===
+bash: line 1: ufw: command not found
+
+=== fail2ban ===
+active
+Status
+|- Number of jail:	1
+`- Jail list:	sshd
+
+=== ports en ecoute (0.0.0.0 / ::) ===
+State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess                                                  
+LISTEN 0      4096      127.0.0.54:53        0.0.0.0:*    users:(("systemd-resolve",pid=1063617,fd=17))           
+LISTEN 0      4096      172.17.0.1:8081      0.0.0.0:*    users:(("docker-proxy",pid=2891334,fd=8))               
+LISTEN 0      4096      172.17.0.1:8082      0.0.0.0:*    users:(("docker-proxy",pid=2891314,fd=8))               
+LISTEN 0      4096         0.0.0.0:443       0.0.0.0:*    users:(("docker-proxy",pid=2721674,fd=8))               
+LISTEN 0      4096   127.0.0.53%lo:53        0.0.0.0:*    users:(("systemd-resolve",pid=1063617,fd=15))           
+LISTEN 0      4096         0.0.0.0:80        0.0.0.0:*    users:(("docker-proxy",pid=2721654,fd=8))               
+LISTEN 0      4096         0.0.0.0:22        0.0.0.0:*    users:(("sshd",pid=42354,fd=3),("systemd",pid=1,fd=151))
+LISTEN 0      4096            [::]:443          [::]:*    users:(("docker-proxy",pid=2721680,fd=8))               
+LISTEN 0      4096            [::]:80           [::]:*    users:(("docker-proxy",pid=2721659,fd=8))               
+LISTEN 0      4096            [::]:22           [::]:*    users:(("sshd",pid=42354,fd=4),("systemd",pid=1,fd=152))
+
+=== iptables DOCKER chain ===
+-N DOCKER
+-A DOCKER -d 172.19.0.5/32 ! -i br-98a87126f0df -o br-98a87126f0df -p tcp -m tcp --dport 5173 -j ACCEPT
+-A DOCKER -d 172.19.0.4/32 ! -i br-98a87126f0df -o br-98a87126f0df -p tcp -m tcp --dport 80 -j ACCEPT
+-A DOCKER -d 172.18.0.8/32 ! -i br-19851c29c149 -o br-19851c29c149 -p tcp -m tcp --dport 443 -j ACCEPT
+-A DOCKER -d 172.18.0.8/32 ! -i br-19851c29c149 -o br-19851c29c149 -p tcp -m tcp --dport 80 -j ACCEPT
+-A DOCKER ! -i br-19851c29c149 -o br-19851c29c149 -j DROP
+-A DOCKER ! -i docker0 -o docker0 -j DROP
+-A DOCKER ! -i br-98a87126f0df -o br-98a87126f0df -j DROP

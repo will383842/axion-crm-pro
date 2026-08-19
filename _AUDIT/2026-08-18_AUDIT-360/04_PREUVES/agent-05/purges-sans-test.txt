@@ -1,0 +1,12 @@
+=== tests citant rgpd:purge-vivier / purge-business-prospects ===
+tests/Feature/Crm/SiteGdprTest.php:299:    test()->artisan('rgpd:purge-vivier')->assertFailed();
+tests/Feature/Crm/SiteGdprTest.php:300:    test()->artisan('rgpd:purge-business-prospects')->assertFailed();
+tests/Feature/Crm/SiteGdprTest.php:327:    test()->artisan('rgpd:purge-vivier')->assertSuccessful();
+tests/Feature/Crm/SiteGdprTest.php:381:    test()->artisan('rgpd:purge-business-prospects')->assertSuccessful();
+
+=== TEMOIN NEGATIF : tests citant une AUTRE commande planifiee (prospection:enrich) ===
+tests/Feature/Commands/ProspectionEnrichTest.php
+
+=== les commandes existent bien ===
+-rw-r--r-- 1 willi 197609 4130 Aug 14 12:39 app/Console/Commands/RgpdPurgeBusinessProspects.php
+-rw-r--r-- 1 willi 197609 4733 Aug 14 12:39 app/Console/Commands/RgpdPurgeVivier.php

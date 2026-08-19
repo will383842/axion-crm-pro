@@ -1,0 +1,28 @@
+=== tables portant deleted_at ===
+      table_name      
+----------------------
+ campaigns
+ candidates
+ companies
+ contacts
+ email_audiences
+ health_practitioners
+ journalists
+ media
+ scraping_campaigns
+ users
+ workspaces
+(11 rows)
+
+=== modeles declarant SoftDeletes ===
+app/Models/Candidate.php
+app/Models/EmailAudience.php
+app/Models/HealthPractitioner.php
+app/Models/Journalist.php
+app/Models/Media.php
+app/Models/ScrapingCampaign.php
+=== filtres deleted_at dans app/ ===
+44
+app/Http/Controllers/Api/CompaniesController.php:135:        return QueryBuilder::for(Company::query()->whereNull('deleted_at'))
+app/Http/Controllers/Api/ContactsController.php:50:                    ->whereNull('deleted_at')
+app/Http/Controllers/Api/Crm/ContactsHubController.php:114:            ->whereNull('deleted_at')

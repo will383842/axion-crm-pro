@@ -1,0 +1,37 @@
+
+  0    *   * * *  php artisan coverage:refresh-matrix  Next Due: dans 11 minutes
+  0    *   * * *  php artisan blacklists:check ..... Next Due: dans 11 minutes
+  0    3   * * *  php artisan audit:verify-chain .... Next Due: dans 15 heures
+  0    4   * * *  php artisan retention:purge ....... Next Due: dans 16 heures
+  30   4   * * *  php artisan rgpd:anonymize-ips .... Next Due: dans 16 heures
+  */15 *   * * *  php artisan anomaly:detect ....... Next Due: dans 11 minutes
+  0    2   * * *  php artisan signals:nightly-scan .. Next Due: dans 14 heures
+  *    *   * * *  php artisan campaigns:start-scheduled  Has Mutex › Next Due: dans 0 seconde
+  0    4   * * *  php artisan audiences:full-refresh  Next Due: dans 16 heures
+  0    2   1 * *  php artisan companies:rescrape-archives --limit=200  Next Due: dans 1 semaine
+  0    3   1 * *  php artisan companies:retry-google-places --limit=500  Next Due: dans 1 semaine
+  0    5   * * *  php artisan media:extract-from-companies  Next Due: dans 17 heures
+  15   5   * * *  php artisan media:sync-from-companies  Next Due: dans 17 heures
+  20   5   * * *  php artisan media:sync-emissions-from-parent  Next Due: dans 17 heures
+  0    4   * * 0  php artisan media:link-to-companies . Next Due: dans 3 jours
+  15   4   * * 0  php artisan media:tag-emissions-status --limit=20000  Next Due: dans 3 jours
+  */30 *   * * *  php artisan media:find-websites --limit=20000  Next Due: dans 11 minutes
+  15   2   * * 1  php artisan media:import-opendatasoft cppap  Next Due: dans 4 jours
+  30   2   * * 1  php artisan media:import-opendatasoft spel  Next Due: dans 4 jours
+  45   2   * * 1  php artisan media:import-opendatasoft agences  Next Due: dans 4 jours
+  0    3   * * 0  php artisan media:import-emissions-wikidata  Next Due: dans 3 jours
+  30   3   * * 0  php artisan media:import-arcom ...... Next Due: dans 3 jours
+  0    */2 * * *  php artisan media:generate-redaction-emails --limit=20000  Next Due: dans 11 minutes
+  40   5   * * *  php artisan journalists:scrape-ours --editorial --limit=300  Next Due: dans 17 heures
+  25   5   * * *  php artisan media:score-confidence  Next Due: dans 17 heures
+  30   4   * * 0  php artisan media:link-emissions-to-channels  Next Due: dans 3 jours
+  15   3   * * 1  php artisan media:backfill-periodicity  Next Due: dans 4 jours
+  30   3   * * 1  php artisan media:import-blogs ...... Next Due: dans 4 jours
+  45   4   * * *  php artisan prospection:score-email-confidence  Next Due: dans 16 heures
+  20   4   * * *  php artisan retention:prune-scraper-runs --days=90  Next Due: dans 16 heures
+  0    */3 * * *  php artisan media:enrich --limit=5000  Next Due: dans 11 minutes
+  5    5   * * *  php artisan media:clean-emails --threshold=10  Next Due: dans 17 heures
+  30   3   2 * *  php artisan rgpd:purge-vivier ..... Next Due: dans 1 semaine
+  15   4   2 * *  php artisan rgpd:purge-business-prospects  Next Due: dans 1 semaine
+  */5  *   * * *  php artisan crm:flush-outbound ..... Next Due: dans 1 minute
+

@@ -1,0 +1,7 @@
+result : fail
+fichiers non formates : 386
+top fixers : [('line_ending', 240), ('unary_operator_spaces', 132), ('not_operator_with_successor_space', 132), ('binary_operator_spaces', 113), ('method_argument_space', 112), ('braces_position', 101)]
+fichiers avec line_ending (CRLF) : 240
+total non formates (poste Windows)      : 386
+dont line_ending SEUL (artefact CRLF)   : 75
+non formates hors CRLF (valeur CI)      : 311

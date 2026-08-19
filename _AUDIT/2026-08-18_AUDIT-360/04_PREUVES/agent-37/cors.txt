@@ -1,0 +1,26 @@
+##### OPTIONS https://api.axion-crm-pro.com/api/v1/auth/login  Origin: https://evil.example.com
+HTTP/1.1 204 No Content
+vary: Origin, Access-Control-Request-Method
+
+##### GET https://api.axion-crm-pro.com/api/v1/auth/login  Origin: https://evil.example.com
+HTTP/1.1 405 Method Not Allowed
+vary: Origin
+vary: Accept-Encoding
+
+##### OPTIONS https://staging-api.axion-crm-pro.com/api/v1/auth/login  Origin: https://evil.example.com
+HTTP/1.1 204 No Content
+vary: Origin, Access-Control-Request-Method
+
+##### GET https://staging-api.axion-crm-pro.com/api/v1/auth/login  Origin: https://evil.example.com
+HTTP/1.1 405 Method Not Allowed
+vary: Origin
+vary: Accept-Encoding
+
+##### legitimate origin prod
+HTTP/1.1 204 No Content
+access-control-allow-credentials: true
+access-control-allow-headers: 
+access-control-allow-methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+access-control-allow-origin: https://app.axion-crm-pro.com
+access-control-max-age: 600
+vary: Origin, Access-Control-Request-Headers, Access-Control-Request-Method

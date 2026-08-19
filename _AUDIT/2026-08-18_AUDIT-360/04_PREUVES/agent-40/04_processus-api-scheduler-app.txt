@@ -1,0 +1,15 @@
+=== api ps ===
+PID   USER     TIME  COMMAND
+    1 www-data  0:01 php -S 0.0.0.0:80 -t public
+  679 www-data  0:00 ps -ef
+
+=== scheduler ps ===
+PID   USER     TIME  COMMAND
+    1 www-data  0:01 php artisan schedule:work
+  163 www-data  0:00 [php]
+  196 www-data  0:00 ps -ef
+
+=== app ps ===
+PID   USER     TIME  COMMAND
+    1 root      0:00 caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+  335 root      0:00 ps -ef

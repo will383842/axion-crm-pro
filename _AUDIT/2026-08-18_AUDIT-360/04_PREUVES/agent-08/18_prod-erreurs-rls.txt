@@ -1,0 +1,14 @@
+=== PROD : erreurs RLS — motifs distincts et volumetrie ===
+      1 new row violates row-level security policy for table "media"
+
+=== PROD : dates des erreurs RLS (premiere / derniere) ===
+[2026-08-16 14:00:00]
+[2026-08-16 15:00:00]
+[2026-08-16 16:00:00]
+---
+[2026-08-19 10:00:01]
+[2026-08-19 11:00:00]
+[2026-08-19 12:00:00]
+
+=== PROD : une occurrence complete, tronquee ===
+[previous exception] [object] (PDOException(code: 42501): SQLSTATE[42501]: Insufficient privilege: 7 ERROR:  must be owner of materialized view coverage_matrix_cells at /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php:584)

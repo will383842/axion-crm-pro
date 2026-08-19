@@ -1,0 +1,14 @@
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+UPDATE 1
+      name       | ecrit_par_launchzonescrapingjob | max_companies 
+-----------------+---------------------------------+---------------
+ ZZ A18 CAMPAGNE |                             400 |          1000
+(1 row)
+
+ runs_completed | companies_created_recalcule 
+----------------+-----------------------------
+              1 |                           0
+(1 row)
+

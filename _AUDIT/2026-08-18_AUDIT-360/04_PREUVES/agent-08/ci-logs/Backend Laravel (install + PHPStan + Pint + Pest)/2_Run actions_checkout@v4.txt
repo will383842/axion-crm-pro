@@ -1,0 +1,136 @@
+﻿2026-08-19T09:42:47.0971747Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-19T09:42:47.0980640Z ##[group]Run actions/checkout@v4
+2026-08-19T09:42:47.0981398Z with:
+2026-08-19T09:42:47.0981870Z   fetch-depth: 0
+2026-08-19T09:42:47.0982616Z   repository: will383842/axion-crm-pro
+2026-08-19T09:42:47.0987114Z   token: ***
+2026-08-19T09:42:47.0987584Z   ssh-strict: true
+2026-08-19T09:42:47.0988057Z   ssh-user: git
+2026-08-19T09:42:47.0988537Z   persist-credentials: true
+2026-08-19T09:42:47.0989052Z   clean: true
+2026-08-19T09:42:47.0989526Z   sparse-checkout-cone-mode: true
+2026-08-19T09:42:47.0990087Z   fetch-tags: false
+2026-08-19T09:42:47.0990582Z   show-progress: true
+2026-08-19T09:42:47.0991098Z   lfs: false
+2026-08-19T09:42:47.0991537Z   submodules: false
+2026-08-19T09:42:47.0992250Z   set-safe-directory: true
+2026-08-19T09:42:47.0992796Z   allow-unsafe-pr-checkout: false
+2026-08-19T09:42:47.0993654Z ##[endgroup]
+2026-08-19T09:42:47.2046219Z Syncing repository: will383842/axion-crm-pro
+2026-08-19T09:42:47.2049131Z ##[group]Getting Git version info
+2026-08-19T09:42:47.2050487Z Working directory is '/home/runner/work/axion-crm-pro/axion-crm-pro'
+2026-08-19T09:42:47.2052552Z [command]/usr/bin/git version
+2026-08-19T09:42:47.2105188Z git version 2.54.0
+2026-08-19T09:42:47.2126335Z ##[endgroup]
+2026-08-19T09:42:47.2141866Z Temporarily overriding HOME='/home/runner/work/_temp/65b7ce8c-ee3e-4760-a5f4-746873653d7e' before making global git config changes
+2026-08-19T09:42:47.2144684Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-19T09:42:47.2147996Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/axion-crm-pro/axion-crm-pro
+2026-08-19T09:42:47.2195793Z Deleting the contents of '/home/runner/work/axion-crm-pro/axion-crm-pro'
+2026-08-19T09:42:47.2200113Z ##[group]Initializing the repository
+2026-08-19T09:42:47.2205440Z [command]/usr/bin/git init /home/runner/work/axion-crm-pro/axion-crm-pro
+2026-08-19T09:42:47.2289564Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-08-19T09:42:47.2292402Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-08-19T09:42:47.2294700Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-08-19T09:42:47.2296286Z hint: call:
+2026-08-19T09:42:47.2297232Z hint:
+2026-08-19T09:42:47.2298466Z hint: 	git config --global init.defaultBranch <name>
+2026-08-19T09:42:47.2300061Z hint:
+2026-08-19T09:42:47.2301374Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-08-19T09:42:47.2303489Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-08-19T09:42:47.2305067Z hint:
+2026-08-19T09:42:47.2306017Z hint: 	git branch -m <name>
+2026-08-19T09:42:47.2307373Z hint:
+2026-08-19T09:42:47.2308551Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-08-19T09:42:47.2309883Z Initialized empty Git repository in /home/runner/work/axion-crm-pro/axion-crm-pro/.git/
+2026-08-19T09:42:47.2312911Z [command]/usr/bin/git remote add origin https://github.com/will383842/axion-crm-pro
+2026-08-19T09:42:47.2349178Z ##[endgroup]
+2026-08-19T09:42:47.2350575Z ##[group]Disabling automatic garbage collection
+2026-08-19T09:42:47.2354365Z [command]/usr/bin/git config --local gc.auto 0
+2026-08-19T09:42:47.2419836Z ##[endgroup]
+2026-08-19T09:42:47.2421133Z ##[group]Setting up auth
+2026-08-19T09:42:47.2428443Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-08-19T09:42:47.2468886Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-08-19T09:42:47.2818815Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-19T09:42:47.2863610Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-08-19T09:42:47.3136137Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-19T09:42:47.3175766Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-08-19T09:42:47.3419935Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-08-19T09:42:47.3460932Z ##[endgroup]
+2026-08-19T09:42:47.3461829Z ##[group]Fetching the repository
+2026-08-19T09:42:47.3473877Z [command]/usr/bin/git -c protocol.version=2 fetch --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/* +a3369040168b75612b1e3882adecd13d49fde737:refs/remotes/pull/188/merge
+2026-08-19T09:42:48.6655422Z From https://github.com/will383842/axion-crm-pro
+2026-08-19T09:42:48.6658208Z  * [new branch]      archive/spec-v1                          -> origin/archive/spec-v1
+2026-08-19T09:42:48.6660019Z  * [new branch]      chore/etape-0-prealables                 -> origin/chore/etape-0-prealables
+2026-08-19T09:42:48.6661767Z  * [new branch]      diag/website-status                      -> origin/diag/website-status
+2026-08-19T09:42:48.6664373Z  * [new branch]      docs/cloture-e2e2-maj                    -> origin/docs/cloture-e2e2-maj
+2026-08-19T09:42:48.6750679Z  * [new branch]      docs/cnil-decision                       -> origin/docs/cnil-decision
+2026-08-19T09:42:48.6753149Z  * [new branch]      docs/cnil-identite-complete              -> origin/docs/cnil-identite-complete
+2026-08-19T09:42:48.6755195Z  * [new branch]      docs/cnil-sans-telephone                 -> origin/docs/cnil-sans-telephone
+2026-08-19T09:42:48.6757680Z  * [new branch]      docs/decisions-will-19-08                -> origin/docs/decisions-will-19-08
+2026-08-19T09:42:48.6759518Z  * [new branch]      docs/journal-etape-1a                    -> origin/docs/journal-etape-1a
+2026-08-19T09:42:48.6761346Z  * [new branch]      docs/journal-preprod                     -> origin/docs/journal-preprod
+2026-08-19T09:42:48.6763575Z  * [new branch]      docs/registre-violations                 -> origin/docs/registre-violations
+2026-08-19T09:42:48.6766245Z  * [new branch]      feat/capture-all-emails-phones           -> origin/feat/capture-all-emails-phones
+2026-08-19T09:42:48.6768771Z  * [new branch]      feat/crm-L5-consent-webhook              -> origin/feat/crm-L5-consent-webhook
+2026-08-19T09:42:48.6771262Z  * [new branch]      feat/crm-L6-console                      -> origin/feat/crm-L6-console
+2026-08-19T09:42:48.6774173Z  * [new branch]      feat/deploy-consolidation                -> origin/feat/deploy-consolidation
+2026-08-19T09:42:48.6776870Z  * [new branch]      feat/deploy-media-final                  -> origin/feat/deploy-media-final
+2026-08-19T09:42:48.6779495Z  * [new branch]      feat/enrich-website-shard                -> origin/feat/enrich-website-shard
+2026-08-19T09:42:48.6782581Z  * [new branch]      feat/enrichment-perfection-terrain       -> origin/feat/enrichment-perfection-terrain
+2026-08-19T09:42:48.6785241Z  * [new branch]      feat/etape-1a                            -> origin/feat/etape-1a
+2026-08-19T09:42:48.6787395Z  * [new branch]      feat/etape-1a-p2                         -> origin/feat/etape-1a-p2
+2026-08-19T09:42:48.6789905Z  * [new branch]      feat/find-websites-revalidate            -> origin/feat/find-websites-revalidate
+2026-08-19T09:42:48.6792879Z  * [new branch]      feat/media-arcom                         -> origin/feat/media-arcom
+2026-08-19T09:42:48.6795780Z  * [new branch]      feat/media-autonomous-enrichment         -> origin/feat/media-autonomous-enrichment
+2026-08-19T09:42:48.6798975Z  * [new branch]      feat/media-emissions-wikidata            -> origin/feat/media-emissions-wikidata
+2026-08-19T09:42:48.6802155Z  * [new branch]      feat/media-hardening                     -> origin/feat/media-hardening
+2026-08-19T09:42:48.6804939Z  * [new branch]      feat/media-import-press-kit              -> origin/feat/media-import-press-kit
+2026-08-19T09:42:48.6807824Z  * [new branch]      feat/media-journalists-llm               -> origin/feat/media-journalists-llm
+2026-08-19T09:42:48.6810660Z  * [new branch]      feat/media-redaction-emails              -> origin/feat/media-redaction-emails
+2026-08-19T09:42:48.6813573Z  * [new branch]      feat/preprod-remplie                     -> origin/feat/preprod-remplie
+2026-08-19T09:42:48.6816264Z  * [new branch]      feat/preproduction                       -> origin/feat/preproduction
+2026-08-19T09:42:48.6818782Z  * [new branch]      feat/scraper-speed                       -> origin/feat/scraper-speed
+2026-08-19T09:42:48.6821768Z  * [new branch]      fix/enseigne-migration-jsonb-operator    -> origin/fix/enseigne-migration-jsonb-operator
+2026-08-19T09:42:48.6824931Z  * [new branch]      fix/garde-pile-privee                    -> origin/fix/garde-pile-privee
+2026-08-19T09:42:48.6827689Z  * [new branch]      fix/horodatage-scraping-utc              -> origin/fix/horodatage-scraping-utc
+2026-08-19T09:42:48.6831677Z  * [new branch]      fix/horodatages-fuseau-paris             -> origin/fix/horodatages-fuseau-paris
+2026-08-19T09:42:48.6834880Z  * [new branch]      fix/preprod-502                          -> origin/fix/preprod-502
+2026-08-19T09:42:48.6837856Z  * [new branch]      fix/prospection-keyscan-all-workflows    -> origin/fix/prospection-keyscan-all-workflows
+2026-08-19T09:42:48.6841342Z  * [new branch]      main                                     -> origin/main
+2026-08-19T09:42:48.6844385Z  * [new tag]         archive/spec-v1-2026-05-16               -> archive/spec-v1-2026-05-16
+2026-08-19T09:42:48.6847840Z  * [new tag]         audit-e2e-phase1-2026-05-17              -> audit-e2e-phase1-2026-05-17
+2026-08-19T09:42:48.6851798Z  * [new tag]         phase1-mocks-complete-2026-05-17         -> phase1-mocks-complete-2026-05-17
+2026-08-19T09:42:48.6857215Z  * [new tag]         phase1-sprint16-prod-conditional-2026-05-17 -> phase1-sprint16-prod-conditional-2026-05-17
+2026-08-19T09:42:48.6861601Z  * [new tag]         poc05-validated-2026-05-16               -> poc05-validated-2026-05-16
+2026-08-19T09:42:48.6865187Z  * [new tag]         pocs-coded-2026-05-16                    -> pocs-coded-2026-05-16
+2026-08-19T09:42:48.6868091Z  * [new tag]         spec-v1.1-16-p0-fixed                    -> spec-v1.1-16-p0-fixed
+2026-08-19T09:42:48.6871600Z  * [new tag]         spec-v1.2-frontend-complete              -> spec-v1.2-frontend-complete
+2026-08-19T09:42:48.6875298Z  * [new ref]         a3369040168b75612b1e3882adecd13d49fde737 -> pull/188/merge
+2026-08-19T09:42:48.6881390Z ##[endgroup]
+2026-08-19T09:42:48.6884209Z ##[group]Determining the checkout info
+2026-08-19T09:42:48.6887205Z ##[endgroup]
+2026-08-19T09:42:48.6888809Z [command]/usr/bin/git sparse-checkout disable
+2026-08-19T09:42:48.6912359Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-08-19T09:42:48.6963302Z ##[group]Checking out the ref
+2026-08-19T09:42:48.6967039Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/188/merge
+2026-08-19T09:42:48.8377715Z Note: switching to 'refs/remotes/pull/188/merge'.
+2026-08-19T09:42:48.8379005Z 
+2026-08-19T09:42:48.8379935Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-08-19T09:42:48.8382389Z changes and commit them, and you can discard any commits you make in this
+2026-08-19T09:42:48.8384593Z state without impacting any branches by switching back to a branch.
+2026-08-19T09:42:48.8385855Z 
+2026-08-19T09:42:48.8387046Z If you want to create a new branch to retain commits you create, you may
+2026-08-19T09:42:48.8389769Z do so (now or later) by using -c with the switch command. Example:
+2026-08-19T09:42:48.8391400Z 
+2026-08-19T09:42:48.8392629Z   git switch -c <new-branch-name>
+2026-08-19T09:42:48.8393782Z 
+2026-08-19T09:42:48.8394434Z Or undo this operation with:
+2026-08-19T09:42:48.8395468Z 
+2026-08-19T09:42:48.8396063Z   git switch -
+2026-08-19T09:42:48.8396781Z 
+2026-08-19T09:42:48.8398147Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-08-19T09:42:48.8400180Z 
+2026-08-19T09:42:48.8402502Z HEAD is now at a336904 Merge bb60473dce8b29de40c94781c3a30ebf11224d1e into b53338cd6ba50d7f9e18557e2a725a5f00fe15db
+2026-08-19T09:42:48.8409108Z ##[endgroup]
+2026-08-19T09:42:48.8452833Z [command]/usr/bin/git log -1 --format=%H
+2026-08-19T09:42:48.8488970Z a3369040168b75612b1e3882adecd13d49fde737

@@ -1,0 +1,11 @@
+viewer    status=403 {    "message": "This action is unauthorized.",    "exception": "Symfony\\Component\\Htt
+operator  status=403 {    "message": "This action is unauthorized.",    "exception": "Symfony\\Component\\Htt
+admin     status=403 {    "message": "This action is unauthorized.",    "exception": "Symfony\\Component\\Htt
+owner     status=200 {"data":[{"id":68,"workspace_id":"c6a16436-ec1b-461a-a797-e4700d6a0168","user_id":"977077d
+owner2    status=200 {"data":[{"id":68,"workspace_id":"c6a16436-ec1b-461a-a797-e4700d6a0168","user_id":"977077d
+=== POLICY HITS (temoin) ===
+App\Policies\AuditLogPolicy::viewAny
+App\Policies\AuditLogPolicy::viewAny
+App\Policies\AuditLogPolicy::viewAny
+App\Policies\AuditLogPolicy::viewAny
+App\Policies\AuditLogPolicy::viewAny

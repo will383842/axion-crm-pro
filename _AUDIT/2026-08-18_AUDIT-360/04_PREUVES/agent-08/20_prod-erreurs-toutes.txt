@@ -1,0 +1,26 @@
+=== PROD : la vue figee est-elle FAUSSE aujourd'hui ? ===
+  derniere_entreprise   
+------------------------
+ 2026-08-15 12:16:07+00
+(1 row)
+
+   derniere_activite    
+------------------------
+ 2026-08-19 03:25:48+00
+(1 row)
+
+
+=== PROD : TOUTES les erreurs applicatives depuis l'armement (motifs distincts) ===
+  23658 production.ERROR: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "telescope_entries" does not exist
+     71 production.ERROR: Scheduled command ['/usr/local/bin/php' 'artisan' coverage:refresh-matrix] failed with exit code [1]. 
+     71 production.ERROR: SQLSTATE[42501]: Insufficient privilege: 7 ERROR:  must be owner of materialized view coverage_matrix_cells 
+     12 production.ERROR: Stream is already at the end [tcp://redis:6379] 
+      5 production.ERROR: Route [login] not defined. 
+      3 production.ERROR: Scheduled command ['/usr/local/bin/php' 'artisan' rgpd:anonymize-ips] failed with exit code [1]. 
+      3 production.ERROR: SQLSTATE[42883]: Undefined function: 7 ERROR:  operator does not exist: cidr / integer
+      1 production.ERROR: could not find driver 
+      1 production.ERROR: Scheduled command ['/usr/local/bin/php' 'artisan' media:import-opendatasoft spel] failed with exit code [1]. 
+      1 production.ERROR: Scheduled command ['/usr/local/bin/php' 'artisan' media:import-opendatasoft cppap] failed with exit code [1]. 
+      1 production.ERROR: Scheduled command ['/usr/local/bin/php' 'artisan' media:import-opendatasoft agences] failed with exit code [1]
+      1 production.ERROR: Scheduled command ['/usr/local/bin/php' 'artisan' media:import-blogs] failed with exit code [1]. 
+      1 production.ERROR: SQLSTATE[42501]: Insufficient privilege: 7 ERROR:  new row violates row-level security policy for table "media

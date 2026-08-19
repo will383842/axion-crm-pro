@@ -1,0 +1,25 @@
+=== 16 specs presentes ===
+tests/e2e/a11y.spec.ts
+tests/e2e/audiences-builder.spec.ts
+tests/e2e/auth.spec.ts
+tests/e2e/campaigns-wizard.spec.ts
+tests/e2e/companies.spec.ts
+tests/e2e/console-locale.spec.ts
+tests/e2e/coverage.spec.ts
+tests/e2e/dark-mode.spec.ts
+tests/e2e/dashboard.spec.ts
+tests/e2e/global-search.spec.ts
+tests/e2e/llm.spec.ts
+tests/e2e/navigation.spec.ts
+tests/e2e/onboarding.spec.ts
+tests/e2e/rgpd.spec.ts
+tests/e2e/settings.spec.ts
+tests/e2e/tags-manager.spec.ts
+
+=== specs referencees dans un workflow ===
+tests/e2e/a11y.spec.ts
+tests/e2e/navigation.spec.ts
+
+=== scripts frontend ===
+17:    "test": "vitest run",
+20:    "e2e": "playwright test"

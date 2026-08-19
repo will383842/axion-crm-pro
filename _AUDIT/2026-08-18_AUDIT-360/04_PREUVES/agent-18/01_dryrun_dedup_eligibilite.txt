@@ -1,0 +1,61 @@
+BASE=axion_crm_a18  workspace=0dfda679-a501-4dcd-bc51-4c7edfb49052  sources_registre=17
+
+===== [1] DRY-RUN : trace sur TOUTES les tables + sequences =====
+  outcome={"status":"created","company_id":3,"contacts_created":0,"contacts_updated":0,"persons_skipped_opt_out":0,"emails_rejected_mx":0,"company_fields_written":["denomination","website","phone","city"],"tags":["src:scraping-mentions-legales"],"activity_id":9}
+  => AUCUNE des 114 tables modifiee
+    SEQ companies_id_seq                         '2' -> '3'
+    SEQ scraper_runs_id_seq                      '8' -> '9'
+    SEQ activities_id_seq                        '8' -> '9'
+  => 3 sequence(s) consommee(s) : trace hors lignes
+
+===== [2] TEMOIN NEGATIF : le meme appel en ecriture reelle =====
+  outcome={"status":"created","company_id":4,"contacts_created":0,"contacts_updated":0,"persons_skipped_opt_out":0,"emails_rejected_mx":0,"company_fields_written":["denomination","website","phone","city"],"tags":["src:scraping-mentions-legales"],"activity_id":10}
+    activities                             4 -> 5 (+1)
+    companies                              1 -> 2 (+1)
+    company_tag                            1 -> 2 (+1)
+    scraper_runs                           4 -> 5 (+1)
+  => 4 table(s) modifiee(s) en ecriture reelle
+
+===== [3] DEDUP niveau 2 : computeContactHash (PHP) vs colonne GENERATED (SQL) =====
+  'Paul' / 'ZZ A18'              PHP=801fa0a07e80  SQL=801fa0a07e80  IDENTIQUE
+  'Paul' / 'Dupont'              PHP=515ee5b1033c  SQL=515ee5b1033c  IDENTIQUE
+  'Elodie' / 'Dupont'            PHP=add2d8b5e71f  SQL=add2d8b5e71f  IDENTIQUE
+  'Elodie' / 'Dupont Martin'     PHP=bb16247cef9b  SQL=bb16247cef9b  IDENTIQUE
+  'Jean' / 'de la Fontaine'      PHP=ed131b778de1  SQL=1b2a298f732e  *** DIVERGENT ***
+  'Paul' / ' Dupont'             PHP=515ee5b1033c  SQL=e85f971ef5df  *** DIVERGENT ***
+  (aucun contact en base)
+
+===== [4] PIEGE 10 : dedup email du funnel sous lc_ctype=C =====
+  datcollate=C datctype=C
+  PHP mb_strtolower = élodie@a18.example.invalid
+  SQL lower()       = Élodie@a18.example.invalid
+  identiques ? *** NON ***
+  requete EXACTE du funnel (upsertContact l.435) => 0 ligne(s) *** DOUBLON GARANTI ***
+  temoin : comparaison citext directe (sans lower) => 0 ligne(s)
+
+===== [5] EligibiliteCampagne =====
+  companies=2  eligibles=0  non_eligibles=2  somme=2  ecart=0
+  contacts=2  joignables=2
+  peutRecevoir(paul@a18.example.invalid) = true
+  apres opposition -> peutRecevoir = false
+  methodes publiques = appliquer, appliquerContacts, exclureOpposes, peutRecevoir, appliquerNonEligibles
+
+===== [6] MOCKS : MockServicesProvider peut-il s'armer en production ? =====
+  garde d'environnement dans le provider ? *** AUCUNE ***
+  config:cache actif ? NON
+  A. .env local tel quel   app.env=production  mocks=5/5   {"GoogleMapsScraper":"MockGoogleMapsScraper","LLMClient":"MockLLMClient","SmtpProber":"MockSmtpProber","ProxyProvider":"MockProxyProvider","CaptchaSolver":"MockCaptchaSolver"}
+  B. MOCK_MODE ABSENT      app.env=production  mocks=5/5   {"GoogleMapsScraper":"MockGoogleMapsScraper","LLMClient":"MockLLMClient","SmtpProber":"MockSmtpProber","ProxyProvider":"MockProxyProvider","CaptchaSolver":"MockCaptchaSolver"}
+  C. MOCK_MODE=false       app.env=production  mocks=5/5   {"GoogleMapsScraper":"MockGoogleMapsScraper","LLMClient":"MockLLMClient","SmtpProber":"MockSmtpProber","ProxyProvider":"MockProxyProvider","CaptchaSolver":"MockCaptchaSolver"}
+  D. MOCK_MODE=FALSE       app.env=production  mocks=5/5   {"GoogleMapsScraper":"MockGoogleMapsScraper","LLMClient":"MockLLMClient","SmtpProber":"MockSmtpProber","ProxyProvider":"MockProxyProvider","CaptchaSolver":"MockCaptchaSolver"}
+  E. MOCK_MODE=0           app.env=production  mocks=5/5   {"GoogleMapsScraper":"MockGoogleMapsScraper","LLMClient":"MockLLMClient","SmtpProber":"MockSmtpProber","ProxyProvider":"MockProxyProvider","CaptchaSolver":"MockCaptchaSolver"}
+  F. MOCK_MODE vide        app.env=production  mocks=5/5   {"GoogleMapsScraper":"MockGoogleMapsScraper","LLMClient":"MockLLMClient","SmtpProber":"MockSmtpProber","ProxyProvider":"MockProxyProvider","CaptchaSolver":"MockCaptchaSolver"}
+  G. MOCK_MODE=off         app.env=production  mocks=5/5   {"GoogleMapsScraper":"MockGoogleMapsScraper","LLMClient":"MockLLMClient","SmtpProber":"MockSmtpProber","ProxyProvider":"MockProxyProvider","CaptchaSolver":"MockCaptchaSolver"}
+  H. MOCK_MODE=no          app.env=production  mocks=5/5   {"GoogleMapsScraper":"MockGoogleMapsScraper","LLMClient":"MockLLMClient","SmtpProber":"MockSmtpProber","ProxyProvider":"MockProxyProvider","CaptchaSolver":"MockCaptchaSolver"}
+
+=== FIN A18 ===
+
+### AVERTISSEMENT SUR LA SECTION [6] DE CE FICHIER
+Le depot d'environnement de Laravel est IMMUABLE : Env::getRepository()->set()/clear()
+n'a AUCUN effet sur une clef deja chargee du .env. Les cas B a H de la section [6]
+ont donc tous mesure la MEME valeur (MOCK_MODE=true du .env local) : ils ne prouvent rien.
+La mesure valide est dans 08_mocks_production.txt, faite avec de VRAIES variables d'environnement.

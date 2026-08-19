@@ -1,0 +1,349 @@
+{
+  "dump": {
+    "sections": [
+      {
+        "titre": "Console CRM",
+        "ouverte": "false",
+        "ulHidden": true,
+        "entrees": [
+          {
+            "label": "Contacts",
+            "href": "/console/contacts",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "À arbitrer",
+            "href": "/console/arbitrage",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Vivier candidats",
+            "href": "/console/vivier",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          }
+        ]
+      },
+      {
+        "titre": "Pilotage",
+        "ouverte": "true",
+        "ulHidden": false,
+        "entrees": [
+          {
+            "label": "Tableau de bord",
+            "href": "/",
+            "dataTour": "nav-dashboard",
+            "compteur": null,
+            "visible": true
+          },
+          {
+            "label": "Couverture France",
+            "href": "/coverage",
+            "dataTour": null,
+            "compteur": null,
+            "visible": true
+          },
+          {
+            "label": "Campagnes",
+            "href": "/campaigns",
+            "dataTour": "nav-campaigns",
+            "compteur": null,
+            "visible": true
+          },
+          {
+            "label": "Runs de scraping",
+            "href": "/scraper-runs",
+            "dataTour": null,
+            "compteur": null,
+            "visible": true
+          }
+        ]
+      },
+      {
+        "titre": "Data",
+        "ouverte": "false",
+        "ulHidden": true,
+        "entrees": [
+          {
+            "label": "Entreprises",
+            "href": "/companies",
+            "dataTour": "nav-companies",
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Contacts",
+            "href": "/contacts",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Tags",
+            "href": "/tags",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          }
+        ]
+      },
+      {
+        "titre": "International",
+        "ouverte": "false",
+        "ulHidden": true,
+        "entrees": [
+          {
+            "label": "Roumanie",
+            "href": "/international/roumanie",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          }
+        ]
+      },
+      {
+        "titre": "Médias & Presse",
+        "ouverte": "false",
+        "ulHidden": true,
+        "entrees": [
+          {
+            "label": "Médias",
+            "href": "/media",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Journalistes",
+            "href": "/journalists",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          }
+        ]
+      },
+      {
+        "titre": "Communication",
+        "ouverte": "false",
+        "ulHidden": true,
+        "entrees": [
+          {
+            "label": "Audiences",
+            "href": "/audiences",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Templates email",
+            "href": "/email-templates",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Envois email",
+            "href": "/email-sends",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          }
+        ]
+      },
+      {
+        "titre": "IA",
+        "ouverte": "false",
+        "ulHidden": true,
+        "entrees": [
+          {
+            "label": "LLM Router",
+            "href": "/llm/router",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Proxies",
+            "href": "/llm/proxy-providers",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Rotations",
+            "href": "/llm/rotations",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          }
+        ]
+      },
+      {
+        "titre": "Conformité",
+        "ouverte": "false",
+        "ulHidden": true,
+        "entrees": [
+          {
+            "label": "Requêtes RGPD",
+            "href": "/rgpd/requests",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Registre AI Act",
+            "href": "/rgpd/ai-act",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Journaux d’audit",
+            "href": "/audit-logs",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          }
+        ]
+      },
+      {
+        "titre": "Admin",
+        "ouverte": "false",
+        "ulHidden": true,
+        "entrees": [
+          {
+            "label": "Utilisateurs",
+            "href": "/users",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Paramètres",
+            "href": "/settings",
+            "dataTour": "nav-settings",
+            "compteur": null,
+            "visible": false
+          }
+        ]
+      },
+      {
+        "titre": "Phase 2",
+        "ouverte": "false",
+        "ulHidden": true,
+        "entrees": [
+          {
+            "label": "E-mails à froid",
+            "href": "/cold-email",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Prospection LinkedIn",
+            "href": "/linkedin",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Pipeline CRM",
+            "href": "/crm",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Analytique",
+            "href": "/analytics",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          }
+        ]
+      }
+    ],
+    "pied": [
+      "Réduire"
+    ],
+    "texteIntegral": "A\nAxion CRM Pro\nWW\nWorkspace ws-uui\nCONSOLE CRM\nPILOTAGE\nTableau de bord\nCouverture France\nCampagnes\nRuns de scraping\nDATA\nINTERNATIONAL\nMÉDIAS & PRESSE\nCOMMUNICATION\nIA\nCONFORMITÉ\nADMIN\nPHASE 2\nRéduire"
+  },
+  "cibles": [
+    {
+      "nom": "sidebar",
+      "present": true,
+      "visible": true,
+      "rect": {
+        "w": 260,
+        "h": 900
+      },
+      "parentUlHidden": false
+    },
+    {
+      "nom": "global-search",
+      "present": true,
+      "visible": true,
+      "rect": {
+        "w": 441,
+        "h": 34
+      },
+      "parentUlHidden": false
+    },
+    {
+      "nom": "nav-companies",
+      "present": true,
+      "visible": false,
+      "rect": {
+        "w": 0,
+        "h": 0
+      },
+      "parentUlHidden": true
+    },
+    {
+      "nom": "nav-dashboard",
+      "present": true,
+      "visible": true,
+      "rect": {
+        "w": 243,
+        "h": 32
+      },
+      "parentUlHidden": false
+    },
+    {
+      "nom": "dark-mode",
+      "present": true,
+      "visible": true,
+      "rect": {
+        "w": 81,
+        "h": 30
+      },
+      "parentUlHidden": false
+    },
+    {
+      "nom": "nav-settings",
+      "present": true,
+      "visible": false,
+      "rect": {
+        "w": 0,
+        "h": 0
+      },
+      "parentUlHidden": true
+    },
+    {
+      "nom": "nav-campaigns",
+      "present": true,
+      "visible": true,
+      "rect": {
+        "w": 243,
+        "h": 32
+      },
+      "parentUlHidden": false
+    }
+  ],
+  "compteursTdb": []
+}

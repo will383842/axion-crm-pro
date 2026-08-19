@@ -1,0 +1,44 @@
+=== bases ===
+                                                     List of databases
+         Name          | Owner | Encoding | Locale Provider | Collate | Ctype | ICU Locale | ICU Rules | Access privileges 
+-----------------------+-------+----------+-----------------+---------+-------+------------+-----------+-------------------
+ a07_fresh             | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm             | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_a           | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_a11         | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_a16         | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_a18         | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_agent14     | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_agent17     | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_audit13     | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_b           | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_c           | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_d           | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_dr_a08      | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_e           | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_e2e         | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_fresh       | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_perf        | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_perf4m      | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_rgpd15      | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_sh1         | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_sh2         | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_sh3         | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_test        | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_test_test_1 | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_test_test_2 | axion | UTF8     | libc            | C       | C     |            |           | 
+ postgres              | axion | UTF8     | libc            | C       | C     |            |           | 
+ template0             | axion | UTF8     | libc            | C       | C     |            |           | =c/axion         +
+                       |       |          |                 |         |       |            |           | axion=CTc/axion
+ template1             | axion | UTF8     | libc            | C       | C     |            |           | =c/axion         +
+                       |       |          |                 |         |       |            |           | axion=CTc/axion
+(28 rows)
+
+=== axion_crm : schema pg_partman ===
+partman
+=== axion_crm_test : schema pg_partman ===
+partman
+=== axion_crm_perf : schema pg_partman ===
+partman
+=== axion_crm_perf4m : schema pg_partman ===
+partman

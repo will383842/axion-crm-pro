@@ -1,0 +1,57 @@
+ candidates | activites_site | outbound | opt_out | sources | candidate_tag | companies_first_info | contacts_person_key 
+------------+----------------+----------+---------+---------+---------------+----------------------+---------------------
+          0 |              3 |        0 |       0 |      17 |             0 |                    0 |                   0
+(1 row)
+
+ contacts_total | avec_person_key | avec_email | avec_external_ref | avec_consent 
+----------------+-----------------+------------+-------------------+--------------
+        1319567 |               0 |     410481 |                 0 |            0
+(1 row)
+
+      kind       | count 
+-----------------+-------
+ form_submission |     3
+(1 row)
+
+ en_arbitrage 
+--------------
+           15
+(1 row)
+
+  id  |      kind       |      occurred_at       |                  external_ref                   
+------+-----------------+------------------------+-------------------------------------------------
+ 1203 | form_submission | 2026-08-19 03:25:47+00 | site:event:39f47c9c-009c-4a56-8d52-7df3d7a47bcf
+ 1202 | form_submission | 2026-08-18 02:13:07+00 | site:event:5707e4f5-ba10-4c97-82cf-c33f5b0619ce
+ 1197 | form_submission | 2026-08-16 15:21:08+00 | site:event:ec98d12b-4b9f-4580-a08b-1211604655fe
+(3 rows)
+
+ site_en_arbitrage | site_total 
+-------------------+------------
+                 3 |          3
+(1 row)
+
+ contacts_crees_depuis_le_site 
+-------------------------------
+                             0
+(1 row)
+
+ companies_avec_relation_type_non_defaut 
+-----------------------------------------
+                                       0
+(1 row)
+
+ tags_total | verrouilles | ns_src | candidat 
+------------+-------------+--------+----------
+        217 |          60 |     38 |       14
+(1 row)
+
+ company_tag_total | backfill_src 
+-------------------+--------------
+           7501969 |      4294895
+(1 row)
+
+ lifecycle_stage |  count  
+-----------------+---------
+ nouveau         | 4295349
+(1 row)
+

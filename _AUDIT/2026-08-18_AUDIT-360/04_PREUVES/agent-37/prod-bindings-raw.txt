@@ -1,0 +1,73 @@
+BIND LLMClient                    => App\Services\LLM\Mocks\MockLLMClient
+BIND ProxyProvider                => App\Services\Proxies\Mocks\MockProxyProvider
+BIND CaptchaSolver                => App\Services\Captcha\Mocks\MockCaptchaSolver
+BIND SmtpProber                   => App\Services\Smtp\Mocks\MockSmtpProber
+BIND InseeClient                  => App\Services\Insee\HttpInseeClient
+BIND AnnuaireEntreprisesClient    => App\Services\AnnuaireEntreprises\HttpAnnuaireEntreprisesClient
+BIND BodaccClient                 => App\Services\Bodacc\HttpBodaccClient
+BIND BanGeocoder                  => App\Services\Ban\HttpBanGeocoder
+BIND FranceTravailClient          => App\Services\FranceTravail\Mocks\MockFranceTravailClient
+BIND GoogleMapsScraper            => App\Services\Scraping\Mocks\MockGoogleMapsScraper
+BIND PagesJaunesScraper           => App\Services\Scraping\Mocks\MockPagesJaunesScraper
+BIND WebsiteScraper               => App\Services\Scraping\Mocks\MockWebsiteScraper
+BIND SearchEngine                 => App\Services\Scraping\Mocks\MockSearchEngine
+BIND DirectionFinder              => App\Services\Scraping\Mocks\MockDirectionFinder
+BIND APP_ENV=production MOCK_MODE=false configCached=true telescope.enabled=true
+[2026-08-19 13:15:59] production.ERROR: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "telescope_entries" does not exist
+LINE 1: insert into "telescope_entries" ("batch_id", "content", "cre...
+                    ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm, SQL: insert into "telescope_entries" ("batch_id", "content", "created_at", "family_hash", "type", "uuid") values (a28a0d84-20a2-47e5-ad44-c3c65d221403, {"command":"tinker","exit_code":0,"arguments":{"command":"tinker","include":[]},"options":{"execute":"$n=chr(92); $ns=\"App\".$n.\"Contracts\".$n; foreach ([\"LLMClient\",\"ProxyProvider\",\"CaptchaSolver\",\"SmtpProber\",\"InseeClient\",\"AnnuaireEntreprisesClient\",\"BodaccClient\",\"BanGeocoder\",\"FranceTravailClient\",\"GoogleMapsScraper\",\"PagesJaunesScraper\",\"WebsiteScraper\",\"SearchEngine\",\"DirectionFinder\"] as $c) { $f=$ns.$c; try { echo \"BIND \".str_pad($c,28).\" => \".get_class(app($f)).PHP_EOL; } catch (Throwable $e) { echo \"BIND \".str_pad($c,28).\" => ERR \".$e->getMessage().PHP_EOL; } } echo \"BIND APP_ENV=\".app()->environment().\" MOCK_MODE=\".var_export(env(\"MOCK_MODE\"),true).\" configCached=\".var_export(app()->configurationIsCached(),true).\" telescope.enabled=\".var_export(config(\"telescope.enabled\"),true).PHP_EOL;","help":false,"silent":false,"quiet":false,"verbose":false,"version":false,"ansi":null,"no-interaction":false,"env":null},"hostname":"cba3064024ca"}, 2026-08-19 13:15:59, ?, command, a28a0d84-1e88-435f-8cad-1aaf8e2febb5)) {"exception":"[object] (Illuminate\\Database\\QueryException(code: 42P01): SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation \"telescope_entries\" does not exist
+LINE 1: insert into \"telescope_entries\" (\"batch_id\", \"content\", \"cre...
+                    ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm, SQL: insert into \"telescope_entries\" (\"batch_id\", \"content\", \"created_at\", \"family_hash\", \"type\", \"uuid\") values (a28a0d84-20a2-47e5-ad44-c3c65d221403, {\"command\":\"tinker\",\"exit_code\":0,\"arguments\":{\"command\":\"tinker\",\"include\":[]},\"options\":{\"execute\":\"$n=chr(92); $ns=\\\"App\\\".$n.\\\"Contracts\\\".$n; foreach ([\\\"LLMClient\\\",\\\"ProxyProvider\\\",\\\"CaptchaSolver\\\",\\\"SmtpProber\\\",\\\"InseeClient\\\",\\\"AnnuaireEntreprisesClient\\\",\\\"BodaccClient\\\",\\\"BanGeocoder\\\",\\\"FranceTravailClient\\\",\\\"GoogleMapsScraper\\\",\\\"PagesJaunesScraper\\\",\\\"WebsiteScraper\\\",\\\"SearchEngine\\\",\\\"DirectionFinder\\\"] as $c) { $f=$ns.$c; try { echo \\\"BIND \\\".str_pad($c,28).\\\" => \\\".get_class(app($f)).PHP_EOL; } catch (Throwable $e) { echo \\\"BIND \\\".str_pad($c,28).\\\" => ERR \\\".$e->getMessage().PHP_EOL; } } echo \\\"BIND APP_ENV=\\\".app()->environment().\\\" MOCK_MODE=\\\".var_export(env(\\\"MOCK_MODE\\\"),true).\\\" configCached=\\\".var_export(app()->configurationIsCached(),true).\\\" telescope.enabled=\\\".var_export(config(\\\"telescope.enabled\\\"),true).PHP_EOL;\",\"help\":false,\"silent\":false,\"quiet\":false,\"verbose\":false,\"version\":false,\"ansi\":null,\"no-interaction\":false,\"env\":null},\"hostname\":\"cba3064024ca\"}, 2026-08-19 13:15:59, ?, command, a28a0d84-1e88-435f-8cad-1aaf8e2febb5)) at /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php:838)
+[stacktrace]
+#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(794): Illuminate\\Database\\Connection->runQueryCallback('insert into \"te...', Array, Object(Closure))
+#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(573): Illuminate\\Database\\Connection->run('insert into \"te...', Array, Object(Closure))
+#2 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(537): Illuminate\\Database\\Connection->statement('insert into \"te...', Array)
+#3 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php(4121): Illuminate\\Database\\Connection->insert('insert into \"te...', Array)
+#4 /var/www/html/vendor/laravel/telescope/src/Storage/DatabaseEntriesRepository.php(145): Illuminate\\Database\\Query\\Builder->insert(Array)
+#5 /var/www/html/vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php(275): Laravel\\Telescope\\Storage\\DatabaseEntriesRepository->Laravel\\Telescope\\Storage\\{closure}(Object(Illuminate\\Support\\Collection), 0)
+#6 /var/www/html/vendor/laravel/telescope/src/Storage/DatabaseEntriesRepository.php(144): Illuminate\\Support\\Collection->each(Object(Closure))
+#7 /var/www/html/vendor/laravel/telescope/src/Telescope.php(671): Laravel\\Telescope\\Storage\\DatabaseEntriesRepository->store(Object(Illuminate\\Support\\Collection))
+#8 [internal function]: Laravel\\Telescope\\Telescope::Laravel\\Telescope\\{closure}()
+#9 /var/www/html/vendor/laravel/telescope/src/Telescope.php(296): call_user_func(Object(Closure))
+#10 /var/www/html/vendor/laravel/telescope/src/Telescope.php(663): Laravel\\Telescope\\Telescope::withoutRecording(Object(Closure))
+#11 /var/www/html/vendor/laravel/telescope/src/ListensForStorageOpportunities.php(65): Laravel\\Telescope\\Telescope::store(Object(Laravel\\Telescope\\Storage\\DatabaseEntriesRepository))
+#12 /var/www/html/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(36): Laravel\\Telescope\\Telescope::Laravel\\Telescope\\{closure}()
+#13 /var/www/html/vendor/laravel/framework/src/Illuminate/Container/Util.php(43): Illuminate\\Container\\BoundMethod::Illuminate\\Container\\{closure}()
+#14 /var/www/html/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(84): Illuminate\\Container\\Util::unwrapIfClosure(Object(Closure))
+#15 /var/www/html/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(35): Illuminate\\Container\\BoundMethod::callBoundMethod(Object(Illuminate\\Foundation\\Application), Object(Closure), Object(Closure))
+#16 /var/www/html/vendor/laravel/framework/src/Illuminate/Container/Container.php(799): Illuminate\\Container\\BoundMethod::call(Object(Illuminate\\Foundation\\Application), Object(Closure), Array, NULL)
+#17 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1466): Illuminate\\Container\\Container->call(Object(Closure))
+#18 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(219): Illuminate\\Foundation\\Application->terminate()
+#19 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1240): Illuminate\\Foundation\\Console\\Kernel->terminate(Object(Symfony\\Component\\Console\\Input\\ArgvInput), 0)
+#20 /var/www/html/artisan(12): Illuminate\\Foundation\\Application->handleCommand(Object(Symfony\\Component\\Console\\Input\\ArgvInput))
+#21 {main}
+
+[previous exception] [object] (PDOException(code: 42P01): SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation \"telescope_entries\" does not exist
+LINE 1: insert into \"telescope_entries\" (\"batch_id\", \"content\", \"cre...
+                    ^ at /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php:584)
+[stacktrace]
+#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(584): PDOStatement->execute()
+#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(827): Illuminate\\Database\\Connection->Illuminate\\Database\\{closure}('insert into \"te...', Array)
+#2 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(794): Illuminate\\Database\\Connection->runQueryCallback('insert into \"te...', Array, Object(Closure))
+#3 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(573): Illuminate\\Database\\Connection->run('insert into \"te...', Array, Object(Closure))
+#4 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(537): Illuminate\\Database\\Connection->statement('insert into \"te...', Array)
+#5 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php(4121): Illuminate\\Database\\Connection->insert('insert into \"te...', Array)
+#6 /var/www/html/vendor/laravel/telescope/src/Storage/DatabaseEntriesRepository.php(145): Illuminate\\Database\\Query\\Builder->insert(Array)
+#7 /var/www/html/vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php(275): Laravel\\Telescope\\Storage\\DatabaseEntriesRepository->Laravel\\Telescope\\Storage\\{closure}(Object(Illuminate\\Support\\Collection), 0)
+#8 /var/www/html/vendor/laravel/telescope/src/Storage/DatabaseEntriesRepository.php(144): Illuminate\\Support\\Collection->each(Object(Closure))
+#9 /var/www/html/vendor/laravel/telescope/src/Telescope.php(671): Laravel\\Telescope\\Storage\\DatabaseEntriesRepository->store(Object(Illuminate\\Support\\Collection))
+#10 [internal function]: Laravel\\Telescope\\Telescope::Laravel\\Telescope\\{closure}()
+#11 /var/www/html/vendor/laravel/telescope/src/Telescope.php(296): call_user_func(Object(Closure))
+#12 /var/www/html/vendor/laravel/telescope/src/Telescope.php(663): Laravel\\Telescope\\Telescope::withoutRecording(Object(Closure))
+#13 /var/www/html/vendor/laravel/telescope/src/ListensForStorageOpportunities.php(65): Laravel\\Telescope\\Telescope::store(Object(Laravel\\Telescope\\Storage\\DatabaseEntriesRepository))
+#14 /var/www/html/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(36): Laravel\\Telescope\\Telescope::Laravel\\Telescope\\{closure}()
+#15 /var/www/html/vendor/laravel/framework/src/Illuminate/Container/Util.php(43): Illuminate\\Container\\BoundMethod::Illuminate\\Container\\{closure}()
+#16 /var/www/html/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(84): Illuminate\\Container\\Util::unwrapIfClosure(Object(Closure))
+#17 /var/www/html/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(35): Illuminate\\Container\\BoundMethod::callBoundMethod(Object(Illuminate\\Foundation\\Application), Object(Closure), Object(Closure))
+#18 /var/www/html/vendor/laravel/framework/src/Illuminate/Container/Container.php(799): Illuminate\\Container\\BoundMethod::call(Object(Illuminate\\Foundation\\Application), Object(Closure), Array, NULL)
+#19 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1466): Illuminate\\Container\\Container->call(Object(Closure))
+#20 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(219): Illuminate\\Foundation\\Application->terminate()
+#21 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1240): Illuminate\\Foundation\\Console\\Kernel->terminate(Object(Symfony\\Component\\Console\\Input\\ArgvInput), 0)
+#22 /var/www/html/artisan(12): Illuminate\\Foundation\\Application->handleCommand(Object(Symfony\\Component\\Console\\Input\\ArgvInput))
+#23 {main}
+"} 

@@ -1,0 +1,34 @@
+########## 1. ATELIER LOCAL — axion-crm-pro (doit ROUGIR)
+=== commandes du processus 1 des conteneurs de « axion-crm-pro » ===
+  a36-api                          :: php -S 0.0.0.0:80 -t public 
+      ⚠️ php -S avec PHP_CLI_SERVER_WORKERS=10 — atténué, mais toujours le serveur de développement
+  a45                              :: sleep infinity 
+  a06-pest2                        :: php ./vendor/bin/pest tests/Feature/NeDoitPasRegresserTest.php tests/Feature/EtancheiteParTableTest.php tests/Feature/RlsTest.php tests/Feature/PasDeStub501SousCrmEtAnalyticsTest.php 
+  a35-api                          :: php -S 0.0.0.0:80 -t public 
+      🔴 php -S SANS PHP_CLI_SERVER_WORKERS — une requête à la fois
+  axion-crm-horizon                :: php artisan horizon 
+  axion-crm-scheduler              :: php artisan schedule:work 
+  axion-crm-app                    :: caddy run --config /etc/caddy/Caddyfile --adapter caddyfile 
+  axion-crm-api                    :: php -S 0.0.0.0:80 -t public 
+      🔴 php -S SANS PHP_CLI_SERVER_WORKERS — une requête à la fois
+  axion-crm-caddy                  :: caddy run --config /etc/caddy/Caddyfile --adapter caddyfile 
+  axion-crm-redis                  :: redis-server *:6379                                                                           
+  axion-crm-postgres               :: postgres 
+
+Conteneurs qui servent HTTP : a36-api a35-api axion-crm-app axion-crm-api axion-crm-caddy
+
+ÉCHEC : ces conteneurs servent HTTP par le serveur de développement de PHP : a36-api a35-api axion-crm-api
+
+  « php -S » traite UNE requête à la fois (sauf PHP_CLI_SERVER_WORKERS).
+  Mesuré sur la production le 2026-08-19 : 50 requêtes simultanées sur
+  /up → 1,075 s au total, 0,882 s de latence maximale, contre 0,018 s
+  pour la même requête seule. Constat A-010.
+
+  Correctif de fond — php-fpm est DÉJÀ dans l'image (/usr/local/sbin/php-fpm,
+  PHP 8.3.33 fpm-fcgi), il n'est simplement jamais lancé :
+    · Dockerfile.laravel, cible prod : CMD ["php-fpm"]
+    · php-fpm.d : listen = 0.0.0.0:9000 et pm.max_children ≥ 20
+      (le défaut de l'image est 5 : insuffisant pour dix sessions)
+    · Caddyfile : reverse_proxy api:9000 { transport fastcgi { root /var/www/html/public } }
+    · le healthcheck curl http://localhost/up doit devenir un test fastcgi
+

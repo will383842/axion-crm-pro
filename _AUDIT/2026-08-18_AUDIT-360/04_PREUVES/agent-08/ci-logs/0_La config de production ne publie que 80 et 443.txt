@@ -1,0 +1,200 @@
+﻿2026-08-19T09:42:46.7935419Z Current runner version: '2.336.0'
+2026-08-19T09:42:46.7965713Z ##[group]Runner Image Provisioner
+2026-08-19T09:42:46.7967081Z Hosted Compute Agent
+2026-08-19T09:42:46.7968206Z Version: 20260729.566
+2026-08-19T09:42:46.7969326Z Commit: cf7153fe6e25b664e8693c24944bf2b00355d109
+2026-08-19T09:42:46.7970577Z Build Date: 2026-07-29T19:17:02Z
+2026-08-19T09:42:46.7971852Z Worker ID: {290ce4eb-c550-48ff-9c87-1fd115ae00f4}
+2026-08-19T09:42:46.7973278Z Azure Region: westus2
+2026-08-19T09:42:46.7974259Z ##[endgroup]
+2026-08-19T09:42:46.7976366Z ##[group]Operating System
+2026-08-19T09:42:46.7977019Z Ubuntu
+2026-08-19T09:42:46.7977610Z 24.04.4
+2026-08-19T09:42:46.7978175Z LTS
+2026-08-19T09:42:46.7978687Z ##[endgroup]
+2026-08-19T09:42:46.7979277Z ##[group]Runner Image
+2026-08-19T09:42:46.7979891Z Image: ubuntu-24.04
+2026-08-19T09:42:46.7980439Z Version: 20260810.271.1
+2026-08-19T09:42:46.7981771Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260810.271/images/ubuntu/Ubuntu2404-Readme.md
+2026-08-19T09:42:46.7983355Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260810.271
+2026-08-19T09:42:46.7984587Z ##[endgroup]
+2026-08-19T09:42:46.7985833Z ##[group]GITHUB_TOKEN Permissions
+2026-08-19T09:42:46.7988012Z Contents: read
+2026-08-19T09:42:46.7988653Z Metadata: read
+2026-08-19T09:42:46.7989334Z Packages: read
+2026-08-19T09:42:46.7989846Z ##[endgroup]
+2026-08-19T09:42:46.7992308Z Secret source: Actions
+2026-08-19T09:42:46.7993614Z Prepare workflow directory
+2026-08-19T09:42:46.8331022Z Prepare all required actions
+2026-08-19T09:42:46.8380593Z Getting action download info
+2026-08-19T09:42:47.2141596Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-08-19T09:42:47.4712850Z Complete job name: La config de production ne publie que 80 et 443
+2026-08-19T09:42:47.5487191Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-19T09:42:47.5496191Z ##[group]Run actions/checkout@v4
+2026-08-19T09:42:47.5496940Z with:
+2026-08-19T09:42:47.5497398Z   repository: will383842/axion-crm-pro
+2026-08-19T09:42:47.5500999Z   token: ***
+2026-08-19T09:42:47.5501443Z   ssh-strict: true
+2026-08-19T09:42:47.5501888Z   ssh-user: git
+2026-08-19T09:42:47.5502344Z   persist-credentials: true
+2026-08-19T09:42:47.5502835Z   clean: true
+2026-08-19T09:42:47.5503286Z   sparse-checkout-cone-mode: true
+2026-08-19T09:42:47.5503817Z   fetch-depth: 1
+2026-08-19T09:42:47.5504503Z   fetch-tags: false
+2026-08-19T09:42:47.5504973Z   show-progress: true
+2026-08-19T09:42:47.5505427Z   lfs: false
+2026-08-19T09:42:47.5505889Z   submodules: false
+2026-08-19T09:42:47.5506353Z   set-safe-directory: true
+2026-08-19T09:42:47.5506870Z   allow-unsafe-pr-checkout: false
+2026-08-19T09:42:47.5507791Z ##[endgroup]
+2026-08-19T09:42:47.6635121Z Syncing repository: will383842/axion-crm-pro
+2026-08-19T09:42:47.6637300Z ##[group]Getting Git version info
+2026-08-19T09:42:47.6638122Z Working directory is '/home/runner/work/axion-crm-pro/axion-crm-pro'
+2026-08-19T09:42:47.6678553Z [command]/usr/bin/git version
+2026-08-19T09:42:47.6832964Z git version 2.54.0
+2026-08-19T09:42:47.6895363Z ##[endgroup]
+2026-08-19T09:42:47.6913179Z Temporarily overriding HOME='/home/runner/work/_temp/22472e58-cc57-479c-a349-f500ab07fe4e' before making global git config changes
+2026-08-19T09:42:47.6915880Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-19T09:42:47.6919873Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/axion-crm-pro/axion-crm-pro
+2026-08-19T09:42:47.6992034Z Deleting the contents of '/home/runner/work/axion-crm-pro/axion-crm-pro'
+2026-08-19T09:42:47.6999440Z ##[group]Initializing the repository
+2026-08-19T09:42:47.7006965Z [command]/usr/bin/git init /home/runner/work/axion-crm-pro/axion-crm-pro
+2026-08-19T09:42:47.7157369Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-08-19T09:42:47.7162182Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-08-19T09:42:47.7164260Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-08-19T09:42:47.7166676Z hint: call:
+2026-08-19T09:42:47.7168340Z hint:
+2026-08-19T09:42:47.7169672Z hint: 	git config --global init.defaultBranch <name>
+2026-08-19T09:42:47.7170918Z hint:
+2026-08-19T09:42:47.7172293Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-08-19T09:42:47.7173561Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-08-19T09:42:47.7174895Z hint:
+2026-08-19T09:42:47.7175588Z hint: 	git branch -m <name>
+2026-08-19T09:42:47.7176334Z hint:
+2026-08-19T09:42:47.7177492Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-08-19T09:42:47.7179430Z Initialized empty Git repository in /home/runner/work/axion-crm-pro/axion-crm-pro/.git/
+2026-08-19T09:42:47.7195804Z [command]/usr/bin/git remote add origin https://github.com/will383842/axion-crm-pro
+2026-08-19T09:42:47.7277123Z ##[endgroup]
+2026-08-19T09:42:47.7278455Z ##[group]Disabling automatic garbage collection
+2026-08-19T09:42:47.7281336Z [command]/usr/bin/git config --local gc.auto 0
+2026-08-19T09:42:47.7359645Z ##[endgroup]
+2026-08-19T09:42:47.7361700Z ##[group]Setting up auth
+2026-08-19T09:42:47.7363063Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-08-19T09:42:47.7422984Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-08-19T09:42:47.8004232Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-19T09:42:47.8057337Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-08-19T09:42:47.8374552Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-19T09:42:47.8431269Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-08-19T09:42:47.8750492Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-08-19T09:42:47.8820186Z ##[endgroup]
+2026-08-19T09:42:47.8821666Z ##[group]Fetching the repository
+2026-08-19T09:42:47.8840401Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +a3369040168b75612b1e3882adecd13d49fde737:refs/remotes/pull/188/merge
+2026-08-19T09:42:48.7819184Z From https://github.com/will383842/axion-crm-pro
+2026-08-19T09:42:48.7820644Z  * [new ref]         a3369040168b75612b1e3882adecd13d49fde737 -> pull/188/merge
+2026-08-19T09:42:48.7871429Z ##[endgroup]
+2026-08-19T09:42:48.7872610Z ##[group]Determining the checkout info
+2026-08-19T09:42:48.7874043Z ##[endgroup]
+2026-08-19T09:42:48.7881373Z [command]/usr/bin/git sparse-checkout disable
+2026-08-19T09:42:48.7946875Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-08-19T09:42:48.8002189Z ##[group]Checking out the ref
+2026-08-19T09:42:48.8008835Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/188/merge
+2026-08-19T09:42:48.9385140Z Note: switching to 'refs/remotes/pull/188/merge'.
+2026-08-19T09:42:48.9385920Z 
+2026-08-19T09:42:48.9386425Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-08-19T09:42:48.9387502Z changes and commit them, and you can discard any commits you make in this
+2026-08-19T09:42:48.9388526Z state without impacting any branches by switching back to a branch.
+2026-08-19T09:42:48.9389153Z 
+2026-08-19T09:42:48.9389574Z If you want to create a new branch to retain commits you create, you may
+2026-08-19T09:42:48.9390908Z do so (now or later) by using -c with the switch command. Example:
+2026-08-19T09:42:48.9391451Z 
+2026-08-19T09:42:48.9391689Z   git switch -c <new-branch-name>
+2026-08-19T09:42:48.9392107Z 
+2026-08-19T09:42:48.9392339Z Or undo this operation with:
+2026-08-19T09:42:48.9392682Z 
+2026-08-19T09:42:48.9392872Z   git switch -
+2026-08-19T09:42:48.9393193Z 
+2026-08-19T09:42:48.9393634Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-08-19T09:42:48.9394502Z 
+2026-08-19T09:42:48.9394990Z HEAD is now at a336904 Merge bb60473dce8b29de40c94781c3a30ebf11224d1e into b53338cd6ba50d7f9e18557e2a725a5f00fe15db
+2026-08-19T09:42:48.9400595Z ##[endgroup]
+2026-08-19T09:42:48.9457933Z [command]/usr/bin/git log -1 --format=%H
+2026-08-19T09:42:48.9493137Z a3369040168b75612b1e3882adecd13d49fde737
+2026-08-19T09:42:48.9767460Z ##[group]Run set -euo pipefail
+2026-08-19T09:42:48.9768043Z [36;1mset -euo pipefail[0m
+2026-08-19T09:42:48.9768558Z [36;1m# `config` exige un `.env` présent (env_file du service api).[0m
+2026-08-19T09:42:48.9769054Z [36;1mcp .env.example .env[0m
+2026-08-19T09:42:48.9769625Z [36;1mdocker compose -f docker-compose.yml -f docker-compose.prod.yml config > /tmp/merged.yml[0m
+2026-08-19T09:42:48.9770208Z [36;1m[0m
+2026-08-19T09:42:48.9770604Z [36;1mecho "::group::configuration fusionnée — publications de ports"[0m
+2026-08-19T09:42:48.9771214Z [36;1mgrep -n 'published:' /tmp/merged.yml || echo '(aucune)'[0m
+2026-08-19T09:42:48.9771669Z [36;1mecho "::endgroup::"[0m
+2026-08-19T09:42:48.9771988Z [36;1m[0m
+2026-08-19T09:42:48.9772430Z [36;1m# ⚠️ Extraction FAIL-CLOSED. La première version de ce job utilisait[0m
+2026-08-19T09:42:48.9773075Z [36;1m# `grep -oP … || true` : le jour où `grep -P` n'est pas disponible (ou[0m
+2026-08-19T09:42:48.9773779Z [36;1m# échoue sur la locale), la liste ressortait VIDE et le job passait[0m
+2026-08-19T09:42:48.9774595Z [36;1m# VERT sans avoir rien mesuré. Un contrôle qui réussit quand il ne[0m
+2026-08-19T09:42:48.9775254Z [36;1m# peut pas mesurer ne contrôle rien. Constaté en le rejouant à la main[0m
+2026-08-19T09:42:48.9775767Z [36;1m# le 2026-08-19.[0m
+2026-08-19T09:42:48.9776328Z [36;1mpublies="$(awk -F'published: ' '/published: /{gsub(/"/,"",$2); print $2}' /tmp/merged.yml | sort -u)"[0m
+2026-08-19T09:42:48.9776981Z [36;1mecho "Ports publiés : ${publies:-aucun}"[0m
+2026-08-19T09:42:48.9777378Z [36;1m[0m
+2026-08-19T09:42:48.9777776Z [36;1m# TÉMOIN POSITIF — l'extraction a-t-elle seulement fonctionné ?[0m
+2026-08-19T09:42:48.9778396Z [36;1m# La production publie forcément 80 et 443 (Caddy). Si on ne les[0m
+2026-08-19T09:42:48.9778993Z [36;1m# trouve pas, ce n'est pas que tout va bien : c'est que la mesure est[0m
+2026-08-19T09:42:48.9779533Z [36;1m# cassée. On échoue plutôt que de rassurer.[0m
+2026-08-19T09:42:48.9779982Z [36;1mfor attendu in 80 443; do[0m
+2026-08-19T09:42:48.9780392Z [36;1m  if ! echo "$publies" | grep -qx "$attendu"; then[0m
+2026-08-19T09:42:48.9781038Z [36;1m    echo "::error::Témoin positif en échec : le port $attendu (Caddy) n'a PAS été trouvé."[0m
+2026-08-19T09:42:48.9781787Z [36;1m    echo "::error::L'extraction des ports ne fonctionne pas — ce job ne mesure rien."[0m
+2026-08-19T09:42:48.9782502Z [36;1m    echo "::error::Corriger l'extraction avant de croire un résultat vert."[0m
+2026-08-19T09:42:48.9783004Z [36;1m    exit 1[0m
+2026-08-19T09:42:48.9783286Z [36;1m  fi[0m
+2026-08-19T09:42:48.9783549Z [36;1mdone[0m
+2026-08-19T09:42:48.9783821Z [36;1m[0m
+2026-08-19T09:42:48.9784248Z [36;1m# Liste FERMÉE. Publier un port de plus en production est une décision[0m
+2026-08-19T09:42:48.9785424Z [36;1m# d'EXPOSITION : elle doit passer par une modification explicite de ce[0m
+2026-08-19T09:42:48.9785995Z [36;1m# job, jamais se glisser dans un overlay.[0m
+2026-08-19T09:42:48.9786422Z [36;1minattendus=""[0m
+2026-08-19T09:42:48.9786754Z [36;1mfor port in $publies; do[0m
+2026-08-19T09:42:48.9787427Z [36;1m  case "$port" in[0m
+2026-08-19T09:42:48.9787747Z [36;1m    80|443) ;;[0m
+2026-08-19T09:42:48.9788090Z [36;1m    *) inattendus="$inattendus $port" ;;[0m
+2026-08-19T09:42:48.9788474Z [36;1m  esac[0m
+2026-08-19T09:42:48.9788748Z [36;1mdone[0m
+2026-08-19T09:42:48.9789016Z [36;1m[0m
+2026-08-19T09:42:48.9789296Z [36;1mif [ -n "$inattendus" ]; then[0m
+2026-08-19T09:42:48.9789900Z [36;1m  echo "::error::La configuration de PRODUCTION publie des ports non autorisés :$inattendus"[0m
+2026-08-19T09:42:48.9790745Z [36;1m  echo "::error::Un port publié écoute sur 0.0.0.0, et Docker insère ses règles iptables AVANT ufw :"[0m
+2026-08-19T09:42:48.9791564Z [36;1m  echo "::error::le pare-feu annoncera « fermé » pendant que le port répondra depuis internet."[0m
+2026-08-19T09:42:48.9792332Z [36;1m  echo "::error::Fermer avec « ports: !override [] » dans docker-compose.prod.yml,"[0m
+2026-08-19T09:42:48.9793342Z [36;1m  echo "::error::ou, si l'exposition est VOULUE, l'ajouter explicitement à la liste de ce job."[0m
+2026-08-19T09:42:48.9794014Z [36;1m  exit 1[0m
+2026-08-19T09:42:48.9794493Z [36;1mfi[0m
+2026-08-19T09:42:48.9794937Z [36;1m[0m
+2026-08-19T09:42:48.9795370Z [36;1mecho "OK — seuls 80 et 443 sont publiés par la configuration de production."[0m
+2026-08-19T09:42:48.9842896Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:42:48.9843365Z ##[endgroup]
+2026-08-19T09:42:49.5589552Z ##[group]configuration fusionnée — publications de ports
+2026-08-19T09:42:49.5603496Z 179:        published: "80"
+2026-08-19T09:42:49.5604135Z 183:        published: "443"
+2026-08-19T09:42:49.5606992Z ##[endgroup]
+2026-08-19T09:42:49.5645586Z Ports publiés : 443
+2026-08-19T09:42:49.5646235Z 80
+2026-08-19T09:42:49.5683745Z OK — seuls 80 et 443 sont publiés par la configuration de production.
+2026-08-19T09:42:49.5935373Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-19T09:42:49.5938268Z Post job cleanup.
+2026-08-19T09:42:49.6859868Z [command]/usr/bin/git version
+2026-08-19T09:42:49.6940223Z git version 2.54.0
+2026-08-19T09:42:49.6984613Z Temporarily overriding HOME='/home/runner/work/_temp/9ceb87dc-b951-44e9-8483-3b4a63ed090c' before making global git config changes
+2026-08-19T09:42:49.6986120Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-19T09:42:49.6992454Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/axion-crm-pro/axion-crm-pro
+2026-08-19T09:42:49.7038747Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-08-19T09:42:49.7081272Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-08-19T09:42:49.7350843Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-19T09:42:49.7387429Z http.https://github.com/.extraheader
+2026-08-19T09:42:49.7403212Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-08-19T09:42:49.7437253Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-08-19T09:42:49.7710430Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-19T09:42:49.7760910Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-08-19T09:42:49.8173502Z Cleaning up orphan processes
+2026-08-19T09:42:49.8504646Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

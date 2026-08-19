@@ -1,0 +1,84 @@
+===== axion-crm-postgres =====
+restart      = unless-stopped (max=0)
+extra_hosts  = []
+ports_pub    = map[]
+image        = ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman
+created      = 2026-08-19T06:12:15.058385661Z
+started      = 2026-08-19T06:12:15.421788117Z
+healthcheck  = [CMD-SHELL pg_isready -U axion -d axion_crm]
+cmd          = [postgres]
+binds        = [axion-crm-pro_postgres-data:/var/lib/postgresql/data:rw /opt/axion-crm-pro/infra/postgres/init:/docker-entrypoint-initdb.d:ro]
+compose_conf = /opt/axion-crm-pro/docker-compose.yml,/opt/axion-crm-pro/docker-compose.prod.yml
+compose_svc  = postgres
+===== axion-crm-redis =====
+restart      = unless-stopped (max=0)
+extra_hosts  = []
+ports_pub    = map[]
+image        = redis:7.2-alpine
+created      = 2026-08-19T06:12:15.024867561Z
+started      = 2026-08-19T06:12:15.420462331Z
+healthcheck  = [CMD redis-cli ping]
+cmd          = [redis-server --appendonly yes --save 60 1000 --maxmemory 256mb --maxmemory-policy allkeys-lru]
+binds        = [axion-crm-pro_redis-data:/data:rw]
+compose_conf = /opt/axion-crm-pro/docker-compose.yml,/opt/axion-crm-pro/docker-compose.prod.yml
+compose_svc  = redis
+===== axion-crm-caddy =====
+restart      = unless-stopped (max=0)
+extra_hosts  = [host.docker.internal:host-gateway]
+ports_pub    = map[80/tcp:[{invalid IP 80}] 443/tcp:[{invalid IP 443}]]
+image        = caddy:2-alpine
+created      = 2026-08-19T08:05:07.752447918Z
+started      = 2026-08-19T08:05:08.432462918Z
+healthcheck  = AUCUN
+cmd          = [caddy run --config /etc/caddy/Caddyfile --adapter caddyfile]
+binds        = [axion-crm-pro_caddy-config:/config:rw /opt/axion-crm-pro/infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro axion-crm-pro_caddy-data:/data:rw]
+compose_conf = /opt/axion-crm-pro/docker-compose.yml,/opt/axion-crm-pro/docker-compose.prod.yml
+compose_svc  = caddy
+===== axion-crm-api =====
+restart      = unless-stopped (max=0)
+extra_hosts  = []
+ports_pub    = map[]
+image        = axion-crm-pro-api
+created      = 2026-08-19T10:10:20.726732177Z
+started      = 2026-08-19T10:10:31.20108575Z
+healthcheck  = [CMD-SHELL curl -fsS http://localhost/up || exit 1]
+cmd          = [php -S 0.0.0.0:80 -t public]
+binds        = [axion-crm-pro_api-storage:/var/www/html/storage:rw]
+compose_conf = /opt/axion-crm-pro/docker-compose.yml,/opt/axion-crm-pro/docker-compose.prod.yml
+compose_svc  = api
+===== axion-crm-app =====
+restart      = unless-stopped (max=0)
+extra_hosts  = []
+ports_pub    = map[]
+image        = axion-crm-pro-app
+created      = 2026-08-19T10:10:20.62293315Z
+started      = 2026-08-19T10:10:31.1980407Z
+healthcheck  = [CMD-SHELL wget -qO- http://localhost:5173/ || exit 1]
+cmd          = [caddy run --config /etc/caddy/Caddyfile --adapter caddyfile]
+binds        = []
+compose_conf = /opt/axion-crm-pro/docker-compose.yml,/opt/axion-crm-pro/docker-compose.prod.yml
+compose_svc  = app
+===== axion-crm-horizon =====
+restart      = unless-stopped (max=0)
+extra_hosts  = []
+ports_pub    = map[]
+image        = axion-crm-pro-horizon
+created      = 2026-08-19T10:10:20.718014128Z
+started      = 2026-08-19T10:10:31.193571254Z
+healthcheck  = [CMD-SHELL php artisan horizon:status | grep -q running || exit 1]
+cmd          = [php artisan horizon]
+binds        = [axion-crm-pro_api-storage:/var/www/html/storage:rw]
+compose_conf = /opt/axion-crm-pro/docker-compose.yml,/opt/axion-crm-pro/docker-compose.prod.yml
+compose_svc  = horizon
+===== axion-crm-scheduler =====
+restart      = unless-stopped (max=0)
+extra_hosts  = []
+ports_pub    = map[]
+image        = axion-crm-pro-scheduler
+created      = 2026-08-19T10:10:20.725204474Z
+started      = 2026-08-19T10:10:31.19676659Z
+healthcheck  = [NONE]
+cmd          = [php artisan schedule:work]
+binds        = [axion-crm-pro_api-storage:/var/www/html/storage:rw]
+compose_conf = /opt/axion-crm-pro/docker-compose.yml,/opt/axion-crm-pro/docker-compose.prod.yml
+compose_svc  = scheduler

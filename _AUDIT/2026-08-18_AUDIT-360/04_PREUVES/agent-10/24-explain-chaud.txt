@@ -1,0 +1,9 @@
+ Execution Time: 932.245 ms
+ Execution Time: 1228.983 ms
+ Execution Time: 878.086 ms
+=== taille totale des index vs tas (perf4m) ===
+  tas   | index_total 
+--------+-------------
+ 624 MB | 1491 MB
+(1 row)
+

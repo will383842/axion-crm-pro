@@ -1,0 +1,106 @@
+
+   INFO  Running scheduled tasks.  
+
+  2026-08-19 11:32:27 Running ['artisan' campaigns:start-scheduled]  15 s DONE
+  ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+
+  2026-08-19 11:33:10 Running ['artisan' campaigns:start-scheduled]  20 s DONE
+  ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+
+  2026-08-19 11:34:09 Running ['artisan' campaigns:start-scheduled]  14 s DONE
+  ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+
+  2026-08-19 11:35:11 Running ['artisan' campaigns:start-scheduled]  14 s DONE
+  ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+
+  2026-08-19 11:36:12 Running ['artisan' campaigns:start-scheduled]  14 s DONE
+  ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+
+  2026-08-19 11:37:18 Running ['artisan' campaigns:start-scheduled]  18 s DONE
+  ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+
+  2026-08-19 11:38:12 Running ['artisan' campaigns:start-scheduled]  14 s DONE
+  ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+
+  2026-08-19 11:39:24 Running ['artisan' campaigns:start-scheduled]  26 s DONE
+  ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+
+  2026-08-19 11:40:34 Running ['artisan' campaigns:start-scheduled]  41 s DONE
+  ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+
+  2026-08-19 11:41:28 Running ['artisan' campaigns:start-scheduled]  13 s DONE
+  ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+
+  2026-08-19 11:42:12 Running ['artisan' campaigns:start-scheduled]  14 s DONE
+  ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+
+  2026-08-19 11:43:13 Running ['artisan' campaigns:start-scheduled]  13 s DONE
+  ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+
+  2026-08-19 11:44:13 Running ['artisan' campaigns:start-scheduled]  14 s DONE
+  ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+
+  2026-08-19 11:45:13 Running ['artisan' anomaly:detect] ........... 14 s DONE
+  ⇂ '/usr/local/bin/php' 'artisan' anomaly:detect > '/dev/null' 2>&1  
+  2026-08-19 11:45:28 Running ['artisan' campaigns:start-scheduled]  15 s DONE
+  ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+  2026-08-19 11:46:13 Running ['artisan' campaigns:start-scheduled]  15 s DONE
+  ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+
+  2026-08-19 11:47:17 Running ['artisan' campaigns:start-scheduled]  18 s DONE
+  ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+
+  2026-08-19 11:48:41 Running ['artisan' campaigns:start-scheduled]  26 s DONE
+  ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+
+  2026-08-19 11:49:25 Running ['artisan' campaigns:start-scheduled]  1 min 43 s DONE
+  ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+
+  2026-08-19 11:53:11 Running ['artisan' campaigns:start-scheduled]    INFO  No scheduled commands are ready to run.  
+
+   INFO  No scheduled commands are ready to run.  
+
+   INFO  No scheduled commands are ready to run.  
+
+ 3 min 43 s DONE
+  ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+
+  2026-08-19 11:57:18 Running ['artisan' campaigns:start-scheduled]    INFO  No scheduled commands are ready to run.  
+
+   INFO  No scheduled commands are ready to run.  
+
+   INFO  No scheduled commands are ready to run.  
+
+ 3 min 53 s DONE
+  2026-08-19 12:01:17 Running ['artisan' campaigns:start-scheduled]   ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+
+   INFO  No scheduled commands are ready to run.  
+
+   INFO  No scheduled commands are ready to run.  
+
+ 3 min 53 s DONE
+  2026-08-19 12:05:17 Running ['artisan' campaigns:start-scheduled]   ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+
+   INFO  No scheduled commands are ready to run.  
+
+   INFO  No scheduled commands are ready to run.  
+
+   INFO  No scheduled commands are ready to run.  
+
+   INFO  No scheduled commands are ready to run.  
+
+ 5 min 41 s DONE
+  ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+  2026-08-19 12:11:29 Running ['artisan' campaigns:start-scheduled]    INFO  No scheduled commands are ready to run.  
+
+   INFO  No scheduled commands are ready to run.  
+
+   INFO  No scheduled commands are ready to run.  
+
+  2026-08-19 12:15:05 Running ['artisan' anomaly:detect]    INFO  No scheduled commands are ready to run.  
+
+ 6 min 12 s DONE
+  2026-08-19 12:17:55 Running ['artisan' campaigns:start-scheduled]   ⇂ '/usr/local/bin/php' 'artisan' campaigns:start-scheduled > '/dev/null' 2>&1  
+
+   INFO  No scheduled commands are ready to run.  
+

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         bootstrap="/tmp/a35/bootstrap.php"
+         colors="false"
+         cacheDirectory="/tmp/a35/.cache"
+         failOnRisky="false"
+         failOnWarning="false"
+         failOnDeprecation="false"
+         beStrictAboutOutputDuringTests="false">
+    <testsuites>
+        <testsuite name="A35">
+            <directory>/tmp/a35/tests</directory>
+        </testsuite>
+    </testsuites>
+    <php>
+        <env name="APP_ENV" value="testing" force="true"/>
+        <env name="APP_KEY" value="base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="/>
+        <env name="MOCK_MODE" value="true"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
+        <env name="DB_CONNECTION" value="pgsql" force="true"/>
+        <env name="DB_DATABASE" value="axion_crm_test_a35" force="true"/>
+        <env name="DB_TIMEZONE" value="Europe/Paris"/>
+        <env name="DB_APP_USERNAME" value="axion_app"/>
+        <env name="DB_APP_PASSWORD" value="axion_app_test_only"/>
+        <env name="SESSION_DRIVER" value="database" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="PULSE_ENABLED" value="false"/>
+        <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="SANCTUM_STATEFUL_DOMAINS" value="localhost,app.localhost,127.0.0.1" force="true"/>
+    </php>
+</phpunit>

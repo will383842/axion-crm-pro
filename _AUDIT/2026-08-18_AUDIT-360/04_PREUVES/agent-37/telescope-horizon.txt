@@ -1,0 +1,22 @@
+##### GET https://api.axion-crm-pro.com/telescope
+HTTP 403  size=6659  redirect=
+##### GET https://api.axion-crm-pro.com/telescope/requests
+HTTP 403  size=6659  redirect=
+##### GET https://api.axion-crm-pro.com/horizon
+HTTP 500  size=6665  redirect=
+##### GET https://api.axion-crm-pro.com/horizon/api/stats
+HTTP 500  size=6665  redirect=
+##### GET https://api.axion-crm-pro.com/_debugbar
+HTTP 404  size=6659  redirect=
+##### GET https://api.axion-crm-pro.com/api/documentation
+HTTP 404  size=6659  redirect=
+##### GET https://api.axion-crm-pro.com/.env
+HTTP 404  size=537  redirect=
+##### GET https://api.axion-crm-pro.com/storage/logs/laravel.log
+HTTP 404  size=557  redirect=
+
+##### staging
+##### GET https://staging-api.axion-crm-pro.com/telescope
+HTTP 404  size=6659  redirect=
+##### GET https://staging-api.axion-crm-pro.com/horizon
+HTTP 500  size=880065  redirect=

@@ -1,0 +1,91 @@
+===== workflow 278012891 =====
+2026-08-19T10:04:52Z pull_request completed/success — fix(rgpd+acces): le registre affirmait une chose fausse en sa faveur — rectifie le jour meme
+2026-08-19T09:42:42Z pull_request completed/success — docs(rgpd): registre des violations (art. 33-5) — la notification n'aura pas lieu
+2026-08-19T09:26:46Z pull_request completed/success — docs(cnil): pas de telephone — l'article 33-3-b exige des coordonnees, pas un numero
+2026-08-19T09:13:28Z pull_request completed/success — docs(cnil): les deux decisions du dirigeant, prises le 2026-08-19
+2026-08-19T09:06:49Z pull_request completed/success — docs(cnil): brouillon complet — identite relevee, duree d'exposition mesuree
+===== workflow 278156304 =====
+2026-08-19T10:07:37Z push completed/success — fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)
+2026-08-19T10:04:52Z pull_request completed/success — fix(rgpd+acces): le registre affirmait une chose fausse en sa faveur — rectifie le jour meme
+2026-08-19T09:44:27Z push completed/success — docs(rgpd): registre des violations, notification non retenue (#188)
+2026-08-19T09:42:42Z pull_request completed/success — docs(rgpd): registre des violations (art. 33-5) — la notification n'aura pas lieu
+2026-08-19T09:29:01Z push completed/success — docs(cnil): pas de telephone (#187)
+===== workflow 278156308 =====
+2026-08-19T10:07:37Z push completed/success — fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)
+2026-08-19T10:04:52Z pull_request completed/success — fix(rgpd+acces): le registre affirmait une chose fausse en sa faveur — rectifie le jour meme
+2026-08-19T09:44:27Z push completed/success — docs(rgpd): registre des violations, notification non retenue (#188)
+2026-08-19T09:42:42Z pull_request completed/success — docs(rgpd): registre des violations (art. 33-5) — la notification n'aura pas lieu
+2026-08-19T09:29:01Z push completed/success — docs(cnil): pas de telephone (#187)
+===== workflow 278156307 =====
+2026-08-19T10:07:37Z push completed/failure — fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)
+2026-08-19T09:44:27Z push completed/failure — docs(rgpd): registre des violations, notification non retenue (#188)
+2026-08-19T09:29:01Z push completed/failure — docs(cnil): pas de telephone (#187)
+2026-08-19T09:15:19Z push completed/failure — docs(cnil): les deux decisions du dirigeant (#186)
+2026-08-19T09:08:35Z push completed/failure — docs(cnil): brouillon complet (#185)
+===== workflow 278263498 =====
+2026-08-19T10:07:37Z push completed/success — fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)
+2026-08-19T08:37:22Z push completed/success — feat(preprod): jeu de reference portable + preproduction remplie + br…
+2026-08-19T08:18:28Z push completed/success — fix(eol+garde): CRLF sur un script shell, garde qui rougissait sur un…
+2026-08-19T08:11:56Z push completed/success — fix(preprod): 502 — liaison sur la passerelle du pont Docker (#181)
+2026-08-19T07:58:39Z push completed/success — feat(preprod): la preproduction — overlay, Caddyfile, gardes, deploie…
+===== workflow 278246765 =====
+2026-08-18T18:44:43Z push completed/success — chore(etape-0): les préalables du chantier « CRM cible » — 16 lignes,…
+2026-08-16T15:28:20Z push completed/success — chore(deps): bump docker/login-action from 3 to 4 (#108)
+2026-08-16T15:28:11Z push completed/success — chore(deps): bump docker/metadata-action from 5 to 6 (#103)
+2026-05-17T12:19:17Z push completed/success — feat(Sprint 19.3): Dockerfile.postgres custom pgvector + pg_partman +…
+===== workflow 335878026 =====
+2026-08-19T05:26:31Z schedule completed/success — Surveillance des sauvegardes
+2026-08-18T05:25:13Z schedule completed/success — Surveillance des sauvegardes
+2026-08-17T05:32:04Z schedule completed/success — Surveillance des sauvegardes
+2026-08-17T02:11:29Z workflow_dispatch completed/success — Surveillance des sauvegardes
+2026-08-17T02:10:51Z workflow_dispatch completed/failure — Surveillance des sauvegardes
+===== workflow 278256548 =====
+===== workflow 308789154 =====
+2026-07-07T15:08:30Z workflow_dispatch completed/success — Recover scraping + restore access
+===== workflow 307614371 =====
+2026-07-05T18:54:13Z workflow_dispatch completed/success — Prospection — Collecte Paris par arrondissement (prod)
+===== workflow 307266265 =====
+2026-07-04T21:46:19Z workflow_dispatch completed/failure — Prospection — Collecte FRANCE entière (prod)
+2026-07-04T21:37:37Z workflow_dispatch completed/cancelled — Prospection — Collecte FRANCE entière (prod)
+===== workflow 307138452 =====
+2026-07-04T20:44:02Z workflow_dispatch completed/cancelled — Prospection — Collecte département (prod)
+2026-07-04T20:43:31Z workflow_dispatch completed/cancelled — Prospection — Collecte département (prod)
+2026-07-04T18:33:15Z workflow_dispatch completed/success — Prospection — Collecte département (prod)
+2026-07-04T17:15:06Z workflow_dispatch completed/cancelled — Prospection — Collecte département (prod)
+2026-07-04T15:44:53Z workflow_dispatch completed/cancelled — Prospection — Collecte département (prod)
+===== workflow 307756538 =====
+2026-07-06T04:19:51Z workflow_dispatch completed/success — Prospection — Enrichissement (test gratuit)
+2026-07-06T04:15:27Z workflow_dispatch completed/success — Prospection — Enrichissement (test gratuit)
+2026-07-06T04:13:23Z workflow_dispatch completed/success — Prospection — Enrichissement (test gratuit)
+2026-07-06T04:05:20Z workflow_dispatch completed/success — Prospection — Enrichissement (test gratuit)
+2026-07-06T03:33:37Z workflow_dispatch completed/success — Prospection — Enrichissement (test gratuit)
+===== workflow 307871041 =====
+2026-07-06T09:00:54Z workflow_dispatch completed/failure — Prospection — Trouver les sites web (DISTRIBUÉ ~20×)
+2026-07-06T08:45:04Z workflow_dispatch completed/failure — Prospection — Trouver les sites web (DISTRIBUÉ ~20×)
+2026-07-06T08:40:12Z workflow_dispatch completed/cancelled — Prospection — Trouver les sites web (DISTRIBUÉ ~20×)
+2026-07-06T08:33:22Z workflow_dispatch completed/success — Prospection — Trouver les sites web (DISTRIBUÉ ~20×)
+2026-07-06T08:26:49Z workflow_dispatch completed/failure — Prospection — Trouver les sites web (DISTRIBUÉ ~20×)
+===== workflow 307779943 =====
+2026-07-06T07:44:03Z workflow_dispatch completed/cancelled — Prospection — Trouver les sites web (devinette)
+2026-07-06T07:12:12Z workflow_dispatch completed/cancelled — Prospection — Trouver les sites web (devinette)
+2026-07-06T06:10:40Z workflow_dispatch completed/cancelled — Prospection — Trouver les sites web (devinette)
+2026-07-06T06:03:54Z workflow_dispatch completed/success — Prospection — Trouver les sites web (devinette)
+2026-07-06T05:25:16Z workflow_dispatch completed/failure — Prospection — Trouver les sites web (devinette)
+===== workflow 307178546 =====
+2026-07-04T21:36:37Z workflow_dispatch completed/success — Prospection — Reclasser la taille (prod)
+2026-07-04T21:29:50Z workflow_dispatch completed/success — Prospection — Reclasser la taille (prod)
+2026-07-04T20:17:38Z workflow_dispatch completed/success — Prospection — Reclasser la taille (prod)
+2026-07-04T18:22:09Z workflow_dispatch completed/success — Prospection — Reclasser la taille (prod)
+2026-07-04T17:05:42Z workflow_dispatch completed/success — Prospection — Reclasser la taille (prod)
+===== workflow 307177634 =====
+2026-07-07T14:25:03Z workflow_dispatch completed/failure — Prospection — Diagnostic (prod)
+2026-07-06T09:30:48Z workflow_dispatch completed/success — Prospection — Diagnostic (prod)
+2026-07-06T09:30:46Z workflow_dispatch completed/success — Prospection — Diagnostic (prod)
+2026-07-06T09:00:59Z workflow_dispatch completed/failure — Prospection — Diagnostic (prod)
+2026-07-06T08:51:36Z workflow_dispatch completed/failure — Prospection — Diagnostic (prod)
+===== workflow 333858977 =====
+2026-08-13T21:33:34Z pull_request completed/success — ci: CI réellement bloquante + déploiement gaté par la CI (Gate 0)
+2026-08-13T21:31:00Z pull_request completed/success — ci: CI réellement bloquante + déploiement gaté par la CI (Gate 0)
+2026-08-13T21:29:18Z pull_request completed/success — ci: CI réellement bloquante + déploiement gaté par la CI (Gate 0)
+2026-08-13T21:27:20Z pull_request completed/success — ci: CI réellement bloquante + déploiement gaté par la CI (Gate 0)
+2026-08-13T21:22:54Z pull_request completed/success — ci: CI réellement bloquante + déploiement gaté par la CI (Gate 0)

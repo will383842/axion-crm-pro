@@ -1,0 +1,5 @@
+### DB_TIMEZONE= (chaine vide) — la connexion Postgres meurt
+ERREUR: SQLSTATE[22023]: Invalid parameter value: 7 ERROR:  invalid value for parameter "TimeZone": "" (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm_a29, SQL: SHOW TimeZone)
+
+### DB_TIMEZONE absent (etat de l atelier)
+Etc/UTC

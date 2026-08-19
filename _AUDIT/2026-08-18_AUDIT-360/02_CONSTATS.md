@@ -1,0 +1,1709 @@
+# 02 — REGISTRE UNIQUE DES CONSTATS
+
+> Dédoublonné, identifiants stables, **référence : `main = c0c453d`** sauf mention contraire.
+> Tenu par l'agent 4 (registrateur). Les constats des agents arrivent avec leur préfixe
+> (`A05-*` bloc A, `B10-*` bloc B, `C18-*` bloc C, `D22-*` bloc D, `E31-*` bloc E,
+> `F35-*` bloc F, `G41-*` bloc G, `H44-*` bloc H, `I48-*` bloc I) puis sont renumérotés
+> `A-NNN` au dédoublonnage de P2.
+>
+> **Statuts** : ouvert · corrigé · refusé (avec raison) · reste Will.
+> **Verdicts** : `Vérifié par` (rotation +17, P4) · `Réfuté par` (rotation +29, P5) · `Passe 3` (P6).
+
+---
+
+## Constats de P0 — trouvés pendant l'amorçage, par le chef de chantier
+
+Le §8 P0.3 prévient : « rendre le terrain praticable — **chaque échec ici est lui-même un constat
+de sévérité élevée** ». Trois sont tombés avant le premier agent.
+
+---
+
+### [A-001] Une route protégée répond 500 au lieu de 401 à tout client qui n'envoie pas `Accept: application/json` — en production
+- **Sévérité**      : **S2** *(abaissée depuis S1 — voir la correction ci-dessous)*
+- **Domaine**       : backend / exploitation
+- **Référence**     : `e8924b8` — reproduit en **local**, en **préproduction** et en **PRODUCTION**
+- **Emplacement**   : le mécanisme de redirection d'authentification de Laravel (`Authenticate::redirectTo`) cherche une route nommée `login`, qui n'existe pas dans une API sans interface serveur
+- **Constat**       : une requête non authentifiée sur une route `auth:sanctum` produit `Route [login] not defined.` et **HTTP 500** — **mais seulement si le client n'annonce pas attendre du JSON**. Avec l'en-tête, la réponse est un **401 correct**.
+- **Preuve**        :
+  ```
+  PRODUCTION, sans en-tete Accept :          PRODUCTION, avec Accept: application/json :
+    /api/v1/crm/arbitrage    -> 500            /api/v1/crm/arbitrage    -> 401
+    /api/v1/config/features  -> 500            /api/v1/config/features  -> 401
+    /api/v1/contacts         -> 500            /api/v1/contacts         -> 401
+  ```
+  `04_PREUVES/P0/a001-recontrole.txt`, `04_PREUVES/P0/prod-401-vs-500.txt`
+- **Témoin négatif** : `/up` répond **200** et `/api/v1/auth/login` répond **405** — le contrôle distingue donc « route absente », « route publique » et « route protégée ». Et la **même** requête, au **même** instant, sur la **même** route, bascule de 500 à 401 selon un seul en-tête : la variable est isolée.
+
+- ⚠️ **CORRECTION DE MA PREMIÈRE VERSION — j'avais tort sur l'impact, et le classement était trop haut.**
+  J'avais écrit que « le SPA ne peut pas distinguer *tu n'es pas connecté* de *le serveur est cassé* »
+  et qu'« un visiteur déconnecté reçoit une erreur au lieu de l'écran de connexion ». **C'est faux.**
+  `frontend/src/lib/api.ts:5-8` pose `headers: { Accept: 'application/json', 'X-Requested-With':
+  'XMLHttpRequest' }`, et `:30-31` renvoie explicitement vers `/login` sur un 401.
+  **Le SPA reçoit donc bien un 401 et sa redirection fonctionne.**
+  L'écart a été levé par l'**agent 13**, qui obtenait un **401 propre** là où j'avais mesuré un 500 —
+  et qui a eu la rigueur de ne pas crier à la réfutation : il a écrit *« mon appel passe par le noyau
+  en processus, sans Caddy : écart de protocole, pas réfutation »*. C'était la bonne lecture, et
+  c'est elle qui a fait trouver la vraie variable. Ce n'était ni Caddy, ni la route : c'était
+  l'en-tête `Accept`.
+  *Leçon de méthode, à retenir pour la passe adversariale : j'avais mesuré avec `curl` nu et
+  généralisé à « tous les clients ». Un `curl` n'est pas un navigateur.*
+
+- **Impact réel, après correction** : la console **n'est pas touchée**. Restent trois effets, réels mais bornés :
+  1. **Tout appelant qui n'est pas le SPA** — sonde de supervision, intégration tierce, script, `curl`,
+     futur usage par jeton d'API — reçoit **500** là où le contrat HTTP impose **401**. Une supervision
+     branchée là-dessus signalerait une panne permanente du produit.
+  2. **Chaque appel de ce type écrit une trace d'erreur complète en production**, ce qui alimente
+     directement **A-007** (journal de 265 Mo, +133 Mo/jour).
+  3. Le produit **ment sur son état** : un 500 annonce « le serveur est cassé » alors qu'il fonctionne.
+- **Reproduction**  : `curl -o /dev/null -w "%{http_code}" https://api.axion-crm-pro.com/api/v1/contacts` (→ 500), puis la même avec `-H "Accept: application/json"` (→ 401).
+- **Correctif**     : forcer la réponse JSON 401 pour **tout** ce qui est sous `/api`, indépendamment de l'en-tête — `->redirectGuestsTo(fn () => null)` dans `bootstrap/app.php`, ou l'interception de `AuthenticationException`. **Le test qui l'accompagne doit être vu rouge sur le cas sans en-tête `Accept`**, sans quoi il garderait exactement le cas qui marche déjà. Coût : ~1 h.
+- **Statut**        : **ouvert**
+- **Vérifié par**   : agent 13 — écart signalé, non surinterprété ; re-mesuré par le chef de chantier, qui a **corrigé son propre constat**.
+- Réfuté par / Passe 3 : —
+
+---
+
+### [A-002] `GET /saved-views` répond 200 avec une liste vide au lieu de 501 : la route ment
+- **Sévérité**      : **S2**
+- **Domaine**       : backend / UX
+- **Référence**     : `main c0c453d`
+- **Emplacement**   : `backend/app/Http/Controllers/Api/SavedViewsController.php:10` ; route `backend/routes/api.php:195`
+- **Constat**       : sur les cinq verbes de `apiResource('saved-views')`, quatre répondent 501 et **`index` répond 200 avec `{"data": []}`**.
+  ```php
+  public function index(Request $r): JsonResponse { return $this->ok(['data' => []]); }  // 200, liste VIDE
+  public function store(...)   { return $this->notImplemented('10'); }                    // 501
+  ```
+- **Preuve**        : lecture du fichier + `php artisan route:list --path=saved-views`. `04_PREUVES/P0/`
+- **Témoin négatif** : les quatre autres verbes du **même contrôleur** répondent bien 501 — le contrôle sait donc reconnaître un 501 quand il y en a un. L'anomalie porte sur `index` seul.
+- **Impact**        : un appelant ne peut pas distinguer « tu n'as enregistré aucune vue » de « cette fonction n'existe pas ». Le CDC (§18) fait des vues enregistrées une fonction attendue : une façade qui répond « rien à afficher » retarde la découverte du trou. **Corrige aussi `_REPORTS/2026-08-19_INVENTAIRE-ETAPE-1A.md`**, qui classe `saved_views` parmi les tables « sans modèle, ni contrôleur, ni route » — c'est faux.
+- **Reproduction**  : `GET /api/v1/saved-views` avec une session valide.
+- **Correctif**     : deux options — (a) `index` répond 501 comme ses quatre voisines, cohérent et honnête ; (b) la fonction est réalisée. Le §12-10 de la consigne d'audit interdit qu'une route 501 subsiste **sous un nom que le CDC emploie** : « vues enregistrées » en est un. Décision à prendre en P2.
+- **Statut**        : **ouvert**
+- Vérifié par / Réfuté par / Passe 3 : —
+
+---
+
+### [A-003] `.gitattributes` a été posé mais la copie de travail n'a jamais été renormalisée : 8 scripts `.sh` sur 16 sont encore en CRLF
+- **Sévérité**      : **S2**
+- **Domaine**       : exploitation / tests
+- **Référence**     : mesuré à `c0c453d`, **re-mesuré à `e8924b8`**
+- **Emplacement**   : `.gitattributes` (posé le 2026-08-19) vs la copie de travail du dépôt principal
+- **Constat**       : `.gitattributes` déclare `* text=auto eol=lf` et `*.sh text eol=lf`. Git **ne renormalise pas** une copie de travail existante : les fichiers extraits avant restent en CRLF jusqu'à une nouvelle extraction.
+- **Preuve**        : comptage des **octets `0x0d`** (`od -An -tx1 | grep -c '^0d'`) sur les 16 `.sh` suivis par git :
+  ```
+  CRLF backend/database/perf/mesure_reference.sh         29 octets CR
+  CRLF infra/docker/entrypoint-prod.sh                   51
+  CRLF infra/scripts/backup-postgres.sh                 181
+  CRLF infra/scripts/configure-prod-env.sh              103
+  CRLF infra/scripts/dr-drill.sh                        205
+  CRLF infra/scripts/setup-backup.sh                    116
+  CRLF infra/scripts/setup-hetzner-cpx22.sh             149
+  CRLF infra/scripts/verifier-sauvegarde.sh             155
+  ---
+  scripts .sh suivis : 16   dont porteurs de CR : 8
+  ```
+- **Témoin négatif** : la méthode a été validée **avant** usage, sur deux fichiers fabriqués — un pur LF rend **0** octet CR, un pur CRLF rend **2**. Et les 8 autres scripts rendent **0** : le contrôle n'accuse donc pas tout le monde en bloc.
+- ⚠️ **Correction de ma propre mesure de 09:40Z.** La première version de ce constat citait `verifier-ports-publies.sh` (« 167 lignes CRLF ») et `fermer-ports-db-prod.sh`. **Ces deux fichiers sont en LF aujourd'hui**, corrigés par un commit postérieur à `c0c453d`. Le fond du constat tient, mais l'exemple était périmé et la liste exacte est celle ci-dessus. Écart levé par l'**agent 9** (contre-vérification), puis re-mesuré indépendamment par le chef de chantier avec témoin.
+- **Impact**        : c'est la mécanique exacte qui a rendu un script inexécutable sur le serveur le 19/08 (`line 39: $'\r': command not found`). Les 8 fichiers restants sont **précisément ceux qu'on envoie sur un serveur le jour où ça va mal** : `dr-drill.sh` (exercice de reprise), `backup-postgres.sh` et `verifier-sauvegarde.sh` (sauvegardes), `entrypoint-prod.sh`, `setup-hetzner-cpx22.sh`, `configure-prod-env.sh`. Le commentaire de `.gitattributes` affirme pourtant « plus de divergence entre ce qu'on lit, ce qu'on commite et ce qu'on envoie » : c'est faux pour la moitié des scripts, et c'est le genre d'affirmation qu'on ne relit pas le jour de la panne.
+- **Reproduction**  : `for f in $(git ls-files '*.sh'); do od -An -tx1 "$f" | tr ' ' '\n' | grep -c '^0d'; done`
+- **Correctif**     : `git add --renormalize .` puis re-extraction. Ajouter une garde CI qui refuse un `.sh` porteur d'un octet CR, **vue rouge** sur un fichier fautif fabriqué pour l'occasion. Corriger le commentaire de `.gitattributes`, qui promet plus qu'il ne tient. Coût : ~45 min.
+- **Statut**        : **ouvert**
+- **Vérifié par**   : agent 9 — exemple réfuté, fond confirmé ; re-mesuré avec témoin par le chef de chantier.
+- Réfuté par / Passe 3 : —
+
+### [A-004] La pile locale demande des certificats Let's Encrypt/ZeroSSL pour les domaines de PRODUCTION
+- **Sévérité**      : **S3** *(abaissée depuis S2 — voir la correction dans Impact)*
+- **Domaine**       : exploitation / sécurité
+- **Référence**     : `main c0c453d`
+- **Emplacement**   : `infra/caddy/Caddyfile` — les blocs `app.axion-crm-pro.com` (l.91), `api.axion-crm-pro.com` (l.120), `staging.axion-crm-pro.com` (l.164), `staging-api.axion-crm-pro.com` (l.192) sont dans **le même fichier** que les blocs `app.localhost` / `api.localhost`, et le Caddy **local** les charge tous.
+- **Constat**       : le Caddy du poste de développement tente en boucle d'obtenir des certificats pour les quatre noms de production et de préproduction, et échoue (`Redirect loop detected`, le nom résout vers Cloudflare).
+- **Preuve**        :
+  ```
+  $ docker logs axion-crm-caddy
+  {"logger":"http.acme_client","msg":"challenge failed","identifier":"api.axion-crm-pro.com",
+   "problem":{"detail":"104.21.61.221: Fetching https://api.axion-crm-pro.com/.well-known/
+   acme-challenge/…: Redirect loop detected"}}
+  {"logger":"tls.obtain","msg":"could not get certificate from issuer",
+   "identifier":"api.axion-crm-pro.com","issuer":"acme-v02.api.letsencrypt.org-directory"}
+  … puis bascule sur acme.zerossl.com, compte williamsjullin@gmail.com
+  ```
+  `04_PREUVES/P0/etat-local.txt`
+- **Témoin négatif** : les blocs `app.localhost` / `api.localhost` obtiennent bien, eux, un certificat interne et répondent **200**. Le mécanisme ACME de Caddy fonctionne donc : ce sont bien les **noms de production** qui échouent, et non le poste qui serait hors ligne.
+- **Impact**        : chaque poste de développement qui lance la pile consomme un quota ACME **sur les noms réels de la production**, avec un compte **personnel**.
+  ⚠️ **Correction, apportée par l'agent 40 — j'avais surévalué la gravité.** Ce qui est consommé est la
+  **limite horaire de validations échouées**, **pas le quota d'émission de certificats**. Le
+  renouvellement de la production **n'est donc pas menacé** : fenêtre ARI au **13/09**, expiration au
+  **14/10**. J'avais écrit « le jour où la production doit renouveler, elle peut se le voir refuser » —
+  c'était une extrapolation, pas une mesure. Le constat tient (une pile locale ne doit pas demander de
+  certificat pour un nom de production, et le bruit ACME est réel), **sa gravité baisse de S2 à S3**.
+- **Reproduction**  : `docker compose -f docker-compose.yml -f docker-compose.local.yml up -d` puis `docker logs axion-crm-caddy`.
+- **Correctif**     : sortir les blocs de production et de préproduction dans un `Caddyfile.prod` chargé uniquement par `docker-compose.prod.yml`/`.staging.yml` (le fichier local ne portant que `*.localhost`) ; ou les encadrer d'un `import` conditionnel. Ajouter une garde qui refuse qu'un `Caddyfile` local déclare un nom public. Coût : ~1 h. ⚠️ **Contrainte de sécurité connue** : « une faute de frappe dans le Caddyfile casse la production » (journal 19/08 §6.4-3) — la garde CI `caddy validate` existe déjà (`ci.yml`, job `caddyfile-valide`), **s'appuyer dessus, ne pas la réinventer** (règle 8).
+- **Statut**        : **ouvert**
+- Vérifié par / Réfuté par / Passe 3 : —
+
+---
+
+## Constats des agents — P1
+
+*(remplis au fur et à mesure des retours d'agents, puis dédoublonnés en P2)*
+
+---
+
+### [A-005] Deux écrans factices restent joignables par URL, sans que rien ne les annonce
+- **Sévérité**      : **S3**
+- **Domaine**       : navigation / UX
+- **Référence**     : `main c0c453d`
+- **Emplacement**   : `frontend/src/app/routeTree.tsx:102-103` ; `frontend/src/features/phase2-scaffold/{ColdEmailStub,LinkedInStub}.tsx` ; `backend/routes/api.php:297-300`
+- **Constat**       : l'étape 0 a retiré les **six entrées verrouillées** de la barre latérale et supprimé les fourre-tout `/crm{any?}` et `/analytics{any?}` (F7). Mais les routes `/cold-email` et `/linkedin` — écran factice côté SPA, réponse 501 côté API — **sont conservées à dessein** et restent joignables en tapant l'URL.
+- **Preuve**        : `routeTree.tsx:102` `path: '/cold-email', component: ColdEmailStub` ; `api.php:299` `Route::any('/cold-email{any?}', ColdEmailController::class)`. Le commentaire du dépôt assume le choix : « ces noms n'entrent en collision avec aucun nom du cahier des charges, et le lot campagnes est hors périmètre ».
+- **Témoin négatif** : `/crm{any?}` et `/analytics{any?}` **ont bien été retirés**, et la garde `tests/Feature/PasDeStub501SousCrmEtAnalyticsTest.php` existe pour l'empêcher de revenir. Le contrôle voit donc la différence entre « retiré » et « conservé » : les deux routes restantes le sont réellement.
+- **Impact**        : faible et borné — plus aucune navigation n'y mène, et les noms ne collident avec aucun mot du CDC. Mais l'exigence de sortie de **F8 (§A.1 du CDC)** est « **retirées ou réalisées** », pas « masquées du menu ». En l'état, F8 est **partiellement** close, et un signet ou un lien externe mène encore à un écran qui promet une fonction inexistante.
+- **Reproduction**  : ouvrir `https://app.localhost/cold-email`.
+- **Correctif**     : retirer les deux routes SPA et les deux contrôleurs, et rediriger `/cold-email` et `/linkedin` vers `/` (le §6.3-9 du mandat exige que ce qui disparaît devienne une redirection, pas un 404). Coût : ~30 min. **Ou** arbitrage écrit assumant la conservation — auquel cas il doit être inscrit dans un ADR, pas seulement dans un commentaire de `routes/api.php`.
+- **Statut**        : **ouvert** — arbitrage `D-008`
+- Vérifié par / Réfuté par / Passe 3 : —
+
+---
+
+### [A-006] Le §4.8 et le §6.2 du mandat d'audit décrivent une barre latérale qui n'existe plus
+- **Sévérité**      : **S2** *(constat de méthode, dirigé contre le document qui pilote l'audit)*
+- **Domaine**       : navigation
+- **Référence**     : `main c0c453d`
+- **Emplacement**   : `frontend/src/components/layout/Sidebar.tsx:58-172` vs `_PROMPTS/PROMPT_AUDIT_360_CRM_PRO_2026-08-18.md` §4.8 et §6.2
+- **Constat**       : la barre a été **refondue pendant l'étape 0** (ligne 3 bis, F15/F17). Le mandat d'audit, même dans sa révision 2.1 du 19/08, décrit l'état d'avant.
+- **Preuve**        : lecture de `Sidebar.tsx`. Ce que le mandat annonce comme « défauts déjà identifiés », et ce que le code dit :
+
+  | §6.2 du mandat | Mesuré sur `main = c0c453d` |
+  |---|---|
+  | 1. Deux entrées « Contacts » | **corrigé** — `sectionContacts()` en rend **une seule** : `/console/contacts` si la console v2 est ouverte, `/contacts` sinon, **jamais les deux** |
+  | 2. « Campagnes » = collecte, collision à venir | **corrigé** — renommé **« Collectes »**, le mot « campagne » est réservé aux e-mails (L7) |
+  | 3. Six entrées verrouillées vers quatre routes 501 | **corrigé** — plus **aucune** entrée `locked` dans les sections |
+  | 4. Une section « Phase 2 » entière | **corrigée** — la section n'existe plus |
+  | 5. Outillage de collecte au premier niveau | **partiellement corrigé** — LLM Router / Proxies / Rotations ont quitté le premier niveau… pour atterrir dans **« Réglages »**, où ils cohabitent avec Utilisateurs, Paramètres et Tags |
+  | 6. Un groupe nommé « Data » | **corrigé** — devenu « Contacts » |
+  | 7. Dix sections | **corrigé** — **six** : Aujourd'hui · Contacts · Collecte · Pilotage · Conformité · Réglages |
+  | 8. Visite guidée câblée sur l'ancienne barre | **à vérifier** — `OnboardingTour.tsx` vise `sidebar`, `global-search`, `nav-companies`, `nav-dashboard`, `dark-mode`, `nav-settings` ; le `data-tour="nav-campaigns"` est **conservé dans la barre mais n'est plus utilisé par la visite** |
+  | 9. « Runs de scraping », anglicisme | **corrigé** — « Journaux de collecte » |
+  | 10. Hub derrière un drapeau runtime | **encore vrai** — et c'est un choix, pas un défaut : sans le drapeau, la barre retombe proprement sur `/contacts` |
+
+- **Témoin négatif** : le point 10 est **confirmé encore vrai** et le point 5 **partiellement**. Le contrôle ne dit donc pas « tout est corrigé » par complaisance : il distingue.
+- **Impact**        : un audit qui aurait recopié le §6.2 aurait produit **huit constats faux** et fait rouvrir un chantier déjà fait — exactement le gaspillage que la révision 2.1 disait vouloir éviter. **Ce qui reste réellement à faire vis-à-vis de la cible §23.3 du CDC est autre chose** : il manque le groupe **ÉCHANGES** en entier, les entrées **Boîte de réception / Mes rendez-vous / Mes tâches**, les **vues épinglées par type**, **Organisations**, **Prospection**, **Canal avec la console**, **Coûts**, le lien **↗ Console axionia**, **Fiches récentes**, et **tous les compteurs** (le CDC en exige, la barre n'en porte aucun). C'est le vrai périmètre de l'agent 23.
+- **Correctif**     : corriger le §4.8 et le §6.2 du mandat d'audit ; recentrer le chapitre §6 sur l'**écart à la cible §23.3**, et non sur des défauts résolus.
+- **Statut**        : **ouvert**
+- Vérifié par / Réfuté par / Passe 3 : —
+
+---
+
+### [A-007] Telescope tourne en production sans ses tables : le journal pèse 270 Mo, grossit d'environ 90 Mo par jour, et 100 % de ce qu'il écrit est le même défaut
+- **Sévérité**      : **S1**
+- **Domaine**       : exploitation / sécurité
+- **Référence**     : PRODUCTION `46.62.248.239`, mesuré en **lecture seule** le 2026-08-19 (11:05Z pour la mesure corrigée)
+- **Emplacement**   : conteneur `axion-crm-api` ; `laravel/telescope` est une dépendance **dure** de `composer.json`, dont le défaut est `enabled = true`, et **ses migrations ne sont jamais publiées** dans ce dépôt
+- **Constat**       : `TELESCOPE_ENABLED` **n'existe pas dans le `.env` de production**. Telescope est donc actif alors qu'**aucune table `telescope_*` n'existe**. Chaque requête échoue à la terminaison sur un `insert into telescope_entries` et écrit sa trace complète.
+- **Preuve**        :
+  ```
+  $ docker exec axion-crm-postgres psql -U axion -d axion_crm -tAc
+      "select count(*) from information_schema.tables where table_name like 'telescope%'"
+  0
+  $ docker exec axion-crm-api sh -c 'env | grep -i telescope'
+    (aucune variable TELESCOPE_*)
+  $ LOG_LEVEL=debug   LOG_CHANNEL=stack        # aucune rotation
+
+  # fenetre chronometree de 120 s, decoupee sur la croissance reelle du fichier
+  croissance                                   : 124 514 octets
+  entrees de journal (lignes horodatees)       : 11        -> 5,5 par minute
+  dont production.ERROR                        : 11        -> 100 %
+  occurrences de la chaine 'telescope_entries' : 77        -> 7 par entree
+  debit projete                                : ~89 Mo/jour
+  taille du fichier                            : 270 394 142 octets (270 Mo)
+  $ df -h /   ->  75G total, 25G disponibles
+  ```
+- **Témoin négatif** : la fenêtre est **découpée sur la croissance réelle du fichier** (`tail -c $DELTA`), donc les 11 entrées sont exactement celles écrites pendant les 120 s mesurées. Et **11 entrées sur 11 sont des `ERROR`** : le compte ne mélange pas le bruit normal avec le défaut.
+
+- ⚠️ **CORRECTION DE MA PREMIÈRE MESURE — je m'étais trompé, et j'avais accusé le journal de construction à tort.**
+  J'avais écrit : *« le journal du 19/08 chiffre ce défaut à 6 erreurs par minute ; mesuré : 56 par minute — 9× plus »*.
+  **C'est faux.** J'avais compté les **occurrences de la chaîne** `telescope_entries`, or elle apparaît
+  **7 fois par entrée de journal** (message, requête SQL, trace d'appels). 56 occurrences ≈ 8 entrées.
+  La mesure propre, sur 120 s et en comptant les **entrées horodatées**, donne **5,5 par minute** —
+  et l'agent 40, qui a compté 2 824 `ERROR` sur 484 minutes, trouve **5,8**. Les deux concordent.
+  **Le « 6 par minute » du journal de construction était juste. C'est moi qui avais tort.**
+  Le débit se corrige de la même façon : **~90 Mo/jour** (89 mesuré ici, 94 par l'agent 40 en moyenne),
+  et non 133.
+  *Leçon, et elle vaut pour toute la suite de l'audit : compter des occurrences de chaîne n'est pas
+  compter des événements. Le facteur d'erreur était de 7 — soit exactement le nombre de fois où le
+  défaut se cite lui-même.*
+
+- **Impact**        : trois effets, et le troisième reste le grave.
+  1. **Disque** : ~90 Mo/jour, soit ~2,7 Go/mois, sur une machine à 25 Go libres qui a déjà frôlé la
+     saturation le 19/08. Aucune rotation (`LOG_CHANNEL=stack`, pas `daily`) ; l'agent 40 a mesuré
+     qu'**aucun `daemon.json` ne borne non plus les journaux de conteneurs**.
+  2. **Lisibilité** : un fichier de 270 Mo n'est plus consultable au moment où l'on en a besoin.
+  3. 🔴 **Aveuglement** : `LOG_LEVEL=debug` en production, dans un fichier dont **100 % des erreurs
+     sont le même défaut**. Une vraie erreur y passe inaperçue. C'est la condition qui a permis à la
+     faille du 19/08 de rester invisible — et le volume reste largement suffisant pour la rejouer.
+- **Cause racine, mesurée par l'agent 40** : `TELESCOPE_ENABLED` est présent dans `.env.example`,
+  `.env.local` et `.env.test`, et **absent du `.env` de production** — avec **20 autres clés** de
+  `.env.example` absentes du serveur. Ce n'est donc pas un oubli isolé mais une **dérive** entre le
+  modèle et le réel. → constat **F40-003**.
+- **Correctif**     : poser `TELESCOPE_ENABLED=false` en production. **La parade existe déjà et est
+  motivée** dans `docker-compose.local.yml` — elle n'a simplement jamais été portée en production
+  (règle 8 : on étend, on ne réinvente pas). Puis `LOG_CHANNEL=daily` avec rétention, `LOG_LEVEL=warning`,
+  un `daemon.json` qui borne les journaux de conteneurs, et la purge du fichier de 270 Mo.
+  ⚠️ **Piège 18** : `api` est l'un des quatre services **que le déploiement recrée** — la variable
+  passera. **Piège 8** : `docker compose restart` ne relit pas `env_file`, il faut `up -d`.
+  Et la garde doit **rougir sur le conteneur**, pas sur `.env.example` (piège 19, constat A-011).
+- **Statut**        : **ouvert**
+- **Vérifié par**   : agent 40 — chiffres corrigés, cause racine trouvée ; re-mesuré par le chef de chantier, qui **corrige son propre constat et rend raison au journal de construction**.
+- Réfuté par / Passe 3 : —
+
+---
+
+### [A-008] Une session de construction a poussé trois PR sur `main` pendant l'audit
+- **Sévérité**      : **S3** *(constat de méthode — aucun dégât, mais il change la référence)*
+- **Domaine**       : exploitation
+- **Référence**     : `c0c453d` → `b53338c` → `1145473` → **`e8924b8`**
+- **Constat**       : le §3 ter du mandat interdit de lancer l'audit en parallèle d'une session de construction. La consigne a été respectée côté audit (le worktree `crmpro-wt-etape1a` n'a pas été touché), mais **une autre session a fusionné trois PR sur `main` pendant que les 20 agents mesuraient**.
+- **Preuve**        :
+  ```
+  $ git log --format="%h | %an | %ad | %s" --date=iso c0c453d..origin/main
+  e8924b8 | will383842 | 2026-08-19 12:07:34 +0200 | fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)
+  1145473 | will383842 | 2026-08-19 11:44:24 +0200 | docs(rgpd): registre des violations, notification non retenue (#188)
+  b53338c | will383842 | 2026-08-19 11:28:58 +0200 | docs(cnil): pas de telephone (#187)
+
+  $ git diff --stat c0c453d origin/main
+   _REPORTS/2026-08-19_BROUILLON-NOTIFICATION-CNIL-ART33.md | 109 +++----
+   _REPORTS/REGISTRE-DES-VIOLATIONS-DE-DONNEES.md           | 247 +++++++++++
+   infra/scripts/definir-mot-de-passe-crm.sh                | 131 +++++++
+   3 files changed, 442 insertions(+), 45 deletions(-)
+  ```
+- **Témoin négatif** : le `git diff --stat` porte sur **l'intégralité** de l'arborescence, pas sur un sous-ensemble choisi — s'il avait touché `backend/`, `frontend/` ou `workers/`, il l'aurait montré. **Aucun fichier de code produit n'a bougé** : deux documents et un script neuf.
+- **Impact**        : **nul sur la validité de l'audit** — le code mesuré à `c0c453d` est identique à celui de `e8924b8`. Mais trois agents ont rapporté trois références différentes (`1145473`, `b53338c`, `e8924b8`), ce qui aurait pu passer pour une incohérence de mesure. Deux conséquences à retenir : (a) la référence de l'audit devient **`e8924b8`, code identique à `c0c453d`** ; (b) le nouveau script `infra/scripts/definir-mot-de-passe-crm.sh` (« accès CRM rendu ») **entre au périmètre** — il n'a été audité par personne, et il touche à l'accès du produit, ce qui croise directement **A-001**.
+- **Correctif**     : mettre `_DOSSIER-AGENT.md` à jour ; auditer le script neuf ; re-comparer `main` en fin de P7 pour vérifier qu'aucun code n'a bougé sous l'audit.
+- **Statut**        : **ouvert**
+- Vérifié par / Réfuté par / Passe 3 : —
+
+---
+
+### [A-009] L'atelier local sert la console par le serveur de développement mono-processus de PHP
+- **Sévérité**      : **S2**
+- **Domaine**       : exploitation / tests / performance
+- **Référence**     : `e8924b8`, atelier local
+- **Emplacement**   : conteneur `axion-crm-api` — `php -S 0.0.0.0:80 -t public`
+- **Constat**       : la pile locale ne sert **qu'une requête à la fois**. Toute commande `artisan`, `pest` ou `tinker` lancée dans le même conteneur passe devant les requêtes HTTP.
+- **Preuve**        :
+  ```
+  $ docker exec axion-crm-api ps
+  PID  COMMAND
+    1  php -S 0.0.0.0:80 -t public              <- serveur de developpement, mono-processus
+    7  php artisan crm:flush-outbound
+   13  php /tmp/seed.php
+   33  php artisan tinker --execute=...
+   45  php artisan db:seed --class=PermissionsAndRolesSeeder --force
+   61  php ./vendor/bin/pest --filter=Etancheite
+   67  sh -c php artisan test --filter=EtancheiteParTable
+
+  $ curl https://api.localhost/up      -> 000 (expiration a 45 s puis a 60 s)
+  ```
+- **Témoin négatif** : le même `/up` répondait **200 en 2,7 s** à 09:32Z, avant que les agents ne chargent l'atelier — et `https://app.localhost` (servi par le conteneur `app`, indépendant) **répond toujours**. Le blocage est donc bien la sérialisation de l'API, pas une panne de la pile ni du réseau.
+- **Impact**        : deux conséquences distinctes.
+  1. **Sur l'audit** : le §8 P0.3 exige que « la console CRM tourne en local ». Elle tourne — **pour un seul utilisateur à la fois**. Le bloc D (37 écrans à ouvrir à la main) et le bloc G (charge) ne peuvent pas travailler en parallèle du reste. C'est une contrainte de méthode, consignée plutôt que subie.
+  2. **Sur le produit** : le **critère 17 du §29** du CDC exige « dix sessions actives sans dégradation de plus de 20 % ». Il est **inmesurable sur cet atelier** : dix sessions y seraient sérialisées par construction. Toute mesure de concurrence faite ici serait fausse — et une mesure fausse présentée comme vraie est exactement ce que la passe adversariale doit trouver.
+- **À vérifier séparément** : la **production** utilise-t-elle php-fpm, ou le même serveur de développement ? Si c'est le second, ce constat passe **S0**. *(Confié à l'agent 40 — infrastructure.)*
+- **Correctif**     : pour l'atelier, servir l'API par php-fpm + Caddy comme en production, ou au minimum documenter que les mesures de concurrence n'y sont pas valables. Pour l'audit : sérialiser les travaux qui passent par HTTP.
+- **Statut**        : **ouvert**
+- Vérifié par / Réfuté par / Passe 3 : —
+
+
+---
+
+### [A-010] 🔴 La PRODUCTION sert toute l'API par le serveur de développement mono-processus de PHP : les requêtes sont sérialisées
+- **Sévérité**      : **S0** — *blocage du chantier cible*
+- **Domaine**       : infrastructure / performance / sécurité
+- **Référence**     : PRODUCTION `46.62.248.239`, conteneur `axion-crm-api`, mesuré en **lecture seule** le 2026-08-19 vers 10:45Z. Même constat en **préproduction**.
+- **Emplacement**   : `Dockerfile.laravel` / `infra/docker/entrypoint-prod` — `Config.Cmd = ["php","-S","0.0.0.0:80","-t","public"]`
+- **Constat**       : l'API de production est servie par le **serveur web intégré de PHP en ligne de commande**, en **un seul processus**, sans `PHP_CLI_SERVER_WORKERS`. Il traite **une requête à la fois** : la Nᵉ requête simultanée attend que les N−1 précédentes soient terminées.
+
+- **Preuve**        :
+  ```
+  $ docker inspect axion-crm-api --format '{{json .Config.Cmd}} {{json .Config.Entrypoint}}'
+  ["php","-S","0.0.0.0:80","-t","public"]   ["/usr/local/bin/entrypoint-prod"]
+
+  $ docker exec axion-crm-api sh -c 'ps -o pid,args' | grep -F 'php -S' | grep -v grep
+      1 php -S 0.0.0.0:80 -t public
+    -> nombre de processus : 1
+
+  $ docker exec axion-crm-api sh -c 'env | grep -i CLI_SERVER'
+    (non pose)          # PHP_CLI_SERVER_WORKERS absent : pas de worker supplementaire
+  ```
+
+  **12 requêtes SIMULTANÉES sur `/up`** (depuis le conteneur, sans surcoût réseau), temps triés :
+  ```
+   1  0,025 s     7  0,103 s
+   2  0,041 s     8  0,121 s
+   3  0,055 s     9  0,140 s
+   4  0,072 s    10  0,156 s
+   5  0,086 s    11  0,177 s
+   6  0,091 s    12  0,192 s
+  ```
+  **Escalier parfait, de pas ≈ 15 ms** — soit exactement la durée d'une requête isolée. La Nᵉ termine à N × 15 ms.
+
+- **Témoin positif** : **12 requêtes SÉQUENTIELLES** sur le même point, mêmes conditions :
+  ```
+   1  0,0145 s    …    12  0,0184 s      (plat, aucune croissance)
+  ```
+  Le serveur traite donc bien une requête en **15 ms**. L'escalier observé en concurrence n'est **pas**
+  un ralentissement du serveur ni un artefact de mesure : c'est une **mise en file d'attente**.
+  Les deux séries ont été jouées **dans le même conteneur, à la même minute, sur le même point**.
+- **Témoin manqué, et je le dis** : j'ai tenté de déposer un point lent (`sleep 3`) pour rendre
+  l'escalier spectaculaire. **Refusé — `Permission denied` : le système de fichiers du conteneur de
+  production est en lecture seule.** C'est une bonne nouvelle de sécurité, et cela signifie que ce
+  témoin-là n'a pas été joué. La démonstration repose donc sur l'escalier de 12 points et son témoin
+  séquentiel, qui suffisent.
+
+- **Impact**        : c'est le constat d'infrastructure le plus lourd de l'audit, et il a trois faces.
+  1. 🔴 **Une requête lente bloque TOUS les utilisateurs.** Ce n'est pas théorique : le journal du
+     19/08 (§2.11) a mesuré les compteurs du hub à **17,5 s cache froid sur 2,8 M de fiches** — et la
+     production en porte **4,29 M**. Une seule ouverture de la console après une purge de cache gèle
+     **l'application entière** pendant tout ce temps. Le correctif de la pièce 1 (index couvrant +
+     `Cache::flexible`) prend d'ailleurs tout son sens ici : il ne réglait pas seulement une lenteur,
+     il retirait un **point de blocage global** — sans que personne ait vu que c'en était un.
+  2. 🔴 **Le principe directeur 8 du CDC est structurellement violé** : « Conçu pour **dix
+     utilisateurs** et plusieurs sociétés **dès le premier jour** ». Et le **critère 17 du §29**
+     (« dix sessions actives, aucune dégradation de plus de 20 % ») n'est pas « non mesuré » : il est
+     **inatteignable par construction**. Aucun réglage applicatif ne le rendra vrai.
+  3. **Sécurité** : la documentation de PHP est explicite sur ce serveur — *« il n'est pas destiné à
+     être un serveur web complet ; il ne devrait pas être utilisé sur un réseau public »*. Il est ici
+     sur un réseau public, derrière Caddy et Cloudflare, mais exposé.
+
+- **Pourquoi personne ne l'a vu** : avec **un seul utilisateur** (mesuré : 1 compte, 0 session,
+  0 jeton — personne ne s'est jamais connecté), la sérialisation est **rigoureusement invisible**.
+  Tous les contrôles verts du produit ont été joués à un utilisateur. C'est le piège 19 dans sa forme
+  la plus pure : **les gardes mesurent le bon objet, mais dans des conditions où le défaut ne peut pas
+  se manifester.**
+
+- **Reproduction**  : les trois commandes ci-dessus, en lecture seule, depuis le serveur.
+- **Correctif**     : servir l'API par **php-fpm** (l'image le contient déjà : les conteneurs
+  `horizon` et `scheduler` exposent `9000/tcp`, le port de php-fpm — **la brique existe, il n'y a rien
+  à inventer**, règle 8), avec Caddy en `fastcgi`. Repli immédiat et à coût quasi nul si php-fpm
+  demande trop de travail : poser **`PHP_CLI_SERVER_WORKERS=8`**, que PHP lit au démarrage du serveur
+  intégré et qui le fait forker — ce n'est pas une solution de production, mais cela supprime la
+  sérialisation en une variable d'environnement.
+  ⚠️ **Piège 18** : `api` fait partie des quatre services **que le déploiement recrée** — un changement
+  passera donc. Mais **piège 8** : `docker compose restart` ne relit pas `env_file`, il faut `up -d`.
+  **Et la garde à écrire** (piège 19) doit rougir **sur le conteneur qui tourne**, pas sur le
+  `Dockerfile` : « aucun conteneur de la pile ne sert HTTP par `php -S` ».
+- **Coût**          : ~4 h pour php-fpm + Caddy `fastcgi` + garde ; ~15 min pour le repli par variable.
+- **Statut**        : **ouvert** — **le premier lot de P3**
+- Vérifié par / Réfuté par / Passe 3 : —
+
+*(Ce constat **absorbe et remplace** le volet « production » de A-009. A-009 reste ouvert pour son
+volet atelier : la même sérialisation y rend le critère 17 inmesurable en local, et a saturé la pile
+sous vingt agents.)*
+
+---
+
+### [A-011] Défaut systémique : les gardes de ce dépôt mesurent souvent le mauvais objet — huit cas indépendants
+- **Sévérité**      : **S1** *(constat de synthèse du chef de chantier — il ne remplace aucun constat d'agent, il les relie)*
+- **Domaine**       : tests / méthode
+- **Référence**     : `e8924b8`
+- **Constat**       : le §3 bis du mandat signalait **un** cas (« la garde `config-prod` est irréprochable et mesure le mauvais objet ») et demandait d'en chercher d'autres. **Six ont été trouvés, par six agents qui ne se parlaient pas.** Ce n'est plus un incident, c'est un **patron de conception** du harnais de ce dépôt.
+
+- **Preuve**        : les six cas, chacun mesuré indépendamment, chacun avec son rapport :
+
+  | # | La garde | Ce qu'elle prétend garder | Ce qu'elle mesure **réellement** | Trouvé par |
+  |---|---|---|---|---|
+  | 1 | `config-prod` (CI) | que la production ne publie que 80 et 443 | **le fichier Compose**, pas les conteneurs — un correctif fusionné et déployé « avec succès » n'avait **rien fermé** | journal 19/08 §7.3 |
+  | 2 | `CrmOutboundTest` — « un 503 fait ATTENDRE sans consommer de tentative » | la temporisation du canal sortant | une réponse 503 **que le site n'émet jamais** (`Http::fake`). **15 tests verts, 52 assertions** | agent 14 |
+  | 3 | `SsrfGuard` (PHP **et** TS) | que l'IPv6 privée est refusée | rien : les 6 cas IPv6 sont bloqués par **`dns_no_records`**, un accident de parsing. `DENY_CIDR` **ne contient aucune plage IPv6** — corriger le parsing **ouvrirait** la faille | agent 19 |
+  | 4 | La garde du décalage horaire | que les dates traversent en UTC | **sa propre fixture**, pendant que le canal décale de **+7 200 s** `occurred_at` **et** `consent_at` | agent 13 |
+  | ~~5~~ | ~~rapport pare-feu~~ | — | **RETIRÉ de cette liste : ce n’en est pas un.** Le document **refusait de conclure** et **prédisait la faille exacte** ; c’est une **case ✅ posée par-dessus** qui a failli. Patron distinct → **A-013** | agent 6 |
+  | 6 | `POST /proxy-providers/{p}/test`, documenté « health check live » | la santé réelle d'un fournisseur | rien : il renvoie **`healthy: true` en dur** | agent 19 |
+
+  À quoi s'ajoutent trois gardes qui ne mesurent **rien du tout**, ce qui est le cas dégénéré du même
+  défaut : `composer-audit` sort `No installed packages found` puis rend `success` (**H47-001**) ; les
+  deux `pnpm-audit` affichent 31 et 33 vulnérabilités puis rendent `success`, et le job d'alerte dépend
+  de leur `failure()` — il **ne peut jamais** se déclencher (**H47-002**) ; et le « BLOQUANT » écrit
+  dans `a11y.yml` **n'est pas une vérification requise** (**H44-002**).
+
+- **Témoin négatif** : le crible **discrimine** — toutes les gardes n'y tombent pas. L'agent 13 a
+  trouvé le canal entrant **exemplaire** (1 témoin positif et 4 témoins négatifs joués sur la
+  signature HMAC, idempotence adossée à un index UNIQUE réel, cloisonnement en 503 sans écriture) ;
+  l'agent 11 a semé **2 lignes dans 2 espaces sur 57/57 tables** pour qu'aucun contrôle ne soit vrai
+  par vacuité ; les gardes de la pièce 1 du 19/08 ont été vues rouges **dans cinq modes de
+  défaillance distincts**, et l'une d'elles **nomme l'index attendu** précisément parce que « pas de
+  `Seq Scan` » serait passé vert sans l'index. **Le dépôt sait écrire de bonnes gardes.** Le défaut
+  n'est donc pas une incapacité, c'est une **inattention répétée au même endroit** : personne ne se
+  demande *sur quel objet* la garde rougit.
+
+- **Impact**        : c'est le constat qui **explique les autres**. Le produit affiche des indicateurs
+  verts et a laissé passer : une base de données ouverte sur internet, une chaîne d'audit sans secret,
+  26 tâches planifiées sans contexte d'espace, un canal sortant qui n'efface rien, et une production
+  qui sérialise toutes ses requêtes. **Aucun de ces défauts n'a fait rougir quoi que ce soit.**
+  Tant que le patron n'est pas nommé et corrigé, chaque nouvelle garde a de bonnes chances de le
+  rejouer — y compris les gardes que **cet audit** va écrire en P3.
+
+- **Correctif**     : trois gestes, dans cet ordre.
+  1. **Étendre la règle 2 de la doctrine par écrit** dans `CONTRIBUTING.md` : *une garde ne vaut que
+     si elle rougit **sur l'objet qui casse**.* Toute nouvelle garde doit déclarer, en une phrase,
+     **quel objet** elle mesure et **pourquoi c'est celui qui casse**.
+  2. **Passer les gardes existantes au crible**, une par une — c'est le périmètre de l'agent 45, qui
+     reçoit ces six cas comme modèles.
+  3. **Pour les six cas ci-dessus** : réparer la garde **avant** de réparer ce qu'elle garde. Une garde
+     fausse réparée après le défaut qu'elle a laissé passer ne prouve rien. Cas 3 en priorité :
+     **corriger le parsing IPv6 sans ajouter les plages à `DENY_CIDR` ouvrirait une faille** — les deux
+     gestes sont indissociables.
+
+- **Statut**        : **ouvert**
+- Vérifié par / Réfuté par / Passe 3 : —
+
+---
+
+### [A-012] Le propriétaire du CRM ne peut pas entrer dans son propre produit — trois défauts qui se referment l'un sur l'autre
+- **Sévérité**      : **S0** — *le produit n'a jamais été utilisable par qui que ce soit*
+- **Domaine**       : sécurité / exploitation / UX
+- **Référence**     : PRODUCTION, mesuré en lecture seule le 2026-08-19 à 11:07Z
+- **Constat**       : le compte propriétaire existe depuis le **2026-05-17**. **Personne ne s'est jamais connecté au CRM en production** — et ce n'est pas un manque d'intérêt, c'est une **impossibilité mécanique**, produite par trois défauts indépendants qui se renforcent.
+
+- **Preuve**        :
+  ```
+  users    = 1        williamsjullin@gmail.com | 2026-05-17 | a_un_hash = t
+  sessions = 0
+  tokens   = 0
+  ```
+  Les trois maillons, chacun mesuré séparément :
+
+  | # | Le maillon | Mesure | Constat |
+  |---|---|---|---|
+  | 1 | `OWNER_INITIAL_PASSWORD` était **vide** à l'installation → le seeder a **généré** un mot de passe aléatoire de 32 caractères et l'a **annoncé une seule fois**, à la console de déploiement | `OwnerUserSeeder.php:20` et `:164` | personne n'a jamais reçu ce mot de passe |
+  | 2 | **`MAIL_MAILER` n'est défini nulle part** — ni `.env` de production, ni `.env.example`, ni conteneur. `config/mail.php:4` retombe donc sur `'log'` | `env('MAIL_MAILER', 'log')` ; 7 clés `MAIL_*` ZeptoMail **complètes et valides** en production | **aucun courriel ne quitte le CRM** — ni **lien magique**, ni **réinitialisation de mot de passe** (les 3 seuls émetteurs du produit : `MagicLinkMail`, `MagicLinkService`, `PasswordResetController`) — **F40-002** |
+  | 3 | Les deux voies de secours passent **toutes deux** par le courriel | `routes/api.php` : `POST /auth/magic-link`, `POST /auth/password/forgot` | **aucune porte de sortie** |
+
+  Autrement dit : le mot de passe initial n'a été vu par personne, et **les deux mécanismes conçus
+  pour en sortir sont muets**. La console est inaccessible à son propriétaire depuis trois mois.
+
+- **Témoin négatif** : la configuration SMTP n'est **pas** absente — les sept clés ZeptoMail sont
+  posées, complètes et valides en production. Ce n'est donc pas « l'e-mail n'a pas été branché », c'est
+  **une seule clé manquante qui annule les sept autres, en silence**. Et le contrôle distingue : le
+  compte **existe** et **porte un hachage** (`a_un_hash = t`) — ce n'est pas un compte absent ou cassé.
+
+- ⚠️ **Un détail de ce diagnostic ne survit pas à la mesure, et je le corrige.** Le script
+  `infra/scripts/definir-mot-de-passe-crm.sh`, arrivé sur `main` **pendant** cet audit, affirme que le
+  mot de passe généré « a été écrit **dans `storage/logs`**, un fichier qui pèse aujourd'hui 263 Mo ».
+  **Je ne l'y trouve pas** : `grep -aioE 'owner_initial_password|mot de passe (genere|initial)|initial
+  password'` sur le `laravel.log` de production rend **zéro occurrence**. La raison est dans le code :
+  `OwnerUserSeeder.php:164` emploie **`$this->command?->warn(...)`**, qui écrit sur la **sortie console
+  d'Artisan**, pas dans `laravel.log`.
+  **Conséquence pratique, et elle est meilleure que ce qui était craint** : le mot de passe n'est
+  **pas** dans un fichier de 270 Mo lisible par tout ce qui accède au conteneur. Il est dans les
+  **journaux de déploiement / la sortie du conteneur** de mai 2026 — un périmètre plus étroit, plus
+  ancien, et probablement déjà tourné.
+  *Cela ne change rien au verrouillage ; cela change l'évaluation de l'exposition, et donc la suite à
+  donner.*
+
+- **Impact**        : c'est le constat qui **relie** plusieurs autres et leur donne leur sens.
+  - Il **explique** pourquoi tous les contrôles verts du produit ont été joués à un seul utilisateur —
+    et donc pourquoi **A-010** (la sérialisation de la production) est resté invisible : *on ne
+    découvre pas un problème de dix utilisateurs quand on n'en a jamais eu un seul*.
+  - Il **redonne leur poids** aux constats d'interface : les 37 écrans n'ont jamais été ouverts en
+    production par personne. « Ça marche » n'a jamais été vérifié par un usage.
+  - Il **bloque le mandat lui-même** : le §11 exige d'ouvrir les 37 écrans à la main dans un vrai
+    navigateur. Sans identifiants, un tiers de l'audit était impossible — c'est d'ailleurs ce que la
+    session parallèle a écrit noir sur blanc en justifiant son script.
+  - Et il **relativise** l'urgence d'autres constats : un produit où personne n'entre n'a pas fait de
+    dégât. Mais il en fera dès la première connexion, et tous les défauts trouvés l'attendent.
+
+- **Ce qui n'est PAS un défaut, et qu'il ne faut pas confondre** : `MAIL_MAILER = log` **est une
+  décision explicite du dirigeant** (« reste `log` tant que le cahier des charges ne demande pas
+  d'envoyer », journal du 19/08 §3.3 et §D). Cette décision est respectée et n'est pas rouverte
+  (D-005). **Le défaut est ailleurs** : personne n'avait vu que cette décision, prise pour les envois
+  *transactionnels métier*, coupait aussi les courriels **d'authentification**. Une décision dont on
+  n'a pas nommé toutes les conséquences n'est pas une décision fautive — c'est une conséquence non
+  nommée, et c'est le travail d'un audit de la nommer.
+
+- **Correctif**     : trois gestes indépendants, et le premier est déjà fait par d'autres.
+  1. **L'accès immédiat** : le script `definir-mot-de-passe-crm.sh` existe désormais et il est bien
+     écrit (mot de passe lu sur **l'entrée standard**, jamais en argument — donc absent de `ps` et de
+     l'historique ; longueur minimale de 12 ; vérification par `Hash::check` après écriture). **Rien à
+     refaire, il faut le jouer.** ⚠️ Il documente au passage un piège réel : la colonne s'appelle
+     **`password_hash`**, pas `password`, et elle **n'est pas castée `hashed`** — écrire `$u->password`
+     ne lève **aucune erreur** et ne fait **rien**.
+  2. **La cause de fond** : poser **`MAIL_MAILER` explicitement** — à `log` si c'est bien la décision,
+     mais **écrit**, pas subi par un défaut de framework. Une valeur implicite est une décision que
+     personne ne peut relire.
+  3. **La séparation qui manque** : distinguer le courrier **d'authentification** (qui doit partir, en
+     toutes circonstances) du courrier **métier** (qui attend le CDC). Un `MAIL_MAILER` unique ne peut
+     pas porter les deux politiques — Laravel permet de désigner un mailer par envoi.
+  4. **La garde** : un contrôle de démarrage qui **rougit** si un produit dont la seule voie de
+     récupération est le courriel a `MAIL_MAILER = log` en production. Elle doit mesurer **la
+     configuration résolue de l'application qui tourne**, pas `.env.example` (piège 19, A-011).
+
+- **Statut**        : **ouvert** — accès rendu par la session parallèle ; **cause de fond ouverte**
+- Vérifié par / Réfuté par / Passe 3 : —
+
+---
+
+### [A-013] 🔴 La faille du 19 août était écrite, en toutes lettres, la veille — et une case ✅ a été posée par-dessus
+- **Sévérité**      : **S1** *(constat de méthode — c'est le plus important de l'audit)*
+- **Domaine**       : méthode / exploitation
+- **Référence**     : `e8924b8` · `_REPORTS/2026-08-18_ETAT-PARE-FEU.md` vs le §4 du journal d'étape 0
+- **Constat**       : le mandat d'audit (§3 bis, §10 piège 19) présente ce rapport comme l'exemple fondateur d'une **garde qui mesure le mauvais objet** : « il concluait que le pare-feu était en ordre. Il l'était — au niveau d'`ufw`. Le trou est en dessous. » **Ce n'est pas ce qui s'est passé.** Le rapport ne conclut rien du tout : il **refuse** de conclure, **prédit la faille exacte**, **donne le correctif**, **donne la commande qui la prouverait** — et **quelqu'un a coché la ligne ✅ par-dessus**.
+
+- **Preuve**        : lecture du document, joué le 19/08. Il porte, dès sa ligne 11 :
+  ```
+  ## 🔴 AVERTISSEMENT — CE DOCUMENT NE CONSTATE RIEN SUR LE SERVEUR
+     L'état réel du pare-feu de production n'a PAS été mesuré, faute d'accès.
+  ```
+  puis, plus bas — **la veille de la faille** :
+  ```
+  l.153  | postgres | 22-23   | "55432:5432" | **0.0.0.0** (toutes) |
+  l.154  | redis    | 43-44   | "56379:6379" | **0.0.0.0** (toutes) |
+  l.174  → En production, Postgres ecoute sur le port hote 55432 et Redis sur 56379
+  l.188  Un `ufw deny` sur un port publie par Docker **ne bloque rien**.
+  l.198       - "127.0.0.1:55432:5432"                    <- le correctif, ecrit
+  l.212  POSTGRES_PASSWORD: axion_dev_only
+  l.247  | 7 | POSTGRES_PASSWORD=axion_dev_only en production | rôle SUPERUSER+BYPASSRLS |
+  l.335  Sortie saine : aucune ligne 0.0.0.0:55432 … Seuls 22, 80 et 443
+  ```
+  Il anticipe jusqu'à la notification CNIL, et se clôt par : *« tant que ce n'est pas fait, **F12 n'est PAS soldé** »*.
+
+- **Témoin négatif** : le contrôle **discrimine**. Sur les 16 lignes de l'étape 0, l'agent 6 en trouve **7 réellement closes** au sens de leur propre critère de sortie — il ne conclut donc pas « tout est faux ». Et le document lui-même **ne prétend rien** : c'est bien l'écart entre lui et son résumé qui est mesuré, pas une faiblesse du document.
+
+- **Impact**        : la conséquence est connue et chiffrée — **une base de 4 295 349 fiches, dont 1 319 567 personnes, joignable en superutilisateur depuis internet**, découverte le lendemain par hasard, en préparant autre chose. Le coût réel n'a pas été la difficulté technique : **le diagnostic était déjà écrit**. Le coût a été qu'un **tableau de synthèse a transformé un « je n'ai pas pu mesurer, et voici précisément ce qui va casser » en un ✅.**
+
+- 🔑 **Et le motif se généralise — c'est là que ce constat devient structurel.** L'agent 6 a mesuré que **les artefacts de ce dépôt sont d'une honnêteté inhabituelle**, et que **ce sont les couches de résumé qui mentent** :
+  - le README du harnais écrit noir sur blanc « **31 écrans sur 37 restent** » ;
+  - `vitest.config.ts` documente lui-même que ses seuils de couverture sont « **DÉCORATIFS** » ;
+  - `EtancheiteWorkspace` **avoue** la cécité de son scan (il écarte `audit_logs` parce que `relkind='p'`) ;
+  - `deploy-staging.yml` écrit lui-même « **Coolify RETIRÉ, le CRM ne se déploie pas par Coolify** ».
+
+  **Dans chacun de ces cas, l'information exacte existait, écrite, au bon endroit.** Ce qui a échoué,
+  c'est la lecture — et le document qui résume. *Ce dépôt n'a pas un problème de mesure : il a un
+  problème de clôture.*
+
+- **Ce que cela corrige dans mon propre travail** : le constat **A-011** listait ce rapport comme le
+  cas n° 5 de « gardes qui mesurent le mauvais objet ». **C'est retiré** : ce n'en est pas un.
+  A-011 garde ses **sept** autres cas, tous vérifiés, et ils restent un défaut systémique réel. Mais
+  le cas fondateur qu'invoquait le mandat relève d'un **second** patron, distinct et plus grave,
+  parce qu'aucune garde technique ne l'attrape : **une case cochée sur un refus de conclure**.
+
+- **Correctif**     : trois gestes, et aucun n'est technique.
+  1. **Une ligne ne se coche pas sur un livrable qui dit ne pas avoir mesuré.** Règle à écrire : tout
+     rapport portant « non mesuré », « à valider », « n'est PAS soldé » **bloque** la clôture de sa
+     ligne — la clôture cite la mesure, ou n'a pas lieu.
+  2. **Rejouer la clôture de l'étape 0** ligne à ligne contre le critère de sortie écrit : l'agent 6
+     l'a fait, et trouve **7 CLOS · 7 PARTIELS · 2 OUVERTS** là où le journal annonce « 15 sur 16 ».
+     **L'écart n'est pas un écart de travail — c'est un écart de clôture.** Le travail a été fait.
+  3. **Appliquer la même règle à cet audit**, sans exception : aucun constat de ce registre n'est
+     déclaré corrigé en P3 sans une mesure jouée en P4 par un **autre** agent. C'est déjà la règle 7 ;
+     ce constat montre ce qu'il en coûte de l'oublier une fois.
+
+- **Statut**        : **ouvert**
+- **Vérifié par**   : agent 6 (mesure d'origine) ; document relu **ligne à ligne** par le chef de chantier avant publication.
+- Réfuté par / Passe 3 : —
+---
+---
+
+# P1 — CONSTATS DES AGENTS
+
+> Un tableau par agent rendu. Le détail complet, les tableaux de grille et les preuves brutes sont
+> dans `11_GRILLES/<rapport>.md` et `04_PREUVES/agent-NN/`. Le dédoublonnage et la renumérotation
+> `A-NNN` se font en P2. **Aucun de ces constats n'est encore vérifié ni réfuté** : c'est le travail
+> de P4 (rotation +17) et P5 (rotation +29).
+
+---
+
+## Agent 16 — journal d'audit, chaîne de hachage, registre AI Act
+**Rapport** : `11_GRILLES/agent-16_audit-ai-act.md` · **Preuves** : `04_PREUVES/agent-16/` (7 fichiers)
+
+À ce stade, **la récolte la plus grave de l'audit** : quatre S0, mesurés sur base jetable, avec
+témoin positif ET négatif joués dans le même amorçage.
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **B16-001** | **S0** | La chaîne d'audit est hachée **sans secret** : `AUDIT_HASH_CHAIN_SECRET` est la chaîne vide (longueur = 0) — qui écrit en base peut recalculer toute la chaîne |
+| **B16-002** | **S0** | **Supprimer la dernière ligne ne rompt pas la chaîne** : le journal n'est pas append-only, il est tronquable par la queue — le contrôle rend `code 0, « OK »` |
+| **B16-003** | **S0** | `created_at` n'entre pas dans le hachage : un horodatage passé de 2026 à **2019** laisse la chaîne « OK », alors que le §20 exige un journal *horodaté* |
+| **B16-004** | **S0** | `GET /audit-logs` rend le journal de **tous les espaces** à **tout compte authentifié** : 0 `where workspace_id`, 0 scope global, 0 politique RLS sur `audit_logs` ni ses 14 partitions, et `AuditLogPolicy::viewAny` **n'est jamais appelée** |
+| **B16-005** | **S1** | L'empreinte de corps d'une connexion **contient le mot de passe**, et elle est servie à tout compte authentifié |
+| **B16-006** | **S1** | Le contrôle d'intégrité planifié à 03:00 **n'avertit personne** : `output = /dev/null`, 0 `afterCallbacks`, aucune destination Sentry configurée |
+| **B16-007** | **S1** | Le registre AI Act est **vide (0 ligne)** et `AiActRegisterController::index()` rend `['data' => []]` **en dur**, sans aucune requête SQL — alors que le §21.4 du CDC affirme qu'il « existe déjà » |
+| **B16-008** | **S1** | Les **quatre exports de données nominatives** ne laissent aucune trace : le middleware ne capte que POST/PUT/PATCH/DELETE, donc **50 routes `GET` sur 111 sont muettes** |
+| **B16-009** | **S1** | Suivre le runbook « disque plein » (`infra/runbooks/02-disk-full.md` §3) rend le contrôle d'intégrité **définitivement rouge** |
+| B16-010 | S2 | `user_agent` n'entre pas dans le hachage |
+| B16-011 | S2 | L'écran « Journaux d'audit » affiche **cinq colonnes qui n'existent ni en base ni dans l'API** |
+| B16-012 | S2 | Les commandes destructives planifiées n'écrivent rien au journal, sauf deux |
+| B16-013 | S3 | Une ligne insérée sans `prev_hash` fait crier « falsification » sans qu'il y en ait eu |
+| B16-014 | S3 | Deux commentaires décrivent un état révolu ; un runbook renvoie à `audit:checkpoint`, commande inexistante |
+
+**Chiffres retenus** : **13 écritures sensibles journalisées sur 25**. Sept gestes exigés par le §20
+(cycle de vie des comptes, rôles, permissions, sessions) **n'existent pas du tout** —
+`UsersController::store/update/destroy` rendent **501**, et le fichier ne contient aucune occurrence
+de `role` ni `permission`. Journal réel : **80 lignes**, toutes `POST`, **72/80 sans espace de
+travail**, **52/80 sans acteur**. `ai_act_register` = 0 · `llm_usage` = 0 · `business_events` = 0.
+
+⚠️ **RÉSERVE LEVÉE — et B16-001 est RÉFUTÉ pour la production.** L'agent 16 avait honnêtement borné
+son constat à l'atelier, faute d'accès. L'agent 40, qui avait l'accès, a mesuré **deux fois** et
+**sans jamais afficher la valeur** : `AUDIT_HASH_CHAIN_SECRET` fait **64 caractères** en production
+(`wc -c` sur l'environnement du processus, puis `env()` dans l'application démarrée ; `=== ''` → non ;
+`=== 'dev-only-secret-change-me'` → non).
+
+> **B16-001 ne s'applique donc PAS à la production. Il reste vrai en local**, où le secret est vide —
+> ce qui signifie que **les tests de la chaîne d'audit tournent, en local et en CI, sur une
+> configuration qui n'est pas celle de la production**. C'est le même motif que **B11-010**
+> (cloisonnement) et **A05-008** (fuseau horaire) : *l'atelier et la production ne se comportent pas
+> pareil, et c'est l'atelier qui sert de référence aux gardes.*
+
+**Ce qui reste entier**, en revanche : **B16-002** (journal tronquable par la queue), **B16-003**
+(horodatage hors hachage) et **B16-004** (fuite inter-espaces) **ne dépendent d'aucun secret** — ils
+tiennent en production comme ailleurs. Trois S0 sur quatre survivent.
+
+---
+
+## Agent 5 — le plan du 13 août, lot par lot
+**Rapport** : `11_GRILLES/agent-05_plan-13-aout.md` · **Preuves** : `04_PREUVES/agent-05/` (10 fichiers)
+
+**65 livrables re-prouvés** sur 12 blocs : **46 LIVRÉ · 7 PARTIEL · 9 NON LIVRÉ · 2 DÉCLARÉ À TORT ·
+1 non vérifié** (la suite Pest, que l'agent a **refusé** de mesurer : le conteneur portait plus de
+vingt processus concurrents d'autres agents, dont un `migrate:fresh` — refus honnête, et juste).
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **A05-001** | **S1** | La fiche 360° et le rapprochement par `person_key` sont **inatteignables** : **0 contact sur 1 319 567** porte une clé — dont **410 481 ont pourtant un e-mail** — et aucun backfill n'existe |
+| **A05-003** | **S1** | Cinq jours après activation, la synchro site → CRM n'a créé **aucune** fiche : **3 événements sur 3** tombés en arbitrage manuel faute de SIREN |
+| A05-002 | S2 | `first_info_at` (article 14 RGPD) : deux colonnes livrées et commentées, **aucun écrivain ni lecteur** dans tout le dépôt, 0 ligne renseignée en production |
+| A05-004 | S2 | Le cycle de vie business n'a **jamais** changé d'état : **4 295 349 fiches à `nouveau`** ; la règle « client → dormant » n'est implémentée nulle part |
+| A05-005 | S2 | La conception console UX v2, référentiel n°4 de l'ordre de mission, décrit une navigation qui **n'a jamais existé** |
+| A05-006 | S2 | Le vivier candidats — objet central du plan — est **vide** (`candidates` = 0) cinq jours après ouverture du flux, et **rien ne signale ce silence** |
+| **A05-009** | **S2** | **14 des 16 spécifications Playwright ne sont exécutées par aucun pipeline**, dont `console-locale.spec.ts`, seule couverture automatisée des 4 écrans de la console v2 |
+| A05-007 | S3 | Deux numérotations de lots coexistent dans les documents de référence, sans table de correspondance |
+| A05-008 | S3 | Le correctif du décalage de 2 h est **actif en production** alors que le plan affirme « RIEN N'EST APPLIQUÉ », et **inerte en local** |
+
+**Au crédit du chantier, re-prouvé et non cru** : Gate 0 est réel (CI bloquante, `needs: [ci]`,
+`migrate --force` sans `|| true`) ; **780 tests / 6 503 assertions** et PHPStan `[OK] No errors` sur un
+run CI du 19/08 ; PR #53→#65 toutes fusionnées ; durcissement RLS P0 livré ; **les 9 drapeaux CRM sont
+bien à `true` en production** (vérifié par `docker inspect`, pas cru sur parole) ; backfill des tags
+`src:` = **4 294 895 lignes**, au chiffre près de ce qui était déclaré.
+
+---
+
+## Agent 9 — écarts document ↔ code
+**Rapport** : `11_GRILLES/agent-09_ecarts-documents.md` · **Preuves** : `04_PREUVES/agent-09/` (6 fichiers)
+
+**70 documents** au périmètre, **22 mesurés par commande jouée**, 48 inventoriés sans mesure (nommés
+au §4 de son rapport ; ses délégations ont échoué sur le plafond de 20 agents simultanés).
+**51 affirmations fausses**, dont **12 qui feraient prendre une mauvaise décision**.
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **A09-001** | **S1** | `_AUDIT/DEPLOY-PIPELINE.md` décrit une commande de déploiement qui n'est pas celle qui tourne, et **omet `--no-deps`** : il laisse croire qu'un changement de compose sur `postgres`/`redis`/`reverb` est déployé. **C'est exactement ce qui a laissé la faille du 19/08 ouverte sous un déploiement vert.** |
+| **A09-002** | **S1** | `_REPORTS/PROGRESS.md`, **lié depuis `README.md`**, annonce S3→S12 « pending » alors que `README.md` annonce 12/12 livrés |
+| **A09-005** | **S1** | Le commentaire de `.gitattributes` affirme « plus de divergence » ; **8 scripts `.sh` sur 16 sont encore en CRLF** *(recoupe A-003)* |
+| A09-003 | S2 | L'inventaire de l'étape 1a déclare absentes des activités et motifs qui **existent en base depuis le même jour** — et c'est ce document qui **fixe l'ordre des pièces** |
+| A09-004 | S2 | L'inventaire de l'étape 1a déclare `saved_views` sans contrôleur ni route ; **les deux existent** *(confirme A-002)* |
+| A09-006 | S2 | `CONTRIBUTING.md` présente comme « quality gates » deux seuils de couverture que la CI **ne mesure jamais** (`ci.yml:245` pose `coverage: none`) |
+| A09-007 | S2 | Le runbook de la console locale fait démarrer la pile depuis **le worktree résiduel `crmpro-wt-etape0`**, alors que le fichier est versionné à la racine |
+| **A09-008** | **S2** | Trois documents annoncent « RLS sur 30 tables » ; mesuré : **55 tables avec RLS sur 72 portant `workspace_id`** — et **`audit_logs`, `audit_logs_default`, `sessions`, `user_workspaces` n'en ont pas** *(recoupe B16-004)* |
+| A09-009 | S2 | `TODO.md` se déclare « source de vérité » et décrit un dépôt **d'avant la première ligne de code** |
+| A09-010 → A09-013 | S3 | Commandes de test prescrites inexécutables · `spec/00_INDEX.md` faux jusqu'à un facteur 2,4 · commentaires de `routes/console.php` déclarant inexistantes des commandes qui existent · journal d'étape 1a à SHA périmé |
+
+**Deux avertissements de méthode adoptés par le chef de chantier** :
+- `grep -c $'\r'` **n'est pas fiable selon les shells de ce poste** — il a « prouvé » 15/15 à tort.
+  Méthode retenue : comptage des **octets `0x0d`**, **validée sur un témoin pur LF et un témoin pur
+  CRLF** avant usage. C'est ainsi que A-003 a été re-mesuré (8/16).
+- **La base locale `axion_crm` est mutée en concurrence** : toute mesure en base doit être horodatée
+  et recroisée avec `select count(*) from migrations` = 58.
+
+---
+
+## Agent 47 — dépendances et vulnérabilités
+**Rapport** : `11_GRILLES/agent-47_dependances.md` · **Preuves** : `04_PREUVES/agent-47/` (16 fichiers)
+
+**Le chiffre du mandat est exact au chiffre près : 57 alertes ouvertes (4 critiques, 18 hautes,
+31 moyennes, 4 basses).** Deux faits qu'il ne dit pas : **57/57 sont npm** (zéro composer, zéro
+docker, zéro github-actions), et **57/57 ont été créées le 2026-08-19**, les alertes n'ayant été
+activées que la veille.
+
+🔑 **Combien sont réellement atteignables en production : ZÉRO**, par trois mesures indépendantes.
+- **32 alertes (56 %, dont 2 critiques et 8 hautes) viennent de `workers/`, qui n'est déployé par aucun compose hors tests** — et les 8 workflows `prospection-*.yml` passent tous par `php artisan`, **0 par Node**.
+- **Les 4 critiques sont la même CVE** (`vitest`, CVE-2026-47429), qui exige le serveur d'interface Vitest : `@vitest/ui` **n'est installé nulle part** et `--ui` n'apparaît dans aucun fichier.
+- **11 alertes seulement** touchent le seul artefact livré. `vite build` rejoué, marqueurs comptés : `follow-redirects`, `httpAdapter`, `getBoundary`, `formDataToJSON` = **0** (témoin positif : `XMLHttpRequest` = 16). Toutes se corrigent par **une seule** montée mineure, `axios 1.16.1 → 1.18.0`, dans l'intervalle `^1.7.0` déjà déclaré.
+
+🔴 **L'hypothèse du mandat sur les 20 PR est RÉFUTÉE.** Elles n'ont pas été « fermées sans
+traitement » : elles ont été fermées **par Dependabot lui-même**, le 18/08 entre 18:44:47Z et
+18:44:49Z, après le gel des 5 écosystèmes (`fccc9d1`), sous une **politique écrite, datée et
+chiffrée** de 441 lignes (`_REPORTS/2026-08-18_POLITIQUE-DEPENDANCES-ETAPE-0.md`) qui donne le sort
+de chaque PR. **16 des 20 étaient des majeures ; aucune n'était corrective de sécurité.** Et **0
+branche `dependabot/*`** ne subsiste sur `origin` — ma propre mesure de 09:26Z en comptait 20 :
+elles ont été supprimées entre-temps.
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **H47-001** | **S1** | Le job `composer-audit` de `security.yml` **n'a jamais audité un seul paquet PHP** — il sort `No installed packages found` et rend `success`. Témoin négatif fourni : la même commande en `--locked` trouve **18 avis** sur un guzzle volontairement ancien |
+| **H47-002** | **S2** | Les deux jobs `pnpm-audit` affichent 31 et 33 vulnérabilités **puis rendent `success`** ; et le job `alerte` dépend de leur `failure()` — il **ne peut donc jamais** se déclencher sur une vulnérabilité |
+| **H47-005** | **S2** | `workers/` — **32 des 57 alertes** — n'est déployé par aucun compose hors tests, alors que son image est construite à chaque déploiement de préproduction et scannée par Trivy. **Trancher son sort éteint 32 alertes sans monter une seule dépendance** |
+| H47-003 | S3 | La prémisse écrite du gel (« les alertes Dependabot sont DÉSACTIVÉES », « précaution INERTE ») est fausse depuis le 19/08 : le critère d'entrée du dégel est **déjà rempli** |
+| H47-004 | S3 | `poc/05_dedup_performance/pnpm-lock.yaml` porte 1 alerte, hors des 5 `directory:` de `dependabot.yml` et hors de la matrice `pnpm-audit` : **aucune PR ne sera jamais proposée** |
+
+**Le piège Stripe du mandat ne s'applique pas à ce dépôt** : il n'y a aucun SDK Stripe dans le CRM
+(il vise le dépôt Axion-IA). **7 autres contrats de version figée** ont été trouvés, dont le gel des
+5 écosystèmes, `postgis/postgis` majeure interdite à titre permanent, et `ARG PLAYWRIGHT_VERSION`
+sous garde CI bloquante.
+
+**À re-mesurer le lundi suivant, après 06:00 UTC** : `automated-security-fixes` est actif et n'a
+produit **0 PR en 24 h**. Si le compte reste 0, c'est un **S1** — le gel aurait alors coupé en
+silence le canal de sécurité qu'il prétendait préserver.
+
+---
+
+## Apport hors périmètre — inventaire du canal, côté site
+*(Produit par un agent auxiliaire du bloc B, remonté directement au chef de chantier.
+À contre-vérifier côté CRM par l'agent 13 — il n'est pas repris tel quel.)*
+
+**Le point le plus grave, et il est de nature RGPD.** L'opposition « vivier » émise par le site
+(`Axion-IA/axionia/src/server/vivier/opposition.ts:66`) envoie `consent.version` **lu en base sur la
+ligne `JobApplication`**. Pour les **71 candidatures du stock historique**, cette valeur est
+`careers-v1-2026-06-09` — qui n'est **pas** dans la liste fermée
+`Taxonomy::CANDIDATE_CONSENT_VERSIONS_V2` du CRM.
+
+> **Si le CRM valide `consent.version` pour tout événement d'univers vivier, et pas seulement pour
+> `application_submitted`, une opposition part en 422 puis en `gave_up`.**
+> **Refuser un opt-out pour cause de version de consentement périmée est l'inverse de ce qu'il faut.**
+
+🔴 **RÉFUTÉ PAR L'AGENT 13 — et c'est moi qui avais mal lu.** J'avais étayé cette hypothèse sur une
+ligne trouvée dans le journal applicatif **local** :
+`Fiche candidat refusée : consentement v2 requis (…), reçu : careers-v1-2026-06-09.`
+L'agent 13 a établi que cette ligne **ne vient pas de trafic réel** : elle n'apparaît que dans
+`_REPORTS/e2e2-preuves/pest-*.txt` et les journaux de CI — ce sont les **témoins négatifs de la suite
+de tests**. Et la suite Pest s'exécutant **dans le même conteneur**, elle écrit dans **le même
+`laravel.log`** que j'ai lu. *J'ai pris la preuve qu'une garde fonctionne pour la preuve qu'un défaut
+existe.*
+Il a par ailleurs montré que la seconde ligne que j'avais versée au dossier — `Version de schéma pivot
+non supportée` — **n'appartient pas à ce canal** : elle vit dans `app/Crm/Scraping/ScrapedRecord.php:123`,
+canal **collecte**, sous le message `scraper-result refusé`.
+**Mesure de l'agent 13, point 9 : zéro événement légitime rejeté** — les 3 émetteurs du site couvrent
+exactement les 3 versions de la liste fermée. **Hypothèse close, pas de constat.**
+*(L'angle mort côté site — la valeur **dynamique** lue sur `JobApplication.consentVersion` pour les
+71 candidatures du stock — reste à trancher par l'**agent 31**, qui travaille sur le dépôt du site :
+c'est un chemin distinct de ceux qu'a mesurés l'agent 13.)*
+
+Autres éléments versés au dossier du bloc E :
+- Le site émet **9 valeurs de `consent.version`** (8 constantes + 1 dynamique) ; le CRM n'en accepte
+  que **3** pour le vivier. Et `v1-2026-05-24` avec `form_type = recrutement` **bascule en univers
+  vivier** tout en portant une version non-v2.
+- **5 valeurs de `source_slug`** seulement (`calendly`, `site-candidature-offre`,
+  `site-candidature-commerciale`, `site-formulaire-podcast`, `chatbot`). Le formulaire unifié
+  (12 finalités), le simulateur ROI, la newsletter, les avis et l'opposition vivier **n'en envoient
+  aucun** : le CRM ne saura pas d'où vient un lead du formulaire principal.
+- Le champ `tags[]` du contrat existe côté site mais **aucun émetteur ne le renseigne** : code mort.
+- Les 4 événements `calendly_*`, le chatbot et `newsletter_optout` **n'envoient aucun bloc `consent`**.
+- Côté visibilité, en revanche, le canal est honnête : un 422 **est** visible (compteur « Abandons
+  définitifs » en rouge, ligne détaillée avec le payload complet, alerte Telegram). Mais la
+  déduplication est **horaire** : 40 abandons dans la même heure ne produisent **qu'un seul** message.
+
+---
+
+## Agent 11 — cloisonnement par espace de travail, table par table
+**Rapport** : `11_GRILLES/agent-11_cloisonnement.md` (538 l.) · **Preuves** : `04_PREUVES/agent-11/` (11 fichiers, dont 3 scripts SQL rejouables)
+
+**Méthode retenue, et elle est exemplaire** : 2 lignes semées dans 2 espaces différents sur **57/57**
+tables — donc **aucune table vide**, donc **aucun contrôle vrai par vacuité**. C'est le témoin négatif
+que la règle 3 exige, et il est joué avant les conclusions, pas après.
+
+**Chiffres** : **101 tables auditées** (114 en fin de session — 13 partitions d'`audit_logs` sont
+apparues pendant la mesure) · **59** portent une colonne d'espace · **55** portent `ENABLE` **et**
+`FORCE ROW LEVEL SECURITY` · **54/57** rendent 0 ligne sans contexte · **55/57** ne rendent que
+l'espace demandé.
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **B11-001** | **S0** | **26 des 33 tâches planifiées** touchant une table cloisonnée s'exécutent **sans aucun contexte d'espace** — seules `rgpd:purge-vivier` et `rgpd:purge-business-prospects` en posent un |
+| **B11-002** | **S0** | **5 jobs sur 6** s'exécutent sans contexte, alors que `Queue::looping` l'efface avant chacun |
+| **B11-003** | **S1** | `retention:purge` purge **tous les espaces ou aucun** |
+| **B11-006** | **S1** | `audit_logs` et ses **14 partitions** n'ont **aucune** RLS *(recoupe B16-004 et A09-008)* |
+| B11-004 | S2 | `email_verification_logs` : une policy permissive `COALESCE` a survécu — **2 lignes visibles sans contexte** |
+| B11-005 | S2 | Base de test **unique codée en dur** : trois agents lançant des tests dessus se détruisent mutuellement |
+| B11-007 | S2 | **11 tables portant des données personnelles n'ont aucune colonne d'espace** : `crm_outbound_events`, `deal_history`, `dnc_entries`, `email_messages`, `email_sequences`, `email_suppressions`, `email_validations`, `linkedin_health_checks`, `linkedin_sequence_runs`, `opt_out`, `analytics_funnel_snapshots` |
+| B11-009 | S2 | L'échappatoire explicite `runWithoutScope()` n'a **aucun appelant** |
+| **B11-010** | **S2** | 🔑 **L'atelier local n'arme aucun des deux dispositifs de cloisonnement** : `CRM_DB_APP_ROLE_ENABLED` = `false` en local, **`true` en production** |
+| B11-008 | S3 | Le commentaire « permissive si non défini » de `health_practitioners` est **faux** et sert de modèle dans la migration |
+| B11-011 | S3 | Quatre événements diffusés re-résolvent leurs modèles dans le worker, sans contexte |
+
+🔑 **Le fait qui commande tout le reste : local et production n'exécutent pas le même cloisonnement**
+(B11-010). Toute mesure d'étanchéité faite en local est donc, par construction, une mesure **d'autre
+chose**. C'est une variante exacte du piège 19 — *une garde peut mesurer le mauvais objet* — appliquée
+cette fois à l'atelier lui-même. **Conséquence pour l'audit** : les verdicts d'étanchéité doivent être
+rejoués sur une pile configurée comme la production, ou déclarés non concluants. Porté en P2.
+
+**Deux points d'honnêteté de l'agent, retenus tels quels** :
+- Le point chaud `health_practitioners` du mandat (« permissive si non défini ») est un **faux positif** :
+  le commentaire décrit une policy remplacée le 14/08 — mesuré, 0 ligne sans contexte, 1 avec.
+- **Il n'a pas obtenu de rouge provoqué propre.** `EtancheiteParTableTest` sortait déjà 4 échecs sur 11
+  sur `main` **sans qu'on ait rien cassé** — mais parce que trois agents partageaient la même base de
+  test (B11-005). L'agent le déclare comme un manque plutôt que de présenter ce rouge comme le sien.
+  **À rejouer en P4, sur une base isolée.**
+
+**Recensement complet du patron « contexte perdu après la réponse »** (ce que le chef de chantier avait
+demandé de chercher au-delà du cas déjà corrigé) : `Cache::flexible` **1** occurrence, corrigée ·
+`dispatchAfterResponse` / `defer()` / `App::terminating` / `register_shutdown_function` : **0** ·
+middleware `terminate()` après `SetCurrentWorkspace` : **0**. Le trou n'est donc pas là où on le
+cherchait : il est dans les **tâches planifiées** et les **jobs**.
+
+---
+
+## Agent 17 — les 35 tâches planifiées, 6 jobs, 49 commandes
+**Rapport** : `11_GRILLES/automatismes.md` (490 l.) · **Preuves** : `04_PREUVES/agent-17/` (13 fichiers)
+
+**91 objets, 91 audités.** Décompte refait par l'agent lui-même : **35** `Schedule::command` (le mandat
+en nommait **10**), **49** commandes, **6** jobs.
+
+**Classement des 49 commandes** : **44 utilisées** · **1 morte** (`media:import-press-kit`, 449 lignes,
+zéro référence dans tout le dépôt) · **4 candidates mortes** · **14 dangereuses, dont 11 sans aucun test**.
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **B17-001** | **S1** | `retention:purge --dry-run` **exécute réellement** l'`UPDATE` qu'il prétend seulement compter — et rapporte « 0 » |
+| **B17-012** | **S1** | Deux purges de `companies` sans contexte d'espace, sans `--dry-run`, sans journal, sans test — **déjà jouées 5 fois en production** le 2026-07-04 ; `WHERE legal_form IS NULL` supprime **sur une absence de donnée** |
+| **B17-009** | **S1** | Les deux seules purges RGPD correctement construites **ne s'exécutent jamais** : l'échéance CNIL 2 ans / 3 ans n'est tenue par **aucun** automatisme |
+| **B17-010** | **S1** | Le trait `RunsInWorkspace` n'est **jamais emprunté** : les 5 points de dispatch d'`EnrichCompanyJob` omettent le `workspaceId`, les 5 autres jobs ne l'utilisent pas *(recoupe B11-002)* |
+| **B17-008** | **S1** | Les 3 imports médias hebdomadaires font `DELETE` + réinsertion : **l'enrichissement de la semaine est détruit** et les journalistes détachés (`confdeltype='n'` mesuré) |
+| **B17-003** | **S1** | Les 35 tâches n'ont **aucun** canal d'échec : sortie dans `/dev/null`, 0 `onFailure` ; l'alerte de `audit:verify-chain` et celle d'`anomaly:detect` sont **des commentaires** *(recoupe B16-006)* |
+| **B17-002** | **S1** | Mutex `withoutOverlapping()` à **TTL 24 h** mesuré, et le déploiement tue le planificateur en pleine tâche : **10 s de grâce contre 1 min 43 s mesurées** |
+| B17-004 | S2 | Trois tâches s'auto-sautent **depuis l'intérieur de la commande** — invisibles dans `schedule:list` |
+| B17-005 | S2 | `rgpd:anonymize-ips` réécrit **chaque nuit tout l'historique** `audit_logs` (clause non convergente) |
+| B17-006 | S2 | Sept tâches sans aucun verrou, dont un `REFRESH MATERIALIZED VIEW` **non concurrent** chaque heure |
+| B17-011 | S2 | `MonitorCampaignProgressJob` a `tries=1` : une exception fige la campagne en `running` **pour toujours**, sans alerte |
+| B17-013 | S2 | 24 des 35 tâches sans test ; 11 des 14 destructives sans test ; le trait `RunsInWorkspace` sans test |
+| B17-014 | S2 | `prospection:reclassify-size/--sector --all` réécrivent **toute** la table `companies` en une requête (`WHERE 1=1`), sans bornage ni contexte, **depuis un bouton GitHub** |
+| B17-007 | S3 | Le commentaire de `console.php` affirme un auto-skip qui n'a plus lieu |
+
+🔑 **« Les tâches qui s'auto-sautent » : il y en a 9, pas 1.** Le mandat n'en nommait qu'une
+(`companies:rescrape-archives`, censée se sauter « si la commande n'existe pas »). Mesuré :
+**la commande existe** (`array_key_exists(...)` → `true`), donc **le commentaire de `console.php:29-32`
+ment**. Et trois autres se sautent **depuis l'intérieur de leur propre corps**, invisibles à la fois
+depuis `console.php` et depuis `schedule:list` : `blacklists:check` (horaire) et `signals:nightly-scan`
+(nocturne) ont pour corps entier `if (env('MOCK_MODE', true)) return SUCCESS`, et
+`journalists:scrape-ours` (quotidienne) dépend de `MEDIA_JOURNALISTS_ENABLED`, défaut `false`.
+**Ce sont les pires : elles s'exécutent, rendent `SUCCESS`, et ne font rien.** C'est la définition
+même du « vert qui ne témoigne de rien ».
+
+**Deux points d'honnêteté de l'agent, retenus** :
+1. **Le planificateur de production n'a pas pu être vérifié** — le SSH dont il disposait mène au VPS
+   du site, pas à celui du CRM. Il l'écrit plutôt que de conclure. *(Confié à l'agent 40, qui a
+   l'accès.)* Fait ajouté au passage : `docker-compose.prod.yml:80-88` pose `healthcheck: disable: true`
+   sur `scheduler` — **rien ne dirait qu'il est mort.**
+2. La base locale étant vide et **aucune table de suivi d'exécution n'existant** dans le schéma, les
+   colonnes « durée » et « coût » sont marquées **non vérifiées pour 33 des 35 tâches** plutôt que
+   remplies au jugé. C'est exactement ce que le §5 du mandat demande : une case « non vérifié — raison »
+   est honnête, une case inventée ne l'est pas.
+
+---
+
+## Agent 14 — le canal sortant CRM → site
+**Rapport** : `11_GRILLES/agent-14_canal-sortant.md` (579 l.) · **Preuves** : `04_PREUVES/agent-14/`
+
+**Le mandat annonce « 3 seuls événements ». Le 3 est le vocabulaire déclaré, pas le nombre émis :**
+
+| Compte | Valeur |
+|---|---|
+| Types **déclarés** (constante PHP + `CHECK` Postgres) | **3** |
+| Types ayant un **producteur** dans le code | **2** |
+| Types **atteignables par un humain** depuis la console | **1** (`erasure`) |
+| Types ayant un **effet réel** côté site | **1** (`consent_optout`) |
+| Événements **exigés par le §22.2**, sens CRM → console | **19** |
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **B14-002** | **S0** | 🔴 **`erasure` traverse, le site répond « 200 applied », et rien n'est effacé** — même branche que l'opt-out ; seul effet réel : désabonner d'une newsletter |
+| **B14-013** | **S1** | En production, le canal est **ouvert dans le sens site → CRM et fermé dans le sens CRM → site** |
+| **B14-005** | **S1** | Le site **ne renvoie jamais 503** : la garde de temporisation est morte, et **3 h 02 de panne réseau suffisent à perdre un événement définitivement** |
+| **B14-003** | **S1** | La file morte (`gave_up`) n'est visible **sur aucun écran du CRM**, et n'est **jamais reprise** — même remise « due » de force |
+| **B14-004** | **S1** | Le sens CRM → site n'a **aucune alerte, dans aucun des deux dépôts**. `CRM_SYNC_ALERT` **n'existe pas** dans le CRM (5 occurrences, toutes documentaires) |
+| **B14-009** | **S1** | Le « batch de réconciliation quotidien » que le code **promet en commentaire** n'existe pas |
+| **B14-010** | **S1** | L'effacement d'un journaliste (`DELETE`, documenté « droit à l'effacement ») **n'émet rien** — dans le contrôleur même qui émet pour l'opposition |
+| B14-001 | S1 | 3 événements déclarés, 2 produits, 1 atteignable par un humain |
+| B14-011 | S2 | **5 des 6 familles du §22.2 n'ont aucun émetteur** — 2 événements sur 19 |
+| B14-006 | S2 | Rien ne détecte l'arrêt de `crm:flush-outbound` ; `withoutOverlapping()` sans argument = **verrou 24 h**, soit **288 passages sautés en silence** |
+| B14-007 | S2 | Canal **mono-destination** pour un CRM multi-espaces : table sans `workspace_id`, **RLS absente** (mesuré `f\|f`), `scope` codé en dur `'business'`, une seule URL |
+| B14-008 | S2 | Contrat versionné **à l'entrée, pas à la sortie** ; aucun test croisé entre les deux dépôts |
+| B14-012 | S2 | `person_key` prévu, **jamais renseigné**, et **jeté par le site** *(recoupe A05-001)* |
+| B14-014 | S3 | L'anti-doublon peut écraser une décision plus récente |
+
+**Ce qui devrait traverser et ne traverse pas** — la liste est longue et c'est le livrable central :
+effacement d'un journaliste · réinscription (inexistante) · opposition depuis un écran (**aucun
+bouton n'appelle la route**) · opposition et effacement d'un candidat du vivier · correction de
+coordonnée (**501**) · suppression d'un contact (**501**) · rapprochement de fiche · fusion de fiches ·
+actions de masse · suppression d'entreprise · purges RGPD mensuelles · et **15 événements métier**
+(opportunité, devis, facture, réclamation, rendez-vous interne, compte rendu, décision d'embauche…)
+qui n'ont **aucun modèle**.
+
+**Et ce qui traverse sans avoir l'effet annoncé** : `erasure` (rien) · `consent_optout` sur un
+non-abonné → `no_match` **et 200** · tout `scope: vivier` → **ignoré** · `person_key` reçu **puis jeté**.
+
+**Symétrique Calendly** : le site émet bien `calendly_canceled` / `no_show` / `completed` ; **le CRM
+ne renvoie rien**, alors que le §22.6 du CDC promet « le statut redescend vers la console tout seul ».
+
+🔑 **Un cas de piège 19 attrapé en flagrant délit.** L'agent a rejoué `CrmOutboundTest` : **15 passés,
+52 assertions**, dont une garde nommée « *un 503 fait ATTENDRE sans consommer de tentative* ».
+Cette garde est **verte et mesure le mauvais objet** : elle exerce, via `Http::fake`, une réponse
+**que le site n'émet jamais**. C'est exactement le motif de la garde `config-prod` du 19/08, retrouvé
+indépendamment sur un autre sujet. **Il faut le chercher partout** — porté au périmètre de l'agent 45.
+
+---
+
+## Agent 44 — le harnais de tests : ce qui existe, ce qui s'exécute
+**Rapport** : `11_GRILLES/agent-44_harnais-tests.md` (318 l.) · **Preuves** : `04_PREUVES/agent-44/` (15 fichiers, journaux CI complets)
+
+| Suite | Existe | S'exécute | Résultat mesuré |
+|---|---|---|---|
+| **Pest** | 95 fichiers | ✅ CI bloquante **et requise** | **780 tests, 6 503 assertions, 39,31 s**, 0 échec, 0 ignoré |
+| **Vitest frontend** | 21 fichiers | ✅ CI requise | **118 tests, 118 passés** |
+| **Vitest workers** | 6 fichiers | ✅ CI requise | **61 tests, 61 passés**, 7,32 s |
+| **Playwright** | 16 specs / **285 tests** | ⚠️ **2 specs sur 16**, chromium seul | **18 tests joués** sur 285 |
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **H44-003** | **S1** | `deploy-staging.yml` **déploie la préproduction à chaque poussée sur `main` sans aucun test** — pas de `needs: ci` |
+| **H44-004** | **S2** | Le harnais n'a **aucune isolation** : `tests/bootstrap.php` épingle **toute** exécution sur l'unique `axion_crm_test`, où `RefreshDatabase` fait `DROP TABLE … CASCADE`. **Deux personnes ne peuvent pas lancer les tests en même temps** *(recoupe B11-005)* |
+| **H44-001** | **S2** | 14 des 16 specs Playwright ne sont exécutées par aucun workflow : **267 des 285 tests ne tournent nulle part** *(confirme A05-009 et le chiffre)* |
+| **H44-002** | **S2** | Le seul job qui exécute Playwright **n'est pas une vérification requise** : le « BLOQUANT » écrit dans `a11y.yml` **ne bloque rien** |
+| **H44-006** | **S2** | **6 écrans sur 37** sont montés par un test ; **10 sur 37** touchés par un test qui s'exécute en CI ; **27 sur 37 par rien** |
+| **H44-011** | **S2** | La CI est **épinglée sur l'ordre qui passe** (`executionOrder` fixe) : le couplage entre tests n'est plus mesuré par aucune porte |
+| H44-005 | S3 | `memory_limit=128M` non déclaré dans le dépôt, pour une suite de 780 tests |
+| H44-007 | S3 | **Aucune couverture produite ni évaluée** : seuils Vitest décoratifs, `coverage: none` côté PHP *(confirme A09-006)* |
+| H44-008 | S3 | `a11y.yml` : `pnpm install --frozen-lockfile \|\| pnpm install` **rattrape en silence** une dérive du lockfile |
+| H44-009 | S3 | `MOCKS-STRATEGY.md` décrit `DnsManager`/`EmailSender` qui n'existent pas |
+| H44-010 | S3 | `workers/vitest.config.ts` ne collecte que `tests/` : un test placé sous `src/` serait ignoré **sans un mot** |
+
+**Le résultat le plus utile de cet agent est ce qu'il a RÉFUTÉ**, et il faut le retenir :
+- **Zéro exclusion silencieuse dans les configurations** : 0 `<exclude>`, 0 `@group`, 0 `->skip()`,
+  0 `it.skip`, 0 `test.todo`, 0 `.only`, 0 `testIgnore`. `phpunit.xml` et `phpunit-ci.xml` ne diffèrent
+  que par `executionOrder` : **la quarantaine est réellement levée**. Les exclusions de ce dépôt sont
+  toutes **hors configuration** — ligne de commande, protection de branche, absence de porte.
+- **`navigation.spec.ts` n'est plus rouge en silence** (14 verts depuis `da97826`) : le piège 13 du
+  mandat est **périmé** sur ce point.
+- **Le piège 9 (`localhost` vs `127.0.0.1`) ne s'applique pas** : `127.0.0.1` ne sert que `vite preview`.
+- **Le piège 7 ne s'applique pas à `ci.yml`** : aucune installation en `continue-on-error`.
+- **« 1 écran de route couvert sur ~37 » est faux** : c'est **6 montés, 10 touchés**.
+
+**Deux points d'honnêteté, et ils valent mieux qu'un chiffre de plus** :
+1. **L'agent a RETIRÉ une mesure déjà écrite.** Il avait chronométré `php artisan --version` à
+   **3 min 12 s** (contre 0,22 s pour `php -r`) et en tirait un constat sur le montage Windows. En
+   cherchant la cause, il a découvert par `ps aux` qu'**une quinzaine de processus PHP d'autres agents
+   de cet audit tournaient dans le même conteneur**. *La mesure est réelle, l'attribution ne l'est pas.*
+   Retirée.
+2. **Il a arrêté sa propre exécution** en constatant qu'elle détruisait les bases des autres agents
+   autant qu'ils détruisaient la sienne — et il en a fait le constat **H44-004** plutôt qu'une plainte.
+   Corollaire assumé : il **ne peut pas dire** si ses 3 échecs locaux (verts en CI) sont des défauts ou
+   des collisions. *C'est précisément ce qu'un harnais ne devrait jamais rendre indécidable.*
+
+---
+
+## Agent 13 — le canal entrant site → CRM
+**Rapport** : `11_GRILLES/agent-13_canal-entrant.md` · **Preuves** : `04_PREUVES/agent-13/`
+Base jetable `axion_crm_audit13`, créée puis détruite.
+
+**C'est le rapport le plus rigoureux rendu à ce stade** : il réfute deux hypothèses qu'on lui avait
+données, dont **une de moi**, et il abandonne deux de ses propres pistes après vérification.
+
+| # | Point de grille | Verdict |
+|---|---|---|
+| 1 | **Signature HMAC** | ✅ SHA-256 sur `"<timestamp>.<corps brut>"`, `hash_equals`, vérifiée **avant** le drapeau. **1 témoin positif** (200 `created`) et **4 témoins négatifs** joués : signature falsifiée, en-tête absent, corps altéré après signature, horodatage altéré après signature → **401** à chaque fois, **0 écriture** |
+| 2 | **Rejeu** | ✅ Pas de nonce, **et il n'en faut pas** : fenêtre ±300 s (mesurée à −400 s et +400 s → 401 `stale_signature`) + idempotence par `event_id` **adossée à un index UNIQUE réel**. Rejeu octet pour octet → `noop_idempotent`, 1 seule activité |
+| 3 | **Déduplication** | ⚠️ correcte, sauf un angle mort de locale |
+| 4 | **Classement** | ✅ 10/10 événements classés, inconnu → **422 bruyant**. ⚠️ mais un **tag** inconnu est perdu **en silence, avec un 200** |
+| 5 | **Horodatage UTC** | ⚠️ **+7 200 s mesurés** sur `occurred_at` **et** `consent_at` |
+| 6 | **Rejets** | ❌ **aucune file morte** : 26 refus joués → **0 ligne persistée** |
+| 7 | **Journal** | ⚠️ trace oui (200\|15, 401\|7, 422\|18, 503\|1), exploitable non : ni `event_id`, ni code, ni contenu |
+| 8 | **Cloisonnement** | ✅ **le meilleur point du produit** : le workspace n'est **jamais** dans le contrat, `WorkspaceContext::run` + RLS forcé, workspace absent → **503 et 0 écriture** |
+| 9 | **Consentement** | ✅ **zéro événement légitime rejeté** |
+| 10 | **Ne traverse pas** | ⚠️ un gisement entier |
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **B13-001** | **S1** | 🔑 **Aucun émetteur du site ne transmet de SIREN** — et **aucun formulaire n'en collecte**. 6 leads calqués sur le contrat réel → **6 `pending_match`, 0 entreprise, 0 personne** |
+| **B13-002** | **S1** | Un lead **avec** SIREN mais **sans nom de famille** est accepté **200**, et **son adresse électronique est détruite** |
+| B13-003 | S2 | La déduplication par adresse **échoue en production** (locale `C`) et **réussit en CI** (`en_US.utf8`) — **piège 10 confirmé en vivo** |
+| B13-004 | S2 | Un événement refusé ne laisse **aucune trace exploitable** : ni file morte, ni motif persisté, ni alerte |
+| B13-005 | S2 | Un tag de provenance hors référentiel est **perdu en silence, avec une réponse 200** |
+| B13-006 | S2 | Le point d'entrée décale de **2 h la date qui prouve le consentement** — et **la garde ne mesure que sa propre fixture** *(approfondit A05-008, ne pas compter deux fois)* |
+| B13-007 | S3 | `/site-sync/gdpr` n'a ni `schema_version` ni clé d'idempotence : un `export` est **rejouable 300 s** |
+| B13-008 | S3 | `relation_type = 'fournisseur'` est **inatteignable** alors que le site détient les fiches |
+
+🔑 **B13-001 corrige et durcit A05-003.** L'agent 5 avait attribué l'échec du canal à un SIREN
+« rarement rempli ». Mesuré : **ce n'est pas « rarement », c'est 100 %** — aucun point d'appel du site
+n'en transmet, et aucun formulaire n'en collecte. Le canal ne peut donc **structurellement pas**
+créer une fiche : les 3 événements de production tombés en arbitrage manuel n'étaient pas de la
+malchance, c'était le fonctionnement nominal. **C'est la cause racine du critère 18 du §29.**
+
+**Ce qui ne traverse pas et devrait**, par ordre d'impact mesuré : **inscription à une session /
+stagiaire** (confirme le §10.3 du journal — `Trainee` porte **déjà** le consentement horodaté et
+versionné) · **promotion en client payant** (`Client` Qualiopi, **qui détient un `siren`**) ·
+**paiements Stripe** (`payerSiret`) · **signatures DocuSeal** · **lead chatbot escaladé** (asymétrie
+nette : `capturerLead` émet, `escaladerQuestion` non) · bénéficiaires de coaching · sous-traitants ·
+liste espace-ressources · réclamations.
+
+⚠️ **Deux réfutations de l'agent 13, dont une contre le chef de chantier — retenues telles quelles :**
+1. **L'hypothèse « une opposition RGPD part en 422 » est fausse**, et c'est **ma** faute : j'avais lu
+   la ligne `consentement v2 requis … reçu : careers-v1-2026-06-09` dans le `laravel.log` **local**.
+   Elle vient de la **suite de tests**, qui s'exécute dans le même conteneur et écrit dans le même
+   fichier. **J'ai pris la preuve qu'une garde fonctionne pour la preuve qu'un défaut existe.**
+   Mesure de l'agent : **zéro événement légitime rejeté**.
+2. **A-001 n'était pas ce que j'en disais** : il obtenait un **401 propre**, et a refusé de crier à la
+   réfutation — « écart de protocole, pas réfutation ». C'est cette prudence qui a fait trouver la
+   vraie variable : **l'en-tête `Accept`**. A-001 est corrigé et **abaissé de S1 à S2**.
+
+**Et deux pistes qu'il a lui-même abandonnées après vérification** : les familles de candidats *sont*
+correctement dérivées ; `simulateur_roi` *est* présent des deux côtés. Un agent qui referme ses
+propres pistes vaut mieux qu'un agent qui les laisse ouvertes pour gonfler son rapport.
+
+---
+
+## Agent 19 — sécurité et légalité de la collecte
+**Rapport** : `11_GRILLES/agent-19_collecte-securite.md` · **Preuves** : `04_PREUVES/agent-19/`
+Base jetable `axion_crm_a19` (116 tables). Aucune requête vers un site tiers réel.
+
+### La matrice SSRF — 31 cas joués sur **chacune** des deux gardes
+
+| Cas | PHP | TypeScript |
+|---|---|---|
+| **Témoins positifs** (IP publique, DNS public, `api.insee.fr`) | **PASSENT ×3** | **PASSENT ×3** |
+| Boucle locale, formes décimale / octale / courte | BLOQUÉ | BLOQUÉ |
+| Privées 10/8, 192.168/16, 172.16/12, lien local | BLOQUÉ `deny_cidr` | BLOQUÉ `deny_cidr` |
+| **IMDS** (`169.254.169.254`, GCP, Alibaba, Azure) | **BLOQUÉ ×4** | **BLOQUÉ ×4** |
+| IPv6 `[::1]`, `[::ffff:169.254.169.254]`, `[fd00::1]`, `[fe80::1]` | BLOQUÉ **`dns_no_records`** | BLOQUÉ **`dns_no_records`** |
+| **IPv6 publique légitime** `[2606:4700:4700::1111]` | 🔴 **BLOQUÉ** (faux positif) | 🔴 **BLOQUÉ** |
+| `file:` / `gopher:` / `dict:` / `ftp:` | BLOQUÉ | BLOQUÉ |
+| **Rebinding DNS** (`127.0.0.1.nip.io`) | **BLOQUÉ** | **BLOQUÉ** |
+| **Redirection 302 → hôte interne** | 🔴 **NON RE-VÉRIFIÉE — cible atteinte** | idem par construction |
+
+**Aucun « PASSE » sur un cas d'attaque, et les témoins positifs passent.** Mais — et c'est le piège 19
+retrouvé une troisième fois — **les 6 cas IPv6 sont bloqués par `dns_no_records`, jamais par la règle** :
+les crochets ne sont pas retirés, la résolution échoue, **la garde ferme par accident**. Sur l'hôte
+dé-crocheté, c'est-à-dire si quelqu'un « corrigeait » le parsing, **PHP accepterait 6 cas sur 6**
+(`::1`, `::ffff:169.254.169.254`, `::ffff:127.0.0.1`, `fd00::1`, `fe80::1`, `fc00::1`) — `DENY_CIDR`
+côté PHP **ne contient aucune plage IPv6**, prouvé par réflexion. Le commentaire `ssrf-guard.ts:5`
+affirme pourtant « équivalent fonctionnel ». *Corriger un défaut ferait donc apparaître une faille :
+c'est exactement le genre de dette qu'un audit doit nommer avant qu'un développeur bien intentionné ne
+la déclenche.*
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **C19-007** | **S0** | 🔴 Base légale « intérêt légitime » (art. 6.1.f) **sans mise en balance écrite** et **sans information de l'article 14**, pour **1 319 567 personnes physiques**. L'AIPD en vigueur le dit elle-même : « *il n'est écrit nulle part* », « *rien dans le code ne la déclenche* ». La table `data_processing_log` du registre art. 30 **n'est créée par aucune migration** |
+| **C19-001** | **S1** | Côté PHP, la garde SSRF **n'est jamais appliquée à une URL issue de la donnée** : ses 5 appels portent **tous** sur `self::BASE_URL`, une **constante**. Les 3 services qui consomment une URL de la base (`MentionsLegales`, `DomainFinder`, `ProxiedHttpClient`) **ne l'appellent pas**. Côté TS, 2 appels sur 3 portent sur une URL réellement contrôlée par la donnée |
+| **C19-003** | **S1** | La **redirection n'est pas re-vérifiée** : cible interne atteinte (mesuré, 302 local) |
+| **C19-010** | **S1** | Le « non diffusible » INSEE — une **opposition légale** — n'est filtré que sur **1 voie de collecte sur 3**, et la purge ne reconnaît **qu'une variante sur 5** (mesuré : 1 supprimée, **4 survivantes**) |
+| **C19-008** | **S1** | `POST /proxy-providers/{p}/test`, documenté « health check live », renvoie **`healthy: true` en dur** |
+| C19-002 | S2 | Les deux gardes ne bloquent **aucun** IPv6 par la règle ; elles ferment par accident de parsing et **divergent sur 6 entrées sur 13** *(piège 15 : la constante dupliquée a divergé sans le dire)* |
+| C19-004 | S2 | **Aucun collecteur ne lit le `robots.txt`** des sites moissonnés — **zéro occurrence** dans `backend/app`, `workers/src`, `composer.json`, `package.json` (témoin négatif : la recherche trouve bien `frontend/public/robots.txt`) |
+| C19-005 | S2 | **Aucune limite par domaine cible** : 8 requêtes **concurrentes** par site, 400 par salve × 20 shards CI ; 0 occurrence de `Redis::throttle` ou `WithoutOverlapping`. Le seul `usleep(100–300 ms)` « pour ne pas marteler le serveur » est dans une **méthode sans aucun appelant** — et la docblock promet toujours des « délais polis » |
+| C19-006 | S2 | **Tous les collecteurs de masse sont déguisés** (4 UA navigateurs tournants, Chrome 131, `STEALTH_INIT` masquant `navigator.webdriver`) — **aucun ADR n'existe** : le déguisement est **subi, pas assumé** |
+| C19-009 | S3 | `SSRF_GUARD_DENY_PRIVATE` a **deux défauts opposés** : l'auto-contrôle déclare la garde **inactive** alors qu'elle est **active** |
+| C19-011 | S3 | Les deux fournisseurs de proxy **désactivent la vérification TLS** de leur sonde de santé |
+| C19-012 | S3 | Le contournement de captcha n'est pas actif (`TwoCaptchaSolver::solve()` ne fait que `throw`, jamais bindé), mais **rien ne l'interdit par construction et rien ne l'a arbitré** |
+
+**Ce qui va bien, et qu'il ne faut pas casser** (7 points au rapport). Notamment : **aucun identifiant
+de proxy n'est stocké en base** — `proxy_providers_config` n'a **pas une seule colonne de secret**,
+et le témoin négatif est solide : la même requête trouve bien `users.password_hash`, `totp_secret` et
+`invitations.token_hash`. **Rien ne peut donc fuir par `GET /proxy-providers`**, contrairement à ce que
+le mandat faisait craindre.
+
+⚠️ **Correction de référentiel à propager** : le mandat et mon dossier commun renvoyaient à
+`_REPORTS/DPIA_2026-05-17.md`. Ce document porte **depuis le 18/08 un bandeau « DOCUMENT OBSOLÈTE —
+NE PAS UTILISER »**. La référence en vigueur est **`AIPD_2026-08-18.md`**. L'agent 19 l'a vu et a
+mesuré sur le bon document — **les agents 15 et 33 doivent en faire autant**.
+
+---
+
+## Agent 10 — les 18 modèles, les 58 migrations, les 115 relations
+**Rapport** : `11_GRILLES/tables.md` (642 l.) · **Preuves** : `04_PREUVES/agent-10/` (34 fichiers)
+
+**Recompte, encore** : **115 relations** dans `public` (113 ordinaires dont **14 partitions**
+`audit_logs`, 1 partitionnée, 1 vue matérialisée) — et non 104 comme je l'avais compté ni 54 migrations
+comme le mandat l'annonce. **58 migrations**, confirmé.
+
+🔑 **Le double `migrate:fresh` — le résultat le plus important, et il est double lui aussi.**
+`make` **n'est pas installé sur ce poste** (`EXIT=127`), l'agent a donc rejoué la recette de
+`Makefile:95-108` ligne pour ligne. **Premier passage : RC1=1 et RC2=1** — la reconstruction échoue
+**dès la première**, sur `cannot drop table part_config because extension pg_partman requires it`.
+La base locale avait **4 migrations de retard, dont le correctif lui-même** : *le correctif était
+inatteignable par le chemin qu'il est censé réparer.* Après `php artisan migrate --force`
+(relocalisation en 425 ms) : **RC1=0, RC2=0**, `pg_partman` dans son schéma, 14 partitions, 58/58.
+**Verdict : la fragilité F10 est levée — mais seulement pour une base déjà à jour.** Une base en
+retard reste bloquée, ce qui est exactement le cas d'un poste qu'on rallume après une semaine.
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **B10-004** | **S0** | 🔴 **Export RGPD = 4 tables ; effacement = 8 ; `candidates` n'est dans NI L'UN NI L'AUTRE** |
+| **B10-001** | **S1** | Une base dont `pg_partman` est resté dans `public` : `migrate:fresh` meurt au premier coup, et **le correctif est inatteignable par ce chemin** |
+| **B10-002** | **S1** | Le rôle `axion_app` a `DELETE` **et** `UPDATE` sur `audit_logs`, **sans aucune RLS** sur la table ni ses 14 partitions *(recoupe B16-002/004, B11-006)* |
+| **B10-003** | **S1** | `run_maintenance()` n'est appelé **par personne** : la rétention de 24 mois n'est **jamais** appliquée, et les partitions **s'arrêtent en 02/2027** |
+| **B10-016** | **S1** | `companies`, `contacts`, `users`, `workspaces` portent `deleted_at` **sans le trait `SoftDeletes`** : **44 filtres lisent en suppression douce, Eloquent écrit en suppression dure** |
+| B10-011 | S2 | `ScrapingSourcesSeeder` fait un **`upsert` depuis DEUX migrations** : `name`, `kind`, `ttl_days`, `legal_note`, `dedup_key_pattern`, `quota_per_day` **réécrits à chaque déploiement** *(piège 22)* |
+| B10-005 | S2 | Le masquage `contacts.view_pii` ne couvre que **3 écrans** : journalistes et candidats **en clair** |
+| B10-006 | S2 | `BelongsToWorkspace` sur **4 modèles sur 15**, et **aucun test ne l'exige** |
+| B10-007 | S2 | **15 tables à `workspace_id` sans clé étrangère** : orphelins invisibles à la suppression d'un espace |
+| B10-008 | S2 | `email_verification_logs` fuit sans contexte — la policy a **survécu au durcissement** grâce à un nom raccourci *(confirme B11-004)* |
+| B10-009 | S2 | `permissions` : `UNIQUE(name)` seul là où le code suppose `(name, guard_name)` ; **`EtancheiteUniversTest` est rouge sur `main`** |
+| B10-010 | S2 | Le correctif `search_path` — écrit parce qu'**une sauvegarde de production n'était pas restaurable** — repose sur une **liste en dur, sans aucune garde** : une fonction ajoutée demain rejoue la panne |
+| B10-013 | S2 | **`/ai-act/register` et la recherche globale mentent exactement comme `/saved-views`** : 200 + liste vide |
+| B10-015 | S2 | `db-rebuild-check` n'est dans **aucun workflow CI** |
+| B10-012 | S3 | **42 tables sur 102** ne sont nommées par aucune ligne de `app/`, `routes/`, `config/` ni du frontend |
+| B10-014 | S3 | `companies` : **1 491 Mo d'index pour 624 Mo de tas**, et **20 index à `idx_scan = 0`** |
+
+🔑 **« Six tables mortes » sous-compte d'un facteur sept.** Le §3 bis en nommait six ; l'agent en
+mesure **42 sur 102**, dont **six qui n'existent nulle part dans le dépôt** (`analytics_funnel_snapshots`,
+`deal_history`, `email_messages`, `email_sequences`, `linkedin_health_checks`, `linkedin_sequence_runs`).
+Et le patron de `saved_views` (**A-002**) se répète **deux fois de plus** : `/ai-act/register` — un
+**registre réglementaire** — et `GlobalSearchController` répondent « 200, liste vide ».
+
+**Points solides mesurés, à ne pas re-rapporter comme défauts** : `EtancheiteParTableTest` **11/11
+verts**, sème les 55 tables, **deux témoins négatifs** · **203/203 colonnes temporelles en
+`timestamptz`, zéro naïve** · 68 `CHECK`, 139 clés étrangères, 36 `UNIQUE` réellement en base ·
+`search_path` fixé sur 7/7 fonctions · **aucun index invalide ni doublon** · **58/58 migrations
+déclarent un `down()`** · et l'index `idx_companies_ws_counts` rejoué sur 2,8 M confirme l'ordre de
+grandeur annoncé par la pièce 1 (`Index Only Scan`, `Heap Fetches: 0`).
+
+---
+
+## Agent 38 — les 17 workflows, 36 jobs
+**Rapport** : `11_GRILLES/agent-38_cicd.md` (500 l.) · **Preuves** : `04_PREUVES/agent-38/` (24 fichiers, 2,3 Mo)
+
+**36 jobs déclarés. 9 réellement bloquants. 27 décoratifs** — dont **5 déclarés honnêtement comme
+tels et 22 qui ne le disent pas**. Et surtout : **seuls 4 bloquent une fusion** (`backend`,
+`frontend`, `workers`, `gitleaks`) — et **`enforce_admins: false`** les rend inapplicables au seul
+contributeur du dépôt.
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **F38-007** | **S1** | 🔴 `diag-website-status.yml` recréerait la production **sans l'overlay** : un simple `workflow_dispatch` **rouvre la faille du 19/08** (ports 55432/56379) |
+| **F38-002** | **S1** | 4 contextes requis sur 36 jobs, **aucune des trois gardes nées d'un incident**, `enforce_admins: false` — et **la PR #186 a été fusionnée AVANT la fin de son run Security rouge** |
+| **F38-001** | **S1** | La vérification post-déploiement de la préproduction interroge **`127.0.0.1`** quand la pile se lie à **`172.17.0.1`** depuis la PR #181 → **10 rouges sur 10**, sur une préprod qui répond **200** depuis internet |
+| **F38-003** | **S1** | La seule garde qui mesure **les ports réels** ne tourne **que sur la préproduction**, et son code de retour y est **avalé par `\|\| echo`** : **la production n'est mesurée par aucun job** |
+| F38-005 | S2 | **64 vulnérabilités affichées, deux jobs verts** ; et l'alerte ne peut jamais naître d'un audit |
+| F38-006 | S2 | Lighthouse rend `success` **sans avoir jamais produit un score** — et la cible n'est plus l'excuse |
+| F38-008 | S2 | **Aucun `timeout-minutes`** dans les 8 workflows qualité — **6 exécutions figées de 1 h 28 à 2 h 25** |
+| F38-013 | S2 | `continue-on-error` **non commenté** sur le seul SAST, dans le fichier même qui explique le retrait des autres |
+| F38-004, F38-009, F38-011 | S2 | confirment H47-001, A09-006 et A05-009 **sur `e8924b8`** |
+| F38-010 | S3 | Le commentaire de `ci.yml` annonce **276** fichiers Pint non formatés ; mesuré **386** (311 hors artefact CRLF) |
+| F38-012, F38-014 | S3 | `release-tracking.yml` : **0 exécution depuis toujours**, et sans effet s'il tournait ; `zap-baseline` idem |
+
+**Deux réfutations, et elles honorent l'agent** (règle 7 appliquée à ses propres hypothèses) : le job
+`alerte` de `security.yml` **a bien tourné** — `if: failure()` est vrai dès qu'**un** job du workflow
+échoue, pas seulement ses `needs:` ; et celui de `surveillance-sauvegarde.yml` **a tourné deux fois le
+17/08**. Les vestiges `trigger-coolify` et `smoke` ont **réellement été supprimés** le 19/08.
+
+**Un 18ᵉ workflow fantôme** existe côté GitHub — `TMP — génération baseline PHPStan` (id 333858977,
+**`active`**) — **sans aucun fichier correspondant dans le dépôt**.
+
+---
+
+## Agent 40 — infrastructure et exposition
+**Rapport** : `11_GRILLES/agent-40_infrastructure.md` · **Preuves** : `04_PREUVES/agent-40/` (28 fichiers)
+
+**Trois réponses aux questions que je lui avais confiées en priorité :**
+1. **`AUDIT_HASH_CHAIN_SECRET` en production : longueur 64. Il n'est PAS vide.** → **B16-001 réfuté pour la production**, vrai en local seulement.
+2. **Le serveur HTTP de production est bien `php -S`** → confirme **A-010**. Apport décisif : **php-fpm EST dans l'image** (`/usr/local/sbin/php-fpm`, PHP 8.3.33 fpm-fcgi, configuration complète) et **n'est jamais lancé** ; le `9000/tcp` visible dans `docker ps` est un simple `EXPOSE`, **rien n'écoute dessus**. ⚠️ **Piège du correctif** : `pm.max_children = 5` par défaut — basculer en fastcgi sans y toucher donnerait **cinq** requêtes simultanées, pas dix.
+3. **Le planificateur tourne vraiment** : `schedule:work` en PID 1, `RestartCount = 0`, trace d'exécution réelle à 12:35:00. → **lève la crainte de l'agent 17.** Le `healthcheck: disable: true` est bien appliqué : rien ne le surveillerait, mais il n'est pas mort.
+
+🔑 **Et il a écrit la garde qui manquait** — `infra/scripts/verifier-serveur-http.sh`, qui mesure
+**`/proc/1/cmdline` des conteneurs**, jamais le `Dockerfile`. **Vue rouge sur la production et sur la
+préproduction** (exit 1, un seul conteneur signalé sur sept), avec **témoin négatif** (projet
+inexistant → exit 2) **et témoin positif réel** (pile `bookforge` sans serveur HTTP → exit 2, pas 0).
+Exécutée par `ssh 'bash -s' < script` : **aucun fichier déposé sur le serveur**. C'est exactement ce
+que **A-011** réclame — une garde qui rougit **sur l'objet qui casse**.
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **F40-002** | **S0** | `MAIL_MAILER` n'est défini **nulle part** : 7 clés SMTP complètes et valides, et **aucun courriel n'est envoyé** → **A-012** |
+| **F40-003** | **S1** | `TELESCOPE_ENABLED` absent du `.env` de production — **cause racine de A-007** — avec **20 autres clés** de `.env.example` absentes du serveur |
+| **F40-004** | **S1** | `verifier-ports-publies.sh` branchée **sur la préproduction seulement**, et son échec y est **avalé** |
+| **F40-005** | **S1** | Le correctif du piège 18 (`up -d --no-deps postgres redis`) a été écrit pour la préproduction et **jamais rétroporté** en production |
+| **F40-006** | **S1** | **La production exécute une migration absente de `main`** : 59 contre 58. `2026_05_17_195529_create_failed_jobs_table.php` est **non suivi par git**, entré dans l'image parce que le contexte de build est le répertoire de travail du serveur — que `git reset --hard` ne nettoie pas — et **appliqué en base** (batch 7) |
+| **F40-007** | **S1** | Le mot de passe Postgres de production est **celui du dépôt public**, et `environment:` **empêche le `.env` de le corriger** |
+| F40-008 | S2 | `docker-compose.observability.yml` : **9 ports sur `0.0.0.0`**, sans aucun `!override` — le piège fermé pour `reverb` **reste ouvert ici** |
+| F40-009 | S2 | **`ufw` n'est pas installé**, alors qu'un script d'installation et un runbook le supposent |
+| F40-010 | S2 | **Aucun `daemon.json`** : les journaux de conteneurs n'ont **aucune limite de taille** |
+| F40-013 | S2 | Le conteneur n'est **pas** en lecture seule (`ReadonlyRootfs=false`) : la protection vient des droits, et `/var/www/html` est en **1777** |
+| F40-011 | S3 | **961 Mo de journaux morts + 3,8 Go de cache de build** : 4,8 Go récupérables |
+| F40-012 | S3 | `Dockerfile.worker` et la cible `prod-nginx` : **construits, jamais exécutés** |
+
+⚠️ **Correction que je dois à cet agent, sur mon propre constat A-004 (exposition ACME)** : **A-004
+consomme la limite horaire de validations échouées, PAS le quota d'émission** — le renouvellement de
+la production (fenêtre ARI au 13/09, expiration au 14/10) **n'est pas menacé**. Mon impact était
+surévalué ; le constat reste, sa gravité baisse.
+
+**Et le patron du piège 18 se répète cinq fois ailleurs** — c'est ce que le mandat demandait de
+chercher : `TELESCOPE_ENABLED`, `MAIL_MAILER`, le correctif `--no-deps` non rétroporté, la garde des
+ports branchée au mauvais endroit, et `docker-compose.observability.yml`. **Plus l'inverse, qui est
+nouveau** : une migration qui existe **en production et pas dans `main`**.
+
+---
+
+## Agent 23 — architecte de la navigation (§6, « le chapitre qui empêche le bordel »)
+**Livrable** : `10_NAVIGATION-CIBLE.md` · **Preuves** : `04_PREUVES/agent-23/` (dont `COMMANDES-JOUEES.md`)
+
+### 🔴 D23-001 — le fait qui invalide une partie du bloc D, et que j'ai vérifié moi-même
+
+**L'atelier local sert une barre latérale vieille de 32 heures.** L'image `axion-crm-app` date du
+**17 août 07:12** ; le commit qui refond la barre (`da97826`) du **18 août 17:39**. `https://app.localhost`
+affiche donc encore **10 sections / 28 entrées** — « Campagnes », « Runs de scraping », « Data »,
+« Phase 2 », et des entrées vers `/crm` et `/analytics` **qui n'existent plus dans le routeur**.
+
+**Vérification du chef de chantier — et la question urgente de l'agent est LEVÉE :**
+
+```
+PRODUCTION   /assets/index-D3nU2tuG.js (1 046 364 o)
+  Journaux de collecte : 2      <- barre NEUVE   (témoin positif)
+  Collectes            : 2      <- barre NEUVE
+  Audiences (segments) : 1      <- barre NEUVE
+  Conformité           : 3      <- barre NEUVE
+  Runs de scraping     : 0      <- barre PÉRIMÉE absente (témoin négatif)
+
+LOCAL        /assets/index-DPQz8SpC.js (975 382 o)
+  Journaux de collecte : 0      <- barre neuve ABSENTE
+  Runs de scraping     : 2      <- barre PÉRIMÉE présente
+  Phase 2              : 2      <- barre PÉRIMÉE présente
+```
+
+> **La production est à jour. C'est l'atelier local qui est périmé.**
+> La crainte finale de l'agent — « si le bundle de production porte la même barre, les utilisateurs
+> cliquent sur 4 entrées menant à un 404 sans navigation » — **est écartée par la mesure**.
+
+**Mais la conséquence sur l'audit est lourde** : tout agent du bloc D qui a « ouvert les écrans pour
+de vrai » sur `app.localhost` a mesuré **une interface morte**. → décision **D-011**.
+*Et A-006, mon propre constat, doit être nuancé : il a raison sur le **code**, tort sur **l'atelier**.
+J'avais lu `Sidebar.tsx` et conclu sur ce que voyait l'utilisateur. Le code n'est pas l'écran servi.*
+
+### Les écarts réels à la cible §23.3
+
+Le **nombre** de groupes est bon (6, dont « Collecte » explicitement autorisé par le §A.1 n°15) —
+**ce sont les noms et le contenu qui divergent** : **1 conforme · 4 partiels · 13 absents**.
+Manquent le groupe **ÉCHANGES en entier** (0/4), **Boîte de réception**, **Mes rendez-vous**,
+**Mes tâches**, **Organisations**, **Prospection**, les **6 vues épinglées par type**,
+**Tableaux de bord / Canal avec la console / Coûts**, les **8 sous-groupes de Réglages**, et les
+**3 éléments du pied de barre** — pied de barre réellement mesuré : **`["Réduire"]`**.
+
+**Test des intentions** (substitution D-007) : sur 20 intentions instruites — **4 trouvables ·
+4 avec effort · 5 introuvables · 7 impossibles**. Et sur les **deux exemples littéraux du critère 24**
+(« voir les visios de la semaine », « régler le rappel avant rendez-vous ») : **0 sur 2**.
+
+### Le plan de correspondance — le livrable du §6.5
+
+**5 conservées · 8 renommées · 9 déplacées · 4 fusionnées · 2 écrans + 1 groupe supprimés ·
+8 redirections à écrire · 1 orpheline réintégrée · 14 créées.** Les **37 écrans sont tranchés un par
+un** (§6.4) : 12 gardés tels quels, 9 renommés, 8 rangés ailleurs, 5 fusionnés, 2 retirés, 1 éclaté,
+1 refait. Principe retenu, et il est juste : **l'URL d'un écran qui survit ne change pas** — on
+n'écrit une redirection que là où un écran fusionne ou disparaît.
+
+### Le glossaire — « un seul mot par notion », et la règle est violée partout
+
+- 🔴 **Une personne = 4 mots** : `Contact`, `Candidate`, `Personne`, `person_key`. Et une mesure qui
+  fait mal : **`contacts.company_id` est `NOT NULL`** — *dans ce produit, une personne ne peut pas
+  exister sans société.* Le CDC veut l'inverse (§1.1).
+- **« Campagne » = 3 objets** : collecte (CRM), génération de contenu (axionia), e-mail L7 à venir.
+  Le renommage de l'étape 0 **s'est arrêté à la barre** : **27 chaînes « campagne »** subsistent
+  derrière l'entrée « Collectes ».
+- **« Boîte de réception », « Clients » (3 objets), « Couverture », « Prospection »** : collisions
+  **entre les deux consoles**, que le §23.2 interdit explicitement.
+- **Accueil = 4 mots** : « Aujourd'hui » / « Tableau de bord » / « Accueil » / « dashboard ».
+- Le fil d'Ariane est **en anglais sur 10 routes** et porte encore « E-mails à froid » et
+  « Prospection LinkedIn », libellés pourtant retirés de la barre. `locales/fr.json` est **mort** et
+  dit encore « Scraper runs ».
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **D23-001** | **S1** | L'atelier local sert une barre vieille de 32 h — **toute mesure d'écran y est fausse** |
+| D23-005 | S2 | La recherche ⌘K trouve une personne et ouvre **la liste** au lieu de sa fiche |
+| D23-003 | S2 | L'entrée « Contacts » **liste des entreprises**, et deux entrées voisines listent la même chose |
+| D23-002 | S2 | L'écran d'accueil montre **4 totaux décoratifs** et ne dit rien de la journée |
+| D23-007 | S2 | **Aucun compteur** dans la barre : 6 manquent, dont un sur une entrée **déjà livrée** |
+| D23-004 | S2 | Le renommage de l'étape 0 s'est arrêté à la barre : « campagne » et « scraping » vivent dans les écrans |
+| D23-008 | S2 | « Réglages » ne peut pas devenir les 8 sous-groupes du §19 **sans dépasser la règle des sept** |
+| D23-009 | S2 | `/crm` et `/analytics` rendent un **404 sans barre latérale**, sans redirection |
+| D23-010 | S2 | La visite guidée n'affiche que **5 de ses 7 étapes** et **se marque « faite » quand même** |
+| D23-011 | S2 | Le lien CRM → console axionia **n'existe pas** ; celui de l'autre sens s'appelle « Prospection » |
+| D23-012 | S2 | **Trois notions portent le même mot** dans les deux consoles |
+| D23-006 | S3 | Le fil d'Ariane parle **anglais sur 10 routes** et porte des libellés retirés |
+| D23-013 | S3 | Le retrait par paliers des 12 écrans de la console n'a franchi **aucun** palier |
+
+**Deux mesures signalées comme honnêtes plutôt que spectaculaires**, et c'est exactement le
+comportement attendu : la visite guidée **ne bloque pas** l'interface après son arrêt (l'overlay se
+retire, vérifié) et elle appelle bien `POST /auth/onboarding/complete` (vérifié) — l'agent **n'a donc
+pas** écrit qu'elle rejoue indéfiniment, alors que c'eût été un constat plus vendeur. Et le témoin
+négatif de D23-010 est net : les mêmes sondes, sections forcées dépliées, affichent **7 étapes sur 7**.
+
+---
+
+## Agent 7 — les fragilités du §A.1 et les défauts D-01 → D-13
+**Rapport** : `11_GRILLES/agent-07_fragilites.md` · **Preuves** : `04_PREUVES/agent-07/` (50 sorties)
+
+**Le recompte tranche la contradiction du mandat** : le §A.1 compte **15 fragilités**, numérotées 1→15.
+Le mandat d'audit écrit « 15 » à sa ligne 78 et « **F1 → F19** » à ses lignes 469 et 716 — **il se
+contredit lui-même**. Et le **code** emploie une **troisième** numérotation (`F5` = perf, `F7` = routes
+501, `F11` = AIPD, `F12` = pare-feu, `F17` = navigation). **Trois numérotations concurrentes** pour la
+même liste : c'est le constat A07-008, et il explique pourquoi personne n'arrive à dire ce qui est clos.
+
+| | LEVÉE | PARTIELLE | ENCORE VRAIE |
+|---|---|---|---|
+| **Fragilités F1→F15** | **5** (F4, F5, F6, F11, F15) | **7** (F1, F2, F3, F7, F8, F12, F14) | **3** (F9, F10, F13) |
+| **Défauts D-01→D-13** | **8** | **2** | **3** (D-05, D-06, D-13) |
+
+🔴 **Le rapport de clôture du 17/08 déclare D-05 et D-13 corrigés. Mesuré : c'est faux.**
+Et symétriquement, il classait **D-11 « restant »** alors qu'il est **levé** — l'erreur va dans les
+deux sens, ce qui est le signe d'un document qu'on n'a pas rejoué.
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **A07-001** | **S0** | 🔴 **L'enrôlement 2FA écrit trois colonnes qui n'existent pas** : **aucun utilisateur nouvellement créé ne peut terminer sa première connexion** |
+| **A07-003** | **S0** | Le **runbook de rotation des secrets** prescrit `docker compose restart` — **un secret réputé tourné ne l'est pas** *(piège 8, transformé en fausse assurance opérationnelle)* |
+| A07-002 | S1 | `email_verification_logs` : la policy permissive survivante rend visibles les lignes **des deux espaces** sans contexte *(3ᵉ mesure indépendante — confirme B11-004 et B10-008)* |
+| A07-005 | S2 | **L'adresse en clair n'a pas disparu** de la liste d'opposition : colonne **et** index subsistent *(F7 non close)* |
+| A07-006 | S2 | **Rien n'interdit d'ajouter une ligne à la baseline PHPStan** : l'exigence F3 n'a **aucune garde** |
+| A07-007 | S2 | `GovernedTagsSeeder` **n'est appelé par aucun seeder ni migration** : une base neuve ne porte **aucun tag gouverné** |
+| A07-010 | S2 | La garde d'étanchéité par table **ne peut pas être rejouée sur l'atelier** : 4 tests sur 11 échouent |
+| A07-011 | S2 | Le statut Calendly « **honoré** » reste **manuel** : F14 n'est remplie que pour 2 statuts sur 3 |
+| A07-008 | S2 | **Trois numérotations concurrentes** des fragilités coexistent dans les documents et le code |
+| A07-009 | S3 | Le runbook console locale renvoie au worktree `crmpro-wt-etape0` *(confirme A09-007)* |
+
+🔑 **A07-001 est le maillon qui manquait à A-012.** Même une fois un mot de passe posé, `EnforceFirstLoginSetup`
+conduit à un enrôlement 2FA **qui écrit trois colonnes inexistantes**. Le verrouillage du propriétaire
+n'était donc pas seulement « il n'a pas reçu son mot de passe » : **la première connexion ne peut pas
+aboutir**. Le script `definir-mot-de-passe-crm.sh` posé pendant l'audit ne suffira **pas** à ouvrir la
+console — à vérifier en P4, et à corriger avant d'espérer ouvrir les 37 écrans.
+
+### 🔴 A07-004 — RÉFUTÉ par le chef de chantier, et la façon dont il est faux est instructive
+
+L'agent conclut que `_PLANS/2026-08-18_PREALABLES-AVANT-CHANTIER-CRM-CIBLE.md` — le plan que le CDC
+déclare « faisant foi pour l'étape 0 » — **n'a jamais existé**, sur la foi d'un `git log --all` vide,
+présenté comme un **témoin négatif**.
+
+**Mesuré :** le fichier **existe**, `28 200 octets`, daté du 18/08 19:35, et porte bien les 16 lignes.
+
+```
+$ ls -la Axion-IA/_PLANS/2026-08-18_PREALABLES-AVANT-CHANTIER-CRM-CIBLE.md
+-rw-r--r-- 28200 Aug 18 19:35                              <- il existe
+
+$ cd Axion-IA && git log --all -- "_PLANS/2026-08-18_PREALABLES*"
+fatal: not a git repository (or any of the parent directories): .git   <- LA COMMANDE A ECHOUE
+
+$ cd Axion-IA/axionia && git rev-parse --show-toplevel
+C:/Users/willi/Documents/Projets/Axion-IA/axionia        <- la racine git est UN NIVEAU PLUS BAS
+$ git log --oneline -2                                    <- TEMOIN POSITIF : ce depot repond bien
+eb754332 fix(qualiopi): …
+```
+
+**`Axion-IA` n'est pas un dépôt git** — la racine est `Axion-IA/axionia`, et `_PLANS` est **au-dessus**.
+Le `git log` a donc **échoué**, et son message d'erreur a été lu comme « aucun résultat ».
+C'est **exactement le piège 21 du dossier commun** : *une commande de diagnostic qui échoue n'a rien
+mesuré — ne lis pas son silence comme un résultat.* Et c'est la règle 3 retournée contre elle-même :
+un « témoin négatif » qui n'a pas d'abord été prouvé capable de rendre un résultat **n'est pas un
+témoin**.
+
+**Ce qui reste vrai, et devient le constat** : ce plan **n'est pas versionné**. Il vit **hors des deux
+dépôts**, exactement comme le prompt d'audit — que le journal du 19/08 signale lui-même « à committer ».
+**Un document qui « fait foi » et qu'aucun historique ne protège** est un constat de gouvernance :
+une mauvaise manipulation l'efface, et personne ne peut dire après coup quelle version a été jouée.
+→ **A07-004 reclassé S3, énoncé corrigé.**
+
+---
+
+## Agent 32 — les écrans « Contacts » de la console axionia
+**Rapport** : `11_GRILLES/agent-32_console-axionia.md` · **Preuves** : `04_PREUVES/agent-32/`
+
+**Recompte, avec une méthode qui mérite d'être signalée** : l'agent a **exécuté** `buildAdminNav()`
+au lieu de la grepper — le grep rendait 150, il manquait 4 catégories QR et 3 imprimés **dépliés
+dynamiquement**. Mesure réelle : **153 entrées** + 1 lien codé en dur hors référentiel = **154
+destinations**. Le « ~150 » du §A du CDC est donc **juste**.
+
+**Sur les « 12 écrans » du mandat : le nombre est bon, mais 2 items sur 12 sont faux.**
+« Rendez-vous + calendrier » n'est **plus** dans la navigation depuis le 2026-07-29 (devenu 4
+redirections), et l'entrée « **Tout** » (`/contacts`, boîte de réception unifiée des 4 canaux) **n'est
+dans aucune liste**. Périmètre réel : **17 écrans vivants**, 8 redirections de compatibilité, 2 routes
+de fichier, 5 redirections du module Booking mort. **Sur les 27 pages purement redirectrices de toute
+la console, 0 ne pointe vers le CRM.**
+
+🔑 **Et une découverte de conception qui change le sujet** : **12 écrans ≠ 12 objets — ils lisent
+4 tables**, et **8 des 12 entrées rendent le même composant sur la même table `Submission`** avec un
+filtre figé.
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **E32-002** | **S1** | 🔴 **Le canal ne transporte aucun contenu** : retirer les écrans du site perdrait **13 catégories d'information** — corps du message, réponses envoyées et leur remise, notes internes, `assignedTo`, statuts, archive, marqueurs de lecture, heure du rendez-vous, lieu et lien Meet, CV et photo, réponses au questionnaire, champs du tournage podcast, empreinte anti-spam |
+| **E32-003** | **S1** | **L'instrument de parité mesure le mauvais objet** : il compte les lignes d'outbox **sans filtre de statut** — un `gave_up` compte comme émis *(7ᵉ occurrence du patron A-011)* |
+| E32-010 | S2 | `GET /config/features` répond **500 en production** : la route est dans `auth:sanctum` **alors que son propre commentaire dit l'inverse** — l'état du drapeau de destination est **inaudible de l'extérieur** *(recoupe A-001)* |
+| E32-005 | S2 | **Critère 23 : l'écart est de 17 sur 17.** Aucun écran de relation ne redirige vers le CRM. Quatre chemins d'accès, dont la palette ⌘K qui expose **les 153 entrées** sans filtrer ni `parent` ni `tier` |
+| E32-009 | S2 | **8 entrées pour une seule table**, là où le CRM a explicitement tranché l'inverse |
+| E32-007 | S2 | Une candidature commerciale s'affiche dans **4 écrans, 2 fiches de détail, 2 vocabulaires de statut** |
+| E32-004 | S2 | Le drapeau du critère 25 **n'existe pas** — cherché **avec témoin négatif** (le même grep trouve bien `CRM_SYNC_ENABLED`, `CRM_SYNC_CANDIDATES_ENABLED`, `EN_LOCALE_ENABLED`) — et **la forme évidente ne peut pas tenir la minute** exigée : une variable Coolify impose un redémarrage de conteneur |
+| E32-006 | S2 | L'unique lien vers le CRM le nomme « **Prospection** », pointe la **racine**, et vit **hors du référentiel** |
+| E32-001 | S3 | La liste des « 12 écrans » du mandat se trompe sur 2 items |
+| E32-008 | S3 | « Recrutement » en navigation, `commercial` en URL, « Commercial » dans la page |
+
+🔑 **E32-002 est le constat le plus profond du bloc E, et ce n'est pas un bug.** Le CRM déclare
+lui-même, dans son code : *« la timeline est un **INDEX** des touchpoints, jamais une copie de leur
+contenu »* — le contrôleur ne projette que `kind, title, occurred_at, external_ref`. Autrement dit,
+**« le système qui a produit le détail » — la formule du CRM — désigne exactement la console qu'on
+veut retirer.** C'est un **parti pris de conception assumé**, et il **contredit frontalement le
+principe 10** du CDC (« une seule porte pour la journée : le CRM »). *Ce n'est pas un défaut à
+corriger, c'est un arbitrage à trancher* — et il conditionne toute l'étape 1c. → **porté à l'agent 48
+et au rapport final.**
+
+**Les paliers de retrait (§25.1)** sont produits, et l'agent est honnête sur ce qui les bloque :
+**palier 0 non tenu** (0 fiche sur 1 319 567 porte une `person_key`) ; **palier 2 seul ouvrable
+aujourd'hui** — un bandeau et un **lien profond** vers `/console/personnes/{person_key}`, la clé étant
+**déjà calculée par le site** (`hashEmailForLookup` = `contactEmailHash` = `person_key`) — et c'est un
+**ajout, qui ne perd rien**. Contrainte transverse relevée : **7 alertes Telegram pointent dans
+`contacts/*`** ; les 8 redirections de compatibilité les couvrent, **ne pas les supprimer**.
+
+---
+
+## Agent 12 — les routes API : grille complète, 117 lignes × 18 colonnes, **zéro case vide**
+**Rapport** : `11_GRILLES/routes.md` · **Preuves** : `04_PREUVES/agent-12/`
+
+**Le recensement corrige tout le monde, moi compris** : **114 déclarations** `Route::verb(` dans
+`api.php` (j'en avais compté 112, le mandat annonce « ~110 ») → **117 routes enregistrées**
+(113 `/api/v1` + 4 `/api/internal`), **117 auditées**. Et **1 déclaration perdue** en route :
+110 v1 − 1 (`apiResource`) + 5 − **1 collision** = 113.
+
+| Verdict | Nombre |
+|---|---|
+| **Vivante** | **86** |
+| **Factice — 501** | **19** |
+| **Factice mais 200, corps codé en dur** | **9** |
+| **Inerte par drapeau** | **3** |
+| Déclaration morte (hors total) | 1 |
+
+Transversal : **106/117** sous `auth:sanctum` · **4 seulement** avec une autorisation réelle ·
+**21 sans aucun filtre applicatif** (RLS seule) · **88 sans limitation de débit** · **42 citées par
+aucun test**.
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **B12-001** | **S0** | 🔴 `GET /v1/companies/{company}` **rend la fiche d'un autre espace** — 200 mesuré. 21 routes sans filtre applicatif, et le rôle de base est **`BYPASSRLS`** *(étend B11-010 : la RLS ne rattrape rien pour ce rôle)* |
+| **B12-003** | **S0** | 🔴 **Aucune policy n'est jamais appelée** : un compte `viewer` a **supprimé définitivement une entreprise** — `Company` n'a **pas** `SoftDeletes` alors que la documentation annonce une suppression douce *(recoupe B10-016)* |
+| **B12-004** | **S0** | 🔴 `POST /internal/scraper-result` **accepte une signature FORGÉE** : la vérification HMAC y est **réimplémentée** sans garde de secret vide, et le secret est **vide dans `.env.example`** |
+| **B12-012** | **S1** | `BasePolicy::sameWorkspace()` compare deux **UUID castés `(int)`** → **`0 === 0`, toujours vrai**. Le défaut identique de `channels.php`, corrigé le 16/08, **n'a pas été propagé**. Dormant aujourd'hui (aucune policy n'est appelée), **il s'arme au premier `authorize()`** — c'est-à-dire dès qu'on corrigera B12-003 |
+| **B12-002** | **S1** | Le masquage des coordonnées couvre **3 listes** ; la **fiche détaillée** livre e-mail et téléphone **en clair** au même `viewer` *(recoupe B10-005)* |
+| **B12-010** | **S1** | Les **3 exports CSV nominatifs ne laissent aucune trace** — le journal n'audite que les écritures — et **aucun plafond de lignes** *(confirme B16-008)* |
+| **B12-016** | **S1** | `POST /rgpd/requests/{req}/process` déclenche un **effacement définitif sans permission ni test** |
+| **B12-007** | **S1** | **Dix routes répondent 200 avec un corps figé**, dont un **contrôle de santé qui dit toujours « en bonne santé »** |
+| B12-005 | S2 | `scraper-result` : aucun `throttle`, aucun horodatage — **rejeu à l'identique accepté 3/3** |
+| B12-008 | S2 | **88/117 sans limitation de débit** ; le limiteur `api` **déclaré n'est attaché à rien** |
+| B12-011 | S2 | **42/117 routes citées par aucun test** — dont **mot de passe, lien magique, 2FA, les 8 `/audiences`, et l'effacement RGPD** |
+| B12-013 | S2 | `POST /companies/bulk-enrich` met en file **500 identifiants sans contrôle d'appartenance** |
+| B12-014 | S2 | Trois gardes d'espace **« ouvertes en cas de doute »** (`ScraperRuns`, `Audiences`, `Tags`) |
+| B12-015 | S2 | **16 routes lisent une entrée sans la valider** ; **7 formes de réponse d'erreur** coexistent |
+| B12-018 | S2 | `GET /users` liste par `current_workspace_id` — un **pointeur d'affichage**, pas l'appartenance |
+| B12-009 | S2 | `POST /auth/login` sans en-tête JSON rend **302 vers la racine de l'API** au lieu de 422 |
+| B12-006 | S2 | `GET /search` **déclaré deux fois** : la ligne 99 est **morte en silence** |
+| B12-017, B12-019 | S3 | `Api/Phase2/CampaignsController` **mort** ; `channels.php` : 2 canaux **jamais enregistrés**, donc la correction UUID du 16/08 **n'a jamais tourné** |
+
+🔑 **La validation, chiffrée** — le mandat demandait « 44 contrôleurs pour 4 FormRequest : où est la
+validation du reste ? ». Réponse mesurée : **4 FormRequest · 23 `validate()` inline · 3 contrats
+internes · 16 routes sans rien · 19 stubs · 52 sans entrée**. Les **16 sans rien** sont nommées, et
+elles incluent `GET /rgpd/export/{token}` (route **publique**) et `POST /internal/scraper-result`.
+
+🔑 **`GET /search` déclaré deux fois : le mandat avait raison, et le détail est pire.** Le routeur ne
+retient que `GlobalSearchController@index` ; la fermeture de `api.php:99` est **morte**. Mais **les
+deux rendent le même corps vide** — donc **la collision est invisible**, et le serait restée.
+
+**Sur A-001, l'agent confirme ma correction et la chiffre** : la condition n'est pas « sans
+authentification » mais « **sans `Accept: application/json`** » → **500 sur 106 routes**. Les
+**11 routes publiques sont épargnées** (`/up` 200, `/` 200, magic-link 200, `rgpd/export` 404,
+`scraper-result` 401). *Le SPA n'est pas touché ; le sont les navigateurs en accès direct, les sondes
+et les clients machine.*
+
+**Réfutation d'une ligne de mon propre dossier commun** : le « plafond d'export **5 000**, silencieux »
+que j'avais repris du mandat est **introuvable dans les trois contrôleurs d'export**. Il n'y a
+**aucun plafond** — ce qui est pire, et rejoint B12-010.
+
+**Non vérifié, déclaré comme livrable** (et les raisons sont bonnes) : le point 10 (`EXPLAIN`) sur les
+117 routes — la base `axion_crm` a été **vidée par le `migrate:fresh` d'un autre agent**, conteneur à
+charge 26-28 ; le point 17 « vu rouge » — suite Pest non rejouée pour la même raison ; le point 4 joué
+sur **une seule** route ; **production et préproduction jamais interrogées** — l'agent précise que
+**B12-001 et B12-004 reposent sur des valeurs livrées dans `.env.example`, et qu'une surcharge en
+production changerait leur gravité**. *C'est exactement la réserve qu'il fallait poser : à lever en P4.*
+
+---
+
+### Complément à A-011 — les deux cas trouvés après sa rédaction
+
+| # | La garde | Ce qu'elle prétend garder | Ce qu'elle mesure **réellement** | Trouvé par |
+|---|---|---|---|---|
+| 7 | L'instrument de **parité de capture** (`reconcile.ts:311`) | que rien ne se perd entre le site et le CRM | les lignes d'outbox **sans filtre de statut** : un `gave_up` **compte comme émis** | agents 32 et 6 |
+| 8 | La garde e2e de `ErrorBoundary` | que l'écran d'erreur fonctionne | **un objet absent** — `ErrorBoundary` **n'est monté nulle part** | agent 27 |
+
+Et un cas de la même famille, du côté des **assertions** plutôt que des gardes : la mesure de
+performance de l'étape 0 conclut sur une production « **php-fpm + opcache** » (l.19 du rapport) alors
+que la production tourne sous **`php -S`** (`Dockerfile.laravel:121`) — elle déclare même le critère 17
+« impossible sur un serveur mono-thread » **sans voir que la production en est un** (A06-003).
+*Le bon raisonnement, appliqué au mauvais objet, produit la bonne conclusion sur le mauvais système.*
+
+---
+
+## Agent 8 — les non-régressions du §A.1 : **une sauvegarde a été restaurée pour de vrai**
+**Rapport** : `11_GRILLES/agent-08_non-regressions.md` · **Preuves** : `04_PREUVES/agent-08/` (36 fichiers)
+
+**Le §A.1 compte cinq points, pas quatre**, et le résumé du mandat (« horodatage UTC ») est **inexact** :
+le correctif retenu est `DB_TIMEZONE = APP_TIMEZONE = Europe/Paris`, **pas de l'UTC**. L'agent a mesuré
+**le comportement, pas le mot**.
+
+| # | Point « ne doit pas régresser » | Verdict |
+|---|---|---|
+| 1 | Sauvegardes de production restaurables | ✅ **TENU** (réserve : copie locale, pas hors-site) |
+| 2 | Décalage horaire des dates du site corrigé | ✅ **TENU** |
+| 3 | Intégration continue réelle | ⚠️ **TENU sur l'exécution, DÉFAILLANT sur le câblage** |
+| 4 | Isolation par espace durcie | ⚠️ **NON RÉGRESSÉ sur la barrière, RÉGRESSÉ sur ce qui tourne derrière** |
+| 5 | Formulaire du site réparé | ✅ **TENU** |
+
+🔑 **Le critère 11 du §29 et le point 13 de la définition de fini sont TENUS — pour de vrai.**
+`axion_crm_20260819T030001Z.sql.gz` (**724 926 343 octets**), streamée par SSH dans une base jetable
+locale. **Les cinq tables de référence sont revenues au nombre exact : 20 726 338 lignes, écart nul** —
+`companies` 4 295 349 · `contacts` 1 319 567 · `company_tag` 7 501 969 · `scraper_runs` 7 608 196 ·
+`journalists` 1 257. Zéro erreur `psql`.
+**Témoin négatif** : les mêmes comptages joués **pendant** le flux rendaient **0 partout** — la mesure
+sait donc distinguer une restauration finie d'une restauration en cours.
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **A08-006** | **S1** | 🔴 **La tâche RGPD d'anonymisation des IP n'a JAMAIS fonctionné** : `ip::cidr / 24` n'est pas un opérateur valide |
+| **A08-001** | **S1** | `coverage:refresh-matrix` échoue **71 fois sur 71** depuis l'armement du rôle applicatif (16/08 14:00) — vue matérialisée **figée**, **aucune alerte** |
+| **A08-003** | **S1** | La suite de 780 tests **ne tourne jamais dans la configuration de production** (`CRM_DB_APP_ROLE_ENABLED=true` en prod, **absent partout en CI**) — **et deux tests verts affirment le contraire** |
+| **A08-008** | **S1** | La sauvegarde restaure les données **mais pas les droits** (`--no-acl`) : une restauration de secours livre **une application incapable de lire**, et `restore-postgres.sh` annonce « Restore complet » |
+| A08-002 | S2 | L'import de médias **refusé par la RLS en production**, même cause, même silence |
+| A08-004 | S2 | **Schéma prod ≠ schéma CI** : `audit_logs` est en prod une table **ordinaire** à `workspace_id` **sans RLS**, que la garde exclut au motif — **faux en prod** — qu'elle serait partitionnée |
+| A08-005 | S2 | **3 des 6 jobs de CI ne bloquent aucune fusion**, dont les gardes nées des **deux incidents les plus graves** du produit |
+| A08-007 | S2 | Journal de production à **99,2 % de bruit** (23 658 erreurs Telescope sur 23 858) — **la raison mécanique** pour laquelle A08-001 et A08-006 sont passés inaperçus |
+
+🔑 **Deux renversements qui comptent.**
+1. **Le durcissement de l'isolation EST armé en production** — la documentation du dépôt affirme le
+   contraire — et **c'est son armement, non son absence, qui a cassé des tâches planifiées pendant
+   71 heures sans témoin**. On cherchait une régression de sécurité ; c'est une régression
+   d'exploitation causée par la sécurité, que rien ne surveillait.
+2. **A08-008 était DÉJÀ ÉCRIT dans le dépôt**, sous forme d'attente inversée, avec la prédiction :
+   *« le jour où le drapeau passe à `true`, une restauration livre une application qui ne peut plus
+   rien lire »*. **Ce jour est arrivé le 2026-08-16. L'attente est toujours verte.**
+   *C'est A-013 sous une autre forme : l'information exacte était écrite, au bon endroit, et personne
+   ne l'a relue quand la condition s'est réalisée.*
+
+---
+
+## Agent 6 — l'étape 0, ligne par ligne
+**Rapport** : `11_GRILLES/agent-06_etape-0.md` · **Preuves** : `04_PREUVES/agent-06/`
+
+**Le mandat se trompait : l'étape 0 EST sur `main`** — PR #174 fusionnée le 18/08 à 18:44 UTC
+(`e577828`), **16/16 commits ancêtres**, 41 PR depuis, et la CI a réellement tourné sur la référence
+(**780 tests / 6 503 assertions, 0 ignoré**).
+
+| Verdict | Lignes | N |
+|---|---|---|
+| **CLOS** | 2, 4, 5, 6, 7, 9, 13 | **7** |
+| **PARTIEL** | 1, 3, 3 bis, 8, 10, 11, 12 | **7** |
+| **OUVERT** | 3 ter, 14 | **2** |
+
+**Le journal annonce « 15 closes sur 16 ». Sept le sont au sens de leur propre critère de sortie.**
+Et l'agent précise ce qui compte : **aucune ligne n'est vide** — les 16 ont produit un livrable réel.
+**L'écart n'est pas un écart de travail, c'est un écart de clôture.** → c'est le cœur de **A-013**.
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **A06-001** | **S1** | Le rapport pare-feu **désignait la faille du 19/08** ; la ligne 14 a été déclarée close par-dessus → **A-013** |
+| A06-003 | S2 | La mesure de performance de l'étape 0 conclut sur une production **qui n'existe pas** : elle écrit « php-fpm + opcache » quand `Dockerfile.laravel:121` pose `CMD ["php","-S",…]`. **Elle déclare même le critère 17 « impossible sur un serveur mono-thread » sans voir que la production en est un** |
+| A06-004 | S2 | « Chaque table à `workspace_id` » **exclut le journal d'audit RGPD**, par **cécité de scan promue en décision** (`relkind='p'`) |
+| A06-008 | S2 | Le journal annonce 15 closes sur 16 ; **sept** le sont |
+| A06-002 | S2 | Ligne 3 ter déclarée « CLOSE en production » : `MAIL_MAILER: log` en préproduction (×3) **et** en production → **A-012** |
+| A06-007 | S2 | La **seule preuve** de la ligne 1 (`console-locale.spec.ts`) **ne tourne dans aucun workflow** |
+| A06-012 | S2 | La parité de capture s'arrête à l'outbox : **une livraison abandonnée compte comme reçue** |
+| A06-010 | S2 | Le plan qui « fait foi » pour l'étape 0 **n'est versionné dans aucun dépôt** — et il a été **mis à jour sur disque en cours de session (v2.3 → v2.7)** : *personne ne peut dire quelle version de quel critère a été jouée* |
+| A06-005, A06-006, A06-009, A06-011, A06-013 | S3 | garde de base reconstructible qui ne joue jamais le geste · baseline omettant `AudienceBuilderService`, **que l'étape 0 a elle-même modifié** · deux fichiers de test affirmant `CRM_DB_APP_ROLE_ENABLED=false` en production quand B11-010 le mesure `true` · trois numérotations · diagnostic Calendly faux |
+
+*(A07-004 « le plan n'a jamais existé » avait été **réfuté** par le chef de chantier ; A06-010 en donne
+la formulation juste : il **existe**, il n'est **pas versionné**, et il a **changé sous les pieds**.)*
+
+---
+
+## Agent 31 — le canal, côté site
+**Rapport** : `11_GRILLES/agent-31_canal-cote-site.md` · **Preuves** : `04_PREUVES/agent-31/` (7 fichiers)
+
+**16 points de capture, pas 14.** Le « 14 » du mandat correspond aux **14 `FORM_TYPES` du contrat**,
+pas aux points de capture. **Trois surfaces portent des identités et n'émettent rien** :
+`ChatEscalation`, `Client`, `Devis`.
+
+🔑 **L'hypothèse RGPD que j'avais versée au dossier est DÉFINITIVEMENT RÉFUTÉE — et bien réfutée.**
+Le CRM ne classe **pas** un `opt_out` en univers vivier : `assertCandidateConsentV2()` n'est appelée
+que `if ($universe === 'vivier')`, et `SiteSyncClassifier::universe()` ne rend `vivier` que pour
+`application_submitted` ou `form_submission`+`recrutement`. **Et l'agent a joué le témoin positif** :
+en forçant la garde sur ce même événement, elle **rougit** (`REJET : consentement v2 requis … reçu :
+careers-v1-2026-06-09`). *Le contrôle est capable de rougir ; il n'est jamais atteint sur ce chemin.*
+
+**Mais une variante voisine est CONFIRMÉE, et elle est réelle** : `v1-2026-05-24` +
+`form_type=recrutement` — **l'un des 12 choix visibles du formulaire unifié** — bascule en univers
+vivier et part en **422 garanti**.
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **E31-001** | **S0** | `erasure` traité comme une désinscription : « 200 applied », **rien n'est effacé**. Le mot apparaît **3 fois** dans tout le module, **toutes déclaratives**, jamais dans un `if`, **jamais dans un test**. C'est **moins** que l'opt-out local, qui supprime l'abonné et touche 5 ensembles. **Les 3 suites du canal sont vertes 59/59 avec le défaut en place** *(confirme B14-002 ; 9ᵉ cas de A-011)* |
+| **E31-002** | **S1** | Une demande « **Recrutement** » du formulaire unifié **ne peut jamais arriver** : 422 garanti, ou aucune ligne d'outbox |
+| **E31-003** | **S1** | L'opposition vivier **n'est pas transmise** si le flux candidats est fermé — **sans ligne d'outbox, sans alerte, réponse « ok »** |
+| **E31-004** | **S1** | La réconciliation compte comme « émis » un événement `gave_up` : **parité verte sur des leads perdus** |
+| E31-005 → E31-007 | S2 | Réconciliation : **6ᵉ famille ignorée** (podcast) · **aveugle aux 6 changements d'état** · **faux positifs garantis** sur `submission` |
+| E31-009 | S2 | L'opposition d'un candidat crée une activité `pending_match` **business** portant **son e-mail en clair** |
+| E31-010 | S2 | Opposition **perdue en silence** si le déchiffrement de l'adresse échoue — réponse « ok » |
+| E31-008, E31-011 → E31-013 | S2/S3 | Le contrat entrant n'accepte que 3 types : **le §22.6 est inapplicable par construction** · rafale d'abandons = 1 message/heure · 11 des 16 émetteurs sans `source_slug` · `tags[]` code mort **des deux côtés** |
+
+**Critère 18 : non mesurable aujourd'hui**, et l'agent le démontre plutôt que de l'affirmer
+(`CRM_SYNC_ENABLED` absent en local, `axion-ia-postgres` **arrêté depuis 3 semaines**, CRM local à
+0 activité, prod interdite en écriture) — **avec témoin négatif** : le même `psql` sur une base qui
+existe rend bien `58 migrations`.
+
+---
+
+## Agent 18 — le pipeline de collecte
+**Rapport** : `11_GRILLES/agent-18_collecte.md` (847 l.) · **Preuves** : `04_PREUVES/agent-18/` (11 fichiers)
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **C18-016** | **S1→S0 (reclassé, D-012)** | 🔴 `MockServicesProvider` **sans aucune garde d'environnement**, et **son défaut est le mock** : `env('MOCK_MODE', true)`. Une variable **absente** suffit. `APP_ENV=production` **ne change rien**. Et l'effet n'est pas l'inertie : `MockLLMClient` alimente `step10_llm_classify`, **qui écrit dans `companies.signals` puis `save()`** — des **classifications fabriquées en base de production, sans marqueur** |
+| **C18-011** | **S1** | 🔴 **Le pont Laravel → Node est rompu par le préfixe Redis.** Laravel écrit `axion_crm_pro_database_axion:scrape:google-maps` ; le `BRPOP axion:scrape:google-maps` **exact** de `base.ts:159` rend **vide** ; le même `BRPOP` voit **immédiatement** un job poussé sur la clef nue. **Le pont n'a, mesure faite, jamais pu fonctionner** — et le défaut est **masqué** par le retrait des workers du compose : il se déclenchera **au moment exact où l'on croira réactiver la collecte** |
+| **C18-001** | **S1** | `CRM_SCRAPE_FUNNEL_ENABLED=false` par défaut → l'endpoint répond **`{"ingested": true}` sans rien ingérer** |
+| **C18-007** | **S1** | Le quota `max_companies` **ne freine rien** : le moniteur remet 400 → 0 **toutes les 60 s** |
+| **C18-008** | **S1** | **L'arrêt d'urgence n'arrête rien** : file Redis **non purgée** (4 jobs avant / 4 après), drapeau `cancelled:*` **lu par personne** |
+| C18-006 | S2 | **Piège 10, cause corrigée** : dédup e-mail — `lower()` **SQL** ≠ `mb_strtolower` **PHP** sous `lc_ctype=C` |
+| C18-014 | S2 | `WaterfallSentry` couvre **11 pannes silencieuses** et **ne peut rien émettre** (`SENTRY_LARAVEL_DSN` n'existe nulle part) |
+| C18-018 | S2 | **Aucun des 13 scrapers n'est testé, aucun n'est déployé** — 11 branchés au registre, **0 déployé**, `social-light` pointe sur `https://api.example-social.com/`, **un domaine d'exemple** ; `_stub.ts` **code mort absolu** |
+| C18-003, C18-015 | S3 | Essai à blanc : **0 ligne sur 114 tables** (témoin négatif : le même appel réel en modifie 4) — mais **3 séquences consommées** et de **vraies requêtes DNS** · **piège 22** : le seeder protège `enabled` mais **écrase `ttl_days`**, la valeur même que la migration promet éditable |
+
+**Deux réfutations de l'agent, contre ses propres hypothèses** : il avait supposé le piège
+`config:cache` → `.env` non chargé ; `Dockerfile.laravel:86` l'interdit et `configurationIsCached()`
+rend **NON** — **ce chemin-là est fermé**. Et côté Node, **le mock ne peut pas fuir** (seule la chaîne
+minuscule exacte `'false'` arme le réel) — mais **les deux moitiés divergent** : `MOCK_SCRAPERS=FALSE`
+met le **backend en réel** et les **workers en mock**.
+
+---
+
+## Agent 27 — le design system
+**Rapport** : `11_GRILLES/agent-27_design-system.md` (584 l.) · **Preuves** : `04_PREUVES/agent-27/`
+
+**Emploi réel** : `Card` 29 écrans · `PageHeader` 27 · `Button` 23 · `EmptyState` 22 · `StatusPill` 17 ·
+`KpiCard` 15 · … · **`PageShell` 3** · **`IconButton` 2** · **`FormField` 1**.
+**3 composants morts** (0 consommateur) : `Stat`, `ErrorBoundary`, `CardFooter`.
+**2 écrans à 0 composant du système** : `/coverage` et `404`.
+**23 écrans sur 37 recopient du balisage**, 61 occurrences.
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **D27-002** | **S1** | 🔴 **4 règles `!important` de `index.css:88-91` neutralisent 174 déclarations `dark:`** — mesuré **en navigateur**, avec témoin négatif. *Le thème sombre réel n'est pas celui que les composants décrivent, et toute correction de contraste portée sur ces 4 propriétés est **silencieusement sans effet**.* |
+| D27-010 | S2 | `ErrorBoundary` **jamais monté** — **et la garde e2e qui prétend le surveiller mesure un objet absent** *(8ᵉ cas de A-011)* |
+| D27-003 | S2 | `/coverage` : **0 composant importé**, 4 noms du système **redéfinis localement** — son `SegmentedControl` local perd `role=tablist`, `aria-selected` **et tout le mode sombre** |
+| D27-004 | S2 | 23 écrans sur 37 recopient : les copies **perdent l'anneau de focus clavier, les rôles ARIA et le mode sombre** |
+| D27-005 | S2 | **Aucun composant `Table`** ; 3 idiomes sur 16 écrans ; **le même en-tête de 210 caractères copié à l'identique dans 8 fichiers** |
+| D27-006 | S2 | **92 couleurs claires sans `dark:`** ; `SizeCategoryBadge` et `QualityBadge` **n'ont aucun mode sombre** |
+| D27-007 | S2 | Jeton d'ombre **dupliqué en littéral et déjà divergé** — **piège 15 en situation** |
+| D27-008 | S2 | **30 champs bruts en 19 variantes** de classes alors qu'`Input` existe ; `FormField` employé par **1** écran |
+| D27-001, D27-013 | S2/S3 | `Stat` **recopié à la main dans les 2 écrans qui en avaient besoin, et les 2 copies ont déjà divergé** · `PageShell` : son commentaire annonce **18 pages**, la mesure en donne **3, dont 2 stubs morts** |
+
+**Et une honnêteté de méthode à porter au crédit** : le détecteur de couleurs a été **validé par témoin
+planté positif et négatif**, et **ses deux premières versions étaient fausses** (97 avec faux positifs,
+puis 75 avec faux négatifs) — **les trois sont archivées**. L'agent déclare aussi n'avoir **ouvert aucun
+écran pour de vrai** : ses constats portent sur le code. *(Et c'était la bonne prudence : l'atelier
+servait alors un bundle périmé — D23-001.)*

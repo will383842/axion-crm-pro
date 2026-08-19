@@ -1,0 +1,182 @@
+BASE   : axion_crm_a16
+SECRET : ABSENT -> defaut dev-only-secret-change-me
+
+========== 1. ETAT INITIAL (base vide) ==========
+lignes = 0
+[vide] audit:verify-chain -> code de sortie = 0
+[vide] sortie :
+Audit hash chain OK — aucune anomalie détectée.
+
+
+========== 2. ECRITURE DE 3 MAILLONS ==========
+insere id=1  POST api/v1/users
+insere id=2  DELETE api/v1/users/7
+insere id=3  PUT api/v1/workspace
+{"id":1,"event_type":"POST","path":"api/v1/users","status_code":201,"ip":"10.0.0.1","user_agent":"agent-16","prev16":"0000000000000000","cur16":"33bc3564e4dbb76f"}
+{"id":2,"event_type":"DELETE","path":"api/v1/users/7","status_code":204,"ip":"10.0.0.2","user_agent":"agent-16","prev16":"33bc3564e4dbb76f","cur16":"de19429d2a901c2b"}
+{"id":3,"event_type":"PUT","path":"api/v1/workspace","status_code":200,"ip":"10.0.0.3","user_agent":"agent-16","prev16":"de19429d2a901c2b","cur16":"39f382092f536bc2"}
+
+========== 3. TEMOIN POSITIF — chaine intacte ==========
+[intacte] audit:verify-chain -> code de sortie = 0
+[intacte] sortie :
+Audit hash chain OK — aucune anomalie détectée.
+
+
+========== 4. ALTERATION SQL DIRECTE : status_code 204 -> 200 sur la ligne du milieu ==========
+cible id=2  status_code avant = 204
+status_code apres = 200
+
+========== 5. TEMOIN NEGATIF — la chaine doit ROUGIR ==========
+[alteree-status] audit:verify-chain -> code de sortie = 1
+[alteree-status] sortie :
+Audit hash chain INVALIDE — possible falsification détectée.
+
+
+========== 6. REMISE EN ETAT ==========
+[restauree] audit:verify-chain -> code de sortie = 0
+[restauree] sortie :
+Audit hash chain OK — aucune anomalie détectée.
+
+
+========== 7. ALTERATION DU user_agent (colonne STOCKEE mais HORS canonical()) ==========
+user_agent avant = agent-16
+user_agent apres = FALSIFIE-PAR-AGENT-16
+[alteree-user-agent] audit:verify-chain -> code de sortie = 0
+[alteree-user-agent] sortie :
+Audit hash chain OK — aucune anomalie détectée.
+
+
+========== 8. ALTERATION DU created_at (colonne STOCKEE mais HORS canonical()) ==========
+created_at avant = 2026-08-19 12:03:06+00
+created_at apres = 2019-01-01 00:00:00+00
+[alteree-created-at] audit:verify-chain -> code de sortie = 0
+[alteree-created-at] sortie :
+Audit hash chain OK — aucune anomalie détectée.
+
+
+========== 9. SUPPRESSION DE LA DERNIERE LIGNE (troncature de queue) ==========
+supprime id=3 ; reste 2 lignes
+[queue-tronquee] audit:verify-chain -> code de sortie = 0
+[queue-tronquee] sortie :
+Audit hash chain OK — aucune anomalie détectée.
+
+
+========== 10. INSERT SANS prev_hash — le DEFAUT SQL repeat(0,64) est-il detecte ? ==========
+ligne injectee id=4 prev_hash=0000000000000000000000000000000000000000000000000000000000000000 current_hash=deadbeef
+[insert-sans-prev-hash] audit:verify-chain -> code de sortie = 1
+[insert-sans-prev-hash] sortie :
+Audit hash chain INVALIDE — possible falsification détectée.
+
+
+========== 11. SUPPRESSION DE LA PREMIERE LIGNE (ce que ferait une purge de retention) ==========
+supprime la premiere ligne id=1 ; reste 1 lignes
+[tete-purgee] audit:verify-chain -> code de sortie = 1
+[tete-purgee] sortie :
+Audit hash chain INVALIDE — possible falsification détectée.
+
+
+========== 12. QUOI QUE FASSE verify-chain, OU VA LA SORTIE ? ==========
+config logging default = stack
+Schedule audit:verify-chain — hooks declares :
+  afterCallbacks = 0 element(s)
+  beforeCallbacks = 0 element(s)
+  output = '/dev/null'
+  shouldAppendOutput = false
+  onOneServer = false
+  expression = 0 3 * * *
+
+========== 13. CLOISONNEMENT — RLS sur audit_logs ? ==========
+{"relname":"audit_logs_id_seq","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_pkey","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260201","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260201_pkey","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260201_workspace_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260201_user_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260301","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260401","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260301_pkey","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260301_workspace_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260301_user_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260401_pkey","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260401_workspace_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260401_user_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260501_pkey","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260501_workspace_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260501_user_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260501","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260601","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260601_user_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260601_pkey","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260601_workspace_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260701","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260701_pkey","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260701_workspace_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260701_user_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260801","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260801_pkey","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260901_pkey","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260901_workspace_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260801_workspace_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260801_user_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260901","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20260901_user_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20261001","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20261001_pkey","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20261001_workspace_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20261001_user_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20261101","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20261201","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20261101_pkey","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20261101_workspace_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20261101_user_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20261201_pkey","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20261201_workspace_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20261201_user_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20270101_pkey","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20270101_workspace_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20270101_user_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20270101","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20270201_pkey","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20270201_workspace_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20270201_user_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_default_pkey","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_default_workspace_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_default_user_id_created_at_idx","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_p20270201","relrowsecurity":false,"relforcerowsecurity":false}
+{"relname":"audit_logs_default","relrowsecurity":false,"relforcerowsecurity":false}
+policies : 0
+AuditLog global scopes : []
+
+========== 14. REGISTRE AI ACT — que contient la base ? ==========
+ai_act_register        : 0 ligne(s)
+ai_act_registry        : TABLE ABSENTE
+ai_systems             : TABLE ABSENTE
+llm_usage              : 0 ligne(s)
+llm_usages             : TABLE ABSENTE
+llm_use_cases          : 1 ligne(s)
+business_events        : 0 ligne(s)
+
+Toutes les tables contenant 'ai' ou 'llm' :
+  ai_act_register = 0
+  analytics_daily_rollups = 0
+  campaigns = 0
+  email_audiences = 0
+  email_events = 0
+  email_inboxes = 0
+  email_messages = 0
+  email_sends = 0
+  email_sequences = 0
+  email_suppressions = 0
+  email_templates = 0
+  email_threads = 0
+  email_validations = 0
+  email_verification_logs = 0
+  email_warmup_pools = 0
+  llm_usage = 0
+  llm_use_cases = 1
+  scraping_campaigns = 0
+
+===== FIN =====
+
+[exited with code 0]

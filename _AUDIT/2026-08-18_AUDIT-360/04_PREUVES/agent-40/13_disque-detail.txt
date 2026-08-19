@@ -1,0 +1,55 @@
+=== repartition racine ===
+46G	/var
+4.1G	/swapfile
+1.5G	/usr
+1.2G	/opt
+733M	/root
+117M	/boot
+6.8M	/etc
+2.1M	/run
+88K	/tmp
+16K	/lost+found
+8.0K	/snap
+4.0K	/srv
+4.0K	/sbin.usr-is-merged
+4.0K	/mnt
+4.0K	/media
+
+=== /opt ===
+1.2G	/opt/axion-crm-pro
+36M	/opt/axion-crm-pro-staging
+12K	/opt/containerd
+
+=== /root ===
+733M	/root
+
+=== journald ===
+Archived and active journals take up 3.9G in the file system.
+[Journal]
+
+=== axion-enrich ===
+total 983356
+drwxr-xr-x  2 root root        4096 Jul  9 08:17 .
+drwxr-xr-x 11 root syslog      4096 Aug 16 20:24 ..
+-rw-r--r--  1 root root    99810023 Jul 12 03:05 shard0.log
+-rw-r--r--  1 root root   101605064 Jul 12 03:05 shard1.log
+-rw-r--r--  1 root root   100316647 Jul 12 03:05 shard2.log
+-rw-r--r--  1 root root   101093342 Jul 12 03:05 shard3.log
+-rw-r--r--  1 root root    99839839 Jul 12 03:05 shard4.log
+-rw-r--r--  1 root root   100838309 Jul 12 03:05 shard5.log
+-rw-r--r--  1 root root   100061193 Jul 12 03:05 shard6.log
+10
+
+=== volumes docker : tailles ===
+17G	/var/lib/docker/volumes/axion-crm-pro_postgres-data
+1.6G	/var/lib/docker/volumes/axion-crm-staging_staging-postgres-data
+477M	/var/lib/docker/volumes/axion-crm-pro_frontend-node-modules
+255M	/var/lib/docker/volumes/axion-crm-pro_api-storage
+129M	/var/lib/docker/volumes/axion-crm-pro_workers-node-modules
+16M	/var/lib/docker/volumes/axion-crm-pro_redis-data
+3.6M	/var/lib/docker/volumes/axion-crm-staging_staging-redis-data
+500K	/var/lib/docker/volumes/axion-crm-staging_staging-api-storage
+204K	/var/lib/docker/volumes/axion-crm-pro_caddy-data
+44K	/var/lib/docker/volumes/metadata.db
+20K	/var/lib/docker/volumes/axion-crm-pro_caddy-config
+0	/var/lib/docker/volumes/backingFsBlockDev

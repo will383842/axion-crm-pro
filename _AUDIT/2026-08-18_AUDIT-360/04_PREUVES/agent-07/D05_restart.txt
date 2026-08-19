@@ -1,0 +1,51 @@
+# Runbook — Rotation des secrets
+
+## P�./_REPORTS/2026-08-17_CLOTURE-PLAN-CRM-E2E2.md:445:| **D-05** | **`docker compose restart` ne recharge pas `env_file`** — prouvé des deux côtés. Le même geste est prescrit par le **Geste A du runbook de production**, dont l'étape 5 est présentée comme « le seul contrôle qui ne ment pas » : jouée après un `restart`, elle revient **vide**. **Piège déjà consigné le 14/08 dans le journal, jamais reporté dans le runbook.** | 🔴 **critique** |
+./_REPORTS/2026-08-17_CLOTURE-PLAN-CRM-E2E2.md:461:  `docker compose up -d …` au §A.1 **et** dans le Geste A du runbook. Sans
+./_REPORTS/2026-08-17_CLOTURE-PLAN-CRM-E2E2.md:482:D-14 et D-15 sont **traités** (code + réécriture du §A et du Geste A du
+./_REPORTS/2026-08-17_CLOTURE-PLAN-CRM-E2E2.md:598:   - D-05 : le Geste A du runbook et le §A.1 prescrivent désormais
+./_REPORTS/e2e2-preuves/journal-session-E2E2.md:190:🔴 **Le même geste figure dans le runbook de production** (§2, Geste A, étapes 4
+./_REPORTS/e2e2-preuves/journal-session-E2E2.md:203:`docker compose restart …`, au §A.1 **et** dans le Geste A du runbook.
+CHAIN_SECRET=<nouveau>` + redémarrer api
+4. Marquer le breakpoint via `audit:checkpoint` artisan command
+
+## Procédure révocation clé provider compromise
+1. Révoquer côté console provider (Anthropic console / Webshare dashboard)
+2. Mettre à jour `.env` ou Doppler
+3. `docker compose restart api horizon` workers
+4. Vérifier 5 min après : `php artisan llm:smoke-test` doit passer
+=== docker-compose.yml : env_file par service ===
+7:  postgres:
+14:    environment:
+32:  redis:
+53:  api:
+59:    env_file: .env
+60:    environment:
+63:      # `environment:` l'emporte sur `env_file:`. Écrite en dur, cette ligne
+96:  horizon:
+103:    env_file: .env
+104:    environment:
+118:  reverb:
+125:    env_file: .env
+126:    environment:
+142:  scheduler:
+149:    env_file: .env
+150:    environment:
+163:  app:
+189:  caddy:
+207:  axion-crm:
+212:  postgres-data:
+213:  redis-data:
+214:  caddy-data:
+215:  caddy-config:
+216:  frontend-node-modules:
+=== docker-compose.prod.yml ===
+42:  api:
+61:  horizon:
+80:  scheduler:
+93:  app:
+110:  reverb:
+118:  postgres:
+149:  redis:
+179:  caddy:
+192:  api-storage:

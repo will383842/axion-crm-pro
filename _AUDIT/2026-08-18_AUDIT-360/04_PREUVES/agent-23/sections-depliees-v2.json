@@ -1,0 +1,80 @@
+[
+  {
+    "titre": "Console CRM",
+    "liensVisiblesApresOuverture": [
+      "Contacts",
+      "À arbitrer",
+      "Vivier candidats"
+    ]
+  },
+  {
+    "titre": "Pilotage",
+    "liensVisiblesApresOuverture": [
+      "Tableau de bord",
+      "Couverture France",
+      "Campagnes",
+      "Runs de scraping"
+    ]
+  },
+  {
+    "titre": "Data",
+    "liensVisiblesApresOuverture": [
+      "Entreprises",
+      "Contacts",
+      "Tags"
+    ]
+  },
+  {
+    "titre": "International",
+    "liensVisiblesApresOuverture": [
+      "Roumanie"
+    ]
+  },
+  {
+    "titre": "Médias & Presse",
+    "liensVisiblesApresOuverture": [
+      "Médias",
+      "Journalistes"
+    ]
+  },
+  {
+    "titre": "Communication",
+    "liensVisiblesApresOuverture": [
+      "Audiences",
+      "Templates email",
+      "Envois email"
+    ]
+  },
+  {
+    "titre": "IA",
+    "liensVisiblesApresOuverture": [
+      "LLM Router",
+      "Proxies",
+      "Rotations"
+    ]
+  },
+  {
+    "titre": "Conformité",
+    "liensVisiblesApresOuverture": [
+      "Requêtes RGPD",
+      "Registre AI Act",
+      "Journaux d’audit"
+    ]
+  },
+  {
+    "titre": "Admin",
+    "liensVisiblesApresOuverture": [
+      "Utilisateurs",
+      "Paramètres"
+    ]
+  },
+  {
+    "titre": "Phase 2",
+    "liensVisiblesApresOuverture": [
+      "E-mails à froid",
+      "Prospection LinkedIn",
+      "Pipeline CRM",
+      "Analytique"
+    ]
+  }
+]

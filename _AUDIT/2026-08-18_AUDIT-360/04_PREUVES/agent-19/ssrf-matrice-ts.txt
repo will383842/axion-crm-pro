@@ -1,0 +1,35 @@
+CAS                            | URL                                            | VERDICT | RAISON
+---------------------------------------------------------------------------------------------------------------------------------------
+temoin_positif_ip_publique     | http://93.184.216.34/                          | PASSE   | 
+temoin_positif_dns_public      | https://example.com/                           | PASSE   | 
+temoin_positif_api_insee       | https://api.insee.fr/                          | PASSE   | 
+loopback_127                   | http://127.0.0.1/                              | BLOQUE  | deny_host:127.0.0.1
+loopback_nom                   | http://localhost/                              | BLOQUE  | deny_host:localhost
+loopback_decimal               | http://2130706433/                             | BLOQUE  | deny_host:127.0.0.1
+loopback_octal                 | http://0177.0.0.1/                             | BLOQUE  | deny_host:127.0.0.1
+loopback_127_1_court           | http://127.1/                                  | BLOQUE  | deny_host:127.0.0.1
+prive_10                       | http://10.0.0.5/                               | BLOQUE  | deny_cidr:10.0.0.5
+prive_192_168                  | http://192.168.1.1/                            | BLOQUE  | deny_cidr:192.168.1.1
+prive_172_16                   | http://172.16.0.1/                             | BLOQUE  | deny_cidr:172.16.0.1
+link_local_169                 | http://169.254.1.1/                            | BLOQUE  | deny_cidr:169.254.1.1
+IMDS_aws_gcp                   | http://169.254.169.254/latest/meta-data/       | BLOQUE  | deny_host:169.254.169.254
+IMDS_gcp_nom                   | http://metadata.google.internal/               | BLOQUE  | deny_host:metadata.google.internal
+IMDS_alibaba                   | http://100.100.100.200/                        | BLOQUE  | deny_host:100.100.100.200
+IMDS_azure_nom                 | http://metadata.azure.com/                     | BLOQUE  | deny_host:metadata.azure.com
+ipv6_loopback                  | http://[::1]/                                  | BLOQUE  | dns_no_records
+ipv6_mappee_loopback           | http://[::ffff:127.0.0.1]/                     | BLOQUE  | dns_no_records
+ipv6_mappee_IMDS               | http://[::ffff:169.254.169.254]/               | BLOQUE  | dns_no_records
+ipv6_ULA_fd00                  | http://[fd00::1]/                              | BLOQUE  | dns_no_records
+ipv6_link_local_fe80           | http://[fe80::1]/                              | BLOQUE  | dns_no_records
+ipv6_public_cloudflare         | http://[2606:4700:4700::1111]/                 | BLOQUE  | dns_no_records
+scheme_file                    | file:///etc/passwd                             | BLOQUE  | bad_scheme:file:
+scheme_gopher                  | gopher://169.254.169.254/_GET%20/              | BLOQUE  | bad_scheme:gopher:
+scheme_dict                    | dict://127.0.0.1:11211/stat                    | BLOQUE  | bad_scheme:dict:
+scheme_ftp                     | ftp://example.com/x                            | BLOQUE  | bad_scheme:ftp:
+userinfo_confusion             | http://example.com@169.254.169.254/            | BLOQUE  | deny_host:169.254.169.254
+docker_hote_interne            | http://host.docker.internal/                   | BLOQUE  | dns_no_records
+service_interne_postgres       | http://axion-crm-postgres:5432/                | BLOQUE  | dns_no_records
+service_interne_redis          | http://axion-crm-redis:6379/                   | BLOQUE  | dns_no_records
+dns_rebinding_nip_io           | http://127.0.0.1.nip.io/                       | BLOQUE  | deny_cidr:127.0.0.1
+
+SSRF_GUARD_DENY_PRIVATE brut = undefined

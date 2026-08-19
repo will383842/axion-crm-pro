@@ -1,0 +1,790 @@
+
+> @axion-ia/axion-crm-pro-frontend@0.1.0 test C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend
+> vitest run
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/willi/Documents/Projets/Axion-CRM-Pro/frontend[39m
+
+ [32m✓[39m tests/lib/echo.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 819[2mms[22m[39m
+ [32m✓[39m tests/components/ContactsHubPage.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 1245[2mms[22m[39m
+   [33m[2m✓[22m[39m ContactsHubPage — bascule de température[2m > [22maffiche le squelette, et NON « aucun contact », pendant le chargement de la vue froide [33m713[2mms[22m[39m
+ [32m✓[39m tests/components/SidebarAccordeon.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 1743[2mms[22m[39m
+   [33m[2m✓[22m[39m Barre latérale — accordéon[2m > [22mouvre la section de la PAGE COURANTE à l’arrivée [33m473[2mms[22m[39m
+   [33m[2m✓[22m[39m Barre latérale — accordéon[2m > [22mouvrir une section referme la précédente [33m415[2mms[22m[39m
+   [33m[2m✓[22m[39m Barre latérale — accordéon[2m > [22mrecliquer sur la section ouverte la referme [33m332[2mms[22m[39m
+   [33m[2m✓[22m[39m Barre latérale — accordéon[2m > [22mles entrées d’une section fermée ne sont pas atteignables au clavier [33m317[2mms[22m[39m
+ [32m✓[39m tests/components/ConsoleGate.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 605[2mms[22m[39m
+ [32m✓[39m tests/lib/msw-contract.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 288[2mms[22m[39m
+[90mstderr[2m | tests/screens/LoginPage.test.tsx[2m > [22m[2mLoginPage — rendu[2m > [22m[2maffiche le formulaire complet, avec les libellés FRANÇAIS de fr.json
+[22m[39mAn update to Transitioner inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Transitioner inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchesInner inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to OutletImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchInnerImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchInnerImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Transitioner inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+[90mstderr[2m | tests/screens/LoginPage.test.tsx[2m > [22m[2mLoginPage — rendu[2m > [22m[2mpropose les deux échappatoires (lien magique, mot de passe oublié)
+[22m[39mAn update to Transitioner inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Transitioner inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchesInner inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to OutletImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchInnerImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchInnerImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Transitioner inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+[90mstderr[2m | tests/screens/ContactsHubPage.test.tsx[2m > [22m[2mContactsHubPage — rendu[2m > [22m[2mdrapeau INCONNU : muet et fermé — pas d’affirmation « non activée »
+[22m[39mAn update to Transitioner inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Transitioner inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchesInner inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to OutletImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchInnerImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to OutletImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchInnerImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchInnerImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Transitioner inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+[90mstderr[2m | tests/screens/CompanyDetailPage.test.tsx[2m > [22m[2mCompanyDetailPage — rendu[2m > [22m[2mcharge la fiche de l’entreprise DE L’URL et affiche son identité légale
+[22m[39mIn HTML, <button> cannot be a descendant of <button>.
+This will cause a hydration error.
+
+  ...
+    <MatchView router={{...}} matchId="/layout/co..." resetKey={1787133748687} matchState={{routeId:"/...", ...}}>
+      <SafeFragment>
+        <SafeFragment fallback={null}>
+          <CatchBoundary getResetKey={function getResetKey} errorComponent={function defaultErrorComponent} ...>
+            <CatchBoundaryImpl getResetKey={function getResetKey} onCatch={function onCatch}>
+              <SafeFragment fallback={function fallback}>
+                <MatchInnerImpl matchId="/layout/co...">
+                  <component>
+                    <CompanyDetailPage>
+                      <div className="px-6 py-6">
+                        <Breadcrumbs>
+                        <header className="mb-6 flex ...">
+                          <div>
+                          <div className="flex items...">
+                            <Button>
+                            <Button>
+                            <DropdownMenu align="right" trigger={<ForwardRef(IconButton)>} items={[...]}>
+                              <div ref={{current:null}} className="relative i...">
+>                               <button
+>                                 type="button"
+>                                 onClick={function onClick}
+>                                 aria-haspopup="menu"
+>                                 aria-expanded={false}
+>                                 className="inline-flex"
+>                               >
+                                  <IconButton label={"Plus d'a..."} variant="outline" size="md">
+>                                   <button
+>                                     ref={null}
+>                                     aria-label={"Plus d'actions"}
+>                                     title={"Plus d'actions"}
+>                                     className="inline-flex items-center justify-center rounded-lg transition-[transf..."
+>                                   >
+                        ...
+
+<button> cannot contain a nested <button>.
+See this log for the ancestor stack trace.
+
+ [32m✓[39m tests/screens/PersonTimelinePage.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 1556[2mms[22m[39m
+   [33m[2m✓[22m[39m PersonTimelinePage — rendu[2m > [22mextrait `personKey` de l’URL et affiche la fiche de CETTE personne [33m546[2mms[22m[39m
+   [33m[2m✓[22m[39m PersonTimelinePage — parcours[2m > [22mcliquer une personne depuis le hub Contacts ouvre SA fiche [33m649[2mms[22m[39m
+[90mstderr[2m | tests/screens/AudienceBuilderPage.test.tsx[2m > [22m[2mAudienceBuilderPage — rendu[2m > [22m[2maffiche les cinq blocs de critères, et la création est VERROUILLÉE à l’arrivée
+[22m[39mAn update to Transitioner inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Transitioner inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchesInner inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to OutletImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchInnerImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to OutletImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchInnerImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchInnerImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Transitioner inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+[90mstderr[2m | tests/screens/AudienceBuilderPage.test.tsx[2m > [22m[2mAudienceBuilderPage — rendu[2m > [22m[2mdémarre avec le seul critère « prêt outreach », et l’affiche dans le récapitulatif
+[22m[39mAn update to Transitioner inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Transitioner inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchesInner inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to OutletImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchInnerImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to OutletImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchInnerImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchInnerImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to MatchImpl inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Transitioner inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ [32m✓[39m tests/screens/ContactsHubPage.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 2751[2mms[22m[39m
+   [33m[2m✓[22m[39m ContactsHubPage — rendu[2m > [22maffiche les compteurs, les onglets de type et la première page de fiches [33m806[2mms[22m[39m
+   [33m[2m✓[22m[39m ContactsHubPage — parcours[2m > [22mbasculer sur la base froide REQUÊTE `temperature=froids` et change le périmètre affiché [33m704[2mms[22m[39m
+   [33m[2m✓[22m[39m ContactsHubPage — parcours[2m > [22mchoisir un onglet de type ajoute `relation_type` à la requête [33m525[2mms[22m[39m
+   [33m[2m✓[22m[39m ContactsHubPage — parcours[2m > [22mle filtre statut de prospection part bien en `filter[prospection_status]` [33m594[2mms[22m[39m
+ [32m✓[39m tests/screens/CompanyDetailPage.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 3227[2mms[22m[39m
+   [33m[2m✓[22m[39m CompanyDetailPage — rendu[2m > [22mcharge la fiche de l’entreprise DE L’URL et affiche son identité légale [33m816[2mms[22m[39m
+   [33m[2m✓[22m[39m CompanyDetailPage — rendu[2m > [22m404 : écran honnête, pas un chargement perpétuel [33m377[2mms[22m[39m
+   [33m[2m✓[22m[39m CompanyDetailPage — parcours[2m > [22mdéplier « Données brutes » RÉVÈLE les signaux, replier les cache [33m832[2mms[22m[39m
+   [33m[2m✓[22m[39m CompanyDetailPage — parcours[2m > [22m« Enrichir maintenant » POSTe (cookie CSRF compris) puis RECHARGE la fiche [33m502[2mms[22m[39m
+   [33m[2m✓[22m[39m CompanyDetailPage — parcours[2m > [22mle fil d’Ariane ramène à la liste des entreprises [33m397[2mms[22m[39m
+ [32m✓[39m tests/screens/DashboardPage.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 3743[2mms[22m[39m
+   [33m[2m✓[22m[39m DashboardPage — rendu[2m > [22maffiche les quatre indicateurs, la couverture et l’activité récente [33m1015[2mms[22m[39m
+   [33m[2m✓[22m[39m DashboardPage — rendu[2m > [22mune carte fille en échec n’emporte PAS le tableau de bord [33m414[2mms[22m[39m
+   [33m[2m✓[22m[39m DashboardPage — parcours[2m > [22m🔴 changer de période ne déclenche AUCUNE requête (clé de cache sans `period`) [33m1046[2mms[22m[39m
+   [33m[2m✓[22m[39m DashboardPage — parcours[2m > [22m🔴 sans `period_label` du serveur, l’écran AFFIRME une période qu’il n’a pas chargée [33m533[2mms[22m[39m
+   [33m[2m✓[22m[39m DashboardPage — parcours[2m > [22m« Actualiser » redemande les statistiques et l’écran reflète la NOUVELLE valeur [33m402[2mms[22m[39m
+ [32m✓[39m tests/screens/LoginPage.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 9145[2mms[22m[39m
+   [33m[2m✓[22m[39m LoginPage — rendu[2m > [22maffiche le formulaire complet, avec les libellés FRANÇAIS de fr.json [33m627[2mms[22m[39m
+   [33m[2m✓[22m[39m LoginPage — parcours[2m > [22msaisir puis soumettre POSTe les identifiants et ATTERRIT sur le tableau de bord [33m3486[2mms[22m[39m
+   [33m[2m✓[22m[39m LoginPage — parcours[2m > [22maiguille vers /2fa quand le compte exige un second facteur [33m2641[2mms[22m[39m
+   [33m[2m✓[22m[39m LoginPage — parcours[2m > [22mle bouton œil dévoile puis remasque le mot de passe [33m789[2mms[22m[39m
+   [33m[2m✓[22m[39m LoginPage — parcours[2m > [22midentifiants refusés (422) : on RESTE sur /login et le bouton redevient actif [33m1503[2mms[22m[39m
+ [32m✓[39m tests/screens/AudienceBuilderPage.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 10794[2mms[22m[39m
+   [33m[2m✓[22m[39m AudienceBuilderPage — rendu[2m > [22maffiche les cinq blocs de critères, et la création est VERROUILLÉE à l’arrivée [33m1557[2mms[22m[39m
+   [33m[2m✓[22m[39m AudienceBuilderPage — parcours[2m > [22mcliquer un département et cocher « a un email » construit les CRITÈRES envoyés à l’aperçu [33m1557[2mms[22m[39m
+   [33m[2m✓[22m[39m AudienceBuilderPage — parcours[2m > [22mre-cliquer un département le RETIRE — la puce est une bascule, pas un ajout [33m1944[2mms[22m[39m
+   [33m[2m✓[22m[39m AudienceBuilderPage — parcours[2m > [22mnommer puis créer POSTe l’audience et ATTERRIT sur sa fiche [33m3615[2mms[22m[39m
+   [33m[2m✓[22m[39m AudienceBuilderPage — parcours[2m > [22maperçu en échec : l’écran affiche le message du serveur, jamais un compte faux [33m1279[2mms[22m[39m
+   [33m[2m✓[22m[39m AudienceBuilderPage — parcours[2m > [22m« Annuler » revient à la liste des audiences [33m569[2mms[22m[39m
+ [32m✓[39m tests/smoke.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 16[2mms[22m[39m
+ [32m✓[39m tests/components/SizeCategoryBadge.extended.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[90m 146[2mms[22m[39m
+ [32m✓[39m tests/components/SizeCategoryBadge.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[90m 194[2mms[22m[39m
+ [32m✓[39m tests/components/EmptyState.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 465[2mms[22m[39m
+ [32m✓[39m tests/components/crmConsoleTypes.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 30[2mms[22m[39m
+ [32m✓[39m tests/components/QualityBadge.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[90m 205[2mms[22m[39m
+ [32m✓[39m tests/components/Skeleton.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[90m 187[2mms[22m[39m
+ [32m✓[39m tests/lib/api.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 86[2mms[22m[39m
+ [32m✓[39m tests/components/DarkModeToggle.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 750[2mms[22m[39m
+   [33m[2m✓[22m[39m DarkModeToggle[2m > [22mrenders 3 buttons : light / system / dark [33m407[2mms[22m[39m
+ [32m✓[39m tests/components/FormField.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 863[2mms[22m[39m
+   [33m[2m✓[22m[39m FormField[2m > [22muser can type in the input [33m359[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m21 passed[39m[22m[90m (21)[39m
+[2m      Tests [22m [1m[32m118 passed[39m[22m[90m (118)[39m
+[2m   Start at [22m 12:00:19
+[2m   Duration [22m 213.96s[2m (transform 6.84s, setup 845.69s, collect 220.33s, tests 38.86s, environment 998.32s, prepare 105.54s)[22m
+

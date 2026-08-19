@@ -1,0 +1,47 @@
+=== Ce que GET /v1/proxy-providers peut serialiser ===
+Le controleur (ProxyProvidersController.php:25) rend le modele Eloquent BRUT :
+  ProxyProvider::query()->orderBy('slug')->limit(50)->get()
+Aucune Resource, aucun $hidden, aucun cast 'encrypted' (Models/ProxyProvider.php).
+Donc les colonnes de la table SONT la reponse. Colonnes reelles :
+
+     column_name      |        data_type         
+----------------------+--------------------------
+ id                   | bigint
+ workspace_id         | uuid
+ slug                 | text
+ type                 | text
+ zone                 | text
+ enabled              | boolean
+ weight               | integer
+ endpoints_count      | integer
+ last_health_check_at | timestamp with time zone
+ last_health_status   | text
+ metadata             | jsonb
+ created_at           | timestamp with time zone
+ updated_at           | timestamp with time zone
+(13 rows)
+
+=== Y a-t-il une colonne d'identifiant ? (temoin negatif : on cherche large) ===
+       table_name       |      column_name      
+------------------------+-----------------------
+ invitations            | token_hash
+ llm_usage              | tokens_input
+ llm_usage              | tokens_output
+ magic_links            | token_hash
+ password_reset_tokens  | token
+ personal_access_tokens | token
+ personal_access_tokens | tokenable_id
+ personal_access_tokens | tokenable_type
+ pg_authid              | rolpassword
+ pg_ident_file_mappings | pg_username
+ pg_roles               | rolpassword
+ pg_stat_gssapi         | credentials_delegated
+ pg_subscription        | subpasswordrequired
+ pg_ts_config_map       | maptokentype
+ pg_ts_parser           | prstoken
+ rgpd_requests          | export_token
+ users                  | password_hash
+ users                  | remember_token
+ users                  | totp_secret
+(19 rows)
+

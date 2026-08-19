@@ -1,0 +1,55 @@
+PAS-DE-TEST-DIRECT | scripts/calendly-webhook-subscribe.ts
+PAS-DE-TEST-DIRECT | src/app/[locale]/(admin)/[adminPrefix]/submissions/_v2/SubmissionsV2.tsx
+PAS-DE-TEST-DIRECT | src/app/[locale]/(admin)/[adminPrefix]/synchro-crm/_components/RejouerBouton.tsx
+PAS-DE-TEST-DIRECT | src/app/[locale]/(admin)/[adminPrefix]/synchro-crm/page.tsx
+PAS-DE-TEST-DIRECT | src/app/[locale]/carrieres/[slug]/postuler/page.tsx
+PAS-DE-TEST-DIRECT | src/app/[locale]/vivier-opposition/page.tsx
+PAS-DE-TEST-DIRECT | src/app/api/admin/submissions/export/route.ts
+TEST-DIRECT | src/app/api/calendly/client-event/route.ts | src/app/api/calendly/client-event/__tests__/route.test.ts 
+PAS-DE-TEST-DIRECT | src/app/api/calendly/webhook/route.ts
+PAS-DE-TEST-DIRECT | src/app/api/gdpr-erase/route.ts
+PAS-DE-TEST-DIRECT | src/app/api/gdpr-export/route.ts
+TEST-DIRECT | src/app/api/internal/crm-webhook/route.ts | src/app/api/internal/crm-webhook/__tests__/route.test.ts 
+PAS-DE-TEST-DIRECT | src/app/api/vivier-opposition/route.ts
+PAS-DE-TEST-DIRECT | src/components/forms/commercial-application/steps.tsx
+PAS-DE-TEST-DIRECT | src/components/forms/commercial-application/wizard-state.ts
+PAS-DE-TEST-DIRECT | src/components/forms/JobApplicationForm.tsx
+PAS-DE-TEST-DIRECT | src/env.ts
+PAS-DE-TEST-DIRECT | src/features/admin-calendly/actions.ts
+PAS-DE-TEST-DIRECT | src/features/admin-submissions/actions.ts
+PAS-DE-TEST-DIRECT | src/features/admin-submissions/query.ts
+PAS-DE-TEST-DIRECT | src/features/commercial-application/actions.ts
+PAS-DE-TEST-DIRECT | src/features/job-application/actions.ts
+PAS-DE-TEST-DIRECT | src/features/newsletter/actions.ts
+PAS-DE-TEST-DIRECT | src/features/podcast-request/actions.ts
+PAS-DE-TEST-DIRECT | src/features/review-submission/actions.ts
+PAS-DE-TEST-DIRECT | src/features/roi-report/actions.ts
+PAS-DE-TEST-DIRECT | src/features/unified-contact/actions.ts
+PAS-DE-TEST-DIRECT | src/i18n/routing.ts
+TEST-DIRECT | src/lib/admin-nav.ts | src/lib/admin-nav.test.ts 
+TEST-DIRECT | src/lib/admin-nav-icons.ts | src/lib/admin-nav-icons.test.ts 
+PAS-DE-TEST-DIRECT | src/lib/careers/candidate-family.ts
+PAS-DE-TEST-DIRECT | src/lib/commercial-application/model.ts
+PAS-DE-TEST-DIRECT | src/lib/consents/index.ts
+PAS-DE-TEST-DIRECT | src/lib/csv.ts
+PAS-DE-TEST-DIRECT | src/lib/email/templates/index.tsx
+PAS-DE-TEST-DIRECT | src/lib/email/templates/vivier-information.tsx
+PAS-DE-TEST-DIRECT | src/server/actions/crm-sync/replay.ts
+TEST-DIRECT | src/server/calendly/api.ts | src/server/calendly/__tests__/api.test.ts 
+TEST-DIRECT | src/server/calendly/discover.ts | src/server/calendly/__tests__/discover.test.ts 
+TEST-DIRECT | src/server/calendly/enrich.ts | src/server/calendly/__tests__/enrich.test.ts 
+TEST-DIRECT | src/server/calendly/refresh.ts | src/server/calendly/__tests__/refresh.test.ts 
+TEST-DIRECT | src/server/chatbot/tools/capturer-lead.ts | src/server/chatbot/tools/capturer-lead.test.ts 
+TEST-DIRECT | src/server/notifications/format.ts | src/server/notifications/__tests__/format.test.ts 
+TEST-DIRECT | src/server/notifications/routing.ts | src/server/notifications/__tests__/routing.test.ts 
+PAS-DE-TEST-DIRECT | src/server/notifications/types.ts
+TEST-DIRECT | src/server/queue/lib/sentry-worker.ts | src/server/queue/lib/__tests__/sentry-worker.spec.ts 
+PAS-DE-TEST-DIRECT | src/server/queue/queues.ts
+PAS-DE-TEST-DIRECT | src/server/queue/types.ts
+PAS-DE-TEST-DIRECT | src/server/queue/worker.ts
+PAS-DE-TEST-DIRECT | src/server/queue/workers/crm-sync-worker.ts
+PAS-DE-TEST-DIRECT | src/server/queue/workers/vivier-crons-worker.ts
+PAS-DE-TEST-DIRECT | src/server/vivier/config.ts
+PAS-DE-TEST-DIRECT | src/server/vivier/opposition.ts
+PAS-DE-TEST-DIRECT | src/server/vivier/stock.ts
+PAS-DE-TEST-DIRECT | src/server/vivier/token.ts

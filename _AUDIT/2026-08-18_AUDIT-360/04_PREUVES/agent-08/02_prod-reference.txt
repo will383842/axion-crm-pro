@@ -1,0 +1,14 @@
+=== image postgres locale vs prod ===
+-- local --
+ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman
+PostgreSQL 16.9 (Debian 16.9-1.pgdg110+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit
+-- prod --
+ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman
+PostgreSQL 16.9 (Debian 16.9-1.pgdg110+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit
+
+=== comptages PRODUCTION (lecture seule) 2026-08-19T09:48:50Z ===
+companies=4295349
+company_tag=7501969
+contacts=1319567
+journalists=1257
+scraper_runs=7608196

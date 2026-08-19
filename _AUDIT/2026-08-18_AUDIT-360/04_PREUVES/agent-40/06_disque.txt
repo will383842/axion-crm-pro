@@ -1,0 +1,46 @@
+=== df -h ===
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs           382M  2.1M  380M   1% /run
+efivarfs        256K   27K  225K  11% /sys/firmware/efi/efivars
+/dev/sda1        75G   48G   25G  67% /
+tmpfs           1.9G     0  1.9G   0% /dev/shm
+tmpfs           5.0M     0  5.0M   0% /run/lock
+/dev/sda15      253M  146K  252M   1% /boot/efi
+overlay          75G   48G   25G  67% /var/lib/docker/rootfs/overlayfs/a30382ad800f284ed1f08dbe11972b070e63a663edbd865ed6b72af6dc9c1b4b
+overlay          75G   48G   25G  67% /var/lib/docker/rootfs/overlayfs/c1a4a7ad695204a3ce077acb5fde1f4b7b7e46a4cd85d153cbe912f96e85a3fa
+overlay          75G   48G   25G  67% /var/lib/docker/rootfs/overlayfs/7f490a0e81afff77001f52f129362b8dd7fc15385407cb864ab21c08525d17ad
+overlay          75G   48G   25G  67% /var/lib/docker/rootfs/overlayfs/cf5b5a748678556c39bfee83dda5083e59d94289f354770485003ae6f8896f1a
+overlay          75G   48G   25G  67% /var/lib/docker/rootfs/overlayfs/6ab2a17781da5d40c13ced5d8bef6444facae8655fb05630e9154ca5314ea317
+tmpfs           382M   12K  382M   1% /run/user/0
+overlay          75G   48G   25G  67% /var/lib/docker/rootfs/overlayfs/7e1f5e85a064de0bfcddc52ba8345372e053a34b2e879e799899fc8ee8ebe346
+overlay          75G   48G   25G  67% /var/lib/docker/rootfs/overlayfs/11ab2af5b928268d45a5e7d228deea407595ec0f5a0823bf5e5710d3c296b2b3
+overlay          75G   48G   25G  67% /var/lib/docker/rootfs/overlayfs/ebc259be7ec9cda02176371ca06892853b11251acc630638846a1f88c3eb7011
+overlay          75G   48G   25G  67% /var/lib/docker/rootfs/overlayfs/cba3064024caaffacc8353b9c2c7331c0efefb90776804a5c753ace06b21d612
+overlay          75G   48G   25G  67% /var/lib/docker/rootfs/overlayfs/83895f5fb7cb7b44d4ab3f9cc878c6564b7e64388b59e3cb91d0b876adeefd74
+overlay          75G   48G   25G  67% /var/lib/docker/rootfs/overlayfs/8fa67c199a06a7771db88efe92ccabf1a377fe829e92ac4aad9b767293766ead
+overlay          75G   48G   25G  67% /var/lib/docker/rootfs/overlayfs/0aa67805315ecd74286cc282f49c2048e88638abb07ce2ff8eecd0c73cdf3c55
+overlay          75G   48G   25G  67% /var/lib/docker/rootfs/overlayfs/72bc0d97866fa09488de5c9296fd7fecd940e1ba323314637c716b5ce79d119e
+
+=== docker system df ===
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
+Images          23        12        11.43GB   826.9MB (7%)
+Containers      14        13        2.347MB   4.096kB (0%)
+Local Volumes   10        8         20.68GB   522MB (2%)
+Build Cache     119       0         3.786GB   2.45GB
+
+=== top 15 repertoires /var ===
+26G	/var/lib/docker
+5.1G	/var/log
+
+=== volumes docker ===
+DRIVER    VOLUME NAME
+local     axion-crm-pro_api-storage
+local     axion-crm-pro_caddy-config
+local     axion-crm-pro_caddy-data
+local     axion-crm-pro_frontend-node-modules
+local     axion-crm-pro_postgres-data
+local     axion-crm-pro_redis-data
+local     axion-crm-pro_workers-node-modules
+local     axion-crm-staging_staging-api-storage
+local     axion-crm-staging_staging-postgres-data
+local     axion-crm-staging_staging-redis-data

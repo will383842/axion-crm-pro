@@ -1,0 +1,14 @@
+PREUVE : DENY_CIDR de SsrfGuard.php ne contient AUCUNE plage IPv6.
+inet_pton(IPv6)=16 octets, inet_pton(IPv4)=4 -> la boucle fait continue sur CHAQUE plage.
+
+IP (host deja de-crochete)             | ipInDenyCidr()
+--------------------------------------------------------------
+169.254.169.254                        | true (refuse)
+10.0.0.1                               | true (refuse)
+::1                                    | FALSE (ACCEPTE)
+::ffff:169.254.169.254                 | FALSE (ACCEPTE)
+::ffff:127.0.0.1                       | FALSE (ACCEPTE)
+fd00::1                                | FALSE (ACCEPTE)
+fe80::1                                | FALSE (ACCEPTE)
+fc00::1                                | FALSE (ACCEPTE)
+2606:4700:4700::1111                   | FALSE (ACCEPTE)

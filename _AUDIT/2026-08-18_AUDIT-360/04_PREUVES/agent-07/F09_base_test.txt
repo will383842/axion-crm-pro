@@ -1,0 +1,15 @@
+=== linkedin_sequences dans axion_crm_test ? ===
+  2026_07_09_000003_backfill_media_website_status_pending ............ [1] Ran  
+
+ nb |                    derniere                     
+----+-------------------------------------------------
+  9 | 2026_05_16_000009_create_quality_score_triggers
+(1 row)
+
+ nb |                 derniere                  
+----+-------------------------------------------
+ 58 | 2026_08_19_000002_crm_activites_et_motifs
+(1 row)
+
+=== migration qui cree linkedin_sequences ===
+backend/database/migrations/2026_05_17_000010_phase2_full_scaffold_schema.php

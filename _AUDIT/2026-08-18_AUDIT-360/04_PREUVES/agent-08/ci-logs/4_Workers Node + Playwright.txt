@@ -1,0 +1,343 @@
+﻿2026-08-19T09:42:45.0585622Z Current runner version: '2.336.0'
+2026-08-19T09:42:45.0621037Z ##[group]Runner Image Provisioner
+2026-08-19T09:42:45.0622358Z Hosted Compute Agent
+2026-08-19T09:42:45.0623288Z Version: 20260729.566
+2026-08-19T09:42:45.0624171Z Commit: cf7153fe6e25b664e8693c24944bf2b00355d109
+2026-08-19T09:42:45.0625359Z Build Date: 2026-07-29T19:17:02Z
+2026-08-19T09:42:45.0626415Z Worker ID: {46b7db0f-acd6-492e-9365-dbb4b338b36b}
+2026-08-19T09:42:45.0627614Z Azure Region: eastus2
+2026-08-19T09:42:45.0628388Z ##[endgroup]
+2026-08-19T09:42:45.0631294Z ##[group]Operating System
+2026-08-19T09:42:45.0632259Z Ubuntu
+2026-08-19T09:42:45.0633093Z 24.04.4
+2026-08-19T09:42:45.0633947Z LTS
+2026-08-19T09:42:45.0634660Z ##[endgroup]
+2026-08-19T09:42:45.0635500Z ##[group]Runner Image
+2026-08-19T09:42:45.0636476Z Image: ubuntu-24.04
+2026-08-19T09:42:45.0637321Z Version: 20260816.277.1
+2026-08-19T09:42:45.0639568Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260816.277/images/ubuntu/Ubuntu2404-Readme.md
+2026-08-19T09:42:45.0642142Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260816.277
+2026-08-19T09:42:45.0643623Z ##[endgroup]
+2026-08-19T09:42:45.0645459Z ##[group]GITHUB_TOKEN Permissions
+2026-08-19T09:42:45.0648556Z Contents: read
+2026-08-19T09:42:45.0649750Z Metadata: read
+2026-08-19T09:42:45.0650581Z Packages: read
+2026-08-19T09:42:45.0651583Z ##[endgroup]
+2026-08-19T09:42:45.0654228Z Secret source: Actions
+2026-08-19T09:42:45.0656030Z Prepare workflow directory
+2026-08-19T09:42:45.1128245Z Prepare all required actions
+2026-08-19T09:42:45.1199017Z Getting action download info
+2026-08-19T09:42:45.3195680Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-08-19T09:42:45.4331444Z Download action repository 'pnpm/action-setup@v4' (SHA:b906affcce14559ad1aafd4ab0e942779e9f58b1)
+2026-08-19T09:42:45.6731428Z Download action repository 'actions/setup-node@v7' (SHA:820762786026740c76f36085b0efc47a31fe5020)
+2026-08-19T09:42:45.8629393Z Complete job name: Workers Node + Playwright
+2026-08-19T09:42:45.9418225Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-19T09:42:45.9427440Z ##[group]Run actions/checkout@v4
+2026-08-19T09:42:45.9428129Z with:
+2026-08-19T09:42:45.9428577Z   repository: will383842/axion-crm-pro
+2026-08-19T09:42:45.9432643Z   token: ***
+2026-08-19T09:42:45.9433080Z   ssh-strict: true
+2026-08-19T09:42:45.9433516Z   ssh-user: git
+2026-08-19T09:42:45.9433959Z   persist-credentials: true
+2026-08-19T09:42:45.9434438Z   clean: true
+2026-08-19T09:42:45.9434874Z   sparse-checkout-cone-mode: true
+2026-08-19T09:42:45.9435385Z   fetch-depth: 1
+2026-08-19T09:42:45.9435806Z   fetch-tags: false
+2026-08-19T09:42:45.9436237Z   show-progress: true
+2026-08-19T09:42:45.9436696Z   lfs: false
+2026-08-19T09:42:45.9437143Z   submodules: false
+2026-08-19T09:42:45.9437588Z   set-safe-directory: true
+2026-08-19T09:42:45.9438080Z   allow-unsafe-pr-checkout: false
+2026-08-19T09:42:45.9439005Z ##[endgroup]
+2026-08-19T09:42:46.0556466Z Syncing repository: will383842/axion-crm-pro
+2026-08-19T09:42:46.0560082Z ##[group]Getting Git version info
+2026-08-19T09:42:46.0561557Z Working directory is '/home/runner/work/axion-crm-pro/axion-crm-pro'
+2026-08-19T09:42:46.0563745Z [command]/usr/bin/git version
+2026-08-19T09:42:46.0597517Z git version 2.55.0
+2026-08-19T09:42:46.0627214Z ##[endgroup]
+2026-08-19T09:42:46.0655335Z Temporarily overriding HOME='/home/runner/work/_temp/a037b260-ce24-4249-9392-9a26c32a7eab' before making global git config changes
+2026-08-19T09:42:46.0658194Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-19T09:42:46.0672444Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/axion-crm-pro/axion-crm-pro
+2026-08-19T09:42:46.0733376Z Deleting the contents of '/home/runner/work/axion-crm-pro/axion-crm-pro'
+2026-08-19T09:42:46.0740023Z ##[group]Initializing the repository
+2026-08-19T09:42:46.0745644Z [command]/usr/bin/git init /home/runner/work/axion-crm-pro/axion-crm-pro
+2026-08-19T09:42:46.0858642Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-08-19T09:42:46.0876839Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-08-19T09:42:46.0879049Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-08-19T09:42:46.0880548Z hint: call:
+2026-08-19T09:42:46.0881273Z hint:
+2026-08-19T09:42:46.0882095Z hint: 	git config --global init.defaultBranch <name>
+2026-08-19T09:42:46.0883004Z hint:
+2026-08-19T09:42:46.0883946Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-08-19T09:42:46.0886052Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-08-19T09:42:46.0887481Z hint:
+2026-08-19T09:42:46.0888636Z hint: 	git branch -m <name>
+2026-08-19T09:42:46.0889891Z hint:
+2026-08-19T09:42:46.0891270Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-08-19T09:42:46.0893415Z Initialized empty Git repository in /home/runner/work/axion-crm-pro/axion-crm-pro/.git/
+2026-08-19T09:42:46.0897099Z [command]/usr/bin/git remote add origin https://github.com/will383842/axion-crm-pro
+2026-08-19T09:42:46.0977192Z ##[endgroup]
+2026-08-19T09:42:46.0979249Z ##[group]Disabling automatic garbage collection
+2026-08-19T09:42:46.0984132Z [command]/usr/bin/git config --local gc.auto 0
+2026-08-19T09:42:46.1034144Z ##[endgroup]
+2026-08-19T09:42:46.1035905Z ##[group]Setting up auth
+2026-08-19T09:42:46.1043512Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-08-19T09:42:46.1111182Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-08-19T09:42:46.1524917Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-19T09:42:46.1569917Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-08-19T09:42:46.1842051Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-19T09:42:46.1884131Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-08-19T09:42:46.2136262Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-08-19T09:42:46.2180463Z ##[endgroup]
+2026-08-19T09:42:46.2181563Z ##[group]Fetching the repository
+2026-08-19T09:42:46.2190256Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +a3369040168b75612b1e3882adecd13d49fde737:refs/remotes/pull/188/merge
+2026-08-19T09:42:47.3211645Z From https://github.com/will383842/axion-crm-pro
+2026-08-19T09:42:47.3213597Z  * [new ref]         a3369040168b75612b1e3882adecd13d49fde737 -> pull/188/merge
+2026-08-19T09:42:47.3230714Z ##[endgroup]
+2026-08-19T09:42:47.3232498Z ##[group]Determining the checkout info
+2026-08-19T09:42:47.3233957Z ##[endgroup]
+2026-08-19T09:42:47.3235179Z [command]/usr/bin/git sparse-checkout disable
+2026-08-19T09:42:47.3315013Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-08-19T09:42:47.3353501Z ##[group]Checking out the ref
+2026-08-19T09:42:47.3361731Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/188/merge
+2026-08-19T09:42:47.9657061Z Note: switching to 'refs/remotes/pull/188/merge'.
+2026-08-19T09:42:47.9657838Z 
+2026-08-19T09:42:47.9658259Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-08-19T09:42:47.9659829Z changes and commit them, and you can discard any commits you make in this
+2026-08-19T09:42:47.9661420Z state without impacting any branches by switching back to a branch.
+2026-08-19T09:42:47.9662145Z 
+2026-08-19T09:42:47.9662552Z If you want to create a new branch to retain commits you create, you may
+2026-08-19T09:42:47.9663619Z do so (now or later) by using -c with the switch command. Example:
+2026-08-19T09:42:47.9664202Z 
+2026-08-19T09:42:47.9664477Z   git switch -c <new-branch-name>
+2026-08-19T09:42:47.9664964Z 
+2026-08-19T09:42:47.9665364Z Or undo this operation with:
+2026-08-19T09:42:47.9665761Z 
+2026-08-19T09:42:47.9666132Z   git switch -
+2026-08-19T09:42:47.9666464Z 
+2026-08-19T09:42:47.9666980Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-08-19T09:42:47.9667649Z 
+2026-08-19T09:42:47.9668535Z HEAD is now at a336904 Merge bb60473dce8b29de40c94781c3a30ebf11224d1e into b53338cd6ba50d7f9e18557e2a725a5f00fe15db
+2026-08-19T09:42:47.9730302Z ##[endgroup]
+2026-08-19T09:42:47.9786121Z [command]/usr/bin/git log -1 --format=%H
+2026-08-19T09:42:47.9821218Z a3369040168b75612b1e3882adecd13d49fde737
+2026-08-19T09:42:48.0174600Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-19T09:42:48.0176502Z ##[group]Run pnpm/action-setup@v4
+2026-08-19T09:42:48.0176831Z with:
+2026-08-19T09:42:48.0177080Z   version: 9
+2026-08-19T09:42:48.0177333Z   dest: ~/setup-pnpm
+2026-08-19T09:42:48.0177629Z   run_install: null
+2026-08-19T09:42:48.0177952Z   cache: false
+2026-08-19T09:42:48.0178255Z   cache_dependency_path: pnpm-lock.yaml
+2026-08-19T09:42:48.0178608Z   package_json_file: package.json
+2026-08-19T09:42:48.0179236Z   standalone: false
+2026-08-19T09:42:48.0179507Z ##[endgroup]
+2026-08-19T09:42:48.1695064Z ##[group]Running self-installer...
+2026-08-19T09:42:48.5674087Z (node:2192) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-08-19T09:42:48.7291114Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-08-19T09:42:48.7291973Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-08-19T09:42:48.7378256Z Packages: +1
+2026-08-19T09:42:48.7379198Z +
+2026-08-19T09:42:49.1389682Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-08-19T09:42:49.1648068Z 
+2026-08-19T09:42:49.1648845Z dependencies:
+2026-08-19T09:42:49.1649364Z + pnpm 9.15.9 (11.22.0 is available)
+2026-08-19T09:42:49.1649709Z 
+2026-08-19T09:42:49.1682816Z Done in 821ms
+2026-08-19T09:42:49.1874434Z ##[endgroup]
+2026-08-19T09:42:49.1875102Z Installation Completed!
+2026-08-19T09:42:49.2088379Z ##[group]Run actions/setup-node@v7
+2026-08-19T09:42:49.2088967Z with:
+2026-08-19T09:42:49.2089263Z   node-version: 22
+2026-08-19T09:42:49.2089482Z   cache: pnpm
+2026-08-19T09:42:49.2089730Z   cache-dependency-path: workers/pnpm-lock.yaml
+2026-08-19T09:42:49.2090041Z   check-latest: false
+2026-08-19T09:42:49.2092501Z   token: ***
+2026-08-19T09:42:49.2092740Z   package-manager-cache: true
+2026-08-19T09:42:49.2092995Z env:
+2026-08-19T09:42:49.2093286Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-19T09:42:49.2093610Z ##[endgroup]
+2026-08-19T09:42:49.3427003Z Found in cache @ /opt/hostedtoolcache/node/22.23.2/x64
+2026-08-19T09:42:49.3430273Z ##[group]Environment details
+2026-08-19T09:42:49.7077765Z node: v22.23.2
+2026-08-19T09:42:49.7078449Z npm: 10.9.8
+2026-08-19T09:42:49.7079561Z yarn: 1.22.22
+2026-08-19T09:42:49.7080448Z ##[endgroup]
+2026-08-19T09:42:49.7099450Z [command]/home/runner/setup-pnpm/node_modules/.bin/pnpm store path --silent
+2026-08-19T09:42:50.0952569Z /home/runner/setup-pnpm/node_modules/.bin/store/v3
+2026-08-19T09:42:50.1976317Z Cache hit for: node-cache-Linux-x64-pnpm-28a61a4811babeefaa8f4436a22207dea9cf71b0701323152a5028bd6dfc5c27
+2026-08-19T09:42:50.4595564Z Received 30794187 of 30794187 (100.0%), 138.5 MBs/sec
+2026-08-19T09:42:50.4599767Z Cache Size: ~29 MB (30794187 B)
+2026-08-19T09:42:50.4623357Z [command]/usr/bin/tar -xf /home/runner/work/_temp/1e7a18f0-72f9-4f15-9ccd-b4fd126d99d0/cache.tzst -P -C /home/runner/work/axion-crm-pro/axion-crm-pro --use-compress-program unzstd
+2026-08-19T09:42:50.7914187Z Cache restored successfully
+2026-08-19T09:42:50.7934461Z Cache restored from key: node-cache-Linux-x64-pnpm-28a61a4811babeefaa8f4436a22207dea9cf71b0701323152a5028bd6dfc5c27
+2026-08-19T09:42:50.8110907Z ##[group]Run pnpm install --frozen-lockfile
+2026-08-19T09:42:50.8111352Z [36;1mpnpm install --frozen-lockfile[0m
+2026-08-19T09:42:50.8161748Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:42:50.8162046Z env:
+2026-08-19T09:42:50.8162320Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-19T09:42:50.8162645Z ##[endgroup]
+2026-08-19T09:42:51.2447772Z Lockfile is up to date, resolution step is skipped
+2026-08-19T09:42:51.2838482Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-08-19T09:42:51.3290787Z Packages: +245
+2026-08-19T09:42:51.3291875Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-08-19T09:42:51.6628450Z Progress: resolved 245, reused 245, downloaded 0, added 245, done
+2026-08-19T09:42:52.0575663Z 
+2026-08-19T09:42:52.0576329Z dependencies:
+2026-08-19T09:42:52.0576761Z + axios 1.16.1
+2026-08-19T09:42:52.0577134Z + cheerio 1.2.0
+2026-08-19T09:42:52.0577496Z + ioredis 6.0.0
+2026-08-19T09:42:52.0577826Z + pino 10.3.1
+2026-08-19T09:42:52.0578318Z + playwright 1.62.1
+2026-08-19T09:42:52.0578940Z + playwright-extra 4.3.6
+2026-08-19T09:42:52.0579491Z + puppeteer-extra-plugin-stealth 2.11.2
+2026-08-19T09:42:52.0579975Z + zod 4.4.3
+2026-08-19T09:42:52.0580166Z 
+2026-08-19T09:42:52.0580322Z devDependencies:
+2026-08-19T09:42:52.0580687Z + @types/node 26.2.0
+2026-08-19T09:42:52.0581033Z + eslint 10.8.1
+2026-08-19T09:42:52.0581394Z + tsx 4.22.1
+2026-08-19T09:42:52.0581694Z + typescript 5.9.3
+2026-08-19T09:42:52.0581950Z + typescript-eslint 8.67.0
+2026-08-19T09:42:52.0582202Z + vitest 2.1.9
+2026-08-19T09:42:52.0582322Z 
+2026-08-19T09:42:52.0796226Z Done in 1.2s using pnpm v9.15.9
+2026-08-19T09:42:52.0978630Z ##[group]Run set -euo pipefail
+2026-08-19T09:42:52.0979924Z [36;1mset -euo pipefail[0m
+2026-08-19T09:42:52.0980379Z [36;1m# Version RÉELLEMENT installée (le lock fait foi, pas l'intervalle[0m
+2026-08-19T09:42:52.0980878Z [36;1m# `^1.62.1` de package.json qui ne dit pas ce qui est résolu).[0m
+2026-08-19T09:42:52.0981424Z [36;1mlib="$(node -p "require('./workers/node_modules/playwright/package.json').version")"[0m
+2026-08-19T09:42:52.0982018Z [36;1mtag="$(sed -n 's/^ARG PLAYWRIGHT_VERSION=v\([0-9.]*\)-.*$/\1/p' Dockerfile.worker)"[0m
+2026-08-19T09:42:52.0982440Z [36;1mecho "bibliothèque : $lib"[0m
+2026-08-19T09:42:52.0982712Z [36;1mecho "image        : $tag"[0m
+2026-08-19T09:42:52.0982966Z [36;1mif [ -z "$tag" ]; then[0m
+2026-08-19T09:42:52.0983560Z [36;1m  echo "::error::PLAYWRIGHT_VERSION introuvable dans Dockerfile.worker (format attendu : ARG PLAYWRIGHT_VERSION=vX.Y.Z-suffixe)"[0m
+2026-08-19T09:42:52.0984121Z [36;1m  exit 1[0m
+2026-08-19T09:42:52.0984366Z [36;1mfi[0m
+2026-08-19T09:42:52.0984578Z [36;1mif [ "$lib" != "$tag" ]; then[0m
+2026-08-19T09:42:52.0984994Z [36;1m  echo "::error::Écart Playwright — la bibliothèque est en $lib, l'image en $tag."[0m
+2026-08-19T09:42:52.0985698Z [36;1m  echo "::error::Corriger ARG PLAYWRIGHT_VERSION dans Dockerfile.worker (v${lib}-noble) DANS LE MÊME COMMIT."[0m
+2026-08-19T09:42:52.0986187Z [36;1m  exit 1[0m
+2026-08-19T09:42:52.0986386Z [36;1mfi[0m
+2026-08-19T09:42:52.0986603Z [36;1mecho "Versions alignées."[0m
+2026-08-19T09:42:52.1028996Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:42:52.1029268Z env:
+2026-08-19T09:42:52.1029544Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-19T09:42:52.1029868Z ##[endgroup]
+2026-08-19T09:42:52.1439699Z bibliothèque : 1.62.1
+2026-08-19T09:42:52.1440251Z image        : 1.62.1
+2026-08-19T09:42:52.1440897Z Versions alignées.
+2026-08-19T09:42:52.1472191Z ##[group]Run pnpm typecheck
+2026-08-19T09:42:52.1472486Z [36;1mpnpm typecheck[0m
+2026-08-19T09:42:52.1513910Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:42:52.1514165Z env:
+2026-08-19T09:42:52.1514432Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-19T09:42:52.1514763Z ##[endgroup]
+2026-08-19T09:42:52.5495196Z 
+2026-08-19T09:42:52.5496274Z > @axion-ia/axion-crm-pro-workers@0.1.0 typecheck /home/runner/work/axion-crm-pro/axion-crm-pro/workers
+2026-08-19T09:42:52.5496879Z > tsc --noEmit
+2026-08-19T09:42:52.5497024Z 
+2026-08-19T09:42:55.7290605Z ##[group]Run pnpm lint
+2026-08-19T09:42:55.7290886Z [36;1mpnpm lint[0m
+2026-08-19T09:42:55.7330682Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:42:55.7330952Z env:
+2026-08-19T09:42:55.7331217Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-19T09:42:55.7331536Z ##[endgroup]
+2026-08-19T09:42:56.1267084Z 
+2026-08-19T09:42:56.1268238Z > @axion-ia/axion-crm-pro-workers@0.1.0 lint /home/runner/work/axion-crm-pro/axion-crm-pro/workers
+2026-08-19T09:42:56.1269377Z > eslint . --max-warnings 0
+2026-08-19T09:42:56.1269648Z 
+2026-08-19T09:42:57.6394745Z ##[group]Run pnpm test
+2026-08-19T09:42:57.6395029Z [36;1mpnpm test[0m
+2026-08-19T09:42:57.6436570Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:42:57.6436837Z env:
+2026-08-19T09:42:57.6437102Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-19T09:42:57.6437427Z ##[endgroup]
+2026-08-19T09:42:58.0385710Z 
+2026-08-19T09:42:58.0387220Z > @axion-ia/axion-crm-pro-workers@0.1.0 test /home/runner/work/axion-crm-pro/axion-crm-pro/workers
+2026-08-19T09:42:58.0387952Z > vitest run
+2026-08-19T09:42:58.0388117Z 
+2026-08-19T09:42:58.3462493Z 
+2026-08-19T09:42:58.3464861Z [1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90m/home/runner/work/axion-crm-pro/axion-crm-pro/workers[39m
+2026-08-19T09:42:58.3465572Z 
+2026-08-19T09:42:58.8312684Z  [32m✓[39m tests/registre-sources.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 21[2mms[22m[39m
+2026-08-19T09:42:58.8636240Z {"level":50,"time":1787132578851,"pid":2412,"hostname":"runnervm76f27","name":"result-sender","err":{"type":"Error","message":"ECONNREFUSED","stack":"Error: ECONNREFUSED\n    at /home/runner/work/axion-crm-pro/axion-crm-pro/workers/tests/result-sender.test.ts:116:26\n    at file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:146:14\n    at file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:533:11\n    at runWithTimeout (file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:39:7)\n    at runTest (file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1056:17)\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at runSuite (file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1271:3)"},"run_id":"run-42","msg":"Failed to POST scrape result"}
+2026-08-19T09:42:58.8780932Z  [32m✓[39m tests/result-sender.test.ts [2m([22m[2m10 tests[22m[2m)[22m[90m 28[2mms[22m[39m
+2026-08-19T09:42:59.0721568Z {"level":30,"time":1787132579068,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","concurrency":1,"msg":"Worker pool starting"}
+2026-08-19T09:42:59.0772156Z {"level":30,"time":1787132579072,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","enCours":0,"msg":"Arrêt demandé — plus aucun job ne sera tiré"}
+2026-08-19T09:42:59.0797053Z {"level":30,"time":1787132579076,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","concurrency":1,"msg":"Worker pool starting"}
+2026-08-19T09:42:59.0799777Z {"level":30,"time":1787132579078,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","enCours":0,"msg":"Arrêt demandé — plus aucun job ne sera tiré"}
+2026-08-19T09:42:59.0801843Z {"level":30,"time":1787132579078,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","concurrency":1,"msg":"Worker pool starting"}
+2026-08-19T09:42:59.0836223Z {"level":30,"time":1787132579082,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","enCours":0,"msg":"Arrêt demandé — plus aucun job ne sera tiré"}
+2026-08-19T09:42:59.0891340Z {"level":30,"time":1787132579083,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","concurrency":1,"msg":"Worker pool starting"}
+2026-08-19T09:42:59.0967673Z {"level":40,"time":1787132579086,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","err":{"type":"Error","message":"boum","stack":"Error: boum\n    at Object.scrape (/home/runner/work/axion-crm-pro/axion-crm-pro/workers/tests/base-worker.test.ts:115:29)\n    at consumeLoop (/home/runner/work/axion-crm-pro/axion-crm-pro/workers/src/scrapers/base.ts:177:32)\n    at async Promise.all (index 0)\n    at /home/runner/work/axion-crm-pro/axion-crm-pro/workers/tests/base-worker.test.ts:196:5\n    at file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1271:3)"},"run_id":"r1","attempts":1,"max":3,"consumerId":0,"msg":"Job failed"}
+2026-08-19T09:42:59.1011671Z {"level":30,"time":1787132579096,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","enCours":0,"msg":"Arrêt demandé — plus aucun job ne sera tiré"}
+2026-08-19T09:42:59.1064758Z {"level":30,"time":1787132579097,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","concurrency":1,"msg":"Worker pool starting"}
+2026-08-19T09:42:59.1127432Z {"level":40,"time":1787132579098,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","err":{"type":"Error","message":"403 Forbidden","stack":"Error: 403 Forbidden\n    at Object.scrape (/home/runner/work/axion-crm-pro/axion-crm-pro/workers/tests/base-worker.test.ts:115:29)\n    at consumeLoop (/home/runner/work/axion-crm-pro/axion-crm-pro/workers/src/scrapers/base.ts:177:32)\n    at async Promise.all (index 0)\n    at /home/runner/work/axion-crm-pro/axion-crm-pro/workers/tests/base-worker.test.ts:215:5\n    at file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1271:3)"},"run_id":"r2","attempts":3,"max":3,"consumerId":0,"msg":"Job failed"}
+2026-08-19T09:42:59.1172738Z {"level":30,"time":1787132579099,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","enCours":0,"msg":"Arrêt demandé — plus aucun job ne sera tiré"}
+2026-08-19T09:42:59.1176016Z {"level":30,"time":1787132579099,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","concurrency":1,"msg":"Worker pool starting"}
+2026-08-19T09:42:59.1215303Z {"level":40,"time":1787132579101,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","err":{"type":"Error","message":"boum","stack":"Error: boum\n    at Object.scrape (/home/runner/work/axion-crm-pro/axion-crm-pro/workers/tests/base-worker.test.ts:115:29)\n    at consumeLoop (/home/runner/work/axion-crm-pro/axion-crm-pro/workers/src/scrapers/base.ts:177:32)\n    at async Promise.all (index 0)\n    at /home/runner/work/axion-crm-pro/axion-crm-pro/workers/tests/base-worker.test.ts:236:5\n    at file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///home/runner/work/axion-crm-pro/axion-crm-pro/workers/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1271:3)"},"run_id":"r3","attempts":3,"max":3,"consumerId":0,"msg":"Job failed"}
+2026-08-19T09:42:59.1225359Z {"level":30,"time":1787132579103,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","enCours":0,"msg":"Arrêt demandé — plus aucun job ne sera tiré"}
+2026-08-19T09:42:59.1226914Z {"level":30,"time":1787132579104,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","concurrency":4,"msg":"Worker pool starting"}
+2026-08-19T09:42:59.1228380Z {"level":30,"time":1787132579105,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","enCours":0,"msg":"Arrêt demandé — plus aucun job ne sera tiré"}
+2026-08-19T09:42:59.1240977Z {"level":40,"time":1787132579106,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","valeur":"auto","msg":"Concurrence illisible — repli sur 1"}
+2026-08-19T09:42:59.1242927Z {"level":30,"time":1787132579106,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","concurrency":1,"msg":"Worker pool starting"}
+2026-08-19T09:42:59.1245392Z {"level":30,"time":1787132579108,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","enCours":0,"msg":"Arrêt demandé — plus aucun job ne sera tiré"}
+2026-08-19T09:42:59.1248087Z {"level":40,"time":1787132579109,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","valeur":"0","msg":"Concurrence illisible — repli sur 1"}
+2026-08-19T09:42:59.1250360Z {"level":30,"time":1787132579109,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","concurrency":1,"msg":"Worker pool starting"}
+2026-08-19T09:42:59.1252829Z {"level":30,"time":1787132579110,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","enCours":0,"msg":"Arrêt demandé — plus aucun job ne sera tiré"}
+2026-08-19T09:42:59.1254923Z {"level":30,"time":1787132579111,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","concurrency":1,"msg":"Worker pool starting"}
+2026-08-19T09:42:59.1257325Z {"level":30,"time":1787132579116,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","enCours":1,"msg":"Arrêt demandé — plus aucun job ne sera tiré"}
+2026-08-19T09:42:59.1259967Z {"level":30,"time":1787132579116,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","concurrency":1,"msg":"Worker pool starting"}
+2026-08-19T09:42:59.1262377Z {"level":30,"time":1787132579118,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","enCours":1,"msg":"Arrêt demandé — plus aucun job ne sera tiré"}
+2026-08-19T09:42:59.1617439Z {"level":30,"time":1787132579160,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","concurrency":1,"msg":"Worker pool starting"}
+2026-08-19T09:42:59.1652098Z {"level":30,"time":1787132579162,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","enCours":0,"msg":"Arrêt demandé — plus aucun job ne sera tiré"}
+2026-08-19T09:42:59.1687733Z {"level":30,"time":1787132579162,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","consumerId":0,"msg":"Job remis en file : arrêt demandé avant traitement"}
+2026-08-19T09:42:59.1691005Z {"level":30,"time":1787132579164,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","concurrency":1,"msg":"Worker pool starting"}
+2026-08-19T09:42:59.1693734Z {"level":30,"time":1787132579166,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","enCours":1,"msg":"Arrêt demandé — plus aucun job ne sera tiré"}
+2026-08-19T09:42:59.1851273Z {"level":30,"time":1787132579182,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","concurrency":1,"msg":"Worker pool starting"}
+2026-08-19T09:42:59.1854524Z {"level":30,"time":1787132579182,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","enCours":0,"msg":"Arrêt demandé — plus aucun job ne sera tiré"}
+2026-08-19T09:42:59.1880657Z {"level":30,"time":1787132579184,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","concurrency":1,"msg":"Worker pool starting"}
+2026-08-19T09:42:59.1911153Z {"level":30,"time":1787132579185,"pid":2411,"hostname":"runnervm76f27","name":"worker-base","queue":"axion:scrape:google-maps","enCours":0,"msg":"Arrêt demandé — plus aucun job ne sera tiré"}
+2026-08-19T09:42:59.1940363Z  [32m✓[39m tests/base-worker.test.ts [2m([22m[2m16 tests[22m[2m)[22m[90m 119[2mms[22m[39m
+2026-08-19T09:42:59.2110865Z  [32m✓[39m tests/ssrf-guard-dns.test.ts [2m([22m[2m16 tests[22m[2m)[22m[90m 24[2mms[22m[39m
+2026-08-19T09:42:59.2778550Z  [32m✓[39m tests/ssrf-guard.test.ts [2m([22m[2m9 tests[22m[2m)[22m[90m 10[2mms[22m[39m
+2026-08-19T09:42:59.5120453Z  [32m✓[39m tests/extract.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+2026-08-19T09:42:59.5250661Z 
+2026-08-19T09:42:59.5261299Z [2m Test Files [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+2026-08-19T09:42:59.5262879Z [2m      Tests [22m [1m[32m61 passed[39m[22m[90m (61)[39m
+2026-08-19T09:42:59.5263810Z [2m   Start at [22m 09:42:58
+2026-08-19T09:42:59.5265188Z [2m   Duration [22m 1.18s[2m (transform 327ms, setup 0ms, collect 863ms, tests 206ms, environment 1ms, prepare 566ms)[22m
+2026-08-19T09:42:59.5266019Z 
+2026-08-19T09:42:59.5648443Z ##[group]Run pnpm build
+2026-08-19T09:42:59.5648958Z [36;1mpnpm build[0m
+2026-08-19T09:42:59.5689386Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:42:59.5689646Z env:
+2026-08-19T09:42:59.5689908Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-19T09:42:59.5690233Z ##[endgroup]
+2026-08-19T09:42:59.9504956Z 
+2026-08-19T09:42:59.9506086Z > @axion-ia/axion-crm-pro-workers@0.1.0 build /home/runner/work/axion-crm-pro/axion-crm-pro/workers
+2026-08-19T09:42:59.9507039Z > tsc -p tsconfig.build.json
+2026-08-19T09:42:59.9507314Z 
+2026-08-19T09:43:02.8994798Z Post job cleanup.
+2026-08-19T09:43:03.0181303Z Cache hit occurred on the primary key node-cache-Linux-x64-pnpm-28a61a4811babeefaa8f4436a22207dea9cf71b0701323152a5028bd6dfc5c27, not saving cache.
+2026-08-19T09:43:03.0308644Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-19T09:43:03.0309975Z Post job cleanup.
+2026-08-19T09:43:03.1854030Z Pruning is unnecessary.
+2026-08-19T09:43:03.2093075Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-19T09:43:03.2095103Z Post job cleanup.
+2026-08-19T09:43:03.3230399Z [command]/usr/bin/git version
+2026-08-19T09:43:03.3364057Z git version 2.55.0
+2026-08-19T09:43:03.3401974Z Temporarily overriding HOME='/home/runner/work/_temp/2c046642-3098-4c15-a8e7-d1d517f872c4' before making global git config changes
+2026-08-19T09:43:03.3403636Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-19T09:43:03.3408497Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/axion-crm-pro/axion-crm-pro
+2026-08-19T09:43:03.3596660Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-08-19T09:43:03.3647722Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-08-19T09:43:03.4029934Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-19T09:43:03.4129907Z http.https://github.com/.extraheader
+2026-08-19T09:43:03.4259736Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-08-19T09:43:03.4301288Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-08-19T09:43:03.4640133Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-19T09:43:03.4710369Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-08-19T09:43:03.5249321Z Cleaning up orphan processes
+2026-08-19T09:43:03.5581673Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, pnpm/action-setup@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

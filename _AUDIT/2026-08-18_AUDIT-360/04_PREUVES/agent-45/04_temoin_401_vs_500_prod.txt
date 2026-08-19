@@ -1,0 +1,13 @@
+# AGENT 45 — temoin : la garde « sans auth retourne 401 (jamais 500) » ne mesure QUE le chemin JSON
+# Mesure jouee le 2026-08-19T11:12:09Z sur la PRODUCTION, en lecture seule (GET uniquement).
+
+GET https://api.axion-crm-pro.com/api/v1/tags             Accept: application/json   -> 401
+GET https://api.axion-crm-pro.com/api/v1/tags             Accept: text/html          -> 500
+GET https://api.axion-crm-pro.com/api/v1/dashboard/stats  Accept: application/json   -> 401
+GET https://api.axion-crm-pro.com/api/v1/dashboard/stats  Accept: text/html          -> 500
+GET https://api.axion-crm-pro.com/api/v1/notifications    Accept: application/json   -> 401
+GET https://api.axion-crm-pro.com/api/v1/notifications    Accept: text/html          -> 500
+GET https://api.axion-crm-pro.com/api/v1/audit-logs       Accept: application/json   -> 401
+GET https://api.axion-crm-pro.com/api/v1/audit-logs       Accept: text/html          -> 500
+GET https://api.axion-crm-pro.com/api/v1/saved-views      Accept: application/json   -> 401
+GET https://api.axion-crm-pro.com/api/v1/saved-views      Accept: text/html          -> 500

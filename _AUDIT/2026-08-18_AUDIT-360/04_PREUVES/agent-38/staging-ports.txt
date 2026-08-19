@@ -1,0 +1,61 @@
+=== docker-compose.staging.yml : ports ===
+39-#    deviendrait indéterminé. Compose ajoute toujours le nom du service comme
+40-#    alias réseau ; on ne peut pas le retirer.
+41-#
+42:#    D'où la publication sur la PASSERELLE DU PONT DOCKER (`172.17.0.1`)
+43-#    ci-dessous : les deux réseaux restent totalement étanches, et le Caddy de
+44-#    production joint la préproduction par `host.docker.internal`. Adresse
+45-#    privée, jamais joignable depuis internet.
+--
+50-#    l'adresse par laquelle un conteneur voit l'hôte. Mesuré sur le serveur :
+51-#
+52-#      $ docker exec axion-crm-caddy getent hosts host.docker.internal
+53:#      172.17.0.1
+54:#      $ ss -ltn | grep 8081
+55:#      LISTEN 127.0.0.1:8081
+56-#
+57:#    Deux adresses différentes — Caddy tapait sur 172.17.0.1:8081, où rien
+58:#    n'écoutait. `172.17.0.1` est la passerelle de `docker0`, c'est-à-dire
+59-#    exactement ce que Docker désigne par `host-gateway`.
+60-#
+61-# 4. Le bundle frontend est bâti À LA CONSTRUCTION (`VITE_API_BASE_URL` en
+--
+63-#    `https://staging.axion-crm-pro.com`. La garde `VITE_BUILD_CIBLE=prod` de
+64-#    `vite.config.ts` accepte cette valeur — elle ne refuse que `localhost`.
+65-#
+66:# 5. `ports: !override []` vaut AUSSI ici : la faille du 2026-08-19 (Postgres et
+67-#    Redis publiés sur `0.0.0.0`) ne doit pas être réintroduite par une seconde
+68-#    pile. Garde : `infra/scripts/verifier-ports-publies.sh`, qui mesure les
+69-#    CONTENEURS et connaît la différence entre `0.0.0.0:` (tout internet) et une
+--
+89-  postgres:
+90-    container_name: axion-crm-staging-postgres
+91-    restart: unless-stopped
+92:    # Contrainte 5. `!override` et non `ports: []` : Compose FUSIONNE les listes
+93-    # entre fichiers. Sans le tag, la publication `55432:5432` de
+94-    # `docker-compose.yml` survivrait et rouvrirait la faille du 19/08 par une
+95-    # porte de service.
+96:    ports: !override []
+97-    environment:
+98-      POSTGRES_DB: axion_crm_staging
+99-    volumes: !override
+--
+102-  redis:
+103-    container_name: axion-crm-staging-redis
+104-    restart: unless-stopped
+105:    ports: !override []
+106-    volumes: !override
+107-      - staging-redis-data:/data
+108-
+--
+134-    # `STAGING_BIND_IP` permet de la corriger sans toucher au fichier si Docker
+135-    # attribue un jour un autre pont ; une préproduction en 502 n'est pas une
+136-    # panne de production, le mode de défaillance est contenu.
+137:    ports: !override
+138:      - '${STAGING_BIND_IP:-172.17.0.1}:8082:80'
+139-    healthcheck:
+140-      test: ['CMD-SHELL', 'curl -fsS http://localhost/up || exit 1']
+141-      interval: 30s
+--
+193-        VITE_API_BASE_URL: https://staging.axion-crm-pro.com
+194-    restart: unless-stopped

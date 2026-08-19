@@ -1,0 +1,29 @@
+AGENT 22 — COMMENT LES 37 ÉCRANS ONT ÉTÉ OUVERTS
+
+Obstacle mesuré : Chrome refuse https://app.localhost — le certificat est émis par
+« Caddy Local Authority - ECC Intermediate », absent du magasin de confiance Windows.
+  curl https://app.localhost/        -> exit 60 (SSL certificate problem)
+  openssl s_client                   -> Verify return code: 20
+                                        (unable to get local issuer certificate)
+  Get-ChildItem Cert:\*\Root | ? Subject -like "*Caddy*"  -> AUCUN résultat
+L'extension Chrome ne peut pas s'attacher à une page d'erreur ; aucune capture,
+aucun texte, aucun clic n'y est possible.
+=> Installer une autorité racine dans le magasin système est une modification de
+   sécurité de la machine : l'agent NE l'a PAS faite. C'est un geste pour Will.
+
+Contournement employé (sans toucher au produit ni à la configuration) :
+  conteneur temporaire, en lecture seule, retiré à la fin :
+  docker run -d --name a22-proxy --network axion-crm -p 58122:80 \
+         caddy:2-alpine caddy reverse-proxy --from :80 --to app:5173
+  puis navigation réelle sur http://app.localhost:58122/...
+  -> même hôte, même bundle, même origine de cookie ; seul le TLS est retiré.
+
+Conséquence à ne PAS masquer : le SPA appelle une base d'API ABSOLUE
+`https://app.localhost` (compilée dans le bundle, frontend/src/lib/api.ts:3).
+Depuis http://app.localhost:58122 ces appels échouent donc tous :
+  fetch('https://app.localhost/api/v1/companies') -> "Failed to fetch"
+Les 37 écrans ont donc été ouverts NON CONNECTÉS et API INJOIGNABLE.
+Ce que cela mesure vraiment, et bien : l'état DÉGRADÉ de chaque écran —
+c'est-à-dire la colonne « états gérés (erreur / vide) » de la grille.
+Ce que cela NE mesure PAS : l'état nominal avec données. Déclaré comme tel
+écran par écran dans ecrans.md.

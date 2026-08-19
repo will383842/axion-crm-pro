@@ -1,0 +1,822 @@
+TOTAL passe 2 : 676
+| fichier | libelles hors JSX |
+|---|---:|
+| features/campaigns/fr-zones.ts | 169 |
+| features/audiences/AudienceBuilderPage.tsx | 47 |
+| features/companies/CompaniesListPage.tsx | 38 |
+| features/settings/SettingsPage.tsx | 36 |
+| features/media/MediaListPage.tsx | 32 |
+| components/layout/Sidebar.tsx | 29 |
+| features/campaigns/types.ts | 25 |
+| features/crm-console/types.ts | 24 |
+| features/campaigns/CampaignWizardPage.tsx | 20 |
+| lib/prospection-referentiels.ts | 20 |
+| components/layout/AutoBreadcrumbs.tsx | 19 |
+| features/companies/effectif.ts | 16 |
+| features/campaigns/CampaignsListPage.tsx | 15 |
+| features/tags/TagsManagerPage.tsx | 14 |
+| features/international/RoumaniePage.tsx | 13 |
+| features/coverage/CoveragePage.tsx | 11 |
+| features/campaigns/CampaignDetailPage.tsx | 10 |
+| features/rgpd/RgpdRequestsPage.tsx | 10 |
+| features/scraping/ScraperRunsPage.tsx | 10 |
+| features/audiences/AudienceDetailPage.tsx | 8 |
+| features/dashboard/components/NextActions.tsx | 8 |
+| components/ui/StatusPill.tsx | 7 |
+| features/contacts/ContactsListPage.tsx | 7 |
+| features/dashboard/DashboardPage.tsx | 7 |
+| components/ui/SizeCategoryBadge.tsx | 6 |
+| features/companies/CompanyDetailPage.tsx | 6 |
+| features/companies/components/EnrichmentTimeline.tsx | 6 |
+| features/dashboard/components/QualityDistributionBar.tsx | 6 |
+| features/users/UsersPage.tsx | 6 |
+| features/audiences/AudiencesListPage.tsx | 5 |
+| features/dashboard/components/SizeDistributionChart.tsx | 5 |
+| features/llm/RotationsPage.tsx | 5 |
+| features/companies/components/CompanyRow.tsx | 4 |
+| features/crm-console/ContactsHubPage.tsx | 4 |
+| features/llm/LlmRouterPage.tsx | 4 |
+| components/layout/UserMenu.tsx | 3 |
+| components/ui/QualityBadge.tsx | 3 |
+| features/crm-console/ArbitragePage.tsx | 3 |
+| features/rgpd/AuditLogsPage.tsx | 3 |
+| components/layout/WorkspaceSelector.tsx | 2 |
+| features/auth/PasswordResetPage.tsx | 2 |
+| features/media/JournalistsListPage.tsx | 2 |
+| lib/echo.ts | 2 |
+| features/auth/MagicLinkPage.tsx | 1 |
+| features/auth/TwoFactorPage.tsx | 1 |
+| features/crm-console/CandidatesPage.tsx | 1 |
+| features/llm/ProxyProvidersPage.tsx | 1 |
+
+===== DETAIL =====
+
+--- features/campaigns/fr-zones.ts ---
+  13 [prop:name] Ain
+  14 [prop:name] Aisne
+  15 [prop:name] Allier
+  16 [prop:name] Alpes-de-Haute-Provence
+  17 [prop:name] Hautes-Alpes
+  18 [prop:name] Alpes-Maritimes
+  19 [prop:name] Ardèche
+  20 [prop:name] Ardennes
+  21 [prop:name] Ariège
+  22 [prop:name] Aube
+  23 [prop:name] Aude
+  24 [prop:name] Aveyron
+  25 [prop:name] Bouches-du-Rhône
+  26 [prop:name] Calvados
+  27 [prop:name] Cantal
+  28 [prop:name] Charente
+  29 [prop:name] Charente-Maritime
+  30 [prop:name] Cher
+  31 [prop:name] Corrèze
+  32 [prop:name] Corse-du-Sud
+  33 [prop:name] Haute-Corse
+  34 [prop:name] Côte-d'Or
+  35 [prop:name] Côtes-d'Armor
+  36 [prop:name] Creuse
+  37 [prop:name] Dordogne
+  38 [prop:name] Doubs
+  39 [prop:name] Drôme
+  40 [prop:name] Eure
+  41 [prop:name] Eure-et-Loir
+  42 [prop:name] Finistère
+  43 [prop:name] Gard
+  44 [prop:name] Haute-Garonne
+  45 [prop:name] Gers
+  46 [prop:name] Gironde
+  47 [prop:name] Hérault
+  48 [prop:name] Ille-et-Vilaine
+  49 [prop:name] Indre
+  50 [prop:name] Indre-et-Loire
+  51 [prop:name] Isère
+  52 [prop:name] Jura
+  53 [prop:name] Landes
+  54 [prop:name] Loir-et-Cher
+  55 [prop:name] Loire
+  56 [prop:name] Haute-Loire
+  57 [prop:name] Loire-Atlantique
+  58 [prop:name] Loiret
+  59 [prop:name] Lot
+  60 [prop:name] Lot-et-Garonne
+  61 [prop:name] Lozère
+  62 [prop:name] Maine-et-Loire
+  63 [prop:name] Manche
+  64 [prop:name] Marne
+  65 [prop:name] Haute-Marne
+  66 [prop:name] Mayenne
+  67 [prop:name] Meurthe-et-Moselle
+  68 [prop:name] Meuse
+  69 [prop:name] Morbihan
+  70 [prop:name] Moselle
+  71 [prop:name] Nièvre
+  72 [prop:name] Nord
+  73 [prop:name] Oise
+  74 [prop:name] Orne
+  75 [prop:name] Pas-de-Calais
+  76 [prop:name] Puy-de-Dôme
+  77 [prop:name] Pyrénées-Atlantiques
+  78 [prop:name] Hautes-Pyrénées
+  79 [prop:name] Pyrénées-Orientales
+  80 [prop:name] Bas-Rhin
+  81 [prop:name] Haut-Rhin
+  82 [prop:name] Rhône
+  83 [prop:name] Haute-Saône
+  84 [prop:name] Saône-et-Loire
+  85 [prop:name] Sarthe
+  86 [prop:name] Savoie
+  87 [prop:name] Haute-Savoie
+  88 [prop:name] Paris
+  89 [prop:name] Seine-Maritime
+  90 [prop:name] Seine-et-Marne
+  91 [prop:name] Yvelines
+  92 [prop:name] Deux-Sèvres
+  93 [prop:name] Somme
+  94 [prop:name] Tarn
+  95 [prop:name] Tarn-et-Garonne
+  96 [prop:name] Var
+  97 [prop:name] Vaucluse
+  98 [prop:name] Vendée
+  99 [prop:name] Vienne
+  100 [prop:name] Haute-Vienne
+  101 [prop:name] Vosges
+  102 [prop:name] Yonne
+  103 [prop:name] Territoire de Belfort
+  104 [prop:name] Essonne
+  105 [prop:name] Hauts-de-Seine
+  106 [prop:name] Seine-Saint-Denis
+  107 [prop:name] Val-de-Marne
+  108 [prop:name] Val-d'Oise
+  110 [prop:name] Guadeloupe
+  111 [prop:name] Martinique
+  112 [prop:name] Guyane
+  113 [prop:name] La Réunion
+  114 [prop:name] Mayotte
+  119 [prop:name] Auvergne-Rhône-Alpes
+  120 [prop:name] Bourgogne-Franche-Comté
+  121 [prop:name] Bretagne
+  122 [prop:name] Centre-Val de Loire
+  123 [prop:name] Corse
+  124 [prop:name] Grand Est
+  125 [prop:name] Hauts-de-France
+  126 [prop:name] Île-de-France
+  127 [prop:name] Normandie
+  128 [prop:name] Nouvelle-Aquitaine
+  129 [prop:name] Occitanie
+  130 [prop:name] Pays de la Loire
+  131 [prop:name] Provence-Alpes-Côte d'Azur
+  132 [prop:name] Guadeloupe
+  133 [prop:name] Martinique
+  134 [prop:name] Guyane
+  135 [prop:name] La Réunion
+  136 [prop:name] Mayotte
+  141 [prop:name] Paris
+  142 [prop:name] Marseille
+  143 [prop:name] Lyon
+  144 [prop:name] Toulouse
+  145 [prop:name] Nice
+  146 [prop:name] Nantes
+  147 [prop:name] Montpellier
+  148 [prop:name] Strasbourg
+  149 [prop:name] Bordeaux
+  150 [prop:name] Lille
+  151 [prop:name] Rennes
+  152 [prop:name] Reims
+  153 [prop:name] Le Havre
+  154 [prop:name] Saint-Étienne
+  155 [prop:name] Toulon
+  156 [prop:name] Grenoble
+  157 [prop:name] Dijon
+  158 [prop:name] Angers
+  159 [prop:name] Nîmes
+  160 [prop:name] Villeurbanne
+  161 [prop:name] Clermont-Ferrand
+  162 [prop:name] Le Mans
+  163 [prop:name] Aix-en-Provence
+  164 [prop:name] Brest
+  165 [prop:name] Tours
+  166 [prop:name] Limoges
+  167 [prop:name] Nancy
+  168 [prop:name] Amiens
+  169 [prop:name] Perpignan
+  170 [prop:name] Cannes
+  171 [prop:name] Boulogne-Billancourt
+  172 [prop:name] Rouen
+  173 [prop:name] Béziers
+  174 [prop:name] Metz
+  175 [prop:name] Saint-Denis
+  176 [prop:name] Argenteuil
+  177 [prop:name] Antibes
+  178 [prop:name] Saint-Maur-des-Fossés
+  179 [prop:name] Asnières-sur-Seine
+  180 [prop:name] Courbevoie
+  181 [prop:name] Rueil-Malmaison
+  182 [prop:name] Issy-les-Moulineaux
+  183 [prop:name] Saint-Denis
+  184 [prop:name] Créteil
+  185 [prop:name] Saint-Maur-des-Fossés
+  186 [prop:name] Cergy
+  187 [prop:name] Argenteuil
+  188 [prop:name] Versailles
+  189 [prop:name] Saint-Germain-en-Laye
+  190 [prop:name] Évry-Courcouronnes
+
+--- features/audiences/AudienceBuilderPage.tsx ---
+  36 [prop:label] Paris
+  37 [prop:label] Hauts-de-Seine
+  38 [prop:label] Seine-Saint-Denis
+  39 [prop:label] Rhône
+  40 [prop:label] Bouches-du-Rhône
+  41 [prop:label] Gironde
+  42 [prop:label] Haute-Garonne
+  43 [prop:label] Nord
+  44 [prop:label] Bas-Rhin
+  45 [prop:label] Loire-Atlantique
+  49 [prop:label] Île-de-France
+  50 [prop:label] Centre-Val de Loire
+  51 [prop:label] Bourgogne-Franche-Comté
+  52 [prop:label] Normandie
+  53 [prop:label] Hauts-de-France
+  54 [prop:label] Grand Est
+  55 [prop:label] Pays de la Loire
+  56 [prop:label] Bretagne
+  57 [prop:label] Nouvelle-Aquitaine
+  58 [prop:label] Occitanie
+  59 [prop:label] Auvergne-Rhône-Alpes
+  60 [prop:label] Provence-Alpes-Côte d'Azur
+  61 [prop:label] Corse
+  65 [prop:label] Micro (1-9)
+  66 [prop:label] TPE (10-49)
+  67 [prop:label] PME (50-249)
+  68 [prop:label] ETI (250-4999)
+  69 [prop:label] Grande (5000+)
+  73 [prop:label] IT / SaaS
+  74 [prop:label] BTP
+  75 [prop:label] Santé
+  76 [prop:label] Commerce
+  77 [prop:label] Services pro
+  78 [prop:label] Finance / Assurance
+  79 [prop:label] Industrie
+  80 [prop:label] Hôtellerie / Resto
+  81 [prop:label] Transport
+  82 [prop:label] Agro-alimentaire
+  86 [prop:label] Pending
+  87 [prop:label] Prêt outreach
+  88 [prop:label] Email partiel
+  89 [prop:label] Archivé sans email
+  182 [toast] Ajoute au moins un critère
+  193 [toast] Audience créée
+  209 [prop:label] Audiences
+  210 [prop:label] Nouvelle
+  223 [prop:message] Max 120 caractères
+
+--- features/companies/CompaniesListPage.tsx ---
+  48 [prop:label] Toutes tailles
+  49 [prop:label] Artisan
+  50 [prop:label] TPE
+  51 [prop:label] PME
+  52 [prop:label] ETI
+  53 [prop:label] Grande entreprise
+  57 [prop:label] Toutes qualités
+  58 [prop:label] 🟢 Complète (≥ 90)
+  59 [prop:label] 🟡 Partielle (50-89)
+  60 [prop:label] 🔴 Basique (< 50)
+  64 [prop:label] Toutes priorités
+  65 [prop:label] Haute
+  66 [prop:label] Moyenne
+  67 [prop:label] Basse
+  68 [prop:label] Gelée
+  72 [prop:label] Tous
+  73 [prop:label] Prospectables
+  74 [prop:label] Partiels
+  75 [prop:label] Pending
+  76 [prop:label] Archivés
+  83 [prop:label] Tous secteurs
+  84 [prop:label] IT / SaaS
+  85 [prop:label] BTP
+  86 [prop:label] Santé
+  87 [prop:label] Commerce
+  88 [prop:label] Services pro
+  89 [prop:label] Finance / Assurance
+  90 [prop:label] Industrie
+  91 [prop:label] Hôtellerie / Restauration
+  92 [prop:label] Transport
+  93 [prop:label] Agro-alimentaire
+  94 [prop:label] Immobilier
+  95 [prop:label] Enseignement / Formation
+  96 [prop:label] Services aux particuliers
+  97 [prop:label] Arts / Loisirs / Sport
+  98 [prop:label] Autre
+  247 [toast] Export CSV téléchargé
+  249 [toast] Erreur lors de l'export
+
+--- features/settings/SettingsPage.tsx ---
+  49 [prop:name] INSEE Sirene
+  49 [prop:description] Base entreprises + données légales (gratuit, 500 req/min)
+  50 [prop:name] France Travail
+  50 [prop:description] Offres d'emploi + intentions de recrutement (gratuit)
+  51 [prop:name] Mistral AI
+  51 [prop:description] LLM principal classification entreprises (FR souverain, ~5€/mois)
+  52 [prop:name] Anthropic Claude
+  52 [prop:description] LLM premium pour use cases stratégiques (optionnel)
+  54 [prop:name] Google Places API
+  54 [prop:description] Enrichissement auto téléphone/horaires/site/note Google (gratuit ≤12K/mois via c
+  55 [prop:name] Webshare proxies
+  55 [prop:description] Proxies résidentiels pour Pages Jaunes (~$30/mois, Phase B optionnelle)
+  56 [prop:name] 2captcha
+  56 [prop:description] Résolution captcha (Phase B, uniquement si scraping Google direct)
+  60 [prop:name] Prometheus
+  60 [prop:description] Métriques + alertes
+  61 [prop:name] Grafana
+  61 [prop:description] Dashboards visuels
+  62 [prop:name] Loki logs
+  62 [prop:description] Agrégateur de logs
+  63 [prop:name] Tempo traces
+  63 [prop:description] Traces distribuées
+  64 [prop:name] GlitchTip errors
+  64 [prop:description] Errors Sentry-compatible
+  65 [prop:name] Uptime Kuma
+  65 [prop:description] Probes uptime
+  66 [prop:name] Horizon
+  66 [prop:description] Workers queue Laravel
+  67 [prop:name] Telescope
+  67 [prop:description] Debug local uniquement
+  71 [prop:label] Workspace
+  72 [prop:label] Intégrations
+  73 [prop:label] Observabilité
+  74 [prop:label] Apparence
+  109 [toast] Workspace mis à jour
+  112 [toast] Erreur mise à jour
+
+--- features/media/MediaListPage.tsx ---
+  35 [prop:label] Tous types
+  36 [prop:label] 📰 Journal
+  37 [prop:label] 📓 Revue / périodique
+  38 [prop:label] 🗞️ Autre presse
+  39 [prop:label] 📻 Radio
+  40 [prop:label] 📺 Télévision
+  41 [prop:label] 🎬 Émission TV
+  42 [prop:label] 🛰️ Agence de presse
+  43 [prop:label] 🌐 Portail / site info
+  44 [prop:label] ✍️ Blog
+  45 [prop:label] 🎥 Production audiovisuelle
+  49 [prop:label] Toute périodicité
+  50 [prop:label] Quotidien
+  51 [prop:label] Hebdomadaire
+  52 [prop:label] Mensuel
+  53 [prop:label] Bimensuel
+  54 [prop:label] Trimestriel
+  58 [prop:label] Site : tous
+  59 [prop:label] Avec site web
+  60 [prop:label] Sans site web
+  64 [prop:label] Toutes familles
+  65 [prop:label] 📝 Rédactionnel
+  66 [prop:label] 🎥 Production audiovisuelle
+  70 [prop:label] Email : tous
+  71 [prop:label] Avec email
+  72 [prop:label] Sans email
+  76 [prop:label] Confiance : toutes
+  77 [prop:label] A · email = domaine du site
+  78 [prop:label] B · domaine pro
+  79 [prop:label] C · boîte grand public
+  148 [toast] Export CSV téléchargé
+  150 [toast] Erreur lors de l'export
+
+--- components/layout/Sidebar.tsx ---
+  88 [prop:title] Collecte
+  90 [prop:label] Couverture France
+  91 [prop:label] Collectes
+  92 [prop:label] Journaux de collecte
+  93 [prop:label] Roumanie
+  98 [prop:title] Pilotage
+  100 [prop:label] Audiences (segments)
+  101 [prop:label] Observabilité
+  106 [prop:title] Conformité
+  108 [prop:label] Requêtes RGPD
+  109 [prop:label] Registre AI Act
+  110 [prop:label] Journaux d’audit
+  115 [prop:title] Réglages
+  117 [prop:label] Utilisateurs
+  118 [prop:label] Paramètres
+  119 [prop:label] Tags
+  120 [prop:label] LLM Router
+  121 [prop:label] Proxies
+  122 [prop:label] Rotations
+  129 [prop:title] Aujourd'hui
+  131 [prop:label] Tableau de bord
+  147 [prop:label] Contacts
+  149 [prop:label] Vivier candidats
+  151 [prop:label] À arbitrer
+  153 [prop:label] Contacts
+  156 [prop:label] Entreprises
+  157 [prop:label] Journalistes
+  158 [prop:label] Médias (presse)
+  161 [prop:title] Contacts
+
+--- features/campaigns/types.ts ---
+  131 [prop:label] INSEE Sirene
+  131 [prop:description] Base officielle entreprises FR (gratuite + API key)
+  132 [prop:label] Google Maps
+  132 [prop:description] Fiches établissement geo-locale (proxies requis)
+  133 [prop:label] Pages Jaunes
+  133 [prop:description] Annuaire pro FR (proxies recommandés)
+  134 [prop:label] France Travail
+  134 [prop:description] Offres d’emploi (API key gratuite)
+  135 [prop:label] Annuaire entreprises
+  135 [prop:description] annuaire-entreprises.data.gouv.fr (gratuit)
+  136 [prop:label] BODACC
+  136 [prop:description] Annonces légales (gratuit)
+  137 [prop:label] BAN géocodage
+  137 [prop:description] Base Adresse Nationale (gratuit)
+  141 [map:STATUS_LABEL] Brouillon
+  142 [map:STATUS_LABEL] Planifiée
+  143 [map:STATUS_LABEL] En cours
+  144 [map:STATUS_LABEL] En pause
+  145 [map:STATUS_LABEL] Terminée
+  146 [map:STATUS_LABEL] Échec
+  147 [map:STATUS_LABEL] Annulée
+  151 [map:PAUSED_REASON_LABEL] Quota entreprises atteint
+  152 [map:PAUSED_REASON_LABEL] Quota durée atteint
+  153 [map:PAUSED_REASON_LABEL] Pause manuelle
+  154 [map:PAUSED_REASON_LABEL] Limite de taux dépassée
+
+--- features/crm-console/types.ts ---
+  28 [map:RELATION_TYPE_LABELS] Prospects
+  29 [map:RELATION_TYPE_LABELS] Clients
+  30 [map:RELATION_TYPE_LABELS] Presse & médias
+  31 [map:RELATION_TYPE_LABELS] Partenaires
+  32 [map:RELATION_TYPE_LABELS] Investisseurs
+  33 [map:RELATION_TYPE_LABELS] Conférences
+  34 [map:RELATION_TYPE_LABELS] Newsletter
+  35 [map:RELATION_TYPE_LABELS] Fournisseurs
+  39 [map:LIFECYCLE_LABELS] Nouveau
+  40 [map:LIFECYCLE_LABELS] Qualifié
+  41 [map:LIFECYCLE_LABELS] Opportunité
+  42 [map:LIFECYCLE_LABELS] Client
+  43 [map:LIFECYCLE_LABELS] Dormant
+  44 [map:LIFECYCLE_LABELS] Perdu
+  48 [map:CANDIDATE_FAMILY_LABELS] Commercial
+  49 [map:CANDIDATE_FAMILY_LABELS] Vidéo
+  50 [map:CANDIDATE_FAMILY_LABELS] Tech
+  51 [map:CANDIDATE_FAMILY_LABELS] Autres métiers
+  55 [map:CANDIDATE_STAGE_LABELS] Nouveau
+  56 [map:CANDIDATE_STAGE_LABELS] Présélection
+  57 [map:CANDIDATE_STAGE_LABELS] Entretien
+  58 [map:CANDIDATE_STAGE_LABELS] Retenu
+  59 [map:CANDIDATE_STAGE_LABELS] Vivier
+  60 [map:CANDIDATE_STAGE_LABELS] Refusé
+
+--- features/campaigns/CampaignWizardPage.tsx ---
+  75 [prop:label] INSEE Sirene
+  76 [prop:description] Base officielle entreprises FR (~30M entreprises légales)
+  83 [prop:label] France Travail
+  84 [prop:description] Entreprises qui recrutent dans la zone — signal intent fort
+  92 [map:SOURCE_STATUS_LABEL] API key requise
+  93 [map:SOURCE_STATUS_LABEL] Proxies requis
+  195 [toast] Campagne créée en brouillon
+  208 [toast] Campagne lancée
+  210 [toast] Campagne créée et planifiée
+  248 [prop:label] Collectes
+  249 [prop:label] Nouvelle
+  349 [prop:label] Identité
+  350 [prop:label] Zones
+  351 [prop:label] Sources
+  352 [prop:label] Budget & sécurité
+  425 [prop:label] Lancer maintenant
+  426 [prop:label] Planifier plus tard
+  472 [prop:label] Départements
+  473 [prop:label] Régions
+  474 [prop:label] Villes
+
+--- lib/prospection-referentiels.ts ---
+  23 [prop:label] Tous pays
+  24 [prop:label] France
+  25 [prop:label] Roumanie
+  33 [prop:label] Toutes natures
+  34 [prop:label] Entreprises
+  35 [prop:label] Associations
+  36 [prop:label] Institutions
+  37 [prop:label] Autres
+  59 [prop:label] Prêtes ou non
+  60 [prop:label] ✅ Prêtes pour une campagne
+  61 [prop:label] ⏳ Reste à enrichir
+  71 [prop:label] Toutes qualités
+  72 [prop:label] A — adresse du domaine officiel
+  73 [prop:label] B — adresse probable
+  74 [prop:label] C — adresse incertaine
+  78 [prop:label] Tous statuts
+  79 [prop:label] Contactables (e-mail exploitable)
+  80 [prop:label] Partiels (e-mail incertain)
+  81 [prop:label] Collectés, pas encore enrichis
+  82 [prop:label] Sans e-mail (archivés)
+
+--- components/layout/AutoBreadcrumbs.tsx ---
+  12 [map:LABELS] Tableau de bord
+  13 [map:LABELS] Entreprises
+  14 [map:LABELS] Contacts
+  15 [map:LABELS] Couverture France
+  16 [map:LABELS] Journaux de collecte
+  17 [map:LABELS] LLM
+  18 [map:LABELS] Router
+  19 [map:LABELS] Proxies
+  20 [map:LABELS] Rotations
+  21 [map:LABELS] RGPD
+  22 [map:LABELS] Requêtes
+  23 [map:LABELS] Registre AI Act
+  24 [map:LABELS] Journaux d’audit
+  25 [map:LABELS] Utilisateurs
+  26 [map:LABELS] Paramètres
+  27 [map:LABELS] Collectes
+  28 [map:LABELS] E-mails à froid
+  29 [map:LABELS] Prospection LinkedIn
+  44 [prop:label] Accueil
+
+--- features/companies/effectif.ts ---
+  5 [prop:label] Tous effectifs
+  6 [prop:label] 0 salarié
+  7 [prop:label] 1 à 2 salariés
+  8 [prop:label] 3 à 5 salariés
+  9 [prop:label] 6 à 9 salariés
+  10 [prop:label] 10 à 19 salariés
+  11 [prop:label] 20 à 49 salariés
+  12 [prop:label] 50 à 99 salariés
+  13 [prop:label] 100 à 199 salariés
+  14 [prop:label] 200 à 249 salariés
+  15 [prop:label] 250 à 499 salariés
+  16 [prop:label] 500 à 999 salariés
+  17 [prop:label] 1 000 à 1 999 salariés
+  18 [prop:label] 2 000 à 4 999 salariés
+  19 [prop:label] 5 000 à 9 999 salariés
+  20 [prop:label] 10 000 salariés et +
+
+--- features/campaigns/CampaignsListPage.tsx ---
+  45 [prop:label] Toutes
+  46 [prop:label] Brouillons
+  47 [prop:label] Planifiées
+  48 [prop:label] En cours
+  49 [prop:label] En pause
+  50 [prop:label] Terminées
+  93 [toast] Campagne mise en pause
+  98 [toast] Campagne reprise
+  103 [toast] Campagne annulée
+  108 [toast] Campagne supprimée
+  228 [prop:label] Voir détails
+  231 [prop:label] Mettre en pause
+  234 [prop:label] Reprendre
+  237 [prop:label] Annuler
+  241 [prop:label] Supprimer
+
+--- features/tags/TagsManagerPage.tsx ---
+  47 [prop:label] Géographie
+  47 [prop:description] Région et département (auto)
+  48 [prop:label] Secteur
+  48 [prop:description] NAF mapping (auto)
+  49 [prop:label] Taille
+  49 [prop:description] Effectif (auto)
+  50 [prop:label] Intent (LLM)
+  50 [prop:description] Classification IA
+  51 [prop:label] Custom
+  51 [prop:description] Tags manuels
+  128 [toast] Tag créé
+  134 [toast] Slug déjà utilisé
+  145 [toast] Tag supprimé
+  150 [toast] Impossible : tags auto/LLM protégés
+
+--- features/international/RoumaniePage.tsx ---
+  32 [prop:label] Tout
+  33 [prop:label] Entreprises
+  34 [prop:label] Associations
+  35 [prop:label] Cabinets
+  36 [prop:label] Enseignement
+  37 [prop:label] Institutions
+  38 [prop:label] Chambres de commerce
+  39 [prop:label] Médias
+  50 [prop:label] Tous
+  51 [prop:label] Prospectables
+  52 [prop:label] Partiels
+  53 [prop:label] Pending
+  54 [prop:label] Archivés
+
+--- features/coverage/CoveragePage.tsx ---
+  12 [prop:label] Visualisation
+  12 [prop:hint] Lecture seule
+  13 [prop:label] Recherche
+  13 [prop:hint] Filtre la liste
+  14 [prop:label] Action
+  14 [prop:hint] Clic = lance scrape
+  18 [prop:label] Régions
+  19 [prop:label] Départements
+  20 [prop:label] Villes
+  57 [toast] Erreur lors de la récupération
+  72 [toast] Erreur lors de l'enrichissement
+
+--- features/campaigns/CampaignDetailPage.tsx ---
+  46 [prop:label] Suivi temps réel
+  47 [prop:label] Sources
+  48 [prop:label] Zones
+  49 [prop:label] Runs
+  50 [prop:label] Configuration
+  77 [toast] Campagne mise en pause
+  82 [toast] Campagne reprise
+  87 [toast] Campagne annulée
+  92 [toast] Campagne lancée
+  120 [prop:label] Collectes
+
+--- features/rgpd/RgpdRequestsPage.tsx ---
+  56 [prop:label] Toutes
+  57 [prop:label] Accès
+  58 [prop:label] Portabilité
+  59 [prop:label] Suppression
+  60 [prop:label] Rectification
+  61 [prop:label] Opposition
+  84 [toast] Requête RGPD créée
+  90 [toast] Erreur création requête
+  97 [toast] Requête traitée
+  102 [toast] Erreur traitement
+
+--- features/scraping/ScraperRunsPage.tsx ---
+  318 [prop:label] Tous
+  319 [prop:label] En cours
+  320 [prop:label] En attente
+  321 [prop:label] Terminés
+  322 [prop:label] Échec
+  323 [prop:label] Annulés
+  529 [prop:label] Voir détails
+  532 [prop:label] Copier l’ID
+  543 [prop:label] Annuler le run
+  546 [prop:label] Relancer
+
+--- features/audiences/AudienceDetailPage.tsx ---
+  51 [prop:label] Membres
+  52 [prop:label] Critères
+  53 [prop:label] Préparation campagne
+  83 [toast] Audience rafraîchie
+  93 [toast] Audience supprimée
+  108 [prop:label] Audiences
+  136 [toast] Édition bientôt disponible
+  289 [toast] Édition bientôt disponible
+
+--- features/dashboard/components/NextActions.tsx ---
+  31 [prop:title] Lance ton premier scrape
+  32 [prop:description] Choisis un département sur la carte France et démarre la collecte.
+  40 [prop:title] Reprends ton dernier zone
+  41 [prop:description] Aucun scrape lancé sur les dernières 24h — relance la couverture.
+  51 [prop:title] Améliore la qualité
+  63 [prop:title] Explore tes entreprises
+  75 [prop:title] Découvre la carte France
+  76 [prop:description] Visualise la couverture en régions, départements et villes.
+
+--- components/ui/StatusPill.tsx ---
+  14 [prop:text] text-slate-700 dark:text-slate-300
+  15 [prop:text] text-emerald-700 dark:text-emerald-300
+  16 [prop:text] text-amber-700 dark:text-amber-300
+  17 [prop:text] text-rose-700 dark:text-rose-300
+  18 [prop:text] text-sky-700 dark:text-sky-300
+  19 [prop:text] text-slate-600 dark:text-slate-400
+  20 [prop:text] text-sky-700 dark:text-sky-300
+
+--- features/contacts/ContactsListPage.tsx ---
+  40 [prop:label] Tous statuts e-mail
+  41 [prop:label] Valide
+  42 [prop:label] Catch-all
+  43 [prop:label] Inconnu
+  44 [prop:label] Invalide
+  45 [prop:label] Rôle générique
+  46 [prop:label] Jetable
+
+--- features/dashboard/DashboardPage.tsx ---
+  51 [map:PERIOD_LABEL] derniers 7 jours
+  52 [map:PERIOD_LABEL] derniers 30 jours
+  53 [map:PERIOD_LABEL] derniers 90 jours
+  167 [prop:label] vs précédent
+  183 [prop:label] vs J-1
+  198 [prop:label] vs S-1
+  214 [prop:label] vs précédent
+
+--- components/ui/SizeCategoryBadge.tsx ---
+  4 [prop:label] Artisan
+  5 [prop:label] TPE
+  6 [prop:label] PME
+  7 [prop:label] ETI
+  8 [prop:label] Grande
+  9 [prop:label] Inconnue
+
+--- features/companies/CompanyDetailPage.tsx ---
+  71 [toast] Enrichissement lancé
+  74 [toast] Échec lancement enrichissement
+  107 [prop:label] Entreprises
+  162 [prop:label] Exporter en vCard (VCF)
+  163 [prop:label] Marquer doublon
+  165 [prop:label] Marquer obsolète
+
+--- features/companies/components/EnrichmentTimeline.tsx ---
+  19 [prop:label] INSEE Sirene
+  20 [prop:label] Base Adresse Nationale
+  21 [prop:label] France Travail
+  22 [prop:label] Mistral (NAF→libellé)
+  23 [prop:label] Crawl site web
+  24 [prop:label] LinkedIn
+
+--- features/dashboard/components/QualityDistributionBar.tsx ---
+  12 [prop:label] Complète
+  16 [prop:text] text-emerald-700 dark:text-emerald-300
+  20 [prop:label] Partielle
+  24 [prop:text] text-amber-700 dark:text-amber-300
+  28 [prop:label] Basique
+  32 [prop:text] text-rose-700 dark:text-rose-300
+
+--- features/users/UsersPage.tsx ---
+  31 [prop:label] Lecteur (lecture seule)
+  32 [prop:label] Opérateur (édition)
+  33 [prop:label] Admin (gestion équipe)
+  34 [prop:label] Propriétaire (owner)
+  71 [toast] Invitation envoyée
+  77 [toast] Impossible d'envoyer l'invitation
+
+--- features/audiences/AudiencesListPage.tsx ---
+  85 [toast] Audience rafraîchie
+  91 [toast] Statut mis à jour
+  96 [toast] Audience supprimée
+  179 [prop:label] Rafraîchir
+  182 [prop:label] Supprimer
+
+--- features/dashboard/components/SizeDistributionChart.tsx ---
+  6 [prop:label] Artisan
+  7 [prop:label] TPE
+  8 [prop:label] PME
+  9 [prop:label] ETI
+  10 [prop:label] Grande
+
+--- features/llm/RotationsPage.tsx ---
+  28 [map:DIMENSION_LABELS] Proxy
+  29 [map:DIMENSION_LABELS] User-agent
+  30 [map:DIMENSION_LABELS] Cible
+  31 [map:DIMENSION_LABELS] Moteur de recherche
+  32 [map:DIMENSION_LABELS] Fournisseur LLM
+
+--- features/companies/components/CompanyRow.tsx ---
+  132 [prop:label] Voir la fiche
+  139 [prop:label] Enrichir maintenant
+  145 [prop:label] Exporter (vCard)
+  152 [prop:label] Supprimer
+
+--- features/crm-console/ContactsHubPage.tsx ---
+  39 [prop:label] Contacts actifs
+  40 [prop:label] Prospection (base froide)
+  41 [prop:label] Tout
+  84 [prop:label] Tous
+
+--- features/llm/LlmRouterPage.tsx ---
+  45 [prop:label] Cas d'usage
+  46 [prop:label] Fournisseurs
+  47 [prop:label] Prompts
+  48 [prop:label] Usage 30j
+
+--- components/layout/UserMenu.tsx ---
+  56 [prop:label] Profil
+  62 [prop:label] Paramètres
+  69 [prop:label] Déconnexion
+
+--- components/ui/QualityBadge.tsx ---
+  4 [prop:label] Complète
+  5 [prop:label] Partielle
+  6 [prop:label] Basique
+
+--- features/crm-console/ArbitragePage.tsx ---
+  59 [toast] Rattachement impossible : vérifiez l’identifiant d’entreprise.
+  70 [toast] Écarté de la file, avec son motif.
+  73 [toast] Le motif est obligatoire (3 caractères minimum).
+
+--- features/rgpd/AuditLogsPage.tsx ---
+  69 [toast] Chaîne d'audit VALIDE — aucune anomalie détectée.
+  71 [toast] Chaîne d'audit INVALIDE — possible falsification.
+  74 [toast] Erreur vérification chaîne
+
+--- components/layout/WorkspaceSelector.tsx ---
+  41 [prop:label] Créer un workspace
+  48 [prop:label] Gérer les workspaces
+
+--- features/auth/PasswordResetPage.tsx ---
+  19 [toast] Email envoyé
+  21 [toast] Erreur envoi du lien
+
+--- features/media/JournalistsListPage.tsx ---
+  42 [toast] Export CSV téléchargé
+  44 [toast] Erreur lors de l'export
+
+--- lib/echo.ts ---
+  109 [prop:label] Voir
+  118 [toast] Scrape échoué
+
+--- features/auth/MagicLinkPage.tsx ---
+  23 [toast] Erreur envoi du lien
+
+--- features/auth/TwoFactorPage.tsx ---
+  23 [toast] Code invalide
+
+--- features/crm-console/CandidatesPage.tsx ---
+  70 [prop:label] Tous les candidats
+
+--- features/llm/ProxyProvidersPage.tsx ---
+  46 [toast] Échec du test

@@ -1,0 +1,25 @@
+﻿2026-08-19T09:42:49.2088358Z ##[group]Run actions/setup-node@v7
+2026-08-19T09:42:49.2088939Z with:
+2026-08-19T09:42:49.2089258Z   node-version: 22
+2026-08-19T09:42:49.2089479Z   cache: pnpm
+2026-08-19T09:42:49.2089725Z   cache-dependency-path: workers/pnpm-lock.yaml
+2026-08-19T09:42:49.2090038Z   check-latest: false
+2026-08-19T09:42:49.2092497Z   token: ***
+2026-08-19T09:42:49.2092737Z   package-manager-cache: true
+2026-08-19T09:42:49.2092991Z env:
+2026-08-19T09:42:49.2093282Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-19T09:42:49.2093607Z ##[endgroup]
+2026-08-19T09:42:49.3426947Z Found in cache @ /opt/hostedtoolcache/node/22.23.2/x64
+2026-08-19T09:42:49.3430260Z ##[group]Environment details
+2026-08-19T09:42:49.7077704Z node: v22.23.2
+2026-08-19T09:42:49.7078439Z npm: 10.9.8
+2026-08-19T09:42:49.7079544Z yarn: 1.22.22
+2026-08-19T09:42:49.7080438Z ##[endgroup]
+2026-08-19T09:42:49.7099426Z [command]/home/runner/setup-pnpm/node_modules/.bin/pnpm store path --silent
+2026-08-19T09:42:50.0952426Z /home/runner/setup-pnpm/node_modules/.bin/store/v3
+2026-08-19T09:42:50.1976283Z Cache hit for: node-cache-Linux-x64-pnpm-28a61a4811babeefaa8f4436a22207dea9cf71b0701323152a5028bd6dfc5c27
+2026-08-19T09:42:50.4595513Z Received 30794187 of 30794187 (100.0%), 138.5 MBs/sec
+2026-08-19T09:42:50.4599755Z Cache Size: ~29 MB (30794187 B)
+2026-08-19T09:42:50.4623351Z [command]/usr/bin/tar -xf /home/runner/work/_temp/1e7a18f0-72f9-4f15-9ccd-b4fd126d99d0/cache.tzst -P -C /home/runner/work/axion-crm-pro/axion-crm-pro --use-compress-program unzstd
+2026-08-19T09:42:50.7914146Z Cache restored successfully
+2026-08-19T09:42:50.7934442Z Cache restored from key: node-cache-Linux-x64-pnpm-28a61a4811babeefaa8f4436a22207dea9cf71b0701323152a5028bd6dfc5c27

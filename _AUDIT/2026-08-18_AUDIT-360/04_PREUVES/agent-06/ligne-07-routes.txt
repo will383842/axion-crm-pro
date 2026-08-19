@@ -1,0 +1,5 @@
+/up                            -> 000
+/api/v1/crm                    -> 000
+/api/v1/analytics              -> 000
+/api/v1/cold-email             -> 000
+/api/v1/linkedin               -> 000

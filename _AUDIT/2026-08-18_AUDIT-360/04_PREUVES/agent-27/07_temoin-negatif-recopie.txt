@@ -1,0 +1,15 @@
+=== ECRAN -> BALISAGE RECOPIE (numeros de ligne) ===
+
+PLANTE-FAUTIF            TOTAL=  5  EN-TETE DE PAGE recopie=1 (L5)  |  BOUTON recopie (<button> nu)=1 (L7)  |  CARTE recopiee=1 (L6)  |  PASTILLE recopiee=1 (L8)  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=1 (L6)
+                           >>> REDEFINIT LOCALEMENT DES NOMS DU DS : KpiCard@L12   [features/xx/Plante.tsx]
+TEMOIN-SAIN              TOTAL=  0  EN-TETE DE PAGE recopie=0  |  BOUTON recopie (<button> nu)=0  |  CARTE recopiee=0  |  PASTILLE recopiee=0  |  EN-TETE DE TABLEAU recopie=0  |  OMBRE en dur (jeton double)=0
+
+=== TOTAUX PAR MOTIF ===
+EN-TETE DE PAGE recopie            1 occurrences sur  1 ecrans   (le DS fournit : PageHeader / PageShell)
+BOUTON recopie (<button> nu)       1 occurrences sur  1 ecrans   (le DS fournit : Button / IconButton)
+CARTE recopiee                     1 occurrences sur  1 ecrans   (le DS fournit : Card)
+PASTILLE recopiee                  1 occurrences sur  1 ecrans   (le DS fournit : StatusPill / QualityBadge)
+EN-TETE DE TABLEAU recopie         0 occurrences sur  0 ecrans   (le DS fournit : (aucun composant Table dans le DS))
+OMBRE en dur (jeton double)        1 occurrences sur  1 ecrans   (le DS fournit : shadow-[var(--shadow-*)])
+
+Ecrans qui recopient au moins un motif : 1 / 37

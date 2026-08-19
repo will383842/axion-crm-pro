@@ -1,0 +1,25 @@
+   [33m[2m✓[22m[39m AudienceBuilderPage — rendu[2m > [22maffiche les cinq blocs de critères, et la création est VERROUILLÉE à l’arrivée [33m2134[2mms[22m[39m
+   [33m[2m✓[22m[39m AudienceBuilderPage — rendu[2m > [22mdémarre avec le seul critère « prêt outreach », et l’affiche dans le récapitulatif [33m413[2mms[22m[39m
+   [33m[2m✓[22m[39m AudienceBuilderPage — parcours[2m > [22mcliquer un département et cocher « a un email » construit les CRITÈRES envoyés à l’aperçu [33m2201[2mms[22m[39m
+   [33m[2m✓[22m[39m AudienceBuilderPage — parcours[2m > [22mre-cliquer un département le RETIRE — la puce est une bascule, pas un ajout [33m2606[2mms[22m[39m
+   [33m[2m✓[22m[39m AudienceBuilderPage — parcours[2m > [22mnommer puis créer POSTe l’audience et ATTERRIT sur sa fiche [33m4706[2mms[22m[39m
+   [33m[2m✓[22m[39m AudienceBuilderPage — parcours[2m > [22maperçu en échec : l’écran affiche le message du serveur, jamais un compte faux [33m1339[2mms[22m[39m
+   [33m[2m✓[22m[39m AudienceBuilderPage — parcours[2m > [22m« Annuler » revient à la liste des audiences [33m1182[2mms[22m[39m
+ [32m✓[39m tests/lib/api.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 74[2mms[22m[39m
+ [32m✓[39m tests/components/SizeCategoryBadge.extended.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[90m 147[2mms[22m[39m
+ [32m✓[39m tests/components/Skeleton.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[90m 175[2mms[22m[39m
+ [32m✓[39m tests/components/SizeCategoryBadge.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[90m 177[2mms[22m[39m
+ [32m✓[39m tests/components/EmptyState.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 367[2mms[22m[39m
+ [32m✓[39m tests/components/crmConsoleTypes.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 27[2mms[22m[39m
+ [32m✓[39m tests/smoke.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 16[2mms[22m[39m
+ [32m✓[39m tests/components/QualityBadge.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[90m 186[2mms[22m[39m
+ [32m✓[39m tests/components/FormField.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 790[2mms[22m[39m
+   [33m[2m✓[22m[39m FormField[2m > [22muser can type in the input [33m323[2mms[22m[39m
+ [32m✓[39m tests/components/DarkModeToggle.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 822[2mms[22m[39m
+   [33m[2m✓[22m[39m DarkModeToggle[2m > [22mrenders 3 buttons : light / system / dark [33m373[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m21 passed[39m[22m[90m (21)[39m
+[2m      Tests [22m [1m[32m118 passed[39m[22m[90m (118)[39m
+[2m   Start at [22m 12:06:29
+[2m   Duration [22m 208.98s[2m (transform 6.55s, setup 822.02s, collect 193.72s, tests 46.54s, environment 1041.56s, prepare 35.39s)[22m
+

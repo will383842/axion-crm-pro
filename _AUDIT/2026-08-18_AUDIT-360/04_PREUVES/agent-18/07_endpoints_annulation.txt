@@ -1,0 +1,4 @@
+/api/v1/scraper-runs/1/cancel            HTTP 000  30.021486s
+/api/v1/campaigns/1/cancel               HTTP 000  30.039171s
+/api/v1/scraper-runs                     HTTP 000  30.027038s
+/api/v1/campaigns                        HTTP 000  30.045211s

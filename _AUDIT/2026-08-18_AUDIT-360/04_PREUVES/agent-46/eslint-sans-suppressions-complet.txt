@@ -1,0 +1,135 @@
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\components\OnboardingTour.tsx
+  94:7  error  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\components\ui\GlobalSearch.tsx
+  101:39  error  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  117:39  error  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\features\audiences\AudienceBuilderPage.tsx
+  214:22  error  Promise-returning function provided to attribute where a void return was expected  @typescript-eslint/no-misused-promises
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\features\auth\LoginPage.tsx
+  70:9   error  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  72:9   error  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  83:22  error  Promise-returning function provided to attribute where a void return was expected                                                                                   @typescript-eslint/no-misused-promises
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\features\auth\MagicLinkPage.tsx
+  53:24  error  Promise-returning function provided to attribute where a void return was expected  @typescript-eslint/no-misused-promises
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\features\auth\PasswordResetPage.tsx
+  51:24  error  Promise-returning function provided to attribute where a void return was expected  @typescript-eslint/no-misused-promises
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\features\auth\TwoFactorPage.tsx
+  21:7   error  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  31:22  error  Promise-returning function provided to attribute where a void return was expected                                                                                   @typescript-eslint/no-misused-promises
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\features\companies\CompanyDetailPage.tsx
+  59:25  error  This assertion is unnecessary since it does not change the type of the expression                                                                                   @typescript-eslint/no-unnecessary-type-assertion
+  69:29  error  Unsafe return of a value of type `any`                                                                                                                              @typescript-eslint/no-unsafe-return
+  72:7   error  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\features\companies\components\EnrichmentTimeline.tsx
+  29:20  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+  31:63  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+  32:55  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+  33:63  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\features\companies\components\QualityScoreCard.tsx
+  52:12  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+  52:65  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+  52:65  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+  53:12  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+  53:69  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+  53:69  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+  54:12  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+  54:70  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+  54:70  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+  55:12  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+  55:70  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+  55:70  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\features\contacts\ContactsListPage.tsx
+  257:41  error  This assertion is unnecessary since the receiver accepts the original type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\features\coverage\FranceCoverageMap.tsx
+   24:7   error  Unsafe assignment of an `any` value                                                     @typescript-eslint/no-unsafe-assignment
+   83:7   error  Unsafe assignment of an `any` value                                                     @typescript-eslint/no-unsafe-assignment
+  161:13  error  Unsafe assignment of an `any` value                                                     @typescript-eslint/no-unsafe-assignment
+  166:13  error  Unsafe argument of type `any` assigned to a parameter of type `string | URL | Request`  @typescript-eslint/no-unsafe-argument
+  186:9   error  Unsafe assignment of an `any` value                                                     @typescript-eslint/no-unsafe-assignment
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\features\dashboard\DashboardPage.tsx
+  126:23  error  Promise-returning function provided to attribute where a void return was expected  @typescript-eslint/no-misused-promises
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\features\dashboard\components\ActivityFeed.tsx
+  39:40  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\features\rgpd\RgpdRequestsPage.tsx
+   82:7  error  Unsafe return of a value of type `any`                                                                                                                              @typescript-eslint/no-unsafe-return
+   88:7  error  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+   95:7  error  Unsafe return of a value of type `any`                                                                                                                              @typescript-eslint/no-unsafe-return
+  100:7  error  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\features\scraping\ScraperRunsPage.tsx
+  31:18  error  "pending" is overridden by string in this union type    @typescript-eslint/no-redundant-type-constituents
+  31:30  error  "running" is overridden by string in this union type    @typescript-eslint/no-redundant-type-constituents
+  31:42  error  "success" is overridden by string in this union type    @typescript-eslint/no-redundant-type-constituents
+  31:54  error  "completed" is overridden by string in this union type  @typescript-eslint/no-redundant-type-constituents
+  31:68  error  "failed" is overridden by string in this union type     @typescript-eslint/no-redundant-type-constituents
+  31:79  error  "cancelled" is overridden by string in this union type  @typescript-eslint/no-redundant-type-constituents
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\features\settings\SettingsPage.tsx
+  107:54  error  Unsafe return of a value of type `any`                                                                                                                              @typescript-eslint/no-unsafe-return
+  110:7   error  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  146:32  error  'fd.get('name') ?? ''' may use Object's default stringification format ('[object Object]') when stringified                                                         @typescript-eslint/no-base-to-string
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\features\tags\TagsManagerPage.tsx
+  241:24  error  Promise-returning function provided to attribute where a void return was expected  @typescript-eslint/no-misused-promises
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\features\users\UsersPage.tsx
+  69:7  error  Unsafe return of a value of type `any`                                                                                                                              @typescript-eslint/no-unsafe-return
+  75:7  error  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\lib\api.ts
+   3:7   error  Unsafe assignment of an `any` value                   @typescript-eslint/no-unsafe-assignment
+  30:16  error  Unsafe member access .response on an `any` value      @typescript-eslint/no-unsafe-member-access
+  33:12  error  Expected the Promise rejection reason to be an Error  @typescript-eslint/prefer-promise-reject-errors
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\lib\i18n.ts
+  7:1  error  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\lib\sentry.ts
+  13:7   error  Unsafe assignment of an `any` value                                                           @typescript-eslint/no-unsafe-assignment
+  33:18  error  This assertion is unnecessary since the receiver accepts the original type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\src\main.tsx
+  45:7  error  Unsafe assignment of an `any` value  @typescript-eslint/no-unsafe-assignment
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\tests\components\FormField.test.tsx
+  42:19  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\tests\e2e\global-search.spec.ts
+  49:7  error  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\tests\e2e\onboarding.spec.ts
+  57:7  error  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\tests\lib\api.test.ts
+  34:12  error  A method that is not declared with `this: void` may cause unintentional scoping of `this` when separated from its object.
+Consider using an arrow function or explicitly `.bind()`ing the method to avoid calling the method with an unintended `this` value. 
+If a function does not access `this`, it can be annotated with `this: void`  @typescript-eslint/unbound-method
+  42:11  error  Unsafe assignment of an `any` value                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-unsafe-assignment
+  43:17  error  Unsafe member access .baseURL on an `any` value                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unsafe-member-access
+  49:11  error  Unsafe assignment of an `any` value                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-unsafe-assignment
+  50:17  error  Unsafe member access .timeout on an `any` value                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unsafe-member-access
+
+C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\tests\lib\echo.test.ts
+  31:23  error  Unexpected any. Specify a different type         @typescript-eslint/no-explicit-any
+  31:28  error  Unsafe member access .Echo on an `any` value     @typescript-eslint/no-unsafe-member-access
+  75:11  error  Unsafe assignment of an `any` value              @typescript-eslint/no-unsafe-assignment
+  77:27  error  Unsafe member access .private on an `any` value  @typescript-eslint/no-unsafe-member-access
+
+✖ 73 problems (73 errors, 0 warnings)
+  21 errors and 0 warnings potentially fixable with the `--fix` option.
+

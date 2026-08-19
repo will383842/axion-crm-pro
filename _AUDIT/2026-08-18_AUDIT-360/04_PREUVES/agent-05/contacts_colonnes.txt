@@ -1,0 +1,12 @@
+   column_name    | is_nullable |        data_type         
+------------------+-------------+--------------------------
+ company_id       | NO          | bigint
+ consent_text_ref | YES         | text
+ consent_version  | YES         | text
+ external_ref     | YES         | text
+ field_origins    | NO          | jsonb
+ first_info_at    | YES         | timestamp with time zone
+ legal_basis      | YES         | text
+ person_key       | YES         | text
+(8 rows)
+

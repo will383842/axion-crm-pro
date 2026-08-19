@@ -1,0 +1,36 @@
+                                       Table "public.permissions"
+   Column    |           Type           | Collation | Nullable |                 Default                 
+-------------+--------------------------+-----------+----------+-----------------------------------------
+ id          | bigint                   |           | not null | nextval('permissions_id_seq'::regclass)
+ name        | text                     |           | not null | 
+ guard_name  | text                     |           | not null | 'web'::text
+ description | text                     |           |          | 
+ created_at  | timestamp with time zone |           | not null | now()
+ updated_at  | timestamp with time zone |           | not null | now()
+Indexes:
+    "permissions_pkey" PRIMARY KEY, btree (id)
+    "permissions_name_key" UNIQUE CONSTRAINT, btree (name)
+Referenced by:
+    TABLE "model_has_permissions" CONSTRAINT "model_has_permissions_permission_id_fkey" FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
+    TABLE "role_has_permissions" CONSTRAINT "role_has_permissions_permission_id_fkey" FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
+
+       name        | guard_name 
+-------------------+------------
+ audit.view        | web
+ companies.create  | web
+ companies.delete  | web
+ companies.update  | web
+ companies.view    | web
+ contacts.view_pii | web
+ data.export       | web
+ llm.config        | web
+ llm.view_usage    | web
+ proxies.config    | web
+ rgpd.handle       | web
+ rgpd.view         | web
+ scraping.config   | web
+ scraping.run      | web
+ users.manage      | web
+ workspaces.manage | web
+(16 rows)
+

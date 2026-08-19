@@ -1,0 +1,24 @@
+##### TLS edge api.axion-crm-pro.com
+  tlsv1.0  http=200
+  tlsv1.1  http=200
+  tlsv1.2  http=200
+  tlsv1.3  http=200
+
+##### ORIGINE DIRECTE (Host force, IP 46.62.248.239)
+  api.axion-crm-pro.com          http=200
+  app.axion-crm-pro.com          http=200
+  staging-api.axion-crm-pro.com  http=200
+
+##### Certificat servi par l'origine directe
+subject=CN=api.axion-crm-pro.com
+issuer=C=US, O=Let's Encrypt, CN=YE1
+notBefore=Jul 16 08:20:24 2026 GMT
+notAfter=Oct 14 08:20:23 2026 GMT
+X509v3 Subject Alternative Name: 
+    DNS:api.axion-crm-pro.com
+
+##### Certificat servi par l'edge
+subject=CN=axion-crm-pro.com
+issuer=C=US, O=Let's Encrypt, CN=YE2
+notBefore=Jul 15 09:35:46 2026 GMT
+notAfter=Oct 13 09:35:45 2026 GMT

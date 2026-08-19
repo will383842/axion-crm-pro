@@ -1,0 +1,31 @@
+## 7. PIECE 2 DE L'ETAPE 1a (activites et motifs) : deux tables sans route, sans controleur, sans ecran
+-- citations hors de la constante et de la migration :
+(vide = aucun controleur, aucune route, aucun ecran)
+-- les SEULS consommateurs sont le seeder, la migration et le test :
+backend/app/Crm/ActivitesEtMotifs.php
+backend/database/migrations/2026_08_19_000002_crm_activites_et_motifs.php
+backend/database/seeders/ActivitesEtMotifsSeeder.php
+backend/tests/Feature/Crm/ActivitesEtMotifsTest.php
+
+TEMOIN NEGATIF : le meme grep sur une taxonomie qui EST servie par une route
+backend/app/Http/Controllers/Api/Crm/BulkController.php
+backend/app/Http/Controllers/Api/Crm/CandidatesController.php
+backend/app/Http/Controllers/Api/Crm/ContactsHubController.php
+
+## 8. TABLES DES CHAPITRES DU CDC — presence en migration
+documents : migrations=0  code applicatif+frontend=0
+recordings : migrations=0  code applicatif+frontend=0
+transcriptions : migrations=0  code applicatif+frontend=0
+questionnaires : migrations=0  code applicatif+frontend=0
+interactions : migrations=0  code applicatif+frontend=1
+dossiers : migrations=0  code applicatif+frontend=1
+appointments : migrations=0  code applicatif+frontend=0
+quotes : migrations=0  code applicatif+frontend=0
+invoices : migrations=0  code applicatif+frontend=0
+opportunities : migrations=0  code applicatif+frontend=0
+crm_tasks : migrations=1  code applicatif+frontend=0
+crm_notes : migrations=1  code applicatif+frontend=0
+crm_pipelines : migrations=1  code applicatif+frontend=0
+deals : migrations=5  code applicatif+frontend=0
+saved_views : migrations=4  code applicatif+frontend=1
+email_messages : migrations=1  code applicatif+frontend=0

@@ -1,0 +1,19 @@
+### Mesure de concurrence, PRODUCTION, lecture seule — 2026-08-19T10:45:32Z
+
+--- 1 requete seule (reference) ---
+  /up  200  0.433542s
+  /up  200  0.314000s
+  /up  200  0.329324s
+
+--- 10 requetes SIMULTANEES ---
+  #1 200 0.190216s
+  #2 200 0.177837s
+  #3 200 0.200636s
+  #4 200 0.202867s
+  #5 200 0.320249s
+  #6 200 0.232917s
+  #7 200 0.210769s
+  #8 200 0.188507s
+  #9 200 0.235095s
+  #10 200 0.230245s
+  duree totale du lot de 10 : 2006 ms

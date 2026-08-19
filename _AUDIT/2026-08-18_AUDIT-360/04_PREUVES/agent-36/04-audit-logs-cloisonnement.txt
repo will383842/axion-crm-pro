@@ -1,0 +1,23 @@
+########## AUDIT-LOGS — viewer (workspace ALPHA), role viewer
+      1 <<status=200>>
+########## AUDIT-LOGS — owner2 (workspace BETA)
+      1 <<status=200>>
+########## AUDIT-LOGS verify-chain — viewer
+{"valid":false}
+<<status=200>>
+########## viewer
+status=200
+total declare :
+"total":68
+workspace_id distincts dans la page :
+     49 "workspace_id":"c6a16436-ec1b-461a-a797-e4700d6a0168"
+workspace_id null :
+1
+########## owner2
+status=200
+total declare :
+"total":68
+workspace_id distincts dans la page :
+     49 "workspace_id":"c6a16436-ec1b-461a-a797-e4700d6a0168"
+workspace_id null :
+1

@@ -1,0 +1,101 @@
+# Croisement fichiers de test <-> workflows — main e8924b8
+
+## Workflows presents
+a11y.yml
+build-postgres-image.yml
+ci.yml
+deploy-direct-ssh.yml
+deploy-staging.yml
+diag-website-status.yml
+prospection-collect.yml
+prospection-collect-paris.yml
+prospection-collect-region.yml
+prospection-enrich.yml
+prospection-find-websites.yml
+prospection-find-websites-distributed.yml
+prospection-reclassify.yml
+prospection-stats.yml
+release-tracking.yml
+security.yml
+surveillance-sauvegarde.yml
+
+## Toute occurrence de pest/phpunit/vitest/playwright/pnpm test dans les workflows
+.github/workflows/a11y.yml:48:        run: pnpm exec playwright test tests/e2e/a11y.spec.ts --project=chromium --reporter=html
+.github/workflows/a11y.yml:58:        run: pnpm exec playwright test tests/e2e/navigation.spec.ts --project=chromium --reporter=line
+.github/workflows/ci.yml:269:          # (phpunit.xml) transforme la suite entière en échec. Les valeurs
+.github/workflows/ci.yml:270:          # utiles sont de toute façon écrasées par phpunit.xml et par l'env du
+.github/workflows/ci.yml:420:        # ⚠️ 2026-08-16 — la quarantaine est LEVÉE : `phpunit-ci.xml` n'écarte
+.github/workflows/ci.yml:422:        # qu'une différence avec `phpunit.xml` : `executionOrder="default"`,
+.github/workflows/ci.yml:425:        run: php vendor/bin/pest --colors --configuration phpunit-ci.xml
+.github/workflows/ci.yml:459:        run: pnpm test
+.github/workflows/ci.yml:524:      # `pnpm test` ne porte plus `--passWithNoTests` : une suite qui ne
+.github/workflows/ci.yml:526:      # rendre vert. Les globs sont figés dans `workers/vitest.config.ts` — sans
+.github/workflows/ci.yml:531:        run: pnpm test
+
+## Verifications requises sur main (branch protection)
+["Backend Laravel (install + PHPStan + Pint + Pest)","Frontend React/Vite","Workers Node + Playwright","Secrets scan (Gitleaks)"]
+
+## Declencheurs des workflows qui executent des tests
+--- ci.yml
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  # Appelé comme gate par deploy-direct-ssh.yml (push sur main).
+  workflow_call:
+
+permissions:
+--- a11y.yml
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+--- deploy-direct-ssh.yml
+on:
+  push:
+    branches: [main]
+    # On évite de redéployer pour des changements purement docs/_AUDIT.
+    paths-ignore:
+      - '_AUDIT/**'
+      - '_REPORTS/**'
+      - 'spec/**'
+      - 'docs/**'
+      - '**/*.md'
+      # Un changement purement CI/workflow ne doit pas redéployer l'app.
+      - '.github/workflows/**'
+  workflow_dispatch:
+    inputs:
+      skip_migrate:
+        description: 'Skip php artisan migrate (true/false)'
+        required: false
+        default: 'false'
+
+permissions:
+--- deploy-staging.yml
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+
+## Specs Playwright presentes (16) et nombre de tests par projet chromium
+frontend/tests/e2e/a11y.spec.ts
+frontend/tests/e2e/audiences-builder.spec.ts
+frontend/tests/e2e/auth.spec.ts
+frontend/tests/e2e/campaigns-wizard.spec.ts
+frontend/tests/e2e/companies.spec.ts
+frontend/tests/e2e/console-locale.spec.ts
+frontend/tests/e2e/coverage.spec.ts
+frontend/tests/e2e/dark-mode.spec.ts
+frontend/tests/e2e/dashboard.spec.ts
+frontend/tests/e2e/global-search.spec.ts
+frontend/tests/e2e/llm.spec.ts
+frontend/tests/e2e/navigation.spec.ts
+frontend/tests/e2e/onboarding.spec.ts
+frontend/tests/e2e/rgpd.spec.ts
+frontend/tests/e2e/settings.spec.ts
+frontend/tests/e2e/tags-manager.spec.ts

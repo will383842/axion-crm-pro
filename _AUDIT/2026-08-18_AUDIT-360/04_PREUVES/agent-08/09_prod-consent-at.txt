@@ -1,0 +1,8 @@
+=== PROD : consent_at stocke dans payload->pending_match vs occurred_at (identite masquee) ===
+  id  |      occurred_at       |      consent_at_json      |      base      | formulaire | delta_s 
+------+------------------------+---------------------------+----------------+------------+---------
+ 1203 | 2026-08-19 03:25:47+00 | 2026-08-19T05:25:47+02:00 | precontractual |            |       0
+ 1202 | 2026-08-18 02:13:07+00 | 2026-08-18T04:13:07+02:00 | precontractual |            |       0
+ 1197 | 2026-08-16 15:21:08+00 | 2026-08-16T15:21:08+00:00 | precontractual |            |       0
+(3 rows)
+

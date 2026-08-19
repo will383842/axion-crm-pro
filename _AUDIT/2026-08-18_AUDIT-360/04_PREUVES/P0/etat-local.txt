@@ -1,0 +1,18 @@
+### 2026-08-19T09:32:08Z — etat local apres up
+axion-crm-reverb :: Up 34 seconds :: 0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
+axion-crm-horizon :: Up 34 seconds :: 80/tcp, 9000/tcp
+axion-crm-scheduler :: Up 34 seconds :: 80/tcp, 9000/tcp
+axion-crm-app :: Up 35 seconds (healthy) :: 80/tcp, 443/tcp, 2019/tcp, 5173/tcp, 443/udp
+axion-crm-api :: Up 4 minutes :: 0.0.0.0:58080->80/tcp, [::]:58080->80/tcp
+axion-crm-caddy :: Up 4 hours :: 0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+axion-crm-redis :: Up 4 minutes (healthy) :: 0.0.0.0:56379->6379/tcp, [::]:56379->6379/tcp
+axion-crm-postgres :: Up 3 hours (healthy) :: 0.0.0.0:55432->5432/tcp, [::]:55432->5432/tcp
+
+--- app.localhost (SPA) ---
+200 en 0.287015s
+--- api.localhost/up ---
+200 en 2.747580s
+--- app.localhost/api/v1/config/features (NON authentifie) ---
+500 en 7.097843s
+--- api.localhost/api/v1/config/features (NON authentifie) ---
+500 en 6.995867s

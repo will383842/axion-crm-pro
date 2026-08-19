@@ -1,0 +1,37 @@
+############ A02-companies-page-defaut
+### base   : axion_crm_perf4m   (datcollate = C)
+### date   : 2026-08-19T13:37:42+02:00
+### SQL    :
+select * from "companies" where "deleted_at" is null and "workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168' order by "quality_score" desc limit 100 offset 0;
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                                           QUERY PLAN                                                                            
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.43..9.11 rows=100 width=2078) (actual time=16.558..21.146 rows=100 loops=1)
+   Buffers: shared hit=5 read=1
+   ->  Index Scan using idx_companies_workspace_score on companies  (cost=0.43..243149.24 rows=2800000 width=2078) (actual time=16.553..21.120 rows=100 loops=1)
+         Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+         Filter: (deleted_at IS NULL)
+         Buffers: shared hit=5 read=1
+ Planning:
+   Buffers: shared hit=803 read=2
+ Planning Time: 120.227 ms
+ Execution Time: 21.351 ms
+(10 rows)
+
+
+===== CHAUD (4e exécution) =====
+                                                                          QUERY PLAN                                                                           
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.43..9.11 rows=100 width=2078) (actual time=0.075..0.196 rows=100 loops=1)
+   Buffers: shared hit=6
+   ->  Index Scan using idx_companies_workspace_score on companies  (cost=0.43..243149.24 rows=2800000 width=2078) (actual time=0.073..0.164 rows=100 loops=1)
+         Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+         Filter: (deleted_at IS NULL)
+         Buffers: shared hit=6
+ Planning:
+   Buffers: shared hit=805
+ Planning Time: 3.754 ms
+ Execution Time: 0.464 ms
+(10 rows)
+

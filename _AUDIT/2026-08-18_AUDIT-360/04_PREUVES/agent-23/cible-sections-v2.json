@@ -1,0 +1,54 @@
+[
+  {
+    "titre": "Aujourd'hui",
+    "liensVisiblesApresOuverture": [
+      "Tableau de bord"
+    ]
+  },
+  {
+    "titre": "Contacts",
+    "liensVisiblesApresOuverture": [
+      "Contacts",
+      "Vivier candidats",
+      "À arbitrer",
+      "Entreprises",
+      "Journalistes",
+      "Médias (presse)"
+    ]
+  },
+  {
+    "titre": "Collecte",
+    "liensVisiblesApresOuverture": [
+      "Couverture France",
+      "Collectes",
+      "Journaux de collecte",
+      "Roumanie"
+    ]
+  },
+  {
+    "titre": "Pilotage",
+    "liensVisiblesApresOuverture": [
+      "Audiences (segments)",
+      "Observabilité"
+    ]
+  },
+  {
+    "titre": "Conformité",
+    "liensVisiblesApresOuverture": [
+      "Requêtes RGPD",
+      "Registre AI Act",
+      "Journaux d’audit"
+    ]
+  },
+  {
+    "titre": "Réglages",
+    "liensVisiblesApresOuverture": [
+      "Utilisateurs",
+      "Paramètres",
+      "Tags",
+      "LLM Router",
+      "Proxies",
+      "Rotations"
+    ]
+  }
+]

@@ -1,0 +1,4 @@
+=== atelier LOCAL (main c0c453d) ===
+Etc/UTC
+app.timezone = Europe/Paris ; DB_TIMEZONE (env conteneur api) = NULL ; config database.connections.pgsql.timezone = NULL
+=> le correctif PR #90 est INERTE dans l atelier local : la session PG reste en UTC alors que l app vit a Paris.

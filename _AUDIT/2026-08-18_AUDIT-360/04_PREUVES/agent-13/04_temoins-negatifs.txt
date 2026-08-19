@@ -1,0 +1,22 @@
+
+############ T1. TÉMOIN — un namespace de tag NON gouverné est-il refusé ? ############
+[2026-08-19 12:50:40] local.WARNING: site-sync refusé {"code":"ungoverned_tag_namespace","message":"Namespace de tag hors référentiel gouverné : « toto »."} 
+
+=== T1.1 tag « toto:inconnu » — namespace HORS référentiel gouverné ===
+HTTP 422
+{"error":"ungoverned_tag_namespace","message":"Namespace de tag hors r\u00e9f\u00e9rentiel gouvern\u00e9 : \u00ab toto \u00bb.","details":[]}
+
+=== T1.2 tag « taille:micro » — namespace gouverné, valeur hors référentiel ===
+HTTP 200
+{"ok":true,"result":{"status":"created","subject_type":"company","subject_id":7,"activity_id":21,"tags":["src:site-formulaire-audit","svc:audit"]}}
+
+############ T2. TÉMOIN — la sonde d’écart sait-elle rendre ZÉRO ? ############
+
+--- T2.1 colonnes écrites par POSTGRES lui-même (created_at DEFAULT now()) ---
+{"external_ref":"site:event:audit13-0001","ecart_created_at_vs_now":"5472.891666","ecart_occurred_at":"7200.000000"}
+
+--- T2.2 la même sonde sur une valeur volontairement JUSTE ---
+{"doit_valoir_zero":"0.000000"}
+
+--- T2.3 fuseau de la session Postgres vue par l’application ---
+{"TimeZone":"Etc\/UTC"}

@@ -1,0 +1,48 @@
+=== F1 : ecrans couverts par un test de rendu ===
+AiActRegisterPage : 1 fichier(s) de test
+ArbitragePage : 1 fichier(s) de test
+AudienceBuilderPage : 2 fichier(s) de test
+AudienceDetailPage : 1 fichier(s) de test
+AudiencesListPage : 1 fichier(s) de test
+AuditLogsPage : 1 fichier(s) de test
+CampaignDetailPage : 1 fichier(s) de test
+CampaignsListPage : 1 fichier(s) de test
+CampaignWizardPage : 1 fichier(s) de test
+CandidatesPage : 1 fichier(s) de test
+CompaniesListPage : 1 fichier(s) de test
+CompanyDetailPage : 1 fichier(s) de test
+ContactsHubPage : 6 fichier(s) de test
+ContactsListPage : 1 fichier(s) de test
+CoveragePage : 1 fichier(s) de test
+DashboardPage : 2 fichier(s) de test
+JournalistsListPage : 1 fichier(s) de test
+LlmRouterPage : 1 fichier(s) de test
+LoginPage : 1 fichier(s) de test
+MagicLinkPage : 1 fichier(s) de test
+MediaDetailPage : 1 fichier(s) de test
+MediaListPage : 1 fichier(s) de test
+NotFoundPage : 1 fichier(s) de test
+ObservabilityPage : 1 fichier(s) de test
+PasswordResetPage : 1 fichier(s) de test
+PersonTimelinePage : 2 fichier(s) de test
+ProxyProvidersPage : 1 fichier(s) de test
+RgpdRequestsPage : 1 fichier(s) de test
+RotationsPage : 1 fichier(s) de test
+RoumaniePage : 1 fichier(s) de test
+ScraperRunsPage : 1 fichier(s) de test
+SettingsPage : 1 fichier(s) de test
+TagsManagerPage : 1 fichier(s) de test
+TwoFactorPage : 1 fichier(s) de test
+UsersPage : 1 fichier(s) de test
+=== quel fichier de test mentionne RoumaniePage / UsersPage ? ===
+frontend/tests/README.md
+frontend/tests/README.md
+=== tests de RENDU reels (screens/) ===
+AudienceBuilderPage.test.tsx
+CompanyDetailPage.test.tsx
+ContactsHubPage.test.tsx
+DashboardPage.test.tsx
+LoginPage.test.tsx
+PersonTimelinePage.test.tsx
+=== nb ecrans avec test de rendu dedie ===
+6

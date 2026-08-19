@@ -1,0 +1,92 @@
+############ https://api.axion-crm-pro.com/up
+HTTP/1.1 200 OK
+Date: Wed, 19 Aug 2026 11:16:23 GMT
+Content-Type: text/html; charset=utf-8
+Transfer-Encoding: chunked
+Connection: keep-alive
+alt-svc: h3=":443"; ma=86400
+Cache-Control: no-cache, private
+Report-To: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=xfAqT8EHOFWRrx2pheSaNY0F5ToApuOsEuI5wbgys0lr6wgqUWltUHZyXgpy4DAr%2BRPH618i5vhVAD2hsAdsYhS6mjuD0iD6arX0dBjT9RdDpt%2FXRE3G8ndgDd%2FlpiEOIwNfDB%2Fq9ZweLqxCEIsuPVS3Ic8%3D"}]}
+Host: api.axion-crm-pro.com
+referrer-policy: strict-origin-when-cross-origin
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+vary: Accept-Encoding
+via: 1.1 Caddy
+x-content-type-options: nosniff
+x-frame-options: DENY
+x-powered-by: PHP/8.3.33
+cf-cache-status: DYNAMIC
+Nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+Server: cloudflare
+CF-RAY: a2d8beeedf54c0ae-MRS
+
+
+############ https://app.axion-crm-pro.com/
+HTTP/1.1 200 OK
+Date: Wed, 19 Aug 2026 11:16:24 GMT
+Content-Type: text/html; charset=utf-8
+Transfer-Encoding: chunked
+Connection: keep-alive
+alt-svc: h3=":443"; ma=86400
+Cache-Control: no-store
+Report-To: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=IByubTpQ9bDopeCvj5OWdW4BThxIYfwj6ooP5EAjhlvP5j1yZyS%2B0mo0yuIu513g%2FtzvpiY1ScHb5yfzZeHLUEavN6Hs1vahLxtE4EAQyKTaefD8T9YcUlKAbOatBTFJAYtOyYA7T4KqWL70BlMr3HF3b5k%3D"}]}
+Nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+last-modified: Wed, 19 Aug 2026 08:01:33 GMT
+referrer-policy: strict-origin-when-cross-origin
+Server: cloudflare
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+vary: Accept-Encoding
+via: 1.1 Caddy
+x-content-type-options: nosniff
+x-frame-options: DENY
+cf-cache-status: DYNAMIC
+CF-RAY: a2d8bef22d1316a9-MRS
+
+
+############ https://staging-api.axion-crm-pro.com/up
+HTTP/1.1 200 OK
+Date: Wed, 19 Aug 2026 11:16:24 GMT
+Content-Type: text/html; charset=utf-8
+Transfer-Encoding: chunked
+Connection: keep-alive
+alt-svc: h3=":443"; ma=86400
+Cache-Control: no-cache, private
+Report-To: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=sSg065wR53lCVWJ3MsEjG9fYK40QSN7gxjEi6V6HcLnbrsa7n%2BLVTlvtbfDDwgKalU5696%2FZuSU0QhJhs9G%2BOPXRJeXBVlphmOIUSmR5PWKyyzQ9zdZT0ItHRt22JqzzjRpfxrQeYEGUFSg8N8VkBOvs1Iz9Vk86EtX%2BUg%3D%3D"}]}
+Host: staging-api.axion-crm-pro.com
+referrer-policy: strict-origin-when-cross-origin
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+vary: Accept-Encoding
+via: 1.1 Caddy
+x-content-type-options: nosniff
+x-frame-options: DENY
+x-powered-by: PHP/8.3.33
+x-robots-tag: noindex, nofollow, noarchive
+cf-cache-status: DYNAMIC
+Nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+Server: cloudflare
+CF-RAY: a2d8bef5fa87ac32-MRS
+
+
+############ https://staging.axion-crm-pro.com/
+HTTP/1.1 200 OK
+Date: Wed, 19 Aug 2026 11:16:25 GMT
+Content-Type: text/html; charset=utf-8
+Transfer-Encoding: chunked
+Connection: keep-alive
+alt-svc: h3=":443"; ma=86400
+Cache-Control: no-store
+Report-To: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=hfxaEqmktk2mb4jon5qmzOSzxRrRFASYgR%2FYsdvZS7XR%2FGTi9ltZizaHkaWFEiVFHROpBQDwO06RW09WFw3wmML2mwn4oVl2IuvKqU5lEKR1rHM%2FghYZqwwuELEf291waNzaEKZiGdwhJpPbQBY69ind7SCd0Jpt"}]}
+Nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+last-modified: Wed, 19 Aug 2026 08:00:44 GMT
+referrer-policy: strict-origin-when-cross-origin
+Server: cloudflare
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+vary: Accept-Encoding
+via: 1.1 Caddy
+x-content-type-options: nosniff
+x-frame-options: DENY
+x-robots-tag: noindex, nofollow, noarchive
+cf-cache-status: DYNAMIC
+CF-RAY: a2d8bef98ed48741-MRS
+
+

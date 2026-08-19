@@ -1,0 +1,12 @@
+=== TEMOIN NEGATIF : POST non signe sur la porte d'entree PROD (aucune ecriture) ===
+-- 1. sans signature --
+
+HTTP=401
+
+-- 2. signature bidon --
+
+HTTP=401
+
+-- 3. la porte existe-t-elle ? (GET => 405 attendu, pas 404) --
+GET  /api/internal/site-sync HTTP=405
+GET  /api/internal/route-qui-nexiste-pas HTTP=404

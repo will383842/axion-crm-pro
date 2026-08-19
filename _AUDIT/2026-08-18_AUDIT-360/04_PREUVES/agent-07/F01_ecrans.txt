@@ -1,0 +1,46 @@
+=== pages/ecrans sous frontend/src ===
+frontend/src/features/audiences/AudienceBuilderPage.tsx
+frontend/src/features/audiences/AudienceDetailPage.tsx
+frontend/src/features/audiences/AudiencesListPage.tsx
+frontend/src/features/auth/LoginPage.tsx
+frontend/src/features/auth/MagicLinkPage.tsx
+frontend/src/features/auth/PasswordResetPage.tsx
+frontend/src/features/auth/TwoFactorPage.tsx
+frontend/src/features/campaigns/CampaignDetailPage.tsx
+frontend/src/features/campaigns/CampaignsListPage.tsx
+frontend/src/features/campaigns/CampaignWizardPage.tsx
+frontend/src/features/companies/CompaniesListPage.tsx
+frontend/src/features/companies/CompanyDetailPage.tsx
+frontend/src/features/contacts/ContactsListPage.tsx
+frontend/src/features/coverage/CoveragePage.tsx
+frontend/src/features/crm-console/ArbitragePage.tsx
+frontend/src/features/crm-console/CandidatesPage.tsx
+frontend/src/features/crm-console/ContactsHubPage.tsx
+frontend/src/features/crm-console/PersonTimelinePage.tsx
+frontend/src/features/dashboard/DashboardPage.tsx
+frontend/src/features/international/RoumaniePage.tsx
+frontend/src/features/llm/LlmRouterPage.tsx
+frontend/src/features/llm/ProxyProvidersPage.tsx
+frontend/src/features/llm/RotationsPage.tsx
+frontend/src/features/media/JournalistsListPage.tsx
+frontend/src/features/media/MediaDetailPage.tsx
+frontend/src/features/media/MediaListPage.tsx
+frontend/src/features/misc/NotFoundPage.tsx
+frontend/src/features/observability/ObservabilityPage.tsx
+frontend/src/features/rgpd/AiActRegisterPage.tsx
+frontend/src/features/rgpd/AuditLogsPage.tsx
+frontend/src/features/rgpd/RgpdRequestsPage.tsx
+frontend/src/features/scraping/ScraperRunsPage.tsx
+frontend/src/features/settings/SettingsPage.tsx
+frontend/src/features/tags/TagsManagerPage.tsx
+frontend/src/features/users/UsersPage.tsx
+--- nb Pages ---
+35
+=== routes declarees ===
+frontend/src/app/routeTree.tsx:1:import { createRootRoute, createRoute, Outlet } from '@tanstack/react-router';
+frontend/src/app/routeTree.tsx:55:const layoutRoute = createRoute({
+frontend/src/app/routeTree.tsx:61:const loginRoute = createRoute({ getParentRoute: () => rootRoute, path: '/login', component: LoginPage });
+frontend/src/app/routeTree.tsx:62:const twoFactorRoute = createRoute({ getParentRoute: () => rootRoute, path: '/2fa', component: TwoFactorPage });
+frontend/src/app/routeTree.tsx:63:const magicLinkRoute = createRoute({ getParentRoute: () => rootRoute, path: '/magic-link', component: MagicLinkPage });
+RootLayout.tsx
+routeTree.tsx

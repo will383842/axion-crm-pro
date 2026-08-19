@@ -1,0 +1,11 @@
+taille laravel.log : 253.4M
+premiere ligne datee : [2026-08-16 13:34:28]
+derniere ligne datee : [2026-08-19 12:18:39]
+lignes ERROR/CRITICAL totales : 23858
+dont telescope_entries        : 165810
+--- rgpd:anonymize-ips ---
+[2026-08-17 04:30:00]
+[2026-08-18 04:30:00]
+[2026-08-19 04:30:00]
+[2026-08-17 04:30:00] production.ERROR: SQLSTATE[42883]: Undefined function: 7 ERROR:  operator does not exist: cidr / integer
+LINE 2: SET ip = (host(network(ip::cidr / CASE WHEN family(ip) = 4 T...

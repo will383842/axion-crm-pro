@@ -1,0 +1,122 @@
+// Route handler GET /api/admin/submissions/export — telechargement CSV.
+//
+// La Server Action `exportSubmissionsCsvAction` retourne le CSV mais
+// ne sait pas servir un fichier. On expose une route handler qui appelle
+// l'action puis renvoie un Response avec les bons headers Content-Type +
+// Content-Disposition (download).
+
+import { NextResponse, type NextRequest } from "next/server";
+import { exportSubmissionsCsvAction } from "@/features/admin-submissions/actions";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+export async function GET(request: NextRequest) {
+  try {
+    const sp = request.nextUrl.searchParams;
+    const { filename, csv } = await exportSubmissionsCsvAction({
+      type: (sp.get("type") as never) ?? undefined,
+      // Filtre « Catégorie » (2026-07-29) + types forcés des vues filtrées :
+      // l'export doit refléter exactement l'écran depuis lequel on le lance.
+      unifiedType: sp.get("unifiedType") ?? undefined,
+      ...(sp.getAll("unifiedTypeIn").length > 0
+        ? { unifiedTypeIn: sp.getAll("unifiedTypeIn") }
+        : {}),
+      status: (sp.get("status") as never) ?? undefined,
+      locale: (sp.get("locale") as never) ?? undefined,
+      dateFrom: sp.get("dateFrom") ?? undefined,
+      dateTo: sp.get("dateTo") ?? undefined,
+      // Ces quatre-là n'étaient pas transmis : l'export ignorait donc la
+      // recherche, le statut de réponse, et sortait de la corbeille des
+      // messages que l'écran masquait.
+      search: sp.get("search") ?? undefined,
+      replyStatus: (sp.get("replyStatus") as never) ?? undefined,
+      // ⚠️ `z.coerce.boolean()` rend TRUE pour la chaîne "false" (toute chaîne
+      // non vide est truthy). On ne transmet donc le champ que lorsqu'il vaut
+      // explicitement "true" — sinon `?deleted=false` viderait l'export dans la
+      // corbeille.
+      ...(sp.get("includeArchived") === "true" ? { includeArchived: true } : {}),
+      ...(sp.get("deleted") === "true" ? { deleted: true } : {}),
+    });
+    return new NextResponse(csv, {
+      status: 200,
+      headers: {
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": `attachment; filename="${filename}"`,
+        "cache-control": "no-store",
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "internal";
+    if (message === "unauthorized" || message === "forbidden") {
+      return NextResponse.json({ error: message }, { status: 403 });
+    }
+    return NextResponse.json({ error: "internal" }, { status: 500 });
+  }
+}
+=== exportSubmissionsCsvAction ===
+6:463-  // `page` / `pageSize` ne servent qu'à satisfaire le schéma partagé avec le
+8:465-  const parsed = listSubmissionsSchema.parse({ ...input, pageSize: 100, page: 1 });
+--- definition brute ---
+export async function exportSubmissionsCsvAction(
+  input: Partial<ListSubmissionsInput> = {},
+): Promise<{ filename: string; csv: string }> {
+  // Sprint 15 fix Fork 2 C2-2 : RGPD — export PII reservé super_admin/admin
+  const session = await requireAdminWriteSession();
+  // `page` / `pageSize` ne servent qu'à satisfaire le schéma partagé avec le
+  // listing : l'export ne pagine pas pour l'utilisateur, il pagine en interne.
+  const parsed = listSubmissionsSchema.parse({ ...input, pageSize: 100, page: 1 });
+
+  const where = buildSubmissionsWhere(parsed);
+  const searchQ = normalizeSearch(parsed.search);
+
+  const selection = {
+    id: true,
+    type: true,
+    status: true,
+    locale: true,
+    companyName: true,
+    sector: true,
+    contactName: true,
+    contactRole: true,
+    contactEmail: true,
+    contactPhone: true,
+    employeesCount: true,
+    address: true,
+    assignedTo: true,
+    internalNotes: true,
+    submittedAt: true,
+    // `details` porte le type métier fin, l'attribution publicitaire et — pour
+    // les leads du simulateur — le gain estimé. Il n'était pas sélectionné :
+    // l'export était donc inutilisable pour prioriser un rappel ou alimenter
+    // un CRM, alors que la donnée existe en base depuis le premier jour.
+    details: true,
+  } as const;
+
+  const headers = [
+    "id",
+    "type",
+    "status",
+    "locale",
+    "companyName",
+    "sector",
+    "contactName",
+    "contactRole",
+    "contactEmail",
+    "contactPhone",
+    "employeesCount",
+    "address",
+    "assignedTo",
+    "internalNotes",
+    "submittedAt",
+    // Type métier fin : `type` ne connaît que 5 valeurs d'enum, l'essentiel de
+    // la distinction vit dans `details.unifiedType`.
+    "categorie",
+    // Attribution publicitaire — sans elle, impossible de rapprocher un lead
+    // de la campagne qui l'a payé.
+    "utmSource",
+    "utmMedium",
+    "utmCampaign",
+    // Spécifique simulateur : vide pour les autres formulaires.
+=== SEARCH_SCAN_CAP ===
+/c/Users/willi/Documents/Projets/Axion-IA/axionia/src/features/admin-submissions/actions.ts:197:    const SEARCH_SCAN_CAP = 2000;

@@ -1,0 +1,7 @@
+=== F13 bis : ports reellement ouverts en prod (lecture seule, depuis l exterieur) ===
+port 22 : ferme/filtre
+port 80 : OUVERT
+port 443 : OUVERT
+port 5432 : ferme/filtre
+port 6379 : ferme/filtre
+port 8080 : OUVERT

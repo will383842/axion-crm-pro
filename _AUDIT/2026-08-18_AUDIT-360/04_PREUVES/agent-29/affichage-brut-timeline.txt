@@ -1,0 +1,19 @@
+### Ce que Postgres renvoie pour activities.occurred_at (chaine PDO brute, telle qu'affichee par la fiche 360)
+ id | kind | chaine_renvoyee 
+----+------+-----------------
+(0 rows)
+
+
+### format d une valeur timestamptz selon la session
+SET
+        vue_utc         
+------------------------
+ 2026-03-29 12:00:00+00
+(1 row)
+
+SET
+       vue_paris        
+------------------------
+ 2026-03-29 14:00:00+02
+(1 row)
+

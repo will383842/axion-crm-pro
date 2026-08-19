@@ -1,0 +1,12 @@
+##### EDGE (api.axion-crm-pro.com:443)
+  tls1     Protocol: TLSv1.3 840A0000:error:0A0000BF:SSL routines:tls_setup_handshake:no protocols available:../openssl-3.5.4/ssl/statem/statem_lib.c:155: 
+  tls1_1   Protocol: TLSv1.3 B03D0000:error:0A0000BF:SSL routines:tls_setup_handshake:no protocols available:../openssl-3.5.4/ssl/statem/statem_lib.c:155: 
+  tls1_2   Protocol: TLSv1.2     Protocol  : TLSv1.2 
+  tls1_3   Protocol: TLSv1.3 
+
+##### ORIGINE (46.62.248.239:443)
+  tls1     Protocol: TLSv1.3 5C470000:error:0A0000BF:SSL routines:tls_setup_handshake:no protocols available:../openssl-3.5.4/ssl/statem/statem_lib.c:155: 
+  tls1_1   Protocol: TLSv1.3 50550000:error:0A0000BF:SSL routines:tls_setup_handshake:no protocols available:../openssl-3.5.4/ssl/statem/statem_lib.c:155: 
+  tls1_2   Protocol: TLSv1.2     Protocol  : TLSv1.2 
+  tls1_3   Protocol: TLSv1.3     Protocol  : TLSv1.3 
+

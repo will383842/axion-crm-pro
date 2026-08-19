@@ -1,0 +1,182 @@
+[
+  {
+    "route": "/",
+    "filDAriane": "Accueil",
+    "barreLaterale": "présente",
+    "h1": "Tableau de bord"
+  },
+  {
+    "route": "/companies",
+    "filDAriane": "Accueil › / › Entreprises",
+    "barreLaterale": "présente",
+    "h1": "Entreprises"
+  },
+  {
+    "route": "/contacts",
+    "filDAriane": "Accueil › / › Contacts",
+    "barreLaterale": "présente",
+    "h1": "Contacts"
+  },
+  {
+    "route": "/media",
+    "filDAriane": "Accueil › / › Media",
+    "barreLaterale": "présente",
+    "h1": "Médias"
+  },
+  {
+    "route": "/journalists",
+    "filDAriane": "Accueil › / › Journalists",
+    "barreLaterale": "présente",
+    "h1": "Journalistes"
+  },
+  {
+    "route": "/tags",
+    "filDAriane": "Accueil › / › Tags",
+    "barreLaterale": "présente",
+    "h1": "Tags"
+  },
+  {
+    "route": "/audiences",
+    "filDAriane": "Accueil › / › Audiences",
+    "barreLaterale": "présente",
+    "h1": "Audiences"
+  },
+  {
+    "route": "/audiences/new",
+    "filDAriane": "Accueil › / › Audiences › / › New",
+    "barreLaterale": "présente",
+    "h1": "Nouvelle audience"
+  },
+  {
+    "route": "/admin/observability",
+    "filDAriane": "Accueil › / › Admin › / › Observability",
+    "barreLaterale": "présente",
+    "h1": "(aucun h1)"
+  },
+  {
+    "route": "/international/roumanie",
+    "filDAriane": "Accueil › / › International › / › Roumanie",
+    "barreLaterale": "présente",
+    "h1": "Présence française — Roumanie"
+  },
+  {
+    "route": "/console/contacts",
+    "filDAriane": "Accueil › / › Console › / › Contacts",
+    "barreLaterale": "présente",
+    "h1": "Contacts"
+  },
+  {
+    "route": "/console/vivier",
+    "filDAriane": "Accueil › / › Console › / › Vivier",
+    "barreLaterale": "présente",
+    "h1": "Vivier candidats"
+  },
+  {
+    "route": "/console/arbitrage",
+    "filDAriane": "Accueil › / › Console › / › Arbitrage",
+    "barreLaterale": "présente",
+    "h1": "Rapprochements à arbitrer"
+  },
+  {
+    "route": "/console/personnes/abcdef0123456789",
+    "filDAriane": "Accueil › / › Console › / › Personnes › / › Abcdef0123456789",
+    "barreLaterale": "présente",
+    "h1": "(aucun h1)"
+  },
+  {
+    "route": "/campaigns",
+    "filDAriane": "Accueil › / › Collectes",
+    "barreLaterale": "présente",
+    "h1": "Collectes"
+  },
+  {
+    "route": "/campaigns/new",
+    "filDAriane": "Accueil › / › Collectes › / › New",
+    "barreLaterale": "présente",
+    "h1": "Nouvelle campagne"
+  },
+  {
+    "route": "/scraper-runs",
+    "filDAriane": "Accueil › / › Journaux de collecte",
+    "barreLaterale": "présente",
+    "h1": "Journaux de collecte"
+  },
+  {
+    "route": "/rgpd/requests",
+    "filDAriane": "Accueil › / › RGPD › / › Requêtes",
+    "barreLaterale": "présente",
+    "h1": "Requêtes RGPD"
+  },
+  {
+    "route": "/rgpd/ai-act",
+    "filDAriane": "Accueil › / › RGPD › / › Registre AI Act",
+    "barreLaterale": "présente",
+    "h1": "Registre AI Act"
+  },
+  {
+    "route": "/audit-logs",
+    "filDAriane": "Accueil › / › Journaux d’audit",
+    "barreLaterale": "présente",
+    "h1": "Journaux d’audit"
+  },
+  {
+    "route": "/users",
+    "filDAriane": "Accueil › / › Utilisateurs",
+    "barreLaterale": "présente",
+    "h1": "Utilisateurs"
+  },
+  {
+    "route": "/settings",
+    "filDAriane": "Accueil › / › Paramètres",
+    "barreLaterale": "présente",
+    "h1": "Paramètres"
+  },
+  {
+    "route": "/llm/router",
+    "filDAriane": "Accueil › / › LLM › / › Router",
+    "barreLaterale": "présente",
+    "h1": "LLM Router"
+  },
+  {
+    "route": "/llm/proxy-providers",
+    "filDAriane": "Accueil › / › LLM › / › Proxies",
+    "barreLaterale": "présente",
+    "h1": "Fournisseurs de proxies"
+  },
+  {
+    "route": "/llm/rotations",
+    "filDAriane": "Accueil › / › LLM › / › Rotations",
+    "barreLaterale": "présente",
+    "h1": "Rotations"
+  },
+  {
+    "route": "/coverage",
+    "filDAriane": "Accueil › / › Couverture France",
+    "barreLaterale": "présente",
+    "h1": "Couverture France"
+  },
+  {
+    "route": "/cold-email",
+    "filDAriane": "Accueil › / › E-mails à froid",
+    "barreLaterale": "présente",
+    "h1": "Cold email"
+  },
+  {
+    "route": "/linkedin",
+    "filDAriane": "Accueil › / › Prospection LinkedIn",
+    "barreLaterale": "présente",
+    "h1": "LinkedIn outreach"
+  },
+  {
+    "route": "/crm",
+    "filDAriane": "(aucun fil)",
+    "barreLaterale": "ABSENTE",
+    "h1": "(aucun h1)"
+  },
+  {
+    "route": "/analytics",
+    "filDAriane": "(aucun fil)",
+    "barreLaterale": "ABSENTE",
+    "h1": "(aucun h1)"
+  }
+]

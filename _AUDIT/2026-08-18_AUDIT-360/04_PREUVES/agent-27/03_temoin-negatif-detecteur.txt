@@ -1,0 +1,47 @@
+=== DETECTEUR v3 — expression className= complete (accolades equilibrees) + Records de classes ===
+
+### components/ui/SizeCategoryBadge.tsx   occurrences=6  jetons=6  literaux=0
+   L4  [bg-orange-100]  << artisan:           { bg: 'bg-orange-100', fg: 'text-orange-800', label: 'Artisan' },
+   L5  [bg-sky-100]  << tpe:               { bg: 'bg-sky-100',    fg: 'text-sky-800',    label: 'TPE' },
+   L6  [bg-indigo-100]  << pme:               { bg: 'bg-indigo-100', fg: 'text-indigo-800', label: 'PME' },
+   L7  [bg-violet-100]  << eti:               { bg: 'bg-violet-100', fg: 'text-violet-800', label: 'ETI' },
+   L8  [bg-fuchsia-100]  << grande_entreprise: { bg: 'bg-fuchsia-100',fg: 'text-fuchsia-800',label: 'Grande' },
+   L9  [bg-slate-100]  << inconnue:          { bg: 'bg-slate-100',  fg: 'text-slate-600',  label: 'Inconnue' },
+
+### components/layout/Sidebar.tsx   occurrences=4  jetons=5  literaux=0
+   L211  [text-white]  << "flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-700 text-sm font-bold text-white sh
+   L219  [text-white]  << "flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-700 text-sm font-bold text-white sh
+   L222  [text-white]  << "text-sm font-bold tracking-tight text-white"
+   L334  [text-white, ring-white/15]  << {cn( 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium transition', active ? 'bg-sidebar-active text-white
+
+### components/ui/QualityBadge.tsx   occurrences=3  jetons=3  literaux=0
+   L4  [bg-emerald-100]  << complete:  { bg: 'bg-emerald-100', fg: 'text-emerald-800', label: 'Complète',  icon: '🟢' },
+   L5  [bg-amber-100]  << partielle: { bg: 'bg-amber-100',   fg: 'text-amber-800',   label: 'Partielle', icon: '🟡' },
+   L6  [bg-rose-100]  << basique:   { bg: 'bg-rose-100',    fg: 'text-rose-800',    label: 'Basique',   icon: '🔴' },
+
+### components/OnboardingTour.tsx   occurrences=2  jetons=2  literaux=2
+   L41  [bg-slate-100]  << "rounded bg-slate-100 px-1 py-0.5 text-xs"
+   L42  [bg-slate-100]  << "rounded bg-slate-100 px-1 py-0.5 text-xs"
+   L138  LITERAL #7c3aed  << primaryColor: '#7c3aed',
+   L139  LITERAL #0f172a  << textColor: '#0f172a',
+
+### components/ui/ErrorBoundary.tsx   occurrences=2  jetons=2  literaux=0
+   L27  [bg-rose-50]  << {`rounded-xl bg-rose-50 p-${level === 'root' ? 8 : 4} text-rose-900`}
+   L33  [text-white]  << "mt-3 rounded-md bg-rose-600 px-3 py-1.5 text-sm text-white hover:bg-rose-700"
+
+### components/ui/EmptyState.tsx   occurrences=1  jetons=2  literaux=0
+   L15  [border-slate-200, bg-white]  << "flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-white px-6 py-12 text-center"
+
+### components/ui/Skeleton.tsx   occurrences=1  jetons=1  literaux=0
+   L2  [bg-slate-200]  << {`animate-pulse rounded bg-slate-200 ${className}`}
+
+### components/ui/Tooltip.tsx   occurrences=1  jetons=2  literaux=0
+   L57  [text-white, ring-white/10]  << {cn( 'pointer-events-none absolute z-50 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] font-medium text-white sha
+
+### features/PlanteBad.tsx   occurrences=1  jetons=2  literaux=0
+   L2  [bg-white, text-black]  << "rounded bg-white p-4 text-black"
+
+TOTAL occurrences (expressions className fautives) = 21
+TOTAL jetons de couleur claire sans dark:          = 25
+TOTAL literaux couleur                            = 2
+Fichiers touches                                  = 9

@@ -1,0 +1,101 @@
+=== RECENSEMENT DES POINTS DE CAPTURE — site @ eb754332 ===
+Wed, Aug 19, 2026  1:20:23 PM
+
+--- apsrc/app/api/calendly/client-event/route.ts:173:    await syncCalendlyEventToCrm({
+src/features/admin-calendly/actions.ts:181:      await syncCalendlyEventToCrm({
+src/features/admin-calendly/actions.ts:98:      await syncCalendlyEventToCrm({
+src/features/commercial-application/actions.ts:273:    await syncCandidateToCrm({
+src/features/job-application/actions.ts:315:    await syncCandidateToCrm({
+src/features/newsletter/actions.ts:180:    await syncNewsletterOptInToCrm({
+src/features/newsletter/actions.ts:259:    await syncNewsletterOptOutToCrm({
+src/features/podcast-request/actions.ts:110:    await syncFormSubmissionToCrm({
+src/features/review-submission/actions.ts:217:    await syncReviewToCrm({
+src/features/roi-report/actions.ts:168:    await syncFormSubmissionToCrm({
+src/features/unified-contact/actions.ts:250:    await syncFormSubmissionToCrm({
+src/server/calendly/discover.ts:244:      await syncCalendlyEventToCrm({
+src/server/calendly/enrich.ts:237:      await syncCalendlyEventToCrm({
+src/server/chatbot/tools/capturer-lead.ts:156:      await syncFormSubmissionToCrm({
+src/server/vivier/opposition.ts:66:      await syncVivierOppositionToCrm({
+src/server/vivier/stock.ts:250:    const outboxId = await syncCandidateToCrm({
+Id = await syncCandidateToCrm({
+
+nombre d'appels emetteurs : 16
+
+--- subject_ref emis : familles ---
+      5 site:calendly_event
+      1 site:customer_review
+      3 site:job_application
+      2 site:newsletter_subscriber
+      1 site:podcast_request
+      4 site:submission
+
+--- familles comparees par la reconciliation (reconcile.ts) ---
+163:      family: "submission",
+187:        family: "job_application",
+202:      family: "job_application",
+227:      family: "calendly_event",
+240:      family: "newsletter_subscriber",
+253:      family: "customer_review",
+
+--- source_slug emis ---
+      5 calendly
+      1 chatbot
+      1 site-candidature-commerciale
+      2 site-candidature-offre
+      1 site-formulaire-podcast
+
+--- versions de consentement emises ---
+src/features/job-application/actions.ts:43:const CONSENT_VERSION = "careers-v2-2026-08-13";
+src/features/newsletter/actions.ts:37:const NEWSLETTER_CONSENT_VERSION = "newsletter-v1-2026-08-13";
+src/features/podcast-request/actions.ts:29:const CONSENT_VERSION = "podcast-v1-2026-07-21";
+src/features/review-submission/actions.ts:32:const CONSENT_VERSION = "reviews-v1-2026-07-06";
+src/features/roi-report/actions.ts:50:const CONSENT_VERSION = "v1-2026-08-12";
+src/features/unified-contact/actions.ts:50:const CONSENT_VERSION = "v1-2026-05-24";
+src/lib/commercial-application/model.ts:26:export const COMMERCIAL_APPLICATION_CONSENT_VERSION = "memo-v2-2026-08-13";
+src/server/vivier/config.ts:57:export const VIVIER_STOCK_CONSENT_VERSION = "vivier-stock-2026-08-14";
+  + 1 DYNAMIQUE : src/server/vivier/opposition.ts:66 -> application.consentVersion (lu en base)
+
+--- champ tags[] du contrat : emetteurs ---
+src/server/actions/content-gen/kb-ingest-external.ts:73:    tags: ["external", extracted.domain],
+src/server/content-gen/blog/loader.ts:323:    tags: [],
+src/server/content-gen/rss-starter-feeds.ts:31:    tags: ["business", "transformation numérique", "SI", "dirigeants", "France"],
+src/server/content-gen/rss-starter-feeds.ts:41:    tags: ["data", "BI", "analytics", "IA", "entreprise"],
+src/server/content-gen/rss-starter-feeds.ts:51:    tags: ["cloud", "cybersécurité", "IA", "transformation numérique", "IT"],
+src/server/content-gen/rss-starter-feeds.ts:61:    tags: ["cloud", "IA", "infrastructure", "SaaS", "intégration"],
+src/server/content-gen/rss-starter-feeds.ts:71:    tags: ["IA", "dev", "ML", "frameworks", "intégration"],
+src/server/content-gen/rss-starter-feeds.ts:81:    tags: ["IA", "veille", "innovation", "cas d'usage", "France"],
+src/server/content-gen/rss-starter-feeds.ts:91:    tags: ["formation", "dispositifs", "réglementation", "innovation pédagogique"],
+src/server/content-gen/rss-starter-feeds.ts:102:    tags: ["économie", "entreprises", "dirigeants", "macro"],
+src/server/content-gen/rss-starter-feeds.ts:112:    tags: ["entreprises", "marchés", "économie", "dirigeants"],
+src/server/content-gen/rss-starter-feeds.ts:123:    tags: ["ML", "cloud", "déploiement", "cas d'usage entreprise", "AWS"],
+src/server/content-gen/rss-starter-feeds.ts:133:    tags: ["AI", "ML", "cloud", "intégration", "SaaS", "Google Cloud"],
+src/server/content-gen/rss-starter-feeds.ts:143:    tags: ["AI", "GPU", "industrie", "optimisation", "déploiement"],
+src/server/content-gen/rss-starter-feeds.ts:153:    tags: ["AI", "enterprise", "produits", "SaaS", "tendances"],
+src/server/content-gen/rss-starter-feeds.ts:163:    tags: ["AI", "stratégie", "impacts business", "innovation"],
+src/server/content-gen/rss-starter-feeds.ts:173:    tags: ["LLM", "API", "produits", "agents", "roadmap"],
+src/server/content-gen/rss-starter-feeds.ts:183:    tags: ["research", "AI", "tendances", "cas d'usage"],
+src/server/exporters/knowledge-rss.ts:190:        tags: [it.type],
+
+--- champ tags[] : recherche CIBLEE dans les 16 fichiers emetteurs ---
+  src/app/api/calendly/client-event/route.ts : 0 occurrence(s) de 'tags:'
+  src/features/admin-calendly/actions.ts : 0 occurrence(s) de 'tags:'
+  src/features/commercial-application/actions.ts : 4 occurrence(s) de 'tags:'
+  src/features/job-application/actions.ts : 1 occurrence(s) de 'tags:'
+  src/features/newsletter/actions.ts : 0 occurrence(s) de 'tags:'
+  src/features/podcast-request/actions.ts : 2 occurrence(s) de 'tags:'
+  src/features/review-submission/actions.ts : 1 occurrence(s) de 'tags:'
+  src/features/roi-report/actions.ts : 5 occurrence(s) de 'tags:'
+  src/features/unified-contact/actions.ts : 3 occurrence(s) de 'tags:'
+  src/server/calendly/discover.ts : 0 occurrence(s) de 'tags:'
+  src/server/calendly/enrich.ts : 0 occurrence(s) de 'tags:'
+  src/server/chatbot/tools/capturer-lead.ts : 0 occurrence(s) de 'tags:'
+  src/server/vivier/opposition.ts : 0 occurrence(s) de 'tags:'
+  src/server/vivier/stock.ts : 0 occurrence(s) de 'tags:'
+  => 0 partout : le champ tags[] du contrat (types.ts:105) n'est renseigne par AUCUN emetteur.
+
+  RECTIFICATION (relecture ligne a ligne) : les occurrences de 'tags:' ci-dessus
+  ne sont PAS des arguments passes au canal. Verification manuelle des 16 appels
+  sync*ToCrm : toutes les occurrences comptees appartiennent a des appels
+  Sentry.captureException({ tags: { action: ... } }) ou a des objets de
+  notification. AUCUN des 16 appels emetteurs ne passe le champ `tags` du
+  contrat (types.ts:105). Le champ reste donc du code mort des deux cotes.

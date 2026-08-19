@@ -1,0 +1,12 @@
+=== roles postgres (local) ===
+  rolname  | rolsuper | rolbypassrls | rolcanlogin 
+-----------+----------+--------------+-------------
+ axion     | t        | t            | t
+ axion_app | f        | f            | t
+(2 rows)
+
+=== drapeaux applicatifs ===
+DB_USERNAME=axion
+DB_CONNECTION=pgsql
+(rc=0)
+=== config/database.php : connexions ===

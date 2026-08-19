@@ -1,0 +1,41 @@
+=== AGENT 35 — infra/scripts/definir-mot-de-passe-crm.sh : le mot de passe EST dans argv ===
+Reference : main e8924b8 (script introduit par 9d273cd)
+
+L'en-tete du script (l.19-22) affirme :
+  "Le mot de passe ne transite NI par un argument, NI par une variable
+   Il est lu sur l'ENTREE STANDARD. Un mot de passe passe en argument apparait
+   dans `ps` pour tous les utilisateurs de la machine..."
+
+Or la ligne 106-107 fait :
+  SORTIE="$(docker exec -e CRM_COMPTE="$COMPTE" -e CRM_MDP="$MDP" "$CONTENEUR" php artisan tinker ...)"
+
+`-e CRM_MDP=<mot de passe en clair>` EST un argument de la commande `docker`.
+
+--- GESTE JOUE (2026-08-19) : meme forme de commande, mot de passe factice ---
+  Start-Process docker -ArgumentList 'exec','-e','CRM_COMPTE=williamsjullin@gmail.com',
+                                     '-e','CRM_MDP=MotDePasseSecret2026!','a35-api','sleep','25'
+  puis, depuis une AUTRE session, sans privilege particulier :
+  Get-CimInstance Win32_Process -Filter "Name='docker.exe'" | Select ProcessId, CommandLine
+
+--- SORTIE ---
+ProcessId   : 21224
+CommandLine : "C:\Program Files\Docker\Docker\resources\bin\docker.exe" exec -e CRM_COMPTE=williamsjullin@gmail.com -e CRM_MDP=MotDePasseSecret2026! a35-api sleep 25
+
+--- TEMOIN NEGATIF ---
+La meme enumeration montre 15 autres processus `docker exec` de la meme machine,
+dont AUCUN ne porte de secret : la methode voit donc bien la difference entre une
+commande qui expose un secret et une commande qui n'en expose pas. Exemples releves
+dans la meme sortie :
+  docker exec -e DB_DATABASE=axion_crm_a29 -e DB_TIMEZONE= axion-crm-api php artisan migrate --force
+  docker exec axion-crm-api php vendor/bin/phpstan analyse ...
+
+--- SUR LE SERVEUR DE PRODUCTION (Linux) ---
+Le meme argv est lisible par TOUT utilisateur du serveur via `ps -ef`, `ps auxww`
+ou /proc/<pid>/cmdline (world-readable, mode 0444, sauf option de montage `hidepid`
+que ce projet ne pose nulle part). La fenetre d'exposition est la duree du
+`docker exec` — mesuree ci-dessous sur `php artisan tinker` dans le conteneur API.
+
+--- FINS DE LIGNE ---
+od -An -tx1 infra/scripts/definir-mot-de-passe-crm.sh | tr ' ' '\n' | grep -c '^0d'  ->  0
+git ls-files --eol -> i/lf w/lf attr/text eol=lf
+Le script est en LF pur : il n'est PAS concerne par A-003.

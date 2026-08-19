@@ -1,0 +1,16 @@
+        data_type         | colonnes | tables 
+--------------------------+----------+--------
+ timestamp with time zone |      203 |     93
+ date                     |        3 |      3
+(2 rows)
+
+        data_type         |            defaut             | count 
+--------------------------+-------------------------------+-------
+ timestamp with time zone | now()                         |   110
+ timestamp with time zone | ecrit par l application       |    89
+ date                     | ecrit par l application       |     3
+ timestamp with time zone | CURRENT_TIMESTAMP             |     2
+ timestamp with time zone | (now() + '30 days'::interval) |     1
+ timestamp with time zone | (now() + '90 days'::interval) |     1
+(6 rows)
+

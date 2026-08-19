@@ -1,0 +1,54 @@
+=== PHP deps audit (composer-audit) ===
+PHP deps audit | Run composer audit --no-dev || true | ﻿2026-08-19T10:07:46.5683889Z ##[group]Run composer audit --no-dev || true
+PHP deps audit | Run composer audit --no-dev || true | 2026-08-19T10:07:46.5684398Z [36;1mcomposer audit --no-dev || true[0m
+PHP deps audit | Run composer audit --no-dev || true | 2026-08-19T10:07:46.5728863Z shell: /usr/bin/bash -e {0}
+PHP deps audit | Run composer audit --no-dev || true | 2026-08-19T10:07:46.5729248Z env:
+PHP deps audit | Run composer audit --no-dev || true | 2026-08-19T10:07:46.5729517Z   COMPOSER_PROCESS_TIMEOUT: 0
+PHP deps audit | Run composer audit --no-dev || true | 2026-08-19T10:07:46.5729851Z   COMPOSER_NO_INTERACTION: 1
+PHP deps audit | Run composer audit --no-dev || true | 2026-08-19T10:07:46.5730169Z   COMPOSER_NO_AUDIT: 1
+PHP deps audit | Run composer audit --no-dev || true | 2026-08-19T10:07:46.5730452Z ##[endgroup]
+PHP deps audit | Run composer audit --no-dev || true | 2026-08-19T10:07:46.7594720Z No installed packages found. Please run "composer install" before running "audit" or pass "--locked" to audit the lo
+
+=== Node deps audit (frontend) ===
+Node deps audit (frontend) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:08:03.0200834Z ├─────────────────────┼─────────�
+Node deps audit (frontend) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:08:03.0201367Z │ More info           │ https://github.com/advisories/GHSA-2v37-7h3g-55p8      │
+Node deps audit (frontend) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:08:03.0201992Z └─────────────────────┴─────────�
+Node deps audit (frontend) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:08:03.0202546Z ┌─────────────────────┬─────────�
+Node deps audit (frontend) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:08:03.0203045Z │ high                │ PostCSS: Path Traversal in Previous Source Map         │
+Node deps audit (frontend) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:08:03.0203523Z │                     │ Auto-Loading (sourceMappingURL) leads to Arbitrary     │
+Node deps audit (frontend) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:08:03.0203967Z │                     │ .map File Disclosure                                   │
+Node deps audit (frontend) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:08:03.0204478Z ├─────────────────────┼─────────�
+Node deps audit (frontend) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:08:03.0205141Z │ Package             │ postcss                                                │
+Node deps audit (frontend) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:08:03.0205684Z ├─────────────────────┼─────────�
+Node deps audit (frontend) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:08:03.0206189Z │ Vulnerable versions │ <=8.5.17                                               │
+Node deps audit (frontend) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:08:03.0206755Z ├─────────────────────┼─────────�
+Node deps audit (frontend) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:08:03.0207260Z │ Patched versions    │ >=8.5.18                                               │
+Node deps audit (frontend) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:08:03.0207816Z ├─────────────────────┼─────────�
+Node deps audit (frontend) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:08:03.0208289Z │ Paths               │                                                        │
+Node deps audit (frontend) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:08:03.0208804Z ├─────────────────────┼─────────�
+Node deps audit (frontend) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:08:03.0209319Z │ More info           │ https://github.com/advisories/GHSA-r28c-9q8g-f849      │
+Node deps audit (frontend) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:08:03.0209884Z └─────────────────────┴─────────�
+Node deps audit (frontend) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:08:03.0210239Z 31 vulnerabilities found
+Node deps audit (frontend) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:08:03.0210523Z Severity: 12 moderate | 18 high | 1 critical
+
+=== Node deps audit (workers) ===
+Node deps audit (workers) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:07:48.7026443Z ├─────────────────────┼──────────
+Node deps audit (workers) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:07:48.7027698Z │ More info           │ https://github.com/advisories/GHSA-2v37-7h3g-55p8      │
+Node deps audit (workers) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:07:48.7029253Z └─────────────────────┴──────────
+Node deps audit (workers) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:07:48.7030669Z ┌─────────────────────┬──────────
+Node deps audit (workers) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:07:48.7031888Z │ high                │ PostCSS: Path Traversal in Previous Source Map         │
+Node deps audit (workers) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:07:48.7032984Z │                     │ Auto-Loading (sourceMappingURL) leads to Arbitrary     │
+Node deps audit (workers) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:07:48.7034054Z │                     │ .map File Disclosure                                   │
+Node deps audit (workers) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:07:48.7035318Z ├─────────────────────┼──────────
+Node deps audit (workers) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:07:48.7036706Z │ Package             │ postcss                                                │
+Node deps audit (workers) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:07:48.7038040Z ├─────────────────────┼──────────
+Node deps audit (workers) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:07:48.7039315Z │ Vulnerable versions │ <=8.5.17                                               │
+Node deps audit (workers) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:07:48.7040656Z ├─────────────────────┼──────────
+Node deps audit (workers) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:07:48.7041413Z │ Patched versions    │ >=8.5.18                                               │
+Node deps audit (workers) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:07:48.7042192Z ├─────────────────────┼──────────
+Node deps audit (workers) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:07:48.7042902Z │ Paths               │                                                        │
+Node deps audit (workers) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:07:48.7044472Z ├─────────────────────┼──────────
+Node deps audit (workers) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:07:48.7045621Z │ More info           │ https://github.com/advisories/GHSA-r28c-9q8g-f849      │
+Node deps audit (workers) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:07:48.7047048Z └─────────────────────┴──────────
+Node deps audit (workers) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:07:48.7047609Z 33 vulnerabilities found
+Node deps audit (workers) | Run pnpm audit --audit-level=high || true | 2026-08-19T10:07:48.7048000Z Severity: 3 low | 19 moderate | 10 high | 1 critical

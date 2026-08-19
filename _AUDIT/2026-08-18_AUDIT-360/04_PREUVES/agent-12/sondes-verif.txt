@@ -1,0 +1,27 @@
+===== VERIFICATIONS DE SUIVI — AGENT 12 =====
+base : axion_crm_a12
+
+----- a) la fiche 400005 (cible du DELETE par le viewer) -----------
+    ligne 400005 en base : DISPARUE — suppression DEFINITIVE
+    le modele Company utilise-t-il SoftDeletes ? NON
+    total companies restant : 300000
+
+----- b) etat de la RLS sur `companies` dans cette base ------------
+    candidates : rowsecurity=true force=true
+    companies : rowsecurity=true force=true
+    contacts : rowsecurity=true force=true
+    politiques sur companies :
+      - companies_workspace_isolation : ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+    role de connexion : axion
+    rolsuper=true  rolbypassrls=true
+    proprietaire de la table companies : axion
+
+----- c) le variable de session et le scope global ------------------
+    crm.strict_workspace_scope = false
+    app.current_workspace_id (hors requete) = NULL
+    pose de la variable puis lecture croisee :
+      variable posee = '20cd81e4-de5d-4875-a759-07d64fe1f168'
+      lignes de l'AUTRE univers encore visibles en SQL direct : 1
+      VERDICT RLS : la RLS NE FILTRE PAS pour ce role
+
+===== FIN =====

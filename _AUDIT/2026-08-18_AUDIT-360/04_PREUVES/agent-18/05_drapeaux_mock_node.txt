@@ -1,0 +1,18 @@
+Expression EXACTE des 11 workers demarrables (ex. google-maps.worker.ts:7) :
+  const useMock = (process.env['MOCK_SCRAPERS'] ?? process.env['MOCK_MODE'] ?? 'true') !== 'false';
+
+  MOCK_SCRAPERS=ABSENT    -> useMock=true (MOCK)
+  MOCK_SCRAPERS=false     -> useMock=false(REEL)
+  MOCK_SCRAPERS=FALSE     -> useMock=true (MOCK)
+  MOCK_SCRAPERS=False     -> useMock=true (MOCK)
+  MOCK_SCRAPERS=0         -> useMock=true (MOCK)
+  MOCK_SCRAPERS=(vide)    -> useMock=true (MOCK)
+  MOCK_SCRAPERS=off       -> useMock=true (MOCK)
+  MOCK_SCRAPERS=no        -> useMock=true (MOCK)
+  MOCK_SCRAPERS=true      -> useMock=true (MOCK)
+  MOCK_SCRAPERS=1         -> useMock=true (MOCK)
+
+CONCLUSION MESUREE : seule la chaine minuscule exacte 'false' arme le scraper reel.
+Le defaut, la casse, la chaine vide, 0, off, no -> TOUS retombent sur le MOCK.
+Le mock ne peut donc PAS fuir en production cote Node : c'est l'inverse qui menace,
+une production qui ne collecte rien tout en repondant status=success.

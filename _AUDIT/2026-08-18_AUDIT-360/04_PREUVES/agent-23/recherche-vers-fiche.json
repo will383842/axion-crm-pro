@@ -1,0 +1,7 @@
+{
+  "urlDepart": "http://127.0.0.1:5199/",
+  "paletteTexte": "🔍\nEsc\nENTREPRISES\nDUPONT SAS\n123456789\nCONTACTS\nMARIE DUPONT\nMARIE@DUPONT.FR\n⌘K pour ouvrir / fermer\n↑↓ naviguer · ↵ ouvrir",
+  "resultatPersonneVisible": true,
+  "urlApresClicSurLaPersonne": "http://127.0.0.1:5199/contacts",
+  "titreEcranAtteint": "Contacts"
+}

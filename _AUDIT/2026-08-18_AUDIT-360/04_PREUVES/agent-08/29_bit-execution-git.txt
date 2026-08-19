@@ -1,0 +1,32 @@
+=== Le bit d'execution des scripts de sauvegarde DANS GIT (la cause des 91 echecs) ===
+100755 78a440cf8334b20a50fddd97fd6095beee545679 0	infra/scripts/backup-postgres.sh
+100755 29b26a3d3890c89ca11ebabe7bde70ad59d59ba5 0	infra/scripts/dr-drill.sh
+100755 e59e2fa091044fd454431d827348d3e110fe0f68 0	infra/scripts/restore-postgres.sh
+100755 48b363debe8aa4e16868326009e1ca42a87e28b5 0	infra/scripts/verifier-sauvegarde.sh
+
+=== TEMOIN NEGATIF : le job CI sait-il distinguer 100755 de 100644 ? ===
+100644 0a086f08f5159f2f57673b172a3932c98b0aa93f 0	infra/scripts/README.md
+100644 c0c14203ea233530777181a13bf48cd321af1971 0	infra/scripts/install-terraform-windows.ps1
+(ces deux-la sont en 100644 : la lecture du mode n'est pas constante)
+
+=== Ce que verifie le job 'Les scripts d'infra sont-ils executables ?' ===
+  scripts-executables:
+    name: Les scripts d'infra sont-ils exécutables ?
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -euo pipefail
+          # `git ls-files -s` donne le mode ENREGISTRÉ, pas celui du disque —
+          # c'est la seule mesure qui survive à un clone.
+          fautifs="$(git ls-files -s infra/scripts/*.sh | awk '$1 != "100755" { print $4 }')"
+          if [ -n "$fautifs" ]; then
+            echo "::error::Scripts d'infra sans bit d'exécution dans git :"
+            printf '::error::  - %s\n' $fautifs
+            echo "::error::Corriger avec : git update-index --chmod=+x <fichier>"
+            echo "::error::Un script d'infra non exécutable échoue en silence sous cron."
+            exit 1
+          fi
+          echo "Tous les scripts d'infra sont en 100755."
+
+  backend:

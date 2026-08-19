@@ -1,0 +1,31 @@
+### REF
+1145473c436751bed33e815d4bde93d7594ba4f1 docs(rgpd): registre des violations, notification non retenue (#188)
+diff c0c453d..HEAD :
+_REPORTS/2026-08-19_BROUILLON-NOTIFICATION-CNIL-ART33.md
+_REPORTS/REGISTRE-DES-VIOLATIONS-DE-DONNEES.md
+
+### COMPTES DE CODE
+migrations       : 58
+modeles          : 18
+controleurs      : 44
+services (files) : 65
+seeders          : 20
+commandes artisan: 49
+routes/api.php   : 328
+specs *.md       : 26
+poc *.ts         : 20
+e2e *.spec.ts    : 16
+ecrans (Page.tsx): 35
+routes frontend  : 37
+dashboards grafana:9
+prometheus jobs  : 7
+alertes          : 8
+controleurs Phase2:3
+cles CRM_ .env.ex: 15
+
+### ABSENTS
+ABSENT  .github/PULL_REQUEST_TEMPLATE.md
+ABSENT  _INCIDENTS
+ABSENT  _DOCS/DPIA-2026.md
+ABSENT  .github/workflows/deploy-prod.yml
+ABSENT  frontend/e2e

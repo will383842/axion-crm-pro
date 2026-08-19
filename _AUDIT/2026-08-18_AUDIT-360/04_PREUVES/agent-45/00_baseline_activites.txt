@@ -1,0 +1,141 @@
+[2026-08-19 12:05:26] local.INFO: Remplissage des empreintes d’opposition {"table":"opt_out","empreintes_calculees":0} 
+[2026-08-19 12:05:26] local.INFO: Remplissage des empreintes d’opposition {"table":"email_suppressions","empreintes_calculees":0} 
+
+   FAIL  Tests\Feature\Crm\ActivitesEtMotifsTest
+  ✓ un espace hors référentiel est refusé par la base                  326.86s  
+  ✓ le code et la base disent la même chose                              8.30s  
+  ✓ un motif maison s'ajoute SANS migration (§29 critère 2)              7.08s  
+  ✓ les cinq activités du §2.3 sont livrées d'origine                    6.12s  
+  ✓ une activité maison s'ajoute SANS migration                          5.63s  
+  ✓ un slug en double est refusé par la base                             5.46s  
+  ✓ un motif DÉSACTIVÉ depuis la console ne se rallume pas tout seul     5.91s  
+  ✓ un re-semis ne duplique aucune ligne                                 5.30s  
+  ⨯ un libellé modifié depuis la console SURVIT à un re-semis           24.78s  
+  ✓ un libellé vide est refusé par la base                               7.86s  
+  ⨯ les espaces reconnus sont exactement ceux du CHECK en base           4.40s  
+  ⨯ les onze motifs non commerciaux du §2.3 sont livrés d'origine        5.17s  
+  ⨯ un motif ajouté à la main survit à un re-semis                      14.13s  
+  ⨯ la formation est la SEULE activité soumise à Qualiopi                8.49s  
+  ⨯ la candidature est le seul motif réservé à l'espace vivier           7.84s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Crm\ActivitesEtMotifsTest > un libe…  QueryException   
+  SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "crm_motifs" does not exist
+LINE 1: update "crm_motifs" set "label" = $1, "ordre" = $2 where "sl...
+               ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm_test, SQL: update "crm_motifs" set "label" = Relations presse et médias, "ordre" = 5 where "slug" = presse)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:609
+    605▕             $statement = $this->getPdo()->prepare($query);
+    606▕ 
+    607▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    608▕ 
+  ➜ 609▕             $statement->execute();
+    610▕ 
+    611▕             $this->recordsHaveBeenModified(
+    612▕                 ($count = $statement->rowCount()) > 0
+    613▕             );
+
+      [2m+6 vendor frames [22m
+  7   tests/Feature/Crm/ActivitesEtMotifsTest.php:132
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Crm\ActivitesEtMotifsTest > les espaces reconnus so…   
+  Expecting null not to be null 'La contrainte crm_motifs_espa… base.'.
+
+  at tests/Feature/Crm/ActivitesEtMotifsTest.php:230
+    226▕         'SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conname = ?',
+    227▕         ['crm_motifs_espace_check'],
+    228▕     );
+    229▕ 
+  ➜ 230▕     expect($def)->not->toBeNull('La contrainte crm_motifs_espace_check n\'existe pas en base.');
+    231▕ 
+    232▕     preg_match_all("/'([^']*)'::/", (string) $def->def, $matches);
+    233▕     $valeurs = array_values(array_unique($matches[1]));
+    234▕     sort($valeurs);
+
+  1   tests/Feature/Crm/ActivitesEtMotifsTest.php:230
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Crm\ActivitesEtMotifsTest > les onz…  QueryException   
+  SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "crm_motifs" does not exist
+LINE 1: select "slug" from "crm_motifs" order by "ordre" asc
+                           ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm_test, SQL: select "slug" from "crm_motifs" order by "ordre" asc)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:425
+    421▕             );
+    422▕ 
+    423▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    424▕ 
+  ➜ 425▕             $statement->execute();
+    426▕ 
+    427▕             return $statement->fetchAll();
+    428▕         });
+    429▕     }
+
+      [2m+8 vendor frames [22m
+  9   tests/Feature/Crm/ActivitesEtMotifsTest.php:56
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Crm\ActivitesEtMotifsTest > un moti…  QueryException   
+  SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "crm_motifs" does not exist
+LINE 1: insert into "crm_motifs" ("slug", "label", "espace", "ordre"...
+                    ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm_test, SQL: insert into "crm_motifs" ("slug", "label", "espace", "ordre", "actif", "created_at", "updated_at") values (jury-ecole, Jury d'école, business, 300, 1, 2026-08-19 12:07:23, 2026-08-19 12:07:23))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:584
+    580▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    581▕ 
+    582▕             $this->recordsHaveBeenModified();
+    583▕ 
+  ➜ 584▕             return $statement->execute();
+    585▕         });
+    586▕     }
+    587▕ 
+    588▕     /**
+
+      [2m+6 vendor frames [22m
+  7   tests/Feature/Crm/ActivitesEtMotifsTest.php:165
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Crm\ActivitesEtMotifsTest > la form…  QueryException   
+  SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "crm_activites" does not exist
+LINE 1: select "slug" from "crm_activites" where "qualiopi" = $1
+                           ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm_test, SQL: select "slug" from "crm_activites" where "qualiopi" = 1)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:425
+    421▕             );
+    422▕ 
+    423▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    424▕ 
+  ➜ 425▕             $statement->execute();
+    426▕ 
+    427▕             return $statement->fetchAll();
+    428▕         });
+    429▕     }
+
+      [2m+8 vendor frames [22m
+  9   tests/Feature/Crm/ActivitesEtMotifsTest.php:50
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Crm\ActivitesEtMotifsTest > la cand…  QueryException   
+  SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "crm_motifs" does not exist
+LINE 1: select "espace", "slug" from "crm_motifs" order by "slug" as...
+                                     ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm_test, SQL: select "espace", "slug" from "crm_motifs" order by "slug" asc)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:425
+    421▕             );
+    422▕ 
+    423▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    424▕ 
+  ➜ 425▕             $statement->execute();
+    426▕ 
+    427▕             return $statement->fetchAll();
+    428▕         });
+    429▕     }
+
+      [2m+8 vendor frames [22m
+  9   tests/Feature/Crm/ActivitesEtMotifsTest.php:76
+
+
+  Tests:    6 failed, 9 passed (11 assertions)
+  Duration: 563.85s
+  Random Order Seed: 1787133570
+

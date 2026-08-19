@@ -1,0 +1,157 @@
+
+############ R4. ÉVÉNEMENT / VOCABULAIRE INCONNU (reprise) ############
+[2026-08-19 12:30:30] local.WARNING: site-sync refusé {"code":"unknown_event_type","message":"Type d'événement inconnu : « enrollment_created »."} 
+
+=== R4.1 event_type inconnu « enrollment_created » (inscription à une session) ===
+HTTP 422
+{"error":"unknown_event_type","message":"Type d'\u00e9v\u00e9nement inconnu : \u00ab enrollment_created \u00bb.","details":[]}
+[2026-08-19 12:30:49] local.WARNING: site-sync refusé {"code":"unknown_form_type","message":"Type de formulaire inconnu : « webinaire »."} 
+
+=== R4.2 form_type inconnu « webinaire » ===
+HTTP 422
+{"error":"unknown_form_type","message":"Type de formulaire inconnu : \u00ab webinaire \u00bb.","details":[]}
+
+=== R4.3 source_slug NON gouverné « qualiopi-portail » ===
+HTTP 200
+{"ok":true,"result":{"status":"updated","subject_type":"company","subject_id":3,"activity_id":8,"tags":["svc:audit"]}}
+
+--- R4.3 le tag src:qualiopi-portail a-t-il été créé ? ---
+{"n":0}
+
+--- R4.3 tags réellement posés sur GAMMA ---
+{"tags":"svc:audit"}
+
+=== R4.4 tags gouvernés : « taille:micro » (hors référentiel) + « taille:pme » (dans le référentiel) ===
+HTTP 200
+{"ok":true,"result":{"status":"updated","subject_type":"company","subject_id":4,"activity_id":9,"tags":["src:site-formulaire-audit","svc:audit","taille:pme"]}}
+
+--- R4.4 tags réellement posés sur DELTA ---
+{"tags":"src:site-formulaire-audit,svc:audit,taille:pme"}
+[2026-08-19 12:30:51] local.WARNING: site-sync rejeté (signature invalide) {"ip":"127.0.0.1"} 
+
+=== R4.5 signature préfixée « sha256=… » ===
+HTTP 401
+{"error":"bad_signature"}
+
+############ R2. REJEU DANS LA FENÊTRE (reprise) ############
+
+=== R2.1 horodatage -290 s (DANS la fenêtre de 300 s) ===
+HTTP 200
+{"ok":true,"result":{"status":"updated","subject_type":"company","subject_id":1,"activity_id":10,"tags":["src:site-formulaire-audit","svc:audit"]}}
+
+############ R3. DÉDUPLICATION (reprise, cas isolés) ############
+
+=== R3.1 MÊME e-mail, person_key DIFFÉRENT, autre subject_ref ===
+HTTP 200
+{"ok":true,"result":{"status":"updated","subject_type":"company","subject_id":1,"activity_id":11,"tags":["src:site-formulaire-audit","svc:audit"]}}
+
+--- R3.1 fiches Dupont ---
+{"id":1,"first_name":"J.","last_name":"Dupont","email":"jean.dupont@example.com","person_key":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}
+[2026-08-19 12:30:51] local.WARNING: site-sync refusé {"code":"invalid_person_key","message":"person.person_key est obligatoire et doit être un sha256 hexadécimal de 64 caractères (calculé côté site AVANT chiffrement)."} 
+
+=== R3.2 person_key en MAJUSCULES hexadécimales ===
+HTTP 422
+{"error":"invalid_person_key","message":"person.person_key est obligatoire et doit \u00eatre un sha256 hexad\u00e9cimal de 64 caract\u00e8res (calcul\u00e9 c\u00f4t\u00e9 site AVANT chiffrement).","details":[]}
+
+--- R3.3 état AVANT ---
+{"id":3,"first_name":"Zoé","last_name":"Ancienne","email":"ZOÉ.TEST@example.com"}
+{"id":4,"first_name":"Ana","last_name":"Temoin","email":"ANA.TEST@example.com"}
+
+=== R3.3 PIÈGE 10 — e-mail ACCENTUÉ majuscule en base, même personne ingérée (nom DIFFÉRENT) ===
+HTTP 200
+{"ok":true,"result":{"status":"created","subject_type":"company","subject_id":5,"activity_id":12,"tags":["src:site-formulaire-audit","svc:audit"]}}
+
+=== R3.4 TÉMOIN — e-mail ASCII majuscule en base, même personne (nom DIFFÉRENT) ===
+HTTP 200
+{"ok":true,"result":{"status":"updated","subject_type":"company","subject_id":5,"activity_id":13,"tags":["src:site-formulaire-audit","svc:audit"]}}
+
+--- R3.3/R3.4 état APRÈS (accentué = doublon ? ASCII = fusion ?) ---
+{"id":3,"first_name":"Zoé","last_name":"Ancienne","email":"ZOÉ.TEST@example.com","person_key":null,"discovery_source":"scraping"}
+{"id":4,"first_name":"Ana","last_name":"Nouveau","email":"ana.test@example.com","person_key":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","discovery_source":"scraping"}
+{"id":5,"first_name":"Zoé","last_name":"Nouveau","email":"zoé.test@example.com","person_key":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","discovery_source":"site"}
+
+############ R6. PERTE DE LA PERSONNE SANS NOM ############
+
+=== R6.1 SIREN présent, e-mail présent, nom de famille ABSENT ===
+HTTP 200
+{"ok":true,"result":{"status":"created","subject_type":"company","subject_id":6,"activity_id":14,"tags":["src:site-formulaire-audit","svc:audit"]}}
+
+--- R6.1 contacts de ZETA ---
+{"contacts":"(AUCUN CONTACT)"}
+
+--- R6.1 l’e-mail survit-il quelque part dans l’activité ? ---
+{"external_ref":"site:event:fix-r61-sansnom-0001","payload":"{\"message\": \"bonjour\", \"source_slug\": null, \"subject_ref\": \"site:submission:r61\"}"}
+
+--- R6.1 « perdu@example.com » existe-t-il ENCORE dans la base ? ---
+{"c":0,"a":0}
+
+############ R8. WORKSPACE DE DESTINATION ABSENT ############
+[2026-08-19 12:30:52] local.WARNING: site-sync refusé {"code":"workspace_missing","message":"Workspace de destination introuvable : « axion-ia »."} 
+
+=== R8.1 événement business, workspace « axion-ia » introuvable ===
+HTTP 503
+{"error":"workspace_missing","message":"Workspace de destination introuvable : \u00ab axion-ia \u00bb.","details":[]}
+
+--- R8.1 quelque chose a-t-il été écrit ? ---
+{"c":0,"a":0}
+(workspace restauré)
+
+############ R7. JOURNAL — que reste-t-il d’un REFUS ? ############
+
+--- R7 audit_logs des appels site-sync ---
+[2026-08-19 12:30:54] local.ERROR: SQLSTATE[42703]: Undefined column: 7 ERROR:  column "method" does not exist
+LINE 1: select method, path, status, count(*) n from audit_logs wher...
+               ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm_audit13, SQL: select method, path, status, count(*) n from audit_logs where path like '%site-sync%' group by 1,2,3 order by 3) {"exception":"[object] (Illuminate\\Database\\QueryException(code: 42703): SQLSTATE[42703]: Undefined column: 7 ERROR:  column \"method\" does not exist
+LINE 1: select method, path, status, count(*) n from audit_logs wher...
+               ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm_audit13, SQL: select method, path, status, count(*) n from audit_logs where path like '%site-sync%' group by 1,2,3 order by 3) at /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php:838)
+[stacktrace]
+#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(794): Illuminate\\Database\\Connection->runQueryCallback('select method, ...', Array, Object(Closure))
+#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(411): Illuminate\\Database\\Connection->run('select method, ...', Array, Object(Closure))
+#2 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php(491): Illuminate\\Database\\Connection->select('select method, ...')
+#3 /var/www/html/vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php(363): Illuminate\\Database\\DatabaseManager->__call('select', Array)
+#4 /tmp/harness.php(65): Illuminate\\Support\\Facades\\Facade::__callStatic('select', Array)
+#5 /tmp/harness.php(71): q('select method, ...')
+#6 /tmp/scenario_fix.php(102): dump('R7 audit_logs d...', 'select method, ...')
+#7 /tmp/harness.php(78): require('/tmp/scenario_f...')
+#8 {main}
+
+[previous exception] [object] (PDOException(code: 42703): SQLSTATE[42703]: Undefined column: 7 ERROR:  column \"method\" does not exist
+LINE 1: select method, path, status, count(*) n from audit_logs wher...
+               ^ at /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php:425)
+[stacktrace]
+#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(425): PDOStatement->execute()
+#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(827): Illuminate\\Database\\Connection->Illuminate\\Database\\{closure}('select method, ...', Array)
+#2 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(794): Illuminate\\Database\\Connection->runQueryCallback('select method, ...', Array, Object(Closure))
+#3 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(411): Illuminate\\Database\\Connection->run('select method, ...', Array, Object(Closure))
+#4 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php(491): Illuminate\\Database\\Connection->select('select method, ...')
+#5 /var/www/html/vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php(363): Illuminate\\Database\\DatabaseManager->__call('select', Array)
+#6 /tmp/harness.php(65): Illuminate\\Support\\Facades\\Facade::__callStatic('select', Array)
+#7 /tmp/harness.php(71): q('select method, ...')
+#8 /tmp/scenario_fix.php(102): dump('R7 audit_logs d...', 'select method, ...')
+#9 /tmp/harness.php(78): require('/tmp/scenario_f...')
+#10 {main}
+"} 
+
+   Illuminate\Database\QueryException 
+
+  SQLSTATE[42703]: Undefined column: 7 ERROR:  column "method" does not exist
+LINE 1: select method, path, status, count(*) n from audit_logs wher...
+               ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm_audit13, SQL: select method, path, status, count(*) n from audit_logs where path like '%site-sync%' group by 1,2,3 order by 3)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+    834▕             $exceptionType = $this->isUniqueConstraintError($e)
+    835▕                 ? UniqueConstraintViolationException::class
+    836▕                 : QueryException::class;
+    837▕ 
+  ➜ 838▕             throw new $exceptionType(
+    839▕                 $this->getNameWithReadWriteType(),
+    840▕                 $query,
+    841▕                 $this->prepareBindings($bindings),
+    842▕                 $e,
+
+      [2m+7 vendor frames [22m
+
+  8   /tmp/harness.php:65
+      Illuminate\Support\Facades\Facade::__callStatic("select")
+  9   /tmp/harness.php:71
+

@@ -1,0 +1,16 @@
+IP api = 172.18.0.7
+PHP_CLI_SERVER_WORKERS dans le conteneur : 0 occurrence(s)
+
+=== 1 requete seule (5 mesures) ===
+0.036226 0.018393 0.018557 0.017088 0.017338 
+
+=== 10 requetes SEQUENTIELLES : duree totale ===
+sequentiel = .255252542 s
+
+=== 10 requetes PARALLELES : duree totale ===
+parallele  = .199341076 s
+
+=== processus dans le conteneur PENDANT 10 requetes paralleles ===
+PID   USER     TIME  COMMAND
+    1 www-data  0:01 php -S 0.0.0.0:80 -t public
+  855 www-data  0:00 ps -ef

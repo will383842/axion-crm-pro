@@ -1,0 +1,67 @@
+=== volumes axion_crm_perf4m ===
+ relname | n_live_tup 
+---------+------------
+(0 rows)
+
+=== migrations appliquees sur perf4m ===
+57
+=== index sur companies (perf4m) ===
+                indexname                
+-----------------------------------------
+ companies_pkey
+ companies_website_status_index
+ companies_workspace_external_ref_key
+ companies_workspace_foreign_id_unique
+ companies_workspace_id_siren_key
+ idx_companies_archive_reason
+ idx_companies_best_email_confidence
+ idx_companies_denom_btree
+ idx_companies_denomination_trgm
+ idx_companies_dept
+ idx_companies_geo
+ idx_companies_prospection_status
+ idx_companies_region
+ idx_companies_revalidate
+ idx_companies_sector
+ idx_companies_signals
+ idx_companies_workspace_country_nature
+ idx_companies_workspace_dept
+ idx_companies_workspace_lifecycle_stage
+ idx_companies_workspace_naf
+ idx_companies_workspace_relation_type
+ idx_companies_workspace_score
+ idx_companies_workspace_size
+ idx_companies_ws_counts
+ idx_companies_ws_created_at
+ idx_companies_ws_stage_updated_id
+ idx_companies_ws_updated_id
+(27 rows)
+
+=== index sur contacts (perf4m) ===
+                 indexname                 
+-------------------------------------------
+ contacts_pkey
+ contacts_workspace_external_ref_key
+ contacts_workspace_id_normalized_hash_key
+ idx_contacts_company
+ idx_contacts_email
+ idx_contacts_email_confidence
+ idx_contacts_workspace
+ idx_contacts_workspace_person_key
+ idx_contacts_ws_email_status_id
+ idx_contacts_ws_id_desc
+ idx_contacts_ws_lower_last_name
+(11 rows)
+
+=== axion_crm_perf ===
+ companies | contacts | activities | candidates | migrations 
+-----------+----------+------------+------------+------------
+    300000 |    50000 |     500000 |          0 |         57
+(1 row)
+
+=== axion_crm_perf4m ===
+ companies | contacts | activities | candidates | migrations 
+-----------+----------+------------+------------+------------
+   2800000 |        0 |          0 |          0 |         57
+(1 row)
+

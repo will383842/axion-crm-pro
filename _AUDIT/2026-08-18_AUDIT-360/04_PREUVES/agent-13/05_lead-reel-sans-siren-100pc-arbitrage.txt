@@ -1,0 +1,48 @@
+
+############ S1. UN LEAD TEL QUE LE SITE L’ÉMET (sans SIREN) ############
+
+=== S1.1 formulaire d’audit, contrat réel du site ===
+HTTP 200
+{"ok":true,"result":{"status":"pending_match","subject_type":null,"subject_id":null,"activity_id":15,"tags":[]}}
+
+--- S1.1 une société a-t-elle été créée ? ---
+{"n":0}
+
+--- S1.1 une personne a-t-elle été créée ? ---
+{"n":0}
+
+--- S1.1 l’activité produite ---
+{"id":15,"kind":"form_submission","subject_type":null,"subject_id":null,"title":"Formulaire — audit","external_ref":"site:event:reel-unified-contact-01"}
+
+--- S1.1 le lead est-il conservé dans pending_match ? ---
+{"p":"{\n    \"city\": \"Lyon\",\n    \"email\": \"directrice@vraie-entreprise.fr\",\n    \"phone\": \"+33612345678\",\n    \"last_name\": \"Moreau\",\n    \"consent_at\": \"2026-08-19T10:00:00+02:00\",\n    \"first_name\": \"Claire\",\n    \"legal_basis\": \"precontractual\",\n    \"subject_ref\": \"site:submission:reel-01\",\n    \"denomination\": \"VRAIE ENTREPRISE SAS\",\n    \"consent_version\": \"unified-contact-v1\",\n    \"consent_text_ref\": \"unified-contact-form\"\n}"}
+
+############ S2. VOLUME : 5 leads réels consécutifs ############
+  audit → HTTP 200 {"ok":true,"result":{"status":"pending_match","subject_type":null,"subject_id":null,"activity_id":16,"tags":[]}}
+  devis → HTTP 200 {"ok":true,"result":{"status":"pending_match","subject_type":null,"subject_id":null,"activity_id":17,"tags":[]}}
+  formation → HTTP 200 {"ok":true,"result":{"status":"pending_match","subject_type":null,"subject_id":null,"activity_id":18,"tags":[]}}
+  partenariat → HTTP 200 {"ok":true,"result":{"status":"pending_match","subject_type":null,"subject_id":null,"activity_id":19,"tags":[]}}
+  support_client → HTTP 200 {"ok":true,"result":{"status":"pending_match","subject_type":null,"subject_id":null,"activity_id":20,"tags":[]}}
+
+--- S2 sociétés créées par ces 6 leads ---
+{"n":0}
+
+--- S2 personnes créées ---
+{"n":0}
+
+--- S2 événements en attente d’arbitrage HUMAIN ---
+{"n":6}
+
+--- S2 statut renvoyé au site ---
+{"ref":"site:submission:reel-01","subject_type":null,"subject_id":null}
+{"ref":"site:submission:reel-0","subject_type":null,"subject_id":null}
+{"ref":"site:submission:reel-1","subject_type":null,"subject_id":null}
+{"ref":"site:submission:reel-2","subject_type":null,"subject_id":null}
+{"ref":"site:submission:reel-3","subject_type":null,"subject_id":null}
+{"ref":"site:submission:reel-4","subject_type":null,"subject_id":null}
+
+############ S3. L’ÉCRAN D’ARBITRAGE EST-IL ACCESSIBLE ? ############
+crm.console_v2 (drapeau) = true
+CRM_CONSOLE_V2_ENABLED (env conteneur) = 'true'
+GET /api/v1/crm/arbitrage (sans authentification) → HTTP 401
+{"message":"Unauthenticated."}

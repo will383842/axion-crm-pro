@@ -1,0 +1,22 @@
+=== types temporels : timestamptz vs timestamp SANS fuseau ===
+        data_type         | count 
+--------------------------+-------
+ timestamp with time zone |   203
+(1 row)
+
+=== colonnes 'timestamp without time zone' (le defaut dangereux) ===
+ table_name | column_name 
+------------+-------------
+(0 rows)
+
+=== montants : types numeriques des colonnes *eur*, *cost*, *amount*, *price* ===
+     table_name      |  column_name  | data_type | numeric_precision | numeric_scale 
+---------------------+---------------+-----------+-------------------+---------------
+ axion_offer_targets | price_max_eur | numeric   |                10 |             2
+ axion_offer_targets | price_min_eur | numeric   |                10 |             2
+ deals               | value_eur     | numeric   |                12 |             2
+ llm_usage           | cost_eur      | numeric   |                10 |             6
+ llm_use_cases       | cost_cap_eur  | numeric   |                10 |             4
+ workspaces          | cost_cap_eur  | numeric   |                10 |             2
+(6 rows)
+

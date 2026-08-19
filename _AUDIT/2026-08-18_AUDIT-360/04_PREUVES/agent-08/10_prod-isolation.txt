@@ -1,0 +1,23 @@
+=== PROD : qui est REELLEMENT connecte a la base (pg_stat_activity) ===
+  usename  | application_name | sessions |         plus_ancienne         
+-----------+------------------+----------+-------------------------------
+ axion_app |                  |        5 | 2026-08-19 08:40:30.861854+00
+ axion     | psql             |        1 | 2026-08-19 09:57:26.565431+00
+(2 rows)
+
+
+=== PROD : tables cloisonnees — RLS activee et FORCEE ===
+ rls_active | rls_forcee | tables_avec_workspace_id 
+------------+------------+--------------------------
+         38 |         38 |                       41
+(1 row)
+
+
+=== PROD : tables avec workspace_id SANS RLS forcee (le trou) ===
+     relname     | rls | forcee 
+-----------------+-----+--------
+ audit_logs      | f   | f
+ sessions        | f   | f
+ user_workspaces | f   | f
+(3 rows)
+

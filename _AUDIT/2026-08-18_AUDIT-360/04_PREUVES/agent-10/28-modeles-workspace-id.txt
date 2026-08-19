@@ -1,0 +1,22 @@
+       table_name       | a_workspace_id 
+------------------------+----------------
+ audience_members       |              1
+ audit_logs             |              1
+ candidates             |              1
+ companies              |              1
+ contacts               |              1
+ email_audiences        |              1
+ health_practitioners   |              1
+ journalists            |              1
+ llm_use_cases          |              1
+ media                  |              1
+ personal_access_tokens |              0
+ proxy_providers_config |              1
+ rgpd_requests          |              1
+ scraper_runs           |              1
+ scraping_campaigns     |              1
+ tags                   |              1
+ users                  |              0
+ workspaces             |              0
+(18 rows)
+

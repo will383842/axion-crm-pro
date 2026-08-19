@@ -1,0 +1,13 @@
+ kind | count 
+------+-------
+(0 rows)
+
+ total_activities 
+------------------
+                0
+(1 row)
+
+ scope | source | count 
+-------+--------+-------
+(0 rows)
+

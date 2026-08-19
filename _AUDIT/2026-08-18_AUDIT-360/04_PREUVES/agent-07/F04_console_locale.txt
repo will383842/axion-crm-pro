@@ -1,0 +1,51 @@
+=== F4 / D-11 : runbook console locale ===
+# Runbook — faire tourner la console Axion CRM Pro en local
+
+> **À qui s'adresse ce document** : à quelqu'un qui n'a jamais lancé ce dépôt.
+> Tout ce qui suit a été **exécuté** le 2026-08-18 sur Windows 11 + Docker
+> Desktop. Aucune commande n'est recopiée d'une note antérieure : ce qui est
+> écrit ici a rendu la sortie qui est citée.
+>
+> **Critère que ce runbook sert** : « la console tourne en local, connexion,
+> 2FA, tous les écrans v2 ouverts, sans `NODE_TLS_REJECT_UNAUTHORIZED=0` ».
+
+---
+
+## 0. Ce qu'il faut savoir avant de taper quoi que ce soit
+
+**L'origine est UNIQUE : `https://app.localhost`.** Le SPA et l'API sont servis
+par le même hôte, Caddy routant `/api/*`, `/sanctum/*`, `/up`, `/docs`,
+`/broadcasting/*` vers Laravel et tout le reste vers le frontend
+(`infra/caddy/Caddyfile`, bloc `app.localhost`). Ce n'est pas une commodité :
+c'est la condition pour que le cookie de session existe (§2, défaut D-11). Ne
+jamais viser `api.localhost`, `127.0.0.1` ou `localhost:5173` pour vérifier la
+console — on ne vérifierait alors plus rien de ce qui casse.
+
+Une **seconde porte** existe, en HTTP nu : `http://localhost:58080`. Elle est
+réservée à deux usages : le débogage `curl` (lisible, rapide, pas de
+certificat), et l'émission du **site Next.js** vers le CRM (§7). Elle ne
+remplace pas l'origine unique pour la vérification du navigateur.
+
+---
+
+## 1. Démarrer la pile
+
+Le fichier de projet Compose vit dans le **dépôt principal**, la surcouche de
+développement vit dans le **worktree**. Les deux `-f` sont obligatoires, dans
+cet ordre, et la commande se lance depuis le dépôt principal :
+
+```bash
+cd C:/Users/willi/Documents/Projets/Axion-CRM-Pro
+
+docker compose \
+  -f docker-compose.yml \
+  -f C:/Users/willi/Documents/Projets/crmpro-wt-etape0/docker-compose.local.yml \
+  up -d
+```
+
+Le projet Compose s'appelle `axion-crm-pro`. Toute commande ultérieure
+(`ps`, `logs`, `down`, `build`) **doit reprendre les deux `-f`** : sans la
+surcouche, Compose considère les services comme différents et en recrée une
+seconde copie.
+
+### Ce que fait la surcouche, et pourquoi elle n'est pas optionnelle

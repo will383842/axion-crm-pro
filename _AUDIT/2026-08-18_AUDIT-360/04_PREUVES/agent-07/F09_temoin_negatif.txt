@@ -1,0 +1,17 @@
+BEGIN
+INSERT 0 2
+DROP POLICY
+SET
+RESET
+                     cas                      | lignes_vues 
+----------------------------------------------+-------------
+ TEMOIN sans la policy laxiste, SANS contexte |           0
+(1 row)
+
+SET
+                       cas                        | lignes_vues 
+--------------------------------------------------+-------------
+ TEMOIN sans la policy laxiste, contexte=Axion-IA |           1
+(1 row)
+
+ROLLBACK

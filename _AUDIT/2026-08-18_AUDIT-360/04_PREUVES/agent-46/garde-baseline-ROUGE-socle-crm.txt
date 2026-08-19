@@ -1,0 +1,31 @@
+
+   PASS  Tests\Unit\PhpstanBaselineNeGro   FAILED  Tmp\garde\tests\Unit\PhpstanBaselineNeGrossitPasTest > aucune ent…   
+  Le socle CRM a été écrit APRÈS le gel du 2026-08-13 et est propre au niveau 8.
+Aucune entrée de baseline ne doit le viser — ces 1 entrées le font :
+  - app/Models/Company.php → #^Parameter \#1 \$string of method Illuminate\\Console\\Command\:\:warn\(\) expects string, string\|false given\.$#
+Corrige le code (types de retour de relations, @property PHPDoc), ne gèle pas l'erreur.
+Failed asserting that two arrays are identical.
+  -Array &0 []
+  +Array &0 [
+  +    0 => 'app/Models/Company.php → #^Parameter \#1 \$string of method Illuminate\\Console\\Command\:\:warn\(\) expects string, string\|false given\.$#',
+  +]
+  
+
+  at tests/Unit/PhpstanBaselineNeGrossitPasTest.php:212
+    208▕             }
+    209▕         }
+    210▕     }
+    211▕ 
+  ➜ 212▕     $this->assertSame([], $fautives, sprintf(
+    213▕         "Le socle CRM a été écrit APRÈS le gel du 2026-08-13 et est propre au niveau 8.\n" .
+    214▕         "Aucune entrée de baseline ne doit le viser — ces %d entrées le font :\n  - %s\n" .
+    215▕         "Corrige le code (types de retour de relations, @property PHPDoc), ne gèle pas l'erreur.",
+    216▕         count($fautives),
+
+  1   tests/Unit/PhpstanBaselineNeGrossitPasTest.php:212
+
+
+  Tests:    1 failed (1 assertions)
+  Duration: 438.43s
+  Random Order Seed: 1787139075
+

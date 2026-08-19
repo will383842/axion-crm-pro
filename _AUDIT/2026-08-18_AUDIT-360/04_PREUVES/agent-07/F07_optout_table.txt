@@ -1,0 +1,26 @@
+=== opt_out : colonnes reelles en base locale ===
+                                       Table "public.opt_out"
+   Column   |           Type           | Collation | Nullable |               Default               
+------------+--------------------------+-----------+----------+-------------------------------------
+ id         | bigint                   |           | not null | nextval('opt_out_id_seq'::regclass)
+ email      | citext                   |           |          | 
+ phone      | text                     |           |          | 
+ source     | text                     |           | not null | 
+ reason     | text                     |           |          | 
+ created_at | timestamp with time zone |           | not null | now()
+ scope      | text                     |           | not null | 'business'::text
+ email_hash | text                     |           |          | 
+Indexes:
+    "opt_out_pkey" PRIMARY KEY, btree (id)
+    "idx_opt_out_email" btree (email) WHERE email IS NOT NULL
+    "idx_opt_out_phone" btree (phone) WHERE phone IS NOT NULL
+    "idx_opt_out_scope_email_hash" btree (scope, email_hash) WHERE email_hash IS NOT NULL
+Check constraints:
+    "opt_out_scope_check" CHECK (scope = ANY (ARRAY['business'::text, 'vivier'::text]))
+
+=== donnees en clair ? ===
+ total | email_en_clair | avec_hash 
+-------+----------------+-----------
+     0 |              0 |         0
+(1 row)
+

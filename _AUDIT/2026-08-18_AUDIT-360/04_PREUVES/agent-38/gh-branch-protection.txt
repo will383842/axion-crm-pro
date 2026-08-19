@@ -1,0 +1,9 @@
+### GET /repos/:owner/:repo/branches/main/protection
+{"url":"https://api.github.com/repos/will383842/axion-crm-pro/branches/main/protection","required_status_checks":{"url":"https://api.github.com/repos/will383842/axion-crm-pro/branches/main/protection/required_status_checks","strict":false,"contexts":["Backend Laravel (install + PHPStan + Pint + Pest)","Frontend React/Vite","Workers Node + Playwright","Secrets scan (Gitleaks)"],"contexts_url":"https://api.github.com/repos/will383842/axion-crm-pro/branches/main/protection/required_status_checks/contexts","checks":[{"context":"Backend Laravel (install + PHPStan + Pint + Pest)","app_id":15368},{"context":"Frontend React/Vite","app_id":15368},{"context":"Workers Node + Playwright","app_id":15368},{"context":"Secrets scan (Gitleaks)","app_id":15368}]},"required_signatures":{"url":"https://api.github.com/repos/will383842/axion-crm-pro/branches/main/protection/required_signatures","enabled":false},"enforce_admins":{"url":"https://api.github.com/repos/will383842/axion-crm-pro/branches/main/protection/enforce_admins","enabled":false},"required_linear_history":{"enabled":false},"allow_force_pushes":{"enabled":false},"allow_deletions":{"enabled":false},"block_creations":{"enabled":false},"required_conversation_resolution":{"enabled":false},"lock_branch":{"enabled":false},"allow_fork_syncing":{"enabled":false}}
+### GET /repos/:owner/:repo/rulesets
+[]
+### repo meta
+{"allow_auto_merge":false,"default_branch":"main","delete_branch_on_merge":false,"private":false,"visibility":"public"}
+
+### branches/main
+{"name":"main","protected":true}

@@ -1,0 +1,42 @@
+=== SUITE DE TESTS DU DEPOT, REJOUEE PAR AGENT-14 ===
+commande : docker exec axion-crm-api php artisan test --filter=CrmOutbound
+base : axion_crm_test (RefreshDatabase) ; reference main 1145473
+
+exit=0
+[2026-08-19 12:45:21] local.INFO: Remplissage des empreintes d’opposition {"table":"opt_out","empreintes_calculees":0} 
+[2026-08-19 12:45:21] local.INFO: Remplissage des empreintes d’opposition {"table":"email_suppressions","empreintes_calculees":0} 
+[2026-08-19 12:47:34] local.WARNING: crm.outbound.gave_up {"event_id":"2150dc39-9424-4025-b7aa-99ae79371cf5","status":422} 
+[2026-08-19 12:47:52] local.WARNING: crm.outbound.gave_up {"event_id":"39c14431-920f-4be0-8eb3-027da38d433c","attempts":8} 
+
+   PASS  Tests\Feature\Crm\CrmOutboundTest
+  ✓ un 2xx solde la ligne et le corps est signé <timestamp>.<corps>                      573.89s  
+  ✓ un événement d'origine SITE est REFUSÉ et ne laisse aucune ligne     9.38s  
+  ✓ une ligne non encore due n'est pas rejouée                           9.22s  
+  ✓ le corps ne transporte JAMAIS l'email en clair                       7.58s  
+  ✓ le résumé d'observabilité expose les réceptions et le backlog       37.40s  
+  ✓ drapeau ON mais destination vide : l'émetteur refuse plutôt que de…  5.39s  
+  ✓ un 500 consomme une tentative et programme un backoff                5.68s  
+  ✓ un 422 abandonne IMMÉDIATEMENT (le rejeu échouerait éternellement)   5.04s  
+  ✓ les oppositions VENUES du site n'alimentent jamais l'outbox          4.39s  
+  ✓ une opposition décidée dans la console met un événement en file      8.94s  
+  ✓ au plafond d'essais, la ligne passe en gave_up (état terminal visib… 4.50s  
+  ✓ la base elle-même refuse une origine autre que crm                   3.67s  
+  ✓ drapeau OFF : le producteur écrit, l'émetteur REFUSE, rien ne part   4.84s  
+  ✓ un 503 fait ATTENDRE sans consommer de tentative                     2.21s  
+  ✓ deux oppositions identiques encore en attente ne font qu'un message  2.79s  
+
+  Tests:    15 passed (52 assertions)
+  Duration: 1169.06s
+  Random Order Seed: 1787135418
+
+
+[exited with code 0]
+
+LECTURE :
+ - 15 tests passes, 52 assertions. Duree 1169 s : le poste etait sature
+   (un test a pris 573 s), ce n'est PAS une mesure de performance du produit.
+ - les deux WARNING 'crm.outbound.gave_up' du journal montrent les DEUX chemins
+   d'abandon reellement exerces : {status:422} (abandon immediat) et {attempts:8}
+   (plafond). Ils sont emis en Log::warning, et RIEN d'autre ne s'ensuit.
+ - ces tests utilisent Http::fake : ils prouvent la semantique du CRM face a un
+   422/503/2xx SUPPOSE, jamais l'aller-retour reel avec le gestionnaire du site.

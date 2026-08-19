@@ -1,0 +1,16 @@
+ALPHA = company 4 / contact 3 / tag 4   |   BETA = company 3 / contact 2 / tag 3
+viewer & operator & norole appartiennent a ALPHA ; owner2 a BETA
+viewer   /api/v1/companies/4      200  {"id":4,"workspace_id":"c6a16436-ec1b-461a-a797-e4700d6a0168","siren":"111111111","siret":null,"denomination":"ALPHA SAR
+viewer   /api/v1/companies/3      200  {"id":3,"workspace_id":"5c654b31-e479-4b79-b7ab-a94331cafcfc","siren":"222222222","siret":null,"denomination":"BETA SARL
+viewer   /api/v1/contacts/3       200  {"id":3,"workspace_id":"c6a16436-ec1b-461a-a797-e4700d6a0168","company_id":4,"first_name":"Pierre","last_name":"Durand",
+viewer   /api/v1/contacts/2       200  {"id":2,"workspace_id":"5c654b31-e479-4b79-b7ab-a94331cafcfc","company_id":3,"first_name":"Pierre","last_name":"Durand",
+viewer   /api/v1/companies        200  {"data":[{"id":4,"workspace_id":"c6a16436-ec1b-461a-a797-e4700d6a0168","siren":"111111111","siret":null,"denomination":"
+viewer   /api/v1/tags             200  {"data":[{"id":4,"slug":"tag-alpha","name":"TagAlpha","color":null,"category":"custom","kind":"manual","description":nul
+----
+owner2   /api/v1/companies/4      200  {"id":4,"workspace_id":"c6a16436-ec1b-461a-a797-e4700d6a0168","siren":"111111111","siret":null,"denomination":"ALPHA SAR
+owner2   /api/v1/companies/3      200  {"id":3,"workspace_id":"5c654b31-e479-4b79-b7ab-a94331cafcfc","siren":"222222222","siret":null,"denomination":"BETA SARL
+owner2   /api/v1/contacts/3       200  {"id":3,"workspace_id":"c6a16436-ec1b-461a-a797-e4700d6a0168","company_id":4,"first_name":"Pierre","last_name":"Durand",
+owner2   /api/v1/contacts/2       200  {"id":2,"workspace_id":"5c654b31-e479-4b79-b7ab-a94331cafcfc","company_id":3,"first_name":"Pierre","last_name":"Durand",
+owner2   /api/v1/companies        200  {"data":[{"id":3,"workspace_id":"5c654b31-e479-4b79-b7ab-a94331cafcfc","siren":"222222222","siret":null,"denomination":"
+owner2   /api/v1/tags             200  {"data":[{"id":3,"slug":"tag-beta","name":"TagBeta","color":null,"category":"custom","kind":"manual","description":null,
+----

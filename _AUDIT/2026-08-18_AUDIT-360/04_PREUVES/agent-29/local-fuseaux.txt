@@ -1,0 +1,142 @@
+APP_TIMEZONE (env)      : 'Europe/Paris'
+DB_TIMEZONE  (env)      : NULL
+config(app.timezone)    : Europe/Paris
+config(db.pgsql.tz)     : NULL
+date_default_timezone   : Europe/Paris
+PHP now()               : 2026-08-19 13:14:40 +02:00 Europe/Paris
+grammar getDateFormat   : Y-m-d H:i:s
+PG SHOW TimeZone        : Etc/UTC
+PG now()                : 2026-08-19 11:14:48.032732+00
+PG current_database     : axion_crm
+select now() as n, current_setting("TimeZone") as tz
+                                           ^ in /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php:425
+Stack trace:
+#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(425): PDOStatement->execute()
+#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(827): Illuminate\Database\Connection->Illuminate\Database\{closure}('select now() as...', Array)
+#2 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(794): Illuminate\Database\Connection->runQueryCallback('select now() as...', Array, Object(Closure))
+#3 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(411): Illuminate\Database\Connection->run('select now() as...', Array, Object(Closure))
+#4 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php(491): Illuminate\Database\Connection->select('select now() as...')
+#5 /var/www/html/vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php(363): Illuminate\Database\DatabaseManager->__call('select', Array)
+#6 Command line code(12): Illuminate\Support\Facades\Facade::__callStatic('select', Array)
+#7 {main}
+
+Next Illuminate\Database\QueryException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column "TimeZone" does not exist
+LINE 1: select now() as n, current_setting("TimeZone") as tz
+                                           ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm, SQL: select now() as n, current_setting("TimeZone") as tz) in /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+Stack trace:
+#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(794): Illuminate\Database\Connection->runQueryCallback('select now() as...', Array, Object(Closure))
+#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(411): Illuminate\Database\Connection->run('select now() as...', Array, Object(Closure))
+#2 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php(491): Illuminate\Database\Connection->select('select now() as...')
+#3 /var/www/html/vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php(363): Illuminate\Database\DatabaseManager->__call('select', Array)
+#4 Command line code(12): Illuminate\Support\Facades\Facade::__callStatic('select', Array)
+#5 {main}
+  thrown {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Uncaught PDOException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column \"TimeZone\" does not exist
+LINE 1: select now() as n, current_setting(\"TimeZone\") as tz
+                                           ^ in /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php:425
+Stack trace:
+#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(425): PDOStatement->execute()
+#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(827): Illuminate\\Database\\Connection->Illuminate\\Database\\{closure}('select now() as...', Array)
+#2 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(794): Illuminate\\Database\\Connection->runQueryCallback('select now() as...', Array, Object(Closure))
+#3 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(411): Illuminate\\Database\\Connection->run('select now() as...', Array, Object(Closure))
+#4 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php(491): Illuminate\\Database\\Connection->select('select now() as...')
+#5 /var/www/html/vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php(363): Illuminate\\Database\\DatabaseManager->__call('select', Array)
+#6 Command line code(12): Illuminate\\Support\\Facades\\Facade::__callStatic('select', Array)
+#7 {main}
+
+Next Illuminate\\Database\\QueryException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column \"TimeZone\" does not exist
+LINE 1: select now() as n, current_setting(\"TimeZone\") as tz
+                                           ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm, SQL: select now() as n, current_setting(\"TimeZone\") as tz) in /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+Stack trace:
+#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(794): Illuminate\\Database\\Connection->runQueryCallback('select now() as...', Array, Object(Closure))
+#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(411): Illuminate\\Database\\Connection->run('select now() as...', Array, Object(Closure))
+#2 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php(491): Illuminate\\Database\\Connection->select('select now() as...')
+#3 /var/www/html/vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php(363): Illuminate\\Database\\DatabaseManager->__call('select', Array)
+#4 Command line code(12): Illuminate\\Support\\Facades\\Facade::__callStatic('select', Array)
+#5 {main}
+  thrown at /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php:838)
+[stacktrace]
+#0 {main}
+"} 
+
+   Symfony\Component\ErrorHandler\Error\FatalError 
+
+  Uncaught PDOException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column "TimeZone" does not exist
+LINE 1: select now() as n, current_setting("TimeZone") as tz
+                                           ^ in /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php:425
+Stack trace:
+#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(425): PDOStatement->execute()
+#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(827): Illuminate\Database\Connection->Illuminate\Database\{closure}('select now() as...', Array)
+#2 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(794): Illuminate\Database\Connection->runQueryCallback('select now() as...', Array, Object(Closure))
+#3 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(411): Illuminate\Database\Connection->run('select now() as...', Array, Object(Closure))
+#4 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php(491): Illuminate\Database\Connection->select('select now() as...')
+#5 /var/www/html/vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php(363): Illuminate\Database\DatabaseManager->__call('select', Array)
+#6 Command line code(12): Illuminate\Support\Facades\Facade::__callStatic('select', Array)
+#7 {main}
+
+Next Illuminate\Database\QueryException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column "TimeZone" does not exist
+LINE 1: select now() as n, current_setting("TimeZone") as tz
+                                           ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm, SQL: select now() as n, current_setting("TimeZone") as tz) in /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+Stack trace:
+#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(794): Illuminate\Database\Connection->runQueryCallback('select now() as...', Array, Object(Closure))
+#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(411): Illuminate\Database\Connection->run('select now() as...', Array, Object(Closure))
+#2 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php(491): Illuminate\Database\Connection->select('select now() as...')
+#3 /var/www/html/vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php(363): Illuminate\Database\DatabaseManager->__call('select', Array)
+#4 Command line code(12): Illuminate\Support\Facades\Facade::__callStatic('select', Array)
+#5 {main}
+  thrown
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+    834▕             $exceptionType = $this->isUniqueConstraintError($e)
+    835▕                 ? UniqueConstraintViolationException::class
+    836▕                 : QueryException::class;
+    837▕ 
+  ➜ 838▕             throw new $exceptionType(
+    839▕                 $this->getNameWithReadWriteType(),
+    840▕                 $query,
+    841▕                 $this->prepareBindings($bindings),
+    842▕                 $e,
+
+
+   Whoops\Exception\ErrorException 
+
+  Uncaught PDOException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column "TimeZone" does not exist
+LINE 1: select now() as n, current_setting("TimeZone") as tz
+                                           ^ in /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php:425
+Stack trace:
+#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(425): PDOStatement->execute()
+#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(827): Illuminate\Database\Connection->Illuminate\Database\{closure}('select now() as...', Array)
+#2 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(794): Illuminate\Database\Connection->runQueryCallback('select now() as...', Array, Object(Closure))
+#3 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(411): Illuminate\Database\Connection->run('select now() as...', Array, Object(Closure))
+#4 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php(491): Illuminate\Database\Connection->select('select now() as...')
+#5 /var/www/html/vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php(363): Illuminate\Database\DatabaseManager->__call('select', Array)
+#6 Command line code(12): Illuminate\Support\Facades\Facade::__callStatic('select', Array)
+#7 {main}
+
+Next Illuminate\Database\QueryException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column "TimeZone" does not exist
+LINE 1: select now() as n, current_setting("TimeZone") as tz
+                                           ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm, SQL: select now() as n, current_setting("TimeZone") as tz) in /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+Stack trace:
+#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(794): Illuminate\Database\Connection->runQueryCallback('select now() as...', Array, Object(Closure))
+#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(411): Illuminate\Database\Connection->run('select now() as...', Array, Object(Closure))
+#2 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php(491): Illuminate\Database\Connection->select('select now() as...')
+#3 /var/www/html/vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php(363): Illuminate\Database\DatabaseManager->__call('select', Array)
+#4 Command line code(12): Illuminate\Support\Facades\Facade::__callStatic('select', Array)
+#5 {main}
+  thrown
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+    834▕             $exceptionType = $this->isUniqueConstraintError($e)
+    835▕                 ? UniqueConstraintViolationException::class
+    836▕                 : QueryException::class;
+    837▕ 
+  ➜ 838▕             throw new $exceptionType(
+    839▕                 $this->getNameWithReadWriteType(),
+    840▕                 $query,
+    841▕                 $this->prepareBindings($bindings),
+    842▕                 $e,
+
+      [2m+1 vendor frames [22m
+
+  2   [internal]:0
+      Whoops\Run::handleShutdown()
+

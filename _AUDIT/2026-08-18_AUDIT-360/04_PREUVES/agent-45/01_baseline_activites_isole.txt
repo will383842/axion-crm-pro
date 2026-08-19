@@ -1,0 +1,294 @@
+[2026-08-19 12:33:44] local.INFO: Remplissage des empreintes d’opposition {"table":"opt_out","empreintes_calculees":0} 
+[2026-08-19 12:33:45] local.INFO: Remplissage des empreintes d’opposition {"table":"email_suppressions","empreintes_calculees":0} 
+
+   WARN  Tests\Feature\Crm\ActivitesEtMotifsTest
+  ! la candidature est le seul motif réservé à l'espace vivier → file… 483.23s  
+  ! les onze motifs non commerciaux du §2.3 sont livrés d'origine → fi… 43.20s  
+  ! un motif DÉSACTIVÉ depuis la console ne se rallume pas tout seul →… 17.57s  
+  ! les cinq activités du §2.3 sont livrées d'origine → file_get_conte… 19.94s  
+  ! un slug en double est refusé par la base → file_get_contents(/var/… 18.99s  
+  ! une activité maison s'ajoute SANS migration → file_get_contents(/v… 16.98s  
+  ! un re-semis ne duplique aucune ligne → file_get_contents(/var/www/… 17.01s  
+  ! un libellé modifié depuis la console SURVIT à un re-semis → file_g… 19.96s  
+  ! la formation est la SEULE activité soumise à Qualiopi → file_get_c… 23.22s  
+  ! un motif ajouté à la main survit à un re-semis → file_get_contents… 21.09s  
+  ! un libellé vide est refusé par la base → file_get_contents(/var/ww… 21.30s  
+  ! un motif maison s'ajoute SANS migration (§29 critère 2) → file_get… 39.60s  
+  ! le code et la base disent la même chose → file_get_contents(/var/w… 29.25s  
+  ! les espaces reconnus sont exactement ceux du CHECK en base → file_… 41.59s  
+  ! un espace hors référentiel est refusé par la base → file_get_conte… 22.53s  
+  ────────────────────────────────────────────────────────────────────────────  
+   WARNINGS  Tests\Feature\Crm\ActivitesEtMotifsTest > la candidature est le…   
+  file_get_contents(/var/www/html/.env): Failed to open stream: No such file or directory
+
+  at vendor/vlucas/phpdotenv/src/Store/File/Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+      [2m+7 vendor frames [22m
+  8   tests/TestCase.php:25
+
+  ────────────────────────────────────────────────────────────────────────────  
+   WARNINGS  Tests\Feature\Crm\ActivitesEtMotifsTest > les onze motifs non c…   
+  file_get_contents(/var/www/html/.env): Failed to open stream: No such file or directory
+
+  at vendor/vlucas/phpdotenv/src/Store/File/Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+      [2m+7 vendor frames [22m
+  8   tests/TestCase.php:25
+
+  ────────────────────────────────────────────────────────────────────────────  
+   WARNINGS  Tests\Feature\Crm\ActivitesEtMotifsTest > un motif DÉSACTIVÉ de…   
+  file_get_contents(/var/www/html/.env): Failed to open stream: No such file or directory
+
+  at vendor/vlucas/phpdotenv/src/Store/File/Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+      [2m+7 vendor frames [22m
+  8   tests/TestCase.php:25
+
+  ────────────────────────────────────────────────────────────────────────────  
+   WARNINGS  Tests\Feature\Crm\ActivitesEtMotifsTest > les cinq activités du…   
+  file_get_contents(/var/www/html/.env): Failed to open stream: No such file or directory
+
+  at vendor/vlucas/phpdotenv/src/Store/File/Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+      [2m+7 vendor frames [22m
+  8   tests/TestCase.php:25
+
+  ────────────────────────────────────────────────────────────────────────────  
+   WARNINGS  Tests\Feature\Crm\ActivitesEtMotifsTest > un slug en double est…   
+  file_get_contents(/var/www/html/.env): Failed to open stream: No such file or directory
+
+  at vendor/vlucas/phpdotenv/src/Store/File/Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+      [2m+7 vendor frames [22m
+  8   tests/TestCase.php:25
+
+  ────────────────────────────────────────────────────────────────────────────  
+   WARNINGS  Tests\Feature\Crm\ActivitesEtMotifsTest > une activité maison s…   
+  file_get_contents(/var/www/html/.env): Failed to open stream: No such file or directory
+
+  at vendor/vlucas/phpdotenv/src/Store/File/Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+      [2m+7 vendor frames [22m
+  8   tests/TestCase.php:25
+
+  ────────────────────────────────────────────────────────────────────────────  
+   WARNINGS  Tests\Feature\Crm\ActivitesEtMotifsTest > un re-semis ne dupliq…   
+  file_get_contents(/var/www/html/.env): Failed to open stream: No such file or directory
+
+  at vendor/vlucas/phpdotenv/src/Store/File/Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+      [2m+7 vendor frames [22m
+  8   tests/TestCase.php:25
+
+  ────────────────────────────────────────────────────────────────────────────  
+   WARNINGS  Tests\Feature\Crm\ActivitesEtMotifsTest > un libellé modifié de…   
+  file_get_contents(/var/www/html/.env): Failed to open stream: No such file or directory
+
+  at vendor/vlucas/phpdotenv/src/Store/File/Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+      [2m+7 vendor frames [22m
+  8   tests/TestCase.php:25
+
+  ────────────────────────────────────────────────────────────────────────────  
+   WARNINGS  Tests\Feature\Crm\ActivitesEtMotifsTest > la formation est la S…   
+  file_get_contents(/var/www/html/.env): Failed to open stream: No such file or directory
+
+  at vendor/vlucas/phpdotenv/src/Store/File/Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+      [2m+7 vendor frames [22m
+  8   tests/TestCase.php:25
+
+  ────────────────────────────────────────────────────────────────────────────  
+   WARNINGS  Tests\Feature\Crm\ActivitesEtMotifsTest > un motif ajouté à la…    
+  file_get_contents(/var/www/html/.env): Failed to open stream: No such file or directory
+
+  at vendor/vlucas/phpdotenv/src/Store/File/Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+      [2m+7 vendor frames [22m
+  8   tests/TestCase.php:25
+
+  ────────────────────────────────────────────────────────────────────────────  
+   WARNINGS  Tests\Feature\Crm\ActivitesEtMotifsTest > un libellé vide est r…   
+  file_get_contents(/var/www/html/.env): Failed to open stream: No such file or directory
+
+  at vendor/vlucas/phpdotenv/src/Store/File/Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+      [2m+7 vendor frames [22m
+  8   tests/TestCase.php:25
+
+  ────────────────────────────────────────────────────────────────────────────  
+   WARNINGS  Tests\Feature\Crm\ActivitesEtMotifsTest > un motif maison s'ajo…   
+  file_get_contents(/var/www/html/.env): Failed to open stream: No such file or directory
+
+  at vendor/vlucas/phpdotenv/src/Store/File/Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+      [2m+7 vendor frames [22m
+  8   tests/TestCase.php:25
+
+  ────────────────────────────────────────────────────────────────────────────  
+   WARNINGS  Tests\Feature\Crm\ActivitesEtMotifsTest > le code et la base di…   
+  file_get_contents(/var/www/html/.env): Failed to open stream: No such file or directory
+
+  at vendor/vlucas/phpdotenv/src/Store/File/Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+      [2m+7 vendor frames [22m
+  8   tests/TestCase.php:25
+
+  ────────────────────────────────────────────────────────────────────────────  
+   WARNINGS  Tests\Feature\Crm\ActivitesEtMotifsTest > les espaces reconnus…    
+  file_get_contents(/var/www/html/.env): Failed to open stream: No such file or directory
+
+  at vendor/vlucas/phpdotenv/src/Store/File/Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+      [2m+7 vendor frames [22m
+  8   tests/TestCase.php:25
+
+  ────────────────────────────────────────────────────────────────────────────  
+   WARNINGS  Tests\Feature\Crm\ActivitesEtMotifsTest > un espace hors référe…   
+  file_get_contents(/var/www/html/.env): Failed to open stream: No such file or directory
+
+  at vendor/vlucas/phpdotenv/src/Store/File/Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+      [2m+7 vendor frames [22m
+  8   tests/TestCase.php:25
+
+
+  Tests:    15 warnings (19 assertions)
+  Duration: 960.59s
+  Random Order Seed: 1787135135
+

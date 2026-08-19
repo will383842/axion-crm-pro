@@ -1,0 +1,22 @@
+=== docker-compose.local.yml dans main ? ===
+-rw-r--r-- 1 willi 197609  9095 Aug 19 03:56 docker-compose.local.yml
+-rw-r--r-- 1 willi 197609  3282 Jul  6 11:11 docker-compose.observability.yml
+-rw-r--r-- 1 willi 197609  9070 Aug 19 11:13 docker-compose.prod.yml
+-rw-r--r-- 1 willi 197609 12080 Aug 19 11:13 docker-compose.staging.yml
+-rw-r--r-- 1 willi 197609  1129 May 17 01:02 docker-compose.test.yml
+-rw-r--r-- 1 willi 197609  6829 Aug 16 17:34 docker-compose.yml
+--- git ls-files ---
+backend/composer.json
+backend/composer.lock
+docker-compose.local.yml
+docker-compose.observability.yml
+docker-compose.prod.yml
+docker-compose.staging.yml
+docker-compose.test.yml
+docker-compose.yml
+poc/05_dedup_performance/docker-compose.yml
+=== dans le worktree etape0 ? ===
+/c/Users/willi/Documents/Projets/crmpro-wt-etape0/docker-compose.local.yml
+=== fichier de test garde 501 ===
+PasDeStub501SousCrmEtAnalyticsTest.php
+Phase2StubsTest.php

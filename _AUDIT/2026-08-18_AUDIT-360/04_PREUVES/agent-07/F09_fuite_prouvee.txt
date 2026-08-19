@@ -1,0 +1,22 @@
+BEGIN
+INSERT 0 2
+SET
+RESET
+      cas      | lignes_vues 
+---------------+-------------
+ SANS contexte |           2
+(1 row)
+
+SET
+        cas        | lignes_vues 
+-------------------+-------------
+ contexte=Axion-IA |           1
+(1 row)
+
+RESET
+psql:<stdin>:13: ERROR:  new row for relation "tags" violates check constraint "tags_kind_check"
+DETAIL:  Failing row contains (74, 20cd81e4-de5d-4875-a759-07d64fe1f168, a07-temoin, a07-temoin, null, null, {}, 2026-08-19 09:48:28.045845+00, 2026-08-19 09:48:28.045845+00, custom, business, f, null).
+psql:<stdin>:14: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:<stdin>:15: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:<stdin>:16: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ROLLBACK

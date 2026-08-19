@@ -1,0 +1,21 @@
+=== PRODUCTION : meme test, non authentifie ===
+/up                                 -> 200
+/api/v1/config/features             -> 500
+/api/v1/dashboard/stats             -> 500
+/api/v1/companies                   -> 500
+
+--- corps (200 premiers octets) ---
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <title>Server Error</title>
+
+        <style>
+            /*! normalize.css v8.0.1 | MIT License | github.com/necolas/normalize.css */html{l
+
+=== STAGING ===
+/up                                 -> 200
+/api/v1/config/features             -> 500

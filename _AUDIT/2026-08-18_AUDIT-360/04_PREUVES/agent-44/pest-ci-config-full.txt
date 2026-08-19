@@ -1,0 +1,323 @@
+
+   PASS  Tests\Unit\AnnuaireEntreprises\HttpAnnuaireEntreprisesAddressTest
+  ✓ it exposes siège address from geo_adresse                          154.38s  
+  ✓ it reconstructs siège address from voie components when geo_adresse… 3.61s  
+  ✓ it returns null address when siège absent                            4.11s  
+[2026-08-19 11:58:53] local.INFO: Remplissage des empreintes d’opposition {"table":"opt_out","empreintes_calculees":0} 
+[2026-08-19 11:58:53] local.INFO: Remplissage des empreintes d’opposition {"table":"email_suppressions","empreintes_calculees":0} 
+[2026-08-19 11:59:44] local.INFO: Audience refresh start {"audience_id":1} 
+[2026-08-19 11:59:45] local.INFO: Audience refresh done {"audience_id":1,"members":1} 
+[2026-08-19 11:59:57] local.INFO: Audience refresh start {"audience_id":2} 
+[2026-08-19 11:59:57] local.INFO: Audience refresh done {"audience_id":2,"members":2} 
+[2026-08-19 11:59:57] local.INFO: Audience refresh start {"audience_id":2} 
+[2026-08-19 11:59:57] local.INFO: Audience refresh done {"audience_id":2,"members":2} 
+[2026-08-19 12:01:38] local.INFO: Audience refresh start {"audience_id":14} 
+[2026-08-19 12:01:40] local.INFO: Audience refresh done {"audience_id":14,"members":5000} 
+[2026-08-19 12:01:48] local.INFO: Audience refresh start {"audience_id":15} 
+[2026-08-19 12:01:49] local.INFO: Audience refresh via Bus::batch {"audience_id":15,"total":5001} 
+[2026-08-19 12:02:08] local.INFO: Audience refresh start {"audience_id":16} 
+[2026-08-19 12:02:08] local.INFO: Audience refresh via Bus::batch {"audience_id":16,"total":5001} 
+
+   FAIL  Tests\Unit\Audiences\AudienceBuilderServiceTest
+  ⨯ it preview returns count for simple criteria                       120.75s  
+  ✓ it preview uses any combinator (OR)                                  7.92s  
+  ✓ it filters by quality_score range                                    5.31s  
+  ✓ it filters by has_email contacts                                     5.01s  
+  ✓ it refresh populates audience_members                               12.79s  
+  ✓ it refresh is idempotent (run twice = same count)                    5.87s  
+  ✓ it evaluateForCompany returns matching audience IDs                  5.20s  
+  ✓ it skips invalid fields/ops silently                                 4.27s  
+  ✓ it not exclut les fiches qui matchent la condition                   5.66s  
+  ✓ it not sur un champ NULL garde la fiche : inconnu n est pas egal     5.79s  
+  ✓ it not : SQL et evaluateur en memoire donnent le MEME nombre (champ… 5.47s  
+  ✓ it not + in sur un champ NULL garde la fiche, comme en memoire       5.33s  
+  ✓ it not + neq sur un champ NULL exclut la fiche, des deux cotes       4.76s  
+  ✓ it not : is_not_null garde les fiches dont le champ est NULL         5.03s  
+  ✓ it neq garde les fiches dont le champ est NULL, comme en memoire     5.81s  
+  ✓ it not_in garde les fiches dont le champ est NULL, comme en memoire  5.52s  
+  ✓ it neq sur un champ renseigne ne change pas de comportement          6.00s  
+  ✓ it tags contains_any ne retient que les fiches portant un des slugs  6.39s  
+  ✓ it tags contains_any accepte plusieurs slugs (union, pas intersecti… 4.64s  
+  ✓ it not + tags contains_any garde les fiches SANS le tag              5.27s  
+  ✓ it tags : SQL et evaluateur en memoire donnent le MEME nombre        4.54s  
+  ✓ it tags contains_any avec une liste VIDE ne vise personne            6.38s  
+  ✓ it tags avec un operateur non supporte ne vise personne              6.07s  
+  ✓ it refresh reste en ligne a exactement 5 000 fiches (le seuil est…  11.64s  
+  ✓ it refresh bascule en Bus::batch au-dela de 5 000 fiches            16.26s  
+  ✓ it le chemin batch remet l audience a zero AVANT de dispatcher      11.15s  
+
+   PASS  Tests\Unit\Audit\AuditHashChainExtendedTest
+  ✓ AuditHashChain record retourne un id positif                         5.04s  
+  ✓ AuditHashChain verifyChain retourne true sur chaîne vide             8.80s  
+  ✓ AuditHashChain verifyChain retourne true sur 1 record               14.62s  
+  ✓ AuditHashChain verifyChain retourne true sur 10 records              9.95s  
+  ✓ AuditHashChain verifyChain détecte tampering manuel                  6.86s  
+  ✓ AuditHashChain canonical respecte l'ordre des clés                   7.58s  
+  ✓ AuditHashChain enchaine prev_hash correctement                       4.71s  
+  ✓ AuditHashChain premier record a prev_hash = 0*64                     7.22s  
+
+   PASS  Tests\Unit\Audit\AuditHashChainTest
+  ✓ first record uses the 64-zero genesis prev hash                      6.02s  
+  ✓ subsequent record chains to previous hash                            4.90s  
+  ✓ verifyChain returns true for untampered chain                        6.68s  
+  ✓ verifyChain detects tampering                                        5.43s  
+  ✓ verifyChain detects tampering on event_type (the HTTP verb)          4.77s  
+  ✓ verifyChain detects a rewritten prev_hash link                       4.67s  
+
+   FAIL  Tests\Unit\Auth\AuthServiceTest
+  ✓ AuthService::attemptLogin avec bons credentials retourne user + re… 11.69s  
+  ✓ AuthService::attemptLogin avec totp_enabled_at retourne requires_2f… 4.54s  
+  ✓ AuthService::attemptLogin avec mauvais password lance ValidationExc… 8.00s  
+  ✓ AuthService::attemptLogin reset failed_login_count après login OK    4.40s  
+  ✓ AuthService::attemptLogin rejette account avec locked_until future   5.17s  
+  ⨯ AuthService::attemptLogin trace last_login_ip + user_agent           6.24s  
+  ✓ AuthService constants exposed                                        4.25s  
+[2026-08-19 12:05:01] local.WARNING: HibpChecker: connection error {"error":"connect timeout"} 
+[2026-08-19 12:05:10] local.WARNING: HibpChecker: guzzle error {"error":"Server error: `GET https://api.pwnedpasswords.com/range/8867C` resulted in a `503 Service Unavailable` response:
+service unavailable
+"} 
+
+   PASS  Tests\Unit\Auth\HibpCheckerTest
+  ✓ HibpChecker returns 0 quand suffix absent                            8.70s  
+  ✓ HibpChecker retourne le count si suffix trouvé                       5.85s  
+  ✓ HibpChecker isBreached respecte le threshold                         6.17s  
+  ✓ HibpChecker fail-open en cas d'erreur réseau                         9.42s  
+  ✓ HibpChecker fail-open sur status non-200                             8.32s  
+  ✓ HibpChecker retourne 0 pour password vide sans appel API             5.96s  
+  ✓ HibpChecker met en cache le résultat 24h                             5.46s  
+  ✓ HibpChecker parse correctement les newlines mixtes                   4.62s  
+[2026-08-19 12:05:31] local.INFO: Mock magic link (would be emailed) {"email":"test@example.com","link":"https://app.localhost/magic-link/verify?token=5z5IPE0LQUivf3tbagKEwFmyHj2ttLrFOYSoDPudzZ58sIYKNkADDoF7LstkknVE"} 
+[2026-08-19 12:05:37] local.INFO: Magic link requested for unknown email {"email":"nobody@example.com"} 
+
+   PASS  Tests\Unit\Auth\MagicLinkServiceTest
+  ✓ issue creates a magic_links row with hashed token and 15min TTL      4.85s  
+  ✓ issue for unknown email does not throw (anti-enumeration)            6.30s  
+
+   PASS  Tests\Unit\Auth\NotPwnedPasswordRuleTest
+  ✓ NotPwnedPassword laisse passer si password non breached              6.22s  
+  ✓ NotPwnedPassword bloque si count > threshold                         7.30s  
+  ✓ NotPwnedPassword laisse passer si count = threshold                  6.90s  
+  ✓ NotPwnedPassword threshold custom respecté                           6.04s  
+  ✓ NotPwnedPassword ignore les types non-string                         5.87s  
+  ✓ NotPwnedPassword ignore les strings vides                            5.39s  
+
+   PASS  Tests\Unit\Broadcasting\AutorisationCanauxTest
+  ✓ deux UUID DIFFÉRENTS ne s’autorisent pas                             5.34s  
+  ✓ un UUID s’autorise lui-même                                          7.31s  
+  ✓ LA PREUVE DU DÉFAUT : le cast en entier autorisait deux UUID étrang… 9.60s  
+  ✓ routes/channels.php ne type plus ces paramètres en int              10.90s  
+
+   FAIL  Tests\Unit\Classification\AutoClassifierServiceTest
+  ⨯ it extracts dept 75 from postcode 75008
+  ⨯ it extracts dept 2A for Corse-du-Sud postcode 20000
+  ⨯ it extracts dept 2B for Haute-Corse postcode 20200
+  ⨯ it extracts dept 971 for DOM postcode 97110
+  ✓ it classifies effectif_range 21 as PME                              13.92s  
+  ✓ it classifies effectif_range 52 as grande entreprise                 8.42s  
+  ✓ it maps NAF 6201Z to it_saas                                         6.62s  
+  ⨯ it maps NAF 4321A to btp
+  ⨯ it falls back to "autre" for unknown NAF prefix
+  ⨯ it extracts commune code and city name from signals.ban
+
+   PASS  Tests\Unit\Classification\AutoTagApplierTest
+  ✓ matches simple equality rule                                         5.70s  
+  ✓ matches starts_with rule                                             3.44s  
+  ✓ matches all-of compound rule                                         7.96s  
+  ✓ matches any-of compound rule                                        11.44s  
+  ✓ regex operator works                                                 7.16s  
+  ✓ in operator works on array values                                    5.93s  
+  ✓ numeric comparison operators                                         5.35s  
+
+   PASS  Tests\Unit\Container\DependancesOptionnellesTest
+  ✓ les dépendances optionnelles sont RÉELLEMENT injectées par le conte… 5.66s  
+  ✓ les dépendances optionnelles sont RÉELLEMENT injectées par le conte… 8.09s  
+  ✓ les dépendances optionnelles sont RÉELLEMENT injectées par le conte… 4.63s  
+  ✓ les dépendances optionnelles sont RÉELLEMENT injectées par le conte… 7.42s  
+  ✓ le conteneur sait résoudre les classes concrètes bindées with ('App… 4.20s  
+  ✓ le conteneur sait résoudre les classes concrètes bindées with ('App… 5.67s  
+  ✓ le conteneur sait résoudre les classes concrètes bindées with ('App… 5.31s  
+
+   PASS  Tests\Unit\Dedup\DeduplicationServiceTest
+  ✓ buildDedupKey is stable for same inputs                              9.00s  
+  ✓ buildDedupKey differs across sources                                 6.67s  
+  ✓ buildDedupKey for google-maps incorporates query + coords            4.69s  
+  ✓ computeContactHash matches expected sha256 pattern                   6.35s  
+  ✓ computeContactHash is case + accents insensitive                     7.29s  
+  ✓ SOURCE_TTL_DAYS contains all 14 sources                              4.49s  
+
+   PASS  Tests\Unit\Dedup\OptOutTest
+  ✓ isOptedOut returns false when no opt_out entry                       5.73s  
+  ✓ isOptedOut returns true after addOptOut                              4.66s  
+  ✓ isOptedOut normalizes email (trim + lowercase)                       6.50s  
+  ✓ isOptedOut normalizes phone (strip separators)                       5.39s  
+  ✓ isOptedOut cross-workspace (table sans workspace_id)                 4.88s  
+
+   PASS  Tests\Unit\Domain\DomainFinderRevalidateTest
+  ✓ it marque VIVANT un site qui répond 200                              5.83s  
+  ✓ it marque VIVANT même un 404/500 (le serveur répond = hébergement v… 4.86s  
+  ✓ it marque MORT un site dont la requête lève une ConnectionException  3.27s  
+  ✓ it mélange vivant + mort dans un même lot                            4.85s  
+  ✓ it ignore (skip) les entreprises sans website                        3.16s  
+[2026-08-19 12:11:24] local.DEBUG: DomainFinder Brave skipped (no API key)  
+[2026-08-19 12:11:34] local.DEBUG: DomainFinder Brave skipped (no API key)  
+[2026-08-19 12:11:39] local.DEBUG: DomainFinder Brave skipped (no API key)  
+
+   PASS  Tests\Unit\Domain\DomainFinderServiceTest
+  ✓ it returns signals.legal.siteweb when present                        3.38s  
+  ✓ it returns first non-blacklist URL from Brave Search                 4.14s  
+  ✓ it falls back to Pages Jaunes when MOCK_SCRAPERS=false and Brave em… 8.76s  
+  ✓ it skips Pages Jaunes when MOCK_SCRAPERS=true                        5.65s  
+  ✓ it returns null when Brave key absent and PJ scrapers disabled       6.23s  
+  ✓ it returns null when denomination missing                            9.20s  
+  ✓ it pass 1 candidates = 4 variantes prioritaires                      7.70s  
+  ✓ it pass 2 candidates ajoute TLD alternatifs, deux premiers mots et…  6.32s  
+  ✓ it acronyme non généré si moins de 3 tokens                          7.37s  
+
+   PASS  Tests\Unit\Email\EmailFinderServiceTest
+  ✓ PATTERNS contains 18 entries                                         6.33s  
+  ✓ generateCandidates produces 12+ unique valid emails for typical inp… 9.43s  
+  ✓ renderPattern handles accents + apostrophes                          8.13s  
+  ✓ aucun accent ne peut faire entrer de ponctuation dans une adresse    5.62s  
+  ✓ les initiales aussi sont ASCII (motif {f}.{last})                    6.70s  
+  ✓ detectPatternFromKnownEmails returns dominant pattern                6.14s  
+  ✓ verifyEmail returns skipped_catchall_provider for big mail provider… 5.05s  
+  ✓ verifyEmail returns unknown when no Hunter verifier wired (Sprint H… 4.49s  
+  ✓ verifyEmail returns invalid for malformed addresses (Sprint H2)      5.68s  
+[2026-08-19 12:13:33] local.WARNING: Hunter API error {"status":503,"email":"hi@acme.fr"} 
+[2026-08-19 12:13:39] local.WARNING: Hunter API error {"status":503,"email":"hi@acme.fr"} 
+
+   PASS  Tests\Unit\Email\HunterEmailVerifierTest
+  ✓ it returns unknown when API key is missing                           5.78s  
+  ✓ it returns deliverable result when Hunter returns deliverable        5.16s  
+  ✓ it returns unknown with http_error when API responds 5xx            12.41s  
+  ✓ it does NOT cache a transport failure — un 5xx doit rester réessaya… 5.91s  
+  ✓ it caches result for 30 days to avoid quota waste                    5.23s  
+
+   PASS  Tests\Unit\Email\MxEmailValidatorTest
+  ✓ it returns invalid for malformed syntax                              5.21s  
+  ✓ it returns disposable for known throwaway domains                    5.59s  
+  ✓ it returns role for role-based prefixes                              4.05s  
+  ✓ it returns risky for free providers (gmail, orange, etc) — assuming… 5.50s  
+  ✓ it returns invalid when domain has no MX records                     4.61s  
+  ✓ it full validate returns structured payload                          4.73s  
+  ✓ it lowercases and trims input                                        4.67s  
+  ✓ it rejects emails longer than 254 chars (RFC 5321)                   4.73s  
+
+   PASS  Tests\Unit\Email\SmtpProberTest
+  ✓ mock prober returns valid for known email                            7.08s  
+  ✓ mock prober detects role email                                       6.28s  
+  ✓ mock prober detects disposable domain                               13.60s  
+  ✓ mock prober defaults to valid for unknown email in fixture           9.23s  
+  ✓ email normalization (trim + lowercase)                               7.40s  
+
+   PASS  Tests\Unit\Events\BroadcastEventsTest
+  ✓ ScrapeJobCompleted broadcastWith expose les bons champs              8.41s  
+  ✓ ScrapeJobCompleted broadcast sur channel private workspace          10.23s  
+  ✓ ScrapeJobCompleted alias broadcast name                              9.13s  
+  ✓ CompanyEnriched payload                                             17.29s  
+  ✓ NotificationCreated route vers channel user si userId fourni        15.29s  
+  ✓ NotificationCreated route vers channel workspace si userId null     28.26s  
+  ✓ NotificationCreated payload contient severity                        7.61s  
+[2026-08-19 12:17:03] local.WARNING: FranceTravailDiscovery: OAuth token unavailable, returning empty  
+[2026-08-19 12:17:20] local.DEBUG: FranceTravailDiscovery INSEE check failed {"siren":"123456789","error":"HTTP request returned status code 404:
+{\"header\":{\"statut\":404,\"message\":\"Aucun élément trouvé pour le siren 123456789\"}}
+"} 
+[2026-08-19 12:17:21] local.DEBUG: FranceTravailDiscovery INSEE check failed {"siren":"987654321","error":"HTTP request returned status code 404:
+{\"header\":{\"statut\":404,\"message\":\"Aucun élément trouvé pour le siren 987654321\"}}
+"} 
+[2026-08-19 12:17:56] local.DEBUG: FranceTravailDiscovery INSEE check failed {"siren":"444444444","error":"INSEE down"} 
+
+   PASS  Tests\Unit\FranceTravail\FranceTravailDiscoveryClientTest
+  ✓ it returns empty when client credentials missing                    17.97s  
+  ✓ it returns deduplicated entreprises from offres                     18.34s  
+  ✓ it returns empty on 204 No Content                                   5.05s  
+  ✓ it skips offres with invalid SIRET                                   6.64s  
+  ✓ it Sprint H3: filters out radiées entreprises via INSEE check        8.51s  
+  ✓ it Sprint H3: graceful fallback if InseeClient throws               14.96s  
+
+   PASS  Tests\Unit\Http\ProxiedHttpClientTest
+  ✓ it reports proxy disabled by default                                 7.47s  
+  ✓ it reports proxy enabled when flag set                               5.09s  
+  ✓ it builds a PendingRequest without proxy option when disabled        3.84s  
+  ✓ it applies proxy option when enabled with credentials                4.19s  
+  ✓ it skips proxy option when enabled but credentials missing           4.46s  
+
+   PASS  Tests\Unit\Http\SsrfGuardExtendedTest
+  ✓ SsrfGuard rejette URL invalide                                       4.64s  
+  ✓ SsrfGuard rejette scheme non-http(s)                                 3.69s  
+  ✓ SsrfGuard rejette ftp                                                5.55s  
+  ✓ SsrfGuard rejette URL vide                                           2.40s  
+  ✓ SsrfGuard rejette metadata AWS                                       4.26s  
+  ✓ SsrfGuard rejette metadata GCP                                       5.57s  
+  ✓ SsrfGuard rejette metadata Azure                                     6.42s  
+  ✓ SsrfGuard rejette metadata Alibaba                                   5.37s  
+  ✓ SsrfGuard rejette localhost                                          6.24s  
+  ✓ SsrfGuard rejette 127.0.0.1                                          5.62s  
+  ✓ SsrfGuard rejette 0.0.0.0                                            2.90s  
+  ✓ SsrfGuard rejette 10.0.0.0/8                                         3.72s  
+  ✓ SsrfGuard rejette 192.168.0.0/16                                     6.24s  
+  ✓ SsrfGuard rejette 172.16-31                                          5.94s  
+  ✓ SsrfGuard rejette 169.254.x.x link-local                             5.27s  
+  ✓ SsrfGuard ensure() lance exception si denied                         4.28s  
+
+   PASS  Tests\Unit\Http\SsrfGuardTest
+  ✓ blocks AWS metadata endpoint                                         5.72s  
+  ✓ blocks the whole link-local range 169.254/16 by CIDR (not by hostna… 3.62s  
+  ✓ blocks GCP metadata hostname                                         4.99s  
+  ✓ blocks localhost                                                     4.02s  
+  ✓ blocks 127.0.0.1                                                     5.41s  
+  ✓ blocks RFC 1918 192.168/16                                           3.82s  
+  ✓ blocks RFC 1918 10/8                                                 2.92s  
+  ✓ blocks RFC 1918 172.16/12                                            3.64s  
+  ✓ blocks CGNAT 100.64/10                                               2.89s  
+  ✓ blocks ftp scheme                                                    3.14s  
+  ✓ blocks file scheme                                                   3.98s  
+  ✓ ensure throws when blocked                                           3.87s  
+  ✓ invalid URL is rejected                                              2.84s  
+
+   PASS  Tests\Unit\Legal\MentionsLegalesScraperServiceTest
+  ✓ it extracts email and phone from mentions-legales page               3.84s  
+  ✓ it skips technical email prefixes                                    2.99s  
+  ✓ it returns false when body too short on all paths                    3.24s  
+  ✓ it returns false when website missing                                2.68s  
+  ✓ it tries fallback path when first 404                                3.29s  
+  ✓ it captures ALL emails and ALL phones (not just the first)           3.58s  
+  ✓ it deduces service roles and picks a service email as generic        4.97s  
+
+   PASS  Tests\Unit\Media\ImportMediaFromArcomTest
+  ✓ it parse la base ARCOM et dédoublonne les stations par nom+type      3.60s  
+
+   PASS  Tests\Unit\Media\PressKitImportTest
+  ✓ it parse 193 émissions TV bien formées                               7.83s  
+  ✓ it parse les médias de diffusion national + départementaux           4.13s  
+  ✓ it rejette un email bidon et garde un email rédaction (role)         4.28s  
+
+   PASS  Tests\Unit\PhpstanBaselineNeGrossitPasTest
+  ✓ le parseur de baseline lit vraiment des entrées                      2.80s  
+  ✓ la baseline PHPStan ne grossit pas                                   3.91s  
+  ✓ l'en-tête de la baseline annonce les nombres réellement présents     3.63s  
+  ✓ aucune entrée de baseline ne vise le socle CRM                       5.57s  
+  ✓ reportUnmatchedIgnoredErrors reste activé                            6.70s  
+
+   PASS  Tests\Unit\Rotations\SearchEngineRotatorTest
+  ✓ SearchEngineRotator retourne null si aucun moteur enabled            7.13s  
+  ✓ SearchEngineRotator retourne un engine si dispo                      5.03s  
+  ✓ SearchEngineRotator pondère par weight statistiquement               5.90s  
+  ✓ SearchEngineRotator retourne null si total weight = 0                6.25s  
+
+   PASS  Tests\Unit\Rotations\WeightedRoundRobinTest
+  ✓ WeightedRoundRobin pick retourne null si aucun item                  6.64s  
+  ✓ WeightedRoundRobin pick retourne un item disponible                  5.32s  
+  ✓ WeightedRoundRobin incrémente le compteur metadata.count             3.19s  
+  ✓ WeightedRoundRobin skip items disabled                               4.29s  
+  ✓ WeightedRoundRobin respecte cooldown                                 3.68s  
+  ✓ WeightedRoundRobin pondère par weight (1 vs 10)                      3.81s  
+  ✓ WeightedRoundRobin pick ne croise pas les workspaces                 4.85s  
+[2026-08-19 12:22:50] local.WARNING: HibpChecker: unexpected {"error":"GuzzleHttp\\PrepareBodyMiddleware::__invoke(): Return value must be of type GuzzleHttp\\Promise\\PromiseInterface, GuzzleHttp\\Psr7\\Response returned"} 
+
+   PASS  Tests\Unit\Rules\PasswordResetWithHibpTest
+  ✓ HIBP integration : password "password" est compromis                 2.69s  
+  ✓ HIBP intégration : password long custom est sain                     2.68s  
+  ✓ HIBP cache prefix unique par 5 chars du sha1                         3.55s  
+  ✓ HIBP user-agent inclus dans la requête                               6.05s  
+[2026-08-19 12:22:54] local.DEBUG: GooglePlacesClient skipped (no API key)  

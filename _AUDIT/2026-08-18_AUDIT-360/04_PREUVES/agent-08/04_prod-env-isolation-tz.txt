@@ -1,0 +1,17 @@
+=== PROD : env du conteneur api (docker inspect, lecture seule) ===
+APP_TIMEZONE=Europe/Paris
+DB_USERNAME=axion
+CRM_INGEST_CANDIDATES_ENABLED=true
+CRM_DB_APP_ROLE_ENABLED=true
+CRM_INGEST_ENABLED=true
+SITE_SYNC_HMAC_SECRET=***MASQUE***
+DB_TIMEZONE=Europe/Paris
+APP_ENV=production
+
+=== PROD : role de connexion effectif + attributs (lecture seule) ===
+axion super=true bypassrls=true
+axion_app super=false bypassrls=false
+
+=== PROD : timezone session + parametre serveur ===
+Etc/UTC
+2026-08-19 09:52:05.560636+00|Etc/UTC

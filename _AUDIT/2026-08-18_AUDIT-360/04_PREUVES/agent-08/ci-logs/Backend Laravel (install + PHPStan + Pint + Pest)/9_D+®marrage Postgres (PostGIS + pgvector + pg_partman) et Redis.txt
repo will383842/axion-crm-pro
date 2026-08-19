@@ -1,0 +1,227 @@
+﻿2026-08-19T09:43:14.5523706Z ##[group]Run set -euo pipefail
+2026-08-19T09:43:14.5524077Z [36;1mset -euo pipefail[0m
+2026-08-19T09:43:14.5524475Z [36;1mIMG="ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman"[0m
+2026-08-19T09:43:14.5525069Z [36;1m# Les migrations créent postgis ET vector : une image postgres nue ne[0m
+2026-08-19T09:43:14.5525588Z [36;1m# peut pas faire tourner la suite Feature. On réutilise donc l'image[0m
+2026-08-19T09:43:14.5526075Z [36;1m# de prod ; à défaut on la reconstruit depuis Dockerfile.postgres.[0m
+2026-08-19T09:43:14.5526587Z [36;1mecho "$GHCR_TOKEN" | docker login ghcr.io -u "will383842" --password-stdin[0m
+2026-08-19T09:43:14.5527090Z [36;1m# ⚠️ 2026-08-16 — ce repli faisait dépendre un gate BLOQUANT de la[0m
+2026-08-19T09:43:14.5527562Z [36;1m# joignabilité de `deb.debian.org` et de deux clones GitHub :[0m
+2026-08-19T09:43:14.5528034Z [36;1m# `Dockerfile.postgres` compile pgvector et pg_partman depuis les[0m
+2026-08-19T09:43:14.5528504Z [36;1m# sources. Une PR Dependabot est tombée dessus (« Failed to fetch[0m
+2026-08-19T09:43:14.5529012Z [36;1m# libstdc++-10-dev … Connection reset by peer ») et a été signalée[0m
+2026-08-19T09:43:14.5529492Z [36;1m# rouge alors que le diff ne touchait qu'un paquet frontend. Un gate[0m
+2026-08-19T09:43:14.5529963Z [36;1m# qui rougit pour une raison étrangère au diff finit ignoré — c'est[0m
+2026-08-19T09:43:14.5530391Z [36;1m# le même piège que la police téléchargée au build.[0m
+2026-08-19T09:43:14.5530713Z [36;1m#[0m
+2026-08-19T09:43:14.5531012Z [36;1m# On retente donc, le tirage étant transitoire : d'abord le `pull`[0m
+2026-08-19T09:43:14.5531428Z [36;1m# (le chemin normal, ~10 s), puis le build de repli.[0m
+2026-08-19T09:43:14.5531806Z [36;1mreessayer() { # reessayer <tentatives> <commande...>[0m
+2026-08-19T09:43:14.5532347Z [36;1m  local n=$1; shift[0m
+2026-08-19T09:43:14.5532602Z [36;1m  for i in $(seq 1 "$n"); do[0m
+2026-08-19T09:43:14.5532883Z [36;1m    if "$@"; then return 0; fi[0m
+2026-08-19T09:43:14.5533215Z [36;1m    echo "::warning::échec de « $* » (tentative $i/$n)"[0m
+2026-08-19T09:43:14.5533561Z [36;1m    sleep $((i * 10))[0m
+2026-08-19T09:43:14.5533803Z [36;1m  done[0m
+2026-08-19T09:43:14.5534016Z [36;1m  return 1[0m
+2026-08-19T09:43:14.5534229Z [36;1m}[0m
+2026-08-19T09:43:14.5534470Z [36;1mif ! reessayer 3 docker pull "$IMG"; then[0m
+2026-08-19T09:43:14.5534966Z [36;1m  echo "::notice::Image GHCR indisponible — reconstruction locale depuis Dockerfile.postgres"[0m
+2026-08-19T09:43:14.5535554Z [36;1m  reessayer 2 docker build -f Dockerfile.postgres -t "$IMG" .[0m
+2026-08-19T09:43:14.5535909Z [36;1mfi[0m
+2026-08-19T09:43:14.5536225Z [36;1m# --network host : PAS de publication de port. Avec `-p 5432:5432`, la[0m
+2026-08-19T09:43:14.5536700Z [36;1m# suite (qui ouvre une connexion PDO par test) traversait le proxy[0m
+2026-08-19T09:43:14.5537175Z [36;1m# userland de Docker, qui lâchait quelques connexions par exécution[0m
+2026-08-19T09:43:14.5537634Z [36;1m# (« server closed the connection unexpectedly ») — alors que les[0m
+2026-08-19T09:43:14.5538109Z [36;1m# journaux Postgres ne montraient AUCUN crash. Résultat : une CI qui[0m
+2026-08-19T09:43:14.5538783Z [36;1m# rougissait au hasard, donc un gate sans valeur. En réseau hôte,[0m
+2026-08-19T09:43:14.5539201Z [36;1m# Postgres écoute directement sur 127.0.0.1:5432.[0m
+2026-08-19T09:43:14.5539595Z [36;1m# --shm-size : /dev/shm de 64 Mo par défaut, trop juste.[0m
+2026-08-19T09:43:14.5540054Z [36;1m# fsync/full_page_writes/synchronous_commit off : base jetable de CI.[0m
+2026-08-19T09:43:14.5540523Z [36;1m# 2026-08-18 (étape 0) — MÊME locale que la production et que[0m
+2026-08-19T09:43:14.5540970Z [36;1m# `docker-compose.yml` (`--lc-collate=C --lc-ctype=C`). Sans cet[0m
+2026-08-19T09:43:14.5541411Z [36;1m# argument, la base de CI naissait en `en_US.utf8` : `lower()` y[0m
+2026-08-19T09:43:14.5541859Z [36;1m# abaisse les majuscules accentuées, pas en prod — la CI validait[0m
+2026-08-19T09:43:14.5542619Z [36;1m# une sémantique que la production n'a pas (empreintes d'opposition,[0m
+2026-08-19T09:43:14.5543280Z [36;1m# tris). Un test qui décrit la prod y rougissait sans que rien ne[0m
+2026-08-19T09:43:14.5543658Z [36;1m# l'explique.[0m
+2026-08-19T09:43:14.5543937Z [36;1mdocker run -d --name axion-ci-postgres \[0m
+2026-08-19T09:43:14.5544256Z [36;1m  --network host \[0m
+2026-08-19T09:43:14.5544505Z [36;1m  --shm-size=1g \[0m
+2026-08-19T09:43:14.5544766Z [36;1m  -e POSTGRES_USER=axion \[0m
+2026-08-19T09:43:14.5545062Z [36;1m  -e POSTGRES_PASSWORD=axion_dev_only \[0m
+2026-08-19T09:43:14.5545380Z [36;1m  -e POSTGRES_DB=axion_crm_test \[0m
+2026-08-19T09:43:14.5545782Z [36;1m  -e POSTGRES_INITDB_ARGS="--encoding=UTF-8 --lc-collate=C --lc-ctype=C" \[0m
+2026-08-19T09:43:14.5546201Z [36;1m  "$IMG" \[0m
+2026-08-19T09:43:14.5546517Z [36;1m  -c fsync=off -c full_page_writes=off -c synchronous_commit=off \[0m
+2026-08-19T09:43:14.5546902Z [36;1m  -c max_connections=300[0m
+2026-08-19T09:43:14.5547271Z [36;1mdocker run -d --name axion-ci-redis --network host redis:7.2-alpine[0m
+2026-08-19T09:43:14.5547748Z [36;1m# ⚠️ NE PAS tester la disponibilité avec `pg_isready` sur le socket[0m
+2026-08-19T09:43:14.5548219Z [36;1m# local : pendant son initialisation, l'entrypoint de l'image démarre[0m
+2026-08-19T09:43:14.5548712Z [36;1m# un serveur TEMPORAIRE en socket UNIX seulement (`listen_addresses=''`),[0m
+2026-08-19T09:43:14.5549199Z [36;1m# puis l'arrête et redémarre le vrai. `pg_isready` répond OK à ce[0m
+2026-08-19T09:43:14.5549640Z [36;1m# serveur temporaire — la CI enchaînait donc sur des tests qui[0m
+2026-08-19T09:43:14.5550084Z [36;1m# tombaient sur « Connection refused » / « server closed the[0m
+2026-08-19T09:43:14.5550554Z [36;1m# connection unexpectedly » le temps du vrai démarrage. C'était ça, le[0m
+2026-08-19T09:43:14.5551043Z [36;1m# flake qui rougissait la CI au hasard depuis le début de la soirée.[0m
+2026-08-19T09:43:14.5551524Z [36;1m# On attend donc une vraie connexion TCP, plus la ligne de journal du[0m
+2026-08-19T09:43:14.5552075Z [36;1m# démarrage définitif.[0m
+2026-08-19T09:43:14.5552353Z [36;1mfor i in $(seq 1 90); do[0m
+2026-08-19T09:43:14.5552703Z [36;1m  if docker exec -e PGPASSWORD=axion_dev_only axion-ci-postgres \[0m
+2026-08-19T09:43:14.5553238Z [36;1m       psql -h 127.0.0.1 -p 5432 -U axion -d axion_crm_test -tAc 'select 1' >/dev/null 2>&1 \[0m
+2026-08-19T09:43:14.5553880Z [36;1m     && docker logs axion-ci-postgres 2>&1 | grep -q 'database system is ready to accept connections'; then[0m
+2026-08-19T09:43:14.5554510Z [36;1m    echo "Postgres accepte les connexions TCP après ${i} tentative(s)."[0m
+2026-08-19T09:43:14.5554894Z [36;1m    exit 0[0m
+2026-08-19T09:43:14.5555104Z [36;1m  fi[0m
+2026-08-19T09:43:14.5555308Z [36;1m  sleep 2[0m
+2026-08-19T09:43:14.5555522Z [36;1mdone[0m
+2026-08-19T09:43:14.5555817Z [36;1mecho "::error::Postgres n'est jamais devenu disponible en TCP"[0m
+2026-08-19T09:43:14.5556225Z [36;1mdocker logs axion-ci-postgres | tail -50[0m
+2026-08-19T09:43:14.5556530Z [36;1mexit 1[0m
+2026-08-19T09:43:14.5596895Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:43:14.5597163Z env:
+2026-08-19T09:43:14.5597378Z   COMPOSER_PROCESS_TIMEOUT: 0
+2026-08-19T09:43:14.5597830Z   COMPOSER_NO_INTERACTION: 1
+2026-08-19T09:43:14.5598080Z   COMPOSER_NO_AUDIT: 1
+2026-08-19T09:43:14.5600865Z   GHCR_TOKEN: ***
+2026-08-19T09:43:14.5601093Z ##[endgroup]
+2026-08-19T09:43:14.8986545Z 
+2026-08-19T09:43:14.8987138Z Login Succeeded
+2026-08-19T09:43:14.9003020Z WARNING! Your credentials are stored unencrypted in '/home/runner/.docker/config.json'.
+2026-08-19T09:43:14.9003854Z Configure a credential helper to remove this warning. See
+2026-08-19T09:43:14.9004269Z https://docs.docker.com/go/credential-store/
+2026-08-19T09:43:14.9004490Z 
+2026-08-19T09:43:15.3880716Z 16-3.5-vector-partman: Pulling from will383842/axion-crm-pro-postgres
+2026-08-19T09:43:15.4923464Z ccaf924377f9: Pulling fs layer
+2026-08-19T09:43:15.4924335Z 083e2f1bcc41: Pulling fs layer
+2026-08-19T09:43:15.4925006Z 08811b73c39a: Pulling fs layer
+2026-08-19T09:43:15.4925763Z daf261d971ce: Pulling fs layer
+2026-08-19T09:43:15.4926096Z aa55c9ca3dac: Pulling fs layer
+2026-08-19T09:43:15.4926443Z b3e32e023cac: Pulling fs layer
+2026-08-19T09:43:15.4926805Z 3168663910ad: Pulling fs layer
+2026-08-19T09:43:15.4927164Z 619276d2f7a0: Pulling fs layer
+2026-08-19T09:43:15.4927447Z 6c39b7450da9: Pulling fs layer
+2026-08-19T09:43:15.4927856Z e763ecdd6345: Pulling fs layer
+2026-08-19T09:43:15.4928263Z 9f6a1c0e5f9e: Pulling fs layer
+2026-08-19T09:43:15.4928634Z cf3c9f1d0bb3: Pulling fs layer
+2026-08-19T09:43:15.4929000Z 8d66c163f547: Pulling fs layer
+2026-08-19T09:43:15.4929362Z b068b43f0b64: Pulling fs layer
+2026-08-19T09:43:15.4929730Z ad3a7d41b081: Pulling fs layer
+2026-08-19T09:43:15.4930115Z 4f4fb700ef54: Pulling fs layer
+2026-08-19T09:43:15.4930505Z 230348c0dca1: Pulling fs layer
+2026-08-19T09:43:15.4930889Z 2ea57890ddef: Pulling fs layer
+2026-08-19T09:43:15.4931267Z e42cdb82462e: Pulling fs layer
+2026-08-19T09:43:15.4931632Z 5998a9e5f40a: Pulling fs layer
+2026-08-19T09:43:15.4932189Z daf261d971ce: Waiting
+2026-08-19T09:43:15.4932519Z aa55c9ca3dac: Waiting
+2026-08-19T09:43:15.4932837Z b3e32e023cac: Waiting
+2026-08-19T09:43:15.4933092Z 3168663910ad: Waiting
+2026-08-19T09:43:15.4933316Z ad3a7d41b081: Waiting
+2026-08-19T09:43:15.4933522Z 619276d2f7a0: Waiting
+2026-08-19T09:43:15.4933725Z cf3c9f1d0bb3: Waiting
+2026-08-19T09:43:15.4933935Z 6c39b7450da9: Waiting
+2026-08-19T09:43:15.4934138Z 8d66c163f547: Waiting
+2026-08-19T09:43:15.4934342Z b068b43f0b64: Waiting
+2026-08-19T09:43:15.4934551Z 4f4fb700ef54: Waiting
+2026-08-19T09:43:15.4934765Z 230348c0dca1: Waiting
+2026-08-19T09:43:15.4934983Z 5998a9e5f40a: Waiting
+2026-08-19T09:43:15.4935198Z 2ea57890ddef: Waiting
+2026-08-19T09:43:15.4935405Z e42cdb82462e: Waiting
+2026-08-19T09:43:15.4935615Z 9f6a1c0e5f9e: Waiting
+2026-08-19T09:43:15.6038869Z 083e2f1bcc41: Verifying Checksum
+2026-08-19T09:43:15.6039466Z 083e2f1bcc41: Download complete
+2026-08-19T09:43:15.6367746Z 08811b73c39a: Verifying Checksum
+2026-08-19T09:43:15.6370037Z 08811b73c39a: Download complete
+2026-08-19T09:43:15.6869879Z ccaf924377f9: Verifying Checksum
+2026-08-19T09:43:15.6870411Z ccaf924377f9: Download complete
+2026-08-19T09:43:15.7468423Z daf261d971ce: Verifying Checksum
+2026-08-19T09:43:15.7469375Z daf261d971ce: Download complete
+2026-08-19T09:43:15.8007874Z aa55c9ca3dac: Verifying Checksum
+2026-08-19T09:43:15.8008444Z aa55c9ca3dac: Download complete
+2026-08-19T09:43:15.8185340Z b3e32e023cac: Download complete
+2026-08-19T09:43:15.8664358Z 3168663910ad: Verifying Checksum
+2026-08-19T09:43:15.8665188Z 3168663910ad: Download complete
+2026-08-19T09:43:15.9126934Z 619276d2f7a0: Download complete
+2026-08-19T09:43:15.9906587Z e763ecdd6345: Download complete
+2026-08-19T09:43:16.0297267Z 9f6a1c0e5f9e: Verifying Checksum
+2026-08-19T09:43:16.0297891Z 9f6a1c0e5f9e: Download complete
+2026-08-19T09:43:16.1031122Z cf3c9f1d0bb3: Download complete
+2026-08-19T09:43:16.1485655Z 8d66c163f547: Download complete
+2026-08-19T09:43:16.2184099Z b068b43f0b64: Verifying Checksum
+2026-08-19T09:43:16.2184694Z b068b43f0b64: Download complete
+2026-08-19T09:43:16.3090692Z 4f4fb700ef54: Verifying Checksum
+2026-08-19T09:43:16.3091454Z 4f4fb700ef54: Download complete
+2026-08-19T09:43:16.4801130Z 230348c0dca1: Verifying Checksum
+2026-08-19T09:43:16.4809126Z 230348c0dca1: Download complete
+2026-08-19T09:43:16.6016321Z 2ea57890ddef: Verifying Checksum
+2026-08-19T09:43:16.6016885Z 2ea57890ddef: Download complete
+2026-08-19T09:43:16.6705261Z 6c39b7450da9: Verifying Checksum
+2026-08-19T09:43:16.6705748Z 6c39b7450da9: Download complete
+2026-08-19T09:43:16.7947820Z 5998a9e5f40a: Verifying Checksum
+2026-08-19T09:43:16.7948603Z 5998a9e5f40a: Download complete
+2026-08-19T09:43:16.8601890Z e42cdb82462e: Verifying Checksum
+2026-08-19T09:43:16.8603322Z e42cdb82462e: Download complete
+2026-08-19T09:43:17.0406584Z ccaf924377f9: Pull complete
+2026-08-19T09:43:17.2768014Z ad3a7d41b081: Verifying Checksum
+2026-08-19T09:43:17.2768415Z ad3a7d41b081: Download complete
+2026-08-19T09:43:17.6138830Z 083e2f1bcc41: Pull complete
+2026-08-19T09:43:17.7417670Z 08811b73c39a: Pull complete
+2026-08-19T09:43:17.7817842Z daf261d971ce: Pull complete
+2026-08-19T09:43:18.0748309Z aa55c9ca3dac: Pull complete
+2026-08-19T09:43:18.1288844Z b3e32e023cac: Pull complete
+2026-08-19T09:43:18.1362468Z 3168663910ad: Pull complete
+2026-08-19T09:43:18.1459094Z 619276d2f7a0: Pull complete
+2026-08-19T09:43:21.0201095Z 6c39b7450da9: Pull complete
+2026-08-19T09:43:21.0318169Z e763ecdd6345: Pull complete
+2026-08-19T09:43:21.0435677Z 9f6a1c0e5f9e: Pull complete
+2026-08-19T09:43:21.0514045Z cf3c9f1d0bb3: Pull complete
+2026-08-19T09:43:21.0600299Z 8d66c163f547: Pull complete
+2026-08-19T09:43:21.0699533Z b068b43f0b64: Pull complete
+2026-08-19T09:43:22.6202447Z ad3a7d41b081: Pull complete
+2026-08-19T09:43:22.6286539Z 4f4fb700ef54: Pull complete
+2026-08-19T09:43:22.6389741Z 230348c0dca1: Pull complete
+2026-08-19T09:43:22.6480669Z 2ea57890ddef: Pull complete
+2026-08-19T09:43:22.9760408Z e42cdb82462e: Pull complete
+2026-08-19T09:43:22.9832925Z 5998a9e5f40a: Pull complete
+2026-08-19T09:43:22.9874458Z Digest: sha256:7ec90cff5540804956ec0686efa58a6a20f7b76d863a3d1eba31211adbdbbfe1
+2026-08-19T09:43:22.9884713Z Status: Downloaded newer image for ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman
+2026-08-19T09:43:22.9894539Z ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman
+2026-08-19T09:43:23.0176560Z 47b9de351333df9afae2339f6189908ada61c15265b918761cb090ffcd8939b7
+2026-08-19T09:43:23.1449056Z Unable to find image 'redis:7.2-alpine' locally
+2026-08-19T09:43:23.5224881Z 7.2-alpine: Pulling from library/redis
+2026-08-19T09:43:23.6439068Z 897d797d2723: Pulling fs layer
+2026-08-19T09:43:23.6440040Z 8de862b234c6: Pulling fs layer
+2026-08-19T09:43:23.6440932Z 14159f373715: Pulling fs layer
+2026-08-19T09:43:23.6441729Z ed5c2da5e6d8: Pulling fs layer
+2026-08-19T09:43:23.6442446Z d377fc82d0d5: Pulling fs layer
+2026-08-19T09:43:23.6443212Z 4f4fb700ef54: Pulling fs layer
+2026-08-19T09:43:23.6443698Z 8a9ecfc63161: Pulling fs layer
+2026-08-19T09:43:23.6444141Z d377fc82d0d5: Waiting
+2026-08-19T09:43:23.6444486Z 4f4fb700ef54: Waiting
+2026-08-19T09:43:23.6444804Z 8a9ecfc63161: Waiting
+2026-08-19T09:43:23.6445128Z ed5c2da5e6d8: Waiting
+2026-08-19T09:43:23.7233067Z 8de862b234c6: Verifying Checksum
+2026-08-19T09:43:23.7234533Z 8de862b234c6: Download complete
+2026-08-19T09:43:23.7264798Z 14159f373715: Verifying Checksum
+2026-08-19T09:43:23.7265261Z 14159f373715: Download complete
+2026-08-19T09:43:23.7570416Z 897d797d2723: Verifying Checksum
+2026-08-19T09:43:23.7571246Z 897d797d2723: Download complete
+2026-08-19T09:43:23.8010476Z d377fc82d0d5: Verifying Checksum
+2026-08-19T09:43:23.8011629Z d377fc82d0d5: Download complete
+2026-08-19T09:43:23.8466045Z 4f4fb700ef54: Verifying Checksum
+2026-08-19T09:43:23.8466588Z 4f4fb700ef54: Download complete
+2026-08-19T09:43:23.8508384Z ed5c2da5e6d8: Verifying Checksum
+2026-08-19T09:43:23.8508854Z ed5c2da5e6d8: Download complete
+2026-08-19T09:43:23.8780370Z 8a9ecfc63161: Verifying Checksum
+2026-08-19T09:43:23.8781280Z 8a9ecfc63161: Download complete
+2026-08-19T09:43:23.8861204Z 897d797d2723: Pull complete
+2026-08-19T09:43:23.9083730Z 8de862b234c6: Pull complete
+2026-08-19T09:43:24.0585829Z 14159f373715: Pull complete
+2026-08-19T09:43:24.2720207Z ed5c2da5e6d8: Pull complete
+2026-08-19T09:43:24.2799125Z d377fc82d0d5: Pull complete
+2026-08-19T09:43:24.2892767Z 4f4fb700ef54: Pull complete
+2026-08-19T09:43:24.2975499Z 8a9ecfc63161: Pull complete
+2026-08-19T09:43:24.3008043Z Digest: sha256:05a97a479bc73de66f087dc05b569010772880f778cc8671fa6b8aadee32e5c6
+2026-08-19T09:43:24.3020905Z Status: Downloaded newer image for redis:7.2-alpine
+2026-08-19T09:43:24.3132438Z 7f41552e32c41298a91bd3262e6e369e7fe7ed5752a4db700a0fd81de5611ae3
+2026-08-19T09:43:26.5926236Z Postgres accepte les connexions TCP après 2 tentative(s).

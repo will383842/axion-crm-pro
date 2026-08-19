@@ -1,0 +1,63 @@
+# Agent 11 — epreuve d'etancheite, base jetable axion_crm_a11, role axion_app (NON-proprietaire, NOBYPASSRLS)
+# 2 lignes semees par table : une dans l'espace A (1111...), une dans l'espace B (2222...)
+       table_name        | rls | force_rls | npol | n_sans_contexte | n_contexte_a | n_contexte_a_hors_a | n_contexte_b |       verdict       
+-------------------------+-----+-----------+------+-----------------+--------------+---------------------+--------------+---------------------
+ activities              | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ ai_act_register         | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ analytics_attribution   | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ analytics_cohorts       | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ analytics_daily_rollups | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ analytics_funnels       | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ analytics_kpis          | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ audience_members        | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ business_events         | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ campaigns               | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ candidate_tag           | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ candidates              | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ companies               | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ company_tag             | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ contacts                | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ coverage_zones          | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ crm_lost_reasons        | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ crm_notes               | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ crm_pipelines           | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ crm_tasks               | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ deals                   | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ dnc_lists               | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ duplicate_flags         | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ email_audiences         | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ email_events            | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ email_inboxes           | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ email_sends             | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ email_templates         | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ email_threads           | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ email_warmup_pools      | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ health_practitioners    | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ invitations             | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ journalists             | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ linkedin_accounts       | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ linkedin_invitations    | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ linkedin_messages       | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ linkedin_profiles_cache | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ linkedin_sequences      | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ llm_usage               | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ llm_use_cases           | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ media                   | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ notifications           | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ pipeline_stages         | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ proxy_providers_config  | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ proxy_usage_log         | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ rgpd_requests           | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ rotations               | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ saved_views             | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ scraper_runs            | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ scraping_campaigns      | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ strategic_keywords      | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ tags                    | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ unsubscribes            | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ web_vital_samples       | t   | t         |    1 |               0 |            1 |                   0 |            1 | ETANCHE
+ sessions                | f   | f         |    0 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ user_workspaces         | f   | f         |    0 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ email_verification_logs | t   | t         |    2 |               2 |            1 |                   0 |            1 | FUITE-SANS-CONTEXTE
+(57 rows)
+

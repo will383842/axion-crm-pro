@@ -1,0 +1,52 @@
+
+   FAIL  Tests\Unit\PhpstanBaselineNeGrossitPasTest
+  ⨯ la baseline PHPStan ne grossit pas                                 217.83s  
+  ✓ aucune entrée de baseline ne vise le socle CRM                       5.53s  
+  ⨯ l'en-tête de la baseline annonce les nombres réellement présents     6.28s  
+  ✓ le parseur de baseline lit vraiment des entrées                      6.70s  
+  ✓ reportUnmatchedIgnoredErrors reste activé                           12.22s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\PhpstanBaselineNeGrossitPasTest > la baseline PHPStan…    
+  phpstan-baseline.neon contient 212 entrées pour un plafond de 211. La baseline ne peut que DÉCROÎTRE : corrige le code plutôt que de régénérer le fichier.
+Failed asserting that 212 is equal to 211 or is less than 211.
+
+  at tests/Unit/PhpstanBaselineNeGrossitPasTest.php:160
+    156▕ 
+    157▕     // Assertions PHPUnit et non `expect()` : les expectations Pest concernées
+    158▕     // sont variadiques, un second argument y serait lu comme une autre valeur
+    159▕     // attendue et non comme un message. Vu à l'écriture de cette garde.
+  ➜ 160▕     $this->assertLessThanOrEqual(
+    161▕         BASELINE_MAX_ENTREES,
+    162▕         $nbEntrees,
+    163▕         "phpstan-baseline.neon contient {$nbEntrees} entrées pour un plafond de " .
+    164▕         BASELINE_MAX_ENTREES . '. La baseline ne peut que DÉCROÎTRE : corrige le ' .
+
+  1   tests/Unit/PhpstanBaselineNeGrossitPasTest.php:160
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\PhpstanBaselineNeGrossitPasTest > l'en-tête de la base…   
+  Expected: # =============================================================================\n
+  # BASELINE PHPStan — dette figée le 2026-08-13, dégonflée le 2026-08-18\n
+  # =============================================================================\n
+  ... (1325 more lines)
+
+  To contain: ÉTAT COURANT (2026-08-18) : 212 entrées / 249 erreurs
+
+  at tests/Unit/PhpstanBaselineNeGrossitPasTest.php:188
+    184▕     $entete = str_replace(["\r\n", "\r"], "\n", (string) file_get_contents($chemin));
+    185▕ 
+    186▕     // C'est très exactement la dérive constatée : l'en-tête annonçait 339/443,
+    187▕     // le fichier en portait 337/441, et rien ne le signalait.
+  ➜ 188▕     $this->assertStringContainsString(
+    189▕         "ÉTAT COURANT (2026-08-18) : {$nbEntrees} entrées / {$nbErreurs} erreurs",
+    190▕         $entete,
+    191▕         "L'en-tête de phpstan-baseline.neon ne correspond plus au contenu " .
+    192▕         "({$nbEntrees} entrées / {$nbErreurs} erreurs mesurées). Mets-le à jour.",
+
+  1   tests/Unit/PhpstanBaselineNeGrossitPasTest.php:188
+
+
+  Tests:    2 failed, 3 passed (7 assertions)
+  Duration: 430.91s
+  Random Order Seed: 1787137045
+

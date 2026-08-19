@@ -1,0 +1,30 @@
+=== SESSION_DOMAIN ===
+15:    'domain'         ./docker-compose.local.yml
+./frontend/tests/e2e/console-locale.spec.ts
+./_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-07/D_defauts.txt
+./_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-07/F04_console_locale.txt
+./_AUDIT/2026-08-18_AUDIT-360/11_GRILLES/agent-07_fragilites.md
+./_REPORTS/2026-08-17_CLOTURE-PLAN-CRM-E2E2.md
+./_REPORTS/e2e2-preuves/journal-session-E2E2.md
+./_REPORTS/e2e2-preuves/plan-scenarios-E2E-corrige.md
+./_REPORTS/RUNBOOK-CONSOLE-LOCALE.md
+ost` — les deux
+44:# laisser un autre `APP_URL` que l'API, c'est fabriquer deux URL différentes
+49:    APP_URL: https://app.localhost
+50:    SESSION_DOMAIN: ""
+52:    SANCTUM_STATEFUL_DOMAINS: app.localhost,localhost,127.0.0.1
+53:    FRONTEND_URL: https://app.localhost
+77:    # porte `localhost` pour un usage hors conteneur. `docker-compose.yml` les
+94:    # porte d'entrée est Caddy, en `https://api.localhost`. Or, mesuré le
+97:    #     node -e "require('dns').lookup('api.localhost', console.log)"  → ENOTFOUND
+98:    #     curl  https://api.localhost/up                                  → 200
+100:    # Les navigateurs (et curl) traitent `*.localhost` spécialement ; **Node ne
+108:    # `localhost`, il n'y a plus de certificat auto-signé à contourner (donc
+112:    # Côté site : CRM_SYNC_URL=http://localhost:58080/api/internal/site-sync
+131:  # config` affiche DEUX `APP_URL` différentes dans la même pile — la seconde
+150:  # (`https://api.localhost`), et s'y adosser rejouerait le défaut.
+154:        VITE_API_BASE_URL: ${VITE_API_BASE_URL_LOCAL:-https://app.localhost}
+156:        # de `frontend/vite.config.ts` refusant une base d'API `localhost`. Le
+=== curl atelier ===
+app.localhost -> 200
+api.localhost/up -> 000

@@ -1,0 +1,47 @@
+=== certificats detenus par le Caddy de prod ===
+local/api.localhost/api.localhost.crt
+local/app.localhost/app.localhost.crt
+acme-v02.api.letsencrypt.org-directory/app.axion-crm-pro.com/app.axion-crm-pro.com.crt
+acme-v02.api.letsencrypt.org-directory/api.axion-crm-pro.com/api.axion-crm-pro.com.crt
+acme-v02.api.letsencrypt.org-directory/staging.axion-crm-pro.com/staging.axion-crm-pro.com.crt
+acme-v02.api.letsencrypt.org-directory/staging-api.axion-crm-pro.com/staging-api.axion-crm-pro.com.crt
+
+=== dates de validite ===
+-- /data/caddy/certificates/local/api.localhost/api.localhost.crt
+-- /data/caddy/certificates/local/app.localhost/app.localhost.crt
+-- /data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/app.axion-crm-pro.com/app.axion-crm-pro.com.crt
+-- /data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/api.axion-crm-pro.com/api.axion-crm-pro.com.crt
+-- /data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/staging.axion-crm-pro.com/staging.axion-crm-pro.com.crt
+-- /data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/staging-api.axion-crm-pro.com/staging-api.axion-crm-pro.com.crt
+
+=== journaux Caddy : erreurs ACME / rate limit (30 derniers jours de conteneur) ===
+{"level":"info","ts":1787126708.7551143,"logger":"tls.renew","msg":"renewing certificate","identifier":"app.localhost","remaining":14021.244889749}
+{"level":"info","ts":1787126708.7551644,"logger":"tls.obtain","msg":"obtaining certificate","identifier":"staging-api.axion-crm-pro.com"}
+{"level":"info","ts":1787126708.7554924,"logger":"tls.renew","msg":"lock acquired","identifier":"api.localhost"}
+{"level":"info","ts":1787126708.7556276,"logger":"tls.renew","msg":"renewing certificate","identifier":"api.localhost","remaining":14021.244373749}
+{"level":"info","ts":1787126708.7593658,"logger":"tls.obtain","msg":"lock acquired","identifier":"staging.axion-crm-pro.com"}
+{"level":"info","ts":1787126708.7597432,"logger":"tls.obtain","msg":"obtaining certificate","identifier":"staging.axion-crm-pro.com"}
+{"level":"info","ts":1787126708.7605507,"logger":"http","msg":"waiting on internal rate limiter","identifiers":["staging.axion-crm-pro.com"],"ca":"https://acme-v02.api.letsencrypt.org/directory","account":"williamsjullin@gmail.com"}
+{"level":"info","ts":1787126708.7605698,"logger":"http","msg":"done waiting on internal rate limiter","identifiers":["staging.axion-crm-pro.com"],"ca":"https://acme-v02.api.letsencrypt.org/directory","account":"williamsjullin@gmail.com"}
+{"level":"info","ts":1787126708.7627294,"logger":"http","msg":"waiting on internal rate limiter","identifiers":["staging-api.axion-crm-pro.com"],"ca":"https://acme-v02.api.letsencrypt.org/directory","account":"williamsjullin@gmail.com"}
+{"level":"info","ts":1787126708.7631326,"logger":"http","msg":"done waiting on internal rate limiter","identifiers":["staging-api.axion-crm-pro.com"],"ca":"https://acme-v02.api.letsencrypt.org/directory","account":"williamsjullin@gmail.com"}
+{"level":"info","ts":1787126708.7665503,"logger":"tls.renew","msg":"certificate renewed successfully","identifier":"api.localhost","issuer":"local"}
+{"level":"info","ts":1787126708.7666812,"logger":"tls.renew","msg":"releasing lock","identifier":"api.localhost"}
+{"level":"info","ts":1787126708.7680953,"logger":"tls.renew","msg":"certificate renewed successfully","identifier":"app.localhost","issuer":"local"}
+{"level":"info","ts":1787126708.7682028,"logger":"tls.renew","msg":"releasing lock","identifier":"app.localhost"}
+{"level":"error","ts":1787126710.6258457,"logger":"http.acme_client","msg":"challenge failed","identifier":"staging.axion-crm-pro.com","challenge_type":"tls-alpn-01","problem":{"type":"urn:ietf:params:acme:error:unauthorized","title":"","detail":"Cannot negotiate ALPN protocol \"acme-tls/1\" for tls-alpn-01 challenge","instance":"","subproblems":null}}
+{"level":"error","ts":1787126710.6259258,"logger":"http.acme_client","msg":"validating authorization","identifier":"staging.axion-crm-pro.com","problem":{"type":"urn:ietf:params:acme:error:unauthorized","title":"","detail":"Cannot negotiate ALPN protocol \"acme-tls/1\" for tls-alpn-01 challenge","instance":"","subproblems":null},"order":"https://acme-v02.api.letsencrypt.org/acme/order/3342856046/546788705421","attempt":1,"max_attempts":3}
+{"level":"error","ts":1787126711.0785964,"logger":"http.acme_client","msg":"challenge failed","identifier":"staging-api.axion-crm-pro.com","challenge_type":"tls-alpn-01","problem":{"type":"urn:ietf:params:acme:error:unauthorized","title":"","detail":"Cannot negotiate ALPN protocol \"acme-tls/1\" for tls-alpn-01 challenge","instance":"","subproblems":null}}
+{"level":"error","ts":1787126711.0786586,"logger":"http.acme_client","msg":"validating authorization","identifier":"staging-api.axion-crm-pro.com","problem":{"type":"urn:ietf:params:acme:error:unauthorized","title":"","detail":"Cannot negotiate ALPN protocol \"acme-tls/1\" for tls-alpn-01 challenge","instance":"","subproblems":null},"order":"https://acme-v02.api.letsencrypt.org/acme/order/3342856046/546788705481","attempt":1,"max_attempts":3}
+{"level":"info","ts":1787126716.6520972,"logger":"http.acme_client","msg":"got renewal info","names":["staging-api.axion-crm-pro.com"],"window_start":1792230649,"window_end":1792386099,"selected_time":1792359946,"recheck_after":1787151465.652086,"explanation_url":""}
+{"level":"info","ts":1787126717.0520566,"logger":"http.acme_client","msg":"got renewal info","names":["staging-api.axion-crm-pro.com"],"window_start":1792230649,"window_end":1792386099,"selected_time":1792262160,"recheck_after":1787152442.0520418,"explanation_url":""}
+{"level":"info","ts":1787126717.466988,"logger":"http.acme_client","msg":"got renewal info","names":["staging-api.axion-crm-pro.com"],"window_start":1792230649,"window_end":1792386099,"selected_time":1792307204,"recheck_after":1787145237.4669771,"explanation_url":""}
+{"level":"info","ts":1787126717.4718595,"logger":"tls.obtain","msg":"certificate obtained successfully","identifier":"staging-api.axion-crm-pro.com","issuer":"acme-v02.api.letsencrypt.org-directory"}
+{"level":"info","ts":1787126717.4720023,"logger":"tls.obtain","msg":"releasing lock","identifier":"staging-api.axion-crm-pro.com"}
+{"level":"info","ts":1787126717.6442904,"logger":"http.acme_client","msg":"got renewal info","names":["staging.axion-crm-pro.com"],"window_start":1792230650,"window_end":1792386100,"selected_time":1792329025,"recheck_after":1787144857.6442783,"explanation_url":""}
+{"level":"info","ts":1787126718.0460584,"logger":"http.acme_client","msg":"got renewal info","names":["staging.axion-crm-pro.com"],"window_start":1792230650,"window_end":1792386100,"selected_time":1792365280,"recheck_after":1787150508.046047,"explanation_url":""}
+{"level":"info","ts":1787126718.447005,"logger":"http.acme_client","msg":"got renewal info","names":["staging.axion-crm-pro.com"],"window_start":1792230650,"window_end":1792386100,"selected_time":1792312365,"recheck_after":1787152190.4469934,"explanation_url":""}
+{"level":"info","ts":1787126718.4525585,"logger":"tls.obtain","msg":"certificate obtained successfully","identifier":"staging.axion-crm-pro.com","issuer":"acme-v02.api.letsencrypt.org-directory"}
+{"level":"info","ts":1787126718.4526713,"logger":"tls.obtain","msg":"releasing lock","identifier":"staging.axion-crm-pro.com"}
+{"level":"info","ts":1787135109.1913483,"logger":"http.acme_client","msg":"got renewal info","names":["api.axion-crm-pro.com"],"window_start":1789297468,"window_end":1789452917,"selected_time":1789450169,"recheck_after":1787154786.1913185,"explanation_url":""}
+{"level":"info","ts":1787135109.1965754,"logger":"tls.cache.maintenance","msg":"updated and stored ACME renewal information","identifiers":["api.axion-crm-pro.com"],"cert_hash":"181c455ef01e80438b04fe50ae4bf6eb20274caaeeeb336f791467ee73e96953","ari_unique_id":"uyDKRwv-1-Wc-Y8JKqOMN0WxvNg.BbqI62nowP1s5BovmYv9LZNT","cert_expiry":1791966023,"selected_time":1789417354,"next_update":1787154786.1913185,"explanation_url":""}

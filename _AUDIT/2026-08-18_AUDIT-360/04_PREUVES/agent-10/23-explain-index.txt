@@ -1,0 +1,74 @@
+=== EXPLAIN ANALYZE compteurs hub, 2 800 000 fiches, index en place ===
+                                                                                      QUERY PLAN                                                                                      
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Finalize GroupAggregate  (cost=1000.45..52409.39 rows=1 width=25) (actual time=4199.435..4248.484 rows=1 loops=1)
+   Group Key: relation_type, lifecycle_stage
+   Buffers: shared hit=9 read=2472
+   ->  Gather Merge  (cost=1000.45..52409.36 rows=2 width=25) (actual time=4199.414..4248.462 rows=3 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=9 read=2472
+         ->  Partial GroupAggregate  (cost=0.43..51409.11 rows=1 width=25) (actual time=4164.236..4164.239 rows=1 loops=3)
+               Group Key: relation_type, lifecycle_stage
+               Buffers: shared hit=9 read=2472
+               ->  Parallel Index Only Scan using idx_companies_ws_counts on companies  (cost=0.43..42659.10 rows=1166667 width=17) (actual time=4.857..3875.784 rows=933333 loops=3)
+                     Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+                     Heap Fetches: 0
+                     Buffers: shared hit=9 read=2472
+ Planning:
+   Buffers: shared hit=640 read=7
+ Planning Time: 16.842 ms
+ Execution Time: 4248.753 ms
+(18 rows)
+
+=== EXPLAIN liste console contacts (index idx_contacts_ws_id_desc) ===
+                                                                    QUERY PLAN                                                                     
+---------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.34..1.95 rows=25 width=643) (actual time=31.325..32.494 rows=25 loops=1)
+   Buffers: shared hit=1 read=4 dirtied=2
+   InitPlan 1 (returns $0)
+     ->  Limit  (cost=0.00..0.05 rows=1 width=16) (actual time=0.032..0.035 rows=1 loops=1)
+           Buffers: shared hit=1
+           ->  Seq Scan on contacts contacts_1  (cost=0.00..2287.00 rows=50000 width=16) (actual time=0.030..0.031 rows=1 loops=1)
+                 Buffers: shared hit=1
+   ->  Index Scan Backward using contacts_pkey on contacts  (cost=0.29..3221.29 rows=50000 width=643) (actual time=31.323..32.481 rows=25 loops=1)
+         Filter: (workspace_id = $0)
+         Buffers: shared hit=1 read=4 dirtied=2
+ Planning:
+   Buffers: shared hit=391 read=17 dirtied=1
+ Planning Time: 19.333 ms
+ Execution Time: 32.699 ms
+(14 rows)
+
+=== taille des index companies (perf4m) ===
+              indexrelname               |   taille   | idx_scan 
+-----------------------------------------+------------+----------
+ idx_companies_denom_btree               | 276 MB     |        0
+ idx_companies_ws_stage_updated_id       | 221 MB     |        0
+ idx_companies_ws_updated_id             | 179 MB     |        0
+ idx_companies_ws_created_at             | 144 MB     |        0
+ companies_workspace_id_siren_key        | 141 MB     |        0
+ idx_companies_geo                       | 114 MB     |        0
+ idx_companies_denomination_trgm         | 110 MB     |        0
+ companies_pkey                          | 64 MB      |        0
+ idx_companies_workspace_dept            | 30 MB      |        0
+ idx_companies_ws_counts                 | 20 MB      |        3
+ idx_companies_dept                      | 19 MB      |        0
+ idx_companies_workspace_relation_type   | 19 MB      |        0
+ idx_companies_workspace_score           | 19 MB      |        0
+ idx_companies_region                    | 19 MB      |        0
+ idx_companies_workspace_size            | 19 MB      |        0
+ idx_companies_workspace_lifecycle_stage | 19 MB      |        0
+ idx_companies_prospection_status        | 19 MB      |        0
+ idx_companies_workspace_naf             | 19 MB      |        0
+ idx_companies_sector                    | 19 MB      |        0
+ companies_website_status_index          | 18 MB      |        6
+ idx_companies_signals                   | 7280 kB    |        0
+ companies_workspace_external_ref_key    | 16 kB      |        0
+ idx_companies_archive_reason            | 8192 bytes |        0
+ idx_companies_best_email_confidence     | 8192 bytes |        0
+ companies_workspace_foreign_id_unique   | 8192 bytes |        0
+ idx_companies_workspace_country_nature  | 8192 bytes |        0
+ idx_companies_revalidate                | 8192 bytes |        0
+(27 rows)
+

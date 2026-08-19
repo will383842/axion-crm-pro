@@ -1,0 +1,23 @@
+=== PROD : IPs non anonymisees au-dela de 30 jours (lecture seule) ===
+ audit_a_anonymiser | audit_avec_ip |     plus_ancienne      
+--------------------+---------------+------------------------
+                 25 |            58 | 2026-05-17 12:37:43+00
+(1 row)
+
+ sessions_a_anonymiser | sessions_total 
+-----------------------+----------------
+                     0 |              0
+(1 row)
+
+
+=== TEMOIN NEGATIF : l'operateur existe-t-il vraiment ? ===
+ERROR:  operator does not exist: cidr / integer
+LINE 1: SELECT (host(network('192.168.42.123'::cidr / 24)))::inet
+                                                    ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+-- et la forme correcte, pour montrer que le controle sait reussir --
+  anonymisee  
+--------------
+ 192.168.42.0
+(1 row)
+

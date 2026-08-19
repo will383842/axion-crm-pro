@@ -1,0 +1,287 @@
+Listing tests:
+  [chromium] › a11y.spec.ts:12:3 › Login has no critical a11y violations
+  [chromium] › a11y.spec.ts:12:3 › Companies has no critical a11y violations
+  [chromium] › a11y.spec.ts:12:3 › Coverage has no critical a11y violations
+  [chromium] › a11y.spec.ts:12:3 › RGPD has no critical a11y violations
+  [chromium] › audiences-builder.spec.ts:8:3 › Audiences builder (Sprint H4) › renders builder page with live preview area
+  [chromium] › audiences-builder.spec.ts:26:3 › Audiences builder (Sprint H4) › list page renders without crashing
+  [chromium] › auth.spec.ts:4:3 › Auth flow › login page displays form with email + password
+  [chromium] › auth.spec.ts:12:3 › Auth flow › magic link page shows email input
+  [chromium] › auth.spec.ts:17:3 › Auth flow › 2FA page shows 6-digit input
+  [chromium] › auth.spec.ts:22:3 › Auth flow › password reset page renders
+  [chromium] › campaigns-wizard.spec.ts:8:3 › Campaigns wizard (Sprint H4) › renders 4 steps and reaches the launch button
+  [chromium] › companies.spec.ts:4:3 › Companies list › renders empty state when no companies
+  [chromium] › companies.spec.ts:12:3 › Companies list › renders table with company rows
+  [chromium] › companies.spec.ts:29:3 › Companies list › search filter updates URL params
+  [chromium] › console-locale.spec.ts:285:3 › Console CRM Pro — vérification locale de bout en bout › TLS n'est jamais désarmé au niveau du process Node
+  [chromium] › console-locale.spec.ts:296:3 › Console CRM Pro — vérification locale de bout en bout › connexion par le formulaire /login
+  [chromium] › console-locale.spec.ts:320:3 › Console CRM Pro — vérification locale de bout en bout › écran 2FA : un code TOTP réel ouvre la session
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran / — Tableau de bord
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /companies — Entreprises
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /companies/00000000-0000-4000-8000-000000000000 — Entreprise — fiche
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /contacts — Contacts
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /international/roumanie — International — Roumanie
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /media — Médias
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /media/00000000-0000-4000-8000-000000000000 — Média — fiche
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /journalists — Journalistes
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /coverage — Couverture territoriale
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /scraper-runs — Exécutions de collecte
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /llm/router — LLM — routeur
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /llm/proxy-providers — LLM — fournisseurs proxy
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /llm/rotations — LLM — rotations
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /rgpd/requests — RGPD — demandes
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /rgpd/ai-act — RGPD — registre AI Act
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /audit-logs — Journal d'audit
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /users — Utilisateurs
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /settings — Réglages
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /campaigns — Campagnes
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /campaigns/new — Campagne — assistant
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /campaigns/00000000-0000-4000-8000-000000000000 — Campagne — détail
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /tags — Étiquettes
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /audiences — Audiences
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /audiences/new — Audience — constructeur
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /audiences/00000000-0000-4000-8000-000000000000 — Audience — détail
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /admin/observability — Observabilité
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /console/contacts — Console v2 — hub contacts
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /console/vivier — Console v2 — vivier candidats
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /console/arbitrage — Console v2 — arbitrage
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /console/personnes/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa — Console v2 — fiche 360°
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /cold-email — Cold email (bouchon Phase 2)
+  [chromium] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /linkedin — LinkedIn (bouchon Phase 2)
+  [chromium] › coverage.spec.ts:4:3 › Coverage map › coverage page renders map and mode buttons
+  [chromium] › coverage.spec.ts:12:3 › Coverage map › level switcher region/department/city
+  [chromium] › dark-mode.spec.ts:15:3 › Dark mode toggle › default theme is system (system aria-pressed)
+  [chromium] › dark-mode.spec.ts:21:3 › Dark mode toggle › click on dark switches html.dark class
+  [chromium] › dark-mode.spec.ts:27:3 › Dark mode toggle › click on light removes html.dark class
+  [chromium] › dark-mode.spec.ts:34:3 › Dark mode toggle › theme persists in localStorage
+  [chromium] › dashboard.spec.ts:25:3 › Dashboard › dashboard page loads
+  [chromium] › dashboard.spec.ts:30:3 › Dashboard › dashboard displays main heading
+  [chromium] › global-search.spec.ts:24:3 › Global search ⌘K › Cmd+K opens the search palette
+  [chromium] › global-search.spec.ts:31:3 › Global search ⌘K › Escape closes the search palette
+  [chromium] › global-search.spec.ts:38:3 › Global search ⌘K › Typing 2+ chars triggers search
+  [chromium] › global-search.spec.ts:45:3 › Global search ⌘K › Less than 2 chars does not trigger search
+  [chromium] › llm.spec.ts:24:3 › LLM pages › LLM router page loads
+  [chromium] › llm.spec.ts:29:3 › LLM pages › LLM proxy providers page loads
+  [chromium] › llm.spec.ts:34:3 › LLM pages › LLM rotations page loads
+  [chromium] › llm.spec.ts:52:3 › Audit logs page › audit logs page loads
+  [chromium] › llm.spec.ts:67:3 › Phase 2 pages (stubs) › campaigns page loads
+  [chromium] › llm.spec.ts:72:3 › Phase 2 pages (stubs) › cold-email page loads
+  [chromium] › llm.spec.ts:77:3 › Phase 2 pages (stubs) › linkedin page loads
+  [chromium] › llm.spec.ts:87:3 › Phase 2 pages (stubs) › /crm ne sert plus d’écran bouchon
+  [chromium] › llm.spec.ts:92:3 › Phase 2 pages (stubs) › /analytics ne sert plus d’écran bouchon
+  [chromium] › navigation.spec.ts:62:3 › Navigation smoke › sidebar : dashboard link visible
+  [chromium] › navigation.spec.ts:67:3 › Navigation smoke › sidebar : entreprises link
+  [chromium] › navigation.spec.ts:73:3 › Navigation smoke › sidebar : contacts link
+  [chromium] › navigation.spec.ts:79:3 › Navigation smoke › sidebar : médias link
+  [chromium] › navigation.spec.ts:85:3 › Navigation smoke › sidebar : journalistes link
+  [chromium] › navigation.spec.ts:91:3 › Navigation smoke › page médias : se charge sans erreur
+  [chromium] › navigation.spec.ts:96:3 › Navigation smoke › sidebar : couverture France link
+  [chromium] › navigation.spec.ts:102:3 › Navigation smoke › sidebar : LLM Router sous Réglages
+  [chromium] › navigation.spec.ts:108:3 › Navigation smoke › sidebar : Conformité
+  [chromium] › navigation.spec.ts:115:3 › Navigation smoke › sidebar : Réglages
+  [chromium] › navigation.spec.ts:122:3 › Navigation smoke › sidebar : rangée (étape 0, F17) — six groupes, une seule entrée Contacts, aucun cadenas
+  [chromium] › navigation.spec.ts:147:3 › Navigation smoke › header : recherche globale visible
+  [chromium] › navigation.spec.ts:153:3 › Navigation smoke › header : dark mode toggle
+  [chromium] › navigation.spec.ts:158:3 › Navigation smoke › skip-link a11y présent
+  [chromium] › onboarding.spec.ts:4:3 › Onboarding tour (Sprint 18.4) › tour does NOT show when onboarding_tour_completed_at is set
+  [chromium] › onboarding.spec.ts:23:3 › Onboarding tour (Sprint 18.4) › tour shows when onboarding_tour_completed_at is null
+  [chromium] › onboarding.spec.ts:41:3 › Onboarding tour (Sprint 18.4) › cleanup leave channel after unmount (Echo)
+  [chromium] › onboarding.spec.ts:53:3 › Onboarding tour (Sprint 18.4) › POST /auth/onboarding/complete called on tour skip
+  [chromium] › rgpd.spec.ts:4:3 › RGPD › rgpd requests page renders
+  [chromium] › rgpd.spec.ts:12:3 › RGPD › ai-act register page renders
+  [chromium] › rgpd.spec.ts:20:3 › RGPD › audit logs page renders
+  [chromium] › settings.spec.ts:20:3 › Settings page › settings page loads
+  [chromium] › settings.spec.ts:25:3 › Settings page › settings shows page content
+  [chromium] › settings.spec.ts:44:3 › Users page › users page loads
+  [chromium] › tags-manager.spec.ts:8:3 › Tags manager (Sprint H4) › renders tags list grouped by category
+  [firefox] › a11y.spec.ts:12:3 › Login has no critical a11y violations
+  [firefox] › a11y.spec.ts:12:3 › Companies has no critical a11y violations
+  [firefox] › a11y.spec.ts:12:3 › Coverage has no critical a11y violations
+  [firefox] › a11y.spec.ts:12:3 › RGPD has no critical a11y violations
+  [firefox] › audiences-builder.spec.ts:8:3 › Audiences builder (Sprint H4) › renders builder page with live preview area
+  [firefox] › audiences-builder.spec.ts:26:3 › Audiences builder (Sprint H4) › list page renders without crashing
+  [firefox] › auth.spec.ts:4:3 › Auth flow › login page displays form with email + password
+  [firefox] › auth.spec.ts:12:3 › Auth flow › magic link page shows email input
+  [firefox] › auth.spec.ts:17:3 › Auth flow › 2FA page shows 6-digit input
+  [firefox] › auth.spec.ts:22:3 › Auth flow › password reset page renders
+  [firefox] › campaigns-wizard.spec.ts:8:3 › Campaigns wizard (Sprint H4) › renders 4 steps and reaches the launch button
+  [firefox] › companies.spec.ts:4:3 › Companies list › renders empty state when no companies
+  [firefox] › companies.spec.ts:12:3 › Companies list › renders table with company rows
+  [firefox] › companies.spec.ts:29:3 › Companies list › search filter updates URL params
+  [firefox] › console-locale.spec.ts:285:3 › Console CRM Pro — vérification locale de bout en bout › TLS n'est jamais désarmé au niveau du process Node
+  [firefox] › console-locale.spec.ts:296:3 › Console CRM Pro — vérification locale de bout en bout › connexion par le formulaire /login
+  [firefox] › console-locale.spec.ts:320:3 › Console CRM Pro — vérification locale de bout en bout › écran 2FA : un code TOTP réel ouvre la session
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran / — Tableau de bord
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /companies — Entreprises
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /companies/00000000-0000-4000-8000-000000000000 — Entreprise — fiche
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /contacts — Contacts
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /international/roumanie — International — Roumanie
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /media — Médias
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /media/00000000-0000-4000-8000-000000000000 — Média — fiche
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /journalists — Journalistes
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /coverage — Couverture territoriale
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /scraper-runs — Exécutions de collecte
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /llm/router — LLM — routeur
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /llm/proxy-providers — LLM — fournisseurs proxy
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /llm/rotations — LLM — rotations
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /rgpd/requests — RGPD — demandes
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /rgpd/ai-act — RGPD — registre AI Act
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /audit-logs — Journal d'audit
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /users — Utilisateurs
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /settings — Réglages
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /campaigns — Campagnes
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /campaigns/new — Campagne — assistant
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /campaigns/00000000-0000-4000-8000-000000000000 — Campagne — détail
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /tags — Étiquettes
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /audiences — Audiences
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /audiences/new — Audience — constructeur
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /audiences/00000000-0000-4000-8000-000000000000 — Audience — détail
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /admin/observability — Observabilité
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /console/contacts — Console v2 — hub contacts
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /console/vivier — Console v2 — vivier candidats
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /console/arbitrage — Console v2 — arbitrage
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /console/personnes/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa — Console v2 — fiche 360°
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /cold-email — Cold email (bouchon Phase 2)
+  [firefox] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /linkedin — LinkedIn (bouchon Phase 2)
+  [firefox] › coverage.spec.ts:4:3 › Coverage map › coverage page renders map and mode buttons
+  [firefox] › coverage.spec.ts:12:3 › Coverage map › level switcher region/department/city
+  [firefox] › dark-mode.spec.ts:15:3 › Dark mode toggle › default theme is system (system aria-pressed)
+  [firefox] › dark-mode.spec.ts:21:3 › Dark mode toggle › click on dark switches html.dark class
+  [firefox] › dark-mode.spec.ts:27:3 › Dark mode toggle › click on light removes html.dark class
+  [firefox] › dark-mode.spec.ts:34:3 › Dark mode toggle › theme persists in localStorage
+  [firefox] › dashboard.spec.ts:25:3 › Dashboard › dashboard page loads
+  [firefox] › dashboard.spec.ts:30:3 › Dashboard › dashboard displays main heading
+  [firefox] › global-search.spec.ts:24:3 › Global search ⌘K › Cmd+K opens the search palette
+  [firefox] › global-search.spec.ts:31:3 › Global search ⌘K › Escape closes the search palette
+  [firefox] › global-search.spec.ts:38:3 › Global search ⌘K › Typing 2+ chars triggers search
+  [firefox] › global-search.spec.ts:45:3 › Global search ⌘K › Less than 2 chars does not trigger search
+  [firefox] › llm.spec.ts:24:3 › LLM pages › LLM router page loads
+  [firefox] › llm.spec.ts:29:3 › LLM pages › LLM proxy providers page loads
+  [firefox] › llm.spec.ts:34:3 › LLM pages › LLM rotations page loads
+  [firefox] › llm.spec.ts:52:3 › Audit logs page › audit logs page loads
+  [firefox] › llm.spec.ts:67:3 › Phase 2 pages (stubs) › campaigns page loads
+  [firefox] › llm.spec.ts:72:3 › Phase 2 pages (stubs) › cold-email page loads
+  [firefox] › llm.spec.ts:77:3 › Phase 2 pages (stubs) › linkedin page loads
+  [firefox] › llm.spec.ts:87:3 › Phase 2 pages (stubs) › /crm ne sert plus d’écran bouchon
+  [firefox] › llm.spec.ts:92:3 › Phase 2 pages (stubs) › /analytics ne sert plus d’écran bouchon
+  [firefox] › navigation.spec.ts:62:3 › Navigation smoke › sidebar : dashboard link visible
+  [firefox] › navigation.spec.ts:67:3 › Navigation smoke › sidebar : entreprises link
+  [firefox] › navigation.spec.ts:73:3 › Navigation smoke › sidebar : contacts link
+  [firefox] › navigation.spec.ts:79:3 › Navigation smoke › sidebar : médias link
+  [firefox] › navigation.spec.ts:85:3 › Navigation smoke › sidebar : journalistes link
+  [firefox] › navigation.spec.ts:91:3 › Navigation smoke › page médias : se charge sans erreur
+  [firefox] › navigation.spec.ts:96:3 › Navigation smoke › sidebar : couverture France link
+  [firefox] › navigation.spec.ts:102:3 › Navigation smoke › sidebar : LLM Router sous Réglages
+  [firefox] › navigation.spec.ts:108:3 › Navigation smoke › sidebar : Conformité
+  [firefox] › navigation.spec.ts:115:3 › Navigation smoke › sidebar : Réglages
+  [firefox] › navigation.spec.ts:122:3 › Navigation smoke › sidebar : rangée (étape 0, F17) — six groupes, une seule entrée Contacts, aucun cadenas
+  [firefox] › navigation.spec.ts:147:3 › Navigation smoke › header : recherche globale visible
+  [firefox] › navigation.spec.ts:153:3 › Navigation smoke › header : dark mode toggle
+  [firefox] › navigation.spec.ts:158:3 › Navigation smoke › skip-link a11y présent
+  [firefox] › onboarding.spec.ts:4:3 › Onboarding tour (Sprint 18.4) › tour does NOT show when onboarding_tour_completed_at is set
+  [firefox] › onboarding.spec.ts:23:3 › Onboarding tour (Sprint 18.4) › tour shows when onboarding_tour_completed_at is null
+  [firefox] › onboarding.spec.ts:41:3 › Onboarding tour (Sprint 18.4) › cleanup leave channel after unmount (Echo)
+  [firefox] › onboarding.spec.ts:53:3 › Onboarding tour (Sprint 18.4) › POST /auth/onboarding/complete called on tour skip
+  [firefox] › rgpd.spec.ts:4:3 › RGPD › rgpd requests page renders
+  [firefox] › rgpd.spec.ts:12:3 › RGPD › ai-act register page renders
+  [firefox] › rgpd.spec.ts:20:3 › RGPD › audit logs page renders
+  [firefox] › settings.spec.ts:20:3 › Settings page › settings page loads
+  [firefox] › settings.spec.ts:25:3 › Settings page › settings shows page content
+  [firefox] › settings.spec.ts:44:3 › Users page › users page loads
+  [firefox] › tags-manager.spec.ts:8:3 › Tags manager (Sprint H4) › renders tags list grouped by category
+  [mobile-safari] › a11y.spec.ts:12:3 › Login has no critical a11y violations
+  [mobile-safari] › a11y.spec.ts:12:3 › Companies has no critical a11y violations
+  [mobile-safari] › a11y.spec.ts:12:3 › Coverage has no critical a11y violations
+  [mobile-safari] › a11y.spec.ts:12:3 › RGPD has no critical a11y violations
+  [mobile-safari] › audiences-builder.spec.ts:8:3 › Audiences builder (Sprint H4) › renders builder page with live preview area
+  [mobile-safari] › audiences-builder.spec.ts:26:3 › Audiences builder (Sprint H4) › list page renders without crashing
+  [mobile-safari] › auth.spec.ts:4:3 › Auth flow › login page displays form with email + password
+  [mobile-safari] › auth.spec.ts:12:3 › Auth flow › magic link page shows email input
+  [mobile-safari] › auth.spec.ts:17:3 › Auth flow › 2FA page shows 6-digit input
+  [mobile-safari] › auth.spec.ts:22:3 › Auth flow › password reset page renders
+  [mobile-safari] › campaigns-wizard.spec.ts:8:3 › Campaigns wizard (Sprint H4) › renders 4 steps and reaches the launch button
+  [mobile-safari] › companies.spec.ts:4:3 › Companies list › renders empty state when no companies
+  [mobile-safari] › companies.spec.ts:12:3 › Companies list › renders table with company rows
+  [mobile-safari] › companies.spec.ts:29:3 › Companies list › search filter updates URL params
+  [mobile-safari] › console-locale.spec.ts:285:3 › Console CRM Pro — vérification locale de bout en bout › TLS n'est jamais désarmé au niveau du process Node
+  [mobile-safari] › console-locale.spec.ts:296:3 › Console CRM Pro — vérification locale de bout en bout › connexion par le formulaire /login
+  [mobile-safari] › console-locale.spec.ts:320:3 › Console CRM Pro — vérification locale de bout en bout › écran 2FA : un code TOTP réel ouvre la session
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran / — Tableau de bord
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /companies — Entreprises
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /companies/00000000-0000-4000-8000-000000000000 — Entreprise — fiche
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /contacts — Contacts
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /international/roumanie — International — Roumanie
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /media — Médias
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /media/00000000-0000-4000-8000-000000000000 — Média — fiche
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /journalists — Journalistes
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /coverage — Couverture territoriale
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /scraper-runs — Exécutions de collecte
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /llm/router — LLM — routeur
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /llm/proxy-providers — LLM — fournisseurs proxy
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /llm/rotations — LLM — rotations
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /rgpd/requests — RGPD — demandes
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /rgpd/ai-act — RGPD — registre AI Act
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /audit-logs — Journal d'audit
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /users — Utilisateurs
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /settings — Réglages
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /campaigns — Campagnes
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /campaigns/new — Campagne — assistant
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /campaigns/00000000-0000-4000-8000-000000000000 — Campagne — détail
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /tags — Étiquettes
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /audiences — Audiences
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /audiences/new — Audience — constructeur
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /audiences/00000000-0000-4000-8000-000000000000 — Audience — détail
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /admin/observability — Observabilité
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /console/contacts — Console v2 — hub contacts
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /console/vivier — Console v2 — vivier candidats
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /console/arbitrage — Console v2 — arbitrage
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /console/personnes/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa — Console v2 — fiche 360°
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /cold-email — Cold email (bouchon Phase 2)
+  [mobile-safari] › console-locale.spec.ts:356:5 › Console CRM Pro — vérification locale de bout en bout › écran /linkedin — LinkedIn (bouchon Phase 2)
+  [mobile-safari] › coverage.spec.ts:4:3 › Coverage map › coverage page renders map and mode buttons
+  [mobile-safari] › coverage.spec.ts:12:3 › Coverage map › level switcher region/department/city
+  [mobile-safari] › dark-mode.spec.ts:15:3 › Dark mode toggle › default theme is system (system aria-pressed)
+  [mobile-safari] › dark-mode.spec.ts:21:3 › Dark mode toggle › click on dark switches html.dark class
+  [mobile-safari] › dark-mode.spec.ts:27:3 › Dark mode toggle › click on light removes html.dark class
+  [mobile-safari] › dark-mode.spec.ts:34:3 › Dark mode toggle › theme persists in localStorage
+  [mobile-safari] › dashboard.spec.ts:25:3 › Dashboard › dashboard page loads
+  [mobile-safari] › dashboard.spec.ts:30:3 › Dashboard › dashboard displays main heading
+  [mobile-safari] › global-search.spec.ts:24:3 › Global search ⌘K › Cmd+K opens the search palette
+  [mobile-safari] › global-search.spec.ts:31:3 › Global search ⌘K › Escape closes the search palette
+  [mobile-safari] › global-search.spec.ts:38:3 › Global search ⌘K › Typing 2+ chars triggers search
+  [mobile-safari] › global-search.spec.ts:45:3 › Global search ⌘K › Less than 2 chars does not trigger search
+  [mobile-safari] › llm.spec.ts:24:3 › LLM pages › LLM router page loads
+  [mobile-safari] › llm.spec.ts:29:3 › LLM pages › LLM proxy providers page loads
+  [mobile-safari] › llm.spec.ts:34:3 › LLM pages › LLM rotations page loads
+  [mobile-safari] › llm.spec.ts:52:3 › Audit logs page › audit logs page loads
+  [mobile-safari] › llm.spec.ts:67:3 › Phase 2 pages (stubs) › campaigns page loads
+  [mobile-safari] › llm.spec.ts:72:3 › Phase 2 pages (stubs) › cold-email page loads
+  [mobile-safari] › llm.spec.ts:77:3 › Phase 2 pages (stubs) › linkedin page loads
+  [mobile-safari] › llm.spec.ts:87:3 › Phase 2 pages (stubs) › /crm ne sert plus d’écran bouchon
+  [mobile-safari] › llm.spec.ts:92:3 › Phase 2 pages (stubs) › /analytics ne sert plus d’écran bouchon
+  [mobile-safari] › navigation.spec.ts:62:3 › Navigation smoke › sidebar : dashboard link visible
+  [mobile-safari] › navigation.spec.ts:67:3 › Navigation smoke › sidebar : entreprises link
+  [mobile-safari] › navigation.spec.ts:73:3 › Navigation smoke › sidebar : contacts link
+  [mobile-safari] › navigation.spec.ts:79:3 › Navigation smoke › sidebar : médias link
+  [mobile-safari] › navigation.spec.ts:85:3 › Navigation smoke › sidebar : journalistes link
+  [mobile-safari] › navigation.spec.ts:91:3 › Navigation smoke › page médias : se charge sans erreur
+  [mobile-safari] › navigation.spec.ts:96:3 › Navigation smoke › sidebar : couverture France link
+  [mobile-safari] › navigation.spec.ts:102:3 › Navigation smoke › sidebar : LLM Router sous Réglages
+  [mobile-safari] › navigation.spec.ts:108:3 › Navigation smoke › sidebar : Conformité
+  [mobile-safari] › navigation.spec.ts:115:3 › Navigation smoke › sidebar : Réglages
+  [mobile-safari] › navigation.spec.ts:122:3 › Navigation smoke › sidebar : rangée (étape 0, F17) — six groupes, une seule entrée Contacts, aucun cadenas
+  [mobile-safari] › navigation.spec.ts:147:3 › Navigation smoke › header : recherche globale visible
+  [mobile-safari] › navigation.spec.ts:153:3 › Navigation smoke › header : dark mode toggle
+  [mobile-safari] › navigation.spec.ts:158:3 › Navigation smoke › skip-link a11y présent
+  [mobile-safari] › onboarding.spec.ts:4:3 › Onboarding tour (Sprint 18.4) › tour does NOT show when onboarding_tour_completed_at is set
+  [mobile-safari] › onboarding.spec.ts:23:3 › Onboarding tour (Sprint 18.4) › tour shows when onboarding_tour_completed_at is null
+  [mobile-safari] › onboarding.spec.ts:41:3 › Onboarding tour (Sprint 18.4) › cleanup leave channel after unmount (Echo)
+  [mobile-safari] › onboarding.spec.ts:53:3 › Onboarding tour (Sprint 18.4) › POST /auth/onboarding/complete called on tour skip
+  [mobile-safari] › rgpd.spec.ts:4:3 › RGPD › rgpd requests page renders
+  [mobile-safari] › rgpd.spec.ts:12:3 › RGPD › ai-act register page renders
+  [mobile-safari] › rgpd.spec.ts:20:3 › RGPD › audit logs page renders
+  [mobile-safari] › settings.spec.ts:20:3 › Settings page › settings page loads
+  [mobile-safari] › settings.spec.ts:25:3 › Settings page › settings shows page content
+  [mobile-safari] › settings.spec.ts:44:3 › Users page › users page loads
+  [mobile-safari] › tags-manager.spec.ts:8:3 › Tags manager (Sprint H4) › renders tags list grouped by category
+Total: 285 tests in 16 files

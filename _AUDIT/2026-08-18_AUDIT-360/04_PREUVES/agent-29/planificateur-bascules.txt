@@ -1,0 +1,26 @@
+--- 2026-03-29 (fenetre de 36 h de temps universel autour du jour) ---
+  dailyAt('02:00') atteint 0 fois   <-- JAMAIS
+  dailyAt('03:00') atteint 1 fois
+  dailyAt('04:00') atteint 1 fois
+  dailyAt('04:20') atteint 1 fois
+  dailyAt('04:30') atteint 1 fois
+  dailyAt('04:45') atteint 1 fois
+  dailyAt('05:00') atteint 1 fois
+  dailyAt('05:05') atteint 1 fois
+  dailyAt('05:15') atteint 1 fois
+  dailyAt('05:20') atteint 1 fois
+  dailyAt('05:25') atteint 1 fois
+  dailyAt('05:40') atteint 1 fois
+--- 2026-10-25 (fenetre de 36 h de temps universel autour du jour) ---
+  dailyAt('02:00') atteint 2 fois   <-- DEUX FOIS
+  dailyAt('03:00') atteint 1 fois
+  dailyAt('04:00') atteint 1 fois
+  dailyAt('04:20') atteint 1 fois
+  dailyAt('04:30') atteint 1 fois
+  dailyAt('04:45') atteint 1 fois
+  dailyAt('05:00') atteint 1 fois
+  dailyAt('05:05') atteint 1 fois
+  dailyAt('05:15') atteint 1 fois
+  dailyAt('05:20') atteint 1 fois
+  dailyAt('05:25') atteint 1 fois
+  dailyAt('05:40') atteint 1 fois

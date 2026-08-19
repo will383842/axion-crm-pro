@@ -1,0 +1,48 @@
+=== F14-c : statuts calendly - mapping ===
+66:    return new Response("payload_too_large", { status: 413 });
+74:  if (!rl.allowed) return new Response("rate_limited", { status: 429 });
+82:    return new Response("unreadable_body", { status: 400 });
+85:    return new Response("payload_too_large", { status: 413 });
+109:    return new Response("invalid_signature", { status: 401 });
+116:    return new Response("invalid_json", { status: 400 });
+--- poll worker ---
+=== tests des 3 defauts ===
+api.test.ts
+availability.test.ts
+discover.test.ts
+enrich.test.ts
+refresh.test.ts
+webhook-signature.test.ts
+capturer-lead.test.ts
+chercher-ressource.test.ts
+escalader-question.test.ts
+proposer-rdv.test.ts
+qualifier-prospect.test.ts
+rechercher-offres.test.ts
+registry.test.ts
+__tests__
+export-csv.test.ts
+=== enrich.ts : statuts poses ===
+33://   · `canceled` — l'invité (ou l'hôte) a annulé côté Calendly ;
+34://   · `no_show`  — l'hôte a coché « Mark as no-show ». Contrairement à ce qu'on
+35://     a longtemps écrit ici, l'API le sait : l'invitee porte `no_show`.
+37:// `completed` reste MANUEL, et ce n'est pas un oubli : rien dans l'API ne dit
+71:): "scheduled" | "canceled" | "no_show" | null {
+72:  if (noShow) return "no_show";
+73:  if (raw === "canceled") return "canceled";
+98:    status: string;
+117:        status: true,
+190:  // (`completed` / `no_show`) : il décrit ce qui s'est réellement passé pendant
+193:  const terminal = row.status === "completed" || row.status === "no_show";
+194:  const canceled = mapped === "canceled" && row.status !== "canceled" && !terminal;
+195:  const noShow = mapped === "no_show" && !terminal;
+196:  if (mapped && mapped !== row.status && !terminal) {
+197:    data["status"] = mapped;
+198:    updatedFields.push("status");
+224:  // Émise sur TRANSITION seulement (`canceled` / `noShow` sont déjà des gardes
+235:  if ((canceled || noShow) && inviteeEmail) {
+238:        kind: canceled ? "canceled" : "no_show",
+259:  if (canceled || rescheduled) {
+261:      if (canceled) {
+=== refresh.ts : passage a honore ? ===
+91:  const cutoff = new Date(Date.now() - GRACE_HOURS * 3600_000);

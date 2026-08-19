@@ -1,0 +1,8 @@
+ public | activities                 | table             | axion
+ public | candidate_tag              | table             | axion
+ public | candidates                 | table             | axion
+ public | crm_outbound_events        | table             | axion
+ public | email_suppressions         | table             | axion
+ public | opt_out                    | table             | axion
+ public | scraping_sources           | table             | axion
+ public | tags                       | table             | axion

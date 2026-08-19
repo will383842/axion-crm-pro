@@ -1,0 +1,36 @@
+=== [1] verifier-sauvegarde.sh seuils par defaut ===
+=== Vérification des sauvegardes — 2026-08-19T09:48:19Z ===
+    seuils : âge ≤ 36 h, taille ≥ 100 Mo
+    dernière archive hors-site : axion_crm_20260819T030001Z.sql.gz
+    âge    : 6 h
+    taille : 691 Mo (724926343 octets)
+    copie locale la plus récente : axion_crm_20260819T030001Z.sql.gz (6 h)
+✅ Sauvegarde hors-site présente, récente et de taille plausible.
+CODE=0
+
+=== [2] TEMOIN NEGATIF : SEUIL_AGE_H=0 (doit ROUGIR) ===
+=== Vérification des sauvegardes — 2026-08-19T09:48:20Z ===
+    seuils : âge ≤ 0 h, taille ≥ 100 Mo
+    dernière archive hors-site : axion_crm_20260819T030001Z.sql.gz
+    âge    : 6 h
+    taille : 691 Mo (724926343 octets)
+❌ ÂGE : la dernière sauvegarde hors-site a 6 h (> 0 h).
+   La sauvegarde quotidienne de 03:00 UTC ne produit plus rien.
+    copie locale la plus récente : axion_crm_20260819T030001Z.sql.gz (6 h)
+
+❌ 1 contrôle(s) en échec — la sauvegarde de production n'est pas fiable.
+CODE=1
+
+=== [3] TEMOIN NEGATIF : SEUIL_TAILLE_MO=999999 (doit ROUGIR) ===
+=== Vérification des sauvegardes — 2026-08-19T09:48:22Z ===
+    seuils : âge ≤ 36 h, taille ≥ 999999 Mo
+    dernière archive hors-site : axion_crm_20260819T030001Z.sql.gz
+    âge    : 6 h
+    taille : 691 Mo (724926343 octets)
+❌ TAILLE : 691 Mo (< 999999 Mo attendus).
+   Un fichier présent mais minuscule n'est PAS une sauvegarde :
+   pendant trois mois la Storage Box en a hébergé un de 18 497 octets.
+    copie locale la plus récente : axion_crm_20260819T030001Z.sql.gz (6 h)
+
+❌ 1 contrôle(s) en échec — la sauvegarde de production n'est pas fiable.
+CODE=1

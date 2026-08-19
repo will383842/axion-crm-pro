@@ -1,0 +1,10 @@
+﻿2026-08-19T09:42:55.7290593Z ##[group]Run pnpm lint
+2026-08-19T09:42:55.7290884Z [36;1mpnpm lint[0m
+2026-08-19T09:42:55.7330674Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:42:55.7330950Z env:
+2026-08-19T09:42:55.7331214Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-19T09:42:55.7331534Z ##[endgroup]
+2026-08-19T09:42:56.1267030Z 
+2026-08-19T09:42:56.1268229Z > @axion-ia/axion-crm-pro-workers@0.1.0 lint /home/runner/work/axion-crm-pro/axion-crm-pro/workers
+2026-08-19T09:42:56.1269368Z > eslint . --max-warnings 0
+2026-08-19T09:42:56.1269644Z 

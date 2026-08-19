@@ -1,0 +1,10 @@
+# Reference mesuree le 2026-08-19
+e8924b8 fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)
+9d273cd fix(rgpd+acces): le registre affirmait une chose FAUSSE en sa faveur — rectifié le jour même
+1145473 docs(rgpd): registre des violations, notification non retenue (#188)
+
+# grep -c Schedule::command backend/routes/console.php
+35
+
+# hooks d'echec dans console.php (onFailure/emailOutputOnFailure/pingOnFailure/sendOutputTo)
+0

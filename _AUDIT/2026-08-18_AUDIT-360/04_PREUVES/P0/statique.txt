@@ -1,0 +1,22 @@
+### PHPStan niveau 8 — 2026-08-19T09:37:51Z
+Note: Using configuration file /var/www/html/phpstan.neon.
+
+ [OK] No errors                                                                 
+
+
+### Pint (dry-run)
+  ⨯ tests/Unit/Media/ImportMediaFromArcomTest.php new_with_parentheses, metho…  
+  ⨯ tests/Unit/Media/PressKitImportTest.php line_ending, unary_operator_space…  
+  ⨯ tests/Unit/PhpstanBaselineNeGrossitPasTest.php method_argument_space, lin…  
+  ⨯ tests/Unit/Rotations/SearchEngineRotatorTest.php method_argument_space, l…  
+  ⨯ tests/Unit/Rotations/WeightedRoundRobinTest.php                line_ending  
+  ⨯ tests/Unit/Rules/PasswordResetWithHibpTest.php no_unused_imports, blank_l…  
+  ⨯ tests/Unit/Scraping/GooglePlacesClientTest.php                 line_ending  
+  ⨯ tests/Unit/Scraping/GooglePlacesQuotaTest.php                  line_ending  
+  ⨯ tests/Unit/Scraping/GooglePlacesSmartSkipTest.php              line_ending  
+  ⨯ tests/Unit/SmokeTest.php                              new_with_parentheses  
+  ⨯ tests/Unit/Support/AuditLoggerTest.php        fully_qualified_strict_types  
+  ⨯ tests/Unit/Support/WaterfallSentryTest.php    fully_qualified_strict_types  
+  ⨯ tests/Unit/Tags/AutoTaggerServiceTest.php                      line_ending  
+  ⨯ tests/bootstrap.php                                            line_ending  
+

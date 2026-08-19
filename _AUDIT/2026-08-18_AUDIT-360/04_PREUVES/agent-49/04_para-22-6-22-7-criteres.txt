@@ -1,0 +1,119 @@
+AGENT 49 — 04 §22.6 LA CARTE, §22.7 LE TABLEAU DE BORD, CRITERES 5 et 18
+=======================================================================
+
+--- §22.6 : la carte 'ou je vais pour quoi' est-elle implementee ? ---
+$ grep -rniE "o[uù] je vais|quel outil|console axionia" src/
+[fin — AUCUN]
+Le seul dispositif d'orientation du CRM est OnboardingTour.tsx (6 etapes) :
+17:    target: 'body',
+19:    content: (
+31:    target: '[data-tour="sidebar"]',
+33:    content: "La barre latérale suit votre journée : Aujourd'hui, Contacts, Collecte, Pilotage, Conformité, Réglages. Un mot par notion, toujours au même endroit.",
+36:    target: '[data-tour="global-search"]',
+38:    content: (
+47:    target: '[data-tour="nav-companies"]',
+49:    content: 'Cliquez ici pour parcourir vos entreprises enrichies. Vous pouvez en créer manuellement ou laisser les scrapers les remplir.',
+52:    target: '[data-tour="nav-dashboard"]',
+54:    content: 'Le dashboard affiche vos KPIs : entreprises totales, contacts valides, taux de succès des scrapers.',
+57:    target: '[data-tour="dark-mode"]',
+59:    content: 'Mode clair/sombre — la préférence est sauvegardée localement.',
+62:    target: '[data-tour="nav-settings"]',
+64:    content: (
+-> les 6 etapes portent sur la barre laterale, la recherche, les entreprises,
+   le tableau de bord et le mode sombre. AUCUNE ne nomme la console axionia.
+
+$ grep -rniE "o[uù] je vais|ouvrir le CRM|console axionia" src/lib src/components/admin
+[fin — AUCUN]
+
+--- §22.7 : le tableau de bord du canal, cote SITE ---
+$ ls src/app/[locale]/(admin)/[adminPrefix]/synchro-crm/
+_components
+page.tsx
+
+Champs rendus (CrmSyncHealth) :
+  /** Drapeaux — une carte vide n'est une anomalie que si la synchro est allumée. */
+  enabled: boolean;
+  candidatesEnabled: boolean;
+  /** URL + secret présents : sans eux aucune émission n'est possible. */
+  configured: boolean;
+
+  counts: Record<CrmSyncStatusName, number>;
+  /** `pending` + `failed` : ce qui reste à passer. */
+  backlog: number;
+  backlogThreshold: number;
+  /** Lignes dont la dernière tentative a échoué dans les 24 h. */
+  failures24h: number;
+  /** Lignes acquittées par le CRM dans les 24 h. */
+  sent24h: number;
+  lastSentAt: Date | null;
+  /** Âge du plus vieux `pending`/`failed` — le RETARD MAX du plan. */
+  oldestPendingAt: Date | null;
+  oldestPendingMinutes: number | null;
+
+  /** Événements reçus du CRM (consentements, sens inverse). */
+  inbound: { total: number; last24h: number; lastAt: Date | null };
+
+  /** Écart source ↔ outbox, recalculé à l'affichage (aucun effet de bord). */
+  reconciliation: ReconcileReport;
+
+  errors: CrmSyncErrorRow[];
+
+Rejeu en un clic :
+29:import { rejouerLigneCrmSyncAction } from "@/server/actions/crm-sync/replay";
+31:import { RejouerBouton } from "./_components/RejouerBouton";
+310:                    <RejouerBouton id={ligne.id} action={rejouerLigneCrmSyncAction} />
+
+MAIS : aucun seuil de SILENCE sur l'entrant (derniere phrase du §22.7).
+$ grep -rnE 'inbound' src/server/crm-sync/health.ts src/server/crm-sync/alerts.ts
+src/server/crm-sync/health.ts:63:  inbound: { total: number; last24h: number; lastAt: Date | null };
+src/server/crm-sync/health.ts:74:  const [grouped, failures24h, sent24h, lastSent, oldest, inboundTotal, inbound24h, lastInbound] =
+src/server/crm-sync/health.ts:147:    inbound: {
+src/server/crm-sync/health.ts:148:      total: inboundTotal,
+src/server/crm-sync/health.ts:149:      last24h: inbound24h,
+-> inbound.lastAt est CALCULE et AFFICHE, jamais COMPARE a un seuil.
+TEMOIN NEGATIF : le seuil existe pour l'autre sens —
+src/server/crm-sync/alerts.ts:36:export const CRM_SYNC_BACKLOG_THRESHOLD = 50;
+src/server/crm-sync/health.ts:16:import { CRM_SYNC_BACKLOG_THRESHOLD } from "./alerts";
+src/server/crm-sync/health.ts:139:    backlogThreshold: CRM_SYNC_BACKLOG_THRESHOLD,
+
+--- CRITERE 18 : l'instrument de parite (E32-003 recoupe) ---
+familles comparees :
+ * avis rejoignent la comparaison ; chacune avec SA condition d'émission (un
+ * enregistrement qui, par construction, n'émet pas n'est pas un manquant).
+ */
+compareFamily — la requete, SANS filtre de statut :
+  const emitted = await prisma.crmSyncOutbox.findMany({
+    where: { subjectRef: { in: refs } },
+    select: { subjectRef: true },
+  });
+
+  const seen = new Set(emitted.map((row) => row.subjectRef));
+  const missing = refs.filter((ref) => !seen.has(ref));
+
+-> compare des sources DU SITE a l'outbox DU SITE. Le CRM n'est jamais interroge.
+
+--- CRITERE 5 : les cadences ---
+sens CRM -> site (routes/console.php) :
+// Lot L5 (2026-08-14) — mini-outbox CRM → site : les oppositions nées dans la
+// console convergent vers le site (sinon les deux systèmes se réécrivent à des
+// opposés). Construite INERTE : le skip() saute le run tant que
+// CRM_OUTBOUND_ENABLED n'est pas à true, et la commande elle-même refuse
+// (double verrou, comme les purges). withoutOverlapping : deux passages
+// concurrents rejoueraient les mêmes lignes dues.
+Schedule::command('crm:flush-outbound')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->skip(fn (): bool => ! filter_var(config('crm.outbound_enabled', false), FILTER_VALIDATE_BOOLEAN));
+
+sens site -> CRM : emission immediate post-commit (enqueue.ts) —
+/**
+ * Écriture d'un événement dans l'OUTBOX, puis demande d'émission immédiate.
+ *
+ * ── Pourquoi une outbox et pas un appel direct ───────────────────────────────
+ * Un appel HTTP direct depuis la Server Action ferait dépendre la capture du
+ * lead de la disponibilité d'un autre système : CRM lent = formulaire lent,
+ * CRM mort = événement perdu sans trace. Ici, l'événement est d'abord POSÉ en
+ * base (statut `pending`), et l'émission n'est qu'une optimisation de
+ * fraîcheur : ce qui garantit la livraison, c'est le rejeu périodique.
+ *

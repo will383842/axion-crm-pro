@@ -1,0 +1,86 @@
+### INVENTAIRE DES 13 SCRAPERS
+-- fichiers + lignes
+   10 workers/src/bridge/redis.ts
+   10 workers/src/scrapers/_stub.ts
+   10 workers/src/scrapers/crunchbase.worker.ts
+   10 workers/src/scrapers/direction-finder.worker.ts
+   10 workers/src/scrapers/france-travail.worker.ts
+   10 workers/src/scrapers/google-maps.worker.ts
+   10 workers/src/scrapers/google-search.worker.ts
+   10 workers/src/scrapers/infogreffe.worker.ts
+   10 workers/src/scrapers/mesri.worker.ts
+   10 workers/src/scrapers/pages-jaunes.worker.ts
+   10 workers/src/scrapers/social-light.worker.ts
+   10 workers/src/scrapers/societe-com.worker.ts
+   10 workers/src/scrapers/website.worker.ts
+   15 workers/src/mocks/MockPagesJaunesScraper.ts
+   15 workers/src/mocks/MockWebsiteScraper.ts
+   17 workers/src/healthcheck.ts
+   20 workers/src/bridge/queues.ts
+   22 workers/src/mocks/MockSearchScraper.ts
+   22 workers/src/utils/extract.ts
+   23 workers/src/mocks/MockDirectionFinderScraper.ts
+   23 workers/src/mocks/MockGoogleMapsScraper.ts
+   27 workers/src/mocks/MockHttpSourceScraper.ts
+   34 workers/src/bridge/result-sender.ts
+   45 workers/src/scrapers/pages-jaunes.playwright.ts
+   46 workers/src/healthcheck-server.ts
+   53 workers/src/main.ts
+   56 workers/src/scrapers/google-maps.playwright.ts
+   71 workers/src/scrapers/website.playwright.ts
+   78 workers/src/scrapers/google-search.playwright.ts
+   85 workers/src/browser/launcher.ts
+   92 workers/src/scrapers/http-source.ts
+  118 workers/src/scrapers/direction-finder.playwright.ts
+  119 workers/src/utils/ssrf-guard.ts
+  252 workers/src/scrapers/base.ts
+ 1363 total
+
+-- REGISTRY de workers/src/main.ts (les workers reellement demarrables)
+const REGISTRY: Record<WorkerType, () => Promise<void>> = {
+  'google-maps':       startGoogleMapsWorker,
+  'pages-jaunes':      startPagesJaunesWorker,
+  'website':           startWebsiteWorker,
+  'google-search':     startGoogleSearchWorker,
+  'direction-finder':  startDirectionFinderWorker,
+  'france-travail':    startFranceTravailWorker,
+  'mesri':             startMesriWorker,
+  'crunchbase':        startCrunchbaseWorker,
+  'infogreffe':        startInfogreffeWorker,
+  'societe-com':       startSocieteComWorker,
+  'social-light':      startSocialLightWorker,
+};
+
+
+-- _stub.ts est-il importe quelque part ?
+workers/src/scrapers/_stub.ts:7:export async function stubWorker(name: string): Promise<void> {
+
+-- les workers sont-ils declares dans docker-compose ?
+187:  # conservé (workers/) et le job CI `workers` continue de le tester sur
+
+-- quels scrapers sont couverts par un test ?
+workers/tests/base-worker.test.ts:12:} from '../src/scrapers/base';
+workers/tests/base-worker.test.ts:13:import type { ScrapeResult } from '../src/bridge/result-sender';
+workers/tests/extract.test.ts:2:import { extractEmails, extractPhones } from '../src/utils/extract';
+workers/tests/registre-sources.test.ts:5:import { QUEUES } from '../src/bridge/queues';
+workers/tests/result-sender.test.ts:63:import { sendResult, type ScrapeResult } from '../src/bridge/result-sender';
+workers/tests/ssrf-guard.test.ts:2:import { checkSsrf } from '../src/utils/ssrf-guard';
+workers/tests/ssrf-guard-dns.test.ts:28:import { checkSsrf, ensureSsrf } from '../src/utils/ssrf-guard';
+
+  google-maps : 2 fichier(s) de test
+  google-search : 0 fichier(s) de test
+  pages-jaunes : 1 fichier(s) de test
+  website : 0 fichier(s) de test
+  direction-finder : 0 fichier(s) de test
+  crunchbase : 0 fichier(s) de test
+  france-travail : 0 fichier(s) de test
+  infogreffe : 0 fichier(s) de test
+  mesri : 0 fichier(s) de test
+  societe-com : 0 fichier(s) de test
+  social-light : 0 fichier(s) de test
+  http-source : 0 fichier(s) de test
+  base : 2 fichier(s) de test
+  _stub : 0 fichier(s) de test
+
+-- resultat de la suite workers (npx vitest run)
+   Test Files 6 passed (6) / Tests 61 passed (61) -- voir 06_workers_vitest.txt

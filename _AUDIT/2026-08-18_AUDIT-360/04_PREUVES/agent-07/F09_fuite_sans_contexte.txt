@@ -1,0 +1,22 @@
+SET
+RESET
+                  cas                  | count 
+---------------------------------------+-------
+ email_verification_logs SANS contexte |     0
+(1 row)
+
+           cas           | count 
+-------------------------+-------
+ companies SANS contexte |     0
+(1 row)
+
+                cas                 | count 
+------------------------------------+-------
+ health_practitioners SANS contexte |     0
+(1 row)
+
+             cas             | count 
+-----------------------------+-------
+ llm_use_cases SANS contexte |     1
+(1 row)
+

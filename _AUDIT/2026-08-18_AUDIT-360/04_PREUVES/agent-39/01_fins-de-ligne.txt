@@ -1,0 +1,64 @@
+# F39 — preuve 01 : fins de ligne des scripts (methode validee sur temoins)
+# date : 2026-08-19T11:36:44Z   reference : main e8924b8
+
+## Methode : comptage des octets 0x0d
+temoin pur LF   : 0 (attendu 0)
+temoin pur CRLF : 3 (attendu 3)
+
+## Copie de travail Windows (git ls-files '*.sh')
+    29  backend/database/perf/mesure_reference.sh
+    51  infra/docker/entrypoint-prod.sh
+   181  infra/scripts/backup-postgres.sh
+     0  infra/scripts/bootstrap-preprod.sh
+   103  infra/scripts/configure-prod-env.sh
+     0  infra/scripts/definir-mot-de-passe-crm.sh
+   205  infra/scripts/dr-drill.sh
+     0  infra/scripts/fermer-ports-db-prod.sh
+     0  infra/scripts/restore-postgres.sh
+   116  infra/scripts/setup-backup.sh
+   149  infra/scripts/setup-hetzner-cpx22.sh
+     0  infra/scripts/verifier-ports-publies.sh
+   155  infra/scripts/verifier-sauvegarde.sh
+     0  infra/scripts/worktree/artisan-worktree.sh
+     0  infra/scripts/worktree/garde-ports-prod.sh
+     0  infra/scripts/worktree/pest-worktree.sh
+
+## Blob git HEAD (ce qu'un clone Linux recoit)
+     0  infra/scripts/backup-postgres.sh
+     0  infra/scripts/dr-drill.sh
+     0  infra/scripts/verifier-sauvegarde.sh
+     0  infra/scripts/setup-backup.sh
+     0  infra/docker/entrypoint-prod.sh
+
+## Serveur de production /opt/axion-crm-pro (deploye par git fetch+reset)
+     0  infra/scripts/backup-postgres.sh
+     0  infra/scripts/dr-drill.sh
+     0  infra/scripts/verifier-sauvegarde.sh
+     0  infra/docker/entrypoint-prod.sh
+
+## Temoins d'EXECUTION
+Git Bash (Windows), script CRLF   : TEMOIN-EXECUTE   <- TOLERE
+Git Bash (Windows), script LF     : TEMOIN-EXECUTE
+Linux, script CRLF                : /tmp/crlf.sh: line 2: set: pipefail: invalid option name
+Linux, script LF                  : TEMOIN-EXECUTE
+
+## bash -n sur Linux des copies de travail Windows
+--- dr-drill.sh (copie Windows)
+/tmp/dr-drill.sh: line 154: syntax error near unexpected token `|'
+/tmp/dr-drill.sh: line 154: `    | docker exec -i "$PG_CONTENEUR" psql -U axion -d "$BASE_DRILL" -q \'
+code=2
+--- verifier-sauvegarde.sh (copie Windows)
+/tmp/vs.sh: line 82: unexpected EOF while looking for matching `)'
+/tmp/vs.sh: line 156: syntax error: unexpected end of file
+code=2
+--- backup-postgres.sh (copie Windows)
+/tmp/bp.sh: line 145: unexpected EOF while looking for matching `)'
+/tmp/bp.sh: line 182: syntax error: unexpected end of file
+code=2
+--- TEMOIN NEGATIF : backup-postgres.sh depuis le blob git (LF)
+code=0
+
+## Cause
+git config core.autocrlf = true
+.gitattributes present (41 lignes) mais copie de travail jamais renormalisee
+Deploiement : .github/workflows/deploy-direct-ssh.yml ligne 153 = 'git fetch --all --prune' (donc LF sur le serveur)

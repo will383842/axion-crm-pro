@@ -1,0 +1,70 @@
+﻿2026-08-19T09:42:55.8806742Z ##[group]Run pnpm install --frozen-lockfile
+2026-08-19T09:42:55.8807148Z [36;1mpnpm install --frozen-lockfile[0m
+2026-08-19T09:42:55.8884787Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:42:55.8885070Z env:
+2026-08-19T09:42:55.8885337Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-19T09:42:55.8885689Z ##[endgroup]
+2026-08-19T09:42:56.3404602Z Lockfile is up to date, resolution step is skipped
+2026-08-19T09:42:56.4043649Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-08-19T09:42:56.5289482Z Packages: +600
+2026-08-19T09:42:56.5290124Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-08-19T09:42:57.4058859Z Progress: resolved 600, reused 600, downloaded 0, added 162
+2026-08-19T09:42:57.6945852Z Progress: resolved 600, reused 600, downloaded 0, added 600, done
+2026-08-19T09:42:58.1450338Z 
+2026-08-19T09:42:58.1451049Z dependencies:
+2026-08-19T09:42:58.1451865Z + @hookform/resolvers 3.10.0
+2026-08-19T09:42:58.1452453Z + @sentry/react 8.55.2
+2026-08-19T09:42:58.1453096Z + @tanstack/react-query 5.101.4
+2026-08-19T09:42:58.1453778Z + @tanstack/react-query-devtools 5.101.4
+2026-08-19T09:42:58.1454446Z + @tanstack/react-router 1.170.27
+2026-08-19T09:42:58.1455076Z + @tanstack/react-table 8.21.3
+2026-08-19T09:42:58.1455647Z + @tanstack/react-virtual 3.14.9
+2026-08-19T09:42:58.1456165Z + axios 1.16.1
+2026-08-19T09:42:58.1456694Z + class-variance-authority 0.7.1
+2026-08-19T09:42:58.1457178Z + clsx 2.1.1
+2026-08-19T09:42:58.1457563Z + cmdk 1.1.1
+2026-08-19T09:42:58.1457944Z + date-fns 4.2.0
+2026-08-19T09:42:58.1458345Z + i18next 26.3.6
+2026-08-19T09:42:58.1458874Z + i18next-browser-languagedetector 8.2.1
+2026-08-19T09:42:58.1459458Z + laravel-echo 1.19.0
+2026-08-19T09:42:58.1459893Z + lucide-react 0.460.0
+2026-08-19T09:42:58.1460321Z + maplibre-gl 4.7.1
+2026-08-19T09:42:58.1460726Z + pusher-js 8.5.0
+2026-08-19T09:42:58.1461072Z + react 19.2.8
+2026-08-19T09:42:58.1461914Z + react-dom 19.2.8
+2026-08-19T09:42:58.1462324Z + react-hook-form 7.76.0
+2026-08-19T09:42:58.1462762Z + react-i18next 15.7.4
+2026-08-19T09:42:58.1463179Z + react-joyride 2.9.3
+2026-08-19T09:42:58.1463540Z + sonner 2.0.8
+2026-08-19T09:42:58.1463903Z + tailwind-merge 3.6.0
+2026-08-19T09:42:58.1464258Z + zod 4.4.3
+2026-08-19T09:42:58.1464704Z + zustand 5.0.15
+2026-08-19T09:42:58.1464967Z 
+2026-08-19T09:42:58.1465153Z devDependencies:
+2026-08-19T09:42:58.1465628Z + @axe-core/playwright 4.11.3
+2026-08-19T09:42:58.1465969Z + @playwright/test 1.60.0
+2026-08-19T09:42:58.1466246Z + @sentry/cli 2.58.5
+2026-08-19T09:42:58.1466486Z + @tailwindcss/vite 4.3.3
+2026-08-19T09:42:58.1466747Z + @testing-library/dom 10.4.1
+2026-08-19T09:42:58.1467042Z + @testing-library/jest-dom 6.9.1
+2026-08-19T09:42:58.1467357Z + @testing-library/react 16.3.2
+2026-08-19T09:42:58.1467664Z + @testing-library/user-event 14.6.1
+2026-08-19T09:42:58.1467948Z + @types/node 22.19.19
+2026-08-19T09:42:58.1468182Z + @types/react 19.2.18
+2026-08-19T09:42:58.1468415Z + @types/react-dom 19.2.4
+2026-08-19T09:42:58.1468692Z + @vitejs/plugin-react-swc 4.3.3
+2026-08-19T09:42:58.1468973Z + @vitest/coverage-v8 2.1.9
+2026-08-19T09:42:58.1469215Z + eslint 9.39.4
+2026-08-19T09:42:58.1469466Z + eslint-plugin-jsx-a11y 6.10.2
+2026-08-19T09:42:58.1469743Z + eslint-plugin-react 7.37.5
+2026-08-19T09:42:58.1470040Z + eslint-plugin-react-hooks 5.2.0
+2026-08-19T09:42:58.1470540Z + jsdom 25.0.1
+2026-08-19T09:42:58.1470751Z + msw 2.14.6
+2026-08-19T09:42:58.1470943Z + prettier 3.8.3
+2026-08-19T09:42:58.1471446Z + tailwindcss 4.3.0
+2026-08-19T09:42:58.1471779Z + typescript 5.9.3
+2026-08-19T09:42:58.1472021Z + typescript-eslint 8.59.3
+2026-08-19T09:42:58.1472264Z + vite 6.4.2
+2026-08-19T09:42:58.1472454Z + vitest 2.1.9
+2026-08-19T09:42:58.1472568Z 
+2026-08-19T09:42:58.1817919Z Done in 2.2s using pnpm v9.15.9

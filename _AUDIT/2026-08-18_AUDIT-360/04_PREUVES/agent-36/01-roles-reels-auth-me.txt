@@ -1,0 +1,12 @@
+--- owner ---
+{"user":{"id":"f8dabc8d-ed4f-45cc-aaf4-adf8d6f739e7","email":"a36-owner@test.local","name":"a36-owner@test.local","locale":"fr","timezone":"Europe\/Paris","current_workspace_id":"c6a16436-ec1b-461a-a797-e4700d6a0168","totp_enabled_at":null,"first_login_completed_at":"2026-08-19T12:55:01.000000Z","onboarding_tour_completed_at":null},"roles":["owner"]}
+--- admin ---
+{"user":{"id":"71302dbc-f8d0-482d-80cb-ed16e219ed80","email":"a36-admin@test.local","name":"a36-admin@test.local","locale":"fr","timezone":"Europe\/Paris","current_workspace_id":"c6a16436-ec1b-461a-a797-e4700d6a0168","totp_enabled_at":null,"first_login_completed_at":"2026-08-19T12:55:03.000000Z","onboarding_tour_completed_at":null},"roles":["admin"]}
+--- operator ---
+{"user":{"id":"95a59681-c23f-468f-8108-7a93a8dc7523","email":"a36-operator@test.local","name":"a36-operator@test.local","locale":"fr","timezone":"Europe\/Paris","current_workspace_id":"c6a16436-ec1b-461a-a797-e4700d6a0168","totp_enabled_at":null,"first_login_completed_at":"2026-08-19T12:55:04.000000Z","onboarding_tour_completed_at":null},"roles":["operator"]}
+--- viewer ---
+{"user":{"id":"977077d5-4ac6-469d-ace2-003ff5ae952b","email":"a36-viewer@test.local","name":"a36-viewer@test.local","locale":"fr","timezone":"Europe\/Paris","current_workspace_id":"c6a16436-ec1b-461a-a797-e4700d6a0168","totp_enabled_at":null,"first_login_completed_at":"2026-08-19T12:55:04.000000Z","onboarding_tour_completed_at":null},"roles":["viewer"]}
+--- norole ---
+{"user":{"id":"3b4c7cec-43d0-4791-9921-d19cf81206e6","email":"a36-norole@test.local","name":"a36-norole@test.local","locale":"fr","timezone":"Europe\/Paris","current_workspace_id":"c6a16436-ec1b-461a-a797-e4700d6a0168","totp_enabled_at":null,"first_login_completed_at":"2026-08-19T12:55:05.000000Z","onboarding_tour_completed_at":null},"roles":[]}
+--- owner2 ---
+{"user":{"id":"4aa245ce-278d-4d1d-9dff-7c96b0969628","email":"a36-owner2@test.local","name":"a36-owner2@test.local","locale":"fr","timezone":"Europe\/Paris","current_workspace_id":"5c654b31-e479-4b79-b7ab-a94331cafcfc","totp_enabled_at":null,"first_login_completed_at":"2026-08-19T12:55:06.000000Z","onboarding_tour_completed_at":null},"roles":["owner"]}

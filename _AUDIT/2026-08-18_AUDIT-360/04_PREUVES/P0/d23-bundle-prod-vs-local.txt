@@ -1,0 +1,17 @@
+### D23-001 — le bundle PRODUCTION porte-t-il la barre neuve ? — 2026-08-19T11:16:19Z
+Commit de refonte : da97826, 2026-08-18 17:39
+
+PRODUCTION  https://app.axion-crm-pro.com/assets/index-D3nU2tuG.js (1 046 364 o)
+  Journaux de collecte : 2     <- barre NEUVE, temoin positif
+  Collectes            : 2     <- barre NEUVE
+  Audiences (segments) : 1     <- barre NEUVE
+  Conformite           : 3     <- barre NEUVE
+  Runs de scraping     : 0     <- barre PERIMEE absente, temoin negatif
+
+LOCAL       https://app.localhost/assets/index-DPQz8SpC.js (975 382 o)
+  Journaux de collecte : 0     <- barre neuve ABSENTE
+  Runs de scraping     : 2     <- barre PERIMEE presente
+  Phase 2              : 2     <- barre PERIMEE presente
+
+VERDICT : la PRODUCTION est a jour. C'est l'ATELIER LOCAL qui sert une barre
+          vieille de 32 h. La crainte de l'agent 23 est levee pour la production.

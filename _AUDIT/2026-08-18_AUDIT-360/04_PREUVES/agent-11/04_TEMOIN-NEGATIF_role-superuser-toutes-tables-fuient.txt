@@ -1,0 +1,72 @@
+# Agent 11 — MEME epreuve sous le role REELLEMENT utilise par l'application : axion (SUPERUSER + BYPASSRLS)
+ current_user | super | bypassrls 
+--------------+-------+-----------
+ axion        | t     | t
+(1 row)
+
+      verdict       | count 
+--------------------+-------
+ FUITE-CROSS-ESPACE |    57
+(1 row)
+
+       table_name        | rls | force_rls | npol | n_sans_contexte | n_contexte_a | n_contexte_a_hors_a | n_contexte_b |      verdict       
+-------------------------+-----+-----------+------+-----------------+--------------+---------------------+--------------+--------------------
+ activities              | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ ai_act_register         | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ analytics_attribution   | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ analytics_cohorts       | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ analytics_daily_rollups | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ analytics_funnels       | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ analytics_kpis          | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ audience_members        | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ business_events         | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ campaigns               | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ candidate_tag           | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ candidates              | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ companies               | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ company_tag             | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ contacts                | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ coverage_zones          | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ crm_lost_reasons        | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ crm_notes               | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ crm_pipelines           | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ crm_tasks               | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ deals                   | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ dnc_lists               | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ duplicate_flags         | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ email_audiences         | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ email_events            | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ email_inboxes           | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ email_sends             | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ email_templates         | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ email_threads           | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ email_verification_logs | t   | t         |    2 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ email_warmup_pools      | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ health_practitioners    | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ invitations             | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ journalists             | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ linkedin_accounts       | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ linkedin_invitations    | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ linkedin_messages       | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ linkedin_profiles_cache | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ linkedin_sequences      | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ llm_usage               | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ llm_use_cases           | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ media                   | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ notifications           | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ pipeline_stages         | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ proxy_providers_config  | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ proxy_usage_log         | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ rgpd_requests           | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ rotations               | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ saved_views             | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ scraper_runs            | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ scraping_campaigns      | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ sessions                | f   | f         |    0 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ strategic_keywords      | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ tags                    | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ unsubscribes            | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ user_workspaces         | f   | f         |    0 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+ web_vital_samples       | t   | t         |    1 |               2 |            2 |                   1 |            2 | FUITE-CROSS-ESPACE
+(57 rows)
+

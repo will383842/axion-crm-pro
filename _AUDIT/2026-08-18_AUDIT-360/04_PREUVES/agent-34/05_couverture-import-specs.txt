@@ -1,0 +1,12 @@
+scripts/calendly-webhook-subscribe.ts | import-alias:0 | import-rel:0
+src/app/[locale]/(admin)/[adminPrefix]/submissions/_v2/SubmissionsV2.tsx | import-alias:0 | import-rel:0
+src/app/[locale]/(admin)/[adminPrefix]/synchro-crm/_components/RejouerBouton.tsx | import-alias:0 | import-rel:0
+src/app/[locale]/(admin)/[adminPrefix]/synchro-crm/page.tsx | import-alias:0 | import-rel:2
+src/app/[locale]/carrieres/[slug]/postuler/page.tsx | import-alias:0 | import-rel:2
+src/app/[locale]/vivier-opposition/page.tsx | import-alias:0 | import-rel:2
+src/app/api/admin/submissions/export/route.ts | import-alias:0 | import-rel:11
+src/app/api/calendly/client-event/route.ts | import-alias:0 | import-rel:11
+src/app/api/calendly/webhook/route.ts | import-alias:0 | import-rel:11
+src/app/api/gdpr-erase/route.ts | import-alias:0 | import-rel:11
+src/app/api/gdpr-export/route.ts | import-alias:0 | import-rel:11
+src/app/api/internal/crm-webhook/route.ts | import-alias:0 | import-rel:11

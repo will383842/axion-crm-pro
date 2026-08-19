@@ -1,0 +1,77 @@
+=== D-03 : TELESCOPE ===
+.env.example:52:TELESCOPE_ENABLED=false
+=== D-04 : DatabaseSeeder appelle quoi ? ===
+11:        $this->call([
+12:            PermissionsAndRolesSeeder::class,
+13:            CountriesSeeder::class,
+14:            FrenchRegionsSeeder::class,
+15:            CitiesLargeSeeder::class,
+16:            EffectifRangesSeeder::class,
+17:            AxionOfferTargetsSeeder::class,
+18:            SearchEnginesSeeder::class,
+19:            NafSectionsSeeder::class,
+20:            LegalFormsSeeder::class,
+21:            UserAgentsSeeder::class,
+22:            LlmUseCasesSeeder::class,
+23:            OwnerUserSeeder::class,
+24:            AiActRegisterSeeder::class,
+25:            DemoCompaniesSeeder::class,
+26:            DefaultAudiencesSeeder::class,
+=== D-13 : base du site ===
+(vide = absent)
+axion-ia-redis
+axion-ia-mailhog
+=== D-13 : DATABASE_URL du site ===
+13:***@localhost:5433/axion_ia_dev?schema=public
+/c/Users/willi/Documents/Projets/Axion-IA/axionia/.env.ci.example
+/c/Users/willi/Documents/Projets/Axion-IA/axionia/.env.dev
+/c/Users/willi/Documents/Projets/Axion-IA/axionia/.env.dev.example
+/c/Users/willi/Documents/Projets/Axion-IA/axionia/.env.example
+/c/Users/willi/Documents/Projets/Axion-IA/axionia/.env.local
+/c/Users/willi/Documents/Projets/Axion-IA/axionia/.env.production.example
+=== D-04 : GovernedTagsSeeder appele ? ===
+    {
+        $this->call([
+            PermissionsAndRolesSeeder::class,
+            CountriesSeeder::class,
+            FrenchRegionsSeeder::class,
+            CitiesLargeSeeder::class,
+            EffectifRangesSeeder::class,
+            AxionOfferTargetsSeeder::class,
+            SearchEnginesSeeder::class,
+            NafSectionsSeeder::class,
+            LegalFormsSeeder::class,
+            UserAgentsSeeder::class,
+            LlmUseCasesSeeder::class,
+            OwnerUserSeeder::class,
+            AiActRegisterSeeder::class,
+            DemoCompaniesSeeder::class,
+            DefaultAudiencesSeeder::class,
+        ]);
+    }
+}
+=== tags src:site-formulaire dans GovernedTagsSeeder ===
+14
+backend/database/seeders/GovernedTagsSeeder.php:30:class GovernedTagsSeeder extends Seeder
+backend/database/seeders/ScrapingSourcesSeeder.php:176:     * `GovernedTagsSeeder::referential()`).
+=== qui appelle GovernedTagsSeeder ? ===
+backend/app/Console/Commands/ScrapingBackfillSrcTags.php
+backend/app/Crm/Ingest/SiteSyncIngestService.php
+backend/app/Services/Tags/AutoTaggerService.php
+backend/database/seeders/GovernedTagsSeeder.php
+backend/database/seeders/ScrapingSourcesSeeder.php
+backend/tests/Feature/Crm/ScrapedIngestTest.php
+backend/tests/Feature/Crm/SiteSyncIngestTest.php
+backend/tests/Feature/Crm/SocleCrmTest.php
+backend/tests/Unit/Tags/AutoTaggerServiceTest.php
+--- occurrences ---
+backend/database/seeders/GovernedTagsSeeder.php:30:class GovernedTagsSeeder extends Seeder
+backend/database/seeders/ScrapingSourcesSeeder.php:176:     * `GovernedTagsSeeder::referential()`).
+backend/app/Console/Commands/ScrapingBackfillSrcTags.php:108:        // Le tag de chaque source doit préexister (GovernedTagsSeeder les
+backend/app/Crm/Ingest/SiteSyncIngestService.php:7:use Database\Seeders\GovernedTagsSeeder;
+backend/app/Crm/Ingest/SiteSyncIngestService.php:399:     *   - il appartient au référentiel VERSIONNÉ (`GovernedTagsSeeder`) ou à un
+backend/app/Crm/Ingest/SiteSyncIngestService.php:417:        $referential = GovernedTagsSeeder::referential();
+backend/app/Services/Tags/AutoTaggerService.php:103:            // (`tags.is_locked`, référentiel gouverné du GovernedTagsSeeder)
+=== tags dans la base fraiche a07_fresh (apres migrate) ===
+0
+0

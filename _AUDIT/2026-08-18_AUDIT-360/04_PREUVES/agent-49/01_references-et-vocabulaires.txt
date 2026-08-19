@@ -1,0 +1,62 @@
+AGENT 49 — 01 REFERENCES ET VOCABULAIRES (joue le 2026-08-19)
+============================================================
+$ git -C Axion-CRM-Pro rev-parse --short HEAD
+e8924b8
+$ git log --oneline -4
+e8924b8 fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)
+9d273cd fix(rgpd+acces): le registre affirmait une chose FAUSSE en sa faveur — rectifié le jour même
+1145473 docs(rgpd): registre des violations, notification non retenue (#188)
+bb60473 docs(rgpd): registre des violations — obligation art. 33-5, et la notification n'aura PAS lieu
+
+$ git -C axionia rev-parse --short HEAD
+eb754332
+
+--- T1 : vocabulaire ENTRANT (site -> CRM), cote CRM ---
+    public const EVENT_TYPES = [
+        'form_submission',
+        'calendly_booked',
+        'calendly_completed',
+        'calendly_canceled',
+        'calendly_no_show',
+        'newsletter_optin',
+        'newsletter_optout',
+        'review_posted',
+        'application_submitted',
+        'opt_out',
+    ];
+    public const FORM_TYPES = [
+        'audit', 'implementation', 'formation', 'un_a_un', 'devis',
+        'partenariat', 'presse', 'recrutement', 'speaker', 'investisseur',
+        'support_client', 'autre', 'podcast', 'simulateur_roi',
+    ];
+
+--- T1b : sections fermees du contrat entrant ---
+72:    private const TOP_LEVEL_KEYS = [
+73-        'schema_version', 'event_id', 'event_type', 'occurred_at', 'form_type',
+74-        'source_slug', 'subject_ref', 'person', 'company', 'consent',
+75-        'candidate', 'tags', 'payload',
+76-    ];
+--
+78:    private const PERSON_KEYS = ['person_key', 'email', 'first_name', 'last_name', 'phone'];
+79-
+80:    private const COMPANY_KEYS = ['siren', 'name', 'postcode', 'city', 'website', 'size_category', 'sector'];
+81-
+82:    private const CONSENT_KEYS = ['version', 'at', 'text_ref', 'vivier_at'];
+83-
+84:    private const CANDIDATE_KEYS = ['family', 'offer_slug', 'attributes', 'experiences', 'cv_ref'];
+85-
+86-    /**
+87-     * @param  array<string, mixed>  $person
+88-     * @param  array<string, mixed>  $company
+
+--- T16a : vocabulaire SORTANT (CRM -> site) @ HEAD ---
+33:    public const EVENT_TYPES = ['consent_optout', 'consent_optin', 'erasure'];
+--- T16b : appelants reels du recorder (hors app/Crm/Outbound) ---
+app/Http/Controllers/Api/JournalistsController.php:5:use App\Crm\Outbound\ConsentOutboundRecorder;
+app/Http/Controllers/Api/JournalistsController.php:155:                app(ConsentOutboundRecorder::class)->recordForEmail(
+app/Http/Controllers/Api/RgpdRequestsController.php:5:use App\Crm\Outbound\ConsentOutboundRecorder;
+app/Http/Controllers/Api/RgpdRequestsController.php:135:            app(ConsentOutboundRecorder::class)->recordForEmail(
+--- TEMOIN NEGATIF : le meme grep trouve bien un autre service injecte ---
+app/Crm/Outbound/ConsentOutboundRecorder.php:17: * Il n'est JAMAIS branché sur SiteSyncIngestService ni SiteGdprService : ces
+app/Http/Controllers/Internal/SiteSyncController.php:6:use App\Crm\Ingest\SiteSyncIngestService;
+app/Http/Controllers/Internal/SiteSyncController.php:37:    public function __construct(private readonly SiteSyncIngestService $ingest) {}

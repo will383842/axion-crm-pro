@@ -1,0 +1,21 @@
+=== PROD : les 3 form_submission — contact_id, workspace, payload (cles seules) ===
+  id  | contact_id | a_person_key |    ws    |                 cles_payload                 
+------+------------+--------------+----------+----------------------------------------------
+ 1203 |            | t            | axion-ia | source,source_slug,subject_ref,pending_match
+ 1202 |            | t            | axion-ia | source,source_slug,subject_ref,pending_match
+ 1197 |            | t            | axion-ia | source,source_slug,subject_ref,pending_match
+(3 rows)
+
+
+=== PROD : contacts lies + person_key ===
+ERROR:  column c.source does not exist
+LINE 2: ...T NULL AS a_person_key, c.consent_at, c.created_at, c.source
+                                                               ^
+HINT:  Perhaps you meant to reference the column "c.sources".
+
+=== PROD : total contacts avec person_key / consent_at ===
+ avec_empreinte | avec_consentement |  total  
+----------------+-------------------+---------
+              0 |                 0 | 1319567
+(1 row)
+

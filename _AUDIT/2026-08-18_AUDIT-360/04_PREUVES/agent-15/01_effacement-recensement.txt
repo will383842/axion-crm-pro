@@ -1,0 +1,54 @@
+# AGENT 15 — EFFACEMENT REEL SUR BASE JETABLE
+# Base : axion_crm_rgpd15 (clone schema de axion_crm, 101 tables), conteneur axion-crm-api
+# Commande : docker exec -e DB_DATABASE=axion_crm_rgpd15 axion-crm-api php /tmp/seed.php && php /tmp/test.php
+# Reference : main c0c453d (HEAD 1145473 = 4 commits docs uniquement, code identique)
+# Sujet : jean.dupont@exemple-test.fr / +33612345678 / person_key pk-test-15
+
+SEED OK contact=1 company=1 ws=8f1f22b0-... vivier=018b3bae-...
+=== A. RECENSEMENT AVANT EFFACEMENT ===
+  contacts 1 | candidates 1 | activities 1 | journalists 1 | media 1
+  health_practitioners 1 | email_validations 1 | email_verification_logs 1
+  rgpd_requests 1 | notifications 1 | magic_links 1 | unsubscribes 1
+  dnc_entries 1 | email_messages 1 | email_threads 1 | crm_notes 1
+  opt_out 0 | email_suppressions 0
+
+=== B. EFFACEMENT REEL : GdprErasureService::erase() ===
+{"deleted":{"contacts":1,"email_validations":1,"rgpd_requests":1,"notifications":1,
+ "magic_links":1,"journalists":1,"media_email":1,"health_practitioners":1},"opt_out_added":true}
+
+=== C. RESIDUS APRES EFFACEMENT (table | avant | apres) ===
+  contacts                   1      0
+  candidates                 1      1      <<< RESIDU
+  activities                 1      1      <<< RESIDU
+  journalists                1      0
+  media                      1      1      <<< RESIDU (email nullifie, phone conserve)
+  health_practitioners       1      0
+  email_validations          1      0
+  email_verification_logs    1      1      <<< RESIDU
+  rgpd_requests              1      0
+  notifications              1      0
+  magic_links                1      0
+  unsubscribes               1      1      <<< RESIDU
+  dnc_entries                1      1      <<< RESIDU
+  email_messages             1      0      (cascade FK depuis contacts)
+  email_threads              1      0      (cascade FK depuis contacts)
+  crm_notes                  1      0      (cascade FK depuis contacts)
+  opt_out                    0      1      (attendu : anti-reinsertion)
+  email_suppressions         0      0
+
+=== C2. CONTENU DES RESIDUS ===
+activities : {"id":1,"contact_id":null,"person_key":"pk-test-15",
+  "content":"appele au +33612345678",
+  "payload":"{\"tel\": \"+33612345678\", \"email\": \"jean.dupont@exemple-test.fr\"}"}
+  -> contact_id passe a NULL (FK ON DELETE SET NULL) mais l'ADRESSE ET LE TELEPHONE
+     RESTENT EN CLAIR dans content et payload.
+
+opt_out : {"id":1,"email":null,"email_hash":"7bb3a4c3...","phone":"+33612345678",
+  "scope":"business","source":"gdpr_erasure"}
+  -> email en clair : NULL (correct). phone : EN CLAIR. scope : business SEUL.
+
+=== FK ON DELETE mesurees (pg_constraint, confdeltype) ===
+email_sends.contact_id=c  linkedin_messages.contact_id=c  email_threads.contact_id=c
+linkedin_invitations.contact_id=c  linkedin_sequence_runs.contact_id=c
+crm_notes.contact_id=c  crm_tasks.contact_id=c  audience_members.contact_id=c
+deals.primary_contact_id=n (SET NULL)   activities.contact_id=n (SET NULL)

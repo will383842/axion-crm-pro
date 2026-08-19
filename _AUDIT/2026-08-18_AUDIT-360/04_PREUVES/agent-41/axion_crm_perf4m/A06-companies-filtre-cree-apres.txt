@@ -1,0 +1,39 @@
+############ A06-companies-filtre-cree-apres
+### base   : axion_crm_perf4m   (datcollate = C)
+### date   : 2026-08-19T13:41:07+02:00
+### SQL    :
+select * from "companies" where "deleted_at" is null and "created_at" >= '2026-08-01 00:00:00' and "workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168' order by "quality_score" desc limit 100 offset 0;
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                                          QUERY PLAN                                                                           
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.43..894.43 rows=100 width=2078) (actual time=4.984..701.168 rows=100 loops=1)
+   Buffers: shared hit=6 read=286
+   ->  Index Scan using idx_companies_workspace_score on companies  (cost=0.43..250149.24 rows=27981 width=2078) (actual time=4.980..700.504 rows=100 loops=1)
+         Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+         Filter: ((deleted_at IS NULL) AND (created_at >= '2026-08-01 00:00:00+00'::timestamp with time zone))
+         Rows Removed by Filter: 10292
+         Buffers: shared hit=6 read=286
+ Planning:
+   Buffers: shared hit=815
+ Planning Time: 27.634 ms
+ Execution Time: 701.564 ms
+(11 rows)
+
+
+===== CHAUD (4e exécution) =====
+                                                                          QUERY PLAN                                                                          
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.43..894.43 rows=100 width=2078) (actual time=0.147..18.764 rows=100 loops=1)
+   Buffers: shared hit=292
+   ->  Index Scan using idx_companies_workspace_score on companies  (cost=0.43..250149.24 rows=27981 width=2078) (actual time=0.143..18.723 rows=100 loops=1)
+         Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+         Filter: ((deleted_at IS NULL) AND (created_at >= '2026-08-01 00:00:00+00'::timestamp with time zone))
+         Rows Removed by Filter: 10292
+         Buffers: shared hit=292
+ Planning:
+   Buffers: shared hit=815
+ Planning Time: 15.996 ms
+ Execution Time: 18.933 ms
+(11 rows)
+

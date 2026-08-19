@@ -1,0 +1,33 @@
+﻿2026-08-19T09:42:45.0584726Z Current runner version: '2.336.0'
+2026-08-19T09:42:45.0621001Z ##[group]Runner Image Provisioner
+2026-08-19T09:42:45.0622344Z Hosted Compute Agent
+2026-08-19T09:42:45.0623280Z Version: 20260729.566
+2026-08-19T09:42:45.0624165Z Commit: cf7153fe6e25b664e8693c24944bf2b00355d109
+2026-08-19T09:42:45.0625349Z Build Date: 2026-07-29T19:17:02Z
+2026-08-19T09:42:45.0626406Z Worker ID: {46b7db0f-acd6-492e-9365-dbb4b338b36b}
+2026-08-19T09:42:45.0627547Z Azure Region: eastus2
+2026-08-19T09:42:45.0628382Z ##[endgroup]
+2026-08-19T09:42:45.0631266Z ##[group]Operating System
+2026-08-19T09:42:45.0632251Z Ubuntu
+2026-08-19T09:42:45.0633023Z 24.04.4
+2026-08-19T09:42:45.0633848Z LTS
+2026-08-19T09:42:45.0634651Z ##[endgroup]
+2026-08-19T09:42:45.0635494Z ##[group]Runner Image
+2026-08-19T09:42:45.0636470Z Image: ubuntu-24.04
+2026-08-19T09:42:45.0637313Z Version: 20260816.277.1
+2026-08-19T09:42:45.0639306Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260816.277/images/ubuntu/Ubuntu2404-Readme.md
+2026-08-19T09:42:45.0642122Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260816.277
+2026-08-19T09:42:45.0643611Z ##[endgroup]
+2026-08-19T09:42:45.0645449Z ##[group]GITHUB_TOKEN Permissions
+2026-08-19T09:42:45.0648531Z Contents: read
+2026-08-19T09:42:45.0649737Z Metadata: read
+2026-08-19T09:42:45.0650572Z Packages: read
+2026-08-19T09:42:45.0651576Z ##[endgroup]
+2026-08-19T09:42:45.0654205Z Secret source: Actions
+2026-08-19T09:42:45.0656009Z Prepare workflow directory
+2026-08-19T09:42:45.1128126Z Prepare all required actions
+2026-08-19T09:42:45.1198952Z Getting action download info
+2026-08-19T09:42:45.3195643Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-08-19T09:42:45.4331410Z Download action repository 'pnpm/action-setup@v4' (SHA:b906affcce14559ad1aafd4ab0e942779e9f58b1)
+2026-08-19T09:42:45.6731329Z Download action repository 'actions/setup-node@v7' (SHA:820762786026740c76f36085b0efc47a31fe5020)
+2026-08-19T09:42:45.8629361Z Complete job name: Workers Node + Playwright

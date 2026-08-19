@@ -1,0 +1,15 @@
+===================== SONDES AGENT 12 =====================
+UTC 2026-08-19T09:58:23Z
+
+--- 1. A-001 : etendue -------------------------------------
+### GET /up (public) -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)
+### GET / (web.php, public) -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)
+### GET /api/v1/auth/me  Accept:json -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)
+### GET /api/v1/auth/me  Accept:text/html -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)
+### GET /api/v1/companies Accept:*/* -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)
+### GET /api/v1/companies Accept:text/html -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)
+### GET /api/v1/crm/contacts-hub Accept:text/html -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)
+### POST /api/v1/auth/logout Accept:text/html -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)
+
+--- 2. Routes publiques : epargnees ? ----------------------
+### POST /api/v1/auth/login (vide, json) -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)

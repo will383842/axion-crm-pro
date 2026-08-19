@@ -1,0 +1,654 @@
+[2026-08-19 12:54:36] local.INFO: Remplissage des empreintes d’opposition {"table":"opt_out","empreintes_calculees":0} 
+[2026-08-19 12:54:36] local.INFO: Remplissage des empreintes d’opposition {"table":"email_suppressions","empreintes_calculees":0} 
+
+   PASS  Tests\Feature\PasDeStub501SousCrmEtAnalyticsTest
+  ✓ 🔴 A2 — aucun fourre-tout {any} ne capture les sous-chemins de /c… 315.79s  
+  ✓ 🔴 C3 — le drapeau console v2 ouvert, /crm sert du code réel (200)… 47.71s  
+  ✓ 🔴 A1 — aucune route sous /crm ni /analytics n’est servie par un c… 10.82s  
+  ✓ 🔴 C1 — /api/v1/crm et /api/v1/analytics ne répondent 501 sur aucu… 17.47s  
+  ✓ 🔴 C2 — un sous-chemin inexistant sous /crm ou /analytics répond 40… 9.67s  
+  ✓ 🔴 B — les routes RÉELLES de la console v2 sous /crm sont toujours… 12.62s  
+  ✓ /cold-email et /linkedin restent des bouchons 501 — choix assumé,…  11.02s  
+
+   FAIL  Tests\Feature\NeDoitPasRegresserTest
+  ✓ ACQUIS 2 (suite) — la surveillance et l’exercice de restauration e… 29.63s  
+  ✓ ACQUIS 4 (suite) — une empreinte INCONNUE ne rend rien : le filtre… 24.79s  
+  ✓ ACQUIS 1 (suite) — le rôle applicatif n’est ni superutilisateur ni… 11.66s  
+  ⨯ ACQUIS 2 — un dump produit avec la recette de production se restau… 36.81s  
+  ⨯ ACQUIS 4 — l’export RGPD trouve la fiche par son EMPREINTE, même q… 15.63s  
+  ⨯ ACQUIS 1 — sans contexte workspace, le rôle applicatif ne voit AUC… 26.79s  
+  ⨯ ACQUIS 3 — une date reçue en UTC survit à l’aller-retour en base    17.82s  
+  ⨯ ACQUIS 3 — le réglage qui rend le verrou capable de rougir est tou… 24.58s  
+  ⨯ ACQUIS 3 — la session Postgres est alignée sur le fuseau de l’appli… 9.62s  
+
+   FAIL  Tests\Feature\RlsTest
+  ⨯ le rôle applicatif n’est ni superutilisateur ni BYPASSRLS ni propr… 18.58s  
+  ⨯ drapeaux OFF : une requête sans contexte se comporte comme avant (… 16.52s  
+  ⨯ en mode strict, WorkspaceContext::run pose le contexte et le resta… 13.87s  
+  ⨯ le rôle applicatif ne voit que son workspace                        17.69s  
+  ⨯ runWithoutScope exige une justification écrite                      16.63s  
+  ⨯ une écriture SANS contexte est rejetée (pas un no-op silencieux)    12.49s  
+  ⨯ sans contexte, un tag EXISTANT est invisible et son insertion est…  22.95s  
+  ⨯ sans contexte workspace, le rôle applicatif ne voit AUCUNE ligne     9.73s  
+  ⨯ drapeau db_app_role à OFF : la connexion par défaut reste le rôle…  10.08s  
+  ⨯ un UPDATE croisé ne touche aucune ligne du workspace voisin         17.85s  
+  ⨯ la commande de backfill pose bien son contexte workspace (correcti… 19.47s  
+  ⨯ drapeaux par défaut : aucun durcissement actif                      38.06s  
+  ⨯ une écriture dans un AUTRE workspace est rejetée par la policy      27.78s  
+  ⨯ en mode strict, le contexte est restauré même si le job lève une e… 30.91s  
+  ⨯ en mode strict, une requête sans contexte workspace échoue bruyamm… 15.53s  
+
+   FAIL  Tests\Feature\EtancheiteParTableTest
+  ⨯ TÉMOIN — la sonde « 0 ligne sans contexte » détecte réellement une… 16.04s  
+  ⨯ TÉMOIN — FORCE ROW LEVEL SECURITY change bien le comportement du P… 20.01s  
+  ⨯ health_practitioners : le commentaire de 2026_07_04 annonce une po… 30.60s  
+  ⨯ le semeur couvre TOUTES les tables scopées — aucune table nouvelle… 21.33s  
+  ⨯ AVEC le contexte du workspace A, chaque table scopée ne rend QUE l… 33.69s  
+  ⨯ l’inventaire des tables scopées est CALCULÉ, et ses exclusions son… 20.14s  
+  ⨯ toutes les tables scopées portent ENABLE + FORCE ROW LEVEL SECURIT… 26.15s  
+  ⨯ aucune policy ne rouvre un repli permissif — y compris sous la for… 27.17s  
+  ⨯ DÉFAUT CONNU — email_verification_logs fuit SANS contexte (à corri… 38.91s  
+  ⨯ SANS contexte workspace, AUCUNE table scopée ne rend la moindre li… 41.17s  
+  ⨯ les exclusions de la MIGRATION et celles des TESTS sont la même li… 12.57s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\NeDoitPasRegresserTest > ACQUIS 2 —…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/NeDoitPasRegresserTest.php:104
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\NeDoitPasRegresserTest > ACQUIS 4 —…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/NeDoitPasRegresserTest.php:104
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\NeDoitPasRegresserTest > ACQUIS 1 —…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, 13670c6a-6d50-4976-a2e7-30d4a8f0591d, false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/NeDoitPasRegresserTest.php:122
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\NeDoitPasRegresserTest > ACQUIS 3 —…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/NeDoitPasRegresserTest.php:104
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\NeDoitPasRegresserTest > ACQUIS 3 —…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/NeDoitPasRegresserTest.php:104
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\NeDoitPasRegresserTest > ACQUIS 3 —…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/NeDoitPasRegresserTest.php:104
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > le rôle applicatif n’est…   QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  app/Support/WorkspaceContext.php:55
+  13  app/Support/WorkspaceContext.php:60
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > drapeaux OFF : une requêt…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  app/Support/WorkspaceContext.php:55
+  13  app/Support/WorkspaceContext.php:60
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > en mode strict, Workspace…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  app/Support/WorkspaceContext.php:55
+  13  app/Support/WorkspaceContext.php:60
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > le rôle applicatif ne voi…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, 3c82188b-238c-4c5a-8c4b-85996ff99ae7, false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/RlsTest.php:110
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > runWithoutScope exige une…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  app/Support/WorkspaceContext.php:55
+  13  app/Support/WorkspaceContext.php:60
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > une écriture SANS context…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/RlsTest.php:161
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > sans contexte, un tag EXI…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  app/Support/WorkspaceContext.php:55
+  13  app/Support/WorkspaceContext.php:60
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > sans contexte workspace,…   QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/RlsTest.php:126
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > drapeau db_app_role à OFF…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  app/Support/WorkspaceContext.php:55
+  13  app/Support/WorkspaceContext.php:60
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > un UPDATE croisé ne touch…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, 875e38c7-84a3-4600-a08b-f14b048d9959, false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/RlsTest.php:184
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > la commande de backfill p…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  app/Support/WorkspaceContext.php:55
+  13  app/Support/WorkspaceContext.php:60
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > drapeaux par défaut : auc…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  app/Support/WorkspaceContext.php:55
+  13  app/Support/WorkspaceContext.php:60
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > une écriture dans un AUTR…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, 906abf41-868d-4cdb-be57-26b616a7d566, false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/RlsTest.php:138
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > en mode strict, le contex…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  app/Support/WorkspaceContext.php:55
+  13  app/Support/WorkspaceContext.php:60
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > en mode strict, une requê…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  app/Support/WorkspaceContext.php:55
+  13  app/Support/WorkspaceContext.php:60
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\EtancheiteParTableTest > TÉMOIN — l…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/EtancheiteParTableTest.php:53
+  13  tests/Feature/EtancheiteParTableTest.php:459
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\EtancheiteParTableTest > TÉMOIN — F…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/EtancheiteParTableTest.php:53
+  13  tests/Feature/EtancheiteParTableTest.php:98
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\EtancheiteParTableTest > health_pra…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/EtancheiteParTableTest.php:53
+  13  tests/Feature/EtancheiteParTableTest.php:557
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\EtancheiteParTableTest > le semeur…   QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/EtancheiteParTableTest.php:53
+  13  tests/Feature/EtancheiteParTableTest.php:98
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\EtancheiteParTableTest > AVEC le co…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, c3d992be-f068-45d1-a85c-d8ef13f2a695, false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/EtancheiteParTableTest.php:53
+  13  tests/Feature/EtancheiteParTableTest.php:282
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\EtancheiteParTableTest > l’inventai…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/EtancheiteParTableTest.php:53
+  13  tests/Feature/EtancheiteParTableTest.php:98
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\EtancheiteParTableTest > toutes les…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/EtancheiteParTableTest.php:53
+  13  tests/Feature/EtancheiteParTableTest.php:98
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\EtancheiteParTableTest > aucune pol…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/EtancheiteParTableTest.php:53
+  13  tests/Feature/EtancheiteParTableTest.php:98
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\EtancheiteParTableTest > DÉFAUT CON…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/EtancheiteParTableTest.php:53
+  13  tests/Feature/EtancheiteParTableTest.php:405
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\EtancheiteParTableTest > SANS conte…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/EtancheiteParTableTest.php:53
+  13  tests/Feature/EtancheiteParTableTest.php:247
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\EtancheiteParTableTest > les exclus…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/EtancheiteParTableTest.php:53
+  13  tests/Feature/EtancheiteParTableTest.php:98
+
+
+  Tests:    32 failed, 10 passed (122 assertions)
+  Duration: 1295.88s
+  Random Order Seed: 1787136561
+

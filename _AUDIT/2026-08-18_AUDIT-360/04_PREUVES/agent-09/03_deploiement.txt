@@ -1,0 +1,20 @@
+### DEPLOIEMENT — ce que le workflow fait reellement
+200:          docker compose up -d --build --force-recreate --no-deps api app horizon scheduler
+--- ce que _AUDIT/DEPLOY-PIPELINE.md ecrit ---
+14:            │    ├─ docker compose up -d --force-recreate api app
+84:docker compose up -d --force-recreate api app
+97:docker compose up -d --force-recreate api app
+--- deploy-prod.yml ---
+ls: cannot access 'C:/Users/willi/Documents/Projets/Axion-CRM-Pro/.github/workflows/deploy-prod.yml': No such file or directory
+--- Coolify retire de deploy-staging.yml le 19/08 ---
+  # 🔴 RÉÉCRIT le 2026-08-19 — Coolify RETIRÉ, remplacé par le patron SSH.
+  #
+  # Ce qui était là avant : deux jobs `trigger-coolify` + `smoke` conditionnés à
+  # `vars.COOLIFY_STAGING_ENABLED`. Ils n'ont JAMAIS tourné, et pour une raison
+  # de fond : **le CRM ne se déploie pas par Coolify.** Il se déploie par
+  # `deploy-direct-ssh.yml` (SSH + `git reset --hard` + `docker compose`).
+  # Coolify déploie le SITE Axion-IA, pas ce produit — une confusion durable
+  # entre les deux dépôts.
+  #
+  # Bâtir la préproduction sur Coolify aurait créé un SECOND mécanisme de
+  # déploiement, différent de celui de la production : une préproduction qui ne

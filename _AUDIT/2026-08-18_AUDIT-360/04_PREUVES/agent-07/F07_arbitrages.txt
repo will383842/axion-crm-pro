@@ -1,0 +1,19 @@
+=== F7 : arbitrages — neq/not_in sur NULL ===
+backend/app/Services/Audiences/AudienceBuilderService.php:26:        'eq', 'neq', 'in', 'not_in', 'gt', 'lt', 'gte', 'lte',
+backend/app/Services/Audiences/AudienceBuilderService.php:316:     * `neq` et `not_in` en sont ABSENTS à dessein : en mémoire ils répondent
+backend/app/Services/Audiences/AudienceBuilderService.php:404:        if (in_array($op, ['in', 'not_in'], true) && ! is_array($value)) {
+backend/app/Services/Audiences/AudienceBuilderService.php:410:        // 🔴 `neq` et `not_in` acceptent EXPLICITEMENT les colonnes NULL.
+backend/app/Services/Audiences/AudienceBuilderService.php:427:        // ⚠️ Cela ÉLARGIT les audiences bâties sur `neq` / `not_in` : les fiches
+backend/app/Services/Audiences/AudienceBuilderService.php:439:                case 'neq':         $q->where(fn ($qq) => $qq->where($field, '!=', $value)->orWhereNull($field));
+backend/app/Services/Audiences/AudienceBuilderService.php:443:                case 'not_in':      $q->where(fn ($qq) => $qq->whereNotIn($field, $value)->orWhereNull($field));
+backend/app/Services/Audiences/AudienceBuilderService.php:535:            'neq' => $actual != $value,
+backend/app/Services/Audiences/AudienceBuilderService.php:537:            'not_in' => is_array($value) && ! in_array($actual, $value, false),
+
+=== F7 : adresse en clair dans opposition ===
+25: * `opt_out` est aujourd'hui GLOBALE et stocke l'email EN CLAIR. Deux ajouts :
+31: *   - `email_hash` : opposer sans conserver l'email en clair. C'est le hash qui
+61:        foreach (['scope', 'email_hash'] as $column) {
+93:        DB::statement('ALTER TABLE opt_out ADD COLUMN IF NOT EXISTS email_hash TEXT');
+98:        DB::statement('CREATE INDEX IF NOT EXISTS idx_opt_out_scope_email_hash ON opt_out (scope, email_hash) WHERE email_hash IS NOT NULL');
+101:        DB::statement("COMMENT ON COLUMN opt_out.email_hash IS 'sha256 de l''email normalisé. Conservé APRÈS effacement pour empêcher la réinsertion par un futur re-scrape — c''est le seul motif légitime de conservation.'");
+2026_08_15_000004_email_suppressions.php

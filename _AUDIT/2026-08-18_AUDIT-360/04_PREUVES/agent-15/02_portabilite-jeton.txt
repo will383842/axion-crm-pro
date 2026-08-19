@@ -1,0 +1,24 @@
+# AGENT 15 — PORTABILITE ART. 20 + JETON D'EXPORT
+=== D. PORTABILITE ===
+token=LOdKlepN6FfFKNZxlPmFdQfUmVIDbDF8u9wo80izp1sXC9of len=48 expires=2026-08-26T12:54:09+02:00 size=1568
+alphabet distinct chars = 33   (Str::random -> base62, ~285 bits : NON enumerable)
+export_token en base = 0f60760d...  (hash sha256 du jeton ? OUI)
+fichier sur disque   = gdpr-exports/LOdKlepN...enc  existe=oui  (LE JETON EST LE NOM DE FICHIER)
+
+-- D1. CONTENU DE L'EXPORT (cles de premier niveau) --
+   subject, exported, contacts(0), email_validations(0), rgpd_requests(1), magic_links_history(0)
+   -> QUATRE tables seulement.
+
+-- D2. JETON : USAGE UNIQUE ? --
+   3 recuperations consecutives : OK / OK / OK
+   -> NON. Le docblock de GdprPortabilityService:13 annonce « token telechargement one-shot ».
+      retrieve() ne consomme jamais le jeton. Rejouable pendant 7 jours.
+
+-- D3. JETON FAUX --
+   retrieve('AAAA...48') => NULL  -> 404 invalid_or_expired_token (correct, pas de 401)
+
+-- D4. JETON EXPIRE --
+   retrieve(tok) apres expiration => NULL (correct)
+   fichier .enc encore sur disque ? OUI (non purge)
+   fichiers presents : gdpr-exports/LOdKlepN...enc
+   -> aucune commande de nettoyage des exports expires n'existe dans le depot.

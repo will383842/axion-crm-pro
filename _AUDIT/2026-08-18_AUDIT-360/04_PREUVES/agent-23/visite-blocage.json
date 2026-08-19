@@ -1,0 +1,16 @@
+{
+  "etat": {
+    "infobulle": false,
+    "overlay": false,
+    "overlayRect": null,
+    "auClicSurLaBarre": {
+      "tag": "NAV",
+      "cls": "flex-1 overflow-y-auto px-2 py-3"
+    },
+    "auClicSurLeContenu": {
+      "tag": "P",
+      "cls": "mt-1 max-w-md text-sm text-slate-600"
+    }
+  },
+  "clicSurSectionContacts": "oui"
+}

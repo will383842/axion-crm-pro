@@ -1,0 +1,55 @@
+=== nombre de contraintes par type ===
+ contype | count 
+---------+-------
+ f       |   139
+ p       |   114
+ c       |    68
+ u       |    36
+(4 rows)
+
+=== tables SANS aucune cle etrangere alors qu'elles portent une colonne *_id ===
+         relname         |   colonnes_id_sans_fk    
+-------------------------+--------------------------
+ activities              | subject_id, workspace_id
+ analytics_attribution   | workspace_id
+ analytics_cohorts       | workspace_id
+ analytics_daily_rollups | workspace_id
+ analytics_funnels       | workspace_id
+ analytics_kpis          | workspace_id
+ audience_members        | workspace_id
+ audit_logs_default      | workspace_id
+ audit_logs_p20260201    | workspace_id
+ audit_logs_p20260301    | workspace_id
+ audit_logs_p20260401    | workspace_id
+ audit_logs_p20260501    | workspace_id
+ audit_logs_p20260601    | workspace_id
+ audit_logs_p20260701    | workspace_id
+ audit_logs_p20260801    | workspace_id
+ audit_logs_p20260901    | workspace_id
+ audit_logs_p20261001    | workspace_id
+ audit_logs_p20261101    | workspace_id
+ audit_logs_p20261201    | workspace_id
+ audit_logs_p20270101    | workspace_id
+ audit_logs_p20270201    | workspace_id
+ business_events         | resource_id
+ companies               | foreign_id
+ company_tag             | workspace_id
+ crm_notes               | workspace_id
+ crm_outbound_events     | event_id
+ crm_tasks               | workspace_id
+ duplicate_flags         | entity_b_id, entity_a_id
+ email_messages          | message_id
+ email_sends             | message_id
+ email_threads           | workspace_id
+ linkedin_accounts       | proxy_id
+ linkedin_invitations    | workspace_id
+ linkedin_messages       | workspace_id
+ linkedin_profiles_cache | workspace_id
+ media                   | arcom_id
+ model_has_permissions   | model_id
+ model_has_roles         | model_id
+ personal_access_tokens  | tokenable_id
+ proxy_usage_log         | workspace_id
+ unsubscribes            | workspace_id
+(41 rows)
+

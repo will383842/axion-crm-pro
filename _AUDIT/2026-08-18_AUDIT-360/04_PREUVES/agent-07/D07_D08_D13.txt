@@ -1,0 +1,33 @@
+=== D-07 : port 58080 publie ? ===
+80/tcp -> 0.0.0.0:58080
+80/tcp -> [::]:58080
+http://localhost:58080/up -> 000/n=== D-08 : versions de consentement ===
+ slug 
+------
+(0 rows)
+
+backend/app/Crm/Taxonomy.php:188:        'vivier-stock-2026-08-14',
+=== D-13 : base du site ===
+                                                     List of databases
+         Name          | Owner | Encoding | Locale Provider | Collate | Ctype | ICU Locale | ICU Rules | Access privileges 
+-----------------------+-------+----------+-----------------+---------+-------+------------+-----------+-------------------
+ a07_fresh             | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm             | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_a           | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_a06         | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_a11         | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_a12         | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_a18         | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_a19         | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_a35         | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_a36         | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_a45         | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_agent14     | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_agent17     | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_audit13     | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_b           | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_c           | axion | UTF8     | libc            | C       | C     |            |           | 
+ axion_crm_d           | axion | UTF8     | libc            | C       | C     |            |           | 
+=== D-07 : test 58080 ===
+curl: (28) Operation timed out after 10008 milliseconds with 0 bytes received
+--- depuis le conteneur ---

@@ -1,0 +1,45 @@
+# Agent 11 — les 33 commandes planifiees de routes/console.php, hors requete HTTP
+# colonne 3 : la commande touche-t-elle une table portant workspace_id ?
+# colonne 4 : pose-t-elle un contexte d'espace (WorkspaceContext) ?
+nom_commande | fichier | touche_table_scopee | WorkspaceContext
+anomaly:detect | AnomalyDetect.php | OUI | non
+audiences:full-refresh | AudiencesFullRefreshCommand.php | OUI | non
+audit:verify-chain | AuditVerifyChain.php | non | non
+blacklists:check | BlacklistsCheck.php | non | non
+campaigns:start-scheduled | StartScheduledCampaignsCommand.php | OUI | non
+companies:rescrape-archives | RescrapeArchivesCommand.php | OUI | non
+companies:retry-google-places | RetryGooglePlacesCommand.php | OUI | non
+coverage:refresh-matrix | CoverageRefreshMatrix.php | non | non
+crm:flush-outbound | CrmFlushOutbound.php | non | non
+journalists:scrape-ours | JournalistsScrapeOurs.php | OUI | non
+media:backfill-periodicity | MediaBackfillPeriodicity.php | OUI | non
+media:clean-emails | MediaCleanEmails.php | OUI | non
+media:enrich | MediaEnrich.php | OUI | non
+media:extract-from-companies | ExtractMediaFromCompanies.php | OUI | non
+media:find-websites | MediaFindWebsites.php | OUI | non
+media:generate-redaction-emails | GenerateMediaRedactionEmails.php | OUI | non
+media:import-arcom | ImportMediaFromArcom.php | OUI | non
+media:import-blogs | ImportMediaBlogs.php | OUI | non
+media:import-emissions-wikidata | ImportMediaEmissionsFromWikidata.php | OUI | non
+media:import-opendatasoft | ImportMediaFromOpendatasoft.php | OUI | non
+media:link-emissions-to-channels | MediaLinkEmissionsToChannels.php | OUI | non
+media:link-to-companies | MediaLinkToCompanies.php | OUI | non
+media:score-confidence | MediaScoreConfidence.php | OUI | non
+media:sync-emissions-from-parent | MediaSyncEmissionsFromParent.php | OUI | non
+media:sync-from-companies | MediaSyncFromCompanies.php | OUI | non
+media:tag-emissions-status | MediaTagEmissionsStatus.php | OUI | non
+prospection:score-email-confidence | ScoreEmailConfidence.php | OUI | non
+retention:prune-scraper-runs | PruneScraperRuns.php | OUI | non
+retention:purge | RetentionPurge.php | OUI | non
+rgpd:anonymize-ips | AnonymizeOldIps.php | OUI | non
+rgpd:purge-business-prospects | RgpdPurgeBusinessProspects.php | OUI | OUI
+rgpd:purge-vivier | RgpdPurgeVivier.php | OUI | OUI
+signals:nightly-scan | SignalsNightlyScan.php | non | non
+
+# Jobs de app/Jobs (hors trait) et usage de RunsInWorkspace / WorkspaceContext
+DispatchScrapeJob.php | contexte=non
+EnrichCompanyJob.php | contexte=OUI
+LaunchCampaignJob.php | contexte=non
+LaunchZoneScrapingJob.php | contexte=non
+MonitorCampaignProgressJob.php | contexte=non
+RefreshAudienceChunkJob.php | contexte=non

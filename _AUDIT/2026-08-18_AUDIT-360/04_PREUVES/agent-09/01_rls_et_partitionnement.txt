@@ -1,0 +1,46 @@
+### RLS — base locale axion_crm — mesure 2026-08-19T10:03:20Z
+!! La base locale axion_crm est MUTEE EN CONCURRENCE par d autres agents de l audit.
+!! Une premiere mesure a 11h50 UTC rendait 101 tables / 55 RLS / 59 workspace_id.
+!! Une seconde a 12h02 rendait 2 tables : elle est tombee PENDANT un migrate:fresh.
+!! Les chiffres ci-dessous sont horodates ; croiser avec les fichiers de migration.
+-- migrations appliquees vs fichiers --
+58
+58
+-- tables / RLS / workspace_id --
+114|55|72
+-- workspace_id SANS RLS --
+audit_logs
+audit_logs_default
+audit_logs_p20260201
+audit_logs_p20260301
+audit_logs_p20260401
+audit_logs_p20260501
+audit_logs_p20260601
+audit_logs_p20260701
+audit_logs_p20260801
+audit_logs_p20260901
+audit_logs_p20261001
+audit_logs_p20261101
+audit_logs_p20261201
+audit_logs_p20270101
+audit_logs_p20270201
+sessions
+user_workspaces
+-- audit_logs partitionne ? --
+ERROR:  operator is not unique: text || "char"
+LINE 1: SELECT relname||' '||relkind FROM pg_class c JOIN pg_namespa...
+                           ^
+HINT:  Could not choose a best candidate operator. You might need to add explicit type casts.
+-- pg_partman installe ? --
+pg_partman
+-- source statique : ENABLE ROW LEVEL SECURITY dans les migrations --
+15
+17
+-- audit_logs : relkind (p = table partitionnee, r = table ordinaire) --
+audit_logs|p
+audit_logs_default|r
+-- tables logiques workspace-scoped SANS RLS (hors partitions) --
+audit_logs
+audit_logs_default
+sessions
+user_workspaces

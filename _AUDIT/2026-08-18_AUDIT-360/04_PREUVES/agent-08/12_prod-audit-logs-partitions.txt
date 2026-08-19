@@ -1,0 +1,43 @@
+=== PROD : audit_logs — volume, workspaces distincts, partitions ===
+ lignes | workspaces 
+--------+------------
+     54 |          1
+(1 row)
+
+ relations_partitionnees 
+-------------------------
+                       0
+(1 row)
+
+  extname   | extversion 
+------------+------------
+ btree_gin  | 1.3
+ btree_gist | 1.7
+ citext     | 1.6
+ pg_trgm    | 1.6
+ pgcrypto   | 1.3
+ plpgsql    | 1.0
+ postgis    | 3.5.2
+ unaccent   | 1.1
+ uuid-ossp  | 1.1
+(9 rows)
+
+
+=== PROD : migrations appliquees les plus recentes ===
+                     migration                     | batch 
+---------------------------------------------------+-------
+ 2026_08_19_000002_crm_activites_et_motifs         |    40
+ 2026_08_19_000001_companies_hub_counts_index      |    39
+ 2026_08_18_100001_partman_dans_son_propre_schema  |    38
+ 2026_08_18_000001_backfill_empreintes_oppositions |    38
+ 2026_08_17_000001_companies_hub_tous_index        |    37
+ 2026_08_16_200000_fixer_search_path_des_fonctions |    36
+ 2026_08_16_000001_audit_logs_prev_hash_default    |    35
+ 2026_08_15_000006_companies_created_at_index      |    34
+(8 rows)
+
+59 migrations appliquees
+
+=== LOCAL : nb migrations dans le depot ===
+58
+58 migrations appliquees en local

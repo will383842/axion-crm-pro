@@ -1,0 +1,29 @@
+# AGENT 15 — MIDDLEWARE REELLEMENT ATTACHE AUX ROUTES (php artisan route:list --json)
+# Joue sur le routeur reel du conteneur axion-crm-api, pas sur une lecture de routes/api.php
+
+GET    api/v1/rgpd/requests           | api,Authenticate:sanctum,SetCurrentWorkspace,EnforceFirstLoginSetup
+POST   api/v1/rgpd/requests           | api,Authenticate:sanctum,SetCurrentWorkspace,EnforceFirstLoginSetup
+POST   api/v1/rgpd/requests/{req}/process | api,Authenticate:sanctum,SetCurrentWorkspace,EnforceFirstLoginSetup
+GET    api/v1/rgpd/export/{token}     | api,ThrottleRequests:magic-link                 <- publique, par jeton
+
+TEMOIN NEGATIF (le controle SAIT montrer une permission quand il y en a une) :
+GET    api/v1/journalists/export      | ...,ThrottleRequests:scraper-list,PermissionMiddleware:data.export
+GET    api/v1/media/export            | ...,ThrottleRequests:scraper-list,PermissionMiddleware:data.export
+
+=> AUCUN PermissionMiddleware sur les trois routes RGPD authentifiees.
+   La permission `rgpd.handle` existe (PermissionsAndRolesSeeder:24), n'est accordee
+   qu'a owner+admin (:65), et n'est JAMAIS exigee :
+   $ grep -o "permission:[a-z._]*" routes/api.php | sort | uniq -c
+         1 permission:companies.update
+         3 permission:data.export
+   (aucune occurrence de permission:rgpd.handle ni de permission:rgpd.view)
+
+MASQUAGE — routes qui rendent des PII SANS MasquageCoordonnees :
+  GET /contacts/{contact}   -> ContactsController::show() : `return $this->ok($contact);`
+                               (modele Eloquent brut ; l'index masque, le detail non)
+  GET /journalists          -> `'data' => $page->items()` (modeles bruts : email, phone)
+  GET /journalists/{j}      -> `$journalist->load('media')`
+  GET /media/{m}            -> `$media->load(['journalists', ...])` (emails des journalistes)
+  GET /crm/candidates       -> CandidatesController:203-204 : 'email' et 'phone' bruts
+Seuls CompaniesController::export, ContactsController::index et ContactsHubController
+appellent MasquageCoordonnees (grep exhaustif sur app/).

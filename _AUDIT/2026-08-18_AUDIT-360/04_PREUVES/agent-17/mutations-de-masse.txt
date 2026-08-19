@@ -1,0 +1,29 @@
+# Suppressions et modifications de masse (grep)
+AnonymizeOldIps.php:25:            : DB::statement(<<<SQL
+CoverageRefreshMatrix.php:23:        DB::statement($concurrent
+ExtractMediaFromCompanies.php:66:        $inserted = DB::affectingStatement($sql);
+ImportIgnAdminExpress.php:157:                    DB::statement(<<<SQL
+ImportIgnAdminExpress.php:164:                    DB::statement(<<<SQL
+ImportIgnAdminExpress.php:176:                    DB::statement(<<<SQL
+ImportMediaFromArcom.php:174:                ->delete();
+ImportMediaFromOpendatasoft.php:134:                ->delete();
+MediaLinkToCompanies.php:51:        $bySiren = DB::affectingStatement(<<<'SQL'
+MediaLinkToCompanies.php:67:        $byName = DB::affectingStatement(<<<'SQL'
+MediaSyncEmissionsFromParent.php:50:        $emailSynced = DB::affectingStatement(<<<'SQL'
+MediaSyncEmissionsFromParent.php:66:        $siteSynced = DB::affectingStatement(<<<'SQL'
+MediaSyncEmissionsFromParent.php:84:        $phoneSynced = DB::affectingStatement(<<<'SQL'
+MediaSyncFromCompanies.php:30:        $siteSynced = DB::affectingStatement(<<<'SQL'
+MediaSyncFromCompanies.php:46:        $contactSynced = DB::affectingStatement(<<<'SQL'
+ProspectionPurgeNonCommercial.php:24:        DB::table('companies')->whereRaw($condition)->delete();
+ProspectionPurgeNonDiffusible.php:22:        DB::table('companies')->where('denomination', '[ND]')->delete();
+PruneScraperRuns.php:39:            $total += DB::table('scraper_runs')->whereIn('id', $ids)->delete();
+RetentionPurge.php:29:                "DELETE FROM email_validations WHERE expires_at < now() - INTERVAL '7 days'",
+RetentionPurge.php:31:                "DELETE FROM notifications WHERE created_at < now() - INTERVAL '90 days'",
+RetentionPurge.php:40:                $explainSql = preg_replace('/^DELETE FROM (\w+)/', 'SELECT COUNT(*) AS c FROM $1', $sql);
+RetentionPurge.php:45:                $affected = DB::affectingStatement($sql);
+RgpdPurgeBusinessProspects.php:72:                return $dryRun ? $stale->count() : $stale->delete();
+RgpdPurgeVivier.php:79:                $expiredCount = $expired->delete();
+RgpdPurgeVivier.php:80:                $refusedCount = $refused->delete();
+RgpdPurgeVivier.php:87:                        ->delete();
+ScrapingBackfillSrcTags.php:78:        $this->info('Rollback par lot si nécessaire : DELETE FROM company_tag WHERE assigned_by = \'backfill-src\' (par tranches).');
+ScrapingBackfillSrcTags.php:165:                        $affected += DB::affectingStatement(

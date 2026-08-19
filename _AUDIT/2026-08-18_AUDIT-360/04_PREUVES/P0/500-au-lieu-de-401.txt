@@ -1,0 +1,25 @@
+=== TEMOIN : routes publiques et protegees, non authentifie ===
+/up                                 -> 200
+/api/v1/auth/login                  -> 405
+/api/v1/config/features             -> 500
+/api/v1/dashboard/stats             -> 500
+/api/v1/companies                   -> 500
+/api/v1/crm/contacts-hub            -> 500
+
+=== corps de la reponse 500 ===
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+
+    <title>Axion CRM Pro</title>
+
+    <link
+        rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg viewBox='0 -.11376601 49.74245785 51.31690859' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m49.626 11.564a.809.809 0 0 1 .028.209v10.972a.8.8 0 0 1 -.402.694l-9.209 5.302v10.509c0 .286-.152.55-.4.694l-19.223 11.066c-.044.025-.092.041-.14.058-.018.006-.035.017-.054.022a.805.805 0 0 1 -.41 0c-.0
+
+=== derniere exception ===
+local.ERROR: Route [login] not defined. 
+local.ERROR: Route [login] not defined. 
+local.ERROR: Route [login] not defined. 

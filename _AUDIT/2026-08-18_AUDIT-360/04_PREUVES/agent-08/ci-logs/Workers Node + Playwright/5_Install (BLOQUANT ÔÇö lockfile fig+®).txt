@@ -1,0 +1,31 @@
+﻿2026-08-19T09:42:50.8110891Z ##[group]Run pnpm install --frozen-lockfile
+2026-08-19T09:42:50.8111349Z [36;1mpnpm install --frozen-lockfile[0m
+2026-08-19T09:42:50.8161728Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:42:50.8162043Z env:
+2026-08-19T09:42:50.8162318Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-19T09:42:50.8162642Z ##[endgroup]
+2026-08-19T09:42:51.2447722Z Lockfile is up to date, resolution step is skipped
+2026-08-19T09:42:51.2838440Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-08-19T09:42:51.3290738Z Packages: +245
+2026-08-19T09:42:51.3291869Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-08-19T09:42:51.6628385Z Progress: resolved 245, reused 245, downloaded 0, added 245, done
+2026-08-19T09:42:52.0575606Z 
+2026-08-19T09:42:52.0576324Z dependencies:
+2026-08-19T09:42:52.0576756Z + axios 1.16.1
+2026-08-19T09:42:52.0577129Z + cheerio 1.2.0
+2026-08-19T09:42:52.0577491Z + ioredis 6.0.0
+2026-08-19T09:42:52.0577822Z + pino 10.3.1
+2026-08-19T09:42:52.0578217Z + playwright 1.62.1
+2026-08-19T09:42:52.0578935Z + playwright-extra 4.3.6
+2026-08-19T09:42:52.0579487Z + puppeteer-extra-plugin-stealth 2.11.2
+2026-08-19T09:42:52.0579971Z + zod 4.4.3
+2026-08-19T09:42:52.0580161Z 
+2026-08-19T09:42:52.0580319Z devDependencies:
+2026-08-19T09:42:52.0580683Z + @types/node 26.2.0
+2026-08-19T09:42:52.0581028Z + eslint 10.8.1
+2026-08-19T09:42:52.0581389Z + tsx 4.22.1
+2026-08-19T09:42:52.0581692Z + typescript 5.9.3
+2026-08-19T09:42:52.0581948Z + typescript-eslint 8.67.0
+2026-08-19T09:42:52.0582200Z + vitest 2.1.9
+2026-08-19T09:42:52.0582319Z 
+2026-08-19T09:42:52.0796176Z Done in 1.2s using pnpm v9.15.9

@@ -1,0 +1,137 @@
+########## 1. Le SQL EXACT de retention:purge, joue SANS contexte ##########
+--- etat initial : notifications, deux espaces
+             workspace_id             | count 
+--------------------------------------+-------
+ 11111111-1111-4111-8111-111111111111 |     1
+ 22222222-2222-4222-8222-222222222222 |     1
+(2 rows)
+
+--- 1a. sous le role APPLICATIF (axion_app, cible du lot L0) : cron vert, zero ligne purgee
+BEGIN
+SET
+ set_config 
+------------
+ 
+(1 row)
+
+UPDATE 0
+ visibles_sans_contexte 
+------------------------
+                      0
+(1 row)
+
+DELETE 0
+ROLLBACK
+--- 1b. sous le role REEL de l application (axion, SUPERUSER) : purge les DEUX espaces
+BEGIN
+UPDATE 2
+ set_config 
+------------
+ 
+(1 row)
+
+ visibles_sans_contexte 
+------------------------
+                      2
+(1 row)
+
+DELETE 2
+ restantes 
+-----------
+         0
+(1 row)
+
+ROLLBACK
+########## 2. Un job sans contexte : lecture ET ecriture ##########
+--- 2a. lecture (ScrapingCampaign::find equivalent) sous axion_app sans contexte
+BEGIN
+SET
+ set_config 
+------------
+ 
+(1 row)
+
+ scraping_campaigns_visibles 
+-----------------------------
+                           0
+(1 row)
+
+ companies_visibles 
+--------------------
+                  0
+(1 row)
+
+ contacts_visibles 
+-------------------
+                 0
+(1 row)
+
+ROLLBACK
+--- 2b. ecriture sans contexte (Company::updateOrCreate equivalent) sous axion_app
+BEGIN
+SET
+ set_config 
+------------
+ 
+(1 row)
+
+ROLLBACK
+########## 3. health_practitioners : la policy reellement en base ##########
+psql:/tmp/a11_hr.sql:38: ERROR:  new row violates row-level security policy for table "companies"
+                 polname                  |                                            using_clause                                            
+------------------------------------------+----------------------------------------------------------------------------------------------------
+ health_practitioners_workspace_isolation | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+(1 row)
+
+BEGIN
+SET
+ set_config 
+------------
+ 
+(1 row)
+
+ hp_sans_contexte 
+------------------
+                0
+(1 row)
+
+              set_config              
+--------------------------------------
+ 11111111-1111-4111-8111-111111111111
+(1 row)
+
+ hp_contexte_a 
+---------------
+             1
+(1 row)
+
+ROLLBACK
+########## 4. email_verification_logs : DEUX policies, dont une permissive ##########
+                   polname                   |                                                            using_clause                                                            
+---------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------
+ email_verif_workspace_isolation             | ((workspace_id)::text = COALESCE(NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text), (workspace_id)::text))
+ email_verification_logs_workspace_isolation | ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+(2 rows)
+
+BEGIN
+SET
+ set_config 
+------------
+ 
+(1 row)
+
+ evl_sans_contexte 
+-------------------
+                 2
+(1 row)
+
+ROLLBACK
+########## 5. audit_logs / sessions / user_workspaces : porteuses de workspace_id, SANS RLS ##########
+      relname       | rls | force_rls | policies 
+--------------------+-----+-----------+----------
+ audit_logs         | f   | f         |        0
+ audit_logs_default | f   | f         |        0
+ sessions           | f   | f         |        0
+ user_workspaces    | f   | f         |        0
+(4 rows)
+

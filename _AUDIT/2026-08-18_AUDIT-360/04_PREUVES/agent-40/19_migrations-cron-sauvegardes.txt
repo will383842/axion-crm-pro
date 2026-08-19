@@ -1,0 +1,42 @@
+=== migration non suivie par git presente dans le conteneur ? ===
+59
+2026_05_17_195529_create_failed_jobs_table.php
+
+=== nb migrations suivies par git (serveur) ===
+59
+
+=== crontab root ===
+0 3 * * * /opt/axion-crm-pro/infra/scripts/backup-postgres.sh >> /var/log/axion-backup.log 2>&1
+
+=== timers systemd actifs ===
+NEXT                                LEFT LAST                              PASSED UNIT                           ACTIVATES
+Wed 2026-08-19 10:50:00 UTC         5min Wed 2026-08-19 10:40:02 UTC 4min 50s ago sysstat-collect.timer          sysstat-collect.service
+Wed 2026-08-19 13:26:05 UTC     2h 41min Tue 2026-08-18 13:26:05 UTC      21h ago update-notifier-download.timer update-notifier-download.service
+Wed 2026-08-19 13:35:33 UTC     2h 50min Tue 2026-08-18 13:35:33 UTC      21h ago systemd-tmpfiles-clean.timer   systemd-tmpfiles-clean.service
+Wed 2026-08-19 18:03:04 UTC           7h Wed 2026-08-19 09:05:29 UTC 1h 39min ago apt-daily.timer                apt-daily.service
+Wed 2026-08-19 18:39:45 UTC           7h Wed 2026-08-19 05:34:23 UTC 5h 10min ago motd-news.timer                motd-news.service
+Thu 2026-08-20 00:00:00 UTC          13h Wed 2026-08-19 00:00:02 UTC      10h ago dpkg-db-backup.timer           dpkg-db-backup.service
+Thu 2026-08-20 00:00:00 UTC          13h Wed 2026-08-19 00:00:02 UTC      10h ago logrotate.timer                logrotate.service
+Thu 2026-08-20 00:07:00 UTC          13h Wed 2026-08-19 00:07:02 UTC      10h ago sysstat-summary.timer          sysstat-summary.service
+Thu 2026-08-20 04:55:01 UTC          18h Wed 2026-08-19 05:34:22 UTC 5h 10min ago man-db.timer                   man-db.service
+Thu 2026-08-20 06:47:56 UTC          20h Wed 2026-08-19 06:17:14 UTC 4h 27min ago apt-daily-upgrade.timer        apt-daily-upgrade.service
+Sun 2026-08-23 03:10:58 UTC       3 days Sun 2026-08-16 03:11:02 UTC   3 days ago e2scrub_all.timer              e2scrub_all.service
+Mon 2026-08-24 01:20:28 UTC       4 days Mon 2026-08-17 00:50:55 UTC   2 days ago fstrim.timer                   fstrim.service
+Thu 2026-08-27 23:22:41 UTC 1 week 1 day Wed 2026-08-19 05:34:22 UTC 5h 10min ago update-notifier-motd.timer     update-notifier-motd.service
+
+
+=== unites systemd axion ===
+(aucune)
+
+=== sauvegardes postgres ===
+ls: cannot access '/opt/backups': No such file or directory
+total 1776
+drwxr-xr-x  3 root root   4096 Aug 19 06:17 .
+drwxr-xr-x 13 root root   4096 Jan  8  2026 ..
+-rw-r--r--  1 root root  40960 Jul 26 00:00 alternatives.tar.0
+-rw-r--r--  1 root root   2152 Jul 19 00:00 alternatives.tar.1.gz
+-rw-r--r--  1 root root   2150 Jul 17 00:00 alternatives.tar.2.gz
+-rw-r--r--  1 root root   2153 Jul  9 00:00 alternatives.tar.3.gz
+-rw-r--r--  1 root root   2153 Jul  5 00:00 alternatives.tar.4.gz
+-rw-r--r--  1 root root   2150 Jun 28 00:00 alternatives.tar.5.gz
+-rw-r--r--  1 root root   2145 Jun 22 00:00 alternatives.tar.6.gz

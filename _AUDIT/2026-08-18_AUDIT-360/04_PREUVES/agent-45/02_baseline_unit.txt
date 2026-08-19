@@ -1,0 +1,51 @@
+
+   WARN  Tests\Unit\PhpstanBaselineNeGrossitPasTest
+  ! l'en-tête de la baseline annonce les nombres réellement présents…  304.49s  
+  ✓ reportUnmatchedIgnoredErrors reste activé                           27.80s  
+  ✓ la baseline PHPStan ne grossit pas                                  15.06s  
+  ✓ aucune entrée de baseline ne vise le socle CRM                      11.53s  
+  ✓ le parseur de baseline lit vraiment des entrées                     16.42s  
+[2026-08-19 12:47:54] local.WARNING: HibpChecker: connection error {"error":"connect timeout"} 
+[2026-08-19 12:48:10] local.WARNING: HibpChecker: guzzle error {"error":"Server error: `GET https://api.pwnedpasswords.com/range/8867C` resulted in a `503 Service Unavailable` response:
+service unavailable
+"} 
+
+   PASS  Tests\Unit\Auth\HibpCheckerTest
+  ✓ HibpChecker fail-open en cas d'erreur réseau                        32.22s  
+  ✓ HibpChecker retourne 0 pour password vide sans appel API             7.19s  
+  ✓ HibpChecker fail-open sur status non-200                             8.40s  
+  ✓ HibpChecker isBreached respecte le threshold                        13.42s  
+  ✓ HibpChecker parse correctement les newlines mixtes                  29.46s  
+  ✓ HibpChecker met en cache le résultat 24h                             8.31s  
+  ✓ HibpChecker retourne le count si suffix trouvé                       4.13s  
+  ✓ HibpChecker returns 0 quand suffix absent                            5.25s  
+[2026-08-19 12:49:34] local.WARNING: HibpChecker: unexpected {"error":"GuzzleHttp\\PrepareBodyMiddleware::__invoke(): Return value must be of type GuzzleHttp\\Promise\\PromiseInterface, GuzzleHttp\\Psr7\\Response returned"} 
+
+   PASS  Tests\Unit\Rules\PasswordResetWithHibpTest
+  ✓ HIBP cache prefix unique par 5 chars du sha1                         4.55s  
+  ✓ HIBP intégration : password long custom est sain                     7.49s  
+  ✓ HIBP integration : password "password" est compromis                 5.70s  
+  ✓ HIBP user-agent inclus dans la requête                               6.52s  
+  ────────────────────────────────────────────────────────────────────────────  
+   WARNINGS  Tests\Unit\PhpstanBaselineNeGrossitPasTest > l'en-tête de la ba…   
+  file_get_contents(/var/www/html/.env): Failed to open stream: No such file or directory
+
+  at vendor/vlucas/phpdotenv/src/Store/File/Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+      [2m+7 vendor frames [22m
+  8   tests/TestCase.php:25
+
+
+  Tests:    1 warning, 16 passed (23 assertions)
+  Duration: 765.81s
+  Random Order Seed: 1787135967
+

@@ -1,0 +1,337 @@
+# 00 — JOURNAL DE L'AUDIT 360°
+
+> Append-only, horodaté (UTC). **Seule source de vérité de l'avancement de l'audit.**
+> Prompt joué : `_PROMPTS/PROMPT_AUDIT_360_CRM_PRO_2026-08-18.md` **v2.1 (révisée le 2026-08-19)**,
+> empreinte MD5 `44c6f70053057cabefec69d50b00d6e6`.
+
+---
+
+## 2026-08-19T09:20Z — P0.0 Ouverture
+
+Session ouverte sur `C:\Users\willi\Documents\Projets\Axion-CRM-Pro`.
+Trois préconditions posées par le dirigeant avant tout agent :
+
+1. **§3 bis et §3 ter lus en premier.** Fait.
+2. **Aucun SHA du document n'est cru.** Relevé indépendamment ci-dessous.
+3. **`_SESSIONS/2026-08-19_CRM-ETAPE-1A.md` lu intégralement (1 397 l.)** avant tout
+   audit touchant contacts, compteurs, préproduction, gardes, activités et motifs. Fait.
+
+**Contrainte de périmètre acceptée** : le worktree `C:\Users\willi\Documents\Projets\crmpro-wt-etape1a`
+et sa branche ne sont ni lus en écriture, ni modifiés, ni supprimés.
+
+---
+
+## 2026-08-19T09:25Z — P0.1 Référence réelle, mesurée (règle 6)
+
+```
+$ git -C Axion-CRM-Pro log --oneline -5
+c0c453d docs(cnil): les deux decisions du dirigeant (#186)
+01004a5 docs(cnil): les deux decisions du dirigeant, prises le 2026-08-19
+02b46c2 docs(cnil): brouillon complet (#185)
+eb74ac4 docs(cnil): le brouillon est complet
+377b902 feat(preprod): jeu de reference portable + preproduction remplie (#184)
+
+$ gh pr list --state open
+(vide — 0 PR ouverte)
+
+$ git worktree list
+Axion-CRM-Pro      c0c453d [main]
+crmpro-wt-etape0   702253c [chore/etape-0-prealables]   <- résiduel, étape 0 close
+crmpro-wt-etape1a  c0c453d [travail]                    <- INTERDIT (construction)
+```
+
+**Référence de l'audit : `main = c0c453d`, `origin/main = c0c453d`, 0 PR ouverte.**
+
+⚠️ **Écarts mesurés avec le document lui-même, y compris sa révision 2.1 :**
+
+| Le document v2.1 dit | Mesuré le 19/08 à 09:25Z |
+|---|---|
+| `main` = `e577828` puis `65e39a6` (§3) | `main` = **`c0c453d`** — 8 commits plus loin, PR #179 → #186 fusionnées depuis |
+| Journal §9.1 : `main = d4910c8` | **périmé** — d4910c8 est 5 PR en arrière |
+| worktree `crmpro-wt-etape0` « n'est plus actif » | il **existe encore** (`702253c`), non supprimé |
+| worktree étape 1a sur `feat/etape-1a` | il est sur la branche **`travail`**, à `c0c453d` |
+
+*Conclusion de méthode : la règle 6 avait raison contre le document trois fois de suite.
+Aucun SHA de ce prompt n'est réutilisé nulle part dans l'audit.*
+
+
+---
+
+## 2026-08-19T09:30Z — P0.2 Lecture du contexte imposé
+
+- `_SESSIONS/2026-08-19_CRM-ETAPE-1A.md` (1 397 l.) lu **intégralement** avant tout audit
+  touchant contacts, compteurs, préproduction, gardes, activités et motifs. Retenu comme
+  source de vérité de l'avancement — et daté : son §9.1 annonce `main = d4910c8`, périmé de 5 PR.
+- Cahier des charges v2.7 (983 l.) : §A, §A.1, §0, §23.3, §23.4, §27, §29 lus par le chef de chantier.
+  ⚠️ **Le §A.1 compte 15 fragilités (F1 → F15), pas 19.** Le prompt d'audit parle de « F1 → F19 » :
+  l'agent 7 recompte et publie l'écart.
+- Prompt d'audit v2.1 lu en entier. Empreinte MD5 identique à sa prétendue « sauvegarde v2.0 » :
+  **la v2.0 n'existe plus**, aucune comparaison n'est possible.
+
+## 2026-08-19T09:32Z — P0.3 Terrain rendu praticable
+
+Pile locale relancée **depuis le dépôt principal** (`docker compose -f docker-compose.yml
+-f docker-compose.local.yml up -d`). Les conteneurs tournaient jusque-là avec un fichier
+de surcouche pris dans le worktree `crmpro-wt-etape0` — référence périmée, corrigée.
+
+État : `app.localhost` 200 · `api.localhost/up` 200 · 8 conteneurs sains.
+**Mais toute route authentifiée répond 500** → constat **A-001**.
+
+Constats tombés pendant l'amorçage, comme le §8 P0.3 le prévoyait :
+**A-001** (500 au lieu de 401, **en production**), **A-002** (`/saved-views` ment),
+**A-003** (CRLF encore armé dans la copie de travail), **A-004** (le Caddy local
+demande les certificats des domaines de production).
+
+## 2026-08-19T09:35Z — P0.4/P0.5 Inventaire publié, agents lancés
+
+`01_INVENTAIRE.md` publié. Écarts majeurs avec le §4 du prompt : **35 tâches planifiées
+et non 10**, **58 migrations et non 54**, **3 stubs Phase 2 et non 5**, **37 écrans et non 39**,
+**18 modèles et non 21**, **84 services et non 68**, **+1 contrôleur interne** non listé.
+
+Contre-vérifications de la règle 7 sur le travail produit **le jour même** :
+- « six tables mortes » → **six confirmées**, mais `saved_views` **réfutée** (elle a un contrôleur
+  et une route enregistrée) ;
+- « `reportUnmatchedIgnoredErrors: false`, baseline 2 045 l. » → **réfuté** : `true`, 1 321 l.,
+  et `phpstan analyse` niveau 8 rend `[OK] No errors` ;
+- « aucun hook Git » → **confirmé**.
+
+**P1 vague (a) lancée** : agents 5, 6, 7, 8, 9 (bloc A), 10, 11, 12, 13, 14, 15, 16, 17 (bloc B),
+44, 45, 46, 47 (bloc H), puis 18 (bloc C). Plafond de 20 agents simultanés atteint ;
+les blocs C (reste), D, E, F, G, I partent au fur et à mesure des retours.
+
+## 2026-08-19T12:20Z — P1 en cours · premiers retours · deux corrections de ma propre mesure
+
+**Agents rendus : 5 (plan 13/08), 9 (écarts documents), 16 (audit/AI Act), 17 (automatismes),
+47 (dépendances).** Détail dans `02_CONSTATS.md` §P1.
+
+**Récolte la plus grave à ce stade : quatre S0, tous de l'agent 16**, sur la chaîne d'audit —
+hachée **sans secret**, **tronquable par la queue** sans être détectée, **horodatage non haché**
+(2026 → 2019 passe « OK »), et `GET /audit-logs` qui rend le journal de **tous les espaces** à
+**tout compte authentifié**. Chacun mesuré avec témoin positif **et** négatif joués dans le même
+amorçage.
+
+**Deux corrections de mes propres constats — règle 7 appliquée contre moi-même :**
+
+1. **A-003 (CRLF).** L'agent 9 a montré que `grep -c $'\r'` n'est pas fiable selon les shells de ce
+   poste : il avait « prouvé » 15/15 à tort. J'ai re-mesuré par comptage des **octets `0x0d`**,
+   **après avoir validé la méthode sur un témoin pur LF (0) et un témoin pur CRLF (2)**. Résultat
+   réel : **8 fichiers `.sh` sur 16**, et les deux que je citais en exemple ont été corrigés depuis.
+   Le constat tient, l'exemple était faux. Corrigé dans le registre, avec la mention de l'écart.
+2. **« migrate:status dit Pending, migrate dit Nothing to migrate ».** J'allais en faire un constat.
+   Ce n'en était pas un : l'agent 10 jouait `migrate:fresh` sur `axion_crm` au même instant, comme
+   le §8 P0.3 le demande. **Artefact de concurrence, pas défaut du produit.** Non retenu.
+
+**Deux faits d'environnement qui contraignent la suite :**
+
+- **A-008** — une **autre session** a fusionné les PR #187, #188, #189 sur `main` **pendant** l'audit
+  (11:26 → 12:07). Le §3 ter est donc violé, mais **par l'autre bord** : l'audit n'a touché à rien.
+  `git diff --stat c0c453d origin/main` → **2 documents et 1 script neuf, aucun code produit**.
+  Référence portée à **`e8924b8`, code identique à `c0c453d`**. Le script neuf
+  `infra/scripts/definir-mot-de-passe-crm.sh` **entre au périmètre** (confié à l'agent 35).
+- **A-009** — l'atelier local sert l'API par **`php -S`, mono-processus**. Vingt agents ne peuvent pas
+  le partager : `/up` est passé de 200 en 2,7 s à une expiration à 60 s. Conséquence de méthode :
+  les travaux qui passent par HTTP sont **sérialisés**. Conséquence produit : le **critère 17 du §29**
+  (dix sessions simultanées) est **inmesurable sur cet atelier** — toute mesure de concurrence faite
+  ici serait fausse, et une mesure fausse présentée comme vraie est exactement ce que la passe
+  adversariale doit trouver. Confié à l'agent 40 de vérifier ce qu'il en est **en production**.
+
+**Trois hypothèses du mandat réfutées par la mesure, et c'est heureux :**
+
+- les 20 PR Dependabot n'ont **pas** été « fermées sans traitement » : fermées **par Dependabot
+  lui-même** après un gel sous politique écrite de 441 lignes, aucune n'étant corrective de sécurité ;
+- les **57 alertes** sont exactes au chiffre près, mais **aucune n'est atteignable en production** —
+  32 viennent de `workers/`, qui n'est déployé nulle part ;
+- le **piège Stripe** du §12-9 ne concerne pas ce dépôt : il n'y a aucun SDK Stripe dans le CRM.
+
+**Vague (b) lancée** : agents 22 (écrans), 23 (navigation), 35 (authentification), 36 (permissions),
+40 (infrastructure). Restent à lancer : 24, 25, 26, 27, 28, 29, 30 (bloc D), 31→34 (bloc E),
+37, 38, 39 (bloc F), 41, 42, 43 (bloc G), 48, 49, 50 (bloc I).
+
+## 2026-08-19T10:50Z — A-010 : le constat d'infrastructure le plus lourd de l'audit
+
+En cherchant à déporter le bloc D sur la préproduction (l'atelier local étant saturé, A-009), j'ai
+mesuré le serveur HTTP de la **production**. C'est `php -S`, **un seul processus**.
+
+Trois mesures, en lecture seule, dans cet ordre :
+1. `docker inspect` → `Config.Cmd = ["php","-S","0.0.0.0:80","-t","public"]` ; `PHP_CLI_SERVER_WORKERS`
+   **non posé** ; **1 seul** processus `php -S`, PID 1.
+2. **12 requêtes simultanées** sur `/up` → escalier **parfait**, pas ≈ **15 ms** : 0,025 · 0,041 ·
+   0,055 · 0,072 · 0,086 · 0,091 · 0,103 · 0,121 · 0,140 · 0,156 · 0,177 · 0,192 s.
+3. **Témoin positif** — les **mêmes 12 en séquentiel** : **plates à 0,0145 → 0,0184 s**. Le serveur
+   traite donc bien une requête en 15 ms : l'escalier n'est pas un ralentissement, c'est une **file**.
+
+**Témoin manqué, consigné comme tel** : j'ai voulu déposer un point lent (`sleep 3`) pour rendre la
+démonstration spectaculaire. **Refusé, `Permission denied` — le système de fichiers du conteneur de
+production est en lecture seule.** Bonne nouvelle de sécurité, et ce témoin-là n'a pas été joué.
+
+**Pourquoi personne ne l'avait vu** : avec **un seul utilisateur** (1 compte, 0 session, 0 jeton),
+la sérialisation est rigoureusement invisible. Tous les contrôles verts du produit ont été joués à un
+utilisateur. C'est le piège 19 dans sa forme la plus pure — la garde mesure le bon objet, mais dans
+des conditions où le défaut **ne peut pas** se manifester.
+
+Portée : le **critère 17 du §29** n'est pas « non mesuré », il est **inatteignable par construction** ;
+et le **principe directeur 8** du CDC (« dix utilisateurs dès le premier jour ») est structurellement
+violé. Le §0 précise que les principes « priment sur toute fonctionnalité prise isolément ».
+→ **A-010, S0, premier lot de P3.**
+
+Effet de bord utile : le correctif de la pièce 1 du 19/08 (index couvrant + `Cache::flexible` sur les
+compteurs du hub, mesurés à **17,5 s cache froid** sur 2,8 M) ne réglait pas seulement une lenteur —
+il retirait un **point de blocage global de l'application**. Personne ne le savait, y compris son auteur.
+
+## 2026-08-19T11:00Z — Deux corrections de mes propres constats, levées par les agents
+
+**1. A-001 abaissé de S1 à S2.** L'agent 13 obtenait un **401 propre** là où j'avais mesuré un 500, et
+a refusé de crier à la réfutation : « écart de protocole, pas réfutation ». C'est cette prudence qui a
+fait trouver la vraie variable — ni la route, ni Caddy : **l'en-tête `Accept`**.
+
+```
+PRODUCTION, sans Accept :            PRODUCTION, avec Accept: application/json :
+  /api/v1/crm/arbitrage   -> 500       /api/v1/crm/arbitrage   -> 401
+  /api/v1/config/features -> 500       /api/v1/config/features -> 401
+  /api/v1/contacts        -> 500       /api/v1/contacts        -> 401
+```
+
+Et `frontend/src/lib/api.ts:5-8` **pose cet en-tête**, `:30-31` redirige vers `/login` sur 401.
+**La console n'est donc pas touchée.** J'avais écrit qu'« un visiteur déconnecté reçoit une erreur au
+lieu de l'écran de connexion » : **c'était faux**. J'avais mesuré au `curl` nu et généralisé à tous les
+clients. **Un `curl` n'est pas un navigateur.** La clause de reclassement en S0 de la décision D-004
+tombe d'elle-même ; D-004 est révisée.
+
+**2. L'hypothèse « une opposition RGPD part en 422 » est morte, et c'était ma faute.** Je l'avais
+étayée sur une ligne du `laravel.log` **local** : `consentement v2 requis … reçu : careers-v1-2026-06-09`.
+L'agent 13 a établi qu'elle vient de la **suite de tests** — qui s'exécute dans le même conteneur et
+écrit dans le même fichier. **J'ai pris la preuve qu'une garde fonctionne pour la preuve qu'un défaut
+existe.** Sa mesure : **zéro événement légitime rejeté**. Hypothèse close.
+*(L'angle mort côté site — la version dynamique des 71 candidatures du stock — reste ouvert et
+appartient à l'agent 31.)*
+
+**Ce que ces deux corrections disent de la méthode** : la rotation de vérification a fonctionné **dès
+P1**, sans attendre P4, et elle a corrigé le chef de chantier deux fois. C'est exactement ce que la
+règle 7 vise. Les deux constats corrigés portent désormais la trace de l'écart, pas seulement la
+version corrigée — un registre qui efface ses erreurs ne permet pas de juger sa propre fiabilité.
+
+## 2026-08-19T11:05Z — B13-001 corrige et durcit A05-003
+
+L'agent 5 attribuait l'échec du canal à un SIREN « rarement rempli ». L'agent 13 a mesuré :
+**aucun émetteur du site ne transmet de SIREN, et aucun formulaire n'en collecte.** Six leads calqués
+sur le contrat réel → **6 `pending_match`, 0 entreprise, 0 personne**. Ce n'est pas « rarement »,
+c'est **100 %**. Les 3 événements de production tombés en arbitrage manuel n'étaient pas de la
+malchance : **c'est le fonctionnement nominal**. C'est la **cause racine du critère 18 du §29**.
+
+## 2026-08-19T11:10Z — A-012 : le produit n'a jamais été utilisable par personne
+
+En vérifiant le script `infra/scripts/definir-mot-de-passe-crm.sh` — arrivé sur `main` **pendant**
+l'audit, par la session parallèle — j'ai trouvé que celle-ci avait diagnostiqué **exactement** la même
+chaîne causale que j'étais en train d'assembler à partir de F40-002 et de la mesure « 1 utilisateur,
+0 session, 0 jeton ». Trois défauts qui se referment l'un sur l'autre :
+
+1. `OWNER_INITIAL_PASSWORD` était **vide** → le seeder a généré un mot de passe et l'a annoncé **une
+   seule fois**, à la console de déploiement ;
+2. **`MAIL_MAILER` n'est défini nulle part** → `config/mail.php:4` retombe sur `'log'` → **aucun
+   courriel ne part**, alors que **sept clés ZeptoMail sont posées et valides en production** ;
+3. les **deux** voies de secours — lien magique et réinitialisation — **passent par le courriel**.
+
+**Le propriétaire ne peut pas entrer dans son propre CRM depuis le 2026-05-17.** → **A-012, S0**.
+
+**Ce que ce constat explique, et c'est sa vraie valeur** : *on ne découvre pas un problème de dix
+utilisateurs quand on n'en a jamais eu un seul.* A-010 (sérialisation), les 37 écrans jamais ouverts
+en production, les contrôles verts joués à un utilisateur — tout tient à cela.
+
+⚠️ **Et un détail de ce diagnostic ne survit pas à ma mesure.** Le script affirme que le mot de passe
+généré « a été écrit dans `storage/logs`, un fichier qui pèse aujourd'hui 263 Mo ». **Je ne l'y trouve
+pas** : zéro occurrence de toute ligne annonçant un mot de passe dans le `laravel.log` de production.
+La raison est dans le code — `OwnerUserSeeder.php:164` emploie **`$this->command?->warn(...)`**, qui
+écrit sur la **sortie console d'Artisan**, pas dans `laravel.log`. Le mot de passe est donc dans les
+journaux de déploiement de mai 2026, **pas** dans un fichier de 270 Mo lisible par tout ce qui accède
+au conteneur. *Cela ne change rien au verrouillage ; cela change l'évaluation de l'exposition.*
+
+**Ce n'est pas une décision fautive du dirigeant.** `MAIL_MAILER = log` **est** sa décision explicite,
+et elle n'est pas rouverte (D-005). Le défaut est que personne n'avait vu qu'une décision prise pour
+les envois **transactionnels métier** coupait aussi les courriels **d'authentification**. Une
+conséquence non nommée n'est pas une faute — la nommer est le travail d'un audit.
+
+## 2026-08-19T11:15Z — Troisième correction de mes propres mesures
+
+**A-007 : j'avais tort, et j'avais accusé le journal de construction à tort.** J'avais écrit « le
+journal dit 6 erreurs/minute, mesuré 56 — 9× plus ». **Faux.** Je comptais les **occurrences de la
+chaîne** `telescope_entries`, or elle apparaît **7 fois par entrée** (message, requête SQL, trace).
+Re-mesure propre sur 120 s en comptant les **entrées horodatées** : **11 entrées, soit 5,5/minute** ;
+l'agent 40, sur 484 minutes, trouve **5,8**. **Le « 6 par minute » du journal était juste.**
+Débit corrigé : **~90 Mo/jour**, pas 133. *Compter des occurrences de chaîne n'est pas compter des
+événements — et le facteur d'erreur était exactement le nombre de fois où le défaut se cite lui-même.*
+
+**A-004 abaissé de S2 à S3** (agent 40) : ce qui est consommé est la limite horaire de **validations
+échouées**, pas le quota d'**émission**. Le renouvellement de la production n'est pas menacé (fenêtre
+ARI au 13/09). J'avais extrapolé au lieu de mesurer.
+
+**B16-001 réfuté pour la production** (agent 40) : `AUDIT_HASH_CHAIN_SECRET` fait **64 caractères** en
+production, mesuré deux fois sans jamais afficher la valeur. Il reste vide **en local** — ce qui veut
+dire que **les gardes de la chaîne d'audit tournent sur une configuration qui n'est pas celle de la
+production**. Troisième occurrence du même motif, après B11-010 (cloisonnement) et A05-008 (fuseau).
+**Les trois autres S0 de l'agent 16 survivent** : ils ne dépendent d'aucun secret.
+
+*Bilan de méthode à mi-P1 : la rotation de vérification a corrigé le chef de chantier **quatre fois**
+(A-001, A-004, A-007, et l'hypothèse RGPD morte). C'est le fonctionnement attendu, pas un incident —
+mais cela dit aussi que mes propres constats doivent passer la passe adversariale comme les autres.*
+
+## 2026-08-19T13:20Z — A-013 : le constat le plus important de l'audit, et il n'est pas technique
+
+L'agent 6 a mesuré que **l'exemple fondateur du mandat est mal caractérisé**. Le §3 bis et le piège 19
+présentent `_REPORTS/2026-08-18_ETAT-PARE-FEU.md` comme « une garde irréprochable qui mesure le mauvais
+objet : elle concluait que le pare-feu était en ordre ». **J'ai relu le document ligne à ligne. Ce n'est
+pas ce qui s'est passé.**
+
+Le rapport porte, **dès sa ligne 11** : « 🔴 **CE DOCUMENT NE CONSTATE RIEN SUR LE SERVEUR** ». Puis,
+**la veille de la faille**, il écrit : Postgres `55432` et Redis `56379` sur **`0.0.0.0`** (l.153-154) ·
+« un `ufw deny` sur un port publié par Docker **ne bloque rien** » (l.188) · `POSTGRES_PASSWORD=axion_dev_only`,
+rôle **SUPERUSER + BYPASSRLS** (l.212, 247) · le correctif `- "127.0.0.1:55432:5432"` (l.198) · la
+commande de vérification et sa sortie saine attendue (l.335-336) · et jusqu'à la notification CNIL.
+Il se clôt sur : « **tant que ce n'est pas fait, F12 n'est PAS soldé** ».
+
+**Et la ligne 14 a été cochée ✅ par-dessus.**
+
+Le lendemain, une base de **4 295 349 fiches — 1 319 567 personnes** — était joignable en
+superutilisateur depuis internet, et on l'a découverte **par hasard**, en préparant autre chose.
+
+**Le coût n'a pas été la difficulté technique : le diagnostic était déjà écrit.** Le coût a été qu'un
+tableau de synthèse a transformé « je n'ai pas pu mesurer, et voici précisément ce qui va casser » en
+un ✅.
+
+🔑 **Et le motif se généralise.** L'agent 6 a montré que **les artefacts de ce dépôt sont d'une
+honnêteté inhabituelle**, et que **ce sont les couches de résumé qui mentent** : le README du harnais
+écrit « 31 écrans sur 37 restent » · `vitest.config.ts` documente ses propres seuils comme
+« **DÉCORATIFS** » · `EtancheiteWorkspace` **avoue** la cécité de son scan · `deploy-staging.yml` écrit
+lui-même « Coolify RETIRÉ ». **Dans chaque cas, l'information exacte existait, écrite, au bon endroit.**
+
+*Ce dépôt n'a pas un problème de mesure. Il a un problème de clôture.*
+
+**Conséquences prises immédiatement :**
+- **A-013** ouvert (S1), avec le document cité ligne à ligne.
+- **A-011 corrigé** : le rapport pare-feu **retiré** de sa liste — ce n'est pas une garde qui mesure
+  mal, c'est un patron **distinct et plus grave**, qu'aucune garde technique n'attrape. A-011 garde
+  ses **huit** autres cas (deux ajoutés depuis : l'instrument de parité, et la garde e2e d'un
+  `ErrorBoundary` **jamais monté**).
+- **Clôture de l'étape 0 rejouée** : **7 CLOS · 7 PARTIELS · 2 OUVERTS**, là où le journal annonce
+  « 15 sur 16 ». *L'écart n'est pas un écart de travail — le travail a été fait — c'est un écart de
+  clôture.*
+- **Règle appliquée à cet audit lui-même, sans exception** : aucun constat ne sera déclaré corrigé en
+  P3 sans une mesure jouée en P4 par un **autre** agent.
+
+## 2026-08-19T13:26Z — Atelier remis d'aplomb (D-011)
+
+Image `axion-crm-app` reconstruite et conteneur recréé. Vérifié sur le bundle réellement servi :
+
+```
+avant  /assets/index-DPQz8SpC.js   "Journaux de collecte" : 0   "Runs de scraping" : 2
+apres  /assets/index-BVK1vh1a.js   "Journaux de collecte" : 2   "Runs de scraping" : 0
+PROD   /assets/index-D3nU2tuG.js   "Journaux de collecte" : 2   "Runs de scraping" : 0
+```
+
+**L'atelier sert enfin la même interface que la production.** L'agent 22 a été prévenu que ses mesures
+antérieures sont à rejouer.
+
+**Piège 10 du mandat corrigé** : il annonce « CI en `en_US.utf8`, prod en `C` ». **Faux** —
+`ci.yml:363` initialise Postgres en `--lc-collate=C --lc-ctype=C` **exprès** (commentaire l.351), et
+la production mesure `C|C`. **La CI est alignée.** Le piège est réel mais sa cause est ailleurs : sous
+`lc_ctype=C`, le `lower()` **de PostgreSQL** ne replie pas les accents là où `mb_strtolower` **de PHP**
+le fait. La divergence est **SQL ↔ PHP**, pas CI ↔ prod — donc « aligner les locales » ne réglerait rien.

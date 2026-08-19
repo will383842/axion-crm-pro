@@ -1,0 +1,12 @@
+=== migrations appliquees apres double migrate:fresh ===
+58
+=== part_config apres reconstruction ===
+   parent_table    | partition_type | partition_interval | premake | retention | retention_keep_table 
+-------------------+----------------+--------------------+---------+-----------+----------------------
+ public.audit_logs | range          | 1 mon              |       6 | 24 months | t
+(1 row)
+
+=== partitions audit_logs ===
+14
+=== reference git ===
+e8924b81ad64c0b236acd99ac5cbac4cd68eada7 fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)

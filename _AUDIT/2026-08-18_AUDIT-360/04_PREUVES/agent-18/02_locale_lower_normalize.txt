@@ -1,0 +1,20 @@
+ datcollate | datctype 
+------------+----------
+ C          | C
+(1 row)
+
+     ascii_ok      |    accent_sql     |    accent_php     | egal 
+-------------------+-------------------+-------------------+------
+ elodie@exemple.fr | Élodie@exemple.fr | élodie@exemple.fr | f
+(1 row)
+
+   a    | b_espace_avant | c_maj  | d_accent 
+--------+----------------+--------+----------
+ dupont |  dupont        | dupont | dupont
+(1 row)
+
+ casse_ok | espace_avant_ok | accent_ok 
+----------+-----------------+-----------
+ t        | f               | t
+(1 row)
+

@@ -1,0 +1,43 @@
+﻿=== AGENT 16 — etat mesure le 2026-08-19, base de travail axion_crm ===
+NB: mesures prises a 12:00 UTC, AVANT qu'un agent parallele ne relance migrate:fresh sur axion_crm.
+ relrowsecurity | relforcerowsecurity 
+----------------+---------------------
+ f              | f
+(1 row)
+
+ politiques_rls_audit_logs 
+---------------------------
+                         0
+(1 row)
+
+ column_name  |             column_default             | is_nullable 
+--------------+----------------------------------------+-------------
+ id           | nextval('audit_logs_id_seq'::regclass) | NO
+ workspace_id |                                        | YES
+ user_id      |                                        | YES
+ event_type   |                                        | NO
+ path         |                                        | YES
+ status_code  |                                        | YES
+ ip           |                                        | YES
+ user_agent   |                                        | YES
+ payload_hash |                                        | YES
+ prev_hash    | repeat('0'::text, 64)                  | NO
+ current_hash |                                        | NO
+ created_at   | now()                                  | NO
+(12 rows)
+
+ nspname 
+---------
+ partman
+(1 row)
+
+   parent_table    | retention | retention_keep_table | retention_keep_index | partition_interval | premake 
+-------------------+-----------+----------------------+----------------------+--------------------+---------
+ public.audit_logs | 24 months | t                    | f                    | 1 mon              |       6
+(1 row)
+
+ partitions 
+------------
+         14
+(1 row)
+

@@ -1,0 +1,5 @@
+ total_companies | avec_first_info 
+-----------------+-----------------
+               0 |               0
+(1 row)
+

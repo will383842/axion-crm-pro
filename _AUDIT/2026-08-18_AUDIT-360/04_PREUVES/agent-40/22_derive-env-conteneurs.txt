@@ -1,0 +1,41 @@
+=== date de modification du .env vs creation des conteneurs ===
+2026-08-19 10:10:15.030095295 +0000  .env
+2026-08-19T10:10:20.726732177Z  axion-crm-api
+2026-08-19T10:10:20.718014128Z  axion-crm-horizon
+2026-08-19T10:10:20.725204474Z  axion-crm-scheduler
+2026-08-19T08:05:07.752447918Z  axion-crm-caddy
+2026-08-19T06:12:15.058385661Z  axion-crm-postgres
+2026-08-19T06:12:15.024867561Z  axion-crm-redis
+
+=== nb de variables d env vues par chaque conteneur applicatif ===
+axion-crm-api : 122
+axion-crm-horizon : 122
+axion-crm-scheduler : 122
+
+=== cles presentes dans api mais PAS dans horizon (et inversement) ===
+-- dans api seulement :
+-- dans horizon seulement :
+-- dans scheduler seulement (vs api) :
+
+=== APP_URL / APP_ENV / APP_DEBUG / LOG_LEVEL par conteneur ===
+-- axion-crm-api
+APP_ENV=production
+LOG_CHANNEL=stack
+BROADCAST_CONNECTION=log
+LOG_LEVEL=debug
+APP_URL=https://api.axion-crm-pro.com
+APP_DEBUG=false
+-- axion-crm-horizon
+APP_ENV=production
+LOG_CHANNEL=stack
+APP_URL=https://api.axion-crm-pro.com
+LOG_LEVEL=debug
+BROADCAST_CONNECTION=log
+APP_DEBUG=false
+-- axion-crm-scheduler
+LOG_CHANNEL=stack
+APP_ENV=production
+APP_URL=https://api.axion-crm-pro.com
+LOG_LEVEL=debug
+BROADCAST_CONNECTION=log
+APP_DEBUG=false

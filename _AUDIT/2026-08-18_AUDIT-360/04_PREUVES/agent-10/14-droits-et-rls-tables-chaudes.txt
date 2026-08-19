@@ -1,0 +1,59 @@
+=== droits de axion_app sur audit_logs / sessions / user_workspaces ===
+     table_name      | privilege_type 
+---------------------+----------------
+ audit_logs          | DELETE
+ audit_logs          | INSERT
+ audit_logs          | SELECT
+ audit_logs          | UPDATE
+ audit_logs_default  | DELETE
+ audit_logs_default  | INSERT
+ audit_logs_default  | SELECT
+ audit_logs_default  | UPDATE
+ crm_activites       | DELETE
+ crm_activites       | INSERT
+ crm_activites       | SELECT
+ crm_activites       | UPDATE
+ crm_motifs          | DELETE
+ crm_motifs          | INSERT
+ crm_motifs          | SELECT
+ crm_motifs          | UPDATE
+ crm_outbound_events | DELETE
+ crm_outbound_events | INSERT
+ crm_outbound_events | SELECT
+ crm_outbound_events | UPDATE
+ email_suppressions  | DELETE
+ email_suppressions  | INSERT
+ email_suppressions  | SELECT
+ email_suppressions  | UPDATE
+ opt_out             | DELETE
+ opt_out             | INSERT
+ opt_out             | SELECT
+ opt_out             | UPDATE
+ scraping_sources    | DELETE
+ scraping_sources    | INSERT
+ scraping_sources    | SELECT
+ scraping_sources    | UPDATE
+ sessions            | DELETE
+ sessions            | INSERT
+ sessions            | SELECT
+ sessions            | UPDATE
+ user_workspaces     | DELETE
+ user_workspaces     | INSERT
+ user_workspaces     | SELECT
+ user_workspaces     | UPDATE
+(40 rows)
+
+=== RLS sur les tables citees ===
+       relname       | relrowsecurity | relforcerowsecurity | pol | ws 
+---------------------+----------------+---------------------+-----+----
+ activities          | t              | t                   |   1 | t
+ crm_activites       | f              | f                   |   0 | f
+ crm_lost_reasons    | t              | t                   |   1 | t
+ crm_motifs          | f              | f                   |   0 | f
+ crm_outbound_events | f              | f                   |   0 | f
+ email_suppressions  | f              | f                   |   0 | f
+ opt_out             | f              | f                   |   0 | f
+ saved_views         | t              | t                   |   1 | t
+ scraping_sources    | f              | f                   |   0 | f
+(9 rows)
+

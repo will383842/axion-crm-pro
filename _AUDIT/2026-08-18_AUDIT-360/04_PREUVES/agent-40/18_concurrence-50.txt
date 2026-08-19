@@ -1,0 +1,4 @@
+=== 50 requetes paralleles : latence max ===
+duree totale = 1.075031436 s
+latence min/max = 0.027785 / 0.882434
+nb mesures = 50

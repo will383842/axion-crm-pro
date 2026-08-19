@@ -1,0 +1,18 @@
+=== MAIL_* dans le conteneur api (valeurs masquees pour les secrets) ===
+MAIL_WEBHOOK_TOKEN=<masque>
+MAIL_FROM_ADDRESS=crm@axion-ia.com
+MAIL_FROM_NAME=Axion IA - CRM
+MAIL_USERNAME=emailapikey
+MAIL_ENCRYPTION=tls
+MAIL_PASSWORD=<masque>
+MAIL_PORT=587
+MAIL_HOST=smtp.zeptomail.eu
+
+=== MAIL_MAILER dans le .env du serveur ===
+(ABSENT du .env serveur)
+
+=== MAIL_MAILER dans .env.example ===
+(ABSENT de .env.example)
+
+=== defaut du code ===
+4:    'default' => env('MAIL_MAILER', 'log'),

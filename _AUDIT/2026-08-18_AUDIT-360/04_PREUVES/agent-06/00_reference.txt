@@ -1,0 +1,28 @@
+=== main HEAD ===
+e8924b8 fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)
+9d273cd fix(rgpd+acces): le registre affirmait une chose FAUSSE en sa faveur — rectifié le jour même
+1145473 docs(rgpd): registre des violations, notification non retenue (#188)
+
+=== PR174 merge commit e577828 ancestor? ===
+OUI
+
+=== 16 commits etape-0 ancetres de main ===
+4030dda ANCESTOR
+83932d7 ANCESTOR
+9365982 ANCESTOR
+da97826 ANCESTOR
+af394d1 ANCESTOR
+72a40a9 ANCESTOR
+41011db ANCESTOR
+7a6acab ANCESTOR
+3feb733 ANCESTOR
+c74f7a6 ANCESTOR
+fccc9d1 ANCESTOR
+dd91665 ANCESTOR
+ab2b9d1 ANCESTOR
+9e81b8a ANCESTOR
+356297a ANCESTOR
+635ea79 ANCESTOR
+
+=== PR depuis #174 ===
+41

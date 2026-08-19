@@ -1,0 +1,76 @@
+### L1 — surcouche locale + runbook
+$ git ls-files | grep -Ei 'compose.local|RUNBOOK-CONSOLE'
+_REPORTS/RUNBOOK-CONSOLE-LOCALE.md
+docker-compose.local.yml
+
+$ grep -n 'crmpro-wt-etape0' _REPORTS/RUNBOOK-CONSOLE-LOCALE.md
+41:  -f C:/Users/willi/Documents/Projets/crmpro-wt-etape0/docker-compose.local.yml \
+331:  pnpm --dir C:/Users/willi/Documents/Projets/crmpro-wt-etape0/frontend \
+344:pnpm --dir C:/Users/willi/Documents/Projets/crmpro-wt-etape0/frontend \
+575:`crmpro-wt-etape0`, elle monte le backend du dépôt principal et construit le
+
+### Quels specs Playwright tournent en CI ?
+$ grep -n 'playwright test' .github/workflows/*.yml
+.github/workflows/a11y.yml:48:        run: pnpm exec playwright test tests/e2e/a11y.spec.ts --project=chromium --reporter=html
+.github/workflows/a11y.yml:58:        run: pnpm exec playwright test tests/e2e/navigation.spec.ts --project=chromium --reporter=line
+$ git ls-files frontend/tests/e2e/*.spec.ts | wc -l
+16
+
+### L3 — ecrans couverts
+$ git ls-files frontend/tests/screens/
+frontend/tests/screens/AudienceBuilderPage.test.tsx
+frontend/tests/screens/CompanyDetailPage.test.tsx
+frontend/tests/screens/ContactsHubPage.test.tsx
+frontend/tests/screens/DashboardPage.test.tsx
+frontend/tests/screens/LoginPage.test.tsx
+frontend/tests/screens/PersonTimelinePage.test.tsx
+$ routes declarees dans routeTree.tsx :
+37
+CI frontend e8924b8 : 21 fichiers / 118 tests (cf ci_frontend_e8924b8.txt)
+
+### L3bis — captures avant/apres du commit da97826
+$ git show --stat --name-only da97826 | grep -i png
+(aucune capture dans le commit)
+
+### L3ter — MAIL_MAILER
+$ grep -rn MAIL_MAILER backend/config/mail.php docker-compose.staging.yml
+backend/config/mail.php:4:    'default' => env('MAIL_MAILER', 'log'),
+docker-compose.staging.yml:130:      MAIL_MAILER: log
+docker-compose.staging.yml:156:      MAIL_MAILER: log
+docker-compose.staging.yml:177:      MAIL_MAILER: log
+
+### L11 — le serveur HTTP de PRODUCTION
+$ grep -nE '^CMD|^ENTRYPOINT|FROM .* AS' Dockerfile.laravel
+10:FROM composer:${COMPOSER_VERSION} AS composer-deps
+40:FROM php:${PHP_VERSION}-fpm-alpine AS php-base
+61:FROM php-base AS dev
+66:CMD ["php", "-S", "0.0.0.0:80", "-t", "public"]
+71:FROM php-base AS builder
+103:FROM php-base AS prod
+120:ENTRYPOINT ["/usr/local/bin/entrypoint-prod"]
+121:CMD ["php", "-S", "0.0.0.0:80", "-t", "public"]
+-> la cible 'prod' sert par php -S : le rapport de perf suppose php-fpm (l.19)
+
+### L6 — baseline
+awk: cmd. line:1: {s+=\$1} END {print s}
+awk: cmd. line:1:     ^ backslash not last character on line
+entrees=211 errs= lignes=1321
+13:    level: 8
+27:    reportUnmatchedIgnoredErrors: true
+
+### L8 — tables ecartees du controle d'etancheite
+18: *        `sessions`, `user_workspaces`, `audit_logs`, `audit_logs_default` ;
+21: *        `sessions`, `user_workspaces`, `audit_logs_default`.
+24: * divergence n'était pas visible parce que `audit_logs` est une table
+27: * indistinguable d'un oubli. Le jour où `audit_logs` cesserait d'être
+64:     * annoncé : si `audit_logs` redevient une table ordinaire, ou si
+65:     * `coverage_matrix_cells` cesse d'être une vue matérialisée, la garde
+71:        'audit_logs' => [
+78:        'audit_logs_default' => [
+80:            'motif' => "Partition ENFANT d'audit_logs (relispartition = true). Écartée par la clause "
+83:        'coverage_matrix_cells' => [
+126:        'email_verification_logs' => <<<'MOTIF'
+135:              · `email_verification_logs_workspace_isolation` (durcissement L0) : stricte.
+
+### L9 — PR dependabot ouvertes
+[]

@@ -1,0 +1,15 @@
+--- must be owner of materialized view ---
+occurrences=142
+premiere=[2026-08-16 14:00:00]
+derniere=[2026-08-19 12:00:00]
+--- row-level security policy for table ---
+occurrences=2
+premiere=[2026-08-17 03:30:04]
+derniere=[2026-08-17 03:30:04]
+--- coverage:refresh-matrix ---
+occurrences=71
+premiere=[2026-08-16 14:00:00]
+derniere=[2026-08-19 12:00:00]
+--- media (RLS) ligne complete ---
+[2026-08-17 03:30:04] production.ERROR: SQLSTATE[42501]: Insufficient privilege: 7 ERROR:  new row violates row-level security policy for table "media" (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm, SQL: insert into "media" ("workspace_id", "name", "media_type", "media_family", "editorial_theme", 
+rm: can't remove '/tmp/a08_timeline.sh': Operation not permitted

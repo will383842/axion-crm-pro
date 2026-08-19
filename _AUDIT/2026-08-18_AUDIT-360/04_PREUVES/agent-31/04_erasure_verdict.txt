@@ -1,0 +1,39 @@
+=== VERDICT erasure (B14-002) — cote SITE, ligne a ligne ===
+
+--- 1. la seule fonction qui applique un evenement entrant : src/server/crm-sync/inbound.ts ---
+243:async function applyEffect(payload: CrmInboundPayload): Promise<CrmInboundOutcome> {
+244-  // 🔴 L'opposition gagne toujours : seules les oppositions agissent. Un
+245-  // opt-in venu du CRM ne ressuscite jamais une désinscription faite ici.
+246-  if (payload.event_type === "consent_optin") return "ignored";
+247-
+248-  // Le vivier candidats n'a pas d'équivalent « abonné » côté site : rien à
+249-  // répercuter aujourd'hui. L'événement est conservé pour la preuve.
+250-  if (payload.scope !== "business") return "ignored";
+251-
+252-  const subscriberId = await findSubscriberIdByHash(payload.email_hash);
+253-  if (!subscriberId) return "no_match";
+254-
+255-  await prisma.newsletterSubscriber.update({
+256-    where: { id: subscriberId },
+257-    data: { status: "unsubscribed", unsubscribedAt: new Date() },
+258-  });
+259-
+260-  return "applied";
+261-}
+262-
+263-/**
+264- * Retrouve un abonné par sha256 non salé de son adresse.
+265- *
+
+--- 2. TOUTES les occurrences du mot 'erasure' dans src/server/crm-sync/ et dans les tests ---
+src/server/crm-sync/inbound.ts:17: * `consent_optout` et `erasure` produisent un effet local. `consent_optin`
+src/server/crm-sync/inbound.ts:58:export type CrmInboundEventType = "consent_optout" | "consent_optin" | "erasure";
+src/server/crm-sync/inbound.ts:133:const EVENT_TYPES: ReadonlySet<string> = new Set(["consent_optout", "consent_optin", "erasure"]);
+
+--- 3. TEMOIN NEGATIF : la meme recherche TROUVE bien les types traites ET testes ---
+src/server/crm-sync/inbound.ts:17: * `consent_optout` et `erasure` produisent un effet local. `consent_optin`
+src/server/crm-sync/inbound.ts:58:export type CrmInboundEventType = "consent_optout" | "consent_optin" | "erasure";
+src/server/crm-sync/inbound.ts:133:const EVENT_TYPES: ReadonlySet<string> = new Set(["consent_optout", "consent_optin", "erasure"]);
+src/server/crm-sync/inbound.ts:246:  if (payload.event_type === "consent_optin") return "ignored";
+src/server/crm-sync/__tests__/crm-sync-l5.test.ts:164:  event_type: "consent_optout" as const,
+src/server/crm-sync/__tests__/crm-sync-l5.test.ts:219:    const result = await processInboundEvent({ ...EVENEMENT, event_type: "consent_optin" });

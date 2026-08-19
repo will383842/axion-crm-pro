@@ -1,0 +1,150 @@
+=== COMPOSANT -> NB ECRANS (sur 37) | NB FICHIERS CONSOMMATEURS HORS components/ | USAGE INTERNE components/ ===
+AutoBreadcrumbs          ecrans= 0  fichiersHorsComp= 0  interne=[]
+CardFooter               ecrans= 0  fichiersHorsComp= 0  interne=[]
+ErrorBoundary            ecrans= 0  fichiersHorsComp= 0  interne=[]
+GlobalSearch             ecrans= 0  fichiersHorsComp= 1  interne=[components/layout/Header.tsx]
+    fichiers: app/RootLayout.tsx
+Header                   ecrans= 0  fichiersHorsComp= 1  interne=[]
+    fichiers: app/RootLayout.tsx
+OnboardingTour           ecrans= 0  fichiersHorsComp= 1  interne=[]
+    fichiers: app/RootLayout.tsx
+Sidebar                  ecrans= 0  fichiersHorsComp= 1  interne=[]
+    fichiers: app/RootLayout.tsx
+Stat                     ecrans= 0  fichiersHorsComp= 0  interne=[]
+UserMenu                 ecrans= 0  fichiersHorsComp= 0  interne=[]
+WorkspaceSelector        ecrans= 0  fichiersHorsComp= 0  interne=[]
+Breadcrumbs              ecrans= 1  fichiersHorsComp= 1  interne=[components/layout/AutoBreadcrumbs.tsx]
+    ecrans: /companies/$id
+    fichiers: features/companies/CompanyDetailPage.tsx
+DarkModeToggle           ecrans= 1  fichiersHorsComp= 1  interne=[components/layout/Header.tsx]
+    ecrans: /settings
+    fichiers: features/settings/SettingsPage.tsx
+FormField                ecrans= 1  fichiersHorsComp= 1  interne=[]
+    ecrans: /tags
+    fichiers: features/tags/TagsManagerPage.tsx
+QualityBadge             ecrans= 1  fichiersHorsComp= 3  interne=[features/companies/components/CompanyRow.tsx · features/companies/components/QualityScoreCard.tsx]
+    ecrans: /companies/$id
+    fichiers: features/companies/CompanyDetailPage.tsx · features/companies/components/CompanyRow.tsx · features/companies/components/QualityScoreCard.tsx
+SizeCategoryBadge        ecrans= 1  fichiersHorsComp= 2  interne=[features/companies/components/CompanyRow.tsx]
+    ecrans: /companies/$id
+    fichiers: features/companies/CompanyDetailPage.tsx · features/companies/components/CompanyRow.tsx
+Tooltip                  ecrans= 1  fichiersHorsComp= 1  interne=[components/layout/Sidebar.tsx]
+    ecrans: /scraper-runs
+    fichiers: features/scraping/ScraperRunsPage.tsx
+IconButton               ecrans= 2  fichiersHorsComp= 3  interne=[components/layout/Header.tsx · features/companies/components/CompanyRow.tsx]
+    ecrans: /companies/$id · /scraper-runs
+    fichiers: features/companies/CompanyDetailPage.tsx · features/companies/components/CompanyRow.tsx · features/scraping/ScraperRunsPage.tsx
+mapStatusToTone          ecrans= 2  fichiersHorsComp= 4  interne=[features/companies/components/ContactsCard.tsx · features/companies/components/EnrichmentTimeline.tsx]
+    ecrans: /scraper-runs · /rgpd/requests
+    fichiers: features/companies/components/ContactsCard.tsx · features/companies/components/EnrichmentTimeline.tsx · features/rgpd/RgpdRequestsPage.tsx · features/scraping/ScraperRunsPage.tsx
+Avatar                   ecrans= 3  fichiersHorsComp= 6  interne=[components/layout/UserMenu.tsx · components/layout/WorkspaceSelector.tsx · features/companies/components/CompanyRow.tsx · features/companies/components/ContactsCard.tsx · features/dashboard/components/ActivityFeed.tsx]
+    ecrans: /companies/$id · /contacts · /users
+    fichiers: features/companies/CompanyDetailPage.tsx · features/companies/components/CompanyRow.tsx · features/companies/components/ContactsCard.tsx · features/contacts/ContactsListPage.tsx · features/dashboard/components/ActivityFeed.tsx · features/users/UsersPage.tsx
+Drawer                   ecrans= 3  fichiersHorsComp= 4  interne=[]
+    ecrans: /scraper-runs · /rgpd/ai-act · /audit-logs
+    fichiers: app/RootLayout.tsx · features/rgpd/AiActRegisterPage.tsx · features/rgpd/AuditLogsPage.tsx · features/scraping/ScraperRunsPage.tsx
+PageShell                ecrans= 3  fichiersHorsComp= 3  interne=[]
+    ecrans: /companies/$id · /cold-email · /linkedin
+    fichiers: features/companies/CompanyDetailPage.tsx · features/phase2-scaffold/ColdEmailStub.tsx · features/phase2-scaffold/LinkedInStub.tsx
+SegmentedControl         ecrans= 3  fichiersHorsComp= 3  interne=[]
+    ecrans: / (dashboard) · /rgpd/requests · /campaigns/new
+    fichiers: features/campaigns/CampaignWizardPage.tsx · features/dashboard/DashboardPage.tsx · features/rgpd/RgpdRequestsPage.tsx
+CardHeader               ecrans= 4  fichiersHorsComp=12  interne=[features/companies/components/ContactsCard.tsx · features/companies/components/EnrichmentTimeline.tsx · features/companies/components/QualityScoreCard.tsx · features/dashboard/components/ActivityFeed.tsx · features/dashboard/components/NextActions.tsx · features/dashboard/components/QualityDistributionBar.tsx · features/dashboard/components/SizeDistributionChart.tsx · features/dashboard/components/TopDeptsCard.tsx]
+    ecrans: /companies/$id · /llm/router · /rgpd/ai-act · /settings
+    fichiers: features/companies/CompanyDetailPage.tsx · features/companies/components/ContactsCard.tsx · features/companies/components/EnrichmentTimeline.tsx · features/companies/components/QualityScoreCard.tsx · features/dashboard/components/ActivityFeed.tsx · features/dashboard/components/NextActions.tsx · features/dashboard/components/QualityDistributionBar.tsx · features/dashboard/components/SizeDistributionChart.tsx · features/dashboard/components/TopDeptsCard.tsx · features/llm/LlmRouterPage.tsx · features/rgpd/AiActRegisterPage.tsx · features/settings/SettingsPage.tsx
+DropdownMenu             ecrans= 4  fichiersHorsComp= 5  interne=[components/layout/UserMenu.tsx · components/layout/WorkspaceSelector.tsx · features/companies/components/CompanyRow.tsx]
+    ecrans: /companies/$id · /scraper-runs · /campaigns · /audiences
+    fichiers: features/audiences/AudiencesListPage.tsx · features/campaigns/CampaignsListPage.tsx · features/companies/CompanyDetailPage.tsx · features/companies/components/CompanyRow.tsx · features/scraping/ScraperRunsPage.tsx
+LiveBadge                ecrans= 4  fichiersHorsComp= 4  interne=[]
+    ecrans: / (dashboard) · /scraper-runs · /campaigns · /campaigns/$id
+    fichiers: features/campaigns/CampaignDetailPage.tsx · features/campaigns/CampaignsListPage.tsx · features/dashboard/DashboardPage.tsx · features/scraping/ScraperRunsPage.tsx
+Modal                    ecrans= 4  fichiersHorsComp= 5  interne=[]
+    ecrans: /scraper-runs · /rgpd/requests · /users · /tags
+    fichiers: app/RootLayout.tsx · features/rgpd/RgpdRequestsPage.tsx · features/scraping/ScraperRunsPage.tsx · features/tags/TagsManagerPage.tsx · features/users/UsersPage.tsx
+CardEyebrow              ecrans= 5  fichiersHorsComp=11  interne=[features/companies/components/QualityScoreCard.tsx · features/dashboard/components/ActivityFeed.tsx · features/dashboard/components/NextActions.tsx · features/dashboard/components/QualityDistributionBar.tsx · features/dashboard/components/SizeDistributionChart.tsx · features/dashboard/components/TopDeptsCard.tsx]
+    ecrans: /companies/$id · /llm/router · /llm/rotations · /rgpd/ai-act · /settings
+    fichiers: features/companies/CompanyDetailPage.tsx · features/companies/components/QualityScoreCard.tsx · features/dashboard/components/ActivityFeed.tsx · features/dashboard/components/NextActions.tsx · features/dashboard/components/QualityDistributionBar.tsx · features/dashboard/components/SizeDistributionChart.tsx · features/dashboard/components/TopDeptsCard.tsx · features/llm/LlmRouterPage.tsx · features/llm/RotationsPage.tsx · features/rgpd/AiActRegisterPage.tsx · features/settings/SettingsPage.tsx
+Skeleton                 ecrans= 5  fichiersHorsComp= 6  interne=[]
+    ecrans: / (dashboard) · /scraper-runs · /campaigns · /tags · /audiences
+    fichiers: features/audiences/AudiencesListPage.tsx · features/campaigns/CampaignsListPage.tsx · features/crm-console/ConsoleGate.tsx · features/dashboard/DashboardPage.tsx · features/scraping/ScraperRunsPage.tsx · features/tags/TagsManagerPage.tsx
+Spinner                  ecrans= 5  fichiersHorsComp= 5  interne=[]
+    ecrans: /companies/$id · /media/$id · /campaigns/$id · /audiences/new · /audiences/$id
+    fichiers: features/audiences/AudienceBuilderPage.tsx · features/audiences/AudienceDetailPage.tsx · features/campaigns/CampaignDetailPage.tsx · features/companies/CompanyDetailPage.tsx · features/media/MediaDetailPage.tsx
+CardTitle                ecrans= 6  fichiersHorsComp=14  interne=[features/companies/components/ContactsCard.tsx · features/companies/components/EnrichmentTimeline.tsx · features/companies/components/QualityScoreCard.tsx · features/dashboard/components/ActivityFeed.tsx · features/dashboard/components/NextActions.tsx · features/dashboard/components/QualityDistributionBar.tsx · features/dashboard/components/SizeDistributionChart.tsx · features/dashboard/components/TopDeptsCard.tsx]
+    ecrans: /companies/$id · /llm/router · /llm/rotations · /rgpd/ai-act · /settings · /console/personnes/$k
+    fichiers: features/companies/CompanyDetailPage.tsx · features/companies/components/ContactsCard.tsx · features/companies/components/EnrichmentTimeline.tsx · features/companies/components/QualityScoreCard.tsx · features/crm-console/PersonTimelinePage.tsx · features/dashboard/components/ActivityFeed.tsx · features/dashboard/components/NextActions.tsx · features/dashboard/components/QualityDistributionBar.tsx · features/dashboard/components/SizeDistributionChart.tsx · features/dashboard/components/TopDeptsCard.tsx · features/llm/LlmRouterPage.tsx · features/llm/RotationsPage.tsx · features/rgpd/AiActRegisterPage.tsx · features/settings/SettingsPage.tsx
+Toolbar                  ecrans= 6  fichiersHorsComp= 6  interne=[]
+    ecrans: /companies · /contacts · /scraper-runs · /audit-logs · /console/contacts · /console/vivier
+    fichiers: features/companies/CompaniesListPage.tsx · features/contacts/ContactsListPage.tsx · features/crm-console/CandidatesPage.tsx · features/crm-console/ContactsHubPage.tsx · features/rgpd/AuditLogsPage.tsx · features/scraping/ScraperRunsPage.tsx
+SearchInput              ecrans= 8  fichiersHorsComp= 8  interne=[]
+    ecrans: /companies · /contacts · /media · /journalists · /scraper-runs · /audit-logs · /console/contacts · /console/vivier
+    fichiers: features/companies/CompaniesListPage.tsx · features/contacts/ContactsListPage.tsx · features/crm-console/CandidatesPage.tsx · features/crm-console/ContactsHubPage.tsx · features/media/JournalistsListPage.tsx · features/media/MediaListPage.tsx · features/rgpd/AuditLogsPage.tsx · features/scraping/ScraperRunsPage.tsx
+Tabs                     ecrans= 8  fichiersHorsComp= 8  interne=[]
+    ecrans: /scraper-runs · /llm/router · /settings · /campaigns · /campaigns/$id · /audiences/$id · /console/contacts · /console/vivier
+    fichiers: features/audiences/AudienceDetailPage.tsx · features/campaigns/CampaignDetailPage.tsx · features/campaigns/CampaignsListPage.tsx · features/crm-console/CandidatesPage.tsx · features/crm-console/ContactsHubPage.tsx · features/llm/LlmRouterPage.tsx · features/scraping/ScraperRunsPage.tsx · features/settings/SettingsPage.tsx
+CompaniesTableSkeleton   ecrans= 9  fichiersHorsComp= 9  interne=[]
+    ecrans: /companies · /contacts · /llm/router · /llm/proxy-providers · /llm/rotations · /rgpd/requests · /rgpd/ai-act · /audit-logs · /users
+    fichiers: features/companies/CompaniesListPage.tsx · features/contacts/ContactsListPage.tsx · features/llm/LlmRouterPage.tsx · features/llm/ProxyProvidersPage.tsx · features/llm/RotationsPage.tsx · features/rgpd/AiActRegisterPage.tsx · features/rgpd/AuditLogsPage.tsx · features/rgpd/RgpdRequestsPage.tsx · features/users/UsersPage.tsx
+Input                    ecrans=10  fichiersHorsComp=10  interne=[]
+    ecrans: login · magic-link · password-reset · /rgpd/requests · /users · /settings · /campaigns · /campaigns/new · /audiences/new · /console/arbitrage
+    fichiers: features/audiences/AudienceBuilderPage.tsx · features/auth/LoginPage.tsx · features/auth/MagicLinkPage.tsx · features/auth/PasswordResetPage.tsx · features/campaigns/CampaignsListPage.tsx · features/campaigns/CampaignWizardPage.tsx · features/crm-console/ArbitragePage.tsx · features/rgpd/RgpdRequestsPage.tsx · features/settings/SettingsPage.tsx · features/users/UsersPage.tsx
+KpiCard                  ecrans=15  fichiersHorsComp=15  interne=[components/ui/index.ts]
+    ecrans: / (dashboard) · /companies · /media · /journalists · /scraper-runs · /llm/router · /rgpd/ai-act · /campaigns · /campaigns/$id · /tags · /audiences · /audiences/$id · /admin/observability · /console/contacts · /console/vivier
+    fichiers: features/audiences/AudienceDetailPage.tsx · features/audiences/AudiencesListPage.tsx · features/campaigns/CampaignDetailPage.tsx · features/campaigns/CampaignsListPage.tsx · features/companies/CompaniesListPage.tsx · features/crm-console/CandidatesPage.tsx · features/crm-console/ContactsHubPage.tsx · features/dashboard/DashboardPage.tsx · features/llm/LlmRouterPage.tsx · features/media/JournalistsListPage.tsx · features/media/MediaListPage.tsx · features/observability/ObservabilityPage.tsx · features/rgpd/AiActRegisterPage.tsx · features/scraping/ScraperRunsPage.tsx · features/tags/TagsManagerPage.tsx
+StatusPill               ecrans=17  fichiersHorsComp=19  interne=[features/companies/components/ContactsCard.tsx · features/companies/components/EnrichmentTimeline.tsx]
+    ecrans: /contacts · /scraper-runs · /llm/router · /llm/proxy-providers · /llm/rotations · /rgpd/requests · /rgpd/ai-act · /audit-logs · /users · /settings · /campaigns · /campaigns/new · /campaigns/$id · /audiences · /audiences/new · /audiences/$id · /console/personnes/$k
+    fichiers: features/audiences/AudienceBuilderPage.tsx · features/audiences/AudienceDetailPage.tsx · features/audiences/AudiencesListPage.tsx · features/campaigns/CampaignDetailPage.tsx · features/campaigns/CampaignsListPage.tsx · features/campaigns/CampaignWizardPage.tsx · features/companies/components/ContactsCard.tsx · features/companies/components/EnrichmentTimeline.tsx · features/contacts/ContactsListPage.tsx · features/crm-console/PersonTimelinePage.tsx · features/llm/LlmRouterPage.tsx · features/llm/ProxyProvidersPage.tsx · features/llm/RotationsPage.tsx · features/rgpd/AiActRegisterPage.tsx · features/rgpd/AuditLogsPage.tsx · features/rgpd/RgpdRequestsPage.tsx · features/scraping/ScraperRunsPage.tsx · features/settings/SettingsPage.tsx · features/users/UsersPage.tsx
+cn                       ecrans=19  fichiersHorsComp=27  interne=[components/layout/Sidebar.tsx · features/companies/components/CompanyRow.tsx · features/companies/components/EnrichmentTimeline.tsx · features/companies/components/Pagination.tsx · features/companies/components/QualityScoreCard.tsx · features/dashboard/components/NextActions.tsx · features/dashboard/components/QualityDistributionBar.tsx · features/dashboard/components/SizeDistributionChart.tsx · features/dashboard/components/TopDeptsCard.tsx]
+    ecrans: / (dashboard) · /companies · /companies/$id · /contacts · /media · /media/$id · /scraper-runs · /llm/router · /llm/proxy-providers · /llm/rotations · /rgpd/requests · /rgpd/ai-act · /audit-logs · /users · /campaigns · /campaigns/new · /campaigns/$id · /audiences/new · /console/contacts
+    fichiers: features/audiences/AudienceBuilderPage.tsx · features/campaigns/CampaignDetailPage.tsx · features/campaigns/CampaignsListPage.tsx · features/campaigns/CampaignWizardPage.tsx · features/companies/CompaniesListPage.tsx · features/companies/CompanyDetailPage.tsx · features/companies/components/CompanyRow.tsx · features/companies/components/EnrichmentTimeline.tsx · features/companies/components/Pagination.tsx · features/companies/components/QualityScoreCard.tsx · features/contacts/ContactsListPage.tsx · features/crm-console/ContactsHubPage.tsx · features/dashboard/components/NextActions.tsx · features/dashboard/components/QualityDistributionBar.tsx · features/dashboard/components/SizeDistributionChart.tsx · features/dashboard/components/TopDeptsCard.tsx · features/dashboard/DashboardPage.tsx · features/llm/LlmRouterPage.tsx · features/llm/ProxyProvidersPage.tsx · features/llm/RotationsPage.tsx · features/media/MediaDetailPage.tsx · features/media/MediaListPage.tsx · features/rgpd/AiActRegisterPage.tsx · features/rgpd/AuditLogsPage.tsx · features/rgpd/RgpdRequestsPage.tsx · features/scraping/ScraperRunsPage.tsx · features/users/UsersPage.tsx
+EmptyState               ecrans=22  fichiersHorsComp=25  interne=[features/dashboard/components/ActivityFeed.tsx · features/dashboard/components/TopDeptsCard.tsx]
+    ecrans: / (dashboard) · /companies · /companies/$id · /contacts · /media · /media/$id · /journalists · /scraper-runs · /llm/router · /llm/proxy-providers · /llm/rotations · /rgpd/requests · /rgpd/ai-act · /audit-logs · /users · /campaigns · /tags · /audiences · /console/contacts · /console/vivier · /console/arbitrage · /console/personnes/$k
+    fichiers: features/audiences/AudiencesListPage.tsx · features/campaigns/CampaignsListPage.tsx · features/companies/CompaniesListPage.tsx · features/companies/CompanyDetailPage.tsx · features/contacts/ContactsListPage.tsx · features/crm-console/ArbitragePage.tsx · features/crm-console/CandidatesPage.tsx · features/crm-console/ConsoleGate.tsx · features/crm-console/ContactsHubPage.tsx · features/crm-console/PersonTimelinePage.tsx · features/dashboard/components/ActivityFeed.tsx · features/dashboard/components/TopDeptsCard.tsx · features/dashboard/DashboardPage.tsx · features/llm/LlmRouterPage.tsx · features/llm/ProxyProvidersPage.tsx · features/llm/RotationsPage.tsx · features/media/JournalistsListPage.tsx · features/media/MediaDetailPage.tsx · features/media/MediaListPage.tsx · features/rgpd/AiActRegisterPage.tsx · features/rgpd/AuditLogsPage.tsx · features/rgpd/RgpdRequestsPage.tsx · features/scraping/ScraperRunsPage.tsx · features/tags/TagsManagerPage.tsx · features/users/UsersPage.tsx
+Button                   ecrans=23  fichiersHorsComp=24  interne=[components/ui/index.ts · features/companies/components/Pagination.tsx]
+    ecrans: login · 2fa · magic-link · password-reset · / (dashboard) · /companies · /companies/$id · /media · /journalists · /scraper-runs · /llm/proxy-providers · /rgpd/requests · /audit-logs · /users · /settings · /campaigns · /campaigns/new · /campaigns/$id · /tags · /audiences · /audiences/new · /audiences/$id · /console/arbitrage
+    fichiers: features/audiences/AudienceBuilderPage.tsx · features/audiences/AudienceDetailPage.tsx · features/audiences/AudiencesListPage.tsx · features/auth/LoginPage.tsx · features/auth/MagicLinkPage.tsx · features/auth/PasswordResetPage.tsx · features/auth/TwoFactorPage.tsx · features/campaigns/CampaignDetailPage.tsx · features/campaigns/CampaignsListPage.tsx · features/campaigns/CampaignWizardPage.tsx · features/companies/CompaniesListPage.tsx · features/companies/CompanyDetailPage.tsx · features/companies/components/Pagination.tsx · features/crm-console/ArbitragePage.tsx · features/dashboard/DashboardPage.tsx · features/llm/ProxyProvidersPage.tsx · features/media/JournalistsListPage.tsx · features/media/MediaListPage.tsx · features/rgpd/AuditLogsPage.tsx · features/rgpd/RgpdRequestsPage.tsx · features/scraping/ScraperRunsPage.tsx · features/settings/SettingsPage.tsx · features/tags/TagsManagerPage.tsx · features/users/UsersPage.tsx
+PageHeader               ecrans=27  fichiersHorsComp=27  interne=[]
+    ecrans: / (dashboard) · /companies · /contacts · /international/roumanie · /media · /journalists · /scraper-runs · /llm/router · /llm/proxy-providers · /llm/rotations · /rgpd/requests · /rgpd/ai-act · /audit-logs · /users · /settings · /campaigns · /campaigns/new · /campaigns/$id · /tags · /audiences · /audiences/new · /audiences/$id · /admin/observability · /console/contacts · /console/vivier · /console/arbitrage · /console/personnes/$k
+    fichiers: features/audiences/AudienceBuilderPage.tsx · features/audiences/AudienceDetailPage.tsx · features/audiences/AudiencesListPage.tsx · features/campaigns/CampaignDetailPage.tsx · features/campaigns/CampaignsListPage.tsx · features/campaigns/CampaignWizardPage.tsx · features/companies/CompaniesListPage.tsx · features/contacts/ContactsListPage.tsx · features/crm-console/ArbitragePage.tsx · features/crm-console/CandidatesPage.tsx · features/crm-console/ContactsHubPage.tsx · features/crm-console/PersonTimelinePage.tsx · features/dashboard/DashboardPage.tsx · features/international/RoumaniePage.tsx · features/llm/LlmRouterPage.tsx · features/llm/ProxyProvidersPage.tsx · features/llm/RotationsPage.tsx · features/media/JournalistsListPage.tsx · features/media/MediaListPage.tsx · features/observability/ObservabilityPage.tsx · features/rgpd/AiActRegisterPage.tsx · features/rgpd/AuditLogsPage.tsx · features/rgpd/RgpdRequestsPage.tsx · features/scraping/ScraperRunsPage.tsx · features/settings/SettingsPage.tsx · features/tags/TagsManagerPage.tsx · features/users/UsersPage.tsx
+Card                     ecrans=29  fichiersHorsComp=37  interne=[features/companies/components/ContactsCard.tsx · features/companies/components/EnrichmentTimeline.tsx · features/companies/components/QualityScoreCard.tsx · features/dashboard/components/ActivityFeed.tsx · features/dashboard/components/NextActions.tsx · features/dashboard/components/QualityDistributionBar.tsx · features/dashboard/components/SizeDistributionChart.tsx · features/dashboard/components/TopDeptsCard.tsx]
+    ecrans: login · / (dashboard) · /companies · /companies/$id · /contacts · /media · /media/$id · /journalists · /scraper-runs · /llm/router · /llm/proxy-providers · /llm/rotations · /rgpd/requests · /rgpd/ai-act · /audit-logs · /users · /settings · /campaigns · /campaigns/new · /campaigns/$id · /tags · /audiences · /audiences/new · /audiences/$id · /admin/observability · /console/contacts · /console/vivier · /console/arbitrage · /console/personnes/$k
+    fichiers: features/audiences/AudienceBuilderPage.tsx · features/audiences/AudienceDetailPage.tsx · features/audiences/AudiencesListPage.tsx · features/auth/LoginPage.tsx · features/campaigns/CampaignDetailPage.tsx · features/campaigns/CampaignsListPage.tsx · features/campaigns/CampaignWizardPage.tsx · features/companies/CompaniesListPage.tsx · features/companies/CompanyDetailPage.tsx · features/companies/components/ContactsCard.tsx · features/companies/components/EnrichmentTimeline.tsx · features/companies/components/QualityScoreCard.tsx · features/contacts/ContactsListPage.tsx · features/crm-console/ArbitragePage.tsx · features/crm-console/CandidatesPage.tsx · features/crm-console/ContactsHubPage.tsx · features/crm-console/PersonTimelinePage.tsx · features/dashboard/components/ActivityFeed.tsx · features/dashboard/components/NextActions.tsx · features/dashboard/components/QualityDistributionBar.tsx · features/dashboard/components/SizeDistributionChart.tsx · features/dashboard/components/TopDeptsCard.tsx · features/dashboard/DashboardPage.tsx · features/llm/LlmRouterPage.tsx · features/llm/ProxyProvidersPage.tsx · features/llm/RotationsPage.tsx · features/media/JournalistsListPage.tsx · features/media/MediaDetailPage.tsx · features/media/MediaListPage.tsx · features/observability/ObservabilityPage.tsx · features/rgpd/AiActRegisterPage.tsx · features/rgpd/AuditLogsPage.tsx · features/rgpd/RgpdRequestsPage.tsx · features/scraping/ScraperRunsPage.tsx · features/settings/SettingsPage.tsx · features/tags/TagsManagerPage.tsx · features/users/UsersPage.tsx
+
+=== ECRAN -> COMPOSANTS DS IMPORTES ===
+login                    (3) Button, Card, Input
+2fa                      (1) Button
+magic-link               (2) Button, Input
+password-reset           (2) Button, Input
+/ (dashboard)            (9) Button, Card, EmptyState, KpiCard, LiveBadge, PageHeader, SegmentedControl, Skeleton, cn
+/companies               (9) Button, Card, CompaniesTableSkeleton, EmptyState, KpiCard, PageHeader, SearchInput, Toolbar, cn
+/companies/$id           (15) Avatar, Breadcrumbs, Button, Card, CardEyebrow, CardHeader, CardTitle, DropdownMenu, EmptyState, IconButton, PageShell, QualityBadge, SizeCategoryBadge, Spinner, cn
+/contacts                (10) Avatar, Card, CompaniesTableSkeleton, EmptyState, PageHeader, SearchInput, StatusPill, StatusTone, Toolbar, cn
+/international/roumanie  (1) PageHeader
+/media                   (7) Button, Card, EmptyState, KpiCard, PageHeader, SearchInput, cn
+/media/$id               (4) Card, EmptyState, Spinner, cn
+/journalists             (6) Button, Card, EmptyState, KpiCard, PageHeader, SearchInput
+/coverage                (0) — AUCUN —
+/scraper-runs            (20) Button, Card, Drawer, DropdownMenu, EmptyState, IconButton, KpiCard, LiveBadge, MenuItem, Modal, PageHeader, SearchInput, Skeleton, StatusPill, TabItem, Tabs, Toolbar, Tooltip, cn, mapStatusToTone
+/llm/router              (12) Card, CardEyebrow, CardHeader, CardTitle, CompaniesTableSkeleton, EmptyState, KpiCard, PageHeader, StatusPill, TabItem, Tabs, cn
+/llm/proxy-providers     (8) Button, Card, CompaniesTableSkeleton, EmptyState, PageHeader, StatusPill, StatusTone, cn
+/llm/rotations           (8) Card, CardEyebrow, CardTitle, CompaniesTableSkeleton, EmptyState, PageHeader, StatusPill, cn
+/rgpd/requests           (11) Button, Card, CompaniesTableSkeleton, EmptyState, Input, Modal, PageHeader, SegmentedControl, StatusPill, cn, mapStatusToTone
+/rgpd/ai-act             (12) Card, CardEyebrow, CardHeader, CardTitle, CompaniesTableSkeleton, Drawer, EmptyState, KpiCard, PageHeader, StatusPill, StatusTone, cn
+/audit-logs              (11) Button, Card, CompaniesTableSkeleton, Drawer, EmptyState, PageHeader, SearchInput, StatusPill, StatusTone, Toolbar, cn
+/users                   (10) Avatar, Button, Card, CompaniesTableSkeleton, EmptyState, Input, Modal, PageHeader, StatusPill, cn
+/settings                (11) Button, Card, CardEyebrow, CardHeader, CardTitle, DarkModeToggle, Input, PageHeader, StatusPill, TabItem, Tabs
+/campaigns               (14) Button, Card, DropdownMenu, EmptyState, Input, KpiCard, LiveBadge, MenuItem, PageHeader, Skeleton, StatusPill, TabItem, Tabs, cn
+/campaigns/new           (7) Button, Card, Input, PageHeader, SegmentedControl, StatusPill, cn
+/campaigns/$id           (10) Button, Card, KpiCard, LiveBadge, PageHeader, Spinner, StatusPill, TabItem, Tabs, cn
+/tags                    (8) Button, Card, EmptyState, FormField, KpiCard, Modal, PageHeader, Skeleton
+/audiences               (9) Button, Card, DropdownMenu, EmptyState, KpiCard, MenuItem, PageHeader, Skeleton, StatusPill
+/audiences/new           (7) Button, Card, Input, PageHeader, Spinner, StatusPill, cn
+/audiences/$id           (8) Button, Card, KpiCard, PageHeader, Spinner, StatusPill, TabItem, Tabs
+/admin/observability     (3) Card, KpiCard, PageHeader
+/console/contacts        (9) Card, EmptyState, KpiCard, PageHeader, SearchInput, TabItem, Tabs, Toolbar, cn
+/console/vivier          (8) Card, EmptyState, KpiCard, PageHeader, SearchInput, TabItem, Tabs, Toolbar
+/console/arbitrage       (5) Button, Card, EmptyState, Input, PageHeader
+/console/personnes/$k    (5) Card, CardTitle, EmptyState, PageHeader, StatusPill
+/cold-email              (1) PageShell
+/linkedin                (1) PageShell
+404                      (0) — AUCUN —

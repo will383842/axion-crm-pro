@@ -1,0 +1,7 @@
+      nspname       | count 
+--------------------+-------
+ public             |   101
+ pg_catalog         |    64
+ information_schema |     4
+(3 rows)
+

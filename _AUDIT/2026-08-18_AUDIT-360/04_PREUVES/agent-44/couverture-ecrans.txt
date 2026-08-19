@@ -1,0 +1,92 @@
+# Couverture des 37 ecrans de route
+
+## 1. Les routes declarees (routeTree.tsx)
+58:  component: RootLayout,
+61:const loginRoute = createRoute({ getParentRoute: () => rootRoute, path: '/login', component: LoginPage });
+62:const twoFactorRoute = createRoute({ getParentRoute: () => rootRoute, path: '/2fa', component: TwoFactorPage });
+63:const magicLinkRoute = createRoute({ getParentRoute: () => rootRoute, path: '/magic-link', component: MagicLinkPage });
+64:const passwordResetRoute = createRoute({ getParentRoute: () => rootRoute, path: '/password-reset', component: PasswordResetPage });
+66:const dashboardRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/', component: DashboardPage });
+67:const companiesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/companies', component: CompaniesListPage });
+68:const companyDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/companies/$companyId', component: CompanyDetailPage });
+69:const contactsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/contacts', component: ContactsListPage });
+70:const roumanieRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/international/roumanie', component: RoumaniePage });
+71:const mediaRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/media', component: MediaListPage });
+72:const mediaDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/media/$mediaId', component: MediaDetailPage });
+73:const journalistsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/journalists', component: JournalistsListPage });
+74:const coverageRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/coverage', component: CoveragePage });
+75:const scraperRunsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/scraper-runs', component: ScraperRunsPage });
+76:const llmRouterRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/llm/router', component: LlmRouterPage });
+77:const proxyProvidersRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/llm/proxy-providers', component: ProxyProvidersPage });
+78:const rotationsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/llm/rotations', component: RotationsPage });
+79:const rgpdRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/rgpd/requests', component: RgpdRequestsPage });
+80:const aiActRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/rgpd/ai-act', component: AiActRegisterPage });
+81:const auditRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/audit-logs', component: AuditLogsPage });
+82:const usersRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/users', component: UsersPage });
+83:const settingsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/settings', component: SettingsPage });
+86:const campaignsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/campaigns', component: CampaignsListPage });
+87:const campaignsNewRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/campaigns/new', component: CampaignWizardPage });
+88:const campaignDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/campaigns/$campaignId', component: CampaignDetailPage });
+90:const tagsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/tags', component: TagsManagerPage });
+91:const audiencesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/audiences', component: AudiencesListPage });
+92:const audiencesNewRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/audiences/new', component: AudienceBuilderPage });
+93:const audienceDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/audiences/$audienceId', component: AudienceDetailPage });
+95:const observabilityRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/admin/observability', component: ObservabilityPage });
+97:const consoleContactsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/contacts', component: ContactsHubPage });
+98:const consoleVivierRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/vivier', component: CandidatesPage });
+99:const consoleArbitrageRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/arbitrage', component: ArbitragePage });
+100:const consolePersonRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/personnes/$personKey', component: PersonTimelinePage });
+102:const coldEmailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/cold-email', component: ColdEmailStub });
+103:const linkedInRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/linkedin', component: LinkedInStub });
+107:const notFoundRoute = createRoute({ getParentRoute: () => rootRoute, path: '/*', component: NotFoundPage });
+
+total routes portant un component : 38
+
+## 2. Composants d'ecran importes par les tests Vitest
+
+audiences/AudienceBuilderPage
+auth/LoginPage
+companies/CompanyDetailPage
+crm-console/ConsoleGate
+crm-console/ContactsHubPage
+crm-console/PersonTimelinePage
+crm-console/types
+crm-console/useConsoleFeatures
+dashboard/DashboardPage
+
+## 3. Adresses visitees par les 2 specs Playwright REELLEMENT jouees en CI
+const PAGES = [
+  { url: '/login',          title: 'Login' },
+  { url: '/companies',      title: 'Companies' },
+  { url: '/coverage',       title: 'Coverage' },
+  { url: '/rgpd/requests',  title: 'RGPD' },
+];
+goto('/
+goto('/media
+
+## 4. Adresses visitees par l'ENSEMBLE des 16 specs
+/
+/2fa
+/analytics
+/audiences
+/audiences/new
+/audit-logs
+/campaigns
+/campaigns/new
+/cold-email
+/companies
+/coverage
+/crm
+/linkedin
+/llm/proxy-providers
+/llm/rotations
+/llm/router
+/login
+/magic-link
+/media
+/password-reset
+/rgpd/ai-act
+/rgpd/requests
+/settings
+/tags
+/users

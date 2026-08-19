@@ -1,0 +1,49 @@
+# AGENT 15 — PURGES : PERIMETRE, PLANIFICATION, GATE, TEST
+
+| commande                          | planifiee (routes/console.php) | gate            | dry-run | audit | test |
+|-----------------------------------|--------------------------------|-----------------|---------|-------|------|
+| retention:purge                   | OUI quotidien 04:00            | AUCUN           | oui     | non   | AUCUN|
+| rgpd:anonymize-ips                | OUI quotidien 04:30            | AUCUN           | oui     | non   | AUCUN|
+| retention:prune-scraper-runs      | OUI quotidien 04:20 (--days=90)| AUCUN           | NON     | non   | AUCUN|
+| rgpd:purge-vivier                 | OUI mensuel le 2 a 03:30       | CRM_PURGE_ENABLED| oui    | OUI   | AUCUN|
+| rgpd:purge-business-prospects     | OUI mensuel le 2 a 04:15       | CRM_PURGE_ENABLED| oui    | OUI   | AUCUN|
+| prospection:purge-non-commercial  | non                            | AUCUN           | NON     | non   | AUCUN|
+| prospection:purge-non-diffusible  | non                            | AUCUN           | NON     | non   | AUCUN|
+
+Recherche de test (temoin : le motif trouve bien un fichier quand il existe) :
+$ grep -rln "purge-vivier|PurgeVivier|purge-business|PurgeBusiness|prune-scraper|PruneScraper|RetentionPurge|retention:purge|purge-non-commercial|purge-non-diffusible|AnonymizeOldIps" tests/
+tests/Feature/Crm/SiteGdprTest.php      <- seule occurrence, et elle ne teste que le REFUS
+                                           quand CRM_PURGE_ENABLED=false (:296)
+=> AUCUN test ne verifie ce que ces commandes SUPPRIMENT quand elles s'executent.
+
+CLAUSES WHERE EXACTES :
+ retention:purge            DELETE email_validations WHERE expires_at < now()-7d
+                            DELETE notifications     WHERE created_at < now()-90d
+                            UPDATE scraper_runs SET response_payload=NULL,payload_path=NULL WHERE created_at<now()-90d
+ rgpd:anonymize-ips         UPDATE audit_logs SET ip=network(/24 ou /48) WHERE created_at<now()-30d
+                            UPDATE sessions SET ip_address=NULL WHERE last_activity<now()-30d
+ prune-scraper-runs         DELETE scraper_runs WHERE created_at < now()-90d   (par lots de 50 000)
+ rgpd:purge-vivier          DELETE candidates WHERE COALESCE(derniere_interaction_at,created_at) < now()-2ans
+                            DELETE candidates WHERE lifecycle_stage='refuse' AND updated_at < now()-90j
+                            DELETE activities  WHERE person_key IN (cles des fiches purgees)
+ purge-business-prospects   DELETE contacts WHERE legal_basis='legitimate_interest_b2b' (ou NULL)
+                            AND created_at < now()-3ans AND NOT EXISTS (activities sur person_key)
+ purge-non-commercial       DELETE companies WHERE (legal_form IS NULL OR left(legal_form,1) <> '5')
+ purge-non-diffusible       DELETE companies WHERE denomination = '[ND]'
+
+RAYON DE SOUFFLE MESURE de purge-non-commercial sur la base de reference de volume :
+$ psql -d axion_crm_perf4m -c "SELECT count(*) total, count(*) FILTER (WHERE legal_form IS NULL) nulls,
+    count(*) FILTER (WHERE legal_form IS NULL OR left(legal_form,1)<>'5') supprimees FROM companies;"
+  total=2800000 | nulls=2800000 | supprimees=2800000
+=> sur cette base, la commande supprime 100 % du stock, sans confirmation ni dry-run.
+   (Base de volume synthetique ; la distribution de legal_form en production n'a PAS pu
+    etre mesuree — production en lecture seule et non joignable depuis ce poste.)
+
+REVERSIBILITE : aucune des 7 commandes n'ecrit d'archive avant suppression.
+La seule reversibilite est la sauvegarde de production — dont l'AIPD_2026-08-18 (§ tableau
+des ecarts, ligne 7) rapporte 91 executions cron pour 91 echecs jusqu'au 2026-08-16.
+
+DOCBLOC MENTEUR — RetentionPurge.php:11-17 annonce :
+  « audit_logs > 24 mois -> archivage S3 + suppression »   -> ABSENT du tableau $tasks
+  « llm_usage  > 12 mois -> archivage + suppression »      -> ABSENT du tableau $tasks
+Le code ne traite que email_validations, notifications et scraper_runs.payload.

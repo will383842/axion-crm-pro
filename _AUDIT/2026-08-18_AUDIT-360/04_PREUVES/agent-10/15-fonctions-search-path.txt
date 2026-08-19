@@ -1,0 +1,11 @@
+               proname               |                              args                              |             proconfig              | lanname 
+-------------------------------------+----------------------------------------------------------------+------------------------------------+---------
+ candidates_enforce_vivier_workspace |                                                                | {"search_path=public, pg_catalog"} | plpgsql
+ compute_size_category               | effectif_min integer, effectif_max integer, is_artisan boolean | {"search_path=public, pg_catalog"} | sql
+ normalize_name                      | input text                                                     | {"search_path=public, pg_catalog"} | sql
+ recompute_company_quality_score     | c_id bigint                                                    | {"search_path=public, pg_catalog"} | plpgsql
+ trg_company_recompute_score         |                                                                | {"search_path=public, pg_catalog"} | plpgsql
+ trg_contact_recompute_company_score |                                                                | {"search_path=public, pg_catalog"} | plpgsql
+ trg_set_updated_at                  |                                                                | {"search_path=public, pg_catalog"} | plpgsql
+(7 rows)
+

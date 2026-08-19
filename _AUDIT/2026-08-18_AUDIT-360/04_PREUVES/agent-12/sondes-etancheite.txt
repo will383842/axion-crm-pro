@@ -1,0 +1,58 @@
+===== ETANCHEITE / MASQUAGE / AUTORISATION — AGENT 12 =====
+date : 2026-08-19T10:53:39+00:00
+base : axion_crm_a12
+
+entreprise univers A : id=100006
+entreprise univers B : id=400039
+
+owner  : console-locale@axion-ia.test (ff845f78-5bbe-4b33-99e6-e487ab9fa8ff)
+viewer : viewer-agent12@exemple.test (0e3b37fe-3238-45ff-91ec-0c66d61a759a)
+
+roles owner  : owner
+roles viewer : viewer
+viewer a-t-il contacts.view_pii ? false
+viewer a-t-il companies.update ? false
+
+----- 4. un compte de l'univers A atteint-il une fiche de B ? ------
+### fiche de l'univers B demandee par un compte de A
+    GET /api/v1/companies/400039  (compte : console-locale@axion-ia.test)
+    -> HTTP 200
+    {"id":400039,"workspace_id":"95cbe9b3-378e-4c9a-87cf-1d0faa629643","siren":"999000111","siret":null,"denomination":"FICHE-UNIVERS-B-AGENT12","denomination_normalized":"fiche-univers-b-agent12","naf":n
+    VERDICT : FUITE — la fiche de l autre univers est rendue
+
+----- TEMOIN POSITIF : la meme requete sur une fiche de SON univers -
+### fiche du propre univers
+    GET /api/v1/companies/100006  (compte : console-locale@axion-ia.test)
+    -> HTTP 200
+    {"id":100006,"workspace_id":"20cd81e4-de5d-4875-a759-07d64fe1f168","siren":"100000001","siret":null,"denomination":"Soci\u00e9t\u00e9 froide 1","denomination_normalized":"societe froide 1","naf":null,
+    (si celle-ci ne rend pas 200, la sonde ci-dessus ne prouve rien)
+
+----- 14. masquage des coordonnees : LISTE vs FICHE ----------------
+### LISTE (index) vue par le VIEWER
+    GET /api/v1/companies?per_page=1&filter[denomination]=Soci%C3%A9t%C3%A9%20froide%201  (compte : viewer-agent12@exemple.test)
+    -> HTTP 200
+    email en clair dans la LISTE ? NON (masque)
+    {"data":[{"id":100006,"workspace_id":"20cd81e4-de5d-4875-a759-07d64fe1f168","siren":"100000001","siret":null,"denomination":"Soci\u00e9t\u00e9 froide 1","denomination_normalized":"societe froide 1","naf":null,"legal_form":null,"effectif_range":null,"effectif_min":null,"effectif_max":null,"size_category":null,"is_artisan":false,"address":null,"postcode":"02001","city":"Ville 1","insee":null,"lat":n
+
+### FICHE (show) vue par le MEME VIEWER
+    GET /api/v1/companies/100006  (compte : viewer-agent12@exemple.test)
+    -> HTTP 200
+    email entreprise en clair dans la FICHE ? OUI
+    email du CONTACT en clair dans la FICHE ? OUI
+    {"id":100006,"workspace_id":"20cd81e4-de5d-4875-a759-07d64fe1f168","siren":"100000001","siret":null,"denomination":"Soci\u00e9t\u00e9 froide 1","denomination_normalized":"societe froide 1","naf":null,"legal_form":null,"effectif_range":null,"effectif_min":null,"effectif_max":null,"size_category":null,"is_artisan":false,"address":null,"postcode":"02001","city":"Ville 1","insee":null,"lat":null,"lon":null,"geo_point":null,"website":null,"phone":"+33611223344","linkedin_url":null,"discovery_source":
+
+----- 2. autorisation : un VIEWER peut-il SUPPRIMER une fiche ? ----
+    cible : companies.id=400005
+### DELETE par le VIEWER
+    DELETE /api/v1/companies/400005  (compte : viewer-agent12@exemple.test)
+    -> HTTP 204
+    deleted_at apres appel : NULL
+    VERDICT : refuse
+
+----- 2bis. TEMOIN POSITIF : la garde `permission:` fonctionne ------
+### GET /companies/export par le VIEWER (permission:data.export)
+    GET /api/v1/companies/export  (compte : viewer-agent12@exemple.test)
+    -> HTTP 403
+    VERDICT : 403 — la garde `permission:` rougit bien quand elle existe
+
+===== FIN =====

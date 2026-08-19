@@ -1,0 +1,24 @@
+# I48 — reference
+e8924b8 | 2026-08-19 12:07:34 +0200 | fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)
+
+## 1. AUCUNE ROUTE DE CREATION NI DE MODIFICATION DE CONTACT
+131:        Route::get('/contacts', [ContactsController::class, 'index']);
+132:        Route::get('/contacts/{contact}', [ContactsController::class, 'show']);
+133:        Route::put('/contacts/{contact}', [ContactsController::class, 'update']);
+134:        Route::delete('/contacts/{contact}', [ContactsController::class, 'destroy']);
+265:            Route::get('/contacts-hub', [ContactsHubController::class, 'index']);
+266:            Route::get('/contacts-hub/counts', [ContactsHubController::class, 'counts']);
+-> POST /contacts : absent
+0
+TEMOIN POSITIF : le meme grep trouve bien les POST des autres ressources
+122:        Route::post('/companies', [CompaniesController::class, 'store']);
+186:        Route::post('/tags', [TagsController::class, 'store']);
+199:        Route::post('/audiences', [AudiencesController::class, 'store']);
+
+verbes du ContactsController :
+30:    public function index(Request $r): JsonResponse
+125:    public function show(Contact $contact): JsonResponse
+138:    public function update(Request $r, Contact $contact): JsonResponse
+140:        return $this->notImplemented('5');
+151:    public function destroy(Contact $contact): JsonResponse
+153:        return $this->notImplemented('5');

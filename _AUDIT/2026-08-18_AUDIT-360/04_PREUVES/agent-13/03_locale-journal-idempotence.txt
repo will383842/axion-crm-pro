@@ -1,0 +1,45 @@
+=== PIÈGE 10 — sémantique de lower() selon la locale ===
+ datcollate | datctype 
+------------+----------
+ C          | C
+(1 row)
+
+ type_contacts_email 
+---------------------
+ citext
+(1 row)
+
+ prod_et_local_locale_c |  ci_locale_en_us   | egale_le_mb_strtolower_de_php 
+------------------------+--------------------+-------------------------------
+ josÉ.martin@ex.com     | josé.martin@ex.com | f
+(1 row)
+
+
+=== JOURNAL — ce que la chaîne d'audit garde d'une ingestion et d'un refus ===
+                                                     colonnes_audit_logs                                                     
+-----------------------------------------------------------------------------------------------------------------------------
+ id, workspace_id, user_id, event_type, path, status_code, ip, user_agent, payload_hash, prev_hash, current_hash, created_at
+(1 row)
+
+ event_type |          path          | status_code | n  
+------------+------------------------+-------------+----
+ POST       | api/internal/site-sync |         200 | 15
+ POST       | api/internal/site-sync |         401 |  7
+ POST       | api/internal/site-sync |         422 | 18
+ POST       | api/internal/site-sync |         503 |  1
+(4 rows)
+
+ id | event_type |          path          | status_code |                           payload_hash                           
+----+------------+------------------------+-------------+------------------------------------------------------------------
+  1 | POST       | api/internal/site-sync |         422 | 4f292e39e26bc4330d5ef4a734f3773378cc1db6bf8c33e8c296b702f7cb6389
+  3 | POST       | api/internal/site-sync |         401 | 0094c06aa2e27647e8324a7e8cc5347cef118adcd97db51a093e253de435a282
+  4 | POST       | api/internal/site-sync |         401 | 9e09888569085bcc02b249004d78788777cca8570df8233a0666bbe5ea979917
+(3 rows)
+
+
+=== UNICITÉ qui porte l'idempotence ===
+                                                                         indexdef                                                                         
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+ CREATE UNIQUE INDEX activities_workspace_external_ref_key ON public.activities USING btree (workspace_id, external_ref) WHERE (external_ref IS NOT NULL)
+(1 row)
+

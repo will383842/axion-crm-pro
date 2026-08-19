@@ -1,0 +1,46 @@
+=== resolution DNS ===
+R‚ponse ne faisant pas autorit‚ :
+Serveur :   box
+Address:  192.168.1.1
+
+Nom :    api.axion-crm-pro.com
+Addresses:  2a06:98c1:3120::6
+	  2a06:98c1:3121::6
+	  188.114.96.6
+	  188.114.97.6
+
+=== en-tetes HTTP 443 ===
+HTTP/1.1 200 OK
+Date: Wed, 19 Aug 2026 10:11:24 GMT
+Content-Type: text/html; charset=utf-8
+Connection: keep-alive
+alt-svc: h3=":443"; ma=86400
+Cache-Control: no-cache, private
+Host: api.axion-crm-pro.com
+referrer-policy: strict-origin-when-cross-origin
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+via: 1.1 Caddy
+x-content-type-options: nosniff
+x-frame-options: DENY
+x-powered-by: PHP/8.3.33
+cf-cache-status: DYNAMIC
+Report-To: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=oMPPhoAmLSmis%2Ba6AQfYgz1W08ewca3U3CxUC7tXaIc1RTBaJmyE3RXiITV%2Bn%2B4MUH5cpQvi%2Bo76anTQFZOikICmI6Nqx6nHNQdhqUHebMKChk4L2N70pGYRJOExRuu%2FDXB1OOwk%2BN1qNoBJ3qfokhGA9P4%3D"}]}
+Nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+Server: cloudflare
+CF-RAY: a2d85fbdefeeace6-MRS
+
+=== port 8080 : qui repond ? ===
+HTTP/1.1 521 <none>
+Date: Wed, 19 Aug 2026 10:11:25 GMT
+Content-Type: text/plain; charset=UTF-8
+Content-Length: 16
+Connection: keep-alive
+Cache-Control: private, max-age=0, no-store, no-cache, must-revalidate, post-check=0, pre-check=0
+Expires: Thu, 01 Jan 1970 00:00:01 GMT
+Referrer-Policy: same-origin
+X-Frame-Options: SAMEORIGIN
+Server: cloudflare
+CF-RAY: a2d85fc19c3efa41-MRS
+alt-svc: h3=":443"; ma=86400
+
+error code: 521

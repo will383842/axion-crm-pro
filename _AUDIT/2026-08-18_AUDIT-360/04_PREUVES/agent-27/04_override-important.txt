@@ -1,0 +1,190 @@
+=== Les 4 utilitaires ecrasees par src/styles/index.css:88-91  (.dark .X { ... !important }) ===
+
+bg-white           elements qui la portent =  42   dont avec variante dark: EXPLICITE, donc neutralisee par le !important = 38
+bg-slate-50        elements qui la portent =  26   dont avec variante dark: EXPLICITE, donc neutralisee par le !important = 23
+text-slate-900     elements qui la portent =  98   dont avec variante dark: EXPLICITE, donc neutralisee par le !important = 91
+border-slate-200   elements qui la portent =  24   dont avec variante dark: EXPLICITE, donc neutralisee par le !important = 22
+
+=== detail des variantes dark: neutralisees ===
+
+--- bg-white ---
+   components/ui/DarkModeToggle.tsx:38  dark:bg-slate-800
+   components/ui/DropdownMenu.tsx:59  dark:bg-slate-900
+   components/ui/GlobalSearch.tsx:50  dark:bg-slate-800
+   components/ui/GlobalSearch.tsx:68  dark:bg-slate-800
+   components/ui/Input.tsx:22  dark:bg-slate-900
+   components/ui/Modal.tsx:51  dark:bg-slate-900
+   components/ui/Modal.tsx:109  dark:bg-slate-900
+   components/ui/SegmentedControl.tsx:24  dark:bg-slate-800 dark:bg-slate-900
+   components/ui/SegmentedControl.tsx:39  dark:bg-slate-700
+   components/ui/Toolbar.tsx:34  dark:bg-slate-900
+   features/audiences/AudienceBuilderPage.tsx:230  dark:bg-slate-900
+   features/audiences/AudienceBuilderPage.tsx:469  dark:bg-slate-900
+   features/auth/TwoFactorPage.tsx:41  dark:bg-slate-900
+   features/campaigns/CampaignWizardPage.tsx:362  dark:bg-white dark:bg-slate-800
+   features/campaigns/CampaignWizardPage.tsx:412  dark:bg-slate-900
+   features/campaigns/CampaignWizardPage.tsx:433  dark:bg-slate-900
+   features/campaigns/CampaignWizardPage.tsx:536  dark:bg-slate-900
+   features/campaigns/CampaignWizardPage.tsx:591  dark:bg-slate-900 dark:bg-slate-900
+   features/companies/CompaniesListPage.tsx:565  dark:bg-slate-900
+   features/companies/CompaniesListPage.tsx:575  dark:bg-slate-900
+   features/companies/CompaniesListPage.tsx:584  dark:bg-slate-900
+   features/companies/CompaniesListPage.tsx:591  dark:bg-slate-900
+   features/companies/CompaniesListPage.tsx:652  dark:bg-slate-900
+   features/companies/CompaniesListPage.tsx:772  dark:bg-slate-900
+   features/contacts/ContactsListPage.tsx:133  dark:bg-slate-900
+   features/dashboard/DashboardPage.tsx:263  dark:bg-slate-900
+   features/dashboard/DashboardPage.tsx:271  dark:bg-slate-900
+   features/media/MediaListPage.tsx:248  dark:bg-slate-900
+   features/media/MediaListPage.tsx:357  dark:bg-slate-900
+   features/observability/ObservabilityPage.tsx:135  dark:bg-slate-900
+   features/rgpd/AuditLogsPage.tsx:119  dark:bg-slate-900
+   features/rgpd/RgpdRequestsPage.tsx:241  dark:bg-slate-900
+   features/rgpd/RgpdRequestsPage.tsx:306  dark:bg-slate-900
+   features/settings/SettingsPage.tsx:247  dark:bg-slate-900
+   features/settings/SettingsPage.tsx:292  dark:bg-slate-700
+   features/tags/TagsManagerPage.tsx:266  dark:bg-slate-900
+   features/tags/TagsManagerPage.tsx:307  dark:bg-slate-900
+   features/users/UsersPage.tsx:212  dark:bg-slate-900
+
+--- bg-slate-50 ---
+   components/ui/Stat.tsx:17  dark:bg-slate-800/60
+   features/audiences/AudienceBuilderPage.tsx:349  dark:bg-slate-800/40
+   features/audiences/AudienceBuilderPage.tsx:362  dark:bg-slate-800/60
+   features/audiences/AudienceDetailPage.tsx:221  dark:bg-slate-800/60
+   features/audiences/AudienceDetailPage.tsx:267  dark:bg-slate-800/40
+   features/audiences/AudiencesListPage.tsx:224  dark:bg-slate-800/60
+   features/campaigns/CampaignDetailPage.tsx:339  dark:bg-slate-800/60
+   features/campaigns/CampaignDetailPage.tsx:386  dark:bg-slate-800/60
+   features/campaigns/CampaignDetailPage.tsx:423  dark:bg-slate-800/60
+   features/campaigns/CampaignDetailPage.tsx:500  dark:bg-slate-800/40
+   features/campaigns/CampaignWizardPage.tsx:523  dark:bg-slate-800/40
+   features/campaigns/CampaignWizardPage.tsx:714  dark:bg-slate-800/40
+   features/campaigns/CampaignWizardPage.tsx:760  dark:bg-slate-800/40
+   features/campaigns/CampaignWizardPage.tsx:842  dark:bg-slate-800/40
+   features/companies/CompanyDetailPage.tsx:241  dark:bg-slate-950
+   features/dashboard/components/QualityDistributionBar.tsx:94  dark:bg-slate-800/60
+   features/observability/ObservabilityPage.tsx:117  dark:bg-slate-800/40
+   features/rgpd/AiActRegisterPage.tsx:255  dark:bg-slate-800/60
+   features/rgpd/AuditLogsPage.tsx:247  dark:bg-slate-800/60
+   features/rgpd/AuditLogsPage.tsx:262  dark:bg-slate-800/60
+   features/scraping/ScraperRunsPage.tsx:701  dark:bg-slate-800/40
+   features/scraping/ScraperRunsPage.tsx:712  dark:bg-slate-800/40
+   features/scraping/ScraperRunsPage.tsx:727  dark:bg-slate-800/40
+
+--- text-slate-900 ---
+   components/ui/Breadcrumbs.tsx:53  dark:text-white
+   components/ui/Card.tsx:39  dark:text-white
+   components/ui/FormField.tsx:36  dark:text-slate-100
+   components/ui/Input.tsx:22  dark:text-white
+   components/ui/KpiCard.tsx:81  dark:text-white
+   components/ui/Modal.tsx:60  dark:text-white
+   components/ui/Modal.tsx:117  dark:text-white
+   components/ui/PageHeader.tsx:26  dark:text-white
+   components/ui/SegmentedControl.tsx:39  dark:text-white dark:text-slate-400
+   components/ui/Stat.tsx:22  dark:text-white
+   components/ui/Tabs.tsx:61  dark:text-white dark:text-slate-400
+   components/ui/Toolbar.tsx:34  dark:text-white
+   features/audiences/AudienceBuilderPage.tsx:230  dark:text-white
+   features/audiences/AudienceBuilderPage.tsx:335  dark:text-white
+   features/audiences/AudienceBuilderPage.tsx:363  dark:text-white
+   features/audiences/AudienceBuilderPage.tsx:473  dark:text-white
+   features/audiences/AudienceBuilderPage.tsx:487  dark:text-white
+   features/audiences/AudienceDetailPage.tsx:236  dark:text-white
+   features/audiences/AudienceDetailPage.tsx:284  dark:text-white
+   features/audiences/AudienceDetailPage.tsx:311  dark:text-white
+   features/audiences/AudiencesListPage.tsx:193  dark:text-white
+   features/audiences/AudiencesListPage.tsx:229  dark:text-white
+   features/auth/LoginPage.tsx:28  dark:text-white
+   features/auth/LoginPage.tsx:36  dark:text-white
+   features/auth/TwoFactorPage.tsx:41  dark:text-white
+   features/campaigns/CampaignDetailPage.tsx:185  dark:text-white
+   features/campaigns/CampaignDetailPage.tsx:205  dark:text-white
+   features/campaigns/CampaignDetailPage.tsx:356  dark:text-white
+   features/campaigns/CampaignDetailPage.tsx:475  dark:text-white
+   features/campaigns/CampaignDetailPage.tsx:502  dark:text-white
+   features/campaigns/CampaignsListPage.tsx:252  dark:text-white
+   features/campaigns/CampaignsListPage.tsx:323  dark:text-white
+   features/campaigns/CampaignsListPage.tsx:345  dark:text-white
+   features/campaigns/CampaignWizardPage.tsx:373  dark:text-white dark:text-emerald-400 dark:text-slate-400
+   features/campaigns/CampaignWizardPage.tsx:412  dark:text-white
+   features/campaigns/CampaignWizardPage.tsx:433  dark:text-white
+   features/campaigns/CampaignWizardPage.tsx:624  dark:text-white
+   features/campaigns/CampaignWizardPage.tsx:719  dark:text-white
+   features/campaigns/CampaignWizardPage.tsx:814  dark:text-white
+   features/companies/CompaniesListPage.tsx:458  dark:text-white dark:text-slate-400
+   features/companies/CompaniesListPage.tsx:565  dark:text-white
+   features/companies/CompaniesListPage.tsx:575  dark:text-white
+   features/companies/CompaniesListPage.tsx:584  dark:text-white
+   features/companies/CompaniesListPage.tsx:591  dark:text-white
+   features/companies/CompaniesListPage.tsx:652  dark:text-white
+   features/companies/CompaniesListPage.tsx:772  dark:text-white
+   features/companies/CompanyDetailPage.tsx:295  dark:text-white
+   features/companies/components/CompanyRow.tsx:79  dark:text-white
+   features/companies/components/ContactsCard.tsx:47  dark:text-white
+   features/companies/components/EnrichmentTimeline.tsx:67  dark:text-white
+   features/companies/components/QualityScoreCard.tsx:45  dark:text-white
+   features/contacts/ContactsListPage.tsx:133  dark:text-white
+   features/contacts/ContactsListPage.tsx:224  dark:text-white
+   features/contacts/ContactsListPage.tsx:240  dark:text-slate-200
+   features/crm-console/ArbitragePage.tsx:128  dark:text-white
+   features/crm-console/CandidatesPage.tsx:121  dark:text-white
+   features/crm-console/ContactsHubPage.tsx:155  dark:text-white dark:text-slate-400
+   features/crm-console/ContactsHubPage.tsx:193  dark:text-white
+   features/crm-console/PersonTimelinePage.tsx:76  dark:text-white
+   features/crm-console/PersonTimelinePage.tsx:115  dark:text-white
+   features/dashboard/components/NextActions.tsx:115  dark:text-white
+   features/dashboard/components/QualityDistributionBar.tsx:56  dark:text-white
+   features/dashboard/components/SizeDistributionChart.tsx:28  dark:text-white
+   features/dashboard/components/TopDeptsCard.tsx:93  dark:text-white
+   features/international/RoumaniePage.tsx:153  dark:text-white dark:text-slate-400
+   features/llm/ProxyProvidersPage.tsx:97  dark:text-white
+   features/media/JournalistsListPage.tsx:123  dark:text-white
+   features/media/MediaDetailPage.tsx:92  dark:text-white
+   features/media/MediaDetailPage.tsx:115  dark:text-white
+   features/media/MediaDetailPage.tsx:128  dark:text-white
+   features/media/MediaDetailPage.tsx:172  dark:text-white
+   features/media/MediaDetailPage.tsx:207  dark:text-white
+   features/media/MediaListPage.tsx:248  dark:text-white
+   features/media/MediaListPage.tsx:289  dark:text-white
+   features/media/MediaListPage.tsx:357  dark:text-white
+   features/rgpd/AiActRegisterPage.tsx:153  dark:text-white
+   features/rgpd/AuditLogsPage.tsx:119  dark:text-white
+   features/rgpd/AuditLogsPage.tsx:175  dark:text-white
+   features/rgpd/RgpdRequestsPage.tsx:179  dark:text-white
+   features/rgpd/RgpdRequestsPage.tsx:241  dark:text-white
+   features/rgpd/RgpdRequestsPage.tsx:306  dark:text-white
+   features/scraping/ScraperRunsPage.tsx:590  dark:text-white
+   features/scraping/ScraperRunsPage.tsx:673  dark:text-white
+   features/scraping/ScraperRunsPage.tsx:729  dark:text-white
+   features/settings/SettingsPage.tsx:250  dark:text-white
+   features/settings/SettingsPage.tsx:292  dark:text-white dark:text-slate-400
+   features/tags/TagsManagerPage.tsx:218  dark:text-slate-100
+   features/tags/TagsManagerPage.tsx:266  dark:text-slate-100
+   features/tags/TagsManagerPage.tsx:307  dark:text-slate-100
+   features/users/UsersPage.tsx:137  dark:text-white
+   features/users/UsersPage.tsx:212  dark:text-white
+
+--- border-slate-200 ---
+   components/ui/DarkModeToggle.tsx:38  dark:border-slate-700
+   components/ui/GlobalSearch.tsx:70  dark:border-slate-700
+   components/ui/GlobalSearch.tsx:143  dark:border-slate-700
+   components/ui/Tabs.tsx:52  dark:border-slate-800
+   features/campaigns/CampaignWizardPage.tsx:658  dark:border-slate-700
+   features/companies/CompaniesListPage.tsx:451  dark:border-slate-800
+   features/companies/CompaniesListPage.tsx:642  dark:border-slate-800
+   features/companies/CompaniesListPage.tsx:683  dark:border-slate-800
+   features/companies/components/EnrichmentTimeline.tsx:51  dark:border-slate-800
+   features/contacts/ContactsListPage.tsx:190  dark:border-slate-800
+   features/crm-console/PersonTimelinePage.tsx:113  dark:border-slate-700
+   features/international/RoumaniePage.tsx:140  dark:border-slate-800
+   features/llm/LlmRouterPage.tsx:104  dark:border-slate-800
+   features/llm/ProxyProvidersPage.tsx:75  dark:border-slate-800
+   features/media/JournalistsListPage.tsx:112  dark:border-slate-800
+   features/media/MediaDetailPage.tsx:178  dark:border-slate-800
+   features/media/MediaListPage.tsx:274  dark:border-slate-800
+   features/observability/ObservabilityPage.tsx:117  dark:border-slate-700
+   features/rgpd/AiActRegisterPage.tsx:130  dark:border-slate-800
+   features/rgpd/AuditLogsPage.tsx:147  dark:border-slate-800
+   features/rgpd/RgpdRequestsPage.tsx:158  dark:border-slate-800
+   features/users/UsersPage.tsx:115  dark:border-slate-800

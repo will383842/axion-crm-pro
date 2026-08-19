@@ -1,0 +1,36 @@
+=== git ===
+e8924b8 fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)
+9d273cd fix(rgpd+acces): le registre affirmait une chose FAUSSE en sa faveur — rectifié le jour même
+1145473 docs(rgpd): registre des violations, notification non retenue (#188)
+?? backend/database/database/
+?? backend/database/migrations/2026_05_17_195529_create_failed_jobs_table.php
+?? enrich-runner.sh
+?? find-websites-runner.sh
+?? frontend/public/tiles/
+
+=== reseaux docker ===
+NETWORK ID     NAME                DRIVER    SCOPE
+19851c29c149   axion-crm           bridge    local
+98a87126f0df   axion-crm-staging   bridge    local
+311827f5cde7   bridge              bridge    local
+b080d98e0f94   host                host      local
+b299edac1d8a   none                null      local
+
+=== conteneurs par reseau axion-crm ===
+axion-crm-scheduler 172.18.0.5/16
+axion-crm-caddy 172.18.0.8/16
+axion-crm-horizon 172.18.0.3/16
+axion-crm-redis 172.18.0.2/16
+axion-crm-postgres 172.18.0.4/16
+axion-crm-api 172.18.0.7/16
+axion-crm-app 172.18.0.6/16
+
+=== reseaux staging ===
+-- axion-crm-staging
+axion-crm-staging-horizon 172.19.0.3/16
+axion-crm-staging-api 172.19.0.4/16
+axion-crm-staging-postgres 172.19.0.6/16
+axion-crm-staging-scheduler 172.19.0.2/16
+axion-crm-staging-app 172.19.0.5/16
+axion-crm-staging-redis 172.19.0.7/16
+

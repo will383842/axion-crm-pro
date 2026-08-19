@@ -1,0 +1,65 @@
+=== ecritures opt_out avec email en clair ===
+backend/app/Crm/Ingest/SiteSyncIngestService.php:522:        DB::table('opt_out')->insert([
+backend/app/Crm/Rgpd/SiteGdprService.php:225:        DB::table('opt_out')->insert([
+backend/app/Services/Dedup/DeduplicationService.php:263:        DB::table('opt_out')->insert([
+--- toutes refs opt_out dans app ---
+backend/app/Console/Commands/JournalistsScrapeOurs.php
+backend/app/Crm/Ingest/SiteSyncEvent.php
+backend/app/Crm/Ingest/SiteSyncIngestService.php
+backend/app/Crm/Outbound/ConsentOutboundRecorder.php
+backend/app/Crm/Rgpd/SiteGdprService.php
+backend/app/Crm/Scraping/ScrapedRecordIngestService.php
+backend/app/Crm/Scraping/ScrapeIngestOutcome.php
+backend/app/Crm/Taxonomy.php
+backend/app/Http/Controllers/Api/CompaniesController.php
+backend/app/Http/Controllers/Api/Crm/CandidatesController.php
+backend/app/Http/Controllers/Api/JournalistsController.php
+backend/app/Http/Controllers/Api/MediaController.php
+backend/app/Models/Candidate.php
+backend/app/Models/Journalist.php
+backend/app/Services/Dedup/DeduplicationService.php
+backend/app/Services/Rgpd/GdprErasureService.php
+backend/app/Support/EligibiliteCampagne.php
+backend/app/Support/ListeSuppression.php
+
+=== rapport temps 2 (tete) ===
+# `opt_out` / `email_suppressions` — la migration de suppression à écrire (temps 2)
+
+> **Date** : 2026-08-18 · **Contexte** : décision 3 de
+> `_REPORTS/2026-08-18_ARBITRAGES-PREALABLES-SECTION-4.md`, ligne 10 du §3.
+> **Statut** : le temps 1 est livré dans cette PR. Le temps 2 **n'est pas écrit**,
+> et il ne doit pas l'être avant que sa condition d'entrée soit constatée.
+
+---
+
+## Ce que le temps 1 a fait (dans cette PR)
+
+- Migration `2026_08_18_000001_backfill_empreintes_oppositions.php` : calcule
+  `email_hash` pour toute ligne d'`opt_out` et d'`email_suppressions` qui porte
+  une adresse sans empreinte, **en PHP** via `ListeSuppression::empreinte()`.
+- La même migration pose sur chaque table la contrainte
+  `<table>_empreinte_obligatoire_check` : `email IS NULL OR email_hash IS NOT NULL`.
+  Une opposition ne peut donc **plus naître** sous la seule forme lisible.
+- Plus aucun point d'écriture ne consigne l'adresse en clair.
+- Plus aucun point de lecture ne l'interroge.
+
+## Ce que le temps 2 doit faire
+
+Une migration **séparée**, dans un **déploiement séparé** :
+
+```php
+DB::statement('ALTER TABLE opt_out DROP CONSTRAINT IF EXISTS opt_out_empreinte_obligatoire_check');
+DB::statement('DROP INDEX IF EXISTS idx_opt_out_email');
+DB::statement('ALTER TABLE opt_out DROP COLUMN email');
+
+DB::statement('ALTER TABLE email_suppressions DROP CONSTRAINT IF EXISTS email_suppressions_empreinte_obligatoire_check');
+DB::statement('ALTER TABLE email_suppressions DROP CONSTRAINT IF EXISTS email_suppressions_identifiable_check');
+DB::statement('DROP INDEX IF EXISTS email_suppressions_scope_email_key');
+DB::statement('ALTER TABLE email_suppressions DROP COLUMN email');
+// La table doit rester « identifiable » : l'empreinte devient obligatoire.
+DB::statement('ALTER TABLE email_suppressions ALTER COLUMN email_hash SET NOT NULL');
+```
+
+⚠️ Les deux contraintes d'`email_suppressions` mentionnent la colonne et
+tomberaient avec elle en `CASCADE` : on les retire **explicitement**, sinon le
+`DROP COLUMN` emporterait en silence `email_suppressions_identifiable_check`,

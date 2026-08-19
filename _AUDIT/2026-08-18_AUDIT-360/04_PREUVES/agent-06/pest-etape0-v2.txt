@@ -1,0 +1,521 @@
+[2026-08-19 12:10:43] local.INFO: Remplissage des empreintes d’opposition {"table":"opt_out","empreintes_calculees":0} 
+[2026-08-19 12:10:44] local.INFO: Remplissage des empreintes d’opposition {"table":"email_suppressions","empreintes_calculees":0} 
+
+   FAIL  Tests\Feature\PasDeStub501SousCrmEtAnalyticsTest
+  ⨯ 🔴 C1 — /api/v1/crm et /api/v1/analytics ne répondent 501 sur aucun verbe
+  ✓ 🔴 C3 — le drapeau console v2 ouvert, /crm sert du code réel (200… 125.29s  
+  ✓ 🔴 A2 — aucun fourre-tout {any} ne capture les sous-chemins de /cr… 22.96s  
+  ✓ 🔴 C2 — un sous-chemin inexistant sous /crm ou /analytics répond 4… 17.18s  
+  ✓ 🔴 A1 — aucune route sous /crm ni /analytics n’est servie par un c… 14.48s  
+  ✓ /cold-email et /linkedin restent des bouchons 501 — choix assumé,…  16.37s  
+  ✓ 🔴 B — les routes RÉELLES de la console v2 sous /crm sont toujours… 13.88s  
+
+   PASS  Tests\Feature\Database\ReconstructionBaseTest
+  ✓ it n'expose aucune table d'extension au DROP TABLE global de migra… 12.71s  
+
+   PASS  Tests\Unit\PhpstanBaselineNeGrossitPasTest
+  ✓ l'en-tête de la baseline annonce les nombres réellement présents    10.93s  
+  ✓ le parseur de baseline lit vraiment des entrées                     12.89s  
+  ✓ aucune entrée de baseline ne vise le socle CRM                      19.61s  
+  ✓ reportUnmatchedIgnoredErrors reste activé                           10.12s  
+  ✓ la baseline PHPStan ne grossit pas                                  10.99s  
+
+   PASS  Tests\Feature\EtancheiteParTableTest
+  ✓ le semeur couvre TOUTES les tables scopées — aucune table nouvelle… 10.32s  
+  ✓ toutes les tables scopées portent ENABLE + FORCE ROW LEVEL SECURIT… 13.07s  
+  ✓ AVEC le contexte du workspace A, chaque table scopée ne rend QUE l… 29.36s  
+  ✓ DÉFAUT CONNU — email_verification_logs fuit SANS contexte (à corri… 20.08s  
+  ✓ health_practitioners : le commentaire de 2026_07_04 annonce une po… 32.64s  
+  ✓ les exclusions de la MIGRATION et celles des TESTS sont la même li… 52.59s  
+  ✓ TÉMOIN — la sonde « 0 ligne sans contexte » détecte réellement une… 31.73s  
+  ✓ aucune policy ne rouvre un repli permissif — y compris sous la for… 12.31s  
+  ✓ TÉMOIN — FORCE ROW LEVEL SECURITY change bien le comportement du P… 24.22s  
+  ✓ l’inventaire des tables scopées est CALCULÉ, et ses exclusions son… 15.20s  
+  ✓ SANS contexte workspace, AUCUNE table scopée ne rend la moindre li… 14.64s  
+
+   FAIL  Tests\Feature\NeDoitPasRegresserTest
+  ✓ ACQUIS 3 — une date reçue en UTC survit à l’aller-retour en base    10.82s  
+  - ACQUIS 2 — un dump produit avec la recette de production se restau… 16.66s  
+  ✓ ACQUIS 2 (suite) — la surveillance et l’exercice de restauration e… 12.43s  
+  ✓ ACQUIS 3 — la session Postgres est alignée sur le fuseau de l’appli… 7.22s  
+  ✓ ACQUIS 1 (suite) — le rôle applicatif n’est ni superutilisateur ni…  9.92s  
+  ⨯ ACQUIS 1 — sans contexte workspace, le rôle applicatif ne voit AUC… 13.29s  
+  ⨯ ACQUIS 4 (suite) — une empreinte INCONNUE ne rend rien : le filtre… 11.04s  
+  ⨯ ACQUIS 3 — le réglage qui rend le verrou capable de rougir est tou… 10.79s  
+  ⨯ ACQUIS 4 — l’export RGPD trouve la fiche par son EMPREINTE, même qu… 9.86s  
+
+   FAIL  Tests\Feature\RlsTest
+  ⨯ drapeau db_app_role à OFF : la connexion par défaut reste le rôle h… 7.08s  
+  ⨯ en mode strict, le contexte est restauré même si le job lève une ex… 8.72s  
+  ⨯ la commande de backfill pose bien son contexte workspace (correctif… 7.27s  
+  ⨯ sans contexte workspace, le rôle applicatif ne voit AUCUNE ligne     7.75s  
+  ⨯ une écriture dans un AUTRE workspace est rejetée par la policy       6.78s  
+  ⨯ le rôle applicatif ne voit que son workspace                        11.18s  
+  ⨯ drapeaux par défaut : aucun durcissement actif                       9.30s  
+  ⨯ en mode strict, une requête sans contexte workspace échoue bruyamme… 9.55s  
+  ⨯ une écriture SANS contexte est rejetée (pas un no-op silencieux)    16.94s  
+  ⨯ runWithoutScope exige une justification écrite                      12.91s  
+  ⨯ drapeaux OFF : une requête sans contexte se comporte comme avant (… 11.90s  
+  ⨯ le rôle applicatif n’est ni superutilisateur ni BYPASSRLS ni propr… 13.21s  
+  ⨯ sans contexte, un tag EXISTANT est invisible et son insertion est…  11.57s  
+  ⨯ en mode strict, WorkspaceContext::run pose le contexte et le resta… 12.16s  
+  ⨯ un UPDATE croisé ne touche aucune ligne du workspace voisin          9.97s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PasDeStub501SousCrmEtAnalyticsTest…   QueryException   
+  SQLSTATE[2BP01]: Dependent objects still exist: 7 ERROR:  cannot drop column workspace_id of table scraping_campaigns because other objects depend on it
+DETAIL:  policy scraping_campaigns_workspace_isolation on table scraping_campaigns depends on column workspace_id of table scraping_campaigns
+HINT:  Use DROP ... CASCADE to drop the dependent objects too.
+CONTEXT:  SQL statement "ALTER TABLE scraping_campaigns DROP COLUMN workspace_id"
+PL/pgSQL function inline_code_block line 34 at SQL statement (Connection: pgsql, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL:     DO $$
+    DECLARE
+        v_workspaces_id_type TEXT;
+        v_current_type       TEXT;
+    BEGIN
+        -- Lire le type réel de workspaces.id
+        SELECT data_type INTO v_workspaces_id_type
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'workspaces'
+          AND column_name = 'id';
+
+        -- Lire le type actuel de scraping_campaigns.workspace_id
+        SELECT data_type INTO v_current_type
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'scraping_campaigns'
+          AND column_name = 'workspace_id';
+
+        RAISE NOTICE 'workspaces.id type = %, scraping_campaigns.workspace_id type = %',
+            v_workspaces_id_type, v_current_type;
+
+        -- Si déjà aligné, no-op
+        IF v_workspaces_id_type = v_current_type THEN
+            RAISE NOTICE 'Types already aligned, skipping fix.';
+            RETURN;
+        END IF;
+
+        -- Drop constraint FK puis colonne, recréer dans le bon type
+        ALTER TABLE scraping_campaigns
+            DROP CONSTRAINT IF EXISTS scraping_campaigns_workspace_id_fkey;
+        DROP INDEX IF EXISTS idx_scraping_campaigns_workspace_status;
+        DROP INDEX IF EXISTS idx_scraping_campaigns_running;
+        ALTER TABLE scraping_campaigns DROP COLUMN workspace_id;
+
+        IF v_workspaces_id_type IN ('bigint', 'integer') THEN
+            ALTER TABLE scraping_campaigns
+                ADD COLUMN workspace_id BIGINT NOT NULL
+                REFERENCES workspaces(id) ON DELETE CASCADE;
+        ELSIF v_workspaces_id_type = 'uuid' THEN
+            ALTER TABLE scraping_campaigns
+                ADD COLUMN workspace_id UUID NOT NULL
+                REFERENCES workspaces(id) ON DELETE CASCADE;
+        ELSE
+            -- Fallback (varchar/text) : on prend TEXT pour ne pas perdre la FK
+            ALTER TABLE scraping_campaigns
+                ADD COLUMN workspace_id TEXT NOT NULL
+                REFERENCES workspaces(id) ON DELETE CASCADE;
+        END IF;
+
+        CREATE INDEX idx_scraping_campaigns_workspace_status
+            ON scraping_campaigns (workspace_id, status);
+        CREATE INDEX idx_scraping_campaigns_running
+            ON scraping_campaigns (workspace_id, started_at DESC)
+            WHERE status = 'running';
+
+        -- Recréer RLS policy (cohérente avec le nouveau type)
+        DROP POLICY IF EXISTS scraping_campaigns_workspace_isolation ON scraping_campaigns;
+        CREATE POLICY scraping_campaigns_workspace_isolation ON scraping_campaigns
+            FOR ALL
+            USING (
+                workspace_id IS NULL
+                OR NULLIF(current_setting('app.current_workspace_id', true), '') IS NULL
+                OR workspace_id::TEXT = NULLIF(current_setting('app.current_workspace_id', true), '')
+            )
+            WITH CHECK (
+                workspace_id IS NULL
+                OR NULLIF(current_setting('app.current_workspace_id', true), '') IS NULL
+                OR workspace_id::TEXT = NULLIF(current_setting('app.current_workspace_id', true), '')
+            );
+
+        RAISE NOTICE 'scraping_campaigns.workspace_id aligned to type %', v_workspaces_id_type;
+    END
+    $$;)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:633
+    629▕                 return true;
+    630▕             }
+    631▕ 
+    632▕             $this->recordsHaveBeenModified(
+  ➜ 633▕                 $change = $this->getPdo()->exec($query) !== false
+    634▕             );
+    635▕ 
+    636▕             return $change;
+    637▕         });
+
+      [2m+6 vendor frames [22m
+  7   database/migrations/2026_05_18_000004_fix_scraping_campaigns_workspace_id_type.php:24
+      [2m+38 vendor frames [22m
+  46  tests/TestCase.php:25
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\NeDoitPasRegresserTest > ACQUIS 1 — sans contexte w…   
+  Failed asserting that 2 is identical to 0.
+
+  at tests/Feature/NeDoitPasRegresserTest.php:128
+    124▕             ->and($app->table('contacts')->count())->toBe(1);
+    125▕ 
+    126▕         // Et l'acquis : plus de contexte, plus rien.
+    127▕         $app->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
+  ➜ 128▕         expect($app->table('companies')->count())->toBe(0)
+    129▕             ->and($app->table('contacts')->count())->toBe(0);
+    130▕     } finally {
+    131▕         nePasRegresserNettoyer([$wsA, $wsB]);
+    132▕     }
+
+  1   tests/Feature/NeDoitPasRegresserTest.php:128
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\NeDoitPasRegresserTest > ACQUIS 4 (…  QueryException   
+  SQLSTATE[42703]: Undefined column: 7 ERROR:  column "person_key" of relation "contacts" does not exist
+LINE 1: ...orkspace_id", "company_id", "last_name", "email", "person_ke...
+                                                             ^ (Connection: pgsql_owner, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: insert into "contacts" ("workspace_id", "company_id", "last_name", "email", "person_key") values (e6d20e06-3231-449a-8b6c-dbbc8dd94ceb, 5, ZZ SYNCHRO, une-tout-autre-adresse@test.invalid, daf0622c19a7ef9030edb8427ba60b0b564afa3ea9a0d1f2a74929ae4b71414f))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:584
+    580▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    581▕ 
+    582▕             $this->recordsHaveBeenModified();
+    583▕ 
+  ➜ 584▕             return $statement->execute();
+    585▕         });
+    586▕     }
+    587▕ 
+    588▕     /**
+
+      [2m+6 vendor frames [22m
+  7   tests/Feature/NeDoitPasRegresserTest.php:462
+  8   tests/Feature/NeDoitPasRegresserTest.php:542
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\NeDoitPasRegresserTest > ACQUIS 3 —…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/NeDoitPasRegresserTest.php:104
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\NeDoitPasRegresserTest > ACQUIS 4 —…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/NeDoitPasRegresserTest.php:104
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > drapeau db_app_role à OFF…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  app/Support/WorkspaceContext.php:55
+  13  app/Support/WorkspaceContext.php:60
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > en mode strict, le contex…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  app/Support/WorkspaceContext.php:55
+  13  app/Support/WorkspaceContext.php:60
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > la commande de backfill p…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  app/Support/WorkspaceContext.php:55
+  13  app/Support/WorkspaceContext.php:60
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > sans contexte workspace,…   QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/RlsTest.php:126
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > une écriture dans un AUTR…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, 00d11707-6165-4488-9b73-9ab3a7db74ee, false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/RlsTest.php:138
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > le rôle applicatif ne voi…  QueryException   
+  SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "workspaces" does not exist
+LINE 1: insert into "workspaces" ("cost_cap_eur", "created_at", "id"...
+                    ^ (Connection: pgsql_owner, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: insert into "workspaces" ("cost_cap_eur", "created_at", "id", "is_active", "name", "settings", "slug", "updated_at") values (100, 2026-08-19 12:20:57, 33651bbc-e15a-4074-953c-4d94f98bbb61, 1, RLS A, {}, rls-a-33651bbc, 2026-08-19 12:20:57), (100, 2026-08-19 12:20:57, 9f0afaaa-1f96-4bcf-a2b4-466316d501f7, 1, RLS B, {}, rls-b-9f0afaaa, 2026-08-19 12:20:57))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:584
+    580▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    581▕ 
+    582▕             $this->recordsHaveBeenModified();
+    583▕ 
+  ➜ 584▕             return $statement->execute();
+    585▕         });
+    586▕     }
+    587▕ 
+    588▕     /**
+
+      [2m+6 vendor frames [22m
+  7   tests/Feature/RlsTest.php:57
+  8   tests/Feature/RlsTest.php:107
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > drapeaux par défaut : auc…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  app/Support/WorkspaceContext.php:55
+  13  app/Support/WorkspaceContext.php:60
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > en mode strict, une requê…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  app/Support/WorkspaceContext.php:55
+  13  app/Support/WorkspaceContext.php:60
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > une écriture SANS context…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/RlsTest.php:161
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > runWithoutScope exige une…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  app/Support/WorkspaceContext.php:55
+  13  app/Support/WorkspaceContext.php:60
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > drapeaux OFF : une requêt…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  app/Support/WorkspaceContext.php:55
+  13  app/Support/WorkspaceContext.php:60
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > le rôle applicatif n’est…   QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  app/Support/WorkspaceContext.php:55
+  13  app/Support/WorkspaceContext.php:60
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > sans contexte, un tag EXI…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  app/Support/WorkspaceContext.php:55
+  13  app/Support/WorkspaceContext.php:60
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > en mode strict, Workspace…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, , false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  app/Support/WorkspaceContext.php:55
+  13  app/Support/WorkspaceContext.php:60
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RlsTest > un UPDATE croisé ne touch…  QueryException   
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_test, SQL: SELECT set_config(app.current_workspace_id, e76a5f4c-c926-4443-bd7d-818738e12258, false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+     62▕      */
+     63▕     protected function createPdoConnection($dsn, $username, #[\SensitiveParameter] $password, $options)
+     64▕     {
+     65▕         return version_compare(PHP_VERSION, '8.4.0', '<')
+  ➜  66▕             ? new PDO($dsn, $username, $password, $options)
+     67▕             : PDO::connect($dsn, $username, $password, $options); /** @phpstan-ignore staticMethod.notFound (PHP 8.4) */
+     68▕     }
+     69▕ 
+     70▕     /**
+
+      [2m+11 vendor frames [22m
+  12  tests/Feature/RlsTest.php:184
+
+
+  Tests:    20 failed, 1 skipped, 27 passed (133 assertions)
+  Duration: 1294.73s
+  Random Order Seed: 1787133770
+

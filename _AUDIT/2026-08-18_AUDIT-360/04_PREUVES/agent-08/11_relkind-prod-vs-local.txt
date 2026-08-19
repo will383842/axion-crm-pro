@@ -1,0 +1,20 @@
+=== PROD : relkind reel des tables portant workspace_id, exclusions comprises ===
+        relname        | relkind | relispartition | relrowsecurity | relforcerowsecurity 
+-----------------------+---------+----------------+----------------+---------------------
+ audit_logs            | r       | f              | f              | f
+ coverage_matrix_cells | m       | f              | f              | f
+ sessions              | r       | f              | f              | f
+ user_workspaces       | r       | f              | f              | f
+(4 rows)
+
+
+=== LOCAL (base de travail migree) : memes relations ===
+        relname        | relkind | relispartition | relrowsecurity | relforcerowsecurity 
+-----------------------+---------+----------------+----------------+---------------------
+ audit_logs            | p       | f              | f              | f
+ audit_logs_default    | r       | t              | f              | f
+ coverage_matrix_cells | m       | f              | f              | f
+ sessions              | r       | f              | f              | f
+ user_workspaces       | r       | f              | f              | f
+(5 rows)
+

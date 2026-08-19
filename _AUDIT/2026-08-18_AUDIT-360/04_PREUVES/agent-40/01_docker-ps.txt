@@ -1,0 +1,14 @@
+NAMES                         IMAGE                                                             STATUS                    PORTS
+axion-crm-staging-scheduler   axion-crm-staging-scheduler                                       Up 16 minutes             80/tcp, 9000/tcp
+axion-crm-staging-api         axion-crm-staging-api                                             Up 16 minutes (healthy)   9000/tcp, 172.17.0.1:8082->80/tcp
+axion-crm-staging-horizon     axion-crm-staging-horizon                                         Up 16 minutes (healthy)   80/tcp, 9000/tcp
+axion-crm-staging-app         axion-crm-staging-app                                             Up 16 minutes (healthy)   80/tcp, 443/tcp, 2019/tcp, 443/udp, 172.17.0.1:8081->5173/tcp
+axion-crm-api                 axion-crm-pro-api                                                 Up 20 minutes (healthy)   80/tcp, 9000/tcp
+axion-crm-scheduler           axion-crm-pro-scheduler                                           Up 20 minutes             80/tcp, 9000/tcp
+axion-crm-horizon             axion-crm-pro-horizon                                             Up 20 minutes (healthy)   80/tcp, 9000/tcp
+axion-crm-app                 axion-crm-pro-app                                                 Up 20 minutes (healthy)   80/tcp, 443/tcp, 2019/tcp, 5173/tcp, 443/udp
+axion-crm-caddy               caddy:2-alpine                                                    Up 2 hours                0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp, 443/udp, 2019/tcp
+axion-crm-staging-redis       redis:7.2-alpine                                                  Up 2 hours (healthy)      6379/tcp
+axion-crm-staging-postgres    ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman   Up 2 hours (healthy)      5432/tcp
+axion-crm-postgres            ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman   Up 4 hours (healthy)      5432/tcp
+axion-crm-redis               redis:7.2-alpine                                                  Up 4 hours (healthy)      6379/tcp

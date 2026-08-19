@@ -1,0 +1,10 @@
+=== [1] Accept: text/html, max-time 15 ===
+
+--exit=28 code=000 time=15.036585
+
+=== [2] Accept par defaut (*/*), max-time 15 ===
+
+--exit=28 code=000 time=15.017595
+
+=== [3] Accept: application/json, max-time 15 ===
+code=000 time=15.016377

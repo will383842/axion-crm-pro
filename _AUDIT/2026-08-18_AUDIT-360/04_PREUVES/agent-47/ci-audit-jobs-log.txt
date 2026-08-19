@@ -1,0 +1,927 @@
+Node deps audit (frontend)	Set up job	﻿2026-08-19T09:44:30.4534198Z Current runner version: '2.336.0'
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4559858Z ##[group]Runner Image Provisioner
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4561191Z Hosted Compute Agent
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4561770Z Version: 20260729.566
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4562427Z Commit: cf7153fe6e25b664e8693c24944bf2b00355d109
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4563324Z Build Date: 2026-07-29T19:17:02Z
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4564033Z Worker ID: {3e758b90-09b3-49bd-a0cd-57093c9b082e}
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4564759Z Azure Region: northcentralus
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4565458Z ##[endgroup]
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4566799Z ##[group]Operating System
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4567528Z Ubuntu
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4568079Z 24.04.4
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4568605Z LTS
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4569178Z ##[endgroup]
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4569745Z ##[group]Runner Image
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4570572Z Image: ubuntu-24.04
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4571269Z Version: 20260810.271.1
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4572350Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260810.271/images/ubuntu/Ubuntu2404-Readme.md
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4574163Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260810.271
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4575117Z ##[endgroup]
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4576525Z ##[group]GITHUB_TOKEN Permissions
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4578550Z Contents: read
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4579600Z Issues: write
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4580395Z Metadata: read
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4580990Z SecurityEvents: write
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4581675Z ##[endgroup]
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4583752Z Secret source: Actions
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.4584900Z Prepare workflow directory
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.5010101Z Prepare all required actions
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.5076431Z Getting action download info
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.7281801Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:30.8457193Z Download action repository 'pnpm/action-setup@v4' (SHA:b906affcce14559ad1aafd4ab0e942779e9f58b1)
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:31.3197490Z Download action repository 'actions/setup-node@v7' (SHA:820762786026740c76f36085b0efc47a31fe5020)
+Node deps audit (frontend)	Set up job	2026-08-19T09:44:31.5537000Z Complete job name: Node deps audit (frontend)
+Node deps audit (frontend)	Run actions/checkout@v4	﻿2026-08-19T09:44:31.6299016Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.6308185Z ##[group]Run actions/checkout@v4
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.6308993Z with:
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.6309487Z   repository: will383842/axion-crm-pro
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.6313783Z   token: ***
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.6314276Z   ssh-strict: true
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.6314768Z   ssh-user: git
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.6315247Z   persist-credentials: true
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.6315780Z   clean: true
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.6316267Z   sparse-checkout-cone-mode: true
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.6316822Z   fetch-depth: 1
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.6317272Z   fetch-tags: false
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.6317795Z   show-progress: true
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.6318289Z   lfs: false
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.6318730Z   submodules: false
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.6319253Z   set-safe-directory: true
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.6319785Z   allow-unsafe-pr-checkout: false
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.6320769Z ##[endgroup]
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7349779Z Syncing repository: will383842/axion-crm-pro
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7352162Z ##[group]Getting Git version info
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7353211Z Working directory is '/home/runner/work/axion-crm-pro/axion-crm-pro'
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7360941Z [command]/usr/bin/git version
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7450459Z git version 2.54.0
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7472290Z ##[endgroup]
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7489209Z Temporarily overriding HOME='/home/runner/work/_temp/ab1c4847-f1ae-425b-961f-562ebc626961' before making global git config changes
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7491887Z Adding repository directory to the temporary git global config as a safe directory
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7495002Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/axion-crm-pro/axion-crm-pro
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7543823Z Deleting the contents of '/home/runner/work/axion-crm-pro/axion-crm-pro'
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7548782Z ##[group]Initializing the repository
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7553623Z [command]/usr/bin/git init /home/runner/work/axion-crm-pro/axion-crm-pro
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7627305Z hint: Using 'master' as the name for the initial branch. This default branch name
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7628912Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7630476Z hint: to use in all of your new repositories, which will suppress this warning,
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7631558Z hint: call:
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7632311Z hint:
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7633217Z hint: 	git config --global init.defaultBranch <name>
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7634144Z hint:
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7635167Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7636481Z hint: 'development'. The just-created branch can be renamed via this command:
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7637547Z hint:
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7638435Z hint: 	git branch -m <name>
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7639227Z hint:
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7640552Z hint: Disable this message with "git config set advice.defaultBranchName false"
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7646832Z Initialized empty Git repository in /home/runner/work/axion-crm-pro/axion-crm-pro/.git/
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7660874Z [command]/usr/bin/git remote add origin https://github.com/will383842/axion-crm-pro
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7698768Z ##[endgroup]
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7699805Z ##[group]Disabling automatic garbage collection
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7702775Z [command]/usr/bin/git config --local gc.auto 0
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7734220Z ##[endgroup]
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7735440Z ##[group]Setting up auth
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7741650Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.7781206Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.8151506Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.8189419Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.8446775Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.8486091Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.8726442Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.8766817Z ##[endgroup]
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.8768107Z ##[group]Fetching the repository
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:31.8777283Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +1145473c436751bed33e815d4bde93d7594ba4f1:refs/remotes/origin/main
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:33.0372013Z From https://github.com/will383842/axion-crm-pro
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:33.0374978Z  * [new ref]         1145473c436751bed33e815d4bde93d7594ba4f1 -> origin/main
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:33.0408119Z ##[endgroup]
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:33.0410391Z ##[group]Determining the checkout info
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:33.0412892Z ##[endgroup]
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:33.0417551Z [command]/usr/bin/git sparse-checkout disable
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:33.0470449Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:33.0508397Z ##[group]Checking out the ref
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:33.0512644Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:33.1886232Z Switched to a new branch 'main'
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:33.1888455Z branch 'main' set up to track 'origin/main'.
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:33.1903710Z ##[endgroup]
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:33.1953686Z [command]/usr/bin/git log -1 --format=%H
+Node deps audit (frontend)	Run actions/checkout@v4	2026-08-19T09:44:33.1983800Z 1145473c436751bed33e815d4bde93d7594ba4f1
+Node deps audit (frontend)	Run pnpm/action-setup@v4	﻿2026-08-19T09:44:33.2267390Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:33.2270505Z ##[group]Run pnpm/action-setup@v4
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:33.2271303Z with:
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:33.2271976Z   version: 9
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:33.2272672Z   dest: ~/setup-pnpm
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:33.2273387Z   run_install: null
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:33.2274086Z   cache: false
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:33.2274832Z   cache_dependency_path: pnpm-lock.yaml
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:33.2275673Z   package_json_file: package.json
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:33.2276453Z   standalone: false
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:33.2277178Z ##[endgroup]
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:33.3742363Z ##[group]Running self-installer...
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:33.8942022Z (node:2325) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:33.8944207Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:34.0269099Z Progress: resolved 1, reused 0, downloaded 0, added 0
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:34.0373418Z Packages: +1
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:34.0374229Z +
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:34.4018125Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:34.4258841Z 
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:34.4259611Z dependencies:
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:34.4260499Z + pnpm 9.15.9 (11.22.0 is available)
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:34.4260782Z 
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:34.4283988Z Done in 852ms
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:34.4470544Z ##[endgroup]
+Node deps audit (frontend)	Run pnpm/action-setup@v4	2026-08-19T09:44:34.4471615Z Installation Completed!
+Node deps audit (frontend)	Run actions/setup-node@v7	﻿2026-08-19T09:44:34.4729562Z ##[group]Run actions/setup-node@v7
+Node deps audit (frontend)	Run actions/setup-node@v7	2026-08-19T09:44:34.4730132Z with:
+Node deps audit (frontend)	Run actions/setup-node@v7	2026-08-19T09:44:34.4730420Z   node-version: 22
+Node deps audit (frontend)	Run actions/setup-node@v7	2026-08-19T09:44:34.4730644Z   check-latest: false
+Node deps audit (frontend)	Run actions/setup-node@v7	2026-08-19T09:44:34.4732919Z   token: ***
+Node deps audit (frontend)	Run actions/setup-node@v7	2026-08-19T09:44:34.4733151Z   package-manager-cache: true
+Node deps audit (frontend)	Run actions/setup-node@v7	2026-08-19T09:44:34.4733400Z env:
+Node deps audit (frontend)	Run actions/setup-node@v7	2026-08-19T09:44:34.4733660Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+Node deps audit (frontend)	Run actions/setup-node@v7	2026-08-19T09:44:34.4733987Z ##[endgroup]
+Node deps audit (frontend)	Run actions/setup-node@v7	2026-08-19T09:44:34.6014496Z Found in cache @ /opt/hostedtoolcache/node/22.23.2/x64
+Node deps audit (frontend)	Run actions/setup-node@v7	2026-08-19T09:44:34.6017952Z ##[group]Environment details
+Node deps audit (frontend)	Run actions/setup-node@v7	2026-08-19T09:44:34.9477242Z node: v22.23.2
+Node deps audit (frontend)	Run actions/setup-node@v7	2026-08-19T09:44:34.9477562Z npm: 10.9.8
+Node deps audit (frontend)	Run actions/setup-node@v7	2026-08-19T09:44:34.9477770Z yarn: 1.22.22
+Node deps audit (frontend)	Run actions/setup-node@v7	2026-08-19T09:44:34.9478342Z ##[endgroup]
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	﻿2026-08-19T09:44:34.9619724Z ##[group]Run pnpm audit --audit-level=high || true
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:34.9620451Z [36;1mpnpm audit --audit-level=high || true[0m
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:34.9670914Z shell: /usr/bin/bash -e {0}
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:34.9671193Z env:
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:34.9671461Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:34.9671790Z ##[endgroup]
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4117619Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4118761Z │ critical            │ When Vitest UI server is listening, arbitrary file can │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4119416Z │                     │ be read and executed                                   │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4120283Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4120889Z │ Package             │ vitest                                                 │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4121575Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4122388Z │ Vulnerable versions │ <3.2.6                                                 │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4123111Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4123848Z │ Patched versions    │ >=3.2.6                                                │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4125077Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4125823Z │ Paths               │                                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4126631Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4127477Z │ More info           │ https://github.com/advisories/GHSA-5xrq-8626-4rwp      │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4128346Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4129280Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4130308Z │ high                │ form-data: CRLF injection in form-data via unescaped   │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4131031Z │                     │ multipart field names and filenames                    │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4131818Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4132536Z │ Package             │ form-data                                              │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4133341Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4134114Z │ Vulnerable versions │ >=4.0.0 <4.0.6                                         │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4134957Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4135722Z │ Patched versions    │ >=4.0.6                                                │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4136558Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4137287Z │ Paths               │                                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4138389Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4139213Z │ More info           │ https://github.com/advisories/GHSA-hmw2-7cc7-3qxx      │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4140255Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4141372Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4142153Z │ high                │ ws: Memory exhaustion DoS from tiny fragments and data │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4142789Z │                     │ chunks                                                 │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4143576Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4144306Z │ Package             │ ws                                                     │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4145060Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4145837Z │ Vulnerable versions │ >=8.0.0 <8.21.0                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4146942Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4147773Z │ Patched versions    │ >=8.21.0                                               │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4148595Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4149317Z │ Paths               │                                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4150308Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4151096Z │ More info           │ https://github.com/advisories/GHSA-96hv-2xvq-fx4p      │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4151924Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4152797Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4153553Z │ high                │ vite: `server.fs.deny` bypass on Windows alternate     │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4154402Z │                     │ paths                                                  │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4155151Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4155825Z │ Package             │ vite                                                   │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4156546Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4157273Z │ Vulnerable versions │ <=6.4.2                                                │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4158084Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4158808Z │ Patched versions    │ >=6.4.3                                                │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4159581Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4160373Z │ Paths               │                                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4161156Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4161916Z │ More info           │ https://github.com/advisories/GHSA-fx2h-pf6j-xcff      │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4162730Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4163761Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4164539Z │ high                │ brace-expansion: DoS via exponential-time expansion of │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4165209Z │                     │ consecutive non-expanding {} groups                    │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4165974Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4166831Z │ Package             │ brace-expansion                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4167804Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4168567Z │ Vulnerable versions │ >=2.0.0 <2.1.2                                         │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4169345Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4170153Z │ Patched versions    │ >=2.1.2                                                │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4170989Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4171755Z │ Paths               │                                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4172482Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4173222Z │ More info           │ https://github.com/advisories/GHSA-3jxr-9vmj-r5cp      │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4174007Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4174832Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4175552Z │ high                │ brace-expansion: DoS via exponential-time expansion of │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4176391Z │                     │ consecutive non-expanding {} groups                    │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4177155Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4178338Z │ Package             │ brace-expansion                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4179633Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4180589Z │ Vulnerable versions │ <1.1.16                                                │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4181386Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4182103Z │ Patched versions    │ >=1.1.16                                               │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4182885Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4183550Z │ Paths               │                                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4184309Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4185037Z │ More info           │ https://github.com/advisories/GHSA-3jxr-9vmj-r5cp      │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4185802Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4186630Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4187370Z │ high                │ brace-expansion: DoS via exponential-time expansion of │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4188025Z │                     │ consecutive non-expanding {} groups                    │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4188792Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4189499Z │ Package             │ brace-expansion                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4190461Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4191386Z │ Vulnerable versions │ >=3.0.0 <5.0.7                                         │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4192159Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4192862Z │ Patched versions    │ >=5.0.7                                                │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4193771Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4194433Z │ Paths               │                                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4195159Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4195900Z │ More info           │ https://github.com/advisories/GHSA-3jxr-9vmj-r5cp      │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4196671Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4197467Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4198209Z │ high                │ js-yaml: YAML merge-key chains can force quadratic CPU │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4198900Z │                     │ consumption                                            │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4199675Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4200610Z │ Package             │ js-yaml                                                │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4201362Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4202109Z │ Vulnerable versions │ >=4.0.0 <4.3.0                                         │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4202880Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4203546Z │ Patched versions    │ >=4.3.0                                                │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4204239Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4204989Z │ Paths               │                                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4205853Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4206543Z │ More info           │ https://github.com/advisories/GHSA-52cp-r559-cp3m      │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4207279Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4208195Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4208860Z │ high                │ Axios Node HTTP adapter can use an inherited proxy     │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4209477Z │                     │ after interceptor config cloning                       │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4211935Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4212999Z │ Package             │ axios                                                  │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4213745Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4214466Z │ Vulnerable versions │ >=1.15.2 <1.18.0                                       │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4215180Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4215826Z │ Patched versions    │ >=1.18.0                                               │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4216754Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4217372Z │ Paths               │                                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4218031Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4218715Z │ More info           │ https://github.com/advisories/GHSA-gcfj-64vw-6mp9      │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4219494Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4220652Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4221825Z │ high                │ brace-expansion: DoS via unbounded expansion length    │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4222798Z │                     │ causing an out-of-memory process crash                 │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4223907Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4224947Z │ Package             │ brace-expansion                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4226043Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4227040Z │ Vulnerable versions │ <1.1.17                                                │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4228131Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4229119Z │ Patched versions    │ >=1.1.17                                               │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4230364Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4231318Z │ Paths               │                                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4232365Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4233402Z │ More info           │ https://github.com/advisories/GHSA-mh99-v99m-4gvg      │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4234540Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4235914Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4236939Z │ high                │ brace-expansion: DoS via unbounded expansion length    │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4237872Z │                     │ causing an out-of-memory process crash                 │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4238941Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4240077Z │ Package             │ brace-expansion                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4241239Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4242406Z │ Vulnerable versions │ >=2.0.0 <2.1.3                                         │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4243538Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4244547Z │ Patched versions    │ >=2.1.3                                                │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4245648Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4246566Z │ Paths               │                                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4247571Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4248598Z │ More info           │ https://github.com/advisories/GHSA-mh99-v99m-4gvg      │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4249734Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4251021Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4252248Z │ high                │ brace-expansion: DoS via unbounded expansion length    │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4253207Z │                     │ causing an out-of-memory process crash                 │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4254302Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4255533Z │ Package             │ brace-expansion                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4256665Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4257721Z │ Vulnerable versions │ >=4.0.0 <5.0.8                                         │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4258846Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4260054Z │ Patched versions    │ >=5.0.8                                                │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4261216Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4262216Z │ Paths               │                                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4263336Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4264416Z │ More info           │ https://github.com/advisories/GHSA-mh99-v99m-4gvg      │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4265584Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4266828Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4267898Z │ high                │ brace-expansion: DoS via unbounded intermediate        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4268884Z │                     │ arrays, bypassing the CVE-2026-14257 mitigation        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4270139Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4271193Z │ Package             │ brace-expansion                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4272344Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4273627Z │ Vulnerable versions │ >=4.0.0 <5.0.9                                         │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4274789Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4275836Z │ Patched versions    │ >=5.0.9                                                │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4277143Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4278133Z │ Paths               │                                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4279232Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4280449Z │ More info           │ https://github.com/advisories/GHSA-rgw5-rvv9-x895      │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4281599Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4282881Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4284008Z │ high                │ brace-expansion: DoS via unbounded intermediate        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4284959Z │                     │ arrays, bypassing the CVE-2026-14257 mitigation        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4286079Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4287135Z │ Package             │ brace-expansion                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4287967Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4288624Z │ Vulnerable versions │ >=2.0.0 <2.1.4                                         │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4289315Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4290165Z │ Patched versions    │ >=2.1.4                                                │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4291362Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4292638Z │ Paths               │                                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4293632Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4294316Z │ More info           │ https://github.com/advisories/GHSA-rgw5-rvv9-x895      │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4295034Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4295755Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4296400Z │ high                │ brace-expansion: DoS via unbounded intermediate        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4297015Z │                     │ arrays, bypassing the CVE-2026-14257 mitigation        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4297694Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4298329Z │ Package             │ brace-expansion                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4299010Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4299673Z │ Vulnerable versions │ <1.1.18                                                │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4300629Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4301282Z │ Patched versions    │ >=1.1.18                                               │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4302121Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4302721Z │ Paths               │                                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4303370Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4304030Z │ More info           │ https://github.com/advisories/GHSA-rgw5-rvv9-x895      │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4304724Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4305440Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4306260Z │ high                │ JS-YAML: Quadratic CPU consumption in !!omap           │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4306887Z │                     │ resolution (3.x and 4.x) — CVE-2026-59870 fix not      │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4307459Z │                     │ backported                                             │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4308143Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4308766Z │ Package             │ js-yaml                                                │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4309434Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4310257Z │ Vulnerable versions │ >=4.0.0 <4.3.1                                         │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4310979Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4311602Z │ Patched versions    │ >=4.3.1                                                │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4312280Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4312903Z │ Paths               │                                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4313546Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4314351Z │ More info           │ https://github.com/advisories/GHSA-5p4m-2wfm-xmqj      │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4315056Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4315765Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4316409Z │ high                │ nanoid: non-secure generators can loop indefinitely    │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4316991Z │                     │ with negative size                                     │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4317654Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4318289Z │ Package             │ nanoid                                                 │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4318989Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4319639Z │ Vulnerable versions │ <3.3.16                                                │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4320577Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4321227Z │ Patched versions    │ >=3.3.16                                               │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4321915Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4322514Z │ Paths               │                                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4323163Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4323828Z │ More info           │ https://github.com/advisories/GHSA-28wg-ghj8-5hjv      │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4324555Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4325456Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4326108Z │ high                │ nanoid: custom generators can loop indefinitely when   │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4326682Z │                     │ size is zero                                           │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4327484Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4328101Z │ Package             │ nanoid                                                 │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4328769Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4329409Z │ Vulnerable versions │ <3.3.18                                                │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4330713Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4331400Z │ Patched versions    │ >=3.3.18                                               │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4332118Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4332714Z │ Paths               │                                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4333366Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4334046Z │ More info           │ https://github.com/advisories/GHSA-2v37-7h3g-55p8      │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4334754Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4335470Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4336117Z │ high                │ PostCSS: Path Traversal in Previous Source Map         │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4336724Z │                     │ Auto-Loading (sourceMappingURL) leads to Arbitrary     │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4337302Z │                     │ .map File Disclosure                                   │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4337973Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4338785Z │ Package             │ postcss                                                │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4339862Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4340928Z │ Vulnerable versions │ <=8.5.17                                               │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4341665Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4342306Z │ Patched versions    │ >=8.5.18                                               │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4342991Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4343588Z │ Paths               │                                                        │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4344244Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4344902Z │ More info           │ https://github.com/advisories/GHSA-r28c-9q8g-f849      │
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4345624Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4346057Z 31 vulnerabilities found
+Node deps audit (frontend)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.4346388Z Severity: 12 moderate | 18 high | 1 critical
+Node deps audit (frontend)	Post Run actions/setup-node@v7	﻿2026-08-19T09:44:36.4424240Z Post job cleanup.
+Node deps audit (frontend)	Post Run pnpm/action-setup@v4	﻿2026-08-19T09:44:36.5707012Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Node deps audit (frontend)	Post Run pnpm/action-setup@v4	2026-08-19T09:44:36.5708242Z Post job cleanup.
+Node deps audit (frontend)	Post Run pnpm/action-setup@v4	2026-08-19T09:44:36.7191466Z Pruning is unnecessary.
+Node deps audit (frontend)	Post Run actions/checkout@v4	﻿2026-08-19T09:44:36.7411623Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Node deps audit (frontend)	Post Run actions/checkout@v4	2026-08-19T09:44:36.7413655Z Post job cleanup.
+Node deps audit (frontend)	Post Run actions/checkout@v4	2026-08-19T09:44:36.8289205Z [command]/usr/bin/git version
+Node deps audit (frontend)	Post Run actions/checkout@v4	2026-08-19T09:44:36.8331393Z git version 2.54.0
+Node deps audit (frontend)	Post Run actions/checkout@v4	2026-08-19T09:44:36.8367880Z Temporarily overriding HOME='/home/runner/work/_temp/ea89f7d3-c8b3-4dc5-aab4-26d917158c9e' before making global git config changes
+Node deps audit (frontend)	Post Run actions/checkout@v4	2026-08-19T09:44:36.8369770Z Adding repository directory to the temporary git global config as a safe directory
+Node deps audit (frontend)	Post Run actions/checkout@v4	2026-08-19T09:44:36.8374760Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/axion-crm-pro/axion-crm-pro
+Node deps audit (frontend)	Post Run actions/checkout@v4	2026-08-19T09:44:36.8416555Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Node deps audit (frontend)	Post Run actions/checkout@v4	2026-08-19T09:44:36.8455346Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Node deps audit (frontend)	Post Run actions/checkout@v4	2026-08-19T09:44:36.8722599Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Node deps audit (frontend)	Post Run actions/checkout@v4	2026-08-19T09:44:36.8751319Z http.https://github.com/.extraheader
+Node deps audit (frontend)	Post Run actions/checkout@v4	2026-08-19T09:44:36.8763467Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+Node deps audit (frontend)	Post Run actions/checkout@v4	2026-08-19T09:44:36.8813052Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Node deps audit (frontend)	Post Run actions/checkout@v4	2026-08-19T09:44:36.9096876Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Node deps audit (frontend)	Post Run actions/checkout@v4	2026-08-19T09:44:36.9137572Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Node deps audit (frontend)	Complete job	﻿2026-08-19T09:44:36.9557363Z Cleaning up orphan processes
+Node deps audit (frontend)	Complete job	2026-08-19T09:44:36.9847567Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, pnpm/action-setup@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Node deps audit (workers)	Set up job	﻿2026-08-19T09:44:32.3260121Z Current runner version: '2.336.0'
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3286583Z ##[group]Runner Image Provisioner
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3287485Z Hosted Compute Agent
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3288166Z Version: 20260729.566
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3288892Z Commit: cf7153fe6e25b664e8693c24944bf2b00355d109
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3289658Z Build Date: 2026-07-29T19:17:02Z
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3290719Z Worker ID: {e064fc1a-6885-48b9-9cf4-f007320e2e60}
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3291463Z Azure Region: westus2
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3292095Z ##[endgroup]
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3293627Z ##[group]Operating System
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3294243Z Ubuntu
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3294853Z 24.04.4
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3295356Z LTS
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3295886Z ##[endgroup]
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3296478Z ##[group]Runner Image
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3297069Z Image: ubuntu-24.04
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3297667Z Version: 20260810.271.1
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3298708Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260810.271/images/ubuntu/Ubuntu2404-Readme.md
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3300835Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260810.271
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3301822Z ##[endgroup]
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3303135Z ##[group]GITHUB_TOKEN Permissions
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3305183Z Contents: read
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3306272Z Issues: write
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3306872Z Metadata: read
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3307403Z SecurityEvents: write
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3308043Z ##[endgroup]
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3310097Z Secret source: Actions
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3311485Z Prepare workflow directory
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3660202Z Prepare all required actions
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.3710485Z Getting action download info
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.7448649Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+Node deps audit (workers)	Set up job	2026-08-19T09:44:32.8749596Z Download action repository 'pnpm/action-setup@v4' (SHA:b906affcce14559ad1aafd4ab0e942779e9f58b1)
+Node deps audit (workers)	Set up job	2026-08-19T09:44:33.1662754Z Download action repository 'actions/setup-node@v7' (SHA:820762786026740c76f36085b0efc47a31fe5020)
+Node deps audit (workers)	Set up job	2026-08-19T09:44:33.3724882Z Complete job name: Node deps audit (workers)
+Node deps audit (workers)	Run actions/checkout@v4	﻿2026-08-19T09:44:33.4586812Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.4597534Z ##[group]Run actions/checkout@v4
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.4598670Z with:
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.4599398Z   repository: will383842/axion-crm-pro
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.4609007Z   token: ***
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.4609709Z   ssh-strict: true
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.4610558Z   ssh-user: git
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.4611313Z   persist-credentials: true
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.4612158Z   clean: true
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.4612893Z   sparse-checkout-cone-mode: true
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.4613767Z   fetch-depth: 1
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.4614469Z   fetch-tags: false
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.4615223Z   show-progress: true
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.4615956Z   lfs: false
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.4616641Z   submodules: false
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.4617421Z   set-safe-directory: true
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.4618271Z   allow-unsafe-pr-checkout: false
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.4619438Z ##[endgroup]
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.5656215Z Syncing repository: will383842/axion-crm-pro
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.5659971Z ##[group]Getting Git version info
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.5662354Z Working directory is '/home/runner/work/axion-crm-pro/axion-crm-pro'
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.5665324Z [command]/usr/bin/git version
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.5737749Z git version 2.54.0
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.5767097Z ##[endgroup]
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.5785248Z Temporarily overriding HOME='/home/runner/work/_temp/31bac85c-8f65-4c07-b066-ad16aa4db093' before making global git config changes
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.5791094Z Adding repository directory to the temporary git global config as a safe directory
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.5795243Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/axion-crm-pro/axion-crm-pro
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.5852167Z Deleting the contents of '/home/runner/work/axion-crm-pro/axion-crm-pro'
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.5857745Z ##[group]Initializing the repository
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.5863258Z [command]/usr/bin/git init /home/runner/work/axion-crm-pro/axion-crm-pro
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.5999146Z hint: Using 'master' as the name for the initial branch. This default branch name
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6002540Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6005324Z hint: to use in all of your new repositories, which will suppress this warning,
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6007868Z hint: call:
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6008946Z hint:
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6010436Z hint: 	git config --global init.defaultBranch <name>
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6012165Z hint:
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6013816Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6016545Z hint: 'development'. The just-created branch can be renamed via this command:
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6018751Z hint:
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6019773Z hint: 	git branch -m <name>
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6021271Z hint:
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6023033Z hint: Disable this message with "git config set advice.defaultBranchName false"
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6026224Z Initialized empty Git repository in /home/runner/work/axion-crm-pro/axion-crm-pro/.git/
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6031364Z [command]/usr/bin/git remote add origin https://github.com/will383842/axion-crm-pro
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6076946Z ##[endgroup]
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6079087Z ##[group]Disabling automatic garbage collection
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6081349Z [command]/usr/bin/git config --local gc.auto 0
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6129199Z ##[endgroup]
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6131691Z ##[group]Setting up auth
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6156078Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6164090Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6591274Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6637598Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6867942Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.6906017Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.7139153Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.7178581Z ##[endgroup]
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.7179914Z ##[group]Fetching the repository
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:33.7189869Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +1145473c436751bed33e815d4bde93d7594ba4f1:refs/remotes/origin/main
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:34.7044103Z From https://github.com/will383842/axion-crm-pro
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:34.7045524Z  * [new ref]         1145473c436751bed33e815d4bde93d7594ba4f1 -> origin/main
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:34.7084289Z ##[endgroup]
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:34.7085604Z ##[group]Determining the checkout info
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:34.7087341Z ##[endgroup]
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:34.7094107Z [command]/usr/bin/git sparse-checkout disable
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:34.7145490Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:34.7179691Z ##[group]Checking out the ref
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:34.7185110Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:34.8507696Z Switched to a new branch 'main'
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:34.8508966Z branch 'main' set up to track 'origin/main'.
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:34.8522961Z ##[endgroup]
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:34.8569603Z [command]/usr/bin/git log -1 --format=%H
+Node deps audit (workers)	Run actions/checkout@v4	2026-08-19T09:44:34.8597527Z 1145473c436751bed33e815d4bde93d7594ba4f1
+Node deps audit (workers)	Run pnpm/action-setup@v4	﻿2026-08-19T09:44:34.8878955Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:34.8881648Z ##[group]Run pnpm/action-setup@v4
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:34.8882282Z with:
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:34.8882799Z   version: 9
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:34.8883326Z   dest: ~/setup-pnpm
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:34.8883886Z   run_install: null
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:34.8884428Z   cache: false
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:34.8884990Z   cache_dependency_path: pnpm-lock.yaml
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:34.8885664Z   package_json_file: package.json
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:34.8886261Z   standalone: false
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:34.8886795Z ##[endgroup]
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:35.0382489Z ##[group]Running self-installer...
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:35.4671745Z (node:2185) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:35.4673930Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:35.6214267Z Progress: resolved 1, reused 0, downloaded 0, added 0
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:35.6336307Z Packages: +1
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:35.6337474Z +
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:36.0179460Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:36.0444575Z 
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:36.0445099Z dependencies:
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:36.0445400Z + pnpm 9.15.9 (11.22.0 is available)
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:36.0445598Z 
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:36.0475766Z Done in 806ms
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:36.0679561Z ##[endgroup]
+Node deps audit (workers)	Run pnpm/action-setup@v4	2026-08-19T09:44:36.0680505Z Installation Completed!
+Node deps audit (workers)	Run actions/setup-node@v7	﻿2026-08-19T09:44:36.0931872Z ##[group]Run actions/setup-node@v7
+Node deps audit (workers)	Run actions/setup-node@v7	2026-08-19T09:44:36.0932213Z with:
+Node deps audit (workers)	Run actions/setup-node@v7	2026-08-19T09:44:36.0932449Z   node-version: 22
+Node deps audit (workers)	Run actions/setup-node@v7	2026-08-19T09:44:36.0932667Z   check-latest: false
+Node deps audit (workers)	Run actions/setup-node@v7	2026-08-19T09:44:36.0935354Z   token: ***
+Node deps audit (workers)	Run actions/setup-node@v7	2026-08-19T09:44:36.0935571Z   package-manager-cache: true
+Node deps audit (workers)	Run actions/setup-node@v7	2026-08-19T09:44:36.0935811Z env:
+Node deps audit (workers)	Run actions/setup-node@v7	2026-08-19T09:44:36.0936058Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+Node deps audit (workers)	Run actions/setup-node@v7	2026-08-19T09:44:36.0936370Z ##[endgroup]
+Node deps audit (workers)	Run actions/setup-node@v7	2026-08-19T09:44:36.2219760Z Found in cache @ /opt/hostedtoolcache/node/22.23.2/x64
+Node deps audit (workers)	Run actions/setup-node@v7	2026-08-19T09:44:36.2222527Z ##[group]Environment details
+Node deps audit (workers)	Run actions/setup-node@v7	2026-08-19T09:44:36.6733010Z node: v22.23.2
+Node deps audit (workers)	Run actions/setup-node@v7	2026-08-19T09:44:36.6733503Z npm: 10.9.8
+Node deps audit (workers)	Run actions/setup-node@v7	2026-08-19T09:44:36.6733831Z yarn: 1.22.22
+Node deps audit (workers)	Run actions/setup-node@v7	2026-08-19T09:44:36.6735162Z ##[endgroup]
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	﻿2026-08-19T09:44:36.6868211Z ##[group]Run pnpm audit --audit-level=high || true
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.6868696Z [36;1mpnpm audit --audit-level=high || true[0m
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.6917393Z shell: /usr/bin/bash -e {0}
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.6917666Z env:
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.6917957Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:36.6918295Z ##[endgroup]
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6336895Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6338568Z │ critical            │ When Vitest UI server is listening, arbitrary file can │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6339762Z │                     │ be read and executed                                   │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6341341Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6342596Z │ Package             │ vitest                                                 │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6343925Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6345296Z │ Vulnerable versions │ <3.2.6                                                 │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6346736Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6348046Z │ Patched versions    │ >=3.2.6                                                │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6349965Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6351498Z │ Paths               │                                                        │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6352906Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6354335Z │ More info           │ https://github.com/advisories/GHSA-5xrq-8626-4rwp      │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6355811Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6357404Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6358777Z │ high                │ form-data: CRLF injection in form-data via unescaped   │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6360115Z │                     │ multipart field names and filenames                    │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6361767Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6363112Z │ Package             │ form-data                                              │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6364608Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6366014Z │ Vulnerable versions │ >=4.0.0 <4.0.6                                         │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6367529Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6368948Z │ Patched versions    │ >=4.0.6                                                │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6370655Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6372102Z │ Paths               │                                                        │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6373938Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6375445Z │ More info           │ https://github.com/advisories/GHSA-hmw2-7cc7-3qxx      │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6377074Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6379043Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6380730Z │ high                │ undici vulnerable to TLS certificate validation bypass │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6382049Z │                     │ via dropped requestTls in SOCKS5 ProxyAgent            │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6383299Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6384534Z │ Package             │ undici                                                 │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6385827Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6387310Z │ Vulnerable versions │ >=7.23.0 <7.28.0                                       │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6388809Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6390166Z │ Patched versions    │ >=7.28.0                                               │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6391930Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6393265Z │ Paths               │                                                        │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6394656Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6396017Z │ More info           │ https://github.com/advisories/GHSA-vmh5-mc38-953g      │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6397554Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6399078Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6400579Z │ high                │ undici WebSocket client vulnerable to denial of        │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6402161Z │                     │ service via fragment count bypass                      │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6403592Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6404894Z │ Package             │ undici                                                 │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6406321Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6407652Z │ Vulnerable versions │ >=7.0.0 <7.28.0                                        │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6409074Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6410560Z │ Patched versions    │ >=7.28.0                                               │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6411990Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6413294Z │ Paths               │                                                        │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6414715Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6416113Z │ More info           │ https://github.com/advisories/GHSA-vxpw-j846-p89q      │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6417588Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6419369Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6420956Z │ high                │ undici vulnerable to cross-origin request routing via  │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6422172Z │                     │ SOCKS5 proxy pool reuse                                │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6423573Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6424809Z │ Package             │ undici                                                 │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6426218Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6427635Z │ Vulnerable versions │ >=7.23.0 <7.28.0                                       │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6429067Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6430534Z │ Patched versions    │ >=7.28.0                                               │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6432049Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6433366Z │ Paths               │                                                        │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6434739Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6436045Z │ More info           │ https://github.com/advisories/GHSA-hm92-r4w5-c3mj      │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6437496Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6438889Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6439691Z │ high                │ vite: `server.fs.deny` bypass on Windows alternate     │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6440914Z │                     │ paths                                                  │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6441671Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6443024Z │ Package             │ vite                                                   │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6444345Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6445770Z │ Vulnerable versions │ <=6.4.2                                                │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6447066Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6447872Z │ Patched versions    │ >=6.4.3                                                │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6448690Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6449407Z │ Paths               │                                                        │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6450193Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6452333Z │ More info           │ https://github.com/advisories/GHSA-fx2h-pf6j-xcff      │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6453569Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6454890Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6456037Z │ high                │ Axios Node HTTP adapter can use an inherited proxy     │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6457058Z │                     │ after interceptor config cloning                       │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6458231Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6459238Z │ Package             │ axios                                                  │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6460687Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6462288Z │ Vulnerable versions │ >=1.15.2 <1.18.0                                       │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6463551Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6464694Z │ Patched versions    │ >=1.18.0                                               │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6466111Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6467200Z │ Paths               │                                                        │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6468396Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6469589Z │ More info           │ https://github.com/advisories/GHSA-gcfj-64vw-6mp9      │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6471077Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6472399Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6473600Z │ high                │ undici vulnerable to cross-user information disclosure │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6474679Z │                     │ and parse-time crash via degenerate private cache      │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6475678Z │                     │ directives                                             │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6476922Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6478041Z │ Package             │ undici                                                 │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6479388Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6480826Z │ Vulnerable versions │ >=7.0.0 <7.29.0                                        │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6482128Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6483280Z │ Patched versions    │ >=7.29.0                                               │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6484562Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6485842Z │ Paths               │                                                        │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6487018Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6488190Z │ More info           │ https://github.com/advisories/GHSA-4cwx-7wf7-3272      │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6489477Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6490991Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6492127Z │ high                │ nanoid: non-secure generators can loop indefinitely    │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6493141Z │                     │ with negative size                                     │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6494347Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6495458Z │ Package             │ nanoid                                                 │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6496864Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6498090Z │ Vulnerable versions │ <3.3.16                                                │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6499383Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6501072Z │ Patched versions    │ >=3.3.16                                               │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6502378Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6503497Z │ Paths               │                                                        │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6504688Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6505929Z │ More info           │ https://github.com/advisories/GHSA-28wg-ghj8-5hjv      │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6507252Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6508823Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6509992Z │ high                │ nanoid: custom generators can loop indefinitely when   │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6511395Z │                     │ size is zero                                           │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6512669Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6513825Z │ Package             │ nanoid                                                 │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6515066Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6516291Z │ Vulnerable versions │ <3.3.18                                                │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6517571Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6518720Z │ Patched versions    │ >=3.3.18                                               │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6519519Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6520186Z │ Paths               │                                                        │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6521458Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6522708Z │ More info           │ https://github.com/advisories/GHSA-2v37-7h3g-55p8      │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6524072Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6524918Z ┌─────────────────────┬────────────────────────────────────────────────────────┐
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6525663Z │ high                │ PostCSS: Path Traversal in Previous Source Map         │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6526364Z │                     │ Auto-Loading (sourceMappingURL) leads to Arbitrary     │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6527029Z │                     │ .map File Disclosure                                   │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6527785Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6528506Z │ Package             │ postcss                                                │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6529260Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6529971Z │ Vulnerable versions │ <=8.5.17                                               │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6531041Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6531783Z │ Patched versions    │ >=8.5.18                                               │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6532573Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6533281Z │ Paths               │                                                        │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6534025Z ├─────────────────────┼────────────────────────────────────────────────────────┤
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6534772Z │ More info           │ https://github.com/advisories/GHSA-r28c-9q8g-f849      │
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6535754Z └─────────────────────┴────────────────────────────────────────────────────────┘
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6536293Z 33 vulnerabilities found
+Node deps audit (workers)	Run pnpm audit --audit-level=high || true	2026-08-19T09:44:37.6536727Z Severity: 3 low | 19 moderate | 10 high | 1 critical
+Node deps audit (workers)	Post Run actions/setup-node@v7	﻿2026-08-19T09:44:37.6615755Z Post job cleanup.
+Node deps audit (workers)	Post Run pnpm/action-setup@v4	﻿2026-08-19T09:44:37.7891119Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Node deps audit (workers)	Post Run pnpm/action-setup@v4	2026-08-19T09:44:37.7892608Z Post job cleanup.
+Node deps audit (workers)	Post Run pnpm/action-setup@v4	2026-08-19T09:44:37.9387419Z Pruning is unnecessary.
+Node deps audit (workers)	Post Run actions/checkout@v4	﻿2026-08-19T09:44:37.9688743Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Node deps audit (workers)	Post Run actions/checkout@v4	2026-08-19T09:44:37.9691226Z Post job cleanup.
+Node deps audit (workers)	Post Run actions/checkout@v4	2026-08-19T09:44:38.0566155Z [command]/usr/bin/git version
+Node deps audit (workers)	Post Run actions/checkout@v4	2026-08-19T09:44:38.0612237Z git version 2.54.0
+Node deps audit (workers)	Post Run actions/checkout@v4	2026-08-19T09:44:38.0662358Z Temporarily overriding HOME='/home/runner/work/_temp/76344b66-007b-4f44-a609-3294fa13b65f' before making global git config changes
+Node deps audit (workers)	Post Run actions/checkout@v4	2026-08-19T09:44:38.0663981Z Adding repository directory to the temporary git global config as a safe directory
+Node deps audit (workers)	Post Run actions/checkout@v4	2026-08-19T09:44:38.0668269Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/axion-crm-pro/axion-crm-pro
+Node deps audit (workers)	Post Run actions/checkout@v4	2026-08-19T09:44:38.0713206Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Node deps audit (workers)	Post Run actions/checkout@v4	2026-08-19T09:44:38.0748715Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Node deps audit (workers)	Post Run actions/checkout@v4	2026-08-19T09:44:38.1009849Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Node deps audit (workers)	Post Run actions/checkout@v4	2026-08-19T09:44:38.1038220Z http.https://github.com/.extraheader
+Node deps audit (workers)	Post Run actions/checkout@v4	2026-08-19T09:44:38.1049638Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+Node deps audit (workers)	Post Run actions/checkout@v4	2026-08-19T09:44:38.1084545Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Node deps audit (workers)	Post Run actions/checkout@v4	2026-08-19T09:44:38.1361622Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Node deps audit (workers)	Post Run actions/checkout@v4	2026-08-19T09:44:38.1383688Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Node deps audit (workers)	Complete job	﻿2026-08-19T09:44:38.1791181Z Cleaning up orphan processes
+Node deps audit (workers)	Complete job	2026-08-19T09:44:38.2061300Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, pnpm/action-setup@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+PHP deps audit	Set up job	﻿2026-08-19T09:44:37.2965513Z Current runner version: '2.336.0'
+PHP deps audit	Set up job	2026-08-19T09:44:37.2992116Z ##[group]Runner Image Provisioner
+PHP deps audit	Set up job	2026-08-19T09:44:37.2993128Z Hosted Compute Agent
+PHP deps audit	Set up job	2026-08-19T09:44:37.2993735Z Version: 20260729.566
+PHP deps audit	Set up job	2026-08-19T09:44:37.2994391Z Commit: cf7153fe6e25b664e8693c24944bf2b00355d109
+PHP deps audit	Set up job	2026-08-19T09:44:37.2995193Z Build Date: 2026-07-29T19:17:02Z
+PHP deps audit	Set up job	2026-08-19T09:44:37.2995875Z Worker ID: {3f37cd8b-0a54-4f91-a427-b7379680f54a}
+PHP deps audit	Set up job	2026-08-19T09:44:37.2996618Z Azure Region: westus
+PHP deps audit	Set up job	2026-08-19T09:44:37.2997431Z ##[endgroup]
+PHP deps audit	Set up job	2026-08-19T09:44:37.2999383Z ##[group]Operating System
+PHP deps audit	Set up job	2026-08-19T09:44:37.3000160Z Ubuntu
+PHP deps audit	Set up job	2026-08-19T09:44:37.3000698Z 24.04.4
+PHP deps audit	Set up job	2026-08-19T09:44:37.3001196Z LTS
+PHP deps audit	Set up job	2026-08-19T09:44:37.3001771Z ##[endgroup]
+PHP deps audit	Set up job	2026-08-19T09:44:37.3002368Z ##[group]Runner Image
+PHP deps audit	Set up job	2026-08-19T09:44:37.3003004Z Image: ubuntu-24.04
+PHP deps audit	Set up job	2026-08-19T09:44:37.3003588Z Version: 20260810.271.1
+PHP deps audit	Set up job	2026-08-19T09:44:37.3004644Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260810.271/images/ubuntu/Ubuntu2404-Readme.md
+PHP deps audit	Set up job	2026-08-19T09:44:37.3006445Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260810.271
+PHP deps audit	Set up job	2026-08-19T09:44:37.3007740Z ##[endgroup]
+PHP deps audit	Set up job	2026-08-19T09:44:37.3009469Z ##[group]GITHUB_TOKEN Permissions
+PHP deps audit	Set up job	2026-08-19T09:44:37.3011555Z Contents: read
+PHP deps audit	Set up job	2026-08-19T09:44:37.3012248Z Issues: write
+PHP deps audit	Set up job	2026-08-19T09:44:37.3012776Z Metadata: read
+PHP deps audit	Set up job	2026-08-19T09:44:37.3013435Z SecurityEvents: write
+PHP deps audit	Set up job	2026-08-19T09:44:37.3014075Z ##[endgroup]
+PHP deps audit	Set up job	2026-08-19T09:44:37.3016221Z Secret source: Actions
+PHP deps audit	Set up job	2026-08-19T09:44:37.3018066Z Prepare workflow directory
+PHP deps audit	Set up job	2026-08-19T09:44:37.3374173Z Prepare all required actions
+PHP deps audit	Set up job	2026-08-19T09:44:37.3427660Z Getting action download info
+PHP deps audit	Set up job	2026-08-19T09:44:37.7006921Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+PHP deps audit	Set up job	2026-08-19T09:44:37.8302021Z Download action repository 'shivammathur/setup-php@v2' (SHA:f3e473d116dcccaddc5834248c87452386958240)
+PHP deps audit	Set up job	2026-08-19T09:44:38.2156933Z Complete job name: PHP deps audit
+PHP deps audit	Run actions/checkout@v4	﻿2026-08-19T09:44:38.2943843Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.2953599Z ##[group]Run actions/checkout@v4
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.2954376Z with:
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.2954852Z   repository: will383842/axion-crm-pro
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.2959099Z   token: ***
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.2959550Z   ssh-strict: true
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.2959991Z   ssh-user: git
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.2960446Z   persist-credentials: true
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.2960936Z   clean: true
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.2961387Z   sparse-checkout-cone-mode: true
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.2961909Z   fetch-depth: 1
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.2962349Z   fetch-tags: false
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.2962793Z   show-progress: true
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.2963240Z   lfs: false
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.2963651Z   submodules: false
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.2964163Z   set-safe-directory: true
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.2964659Z   allow-unsafe-pr-checkout: false
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.2965434Z ##[endgroup]
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4062301Z Syncing repository: will383842/axion-crm-pro
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4065026Z ##[group]Getting Git version info
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4066235Z Working directory is '/home/runner/work/axion-crm-pro/axion-crm-pro'
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4068358Z [command]/usr/bin/git version
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4188772Z git version 2.54.0
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4222641Z ##[endgroup]
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4245098Z Temporarily overriding HOME='/home/runner/work/_temp/43169b80-ac1c-498a-a87f-e729789f96f6' before making global git config changes
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4248385Z Adding repository directory to the temporary git global config as a safe directory
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4252199Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/axion-crm-pro/axion-crm-pro
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4339075Z Deleting the contents of '/home/runner/work/axion-crm-pro/axion-crm-pro'
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4341755Z ##[group]Initializing the repository
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4343094Z [command]/usr/bin/git init /home/runner/work/axion-crm-pro/axion-crm-pro
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4459529Z hint: Using 'master' as the name for the initial branch. This default branch name
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4461760Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4463595Z hint: to use in all of your new repositories, which will suppress this warning,
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4465150Z hint: call:
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4466161Z hint:
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4467442Z hint: 	git config --global init.defaultBranch <name>
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4468533Z hint:
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4469614Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4471225Z hint: 'development'. The just-created branch can be renamed via this command:
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4472464Z hint:
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4473149Z hint: 	git branch -m <name>
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4473983Z hint:
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4475096Z hint: Disable this message with "git config set advice.defaultBranchName false"
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4476986Z Initialized empty Git repository in /home/runner/work/axion-crm-pro/axion-crm-pro/.git/
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4480404Z [command]/usr/bin/git remote add origin https://github.com/will383842/axion-crm-pro
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4562167Z ##[endgroup]
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4563626Z ##[group]Disabling automatic garbage collection
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4566563Z [command]/usr/bin/git config --local gc.auto 0
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4604126Z ##[endgroup]
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4605472Z ##[group]Setting up auth
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4612070Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.4652510Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.5044691Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.5082892Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.5321327Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.5361115Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.5594178Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.5637172Z ##[endgroup]
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.5638606Z ##[group]Fetching the repository
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:38.5647949Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +1145473c436751bed33e815d4bde93d7594ba4f1:refs/remotes/origin/main
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:39.7192631Z From https://github.com/will383842/axion-crm-pro
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:39.7194655Z  * [new ref]         1145473c436751bed33e815d4bde93d7594ba4f1 -> origin/main
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:39.7254234Z ##[endgroup]
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:39.7256182Z ##[group]Determining the checkout info
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:39.7258418Z ##[endgroup]
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:39.7268587Z [command]/usr/bin/git sparse-checkout disable
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:39.7321020Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:39.7360472Z ##[group]Checking out the ref
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:39.7365777Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:39.8683145Z Switched to a new branch 'main'
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:39.8684750Z branch 'main' set up to track 'origin/main'.
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:39.8696309Z ##[endgroup]
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:39.8744820Z [command]/usr/bin/git log -1 --format=%H
+PHP deps audit	Run actions/checkout@v4	2026-08-19T09:44:39.8774073Z 1145473c436751bed33e815d4bde93d7594ba4f1
+PHP deps audit	Run shivammathur/setup-php@v2	﻿2026-08-19T09:44:39.9074730Z ##[group]Run shivammathur/setup-php@v2
+PHP deps audit	Run shivammathur/setup-php@v2	2026-08-19T09:44:39.9075725Z with:
+PHP deps audit	Run shivammathur/setup-php@v2	2026-08-19T09:44:39.9076220Z   php-version: 8.3
+PHP deps audit	Run shivammathur/setup-php@v2	2026-08-19T09:44:39.9076796Z   ini-file: production
+PHP deps audit	Run shivammathur/setup-php@v2	2026-08-19T09:44:39.9086973Z   github-token: ***
+PHP deps audit	Run shivammathur/setup-php@v2	2026-08-19T09:44:39.9087825Z ##[endgroup]
+PHP deps audit	Run shivammathur/setup-php@v2	2026-08-19T09:44:39.9505950Z [command]/usr/bin/bash /home/runner/work/_actions/shivammathur/setup-php/v2/src/scripts/run.sh
+PHP deps audit	Run shivammathur/setup-php@v2	2026-08-19T09:44:40.0029425Z 
+PHP deps audit	Run shivammathur/setup-php@v2	2026-08-19T09:44:40.0030811Z [90;1m==> [0m[37;1mSetup PHP[0m
+PHP deps audit	Run shivammathur/setup-php@v2	2026-08-19T09:44:47.5211418Z [32;1m✓ [0m[34;1mPHP [0m[90;1mUpdated to PHP 8.3.33[0m
+PHP deps audit	Run shivammathur/setup-php@v2	2026-08-19T09:44:47.5212100Z 
+PHP deps audit	Run shivammathur/setup-php@v2	2026-08-19T09:44:47.5212448Z [90;1m==> [0m[37;1mSetup Tools[0m
+PHP deps audit	Run shivammathur/setup-php@v2	2026-08-19T09:44:47.8165851Z [32;1m✓ [0m[34;1mcomposer [0m[90;1mAdded composer 2.10.2[0m
+PHP deps audit	Run shivammathur/setup-php@v2	2026-08-19T09:44:47.8167059Z 
+PHP deps audit	Run shivammathur/setup-php@v2	2026-08-19T09:44:47.8167886Z [90;1m==> [0m[37;1mSponsor setup-php[0m
+PHP deps audit	Run shivammathur/setup-php@v2	2026-08-19T09:44:47.8168782Z [32;1m✓ [0m[34;1msetup-php [0m[90;1mhttps://setup-php.com/sponsor[0m
+PHP deps audit	Run composer audit --no-dev || true	﻿2026-08-19T09:44:47.8403957Z ##[group]Run composer audit --no-dev || true
+PHP deps audit	Run composer audit --no-dev || true	2026-08-19T09:44:47.8404480Z [36;1mcomposer audit --no-dev || true[0m
+PHP deps audit	Run composer audit --no-dev || true	2026-08-19T09:44:47.8449294Z shell: /usr/bin/bash -e {0}
+PHP deps audit	Run composer audit --no-dev || true	2026-08-19T09:44:47.8449690Z env:
+PHP deps audit	Run composer audit --no-dev || true	2026-08-19T09:44:47.8449955Z   COMPOSER_PROCESS_TIMEOUT: 0
+PHP deps audit	Run composer audit --no-dev || true	2026-08-19T09:44:47.8450273Z   COMPOSER_NO_INTERACTION: 1
+PHP deps audit	Run composer audit --no-dev || true	2026-08-19T09:44:47.8450561Z   COMPOSER_NO_AUDIT: 1
+PHP deps audit	Run composer audit --no-dev || true	2026-08-19T09:44:47.8450818Z ##[endgroup]
+PHP deps audit	Run composer audit --no-dev || true	2026-08-19T09:44:48.0406347Z No installed packages found. Please run "composer install" before running "audit" or pass "--locked" to audit the lock file.
+PHP deps audit	Post Run actions/checkout@v4	﻿2026-08-19T09:44:48.0847067Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+PHP deps audit	Post Run actions/checkout@v4	2026-08-19T09:44:48.0848708Z Post job cleanup.
+PHP deps audit	Post Run actions/checkout@v4	2026-08-19T09:44:48.1723461Z [command]/usr/bin/git version
+PHP deps audit	Post Run actions/checkout@v4	2026-08-19T09:44:48.1774234Z git version 2.54.0
+PHP deps audit	Post Run actions/checkout@v4	2026-08-19T09:44:48.1829617Z Temporarily overriding HOME='/home/runner/work/_temp/11a056f1-ae2f-440a-8d3d-699d8cb930fd' before making global git config changes
+PHP deps audit	Post Run actions/checkout@v4	2026-08-19T09:44:48.1831261Z Adding repository directory to the temporary git global config as a safe directory
+PHP deps audit	Post Run actions/checkout@v4	2026-08-19T09:44:48.1842772Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/axion-crm-pro/axion-crm-pro
+PHP deps audit	Post Run actions/checkout@v4	2026-08-19T09:44:48.1879213Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+PHP deps audit	Post Run actions/checkout@v4	2026-08-19T09:44:48.1919436Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+PHP deps audit	Post Run actions/checkout@v4	2026-08-19T09:44:48.2179086Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+PHP deps audit	Post Run actions/checkout@v4	2026-08-19T09:44:48.2216391Z http.https://github.com/.extraheader
+PHP deps audit	Post Run actions/checkout@v4	2026-08-19T09:44:48.2231223Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+PHP deps audit	Post Run actions/checkout@v4	2026-08-19T09:44:48.2279669Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+PHP deps audit	Post Run actions/checkout@v4	2026-08-19T09:44:48.2573413Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+PHP deps audit	Post Run actions/checkout@v4	2026-08-19T09:44:48.2621882Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+PHP deps audit	Complete job	﻿2026-08-19T09:44:48.3044124Z Cleaning up orphan processes
+PHP deps audit	Complete job	2026-08-19T09:44:48.3343862Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

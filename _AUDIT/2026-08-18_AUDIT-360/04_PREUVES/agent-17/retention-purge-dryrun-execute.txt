@@ -1,0 +1,25 @@
+# Reproduction du bloc --dry-run de RetentionPurge::handle() (backend/app/Console/Commands/RetentionPurge.php:38-42)
+# base jetable axion_crm_agent17, creee pour l'occasion
+
+--- AVANT ---
+ id | response_payload | payload_path 
+----+------------------+--------------
+  1 | PAYLOAD          | path/a
+  2 | PAYLOAD          | path/b
+(2 rows)
+
+--- SORTIE PHP ---
+(sortie php non capturable via pipe docker exec sans tty ; l'effet est mesure ci-dessous)
+--- APRES le passage du bloc --dry-run ---
+ id | response_payload | payload_path 
+----+------------------+--------------
+  1 | PAYLOAD          | path/a
+  2 | PAYLOAD          | path/b
+(2 rows)
+
+ id | response_payload | payload_path 
+----+------------------+--------------
+  1 |                  | 
+  2 | PAYLOAD          | path/b
+(2 rows)
+

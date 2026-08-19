@@ -1,0 +1,57 @@
+=== taille du volume api-storage (prod) ===
+254.9M	/var/www/html/storage
+
+total 260844
+drwxr-xr-x    2 www-data www-data      4096 Aug 16 11:58 .
+drwxrwxrwx    5 www-data www-data      4096 Aug 16 11:34 ..
+-rw-r--r--    1 www-data www-data 267017019 Aug 19 10:41 laravel.log
+
+8.0K	/var/www/html/storage/app
+180.0K	/var/www/html/storage/framework
+254.7M	/var/www/html/storage/logs
+
+=== journaux json du demon docker (les plus gros) ===
+4.1M	/var/lib/docker/containers
+1.1M	/var/lib/docker/containers/cba3064024caaffacc8353b9c2c7331c0efefb90776804a5c753ace06b21d612/cba3064024caaffacc8353b9c2c7331c0efefb90776804a5c753ace06b21d612-json.log
+1.1M	/var/lib/docker/containers/cba3064024caaffacc8353b9c2c7331c0efefb90776804a5c753ace06b21d612
+832K	/var/lib/docker/containers/c1a4a7ad695204a3ce077acb5fde1f4b7b7e46a4cd85d153cbe912f96e85a3fa
+792K	/var/lib/docker/containers/c1a4a7ad695204a3ce077acb5fde1f4b7b7e46a4cd85d153cbe912f96e85a3fa/c1a4a7ad695204a3ce077acb5fde1f4b7b7e46a4cd85d153cbe912f96e85a3fa-json.log
+620K	/var/lib/docker/containers/11ab2af5b928268d45a5e7d228deea407595ec0f5a0823bf5e5710d3c296b2b3
+576K	/var/lib/docker/containers/11ab2af5b928268d45a5e7d228deea407595ec0f5a0823bf5e5710d3c296b2b3/11ab2af5b928268d45a5e7d228deea407595ec0f5a0823bf5e5710d3c296b2b3-json.log
+404K	/var/lib/docker/containers/6ab2a17781da5d40c13ced5d8bef6444facae8655fb05630e9154ca5314ea317
+364K	/var/lib/docker/containers/6ab2a17781da5d40c13ced5d8bef6444facae8655fb05630e9154ca5314ea317/6ab2a17781da5d40c13ced5d8bef6444facae8655fb05630e9154ca5314ea317-json.log
+332K	/var/lib/docker/containers/7f490a0e81afff77001f52f129362b8dd7fc15385407cb864ab21c08525d17ad
+292K	/var/lib/docker/containers/7f490a0e81afff77001f52f129362b8dd7fc15385407cb864ab21c08525d17ad/7f490a0e81afff77001f52f129362b8dd7fc15385407cb864ab21c08525d17ad-json.log
+232K	/var/lib/docker/containers/a30382ad800f284ed1f08dbe11972b070e63a663edbd865ed6b72af6dc9c1b4b
+
+=== /var/log les plus gros ===
+5.1G	/var/log
+4.0G	/var/log/journal/1cbe55cac95d4e598edcd141b8c5f066
+4.0G	/var/log/journal
+961M	/var/log/axion-enrich
+109M	/var/log/journal/1cbe55cac95d4e598edcd141b8c5f066/system@8710de48b5824ce980599d53750c7f94-00000000006ea072-0006561433d39ead.journal
+109M	/var/log/journal/1cbe55cac95d4e598edcd141b8c5f066/system@8710de48b5824ce980599d53750c7f94-00000000006bfb15-00065612e2d969ed.journal
+109M	/var/log/journal/1cbe55cac95d4e598edcd141b8c5f066/system@8710de48b5824ce980599d53750c7f94-000000000066b36d-0006561023ad3c2c.journal
+109M	/var/log/journal/1cbe55cac95d4e598edcd141b8c5f066/system@8710de48b5824ce980599d53750c7f94-0000000000640e71-0006560ea9485621.journal
+109M	/var/log/journal/1cbe55cac95d4e598edcd141b8c5f066/system@8710de48b5824ce980599d53750c7f94-00000000006169b1-0006560d76c763df.journal
+109M	/var/log/journal/1cbe55cac95d4e598edcd141b8c5f066/system@8710de48b5824ce980599d53750c7f94-00000000005ec3a2-0006560c756f251e.journal
+109M	/var/log/journal/1cbe55cac95d4e598edcd141b8c5f066/system@8710de48b5824ce980599d53750c7f94-00000000005c1cb3-0006560b8a73300a.journal
+108M	/var/log/journal/1cbe55cac95d4e598edcd141b8c5f066/system@8710de48b5824ce980599d53750c7f94-00000000007e6f95-0006561e08070c4f.journal
+
+=== logrotate pour docker/laravel ? ===
+alternatives
+apport
+apt
+bootlog
+btmp
+cloud-init
+dpkg
+fail2ban
+rsyslog
+ubuntu-pro-client
+ufw
+unattended-upgrades
+wtmp
+
+=== daemon.json ===
+cat: /etc/docker/daemon.json: No such file or directory

@@ -1,0 +1,54 @@
+AGENT 49 — 02 §22.3 : CE QUI NE TRAVERSE JAMAIS — INTERDIT OU ABSENT ?
+======================================================================
+
+--- A) L'INTERDICTION EST-ELLE ECRITE DANS LE CONTRAT ? (entete du contrat cote site) ---
+/**
+ * CONTRAT du canal site → CRM (lot L2), miroir EXACT du contrat d'entrée
+ * `App\Crm\Ingest\SiteSyncEvent` côté Axion CRM Pro.
+ *
+ * Le schéma y est STRICT : toute clé inconnue fait rejeter le message (422).
+ * Ce fichier est donc la seule source de vérité côté site — un champ ajouté
+ * ici sans être ajouté là-bas casse la synchro, et réciproquement. Les deux
+ * fichiers portent le même numéro de version de schéma.
+ *
+ * Ce que le payload ne porte JAMAIS, volontairement :
+ *   - le workspace ni le type de relation de destination : c'est le CRM qui
+ *     classe (sinon le site déciderait de l'univers d'atterrissage) ;
+ *   - de pièce jointe : le CV reste sur le disque du site, `cv_ref` n'est
+ *     qu'une référence (surface RGPD minimale) ;
+ *   - de jeton du site (désinscription, RGPD) : ils restent côté site, qui est
+ *     la source de vérité du consentement.
+ */
+
+export const CRM_SYNC_SCHEMA_VERSION = 1;
+
+
+--- B) EST-ELLE APPLIQUEE ? schema STRICT cote CRM (clef inconnue = 422) ---
+116:        self::assertOnlyKeys($raw, self::TOP_LEVEL_KEYS, 'racine');
+262:    private static function assertOnlyKeys(array $data, array $allowed, string $where): void
+282:        self::assertOnlyKeys($section, $allowed, $key);
+
+--- C) SENS INVERSE : le site rejette-t-il une clef inconnue ? ---
+$ grep -nE 'assertOnlyKeys|Object.keys|unknown_field|strict' src/server/crm-sync/inbound.ts
+[aucun resultat = le parseur du site ne refuse aucune clef inconnue ; il les ignore]
+TEMOIN NEGATIF : le meme fichier contient bien des refus explicites —
+144:  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+148:  if (typeof eventId !== "string" || eventId.length === 0 || eventId.length > 80) return null;
+151:  if (typeof eventType !== "string" || !EVENT_TYPES.has(eventType)) return null;
+154:  if (typeof emailHash !== "string" || !SHA256_HEX.test(emailHash)) return null;
+157:  if (typeof scope !== "string" || !SCOPES.has(scope)) return null;
+161:  if (raw.origin !== "crm") return null;
+164:  if (typeof occurredAt !== "string" || Number.isNaN(Date.parse(occurredAt))) return null;
+167:  if (personKey !== undefined && typeof personKey !== "string") return null;
+301:  return null;
+
+--- D) Y A-T-IL SEULEMENT QUELQUE CHOSE A PROTEGER ? (items 3 et 4 du §22.3) ---
+$ grep -rniE 'recording|transcri' app/Models/ database/migrations/ --include=*.php -l
+[fin — aucun modele, aucune migration]
+$ grep -rniE 'ressenti|sentiment' app/ database/migrations/ --include=*.php -l
+[fin — aucun]
+TEMOIN NEGATIF : le meme grep trouve bien les notions QUI existent —
+$ grep -rl 'ActivitesEtMotifs' app/ | head -5
+app/Crm/ActivitesEtMotifs.php
+$ ls app/Models/
+AudienceMember.php AuditLog.php Candidate.php Company.php Concerns Contact.php EmailAudience.php HealthPractitioner.php Journalist.php LlmUseCase.php Media.php PersonalAccessToken.php ProxyProvider.php RgpdRequest.php Scopes ScraperRun.php ScrapingCampaign.php Tag.php User.php Workspace.php 

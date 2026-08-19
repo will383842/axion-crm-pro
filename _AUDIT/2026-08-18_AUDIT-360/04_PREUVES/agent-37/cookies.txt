@@ -1,0 +1,13 @@
+##### GET https://api.axion-crm-pro.com/sanctum/csrf-cookie (Origin app)
+HTTP/1.1 204 No Content
+access-control-allow-credentials: true
+access-control-allow-origin: https://app.axion-crm-pro.com
+access-control-expose-headers: X-Request-Id, X-RateLimit-Limit, X-RateLimit-Remaining
+Set-Cookie: XSRF-TOKEN=<REDACTED>; expires=Wed, 19 Aug 2026 13:19:37 GMT; Max-Age=7200; path=/; domain=.axion-crm-pro.com; secure; samesite=lax
+Set-Cookie: axion_crm_session=<REDACTED>; expires=Wed, 19 Aug 2026 13:19:37 GMT; Max-Age=7200; path=/; domain=.axion-crm-pro.com; secure; httponly; samesite=lax
+
+##### GET https://staging-api.axion-crm-pro.com/sanctum/csrf-cookie (Origin app)
+HTTP/1.1 204 No Content
+Set-Cookie: XSRF-TOKEN=<REDACTED>; expires=Wed, 19 Aug 2026 13:19:39 GMT; Max-Age=7200; path=/; secure; samesite=lax
+Set-Cookie: axion_crm_staging_session=<REDACTED>; expires=Wed, 19 Aug 2026 13:19:39 GMT; Max-Age=7200; path=/; secure; httponly; samesite=lax
+

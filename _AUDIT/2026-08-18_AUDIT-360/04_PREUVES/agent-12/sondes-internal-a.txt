@@ -1,0 +1,117 @@
+===== ROUTES INTERNES SIGNEES — AGENT 12 =====
+date : 2026-08-19T10:26:55+00:00
+WORKER_INTERNAL_HMAC_SECRET  = ''
+crm.ingest.hmac_secret       = ''
+crm.ingest.enabled           = false
+crm.scrape_funnel.enabled    = false
+mail.webhooks.zeptomail_token= NULL
+
+----- TEMOIN NEGATIF : signature fausse ----------------------------
+[2026-08-19 12:27:20] local.WARNING: Internal scraper result rejected (bad HMAC) {"ip":"127.0.0.1"} 
+### scraper-result — signature bidon
+    POST /api/internal/scraper-result
+    -> HTTP 401
+    {"error":"bad_signature"}
+
+[2026-08-19 12:27:36] local.WARNING: Internal scraper result rejected (bad HMAC) {"ip":"127.0.0.1"} 
+### scraper-result — sans en-tete de signature
+    POST /api/internal/scraper-result
+    -> HTTP 401
+    {"error":"bad_signature"}
+
+[2026-08-19 12:27:54] local.WARNING: site-sync rejeté (signature invalide) {"ip":"127.0.0.1"} 
+### site-sync — signature bidon
+    POST /api/internal/site-sync
+    -> HTTP 401
+    {"error":"bad_signature"}
+
+[2026-08-19 12:27:56] local.WARNING: site-sync/gdpr rejeté (signature invalide) {"ip":"127.0.0.1"} 
+### site-sync/gdpr — signature bidon
+    POST /api/internal/site-sync/gdpr
+    -> HTTP 401
+    {"error":"bad_signature"}
+
+### email/zeptomail — sans jeton
+    POST /api/internal/email/zeptomail
+    -> HTTP 503
+    {"error":"webhook_disabled","message":"Webhook ZeptoMail d\u00e9sactiv\u00e9 (MAIL_WEBHOOK_TOKEN absent)."}
+
+### email/zeptomail — mauvais jeton
+    POST /api/internal/email/zeptomail?t=mauvais
+    -> HTTP 503
+    {"error":"webhook_disabled","message":"Webhook ZeptoMail d\u00e9sactiv\u00e9 (MAIL_WEBHOOK_TOKEN absent)."}
+
+----- TEMOIN POSITIF : signature calculee avec le secret CONFIGURE --
+    corps     = {"run_id":424242,"source":"audit-agent-12","status":"ok"}
+    secret    = ''
+    signature = 5c8e748281d8ccf3aa57ad9a991db73b5993ee8d64151cde35679ee290021e0b
+
+[2026-08-19 12:27:57] local.INFO: ScraperResult ingested {"run_id":424242,"source":"audit-agent-12","status":"ok"} 
+### scraper-result — signature FORGEE avec ce secret
+    POST /api/internal/scraper-result
+    -> HTTP 200
+    {"ingested":true}
+
+[2026-08-19 12:27:57] local.INFO: ScraperResult ingested {"run_id":424242,"source":"audit-agent-12","status":"ok"} 
+### scraper-result — REJEU identique #2
+    POST /api/internal/scraper-result
+    -> HTTP 200
+    {"ingested":true}
+
+[2026-08-19 12:27:57] local.INFO: ScraperResult ingested {"run_id":424242,"source":"audit-agent-12","status":"ok"} 
+### scraper-result — REJEU identique #3
+    POST /api/internal/scraper-result
+    -> HTTP 200
+    {"ingested":true}
+
+[2026-08-19 12:27:57] local.WARNING: Internal scraper result rejected (bad HMAC) {"ip":"127.0.0.1"} 
+### scraper-result — CORPS ALTERE, meme signature
+    POST /api/internal/scraper-result
+    -> HTTP 401
+    {"error":"bad_signature"}
+
+----- site-sync : signature forgee, rejeu, horodatage --------------
+    charge signee = 1787135278.{"type":"audit_agent12"}
+    signature     = sha256=f4cfbf21f7b178d1e79897fff427a6194f7e716f5a6c09c4f5672992a4e9856b
+
+[2026-08-19 12:27:58] local.WARNING: site-sync rejeté (signature invalide) {"ip":"127.0.0.1"} 
+### site-sync — signature FORGEE
+    POST /api/internal/site-sync
+    -> HTTP 401
+    {"error":"bad_signature"}
+
+[2026-08-19 12:27:58] local.WARNING: site-sync rejeté (signature invalide) {"ip":"127.0.0.1"} 
+### site-sync — REJEU identique
+    POST /api/internal/site-sync
+    -> HTTP 401
+    {"error":"bad_signature"}
+
+[2026-08-19 12:27:58] local.WARNING: site-sync rejeté (signature invalide) {"ip":"127.0.0.1"} 
+### site-sync — horodatage a t-4000 s (hors fenetre 300 s)
+    POST /api/internal/site-sync
+    -> HTTP 401
+    {"error":"bad_signature"}
+
+[2026-08-19 12:27:58] local.WARNING: site-sync rejeté (signature invalide) {"ip":"127.0.0.1"} 
+### site-sync — SANS horodatage
+    POST /api/internal/site-sync
+    -> HTTP 401
+    {"error":"bad_signature"}
+
+----- routage : /search declare deux fois ? ------------------------
+    entree #1 : GET|HEAD -> App\Http\Controllers\Api\GlobalSearchController@index
+    total d entrees 'api/v1/search' RETENUES par le routeur : 1
+    (le fichier routes/api.php en declare DEUX : ligne 99 fermeture, ligne 207 GlobalSearchController)
+
+----- stubs / routes mortes ---------------------------------------
+### /v1/crm/inexistant (404 attendu, plus 501)
+    GET /api/v1/crm/inexistant
+    -> HTTP 404
+    {     "message": "The route api/v1/crm/inexistant could not be found." }
+
+### /v1/analytics (404 attendu)
+    GET /api/v1/analytics
+    -> HTTP 404
+    {     "message": "The route api/v1/analytics could not be found." }
+
+===== FIN =====

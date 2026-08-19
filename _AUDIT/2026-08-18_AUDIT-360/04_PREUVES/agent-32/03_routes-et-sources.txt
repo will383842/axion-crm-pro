@@ -1,0 +1,26 @@
+### Périmètre relation — routes et sources de données (site eb754332)
+ECRAN | contacts/page.tsx | 325l | listInbox,
+ECRAN | contacts/appels/page.tsx | 335l | listRendezVous,
+ECRAN | contacts/appels/[id]/page.tsx | 240l | prisma.calendlyEvent,
+ECRAN | contacts/messages/page.tsx | 46l | SubmissionsV2,
+ECRAN | contacts/messages/[id]/page.tsx | 31l | SubmissionDetailContent,
+ECRAN | contacts/clients/page.tsx | 35l | forcedTypes,SubmissionsV2,
+ECRAN | contacts/presse/page.tsx | 32l | forcedTypes,SubmissionsV2,
+ECRAN | contacts/partenariats/page.tsx | 30l | forcedTypes,SubmissionsV2,
+ECRAN | contacts/investisseurs/page.tsx | 30l | forcedTypes,SubmissionsV2,
+ECRAN | contacts/conferences/page.tsx | 34l | forcedTypes,SubmissionsV2,
+ECRAN | contacts/commercial/page.tsx | 31l | forcedTypes,SubmissionsV2,
+ECRAN | contacts/commercial/[id]/page.tsx | 32l | SubmissionDetailContent,
+ECRAN | contacts/autres/page.tsx | 30l | forcedTypes,SubmissionsV2,
+ECRAN | contacts/candidatures/page.tsx | 90l | listApplicationsAction,listCandidaturesUnifieesAction,
+ECRAN | contacts/candidatures/[id]/page.tsx | 206l | getApplicationDetailAction,
+ECRAN | podcast/page.tsx | 164l | prisma.podcastRequest,
+ECRAN | podcast/[id]/page.tsx | 140l | prisma.podcastRequest,
+REDIRECT | contacts/rendez-vous/page.tsx | 19l | 
+REDIRECT | contacts/rendez-vous/calendrier/page.tsx | 28l | 
+REDIRECT | contacts/calendly/page.tsx | 15l | 
+REDIRECT | contacts/calendly/[id]/page.tsx | 19l | 
+REDIRECT | calendrier/page.tsx | 25l | 
+REDIRECT | reservations/page.tsx | 25l | 
+REDIRECT | submissions/page.tsx | 28l | 
+REDIRECT | candidatures/page.tsx | 24l | 

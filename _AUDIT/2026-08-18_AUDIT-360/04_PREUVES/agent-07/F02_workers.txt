@@ -1,0 +1,19 @@
+=== F2 : couverture des parcours de collecte du §11 ===
+--- workers/tests/base-worker.test.ts : 16 cas
+--- workers/tests/extract.test.ts : 3 cas
+--- workers/tests/registre-sources.test.ts : 7 cas
+--- workers/tests/result-sender.test.ts : 10 cas
+--- workers/tests/ssrf-guard.test.ts : 9 cas
+--- workers/tests/ssrf-guard-dns.test.ts : 16 cas
+=== mots-cles §11 : dedoublonnage, exclusion, journal, arret d urgence ===
+workers/tests/base-worker.test.ts
+workers/src/scrapers/base.ts
+=== backend tests couvrant collecte / dedup / exclusion / arret ===
+CampaignsTest.php
+ListeSuppressionTest.php
+ScraperRateLimitTest.php
+ScraperRunsCancelRetryTest.php
+Dedup
+Scraping
+=== arret d urgence : code ===
+backend/app/Http/Controllers/Api/ScrapingCampaignsController.php

@@ -1,0 +1,6 @@
+ table_referencante |          conname           | confdeltype 
+--------------------+----------------------------+-------------
+ media              | media_parent_media_id_fkey | n
+ journalists        | journalists_media_id_fkey  | n
+(2 rows)
+

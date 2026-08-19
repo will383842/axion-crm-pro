@@ -1,0 +1,25 @@
+﻿2026-08-19T09:42:52.0978616Z ##[group]Run set -euo pipefail
+2026-08-19T09:42:52.0979920Z [36;1mset -euo pipefail[0m
+2026-08-19T09:42:52.0980375Z [36;1m# Version RÉELLEMENT installée (le lock fait foi, pas l'intervalle[0m
+2026-08-19T09:42:52.0980875Z [36;1m# `^1.62.1` de package.json qui ne dit pas ce qui est résolu).[0m
+2026-08-19T09:42:52.0981421Z [36;1mlib="$(node -p "require('./workers/node_modules/playwright/package.json').version")"[0m
+2026-08-19T09:42:52.0982016Z [36;1mtag="$(sed -n 's/^ARG PLAYWRIGHT_VERSION=v\([0-9.]*\)-.*$/\1/p' Dockerfile.worker)"[0m
+2026-08-19T09:42:52.0982437Z [36;1mecho "bibliothèque : $lib"[0m
+2026-08-19T09:42:52.0982709Z [36;1mecho "image        : $tag"[0m
+2026-08-19T09:42:52.0982964Z [36;1mif [ -z "$tag" ]; then[0m
+2026-08-19T09:42:52.0983557Z [36;1m  echo "::error::PLAYWRIGHT_VERSION introuvable dans Dockerfile.worker (format attendu : ARG PLAYWRIGHT_VERSION=vX.Y.Z-suffixe)"[0m
+2026-08-19T09:42:52.0984119Z [36;1m  exit 1[0m
+2026-08-19T09:42:52.0984331Z [36;1mfi[0m
+2026-08-19T09:42:52.0984576Z [36;1mif [ "$lib" != "$tag" ]; then[0m
+2026-08-19T09:42:52.0984990Z [36;1m  echo "::error::Écart Playwright — la bibliothèque est en $lib, l'image en $tag."[0m
+2026-08-19T09:42:52.0985694Z [36;1m  echo "::error::Corriger ARG PLAYWRIGHT_VERSION dans Dockerfile.worker (v${lib}-noble) DANS LE MÊME COMMIT."[0m
+2026-08-19T09:42:52.0986184Z [36;1m  exit 1[0m
+2026-08-19T09:42:52.0986384Z [36;1mfi[0m
+2026-08-19T09:42:52.0986600Z [36;1mecho "Versions alignées."[0m
+2026-08-19T09:42:52.1028986Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:42:52.1029265Z env:
+2026-08-19T09:42:52.1029541Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-19T09:42:52.1029866Z ##[endgroup]
+2026-08-19T09:42:52.1439650Z bibliothèque : 1.62.1
+2026-08-19T09:42:52.1440246Z image        : 1.62.1
+2026-08-19T09:42:52.1440891Z Versions alignées.

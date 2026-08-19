@@ -1,0 +1,15 @@
+### saved_views — le controleur et la route EXISTENT
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/backend/app/Http/Controllers/Api/SavedViewsController.php
+33:use App\Http\Controllers\Api\SavedViewsController;
+195:        Route::apiResource('saved-views', SavedViewsController::class);
+--- index() rend 200 liste vide, pas 501 ---
+    public function index(Request $r): JsonResponse { return $this->ok(['data' => []]); }
+
+### activites/motifs — la table, la constante et le seeder EXISTENT
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/backend/database/migrations/2026_08_19_000002_crm_activites_et_motifs.php
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/backend/app/Crm/ActivitesEtMotifs.php
+52:        DB::table('crm_activites')->insertOrIgnore($activites);
+68:        DB::table('crm_motifs')->insertOrIgnore($motifs);
+--- commit qui les a posees (posterieur a l inventaire) ---
+504737f 2026-08-19 feat(etape1a-p2): les cinq activités et les onze motifs d'échange (§2.3)
+a832d88 2026-08-19 fix(securite): une garde qui mesure les CONTENEURS, pas le fichier

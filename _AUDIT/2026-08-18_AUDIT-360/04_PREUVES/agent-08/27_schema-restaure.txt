@@ -1,0 +1,57 @@
+=== Le schema RESTAURE depuis le dump de PRODUCTION confirme A08-004 ===
+(base axion_crm_dr_a08, restauree localement depuis axion_crm_20260819T030001Z.sql.gz)
+         relname         | relkind | relispartition | rls | forcee 
+-------------------------+---------+----------------+-----+--------
+ activities              | r       | f              | f   | t
+ ai_act_register         | r       | f              | f   | t
+ analytics_daily_rollups | r       | f              | f   | t
+ audience_members        | r       | f              | f   | t
+ audit_logs              | r       | f              | f   | f
+ business_events         | r       | f              | f   | t
+ campaigns               | r       | f              | f   | t
+ candidate_tag           | r       | f              | f   | t
+ candidates              | r       | f              | f   | t
+ companies               | r       | f              | f   | t
+ company_tag             | r       | f              | f   | t
+ contacts                | r       | f              | f   | t
+ coverage_matrix_cells   | m       | f              | f   | f
+ coverage_zones          | r       | f              | f   | t
+ deals                   | r       | f              | f   | t
+ duplicate_flags         | r       | f              | f   | t
+ email_audiences         | r       | f              | f   | t
+ email_sends             | r       | f              | f   | t
+ email_templates         | r       | f              | f   | t
+ email_verification_logs | r       | f              | f   | t
+ health_practitioners    | r       | f              | f   | t
+ invitations             | r       | f              | f   | t
+ journalists             | r       | f              | f   | t
+ linkedin_accounts       | r       | f              | f   | t
+ linkedin_messages       | r       | f              | f   | t
+ llm_usage               | r       | f              | f   | t
+ llm_use_cases           | r       | f              | f   | t
+ media                   | r       | f              | f   | t
+ notifications           | r       | f              | f   | t
+ pipeline_stages         | r       | f              | f   | t
+ proxy_providers_config  | r       | f              | f   | t
+ proxy_usage_log         | r       | f              | f   | t
+ rgpd_requests           | r       | f              | f   | t
+ rotations               | r       | f              | f   | t
+ saved_views             | r       | f              | f   | t
+ scraper_runs            | r       | f              | f   | t
+ scraping_campaigns      | r       | f              | f   | t
+ sessions                | r       | f              | f   | f
+ strategic_keywords      | r       | f              | f   | t
+ tags                    | r       | f              | f   | t
+ user_workspaces         | r       | f              | f   | f
+ web_vital_samples       | r       | f              | f   | t
+(42 rows)
+
+--- total tables cloisonnees restaurees ---
+ rls_forcee | total 
+------------+-------
+          0 |    41
+(1 row)
+
+--- policies RLS restaurees (le dump les conserve-t-il ?) ---
+0 policies
+39 policies en PRODUCTION

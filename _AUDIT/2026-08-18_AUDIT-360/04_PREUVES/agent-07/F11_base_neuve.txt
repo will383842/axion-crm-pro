@@ -1,0 +1,29 @@
+=== F11 : migrate:fresh sur base neuve ===
+DROP DATABASE
+NOTICE:  database "a07_fresh" does not exist, skipping
+CREATE DATABASE
+  2026_08_14_000002_crm_socle_taxonomie_business ............... 241.94ms DONE
+  2026_08_14_000003_crm_socle_vivier_candidats ................. 793.23ms DONE
+  2026_08_14_000004_crm_socle_tags_optout_timeline ............. 234.09ms DONE
+  2026_08_14_000005_crm_socle_index_concurrents ................ 379.11ms DONE
+  2026_08_14_000006_crm_scraping_sources ....................... 592.09ms DONE
+  2026_08_14_000007_crm_outbound_events ........................ 126.30ms DONE
+  2026_08_15_000001_company_tag_assigned_by_backfill ........... 100.92ms DONE
+  2026_08_15_000002_companies_hub_temperature_index ............. 80.90ms DONE
+  2026_08_15_000003_contacts_liste_console_index ............... 141.75ms DONE
+  2026_08_15_000004_email_suppressions .............................. 1 s DONE
+  2026_08_15_000005_permission_contacts_view_pii .................... 8 s DONE
+  2026_08_15_000006_companies_created_at_index ................. 118.77ms DONE
+  2026_08_15_100001_seed_implantations_fr_etranger_source ....... 78.66ms DONE
+  2026_08_15_120001_companies_entites_sans_siren ................ 73.07ms DONE
+  2026_08_15_120002_companies_foreign_id_unique_index .......... 633.36ms DONE
+  2026_08_16_000001_audit_logs_prev_hash_default ................ 18.59ms DONE
+  2026_08_16_200000_fixer_search_path_des_fonctions ............. 27.44ms DONE
+  2026_08_17_000001_companies_hub_tous_index .................... 86.49ms DONE
+  2026_08_18_000001_backfill_empreintes_oppositions [2026-08-19 12:01:08] local.INFO: Remplissage des empreintes d’opposition {"table":"opt_out","empreintes_calculees":0} 
+[2026-08-19 12:01:08] local.INFO: Remplissage des empreintes d’opposition {"table":"email_suppressions","empreintes_calculees":0} 
+................. 6 s DONE
+  2026_08_18_100001_partman_dans_son_propre_schema ............... 3.20ms DONE
+  2026_08_19_000001_companies_hub_counts_index ................. 119.29ms DONE
+  2026_08_19_000002_crm_activites_et_motifs .................... 985.34ms DONE
+

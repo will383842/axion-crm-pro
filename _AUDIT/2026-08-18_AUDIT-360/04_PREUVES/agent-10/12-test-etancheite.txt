@@ -1,0 +1,78 @@
+[2026-08-19 12:41:35] local.INFO: Remplissage des empreintes d’opposition {"table":"opt_out","empreintes_calculees":0} 
+[2026-08-19 12:41:36] local.INFO: Remplissage des empreintes d’opposition {"table":"email_suppressions","empreintes_calculees":0} 
+
+   FAIL  Tests\Feature\EtancheiteUniversTest
+  ✓ 🔴 un viewer VIVIER ne lit AUCUNE fiche business                   657.29s  
+  ⨯ l’arbitrage des rapprochements, surface purement business, est fermé aussi
+  ✓ l’inverse tient aussi : un membre business ne lit pas le vivier     17.96s  
+  ✓ le pointeur d’univers ne vaut PAS appartenance                      12.42s  
+  ⨯ le hub de contacts business est fermé à un membre du seul vivier
+
+   PASS  Tests\Feature\EtancheiteParTableTest
+  ✓ SANS contexte workspace, AUCUNE table scopée ne rend la moindre li… 14.50s  
+  ✓ AVEC le contexte du workspace A, chaque table scopée ne rend QUE l… 12.50s  
+  ✓ les exclusions de la MIGRATION et celles des TESTS sont la même lis… 6.97s  
+  ✓ TÉMOIN — FORCE ROW LEVEL SECURITY change bien le comportement du PR… 5.10s  
+  ✓ le semeur couvre TOUTES les tables scopées — aucune table nouvelle…  6.93s  
+  ✓ l’inventaire des tables scopées est CALCULÉ, et ses exclusions son… 10.66s  
+  ✓ DÉFAUT CONNU — email_verification_logs fuit SANS contexte (à corri… 12.69s  
+  ✓ health_practitioners : le commentaire de 2026_07_04 annonce une po… 10.79s  
+  ✓ toutes les tables scopées portent ENABLE + FORCE ROW LEVEL SECURITY  6.18s  
+  ✓ aucune policy ne rouvre un repli permissif — y compris sous la form… 6.73s  
+  ✓ TÉMOIN — la sonde « 0 ligne sans contexte » détecte réellement une…  7.60s  
+
+   PASS  Tests\Feature\Crm\ConsoleV2Test
+  ✓ etancheite : une appartenance REVOQUEE ne donne plus acces au vivie… 5.55s  
+  ✓ etancheite : le pointeur current_workspace_id ne suffit PAS a ouvri… 7.25s  
+  ✓ etancheite : un utilisateur business-only prend 403 sur le vivier    6.13s  
+  ✓ etancheite : un membre du vivier lit le vivier                       7.87s  
+  ✓ etancheite : un utilisateur business-only ne peut pas agir en masse… 6.89s  
+  ✓ etancheite : l arbitrage n existe pas dans l univers vivier          5.20s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\EtancheiteUniversTest > l’arbitrage…  QueryException   
+  SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "permissions" does not exist
+LINE 1: select exists(select * from "permissions" where ("name" = $1...
+                                    ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm_test, SQL: select exists(select * from "permissions" where ("name" = companies.view and "guard_name" = web)) as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:425
+    421▕             );
+    422▕ 
+    423▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    424▕ 
+  ➜ 425▕             $statement->execute();
+    426▕ 
+    427▕             return $statement->fetchAll();
+    428▕         });
+    429▕     }
+
+      [2m+6 vendor frames [22m
+  7   database/seeders/PermissionsAndRolesSeeder.php:39
+      [2m+23 vendor frames [22m
+  31  tests/Feature/EtancheiteUniversTest.php:37
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\EtancheiteUnive…  UniqueConstraintViolationException   
+  SQLSTATE[23505]: Unique violation: 7 ERROR:  duplicate key value violates unique constraint "permissions_name_key"
+DETAIL:  Key (name)=(contacts.view_pii) already exists. (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm_test, SQL: insert into "permissions" ("name", "guard_name", "description", "created_at", "updated_at") values (contacts.view_pii, web, Voir les coordonnées complètes, 2026-08-19 12:44:59, 2026-08-19 12:44:59))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:584
+    580▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    581▕ 
+    582▕             $this->recordsHaveBeenModified();
+    583▕ 
+  ➜ 584▕             return $statement->execute();
+    585▕         });
+    586▕     }
+    587▕ 
+    588▕     /**
+
+      [2m+7 vendor frames [22m
+  8   database/seeders/PermissionsAndRolesSeeder.php:39
+      [2m+23 vendor frames [22m
+  32  tests/Feature/EtancheiteUniversTest.php:37
+
+
+  Tests:    2 failed, 20 passed (76 assertions)
+  Duration: 1354.37s
+  Random Order Seed: 1787135196
+

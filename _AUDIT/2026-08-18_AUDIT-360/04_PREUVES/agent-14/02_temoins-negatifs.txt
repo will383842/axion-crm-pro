@@ -1,0 +1,86 @@
+=== agent-14 / TEMOINS NEGATIFS (chaque 'rien trouve' est precede de la preuve que le controle sait trouver) ===
+
+-- 1. rg 'outbound' frontend/src : --
+[code 1] (1 = aucun resultat)
+-- 1bis TEMOIN : rg 'observability' frontend/src trouve bien --
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/frontend/src\components\layout\Sidebar.tsx:101:      { to: '/admin/observability', label: 'Observabilité', icon: <Activity className="h-4 w-4" /> },
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/frontend/src\features\settings\SettingsPage.tsx:39:type TabKey = 'workspace' | 'integrations' | 'observability' | 'appearance';
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/frontend/src\features\settings\SettingsPage.tsx:73:  { id: 'observability', label: 'Observabilité', icon: <Activity className="h-3.5 w-3.5" /> },
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/frontend/src\features\settings\SettingsPage.tsx:222:      {tab === 'observability' && (
+
+-- 2. rg 'opt-out' frontend/src : --
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/frontend/src\features\media\MediaDetailPage.tsx:191:                  <td className="py-2 text-slate-500">{j.opt_out ? "opt-out" : j.email || "—"}</td>
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/frontend/src\features\media\JournalistsListPage.tsx:129:                    <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400">{j.opt_out ? "opt-out" : j.email ?? "—"}</td>
+   (les 2 occurrences sont des LIBELLES d'affichage ; aucun api.post vers /journalists/{id}/opt-out)
+-- 2bis TEMOIN : rg 'rgpd/requests' frontend/src trouve bien un api.post --
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/frontend/src\app\routeTree.tsx:79:const rgpdRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/rgpd/requests', component: RgpdRequestsPage });
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/frontend/src\features\rgpd\AiActRegisterPage.tsx:243:                    '/rgpd/requests'}
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/frontend/src\features\rgpd\RgpdRequestsPage.tsx:77:    queryFn: async () => (await api.get<{ data: RgpdRequest[] }>('/rgpd/requests')).data,
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/frontend/src\features\rgpd\RgpdRequestsPage.tsx:82:      (await api.post('/rgpd/requests', { type: newType, subject_email: newEmail })).data,
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/frontend/src\features\rgpd\RgpdRequestsPage.tsx:95:      (await api.post(`/rgpd/requests/${id}/process`, { note: processNote })).data,
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/frontend/src\components\layout\AutoBreadcrumbs.tsx:22:  '/rgpd/requests': 'Requêtes',
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/frontend/src\components\layout\Sidebar.tsx:108:      { to: '/rgpd/requests', label: 'Requêtes RGPD', icon: <ShieldCheck className="h-4 w-4" /> },
+
+-- 3. CRM_SYNC_ALERT dans le CODE du depot CRM (backend+frontend+infra) : --
+rg: C:/Users/willi/Documents/Projets/Axion-CRM-Pro/backend\nul: Fonction incorrecte. (os error 1)
+[code 2] (1 = aucun resultat)
+-- 3bis TEMOIN : rg -l 'CRM_SYNC_ALERT' sur tout le depot trouve bien (docs seulement) --
+rg: C:/Users/willi/Documents/Projets/Axion-CRM-Pro\backend\nul: Fonction incorrecte. (os error 1)
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro\_REPORTS\2026-08-17_CLOTURE-PLAN-CRM-E2E2.md
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro\_REPORTS\e2e2-preuves\plan-scenarios-E2E-corrige.md
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro\_PROMPTS\PROMPT_AUDIT_360_CRM_PRO_2026-08-18.v2.0-original-sauvegarde.md.bak
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro\_PROMPTS\PROMPT_AUDIT_360_CRM_PRO_2026-08-18.md
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro\_AUDIT\2026-08-18_AUDIT-360\11_GRILLES\agent-05_plan-13-aout.md
+rg: C:/Users/willi/Documents/Projets/Axion-CRM-Pro\_AUDIT\2026-08-18_AUDIT-360\04_PREUVES\agent-08\ci-logs\Le Caddyfile est-il valide : Le fichier spécifié est introuvable. (os error 2)
+rg: C:/Users/willi/Documents/Projets/Axion-CRM-Pro\_AUDIT\2026-08-18_AUDIT-360\04_PREUVES\agent-08\ci-logs\Les scripts d'infra sont-ils ex+®cutables : Le fichier spécifié est introuvable. (os error 2)
+
+-- 4. alertes Prometheus declarees (aucune sur l'outbox ni le scheduler) --
+5:      - alert: ScrapingFailureRateHigh
+15:      - alert: LLMCostNearCap
+24:      - alert: EmailValidationInvalidRateHigh
+35:      - alert: ApiDown
+42:      - alert: PostgresDown
+49:      - alert: RedisDown
+56:      - alert: ApiLatencyP95High
+63:      - alert: HorizonQueueBacklog
+-- 4bis rg 'outbound|consent|scheduler' dans alerts.yml : --
+[code 1]
+
+-- 5. UNE seule commande crm:* ; aucun rejeu, aucune reconciliation cote CRM --
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/backend/app/Console/Commands/CrmFlushOutbound.php:44:    protected $signature = 'crm:flush-outbound
+[code 1] (1 = aucune reconciliation, alors que RgpdRequestsController:130 en promet une)
+-- 5bis TEMOIN : rg 'reconcil' trouve bien la reconciliation COTE SITE --
+C:/Users/willi/Documents/Projets/Axion-IA/axionia/src/server/crm-sync\health.ts
+C:/Users/willi/Documents/Projets/Axion-IA/axionia/src/server/crm-sync\reconcile.ts
+C:/Users/willi/Documents/Projets/Axion-IA/axionia/src/server/crm-sync\index.ts
+C:/Users/willi/Documents/Projets/Axion-IA/axionia/src/server/crm-sync\__tests__\crm-sync-l5.test.ts
+=== correctif du point 3 (le 'nul' parasite de backend/ faisait sortir rg en code 2) ===
+-- 3. rg 'CRM_SYNC_ALERT' backend/app backend/config backend/routes backend/database frontend/src infra --
+[code 1] (1 = aucun resultat, recherche saine)
+
+-- 3bis TEMOIN : la meme commande trouve bien 'crm.outbound.gave_up' (la SEULE trace d'alerte cote CRM) --
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/backend/app\Console\Commands\CrmFlushOutbound.php:171:            Log::warning('crm.outbound.gave_up', ['event_id' => $row->event_id, 'status' => 422]);
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/backend/app\Console\Commands\CrmFlushOutbound.php:208:            Log::warning('crm.outbound.gave_up', ['event_id' => $row->event_id, 'attempts' => $attempts]);
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/backend/app\Http\Controllers\Api\RgpdRequestsController.php:146:            Log::error('crm.outbound.record_failed', [
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/backend/app\Http\Controllers\Api\JournalistsController.php:164:                Log::error('crm.outbound.record_failed', [
+
+-- 3ter : la chaine CRM_SYNC_ALERT n'existe QUE dans des documents --
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/_PROMPTS\PROMPT_AUDIT_360_CRM_PRO_2026-08-18.v2.0-original-sauvegarde.md.bak
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/_AUDIT/2026-08-18_AUDIT-360/11_GRILLES\agent-05_plan-13-aout.md
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/_REPORTS\2026-08-17_CLOTURE-PLAN-CRM-E2E2.md
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/_REPORTS\e2e2-preuves\plan-scenarios-E2E-corrige.md
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/_PROMPTS\PROMPT_AUDIT_360_CRM_PRO_2026-08-18.md
+
+-- 3quater : elle existe en revanche pour de vrai COTE SITE --
+C:/Users/willi/Documents/Projets/Axion-IA/axionia/src/server/crm-sync/alerts.ts:74:      category: "CRM_SYNC_ALERT",
+C:/Users/willi/Documents/Projets/Axion-IA/axionia/src/server/notifications/routing.ts:99:  CRM_SYNC_ALERT: {
+C:/Users/willi/Documents/Projets/Axion-IA/axionia/src/server/notifications/routing.ts:205:  CRM_SYNC_ALERT: "crm-sync",
+
+-- 11. withoutOverlapping() sans argument : expiration par defaut = 1440 min = 24 h (Laravel vendu dans le conteneur) --
+grep: bad regex 'withoutOverlapping(\': Trailing backslash
+   routes/console.php:168 appelle ->withoutOverlapping() SANS argument.
+-- 11bis (correctif du grep precedent) : expiration par defaut de withoutOverlapping --
+/var/www/html/vendor/laravel/framework/src/Illuminate/Console/Scheduling/CallbackEvent.php:138:    public function withoutOverlapping($expiresAt = 1440)
+/var/www/html/vendor/laravel/framework/src/Illuminate/Console/Scheduling/ManagesAttributes.php:70:    public $expiresAt = 1440;
+/var/www/html/vendor/laravel/framework/src/Illuminate/Console/Scheduling/ManagesAttributes.php:145:    public function withoutOverlapping($expiresAt = 1440)
+/var/www/html/vendor/laravel/framework/src/Illuminate/Console/Scheduling/PendingEventAttributes.php:35:    public function withoutOverlapping($expiresAt = 1440)

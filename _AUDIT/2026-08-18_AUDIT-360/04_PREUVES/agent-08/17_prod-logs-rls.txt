@@ -1,0 +1,14 @@
+=== PROD : erreurs RLS / permission dans les journaux applicatifs (lecture seule) ===
+0
+0
+
+=== PROD : laravel.log — erreurs recentes ===
+total 258824
+drwxr-xr-x    2 www-data www-data      4096 Aug 16 11:58 .
+drwxrwxrwx    5 www-data www-data      4096 Aug 16 11:34 ..
+-rw-r--r--    1 www-data www-data 264946278 Aug 19 10:10 laravel.log
+148
+
+=== PROD : erreurs Postgres cote serveur ===
+0
+0

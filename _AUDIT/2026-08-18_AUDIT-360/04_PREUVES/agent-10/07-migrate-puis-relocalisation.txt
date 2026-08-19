@@ -1,0 +1,14 @@
+### etape A : migrate (applique les 4 migrations en attente, dont la relocalisation partman)
+
+   INFO  Running migrations.  
+
+  2026_08_18_000001_backfill_empreintes_oppositions [2026-08-19 11:58:15] local.INFO: Remplissage des empreintes d’opposition {"table":"opt_out","empreintes_calculees":0} 
+[2026-08-19 11:58:15] local.INFO: Remplissage des empreintes d’opposition {"table":"email_suppressions","empreintes_calculees":0} 
+................. 6 s DONE
+  2026_08_18_100001_partman_dans_son_propre_schema ............. 424.96ms DONE
+  2026_08_19_000001_companies_hub_counts_index .................. 80.69ms DONE
+  2026_08_19_000002_crm_activites_et_motifs .................... 933.59ms DONE
+
+RC_migrate=0
+### schema pg_partman apres migrate
+partman

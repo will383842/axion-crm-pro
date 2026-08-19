@@ -1,0 +1,22 @@
+############ A04-companies-filtre-denomination-partial
+### base   : axion_crm_perf4m   (datcollate = C)
+### date   : 2026-08-19T13:42:22+02:00
+### SQL    :
+select * from "companies" where "deleted_at" is null and LOWER("companies"."denomination") LIKE '%marti%' and "workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168' order by "quality_score" desc limit 100 offset 0;
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                                            QUERY PLAN                                                                            
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.43..5740.36 rows=100 width=2078) (actual time=43139.433..43139.435 rows=0 loops=1)
+   Buffers: shared hit=292 read=81743 written=1359
+   ->  Index Scan using idx_companies_workspace_score on companies  (cost=0.43..257149.24 rows=4480 width=2078) (actual time=43139.428..43139.429 rows=0 loops=1)
+         Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+         Filter: ((deleted_at IS NULL) AND (lower(denomination) ~~ '%marti%'::text))
+         Rows Removed by Filter: 2800000
+         Buffers: shared hit=292 read=81743 written=1359
+ Planning:
+   Buffers: shared hit=805
+ Planning Time: 8.870 ms
+ Execution Time: 43143.766 ms
+(11 rows)
+

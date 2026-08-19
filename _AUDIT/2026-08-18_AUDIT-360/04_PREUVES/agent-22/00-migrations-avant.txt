@@ -1,0 +1,11 @@
+ count 
+-------
+    58
+(1 row)
+
+ count 
+-------
+    58
+(1 row)
+
+--- ci-dessus : APRES mesures ---

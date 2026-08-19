@@ -1,0 +1,23 @@
+### référence site : eb754332 fix(qualiopi): l'espace stagiaire livrait la pièce d'un tiers, et quatre surfaces affirmaient une certification non délivrée (#739)
+
+### T1 — TÉMOIN NÉGATIF du grep de drapeaux : les drapeaux qui EXISTENT sont bien trouvés
+src/env.ts:73:    CRM_SYNC_ENABLED: z.enum(["true", "false"]).optional(),
+src/env.ts:77:    CRM_SYNC_CANDIDATES_ENABLED: z.enum(["true", "false"]).optional(),
+src/env.ts:84:    // CRM_SYNC_CANDIDATES_ENABLED à dessein : on informe les candidats AVANT
+src/env.ts:440:    CRM_SYNC_ENABLED: process.env.CRM_SYNC_ENABLED,
+src/env.ts:441:    CRM_SYNC_CANDIDATES_ENABLED: process.env.CRM_SYNC_CANDIDATES_ENABLED,
+src/proxy.ts:41:  //    Toggle via Coolify env var `EN_LOCALE_ENABLED=true` pour réactiver.
+src/server/crm-sync/config.ts:4: * ⚠️ INERTIE, règle n°1 du lot : tant que `CRM_SYNC_ENABLED` n'est pas
+src/server/crm-sync/config.ts:17:  return process.env.CRM_SYNC_ENABLED === "true";
+src/server/crm-sync/config.ts:27:  return isCrmSyncEnabled() && process.env.CRM_SYNC_CANDIDATES_ENABLED === "true";
+
+### T2 — recherche d'un drapeau de REDIRECTION console -> CRM (attendu : rien)
+(aucun résultat ci-dessus = aucun drapeau)
+
+### T3 — le seul lien console -> CRM
+src/components/admin/ui/AdminSidebarNav.tsx:773:            href="https://app.axion-crm-pro.com"
+
+### T4 — pages purement redirectrices (Promise<never>) : 27
+### T5 — podcast subtree
+src/app/[locale]/(admin)/[adminPrefix]/podcast/[id]/page.tsx
+src/app/[locale]/(admin)/[adminPrefix]/podcast/page.tsx

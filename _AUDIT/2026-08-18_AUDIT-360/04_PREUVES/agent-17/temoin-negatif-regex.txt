@@ -1,0 +1,3 @@
+TEMOIN NEGATIF — meme code sur un DELETE mono-ligne :
+SELECT COUNT(*) AS c FROM notifications WHERE created_at < now() - INTERVAL '90 days'
+bool(true)

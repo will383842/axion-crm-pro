@@ -1,0 +1,50 @@
+## 9. DEUX LISTES DE SUPPRESSION la ou le §9.0 en exige UNE
+backend/app/Crm/Ingest/SiteSyncIngestService.php:505:        return DB::table('opt_out')
+backend/app/Crm/Ingest/SiteSyncIngestService.php:518:        if (DB::table('opt_out')->where('scope', $scope)->where('email_hash', $hash)->exists()) {
+backend/app/Crm/Ingest/SiteSyncIngestService.php:522:        DB::table('opt_out')->insert([
+backend/app/Crm/Rgpd/SiteGdprService.php:91:        $result['opt_out'] = DB::table('opt_out')
+backend/app/Crm/Rgpd/SiteGdprService.php:220:        $exists = DB::table('opt_out')->where('scope', $scope)->where('email_hash', $emailHash)->exists();
+backend/app/Crm/Rgpd/SiteGdprService.php:225:        DB::table('opt_out')->insert([
+backend/app/Crm/Scraping/ScrapedRecordIngestService.php:416:            $opposed = DB::table('opt_out')
+backend/app/Services/Dedup/DeduplicationService.php:217:        return DB::table('opt_out')
+backend/app/Services/Dedup/DeduplicationService.php:263:        DB::table('opt_out')->insert([
+backend/app/Support/EligibiliteCampagne.php:157:        $oppose = DB::table('opt_out')
+
+## 10. ACTIVITY_KINDS : aucun mot d'interaction HUMAINE (appel, e-mail, reunion, note, entretien)
+    /**
+     * Vocabulaire FERMÉ de la timeline (`activities.kind`).
+     *
+     * @var list<string>
+     */
+    public const ACTIVITY_KINDS = [
+        'form_submission',
+        'calendly_booked',
+        'calendly_completed',
+        'calendly_no_show',
+        'calendly_canceled',
+        'review_posted',
+        'newsletter_optin',
+        'newsletter_optout',
+        'application_submitted',
+        'stage_changed',
+        'reclassified',
+        'scraped',
+        'enriched',
+        'opt_out',
+        'gdpr_export',
+        'gdpr_erasure',
+    ];
+
+## 11. TABLES PERSONNES SEPAREES — 'une personne = une fiche' (principe 1) impossible
+backend/database/migrations/2026_05_16_000003_create_companies_contacts_scraping_schema.php:71:            CREATE TABLE contacts (
+
+## 12. LA CONSOLE DU §19 : /settings a QUATRE onglets, aucun des huit sous-groupes du §19
+71:  { id: 'workspace', label: 'Workspace', icon: <Briefcase className="h-3.5 w-3.5" /> },
+72:  { id: 'integrations', label: 'Intégrations', icon: <Plug className="h-3.5 w-3.5" /> },
+73:  { id: 'observability', label: 'Observabilité', icon: <Activity className="h-3.5 w-3.5" /> },
+74:  { id: 'appearance', label: 'Apparence', icon: <Palette className="h-3.5 w-3.5" /> },
+-- et le mot 'console' est deja pris par le hub de contacts :
+97:const consoleContactsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/contacts', component: ContactsHubPage });
+98:const consoleVivierRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/vivier', component: CandidatesPage });
+99:const consoleArbitrageRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/arbitrage', component: ArbitragePage });
+100:const consolePersonRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/personnes/$personKey', component: PersonTimelinePage });

@@ -1,0 +1,22 @@
+=== Deploy Staging 32241133570-neighbour: jobs of run 32241132949 (failure) ===
+{"completedAt":"2026-08-19T10:08:08Z","conclusion":"success","name":"Build + push GHCR (app, Dockerfile.frontend, prod)","startedAt":"2026-08-19T10:07:41Z","status":"completed"}
+{"completedAt":"2026-08-19T10:11:38Z","conclusion":"success","name":"Build + push GHCR (api, Dockerfile.laravel, prod)","startedAt":"2026-08-19T10:07:40Z","status":"completed"}
+{"completedAt":"2026-08-19T10:14:07Z","conclusion":"success","name":"Build + push GHCR (worker, Dockerfile.worker, prod)","startedAt":"2026-08-19T10:07:53Z","status":"completed"}
+{"completedAt":"2026-08-19T10:14:36Z","conclusion":"failure","name":"SSH Hetzner — préproduction","startedAt":"2026-08-19T10:14:10Z","status":"completed"}
+
+=== Accessibility run in_progress 32236095020 ===
+{"jobs":[{"conclusion":"","name":"axe-core Playwright","startedAt":"2026-08-19T09:08:38Z","status":"in_progress"},{"conclusion":"skipped","name":"Lighthouse CI","startedAt":"2026-08-19T09:08:36Z","status":"completed"}],"status":"in_progress"}
+
+=== Security failure run 32236507006 ===
+{"conclusion":"success","name":"SAST (Semgrep)","status":"completed"}
+{"conclusion":"success","name":"Node deps audit (workers)","status":"completed"}
+{"conclusion":"success","name":"Scan images tirées (inventaire) (caddy-bordure, caddy:2-alpine)","status":"completed"}
+{"conclusion":"success","name":"Secrets scan (Gitleaks)","status":"completed"}
+{"conclusion":"success","name":"Container scan (Trivy) (app, Dockerfile.frontend)","status":"completed"}
+{"conclusion":"failure","name":"Container scan (Trivy) (worker, Dockerfile.worker)","status":"completed"}
+{"conclusion":"success","name":"Scan images tirées (inventaire) (redis, redis:7.2-alpine)","status":"completed"}
+{"conclusion":"success","name":"PHP deps audit","status":"completed"}
+{"conclusion":"success","name":"Container scan (Trivy) (api, Dockerfile.laravel)","status":"completed"}
+{"conclusion":"success","name":"Node deps audit (frontend)","status":"completed"}
+{"conclusion":"skipped","name":"OWASP ZAP baseline","status":"completed"}
+{"conclusion":"skipped","name":"Alerte si une analyse de sécurité échoue","status":"completed"}

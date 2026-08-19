@@ -1,0 +1,46 @@
+### Le plan et le journal d'etape 0 sont-ils versionnes ?
+$ git -C 'C:/Users/willi/Documents/Projets/Axion-IA' rev-parse --show-toplevel
+fatal: not a git repository (or any of the parent directories): .git
+
+$ ls -la .../\_PLANS/2026-08-18_PREALABLES-AVANT-CHANTIER-CRM-CIBLE.md
+-rw-r--r-- 1 willi 197609 28200 Aug 18 19:35 C:/Users/willi/Documents/Projets/Axion-IA/_PLANS/2026-08-18_PREALABLES-AVANT-CHANTIER-CRM-CIBLE.md
+
+$ git -C .../axionia ls-files | grep -i PREALABLES   -> (vide)
+(vide : non suivi par le depot du site)
+
+$ git ls-files | grep -i PREALABLES   (depot CRM)
+_REPORTS/2026-08-18_ARBITRAGES-PREALABLES-SECTION-4.md
+
+### Numerotation F dans les messages de commit d'etape 0
+4030dda chore(etape0-l1): surcouche locale, console d'une seule origine, runbook et preuve navigateur (F4)
+83932d7 chore(etape0-l2): base locale reconstructible de zéro, pg_partman dans son propre schéma (F10)
+9365982 test(etape0-l3): harnais de tests d'interface — socle, MSW, écrans existants (F1)
+da97826 chore(etape0-l3bis): ranger la barre latérale — six groupes, une seule entrée Contacts, aucun cadenas (F17)
+af394d1 feat(etape0-l3ter): webhook ZeptoMail rebonds/plaintes → liste de suppression, sans rien envoyer (F18)
+72a40a9 test(etape0-l4): tests de la collecte, lint bloquant, suite qui échoue si vide (F2)
+41011db test(etape0-l5): suite « ne-doit-pas-régresser » sur ce qui a été réparé
+7a6acab refactor(etape0-l6): dégonfler la baseline PHPStan et interdire qu'elle grossisse (F3)
+3feb733 chore(etape0-l7): retirer les stubs 501 /crm et /analytics et leurs entrées de menu (F7)
+c74f7a6 test(etape0-l8): étanchéité par table cloisonnée, test qui rougit sans contexte (F8)
+fccc9d1 chore(etape0-l9): geler Dependabot et écrire la politique de dépendances (F13)
+dd91665 fix(etape0-l10): arbitrages — not_in sur NULL, opposition par empreinte seule, décisions §4 (F6)
+ab2b9d1 docs(etape0-l11): mesure de performance de référence — 50 000 fiches actives, 5 ans, 300 000 entreprises (F5)
+9e81b8a docs(etape0-l14): AIPD refaite pour la SAS, état du pare-feu (F11, F12)
+
+### CDC v2.7 §A.1 — 15 fragilites numerotees 1..15
+46
+| # | Fragilité | Constat | Exigence de sortie |
+|---|---|---|---|
+| 1 | Interface sans aucun test automatisé | 0 fichier de test dans `
+| 2 | Collecte quasi sans test | 2 fichiers de test dans `workers` | L
+| 3 | 337 erreurs d'analyse statique suppressées | `phpstan-baseline.
+| 4 | Console non exécutable en local d'une seule origine (D-11) | co
+| 5 | Dette de dépendances : 20 mises à jour automatiques en attente
+| 6 | Performance jamais mesurée au volume | liste 100 000+ lignes, p
+| 7 | Deux arbitrages ouverts | `neq` / `not_in` sur NULL dans le cons
+| 8 | Routes « CRM » partiellement factices | `/cold-email`, `/linke
+| 9 | Isolation par espace durcie récemment | correctif du 14 août ;
+| 10 | Canal site → CRM prouvé, pas éprouvé | 1 événement en 3 
+| 11 | Base locale non reconstruisible de zéro | `migrate:fresh` bloq
+| 12 | Analyse d'impact obsolète | datée du 17 mai, mentionne une en
+| 13 | Pare-feu du serveur non vérifié | script d'installation prés

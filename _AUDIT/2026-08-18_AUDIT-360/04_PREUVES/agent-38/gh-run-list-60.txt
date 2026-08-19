@@ -1,0 +1,60 @@
+completed	success	fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)	Deploy direct SSH Hetzner	main	push	32241133570	3m23s	2026-08-19T10:07:37Z
+completed	success	fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)	Accessibility	main	push	32241133030	1m47s	2026-08-19T10:07:37Z
+completed	success	fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)	Security	main	push	32241133011	4m4s	2026-08-19T10:07:37Z
+completed	failure	fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)	Deploy Staging	main	push	32241132949	7m0s	2026-08-19T10:07:37Z
+completed	success	fix(rgpd+acces): le registre affirmait une chose fausse en sa faveur — rectifie le jour meme	Security	fix/registre-correction-sessions	pull_request	32240894764	3m41s	2026-08-19T10:04:52Z
+completed	success	fix(rgpd+acces): le registre affirmait une chose fausse en sa faveur — rectifie le jour meme	CI	fix/registre-correction-sessions	pull_request	32240894728	1m32s	2026-08-19T10:04:52Z
+completed	success	fix(rgpd+acces): le registre affirmait une chose fausse en sa faveur — rectifie le jour meme	Accessibility	fix/registre-correction-sessions	pull_request	32240894684	1m19s	2026-08-19T10:04:52Z
+completed	success	docs(rgpd): registre des violations, notification non retenue (#188)	Accessibility	main	push	32239147645	4m53s	2026-08-19T09:44:27Z
+completed	success	docs(rgpd): registre des violations, notification non retenue (#188)	Security	main	push	32239147620	3m26s	2026-08-19T09:44:27Z
+completed	failure	docs(rgpd): registre des violations, notification non retenue (#188)	Deploy Staging	main	push	32239147560	2m50s	2026-08-19T09:44:27Z
+completed	success	docs(rgpd): registre des violations (art. 33-5) — la notification n'aura pas lieu	Accessibility	docs/registre-violations	pull_request	32238995897	1m34s	2026-08-19T09:42:42Z
+completed	success	docs(rgpd): registre des violations (art. 33-5) — la notification n'aura pas lieu	Security	docs/registre-violations	pull_request	32238995773	3m29s	2026-08-19T09:42:42Z
+completed	success	docs(rgpd): registre des violations (art. 33-5) — la notification n'aura pas lieu	CI	docs/registre-violations	pull_request	32238995760	1m24s	2026-08-19T09:42:42Z
+completed	success	docs(cnil): pas de telephone (#187)	Security	main	push	32237830309	4m59s	2026-08-19T09:29:01Z
+completed	failure	docs(cnil): pas de telephone (#187)	Deploy Staging	main	push	32237830235	4m39s	2026-08-19T09:29:01Z
+completed	success	docs(cnil): pas de telephone (#187)	Accessibility	main	push	32237830222	4m54s	2026-08-19T09:29:01Z
+completed	success	docs(cnil): pas de telephone — l'article 33-3-b exige des coordonnees, pas un numero	CI	docs/cnil-sans-telephone	pull_request	32237636817	1m40s	2026-08-19T09:26:46Z
+completed	success	docs(cnil): pas de telephone — l'article 33-3-b exige des coordonnees, pas un numero	Security	docs/cnil-sans-telephone	pull_request	32237636753	6m22s	2026-08-19T09:26:46Z
+completed	success	docs(cnil): pas de telephone — l'article 33-3-b exige des coordonnees, pas un numero	Accessibility	docs/cnil-sans-telephone	pull_request	32237636728	2m30s	2026-08-19T09:26:46Z
+completed	success	docs(cnil): les deux decisions du dirigeant (#186)	Security	main	push	32236667100	3m52s	2026-08-19T09:15:20Z
+completed	success	docs(cnil): les deux decisions du dirigeant (#186)	Accessibility	main	push	32236667068	2m32s	2026-08-19T09:15:19Z
+completed	failure	docs(cnil): les deux decisions du dirigeant (#186)	Deploy Staging	main	push	32236666920	5m18s	2026-08-19T09:15:19Z
+in_progress		docs(cnil): les deux decisions du dirigeant, prises le 2026-08-19	Accessibility	docs/cnil-decision	pull_request	32236507137	1h28m9s	2026-08-19T09:13:28Z
+completed	success	docs(cnil): les deux decisions du dirigeant, prises le 2026-08-19	CI	docs/cnil-decision	pull_request	32236507015	1m33s	2026-08-19T09:13:28Z
+completed	failure	docs(cnil): les deux decisions du dirigeant, prises le 2026-08-19	Security	docs/cnil-decision	pull_request	32236507006	3m50s	2026-08-19T09:13:28Z
+completed	failure	docs(cnil): brouillon complet (#185)	Deploy Staging	main	push	32236095051	3m8s	2026-08-19T09:08:35Z
+completed	success	docs(cnil): brouillon complet (#185)	Security	main	push	32236095029	3m19s	2026-08-19T09:08:35Z
+in_progress		docs(cnil): brouillon complet (#185)	Accessibility	main	push	32236095020	1h33m2s	2026-08-19T09:08:35Z
+completed	failure	docs(cnil): brouillon complet — identite relevee, duree d'exposition mesuree	Security	docs/cnil-identite-complete	pull_request	32235944965	3m37s	2026-08-19T09:06:49Z
+completed	success	docs(cnil): brouillon complet — identite relevee, duree d'exposition mesuree	CI	docs/cnil-identite-complete	pull_request	32235944869	1m38s	2026-08-19T09:06:49Z
+in_progress		docs(cnil): brouillon complet — identite relevee, duree d'exposition mesuree	Accessibility	docs/cnil-identite-complete	pull_request	32235944850	1h34m48s	2026-08-19T09:06:49Z
+completed	success	feat(preprod): jeu de reference portable + preproduction remplie + br…	Deploy direct SSH Hetzner	main	push	32233507233	3m30s	2026-08-19T08:37:22Z
+in_progress		feat(preprod): jeu de reference portable + preproduction remplie + br…	Accessibility	main	push	32233507063	2h4m15s	2026-08-19T08:37:22Z
+completed	success	feat(preprod): jeu de reference portable + preproduction remplie + br…	Security	main	push	32233507057	3m56s	2026-08-19T08:37:22Z
+completed	failure	feat(preprod): jeu de reference portable + preproduction remplie + br…	Deploy Staging	main	push	32233507023	5m6s	2026-08-19T08:37:22Z
+completed	success	feat(preprod): jeu de reference PORTABLE + preproduction remplie + brouillon CNIL	CI	feat/preprod-remplie	pull_request	32233358457	1m30s	2026-08-19T08:35:31Z
+in_progress		feat(preprod): jeu de reference PORTABLE + preproduction remplie + brouillon CNIL	Accessibility	feat/preprod-remplie	pull_request	32233358429	2h6m6s	2026-08-19T08:35:31Z
+completed	success	feat(preprod): jeu de reference PORTABLE + preproduction remplie + brouillon CNIL	Security	feat/preprod-remplie	pull_request	32233358296	2m59s	2026-08-19T08:35:31Z
+completed	failure	docs(preprod): la preproduction existe (#183)	Deploy Staging	main	push	32232235956	3m23s	2026-08-19T08:21:48Z
+completed	success	docs(preprod): la preproduction existe (#183)	Security	main	push	32232235933	3m32s	2026-08-19T08:21:48Z
+in_progress		docs(preprod): la preproduction existe (#183)	Accessibility	main	push	32232235879	2h19m49s	2026-08-19T08:21:48Z
+completed	success	docs(preprod): la preproduction existe — et les cinq defauts trouves en la construisant	CI	docs/journal-preprod	pull_request	32232084621	1m27s	2026-08-19T08:19:58Z
+completed	success	docs(preprod): la preproduction existe — et les cinq defauts trouves en la construisant	Security	docs/journal-preprod	pull_request	32232084536	3m34s	2026-08-19T08:19:57Z
+completed	success	docs(preprod): la preproduction existe — et les cinq defauts trouves en la construisant	Accessibility	docs/journal-preprod	pull_request	32232084364	2m33s	2026-08-19T08:19:57Z
+completed	success	fix(eol+garde): CRLF sur un script shell, garde qui rougissait sur un…	Deploy direct SSH Hetzner	main	push	32231967632	3m12s	2026-08-19T08:18:28Z
+completed	success	fix(eol+garde): CRLF sur un script shell, garde qui rougissait sur un…	Accessibility	main	push	32231967516	2m21s	2026-08-19T08:18:28Z
+completed	failure	fix(eol+garde): CRLF sur un script shell, garde qui rougissait sur un…	Deploy Staging	main	push	32231967455	4m9s	2026-08-19T08:18:28Z
+completed	cancelled	fix(eol+garde): CRLF sur un script shell, garde qui rougissait sur un…	Security	main	push	32231967444	3m28s	2026-08-19T08:18:28Z
+completed	success	fix(eol+garde): CRLF sur un script shell, et une garde qui rougissait sur une pile conforme	Security	fix/garde-pile-privee	pull_request	32231819876	3m25s	2026-08-19T08:16:40Z
+completed	success	fix(eol+garde): CRLF sur un script shell, et une garde qui rougissait sur une pile conforme	CI	fix/garde-pile-privee	pull_request	32231819852	1m32s	2026-08-19T08:16:40Z
+in_progress		fix(eol+garde): CRLF sur un script shell, et une garde qui rougissait sur une pile conforme	Accessibility	fix/garde-pile-privee	pull_request	32231819833	2h24m57s	2026-08-19T08:16:40Z
+completed	success	fix(preprod): 502 — liaison sur la passerelle du pont Docker (#181)	Accessibility	main	push	32231428439	2m40s	2026-08-19T08:11:56Z
+completed	success	fix(preprod): 502 — liaison sur la passerelle du pont Docker (#181)	Deploy direct SSH Hetzner	main	push	32231428051	2m39s	2026-08-19T08:11:56Z
+completed	failure	fix(preprod): 502 — liaison sur la passerelle du pont Docker (#181)	Deploy Staging	main	push	32231427878	2m37s	2026-08-19T08:11:56Z
+completed	success	fix(preprod): 502 — liaison sur la passerelle du pont Docker (#181)	Security	main	push	32231427857	3m19s	2026-08-19T08:11:56Z
+completed	success	fix(preprod): 502 — un port lie a 127.0.0.1 n'ecoute pas la ou le conteneur regarde	CI	fix/preprod-502	pull_request	32231284633	1m34s	2026-08-19T08:10:08Z
+completed	failure	fix(preprod): 502 — un port lie a 127.0.0.1 n'ecoute pas la ou le conteneur regarde	Security	fix/preprod-502	pull_request	32231284627	3m23s	2026-08-19T08:10:08Z
+completed	success	fix(preprod): 502 — un port lie a 127.0.0.1 n'ecoute pas la ou le conteneur regarde	Accessibility	fix/preprod-502	pull_request	32231284609	1m39s	2026-08-19T08:10:08Z
+completed	success	feat(preprod): la preproduction — overlay, Caddyfile, gardes, deploie…	Deploy direct SSH Hetzner	main	push	32230360217	5m47s	2026-08-19T07:58:39Z
+completed	success	feat(preprod): la preproduction — overlay, Caddyfile, gardes, deploie…	Accessibility	main	push	32230360116	3m13s	2026-08-19T07:58:39Z

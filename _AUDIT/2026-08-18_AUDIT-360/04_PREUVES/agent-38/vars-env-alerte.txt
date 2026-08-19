@@ -1,0 +1,26 @@
+=== variables de depot (Actions) ===
+{"variables":[],"total_count":0}
+=== environments ===
+{"name":"production-direct-ssh","protection_rules":[]}
+{"name":"staging-direct-ssh","protection_rules":[]}
+
+=== job 'alerte' de security.yml a-t-il DEJA tourne ? (30 derniers runs main) ===
+run 32241133011 : alerte=skipped
+run 32239147620 : alerte=skipped
+run 32237830309 : alerte=skipped
+run 32236667100 : alerte=skipped
+run 32236095029 : alerte=skipped
+run 32233507057 : alerte=skipped
+run 32232235933 : alerte=skipped
+run 32231967444 : alerte=cancelled
+run 32231427857 : alerte=skipped
+run 32230359916 : alerte=success
+run 32227949146 : alerte=skipped
+run 32224573444 : alerte=skipped
+run 32224122953 : alerte=skipped
+run 32221281534 : alerte=skipped
+run 32172715967 : alerte=skipped
+run 32061268655 : alerte=skipped
+run 32059674837 : alerte=skipped
+run 32056824736 : alerte=skipped
+run 32056797186 : alerte=cancelled

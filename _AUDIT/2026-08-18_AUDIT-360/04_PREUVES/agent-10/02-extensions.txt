@@ -1,0 +1,23 @@
+  extname   |   schema   | extversion 
+------------+------------+------------
+ btree_gin  | public     | 1.3
+ btree_gist | public     | 1.7
+ citext     | public     | 1.6
+ pg_partman | public     | 5.1.0
+ pg_trgm    | public     | 1.6
+ pgcrypto   | public     | 1.3
+ plpgsql    | pg_catalog | 1.0
+ postgis    | public     | 3.5.2
+ unaccent   | public     | 1.1
+ uuid-ossp  | public     | 1.1
+ vector     | public     | 0.8.0
+(11 rows)
+
+      nspname       
+--------------------
+ information_schema
+ pg_catalog
+ pg_toast
+ public
+(4 rows)
+

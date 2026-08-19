@@ -1,0 +1,38 @@
+=== EtancheiteParTableTest : structure ===
+72:    foreach ([[$wsA, 'A'], [$wsB, 'B']] as [$id, $lettre]) {
+104:// 1. L'INVENTAIRE — calculé, jamais recopié, et ses exclusions sont ÉCRITES
+107:test('l’inventaire des tables scopées est CALCULÉ, et ses exclusions sont motivées par écrit', function () {
+116:    // Les deux exclusions MOTIVÉES existent bien dans le schéma : une exclusion
+118:    foreach (array_keys(EtancheiteWorkspace::EXCLUSIONS_MOTIVEES) as $exclue) {
+119:        expect($noms)->toContain($exclue)
+120:            ->and($tables)->not->toContain($exclue);
+121:        expect(EtancheiteWorkspace::EXCLUSIONS_MOTIVEES[$exclue])->not->toBe('');
+130:    foreach ($brut as $relation) {
+134:    foreach (EtancheiteWorkspace::ABSENTES_PAR_CONSTRUCTION as $nom => $attendu) {
+151:test('les exclusions de la MIGRATION et celles des TESTS sont la même liste (une seule source de vérité)', function () {
+152:    $migration = EtancheiteWorkspace::exclusionsDeLaMigration();
+154:    // La migration exclut quatre noms. Les tests n'en excluent explicitement que
+167:        'La migration de durcissement exclut des tables dont les tests ne savent rien : '
+175:    foreach (array_keys(EtancheiteWorkspace::EXCLUSIONS_MOTIVEES) as $exclue) {
+176:        expect(in_array($exclue, $migration, true))->toBeTrue(
+177:            "Les tests excluent « {$exclue} » mais la migration la durcit : l'une des deux a tort.",
+192:        'GLOBAL_ROW_TABLES (migration) et LIGNES_GLOBALES (tests) ont divergé : '
+197:test('le semeur couvre TOUTES les tables scopées — aucune table nouvelle ne peut passer sans être semée', function () {
+229:test('SANS contexte workspace, AUCUNE table scopée ne rend la moindre ligne', function () {
+240:        foreach ($tables as $table) {
+250:        foreach ($tables as $table) {
+277:test('AVEC le contexte du workspace A, chaque table scopée ne rend QUE les lignes de A', function () {
+287:        foreach ($tables as $table) {
+323:test('toutes les tables scopées portent ENABLE + FORCE ROW LEVEL SECURITY', function () {
+326:    foreach (EtancheiteWorkspace::inventaireBrut(etancheiteOwner()) as $relation) {
+343:test('aucune policy ne rouvre un repli permissif — y compris sous la forme COALESCE', function () {
+351:           FROM pg_policies
+365:    foreach ($fautives as $policy) {
+399:test('DÉFAUT CONNU — email_verification_logs fuit SANS contexte (à corriger par une migration)', function () {
+420:            "SELECT policyname, qual FROM pg_policies
+437:test('TÉMOIN — la sonde « 0 ligne sans contexte » détecte réellement une barrière absente', function () {
+477:test('TÉMOIN — FORCE ROW LEVEL SECURITY change bien le comportement du PROPRIÉTAIRE', function () {
+525:test('health_practitioners : le commentaire de 2026_07_04 annonce une policy PERMISSIVE, le durcissement l’a bien rattrapée', function () {
+541:        "SELECT policyname, qual, with_check FROM pg_policies
+--- nb lignes ---
+566 backend/tests/Feature/EtancheiteParTableTest.php

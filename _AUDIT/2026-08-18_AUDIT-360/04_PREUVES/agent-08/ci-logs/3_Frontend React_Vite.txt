@@ -1,0 +1,408 @@
+﻿2026-08-19T09:42:45.6565468Z Current runner version: '2.336.0'
+2026-08-19T09:42:45.6591639Z ##[group]Runner Image Provisioner
+2026-08-19T09:42:45.6592723Z Hosted Compute Agent
+2026-08-19T09:42:45.6593378Z Version: 20260729.566
+2026-08-19T09:42:45.6594153Z Commit: cf7153fe6e25b664e8693c24944bf2b00355d109
+2026-08-19T09:42:45.6594965Z Build Date: 2026-07-29T19:17:02Z
+2026-08-19T09:42:45.6595701Z Worker ID: {d988d7b4-29da-4b0a-a521-6d50158a3b72}
+2026-08-19T09:42:45.6596544Z Azure Region: westus3
+2026-08-19T09:42:45.6597176Z ##[endgroup]
+2026-08-19T09:42:45.6599175Z ##[group]Operating System
+2026-08-19T09:42:45.6599880Z Ubuntu
+2026-08-19T09:42:45.6600436Z 24.04.4
+2026-08-19T09:42:45.6601099Z LTS
+2026-08-19T09:42:45.6602038Z ##[endgroup]
+2026-08-19T09:42:45.6602622Z ##[group]Runner Image
+2026-08-19T09:42:45.6603357Z Image: ubuntu-24.04
+2026-08-19T09:42:45.6603949Z Version: 20260810.271.1
+2026-08-19T09:42:45.6605337Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260810.271/images/ubuntu/Ubuntu2404-Readme.md
+2026-08-19T09:42:45.6606909Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260810.271
+2026-08-19T09:42:45.6608032Z ##[endgroup]
+2026-08-19T09:42:45.6609306Z ##[group]GITHUB_TOKEN Permissions
+2026-08-19T09:42:45.6611869Z Contents: read
+2026-08-19T09:42:45.6612515Z Metadata: read
+2026-08-19T09:42:45.6613173Z Packages: read
+2026-08-19T09:42:45.6613828Z ##[endgroup]
+2026-08-19T09:42:45.6615973Z Secret source: Actions
+2026-08-19T09:42:45.6617187Z Prepare workflow directory
+2026-08-19T09:42:45.6989743Z Prepare all required actions
+2026-08-19T09:42:45.7044907Z Getting action download info
+2026-08-19T09:42:46.0572083Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-08-19T09:42:46.2093552Z Download action repository 'pnpm/action-setup@v4' (SHA:b906affcce14559ad1aafd4ab0e942779e9f58b1)
+2026-08-19T09:42:47.1742167Z Download action repository 'actions/setup-node@v7' (SHA:820762786026740c76f36085b0efc47a31fe5020)
+2026-08-19T09:42:47.3676386Z Complete job name: Frontend React/Vite
+2026-08-19T09:42:47.4541696Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-19T09:42:47.4550797Z ##[group]Run actions/checkout@v4
+2026-08-19T09:42:47.4551886Z with:
+2026-08-19T09:42:47.4552402Z   repository: will383842/axion-crm-pro
+2026-08-19T09:42:47.4557204Z   token: ***
+2026-08-19T09:42:47.4557726Z   ssh-strict: true
+2026-08-19T09:42:47.4558204Z   ssh-user: git
+2026-08-19T09:42:47.4558678Z   persist-credentials: true
+2026-08-19T09:42:47.4559202Z   clean: true
+2026-08-19T09:42:47.4559679Z   sparse-checkout-cone-mode: true
+2026-08-19T09:42:47.4560235Z   fetch-depth: 1
+2026-08-19T09:42:47.4560694Z   fetch-tags: false
+2026-08-19T09:42:47.4561356Z   show-progress: true
+2026-08-19T09:42:47.4561896Z   lfs: false
+2026-08-19T09:42:47.4562375Z   submodules: false
+2026-08-19T09:42:47.4562860Z   set-safe-directory: true
+2026-08-19T09:42:47.4563402Z   allow-unsafe-pr-checkout: false
+2026-08-19T09:42:47.4564332Z ##[endgroup]
+2026-08-19T09:42:47.5624412Z Syncing repository: will383842/axion-crm-pro
+2026-08-19T09:42:47.5628099Z ##[group]Getting Git version info
+2026-08-19T09:42:47.5629941Z Working directory is '/home/runner/work/axion-crm-pro/axion-crm-pro'
+2026-08-19T09:42:47.5632465Z [command]/usr/bin/git version
+2026-08-19T09:42:47.5717181Z git version 2.54.0
+2026-08-19T09:42:47.5745501Z ##[endgroup]
+2026-08-19T09:42:47.5762870Z Temporarily overriding HOME='/home/runner/work/_temp/cd22922b-1328-4552-ba95-214925c1ded7' before making global git config changes
+2026-08-19T09:42:47.5765945Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-19T09:42:47.5770426Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/axion-crm-pro/axion-crm-pro
+2026-08-19T09:42:47.5826462Z Deleting the contents of '/home/runner/work/axion-crm-pro/axion-crm-pro'
+2026-08-19T09:42:47.5830822Z ##[group]Initializing the repository
+2026-08-19T09:42:47.5836498Z [command]/usr/bin/git init /home/runner/work/axion-crm-pro/axion-crm-pro
+2026-08-19T09:42:47.5959663Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-08-19T09:42:47.5962247Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-08-19T09:42:47.5964561Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-08-19T09:42:47.5966507Z hint: call:
+2026-08-19T09:42:47.5967411Z hint:
+2026-08-19T09:42:47.5968538Z hint: 	git config --global init.defaultBranch <name>
+2026-08-19T09:42:47.5969964Z hint:
+2026-08-19T09:42:47.5971453Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-08-19T09:42:47.5973516Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-08-19T09:42:47.5975240Z hint:
+2026-08-19T09:42:47.5976210Z hint: 	git branch -m <name>
+2026-08-19T09:42:47.5977398Z hint:
+2026-08-19T09:42:47.5978863Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-08-19T09:42:47.5980873Z Initialized empty Git repository in /home/runner/work/axion-crm-pro/axion-crm-pro/.git/
+2026-08-19T09:42:47.5984164Z [command]/usr/bin/git remote add origin https://github.com/will383842/axion-crm-pro
+2026-08-19T09:42:47.6032850Z ##[endgroup]
+2026-08-19T09:42:47.6033965Z ##[group]Disabling automatic garbage collection
+2026-08-19T09:42:47.6036579Z [command]/usr/bin/git config --local gc.auto 0
+2026-08-19T09:42:47.6068624Z ##[endgroup]
+2026-08-19T09:42:47.6069657Z ##[group]Setting up auth
+2026-08-19T09:42:47.6076878Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-08-19T09:42:47.6114363Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-08-19T09:42:47.6502188Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-19T09:42:47.6544197Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-08-19T09:42:47.6787026Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-19T09:42:47.6823480Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-08-19T09:42:47.7059172Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-08-19T09:42:47.7100806Z ##[endgroup]
+2026-08-19T09:42:47.7103314Z ##[group]Fetching the repository
+2026-08-19T09:42:47.7113391Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +a3369040168b75612b1e3882adecd13d49fde737:refs/remotes/pull/188/merge
+2026-08-19T09:42:49.5563477Z From https://github.com/will383842/axion-crm-pro
+2026-08-19T09:42:49.5566384Z  * [new ref]         a3369040168b75612b1e3882adecd13d49fde737 -> pull/188/merge
+2026-08-19T09:42:49.5604544Z ##[endgroup]
+2026-08-19T09:42:49.5607079Z ##[group]Determining the checkout info
+2026-08-19T09:42:49.5609675Z ##[endgroup]
+2026-08-19T09:42:49.5614226Z [command]/usr/bin/git sparse-checkout disable
+2026-08-19T09:42:49.5664558Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-08-19T09:42:49.5705669Z ##[group]Checking out the ref
+2026-08-19T09:42:49.5709072Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/188/merge
+2026-08-19T09:42:49.7001660Z Note: switching to 'refs/remotes/pull/188/merge'.
+2026-08-19T09:42:49.7003259Z 
+2026-08-19T09:42:49.7004604Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-08-19T09:42:49.7007648Z changes and commit them, and you can discard any commits you make in this
+2026-08-19T09:42:49.7010413Z state without impacting any branches by switching back to a branch.
+2026-08-19T09:42:49.7012041Z 
+2026-08-19T09:42:49.7013353Z If you want to create a new branch to retain commits you create, you may
+2026-08-19T09:42:49.7015505Z do so (now or later) by using -c with the switch command. Example:
+2026-08-19T09:42:49.7016464Z 
+2026-08-19T09:42:49.7017019Z   git switch -c <new-branch-name>
+2026-08-19T09:42:49.7017845Z 
+2026-08-19T09:42:49.7018574Z Or undo this operation with:
+2026-08-19T09:42:49.7019440Z 
+2026-08-19T09:42:49.7020121Z   git switch -
+2026-08-19T09:42:49.7020801Z 
+2026-08-19T09:42:49.7022301Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-08-19T09:42:49.7023711Z 
+2026-08-19T09:42:49.7025303Z HEAD is now at a336904 Merge bb60473dce8b29de40c94781c3a30ebf11224d1e into b53338cd6ba50d7f9e18557e2a725a5f00fe15db
+2026-08-19T09:42:49.7030707Z ##[endgroup]
+2026-08-19T09:42:49.7064398Z [command]/usr/bin/git log -1 --format=%H
+2026-08-19T09:42:49.7091716Z a3369040168b75612b1e3882adecd13d49fde737
+2026-08-19T09:42:49.7520360Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-19T09:42:49.7526665Z ##[group]Run pnpm/action-setup@v4
+2026-08-19T09:42:49.7527838Z with:
+2026-08-19T09:42:49.7528674Z   version: 9
+2026-08-19T09:42:49.7529574Z   dest: ~/setup-pnpm
+2026-08-19T09:42:49.7530543Z   run_install: null
+2026-08-19T09:42:49.7531713Z   cache: false
+2026-08-19T09:42:49.7532732Z   cache_dependency_path: pnpm-lock.yaml
+2026-08-19T09:42:49.7534055Z   package_json_file: package.json
+2026-08-19T09:42:49.7535215Z   standalone: false
+2026-08-19T09:42:49.7536139Z ##[endgroup]
+2026-08-19T09:42:49.9008669Z ##[group]Running self-installer...
+2026-08-19T09:42:50.3025950Z (node:2228) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-08-19T09:42:50.3029833Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-08-19T09:42:50.4948651Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-08-19T09:42:50.5066565Z Packages: +1
+2026-08-19T09:42:50.5067204Z +
+2026-08-19T09:42:50.9195407Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-08-19T09:42:50.9464887Z 
+2026-08-19T09:42:50.9465330Z dependencies:
+2026-08-19T09:42:50.9465842Z + pnpm 9.15.9 (11.22.0 is available)
+2026-08-19T09:42:50.9466185Z 
+2026-08-19T09:42:50.9501139Z Done in 877ms
+2026-08-19T09:42:50.9729928Z ##[endgroup]
+2026-08-19T09:42:50.9730350Z Installation Completed!
+2026-08-19T09:42:50.9911551Z ##[group]Run actions/setup-node@v7
+2026-08-19T09:42:50.9911870Z with:
+2026-08-19T09:42:50.9912092Z   node-version: 22
+2026-08-19T09:42:50.9912293Z   cache: pnpm
+2026-08-19T09:42:50.9912539Z   cache-dependency-path: frontend/pnpm-lock.yaml
+2026-08-19T09:42:50.9912853Z   check-latest: false
+2026-08-19T09:42:50.9915158Z   token: ***
+2026-08-19T09:42:50.9915376Z   package-manager-cache: true
+2026-08-19T09:42:50.9915612Z env:
+2026-08-19T09:42:50.9915858Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-19T09:42:50.9916408Z ##[endgroup]
+2026-08-19T09:42:51.1216670Z Found in cache @ /opt/hostedtoolcache/node/22.23.2/x64
+2026-08-19T09:42:51.1220113Z ##[group]Environment details
+2026-08-19T09:42:51.5507956Z node: v22.23.2
+2026-08-19T09:42:51.5508340Z npm: 10.9.8
+2026-08-19T09:42:51.5508561Z yarn: 1.22.22
+2026-08-19T09:42:51.5509535Z ##[endgroup]
+2026-08-19T09:42:51.5530603Z [command]/home/runner/setup-pnpm/node_modules/.bin/pnpm store path --silent
+2026-08-19T09:42:51.9533576Z /home/runner/setup-pnpm/node_modules/.bin/store/v3
+2026-08-19T09:42:52.2070216Z Cache hit for: node-cache-Linux-x64-pnpm-fa729912166847d648035c584b896ce970c873080f2d96dd74e499e47d580061
+2026-08-19T09:42:53.4682663Z Received 8388608 of 115177387 (7.3%), 8.0 MBs/sec
+2026-08-19T09:42:54.2650407Z Received 115177387 of 115177387 (100.0%), 61.1 MBs/sec
+2026-08-19T09:42:54.2652260Z Cache Size: ~110 MB (115177387 B)
+2026-08-19T09:42:54.2711551Z [command]/usr/bin/tar -xf /home/runner/work/_temp/61a10687-f968-4c4b-b325-a898c31982b7/cache.tzst -P -C /home/runner/work/axion-crm-pro/axion-crm-pro --use-compress-program unzstd
+2026-08-19T09:42:55.8549157Z Cache restored successfully
+2026-08-19T09:42:55.8607220Z Cache restored from key: node-cache-Linux-x64-pnpm-fa729912166847d648035c584b896ce970c873080f2d96dd74e499e47d580061
+2026-08-19T09:42:55.8806754Z ##[group]Run pnpm install --frozen-lockfile
+2026-08-19T09:42:55.8807152Z [36;1mpnpm install --frozen-lockfile[0m
+2026-08-19T09:42:55.8884799Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:42:55.8885074Z env:
+2026-08-19T09:42:55.8885340Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-19T09:42:55.8885692Z ##[endgroup]
+2026-08-19T09:42:56.3404640Z Lockfile is up to date, resolution step is skipped
+2026-08-19T09:42:56.4043690Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-08-19T09:42:56.5289517Z Packages: +600
+2026-08-19T09:42:56.5290129Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-08-19T09:42:57.4058890Z Progress: resolved 600, reused 600, downloaded 0, added 162
+2026-08-19T09:42:57.6945893Z Progress: resolved 600, reused 600, downloaded 0, added 600, done
+2026-08-19T09:42:58.1450384Z 
+2026-08-19T09:42:58.1451057Z dependencies:
+2026-08-19T09:42:58.1451887Z + @hookform/resolvers 3.10.0
+2026-08-19T09:42:58.1452531Z + @sentry/react 8.55.2
+2026-08-19T09:42:58.1453102Z + @tanstack/react-query 5.101.4
+2026-08-19T09:42:58.1453786Z + @tanstack/react-query-devtools 5.101.4
+2026-08-19T09:42:58.1454453Z + @tanstack/react-router 1.170.27
+2026-08-19T09:42:58.1455083Z + @tanstack/react-table 8.21.3
+2026-08-19T09:42:58.1455663Z + @tanstack/react-virtual 3.14.9
+2026-08-19T09:42:58.1456174Z + axios 1.16.1
+2026-08-19T09:42:58.1456702Z + class-variance-authority 0.7.1
+2026-08-19T09:42:58.1457184Z + clsx 2.1.1
+2026-08-19T09:42:58.1457569Z + cmdk 1.1.1
+2026-08-19T09:42:58.1457950Z + date-fns 4.2.0
+2026-08-19T09:42:58.1458350Z + i18next 26.3.6
+2026-08-19T09:42:58.1458882Z + i18next-browser-languagedetector 8.2.1
+2026-08-19T09:42:58.1459464Z + laravel-echo 1.19.0
+2026-08-19T09:42:58.1459899Z + lucide-react 0.460.0
+2026-08-19T09:42:58.1460325Z + maplibre-gl 4.7.1
+2026-08-19T09:42:58.1460730Z + pusher-js 8.5.0
+2026-08-19T09:42:58.1461075Z + react 19.2.8
+2026-08-19T09:42:58.1461919Z + react-dom 19.2.8
+2026-08-19T09:42:58.1462339Z + react-hook-form 7.76.0
+2026-08-19T09:42:58.1462766Z + react-i18next 15.7.4
+2026-08-19T09:42:58.1463182Z + react-joyride 2.9.3
+2026-08-19T09:42:58.1463543Z + sonner 2.0.8
+2026-08-19T09:42:58.1463906Z + tailwind-merge 3.6.0
+2026-08-19T09:42:58.1464262Z + zod 4.4.3
+2026-08-19T09:42:58.1464710Z + zustand 5.0.15
+2026-08-19T09:42:58.1464973Z 
+2026-08-19T09:42:58.1465157Z devDependencies:
+2026-08-19T09:42:58.1465636Z + @axe-core/playwright 4.11.3
+2026-08-19T09:42:58.1465972Z + @playwright/test 1.60.0
+2026-08-19T09:42:58.1466248Z + @sentry/cli 2.58.5
+2026-08-19T09:42:58.1466489Z + @tailwindcss/vite 4.3.3
+2026-08-19T09:42:58.1466749Z + @testing-library/dom 10.4.1
+2026-08-19T09:42:58.1467044Z + @testing-library/jest-dom 6.9.1
+2026-08-19T09:42:58.1467359Z + @testing-library/react 16.3.2
+2026-08-19T09:42:58.1467666Z + @testing-library/user-event 14.6.1
+2026-08-19T09:42:58.1467950Z + @types/node 22.19.19
+2026-08-19T09:42:58.1468184Z + @types/react 19.2.18
+2026-08-19T09:42:58.1468417Z + @types/react-dom 19.2.4
+2026-08-19T09:42:58.1468700Z + @vitejs/plugin-react-swc 4.3.3
+2026-08-19T09:42:58.1468975Z + @vitest/coverage-v8 2.1.9
+2026-08-19T09:42:58.1469218Z + eslint 9.39.4
+2026-08-19T09:42:58.1469468Z + eslint-plugin-jsx-a11y 6.10.2
+2026-08-19T09:42:58.1469745Z + eslint-plugin-react 7.37.5
+2026-08-19T09:42:58.1470042Z + eslint-plugin-react-hooks 5.2.0
+2026-08-19T09:42:58.1470543Z + jsdom 25.0.1
+2026-08-19T09:42:58.1470753Z + msw 2.14.6
+2026-08-19T09:42:58.1470945Z + prettier 3.8.3
+2026-08-19T09:42:58.1471451Z + tailwindcss 4.3.0
+2026-08-19T09:42:58.1471782Z + typescript 5.9.3
+2026-08-19T09:42:58.1472023Z + typescript-eslint 8.59.3
+2026-08-19T09:42:58.1472266Z + vite 6.4.2
+2026-08-19T09:42:58.1472456Z + vitest 2.1.9
+2026-08-19T09:42:58.1472570Z 
+2026-08-19T09:42:58.1817955Z Done in 2.2s using pnpm v9.15.9
+2026-08-19T09:42:58.2012766Z ##[group]Run pnpm typecheck
+2026-08-19T09:42:58.2013087Z [36;1mpnpm typecheck[0m
+2026-08-19T09:42:58.2049882Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:42:58.2050132Z env:
+2026-08-19T09:42:58.2050388Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-19T09:42:58.2050710Z ##[endgroup]
+2026-08-19T09:42:58.6031504Z 
+2026-08-19T09:42:58.6033368Z > @axion-ia/axion-crm-pro-frontend@0.1.0 typecheck /home/runner/work/axion-crm-pro/axion-crm-pro/frontend
+2026-08-19T09:42:58.6034282Z > tsc --noEmit
+2026-08-19T09:42:58.6034478Z 
+2026-08-19T09:43:06.9523491Z ##[group]Run pnpm lint
+2026-08-19T09:43:06.9523918Z [36;1mpnpm lint[0m
+2026-08-19T09:43:06.9572243Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:43:06.9572634Z env:
+2026-08-19T09:43:06.9573028Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-19T09:43:06.9573549Z ##[endgroup]
+2026-08-19T09:43:07.3576288Z 
+2026-08-19T09:43:07.3577235Z > @axion-ia/axion-crm-pro-frontend@0.1.0 lint /home/runner/work/axion-crm-pro/axion-crm-pro/frontend
+2026-08-19T09:43:07.3578110Z > eslint . --max-warnings 0
+2026-08-19T09:43:07.3578409Z 
+2026-08-19T09:43:19.7876825Z ##[group]Run pnpm test
+2026-08-19T09:43:19.7877106Z [36;1mpnpm test[0m
+2026-08-19T09:43:19.7914287Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:43:19.7914544Z env:
+2026-08-19T09:43:19.7914805Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-19T09:43:19.7915121Z ##[endgroup]
+2026-08-19T09:43:20.1848862Z 
+2026-08-19T09:43:20.1849853Z > @axion-ia/axion-crm-pro-frontend@0.1.0 test /home/runner/work/axion-crm-pro/axion-crm-pro/frontend
+2026-08-19T09:43:20.1850617Z > vitest run
+2026-08-19T09:43:20.1850782Z 
+2026-08-19T09:43:20.5049541Z 
+2026-08-19T09:43:20.5074005Z [1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90m/home/runner/work/axion-crm-pro/axion-crm-pro/frontend[39m
+2026-08-19T09:43:20.5091899Z 
+2026-08-19T09:43:23.6253478Z  [32m✓[39m tests/screens/ContactsHubPage.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 811[2mms[22m[39m
+2026-08-19T09:43:23.6269737Z    [33m[2m✓[22m[39m ContactsHubPage — rendu[2m > [22maffiche les compteurs, les onglets de type et la première page de fiches [33m384[2mms[22m[39m
+2026-08-19T09:43:24.2567642Z  [32m✓[39m tests/screens/DashboardPage.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 1398[2mms[22m[39m
+2026-08-19T09:43:24.2569792Z    [33m[2m✓[22m[39m DashboardPage — rendu[2m > [22maffiche les quatre indicateurs, la couverture et l’activité récente [33m411[2mms[22m[39m
+2026-08-19T09:43:24.2572599Z    [33m[2m✓[22m[39m DashboardPage — parcours[2m > [22m🔴 changer de période ne déclenche AUCUNE requête (clé de cache sans `period`) [33m432[2mms[22m[39m
+2026-08-19T09:43:25.5938579Z  [32m✓[39m tests/screens/PersonTimelinePage.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 426[2mms[22m[39m
+2026-08-19T09:43:26.2614443Z [90mstderr[2m | tests/screens/CompanyDetailPage.test.tsx[2m > [22m[2mCompanyDetailPage — rendu[2m > [22m[2mcharge la fiche de l’entreprise DE L’URL et affiche son identité légale
+2026-08-19T09:43:26.2616690Z [22m[39mIn HTML, <button> cannot be a descendant of <button>.
+2026-08-19T09:43:26.2617474Z This will cause a hydration error.
+2026-08-19T09:43:26.2617832Z 
+2026-08-19T09:43:26.2617992Z   ...
+2026-08-19T09:43:26.2618524Z     <MatchView router={{...}} match={{id:"/layou...", ...}}>
+2026-08-19T09:43:26.2619131Z       <SafeFragment>
+2026-08-19T09:43:26.2619619Z         <SafeFragment fallback={null}>
+2026-08-19T09:43:26.2620711Z           <CatchBoundary getResetKey={function getResetKey} errorComponent={function defaultErrorComponent} ...>
+2026-08-19T09:43:26.2623236Z             <CatchBoundaryImpl getResetKey={function getResetKey} errorComponent={function defaultErrorComponent} ...>
+2026-08-19T09:43:26.2624420Z               <SafeFragment fallback={function fallback}>
+2026-08-19T09:43:26.2625171Z                 <MatchInnerImpl match={{id:"/layou...", ...}}>
+2026-08-19T09:43:26.2625783Z                   <component>
+2026-08-19T09:43:26.2626301Z                     <CompanyDetailPage>
+2026-08-19T09:43:26.2626921Z                       <div className="px-6 py-6">
+2026-08-19T09:43:26.2627533Z                         <Breadcrumbs>
+2026-08-19T09:43:26.2628329Z                         <header className="mb-6 flex ...">
+2026-08-19T09:43:26.2628907Z                           <div>
+2026-08-19T09:43:26.2629449Z                           <div className="flex items...">
+2026-08-19T09:43:26.2630032Z                             <Button>
+2026-08-19T09:43:26.2630555Z                             <Button>
+2026-08-19T09:43:26.2631761Z                             <DropdownMenu align="right" trigger={<ForwardRef(IconButton)>} items={[...]}>
+2026-08-19T09:43:26.2632840Z                               <div ref={{current:null}} className="relative i...">
+2026-08-19T09:43:26.2633613Z >                               <button
+2026-08-19T09:43:26.2634224Z >                                 type="button"
+2026-08-19T09:43:26.2634946Z >                                 onClick={function onClick}
+2026-08-19T09:43:26.2635650Z >                                 aria-haspopup="menu"
+2026-08-19T09:43:26.2636760Z >                                 aria-expanded={false}
+2026-08-19T09:43:26.2637432Z >                                 className="inline-flex"
+2026-08-19T09:43:26.2637954Z >                               >
+2026-08-19T09:43:26.2638693Z                                   <IconButton label={"Plus d'a..."} variant="outline" size="md">
+2026-08-19T09:43:26.2639490Z >                                   <button
+2026-08-19T09:43:26.2640108Z >                                     ref={null}
+2026-08-19T09:43:26.2640849Z >                                     aria-label={"Plus d'actions"}
+2026-08-19T09:43:26.2641977Z >                                     title={"Plus d'actions"}
+2026-08-19T09:43:26.2643156Z >                                     className="inline-flex items-center justify-center rounded-lg transition-[transf..."
+2026-08-19T09:43:26.2644141Z >                                   >
+2026-08-19T09:43:26.2644600Z                         ...
+2026-08-19T09:43:26.2644851Z 
+2026-08-19T09:43:26.2645148Z <button> cannot contain a nested <button>.
+2026-08-19T09:43:26.2645796Z See this log for the ancestor stack trace.
+2026-08-19T09:43:26.2646173Z 
+2026-08-19T09:43:26.9627448Z  [32m✓[39m tests/screens/CompanyDetailPage.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 990[2mms[22m[39m
+2026-08-19T09:43:26.9630104Z    [33m[2m✓[22m[39m CompanyDetailPage — rendu[2m > [22mcharge la fiche de l’entreprise DE L’URL et affiche son identité légale [33m341[2mms[22m[39m
+2026-08-19T09:43:27.5443692Z  [32m✓[39m tests/screens/AudienceBuilderPage.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 4747[2mms[22m[39m
+2026-08-19T09:43:27.5457397Z    [33m[2m✓[22m[39m AudienceBuilderPage — rendu[2m > [22maffiche les cinq blocs de critères, et la création est VERROUILLÉE à l’arrivée [33m522[2mms[22m[39m
+2026-08-19T09:43:27.5474008Z    [33m[2m✓[22m[39m AudienceBuilderPage — parcours[2m > [22mcliquer un département et cocher « a un email » construit les CRITÈRES envoyés à l’aperçu [33m884[2mms[22m[39m
+2026-08-19T09:43:27.5476973Z    [33m[2m✓[22m[39m AudienceBuilderPage — parcours[2m > [22mre-cliquer un département le RETIRE — la puce est une bascule, pas un ajout [33m1409[2mms[22m[39m
+2026-08-19T09:43:27.5488638Z    [33m[2m✓[22m[39m AudienceBuilderPage — parcours[2m > [22mnommer puis créer POSTe l’audience et ATTERRIT sur sa fiche [33m870[2mms[22m[39m
+2026-08-19T09:43:27.5491824Z    [33m[2m✓[22m[39m AudienceBuilderPage — parcours[2m > [22maperçu en échec : l’écran affiche le message du serveur, jamais un compte faux [33m726[2mms[22m[39m
+2026-08-19T09:43:29.0069278Z  [32m✓[39m tests/components/ContactsHubPage.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 467[2mms[22m[39m
+2026-08-19T09:43:29.1107661Z  [32m✓[39m tests/screens/LoginPage.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 1450[2mms[22m[39m
+2026-08-19T09:43:29.1109427Z    [33m[2m✓[22m[39m LoginPage — parcours[2m > [22msaisir puis soumettre POSTe les identifiants et ATTERRIT sur le tableau de bord [33m473[2mms[22m[39m
+2026-08-19T09:43:29.1110596Z    [33m[2m✓[22m[39m LoginPage — parcours[2m > [22maiguille vers /2fa quand le compte exige un second facteur [33m338[2mms[22m[39m
+2026-08-19T09:43:29.9653900Z  [32m✓[39m tests/components/SidebarAccordeon.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 714[2mms[22m[39m
+2026-08-19T09:43:30.9153439Z  [32m✓[39m tests/components/ConsoleGate.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[90m 146[2mms[22m[39m
+2026-08-19T09:43:31.1019703Z  [32m✓[39m tests/lib/msw-contract.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 147[2mms[22m[39m
+2026-08-19T09:43:31.4913358Z  [32m✓[39m tests/lib/echo.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 27[2mms[22m[39m
+2026-08-19T09:43:32.6254708Z  [32m✓[39m tests/components/DarkModeToggle.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[90m 230[2mms[22m[39m
+2026-08-19T09:43:32.8744047Z  [32m✓[39m tests/components/crmConsoleTypes.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 15[2mms[22m[39m
+2026-08-19T09:43:32.9387137Z  [32m✓[39m tests/components/FormField.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[90m 204[2mms[22m[39m
+2026-08-19T09:43:34.0503366Z  [32m✓[39m tests/components/SizeCategoryBadge.extended.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[90m 82[2mms[22m[39m
+2026-08-19T09:43:34.3783187Z  [32m✓[39m tests/lib/api.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 37[2mms[22m[39m
+2026-08-19T09:43:34.4459197Z  [32m✓[39m tests/components/Skeleton.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[90m 76[2mms[22m[39m
+2026-08-19T09:43:35.5523585Z  [32m✓[39m tests/components/QualityBadge.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[90m 81[2mms[22m[39m
+2026-08-19T09:43:35.9409266Z  [32m✓[39m tests/components/SizeCategoryBadge.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[90m 74[2mms[22m[39m
+2026-08-19T09:43:35.9747102Z  [32m✓[39m tests/components/EmptyState.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[90m 184[2mms[22m[39m
+2026-08-19T09:43:36.6529941Z  [32m✓[39m tests/smoke.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 5[2mms[22m[39m
+2026-08-19T09:43:36.6716308Z 
+2026-08-19T09:43:36.6729012Z [2m Test Files [22m [1m[32m21 passed[39m[22m[90m (21)[39m
+2026-08-19T09:43:36.6729947Z [2m      Tests [22m [1m[32m118 passed[39m[22m[90m (118)[39m
+2026-08-19T09:43:36.6742284Z [2m   Start at [22m 09:43:20
+2026-08-19T09:43:36.6750284Z [2m   Duration [22m 16.17s[2m (transform 907ms, setup 9.42s, collect 5.66s, tests 12.31s, environment 13.04s, prepare 2.30s)[22m
+2026-08-19T09:43:36.6751502Z 
+2026-08-19T09:43:36.7227293Z ##[group]Run pnpm build
+2026-08-19T09:43:36.7227580Z [36;1mpnpm build[0m
+2026-08-19T09:43:36.7265112Z shell: /usr/bin/bash -e {0}
+2026-08-19T09:43:36.7265367Z env:
+2026-08-19T09:43:36.7265629Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-19T09:43:36.7265990Z   VITE_API_BASE_URL: https://api.localhost
+2026-08-19T09:43:36.7266286Z ##[endgroup]
+2026-08-19T09:43:37.1202583Z 
+2026-08-19T09:43:37.1203748Z > @axion-ia/axion-crm-pro-frontend@0.1.0 build /home/runner/work/axion-crm-pro/axion-crm-pro/frontend
+2026-08-19T09:43:37.1204902Z > tsc --noEmit && vite build
+2026-08-19T09:43:37.1205220Z 
+2026-08-19T09:43:44.9540816Z [36mvite v6.4.2 [32mbuilding for production...[36m[39m
+2026-08-19T09:43:45.0297736Z transforming...
+2026-08-19T09:43:51.8013613Z [32m✓[39m 2285 modules transformed.
+2026-08-19T09:43:52.1576042Z rendering chunks...
+2026-08-19T09:43:52.8302023Z computing gzip size...
+2026-08-19T09:43:52.8915465Z [2mdist/[22m[32mindex.html                   [39m[1m[2m    1.05 kB[22m[1m[22m[2m │ gzip:   0.51 kB[22m
+2026-08-19T09:43:52.8917188Z [2mdist/[22m[2massets/[22m[35mindex-CUr7lyZ3.css    [39m[1m[2m  160.18 kB[22m[1m[22m[2m │ gzip:  22.61 kB[22m
+2026-08-19T09:43:52.8919234Z [2mdist/[22m[2massets/[22m[36mreact-DJ4PxdIq.js     [39m[1m[2m    3.94 kB[22m[1m[22m[2m │ gzip:   1.55 kB[22m[2m │ map:    13.03 kB[22m
+2026-08-19T09:43:52.8920332Z [33m
+2026-08-19T09:43:52.8921450Z (!) Some chunks are larger than 500 kB after minification. Consider:
+2026-08-19T09:43:52.8922268Z - Using dynamic import() to code-split the application
+2026-08-19T09:43:52.8923913Z - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+2026-08-19T09:43:52.8925181Z - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+2026-08-19T09:43:52.8927592Z [2mdist/[22m[2massets/[22m[36mrouter-Xihj9pMy.js    [39m[1m[2m   77.41 kB[22m[1m[22m[2m │ gzip:  27.21 kB[22m[2m │ map:   406.77 kB[22m
+2026-08-19T09:43:52.8930402Z [2mdist/[22m[2massets/[22m[36mquery-BBqhhbbe.js     [39m[1m[2m   87.49 kB[22m[1m[22m[2m │ gzip:  30.20 kB[22m[2m │ map:   395.08 kB[22m
+2026-08-19T09:43:52.8933166Z [2mdist/[22m[2massets/[22m[36mmaplibre-CaQzARel.js  [39m[1m[33m  802.72 kB[39m[22m[2m │ gzip: 217.79 kB[22m[2m │ map: 1,717.02 kB[22m
+2026-08-19T09:43:52.8935483Z [2mdist/[22m[2massets/[22m[36mindex-BLqgqVy2.js     [39m[1m[33m1,046.29 kB[39m[22m[2m │ gzip: 302.59 kB[22m[2m │ map: 4,174.07 kB[22m
+2026-08-19T09:43:52.8936574Z [32m✓ built in 7.91s[39m
+2026-08-19T09:43:53.0255659Z Post job cleanup.
+2026-08-19T09:43:53.1383561Z Cache hit occurred on the primary key node-cache-Linux-x64-pnpm-fa729912166847d648035c584b896ce970c873080f2d96dd74e499e47d580061, not saving cache.
+2026-08-19T09:43:53.1483020Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-19T09:43:53.1484326Z Post job cleanup.
+2026-08-19T09:43:53.2967913Z Pruning is unnecessary.
+2026-08-19T09:43:53.3183782Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-19T09:43:53.3185650Z Post job cleanup.
+2026-08-19T09:43:53.4097348Z [command]/usr/bin/git version
+2026-08-19T09:43:53.4141640Z git version 2.54.0
+2026-08-19T09:43:53.4186318Z Temporarily overriding HOME='/home/runner/work/_temp/1723d5a3-d45d-46cc-a773-50c669738650' before making global git config changes
+2026-08-19T09:43:53.4187867Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-19T09:43:53.4192633Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/axion-crm-pro/axion-crm-pro
+2026-08-19T09:43:53.4234769Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-08-19T09:43:53.4273245Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-08-19T09:43:53.4563562Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-19T09:43:53.4601940Z http.https://github.com/.extraheader
+2026-08-19T09:43:53.4618758Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-08-19T09:43:53.4667746Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-08-19T09:43:53.4978118Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-19T09:43:53.5040333Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-08-19T09:43:53.5484654Z Cleaning up orphan processes
+2026-08-19T09:43:53.5911662Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, pnpm/action-setup@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

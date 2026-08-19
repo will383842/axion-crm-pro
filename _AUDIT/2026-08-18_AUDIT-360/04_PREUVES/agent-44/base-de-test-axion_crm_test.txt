@@ -1,0 +1,75 @@
+# Base de test axion_crm_test — main e8924b8 — 2026-08-19T12:30:27+02:00
+
+## locales de toutes les bases
+        datname        | datcollate | datctype 
+-----------------------+------------+----------
+ a07_fresh             | C          | C
+ axion_crm             | C          | C
+ axion_crm_a           | C          | C
+ axion_crm_a06         | C          | C
+ axion_crm_a11         | C          | C
+ axion_crm_a18         | C          | C
+ axion_crm_a19         | C          | C
+ axion_crm_a35         | C          | C
+ axion_crm_a45         | C          | C
+ axion_crm_agent14     | C          | C
+ axion_crm_agent17     | C          | C
+ axion_crm_audit13     | C          | C
+ axion_crm_b           | C          | C
+ axion_crm_c           | C          | C
+ axion_crm_d           | C          | C
+ axion_crm_dr_a08      | C          | C
+ axion_crm_e           | C          | C
+ axion_crm_e2e         | C          | C
+ axion_crm_fresh       | C          | C
+ axion_crm_perf        | C          | C
+ axion_crm_perf4m      | C          | C
+ axion_crm_rgpd15      | C          | C
+ axion_crm_sh1         | C          | C
+ axion_crm_sh2         | C          | C
+ axion_crm_sh3         | C          | C
+ axion_crm_test        | C          | C
+ axion_crm_test_test_1 | C          | C
+ axion_crm_test_test_2 | C          | C
+ postgres              | C          | C
+ template0             | C          | C
+ template1             | C          | C
+(31 rows)
+
+## migrations appliquees dans axion_crm_test
+ migrations_appliquees 
+-----------------------
+                    58
+(1 row)
+
+                    migration                     
+--------------------------------------------------
+ 2026_08_19_000002_crm_activites_et_motifs
+ 2026_08_19_000001_companies_hub_counts_index
+ 2026_08_18_100001_partman_dans_son_propre_schema
+(3 rows)
+
+## migrations presentes dans le depot
+58
+## base de developpement axion_crm INTACTE apres les executions
+ tables_public 
+---------------
+           116
+(1 row)
+
+## pg_partman est-il hors de public ?
+  extname   |   schema   
+------------+------------
+ btree_gin  | public
+ btree_gist | public
+ citext     | public
+ pg_partman | partman
+ pg_trgm    | public
+ pgcrypto   | public
+ plpgsql    | pg_catalog
+ postgis    | public
+ unaccent   | public
+ uuid-ossp  | public
+ vector     | public
+(11 rows)
+

@@ -1,0 +1,13 @@
+=== tests isolation ===
+RlsTest.php
+--- contenu liste tables du test ---
+backend/tests/Feature/CompaniesExportTest.php:7: * `health_practitioners` existe-t-elle ? ») puis relu tout au fond de deux
+backend/tests/Feature/EtancheiteParTableTest.php:148:    expect($tables)->toContain('companies', 'contacts', 'tags', 'candidates', 'health_practitioners');
+backend/tests/Feature/EtancheiteParTableTest.php:522:// 5. LE CAS NOMMÉ : health_practitioners
+backend/tests/Feature/EtancheiteParTableTest.php:525:test('health_practitioners : le commentaire de 2026_07_04 annonce une policy PERMISSIVE, le durcissement l’a bien rattrapée', function () {
+backend/tests/Feature/EtancheiteParTableTest.php:526:    // La migration `2026_07_04_000001_create_health_practitioners` porte encore
+backend/tests/Feature/EtancheiteParTableTest.php:534:          WHERE oid = 'health_practitioners'::regclass",
+backend/tests/Feature/EtancheiteParTableTest.php:542:          WHERE schemaname = current_schema() AND tablename = 'health_practitioners'",
+backend/tests/Feature/EtancheiteParTableTest.php:548:        ->and($policies[0]->policyname)->toBe('health_practitioners_workspace_isolation')
+backend/tests/Feature/EtancheiteParTableTest.php:558:        expect(etancheiteApp()->table('health_practitioners')->count())->toBe(0);
+backend/tests/Feature/EtancheiteParTableTest.php:561:        $vus = etancheiteApp()->table('health_practitioners')->pluck('workspace_id')->all();

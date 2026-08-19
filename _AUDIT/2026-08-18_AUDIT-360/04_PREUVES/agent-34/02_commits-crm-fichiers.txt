@@ -1,0 +1,127 @@
+=== 90d429bc ===
+feat(L2) : outbox de synchronisation site → Axion CRM Pro, 14 points de capture, tout inerte (#598)
+
+ .env.example                                       |  17 +
+--- fichiers ---
+.env.example
+prisma/migrations/20260814070000_crm_sync_outbox/migration.sql
+prisma/schema.prisma
+src/app/api/calendly/client-event/route.ts
+src/env.ts
+src/features/admin-calendly/actions.ts
+src/features/commercial-application/actions.ts
+src/features/job-application/actions.ts
+src/features/newsletter/actions.ts
+src/features/podcast-request/actions.ts
+src/features/review-submission/actions.ts
+src/features/roi-report/actions.ts
+src/features/unified-contact/actions.ts
+src/lib/careers/candidate-family.ts
+src/server/calendly/discover.ts
+src/server/chatbot/tools/capturer-lead.ts
+src/server/crm-sync/__tests__/crm-sync.test.ts
+src/server/crm-sync/config.ts
+src/server/crm-sync/emit.ts
+src/server/crm-sync/enqueue.ts
+src/server/crm-sync/index.ts
+src/server/crm-sync/types.ts
+src/server/queue/lib/sentry-worker.ts
+src/server/queue/queues.ts
+src/server/queue/worker.ts
+src/server/queue/workers/crm-sync-worker.ts
+=== a8e3d8aa ===
+test(crm-sync) : harnais E2E local site↔CRM + tests de contrat inter-dépôts (#601)
+
+ scripts/e2e-crm-sync/README.md         | 269 +++++++++++++++++++++++
+--- fichiers ---
+scripts/e2e-crm-sync/README.md
+scripts/e2e-crm-sync/mock-crm.ts
+scripts/e2e-crm-sync/run-loop-check.ts
+tests/e2e-crm-sync/contract.spec.ts
+vitest.config.ts
+=== 99ba93a0 ===
+feat(L4) : consentements v2, registre de preuve, mécanique vivier 30 j, RGPD bi-système (#602)
+
+ .../migration.sql                                  |  77 +++
+--- fichiers ---
+prisma/migrations/20260814120000_consents_v2_vivier_registre/migration.sql
+prisma/schema.prisma
+src/app/[locale]/carrieres/[slug]/postuler/page.tsx
+src/app/[locale]/vivier-opposition/page.tsx
+src/app/api/gdpr-erase/route.ts
+src/app/api/gdpr-export/route.ts
+src/app/api/vivier-opposition/route.ts
+src/components/forms/JobApplicationForm.tsx
+src/components/forms/commercial-application/steps.tsx
+src/components/forms/commercial-application/wizard-state.ts
+src/env.ts
+src/features/commercial-application/actions.ts
+src/features/job-application/actions.ts
+src/features/newsletter/actions.ts
+src/features/unified-contact/actions.ts
+src/i18n/routing.ts
+src/lib/commercial-application/model.ts
+src/lib/consents/__tests__/consents.test.ts
+src/lib/consents/index.ts
+src/lib/email/templates/index.tsx
+src/lib/email/templates/vivier-information.tsx
+src/server/crm-sync/gdpr.ts
+src/server/crm-sync/index.ts
+src/server/queue/lib/sentry-worker.ts
+src/server/queue/queues.ts
+src/server/queue/types.ts
+src/server/queue/worker.ts
+src/server/queue/workers/vivier-crons-worker.ts
+src/server/vivier/__tests__/vivier.test.ts
+src/server/vivier/config.ts
+src/server/vivier/opposition.ts
+src/server/vivier/stock.ts
+src/server/vivier/token.ts
+=== f51d544b ===
+feat(L5) : observabilité synchro CRM — carte console, alertes, réconciliation, webhook consentements entrant (#604)
+
+ .env.example                                       |   5 +
+--- fichiers ---
+.env.example
+prisma/migrations/20260814150000_crm_inbound_events/migration.sql
+prisma/schema.prisma
+src/app/[locale]/(admin)/[adminPrefix]/synchro-crm/_components/RejouerBouton.tsx
+src/app/[locale]/(admin)/[adminPrefix]/synchro-crm/page.tsx
+src/app/api/internal/crm-webhook/__tests__/route.test.ts
+src/app/api/internal/crm-webhook/route.ts
+src/lib/admin-nav-icons.ts
+src/lib/admin-nav.test.ts
+src/lib/admin-nav.ts
+src/server/actions/crm-sync/replay.ts
+src/server/crm-sync/__tests__/crm-sync-l5.test.ts
+src/server/crm-sync/__tests__/crm-sync.test.ts
+src/server/crm-sync/alerts.ts
+src/server/crm-sync/health.ts
+src/server/crm-sync/inbound.ts
+src/server/crm-sync/index.ts
+src/server/crm-sync/reconcile.ts
+src/server/notifications/__tests__/telegram-routing.test.ts
+src/server/notifications/format.ts
+src/server/notifications/routing.ts
+src/server/notifications/types.ts
+src/server/queue/queues.ts
+src/server/queue/workers/crm-sync-worker.ts
+=== d9795e8b ===
+feat(crm-sync): la réconciliation compare les CINQ familles de capture, pas deux (étape 0, ligne 12)
+
+ src/server/crm-sync/__tests__/crm-sync-l5.test.ts | 59 ++++++++++++++++++
+--- fichiers ---
+src/server/crm-sync/__tests__/crm-sync-l5.test.ts
+src/server/crm-sync/reconcile.ts
+=== 5142bc93 ===
+style(crm-sync): Prettier sur reconcile.ts et son test (Gate A)
+
+ src/server/crm-sync/__tests__/crm-sync-l5.test.ts | 10 +++++++---
+--- fichiers ---
+src/server/crm-sync/__tests__/crm-sync-l5.test.ts
+src/server/crm-sync/reconcile.ts
+=== 1dadc242 ===
+fix(crm-prealables): les 3 défauts du site + réconciliation sur les 5 familles — étape 0, lignes 12-13 (#735)
+
+ ...reception-unifiee-et-enrichissement-calendly.md |  33 ++
+--- fichiers ---

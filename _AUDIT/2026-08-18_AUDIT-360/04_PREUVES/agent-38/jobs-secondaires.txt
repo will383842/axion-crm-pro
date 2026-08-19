@@ -1,0 +1,106 @@
+=== surveillance-sauvegarde : jobs des runs ===
+-- run 32219428026 --
+   La sauvegarde d'hier soir a-t-elle eu lieu ? : success
+   Ouvrir une issue si la sauvegarde n'est pas fiable : skipped
+-- run 32102803274 --
+   La sauvegarde d'hier soir a-t-elle eu lieu ? : success
+   Ouvrir une issue si la sauvegarde n'est pas fiable : skipped
+-- run 31998225594 --
+   La sauvegarde d'hier soir a-t-elle eu lieu ? : success
+   Ouvrir une issue si la sauvegarde n'est pas fiable : skipped
+-- run 31987226385 --
+   La sauvegarde d'hier soir a-t-elle eu lieu ? : success
+   Ouvrir une issue si la sauvegarde n'est pas fiable : skipped
+-- run 31987194878 --
+   La sauvegarde d'hier soir a-t-elle eu lieu ? : failure
+   Ouvrir une issue si la sauvegarde n'est pas fiable : success
+-- run 31987144988 --
+   La sauvegarde d'hier soir a-t-elle eu lieu ? : failure
+   Ouvrir une issue si la sauvegarde n'est pas fiable : success
+
+=== prospection-collect-paris job finalize ===
+   Arrondissement 75111 : success
+   Arrondissement 75110 : success
+   Arrondissement 75106 : success
+   Arrondissement 75109 : success
+   Arrondissement 75107 : success
+   Arrondissement 75102 : success
+   Arrondissement 75105 : success
+   Arrondissement 75101 : success
+   Arrondissement 75103 : success
+   Arrondissement 75104 : success
+   Arrondissement 75108 : success
+   Arrondissement 75112 : success
+   Arrondissement 75113 : success
+   Arrondissement 75114 : success
+   Arrondissement 75117 : success
+   Arrondissement 75115 : success
+   Arrondissement 75116 : success
+   Arrondissement 75120 : success
+   Arrondissement 75119 : success
+   Arrondissement 75118 : success
+   Coverage + stats : success
+
+=== prospection-find-websites (307779943) jobs ===
+   prepare : success
+   find (02) : success
+   find (04) : success
+   find (08) : success
+   find (09) : success
+   find (03) : failure
+   find (01) : failure
+   find (05) : success
+   find (11) : failure
+   find (06) : failure
+   find (07) : failure
+   find (19) : failure
+   find (18) : failure
+   find (16) : failure
+   find (17) : failure
+   find (14) : failure
+   find (10) : success
+   find (12) : failure
+   find (15) : failure
+   find (13) : failure
+   find (21) : failure
+   find (22) : failure
+   find (23) : failure
+   find (27) : failure
+   find (24) : failure
+   find (29) : failure
+   find (25) : failure
+   find (28) : failure
+   find (26) : failure
+   find (2A) : failure
+
+=== prospection-collect-region (307266265) jobs ===
+   Collecte 63 : success
+   Collecte 43 : success
+   Collecte 03 : success
+   Collecte 69 : success
+   Collecte 73 : success
+   Collecte 74 : success
+   Collecte 01 : success
+   Collecte 07 : success
+   Collecte 15 : success
+   Collecte 42 : success
+   Collecte 26 : success
+   Collecte 78 : success
+   Collecte 77 : success
+   Collecte 75 : failure
+   Collecte 94 : success
+   Collecte 92 : success
+   Collecte 21 : success
+   Collecte 91 : success
+   Collecte 25 : success
+   Collecte 93 : success
+   Collecte 95 : success
+   Collecte 39 : success
+   Collecte 58 : success
+   Collecte 70 : success
+   Collecte 71 : success
+   Collecte 89 : success
+   Collecte 90 : success
+   Collecte 29 : success
+   Collecte 35 : success
+   Collecte 22 : success

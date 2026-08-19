@@ -1,0 +1,31 @@
+=== gate CI sur la baseline ===
+9:# démarrait même pas — phpstan.neon contenait deux clés supprimées en PHPStan 2).
+17:#   - PHPStan niveau 8 : baseline `backend/phpstan-baseline.neon` (datée, note
+18:#     en tête du fichier) — le NOUVEAU code doit être propre, la baseline ne
+278:      - name: PHPStan niveau 8 (BLOQUANT — baseline figée)
+          # utiles sont de toute façon écrasées par phpunit.xml et par l'env du
+          # job (l'env réel a la priorité sur le fichier).
+          cp .env.example backend/.env
+
+      - name: Install (BLOQUANT)
+        working-directory: backend
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: PHPStan niveau 8 (BLOQUANT — baseline figée)
+        working-directory: backend
+        run: composer analyse
+
+      - name: Pint — format des fichiers PHP modifiés (BLOQUANT)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          base="${BASE_SHA:-}"
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            base="$(git rev-parse HEAD^ 2>/dev/null || true)"
+          fi
+          if [ -z "$base" ]; then
+            echo "Aucune base de comparaison disponible — rien à contrôler."
+            exit 0
+          fi

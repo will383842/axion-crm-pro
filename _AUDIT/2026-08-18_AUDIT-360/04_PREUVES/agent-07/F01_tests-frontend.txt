@@ -1,0 +1,50 @@
+=== F1 : tests DANS frontend/src ===
+0
+=== tests dans frontend/tests ===
+frontend/tests/components/ConsoleGate.test.tsx
+frontend/tests/components/ContactsHubPage.test.tsx
+frontend/tests/components/crmConsoleTypes.test.ts
+frontend/tests/components/DarkModeToggle.test.tsx
+frontend/tests/components/EmptyState.test.tsx
+frontend/tests/components/FormField.test.tsx
+frontend/tests/components/QualityBadge.test.tsx
+frontend/tests/components/SidebarAccordeon.test.tsx
+frontend/tests/components/SizeCategoryBadge.extended.test.tsx
+frontend/tests/components/SizeCategoryBadge.test.tsx
+frontend/tests/components/Skeleton.test.tsx
+frontend/tests/e2e/a11y.spec.ts
+frontend/tests/e2e/audiences-builder.spec.ts
+frontend/tests/e2e/auth.spec.ts
+frontend/tests/e2e/campaigns-wizard.spec.ts
+frontend/tests/e2e/companies.spec.ts
+frontend/tests/e2e/console-locale.spec.ts
+frontend/tests/e2e/coverage.spec.ts
+frontend/tests/e2e/dark-mode.spec.ts
+frontend/tests/e2e/dashboard.spec.ts
+frontend/tests/e2e/global-search.spec.ts
+frontend/tests/e2e/llm.spec.ts
+frontend/tests/e2e/navigation.spec.ts
+frontend/tests/e2e/onboarding.spec.ts
+frontend/tests/e2e/rgpd.spec.ts
+frontend/tests/e2e/settings.spec.ts
+frontend/tests/e2e/tags-manager.spec.ts
+frontend/tests/lib/api.test.ts
+frontend/tests/lib/echo.test.ts
+frontend/tests/lib/msw-contract.test.ts
+frontend/tests/screens/AudienceBuilderPage.test.tsx
+frontend/tests/screens/CompanyDetailPage.test.tsx
+frontend/tests/screens/ContactsHubPage.test.tsx
+frontend/tests/screens/DashboardPage.test.tsx
+frontend/tests/screens/LoginPage.test.tsx
+frontend/tests/screens/PersonTimelinePage.test.tsx
+frontend/tests/smoke.test.ts
+--- total ---
+37
+=== ecrans/pages ===
+app
+components
+features
+lib
+locales
+main.tsx
+styles

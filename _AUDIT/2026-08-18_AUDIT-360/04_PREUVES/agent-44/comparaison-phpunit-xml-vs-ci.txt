@@ -1,0 +1,79 @@
+# Comparaison phpunit.xml vs phpunit-ci.xml — main e8924b8, 2026-08-19T12:23:23+02:00
+
+## diff brut (commentaires de fin de ligne neutralisés)
+1a2,22
+> 
+>   ==========================================================================
+>   Configuration PHPUnit/Pest utilisée UNIQUEMENT par la CI (Gate 0, 2026-08-13)
+>   ==========================================================================
+>   ⚠️ 2026-08-16 — LA QUARANTAINE EST LEVÉE. Ce fichier n'écarte plus AUCUN test :
+>   les 23 fichiers de tests/QUARANTAINE.md ont été réparés ou supprimés, et la CI
+>   exécute désormais la suite entière. Le document reste en place comme archive de
+>   ce qui s'est passé, plus comme liste active.
+> 
+>   Il subsiste donc UNE seule différence avec phpunit.xml, et c'est la raison
+>   d'être de ce fichier : `executionOrder="default"` au lieu de `random`. Deux
+>   exécutions du MÊME commit avaient donné 262 verts puis 48 rouges — du couplage
+>   entre tests, pas une régression. Un gate qui change d'avis sans changement de
+>   code ne vaut rien. L'ordre aléatoire reste actif en local (phpunit.xml) pour
+>   continuer à débusquer ces couplages.
+> 
+>   Règle qui subsiste : tout NOUVEAU test est bloquant d'office. Réintroduire une
+>   exclusion ici demande une justification datée — c'est exactement le mécanisme
+>   qui avait laissé 61 tests non exécutés pendant des mois.
+>   ==========================================================================
+> -->
+6c27
+<          executionOrder="random"
+---
+>          executionOrder="default"
+33,42c54,55
+<              Sans lui, un `<env>` de PHPUnit n'écrase PAS une variable déjà
+<              présente dans l'environnement du processus — et `docker-compose.yml`
+<              en pose une via `env_file: .env` : `DB_DATABASE=axion_crm`.
+<              Conséquence mesurée le 2026-08-17 : `composer test` lancé DANS le
+<              conteneur `api` (c'est ce que documente `make test-backend`) visait
+<              la base de DÉVELOPPEMENT, et `RefreshDatabase` y lançait
+<              `DROP TABLE … CASCADE` sur une centaine de tables. Seul le rôle
+<              applicatif non-propriétaire (`CRM_DB_APP_ROLE_ENABLED=true`) l'a
+<              arrêté ; avec la valeur par défaut, la connexion est SUPERUSER et
+<              le DROP réussit. Invisible en CI, où aucun `.env` n'est chargé. -->
+---
+>              PAS suffisant (PHPUnit n'ecrit pas $_SERVER) — c'est
+>              `tests/bootstrap.php` qui epingle reellement la base. -->
+46,51c59
+<              variable se pose dans `/opt/axion-crm-pro/.env` sur le serveur
+<              HETZNER — ce dépôt n'est pas déployé par Coolify (c'est le site
+<              Axion-IA qui l'est) — et seulement APRÈS la reprise des données
+<              par `php artisan horodatages:corriger`. Ici elle est toujours
+<              active, sans quoi `HorodatagesFuseauTest` ne pourrait pas garder
+<              le correctif. -->
+---
+>              `app.timezone` pour que le verrou du décalage puisse rougir. -->
+
+## testsuites declarees
+--- phpunit.xml
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+--- phpunit-ci.xml
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+
+## balises d'exclusion (exclude / excludeGroups / groups) dans les deux fichiers
+(AUCUNE)
+
+## fichiers *Test.php sous tests/, par racine
+     56 Feature
+     39 Unit
+total: 95
+
+## fichiers .php sous tests/Unit|Feature NE finissant PAS par Test.php (non collectes par le suffixe PHPUnit)
+(fin)

@@ -1,0 +1,9 @@
+PHP 8.3.32 (cli) (built: Jul  2 2026 20:46:16) (NTS)
+Copyright (c) The PHP Group
+===
+Note: Using configuration file /var/www/html/phpstan.neon.
+
+ [OK] No errors                                                                 
+
+
+[exited with code 0]

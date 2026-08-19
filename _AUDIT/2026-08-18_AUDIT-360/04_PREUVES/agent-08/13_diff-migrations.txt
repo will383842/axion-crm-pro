@@ -1,0 +1,7 @@
+=== diff PROD vs DEPOT (< prod seulement, > depot seulement) ===
+12d11
+< 2026_05_17_195529_create_failed_jobs_table
+(fin diff prod/depot)
+
+=== diff LOCAL vs DEPOT ===
+(fin diff local/depot)

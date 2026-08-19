@@ -1,0 +1,265 @@
+{
+  "dump": {
+    "sections": [
+      {
+        "titre": "Aujourd'hui",
+        "ouverte": "true",
+        "ulHidden": false,
+        "entrees": [
+          {
+            "label": "Tableau de bord",
+            "href": "/",
+            "dataTour": "nav-dashboard",
+            "compteur": null,
+            "visible": true
+          }
+        ]
+      },
+      {
+        "titre": "Contacts",
+        "ouverte": "false",
+        "ulHidden": true,
+        "entrees": [
+          {
+            "label": "Contacts",
+            "href": "/contacts",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Entreprises",
+            "href": "/companies",
+            "dataTour": "nav-companies",
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Journalistes",
+            "href": "/journalists",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Médias (presse)",
+            "href": "/media",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          }
+        ]
+      },
+      {
+        "titre": "Collecte",
+        "ouverte": "false",
+        "ulHidden": true,
+        "entrees": [
+          {
+            "label": "Couverture France",
+            "href": "/coverage",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Collectes",
+            "href": "/campaigns",
+            "dataTour": "nav-campaigns",
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Journaux de collecte",
+            "href": "/scraper-runs",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Roumanie",
+            "href": "/international/roumanie",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          }
+        ]
+      },
+      {
+        "titre": "Pilotage",
+        "ouverte": "false",
+        "ulHidden": true,
+        "entrees": [
+          {
+            "label": "Audiences (segments)",
+            "href": "/audiences",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Observabilité",
+            "href": "/admin/observability",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          }
+        ]
+      },
+      {
+        "titre": "Conformité",
+        "ouverte": "false",
+        "ulHidden": true,
+        "entrees": [
+          {
+            "label": "Requêtes RGPD",
+            "href": "/rgpd/requests",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Registre AI Act",
+            "href": "/rgpd/ai-act",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Journaux d’audit",
+            "href": "/audit-logs",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          }
+        ]
+      },
+      {
+        "titre": "Réglages",
+        "ouverte": "false",
+        "ulHidden": true,
+        "entrees": [
+          {
+            "label": "Utilisateurs",
+            "href": "/users",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Paramètres",
+            "href": "/settings",
+            "dataTour": "nav-settings",
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Tags",
+            "href": "/tags",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "LLM Router",
+            "href": "/llm/router",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Proxies",
+            "href": "/llm/proxy-providers",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          },
+          {
+            "label": "Rotations",
+            "href": "/llm/rotations",
+            "dataTour": null,
+            "compteur": null,
+            "visible": false
+          }
+        ]
+      }
+    ],
+    "pied": [
+      "Réduire"
+    ],
+    "texteIntegral": "A\nAxion CRM Pro\nWW\nWorkspace ws-uui\nAUJOURD'HUI\nTableau de bord\nCONTACTS\nCOLLECTE\nPILOTAGE\nCONFORMITÉ\nRÉGLAGES\nRéduire"
+  },
+  "cibles": [
+    {
+      "nom": "sidebar",
+      "present": true,
+      "visible": true,
+      "rect": {
+        "w": 260,
+        "h": 900
+      },
+      "parentUlHidden": false
+    },
+    {
+      "nom": "global-search",
+      "present": true,
+      "visible": true,
+      "rect": {
+        "w": 441,
+        "h": 34
+      },
+      "parentUlHidden": false
+    },
+    {
+      "nom": "nav-companies",
+      "present": true,
+      "visible": false,
+      "rect": {
+        "w": 0,
+        "h": 0
+      },
+      "parentUlHidden": true
+    },
+    {
+      "nom": "nav-dashboard",
+      "present": true,
+      "visible": true,
+      "rect": {
+        "w": 243,
+        "h": 32
+      },
+      "parentUlHidden": false
+    },
+    {
+      "nom": "dark-mode",
+      "present": true,
+      "visible": true,
+      "rect": {
+        "w": 81,
+        "h": 30
+      },
+      "parentUlHidden": false
+    },
+    {
+      "nom": "nav-settings",
+      "present": true,
+      "visible": false,
+      "rect": {
+        "w": 0,
+        "h": 0
+      },
+      "parentUlHidden": true
+    },
+    {
+      "nom": "nav-campaigns",
+      "present": true,
+      "visible": false,
+      "rect": {
+        "w": 0,
+        "h": 0
+      },
+      "parentUlHidden": true
+    }
+  ],
+  "compteursTdb": []
+}

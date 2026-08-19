@@ -1,0 +1,57 @@
+=== F12 : AIPD 2026-08-18 ===
+# AIPD — Analyse d'impact relative à la protection des données
+
+**Système :** Axion CRM Pro (prospection B2B, synchronisation site ↔ CRM, vivier de candidats) et son extension projetée « entretiens enregistrés et notés »
+
+> **Date :** 2026-08-18
+> **Version :** 2.0 — remplace `DPIA_2026-05-17.md`, marqué obsolète
+> **Fondement :** RGPD art. 35
+> **Statut :** 🔴 **PROJET — non validé.** Rédigé par un agent, **à valider par Will**.
+> **Périmètre du plan :** ligne 14 du §3 du plan de préalables, volet **F11**.
+
+---
+
+## 🔴 AVERTISSEMENT SUR LA MÉTHODE — À LIRE AVANT TOUT
+
+Une analyse d'impact est le document de conformité le plus facile à falsifier
+sans le vouloir : il suffit d'y écrire ce qu'une AIPD-type contient d'habitude.
+Le document qu'elle remplace en est l'illustration — il affirmait des mesures de
+sécurité qui n'existent pas (§7).
+
+**Règle appliquée ici :** chaque affirmation est adossée à un fichier du dépôt,
+avec son chemin et sa ligne. Là où la vérification n'était pas possible sans
+accès au serveur de production ou à une décision de Will, c'est écrit
+**NON VÉRIFIÉ**, avec ce qu'il faudrait pour le savoir.
+
+Ce document en est constellé. **C'est sa valeur, pas son défaut.** Une AIPD qui
+affirme une mesure inexistante ne protège personne : elle documente une
+conformité fausse.
+
+**Ce document N'A PAS ÉTÉ CONFRONTÉ À LA PRODUCTION.** Aucune requête n'a été
+jouée sur la base réelle, aucune session ouverte sur le serveur. Tout ce qui suit
+décrit le **code du dépôt** au commit courant de
+`C:\Users\willi\Documents\Projets\crmpro-wt-etape0`.
+
+---
+
+--- mentions entite / SAS / estonienne ---
+40:| 1 | **Le responsable de traitement n'est plus le même.** L'ancienne analyse nommait « Axion-IA OÜ (Estonie) ». L'entité est une **SAS française**. | Autorité de contrôle compétente, mentions d'information, registre des traitements, contrats de sous-traitance : **tout est à reprendre**. Une AIPD au mauvais nom est inopposable. |
+45:| 6 | **Un traitement à haut risque est planifié** : enregistrement d'entretiens et **notation automatisée de candidats** (§17, §21.4 et §27 étape 5 du cahier des charges v2.7). | C'est le motif principal de cette refonte. Traité au **§5**. |
+56:| Responsable de traitement | **SAS de droit français** — ⚠️ **NON VÉRIFIÉ** : le dépôt ne contient **aucune** mention de la raison sociale, du SIREN, du siège ni du représentant légal de la nouvelle entité (recherche `OÜ\|Estonie\|SAS\|SIREN\|RCS` sur `backend/config/**`, `.env.example`, `frontend/src/**` → aucune occurrence pertinente). **À compléter par Will** (décision n° 1). |
+57:| Ancienne mention à corriger | « Axion-IA OÜ (Estonie) » — `_REPORTS/DPIA_2026-05-17.md:4` |
+59:| Autorité de contrôle | **CNIL** (France), du fait de l'établissement français. Change par rapport à l'ancienne analyse (qui relevait de l'AKI estonienne). |
+70:| **D** | 🔴 **PROJETÉ — Entretiens : visioconférence intégrée, enregistrement, transcription, analyse automatique et NOTATION de candidats** | **N'existe pas dans ce dépôt.** Recherche exhaustive : aucune table, aucune colonne, aucun service, aucune ligne de spécification. Traité au **§5** comme traitement projeté. |
+481:en anglais (`entretien`, `interview`, `enregistrement`, `recording`, `audio`,
+482:`video`, `transcription`, `transcript`, `notation`, `scoring`, `grille`…) :
+496:983 lignes, 18/08/2026) — **hors du dépôt** : §4 questionnaires, §5 notation, §6
+497:écran d'entretien, §7 visioconférence, §8 appels, §17 enregistrements et analyse
+511:l'AIPD : évaluation/notation · décision automatisée avec effet significatif ·
+523:L'enregistrement porte-t-il sur **tous** les échanges (y compris les appels
+529:#### Q2 — Base légale de l'enregistrement
+535:  devient l'enregistrement si la personne se rétracte après l'entretien ? Et la
+541:  d'enregistrement doit être **sans conséquence sur la candidature**, et cela
+544:#### Q3 — Base légale et licéité de la **notation**
+546:Noter une personne à partir d'un enregistrement est un **profilage**. Base légale
+548:l'enregistrement ne vaut pas consentement à être noté par une machine.
+575:À délivrer **avant** l'enregistrement, pas au moment de l'entretien : logique de
+576:la notation, critères, existence d'une analyse automatique, droit de s'y opposer,

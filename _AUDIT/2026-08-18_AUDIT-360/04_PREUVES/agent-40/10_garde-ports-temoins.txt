@@ -1,0 +1,60 @@
+### 1. prod, defaut (80 443)
+=== ports publiés par la pile « axion-crm-pro » ===
+axion-crm-api 80/tcp, 9000/tcp
+axion-crm-scheduler 80/tcp, 9000/tcp
+axion-crm-horizon 80/tcp, 9000/tcp
+axion-crm-app 80/tcp, 443/tcp, 2019/tcp, 5173/tcp, 443/udp
+axion-crm-caddy 0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp, 443/udp, 2019/tcp
+axion-crm-postgres 5432/tcp
+axion-crm-redis 6379/tcp
+
+Ports publiés sur l'hôte : 80 443 
+OK : la pile ne publie que 80 443 — mesuré sur les conteneurs, pas sur le fichier.
+exit=0
+
+### 2. TEMOIN NEGATIF : prod avec seulement 80 autorise (443 doit rougir)
+=== ports publiés par la pile « axion-crm-pro » ===
+axion-crm-api 80/tcp, 9000/tcp
+axion-crm-scheduler 80/tcp, 9000/tcp
+axion-crm-horizon 80/tcp, 9000/tcp
+axion-crm-app 80/tcp, 443/tcp, 2019/tcp, 5173/tcp, 443/udp
+axion-crm-caddy 0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp, 443/udp, 2019/tcp
+axion-crm-postgres 5432/tcp
+axion-crm-redis 6379/tcp
+
+Ports publiés sur l'hôte : 80 443 
+
+ÉCHEC : ports publiés sur internet alors qu'ils ne devraient pas : 443
+
+  Le fichier a probablement raison et le conteneur a tort : le
+  déploiement ne recrée que « api app horizon scheduler » (--no-deps).
+  Un changement de « ports » sur postgres, redis ou reverb exige donc
+  une recréation explicite :
+
+    docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+      up -d --force-recreate --no-deps postgres redis
+
+  ⚠️ Quelques secondes d'interruption de la base.
+exit=1
+
+### 3. preprod, aucun port public autorise
+=== ports publiés par la pile « axion-crm-staging » ===
+axion-crm-staging-scheduler 80/tcp, 9000/tcp
+axion-crm-staging-api 9000/tcp, 172.17.0.1:8082->80/tcp
+axion-crm-staging-horizon 80/tcp, 9000/tcp
+axion-crm-staging-app 80/tcp, 443/tcp, 2019/tcp, 443/udp, 172.17.0.1:8081->5173/tcp
+axion-crm-staging-redis 6379/tcp
+axion-crm-staging-postgres 5432/tcp
+
+Ports sur adresse privee (hors internet, autorises) : 8081 8082 
+Ports publiés sur l'hôte :  
+OK : la pile ne publie RIEN sur internet — mesuré sur les conteneurs, pas sur le fichier.
+exit=0
+
+### 4. TEMOIN NEGATIF : projet inexistant
+exit=2
+
+### 5. octets CR dans le script sur le serveur
+ERREUR : aucun conteneur du projet « projet-qui-nexiste-pas » — la mesure n'a rien vu.
+         (un résultat « conforme » sur zéro conteneur serait un mensonge)
+0

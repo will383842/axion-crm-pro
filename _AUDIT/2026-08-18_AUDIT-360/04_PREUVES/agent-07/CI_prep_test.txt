@@ -1,0 +1,35 @@
+a11y.yml
+build-postgres-image.yml
+ci.yml
+deploy-direct-ssh.yml
+deploy-staging.yml
+diag-website-status.yml
+prospection-collect.yml
+prospection-collect-paris.yml
+prospection-collect-region.yml
+prospection-enrich.yml
+prospection-find-websites.yml
+prospection-find-websites-distributed.yml
+prospection-reclassify.yml
+prospection-stats.yml
+release-tracking.yml
+security.yml
+surveillance-sauvegarde.yml
+=== prep base de test en CI ===
+.github/workflows/ci.yml:362:            -e POSTGRES_DB=axion_crm_test \
+.github/workflows/ci.yml:380:                 psql -h 127.0.0.1 -p 5432 -U axion -d axion_crm_test -tAc 'select 1' >/dev/null 2>&1 \
+.github/workflows/ci.yml:398:          DB_DATABASE: axion_crm_test
+.github/workflows/deploy-direct-ssh.yml:10:# `php artisan migrate --force || true` laissait un déploiement VERT alors que
+.github/workflows/deploy-direct-ssh.yml:17:#   3. `migrate --force` est BLOQUANT : migration en échec = déploiement en échec ;
+.github/workflows/deploy-direct-ssh.yml:19:#      `unhealthy`) + `migrate:status` sans aucune migration `Pending`, sinon le
+.github/workflows/deploy-direct-ssh.yml:45:      skip_migrate:
+.github/workflows/deploy-direct-ssh.yml:46:        description: 'Skip php artisan migrate (true/false)'
+.github/workflows/deploy-direct-ssh.yml:73:    name: SSH Hetzner + pull + migrate + restart
+.github/workflows/deploy-direct-ssh.yml:110:          SKIP_MIGRATE: ${{ github.event.inputs.skip_migrate || 'false' }}
+.github/workflows/deploy-direct-ssh.yml:204:            echo "::group::php artisan migrate --force (BLOQUANT)"
+.github/workflows/deploy-direct-ssh.yml:213:            docker compose exec -u root -T api php artisan migrate --force --database=pgsql_owner </dev/null
+.github/workflows/deploy-direct-ssh.yml:257:          MIGRATE_STATUS="$(docker compose exec -u root -T api php artisan migrate:status --no-ansi --database=pgsql_owner </dev/null)"
+.github/workflows/deploy-staging.yml:147:          docker exec axion-crm-staging-api php artisan migrate --force --database=pgsql_owner < /dev/null
+.github/workflows/prospection-find-websites-distributed.yml:123:          DB_DATABASE=$(printf '%s\n' "$CREDS" | sed -n 's/^DB_DATABASE=//p')
+.github/workflows/prospection-find-websites-distributed.yml:128:          if [ -z "$DB_DATABASE" ] || [ -z "$DB_USERNAME" ] || [ -z "$DB_PASSWORD" ]; then
+.github/workflows/prospection-find-websites-distributed.yml:167:          export DB_DATABASE DB_USERNAME DB_PASSWORD

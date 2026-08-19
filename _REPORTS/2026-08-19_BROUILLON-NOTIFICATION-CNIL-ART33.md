@@ -43,10 +43,29 @@
 | Directeur de la publication | **Williams Jullin** |
 | Contact | contact@axion-ia.com |
 | Délégué à la protection des données | **Aucun DPO désigné** — sa désignation n'est pas obligatoire au regard de l'activité (position déjà publiée dans les mentions légales). Le formulaire CNIL accepte l'absence de DPO ; c'est alors le représentant légal qui est l'interlocuteur. |
-| Interlocuteur pour cette notification | Williams Jullin, président — contact@axion-ia.com *(téléphone à saisir dans le formulaire)* |
+| Interlocuteur pour cette notification | Williams Jullin, président — **contact@axion-ia.com** |
 
 ✅ **Confirmé par le dirigeant le 2026-08-19** : c'est bien **AXION IA SAS** qui
 exploite le serveur du CRM. Aucune autre entité n'est concernée.
+
+### ☎️ Pas de numéro de téléphone — et le droit ne l'exige pas
+
+Décision du dirigeant : **aucun numéro de téléphone ne sera communiqué.** Cette
+décision est conforme.
+
+L'**article 33-3-b du RGPD** exige de « communiquer le **nom et les coordonnées**
+du délégué à la protection des données ou d'un autre point de contact ». Le terme
+est **« coordonnées »** — une adresse électronique en est une. Le règlement
+n'impose aucun canal particulier, et la page de la CNIL consacrée à la
+notification ne cite pas le téléphone parmi les informations obligatoires (elle
+liste : nature de la violation, nombre et catégories de personnes concernées,
+nombre et catégories d'enregistrements, conséquences probables, mesures prises).
+
+**Point de contact retenu : `contact@axion-ia.com`.**
+
+Si le téléservice marque le champ d'un astérisque, il s'agit d'une contrainte du
+formulaire et non du droit : porter « non communiqué » suffit. Ce point ne doit
+en aucun cas retarder la notification — le délai, lui, est réel.
 
 ---
 

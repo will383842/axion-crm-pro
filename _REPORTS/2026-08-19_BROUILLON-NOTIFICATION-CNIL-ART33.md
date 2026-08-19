@@ -1,29 +1,26 @@
-# BROUILLON — Notification de violation de données à la CNIL (article 33 RGPD)
+# ANALYSE — notification CNIL (article 33) : instruite, puis NON RETENUE
 
-> ✅ **DÉCISION PRISE PAR LE DIRIGEANT LE 2026-08-19 : NOTIFIER.**
-> Williams Jullin a validé la recommandation de notifier la CNIL au titre de
-> l'article 33, et de **ne pas** informer individuellement les personnes
-> concernées (article 34). Il a également confirmé que **AXION IA SAS est bien
-> l'entité qui exploite le serveur du CRM** — la dernière incertitude du §1 est
-> donc levée.
+> 🛑 **DÉCISION DU RESPONSABLE DE TRAITEMENT, 2026-08-19 : NE PAS NOTIFIER.**
+> Prise par Williams Jullin, président d'AXION IA SAS, après examen des éléments
+> ci-dessous. **Aucune notification n'a été envoyée. Aucun formulaire n'a été
+> saisi. Rien n'a quitté l'entreprise.**
 >
-> ⚠️ **CE DOCUMENT RESTE UN BROUILLON À SAISIR.** Il est rédigé par l'autopilote
-> à partir de faits mesurés et datés. **L'envoi n'a pas eu lieu** : la saisie du
-> formulaire et sa transmission sont un acte du responsable de traitement, qui
-> exige un compte personnel sur le téléservice. L'autopilote rédige, il ne
-> signe pas.
+> ⚠️ **Une version antérieure de ce document annonçait la décision inverse.**
+> L'accord donné reposait sur un malentendu sur la nature de l'acte ; il a été
+> repris et clarifié le jour même. C'est la présente version qui fait foi.
 >
-> **Où l'envoyer** : téléservice CNIL — `notifications.cnil.fr`, rubrique
-> « Notifier une violation de données personnelles ». Compte requis.
+> **Pourquoi ce document est conservé, alors que la notification n'a pas lieu.**
+> L'article 33-5 impose de documenter toute violation, notifiée ou non. Le
+> document qui satisfait cette obligation est le **registre** :
+> `_REPORTS/REGISTRE-DES-VIOLATIONS-DE-DONNEES.md`, entrée **2026-001**, qui
+> porte la décision et sa motivation.
 >
-> **Délai** : 72 h à compter de la **connaissance** de la violation. Connaissance
-> établie le **2026-08-19**. Au-delà, le formulaire demande de justifier le
-> retard — ce qui se fait, mais se motive.
+> Celui-ci en est la pièce d'instruction : il établit que la question a été
+> examinée **avec les chiffres réels**, et non ignorée. Devant un contrôle, un
+> dossier qui montre l'analyse vaut mieux qu'un silence. **Ne pas le supprimer.**
 >
-> ⚠️ Une notification peut être faite **de façon échelonnée** (art. 33-4) quand
-> tout n'est pas encore connu. Ici la durée d'exposition **est** établie
-> (94 jours, mesurée), mais l'existence ou non d'accès non autorisés ne l'est
-> **pas** — les journaux de connexion n'étaient pas conservés.
+> Tout ce qui suit reste exact sur les faits. Seule la conclusion a changé : les
+> §7 et §8 portent la décision définitive.
 
 ---
 
@@ -204,35 +201,35 @@ revenir sur cette décision avant l'envoi.)*
 
 ---
 
-## 7. Information des personnes concernées (article 34)
+## 7. Décision définitive
 
-**Position proposée : ne pas procéder à une information individuelle.**
+🛑 **NE PAS NOTIFIER la CNIL.** Décision de Williams Jullin, président d'AXION IA
+SAS, le 2026-08-19.
 
-Motivation : l'article 34 ne l'impose qu'en cas de risque **élevé** pour les
-droits et libertés. Les données concernées sont des coordonnées
-**professionnelles** issues de **sources publiques**, sans catégorie
-particulière, sans donnée financière et sans identifiant de connexion. Le risque,
-bien que réel, n'atteint pas ce seuil.
+🛑 **NE PAS informer individuellement les personnes concernées** (article 34).
+Cette obligation ne s'applique qu'en cas de risque **élevé**, non retenu ici.
 
-En outre, l'information individuelle de 1,32 million de personnes dont l'adresse
-a été collectée en prospection constituerait elle-même un envoi de masse non
-sollicité — un remède disproportionné au regard du risque.
+La motivation complète — éléments retenus **et** éléments contraires examinés —
+figure au §7 de l'entrée **2026-001** du registre des violations.
 
-✅ **Position retenue par le dirigeant le 2026-08-19** : pas d'information
-individuelle. ⚠️ La CNIL peut, après examen, demander que les personnes soient
-informées — cette possibilité reste ouverte quelle que soit la position initiale.
+⚠️ **Cette appréciation devra être réexaminée** si un élément nouveau apparaît :
+indice d'exploitation, réclamation d'une personne concernée, diffusion constatée
+des données. Dans ce cas la notification se fait sans délai, en justifiant le
+décalage.
 
 ---
 
-## 8. Inscription au registre des violations (article 33-5)
+## 8. L'obligation qui demeure, et qui est remplie
 
-Cette violation doit être consignée au **registre interne des violations**,
-**qu'elle soit notifiée ou non**. Cette obligation est indépendante de la
-décision de notifier.
+L'article 33-5 impose de consigner toute violation **qu'elle soit notifiée ou
+non**. Cette obligation est **indépendante** de la décision du §7, et elle est
+remplie :
 
-Éléments à y porter : les faits du §2, la chronologie du §3, les volumes du §4,
-l'évaluation du §5, les mesures du §6, et la décision prise au §7 avec sa
-motivation.
+📕 **`_REPORTS/REGISTRE-DES-VIOLATIONS-DE-DONNEES.md`** — entrée **2026-001**.
+
+Ce registre est interne : il ne s'envoie à personne, et la CNIL peut le demander
+lors d'un contrôle. **Ne pas le supprimer** — une violation consignée puis
+effacée est pire qu'une violation non consignée.
 
 ---
 

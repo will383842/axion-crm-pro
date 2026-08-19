@@ -1,0 +1,237 @@
+# Axion CRM Pro — overlay PRÉPRODUCTION
+#
+# Usage OBLIGATOIRE (les deux fichiers, dans cet ordre), depuis
+# `/opt/axion-crm-pro-staging` sur le serveur :
+#
+#   docker compose -p axion-crm-staging \
+#     -f docker-compose.yml -f docker-compose.staging.yml up -d
+#
+# ── POURQUOI CET OVERLAY EXISTE ─────────────────────────────────────────────
+#
+# Le §28.1 du cahier des charges est catégorique : « un lot qui n'a pas vécu en
+# préproduction n'est pas livrable ». Elle n'existait pas au 2026-08-19.
+#
+# `deploy-staging.yml` pointait vers un Coolify qui **n'existe pas pour ce
+# produit** : le CRM se déploie par `deploy-direct-ssh.yml` (SSH + git reset +
+# docker compose). Bâtir la préproduction sur Coolify aurait créé un SECOND
+# mécanisme de déploiement, différent de celui de la production — donc une
+# préproduction qui ne prouve rien sur le chemin réel. Cet overlay rejoue le
+# mécanisme de production, il n'en invente pas un autre.
+#
+# ── LES CINQ CONTRAINTES MESURÉES, ET COMMENT CHACUNE EST TENUE ─────────────
+#
+# 1. `container_name` FIGÉS dans `docker-compose.yml` (`axion-crm-api`, …).
+#    Deux piles ne peuvent pas coexister sans les redéfinir → tous renommés
+#    `axion-crm-staging-*` ci-dessous. Sans ça, `docker compose up` de la
+#    préproduction TUERAIT les conteneurs de production portant le même nom.
+#
+# 2. Le réseau porte un `name:` FIXE (`axion-crm`). Deux piles le partageraient,
+#    et `api` désignerait DEUX conteneurs → redéfini en `axion-crm-staging`.
+#
+# 3. 🔴 UN SEUL PROCESSUS PEUT TENIR 80 ET 443. La préproduction ne les prend
+#    donc pas : elle n'a **aucun service `caddy`**. Le Caddy de production reste
+#    l'unique porte d'entrée et sert les deux noms `staging.*`.
+#
+#    ⚠️ Le chemin retenu pour qu'il ATTEIGNE la préproduction n'est pas évident,
+#    et la solution naturelle est un piège : attacher le Caddy de production au
+#    réseau de la préproduction rendrait le nom `api` AMBIGU pour lui — il
+#    verrait `api` sur ses deux réseaux, et le routage de la PRODUCTION
+#    deviendrait indéterminé. Compose ajoute toujours le nom du service comme
+#    alias réseau ; on ne peut pas le retirer.
+#
+#    D'où la publication sur la BOUCLE LOCALE (`127.0.0.1`) ci-dessous : les
+#    deux réseaux restent totalement étanches, et le Caddy de production joint
+#    la préproduction par `host-gateway`. Joignable depuis l'hôte, jamais depuis
+#    internet.
+#
+# 4. Le bundle frontend est bâti À LA CONSTRUCTION (`VITE_API_BASE_URL` en
+#    build-arg) : la préproduction a besoin de sa PROPRE image, bâtie avec
+#    `https://staging.axion-crm-pro.com`. La garde `VITE_BUILD_CIBLE=prod` de
+#    `vite.config.ts` accepte cette valeur — elle ne refuse que `localhost`.
+#
+# 5. `ports: !override []` vaut AUSSI ici : la faille du 2026-08-19 (Postgres et
+#    Redis publiés sur `0.0.0.0`) ne doit pas être réintroduite par une seconde
+#    pile. Garde : `infra/scripts/verifier-ports-publies.sh`, qui mesure les
+#    CONTENEURS et connaît la différence entre `0.0.0.0:` et `127.0.0.1:`.
+#
+# ── DONNÉES : SYNTHÉTIQUES, JAMAIS UN EXPORT DE PRODUCTION ──────────────────
+#
+# 16 Go de données personnelles réelles dans un environnement moins surveillé,
+# c'est précisément ce que le §21 interdit de faire à la légère. La
+# préproduction se remplit avec `backend/database/perf/seed_reference_50k.sql`
+# (300 000 fiches, ~600 Mo) — plus sûr, 25 fois plus petit, et c'est exactement
+# le volume de référence dont le §29 a besoin.
+#
+# ── VÉRIFIER SANS DÉPLOYER ──────────────────────────────────────────────────
+#
+#   docker compose -p axion-crm-staging \
+#     -f docker-compose.yml -f docker-compose.staging.yml config
+#
+# ⚠️ Sous Windows le séparateur de `COMPOSE_FILE` est `;`, sous Linux `:`.
+
+services:
+  # ── Base de données ───────────────────────────────────────────────────────
+  postgres:
+    container_name: axion-crm-staging-postgres
+    restart: unless-stopped
+    # Contrainte 5. `!override` et non `ports: []` : Compose FUSIONNE les listes
+    # entre fichiers. Sans le tag, la publication `55432:5432` de
+    # `docker-compose.yml` survivrait et rouvrirait la faille du 19/08 par une
+    # porte de service.
+    ports: !override []
+    environment:
+      POSTGRES_DB: axion_crm_staging
+    volumes: !override
+      - staging-postgres-data:/var/lib/postgresql/data
+
+  redis:
+    container_name: axion-crm-staging-redis
+    restart: unless-stopped
+    ports: !override []
+    volumes: !override
+      - staging-redis-data:/data
+
+  # ── Application ───────────────────────────────────────────────────────────
+  api:
+    container_name: axion-crm-staging-api
+    build:
+      target: prod
+    restart: unless-stopped
+    # Même raison qu'en production : le code exécuté est celui de l'image, avec
+    # son `vendor` construit par `composer install --no-dev`. Un montage bind
+    # masquerait le `vendor` de l'image — le défaut mesuré le 2026-08-16, où la
+    # production a exécuté un `vendor` du 17 mai pendant trois mois.
+    volumes: !override
+      - staging-api-storage:/var/www/html/storage
+    environment:
+      APP_ENV: staging
+      # Le débogage reste ACTIF : c'est tout l'intérêt d'une préproduction —
+      # voir la trace plutôt que « Server Error ». Elle ne sert aucun public.
+      APP_DEBUG: 'true'
+      APP_URL: https://staging.axion-crm-pro.com
+      DB_DATABASE: axion_crm_staging
+      # Les envois réels ne partent JAMAIS de la préproduction. Un compte rendu
+      # de test expédié à un vrai contact est une faute qu'on ne rattrape pas.
+      MAIL_MAILER: log
+    # Contrainte 3 : joignable depuis l'hôte (donc depuis le Caddy de
+    # production via `host-gateway`), jamais depuis internet.
+    ports: !override
+      - '127.0.0.1:8082:80'
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsS http://localhost/up || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  horizon:
+    container_name: axion-crm-staging-horizon
+    build:
+      target: prod
+    restart: unless-stopped
+    volumes: !override
+      - staging-api-storage:/var/www/html/storage
+    environment:
+      APP_ENV: staging
+      DB_DATABASE: axion_crm_staging
+      MAIL_MAILER: log
+    # `php artisan horizon` n'ouvre aucun port HTTP : le healthcheck `curl /up`
+    # de l'image `prod` le rendrait `unhealthy` en permanence. On teste ce que
+    # ce service fait vraiment.
+    healthcheck:
+      test: ['CMD-SHELL', 'php artisan horizon:status | grep -q running || exit 1']
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+
+  scheduler:
+    container_name: axion-crm-staging-scheduler
+    build:
+      target: prod
+    restart: unless-stopped
+    volumes: !override
+      - staging-api-storage:/var/www/html/storage
+    environment:
+      APP_ENV: staging
+      DB_DATABASE: axion_crm_staging
+      MAIL_MAILER: log
+    # Pas de commande fiable pour interroger `schedule:work` : on RETIRE le
+    # contrôle plutôt que d'en garder un qui ment. Un contrôle absent est
+    # honnête ; un contrôle qui rougit toujours apprend à ignorer les rouges.
+    healthcheck:
+      disable: true
+
+  app:
+    container_name: axion-crm-staging-app
+    build:
+      target: prod
+      args:
+        # Contrainte 4 : le bundle est figé à la construction. Sans cette
+        # valeur, la préproduction appellerait l'API de PRODUCTION — et
+        # « préproduction » deviendrait un mot qui ne veut plus rien dire.
+        VITE_BUILD_CIBLE: prod
+        VITE_API_BASE_URL: https://staging.axion-crm-pro.com
+    restart: unless-stopped
+    volumes: !override []
+    ports: !override
+      - '127.0.0.1:8081:5173'
+
+  # `reverb` reste absent du déploiement (Echo est désactivé côté frontend et le
+  # Caddyfile n'a aucune route WebSocket). On ferme quand même sa publication :
+  # le jour où quelqu'un le démarrerait « pour voir », il ne rouvrirait rien.
+  reverb:
+    container_name: axion-crm-staging-reverb
+    ports: !override []
+    # Il hérite sinon de `DB_DATABASE: axion_crm` — le nom de la base de
+    # PRODUCTION. Sans effet tant qu'il ne démarre pas (et le `postgres` de
+    # cette pile n'a pas cette base), mais un réglage faux qui dort est un
+    # réglage faux : `docker compose config` l'a montré, on le corrige.
+    environment:
+      APP_ENV: staging
+      DB_DATABASE: axion_crm_staging
+
+  # ── 🔴 Contrainte 3 : NEUTRALISER le `caddy` hérité ───────────────────────
+  #
+  # MINE TROUVÉE PAR LA MESURE, pas par le raisonnement. La première version de
+  # cet overlay se contentait de ne pas mentionner `caddy`, en comptant sur le
+  # fait que le déploiement nomme ses services. `docker compose config` a montré
+  # ce que ça donnait vraiment :
+  #
+  #     caddy:
+  #       container_name: axion-crm-caddy      <-- LE NOM DE LA PRODUCTION
+  #       ports: ["80:80", "443:443"]
+  #
+  # Un `docker compose up -d` sans liste de services, tapé une fois par
+  # quelqu'un de pressé, aurait **détruit le Caddy de production** (Docker
+  # refuse deux conteneurs de même nom : Compose supprime l'ancien) et rendu
+  # tout le site injoignable. Une omission n'est pas une protection.
+  #
+  # Trois verrous plutôt qu'un commentaire :
+  #   - `profiles` : un service sous profil n'est JAMAIS démarré sans
+  #     `--profile jamais`. C'est le seul mécanisme de Compose qui empêche
+  #     réellement un `up` global de le lancer ;
+  #   - `container_name` distinct : même démarré de force, il ne peut plus
+  #     écraser celui de la production ;
+  #   - `ports: !override []` : même démarré de force, il ne peut plus prendre
+  #     80 et 443 au Caddy qui sert le site.
+  #
+  # Vérifié : aucun service de `docker-compose.yml` n'a de `depends_on: caddy`,
+  # donc le profil ne casse aucune dépendance.
+  caddy:
+    profiles: ['jamais']
+    container_name: axion-crm-staging-caddy-inutilise
+    ports: !override []
+
+# Contrainte 2 : réseau distinct. Sans ce bloc, les deux piles partageraient
+# `axion-crm` et le nom `api` désignerait deux conteneurs.
+networks:
+  axion-crm:
+    name: axion-crm-staging
+
+# Volumes distincts : la préproduction ne doit RIEN partager avec la production.
+# Un volume commun ferait écrire les deux piles dans la même base.
+volumes:
+  staging-postgres-data:
+  staging-redis-data:
+  staging-api-storage:

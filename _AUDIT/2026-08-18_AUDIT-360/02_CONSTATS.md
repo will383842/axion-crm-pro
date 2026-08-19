@@ -2536,3 +2536,70 @@ accessibles par jeton stagiaire ou formateur ont été passées au crible : tout
 de CI (36 s par fichier de test). Les 4 rouges initiaux de l'agent étaient **des expirations à
 5 000 ms** — rejoués à 120 000 ms : **24/24 verts**. *Encore un rouge d'atelier qui n'est pas un
 défaut de produit.*
+
+---
+
+## Agent 43 — charge et concurrence : **la mesure de référence du §29 a été jouée dans la mauvaise configuration**
+**Rapport** : `11_GRILLES/agent-43_charge-concurrence.md` · **Preuves** : `04_PREUVES/agent-43/` (13 fichiers + 4 scripts de scénario)
+**Aucune charge envoyée vers la production ni la préproduction.**
+
+### 🔑 `G43-001` (S1) — et elle est née de la consigne §5 bis du dossier
+
+L'agent a **doublé chaque mesure sous les deux rôles**, parce que le dossier l'avertissait que
+l'atelier et la production n'exécutent pas le même cloisonnement. **C'est ce doublement qui a tout
+révélé** : **la mesure de référence du §29 a été jouée sous `BYPASSRLS`** — c'est-à-dire dans une
+configuration que la production n'a pas.
+
+Sous la RLS **réelle**, le prédicat `(workspace_id)::text = current_setting(...)` **détruit
+l'estimation de sélectivité** (`rows=1` au lieu de 3 125) → le planificateur **abandonne l'index** →
+le coût estimé franchit `jit_above_cost` → **+391 ms de compilation JIT par requête**.
+
+```
+recherche globale :   39 ms (axion, BYPASSRLS)
+                   3 589 ms (axion_app, RLS de production)     <- x92
+                     632 ms (axion_app, jit=off)               <- correctif : UNE ligne, gain x5,7
+```
+
+### `G43-002` (S1) — **corriger `A-010` ne suffira pas**
+
+`pgbench`, 300 000 fiches, 40 s par passe :
+
+| rôle | p95 à c=1 | p95 à c=10 | dégradation | débit |
+|---|---|---|---|---|
+| `axion_app` (**RLS armée = production**) | 1 413 ms | **5 794 ms** | **+310 %** | 1,40 → 4,55 tps |
+| `axion` (BYPASSRLS = atelier) | 337 ms | 658 ms | +95 % | 5,59 → 36,4 tps |
+
+**Postgres n'est PAS sérialisé** (débit ×3,2 à ×6,5 — à l'opposé de l'escalier plat d'`A-010`).
+**Mais le critère 17 échouerait sur la base seule** : le budget est **+20 %**, la mesure donne **+310 %**.
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **G43-001** | **S1** | La mesure de référence du §29 a été jouée **hors configuration de production** — écart **×92** sur la recherche globale |
+| **G43-002** | **S1** | **Le critère 17 échoue sur la couche base seule** : +310 % à 10 sessions |
+| **G43-004** | **S1** | `POST /companies/tags/bulk` **insère sans `workspace_id`** → **cassé en production** (refus RLS mesuré, **témoin positif joué**) |
+| **G43-005** | **S1** *(relevable S0)* | **Aucun mécanisme d'édition concurrente** : 0 `ETag`, 0 `If-Match`, 0 colonne de version, backend **et** frontend. Deux sessions réellement simultanées rendent **toutes deux `UPDATE 1`** : **une saisie disparaît en silence**. **Témoin positif** : la même séquence avec `AND updated_at = <lu>` rend **`UPDATE 0`** |
+| G43-006 | S2 | **28 `withoutOverlapping()` sur 28 sans argument** → **24 h de verrou chacun**, dont `crm:flush-outbound` (cadence 5 min) : un processus tué **gèle 288 passages d'oppositions RGPD sous un ordonnanceur vert**. *La brique correcte existe déjà dans le dépôt* (`CompteursHub.php:85`, `lock: ['seconds' => 30]`, **avec le raisonnement écrit**) |
+| G43-003, G43-007, G43-008 | S2 | Compteurs à **6,2 s** à 10 sessions · `load-tests/` **n'a jamais tourné** · **aucune garde de concurrence** |
+
+🔑 **Une conséquence d'`A-010` que personne n'avait vue, pas même moi** : `Cache::flexible` s'appuie
+sur `defer()`, **qui s'exécute dans la phase de terminaison du même processus**. Sur un serveur
+**mono-processus**, le recalcul « différé, qui ne coûte rien » **coûte le même gel une seconde fois**,
+au visiteur suivant. *Le correctif de la pièce 1 est bon, mais son bénéfice est partiellement mangé
+par `A-010` — et il le sera jusqu'à ce que `A-010` soit corrigé.*
+
+**Projection du gel, déclarée comme projection** (arithmétique sur `A-010` + les compteurs
+chronométrés, **aucune requête parallèle envoyée**) : sans index, cache froid, 2,8 M → **17,5 s**
+mesurés ; extrapolé à 4,29 M → **≈ 26,8 s** ; avec index → **≈ 3,4 s**. *Dix ouvertures simultanées :
+le dixième attend entre **5,3 s** et **157 s** avant que sa propre requête ne démarre.*
+
+⚠️ **Et `load-tests/` mérite d'être signalé pour ce qu'il prescrit** : son runbook demande de jouer
+une charge **contre la production**, **avec le mot de passe du dirigeant**, décrit un serveur
+**php-fpm/CPX42 qui n'existe pas**, et son seuil `ensure.p95: 800` s'applique au p95 **global** alors
+qu'il se commente « list companies ». *Onzième instance du patron `A-011`, et la seule qui pourrait
+faire tomber la production si quelqu'un suivait le mode d'emploi.*
+
+**Deux points de méthode à porter au crédit de l'agent** : il a **rejeté sa propre première mesure**
+d'édition concurrente (jouée sur `id=1`, inexistant — elle rendait `UPDATE 0` **pour la mauvaise
+raison**). Et son protocole du critère 17, écrit **en extension** des deux mesures de référence
+existantes, impose une **passe B de témoin séquentiel obligatoire** : *sans elle, un p95 dégradé ne
+prouve pas que la concurrence en est la cause.*

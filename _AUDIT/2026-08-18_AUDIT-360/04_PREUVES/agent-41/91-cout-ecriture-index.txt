@@ -1,0 +1,72 @@
+Timing is on.
+=== AGENT 41 — coût d écriture des index de companies (base axion_crm_a41, copie jetable de axion_crm_perf, 300 000 fiches, locale C) ===
+--- état initial
+ count  
+--------
+ 300000
+(1 row)
+
+Time: 105.023 ms
+  tas  | index  
+-------+--------
+ 80 MB | 183 MB
+(1 row)
+
+Time: 4.460 ms
+=== TOUR 1 : insertion de 50 000 fiches AVEC les 27 index ===
+psql:/tmp/cout_index.sql:19: ERROR:  duplicate key value violates unique constraint "companies_workspace_id_siren_key"
+DETAIL:  Key (workspace_id, siren)=(20cd81e4-de5d-4875-a759-07d64fe1f168, 100000001) already exists.
+Time: 369.575 ms
+=== retrait des index JAMAIS PARCOURUS par une requête d écran ni par une requête du produit ===
+DROP INDEX
+Time: 491.285 ms
+DROP INDEX
+Time: 352.179 ms
+DROP INDEX
+Time: 25.895 ms
+DROP INDEX
+Time: 257.624 ms
+DROP INDEX
+Time: 157.702 ms
+DROP INDEX
+Time: 35.930 ms
+DROP INDEX
+Time: 119.774 ms
+DROP INDEX
+Time: 71.010 ms
+DROP INDEX
+Time: 102.099 ms
+ index_apres_retrait 
+---------------------
+ 144 MB
+(1 row)
+
+Time: 0.840 ms
+=== TOUR 2 : insertion de 50 000 fiches SANS ces 9 index ===
+                                                                        QUERY PLAN                                                                         
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Insert on companies  (cost=0.42..5525.59 rows=0 width=0) (actual rows=0 loops=1)
+   Buffers: shared hit=2283494 read=8115 dirtied=7088 written=78
+   ->  Subquery Scan on "*SELECT*"  (cost=0.42..5525.59 rows=50000 width=2163) (actual rows=50000 loops=1)
+         Buffers: shared hit=50004 read=1487
+         ->  Limit  (cost=0.42..4775.59 rows=50000 width=695) (actual rows=50000 loops=1)
+               Buffers: shared hit=4 read=1487
+               ->  WindowAgg  (cost=0.42..28651.42 rows=300000 width=695) (actual rows=50000 loops=1)
+                     Buffers: shared hit=4 read=1487
+                     ->  Index Scan using companies_pkey on companies companies_1  (cost=0.42..19651.42 rows=300000 width=647) (actual rows=50000 loops=1)
+                           Buffers: shared hit=4 read=1487
+ Planning:
+   Buffers: shared hit=3
+ Planning Time: 0.582 ms
+ Trigger for constraint companies_workspace_id_fkey: calls=50000
+ Execution Time: 79195.163 ms
+(15 rows)
+
+Time: 79338.206 ms (01:19.338)
+=== TÉMOIN : on remet les index, et on refait exactement la même insertion ===
+CREATE INDEX
+Time: 67768.957 ms (01:07.769)
+CREATE INDEX
+Time: 7920.850 ms (00:07.921)
+CREATE INDEX
+Time: 2447.060 ms (00:02.447)

@@ -13,7 +13,7 @@
 
 ---
 
-## 0. Les deux bornes de ce rapport — à lire avant tout chiffre
+## 0. Les bornes de ce rapport — à lire avant tout chiffre
 
 **Borne 1 — la console n'est pas utilisable.** Connexion 200 → 403 → 2FA 500 (constats A-012,
 A07-001). **Je n'ai mesuré aucun parcours authentifié**, aucune interaction réelle dans un
@@ -53,7 +53,7 @@ Une ligne par objet du périmètre, une colonne par point de grille.
 | Nombre de fichiers tirés au 1er écran | ✅ | 5 JS + 1 CSS, **tous** déclarés dans `index.html` | ❌ | G42-001 |
 | Découpage **par route** | ✅ | **AUCUN.** 0 `React.lazy`, 0 `import()` dynamique dans `src/` | ❌ | G42-001 |
 | Découpage manuel `manualChunks` | ✅ | 4 déclarés, **le chunk `react` sort VIDE** (44 o) | ❌ | G42-005 |
-| Composition du chunk `index` | ✅ | npm **704 577 o** (68,2 %) · `src/` **324 509 o** (31,4 %) · non mappé 2 360 o | ⚠️ | G42-002 |
+| Composition du chunk `index` | ✅ | npm **704 577 o** (68,2 %) · `src/` **324 509 o** (31,4 %) · non mappé 2 360 o — *attribution faite sur le build **local** (1 033 270 o), le seul dont j'aie la sourcemap complète ; la production ne diffère que des 13 094 o de config Sentry/API* | ⚠️ | G42-002 |
 | Dépendance la plus lourde du 1er écran | ✅ | `maplibre-gl` **802 715 o** (chunk séparé, mais préchargé) | ❌ | G42-003 |
 | 2ᵉ plus lourde | ✅ | `react-dom` 177 786 o (17,2 % du chunk `index`) | ✅ inévitable | — |
 | Dépendances lourdes mono-usage | ✅ | `zod` 53 613 o (1 écran) · grappe `react-joyride` 97 529 o (1 composant) · `pusher-js`+`laravel-echo` 78 261 o (1 effet) | ❌ | G42-002 |
@@ -294,7 +294,7 @@ que le produit émet.
   | `react-dom` | 177 786 | 17,2 % | partout — incompressible |
   | **`pusher-js` + `laravel-echo`** | **78 261** | 7,6 % | **un seul `useEffect`** (`RootLayout.tsx:40-46`), coupé par `VITE_ECHO_DISABLED` |
   | `@sentry/*` (4 paquets) | 72 701 | 7,0 % | `src/lib/sentry.ts` |
-  | **`i18next` + 2 greffons** | **61 103** | 5,9 % | 5 écrans, pour un produit **mono-langue de fait** (EN non servi) |
+  | **`i18next` + 2 greffons** | **61 103** | 5,9 % | **5 fichiers** seulement (`LoginPage`, `MagicLinkPage`, `TwoFactorPage`, et les 2 bouchons Phase 2), pour **27 clés** de traduction — soit 1 154 o de `fr.json` + 1 026 o de `en.json`. Les 32 autres écrans ont leurs libellés en dur, en français |
   | **`zod` (+`@hookform/resolvers`)** | **53 613** | 5,2 % | **un seul écran** : `TagsManagerPage.tsx:12` |
   | **grappe `react-joyride`** (`react-joyride` 34 623 + `react-floater` 23 052 + `popper.js` 22 508 + `tree-changes` 6 532 + `is-lite` 5 782 + `@gilbarbara/deep-equal` 4 088 + `scrollparent` 499 + `react-innertext` 445) | **97 529** | 9,4 % | **un seul composant** : `OnboardingTour.tsx` |
   | `lucide-react` | 33 706 | 3,3 % | icônes, bien élagué |

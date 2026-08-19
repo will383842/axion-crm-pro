@@ -7,7 +7,9 @@ port 58135), bases **dédiées** `axion_crm_a35` et `axion_crm_test_a35`. Aucun 
 aucune base partagée avec les autres agents n'a été muté.
 **Production** : **aucune requête n'a été émise vers la production.** Voir §5.
 **Aucun fichier du produit n'a été modifié** : la sonde vit dans `/tmp/a35` du conteneur ;
-ses sources sont archivées dans `04_PREUVES/agent-35/sonde/`.
+ses sources sont archivées dans `04_PREUVES/agent-35/sonde/` et `sonde2/`.
+**Inventaire des preuves** : `04_PREUVES/agent-35/README.txt`. **Pièges de mesure rencontrés**
+(à lire avant de rejouer quoi que ce soit) : `04_PREUVES/agent-35/PIEGES-DE-MESURE-RENCONTRES.txt`.
 
 ---
 
@@ -359,8 +361,8 @@ réduit mécaniquement A-007.
 - Référence     : main e8924b8
 - Emplacement   : `backend/config/sanctum.php:14`
 - Constat       : `'expiration' => null`. Aucun jeton personnel n'a de date d'expiration, et aucune tâche planifiée ne les élague (`sanctum:prune-expired` n'a rien à élaguer).
-- Preuve        : `config/sanctum.php:14` : `'expiration' => null`. Sanctum ne pose alors aucun `expires_at` sur les jetons créés, et `PersonalAccessToken::isExpired()` rend toujours `false`.
-- Témoin négatif: la clé existe et est lue par Sanctum (`NewAccessToken` la consulte pour calculer `expires_at`) — la configuration n'est pas ignorée, c'est sa valeur qui désactive le mécanisme. À l'inverse, `config/session.php:5` fixe bien une durée de vie de 120 min pour les sessions : le dépôt sait poser une expiration quand il le veut.
+- Preuve        : **joué** — `04_PREUVES/agent-35/sonde-courte-2.txt`, bloc [5] : `jeton cree : expires_at = NULL (sanctum.expiration = NULL)`. `config/sanctum.php:14` porte bien `'expiration' => null`.
+- Témoin négatif: dans la **même** sonde, le cookie de session, lui, porte bien une expiration — `expire=2026-08-19T17:05:02+02:00`, soit +120 min. Le dépôt sait donc poser une expiration quand il le veut ; il ne le fait pas pour les jetons d'API. Et la **révocation explicite**, elle, fonctionne : jeton valide ⇒ 200, jeton supprimé ⇒ 401 (même bloc).
 - Impact        : un jeton qui fuit reste valable pour toujours, sauf révocation manuelle. Aucun écran de la console ne liste ni ne révoque les jetons (à confirmer par l'agent des écrans).
 - Correctif     : `'expiration' => (int) env('SANCTUM_TOKEN_TTL_MINUTES', 43200)` (30 jours) et planifier `sanctum:prune-expired`. Coût : 1 h.
 - Statut        : ouvert
@@ -485,13 +487,26 @@ F35-003 dans la foulée.
      pile de middlewares, le même routeur et le même gestionnaire d'exceptions. Une seule
      requête HTTP y coûtait **19 minutes pour 15 requêtes**, dont l'essentiel en écritures
      de journal : chaque 500 écrit 8 475 octets sur un montage 9p saturé.
-   - **Ce qui a été obtenu** : le témoin d'instrumentation et la matrice A-001 complète
-     (`04_PREUVES/agent-35/sonde-courte-1.txt`).
+   - **Ce qui a fini par être obtenu**, en trois sondes successives : le témoin
+     d'instrumentation et la matrice A-001 complète (`sonde-courte-1.txt`) ; la preuve du
+     correctif à quatre états, le fail-open de HIBP, et la révocation d'un jeton d'API
+     (`sonde-courte-2.txt`).
+   - **Trois pièges de mesure m'ont menti en chemin**, et je les consigne pour les suivants
+     dans `04_PREUVES/agent-35/PIEGES-DE-MESURE-RENCONTRES.txt` : (1) `TestCase::call()`
+     n'envoie pas les en-têtes ; (2) le banc remplace le gestionnaire d'exceptions par celui
+     de Collision, qui n'a pas `shouldRenderJsonWhen()` ; (3) `opcache.file_cache` +
+     `validate_timestamps=0` a servi une version **périmée** de mon fichier d'amorçage — d'où
+     un `APP_ENV=local` que je croyais avoir corrigé, donc `ValidateCsrfToken` actif, donc
+     **toutes** mes requêtes POST en `419 CSRF token mismatch`. Ces 419 sont un défaut de mon
+     banc, **pas un constat produit** : aucun n'est rapporté comme tel.
    - **Restent à rejouer**, et la sonde est prête pour cela dans
-     `04_PREUVES/agent-35/sonde/` et `sonde2/` : la preuve à 4 états du correctif, la
-     révocation d'un jeton d'API, les 20 tentatives de connexion, les temps de réponse de
-     l'énumération, le rejeu du lien magique, l'usage unique et l'expiration du jeton de
-     réinitialisation, le contournement de la 2FA en session, et `EnforceFirstLoginSetup`.
+     `04_PREUVES/agent-35/sonde/` et `sonde2/` — ce sont exactement les blocs qui exigeaient
+     une **connexion réussie** : le rejeu du lien magique, l'usage unique et l'expiration du
+     jeton de réinitialisation, le contournement de la 2FA en session, `EnforceFirstLoginSetup`,
+     le refus d'un mot de passe court, les 20 tentatives de connexion et les temps de réponse
+     de l'énumération. Il faut soit corriger l'amorçage (`APP_ENV=testing` réellement pris en
+     compte, `rm -rf` du cache opcache), soit fournir un jeton CSRF à chaque requête comme le
+     fait déjà `tests/Feature/Auth/LoginTest.php:68-75`.
      **Pour les rejouer** : `docker exec <conteneur> sh -c "cd /var/www/html && php
      -d opcache.enable_cli=1 -d opcache.enable=1 -d opcache.file_cache=/tmp/oc
      vendor/bin/phpunit -c /tmp/a35/phpunit-slim2.xml"`, sur une machine qui ne fait pas
@@ -527,4 +542,14 @@ F35-003 dans la foulée.
    `stat` sur la production. Le `ls -l` de cet atelier n'a **aucune valeur** : Windows ne
    porte pas de mode POSIX, et Git Bash en invente un.
 10. **Les autres appels `diffIn*` du dépôt hors `backend/app/`** (`database/`, `routes/`,
-    `workers/`) n'ont pas été passés au crible du piège Carbon 3 de F35-005.
+    `workers/`) n'ont pas été passés au crible du piège Carbon 3 de F35-005. Dans `app/`,
+    la recherche est exhaustive : **une seule** occurrence fautive, et l'autre occurrence
+    du dépôt (`ScrapingCampaign.php:137`) est correcte — bon ordre d'opérandes **et** second
+    argument explicite.
+11. **`GET /broadcasting/auth` répond 200 sans authentification** (`sonde-courte-2.txt`,
+    bloc [10]). Cette route vit **hors** du groupe `api` : ni `auth:sanctum` ni
+    `EnforceFirstLoginSetup` ne s'y appliquent — c'est la réponse à mon point 9, et elle
+    est structurelle. Le corps rendu était **vide** et je n'ai pas poussé plus loin : **je
+    ne conclus pas à une faille**, je signale une porte que mon périmètre ne couvre pas.
+    À confier à l'agent du canal temps réel (Reverb) : que rend `Broadcast::auth()` à un
+    visiteur non authentifié, et sur quels canaux ?

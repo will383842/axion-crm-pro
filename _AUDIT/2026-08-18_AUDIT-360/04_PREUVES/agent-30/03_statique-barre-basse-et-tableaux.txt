@@ -1,37 +1,90 @@
-AGENT 30 — analyse statique (reference : main 8db8229 ; frontend identique a e8924b8)
-git rev-parse HEAD :
-a3c42d66398b94afdb31843f5427e840388c33aa
+AGENT 30 — analyse statique
+date          : 2026-08-19T13:07:52Z
+git rev-parse HEAD : 7be3753  (audit(360): agents 24, 26, 34 — les parcours, les refus silencieux, )
+REFERENCE DES CONSTATS : frontend/ identique a e8924b8 — verifie :
+  git diff --stat e8924b8 HEAD -- frontend/  ->
+  [SORTIE VIDE = aucune ligne de frontend/ n a bouge]
 
-diff frontend/ entre e8924b8 et 8db8229 (doit etre vide) :
-[fin du diff]
-
-=== A. BARRE BASSE A CINQ ENTREES (CDC 23.3) ===
--- recherche des libelles exiges dans TOUT frontend/src :
-Aujourd'hui      : frontend/src/components/layout/Sidebar.tsx:2 frontend/src/components/OnboardingTour.tsx:1 
-Aujourd’hui    : 
-Échanges        : 
-Echanges         : 
-Rechercher       : frontend/src/components/layout/Header.tsx:1 frontend/src/components/ui/GlobalSearch.tsx:2 frontend/src/components/ui/Toolbar.tsx:1 frontend/src/features/campaigns/CampaignsListPage.tsx:1 frontend/src/features/campaigns/CampaignWizardPage.tsx:1 frontend/src/features/companies/CompaniesListPage.tsx:1 frontend/src/features/media/JournalistsListPage.tsx:1 frontend/src/features/media/MediaListPage.tsx:1 frontend/src/features/scraping/ScraperRunsPage.tsx:1 frontend/src/locales/fr.json:1 
--- recherche d'un composant de barre basse :
-BottomBar    : 0
-BottomNav    : 0
-TabBar       : 0
-MobileNav    : 0
-bottom-nav   : 0
--- elements ancres en bas d'ecran (fixed/sticky bottom-0) — TEMOIN : le detecteur trouve bien le pied de Modal :
+=== A. BARRE BASSE A CINQ ENTREES (CDC 23.3 : Aujourd'hui · Contacts · Echanges · Rechercher · Plus) ===
+-- A.1 composant de barre basse :
+   BottomBar    fichiers=0
+   BottomNav    fichiers=0
+   TabBar       fichiers=0
+   MobileNav    fichiers=0
+   bottom-nav   fichiers=0
+   BarreBasse   fichiers=0
+-- A.2 elements ancres en bas d ecran (bottom-0) dans tout frontend/src :
 frontend/src/components/ui/Modal.tsx:124:          <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t border-slate-100 bg-white/95 px-6 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+   TEMOIN POSITIF : le seul resultat est le pied de Modal — le controle n est donc pas aveugle a un element ancre en bas.
+-- A.3 le libelle « Echanges » (groupe entier exige par le CDC) :
+   occurrences dans frontend/src : 0
 
 === B. CONTENEURS A DEFILEMENT HORIZONTAL ===
--- overflow-x-auto / overflow-x-scroll dans frontend/src :
 frontend/src/features/audiences/AudienceDetailPage.tsx:219:      <div className="overflow-x-auto">
 frontend/src/features/audiences/AudienceDetailPage.tsx:294:        <pre className="overflow-x-auto rounded-lg bg-slate-900 p-4 text-xs text-slate-100 dark:bg-slate-950 dark:text-slate-200">
 frontend/src/features/international/RoumaniePage.tsx:174:          <div className="overflow-x-auto rounded-lg border border-slate-200">
 frontend/src/features/media/JournalistsListPage.tsx:109:          <div className="overflow-x-auto">
 frontend/src/features/media/MediaListPage.tsx:271:          <div className="overflow-x-auto">
--- total :
-5
--- overflow-x-hidden (le contraire) :
+   total overflow-x-auto/scroll : 5   sur 4 fichiers
+-- le conteneur principal, lui, ROGNE :
 frontend/src/app/RootLayout.tsx:100:        <main id="main" className="flex-1 overflow-x-hidden px-4 py-5 md:px-6 md:py-6 lg:px-10">
 
 === C. LES 16 ECRANS TABULAIRES (cf. D27-005) ===
--- C.1 idiome <table> (7 ecrans) : y a-t-il un conteneur defilable ?
+-- C.1 idiome <table> : 7 ecrans, conteneur defilable present ou non
+frontend/src/features/audiences/AudienceDetailPage.tsx-218-    <Card padding="none" className="overflow-hidden">
+frontend/src/features/audiences/AudienceDetailPage.tsx-219-      <div className="overflow-x-auto">
+frontend/src/features/audiences/AudienceDetailPage.tsx:220:        <table className="w-full text-sm">
+frontend/src/features/campaigns/CampaignDetailPage.tsx-337-    <Card padding="none" className="overflow-hidden">
+frontend/src/features/campaigns/CampaignDetailPage.tsx:338:      <table className="w-full text-sm">
+frontend/src/features/campaigns/CampaignDetailPage.tsx-384-    <Card padding="none" className="overflow-hidden">
+frontend/src/features/campaigns/CampaignDetailPage.tsx:385:      <table className="w-full text-sm">
+frontend/src/features/campaigns/CampaignDetailPage.tsx-421-    <Card padding="none" className="overflow-hidden">
+frontend/src/features/campaigns/CampaignDetailPage.tsx:422:      <table className="w-full text-sm">
+frontend/src/features/international/RoumaniePage.tsx-174-          <div className="overflow-x-auto rounded-lg border border-slate-200">
+frontend/src/features/international/RoumaniePage.tsx:175:            <table className="min-w-full text-sm">
+frontend/src/features/media/JournalistsListPage.tsx-108-        <Card padding="none" className="overflow-hidden">
+frontend/src/features/media/JournalistsListPage.tsx-109-          <div className="overflow-x-auto">
+frontend/src/features/media/JournalistsListPage.tsx:110:            <table className="w-full min-w-[760px] text-sm">
+frontend/src/features/media/MediaDetailPage.tsx:176:          <table className="w-full text-sm">
+frontend/src/features/media/MediaListPage.tsx-270-        <Card padding="none" className="overflow-hidden">
+frontend/src/features/media/MediaListPage.tsx-271-          <div className="overflow-x-auto">
+frontend/src/features/media/MediaListPage.tsx:272:            <table className="w-full min-w-[860px] text-sm">
+frontend/src/features/observability/ObservabilityPage.tsx:134:              <table className="w-full">
+
+-- C.2 idiome grille role=row : les gabarits de colonnes declares (largeur minimale imposee)
+frontend/src/features/companies/components/CompanyRow.tsx:32:const GRID = '32px 2fr 110px 90px 110px 140px 1.1fr 100px 36px';
+frontend/src/features/contacts/ContactsListPage.tsx:58:const GRID = 'minmax(220px,1.4fr) minmax(140px,1fr) minmax(220px,1.6fr) 110px minmax(140px,1fr) minmax(140px,1fr)';
+frontend/src/features/llm/LlmRouterPage.tsx:53:const USE_CASES_GRID = 'minmax(180px,1.4fr) 130px minmax(160px,1fr) minmax(180px,1.2fr) 110px 100px';
+frontend/src/features/llm/ProxyProvidersPage.tsx:34:const GRID = 'minmax(160px,1fr) 120px 120px 110px 180px 90px 100px';
+frontend/src/features/llm/RotationsPage.tsx:35:const ROW_GRID = 'minmax(180px,1fr) 90px 110px 90px 180px';
+frontend/src/features/rgpd/AiActRegisterPage.tsx:50:const GRID = 'minmax(220px,1.4fr) 110px minmax(180px,1fr) 130px minmax(140px,1fr) 130px';
+frontend/src/features/rgpd/AuditLogsPage.tsx:45:const GRID = '160px 180px minmax(160px,1.2fr) minmax(160px,1fr) 100px 130px 110px';
+frontend/src/features/rgpd/RgpdRequestsPage.tsx:64:const GRID = 'minmax(140px,1fr) minmax(240px,1.4fr) 130px 180px 180px 140px';
+frontend/src/features/users/UsersPage.tsx:37:const GRID = 'minmax(220px,1.4fr) minmax(220px,1.6fr) minmax(160px,1fr) 140px 200px';
+
+-- C.3 en-tete sticky recopie a l identique (chaine de 210 car. de D27-005) :
+frontend/src/features/companies/CompaniesListPage.tsx
+frontend/src/features/contacts/ContactsListPage.tsx
+frontend/src/features/llm/LlmRouterPage.tsx
+frontend/src/features/llm/ProxyProvidersPage.tsx
+frontend/src/features/rgpd/AiActRegisterPage.tsx
+frontend/src/features/rgpd/AuditLogsPage.tsx
+frontend/src/features/rgpd/RgpdRequestsPage.tsx
+frontend/src/features/users/UsersPage.tsx
+   fichiers : 8
+
+=== D. PageHeader — les actions ne peuvent pas se replier ===
+18:    <header className={cn('mb-6 flex flex-wrap items-end justify-between gap-4', className)}>
+37:      {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+   ecrans qui emploient PageHeader : 27
+
+=== E. LE TIROIR MOBILE NE SE REFERME PAS SUR NAVIGATION ===
+69:  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+70:  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+83:        open={mobileSidebarOpen}
+107:        open={mobileSearchOpen}
+   -> aucun ecouteur de changement de route ne remet ces deux etats a false.
+
+=== F. DENSITE RESPONSIVE DU DEPOT ===
+   prefixes sm: 21   md: 34   lg: 34   xl: 7   (total 96 sur ~84 fichiers tsx)
+   fichiers de features SANS aucun prefixe responsive : 23 / 49

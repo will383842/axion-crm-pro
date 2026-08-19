@@ -30,12 +30,25 @@ class UsersController extends ApiController
 
             $users = User::query()
                 ->where('current_workspace_id', $workspaceId)
-                ->select(['id', 'email', 'name', 'current_workspace_id', 'first_login_completed_at', 'two_factor_enabled', 'last_login_at'])
+                // `two_factor_enabled` N'EST PAS UNE COLONNE : cette requete partait en
+                // `SQLSTATE[42703] column "two_factor_enabled" does not exist`, et
+                // `GET /api/v1/users` - l'ecran par lequel on invite quelqu'un - etait
+                // casse. Meme derive de schema que l'enrolement 2FA (F35-002).
+                // On selectionne la colonne qui existe ; l'etat 2FA s'en deduit.
+                ->select(['id', 'email', 'name', 'current_workspace_id', 'first_login_completed_at', 'totp_enabled_at', 'last_login_at'])
                 ->orderBy('name')
                 ->limit(200)
                 ->get();
 
-            return $this->ok(['data' => $users]);
+            return $this->ok(['data' => $users->map(fn (User $u) => [
+                'id' => $u->id,
+                'email' => $u->email,
+                'name' => $u->name,
+                'current_workspace_id' => $u->current_workspace_id,
+                'first_login_completed_at' => $u->first_login_completed_at,
+                'two_factor_enabled' => $u->twoFactorEnabled(),
+                'last_login_at' => $u->last_login_at,
+            ])->all()]);
         } catch (\Throwable $e) {
             Log::error('users.index failed', ['exception' => $e->getMessage()]);
             report($e);

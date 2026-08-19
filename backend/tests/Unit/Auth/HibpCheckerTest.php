@@ -49,7 +49,16 @@ test('HibpChecker isBreached respecte le threshold', function () {
     expect($checker->isBreached('password', threshold: 20))->toBeFalse();
 });
 
-test('HibpChecker fail-open en cas d\'erreur réseau', function () {
+/**
+ * CE TEST GARDAIT UN DEFAUT. Il s'appelait « fail-open en cas d'erreur reseau »
+ * et exigeait `0` - c'est-a-dire « ce mot de passe n'apparait dans aucune fuite ».
+ * Une panne reseau desactivait donc le controle en silence, et la regle
+ * NotPwnedPassword acceptait `password`. Mesure le 2026-08-19 (audit 360,
+ * F35-004). Le contrat est desormais a trois etats : un entier quand on sait,
+ * `null` quand on ne sait pas. Un test vert n'est une bonne nouvelle que si ce
+ * qu'il exige est ce qu'on veut.
+ */
+test('HibpChecker rend null - et surtout pas 0 - quand le reseau echoue', function () {
     $mock = new MockHandler([
         new \GuzzleHttp\Exception\ConnectException(
             'connect timeout',
@@ -59,16 +68,16 @@ test('HibpChecker fail-open en cas d\'erreur réseau', function () {
     $client = new Client(['handler' => HandlerStack::create($mock)]);
     $checker = new HibpChecker($client);
 
-    // Pas d'exception, retourne 0 (fail-open)
-    expect($checker->getBreachCount('anything'))->toBe(0);
+    // Pas d'exception, mais surtout pas « 0 » : on ne sait pas, et on le dit.
+    expect($checker->getBreachCount('anything'))->toBeNull();
 });
 
-test('HibpChecker fail-open sur status non-200', function () {
+test('HibpChecker rend null sur un statut HTTP autre que 200', function () {
     $mock = new MockHandler([new Response(503, [], 'service unavailable')]);
     $client = new Client(['handler' => HandlerStack::create($mock)]);
     $checker = new HibpChecker($client);
 
-    expect($checker->getBreachCount('anything'))->toBe(0);
+    expect($checker->getBreachCount('anything'))->toBeNull();
 });
 
 test('HibpChecker retourne 0 pour password vide sans appel API', function () {
@@ -101,4 +110,18 @@ test('HibpChecker parse correctement les newlines mixtes', function () {
     $checker = new HibpChecker($client);
 
     expect($checker->getBreachCount('password'))->toBe(5);
+});
+
+test('HibpChecker isBreached rend null quand le service est injoignable', function () {
+    $mock = new MockHandler([
+        new \GuzzleHttp\Exception\ConnectException(
+            'connect timeout',
+            new \GuzzleHttp\Psr7\Request('GET', 'https://api.pwnedpasswords.com/range/12345')
+        ),
+    ]);
+    $checker = new HibpChecker(new Client(['handler' => HandlerStack::create($mock)]));
+
+    // Ni true ni false : « je ne sais pas ». C'est a l'appelant de trancher, et
+    // NotPwnedPassword tranche en refusant.
+    expect($checker->isBreached('anything'))->toBeNull();
 });

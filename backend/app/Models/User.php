@@ -28,9 +28,8 @@ use Spatie\Permission\Traits\HasRoles;
  * @property ?CarbonInterface $locked_until
  * @property ?string $totp_secret
  * @property ?CarbonInterface $totp_enabled_at
- * @property ?string $two_factor_secret
- * @property bool $two_factor_enabled
- * @property ?array<int, string> $two_factor_recovery_codes
+ * @property ?array<int, string> $totp_recovery_codes Codes de secours, hachés bcrypt
+ * @property ?CarbonInterface $last_failed_login_at
  * @property-read ?Workspace $currentWorkspace
  * @property-read Collection<int, Workspace> $workspaces
  */
@@ -46,19 +45,40 @@ class User extends Authenticatable
     protected $guard_name = 'web';
     // table par défaut 'users' OK
 
+    /**
+     * 🔴 Les colonnes de la 2FA s'appellent `totp_*`, PAS `two_factor_*`.
+     * Ce tableau declarait `two_factor_secret`, `two_factor_enabled` et
+     * `two_factor_recovery_codes` : aucune n'existe en base (migration 000002).
+     * Comme Eloquent cree un attribut dynamique sans broncher, l'erreur
+     * n'apparaissait qu'a l'enregistrement, en SQL, et l'enrolement 2FA etait
+     * mort - donc la premiere connexion aussi (A07-001 / F35-002).
+     * « La 2FA est active » se lit sur `totp_enabled_at` : pas de drapeau booleen
+     * separe a tenir synchronise.
+     */
     protected $fillable = [
         'id', 'name', 'email', 'password_hash', 'current_workspace_id',
-        'two_factor_enabled', 'first_login_completed_at', 'onboarding_tour_completed_at',
-        'totp_enabled_at', 'totp_secret', 'two_factor_secret', 'two_factor_recovery_codes',
+        'first_login_completed_at', 'onboarding_tour_completed_at',
+        'totp_enabled_at', 'totp_secret', 'totp_recovery_codes',
         'last_login_at', 'last_login_ip', 'last_login_user_agent',
-        'failed_login_count', 'locked_until', 'email_verified_at',
+        'failed_login_count', 'last_failed_login_at', 'locked_until', 'email_verified_at',
     ];
 
-    protected $hidden = ['password_hash', 'remember_token', 'totp_secret', 'two_factor_secret', 'two_factor_recovery_codes'];
+    protected $hidden = ['password_hash', 'remember_token', 'totp_secret', 'totp_recovery_codes'];
 
     public function getAuthPassword(): ?string
     {
         return $this->password_hash;
+    }
+
+    /**
+     * La double authentification est-elle active sur ce compte ?
+     *
+     * Remplace l'ancien attribut `two_factor_enabled`, qui n'avait pas de colonne
+     * et donnait un booleen toujours faux (F35-002).
+     */
+    public function twoFactorEnabled(): bool
+    {
+        return $this->totp_enabled_at !== null;
     }
 
     protected function casts(): array
@@ -69,11 +89,10 @@ class User extends Authenticatable
             'onboarding_tour_completed_at' => 'datetime',
             'totp_enabled_at' => 'datetime',
             'last_login_at' => 'datetime',
+            'last_failed_login_at' => 'datetime',
             'locked_until' => 'datetime',
-            'two_factor_enabled' => 'boolean',
-            'two_factor_recovery_codes' => 'encrypted:array',
+            'totp_recovery_codes' => 'encrypted:array',
             'totp_secret' => 'encrypted',
-            'two_factor_secret' => 'encrypted',
         ];
     }
 

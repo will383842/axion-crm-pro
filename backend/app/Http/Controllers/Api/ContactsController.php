@@ -124,6 +124,10 @@ class ContactsController extends ApiController
      */
     public function show(Contact $contact): JsonResponse
     {
+        // Sans ce refus, un compte d'un autre espace lisait la fiche en devinant
+        // l'identifiant — et ce sont des entiers consecutifs (F36-005, S0).
+        $this->refuserHorsEspace($contact);
+
         return $this->ok($contact);
     }
 

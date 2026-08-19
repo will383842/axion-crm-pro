@@ -333,6 +333,10 @@ class CompaniesController extends ApiController
      */
     public function show(Company $company): JsonResponse
     {
+        // Meme raison que sur les contacts : la fiche d'un autre locataire etait
+        // lisible en devinant un identifiant (F36-005 / B12-001, S0).
+        $this->refuserHorsEspace($company);
+
         $relations = ['contacts', 'tags'];
         if (Schema::hasTable('health_practitioners')) {
             $relations[] = 'healthPractitioners';

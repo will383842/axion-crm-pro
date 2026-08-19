@@ -46,6 +46,49 @@ use Illuminate\Routing\Controller;
  */
 abstract class ApiController extends Controller
 {
+    /**
+     * Refuse un enregistrement qui appartient a un AUTRE espace de travail.
+     *
+     * 🔴 POURQUOI CETTE METHODE EXISTE (audit 360, F36-005 / B12-001, S0).
+     *
+     * `GET /contacts/{id}` et `GET /companies/{id}` rendaient `$this->ok($modele)`
+     * sur ce que la resolution de route avait trouve, SANS AUCUN filtre d'espace.
+     * Un compte de l'espace BETA lisait donc la fiche d'une personne de l'espace
+     * ALPHA en devinant un identifiant - et les identifiants sont des entiers
+     * consecutifs. Mesure le 2026-08-19.
+     *
+     * La ceinture applicative existait pourtant : `WorkspaceScope`, pose par le
+     * trait `BelongsToWorkspace`. Elle est INERTE tant que
+     * `CRM_STRICT_WORKSPACE_SCOPE` est a false, et c'est le defaut. On ne bascule
+     * PAS ce drapeau ici : il ferait echouer les 26 taches planifiees qui
+     * s'executent sans contexte d'espace (B11-001). On ferme donc la fuite la ou
+     * elle est, au point d'entree, sans toucher a ce qui tourne en arriere-plan.
+     *
+     * 404 et non 403 : repondre « interdit » confirmerait l'existence de la fiche,
+     * donc renseignerait un curieux qui balaie les identifiants. « Introuvable »
+     * ne renseigne personne.
+     */
+    protected function refuserHorsEspace(mixed $modele): void
+    {
+        if ($modele === null) {
+            return;
+        }
+
+        $espaceDuModele = $modele->workspace_id ?? null;
+
+        // Un enregistrement sans espace n'appartient a personne en particulier
+        // (referentiels globaux) : ce n'est pas a cette garde de trancher.
+        if ($espaceDuModele === null || $espaceDuModele === '') {
+            return;
+        }
+
+        $espaceCourant = app()->bound('workspace.id') ? app('workspace.id') : null;
+
+        if ($espaceCourant === null || (string) $espaceDuModele !== (string) $espaceCourant) {
+            abort(404);
+        }
+    }
+
     protected function ok(mixed $data = null, int $status = 200): JsonResponse
     {
         return response()->json($data ?? ['ok' => true], $status);

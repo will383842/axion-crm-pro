@@ -717,6 +717,76 @@ propre à lire et pire pour la personne.*
 
 ---
 
+## 14. Résultat n° 12 — « une purge efface 90 % de la base » : **la forme est dangereuse, le chiffre n'est pas établi pour la production**
+
+**Annoncé par l'agent 35** : *« `prospection:purge-non-commercial` supprime là où
+`legal_form IS NULL OR …`. Mesuré : **9 entreprises supprimées sur 10**, sans confirmation, sans
+essai à blanc, sans retour possible. »*
+
+### ✅ Ce qui est vrai, et vérifié en trois lignes
+
+```php
+$condition = "(legal_form IS NULL OR left(legal_form, 1) <> '5')";
+$count = DB::table('companies')->whereRaw($condition)->count();
+DB::table('companies')->whereRaw($condition)->delete();
+```
+
+**La commande supprime sur une ABSENCE de donnée.** Pas de `--dry-run`, pas de plafond, pas de
+confirmation, pas de transaction, pas de contexte d'espace. **Et elle est lançable en un clic sur la
+production** : `prospection-collect-region.yml:102-103` et `prospection-reclassify.yml:38-39`
+l'exécutent en SSH sur le serveur.
+
+✅ **Point rassurant, vérifié** : les deux workflows sont en **`workflow_dispatch` seul, sans
+cadence**, et la commande **n'est planifiée nulle part dans Laravel** (aucune occurrence dans
+`routes/`, `Kernel.php`, `bootstrap/`). **Rien ne la déclenche tout seul.**
+
+### 🔴 Mais le chiffre de 90 % n'est PAS établi pour la production — et je refuse de l'y transposer
+
+Il l'a mesuré sur **la base de volume** (le jeu de référence), *où le registre note déjà que la forme
+juridique est inconnue pour l'essentiel des lignes*. **Il n'a aucun accès à la production.** C'est la
+**troisième assertion de production d'affilée** qu'il produit sans pouvoir la mesurer.
+
+**Et le registre porte une contre-indication qu'il ne cite pas.** `B17-012` (S1) établit que ces deux
+purges ont **déjà été jouées CINQ FOIS en production, le 2026-07-04**. Or la production porte
+**4 295 349 entreprises** en août.
+
+> **Si la commande effaçait 9 lignes sur 10 en production, cinq exécutions n'auraient pas laissé
+> 4,29 millions de fiches.** Le raisonnement n'est pas une preuve — la base a pu être recollectée —
+> mais c'est une **contre-indication sérieuse**, et elle suffit à interdire de reprendre le chiffre.
+> *L'explication la plus probable : en production, `legal_form` est renseignée par l'INSEE pour
+> l'essentiel des lignes, ce qui n'est pas le cas du jeu de référence.*
+
+**Arbitrage : `B17-012` reste S1.** Je ne le monte pas en S0 sur un chiffre mesuré ailleurs.
+**Ce qu'il faudrait pour trancher** : une seule requête en **lecture seule** sur la production —
+`SELECT count(*) FILTER (WHERE legal_form IS NULL) , count(*) FROM companies`. *Je ne l'ai pas
+faite : elle demande un accès que je n'ai pas, et la mesure appartient à qui l'a.* **Porté à
+`06_RESTE-WILL` comme la question à poser, pas comme un fait.**
+
+> 🔑 **Je m'applique ici exactement la règle que je viens de lui opposer deux fois.** Il aurait été
+> facile — et spectaculaire — d'écrire « une commande efface 90 % de votre base ». *Ce serait le
+> même défaut que le sien, commis dans le document qui le relève.*
+
+### ✅ Et ses trois barrières sont bonnes quel que soit le vrai chiffre
+
+Un plafond qui refuse au-delà de **30 %** de la table protège **exactement** contre le mode de panne
+redouté, **sans dépendre du taux réel de `legal_form` nulles**. *C'est un correctif juste pour une
+raison indépendante de la mesure contestée.* **Rien à reprendre.**
+
+### ✅ Deux autres trouvailles de son lot, qui tiennent
+
+- **`configure-prod-env.sh` ne configurait rien** : il écrit les variables puis fait
+  `docker compose restart`, **qui ne relit pas `env_file`** — le piège n° 8 du dossier, déjà payé.
+  *Le script annonçait « Restart services… » et rendait la main sans qu'aucune variable soit
+  appliquée.* Il vérifie désormais par `docker inspect` **au lieu de supposer**. **Excellent, et
+  c'est le patron « mesurer, pas supposer » appliqué à un script d'infrastructure.**
+- **Sa propre garde le trompait** : elle inspectait `infra/scripts/*.sh` alors que son conteneur ne
+  monte que `backend/`. **Elle voyait zéro fichier et passait au vert.** *« Le pire des verts : celui
+  qui ne mesure rien. »* **Dix-neuvième cas du patron `A-011`, trouvé par l'agent sur lui-même** —
+  et il a ajouté un test qui vérifie que la garde **a bien des fichiers à inspecter**. *C'est la
+  parade générique à `A-011`, et elle manquait à ce dépôt.*
+
+---
+
 ## 3. Journal de la passe
 
 | Date | Objet | Verdict |
@@ -732,3 +802,4 @@ propre à lire et pire pour la personne.*
 | 2026-08-19 | `46f1717` — la chaîne d'audit se déclarait valide sans secret | ✅ **Défaut réel et bien corrigé** — l'organe qui prouve affirmait sans pouvoir savoir. 🔴 **Mais l'affirmation publique « le secret est vide en production » est FAUSSE** : mesuré **64 caractères**, deux fois, sur la production en marche (`B16-001` réfuté). **Généralisation d'un constat d'atelier — l'erreur la plus répétée de cet audit, et je l'ai commise le premier.** Décompte inchangé : **34** |
 | 2026-08-19 | `debc860` — « la production se croyait en simulacre à cause de `config:cache` » | 🔴 **Mécanisme RÉFUTÉ par la mesure** : `variables_order=EGPCS`, `MOCK_MODE` présent dans `$_SERVER` **et** `$_ENV` — `env()` lit la vraie valeur même sous configuration en cache. Corroboré par les **64 caractères** mesurés par l'agent 40 sur la production. ✅ Mais **`MAIL_MAILER` non défini est vrai** (S0), et son arbitrage produit est juste. **Deuxième assertion de production fausse d'affilée** |
 | 2026-08-19 | `E31-001` « n'est pas dans ce dépôt » | ✅ **Vrai — mais `B14-002` non plus** : les deux portent sur le site, **ma fusion tient, total inchangé (34)**. 🔑 Ce que ça change : **un S0 du décompte n'est pas réparable ici**, il demande une PR sur `Axion-IA`. Le §4 le rangeait au rang 5 sans le dire. ✅ Et sa décision de ne PAS purger `opt_out`/`dnc_entries` est juste — *effacer la preuve de l'opposition, c'est effacer la protection* |
+| 2026-08-19 | « une purge efface 90 % de la base » | ✅ **La forme est bien dangereuse** — suppression sur une ABSENCE de donnée, sans garde-fou, **lançable en un clic sur la production**. ✅ Mais **rien ne la déclenche seule** (dispatch manuel, non planifiée). 🔴 **Le chiffre de 90 % n'est PAS établi pour la production** : mesuré sur le jeu de référence, et le registre note que ces purges ont **déjà tourné 5 fois en production** — qui porte toujours 4,29 M de fiches. **`B17-012` reste S1.** Une requête en lecture seule trancherait |

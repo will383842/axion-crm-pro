@@ -9,13 +9,16 @@ des autres. Règle 7 de la doctrine.
 |---|---|
 | `main` | **`e8924b8`** (`e8924b81ad64c0b236acd99ac5cbac4cd68eada7`) — c'est aussi la base de fusion |
 | Branche au lancement de ma mission | `bdd25eb` (2 commits : `da994be`, `bdd25eb`) |
-| **Branche à la clôture de ma mission** | **`46848d4`** (4 commits : + `26fa980`, + `46848d4`) |
+| **Branche sur laquelle porte mon verdict** | **`46848d4`** (4 commits : `da994be`, `bdd25eb`, `26fa980`, `46848d4`) |
+| Branche au moment où je pose la plume | **`a6aceb0`** — un **5ᵉ** commit est apparu pendant que je rédigeais (« la signature du canal machine était forgeable », B12-004). **Il n'est PAS dans mon périmètre et je ne l'ai pas mesuré.** Il fait l'objet d'un verdict séparé (`dc4bb7a` sur la branche d'audit). |
 | Mon plan de travail | worktree **dédié** `C:/Users/willi/Documents/Projets/crmpro-wt-p5a35`, **détaché** (jamais la branche elle-même), conteneur **dédié** `p5a35`, bases **dédiées** `axion_crm_p5a35` / `axion_crm_test_p5a35` (**59 migrations** vérifiées) |
 | Interdits respectés | aucun `git push`, aucune PR, aucun merge, rien sur `main`, **aucune requête vers la production**, `crmpro-wt-etape1a` jamais approché |
 
-🔴 **La branche a bougé PENDANT ma mesure.** Les commits `26fa980` (17:46) et `46848d4` (18:04)
-sont apparus alors que j'avais commencé. C'est le §1 du dossier appliqué à la lettre : **je nomme
-la référence exacte de chaque mesure**, et je dis laquelle porte sur quel commit.
+🔴 **La branche a bougé TROIS FOIS pendant ma mission.** `26fa980` (17:46), `46848d4` (18:04), puis
+`a6aceb0`. C'est le §1 du dossier appliqué à la lettre : **je nomme la référence exacte de chaque
+mesure**, je dis laquelle porte sur quel commit, et **je ne prétends rien sur ce que je n'ai pas
+mesuré**. Un lot qui grossit plus vite qu'on ne le relit est, en soi, une observation : c'est ce qui
+rend une revue d'un bloc impraticable, et c'est comment un commit finit par passer sans lecture.
 
 Preuves brutes : `_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/p5-agent35/`.
 
@@ -23,9 +26,10 @@ Preuves brutes : `_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/p5-agent35/`.
 
 ## 1. VERDICT — EN UNE LIGNE
 
-> **NON, la branche n'est pas fusionnable en l'état** : à `46848d4` elle **casse un test du dépôt
+> **NON, la branche n'est pas fusionnable en l'état** : à `46848d4` la suite backend complète rend
+> **3 rouges / 819 verts**, dont **un imputable à la branche** — elle **casse un test du dépôt
 > qu'elle n'a pas mis à jour** (`NotificationsControllerTest > GET /audit-logs authentifié → OK`,
-> 403 au lieu de 200, mesuré), **une garde sur vingt-cinq est structurellement incapable de rougir**
+> 403 au lieu de 200, mesuré) ; **une garde sur vingt-cinq est structurellement incapable de rougir**
 > (`F35-002 — GET /users`), **deux des quatorze constats déclarés « gardés » n'ont aucune garde**
 > (F35-007, F35-014), **le correctif du script d'accès rend ses propres branches d'erreur
 > inatteignables** (`set -e`), et **B16-004 n'est corrigé qu'à moitié** — la fuite inter-espaces du
@@ -34,8 +38,7 @@ Preuves brutes : `_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/p5-agent35/`.
 > **Ce n'est pas un verdict « à jeter ».** Onze correctifs sur quatorze sont réels, mesurés, et
 > gardés par des tests que j'ai **vus rougir sur le code d'avant** ; la chaîne de première connexion,
 > qui n'avait jamais été franchissable, **l'est maintenant de bout en bout** (mesuré). Ce lot mérite
-> d'être fusionné **après** les corrections listées au §3 — six d'entre elles tiennent en moins d'une
-> heure.
+> d'être fusionné **après** les corrections listées au §6 — les six premières totalisent **1 h 32**.
 
 ---
 
@@ -97,11 +100,26 @@ Quatre tests exigeaient le défaut ; ils ont été réécrits, pas supprimés, a
 | `OwnerUserSeederTest` | `assertExists('seeders/owner-initial-password.txt')` | `assertMissing`, `password_hash` nul, + un cas nominal neuf | ✅ sain |
 | `MagicLinkServiceTest` | une ligne orpheline `user_id = NULL` | zéro ligne, + un témoin sur une adresse connue | ✅ sain |
 
-⚠️ **Portée exacte de ce « sain »** : il porte sur la **lecture** ligne à ligne de ce que chaque test
-exige avant et après, et sur la vérité de l'histoire écrite en tête. **Je n'ai PAS passé ces quatre
-fichiers au témoin négatif** (restaurer le code d'avant et les voir rougir) : leurs constats sont
-déjà couverts par les gardes du §2.1 pour trois d'entre eux, et **F35-008 n'est donc gardé que par un
-test que je n'ai pas vu rougir**. Voir §4.9.
+**`OwnerUserSeederTest` est le seul de ces quatre à garder un constat (F35-008) qui n'a pas d'équivalent
+dans le fichier de gardes neuves : je l'ai donc passé au témoin négatif, séparément.** `OwnerUserSeeder`
+ramené à `main`, le test **ROUGIT** (`mesures-finales.txt`, bloc [B]) :
+
+```
+⨯ OwnerUserSeeder n écrit AUCUN secret quand OWNER_INITIAL_PASSWORD e…
+  Failed asserting that '$2y$04$f.mY0EReUcmr.F1yyT9Sfe.Cu1wL76.aESRvUunt.uRs5xWmnyNEO' is null.
+  Tests: 1 failed, 4 passed (20 assertions)
+```
+
+Le hachage exhibé **est** le mot de passe de 32 caractères que l'ancien seeder fabriquait, et que le
+correctif ne fabrique plus. Témoin positif : le **même** fichier, avec le correctif remis, rend
+5 verts. ⚠️ Nuance : la garde tombe sur `password_hash` **avant** d'atteindre son
+`assertMissing('seeders/owner-initial-password.txt')` — l'absence du fichier n'a donc, elle, jamais
+été **vue** rougir. La garde prouve « le seeder ne fabrique plus de secret », pas « il ne l'écrit plus
+sur disque ». Les deux sont vrais par lecture du code ; un seul est prouvé par la mesure.
+
+⚠️ **Portée exacte du « sain » des trois autres lignes** : il porte sur la **lecture** ligne à ligne de
+ce que chaque test exige avant et après, et sur la vérité de l'histoire écrite en tête. Leurs constats
+(F35-004, F35-011, F35-013) sont par ailleurs couverts par des gardes du §2.1 que **j'ai** vues rougir.
 
 ### 2.3 — Les gardes d'interface
 
@@ -139,7 +157,34 @@ eux.** Voir P5-35-005.
 |---|---|
 | F35-007 — le mot de passe dans `argv` de `docker exec` | **AUCUNE** |
 | F35-014 — verdict lu sur une sous-chaîne | **AUCUNE** (et le correctif introduit P5-35-004) |
-| F35-008 — secret en clair sur disque | `OwnerUserSeederTest` (réécrit) ✅ |
+| F35-008 — secret en clair sur disque | `OwnerUserSeederTest` (réécrit) ✅ **vue rougir** (§2.2) |
+
+### 2.6 — La suite backend **complète**, sur `46848d4`
+
+Jouée en entier dans mon conteneur dédié, sur ma base dédiée, avec la sévérité du dépôt
+(`failOnWarning=true`, `failOnRisky=true`). Sortie brute : `suite-complete-46848d4.txt` (1 115 l.).
+
+```
+Tests:  3 failed, 1 skipped, 819 passed (6573 assertions)
+Duration: 724.10s
+```
+
+**Attribution des trois rouges — et deux d'entre eux ne sont PAS imputables à la branche :**
+
+| Échec | Message | Imputable à la branche ? |
+|---|---|---|
+| `NotificationsControllerTest > GET /audit-logs authentifié → OK` | `Expected 200 but received 403` | **🔴 OUI** — `46848d4` pose `permission:audit.view` sans mettre ce test à jour. **P5-35-006.** |
+| `CoverageControllerTest > POST /coverage/launch accepte body valide` | `Expected 200 but received 500` | **Non — PRÉEXISTANT, mesuré des deux côtés.** Rejoué isolément sur la branche : `1 failed, 8 passed` (`mesures-finales.txt`). **Le worktree basculé sur `main` (`e8924b8`), le même fichier rend le même rouge, à la même ligne, avec le même message** : `1 failed, 8 passed` (`coverage-attribution.txt`). Le défaut est donc **déjà sur `main`** ; la branche ne le crée pas. *(Au passage : `main` porte un test rouge. Hors de mon périmètre, mais quelqu'un devrait le savoir.)* |
+| `NeDoitPasRegresserTest > ACQUIS 2 (suite)` | `« infra/scripts/backup-postgres.sh » a disparu` | **Non — artefact d'atelier, mesuré.** Le test lit `dirname(base_path())`, soit `/var/www` dans le conteneur, où **seul `backend/` est monté** : `docker exec p5a35 ls /var/www` rend `html` et rien d'autre. Le fichier existe bel et bien (`git ls-files infra/scripts` le liste, `ls -la` le montre à 7 347 octets). ⚠️ **Cela vaut aussi pour le conteneur partagé `axion-crm-api`**, qui monte le même unique volume : cette garde est donc **rouge en permanence dans l'atelier local documenté** (`make test-backend`), et verte en CI. Une garde qui rougit toujours localement finit par n'être plus lue. |
+
+**Conclusion de ce §** : la branche introduit **un** rouge, pas trois — le deuxième est **déjà sur
+`main`** (mesuré), le troisième est un artefact du montage de l'atelier (mesuré). C'est un de trop
+pour fusionner, et il se corrige en quinze minutes.
+
+**Témoin méthodologique** : l'attribution n'est pas une opinion. Pour chacun des deux rouges écartés,
+j'ai produit la mesure qui l'écarte — le même test sur `main` pour l'un, `ls /var/www` dans le
+conteneur pour l'autre. Sans ces deux mesures, « ce n'est pas nous » aurait été une affirmation, pas
+un constat.
 
 ---
 
@@ -217,8 +262,8 @@ eux.** Voir P5-35-005.
 - Sévérité      : S2
 - Domaine       : tests
 - Référence     : branche `fix/a35-authentification` `da994be`
-- Emplacement   : `_AUDIT/2026-08-18_AUDIT-360/11_GRILLES/agent-35_authentification.md:32,379,466` · message de commit `da994be`
-- Constat       : le rapport annonce « **25 tests neufs**, chacun **vu rougir avant** son correctif » et chaque constat porte « Garde vue rougir puis verte ». **F35-007** (le mot de passe dans `argv`) et **F35-014** (le verdict lu sur une sous-chaîne) portent tous deux cette mention, et **aucun test du dépôt ne lit `infra/scripts/`**.
+- Emplacement   : `_AUDIT/2026-08-18_AUDIT-360/11_GRILLES/agent-35_authentification.md` l. **32** (« 25 tests neufs, chacun vu rougir avant son correctif »), l. **401** (statut de F35-007) et l. **488** (statut de F35-014) — numéros relevés le 2026-08-19 à 18:45, le fichier étant modifié par d'autres sessions · message de commit `da994be`
+- Constat       : le rapport annonce « **25 tests neufs**, chacun **vu rougir avant** son correctif », et **les quatorze** lignes « Statut » portent la formule « Garde vue rougir puis verte » (recomptées : `grep -c "Garde vue rougir puis verte"` = 14). **F35-007** (le mot de passe dans `argv`) et **F35-014** (le verdict lu sur une sous-chaîne) portent tous deux cette mention, et **aucun test du dépôt ne lit `infra/scripts/`**.
 - Preuve        : le fichier de gardes couvre 11 constats — F35-001, 002, 003, 004, 005, 006, 009, 010, 011, 012, 013 (recensement par en-têtes de section : `04_PREUVES/p5-agent35/temoin-negatif-backend.txt`, 11 blocs). F35-008 est couvert par `OwnerUserSeederTest` réécrit. Restent F35-007 et F35-014, sans aucun fichier.
 - Témoin négatif: la **même** méthode de recensement trouve bien les 11 autres, et retrouve F35-008 dans un **autre** fichier que celui des gardes : elle sait donc voir une garde quand elle est ailleurs. C'est bien qu'il n'y en a pas pour ces deux-là.
 - Impact        : la ligne de défense de ce lot est déclarée plus large qu'elle ne l'est. Conséquence **immédiate et mesurée** : le correctif de F35-014 introduit P5-35-004 (S1) et **rien ne l'a rattrapé** — c'est exactement ce qu'une garde aurait attrapé. La règle 2 de la doctrine (« une garde ne vaut que si on l'a vue rougir ») suppose d'abord qu'elle existe.
@@ -348,8 +393,9 @@ eux.** Voir P5-35-005.
 Cette liste est un livrable. Trois agents de cet audit ont refusé de conclure et ce refus a été
 validé comme du travail supérieur ; je fais de même là où je ne sais pas.
 
-1. 🔴 **La branche a bougé pendant ma mesure, et elle peut avoir rebougé depuis.** Mon verdict porte
-   sur **`46848d4`**, relu par `git log` à 18:25. Les mesures du §2.1 (les 25 gardes) et du §2.3
+1. 🔴 **La branche a bougé pendant ma mesure, et elle a rebougé depuis.** Mon verdict porte
+   sur **`46848d4`**, relu par `git log` à 18:25. **Un 5ᵉ commit, `a6aceb0`, existe désormais et je ne
+   l'ai pas mesuré** — ni son code, ni ses gardes. Les mesures du §2.1 (les 25 gardes) et du §2.3
    (`ActivityFeed`) ont été faites sur **`bdd25eb`** — mais les fichiers concernés n'ont pas été
    touchés par `26fa980` ni `46848d4` (`git diff bdd25eb..46848d4 --name-only` ne rend que
    `TwoFactorPage.tsx`, `routes/api.php` et trois fichiers de test). **Re-mesurez `git log` avant de
@@ -368,11 +414,12 @@ validé comme du travail supérieur ; je fais de même là où je ne sais pas.
    `https://app.localhost`, se connecter avec un compte neuf, et enrôler pour de vrai. Je ne l'ai pas
    fait : l'atelier partagé sert l'API par `php -S` mono-processus (A-009/A-010) et une quinzaine
    d'agents y travaillaient ; une mesure d'interface y aurait mesuré la file d'attente.
-5. **La suite backend complète.** Elle tournait encore à la clôture de ma mission — résultat partiel
-   consigné dans `04_PREUVES/p5-agent35/suite-complete-46848d4.txt`. Ce que je tiens pour acquis est
-   plus étroit et suffit au verdict : **1 échec mesuré et reproductible** (P5-35-006) sur les
-   6 fichiers ciblés, et **25 + 6 + 4 gardes vertes** sur les fichiers du lot. **Je n'affirme pas
-   qu'il n'y a qu'un seul rouge** — j'affirme qu'il y en a au moins un.
+5. **La suite backend complète a été jouée** (§2.6 : 3 rouges / 819 verts / 1 ignoré), mais **dans
+   MON atelier**, pas en CI. Deux des trois rouges sont imputés à l'environnement plutôt qu'à la
+   branche ; cette imputation repose sur une mesure pour `NeDoitPasRegresserTest` (le montage du
+   conteneur) et sur un rejeu isolé pour `CoverageControllerTest`. **Je ne peux pas garantir que la
+   CI rendrait exactement ces trois-là** : le piège n° 5 du dossier rappelle qu'elle évalue le commit
+   de **fusion**, pas la branche, et je n'ai pas construit ce commit.
 6. **`axion_crm_test` est codée en dur dans `tests/bootstrap.php`** (`const TEST_DATABASE_NAME`), et
    ce fichier **écrase `$_SERVER`, `$_ENV` et `putenv()`** — le `force="true"` de `phpunit.xml` n'y
    peut rien. C'est le mécanisme exact de **B11-005**, et il rend l'isolement **impossible sans
@@ -385,12 +432,12 @@ validé comme du travail supérieur ; je fais de même là où je ne sais pas.
    variable est posée en production.
 8. **La fenêtre TOTP et les codes de secours en conditions réelles** (horloge décalée, code rejoué à
    la seconde près) : non joués. La sonde `P5-H` n'exerce que le chemin nominal.
-9. **Le témoin négatif de `OwnerUserSeederTest` (donc de F35-008) n'a pas été joué.** J'ai lu le test
-    réécrit et vérifié que ce qu'il exige est bien l'inverse de ce qu'il exigeait ; je ne l'ai pas vu
-    **rougir** sur l'ancien `OwnerUserSeeder`. Le geste manque : `git restore --source=main
-    --worktree -- backend/database/seeders/OwnerUserSeeder.php` puis rejouer le fichier. Coût : 5 min.
-    **F35-008 est donc, à ce stade, le seul des douze constats « gardés » dont la garde n'a pas été
-    contre-vérifiée par moi.**
+9. **La garde de F35-008 rougit — mais pas sur la moitié qui compte le plus.** Le témoin négatif a
+    été joué (§2.2) et le test tombe bien sur l'ancien seeder ; il tombe cependant sur
+    `password_hash`, **avant** d'atteindre l'assertion « aucun fichier de secret sur disque ». Que le
+    fichier ne soit plus écrit n'est donc établi que **par lecture du code**, pas par la mesure. Et
+    les permissions réelles du fichier résiduel sur le serveur restent, comme l'écrit l'agent 35
+    lui-même, non mesurées.
 10. **Aucune mesure de performance ou de concurrence.** Toutes mes mesures sont **à un seul
     utilisateur** (§5 bis.0 du dossier) : les durées relevées en `P5-D` (76 ms / 156 ms) sont des
     durées de banc de test, pas des durées de production, et elles ne servent qu'à comparer deux
@@ -475,8 +522,10 @@ Un rapport uniquement à charge ne vaut rien. Voici ce que j'ai cherché à cass
 | 10 | Corriger les trois mentions « garde vue rougir » de F35-007 et F35-014 | P5-35-005 (S2) | 15 min |
 | — | *Hors périmètre de cette branche* : le lot « permissions » des cinq fichiers sans rôle | P5-35-009 (S2) | ~1 j |
 
-**Le §1 à 6 tient en une heure trente.** Après quoi cette branche mérite d'être fusionnée : elle
+**Les gestes 1 à 6 totalisent 1 h 32.** Après quoi cette branche mérite d'être fusionnée : elle
 répare une chaîne de verrous qui empêchait, depuis le 2026-05-17, quiconque d'utiliser ce produit.
+Les gestes 7 à 10 peuvent suivre dans un second lot, **sauf le 7** (fuite inter-espaces du journal
+d'audit) si l'on tient à ce que B16-004 soit réellement clos.
 
 ---
 
@@ -499,5 +548,29 @@ Toutes dans `_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/p5-agent35/` :
 | `sonde-shell-set-e.sh` / `.txt` | la mesure du `set -e`, avec ses deux témoins positifs |
 | `migration-reversibilite.txt` | `up` → `rollback` → `up`, schéma relevé aux trois moments |
 | `six-tests-sans-role.txt` | les six fichiers signalés, 73 verts / 1 rouge |
-| `suite-complete-46848d4.txt` | la suite complète (partielle à la clôture, cf. §4.5) |
+| `suite-complete-46848d4.txt` | la suite backend complète : 3 rouges / 819 verts / 1 ignoré |
+| `mesures-finales.sh` / `.txt` | `CoverageControllerTest` joué seul + le témoin négatif de `OwnerUserSeederTest` |
+| `coverage-attribution.sh` / `.txt` | le même `CoverageControllerTest` joué sur `main` : imputation du rouge |
 | `sondes/*.php` | les sources de mes quatre sondes, rejouables |
+
+
+---
+
+## 8. ÉTAT DE L'ATELIER À MA SORTIE — vérifié
+
+| Objet | État |
+|---|---|
+| Dépôt principal | branche **`audit/360-p1-p2`**, comme à mon arrivée ; mes seuls ajouts sont ce rapport et `04_PREUVES/p5-agent35/` |
+| Worktree `crmpro-wt-p5a35` | **supprimé** (`git worktree remove --force`), après retrait de la jonction `frontend/node_modules` **par `rmdir`** — jamais par une suppression récursive, qui aurait suivi la jonction et détruit les `node_modules` du dépôt principal |
+| Conteneur `p5a35` | **supprimé** (`docker rm -f`) |
+| Bases `axion_crm_p5a35`, `axion_crm_test_p5a35`, `axion_crm_mig_p5` | **supprimées** (`DROP DATABASE`) |
+| Worktree `crmpro-wt-etape1a` | **jamais approché** — ni lu, ni écrit, ni listé autrement que par `git worktree list` |
+| Worktree `crmpro-wt-a35-auth` et conteneur `a35e2e` | **jamais touchés** : ils appartiennent à l'agent 35, j'ai monté les miens à côté |
+| Production | **aucune requête émise**, aucun `ssh`, aucun secret lu ni modifié |
+| `git push` / PR / merge | **aucun** |
+
+⚠️ **Une chose que je n'ai pas pu empêcher, et qu'il faut savoir** : une autre session a committé sur
+`audit/360-p1-p2` pendant que je travaillais (`2a6bd2f`, `dc4bb7a`) et a **emporté mon dossier de
+preuves en cours d'écriture** dans son commit. Les fichiers sont donc versionnés dans un état
+intermédiaire. Ce rapport-ci et les preuves finales sont sur le disque, non committés : **c'est à
+Will de décider ce qui entre dans l'historique.**

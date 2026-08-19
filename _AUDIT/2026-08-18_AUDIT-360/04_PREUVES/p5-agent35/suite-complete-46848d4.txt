@@ -871,3 +871,245 @@
   ✓ subsequent record chains to previous hash                            2.74s  
   ✓ verifyChain detects a rewritten prev_hash link                       3.28s  
   ✓ verifyChain detects tampering on event_type (the HTTP verb)          1.97s  
+
+   PASS  Tests\Unit\FranceTravail\FranceTravailDiscoveryClientTest
+  ✓ it Sprint H3: filters out radiées entreprises via INSEE check        2.87s  
+  ✓ it returns deduplicated entreprises from offres                      3.24s  
+  ✓ it returns empty on 204 No Content                                   4.04s  
+  ✓ it Sprint H3: graceful fallback if InseeClient throws                2.71s  
+  ✓ it skips offres with invalid SIRET                                   2.01s  
+  ✓ it returns empty when client credentials missing                     2.43s  
+
+   PASS  Tests\Unit\Audiences\AudienceBuilderServiceTest
+  ✓ it not + neq sur un champ NULL exclut la fiche, des deux cotes       2.70s  
+  ✓ it neq sur un champ renseigne ne change pas de comportement          1.53s  
+  ✓ it not + in sur un champ NULL garde la fiche, comme en memoire       1.04s  
+  ✓ it tags contains_any accepte plusieurs slugs (union, pas intersecti… 1.19s  
+  ✓ it tags contains_any ne retient que les fiches portant un des slugs  2.48s  
+  ✓ it refresh reste en ligne a exactement 5 000 fiches (le seuil est s… 6.93s  
+  ✓ it evaluateForCompany returns matching audience IDs                  0.99s  
+  ✓ it not + tags contains_any garde les fiches SANS le tag              1.40s  
+  ✓ it refresh populates audience_members                                1.73s  
+  ✓ it not : is_not_null garde les fiches dont le champ est NULL         1.34s  
+  ✓ it filters by has_email contacts                                     1.10s  
+  ✓ it not exclut les fiches qui matchent la condition                   1.06s  
+  ✓ it not sur un champ NULL garde la fiche : inconnu n est pas egal     0.68s  
+  ✓ it preview uses any combinator (OR)                                  0.65s  
+  ✓ it refresh bascule en Bus::batch au-dela de 5 000 fiches             6.23s  
+  ✓ it tags : SQL et evaluateur en memoire donnent le MEME nombre        1.18s  
+  ✓ it skips invalid fields/ops silently                                 0.49s  
+  ✓ it filters by quality_score range                                    0.79s  
+  ✓ it tags avec un operateur non supporte ne vise personne              0.55s  
+  ✓ it not_in garde les fiches dont le champ est NULL, comme en memoire  0.76s  
+  ✓ it tags contains_any avec une liste VIDE ne vise personne            0.90s  
+  ✓ it le chemin batch remet l audience a zero AVANT de dispatcher       1.67s  
+  ✓ it preview returns count for simple criteria                         0.96s  
+  ✓ it not : SQL et evaluateur en memoire donnent le MEME nombre (champ… 0.60s  
+  ✓ it neq garde les fiches dont le champ est NULL, comme en memoire     1.31s  
+  ✓ it refresh is idempotent (run twice = same count)                    0.70s  
+
+   PASS  Tests\Feature\Phase2StubsTest
+  ✓ Phase 2 linkedin endpoint returns 501                                0.65s  
+  ✓ Phase 2 cold-email endpoint returns 501                              0.50s  
+  ✓ 501 response includes sprint Phase 2 marker                          0.47s  
+
+   PASS  Tests\Unit\AnnuaireEntreprises\HttpAnnuaireEntreprisesAddressTest
+  ✓ it reconstructs siège address from voie components when geo_adresse… 0.71s  
+  ✓ it exposes siège address from geo_adresse                            0.49s  
+  ✓ it returns null address when siège absent                            0.48s  
+
+   PASS  Tests\Feature\Audiences\SymetrieEvaluateursTest
+  ✓ témoin — le jeu d’essai discrimine, et la sémantique arbitrée est e… 0.81s  
+  ✓ 🔴 SQL et mémoire rendent le MÊME ensemble — dix opérateurs, deux c… 5.50s  
+
+   PASS  Tests\Feature\ContactsIndexTest
+  ✓ recherche par nom : préfixe, insensible à la casse, et JAMAIS « con… 0.80s  
+  ✓ la pagination est bornée : per_page=1000 ne ramène pas 1000 lignes   0.67s  
+  ✓ pays et statut se COMBINENT — c’est le cas d’usage réel              0.48s  
+  ✓ filtre par statut de prospection — « contactables » ne ramène que l… 0.57s  
+  ✓ un contact d’un AUTRE workspace n’apparaît jamais                    0.52s  
+  ✓ filtre par pays — via l’entreprise rattachée                         0.65s  
+  ✓ chaque ligne porte les champs que l’écran affiche                    0.77s  
+  ✓ la projection n’expose PAS les colonnes internes                     0.90s  
+  ✓ filtre par statut e-mail                                             0.61s  
+  ✓ la liste renvoie les contacts existants — pas un tableau vide        0.75s  
+
+   PASS  Tests\Feature\Commands\ImportMediaEmissionsFromWikidataTest
+  ✓ it parse une réponse SPARQL fake et insère émissions + présentateur… 1.20s  
+  ✓ it est idempotent : un 2e run n'ajoute aucun doublon                 1.57s  
+  ✓ it --dry-run ne persiste rien                                        1.13s  
+
+[P5-G] compte VIEWER (lecture seule), apres 46848d4 :
+       GET  /audit-logs              -> 403  (temoin : doit etre 403)
+       GET  /audit-logs/verify-chain -> 200
+       GET  /ai-act/register         -> 200
+       POST /ai-act/register         -> 501
+
+[P5-F] admin de l espace A lit GET /audit-logs -> statut=200
+       voit la ligne de SON espace ?      OUI   (temoin positif)
+       voit la ligne de l espace VOISIN ? OUI   <<< si OUI, la fuite inter-espaces demeure
+
+   PASS  Tests\Feature\Rgpd\SondeP5RgpdTest
+  ✓ P5-G — routes voisines laissees sans permission                      1.47s  
+  ✓ P5-F — le journal d audit reste-t-il inter-espaces pour un ADMIN ?   0.87s  
+
+   PASS  Tests\Feature\Auth\LoginTest
+  ✓ login rejects locked account even with correct password              0.87s  
+  ✓ me endpoint returns 401 when not authenticated                       0.88s  
+  ✓ login with wrong password fails 422                                  1.07s  
+  ✓ un mot de passe court et faux est refusé par l authentification, pa… 1.16s  
+  ✓ login throttles after 5 attempts per minute                          1.37s  
+  ✓ un mot de passe court mais CORRECT ouvre la session                  0.80s  
+  ✓ login with correct credentials succeeds                              1.03s  
+  ✓ login locks user after 10 failed attempts                            1.93s  
+  ✓ une requête SANS session reçoit un refus explicite, jamais une 500   1.87s  
+  ✓ login increments failed_login_count on wrong password                1.14s  
+
+[P5-E] client machine (Bearer, sans Origin stateful, sans session), compte 2FA ACTIVE,
+        JAMAIS passe par /auth/2fa/verify :
+        GET /api/v1/contacts -> statut=200  erreur=NULL
+        (403 two_factor_required = la 2FA est exigee ; 200 = elle est contournee)
+[P5-E] TEMOIN : GET /api/v1/auth/me avec le meme jeton -> statut=200 (prouve que le jeton est bien accepte par auth:sanctum)
+
+   PASS  Tests\Feature\Auth\SondeP5JetonTest
+  ✓ P5-E — jeton d API SANS Origin stateful, compte a 2FA ACTIVE         0.74s  
+
+   PASS  Tests\Unit\SmokeTest
+  ✓ mock LLM client returns a generic response for known use case        0.69s  
+  ✓ LLMResponseData decodes JSON text via asJson()                       1.22s  
+
+   PASS  Tests\Unit\Support\AuditLoggerTest
+  ✓ it fails open when DB insert throws (table missing)                  2.26s  
+  ✓ it skips silently when workspace_id missing                          1.14s  
+
+   PASS  Tests\Unit\Support\WaterfallSentryTest
+  ✓ it captures without throwing when Sentry class missing               1.56s  
+  ✓ it handles null company without crashing                             0.99s  
+
+   PASS  Tests\Feature\Commands\MediaLinkToCompaniesTest
+  ✓ it rattache par SIREN exact                                          2.07s  
+  ✓ it rattache par nom exact UNIQUE (publisher)                         1.71s  
+  ✓ it NE rattache PAS quand aucune company ne correspond                1.32s  
+  ✓ it est idempotent et --dry-run n'écrit rien                          3.27s  
+  ✓ it NE rattache PAS un nom ambigu (2 companies même nom normalisé)    1.95s  
+
+   PASS  Tests\Feature\Crm\CrmOutboundTest
+  ✓ un 422 abandonne IMMÉDIATEMENT (le rejeu échouerait éternellement)   2.10s  
+  ✓ au plafond d'essais, la ligne passe en gave_up (état terminal visib… 2.29s  
+  ✓ une opposition décidée dans la console met un événement en file      2.60s  
+  ✓ un 2xx solde la ligne et le corps est signé <timestamp>.<corps>                        1.43s  
+  ✓ drapeau OFF : le producteur écrit, l'émetteur REFUSE, rien ne part   1.53s  
+  ✓ les oppositions VENUES du site n'alimentent jamais l'outbox          2.10s  
+  ✓ deux oppositions identiques encore en attente ne font qu'un message  3.25s  
+  ✓ un 500 consomme une tentative et programme un backoff                1.46s  
+  ✓ un 503 fait ATTENDRE sans consommer de tentative                     1.81s  
+  ✓ le corps ne transporte JAMAIS l'email en clair                       2.55s  
+  ✓ drapeau ON mais destination vide : l'émetteur refuse plutôt que de…  1.14s  
+  ✓ la base elle-même refuse une origine autre que crm                   2.65s  
+  ✓ une ligne non encore due n'est pas rejouée                           1.27s  
+  ✓ le résumé d'observabilité expose les réceptions et le backlog        2.28s  
+  ✓ un événement d'origine SITE est REFUSÉ et ne laisse aucune ligne     0.60s  
+
+   PASS  Tests\Unit\Scraping\GooglePlacesSmartSkipTest
+  ✓ it does NOT skip when company is missing email (H16 — appelle Googl… 1.14s  
+  ✓ it considers contact with email_status=valid as sufficient email     1.17s  
+  ✓ it skips Google Places even if phone+website are missing, as long a… 1.43s  
+  ✓ it skip is disabled when smart_skip config is false                  1.35s  
+  ✓ it skips Google Places when company already has email_generic (H16…  1.41s  
+
+   PASS  Tests\Unit\Dedup\OptOutTest
+  ✓ isOptedOut normalizes email (trim + lowercase)                       0.78s  
+  ✓ isOptedOut returns true after addOptOut                              0.80s  
+  ✓ isOptedOut normalizes phone (strip separators)                       0.55s  
+  ✓ isOptedOut cross-workspace (table sans workspace_id)                 0.89s  
+  ✓ isOptedOut returns false when no opt_out entry                       1.41s  
+
+   PASS  Tests\Feature\PasDeStub501SousCrmEtAnalyticsTest
+  ✓ /cold-email et /linkedin restent des bouchons 501 — choix assumé, h… 1.07s  
+  ✓ 🔴 C1 — /api/v1/crm et /api/v1/analytics ne répondent 501 sur aucun… 0.82s  
+  ✓ 🔴 B — les routes RÉELLES de la console v2 sous /crm sont toujours…  0.90s  
+  ✓ 🔴 C2 — un sous-chemin inexistant sous /crm ou /analytics répond 40… 0.93s  
+  ✓ 🔴 A1 — aucune route sous /crm ni /analytics n’est servie par un co… 1.84s  
+  ✓ 🔴 A2 — aucun fourre-tout {any} ne capture les sous-chemins de /crm… 0.89s  
+  ✓ 🔴 C3 — le drapeau console v2 ouvert, /crm sert du code réel (200),… 0.64s  
+
+   PASS  Tests\Unit\Container\DependancesOptionnellesTest
+  ✓ les dépendances optionnelles sont RÉELLEMENT injectées par le conte… 0.51s  
+  ✓ les dépendances optionnelles sont RÉELLEMENT injectées par le conte… 0.61s  
+  ✓ les dépendances optionnelles sont RÉELLEMENT injectées par le conte… 0.81s  
+  ✓ les dépendances optionnelles sont RÉELLEMENT injectées par le conte… 0.69s  
+  ✓ le conteneur sait résoudre les classes concrètes bindées with ('App… 0.97s  
+  ✓ le conteneur sait résoudre les classes concrètes bindées with ('App… 1.13s  
+  ✓ le conteneur sait résoudre les classes concrètes bindées with ('App… 0.82s  
+
+   PASS  Tests\Unit\Rotations\WeightedRoundRobinTest
+  ✓ WeightedRoundRobin pick retourne un item disponible                  0.62s  
+  ✓ WeightedRoundRobin pondère par weight (1 vs 10)                      0.66s  
+  ✓ WeightedRoundRobin pick retourne null si aucun item                  1.02s  
+  ✓ WeightedRoundRobin skip items disabled                               0.81s  
+  ✓ WeightedRoundRobin incrémente le compteur metadata.count             0.52s  
+  ✓ WeightedRoundRobin pick ne croise pas les workspaces                 0.63s  
+  ✓ WeightedRoundRobin respecte cooldown                                 1.34s  
+
+   PASS  Tests\Feature\Controllers\WorkspaceControllerTest
+  ✓ GET /users authentifié retourne liste vide stub                      0.67s  
+  ✓ POST /users retourne 501                                             0.44s  
+  ✓ GET /users sans auth → 401                                           1.54s  
+  ✓ PUT /workspace retourne 501 (Sprint 3 stub)                          0.73s  
+  ✓ GET /workspace sans auth → 401                                       2.07s  
+  ✓ GET /workspace authentifié retourne le workspace courant             1.07s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Controllers\NotificationsControllerTest > GET /audi…   
+  Expected response status code [200] but received 403.
+Failed asserting that 403 is identical to 200.
+
+  at tests/Feature/Controllers/NotificationsControllerTest.php:60
+     56▕ });
+     57▕ 
+     58▕ test('GET /audit-logs authentifié → OK', function () {
+     59▕     $u = makeNotifUser();
+  ➜  60▕     $this->actingAs($u)->getJson('/api/v1/audit-logs')->assertOk();
+     61▕ });
+     62▕ 
+     63▕ test('GET /llm/use-cases authentifié → OK', function () {
+     64▕     $u = makeNotifUser();
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Controllers\CoverageControllerTest > POST /coverage…   
+  Expected response status code [200] but received 500.
+Failed asserting that 500 is identical to 200.
+
+  at tests/Feature/Controllers/CoverageControllerTest.php:78
+     74▕         ->postJson('/api/v1/coverage/launch', [
+     75▕             'department' => '75',
+     76▕             'limit'      => 50,
+     77▕         ])
+  ➜  78▕         ->assertOk()
+     79▕         ->assertJsonStructure(['queued']);
+     80▕ });
+     81▕ 
+     82▕ test('POST /coverage/launch refuse limit > 1000', function () {
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\NeDoitPasRegresserTest > ACQUIS 2 (suite) — la surv…   
+  « infra/scripts/backup-postgres.sh » a disparu : la chaîne sauvegarde → surveillance → restauration est rompue.
+Failed asserting that false is true.
+
+  at tests/Feature/NeDoitPasRegresserTest.php:327
+    323▕         'infra/scripts/verifier-sauvegarde.sh',
+    324▕         'infra/scripts/dr-drill.sh',
+    325▕         '.github/workflows/surveillance-sauvegarde.yml',
+    326▕     ] as $chemin) {
+  ➜ 327▕         expect(is_file($racine . '/' . $chemin))->toBeTrue(
+    328▕             "« {$chemin} » a disparu : la chaîne sauvegarde → surveillance → restauration est rompue.",
+    329▕         );
+    330▕     }
+    331▕
+
+  1   tests/Feature/NeDoitPasRegresserTest.php:327
+
+
+  Tests:    3 failed, 1 skipped, 819 passed (6573 assertions)
+  Duration: 724.10s
+  Random Order Seed: 1787156754
+

@@ -1,0 +1,49 @@
+=== bascule du worktree sur main (e8924b8) ===
+Previous HEAD position was 46848d4 fix(rgpd): un compte en lecture seule pouvait effacer et exporter n'importe qui
+HEAD is now at e8924b8 fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)
+e8924b8 fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)
+27:const TEST_DATABASE_NAME = 'axion_crm_test_p5a35';
+
+=== CoverageControllerTest sur main ===
+
+   FAIL  Tests\Feature\Controllers\CoverageControllerTest
+  ✓ GET /coverage sans auth → 401                                       30.79s  
+  ✓ POST /coverage/launch valide le département                          2.14s  
+  ✓ GET /coverage?level=city authentifié → OK                            0.79s  
+  ✓ GET /coverage?level=region authentifié → OK                          0.65s  
+  ✓ GET /coverage authentifié → OK avec cells                            0.53s  
+  ✓ GET /coverage/cells/42 retourne le détail cell                       0.66s  
+  ⨯ POST /coverage/launch accepte body valide                            1.55s  
+  ✓ GET /coverage/next-zone authentifié → OK                             1.05s  
+  ✓ POST /coverage/launch refuse limit > 1000                            0.78s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Controllers\CoverageControllerTest > POST /coverage…   
+  Expected response status code [200] but received 500.
+Failed asserting that 500 is identical to 200.
+
+  at tests/Feature/Controllers/CoverageControllerTest.php:78
+     74▕         ->postJson('/api/v1/coverage/launch', [
+     75▕             'department' => '75',
+     76▕             'limit'      => 50,
+     77▕         ])
+  ➜  78▕         ->assertOk()
+     79▕         ->assertJsonStructure(['queued']);
+     80▕ });
+     81▕ 
+     82▕ test('POST /coverage/launch refuse limit > 1000', function () {
+
+
+  Tests:    1 failed, 8 passed (12 assertions)
+  Duration: 46.18s
+  Random Order Seed: 1787157727
+
+
+=== retour sur 46848d4 ===
+Previous HEAD position was e8924b8 fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)
+HEAD is now at 46848d4 fix(rgpd): un compte en lecture seule pouvait effacer et exporter n'importe qui
+46848d4 fix(rgpd): un compte en lecture seule pouvait effacer et exporter n'importe qui
+?? backend/phpunit-p5a35.xml
+?? backend/tests/Feature/Auth/SondeP5Agent35Test.php
+?? backend/tests/Feature/Auth/SondeP5ChaineTest.php
+?? backend/tests/Feature/Auth/SondeP5JetonTest.php
+?? backend/tests/Feature/Rgpd/SondeP5RgpdTest.php

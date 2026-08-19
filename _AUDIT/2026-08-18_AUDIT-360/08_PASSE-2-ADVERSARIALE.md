@@ -448,6 +448,79 @@ une pièce existante plutôt qu'en la recopiant, et il déclare ce qu'il ne couv
 
 ---
 
+## 10. Résultat n° 8 — **la contre-vérification adversariale est rendue : PR #191 n'est PAS fusionnable**
+
+**Rapport** : `11_GRILLES/p5_contre-verification-agent-35.md` · **Preuves** : `04_PREUVES/p5-agent35/`
+
+**C'est l'objet n° 1 de cette passe, et la raison pour laquelle j'avais bloqué la branche.** Un agent
+indépendant a repris les gardes de l'agent 35 **une par une**, au témoin négatif. Il pose d'emblée
+sa limite : la branche a bougé **trois fois** sous lui ; son verdict porte jusqu'à `46848d4`, et
+**`a6aceb0` n'est pas mesuré par lui** *(il l'est par moi, §9)*.
+
+### Verdict : **non fusionnable en l'état** — trois blocages, ~1 h 30 de reprise
+
+| Id | Sév. | Ce qui bloque |
+|---|---|---|
+| **`P5-35-007`** | **S1** | 🔴 **`B16-004` n'est corrigé qu'à moitié** : l'**admin de l'espace A lit toujours le journal d'audit de l'espace B** (mesuré, témoin positif). **Et le nouveau test certifie la fuite restante** |
+| **`P5-35-006`** | **S1** | La branche **casse un test du dépôt qu'elle n'a pas mis à jour** : `NotificationsControllerTest > GET /audit-logs` rend **403 au lieu de 200** |
+| **`P5-35-004`** | **S1** | Le `set -e` ajouté à `definir-mot-de-passe-crm.sh` rend ses **branches d'erreur inatteignables** : sur un compte inexistant, l'opérateur **ne voit aucun message**. *C'est le script qui rend l'accès au CRM.* Deux témoins positifs. **Correction : 2 minutes** |
+
+**J'ai vérifié les deux premiers moi-même, statiquement, sur la branche publique :**
+
+- **`->not->toBe(403)`** apparaît **trois fois** dans le diff de `46848d4`. Cette assertion ne demande
+  qu'une chose : *« est-ce autre chose qu'un 403 ? »* — **elle passe sur un 200 qui rend le journal
+  d'un autre espace.** ✅ **Confirmé.**
+- `NotificationsControllerTest` **n'apparaît pas** dans les fichiers du commit. ✅ **Confirmé.**
+
+> 🔑 **`P5-35-007` est le dix-huitième cas du patron, et le plus retors de tous** : c'est la garde
+> **écrite pour prouver la correction de `B16-004`** qui **entérine ce qui reste ouvert**. Comme
+> `AntiReinsertionTest`, elle n'échoue pas à voir le défaut : *elle l'inscrit en assertion.*
+> **Le motif s'est reproduit dans le correctif d'un défaut dont ce motif était la cause.**
+
+### 🎯 Et `P5-ROLES-001`, écrit ce matin, s'est réalisé le jour même
+
+J'avais écrit, en balayant les 17 fichiers de test sans rôle :
+
+> *« Le jour où l'on câble les policies, ces six fichiers au moins passeront au rouge, et ce rouge
+> sera la preuve que le correctif marche. Le risque est humain : la pente naturelle est d'assouplir
+> la garde pour les faire passer. »*
+
+**`NotificationsControllerTest` était le troisième de ma liste.** Il est passé au rouge en quelques
+heures, sur cette branche, exactement comme annoncé. **La prédiction est vérifiée, et l'avertissement
+qui l'accompagnait devient opérationnel** : ce 403 est **la preuve que la garde marche**. *Il faut
+donner un rôle au test, surtout pas relâcher la route.*
+
+### ✅ Ce qui est sain, mesuré, et qu'il faut dire
+
+- **Le risque n° 1 que j'avais nommé est levé.** La chaîne **compte neuf → connexion → enrôlement
+  2FA → écran d'accueil** est franchissable **de bout en bout**, mesurée en **8 étapes**. Elle était
+  bien bloquée à `bdd25eb` ; `26fa980` l'ouvre. *La crainte que le correctif ferme la console au lieu
+  de l'ouvrir est écartée par la mesure.*
+- **`EnsureTwoFactorPassed` est réellement branché** — vu **refuser puis accepter**, pas seulement écrit.
+- **La migration est réversible** : `up` / `rollback` / `up` joués.
+- **Les 4 tests réécrits le sont correctement**, `LoginTest` étant **plus rigoureux** que la garde
+  qu'il remplace.
+- **13 gardes rougissent** avec message exact ; **8 témoins positifs déclarés**.
+
+### 🔴 Et deux constats du registre corrigés **par la mesure** — dans le bon sens
+
+| Constat | Ce qu'il disait | Ce qui est mesuré |
+|---|---|---|
+| **`F35-002`** | *« `GET /api/v1/users` est cassé »* | 🔴 **Imprécis** : sur `main` la route rend **`200 {"data":[],"degraded":true}`**, jamais 500. **Elle n'est pas cassée : elle est silencieusement vide** — patron `A-002`. *La garde correspondante ne peut donc pas rougir.* |
+| **`F35-009`** | énumération de comptes par le temps | ⚠️ **Mesurait une propriété statique chaude** qui ne survit à aucune requête PHP. Remis en condition de production, l'oracle **subsiste mais inversé et doublé** (76 ms vs 156 ms, rapport **2,04**) — **et le seuil de la garde est à 3,0** : *elle ne peut pas le voir* |
+
+### ⚠️ Ma faute d'atelier, et elle est nette
+
+L'agent signale qu'*« une autre session a committé sur la branche d'audit pendant son travail,
+emportant ses preuves en cours d'écriture dans `2a6bd2f`/`dc4bb7a` »*. **Cette autre session, c'est
+moi.** Mes `git add -A _AUDIT/…` ont ramassé ses fichiers de preuve **au milieu de leur écriture**.
+
+*Je lui demandais de mesurer proprement pendant que je marchais sur sa table.* Un ajout large sur un
+répertoire partagé avec un agent en cours est une faute de méthode, pas une maladresse :
+**il faut committer des chemins nommés, pas un répertoire.** Consigné pour toute flotte ultérieure.
+
+---
+
 ## 3. Journal de la passe
 
 | Date | Objet | Verdict |
@@ -459,3 +532,4 @@ une pièce existante plutôt qu'en la recopiant, et il déclare ce qu'il ne couv
 | 2026-08-19 | `F38-007` — « la faille du 19/08 est réarmable en un clic » (signalé par l'agent S1) | 🔴 **Vérifié, vrai, et plus large : le dispatch rouvre AUSSI l'accès root SSH.** Reclassé **S1 → S0** (`D-019`). **Trois fichiers corrigés**, dont le runbook de reprise après sinistre. **Seizième cas de `A-011`** : la garde dynamique des ports n'est câblée que sur la préproduction, déjà saine |
 | 2026-08-19 | *« Il y en a probablement d'autres »* — l'intuition de l'agent 35 sur les tests qui certifient un défaut | 🔴 **Vérifiée et étendue** : **17 fichiers** prennent une identité sans rôle et attendent un succès ; **six** exercent un geste destructeur ou des données personnelles. **`P5-ROLES-001` (S1), dix-septième cas de `A-011`** — espèce « la garde inscrit le défaut en assertion ». **Chiffre le coût caché du correctif `F36-001`** |
 | 2026-08-19 | `a6aceb0` — le correctif HMAC **publié sans relecture** (PR #191) | ✅ **Bon** : fail-closed, réemploi de la classe durcie, limite déclarée. `F37-001` fermé **pour la forge, pas pour le rejeu**. ❌ **Ne ferme ni `P5-HMAC-001` ni `P5-HMAC-002`** : les deux commentaires qui propagent le défaut sont toujours là, et **désormais circulaires**. ⚠️ Une erreur de mesure de ma part consignée : grep sans accents lu comme une absence dans le code |
+| 2026-08-19 | **Contre-vérification adversariale des correctifs de l'agent 35** — l'objet n° 1 de la passe | 🔴 **NON FUSIONNABLE** : `B16-004` corrigé à moitié et **le nouveau test certifie la fuite** (18ᵉ cas du patron) · un test du dépôt cassé et non mis à jour · `set -e` rendant muettes les erreurs du script d'accès. ✅ **Mais le risque n° 1 est levé** : l'enchaînement complet est franchissable, mesuré en 8 étapes. **Et `P5-ROLES-001`, écrit le matin, s'est vérifié le soir.** ⚠️ Ma faute : mes `git add -A` ont emporté ses preuves en cours d'écriture |

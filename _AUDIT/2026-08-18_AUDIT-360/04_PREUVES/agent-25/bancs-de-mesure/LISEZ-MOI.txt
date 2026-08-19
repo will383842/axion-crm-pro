@@ -32,3 +32,12 @@ AVERTISSEMENT DE LECTURE :
   jsdom ne peint pas. Les millisecondes mesurent la CONSTRUCTION du DOM par React,
   pas la peinture du navigateur, et le poste etait partage avec les autres agents.
   Le NOMBRE DE NOEUDS, lui, est exact : c'est celui que le navigateur devrait peindre.
+
+  partiel2.test.tsx   REPRISE de ma propre mesure : le cas C isole la cause du plantage
+                      de /console/contacts (champ manquant, PAS echec reseau).
+  volumes3.test.tsx   REPRISE de /audiences aux volumes, avec `member_count` (le bon champ).
+  delai.test.tsx      BANC QUI N A PAS ABOUTI, archive avec ce resultat negatif :
+                      ni le timeout axios (30 s) ni mon propre plafond waitFor (150 s)
+                      n ont rendu la main sous jsdom + MSW ; j ai du interrompre.
+                      Le ~93 s du rapport (§2.5) est donc un CALCUL a partir de trois
+                      constantes lues dans le code, PAS un chronometrage.

@@ -1,0 +1,31 @@
+AGENT 25 — /audiences aux volumes — REPRISE avec `member_count` (le bon champ)
+Reference : main 8db8229
+
+route      | lignes | ms | noeuds DOM | html (Ko) | note
+/audiences |      0 |    671 |         47 |         5 | 
+/audiences |      0 |    928 |         47 |         5 | 
+/audiences |      1 |    371 |         69 |         8 | 
+/audiences |      1 |    346 |         69 |         8 | 
+/audiences |    100 |   2583 |       3435 |       375 | 
+/audiences |    100 |   3050 |       3435 |       375 | 
+/audiences |  10000 |  80780 |     340035 |     37235 | 
+/audiences |  10000 |  93588 |     340035 |     37235 | 
+
+NOTE DE LECTURE — pourquoi chaque ligne apparait DEUX FOIS :
+  la premiere execution de ce banc a ete lancee dans un lot avec deux autres
+  fichiers ; le lot a ete interrompu (le banc `delai` ne rendait pas la main),
+  et son worker a continue d ecrire pendant que je relancais le banc seul.
+  Les DEUX passes donnent des chiffres IDENTIQUES sur ce qui compte
+  (47 / 69 / 3 435 / 340 035 noeuds ; 5 / 8 / 375 / 37 235 Ko) et ne different
+  que sur les millisecondes (2 583 vs 3 050 ; 80 780 vs 93 588) — deux processus
+  se partageaient la machine. C est donc, involontairement, un doublon de
+  controle : le NOMBRE DE NOEUDS est reproductible, la DUREE ne l est pas.
+  C est exactement la raison pour laquelle le verdict du rapport porte sur les
+  noeuds et non sur les seconde.
+
+NOEUDS PAR LIGNE, calcule sur les 4 ecrans non virtualises :
+  /audiences   (340 035 - 47) / 10 000 = 34,0
+  /users       (160 025 - 33) / 10 000 = 16,0
+  /audit-logs  (100 038 - 37) / 10 000 = 10,0
+  /tags        (100 048 - 54) / 10 000 = 10,0
+  /companies   155 noeuds de 1 a 100 000 lignes -> 0,0 (virtualise)

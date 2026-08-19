@@ -1,16 +1,22 @@
 # Grille des états d'écran — AGENT 25 « Auditeur des états d'écran »
 
-- **Référence** : `main = 8db8229` (relue par `git rev-parse HEAD` au début **et** à la fin de la mission ;
-  `8db8229` = « audit(360): P0 a P2 — 24 agents rendus »). L'agent 22 a mesuré sur `e8924b8` et vérifié
-  qu'aucune ligne de `frontend/` ne bouge entre les deux : **nos deux grilles portent sur le même code frontend**.
+- **Référence** : toutes les mesures ont été jouées sur **`main = 8db8229`** (relue par `git rev-parse HEAD`, pas
+  copiée d'un document — les SHA écrits ont été faux trois fois dans cet audit).
+  **`main` a avancé pendant ma mission jusqu'à `5874ed5`.** Vérifié avant de conclure :
+  `git diff --stat 8db8229..5874ed5 -- frontend/src frontend/tests frontend/package.json backend infra`
+  ne rend **rien** — **aucune ligne de code produit n'a bougé**. *Témoin positif* : le même `git diff` sans
+  restriction de chemin voit bien **378 fichiers, +63 165 / −5 693 lignes** (tous sous `_AUDIT/`). **Cette grille
+  vaut donc aussi pour `5874ed5`.**
+  L'agent 22 a mesuré sur `e8924b8` et vérifié le même invariant : **nos deux grilles portent sur le même code.**
 - **Périmètre** : les **37 écrans** de `src/app/routeTree.tsx` (inventaire de l'agent 22, recompté ici :
   37 `createRoute`, dont 4 hors coquille, 2 bouchons Phase 2, 1 route introuvable).
 - **Écrans effectivement montés et mesurés** : **37 / 37**, sous **4 conditions réseau chacun** = **148 montages réels**,
   auxquels s'ajoutent 10 montages « état partiel » (7 + 3 de reprise), 5 « hors ligne », 3 « retour arrière »,
   28 « volumes » et 1 « délai » — **195 montages** au total.
-- **Cases de grille** : **185** (37 écrans × 5 états). **Renseignées : 180.** **Non vérifiables : 5** — les cinq
-  états de `/coverage`, pour une raison nommée et bornée au §6.1 (jsdom n'a pas de WebGL). Elles sont **lues dans le
-  code** et déclarées comme telles, jamais présentées comme mesurées.
+- **Cases de grille** : **185** (37 écrans × 5 états). **Renseignées par la mesure : 178.**
+  **Non mesurées : 7**, chacune nommée et justifiée — les **5** états de `/coverage` (jsdom n'a pas de WebGL,
+  §6.1) et **2** cases « vide » que **mes propres jeux d'essai** ont invalidées (§0.5). Ces 7 cases sont **lues
+  dans le code** et déclarées telles, jamais présentées comme mesurées. **Aucune case n'est laissée vide.**
 
 ---
 
@@ -86,6 +92,23 @@ le même sens** — il a cru voir un état d'erreur là où le mot venait d'un l
 *Les trois premières corrections vont contre mon propre résultat : sans elles, j'aurais compté 16 écrans menteurs
 au lieu de 19.* C'est exactement ce que le §2 règle 3 du dossier demande.
 
+### 0.5 Les quatre jeux d'essai que j'ai écrits FAUX — et ce qu'ils m'ont appris malgré tout
+
+Quatre de mes lignes d'essai omettaient un champ que l'écran lit **sans garde**. Résultat : l'écran plantait, et
+j'ai d'abord cru tenir un défaut. **Ce n'en était pas un — c'était mon erreur.** Chacune est déclarée ici :
+
+| écran | ce que j'ai écrit | ce que l'écran lit | conséquence sur ma grille |
+|---|---|---|---|
+| `/console/contacts`, `/console/vivier` | ligne sans `tags` ni `contacts` | `company.contacts.length` (`ContactsHubPage.tsx:205`), `company.tags.length` (`:226`) | mesure **refaite** avec une ligne complète (§2.4) |
+| `/audiences` (volumes) | `members_count` | `audience.member_count` (`AudiencesListPage.tsx:230`) | mesure **refaite** (§3.3) |
+| `/console/personnes/$personKey` | corps sans `universes` | `data.universes.business` | case **∅ non mesurée**, déclarée telle |
+| `/admin/observability` | `hunter_quota` | `data.hunter_quota_month.used` (`:88`) | case **∅ non mesurée**, déclarée telle |
+
+**Ce que ces quatre bévues ont produit d'utile** : elles ont établi, par accident puis par témoin délibéré
+(§3.4), que **cinq écrans lisent un champ imbriqué de l'API sans aucune garde** et qu'aucune frontière d'erreur
+ne les rattrape — c'est le constat **D25-011**. *Une mesure fausse qui est vérifiée redevient une mesure ;
+c'est de n'être jamais vérifiée qu'elle serait dangereuse.*
+
 ---
 
 ## 1. LA GRILLE — 37 écrans × 5 états
@@ -121,7 +144,7 @@ Légende : **⏳** chargement · **∅** vide · **⚠** erreur · **⛔** permi
 | `/console/contacts` | **squelette** `ConsoleListSkeleton` + `isPlaceholderData` (bien traité, commenté) | **dessiné** : « Aucun contact dans cette vue — les fiches arrivent depuis le site » | 🔴 **ABSENT** — « Clients **0** · Prospects **0** · Opportunités **0** · Dormants **0** », 12 compteurs à zéro | 🔴 **ABSENT** au sens des droits. Le seul refus dessiné est celui du **drapeau** (`ConsoleGate`), pas d'une **permission** | ◐ 🔴 **MENT** : compteurs KO + liste OK → **une ligne s'affiche sous « Tous 0 »** (§2.3) | 🔴 **MENT** — et **D22-004** (le drapeau prend l'erreur pour une décision) reste ouvert |
 | `/console/vivier` | **squelette** | **dessiné** | 🔴 **ABSENT** — « À qualifier **0** · Présélection **0** · Entretien **0** · Conservés **0** » | ⛔ **le seul refus EXEMPLAIRE du produit** : « Univers vivier candidats non accessible — demandez à un administrateur de vous y rattacher » — **explicite, et pas un cul-de-sac** | ◐ 🔴 **MENT** (même patron) | 🔴 **MENT** sur les données ; **modèle à copier** sur le refus |
 | `/console/arbitrage` | **squelette** | **dessiné** : « Rien à arbitrer » | 🔴 **PIRE QUE L'ABSENCE** — affiche « **Rien à arbitrer — Tous les événements entrants ont trouvé leur entreprise.** » : une **conclusion métier fausse**, pas seulement un zéro (**D25-003**) | 🔴 **ABSENT** | ◐ s.o. (source unique) | 🔴 **GRAVE** — c'est l'écran où stationnent **100 %** des leads (**B13-001**) |
-| `/console/personnes/$personKey` | **squelette sans texte** (`ConsoleListSkeleton`, 0 caractère) | **dessiné** (timeline vide) | ⚠ **présent mais FAUX SUR LA CAUSE** : « **Fiche introuvable** — cette personne n'existe dans aucun univers accessible » sur un 500 | 🔴 **ABSENT** — le même message sert de refus et de panne | ◐ s.o. | **DÉFAUT** — et **A05-001** rend l'écran inatteignable en pratique |
+| `/console/personnes/$personKey` | **squelette sans texte** (`ConsoleListSkeleton`, 0 caractère) | **non mesuré — ma faute** : mon jeu d'essai omettait `universes`, et l'écran le lit sans garde ; il a planté (§3.4). Lu dans le code : le cas `subjects` vide **est** traité (l. 55-58, 66-70) | ⚠ **présent mais FAUX SUR LA CAUSE** : « **Fiche introuvable** — cette personne n'existe dans aucun univers accessible » sur un 500 | 🔴 **ABSENT** — le même message sert de refus et de panne | ◐ s.o. | **DÉFAUT** — et **A05-001** rend l'écran inatteignable en pratique |
 
 ### 1.4 Collecte
 
@@ -141,7 +164,7 @@ Légende : **⏳** chargement · **∅** vide · **⚠** erreur · **⛔** permi
 | `/audiences` | **squelette** `ListSkeleton` | **dessiné** : « Aucune audience — crée ton premier segment » | 🔴 **ABSENT** — « Total audiences **0** · Actives **0** · Membres cumul **0** » | 🔴 **ABSENT** | ◐ s.o. | 🔴 **MENT** |
 | `/audiences/new` | **rendu complet** (formulaire) | **s.o.** — les « Aucun département » sont des **espaces réservés de listes déroulantes**, pas une donnée (corrigé §0.4) | ⚠ **`setPreviewError`** — le **seul** endroit du produit où le message du serveur alimente un **état d'écran** de lecture, et non un toast | 🔴 **ABSENT** | ◐ prévisualisation KO → message dédié | **OK** — second meilleur écran, et **le patron à généraliser** |
 | `/audiences/$audienceId` | **sablier sans texte** | 🔴 **SABLIER ÉTERNEL** | 🔴 **SABLIER ÉTERNEL** | 🔴 **SABLIER ÉTERNEL** | 🔴 fiche OK + membres KO → **l'onglet Membres reste un sablier** | 🔴 **GRAVE** (**D25-004**) — `if (isLoading \|\| !audience)`, même faute |
-| `/admin/observability` | **texte nu** « Chargement de l'observabilité… » | ∅ **NON DESSINÉ** — l'écran rend ses vignettes à 0 sans état vide propre | ✅ **PRÉSENT** : « **Impossible de charger les métriques d'observabilité.** » — **cause NON, action NON**. ⚠️ **Corrige l'agent 22**, qui l'avait noté « ⚠ absent » : le message existe, mais il n'arrive qu'après trois tentatives de 30 s (§2.5) | 🔴 **ABSENT** — même message | ◐ s.o. | **DÉFAUT** — vrai état d'erreur, mais muet pendant tout ce temps |
+| `/admin/observability` | **texte nu** « Chargement de l'observabilité… » | **non mesuré — ma faute** : j'ai écrit `hunter_quota` là où l'écran lit `hunter_quota_month` (l. 88), sans garde ; il a planté (§3.4) | ✅ **PRÉSENT** : « **Impossible de charger les métriques d'observabilité.** » — **cause NON, action NON**. ⚠️ **Corrige l'agent 22**, qui l'avait noté « ⚠ absent » : le message existe, mais il n'arrive qu'après trois tentatives de 30 s (§2.5) | 🔴 **ABSENT** — même message | ◐ s.o. | **DÉFAUT** — vrai état d'erreur, mais muet pendant tout ce temps |
 
 ### 1.6 Conformité
 
@@ -333,10 +356,20 @@ Fabriquer et sérialiser le jeu d'essai, **sans monter quoi que ce soit** :
 | **`/tags`** *(rien)* | 1 | 232 ms | 58 | 6 Ko | 71 Mo |
 | | 100 | 935 ms | 1 048 | 87 Ko | 94 Mo |
 | | **10 000** | **26 893 ms** | **100 048** | **8 264 Ko** | **792 Mo** |
+| **`/audiences`** *(rien)* | 1 | 371 ms | 69 | 8 Ko | — |
+| | 100 | 2 583 ms | 3 435 | 375 Ko | — |
+| | **10 000** | **80 780 ms** | **340 035** | **37 235 Ko** | — |
 
 **Le verdict tient en une ligne** : `/companies` reste à **155 nœuds de 1 à 100 000 lignes** — la virtualisation
-fait exactement son travail. Les trois autres croissent **strictement linéairement** : **16,0 nœuds par ligne** sur
-`/users`, **10,0** sur `/audit-logs` et sur `/tags`.
+fait exactement son travail. Les quatre autres croissent **strictement linéairement**, chacun avec sa pente :
+**34,0 nœuds par ligne** sur `/audiences`, **16,0** sur `/users`, **10,0** sur `/audit-logs` et sur `/tags`.
+À 10 000 lignes — un volume banal pour un journal d'audit ou une base d'utilisateurs d'entreprise — `/audiences`
+construit **340 035 nœuds et 36 Mo de HTML**.
+
+**Doublon de contrôle involontaire, et il tombe bien** : `/audiences` a été mesuré **deux fois**, par deux
+processus concurrents. Les **nœuds et les octets sont identiques au chiffre près** (47 / 69 / 3 435 / 340 035) ;
+**les durées, non** (80 780 ms vs 93 588 ms). *C'est précisément pourquoi le verdict de cette section porte sur
+les nœuds et non sur les secondes.*
 
 **Deux nuances qui vont contre le confort de ce verdict, et qu'il faut dire** :
 
@@ -348,7 +381,7 @@ fait exactement son travail. Les trois autres croissent **strictement linéairem
    serveur ignore la limite. **Elles n'en sont pas une pour `/users`, `/audit-logs`, `/tags` et `/audiences`, qui
    ne demandent aucune limite du tout** — ces quatre écrans rendent exactement ce que le serveur envoie.
 
-### 3.4 Deux écrans plantent sur un champ absent — et j'en ai fait la démonstration à mes dépens
+### 3.4 Cinq écrans plantent sur un champ absent — et j'en ai fait la démonstration à mes dépens
 
 Mes premières lignes d'essai étaient **incomplètes**. Résultat :
 
@@ -356,15 +389,19 @@ Mes premières lignes d'essai étaient **incomplètes**. Résultat :
   (reading 'length')** » — `ContactsHubPage.tsx:205` lit `company.contacts.length` et `:226` `company.tags.length`,
   **sans garde** ;
 - `/audiences` → « **Cannot read properties of undefined (reading 'toLocaleString')** » —
-  `AudiencesListPage.tsx:230` lit `audience.member_count` (j'avais écrit `members_count`), **sans garde**.
+  `AudiencesListPage.tsx:230` lit `audience.member_count` (j'avais écrit `members_count`), **sans garde** ;
+- `/console/personnes/$personKey` → « **… (reading 'business')** » — l'écran lit `data.universes.business` ;
+- `/admin/observability` → « **… (reading 'used')** » — `ObservabilityPage.tsx:88` lit
+  `data.hunter_quota_month.used` (j'avais écrit `hunter_quota`).
 
 **J'ai d'abord cru avoir trouvé un défaut de l'état partiel. C'était ma faute, et je l'ai isolée** par un témoin
 dédié (`releve-partiel-2.txt`, cas C) : ligne incomplète **avec tout le réseau en 200** → l'écran plante quand
 même. La cause est donc le **champ manquant**, pas l'échec partiel. *Ma première mesure accusait le mauvais objet
 — c'est le défaut A-011 appliqué à mon propre contrôle, et c'est le témoin qui l'a rattrapé.*
 
-Ce que cela établit tout de même, et qui vaut d'être noté : **une seule clef absente dans la réponse de l'API
-emporte l'écran entier**, et — faute de frontière d'erreur (**D25-006**) — l'emporte vers un message anglais.
+Ce que cela établit tout de même, et qui vaut d'être noté : sur **cinq écrans**, **une seule clef absente dans la
+réponse de l'API emporte l'écran entier**, et — faute de frontière d'erreur (**D25-006**) — l'emporte vers un
+message anglais.
 Le routeur le dit lui-même dans la sortie de mesure : *« Warning: The following error wasn't caught by any route!
 At the very least, consider setting an `errorComponent` in your RootRoute! »*
 
@@ -612,7 +649,7 @@ prend une autre : c'est un saut de mise en page par construction.** *(Non chiffr
 - Référence     : main 8db8229
 - Emplacement   : `frontend/src/features/companies/CompaniesListPage.tsx:297` (seul `useVirtualizer` du dépôt) · `users/UsersPage.tsx:62-64` · `rgpd/AuditLogsPage.tsx:60-63` · `tags/TagsManagerPage.tsx:99-102` · `audiences/AudiencesListPage.tsx:65-71` · `rgpd/RgpdRequestsPage.tsx:75-78` · `rgpd/AiActRegisterPage.tsx:55-58` · `llm/LlmRouterPage.tsx:58-68` · `llm/ProxyProvidersPage.tsx` · `llm/RotationsPage.tsx:38-41` — **aucun de ces neuf n'envoie de `per_page` ni n'offre de pagination**
 - Constat       : `@tanstack/react-virtual` n'est importé que par `CompaniesListPage` ; `@tanstack/react-table`, pourtant déclaré dans `package.json`, n'est importé **nulle part** ; neuf écrans rendent intégralement ce que le serveur veut bien leur envoyer.
-- Preuve        : 28 montages réels, jeux de 0 / 1 / 100 / 10 000 / 100 000 lignes — `04_PREUVES/agent-25/releve-volumes.txt`, `-2.txt`, `-3.txt`. Croissance **strictement linéaire** : **16,0 nœuds par ligne** sur `/users`, **10,0** sur `/audit-logs`, **10,0** sur `/tags`. À 10 000 lignes : `/users` **160 025 nœuds / 18 397 Ko / 1 101 Mo de tas / 32,4 s** ; `/audit-logs` **100 038 nœuds / 9 436 Ko / 20,4 s** ; `/tags` **100 048 nœuds / 8 264 Ko / 26,9 s**. À 100 000, `/users` **n'aboutit pas** (§3.5). En regard, `/companies` — le seul virtualisé — garde **155 nœuds de 1 à 100 000 lignes**. Inventaire statique : `04_PREUVES/agent-25/04-volumes-pagination-keys.txt`.
+- Preuve        : 32 montages réels, jeux de 0 / 1 / 100 / 10 000 / 100 000 lignes — `04_PREUVES/agent-25/releve-volumes.txt`, `-2.txt`, `-3.txt`. Croissance **strictement linéaire** : **34,0 nœuds par ligne** sur `/audiences`, **16,0** sur `/users`, **10,0** sur `/audit-logs` et sur `/tags`. À 10 000 lignes : `/audiences` **340 035 nœuds / 37 235 Ko / 80,8 s** ; `/users` **160 025 nœuds / 18 397 Ko / 1 101 Mo de tas / 32,4 s** ; `/audit-logs` **100 038 nœuds / 9 436 Ko / 20,4 s** ; `/tags` **100 048 nœuds / 8 264 Ko / 26,9 s**. À 100 000, `/users` **n'aboutit pas** (§3.5). En regard, `/companies` — le seul virtualisé — garde **155 nœuds de 1 à 100 000 lignes**. Inventaire statique : `04_PREUVES/agent-25/04-volumes-pagination-keys.txt`.
 - Témoin négatif: **obligatoire ici, et il est dans le relevé** — la fabrication et la sérialisation du jeu de 100 000 lignes, **sans monter aucun écran**, coûtent **604 ms et 44 Mo**. Tout ce qui dépasse est imputable à l'écran et non au banc. Par ailleurs le contrôle statique **trouve bien** les 2 occurrences de `useVirtualizer` et les 39 fichiers important `@tanstack/react-query` : il sait repérer un import quand il existe.
 - Impact        : la production porte **4,29 M d'entreprises** et **1 319 567 personnes** (**C19-007**). Les écrans concernés sont aujourd'hui vides, donc le défaut est **invisible** — exactement comme la sérialisation d'**A-010** est invisible à un seul utilisateur. Le jour où `/audit-logs` contiendra un an de journal, l'écran demandera **tout** le journal et tentera d'en peindre chaque ligne : sur les mesures ci-dessus, 10 000 entrées suffisent à dépasser le gigaoctet. **B16-004** ajoute que cette route rend le journal de **tous** les espaces : le volume servi n'est même pas borné par l'espace de travail.
 - Reproduction  : `npx vitest run --config tmp/agent25/vitest.a25.config.ts tmp/agent25/volumes.test.tsx`.
@@ -632,17 +669,17 @@ prend une autre : c'est un saut de mise en page par construction.** *(Non chiffr
 - Correctif     : remonter `extractApiMessage` dans `src/lib/api.ts` (une seule copie), et l'appeler depuis le composant d'état de **D25-002**. Coût **0,5 j**, inclus dans D25-002.
 - Statut        : ouvert
 
-### [D25-011] Trois écrans lisent un champ imbriqué de la réponse d'API sans garde : une seule clef absente emporte l'écran entier
+### [D25-011] Cinq écrans lisent un champ imbriqué de la réponse d'API sans garde : une seule clef absente emporte l'écran entier
 - Sévérité      : **S2** défaut
 - Domaine       : interface
 - Référence     : main 8db8229
-- Emplacement   : `frontend/src/features/crm-console/ContactsHubPage.tsx:205` (`company.contacts.length`) et `:226` (`company.tags.length`) · `frontend/src/features/crm-console/CandidatesPage.tsx` (même patron) · `frontend/src/features/audiences/AudiencesListPage.tsx:230` (`audience.member_count.toLocaleString`)
-- Constat       : ces lectures ne sont ni optionnelles (`?.`) ni repliées (`?? []`), alors que le reste des mêmes composants l'est (`company.denomination ?? company.siren`, `counts.data?.by_relation_type ?? {}`) ; une réponse à laquelle il manque `tags`, `contacts` ou `member_count` fait lever le rendu.
-- Preuve        : **découvert contre moi-même.** Mes premières lignes d'essai omettaient ces champs, et les trois écrans ont rendu « **Something went wrong! · Cannot read properties of undefined (reading 'length')** » (resp. `'toLocaleString'`). **Témoin d'isolement joué** (`04_PREUVES/agent-25/releve-partiel-2.txt`, cas C) : la **même** ligne incomplète avec **tout le réseau en 200** plante identiquement — la cause est donc bien le **champ manquant**, et non l'échec réseau que j'avais d'abord accusé.
+- Emplacement   : `frontend/src/features/crm-console/ContactsHubPage.tsx:205` (`company.contacts.length`) et `:226` (`company.tags.length`) · `frontend/src/features/crm-console/CandidatesPage.tsx` (même patron) · `frontend/src/features/audiences/AudiencesListPage.tsx:230` (`audience.member_count.toLocaleString`) · `frontend/src/features/crm-console/PersonTimelinePage.tsx` (`data.universes.business`) · `frontend/src/features/observability/ObservabilityPage.tsx:66,88` (`data.google_places_quota.used`, `data.hunter_quota_month.used`)
+- Constat       : ces lectures ne sont ni optionnelles (`?.`) ni repliées (`?? []`), alors que le reste des mêmes composants l'est (`company.denomination ?? company.siren`, `counts.data?.by_relation_type ?? {}`) ; une réponse à laquelle il manque `tags`, `contacts`, `member_count`, `universes` ou `hunter_quota_month` fait lever le rendu.
+- Preuve        : **découvert contre moi-même** (§0.5). Mes premières lignes d'essai omettaient ces champs, et les cinq écrans ont rendu « **Something went wrong! · Cannot read properties of undefined (reading 'length')** » (resp. `'toLocaleString'`). **Témoin d'isolement joué** (`04_PREUVES/agent-25/releve-partiel-2.txt`, cas C) : la **même** ligne incomplète avec **tout le réseau en 200** plante identiquement — la cause est donc bien le **champ manquant**, et non l'échec réseau que j'avais d'abord accusé.
 - Témoin négatif: le cas **B** du même relevé — ligne **complète**, réseau en 200 — rend l'écran normalement ; et le cas **A** — ligne complète, compteurs en 500 — le rend aussi. La sonde ne plante donc pas d'elle-même : elle plante **exactement** quand le champ manque.
 - Impact        : *portée à déclarer honnêtement — **je n'ai pas démontré que l'API omet un jour ces champs**.* Ce que j'ai démontré, c'est qu'**il n'y a aucun amortisseur si elle le fait** : combiné à **D25-006** (aucune frontière d'erreur montée), une seule clef manquante fait passer l'utilisateur de la console CRM à un message anglais sans coquille ni retour. Le risque n'est pas théorique dans ce dépôt : **A-002 / B10-013** montrent que 9 routes rendent déjà des corps figés.
 - Reproduction  : monter `ContactsHubPage` avec une ligne dépourvue de `tags` et `contacts`, tout le réseau en 200.
-- Correctif     : `(company.contacts ?? []).length`, `(company.tags ?? []).length`, `(audience.member_count ?? 0).toLocaleString(…)` — **0,1 j** ; et monter la frontière d'erreur de **D25-006**, qui vaut pour tous les cas non encore trouvés.
+- Correctif     : `(company.contacts ?? []).length`, `(company.tags ?? []).length`, `(audience.member_count ?? 0).toLocaleString(…)`, et le même repli sur `universes` et `hunter_quota_month` — **0,25 j** ; et monter la frontière d'erreur de **D25-006**, qui vaut pour tous les cas non encore trouvés.
 - Statut        : ouvert
 
 ---

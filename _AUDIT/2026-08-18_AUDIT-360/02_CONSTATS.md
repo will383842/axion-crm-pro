@@ -2924,3 +2924,66 @@ sous 24 px **20 min**, *ce qui débloque 33 écrans pour la porte* · le crochet
 ⚠️ **Et la limite qu'il pose lui-même, qui vaut pour tout le bloc D** : *sans session authentifiée,
 **ses comptes sont un plancher**.* Le passage de `/companies` de **1 à 30 nœuds** dès qu'on lui donne
 cinq lignes en donne l'ordre de grandeur.
+
+---
+
+## Agent 41 — les requêtes réelles, `EXPLAIN` à l'appui : **le dernier rendu, et le plus lourd**
+**Rapport** : `11_GRILLES/agent-41_requetes.md` · **Preuves** : `04_PREUVES/agent-41/` (plans bruts + scripts rejouables)
+
+**Il pose ses limites avant ses chiffres, et elles comptent** : mesures en **SQL direct** (l'API locale
+ne répondait pas), bases `axion_crm_perf` (300 k, jeu complet) et `axion_crm_perf4m` (2,8 M — **mais
+`contacts`, `activities` et `company_tag` VIDES**), **les trois en locale `C` comme la production**.
+> **Tous les temps sont des PLANCHERS** : RLS non armée en local, 2,8 M au lieu de 4,29 M, base seule
+> sans PHP.
+
+### Le tableau qui change l'échelle du problème (volume de production)
+
+| Écran / geste | Plan | Froid | Chaud | Index | **Gel de l'application** |
+|---|---|---:|---:|---|---:|
+| 🔴 **`/console/contacts` — l'écran par défaut** | `Index Scan` + **`Rows Removed by Filter: 2 800 000`** | **188 518 ms** | **60 118 ms** | **aucun possible** | **3 min 08** |
+| 🔴 **`/console/contacts?q=…` — UNE frappe** | idem | **61 841 ms** | 56 624 ms | **AUCUN** | **61,8 s** |
+| `/companies?sort=enriched_at` | `Parallel Seq Scan` + tri | **93 496 ms** | 7 213 ms | **AUCUN** | **93,5 s** |
+| `/companies?filter[denomination]` | `Index Scan`+filtre / `Seq Scan` | **65 245 ms** | 11 297 ms | **AUCUN** | **65,2 s** |
+| `/companies/export` — boucle complète | 2 800 lots | **113 547 ms** | — | ✅ par lot | **1 min 54** |
+| `/companies` — la page | `Index Scan` `..._workspace_score` | 21 ms | **0,46 ms** | ✅ | 0,02 s |
+| `/companies?filter[naf]` | `Index Scan` `..._workspace_naf` | 4,2 ms | 2,5 ms | ✅ | 0,004 s |
+| ⌘K `GET /search` · `GET /dashboard/stats` | **aucune requête SQL** | — | — | sans objet | 0 s |
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **G41-001** | **S0** | 🔴 **L'écran d'accueil de la console met 3 min 08 au volume de production, et gèle l'application entière** |
+| **G41-002** | **S0** | 🔴 **La recherche du hub coûte 61,8 s par caractère** — *et le commentaire du code qui la justifie s'appuie sur **un index qui n'existe pas** : il porte sur `denomination_normalized`* |
+| **G41-014** | **S1** | **Le critère 1 est doublement manqué** : là où la recherche répond vite, **elle ne cherche rien** (`GlobalSearchController` rend `{companies:[],contacts:[],tags:[]}` **en dur, sans lire `q`**) ; là où elle cherche vraiment, elle met **61,8 s** — et **4,9 s dès le volume de RÉFÉRENCE**, donc le seuil de 5 s est **déjà atteint à 300 000 fiches** |
+| **G41-007** | **S1** | **L'export CSV n'a aucun plafond** et gèle l'application **≥ 2 min côté base seule** *(confirme `B12-010` par la mesure)* |
+| **G41-005** | **S1** | **La liste contacts n'a AUCUNE pagination** — 50 fiches servies sur **1,3 million** — et son tri par nom coûte **14,5 s dès 50 000 contacts** |
+| **G41-008** | **S1** | **9 index que rien ne lit multiplient par 2,7 le coût d'écriture** de `companies` |
+| G41-003, G41-004, G41-006 | S1 | L'**index GIN de 110 Mo** censé servir le filtre par dénomination **porte sur une autre colonne** · **2 des 4 tris exposés n'ont aucun index** (15,5 s et 93,5 s) · le `count(*)` de `paginate` coûte **2,2 s à chaque page**, *alors que le hub prouve avec `cursorPaginate` qu'on sait s'en passer* |
+| G41-009 → G41-015 | S2/S3 | La file d'arbitrage **balaye toute la table `activities` deux fois par affichage** · 4 écrans **sans aucun prédicat `workspace_id`** · `/tags` recompte par balayage séquentiel · **5 écrans se rappellent seuls** (10 s) sur un serveur mono-processus · `/coverage` : vue matérialisée **non peuplée**, rafraîchissement horaire **non concurrent** sous verrou `ACCESS EXCLUSIVE` |
+
+### 🔑 La combinaison qui fait le pire chiffre de tout l'audit
+
+**61,8 s par frappe** (`G41-002`) **× aucun anti-rebond** (`G42-010`) **× un serveur qui traite une
+requête à la fois** (`A-010`) :
+
+> **Taper « martin » dans la recherche du hub = 5 requêtes = ≈ 5 MINUTES de gel de l'application
+> entière, pour un seul mot.**
+
+*Et c'est un plancher : RLS non armée, 2,8 M au lieu de 4,29 M, base seule sans PHP.*
+
+### Le coût des index morts, mesuré avec un contre-témoin
+
+**9 index n'ont aucune requête possible**, dont 5 gros totalisant **482 Mo sur 1 491 Mo (32 %)** —
+dont un **index trigramme sur la bonne requête, mais sur la mauvaise colonne** (110 Mo), et un index
+géographique GiST **jamais lu** (114 Mo, `geo_point` n'est qu'écrit).
+**Mesure d'écriture, 50 000 insertions, 4 tours** : **195 041 ms avec les 27 index**, **79 195 puis
+66 143 ms sans les 9**.
+**Le contre-témoin est décisif** : *à table **plus grosse**, l'insertion **accélère de 3×** dès qu'on
+les retire.* → **+2,45 ms par fiche**, soit **+12 min 15 par passe de 300 000** et **+2 h 55 sur les
+4,29 M** de production — **pour zéro lecture**.
+
+✅ **Et le seul point sain de la grille, qu'il faut dire** : **aucun N+1 trouvé.** Tous les chargements
+de relations passent par `with()` ou une requête groupée.
+
+⚠️ **12 points non vérifiés, déclarés** — dont les deux qui bornent le reste : **aucune mesure en
+production**, et **`contacts`/`activities`/`company_tag` sont vides dans le jeu à 2,8 M**, *donc les
+188 s de l'écran d'accueil sont un plancher, pas un pire cas*.

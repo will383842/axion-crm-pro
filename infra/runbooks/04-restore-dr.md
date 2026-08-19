@@ -9,7 +9,20 @@
 ## 1. Provisionner le serveur de remplacement
 ```bash
 hcloud server create --type cpx42 --image ubuntu-24.04 --location fsn1 --name axion-crm-dr
-# Installer docker + restaurer infra : git clone + docker compose up -d
+# Installer docker + restaurer infra : git clone, PUIS :
+#
+#   🔴 export COMPOSE_FILE="docker-compose.yml:docker-compose.prod.yml"
+#   docker compose up -d
+#
+# L'export N'EST PAS FACULTATIF. Sans lui, `docker compose` ne lit que
+# `docker-compose.yml`, qui PUBLIE 55432:5432 (Postgres) et 56379:6379 (Redis)
+# sur l'interface publique — avec le mot de passe ecrit dans ce depot PUBLIC,
+# sur un role SUPERUSER + BYPASSRLS, et un Redis sans mot de passe.
+# C'est la faille du 2026-08-19. Elle est refermee par `ports: !override []`
+# dans `docker-compose.prod.yml`, qui n'est charge QUE par cet export.
+# Ce runbook s'execute sur une machine NEUVE, dans l'urgence : c'est
+# exactement la situation ou personne ne verifiera. (Audit 360, P5.)
+# Verification apres coup : `bash infra/scripts/verifier-ports-publies.sh`
 ```
 
 ## 2. Restaurer Postgres

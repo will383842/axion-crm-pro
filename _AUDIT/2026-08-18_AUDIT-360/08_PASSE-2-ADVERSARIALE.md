@@ -256,6 +256,88 @@ est exactement celui qui manque.*
 
 ---
 
+## 7. Résultat n° 5 — 🔴 **la faille du 19 août est réarmable en un clic. Vérifié, et refermé.**
+
+**Origine** : signalé par l'agent de consolidation S1, qui proposait de reclasser `F38-007` + `F40-007`
+de S1 en S0. **J'ai vérifié avant d'arbitrer. Il a raison, et c'est plus large que ce qu'il décrit.**
+
+### Ce qui est mesuré
+
+`.github/workflows/diag-website-status.yml` — déclenchement **`workflow_dispatch` manuel**, pas de
+cadence — exécute en SSH sur la production :
+
+```
+docker compose up -d          # ← aucun -f, aucun COMPOSE_FILE
+```
+
+Sans overlay, `docker compose` ne lit que `docker-compose.yml`, qui publie
+**`55432:5432`** (l. 23) et **`56379:6379`** (l. 44).
+Le correctif existe : **`ports: !override []`** dans `docker-compose.prod.yml` (l. 111, 147, 156).
+**Il n'est chargé que par l'overlay — que ce workflow ne charge pas.**
+
+Au bout du port ainsi rouvert : le mot de passe Postgres **écrit dans ce dépôt PUBLIC**, sur un rôle
+**SUPERUSER + BYPASSRLS**, et un **Redis sans aucun mot de passe** — `ci.yml:60-73` le documente
+mot pour mot. Sur une base qui porte **1 319 567 personnes physiques**.
+
+**Et le workflow fait une seconde chose que le constat ne disait pas** : avant de relancer la pile,
+il **réinscrit une clé SSH dans `/root/.ssh/authorized_keys`**. Un dispatch rouvre donc **les deux
+portes à la fois** : la base et la racine.
+
+### ⚖️ Arbitrage — **`F38-007` passe S1 → S0** (`D-019`)
+
+L'échelle ne laisse pas le choix : c'est **le défaut qui a été la faille du 19 août**, encore
+atteignable. Un défaut « déjà arrivé et encore atteignable » n'est pas grave, il est **bloquant**.
+`F40-007` (le mot de passe public) reste **S1** : il n'est dangereux que par ce chemin, et le
+refermer suffit à le neutraliser — mais il devra être **tourné**, et cela n'appartient qu'à Will.
+
+### 🔑 Le troisième cas du même motif, dans la même journée
+
+`deploy-direct-ssh.yml:134-149` **documente ce piège exact**, trouvé et corrigé le **2026-08-16** :
+*« Jusqu'ici ce script lançait `docker compose` SANS `-f` »*. Le correctif y est excellent, et son
+commentaire explique même pourquoi `COMPOSE_FILE` vaut mieux que des `-f` recopiés. **Il n'a pas été
+porté à la porte voisine.**
+
+> C'est le **troisième cas identique en une seule passe** :
+> 1. **HMAC** — classe durcie écrite, endpoint faible laissé en place *et désigné comme le patron* ;
+> 2. **`opt_out.scope`** — réparé sur le chemin du site, jamais sur celui de la console ;
+> 3. **`COMPOSE_FILE`** — posé dans le workflow de déploiement, absent des trois autres portes.
+>
+> **Le défaut caractéristique de ce dépôt n'est pas de rater un problème. C'est de le résoudre sur
+> l'exemplaire qu'on a sous les yeux, et de ne jamais balayer les frères.** C'est `A-013` sous sa
+> forme opérationnelle, et c'est la conclusion la plus utile de cette passe.
+
+### ✅ Ce que j'ai corrigé — et le balayage que le dépôt n'avait pas fait
+
+| Fichier | État avant | Correctif |
+|---|---|---|
+| `.github/workflows/diag-website-status.yml` | `up -d` **sans overlay** → rouvre les deux ports | ✅ `export COMPOSE_FILE=…prod.yml` posé, avec la raison écrite en clair |
+| `infra/runbooks/04-restore-dr.md` | *« git clone + `docker compose up -d` »* — **le runbook de reprise après sinistre**, exécuté sur une machine **neuve**, dans l'urgence, quand personne ne vérifie | ✅ l'export rendu **obligatoire et explicite**, + renvoi à la garde de vérification |
+| `infra/runbooks/03-site-down.md` | `up -d --force-recreate api caddy` sans overlay — remet la production sur la cible `dev` **et son montage qui masque le `vendor`** (3 mois de retard mesurés le 16/08), **en pleine panne** | ✅ export ajouté avec la mesure citée |
+| `Makefile:14` | `docker compose up -d` | ✅ **légitime** — cible de développement local, le fichier de base est le bon |
+| `docker-compose.staging.yml` | — | ✅ **sain, et bien fait** : `ports: !override []` partout, et son en-tête **nomme la faille du 19/08**. Rien à reprendre |
+
+*YAML revalidé après correctif.*
+
+### 🔴 Seizième cas de `A-011` — `P5-PORTS-001` (S1) : **les deux gardes nées de la faille ne pouvaient pas la voir**
+
+| Garde | Ce qu'elle mesure | Pourquoi elle rate ce cas |
+|---|---|---|
+| `ci.yml:88-131` | la **fusion statique** des fichiers compose | Elle vérifie que l'overlay **ferme** les ports. Elle ne peut pas voir un workflow qui **ne charge pas l'overlay** : statiquement, tout est en ordre |
+| `infra/scripts/verifier-ports-publies.sh` | les ports **réellement publiés** — la bonne mesure | 🔴 **Elle n'est câblée que dans `deploy-staging.yml:175`, sur `axion-crm-staging`.** Elle mesure la préproduction, **qui est déjà correctement fermée**, et **jamais la production, qui était ouverte** |
+
+> **La garde dynamique est bonne. Elle est simplement braquée sur le seul environnement qui n'avait
+> pas le défaut.** C'est le patron `A-011` dans sa forme la plus coûteuse : *l'outil juste, pointé
+> sur le mauvais objet.*
+> **Correctif à faire en P3** : appeler `verifier-ports-publies.sh` sur `axion-crm-postgres` **après
+> chaque `deploy-direct-ssh`**, et non seulement sur la préproduction.
+
+⚠️ **Limite déclarée** : les trois correctifs sont **locaux et non poussés**. Tant qu'ils ne sont pas
+sur `main`, **le workflow en ligne reste celui d'avant** — un dispatch de `diag-website-status.yml`
+rouvrirait les ports aujourd'hui. **C'est porté à `06_RESTE-WILL.md` : ne pas lancer ce workflow
+avant que le correctif soit déployé.**
+
+---
+
 ## 3. Journal de la passe
 
 | Date | Objet | Verdict |
@@ -264,3 +346,4 @@ est exactement celui qui manque.*
 | 2026-08-19 | `02bis` §5 — « la suite de tests est saine, zéro exclusion silencieuse » | ✅ **Confirmée**, et sur le fichier que la CI ouvre vraiment (`phpunit-ci.xml`), ce qui n'avait pas été fait. Quarantaine levée vérifiée **fichier par fichier : 23/23 présents**. Le couplage entre tests contourné par l'ordre reste ouvert — mais c'est `H44-011`, **déjà connu** : redécouverte, pas trouvaille |
 | 2026-08-19 | La tension `02bis` §5 « canal HMAC exemplaire » vs `F37-001` « canal HMAC forgeable » | ✅ **Pas de contradiction : deux canaux distincts**, les deux affirmations tiennent. 🔴 Mais **constat neuf `P5-HMAC-001` (S2)** : deux commentaires — dont le docbloc de la classe durcie — **désignent le canal troué comme le patron de référence**. Une hypothèse à moi (`config:cache` neutralisant le secret) **poursuivie puis réfutée**, archivée avec sa réponse |
 | 2026-08-19 | `B15-001` + `B15-002` — « la personne effacée revient au vivier » et la garde qui l'entérine | 🔴 **Confirmés**, chaîne prouvée en 6 maillons du code au schéma. **Et pire qu'écrit** : le même défaut a été trouvé, daté (E2E du 17/08) et **réparé sur la porte voisine** ; le chemin de la console n'a jamais été porté. *Vu, nommé, réparé — d'un seul côté.* |
+| 2026-08-19 | `F38-007` — « la faille du 19/08 est réarmable en un clic » (signalé par l'agent S1) | 🔴 **Vérifié, vrai, et plus large : le dispatch rouvre AUSSI l'accès root SSH.** Reclassé **S1 → S0** (`D-019`). **Trois fichiers corrigés**, dont le runbook de reprise après sinistre. **Seizième cas de `A-011`** : la garde dynamique des ports n'est câblée que sur la préproduction, déjà saine |

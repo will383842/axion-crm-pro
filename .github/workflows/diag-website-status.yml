@@ -40,6 +40,29 @@ jobs:
           ssh -o StrictHostKeyChecking=no "$USER@$HOST" bash <<'EOF'
             set -uo pipefail
             cd /opt/axion-crm-pro
+
+            # 🔴 L'OVERLAY DE PRODUCTION — AJOUTE LE 2026-08-19 (audit 360, P5).
+            #
+            # Ce script lancait « docker compose up -d » SANS -f. La commande
+            # ne lisait donc que docker-compose.yml, qui PUBLIE 55432:5432 et
+            # 56379:6379 sur l'interface publique, avec le mot de passe Postgres
+            # ecrit dans ce depot PUBLIC, sur un role SUPERUSER + BYPASSRLS, et
+            # un Redis sans aucun mot de passe.
+            #
+            # C'est EXACTEMENT la faille du 2026-08-19. Elle a ete refermee par
+            # « ports: !override [] » dans docker-compose.prod.yml (l. 111, 147,
+            # 156) — mais cet overlay n'etait pas charge ici : un seul
+            # workflow_dispatch de ce fichier la ROUVRAIT.
+            #
+            # Le meme piege avait deja ete trouve et corrige dans
+            # deploy-direct-ssh.yml (l. 134-149, 2026-08-16). Il n'avait pas ete
+            # porte a cette seconde porte.
+            #
+            # COMPOSE_FILE plutot que des « -f » recopies : la variable
+            # s'applique a TOUS les « docker compose » du script, on ne peut donc
+            # pas en oublier un.
+            export COMPOSE_FILE="docker-compose.yml:docker-compose.prod.yml"
+            echo "COMPOSE_FILE = $COMPOSE_FILE"
             PSQL="docker exec axion-crm-postgres psql -U axion -d axion_crm -t -A"
 
             echo "==================== 1. RESTAURE CLE SSH CLAUDE ===================="

@@ -1,0 +1,155 @@
+
+   PASS  Tests\Feature\Auth\GardesAuthentificationAgent35Test
+  ✓ F35-002 — l enrolement 2FA ecrit des colonnes qui existent vraimen… 47.08s  
+  ✓ F35-002 — confirmer l enrolement pose first_login_completed_at et r… 0.97s  
+  ✓ F35-002 — un code de secours ne sert qu une fois                     0.49s  
+  ✓ F35-002 — GET /users ne selectionne aucune colonne inexistante       2.78s  
+  ✓ F35-003 — un compte a 2FA active ne franchit rien tant que le code…  1.43s  
+  ✓ F35-003 — les routes de la liste blanche restent joignables avant l… 0.63s  
+  ✓ F35-004 — HIBP injoignable : le mot de passe est REFUSE, jamais acc… 1.28s  
+  ✓ F35-004 — TEMOIN : HIBP joignable et mot de passe sain, la regle la… 0.48s  
+  ✓ F35-004 — TEMOIN : HIBP joignable et mot de passe compromis, la reg… 0.44s  
+  ✓ F35-005 — un jeton de reinitialisation de plus de 60 minutes est re… 0.76s  
+  ✓ F35-005 — TEMOIN : un jeton frais est accepte                        0.61s  
+  ✓ F35-005 — un jeton de reinitialisation ne sert qu une fois           0.57s  
+  ✓ F35-006 — reinitialiser le mot de passe revoque les jetons d API     0.64s  
+  ✓ F35-001 — une route protegee rend 401, jamais 500, quel que soit l…  0.45s  
+  ✓ F35-001 — aucune route nommee login n est requise par l application  0.32s  
+  ✓ F35-009 — un compte inconnu coute le meme travail cryptographique q… 1.36s  
+  ✓ F35-010 — un jeton d API cesse d etre accepte passe sa duree de vie  0.37s  
+  ✓ F35-010 — TEMOIN : sans duree de vie configuree, le meme jeton viei… 0.42s  
+  ✓ F35-011 — un mot de passe court mais CORRECT ouvre bien la session   0.59s  
+  ✓ F35-011 — TEMOIN : un mot de passe court et FAUX est refuse par l a… 0.40s  
+  ✓ F35-012 — un compte verrouille est refuse AVANT toute verification…  0.38s  
+  ✓ F35-012 — le compteur d echecs retombe apres la fenetre d oubli      0.36s  
+  ✓ F35-013 — aucun lien magique n est cree pour une adresse inconnue    0.34s  
+  ✓ F35-013 — un lien magique orphelin n ouvre pas de session sur un co… 0.60s  
+  ✓ F35-013 — TEMOIN : un lien magique normal ouvre bien la session, un… 0.32s  
+
+   PASS  Tests\Feature\Auth\LoginTest
+  ✓ login with correct credentials succeeds                              0.51s  
+  ✓ login with wrong password fails 422                                  0.48s  
+  ✓ login increments failed_login_count on wrong password                0.34s  
+  ✓ login locks user after 10 failed attempts                            0.40s  
+  ✓ login rejects locked account even with correct password              0.35s  
+  ✓ un mot de passe court et faux est refusé par l authentification, pa… 0.39s  
+  ✓ un mot de passe court mais CORRECT ouvre la session                  0.31s  
+  ✓ login throttles after 5 attempts per minute                          0.42s  
+  ✓ me endpoint returns 401 when not authenticated                       0.26s  
+  ✓ une requête SANS session reçoit un refus explicite, jamais une 500   0.28s  
+
+   PASS  Tests\Feature\Auth\OnboardingTourTest
+  ✓ POST /auth/onboarding/complete sans auth → 401                       0.33s  
+  ✓ POST /auth/onboarding/complete authentifié pose onboarding_tour_com… 0.26s  
+  ✓ POST /auth/onboarding/complete idempotent ne change pas la date      1.29s  
+  ✓ GET /auth/me expose onboarding_tour_completed_at                     0.31s  
+
+   PASS  Tests\Unit\Auth\AuthServiceTest
+  ✓ AuthService::attemptLogin avec bons credentials retourne user + req… 0.31s  
+  ✓ AuthService::attemptLogin avec totp_enabled_at retourne requires_2f… 0.29s  
+  ✓ AuthService::attemptLogin avec mauvais password lance ValidationExc… 0.51s  
+  ✓ AuthService::attemptLogin reset failed_login_count après login OK    0.58s  
+  ✓ AuthService::attemptLogin rejette account avec locked_until future   0.26s  
+  ✓ AuthService::attemptLogin trace last_login_ip + user_agent           0.24s  
+  ✓ AuthService constants exposed                                        0.31s  
+
+   PASS  Tests\Unit\Auth\HibpCheckerTest
+  ✓ HibpChecker returns 0 quand suffix absent                            0.38s  
+  ✓ HibpChecker retourne le count si suffix trouvé                       0.21s  
+  ✓ HibpChecker isBreached respecte le threshold                         0.30s  
+  ✓ HibpChecker rend null - et surtout pas 0 - quand le reseau echoue    0.29s  
+  ✓ HibpChecker rend null sur un statut HTTP autre que 200               0.35s  
+  ✓ HibpChecker retourne 0 pour password vide sans appel API             0.44s  
+  ✓ HibpChecker met en cache le résultat 24h                             0.52s  
+  ✓ HibpChecker parse correctement les newlines mixtes                   0.25s  
+  ✓ HibpChecker isBreached rend null quand le service est injoignable    0.55s  
+
+   PASS  Tests\Unit\Auth\MagicLinkServiceTest
+  ✓ issue creates a magic_links row with hashed token and 15min TTL      0.49s  
+  ✓ issue pour une adresse inconnue n ecrit rien, et ne leve rien        0.27s  
+  ✓ TEMOIN : issue pour une adresse CONNUE ecrit bien une ligne rattach… 0.33s  
+
+   PASS  Tests\Unit\Auth\NotPwnedPasswordRuleTest
+  ✓ NotPwnedPassword laisse passer si password non breached              0.44s  
+  ✓ NotPwnedPassword bloque si count > threshold                         0.34s  
+  ✓ NotPwnedPassword laisse passer si count = threshold                  0.24s  
+  ✓ NotPwnedPassword threshold custom respecté                           0.26s  
+  ✓ NotPwnedPassword ignore les types non-string                         0.24s  
+  ✓ NotPwnedPassword ignore les strings vides                            0.24s  
+
+   PASS  Tests\Feature\Rgpd\AntiReinsertionTest
+  ✓ un effacement écrit l’EMPREINTE, que la garde du scraping sait lire  0.38s  
+  ✓ une opposition née du SITE (hash seul, sans email) est vue par isOp… 0.30s  
+  ✓ la normalisation de casse et d’espaces vaut pour l’empreinte comme…  0.35s  
+  ✓ une adresse jamais opposée reste scrapable                           0.24s  
+
+   PASS  Tests\Feature\Rgpd\EffacementSanteTest
+  ✓ l’effacement console SUPPRIME le praticien de santé, il ne l’anonym… 0.39s  
+  ✓ l’effacement atteint aussi le praticien retrouvé par son TÉLÉPHONE   0.51s  
+  ✓ un praticien SANS rapport avec le sujet n’est jamais touché          0.38s  
+  ✓ aucune trace identifiante ne subsiste après effacement               0.58s  
+
+   PASS  Tests\Feature\Rgpd\EmpreinteSqlEtPhpTest
+  ✓ 🔴 empreinte SQL et empreinte PHP coïncident sur toutes les formes…  0.32s  
+  ✓ témoin — l’empreinte PHP est bien sha256(mb_strtolower(trim)), sans… 0.34s  
+  ✓ 🔴 ÉCART CONNU ET DÉLIBÉRÉMENT FIGÉ — majuscule non-ASCII            0.33s  
+  ✓ la minuscule non-ASCII, elle, ne pose aucun problème                 0.51s  
+
+   PASS  Tests\Feature\Rgpd\ExportsRespectentOppositionsTest
+  ✓ un contact opposé par ADRESSE EN CLAIR est exclu                     0.60s  
+  ✓ un contact opposé par EMPREINTE SEULE (effacement) est exclu         0.41s  
+  ✓ un contact présent en liste de SUPPRESSION est exclu                 0.60s  
+  ✓ un contact SANS email traverse la garde — il ne s’est opposé à rien  0.47s  
+  ✓ un contact sans rapport reste exportable                             0.37s  
+  ✓ la casse et les espaces ne permettent pas de contourner la garde     0.44s  
+
+   PASS  Tests\Feature\Rgpd\GdprErasureTest
+  ✓ erasure deletes contacts matching email                              0.55s  
+  ✓ erasure adds opt_out entry                                           0.58s  
+  ✓ erasure runs in atomic transaction (rollback on failure)             0.39s  
+  ✓ erasure deletes email_validations entry                              0.32s  
+
+   PASS  Tests\Feature\Rgpd\OppositionEmpreinteSeuleTest
+  ✓ 🔴 signal EN CLAIR côté appelant, empreinte en base : la fiche sort… 0.42s  
+  ✓ 🔴 signal HACHÉ en base (site), appelant qui ne connaît que le clai… 0.41s  
+  ✓ les PERSONNES sont protégées comme les entreprises                   0.40s  
+  ✓ un contact SANS adresse traverse la garde : on n’exclut personne po… 0.29s  
+  ✓ les deux univers restent étanches                                    0.34s  
+  ✓ 🔴 une opposition écrite par le SITE est vue par la garde du scrapi… 0.36s  
+  ✓ 🔴 une opposition écrite par un EFFACEMENT est vue par le site — ac… 0.29s  
+  ✓ un téléphone seul reste une opposition valable, sans empreinte d’ad… 0.30s  
+  ✓ 🔴 une ligne porteuse d’adresse SANS empreinte est REFUSÉE par la b… 0.37s  
+  ✓ 🔴 aucune ligne d’opposition ne porte plus d’adresse en clair après… 0.57s  
+  ✓ 🔴 la migration remplit l’empreinte des lignes héritées, avec le ca… 0.43s  
+  ✓ 🔴 la migration ÉCHOUE BRUYAMMENT sur une ligne irrécupérable, elle… 0.29s  
+
+   PASS  Tests\Feature\Rgpd\PermissionsRoutesRgpdTest
+  ✓ B15-010 — un compte en LECTURE SEULE ne peut pas deposer de demande… 0.93s  
+  ✓ B15-010 — un compte en LECTURE SEULE ne peut pas TRAITER une demand… 0.69s  
+  ✓ B15-010 — TEMOIN : le meme compte peut CONSULTER les demandes        1.11s  
+  ✓ B15-010 — TEMOIN : un OWNER peut, lui, traiter une demande           0.64s  
+  ✓ B16-004 — un compte en LECTURE SEULE ne peut pas lire le journal d…  0.68s  
+  ✓ B16-004 — TEMOIN : un ADMIN peut lire le journal d audit             0.62s  
+
+   PASS  Tests\Feature\Rgpd\RgpdRequestsControllerTest
+  ✓ GET /rgpd/requests sans auth → 401                                   0.35s  
+  ✓ GET /rgpd/requests authentifié → OK                                  0.67s  
+  ✓ POST /rgpd/requests crée une demande                                 0.56s  
+  ✓ POST /rgpd/requests valide le type                                   0.54s  
+  ✓ POST /rgpd/requests valide email                                     0.76s  
+  ✓ POST /rgpd/requests accepte les 5 types valides                      0.58s  
+  ✓ GET /rgpd/export/{token} avec token invalide → 404                   0.54s  
+  ✓ GET /audit-logs/verify-chain authentifié → OK                        0.93s  
+  ✓ le lien de portabilité s’ouvre SANS authentification                 0.40s  
+  ✓ un jeton EXPIRÉ ne livre rien                                        0.81s  
+
+   PASS  Tests\Feature\Seeders\OwnerUserSeederTest
+  ✓ OwnerUserSeeder crée workspace + owner avec password depuis env      1.63s  
+  ✓ OwnerUserSeeder n écrit AUCUN secret quand OWNER_INITIAL_PASSWORD e… 0.65s  
+  ✓ OwnerUserSeeder pose bien le mot de passe quand OWNER_INITIAL_PASSW… 0.67s  
+  ✓ OwnerUserSeeder est idempotent (re-run ne casse pas)                 0.74s  
+  ✓ OwnerUserSeeder pose pivot user_workspaces avec role owner           0.78s  
+
+  Tests:    119 passed (283 assertions)
+  Duration: 129.71s
+

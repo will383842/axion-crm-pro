@@ -392,3 +392,51 @@ The following errors occurred during the last request:
 ############ F35-013 ############
 --- fichiers ramenes a main :
     backend/app/Services/Auth/MagicLinkService.php
+
+   FAIL  Tests\Feature\Auth\GardesAuthentificationAgent35Test
+  ⨯ F35-013 — un lien magique orphelin n ouvre pas de session sur un c… 72.16s  
+  ✓ F35-013 — TEMOIN : un lien magique normal ouvre bien la session, un… 1.16s  
+  ⨯ F35-013 — aucun lien magique n est cree pour une adresse inconnue    1.22s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-013 —…    
+  Expected response status code [401] but received 200.
+Failed asserting that 200 is identical to 401.
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:494
+    490▕         'created_at' => now(),
+    491▕     ]);
+    492▕     utilisateurA35('futur@a35.test');
+    493▕ 
+  ➜ 494▕     test()->postJson('/api/v1/auth/magic-link/verify', ['token' => $jeton])->assertStatus(401);
+    495▕ });
+    496▕ 
+    497▕ test('F35-013 — TEMOIN : un lien magique normal ouvre bien la session, une seule fois', function () {
+    498▕     $utilisateur = utilisateurA35('magique@a35.test');
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-013 —…    
+  Failed asserting that 1 is identical to 0.
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:479
+    475▕ // ─────────────────────────────────────────────────────────────── F35-013
+    476▕ test('F35-013 — aucun lien magique n est cree pour une adresse inconnue', function () {
+    477▕     app(MagicLinkService::class)->issue('inconnu-total@a35.test', '10.0.0.1');
+    478▕ 
+  ➜ 479▕     expect(DB::table('magic_links')->where('email', 'inconnu-total@a35.test')->count())->toBe(0);
+    480▕ });
+    481▕ 
+    482▕ test('F35-013 — un lien magique orphelin n ouvre pas de session sur un compte cree apres coup', function () {
+    483▕     $jeton = Str::random(64);
+
+  1   tests/Feature/Auth/GardesAuthentificationAgent35Test.php:479
+
+
+  Tests:    2 failed, 1 passed (4 assertions)
+  Duration: 90.29s
+  Random Order Seed: 1787155261
+
+--- restauration de la branche
+
+############ ETAT FINAL DE LA COPIE DE TRAVAIL ############
+?? backend/phpunit-p5a35.xml
+?? backend/tests/Feature/Auth/SondeP5Agent35Test.php

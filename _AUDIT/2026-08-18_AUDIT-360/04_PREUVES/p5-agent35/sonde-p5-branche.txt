@@ -1,0 +1,19 @@
+
+[P5-D] medianes : compte connu 76.5 ms | inconnu (statique CHAUDE, condition de la garde) 75.3 ms (rapport 1.02) | inconnu (statique VIDEE, condition de php -S) 156.3 ms (rapport 2.04)
+
+[P5-B] login=200 requires_2fa=false | /contacts=403 first_login_required | 2fa/verify=422 {"message":"Code invalide.","errors":{"code":["Code invalide."]}} | 2fa/setup=200
+
+[P5-A] GET /users statut=200 corps={"data":[{"id":"1998f0a8-3c23-4ee2-a06b-1a79b9c5efaa","email":"p5-users@p5.test","name":"P5","current_workspace_id":"38d7e8d0-573a-4a58-bcaf-8bf016961f4d","first_login_completed_at":"2026-08-19T16:05:54.000000Z","two_factor_enabled":false,"last_login_at":"2026-08-19T16:05:54.000000Z"}]}
+
+[P5-C] /contacts avec Bearer, compte 2FA ACTIVE, sans /2fa/verify : statut=403 erreur=two_factor_required
+
+   PASS  Tests\Feature\Auth\SondeP5Agent35Test
+  ✓ P5-D — enumeration par le temps, statique videe a chaque requete    35.38s  
+  ✓ P5-B — compte neuf : que se passe-t-il si l ecran ne sait que VERIF… 0.79s  
+  ✓ P5-A — GET /users : statut et corps exacts                           0.74s  
+  ✓ P5-C — jeton d API et 2FA exigee                                     0.89s  
+
+  Tests:    4 passed (4 assertions)
+  Duration: 43.92s
+  Random Order Seed: 1787155514
+

@@ -1,0 +1,29 @@
+=== REVERSIBILITE DE LA MIGRATION 2026_08_19_120000_reparer_socle_authentification ===
+--- etat apres up() ---
+     column_name      |        data_type         |  udt_name   
+----------------------+--------------------------+-------------
+ last_failed_login_at | timestamp with time zone | timestamptz
+ totp_recovery_codes  | text                     | text
+(2 rows)
+
+--- rollback --step=1 ---
+
+   INFO  Rolling back migrations.  
+
+  2026_08_19_120000_reparer_socle_authentification ............. 381.71ms DONE
+
+--- etat apres down() ---
+     column_name     | data_type | udt_name 
+---------------------+-----------+----------
+ totp_recovery_codes | ARRAY     | _text
+(1 row)
+
+--- re-migrate (up() rejoue) ---
+  2026_08_19_120000_reparer_socle_authentification ............. 178.01ms DONE
+--- etat final ---
+     column_name      |        data_type         |  udt_name   
+----------------------+--------------------------+-------------
+ last_failed_login_at | timestamp with time zone | timestamptz
+ totp_recovery_codes  | text                     | text
+(2 rows)
+

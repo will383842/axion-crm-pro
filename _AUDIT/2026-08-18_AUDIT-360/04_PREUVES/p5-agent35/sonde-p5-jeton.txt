@@ -1,0 +1,14 @@
+
+[P5-E] client machine (Bearer, sans Origin stateful, sans session), compte 2FA ACTIVE,
+        JAMAIS passe par /auth/2fa/verify :
+        GET /api/v1/contacts -> statut=200  erreur=NULL
+        (403 two_factor_required = la 2FA est exigee ; 200 = elle est contournee)
+[P5-E] TEMOIN : GET /api/v1/auth/me avec le meme jeton -> statut=200 (prouve que le jeton est bien accepte par auth:sanctum)
+
+   PASS  Tests\Feature\Auth\SondeP5JetonTest
+  ✓ P5-E — jeton d API SANS Origin stateful, compte a 2FA ACTIVE        29.26s  
+
+  Tests:    1 passed (1 assertions)
+  Duration: 35.83s
+  Random Order Seed: 1787155638
+

@@ -1,0 +1,10 @@
+
+[P5-A] GET /users statut=200 corps={"data":[],"degraded":true}
+
+   PASS  Tests\Feature\Auth\SondeP5Agent35Test
+  ✓ P5-A — GET /users : statut et corps exacts                          35.14s  
+
+  Tests:    1 passed (1 assertions)
+  Duration: 43.81s
+  Random Order Seed: 1787155698
+

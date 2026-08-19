@@ -231,3 +231,15 @@ mourait sur Postgres (500) sans que le droit ne s'exprime jamais. Deux conséque
 la garde a été réécrite pour créer une **vraie** demande, et la route porte désormais
 `->whereNumber('req')` — un identifiant malformé rend **404** au lieu de **500**.
 
+**Un CINQUIÈME test gardait un défaut**, découvert en rejouant la suite RGPD complète :
+`tests/Feature/Rgpd/RgpdRequestsControllerTest.php` créait un compte **sans aucun rôle**,
+et passait au vert — parce qu'aucune permission n'était exigée. Il garantissait donc,
+sans le dire, que « n'importe quel compte authentifié peut déposer une demande RGPD ».
+Le compte de test porte désormais `admin` : le test vérifie que **l'endpoint fonctionne**,
+pas qu'il est **ouvert à tous**. La garde du droit, elle, vit dans son propre fichier.
+
+C'est le cinquième. Le motif se répète assez pour mériter d'être nommé : **dans ce dépôt,
+un test qui crée un utilisateur sans rôle et attend un 200 est un test qui certifie une
+absence de contrôle d'accès.** Il y en a probablement d'autres ; je n'ai vu que ceux que
+mes correctifs ont fait rougir.
+

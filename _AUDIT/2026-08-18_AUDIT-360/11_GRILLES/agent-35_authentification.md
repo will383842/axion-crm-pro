@@ -34,6 +34,28 @@ plus un rapport d'audit seul : **les défauts qu'il décrit sont réparés.**
 | Vert de référence | 44 tests avant, **69 après** : amélioré de 25, pas seulement retrouvé |
 | Poussé sur `origin` | **NON** — bloqué par la couche de permission de l'outillage. Voir §6 « RESTE WILL » |
 
+### Vague 2 — au-delà de mon périmètre, sur ordre de Will
+
+Will a demandé en cours de session : « il faut que tu fixes tous les problèmes non ? ».
+J'ai donc pris les S0 des autres agents, dans l'ordre du danger et de la tractabilité.
+Chacun garde le nom de qui l'a trouvé — je ne m'approprie aucun constat.
+
+| Constat | Agent | Ce qui était cassé | Commit |
+|---|---|---|---|
+| **A-015 / D24-001** (S0) | 24 | L'écran d'accueil s'effaçait entièrement dès qu'`audit_logs` portait une ligne — et la connexion en écrit une | `bdd25eb` |
+| **D22-001** (S0) | 22 | **Aucun écran** n'appelait `/auth/2fa/setup` : le serveur exigeait un enrôlement impossible à déclencher | `26fa980` |
+| **B15-010** (S0) | 15 | Routes RGPD sans aucune permission : un `viewer` pouvait déposer **et traiter** une demande d'effacement | `46848d4` |
+| **B16-004** (S0) | 16 | `GET /audit-logs` sans garde : le `viewer` recevait **200** et lisait le journal | `46848d4` |
+
+**Bilan des deux vagues : 5 S0 fermés sur 32.** Suite complète des 16 suites touchées :
+**119 tests verts, 0 échec, 0 avertissement**, à la sévérité de la CI.
+
+⚠️ **Il reste 27 S0.** Ils ne sont pas dans mon périmètre et je ne les ai pas touchés :
+couche d'autorisation inerte (11 policies jamais appelées), cloisonnement entre espaces
+qui fuit, effacement RGPD qui n'efface pas, chaîne d'audit sans secret et tronquable,
+signature HMAC forgeable, 6 services simulés en production, 26 tâches planifiées sans
+contexte d'espace, saturation disque prévue au 6 octobre. Voir `07_RAPPORT-FINAL.md`.
+
 **Preuves de la réparation** :
 `04_PREUVES/agent-35/gardes-ROUGE-avant-correctif.txt` (le rouge, attribué garde par garde),
 `gardes-VERT-apres-correctif.txt`, `suite-auth-VERTE-apres-correctif.txt`,

@@ -338,6 +338,58 @@ avant que le correctif soit déployé.**
 
 ---
 
+## 8. Résultat n° 6 — **dix-septième cas de `A-011`** : six tests certifient l'absence de contrôle d'accès
+
+**Origine** : l'agent 35 signale, en clôture, un motif qu'il a rencontré sans le chercher — *« cinq
+tests du dépôt garantissaient un défaut ; je les ai trouvés parce que mes correctifs les ont fait
+rougir »*. Le plus net : `RgpdRequestsControllerTest` **crée un compte sans aucun rôle et attend
+200**. Il certifie donc, sans le dire, que **les routes RGPD sont ouvertes à tout compte connecté**.
+
+**Il ajoute : « il y en a probablement d'autres ; je n'ai vu que ceux que mes correctifs ont
+heurtés. »** *C'est exactement le genre d'intuition qu'on ne doit pas laisser à l'état d'intuition —
+et il ne pouvait pas la vérifier lui-même sans se relire (règle 7).* **Je l'ai balayée.**
+
+**Mesure** — sur `tests/Feature/`, tout fichier qui prend une identité (`actingAs`) **sans jamais
+poser un rôle ni une permission** (`assignRole`, `givePermissionTo`, `syncRoles`, `'role' =>`…) **et
+qui attend au moins un succès** (200/201/204) :
+
+**→ 17 fichiers.** Dont **six exercent un geste destructeur ou des données personnelles** :
+
+| Fichier | Ce qu'il exerce sans rôle, en attendant un succès |
+|---|---|
+| **`Rgpd/RgpdRequestsControllerTest`** | `/rgpd`, `/export`, `/audit-logs`, `erasure` — *celui qu'a trouvé l'agent 35* |
+| **`CompaniesControllerTest`** | `DELETE`, `PUT` — *c'est la garde de `F36-003`, « un `viewer` supprime définitivement une entreprise »* |
+| **`Controllers/NotificationsControllerTest`** | `/audit-logs` — *`B16-004` / `F36-004`, le journal lisible par tout compte* |
+| **`CampaignsTest`** | `DELETE`, `PUT` |
+| **`Crm/CrmOutboundTest`** | `erasure` |
+| **`Controllers/WorkspaceControllerTest`** | `PUT` |
+
+### `P5-ROLES-001` (S1) — et c'est une **espèce** de `A-011` distincte
+
+Les quinze premiers cas étaient des gardes qui **mesurent le mauvais objet**. Ces six-là, comme
+`AntiReinsertionTest` (cas 10), sont d'une autre nature : **elles inscrivent le défaut dans une
+assertion.** Elles ne ratent pas le problème — *elles le certifient correct.*
+
+> **Conséquence opérationnelle pour P3, et personne ne l'a chiffrée** : `F36-001` et `F36-002`
+> (l'autorisation est du code mort) sont au **rang 3** de l'ordonnancement. Le jour où l'on câble
+> les 11 policies, **ces six fichiers au moins passeront au rouge**, et ce rouge sera **la preuve
+> que le correctif marche**.
+>
+> 🔴 **Le risque est là, et il est humain** : devant six suites rouges, la pente naturelle est de
+> « réparer les tests ». **Les réparer, c'est leur donner un rôle.** Assouplir la garde pour les
+> faire passer, c'est défaire le correctif le jour même — et le dépôt vient de montrer trois fois
+> qu'il répare sur un exemplaire sans balayer les frères.
+>
+> **À écrire dans le ticket de `F36-001` avant de l'ouvrir**, pas après.
+
+⚠️ **Limite déclarée** : les 11 autres fichiers ne sont **pas** des défauts par construction — un
+tableau de bord ou une recherche peuvent légitimement n'exiger qu'une authentification. **Le balayage
+donne une liste à examiner, pas un verdict.** Seuls les six ci-dessus sont qualifiés, sur le critère
+« geste destructeur ou donnée personnelle ». *Et la méthode est heuristique : un fichier qui poserait
+un rôle par un chemin que mon motif ne connaît pas m'aurait échappé.*
+
+---
+
 ## 3. Journal de la passe
 
 | Date | Objet | Verdict |
@@ -347,3 +399,4 @@ avant que le correctif soit déployé.**
 | 2026-08-19 | La tension `02bis` §5 « canal HMAC exemplaire » vs `F37-001` « canal HMAC forgeable » | ✅ **Pas de contradiction : deux canaux distincts**, les deux affirmations tiennent. 🔴 Mais **constat neuf `P5-HMAC-001` (S2)** : deux commentaires — dont le docbloc de la classe durcie — **désignent le canal troué comme le patron de référence**. Une hypothèse à moi (`config:cache` neutralisant le secret) **poursuivie puis réfutée**, archivée avec sa réponse |
 | 2026-08-19 | `B15-001` + `B15-002` — « la personne effacée revient au vivier » et la garde qui l'entérine | 🔴 **Confirmés**, chaîne prouvée en 6 maillons du code au schéma. **Et pire qu'écrit** : le même défaut a été trouvé, daté (E2E du 17/08) et **réparé sur la porte voisine** ; le chemin de la console n'a jamais été porté. *Vu, nommé, réparé — d'un seul côté.* |
 | 2026-08-19 | `F38-007` — « la faille du 19/08 est réarmable en un clic » (signalé par l'agent S1) | 🔴 **Vérifié, vrai, et plus large : le dispatch rouvre AUSSI l'accès root SSH.** Reclassé **S1 → S0** (`D-019`). **Trois fichiers corrigés**, dont le runbook de reprise après sinistre. **Seizième cas de `A-011`** : la garde dynamique des ports n'est câblée que sur la préproduction, déjà saine |
+| 2026-08-19 | *« Il y en a probablement d'autres »* — l'intuition de l'agent 35 sur les tests qui certifient un défaut | 🔴 **Vérifiée et étendue** : **17 fichiers** prennent une identité sans rôle et attendent un succès ; **six** exercent un geste destructeur ou des données personnelles. **`P5-ROLES-001` (S1), dix-septième cas de `A-011`** — espèce « la garde inscrit le défaut en assertion ». **Chiffre le coût caché du correctif `F36-001`** |

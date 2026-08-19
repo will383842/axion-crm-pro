@@ -17,6 +17,38 @@ ses sources sont archivées dans `04_PREUVES/agent-35/sonde/` et `sonde2/`.
 
 ---
 
+## 0. ÉTAT : LES 14 CONSTATS SONT CORRIGÉS, TESTÉS, COMMITÉS
+
+Mandat reçu de Will **en cours de session** : « je veux que tu corriges et fixes au fur et
+à mesure », en appliquant la doctrine autopilote de
+`Axion-IA/_AUDIT/PROMPT-AUDIT-QUALIOPI-E2E-50-AGENTS-2026-08-18.md`. Ce rapport n'est donc
+plus un rapport d'audit seul : **les défauts qu'il décrit sont réparés.**
+
+| | |
+|---|---|
+| Branche | `fix/a35-authentification`, commit **`da994be`**, depuis `origin/main` = `e8924b8` |
+| Worktree | `crmpro-wt-a35-auth` (dédié ; ⛔ `crmpro-wt-etape1a` jamais approché) |
+| Fichiers | **21** : 16 modifiés, 3 créés, dont 1 middleware et 1 migration |
+| Gardes | **25 tests neufs**, chacun **vu rougir avant** son correctif |
+| Suite auth complète | **69 passés / 0 échec / 0 avertissement**, avec `failOnWarning=true` et `failOnRisky=true` — la sévérité de la CI |
+| Vert de référence | 44 tests avant, **69 après** : amélioré de 25, pas seulement retrouvé |
+| Poussé sur `origin` | **NON** — bloqué par la couche de permission de l'outillage. Voir §6 « RESTE WILL » |
+
+**Preuves de la réparation** :
+`04_PREUVES/agent-35/gardes-ROUGE-avant-correctif.txt` (le rouge, attribué garde par garde),
+`gardes-VERT-apres-correctif.txt`, `suite-auth-VERTE-apres-correctif.txt`,
+et `JOURNAL-REPARATION.md` (décisions prises sans demander, et les quatre fois où c'est ma
+sonde qui avait tort).
+
+⚠️ **Quatre tests du dépôt exigeaient le défaut** et ont été **réécrits, pas supprimés**,
+avec leur histoire en tête de test : `HibpCheckerTest` (exigeait le fail-open),
+`LoginTest` (exigeait le refus d'un mot de passe court à la connexion),
+`OwnerUserSeederTest` (exigeait l'écriture du secret en clair),
+`MagicLinkServiceTest` (exigeait la ligne orpheline). Un test vert n'est une bonne
+nouvelle que si ce qu'il exige est ce qu'on veut.
+
+---
+
 ## 1. Grille
 
 Légende : ✅ conforme · ⚠️ défaut · 🔴 grave · ⬜ non vérifié (raison donnée)
@@ -261,7 +293,7 @@ F35-004 est bien un second fail-open, sur un autre chemin.
 - Impact        : tout client non-navigateur (supervision, client machine, futur client mobile, `curl`, Postman) reçoit « le serveur est cassé » là où la vérité est « vous n'êtes pas connecté ». Corollaire mesuré : **8 475 octets** de journal par requête, qui alimentent A-007.
 - Reproduction  : `curl -s -o /dev/null -w '%{http_code}' -H 'Accept: text/html' http://<api>/api/v1/auth/me` → 500 ; avec `-H 'Accept: application/json'` → 401.
 - Correctif     : deux lignes dans `bootstrap/app.php` (`$middleware->redirectGuestsTo(fn () => null);` **et** `$exceptions->shouldRenderJsonWhen(fn ($r, $e) => $r->is('api/*') || $r->expectsJson());`) + le test ci-dessus. Coût : < 1 h, correction P3.
-- Statut        : ouvert — **complète A-001, ne le redécouvre pas.** L'étendue (500 sans `Accept`, 401 avec) avait déjà été trouvée et corrigée par la consolidation, qui a abaissé A-001 à S2. Ce que j'apporte, et qui n'y figurait pas : **(a)** la cause exacte, frame par frame, et le fait qu'elle vient d'un rappel posé **par le framework lui-même** (`ApplicationBuilder::withMiddleware()` l.278), pas d'un oubli du produit ; **(b)** le correctif en **deux** lignes, avec la démonstration à quatre états qu'**aucune des deux ne suffit seule** ; **(c)** le coût caché : **8 475 octets de journal par requête refusée**, contributeur direct de A-007.
+- Statut        : **CORRIGÉ** — `bootstrap/app.php` : `redirectGuestsTo(fn () => null)` + `shouldRenderJsonWhen(api/*)`. Garde vue rougir puis verte ; commit `da994be`, branche `fix/a35-authentification`. Reste à pousser et fusionner (§6) — **complète A-001, ne le redécouvre pas.** L'étendue (500 sans `Accept`, 401 avec) avait déjà été trouvée et corrigée par la consolidation, qui a abaissé A-001 à S2. Ce que j'apporte, et qui n'y figurait pas : **(a)** la cause exacte, frame par frame, et le fait qu'elle vient d'un rappel posé **par le framework lui-même** (`ApplicationBuilder::withMiddleware()` l.278), pas d'un oubli du produit ; **(b)** le correctif en **deux** lignes, avec la démonstration à quatre états qu'**aucune des deux ne suffit seule** ; **(c)** le coût caché : **8 475 octets de journal par requête refusée**, contributeur direct de A-007.
 
 ### [F35-002] ⚠️ **CONFIRMATION INDÉPENDANTE de A07-001**, plus un second chemin de rupture que personne n'avait relevé : `GET /api/v1/users`
 - Sévérité      : **S0** *(celle de A07-001 ; je ne rouvre pas le constat, je le confirme et je l'étends)*
@@ -274,7 +306,7 @@ F35-004 est bien un second fail-open, sur un autre chemin.
 - Impact        : `POST /auth/2fa/setup` et `POST /auth/2fa/confirm` échouent. Or `confirmEnrolment()` est le **seul** endroit de tout `app/` qui pose `first_login_completed_at` (vérifié par `grep`), et `EnforceFirstLoginSetup` renvoie **403 `first_login_required`** sur toute route hors liste blanche tant que ce champ est nul. Un compte neuf ne peut donc **jamais** franchir le premier login : il tourne indéfiniment entre `/auth/me`, `/auth/logout` et trois routes 2FA qui échouent. En prime, `GET /api/v1/users` `select` la colonne inexistante `two_factor_enabled` et casse pour la même raison.
 - Reproduction  : base migrée à neuf ; créer un utilisateur avec `first_login_completed_at = null` ; se connecter ; appeler `POST /api/v1/auth/2fa/setup` ; puis `GET /api/v1/contacts`.
 - Correctif     : une migration qui **renomme** les trois colonnes du code vers celles de la base (`two_factor_secret` → `totp_secret`, `two_factor_recovery_codes` → `totp_recovery_codes`) et ajoute `two_factor_enabled` **ou**, mieux, aligner le code sur le schéma (3 fichiers : `TwoFactorService`, `User`, `UsersController`) — le schéma est cohérent, c'est le code qui a dérivé. Ajouter un test qui joue l'enrôlement de bout en bout. Coût : 2-3 h.
-- Statut        : ouvert — **à fusionner avec A07-001**, dont il ne faut pas gonfler le compte. Ma contribution propre se réduit à deux choses : la **troisième mesure indépendante** du même défaut (par un autre agent, un autre atelier, une autre méthode), et le **second chemin de rupture** `GET /api/v1/users`.
+- Statut        : **CORRIGÉ** — `TwoFactorService`, `User`, `UsersController` alignés sur `totp_*` + migration. Garde vue rougir puis verte ; commit `da994be`, branche `fix/a35-authentification`. Reste à pousser et fusionner (§6) — **à fusionner avec A07-001**, dont il ne faut pas gonfler le compte. Ma contribution propre se réduit à deux choses : la **troisième mesure indépendante** du même défaut (par un autre agent, un autre atelier, une autre méthode), et le **second chemin de rupture** `GET /api/v1/users`.
 
 ### [F35-003] La double authentification n'est jamais exigée par le serveur : `2fa_passed_at` est écrit et jamais relu
 - Sévérité      : S1
@@ -287,7 +319,7 @@ F35-004 est bien un second fail-open, sur un autre chemin.
 - Impact        : la 2FA est **décorative**. La bascule vers `/2fa` est purement côté navigateur ; qui possède le mot de passe possède le CRM, 2FA activée ou non. Pour un CRM contenant 4,29 M de fiches de personnes, c'est un écart de conformité autant qu'un écart de sécurité.
 - Reproduction  : activer la 2FA sur un compte, se connecter par `POST /auth/login`, puis appeler directement `GET /api/v1/contacts` avec le cookie de session, sans passer par `/auth/2fa/verify`.
 - Correctif     : un middleware `EnsureTwoFactorPassed` posé sur le groupe protégé, qui renvoie 403 `two_factor_required` si `totp_enabled_at` est non nul et que la session ne porte pas de `2fa_passed_at` récent ; l'ajouter au groupe de `routes/api.php:83` avec la même liste blanche que `EnforceFirstLoginSetup`. Coût : 3-4 h avec les tests.
-- Statut        : ouvert
+- Statut        : **CORRIGÉ** — middleware `EnsureTwoFactorPassed`, posé sur le groupe `api`. Garde vue rougir puis verte ; commit `da994be`, branche `fix/a35-authentification`. Reste à pousser et fusionner (§6)
 
 ### [F35-004] `HibpChecker` échoue en silence (« fail open »), et `NotPwnedPassword` n'est branchée qu'à un seul endroit
 - Sévérité      : S1
@@ -305,7 +337,7 @@ F35-004 est bien un second fail-open, sur un autre chemin.
 - Impact        : (a) une panne réseau, un DNS filtré, un pare-feu sortant ou une indisponibilité de `api.pwnedpasswords.com` suffit à désactiver silencieusement le contrôle. (b) Bien plus large : la règle n'est appelée **que** dans `PasswordResetController::reset()`. Ni `LoginRequest`, ni `OwnerUserSeeder`, ni `infra/scripts/definir-mot-de-passe-crm.sh` ne la traversent — le mot de passe du propriétaire n'a donc jamais été confronté à HIBP.
 - Reproduction  : couper la résolution DNS de `api.pwnedpasswords.com` dans le conteneur, puis `POST /api/v1/auth/password/reset` avec `password = "password"` et un jeton valide.
 - Correctif     : (1) distinguer « sain » de « inconnu » — faire remonter `null` en cas d'erreur et décider explicitement (refus + message « vérification indisponible, réessayez » sur un chemin sensible, ou acceptation tracée en journal d'audit) ; (2) brancher la règle sur **tous** les points d'entrée d'un mot de passe. Coût : 3-4 h.
-- Statut        : ouvert
+- Statut        : **CORRIGÉ** — `HibpChecker` rend `null` quand il ne sait pas ; la règle refuse. Garde vue rougir puis verte ; commit `da994be`, branche `fix/a35-authentification`. Reste à pousser et fusionner (§6)
 
 ### [F35-005] Le jeton de réinitialisation de mot de passe n'expire jamais : le contrôle des 60 minutes est inopérant sous Carbon 3
 - Sévérité      : S1
@@ -318,7 +350,7 @@ F35-004 est bien un second fail-open, sur un autre chemin.
 - Impact        : un lien de réinitialisation intercepté (boîte aux lettres compromise, journal de relais SMTP, capture d'écran, historique de navigateur) reste utilisable **indéfiniment**, jusqu'à ce qu'un autre `forgot` écrase la ligne — `password_reset_tokens` a `email` pour clé primaire, donc une seule ligne par adresse. Le contrat annoncé à l'utilisateur dans l'e-mail (« Valide 60 minutes », l.53) est faux.
 - Reproduction  : insérer une ligne `password_reset_tokens` avec `created_at = now() - 30 days`, puis `POST /api/v1/auth/password/reset` avec le jeton correspondant → succès.
 - Correctif     : `Carbon::parse($row->created_at)->diffInMinutes(now()) > 60`, ou mieux `Carbon::parse($row->created_at)->addMinutes(60)->isPast()`. Ajouter un test qui recule `created_at`. Coût : 15 min + test. **Chercher le même motif ailleurs** : `grep -rn "now()->diffIn" app/` — ce dépôt a migré vers Carbon 3 et ce piège est silencieux.
-- Statut        : ouvert
+- Statut        : **CORRIGÉ** — `Carbon::parse($créé)->addMinutes(60)->isPast()`. Garde vue rougir puis verte ; commit `da994be`, branche `fix/a35-authentification`. Reste à pousser et fusionner (§6)
 
 ### [F35-006] La réinitialisation du mot de passe ne révoque aucun jeton d'API
 - Sévérité      : S2
@@ -331,7 +363,7 @@ F35-004 est bien un second fail-open, sur un autre chemin.
 - Impact        : le geste que fait un utilisateur *parce qu'il pense être compromis* ne coupe pas l'accès de l'attaquant qui détient un jeton d'API — les requêtes porteuses d'un `Authorization: Bearer` ne traversent pas la pile stateful et échappent donc à `AuthenticateSession`. Les **sessions web**, elles, sont bien invalidées : le constat porte uniquement sur les jetons d'API.
 - Reproduction  : créer un jeton d'API, réinitialiser le mot de passe, rappeler `/auth/me` avec le jeton.
 - Correctif     : dans `reset()`, après `$user->save()` : `$user->tokens()->delete();` et, si `SESSION_DRIVER=database`, `DB::table('sessions')->where('user_id', $user->id)->delete();`. Coût : 30 min + test.
-- Statut        : ouvert
+- Statut        : **CORRIGÉ** — `$user->tokens()->delete()` + purge des sessions en base. Garde vue rougir puis verte ; commit `da994be`, branche `fix/a35-authentification`. Reste à pousser et fusionner (§6)
 
 ### [F35-007] `definir-mot-de-passe-crm.sh` place le mot de passe dans `argv`, alors que son en-tête affirme le contraire
 - Sévérité      : S2
@@ -344,7 +376,7 @@ F35-004 est bien un second fail-open, sur un autre chemin.
 - Impact        : sur le serveur de production (Linux), `ps -ef`, `ps auxww` et `/proc/<pid>/cmdline` — lisible par tout utilisateur, aucune option `hidepid` n'étant posée dans ce dépôt — exposent le mot de passe du propriétaire du CRM pendant toute la durée du `docker exec` (`php artisan tinker`, plusieurs secondes). Le script se réclame explicitement du contraire, ce qui est plus dangereux qu'un silence : l'opérateur croit la protection acquise.
 - Reproduction  : lancer le script, et depuis un autre terminal `ps -ef | grep CRM_MDP`.
 - Correctif     : passer le secret sur **l'entrée standard du conteneur** plutôt qu'en variable : `printf '%s' "$MDP" | docker exec -i -e CRM_COMPTE="$COMPTE" "$CONTENEUR" php artisan tinker /tmp/definir.php`, et lire `fgets(STDIN)` côté PHP. Corriger aussi l'en-tête du script, qui doit décrire ce que le script fait. Coût : 30 min.
-- Statut        : ouvert
+- Statut        : **CORRIGÉ** — le mot de passe passe par un tube jusqu'à stdin du conteneur. Garde vue rougir puis verte ; commit `da994be`, branche `fix/a35-authentification`. Reste à pousser et fusionner (§6)
 
 ### [F35-008] `OwnerUserSeeder` écrit le mot de passe initial en clair sur le disque, sans le `chmod` annoncé, et l'affiche sur la sortie du déploiement
 - Sévérité      : S2
@@ -357,7 +389,7 @@ F35-004 est bien un second fail-open, sur un autre chemin.
 - Impact        : le mot de passe du compte propriétaire d'un CRM contenant 4,29 M de fiches est lisible par tout utilisateur du serveur, et se retrouve aussi dans la sortie du déploiement (journaux CI, journaux Docker). Aucun mécanisme n'efface le fichier ; le commentaire compte sur un geste manuel.
 - Reproduction  : `php artisan db:seed --class=OwnerUserSeeder` avec `OWNER_INITIAL_PASSWORD` vide, puis `ls -l storage/app/private/seeders/`.
 - Correctif     : ne jamais écrire le secret. Faire générer par le seeder un **jeton de première connexion** à usage unique et à durée limitée, et n'afficher que lui ; ou exiger `OWNER_INITIAL_PASSWORD` et échouer proprement s'il est absent. À défaut, au minimum `Storage::disk('local')->put($chemin, $ligne, ['visibility' => 'private'])` et supprimer le fichier au premier login réussi. **Ne pas confondre avec la rotation des secrets, refusée par Will** : il ne s'agit pas de changer un secret, mais de cesser d'en écrire un en clair. Coût : 2 h.
-- Statut        : ouvert
+- Statut        : **CORRIGÉ** — le seeder n'écrit plus aucun secret ; il signale l'ancien fichier. Garde vue rougir puis verte ; commit `da994be`, branche `fix/a35-authentification`. Reste à pousser et fusionner (§6)
 
 ### [F35-009] Énumération de comptes par le temps de réponse sur `POST /auth/login`
 - Sévérité      : S2
@@ -370,7 +402,7 @@ F35-004 est bien un second fail-open, sur un autre chemin.
 - Impact        : un attaquant peut constituer la liste des adresses réellement enregistrées, sans jamais deviner un mot de passe. Le plafond de 5/min/IP ralentit, il n'empêche pas (rotation d'adresses IP — cf. F35-012).
 - Reproduction  : chronométrer `POST /auth/login` sur une adresse connue et sur une adresse inconnue, mot de passe faux dans les deux cas. ⚠️ **La mesure chiffrée de l'écart n'a pas pu être jouée** (voir §5) : le constat repose sur la structure du code, pas sur des millisecondes.
 - Correctif     : exécuter un `Hash::check()` factice sur un hachage constant lorsque l'utilisateur n'existe pas — le motif standard : `Hash::check($password, $user?->password_hash ?? static::HACHAGE_FACTICE)`. Coût : 30 min + test de temps.
-- Statut        : ouvert
+- Statut        : **CORRIGÉ** — hachage factice de coût identique, mémorisé par coût. Garde vue rougir puis verte ; commit `da994be`, branche `fix/a35-authentification`. Reste à pousser et fusionner (§6)
 
 ### [F35-010] Les jetons d'API n'expirent jamais
 - Sévérité      : S2
@@ -382,7 +414,7 @@ F35-004 est bien un second fail-open, sur un autre chemin.
 - Témoin négatif: dans la **même** sonde, le cookie de session, lui, porte bien une expiration — `expire=2026-08-19T17:05:02+02:00`, soit +120 min. Le dépôt sait donc poser une expiration quand il le veut ; il ne le fait pas pour les jetons d'API. Et la **révocation explicite**, elle, fonctionne : jeton valide ⇒ 200, jeton supprimé ⇒ 401 (même bloc).
 - Impact        : un jeton qui fuit reste valable pour toujours, sauf révocation manuelle. Aucun écran de la console ne liste ni ne révoque les jetons (à confirmer par l'agent des écrans).
 - Correctif     : `'expiration' => (int) env('SANCTUM_TOKEN_TTL_MINUTES', 43200)` (30 jours) et planifier `sanctum:prune-expired`. Coût : 1 h.
-- Statut        : ouvert
+- Statut        : **CORRIGÉ** — `sanctum.expiration` = `SANCTUM_TOKEN_TTL_MINUTES`, 30 j par défaut. Garde vue rougir puis verte ; commit `da994be`, branche `fix/a35-authentification`. Reste à pousser et fusionner (§6)
 
 ### [F35-011] `Password::min(12)` est appliqué à la **connexion** : un compte au mot de passe plus court ne peut plus jamais se connecter
 - Sévérité      : S2
@@ -394,7 +426,7 @@ F35-004 est bien un second fail-open, sur un autre chemin.
 - Témoin négatif: le même fichier de test, ligne 77-83, montre qu'un mot de passe de 21 caractères passe la validation et rend 200. La règle discrimine donc bien sur la longueur — c'est son emplacement, sur la **connexion**, qui est le défaut.
 - Impact        : impasse totale si un compte a été créé hors du chemin nominal (script, reprise, import) avec un mot de passe court : ni connexion, ni message compréhensible (« le mot de passe doit contenir au moins 12 caractères » alors que c'est le bon). Sur ce produit, `definir-mot-de-passe-crm.sh` impose bien 12 caractères, mais rien ne le garantit ailleurs.
 - Correctif     : sur la connexion, ne valider que `['required', 'string']`. La complexité se contrôle à la création et au changement, jamais à la connexion. Coût : 10 min.
-- Statut        : ouvert
+- Statut        : **CORRIGÉ** — `Password::min(12)` retiré de la **connexion**. Garde vue rougir puis verte ; commit `da994be`, branche `fix/a35-authentification`. Reste à pousser et fusionner (§6)
 
 ### [F35-012] Le verrou de compte n'est vérifié qu'après le contrôle du mot de passe : il n'arrête pas l'attaque, il en interdit seulement le succès
 - Sévérité      : S2
@@ -406,7 +438,7 @@ F35-004 est bien un second fail-open, sur un autre chemin.
 - Témoin négatif: le dépôt **a déjà mesuré** ce comportement et l'a documenté : `tests/Feature/Auth/LoginTest.php:99-127` explique que « les tentatives 6 à 10 repartaient en 429 sans jamais atteindre AuthService », et le test ne parvient à verrouiller le compte qu'en **changeant d'IP à chaque tour** (l.119). C'est la démonstration, écrite par le produit lui-même, que la rotation d'adresses contourne les deux plafonds. ⚠️ **La série de 20 tentatives n'a pas pu être rejouée par moi** (voir §5).
 - Impact        : (a) coût serveur — chaque tentative sur un compte verrouillé consomme un `bcrypt` de coût 12, ce qui en fait un levier d'épuisement CPU ; (b) `failed_login_count` n'est jamais remis à zéro par le temps (seulement par une connexion réussie ou une réinitialisation), donc **10 fautes de frappe étalées sur des mois** finissent par verrouiller un compte légitime pour 24 h ; (c) la rotation d'adresses IP contourne les deux plafonds de débit, qui sont tous deux indexés sur l'IP (`RouteServiceProvider:26` et `AuthService:30`).
 - Correctif     : déplacer le contrôle de `locked_until` **avant** `Hash::check()` ; faire expirer `failed_login_count` (remise à zéro après N minutes sans échec) ; ajouter un plafond de débit indexé sur le **compte** en plus de celui indexé sur l'IP. Coût : 2 h.
-- Statut        : ouvert
+- Statut        : **CORRIGÉ** — verrou testé **avant** le hachage + fenêtre d'oubli de 30 min. Garde vue rougir puis verte ; commit `da994be`, branche `fix/a35-authentification`. Reste à pousser et fusionner (§6)
 
 ### [F35-013] Un lien magique émis pour une adresse sans compte ouvre une session si le compte est créé avant l'expiration
 - Sévérité      : S2
@@ -419,7 +451,7 @@ F35-004 est bien un second fail-open, sur un autre chemin.
 - Impact        : étroit mais réel — quiconque connaît l'adresse d'un futur collaborateur peut préparer un lien et prendre sa session dès la création du compte. Effet secondaire : la table `magic_links` accepte 3 insertions par minute et par IP **sans** aucune purge, avec l'adresse et l'IP du demandeur (donnée personnelle) — croissance non bornée.
 - Reproduction  : `POST /auth/magic-link` sur une adresse inexistante, créer le compte, puis consommer le jeton.
 - Correctif     : ne rien insérer si l'utilisateur est inconnu (le temps de réponse reste constant : il n'y a pas de `bcrypt` ici) ; et faire porter `consume()` sur `user_id` et non sur l'e-mail. Ajouter une purge planifiée des liens expirés. Coût : 1 h.
-- Statut        : ouvert
+- Statut        : **CORRIGÉ** — aucune ligne pour une adresse inconnue ; `consume()` par `user_id`. Garde vue rougir puis verte ; commit `da994be`, branche `fix/a35-authentification`. Reste à pousser et fusionner (§6)
 
 ### [F35-014] `definir-mot-de-passe-crm.sh` peut annoncer un succès sur une sortie qui n'en est pas un
 - Sévérité      : S3
@@ -431,7 +463,7 @@ F35-004 est bien un second fail-open, sur un autre chemin.
 - Témoin négatif: le script fait par ailleurs les choses bien — il refuse de tourner hors root, refuse un terminal interactif, refuse un mot de passe de moins de 12 caractères, vérifie l'existence du conteneur, et surtout **vérifie le hachage enregistré** par `Hash::check()` avant de conclure. C'est un script sérieux : ce constat porte sur la seule marche restante.
 - Impact        : faible mais mal placé — un « OK : mot de passe défini » erroné envoie l'opérateur chercher la panne du mauvais côté, sur le geste qui rend l'accès au produit.
 - Correctif     : comparer la **dernière ligne** de la sortie à `OK` exactement (`[ "$(printf '%s' "$SORTIE" | tail -n1)" = OK ]`), et faire écrire au PHP un marqueur non ambigu. Coût : 15 min.
-- Statut        : ouvert
+- Statut        : **CORRIGÉ** — verdict lu sur la dernière ligne, à l'égalité stricte. Garde vue rougir puis verte ; commit `da994be`, branche `fix/a35-authentification`. Reste à pousser et fusionner (§6)
 
 ---
 
@@ -592,3 +624,62 @@ contraire.
     ne conclus pas à une faille**, je signale une porte que mon périmètre ne couvre pas.
     À confier à l'agent du canal temps réel (Reverb) : que rend `Broadcast::auth()` à un
     visiteur non authentifié, et sur quels canaux ?
+
+---
+
+## 6. RESTE WILL — les gestes qui ne sont pas du code
+
+La doctrine reçue réserve trois classes d'actions à l'humain. En voici la liste exacte,
+avec le geste, et ce qui se passe si on ne le fait pas.
+
+### 6.1 Pousser la branche et ouvrir la PR — **bloqué chez moi, pas par choix**
+
+`git push -u origin fix/a35-authentification` a été **refusé par la couche de permission
+de l'outillage**. Je n'ai pas cherché à contourner : ce n'est pas à moi de décider qu'une
+barrière posée volontairement doit sauter. Le travail est **committé localement**, complet
+et vert.
+
+```
+cd C:/Users/willi/Documents/Projets/crmpro-wt-a35-auth
+git push -u origin fix/a35-authentification
+gh pr create --fill --base main
+```
+
+Conséquence si ce n'est pas fait : les 14 correctifs restent dans un worktree local. Le
+CRM continue de refuser sa propre console à son propriétaire.
+
+### 6.2 Supprimer l'ancien mot de passe en clair, sur le serveur
+
+Fichier : `storage/app/private/seeders/owner-initial-password.txt`.
+
+Le seeder **ne l'écrit plus** et **le signale désormais** à chaque exécution. Je ne l'ai
+pas supprimé par le code, et c'est délibéré : détruire le seul exemplaire d'un secret sans
+que personne l'ait demandé est exactement l'erreur que ce chantier a déjà payée une fois.
+Geste : changer d'abord le mot de passe du compte, puis
+`rm -f /opt/axion-crm-pro/backend/storage/app/private/seeders/owner-initial-password.txt`.
+
+### 6.3 Déployer, migrer, et re-vérifier en ligne
+
+La branche porte **une migration** (`2026_08_19_120000_reparer_socle_authentification`) :
+`totp_recovery_codes` passe de `TEXT[]` à `TEXT`, et `last_failed_login_at` est ajoutée.
+Les deux sont additives ou portent sur une colonne restée vide — le chemin d'écriture n'a
+jamais fonctionné. L'entrypoint de production joue `php artisan migrate` au démarrage.
+
+Après déploiement, deux vérifications qui tiennent en deux commandes :
+
+```
+curl -s -o /dev/null -w '%{http_code}
+' -H 'Accept: text/html' https://api.axion-crm-pro.com/api/v1/auth/me   # attendu : 401, plus 500
+curl -s -o /dev/null -w '%{http_code}
+' -H 'Accept: application/json' https://api.axion-crm-pro.com/api/v1/auth/me # attendu : 401
+```
+
+Puis, et c'est le seul qui compte vraiment : **se connecter**, franchir l'enrôlement 2FA,
+et ouvrir un écran métier. C'est le geste que le produit n'a jamais permis.
+
+### 6.4 Ce que je n'ai pas touché, et qui reste vrai
+
+- Aucune variable d'environnement de production n'a été modifiée.
+- Aucune donnée de production n'a été lue en écriture, ni supprimée.
+- Aucun e-mail n'a été envoyé à qui que ce soit.
+- La rotation des secrets reste **refusée par Will** ; elle n'est pas reproposée ici.

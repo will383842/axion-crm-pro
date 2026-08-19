@@ -1,0 +1,55 @@
+
+   FAIL  Tests\Feature\Auth\GardesAuthentificationAgent35Test
+  ! F35-002 — l enrolement 2FA ecrit des colonnes qui existent vraimen… 59.52s  
+  ! F35-002 — confirmer l enrolement pose first_login_completed_at et r… 0.93s  
+  ! F35-002 — un code de secours ne sert qu une fois → file_get_content… 0.66s  
+  ! F35-002 — GET /users ne selectionne aucune colonne inexistante → fi… 4.51s  
+  ! F35-003 — un compte a 2FA active ne franchit rien tant que le code…  1.60s  
+  ! F35-003 — les routes de la liste blanche restent joignables avant l… 0.90s  
+  ! F35-004 — HIBP injoignable : le mot de passe est REFUSE, jamais acc… 1.78s  
+  ! F35-004 — TEMOIN : HIBP joignable et mot de passe sain, la regle la… 0.51s  
+  ! F35-004 — TEMOIN : HIBP joignable et mot de passe compromis, la reg… 0.64s  
+  ! F35-005 — un jeton de reinitialisation de plus de 60 minutes est re… 3.32s  
+  ! F35-005 — TEMOIN : un jeton frais est accepte → file_get_contents(/… 1.25s  
+  ! F35-005 — un jeton de reinitialisation ne sert qu une fois → file_g… 1.10s  
+  ! F35-006 — reinitialiser le mot de passe revoque les jetons d API →…  0.64s  
+  ! F35-001 — une route protegee rend 401, jamais 500, quel que soit l…  0.85s  
+  ! F35-001 — aucune route nommee login n est requise par l application… 1.30s  
+  ⨯ F35-009 — un compte inconnu coute le meme travail cryptographique q… 1.87s  
+  ! F35-010 — un jeton d API cesse d etre accepte passe sa duree de vie… 1.28s  
+  ! F35-010 — TEMOIN : sans duree de vie configuree, le meme jeton viei… 0.62s  
+  ! F35-011 — un mot de passe court mais CORRECT ouvre bien la session…  0.54s  
+  ! F35-011 — TEMOIN : un mot de passe court et FAUX est refuse par l a… 0.83s  
+  ! F35-012 — un compte verrouille est refuse AVANT toute verification…  0.46s  
+  ! F35-012 — le compteur d echecs retombe apres la fenetre d oubli → f… 0.82s  
+  ! F35-013 — aucun lien magique n est cree pour une adresse inconnue →… 0.65s  
+  ! F35-013 — un lien magique orphelin n ouvre pas de session sur un co… 0.65s  
+  ! F35-013 — TEMOIN : un lien magique normal ouvre bien la session, un… 0.72s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-009 —…    
+  Failed asserting that 6.754761788776306 is less than 3.0.
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:368
+    364▕ 
+    365▕     // Le rapport des médianes doit rester proche de 1. Sans hachage factice, il
+    366▕     // est de l'ordre de 10 (bcrypt coût 12 d'un côté, rien de l'autre).
+    367▕     $rapport = max($connu, $inconnu) / max(min($connu, $inconnu), 1e-6);
+  ➜ 368▕     expect($rapport)->toBeLessThan(3.0);
+    369▕ });
+    370▕ 
+    371▕ // ─────────────────────────────────────────────────────────────── F35-010
+    372▕ /**
+
+  1   tests/Feature/Auth/GardesAuthentificationAgent35Test.php:368
+
+
+  Tests:    1 failed, 24 warnings (57 assertions)
+  Duration: 95.05s
+
+
+   PASS  Tests\Feature\Auth\GardesAuthentificationAgent35Test
+  ✓ F35-009 — un compte inconnu coute le meme travail cryptographique…  69.37s  
+
+  Tests:    1 passed (11 assertions)
+  Duration: 82.05s
+

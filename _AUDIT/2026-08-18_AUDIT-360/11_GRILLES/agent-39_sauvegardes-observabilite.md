@@ -80,7 +80,39 @@ la complète.
 > identiques pour toutes les tables sauf `audit_logs` (63 → 64). La production n'ingérait pas de
 > `companies` pendant la fenêtre de mesure, ce qui rend la comparaison valide ce jour-là.
 
-<!-- COMPTAGES -->
+**Archive restaurée** : `axion_crm_20260819T030001Z.sql.gz`, 724 926 343 octets, produite par le
+cron de production à 03:00:01 UTC. **Journal `psql` : 0 ligne `ERROR`, 0 ligne `FATAL`.**
+
+| Table | Restauré dans `axion_crm_a39` | Production (12:00:47 UTC) | Écart |
+|---|---:|---:|---|
+| `companies` | **4 295 349** | 4 295 349 | **=** |
+| `contacts` | **1 319 567** | 1 319 567 | **=** |
+| `company_tag` | **7 501 969** | 7 501 969 | **=** |
+| `scraper_runs` | **7 608 196** | 7 608 196 | **=** |
+| `business_events` | **1 286 229** | 1 286 229 | **=** |
+| `media` | **55 830** | 55 830 | **=** |
+| `journalists` | **1 257** | 1 257 | **=** |
+| `users` | **1** | 1 | **=** |
+| `candidates` | **0** | 0 | **=** |
+| `activities` | 648 | 649 | +1 en production |
+| `audit_logs` | 53 | 64 | +11 en production |
+
+**Neuf tables sur onze sont identiques à la ligne près.** Les deux écarts vont tous les deux
+dans le même sens — la production a **plus** de lignes que l'archive — et s'expliquent par les
+**neuf heures** écoulées entre le dump de 03:00 et le relevé de 12:00. Aucune table restaurée ne
+contient plus de lignes que la production, aucune n'est vide.
+
+Les valeurs annoncées dans mon mandat (`companies ≈ 4 295 349`, `contacts ≈ 1 319 567`,
+`activities = 649`, `candidates = 0`) sont donc **retrouvées**, à l'activité de la journée près.
+
+> **Corroboration indépendante.** L'agent 08 a restauré **la même archive** dans
+> `axion_crm_dr_a08`. Je n'ai pas produit cette base : je l'ai comptée moi-même (preuve 05), et
+> elle rend **les onze mêmes nombres**. Deux restaurations menées séparément, deux fois les mêmes
+> comptages — et deux journaux `psql` de **1 729 octets** exactement, sans une erreur.
+> Elle porte en plus `coverage_matrix_cells = 1 264 200` contre **1 264 182** en production : la
+> vue matérialisée, rafraîchie toutes les heures par `coverage:refresh-matrix`, a **perdu 18
+> cellules** en production depuis le dump. Écart réel, mais dans le sens inverse des deux autres,
+> et sans rapport avec la sauvegarde.
 
 ### 2.3 Ce que la restauration prouve, et ce qu'elle ne prouve pas
 

@@ -31,3 +31,4 @@ backend/app/Crm/Taxonomy.php:188:        'vivier-stock-2026-08-14',
 === D-07 : test 58080 ===
 curl: (28) Operation timed out after 10008 milliseconds with 0 bytes received
 --- depuis le conteneur ---
+200

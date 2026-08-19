@@ -1,0 +1,351 @@
+
+   FAIL  Tests\Feature\Auth\GardesAuthentificationAgent35Test
+  ⨯ F35-002 — l enrolement 2FA ecrit des colonnes qui existent vraime… 148.44s  
+  ⨯ F35-002 — confirmer l enrolement pose first_login_completed_at et r… 1.54s  
+  ⨯ F35-002 — un code de secours ne sert qu une fois                     0.75s  
+  ! F35-002 — GET /users ne selectionne aucune colonne inexistante → f… 11.61s  
+  ⨯ F35-003 — un compte a 2FA active ne franchit rien tant que le code…  4.54s  
+  ! F35-003 — les routes de la liste blanche restent joignables avant l… 1.88s  
+  ⨯ F35-004 — HIBP injoignable : le mot de passe est REFUSE, jamais acc… 3.30s  
+  ! F35-004 — TEMOIN : HIBP joignable et mot de passe sain, la regle la… 1.50s  
+  ! F35-004 — TEMOIN : HIBP joignable et mot de passe compromis, la reg… 1.11s  
+  ⨯ F35-005 — un jeton de reinitialisation de plus de 60 minutes est re… 3.98s  
+  ! F35-005 — TEMOIN : un jeton frais est accepte → file_get_contents(/… 1.73s  
+  ! F35-005 — un jeton de reinitialisation ne sert qu une fois → file_g… 2.53s  
+  ⨯ F35-006 — reinitialiser le mot de passe revoque les jetons d API     2.25s  
+  ⨯ F35-001 — une route protegee rend 401, jamais 500, quel que soit l…  4.41s  
+  ! F35-001 — aucune route nommee login n est requise par l application… 1.45s  
+  ⨯ F35-009 — un compte inconnu coute le meme travail cryptographique q… 2.06s  
+  ⨯ F35-010 — un jeton d API porte une date d expiration                 1.93s  
+  ⨯ F35-011 — un mot de passe court mais CORRECT ouvre bien la session   3.45s  
+  ! F35-011 — TEMOIN : un mot de passe court et FAUX est refuse par l a… 2.13s  
+  ⨯ F35-012 — un compte verrouille est refuse AVANT toute verification…  1.66s  
+  ⨯ F35-012 — le compteur d echecs retombe apres la fenetre d oubli      2.95s  
+  ⨯ F35-013 — aucun lien magique n est cree pour une adresse inconnue    9.39s  
+  ⨯ F35-013 — un lien magique orphelin n ouvre pas de session sur un co… 2.38s  
+  ⨯ F35-013 — TEMOIN : un lien magique normal ouvre bien la session, un… 2.64s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35T…  QueryException   
+  SQLSTATE[42703]: Undefined column: 7 ERROR:  column "two_factor_secret" of relation "users" does not exist
+LINE 1: update "users" set "two_factor_secret" = $1, "updated_at" = ...
+                           ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm_test_a35r, SQL: update "users" set "two_factor_secret" = eyJpdiI6IjhPYlJUYlpHYzV3QWRHZ1N3ZVRnanc9PSIsInZhbHVlIjoiWEFwY2U0UjVUYW5namVCbTdBaTN6Tk45UVhIWnNBblRxL3UvSnU1Z1cycz0iLCJtYWMiOiJhZGU4NmQ1Y2MzZDlhN2M3NmMzOWE3OTU0ZTJmMGRhZDI0N2U3NGNhNzg5YjdkYTNhOWViZTA5NTE5M2NlN2ZiIiwidGFnIjoiIn0=, "updated_at" = 2026-08-19 15:37:12 where "id" = 7816e729-042e-45f4-919c-8a7611f8d723)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:609
+    605▕             $statement = $this->getPdo()->prepare($query);
+    606▕ 
+    607▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    608▕ 
+  ➜ 609▕             $statement->execute();
+    610▕ 
+    611▕             $this->recordsHaveBeenModified(
+    612▕                 ($count = $statement->rowCount()) > 0
+    613▕             );
+
+      [2m+9 vendor frames [22m
+  10  app/Services/Auth/TwoFactorService.php:30
+  11  tests/Feature/Auth/GardesAuthentificationAgent35Test.php:107
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35T…  QueryException   
+  SQLSTATE[42703]: Undefined column: 7 ERROR:  column "two_factor_secret" of relation "users" does not exist
+LINE 1: update "users" set "two_factor_secret" = $1, "updated_at" = ...
+                           ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm_test_a35r, SQL: update "users" set "two_factor_secret" = eyJpdiI6IlVNTjJ2UEtDbXZBM2doektXTWdWN1E9PSIsInZhbHVlIjoiS2svZWlrZXhXWmZ3L256cjlmaUZiRGdVRDVEYkI3S05TNHBINUdmR3prND0iLCJtYWMiOiI0NmI1YzNjZmRhNWRiZDE4MjhiNDU5OWY2ODA1Y2UxYWEzMzJlZTAyNDM0NmI1NWE3OTMzNTFhZDRiMTYxM2I2IiwidGFnIjoiIn0=, "updated_at" = 2026-08-19 15:37:17 where "id" = 550dbb17-d238-4fb4-813c-4d5944454073)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:609
+    605▕             $statement = $this->getPdo()->prepare($query);
+    606▕ 
+    607▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    608▕ 
+  ➜ 609▕             $statement->execute();
+    610▕ 
+    611▕             $this->recordsHaveBeenModified(
+    612▕                 ($count = $statement->rowCount()) > 0
+    613▕             );
+
+      [2m+9 vendor frames [22m
+  10  app/Services/Auth/TwoFactorService.php:30
+  11  tests/Feature/Auth/GardesAuthentificationAgent35Test.php:119
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35T…  QueryException   
+  SQLSTATE[42703]: Undefined column: 7 ERROR:  column "two_factor_secret" of relation "users" does not exist
+LINE 1: update "users" set "two_factor_secret" = $1, "updated_at" = ...
+                           ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm_test_a35r, SQL: update "users" set "two_factor_secret" = eyJpdiI6IjVaMTlOLzNnV2haVHo1ZzlBMDBpSEE9PSIsInZhbHVlIjoiZWVSMGdGQWdDT3pNTnd4ZUN2aDQzbWlHOHBGaXpaOHNVb2NkUzZmdFF1ND0iLCJtYWMiOiI2M2NjMTk5MjM2YjJjNmVlZmY1ZGNjMzllNDk0MmI0ODY1NzhkY2EzZGY5Njc0NDY3ZjdkMTI2MTFhYjFlMDQwIiwidGFnIjoiIn0=, "updated_at" = 2026-08-19 15:37:18 where "id" = 492cf5ba-a7c0-4819-82f0-9eb8a282201b)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:609
+    605▕             $statement = $this->getPdo()->prepare($query);
+    606▕ 
+    607▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    608▕ 
+  ➜ 609▕             $statement->execute();
+    610▕ 
+    611▕             $this->recordsHaveBeenModified(
+    612▕                 ($count = $statement->rowCount()) > 0
+    613▕             );
+
+      [2m+9 vendor frames [22m
+  10  app/Services/Auth/TwoFactorService.php:30
+  11  tests/Feature/Auth/GardesAuthentificationAgent35Test.php:133
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-003 —…    
+  Expected response status code [403] but received 200.
+Failed asserting that 200 is identical to 403.
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:162
+    158▕     expect($login->status())->toBe(200);
+    159▕     expect($login->json('requires_2fa'))->toBeTrue();
+    160▕ 
+    161▕     // Route métier, SANS avoir appelé /auth/2fa/verify.
+  ➜ 162▕     test()->getJson('/api/v1/contacts')->assertStatus(403)
+    163▕         ->assertJsonPath('error', 'two_factor_required');
+    164▕ 
+    165▕     // Après vérification du code, la même route s'ouvre.
+    166▕     test()->postJson('/api/v1/auth/2fa/verify', ['code' => $g->getCurrentOtp($secret)])->assertOk();
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-004 —…    
+  Failed asserting that false is true.
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:188
+    184▕     app()->instance(HibpChecker::class, new HibpChecker(new Client(['handler' => $pile])));
+    185▕ 
+    186▕     $validation = Validator::make(['password' => 'password'], ['password' => [new NotPwnedPassword()]]);
+    187▕ 
+  ➜ 188▕     expect($validation->fails())->toBeTrue();
+    189▕     expect($validation->errors()->first('password'))->toContain('indisponible');
+    190▕ });
+    191▕ 
+    192▕ test('F35-004 — TEMOIN : HIBP joignable et mot de passe sain, la regle laisse passer', function () {
+
+  1   tests/Feature/Auth/GardesAuthentificationAgent35Test.php:188
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-005 —…    
+  Expected response status code [401] but received 200.
+Failed asserting that 200 is identical to 401.
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:230
+    226▕         'email' => $utilisateur->email,
+    227▕         'token' => $jeton,
+    228▕         'password' => 'MotDePasseTresLong2026!',
+    229▕         'password_confirmation' => 'MotDePasseTresLong2026!',
+  ➜ 230▕     ])->assertStatus(401)->assertJsonPath('error', 'expired_token');
+    231▕ });
+    232▕ 
+    233▕ test('F35-005 — TEMOIN : un jeton frais est accepte', function () {
+    234▕     $utilisateur = utilisateurA35('reset-frais@a35.test');
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-006 —…    
+  Failed asserting that 1 is identical to 0.
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:284
+    280▕         'password' => 'MotDePasseTresLong2026!',
+    281▕         'password_confirmation' => 'MotDePasseTresLong2026!',
+    282▕     ])->assertOk();
+    283▕ 
+  ➜ 284▕     expect(DB::table('personal_access_tokens')->where('tokenable_id', $utilisateur->id)->count())->toBe(0);
+    285▕ 
+    286▕     app('auth')->forgetGuards();
+    287▕     test()->withHeaders(['Authorization' => 'Bearer ' . $jetonApi])
+    288▕         ->getJson('/api/v1/auth/me')->assertUnauthorized();
+
+  1   tests/Feature/Auth/GardesAuthentificationAgent35Test.php:284
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-001 —…    
+  Failed asserting that 500 is identical to 401.
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:300
+    296▕         ['Accept' => '*/*'],
+    297▕         ['Accept' => 'application/json'],
+    298▕         ['Accept' => 'application/json', 'X-Requested-With' => 'XMLHttpRequest'],
+    299▕     ] as $entetes) {
+  ➜ 300▕         expect(test()->get('/api/v1/auth/me', $entetes)->status())->toBe(401);
+    301▕         expect(test()->get('/api/v1/contacts', $entetes)->status())->toBe(401);
+    302▕     }
+    303▕ });
+    304▕
+
+  1   tests/Feature/Auth/GardesAuthentificationAgent35Test.php:300
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-009 —…    
+  Failed asserting that 4.071937147066045 is less than 3.0.
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:333
+    329▕ 
+    330▕     // Le rapport des médianes doit rester proche de 1. Sans hachage factice, il
+    331▕     // est de l'ordre de 10 (bcrypt coût 12 d'un côté, rien de l'autre).
+    332▕     $rapport = max($connu, $inconnu) / max(min($connu, $inconnu), 1e-6);
+  ➜ 333▕     expect($rapport)->toBeLessThan(3.0);
+    334▕ });
+    335▕ 
+    336▕ // ─────────────────────────────────────────────────────────────── F35-010
+    337▕ test('F35-010 — un jeton d API porte une date d expiration', function () {
+
+  1   tests/Feature/Auth/GardesAuthentificationAgent35Test.php:333
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-010 —…    
+  Expecting null not to be null .
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:340
+    336▕ // ─────────────────────────────────────────────────────────────── F35-010
+    337▕ test('F35-010 — un jeton d API porte une date d expiration', function () {
+    338▕     $utilisateur = utilisateurA35('jeton@a35.test');
+    339▕ 
+  ➜ 340▕     expect(config('sanctum.expiration'))->not->toBeNull();
+    341▕     expect($utilisateur->createToken('a35')->accessToken->expires_at)->not->toBeNull();
+    342▕ });
+    343▕ 
+    344▕ // ─────────────────────────────────────────────────────────────── F35-011
+
+  1   tests/Feature/Auth/GardesAuthentificationAgent35Test.php:340
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-011 —…    
+  Expected response status code [200] but received 422.
+Failed asserting that 422 is identical to 200.
+
+The following errors occurred during the last request:
+
+{
+    "message": "validation.min.string",
+    "errors": {
+        "password": [
+            "validation.min.string"
+        ]
+    }
+}
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:348
+    344▕ // ─────────────────────────────────────────────────────────────── F35-011
+    345▕ test('F35-011 — un mot de passe court mais CORRECT ouvre bien la session', function () {
+    346▕     utilisateurA35('court@a35.test', 'court');
+    347▕ 
+  ➜ 348▕     connexionA35('court@a35.test', 'court')->assertOk();
+    349▕ });
+    350▕ 
+    351▕ test('F35-011 — TEMOIN : un mot de passe court et FAUX est refuse par l authentification', function () {
+    352▕     utilisateurA35('court2@a35.test', 'court');
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-012 —…    
+  Failed asserting that 11 is identical to 10.
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:365
+    361▕ 
+    362▕     connexionA35($utilisateur->email, 'NimporteQuoiFaux123!')->assertStatus(422);
+    363▕ 
+    364▕     // Le compteur ne doit PAS continuer de monter sur un compte déjà verrouillé.
+  ➜ 365▕     expect($utilisateur->fresh()->failed_login_count)->toBe(10);
+    366▕ });
+    367▕ 
+    368▕ test('F35-012 — le compteur d echecs retombe apres la fenetre d oubli', function () {
+    369▕     $utilisateur = utilisateurA35('oubli@a35.test');
+
+  1   tests/Feature/Auth/GardesAuthentificationAgent35Test.php:365
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35T…  QueryException   
+  SQLSTATE[42703]: Undefined column: 7 ERROR:  column "last_failed_login_at" of relation "users" does not exist
+LINE 1: update "users" set "failed_login_count" = $1, "last_failed_l...
+                                                      ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm_test_a35r, SQL: update "users" set "failed_login_count" = 9, "last_failed_login_at" = 2026-08-19 15:07:12, "updated_at" = 2026-08-19 15:38:12 where "id" = feb55c16-99c3-4994-b764-239cb45d87e7)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:609
+    605▕             $statement = $this->getPdo()->prepare($query);
+    606▕ 
+    607▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    608▕ 
+  ➜ 609▕             $statement->execute();
+    610▕ 
+    611▕             $this->recordsHaveBeenModified(
+    612▕                 ($count = $statement->rowCount()) > 0
+    613▕             );
+
+      [2m+9 vendor frames [22m
+  10  tests/Feature/Auth/GardesAuthentificationAgent35Test.php:373
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-013 —…    
+  Failed asserting that 1 is identical to 0.
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:387
+    383▕ // ─────────────────────────────────────────────────────────────── F35-013
+    384▕ test('F35-013 — aucun lien magique n est cree pour une adresse inconnue', function () {
+    385▕     app(MagicLinkService::class)->issue('inconnu-total@a35.test', '10.0.0.1');
+    386▕ 
+  ➜ 387▕     expect(DB::table('magic_links')->where('email', 'inconnu-total@a35.test')->count())->toBe(0);
+    388▕ });
+    389▕ 
+    390▕ test('F35-013 — un lien magique orphelin n ouvre pas de session sur un compte cree apres coup', function () {
+    391▕     $jeton = Str::random(64);
+
+  1   tests/Feature/Auth/GardesAuthentificationAgent35Test.php:387
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-013 —…    
+  Expected response status code [401] but received 200.
+Failed asserting that 200 is identical to 401.
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:402
+    398▕         'created_at' => now(),
+    399▕     ]);
+    400▕     utilisateurA35('futur@a35.test');
+    401▕ 
+  ➜ 402▕     test()->postJson('/api/v1/auth/magic-link/verify', ['token' => $jeton])->assertStatus(401);
+    403▕ });
+    404▕ 
+    405▕ test('F35-013 — TEMOIN : un lien magique normal ouvre bien la session, une seule fois', function () {
+    406▕     $utilisateur = utilisateurA35('magique@a35.test');
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-013 —…    
+  Expected response status code [401] but received 419.
+Failed asserting that 419 is identical to 401.
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:419
+    415▕     ]);
+    416▕ 
+    417▕     test()->postJson('/api/v1/auth/magic-link/verify', ['token' => $jeton])->assertOk();
+    418▕     app('auth')->forgetGuards();
+  ➜ 419▕     test()->postJson('/api/v1/auth/magic-link/verify', ['token' => $jeton])->assertStatus(401);
+    420▕ });
+    421▕
+
+
+  Tests:    16 failed, 8 warnings (27 assertions)
+  Duration: 287.72s
+
+
+=== LECTURE (agent 35) — CHAQUE ROUGE EST-IL ROUGE POUR LA BONNE RAISON ? ===
+C'est la seule question qui compte : une garde qui rougit pour un motif de banc ne
+prouve rien. Verdict, garde par garde :
+
+  F35-002 (x3)  SQLSTATE[42703] column "two_factor_secret" does not exist   -> BON MOTIF
+  F35-003       403 attendu, 200 recu (session reelle, cookie rejoue)       -> BON MOTIF
+  F35-004       la regle NotPwnedPassword n'a PAS echoue (false is true)    -> BON MOTIF
+  F35-005       jeton de 61 min : 401 attendu, 200 recu                     -> BON MOTIF
+  F35-006       1 jeton d'API restant apres reinitialisation, 0 attendu     -> BON MOTIF
+  F35-001       500 recu la ou 401 est attendu                              -> BON MOTIF
+  F35-009       rapport des medianes = 4,07 (seuil 3,0)                     -> BON MOTIF
+  F35-010       expires_at du jeton = null                                  -> BON MOTIF
+  F35-011       bon mot de passe de 5 caracteres : 422 au lieu de 200       -> BON MOTIF
+  F35-012 (a)   compteur a 11 sur un compte DEJA verrouille (10 attendu)    -> BON MOTIF
+  F35-012 (b)   column "last_failed_login_at" does not exist                -> BON MOTIF (la colonne fait partie du correctif)
+  F35-013 (a)   1 ligne magic_links pour une adresse inconnue, 0 attendu    -> BON MOTIF
+  F35-013 (b)   lien orphelin : 401 attendu, 200 recu                       -> BON MOTIF
+  F35-013 (c)   419 CSRF au lieu de 401                                     -> ARTEFACT DE BANC
+
+Le dernier n'est PAS un defaut du produit : apres un `Auth::login()` suivi de
+`session()->regenerate()`, le jeton CSRF de la session change, et l'en-tete
+`X-CSRF-TOKEN` de la sonde porte encore l'ancien. En CI (`APP_ENV=testing`)
+`ValidateCsrfToken` s'auto-desactive et le cas rend bien 401 ; c'est le conteneur,
+qui impose `APP_ENV=local`, qui le fait apparaitre. Corrige DANS LA SONDE (resynchro
+du jeton apres toute requete qui regenere la session), pas dans le produit.
+
+MESURE NOUVELLE, obtenue ici et pas avant : l'ecart de temps de l'enumeration de
+comptes vaut **4,07x** entre une adresse connue et une adresse inconnue (medianes sur
+5 tirages). F35-009 cesse d'etre un constat de lecture pour devenir un constat mesure.

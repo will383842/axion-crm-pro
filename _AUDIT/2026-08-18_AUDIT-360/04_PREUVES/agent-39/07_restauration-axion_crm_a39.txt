@@ -1,0 +1,40 @@
+# F39 — preuve 07 : LA restauration. Faite par moi, en local, sur la base jetable axion_crm_a39.
+# ⛔ Aucune ecriture n'a ete faite sur la production.
+
+## Source
+archive        : axion_crm_20260819T030001Z.sql.gz  (724 926 343 octets)
+origine        : 46.62.248.239:/var/backups/axion-crm/  (rapatriee par scp en 40,3 s)
+sha256 serveur : 521b7ab6f796b9b0456c46975c02e4466f7d127506f28325c53cc02c853338de
+sha256 poste   : 521b7ab6f796b9b0456c46975c02e4466f7d127506f28325c53cc02c853338de   (identique)
+gzip -t        : OK
+
+## Methode
+conteneur postgres:16-alpine sur le reseau axion-crm, archive en montage lie :
+  gzip -dc /data/axion_crm_20260819T030001Z.sql.gz \
+    | psql -h axion-crm-postgres -U axion -d axion_crm_a39 -q
+(voir la note d'atelier du rapport : la voie Windows de dr-drill.sh est ~5x plus lente)
+
+## Chronologie
+debut : 2026-08-19T12:35:30Z
+fin   : 2026-08-19T14:02:22Z
+duree : 5 212 s = 1 h 26 min 52 s
+code de sortie psql : 0
+lignes ERROR dans le journal psql : 0
+lignes FATAL dans le journal psql : 0
+taille du journal psql : 1 729 octets (uniquement des sorties set_config / setval)
+
+## COMPTAGES EXACTS count(*) — base restauree axion_crm_a39, 2026-08-19T14:03:07Z
+activities=648
+audit_logs=53
+business_events=1286229
+candidates=0
+companies=4295349
+company_tag=7501969
+contacts=1319567
+coverage_matrix_cells=1264200
+journalists=1257
+media=55830
+scraper_runs=7608196
+users=1
+
+## COMPTAGES EXACTS count(*) — PRODUCTION, releve 2026-08-19T12:00:47Z (lecture seule)

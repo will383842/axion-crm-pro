@@ -267,7 +267,10 @@ Route::prefix('v1')->group(function () {
         // `audit.view`, que ni `viewer` ni `operator` ne portent (B16-004).
         Route::get('/audit-logs', [AuditLogsController::class, 'index'])
             ->middleware('permission:audit.view');
-        Route::get('/audit-logs/verify-chain', [AuditLogsController::class, 'verifyChain']);
+        // Meme droit que la lecture du journal : l'etat d'integrite de la chaine
+        // est une information d'audit, pas une donnee publique.
+        Route::get('/audit-logs/verify-chain', [AuditLogsController::class, 'verifyChain'])
+            ->middleware('permission:audit.view');
 
         // Sprint H4 — Dashboard observabilité (KPI cards + recent events)
         Route::get('/observability/summary', [ObservabilityController::class, 'summary']);

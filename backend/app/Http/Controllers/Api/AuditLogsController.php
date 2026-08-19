@@ -50,7 +50,17 @@ class AuditLogsController extends ApiController
     public function verifyChain(): JsonResponse
     {
         try {
-            return $this->ok(['valid' => $this->chain->verifyChain()]);
+            // On rend la RAISON, pas seulement le verdict. Un `valid: false` muet
+            // envoie chercher une falsification la ou il n'y a qu'une variable
+            // d'environnement absente - et inversement, un `valid: true` sans
+            // secret utilisable serait un mensonge (B16-001).
+            $secretUtilisable = $this->chain->secretEstUtilisable();
+
+            return $this->ok([
+                'valid' => $this->chain->verifyChain(),
+                'verifiable' => $secretUtilisable,
+                'raison' => $secretUtilisable ? null : $this->chain->raisonSecretInutilisable(),
+            ]);
         } catch (\Throwable $e) {
             Log::error('audit-logs.verify-chain failed', ['exception' => $e->getMessage()]);
             report($e);

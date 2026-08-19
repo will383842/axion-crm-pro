@@ -98,19 +98,23 @@ Mesuré **sur la production** : `Accept: application/json` → **401**, `Accept:
 
 # CE QUE CET AUDIT N'A PAS FAIT
 
-**Le mandat annonce 50 agents et trois passes. Ce rapport en livre une.** Le dire est la condition
+**Le mandat annonce 50 agents et trois passes. Ce rapport en livrait une.** Le dire est la condition
 pour que le reste soit utilisable.
+
+> ⚠️ **MIS À JOUR LE 2026-08-19, EN SOIRÉE.** Ce chapitre affirmait que P4 et P5 n'avaient jamais
+> été lancées. **C'était vrai le matin ; ce ne l'est plus.** *Laisser courir cette phrase aurait été
+> le défaut `A-013` commis par le rapport qui le dénonce — pour la quatrième fois de la journée.*
 
 | Phase | État |
 |---|---|
 | **P0** amorçage | ✅ — mais le terrain n'était **pas** praticable : console inaccessible, API sérialisée, `migrate:fresh` en échec au premier passage |
 | **P1** fan-out | ⚠️ **34 rapports rendus sur 46 agents** |
 | **P2** consolidation | ✅ — puis **révisée** après la critique de complétude |
-| **P3** correction | ❌ **0 correctif, 0 PR, 0 test vu rouge en correction** |
-| **P4** vérification | ❌ — *mais une vérification croisée réelle a eu lieu dès P1 : le chef de chantier a été **corrigé sept fois*** |
-| **P5** adversariale | ❌ **jamais lancée** |
+| **P3** correction | ⚠️ **en cours, hors de mon fait** — un agent de réparation a fermé **13 S0 sur 34**, en 13 commits, **méthode conforme** (garde vue rouge, puis verte, puis 27 suites relancées). **Mais rien n'est fusionné, rien n'est déployé**, et **il a publié sur le dépôt public sans autorisation qui me soit parvenue** (`D-024`) |
+| **P4** vérification | ✅ **faite le 2026-08-19** — décompte S0 recompté **trois fois** (26 → 34), 146 étiquettes S1 dédoublonnées en **116 défauts**, **dix reclassements arbitrés** (`D-019`, `D-020`) |
+| **P5** adversariale | ⚠️ **OUVERTE et productive** — `08_PASSE-2-ADVERSARIALE.md`, **douze résultats**. *Voir la section dédiée ci-dessous.* **Loin d'être complète** : 3 des 7 objets restent intacts |
 | **P6** regard neuf | ❌ **jamais lancée** |
-| **P7** clôture | ⚠️ ce document, `08` et `09` **absents** |
+| **P7** clôture | ⚠️ `08` existe ; **`09` absent** |
 
 **Définition de fini (§12) : 3 points tenus sur 16.**
 **§11 (le geste réel) : non satisfait** — les 37 écrans ont été ouverts **non connectés**, **aucun des
@@ -147,6 +151,66 @@ catalogue exact que la doctrine énumère — et les avoir commises malgré cela
 pas.
 
 **Un registre qui efface ses erreurs ne permet pas de juger ce que valent ses constats non corrigés.**
+
+---
+
+# CE QUE LA PASSE ADVERSARIALE A TROUVÉ — LE MÊME JOUR
+
+**Douze résultats.** Ce qu'il faut en retenir tient en trois points.
+
+### 1. Le décompte S0 était faux **trois fois de suite, et toujours trop bas**
+
+**26 → 34.** Et **rien n'a été découvert** : tout était déjà mesuré, écrit et archivé au registre —
+mal classé (un S1 compté parmi les S0), compté une fois de trop, ou pas compté du tout parce qu'un
+tableau **ne se rouvrait pas** quand de nouveaux rendus arrivaient. *L'audit n'avait pas un problème
+de mesure. Il avait un problème de clôture.*
+
+### 2. Le défaut caractéristique de ce dépôt, nommé — **et confirmé par deux chemins indépendants**
+
+**Ce dépôt ne rate pas les problèmes : il les résout sur l'exemplaire qu'il a sous les yeux et ne
+balaye jamais les frères.** Cinq cas mesurés dans la même journée :
+
+| # | Le correctif existait… | …et n'a pas été porté |
+|---|---|---|
+| 1 | la classe HMAC durcie, `fail-closed` | à `scraper-result`, **qui était de surcroît désigné comme « le patron à copier »** |
+| 2 | `opt_out.scope` réparé côté site, avec le mécanisme écrit en commentaire | au chemin de la **console** — *une personne effacée revient au vivier* |
+| 3 | `COMPOSE_FILE` posé dans le workflow de déploiement | aux **trois autres portes**, dont un workflow qui **rouvrait la faille du 19 août en un clic** |
+| 4 | la permission d'étiquetage, avec son raisonnement en commentaire | aux **routes voisines** |
+| 5 | le piège `docker compose restart` qui ne relit pas `env_file`, documenté | à `configure-prod-env.sh`, **qui n'appliquait donc aucune variable** |
+
+**L'agent de réparation, qui l'a trouvé par la réparation, écrit la même phrase que moi qui l'ai
+trouvé par la contre-vérification** : *« ce n'est pas un dépôt qui ignore ce qu'il faut faire, c'est
+un dépôt qui le fait à un endroit et pas aux autres — plus facile à corriger, mais plus facile à
+laisser passer en relecture, parce que le premier fichier qu'on ouvre a l'air correct. »*
+**Deux chemins indépendants vers le même diagnostic : c'est ce qui le rend solide.**
+
+### 3. La contre-vérification a fait son travail — **dans les deux sens**
+
+**Elle a confirmé** : `B15-001`/`B15-002` (six maillons du code au schéma) · la faille du 19 août
+réarmable, **refermée sur trois chemins** · la suite de tests saine, **cette fois vérifiée sur le
+fichier que la CI ouvre réellement** · les deux canaux HMAC, chacun conforme à ce qu'on en disait.
+
+**Elle a réfuté** : la mécanique `config:cache` invoquée pour expliquer un défaut
+(`variables_order=EGPCS`, la variable est dans `$_SERVER` **et** `$_ENV`) · l'affirmation publique
+« le secret de la chaîne d'audit est vide en production » (**64 caractères, mesurés deux fois**) ·
+et **une hypothèse à moi**, poursuivie puis abandonnée, **archivée avec sa réfutation**.
+
+**Elle a refusé de conclure** là où elle ne pouvait pas : le chiffre de « 90 % de la base effacée
+par une purge » **n'est pas transposé à la production**, faute d'une mesure que je n'ai pas le droit
+de faire. *Il aurait été spectaculaire de l'écrire. C'eût été le défaut même que ce rapport dénonce.*
+
+### Et le patron `A-011` est passé de 15 à 19 cas — dont une **espèce** nouvelle
+
+Les quinze premiers étaient des gardes qui **mesurent le mauvais objet**. Les nouveaux sont d'une
+autre nature : **elles inscrivent le défaut dans une assertion.** `AntiReinsertionTest` consacre le
+réglage qui fait revenir une personne effacée ; **six fichiers de test certifient qu'une route
+destructrice accepte un compte sans rôle** ; et la garde écrite pour prouver la correction du
+journal d'audit **n'assert que « pas 403 »**, ce qui passe sur un 200 qui rend le journal d'autrui.
+
+> 🎯 **Une prédiction de cette passe s'est vérifiée le jour même.** J'avais écrit le matin que le
+> câblage des policies ferait rougir six fichiers de test, et que *« la pente naturelle serait
+> d'assouplir la garde »*. **`NotificationsControllerTest` est passé au rouge quelques heures plus
+> tard**, sur la branche de correction. **Ce rouge est la preuve que la garde marche.**
 
 ---
 

@@ -155,6 +155,31 @@ services:
     # l'extérieur le 2026-08-19.
     ports: !override []
 
+  # 🔴 AJOUTÉ le 2026-08-19 avec la préproduction — et ce n'est PAS un détail.
+  #
+  # Le Caddy de production sert aussi les deux noms `staging.*` (cf.
+  # `infra/caddy/Caddyfile`). Il doit donc joindre la pile de préproduction, qui
+  # publie ses services sur la BOUCLE LOCALE de l'hôte (`127.0.0.1:8081` et
+  # `127.0.0.1:8082`) — et non sur un réseau Docker partagé, ce qui rendrait le
+  # nom `api` ambigu pour ce conteneur et le routage de la PRODUCTION
+  # indéterminé (Compose ajoute toujours le nom du service comme alias réseau,
+  # on ne peut pas le retirer).
+  #
+  # `host-gateway` fait pointer `host.docker.internal` vers l'hôte. Sans cette
+  # ligne, `staging.axion-crm-pro.com` répondrait 502 — et Caddy démarrerait
+  # quand même : un `reverse_proxy` vers un hôte inconnu n'est pas une erreur de
+  # configuration, `caddy validate` ne l'attrape pas.
+  #
+  # ⚠️ `extra_hosts` ne s'applique qu'à la CRÉATION du conteneur. Comme
+  # `deploy-direct-ssh.yml` ne recrée que `api app horizon scheduler`, ce
+  # réglage n'atteindra JAMAIS la production par un déploiement : il faut un
+  # `up -d --force-recreate --no-deps caddy` explicite, une fois. C'est le même
+  # piège que celui qui a laissé Postgres publié malgré un correctif déployé
+  # (journal §7).
+  caddy:
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+
 volumes:
   # `storage/` est le seul dossier que l'application ÉCRIT. Sans ce volume, les
   # journaux et le lien `storage:link` disparaîtraient à chaque recréation de

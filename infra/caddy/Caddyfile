@@ -129,3 +129,76 @@ api.axion-crm-pro.com {
         Referrer-Policy "strict-origin-when-cross-origin"
     }
 }
+
+# ============================================================================
+# PRÉPRODUCTION (2026-08-19) — servie par CE Caddy, celui de la production.
+# ============================================================================
+#
+# Un seul processus peut tenir 80 et 443 : la pile de préproduction n'a donc
+# aucun Caddy à elle. C'est celui-ci qui sert les deux noms `staging.*`.
+#
+# POURQUOI `host.docker.internal` ET PAS LE NOM DES CONTENEURS
+#
+# La solution naturelle — attacher ce Caddy au réseau de la préproduction — est
+# un piège : Compose ajoute TOUJOURS le nom du service comme alias réseau, et on
+# ne peut pas le retirer. Ce conteneur verrait donc `api` sur ses DEUX réseaux,
+# et le routage de la PRODUCTION deviendrait indéterminé — une panne
+# intermittente, impossible à reproduire, sur le site en marche.
+#
+# La pile de préproduction publie donc ses deux services sur la BOUCLE LOCALE de
+# l'hôte (`127.0.0.1:8081` frontend, `127.0.0.1:8082` API, cf.
+# `docker-compose.staging.yml`). Les deux réseaux Docker restent totalement
+# étanches, et rien n'est joignable depuis internet.
+#
+# `host.docker.internal` est résolu grâce à `extra_hosts: host-gateway` posé sur
+# le service `caddy` de `docker-compose.prod.yml`. Sans lui, ces deux blocs
+# renverraient 502 — et Caddy démarrerait quand même : un `reverse_proxy` vers
+# un hôte inconnu n'est PAS une erreur de configuration, donc `caddy validate`
+# ne l'attrapera pas. C'est le contrôle APRÈS déploiement qui le dira.
+#
+# Une faute de frappe ici casse TOUTE LA PRODUCTION, pas seulement la
+# préproduction : Caddy refuse de démarrer sur un fichier invalide. Garde : job
+# CI `caddyfile-valide`, qui prouve à chaque exécution qu'il sait rougir.
+
+# --- PRÉPROD : staging.axion-crm-pro.com — origine unique, comme la prod
+staging.axion-crm-pro.com {
+    encode zstd gzip
+
+    @api {
+        path /api/* /sanctum/* /docs /docs/* /up /broadcasting/*
+    }
+    handle @api {
+        reverse_proxy host.docker.internal:8082 {
+            header_up X-Real-IP {remote_host}
+        }
+    }
+
+    handle {
+        reverse_proxy host.docker.internal:8081 {
+            header_up X-Real-IP {remote_host}
+        }
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        X-Robots-Tag "noindex, nofollow, noarchive"
+    }
+}
+
+# --- PRÉPROD : staging-api.axion-crm-pro.com — backend direct (curl/debug)
+staging-api.axion-crm-pro.com {
+    encode zstd gzip
+    reverse_proxy host.docker.internal:8082 {
+        header_up X-Real-IP {remote_host}
+    }
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        X-Robots-Tag "noindex, nofollow, noarchive"
+    }
+}

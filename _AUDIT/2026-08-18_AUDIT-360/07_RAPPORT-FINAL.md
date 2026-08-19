@@ -166,5 +166,5 @@ L'ordonnancement complet et raisonné est au **§4 de `02bis`**. En trois lignes
 des gardes du même genre que celles qu'il corrige.*
 
 **Ce qui revient au dirigeant** est dans `06_RESTE-WILL.md` — une page, dont **un geste qui bloque la
-publication de ce dossier** : le dépôt est **public**, et ce rapport décrit **trente défauts S0 ouverts**
+publication de ce dossier** : le dépôt est **public**, et ce rapport décrit **trente-quatre défauts S0 ouverts**
 sur une production qui porte **1 319 567 personnes**.

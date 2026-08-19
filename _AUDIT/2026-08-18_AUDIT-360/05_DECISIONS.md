@@ -219,3 +219,71 @@ refermer le chemin le neutralise. Mais il devra être **tourné**, et cela n'app
 registre depuis P1, **classé S1, au rang 11 de l'ordonnancement — c'est-à-dire « après »**. Il y
 serait resté si le dédoublonnage S1 n'avait pas été lancé. *Un défaut mal classé est un défaut
 invisible, et ce dossier vient d'en faire la démonstration sur lui-même.*
+
+---
+
+## D-020 — Les dix autres reclassements proposés par la consolidation S1 : **quatre accordés, un différé, quatre accordés à la baisse, un requalifié**
+
+**Instruction respectée par l'agent** : il propose, il ne reclasse pas. **J'ai lu l'argument de
+chacun avant de trancher, et je n'en entérine aucun sur la confiance.**
+
+### ✅ Quatre montées en S0 — accordées, toutes sur un motif de **cohérence de l'échelle**
+
+| Constat | L'argument | Décision |
+|---|---|---|
+| **`A08-006`** — la tâche d'anonymisation des IP **n'a jamais fonctionné** (`ip::cidr / 24` n'est pas un opérateur valide) | Une obligation RGPD qui n'a **jamais** tourné. **Même motif que `C19-007`, qui est S0** | **S1 → S0** |
+| **`B17-009`** — les deux seules purges RGPD correctement écrites **ne s'exécutent jamais** ; l'échéance CNIL 2 ans / 3 ans **n'est tenue par aucun automatisme** | idem. *Une purge bien écrite qui ne tourne pas protège exactement autant qu'une purge absente* | **S1 → S0** |
+| **`E33-006`** — `escalader_question` écrit l'adresse **en clair**, sans hachage de recherche | **Le registre l'écrit lui-même : « même mode de panne que `B10-004` » — et `B10-004` est S0.** Sans empreinte de recherche, **la personne est introuvable**, donc ni exportable ni effaçable | **S1 → S0** |
+| **`G43-005`** — aucune édition concurrente : deux sessions rendent **toutes deux `UPDATE 1`**, **une saisie disparaît en silence** | Perte de données **silencieuse**. Armé-non-déclenché — **exactement le statut de `B15-001`, qui est S0**. Et l'agent qui l'a mesuré avait déjà écrit *« relevable S0 »* : **deux jugements indépendants** | **S1 → S0** |
+
+⚠️ **Ce que « S0 » veut dire ici, et il faut le préciser** : pour `A08-006`, `B17-009` et `E33-006`,
+bloquant signifie **bloquant au regard de la conformité**, pas bloquant pour livrer. Je le dis parce
+qu'un lecteur pressé pourrait croire à un défaut technique de plus. *C'est un défaut d'obligation
+légale non tenue, et le délai court depuis plus longtemps que le produit n'existe.*
+
+### ⏸️ Un différé — `F35-003` (la 2FA n'est jamais exigée par le serveur)
+
+**Non tranché, et délibérément.** L'agent 35 déclare l'avoir corrigé sur `fix/a35-authentification`
+(`EnsureTwoFactorPassed`), et **cette branche est en cours de contre-vérification adversariale
+au moment où j'écris**. Reclasser un constat pendant qu'on vérifie sa réparation, c'est produire
+un chiffre qui sera faux dans les deux sens. **Décision reportée au verdict de P5.**
+
+*Et l'argument de l'agent reste entier, il faudra y répondre* : si l'on exige la 2FA côté serveur
+**sans** que `D22-001` soit levé — aucun écran n'expose l'enrôlement — **on ferme la console au lieu
+de l'ouvrir**. C'est le risque n° 1 de cette branche, et il est déjà écrit dans le mandat du
+contre-vérificateur.
+
+### ✅ Quatre descentes — accordées
+
+`A09-005` **S1 → S2** (recoupe `A-003`, **qui est S2** — la cohérence l'impose) ·
+`E34-001` **S1 → S2** (constat historique, incident clos) ·
+`I48-005` **S1 → S2** (inventaire de dette de périmètre, pas un correctif) ·
+`A09-002` — **pas une descente mais une FUSION** : l'agent le donne *identique* à `A09-009` (S2).
+Deux identifiants pour un défaut se fusionnent, ils ne se reclassent pas.
+
+### 🔧 Une contradiction du dossier, tranchée — `F37-002`
+
+L'agent a raison de la relever : le registre le porte **S1** (l. 1985) et mon §1 bis le compte
+**S0**. **Ni l'un ni l'autre n'a tort ; c'était mal écrit.** `C18-016` porte le S0 (décision `D-012`) ;
+`F37-002` est **sa confirmation en production**, et une confirmation ne change pas de sévérité — elle
+**appuie**. `F37-002` **reste S1**, la paire compte **une fois** en S0. **Total inchangé.**
+
+### 🔧 Une requalification de rangement — `D25-003`, et l'agent a raison contre moi
+
+Il refuse de suivre ma décision 7, qui rangeait `D25-003` en « arbitrage ». *« Ranger en arbitrage un
+écran qui invente une conclusion métier fausse me paraît le mauvais rangement. »* **Il a raison.**
+Un écran qui affiche « Tous les événements entrants ont trouvé leur entreprise » **alors que 100 %
+restent en attente** ne pose aucune question de produit à trancher : **il ment à l'opérateur**, et
+c'est précisément la phrase qui l'empêcherait d'aller voir pourquoi le canal ne crée rien.
+**Sorti des arbitrages, porté aux défauts. Sévérité inchangée (S1)** — il ne contestait que le
+rangement, et je ne reclasse pas au-delà de ce qui m'est demandé.
+
+### Conséquence sur le décompte
+
+**30 → 34 défauts S0 distincts** (`+A08-006 +B17-009 +E33-006 +G43-005`), `F35-003` en suspens.
+
+> **Et je note la nature de ce saut, pour qu'on ne s'y trompe pas** : de 26 à 34 en une journée,
+> **rien n'a été découvert**. Tout était déjà mesuré, écrit et archivé au registre — mal classé, ou
+> compté une fois de trop, ou pas compté. *L'audit n'avait pas un problème de mesure. Il avait un
+> problème de clôture.* C'est `A-013`, énoncé au premier jour, et il aura fallu quatre recomptages
+> pour que le dossier cesse de le pratiquer sur lui-même.

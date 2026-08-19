@@ -344,3 +344,51 @@ The following errors occurred during the last request:
 ############ F35-012 ############
 --- fichiers ramenes a main :
     backend/app/Services/Auth/AuthService.php
+
+   FAIL  Tests\Feature\Auth\GardesAuthentificationAgent35Test
+  ⨯ F35-012 — un compte verrouille est refuse AVANT toute verification… 48.84s  
+  ⨯ F35-012 — le compteur d echecs retombe apres la fenetre d oubli      0.88s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-012 —…    
+  Failed asserting that 11 is identical to 10.
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:457
+    453▕ 
+    454▕     connexionA35($utilisateur->email, 'NimporteQuoiFaux123!')->assertStatus(422);
+    455▕ 
+    456▕     // Le compteur ne doit PAS continuer de monter sur un compte déjà verrouillé.
+  ➜ 457▕     expect($utilisateur->fresh()->failed_login_count)->toBe(10);
+    458▕ });
+    459▕ 
+    460▕ test('F35-012 — le compteur d echecs retombe apres la fenetre d oubli', function () {
+    461▕     $utilisateur = utilisateurA35('oubli@a35.test');
+
+  1   tests/Feature/Auth/GardesAuthentificationAgent35Test.php:457
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-012 —…    
+  Failed asserting that 10 is identical to 1.
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:471
+    467▕     connexionA35($utilisateur->email, 'EncoreFauxMaisVieux1!')->assertStatus(422);
+    468▕ 
+    469▕     // 9 échecs oubliés + 1 nouvel échec = 1, pas 10 : le compte n'est pas verrouillé.
+    470▕     $frais = $utilisateur->fresh();
+  ➜ 471▕     expect($frais->failed_login_count)->toBe(1);
+    472▕     expect($frais->locked_until)->toBeNull();
+    473▕ });
+    474▕ 
+    475▕ // ─────────────────────────────────────────────────────────────── F35-013
+
+  1   tests/Feature/Auth/GardesAuthentificationAgent35Test.php:471
+
+
+  Tests:    2 failed (4 assertions)
+  Duration: 63.06s
+  Random Order Seed: 1787155188
+
+--- restauration de la branche
+
+############ F35-013 ############
+--- fichiers ramenes a main :
+    backend/app/Services/Auth/MagicLinkService.php

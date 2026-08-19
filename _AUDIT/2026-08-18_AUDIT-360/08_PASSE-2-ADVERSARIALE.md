@@ -129,9 +129,74 @@ trouvaille.
 
 ---
 
+## 5. Résultat n° 3 — la tension HMAC du dossier : **les deux affirmations tiennent**, et le défaut est ailleurs
+
+**Objet attaqué** : une **contradiction apparente** que le dossier portait sans la voir.
+`02bis` §5 déclare le canal HMAC **exemplaire** — *« le patron à copier »*. `F37-001` (S0) déclare
+un canal HMAC **forgeable en production**. *L'un des deux devait être faux.*
+
+**Mesuré — ce sont deux canaux distincts, et la contradiction n'existe pas** :
+
+| Route | Contrôleur | Vérification | Secret vide | Rejeu |
+|---|---|---|---|---|
+| `/internal/site-sync` · `/site-sync/gdpr` | `SiteSyncController` · `SiteGdprController` | **classe durcie `HmacSignature`** | 🟢 **`return false`** — *fail-closed* | 🟢 horodatage **dans** la signature, fenêtre bornée |
+| `/internal/scraper-result` | `ScraperResultController:37-41` | **réimplémentée à la main** | 🔴 **aucune garde** — *fail-open* | 🔴 **aucun horodatage** : une requête interceptée rejouable **indéfiniment** |
+
+✅ **`02bis` §5 tient** : le canal exemplaire est bien `site-sync`, et il l'est vraiment — la signature
+est vérifiée **avant** le drapeau, le secret vide **ferme** la porte, l'horodatage est **dans** le
+corps signé. **Rien à rouvrir.**
+✅ **`F37-001` tient** aussi, et se confirme par un second chemin statique : `WORKER_INTERNAL_HMAC_SECRET`
+est **vide dans les trois `.env` du dépôt** (`.env`, `.env.example`, `backend/.env`).
+
+### 🔴 Constat neuf — `P5-HMAC-001` (S2) : **le dépôt documente le canal troué comme étant le patron de référence**
+
+Deux commentaires, écrits par deux mains différentes, désignent au développeur suivant **le mauvais
+des deux canaux** :
+
+1. `routes/api.php:310` — `/site-sync` est signée *« **(même patron que scraper-result)** »*.
+   **C'est faux, et à l'envers** : `site-sync` emploie la classe durcie ; `scraper-result` est la
+   version faible.
+2. `app/Support/HmacSignature.php`, docbloc — *« **Reprend le patron déjà en place sur
+   `POST /internal/scraper-result`** — le seul canal machine authentifié du CRM »*.
+   **La classe écrite pour corriger le défaut présente le code défectueux comme son ancêtre**, et
+   le qualifie de *seul canal machine authentifié*.
+
+> **C'est la mécanique de propagation du défaut, prise sur le fait.** `F37-001` n'est pas un
+> accident isolé : c'est ce qui arrive quand deux commentaires pointent une porte fail-open comme
+> « le patron ». Le prochain canal machine-à-machine sera écrit en copiant ce que ces lignes
+> désignent. **Corriger `F37-001` sans corriger ces deux commentaires, c'est réparer la fuite et
+> laisser le plan.**
+> *Correctif : deux lignes de commentaire, et faire passer `ScraperResultController` par
+> `HmacSignature::verify()` — la classe existe déjà, elle est testée, elle est bonne.*
+
+### ⚠️ Et une hypothèse à moi, poursuivie puis **abandonnée** — elle méritait d'être vérifiée, elle est fausse
+
+J'ai cru tenir plus grave. `ScraperResultController:37` lit le secret par **`env()` brut**, et
+`WORKER_INTERNAL_HMAC_SECRET` **n'a aucune entrée dans `config/`** — seule occurrence du dépôt.
+Or `infra/docker/entrypoint-prod.sh:41-48` exécute **`config:cache` au démarrage du conteneur**, et
+le fichier avertit lui-même : *« sous config mise en cache, `env()` retourne NUL »*. J'en ai déduit
+que l'endpoint serait forgeable **même avec un secret correctement posé**.
+
+**Vérifié, et c'est non.** `docker-compose.yml` injecte le `.env` par **`env_file:`**, donc les
+variables sont dans l'**environnement du processus** — `env()` les lit encore sous config mise en
+cache. Le piège du 2026-08-14 vise le `.env` lu par dotenv, pas `env_file`. **Mon hypothèse
+n'ajoute aucun mode de défaillance ; `F37-001` reste exactement ce qu'il était.**
+
+*Ce qui subsiste, et que je porte en S3 (`P5-HMAC-002`) : ce secret est **le seul** du dépôt sans
+entrée `config/`. Il fonctionne aujourd'hui **par la grâce d'un détail de `docker-compose`**. Le
+jour où quelqu'un passe la production en `environment:` explicite ou en secrets Docker, il tombe à
+vide — **et il tombera en silence, puisque le contrôle est fail-open.***
+
+> **Pourquoi j'écris une hypothèse morte plutôt que de l'effacer** : elle a coûté quatre mesures, et
+> le prochain qui lira `env()` + `config:cache` dans ce dépôt refera le même raisonnement. La
+> réponse mérite d'être archivée avec la question. *Règle 3 : le témoin négatif est un livrable.*
+
+---
+
 ## 3. Journal de la passe
 
 | Date | Objet | Verdict |
 |---|---|---|
 | 2026-08-19 | Décompte S0 (`02bis` §1 bis) | 🔴 **Faux, trois fois de suite et toujours trop bas.** Corrigé à **29**, propagé au rapport final et à `06_RESTE-WILL` (qui portait encore **« douze »** — la page que Will lit en premier) |
 | 2026-08-19 | `02bis` §5 — « la suite de tests est saine, zéro exclusion silencieuse » | ✅ **Confirmée**, et sur le fichier que la CI ouvre vraiment (`phpunit-ci.xml`), ce qui n'avait pas été fait. Quarantaine levée vérifiée **fichier par fichier : 23/23 présents**. Le couplage entre tests contourné par l'ordre reste ouvert — mais c'est `H44-011`, **déjà connu** : redécouverte, pas trouvaille |
+| 2026-08-19 | La tension `02bis` §5 « canal HMAC exemplaire » vs `F37-001` « canal HMAC forgeable » | ✅ **Pas de contradiction : deux canaux distincts**, les deux affirmations tiennent. 🔴 Mais **constat neuf `P5-HMAC-001` (S2)** : deux commentaires — dont le docbloc de la classe durcie — **désignent le canal troué comme le patron de référence**. Une hypothèse à moi (`config:cache` neutralisant le secret) **poursuivie puis réfutée**, archivée avec sa réponse |

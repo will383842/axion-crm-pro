@@ -119,19 +119,44 @@ Route::prefix('v1')->group(function () {
             // §2.10 : un export emporte 4,29 M de fiches nominatives hors du
             // système. Le throttle limitait la CADENCE, pas le DROIT.
             ->middleware(['throttle:scraper-list', 'permission:data.export']);
-        Route::post('/companies', [CompaniesController::class, 'store']);
+        // 🔴 CES ROUTES N'EXIGEAIENT AUCUNE PERMISSION. Mesure le 2026-08-19
+        // (audit 360, F36-003, S0) : un compte `viewer` - « lecture seule » -
+        // creait, modifiait et SUPPRIMAIT DEFINITIVEMENT entreprises et
+        // etiquettes ; le DELETE rendait 204.
+        //
+        // Le modele de droits etait pourtant deja juste et deja seme :
+        //   viewer   -> companies.view seulement
+        //   operator -> create + update, PAS delete (« CRUD sans destruction »)
+        //   admin/owner -> tout
+        // Et le precedent existait a deux pas : `companies/tags/bulk` exige
+        // `companies.update` depuis le §2.10, avec le meme raisonnement ecrit.
+        // Il n'avait simplement jamais ete etendu aux routes unitaires.
+        Route::post('/companies', [CompaniesController::class, 'store'])
+            ->middleware('permission:companies.create');
         Route::get('/companies/{company}', [CompaniesController::class, 'show']);
-        Route::put('/companies/{company}', [CompaniesController::class, 'update']);
-        Route::delete('/companies/{company}', [CompaniesController::class, 'destroy']);
-        Route::post('/companies/{company}/enrich', [CompaniesController::class, 'enrich']);
-        Route::post('/companies/bulk-enrich', [CompaniesController::class, 'bulkEnrich']);
-        Route::post('/companies/{company}/recompute-score', [CompaniesController::class, 'recomputeScore']);
+        Route::put('/companies/{company}', [CompaniesController::class, 'update'])
+            ->middleware('permission:companies.update');
+        Route::delete('/companies/{company}', [CompaniesController::class, 'destroy'])
+            ->middleware('permission:companies.delete');
+        // Enrichir et recalculer ECRIVENT sur la fiche : c'est une modification,
+        // meme si l'utilisateur ne saisit rien lui-meme.
+        Route::post('/companies/{company}/enrich', [CompaniesController::class, 'enrich'])
+            ->middleware('permission:companies.update');
+        Route::post('/companies/bulk-enrich', [CompaniesController::class, 'bulkEnrich'])
+            ->middleware('permission:companies.update');
+        Route::post('/companies/{company}/recompute-score', [CompaniesController::class, 'recomputeScore'])
+            ->middleware('permission:companies.update');
 
         // Contacts
+        // Il n'existe pas de permission `contacts.*` dediee (le referentiel n'en
+        // seme pas) : les contacts vivent sous l'entreprise, on reprend donc ses
+        // droits plutot que d'inventer un referentiel parallele qui divergerait.
         Route::get('/contacts', [ContactsController::class, 'index']);
         Route::get('/contacts/{contact}', [ContactsController::class, 'show']);
-        Route::put('/contacts/{contact}', [ContactsController::class, 'update']);
-        Route::delete('/contacts/{contact}', [ContactsController::class, 'destroy']);
+        Route::put('/contacts/{contact}', [ContactsController::class, 'update'])
+            ->middleware('permission:companies.update');
+        Route::delete('/contacts/{contact}', [ContactsController::class, 'destroy'])
+            ->middleware('permission:companies.delete');
 
         // Médias & Journalistes (chantier base médias)
         // /media/export DOIT précéder /media/{media} (sinon "export" pris pour un id).
@@ -183,9 +208,14 @@ Route::prefix('v1')->group(function () {
 
         // Tags + saved views + global search + notifications
         Route::get('/tags', [TagsController::class, 'index']);
-        Route::post('/tags', [TagsController::class, 'store']);
-        Route::put('/tags/{tag}', [TagsController::class, 'update']);
-        Route::delete('/tags/{tag}', [TagsController::class, 'destroy']);
+        // Memes droits que l'action de masse juste en dessous : creer ou
+        // renommer une etiquette modifie le referentiel, la supprimer detruit.
+        Route::post('/tags', [TagsController::class, 'store'])
+            ->middleware('permission:companies.update');
+        Route::put('/tags/{tag}', [TagsController::class, 'update'])
+            ->middleware('permission:companies.update');
+        Route::delete('/tags/{tag}', [TagsController::class, 'destroy'])
+            ->middleware('permission:companies.delete');
 
         // Action de MASSE : poser ou retirer un tag sur une sélection.
         // `companies.update` exigée — un compte en lecture seule ne modifie

@@ -1,0 +1,30 @@
+######## MICRO-SABOTAGE M2-reportUnmatched-en-commentaire
+######## FICHIER : phpstan.neon
+######## DATE    : 2026-08-19T12:29:00Z
+######## DIFF APPLIQUE ########
+--- /var/www/html.orig/phpstan.neon
++++ /var/www/html/phpstan.neon
+@@ -24,6 +24,7 @@
+     # Conséquence à connaître : quand on corrige une erreur, il faut désormais
+     # RETIRER son entrée de la baseline dans le même commit, sinon la CI rougit.
+     # C'est voulu : c'est ce qui garantit que la baseline ne peut que décroître.
+-    reportUnmatchedIgnoredErrors: true
++    # SABOTAGE A45 : reportUnmatchedIgnoredErrors: true a ete commente,
++    # la valeur effective est desormais celle par defaut de PHPStan (false).
+     ignoreErrors:
+         - identifier: missingType.generics
+######## CIBLES : tests/Unit/PhpstanBaselineNeGrossitPasTest.php ########
+
+   PASS  Tests\Unit\PhpstanBaselineNeGrossitPasTest
+  ✓ le parseur de baseline lit vraiment des entrées                      1.67s  
+  ✓ aucune entrée de baseline ne vise le socle CRM                       0.13s  
+  ✓ la baseline PHPStan ne grossit pas                                   0.25s  
+  ✓ reportUnmatchedIgnoredErrors reste activé                            0.25s  
+  ✓ l'en-tête de la baseline annonce les nombres réellement présents     0.34s  
+
+  Tests:    5 passed (9 assertions)
+  Duration: 4.49s
+  Random Order Seed: 1787142542
+
+######## RESTAURATION ########
+RESTAURE-IDENTIQUE: phpstan.neon

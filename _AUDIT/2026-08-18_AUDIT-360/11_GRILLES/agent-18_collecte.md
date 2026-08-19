@@ -716,8 +716,19 @@ documenté** (l. 182-187) ; ce qui ne l'est pas, c'est que le chemin qui les ré
 - Référence     : main `c0c453d` … `e8924b8`
 - Emplacement   : `backend/app/Support/WaterfallSentry.php:23` ; `backend/config/sentry.php:12`
 - Constat       : la garde `if (! class_exists(\Sentry\State\Hub::class)) return;` ne se déclenche jamais — le paquet `sentry/sentry-laravel ^4.10` est installé et `backend/vendor/sentry` existe. Mais `config/sentry.php` lit `SENTRY_LARAVEL_DSN`, absent de `.env`, de `backend/.env`, de `.env.example` et de `infra/scripts/configure-prod-env.sh`. Sans DSN, la capture est inerte.
-- Preuve        : `grep -rn "SENTRY_LARAVEL_DSN"` sur tout le dépôt hors `vendor`/`node_modules` : la clef n'apparaît que dans `config/sentry.php`, dans `infra/scripts/bootstrap-preprod.sh:109` et dans de la documentation. Aucune ligne d'environnement ne la pose.
-- Témoin négatif: la même recherche trouve bien `VITE_SENTRY_DSN` **posée** (à vide) dans `.env:160` — elle sait donc trouver une clef d'environnement quand elle est écrite.
+- Preuve        : `04_PREUVES/agent-18/11_sentry_dsn.txt` — vérification **fichier par fichier**, chacun ouvert nommément :
+
+  ```
+  .env                                  SENTRY_LARAVEL_DSN x0
+  backend/.env                          SENTRY_LARAVEL_DSN x0
+  .env.example                          SENTRY_LARAVEL_DSN x0
+  infra/scripts/configure-prod-env.sh   SENTRY_LARAVEL_DSN x0
+  infra/scripts/setup-hetzner-cpx22.sh  SENTRY_LARAVEL_DSN x0
+
+  backend/config/sentry.php:12:    'dsn' => env('SENTRY_LARAVEL_DSN'),
+  ```
+  ⚠️ **Pourquoi fichier par fichier et non un `grep -r`** : les `.env` sont *gitignorés*, donc un ripgrep de dépôt les **saute silencieusement**. Ma première mesure était de cette forme — elle aurait rendu le même « rien trouvé » que les fichiers contiennent la clef ou non. Refaite.
+- Témoin négatif: le **même** contrôle, sur la même liste de fichiers, trouve `VITE_SENTRY_DSN` **x1** dans `.env`, `backend/.env` et `.env.example`. Il sait donc lire ces fichiers et y trouver une clef d'environnement quand elle est écrite — le « x0 » n'est pas un angle mort.
 - Impact        : les 11 sites de capture sont tous placés dans un `catch (\Throwable)` qui **avale** l'exception (log `warning` + `recordRun(…, 'failed')`, jamais de `throw`). L'unique voie de remontée est donc Sentry, et elle est coupée. Une panne d'enrichissement se réduit à une ligne de log et à un run marqué `failed` que personne ne regarde. « A-t-il déjà déclenché ? » : sur cette installation, il ne le peut pas.
 - Rattachement  : l'agent 16 a déjà relevé l'absence de DSN (`agent-16_audit-ai-act.md:216`). Je n'ouvre pas de doublon ; ce constat n'ajoute que la **portée waterfall** — l'inventaire des 11 sites et le fait qu'ils avalent tous l'exception.
 - Correctif     : déclarer `SENTRY_LARAVEL_DSN` dans `.env.example` et dans `configure-prod-env.sh` (**30 min**) ; ajouter un test qui rougit si un site de capture existe sans voie de remontée configurée (**1 h**).
@@ -845,3 +856,28 @@ Cette liste est un livrable.
 - **A-001, A-002, A-003** du dossier commun — non repris.
 - **Piège 10 tel qu'énoncé** (« CI en `en_US.utf8` ») — **corrigé** au §2.② : la CI de ce dépôt est
   en `C`, comme la production. Le piège reste réel, sa cause est autre.
+
+---
+
+## 6. Deux erreurs de méthode que j'ai commises, et corrigées
+
+Je les consigne parce qu'un lecteur pressé pourrait les reproduire, et parce que les deux
+produisaient un « rien trouvé » d'apparence honnête.
+
+1. **`Env::getRepository()->set()` ne mesure rien.** Ma première matrice des mocks (§[6] de
+   `01_dryrun_dedup_eligibilite.txt`) manipulait le dépôt d'environnement de Laravel pour simuler
+   des valeurs de `MOCK_MODE`. Ce dépôt est **immuable** : les huit cas ont tous mesuré la même
+   valeur (`true`, venue du `.env`) et rendu « 5 mocks sur 5 » de façon parfaitement cohérente —
+   donc parfaitement crédible, et fausse. Refaite avec de vraies variables d'environnement du
+   processus (`docker exec -e`), la mesure donne un résultat **différent** : `FALSE`, `0` et la
+   chaîne vide arment le réel. L'avertissement est consigné en tête du fichier de preuve d'origine.
+2. **Un `grep -r` de dépôt saute les fichiers *gitignorés*.** Ma première vérification de
+   `SENTRY_LARAVEL_DSN` était de cette forme : elle n'a jamais ouvert `.env` ni `backend/.env`.
+   Elle aurait rendu le même « absent » que la clef y soit ou non. Refaite fichier par fichier,
+   avec un témoin positif (`VITE_SENTRY_DSN`, trouvée x1 dans les trois fichiers) qui prouve que
+   le contrôle sait lire ces fichiers. **La conclusion est inchangée** — mais elle ne reposait sur
+   rien avant cette reprise.
+
+Dans les deux cas, la première mesure n'était pas *approximative* : elle était **muette et
+plausible**. C'est exactement la forme d'erreur que la règle du témoin négatif existe pour
+attraper, et elle l'a attrapée les deux fois.

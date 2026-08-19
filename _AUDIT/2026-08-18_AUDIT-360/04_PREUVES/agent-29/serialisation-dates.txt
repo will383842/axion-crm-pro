@@ -1,0 +1,6 @@
+date_default_timezone = Europe/Paris
+
+ete   2026-03-29 14:00 Paris               Carbon=2026-03-29 14:00:00 +02:00 | vers SQL=2026-03-29 14:00:00   | JSON API=2026-03-29T12:00:00.000000Z
+hiver 2026-10-25 14:00 Paris               Carbon=2026-10-25 14:00:00 +01:00 | vers SQL=2026-10-25 14:00:00   | JSON API=2026-10-25T13:00:00.000000Z
+bascule ete 02:30 (inexistante a Paris)    Carbon=2026-03-29 03:30:00 +02:00 | vers SQL=2026-03-29 03:30:00   | JSON API=2026-03-29T01:30:00.000000Z
+bascule hiver 02:30 (ambigue a Paris)      Carbon=2026-10-25 02:30:00 +01:00 | vers SQL=2026-10-25 02:30:00   | JSON API=2026-10-25T01:30:00.000000Z

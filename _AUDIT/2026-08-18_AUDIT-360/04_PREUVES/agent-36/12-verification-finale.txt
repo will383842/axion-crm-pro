@@ -1,0 +1,26 @@
+ALPHA = company 5 / contact 4    BETA = company 3 / contact 2
+viewer appartient a ALPHA (role viewer, SANS contacts.view_pii)
+owner2 appartient a BETA (role owner)
+
+===== A. contacts.view_pii : LISTE vs FICHE, meme compte, meme donnee =====
+-- viewer : GET /api/v1/contacts (liste)
+{"data":[{"id":4,"first_name":"Pierre","last_name":"Durand","role":null,"email":"p***@alpha-a36.fr","email_status":null,"email_score":null,"phone":"+336******44","linkedin_url":null,"discovery_source":null,"company_id":5,"company":{"id":5,"denomination":"ALPHA SARL"}}],"meta":{"total":1,"per_page":2
+-- viewer : GET /api/v1/contacts/4 (fiche)
+status=200 "email":"pierre.durand@alpha-a36.fr" "phone":"+33611223344" 
+
+-- operator : GET /api/v1/contacts (liste)
+{"data":[{"id":4,"first_name":"Pierre","last_name":"Durand","role":null,"email":"pierre.durand@alpha-a36.fr","email_status":null,"email_score":null,"phone":"+33611223344","linkedin_url":null,"discovery_source":null,"company_id":5,"company":{"id":5,"denomination":"ALPHA SARL"}}],"meta":{"total":1,"pe
+-- operator : GET /api/v1/contacts/4 (fiche)
+status=200 "email":"pierre.durand@alpha-a36.fr" "phone":"+33611223344" 
+
+===== B. cloisonnement : lecture croisee entre espaces de travail =====
+viewer   /api/v1/companies        200 "workspace_id":"c6a16436-ec1b-461a-a797-e4700d6a0168" 
+viewer   /api/v1/companies/5      200 "workspace_id":"c6a16436-ec1b-461a-a797-e4700d6a0168" 
+viewer   /api/v1/companies/3      200 "workspace_id":"5c654b31-e479-4b79-b7ab-a94331cafcfc" 
+viewer   /api/v1/contacts/4       200 "workspace_id":"c6a16436-ec1b-461a-a797-e4700d6a0168" 
+viewer   /api/v1/contacts/2       200 "workspace_id":"5c654b31-e479-4b79-b7ab-a94331cafcfc" 
+owner2   /api/v1/companies        200 "workspace_id":"5c654b31-e479-4b79-b7ab-a94331cafcfc" 
+owner2   /api/v1/companies/5      200 "workspace_id":"c6a16436-ec1b-461a-a797-e4700d6a0168" 
+owner2   /api/v1/companies/3      200 "workspace_id":"5c654b31-e479-4b79-b7ab-a94331cafcfc" 
+owner2   /api/v1/contacts/4       200 "workspace_id":"c6a16436-ec1b-461a-a797-e4700d6a0168" 
+owner2   /api/v1/contacts/2       200 "workspace_id":"5c654b31-e479-4b79-b7ab-a94331cafcfc" 

@@ -3,3 +3,7 @@ ERREUR: SQLSTATE[22023]: Invalid parameter value: 7 ERROR:  invalid value for pa
 
 ### DB_TIMEZONE absent (etat de l atelier)
 Etc/UTC
+(la seconde moitie de cette sonde a expire : l atelier local sert l API par php -S mono-processus,
+ A-009/A-010. La valeur cherchee est deja mesuree, isolement, dans local-fuseaux.txt :
+   DB_TIMEZONE absent -> PG SHOW TimeZone = Etc/UTC, connexion fonctionnelle.
+ Le contraste avec l erreur ci-dessus est donc etabli, sur deux sorties au lieu d une.)

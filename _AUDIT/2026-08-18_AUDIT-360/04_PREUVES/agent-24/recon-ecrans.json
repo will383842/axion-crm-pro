@@ -1,0 +1,535 @@
+{
+  "out": [
+    {
+      "route": "/",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Tableau de bord",
+      "boutons": [
+        "7j",
+        "30j",
+        "90j",
+        "⟳ Actualiser"
+      ],
+      "liensSortants": [
+        "/companies?quality_badge=basique",
+        "/companies"
+      ],
+      "texte": "BONJOUR AGENT 👋 Tableau de bord Vue d'ensemble · derniers 30 jours En direct · actualisé toutes les 30s 7j 30j 90j ⟳ Actualiser TOTAL ENTREPRISES 1 319 Toutes périodes confondues ENRICHIES 24H 42 Fiches enrichies sur 24h NOUVELLES 7J 294 Découvertes sur 7 jou",
+      "nbLiensSortants": 2,
+      "culDeSac": false
+    },
+    {
+      "route": "/companies",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Entreprises",
+      "boutons": [
+        "Importer",
+        "Exporter",
+        "Tous",
+        "Prospectables",
+        "Partiels",
+        "Pending",
+        "Archivés",
+        "← Précédent",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "Suivant →"
+      ],
+      "liensSortants": [
+        "/coverage",
+        "/companies/1",
+        "/companies/2",
+        "/companies/3",
+        "/companies/4",
+        "/companies/5",
+        "/companies/6",
+        "/companies/7",
+        "/companies/8",
+        "/companies/9",
+        "/companies/10",
+        "/companies/11",
+        "/companies/12",
+        "/companies/13",
+        "/companies/14",
+        "/companies/15",
+        "/companies/16",
+        "/companies/17",
+        "/companies/18",
+        "/companies/19"
+      ],
+      "texte": "Entreprises Pipeline de prospection · 137 entreprises actives Importer Exporter Lancer scraping → TOTAL 137 Page 1 · 20 affichées ENRICHIES 100% dont email + téléphone vérifiés TOP TAILLE INCONNUE 100% de l'échantillon TOP NAF — — Tous Prospectables Partiels P",
+      "nbLiensSortants": 20,
+      "culDeSac": false
+    },
+    {
+      "route": "/companies/1",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "(aucun)",
+      "boutons": [
+        "Enrichir maintenant",
+        "Exporter",
+        "DEBUG Données brutes (signals)",
+        "Enrichir maintenant",
+        "Exporter (vCard / VCF)",
+        "Marquer obsolète"
+      ],
+      "liensSortants": [
+        "/companies"
+      ],
+      "texte": "Entreprises / ? SIREN · Dept — · Inconnue · 🔴 Basique Enrichir maintenant Exporter IDENTITÉ LÉGALE Informations entreprise SIREN FORME JURIDIQUE — NAF — EFFECTIF INSEE — ADRESSE — SITE WEB — TÉLÉPHONE — LINKEDIN — DATE CRÉATION — ENRICHI LE Jamais Pipeline d'",
+      "nbLiensSortants": 1,
+      "culDeSac": false
+    },
+    {
+      "route": "/contacts",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Contacts",
+      "boutons": [],
+      "liensSortants": [],
+      "texte": "Contacts 320 décideurs identifiés (waterfall + Direction Finder) Tous statuts e-mail Valide Catch-all Inconnu Invalide Rôle générique Jetable Tous pays France Roumanie Tous statuts Contactables (e-mail exploitable) Partiels (e-mail incertain) Collectés, pas en",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/media",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Médias",
+      "boutons": [
+        "Exporter CSV",
+        "← Précédent",
+        "Suivant →"
+      ],
+      "liensSortants": [
+        "/media/1"
+      ],
+      "texte": "Médias Base médias & presse · 1 médias Exporter CSV TOTAL 1 Page 1 · 1 affichés AVEC SITE WEB 100% de la page AVEC EMAIL 0% email rédaction TOP TYPE inconnu de la page Toutes familles 📝 Rédactionnel 🎥 Production audiovisuelle Tous types 📰 Journal 📓 Revue /",
+      "nbLiensSortants": 1,
+      "culDeSac": false
+    },
+    {
+      "route": "/media/1",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "(aucun)",
+      "boutons": [],
+      "liensSortants": [
+        "/media"
+      ],
+      "texte": "Médias / — Informations Type — Famille — Périodicité — Thème éditorial — Zone de diffusion — Éditeur — Département — Région — Ville — Code postal — SIREN — N° CPPAP — N° ARCOM — Source — Contact rédaction Site web — Email rédaction — Téléphone — Journalistes A",
+      "nbLiensSortants": 1,
+      "culDeSac": false
+    },
+    {
+      "route": "/journalists",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Journalistes",
+      "boutons": [
+        "Exporter CSV",
+        "← Précédent",
+        "Suivant →"
+      ],
+      "liensSortants": [],
+      "texte": "Journalistes Contacts rédaction · 1 journalistes Exporter CSV TOTAL 1 Page 1 AVEC EMAIL 1 sur la page OPT-OUT 0 opposition RGPD NOM MÉDIA RÔLE RUBRIQUE EMAIL Jean PRESSE Le Dauphiné — — j@x.fr Page 1 / 1 ← Précédent Suivant →",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/coverage",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Couverture France",
+      "boutons": [
+        "Visualisation",
+        "Recherche",
+        "Action",
+        "Régions",
+        "Départements",
+        "Villes"
+      ],
+      "liensSortants": [],
+      "texte": "Live · refresh 60s Couverture France Carte interactive de votre prospection · sélectionnez une zone pour la détailler ou lancer un scrape ciblé. Visualisation Recherche Action COUVERTURE 0% 0 / 96 dépts ENTREPRISES TROUVÉES 0 0 complètes MODE ACTIF Visualisati",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/campaigns",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Collectes",
+      "boutons": [
+        "Nouvelle campagne",
+        "Toutes 1",
+        "Brouillons 0",
+        "Planifiées 0",
+        "En cours 1",
+        "En pause 0",
+        "Terminées 0"
+      ],
+      "liensSortants": [
+        "/campaigns/7"
+      ],
+      "texte": "En direct · actualisé toutes les 10s Collectes Lance et supervise des campagnes multi-sources avec budgets et auto-pause anti-blacklist. Nouvelle campagne TOTAL 1 campagnes EN COURS 1 en exécution TERMINÉES 0 succès complets ENTREPRISES CRÉÉES NaN cumul toutes",
+      "nbLiensSortants": 1,
+      "culDeSac": false
+    },
+    {
+      "route": "/campaigns/new",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Nouvelle campagne",
+      "boutons": [
+        "Lancer maintenant",
+        "Planifier plus tard",
+        "Annuler",
+        "Continuer"
+      ],
+      "liensSortants": [
+        "/campaigns"
+      ],
+      "texte": "Collectes / Nouvelle Nouvelle campagne Configure ta campagne en 4 étapes : identité, zones, sources, budget. 1 Identité 2 Zones 3 Sources 4 Budget & sécurité Identité Nom et description visibles dans la liste des campagnes. NOM DE LA CAMPAGNE * DESCRIPTION (OP",
+      "nbLiensSortants": 1,
+      "culDeSac": false
+    },
+    {
+      "route": "/campaigns/7",
+      "coquille": false,
+      "mainVide": true,
+      "h1": "(aucun)",
+      "boutons": [],
+      "liensSortants": [],
+      "texte": "",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/scraper-runs",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Journaux de collecte",
+      "boutons": [
+        "Exporter en CSV",
+        "Tous 1",
+        "En cours 0",
+        "En attente 0",
+        "Terminés 1",
+        "Échec 0",
+        "Annulés 0"
+      ],
+      "liensSortants": [],
+      "texte": "En direct · actualisé toutes les 10s Journaux de collecte Monitoring des jobs de scraping en temps réel. Exporter en CSV TOTAL 1 runs sur la fenêtre EN COURS 0 en cours TAUX DE SUCCÈS 100% 1 OK / 1 clos ÉCHECS 0 aucun échec Tous 1 En cours 0 En attente 0 Termi",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/international/roumanie",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Présence française — Roumanie",
+      "boutons": [
+        "Tout",
+        "Entreprises",
+        "Associations",
+        "Cabinets",
+        "Enseignement",
+        "Institutions",
+        "Chambres de commerce",
+        "Médias",
+        "Tous",
+        "Prospectables",
+        "Partiels",
+        "Pending",
+        "Archivés",
+        "Précédent",
+        "Suivant"
+      ],
+      "liensSortants": [
+        "/companies/1",
+        "/companies/2",
+        "/companies/3",
+        "/companies/4",
+        "/companies/5",
+        "/companies/6",
+        "/companies/7",
+        "/companies/8",
+        "/companies/9",
+        "/companies/10",
+        "/companies/11",
+        "/companies/12",
+        "/companies/13",
+        "/companies/14",
+        "/companies/15",
+        "/companies/16",
+        "/companies/17",
+        "/companies/18",
+        "/companies/19",
+        "/companies/20"
+      ],
+      "texte": "Présence française — Roumanie Entreprises françaises implantées, entités locales et organismes francophones. Collecte : annuaire public CCIFER + DG Trésor. Tout Entreprises Associations Cabinets Enseignement Institutions Chambres de commerce Médias Tous Prospe",
+      "nbLiensSortants": 20,
+      "culDeSac": false
+    },
+    {
+      "route": "/audiences",
+      "coquille": false,
+      "mainVide": true,
+      "h1": "(aucun)",
+      "boutons": [],
+      "liensSortants": [],
+      "texte": "",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/audiences/new",
+      "coquille": false,
+      "mainVide": true,
+      "h1": "(aucun)",
+      "boutons": [],
+      "liensSortants": [],
+      "texte": "",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/audiences/3",
+      "coquille": false,
+      "mainVide": true,
+      "h1": "(aucun)",
+      "boutons": [],
+      "liensSortants": [],
+      "texte": "",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/admin/observability",
+      "coquille": false,
+      "mainVide": true,
+      "h1": "(aucun)",
+      "boutons": [],
+      "liensSortants": [],
+      "texte": "",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/tags",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Tags",
+      "boutons": [
+        "Nouveau tag"
+      ],
+      "liensSortants": [],
+      "texte": "Tags Classification multi-axes des entreprises (géographie, secteur, taille, intent, custom). Nouveau tag TOTAL TAGS 2 tous axes confondus AUTO 0 géo, secteur, taille MANUEL 0 créés par l'équipe LLM 0 intent classification IA Géographie Région et département (",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/console/contacts",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Contacts",
+      "boutons": [
+        "Tous 42",
+        "Prospects 30",
+        "Clients 7",
+        "Presse & médias 2",
+        "Partenaires 1",
+        "Investisseurs 1",
+        "Conférences 0",
+        "Newsletter 1",
+        "Fournisseurs 0",
+        "Contacts actifs",
+        "Prospection (base froide)",
+        "Tout"
+      ],
+      "liensSortants": [],
+      "texte": "Contacts Tous les types — Contacts actifs CLIENTS 7 PROSPECTS 30 OPPORTUNITÉS 3 DORMANTS 2 Tous 42 Prospects 30 Clients 7 Presse & médias 2 Partenaires 1 Investisseurs 1 Conférences 0 Newsletter 1 Fournisseurs 0 Tous pays France Roumanie Tous statuts Contactab",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/console/vivier",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Vivier candidats",
+      "boutons": [
+        "Tous les candidats 11",
+        "Commercial 4",
+        "Vidéo 2",
+        "Tech 4",
+        "Autres métiers 1"
+      ],
+      "liensSortants": [],
+      "texte": "Vivier candidats Univers étanche — base légale et durées de conservation distinctes de la base commerciale. À QUALIFIER 5 PRÉSÉLECTION 2 ENTRETIEN 1 CONSERVÉS EN VIVIER 3 Tous les candidats 11 Commercial 4 Vidéo 2 Tech 4 Autres métiers 1 Cand IDAT Tech · Entre",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/console/arbitrage",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Rapprochements à arbitrer",
+      "boutons": [
+        "Rattacher",
+        "Écarter"
+      ],
+      "liensSortants": [],
+      "texte": "Rapprochements à arbitrer 1 événement(s) reçus sans SIREN — à rattacher ou à écarter. ACME Formulaire contact · 2026-08-18T09:00:00Z Personne Jean ACME E-mail x@y.fr Code postal 38000 Ville GRENOBLE Identifiant d’entreprise Rattacher Motif d’écartement Écarter",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/console/personnes/pk-demo",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Marie DUPONT",
+      "boutons": [],
+      "liensSortants": [],
+      "texte": "Marie DUPONT Fiche 360° — tous les touchpoints connus de cette personne. Identité Marie DUPONT marie@dupont.fr ENTREPRISE 1 SAS Univers Business Fiche présente Vivier candidats Aucune fiche Timeline 2026-08-18T09:00:00Z Formulaire contact Business · site:submi",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/rgpd/requests",
+      "coquille": false,
+      "mainVide": true,
+      "h1": "(aucun)",
+      "boutons": [],
+      "liensSortants": [],
+      "texte": "",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/rgpd/ai-act",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Registre AI Act",
+      "boutons": [],
+      "liensSortants": [],
+      "texte": "Registre AI Act Conformité UE 2024/1689 — systèmes IA + classification risque + supervision humaine documentés. Article 9 AI Act — tout système classé high doit être documenté ici avec DPIA, mesures de mitigation, supervision humaine et révision annuelle. TOTA",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/audit-logs",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Journaux d’audit",
+      "boutons": [
+        "Vérifier la chaîne",
+        "10/08/2026 12:00:00 PUT api/v1/companies/1 — info 127.0.0.1 x…"
+      ],
+      "liensSortants": [],
+      "texte": "Journaux d’audit Journal append-only avec chaîne cryptographique SHA-256 vérifiable. Vérifier la chaîne Toutes sévérités Info Attention Erreur Critique QUAND ÉVÉNEMENT CHEMIN ACTEUR SÉVÉRITÉ IP EMPREINTE 10/08/2026 12:00:00 PUT api/v1/companies/1 — info 127.0.",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/users",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Utilisateurs",
+      "boutons": [
+        "Inviter un utilisateur"
+      ],
+      "liensSortants": [],
+      "texte": "Utilisateurs 4 rôles RBAC : owner / admin / operator / viewer (Spatie Permission teams). Inviter un utilisateur UTILISATEUR EMAIL RÔLES 2FA DERNIÈRE CONNEXION A2 Agent 24 a24@axion.local Propriétaire Non activé Jamais",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/settings",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Paramètres",
+      "boutons": [
+        "Workspace",
+        "Intégrations",
+        "Observabilité",
+        "Apparence",
+        "Enregistrer"
+      ],
+      "liensSortants": [],
+      "texte": "Paramètres Workspace, intégrations, observabilité, apparence. Workspace : … Workspace Intégrations Observabilité Apparence WORKSPACE Identité et limites Nom Slug (URL) Non modifiable Plafond LLM mensuel (€) Kill-switch automatique LLM quand atteint Enregistrer",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/llm/router",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "LLM Router",
+      "boutons": [
+        "Cas d'usage 1",
+        "Fournisseurs",
+        "Prompts",
+        "Usage 30j"
+      ],
+      "liensSortants": [],
+      "texte": "LLM Router 9 use cases × 5 providers + fallback chain + cost tracking + idempotency cache 24h. Cas d'usage 1 Fournisseurs Prompts Usage 30j CAS D'USAGE FOURNISSEUR MODÈLE CHAÎNE DE REPLI PLAFOND € ÉTAT x gpt — OFF",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/llm/proxy-providers",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Fournisseurs de proxies",
+      "boutons": [
+        "Tester"
+      ],
+      "liensSortants": [],
+      "texte": "Fournisseurs de proxies Webshare datacenter + IPRoyal résidentiel + Mock — bascule automatique selon zone. IDENTIFIANT TYPE ZONE POINTS DE SORTIE ÉTAT DE SANTÉ POIDS ACTIONS — Tester",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/llm/rotations",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Rotations",
+      "boutons": [],
+      "liensSortants": [],
+      "texte": "Rotations 5 dimensions de rotation : proxies + user-agents + targets + moteurs de recherche + LLM providers. DIMENSION Proxy 0 Aucune rotation configurée pour cette dimension. DIMENSION User-agent 0 Aucune rotation configurée pour cette dimension. DIMENSION Ci",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/cold-email",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "Cold email",
+      "boutons": [],
+      "liensSortants": [],
+      "texte": "Cold email Phase 2 — bientôt disponible Ce module est scaffoldé : DB + UI prêtes, logique métier reportée à la Phase 2.",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    },
+    {
+      "route": "/linkedin",
+      "coquille": true,
+      "mainVide": false,
+      "h1": "LinkedIn outreach",
+      "boutons": [],
+      "liensSortants": [],
+      "texte": "LinkedIn outreach Phase 2 — bientôt disponible Ce module est scaffoldé : DB + UI prêtes, logique métier reportée à la Phase 2.",
+      "nbLiensSortants": 0,
+      "culDeSac": true
+    }
+  ],
+  "plantages": []
+}

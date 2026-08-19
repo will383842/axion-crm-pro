@@ -20,3 +20,20 @@ select * from "companies" where "deleted_at" is null and LOWER("companies"."deno
  Execution Time: 43143.766 ms
 (11 rows)
 
+
+===== CHAUD (4e exécution) =====
+                                                                           QUERY PLAN                                                                           
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.43..5740.36 rows=100 width=2078) (actual time=6666.462..6666.467 rows=0 loops=1)
+   Buffers: shared read=82035 written=156
+   ->  Index Scan using idx_companies_workspace_score on companies  (cost=0.43..257149.24 rows=4480 width=2078) (actual time=6666.451..6666.453 rows=0 loops=1)
+         Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+         Filter: ((deleted_at IS NULL) AND (lower(denomination) ~~ '%marti%'::text))
+         Rows Removed by Filter: 2800000
+         Buffers: shared read=82035 written=156
+ Planning:
+   Buffers: shared hit=713 read=92
+ Planning Time: 35.759 ms
+ Execution Time: 6666.660 ms
+(11 rows)
+

@@ -1,0 +1,127 @@
+=== T25 structure tags ===
+                                                            Table "public.tags"
+    Column    |           Type           | Collation | Nullable |                                  Default                                  
+--------------+--------------------------+-----------+----------+---------------------------------------------------------------------------
+ id           | bigint                   |           | not null | nextval('tags_id_seq'::regclass)
+ workspace_id | uuid                     |           | not null | 
+ slug         | text                     |           | not null | 
+ name         | text                     |           | not null | 
+ color        | text                     |           |          | 
+ description  | text                     |           |          | 
+ rules        | jsonb                    |           | not null | '{}'::jsonb
+ created_at   | timestamp with time zone |           | not null | now()
+ updated_at   | timestamp with time zone |           | not null | now()
+ category     | character varying(32)    |           | not null | 'custom'::character varying
+ kind         | character varying(16)    |           | not null | 'manual'::character varying
+ is_locked    | boolean                  |           | not null | false
+ namespace    | text                     |           |          | generated always as (NULLIF(split_part(slug, ':'::text, 1), slug)) stored
+Indexes:
+    "tags_pkey" PRIMARY KEY, btree (id)
+    "idx_tags_workspace_category" btree (workspace_id, category)
+    "idx_tags_workspace_kind" btree (workspace_id, kind)
+    "idx_tags_workspace_namespace" btree (workspace_id, namespace)
+    "tags_workspace_id_slug_key" UNIQUE CONSTRAINT, btree (workspace_id, slug)
+Check constraints:
+    "tags_category_check" CHECK (category::text = ANY (ARRAY['geo'::character varying, 'sector'::character varying, 'size'::character varying, 'intent'::character varying, 'custom'::character varying, 'candidate'::character varying]::text[]))
+    "tags_kind_check" CHECK (kind::text = ANY (ARRAY['auto'::character varying, 'manual'::character varying, 'llm'::character varying]::text[]))
+Foreign-key constraints:
+    "tags_workspace_id_fkey" FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+Referenced by:
+    TABLE "candidate_tag" CONSTRAINT "candidate_tag_tag_id_fkey" FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+    TABLE "company_tag" CONSTRAINT "company_tag_tag_id_fkey" FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+Policies (forced row security enabled):
+    POLICY "tags_workspace_isolation"
+      USING (((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text)))
+      WITH CHECK (((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text)))
+Triggers:
+    tags_updated_at BEFORE UPDATE ON tags FOR EACH ROW EXECUTE FUNCTION trg_set_updated_at()
+
+=== T26 fiches companies portant AU MOINS un tag src: ===
+  count  
+---------
+ 4295346
+(1 row)
+
+=== T27 tags src: existants ===
+ id  |                  slug                  |                                 name                                 | fiches  
+-----+----------------------------------------+----------------------------------------------------------------------+---------
+ 174 | src:scraping-insee                     | Collecte — INSEE — Sirene                                            | 4294895
+ 440 | src:scraping-implantations-fr-etranger | Collecte — Implantations françaises à l'étranger (annuaires publics) |     546
+ 161 | src:site-formulaire-simulateur-roi     | Simulateur de gains                                                  |       0
+ 179 | src:scraping-website                   | Collecte — Site web de l'entreprise (mentions légales)               |       0
+ 188 | src:scraping-mentions-legales          | Collecte — Mentions légales (waterfall PHP)                          |       0
+ 152 | src:site-formulaire-devis              | Formulaire — devis                                                   |       0
+ 181 | src:scraping-direction-finder          | Collecte — Direction finder (LLM sur pages publiques)                |       0
+ 153 | src:site-formulaire-partenariat        | Formulaire — partenariat                                             |       0
+ 157 | src:site-formulaire-support-client     | Formulaire — support client                                          |       0
+ 190 | src:site-candidature-offre             | Candidature — offre publiée                                          |       0
+ 162 | src:calendly                           | RDV Calendly                                                         |       0
+ 183 | src:scraping-mesri                     | Collecte — MESRI — établissements                                    |       0
+ 150 | src:site-formulaire-formation          | Formulaire — formation                                               |       0
+ 187 | src:scraping-social-light              | Collecte — Réseaux sociaux (light)                                   |       0
+ 164 | src:chatbot                            | Chatbot                                                              |       0
+ 176 | src:scraping-bodacc                    | Collecte — BODACC — annonces légales                                 |       0
+ 163 | src:newsletter                         | Newsletter                                                           |       0
+ 191 | src:site-candidature-commerciale       | Candidature — tunnel commercial                                      |       0
+ 159 | src:site-formulaire-podcast            | Formulaire — podcast                                                 |       0
+ 160 | src:site-formulaire-recrutement        | Formulaire — recrutement                                             |       0
+ 175 | src:scraping-annuaire-entreprises      | Collecte — Annuaire des Entreprises (administration)                 |       0
+ 180 | src:scraping-google-search             | Collecte — Google Search (browser)                                   |       0
+ 154 | src:site-formulaire-presse             | Formulaire — presse                                                  |       0
+ 186 | src:scraping-societe-com               | Collecte — Societe.com                                               |       0
+ 158 | src:site-formulaire-autre              | Formulaire — autre                                                   |       0
+ 177 | src:scraping-google-maps               | Collecte — Google Maps (browser)                                     |       0
+ 156 | src:site-formulaire-investisseur       | Formulaire — investisseur                                            |       0
+ 182 | src:scraping-france-travail            | Collecte — France Travail — offres                                   |       0
+ 155 | src:site-formulaire-speaker            | Formulaire — conférence                                              |       0
+ 204 | src:site-formulaire-autre              | Formulaire — autre                                                   |       0
+ 185 | src:scraping-infogreffe                | Collecte — Infogreffe                                                |       0
+ 178 | src:scraping-pages-jaunes              | Collecte — Pages Jaunes (browser)                                    |       0
+ 148 | src:site-formulaire-audit              | Formulaire — audit                                                   |       0
+ 165 | src:avis-client                        | Avis client                                                          |       0
+ 149 | src:site-formulaire-implementation     | Formulaire — implémentation                                          |       0
+ 184 | src:scraping-crunchbase                | Collecte — Crunchbase                                                |       0
+ 151 | src:site-formulaire-un-a-un            | Formulaire — un à un                                                 |       0
+ 189 | src:scraping-gplaces                   | Collecte — Google Places API                                         |       0
+(38 rows)
+
+=== T28 companies SANS aucun tag ===
+ERROR:  could not resize shared memory segment "/PostgreSQL.3329320208" to 67244032 bytes: No space left on device
+=== T29 tags orphelins (aucune fiche) ===
+ count 
+-------
+    59
+(1 row)
+
+=== T30 tags doublons de casse / de nom ===
+         k          | n |                variantes                
+--------------------+---+-----------------------------------------
+ formulaire - autre | 2 | Formulaire — autre | Formulaire — autre
+(1 row)
+
+=== T31 tags doublons de slug ===
+             k             | n 
+---------------------------+---
+ src:site-formulaire-autre | 2
+(1 row)
+
+=== T32 top tags par volume ===
+              slug               |    n    
+---------------------------------+---------
+ src:scraping-insee              | 4294895
+ size-micro                      |  702488
+ region-11                       |  279012
+ sector-commerce                 |  147277
+ dept-75                         |  146172
+ sector-services-pro             |  133498
+ sector-btp                      |   98057
+ region-84                       |   90914
+ size-tpe                        |   87053
+ region-93                       |   79094
+ region-76                       |   62218
+ sector-services-aux-entreprises |   58102
+ region-75                       |   56132
+ sector-hotellerie-restauration  |   56103
+ sector-transport                |   47276
+(15 rows)
+

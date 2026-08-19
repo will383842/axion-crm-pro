@@ -1,0 +1,112 @@
+# F39 — preuve 03 : qu'est-ce qui alerterait un humain ?
+# date : 2026-08-19T12:03:50Z   reference : main 8db8229
+
+## 1. La pile d'observabilite est-elle deployee en production ?
+docker-compose.observability.yml declare : prometheus, alertmanager, grafana, loki, promtail, tempo, glitchtip, uptime-kuma
+Conteneurs reellement en marche sur 46.62.248.239 :
+axion-crm-staging-scheduler	axion-crm-staging-scheduler
+axion-crm-staging-api	axion-crm-staging-api
+axion-crm-staging-horizon	axion-crm-staging-horizon
+axion-crm-staging-app	axion-crm-staging-app
+axion-crm-api	axion-crm-pro-api
+axion-crm-scheduler	axion-crm-pro-scheduler
+axion-crm-horizon	axion-crm-pro-horizon
+axion-crm-app	axion-crm-pro-app
+axion-crm-caddy	caddy:2-alpine
+axion-crm-staging-redis	redis:7.2-alpine
+axion-crm-staging-postgres	ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman
+axion-crm-postgres	ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman
+axion-crm-redis	redis:7.2-alpine
+=> AUCUN des 8 services d'observabilite.
+
+## 2. Les cibles de scrape existent-elles seulement ?
+prometheus.yml declare 6 jobs / 8 cibles :
+          - targets: ['alertmanager:9093']
+    - job_name: prometheus
+        - targets: ['localhost:9090']
+    - job_name: laravel-api
+        - targets: ['api:80']
+    - job_name: horizon
+        - targets: ['horizon:80']
+    - job_name: workers
+        - targets:
+    - job_name: postgres
+        - targets: ['postgres-exporter:9187']
+    - job_name: redis
+        - targets: ['redis-exporter:9121']
+    - job_name: caddy
+        - targets: ['caddy:2019']
+
+Route /metrics dans le depot :
+  AUCUNE (grep -rn "/metrics" backend/routes/ : 0 resultat)
+postgres-exporter / redis-exporter dans un docker-compose :
+  AUCUN (0 resultat)
+
+## 3. Alerte disque ?
+Occurrences de DiskSpaceLow dans alerts.yml : 0
+(infra/runbooks/02-disk-full.md ligne 3 dit : « Symptomes : alerte DiskSpaceLow »)
+Toute alerte mentionnant disque/disk/filesystem/node_ dans alerts.yml :
+  AUCUNE
+
+## 4. Sentry
+config/sentry.php lit SENTRY_LARAVEL_DSN.
+Presente dans .env.example ? -> 0 occurrence(s)
+Presente dans le .env de PRODUCTION ? -> oui :
+SENTRY_LARAVEL_DSN=https://***@o4510557298294784.ingest.de.sentry.io/4511361744175184
+Vue par le conteneur api :
+SENTRY_LARAVEL_DSN=https://***@o4510557298294784.ingest.de.sentry.io/4511361744175184
+GLITCHTIP_DSN=
+
+MAIS le branchement du gestionnaire d'exceptions n'est pas fait :
+--- backend/bootstrap/app.php (extrait) ---
+            // détenteurs de la permission `data.export` (owner, admin,
+            // opérateur ; PAS viewer). Sans cette garde, n'importe quel compte
+            // authentifié pouvait exporter les 4,29 M de fiches en CSV.
+            'permission' => PermissionMiddleware::class,
+        ]);
+    })
+    ->withExceptions(function (Exceptions $exceptions) {
+        //
+    })->create();
+--- README du paquet sentry/sentry-laravel 4.27.0 (extrait) ---
+        health: '/up',
+    )
+    ->withMiddleware(function (Middleware $middleware) {
+        //
+    })
+    ->withExceptions(function (Exceptions $exceptions) {
+        Integration::handles($exceptions);
+    })->create();
+```
+--- aucun canal de log 'sentry' non plus ---
+occurrences de 'sentry' dans backend/config/logging.php : 0
+--- les seuls envois a Sentry sont explicites (8 appels) ---
+
+## 5. Les taches planifiees previennent-elles quelqu'un quand elles echouent ?
+occurrences de onFailure / emailOutputOnFailure / pingOnFailure dans backend/ : 0
+--- AuditVerifyChain (verification quotidienne de la chaine d'audit) ---
+    public function handle(AuditHashChain $chain): int
+    {
+        $max = $this->option('max') !== null ? (int) $this->option('max') : null;
+        $valid = $chain->verifyChain($max);
+
+        if ($valid) {
+            $this->info('Audit hash chain OK — aucune anomalie détectée.');
+            return self::SUCCESS;
+        }
+
+        $this->error('Audit hash chain INVALIDE — possible falsification détectée.');
+        // En prod : envoi Slack/Telegram + ouverture incident.
+        return self::FAILURE;
+    }
+}
+
+## 6. Ce qui alerte VRAIMENT : le workflow GitHub de surveillance des sauvegardes
+completed	success	Surveillance des sauvegardes	Surveillance des sauvegardes	main	schedule	32219428026	16s	2026-08-19T05:26:31Z
+completed	success	Surveillance des sauvegardes	Surveillance des sauvegardes	main	schedule	32102803274	11s	2026-08-18T05:25:13Z
+completed	success	Surveillance des sauvegardes	Surveillance des sauvegardes	main	schedule	31998225594	14s	2026-08-17T05:32:04Z
+completed	success	Surveillance des sauvegardes	Surveillance des sauvegardes	main	workflow_dispatch	31987226385	15s	2026-08-17T02:11:29Z
+completed	failure	Surveillance des sauvegardes	Surveillance des sauvegardes	main	workflow_dispatch	31987194878	20s	2026-08-17T02:10:51Z
+completed	failure	Surveillance des sauvegardes	Surveillance des sauvegardes	main	workflow_dispatch	31987144988	26s	2026-08-17T02:09:57Z
+
+141	CLOSED	🔴 La sauvegarde de production n'est pas fiable	sauvegarde	2026-08-17T02:12:07Z

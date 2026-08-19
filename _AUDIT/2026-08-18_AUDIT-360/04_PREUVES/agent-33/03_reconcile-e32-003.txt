@@ -1,0 +1,29 @@
+### E32-003 contre-verifie : reconcile.ts:311-314, AUCUN filtre de statut
+  // Une seule requête, sur l'index `subject_ref` créé par la migration L2.
+  // On demande les `subject_ref` PRÉSENTS et on déduit les absents en mémoire :
+  // l'inverse (un NOT IN) ne saurait pas dire quels identifiants manquent.
+  const emitted = await prisma.crmSyncOutbox.findMany({
+    where: { subjectRef: { in: refs } },
+    select: { subjectRef: true },
+  });
+
+  const seen = new Set(emitted.map((row) => row.subjectRef));
+  const missing = refs.filter((ref) => !seen.has(ref));
+
+
+### enum CrmSyncStatus (prisma/schema.prisma:10831-10841)
+enum CrmSyncStatus {
+  /// En attente d'émission (ou d'une nouvelle tentative).
+  pending
+  /// Acquittée par le CRM (2xx).
+  sent
+  /// Dernière tentative en échec — sera rejouée.
+  failed
+  /// Refus DÉFINITIF du CRM (422 : contrat, consentement, taxonomie) ou
+  /// plafond de tentatives atteint. Ne sera plus rejouée : à traiter à la main.
+  gave_up
+}
+
+### Aucun test ne couvre gave_up compte comme emis :
+298:    expect(crmSyncAlertDedupKey("backlog", now)).not.toBe(crmSyncAlertDedupKey("gave_up", now));
+329:    await alertCrmSync({ kind: "gave_up", subjectRef: "site:submission:abc" });

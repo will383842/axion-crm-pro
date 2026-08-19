@@ -1,0 +1,27 @@
+# AGENT 45 — le role Postgres `axion_app` est GLOBAL au cluster : isoler par base ne suffit pas.
+# Reference : main e8924b8. Releve le 2026-08-19T11:58:44Z.
+
+## 1. Chaque `php artisan migrate` repose le mot de passe du role, pour TOUT le cluster
+        );
+
+        // Jamais de superuser / bypassrls sur ce rôle, même si quelqu'un l'a
+        // créé à la main auparavant.
+        DB::statement("ALTER ROLE {$role} NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE");
+
+        if ($password !== '') {
+            DB::statement("ALTER ROLE {$role} LOGIN PASSWORD " . DB::getPdo()->quote($password));
+        }
+
+        $schema = 'public';
+
+## 2. Et la valeur employee n'est PAS epinglee : phpunit.xml la declare SANS force="true"
+backend/phpunit.xml:57:        <env name="DB_APP_PASSWORD" value="axion_app_test_only"/>
+backend/phpunit-ci.xml:65:        <env name="DB_APP_PASSWORD" value="axion_app_test_only"/>
+
+## 3. Consequence mesuree pendant l'audit — sabotage S04, base axion_crm_a45, 11:31 UTC
+  SQLSTATE[08006] [7] connection to server at "axion-crm-postgres" (172.23.0.4), port 5432 failed: FATAL:  password authentication failed for user "axion_app" (Connection: pgsql_app, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_a45, SQL: SELECT set_config(app.current_workspace_id, c10a5990-e89d-4ee4-b14d-62094a09f33f, false))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connectors/Connector.php:66
+
+## 4. Nombre de tests emportes par cet effet de bord (hors la cible du sabotage) :
+35

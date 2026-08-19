@@ -1,0 +1,179 @@
+
+================ index-C8i6k4WZ.js — 1033270 octets ================
+octets attribués à une source : 1029086
+   177786   17.21%  npm:react-dom
+    62030    6.00%  npm:pusher-js
+    53729    5.20%  npm:@sentry/core
+    53613    5.19%  npm:zod
+    48758    4.72%  npm:i18next
+    34623    3.35%  npm:react-joyride
+    33706    3.26%  npm:lucide-react
+    32598    3.15%  npm:sonner
+    26394    2.55%  npm:react-hook-form
+    23052    2.23%  npm:react-floater
+    22508    2.18%  npm:popper.js
+    19910    1.93%  src/features/campaigns/CampaignWizardPage.tsx
+    16231    1.57%  npm:laravel-echo
+    16013    1.55%  npm:@tanstack/virtual-core
+    15904    1.54%  src/features/companies/CompaniesListPage.tsx
+    15781    1.53%  src/features/scraping/ScraperRunsPage.tsx
+    15032    1.45%  npm:@sentry/browser
+    14686    1.42%  src/features/campaigns/CampaignDetailPage.tsx
+    11922    1.15%  npm:cmdk
+    11374    1.10%  src/features/audiences/AudienceBuilderPage.tsx
+    11186    1.08%  src/features/coverage/CoveragePage.tsx
+     9420    0.91%  src/features/media/MediaListPage.tsx
+     9386    0.91%  src/features/campaigns/CampaignsListPage.tsx
+     8754    0.85%  src/features/settings/SettingsPage.tsx
+     8519    0.82%  npm:i18next-browser-languagedetector
+     7836    0.76%  src/features/tags/TagsManagerPage.tsx
+     7783    0.75%  src/features/audiences/AudienceDetailPage.tsx
+     7744    0.75%  src/features/coverage/FranceCoverageMap.tsx
+     6546    0.63%  src/features/companies/CompanyDetailPage.tsx
+     6532    0.63%  npm:tree-changes
+     6461    0.63%  src/features/rgpd/RgpdRequestsPage.tsx
+     6312    0.61%  src/features/llm/LlmRouterPage.tsx
+     6260    0.61%  src/features/rgpd/AuditLogsPage.tsx
+     6100    0.59%  src/components/layout/Sidebar.tsx
+     5947    0.58%  src/features/media/MediaDetailPage.tsx
+     5838    0.57%  npm:react-remove-scroll
+     5815    0.56%  src/features/contacts/ContactsListPage.tsx
+     5782    0.56%  npm:is-lite
+     5781    0.56%  src/features/rgpd/AiActRegisterPage.tsx
+     5688    0.55%  src/features/audiences/AudiencesListPage.tsx
+     5272    0.51%  src/features/campaigns/fr-zones.ts
+     5220    0.51%  src/features/dashboard/DashboardPage.tsx
+     4950    0.48%  src/features/international/RoumaniePage.tsx
+     4933    0.48%  npm:@radix-ui/react-dialog
+     4482    0.43%  src/features/users/UsersPage.tsx
+     4448    0.43%  src/features/crm-console/ContactsHubPage.tsx
+     4088    0.40%  npm:@gilbarbara/deep-equal
+     4079    0.39%  src/features/media/JournalistsListPage.tsx
+     4035    0.39%  src/components/ui/GlobalSearch.tsx
+     4001    0.39%  src/features/observability/ObservabilityPage.tsx
+     3839    0.37%  npm:@sentry-internal/browser-utils
+     3826    0.37%  npm:react-i18next
+     3787    0.37%  src/features/auth/LoginPage.tsx
+     3665    0.35%  npm:scheduler
+     3339    0.32%  src/features/crm-console/CandidatesPage.tsx
+     3335    0.32%  npm:@radix-ui/react-dismissable-layer
+     3274    0.32%  src/features/crm-console/ArbitragePage.tsx
+     3239    0.31%  src/components/ui/Modal.tsx
+     3164    0.31%  npm:@radix-ui/react-focus-scope
+     3152    0.31%  src/features/dashboard/components/NextActions.tsx
+     3143    0.30%  src/components/ui/KpiCard.tsx
+     3079    0.30%  npm:@radix-ui/react-slot
+     3077    0.30%  src/features/crm-console/PersonTimelinePage.tsx
+     3037    0.29%  src/features/companies/components/CompanyRow.tsx
+     2861    0.28%  src/features/llm/ProxyProvidersPage.tsx
+     2642    0.26%  src/app/routeTree.tsx
+     2584    0.25%  src/features/llm/RotationsPage.tsx
+     2573    0.25%  src/features/dashboard/components/QualityDistributionBar.tsx
+     2493    0.24%  src/components/OnboardingTour.tsx
+     2420    0.23%  src/features/dashboard/components/ActivityFeed.tsx
+     2360    0.23%  [non mappé]
+     2212    0.21%  src/features/dashboard/components/SizeDistributionChart.tsx
+     2167    0.21%  npm:react-remove-scroll-bar
+     2146    0.21%  src/features/dashboard/components/TopDeptsCard.tsx
+     2045    0.20%  src/components/ui/Button.tsx
+     1977    0.19%  npm:@radix-ui/react-presence
+     1864    0.18%  src/features/auth/MagicLinkPage.tsx
+     1862    0.18%  src/features/companies/components/EnrichmentTimeline.tsx
+     1832    0.18%  src/features/auth/PasswordResetPage.tsx
+     1794    0.17%  src/features/companies/components/ContactsCard.tsx
+     1689    0.16%  src/features/companies/components/QualityScoreCard.tsx
+     1679    0.16%  src/features/companies/components/Pagination.tsx
+     1659    0.16%  src/components/ui/Tabs.tsx
+     1650    0.16%  npm:deepmerge
+     1560    0.15%  src/components/ui/DropdownMenu.tsx
+     1551    0.15%  npm:@hookform/resolvers
+     1489    0.14%  src/components/ui/StatusPill.tsx
+     1487    0.14%  npm:aria-hidden
+     1470    0.14%  src/app/RootLayout.tsx
+     1380    0.13%  src/components/ui/PageHeader.tsx
+     1321    0.13%  src/components/ui/FormField.tsx
+     1318    0.13%  src/lib/echo.ts
+     1305    0.13%  src/features/campaigns/types.ts
+     1281    0.12%  npm:@radix-ui/react-context
+     1253    0.12%  src/features/auth/TwoFactorPage.tsx
+     1231    0.12%  src/components/ui/Toolbar.tsx
+     1165    0.11%  src/components/ui/Card.tsx
+     1159    0.11%  npm:use-sidecar
+     1111    0.11%  src/components/layout/UserMenu.tsx
+     1082    0.10%  src/components/layout/Header.tsx
+     1064    0.10%  src/components/ui/DarkModeToggle.tsx
+     1046    0.10%  src/components/layout/AutoBreadcrumbs.tsx
+      983    0.10%  src/lib/prospection-referentiels.ts
+      966    0.09%  src/components/ui/IconButton.tsx
+      952    0.09%  src/components/ui/SegmentedControl.tsx
+      922    0.09%  src/components/layout/WorkspaceSelector.tsx
+      920    0.09%  src/components/ui/Breadcrumbs.tsx
+      908    0.09%  npm:@radix-ui/react-use-controllable-state
+      876    0.08%  src/features/crm-console/types.ts
+      875    0.08%  src/components/ui/Tooltip.tsx
+      841    0.08%  npm:prop-types
+      803    0.08%  src/components/ui/Input.tsx
+      791    0.08%  src/features/crm-console/ConsoleGate.tsx
+      779    0.08%  npm:@radix-ui/react-primitive
+      750    0.07%  npm:scroll
+      747    0.07%  npm:tslib
+      742    0.07%  src/features/companies/effectif.ts
+      724    0.07%  npm:react-style-singleton
+      721    0.07%  src/main.tsx
+      719    0.07%  src/components/ui/Avatar.tsx
+      632    0.06%  npm:use-callback-ref
+      587    0.06%  src/lib/api.ts
+      572    0.06%  src/components/ui/SizeCategoryBadge.tsx
+      571    0.06%  src/components/ui/QualityBadge.tsx
+      552    0.05%  npm:@radix-ui/react-focus-guards
+      515    0.05%  src/components/ui/EmptyState.tsx
+      499    0.05%  npm:scrollparent
+      445    0.04%  npm:react-innertext
+      429    0.04%  src/components/ui/Spinner.tsx
+      425    0.04%  npm:@tanstack/react-virtual
+      386    0.04%  src/features/misc/NotFoundPage.tsx
+      341    0.03%  npm:@radix-ui/react-compose-refs
+      313    0.03%  src/components/ui/Skeleton.tsx
+      263    0.03%  src/features/phase2-scaffold/LinkedInStub.tsx
+      256    0.02%  src/features/phase2-scaffold/ColdEmailStub.tsx
+      250    0.02%  src/features/crm-console/useConsoleFeatures.ts
+      225    0.02%  npm:@radix-ui/react-portal
+      217    0.02%  npm:@radix-ui/react-use-escape-keydown
+      210    0.02%  src/lib/i18n.ts
+      194    0.02%  src/components/ui/PageShell.tsx
+      182    0.02%  src/components/ui/cn.ts
+      154    0.01%  npm:@radix-ui/react-id
+      152    0.01%  src/lib/sentry.ts
+      124    0.01%  npm:@radix-ui/primitive
+      117    0.01%  npm:@radix-ui/react-use-callback-ref
+      101    0.01%  npm:@sentry/react
+       76    0.01%  npm:get-nonce
+       53    0.01%  npm:@radix-ui/react-use-layout-effect
+cumul = 1031446
+
+================ maplibre-CaQzARel.js — 802715 octets ================
+octets attribués à une source : 801592
+   801592   99.86%  npm:maplibre-gl
+      807    0.10%  [non mappé]
+cumul = 802399
+
+================ query-Cj3nfwYd.js — 87317 octets ================
+octets attribués à une source : 86235
+    42462   48.63%  npm:axios
+    33128   37.94%  npm:@tanstack/query-core
+     8045    9.21%  npm:react
+     2600    2.98%  npm:@tanstack/react-query
+     1039    1.19%  [non mappé]
+cumul = 87274
+
+================ router-BGJXsG0I.js — 88127 octets ================
+octets attribués à une source : 87097
+    57392   65.12%  npm:@tanstack/router-core
+    15814   17.94%  npm:@tanstack/react-router
+     4255    4.83%  npm:@tanstack/store
+     4207    4.77%  npm:@tanstack/history
+     3546    4.02%  npm:react-dom
+     1648    1.87%  npm:use-sync-external-store
+      982    1.11%  [non mappé]
+      235    0.27%  npm:@tanstack/react-store
+cumul = 88079

@@ -1,0 +1,15 @@
+=== G43 : latence de la requete liste du hub, par role, 1 client, 20 s, base axion_crm_perf (300 000) ===
+--- warmup axion (10s, non compte) ---
+latency average = 217.209 ms
+tps = 4.603867 (without initial connection time)
+--- MESURE role=axion (BYPASSRLS, config LOCALE) ---
+number of transactions actually processed: 95
+latency average = 210.512 ms
+tps = 4.750318 (without initial connection time)
+--- warmup axion_app (10s, non compte) ---
+latency average = 1261.805 ms
+tps = 0.792515 (without initial connection time)
+--- MESURE role=axion_app (RLS mord, config PRODUCTION) ---
+number of transactions actually processed: 20
+latency average = 1010.142 ms
+tps = 0.989960 (without initial connection time)

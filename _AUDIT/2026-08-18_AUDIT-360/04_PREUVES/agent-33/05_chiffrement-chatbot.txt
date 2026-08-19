@@ -1,0 +1,54 @@
+### capturer_lead CHIFFRE (capturer-lead.ts:122-136)
+      const submission = await tx.submission.create({
+        data: {
+          type: "contact",
+          locale: "fr",
+          companyName: input.structure ?? "Via chatbot",
+          contactName: encryptPii(input.nom),
+          contactEmail: encryptPii(input.email),
+          contactEmailHash: hashEmailForLookup(input.email),
+          ...(input.telephone ? { contactPhone: encryptPii(input.telephone) } : {}),
+          details: { besoin: input.besoin_resume, canal: "chatbot", consentementRgpd: true },
+          source: "chatbot",
+          ...(ctx.ipHash ? { ipHash: ctx.ipHash } : {}),
+        },
+        select: { id: true },
+      });
+
+### escalader_question N'A AUCUN import de chiffrement :
+11:import { z } from "zod";
+12:import { prisma } from "@/lib/prisma";
+13:import { sendTelegram } from "@/lib/telegram";
+14:import { enqueueEmail } from "@/server/queue/queues";
+15:import type { ToolContext } from "@/server/chatbot/tools/rechercher-offres";
+
+### et ecrit contact_email EN CLAIR (escalader-question.ts:40-49)
+  const escalation = await prisma.chatEscalation.create({
+    data: {
+      tenantId: ctx.tenantId,
+      ...(ctx.conversationId ? { conversationId: ctx.conversationId } : {}),
+      question: input.question,
+      ...(input.contexte_conversation ? { contexte: input.contexte_conversation } : {}),
+      ...(input.contact_email ? { contactEmail: input.contact_email } : {}),
+      statut: "ouverte",
+    },
+    select: { id: true, statut: true },
+
+### colonne cible : @db.Citext, aucun hash de recherche (schema.prisma:5294-5310)
+model ChatEscalation {
+  id             String            @id @default(uuid()) @db.Uuid
+  tenantId       String            @map("tenant_id") @db.Uuid
+  tenant         ChatTenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversationId String?           @map("conversation_id") @db.Uuid
+  conversation   ChatConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  question       String            @db.Text
+  contexte       String?           @db.Text
+  contactEmail   String?           @map("contact_email") @db.Citext
+  statut         String            @default("ouverte") @db.VarChar(20)
+  emailEnvoye    Boolean           @default(false) @map("email_envoye")
+  submissionId   String?           @map("submission_id") @db.Uuid // si converti en lead
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  @@index([tenantId, statut])
+  @@map("chat_escalations")
+}

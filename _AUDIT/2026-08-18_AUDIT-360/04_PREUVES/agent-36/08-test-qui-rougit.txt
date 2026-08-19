@@ -1,0 +1,44 @@
+0
+        Route::get('/companies/export', [CompaniesController::class, 'export'])
+            // §2.10 : un export emporte 4,29 M de fiches nominatives hors du
+            // système. Le throttle limitait la CADENCE, pas le DROIT.
+            ->middleware(['throttle:scraper-list']);
+        Route::post('/companies', [CompaniesController::class, 'store']);
+===== PEST APRES RETRAIT =====
+     92▕     // sur trois.
+     93▕     $this->actingAs(utilisateurAvecRole($this->workspace->id, 'viewer'));
+     94▕ 
+  ➜  95▕     $this->get('/api/v1/media/export')->assertForbidden();
+     96▕     $this->get('/api/v1/journalists/export')->assertForbidden();
+     97▕ });
+     98▕ 
+     99▕ test('un viewer garde l’accès en LECTURE — on ferme l’export, pas la consultation', function () {
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ExportPermissionTest > un viewer NE PEUT PAS export…   
+  Expected response status code [403] but received 200.
+Failed asserting that 200 is identical to 403.
+
+  at tests/Feature/ExportPermissionTest.php:80
+     76▕ test('un viewer NE PEUT PAS exporter les entreprises', function () {
+     77▕     $this->actingAs(utilisateurAvecRole($this->workspace->id, 'viewer'));
+     78▕ 
+     79▕     // ⬇️ Le défaut : avant, c'était 200 et 4,29 M de lignes.
+  ➜  80▕     $this->get('/api/v1/companies/export')->assertForbidden();
+     81▕ });
+     82▕ 
+     83▕ test('un compte SANS aucun rôle ne peut pas exporter', function () {
+     84▕     $this->actingAs(utilisateurAvecRole($this->workspace->id, null));
+
+
+  Tests:    3 failed, 3 passed (6 assertions)
+  Duration: 94.62s
+  Random Order Seed: 1787140033
+
+3
+  ✓ la garde couvre AUSSI les médias et les journalistes                 1.20s  
+
+  Tests:    6 passed (7 assertions)
+  Duration: 58.21s
+  Random Order Seed: 1787140144
+

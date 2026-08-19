@@ -1,0 +1,7 @@
+# gitleaks (question 7)
+# - Job "Secrets scan (Gitleaks)" dans .github/workflows/security.yml (push+PR+cron).
+# - CHECK REQUIS sur main : gh api .../branches/main/protection -> contexts inclut "Secrets scan (Gitleaks)". Il BLOQUE bien une fusion (pas de continue-on-error sur ce job).
+# - Couvre : contenu SUIVI par git + historique (fetch-depth:0). 
+# - NE COUVRE PAS : le .env de PRODUCTION (non suivi, sur le serveur), le laravel.log de 272 Mo (non suivi), les 5 objets non-suivis entrés dans l'image (cf F40-006).
+# - .gitleaksignore : 2 empreintes (commit 4030dda) = 1 secret TOTP d'un utilisateur de TEST LOCAL, déjà TOURNÉ le soir même. Justifié et documenté.
+# - Aucun .env réel suivi par git (git ls-files: seuls .env.example) ; aucun .env ajouté dans l'historique (git log --diff-filter=A: vide).

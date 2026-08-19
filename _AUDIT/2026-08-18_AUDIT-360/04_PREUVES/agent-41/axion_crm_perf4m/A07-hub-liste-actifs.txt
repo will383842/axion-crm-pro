@@ -1,0 +1,57 @@
+############ A07-hub-liste-actifs
+### base   : axion_crm_perf4m   (datcollate = C)
+### date   : 2026-08-19T13:45:15+02:00
+### SQL    :
+select * from "companies" where "deleted_at" is null and "workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168' and ("lifecycle_stage" != 'nouveau' or exists (select 1 from "company_tag" inner join "tags" on "tags"."id" = "company_tag"."tag_id" where "company_tag"."company_id" = "companies"."id" and "tags"."slug" not like 'src:scraping-%' and "tags"."slug" like 'src:%')) order by "updated_at" desc, "id" desc limit 51;
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                                              QUERY PLAN                                                                               
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.43..1465.21 rows=51 width=2078) (actual time=188508.933..188516.746 rows=0 loops=1)
+   Buffers: shared hit=533421 read=2288631 written=967
+   ->  Index Scan using idx_companies_ws_updated_id on companies  (cost=0.43..40209588.79 rows=1400000 width=2078) (actual time=188508.929..188515.854 rows=0 loops=1)
+         Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+         Filter: ((lifecycle_stage <> 'nouveau'::text) OR (hashed SubPlan 2))
+         Rows Removed by Filter: 2800000
+         Buffers: shared hit=533421 read=2288631 written=967
+         SubPlan 2
+           ->  Hash Join  (cost=3.18..20.03 rows=246 width=8) (actual time=0.607..7.528 rows=0 loops=1)
+                 Hash Cond: (company_tag.tag_id = tags.id)
+                 Buffers: shared read=1
+                 ->  Seq Scan on company_tag  (cost=0.00..15.40 rows=540 width=16) (actual time=0.603..0.704 rows=0 loops=1)
+                       Buffers: shared read=1
+                 ->  Hash  (cost=2.85..2.85 rows=26 width=8) (never executed)
+                       ->  Seq Scan on tags  (cost=0.00..2.85 rows=26 width=8) (never executed)
+                             Filter: ((slug !~~ 'src:scraping-%'::text) AND (slug ~~ 'src:%'::text))
+ Planning:
+   Buffers: shared hit=959 read=29
+ Planning Time: 94.533 ms
+ Execution Time: 188518.058 ms
+(20 rows)
+
+
+===== CHAUD (4e exécution) =====
+                                                                             QUERY PLAN                                                                              
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.43..1465.21 rows=51 width=2078) (actual time=60117.294..60117.303 rows=0 loops=1)
+   Buffers: shared hit=540953 read=2281099 written=1745
+   ->  Index Scan using idx_companies_ws_updated_id on companies  (cost=0.43..40209588.79 rows=1400000 width=2078) (actual time=60117.289..60117.297 rows=0 loops=1)
+         Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+         Filter: ((lifecycle_stage <> 'nouveau'::text) OR (hashed SubPlan 2))
+         Rows Removed by Filter: 2800000
+         Buffers: shared hit=540953 read=2281099 written=1745
+         SubPlan 2
+           ->  Hash Join  (cost=3.18..20.03 rows=246 width=8) (actual time=0.032..0.037 rows=0 loops=1)
+                 Hash Cond: (company_tag.tag_id = tags.id)
+                 Buffers: shared read=1
+                 ->  Seq Scan on company_tag  (cost=0.00..15.40 rows=540 width=16) (actual time=0.030..0.031 rows=0 loops=1)
+                       Buffers: shared read=1
+                 ->  Hash  (cost=2.85..2.85 rows=26 width=8) (never executed)
+                       ->  Seq Scan on tags  (cost=0.00..2.85 rows=26 width=8) (never executed)
+                             Filter: ((slug !~~ 'src:scraping-%'::text) AND (slug ~~ 'src:%'::text))
+ Planning:
+   Buffers: shared hit=886 read=102
+ Planning Time: 18.288 ms
+ Execution Time: 60117.615 ms
+(20 rows)
+

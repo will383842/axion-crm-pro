@@ -22,3 +22,21 @@ fichier sur disque   = gdpr-exports/LOdKlepN...enc  existe=oui  (LE JETON EST LE
    fichier .enc encore sur disque ? OUI (non purge)
    fichiers presents : gdpr-exports/LOdKlepN...enc
    -> aucune commande de nettoyage des exports expires n'existe dans le depot.
+
+=== D5. LE JETON EN CLAIR ATTERRIT DANS rgpd_requests.metadata (chaine lue, non jouee) ===
+GdprPortabilityService.php:44   export_token = hash('sha256', $token)      <- forme HACHEE
+GdprPortabilityService.php:48   return ['token' => $token, ...]            <- forme CLAIRE rendue
+RgpdRequestsController.php:102  'portability' => $this->portability->export(...)  -> $result
+RgpdRequestsController.php:119  'metadata' => array_merge((array)$req->metadata, ['result' => $result])
+RgpdRequestsController.php:122  return $this->ok(['request' => $req->fresh(), 'result' => $result])
+app/Models/RgpdRequest.php      aucun $hidden -> metadata ET export_token sont serialises
+                                par GET /rgpd/requests (index -> paginate du modele)
+
+TEMOIN PARTIEL JOUE : en appelant le SERVICE SEUL (sans passer par le controleur),
+la colonne metadata reste `{}` (section D ci-dessus). C'est donc bien le CONTROLEUR
+qui y ecrit le jeton en clair, et non le service.
+
+Aucun test du depot n'exerce process() sur une demande de type 'portability' :
+tests/Feature/Rgpd/RgpdRequestsControllerTest.php ne teste que index/store/validation
+et deux cas de GET /rgpd/export/{token} (jeton inconnu, jeton expire) — le jeton y est
+toujours pose A LA MAIN dans la fixture, jamais produit par process().

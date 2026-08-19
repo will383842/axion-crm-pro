@@ -1,0 +1,62 @@
+# F39 — preuve 02 : sauvegardes reelles en production (lecture seule)
+# date : 2026-08-19T12:00:09Z
+
+## Cron
+0 3 * * * /opt/axion-crm-pro/infra/scripts/backup-postgres.sh >> /var/log/axion-backup.log 2>&1
+
+## Copies LOCALES /var/backups/axion-crm (meme disque que la base)
+total 4247652
+drwxr-xr-x 2 root root      4096 2026-08-19T03:00:01Z .
+drwxr-xr-x 3 root root      4096 2026-08-19T06:17:14Z ..
+-rw-r--r-- 1 root root 724924607 2026-08-16T18:18:21Z axion_crm_20260816T181456Z.sql.gz
+-rw-r--r-- 1 root root 724924948 2026-08-16T19:07:26Z axion_crm_20260816T190401Z.sql.gz
+-rw-r--r-- 1 root root 724925309 2026-08-16T20:28:19Z axion_crm_20260816T202450Z.sql.gz
+-rw-r--r-- 1 root root 724924948 2026-08-17T03:03:33Z axion_crm_20260817T030001Z.sql.gz
+-rw-r--r-- 1 root root 724927386 2026-08-18T03:03:31Z axion_crm_20260818T030001Z.sql.gz
+-rw-r--r-- 1 root root 724926343 2026-08-19T03:03:29Z axion_crm_20260819T030001Z.sql.gz
+
+4.1G	/var/backups/axion-crm
+
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        75G   48G   25G  67% /
+
+## Copies HORS-SITE (Hetzner Storage Box u595329.your-storagebox.de:/home/axion-crm-backups)
+sftp> cd /home/axion-crm-backups
+sftp> ls -l
+-rw-r--r--    ? u595329  u595329  724924607 Aug 16 18:18 axion_crm_20260816T181456Z.sql.gz
+-rw-r--r--    ? u595329  u595329  724924948 Aug 16 19:07 axion_crm_20260816T190401Z.sql.gz
+-rw-r--r--    ? u595329  u595329  724925309 Aug 16 20:28 axion_crm_20260816T202450Z.sql.gz
+-rw-r--r--    ? u595329  u595329  724924948 Aug 17 03:03 axion_crm_20260817T030001Z.sql.gz
+-rw-r--r--    ? u595329  u595329  724927386 Aug 18 03:03 axion_crm_20260818T030001Z.sql.gz
+-rw-r--r--    ? u595329  u595329  724926343 Aug 19 03:03 axion_crm_20260819T030001Z.sql.gz
+sftp> df -h
+    Size     Used    Avail   (root)    %Capacity
+   1.0TB    4.0GB   1020GB   1020GB           0%
+
+## Taille de la base et comptages de production
+ taille_base 
+-------------
+ 16 GB
+(1 row)
+
+        relname        |  total  |  heap   | n_live_tup 
+-----------------------+---------+---------+------------
+ companies             | 8071 MB | 3859 MB |    4299359
+ scraper_runs          | 4658 MB | 1906 MB |    7649769
+ contacts              | 1501 MB | 795 MB  |    1327748
+ company_tag           | 1312 MB | 863 MB  |    7500724
+ business_events       | 715 MB  | 520 MB  |    1286458
+ coverage_matrix_cells | 191 MB  | 122 MB  |    1264182
+ media                 | 50 MB   | 32 MB   |      55830
+ failed_jobs           | 11 MB   | 2296 kB |          0
+ spatial_ref_sys       | 7144 kB | 6896 kB |          0
+ activities            | 952 kB  | 640 kB  |        649
+ journalists           | 848 kB  | 416 kB  |       1257
+ audience_members      | 416 kB  | 120 kB  |        718
+(12 rows)
+
+
+## Empreinte de l'archive du 19/08 : serveur vs poste (apres scp)
+serveur : 521b7ab6f796b9b0456c46975c02e4466f7d127506f28325c53cc02c853338de
+poste   : 521b7ab6f796b9b0456c46975c02e4466f7d127506f28325c53cc02c853338de  (identique, gzip -t OK)
+duree du rapatriement 692 Mio par scp : 40,3 s (mesure 'time scp')

@@ -1,0 +1,11 @@
+### TEMOIN NEGATIF : le contrat SAIT porter un siren, le normalisateur est applique
+src/server/crm-sync/index.ts:64:  siren?: string | null;
+src/server/crm-sync/index.ts:228:    siren: normalizeSiren(company.siren),
+src/server/crm-sync/index.ts:297: * déclarent `siren?: string`, pas `siren?: string | undefined`) — alors même
+src/server/crm-sync/types.ts:89:    siren?: string;
+
+### Tout appelant du site passant un siren :
+>>> AUCUN <<<
+
+### Tout schema de formulaire collectant un siren :
+>>> AUCUN <<<

@@ -1,0 +1,37 @@
+=== T0 TEMOIN : lower() PG sous lc_ctype=C ===
+   a    |   b    |   c    |   d    | pg_lower_replie_accent | citext_egal_accent | citext_egal_ascii | unaccent_lower |   nn   
+--------+--------+--------+--------+------------------------+--------------------+-------------------+----------------+--------
+ dupont | elodie | Élodie | éLODIE | f                      | f                  | t                 | elodie         | elodie
+(1 row)
+
+=== T1 emails contenant un caractere non-ASCII ===
+ non_ascii | email_avec_majuscule_pg | diverge_sql_vs_php 
+-----------+-------------------------+--------------------
+         0 |                       0 |                  0
+(1 row)
+
+=== T2 groupes doublons email : citext vs repli PHP (unaccent+lower) ===
+ citext_groupes | php_groupes | ecart 
+----------------+-------------+-------
+          49492 |       49492 |     0
+(1 row)
+
+=== T3 doublons email supplementaires attrapes par le repli PHP ===
+ citext_surnum | php_surnum | echappent 
+---------------+------------+-----------
+        176218 |     176218 |         0
+(1 row)
+
+=== T4 last_name : lower() PG vs normalize_name (unaccent) ===
+ diverge | non_ascii |  total  
+---------+-----------+---------
+   27008 |      7388 | 1319567
+(1 row)
+
+=== T5 noms : DUPONT/dupont/Dupont attrapes ? (echantillon reel) ===
+ last_name | count 
+-----------+-------
+ Dupont    |   528
+ DUPONT    |   453
+(2 rows)
+

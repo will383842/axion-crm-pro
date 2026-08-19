@@ -1,0 +1,12 @@
+=== T23 recompute COMPLET (avec bonus +20 contact) vs stocke ===
+  total  | identiques | divergents | sous_evalues | sur_evalues | max_theorique 
+---------+------------+------------+--------------+-------------+---------------
+ 4295349 |     748363 |    3546986 |      3484663 |       62323 |            85
+(1 row)
+
+=== T24 max/min stocke + badge complete atteignable ? ===
+ mn | mx | au_dessus_de_90 
+----+----+-----------------
+  0 | 85 |               0
+(1 row)
+

@@ -1,0 +1,24 @@
+=== D1 companies: SIREN partage (tous espaces) ===
+ groupes | fiches | surnumeraires 
+---------+--------+---------------
+       0 |      0 |             0
+(1 row)
+
+=== D2 companies: siren NULL ===
+ sans_siren | avec_siren | avec_foreign_id 
+------------+------------+-----------------
+        446 |    4294903 |             446
+(1 row)
+
+=== D3 companies: meme denomination_normalized + city_name ===
+ groupes | fiches | surnumeraires 
+---------+--------+---------------
+   38451 | 102974 |         64523
+(1 row)
+
+=== D4 companies: meme telephone ===
+ groupes | fiches | surnumeraires 
+---------+--------+---------------
+   31885 | 193910 |        162025
+(1 row)
+

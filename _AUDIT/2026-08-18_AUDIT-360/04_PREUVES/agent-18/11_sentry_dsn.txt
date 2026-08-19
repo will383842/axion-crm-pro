@@ -1,0 +1,22 @@
+### C18-014 — SENTRY_LARAVEL_DSN est-il pose quelque part ?
+Verification DIRECTE fichier par fichier : les .env sont gitignores, donc un ripgrep
+de depot les SAUTE. Ce controle-ci les ouvre nommement.
+
+  .env                                          SENTRY_LARAVEL_DSN x0
+  backend/.env                                  SENTRY_LARAVEL_DSN x0
+  .env.example                                  SENTRY_LARAVEL_DSN x0
+  infra/scripts/configure-prod-env.sh           SENTRY_LARAVEL_DSN x0
+  infra/scripts/setup-hetzner-cpx22.sh          SENTRY_LARAVEL_DSN x0
+
+### TEMOIN POSITIF — le meme controle sait trouver une clef qui EXISTE
+  .env                                          VITE_SENTRY_DSN x1
+  backend/.env                                  VITE_SENTRY_DSN x1
+  .env.example                                  VITE_SENTRY_DSN x1
+
+### La seule lecture de la clef dans le code
+6: * Activé seulement si SENTRY_LARAVEL_DSN est défini.
+12:    'dsn' => env('SENTRY_LARAVEL_DSN'),
+
+CONCLUSION : la clef est LUE par config/sentry.php et POSEE nulle part.
+Sans DSN, Sentry\captureException() est inerte : les 11 sites de WaterfallSentry
+n'ont aucune voie de remontee, et tous leurs catch avalent l'exception.

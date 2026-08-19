@@ -1,0 +1,30 @@
+=== D5 contacts: meme email (citext, tel quel) ===
+ groupes | fiches | surnumeraires 
+---------+--------+---------------
+   49492 | 225710 |        176218
+(1 row)
+
+=== D6 contacts: email renseigne / total ===
+  total  | avec_email | emails_distincts 
+---------+------------+------------------
+ 1319567 |     410481 |           234263
+(1 row)
+
+=== D7 contacts: meme telephone ===
+ groupes | fiches | surnumeraires 
+---------+--------+---------------
+       0 |      0 |             0
+(1 row)
+
+=== D8 contacts: meme nom+prenom+company_id (brut, sans normalisation) ===
+ groupes | fiches | surnumeraires 
+---------+--------+---------------
+       0 |      0 |             0
+(1 row)
+
+=== D9 contacts: meme nom+prenom NORMALISE, entreprises DIFFERENTES mais meme denomination ===
+ groupes | fiches | surnumeraires 
+---------+--------+---------------
+   23386 |  69618 |         46232
+(1 row)
+

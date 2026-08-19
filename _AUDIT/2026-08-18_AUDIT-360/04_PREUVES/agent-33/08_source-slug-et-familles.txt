@@ -1,0 +1,34 @@
+### source_slug : 5 valeurs seulement, sur 14 sites d appel
+src/features/admin-calendly/actions.ts:101:        sourceSlug: "calendly",
+src/features/admin-calendly/actions.ts:184:        sourceSlug: "calendly",
+src/features/commercial-application/actions.ts:277:      sourceSlug: "site-candidature-commerciale",
+src/features/job-application/actions.ts:319:      sourceSlug: "site-candidature-offre",
+src/features/podcast-request/actions.ts:113:      sourceSlug: "site-formulaire-podcast",
+src/server/vivier/stock.ts:254:      sourceSlug: "site-candidature-offre",
+src/server/chatbot/tools/capturer-lead.ts:160:        sourceSlug: "chatbot",
+src/server/calendly/discover.ts:247:        sourceSlug: "calendly",
+src/server/calendly/enrich.ts:240:        sourceSlug: "calendly",
+src/app/api/calendly/client-event/route.ts:176:      sourceSlug: "calendly",
+
+### valeurs distinctes :
+calendly
+chatbot
+site-candidature-commerciale
+site-candidature-offre
+site-formulaire-podcast
+
+### subject_ref : 6 familles emises
+site:calendly_event
+site:customer_review
+site:job_application
+site:newsletter_subscriber
+site:podcast_request
+site:submission
+
+### familles comparees par la reconciliation (reconcile.ts) : 5
+163:      family: "submission",
+187:        family: "job_application",
+202:      family: "job_application",
+227:      family: "calendly_event",
+240:      family: "newsletter_subscriber",
+253:      family: "customer_review",

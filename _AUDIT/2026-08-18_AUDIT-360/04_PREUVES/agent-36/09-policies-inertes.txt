@@ -1,0 +1,26 @@
+===== API avec TOUTES les policies a REFUS TOTAL =====
+viewer  /api/v1/audit-logs     200
+viewer  /api/v1/companies      200
+viewer  /api/v1/contacts       200
+viewer  /api/v1/tags           200
+viewer  /api/v1/users          200
+viewer  /api/v1/workspace      200
+owner   /api/v1/audit-logs     200
+owner   /api/v1/companies      200
+owner   /api/v1/contacts       200
+owner   /api/v1/tags           200
+owner   /api/v1/users          200
+owner   /api/v1/workspace      200
+===== Suite Pest (2 fichiers de securite) =====
+  ✓ 🔴 la sélection est BORNÉE — 501 identifiants sont refusés           1.21s  
+  ✓ l’action est posée comme décision HUMAINE, pas comme observation     1.13s  
+  ✓ un VIEWER ne peut rien modifier en masse                             2.08s  
+  ✓ 🔴 un tag INCONNU est refusé — pas de création à la volée            1.33s  
+  ✓ 🔴 un tag VERROUILLÉ est refusé — on ne fabrique pas une provenance  1.20s  
+  ✓ poser un tag sur une sélection                                       1.22s  
+  ✓ 🔴 une fiche d’un AUTRE univers est ignorée, et le dit               2.98s  
+
+  Tests:    15 passed (33 assertions)
+  Duration: 92.34s
+  Random Order Seed: 1787140345
+

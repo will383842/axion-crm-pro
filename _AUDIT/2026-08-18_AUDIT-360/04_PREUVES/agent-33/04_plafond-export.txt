@@ -1,0 +1,54 @@
+### Plafond REEL de l'export des soumissions COTE SITE
+
+/**
+ * Garde-fou dur, VOLONTAIREMENT conservé — et le chiffre est motivé.
+ *
+ * Une Server Action ne peut pas diffuser en flux : elle retourne le CSV en une
+ * seule chaîne, qui est ensuite recopiée par la sérialisation RSC. Le coût
+ * mémoire est donc proportionnel au TOTAL, pas à la page.
+ *
+ * Mesure sur une ligne réelle de cet export (22 colonnes, `details` non
+ * sérialisé — seules des clés dérivées en sortent) : ~250 à 400 octets. À
+ * 50 000 lignes : ~20 Mo de CSV, soit ~40 Mo en UTF-16 côté V8, plus le tableau
+ * de lignes et la copie RSC — de l'ordre de 100 à 150 Mo au pic. C'est tenable
+ * dans le conteneur ; 200 000 lignes ne le seraient pas.
+ *
+ * 50 000 correspond à ~137 soumissions PAR JOUR pendant un an. Le volume réel
+ * est de l'ordre de quelques unités par jour : ce plafond n'est pas atteignable
+ * à l'échelle du produit. S'il l'était, le remède n'est pas de l'augmenter mais
+ * de diffuser depuis le route handler (`api/admin/submissions/export`), ce que
+ * l'action ne peut structurellement pas faire.
+ */
+const PLAFOND_EXPORT = 50_000;
+
+
+### Application du plafond (actions.ts:600-624)
+      if (searchQ && !matchSubmissionSearch(l.recherche, searchQ)) continue;
+      lines.push(l.csv);
+      if (lines.length >= PLAFOND_EXPORT) {
+        tronque = true;
+        break;
+      }
+    }
+    if (tronque || page.length < TAILLE_PAGE_EXPORT) break;
+    curseur = page[page.length - 1]!.id;
+  }
+
+  // Compté AVANT l'éventuelle ligne d'avertissement : le journal RGPD doit dire
+  // combien de soumissions sont sorties, pas combien de lignes contient le
+  // fichier.
+  const lignesDonnees = lines.length;
+
+  // Une troncature ne doit JAMAIS être muette : elle se voit dans le fichier,
+  // dans Sentry, et dans le journal RGPD (plus bas).
+  if (tronque) {
+    const avertissement =
+      `EXPORT TRONQUÉ à ${PLAFOND_EXPORT} lignes — ` +
+      `le fichier est INCOMPLET. Restreindre la plage de dates ou les filtres.`;
+    lines.push(escape(`### ${avertissement}`));
+    Sentry.captureMessage(`[submissions:export] ${avertissement}`, "warning");
+  }
+
+### Historique : le take:5000 a bien existe, retire le 2026-08-18
+181e21e4 feat(admin): m9 t1.1 — section soumissions (listing + filtres + detail + csv)
+1bcde6a4 fix(admin): l'export CSV des soumissions rendait 100 lignes en silence — export complet (F15)

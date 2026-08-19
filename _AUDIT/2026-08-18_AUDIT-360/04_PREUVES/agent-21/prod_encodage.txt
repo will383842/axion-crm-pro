@@ -1,0 +1,29 @@
+=== T11 TEMOIN : les motifs detectent-ils ce qu ils cherchent ? ===
+ temoin_double_encodage_positif | temoin_negatif | temoin_remplacement_positif | temoin_remplacement_negatif | temoin_entites_positif | temoin_entites_negatif 
+--------------------------------+----------------+-----------------------------+-----------------------------+------------------------+------------------------
+ t                              | f              | t                           | f                           | t                      | f
+(1 row)
+
+=== T12 companies.denomination ===
+ double_encodage | remplacement | entites_html |  total  
+-----------------+--------------+--------------+---------
+               0 |            0 |            0 | 4295349
+(1 row)
+
+=== T13 companies.address + city_name + enseigne ===
+ addr_dbl | addr_repl | city_dbl | ens_dbl | ens_ent 
+----------+-----------+----------+---------+---------
+        0 |         0 |        0 |       0 |       0
+(1 row)
+
+=== T14 contacts ===
+ ln_dbl | fn_dbl | repl | ent | titre_dbl 
+--------+--------+------+-----+-----------
+      1 |      0 |    0 |   0 |         0
+(1 row)
+
+=== T15 echantillon double encodage companies ===
+ id | denomination 
+----+--------------
+(0 rows)
+

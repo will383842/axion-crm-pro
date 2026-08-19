@@ -13,3 +13,10 @@ UTC 2026-08-19T09:58:23Z
 
 --- 2. Routes publiques : epargnees ? ----------------------
 ### POST /api/v1/auth/login (vide, json) -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)
+### POST /api/v1/auth/login (vide, html) -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)
+### GET /api/v1/rgpd/export/jeton-bidon -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)
+
+--- 3. /search : quelle declaration gagne ? ----------------
+### GET /api/v1/search?q=ab (non auth, json) -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)
+
+--- 4. internal : temoin NEGATIF (mauvaise signature) ------

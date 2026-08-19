@@ -1,0 +1,73 @@
+# F39 — preuve 04 : trajectoire du disque de production (25 Go libres)
+# date : 2026-08-19T12:08:33Z
+
+## Etat
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        75G   48G   25G  67% /
+
+--- gros postes ---
+26G	/var/lib/docker
+4.1G	/var/backups
+5.1G	/var/log
+1.2G	/opt
+
+--- docker ---
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
+Images          23        12        11.43GB   826.9MB (7%)
+Containers      14        13        2.367MB   4.096kB (0%)
+Local Volumes   10        8         20.71GB   522MB (2%)
+Build Cache     119       0         3.786GB   2.45GB
+
+--- journald ---
+Archived and active journals take up 3.9G in the file system.
+--- /etc/systemd/journald.conf (sans commentaires) ---
+[Journal]
+--- /etc/docker/daemon.json ---
+cat: /etc/docker/daemon.json: No such file or directory
+
+## laravel.log
+total 268764
+drwxr-xr-x    2 www-data www-data      4096 Aug 19 10:54 .
+drwxrwxrwx    5 www-data www-data      4096 Aug 16 11:34 ..
+-rw-r--r--    1 www-data www-data 275120536 Aug 19 12:08 laravel.log
+--- premiere entree ---
+[2026-08-16 13:34:28] production.ERROR: could not find driver (Connection: mysql, Host: 127.0.0.1, Port: 3306, Database:
+--- LOG_* du .env de prod ---
+LOG_CHANNEL=stack
+LOG_LEVEL=debug
+(LOG_STACK absent du .env => defaut config/logging.php = 'single,stderr' :
+ le meme flot part DEUX fois, dans le fichier ET dans le journal du conteneur)
+
+## MESURE 1 — croissance par composant, fenetre 180 s (12:35 UTC environ)
+  logs conteneurs /var/lib/docker/containers : 185 474 o en 180 s =>  84 Mio/j
+  laravel.log                                : 179 627 o en 180 s =>  82 Mio/j
+  espace libre / (df)                        : -1 052 Ko en 180 s => 493 Mio/j de consommation nette
+
+## MESURE 2 — consommation nette, fenetre 900 s (13:35 -> 13:50 UTC)
+dt=900 s ; libre 25425224 Ko -> 25419772 Ko ; delta=5452 Ko
+consommation nette = 511 Mio/j
+jours avant saturation (a ce rythme) = 48
+
+[exited with code 0]
+
+## MESURE 3 — croissance de laravel.log seule, fenetre 120 s
+  272 078 697 o -> 272 188 925 o en 120 s = 110 228 o => 75 Mio/j
+  moyenne depuis la creation du fichier (2026-08-16 13:34:28 -> 2026-08-19 11:21) :
+  272 067 592 o / 2,908 j = 93,6 Mo/j
+
+## PROJECTION
+  Libre au 2026-08-19 12:00 UTC : 25 419 772 Kio = 24,25 Gio
+  Rythme net mesure sur 900 s   : 511 Mio/j
+  => saturation dans 48 jours   => vers le 2026-10-06
+  Encadrement avec la mesure 180 s (493 Mio/j) : 50 jours => 2026-10-08
+
+  Part imputable aux journaux (laravel.log + journaux de conteneurs) : 166 Mio/j, soit 32 %.
+  Le reste est la croissance legitime de postgres-data (18,21 Go) + cache de build docker.
+  /var/backups/axion-crm occupe 4,1 Go du meme disque (16 % de l'espace libre restant).
+
+## Ce qui surveille cette trajectoire
+  Alerte disque dans infra/monitoring/prometheus/alerts.yml : 0
+  Prometheus/Alertmanager deployes en production            : non (cf. preuve 03)
+  Rotation de laravel.log                                   : aucune (canal 'single', pas 'daily')
+  Borne sur les journaux de conteneurs (/etc/docker/daemon.json) : le fichier n'existe pas
+  => rien.

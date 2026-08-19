@@ -1,0 +1,21 @@
+# Scan du laravel.log de PRODUCTION (conteneur axion-crm-api:/var/www/html/storage/logs/laravel.log)
+# Taille = 272 067 592 octets (~260 Mo), perms -rw-r--r-- www-data:www-data (le fichier hôte /opt/.../storage/logs/laravel.log = 1,0 Go, -rwxrwxrwx : ancien, non tourné)
+# 1 416 759 lignes. Scan awk single-pass. TEMOIN POSITIF: le meme awk sur un fichier leurre (9 lignes, 1 de chaque type) a detecte 10/10 categories -> le controle N'EST PAS aveugle.
+# VALEURS JAMAIS COPIEES. Comptes et types seulement.
+TOTAL_LINES                          1 416 759
+telescope_entries (erreurs SQL)        169 653   -> relation "telescope_entries" does not exist (cause A-007/F40-003)
+production.ERROR                        24 417
+SQLSTATE (exceptions SQL)               72 815
+requetes SQL loggees (select/insert)   337 460   (dont bindings 11 748)
+K_telescope_payload_field (payload/content capturé) 48 108
+J_telescope_payload_with_ip_ua          24 055   -> IP client + user-agent capturés dans les entrées Telescope
+G_session_cookie_value (axion_crm_session=<val>)   258   (129 valeurs DISTINCTES de cookie de session en clair)
+F_cookie_header_present                    261
+I/M email addresses (adresses e-mail)      124 lignes ; 14 adresses DISTINCTES (813 occ. @gmail.com dont 1 seule adresse gmail distincte = le compte propriétaire, 18 @axion-ia.com, 16 @zylker.com, 14 @example.invalid)
+"password":"********"                       21   -> DÉJÀ MASQUÉ par le middleware Laravel (aucun mot de passe en clair trouvé)
+$2y$ bcrypt hash littéral                    0   (val:bcrypt-hash 62 = le mot "password_hash"/colonne, PAS un hash de valeur)
+APP_KEY / base64: secret                     0
+Bearer token / JWT / sanctum plaintext       0
+AUTHORIZATION header en clair                 0
+noms d'env secrets (DB_PASSWORD, *_API_KEY)   0 (dans le log applicatif)
+IP client distinctes dans payloads Telescope   5

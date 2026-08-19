@@ -1,0 +1,62 @@
+=== F35-003 — la 2FA n'est jamais exigee par le serveur ===
+Reference : main e8924b8
+
+--- toutes les occurrences de '2fa_passed_at' dans le depot ---
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro/backend/app/Http/Controllers/Api/Auth/TwoFactorController.php:68:        $request->session()->put('2fa_passed_at', now()->toIso8601String());
+
+  -> UNE seule ligne, et c'est celle qui ECRIT. Aucune ne LIT.
+     Un drapeau de session que rien ne relit ne peut proteger aucune route.
+
+--- TEMOIN NEGATIF : la meme recherche, sur un drapeau qui EST relu ---
+grep -rn 'first_login_completed_at' (ecrit ET relu) :
+backend/app/Http/Controllers/Api/Auth/AuthController.php:59:            'user' => $result['user']->only(['id', 'email', 'name', 'current_workspace_id', 'totp_enabled_at', 'first_login_completed_at', 'onboarding_tour_completed_at']),
+backend/app/Http/Controllers/Api/Auth/AuthController.php:92:            'user' => $user->only(['id', 'email', 'name', 'locale', 'timezone', 'current_workspace_id', 'totp_enabled_at', 'first_login_completed_at', 'onboarding_tour_completed_at']),
+backend/app/Http/Controllers/Api/UsersController.php:33:                ->select(['id', 'email', 'name', 'current_workspace_id', 'first_login_completed_at', 'two_factor_enabled', 'last_login_at'])
+backend/app/Http/Middleware/EnforceFirstLoginSetup.php:11: * Renvoie 403 first_login_required tant que `first_login_completed_at` est null.
+backend/app/Http/Middleware/EnforceFirstLoginSetup.php:31:        if ($user->first_login_completed_at === null
+backend/app/Models/User.php:21: * @property ?CarbonInterface $first_login_completed_at
+backend/app/Models/User.php:51:        'two_factor_enabled', 'first_login_completed_at', 'onboarding_tour_completed_at',
+backend/app/Models/User.php:68:            'first_login_completed_at' => 'datetime',
+backend/app/Services/Auth/TwoFactorService.php:68:            'first_login_completed_at' => now(),
+  -> ecrit par TwoFactorService:68, RELU par EnforceFirstLoginSetup:31.
+     La methode sait donc distinguer un drapeau applique d'un drapeau decoratif.
+
+--- tous les middlewares declares par l'application ---
+    ->withMiddleware(function (Middleware $middleware) {
+        // statefulApi() prepend EnsureFrontendRequestsAreStateful sur les routes api/* déjà.
+        // Ne pas le réajouter manuellement sur web (double-bind = double-exec).
+        $middleware->statefulApi();
+
+        $middleware->api(append: [
+            SetCurrentWorkspace::class,
+            EnforceFirstLoginSetup::class,
+            AuditHashChainLogger::class,
+        ]);
+
+        $middleware->alias([
+            'workspace' => SetCurrentWorkspace::class,
+            'first-login' => EnforceFirstLoginSetup::class,
+            'audit' => AuditHashChainLogger::class,
+            // Lot L6 : drapeau de la console CRM v2 (404 tant qu'il est fermé).
+            'crm-console' => EnsureCrmConsoleV2::class,
+            // §2.10 du plan — les exports de données sont réservés aux
+            // détenteurs de la permission `data.export` (owner, admin,
+            // opérateur ; PAS viewer). Sans cette garde, n'importe quel compte
+            // authentifié pouvait exporter les 4,29 M de fiches en CSV.
+            'permission' => PermissionMiddleware::class,
+        ]);
+  -> aucun middleware de double authentification.
+
+--- la bascule vers /2fa est PUREMENT cote navigateur ---
+64:      const { data } = await api.post<{ requires_2fa?: boolean }>('/auth/login', {
+65-        email,
+66-        password,
+67-        remember,
+--
+69:      if (data.requires_2fa) {
+70-        navigate({ to: '/2fa' });
+71-      } else {
+72-        navigate({ to: '/' });
+
+frontend/src/features/auth/TwoFactorPage.tsx : POST /auth/2fa/verify puis navigate('/').
+Rien n'empeche d'ignorer cette page et d'appeler l'API directement.

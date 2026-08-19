@@ -1,0 +1,64 @@
+AGENT 49 — 05 DECOMPTE DES EVENEMENTS DU §22.2 (source : CDC v2, l.672-706)
+==========================================================================
+Methode : un evenement = un item separe par une virgule ou un point-virgule dans
+la colonne « Evenements » du §22.2. Le gras du CDC marque ce qui est annonce
+DEJA EXISTANT. « formulaire soumis (14 finalites) » compte pour UN evenement
+(les 14 finalites sont les 14 form_type du meme event_type).
+
+--- SENS SITE/CONSOLE -> CRM (8 familles) ---
+Capture       6  = formulaire soumis, candidature deposee, inscription newsletter,
+                   desinscription newsletter, avis publie, opposition
+Rendez-vous   5  = reserve, honore, annule, absent, reporte
+Devis         6  = envoye, consulte, revise, accepte, refuse, expire
+Facturation   5  = numero client attribue, facture emise, payee, en retard, avoir emis
+Livraison    22  = formation 5 (convention signee, session planifiee, session realisee,
+                     attestation delivree, satisfaction recue)
+                 + 1:1 3 (seance planifiee, seance realisee, serie close)
+                 + audit 3 (mission lancee, restitution faite, livrable remis)
+                 + implementation 5 (jalon atteint, recette, mise en production,
+                     maintenance ouverte, maintenance close)
+                 + site web/SaaS 6 (mise en ligne, abonnement ouvert, renouvele,
+                     resilie, incident ouvert, incident clos)
+Reclamation   2  = reclamation ouverte dans la console, close
+Messages sortants 1 = e-mail transactionnel envoye par la console
+Chatbot       1  = lead capture
+                                                       SOUS-TOTAL ENTRANT = 48
+
+--- SENS CRM -> CONSOLE (6 familles) ---
+Consentement  3  = desinscription, reinscription, effacement
+Identite      3  = fiche creee ou rapprochee, coordonnee corrigee, fiches fusionnees
+Commercial    4  = opportunite creee, gagnee, perdue, demande de creation de devis
+Reclamation   1  = reclamation qualifiee par l'utilisateur sur une interaction
+Rendez-vous   5  = reserve sur la page interne, reporte, annule, honore, absent
+Interaction   3  = compte rendu valide avec motif(s) et actions ; entretien realise
+                   avec un candidat retenu ; decision d'embauche
+                                                       SOUS-TOTAL SORTANT = 19
+                   (concorde avec le chiffre 19 de l'agent 14, obtenu independamment)
+
+                                                       TOTAL §22.2 = 67
+
+--- CE QUI EST EMIS (mesure) ---
+ENTRANT : SiteSyncEvent::EVENT_TYPES = 10 valeurs, dont 11 evenements du §22.2 :
+  form_submission          -> Capture « formulaire soumis » (+ 14 FORM_TYPES, miroir exact)
+  application_submitted    -> Capture « candidature deposee »
+  newsletter_optin         -> Capture « inscription newsletter »
+  newsletter_optout        -> Capture « desinscription newsletter »
+  review_posted            -> Capture « avis publie »
+  opt_out                  -> Capture « opposition »
+  calendly_booked          -> Rendez-vous « reserve »
+  calendly_completed       -> Rendez-vous « honore »
+  calendly_canceled        -> Rendez-vous « annule »
+  calendly_no_show         -> Rendez-vous « absent »
+  (form_submission)        -> Chatbot « lead capture » (branche capturerLead, meme event_type)
+  => 11 evenements du §22.2 couverts par 10 event_type. Capture 6/6, Rendez-vous 4/5,
+     Chatbot 1/1. Devis 0/6, Facturation 0/5, Livraison 0/22, Reclamation 0/2,
+     Messages sortants 0/1.
+  SOUS-TOTAL ENTRANT EMIS = 11 sur 48
+
+SORTANT : ConsentOutboundRecorder::EVENT_TYPES = 3, producteurs reels = 2
+  consent_optout  emis par JournalistsController:155  (aucun ecran ne l'appelle)
+  erasure         emis par RgpdRequestsController:135 (seul geste humain reel)
+  consent_optin   AUCUN producteur
+  SOUS-TOTAL SORTANT EMIS = 2 sur 19
+
+                                                       TOTAL EMIS = 13 sur 67 (19 %)

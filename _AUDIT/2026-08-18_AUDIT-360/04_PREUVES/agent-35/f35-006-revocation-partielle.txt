@@ -1,0 +1,49 @@
+=== F35-006 — ce que la reinitialisation du mot de passe revoque, et ce qu'elle ne revoque pas ===
+Reference : main e8924b8
+
+--- toutes les ecritures de PasswordResetController::reset() ---
+        $user = User::query()->where('email', $email)->whereNull('deleted_at')->first();
+        if (! $user) {
+            return response()->json(['error' => 'user_not_found'], 404);
+        }
+
+        $user->password_hash = Hash::make((string) $request->input('password'));
+        $user->failed_login_count = 0;
+        $user->locked_until = null;
+        $user->save();
+
+        DB::table('password_reset_tokens')->where('email', $email)->delete();
+
+        return $this->ok(['reset' => true]);
+
+  -> 4 ecritures : users.password_hash, users.failed_login_count, users.locked_until,
+     et la suppression de la ligne password_reset_tokens.
+  -> NI personal_access_tokens, NI sessions.
+
+--- CE QUI EST TOUT DE MEME COUVERT : les sessions web ---
+config/sanctum.php declare authenticate_session :
+19:        'authenticate_session'      => Laravel\Sanctum\Http\Middleware\AuthenticateSession::class,
+
+et Sanctum l'insere REELLEMENT dans la pile des requetes stateful
+(vendor/laravel/sanctum/.../EnsureFrontendRequestsAreStateful.php:48-56) :
+    protected function frontendMiddleware()
+    {
+        $middleware = array_values(array_filter(array_unique([
+            config('sanctum.middleware.encrypt_cookies', \Illuminate\Cookie\Middleware\EncryptCookies::class),
+            \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+            \Illuminate\Session\Middleware\StartSession::class,
+            config('sanctum.middleware.validate_csrf_token', config('sanctum.middleware.verify_csrf_token', \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)),
+            config('sanctum.middleware.authenticate_session'),
+        ])));
+
+
+AuthenticateSession compare le hachage du mot de passe stocke en session a celui
+de l'utilisateur, et deconnecte si les deux different. Un changement de mot de passe
+invalide donc bien les SESSIONS WEB a leur requete suivante.
+
+--- CE QUI N'EST PAS COUVERT : les jetons d'API ---
+Les requetes porteuses d'un en-tete Authorization: Bearer ne traversent pas cette pile
+(fromFrontend() est faux : pas d'Origin/Referer stateful). Aucun code ne supprime les
+lignes de personal_access_tokens lors d'une reinitialisation :
+
+  -> le constat porte donc UNIQUEMENT sur les jetons d'API, pas sur les sessions web.

@@ -1,0 +1,9 @@
+A = 2026-10-25 02:30:00+02 -> 2026-10-25T00:30:00.000Z
+B = 2026-10-25 02:30:00+01 -> 2026-10-25T01:30:00.000Z   (B est POSTERIEUR a A)
+
+ordre rendu par usort(strcmp) : 2026-10-25 02:30:00+02   puis   2026-10-25 02:30:00+01
+ordre attendu (plus recent dabord): 2026-10-25 02:30:00+01   puis   2026-10-25 02:30:00+02
+VERDICT : ORDRE INVERSE dans l heure rejouee du 25/10/2026
+
+--- temoin negatif : hors bascule, le meme tri est correct ---
+ordre rendu : 2026-10-25 03:30:00+01   puis   2026-10-25 02:30:00+01 -> correct

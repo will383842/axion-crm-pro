@@ -1,0 +1,37 @@
+AGENT 25 - ENDPOINTS GET consommes par ecran (pour armer les mesures MSW) - main 8db8229
+components/layout/UserMenu.tsx                             /auth/me 
+components/layout/WorkspaceSelector.tsx                    /auth/me 
+components/OnboardingTour.tsx                              /auth/me 
+components/ui/GlobalSearch.tsx                             /search?q=${encodeURIComponent(search)} 
+features/audiences/AudienceDetailPage.tsx                  /audiences/${id} /audiences/${id}/members 
+features/audiences/AudiencesListPage.tsx                   /audiences 
+features/campaigns/CampaignDetailPage.tsx                  /campaigns/${id} /campaigns/${id}/stats 
+features/campaigns/CampaignsListPage.tsx                   /campaigns 
+features/campaigns/CampaignWizardPage.tsx                  /coverage 
+features/companies/CompaniesListPage.tsx                   /companies/export?${filterParams().toString()} /companies?${params.toString()} /referentiels/geo 
+features/companies/CompanyDetailPage.tsx                   /companies/${companyId} 
+features/contacts/ContactsListPage.tsx                     /contacts?${params} 
+features/coverage/CoveragePage.tsx                         /coverage 
+features/crm-console/ArbitragePage.tsx                     /crm/arbitrage?per_page=50 
+features/crm-console/CandidatesPage.tsx                    /crm/candidates/counts /crm/candidates?${params.toString()} 
+features/crm-console/ContactsHubPage.tsx                   /crm/contacts-hub/counts /crm/contacts-hub?${params.toString()} 
+features/crm-console/PersonTimelinePage.tsx                /crm/persons/${personKey}/timeline 
+features/crm-console/useConsoleFeatures.ts                 /config/features 
+features/dashboard/components/ActivityFeed.tsx             /audit-logs 
+features/dashboard/components/TopDeptsCard.tsx             /coverage 
+features/dashboard/DashboardPage.tsx                       /auth/me /dashboard/stats 
+features/international/RoumaniePage.tsx                    /companies?${params.toString()} 
+features/llm/LlmRouterPage.tsx                             /llm/usage/summary /llm/use-cases 
+features/llm/ProxyProvidersPage.tsx                        /proxy-providers 
+features/llm/RotationsPage.tsx                             /rotations 
+features/media/JournalistsListPage.tsx                     /journalists/export?${params.toString()} /journalists?${params.toString()} 
+features/media/MediaDetailPage.tsx                         /media/${mediaId} 
+features/media/MediaListPage.tsx                           /media/export?${params.toString()} /media?${params.toString()} 
+features/observability/ObservabilityPage.tsx               /observability/summary 
+features/rgpd/AiActRegisterPage.tsx                        /ai-act/register 
+features/rgpd/AuditLogsPage.tsx                            /audit-logs /audit-logs/verify-chain 
+features/rgpd/RgpdRequestsPage.tsx                         /rgpd/requests 
+features/scraping/ScraperRunsPage.tsx                      /scraper-runs?per_page=50 
+features/settings/SettingsPage.tsx                         /workspace 
+features/tags/TagsManagerPage.tsx                          /tags 
+features/users/UsersPage.tsx                               /users 

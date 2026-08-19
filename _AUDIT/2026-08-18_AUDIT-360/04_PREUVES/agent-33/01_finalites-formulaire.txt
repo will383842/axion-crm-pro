@@ -1,0 +1,39 @@
+### Reference site
+eb754332 fix(qualiopi): l'espace stagiaire livrait la pièce d'un tiers, et quatre surfaces affirmaient une certification non délivrée (#739)
+
+### 1. Les 12 finalites du formulaire unifie (src/lib/schemas/unified-contact-schema.ts:19-34)
+export const UNIFIED_CONTACT_TYPES = [
+  // Groupe 1 — Projet IA pour mon entreprise (intent commercial)
+  "audit",
+  "implementation",
+  "formation",
+  "un_a_un",
+  "devis",
+  // Groupe 2 — Autres demandes (non-commercial / périphérique)
+  "partenariat",
+  "presse",
+  "recrutement",
+  "speaker",
+  "investisseur",
+  "support_client",
+  "autre",
+] as const;
+export type UnifiedContactType = (typeof UNIFIED_CONTACT_TYPES)[number];
+
+### 2. Les 14 CRM_FORM_TYPES du contrat (src/server/crm-sync/types.ts:46-61)
+export const CRM_FORM_TYPES = [
+  "audit",
+  "implementation",
+  "formation",
+  "un_a_un",
+  "devis",
+  "partenariat",
+  "presse",
+  "recrutement",
+  "speaker",
+  "investisseur",
+  "support_client",
+  "autre",
+  "podcast",
+  "simulateur_roi",
+] as const;

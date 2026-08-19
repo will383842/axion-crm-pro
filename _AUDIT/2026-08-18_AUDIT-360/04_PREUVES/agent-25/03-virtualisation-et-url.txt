@@ -1,0 +1,82 @@
+AGENT 25 - VIRTUALISATION, ETAT D'URL, PAGINATION - main 8db8229
+
+=== 1. VIRTUALISATION : @tanstack/react-virtual est-il IMPORTE quelque part ? ===
+src/features/companies/CompaniesListPage.tsx:4:import { useVirtualizer } from "@tanstack/react-virtual";
+src/features/companies/CompaniesListPage.tsx:297:  const rowVirtualizer = useVirtualizer({
+src/features/companies/CompaniesListPage.tsx:714:              it's what keeps perf flat with @tanstack/react-virtual. */}
+
+--- TEMOIN POSITIF (le controle sait trouver un import de dependance) ---
+39
+fichiers importent @tanstack/react-query
+>>> @tanstack/react-table : AUCUNE OCCURRENCE non plus
+
+=== 2. ETAT DANS L'URL : useSearch / navigate({search}) / validateSearch / URLSearchParams ===
+src/components/layout/UserMenu.tsx:8:import { useNavigate } from '@tanstack/react-router';
+src/components/layout/UserMenu.tsx:22:  const navigate = useNavigate();
+src/components/ui/GlobalSearch.tsx:3:import { useNavigate } from '@tanstack/react-router';
+src/components/ui/GlobalSearch.tsx:16:  const navigate = useNavigate();
+src/features/audiences/AudienceBuilderPage.tsx:9:import { useNavigate } from '@tanstack/react-router';
+src/features/audiences/AudienceBuilderPage.tsx:109:  const navigate = useNavigate();
+src/features/audiences/AudienceDetailPage.tsx:8:import { useParams, useNavigate } from '@tanstack/react-router';
+src/features/audiences/AudienceDetailPage.tsx:63:  const navigate = useNavigate();
+src/features/audiences/AudiencesListPage.tsx:8:import { Link, useNavigate } from '@tanstack/react-router';
+src/features/audiences/AudiencesListPage.tsx:62:  const navigate = useNavigate();
+src/features/auth/LoginPage.tsx:4:import { useNavigate } from '@tanstack/react-router';
+src/features/auth/LoginPage.tsx:53:  const navigate = useNavigate();
+src/features/auth/TwoFactorPage.tsx:2:import { useNavigate } from '@tanstack/react-router';
+src/features/auth/TwoFactorPage.tsx:12:  const navigate = useNavigate();
+src/features/campaigns/CampaignDetailPage.tsx:13:import { Link, useParams, useNavigate } from '@tanstack/react-router';
+src/features/campaigns/CampaignDetailPage.tsx:57:  const navigate = useNavigate();
+src/features/campaigns/CampaignsListPage.tsx:8:import { Link, useNavigate } from '@tanstack/react-router';
+src/features/campaigns/CampaignsListPage.tsx:54:  const navigate = useNavigate();
+src/features/campaigns/CampaignWizardPage.tsx:13:import { useNavigate } from '@tanstack/react-router';
+src/features/campaigns/CampaignWizardPage.tsx:102:  const navigate = useNavigate();
+src/features/companies/CompaniesListPage.tsx:203:  function filterParams(): URLSearchParams {
+src/features/companies/CompaniesListPage.tsx:204:    return new URLSearchParams({
+src/features/companies/CompaniesListPage.tsx:258:      const params = new URLSearchParams({
+src/features/contacts/ContactsListPage.tsx:88:      const params = new URLSearchParams({ per_page: '50' });
+src/features/crm-console/CandidatesPage.tsx:58:      const params = new URLSearchParams({ per_page: '50' });
+src/features/crm-console/ContactsHubPage.tsx:70:      const params = new URLSearchParams({ temperature, per_page: '50' });
+src/features/international/RoumaniePage.tsx:82:      const params = new URLSearchParams({
+src/features/media/JournalistsListPage.tsx:32:      const params = new URLSearchParams(search ? { "filter[last_name]": search } : {});
+src/features/media/JournalistsListPage.tsx:53:      const params = new URLSearchParams({
+src/features/media/MediaListPage.tsx:138:      const params = new URLSearchParams(filterParams());
+src/features/media/MediaListPage.tsx:159:      const params = new URLSearchParams({ page: String(page), per_page: "100", ...filterParams() });
+
+--- TEMOIN POSITIF : le routeur EST bien utilise pour naviguer (Link / router) ---
+src/app/RootLayout.tsx:1
+src/app/routeTree.tsx:1
+src/components/layout/AutoBreadcrumbs.tsx:1
+src/components/layout/Sidebar.tsx:1
+src/components/layout/UserMenu.tsx:1
+src/components/ui/Breadcrumbs.tsx:1
+src/components/ui/GlobalSearch.tsx:1
+src/features/audiences/AudienceBuilderPage.tsx:1
+src/features/audiences/AudienceDetailPage.tsx:1
+src/features/audiences/AudiencesListPage.tsx:1
+src/features/auth/LoginPage.tsx:1
+src/features/auth/TwoFactorPage.tsx:1
+src/features/campaigns/CampaignDetailPage.tsx:1
+src/features/campaigns/CampaignsListPage.tsx:1
+src/features/campaigns/CampaignWizardPage.tsx:1
+src/features/companies/CompanyDetailPage.tsx:1
+src/features/companies/components/CompanyRow.tsx:1
+src/features/crm-console/CandidatesPage.tsx:1
+src/features/crm-console/ContactsHubPage.tsx:1
+src/features/crm-console/PersonTimelinePage.tsx:1
+
+=== 3. useState pilotant filtres/tri/page (etat EN MEMOIRE seulement) ===
+companies/CompaniesListPage.tsx                      useState=7  refs-page=9
+contacts/ContactsListPage.tsx                        useState=5  refs-page=0
+media/MediaListPage.tsx                              useState=4  refs-page=11
+media/JournalistsListPage.tsx                        useState=4  refs-page=9
+scraping/ScraperRunsPage.tsx                         useState=6  refs-page=9
+crm-console/ContactsHubPage.tsx                      useState=6  refs-page=0
+crm-console/CandidatesPage.tsx                       useState=3  refs-page=0
+international/RoumaniePage.tsx                       useState=4  refs-page=12
+audiences/AudiencesListPage.tsx                      useState=0  refs-page=0
+campaigns/CampaignsListPage.tsx                      useState=3  refs-page=0
+rgpd/AuditLogsPage.tsx                               useState=4  refs-page=0
+rgpd/RgpdRequestsPage.tsx                            useState=7  refs-page=0
+tags/TagsManagerPage.tsx                             useState=2  refs-page=0
+llm/LlmRouterPage.tsx                                useState=2  refs-page=0

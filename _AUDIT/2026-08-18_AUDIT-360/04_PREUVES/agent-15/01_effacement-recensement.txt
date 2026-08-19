@@ -52,3 +52,14 @@ email_sends.contact_id=c  linkedin_messages.contact_id=c  email_threads.contact_
 linkedin_invitations.contact_id=c  linkedin_sequence_runs.contact_id=c
 crm_notes.contact_id=c  crm_tasks.contact_id=c  audience_members.contact_id=c
 deals.primary_contact_id=n (SET NULL)   activities.contact_id=n (SET NULL)
+
+=== LIMITE DE LA BASE JETABLE ===
+axion_crm_rgpd15 porte 75 des 82 contraintes CHECK de axion_crm (7 perdues au clonage
+pg_dump --schema-only, dont opt_out_empreinte_obligatoire_check et
+email_suppressions_empreinte_obligatoire_check).
+VERIFICATION : ces deux contraintes EXISTENT bien dans axion_crm ET axion_crm_test —
+  $ psql -d axion_crm -c "SELECT conname FROM pg_constraint WHERE conname LIKE '%empreinte_obligatoire%';"
+    opt_out_empreinte_obligatoire_check
+    email_suppressions_empreinte_obligatoire_check
+Ce n'est donc PAS un defaut du produit (faux positif ecarte).
+Aucune des 7 contraintes perdues ne porte sur les chemins de suppression ou d'ingestion mesures.

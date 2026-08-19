@@ -1,6 +1,7 @@
 # Grille des écrans — AGENT 22 « Cartographe des écrans »
 
 - **Référence** : `main = e8924b8` (relue par `git log` au début **et** à la fin de la mission).
+  `main` a avancé pendant la mission jusqu'à **`8db8229`**. Vérifié : `git diff --stat e8924b8..8db8229 -- backend frontend infra` ne rend **qu'un fichier**, `infra/scripts/verifier-serveur-http.sh` (**nouveau**, +154 l.). **Aucune ligne de `backend/` ni de `frontend/` n'a bougé** : toutes les mesures de cette grille valent aussi pour `8db8229`.
 - **Base locale** : `axion_crm`, `select count(*) from migrations` = **58 avant** et **58 après** toutes les mesures (preuve `04_PREUVES/agent-22/00-migrations-avant.txt`). Aucune mesure n'est à rejouer de ce chef.
 - **Périmètre** : **37 écrans** (pas 39 — `/crm` et `/analytics` n'existent plus dans `routeTree.tsx`). **Aucun écran omis.**
 - **Écrans réellement ouverts dans un vrai navigateur** : **37 / 37**.

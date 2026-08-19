@@ -1,0 +1,60 @@
+# AGENT 45 — croisement « tache planifiee » x « fichier de test qui la cite ». main e8924b8.
+# Joue le 2026-08-19T12:23:12Z
+
+== 35 taches planifiees (routes/console.php) ==
+anomaly:detect                             fichiers de test la citant : 0
+audiences:full-refresh                     fichiers de test la citant : 0
+audit:verify-chain                         fichiers de test la citant : 0
+blacklists:check                           fichiers de test la citant : 0
+campaigns:start-scheduled                  fichiers de test la citant : 0
+companies:rescrape-archives                fichiers de test la citant : 1
+companies:retry-google-places              fichiers de test la citant : 0
+coverage:refresh-matrix                    fichiers de test la citant : 0
+crm:flush-outbound                         fichiers de test la citant : 1
+journalists:scrape-ours                    fichiers de test la citant : 1
+media:backfill-periodicity                 fichiers de test la citant : 0
+media:clean-emails                         fichiers de test la citant : 0
+media:enrich                               fichiers de test la citant : 1
+media:extract-from-companies               fichiers de test la citant : 0
+media:find-websites                        fichiers de test la citant : 0
+media:generate-redaction-emails            fichiers de test la citant : 1
+media:import-arcom                         fichiers de test la citant : 0
+media:import-blogs                         fichiers de test la citant : 0
+media:import-emissions-wikidata            fichiers de test la citant : 1
+media:import-opendatasoft                  fichiers de test la citant : 0
+media:import-opendatasoft                  fichiers de test la citant : 0
+media:import-opendatasoft                  fichiers de test la citant : 0
+media:link-emissions-to-channels           fichiers de test la citant : 0
+media:link-to-companies                    fichiers de test la citant : 1
+media:score-confidence                     fichiers de test la citant : 0
+media:sync-emissions-from-parent           fichiers de test la citant : 1
+media:sync-from-companies                  fichiers de test la citant : 0
+media:tag-emissions-status                 fichiers de test la citant : 1
+prospection:score-email-confidence         fichiers de test la citant : 0
+retention:prune-scraper-runs               fichiers de test la citant : 0
+retention:purge                            fichiers de test la citant : 0
+rgpd:anonymize-ips                         fichiers de test la citant : 0
+rgpd:purge-business-prospects              fichiers de test la citant : 1
+rgpd:purge-vivier                          fichiers de test la citant : 1
+signals:nightly-scan                       fichiers de test la citant : 0
+
+== 19 commandes offrant --dry-run ==
+rgpd:anonymize-ips                         fichiers de test la citant : 0
+crm:flush-outbound                         fichiers de test la citant : 1
+media:generate-redaction-emails            fichiers de test la citant : 1
+media:import-blogs                         fichiers de test la citant : 0
+media:import-emissions-wikidata            fichiers de test la citant : 1
+media:import-arcom                         fichiers de test la citant : 0
+media:import-press-kit                     fichiers de test la citant : 1
+media:clean-emails                         fichiers de test la citant : 0
+media:link-emissions-to-channels           fichiers de test la citant : 0
+media:link-to-companies                    fichiers de test la citant : 1
+media:sync-emissions-from-parent           fichiers de test la citant : 1
+media:tag-emissions-status                 fichiers de test la citant : 1
+companies:rescrape-archives                fichiers de test la citant : 1
+retention:purge                            fichiers de test la citant : 0
+companies:retry-google-places              fichiers de test la citant : 0
+rgpd:purge-business-prospects              fichiers de test la citant : 1
+rgpd:purge-vivier                          fichiers de test la citant : 1
+scraping:backfill-src-tags                 fichiers de test la citant : 0
+scraping:ingest-file                       fichiers de test la citant : 0

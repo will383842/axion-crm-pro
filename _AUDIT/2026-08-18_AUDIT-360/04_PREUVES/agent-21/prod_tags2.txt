@@ -1,0 +1,26 @@
+=== T28b companies SANS aucun tag ===
+ count 
+-------
+     3
+(1 row)
+
+=== T33 les 2 tags src:site-formulaire-autre : meme espace ? ===
+ id  |             workspace_id             |           slug            | category | kind 
+-----+--------------------------------------+---------------------------+----------+------
+ 158 | 1db106f5-c8a4-47b0-bf86-930f1ccc9f4a | src:site-formulaire-autre | intent   | auto
+ 204 | e08e02c8-26b4-4e2a-9a88-039edb70b20d | src:site-formulaire-autre | intent   | auto
+(2 rows)
+
+=== T34 espaces ===
+                  id                  |       name       
+--------------------------------------+------------------
+ 1db106f5-c8a4-47b0-bf86-930f1ccc9f4a | Axion-IA
+ e08e02c8-26b4-4e2a-9a88-039edb70b20d | Vivier candidats
+(2 rows)
+
+=== T35 repartition companies par espace ===
+             workspace_id             |  count  
+--------------------------------------+---------
+ 1db106f5-c8a4-47b0-bf86-930f1ccc9f4a | 4295349
+(1 row)
+

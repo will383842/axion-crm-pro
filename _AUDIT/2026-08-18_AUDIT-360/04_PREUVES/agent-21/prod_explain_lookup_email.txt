@@ -1,0 +1,47 @@
+=== T43 TEMOIN de l ecart : ce que PHP envoie vs ce que SQL compare ===
+   stocke_ascii   |    sql_lower     | ascii_matche 
+------------------+------------------+--------------
+ Jose.ELODIE@x.fr | jose.elodie@x.fr | t
+(1 row)
+
+ variante_accentuee_stockee | sql_lower_accent |  php_equivalent  | php_matche_sql 
+----------------------------+------------------+------------------+----------------
+ JOSE.ELODIE@x.fr           | josÉ.elodie@x.fr | jose.elodie@x.fr | f
+(1 row)
+
+=== T44 le lookup de dedup/RGPD utilise-t-il un index ? ===
+                                                               QUERY PLAN                                                                
+-----------------------------------------------------------------------------------------------------------------------------------------
+ Gather (actual time=1043.397..1048.846 rows=0 loops=1)
+   Workers Planned: 2
+   Workers Launched: 2
+   Buffers: shared read=101706
+   ->  Parallel Seq Scan on contacts (actual time=1010.895..1010.896 rows=0 loops=3)
+         Filter: ((workspace_id = '1db106f5-c8a4-47b0-bf86-930f1ccc9f4a'::uuid) AND (lower((email)::text) = 'contact@exemple.fr'::text))
+         Rows Removed by Filter: 439856
+         Buffers: shared read=101706
+ Planning:
+   Buffers: shared hit=283 read=16
+ Planning Time: 5.044 ms
+ Execution Time: 1070.604 ms
+(12 rows)
+
+=== T45 temoin positif : la meme requete via citext (index) ===
+                                        QUERY PLAN                                         
+-------------------------------------------------------------------------------------------
+ Index Scan using idx_contacts_email on contacts (actual time=0.968..0.968 rows=0 loops=1)
+   Index Cond: (email = 'contact@exemple.fr'::citext)
+   Filter: (workspace_id = '1db106f5-c8a4-47b0-bf86-930f1ccc9f4a'::uuid)
+   Buffers: shared hit=3 read=3
+ Planning:
+   Buffers: shared hit=2 read=1
+ Planning Time: 0.258 ms
+ Execution Time: 1.378 ms
+(8 rows)
+
+=== T46 health_practitioners : volume + emails non-ASCII ===
+ total | avec_email | non_ascii 
+-------+------------+-----------
+     0 |          0 |         0
+(1 row)
+

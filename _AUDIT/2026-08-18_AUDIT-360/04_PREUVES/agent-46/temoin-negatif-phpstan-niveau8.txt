@@ -1,0 +1,31 @@
+### TEMOIN NEGATIF — agent 46 — 2026-08-19
+### phpstan.phar 27 Mo issu de backend/vendor/phpstan/phpstan/, conteneur php:8.3-cli isole
+
+=== A. Niveau 8, SANS baseline : lerreur neuve est VUE ===
+ ------ --------------------------------------------------------------------- 
+  Line   TemoinAudit46.php                                                    
+ ------ --------------------------------------------------------------------- 
+  9      Parameter #1 $string of function strlen expects string, string|null  
+         given.                                                               
+         🪪  argument.type                                                    
+ ------ --------------------------------------------------------------------- 
+
+
+ [ERROR] Found 1 error                                                          
+
+exit=1
+
+=== B. Baseline generee comme le fait le depot (--generate-baseline) ===
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Parameter \#1 \$string of function strlen expects string, string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: /src/TemoinAudit46.php
+
+=== C. Meme code, meme niveau 8, AVEC la baseline : lerreur DISPARAIT ===
+
+ [OK] No errors                                                                 
+
+exit=0

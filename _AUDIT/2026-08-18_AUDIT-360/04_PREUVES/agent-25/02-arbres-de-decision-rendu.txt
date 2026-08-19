@@ -1,0 +1,446 @@
+AGENT 25 - ARBRE DE DECISION DE RENDU, ECRAN PAR ECRAN
+Reference: main 8db8229
+
+### src/features/audiences/AudienceBuilderPage.tsx
+155:    } catch (err) {
+164:    const hasAny = (criteria.all?.length ?? 0) > 0;
+181:    if ((criteria.all?.length ?? 0) === 0) {
+195:    } catch (err) {
+201:  const canCreate = watchedName.trim().length > 0 && (criteria.all?.length ?? 0) > 0;
+355:            {(criteria.all?.length ?? 0) > 0 ? (
+381:                loading={createMutation.isPending}
+432:      {selected.length === 0 && placeholder ? (
+
+### src/features/audiences/AudienceDetailPage.tsx
+67:  const { data: audience, isLoading } = useQuery({
+73:  const { data: members, isLoading: membersLoading } = useQuery({
+87:    onError: (e) => toast.error(extractApiMessage(e) ?? 'Refresh impossible'),
+97:    onError: (e) => toast.error(extractApiMessage(e) ?? 'Suppression impossible'),
+100:  if (isLoading || !audience) {
+127:              loading={refreshMutation.isPending}
+144:              loading={deleteMutation.isPending}
+191:        <MembersTab members={members ?? []} loading={membersLoading} />
+210:  if (members.length === 0) {
+
+### src/features/audiences/AudiencesListPage.tsx
+19:  EmptyState,
+22:  Skeleton,
+65:  const { data, isLoading } = useQuery({
+71:  const audiences = useMemo<EmailAudience[]>(() => data?.data ?? [], [data]);
+86:    onError: (e) => toast.error(extractApiMessage(e) ?? 'Refresh impossible'),
+92:    onError: (e) => toast.error(extractApiMessage(e) ?? 'Mise à jour impossible'),
+97:    onError: (e) => toast.error(extractApiMessage(e) ?? 'Suppression impossible'),
+125:      {isLoading ? (
+126:        <ListSkeleton />
+127:      ) : audiences.length === 0 ? (
+128:        <EmptyState
+274:function ListSkeleton() {
+279:          <Skeleton className="h-5 w-40" />
+280:          <Skeleton className="h-3 w-24" />
+281:          <Skeleton className="h-16 w-full" />
+282:          <Skeleton className="h-3 w-32" />
+
+### src/features/auth/LoginPage.tsx
+74:    } catch {
+
+### src/features/auth/MagicLinkPage.tsx
+22:    } catch {
+
+### src/features/auth/PasswordResetPage.tsx
+20:    } catch {
+
+### src/features/auth/TwoFactorPage.tsx
+22:    } catch {
+
+### src/features/campaigns/CampaignDetailPage.tsx
+61:  const { data: campaign, isLoading } = useQuery({
+78:    onError: (e) => toast.error(extractApiMessage(e) ?? 'Pause impossible'),
+83:    onError: (e) => toast.error(extractApiMessage(e) ?? 'Reprise impossible'),
+88:    onError: (e) => toast.error(extractApiMessage(e) ?? 'Annulation impossible'),
+93:    onError: (e) => toast.error(extractApiMessage(e) ?? 'Démarrage impossible'),
+96:  if (isLoading || !campaign) {
+110:  const companiesPerMin = stats?.companies_per_minute ?? 0;
+154:              <Button variant="primary" size="md" iconLeft={<Play className="h-4 w-4" />} loading={startMutation.isPending} onClick={() => startMutation.mutate()}>
+159:              <Button variant="secondary" size="md" iconLeft={<Pause className="h-4 w-4" />} loading={pauseMutation.isPending} onClick={() => pauseMutation.mutate()}>
+164:              <Button variant="primary" size="md" iconLeft={<Play className="h-4 w-4" />} loading={resumeMutation.isPending} onClick={() => resumeMutation.mutate()}>
+169:              <Button variant="ghost" size="md" iconLeft={<X className="h-4 w-4" />} loading={cancelMutation.isPending} onClick={() => cancelMutation.mutate()}>
+257:        <TabLiveTimeline events={stats?.last_events ?? []} />
+260:        <TabSources campaign={campaign} perSource={stats?.per_source ?? []} />
+266:        <TabRuns runs={stats?.last_events ?? []} />
+282:  if (events.length === 0) {
+353:            const running = (stat?.running ?? 0) > 0;
+360:                  ) : (stat?.total ?? 0) > 0 ? (
+366:                <td className="px-4 py-2 text-right font-mono tabular-nums">{stat?.total ?? 0}</td>
+367:                <td className="px-4 py-2 text-right font-mono tabular-nums text-emerald-600 dark:text-emerald-400">{stat?.success ?? 0}</td>
+368:                <td className="px-4 py-2 text-right font-mono tabular-nums text-rose-600 dark:text-rose-400">{stat?.failed ?? 0}</td>
+369:                <td className="px-4 py-2 text-right font-mono tabular-nums">{stat?.companies ?? 0}</td>
+413:  if (runs.length === 0) {
+
+### src/features/campaigns/CampaignsListPage.tsx
+21:  EmptyState,
+26:  Skeleton,
+59:  const { data, isLoading } = useQuery({
+68:  const campaigns = useMemo<Campaign[]>(() => data?.data ?? [], [data]);
+94:    onError: (e) => toast.error(extractApiMessage(e) ?? 'Pause impossible'),
+99:    onError: (e) => toast.error(extractApiMessage(e) ?? 'Reprise impossible'),
+104:    onError: (e) => toast.error(extractApiMessage(e) ?? 'Annulation impossible'),
+109:    onError: (e) => toast.error(extractApiMessage(e) ?? 'Suppression impossible'),
+158:      {isLoading ? (
+159:        <ListSkeleton />
+160:      ) : filtered.length === 0 ? (
+161:        <EmptyState
+224:  const sources = (campaign.sources ?? []).slice(0, 5);
+225:  const moreSources = Math.max(0, (campaign.sources?.length ?? 0) - sources.length);
+303:        {(campaign.zones ?? []).slice(0, 6).map((z, i) => (
+311:        {(campaign.zones?.length ?? 0) > 6 ? (
+312:          <span className="text-[10px] text-slate-500">+ {(campaign.zones?.length ?? 0) - 6}</span>
+385:function ListSkeleton() {
+390:          <Skeleton className="h-5 w-40" />
+391:          <Skeleton className="h-3 w-24" />
+392:          <Skeleton className="h-2 w-full" />
+393:          <Skeleton className="h-2 w-full" />
+
+### src/features/campaigns/CampaignWizardPage.tsx
+132:    for (const c of coverageData ?? []) m.set(c.code, c.total ?? 0);
+137:    () => referentialZones.map((z) => ({ code: z.code, name: z.name, total: coverageMap.get(z.code) ?? 0 })),
+150:    return selectedZones.reduce((s, z) => s + (coverageMap.get(z.code) ?? 0), 0);
+197:    } catch (err) {
+213:    } catch (err) {
+319:                  loading={createMutation.isPending && !startMutation.isPending}
+329:                  loading={createMutation.isPending || startMutation.isPending}
+524:        {filteredCells.length === 0 ? (
+
+### src/features/companies/CompaniesListPage.tsx
+8:  CompaniesTableSkeleton,
+9:  EmptyState,
+178:    onError: (erreur: unknown) => {
+195:  const optionsRegions = versOptions(geo.data?.regions ?? [], "Toutes régions");
+196:  const optionsDepartements = versOptions(geo.data?.departments ?? [], "Tous départements");
+248:    } catch {
+255:  const { data, isLoading } = useQuery<CompaniesResponse>({
+292:  const rows = useMemo(() => data?.data ?? [], [data]);
+315:      acc[k] = (acc[k] ?? 0) + 1;
+324:      acc[c.naf] = (acc[c.naf] ?? 0) + 1;
+391:              {(total ?? 0).toLocaleString("fr-FR")}
+425:          value={(total ?? 0).toLocaleString("fr-FR")}
+617:      {isLoading ? (
+618:        <CompaniesTableSkeleton />
+619:      ) : rows.length === 0 ? (
+620:        <EmptyState
+656:                disabled={tagAction.trim() === "" || actionDeMasse.isPending}
+664:                disabled={tagAction.trim() === "" || actionDeMasse.isPending}
+
+### src/features/companies/CompanyDetailPage.tsx
+14:  EmptyState,
+62:  const { data: c, isLoading, isError } = useQuery({
+74:    onError: () => toast.error('Échec lancement enrichissement'),
+79:  if (isLoading) {
+88:  if (isError || !c) {
+91:        <EmptyState
+144:            loading={enrichMut.isPending}
+147:            {enrichMut.isPending ? 'Enrichissement…' : 'Enrichir maintenant'}
+253:          <ContactsCard contacts={c.contacts ?? []} />
+270:                loading={enrichMut.isPending}
+
+### src/features/contacts/ContactsListPage.tsx
+7:  CompaniesTableSkeleton,
+8:  EmptyState,
+42:  { value: 'catchall', label: 'Catch-all' },
+51:  catchall: 'warning',
+67:    catchall: 'Catch-all',
+85:  const { data, isLoading, isPlaceholderData } = useQuery<ContactsResponse>({
+103:  const rows = data?.data ?? [];
+174:      {isLoading || isPlaceholderData ? (
+175:        <CompaniesTableSkeleton rows={6} />
+176:      ) : rows.length === 0 ? (
+177:        <EmptyState
+
+### src/features/coverage/CoveragePage.tsx
+28:  const { data, isLoading } = useQuery({
+37:  const cells = useMemo(() => data ?? [], [data]);
+40:    const totalAll = cells.reduce((s, c) => s + (c.total ?? 0), 0);
+41:    const completeAll = cells.reduce((s, c) => s + (c.complete ?? 0), 0);
+42:    const covered = cells.filter((c) => (c.total ?? 0) > 0).length;
+45:    const top = [...cells].sort((a, b) => (b.total ?? 0) - (a.total ?? 0)).slice(0, 8);
+56:    } catch {
+65:      const n = r.data?.queued ?? 0;
+71:    } catch {
+137:          {isLoading ? 'Chargement…' : `${stats.totalAll.toLocaleString('fr-FR')} entreprises au total`}
+274:  const isCovered = (cell.total ?? 0) > 0;
+295:        <Stat label="Entreprises" value={(cell.total ?? 0).toLocaleString('fr-FR')} />
+296:        <Stat label="Complètes"   value={(cell.complete ?? 0).toLocaleString('fr-FR')} />
+361:  const hasData = top.some((c) => (c.total ?? 0) > 0);
+393:                    {(c.total ?? 0).toLocaleString('fr-FR')}
+
+### src/features/crm-console/ArbitragePage.tsx
+18:import { Button, Card, EmptyState, Input, PageHeader } from '@/components/ui';
+20:import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
+59:    onError: () => toast.error('Rattachement impossible : vérifiez l’identifiant d’entreprise.'),
+73:    onError: () => toast.error('Le motif est obligatoire (3 caractères minimum).'),
+76:  const rows = list.data?.data ?? [];
+82:        subtitle={`${list.data?.meta.total ?? 0} événement(s) reçus sans SIREN — à rattacher ou à écarter.`}
+85:      {list.isLoading ? (
+86:        <ConsoleListSkeleton rows={5} />
+87:      ) : rows.length === 0 ? (
+88:        <EmptyState
+100:              busy={attach.isPending || dismiss.isPending}
+
+### src/features/crm-console/CandidatesPage.tsx
+15:import { Card, EmptyState, KpiCard, PageHeader, SearchInput, Tabs, Toolbar } from '@/components/ui';
+18:import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
+70:    { id: 'tous', label: 'Tous les candidats', count: counts.data?.total ?? 0 },
+74:      count: byFamily[family] ?? 0,
+78:  const rows = list.data?.data ?? [];
+90:        <KpiCard label="À qualifier" value={byStage['nouveau'] ?? 0} tone="amber" />
+91:        <KpiCard label="Présélection" value={byStage['preselection'] ?? 0} tone="sky" />
+92:        <KpiCard label="Entretien" value={byStage['entretien'] ?? 0} tone="violet" />
+93:        <KpiCard label="Conservés en vivier" value={byStage['vivier'] ?? 0} tone="slate" />
+106:            `isLoading` reste faux au changement de vue et l'état vide de la vue
+108:        {list.isLoading || list.isPlaceholderData ? (
+109:          <ConsoleListSkeleton />
+110:        ) : rows.length === 0 ? (
+111:          <EmptyState
+
+### src/features/crm-console/ConsoleGate.tsx
+10:import { EmptyState, Skeleton } from '@/components/ui';
+20:  const { data, isPending } = useConsoleFeaturesQuery();
+27:  if (isPending) {
+30:        <ConsoleListSkeleton rows={4} />
+38:        <EmptyState
+49:        <EmptyState
+61:export function ConsoleListSkeleton({ rows = 8 }: { rows?: number }) {
+65:        <Skeleton key={index} className="h-14 w-full rounded-lg" />
+
+### src/features/crm-console/ContactsHubPage.tsx
+16:import { Card, EmptyState, KpiCard, PageHeader, SearchInput, Tabs, Toolbar, cn } from '@/components/ui';
+20:import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
+84:    { id: 'tous', label: 'Tous', count: counts.data?.total ?? 0 },
+88:      count: byType[type] ?? 0,
+92:  const rows = list.data?.data ?? [];
+103:        <KpiCard label="Clients" value={byType['client'] ?? 0} tone="emerald" />
+104:        <KpiCard label="Prospects" value={byType['prospect'] ?? 0} tone="sky" />
+105:        <KpiCard label="Opportunités" value={byStage['opportunite'] ?? 0} tone="violet" />
+108:        <KpiCard label="Dormants" value={byStage['dormant'] ?? 0} tone="slate" />
+171:        {/* `isLoading` NE SUFFIT PAS ici : `placeholderData` garde les lignes de
+173:            Query considère qu'il y a déjà des données et `isLoading` reste faux.
+180:        {list.isLoading || list.isPlaceholderData ? (
+181:          <ConsoleListSkeleton />
+182:        ) : rows.length === 0 ? (
+183:          <EmptyState
+
+### src/features/crm-console/PersonTimelinePage.tsx
+16:import { Card, CardTitle, EmptyState, PageHeader, StatusPill } from '@/components/ui';
+18:import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
+37:  if (timeline.isLoading) {
+40:        <ConsoleListSkeleton rows={6} />
+49:        <EmptyState title="Fiche introuvable" description="Cette personne n’existe dans aucun univers accessible." />
+68:            {data.subjects.length === 0 ? (
+108:          {data.data.length === 0 ? (
+
+### src/features/crm-console/useConsoleFeatures.ts
+
+### src/features/dashboard/DashboardPage.tsx
+10:  EmptyState,
+11:  Skeleton,
+78:  const { data, isLoading, isFetching, refetch } = useQuery({
+105:  const isEmpty = !isLoading && stats.companies_total === 0;
+125:              loading={isFetching && !isLoading}
+135:      {isLoading ? (
+136:        <DashboardSkeleton />
+139:          <EmptyState
+243:function DashboardSkeleton() {
+254:            <Skeleton className="mb-3 h-4 w-20" />
+255:            <Skeleton className="h-7 w-28" />
+256:            <Skeleton className="mt-3 h-1.5 w-full" />
+264:              <Skeleton className="mb-3 h-4 w-32" />
+265:              <Skeleton className="h-32 w-full" />
+272:              <Skeleton className="mb-3 h-4 w-24" />
+273:              <Skeleton className="h-24 w-full" />
+
+### src/features/international/RoumaniePage.tsx
+79:  const { data, isLoading, isError } = useQuery({
+109:  const rows = data?.data ?? [];
+165:      {isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
+166:      {isError && <p className="text-sm text-red-600">Impossible de charger le vivier Roumanie.</p>}
+168:      {!isLoading && !isError && (
+228:                {rows.length === 0 && (
+
+### src/features/llm/LlmRouterPage.tsx
+9:  CompaniesTableSkeleton,
+10:  EmptyState,
+70:  const useCasesData = useCases.data ?? [];
+92:        useCases.isLoading ? (
+93:          <CompaniesTableSkeleton rows={5} />
+94:        ) : useCasesData.length === 0 ? (
+95:          <EmptyState
+133:                    {(u.fallback_chain ?? []).join(' → ') || '—'}
+179:        useCases.isLoading ? (
+180:          <CompaniesTableSkeleton rows={5} />
+181:        ) : useCasesData.length === 0 ? (
+182:          <EmptyState
+214:        usage.isLoading ? (
+215:          <CompaniesTableSkeleton rows={5} />
+222:                value={`${(usage.data?.total_eur ?? 0).toFixed(2)} €`}
+228:                value={(usage.data?.tokens_in ?? 0).toLocaleString('fr-FR')}
+234:                value={(usage.data?.tokens_out ?? 0).toLocaleString('fr-FR')}
+253:                {Object.entries(usage.data?.by_provider ?? {}).length === 0 ? (
+257:                    const total = usage.data?.total_eur ?? 0;
+
+### src/features/llm/ProxyProvidersPage.tsx
+6:  CompaniesTableSkeleton,
+7:  EmptyState,
+46:    onError: () => toast.error('Échec du test'),
+49:  const rows = list.data?.data ?? [];
+58:      {list.isLoading ? (
+59:        <CompaniesTableSkeleton rows={4} />
+60:      ) : rows.length === 0 ? (
+61:        <EmptyState
+122:                    loading={testMut.isPending}
+
+### src/features/llm/RotationsPage.tsx
+7:  CompaniesTableSkeleton,
+8:  EmptyState,
+38:  const { data, isLoading } = useQuery({
+43:  const byDimension = (data?.data ?? []).reduce<Record<string, Rotation[]>>((acc, r) => {
+48:  const total = (data?.data ?? []).length;
+57:      {isLoading ? (
+58:        <CompaniesTableSkeleton rows={5} />
+60:        <EmptyState
+68:            const items = byDimension[dim] ?? [];
+78:                {items.length === 0 ? (
+
+### src/features/media/JournalistsListPage.tsx
+3:import { Button, Card, EmptyState, KpiCard, PageHeader, SearchInput } from "@/components/ui";
+43:    } catch {
+50:  const { data, isLoading } = useQuery<JournalistsResponse>({
+65:  const rows = useMemo(() => data?.data ?? [], [data]);
+66:  const total = data?.meta.total ?? 0;
+99:      {isLoading ? (
+101:      ) : rows.length === 0 ? (
+102:        <EmptyState
+
+### src/features/media/MediaDetailPage.tsx
+3:import { Card, EmptyState, Spinner, cn } from "@/components/ui";
+35:  const { data, isLoading, isError } = useQuery<MediaDetail>({
+44:  if (isLoading) {
+51:  if (isError || !data) {
+54:        <EmptyState icon="📰" title="Média introuvable" description="Ce média n'existe pas ou a été supprimé." />
+
+### src/features/media/MediaListPage.tsx
+4:import { Button, Card, EmptyState, KpiCard, PageHeader, SearchInput, cn } from "@/components/ui";
+149:    } catch {
+156:  const { data, isLoading } = useQuery<MediaResponse>({
+166:  const rows = useMemo(() => data?.data ?? [], [data]);
+167:  const total = data?.meta.total ?? 0;
+176:      acc[k] = (acc[k] ?? 0) + 1;
+257:      {isLoading ? (
+259:      ) : rows.length === 0 ? (
+260:        <EmptyState
+
+### src/features/misc/NotFoundPage.tsx
+
+### src/features/observability/ObservabilityPage.tsx
+28:  const { data, isLoading, error } = useQuery({
+37:  if (isLoading) {
+110:          {Object.entries(data.archive_reasons).length === 0 ? (
+131:            {data.recent_events.length === 0 ? (
+
+### src/features/phase2-scaffold/ColdEmailStub.tsx
+
+### src/features/phase2-scaffold/LinkedInStub.tsx
+
+### src/features/rgpd/AiActRegisterPage.tsx
+9:  CompaniesTableSkeleton,
+11:  EmptyState,
+55:  const { data, isLoading } = useQuery({
+64:  const rows = data?.data ?? [];
+118:      {isLoading ? (
+119:        <CompaniesTableSkeleton rows={3} />
+120:      ) : rows.length === 0 ? (
+121:        <EmptyState
+
+### src/features/rgpd/AuditLogsPage.tsx
+7:  CompaniesTableSkeleton,
+9:  EmptyState,
+74:    onError: () => toast.error('Erreur vérification chaîne'),
+78:    const all = list.data?.data ?? [];
+98:            loading={verifyMut.isPending}
+131:      {list.isLoading ? (
+132:        <CompaniesTableSkeleton rows={10} />
+133:      ) : rows.length === 0 ? (
+134:        <EmptyState
+
+### src/features/rgpd/RgpdRequestsPage.tsx
+7:  CompaniesTableSkeleton,
+8:  EmptyState,
+90:    onError: () => toast.error('Erreur création requête'),
+102:    onError: () => toast.error('Erreur traitement'),
+106:    const all = list.data?.data ?? [];
+137:      {list.isLoading ? (
+138:        <CompaniesTableSkeleton rows={5} />
+139:      ) : rows.length === 0 ? (
+140:        <EmptyState
+227:              loading={createMut.isPending}
+291:              loading={processMut.isPending}
+
+### src/features/scraping/ScraperRunsPage.tsx
+11:  EmptyState,
+19:  Skeleton,
+85:  return { created: created ?? 0, target: target ?? 0 };
+212:  const { data, isLoading } = useQuery({
+218:  const runs = useMemo<Run[]>(() => data?.data ?? [], [data]);
+296:    onError: (err: unknown) => {
+311:    onError: (err: unknown) => {
+339:              disabled={filtered.length === 0}
+398:      {isLoading ? (
+399:        <RunsTableSkeleton />
+400:      ) : filtered.length === 0 ? (
+401:        <EmptyState
+443:                retryLoading={retryMutation.isPending && retryMutation.variables === run.id}
+498:            <Button variant="ghost" onClick={() => setConfirmCancel(null)} disabled={cancelMutation.isPending}>
+503:              loading={cancelMutation.isPending}
+736:// Skeleton
+738:function RunsTableSkeleton() {
+742:        <Skeleton className="h-3.5 w-32" />
+747:            <Skeleton className="h-3 w-12" />
+748:            <Skeleton className="h-3.5 w-24" />
+749:            <Skeleton className="h-3 w-10" />
+750:            <Skeleton className="h-5 w-20 rounded-full" />
+751:            <Skeleton className="h-3 w-14" />
+752:            <Skeleton className="h-3 w-20" />
+753:            <Skeleton className="h-7 w-16 justify-self-end" />
+
+### src/features/settings/SettingsPage.tsx
+112:    onError: () => toast.error('Erreur mise à jour'),
+147:                  cost_cap_eur: Number(fd.get('cost_cap_eur') ?? 0),
+179:                <Button type="submit" variant="primary" loading={updateMut.isPending}>
+
+### src/features/tags/TagsManagerPage.tsx
+19:  EmptyState,
+24:  Skeleton,
+99:  const { data, isLoading } = useQuery({
+104:  const tags = useMemo<Tag[]>(() => data ?? [], [data]);
+131:    onError: (err: unknown) => {
+147:    onError: (err: unknown) => {
+192:      {isLoading ? (
+195:            <Skeleton key={i} className="h-32 w-full" />
+198:      ) : tags.length === 0 ? (
+199:        <EmptyState
+213:            if (items.length === 0) return null;
+229:                      deleting={deleteMutation.isPending}
+321:            <Button type="submit" variant="primary" disabled={createMutation.isPending} loading={createMutation.isPending}>
+322:              {createMutation.isPending ? 'Création…' : 'Créer'}
+
+### src/features/users/UsersPage.tsx
+8:  CompaniesTableSkeleton,
+9:  EmptyState,
+62:  const { data, isLoading } = useQuery({
+77:    onError: () => toast.error("Impossible d'envoyer l'invitation"),
+80:  const rows = data?.data ?? [];
+98:      {isLoading ? (
+99:        <CompaniesTableSkeleton rows={5} />
+100:      ) : rows.length === 0 ? (
+101:        <EmptyState
+143:                  {(u.roles ?? []).length === 0 ? (
+146:                    (u.roles ?? []).map((r) => (
+188:              loading={inviteMut.isPending}

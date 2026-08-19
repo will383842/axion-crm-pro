@@ -1,0 +1,677 @@
+######## SABOTAGE S09-masquage-pour-tout-le-monde
+######## FICHIER SABOTE : app/Support/MasquageCoordonnees.php
+######## DATE : 2026-08-19T12:27:48Z
+######## DIFF APPLIQUE (preuve que le sabotage a atterri) ########
+--- /var/www/html.orig/app/Support/MasquageCoordonnees.php
++++ /var/www/html/app/Support/MasquageCoordonnees.php
+@@ -40,7 +40,7 @@
+             return true;
+         }
+ 
+-        return ! $user->can(self::PERMISSION);
++        return true;
+     }
+ 
+     /**
+######## SUITE COMPLETE ########
+
+   PASS  Tests\Unit\Media\PressKitImportTest
+  ✓ it rejette un email bidon et garde un email rédaction (role)         3.47s  
+  ✓ it parse les médias de diffusion national + départementaux           0.10s  
+  ✓ it parse 193 émissions TV bien formées                               0.13s  
+[2026-08-19 14:28:57] local.INFO: Remplissage des empreintes d’opposition {"table":"opt_out","empreintes_calculees":0} 
+[2026-08-19 14:28:57] local.INFO: Remplissage des empreintes d’opposition {"table":"email_suppressions","empreintes_calculees":0} 
+
+   PASS  Tests\Unit\Rotations\WeightedRoundRobinTest
+  ✓ WeightedRoundRobin skip items disabled                              62.28s  
+  ✓ WeightedRoundRobin respecte cooldown                                 0.19s  
+  ✓ WeightedRoundRobin incrémente le compteur metadata.count             0.24s  
+  ✓ WeightedRoundRobin pick retourne un item disponible                  0.19s  
+  ✓ WeightedRoundRobin pick ne croise pas les workspaces                 0.20s  
+  ✓ WeightedRoundRobin pick retourne null si aucun item                  0.19s  
+  ✓ WeightedRoundRobin pondère par weight (1 vs 10)                      0.31s  
+
+   PASS  Tests\Unit\Audit\AuditHashChainExtendedTest
+  ✓ AuditHashChain premier record a prev_hash = 0*64                     2.81s  
+  ✓ AuditHashChain record retourne un id positif                         0.17s  
+  ✓ AuditHashChain canonical respecte l'ordre des clés                   0.82s  
+  ✓ AuditHashChain verifyChain retourne true sur 1 record                0.32s  
+  ✓ AuditHashChain verifyChain détecte tampering manuel                  0.35s  
+  ✓ AuditHashChain verifyChain retourne true sur chaîne vide             0.16s  
+  ✓ AuditHashChain verifyChain retourne true sur 10 records              0.76s  
+  ✓ AuditHashChain enchaine prev_hash correctement                       0.25s  
+
+   PASS  Tests\Unit\Scraping\GooglePlacesSmartSkipTest
+  ✓ it skips Google Places when company already has email_generic (H16…  1.65s  
+  ✓ it skips Google Places even if phone+website are missing, as long a… 0.51s  
+  ✓ it considers contact with email_status=valid as sufficient email     0.51s  
+  ✓ it does NOT skip when company is missing email (H16 — appelle Googl… 0.52s  
+  ✓ it skip is disabled when smart_skip config is false                  0.30s  
+
+   PASS  Tests\Unit\Broadcasting\AutorisationCanauxTest
+  ✓ LA PREUVE DU DÉFAUT : le cast en entier autorisait deux UUID étrang… 0.10s  
+  ✓ deux UUID DIFFÉRENTS ne s’autorisent pas                             0.06s  
+  ✓ un UUID s’autorise lui-même                                          0.08s  
+  ✓ routes/channels.php ne type plus ces paramètres en int               0.06s  
+
+   PASS  Tests\Unit\Auth\NotPwnedPasswordRuleTest
+  ✓ NotPwnedPassword threshold custom respecté                           0.11s  
+  ✓ NotPwnedPassword ignore les strings vides                            0.07s  
+  ✓ NotPwnedPassword laisse passer si count = threshold                  0.09s  
+  ✓ NotPwnedPassword bloque si count > threshold                         0.09s  
+  ✓ NotPwnedPassword ignore les types non-string                         0.13s  
+  ✓ NotPwnedPassword laisse passer si password non breached              0.16s  
+
+   PASS  Tests\Unit\Email\MxEmailValidatorTest
+  ✓ it returns invalid for malformed syntax                              0.14s  
+  ✓ it rejects emails longer than 254 chars (RFC 5321)                   0.09s  
+  ✓ it returns invalid when domain has no MX records                     0.35s  
+  ✓ it returns disposable for known throwaway domains                    0.09s  
+  ✓ it lowercases and trims input                                        0.12s  
+  ✓ it returns role for role-based prefixes                              0.20s  
+  ✓ it full validate returns structured payload                          0.11s  
+  ✓ it returns risky for free providers (gmail, orange, etc) — assuming… 0.17s  
+[2026-08-19 14:29:11] local.WARNING: HibpChecker: connection error {"error":"connect timeout"} 
+[2026-08-19 14:29:12] local.WARNING: HibpChecker: guzzle error {"error":"Server error: `GET https://api.pwnedpasswords.com/range/8867C` resulted in a `503 Service Unavailable` response:
+service unavailable
+"} 
+
+   PASS  Tests\Unit\Auth\HibpCheckerTest
+  ✓ HibpChecker fail-open en cas d'erreur réseau                         0.18s  
+  ✓ HibpChecker retourne le count si suffix trouvé                       0.14s  
+  ✓ HibpChecker met en cache le résultat 24h                             0.16s  
+  ✓ HibpChecker isBreached respecte le threshold                         0.14s  
+  ✓ HibpChecker returns 0 quand suffix absent                            0.14s  
+  ✓ HibpChecker retourne 0 pour password vide sans appel API             0.13s  
+  ✓ HibpChecker parse correctement les newlines mixtes                   0.14s  
+  ✓ HibpChecker fail-open sur status non-200                             0.17s  
+[2026-08-19 14:29:12] local.WARNING: GooglePlaces exception {"query":"Acme","error":"HTTP request returned status code 503:
+[]
+"} 
+[2026-08-19 14:29:13] local.DEBUG: GooglePlacesClient skipped (no API key)  
+
+   PASS  Tests\Unit\Scraping\GooglePlacesClientTest
+  ✓ it caches result for 30 days to avoid quota waste                    0.13s  
+  ✓ it returns null on HTTP error                                        0.27s  
+  ✓ it flatten returns null-safe payload when place is null              0.14s  
+  ✓ it flatten extracts opening hours weekday descriptions               0.16s  
+  ✓ it returns first place when API responds with results                0.16s  
+  ✓ it returns null when API key is missing                              0.17s  
+  ✓ it returns null on empty places array                                0.14s  
+  ✓ it flatten extracts phone with fallback international → national     0.16s  
+
+   PASS  Tests\Unit\Auth\AuthServiceTest
+  ✓ AuthService::attemptLogin avec bons credentials retourne user + req… 0.43s  
+  ✓ AuthService constants exposed                                        0.20s  
+  ✓ AuthService::attemptLogin avec mauvais password lance ValidationExc… 0.40s  
+  ✓ AuthService::attemptLogin avec totp_enabled_at retourne requires_2f… 0.57s  
+  ✓ AuthService::attemptLogin reset failed_login_count après login OK    0.49s  
+  ✓ AuthService::attemptLogin rejette account avec locked_until future   0.48s  
+  ✓ AuthService::attemptLogin trace last_login_ip + user_agent           0.15s  
+[2026-08-19 14:29:16] local.WARNING: Hunter API error {"status":503,"email":"hi@acme.fr"} 
+[2026-08-19 14:29:16] local.WARNING: Hunter API error {"status":503,"email":"hi@acme.fr"} 
+
+   PASS  Tests\Unit\Email\HunterEmailVerifierTest
+  ✓ it caches result for 30 days to avoid quota waste                    0.15s  
+  ✓ it returns deliverable result when Hunter returns deliverable        0.13s  
+  ✓ it returns unknown when API key is missing                           0.11s  
+  ✓ it does NOT cache a transport failure — un 5xx doit rester réessaya… 0.11s  
+  ✓ it returns unknown with http_error when API responds 5xx             0.10s  
+
+   PASS  Tests\Unit\Tags\AutoTaggerServiceTest
+  ✓ it creates dept and region tags from geo attributes                  0.35s  
+  ✓ it idempotent on second call                                         0.31s  
+  ✓ it removes auto-rule tag when attribute changes                      1.07s  
+  ✓ it preserves manual tags on resync                                   1.58s  
+  ✓ it imports LLM classification tags as intent category                0.45s  
+  ✓ it creates size and sector tags                                      0.51s  
+  ✓ it never removes a locked governed tag on resync                     0.32s  
+  ✓ it never removes a src: provenance tag on resync                     0.55s  
+
+   PASS  Tests\Unit\AnnuaireEntreprises\HttpAnnuaireEntreprisesAddressTest
+  ✓ it returns null address when siège absent                            0.31s  
+  ✓ it reconstructs siège address from voie components when geo_adresse… 0.25s  
+  ✓ it exposes siège address from geo_adresse                            0.32s  
+
+   PASS  Tests\Unit\Dedup\OptOutTest
+  ✓ isOptedOut cross-workspace (table sans workspace_id)                 0.80s  
+  ✓ isOptedOut normalizes phone (strip separators)                       1.48s  
+  ✓ isOptedOut normalizes email (trim + lowercase)                       0.30s  
+  ✓ isOptedOut returns false when no opt_out entry                       0.56s  
+  ✓ isOptedOut returns true after addOptOut                              0.30s  
+
+   PASS  Tests\Unit\Classification\AutoTagApplierTest
+  ✓ matches all-of compound rule                                         0.26s  
+  ✓ regex operator works                                                 0.11s  
+  ✓ matches starts_with rule                                             0.13s  
+  ✓ in operator works on array values                                    0.12s  
+  ✓ matches simple equality rule                                         0.13s  
+  ✓ numeric comparison operators                                         0.14s  
+  ✓ matches any-of compound rule                                         0.10s  
+
+   PASS  Tests\Unit\Dedup\DeduplicationServiceTest
+  ✓ buildDedupKey for google-maps incorporates query + coords            0.22s  
+  ✓ computeContactHash matches expected sha256 pattern                   0.27s  
+  ✓ computeContactHash is case + accents insensitive                     0.12s  
+  ✓ SOURCE_TTL_DAYS contains all 14 sources                              0.19s  
+  ✓ buildDedupKey differs across sources                                 0.24s  
+  ✓ buildDedupKey is stable for same inputs                              0.15s  
+
+   PASS  Tests\Unit\Http\SsrfGuardExtendedTest
+  ✓ SsrfGuard rejette 0.0.0.0                                            0.15s  
+  ✓ SsrfGuard rejette 169.254.x.x link-local                             0.09s  
+  ✓ SsrfGuard rejette metadata AWS                                       0.10s  
+  ✓ SsrfGuard rejette metadata Alibaba                                   0.08s  
+  ✓ SsrfGuard ensure() lance exception si denied                         0.08s  
+  ✓ SsrfGuard rejette URL vide                                           0.09s  
+  ✓ SsrfGuard rejette ftp                                                0.11s  
+  ✓ SsrfGuard rejette 10.0.0.0/8                                         0.12s  
+  ✓ SsrfGuard rejette metadata GCP                                       0.09s  
+  ✓ SsrfGuard rejette 192.168.0.0/16                                     0.07s  
+  ✓ SsrfGuard rejette metadata Azure                                     0.08s  
+  ✓ SsrfGuard rejette scheme non-http(s)                                 0.07s  
+  ✓ SsrfGuard rejette 127.0.0.1                                          0.08s  
+  ✓ SsrfGuard rejette 172.16-31                                          0.06s  
+  ✓ SsrfGuard rejette localhost                                          0.09s  
+  ✓ SsrfGuard rejette URL invalide                                       0.10s  
+[2026-08-19 14:29:30] local.INFO: Mock magic link (would be emailed) {"email":"test@example.com","link":"https://app.localhost/magic-link/verify?token=De5P3skc8ElLBUZWTEO4xs2oCTcKr1vueibSfFUu6PS63SuVXRNJQ2w9urYF3j3f"} 
+[2026-08-19 14:29:30] local.INFO: Magic link requested for unknown email {"email":"nobody@example.com"} 
+
+   PASS  Tests\Unit\Auth\MagicLinkServiceTest
+  ✓ issue creates a magic_links row with hashed token and 15min TTL      0.20s  
+  ✓ issue for unknown email does not throw (anti-enumeration)            0.21s  
+[2026-08-19 14:29:30] local.DEBUG: DomainFinder Brave skipped (no API key)  
+[2026-08-19 14:29:34] local.DEBUG: DomainFinder Brave skipped (no API key)  
+[2026-08-19 14:29:35] local.DEBUG: DomainFinder Brave skipped (no API key)  
+
+   PASS  Tests\Unit\Domain\DomainFinderServiceTest
+  ✓ it falls back to Pages Jaunes when MOCK_SCRAPERS=false and Brave em… 3.36s  
+  ✓ it returns null when Brave key absent and PJ scrapers disabled       1.12s  
+  ✓ it pass 1 candidates = 4 variantes prioritaires                      0.15s  
+  ✓ it returns null when denomination missing                            0.15s  
+  ✓ it skips Pages Jaunes when MOCK_SCRAPERS=true                        2.73s  
+  ✓ it returns signals.legal.siteweb when present                        0.10s  
+  ✓ it pass 2 candidates ajoute TLD alternatifs, deux premiers mots et…  0.13s  
+  ✓ it returns first non-blacklist URL from Brave Search                 0.12s  
+  ✓ it acronyme non généré si moins de 3 tokens                          0.12s  
+
+   PASS  Tests\Unit\Events\BroadcastEventsTest
+  ✓ ScrapeJobCompleted broadcastWith expose les bons champs              0.15s  
+  ✓ NotificationCreated route vers channel workspace si userId null      0.12s  
+  ✓ NotificationCreated route vers channel user si userId fourni         0.16s  
+  ✓ ScrapeJobCompleted alias broadcast name                              0.28s  
+  ✓ CompanyEnriched payload                                              0.15s  
+  ✓ NotificationCreated payload contient severity                        0.11s  
+  ✓ ScrapeJobCompleted broadcast sur channel private workspace           0.15s  
+
+   PASS  Tests\Unit\Support\AuditLoggerTest
+  ✓ it skips silently when workspace_id missing                          0.46s  
+  ✓ it fails open when DB insert throws (table missing)                  0.19s  
+
+   PASS  Tests\Unit\Email\SmtpProberTest
+  ✓ email normalization (trim + lowercase)                               0.12s  
+  ✓ mock prober detects role email                                       0.11s  
+  ✓ mock prober returns valid for known email                            0.17s  
+  ✓ mock prober defaults to valid for unknown email in fixture           0.13s  
+  ✓ mock prober detects disposable domain                                0.17s  
+
+   PASS  Tests\Unit\Legal\MentionsLegalesScraperServiceTest
+  ✓ it returns false when body too short on all paths                    0.67s  
+  ✓ it deduces service roles and picks a service email as generic        0.42s  
+  ✓ it extracts email and phone from mentions-legales page               0.23s  
+  ✓ it captures ALL emails and ALL phones (not just the first)           0.25s  
+  ✓ it returns false when website missing                                0.45s  
+  ✓ it skips technical email prefixes                                    1.34s  
+  ✓ it tries fallback path when first 404                                0.77s  
+[2026-08-19 14:29:45] local.INFO: GooglePlacesClient quota exceeded, skipping call {"query":"Boulangerie Dupont Paris","used":100,"limit":100} 
+
+   PASS  Tests\Unit\Scraping\GooglePlacesQuotaTest
+  ✓ it does not increment quota when call uses cache hit                 0.14s  
+  ✓ it skips API call when monthly quota is exceeded                     0.16s  
+  ✓ it increments monthly usage counter after successful call            0.20s  
+  ✓ it allows API call when under monthly quota                          0.04s  
+  ✓ it quota counter is per-month (key includes YYYY-MM)                 0.06s  
+  ✓ it isQuotaExceeded reflects current_month_usage vs limit             0.12s  
+
+   PASS  Tests\Unit\PhpstanBaselineNeGrossitPasTest
+  ✓ le parseur de baseline lit vraiment des entrées                      0.15s  
+  ✓ l'en-tête de la baseline annonce les nombres réellement présents     0.11s  
+  ✓ aucune entrée de baseline ne vise le socle CRM                       0.13s  
+  ✓ la baseline PHPStan ne grossit pas                                   0.09s  
+  ✓ reportUnmatchedIgnoredErrors reste activé                            0.09s  
+[2026-08-19 14:29:47] local.WARNING: HibpChecker: unexpected {"error":"GuzzleHttp\\PrepareBodyMiddleware::__invoke(): Return value must be of type GuzzleHttp\\Promise\\PromiseInterface, GuzzleHttp\\Psr7\\Response returned"} 
+
+   PASS  Tests\Unit\Rules\PasswordResetWithHibpTest
+  ✓ HIBP intégration : password long custom est sain                     0.11s  
+  ✓ HIBP cache prefix unique par 5 chars du sha1                         0.09s  
+  ✓ HIBP integration : password "password" est compromis                 0.08s  
+  ✓ HIBP user-agent inclus dans la requête                               0.14s  
+
+   PASS  Tests\Unit\SmokeTest
+  ✓ LLMResponseData decodes JSON text via asJson()                       0.13s  
+  ✓ mock LLM client returns a generic response for known use case        0.11s  
+
+   PASS  Tests\Unit\Classification\AutoClassifierServiceTest
+  ✓ it extracts dept 2B for Haute-Corse postcode 20200                   0.26s  
+  ✓ it falls back to "autre" for unknown NAF prefix                      0.23s  
+  ✓ it maps NAF 6201Z to it_saas                                         0.40s  
+  ✓ it classifies effectif_range 52 as grande entreprise                 0.35s  
+  ✓ it maps NAF 4321A to btp                                             0.38s  
+  ✓ it extracts dept 971 for DOM postcode 97110                          0.59s  
+  ✓ it extracts commune code and city name from signals.ban              0.23s  
+  ✓ it classifies effectif_range 21 as PME                               0.48s  
+  ✓ it extracts dept 2A for Corse-du-Sud postcode 20000                  0.30s  
+  ✓ it extracts dept 75 from postcode 75008                              0.21s  
+[2026-08-19 14:29:59] local.INFO: Audience refresh start {"audience_id":4} 
+[2026-08-19 14:29:59] local.INFO: Audience refresh via Bus::batch {"audience_id":4,"total":5001} 
+[2026-08-19 14:30:11] local.INFO: Audience refresh start {"audience_id":5} 
+[2026-08-19 14:30:14] local.INFO: Audience refresh done {"audience_id":5,"members":5000} 
+[2026-08-19 14:30:22] local.INFO: Audience refresh start {"audience_id":9} 
+[2026-08-19 14:30:22] local.INFO: Audience refresh via Bus::batch {"audience_id":9,"total":5001} 
+[2026-08-19 14:30:23] local.INFO: Audience refresh start {"audience_id":10} 
+[2026-08-19 14:30:23] local.INFO: Audience refresh done {"audience_id":10,"members":2} 
+[2026-08-19 14:30:23] local.INFO: Audience refresh start {"audience_id":10} 
+[2026-08-19 14:30:23] local.INFO: Audience refresh done {"audience_id":10,"members":2} 
+[2026-08-19 14:30:25] local.INFO: Audience refresh start {"audience_id":16} 
+[2026-08-19 14:30:25] local.INFO: Audience refresh done {"audience_id":16,"members":1} 
+
+   PASS  Tests\Unit\Audiences\AudienceBuilderServiceTest
+  ✓ it not : is_not_null garde les fiches dont le champ est NULL         0.47s  
+  ✓ it tags contains_any ne retient que les fiches portant un des slugs  0.60s  
+  ✓ it not : SQL et evaluateur en memoire donnent le MEME nombre (champ… 2.81s  
+  ✓ it filters by has_email contacts                                     0.60s  
+  ✓ it skips invalid fields/ops silently                                 0.37s  
+  ✓ it tags avec un operateur non supporte ne vise personne              0.61s  
+  ✓ it filters by quality_score range                                    0.30s  
+  ✓ it refresh bascule en Bus::batch au-dela de 5 000 fiches             3.73s  
+  ✓ it refresh reste en ligne a exactement 5 000 fiches (le seuil est…  14.47s  
+  ✓ it neq garde les fiches dont le champ est NULL, comme en memoire     0.28s  
+  ✓ it tags contains_any avec une liste VIDE ne vise personne            0.17s  
+  ✓ it not exclut les fiches qui matchent la condition                   0.99s  
+  ✓ it preview uses any combinator (OR)                                  1.01s  
+  ✓ it not sur un champ NULL garde la fiche : inconnu n est pas egal     0.31s  
+  ✓ it preview returns count for simple criteria                         0.29s  
+  ✓ it tags contains_any accepte plusieurs slugs (union, pas intersecti… 0.42s  
+  ✓ it not_in garde les fiches dont le champ est NULL, comme en memoire  0.58s  
+  ✓ it tags : SQL et evaluateur en memoire donnent le MEME nombre        0.56s  
+  ✓ it le chemin batch remet l audience a zero AVANT de dispatcher       3.34s  
+  ✓ it refresh is idempotent (run twice = same count)                    0.52s  
+  ✓ it neq sur un champ renseigne ne change pas de comportement          0.40s  
+  ✓ it not + tags contains_any garde les fiches SANS le tag              1.24s  
+  ✓ it evaluateForCompany returns matching audience IDs                  0.23s  
+  ✓ it not + in sur un champ NULL garde la fiche, comme en memoire       0.32s  
+  ✓ it not + neq sur un champ NULL exclut la fiche, des deux cotes       0.23s  
+  ✓ it refresh populates audience_members                                0.33s  
+
+   PASS  Tests\Unit\Http\ProxiedHttpClientTest
+  ✓ it reports proxy enabled when flag set                               0.24s  
+  ✓ it reports proxy disabled by default                                 0.10s  
+  ✓ it builds a PendingRequest without proxy option when disabled        0.13s  
+  ✓ it applies proxy option when enabled with credentials                0.25s  
+  ✓ it skips proxy option when enabled but credentials missing           0.15s  
+
+   PASS  Tests\Unit\Http\SsrfGuardTest
+  ✓ blocks the whole link-local range 169.254/16 by CIDR (not by hostna… 0.13s  
+  ✓ blocks 127.0.0.1                                                     0.12s  
+  ✓ blocks AWS metadata endpoint                                         0.05s  
+  ✓ blocks CGNAT 100.64/10                                               0.18s  
+  ✓ blocks ftp scheme                                                    0.13s  
+  ✓ ensure throws when blocked                                           0.11s  
+  ✓ blocks localhost                                                     0.12s  
+  ✓ blocks RFC 1918 172.16/12                                            0.13s  
+  ✓ blocks file scheme                                                   0.11s  
+  ✓ invalid URL is rejected                                              0.11s  
+  ✓ blocks GCP metadata hostname                                         0.21s  
+  ✓ blocks RFC 1918 192.168/16                                           0.13s  
+  ✓ blocks RFC 1918 10/8                                                 0.13s  
+
+   PASS  Tests\Unit\Email\EmailFinderServiceTest
+  ✓ renderPattern handles accents + apostrophes                          1.51s  
+  ✓ aucun accent ne peut faire entrer de ponctuation dans une adresse    0.13s  
+  ✓ PATTERNS contains 18 entries                                         0.13s  
+  ✓ verifyEmail returns unknown when no Hunter verifier wired (Sprint H… 0.19s  
+  ✓ les initiales aussi sont ASCII (motif {f}.{last})                    0.16s  
+  ✓ generateCandidates produces 12+ unique valid emails for typical inp… 0.14s  
+  ✓ verifyEmail returns invalid for malformed addresses (Sprint H2)      0.13s  
+  ✓ verifyEmail returns skipped_catchall_provider for big mail provider… 0.11s  
+  ✓ detectPatternFromKnownEmails returns dominant pattern                0.14s  
+
+   PASS  Tests\Unit\Audit\AuditHashChainTest
+  ✓ verifyChain detects tampering on event_type (the HTTP verb)          1.72s  
+  ✓ verifyChain detects tampering                                        0.19s  
+  ✓ first record uses the 64-zero genesis prev hash                      0.36s  
+  ✓ verifyChain returns true for untampered chain                        0.56s  
+  ✓ subsequent record chains to previous hash                            2.87s  
+  ✓ verifyChain detects a rewritten prev_hash link                       0.43s  
+
+   PASS  Tests\Unit\Container\DependancesOptionnellesTest
+  ✓ les dépendances optionnelles sont RÉELLEMENT injectées par le conte… 0.12s  
+  ✓ les dépendances optionnelles sont RÉELLEMENT injectées par le conte… 0.08s  
+  ✓ les dépendances optionnelles sont RÉELLEMENT injectées par le conte… 0.09s  
+  ✓ les dépendances optionnelles sont RÉELLEMENT injectées par le conte… 0.09s  
+  ✓ le conteneur sait résoudre les classes concrètes bindées with ('App… 0.09s  
+  ✓ le conteneur sait résoudre les classes concrètes bindées with ('App… 0.10s  
+  ✓ le conteneur sait résoudre les classes concrètes bindées with ('App… 0.15s  
+
+   PASS  Tests\Unit\Media\ImportMediaFromArcomTest
+  ✓ it parse la base ARCOM et dédoublonne les stations par nom+type      0.97s  
+
+   PASS  Tests\Unit\Support\WaterfallSentryTest
+  ✓ it captures without throwing when Sentry class missing               0.18s  
+  ✓ it handles null company without crashing                             0.23s  
+
+   PASS  Tests\Unit\Domain\DomainFinderRevalidateTest
+  ✓ it marque MORT un site dont la requête lève une ConnectionException  0.18s  
+  ✓ it marque VIVANT même un 404/500 (le serveur répond = hébergement v… 0.13s  
+  ✓ it mélange vivant + mort dans un même lot                            0.16s  
+  ✓ it ignore (skip) les entreprises sans website                        0.10s  
+  ✓ it marque VIVANT un site qui répond 200                              0.09s  
+[2026-08-19 14:30:41] local.DEBUG: FranceTravailDiscovery INSEE check failed {"siren":"123456789","error":"INSEE auth requires either INSEE_API_KEY (plan public) or INSEE_CLIENT_ID + INSEE_CLIENT_SECRET (plan authentifié)."} 
+[2026-08-19 14:30:41] local.DEBUG: FranceTravailDiscovery INSEE check failed {"siren":"987654321","error":"INSEE auth requires either INSEE_API_KEY (plan public) or INSEE_CLIENT_ID + INSEE_CLIENT_SECRET (plan authentifié)."} 
+[2026-08-19 14:30:41] local.DEBUG: FranceTravailDiscovery INSEE check failed {"siren":"444444444","error":"INSEE down"} 
+[2026-08-19 14:30:41] local.WARNING: FranceTravailDiscovery: OAuth token unavailable, returning empty  
+
+   PASS  Tests\Unit\FranceTravail\FranceTravailDiscoveryClientTest
+  ✓ it skips offres with invalid SIRET                                   0.15s  
+  ✓ it returns deduplicated entreprises from offres                      0.61s  
+  ✓ it Sprint H3: graceful fallback if InseeClient throws                0.11s  
+  ✓ it returns empty when client credentials missing                     0.09s  
+  ✓ it returns empty on 204 No Content                                   0.15s  
+  ✓ it Sprint H3: filters out radiées entreprises via INSEE check        0.12s  
+
+   PASS  Tests\Unit\Rotations\SearchEngineRotatorTest
+  ✓ SearchEngineRotator retourne null si total weight = 0                0.22s  
+  ✓ SearchEngineRotator retourne null si aucun moteur enabled            0.15s  
+  ✓ SearchEngineRotator pondère par weight statistiquement               0.77s  
+  ✓ SearchEngineRotator retourne un engine si dispo                      0.14s  
+
+   PASS  Tests\Feature\Commands\GenerateMediaRedactionEmailsTest
+  ✓ it --dry-run ne persiste aucun email                                 1.94s  
+  ✓ it est reprenable : ne retraite pas un média déjà pourvu d'un email  0.26s  
+  ✓ it écrit redaction@ sur un domaine qui a des MX et laisse null les…  0.25s  
+
+   PASS  Tests\Feature\ContactsIndexTest
+  ✓ la liste renvoie les contacts existants — pas un tableau vide        0.79s  
+  ✓ pays et statut se COMBINENT — c’est le cas d’usage réel              0.57s  
+  ✓ la pagination est bornée : per_page=1000 ne ramène pas 1000 lignes   0.39s  
+  ✓ chaque ligne porte les champs que l’écran affiche                    0.27s  
+  ✓ filtre par statut e-mail                                             0.37s  
+  ✓ la projection n’expose PAS les colonnes internes                     0.29s  
+  ✓ filtre par statut de prospection — « contactables » ne ramène que l… 0.26s  
+  ✓ recherche par nom : préfixe, insensible à la casse, et JAMAIS « con… 0.35s  
+  ✓ un contact d’un AUTRE workspace n’apparaît jamais                    0.93s  
+  ✓ filtre par pays — via l’entreprise rattachée                         0.53s  
+
+   PASS  Tests\Feature\EligibiliteCampagneTest
+  ✓ 🔴 la définition est FRAÎCHE : une opposition postérieure retire au… 0.43s  
+  ✓ le filtre HTTP expose la même définition                             0.98s  
+  ✓ une opposition arrivée HACHÉE retire aussi la fiche                  0.24s  
+  ✓ le palier de confiance CIBLE, il ne conditionne pas le droit         0.36s  
+  ✓ une opposition retire la fiche — comparaison sur l’empreinte         0.31s  
+  ✓ l’inverse montre le RESTE À FAIRE, pas un ensemble vide              0.32s  
+  ✓ une opposition de l’univers VIVIER ne retire pas une fiche business  0.23s  
+  ✓ sans adresse, une fiche n’est jamais éligible                        0.18s  
+[2026-08-19 14:30:55] local.ERROR: users.index failed {"exception":"SQLSTATE[42703]: Undefined column: 7 ERROR:  column \"two_factor_enabled\" does not exist
+LINE 1: ...urrent_workspace_id\", \"first_login_completed_at\", \"two_facto...
+                                                             ^ (Connection: pgsql, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_a45, SQL: select \"id\", \"email\", \"name\", \"current_workspace_id\", \"first_login_completed_at\", \"two_factor_enabled\", \"last_login_at\" from \"users\" where \"current_workspace_id\" = 8234845f-cb8b-4ce3-a4e2-f4834fb0845d order by \"name\" asc limit 200)"} 
+[2026-08-19 14:30:55] local.ERROR: SQLSTATE[42703]: Undefined column: 7 ERROR:  column "two_factor_enabled" does not exist
+LINE 1: ...urrent_workspace_id", "first_login_completed_at", "two_facto...
+                                                             ^ (Connection: pgsql, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_a45, SQL: select "id", "email", "name", "current_workspace_id", "first_login_completed_at", "two_factor_enabled", "last_login_at" from "users" where "current_workspace_id" = 8234845f-cb8b-4ce3-a4e2-f4834fb0845d order by "name" asc limit 200) {"userId":"a6e023b0-7431-4779-8e83-948d0089061c","exception":"[object] (Illuminate\\Database\\QueryException(code: 42703): SQLSTATE[42703]: Undefined column: 7 ERROR:  column \"two_factor_enabled\" does not exist
+LINE 1: ...urrent_workspace_id\", \"first_login_completed_at\", \"two_facto...
+                                                             ^ (Connection: pgsql, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_a45, SQL: select \"id\", \"email\", \"name\", \"current_workspace_id\", \"first_login_completed_at\", \"two_factor_enabled\", \"last_login_at\" from \"users\" where \"current_workspace_id\" = 8234845f-cb8b-4ce3-a4e2-f4834fb0845d order by \"name\" asc limit 200) at /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php:838)
+[stacktrace]
+#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(794): Illuminate\\Database\\Connection->runQueryCallback('select \"id\", \"e...', Array, Object(Closure))
+#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(411): Illuminate\\Database\\Connection->run('select \"id\", \"e...', Array, Object(Closure))
+#2 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php(3505): Illuminate\\Database\\Connection->select('select \"id\", \"e...', Array, true)
+#3 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php(3490): Illuminate\\Database\\Query\\Builder->runSelect()
+#4 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php(4080): Illuminate\\Database\\Query\\Builder->Illuminate\\Database\\Query\\{closure}()
+#5 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php(3489): Illuminate\\Database\\Query\\Builder->onceWithColumns(Array, Object(Closure))
+#6 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php(902): Illuminate\\Database\\Query\\Builder->get(Array)
+#7 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php(884): Illuminate\\Database\\Eloquent\\Builder->getModels(Array)
+#8 /var/www/html/app/Http/Controllers/Api/UsersController.php(36): Illuminate\\Database\\Eloquent\\Builder->get()
+#9 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/Controller.php(54): App\\Http\\Controllers\\Api\\UsersController->index(Object(Illuminate\\Http\\Request))
+#10 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/ControllerDispatcher.php(43): Illuminate\\Routing\\Controller->callAction('index', Array)
+#11 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/Route.php(265): Illuminate\\Routing\\ControllerDispatcher->dispatch(Object(Illuminate\\Routing\\Route), Object(App\\Http\\Controllers\\Api\\UsersController), 'index')
+#12 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/Route.php(211): Illuminate\\Routing\\Route->runController()
+#13 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/Router.php(822): Illuminate\\Routing\\Route->run()
+#14 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(180): Illuminate\\Routing\\Router->Illuminate\\Routing\\{closure}(Object(Illuminate\\Http\\Request))
+#15 /var/www/html/app/Http/Middleware/AuditHashChainLogger.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#16 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): App\\Http\\Middleware\\AuditHashChainLogger->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#17 /var/www/html/app/Http/Middleware/EnforceFirstLoginSetup.php(40): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#18 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): App\\Http\\Middleware\\EnforceFirstLoginSetup->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#19 /var/www/html/app/Http/Middleware/SetCurrentWorkspace.php(73): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#20 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): App\\Http\\Middleware\\SetCurrentWorkspace->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#21 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php(50): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#22 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#23 /var/www/html/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(63): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#24 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Auth\\Middleware\\Authenticate->handle(Object(Illuminate\\Http\\Request), Object(Closure), 'sanctum')
+#25 /var/www/html/vendor/laravel/sanctum/src/Http/Middleware/EnsureFrontendRequestsAreStateful.php(26): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#26 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(180): Laravel\\Sanctum\\Http\\Middleware\\EnsureFrontendRequestsAreStateful->Laravel\\Sanctum\\Http\\Middleware\\{closure}(Object(Illuminate\\Http\\Request))
+#27 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#28 /var/www/html/vendor/laravel/sanctum/src/Http/Middleware/EnsureFrontendRequestsAreStateful.php(25): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#29 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Laravel\\Sanctum\\Http\\Middleware\\EnsureFrontendRequestsAreStateful->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#30 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#31 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/Router.php(821): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#32 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/Router.php(800): Illuminate\\Routing\\Router->runRouteWithinStack(Object(Illuminate\\Routing\\Route), Object(Illuminate\\Http\\Request))
+#33 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/Router.php(764): Illuminate\\Routing\\Router->runRoute(Object(Illuminate\\Http\\Request), Object(Illuminate\\Routing\\Route))
+#34 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/Router.php(753): Illuminate\\Routing\\Router->dispatchToRoute(Object(Illuminate\\Http\\Request))
+#35 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(200): Illuminate\\Routing\\Router->dispatch(Object(Illuminate\\Http\\Request))
+#36 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(180): Illuminate\\Foundation\\Http\\Kernel->Illuminate\\Foundation\\Http\\{closure}(Object(Illuminate\\Http\\Request))
+#37 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#38 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#39 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#40 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#41 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#42 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\TrimStrings->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#43 /var/www/html/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#44 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Http\\Middleware\\ValidatePostSize->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#45 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(109): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#46 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#47 /var/www/html/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(74): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#48 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Http\\Middleware\\HandleCors->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#49 /var/www/html/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#50 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Http\\Middleware\\TrustProxies->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#51 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#52 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#53 /var/www/html/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePathEncoding.php(26): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#54 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Http\\Middleware\\ValidatePathEncoding->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#55 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#56 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(175): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#57 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(144): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter(Object(Illuminate\\Http\\Request))
+#58 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/MakesHttpRequests.php(607): Illuminate\\Foundation\\Http\\Kernel->handle(Object(Illuminate\\Http\\Request))
+#59 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/MakesHttpRequests.php(573): Illuminate\\Foundation\\Testing\\TestCase->call('GET', '/api/v1/users', Array, Array, Array, Array, '[]')
+#60 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/MakesHttpRequests.php(381): Illuminate\\Foundation\\Testing\\TestCase->json('GET', '/api/v1/users', Array, Array, 0)
+#61 /var/www/html/tests/Feature/Controllers/WorkspaceControllerTest.php(55): Illuminate\\Foundation\\Testing\\TestCase->getJson('/api/v1/users')
+#62 /var/www/html/vendor/pestphp/pest/src/Factories/TestCaseMethodFactory.php(171): P\\Tests\\Feature\\Controllers\\WorkspaceControllerTest->{closure}()
+#63 [internal function]: P\\Tests\\Feature\\Controllers\\WorkspaceControllerTest->Pest\\Factories\\{closure}()
+#64 /var/www/html/vendor/pestphp/pest/src/Concerns/Testable.php(419): call_user_func_array(Object(Closure), Array)
+#65 /var/www/html/vendor/pestphp/pest/src/Support/ExceptionTrace.php(26): P\\Tests\\Feature\\Controllers\\WorkspaceControllerTest->Pest\\Concerns\\{closure}()
+#66 /var/www/html/vendor/pestphp/pest/src/Concerns/Testable.php(419): Pest\\Support\\ExceptionTrace::ensure(Object(Closure))
+#67 /var/www/html/vendor/pestphp/pest/src/Concerns/Testable.php(321): P\\Tests\\Feature\\Controllers\\WorkspaceControllerTest->__callClosure(Object(Closure), Array)
+#68 /var/www/html/vendor/pestphp/pest/src/Factories/TestCaseFactory.php(170) : eval()'d code(53): P\\Tests\\Feature\\Controllers\\WorkspaceControllerTest->__runTest(Object(Closure))
+#69 /var/www/html/vendor/phpunit/phpunit/src/Framework/TestCase.php(1667): P\\Tests\\Feature\\Controllers\\WorkspaceControllerTest->__pest_evaluable_GET__users_authentifié_retourne_liste_vide_stub()
+#70 /var/www/html/vendor/phpunit/phpunit/src/Framework/TestCase.php(519): PHPUnit\\Framework\\TestCase->runTest()
+#71 /var/www/html/vendor/phpunit/phpunit/src/Framework/TestRunner/TestRunner.php(87): PHPUnit\\Framework\\TestCase->runBare()
+#72 /var/www/html/vendor/phpunit/phpunit/src/Framework/TestCase.php(365): PHPUnit\\Framework\\TestRunner->run(Object(P\\Tests\\Feature\\Controllers\\WorkspaceControllerTest))
+#73 /var/www/html/vendor/phpunit/phpunit/src/Framework/TestSuite.php(369): PHPUnit\\Framework\\TestCase->run()
+#74 /var/www/html/vendor/phpunit/phpunit/src/Framework/TestSuite.php(369): PHPUnit\\Framework\\TestSuite->run()
+#75 /var/www/html/vendor/phpunit/phpunit/src/Framework/TestSuite.php(369): PHPUnit\\Framework\\TestSuite->run()
+#76 /var/www/html/vendor/phpunit/phpunit/src/TextUI/TestRunner.php(64): PHPUnit\\Framework\\TestSuite->run()
+#77 /var/www/html/vendor/phpunit/phpunit/src/TextUI/Application.php(211): PHPUnit\\TextUI\\TestRunner->run(Object(PHPUnit\\TextUI\\Configuration\\Configuration), Object(PHPUnit\\Runner\\ResultCache\\DefaultResultCache), Object(PHPUnit\\Framework\\TestSuite))
+#78 /var/www/html/vendor/pestphp/pest/src/Kernel.php(103): PHPUnit\\TextUI\\Application->run(Array)
+#79 /var/www/html/vendor/pestphp/pest/bin/pest(184): Pest\\Kernel->handle(Array, Array)
+#80 /var/www/html/vendor/pestphp/pest/bin/pest(192): {closure}()
+#81 /var/www/html/vendor/bin/pest(119): include('/var/www/html/v...')
+#82 {main}
+
+[previous exception] [object] (PDOException(code: 42703): SQLSTATE[42703]: Undefined column: 7 ERROR:  column \"two_factor_enabled\" does not exist
+LINE 1: ...urrent_workspace_id\", \"first_login_completed_at\", \"two_facto...
+                                                             ^ at /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php:425)
+[stacktrace]
+#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(425): PDOStatement->execute()
+#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(827): Illuminate\\Database\\Connection->Illuminate\\Database\\{closure}('select \"id\", \"e...', Array)
+#2 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(794): Illuminate\\Database\\Connection->runQueryCallback('select \"id\", \"e...', Array, Object(Closure))
+#3 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(411): Illuminate\\Database\\Connection->run('select \"id\", \"e...', Array, Object(Closure))
+#4 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php(3505): Illuminate\\Database\\Connection->select('select \"id\", \"e...', Array, true)
+#5 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php(3490): Illuminate\\Database\\Query\\Builder->runSelect()
+#6 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php(4080): Illuminate\\Database\\Query\\Builder->Illuminate\\Database\\Query\\{closure}()
+#7 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php(3489): Illuminate\\Database\\Query\\Builder->onceWithColumns(Array, Object(Closure))
+#8 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php(902): Illuminate\\Database\\Query\\Builder->get(Array)
+#9 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php(884): Illuminate\\Database\\Eloquent\\Builder->getModels(Array)
+#10 /var/www/html/app/Http/Controllers/Api/UsersController.php(36): Illuminate\\Database\\Eloquent\\Builder->get()
+#11 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/Controller.php(54): App\\Http\\Controllers\\Api\\UsersController->index(Object(Illuminate\\Http\\Request))
+#12 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/ControllerDispatcher.php(43): Illuminate\\Routing\\Controller->callAction('index', Array)
+#13 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/Route.php(265): Illuminate\\Routing\\ControllerDispatcher->dispatch(Object(Illuminate\\Routing\\Route), Object(App\\Http\\Controllers\\Api\\UsersController), 'index')
+#14 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/Route.php(211): Illuminate\\Routing\\Route->runController()
+#15 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/Router.php(822): Illuminate\\Routing\\Route->run()
+#16 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(180): Illuminate\\Routing\\Router->Illuminate\\Routing\\{closure}(Object(Illuminate\\Http\\Request))
+#17 /var/www/html/app/Http/Middleware/AuditHashChainLogger.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#18 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): App\\Http\\Middleware\\AuditHashChainLogger->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#19 /var/www/html/app/Http/Middleware/EnforceFirstLoginSetup.php(40): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#20 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): App\\Http\\Middleware\\EnforceFirstLoginSetup->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#21 /var/www/html/app/Http/Middleware/SetCurrentWorkspace.php(73): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#22 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): App\\Http\\Middleware\\SetCurrentWorkspace->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#23 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php(50): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#24 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#25 /var/www/html/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(63): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#26 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Auth\\Middleware\\Authenticate->handle(Object(Illuminate\\Http\\Request), Object(Closure), 'sanctum')
+#27 /var/www/html/vendor/laravel/sanctum/src/Http/Middleware/EnsureFrontendRequestsAreStateful.php(26): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#28 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(180): Laravel\\Sanctum\\Http\\Middleware\\EnsureFrontendRequestsAreStateful->Laravel\\Sanctum\\Http\\Middleware\\{closure}(Object(Illuminate\\Http\\Request))
+#29 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#30 /var/www/html/vendor/laravel/sanctum/src/Http/Middleware/EnsureFrontendRequestsAreStateful.php(25): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#31 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Laravel\\Sanctum\\Http\\Middleware\\EnsureFrontendRequestsAreStateful->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#32 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#33 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/Router.php(821): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#34 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/Router.php(800): Illuminate\\Routing\\Router->runRouteWithinStack(Object(Illuminate\\Routing\\Route), Object(Illuminate\\Http\\Request))
+#35 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/Router.php(764): Illuminate\\Routing\\Router->runRoute(Object(Illuminate\\Http\\Request), Object(Illuminate\\Routing\\Route))
+#36 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/Router.php(753): Illuminate\\Routing\\Router->dispatchToRoute(Object(Illuminate\\Http\\Request))
+#37 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(200): Illuminate\\Routing\\Router->dispatch(Object(Illuminate\\Http\\Request))
+#38 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(180): Illuminate\\Foundation\\Http\\Kernel->Illuminate\\Foundation\\Http\\{closure}(Object(Illuminate\\Http\\Request))
+#39 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#40 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#41 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#42 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#43 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#44 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\TrimStrings->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#45 /var/www/html/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#46 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Http\\Middleware\\ValidatePostSize->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#47 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(109): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#48 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#49 /var/www/html/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(74): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#50 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Http\\Middleware\\HandleCors->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#51 /var/www/html/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#52 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Http\\Middleware\\TrustProxies->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#53 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#54 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#55 /var/www/html/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePathEncoding.php(26): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#56 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Http\\Middleware\\ValidatePathEncoding->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#57 /var/www/html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#58 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(175): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#59 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(144): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter(Object(Illuminate\\Http\\Request))
+#60 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/MakesHttpRequests.php(607): Illuminate\\Foundation\\Http\\Kernel->handle(Object(Illuminate\\Http\\Request))
+#61 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/MakesHttpRequests.php(573): Illuminate\\Foundation\\Testing\\TestCase->call('GET', '/api/v1/users', Array, Array, Array, Array, '[]')
+#62 /var/www/html/vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/MakesHttpRequests.php(381): Illuminate\\Foundation\\Testing\\TestCase->json('GET', '/api/v1/users', Array, Array, 0)
+#63 /var/www/html/tests/Feature/Controllers/WorkspaceControllerTest.php(55): Illuminate\\Foundation\\Testing\\TestCase->getJson('/api/v1/users')
+#64 /var/www/html/vendor/pestphp/pest/src/Factories/TestCaseMethodFactory.php(171): P\\Tests\\Feature\\Controllers\\WorkspaceControllerTest->{closure}()
+#65 [internal function]: P\\Tests\\Feature\\Controllers\\WorkspaceControllerTest->Pest\\Factories\\{closure}()
+#66 /var/www/html/vendor/pestphp/pest/src/Concerns/Testable.php(419): call_user_func_array(Object(Closure), Array)
+#67 /var/www/html/vendor/pestphp/pest/src/Support/ExceptionTrace.php(26): P\\Tests\\Feature\\Controllers\\WorkspaceControllerTest->Pest\\Concerns\\{closure}()
+#68 /var/www/html/vendor/pestphp/pest/src/Concerns/Testable.php(419): Pest\\Support\\ExceptionTrace::ensure(Object(Closure))
+#69 /var/www/html/vendor/pestphp/pest/src/Concerns/Testable.php(321): P\\Tests\\Feature\\Controllers\\WorkspaceControllerTest->__callClosure(Object(Closure), Array)
+#70 /var/www/html/vendor/pestphp/pest/src/Factories/TestCaseFactory.php(170) : eval()'d code(53): P\\Tests\\Feature\\Controllers\\WorkspaceControllerTest->__runTest(Object(Closure))
+#71 /var/www/html/vendor/phpunit/phpunit/src/Framework/TestCase.php(1667): P\\Tests\\Feature\\Controllers\\WorkspaceControllerTest->__pest_evaluable_GET__users_authentifié_retourne_liste_vide_stub()
+#72 /var/www/html/vendor/phpunit/phpunit/src/Framework/TestCase.php(519): PHPUnit\\Framework\\TestCase->runTest()
+#73 /var/www/html/vendor/phpunit/phpunit/src/Framework/TestRunner/TestRunner.php(87): PHPUnit\\Framework\\TestCase->runBare()
+#74 /var/www/html/vendor/phpunit/phpunit/src/Framework/TestCase.php(365): PHPUnit\\Framework\\TestRunner->run(Object(P\\Tests\\Feature\\Controllers\\WorkspaceControllerTest))
+#75 /var/www/html/vendor/phpunit/phpunit/src/Framework/TestSuite.php(369): PHPUnit\\Framework\\TestCase->run()
+#76 /var/www/html/vendor/phpunit/phpunit/src/Framework/TestSuite.php(369): PHPUnit\\Framework\\TestSuite->run()
+#77 /var/www/html/vendor/phpunit/phpunit/src/Framework/TestSuite.php(369): PHPUnit\\Framework\\TestSuite->run()
+#78 /var/www/html/vendor/phpunit/phpunit/src/TextUI/TestRunner.php(64): PHPUnit\\Framework\\TestSuite->run()
+#79 /var/www/html/vendor/phpunit/phpunit/src/TextUI/Application.php(211): PHPUnit\\TextUI\\TestRunner->run(Object(PHPUnit\\TextUI\\Configuration\\Configuration), Object(PHPUnit\\Runner\\ResultCache\\DefaultResultCache), Object(PHPUnit\\Framework\\TestSuite))
+#80 /var/www/html/vendor/pestphp/pest/src/Kernel.php(103): PHPUnit\\TextUI\\Application->run(Array)
+#81 /var/www/html/vendor/pestphp/pest/bin/pest(184): Pest\\Kernel->handle(Array, Array)
+#82 /var/www/html/vendor/pestphp/pest/bin/pest(192): {closure}()
+#83 /var/www/html/vendor/bin/pest(119): include('/var/www/html/v...')
+#84 {main}
+"} 
+[2026-08-19 14:30:55] local.WARNING: SetCurrentWorkspace: clear failed {"exception":"SQLSTATE[25P02]: In failed sql transaction: 7 ERROR:  current transaction is aborted, commands ignored until end of transaction block (Connection: pgsql, Host: axion-crm-postgres, Port: 5432, Database: axion_crm_a45, SQL: SELECT set_config(app.current_workspace_id, , false))"} 
+
+   PASS  Tests\Feature\Controllers\WorkspaceControllerTest
+  ✓ GET /workspace sans auth → 401                                       0.18s  
+  ✓ GET /users sans auth → 401                                           0.24s  
+  ✓ POST /users retourne 501                                             0.23s  
+  ✓ PUT /workspace retourne 501 (Sprint 3 stub)                          0.45s  
+  ✓ GET /users authentifié retourne liste vide stub                      1.24s  
+  ✓ GET /workspace authentifié retourne le workspace courant             0.40s  
+
+   PASS  Tests\Feature\Commands\ProspectionEnrichTest
+  ✓ it sans --with-website, la sélection est inchangée (inclut les sans… 1.57s  
+  ✓ it --shard hors plage échoue proprement                              0.26s  
+  ✓ it --with-website ne sélectionne que les entreprises à site vivant   1.21s  
+  ✓ it --shards=2 --shard=0 ne prend que les id pairs                    1.11s  
+
+   PASS  Tests\Feature\HorodatagesFuseauTest
+  ✓ une date reçue en UTC par l’ingestion survit à l’aller-retour en ba… 0.31s  
+  ✓ un horodatage écrit puis relu revient au même instant                0.24s  
+  ✓ l’auto-pause sur quota de durée mord APRÈS un aller-retour en base   0.36s  
+  ✓ la session Postgres est alignée sur le fuseau de l’application       0.28s  
+  ✓ ce que Postgres écrit lui-même reste juste                           0.19s  
+
+   PASS  Tests\Feature\FiltresDatesEtGeoTest
+  ✓ une date ABÎMÉE ne filtre pas au hasard et ne casse rien             1.05s  
+  ✓ les deux bornes se combinent en fenêtre                              0.45s  
+  ✓ le référentiel géographique sert les valeurs de la BASE              0.55s  
+  ✓ filtre « créées après » — la borne basse inclut le jour demandé      0.86s  
+  ✓ filtre par région et par département                                 0.41s  
+  ✓ le filtre par tag reste utilisable — segment de campagne             2.28s  
+  ✓ filtre « créées avant » — la borne haute couvre la JOURNÉE entière   0.69s  
+
+   PASS  Tests\Feature\Rgpd\AntiReinsertionTest
+  ✓ une opposition née du SITE (hash seul, sans email) est vue par isOp… 1.38s  
+  ✓ une adresse jamais opposée reste scrapable                           0.21s  
+  ✓ un effacement écrit l’EMPREINTE, que la garde du scraping sait lire  2.01s  
+  ✓ la normalisation de casse et d’espaces vaut pour l’empreinte comme…  0.20s  
+[2026-08-19 14:31:14] local.INFO: ScraperResult ingested {"run_id":"r-1","source":"google-maps","status":"success"} 
+[2026-08-19 14:31:24] local.WARNING: scraper-result refusé {"code":"unsupported_schema_version","message":"Version de schéma pivot non supportée : NULL (attendu : 1)."} 
+
+   PASS  Tests\Feature\Crm\ScrapedIngestTest
+  ✓ la resync AutoTagger ne supprime NI le tag src: NI le tag implantat… 1.18s  
+  ✓ le dry-run parcourt le vrai funnel puis ne laisse RIEN en base       0.52s  
+  ✓ le froid ne se réchauffe JAMAIS : un re-scrape ne touche ni cycle d… 0.29s  
+  ✓ ni siren ni foreign_id ni match_hint : refusé à la porte             0.43s  
+  ✓ drapeau à OFF : /internal/scraper-result garde son comportement his… 0.30s  
+  ✓ un run en échec est consigné, aucune donnée écrite                   0.25s  
+  ✓ le TÉLÉPHONE est posé sur la fiche personne (réparation de la perte… 0.46s  
+  ✓ une boîte service ne devient JAMAIS une fiche personne               1.50s  
+  ✓ BACKFILL-ONLY : une nature déjà posée n'est jamais réécrite          0.70s  
+  ✓ le vocabulaire de assigned_by reste FERMÉ : une valeur inventée est… 0.76s  
+  ✓ sans SIREN : AUCUNE fiche créée, l'événement part en arbitrage avec… 0.96s  
+  ✓ filter[tag] retrouve le segment implantation-ro dans la liste (et d… 0.89s  
+  ✓ deux entités étrangères DIFFÉRENTES coexistent (siren NULL ne les c… 0.71s  
+  ✓ une implantation est fusionnée dans signals et le tag implantation-<pays>… 1.14s  
+  ✓ un siren annoncé avec un pays non-FR est REFUSÉ (contradiction)      0.24s  
+  ✓ le marqueur backfill-src est accepté et rend le rollback CHIRURGICA… 0.31s  
+  ✓ implantations : un code pays invalide ou une clé inconnue rejettent… 0.21s  
+  ✓ rejouer le MÊME run est idempotent                                   0.72s  
+  ✓ drapeau à ON : le MÊME endpoint valide le pivot et ingère réellemen… 0.62s  
+  ✓ une entité SANS siren est créée, ancrée sur (pays, foreign_id)       1.12s  
+  ✓ BACKFILL-ONLY : le collecté n'écrase ni une valeur existante ni un…  0.79s  
+  ✓ les fiches FRANÇAISES existantes gardent country_code FR et aucun t… 0.61s  
+  ✓ valeur par défaut du drapeau : fermé                                 0.60s  
+  ✓ une nature inventée est REFUSÉE (liste fermée, alignée sur le CHECK… 0.20s  
+  ✓ une source hors registre est refusée (422), une source coupée est d… 0.22s  
+  ✓ chaque source du registre a son tag gouverné dérivé                  0.30s  
+  ✓ un scrapé naît FROID : prospect / nouveau / intérêt légitime, tagué… 0.35s  
+  ✓ le re-seed du registre ne RÉACTIVE jamais une source coupée à la ma… 0.34s  
+  ✓ un champ inconnu fait REJETER le message (schéma pivot strict)       0.27s  
+  ✓ un email au domaine non résolvable est rejeté : pas de fiche sur un… 1.97s  
+  ✓ ANTI-RÉINSERTION : une personne opposée ne revient jamais par un re… 0.70s  
+  ✓ rejouer la MÊME entité ne crée pas de doublon (dédup par foreign_id… 0.79s  
+  ✓ BACKFILL-ONLY sur les implantations : une valeur existante n'est ja… 1.42s  
+  ✓ foreign_id sans country est REFUSÉ : un identifiant sans registre e… 0.52s  
+  ✓ les tags pays et nature sont posés : cibler les associations de Rou… 2.60s  
+
+   PASS  Tests\Feature\Commands\JournalistsScrapeLlmTest
+  ✓ it upsert 2 journalistes quand le LLM en renvoie 2                   0.35s  
+  ✓ it ne crée aucun journaliste quand le LLM renvoie une liste vide     0.21s  
+  ✓ it refuse si MEDIA_JOURNALISTS_ENABLED est false                     0.67s  

@@ -1,0 +1,57 @@
+############ A04b-companies-count-filtre-denomination-partial
+### base   : axion_crm_perf4m   (datcollate = C)
+### date   : 2026-08-19T13:44:03+02:00
+### SQL    :
+select count(*) as aggregate from "companies" where "deleted_at" is null and LOWER("companies"."denomination") LIKE '%marti%' and "workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168';
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                                            QUERY PLAN                                                                             
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate  (cost=101239.55..101239.56 rows=1 width=8) (actual time=4426.904..4675.993 rows=1 loops=1)
+   Buffers: shared hit=12766 read=67052
+   ->  Gather  (cost=101239.33..101239.54 rows=2 width=8) (actual time=4408.501..4675.876 rows=3 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=12766 read=67052
+         ->  Partial Aggregate  (cost=100239.33..100239.34 rows=1 width=8) (actual time=3765.200..3765.205 rows=1 loops=3)
+               Buffers: shared hit=12766 read=67052
+               ->  Parallel Seq Scan on companies  (cost=0.00..100234.67 rows=1867 width=0) (actual time=3765.048..3765.050 rows=0 loops=3)
+                     Filter: ((deleted_at IS NULL) AND (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid) AND (lower(denomination) ~~ '%marti%'::text))
+                     Rows Removed by Filter: 933333
+                     Buffers: shared hit=12766 read=67052
+ Planning:
+   Buffers: shared hit=490 read=85
+ Planning Time: 10.791 ms
+ JIT:
+   Functions: 17
+   Options: Inlining false, Optimization false, Expressions true, Deforming true
+   Timing: Generation 35.614 ms, Inlining 0.000 ms, Optimization 41.044 ms, Emission 1293.612 ms, Total 1370.269 ms
+ Execution Time: 22101.411 ms
+(20 rows)
+
+
+===== CHAUD (4e exécution) =====
+                                                                            QUERY PLAN                                                                             
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate  (cost=101239.55..101239.56 rows=1 width=8) (actual time=3817.909..3856.596 rows=1 loops=1)
+   Buffers: shared hit=12347 read=67471
+   ->  Gather  (cost=101239.33..101239.54 rows=2 width=8) (actual time=3779.557..3856.497 rows=3 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=12347 read=67471
+         ->  Partial Aggregate  (cost=100239.33..100239.34 rows=1 width=8) (actual time=2759.704..2759.707 rows=1 loops=3)
+               Buffers: shared hit=12347 read=67471
+               ->  Parallel Seq Scan on companies  (cost=0.00..100234.67 rows=1867 width=0) (actual time=2759.534..2759.535 rows=0 loops=3)
+                     Filter: ((deleted_at IS NULL) AND (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid) AND (lower(denomination) ~~ '%marti%'::text))
+                     Rows Removed by Filter: 933333
+                     Buffers: shared hit=12347 read=67471
+ Planning:
+   Buffers: shared hit=575
+ Planning Time: 11.796 ms
+ JIT:
+   Functions: 17
+   Options: Inlining false, Optimization false, Expressions true, Deforming true
+   Timing: Generation 57.121 ms, Inlining 0.000 ms, Optimization 36.080 ms, Emission 722.624 ms, Total 815.825 ms
+ Execution Time: 4629.987 ms
+(20 rows)
+

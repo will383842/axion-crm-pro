@@ -74,16 +74,197 @@ Rayon d'explosion = nombre de tests rouges **hors** l'échec de ligne de base
 
 ## 2. Les quatre pathologies, recherchées nommément
 
-<!-- PATHOLOGIES -->
+Balayage outillé sur **100 fichiers / 729 blocs `test()`/`it()`**
+(`04_PREUVES/agent-45/07_balayage-pathologies.txt`, script `scan_pathologies.php`), puis **triage à la
+main** de chaque candidat. Le balayage seul ne conclut rien : il ne fait que réduire la lecture.
+
+| Pathologie | Candidats bruts | Après triage | Verdict |
+|---|---|---|---|
+| **1. Le test pré-insère ce qu'il doit faire produire** | 22 | **0 avéré** | Les 22 candidats insèrent une **fixture** puis relisent ce que la **base** en a fait (colonne générée, valeur par défaut, refus d'un `CHECK`, policy RLS) — ce n'est pas la même chose. Les deux seuls de forme suspecte (`un motif/une activité maison s'ajoute SANS migration`) rougissent bien sur l'objet : fermer la table par un `CHECK` fait échouer leur `insert` — **mesuré** (`08_temoin-motif-maison-check-ferme.txt`). |
+| **2. Assertion vide ou tautologique** | 1 backend + 3 frontend | **4 avérés** | `PasswordResetWithHibpTest` en porte **deux** (`expect(true)->toBeTrue()` et `expect($captured)->not->toBeNull()`), prouvés inutiles par sabotage → **H45-003**. Frontend : `tests/lib/api.test.ts:23` et `tests/lib/echo.test.ts:52` (`toBeDefined()` sur un export toujours défini) ; `tests/e2e/onboarding.spec.ts:50` (`expect(true).toBe(true)` dans un test nommé « cleanup leave channel after unmount ») — ce dernier n'est de toute façon **jamais joué** (cf. H44-001). |
+| **3. Un mock qui teste le mock** | 4 fichiers utilisent une doublure | **0 avéré côté backend** | Les quatre (`GenerateMediaRedactionEmailsTest`, `JournalistsScrapeLlmTest`, `FranceTravailDiscoveryClientTest`) affirment sur l'**effet en base** de la commande, pas sur la valeur rendue par la doublure. Le canal sortant est vérifié par recalcul **indépendant** du HMAC dans le test, et le site (`Axion-IA/axionia/src/server/crm-sync/emit.ts:44`) signe la **même** chaîne `${timestamp}.${body}` — relu, les deux dépôts concordent. |
+| **4. Un test statique qui trouve ses propres commentaires** | 5 | **2 avérés + 1 fragile** | `RlsTest:380` cherche `WorkspaceContext::run(` dans le **source brut** : un sabotage qui retire le vrai appel en laissant la chaîne dans un commentaire le laisse **vert** → **H45-004**. `PhpstanBaselineNeGrossitPasTest` cherche `reportUnmatchedIgnoredErrors: true` dans `phpstan.neon` : la mettre en commentaire laisse le test **vert** → **H45-004**. Fragile : `NeDoitPasRegresserTest` cherche `count(*)` et `sha256sum` dans `dr-drill.sh` — il n'en existe qu'une occurrence de code aujourd'hui, mais rien n'empêche un commentaire de la porter demain. **Contre-exemple exemplaire** : `AutorisationCanauxTest:57` retire les commentaires par `token_get_all` **et l'explique** — c'est la seule garde statique du dépôt qui le fasse. |
+
+⚠️ **Piège 1 (CRLF) — non déclenché ici** : aucune garde statique du dépôt ne cherche un `\n` littéral.
+`PhpstanBaselineNeGrossitPasTest` normalise explicitement `\r\n` avant d'analyser, et le commente.
+Les autres cherchent des sous-chaînes sans fin de ligne. Le piège existe, il n'est pas armé.
 
 ---
 
 ## 3. Constats
 
-<!-- CONSTATS -->
+### [H45-001] La garde « sans auth → 401, jamais 500 » n'interroge le produit qu'en JSON : le défaut A-001, vivant en production, lui est invisible
+- Sévérité      : S1 grave
+- Domaine       : tests
+- Référence     : main e8924b8
+- Emplacement   : `backend/tests/Feature/Controllers/Sprint189NoFiveHundredTest.php:91` (24 adresses en jeu de données) ; `backend/tests/Feature/Controllers/Phase2StubsExtendedTest.php:42`
+- Constat       : les 25 cas qui affirment « sans auth, jamais 500 » appellent tous `getJson()`, qui pose `Accept: application/json` ; **aucun** des 780 tests de la suite n'émet une requête non authentifiée **sans** cet en-tête, et c'est exactement le chemin où le produit rend 500.
+- Preuve        : `04_PREUVES/agent-45/04_temoin_401_vs_500_prod.txt` — cinq adresses de PRODUCTION, en lecture seule :
+  `GET /api/v1/tags` `Accept: application/json` → **401** ; le même avec `Accept: text/html` → **500**. Idem pour `/dashboard/stats`, `/notifications`, `/audit-logs`, `/saved-views` (5/5).
+  Recensement : `grep -rn "\$this->get('" tests/ | grep -v getJson` → **10 appels**, tous **authentifiés** (ce sont les tests d'export).
+- Témoin négatif: la même paire de commandes **distingue** bien les deux cas — elle rend 401 sur le chemin JSON et 500 sur l'autre. La sonde sait donc voir la différence ; c'est la garde qui ne la regarde pas.
+- Impact        : le défaut A-001 (`Route [login] not defined`) est en production et la suite le certifie absent. Tout appelant qui n'annonce pas JSON — navigateur, `curl` nu, sonde de supervision, moteur d'indexation, client d'intégration — reçoit un **500** au lieu d'un **401**, donc une alerte d'indisponibilité au lieu d'un refus d'authentification.
+- Reproduction  : `curl -s -o /dev/null -w "%{http_code}\n" -H "Accept: text/html" https://api.axion-crm-pro.com/api/v1/tags`
+- Correctif     : dans `Sprint189NoFiveHundredTest`, doubler le cas « sans auth » avec `$this->get($url, ['Accept' => 'text/html'])`. **~15 min** — et le test rougira aussitôt, ce qui est le but : il nommera A-001.
+- Statut        : ouvert
+
+### [H45-002] `retention:purge --dry-run` efface des données et annonce « 0 ligne » — et aucun test ne couvre cette commande planifiée
+- Sévérité      : S1 grave
+- Domaine       : tests
+- Référence     : main e8924b8
+- Emplacement   : `backend/app/Console/Commands/RetentionPurge.php:39-41` ; planifiée dans `backend/routes/console.php:15` (`dailyAt('04:00')`)
+- Constat       : en `--dry-run`, la réécriture de la requête en compteur ne s'applique pas à l'ordre `UPDATE` (le motif `/^UPDATE (\w+) SET .* WHERE/` n'a pas le drapeau `s` et l'ordre est sur deux lignes) ; l'`UPDATE` est alors passé tel quel à `DB::selectOne()`, qui l'**exécute**.
+- Preuve        : `04_PREUVES/agent-45/05_retention-purge-dry-run-mute.txt`, base jetable `axion_crm_a45b` :
+  avant → `charge_presente = t`, `payload_path = /tmp/zz-a45.json` ;
+  `php artisan retention:purge --dry-run` → « scraper_runs payload (>90j) : **0 lignes seraient affectées** » ;
+  après → `charge_presente = f`, `payload_path` **vide**.
+  La règle d'expression rationnelle isolée : `04_PREUVES/agent-45/…` (rejouée, `str_starts_with(trim($e),'UPDATE') === true`).
+- Témoin négatif: la même mesure sur les deux autres tâches (`DELETE`) montre le comportement CORRECT — le motif `DELETE` matche, la requête devient un `SELECT COUNT(*)` et rien n'est modifié. La sonde distingue donc bien « sec » de « mouillé » ; seul l'`UPDATE` passe au travers.
+- Impact        : quiconque lance `--dry-run` pour savoir ce que la purge ferait **détruit** les charges utiles de `scraper_runs` de plus de 90 jours, et lit « 0 ligne » — la destruction est silencieuse et irréversible. `retention:purge` n'est cité par **aucun** fichier de test (`grep -rl 'retention:purge' tests/` → 0).
+- Reproduction  : voir la preuve ; trois commandes.
+- Correctif     : ajouter le drapeau `s` et ancrer le motif (`/^UPDATE\s+(\w+)\s+SET\s.*?\sWHERE/s`), ou — mieux — écrire les deux requêtes (compteur / mutation) au lieu de dériver l'une de l'autre. Puis un test qui sème une ligne, joue `--dry-run` et vérifie qu'elle est **intacte**. **~45 min**.
+- Statut        : ouvert
+
+### [H45-003] Deux des quatre tests HIBP n'affirment rien de ce que leur nom promet : la suite entière reste verte quand on casse ce qu'ils prétendent garder
+- Sévérité      : S2 défaut
+- Domaine       : tests
+- Référence     : main e8924b8
+- Emplacement   : `backend/tests/Unit/Rules/PasswordResetWithHibpTest.php:45` (`expect(true)->toBeTrue()`) et `:62` (`expect($captured)->not->toBeNull()`)
+- Constat       : le test « HIBP cache prefix unique par 5 chars du sha1 » n'observe pas la clé de cache — il affirme `true` ; le test « HIBP user-agent inclus dans la requête » n'observe pas l'en-tête — il affirme que la requête a bien été construite. Le premier porte d'ailleurs le commentaire « on valide juste qu'on n'a pas crashé ».
+- Preuve        : sabotages **S10** et **S11**, suite complète (780 tests) jouée à chaque fois — voir la grille §1 et `04_PREUVES/agent-45/S10-*.txt`, `S11-*.txt`.
+- Témoin négatif: les deux autres tests du même fichier (`password "password" est compromis`, `password long custom est sain`) rougissent bien quand on casse la lecture de la réponse HIBP — le fichier n'est donc pas inerte dans son ensemble, ce sont ces deux cas-là qui ne mesurent rien.
+- Impact        : la clé de cache HIBP est ce qui empêche la réponse d'un mot de passe de servir pour un autre ; si elle devenait globale, un mot de passe compromis passerait pour sain pendant 24 h et la règle `NotPwnedPassword` laisserait entrer un mot de passe éventé. Rien ne le dirait.
+- Reproduction  : voir la grille §1, colonnes « sabotage joué » de S10 et S11.
+- Correctif     : remplacer `expect(true)->toBeTrue()` par une lecture de `Cache::has('hibp:range:' . substr(strtoupper(sha1($mdp)),0,5))` pour deux mots de passe de préfixes différents ; et affirmer l'en-tête réellement émis (`$captured->getHeaderLine('User-Agent')`). **~20 min.** ⚠️ Le second test lève par ailleurs un avertissement Guzzle silencieux (`PrepareBodyMiddleware::__invoke(): Return value must be of type PromiseInterface`) : sa doublure ne fonctionne pas, l'appel part dans le `catch (\Throwable)` — le corriger fait partie du même geste.
+- Statut        : ouvert
+
+### [H45-004] Deux gardes statiques trouvent leurs propres commentaires : elles restent vertes quand le code qu'elles nomment disparaît
+- Sévérité      : S2 défaut
+- Domaine       : tests
+- Référence     : main e8924b8
+- Emplacement   : `backend/tests/Feature/RlsTest.php:380-386` ; `backend/tests/Unit/PhpstanBaselineNeGrossitPasTest.php:221-235`
+- Constat       : les deux gardes cherchent une sous-chaîne dans le **texte brut** du fichier (`file_get_contents` + `toContain` / `assertStringContainsString`), commentaires compris. Retirer le vrai réglage en laissant la chaîne dans un commentaire les laisse vertes.
+- Preuve        : sabotage **S12** (le vrai `WorkspaceContext::run(` retiré de `ScrapingBackfillSrcTags.php`, la chaîne conservée dans un commentaire) et micro-sabotage **M2** (`reportUnmatchedIgnoredErrors: true` mis en commentaire dans `phpstan.neon`). Voir §1.
+- Témoin négatif: le sabotage **S07** (`true` → `false`, sans commentaire) fait **bien** rougir `reportUnmatchedIgnoredErrors reste activé`, seul, sans rien emporter d'autre. Les gardes savent donc rougir — elles ne savent pas distinguer le code du commentaire.
+- Impact        : `scraping:backfill-src-tags` écrit sur `tags` et `company_tag` ; sans `WorkspaceContext::run`, une fois `CRM_DB_APP_ROLE_ENABLED` passé à `true`, la commande ne voit plus rien et n'écrit plus rien, **en silence** — la panne exacte du 2026-08-15, que cette garde est censée empêcher de revenir. Côté PHPStan, la baseline redevient muette (une entrée obsolète cesse de rougir) sans que rien ne le signale.
+- Reproduction  : voir §1.
+- Correctif     : le dépôt possède déjà le bon idiome, écrit et expliqué — `AutorisationCanauxTest:57` retire les commentaires par `token_get_all` avant d'analyser. L'appliquer aux deux gardes (une fonction utilitaire partagée dans `tests/Support/`). **~30 min.** Pour `phpstan.neon`, mieux vaut lire la valeur **effective** (`Nette\Neon\Neon::decode`) que la chaîne.
+- Statut        : ouvert
+
+### [H45-005] Les drapeaux `MOCK_*` ne sont épinglés dans aucun des deux fichiers PHPUnit : la suite locale n'est pas hermétique et rougit là où la CI est verte
+- Sévérité      : S2 défaut
+- Domaine       : tests
+- Référence     : main e8924b8
+- Emplacement   : `backend/phpunit.xml:29` et `backend/phpunit-ci.xml:50` (seul `MOCK_MODE` est déclaré, **sans** `force="true"`) ; `.github/workflows/ci.yml:415-425` (la CI pose 10 drapeaux `MOCK_*` en variables de job)
+- Constat       : l'hermétisme de la suite ne vient pas de sa configuration mais du fichier de workflow. En local, `env_file: .env` du conteneur porte `MOCK_INSEE=false`, `MOCK_ANNUAIRE_ENTREPRISES=false`, `MOCK_BODACC=false`, `MOCK_BAN=false` — et c'est cette valeur qui gagne, par le même chemin `$_SERVER` que `tests/bootstrap.php` documente longuement pour `DB_DATABASE` et corrige pour lui seul.
+- Preuve        : ligne de base `04_PREUVES/agent-45/03_baseline_suite_complete.txt` — **1 échec local** (`CoverageControllerTest > POST /coverage/launch accepte body valide`, 500 au lieu de 200) avec, dans le journal :
+  `local.ERROR: INSEE auth requires either INSEE_API_KEY … at app/Services/Insee/HttpInseeClient.php:291`.
+  Le même test, même commit : `gh run view 32240894728 --log` → `Tests: 780 passed`, **0 échec**.
+- Témoin négatif: le reste de la suite est identique dans les deux environnements (778 autres tests, mêmes verdicts) : ce n'est donc pas « la CI est différente en tout », c'est **ce drapeau-là** qui manque.
+- Impact        : (1) un développeur qui joue la suite en local voit un rouge qui n'est pas un défaut — c'est ainsi qu'on apprend à ignorer les rouges ; (2) avec des identifiants INSEE présents dans le `.env`, la suite **appelle vraiment l'INSEE** — une suite de tests qui sort sur Internet n'est plus reproductible, et consomme un quota tiers.
+- Reproduction  : `docker exec <conteneur> ./vendor/bin/pest tests/Feature/Controllers/CoverageControllerTest.php` avec `MOCK_INSEE=false` dans l'environnement.
+- Correctif     : déclarer les 10 drapeaux `MOCK_*` dans `phpunit.xml` **et** `phpunit-ci.xml` avec `force="true"`, comme `DB_DATABASE`. Le workflow peut alors les retirer. **~20 min.**
+- Statut        : ouvert
+
+### [H45-006] `app:pentest-self-check` n'a aucun test, annonce deux contrôles qu'il ne fait pas, et mesure la mauvaise colonne pour la RLS
+- Sévérité      : S2 défaut
+- Domaine       : tests
+- Référence     : main e8924b8
+- Emplacement   : `backend/app/Console/Commands/PentestSelfCheck.php:9-17` (le docbloc) et `:75-89` (`checkRls`)
+- Constat       : (a) `grep -rl "PentestSelfCheck\|pentest-self-check" backend/tests/` → **0 fichier** ; (b) le docbloc annonce « CORS strict (pas de * wildcard) » et « Rate limiting actif sur login/magic-link » — `handle()` n'appelle que quatre contrôles, aucun des deux ; (c) il annonce « RLS Postgres effective sur 30 tables workspace-scoped » et interroge **8** tables, sur la colonne `relrowsecurity` — pas `relforcerowsecurity`.
+- Preuve        : lecture du fichier + comptages joués sur `axion_crm` :
+  `SELECT count(*) … column_name='workspace_id'` → **72 tables** portent la colonne ;
+  `count(*) FILTER (WHERE relrowsecurity)` → **55**, `FILTER (WHERE relforcerowsecurity)` → **55**.
+- Témoin négatif: la même requête, restreinte aux 8 tables citées par la commande, rend bien 8 — le comptage n'est pas cassé, c'est la liste de la commande qui est courte.
+- Impact        : `FORCE` est précisément ce qui fait mordre la RLS **pour le propriétaire**, et le rôle applicatif réel est le propriétaire tant que `CRM_DB_APP_ROLE_ENABLED` vaut `false` (c'est le cas partout : `.env`, `pest-worktree.sh`, `artisan-worktree.sh`). Un auto-contrôle qui lit `relrowsecurity` dirait « ✓ passed » sur une base où la barrière ne s'applique à personne. Et comme aucun test ne le couvre, la dérive entre le docbloc et le code ne peut être signalée par rien.
+- Reproduction  : `docker exec axion-crm-postgres psql -U axion -d axion_crm -c "SELECT count(*) FILTER (WHERE relforcerowsecurity) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r';"`
+- Correctif     : lire `relforcerowsecurity`, calculer la liste des tables scopées au lieu de la coder en dur (`EtancheiteParTableTest` sait déjà le faire), retirer du docbloc les deux contrôles inexistants ou les écrire, et poser un test qui joue la commande sur une base où une table a été dé-forcée. **~2 h.**
+- Statut        : ouvert
+
+### [H45-007] L'anti-rejeu du canal se désarme par configuration, et aucun des 780 tests ne le voit
+- Sévérité      : S2 défaut
+- Domaine       : tests
+- Référence     : main e8924b8
+- Emplacement   : `backend/app/Support/HmacSignature.php:49-51` (`if ($maxSkewSeconds <= 0) { return true; }`) ; `backend/config/crm.php:85` (`(int) env('CRM_INGEST_MAX_CLOCK_SKEW', 300)`)
+- Constat       : une valeur `<= 0` fait rendre `true` sans rien vérifier — la signature redevient valable pour toujours. `(int) env(...)` produit `0` pour une variable vide ou non numérique. Les deux seuls tests qui touchent ce réglage (`SiteSyncIngestTest:40`, `SiteGdprTest:179`) le **posent eux-mêmes à 300** : la valeur 0 n'est jouée nulle part.
+- Preuve        : sabotage **S13** — défaut de `config/crm.php` mis à `0`, suite complète jouée : **aucun** test du canal ne rougit (les 11 échecs observés sont l'effet de bord H45-008, plus l'échec de ligne de base). `grep -rn "max_clock_skew" backend/tests/` → 2 occurrences, toutes deux `=> 300`.
+- Témoin négatif: le sabotage **S14** (vérification HMAC rendue toujours vraie) fait rougir **exactement 2** tests (`signature invalide : 401 et aucune écriture`, `signature invalide : 401, et rien n'est appris de l'état du système`). La famille de gardes du canal sait donc rougir sur la signature ; c'est la **fenêtre** qu'elle ne regarde pas quand elle est ouverte.
+- Impact        : `CRM_INGEST_MAX_CLOCK_SKEW=` (vide) dans un `.env` de production désarme le rejeu du canal site→CRM sans aucun signal ; une requête légitime interceptée reste rejouable indéfiniment. L'idempotence par `event_id` protège de la duplication, pas du rejeu d'un `consent_optout` ou d'une candidature.
+- Reproduction  : poser `CRM_INGEST_MAX_CLOCK_SKEW=` puis rejouer un message signé daté d'une heure.
+- Correctif     : deux tests — l'un qui affirme que la valeur par défaut est 300, l'autre qui affirme qu'une valeur `<= 0` est **refusée** (et faire lever `HmacSignature` plutôt que passer). **~30 min.**
+- Statut        : ouvert
+
+### [H45-008] Le rôle Postgres `axion_app` est global au cluster et reposé par chaque `migrate` : deux exécutions concurrentes de la suite se détruisent même sur des bases distinctes
+- Sévérité      : S2 défaut
+- Domaine       : tests
+- Référence     : main e8924b8
+- Emplacement   : `backend/database/migrations/2026_08_14_000001_*.php:257` (`ALTER ROLE {$role} LOGIN PASSWORD …`) ; `backend/phpunit.xml:57` et `phpunit-ci.xml:65` (`DB_APP_PASSWORD` déclaré **sans** `force="true"`)
+- Constat       : `RefreshDatabase` rejoue les migrations à chaque exécution, donc repose le mot de passe d'un rôle **partagé par tout le cluster** ; et la valeur employée est celle de l'environnement du conteneur, pas celle de `phpunit.xml`. Isoler par base de données ne suffit donc pas.
+- Preuve        : `04_PREUVES/agent-45/06_role-axion_app-global-au-cluster.txt`. Pendant le sabotage **S04** (base `axion_crm_a45`) : **35** tests emportés par `FATAL: password authentication failed for user "axion_app"`, dont l'intégralité de `RlsTest`, `EtancheiteParTableTest` et `NeDoitPasRegresserTest`. Rejoué pendant **S13** (base `axion_crm_a45c`, autre conteneur) : **11** tests emportés, même cause.
+- Témoin négatif: les sabotages S01, S02, S03, S05, S06, S07, S14, S15 — mêmes bases, même code — comptent **0** échec d'authentification : la panne n'est donc pas structurelle, elle survient quand un **autre** processus migre entre-temps. Et la ligne de base initiale, jouée en isolation complète, en compte 0 elle aussi.
+- Impact        : tout audit, toute session de développement, toute exécution parallèle rend des rouges qui ne sont pas des défauts — et un rouge qu'on apprend à ignorer est une garde perdue. C'est la même cause que H44-004 / B11-005, mais **au niveau du cluster**, donc non résolue par la seule création d'une base par agent.
+- Reproduction  : deux conteneurs, deux bases, deux `pest` simultanés, `DB_APP_PASSWORD` différents.
+- Correctif     : poser `force="true"` sur `DB_APP_PASSWORD` dans les deux fichiers PHPUnit (une valeur unique, partout), **et** dériver le nom du rôle de la base (`axion_app_<base>`) pour que deux exécutions ne se marchent plus dessus. **~1 h.** Le nom de base lui-même est codé en dur dans `tests/bootstrap.php:27` : le rendre paramétrable par `AXION_TEST_DB` (avec le garde-fou « le nom commence par `axion_crm_` ») coûterait 15 min de plus.
+- Statut        : ouvert
+
+### [H45-009] La recette locale documentée pour jouer la suite est ~115 fois plus lente que la même suite ailleurs — c'est ce qui fait qu'on ne la joue pas
+- Sévérité      : S2 défaut
+- Domaine       : tests
+- Référence     : main e8924b8
+- Emplacement   : `infra/scripts/worktree/pest-worktree.sh:38-52` (montage bind du code depuis `C:\`) ; `Makefile` (`test-backend`)
+- Constat       : la recette monte le code et `vendor` depuis le système de fichiers Windows. Chaque autoload traverse la frontière ; le coût est mesurable et énorme.
+- Preuve        : mêmes image, même Postgres, même commit —
+  `tests/Unit/SmokeTest.php` (2 tests triviaux) : **234,81 s** monté / **2,14 s** copié dans le conteneur ;
+  `tests/Feature/Crm/ActivitesEtMotifsTest.php` (15 tests) : **960,59 s** monté ;
+  suite complète (780 tests) : **434,15 s** copiée, **30,18 s** en CI.
+  Soit ~115× entre « monté » et « copié », et ~14× entre « copié » et la CI.
+- Témoin négatif: la seule variable changée entre les deux mesures de `SmokeTest` est l'emplacement de l'arbre (`-v C:\…:/var/www/html` contre `docker cp`) — même conteneur de base de données, même image, même `vendor`, même `.env`. Le facteur ne vient donc pas de la charge de la machine.
+- Impact        : une suite qu'on ne peut pas jouer en moins de dix minutes n'est jouée qu'en CI, donc **après** la poussée. Combiné à H45-005 (un rouge local qui n'existe pas en CI) et H45-008 (des rouges de contention), le harnais local décourage précisément le geste qu'il devrait rendre facile.
+- Reproduction  : les deux commandes de la preuve.
+- Correctif     : dans `pest-worktree.sh`, remplacer les montages par un `docker cp` de l'arbre dans un conteneur de longue durée (le `vendor` ne bouge qu'au `composer install`, la vérification `cmp composer.lock` déjà présente sait quand recopier). **~1 h**, et la suite locale passe sous la minute.
+- Statut        : ouvert
+
+### [H45-010] 25 des 35 tâches planifiées ne sont citées par aucun test — dont quatre destructives — et 8 des 19 `--dry-run` non plus
+- Sévérité      : S2 défaut
+- Domaine       : tests
+- Référence     : main e8924b8
+- Emplacement   : `backend/routes/console.php` ; `backend/app/Console/Commands/`
+- Constat       : croisement nom de commande × fichiers de test. **10** des 35 commandes planifiées sont citées par au moins un test ; **25** ne le sont par aucun. Parmi ces 25 : `retention:purge` (DELETE quotidien à 04:00), `retention:prune-scraper-runs` (04:20), `rgpd:anonymize-ips`, `media:clean-emails`. Côté option `--dry-run` : **19** commandes l'offrent, **8** ne sont citées par aucun test — la promesse « je ne toucherai à rien » n'est donc vérifiée nulle part pour elles, et H45-002 montre ce que ça coûte.
+- Preuve        : `04_PREUVES/agent-45/09_planifiees-vs-tests.txt` (boucle de croisement, sortie brute).
+- Témoin négatif: le même croisement **trouve** bien les 10 commandes couvertes (`rgpd:purge-vivier`, `rgpd:purge-business-prospects`, `crm:flush-outbound`, `companies:rescrape-archives`, `media:*` ×6) : le contrôle sait distinguer « cité » de « non cité ».
+- Impact        : les deux purges RGPD sont, elles, gardées finement (bornes des deux côtés : 2 ans / J+90 / 3 ans, et « jamais une personne qui a interagi » — vérifié, ces tests sont bons). Les quatre autres commandes destructives tournent chaque nuit sans qu'aucune garde ne dise ce qu'elles font.
+- Reproduction  : `grep -n "Schedule::command" backend/routes/console.php | sed "s/.*command('//; s/'.*//" | sort -u` puis `grep -rl <commande> backend/tests/`
+- Correctif     : un test par commande destructive, sur le modèle exact de `SiteGdprTest` (semer les deux côtés de la borne, jouer, vérifier qui reste). **~2 h pour les quatre.**
+- Statut        : ouvert
 
 ---
 
 ## 4. Ce que je n'ai PAS pu vérifier, et pourquoi
 
-<!-- NON-VERIFIE -->
+1. **Les 21 fichiers Vitest et les 16 specs Playwright du frontend, par sabotage.** Je les ai lus
+   (pathologie 2 trouvée en trois endroits, §2) mais je n'ai pas monté d'atelier Node isolé : le
+   temps est passé dans la campagne backend, et l'agent 44 a déjà établi ce qui s'exécute
+   (H44-001 : 267 des 285 tests Playwright ne tournent nulle part). **Un sabotage frontend reste à
+   faire** — notamment sur `ConsoleGate` et `ContactsHubPage`.
+2. **Les 6 tests des `workers/`.** Même raison. Le seul candidat repéré est
+   `workers/tests/registre-sources.test.ts:148` (`toBeDefined()`), qui porte un message d'échec
+   explicite — pas une tautologie franche.
+3. **`ACQUIS 2` (dump → restauration) joué sous MA main.** Le conteneur d'audit n'embarque pas le
+   client PostgreSQL ; le test s'ignore proprement en le disant. J'ai vérifié **dans le journal CI**
+   qu'il s'exécute et passe (`gh run view 32240894728 --log` → `✓ ACQUIS 2 … 2.44s`), mais je ne l'ai
+   pas **saboté** : casser `restore-postgres.sh` pour voir le rouge demandait un runner avec
+   `pg_dump`, hors de portée ici. **C'est la garde la plus chère du dépôt et c'est la seule que je
+   n'ai pas éprouvée.**
+4. **Le rayon d'explosion de S04 (oubli du cache après action de masse).** La mesure a été polluée
+   par H45-008 (35 tests emportés par le mot de passe du rôle `axion_app`, reposé par un autre
+   processus pendant l'exécution). Le test **cible** a bien rougi ; le comptage des autres est
+   inutilisable dans ce tirage. Rejoué → voir la ligne S04-bis de la grille §1.
+5. **Le comportement des gardes sous locale `C` contre `en_US.utf8`** (piège 10). `EmpreinteSqlEtPhpTest`
+   le mesure déjà et le fixe explicitement ; je n'ai pas ouvert un second cluster pour rejouer la
+   divergence. Rien ne le contredit, rien ne le confirme de ma main.
+6. **La signature HMAC de bout en bout entre les deux dépôts.** J'ai relu les deux implémentations
+   (`HmacSignature::signedPayload` et `axionia/src/server/crm-sync/emit.ts:44`) : elles signent la
+   même chaîne `<timestamp>.<corps>`. Je n'ai **pas** monté les deux applications pour émettre un
+   vrai message de l'une à l'autre — c'est le périmètre des agents 13/14.
+7. **Le nombre exact de tests emportés par H45-008 dans le cas général.** Je ne l'ai observé que
+   dans mes deux tirages contaminés (35 et 11) ; il dépend de l'instant où l'autre migration passe.

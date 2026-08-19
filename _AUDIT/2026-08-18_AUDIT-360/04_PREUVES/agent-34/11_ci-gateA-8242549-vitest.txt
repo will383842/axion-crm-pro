@@ -1,0 +1,4 @@
+Gate A · per-commit	UNKNOWN STEP	2026-08-19T08:03:20.3812622Z  Test Files  816 passed | 1 skipped (817)
+Gate A · per-commit	UNKNOWN STEP	2026-08-19T08:03:20.3874579Z       Tests  10725 passed | 12710 skipped (23435)
+Gate A · per-commit	UNKNOWN STEP	2026-08-19T08:03:20.3875546Z    Start at  07:51:54
+Gate A · per-commit	UNKNOWN STEP	2026-08-19T08:03:20.3897840Z    Duration  685.34s (transform 21.63s, setup 38.43s, collect 89.27s, tests 55.83s, environment 289.08s, prepare 50.84s)

@@ -1,0 +1,5 @@
+src/components/admin/ui/useConfirmation.tsx  CR=114 LF=114
+src/server/qualiopi/portail/portail-service.ts  CR=0 LF=609
+src/server/qualiopi/portail/portail-service.spec.ts  CR=0 LF=616
+src/lib/admin-nav.ts  CR=0 LF=1544
+.gitattributes  CR=0 LF=80

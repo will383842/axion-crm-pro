@@ -1,0 +1,5 @@
+qualiopi/facturation -> 404
+qualiopi/facturation/plans -> 404
+qualiopi/devis -> 404
+planning -> 404
+image-bank -> 404

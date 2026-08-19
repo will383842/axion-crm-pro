@@ -1,0 +1,17 @@
+# AGENT 45 — temoin : fermer crm_motifs par un CHECK fait-il rougir
+# « un motif maison s'ajoute SANS migration » ? Base jetable axion_crm_a45b. 2026-08-19T12:26:05Z
+# (rejoue proprement : l'essai precedent avait laisse la ligne en place)
+
+## 0. Table remise dans son etat d'origine
+NOTICE:  constraint "zz_a45_slug_ferme" of relation "crm_motifs" does not exist, skipping
+ALTER TABLE
+## 1. Etat d'origine : l'insertion du motif maison PASSE
+INSERT 0 1
+## 2. Sabotage : on FERME la table, comme le ferait un enum
+DELETE 1
+ALTER TABLE
+## 3. La MEME insertion apres fermeture : la base la REFUSE -> le test rougit
+ERROR:  new row for relation "crm_motifs" violates check constraint "zz_a45_slug_ferme"
+DETAIL:  Failing row contains (16, salon-professionnel, Salon professionnel, business, 200, t, null, 2026-08-19 12:26:47.845204+00, 2026-08-19 12:26:47.845204+00).
+## 4. Restauration de la base jetable
+ALTER TABLE

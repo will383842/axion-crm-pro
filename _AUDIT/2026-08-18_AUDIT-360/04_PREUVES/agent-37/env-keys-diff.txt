@@ -1,0 +1,24 @@
+# git main = e8924b8 ; PRODUCTION .env mesuré 2026-08-19 ~11:1xZ, lecture seule
+# prod .env = 111 clés ; .env.example = 116 clés
+# --- 21 clés PRÉSENTES dans .env.example, ABSENTES du .env de production ---
+BRAVE_SEARCH_API_KEY            -> config/services.php:21   env('BRAVE_SEARCH_API_KEY')            defaut=null
+CRM_INGEST_BUSINESS_WORKSPACE   -> config/crm.php:82        env(...,'axion-ia')                    defaut='axion-ia'
+CRM_INGEST_MAX_CLOCK_SKEW       -> config/crm.php:85        (int)env(...,300)                      defaut=300
+CRM_OUTBOUND_BATCH              -> config/crm.php:151       (int)env(...,100)                      defaut=100
+CRM_OUTBOUND_MAX_ATTEMPTS       -> config/crm.php:149       (int)env(...,8)                        defaut=8
+CRM_OUTBOUND_TIMEOUT            -> config/crm.php:150       (int)env(...,10)                       defaut=10
+CRM_SCRAPE_VALIDATE_MX          -> config/crm.php:105       env(...,true)                          defaut=true
+DB_APP_USERNAME                 -> config/database.php:35   env(...,'axion_app')                   defaut='axion_app'
+EMAIL_FINDER_SPECULATIVE_ENABLED-> config/services.php:103  env(...,false)                         defaut=false
+GOOGLE_PLACES_CACHE_TTL_DAYS    -> config/services.php:77   (int)env(...,30)                       defaut=30
+GOOGLE_PLACES_MONTHLY_QUOTA_LIMIT-> config/services.php:81  (int)env(...,11500)                    defaut=11500
+GOOGLE_PLACES_PENDING_ALERT_THRESHOLD-> config/services.php:89 (int)env(...,5000)                  defaut=5000
+GOOGLE_PLACES_SMART_SKIP        -> config/services.php:86   filter_var(env(...,true))              defaut=true
+HUNTER_API_KEY                  -> config/services.php:29   env('HUNTER_API_KEY')                  defaut=null
+MOCK_RPPS                       -> ImportRpps.php:46        env('MOCK_RPPS', env('MOCK_MODE',true)) defaut=MOCK_MODE(prod=false)
+SANTE_INGESTION_ENABLED         -> config/services.php:115  filter_var(env(...,false))             defaut=false
+TELESCOPE_ENABLED               -> vendor telescope.php:19  env('TELESCOPE_ENABLED', TRUE)         defaut=TRUE  <-- WRONG
+WEBSHARE_ENABLED                -> config/services.php:37   env(...,false)                         defaut=false
+WEBSHARE_ENDPOINT               -> config/services.php:40   env(...,'p.webshare.io:80')            defaut='p.webshare.io:80'
+WEBSHARE_PASSWORD               -> config/services.php:39   env('WEBSHARE_PASSWORD')               defaut=null
+WEBSHARE_USERNAME               -> config/services.php:38   env('WEBSHARE_USERNAME')               defaut=null

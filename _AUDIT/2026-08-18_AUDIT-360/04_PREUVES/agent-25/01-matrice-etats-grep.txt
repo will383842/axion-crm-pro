@@ -1,0 +1,43 @@
+AGENT 25 - MATRICE DES MARQUEURS D'ETAT PAR ECRAN
+Reference: main 8db8229 (git rev-parse verifie)
+Methode: grep -c sur chaque FICHIER NOMME (piege 23: pas de recursif)
+
+FICHIER                                        isPnd isLdg isErr error  skel pulse retry  perm
+auth/LoginPage.tsx                                 0     0     0     1     0     0     0     0
+auth/TwoFactorPage.tsx                             0     0     0     1     0     0     0     0
+auth/MagicLinkPage.tsx                             0     0     0     1     0     0     0     0
+auth/PasswordResetPage.tsx                         0     0     0     1     0     0     0     0
+dashboard/DashboardPage.tsx                        0     4     0     0    10     0     4     0
+contacts/ContactsListPage.tsx                      0     2     0     0     2     0     0     0
+companies/CompaniesListPage.tsx                    2     2     0     1     2     0     0     0
+companies/CompanyDetailPage.tsx                    3     2     2     3     0     0     0     0
+media/JournalistsListPage.tsx                      0     2     0     1     0     0     0     0
+media/MediaListPage.tsx                            0     2     0     1     0     0     0     0
+media/MediaDetailPage.tsx                          0     2     2     2     0     0     0     0
+crm-console/ContactsHubPage.tsx                    0     3     0     0     2     0     0     3
+crm-console/CandidatesPage.tsx                     0     2     0     0     2     0     0     3
+crm-console/ArbitragePage.tsx                      1     1     0     2     2     0     0     3
+crm-console/PersonTimelinePage.tsx                 0     1     0     0     2     0     0     3
+crm-console/ConsoleGate.tsx                        2     0     0     0     4     0     0     1
+coverage/CoveragePage.tsx                          0     2     0     2     0     1     1     0
+campaigns/CampaignsListPage.tsx                    0     2     0     6     7     0     1     0
+campaigns/CampaignWizardPage.tsx                   2     0     0     4     0     0     1     0
+campaigns/CampaignDetailPage.tsx                   4     2     0     9     0     0     3     0
+scraping/ScraperRunsPage.tsx                       3     2     0    10    12     0    24     0
+international/RoumaniePage.tsx                     0     3     3     3     0     0     0     0
+audiences/AudiencesListPage.tsx                    0     2     0     5     7     0     1     0
+audiences/AudienceBuilderPage.tsx                  1     0     0     9     0     0     0     0
+audiences/AudienceDetailPage.tsx                   2     3     0     4     0     0     0     0
+observability/ObservabilityPage.tsx                0     2     0     2     0     0     1     0
+rgpd/RgpdRequestsPage.tsx                          2     1     0     2     2     0     0     0
+rgpd/AiActRegisterPage.tsx                         0     2     0     0     2     0     0     1
+rgpd/AuditLogsPage.tsx                             1     1     0     6     2     0     0     0
+users/UsersPage.tsx                                1     2     0     1     2     0     0     3
+settings/SettingsPage.tsx                          1     0     0     1     0     0     0     0
+tags/TagsManagerPage.tsx                           3     2     0     8     2     0     0     1
+llm/LlmRouterPage.tsx                              0     3     0     0     4     0     0     0
+llm/ProxyProvidersPage.tsx                         1     1     0     1     2     0     0     0
+llm/RotationsPage.tsx                              0     2     0     0     2     0     0     0
+phase2-scaffold/ColdEmailStub.tsx                  0     0     0     0     0     0     0     0
+phase2-scaffold/LinkedInStub.tsx                   0     0     0     0     0     0     0     0
+misc/NotFoundPage.tsx                              0     0     0     0     0     0     0     0

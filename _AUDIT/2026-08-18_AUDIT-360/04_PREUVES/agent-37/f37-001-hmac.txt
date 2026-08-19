@@ -1,0 +1,11 @@
+# Preuve F37-001 : app de prod, lecture seule (tinker)
+WORKER_INTERNAL_HMAC_SECRET len=0 isEmpty=true
+funnel.enabled=true
+expected_MAC_for_empty_key=22f8eea909400af98adf3681a9f31923ef6b7fcba4abb553d92823a3e9d5c25e
+
+# Reachabilite (non-mutant)
+POST /api/internal/scraper-result (non signe) -> HTTP 401
+POST /internal/scraper-result (mauvais prefixe) -> HTTP 404
+
+# Forgeabilite (local, aucun appel prod)
+php -r: hash_equals(MAC(body,""), MAC(body,"")) = true

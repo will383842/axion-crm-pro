@@ -1,0 +1,49 @@
+=== T6 last_name : effet ACCENT SEUL (lower vs lower(unaccent)) ===
+ accent_seul | accent_plus_particules 
+-------------+------------------------
+        7383 |                  27008
+(1 row)
+
+=== T7 recherche par nom : combien de fiches INTROUVABLES par lower() si on tape sans accent ===
+ count 
+-------
+  7388
+(1 row)
+
+=== T8 Dupont/Dupond : normalize_name les confond-il ? ===
+   a    |   b    |   c    |   d    | casse_attrapee | dupond_attrape 
+--------+--------+--------+--------+----------------+----------------
+ dupont | dupont | dupont | dupond | t              | f
+(1 row)
+
+=== T9 TOUS les index UNIQUE portant sur email dans la base ===
+               indexname               |                                                                     indexdef                                                                      
+---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------
+ users_email_key                       | CREATE UNIQUE INDEX users_email_key ON public.users USING btree (email)
+ password_reset_tokens_pkey            | CREATE UNIQUE INDEX password_reset_tokens_pkey ON public.password_reset_tokens USING btree (email)
+ email_suppressions_pkey               | CREATE UNIQUE INDEX email_suppressions_pkey ON public.email_suppressions USING btree (id)
+ email_suppressions_scope_email_key    | CREATE UNIQUE INDEX email_suppressions_scope_email_key ON public.email_suppressions USING btree (scope, email) WHERE (email IS NOT NULL)
+ email_suppressions_scope_hash_key     | CREATE UNIQUE INDEX email_suppressions_scope_hash_key ON public.email_suppressions USING btree (scope, email_hash) WHERE (email_hash IS NOT NULL)
+ email_validations_pkey                | CREATE UNIQUE INDEX email_validations_pkey ON public.email_validations USING btree (id)
+ email_validations_email_key           | CREATE UNIQUE INDEX email_validations_email_key ON public.email_validations USING btree (email)
+ email_templates_pkey                  | CREATE UNIQUE INDEX email_templates_pkey ON public.email_templates USING btree (id)
+ email_templates_workspace_id_slug_key | CREATE UNIQUE INDEX email_templates_workspace_id_slug_key ON public.email_templates USING btree (workspace_id, slug)
+ email_sequences_pkey                  | CREATE UNIQUE INDEX email_sequences_pkey ON public.email_sequences USING btree (id)
+ email_sequences_campaign_id_step_key  | CREATE UNIQUE INDEX email_sequences_campaign_id_step_key ON public.email_sequences USING btree (campaign_id, step)
+ email_sends_pkey                      | CREATE UNIQUE INDEX email_sends_pkey ON public.email_sends USING btree (id)
+ email_audiences_pkey                  | CREATE UNIQUE INDEX email_audiences_pkey ON public.email_audiences USING btree (id)
+ email_verification_logs_pkey          | CREATE UNIQUE INDEX email_verification_logs_pkey ON public.email_verification_logs USING btree (id)
+ email_verif_unique                    | CREATE UNIQUE INDEX email_verif_unique ON public.email_verification_logs USING btree (workspace_id, email, provider)
+(15 rows)
+
+=== T9b index UNIQUE utilisant lower() ===
+ indexname | indexdef 
+-----------+----------
+(0 rows)
+
+=== T10 companies : denomination avec majuscules/accents ===
+ accentuees | diverge_accent |  total  
+------------+----------------+---------
+        897 |            715 | 4295349
+(1 row)
+

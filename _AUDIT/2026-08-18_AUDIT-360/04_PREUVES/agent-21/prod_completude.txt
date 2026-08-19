@@ -1,0 +1,26 @@
+=== T16 TEMOIN Luhn SIREN (552081317 = Renault, valide ; 552081318 = invalide) ===
+     s     | luhn_ok 
+-----------+---------
+ 552081317 | t
+ 552081318 | f
+ 732829320 | t
+(3 rows)
+
+=== T17 COMPLETUDE companies (4 295 349) ===
+ email_rens | email_plausible | tel_rens | tel_plausible | adr_rens | adr_plausible | siren_rens | web_rens | web_plausible 
+------------+-----------------+----------+---------------+----------+---------------+------------+----------+---------------
+     255290 |          255290 |   323678 |        323678 |  4285421 |       3788293 |    4294903 |   824762 |        824762
+(1 row)
+
+=== T18 SIREN plausible (9 chiffres + Luhn) ===
+ neuf_chiffres | luhn_ok 
+---------------+---------
+       4294903 | 4294903
+(1 row)
+
+=== T19 COMPLETUDE contacts (1 319 567) ===
+ email_rens | email_plausible | tel_rens | prenom_rens | titre_rens | li_rens | person_key_rens | email_status_rens 
+------------+-----------------+----------+-------------+------------+---------+-----------------+-------------------
+     410481 |          410481 |        0 |      857917 |          0 |       0 |               0 |            410481
+(1 row)
+

@@ -1,0 +1,18 @@
+import { chromium } from 'playwright';
+import { poserLesDoublures } from './mock.mjs';
+const BASE = 'http://127.0.0.1:5224';
+const b = await chromium.launch();
+const p = await (await b.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1440, height: 900 } })).newPage();
+p.on('console', m => console.log('[console]', m.type(), m.text().slice(0, 200)));
+p.on('pageerror', e => console.log('[pageerror]', String(e).slice(0, 300)));
+p.on('requestfailed', r => console.log('[failed]', r.method(), r.url().slice(0, 120), r.failure()?.errorText));
+const journal = [];
+await poserLesDoublures(p, { consoleV2: true, journal });
+await p.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
+await p.waitForTimeout(8000);
+console.log('URL =', p.url());
+console.log('BODY =', (await p.locator('body').innerText().catch(() => '(vide)')).slice(0, 600));
+console.log('sidebar count =', await p.locator('[data-tour="sidebar"]').count());
+console.log('appels doublés =', journal.join(' | '));
+await p.screenshot({ path: process.argv[2] + '/debug.png' });
+await b.close();

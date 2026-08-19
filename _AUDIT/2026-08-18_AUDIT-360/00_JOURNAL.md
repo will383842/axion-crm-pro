@@ -335,3 +335,53 @@ antérieures sont à rejouer.
 la production mesure `C|C`. **La CI est alignée.** Le piège est réel mais sa cause est ailleurs : sous
 `lc_ctype=C`, le `lower()` **de PostgreSQL** ne replie pas les accents là où `mb_strtolower` **de PHP**
 le fait. La divergence est **SQL ↔ PHP**, pas CI ↔ prod — donc « aligner les locales » ne réglerait rien.
+
+## 2026-08-19T14:30Z — Le critique de complétude a fait son travail contre l'audit
+
+L'agent 50 a audité **l'audit**, instantané daté (12:06Z), et il a trouvé quatre choses contre moi.
+**Les quatre sont fondées, les quatre sont corrigées :**
+
+1. 🔴 **J'ai reproduit `A-013` dans le document qui le dénonce.** Le §5 de `02bis` affirmait « la CI
+   backend, **bloquante et requise** » — ce qui contredit `F38-002`, `A08-005` et `H44-003` du même
+   dossier. **C'est la SUITE qui est saine, pas son câblage.** Corrigé, avec la mention de l'écart.
+2. **J'avais laissé tomber une réserve d'agent** : `B12-001`/`B12-003` sont mesurés là où
+   `CRM_DB_APP_ROLE_ENABLED=false` alors que la production est à `true`. L'agent 12 l'avait écrit ; ma
+   consolidation avait gardé le constat et perdu la réserve. **Rétablie.**
+3. **`B12-004` était périmé** — `F37-001` l'a mesuré sur le serveur et l'aggrave. **Corrigé.**
+4. 🔴 **Une garde vue ROUGE dormait dans les preuves, publiée nulle part** : un `viewer` obtient
+   **200 au lieu de 403** sur l'export des **4 295 349 fiches nominatives**. **C'était la seule garde
+   de permission vue rouge de tout l'audit**, et son correctif était déjà écrit.
+   **Publiée en `F36-001`, S0.** *Sans l'agent 50, elle était perdue — `A-013` appliqué à l'audit.*
+
+**Une chose de sa critique est corrigée par la mesure** : il classe l'agent 45 « squelette, 0 constat ».
+C'était vrai **à 12:06Z**, faux depuis **14:10Z** — le rapport porte **dix constats**. Il avait daté son
+instantané : c'est le décalage qui parle, pas l'erreur.
+
+## 2026-08-19T14:35Z — Trois mesures de clôture, dont deux qui referment des points ouverts
+
+**1. La RLS en production (`A-014`).** J'ai attendu **48 minutes** la fin de la restauration plutôt que
+de conclure sur une base en cours d'index — la mesure prématurée aurait donné « 0 policy ».
+Résultat : la base restaurée rend **39 policies / 38 FORCE RLS**, **exactement comme la production**.
+→ ✅ **les policies survivent à une restauration** (point ouvert de l'agent 8, **clos dans le bon
+sens** ; `A08-008` porte sur les **droits**, pas sur les policies) ; ✅ **l'écart 55 ↔ 38 n'est pas un
+trou** (l'agent 11 mesurait une base bâtie par migrations) ; 🔴 **mais sur 41 tables à `workspace_id`,
+3 n'ont pas de FORCE RLS, et deux sont des exclusions motivées. Il reste `audit_logs`.**
+**Cinq agents, cinq chemins, un seul trou — désormais mesuré en production.** Et son périmètre est
+**borné et petit** : une table et ses 14 partitions.
+
+**2. Les deux bascules d'heure, jouées pour la première fois dans ce dépôt** (agent 29). Sur le chemin
+réel, table réelle : **sans `DB_TIMEZONE`, 6/6 décalés** (+7 200 s l'été, +3 600 s l'hiver) ;
+**avec — c'est-à-dire en production — 6/6 à 0 s**, y compris l'heure **inexistante** du 29/03 et
+l'heure **ambiguë** du 25/10. *Le volet stockage du critère 16 est **TENU**. Son volet affichage ne
+l'est pas.*
+
+**3. Une hypothèse sérieuse, tuée par la mesure.** L'agent 46 a montré que le lien magique et le jeton
+de réinitialisation sont **écrits dans le journal** quand `MOCK_MODE`/`MAIL_MAILER=log` — or ce journal
+fait **1 Go** et il est en **`-rwxrwxrwx`**. **Si des liens de connexion y étaient, quiconque lit ce
+fichier pourrait se connecter en tant que propriétaire.** Vérifié en production, sans afficher aucun
+contenu : **0 `Message-ID:`, 0 `To:`, 0 `magic-link/verify`**. **Témoin positif** sur le même fichier :
+`telescope_entries` **172 131**, `axion_crm_session` **264**. *Les zéros sont des zéros.*
+**Aucun courriel n'a jamais été rendu dans ce journal** — cohérent avec `A-012`. **Le risque est armé,
+il n'est pas réalisé** : consigné comme non-constat, pas comme découverte.
+
+*Sixième fois que je vérifie avant d'écrire et que la vérification tue l'hypothèse. C'est le bon ratio.*

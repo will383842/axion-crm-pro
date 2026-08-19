@@ -1,0 +1,49 @@
+=== T36 companies.relation_type : distribution ===
+ relation_type |  count  |   pct    
+---------------+---------+----------
+ prospect      | 4295349 | 100.0000
+(1 row)
+
+=== T37 conference / newsletter comme TYPE (le CDC en fait des MOTIFS) ===
+ count 
+-------
+     0
+(1 row)
+
+=== T38 contacts : existe-t-il une colonne de type ? ===
+ colonnes_de_type 
+------------------
+                0
+(1 row)
+
+=== T39 candidates : colonnes de type + volume ===
+ volume | col_relation_type 
+--------+-------------------
+      0 |                 1
+(1 row)
+
+=== T40 companies portant PLUSIEURS tags impliquant un type (multi-types du 2.2) ===
+ au_moins_un | multi_types 
+-------------+-------------
+           0 |           0
+(1 row)
+
+=== T41 country_code / entity_nature ===
+ country_code | entity_nature |  count  
+--------------+---------------+---------
+ FR           |               | 4294903
+ RO           | entreprise    |     352
+ RO           | association   |      57
+ RO           | cabinet       |      27
+ RO           | enseignement  |       6
+ RO           | institution   |       2
+ RO           | media         |       1
+ RO           | cci           |       1
+(8 rows)
+
+=== T42 fiches sans siren : ancre foreign_id respectee ? ===
+ sans_siren | sans_ancre | sans_nature 
+------------+------------+-------------
+        446 |          0 |           0
+(1 row)
+

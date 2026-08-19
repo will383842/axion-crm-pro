@@ -1,0 +1,44 @@
+### VERDICT CALENDLY, statut par statut
+
+-- booked : AUTOMATIQUE, 3 emetteurs --
+src/app/api/calendly/client-event/route.ts:174:      kind: "booked",
+src/server/calendly/discover.ts:245:        kind: "booked",
+src/features/admin-calendly/actions.ts:182:        kind: "booked",
+
+-- canceled / no_show : AUTOMATIQUES via sondage API (enrich.ts:235-238) --
+  if ((canceled || noShow) && inviteeEmail) {
+    try {
+      await syncCalendlyEventToCrm({
+        kind: canceled ? "canceled" : "no_show",
+        subjectRef: `site:calendly_event:${eventId}`,
+        sourceSlug: "calendly",
+
+-- cadence du sondage (queues.ts:996-1000) --
+      // C'est CE passage qui porte la promesse « moins de 60 s ».
+      { type: "discover", pattern: "* * * * *", jobId: "calendly-discover-cron" },
+      // Annulations et déplacements : toutes les 10 min (jusqu'à ~50 requêtes).
+      { type: "refresh", pattern: "*/10 * * * *", jobId: "calendly-refresh-cron" },
+    ];
+
+-- completed : MANUEL PAR CONCEPTION, documente (enrich.ts:37-40) --
+// `completed` reste MANUEL, et ce n'est pas un oubli : rien dans l'API ne dit
+// qu'un rendez-vous a été honoré. Une règle temporelle (« l'heure de fin est
+// passée depuis N heures ⇒ honoré ») affirmerait au CRM un fait commercial que
+// personne n'a constaté — et un rendez-vous passé n'a pas forcément eu lieu.
+
+
+-- seul emetteur de completed : le changement de statut en console (admin-calendly/actions.ts:86-99) --
+    const kindByStatus = {
+      completed: "completed",
+      no_show: "no_show",
+      canceled: "canceled",
+    } as const;
+    const newStatus = parsed.data.status;
+    if (
+      newStatus &&
+      newStatus !== before?.status &&
+      newStatus in kindByStatus &&
+      updated.inviteeEmail
+    ) {
+      await syncCalendlyEventToCrm({
+        kind: kindByStatus[newStatus as keyof typeof kindByStatus],

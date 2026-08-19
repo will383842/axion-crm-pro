@@ -1,0 +1,10 @@
+Company          -> App\Policies\CompanyPolicy
+Contact          -> App\Policies\ContactPolicy
+ScraperRun       -> App\Policies\ScraperRunPolicy
+Workspace        -> App\Policies\WorkspacePolicy
+User             -> App\Policies\UserPolicy
+Tag              -> App\Policies\TagPolicy
+RgpdRequest      -> App\Policies\RgpdRequestPolicy
+AuditLog         -> App\Policies\AuditLogPolicy
+LlmUseCase       -> App\Policies\LlmUseCasePolicy
+ProxyProvider    -> App\Policies\ProxyProviderPolicy

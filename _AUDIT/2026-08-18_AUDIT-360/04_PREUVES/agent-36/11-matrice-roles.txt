@@ -1,0 +1,9 @@
+/api/v1/companies/export       norole=403 viewer=403 operator=200 admin=200 owner=200 owner2=200 
+/api/v1/media/export           norole=403 viewer=403 operator=500 admin=500 owner=500 owner2=500 
+/api/v1/journalists/export     norole=403 viewer=403 operator=500 admin=500 owner=500 owner2=500 
+/api/v1/audit-logs             norole=200 viewer=200 operator=200 admin=200 owner=200 owner2=200 
+/api/v1/users                  norole=200 viewer=200 operator=200 admin=200 owner=200 owner2=200 
+/api/v1/workspace              norole=200 viewer=200 operator=200 admin=200 owner=200 owner2=200 
+/api/v1/proxy-providers        norole=200 viewer=200 operator=200 admin=200 owner=200 owner2=200 
+/api/v1/rgpd/requests          norole=200 viewer=200 operator=200 admin=200 owner=200 owner2=200 
+/api/v1/scraper-runs           norole=200 viewer=200 operator=200 admin=200 owner=200 owner2=200 

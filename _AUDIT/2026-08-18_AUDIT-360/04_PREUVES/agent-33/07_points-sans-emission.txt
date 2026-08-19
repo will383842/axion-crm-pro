@@ -1,0 +1,46 @@
+### Points de capture qui n EMETTENT RIEN vers le CRM
+
+-- features/booking (tunnel devis/cadrage/reprogrammation/remboursement) --
+>>> AUCUNE REFERENCE crm-sync dans src/features/booking/ (20 fichiers) <<<
+admin-actions.test.ts
+admin-actions.ts
+admin-form-actions.ts
+cadrage-actions.ts
+option-cap.test.ts
+option-cap.ts
+quote-actions.test.ts
+quote-actions.ts
+quote-form-actions.ts
+quote-form-state.ts
+refund-actions.ts
+refund-calc.test.ts
+refund-calc.ts
+refund-form-actions.ts
+refund-form-state.ts
+reschedule-actions.ts
+reschedule-form-actions.ts
+reschedule-form-state.ts
+self-service-actions.ts
+state-machine.test.ts
+state-machine.ts
+
+-- chatbot : 1 outil sur 6 emet --
+capturer-lead.ts
+chercher-ressource.ts
+escalader-question.ts
+proposer-rdv.ts
+qualifier-prospect.ts
+rechercher-offres.ts
+registry.ts
+references crm-sync dans tout src/server/chatbot/ :
+src/server/chatbot/tools/capturer-lead.ts:11:import { syncFormSubmissionToCrm } from "@/server/crm-sync";
+
+-- TEMOIN NEGATIF : le grep trouve bien crm-sync la ou il existe --
+src/features/admin-calendly/actions.ts
+src/features/commercial-application/actions.ts
+src/features/job-application/actions.ts
+src/features/newsletter/actions.ts
+src/features/podcast-request/actions.ts
+src/features/review-submission/actions.ts
+src/features/roi-report/actions.ts
+src/features/unified-contact/actions.ts

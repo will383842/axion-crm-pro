@@ -1,0 +1,286 @@
+# Composition de phpstan-baseline.neon — main 8db8229 (perimetre inchange depuis c0c453d)
+# genere le 2026-08-19 par agent-46
+
+## Par identifiant (entrees / erreurs)
+  53    55  property.notFound
+  32    46  argument.type
+  31    45  larastan.noEnvCallsOutsideOfConfig
+  41    41  missingType.iterableValue
+  14    14  missingType.return
+   2     8  nullsafe.neverNull
+   7     7  nullCoalesce.offset
+   5     6  return.type
+   6     6  missingType.parameter
+   3     3  classConstant.phpDocType
+   3     3  identical.alwaysFalse
+   2     2  method.nonObject
+   2     2  method.notFound
+   1     1  property.nonObject
+   1     1  larastan.noUnnecessaryCollectionCall
+   1     1  identical.alwaysTrue
+   1     1  deadCode.unreachable
+   1     1  notIdentical.alwaysTrue
+   1     1  foreach.nonIterable
+   1     1  arrayValues.list
+   1     1  method.unused
+   1     1  empty.offset
+   1     1  booleanOr.alwaysTrue
+ 211   248  TOTAL
+
+## Par module
+  56    68  app/Http/Controllers
+  27    30  app/Console/Commands
+  25    25  app/Services/LLM
+   9    11  app/Services/Audiences
+  11    11  app/Services/Email
+   4    10  database/seeders/OwnerUserSeeder.php
+   6     6  app/Models/ScrapingCampaign.php
+   6     6  app/Services/Classification
+   4     6  app/Services/Smtp
+   4     5  app/Services/Dedup
+   4     5  app/Services/Waterfall
+   4     4  app/Policies/BasePolicy.php
+   2     4  app/Services/FranceTravail
+   2     4  app/Services/Insee
+   3     3  app/Http/Resources
+   3     3  app/Models/AudienceMember.php
+   3     3  app/Models/Journalist.php
+   3     3  app/Models/Workspace.php
+   1     3  app/Providers/RouteServiceProvider.php
+   3     3  app/Services/Auth
+   3     3  app/Services/Legal
+   2     3  app/Services/Proxies
+   2     3  app/Services/Rotations
+   2     2  app/Events/CompanyEnriched.php
+   2     2  app/Models/HealthPractitioner.php
+   1     2  app/Providers/MockServicesProvider.php
+   1     2  app/Providers/TelescopeServiceProvider.php
+   2     2  app/Services/Domain
+   2     2  app/Services/Rgpd
+   1     1  app/Events/NotificationCreated.php
+   1     1  app/Events/ScrapeJobCompleted.php
+   1     1  app/Events/ScraperRunCancelled.php
+   1     1  app/Jobs/LaunchCampaignJob.php
+   1     1  app/Jobs/LaunchZoneScrapingJob.php
+   1     1  app/Jobs/RefreshAudienceChunkJob.php
+   1     1  app/Rules/NotPwnedPassword.php
+   1     1  app/Services/AnnuaireEntreprises
+   1     1  app/Services/Audit
+   1     1  app/Services/Captcha
+   1     1  app/Services/Http
+   1     1  config/database.php
+   1     1  database/migrations/2026_05_18_000001_apply_rls_dynamic.php
+   1     1  database/seeders/DemoCompaniesSeeder.php
+
+## Detail complet (identifiant | count | chemin | message)
+argument.type	1	app/Console/Commands/AnomalyDetect.php	#^Parameter \#1 \$string of method Illuminate\\Console\\Command\:\:warn\(\) expects string, string\|false given\.$#
+property.nonObject	1	app/Console/Commands/AudiencesFullRefreshCommand.php	#^Cannot access property \$member_count on App\\Models\\EmailAudience\|null\.$#
+larastan.noEnvCallsOutsideOfConfig	1	app/Console/Commands/BlacklistsCheck.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+larastan.noEnvCallsOutsideOfConfig	2	app/Console/Commands/ImportIgnAdminExpress.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+argument.type	1	app/Console/Commands/ImportIgnAdminExpress.php	#^Parameter \#1 \$json of function json_decode expects string, string\|false given\.$#
+missingType.iterableValue	1	app/Console/Commands/ImportMediaEmissionsFromWikidata.php	#^Property App\\Console\\Commands\\ImportMediaEmissionsFromWikidata\:\:\$channelCache type has no value type specified in iterable type array\.$#
+missingType.iterableValue	1	app/Console/Commands/ImportMediaEmissionsFromWikidata.php	#^Property App\\Console\\Commands\\ImportMediaEmissionsFromWikidata\:\:\$channelIndexBuilt type has no value type specified in iterable type array\.$#
+argument.type	1	app/Console/Commands/ImportMediaFromArcom.php	#^Parameter \#1 \$string of function mb_substr expects string, string\|null given\.$#
+property.notFound	1	app/Console/Commands/ImportMediaPressKit.php	#^Access to an undefined property App\\Models\\Media\:\:\$socials\.$#
+argument.type	1	app/Console/Commands/ImportMediaPressKit.php	#^Parameter \#1 \$string of function mb_substr expects string, string\|null given\.$#
+larastan.noEnvCallsOutsideOfConfig	1	app/Console/Commands/ImportNaf.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+argument.type	1	app/Console/Commands/ImportNaf.php	#^Parameter \#1 \$path of function base_path expects string, string\|null given\.$#
+larastan.noEnvCallsOutsideOfConfig	2	app/Console/Commands/ImportRpps.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+argument.type	1	app/Console/Commands/ImportRpps.php	#^Parameter \#1 \$path of function base_path expects string, string\|null given\.$#
+argument.type	2	app/Console/Commands/ImportRpps.php	#^Parameter \#1 \$string of function strlen expects string, string\|null given\.$#
+argument.type	1	app/Console/Commands/ImportRpps.php	#^Parameter \#1 \$string of function substr expects string, string\|null given\.$#
+larastan.noUnnecessaryCollectionCall	1	app/Console/Commands/MediaCleanEmails.php	#^Called ''pluck'' on Laravel collection, but could have been retrieved as a query\.$#
+missingType.iterableValue	1	app/Console/Commands/MediaEnrich.php	#^Method App\\Console\\Commands\\MediaEnrich\:\:pickBestEmail\(\) has parameter \$emails with no value type specified in iterable type array\.$#
+nullCoalesce.offset	1	app/Console/Commands/MediaEnrich.php	#^Offset ''status'' on array\{status\: string, email\: string, reason\: string\|null, mx_records\: array\<int, string\>, is_disposable\: bool, is_role\: bool, is_free_provider\: bool, has_mx_records\: bool\} on left side of \?\? always exists and is not nullable\.$#
+argument.type	1	app/Console/Commands/MediaFindWebsites.php	#^Parameter \#1 \$companies of method App\\Services\\Domain\\DomainFinderService\:\:guessDomainsBatch\(\) expects iterable\<App\\Models\\Company\>, Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Media\> given\.$#
+larastan.noEnvCallsOutsideOfConfig	1	app/Console/Commands/PentestSelfCheck.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+identical.alwaysTrue	1	app/Console/Commands/ProspectionCollect.php	#^Strict comparison using \=\=\= between array\{\} and array\{\} will always evaluate to true\.$#
+deadCode.unreachable	1	app/Console/Commands/ProspectionCollect.php	#^Unreachable statement \- code above always terminates\.$#
+larastan.noEnvCallsOutsideOfConfig	1	app/Console/Commands/ProspectionEnrich.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+argument.type	1	app/Console/Commands/RetentionPurge.php	#^Parameter \#1 \$query of static method Illuminate\\Database\\Connection\:\:selectOne\(\) expects string, string\|null given\.$#
+argument.type	1	app/Console/Commands/RetentionPurge.php	#^Parameter \#3 \$subject of function preg_replace expects array\<float\|int\|string\>\|string, string\|null given\.$#
+larastan.noEnvCallsOutsideOfConfig	1	app/Console/Commands/SignalsNightlyScan.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+missingType.iterableValue	1	app/Events/CompanyEnriched.php	#^Method App\\Events\\CompanyEnriched\:\:__construct\(\) has parameter \$fieldsEnriched with no value type specified in iterable type array\.$#
+missingType.iterableValue	1	app/Events/CompanyEnriched.php	#^Method App\\Events\\CompanyEnriched\:\:broadcastWith\(\) return type has no value type specified in iterable type array\.$#
+missingType.iterableValue	1	app/Events/NotificationCreated.php	#^Method App\\Events\\NotificationCreated\:\:broadcastWith\(\) return type has no value type specified in iterable type array\.$#
+missingType.iterableValue	1	app/Events/ScrapeJobCompleted.php	#^Method App\\Events\\ScrapeJobCompleted\:\:broadcastWith\(\) return type has no value type specified in iterable type array\.$#
+missingType.iterableValue	1	app/Events/ScraperRunCancelled.php	#^Method App\\Events\\ScraperRunCancelled\:\:broadcastWith\(\) return type has no value type specified in iterable type array\.$#
+larastan.noEnvCallsOutsideOfConfig	1	app/Http/Controllers/Api/Auth/PasswordResetController.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+property.notFound	1	app/Http/Controllers/Api/CompaniesController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$city_name\.$#
+property.notFound	1	app/Http/Controllers/Api/CompaniesController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$contacts\.$#
+property.notFound	1	app/Http/Controllers/Api/CompaniesController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$denomination\.$#
+property.notFound	1	app/Http/Controllers/Api/CompaniesController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$department_code\.$#
+property.notFound	1	app/Http/Controllers/Api/CompaniesController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$email_generic\.$#
+property.notFound	1	app/Http/Controllers/Api/CompaniesController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$enseigne\.$#
+property.notFound	1	app/Http/Controllers/Api/CompaniesController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$healthPractitioners\.$#
+property.notFound	1	app/Http/Controllers/Api/CompaniesController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$lat\.$#
+property.notFound	1	app/Http/Controllers/Api/CompaniesController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$lon\.$#
+property.notFound	1	app/Http/Controllers/Api/CompaniesController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$naf\.$#
+property.notFound	1	app/Http/Controllers/Api/CompaniesController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$phone\.$#
+property.notFound	1	app/Http/Controllers/Api/CompaniesController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$siren\.$#
+property.notFound	1	app/Http/Controllers/Api/CompaniesController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$size_category\.$#
+property.notFound	1	app/Http/Controllers/Api/CompaniesController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$website\.$#
+method.nonObject	1	app/Http/Controllers/Api/CompaniesController.php	#^Cannot call method load\(\) on App\\Models\\Company\|null\.$#
+argument.type	1	app/Http/Controllers/Api/CompaniesController.php	#^Parameter \#1 \$c of method App\\Http\\Controllers\\Api\\CompaniesController\:\:resolveBestConfidence\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model given\.$#
+argument.type	2	app/Http/Controllers/Api/CompaniesController.php	#^Parameter \#1 \$stream of function fclose expects resource, resource\|false given\.$#
+argument.type	3	app/Http/Controllers/Api/CompaniesController.php	#^Parameter \#1 \$stream of function fputcsv expects resource, resource\|false given\.$#
+argument.type	2	app/Http/Controllers/Api/CompaniesController.php	#^Parameter \#1 \$stream of function fwrite expects resource, resource\|false given\.$#
+missingType.iterableValue	1	app/Http/Controllers/Api/CoverageController.php	#^Method App\\Http\\Controllers\\Api\\CoverageController\:\:queryCityCells\(\) return type has no value type specified in iterable type array\.$#
+property.notFound	1	app/Http/Controllers/Api/JournalistsController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$beat\.$#
+property.notFound	1	app/Http/Controllers/Api/JournalistsController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$email\.$#
+property.notFound	1	app/Http/Controllers/Api/JournalistsController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$first_name\.$#
+property.notFound	1	app/Http/Controllers/Api/JournalistsController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$last_name\.$#
+property.notFound	1	app/Http/Controllers/Api/JournalistsController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$media\.$#
+property.notFound	1	app/Http/Controllers/Api/JournalistsController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$opt_out\.$#
+property.notFound	1	app/Http/Controllers/Api/JournalistsController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$phone\.$#
+property.notFound	1	app/Http/Controllers/Api/JournalistsController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$role\.$#
+property.notFound	1	app/Http/Controllers/Api/JournalistsController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$source\.$#
+argument.type	2	app/Http/Controllers/Api/JournalistsController.php	#^Parameter \#1 \$stream of function fclose expects resource, resource\|false given\.$#
+argument.type	3	app/Http/Controllers/Api/JournalistsController.php	#^Parameter \#1 \$stream of function fputcsv expects resource, resource\|false given\.$#
+argument.type	2	app/Http/Controllers/Api/JournalistsController.php	#^Parameter \#1 \$stream of function fwrite expects resource, resource\|false given\.$#
+property.notFound	1	app/Http/Controllers/Api/MediaController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$arcom_id\.$#
+property.notFound	1	app/Http/Controllers/Api/MediaController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$city\.$#
+property.notFound	1	app/Http/Controllers/Api/MediaController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$cppap_number\.$#
+property.notFound	1	app/Http/Controllers/Api/MediaController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$department_code\.$#
+property.notFound	1	app/Http/Controllers/Api/MediaController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$diffusion_zone\.$#
+property.notFound	1	app/Http/Controllers/Api/MediaController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$editorial_theme\.$#
+property.notFound	1	app/Http/Controllers/Api/MediaController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$email\.$#
+property.notFound	1	app/Http/Controllers/Api/MediaController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$email_confidence\.$#
+property.notFound	1	app/Http/Controllers/Api/MediaController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$media_family\.$#
+property.notFound	1	app/Http/Controllers/Api/MediaController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$media_type\.$#
+property.notFound	1	app/Http/Controllers/Api/MediaController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#
+property.notFound	1	app/Http/Controllers/Api/MediaController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$periodicity\.$#
+property.notFound	1	app/Http/Controllers/Api/MediaController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$phone\.$#
+property.notFound	1	app/Http/Controllers/Api/MediaController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$publisher\.$#
+property.notFound	1	app/Http/Controllers/Api/MediaController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$region_code\.$#
+property.notFound	1	app/Http/Controllers/Api/MediaController.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$website\.$#
+argument.type	2	app/Http/Controllers/Api/MediaController.php	#^Parameter \#1 \$stream of function fclose expects resource, resource\|false given\.$#
+argument.type	3	app/Http/Controllers/Api/MediaController.php	#^Parameter \#1 \$stream of function fputcsv expects resource, resource\|false given\.$#
+argument.type	2	app/Http/Controllers/Api/MediaController.php	#^Parameter \#1 \$stream of function fwrite expects resource, resource\|false given\.$#
+missingType.iterableValue	1	app/Http/Controllers/Api/ObservabilityController.php	#^Method App\\Http\\Controllers\\Api\\ObservabilityController\:\:countHunterMonth\(\) return type has no value type specified in iterable type array\.$#
+return.type	1	app/Http/Controllers/Api/ObservabilityController.php	#^Method App\\Http\\Controllers\\Api\\ObservabilityController\:\:recentBusinessEvents\(\) should return list\<array\<string, mixed\>\> but returns array\<int, array\{id\: mixed, action\: mixed, resource_type\: mixed, resource_id\: mixed, context\: mixed, created_at\: mixed\}\>\.$#
+notIdentical.alwaysTrue	1	app/Http/Controllers/Api/ScrapingCampaignsController.php	#^Strict comparison using \!\=\= between mixed and null will always evaluate to true\.$#
+larastan.noEnvCallsOutsideOfConfig	1	app/Http/Controllers/Internal/ScraperResultController.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+property.notFound	1	app/Http/Resources/ScrapingCampaignResource.php	#^Access to an undefined property App\\Http\\Resources\\ScrapingCampaignResource\:\:\$created_at\.$#
+property.notFound	1	app/Http/Resources/ScrapingCampaignResource.php	#^Access to an undefined property App\\Http\\Resources\\ScrapingCampaignResource\:\:\$runs\.$#
+property.notFound	1	app/Http/Resources/ScrapingCampaignResource.php	#^Access to an undefined property App\\Http\\Resources\\ScrapingCampaignResource\:\:\$updated_at\.$#
+larastan.noEnvCallsOutsideOfConfig	1	app/Jobs/LaunchCampaignJob.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+larastan.noEnvCallsOutsideOfConfig	1	app/Jobs/LaunchZoneScrapingJob.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+property.notFound	1	app/Jobs/RefreshAudienceChunkJob.php	#^Access to an undefined property App\\Models\\EmailAudience\:\:\$criteria\.$#
+missingType.return	1	app/Models/AudienceMember.php	#^Method App\\Models\\AudienceMember\:\:audience\(\) has no return type specified\.$#
+missingType.return	1	app/Models/AudienceMember.php	#^Method App\\Models\\AudienceMember\:\:company\(\) has no return type specified\.$#
+missingType.return	1	app/Models/AudienceMember.php	#^Method App\\Models\\AudienceMember\:\:contact\(\) has no return type specified\.$#
+missingType.return	1	app/Models/HealthPractitioner.php	#^Method App\\Models\\HealthPractitioner\:\:company\(\) has no return type specified\.$#
+missingType.return	1	app/Models/HealthPractitioner.php	#^Method App\\Models\\HealthPractitioner\:\:workspace\(\) has no return type specified\.$#
+missingType.return	1	app/Models/Journalist.php	#^Method App\\Models\\Journalist\:\:company\(\) has no return type specified\.$#
+missingType.return	1	app/Models/Journalist.php	#^Method App\\Models\\Journalist\:\:media\(\) has no return type specified\.$#
+missingType.return	1	app/Models/Journalist.php	#^Method App\\Models\\Journalist\:\:workspace\(\) has no return type specified\.$#
+missingType.iterableValue	1	app/Models/ScrapingCampaign.php	#^Class App\\Models\\ScrapingCampaign has PHPDoc tag @property for property \$per_source_limits with no value type specified in iterable type array\.$#
+missingType.iterableValue	1	app/Models/ScrapingCampaign.php	#^Class App\\Models\\ScrapingCampaign has PHPDoc tag @property for property \$sources with no value type specified in iterable type array\.$#
+missingType.iterableValue	1	app/Models/ScrapingCampaign.php	#^Class App\\Models\\ScrapingCampaign has PHPDoc tag @property for property \$zones with no value type specified in iterable type array\.$#
+missingType.return	1	app/Models/ScrapingCampaign.php	#^Method App\\Models\\ScrapingCampaign\:\:creator\(\) has no return type specified\.$#
+missingType.return	1	app/Models/ScrapingCampaign.php	#^Method App\\Models\\ScrapingCampaign\:\:runs\(\) has no return type specified\.$#
+missingType.return	1	app/Models/ScrapingCampaign.php	#^Method App\\Models\\ScrapingCampaign\:\:workspace\(\) has no return type specified\.$#
+missingType.iterableValue	1	app/Models/Workspace.php	#^Class App\\Models\\Workspace has PHPDoc tag @property for property \$settings with no value type specified in iterable type array\.$#
+missingType.return	1	app/Models/Workspace.php	#^Method App\\Models\\Workspace\:\:companies\(\) has no return type specified\.$#
+missingType.return	1	app/Models/Workspace.php	#^Method App\\Models\\Workspace\:\:users\(\) has no return type specified\.$#
+missingType.parameter	1	app/Policies/BasePolicy.php	#^Method App\\Policies\\BasePolicy\:\:delete\(\) has parameter \$model with no type specified\.$#
+missingType.parameter	1	app/Policies/BasePolicy.php	#^Method App\\Policies\\BasePolicy\:\:sameWorkspace\(\) has parameter \$model with no type specified\.$#
+missingType.parameter	1	app/Policies/BasePolicy.php	#^Method App\\Policies\\BasePolicy\:\:update\(\) has parameter \$model with no type specified\.$#
+missingType.parameter	1	app/Policies/BasePolicy.php	#^Method App\\Policies\\BasePolicy\:\:view\(\) has parameter \$model with no type specified\.$#
+larastan.noEnvCallsOutsideOfConfig	2	app/Providers/MockServicesProvider.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+larastan.noEnvCallsOutsideOfConfig	3	app/Providers/RouteServiceProvider.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+larastan.noEnvCallsOutsideOfConfig	2	app/Providers/TelescopeServiceProvider.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+method.nonObject	1	app/Rules/NotPwnedPassword.php	#^Cannot call method getBreachCount\(\) on App\\Services\\Auth\\HibpChecker\|null\.$#
+argument.type	1	app/Services/AnnuaireEntreprises/HttpAnnuaireEntreprisesClient.php	#^Parameter \#1 \.\.\.\$arg1 of function max expects non\-empty\-array, list\<int\|string\> given\.$#
+property.notFound	1	app/Services/Audiences/AudienceBuilderService.php	#^Access to an undefined property App\\Models\\EmailAudience\:\:\$criteria\.$#
+property.notFound	3	app/Services/Audiences/AudienceBuilderService.php	#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#
+missingType.iterableValue	1	app/Services/Audiences/AudienceBuilderService.php	#^Method App\\Services\\Audiences\\AudienceBuilderService\:\:applyCondition\(\) has parameter \$cond with no value type specified in iterable type array\.$#
+missingType.parameter	1	app/Services/Audiences/AudienceBuilderService.php	#^Method App\\Services\\Audiences\\AudienceBuilderService\:\:applyCondition\(\) has parameter \$query with no type specified\.$#
+missingType.iterableValue	1	app/Services/Audiences/AudienceBuilderService.php	#^Method App\\Services\\Audiences\\AudienceBuilderService\:\:buildPublicQuery\(\) has parameter \$criteria with no value type specified in iterable type array\.$#
+missingType.iterableValue	1	app/Services/Audiences/AudienceBuilderService.php	#^Method App\\Services\\Audiences\\AudienceBuilderService\:\:buildQuery\(\) has parameter \$criteria with no value type specified in iterable type array\.$#
+missingType.iterableValue	1	app/Services/Audiences/AudienceBuilderService.php	#^Method App\\Services\\Audiences\\AudienceBuilderService\:\:companyMatchesCriteria\(\) has parameter \$criteria with no value type specified in iterable type array\.$#
+missingType.iterableValue	1	app/Services/Audiences/AudienceBuilderService.php	#^Method App\\Services\\Audiences\\AudienceBuilderService\:\:evalCondition\(\) has parameter \$cond with no value type specified in iterable type array\.$#
+missingType.iterableValue	1	app/Services/Audiences/AudienceBuilderService.php	#^Method App\\Services\\Audiences\\AudienceBuilderService\:\:preview\(\) has parameter \$criteria with no value type specified in iterable type array\.$#
+larastan.noEnvCallsOutsideOfConfig	1	app/Services/Audit/AuditHashChain.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+return.type	1	app/Services/Auth/AuthService.php	#^Method App\\Services\\Auth\\AuthService\:\:attemptLogin\(\) should return array\{user\: App\\Models\\User, requires_2fa\: bool\} but returns array\{user\: App\\Models\\User\|null, requires_2fa\: bool\}\.$#
+larastan.noEnvCallsOutsideOfConfig	1	app/Services/Auth/MagicLinkService.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+missingType.iterableValue	1	app/Services/Auth/TwoFactorService.php	#^Method App\\Services\\Auth\\TwoFactorService\:\:startEnrolment\(\) return type has no value type specified in iterable type array\.$#
+argument.type	1	app/Services/Captcha/Mocks/MockCaptchaSolver.php	#^Parameter \#1 \$string of function sha1 expects string, string\|false given\.$#
+classConstant.phpDocType	1	app/Services/Classification/AutoClassifierService.php	#^PHPDoc tag @var for constant App\\Services\\Classification\\AutoClassifierService\:\:DEPT_TO_REGION with type array\<string, string\> is not subtype of value array\{''01''\: ''84'', ''03''\: ''84'', ''07''\: ''84'', 15\: ''84'', 26\: ''84'', 38\: ''84'', 42\: ''84'', 43\: ''84'', \.\.\.\}\.$#
+classConstant.phpDocType	1	app/Services/Classification/AutoClassifierService.php	#^PHPDoc tag @var for constant App\\Services\\Classification\\AutoClassifierService\:\:EFFECTIF_TO_SIZE with type array\<string, string\> is not subtype of value array\{''00''\: ''micro'', ''01''\: ''micro'', ''02''\: ''micro'', ''03''\: ''tpe'', 11\: ''tpe'', 12\: ''tpe'', 21\: ''pme'', 22\: ''pme'', \.\.\.\}\.$#
+classConstant.phpDocType	1	app/Services/Classification/AutoClassifierService.php	#^PHPDoc tag @var for constant App\\Services\\Classification\\AutoClassifierService\:\:NAF_TO_SECTOR with type array\<string, string\> is not subtype of value array\{62\: ''it_saas'', 63\: ''it_saas'', 58\: ''media_edition'', 59\: ''media_edition'', 60\: ''media_edition'', 41\: ''btp'', 42\: ''btp'', 43\: ''btp'', \.\.\.\}\.$#
+property.notFound	1	app/Services/Classification/AutoTagApplier.php	#^Access to an undefined property App\\Models\\Tag\:\:\$rules\.$#
+foreach.nonIterable	1	app/Services/Classification/AutoTagApplier.php	#^Argument of an invalid type list\<string\>\|false supplied for foreach, only iterables are supported\.$#
+identical.alwaysFalse	1	app/Services/Classification/AutoTagApplier.php	#^Strict comparison using \=\=\= between non\-empty\-string and null will always evaluate to false\.$#
+missingType.iterableValue	1	app/Services/Dedup/DeduplicationService.php	#^Method App\\Services\\Dedup\\DeduplicationService\:\:buildDedupKey\(\) has parameter \$context with no value type specified in iterable type array\.$#
+missingType.iterableValue	1	app/Services/Dedup/DeduplicationService.php	#^Method App\\Services\\Dedup\\DeduplicationService\:\:shouldRunScrape\(\) has parameter \$context with no value type specified in iterable type array\.$#
+argument.type	1	app/Services/Dedup/DeduplicationService.php	#^Parameter \#1 \$string of function md5 expects string, string\|false given\.$#
+argument.type	2	app/Services/Dedup/DeduplicationService.php	#^Parameter \#3 \$subject of function preg_replace expects array\<float\|int\|string\>\|string, string\|null given\.$#
+arrayValues.list	1	app/Services/Domain/DomainFinderService.php	#^Parameter \#1 \$array \(list\<non\-falsy\-string\>\) of array_values is already a list, call has no effect\.$#
+argument.type	1	app/Services/Domain/DomainFinderService.php	#^Parameter \#1 \$haystack of function str_contains expects string, string\|null given\.$#
+property.notFound	1	app/Services/Email/EmailFinderService.php	#^Access to an undefined property object\:\:\$is_catchall\.$#
+property.notFound	1	app/Services/Email/EmailFinderService.php	#^Access to an undefined property object\:\:\$is_disposable\.$#
+property.notFound	1	app/Services/Email/EmailFinderService.php	#^Access to an undefined property object\:\:\$is_role\.$#
+property.notFound	1	app/Services/Email/EmailFinderService.php	#^Access to an undefined property object\:\:\$mx_host\.$#
+property.notFound	1	app/Services/Email/EmailFinderService.php	#^Access to an undefined property object\:\:\$score\.$#
+property.notFound	1	app/Services/Email/EmailFinderService.php	#^Access to an undefined property object\:\:\$status\.$#
+missingType.iterableValue	1	app/Services/Email/EmailFinderService.php	#^Method App\\Services\\Email\\EmailFinderService\:\:detectPatternFromKnownEmails\(\) has parameter \$emails with no value type specified in iterable type array\.$#
+nullCoalesce.offset	1	app/Services/Email/EmailFinderService.php	#^Offset ''status'' on array\{status\: string, score\?\: int, mx_records\?\: bool, smtp_check\?\: bool, webmail\?\: bool, disposable\?\: bool, reason\?\: string\} on left side of \?\? always exists and is not nullable\.$#
+nullCoalesce.offset	1	app/Services/Email/EmailFinderService.php	#^Offset 0 on non\-empty\-list\<string\> on left side of \?\? always exists and is not nullable\.$#
+nullCoalesce.offset	1	app/Services/Email/HunterEmailVerifier.php	#^Offset ''score'' on array\{status\: string, score\: int, mx_records\: bool, smtp_check\: bool, webmail\: bool, disposable\: bool\} on left side of \?\? always exists and is not nullable\.$#
+nullCoalesce.offset	1	app/Services/Email/MxEmailValidator.php	#^Offset 0 on non\-empty\-list\<string\> on left side of \?\? always exists and is not nullable\.$#
+larastan.noEnvCallsOutsideOfConfig	2	app/Services/FranceTravail/FranceTravailDiscoveryClient.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+larastan.noEnvCallsOutsideOfConfig	2	app/Services/FranceTravail/HttpFranceTravailClient.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+larastan.noEnvCallsOutsideOfConfig	1	app/Services/Http/SsrfGuard.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+larastan.noEnvCallsOutsideOfConfig	3	app/Services/Insee/HttpInseeClient.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+argument.type	1	app/Services/Insee/Mocks/MockInseeClient.php	#^Parameter \#1 \$json of function json_decode expects string, string\|false given\.$#
+method.notFound	1	app/Services/LLM/LLMRouterService.php	#^Call to an undefined method object\:\:complete\(\)\.$#
+method.notFound	1	app/Services/LLM/LLMRouterService.php	#^Call to an undefined method object\:\:lastUsage\(\)\.$#
+missingType.iterableValue	1	app/Services/LLM/LLMRouterService.php	#^Method App\\Services\\LLM\\LLMRouterService\:\:sanitizeExternalInputs\(\) return type has no value type specified in iterable type array\.$#
+missingType.return	1	app/Services/LLM/LLMRouterService.php	#^Method App\\Services\\LLM\\LLMRouterService\:\:sortRecursively\(\) has no return type specified\.$#
+argument.type	1	app/Services/LLM/LLMRouterService.php	#^Parameter \#2 \$callback of function preg_replace_callback expects callable\(array\<string\>\)\: string, Closure\(mixed\)\: \(string\|false\) given\.$#
+nullsafe.neverNull	1	app/Services/LLM/LLMRouterService.php	#^Using nullsafe property access "\?\-\>content" on left side of \?\? is unnecessary\. Use \-\> instead\.$#
+return.type	1	app/Services/LLM/Mocks/MockLLMClient.php	#^Method App\\Services\\LLM\\Mocks\\MockLLMClient\:\:genericText\(\) should return string but returns string\|false\.$#
+argument.type	1	app/Services/LLM/Mocks/MockLLMClient.php	#^Parameter \#1 \$json of function json_decode expects string, string\|false given\.$#
+larastan.noEnvCallsOutsideOfConfig	1	app/Services/LLM/Providers/AnthropicProvider.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+larastan.noEnvCallsOutsideOfConfig	1	app/Services/LLM/Providers/GroqProvider.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+missingType.iterableValue	1	app/Services/LLM/Providers/GroqProvider.php	#^Method App\\Services\\LLM\\Providers\\GroqProvider\:\:complete\(\) has parameter \$options with no value type specified in iterable type array\.$#
+missingType.iterableValue	1	app/Services/LLM/Providers/GroqProvider.php	#^Method App\\Services\\LLM\\Providers\\GroqProvider\:\:lastUsage\(\) return type has no value type specified in iterable type array\.$#
+missingType.iterableValue	1	app/Services/LLM/Providers/GroqProvider.php	#^Property App\\Services\\LLM\\Providers\\GroqProvider\:\:\$lastUsage type has no value type specified in iterable type array\.$#
+larastan.noEnvCallsOutsideOfConfig	1	app/Services/LLM/Providers/MistralProvider.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+missingType.iterableValue	1	app/Services/LLM/Providers/MistralProvider.php	#^Method App\\Services\\LLM\\Providers\\MistralProvider\:\:complete\(\) has parameter \$options with no value type specified in iterable type array\.$#
+missingType.iterableValue	1	app/Services/LLM/Providers/MistralProvider.php	#^Method App\\Services\\LLM\\Providers\\MistralProvider\:\:lastUsage\(\) return type has no value type specified in iterable type array\.$#
+missingType.iterableValue	1	app/Services/LLM/Providers/MistralProvider.php	#^Property App\\Services\\LLM\\Providers\\MistralProvider\:\:\$lastUsage type has no value type specified in iterable type array\.$#
+larastan.noEnvCallsOutsideOfConfig	1	app/Services/LLM/Providers/OpenAIProvider.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+missingType.iterableValue	1	app/Services/LLM/Providers/OpenAIProvider.php	#^Method App\\Services\\LLM\\Providers\\OpenAIProvider\:\:complete\(\) has parameter \$options with no value type specified in iterable type array\.$#
+missingType.iterableValue	1	app/Services/LLM/Providers/OpenAIProvider.php	#^Method App\\Services\\LLM\\Providers\\OpenAIProvider\:\:lastUsage\(\) return type has no value type specified in iterable type array\.$#
+missingType.iterableValue	1	app/Services/LLM/Providers/OpenAIProvider.php	#^Property App\\Services\\LLM\\Providers\\OpenAIProvider\:\:\$lastUsage type has no value type specified in iterable type array\.$#
+larastan.noEnvCallsOutsideOfConfig	1	app/Services/LLM/Providers/TogetherProvider.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+missingType.iterableValue	1	app/Services/LLM/Providers/TogetherProvider.php	#^Method App\\Services\\LLM\\Providers\\TogetherProvider\:\:complete\(\) has parameter \$options with no value type specified in iterable type array\.$#
+missingType.iterableValue	1	app/Services/LLM/Providers/TogetherProvider.php	#^Method App\\Services\\LLM\\Providers\\TogetherProvider\:\:lastUsage\(\) return type has no value type specified in iterable type array\.$#
+missingType.iterableValue	1	app/Services/LLM/Providers/TogetherProvider.php	#^Property App\\Services\\LLM\\Providers\\TogetherProvider\:\:\$lastUsage type has no value type specified in iterable type array\.$#
+method.unused	1	app/Services/Legal/MentionsLegalesScraperService.php	#^Method App\\Services\\Legal\\MentionsLegalesScraperService\:\:fetch\(\) is unused\.$#
+return.type	1	app/Services/Legal/MentionsLegalesScraperService.php	#^Method App\\Services\\Legal\\MentionsLegalesScraperService\:\:harvestFromWebsite\(\) should return array\{emails\: list\<string\>, phones\: list\<string\>\} but returns array\{emails\: array\<int, string\>, phones\: array\<int, string\>\}\.$#
+missingType.iterableValue	1	app/Services/Legal/MentionsLegalesScraperService.php	#^Method App\\Services\\Legal\\MentionsLegalesScraperService\:\:persistContact\(\) has parameter \$validation with no value type specified in iterable type array\.$#
+larastan.noEnvCallsOutsideOfConfig	2	app/Services/Proxies/IPRoyalProvider.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+larastan.noEnvCallsOutsideOfConfig	1	app/Services/Proxies/WebshareProvider.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+missingType.iterableValue	1	app/Services/Rgpd/GdprPortabilityService.php	#^Method App\\Services\\Rgpd\\GdprPortabilityService\:\:export\(\) return type has no value type specified in iterable type array\.$#
+argument.type	1	app/Services/Rgpd/GdprPortabilityService.php	#^Parameter \#1 \$value of static method Illuminate\\Support\\Facades\\Crypt\:\:encryptString\(\) expects string, string\|false given\.$#
+return.type	2	app/Services/Rotations/SearchEngineRotator.php	#^Method App\\Services\\Rotations\\SearchEngineRotator\:\:pick\(\) should return array\{slug\: string, name\: string, base_url\: string, weight\: int\}\|null but returns array\.$#
+missingType.iterableValue	1	app/Services/Rotations/ZoneRotator.php	#^Method App\\Services\\Rotations\\ZoneRotator\:\:pickNextZone\(\) return type has no value type specified in iterable type array\.$#
+nullCoalesce.offset	1	app/Services/Smtp/HunterSmtpProber.php	#^Offset ''status'' on array\{status\: string, score\?\: int, mx_records\?\: bool, smtp_check\?\: bool, webmail\?\: bool, disposable\?\: bool, reason\?\: string\} on left side of \?\? always exists and is not nullable\.$#
+argument.type	1	app/Services/Smtp/Mocks/MockSmtpProber.php	#^Parameter \#1 \$json of function json_decode expects string, string\|false given\.$#
+larastan.noEnvCallsOutsideOfConfig	3	app/Services/Smtp/RealSmtpProber.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+missingType.parameter	1	app/Services/Smtp/RealSmtpProber.php	#^Method App\\Services\\Smtp\\RealSmtpProber\:\:expect\(\) has parameter \$fp with no type specified\.$#
+larastan.noEnvCallsOutsideOfConfig	2	app/Services/Waterfall/WaterfallOrchestrator.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+empty.offset	1	app/Services/Waterfall/WaterfallOrchestrator.php	#^Offset ''google_places'' on non\-empty\-array\<string, mixed\> in empty\(\) always exists and is not falsy\.$#
+nullCoalesce.offset	1	app/Services/Waterfall/WaterfallOrchestrator.php	#^Offset ''role'' on array\{role\: string, first_name\: string\|null, last_name\: string, birth_date\: string\|null\} on left side of \?\? always exists and is not nullable\.$#
+booleanOr.alwaysTrue	1	app/Services/Waterfall/WaterfallOrchestrator.php	#^Result of \|\| is always true\.$#
+argument.type	1	config/database.php	#^Parameter \#1 \$title of static method Illuminate\\Support\\Str\:\:slug\(\) expects string, bool\|string given\.$#
+missingType.iterableValue	1	database/migrations/2026_05_18_000001_apply_rls_dynamic.php	#^Property Illuminate\\Database\\Migrations\\Migration@anonymous/database/migrations/2026_05_18_000001_apply_rls_dynamic\.php\:24\:\:\$workspaceScopedTables type has no value type specified in iterable type array\.$#
+larastan.noEnvCallsOutsideOfConfig	1	database/seeders/DemoCompaniesSeeder.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+larastan.noEnvCallsOutsideOfConfig	1	database/seeders/OwnerUserSeeder.php	#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#
+identical.alwaysFalse	1	database/seeders/OwnerUserSeeder.php	#^Strict comparison using \=\=\= between non\-empty\-string and null will always evaluate to false\.$#
+identical.alwaysFalse	1	database/seeders/OwnerUserSeeder.php	#^Strict comparison using \=\=\= between string\|true and null will always evaluate to false\.$#
+nullsafe.neverNull	7	database/seeders/OwnerUserSeeder.php	#^Using nullsafe method call on non\-nullable type Illuminate\\Console\\Command\. Use \-\> instead\.$#

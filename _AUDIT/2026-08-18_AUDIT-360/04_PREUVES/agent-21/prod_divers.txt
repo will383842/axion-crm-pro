@@ -1,0 +1,38 @@
+=== T47 le contact au nom double-encode ===
+   id   | first_name |     last_name     |                    hex                     
+--------+------------+-------------------+--------------------------------------------
+ 265192 | KEVIN      | BÃ¿HLER (BÃ¿HLER) | 42c383c2bf484c4552202842c383c2bf484c455229
+(1 row)
+
+=== T48 contacts SANS aucun canal (ni email, ni tel, ni linkedin) ===
+ sans_canal |  total  
+------------+---------
+     909086 | 1319567
+(1 row)
+
+=== T49 email_status distribution ===
+    s    | count  
+---------+--------
+ (null)  | 909086
+ unknown | 410481
+(2 rows)
+
+=== T50 activities ===
+      kind       | count 
+-----------------+-------
+ scraped         |   646
+ form_submission |     3
+(2 rows)
+
+=== T51 lifecycle_stage companies ===
+ lifecycle_stage |  count  
+-----------------+---------
+ nouveau         | 4295349
+(1 row)
+
+=== T52 legal_basis renseignee ? ===
+   b    |  count  
+--------+---------
+ (null) | 1319567
+(1 row)
+

@@ -117,3 +117,30 @@ sens site -> CRM : emission immediate post-commit (enqueue.ts) —
  * base (statut `pending`), et l'émission n'est qu'une optimisation de
  * fraîcheur : ce qui garantit la livraison, c'est le rejeu périodique.
  *
+
+--- RECTIFICATIF (numero de ligne du type CrmSyncFamily) ---
+Le bloc ci-dessus affichait sed -n '69,71p' (des lignes de commentaire).
+Le type lui-meme est aux lignes 72-73 :
+export type CrmSyncFamily =
+  "submission" | "job_application" | "calendly_event" | "newsletter_subscriber" | "customer_review";
+
+--- COMPLEMENT §22.6 : recherche LARGE sur tout src/ du site (recursive) ---
+Cette recherche a ete lancee sur la totalite de axionia/src/ puis TUEE au bout
+de 120 s (depot trop volumineux). Elle est neanmoins CONCLUANTE pour la partie
+qu'elle a parcourue : les seuls resultats du motif « quel outil » sont du
+contenu editorial (page stack-ia, catalogues de formation), AUCUN n'est un
+dispositif d'orientation entre les deux consoles. Sortie partielle conservee :
+=== T11: carte 22.6 cote site ===
+src/app/[locale]/stack-ia/page.tsx:360:            ? "Le marché ne demande plus « quel outil choisir » — il existe 200 sites qui répondent à ça. Il demande comment les faire travailler ensemble. Cette page est notre réponse, en 11 outils et 5 fonctions."
+src/components/admin/ui/__tests__/admin-card-anchor-display.test.ts:1:// Garde-fou « carte-lien » de la console — 2026-08-03.
+src/content/formations/catalog-v2.ts:1398:        "Matin · Module 1 — Le cadre avant les CV : ce qu'on a le droit de faire, avec quel outil",
+src/content/formations/catalog-v2.ts:2589:      titreFr: "Matin · Module 1 — Ce qu'on a le droit de soumettre, et à quel outil",
+src/content/formations/catalog-v2.ts:3879:      titreFr: "Matin J1 — Ce qui se soumet, avec quel outil, sous quelle licence",
+src/content/formations/catalog-v2.ts:3885:            "Objectif du matin : à midi, chacun a écrit sa règle de soumission — quel extrait, sur quel outil, sous quel régime — et l'a éprouvée sur trois extraits pièges",
+src/content/formations/catalog-v2.ts:6582:            "Une réponse type produite à l'écran puis sa ligne de trace écrite dans la foulée (qui a demandé, quel outil, qui a validé, quand) — le prompt affiché en entier, un seul outil",
+src/content/formations/modules/ia-pour-l-it.ts:51:  // Module 1 — Matin J1 : ce qui se soumet, avec quel outil, sous quel régime
+src/content/formations/modules/ia-pour-l-it.ts:57:        "À la fin de ce module, vous écrivez votre règle de soumission — quel extrait, sur quel outil, sous quel régime — et vous la faites tenir sur trois extraits pièges sans laisser passer un secret.",
+src/content/formations/modules/ia-pour-la-banque-assurance.ts:554:        "La même question traitée sur trame validée et extrait de contrat déposé : la réponse sort en une minute, homogène, chaque condition recopiée de l'extrait — et sa ligne de trace est écrite dans la foulée, sous les yeux de la salle : qui a demandé, quel outil, qui valide, quand.",
+[fin]
+[recherche tuee a 120 s — resultat partiel, coherent avec les greps cibles
+ T11/T11b ci-dessus qui, eux, ont abouti et rendent zero]

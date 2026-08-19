@@ -1,0 +1,26 @@
+[
+  {
+    "cas": "journal-VIDE",
+    "nbLignesAuditServies": 0,
+    "barreLateralePresente": true,
+    "mainPresent": true,
+    "texteBody": "Aller au contenu A Axion CRM Pro WW Workspace ws1 AUJOURD'HUI Tableau de bord CONTACTS COLLECTE PILOTAGE CONFORMITÉ RÉGLAGES Réduire Accueil 🔍 Rechercher ⌘K ☀ ⚙ ☾ A2 Agent 24 BONJ",
+    "erreursNonRattrapees": []
+  },
+  {
+    "cas": "journal-REEL-1-ligne",
+    "nbLignesAuditServies": 1,
+    "barreLateralePresente": false,
+    "mainPresent": false,
+    "texteBody": "Something went wrong! Hide Error Cannot read properties of undefined (reading 'replace')",
+    "erreursNonRattrapees": []
+  },
+  {
+    "cas": "TEMOIN-avec-champ-action",
+    "nbLignesAuditServies": 1,
+    "barreLateralePresente": true,
+    "mainPresent": true,
+    "texteBody": "Aller au contenu A Axion CRM Pro WW Workspace ws1 AUJOURD'HUI Tableau de bord CONTACTS COLLECTE PILOTAGE CONFORMITÉ RÉGLAGES Réduire Accueil 🔍 Rechercher ⌘K ☀ ⚙ ☾ A2 Agent 24 BONJ",
+    "erreursNonRattrapees": []
+  }
+]

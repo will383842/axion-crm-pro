@@ -1,0 +1,36 @@
+Fichiers analyses : 100 — blocs test()/it() vus : 729
+
+== PATHOLOGIE 1 (pre-insere ce qu il doit produire) : 22
+   - tests/Feature/Crm/ActivitesEtMotifsTest.php :: un motif maison s\  [tables crm_motifs]
+   - tests/Feature/Crm/ActivitesEtMotifsTest.php :: une activité maison s\  [tables crm_activites]
+   - tests/Feature/Crm/CrmOutboundTest.php :: la base elle-même refuse une origine autre que crm  [tables crm_outbound_events]
+   - tests/Feature/Crm/ScrapedIngestTest.php :: le froid ne se réchauffe JAMAIS : un re-scrape ne touche ni cycle de vie ni base légale  [tables companies]
+   - tests/Feature/Crm/ScrapedIngestTest.php :: BACKFILL-ONLY : le collecté n\  [tables companies,contacts]
+   - tests/Feature/Crm/ScrapedIngestTest.php :: le marqueur backfill-src est accepté et rend le rollback CHIRURGICAL  [tables company_tag]
+   - tests/Feature/Crm/SiteSyncIngestTest.php :: le cycle de vie ne RECULE jamais  [tables companies]
+   - tests/Feature/Crm/SiteSyncIngestTest.php :: fiche SCRAPÉE puis lead ENTRANT : fusion, pas de doublon, le déclaré gagne  [tables companies,contacts]
+   - tests/Feature/Crm/SocleCrmTest.php :: person_key LIE les deux univers sans jamais les fusionner  [tables contacts,candidates]
+   - tests/Feature/Crm/SocleCrmTest.php :: l’opposition est portée par univers et par hash d’email  [tables opt_out]
+   - tests/Feature/Crm/SocleCrmTest.php :: le namespace d’un tag est déduit de son slug, et vaut NULL sans namespace  [tables tags]
+   - tests/Feature/Crm/SocleCrmTest.php :: un candidat peut être tagué par le pivot dédié  [tables candidate_tag]
+   - tests/Feature/Crm/SocleCrmTest.php :: les colonnes ajoutées portent des valeurs par défaut sûres  [tables companies]
+   - tests/Feature/Database/AuditLogsPartitionnementTest.php :: convertit audit_logs en table partitionnée sans perdre les lignes déjà présentes  [tables audit_logs]
+   - tests/Feature/EtancheiteParTableTest.php :: TÉMOIN — la sonde « 0 ligne sans contexte » détecte réellement une barrière absente  [tables zz_temoin_sonde]
+   - tests/Feature/EtancheiteParTableTest.php :: TÉMOIN — FORCE ROW LEVEL SECURITY change bien le comportement du PROPRIÉTAIRE  [tables zz_temoin_force]
+   - tests/Feature/HorodatagesFuseauTest.php :: ce que Postgres écrit lui-même reste juste  [tables tz_controle]
+   - tests/Feature/NeDoitPasRegresserTest.php :: ACQUIS 3 — une date reçue en UTC survit à l’aller-retour en base  [tables zz_ndpr_tz]
+   - tests/Feature/NeDoitPasRegresserTest.php :: ACQUIS 3 — le réglage qui rend le verrou capable de rougir est toujours en place  [tables workspaces]
+   - tests/Feature/Rgpd/OppositionEmpreinteSeuleTest.php :: 🔴 la migration remplit l’empreinte des lignes héritées, avec le calcul du SSOT  [tables opt_out,email_suppressions]
+   - tests/Feature/Rgpd/OppositionEmpreinteSeuleTest.php :: 🔴 la migration ÉCHOUE BRUYAMMENT sur une ligne irrécupérable, elle ne finit pas en vert  [tables opt_out]
+   - tests/Feature/RlsTest.php :: sans contexte, un tag EXISTANT est invisible et son insertion est REFUSÉE (le symptôme du backfill)  [tables tags]
+
+== PATHOLOGIE 2 (assertion tautologique) : 1
+   - tests/Unit/Rules/PasswordResetWithHibpTest.php :: HIBP cache prefix unique par 5 chars du sha1  [expect(true)]
+
+== PATHOLOGIE 4 (test statique aveugle a ses propres commentaires) : 5
+   - tests/Feature/NeDoitPasRegresserTest.php :: ACQUIS 2 (suite) — la surveillance et l’exercice de restauration existent toujours, et sont exécutables  [file_get_contents sans token_get_all]
+   - tests/Feature/NeDoitPasRegresserTest.php :: ACQUIS 3 — le réglage qui rend le verrou capable de rougir est toujours en place  [file_get_contents sans token_get_all]
+   - tests/Feature/RlsTest.php :: la commande de backfill pose bien son contexte workspace (correctif du 2026-08-15)  [file_get_contents sans token_get_all]
+   - tests/Unit/PhpstanBaselineNeGrossitPasTest.php :: l\  [file_get_contents sans token_get_all]
+   - tests/Unit/PhpstanBaselineNeGrossitPasTest.php :: reportUnmatchedIgnoredErrors reste activé  [file_get_contents sans token_get_all]
+

@@ -1,0 +1,44 @@
+######## MICRO-SABOTAGE M4-hibp-cle-globale-cible
+######## FICHIER : app/Services/Auth/HibpChecker.php
+######## DATE    : 2026-08-19T12:29:06Z
+######## DIFF APPLIQUE ########
+--- /var/www/html.orig/app/Services/Auth/HibpChecker.php
++++ /var/www/html/app/Services/Auth/HibpChecker.php
+@@ -61,7 +61,7 @@
+         $prefix = substr($sha1, 0, 5);
+         $suffix = substr($sha1, 5);
+ 
+-        $cacheKey = 'hibp:range:' . $prefix;
++        $cacheKey = 'hibp:range';
+ 
+         try {
+             $body = Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($prefix) {
+######## CIBLES : tests/Unit/Rules/PasswordResetWithHibpTest.php tests/Unit/Auth/HibpCheckerTest.php ########
+[2026-08-19 14:29:10] local.WARNING: HibpChecker: connection error {"error":"connect timeout"} 
+[2026-08-19 14:29:10] local.WARNING: HibpChecker: guzzle error {"error":"Server error: `GET https://api.pwnedpasswords.com/range/8867C` resulted in a `503 Service Unavailable` response:
+service unavailable
+"} 
+
+   PASS  Tests\Unit\Auth\HibpCheckerTest
+  ✓ HibpChecker retourne le count si suffix trouvé                       1.20s  
+  ✓ HibpChecker isBreached respecte le threshold                         0.11s  
+  ✓ HibpChecker met en cache le résultat 24h                             0.15s  
+  ✓ HibpChecker returns 0 quand suffix absent                            0.13s  
+  ✓ HibpChecker fail-open en cas d'erreur réseau                         0.18s  
+  ✓ HibpChecker retourne 0 pour password vide sans appel API             0.10s  
+  ✓ HibpChecker fail-open sur status non-200                             0.12s  
+  ✓ HibpChecker parse correctement les newlines mixtes                   0.11s  
+[2026-08-19 14:29:11] local.WARNING: HibpChecker: unexpected {"error":"GuzzleHttp\\PrepareBodyMiddleware::__invoke(): Return value must be of type GuzzleHttp\\Promise\\PromiseInterface, GuzzleHttp\\Psr7\\Response returned"} 
+
+   PASS  Tests\Unit\Rules\PasswordResetWithHibpTest
+  ✓ HIBP intégration : password long custom est sain                     0.47s  
+  ✓ HIBP integration : password "password" est compromis                 0.11s  
+  ✓ HIBP cache prefix unique par 5 chars du sha1                         0.08s  
+  ✓ HIBP user-agent inclus dans la requête                               0.08s  
+
+  Tests:    12 passed (14 assertions)
+  Duration: 3.39s
+  Random Order Seed: 1787142548
+
+######## RESTAURATION ########
+RESTAURE-IDENTIQUE: app/Services/Auth/HibpChecker.php

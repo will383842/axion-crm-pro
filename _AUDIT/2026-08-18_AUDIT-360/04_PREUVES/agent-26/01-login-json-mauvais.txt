@@ -1,0 +1,3 @@
+=== 1. POST /auth/login AVEC Accept:json, identifiants faux ===
+
+HTTP=000

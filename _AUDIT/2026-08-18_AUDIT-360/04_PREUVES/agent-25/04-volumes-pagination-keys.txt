@@ -1,0 +1,153 @@
+AGENT 25 - TENUE AUX VOLUMES : pagination, virtualisation, cles React - main 8db8229
+
+### TEMOIN NEGATIF pour l'etat d'URL : le controle sait-il trouver useSearch s'il existait ?
+-- grep de useSearch dans node_modules/@tanstack/react-router (la fonction EXISTE bien) :
+node_modules/@tanstack/react-router/dist/esm/fileRoute.d.ts
+node_modules/@tanstack/react-router/dist/esm/fileRoute.js
+node_modules/@tanstack/react-router/dist/esm/fileRoute.js.map
+-- grep de useSearch dans src/ :
+   (code de sortie grep = 1 ; 1 = aucune occurrence)
+
+======================================================================
+### PAR ECRAN DE LISTE : per_page demande | pagination offerte | virtualisation | key
+======================================================================
+
+--- companies/CompaniesListPage.tsx
+  per_page : per_page: "100 
+  Pagination composant : 2
+  useVirtualizer : 2
+  key={index}/key={i} : 0
+  .map( total : 4
+
+--- contacts/ContactsListPage.tsx
+  per_page : per_page: '50 
+  Pagination composant : 0
+  useVirtualizer : 0
+  key={index}/key={i} : 0
+  .map( total : 4
+
+--- media/MediaListPage.tsx
+  per_page : per_page: "100 
+  Pagination composant : 0
+  useVirtualizer : 0
+  key={index}/key={i} : 0
+  .map( total : 2
+
+--- media/JournalistsListPage.tsx
+  per_page : per_page: "100 
+  Pagination composant : 0
+  useVirtualizer : 0
+  key={index}/key={i} : 0
+  .map( total : 1
+
+--- scraping/ScraperRunsPage.tsx
+  per_page : per_page=50 
+  Pagination composant : 1
+  useVirtualizer : 0
+  key={index}/key={i} : 1
+  .map( total : 4
+
+--- crm-console/ContactsHubPage.tsx
+  per_page : per_page: '50 
+  Pagination composant : 0
+  useVirtualizer : 0
+  key={index}/key={i} : 0
+  .map( total : 7
+
+--- crm-console/CandidatesPage.tsx
+  per_page : per_page: '50 
+  Pagination composant : 0
+  useVirtualizer : 0
+  key={index}/key={i} : 0
+  .map( total : 3
+
+--- crm-console/ArbitragePage.tsx
+  per_page : per_page=50 
+  Pagination composant : 0
+  useVirtualizer : 0
+  key={index}/key={i} : 0
+  .map( total : 1
+
+--- international/RoumaniePage.tsx
+  per_page : per_page: '50 
+  Pagination composant : 0
+  useVirtualizer : 0
+  key={index}/key={i} : 0
+  .map( total : 3
+
+--- audiences/AudiencesListPage.tsx
+  per_page : 
+  Pagination composant : 0
+  useVirtualizer : 0
+  key={index}/key={i} : 1
+  .map( total : 2
+
+--- audiences/AudienceDetailPage.tsx
+  per_page : 
+  Pagination composant : 0
+  useVirtualizer : 0
+  key={index}/key={i} : 0
+  .map( total : 1
+
+--- campaigns/CampaignsListPage.tsx
+  per_page : per_page: 50 
+  Pagination composant : 0
+  useVirtualizer : 0
+  key={index}/key={i} : 1
+  .map( total : 5
+
+--- rgpd/AuditLogsPage.tsx
+  per_page : 
+  Pagination composant : 0
+  useVirtualizer : 0
+  key={index}/key={i} : 0
+  .map( total : 1
+
+--- rgpd/RgpdRequestsPage.tsx
+  per_page : 
+  Pagination composant : 0
+  useVirtualizer : 0
+  key={index}/key={i} : 0
+  .map( total : 2
+
+--- rgpd/AiActRegisterPage.tsx
+  per_page : 
+  Pagination composant : 0
+  useVirtualizer : 0
+  key={index}/key={i} : 0
+  .map( total : 2
+
+--- tags/TagsManagerPage.tsx
+  per_page : 
+  Pagination composant : 0
+  useVirtualizer : 0
+  key={index}/key={i} : 1
+  .map( total : 5
+
+--- llm/LlmRouterPage.tsx
+  per_page : 
+  Pagination composant : 0
+  useVirtualizer : 0
+  key={index}/key={i} : 0
+  .map( total : 5
+
+--- llm/ProxyProvidersPage.tsx
+  per_page : 
+  Pagination composant : 0
+  useVirtualizer : 0
+  key={index}/key={i} : 0
+  .map( total : 1
+
+--- llm/RotationsPage.tsx
+  per_page : 
+  Pagination composant : 0
+  useVirtualizer : 0
+  key={index}/key={i} : 0
+  .map( total : 2
+
+--- users/UsersPage.tsx
+  per_page : 
+  Pagination composant : 0
+  useVirtualizer : 0
+  key={index}/key={i} : 0
+  .map( total : 3

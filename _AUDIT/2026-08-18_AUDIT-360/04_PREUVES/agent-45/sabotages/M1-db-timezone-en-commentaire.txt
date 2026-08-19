@@ -1,0 +1,150 @@
+######## MICRO-SABOTAGE M1-db-timezone-en-commentaire
+######## FICHIER : phpunit.xml
+######## DATE    : 2026-08-19T12:27:29Z
+######## DIFF APPLIQUE ########
+--- /var/www/html.orig/phpunit.xml
++++ /var/www/html/phpunit.xml
+@@ -49,7 +49,7 @@
+              par `php artisan horodatages:corriger`. Ici elle est toujours
+              active, sans quoi `HorodatagesFuseauTest` ne pourrait pas garder
+              le correctif. -->
+-        <env name="DB_TIMEZONE" value="Europe/Paris"/>
++        <!-- SABOTAGE A45 : le reglage DB_TIMEZONE a ete RETIRE ; seul ce commentaire le nomme encore. -->
+         <!-- Lot L0 : rôle applicatif non-propriétaire. Mot de passe de TEST
+              uniquement (base jetable) — le secret de prod vit dans le .env
+              du serveur et dans l'environnement de la CI, jamais ici. -->
+######## CIBLES : tests/Feature/NeDoitPasRegresserTest.php tests/Feature/HorodatagesFuseauTest.php ########
+[2026-08-19 14:28:40] local.INFO: Remplissage des empreintes d’opposition {"table":"opt_out","empreintes_calculees":0} 
+[2026-08-19 14:28:40] local.INFO: Remplissage des empreintes d’opposition {"table":"email_suppressions","empreintes_calculees":0} 
+
+   FAIL  Tests\Feature\NeDoitPasRegresserTest
+  - ACQUIS 2 — un dump produit avec la recette de production se restau… 68.47s  
+  ✓ ACQUIS 4 — l’export RGPD trouve la fiche par son EMPREINTE, même qu… 3.15s  
+  ✓ ACQUIS 2 (suite) — la surveillance et l’exercice de restauration ex… 0.47s  
+  ⨯ ACQUIS 3 — la session Postgres est alignée sur le fuseau de l’appli… 2.92s  
+  ✓ ACQUIS 1 (suite) — le rôle applicatif n’est ni superutilisateur ni…  1.76s  
+  ✓ ACQUIS 3 — le réglage qui rend le verrou capable de rougir est touj… 0.97s  
+  ✓ ACQUIS 1 — sans contexte workspace, le rôle applicatif ne voit AUCU… 1.72s  
+  ⨯ ACQUIS 3 — une date reçue en UTC survit à l’aller-retour en base     0.35s  
+  ✓ ACQUIS 4 (suite) — une empreinte INCONNUE ne rend rien : le filtre…  0.77s  
+
+   FAIL  Tests\Feature\HorodatagesFuseauTest
+  ⨯ la session Postgres est alignée sur le fuseau de l’application       0.35s  
+  ⨯ l’auto-pause sur quota de durée mord APRÈS un aller-retour en base   0.34s  
+  ✓ ce que Postgres écrit lui-même reste juste                           0.16s  
+  ⨯ un horodatage écrit puis relu revient au même instant                0.23s  
+  ⨯ une date reçue en UTC par l’ingestion survit à l’aller-retour en ba… 0.20s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\NeDoitPasRegresserTest > ACQUIS 3 — la session Post…   
+  Failed asserting that two strings are identical.
+  -'Europe/Paris'
+  +'Etc/UTC'
+  
+
+  at tests/Feature/NeDoitPasRegresserTest.php:350
+    346▕ // ACQUIS 3 — HORODATAGE UTC
+    347▕ // ═════════════════════════════════════════════════════════════════════════════
+    348▕ 
+    349▕ test('ACQUIS 3 — la session Postgres est alignée sur le fuseau de l’application', function () {
+  ➜ 350▕     expect(DB::selectOne('SHOW timezone')->TimeZone)->toBe(config('app.timezone'));
+    351▕ });
+    352▕ 
+    353▕ test('ACQUIS 3 — une date reçue en UTC survit à l’aller-retour en base', function () {
+    354▕     // Le deuxième visage du décalage, mesuré en PRODUCTION le 2026-08-17 : le
+
+  1   tests/Feature/NeDoitPasRegresserTest.php:350
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\NeDoitPasRegresserTest > ACQUIS 3 — une date reçue…    
+  Failed asserting that 7200.0 is less than 2.
+
+  at tests/Feature/NeDoitPasRegresserTest.php:383
+    379▕ 
+    380▕     $ligne = DB::table('zz_ndpr_tz')->first();
+    381▕     $attendu = Carbon::parse('2026-08-17T10:00:00Z');
+    382▕ 
+  ➜ 383▕     expect(abs($attendu->diffInSeconds(Carbon::parse($ligne->quand), false)))->toBeLessThan(2)
+    384▕         ->and(abs($attendu->diffInSeconds(Carbon::parse($ligne->consenti), false)))->toBeLessThan(2);
+    385▕ });
+    386▕ 
+    387▕ test('ACQUIS 3 — le réglage qui rend le verrou capable de rougir est toujours en place', function () {
+
+  1   tests/Feature/NeDoitPasRegresserTest.php:383
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\HorodatagesFuseauTest > la session Postgres est ali…   
+  Failed asserting that two strings are identical.
+  -'Europe/Paris'
+  +'Etc/UTC'
+  
+
+  at tests/Feature/HorodatagesFuseauTest.php:48
+     44▕     return [$user, $workspace];
+     45▕ }
+     46▕ 
+     47▕ test('la session Postgres est alignée sur le fuseau de l’application', function () {
+  ➜  48▕     expect(DB::selectOne('SHOW timezone')->TimeZone)->toBe(config('app.timezone'));
+     49▕ });
+     50▕ 
+     51▕ test('un horodatage écrit puis relu revient au même instant', function () {
+     52▕     [$user, $workspace] = horodatageWorkspaceEtUtilisateur();
+
+  1   tests/Feature/HorodatagesFuseauTest.php:48
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\HorodatagesFuseauTest > l’auto-pause sur quota de d…   
+  Failed asserting that 0 is equal to 10 or is greater than 10.
+
+  at tests/Feature/HorodatagesFuseauTest.php:96
+     92▕     ]);
+     93▕ 
+     94▕     $relue = $campagne->fresh();
+     95▕ 
+  ➜  96▕     expect($relue->elapsed_minutes)->toBeGreaterThanOrEqual(10)
+     97▕         ->and($relue->shouldAutoPause())->toBe('quota_duration');
+     98▕ });
+     99▕ 
+    100▕ test('ce que Postgres écrit lui-même reste juste', function () {
+
+  1   tests/Feature/HorodatagesFuseauTest.php:96
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\HorodatagesFuseauTest > un horodatage écrit puis re…   
+  Failed asserting that 7199.502624 is less than 2.
+
+  at tests/Feature/HorodatagesFuseauTest.php:72
+     68▕ 
+     69▕     // L'ALLER-RETOUR est le cœur du test : c'est lui qui décalait de +120 min.
+     70▕     $relu = $campagne->fresh()->started_at;
+     71▕ 
+  ➜  72▕     expect(abs(Carbon::parse($ecrit)->diffInSeconds($relu, false)))->toBeLessThan(2);
+     73▕ });
+     74▕ 
+     75▕ test('l’auto-pause sur quota de durée mord APRÈS un aller-retour en base', function () {
+     76▕     [$user, $workspace] = horodatageWorkspaceEtUtilisateur();
+
+  1   tests/Feature/HorodatagesFuseauTest.php:72
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\HorodatagesFuseauTest > une date reçue en UTC par l…   
+  Failed asserting that 7200.0 is less than 2.
+
+  at tests/Feature/HorodatagesFuseauTest.php:158
+    154▕ 
+    155▕     $ligne = DB::table('tz_ingestion')->first();
+    156▕     $attendu = Carbon::parse('2026-08-17T10:00:00Z');
+    157▕ 
+  ➜ 158▕     expect(abs($attendu->diffInSeconds(Carbon::parse($ligne->quand), false)))->toBeLessThan(2)
+    159▕         ->and(abs($attendu->diffInSeconds(Carbon::parse($ligne->consenti), false)))->toBeLessThan(2);
+    160▕ });
+    161▕
+
+  1   tests/Feature/HorodatagesFuseauTest.php:158
+
+
+  Tests:    6 failed, 1 skipped, 7 passed (34 assertions)
+  Duration: 83.05s
+  Random Order Seed: 1787142457
+
+######## RESTAURATION ########
+RESTAURE-IDENTIQUE: phpunit.xml

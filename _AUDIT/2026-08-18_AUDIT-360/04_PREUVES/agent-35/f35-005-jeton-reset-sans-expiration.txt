@@ -1,0 +1,50 @@
+=== F35-005 — le jeton de reinitialisation de mot de passe N'EXPIRE JAMAIS ===
+Reference : main e8924b8
+Emplacement : backend/app/Http/Controllers/Api/Auth/PasswordResetController.php:88-91
+
+--- le code ---
+        }
+
+        // TTL 60 minutes
+        if ($row->created_at && now()->diffInMinutes($row->created_at) > 60) {
+            return response()->json(['error' => 'expired_token'], 401);
+        }
+
+
+--- GESTE JOUE dans le conteneur a35-api (Carbon reellement installe) ---
+$ php -r 'require "vendor/autoload.php"; ...'
+
+Carbon 3.13.0
+now()->diffInMinutes(il y a 3 h)  = -179.99999951667   > 60 ? false
+now()->diffInMinutes(il y a 30 j) = -43199.982270417  > 60 ? false
+TEMOIN : sens inverse, il y a 3 h ->diffInMinutes(now) = 179.99999951667  > 60 ? true
+TEMOIN : valeur absolue diffInMinutes(x, true) = 179.99999951667
+chaine SQL brute : now()->diffInMinutes("2026-08-19 09:00:00") = -167.17163296667
+
+LECTURE : depuis Carbon 3, diffIn*() rend une valeur SIGNEE (absolute=false par
+/usr/bin/bash: command substitution: line 59: syntax error: unexpected end of file
+defaut ; c'etait l'inverse en Carbon 2). L'appel du produit place  a gauche
+et la date PASSEE a droite : le resultat est donc toujours NEGATIF, et la comparaison
+ est FAUSSE quel que soit l'age du jeton.
+
+TEMOIN NEGATIF : la meme methode, operandes inverses, rend +180 et la comparaison
+devient VRAIE. La mesure sait donc distinguer un jeton perime d'un jeton frais ;
+c'est bien le code du produit qui ne le fait pas.
+
+Note : composer.lock epingle nesbot/carbon 3.13.2, la version REELLEMENT installee
+dans l'image est 3.13.0. Le comportement signe est identique sur toute la ligne 3.x.
+
+--- ce que le reste du code croit ---
+27:            'expire'   => 60,
+  -> config/auth.php declare passwords.users.expire = 60, mais le controleur
+     n'utilise PAS le courtier de mots de passe de Laravel : il refait tout a la main.
+
+--- LE MEME MOTIF AILLEURS DANS app/ ? ---
+grep -rnE 'now\(\)->diffIn|->diffIn(Minutes|Hours|Days|Seconds)\(' backend/app :
+  app/Models/ScrapingCampaign.php:137: max(0, (int) $this->started_at->diffInMinutes($end, false));
+  app/Http/Controllers/Api/Auth/PasswordResetController.php:89: now()->diffInMinutes($row->created_at) > 60
+
+  -> une seule occurrence fautive. L'AUTRE occurrence du depot est CORRECTE :
+     bon ordre d'operandes (date passee a gauche) ET second argument explicite.
+     Le depot connait donc la semantique signee de Carbon 3 : c'est bien
+     PasswordResetController qui est reste sur l'habitude de Carbon 2.

@@ -1,0 +1,70 @@
+{
+  "hub avec person_key": {
+    "liens": [],
+    "boutons": [
+      "Tous 0",
+      "Prospects 0",
+      "Clients 0",
+      "Presse & médias 0",
+      "Partenaires 0",
+      "Investisseurs 0",
+      "Conférences 0",
+      "Newsletter 0",
+      "Fournisseurs 0",
+      "Contacts actifs",
+      "Prospection (base froide)",
+      "Tout"
+    ],
+    "texte": "Contacts Tous les types — Contacts actifs CLIENTS 0 PROSPECTS 0 OPPORTUNITÉS 0 DORMANTS 0 Tous 0 Prospects 0 Clients 0 Presse & médias 0 Partenaires 0 Investisseurs 0 Conférences 0 Newsletter 0 Fournisseurs 0 Tous pays France Roumanie Tous statuts Contactables (e-mail exploitable) Partiels (e-mail incertain) Collectés, pas encore enrichis Sans e-mail (archivés) Contacts actifs Prospection (base froide) Tout",
+    "route": "/console/contacts"
+  },
+  "liste /contacts": {
+    "liens": [
+      "mailto:p1@ent1.fr",
+      "tel:0600000000",
+      "mailto:p2@ent1.fr",
+      "mailto:p3@ent1.fr",
+      "mailto:p4@ent1.fr",
+      "mailto:p5@ent1.fr",
+      "mailto:p6@ent1.fr",
+      "mailto:p7@ent1.fr",
+      "mailto:p8@ent1.fr",
+      "mailto:p9@ent1.fr",
+      "mailto:p10@ent1.fr",
+      "mailto:p11@ent1.fr",
+      "mailto:p12@ent1.fr",
+      "mailto:p13@ent1.fr",
+      "mailto:p14@ent1.fr",
+      "mailto:p15@ent1.fr",
+      "mailto:p16@ent1.fr",
+      "mailto:p17@ent1.fr",
+      "mailto:p18@ent1.fr",
+      "mailto:p19@ent1.fr",
+      "mailto:p20@ent1.fr"
+    ],
+    "boutons": [],
+    "texte": "Contacts 320 décideurs identifiés (waterfall + Direction Finder) Tous statuts e-mail Valide Catch-all Inconnu Invalide Rôle générique Jetable Tous pays France Roumanie Tous statuts Contactables (e-mail exploitable) Partiels (e-mail incertain) Collectés, pas encore enrichis Sans e-mail (archivés) CONTACT RÔLE EMAIL SCORE TÉLÉPHONE SOURCE PN Prenom1 NOM1 ENTREPRISE 1 SAS ceo p1@ent1.fr Valide 90 0600000000 — PN Prenom2 NOM2 ENTREPRISE 1 SAS ceo p2@ent1.fr Valide 90 0600000000 — PN Prenom3 NOM3 ENTREPRISE 1 SAS ceo p3@ent1.fr Valide 90 0600000000 — PN Prenom4 NOM4 ENTREPRISE 1 SAS ceo p4@ent1.fr Valide 90 0600000000 — PN Prenom5 NOM5 ENTREPRISE 1 SAS ceo p5@ent1.fr Valide 90 0600000000 — PN Pre",
+    "route": "/contacts"
+  },
+  "fiche entreprise": {
+    "liens": [
+      "/companies"
+    ],
+    "boutons": [
+      "Enrichir maintenant",
+      "Exporter",
+      "DEBUG Données brutes (signals)",
+      "Enrichir maintenant",
+      "Exporter (vCard / VCF)",
+      "Marquer obsolète"
+    ],
+    "texte": "Entreprises / ? SIREN · Dept — · Inconnue · 🔴 Basique Enrichir maintenant Exporter IDENTITÉ LÉGALE Informations entreprise SIREN FORME JURIDIQUE — NAF — EFFECTIF INSEE — ADRESSE — SITE WEB — TÉLÉPHONE — LINKEDIN — DATE CRÉATION — ENRICHI LE Jamais Pipeline d'enrichissement Aucune trace d'enrichissement disponible pour le moment. DEBUG Données brutes (signals) Contacts (0) Aucun contact identifié. SCORE DE QUALITÉ Qualité de la donnée — 🔴 Basique Détail par dimension indisponible pour cette entreprise. ACTIONS RAPIDES Workflow Enrichir maintenant Exporter (vCard / VCF) Marquer obsolète",
+    "route": "/companies/1"
+  },
+  "fiche 360°": {
+    "liens": [],
+    "boutons": [],
+    "texte": "Marie DUPONT Fiche 360° — tous les touchpoints connus de cette personne. Identité Marie DUPONT marie@dupont.fr ENTREPRISE 1 SAS Univers Business Fiche présente Vivier candidats Aucune fiche Timeline 2026-08-18T09:00:00Z Formulaire contact Business · site:submission:abc",
+    "route": "/console/personnes/pk-demo"
+  }
+}

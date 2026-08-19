@@ -2,7 +2,23 @@
 -- Volume de référence du cahier des charges §0.9 : 50 000 fiches actives, 5 ans d'historique.
 -- + 250 000 fiches froides (collecte) pour que le filtre de température travaille.
 -- Synthétique, reproductible (setseed), workspace business local uniquement.
-\set ws '20cd81e4-de5d-4875-a759-07d64fe1f168'
+-- ── Workspace : RÉSOLU par son slug, plus codé en dur ──────────────────
+-- Ce fichier portait `\set ws '20cd81e4-…'`, l'identifiant du workspace d'UNE
+-- machine. Il ne pouvait donc tourner que là — mesuré le 2026-08-19 en tentant de
+-- remplir la préproduction : le workspace n'existait pas, l'insertion tombait sur
+-- la clé étrangère. Un jeu de données de RÉFÉRENCE (§0.9, §29) qui n'est rejouable
+-- que sur un poste ne référence rien.
+--
+-- `\gset` affecte le résultat de la requête à la variable `ws` ; tout le reste du
+-- fichier est inchangé.
+SELECT id AS ws FROM workspaces WHERE slug = 'axion-ia' \gset
+
+\if :{?ws}
+\else
+\echo 'ERREUR : aucun workspace de slug axion-ia. Jouer php artisan db:seed d abord.'
+\quit
+\endif
+
 BEGIN;
 SELECT setseed(0.42);
 
@@ -22,9 +38,14 @@ SELECT :'ws'::uuid,
        'pending'
 FROM generate_series(1, 250000) g;
 
+-- Jointure sur `tags` plutôt que référence directe : si le référentiel de tags
+-- n'est pas semé, on pose moins de tags au lieu de faire tomber TOUTE la
+-- transaction sur une clé étrangère. Le volume de fiches, lui, est identique.
 INSERT INTO company_tag (company_id, tag_id)
-SELECT c.id, (ARRAY[41,42,43,44,45,46,47])[1 + (c.id % 7)::int]
-FROM companies c WHERE c.workspace_id = :'ws'::uuid AND c.denomination LIKE 'Société froide %';
+SELECT c.id, t.id
+FROM companies c
+JOIN tags t ON t.id = (ARRAY[41,42,43,44,45,46,47])[1 + (c.id % 7)::int]
+WHERE c.workspace_id = :'ws'::uuid AND c.denomination LIKE 'Société froide %';
 
 -- 2) 50 000 fiches ACTIVES : types et étapes variés, source humaine (site / calendly / newsletter / avis)
 INSERT INTO companies (workspace_id, siren, denomination, postcode, city, department_code, region_code,
@@ -48,8 +69,10 @@ FROM generate_series(1, 50000) g;
 
 -- source humaine : formulaire (15..22 site), calendly 29, newsletter 30, avis 32, chatbot 31
 INSERT INTO company_tag (company_id, tag_id)
-SELECT c.id, (ARRAY[15,16,17,18,19,20,21,22,29,29,30,32,31])[1 + (c.id % 13)::int]
-FROM companies c WHERE c.workspace_id = :'ws'::uuid AND c.siren >= '500000000';
+SELECT c.id, t.id
+FROM companies c
+JOIN tags t ON t.id = (ARRAY[15,16,17,18,19,20,21,22,29,29,30,32,31])[1 + (c.id % 13)::int]
+WHERE c.workspace_id = :'ws'::uuid AND c.siren >= '500000000';
 
 -- 3) 1 contact par fiche active (50 000), person_key = sha256 d'un e-mail synthétique
 INSERT INTO contacts (workspace_id, company_id, first_name, last_name, email, role, person_key, created_at, updated_at)

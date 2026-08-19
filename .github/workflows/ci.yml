@@ -135,6 +135,80 @@ jobs:
 
           echo "OK — seuls 80 et 443 sont publiés par la configuration de production."
 
+  caddyfile-valide:
+    name: Le Caddyfile est-il valide ?
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── POURQUOI CE JOB EXISTE ────────────────────────────────────────────
+      # `infra/caddy/Caddyfile` est le SEUL point d'entrée du site : un unique
+      # processus tient 80 et 443. Depuis l'ajout de la préproduction
+      # (2026-08-19), ce même fichier sert AUSSI `staging.*` — donc on y touche
+      # plus souvent, et une faute de frappe n'y coûte plus « la préprod » mais
+      # **toute la production** : Caddy refuse de démarrer sur un fichier
+      # invalide, et plus rien ne répond.
+      #
+      # Jusqu'ici RIEN ne validait ce fichier. On s'en apercevait au
+      # redémarrage — c'est-à-dire trop tard.
+
+      - name: TÉMOIN — ce contrôle sait-il seulement échouer ?
+        # 🔴 `shell: bash` sans `-e`. GitHub Actions exécute par défaut
+        # `/usr/bin/bash -e {0}` : la moindre commande non nulle interrompt
+        # l'étape. Or CETTE étape lance délibérément une commande qui DOIT
+        # échouer — avec le défaut, elle mourait à l'affectation de `sortie`,
+        # avant même de pouvoir constater que le témoin avait bien fonctionné.
+        # Mesuré : la première version de ce job a rougi pour cette seule
+        # raison, sans afficher aucune de ses erreurs (le job échouait avant).
+        # Localement, hors `-e`, elle passait — l'écart d'environnement le plus
+        # classique, et le plus trompeur.
+        shell: bash {0}
+        run: |
+          set -uo pipefail
+          # Une garde jamais vue rouge ne garde rien (§28.3). Plutôt que de
+          # l'avoir vue rouge UNE FOIS pendant son écriture, on lui fait la
+          # preuve À CHAQUE EXÉCUTION : on lui soumet d'abord un Caddyfile
+          # volontairement fautif (accolade jamais refermée) et on exige qu'elle
+          # le refuse.
+          #
+          # ⚠️ Ce témoin a lui-même failli mentir : à sa mise au point, la
+          # commande a échoué parce que le montage n'avait PAS eu lieu (« no
+          # such file or directory »). Un rouge obtenu pour la mauvaise raison
+          # ne prouve rien. D'où le contrôle du MESSAGE : on exige une erreur
+          # d'adaptation du Caddyfile, pas n'importe quel échec.
+          mkdir -p /tmp/caddy-faux
+          printf 'exemple.test {\n    reverse_proxy api:80 {\n        header_up X-Real-IP {remote_host}\n' \
+            > /tmp/caddy-faux/Caddyfile
+
+          sortie="$(docker run --rm -v /tmp/caddy-faux:/etc/caddy:ro caddy:2-alpine \
+            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1)"
+          code=$?
+
+          echo "::group::sortie du témoin"
+          echo "$sortie"
+          echo "::endgroup::"
+
+          if [ "$code" -eq 0 ]; then
+            echo "::error::TÉMOIN EN ÉCHEC : « caddy validate » a ACCEPTÉ un Caddyfile invalide."
+            echo "::error::Ce job ne peut donc rien détecter — un vert ici ne voudrait rien dire."
+            exit 1
+          fi
+
+          if ! echo "$sortie" | grep -q 'adapting config using caddyfile'; then
+            echo "::error::TÉMOIN DOUTEUX : la commande a échoué, mais pas sur la SYNTAXE du fichier."
+            echo "::error::(montage absent, image indisponible, réseau ?) — corriger avant de croire un vert."
+            exit 1
+          fi
+
+          echo "OK — le contrôle sait refuser un Caddyfile fautif, et pour la bonne raison."
+
+      - name: Le Caddyfile du dépôt est-il valide ?
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD/infra/caddy:/etc/caddy:ro" caddy:2-alpine \
+            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          echo "OK — le Caddyfile est valide, Caddy démarrera dessus."
+
   scripts-executables:
     name: Les scripts d'infra sont-ils exécutables ?
     runs-on: ubuntu-24.04

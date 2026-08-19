@@ -31,7 +31,11 @@
 set -uo pipefail
 
 PROJET="${1:-axion-crm-pro}"
-AUTORISES="80 443"
+# Second argument : la liste des ports autorisés, pour pouvoir ÉPROUVER ce
+# script sur une pile jetable sans réquisitionner 80 et 443 de la machine.
+# Sans lui, ce contrôle ne serait testable qu'en production — c'est-à-dire
+# jamais avant qu'il soit trop tard.
+AUTORISES="${2:-80 443}"
 
 if ! command -v docker > /dev/null 2>&1; then
   echo "ERREUR : docker introuvable — mesure impossible." >&2
@@ -55,13 +59,38 @@ echo "=== ports publiés par la pile « ${PROJET} » ==="
 echo "$LIGNES" | tr '|' ' '
 echo
 
-# On ne retient que les publications vers l'HÔTE (`0.0.0.0:` ou `[::]:` ou une
-# adresse explicite suivie de `->`). Les ports simplement EXPOSÉS entre
-# conteneurs (`9000/tcp`) ne sortent pas de la machine et ne sont pas concernés.
+# On ne retient que les publications ATTEIGNABLES DEPUIS INTERNET. Trois cas à
+# distinguer, et les confondre rendrait ce contrôle inutilisable :
+#
+#   1. `9000/tcp` — port simplement EXPOSÉ entre conteneurs. Ne sort pas de la
+#      machine. Hors sujet.
+#   2. `127.0.0.1:8081->5173/tcp` — publication sur la BOUCLE LOCALE. Joignable
+#      depuis l'hôte, PAS depuis internet. C'est le mécanisme retenu pour la
+#      préproduction (2026-08-19) : le Caddy de production l'atteint par
+#      `host-gateway`, personne d'autre ne peut. Autorisé.
+#      ⚠️ Sans cette exception, ce script rougirait sur un montage légitime — et
+#      la réaction naturelle serait de l'affaiblir. Une garde qu'on est tenté de
+#      désarmer finit désarmée.
+#   3. `0.0.0.0:55432->5432/tcp` — publication sur TOUTES les interfaces. C'est
+#      la faille du 2026-08-19, et le seul cas que ce contrôle doit attraper.
+#
+# `127.0.0.0/8` en entier, pas seulement `127.0.0.1` : la boucle locale est un
+# /8, et `127.0.1.1` est une adresse d'hôte courante sous Debian.
 PUBLIES="$(echo "$LIGNES" \
-  | grep -oE '(([0-9]{1,3}\.){3}[0-9]{1,3}|\[::\]):[0-9]+->' \
+  | grep -oE '(([0-9]{1,3}\.){3}[0-9]{1,3}|\[::\]|\[::1\]):[0-9]+->' \
+  | grep -vE '^(127\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|\[::1\]):' \
   | sed -E 's/.*:([0-9]+)->/\1/' \
   | sort -un)"
+
+# Ce qui est publié sur la boucle locale est AFFICHÉ, jamais tu : un contrôle
+# qui masque ce qu'il a décidé d'ignorer empêche de vérifier sa propre décision.
+LOOPBACK="$(echo "$LIGNES" \
+  | grep -oE '(127\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|\[::1\]):[0-9]+->' \
+  | sed -E 's/.*:([0-9]+)->/\1/' \
+  | sort -un | tr '\n' ' ')"
+if [ -n "$LOOPBACK" ]; then
+  echo "Ports sur la boucle locale (hors internet, autorisés) : $LOOPBACK"
+fi
 
 if [ -z "$PUBLIES" ]; then
   echo "ERREUR : aucune publication détectée — même 80 et 443 sont absents." >&2

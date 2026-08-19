@@ -1,0 +1,68 @@
+AGENT 30 — COMMENT LES 37 ECRANS ONT ETE MESURES EN 375 px
+
+REFERENCE
+  main = 7be3753 au moment de la cloture (git log relu au debut ET a la fin).
+  frontend/ est STRICTEMENT IDENTIQUE a e8924b8 :
+     git diff --stat e8924b8 HEAD -- frontend/   -> sortie VIDE
+  Tous les constats portent donc sur le meme code que les agents 22, 23 et 27.
+
+ARTEFACT MESURE (decision D-011)
+  Bundle servi : /assets/index-BVK1vh1a.js — c'est le bundle OFFICIEL reconstruit
+  par le chef de chantier, celui-la meme que l'agent 22 a identifie comme la
+  reference. Verifie par curl sur l'index servi. Aucune mesure sur le bundle
+  perime de D23-001.
+
+ACCES — AUCUNE AUTORITE RACINE INSTALLEE
+  Chrome refuse https://app.localhost (autorite « Caddy Local Authority » absente
+  du magasin Windows). Installer cette autorite est une modification de securite
+  du poste du dirigeant : NON FAITE (l'agent 22 a refuse a raison, je fais pareil).
+  Contournement, identique au sien, conteneur temporaire retire a la fin :
+     docker run -d --name a30-proxy --network axion-crm -p 58130:80 \
+            -v <Caddyfile> -v <srv> caddy:2-alpine
+     Caddyfile : reverse_proxy vers app:5173, plus un file_server sur /_a30/*
+                 (une seule page statique, mon banc d'essai a iframe)
+     -> navigation reelle sur http://app.localhost:58130/...
+  Conteneur SUPPRIME en fin de mission : docker rm -f a30-proxy  -> OK.
+  AUCUN fichier du produit modifie. AUCUNE ecriture en production.
+
+CE QUE CELA NE MESURE PAS — dit franchement
+  Le SPA porte une base d'API absolue (frontend/src/lib/api.ts:3 -> https://api.localhost).
+  Depuis http://app.localhost:58130 tous les appels d'API echouent. Les 37 ecrans sont
+  donc mesures NON CONNECTES et API INJOIGNABLE — l'etat vide/erreur.
+  C'est exactement ce que le mandat demande, et c'est suffisant pour :
+    debordement horizontal de la coquille et des en-tetes, cibles tactiles, barre
+    basse, barre repliee, tiroir mobile, budget de gestes.
+  Ce n'est PAS suffisant pour : les LISTES REMPLIES. Aucun tableau du produit ne
+  s'affiche sans donnees. Le sort des tableaux larges est donc etabli autrement —
+  voir 04_largeurs-tableaux.txt (sonde du patron reel injectee dans <main>) et
+  02_barre-tableaux-temoins.txt (sondes A/B avec temoin).
+  Rappel : la console reste inutilisable (A-012 / A07-001), aucun agent ne peut
+  s'y connecter aujourd'hui.
+
+DEUX INSTRUMENTS INDEPENDANTS, ET ILS S'ACCORDENT
+  1) banc d'essai a iframe 375x812 pilote par l'extension navigateur, dans le Chrome
+     du poste (resize_window ne descend pas sous la largeur minimale d'une fenetre
+     Chrome : la fenetre restait a 1920. L'iframe, elle, donne un viewport de mise
+     en page reellement egal a 375 — verifie : matchMedia('(min-width:1024px)')
+     rend false a 375 et true a 1280, la barre laterale dispara?t et le hamburger
+     appara?t exactement au seuil).
+  2) Playwright 1.60 (deja dans frontend/node_modules), viewport 375x812,
+     isMobile:true, hasTouch:true, deviceScaleFactor:2.
+  Ecart entre les deux : 477 vs 473 cibles tactiles, 465 vs 461 sous 44 px
+  (4 elements de plus dans le banc a iframe, lies au moment de la mesure sur un
+  ecran en cours de chargement). MEMES 3 ecrans en debordement, MEMES nombres de
+  pixels perdus (83 / 47 / 231). Les chiffres RETENUS sont ceux de Playwright,
+  reproductibles par une commande.
+
+NOTE DE PRUDENCE — une mesure que je REFUSE de rapporter
+  Dans le banc a iframe, le panneau du tiroir mesurait un transform translateX(24px)
+  residuel. C'est la premiere image de l'animation axion-slide-in-right
+  (index.css:63-65, « from { transform: translateX(24px) } »), figee par le
+  ralentissement des animations dans une iframe. Sous Playwright, aucun decalage.
+  Ce n'etait donc PAS un defaut du produit : c'etait un artefact de mon instrument.
+
+COMMANDES REJOUABLES (depuis frontend/, conteneur a30-proxy relance)
+  node scripts/mesure375.mjs           http://app.localhost:58130 <dossier-preuves>
+  node scripts/barre-tableaux-temoins.mjs http://app.localhost:58130 <dossier-preuves>
+  node scripts/largeurs-tableaux.mjs   http://app.localhost:58130 <dossier-preuves>
+  node scripts/parcours.mjs            http://app.localhost:58130 <dossier-preuves>

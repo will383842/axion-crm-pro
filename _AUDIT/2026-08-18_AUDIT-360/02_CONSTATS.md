@@ -523,10 +523,17 @@ sous vingt agents.)*
   nommée, et c'est le travail d'un audit de la nommer.
 
 - **Correctif**     : trois gestes indépendants, et le premier est déjà fait par d'autres.
-  1. **L'accès immédiat** : le script `definir-mot-de-passe-crm.sh` existe désormais et il est bien
-     écrit (mot de passe lu sur **l'entrée standard**, jamais en argument — donc absent de `ps` et de
-     l'historique ; longueur minimale de 12 ; vérification par `Hash::check` après écriture). **Rien à
-     refaire, il faut le jouer.** ⚠️ Il documente au passage un piège réel : la colonne s'appelle
+  1. **L'accès immédiat** : le script `definir-mot-de-passe-crm.sh` existe désormais, et il fait
+     l'essentiel correctement — longueur minimale de 12, vérification par `Hash::check` après
+     écriture, fichier temporaire retiré.
+     ⚠️ **MAIS J'AVAIS TROP LOUÉ, ET L'AGENT 35 M'A REPRIS (`F35-007`).** J'écrivais que le mot de
+     passe « traverse un tube, jamais un argument, donc absent de `ps` » — **c'est ce que l'en-tête du
+     script promet, et ce n'est vrai qu'à moitié**. Il est bien **lu** sur l'entrée standard
+     (`MDP="$(cat)"`, l.47), puis **repassé en clair à `docker exec -e CRM_MDP="$MDP"`** (l.106) —
+     donc **dans l'`argv` du client Docker, visible dans `ps` par tout utilisateur de la machine**
+     le temps de la commande. *J'avais lu l'en-tête et vérifié la lecture ; je n'avais pas suivi la
+     valeur jusqu'à son usage.* **Correctif : passer par l'entrée standard de `docker exec` aussi.**
+     **Rien à refaire par ailleurs, il faut le jouer — en connaissant cette réserve.** ⚠️ Il documente au passage un piège réel : la colonne s'appelle
      **`password_hash`**, pas `password`, et elle **n'est pas castée `hashed`** — écrire `$u->password`
      ne lève **aucune erreur** et ne fait **rien**.
   2. **La cause de fond** : poser **`MAIL_MAILER` explicitement** — à `log` si c'est bien la décision,
@@ -2661,3 +2668,94 @@ l'ordre, chaque élément avec *la pièce de l'étape 1a qui s'y appuie*. Et son
 oublie toujours : **ce qui peut continuer sans attendre** — dont **cinq chapitres entiers en terrain
 vierge** (§4 questionnaires, §5 notation, §6 écran d'entretien, §14 documents, §16 après-vente),
 **0 contradiction à payer**, où l'on écrit directement la cible.
+
+---
+
+## Agent 35 — authentification : **la cause exacte de A-001, et le correctif prouvé à quatre états**
+**Rapport** : `11_GRILLES/agent-35_authentification.md` · **Preuves** : `04_PREUVES/agent-35/`
+
+🔑 **A-001 a DEUX causes, pas une — et c'est ce qui avait échappé à tout le monde, moi compris.**
+1. **Laravel 12 pose lui-même le rappel fautif** : `ApplicationBuilder::withMiddleware()` (vendor, l.278) appelle **inconditionnellement** `redirectGuestsTo(route('login'))` **avant** d'exécuter le rappel de l'application. `bootstrap/app.php` ne le remplace jamais, et **aucune route nommée `login` n'existe** (`Route::has('login')` rend **false**).
+2. **Le gestionnaire d'exceptions rappelle `route('login')`** à son tour.
+
+**Correctif : 2 lignes, et les deux sont nécessaires** — prouvé **à quatre états** :
+
+```
+(0) tel quel                     -> 500
+(1) shouldRenderJsonWhen seul    -> 500      <- le corps devient {"message":"Server Error"}
+(2) redirectGuestsTo seul        -> 500
+(3) LES DEUX                     -> 401      <- correct
+```
+
+*L'état (1) est le plus instructif : **une demi-correction produit une erreur mieux habillée, pas une
+erreur en moins**.*
+**Coût caché que personne n'avait relevé : 8 475 octets de journal par requête refusée** —
+contributeur direct de `A-007`.
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **F35-002** | **S0** | Confirmation **indépendante** de `A07-001` — **et un SECOND chemin** : `UsersController:33` sélectionne `two_factor_enabled`, **colonne inexistante** → **`GET /api/v1/users` est cassé**. *C'est l'écran par lequel le propriétaire inviterait quelqu'un.* A-001 n'y est pour rien : le SPA reçoit un 401 propre |
+| **F35-003** | **S1** | 🔴 **La 2FA n'est JAMAIS exigée par le serveur** : `2fa_passed_at` est **écrit une fois et relu nulle part**. *Contournable par construction* |
+| **F35-004** | **S1** | **`HibpChecker` est fail-open, joué** : réseau coupé → `getBreachCount("password")` rend **0** **et la règle ACCEPTE**. Témoin : réseau rétabli → **9 999 999**. Et la règle n'est branchée **que sur `password/reset`** |
+| **F35-005** | **S1** | **Le jeton de réinitialisation n'expire jamais** : la différence de dates rend une valeur **négative** en Carbon 3 — joué : **−179,99** et **−43 199,98** |
+| F35-006, F35-010 | S2 | La réinitialisation **ne révoque aucun jeton d'API** · **les jetons d'API n'expirent jamais** |
+| F35-012, F35-009 | S2 | **Le verrou de compte est testé APRÈS le hachage** : il n'arrête pas l'attaque — *et le dépôt le démontre lui-même dans `LoginTest.php:99-127`* · **énumération de comptes par le temps** |
+| **F35-007** | **S2** | `definir-mot-de-passe-crm.sh` **met le mot de passe dans l'`argv`**, **contre son propre en-tête** → *j'avais loué ce script à tort ; correction portée dans `A-012`* |
+| F35-008, F35-011, F35-013, F35-014 | S2/S3 | `OwnerUserSeeder` écrit le mot de passe **en clair, sans le `chmod` annoncé**, et **sur la sortie standard** · la règle de longueur minimale est appliquée **à la connexion** : impasse pour un mot de passe court · un lien magique émis **avant** la création du compte ouvre une session ensuite · le script peut annoncer « OK » sur une sortie qui n'en est pas une |
+
+⚠️ **Et trois pièges de mesure qui lui ont menti, consignés dans un fichier dédié** — c'est un
+livrable, pas un aveu : la méthode de test du framework **n'envoie pas les en-têtes** (*il a failli
+conclure que le SPA était cassé* — **sortie fautive conservée**) · l'outil de rendu **remplace le
+gestionnaire d'exceptions** · et un cache d'opcode a servi **un fichier d'amorçage périmé**, d'où des
+**419 CSRF qui sont un défaut de son banc, et non des constats produit**.
+
+---
+
+## Agent 42 — performance d'interface : **ce qui est mesurable sans serveur, et il y en a beaucoup**
+**Rapport** : `11_GRILLES/agent-42_performance-interface.md` · **Preuves** : `04_PREUVES/agent-42/` (15 fichiers, dont 2 bancs)
+
+**Il commence par borner ce qu'il ne mesure pas** : **aucun temps de réponse d'API publié** — *ce
+serait mesurer la file d'attente d'`A-010`*. Les octets qu'il donne viennent de **fichiers statiques**
+servis par le Caddy du conteneur `app`, que `A-010` ne concerne pas.
+
+**Le chiffre du mandat est exact** — le bundle principal fait **1 046 364 o** — **mais il ne dit que la
+moitié** : la page déclare **les 5 morceaux en préchargement**, donc le premier écran, **sur toutes les
+routes**, pèse **2 178 093 o bruts / 627 369 o compressés**.
+Dedans : **68,2 % de dépendances, 31,4 % de code maison** · une grappe de **97 529 o pour un seul
+composant** · **78 261 o pour un `useEffect`** · **61 103 o pour 27 clés de traduction** · **53 613 o
+pour un seul écran** · et **272 330 o d'écrans de route, tous chargés d'emblée**.
+
+**Découpage par route : NON.** Zéro chargement différé. Et **le découpage manuel déclaré ment** : le
+morceau `react` sort **vide (44 o)**.
+
+**Les listes, aux cinq volumes** (sans réseau) :
+
+| `ContactsListPage` *(non virtualisé)* | 0 | 1 | 100 | 500 | 10 000 | 100 000 |
+|---|---:|---:|---:|---:|---:|---:|
+| ms | 731 | 210 | 1 579 | 5 428 | **84 722** | **n'aboutit pas** |
+| nœuds DOM | 44 | 70 | 2 545 | 12 545 | **250 045** | — |
+
+`CompaniesListPage` *(virtualisé)* : **155 nœuds à 1 ligne comme à 10 000 — plat.**
+**1 fichier sur 31 virtualise.** À 100 000 : deux tentatives, deux arrêts, **8 117 Mo engagés après
+11,4 min**. *« Ne converge pas » est le résultat — il ne l'extrapole pas.*
+
+**L'anti-rebond : il n'y en a aucun.** Mot « boulangerie », 11 touches :
+`ContactsListPage` **11 requêtes** · `ContactsHubPage` **11** · `CompaniesListPage` **11** ·
+recherche globale **10** · **`AudienceBuilderPage`, témoin négatif : 1** (anti-rebond de 500 ms).
+*Le témoin négatif rend la mesure inattaquable.* **Croisé avec `A-010` : taper vite dans un champ de
+recherche occupe l'unique processus PHP et fait attendre tout le monde.**
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **G42-001** | **S1** | **Aucun découpage par route** : les 37 écrans sont importés statiquement |
+| **G42-003** | **S1** | La carte de couverture : **31 244 points** depuis un fichier de **1 079 714 o sans aucun `Cache-Control`**, **téléchargé deux fois par montage** — *le second appel n'existe que pour journaliser* — moteur **802 715 o préchargés sur les 37 routes** |
+| **G42-004** | **S1** | **1 fichier sur 31 virtualise** ; le seul garde-fou est le plafond **serveur** |
+| **G42-010** | **S1** | **Aucun anti-rebond** sur 4 champs de recherche sur 5 |
+| **G42-007** | **S1** | **9 scrutations, dont deux à 5 s** |
+| **G42-006** | **S2** | 🔴 **Les cartes de source sont servies en 200 : 4 174 052 octets de TypeScript public** |
+| G42-002, G42-005, G42-008, G42-011 | S2 | Composition du bundle · **morceau `react` vide** · **0 mémoïsation de composant, 2 rappels mémoïsés** · transport de la carte |
+| **G42-013** | **S2** | **La seule garde de performance est inerte trois fois** : tolérante à l'erreur, **sans aucun fichier de configuration** (donc elle n'assure rien), et pointée sur **la préproduction** — *donc sur le code d'AVANT la PR*. **Quatorzième cas du patron `A-011`** |
+
+✅ **Et deux griefs classiques qu'il a écartés contre ses propres brouillons** : les contextes trop
+larges (**aucun n'existe**) et les clés de liste par index (**10 des 12 portent sur des squelettes
+constants**). *Il corrige ses propres hypothèses avant de les publier.*

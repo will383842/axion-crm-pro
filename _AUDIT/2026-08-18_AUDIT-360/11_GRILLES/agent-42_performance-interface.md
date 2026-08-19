@@ -1,11 +1,13 @@
 # AGENT 42 — Performance d'interface
 
-> **Référence de code** : dépôt CRM. `main` a bougé **pendant** cet audit — j'ai commencé à
-> `8db8229` et terminé à **`a3c42d6`** (relu par `git rev-parse HEAD` à 15 h 05). J'ai donc
-> vérifié ce qui compte plutôt que de le supposer :
-> `git diff --stat c0c453d a3c42d6 -- frontend/` → **vide**. **Le code `frontend/` est identique
-> de `c0c453d` à `a3c42d6`** ; tous les chiffres de ce rapport valent sur les cinq commits.
-> Les commits intermédiaires ne touchent que `_AUDIT/` et `_REPORTS/`.
+> **Référence de code** : dépôt CRM. ⚠️ `main` a bougé **quatre fois pendant** que je mesurais —
+> j'ai commencé à `8db8229` et rendu à **`b46877f`**. Plutôt que de citer un SHA qui serait faux
+> le lendemain, j'ai vérifié **ce qui compte** :
+> `git diff --stat c0c453d b46877f -- frontend/` → **vide**.
+> **Le code `frontend/` n'a pas changé d'une ligne entre `c0c453d` et `b46877f`** ; tous les
+> chiffres de ce rapport valent sur l'ensemble de ces commits. Les commits intermédiaires ne
+> touchent que `_AUDIT/` et `_REPORTS/`. (`git status --porcelain frontend` en fin de mesure →
+> **vide** également : je n'ai modifié aucun fichier du produit.)
 > Les mesures de production portent sur le bundle **`index-D3nU2tuG.js`** servi par
 > `https://app.axion-crm-pro.com` le 2026-08-19 à 12 h 35 UTC.
 >
@@ -272,7 +274,7 @@ que le produit émet.
 
 - Sévérité      : **S1**
 - Domaine       : performance / interface
-- Référence     : `frontend/` identique de `c0c453d` à `a3c42d6` ; production `index-D3nU2tuG.js`
+- Référence     : `frontend/` identique de `c0c453d` à `b46877f` ; production `index-D3nU2tuG.js`
 - Emplacement   : `frontend/src/app/routeTree.tsx:1-52` · `frontend/vite.config.ts:98-112` · `frontend/dist/index.html`
 - Constat       : les **37 composants d'écran** sont importés **statiquement** en tête de `routeTree.tsx` (`grep -c "^import { [A-Z]" src/app/routeTree.tsx` → **37** ; 38 `createRoute`, dont 32 sous la coquille) ; il n'existe **aucun** `React.lazy` ni `import()` dynamique dans `src/`, et `index.html` déclare les **5 chunks JS en `modulepreload`** — le navigateur télécharge donc la totalité de l'application, quelle que soit la page demandée.
 - Preuve        :
@@ -304,7 +306,7 @@ que le produit émet.
 
 - Sévérité      : **S2**
 - Domaine       : performance
-- Référence     : `frontend/` identique de `c0c453d` à `a3c42d6`
+- Référence     : `frontend/` identique de `c0c453d` à `b46877f`
 - Emplacement   : `frontend/package.json:14-42` · `frontend/dist/assets/index-*.js`
 - Constat       : l'attribution des octets générés par module (algorithme *source-map-explorer*, implémenté pour cette mesure) donne **704 577 o de dépendances npm (68,2 %)** contre **324 509 o de code maison (31,4 %)**, et trois grappes qui ne servent qu'à un seul point du produit pèsent à elles seules **229 403 o (22,2 % du chunk)**.
 - Preuve        : `04_PREUVES/agent-42/composition-bundle.txt` (sortie complète, 4 chunks). Extrait du chunk `index` :
@@ -338,7 +340,7 @@ que le produit émet.
 
 - Sévérité      : **S1**
 - Domaine       : performance
-- Référence     : `frontend/` identique de `c0c453d` à `a3c42d6` ; production mesurée le 2026-08-19
+- Référence     : `frontend/` identique de `c0c453d` à `b46877f` ; production mesurée le 2026-08-19
 - Emplacement   : `frontend/src/features/coverage/FranceCoverageMap.tsx:2-3,165-186` · `frontend/vite.config.ts:107` · `frontend/dist/index.html` · `frontend/Caddyfile.app:24-31`
 - Constat       : `maplibre-gl` est importé statiquement par un écran statiquement importé ; le `manualChunks` lui donne un fichier à part **mais `index.html` le déclare en `modulepreload`**, donc il est téléchargé au premier chargement de n'importe quelle route ; et le composant télécharge le fond de carte **deux fois** — une fois par `map.addSource`, une fois par un `fetch()` qui n'existe que pour écrire dans la console.
 - Preuve        :
@@ -370,29 +372,32 @@ que le produit émet.
 
 ---
 
-### [G42-004] Un écran de liste sur trente et un est virtualisé ; à 10 000 lignes le rendu prend 36 s et 250 045 nœuds, et rien côté client ne l'en empêche
+### [G42-004] Un fichier de liste sur trente et un est virtualisé ; à 10 000 lignes le rendu coûte 250 045 nœuds DOM et 36 à 85 s, et rien côté client ne l'en empêche
 
 - Sévérité      : **S1**
 - Domaine       : performance / interface
-- Référence     : `frontend/` identique de `c0c453d` à `a3c42d6`
+- Référence     : `frontend/` identique de `c0c453d` à `b46877f`
 - Emplacement   : `frontend/src/features/contacts/ContactsListPage.tsx:213-217` (`rows.map`) · `frontend/src/features/companies/CompaniesListPage.tsx:297-303,713-745` (le seul virtualisé) · 8 fichiers partageant l'en-tête dupliqué
 - Constat       : **1 fichier sur 31** (29 écrans de route + 2 sous-composants du tableau de bord) utilise `@tanstack/react-virtual`. Les 30 autres rendent `rows.map(...)` sans fenêtre ni plafond ; **le seul garde-fou existant est le plafond de pagination du serveur**, qui n'est écrit nulle part côté client.
 - Preuve        : chronos mesurés (§2), `04_PREUVES/agent-42/journal-chronos.txt` et `chronos-listes.txt`. En résumé pour `ContactsListPage` (non virtualisé) :
 
   | lignes servies | ms (montage → lignes au DOM) | lignes rendues | nœuds DOM | tas Node |
   |---:|---:|---:|---:|---:|
-  | 0 | 2 171 | 0 | 44 | 61 Mo |
-  | 1 | 1 532 | 2 | 70 | 60 Mo |
-  | 100 | 1 276 | 101 | 2 545 | 87 Mo |
-  | 10 000 | **36 236** | 10 001 | **250 045** | **1 516 Mo** |
-  | 100 000 | **n'a pas abouti** — voir §2 | | | |
+  | 0 | 731 | 0 | 44 | 63 Mo |
+  | 1 | 210 | 2 | 70 | 62 Mo |
+  | 100 | 1 579 | 101 | 2 545 | 85 Mo |
+  | 500 | 5 428 | 501 | **12 545** | 170 Mo |
+  | 10 000 | **84 722** *(36 236 à la passe 1)* | 10 001 | **250 045** | **1 519 Mo** |
+  | 100 000 | **n'a pas abouti** : 11,4 min, 8 117 Mo engagés — voir §2 | — | — | — |
 
   Inventaire de la virtualisation : `grep -rn "useVirtualizer" src/` → **`CompaniesListPage.tsx` uniquement**.
   Inventaire des plafonds serveur (`backend/app/Http/Controllers/Api/`) : `min(100, max(1, per_page))` sur `Companies`, `Contacts`, `Journalists`, `Media`, `ScrapingCampaigns` ; `TagsController.php:42` → `limit(500)` ; `UsersController.php:35` → `limit(200)` ; `AuditLogsController.php:28` → `paginate(50)` ; `RgpdRequestsController.php:41` → `paginate(25)`.
   Contrôles de pagination dans l'écran : présents dans **5 fichiers** ; `ContactsHubPage`, `CandidatesPage` et `ArbitragePage` **déclarent** `next_cursor`/`prev_cursor` dans `crm-console/types.ts:93-94` et **ne les lisent nulle part** (`grep -n cursor` sur les trois écrans → 0 ligne).
 - Témoin négatif : l'instrument sait mesurer un écran qui **ne** grossit **pas** — sur `CompaniesListPage`, virtualisé, le même harnais aux mêmes volumes rend le tableau du §2, où le nombre de nœuds **ne suit pas** le nombre de lignes servies. Si les deux courbes s'étaient ressemblées, c'est ma méthode qui aurait été en cause.
-- Impact        : aujourd'hui, aucun utilisateur ne peut déclencher les 36 s — parce que l'API ne renvoie jamais plus de 500 lignes. Ce n'est pas une garde, c'est une coïncidence : elle vit dans neuf contrôleurs PHP, et le jour où l'un d'eux change (un « exporter la vue », un `per_page` relevé, un endpoint neuf sans plafond), **l'écran devient injouable sans qu'aucun test ne rougisse**. Le plus gros cas réellement atteignable aujourd'hui — les **500 tags** de `TagsManagerPage`, non virtualisé, sans pagination — est mesuré au §2.
-- Reproduction  : `AGENT42_VOLUMES="0,1,100,500,10000" pnpm vitest run tests/bench-agent42/listes.test.tsx` (fichier de mesure archivé dans `04_PREUVES/agent-42/`).
+- Impact        : aujourd'hui, **aucun utilisateur ne peut atteindre les 10 000 lignes** — parce que l'API n'en renvoie jamais plus de 500. Ce n'est pas une garde, c'est une coïncidence : elle vit dans neuf contrôleurs PHP, et le jour où l'un d'eux change (un « exporter la vue », un `per_page` relevé, un endpoint neuf sans plafond), **l'écran devient injouable sans qu'aucun test ne rougisse**. Le plus gros volume réellement atteignable aujourd'hui est **500 lignes** — c'est le `limit(500)` de `TagsController`, servi à `TagsManagerPage`, non virtualisé et **sans aucun contrôle de pagination**. Je l'ai mesuré à **12 545 nœuds DOM et 5,4 s** sur `ContactsListPage` (§2) ; **je ne l'ai pas mesuré sur `TagsManagerPage` lui-même**, dont les cartes ont une autre structure — l'ordre de grandeur vaut, le chiffre exact non.
+- Reproduction  : recopier `04_PREUVES/agent-42/listes.test.tsx` dans `frontend/tests/bench-agent42/`, puis
+  `AGENT42_VOLUMES="0,1,100,500,10000" AGENT42_JOURNAL=<chemin> pnpm vitest run tests/bench-agent42/listes.test.tsx --no-file-parallelism`.
+  ⚠️ Le fichier a été **retiré de `frontend/`** en fin de mesure : `git status --porcelain frontend` rend **vide**, aucun fichier du produit n'a été modifié.
 - Correctif     : **ne pas** virtualiser 30 écrans à la main. Extraire d'abord le composant `Table`/`List` qui manque (constat D27-005 de l'agent 27 : aucun composant `Table`, 3 idiomes, un en-tête de 210 caractères recopié dans 8 fichiers), virtualiser **une fois** dedans, puis convertir les écrans. Coût : ~1 j pour le composant + ~2 h par écran converti. `@tanstack/react-table` est **déjà installé et jamais importé** : la brique est payée, pas utilisée.
 - Statut        : ouvert
 
@@ -402,7 +407,7 @@ que le produit émet.
 
 - Sévérité      : **S2**
 - Domaine       : performance
-- Référence     : `frontend/` identique de `c0c453d` à `a3c42d6`
+- Référence     : `frontend/` identique de `c0c453d` à `b46877f`
 - Emplacement   : `frontend/vite.config.ts:103-110`
 - Constat       : `manualChunks` déclare `react: ['react', 'react-dom']`, et le build imprime **`Generated an empty chunk: "react"`** ; `react-dom` (177 786 o) se retrouve dans le chunk `index`, et `react` (8 045 o) dans le chunk `query`.
 - Preuve        : `04_PREUVES/agent-42/build-pnpm.txt` :
@@ -412,7 +417,16 @@ que le produit émet.
   dist/assets/index-C8i6k4WZ.js   1,033.27 kB │ gzip: 296.06 kB
   ```
   et l'attribution par module (`composition-bundle.txt`) : `npm:react-dom 177786` **dans `index`**, `npm:react 8045` **dans `query`**.
-  En production le fichier `react-DJ4PxdIq.js` fait **3 935 o** : il n'est pas vide, mais il ne contient pas React non plus.
+  En production, le fichier `react-DJ4PxdIq.js` fait **3 935 o** — il n'est pas vide, mais sa
+  propre carte de source dit ce qu'il contient, et ce n'est pas React :
+  ```
+  $ curl -s .../assets/react-DJ4PxdIq.js.map | node -e "…console.log(m.sources)"
+  [ 'node_modules/react-dom@19.2.8/react-dom/cjs/react-dom.production.js',
+    'node_modules/react-dom@19.2.8/react-dom/index.js' ]
+  ```
+  soit **l'enveloppe CommonJS de `react-dom`** — quelques kilo-octets d'aiguillage — pendant que
+  les **177 786 o** du moteur de rendu restent dans `index` et que `react` lui-même (8 045 o) est
+  dans `query`. Le fichier porte le nom d'une séparation qui n'a pas eu lieu.
 - Témoin négatif : le mécanisme n'est pas cassé en général — les trois autres chunks déclarés reçoivent bien leur contenu (`maplibre` 99,86 % de `maplibre-gl`, `router` 65 % de `router-core`, `query` 48,6 % d'`axios`). C'est la seule entrée `react` qui rate.
 - Impact        : la conséquence directe est faible (un fichier de 44 octets et une requête HTTP inutile). La conséquence indirecte l'est moins : **la configuration donne à lire une séparation qui n'existe pas**. Quiconque optimise ce bundle en croyant que React est isolé conclura à l'envers.
 - Reproduction  : `cd frontend && pnpm build`, lire la ligne `Generated an empty chunk`.
@@ -425,7 +439,7 @@ que le produit émet.
 
 - Sévérité      : **S2**
 - Domaine       : performance / sécurité
-- Référence     : `frontend/` identique de `c0c453d` à `a3c42d6` ; production le 2026-08-19
+- Référence     : `frontend/` identique de `c0c453d` à `b46877f` ; production le 2026-08-19
 - Emplacement   : `frontend/vite.config.ts:100` (`sourcemap: true`) · `frontend/Dockerfile.frontend:52` (`COPY --from=builder /srv/app/dist /srv/app/dist`) · `frontend/Caddyfile.app:16-21` (`file_server` sur tout `dist/`)
 - Constat       : le build produit **6 498 808 octets** de cartes de source, le `Dockerfile` copie `dist/` **en entier** dans l'image, et le `Caddyfile` sert `dist/` **en entier** : les `.map` sont donc joignables publiquement.
 - Preuve        :
@@ -449,7 +463,7 @@ que le produit émet.
 
 - Sévérité      : **S1**
 - Domaine       : performance
-- Référence     : `frontend/` identique de `c0c453d` à `a3c42d6`
+- Référence     : `frontend/` identique de `c0c453d` à `b46877f`
 - Emplacement   : `frontend/src/features/campaigns/CampaignDetailPage.tsx:64,71` · `CampaignsListPage.tsx:65` · `ScraperRunsPage.tsx:215` · `DashboardPage.tsx:81` · `ObservabilityPage.tsx:34` · `AudiencesListPage.tsx:68` · `CoveragePage.tsx:34`
 - Constat       : neuf `refetchInterval` sont déclarés ; le plus court vaut **5 000 ms** et il y en a **deux sur le même écran**, soit **24 requêtes/minute par onglet ouvert** sur `/campaigns/$campaignId`.
 - Preuve        :
@@ -477,7 +491,7 @@ que le produit émet.
 
 - Sévérité      : **S2**
 - Domaine       : performance
-- Référence     : `frontend/` identique de `c0c453d` à `a3c42d6`
+- Référence     : `frontend/` identique de `c0c453d` à `b46877f`
 - Emplacement   : tout `frontend/src/`
 - Constat       : le produit ne contient **aucun** `React.memo`, **2** `useCallback` et **24** `useMemo`. Comme chaque champ de filtre et chaque champ de recherche est un `useState` **de la page**, toute frappe re-rend l'écran de haut en bas — en-tête, barre d'outils, et **toutes les lignes**.
 - Preuve        :
@@ -506,7 +520,7 @@ que le produit émet.
 
 - Sévérité      : **S3**
 - Domaine       : performance / dépendances
-- Référence     : `frontend/` identique de `c0c453d` à `a3c42d6`
+- Référence     : `frontend/` identique de `c0c453d` à `b46877f`
 - Emplacement   : `frontend/package.json:14-42,44-70`
 - Constat       : `date-fns`, `zustand`, `@tanstack/react-table`, `class-variance-authority`, `tailwind-merge` et `@tanstack/react-query-devtools` sont déclarés et **jamais importés**.
 - Preuve        :
@@ -529,7 +543,7 @@ que le produit émet.
 
 - Sévérité      : **S1**
 - Domaine       : performance / interface
-- Référence     : `frontend/` identique de `c0c453d` à `a3c42d6`
+- Référence     : `frontend/` identique de `c0c453d` à `b46877f`
 - Emplacement   : `frontend/src/components/ui/Toolbar.tsx:30-35` (`SearchInput`) · `ContactsListPage.tsx:86` · `ContactsHubPage.tsx:68` · `CompaniesListPage.tsx:256` · `components/ui/GlobalSearch.tsx:32-38`
 - Constat       : `SearchInput` est un `<input>` contrôlé nu ; sa valeur est poussée telle quelle dans la `queryKey` de React Query. **Une nouvelle clef = une nouvelle requête.** Il n'existe **qu'un seul** anti-rebond dans tout le produit, ailleurs (`AudienceBuilderPage.tsx:170`, 500 ms).
 - Preuve        : mesure jouée — on tape le mot « boulangerie » (11 caractères) dans chaque champ et on **compte les requêtes HTTP réellement émises** (MSW enregistre les URL). Résultats au §3. Et dans le code :
@@ -545,7 +559,7 @@ que le produit émet.
   2. **A-010** : sur une production qui **sérialise**, ces 10 requêtes s'exécutent l'une après l'autre. Une recherche sur 4,29 M de fiches est le type même de requête lente. **Un seul utilisateur qui tape vite dans un champ de recherche suffit à occuper l'unique processus PHP et à faire attendre tous les autres.** C'est le croisement demandé par le mandat, et il tient : le défaut d'interface transforme un défaut d'infrastructure en panne collective.
   3. **CDC critère 1** (« résultats à la frappe, moins de 5 s ») : la réponse affichée est celle de la **dernière** requête arrivée, pas de la dernière frappe. React Query annule les requêtes obsolètes côté client, mais **pas côté serveur** : le travail est fait quand même.
   À décharge : `GlobalSearch` impose 2 caractères minimum et `staleTime: 30 s` évite de refaire la requête si l'utilisateur revient en arrière sur une chaîne déjà tapée. Les trois écrans de liste n'ont **aucun** seuil : la première frappe part.
-- Reproduction  : `pnpm vitest run tests/bench-agent42/frappe.test.tsx` (fichier archivé dans `04_PREUVES/agent-42/`).
+- Reproduction  : recopier `04_PREUVES/agent-42/frappe.test.tsx` dans `frontend/tests/bench-agent42/`, puis `pnpm vitest run tests/bench-agent42/frappe.test.tsx` (→ `Tests 5 passed (5)`). Le fichier a été retiré de `frontend/` en fin de mesure.
 - Correctif     : un anti-rebond de 300 ms **dans `SearchInput` lui-même** — un seul fichier, `~15 lignes`, et les quatre écrans en profitent sans être touchés ; plus un seuil de 2 caractères aligné sur celui de `GlobalSearch`. **~1 h avec les tests.** C'est le meilleur rapport effort/gain de tout ce rapport, et il vaut d'être fait **avant** A-010, pas après : il réduit la charge sur le processus unique.
 - Statut        : ouvert
 
@@ -555,7 +569,7 @@ que le produit émet.
 
 - Sévérité      : **S2**
 - Domaine       : performance
-- Référence     : `frontend/` identique de `c0c453d` à `a3c42d6`
+- Référence     : `frontend/` identique de `c0c453d` à `b46877f`
 - Emplacement   : `frontend/src/features/coverage/FranceCoverageMap.tsx:38,79-186,236-252,266-280`
 - Constat       : trois coûts distincts dans le même composant.
   1. **32 appels `LOG()`** (`console.log('[FranceMap]', …)`), présents dans le bundle de production — Vite ne retire pas `console.*` et rien ne le configure.
@@ -577,11 +591,11 @@ que le produit émet.
 
 ---
 
-### [G42-012] Les squelettes n'ont jamais la hauteur du contenu qu'ils remplacent, et huit écrans n'en ont aucun
+### [G42-012] Les squelettes n'ont jamais la hauteur du contenu qu'ils remplacent, et sept écrans n'en ont aucun
 
 - Sévérité      : **S3**
 - Domaine       : interface / performance perçue
-- Référence     : `frontend/` identique de `c0c453d` à `a3c42d6`
+- Référence     : `frontend/` identique de `c0c453d` à `b46877f`
 - Emplacement   : `frontend/src/components/ui/Skeleton.tsx:5-15` · `ContactsListPage.tsx:175` · `crm-console/ConsoleGate.tsx:61-66` · `CompaniesListPage.tsx:618`
 - Constat       : `CompaniesTableSkeleton` affiche **6** lignes d'attente là où l'écran en rendra **50** (`ContactsListPage.tsx:175`, `rows={6}`, `per_page=50`) ; `ConsoleListSkeleton` en affiche **8** pour 50. Le contenu ne peut donc que **sauter** au moment où il arrive. Par ailleurs **7 écrans** (et 2 sous-composants du tableau de bord) n'affichent rien pendant le chargement.
 - Preuve        :
@@ -609,7 +623,7 @@ que le produit émet.
 
 - Sévérité      : **S2**
 - Domaine       : performance / tests
-- Référence     : `frontend/` identique de `c0c453d` à `a3c42d6`
+- Référence     : `frontend/` identique de `c0c453d` à `b46877f`
 - Emplacement   : `.github/workflows/a11y.yml:65-75` · `.github/workflows/ci.yml:435-464`
 - Constat       : le dépôt contient **un seul** dispositif de mesure de performance, le job
   `lighthouse` de `a11y.yml`. Il porte **`continue-on-error: true`**, il n'a **aucun fichier

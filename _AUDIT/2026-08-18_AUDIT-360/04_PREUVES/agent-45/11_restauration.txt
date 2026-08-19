@@ -4,3 +4,79 @@
 ## Conteneur a45b (vague 2 + micro-campagne) — arbre de travail contre instantane intact
 $ diff -rq /var/www/html.orig /var/www/html   (hors storage/, bootstrap/cache/, .phpunit.cache)
 (aucune ligne ci-dessus = arbre identique)
+
+## Conteneur a45 (vague 1, 13 sabotages) — arbre de travail contre instantane intact
+$ diff -rq /var/www/html.orig /var/www/html   (hors storage/, bootstrap/cache/, .phpunit.cache)
+(aucune ligne ci-dessus = arbre identique)
+
+## Chaque sabotage s'est termine par une restauration verifiee :
+RESTAURE-IDENTIQUE: database/migrations/2026_08_19_000001_companies_hub_counts_index.php
+RESTAURE-IDENTIQUE: app/Crm/Console/CompteursHub.php
+RESTAURE-IDENTIQUE: app/Crm/Console/CompteursHub.php
+RESTAURE-IDENTIQUE: app/Http/Controllers/Api/Crm/BulkController.php
+RESTAURE-IDENTIQUE: database/seeders/ActivitesEtMotifsSeeder.php
+RESTAURE-IDENTIQUE: phpstan-baseline.neon
+RESTAURE-IDENTIQUE: phpstan.neon
+RESTAURE-IDENTIQUE: app/Support/MasquageCoordonnees.php
+RESTAURE-IDENTIQUE: app/Support/MasquageCoordonnees.php
+RESTAURE-IDENTIQUE: app/Services/Auth/HibpChecker.php
+RESTAURE-IDENTIQUE: app/Services/Auth/HibpChecker.php
+RESTAURE-IDENTIQUE: app/Console/Commands/ScrapingBackfillSrcTags.php
+RESTAURE-IDENTIQUE: phpunit.xml
+RESTAURE-IDENTIQUE: phpstan.neon
+RESTAURE-IDENTIQUE: app/Services/Auth/HibpChecker.php
+RESTAURE-IDENTIQUE: app/Http/Controllers/Api/Crm/BulkController.php
+RESTAURE-IDENTIQUE: config/crm.php
+RESTAURE-IDENTIQUE: app/Support/HmacSignature.php
+RESTAURE-IDENTIQUE: app/Crm/Console/ConsoleAccess.php
+RESTAURE-IDENTIQUE: app/Support/MasquageCoordonnees.php
+
+## Demontage de l'atelier — 2026-08-19T13:17:27Z
+a45
+a45b
+Deleted: sha256:3e228f56c529f48d96b9fe341e020fa9d8838c4e7f53da3963477bdd7e312bef
+DROP DATABASE
+DROP DATABASE
+DROP DATABASE
+## Bases restantes :
+axion_crm
+axion_crm_a
+axion_crm_a06
+axion_crm_a11
+axion_crm_a12
+axion_crm_a19
+axion_crm_a26
+axion_crm_a36
+axion_crm_a39
+axion_crm_a41
+axion_crm_agent14
+axion_crm_agent17
+axion_crm_b
+axion_crm_c
+axion_crm_d
+axion_crm_dr_a08
+axion_crm_e
+axion_crm_e2e
+axion_crm_fresh
+axion_crm_g43
+axion_crm_perf
+axion_crm_perf4m
+axion_crm_rgpd15
+axion_crm_sh1
+axion_crm_sh2
+axion_crm_sh3
+axion_crm_test
+axion_crm_test_test_1
+axion_crm_test_test_2
+
+## Retrait du worktree jetable
+$ git worktree list
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro      b46877f [audit/360-p1-p2]
+C:/Users/willi/Documents/Projets/crmpro-wt-etape0   702253c [chore/etape-0-prealables]
+C:/Users/willi/Documents/Projets/crmpro-wt-etape1a  e8924b8 [travail]
+
+## Etat du depot principal — aucun fichier de produit touche
+$ git status --porcelain -- backend frontend workers infra .github
+(la ligne frontend/tests/bench-agent42/ appartient a l'agent 42, pas a moi)
+$ git rev-parse HEAD
+b46877f4645fa8eb8b18d08df1f31b843d7202e6

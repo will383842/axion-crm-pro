@@ -1,0 +1,7 @@
+etape 1 : champs=2 sans nom accessible=0 []
+   axe (tags exacts de la porte) : ["target-size[serious]x1"]
+   >>> la porte retiendrait : rien
+etape 2 : champs=1 sans nom accessible=1 [{"tag":"input","type":"text","ph":"Rechercher un dépt…","nom":"NON"}]
+   axe (tags exacts de la porte) : ["color-contrast[serious]x102","target-size[serious]x1"]
+   >>> la porte retiendrait : rien
+   (« Continuer » absent ou desactive — arret a l etape 2)

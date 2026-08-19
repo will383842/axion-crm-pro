@@ -37,15 +37,13 @@ sonde2/                           Sources de la sonde courte n.2 (blocs restant 
 CE QUI RESTE A REJOUER, ET COMMENT : voir le §5 du rapport
 _AUDIT/2026-08-18_AUDIT-360/11_GRILLES/agent-35_authentification.md
 
---- ETAT DE L'ATELIER A LA FIN DE MA SESSION ---
-Conteneur `a35-api` (dedie, cree par moi) : LAISSE EN MARCHE. La sonde n.2
-(`phpunit-slim2.xml`) y tournait encore, bloquee sur l'amorcage de Laravel
-(montage 9p sature par les autres agents ; opcache desactive dans l'image).
-Si elle a fini depuis :
-    docker exec a35-api cat /tmp/a35/slim2.txt
-    docker exec a35-api cat /tmp/a35/slim2out.txt
-Bases creees par moi : axion_crm_a35, axion_crm_test_a35 (jetables).
-Menage : docker rm -f a35-api ; DROP DATABASE axion_crm_a35, axion_crm_test_a35.
+--- ETAT DE L'ATELIER A LA FIN DE MA SESSION : MENAGE FAIT ---
+Conteneur `a35-api` : SUPPRIME.  Bases `axion_crm_a35` et `axion_crm_test_a35` : SUPPRIMEES.
+Aucun conteneur ni aucune base partagee n'a ete mute. Aucun fichier du produit modifie
+(verifie par `git status --porcelain backend/ infra/` : vide).
+Pour rejouer : recreer un conteneur dedie a partir de l'image `axion-crm-pro-api`, recopier
+`sonde/` et `sonde2/` dans /tmp/a35 du conteneur, et lancer phpunit avec les options
+d'opcache indiquees ci-dessous.
 
 Mesure de la lenteur, pour qui reprendra :
   - opcache.enable = Off ET opcache.enable_cli = Off dans l'image axion-crm-pro-api ;
@@ -55,3 +53,17 @@ Mesure de la lenteur, pour qui reprendra :
   - `wchan` du processus en permanence a `p9_client_rpc` = attente du montage.
 Remedes : `-d opcache.enable_cli=1 -d opcache.enable=1 -d opcache.file_cache=...`
 et LOG_CHANNEL=null epingle dans $_SERVER par le fichier d'amorcage.
+
+
+--- REFERENCE, RE-MESUREE EN FIN DE SESSION ---
+Mesures faites sur main e8924b8. `HEAD` a bouge pendant la session (-> d95de24, 7 commits
+de l'audit lui-meme). Verifie :
+    git diff --name-only e8924b8..HEAD -- backend/app backend/routes backend/config         backend/bootstrap backend/database infra/scripts/definir-mot-de-passe-crm.sh         frontend/src/lib frontend/src/features/auth
+    -> VIDE. Aucun fichier de mon perimetre n'a bouge ; tous les constats tiennent sur d95de24.
+
+--- POSITIONNEMENT (verifie contre 02_CONSTATS.md sur d95de24) ---
+F35-001 complete A-001 (deja trouve, deja abaisse a S2).
+F35-002 CONFIRME A07-001 (S0, deja porte) et l'etend : GET /api/v1/users casse pareil.
+Les douze autres sont nouveaux.
+La mesure de A-001 EN PRODUCTION, que je n'ai pas pu jouer, a ete faite par un autre agent :
+04_PREUVES/P0/a001-recontrole.txt et prod-401-vs-500.txt — meme resultat que le mien.

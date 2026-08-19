@@ -203,8 +203,15 @@ Comparaison **caractère par caractère** du DOM entre la condition **VIDE** (`2
 > **23 / 30.** Aucun octet ne diffère. *Un opérateur ne peut pas distinguer « la base est vide » de « la requête a
 > échoué » — non pas parce que c'est difficile, mais parce qu'il n'y a rigoureusement rien à distinguer.*
 
-**Témoin négatif** — la même comparaison, appliquée au couple **VIDE vs ERREUR**, trouve **7 écrans différents** :
-la sonde sait donc voir une différence quand il y en a une. Elle n'invente pas l'identité.
+Composition honnête de ces 23 : **19** affirment « 0 »/« aucun » (§2.1) ; **2** (`/campaigns/$id`, `/audiences/$id`)
+sont des sabliers éternels, donc identiques parce qu'ils ne disent jamais rien ; **1** (`/coverage`) est
+non vérifiable ; **1** (`/campaigns/new`) est un formulaire dont la coquille ne dépend d'aucune donnée.
+
+**Témoin négatif** — la même comparaison trouve **7 écrans DIFFÉRENTS** : la sonde sait donc voir une différence
+quand il y en a une, elle n'invente pas l'identité. Et parmi ces 7, la différence est parfois d'un cheveu :
+sur `/contacts`, **seul le sous-titre** passe de « **0** décideurs identifiés » à « **…** décideurs identifiés »,
+tandis que le corps continue d'afficher « Aucun contact ». *Trois points de suspension sont tout ce qui sépare, à
+l'écran, une base vide d'un serveur mort.*
 
 ### 2.3 Le verdict sur l'état « permission refusée » : **37 / 37 identiques au 500**
 
@@ -220,9 +227,24 @@ C'est la moitié manquante de **D22-006** : celui-ci établit que l'interface n'
 *avant* d'offrir ses actions ; celui-ci établit qu'elle ne sait pas davantage les reconnaître *après*. L'utilisateur
 ne découvre donc pas son absence de droit « au clic » — **il ne la découvre pas du tout** : il voit un zéro.
 
-### 2.4 L'état partiel : mesuré sur les 7 écrans multi-sources — **0 sur 7** le signale
+### 2.4 L'état partiel : **0 écran sur 7** signale qu'une de ses sources est tombée
 
-*(Relevé complet : `04_PREUVES/agent-25/releve-partiel.txt`.)*
+Sept écrans consomment deux sources ou plus. Mesure : la première répond `200` avec de vraies données, la seconde
+`500`. *(Relevés : `releve-partiel.txt` et sa reprise `releve-partiel-2.txt`.)*
+
+| écran | source tombée | ce qui s'affiche | signale l'échec ? |
+|---|---|---|---|
+| `/` | `/coverage` | « Total entreprises **1 234** » (vrai) **à côté de** « Couverture · Top 5 départements » vide | **non** |
+| `/companies` | `/referentiels/geo` | la liste s'affiche ; les listes déroulantes région/département sont **vides sans un mot** | **non** |
+| `/llm/router` | `/llm/usage/summary` | les cas d'usage s'affichent ; l'onglet *Usage 30 j* rend **0,00 €** | **non** |
+| `/console/contacts` | `/crm/contacts-hub/counts` | la ligne s'affiche sous des onglets à **0** | **non** |
+| `/console/vivier` | `/crm/candidates/counts` | idem | **non** |
+| `/audiences/$id` | `…/members` | **sablier éternel** (D25-004) | **non** |
+| `/campaigns/$id` | `…/stats` | **sablier éternel** (D25-004) | **non** |
+
+**C'est la forme la plus dangereuse du défaut** : sur `/` et `/llm/router`, des chiffres **vrais** et des chiffres
+**inventés par défaut** cohabitent dans la même grille, sans rien qui les distingue. L'utilisateur n'a aucune raison
+de se méfier d'une carte, puisque celle d'à côté est juste.
 
 ### 2.5 Le délai avant le premier aveu : **~93 secondes**, chronométrées
 
@@ -264,9 +286,83 @@ passé le squelette, ils affichent « 0 » et ne se corrigent jamais.
 **Témoin négatif** : le même contrôle **trouve** les 39 fichiers qui importent `@tanstack/react-query` et les
 2 occurrences de `useVirtualizer`. Il sait donc repérer un import quand il existe.
 
-### 3.2 Ce que la mesure donne
+### 3.2 Le témoin d'abord — ce que coûte mon banc d'essai, sans monter aucun écran
 
-<!-- TABLEAU-VOLUMES -->
+Fabriquer et sérialiser le jeu d'essai, **sans monter quoi que ce soit** :
+
+| lignes | durée | JSON | tas |
+|---:|---:|---:|---:|
+| 100 | 0 ms | 22 Ko | 59 → 59 Mo |
+| 10 000 | 34 ms | 2 234 Ko | 59 → 59 Mo |
+| **100 000** | **604 ms** | **22 537 Ko** | **59 → 103 Mo** |
+
+**Tout ce qui dépasse ces valeurs est imputable à l'écran, pas au banc.** Sans ce témoin, je ne pourrais rien affirmer.
+
+### 3.3 Ce que la mesure donne
+
+| écran | lignes servies | durée | **nœuds DOM** | HTML | tas |
+|---|---:|---:|---:|---:|---:|
+| **`/companies`** *(virtualisé + paginé)* | 0 | 1 223 ms | **147** | 16 Ko | 114 Mo |
+| | 1 | 311 ms | **155** | 16 Ko | 67 Mo |
+| | 100 | 282 ms | **155** | 16 Ko | 76 Mo |
+| | 10 000 | 1 249 ms | **155** | 16 Ko | 178 Mo |
+| | **100 000** | 11 033 ms | **155** | 16 Ko | 181 Mo |
+| **`/users`** *(rien)* | 1 | 208 ms | 41 | 4 Ko | 188 Mo |
+| | 100 | 997 ms | 1 625 | 186 Ko | 171 Mo |
+| | **10 000** | **32 450 ms** | **160 025** | **18 397 Ko** | **1 101 Mo** |
+| | **100 000** | — | — | — | — | **n'aboutit pas** (§3.5) |
+| **`/audit-logs`** *(rien)* | 1 | 345 ms | 48 | 5 Ko | 65 Mo |
+| | 100 | 583 ms | 1 038 | 98 Ko | 90 Mo |
+| | **10 000** | **20 428 ms** | **100 038** | **9 436 Ko** | **674 Mo** |
+| **`/tags`** *(rien)* | 1 | 232 ms | 58 | 6 Ko | 71 Mo |
+| | 100 | 935 ms | 1 048 | 87 Ko | 94 Mo |
+| | **10 000** | **26 893 ms** | **100 048** | **8 264 Ko** | **792 Mo** |
+
+**Le verdict tient en une ligne** : `/companies` reste à **155 nœuds de 1 à 100 000 lignes** — la virtualisation
+fait exactement son travail. Les trois autres croissent **strictement linéairement** : **16,0 nœuds par ligne** sur
+`/users`, **10,0** sur `/audit-logs` et sur `/tags`.
+
+**Deux nuances qui vont contre le confort de ce verdict, et qu'il faut dire** :
+
+1. **La virtualisation protège le DOM, pas le calcul.** `/companies` passe de 282 ms (100 lignes) à **11 033 ms**
+   (100 000) **à nombre de nœuds constant** : le coût est ailleurs — analyse du JSON de 22 Mo, puis les `useMemo`
+   qui parcourent **toutes** les lignes pour les vignettes (`CompaniesListPage.tsx:307-330`) et le
+   `rows.every(...)` de la case « tout sélectionner » (l. 695), réévalués à chaque rendu.
+2. **Ces 100 000 lignes sont une hypothèse pour `/companies`**, qui demande `per_page=100` : il faudrait que le
+   serveur ignore la limite. **Elles n'en sont pas une pour `/users`, `/audit-logs`, `/tags` et `/audiences`, qui
+   ne demandent aucune limite du tout** — ces quatre écrans rendent exactement ce que le serveur envoie.
+
+### 3.4 Deux écrans plantent sur un champ absent — et j'en ai fait la démonstration à mes dépens
+
+Mes premières lignes d'essai étaient **incomplètes**. Résultat :
+
+- `/console/contacts` et `/console/vivier` → « **Something went wrong! · Cannot read properties of undefined
+  (reading 'length')** » — `ContactsHubPage.tsx:205` lit `company.contacts.length` et `:226` `company.tags.length`,
+  **sans garde** ;
+- `/audiences` → « **Cannot read properties of undefined (reading 'toLocaleString')** » —
+  `AudiencesListPage.tsx:230` lit `audience.member_count` (j'avais écrit `members_count`), **sans garde**.
+
+**J'ai d'abord cru avoir trouvé un défaut de l'état partiel. C'était ma faute, et je l'ai isolée** par un témoin
+dédié (`releve-partiel-2.txt`, cas C) : ligne incomplète **avec tout le réseau en 200** → l'écran plante quand
+même. La cause est donc le **champ manquant**, pas l'échec partiel. *Ma première mesure accusait le mauvais objet
+— c'est le défaut A-011 appliqué à mon propre contrôle, et c'est le témoin qui l'a rattrapé.*
+
+Ce que cela établit tout de même, et qui vaut d'être noté : **une seule clef absente dans la réponse de l'API
+emporte l'écran entier**, et — faute de frontière d'erreur (**D25-006**) — l'emporte vers un message anglais.
+Le routeur le dit lui-même dans la sortie de mesure : *« Warning: The following error wasn't caught by any route!
+At the very least, consider setting an `errorComponent` in your RootRoute! »*
+
+### 3.5 `/users` à 100 000 lignes : le rendu n'aboutit pas
+
+Premier essai (tas Node par défaut) : **`FATAL ERROR: Reached heap limit — JavaScript heap out of memory`**,
+précédé de deux `Mark-Compact … allocation failure; scavenge might not succeed`. Second essai avec
+`--max-old-space-size=8192` : **il ne meurt plus, il n'en finit pas** — worker à **3 141 Mo** et **377 s de
+processeur** après **17 minutes**, sans avoir écrit une ligne de plus. Mesure interrompue par moi.
+
+**Le point n'est pas la lenteur, c'est la nature du blocage** : React construit ce DOM dans un rendu **synchrone**.
+Rien ne peut l'interrompre — ni le délai de garde de vitest, ni un `waitFor`, ni, dans un navigateur, l'utilisateur.
+**L'onglet est figé, sans sablier et sans message**, jusqu'à la fin du rendu. Je **n'avance aucune durée** pour ce
+cas : je n'ai pas su la mesurer, et c'est précisément le constat.
 
 ---
 
@@ -302,10 +398,21 @@ pas été fait pour l'état de liste.
 
 ### 4.2 Le retour arrière : l'état de liste ne survit pas
 
-Geste réel joué (`04_PREUVES/agent-25/releve-retour.txt`) : ouvrir `/media`, saisir un filtre, aller sur une fiche,
-revenir par `router.history.back()`. **Le composant est démonté à la navigation, son `useState` avec lui.**
-Le cache react-query conserve les **données** (`gcTime` 5 min) mais **pas la question posée** : l'utilisateur
-retrouve la liste au début, sans son filtre, sans sa page, et à la première ligne.
+Geste réel joué (`04_PREUVES/agent-25/releve-retour.txt`) : ouvrir `/media`, saisir un filtre, aller sur une fiche
+par le routeur, revenir par **`router.history.back()`** — la flèche « précédent » du navigateur.
+
+```
+URL du routeur AVANT le filtre : /media
+URL du routeur APRÈS le filtre : /media                       <- inchangée
+dernière requête envoyée à l'API : /media?page=1&per_page=100&filter[department_code]=PRO
+                                                              <- l'API, elle, a bien reçu le filtre
+valeur du filtre avant le départ : « PRO »
+valeur du filtre après le retour : « »                        <- PERDUE
+```
+
+**Le composant est démonté à la navigation, son `useState` avec lui.** Le cache react-query conserve les
+**données** (`gcTime` 5 min) mais **pas la question posée** : l'utilisateur retrouve la liste au début, sans son
+filtre, sans sa page, et à la première ligne.
 
 ### 4.3 Le hors-ligne : rien, nulle part
 
@@ -317,11 +424,26 @@ bandeau de reconnexion / laravel-echo déconnecté                             -
 
 **Témoin négatif** : `onlineManager` et `networkMode` existent dans `@tanstack/react-query` installé.
 
-La conséquence n'est pas neutre : react-query v5 vaut `networkMode: 'online'` par défaut et `src/main.tsx` ne le
-change pas. **Hors ligne, la requête n'est pas émise, elle est mise en pause** — `isPending` reste vrai.
-Mesuré (`releve-horsligne.txt`) : les écrans à squelette restent **en squelette pour toujours**, les fiches restent
-en **sablier**, et **aucun** ne prononce le mot « connexion ». Le seul écran qui saurait dire « impossible de
-charger » ne le dit pas non plus, puisqu'il n'y a pas d'erreur — il y a une attente.
+La conséquence est **pire que ce que j'avais supposé avant de mesurer**, et dans l'autre sens. react-query v5 vaut
+`networkMode: 'online'` par défaut et `src/main.tsx` ne le change pas : hors ligne, la requête **n'est pas émise,
+elle est mise en pause**. `isPending` reste vrai — mais **`isLoading` vaut `isPending && isFetching`**, et une
+requête en pause **ne récupère pas**. **`isLoading` est donc FAUX.**
+
+Or les 19 écrans de **D25-002** branchent tous sur `isLoading`. Mesuré (`releve-horsligne.txt`,
+`onlineManager.setOnline(false)` avant montage) :
+
+| écran | ce qui s'affiche hors ligne | squelette ? | parle-t-il du réseau ? |
+|---|---|---|---|
+| `/users` | « **Aucun utilisateur — Invite ton premier collaborateur** » | **`pulse=0`** | **non** |
+| `/companies` | « **0 entreprises actives · Total 0 · Enrichies 0 %** » | **`pulse=0`** | **non** |
+| `/console/arbitrage` | « **Rien à arbitrer — Tous les événements entrants ont trouvé leur entreprise.** » | `pulse=0` | **non** |
+| `/campaigns/$id` | rien du tout (`spin=1`, 0 caractère) | sablier | **non** |
+| `/admin/observability` | « Impossible de charger les métriques d'observabilité. » | non | **non** |
+
+> **J'avais écrit « ils resteront en squelette pour toujours ». C'est faux, et la mesure l'a corrigé :
+> hors ligne, ces écrans sautent le squelette et affirment « 0 » et « aucun » IMMÉDIATEMENT.**
+> Un opérateur dont le portable perd le réseau dans un ascenseur voit, en moins d'une seconde et sans le moindre
+> signal, un CRM vide — puis, le réseau revenu, react-query reprend et les données réapparaissent sans explication.
 
 ### 4.4 Le vocabulaire de l'erreur est écrit, traduit… et jamais appelé
 

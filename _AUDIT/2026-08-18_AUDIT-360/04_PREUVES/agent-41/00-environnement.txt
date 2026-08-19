@@ -1,0 +1,47 @@
+=== environnement de mesure (agent 41) ===
+2026-08-19T15:17:57+02:00
+--- git
+b46877f audit(360): agents 39 et 48 — une restauration reelle, et une date de saturation
+--- postgres
+                                                           version                                                           
+-----------------------------------------------------------------------------------------------------------------------------
+ PostgreSQL 16.9 (Debian 16.9-1.pgdg110+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit
+(1 row)
+
+              name               | setting | unit 
+---------------------------------+---------+------
+ effective_cache_size            | 524288  | 8kB
+ jit                             | on      | 
+ max_parallel_workers_per_gather | 2       | 
+ random_page_cost                | 4       | 
+ shared_buffers                  | 16384   | 8kB
+ track_io_timing                 | off     | 
+ work_mem                        | 4096    | kB
+(7 rows)
+
+--- bases utilisées
+     datname      | datcollate | datctype | pg_size_pretty 
+------------------+------------+----------+----------------
+ axion_crm_perf   | C          | C        | 573 MB
+ axion_crm_perf4m | C          | C        | 2138 MB
+ axion_crm_a41    | C          | C        | 525 MB
+(3 rows)
+
+--- volumes
+      t      | count  
+-------------+--------
+ tags        |     59
+ contacts    |  50000
+ company_tag | 300000
+ companies   | 300000
+ activities  | 500000
+(5 rows)
+
+      t      |  count  
+-------------+---------
+ companies   | 2800000
+ contacts    |       0
+ activities  |       0
+ company_tag |       0
+(4 rows)
+

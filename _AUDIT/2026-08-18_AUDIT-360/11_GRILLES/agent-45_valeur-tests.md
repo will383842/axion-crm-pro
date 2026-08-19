@@ -23,9 +23,12 @@ e8924b8 fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)
 ```
 
 **Tous mes constats sont référencés à `main = e8924b8`**, mesuré, 6 commits devant le SHA du dossier.
-⚠️ `main` a continué d'avancer pendant mon travail (relu en fin de session : `a3c42d6`) ; les commits
-ajoutés sont des écritures d'audit sous `_AUDIT/`. **Mon worktree jetable et mes deux conteneurs sont
-épinglés sur `e8924b8`** : c'est cet arbre-là, et lui seul, que j'ai saboté et mesuré.
+⚠️ Le dépôt a continué d'avancer pendant mon travail — relu en fin de session, il est sur la branche
+`audit/360-p1-p2` à `b46877f`, et les commits ajoutés sont des écritures d'audit sous `_AUDIT/`.
+**Mon worktree jetable et mes deux conteneurs étaient épinglés sur `e8924b8`** : c'est cet arbre-là,
+et lui seul, que j'ai saboté et mesuré. Aucun fichier de `backend/`, `frontend/`, `workers/`,
+`infra/` ou `.github/` n'a été modifié dans le dépôt principal — vérifié en fin de session
+(`git status --porcelain -- backend frontend workers infra .github` → vide, `11_restauration.txt`).
 
 ### L'atelier que j'ai monté, et pourquoi
 
@@ -347,3 +350,24 @@ Les autres cherchent des sous-chaînes sans fin de ligne. Le piège existe, il n
    vrai message de l'une à l'autre — c'est le périmètre des agents 13/14.
 7. **Le nombre exact de tests emportés par H45-008 dans le cas général.** Je ne l'ai observé que
    dans mes deux tirages contaminés (35 et 11) ; il dépend de l'instant où l'autre migration passe.
+
+---
+
+## 5. Démontage — ce qui a été rendu à l'état d'avant
+
+- **20 sabotages, 20 restaurations vérifiées** (`RESTAURE-IDENTIQUE`, une ligne par sabotage) ; puis
+  `diff -rq /var/www/html.orig /var/www/html` sur les **deux** conteneurs → **aucune différence**
+  hors `storage/`, `bootstrap/cache/` et `.phpunit.cache`. Preuve : `04_PREUVES/agent-45/11_restauration.txt`.
+- Conteneurs `a45` et `a45b` supprimés, image intermédiaire `a45img` supprimée.
+- Bases jetables `axion_crm_a45`, `axion_crm_a45b`, `axion_crm_a45c` supprimées.
+  `axion_crm`, `axion_crm_test`, `axion_crm_perf*` : **jamais touchées**.
+- Worktree jetable retiré (`git worktree remove --force` + `prune`). `git worktree list` ne montre
+  plus que les trois arbres préexistants, dont `crmpro-wt-etape1a` — **jamais lu, jamais écrit**.
+- Dépôt principal : `git status --porcelain -- backend frontend workers infra .github` → **vide**.
+  Mes seules écritures sont ce fichier et `04_PREUVES/agent-45/`.
+
+⚠️ **Une trace de mon passage subsiste dans l'historique** : les 17 sorties `pest` intégrales
+(≈ 845 Ko chacune, 10 Mo au total) ont été committées par un autre agent avant que je ne les
+réduise. Elles sont désormais résumées (en-tête + diff du sabotage + lignes rouges + verdict +
+restauration, ≈ 1 Ko chacune) ; une sortie intégrale est conservée en témoin dans
+`04_PREUVES/agent-45/integral/`.

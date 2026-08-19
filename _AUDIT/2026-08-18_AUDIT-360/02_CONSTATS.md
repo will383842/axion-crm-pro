@@ -2987,3 +2987,60 @@ de relations passent par `with()` ou une requête groupée.
 ⚠️ **12 points non vérifiés, déclarés** — dont les deux qui bornent le reste : **aucune mesure en
 production**, et **`contacts`/`activities`/`company_tag` sont vides dans le jeu à 2,8 M**, *donc les
 188 s de l'écran d'accueil sont un plancher, pas un pire cas*.
+
+---
+
+### Agent 25 — rendu final : **le chiffre monte, et le défaut change de nature**
+
+*(Complète la section « Agent 25 » ci-dessus.)*
+
+**Méthode, et elle est meilleure que celle qu'on lui avait prescrite** : l'agent 22 ne pouvait ouvrir
+les écrans qu'avec l'API **totalement** injoignable — *une seule condition, et non choisie*. Celui-ci
+a **monté les 37 écrans pour de vrai** dans le harnais du dépôt, sous **quatre conditions choisies** :
+requête en vol · **200-vide** · **500** · **403**. **148 montages.**
+
+**Le tableau : 185 cases (37 × 5), 178 mesurées, 7 non mesurées et nommées** — les 5 états de
+`/coverage` (pas de WebGL dans le moteur de rendu) et **2 cases que ses propres jeux d'essai ont
+invalidées, déclarées au §0.5 plutôt que dissimulées**.
+
+🔑 **Le compte exact est 19 écrans, pas 12 — et il l'a corrigé CONTRE son propre automate.**
+Trois écrans avaient été mal classés par son outil ; sans cette reprise, il aurait annoncé **16**.
+*Un agent qui corrige son propre instrument à la hausse est plus fiable qu'un agent qui ne le corrige
+jamais.*
+
+**Et le chiffre le plus dur n'est pas celui-là** : **23 écrans sur 30 rendent un texte strictement
+identique, au caractère près**, selon que le serveur a répondu « vide » ou a **planté**. *Sur
+`/contacts`, la seule différence dans tout le produit est un « … » à la place d'un « 0 » dans un
+sous-titre.*
+
+### 🔑 Ce n'est pas un oubli : **c'est une convention écrite** — et cela change ce qu'il faut en faire
+
+`TopDeptsCard.tsx:15` porte le commentaire :
+> « *Si l'endpoint renvoie 404/500 ou rien, on tombe sur `EmptyState`* »
+
+**La convention est assumée, écrite, et appliquée.** Elle ne se « corrige » donc pas comme un bug :
+**elle se tranche**. Et elle produit, en bout de chaîne, `D25-003` — l'écran d'arbitrage qui **énonce
+une conclusion métier fausse et rassurante**.
+*C'est le même motif que `E32-002` (la timeline comme index) : un parti pris de conception cohérent,
+qui contredit ce que le produit doit à son utilisateur.* → **porté aux arbitrages, pas au lot de
+correction.**
+
+**L'état dans l'URL : il n'y est pas du tout.** `useSearch` / `validateSearch` → **zéro occurrence**
+(*témoin : la fonction existe bien dans la version installée*). Geste réel joué : le filtre **part à
+l'API et pas dans l'URL**, et il est **perdu au retour arrière** ; une URL portant `?severity=critical`
+est **ignorée**. **Le §5.1-7 n'est satisfait sur aucun écran.**
+
+**Les volumes** : `/companies` — **seul écran virtualisé du produit** — garde **155 nœuds de 1 à
+100 000 lignes**. Les autres croissent linéairement : `/audiences` **340 035 nœuds et 36 Mo de HTML**
+à 10 000 lignes ; `/users` **160 025 nœuds, 18 Mo, 1,1 Go de tas**, et **n'aboutit pas** à 100 000 —
+*rendu synchrone, rien ne peut l'interrompre*. **Témoin joué** : son banc **seul** coûte 604 ms à
+100 000 lignes.
+
+**Trois corrections à l'agent 22, et aucune ne l'infirme** : `/admin/observability` **a** un état
+d'erreur — *il n'arrive qu'après trois délais de 30 s, « nous avions tous deux raison »* · les
+« écrans blancs » sont en réalité des **sabliers éternels** (`isLoading || !x`) — *un écran blanc se
+lit « je recharge » ; un sablier se lit « ça travaille »* · et **19 au lieu de 12**.
+
+⚠️ **Deux mesures interrompues, déclarées comme telles** : le rendu à 100 000 lignes, et un
+chronométrage qui n'a pas abouti — **le « ~93 s » est donc présenté comme un calcul, pas comme une
+mesure**.

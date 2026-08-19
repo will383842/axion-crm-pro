@@ -10,9 +10,10 @@
   L'agent 22 a mesuré sur `e8924b8` et vérifié le même invariant : **nos deux grilles portent sur le même code.**
 - **Périmètre** : les **37 écrans** de `src/app/routeTree.tsx` (inventaire de l'agent 22, recompté ici :
   37 `createRoute`, dont 4 hors coquille, 2 bouchons Phase 2, 1 route introuvable).
-- **Écrans effectivement montés et mesurés** : **37 / 37**, sous **4 conditions réseau chacun** = **148 montages réels**,
-  auxquels s'ajoutent 10 montages « état partiel » (7 + 3 de reprise), 5 « hors ligne », 3 « retour arrière »,
-  28 « volumes » et 1 « délai » — **195 montages** au total.
+- **Écrans effectivement montés et mesurés** : **37 / 37**, sous **4 conditions réseau chacun** = **148 montages
+  réels**, auxquels s'ajoutent **10** montages « état partiel » (7 + 3 de reprise), **5** « hors ligne »,
+  **3** « retour arrière », **26** « volumes » (dont 1 interrompu, §3.5) et **1 tentative de chronométrage qui n'a
+  pas abouti** (§6.5, déclarée comme telle).
 - **Cases de grille** : **185** (37 écrans × 5 états). **Renseignées par la mesure : 178.**
   **Non mesurées : 7**, chacune nommée et justifiée — les **5** états de `/coverage` (jsdom n'a pas de WebGL,
   §6.1) et **2** cases « vide » que **mes propres jeux d'essai** ont invalidées (§0.5). Ces 7 cases sont **lues
@@ -649,7 +650,7 @@ prend une autre : c'est un saut de mise en page par construction.** *(Non chiffr
 - Référence     : main 8db8229
 - Emplacement   : `frontend/src/features/companies/CompaniesListPage.tsx:297` (seul `useVirtualizer` du dépôt) · `users/UsersPage.tsx:62-64` · `rgpd/AuditLogsPage.tsx:60-63` · `tags/TagsManagerPage.tsx:99-102` · `audiences/AudiencesListPage.tsx:65-71` · `rgpd/RgpdRequestsPage.tsx:75-78` · `rgpd/AiActRegisterPage.tsx:55-58` · `llm/LlmRouterPage.tsx:58-68` · `llm/ProxyProvidersPage.tsx` · `llm/RotationsPage.tsx:38-41` — **aucun de ces neuf n'envoie de `per_page` ni n'offre de pagination**
 - Constat       : `@tanstack/react-virtual` n'est importé que par `CompaniesListPage` ; `@tanstack/react-table`, pourtant déclaré dans `package.json`, n'est importé **nulle part** ; neuf écrans rendent intégralement ce que le serveur veut bien leur envoyer.
-- Preuve        : 32 montages réels, jeux de 0 / 1 / 100 / 10 000 / 100 000 lignes — `04_PREUVES/agent-25/releve-volumes.txt`, `-2.txt`, `-3.txt`. Croissance **strictement linéaire** : **34,0 nœuds par ligne** sur `/audiences`, **16,0** sur `/users`, **10,0** sur `/audit-logs` et sur `/tags`. À 10 000 lignes : `/audiences` **340 035 nœuds / 37 235 Ko / 80,8 s** ; `/users` **160 025 nœuds / 18 397 Ko / 1 101 Mo de tas / 32,4 s** ; `/audit-logs` **100 038 nœuds / 9 436 Ko / 20,4 s** ; `/tags` **100 048 nœuds / 8 264 Ko / 26,9 s**. À 100 000, `/users` **n'aboutit pas** (§3.5). En regard, `/companies` — le seul virtualisé — garde **155 nœuds de 1 à 100 000 lignes**. Inventaire statique : `04_PREUVES/agent-25/04-volumes-pagination-keys.txt`.
+- Preuve        : 26 montages réels, jeux de 0 / 1 / 100 / 10 000 / 100 000 lignes — `04_PREUVES/agent-25/releve-volumes.txt`, `-2.txt`, `-3.txt`. Croissance **strictement linéaire** : **34,0 nœuds par ligne** sur `/audiences`, **16,0** sur `/users`, **10,0** sur `/audit-logs` et sur `/tags`. À 10 000 lignes : `/audiences` **340 035 nœuds / 37 235 Ko / 80,8 s** ; `/users` **160 025 nœuds / 18 397 Ko / 1 101 Mo de tas / 32,4 s** ; `/audit-logs` **100 038 nœuds / 9 436 Ko / 20,4 s** ; `/tags` **100 048 nœuds / 8 264 Ko / 26,9 s**. À 100 000, `/users` **n'aboutit pas** (§3.5). En regard, `/companies` — le seul virtualisé — garde **155 nœuds de 1 à 100 000 lignes**. Inventaire statique : `04_PREUVES/agent-25/04-volumes-pagination-keys.txt`.
 - Témoin négatif: **obligatoire ici, et il est dans le relevé** — la fabrication et la sérialisation du jeu de 100 000 lignes, **sans monter aucun écran**, coûtent **604 ms et 44 Mo**. Tout ce qui dépasse est imputable à l'écran et non au banc. Par ailleurs le contrôle statique **trouve bien** les 2 occurrences de `useVirtualizer` et les 39 fichiers important `@tanstack/react-query` : il sait repérer un import quand il existe.
 - Impact        : la production porte **4,29 M d'entreprises** et **1 319 567 personnes** (**C19-007**). Les écrans concernés sont aujourd'hui vides, donc le défaut est **invisible** — exactement comme la sérialisation d'**A-010** est invisible à un seul utilisateur. Le jour où `/audit-logs` contiendra un an de journal, l'écran demandera **tout** le journal et tentera d'en peindre chaque ligne : sur les mesures ci-dessus, 10 000 entrées suffisent à dépasser le gigaoctet. **B16-004** ajoute que cette route rend le journal de **tous** les espaces : le volume servi n'est même pas borné par l'espace de travail.
 - Reproduction  : `npx vitest run --config tmp/agent25/vitest.a25.config.ts tmp/agent25/volumes.test.tsx`.
@@ -752,8 +753,8 @@ comme telles. Le **nombre de nœuds**, lui, est exact et transposable.
 
 ## 7. Ce que je corrige de la grille de l'agent 22
 
-Ses mesures ont été faites API totalement injoignable, sur une seule condition ; les miennes séparent les conditions.
-Trois écarts, tous dans le même sens — **son montage ne pouvait pas attendre 93 secondes** :
+Ses mesures ont été faites API **totalement** injoignable, donc sur **une seule** condition ; les miennes séparent
+les quatre. Trois écarts, tous dans le même sens — **son montage ne pouvait pas attendre trois délais de 30 s** :
 
 | écran | agent 22 | mesuré ici | pourquoi l'écart |
 |---|---|---|---|
@@ -768,10 +769,17 @@ ouverts et fondés. Ils les précisent.
 
 ## 8. Ménage effectué
 
-Les cinq bancs de mesure ont été écrits dans `frontend/tmp/agent25/` — répertoire **couvert par `.gitignore`**
-(vérifié : `git check-ignore -v frontend/tmp/agent25` → `.gitignore:97:tmp/`), donc invisible de `git status`.
-Leur source est **archivée dans `04_PREUVES/agent-25/bancs-de-mesure/`** pour que les mesures soient rejouables,
-et le répertoire de travail a été retiré.
+Les **sept** bancs de mesure ont été écrits dans `frontend/tmp/agent25/` — répertoire **couvert par `.gitignore`**
+(vérifié : `git check-ignore -v frontend/tmp/agent25` → `.gitignore:97:tmp/`), donc jamais visible de `git status`.
+Leur source est **archivée dans `04_PREUVES/agent-25/bancs-de-mesure/`** — **y compris le banc qui n'a pas abouti**
+(`delai.test.tsx`), avec son résultat négatif — pour que tout soit rejouable ; le répertoire de travail a été retiré
+(`rm -rf frontend/tmp/agent25`).
+
+Deux processus de mesure ont dû être **interrompus** par moi et le sont explicitement : le rendu de `/users` à
+100 000 lignes (§3.5) et le banc de chronométrage (§6.5). Aucun n'a été relancé en silence, aucun n'a servi de
+demi-résultat.
+
+**Vérification finale jouée** : `git status --short -- frontend backend infra` → **vide**.
 
 **Aucun fichier du produit n'a été modifié** — ni `frontend/src/`, ni `frontend/tests/`, ni `backend/`.
 Le complément de socle jsdom (`URL.createObjectURL`) vit dans **mon** fichier de mise en place, jamais dans

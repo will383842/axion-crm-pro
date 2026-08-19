@@ -114,7 +114,7 @@ corrigé) · et le **schéma lui-même** (`audit_logs` partitionnée en CI, **or
 | 4 | `A07-004` « le plan n'a jamais existé » | **Réfuté**, reformulé en `A06-010` | Le fichier **existe** (28 200 o) ; il n'est **pas versionné**, et il a **changé en cours de session** |
 | 5 | L'hypothèse « une opposition RGPD part en 422 » | **Morte** | Les lignes de journal venaient de **la suite de tests**. Mais la **variante** `form_type=recrutement` est **confirmée** (`E31-002`) |
 | 6 | Piège 10 du mandat (« CI en `en_US.utf8` ») | **Faux, cause corrigée** | CI et prod sont **toutes deux en `C`**. La divergence réelle est **SQL ↔ PHP** — « aligner les locales » ne réglerait rien |
-| 7 | `E32-002` : bug ou arbitrage ? | **Arbitrage, remonté au dirigeant** | Le CRM déclare **par conception** que sa timeline est un **index, jamais une copie**. Cela **contredit le principe 10**. Ce n'est pas à corriger en P3, c'est à trancher |
+| 7 | `E32-002` **et `D25-002`/`D25-003`** : bugs ou arbitrages ? | **Arbitrages, remontés au dirigeant** | Le CRM déclare **par conception** que sa timeline est un **index, jamais une copie**. Cela **contredit le principe 10**. Ce n'est pas à corriger en P3, c'est à trancher |
 | 8 | `I48-008` : le produit **dépasse** son périmètre | **Remonté au dirigeant (§28.6)** | `/cold-email`, `/linkedin` et le constructeur d'audiences relèvent du lot **L7**, que le §26 exclut |
 
 ---

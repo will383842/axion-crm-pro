@@ -35,7 +35,12 @@ PROJET="${1:-axion-crm-pro}"
 # script sur une pile jetable sans réquisitionner 80 et 443 de la machine.
 # Sans lui, ce contrôle ne serait testable qu'en production — c'est-à-dire
 # jamais avant qu'il soit trop tard.
-AUTORISES="${2:-80 443}"
+# ⚠️ `${2-...}` et NON `${2:-...}`. Avec les deux-points, bash retombe sur le
+# défaut quand l'argument est vide AUTANT que quand il est absent — et
+# « aucun port public autorisé », qui est le cas de la préproduction, devenait
+# silencieusement « 80 et 443 autorisés ». Mesuré : la garde rougissait sur la
+# préproduction en annonçant « ports attendus absents : 80 443 ».
+AUTORISES="${2-80 443}"
 
 if ! command -v docker > /dev/null 2>&1; then
   echo "ERREUR : docker introuvable — mesure impossible." >&2

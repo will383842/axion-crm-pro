@@ -1,0 +1,57 @@
+############ B14-timeline-sujets-business
+### base   : axion_crm_perf   (datcollate = C)
+### date   : 2026-08-19T14:47:33+02:00
+### SQL    :
+select "contacts"."id" as contact_id, "contacts"."first_name", "contacts"."last_name", "contacts"."email", "companies"."id" as company_id, "companies"."denomination" from "contacts" left join "companies" on "companies"."id" = "contacts"."company_id" where "contacts"."workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168' and "contacts"."person_key" = (select person_key from contacts where person_key is not null limit 1) limit 20;
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                                       QUERY PLAN                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.88..16.92 rows=1 width=83) (actual time=7.448..7.459 rows=1 loops=1)
+   Buffers: shared hit=4 read=5
+   InitPlan 1 (returns $0)
+     ->  Limit  (cost=0.00..0.05 rows=1 width=65) (actual time=0.011..0.014 rows=1 loops=1)
+           Buffers: shared hit=1
+           ->  Seq Scan on contacts contacts_1  (cost=0.00..2287.00 rows=50000 width=65) (actual time=0.011..0.012 rows=1 loops=1)
+                 Filter: (person_key IS NOT NULL)
+                 Buffers: shared hit=1
+   ->  Nested Loop Left Join  (cost=0.84..16.88 rows=1 width=83) (actual time=7.446..7.451 rows=1 loops=1)
+         Buffers: shared hit=4 read=5
+         ->  Index Scan using idx_contacts_workspace_person_key on contacts  (cost=0.41..8.43 rows=1 width=60) (actual time=5.476..5.479 rows=1 loops=1)
+               Index Cond: ((workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid) AND (person_key = $0))
+               Buffers: shared hit=2 read=3
+         ->  Index Scan using companies_pkey on companies  (cost=0.42..8.44 rows=1 width=31) (actual time=1.958..1.959 rows=1 loops=1)
+               Index Cond: (id = contacts.company_id)
+               Buffers: shared hit=2 read=2
+ Planning:
+   Buffers: shared hit=956 read=9 dirtied=2
+ Planning Time: 13.577 ms
+ Execution Time: 11.684 ms
+(20 rows)
+
+
+===== CHAUD (4e exécution) =====
+                                                                       QUERY PLAN                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.88..16.92 rows=1 width=83) (actual time=1.659..1.669 rows=1 loops=1)
+   Buffers: shared hit=9
+   InitPlan 1 (returns $0)
+     ->  Limit  (cost=0.00..0.05 rows=1 width=65) (actual time=0.019..0.021 rows=1 loops=1)
+           Buffers: shared hit=1
+           ->  Seq Scan on contacts contacts_1  (cost=0.00..2287.00 rows=50000 width=65) (actual time=0.017..0.018 rows=1 loops=1)
+                 Filter: (person_key IS NOT NULL)
+                 Buffers: shared hit=1
+   ->  Nested Loop Left Join  (cost=0.84..16.88 rows=1 width=83) (actual time=1.655..1.659 rows=1 loops=1)
+         Buffers: shared hit=9
+         ->  Index Scan using idx_contacts_workspace_person_key on contacts  (cost=0.41..8.43 rows=1 width=60) (actual time=1.416..1.419 rows=1 loops=1)
+               Index Cond: ((workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid) AND (person_key = $0))
+               Buffers: shared hit=5
+         ->  Index Scan using companies_pkey on companies  (cost=0.42..8.44 rows=1 width=31) (actual time=0.226..0.226 rows=1 loops=1)
+               Index Cond: (id = contacts.company_id)
+               Buffers: shared hit=4
+ Planning:
+   Buffers: shared hit=965
+ Planning Time: 14.681 ms
+ Execution Time: 2.222 ms
+(20 rows)
+

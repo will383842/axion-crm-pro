@@ -1,0 +1,7 @@
+ROLE axion (BYPASSRLS — configuration de l atelier local)
+requete         n(c1)   p50_c1   p95_c1  n(c10)   p50_c10   p95_c10  degrad_p95
+liste_hub         117      202      337     728       239       723       +115%
+compteurs          44      215      504     295       298      1018       +102%
+recherche          48        2       12     289         2        18        +50%
+timeline           16       76      323     143        78       421        +30%
+TOUTES            225      188      337    1455       213       658        +95%

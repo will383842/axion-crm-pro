@@ -1,0 +1,68 @@
+AGENT 25 - LE SQUELETTE RESSEMBLE-T-IL A CE QU'IL REMPLACE ? - main 8db8229
+
+=== CompaniesTableSkeleton : un squelette de TABLEAU D'ENTREPRISES, reutilise ou ? ===
+src/features/companies/CompaniesListPage.tsx:8:  CompaniesTableSkeleton,
+src/features/companies/CompaniesListPage.tsx:618:        <CompaniesTableSkeleton />
+src/features/contacts/ContactsListPage.tsx:7:  CompaniesTableSkeleton,
+src/features/contacts/ContactsListPage.tsx:175:        <CompaniesTableSkeleton rows={6} />
+src/features/llm/LlmRouterPage.tsx:9:  CompaniesTableSkeleton,
+src/features/llm/LlmRouterPage.tsx:93:          <CompaniesTableSkeleton rows={5} />
+src/features/llm/LlmRouterPage.tsx:180:          <CompaniesTableSkeleton rows={5} />
+src/features/llm/LlmRouterPage.tsx:215:          <CompaniesTableSkeleton rows={5} />
+src/features/llm/ProxyProvidersPage.tsx:6:  CompaniesTableSkeleton,
+src/features/llm/ProxyProvidersPage.tsx:59:        <CompaniesTableSkeleton rows={4} />
+src/features/llm/RotationsPage.tsx:7:  CompaniesTableSkeleton,
+src/features/llm/RotationsPage.tsx:58:        <CompaniesTableSkeleton rows={5} />
+src/features/rgpd/AiActRegisterPage.tsx:9:  CompaniesTableSkeleton,
+src/features/rgpd/AiActRegisterPage.tsx:119:        <CompaniesTableSkeleton rows={3} />
+src/features/rgpd/AuditLogsPage.tsx:7:  CompaniesTableSkeleton,
+src/features/rgpd/AuditLogsPage.tsx:132:        <CompaniesTableSkeleton rows={10} />
+src/features/rgpd/RgpdRequestsPage.tsx:7:  CompaniesTableSkeleton,
+src/features/rgpd/RgpdRequestsPage.tsx:138:        <CompaniesTableSkeleton rows={5} />
+src/features/users/UsersPage.tsx:8:  CompaniesTableSkeleton,
+src/features/users/UsersPage.tsx:99:        <CompaniesTableSkeleton rows={5} />
+src/components/ui/index.ts:34:export { Skeleton, CompaniesTableSkeleton } from './Skeleton';
+
+=== Sa forme reelle (src/components/ui/Skeleton.tsx) ===
+export function Skeleton({ className = '' }: { className?: string }) {
+  return <div className={`animate-pulse rounded bg-slate-200 ${className}`} />;
+}
+
+export function CompaniesTableSkeleton({ rows = 10 }: { rows?: number }) {
+  return (
+    <div className="space-y-2" aria-busy="true">
+      <Skeleton className="h-10 w-full" />
+      {Array.from({ length: rows }).map((_, i) => (
+        <Skeleton key={i} className="h-12 w-full" />
+      ))}
+    </div>
+  );
+}
+
+=== Ecrans qui n'ont AUCUN squelette et affichent un texte nu ===
+--- media/MediaListPage.tsx
+    258:        <Card className="p-10 text-center text-sm text-slate-500">Chargement…</Card>
+--- media/JournalistsListPage.tsx
+    100:        <Card className="p-10 text-center text-sm text-slate-500">Chargement…</Card>
+--- observability/ObservabilityPage.tsx
+    38:    return <div className="p-6 text-sm text-slate-500">Chargement de l'observabilité…</div>;
+--- international/RoumaniePage.tsx
+    165:      {isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
+--- coverage/CoveragePage.tsx
+    137:          {isLoading ? 'Chargement…' : `${stats.totalAll.toLocaleString('fr-FR')} entreprises au total`}
+--- settings/SettingsPage.tsx
+    185:            <p className="text-sm text-slate-500">Chargement…</p>
+--- media/MediaDetailPage.tsx
+    3:import { Card, EmptyState, Spinner, cn } from "@/components/ui";
+    47:        <Spinner />
+--- companies/CompanyDetailPage.tsx
+    19:  Spinner,
+    81:      <PageShell title="Chargement…">
+    83:          <Spinner /> Chargement de la fiche entreprise…
+--- campaigns/CampaignDetailPage.tsx
+    29:  Spinner,
+    98:      <div className="flex h-[60vh] items-center justify-center"><Spinner /></div>
+--- audiences/AudienceDetailPage.tsx
+    20:  Spinner,
+    101:    return <div className="flex h-[60vh] items-center justify-center"><Spinner /></div>;
+    208:    return <div className="flex h-40 items-center justify-center"><Spinner /></div>;

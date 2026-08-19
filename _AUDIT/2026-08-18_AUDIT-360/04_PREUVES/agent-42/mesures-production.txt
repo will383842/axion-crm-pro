@@ -1,0 +1,61 @@
+=== AGENT 42 — mesures PRODUCTION (fichiers statiques servis par Caddy, PAS par php -S) ===
+date : 2026-08-19 13:02 UTC
+
+--- index.html de production ---
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="theme-color" content="#0f172a" />
+    <title>Axion CRM Pro</title>
+    <meta name="description" content="Axion CRM Pro — plateforme interne de prospection B2B automatisée." />
+    <meta name="robots" content="noindex,nofollow" />
+    <script type="module" crossorigin src="/assets/index-D3nU2tuG.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/query-BBqhhbbe.js">
+    <link rel="modulepreload" crossorigin href="/assets/react-DJ4PxdIq.js">
+    <link rel="modulepreload" crossorigin href="/assets/router-Xihj9pMy.js">
+    <link rel="modulepreload" crossorigin href="/assets/maplibre-CaQzARel.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-CUr7lyZ3.css">
+  </head>
+  <body class="min-h-screen bg-slate-50 text-slate-900 antialiased">
+    <div id="root"></div>
+  </body>
+</html>
+
+--- taille BRUTE de chaque fichier du premier écran (Accept-Encoding: identity) ---
+index-D3nU2tuG.js          HTTP=200 brut=1046364
+maplibre-CaQzARel.js       HTTP=200 brut=802715
+query-BBqhhbbe.js          HTTP=200 brut=87490
+router-Xihj9pMy.js         HTTP=200 brut=77406
+react-DJ4PxdIq.js          HTTP=200 brut=3935
+index-CUr7lyZ3.css         HTTP=200 brut=160183
+
+--- taille GZIP ---
+index-D3nU2tuG.js          gzip=315438
+maplibre-CaQzARel.js       gzip=227618
+query-BBqhhbbe.js          gzip=31314
+router-Xihj9pMy.js         gzip=28187
+react-DJ4PxdIq.js          gzip=1582
+index-CUr7lyZ3.css         gzip=23230
+
+--- carte de source publiquement servie ---
+index-D3nU2tuG.js.map  HTTP=200 taille=4174052
+TEMOIN NEGATIF (chemin bidon, doit tomber sur le repli SPA) :
+  /assets/nexistepas-agent42.js.map  HTTP=200 taille=1047 type=text/html; charset=utf-8
+
+--- fond de carte GeoJSON ---
+  brut=1079714 type=application/geo+json
+  gzip=470177
+  en-tetes :
+    last-modified: Wed, 19 Aug 2026 08:01:30 GMT
+    cf-cache-status: DYNAMIC
+    etag: W/"dksrgvjneo00n542-gzip"
+  TEMOIN POSITIF (asset fingerprinte, doit etre cache) :
+    Cache-Control: public, max-age=31536000, immutable
+    cf-cache-status: HIT
+  TEMOIN NEGATIF (chemin bidon sous /tiles/) :
+    HTTP=200 taille=1047 type=text/html; charset=utf-8
+  TEMOIN POSITIF (un fichier qui existe vraiment) :
+    /favicon.svg HTTP=200 taille=265 type=image/svg+xml

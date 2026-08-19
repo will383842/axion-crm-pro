@@ -1,0 +1,54 @@
+
+> axion-ia@0.1.0 qualiopi:isolation-check C:\Users\willi\Documents\Projets\Axion-IA\axionia
+> tsx scripts/qualiopi/isolation-check.ts
+
+❌ [qualiopi:isolation-check] 47 violation(s) :
+  - prisma/migrations/20260817120000_nda_declaration_activite/migration.sql : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - scripts/check-knowledge-banned-words.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/app/[locale]/(admin)/[adminPrefix]/planning/[type]/[id]/page.tsx : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/app/[locale]/(admin)/[adminPrefix]/planning/ics/route.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/app/[locale]/(admin)/[adminPrefix]/planning/page.tsx : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/app/[locale]/(admin)/[adminPrefix]/planning/previsionnel/page.tsx : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/app/[locale]/(admin)/[adminPrefix]/planning/timeline/page.tsx : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/app/[locale]/a-propos/page.tsx : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/app/[locale]/avis/page.tsx : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/app/[locale]/certification-qualiopi/page.tsx : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/app/[locale]/espace-formateur/page.tsx : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/app/[locale]/financement-opco-france-travail/page.tsx : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/app/[locale]/memo-isere/page.tsx : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/app/[locale]/page.tsx : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/app/[locale]/secteurs/[secteur]/[activite]/page.tsx : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/app/sitemap-images-services.xml/route.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/app/sitemap.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/components/formations/FormationDetailPage.tsx : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/components/nav/Footer.tsx : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/components/portail/DemanderAccesForm.tsx : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/components/portail/EnqueteEntrepriseForm.tsx : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/content/formations/catalog-v2-minutage.test.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/content/formations/modules/enrichissements.test.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/features/admin-planning/charge-queries.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/features/admin-planning/detail.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/features/admin-planning/hub-queries.spec.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/features/admin-planning/hub-queries.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/features/admin-planning/pipeline.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/features/admin-planning/queries.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/features/admin-qualiopi/session-hub/ChecklistSession.tsx : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/features/contract/admin-actions.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/features/invoice/admin-actions.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/lib/email/templates/_layout.tsx : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/lib/knowledge/banned-words.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/actions/__tests__/admin-recherche.spec.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/actions/admin-recherche.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/admin/dossiers-pipeline.spec.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/admin/dossiers-pipeline.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/admin/pilotage-dashboard.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/admin/qualiopi-nav-counts.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/content-gen/generators/blog-article.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/email/health.spec.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/email/health.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/formateur/echeances-formateur.spec.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/formateur/echeances-formateur.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/formateur/etapes-formateur.spec.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/formateur/etapes-formateur.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+ ELIFECYCLE  Command failed with exit code 1.
+EXIT=1

@@ -1,0 +1,55 @@
+AGENT 25 - RETOUR ARRIERE : l'etat de liste survit-il a un aller-retour ? - main 8db8229
+
+=== 1. Restauration de defilement du routeur (TanStack) ===
+>>> AUCUNE OCCURRENCE : la restauration de defilement n'est PAS activee
+   -- temoin positif : l'option existe bien dans la version installee :
+node_modules/@tanstack/react-router/dist/esm/ScrollRestoration.d.ts
+
+=== 2. Options de createRouter reellement passees (src/main.tsx) ===
+const router = createRouter({
+  routeTree,
+  defaultPreload: 'intent',
+  context: { queryClient },
+});
+
+=== 3. Ou vit l'etat de liste : useState (perdu au demontage) ? ===
+--- companies/CompaniesListPage.tsx
+    157:  const [selection, setSelection] = useState<Set<number>>(new Set());
+    158:  const [tagAction, setTagAction] = useState("");
+    159:  const [messageMasse, setMessageMasse] = useState<string | null>(null);
+    198:  const [page, setPage] = useState(1);
+    199:  const [filter, setFilter] = useState<Filter>(EMPTY_FILTER);
+    200:  const [exporting, setExporting] = useState(false);
+--- media/MediaListPage.tsx
+    117:  const [page, setPage] = useState(1);
+    118:  const [filter, setFilter] = useState<Filter>(EMPTY_FILTER);
+    119:  const [exporting, setExporting] = useState(false);
+--- scraping/ScraperRunsPage.tsx
+    220:  const [filter, setFilter] = useState<Filter>('all');
+    221:  const [search, setSearch] = useState('');
+    222:  const [page, setPage] = useState(1);
+    223:  const [selected, setSelected] = useState<Run | null>(null);
+    224:  const [confirmCancel, setConfirmCancel] = useState<Run | null>(null);
+--- crm-console/ContactsHubPage.tsx
+    53:  const [tab, setTab] = useState<TabId>('tous');
+    54:  const [temperature, setTemperature] = useState<Temperature>('actifs');
+    55:  const [search, setSearch] = useState('');
+    59:  const [country, setCountry] = useState('');
+    60:  const [prospection, setProspection] = useState('');
+--- rgpd/AuditLogsPage.tsx
+    56:  const [severityFilter, setSeverityFilter] = useState<Severity | ''>('');
+    57:  const [search, setSearch] = useState('');
+    58:  const [selected, setSelected] = useState<AuditLog | null>(null);
+--- international/RoumaniePage.tsx
+    75:  const [nature, setNature] = useState('');
+    76:  const [status, setStatus] = useState('');
+    77:  const [page, setPage] = useState(1);
+
+=== 4. Persistance externe (zustand / sessionStorage / localStorage) des filtres ? ===
+>>> AUCUNE dans src/features/ : aucun filtre n'est persiste
+   -- temoin positif : localStorage EST utilise ailleurs dans le produit :
+src/app/RootLayout.tsx:46:  // Sidebar collapsed state — persisté en localStorage
+src/app/RootLayout.tsx:50:      return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
+src/app/RootLayout.tsx:60:        window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0');
+src/components/ui/DarkModeToggle.tsx:22:    return (localStorage.getItem(STORAGE_KEY) as Theme) ?? 'system';
+src/components/ui/DarkModeToggle.tsx:27:    localStorage.setItem(STORAGE_KEY, theme);

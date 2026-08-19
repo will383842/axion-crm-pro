@@ -1,0 +1,43 @@
+AGENT 25 - « LA BASE EST VIDE » ET « LA REQUETE A ECHOUE » SONT-ILS DISCERNABLES ? - main 8db8229
+
+Question de l'operateur : je vois 0. Est-ce un fait, ou une panne ?
+Methode : on compare CARACTERE PAR CARACTERE le rendu 200-collection-vide
+et le rendu 500, sur les 30 ecrans qui consomment une donnee.
+(les 7 ecrans sans donnee — 4 d'authentification, 2 bouchons Phase 2, la page
+ introuvable — sont exclus : ils rendent la meme chose par construction.)
+
+INDISCERNABLES (rendu strictement identique, 200-vide == 500) :
+    /
+    /companies
+    /media
+    /journalists
+    /console/contacts
+    /console/vivier
+    /console/arbitrage
+    /campaigns
+    /campaigns/$campaignId
+    /scraper-runs
+    /audiences
+    /audiences/$audienceId
+    /rgpd/requests
+    /rgpd/ai-act
+    /audit-logs
+    /users
+    /tags
+    /llm/router
+    /llm/proxy-providers
+    /llm/rotations
+    /coverage
+    /campaigns/new
+    /audiences/new
+
+DISCERNABLES (l'ecran dit autre chose quand la requete echoue) :
+    /companies/$companyId
+    /contacts
+    /media/$mediaId
+    /international/roumanie
+    /console/personnes/$personKey
+    /admin/observability
+    /settings
+
+TOTAL : 23 indiscernables / 30 ecrans a donnee mesures.

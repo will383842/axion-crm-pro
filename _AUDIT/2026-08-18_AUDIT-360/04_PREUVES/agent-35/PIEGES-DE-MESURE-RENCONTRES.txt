@@ -1,0 +1,43 @@
+=== AGENT 35 — LES PIEGES DE MESURE QUE J'AI RENCONTRES, ET COMMENT ILS M'ONT MENTI ===
+A lire par tout agent qui mesure du HTTP sur ce poste. Les trois sont du piege n.19 du
+dossier : « une garde peut etre irreprochable et mesurer le mauvais objet ».
+
+--- (1) TestCase::call() N'ENVOIE PAS LES EN-TETES ---
+`$this->withHeaders($h)->call('GET', $uri)` : les en-tetes sont IGNORES. Seuls
+get()/post()/getJson()/postJson() passent par transformHeadersToServerVars(), qui fusionne
+$defaultHeaders. Consequence mesuree le 2026-08-19 : ma matrice « 5 profils de client »
+rendait CINQ FOIS 500, et j'ai failli ecrire que le SPA etait casse. Il ne l'est pas : il
+recoit 401. Sortie fautive conservee : sonde-run1-INVALIDE-headers-non-envoyes.txt.
+REMEDE : ouvrir toute matrice d'en-tetes par un TEMOIN qui fait afficher au serveur
+l'en-tete qu'il a RECU et la valeur de expectsJson(). Cf. bloc [1] de sonde-courte-1.txt.
+
+--- (2) LE BANC DE TEST REMPLACE LE GESTIONNAIRE D'EXCEPTIONS ---
+Sous PHPUnit, `app(ExceptionHandler::class)` rend
+`NunoMaduro\Collision\Adapters\Laravel\ExceptionHandler`, qui n'a PAS de methode
+shouldRenderJsonWhen(). Un test qui l'appelle meurt sur
+« Error: Call to undefined method ... ::shouldRenderJsonWhen() » — et a tue ma premiere
+sonde a 19 minutes de course.
+REMEDE : reposer le VRAI gestionnaire avant de le configurer :
+  $h = new \Illuminate\Foundation\Exceptions\Handler($this->app);
+  $h->shouldRenderJsonWhen(...);
+  $this->app->instance(ExceptionHandler::class, $h);
+
+--- (3) opcache.file_cache + validate_timestamps=0 SERT DU CODE PERIME ---
+Pour contourner la lenteur du montage 9p (opcache est OFF dans l'image
+axion-crm-pro-api : opcache.enable => Off ET opcache.enable_cli => Off), j'ai lance
+PHPUnit avec :
+  -d opcache.enable_cli=1 -d opcache.enable=1 -d opcache.file_cache=/tmp/a35/oc
+  -d opcache.validate_timestamps=0
+J'ai ensuite CORRIGE mon fichier d'amorcage (pour epingler APP_ENV=testing) — et la
+correction n'a JAMAIS pris effet : PHP servait le bytecode compile de la version
+precedente depuis /tmp/a35/oc, sans regarder l'horodatage du fichier.
+Symptome : la sonde annonce `APP_ENV=local` alors que le fichier d'amorcage sur disque
+pose bien `testing`. Consequence en chaine : APP_ENV=local => ValidateCsrfToken ne
+s'auto-desactive PAS => toutes les requetes POST de la sonde ont rendu
+`419 CSRF token mismatch` au lieu de mesurer l'authentification.
+REMEDE : `rm -rf /tmp/a35/oc` a chaque modification de fichier, ou
+`-d opcache.validate_timestamps=1`.
+A RETENIR : un 419 uniforme sur toutes les routes POST n'est pas un constat produit,
+c'est le signe que le banc n'est pas en environnement `testing`. Le depot le sait deja
+et le documente : tests/Feature/Auth/LoginTest.php:62-67 explique que le conteneur impose
+APP_ENV=local et fournit donc un jeton CSRF explicite a chaque requete.

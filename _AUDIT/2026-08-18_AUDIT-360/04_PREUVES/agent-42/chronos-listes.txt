@@ -1,3 +1,47 @@
 
 [1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/willi/Documents/Projets/Axion-CRM-Pro/frontend[39m
 
+ [32m✓[39m tests/bench-agent42/listes.test.tsx[2m > [22mAGENT 42 — coût de rendu des listes[2m > [22mContactsListPage (non virtualisé) — 0 lignes[33m 821[2mms[22m[39m
+ [32m✓[39m tests/bench-agent42/listes.test.tsx[2m > [22mAGENT 42 — coût de rendu des listes[2m > [22mContactsListPage (non virtualisé) — 1 lignes
+ [32m✓[39m tests/bench-agent42/listes.test.tsx[2m > [22mAGENT 42 — coût de rendu des listes[2m > [22mContactsListPage (non virtualisé) — 100 lignes[33m 1647[2mms[22m[39m
+ [32m✓[39m tests/bench-agent42/listes.test.tsx[2m > [22mAGENT 42 — coût de rendu des listes[2m > [22mContactsListPage (non virtualisé) — 500 lignes[33m 6106[2mms[22m[39m
+ [32m✓[39m tests/bench-agent42/listes.test.tsx[2m > [22mAGENT 42 — coût de rendu des listes[2m > [22mContactsListPage (non virtualisé) — 10000 lignes[33m 94183[2mms[22m[39m
+ [32m✓[39m tests/bench-agent42/listes.test.tsx[2m > [22mAGENT 42 — coût de rendu des listes[2m > [22mCompaniesListPage (virtualisé) — 0 lignes[33m 648[2mms[22m[39m
+ [32m✓[39m tests/bench-agent42/listes.test.tsx[2m > [22mAGENT 42 — coût de rendu des listes[2m > [22mCompaniesListPage (virtualisé) — 1 lignes[33m 821[2mms[22m[39m
+ [32m✓[39m tests/bench-agent42/listes.test.tsx[2m > [22mAGENT 42 — coût de rendu des listes[2m > [22mCompaniesListPage (virtualisé) — 100 lignes[33m 880[2mms[22m[39m
+ [32m✓[39m tests/bench-agent42/listes.test.tsx[2m > [22mAGENT 42 — coût de rendu des listes[2m > [22mCompaniesListPage (virtualisé) — 500 lignes[33m 747[2mms[22m[39m
+ [32m✓[39m tests/bench-agent42/listes.test.tsx[2m > [22mAGENT 42 — coût de rendu des listes[2m > [22mCompaniesListPage (virtualisé) — 10000 lignes[33m 1810[2mms[22m[39m
+ [32m✓[39m tests/bench-agent42/listes.test.tsx[2m > [22mAGENT 42 — coût de rendu des listes[2m > [22mContactsHubPage (console v2) — 0 lignes
+ [32m✓[39m tests/bench-agent42/listes.test.tsx[2m > [22mAGENT 42 — coût de rendu des listes[2m > [22mContactsHubPage (console v2) — 1 lignes
+ [32m✓[39m tests/bench-agent42/listes.test.tsx[2m > [22mAGENT 42 — coût de rendu des listes[2m > [22mContactsHubPage (console v2) — 100 lignes[33m 374[2mms[22m[39m
+ [32m✓[39m tests/bench-agent42/listes.test.tsx[2m > [22mAGENT 42 — coût de rendu des listes[2m > [22mContactsHubPage (console v2) — 500 lignes[33m 1823[2mms[22m[39m
+[90mstdout[2m | tests/bench-agent42/listes.test.tsx[2m > [22m[2mAGENT 42 — coût de rendu des listes[2m > [22m[2mTABLEAU DES MESURES
+[22m[39m
+=========== AGENT 42 — CHRONOS DE RENDU (jsdom, sans peinture) ===========
+écran                               servies       ms  rendues   nœuds DOM
+ContactsListPage (NON virtualisé)         0      731        0          44
+ContactsListPage (NON virtualisé)         1      210        2          70
+ContactsListPage (NON virtualisé)       100     1579      101        2545
+ContactsListPage (NON virtualisé)       500     5428      501       12545
+ContactsListPage (NON virtualisé)     10000    84722    10001      250045
+CompaniesListPage (VIRTUALISÉ)            0      632        0         147
+CompaniesListPage (VIRTUALISÉ)            1      814        1         155
+CompaniesListPage (VIRTUALISÉ)          100      862        1         155
+CompaniesListPage (VIRTUALISÉ)          500      733        1         155
+CompaniesListPage (VIRTUALISÉ)        10000     1799        1         155
+ContactsHubPage (console v2)              0      219        0          77
+ContactsHubPage (console v2)              1      161        1          83
+ContactsHubPage (console v2)            100      292      100         776
+ContactsHubPage (console v2)            500     1631      500        3576
+ContactsHubPage (console v2)          10000    19086    10000       70076
+=========================================================================
+
+ [32m✓[39m tests/bench-agent42/listes.test.tsx[2m > [22mAGENT 42 — coût de rendu des listes[2m > [22mContactsHubPage (console v2) — 10000 lignes[33m 23145[2mms[22m[39m
+ [32m✓[39m tests/bench-agent42/listes.test.tsx[2m > [22mAGENT 42 — coût de rendu des listes[2m > [22mTABLEAU DES MESURES
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m16 passed[39m[22m[90m (16)[39m
+[2m   Start at [22m 14:46:24
+[2m   Duration [22m 300.37s[2m (transform 2.34s, setup 52.78s, collect 30.36s, tests 133.76s, environment 72.11s, prepare 8.66s)[22m
+
+EXIT=0

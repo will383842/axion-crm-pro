@@ -1,2 +1,27 @@
 ### G43 — MEME scenario, MEME base, role axion (BYPASSRLS = configuration de l'\''ATELIER LOCAL) ###
 --- warmup c=4, 20 s ---
+tps = 13.438347 (without initial connection time)
+=========== c=1, 40 s ===========
+number of transactions actually processed: 225
+latency average = 178.831 ms
+tps = 5.591863 (without initial connection time)
+SQL script 1: /tmp/g43/s1_liste.sql
+ - latency average = 236.683 ms
+SQL script 2: /tmp/g43/s2_compteurs.sql
+ - latency average = 247.924 ms
+SQL script 3: /tmp/g43/s3_recherche.sql
+ - latency average = 3.902 ms
+SQL script 4: /tmp/g43/s4_timeline.sql
+ - latency average = 89.679 ms
+=========== c=10, 40 s ===========
+number of transactions actually processed: 1455
+latency average = 275.013 ms
+tps = 36.361877 (without initial connection time)
+SQL script 1: /tmp/g43/s1_liste.sql
+ - latency average = 331.651 ms
+SQL script 2: /tmp/g43/s2_compteurs.sql
+ - latency average = 451.610 ms
+SQL script 3: /tmp/g43/s3_recherche.sql
+ - latency average = 5.166 ms
+SQL script 4: /tmp/g43/s4_timeline.sql
+ - latency average = 158.865 ms

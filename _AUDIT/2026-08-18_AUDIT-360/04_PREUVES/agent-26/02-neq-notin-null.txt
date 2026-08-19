@@ -1,0 +1,38 @@
+=== CONTEXTE ===
+base            : axion_crm_perf
+companies (ws)  : 300000
+sector_main NULL: 300000
+fiche temoin    : id=100006  sector_main=NULL
+
+=== LES DEUX EVALUATEURS DU MEME CRITERE, COTE A COTE ===
+(SQL = refresh()/preview() ; MEMOIRE = evaluateForCompany(), chemin waterfall step12)
+
+CAS               |       SQL | MEMOIRE | PREDICAT SQL GENERE
+------------------------------------------------------------------------------------------------------------------------------------
+A  neq btp        |    300000 | GARDE   | "workspace_id" = ? and (("sector_main" != ? or "sector_main" is null))
+B  not_in [btp]   |    300000 | GARDE   | "workspace_id" = ? and (("sector_main" not in (?) or "sector_main" is null))
+C  eq btp         |         0 | EXCLUE  | "workspace_id" = ? and ("sector_main" = ?)
+D  gte score 50   |         0 | EXCLUE  | "workspace_id" = ? and ("quality_score" >= ?)
+E  champ inconnu  |    300000 | EXCLUE  | "workspace_id" = ?
+F  has_email neq  |    300000 | EXCLUE  | "workspace_id" = ?
+G  in non-tableau |    300000 | EXCLUE  | "workspace_id" = ?
+H  op inconnu     |    300000 | EXCLUE  | "workspace_id" = ?
+
+=== TEMOIN NEGATIF : le SQL naif (semantique d'avant le correctif) ===
+Si le controle est capable de distinguer, ces deux lignes doivent rendre 0
+la ou A et B rendent 300000.
+  where sector_main != 'btp'       -> 0
+  where sector_main not in ('btp') -> 0
+
+=== TEMOIN NEGATIF 2 : sur une valeur RENSEIGNEE, neq doit exclure ===
+  companies avec sector_main renseigne : 0
+  (si 0, ce temoin est non concluant et je le dis)
+
+=== COMBINATEUR `not` (doit rester symetrique) ===
+  not{ sector_main neq  btp } -> SQL=      0 | MEMOIRE=EXCLUE
+  not{ sector_main eq   btp } -> SQL= 300000 | MEMOIRE=GARDE
+
+=== CRITERES VIDES (l'audience qui ne filtre rien) ===
+  criteria {}          -> SQL=300000
+  criteria {all:[]}    -> SQL=300000
+EXIT=0

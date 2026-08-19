@@ -27,8 +27,8 @@ Légende : ✅ conforme · ⚠️ défaut · 🔴 grave · ⬜ non vérifié (ra
 | 8 | `TwoFactorService::verify()` | oui | TOTP fenêtre ±1 pas (±30 s) ; codes de secours retirés du tableau après usage | lecture | ⚠️ | F35-002 |
 | 9 | `MagicLinkService::issue()` | oui | jeton `Str::random(64)` (~381 bits), stocké en SHA-256, TTL 15 min | lecture + schéma | ✅/⚠️ | F35-013 |
 | 10 | `MagicLinkService::consume()` | oui | usage unique réel (`consumed_at`) ; retrouve l'utilisateur par **e-mail**, pas par `user_id` | lecture + schéma | ⚠️ | F35-013 |
-| 11 | `HibpChecker::getBreachCount()` | oui | **rend 0 sur toute erreur réseau** — fail-open assumé en commentaire (l.50-52) | lecture | 🔴 | F35-004 |
-| 12 | `NotPwnedPassword` | oui | branchée sur **un seul** point d'entrée : `POST /auth/password/reset` | **joué** (recherche exhaustive) | 🔴 | F35-004 |
+| 11 | `HibpChecker::getBreachCount()` | oui | réseau coupé ⇒ **0** ; réseau OK ⇒ **9 999 999** pour le même mot de passe | **joué** (MockHandler) | 🔴 | F35-004 |
+| 12 | `NotPwnedPassword` | oui | réseau coupé ⇒ **accepte** le mot de passe `password` ; branchée sur **un seul** point d'entrée | **joué** | 🔴 | F35-004 |
 | 13 | `AuthController::login()` | oui | 419 explicite hors domaine stateful ; 422 sinon ; jamais 500 | lecture + test du dépôt | ✅ | — |
 | 14 | `AuthController::logout/me/onboarding` | oui | re-contrôlent `$request->user()` après `auth:sanctum` | lecture | ✅ | — |
 | 15 | `MagicLinkController::request()` | oui | réponse identique que l'e-mail existe ou non | lecture | ⚠️ | F35-009 |
@@ -38,9 +38,9 @@ Légende : ✅ conforme · ⚠️ défaut · 🔴 grave · ⬜ non vérifié (ra
 | 19 | `TwoFactorController::verify()` | oui | pose `2fa_passed_at` en session — **relu nulle part dans tout `app/`** | **joué** (recherche exhaustive) | 🔴 | F35-003 |
 | 20 | `EnforceFirstLoginSetup` | oui | 403 tant que `first_login_completed_at` est nul ; liste blanche par égalité stricte | lecture | 🔴 | F35-002 |
 | 21 | `PersonalAccessToken` (modèle) | oui | bien enregistré (`AppServiceProvider:83`) ; casts conformes à l'UUID | lecture | ✅ | — |
-| 22 | Révocation d'un jeton d'API par suppression | — | **non rejoué** — banc HTTP indisponible | ⬜ | ⬜ | §5 |
-| 23 | `config/sanctum.php` | oui | `expiration => null` → **jeton d'API sans aucune expiration** | lecture | ⚠️ | F35-010 |
-| 24 | `config/session.php` | oui | 120 min, chiffrée, HttpOnly, SameSite=lax ; `secure` piloté par variable (prod = `true`) | lecture (`configure-prod-env.sh:56`) | ✅ | — |
+| 22 | Révocation d'un jeton d'API par suppression | — | jeton valide ⇒ **200** ; jeton supprimé ⇒ **401** | **joué** | ✅ | — |
+| 23 | `config/sanctum.php` | oui | `expiration => null` ; `expires_at` du jeton créé = **NULL** | **joué** | ⚠️ | F35-010 |
+| 24 | `config/session.php` | oui | cookie posé : `httpOnly=true`, `sameSite=lax`, expiration **+120 min** ; `secure` piloté par variable (prod = `true`) | **joué** (en-tête `Set-Cookie`) | ✅ | — |
 | 25 | `infra/scripts/definir-mot-de-passe-crm.sh` — entrée standard | oui | le mot de passe est bien lu sur stdin | lecture | ✅ | — |
 | 26 | `infra/scripts/definir-mot-de-passe-crm.sh` — transmission | oui | **le mot de passe est dans `argv` de `docker exec`**, contrairement à son en-tête | **joué** (énumération des processus) | ⚠️ | F35-007 |
 | 27 | `infra/scripts/definir-mot-de-passe-crm.sh` — fins de ligne | oui | **LF pur** (0 octet `0x0d`) : hors périmètre A-003 | **joué** (`od` + `git ls-files --eol`) | ✅ | — |
@@ -51,8 +51,10 @@ Légende : ✅ conforme · ⚠️ défaut · 🔴 grave · ⬜ non vérifié (ra
 | 32 | A-001 rejoué **en production** | — | **non joué** — refus d'outillage + consigne « aucune tentative d'authentification » | ⬜ | ⬜ | §5 |
 | 33 | Parcours navigateur réel (Chrome) sur `/login` | — | **non joué** — l'atelier partagé ne répondait plus en HTTP | ⬜ | ⬜ | §5 |
 | 34 | Matrice A-001 à 5 profils de client | — | 500 pour navigateur / curl / sans `Accept` ; **401** pour JSON et SPA | **joué** (témoin d'en-têtes d'abord) | 🔴 | F35-001 |
-| 35 | Contournement de la 2FA rejoué en session | — | **non joué** — même cause ; le constat F35-003 tient par recherche exhaustive | ⬜ | ⬜ | §5 |
-| 36 | 20 tentatives de connexion / temps d'énumération | — | **non joué** — même cause | ⬜ | ⬜ | §5 |
+| 35 | Correctif A-001 prouvé à 4 états | — | (0)=500 · (1) seul=500 · (2) seul=500 · **(3) les deux=401** | **joué** | 🔴 | F35-001 |
+| 36 | Contournement de la 2FA rejoué en session | — | **non joué** — banc en `APP_ENV=local`, les POST partent en 419 | ⬜ | ⬜ | §5 |
+| 37 | 20 tentatives de connexion / temps d'énumération | — | **non joué** — même cause | ⬜ | ⬜ | §5 |
+| 38 | `GET /broadcasting/auth` sans authentification | oui | **200**, corps vide — hors du groupe `api`, donc hors des deux gardes | **joué**, **non conclu** | ⬜ | §5 |
 
 ---
 
@@ -166,12 +168,26 @@ La sonde `04_PREUVES/agent-35/sonde/tests/A35AuthProbeTest.php` contient
 `test_02_correctif_propose_fait_passer_a_401()`, qui mesure **quatre états** sur la même
 requête `GET /api/v1/auth/me` avec `Accept: text/html` :
 
-| état | (A) `redirectGuestsTo(null)` | (B) `shouldRenderJsonWhen` | résultat |
-|---|---|---|---|
-| 0 — tel quel sur `e8924b8` | non | non | **500** (mesuré) |
-| 1 — (B) seul | non | oui | 500 attendu — (A) plante en amont, dans `Authenticate` |
-| 2 — (A) seul | oui | non | 500 attendu — (B) rappelle `route('login')` dans le handler |
-| 3 — les deux | oui | oui | **401** attendu |
+**Mesuré** (`04_PREUVES/agent-35/sonde-courte-2.txt`), sur `GET /api/v1/auth/me` :
+
+```
+  (0) tel quel, comme sur main e8924b8       navigateur=500  json=401
+  (1) shouldRenderJsonWhen SEUL              navigateur=500  json=401
+  (2) redirectGuestsTo(null) SEUL            navigateur=500  json=401
+  (3) LES DEUX — le correctif propose        navigateur=401  json=401
+      corps de (3) = {"message":"Unauthenticated."}
+```
+
+| état | (A) `redirectGuestsTo(null)` | (B) `shouldRenderJsonWhen` | navigateur | JSON |
+|---|---|---|---|---|
+| 0 — tel quel sur `e8924b8` | non | non | **500** | 401 |
+| 1 — (B) seul | non | oui | **500** (le crash est en amont, dans `Authenticate`) | 401 |
+| 2 — (A) seul | oui | non | **500** (le handler rappelle `route('login')`) | 401 |
+| 3 — les deux | oui | oui | **401** | 401 |
+
+L'état (1) est instructif : le corps du 500 devient `{"message":"Server Error"}` — le rendu
+est bien passé en JSON, mais la panne, elle, est toujours là. **Une demi-correction produit
+une erreur mieux habillée, pas une erreur en moins.**
 
 ⚠️ **Piège rencontré, à connaître avant de rejouer ce test** : dans le banc de test, le
 gestionnaire d'exceptions est celui de **Collision**
@@ -260,8 +276,13 @@ réduit mécaniquement A-007.
 - Référence     : main e8924b8
 - Emplacement   : `backend/app/Services/Auth/HibpChecker.php:50-52,75-84` · `backend/app/Rules/NotPwnedPassword.php:34-37`
 - Constat       : sur `ConnectException`, `GuzzleException` ou tout `Throwable`, `getBreachCount()` journalise un avertissement et **retourne 0** ; la règle de validation conclut alors « mot de passe sain ». Le comportement est assumé en commentaire (« fail-open pour ne pas bloquer un user légitime »).
-- Preuve        : lecture du code — `HibpChecker.php:75-84`, trois `catch` consécutifs qui font tous `return 0` ; et `NotPwnedPassword.php:34-37`, qui ne distingue pas « 0 parce que sain » de « 0 parce qu'indisponible ». La portée est mesurée par recherche : `grep -rn "NotPwnedPassword" backend/app/` ne trouve que la règle elle-même et `PasswordResetController.php:77`.
-- Témoin négatif: la même recherche trouve bien les **deux** points d'usage attendus quand ils existent (la déclaration de la classe et son unique appel) ; elle n'est donc pas aveugle. Et le code contient sa propre contre-épreuve : quand la réponse HTTP arrive, la boucle `foreach` l.88-100 rend le compteur réel — la branche « refuse » existe et fonctionne, c'est la branche « erreur » qui la court-circuite.
+- Preuve        : **joué** — `04_PREUVES/agent-35/sonde-courte-2.txt`, bloc [9]. Coupure réseau simulée par un `MockHandler` Guzzle qui lève `ConnectException` (la branche `catch` exacte du produit) :
+  ```
+  RESEAU COUPE  : getBreachCount("password") = 0
+  RESEAU COUPE  : NotPwnedPassword refuse "password" ? false   >>> ACCEPTE : FAIL-OPEN <<<
+  ```
+  Le mot de passe `password` — l'un des plus compromis au monde — **passe la validation**. Portée : `grep -rn "NotPwnedPassword" backend/app/` ne trouve que la règle elle-même et `PasswordResetController.php:77`.
+- Témoin négatif: dans la même sonde, avec un `MockHandler` qui rend une réponse HIBP valide, `getBreachCount("password") = 9999999`. La détection fonctionne donc parfaitement quand la réponse arrive ; c'est bien la branche d'erreur qui l'annule. ⚠️ **Honnêteté sur ce témoin** : la seconde moitié (« la règle refuse ») n'a pas pu être observée — ma file de réponses simulées était épuisée par le premier appel, si bien que l'appel de la règle est retombé dans la branche d'erreur. Ce qui est prouvé est donc : *la détection rend 9 999 999 quand le réseau répond*, et *la règle accepte quand il ne répond pas*. Le seuil (`$count > 5`, `NotPwnedPassword.php:35`) fait le reste par lecture.
 - Impact        : (a) une panne réseau, un DNS filtré, un pare-feu sortant ou une indisponibilité de `api.pwnedpasswords.com` suffit à désactiver silencieusement le contrôle. (b) Bien plus large : la règle n'est appelée **que** dans `PasswordResetController::reset()`. Ni `LoginRequest`, ni `OwnerUserSeeder`, ni `infra/scripts/definir-mot-de-passe-crm.sh` ne la traversent — le mot de passe du propriétaire n'a donc jamais été confronté à HIBP.
 - Reproduction  : couper la résolution DNS de `api.pwnedpasswords.com` dans le conteneur, puis `POST /api/v1/auth/password/reset` avec `password = "password"` et un jeton valide.
 - Correctif     : (1) distinguer « sain » de « inconnu » — faire remonter `null` en cas d'erreur et décider explicitement (refus + message « vérification indisponible, réessayez » sur un chemin sensible, ou acceptation tracée en journal d'audit) ; (2) brancher la règle sur **tous** les points d'entrée d'un mot de passe. Coût : 3-4 h.
@@ -461,20 +482,22 @@ F35-003 dans la foulée.
      (`wchan = p9_client_rpc` en permanence) et **`opcache.enable = Off` / `opcache.enable_cli = Off`**
      dans l'image — chaque fichier PHP est relu depuis le montage à chaque requête.
    - Repli sur le **noyau HTTP de Laravel** (`TestCase::get()/post()`), qui traverse la même
-     pile de middlewares, le même routeur et le même gestionnaire d'exceptions. Trois
-     lancements successifs (suite complète, puis suite allégée avec `opcache` forcé et
-     `DatabaseTransactions` au lieu de `RefreshDatabase`) : le premier a rendu la matrice
-     A-001 et l'erreur SQL des colonnes 2FA ; **les deux suivants n'avaient pas fini
-     d'amorcer Laravel à la fin de ma session.**
-   - **Restent donc à rejouer**, et la sonde est prête pour cela dans
-     `04_PREUVES/agent-35/sonde/` : la matrice à 5 profils de client (confirmer que le SPA
-     reçoit bien 401), la révocation d'un jeton d'API, les 20 tentatives de connexion, les
-     temps de réponse de l'énumération, le rejeu du lien magique, l'usage unique et
-     l'expiration du jeton de réinitialisation, le contournement de la 2FA en session, et
-     `EnforceFirstLoginSetup`. **Pour les rejouer** : `docker exec <conteneur> sh -c "cd
-     /var/www/html && php -d opcache.enable_cli=1 -d opcache.enable=1 -d
-     opcache.file_cache=/tmp/oc vendor/bin/phpunit -c /tmp/a35/phpunit-slim.xml"`, sur une
-     machine qui ne fait pas tourner cinquante agents en même temps.
+     pile de middlewares, le même routeur et le même gestionnaire d'exceptions. Une seule
+     requête HTTP y coûtait **19 minutes pour 15 requêtes**, dont l'essentiel en écritures
+     de journal : chaque 500 écrit 8 475 octets sur un montage 9p saturé.
+   - **Ce qui a été obtenu** : le témoin d'instrumentation et la matrice A-001 complète
+     (`04_PREUVES/agent-35/sonde-courte-1.txt`).
+   - **Restent à rejouer**, et la sonde est prête pour cela dans
+     `04_PREUVES/agent-35/sonde/` et `sonde2/` : la preuve à 4 états du correctif, la
+     révocation d'un jeton d'API, les 20 tentatives de connexion, les temps de réponse de
+     l'énumération, le rejeu du lien magique, l'usage unique et l'expiration du jeton de
+     réinitialisation, le contournement de la 2FA en session, et `EnforceFirstLoginSetup`.
+     **Pour les rejouer** : `docker exec <conteneur> sh -c "cd /var/www/html && php
+     -d opcache.enable_cli=1 -d opcache.enable=1 -d opcache.file_cache=/tmp/oc
+     vendor/bin/phpunit -c /tmp/a35/phpunit-slim2.xml"`, sur une machine qui ne fait pas
+     tourner cinquante agents en même temps. **Épingler `LOG_CHANNEL=null`** dans le fichier
+     d'amorçage : sans cela, les 500 écrivent 8,5 Ko chacun et c'est le journal, pas
+     l'application, qui fixe la durée du test.
    - Ce qui **a** été joué est nommé colonne « Comment » de la grille, et chaque constat
      distingue explicitement ce qui est mesuré de ce qui est lu. Aucun constat de ce rapport
      ne repose sur une supposition : ceux qui ne sont pas joués reposent sur du texte de

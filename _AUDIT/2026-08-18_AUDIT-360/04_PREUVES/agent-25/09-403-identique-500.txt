@@ -1,0 +1,53 @@
+AGENT 25 - UN REFUS (403) SE DISTINGUE-T-IL D'UNE PANNE (500) A L'ECRAN ? - main 8db8229
+
+Methode : pour chaque ecran, on compare CARACTERE PAR CARACTERE le texte
+rendu sous 500 et le texte rendu sous 403 (releve-etats.txt, montages reels).
+
+/                                  500 vs 403 : IDENTIQUE
+/companies                         500 vs 403 : IDENTIQUE
+/companies/$companyId              500 vs 403 : IDENTIQUE
+/contacts                          500 vs 403 : IDENTIQUE
+/media                             500 vs 403 : IDENTIQUE
+/media/$mediaId                    500 vs 403 : IDENTIQUE
+/journalists                       500 vs 403 : IDENTIQUE
+/international/roumanie            500 vs 403 : IDENTIQUE
+/console/contacts                  500 vs 403 : IDENTIQUE
+/console/vivier                    500 vs 403 : IDENTIQUE
+/console/arbitrage                 500 vs 403 : IDENTIQUE
+/console/personnes/$personKey      500 vs 403 : IDENTIQUE
+/campaigns                         500 vs 403 : IDENTIQUE
+/campaigns/$campaignId             500 vs 403 : IDENTIQUE
+/scraper-runs                      500 vs 403 : IDENTIQUE
+/audiences                         500 vs 403 : IDENTIQUE
+/audiences/$audienceId             500 vs 403 : IDENTIQUE
+/admin/observability               500 vs 403 : IDENTIQUE
+/rgpd/requests                     500 vs 403 : IDENTIQUE
+/rgpd/ai-act                       500 vs 403 : IDENTIQUE
+/audit-logs                        500 vs 403 : IDENTIQUE
+/users                             500 vs 403 : IDENTIQUE
+/settings                          500 vs 403 : IDENTIQUE
+/tags                              500 vs 403 : IDENTIQUE
+/llm/router                        500 vs 403 : IDENTIQUE
+/llm/proxy-providers               500 vs 403 : IDENTIQUE
+/llm/rotations                     500 vs 403 : IDENTIQUE
+/coverage                          500 vs 403 : IDENTIQUE
+/campaigns/new                     500 vs 403 : IDENTIQUE
+/audiences/new                     500 vs 403 : IDENTIQUE
+/login                             500 vs 403 : IDENTIQUE
+/2fa                               500 vs 403 : IDENTIQUE
+/magic-link                        500 vs 403 : IDENTIQUE
+/password-reset                    500 vs 403 : IDENTIQUE
+/cold-email                        500 vs 403 : IDENTIQUE
+/linkedin                          500 vs 403 : IDENTIQUE
+(NotFoundPage monté seul)          500 vs 403 : IDENTIQUE
+
+TOTAL : 37 ecrans rendent EXACTEMENT LA MEME CHOSE sous 403 et sous 500.
+        0 ecrans distinguent le refus de la panne.
+        0 non mesures.
+
+=== TEMOIN NEGATIF : la comparaison sait-elle voir une DIFFERENCE ? ===
+On rejoue la MEME comparaison sur le couple VIDE vs ERREUR (deux conditions
+dont on SAIT qu'elles different sur plusieurs ecrans) :
+  VIDE vs ERREUR : 30 identiques, 7 DIFFERENTS.
+  => la comparaison DETECTE bien une difference quand il y en a une.
+     Le '37 identiques' sur 403 vs 500 n'est donc pas un artefact de la sonde.

@@ -1,0 +1,119 @@
+AGENT 25 - Y A-T-IL UNE FRONTIERE D'ERREUR ? QUE VOIT-ON SI UN ECRAN LEVE ? - main 8db8229
+
+=== 1. ErrorBoundary / componentDidCatch / Sentry.ErrorBoundary dans src/ ===
+src/components/ui/ErrorBoundary.tsx:6:export class ErrorBoundary extends Component<Props, State> {
+src/components/ui/ErrorBoundary.tsx:9:  static getDerivedStateFromError(error: Error): State {
+src/components/ui/ErrorBoundary.tsx:13:  override componentDidCatch(error: Error, info: { componentStack: string }): void {
+src/components/ui/ErrorBoundary.tsx:15:    console.error('ErrorBoundary caught', error, info);
+src/components/ui/index.ts:33:export { ErrorBoundary } from './ErrorBoundary';
+
+--- TEMOIN POSITIF : Sentry.ErrorBoundary EST disponible dans la version installee
+ErrorBoundary
+ErrorBoundary
+--- TEMOIN POSITIF : errorComponent EST une option de TanStack Router
+errorComponent
+
+=== 2. Ce que rend TanStack Router par defaut quand un ecran leve ===
+Mesure : /coverage sous jsdom (maplibre leve 'Failed to initialize WebGL').
+Texte reellement affiche, releve sur le montage reel :
+### /coverage  [VIDE]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=13 html=577o boutons=1
+    « Something went wrong!Hide ErrorFailed to initialize WebGL »
+
+  => message en ANGLAIS, hors coquille, sans identite ni retour.
+  (Sous jsdom c'est WebGL ; en production, TOUTE exception de rendu
+   produira le meme ecran, puisque createRouter n'a pas de errorComponent.)
+
+=== 3. initSentry : le rapport d'erreur part-il ? ===
+/**
+ * Sprint 19.6 — Sentry React conditional init.
+ *
+ * Le SDK @sentry/react est embarqué mais n'est activé que si `VITE_SENTRY_DSN`
+ * est défini dans l'environnement de BUILD (cf. Dockerfile.frontend ARG +
+ * docker-compose service.app.build.args).
+ *
+ * Si pas de DSN → tous les exports sont no-op (zéro coût runtime, zéro requête
+ * réseau, zéro PII envoyée nulle part).
+ */
+import * as Sentry from '@sentry/react';
+
+const DSN: string | undefined = import.meta.env['VITE_SENTRY_DSN'];
+
+export function initSentry(): void {
+  if (!DSN) return;
+  Sentry.init({
+    dsn: DSN,
+    environment: import.meta.env.PROD ? 'production' : 'development',
+    tracesSampleRate: 0.1,
+    replaysSessionSampleRate: 0,
+    replaysOnErrorSampleRate: 1.0,
+  });
+}
+
+export function captureException(error: unknown, context?: Record<string, unknown>): void {
+  if (!DSN) return;
+  Sentry.captureException(error, context ? { extra: context } : undefined);
+}
+
+export function setUser(user: { id: string; email?: string; workspace_id?: string } | null): void {
+  if (!DSN) return;
+  Sentry.setUser(user as Sentry.User | null);
+}
+
+=== 4. L'ErrorBoundary du produit est-il MONTE quelque part ? ===
+-- occurrences de '<ErrorBoundary' (usage JSX) dans src/ :
+   (code retour grep = 1 ; 1 = AUCUN usage)
+-- occurrences de 'ErrorBoundary' au total, hors sa propre definition et le baril :
+   (code retour grep = 1 ; 1 = AUCUNE autre occurrence)
+
+-- TEMOIN POSITIF : le meme grep TROUVE bien un composant du baril qui, lui, est monte :
+27
+   usages JSX de <EmptyState (le controle sait trouver un composant utilise)
+
+=== 5. Contenu integral de l'ErrorBoundary jamais monte ===
+import { Component, type ReactNode } from 'react';
+
+interface Props { children: ReactNode; fallback?: ReactNode; level?: 'root' | 'page' | 'block' }
+interface State { hasError: boolean; error?: Error }
+
+export class ErrorBoundary extends Component<Props, State> {
+  override state: State = { hasError: false };
+
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
+  }
+
+  override componentDidCatch(error: Error, info: { componentStack: string }): void {
+    // Sprint 11 : Sentry.captureException(error, { contexts: { react: info } })
+    console.error('ErrorBoundary caught', error, info);
+  }
+
+  override render(): ReactNode {
+    if (!this.state.hasError) {
+      return this.props.children;
+    }
+    if (this.props.fallback) {
+      return this.props.fallback;
+    }
+    const level = this.props.level ?? 'block';
+    return (
+      <div className={`rounded-xl bg-rose-50 p-${level === 'root' ? 8 : 4} text-rose-900`}>
+        <h2 className="text-base font-semibold">Une erreur est survenue.</h2>
+        <p className="mt-1 text-sm">{this.state.error?.message ?? 'Erreur inconnue'}</p>
+        {level !== 'block' ? (
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-3 rounded-md bg-rose-600 px-3 py-1.5 text-sm text-white hover:bg-rose-700"
+          >
+            Recharger la page
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+}
+
+=== 6. Est-il monte dans RootLayout ? (la coquille de 33 des 37 ecrans) ===
+15:import { Outlet } from '@tanstack/react-router';
+100:        <main id="main" className="flex-1 overflow-x-hidden px-4 py-5 md:px-6 md:py-6 lg:px-10">
+101:          <Outlet />

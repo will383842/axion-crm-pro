@@ -1,0 +1,5459 @@
+{
+ "base": "http://app.localhost:58130",
+ "date": "2026-08-19T13:03:31.625Z",
+ "totaux": {
+  "ecrans": 37,
+  "ecransHorsEcran": [
+   "/ (83px)",
+   "/companies (47px)",
+   "/rgpd/requests (231px)"
+  ],
+  "totalCibles": 473,
+  "totalSous44": 461,
+  "totalSous44Coquille": 263,
+  "totalSous44Contenu": 198,
+  "totalConformes": 12,
+  "totalBarresBasses": 0,
+  "totalConteneursDefilables": 0,
+  "ecransAvecTable": []
+ },
+ "ecrans": [
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 458,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 83,
+   "offenders": [
+    {
+     "tag": "div",
+     "cls": "flex shrink-0 flex-wrap items-center gap-2",
+     "w": 418,
+     "right": 458,
+     "txt": "En direct · actualisé toutes les 30s 7j 30j 90j Ac"
+    },
+    {
+     "tag": "button",
+     "cls": "inline-flex items-center justify-center font-medium transition-[transform,background-color",
+     "w": 98,
+     "right": 458,
+     "txt": "Actualiser"
+    },
+    {
+     "tag": "svg",
+     "cls": "h-3.5 w-3.5 animate-spin",
+     "w": 15,
+     "right": 387,
+     "txt": ""
+    },
+    {
+     "tag": "circle",
+     "cls": "",
+     "w": 13,
+     "right": 386,
+     "txt": ""
+    },
+    {
+     "tag": "path",
+     "cls": "",
+     "w": 6,
+     "right": 379,
+     "txt": ""
+    }
+   ],
+   "nOffenders": 5,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "main",
+     "cls": "flex-1 overflow-x-hidden px-4 py-5 md:px-6 md:py-6 lg:px-10",
+     "sw": 458,
+     "cw": 375,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 94,
+    "cw": 94,
+    "txt": "Accueil"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    },
+    {
+     "tag": "button",
+     "w": 25.6,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "7j"
+    },
+    {
+     "tag": "button",
+     "w": 32.5,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "30j"
+    },
+    {
+     "tag": "button",
+     "w": 32.5,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "90j"
+    },
+    {
+     "tag": "button",
+     "w": 97.6,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Actualiser"
+    },
+    {
+     "tag": "a",
+     "w": 195,
+     "h": 44,
+     "ok": true,
+     "coquille": false,
+     "lbl": "Démarrer sur /coverage →"
+    }
+   ],
+   "nCibles": 13,
+   "nSous44": 12,
+   "nSous44Coquille": 7,
+   "nSous44Contenu": 5,
+   "conformes": [
+    "Démarrer sur /coverage → 195x44"
+   ],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Tableau de bord",
+   "mainTxtLen": 300,
+   "route": "/",
+   "nom": "Tableau de bord"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 422,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 47,
+   "offenders": [
+    {
+     "tag": "div",
+     "cls": "flex shrink-0 flex-wrap items-center gap-2",
+     "w": 382,
+     "right": 422,
+     "txt": "Importer Exporter Lancer scraping →"
+    },
+    {
+     "tag": "div",
+     "cls": "flex items-center gap-2",
+     "w": 382,
+     "right": 422,
+     "txt": "Importer Exporter Lancer scraping →"
+    },
+    {
+     "tag": "a",
+     "cls": "inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-gradient-to-b from-slate-9",
+     "w": 147,
+     "right": 422,
+     "txt": "Lancer scraping →"
+    }
+   ],
+   "nOffenders": 3,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 150,
+     "cw": 94,
+     "ox": "hidden"
+    },
+    {
+     "tag": "main",
+     "cls": "flex-1 overflow-x-hidden px-4 py-5 md:px-6 md:py-6 lg:px-10",
+     "sw": 422,
+     "cw": 375,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 150,
+    "cw": 94,
+    "txt": "Accueil / Entreprises"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    },
+    {
+     "tag": "button",
+     "w": 110.5,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Importer"
+    },
+    {
+     "tag": "button",
+     "w": 108.3,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Exporter"
+    },
+    {
+     "tag": "a",
+     "w": 147.1,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Lancer scraping →"
+    },
+    {
+     "tag": "button",
+     "w": 52.9,
+     "h": 38,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Tous"
+    },
+    {
+     "tag": "button",
+     "w": 112,
+     "h": 38,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Prospectables"
+    },
+    {
+     "tag": "button",
+     "w": 70.5,
+     "h": 38,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Partiels"
+    },
+    {
+     "tag": "button",
+     "w": 76,
+     "h": 38,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Pending"
+    },
+    {
+     "tag": "button",
+     "w": 77.3,
+     "h": 38,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Archivés"
+    },
+    {
+     "tag": "input",
+     "w": 279,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Rechercher une entreprise…"
+    },
+    {
+     "tag": "select",
+     "w": 167,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre taille"
+    },
+    {
+     "tag": "select",
+     "w": 188,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre effectif (nombre de salariés)"
+    },
+    {
+     "tag": "select",
+     "w": 220,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre secteur"
+    },
+    {
+     "tag": "select",
+     "w": 118,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre pays d'immatriculation"
+    },
+    {
+     "tag": "select",
+     "w": 246,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre prêt pour une campagne"
+    },
+    {
+     "tag": "select",
+     "w": 257,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre qualité de l'adresse e-mail"
+    },
+    {
+     "tag": "select",
+     "w": 146,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre nature d'entité"
+    },
+    {
+     "tag": "select",
+     "w": 180,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre qualité"
+    },
+    {
+     "tag": "select",
+     "w": 151,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre priorité"
+    },
+    {
+     "tag": "select",
+     "w": 174,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre département"
+    },
+    {
+     "tag": "select",
+     "w": 146,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre région"
+    },
+    {
+     "tag": "input",
+     "w": 112,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre NAF"
+    },
+    {
+     "tag": "input",
+     "w": 176,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre tag"
+    },
+    {
+     "tag": "input",
+     "w": 135,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Fiches créées après le"
+    },
+    {
+     "tag": "input",
+     "w": 135,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Fiches créées avant le"
+    }
+   ],
+   "nCibles": 33,
+   "nSous44": 33,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 25,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Entreprises",
+   "mainTxtLen": 1219,
+   "route": "/companies",
+   "nom": "Entreprises"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 219,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 219,
+    "cw": 94,
+    "txt": "Accueil / Entreprises / #11111111"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "a",
+     "w": 70,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Entreprises"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    }
+   ],
+   "nCibles": 10,
+   "nSous44": 10,
+   "nSous44Coquille": 9,
+   "nSous44Contenu": 1,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Chargement…",
+   "mainTxtLen": 46,
+   "route": "/companies/11111111-1111-1111-1111-111111111111",
+   "nom": "Fiche entreprise"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 138,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 138,
+    "cw": 94,
+    "txt": "Accueil / Contacts"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    },
+    {
+     "tag": "input",
+     "w": 279,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Nom de famille…"
+    },
+    {
+     "tag": "select",
+     "w": 160,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre statut email"
+    },
+    {
+     "tag": "select",
+     "w": 106,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre pays"
+    },
+    {
+     "tag": "select",
+     "w": 247,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre statut de prospection"
+    }
+   ],
+   "nCibles": 13,
+   "nSous44": 13,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 5,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Contacts",
+   "mainTxtLen": 296,
+   "route": "/contacts",
+   "nom": "Contacts"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 237,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 237,
+    "cw": 94,
+    "txt": "Accueil / International / Roumanie"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    },
+    {
+     "tag": "button",
+     "w": 52,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Tout"
+    },
+    {
+     "tag": "button",
+     "w": 91.6,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Entreprises"
+    },
+    {
+     "tag": "button",
+     "w": 100.3,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Associations"
+    },
+    {
+     "tag": "button",
+     "w": 77.3,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Cabinets"
+    },
+    {
+     "tag": "button",
+     "w": 111.2,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Enseignement"
+    },
+    {
+     "tag": "button",
+     "w": 92.6,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Institutions"
+    },
+    {
+     "tag": "button",
+     "w": 174.1,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Chambres de commerce"
+    },
+    {
+     "tag": "button",
+     "w": 68.6,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Médias"
+    },
+    {
+     "tag": "button",
+     "w": 52.9,
+     "h": 38,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Tous"
+    },
+    {
+     "tag": "button",
+     "w": 112,
+     "h": 38,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Prospectables"
+    },
+    {
+     "tag": "button",
+     "w": 70.5,
+     "h": 38,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Partiels"
+    },
+    {
+     "tag": "button",
+     "w": 76,
+     "h": 38,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Pending"
+    },
+    {
+     "tag": "button",
+     "w": 77.3,
+     "h": 38,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Archivés"
+    }
+   ],
+   "nCibles": 22,
+   "nSous44": 22,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 14,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Présence française — Roumanie",
+   "mainTxtLen": 308,
+   "route": "/international/roumanie",
+   "nom": "Roumanie"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 125,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 125,
+    "cw": 94,
+    "txt": "Accueil / Media"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    },
+    {
+     "tag": "button",
+     "w": 115.4,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Exporter CSV"
+    },
+    {
+     "tag": "input",
+     "w": 295,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Rechercher un média…"
+    },
+    {
+     "tag": "select",
+     "w": 231,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre famille"
+    },
+    {
+     "tag": "select",
+     "w": 231,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre type"
+    },
+    {
+     "tag": "select",
+     "w": 160,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre périodicité"
+    },
+    {
+     "tag": "select",
+     "w": 140,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre site web"
+    },
+    {
+     "tag": "select",
+     "w": 127,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre email"
+    },
+    {
+     "tag": "select",
+     "w": 226,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre confiance email"
+    },
+    {
+     "tag": "input",
+     "w": 96,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre département"
+    },
+    {
+     "tag": "button",
+     "w": 92.3,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "← Précédent"
+    },
+    {
+     "tag": "button",
+     "w": 77.8,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Suivant →"
+    }
+   ],
+   "nCibles": 20,
+   "nSous44": 20,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 12,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Médias",
+   "mainTxtLen": 688,
+   "route": "/media",
+   "nom": "Medias"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 209,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 209,
+    "cw": 94,
+    "txt": "Accueil / Media / #22222222"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    }
+   ],
+   "nCibles": 9,
+   "nSous44": 9,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 1,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": null,
+   "mainTxtLen": 0,
+   "route": "/media/22222222-2222-2222-2222-222222222222",
+   "nom": "Fiche media"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 148,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 148,
+    "cw": 94,
+    "txt": "Accueil / Journalists"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    },
+    {
+     "tag": "button",
+     "w": 115.4,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Exporter CSV"
+    },
+    {
+     "tag": "input",
+     "w": 295,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Rechercher par nom…"
+    },
+    {
+     "tag": "button",
+     "w": 92.3,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "← Précédent"
+    },
+    {
+     "tag": "button",
+     "w": 77.8,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Suivant →"
+    }
+   ],
+   "nCibles": 13,
+   "nSous44": 13,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 5,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Journalistes",
+   "mainTxtLen": 174,
+   "route": "/journalists",
+   "nom": "Journalistes"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 190,
+     "cw": 94,
+     "ox": "hidden"
+    },
+    {
+     "tag": "div",
+     "cls": "group relative overflow-hidden rounded-2xl bg-white/80 p-4 ring-1 ring-emerald-2",
+     "sw": 145,
+     "cw": 142,
+     "ox": "hidden"
+    },
+    {
+     "tag": "div",
+     "cls": "group relative overflow-hidden rounded-2xl bg-white/80 p-4 ring-1 ring-amber-200",
+     "sw": 163,
+     "cw": 142,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 190,
+    "cw": 94,
+    "txt": "Accueil / Couverture France"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    },
+    {
+     "tag": "button",
+     "w": 108.1,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Visualisation"
+    },
+    {
+     "tag": "button",
+     "w": 93.2,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Recherche"
+    },
+    {
+     "tag": "button",
+     "w": 69.2,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Action"
+    },
+    {
+     "tag": "button",
+     "w": 71.2,
+     "h": 28,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Régions"
+    },
+    {
+     "tag": "button",
+     "w": 105.3,
+     "h": 28,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Départements"
+    },
+    {
+     "tag": "button",
+     "w": 56.7,
+     "h": 28,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Villes"
+    },
+    {
+     "tag": "canvas",
+     "w": 287,
+     "h": 640,
+     "ok": true,
+     "coquille": false,
+     "lbl": "Map"
+    }
+   ],
+   "nCibles": 16,
+   "nSous44": 15,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 7,
+   "conformes": [
+    "Map 287x640"
+   ],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Couverture France",
+   "mainTxtLen": 640,
+   "route": "/coverage",
+   "nom": "Couverture France"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 202,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 202,
+    "cw": 94,
+    "txt": "Accueil / Journaux de collecte"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    },
+    {
+     "tag": "button",
+     "w": 132.2,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Exporter en CSV"
+    },
+    {
+     "tag": "button",
+     "w": 80.5,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Tous 0"
+    },
+    {
+     "tag": "button",
+     "w": 105.3,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "En cours 0"
+    },
+    {
+     "tag": "button",
+     "w": 116.2,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "En attente 0"
+    },
+    {
+     "tag": "button",
+     "w": 108.3,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Terminés 0"
+    },
+    {
+     "tag": "button",
+     "w": 87.6,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Échec 0"
+    },
+    {
+     "tag": "button",
+     "w": 102.6,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Annulés 0"
+    },
+    {
+     "tag": "input",
+     "w": 203,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Rechercher source, dept, id…"
+    }
+   ],
+   "nCibles": 17,
+   "nSous44": 17,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 9,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Journaux de collecte",
+   "mainTxtLen": 289,
+   "route": "/scraper-runs",
+   "nom": "Journaux de collecte"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 139,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 139,
+    "cw": 94,
+    "txt": "Accueil / Collectes"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    },
+    {
+     "tag": "button",
+     "w": 182.2,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Nouvelle campagne"
+    },
+    {
+     "tag": "button",
+     "w": 92.9,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Toutes 0"
+    },
+    {
+     "tag": "button",
+     "w": 115.2,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Brouillons 0"
+    },
+    {
+     "tag": "button",
+     "w": 111.9,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Planifiées 0"
+    },
+    {
+     "tag": "button",
+     "w": 105.3,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "En cours 0"
+    },
+    {
+     "tag": "button",
+     "w": 108.1,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "En pause 0"
+    },
+    {
+     "tag": "button",
+     "w": 115.7,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Terminées 0"
+    },
+    {
+     "tag": "input",
+     "w": 295,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Rechercher par nom…"
+    }
+   ],
+   "nCibles": 17,
+   "nSous44": 17,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 9,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Collectes",
+   "mainTxtLen": 339,
+   "route": "/campaigns",
+   "nom": "Collectes"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 187,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 187,
+    "cw": 94,
+    "txt": "Accueil / Collectes / New"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "a",
+     "w": 59.5,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Collectes"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    },
+    {
+     "tag": "a",
+     "w": 59.5,
+     "h": 20,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Collectes"
+    },
+    {
+     "tag": "input",
+     "w": 247,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Ex : Prospection PME Paris IT — semaine "
+    },
+    {
+     "tag": "textarea",
+     "w": 247,
+     "h": 80,
+     "ok": true,
+     "coquille": false,
+     "lbl": "Notes internes pour l’équipe"
+    },
+    {
+     "tag": "button",
+     "w": 112.5,
+     "h": 52,
+     "ok": true,
+     "coquille": false,
+     "lbl": "Lancer maintenant"
+    },
+    {
+     "tag": "button",
+     "w": 122.5,
+     "h": 52,
+     "ok": true,
+     "coquille": false,
+     "lbl": "Planifier plus tard"
+    },
+    {
+     "tag": "button",
+     "w": 106.2,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Annuler"
+    },
+    {
+     "tag": "button",
+     "w": 118.9,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Continuer"
+    }
+   ],
+   "nCibles": 17,
+   "nSous44": 14,
+   "nSous44Coquille": 9,
+   "nSous44Contenu": 5,
+   "conformes": [
+    "Notes internes pour l’équipe 247x80",
+    "Lancer maintenant 112.5x52",
+    "Planifier plus tard 122.5x52"
+   ],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Nouvelle campagne",
+   "mainTxtLen": 342,
+   "route": "/campaigns/new",
+   "nom": "Nouvelle collecte"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 223,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 223,
+    "cw": 94,
+    "txt": "Accueil / Collectes / #33333333"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "a",
+     "w": 59.5,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Collectes"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    }
+   ],
+   "nCibles": 10,
+   "nSous44": 10,
+   "nSous44Coquille": 9,
+   "nSous44Contenu": 1,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": null,
+   "mainTxtLen": 0,
+   "route": "/campaigns/33333333-3333-3333-3333-333333333333",
+   "nom": "Fiche collecte"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 146,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 146,
+    "cw": 94,
+    "txt": "Accueil / Audiences"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    },
+    {
+     "tag": "button",
+     "w": 173.5,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Nouvelle audience"
+    }
+   ],
+   "nCibles": 10,
+   "nSous44": 10,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 2,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Audiences",
+   "mainTxtLen": 217,
+   "route": "/audiences",
+   "nom": "Audiences"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 194,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 194,
+    "cw": 94,
+    "txt": "Accueil / Audiences / New"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    },
+    {
+     "tag": "a",
+     "w": 66.5,
+     "h": 20,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Audiences"
+    },
+    {
+     "tag": "input",
+     "w": 255,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Ex : PME Île-de-France IT — prêtes outre"
+    },
+    {
+     "tag": "textarea",
+     "w": 255,
+     "h": 70,
+     "ok": true,
+     "coquille": false,
+     "lbl": "Pour quelle campagne ? Quel objectif ?"
+    },
+    {
+     "tag": "button",
+     "w": 60.5,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "75 Paris"
+    },
+    {
+     "tag": "button",
+     "w": 114.3,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "92 Hauts-de-Seine"
+    },
+    {
+     "tag": "button",
+     "w": 125,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "93 Seine-Saint-Denis"
+    },
+    {
+     "tag": "button",
+     "w": 69.1,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "69 Rhône"
+    },
+    {
+     "tag": "button",
+     "w": 132.8,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "13 Bouches-du-Rhône"
+    },
+    {
+     "tag": "button",
+     "w": 77,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "33 Gironde"
+    },
+    {
+     "tag": "button",
+     "w": 114.1,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "31 Haute-Garonne"
+    },
+    {
+     "tag": "button",
+     "w": 62.6,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "59 Nord"
+    },
+    {
+     "tag": "button",
+     "w": 81.1,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "67 Bas-Rhin"
+    },
+    {
+     "tag": "button",
+     "w": 118,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "44 Loire-Atlantique"
+    },
+    {
+     "tag": "button",
+     "w": 103,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "11 Île-de-France"
+    },
+    {
+     "tag": "button",
+     "w": 132.3,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "24 Centre-Val de Loire"
+    },
+    {
+     "tag": "button",
+     "w": 173.6,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "27 Bourgogne-Franche-Comté"
+    },
+    {
+     "tag": "button",
+     "w": 93.3,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "28 Normandie"
+    },
+    {
+     "tag": "button",
+     "w": 120.1,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "32 Hauts-de-France"
+    },
+    {
+     "tag": "button",
+     "w": 85,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "44 Grand Est"
+    },
+    {
+     "tag": "button",
+     "w": 114,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "52 Pays de la Loire"
+    },
+    {
+     "tag": "button",
+     "w": 82.1,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "53 Bretagne"
+    },
+    {
+     "tag": "button",
+     "w": 133.9,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "75 Nouvelle-Aquitaine"
+    },
+    {
+     "tag": "button",
+     "w": 83.4,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "76 Occitanie"
+    },
+    {
+     "tag": "button",
+     "w": 153.4,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "84 Auvergne-Rhône-Alpes"
+    },
+    {
+     "tag": "button",
+     "w": 177.7,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "93 Provence-Alpes-Côte d'Azur"
+    },
+    {
+     "tag": "button",
+     "w": 65.1,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "94 Corse"
+    },
+    {
+     "tag": "button",
+     "w": 107.6,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "micro Micro (1-9)"
+    },
+    {
+     "tag": "button",
+     "w": 98.5,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "tpe TPE (10-49)"
+    },
+    {
+     "tag": "button",
+     "w": 110.3,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "pme PME (50-249)"
+    },
+    {
+     "tag": "button",
+     "w": 115.4,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "eti ETI (250-4999)"
+    },
+    {
+     "tag": "button",
+     "w": 137.8,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "grande Grande (5000+)"
+    },
+    {
+     "tag": "button",
+     "w": 107.8,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "it_saas IT / SaaS"
+    },
+    {
+     "tag": "button",
+     "w": 61.3,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "btp BTP"
+    },
+    {
+     "tag": "button",
+     "w": 81.4,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "sante Santé"
+    },
+    {
+     "tag": "button",
+     "w": 123.7,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "commerce Commerce"
+    },
+    {
+     "tag": "button",
+     "w": 152.8,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "services_pro Services pro"
+    },
+    {
+     "tag": "button",
+     "w": 218.6,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "finance_assurance Finance / Assurance"
+    },
+    {
+     "tag": "button",
+     "w": 119.7,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "industrie Industrie"
+    },
+    {
+     "tag": "button",
+     "w": 239.5,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "hotellerie_restauration Hôtellerie / Res"
+    },
+    {
+     "tag": "button",
+     "w": 123.2,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "transport Transport"
+    },
+    {
+     "tag": "button",
+     "w": 198.9,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "agro_alimentaire Agro-alimentaire"
+    },
+    {
+     "tag": "button",
+     "w": 105.4,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "pending Pending"
+    },
+    {
+     "tag": "button",
+     "w": 210.3,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "ready_for_outreach Prêt outreach"
+    },
+    {
+     "tag": "button",
+     "w": 159.6,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "partial_email Email partiel"
+    },
+    {
+     "tag": "button",
+     "w": 211.4,
+     "h": 24.5,
+     "ok": false,
+     "coquille": false,
+     "lbl": "archived_no_email Archivé sans email"
+    },
+    {
+     "tag": "input",
+     "w": 255,
+     "h": 16,
+     "ok": false,
+     "coquille": false,
+     "lbl": "0"
+    },
+    {
+     "tag": "input",
+     "w": 16,
+     "h": 16,
+     "ok": false,
+     "coquille": false,
+     "lbl": "on"
+    },
+    {
+     "tag": "input",
+     "w": 255,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "ex : decisionnaire, growth, fintech"
+    },
+    {
+     "tag": "button",
+     "w": 253,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Créer l'audience"
+    },
+    {
+     "tag": "button",
+     "w": 253,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Annuler"
+    }
+   ],
+   "nCibles": 59,
+   "nSous44": 58,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 50,
+   "conformes": [
+    "Pour quelle campagne ? Quel objectif ? 255x70"
+   ],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Nouvelle audience",
+   "mainTxtLen": 1479,
+   "route": "/audiences/new",
+   "nom": "Nouvelle audience"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 232,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 232,
+    "cw": 94,
+    "txt": "Accueil / Audiences / #44444444"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    }
+   ],
+   "nCibles": 9,
+   "nSous44": 9,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 1,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": null,
+   "mainTxtLen": 0,
+   "route": "/audiences/44444444-4444-4444-4444-444444444444",
+   "nom": "Fiche audience"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 115,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 115,
+    "cw": 94,
+    "txt": "Accueil / Tags"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    },
+    {
+     "tag": "button",
+     "w": 137.8,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Nouveau tag"
+    }
+   ],
+   "nCibles": 10,
+   "nSous44": 10,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 2,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Tags",
+   "mainTxtLen": 227,
+   "route": "/tags",
+   "nom": "Tags"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 151,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 151,
+    "cw": 94,
+    "txt": "Accueil / Utilisateurs"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    },
+    {
+     "tag": "button",
+     "w": 182,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Inviter un utilisateur"
+    }
+   ],
+   "nCibles": 10,
+   "nSous44": 10,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 2,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Utilisateurs",
+   "mainTxtLen": 113,
+   "route": "/users",
+   "nom": "Utilisateurs"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 151,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 151,
+    "cw": 94,
+    "txt": "Accueil / Paramètres"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    },
+    {
+     "tag": "button",
+     "w": 113.7,
+     "h": 40,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Workspace"
+    },
+    {
+     "tag": "button",
+     "w": 120.9,
+     "h": 40,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Intégrations"
+    },
+    {
+     "tag": "button",
+     "w": 128.2,
+     "h": 40,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Observabilité"
+    },
+    {
+     "tag": "button",
+     "w": 112.1,
+     "h": 40,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Apparence"
+    }
+   ],
+   "nCibles": 13,
+   "nSous44": 13,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 5,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Paramètres",
+   "mainTxtLen": 167,
+   "route": "/settings",
+   "nom": "Parametres"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 174,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 174,
+    "cw": 94,
+    "txt": "Accueil / LLM / Router"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "a",
+     "w": 34.1,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "LLM"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    },
+    {
+     "tag": "button",
+     "w": 119.3,
+     "h": 40,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Cas d'usage"
+    },
+    {
+     "tag": "button",
+     "w": 123.6,
+     "h": 40,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Fournisseurs"
+    },
+    {
+     "tag": "button",
+     "w": 97.5,
+     "h": 40,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Prompts"
+    },
+    {
+     "tag": "button",
+     "w": 106.1,
+     "h": 40,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Usage 30j"
+    }
+   ],
+   "nCibles": 14,
+   "nSous44": 14,
+   "nSous44Coquille": 9,
+   "nSous44Contenu": 5,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "LLM Router",
+   "mainTxtLen": 139,
+   "route": "/llm/router",
+   "nom": "LLM Router"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 176,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 176,
+    "cw": 94,
+    "txt": "Accueil / LLM / Proxies"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "a",
+     "w": 34.1,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "LLM"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    }
+   ],
+   "nCibles": 10,
+   "nSous44": 10,
+   "nSous44Coquille": 9,
+   "nSous44Contenu": 1,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Fournisseurs de proxies",
+   "mainTxtLen": 107,
+   "route": "/llm/proxy-providers",
+   "nom": "Proxies"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 189,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 189,
+    "cw": 94,
+    "txt": "Accueil / LLM / Rotations"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "a",
+     "w": 34.1,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "LLM"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    }
+   ],
+   "nCibles": 10,
+   "nSous44": 10,
+   "nSous44Coquille": 9,
+   "nSous44Contenu": 1,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Rotations",
+   "mainTxtLen": 109,
+   "route": "/llm/rotations",
+   "nom": "Rotations"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 606,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 231,
+   "offenders": [
+    {
+     "tag": "div",
+     "cls": "inline-flex items-center gap-1 rounded-full bg-slate-100 p-1 shadow-inner ring-1 ring-slat",
+     "w": 566,
+     "right": 606,
+     "txt": "Toutes Accès · art. 15 Portabilité · art. 20 Suppr"
+    },
+    {
+     "tag": "button",
+     "cls": "inline-flex items-center gap-1.5 font-medium transition rounded-full px-3.5 py-1.5 text-sm",
+     "w": 105,
+     "right": 389,
+     "txt": "Suppression · art. 17"
+    },
+    {
+     "tag": "button",
+     "cls": "inline-flex items-center gap-1.5 font-medium transition rounded-full px-3.5 py-1.5 text-sm",
+     "w": 107,
+     "right": 499,
+     "txt": "Rectification · art. 16"
+    },
+    {
+     "tag": "button",
+     "cls": "inline-flex items-center gap-1.5 font-medium transition rounded-full px-3.5 py-1.5 text-sm",
+     "w": 99,
+     "right": 602,
+     "txt": "Opposition · art. 21"
+    }
+   ],
+   "nOffenders": 4,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 195,
+     "cw": 94,
+     "ox": "hidden"
+    },
+    {
+     "tag": "main",
+     "cls": "flex-1 overflow-x-hidden px-4 py-5 md:px-6 md:py-6 lg:px-10",
+     "sw": 606,
+     "cw": 375,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 195,
+    "cw": 94,
+    "txt": "Accueil / RGPD / Requêtes"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "a",
+     "w": 42.4,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "RGPD"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    },
+    {
+     "tag": "button",
+     "w": 163.3,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Nouvelle requête"
+    },
+    {
+     "tag": "button",
+     "w": 69.3,
+     "h": 32,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Toutes"
+    },
+    {
+     "tag": "button",
+     "w": 64,
+     "h": 72,
+     "ok": true,
+     "coquille": false,
+     "lbl": "Accès · art. 15"
+    },
+    {
+     "tag": "button",
+     "w": 93.8,
+     "h": 52,
+     "ok": true,
+     "coquille": false,
+     "lbl": "Portabilité · art. 20"
+    },
+    {
+     "tag": "button",
+     "w": 105.4,
+     "h": 52,
+     "ok": true,
+     "coquille": false,
+     "lbl": "Suppression · art. 17"
+    },
+    {
+     "tag": "button",
+     "w": 106.7,
+     "h": 52,
+     "ok": true,
+     "coquille": false,
+     "lbl": "Rectification · art. 16"
+    },
+    {
+     "tag": "button",
+     "w": 98.8,
+     "h": 52,
+     "ok": true,
+     "coquille": false,
+     "lbl": "Opposition · art. 21"
+    }
+   ],
+   "nCibles": 17,
+   "nSous44": 12,
+   "nSous44Coquille": 9,
+   "nSous44Contenu": 3,
+   "conformes": [
+    "Accès · art. 15 64x72",
+    "Portabilité · art. 20 93.8x52",
+    "Suppression · art. 17 105.4x52",
+    "Rectification · art. 16 106.7x52",
+    "Opposition · art. 21 98.8x52"
+   ],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Requêtes RGPD",
+   "mainTxtLen": 225,
+   "route": "/rgpd/requests",
+   "nom": "Requetes RGPD"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 226,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 226,
+    "cw": 94,
+    "txt": "Accueil / RGPD / Registre AI Act"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "a",
+     "w": 42.4,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "RGPD"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    }
+   ],
+   "nCibles": 10,
+   "nSous44": 10,
+   "nSous44Coquille": 9,
+   "nSous44Contenu": 1,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Registre AI Act",
+   "mainTxtLen": 361,
+   "route": "/rgpd/ai-act",
+   "nom": "Registre AI Act"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 181,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 181,
+    "cw": 94,
+    "txt": "Accueil / Journaux d’audit"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    },
+    {
+     "tag": "button",
+     "w": 159.4,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Vérifier la chaîne"
+    },
+    {
+     "tag": "input",
+     "w": 279,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Événement, chemin, IP, acteur…"
+    },
+    {
+     "tag": "select",
+     "w": 142,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Filtre sévérité"
+    }
+   ],
+   "nCibles": 12,
+   "nSous44": 12,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 4,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Journaux d’audit",
+   "mainTxtLen": 153,
+   "route": "/audit-logs",
+   "nom": "Journaux audit"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 222,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 222,
+    "cw": 94,
+    "txt": "Accueil / Admin / Observability"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    }
+   ],
+   "nCibles": 9,
+   "nSous44": 9,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 1,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": null,
+   "mainTxtLen": 30,
+   "route": "/admin/observability",
+   "nom": "Observabilite"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 205,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 205,
+    "cw": 94,
+    "txt": "Accueil / Console / Contacts"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    }
+   ],
+   "nCibles": 9,
+   "nSous44": 9,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 1,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": null,
+   "mainTxtLen": 0,
+   "route": "/console/contacts",
+   "nom": "Console contacts"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 189,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 189,
+    "cw": 94,
+    "txt": "Accueil / Console / Vivier"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    }
+   ],
+   "nCibles": 9,
+   "nSous44": 9,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 1,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": null,
+   "mainTxtLen": 72,
+   "route": "/console/vivier",
+   "nom": "Console vivier"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 209,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 209,
+    "cw": 94,
+    "txt": "Accueil / Console / Arbitrage"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    }
+   ],
+   "nCibles": 9,
+   "nSous44": 9,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 1,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": null,
+   "mainTxtLen": 72,
+   "route": "/console/arbitrage",
+   "nom": "Console arbitrage"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 275,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 275,
+    "cw": 94,
+    "txt": "Accueil / Console / Personnes / Abc123"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    }
+   ],
+   "nCibles": 9,
+   "nSous44": 9,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 1,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": null,
+   "mainTxtLen": 72,
+   "route": "/console/personnes/abc123",
+   "nom": "Fiche 360"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 169,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 169,
+    "cw": 94,
+    "txt": "Accueil / E-mails à froid"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    }
+   ],
+   "nCibles": 9,
+   "nSous44": 9,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 1,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Cold email",
+   "mainTxtLen": 121,
+   "route": "/cold-email",
+   "nom": "Cold email (stub)"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": 375,
+   "mainCW": 375,
+   "mainOX": "hidden",
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "min-w-0 flex-1 truncate",
+     "sw": 204,
+     "cw": 94,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": {
+    "sw": 204,
+    "cw": 94,
+    "txt": "Accueil / Prospection LinkedIn"
+   },
+   "cibles": [
+    {
+     "tag": "a",
+     "w": 115.7,
+     "h": 24,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Aller au contenu"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Ouvrir le menu"
+    },
+    {
+     "tag": "a",
+     "w": 65.7,
+     "h": 20,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Accueil"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Rechercher"
+    },
+    {
+     "tag": "button",
+     "w": 28,
+     "h": 28,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Notifications"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme light"
+    },
+    {
+     "tag": "button",
+     "w": 26.1,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme system"
+    },
+    {
+     "tag": "button",
+     "w": 22.9,
+     "h": 24,
+     "ok": false,
+     "coquille": true,
+     "lbl": "Theme dark"
+    },
+    {
+     "tag": "button",
+     "w": 44,
+     "h": 40,
+     "ok": false,
+     "coquille": true,
+     "lbl": "U"
+    }
+   ],
+   "nCibles": 9,
+   "nSous44": 9,
+   "nSous44Coquille": 8,
+   "nSous44Contenu": 1,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "LinkedIn outreach",
+   "mainTxtLen": 128,
+   "route": "/linkedin",
+   "nom": "LinkedIn (stub)"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": null,
+   "mainCW": null,
+   "mainOX": null,
+   "pxHorsEcran": 0,
+   "offenders": [
+    {
+     "tag": "div",
+     "cls": "absolute -right-32 bottom-1/4 h-72 w-72 rounded-full bg-violet-200/20 blur-3xl dark:bg-vio",
+     "w": 288,
+     "right": 503,
+     "txt": ""
+    }
+   ],
+   "nOffenders": 1,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "pointer-events-none absolute inset-0 overflow-hidden",
+     "sw": 503,
+     "cw": 375,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": null,
+   "cibles": [
+    {
+     "tag": "input",
+     "w": 295,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Adresse e-mail"
+    },
+    {
+     "tag": "input",
+     "w": 295,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Mot de passe"
+    },
+    {
+     "tag": "button",
+     "w": 20,
+     "h": 20,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Afficher le mot de passe"
+    },
+    {
+     "tag": "input",
+     "w": 16,
+     "h": 16,
+     "ok": false,
+     "coquille": false,
+     "lbl": "on"
+    },
+    {
+     "tag": "button",
+     "w": 295,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Se connecter"
+    },
+    {
+     "tag": "a",
+     "w": 133.7,
+     "h": 16,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Recevoir un lien magique"
+    },
+    {
+     "tag": "a",
+     "w": 116.3,
+     "h": 16,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Mot de passe oublié ?"
+    }
+   ],
+   "nCibles": 7,
+   "nSous44": 7,
+   "nSous44Coquille": 0,
+   "nSous44Contenu": 7,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Connexion",
+   "mainTxtLen": null,
+   "route": "/login",
+   "nom": "Connexion"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": null,
+   "mainCW": null,
+   "mainOX": null,
+   "pxHorsEcran": 0,
+   "offenders": [
+    {
+     "tag": "div",
+     "cls": "absolute -right-32 bottom-1/4 h-72 w-72 rounded-full bg-violet-200/20 blur-3xl dark:bg-vio",
+     "w": 288,
+     "right": 503,
+     "txt": ""
+    }
+   ],
+   "nOffenders": 1,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "pointer-events-none absolute inset-0 overflow-hidden",
+     "sw": 503,
+     "cw": 375,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": null,
+   "cibles": [
+    {
+     "tag": "input",
+     "w": 295,
+     "h": 56,
+     "ok": true,
+     "coquille": false,
+     "lbl": "Code à 6 chiffres"
+    },
+    {
+     "tag": "button",
+     "w": 295,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Vérifier"
+    },
+    {
+     "tag": "a",
+     "w": 295,
+     "h": 16,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Retour à la connexion"
+    }
+   ],
+   "nCibles": 3,
+   "nSous44": 2,
+   "nSous44Coquille": 0,
+   "nSous44Contenu": 2,
+   "conformes": [
+    "Code à 6 chiffres 295x56"
+   ],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Code à 6 chiffres",
+   "mainTxtLen": null,
+   "route": "/2fa",
+   "nom": "2FA"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": null,
+   "mainCW": null,
+   "mainOX": null,
+   "pxHorsEcran": 0,
+   "offenders": [
+    {
+     "tag": "div",
+     "cls": "absolute -right-32 bottom-1/4 h-72 w-72 rounded-full bg-violet-200/20 blur-3xl dark:bg-vio",
+     "w": 288,
+     "right": 503,
+     "txt": ""
+    }
+   ],
+   "nOffenders": 1,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "pointer-events-none absolute inset-0 overflow-hidden",
+     "sw": 503,
+     "cw": 375,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": null,
+   "cibles": [
+    {
+     "tag": "input",
+     "w": 295,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "prenom.nom@exemple.com"
+    },
+    {
+     "tag": "button",
+     "w": 295,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Envoyer le lien"
+    },
+    {
+     "tag": "a",
+     "w": 295,
+     "h": 16,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Retour à la connexion"
+    }
+   ],
+   "nCibles": 3,
+   "nSous44": 3,
+   "nSous44Coquille": 0,
+   "nSous44Contenu": 3,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Recevoir un lien magique",
+   "mainTxtLen": null,
+   "route": "/magic-link",
+   "nom": "Lien magique"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": null,
+   "mainCW": null,
+   "mainOX": null,
+   "pxHorsEcran": 0,
+   "offenders": [
+    {
+     "tag": "div",
+     "cls": "absolute -right-32 bottom-1/4 h-72 w-72 rounded-full bg-violet-200/20 blur-3xl dark:bg-vio",
+     "w": 288,
+     "right": 503,
+     "txt": ""
+    }
+   ],
+   "nOffenders": 1,
+   "scrollers": [],
+   "clipped": [
+    {
+     "tag": "div",
+     "cls": "pointer-events-none absolute inset-0 overflow-hidden",
+     "sw": 503,
+     "cw": 375,
+     "ox": "hidden"
+    }
+   ],
+   "filAriane": null,
+   "cibles": [
+    {
+     "tag": "input",
+     "w": 295,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "prenom.nom@exemple.com"
+    },
+    {
+     "tag": "button",
+     "w": 295,
+     "h": 36,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Envoyer le lien"
+    },
+    {
+     "tag": "a",
+     "w": 295,
+     "h": 16,
+     "ok": false,
+     "coquille": false,
+     "lbl": "Retour à la connexion"
+    }
+   ],
+   "nCibles": 3,
+   "nSous44": 3,
+   "nSous44Coquille": 0,
+   "nSous44Contenu": 3,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": "Réinitialiser le mot de passe",
+   "mainTxtLen": null,
+   "route": "/password-reset",
+   "nom": "Mot de passe oublie"
+  },
+  {
+   "VW": 375,
+   "pageSW": 375,
+   "pageOverflow": false,
+   "mainSW": null,
+   "mainCW": null,
+   "mainOX": null,
+   "pxHorsEcran": 0,
+   "offenders": [],
+   "nOffenders": 0,
+   "scrollers": [],
+   "clipped": [],
+   "filAriane": null,
+   "cibles": [],
+   "nCibles": 0,
+   "nSous44": 0,
+   "nSous44Coquille": 0,
+   "nSous44Contenu": 0,
+   "conformes": [],
+   "fixedBottom": [],
+   "nBarreBasse": 0,
+   "tables": [],
+   "gridRows": 0,
+   "h1": null,
+   "mainTxtLen": null,
+   "route": "/route-inexistante-agent30",
+   "nom": "404"
+  }
+ ]
+}

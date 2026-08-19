@@ -1,0 +1,32 @@
+### SettingsPage — les commandes et ce qu'elles font
+
+-- onglet Workspace : le seul formulaire, vers PUT /workspace
+107:    mutationFn: async (patch: Partial<Workspace>) => (await api.put('/workspace', patch)).data,
+109:      toast.success('Workspace mis à jour');
+112:    onError: () => toast.error('Erreur mise à jour'),
+   -> backend :
+41:    public function update(Request $r): JsonResponse { return $this->notImplemented('3'); }
+60:        ], 501);
+
+-- onglet Integrations : boutons SANS onClick
+86:        onClick={() => setRevealed((v) => !v)}
+210:                    Renouveler
+213:                    Configurer
+291:                  onClick={() => setDensity(d)}
+
+-- le secret masque est une constante du code, pas une valeur lue
+207:                <MaskedSecret value="sk-•••••" label={i.env} />
+
+-- onglet Observabilite : le champ DSN Sentry
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">DSN Sentry</span>
+              <Input placeholder="https://xxx@sentry.io/yyy" defaultValue="" />
+              <span className="mt-1 block text-xs text-slate-500">
+                Reporting des erreurs runtime, lié à GlitchTip self-hosted en dev.
+              </span>
+            </label>
+
+-- onglet Apparence : densite
+99:  const [density, setDensity] = useState<'comfortable' | 'compact'>('comfortable');
+291:                  onClick={() => setDensity(d)}
+293:                    density === d

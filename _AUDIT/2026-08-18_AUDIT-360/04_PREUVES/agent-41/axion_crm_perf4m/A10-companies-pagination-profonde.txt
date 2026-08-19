@@ -1,0 +1,37 @@
+############ A10-companies-pagination-profonde
+### base   : axion_crm_perf4m   (datcollate = C)
+### date   : 2026-08-19T14:51:29+02:00
+### SQL    :
+select * from "companies" where "deleted_at" is null and "workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168' order by "quality_score" desc limit 100 offset 99900;
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                                             QUERY PLAN                                                                              
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=8675.63..8684.32 rows=100 width=2078) (actual time=5381.309..5383.054 rows=100 loops=1)
+   Buffers: shared read=2785
+   ->  Index Scan using idx_companies_workspace_score on companies  (cost=0.43..243149.24 rows=2800000 width=2078) (actual time=5.126..5369.320 rows=100000 loops=1)
+         Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+         Filter: (deleted_at IS NULL)
+         Buffers: shared read=2785
+ Planning:
+   Buffers: shared hit=798 read=7
+ Planning Time: 19.502 ms
+ Execution Time: 5383.241 ms
+(10 rows)
+
+
+===== CHAUD (4e exécution) =====
+                                                                             QUERY PLAN                                                                             
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=8675.63..8684.32 rows=100 width=2078) (actual time=280.499..280.663 rows=100 loops=1)
+   Buffers: shared hit=2785
+   ->  Index Scan using idx_companies_workspace_score on companies  (cost=0.43..243149.24 rows=2800000 width=2078) (actual time=0.121..248.929 rows=100000 loops=1)
+         Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+         Filter: (deleted_at IS NULL)
+         Buffers: shared hit=2785
+ Planning:
+   Buffers: shared hit=805
+ Planning Time: 12.370 ms
+ Execution Time: 280.864 ms
+(10 rows)
+

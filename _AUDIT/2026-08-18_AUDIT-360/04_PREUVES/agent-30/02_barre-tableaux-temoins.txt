@@ -1,0 +1,120 @@
+=== 1. BARRE LATERALE — deployee vs repliee (1280x900, seuil lg atteint) ===
+
+--- route /
+  DEPLOYEE  largeur=260px  titres=6 [AUJOURD'HUI, CONTACTS, COLLECTE, PILOTAGE, CONFORMITÉ, RÉGLAGES]  liens visibles=1
+     /                          y=152  243x32
+  REPLIEE   largeur=64px  titres=0  liens visibles=20
+     /                          y=81  32x28
+     /contacts                  y=121  32x28
+     /companies                 y=151  32x28
+     /journalists               y=181  32x28
+     /media                     y=211  32x28
+     /coverage                  y=251  32x28
+     /campaigns                 y=281  32x28
+     /scraper-runs              y=311  32x28
+     /international/roumanie    y=341  32x28
+     /audiences                 y=381  32x28
+     /admin/observability       y=411  32x28
+     /rgpd/requests             y=451  32x28
+     /rgpd/ai-act               y=481  32x28
+     /audit-logs                y=511  32x28
+     /users                     y=551  32x28
+     /settings                  y=581  32x28
+     /tags                      y=611  32x28
+     /llm/router                y=641  32x28
+     /llm/proxy-providers       y=671  32x28
+     /llm/rotations             y=701  32x28
+  ECARTS DE POSITION (exigence CDC 23.3 : « aux memes positions ») :
+     /                          deployee y=152  repliee y=81  ecart=71px
+  entrees affichees en repliee mais ABSENTES en deployee : 19
+  pied de barre deployee=["Réduire"]  repliee=["Étendre la barre latérale"]
+
+--- route /companies
+  DEPLOYEE  largeur=260px  titres=6 [AUJOURD'HUI, CONTACTS, COLLECTE, PILOTAGE, CONFORMITÉ, RÉGLAGES]  liens visibles=4
+     /contacts                  y=187  243x32
+     /companies                 y=221  243x32
+     /journalists               y=255  243x32
+     /media                     y=289  243x32
+  REPLIEE   largeur=64px  titres=0  liens visibles=20
+     /                          y=81  32x28
+     /contacts                  y=121  32x28
+     /companies                 y=151  32x28
+     /journalists               y=181  32x28
+     /media                     y=211  32x28
+     /coverage                  y=251  32x28
+     /campaigns                 y=281  32x28
+     /scraper-runs              y=311  32x28
+     /international/roumanie    y=341  32x28
+     /audiences                 y=381  32x28
+     /admin/observability       y=411  32x28
+     /rgpd/requests             y=451  32x28
+     /rgpd/ai-act               y=481  32x28
+     /audit-logs                y=511  32x28
+     /users                     y=551  32x28
+     /settings                  y=581  32x28
+     /tags                      y=611  32x28
+     /llm/router                y=641  32x28
+     /llm/proxy-providers       y=671  32x28
+     /llm/rotations             y=701  32x28
+  ECARTS DE POSITION (exigence CDC 23.3 : « aux memes positions ») :
+     /contacts                  deployee y=187  repliee y=121  ecart=66px
+     /companies                 deployee y=221  repliee y=151  ecart=70px
+     /journalists               deployee y=255  repliee y=181  ecart=74px
+     /media                     deployee y=289  repliee y=211  ecart=78px
+  entrees affichees en repliee mais ABSENTES en deployee : 16
+  pied de barre deployee=["Réduire"]  repliee=["Étendre la barre latérale"]
+
+=== 2. TIROIR DE NAVIGATION MOBILE (375x812) ===
+barre laterale de bureau visible a 375px : false
+bouton hamburger present : true
+contenu du tiroir : Navigation | A | Axion CRM Pro | MW | Mon workspace | AUJOURD'HUI | CONTACTS | Contacts | Entreprises | Journalistes | Médias (presse) | COLLECTE | PILOTAGE | CONFORMITÉ | RÉGLAGES | Réduire
+cibles tactiles du tiroir : 14 dont 14 sous 44x44
+   <44 36x36  Fermer
+   <44 235x36  A Axion CRM Pro
+   <44 156x36  MW Mon workspace
+   <44 243x23  AUJOURD'HUI
+   <44 243x23  CONTACTS
+   <44 243x32  Contacts
+   <44 243x32  Entreprises
+   <44 243x32  Journalistes
+   <44 243x32  Médias (presse)
+   <44 243x23  COLLECTE
+   <44 243x23  PILOTAGE
+   <44 243x23  CONFORMITÉ
+   <44 243x23  RÉGLAGES
+   <44 243x28  Réduire la barre latérale
+APRES clic sur une entree du menu : url=/journalists  tiroir encore ouvert=true  body.overflow="hidden"
+recherche mobile, 1er niveau : Recherche | 🔍 | Rechercher | ⌘K
+  controles : ["Fermer 28x28","Recherche globale 169x34"]
+recherche mobile, apres 2e appui : 2 dialogues empiles ; ["Recherche | 🔍 | Esc | Tape au moins 2 caractères pour rechercher. | ⌘K pour ouvrir / fermer | ↑↓ naviguer · ↵ ouvrir","🔍 | Esc | Tape au moins 2 caractères pour rechercher. | ⌘K pour ouvrir / fermer | ↑↓ naviguer · ↵ ouvrir"]
+
+=== 3. TABLEAUX LARGES a 375px — sonde du patron reel + TEMOIN ===
+{
+  "VW": 375,
+  "mainOverflowX": "hidden",
+  "SONDE_A_patron_produit": {
+    "carteLargeurVisible": 343,
+    "carteLargeurContenu": 1046,
+    "carteOverflowX": "hidden",
+    "conteneurOverflowX": "hidden",
+    "conteneurLargeurContenu": 1046,
+    "defilableParUtilisateur": false,
+    "derniereColonneDroite": 1062,
+    "derniereColonneVisible": false
+  },
+  "SONDE_B_temoin": {
+    "carteLargeurVisible": 343,
+    "carteLargeurContenu": 343,
+    "carteOverflowX": "hidden",
+    "conteneurOverflowX": "auto",
+    "conteneurLargeurContenu": 1046,
+    "defilableParUtilisateur": true,
+    "derniereColonneDroite": 1062,
+    "derniereColonneVisible": false
+  }
+}
+
+=== 4. TEMOINS NEGATIFS DU DETECTEUR ===
+barres basses detectees SANS plantage : 0
+barres basses detectees APRES plantage : 1 -> [{"tag":"nav","txt":"Aujourd’hui | Contacts | Échanges | Rechercher | Plus"}]
+cibles >= 44x44 detectees apres plantage du temoin44 : ["Démarrer sur /covera","temoin44","Aujourd’hui","Contacts","Échanges","Rechercher","Plus"]

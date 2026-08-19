@@ -1,0 +1,46 @@
+=== G43 — PERTE DE MISE A JOUR, DEUX SESSIONS psql REELLEMENT SIMULTANEES ===
+=== base axion_crm_g43 (jetable), fiche id=100006 ===
+=== UPDATE identique a celui d'Eloquent : Model::performUpdate -> setKeysForSaveQuery
+===   = WHERE "id" = ? SEULEMENT (vendor/.../Eloquent/Model.php:1355-1360) ===
+
+--- etat initial ---
+   id   |  denomination   
+--------+-----------------
+ 100006 | VALEUR INITIALE
+(1 row)
+
+
+--- Marie (session A) et Paul (session B) ouvrent la fiche EN MEME TEMPS ---
+--- chacun LIT, attend 2 s (le temps de saisir), puis ENREGISTRE ---
+  [A] A a lu : VALEUR INITIALE
+  [A] 
+  [A] UPDATE 1
+  [B] B a lu : VALEUR INITIALE
+  [B] 
+  [B] UPDATE 1
+
+--- MESURE : valeur finale ---
+   id   |   denomination   
+--------+------------------
+ 100006 | PAUL (session B)
+(1 row)
+
+>>> UNE des deux saisies a disparu. Les deux UPDATE ont rendu UPDATE 1, sans erreur,
+>>> et aucun des deux operateurs n'a ete averti.
+
+=======================================================================
+=== TEMOIN POSITIF : le controle SAIT detecter le conflit quand la garde existe ===
+=== (verrou optimiste sur updated_at — la garde absente de tout ce depot) ===
+UPDATE 1
+  U0 lu par Marie ET par Paul = 2026-08-19 12:58:07.532546+00
+  Marie ecrit AVEC « AND updated_at = U0 » :
+UPDATE 1
+  Paul ecrit AVEC « AND updated_at = U0 » (meme U0, il n'a pas vu l'ecriture de Marie) :
+UPDATE 0
+>>> « UPDATE 0 » = le conflit est DETECTE. Le controle est donc capable de voir ;
+>>> s'il n'a rien vu au-dessus, c'est qu'il n'y avait rien a voir.
+   id   | denomination 
+--------+--------------
+ 100006 | MARIE
+(1 row)
+

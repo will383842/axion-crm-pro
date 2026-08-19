@@ -1,0 +1,118 @@
+===== SONDE COURTE n2 — AGENT 35 — main e8924b8 — 2026-08-19T14:59:44+02:00 =====
+APP_ENV=local | session.driver=redis | log=single | base=axion_crm_test_a35
+gestionnaire d exceptions par defaut du banc = NunoMaduro\Collision\Adapters\Laravel\ExceptionHandler
+
+----- [3] Correctif A-001 : les DEUX moities sont necessaires -----
+  (0) tel quel, comme sur main e8924b8       navigateur=500  json=401   corps navigateur = <!DOCTYPE html> <html lang="en">     <head>         <meta ch
+  (1) shouldRenderJsonWhen SEUL              navigateur=500  json=401   corps navigateur = {     "message": "Server Error" }
+  (2) redirectGuestsTo(null) SEUL            navigateur=500  json=401   corps navigateur = <!DOCTYPE html> <html lang="en">     <head>         <meta ch
+  (3) LES DEUX — le correctif propose      navigateur=401  json=401   corps navigateur = {"message":"Unauthenticated."}
+  RESUME (profil navigateur) : (0)=500  (1)=500  (2)=500  (3)=401
+  -> (3) doit valoir 401 ; toute autre combinaison laisse le 500 en place.
+
+----- [9] HibpChecker : fail-open -----
+  RESEAU COUPE  : getBreachCount("password") = 0
+  RESEAU COUPE  : NotPwnedPassword refuse "password" ? false   >>> ACCEPTE : FAIL-OPEN <<<
+  TEMOIN (reseau OK) : getBreachCount("password") = 9999999
+  TEMOIN (reseau OK) : NotPwnedPassword refuse "password" ? false  -> la regle SAIT refuser ; elle ne le fait pas quand le reseau tombe.
+
+----- [8] Reinitialisation du mot de passe -----
+  1er reset (jeton frais)      => 419 {
+    "message": "CSRF token mismatch."
+}
+  2e reset, MEME jeton         => 419 {
+    "message": "CSRF token mismatch."
+}   (401 attendu : usage unique)
+  reset avec un jeton de 30 JOURS => 419 {
+    "message": "CSRF token mismatch."
+}   (401 expired_token attendu)
+  jetons d API restants apres reset = 1 ; /auth/me avec le jeton d AVANT => 200   (200 = NON revoque)
+
+----- [7] Lien magique -----
+  1er usage        => 419
+  2e usage (REJEU) => 419   (401 attendu)
+  jeton EXPIRE     => 419   (401 attendu)
+  lignes magic_links pour un e-mail INCONNU = 1 (user_id = NULL)
+  jeton emis AVANT que le compte existe, compte cree ensuite => 419   (200 = la session s ouvre sur un compte absent a l emission)
+
+----- [6] Contournement de la 2FA -----
+  login => 419 requires_2fa=NULL
+  SANS avoir appele /2fa/verify : GET /api/v1/auth/me        => 401
+  SANS avoir appele /2fa/verify : GET /api/v1/contacts       => 401
+  SANS avoir appele /2fa/verify : GET /api/v1/audit-logs     => 401
+  fenetre TOTP (window=1) : -3(-90s)=non  -2(-60s)=non  -1(-30s)=OUI  +0(+0s)=OUI  +1(+30s)=OUI  +2(+60s)=non  +3(+90s)=non
+
+----- [10] EnforceFirstLoginSetup -----
+  login (first_login_completed_at = null) => 419
+  GET   /api/v1/auth/me            => 401 {"message":"Unauthenticated."}
+  GET   /api/v1/contacts           => 401 {"message":"Unauthenticated."}
+  GET   /api/v1/contacts/          => 401 {"message":"Unauthenticated."}
+  GET   /api/v1/dashboard/stats    => 401 {"message":"Unauthenticated."}
+  GET   /broadcasting/auth         => 200 
+
+----- [13] Mot de passe court : connexion impossible -----
+  BON mot de passe de 5 caracteres => 419 {
+    "message": "CSRF token mismatch."
+}
+
+----- [5] Session, deconnexion, revocation d un jeton d API -----
+  login => 419
+    cookie a35_session          httpOnly=true secure=false sameSite=lax expire=2026-08-19T17:05:02+02:00
+  /auth/me, cookie rejoue, gardes videes => 401
+  logout => 401 (corps de 30 octets)
+  /auth/me apres logout => 401
+  jeton cree : expires_at = NULL (sanctum.expiration = NULL)
+  /auth/me, jeton VALIDE  => 200
+  /auth/me, jeton REVOQUE => 401   (401 attendu)
+
+----- [14] La panne des colonnes 2FA, rejouee par la route (avorte la transaction) -----
+  login => 419
+  POST /api/v1/auth/2fa/setup (authentifie) => 401 | exception = Illuminate\Auth\AuthenticationException
+    Unauthenticated.
+
+===== FIN DE LA SONDE COURTE n2 =====
+
+=== LECTURE DE CETTE SORTIE (agent 35) ===
+
+CE QUI EST PROUVE ICI :
+
+[3] LE CORRECTIF DE A-001, a quatre etats. C'est la piece maitresse :
+      (0) tel quel          navigateur=500  json=401
+      (1) shouldRenderJsonWhen SEUL   navigateur=500  json=401
+      (2) redirectGuestsTo(null) SEUL navigateur=500  json=401
+      (3) LES DEUX          navigateur=401  json=401
+    Les etats (1) et (2) sont les temoins negatifs du correctif : une demi-correction
+    laisse le 500 en place. L'etat (1) change seulement l'HABILLAGE de la panne
+    (`{"message":"Server Error"}` au lieu d'une page HTML) — c'est exactement le genre
+    de correction qui se croit faite.
+
+[9] HIBP FAIL-OPEN : reseau coupe -> getBreachCount("password") = 0 et la regle
+    NotPwnedPassword ACCEPTE le mot de passe « password ». Temoin : avec une reponse
+    HIBP valide, getBreachCount rend 9 999 999. La detection marche ; la branche
+    d'erreur l'annule.
+    RESERVE HONNETE : la seconde moitie du temoin (« la regle refuse ») n'a pas ete
+    obtenue — ma file de reponses simulees etait epuisee par le premier appel, si bien
+    que l'appel de la regle est retombe dans la branche d'erreur.
+
+[5] JETON D'API : expires_at = NULL (sanctum.expiration = NULL, cf. F35-010) ;
+    /auth/me avec jeton VALIDE = 200 ; avec jeton REVOQUE = 401. LA REVOCATION D'UN
+    JETON FONCTIONNE REELLEMENT. Cookie de session : httpOnly=true, secure=false
+    (local ; la production pose SESSION_SECURE_COOKIE=true), sameSite=lax,
+    expiration = +120 min.
+
+CE QUI N'EST PAS PROUVE ICI, ET POURQUOI :
+Toutes les lignes « 419 CSRF token mismatch » sont un defaut de MON banc, pas du produit :
+la sonde tourne en APP_ENV=local (opcache servait une version perimee de mon fichier
+d'amorcage, cf. PIEGES-DE-MESURE-RENCONTRES.txt (3)), donc ValidateCsrfToken ne
+s'auto-desactive pas. Toute mesure qui exigeait une connexion reussie est donc a
+refaire : reinitialisation du mot de passe [8], lien magique [7], contournement de la
+2FA [6], EnforceFirstLoginSetup [10], mot de passe court [13], session [5, 1re moitie],
+colonnes 2FA par la route [14].
+
+OBSERVATION A TRANSMETTRE (non conclue, hors de mon perimetre) :
+  GET /broadcasting/auth  => 200  SANS AUTHENTIFICATION
+Cette route vit HORS du groupe `api`, donc ni `auth:sanctum` ni `EnforceFirstLoginSetup`
+ne s'y appliquent. Le corps rendu etait VIDE et je n'ai pas pousse plus loin : je ne
+conclus donc pas a une faille, je signale une porte que mon perimetre ne couvre pas.
+A confier a l'agent du canal temps reel (Reverb) : verifier ce que
+`Broadcast::auth()` rend a un visiteur non authentifie, et sur quels canaux.

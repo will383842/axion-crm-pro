@@ -1,0 +1,7 @@
+.\src\app\api\calendly\client-event\__tests__\route.test.ts
+.\src\app\api\internal\crm-webhook\__tests__\route.test.ts
+.\src\server\calendly\__tests__\enrich.test.ts
+.\src\server\crm-sync\__tests__\crm-sync.test.ts
+.\src\server\crm-sync\__tests__\crm-sync-l5.test.ts
+.\src\server\notifications\__tests__\telegram-routing.test.ts
+.\tests\e2e-crm-sync\contract.spec.ts

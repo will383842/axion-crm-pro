@@ -40,6 +40,35 @@
 
 ---
 
+## C bis. 🟠 Une question hors CRM, et je la pose sans accusation : la certification Qualiopi
+
+**Les faits mesurés, et rien d'autre.** Le dépôt du site porte un drapeau
+`QUALIOPI_CERTIFICATION_OBTENUE`, dont le **défaut est `false`**, et dont les commentaires disent
+explicitement « tant que le certificat n'est [pas délivré] » (`src/lib/vcard/index.ts:30`,
+`Dockerfile:131-137`). L'agent 34 a mesuré que **la variable GitHub vaut `true` depuis le 10/08**,
+que **l'image déployée porte `true`**, et que **la page publique affirme la certification**.
+
+**Deux lectures, et je ne peux pas trancher entre elles — seul toi le peux :**
+
+1. **Tu as obtenu la certification le 10 août.** Alors tout est en ordre : le drapeau dit vrai, et ce
+   sont **les commentaires du code qui sont périmés** — il faut les corriger, c'est tout, et cette
+   ligne disparaît.
+2. **Le certificat n'est pas détenu.** Alors une page publique affirme une certification qui n'existe
+   pas, et Qualiopi n'est pas un label décoratif : c'est une certification encadrée, opposable, et
+   dont l'affichage indu se sanctionne.
+
+**Ce que je sais** : le dépôt dit `false`, le déploiement dit `true`, et **un commit du dépôt écrit,
+le jour même, que le certificat n'est pas délivré**. **Ce que je ne sais pas** : lequel des deux a
+raison — *c'est un fait d'entreprise, pas un fait de code*, et aucune mesure ne me le donnera.
+
+**Recommandation** : vérifie l'état réel en une minute, puis **aligne les deux**. Si le certificat est
+détenu, corrige les commentaires ; sinon, `QUALIOPI_CERTIFICATION_OBTENUE=false` dans Coolify — le
+`Dockerfile:243` indique que l'effet est **immédiat en 30 s** pour ce drapeau-là. *Je le signale parce
+qu'un audit qui voit un écart entre ce qu'un dépôt affirme et ce qu'un site public déclare doit le
+dire, même quand la réponse ne lui appartient pas.*
+
+---
+
 ## D. Un document juridique que je rédige mais ne valide pas
 
 **La mise en balance de l'intérêt légitime, et l'information de l'article 14.**

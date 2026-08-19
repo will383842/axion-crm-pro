@@ -1,0 +1,44 @@
+=== G43 — le JIT declenche par l'explosion du cout sous RLS ===
+ jit 
+-----
+ on
+(1 row)
+
+ jit_above_cost 
+----------------
+ 100000
+(1 row)
+
+ jit_inline_above_cost 
+-----------------------
+ 500000
+(1 row)
+
+ jit_optimize_above_cost 
+-------------------------
+ 500000
+(1 row)
+
+
+--- MESURE : meme requete, meme role axion_app, JIT ON puis JIT OFF ---
+JIT ON (defaut) :
+ Limit  (cost=14645.61..14645.61 rows=1 width=39) (actual time=3550.229..3588.768 rows=20 loops=1)
+   ->  Sort  (cost=14645.61..14645.61 rows=1 width=39) (actual time=3550.224..3588.760 rows=20 loops=1)
+         ->  Gather  (cost=1000.00..14645.60 rows=1 width=39) (actual time=682.601..3586.799 rows=3125 loops=1)
+               ->  Parallel Seq Scan on companies  (cost=0.00..13645.50 rows=1 width=39) (actual time=642.340..3508.616 rows=1042 loops=3)
+ Planning Time: 60.252 ms
+ Execution Time: 3589.091 ms
+
+JIT OFF :
+ Limit  (cost=14645.61..14645.61 rows=1 width=39) (actual time=524.610..632.635 rows=20 loops=1)
+   ->  Sort  (cost=14645.61..14645.61 rows=1 width=39) (actual time=524.606..632.627 rows=20 loops=1)
+         ->  Gather  (cost=1000.00..14645.60 rows=1 width=39) (actual time=182.510..628.403 rows=3125 loops=1)
+               ->  Parallel Seq Scan on companies  (cost=0.00..13645.50 rows=1 width=39) (actual time=84.081..422.548 rows=1042 loops=3)
+ Planning Time: 12.599 ms
+ Execution Time: 632.733 ms
+
+--- TEMOIN : la meme requete sous le role axion (BYPASSRLS) ---
+ Limit  (cost=0.42..289.16 rows=20 width=39) (actual time=4.824..39.312 rows=20 loops=1)
+   ->  Index Scan using idx_companies_ws_updated_id on companies  (cost=0.42..43744.11 rows=3030 width=39) (actual time=4.818..39.290 rows=20 loops=1)
+ Planning Time: 9.993 ms
+ Execution Time: 39.448 ms

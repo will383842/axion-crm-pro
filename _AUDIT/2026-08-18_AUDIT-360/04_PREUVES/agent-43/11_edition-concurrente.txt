@@ -1,0 +1,45 @@
+=== G43 — edition concurrente : y a-t-il le moindre mecanisme ? ===
+--- (1) les 11 routes qui modifient ---
+109:        Route::put('/workspace', [WorkspaceController::class, 'update']);
+112:        Route::put('/users/{user}', [UsersController::class, 'update']);
+124:        Route::put('/companies/{company}', [CompaniesController::class, 'update']);
+133:        Route::put('/contacts/{contact}', [ContactsController::class, 'update']);
+171:        Route::put('/llm/use-cases/{useCase}', [LlmUseCasesController::class, 'update']);
+173:        Route::put('/llm/use-cases/{useCase}/prompts/{v}', [LlmUseCasesController::class, 'updatePrompt']);
+179:        Route::put('/proxy-providers/{p}', [ProxyProvidersController::class, 'update']);
+182:        Route::put('/rotations/{rotation}', [RotationsController::class, 'update']);
+187:        Route::put('/tags/{tag}', [TagsController::class, 'update']);
+202:        Route::put('/audiences/{audience}', [AudiencesController::class, 'update']);
+231:        Route::put('/campaigns/{campaign}', [ScrapingCampaignsController::class, 'update'])
+
+--- (2) TEMOIN NEGATIF : le controle sait-il trouver un verrou quand il y en a un ? ---
+recherche 'lockForUpdate' (verrou pessimiste) — le controle trouve :
+app/Http/Controllers/Api/Crm/ArbitrageController.php:257:            ->lockForUpdate()
+app/Http/Controllers/Api/Crm/BulkController.php:173:            ->lockForUpdate()
+recherche 'lock:' dans le cache (verrou borne) — le controle trouve :
+app/Crm/Console/CompteursHub.php:85:            lock: ['seconds' => 30],
+
+--- (3) MESURE : verrou optimiste / ETag / If-Match / colonne de version ---
+grep -rniE 'if-match|ifmatch|etag|lock_version|version_column|optimistic' sur app/ + frontend/src :
+  (backend : rien ci-dessus)
+  (frontend : rien ci-dessus)
+
+--- (4) MESURE : un client peut-il envoyer un updated_at / une version attendue ? ---
+regles de validation des 11 update() :
+  (rien ci-dessus = aucun champ de concurrence n'est accepte)
+
+--- (5) le corps de PUT /companies/{company} ---
+    public function update(Request $r, Company $company): JsonResponse
+    {
+        $validated = $r->validate([
+            'priority' => ['nullable', Rule::in(['haute', 'moyenne', 'basse', 'gelee'])],
+            'denomination' => ['nullable', 'string', 'max:255'],
+            'website' => ['nullable', 'url', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:32'],
+            'linkedin_url' => ['nullable', 'url', 'max:255'],
+        ]);
+        $company->update($validated);
+
+        return $this->ok($company);
+    }
+

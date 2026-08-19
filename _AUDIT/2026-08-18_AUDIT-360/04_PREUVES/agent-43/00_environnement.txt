@@ -1,0 +1,41 @@
+=== G43 — environnement de mesure, declare (regle : dire a combien d'utilisateurs on mesure) ===
+date UTC : 2026-08-19T12:53:36Z
+reference git :
+a3c42d6 audit(360): A-015 — le quatrieme verrou, et il est derriere les trois autres
+
+--- Postgres ---
+PostgreSQL 16.9 (Debian 16.9-1.pgdg110+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit
+max_connections=100
+shared_buffers=128MB
+max_parallel_workers_per_gather=2
+nproc(conteneur)=12
+
+--- bases utilisees ---
+     datname      | pg_size_pretty 
+------------------+----------------
+ axion_crm_perf   | 573 MB
+ axion_crm_perf4m | 2138 MB
+ axion_crm_g43    | 606 MB
+(3 rows)
+
+ companies | contacts | activities | company_tag | company_tag_ws_null | migrations 
+-----------+----------+------------+-------------+---------------------+------------
+    300000 |    50000 |     500000 |      300000 |                   0 |         57
+(1 row)
+
+ companies | migrations 
+-----------+------------
+   2800000 |         57
+(1 row)
+
+
+--- roles : ce qui distingue l'atelier de la production (B11-010) ---
+  rolname  | rolbypassrls 
+-----------+--------------
+ axion     | t
+ axion_app | f
+(2 rows)
+
+51:CRM_DB_APP_ROLE_ENABLED=false
+
+--- charge envoyee vers la PRODUCTION : AUCUNE. Toutes les mesures ci-dessus sont locales. ---

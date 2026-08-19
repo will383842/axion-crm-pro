@@ -1,0 +1,45 @@
+############ B19-vivier-candidats
+### base   : axion_crm_perf   (datcollate = C)
+### date   : 2026-08-19T14:50:03+02:00
+### SQL    :
+select * from "candidates" where "deleted_at" is null and "workspace_id" = '95cbe9b3-378e-4c9a-87cf-1d0faa629643' order by "derniere_interaction_at" desc, "id" desc limit 51;
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                                       QUERY PLAN                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=8.17..8.18 rows=1 width=609) (actual time=0.165..0.166 rows=0 loops=1)
+   Buffers: shared hit=6 read=1
+   ->  Sort  (cost=8.17..8.18 rows=1 width=609) (actual time=0.162..0.163 rows=0 loops=1)
+         Sort Key: derniere_interaction_at DESC, id DESC
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=6 read=1
+         ->  Index Scan using idx_candidates_workspace_stage on candidates  (cost=0.14..8.16 rows=1 width=609) (actual time=0.032..0.033 rows=0 loops=1)
+               Index Cond: (workspace_id = '95cbe9b3-378e-4c9a-87cf-1d0faa629643'::uuid)
+               Filter: (deleted_at IS NULL)
+               Buffers: shared read=1
+ Planning:
+   Buffers: shared hit=274 read=15
+ Planning Time: 366.233 ms
+ Execution Time: 0.298 ms
+(14 rows)
+
+
+===== CHAUD (4e exécution) =====
+                                                                       QUERY PLAN                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=8.17..8.18 rows=1 width=609) (actual time=0.173..0.174 rows=0 loops=1)
+   Buffers: shared hit=7
+   ->  Sort  (cost=8.17..8.18 rows=1 width=609) (actual time=0.171..0.172 rows=0 loops=1)
+         Sort Key: derniere_interaction_at DESC, id DESC
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=7
+         ->  Index Scan using idx_candidates_workspace_stage on candidates  (cost=0.14..8.16 rows=1 width=609) (actual time=0.005..0.006 rows=0 loops=1)
+               Index Cond: (workspace_id = '95cbe9b3-378e-4c9a-87cf-1d0faa629643'::uuid)
+               Filter: (deleted_at IS NULL)
+               Buffers: shared hit=1
+ Planning:
+   Buffers: shared hit=289
+ Planning Time: 1.399 ms
+ Execution Time: 0.238 ms
+(14 rows)
+

@@ -1,7 +1,11 @@
 # Agent 39 — Sauvegardes et observabilité
 
-> **Référence** : dépôt CRM, `main = e8924b8` (relu par `git log` le 2026-08-19 à 11:12 UTC,
-> **et non** `c0c453d` : trois PR ont été poussées pendant l'audit).
+> **Référence** : dépôt CRM, **code produit = `e8924b8`** (relu par `git log` le 2026-08-19 à
+> 11:12 UTC, **et non** `c0c453d` : trois PR ont été poussées pendant l'audit).
+> `main` a avancé jusqu'à `a3c42d6` pendant que j'écrivais, mais `git diff --stat e8924b8..a3c42d6`
+> sur `backend/ frontend/ infra/ .github/ Makefile docker-compose*.yml` ne rend **qu'un fichier
+> neuf**, `infra/scripts/verifier-serveur-http.sh` — hors de mon périmètre. **Aucun objet audité
+> ici n'a bougé entre les deux références.**
 > **Production** : `46.62.248.239`, accédée **en lecture seule** par SSH. Aucune écriture,
 > aucune suppression, aucune restauration n'a été faite sur la production.
 > **Restauration** : faite **en local**, sur la base jetable `axion_crm_a39`.
@@ -23,7 +27,7 @@ la complète.
 |---|---|---|---|---|---|
 | `infra/scripts/backup-postgres.sh` | oui | **oui** — dump quotidien 03:00 UTC, 692 Mio gz, envoi SFTP, rotation locale 7 j / distante 30 j | n/a | 6 archives locales, 6 hors-site, dernière `20260819T030001Z` | F39-004 (CRLF), F39-009 (profondeur réelle 3 j) |
 | `infra/scripts/verifier-sauvegarde.sh` | oui | **partiellement** — vérifie existence + âge + taille, **jamais la restaurabilité** | **oui**, 2 fois le 2026-08-17 (`SEUIL_AGE_H=0` et `SEUIL_TAILLE_MO=999999`) | 3 contrôles sur 4 possibles | **F39-002** |
-| `infra/scripts/dr-drill.sh` | oui | **jamais joué automatiquement** — aucune CI, aucun cron, aucune trace d'exécution depuis le 2026-08-16 | non | 0 occurrence dans `.github/workflows/*` hors texte d'issue | **F39-003** |
+| `infra/scripts/dr-drill.sh` | oui | **jamais joué automatiquement** — aucune CI, aucun cron, aucune trace d'exécution depuis le 2026-08-16 | non | 0 occurrence dans `.github/workflows/*` hors texte d'issue | **F39-003**, **F39-012** |
 | `infra/scripts/setup-backup.sh` | oui | oui (installation unique, déjà jouée) | n/a | cron présent et actif | F39-004 (CRLF) |
 | `infra/scripts/restore-postgres.sh` | oui | oui, **mais sa cible par défaut est `axion_crm`**, le nom de la base de production | non | ligne 18 : `TARGET_DB="${2:-axion_crm}"` | **F39-010** |
 | `.github/workflows/surveillance-sauvegarde.yml` | oui | oui, et **il a vraiment rougi** | **oui** (2 échecs volontaires, 1 issue #141 ouverte puis fermée) | 6 exécutions, 3 planifiées vertes | F39-002 (ce qu'il ne regarde pas) |
@@ -37,7 +41,7 @@ la complète.
 | `infra/runbooks/04-restore-dr.md` | oui | **non** — décrit S3, `s3cmd`, WAL streaming, Backblaze B2, PITR : **rien de tout cela n'existe** | non | la sauvegarde réelle est un `pg_dump` quotidien vers une Storage Box SFTP | **F39-008** |
 | `infra/runbooks/{01,02,03}` | oui | s'appuient sur des alertes (`HorizonQueueBacklog`, `DiskSpaceLow`, `ApiDown`, Uptime Kuma) qui **ne peuvent pas se déclencher** ; `DiskSpaceLow` **n'existe même pas** dans `alerts.yml` | non | `grep -c DiskSpaceLow alerts.yml` → **0** | **F39-011** |
 | Tâches planifiées (35) | oui | **aucune ne prévient personne quand elle échoue** | non | 0 occurrence de `onFailure`/`emailOutputOnFailure`/`pingOnFailure` dans tout `backend/` | **F39-006** |
-| RPO annoncé (`Makefile`, runbook 04) | « ≤ 1 h » | **faux d'un facteur 24** — la sauvegarde est quotidienne ; `dr-drill.sh` lui-même tolère 36 h | n/a | RPO mesuré : **24 h** (8 h 46 au moment de la mesure) | **F39-009** |
+| RPO annoncé (`Makefile`, runbook 04) | « ≤ 1 h » | **faux d'un facteur 24** — la sauvegarde est quotidienne ; `dr-drill.sh` lui-même tolère 36 h | n/a | RPO mesuré : **24 h** (9 h 00 au moment de la mesure) | **F39-009** |
 | RTO annoncé (`Makefile`, runbook 04) | « ≤ 4 h » | tenu, mais la marge n'est pas celle qu'on croit | n/a | RTO mesuré : voir §3 | F39-009 |
 | Trajectoire du disque de production | 25 Go libres | **rien ne la surveille** | non | consommation nette **511 Mio/j** mesurée sur 900 s | **F39-011** |
 
@@ -54,9 +58,21 @@ la complète.
    **`521b7ab6f796b9b0456c46975c02e4466f7d127506f28325c53cc02c853338de`** des deux côtés.
    `gzip -t` : OK. L'archive rapatriée est **bit à bit** celle du serveur.
 4. Base jetable créée : `CREATE DATABASE axion_crm_a39 OWNER axion` sur le Postgres **local**
-   (16.9, PostGIS + vector disponibles).
+   (16.9, PostGIS + `vector` disponibles). Aucune base d'un autre agent n'a été touchée.
 5. `gzip -dc … | psql -q` dans `axion_crm_a39`.
-6. Comptages exacts (`count(*)`, pas d'estimation `n_live_tup`) comparés à la production.
+6. Comptages exacts (`count(*)`, **pas** d'estimation `n_live_tup`) comparés à la production.
+
+> **Note d'atelier, à retenir pour qui rejouera l'exercice depuis Windows.** La première tentative
+> a été menée en pipant depuis le poste : `gzip -dc <fichier Windows> | docker exec -i … psql`.
+> Elle avance à **27 Mio/min** de base construite et l'attente Postgres est `ClientRead` : c'est
+> **le tuyau qui affame la base**, pas la base qui peine. Mesures faites : `gzip -dc` seul sur le
+> système de fichiers Windows rend **4 Mo/s** ; une lecture `dd` d'un montage lié depuis un
+> conteneur rend **737 Ko/s** ; un `docker cp` de 692 Mio n'était **pas terminé après 50 minutes**
+> et bloquait `docker exec` sur le conteneur visé. La restauration retenue passe donc
+> **entièrement par Linux** : un conteneur `postgres:16-alpine` sur le réseau `axion-crm`, avec
+> l'archive en montage lié, qui décompresse et parle à `axion-crm-postgres` en TCP. C'est cette
+> voie que `dr-drill.sh` devrait documenter : sa ligne 153 (`zcat … | docker exec -i …`) est
+> exactement la voie lente sous Windows, et l'atelier est sous Windows.
 
 ### 2.2 Comptages obtenus
 
@@ -84,7 +100,7 @@ la complète.
 
 | | Annoncé (`Makefile:140`, `infra/runbooks/04-restore-dr.md:3`) | Mesuré |
 |---|---|---|
-| **RPO** | « ≤ 1 h » | **24 h** — la sauvegarde est quotidienne (cron `0 3 * * *`). Au moment de la mesure (12:00 UTC), la dernière sauvegarde datait de **8 h 57**. `dr-drill.sh` lui-même code `RPO_CIBLE_S=129600`, soit **36 h** : le script contredit le `Makefile` qui l'appelle. |
+| **RPO** | « ≤ 1 h » | **24 h** — la sauvegarde est quotidienne (cron `0 3 * * *`). Au moment de la mesure (12:00 UTC), la dernière sauvegarde datait de **9 h 00** (archive `20260819T030001Z`). `dr-drill.sh` lui-même code `RPO_CIBLE_S=129600`, soit **36 h** : le script contredit le `Makefile` qui l'appelle. |
 | **RTO** | « ≤ 4 h » | voir ci-dessous |
 
 <!-- RTO -->
@@ -196,6 +212,9 @@ Tout le reste est muet :
   Linux, bash -n verifier-sauvegarde.sh (copie Win.)  : code=2, « unexpected EOF » l.82
   Linux, bash -n backup-postgres.sh (copie Windows)   : code=2, « unexpected EOF » l.145
   Linux, bash -n backup-postgres.sh DEPUIS LE BLOB GIT: code=0     ← témoin négatif
+
+  # et rien ne l'attrape
+  $ grep -rn "shellcheck\|CRLF\|renormalize\|eol" .github/workflows/*.yml  → 0 résultat
   ```
 - Témoin négatif: le même `bash -n`, dans le même conteneur Linux, rend **code=0** sur la version LF issue du blob git. Le contrôle sait distinguer.
 - Impact        : (1) `make dr-drill` depuis le poste Windows **fonctionne** (Git Bash tolère CR) — le défaut est donc parfaitement invisible à celui qui l'exécute ; (2) tout envoi direct d'un de ces scripts vers un hôte Linux (dépannage, nouveau serveur, `scp` en urgence) produit un script inexécutable, **le jour où l'on en a besoin** ; (3) `git config core.autocrlf = true` continue de re-salir chaque fichier réécrit tant que la copie de travail n'est pas renormalisée.
@@ -232,7 +251,7 @@ Tout le reste est muet :
 - Domaine       : exploitation / observabilité
 - Référence     : `main e8924b8` ; production `46.62.248.239`
 - Emplacement   : `backend/bootstrap/app.php:44-46` ; `backend/config/logging.php` ; `backend/routes/console.php`
-- Constat       : **rectification et extension de B16-006.** Contrairement à ce qui a été écrit, `SENTRY_LARAVEL_DSN` **est présent dans le `.env` de production** (`https://***@o4510557298294784.ingest.de.sentry.io/4511361744175184`) et **est bien vu par le conteneur `axion-crm-api`** ; `sentry/sentry-laravel` 4.27.0 est installé. Seul le `.env.example` l'ignore. Mais le branchement n'est pas fait : `->withExceptions(function (Exceptions $exceptions) { // })` est **vide**, alors que le README du paquet installé impose `Integration::handles($exceptions);` ; et `config/logging.php` ne définit **aucun canal `sentry`**. Les seuls envois sont **8 appels explicites** `\Sentry\captureException()`, tous dans des services de scraping/enrichissement.
+- Constat       : **rectification et extension de B16-006.** Contrairement à ce qui a été écrit, `SENTRY_LARAVEL_DSN` **est présent dans le `.env` de production** (`https://***@o4510557298294784.ingest.de.sentry.io/4511361744175184`) et **est bien vu par le conteneur `axion-crm-api`** ; `sentry/sentry-laravel` 4.27.0 est installé. Seul le `.env.example` l'ignore — il porte `VITE_SENTRY_DSN=` (ligne 232, côté interface) et `GLITCHTIP_DSN=` (ligne 215), mais **pas** `SENTRY_LARAVEL_DSN`, la seule clé que `config/sentry.php` lit réellement. Mais le branchement n'est pas fait : `->withExceptions(function (Exceptions $exceptions) { // })` est **vide**, alors que le README du paquet installé impose `Integration::handles($exceptions);` ; et `config/logging.php` ne définit **aucun canal `sentry`**. Les seuls envois sont **8 appels explicites** `\Sentry\captureException()`, tous dans des services de scraping/enrichissement.
 - Preuve        : `04_PREUVES/agent-39/03_observabilite-alertes.txt`
   ```
   $ ssh root@… 'docker exec axion-crm-api sh -c "printenv | grep -E \"^SENTRY\""'
@@ -348,6 +367,28 @@ Tout le reste est muet :
 - Impact        : à disque plein, Postgres refuse toute écriture et le service s'arrête. La date est dans **sept semaines**. `journald` est plafonné et ne bougera plus ; ce qui monte est (a) la croissance légitime de `postgres-data` (18,21 Go) et (b) **166 Mio/jour de journaux que personne ne lit et que rien ne borne** — dont A-007 a montré que **100 % des entrées sont la même erreur Telescope**. Le nettoyage de A-007 rendrait à lui seul ≈ 1/3 de la trajectoire. Et si le disque se remplit, la **sauvegarde s'arrête aussi** : `/var/backups/axion-crm` est sur le même volume, et c'est le mode de défaillance que le workflow de surveillance liste explicitement (« `df -h /` — un disque plein arrête le dump sans bruit »).
 - Reproduction  : `ssh root@46.62.248.239` puis mesurer `df -k /` à 900 s d'intervalle ; `du -sh /var/lib/docker /var/backups /var/log /opt` ; `cat /etc/docker/daemon.json` ; `grep -c DiskSpaceLow infra/monitoring/prometheus/alerts.yml`.
 - Correctif     : par ordre de rendement. (1) `TELESCOPE_ENABLED=false` (A-007) — supprime l'essentiel des 166 Mio/j, 5 min. (2) `/etc/docker/daemon.json` avec `log-opts max-size=50m, max-file=3` puis redémarrage du démon — 15 min, borne définitivement les journaux de conteneurs. (3) `LOG_CHANNEL=daily` + `LOG_LEVEL=warning` en production — 10 min. (4) Une garde qui **crie** : le patron de `surveillance-sauvegarde.yml` s'applique tel quel — un workflow GitHub quotidien qui lit `df` par SSH et ouvre une issue sous 20 % libres. ≈ 2 h, et c'est la seule des quatre qui empêche la prochaine trajectoire silencieuse.
+- Statut        : ouvert
+
+### [F39-012] L'exercice de restauration compare un dump de 03:00 aux comptages VIVANTS de la production : il rougira à tort le premier jour où la prospection tourne
+- Sévérité      : **S2**
+- Domaine       : exploitation / sauvegarde
+- Référence     : `main e8924b8` ; production `46.62.248.239` au 2026-08-19 12:05 UTC
+- Emplacement   : `infra/scripts/dr-drill.sh:131-138` (relevé de la référence) et `:168-183` (comparaison)
+- Constat       : l'étape 2 relève les comptages **en production, à l'instant du contrôle** ; l'étape 4 les compare à ceux d'une archive produite **à 03:00 UTC**. Toute ligne insérée dans l'intervalle produit un `exit 4` — « ÉCART entre production et restauration » — alors que la restauration est parfaite.
+- Preuve        : mesures en lecture seule sur la production, 2026-08-19 12:05 UTC
+  ```
+  companies    : dernier created_at = 2026-08-15 12:16:07+00 ; 451 créées sur 7 jours
+  scraper_runs : dernier created_at = 2026-08-15 13:07:37+00 ; 4 242 créés sur 7 jours
+  ```
+  et la dérive **déjà visible aujourd'hui**, sur des tables que `dr-drill.sh` ne compare pas :
+  ```
+  activities  : 648 dans l'archive de 03:00, 649 en production à 12:00  → +1
+  audit_logs  :  53 dans l'archive de 03:00,  64 en production à 12:00  → +11
+  ```
+- Témoin négatif: les cinq tables que le script compare (`companies`, `contacts`, `scraper_runs`, `company_tag`, `journalists`) sont **rigoureusement identiques** ce 2026-08-19 — la comparaison passe donc aujourd'hui. C'est bien la preuve que le contrôle sait dire « identiques » quand ils le sont, et que le défaut est **conditionnel** : il attend une journée d'activité.
+- Impact        : 4 242 `scraper_runs` par semaine active suffisent largement à faire diverger les comptages en neuf heures. Le seul contrôle qui prouve réellement la restaurabilité rendrait alors un rouge que personne ne saurait distinguer d'un vrai. Un contrôle qui crie au loup est désarmé aussi sûrement qu'un contrôle muet — et c'est la deuxième fois que le même script se trompe d'objet mesuré (la première, c'était `s3cmd`, cf. son propre en-tête lignes 9-18).
+- Reproduction  : lire les deux blocs du script ; puis `ssh root@46.62.248.239 'docker exec axion-crm-postgres psql -U axion -d axion_crm -tAc "select max(created_at) from scraper_runs"'` un jour où la prospection tourne.
+- Correctif     : relever la référence **à l'horodatage du dump**, pas à celui du contrôle. Deux voies : soit comparer avec `WHERE created_at < <horodatage de l'archive>` sur les tables qui portent la colonne, soit tolérer un écart **positif uniquement** (production ≥ restauration) et échouer sur tout écart négatif ou sur un rapport restauré/production inférieur à 99,9 %. Compter 1 h. ⚠️ `company_tag` n'a **pas** de `created_at` : pour elle, seule la seconde voie est praticable.
 - Statut        : ouvert
 
 ---

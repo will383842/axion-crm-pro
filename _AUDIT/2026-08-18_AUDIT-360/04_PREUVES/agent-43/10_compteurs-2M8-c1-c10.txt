@@ -1,0 +1,26 @@
+### G43 — COMPTEURS DU HUB au volume de production, base axion_crm_perf4m (2 800 000 fiches) ###
+### requete identique a _REPORTS/2026-08-19_MESURE-COMPTEURS-HUB.md, index idx_companies_ws_counts en place ###
+  count  
+---------
+ 2800000
+(1 row)
+
+        indexname        
+-------------------------
+ idx_companies_ws_counts
+(1 row)
+
+--- warmup c=2, 20 s (cache chaud) ---
+latency average = 808.383 ms
+tps = 2.474076 (without initial connection time)
+=========== c=1 (temoin, un seul utilisateur), 30 s ===========
+number of transactions actually processed: 33
+latency average = 967.707 ms
+tps = 1.033371 (without initial connection time)
+=========== c=10 (dix utilisateurs simultanes), 30 s ===========
+number of transactions actually processed: 110
+latency average = 2804.938 ms
+tps = 3.565141 (without initial connection time)
+--- percentiles ---
+logM_c1 n=33 p50=826 ms p95=2192 ms
+logM_c10 n=110 p50=2181 ms p95=6169 ms

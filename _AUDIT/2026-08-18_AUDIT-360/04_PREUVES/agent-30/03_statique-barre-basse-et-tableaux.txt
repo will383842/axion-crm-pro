@@ -1,0 +1,37 @@
+AGENT 30 — analyse statique (reference : main 8db8229 ; frontend identique a e8924b8)
+git rev-parse HEAD :
+a3c42d66398b94afdb31843f5427e840388c33aa
+
+diff frontend/ entre e8924b8 et 8db8229 (doit etre vide) :
+[fin du diff]
+
+=== A. BARRE BASSE A CINQ ENTREES (CDC 23.3) ===
+-- recherche des libelles exiges dans TOUT frontend/src :
+Aujourd'hui      : frontend/src/components/layout/Sidebar.tsx:2 frontend/src/components/OnboardingTour.tsx:1 
+Aujourd’hui    : 
+Échanges        : 
+Echanges         : 
+Rechercher       : frontend/src/components/layout/Header.tsx:1 frontend/src/components/ui/GlobalSearch.tsx:2 frontend/src/components/ui/Toolbar.tsx:1 frontend/src/features/campaigns/CampaignsListPage.tsx:1 frontend/src/features/campaigns/CampaignWizardPage.tsx:1 frontend/src/features/companies/CompaniesListPage.tsx:1 frontend/src/features/media/JournalistsListPage.tsx:1 frontend/src/features/media/MediaListPage.tsx:1 frontend/src/features/scraping/ScraperRunsPage.tsx:1 frontend/src/locales/fr.json:1 
+-- recherche d'un composant de barre basse :
+BottomBar    : 0
+BottomNav    : 0
+TabBar       : 0
+MobileNav    : 0
+bottom-nav   : 0
+-- elements ancres en bas d'ecran (fixed/sticky bottom-0) — TEMOIN : le detecteur trouve bien le pied de Modal :
+frontend/src/components/ui/Modal.tsx:124:          <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t border-slate-100 bg-white/95 px-6 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+
+=== B. CONTENEURS A DEFILEMENT HORIZONTAL ===
+-- overflow-x-auto / overflow-x-scroll dans frontend/src :
+frontend/src/features/audiences/AudienceDetailPage.tsx:219:      <div className="overflow-x-auto">
+frontend/src/features/audiences/AudienceDetailPage.tsx:294:        <pre className="overflow-x-auto rounded-lg bg-slate-900 p-4 text-xs text-slate-100 dark:bg-slate-950 dark:text-slate-200">
+frontend/src/features/international/RoumaniePage.tsx:174:          <div className="overflow-x-auto rounded-lg border border-slate-200">
+frontend/src/features/media/JournalistsListPage.tsx:109:          <div className="overflow-x-auto">
+frontend/src/features/media/MediaListPage.tsx:271:          <div className="overflow-x-auto">
+-- total :
+5
+-- overflow-x-hidden (le contraire) :
+frontend/src/app/RootLayout.tsx:100:        <main id="main" className="flex-1 overflow-x-hidden px-4 py-5 md:px-6 md:py-6 lg:px-10">
+
+=== C. LES 16 ECRANS TABULAIRES (cf. D27-005) ===
+-- C.1 idiome <table> (7 ecrans) : y a-t-il un conteneur defilable ?

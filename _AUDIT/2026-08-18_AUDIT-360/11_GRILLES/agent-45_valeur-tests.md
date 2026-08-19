@@ -23,6 +23,9 @@ e8924b8 fix(rgpd+acces): rectification du registre + acces CRM rendu (#189)
 ```
 
 **Tous mes constats sont référencés à `main = e8924b8`**, mesuré, 6 commits devant le SHA du dossier.
+⚠️ `main` a continué d'avancer pendant mon travail (relu en fin de session : `a3c42d6`) ; les commits
+ajoutés sont des écritures d'audit sous `_AUDIT/`. **Mon worktree jetable et mes deux conteneurs sont
+épinglés sur `e8924b8`** : c'est cet arbre-là, et lui seul, que j'ai saboté et mesuré.
 
 ### L'atelier que j'ai monté, et pourquoi
 
@@ -39,11 +42,13 @@ Deux mesures m'ont forcé à ne PAS travailler dans le conteneur commun :
    **234,81 s** avec le code monté depuis `C:\` (la recette documentée `infra/scripts/worktree/pest-worktree.sh`),
    **2,14 s** avec le même code **copié dans le conteneur**. Même image, même Postgres.
 
-J'ai donc monté : un **worktree jetable détaché** sur `e8924b8`, une base **`axion_crm_a45`**
-(+ `axion_crm_a45b` pour la démonstration de purge), et un conteneur **`a45`** dont l'arbre est
-**copié** (pas monté), avec un instantané intact en `/var/www/html.orig` qui sert de référence de
-restauration. `axion_crm`, `axion_crm_test` et le worktree `crmpro-wt-etape1a` n'ont **jamais** été
-touchés.
+J'ai donc monté un atelier à moi : un **worktree jetable détaché** sur `e8924b8` ; trois bases
+jetables — **`axion_crm_a45`** (conteneur `a45`, vague 1), **`axion_crm_a45c`** (conteneur `a45b`,
+vague 2 et micro-campagne, montés en parallèle pour tenir dans le temps), **`axion_crm_a45b`** (les
+deux démonstrations hors suite) ; et dans chaque conteneur un **instantané intact** en
+`/var/www/html.orig` qui sert de référence de restauration après chaque sabotage.
+`axion_crm`, `axion_crm_test` et le worktree `crmpro-wt-etape1a` n'ont **jamais** été touchés — ni
+lus comme référence, ni écrits.
 
 ### Ligne de base, mesurée trois fois
 
@@ -87,9 +92,19 @@ Rayon d'explosion = nombre de tests rouges **hors** l'échec de ligne de base
 | **M1** | `NeDoitPasRegresserTest` › *ACQUIS 3 — le réglage qui rend le verrou capable de rougir est toujours en place* | que `DB_TIMEZONE` soit toujours posé dans les deux fichiers PHPUnit | `<env name="DB_TIMEZONE">` **retiré**, le mot laissé dans un commentaire XML | **NON — restée VERTE** | 6 autres tests rougissent (les tests **de comportement** du fuseau) | **Non — elle lit le fichier qui décrit l'objet, commentaires compris** | **FAUSSE ASSURANCE (locale)** — la famille rattrape, la garde elle-même ne garde rien → H45-004 |
 | **M2** | `PhpstanBaselineNeGrossitPasTest` › *reportUnmatchedIgnoredErrors reste activé* | que le drapeau reste à `true` | la ligne **mise en commentaire** (`# reportUnmatchedIgnoredErrors: true`) — PHPStan revient donc à `false` | **NON — 5 tests verts sur 5** | **0** | **Non — la chaîne cherchée est trouvée dans le commentaire** | **FAUSSE ASSURANCE** → H45-004 |
 | **M4** | `PasswordResetWithHibpTest` › *HIBP cache prefix unique par 5 chars du sha1* | que la clé de cache HIBP porte le préfixe SHA-1 | `$cacheKey = 'hibp:range'` (clé globale) | **NON — 12 tests verts sur 12** | **0** | **Non — le test affirme `true`** | **FAUSSE ASSURANCE** → H45-003 |
-| **S10** | idem M4, à l'échelle de la suite | idem | idem | *(voir ci-dessous)* | | | |
-| **S11** | `PasswordResetWithHibpTest` › *HIBP user-agent inclus dans la requête* | que la requête HIBP porte un `User-Agent` | l'en-tête `User-Agent` retiré du client Guzzle | *(voir ci-dessous)* | | | |
+| **S10** | `PasswordResetWithHibpTest` › *HIBP cache prefix unique par 5 chars du sha1*, à l'échelle de la suite | que la réponse HIBP d'un mot de passe ne serve pas pour un autre | `$cacheKey = 'hibp:range'` — clé de cache **globale** | **NON** | **0** | **Non — le test affirme `true`, il n'observe jamais la clé** | **FAUSSE ASSURANCE — les 780 tests restent verts** → H45-003 |
+| **S11** | `PasswordResetWithHibpTest` › *HIBP user-agent inclus dans la requête* | que la requête envoyée à HIBP porte un `User-Agent` (HIBP le **exige**) | l'en-tête `User-Agent` retiré du client Guzzle | **NON** | **0** | **Non — le test affirme seulement que la requête a été construite** (`expect($captured)->not->toBeNull()`), il ne lit jamais l'en-tête | **FAUSSE ASSURANCE — les 780 tests restent verts** → H45-003 |
 | **S12** | `RlsTest` › *la commande de backfill pose bien son contexte workspace* | que `ScrapingBackfillSrcTags` enveloppe son travail dans `WorkspaceContext::run` | le vrai appel retiré, la chaîne `WorkspaceContext::run(` laissée **dans un commentaire** | *(voir ci-dessous)* | | | |
+
+### Ce que la grille dit, en une phrase
+
+**Les gardes du chantier CRM cible sont bonnes, et elles sont précises** : sur les dix sabotages qui
+visaient une garde métier récente (compteurs, activités/motifs, masquage, canal, étanchéité,
+baseline PHPStan), **dix ont rougi**, et **aucun n'a fait rougir plus d'un ou deux tests**. Ce n'est
+pas le cas courant : dans une suite mal construite, un sabotage en fait rougir trente et aucun
+n'apprend rien. **Les fausses assurances trouvées ne sont pas dans le socle CRM** — elles sont dans
+des gardes **statiques** (qui lisent un fichier au lieu du produit), dans un test **unitaire hérité**
+(HIBP, Sprint 18.1), et dans un **angle mort de méthode** (l'en-tête `Accept`).
 
 ---
 

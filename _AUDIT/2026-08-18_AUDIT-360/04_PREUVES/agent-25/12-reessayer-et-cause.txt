@@ -1,0 +1,89 @@
+AGENT 25 - QUAND CA ECHOUE, L'ECRAN OFFRE-T-IL UNE ACTION ? DIT-IL LA CAUSE ? - main 8db8229
+(ce fichier remplace la version precedente, dont l'ordre de sortie etait brouille par le tampon)
+
+=== 1. Un bouton « Reessayer » existe-t-il dans une interface de src/ ? ===
+src/locales/fr.json:39:    "retry": "Réessayer",
+
+-- Et 'retry' ? (pour distinguer l'option technique react-query du libelle offert a l'humain)
+    src/app/RootLayout.tsx:34:    retry: false,
+    src/components/layout/UserMenu.tsx:28:    retry: false,
+    src/components/layout/WorkspaceSelector.tsx:23:    retry: false,
+    src/components/OnboardingTour.tsx:86:    retry: false,
+    src/features/campaigns/CampaignWizardPage.tsx:128:    retry: false,
+    src/features/crm-console/useConsoleFeatures.ts:42:    retry: false,
+    src/features/dashboard/components/ActivityFeed.tsx:42:    retry: false,
+    src/features/dashboard/components/TopDeptsCard.tsx:23:    retry: false,
+    src/features/dashboard/DashboardPage.tsx:74:    retry: false,
+    src/features/scraping/ScraperRunsPage.tsx:302:  const retryMutation = useMutation({
+    src/features/scraping/ScraperRunsPage.tsx:304:      const resp = await api.post<Run>(`/scraper-runs/${id}/retry`);
+    src/features/scraping/ScraperRunsPage.tsx:442:                onRetry={() => retryMutation.mutate(run.id)}
+    src/features/scraping/ScraperRunsPage.tsx:443:                retryLoading={retryMutation.isPending && retryMutation.variables === run.id}
+    src/features/scraping/ScraperRunsPage.tsx:522:  retryable: boolean;
+    src/features/scraping/ScraperRunsPage.tsx:527:  const { run, cancellable, retryable, onOpenDetail, onAskCancel, onRetry } = args;
+    src/features/scraping/ScraperRunsPage.tsx:539:  if (cancellable || retryable) {
+    src/features/scraping/ScraperRunsPage.tsx:545:  if (retryable) {
+    src/features/scraping/ScraperRunsPage.tsx:546:    items.push({ id: 'retry', label: 'Relancer', onSelect: onRetry });
+    src/features/scraping/ScraperRunsPage.tsx:559:  retryLoading,
+    src/features/scraping/ScraperRunsPage.tsx:565:  retryLoading: boolean;
+    src/features/scraping/ScraperRunsPage.tsx:568:  const retryable = isRetryable(run.status);
+    src/features/scraping/ScraperRunsPage.tsx:625:        ) : retryable ? (
+    src/features/scraping/ScraperRunsPage.tsx:632:              disabled={retryLoading}
+    src/features/scraping/ScraperRunsPage.tsx:633:              data-testid="run-retry"
+    src/features/scraping/ScraperRunsPage.tsx:645:          items={buildMenuItems({ run, cancellable, retryable, onOpenDetail, onAskCancel, onRetry })}
+    src/locales/en.json:39:    "retry": "Retry",
+    src/locales/fr.json:39:    "retry": "Réessayer",
+    src/main.tsx:19:      retry: (count, err) => {
+
+-- TEMOIN POSITIF : le controle sait lire un libelle de bouton — 'Actualiser' est bien trouve :
+    src/features/dashboard/DashboardPage.tsx:129:              Actualiser
+
+=== 2. extractApiMessage : duplique dans combien de fichiers ? (piege 15) ===
+    src/features/audiences/AudienceBuilderPage.tsx
+    src/features/audiences/AudienceDetailPage.tsx
+    src/features/audiences/AudiencesListPage.tsx
+    src/features/campaigns/CampaignDetailPage.tsx
+    src/features/campaigns/CampaignsListPage.tsx
+    src/features/campaigns/CampaignWizardPage.tsx
+    src/features/scraping/ScraperRunsPage.tsx
+    src/features/tags/TagsManagerPage.tsx
+    TOTAL fichiers : 8
+
+    Les 21 usages sont TOUS dans des toasts de MUTATION (onError) ou un
+    setPreviewError ; AUCUN n'alimente l'etat d'erreur d'une LECTURE.
+    => le message du serveur n'atteint jamais un ecran de liste.
+
+=== 3. La traduction « Reessayer » EXISTE. Est-elle appelee ? ===
+    "stub": {
+      "title": "Phase 2 — bientôt disponible",
+      "description": "Ce module est scaffoldé : DB + UI prêtes, logique métier reportée à la Phase 2."
+    }
+  },
+  "common": {
+    "loading": "Chargement…",
+    "empty": "Aucun résultat",
+    "error": "Une erreur est survenue.",
+    "retry": "Réessayer",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "search": "Rechercher"
+  }
+}
+-- appels t('common.retry') / 'common.retry' dans src/ :
+src/features/scraping/ScraperRunsPage.tsx:546:    items.push({ id: 'retry', label: 'Relancer', onSelect: onRetry });
+   (code retour = 0 ; 1 = AUCUN appel)
+-- TEMOIN POSITIF : d'autres cles du meme bloc SONT appelees ?
+    src/features/auth/LoginPage.tsx:75:      toast.error(t('common.error'));
+    src/features/auth/LoginPage.tsx:140:          {loading ? t('common.loading') : t('auth.login.submit')}
+
+=== 4. Les 9 requetes qui ont retry:false — un echec unique y est DEFINITIF ===
+    src/app/RootLayout.tsx:34:    retry: false,
+    src/components/layout/UserMenu.tsx:28:    retry: false,
+    src/components/layout/WorkspaceSelector.tsx:23:    retry: false,
+    src/components/OnboardingTour.tsx:86:    retry: false,
+    src/features/campaigns/CampaignWizardPage.tsx:128:    retry: false,
+    src/features/crm-console/useConsoleFeatures.ts:42:    retry: false,
+    src/features/dashboard/components/ActivityFeed.tsx:42:    retry: false,
+    src/features/dashboard/components/TopDeptsCard.tsx:23:    retry: false,
+    src/features/dashboard/DashboardPage.tsx:74:    retry: false,
+    et AUCUN de ces ecrans n'offre de bouton pour redemander.

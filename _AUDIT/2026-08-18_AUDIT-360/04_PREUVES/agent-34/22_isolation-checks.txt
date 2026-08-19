@@ -1,1 +1,55 @@
 ### qualiopi:isolation-check
+  - src/features/admin-planning/charge-queries.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/features/admin-planning/detail.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/features/admin-planning/hub-queries.spec.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/features/admin-planning/hub-queries.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/features/admin-planning/pipeline.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/features/admin-planning/queries.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/features/admin-qualiopi/session-hub/ChecklistSession.tsx : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/features/contract/admin-actions.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/features/invoice/admin-actions.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/lib/email/templates/_layout.tsx : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/lib/knowledge/banned-words.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/actions/__tests__/admin-recherche.spec.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/actions/admin-recherche.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/admin/dossiers-pipeline.spec.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/admin/dossiers-pipeline.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/admin/pilotage-dashboard.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/admin/qualiopi-nav-counts.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/content-gen/generators/blog-article.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/email/health.spec.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/email/health.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/formateur/echeances-formateur.spec.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/formateur/echeances-formateur.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/formateur/etapes-formateur.spec.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+  - src/server/formateur/etapes-formateur.ts : Utilise un symbole qualiopi hors des zones dédiées (cloisonnement).
+ ELIFECYCLE  Command failed with exit code 1.
+EXIT=1
+
+### image-bank:isolation-check
+  - scripts/og/rapatrier-heros-blog.ts : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - src/app/[locale]/(admin)/[adminPrefix]/content-gen/hero-images/_v2/HeroImagesBackfill.tsx : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - src/app/[locale]/(admin)/[adminPrefix]/content-gen/hero-images/page.tsx : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - src/app/admin.css : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - src/app/sitemap-news-evergreen.xml/route.ts : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - src/components/admin/ui/AdminSidebarNav.tsx : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - src/components/admin/ui/__tests__/admin-card-anchor-display.test.ts : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - src/components/admin/ui/__tests__/admin-form-labels.test.ts : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - src/components/marketing/ArticleCard.tsx : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - src/components/sections/PressImageCarousel.tsx : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - src/components/sections/PressImages.tsx : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - src/lib/admin-nav.test.ts : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - src/lib/content/__tests__/liens-internes.spec.ts : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - src/lib/content/liens-internes.ts : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - src/scripts/backfill-hero-images.ts : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - src/server/careers/cv-storage.ts : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - src/server/console-documents/storage.ts : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - src/server/content-gen/images/__tests__/select-hero-image.spec.ts : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - src/server/content-gen/images/backfill-hero.ts : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - src/server/content-gen/images/select-hero-image.ts : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - src/server/press/queries.ts : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - tests/unit/ci/seed-images-declencheur.spec.ts : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - tests/unit/seo/galerie-telechargement-crawl.spec.ts : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+  - tests/unit/seo/image-bank-chemins-ssot.spec.ts : Contient marqueur image-bank mais hors zones dédiées (§ 7.1)
+ ELIFECYCLE  Command failed with exit code 1.
+EXIT=1

@@ -1,0 +1,17 @@
+src\app\api\calendly\client-event\route.ts -> syncCalendlyEventToCrm({
+src\features\admin-calendly\actions.ts -> syncCalendlyEventToCrm({
+src\features\commercial-application\actions.ts -> syncCandidateToCrm({
+src\features\job-application\actions.ts -> syncCandidateToCrm({
+src\features\newsletter\actions.ts -> syncNewsletterOptInToCrm({
+src\features\newsletter\actions.ts -> syncNewsletterOptOutToCrm({
+src\features\podcast-request\actions.ts -> syncFormSubmissionToCrm({
+src\features\review-submission\actions.ts -> syncReviewToCrm({
+src\features\roi-report\actions.ts -> syncFormSubmissionToCrm({
+src\features\unified-contact\actions.ts -> syncFormSubmissionToCrm({
+src\server\calendly\discover.ts -> syncCalendlyEventToCrm({
+src\server\calendly\enrich.ts -> syncCalendlyEventToCrm({
+src\server\chatbot\tools\capturer-lead.ts -> syncFormSubmissionToCrm({
+src\server\vivier\opposition.ts -> syncVivierOppositionToCrm({
+src\server\vivier\stock.ts -> syncCandidateToCrm({
+
+[exited with code 0]

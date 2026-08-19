@@ -1,0 +1,21 @@
+######## SABOTAGE S10-hibp-cle-cache-globale
+######## FICHIER SABOTE : app/Services/Auth/HibpChecker.php
+######## DATE : 2026-08-19T12:36:07Z
+######## DIFF APPLIQUE (preuve que le sabotage a atterri) ########
+--- /var/www/html.orig/app/Services/Auth/HibpChecker.php
++++ /var/www/html/app/Services/Auth/HibpChecker.php
+@@ -61,7 +61,7 @@
+         $prefix = substr($sha1, 0, 5);
+         $suffix = substr($sha1, 5);
+ 
+-        $cacheKey = 'hibp:range:' . $prefix;
++        $cacheKey = 'hibp:range';
+ 
+         try {
+             $body = Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($prefix) {
+  ⨯ POST /coverage/launch accepte body valide                            0.50s  
+   FAILED  Tests\Feature\Controllers\CoverageControllerTest > POST /coverage…   
+  Tests:    1 failed, 1 skipped, 778 passed (6492 assertions)
+######## CODE PEST : 1 ########
+######## RESTAURATION ########
+RESTAURE-IDENTIQUE: app/Services/Auth/HibpChecker.php

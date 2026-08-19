@@ -404,7 +404,7 @@ sous vingt agents.)*
 
 ---
 
-### [A-011] Défaut systémique : les gardes de ce dépôt mesurent souvent le mauvais objet — dix cas indépendants
+### [A-011] Défaut systémique : les gardes de ce dépôt mesurent souvent le mauvais objet — douze cas indépendants
 - **Sévérité**      : **S1** *(constat de synthèse du chef de chantier — il ne remplace aucun constat d'agent, il les relie)*
 - **Domaine**       : tests / méthode
 - **Référence**     : `e8924b8`
@@ -2434,3 +2434,105 @@ place du dirigeant** — ils sont à porter au cahier des charges, pas au produi
 - **Statut**        : **ouvert** — **rejoint le lot G4, en tête de P3**
 - **Vérifié par**   : agent 24 (mesure d'origine et témoin) ; **compte de production mesuré par le chef de chantier**
 - Réfuté par / Passe 3 : —
+
+---
+
+## Agent 24 — les 13 parcours du §23.4 : **0 existe · 2 partiels · 11 absents**
+**Rapport** : `11_GRILLES/parcours.md` · **Preuves** : `04_PREUVES/agent-24/` (5 sondes, 6 JSON, 8 captures, `COMMANDES-JOUEES.md`)
+
+**Trois lectures transverses, et elles valent mieux que le tableau** :
+- **6 des 13 parcours partent « de la fiche » — et la fiche a 0 bouton et 0 lien.**
+- **4 butent sur une table qui existe déjà** : il manque le modèle, la route, le contrôleur, l'écran — **jamais la colonne**.
+- **4 butent sur une table qui n'existe pas du tout.** Et **le 13ᵉ ne demande qu'un lien**.
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **D24-001** | **S0** | → devenu **`A-015`** : l'écran d'accueil **s'efface entièrement** dès qu'`audit_logs` porte une ligne. **64 en production** |
+| **D24-007** | **S1** | `crm_activites` et `crm_motifs` **n'ont aucune clé étrangère** : **rien ne peut porter un motif**. *Plus profond que `I48-004`, et préalable à l'étape 1a* |
+| **D24-004** | **S1** | Rattacher un lead exige de **taper à la main l'identifiant numérique interne** de l'entreprise (placeholder « ex. 1842 »), **boutons désactivés** — **sur l'écran où stationnent 100 % des leads** |
+| **D24-003** | **S1** | La fiche 360°, **départ de 6 des 13 parcours**, offre **0 bouton et 0 lien** |
+| **D24-002** | **S1** | La cloche « Notifications » **n'a aucun gestionnaire de clic** ; `/notifications` rend une liste vide **en dur** et **n'est appelée par aucun écran** |
+| D24-006 | S2 | **18 écrans sur 26 sans aucun lien sortant**, dont 4 sans lien **ni** bouton — `/contacts` (320 personnes) et la fiche 360° en font partie |
+| D24-005 | S2 | **Filtres et page absents de l'URL** : le retour arrière renvoie **page 1, sans filtre**, à chaque fiche ouverte |
+| D24-008 | S2 | `ErrorBoundary` **écrit, exporté, monté nulle part** ; **aucun `errorComponent`** : 8 écrans mesurés **effacent l'application entière** |
+
+**Sur les parcours réels de l'outil — 5 sur 8 mesurables aboutissent**, et la répartition est parlante :
+lancer une collecte **4 clics**, assistant **5**, fiche entreprise **3** (**au budget**), export **3**,
+fiche média **3**. **S'arrêtent** : pose de tag en masse (**boutons désactivés**), arbitrage (**boutons
+désactivés**), fiche candidat (aucun lien).
+
+> **Les 5 qui aboutissent sont tous des parcours de collecte ou de lecture ; les 3 qui s'arrêtent sont
+> les 3 seuls où l'on agissait.**
+
+*Le verdict de l'agent 22 est confirmé **par une mesure d'une autre nature** : 4 parcours de collecte
+sur 4 aboutissent ; **0 geste du matin sur 4** ; **0 action sur 4 depuis la fiche**.*
+
+---
+
+## Agent 26 — formulaires et saisie : **14 mécanismes de refus silencieux**
+**Rapport** : `11_GRILLES/agent-26_formulaires.md` · **Preuves** : `04_PREUVES/agent-26/`
+
+🔑 **`D26-001` (S1) ne porte pas sur un champ, mais sur le service qui décide à qui part un courriel.**
+Un critère mal formé **n'est pas rejeté : il est RETIRÉ du SQL**. Mesuré sur 300 000 fiches, le
+prédicat produit devient `"workspace_id" = ?` — *le critère a disparu, et l'aperçu affiche le compte
+du **workspace entier***. **Deux des quatre entrées franchissent la validation et sont persistées**
+(`criteria.*.value` **n'est validée nulle part** — vérifié : 0 occurrence ; `POST /audiences/preview`
+ne valide que `criteria => required|array`). *C'est le « 3 chemins aveugles » du mandat, mesuré — et
+la conséquence est un envoi à tout un espace de travail.*
+
+**Les 14 refus silencieux**, chacun avec son mécanisme — les plus nets :
+bornage **à chaque frappe** (taper « 12 » dans un champ de minimum 5 **donne 52**) · `Number('')` vaut
+`0` **et non `NaN`**, donc vider un champ le remet au plancher · **aucun `<form>` dans l'assistant**,
+donc `min`/`max`/`required` **jamais évalués** sur 8 champs · une limite de source **désélectionnée**
+est **quand même envoyée et persistée** · le champ « DSN Sentry » **sans `name`, sans `onChange`,
+sans bouton** : la saisie est **jetée** · **14 boutons sans `onClick`** · `MaskedSecret` dont
+« Afficher » révèle **une constante littérale** · `status:'configured'` **codé en dur** : l'écran
+affirme **sans avoir rien lu** · et **12 `catch {}`** qui jettent le message du serveur, **dont les
+4 écrans d'authentification**.
+
+**Critère 3 du §29 — « aucune saisie n'est perdue » : il tombe, 0 sur 6.**
+`beforeunload`, `useBlocker`, `isDirty`, `validateSearch`, `useSearch(` → **zéro ligne**.
+**Témoin négatif** : le même contrôle retrouve **les 6 usages réels de `localStorage`** (barre latérale,
+thème, langue — **aucun formulaire**). Aggravé par `api.ts:30`, qui fait `window.location.assign('/login')`
+sur un 401 : *une session expirée pendant la saisie efface tout, sans avertissement.*
+
+✅ **Et l'arbitrage `neq`/`not_in` sur NULL (fragilité F7) TIENT — vérifié, rien à rouvrir.**
+Vrai service, 300 000 fiches toutes à `sector_main` NULL : `neq btp` → **300 000 gardées** ; `not_in`
+idem ; `not` symétrique. **Témoin négatif décisif** : *le SQL naïf sur la même table rend **0***.
+**L'écart vaut 300 000 fiches.**
+
+**L'assistant de campagne** : **4 étapes**, le retour arrière **préserve tout** et **on ne peut pas
+sauter d'étape** — *les deux seuls points sains*. Mais un rechargement perd tout, **le bouton Précédent
+du navigateur quitte l'assistant**, il n'y a **aucun `<form>`**, et **aucun test** ne couvre ses
+869 lignes.
+
+---
+
+## Agent 34 — non-régression de la console du site
+**Rapport** : `11_GRILLES/agent-34_non-regression-console.md` · **Preuves** : `04_PREUVES/agent-34/` (24 fichiers)
+
+**7 commits CRM** sur 150 depuis le 13/08 ont touché **72 fichiers hors `crm-sync`**, dont **55 de
+code** : **29 testés, 26 non testés**. Mais **seuls 7 fichiers sont réellement partagés** avec le
+périmètre de la console — **tous additifs, tous testés, tous verts**… **sauf un** :
+`api/calendly/client-event/route.ts`, **le seul où le canal a modifié le corps d'une fonction
+existante**. *C'est exactement celui qui a cassé.*
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **E34-003** | **S1** | La production **affirme la certification Qualiopi** le jour même où un commit du dépôt écrit qu'elle **n'est pas délivrée** → **porté en `06_RESTE-WILL.md` §C bis, comme une question, pas comme une accusation** |
+| **E34-007** | **S1** | `qualiopi:isolation-check` est **ROUGE** (≥ 24 violations) — **et ne tourne nulle part**, tout en **affirmant dans son en-tête être câblé au pré-envoi**. *Douzième cas du patron `A-011`* |
+| **E34-001** | **S1** | Le canal CRM a rendu **la suite du site rouge pendant 3 jours** et le hook de pré-envoi **infranchissable pour tout le monde** (la PR ajoute l'appel, le mock arrive **3 jours plus tard**) |
+| E34-005 | S2 | Suite **verte**, mais **54 % des tests ne s'exécutent pas en CI** — **12 710 sautés sur 23 435** |
+| E34-006 | S2 | Le verrou LF du 18/08 **n'a pas été appliqué à la copie de travail** : **4 877 fichiers portent encore des CR**, et **le test qu'il devait sauver rougit toujours** *(même défaut que `A-003`, à l'échelle de l'autre dépôt)* |
+| E34-002, E34-004 | S2 | **18 des 21 fichiers appelant le canal n'ont aucun test qui le connaisse** · 5 entrées de navigation mènent à un **404 selon une variable d'environnement**, et le contrôle de routes **ne peut pas le voir** |
+| **E34-008** | **S2** | 🔑 **Le module « Booking » de la console n'est PAS le « booking » du CDC** : *viser le premier détruirait les inscriptions aux sessions de formation.* **À lire avant tout palier de retrait** |
+
+✅ **Le correctif Qualiopi tient, et la garde est bonne** : le `where` distingue 4 types collectifs de
+2 nominatifs, **le filtre est dans la requête**, **la garde rejoue le `where` contre des fixtures**
+(*elle mesure le bon objet*), et les 4 écrans passent par un point d'entrée unique. **Les 8 lectures
+accessibles par jeton stagiaire ou formateur ont été passées au crible : toutes cloisonnées.**
+
+⚠️ **Et une mesure de charge qui recoupe `H45-009`** : le poste est **≈40× plus lent** que le runner
+de CI (36 s par fichier de test). Les 4 rouges initiaux de l'agent étaient **des expirations à
+5 000 ms** — rejoués à 120 000 ms : **24/24 verts**. *Encore un rouge d'atelier qui n'est pas un
+défaut de produit.*

@@ -1,0 +1,64 @@
+=== axion_crm_perf ===
+              indexrelname               | idx_scan |     sz     
+-----------------------------------------+----------+------------
+ idx_companies_ws_updated_id             |      181 | 28 MB
+ idx_companies_workspace_lifecycle_stage |       69 | 2912 kB
+ idx_companies_sector                    |       66 | 2928 kB
+ companies_pkey                          |       15 | 9880 kB
+ companies_website_status_index          |       15 | 2880 kB
+ idx_companies_ws_counts                 |       12 | 2160 kB
+ idx_companies_workspace_score           |       11 | 3048 kB
+ companies_workspace_external_ref_key    |        0 | 16 kB
+ companies_workspace_foreign_id_unique   |        0 | 8192 bytes
+ companies_workspace_id_siren_key        |        0 | 21 MB
+ idx_companies_archive_reason            |        0 | 8192 bytes
+ idx_companies_best_email_confidence     |        0 | 8192 bytes
+ idx_companies_denom_btree               |        0 | 37 MB
+ idx_companies_denomination_trgm         |        0 | 20 MB
+ idx_companies_dept                      |        0 | 3064 kB
+ idx_companies_geo                       |        0 | 17 MB
+ idx_companies_prospection_status        |        0 | 2928 kB
+ idx_companies_region                    |        0 | 3048 kB
+ idx_companies_revalidate                |        0 | 8192 bytes
+ idx_companies_signals                   |        0 | 4560 kB
+ idx_companies_workspace_country_nature  |        0 | 8192 bytes
+ idx_companies_workspace_dept            |        0 | 8664 kB
+ idx_companies_workspace_naf             |        0 | 2928 kB
+ idx_companies_workspace_relation_type   |        0 | 2968 kB
+ idx_companies_workspace_size            |        0 | 2936 kB
+ idx_companies_ws_created_at             |        0 | 17 MB
+ idx_companies_ws_stage_updated_id       |        0 | 38 MB
+(27 rows)
+
+=== axion_crm_perf4m ===
+              indexrelname               | idx_scan |     sz     
+-----------------------------------------+----------+------------
+ idx_companies_ws_counts                 |      491 | 20 MB
+ idx_companies_workspace_score           |       19 | 19 MB
+ companies_website_status_index          |       15 | 18 MB
+ idx_companies_ws_updated_id             |        8 | 179 MB
+ idx_companies_sector                    |        7 | 19 MB
+ companies_pkey                          |        4 | 64 MB
+ idx_companies_workspace_naf             |        4 | 19 MB
+ companies_workspace_external_ref_key    |        0 | 16 kB
+ companies_workspace_foreign_id_unique   |        0 | 8192 bytes
+ companies_workspace_id_siren_key        |        0 | 141 MB
+ idx_companies_archive_reason            |        0 | 8192 bytes
+ idx_companies_best_email_confidence     |        0 | 8192 bytes
+ idx_companies_denom_btree               |        0 | 276 MB
+ idx_companies_denomination_trgm         |        0 | 110 MB
+ idx_companies_dept                      |        0 | 19 MB
+ idx_companies_geo                       |        0 | 114 MB
+ idx_companies_prospection_status        |        0 | 19 MB
+ idx_companies_region                    |        0 | 19 MB
+ idx_companies_revalidate                |        0 | 8192 bytes
+ idx_companies_signals                   |        0 | 7280 kB
+ idx_companies_workspace_country_nature  |        0 | 8192 bytes
+ idx_companies_workspace_dept            |        0 | 30 MB
+ idx_companies_workspace_lifecycle_stage |        0 | 19 MB
+ idx_companies_workspace_relation_type   |        0 | 19 MB
+ idx_companies_workspace_size            |        0 | 19 MB
+ idx_companies_ws_created_at             |        0 | 144 MB
+ idx_companies_ws_stage_updated_id       |        0 | 221 MB
+(27 rows)
+

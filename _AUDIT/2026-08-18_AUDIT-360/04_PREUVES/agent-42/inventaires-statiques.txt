@@ -1,0 +1,82 @@
+=== AGENT 42 — inventaires statiques, main 8db8229 ===
+HEAD = a3c42d66398b94afdb31843f5427e840388c33aa
+frontend/ modifie ? -> 0 fichier(s) hors mes fichiers de mesure
+
+--- 1. decoupage par route : imports dynamiques dans src/ ---
+(AUCUN — 0 ligne)
+TEMOIN POSITIF (le meme motif dans mes fichiers de mesure, qui EN contiennent) :
+  tests/bench-agent42/frappe.test.tsx:124:    const { AudienceBuilderPage } = await import('@/features/audiences/AudienceBuilderPage');
+
+--- 2. virtualisation ---
+  src/features/companies/CompaniesListPage.tsx:4:import { useVirtualizer } from "@tanstack/react-virtual";
+  src/features/companies/CompaniesListPage.tsx:297:  const rowVirtualizer = useVirtualizer({
+  ecrans montant une collection (useQuery) : 31
+
+--- 3. memoisation ---
+  React.memo / memo( : 0
+  useCallback        : 2
+  useMemo            : 24
+  createContext      : 0
+  fleches inline prop: 190
+  objets inline prop : 48
+  key par index      : 12
+    src/components/ui/Skeleton.tsx:10:        <Skeleton key={i} className="h-12 w-full" />
+    src/features/audiences/AudienceBuilderPage.tsx:362:                    <li key={i} className="rounded-md bg-slate-50 px-2 py-1 text-[11px] font-mono text-slate-600 dark:bg-slate-800/60 dark:text-slate-400">
+    src/features/audiences/AudiencesListPage.tsx:278:        <Card key={i} padding="md" className="flex flex-col gap-3">
+    src/features/campaigns/CampaignsListPage.tsx:389:        <Card key={i} padding="md" className="flex flex-col gap-3">
+    src/features/crm-console/ConsoleGate.tsx:65:        <Skeleton key={index} className="h-14 w-full rounded-lg" />
+    src/features/dashboard/components/ActivityFeed.tsx:59:            <li key={i} className="flex items-start gap-3">
+    src/features/dashboard/components/TopDeptsCard.tsx:45:            <li key={i} className="h-9 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
+    src/features/dashboard/DashboardPage.tsx:249:            key={i}
+    src/features/dashboard/DashboardPage.tsx:263:            <div key={i} className="rounded-2xl bg-white p-5 ring-1 ring-slate-200/70 shadow-[var(--shadow-card)] dark:bg-slate-900 dark:ring-slate-800">
+    src/features/dashboard/DashboardPage.tsx:271:            <div key={i} className="rounded-2xl bg-white p-5 ring-1 ring-slate-200/70 shadow-[var(--shadow-card)] dark:bg-slate-900 dark:ring-slate-800">
+    src/features/scraping/ScraperRunsPage.tsx:746:          <div key={i} className="grid grid-cols-7 items-center gap-3 px-4 py-3">
+    src/features/tags/TagsManagerPage.tsx:195:            <Skeleton key={i} className="h-32 w-full" />
+
+--- 4. anti-rebond ---
+  src/components/OnboardingTour.tsx:103:      const t = setTimeout(() => setRun(true), 800);
+  src/components/ui/Tooltip.tsx:26:    setTimer(window.setTimeout(() => setOpen(true), delayMs));
+  src/features/audiences/AudienceBuilderPage.tsx:4: * Builder visuel 2 colonnes : critères à gauche, preview live (debounced 500ms) à droite.
+  src/features/audiences/AudienceBuilderPage.tsx:144:  // Preview live (debounced 500ms)
+  src/features/audiences/AudienceBuilderPage.tsx:170:    const timer = setTimeout(() => { void fetchPreview(criteria); }, 500);
+
+--- 5. scrutation periodique ---
+  src/features/audiences/AudiencesListPage.tsx:68:    refetchInterval: 30_000,
+  src/features/campaigns/CampaignDetailPage.tsx:10: *  - Refresh 5s via refetchInterval
+  src/features/campaigns/CampaignDetailPage.tsx:64:    refetchInterval: 5_000,
+  src/features/campaigns/CampaignDetailPage.tsx:71:    refetchInterval: 5_000,
+  src/features/campaigns/CampaignsListPage.tsx:65:    refetchInterval: 10_000,
+  src/features/coverage/CoveragePage.tsx:34:    refetchInterval: 60_000,
+  src/features/dashboard/DashboardPage.tsx:81:    refetchInterval: 30_000,
+  src/features/observability/ObservabilityPage.tsx:34:    refetchInterval: 30_000,
+  src/features/scraping/ScraperRunsPage.tsx:215:    refetchInterval: 10_000,
+  setInterval : 0 (TEMOIN : la recherche sait chercher les deux formes)
+
+--- 6. dependances declarees et jamais importees ---
+  date-fns -> 0 import(s)
+  zustand -> 0 import(s)
+  @tanstack/react-table -> 0 import(s)
+  class-variance-authority -> 0 import(s)
+  tailwind-merge -> 0 import(s)
+  @tanstack/react-query-devtools -> 0 import(s)
+  TEMOIN POSITIF (dependances reellement utilisees) :
+    zod -> 1 import(s)
+    laravel-echo -> 1 import(s)
+    react-joyride -> 1 import(s)
+    i18next -> 2 import(s)
+    @sentry/react -> 1 import(s)
+
+--- 7. en-tete de liste duplique (confirme D27-005) ---
+  src/features/companies/CompaniesListPage.tsx
+  src/features/contacts/ContactsListPage.tsx
+  src/features/llm/LlmRouterPage.tsx
+  src/features/llm/ProxyProvidersPage.tsx
+  src/features/rgpd/AiActRegisterPage.tsx
+  src/features/rgpd/AuditLogsPage.tsx
+  src/features/rgpd/RgpdRequestsPage.tsx
+  src/features/users/UsersPage.tsx
+  total : 8 fichiers
+
+--- 8. journalisation dans FranceCoverageMap ---
+  appels LOG() : 32
+  console.log dans src/ : 3

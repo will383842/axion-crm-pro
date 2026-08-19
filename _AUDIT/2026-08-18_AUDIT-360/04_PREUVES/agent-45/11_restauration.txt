@@ -1,0 +1,6 @@
+# AGENT 45 — preuve de RESTAURATION. Aucun fichier de code laisse modifie.
+# Releve le 2026-08-19T12:55:56Z. Reference : main e8924b8.
+
+## Conteneur a45b (vague 2 + micro-campagne) — arbre de travail contre instantane intact
+$ diff -rq /var/www/html.orig /var/www/html   (hors storage/, bootstrap/cache/, .phpunit.cache)
+(aucune ligne ci-dessus = arbre identique)

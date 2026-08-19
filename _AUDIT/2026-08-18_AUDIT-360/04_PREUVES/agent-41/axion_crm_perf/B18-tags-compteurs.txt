@@ -1,0 +1,61 @@
+############ B18-tags-compteurs
+### base   : axion_crm_perf   (datcollate = C)
+### date   : 2026-08-19T14:49:08+02:00
+### SQL    :
+select "tag_id", COUNT(*) as c from "company_tag" where "tag_id" in (select id from tags where workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168' limit 500) group by "tag_id";
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                           QUERY PLAN                                                           
+--------------------------------------------------------------------------------------------------------------------------------
+ HashAggregate  (cost=10834.25..10834.44 rows=19 width=16) (actual time=862.366..862.375 rows=19 loops=1)
+   Group Key: company_tag.tag_id
+   Batches: 1  Memory Usage: 24kB
+   Buffers: shared hit=2 read=2206
+   ->  Hash Semi Join  (cost=3.25..9334.25 rows=300000 width=8) (actual time=2.362..747.213 rows=300000 loops=1)
+         Hash Cond: (company_tag.tag_id = tags.id)
+         Buffers: shared hit=2 read=2206
+         ->  Seq Scan on company_tag  (cost=0.00..5206.00 rows=300000 width=8) (actual time=0.156..633.552 rows=300000 loops=1)
+               Buffers: shared read=2206
+         ->  Hash  (cost=2.71..2.71 rows=43 width=8) (actual time=0.843..0.846 rows=43 loops=1)
+               Buckets: 1024  Batches: 1  Memory Usage: 10kB
+               Buffers: shared hit=2
+               ->  Limit  (cost=0.00..2.71 rows=43 width=8) (actual time=0.189..0.247 rows=43 loops=1)
+                     Buffers: shared hit=2
+                     ->  Seq Scan on tags  (cost=0.00..2.71 rows=43 width=8) (actual time=0.181..0.231 rows=43 loops=1)
+                           Filter: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+                           Rows Removed by Filter: 16
+                           Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=221 read=2
+ Planning Time: 4.454 ms
+ Execution Time: 863.499 ms
+(22 rows)
+
+
+===== CHAUD (4e exécution) =====
+                                                           QUERY PLAN                                                           
+--------------------------------------------------------------------------------------------------------------------------------
+ HashAggregate  (cost=10834.25..10834.44 rows=19 width=16) (actual time=1637.483..1637.497 rows=19 loops=1)
+   Group Key: company_tag.tag_id
+   Batches: 1  Memory Usage: 24kB
+   Buffers: shared hit=2 read=2206
+   ->  Hash Semi Join  (cost=3.25..9334.25 rows=300000 width=8) (actual time=0.161..1419.024 rows=300000 loops=1)
+         Hash Cond: (company_tag.tag_id = tags.id)
+         Buffers: shared hit=2 read=2206
+         ->  Seq Scan on company_tag  (cost=0.00..5206.00 rows=300000 width=8) (actual time=0.056..967.110 rows=300000 loops=1)
+               Buffers: shared read=2206
+         ->  Hash  (cost=2.71..2.71 rows=43 width=8) (actual time=0.066..0.072 rows=43 loops=1)
+               Buckets: 1024  Batches: 1  Memory Usage: 10kB
+               Buffers: shared hit=2
+               ->  Limit  (cost=0.00..2.71 rows=43 width=8) (actual time=0.026..0.049 rows=43 loops=1)
+                     Buffers: shared hit=2
+                     ->  Seq Scan on tags  (cost=0.00..2.71 rows=43 width=8) (actual time=0.024..0.040 rows=43 loops=1)
+                           Filter: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+                           Rows Removed by Filter: 16
+                           Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=221 read=2
+ Planning Time: 12.793 ms
+ Execution Time: 1637.735 ms
+(22 rows)
+

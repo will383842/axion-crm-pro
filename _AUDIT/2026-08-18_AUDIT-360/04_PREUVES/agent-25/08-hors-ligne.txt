@@ -1,0 +1,29 @@
+AGENT 25 - ETAT HORS LIGNE : le produit sait-il qu'il a perdu le reseau ? - main 8db8229
+
+=== navigator.onLine / evenements online|offline / onlineManager (react-query) ===
+>>> AUCUNE OCCURRENCE
+
+--- TEMOIN POSITIF : onlineManager et networkMode existent bien dans la version installee
+node_modules/@tanstack/react-query/build/modern/_tsup-dts-rollup.d.ts
+node_modules/@tanstack/react-query/build/modern/index.d.ts
+
+=== Service worker / cache hors-ligne / PWA ===
+>>> AUCUNE OCCURRENCE
+
+=== Bandeau de reconnexion / temps reel coupe (laravel-echo) ===
+>>> AUCUNE OCCURRENCE
+
+=== Le QueryClient de production : quelle politique de reessai ? (src/main.tsx) ===
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+      retry: (count, err) => {
+        const status = (err as { response?: { status?: number } } | null)?.response?.status;
+        return status !== 401 && status !== 403 && count < 2;
+      },
+      refetchOnWindowFocus: false,
+    },
+  },
+});

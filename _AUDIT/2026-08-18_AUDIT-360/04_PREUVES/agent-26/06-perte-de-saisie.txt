@@ -1,0 +1,11 @@
+### garde de sortie / brouillon / etat d'URL — les 7 ecrans de saisie
+commande : grep -rniE 'beforeunload|useBlocker|isDirty|validateSearch|useSearch\(' frontend/src
+(aucune ligne ci-dessus = aucun dispositif)
+
+### TEMOIN NEGATIF : le meme grep trouve bien localStorage la ou il est utilise
+frontend/src/app/RootLayout.tsx:46:  // Sidebar collapsed state — persisté en localStorage
+frontend/src/app/RootLayout.tsx:50:      return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
+frontend/src/app/RootLayout.tsx:60:        window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0');
+frontend/src/components/ui/DarkModeToggle.tsx:22:    return (localStorage.getItem(STORAGE_KEY) as Theme) ?? 'system';
+frontend/src/components/ui/DarkModeToggle.tsx:27:    localStorage.setItem(STORAGE_KEY, theme);
+frontend/src/lib/i18n.ts:17:    detection: { order: ['localStorage', 'navigator'], caches: ['localStorage'] },

@@ -1,0 +1,45 @@
+############ B17-tags-liste
+### base   : axion_crm_perf   (datcollate = C)
+### date   : 2026-08-19T14:48:45+02:00
+### SQL    :
+select * from "tags" where "workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168' order by "category" asc, "name" asc limit 500;
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                  QUERY PLAN                                                  
+--------------------------------------------------------------------------------------------------------------
+ Limit  (cost=3.88..3.99 rows=43 width=176) (actual time=0.142..0.151 rows=43 loops=1)
+   Buffers: shared hit=3 read=2
+   ->  Sort  (cost=3.88..3.99 rows=43 width=176) (actual time=0.140..0.144 rows=43 loops=1)
+         Sort Key: category, name
+         Sort Method: quicksort  Memory: 34kB
+         Buffers: shared hit=3 read=2
+         ->  Seq Scan on tags  (cost=0.00..2.71 rows=43 width=176) (actual time=0.021..0.041 rows=43 loops=1)
+               Filter: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+               Rows Removed by Filter: 16
+               Buffers: shared read=2
+ Planning:
+   Buffers: shared hit=202 read=7
+ Planning Time: 1.545 ms
+ Execution Time: 0.230 ms
+(14 rows)
+
+
+===== CHAUD (4e exécution) =====
+                                                  QUERY PLAN                                                  
+--------------------------------------------------------------------------------------------------------------
+ Limit  (cost=3.88..3.99 rows=43 width=176) (actual time=0.236..0.247 rows=43 loops=1)
+   Buffers: shared hit=5
+   ->  Sort  (cost=3.88..3.99 rows=43 width=176) (actual time=0.232..0.238 rows=43 loops=1)
+         Sort Key: category, name
+         Sort Method: quicksort  Memory: 34kB
+         Buffers: shared hit=5
+         ->  Seq Scan on tags  (cost=0.00..2.71 rows=43 width=176) (actual time=0.035..0.052 rows=43 loops=1)
+               Filter: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+               Rows Removed by Filter: 16
+               Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=209
+ Planning Time: 9.610 ms
+ Execution Time: 0.373 ms
+(14 rows)
+

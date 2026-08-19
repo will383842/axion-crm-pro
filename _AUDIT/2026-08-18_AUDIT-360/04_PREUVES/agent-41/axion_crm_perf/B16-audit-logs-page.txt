@@ -1,0 +1,41 @@
+############ B16-audit-logs-page
+### base   : axion_crm_perf   (datcollate = C)
+### date   : 2026-08-19T14:48:25+02:00
+### SQL    :
+select * from "audit_logs" order by "id" desc limit 50 offset 0;
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                               QUERY PLAN                                                               
+----------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=8.41..8.53 rows=50 width=295) (actual time=0.181..0.192 rows=50 loops=1)
+   Buffers: shared hit=7
+   ->  Sort  (cost=8.41..8.66 rows=102 width=295) (actual time=0.179..0.184 rows=50 loops=1)
+         Sort Key: audit_logs.id DESC
+         Sort Method: quicksort  Memory: 65kB
+         Buffers: shared hit=7
+         ->  Seq Scan on audit_logs_default audit_logs  (cost=0.00..5.02 rows=102 width=295) (actual time=0.013..0.059 rows=80 loops=1)
+               Buffers: shared hit=4
+ Planning:
+   Buffers: shared hit=301 read=3
+ Planning Time: 14.378 ms
+ Execution Time: 0.315 ms
+(12 rows)
+
+
+===== CHAUD (4e exécution) =====
+                                                               QUERY PLAN                                                               
+----------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=8.41..8.53 rows=50 width=295) (actual time=33.608..33.626 rows=50 loops=1)
+   Buffers: shared hit=7
+   ->  Sort  (cost=8.41..8.66 rows=102 width=295) (actual time=33.601..33.614 rows=50 loops=1)
+         Sort Key: audit_logs.id DESC
+         Sort Method: quicksort  Memory: 65kB
+         Buffers: shared hit=7
+         ->  Seq Scan on audit_logs_default audit_logs  (cost=0.00..5.02 rows=102 width=295) (actual time=0.057..0.230 rows=80 loops=1)
+               Buffers: shared hit=4
+ Planning:
+   Buffers: shared hit=304
+ Planning Time: 5.327 ms
+ Execution Time: 132.948 ms
+(12 rows)
+

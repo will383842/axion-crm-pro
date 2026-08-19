@@ -1,0 +1,63 @@
+############ A11-companies-tri-enriched-at
+### base   : axion_crm_perf4m   (datcollate = C)
+### date   : 2026-08-19T14:51:56+02:00
+### SQL    :
+select * from "companies" where "deleted_at" is null and "workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168' order by "enriched_at" asc limit 100 offset 0;
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                                      QUERY PLAN                                                                      
+------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=139990.53..140002.20 rows=100 width=2078) (actual time=92784.602..92934.205 rows=100 loops=1)
+   Buffers: shared hit=2783 read=77115
+   ->  Gather Merge  (cost=139990.53..412231.84 rows=2333334 width=2078) (actual time=92677.903..92827.408 rows=100 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=2783 read=77115
+         ->  Sort  (cost=138990.51..141907.17 rows=1166667 width=2078) (actual time=91794.566..91794.628 rows=100 loops=3)
+               Sort Key: enriched_at
+               Sort Method: top-N heapsort  Memory: 50kB
+               Buffers: shared hit=2783 read=77115
+               Worker 0:  Sort Method: top-N heapsort  Memory: 50kB
+               Worker 1:  Sort Method: top-N heapsort  Memory: 50kB
+               ->  Parallel Seq Scan on companies  (cost=0.00..94401.33 rows=1166667 width=2078) (actual time=359.996..90018.927 rows=933333 loops=3)
+                     Filter: ((deleted_at IS NULL) AND (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid))
+                     Buffers: shared hit=2703 read=77115
+ Planning:
+   Buffers: shared hit=806
+ Planning Time: 48.938 ms
+ JIT:
+   Functions: 14
+   Options: Inlining false, Optimization false, Expressions true, Deforming true
+   Timing: Generation 323.504 ms, Inlining 0.000 ms, Optimization 234.619 ms, Emission 898.561 ms, Total 1456.684 ms
+ Execution Time: 93495.715 ms
+(23 rows)
+
+
+===== CHAUD (4e exécution) =====
+                                                                     QUERY PLAN                                                                      
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=139990.53..140002.20 rows=100 width=2078) (actual time=6797.404..6880.253 rows=100 loops=1)
+   Buffers: shared hit=3071 read=76827
+   ->  Gather Merge  (cost=139990.53..412231.84 rows=2333334 width=2078) (actual time=6401.159..6483.991 rows=100 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=3071 read=76827
+         ->  Sort  (cost=138990.51..141907.17 rows=1166667 width=2078) (actual time=5948.040..5948.051 rows=100 loops=3)
+               Sort Key: enriched_at
+               Sort Method: top-N heapsort  Memory: 50kB
+               Buffers: shared hit=3071 read=76827
+               Worker 0:  Sort Method: top-N heapsort  Memory: 50kB
+               Worker 1:  Sort Method: top-N heapsort  Memory: 50kB
+               ->  Parallel Seq Scan on companies  (cost=0.00..94401.33 rows=1166667 width=2078) (actual time=169.395..3308.646 rows=933333 loops=3)
+                     Filter: ((deleted_at IS NULL) AND (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid))
+                     Buffers: shared hit=2991 read=76827
+ Planning:
+   Buffers: shared hit=806
+ Planning Time: 18.472 ms
+ JIT:
+   Functions: 14
+   Options: Inlining false, Optimization false, Expressions true, Deforming true
+   Timing: Generation 153.776 ms, Inlining 0.000 ms, Optimization 23.660 ms, Emission 876.807 ms, Total 1054.243 ms
+ Execution Time: 7213.239 ms
+(23 rows)
+

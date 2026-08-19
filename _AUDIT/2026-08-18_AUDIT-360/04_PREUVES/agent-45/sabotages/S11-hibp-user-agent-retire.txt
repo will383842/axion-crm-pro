@@ -1,0 +1,21 @@
+######## SABOTAGE S11-hibp-user-agent-retire
+######## FICHIER SABOTE : app/Services/Auth/HibpChecker.php
+######## DATE : 2026-08-19T12:47:39Z
+######## DIFF APPLIQUE (preuve que le sabotage a atterri) ########
+--- /var/www/html.orig/app/Services/Auth/HibpChecker.php
++++ /var/www/html/app/Services/Auth/HibpChecker.php
+@@ -35,7 +35,7 @@
+             'timeout'         => 5,
+             'connect_timeout' => 3,
+             'headers'         => [
+-                'User-Agent' => 'Axion-CRM-Pro/1.0 (security@axion-crm-pro.com)',
++                
+                 'Accept'     => 'text/plain',
+                 // HIBP demande l'opt-in padding response pour anonymity++
+                 'Add-Padding' => 'true',
+  ⨯ POST /coverage/launch accepte body valide                            0.74s  
+   FAILED  Tests\Feature\Controllers\CoverageControllerTest > POST /coverage…   
+  Tests:    1 failed, 1 skipped, 778 passed (6492 assertions)
+######## CODE PEST : 1 ########
+######## RESTAURATION ########
+RESTAURE-IDENTIQUE: app/Services/Auth/HibpChecker.php

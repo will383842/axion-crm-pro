@@ -1,0 +1,65 @@
+# F39 — preuve 05 : verification INDEPENDANTE de la base restauree par l'agent 08
+# (doctrine, regle 7 : celui qui realise ne verifie jamais sa propre piece.
+#  Je n'ai pas produit cette base ; je la compte.)
+# date : 2026-08-19T12:49:32Z
+
+Base : axion_crm_dr_a08, restauree par l'agent 08 depuis axion_crm_20260819T030001Z.sql.gz
+(source declaree dans 04_PREUVES/agent-08/27_schema-restaure.txt)
+
+## Comptages exacts count(*) de la base restauree
+activities=648
+audit_logs=53
+business_events=1286229
+candidates=0
+companies=4295349
+company_tag=7501969
+contacts=1319567
+coverage_matrix_cells=1264200
+journalists=1257
+media=55830
+scraper_runs=7608196
+users=1
+
+## Comptages exacts count(*) de la PRODUCTION, releve 2026-08-19T12:00:47Z (lecture seule)
+activities=649
+audit_logs=64
+business_events=1286229
+candidates=0
+companies=4295349
+company_tag=7501969
+contacts=1319567
+coverage_matrix_cells=1264182
+journalists=1257
+media=55830
+scraper_runs=7608196
+users=1
+
+## Lecture
+IDENTIQUES (9/12) : business_events, candidates, companies, company_tag, contacts,
+                    journalists, media, scraper_runs, users
+ECARTS (3/12), tous explicables par les 9 h ecoulees entre le dump (03:00 UTC) et le releve :
+  activities            648 restaure / 649 prod  -> +1 en production depuis le dump
+  audit_logs             53 restaure /  64 prod  -> +11 en production depuis le dump
+  coverage_matrix_cells 1 264 200 restaure / 1 264 182 prod -> -18 en production :
+     c'est une VUE MATERIALISEE (relkind='m'), rafraichie toutes les heures par
+     Schedule::command('coverage:refresh-matrix')->hourly() — elle a perdu 18 cellules.
+
+## Taille
+axion_crm_a = 23 MB
+axion_crm_dr_a08 = 9883 MB
+axion_crm_a11 = 25 MB
+axion_crm_agent17 = 7564 kB
+axion_crm_agent14 = 24 MB
+axion_crm_a19 = 24 MB
+axion_crm_a45 = 30 MB
+axion_crm_a06 = 25 MB
+axion_crm_a35 = 24 MB
+axion_crm_a36 = 24 MB
+axion_crm_a12 = 573 MB
+axion_crm_test_a35 = 24 MB
+axion_crm_a45b = 24 MB
+axion_crm_a45c = 37 MB
+axion_crm_a26 = 24 MB
+axion_crm_a39 = 1084 MB
+Production : 16 GB. La base restauree est plus petite : les index sont reconstruits
+compacts, la production porte du ballonnement (companies : 8071 Mo dont 3859 de donnees).

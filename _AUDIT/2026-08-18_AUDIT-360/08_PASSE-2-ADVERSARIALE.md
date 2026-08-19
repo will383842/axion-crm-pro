@@ -669,6 +669,54 @@ de production** : il l'applique à ses sondes, pas à ses affirmations.
 
 ---
 
+## 13. Résultat n° 11 — un S0 du décompte **n'est pas réparable dans ce dépôt**
+
+**Signalé par l'agent 35** : *« `E31-001` — "erasure traité comme une désinscription" — vit dans le
+dépôt du **site**, pas dans le CRM. Le CRM aiguille correctement `export|erase`, je l'ai vérifié
+dans le contrôleur. »*
+
+**Vérifié, et il a raison sur les deux moitiés** :
+
+- ✅ Le CRM aiguille bien : `RgpdRequestsController:101` fait
+  `'erasure' => $this->erasure->erase($req->subject_email)`. **Rien à reprocher côté CRM.**
+- ✅ `E31-001` porte bien sur l'autre dépôt.
+
+**Mais cela ne change pas mon décompte, et voici pourquoi** — `B14-002`, avec lequel je l'avais
+fusionné, **porte sur le site lui aussi** : sa formulation au registre le dit,
+*« **le site** répond "200 applied" et rien n'est effacé »*. **Les deux constats décrivent bien le
+même défaut, dans le même dépôt.** *Ma fusion tient. Le total reste **34**.*
+
+### 🔑 Ce que son observation change vraiment — et c'est plus utile qu'un chiffre
+
+**Un des 34 défauts S0 ne peut pas être corrigé ici.** Il demande une PR sur `Axion-IA/axionia`,
+un autre dépôt, avec sa propre CI et son propre déploiement.
+
+**Or le §4 de `02bis` le range au rang 5, dans le lot G3, sans le signaler.** Quelqu'un qui
+dérouler ait l'ordonnancement dans ce dépôt buterait dessus sans comprendre pourquoi rien ne
+s'applique. *Un plan de correction qui range un travail dans le mauvais chantier n'est pas une erreur
+de chiffre : c'est une heure perdue et un doute installé.*
+
+**Porté au §4** : `B14-002`/`E31-001` marqué **« dépôt `Axion-IA` — PR distincte »**.
+
+> **Et je note la manière** : il aurait pu compter ce constat comme fait — il est le seul à savoir
+> qu'il ne l'a pas traité. *« Je l'ai noté dans la fiche de reprise plutôt que de le compter comme
+> fait. »* **C'est la règle 10 appliquée sans témoin**, et c'est exactement ce qui manquait au dépôt
+> quand cet audit a commencé.
+
+### ✅ Et une décision de correctif que je valide explicitement
+
+Sur `3eebde3` (l'effacement laissait le téléphone en clair dans la timeline — `B15-006`), il a
+**délibérément laissé** `opt_out` et `dnc_entries`, **avec la raison écrite dans le code** : *ce sont
+les listes qui empêchent de recontacter la personne ; les purger ferait l'inverse de ce qu'elle
+demande — elle redeviendrait joignable à la prochaine collecte.*
+
+**C'est juste, et c'est le point que `B15-001` avait mis six maillons à établir** (§6) : une personne
+effacée revient au vivier parce que la trace de son opposition ne la protège plus. **Effacer la
+preuve de l'opposition, c'est effacer la protection.** *Un correctif RGPD qui purge tout serait plus
+propre à lire et pire pour la personne.*
+
+---
+
 ## 3. Journal de la passe
 
 | Date | Objet | Verdict |
@@ -683,3 +731,4 @@ de production** : il l'applique à ses sondes, pas à ses affirmations.
 | 2026-08-19 | **Contre-vérification adversariale des correctifs de l'agent 35** — l'objet n° 1 de la passe | 🔴 **NON FUSIONNABLE** : `B16-004` corrigé à moitié et **le nouveau test certifie la fuite** (18ᵉ cas du patron) · un test du dépôt cassé et non mis à jour · `set -e` rendant muettes les erreurs du script d'accès. ✅ **Mais le risque n° 1 est levé** : l'enchaînement complet est franchissable, mesuré en 8 étapes. **Et `P5-ROLES-001`, écrit le matin, s'est vérifié le soir.** ⚠️ Ma faute : mes `git add -A` ont emporté ses preuves en cours d'écriture |
 | 2026-08-19 | `46f1717` — la chaîne d'audit se déclarait valide sans secret | ✅ **Défaut réel et bien corrigé** — l'organe qui prouve affirmait sans pouvoir savoir. 🔴 **Mais l'affirmation publique « le secret est vide en production » est FAUSSE** : mesuré **64 caractères**, deux fois, sur la production en marche (`B16-001` réfuté). **Généralisation d'un constat d'atelier — l'erreur la plus répétée de cet audit, et je l'ai commise le premier.** Décompte inchangé : **34** |
 | 2026-08-19 | `debc860` — « la production se croyait en simulacre à cause de `config:cache` » | 🔴 **Mécanisme RÉFUTÉ par la mesure** : `variables_order=EGPCS`, `MOCK_MODE` présent dans `$_SERVER` **et** `$_ENV` — `env()` lit la vraie valeur même sous configuration en cache. Corroboré par les **64 caractères** mesurés par l'agent 40 sur la production. ✅ Mais **`MAIL_MAILER` non défini est vrai** (S0), et son arbitrage produit est juste. **Deuxième assertion de production fausse d'affilée** |
+| 2026-08-19 | `E31-001` « n'est pas dans ce dépôt » | ✅ **Vrai — mais `B14-002` non plus** : les deux portent sur le site, **ma fusion tient, total inchangé (34)**. 🔑 Ce que ça change : **un S0 du décompte n'est pas réparable ici**, il demande une PR sur `Axion-IA`. Le §4 le rangeait au rang 5 sans le dire. ✅ Et sa décision de ne PAS purger `opt_out`/`dnc_entries` est juste — *effacer la preuve de l'opposition, c'est effacer la protection* |

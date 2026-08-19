@@ -1,0 +1,19 @@
+
+[P5-G] compte VIEWER (lecture seule), apres 46848d4 :
+       GET  /audit-logs              -> 403  (temoin : doit etre 403)
+       GET  /audit-logs/verify-chain -> 200
+       GET  /ai-act/register         -> 200
+       POST /ai-act/register         -> 501
+
+[P5-F] admin de l espace A lit GET /audit-logs -> statut=200
+       voit la ligne de SON espace ?      OUI   (temoin positif)
+       voit la ligne de l espace VOISIN ? OUI   <<< si OUI, la fuite inter-espaces demeure
+
+   PASS  Tests\Feature\Rgpd\SondeP5RgpdTest
+  ✓ P5-G — routes voisines laissees sans permission                     28.09s  
+  ✓ P5-F — le journal d audit reste-t-il inter-espaces pour un ADMIN ?   0.71s  
+
+  Tests:    2 passed (2 assertions)
+  Duration: 34.45s
+  Random Order Seed: 1787156091
+

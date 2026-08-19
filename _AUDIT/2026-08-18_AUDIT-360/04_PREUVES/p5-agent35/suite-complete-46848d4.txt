@@ -1,0 +1,19 @@
+
+   PASS  Tests\Unit\Rotations\SearchEngineRotatorTest
+  ✓ SearchEngineRotator retourne null si aucun moteur enabled           26.47s  
+  ✓ SearchEngineRotator retourne null si total weight = 0                0.43s  
+  ✓ SearchEngineRotator retourne un engine si dispo                      0.52s  
+  ✓ SearchEngineRotator pondère par weight statistiquement               0.52s  
+
+   PASS  Tests\Feature\Rgpd\EffacementSanteTest
+  ✓ un praticien SANS rapport avec le sujet n’est jamais touché          0.94s  
+  ✓ l’effacement atteint aussi le praticien retrouvé par son TÉLÉPHONE   0.97s  
+  ✓ l’effacement console SUPPRIME le praticien de santé, il ne l’anonym… 1.06s  
+  ✓ aucune trace identifiante ne subsiste après effacement               0.76s  
+
+   PASS  Tests\Feature\Seeders\OwnerUserSeederTest
+  ✓ OwnerUserSeeder n écrit AUCUN secret quand OWNER_INITIAL_PASSWORD e… 1.26s  
+  ✓ OwnerUserSeeder pose pivot user_workspaces avec role owner           1.34s  
+  ✓ OwnerUserSeeder pose bien le mot de passe quand OWNER_INITIAL_PASSW… 1.37s  
+  ✓ OwnerUserSeeder est idempotent (re-run ne casse pas)                 1.21s  
+  ✓ OwnerUserSeeder crée workspace + owner avec password depuis env      0.79s  

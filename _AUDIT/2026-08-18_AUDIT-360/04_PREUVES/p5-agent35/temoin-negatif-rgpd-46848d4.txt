@@ -1,0 +1,74 @@
+=== TEMOIN NEGATIF 46848d4 : routes/api.php ramene a bdd25eb (avant correctif) ===
+
+   FAIL  Tests\Feature\Rgpd\PermissionsRoutesRgpdTest
+  ✓ B16-004 — TEMOIN : un ADMIN peut lire le journal d audit            28.83s  
+  ✓ B15-010 — TEMOIN : le meme compte peut CONSULTER les demandes        0.79s  
+  ⨯ B15-010 — un compte en LECTURE SEULE ne peut pas deposer de demande… 1.27s  
+  ✓ B15-010 — TEMOIN : un OWNER peut, lui, traiter une demande           1.04s  
+  ⨯ B16-004 — un compte en LECTURE SEULE ne peut pas lire le journal d…  0.79s  
+  ⨯ B15-010 — un compte en LECTURE SEULE ne peut pas TRAITER une demand… 0.97s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Rgpd\PermissionsRoutesRgpdTest > B15-010 — un compt…   
+  Expected response status code [403] but received 422.
+Failed asserting that 422 is identical to 403.
+
+The following errors occurred during the last request:
+
+{
+    "message": "validation.required",
+    "errors": {
+        "subject_email": [
+            "validation.required"
+        ]
+    }
+}
+
+  at tests/Feature/Rgpd/PermissionsRoutesRgpdTest.php:64
+     60▕         ->postJson('/api/v1/rgpd/requests', [
+     61▕             'type' => 'erasure',
+     62▕             'email' => 'quelquun@example.com',
+     63▕         ])
+  ➜  64▕         ->assertForbidden();
+     65▕ });
+     66▕ 
+     67▕ test('B15-010 — un compte en LECTURE SEULE ne peut pas TRAITER une demande RGPD', function () {
+     68▕     $compte = compteAvecRole('viewer');
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Rgpd\PermissionsRoutesRgpdTest > B16-004 — un compt…   
+  Expected response status code [403] but received 200.
+Failed asserting that 200 is identical to 403.
+
+  at tests/Feature/Rgpd/PermissionsRoutesRgpdTest.php:118
+    114▕ 
+    115▕ test('B16-004 — un compte en LECTURE SEULE ne peut pas lire le journal d audit', function () {
+    116▕     $viewer = compteAvecRole('viewer');
+    117▕ 
+  ➜ 118▕     $this->actingAs($viewer)->getJson('/api/v1/audit-logs')->assertForbidden();
+    119▕ });
+    120▕ 
+    121▕ test('B16-004 — TEMOIN : un ADMIN peut lire le journal d audit', function () {
+    122▕     $admin = compteAvecRole('admin');
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Rgpd\PermissionsRoutesRgpdTest > B15-010 — un compt…   
+  Expected response status code [403] but received 200.
+Failed asserting that 200 is identical to 403.
+
+  at tests/Feature/Rgpd/PermissionsRoutesRgpdTest.php:85
+     81▕     ]);
+     82▕ 
+     83▕     $this->actingAs($compte)
+     84▕         ->postJson('/api/v1/rgpd/requests/' . $demande->id . '/process')
+  ➜  85▕         ->assertForbidden();
+     86▕ });
+     87▕ 
+     88▕ test('B15-010 — TEMOIN : le meme compte peut CONSULTER les demandes', function () {
+     89▕     $viewer = compteAvecRole('viewer');
+
+
+  Tests:    3 failed, 3 passed (6 assertions)
+  Duration: 39.97s
+  Random Order Seed: 1787156018
+
+--- restauration

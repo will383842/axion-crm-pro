@@ -1,0 +1,107 @@
+
+   PASS  Tests\Feature\Controllers\WorkspaceControllerTest
+  ✓ GET /users sans auth → 401                                          24.89s  
+  ✓ GET /workspace sans auth → 401                                       0.52s  
+  ✓ PUT /workspace retourne 501 (Sprint 3 stub)                          1.30s  
+  ✓ POST /users retourne 501                                             0.54s  
+  ✓ GET /users authentifié retourne liste vide stub                      0.57s  
+  ✓ GET /workspace authentifié retourne le workspace courant             1.13s  
+
+   PASS  Tests\Feature\CampaignsTest
+  ✓ start — completed → 422 invalid_state                                0.73s  
+  ✓ shouldAutoPause — quota duration atteint                             0.52s  
+  ✓ store — sources hors whitelist rejetées                              1.12s  
+  ✓ start — draft → running + LaunchCampaignJob dispatched               1.78s  
+  ✓ update — autorisé en draft uniquement                                0.58s  
+  ✓ index — paginé + filtre status                                       0.58s  
+  ✓ shouldAutoPause — sous quotas → null                                 0.33s  
+  ✓ store — scheduled_at futur → status scheduled                        0.47s  
+  ✓ destroy — soft delete                                                0.42s  
+  ✓ store — max_companies hors borne rejeté                              0.39s  
+  ✓ shouldAutoPause — quota companies atteint                            0.42s  
+  ✓ show — cross-workspace → 404 (pas 403)                               0.53s  
+  ✓ show — campagne avec runs nested                                     0.52s  
+  ✓ store — zones vides rejetées                                         0.42s  
+  ✓ store — création campagne draft par défaut                           0.49s  
+  ✓ pause — running → paused                                             0.47s  
+  ✓ resume — paused → running + monitor dispatched                       0.42s  
+  ✓ start cross-workspace → 404                                          0.52s  
+  ✓ shouldAutoPause — campagne paused → null (pas de double pause)       0.40s  
+  ✓ cancel — running → cancelled + runs cancelled                        2.26s  
+
+   PASS  Tests\Feature\Crm\CrmOutboundTest
+  ✓ drapeau OFF : le producteur écrit, l'émetteur REFUSE, rien ne part   0.85s  
+  ✓ une ligne non encore due n'est pas rejouée                           0.41s  
+  ✓ une opposition décidée dans la console met un événement en file      0.68s  
+  ✓ drapeau ON mais destination vide : l'émetteur refuse plutôt que de…  0.53s  
+  ✓ un 503 fait ATTENDRE sans consommer de tentative                     1.84s  
+  ✓ un 2xx solde la ligne et le corps est signé <timestamp>.<corps>                        0.69s  
+  ✓ le résumé d'observabilité expose les réceptions et le backlog        1.37s  
+  ✓ un 422 abandonne IMMÉDIATEMENT (le rejeu échouerait éternellement)   0.87s  
+  ✓ un événement d'origine SITE est REFUSÉ et ne laisse aucune ligne     0.65s  
+  ✓ deux oppositions identiques encore en attente ne font qu'un message  0.83s  
+  ✓ les oppositions VENUES du site n'alimentent jamais l'outbox          0.69s  
+  ✓ au plafond d'essais, la ligne passe en gave_up (état terminal visib… 0.71s  
+  ✓ la base elle-même refuse une origine autre que crm                   1.04s  
+  ✓ un 500 consomme une tentative et programme un backoff                3.84s  
+  ✓ le corps ne transporte JAMAIS l'email en clair                       2.68s  
+
+   PASS  Tests\Feature\CompaniesControllerTest
+  ✓ destroy soft-deletes company                                         5.88s  
+  ✓ store creates company with valid siren                               2.49s  
+  ✓ index returns paginated empty list                                   4.22s  
+  ✓ update with valid priority succeeds                                  2.24s  
+  ✓ store validates siren format 9 digits                                1.25s  
+  ✓ update validates priority enum                                       0.55s  
+  ✓ bulkEnrich queues jobs                                               1.09s  
+  ✓ recompute-score endpoint calls SQL function                          1.80s  
+
+   FAIL  Tests\Feature\Controllers\NotificationsControllerTest
+  ✓ GET /ai-act/register authentifié → OK                                2.21s  
+  ✓ GET /tags authentifié → OK                                           2.75s  
+  ✓ GET /proxy-providers authentifié → OK                                1.43s  
+  ✓ GET /scraper-runs authentifié → OK                                   4.60s  
+  ✓ GET /notifications sans auth → 401                                   1.94s  
+  ✓ GET /llm/use-cases authentifié → OK                                  1.41s  
+  ✓ GET /rotations authentifié → OK                                      1.16s  
+  ✓ GET /llm/usage/summary authentifié → OK                              1.40s  
+  ✓ GET /contacts authentifié → OK                                       1.38s  
+  ⨯ GET /audit-logs authentifié → OK                                     2.01s  
+  ✓ GET /notifications authentifié → OK                                  0.68s  
+  ✓ POST /notifications/1/read retourne 501                              0.89s  
+  ✓ POST /notifications/read-all retourne 501                            0.73s  
+  ✓ GET /llm/usage authentifié → OK                                      0.97s  
+  ✓ GET /saved-views authentifié → OK liste vide                         0.67s  
+
+   PASS  Tests\Feature\Rgpd\RgpdRequestsControllerTest
+  ✓ GET /rgpd/requests sans auth → 401                                   1.40s  
+  ✓ GET /rgpd/requests authentifié → OK                                  2.25s  
+  ✓ POST /rgpd/requests valide le type                                   4.39s  
+  ✓ le lien de portabilité s’ouvre SANS authentification                 1.23s  
+  ✓ GET /rgpd/export/{token} avec token invalide → 404                   0.54s  
+  ✓ POST /rgpd/requests accepte les 5 types valides                      2.05s  
+  ✓ un jeton EXPIRÉ ne livre rien                                        1.21s  
+  ✓ GET /audit-logs/verify-chain authentifié → OK                        2.49s  
+  ✓ POST /rgpd/requests crée une demande                                 3.00s  
+  ✓ POST /rgpd/requests valide email                                     4.55s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Controllers\NotificationsControllerTest > GET /audi…   
+  Expected response status code [200] but received 403.
+Failed asserting that 403 is identical to 200.
+
+  at tests/Feature/Controllers/NotificationsControllerTest.php:60
+     56▕ });
+     57▕ 
+     58▕ test('GET /audit-logs authentifié → OK', function () {
+     59▕     $u = makeNotifUser();
+  ➜  60▕     $this->actingAs($u)->getJson('/api/v1/audit-logs')->assertOk();
+     61▕ });
+     62▕ 
+     63▕ test('GET /llm/use-cases authentifié → OK', function () {
+     64▕     $u = makeNotifUser();
+
+
+  Tests:    1 failed, 73 passed (163 assertions)
+  Duration: 132.40s
+  Random Order Seed: 1787156152
+

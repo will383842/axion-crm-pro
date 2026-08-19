@@ -1,0 +1,521 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/willi/Documents/Projets/crmpro-wt-p5a35/frontend[39m
+
+ [31m❯[39m tests/components/TwoFactorEnrolement.test.tsx [2m([22m[2m2 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 3648[2mms[22m[39m
+[31m   [31m×[31m Enrôlement de la double authentification[2m > [22mpropose d'activer la 2FA quand le compte ne l'a pas encore, et va jusqu'aux codes de secours[33m 3269[2mms[22m[31m[39m
+[31m     → Unable to find role="button" and name `/commencer/i`
+
+Ignored nodes: comments, script, style
+[36m<body>[31m
+  [36m<div>[31m
+    [36m<div[31m
+      [33mclass[31m=[32m"relative flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-white to-sky-50/30 px-4 py-12 dark:from-slate-950 dark:via-slate-900 dark:to-sky-950/30"[31m
+    [36m>[31m
+      [36m<div[31m
+        [33mclass[31m=[32m"pointer-events-none absolute inset-0 overflow-hidden"[31m
+      [36m>[31m
+        [36m<div[31m
+          [33mclass[31m=[32m"absolute -left-32 top-1/3 h-72 w-72 rounded-full bg-sky-200/30 blur-3xl dark:bg-sky-900/20"[31m
+        [36m/>[31m
+        [36m<div[31m
+          [33mclass[31m=[32m"absolute -right-32 bottom-1/4 h-72 w-72 rounded-full bg-violet-200/20 blur-3xl dark:bg-violet-900/20"[31m
+        [36m/>[31m
+      [36m</div>[31m
+      [36m<div[31m
+        [33mclass[31m=[32m"relative w-full max-w-sm"[31m
+      [36m>[31m
+        [36m<div[31m
+          [33mclass[31m=[32m"mb-6 flex items-center justify-center gap-2 text-slate-900 dark:text-white"[31m
+        [36m>[31m
+          [36m<div[31m
+            [33mclass[31m=[32m"flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 text-white shadow-md dark:from-white dark:to-slate-100 dark:text-slate-900"[31m
+          [36m>[31m
+            [36m<svg[31m
+              [33mclass[31m=[32m"lucide lucide-sparkles h-4 w-4"[31m
+              [33mfill[31m=[32m"none"[31m
+              [33mheight[31m=[32m"24"[31m
+              [33mstroke[31m=[32m"currentColor"[31m
+              [33mstroke-linecap[31m=[32m"round"[31m
+              [33mstroke-linejoin[31m=[32m"round"[31m
+              [33mstroke-width[31m=[32m"2"[31m
+              [33mviewBox[31m=[32m"0 0 24 24"[31m
+              [33mwidth[31m=[32m"24"[31m
+              [33mxmlns[31m=[32m"http://www.w3.org/2000/svg"[31m
+            [36m>[31m
+              [36m<path[31m
+                [33md[31m=[32m"M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"[31m
+              [36m/>[31m
+              [36m<path[31m
+                [33md[31m=[32m"M20 3v4"[31m
+              [36m/>[31m
+              [36m<path[31m
+                [33md[31m=[32m"M22 5h-4"[31m
+              [36m/>[31m
+              [36m<path[31m
+                [33md[31m=[32m"M4 17v2"[31m
+              [36m/>[31m
+              [36m<path[31m
+                [33md[31m=[32m"M5 18H3"[31m
+              [36m/>[31m
+            [36m</svg>[31m
+          [36m</div>[31m
+          [36m<div[31m
+            [33mclass[31m=[32m"text-base font-semibold tracking-tight"[31m
+          [36m>[31m
+            [0mAxion CRM Pro[0m
+          [36m</div>[31m
+        [36m</div>[31m
+        [36m<div[31m
+          [33mclass[31m=[32m"rounded-2xl transition-shadow bg-white/80 backdrop-blur-sm ring-1 ring-slate-200/60 shadow-[var(--shadow-card)] dark:bg-slate-900/80 dark:ring-slate-800/70 p-6 backdrop-blur-md"[31m
+        [36m>[31m
+          [36m<h1[31m
+            [33mclass[31m=[32m"mb-1 text-xl font-semibold tracking-tight text-slate-900 dark:text-white"[31m
+          [36m>[31m
+            [0mauth.twoFactor.title[0m
+          [36m</h1>[31m
+          [36m<p[31m
+            [33mclass[31m=[32m"mb-5 text-sm text-slate-500 dark:text-slate-400"[31m
+          [36m>[31m
+            [0mSaisis le code à 6 chiffres généré par ton authenticator.[0m
+          [36m</p>[31m
+          [36m<form[31m
+            [33mclass[31m=[32m"space-y-4"[31m
+          [36m>[31m
+            [36m<input[31m
+              [33maria-label[31m=[32m"Code à 6 chiffres"[31m
+              [33mautocomplete[31m=[32m"one-time-code"[31m
+              [33mclass[31m=[32m"w-full rounded-lg bg-white px-3 py-3 text-center text-2xl font-semibold tracking-[0.5em] text-slate-900 ring-1 ring-slate-200 transition focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700"[31m
+              [33minputmode[31m=[32m"numeric"[31m
+              [33mmaxlength[31m=[32m"6"[31m
+              [33mpattern[31m=[32m"[0-9]*"[31m
+              [33mplaceholder[31m=[32m"••••••"[31m
+              [33mrequired[31m=[32m""[31m
+              [33mvalue[31m=[32m""[31m
+            [36m/>[31m
+            [36m<button[31m
+              [33mclass[31m=[32m"inline-flex items-center justify-center font-medium transition-[transform,background-color,box-shadow,color,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none bg-gradient-to-b from-slate-900 to-slate-800 text-white shadow-sm shadow-slate-900/10 hover:from-slate-800 hover:to-slate-700 active:scale-[0.98] focus-visible:ring-slate-900 dark:from-white dark:to-slate-100 dark:text-slate-900 dark:hover:from-slate-100 dark:hover:to-white h-9 px-4 text-sm gap-2 rounded-lg w-full"[31m
+              [33mdisabled[31m=[32m""[31m
+              [33mtype[31m=[32m"submit"[31m
+            [36m>[31m
+              [36m<svg[31m
+                [33mclass[31m=[32m"lucide lucide-shield h-3.5 w-3.5"[31m
+                [33mfill[31m=[32m"none"[31m
+                [33mheight[31m=[32m"24"[31m
+                [33mstroke[31m=[32m"currentColor"[31m
+                [33mstroke-linecap[31m=[32m"round"[31m
+                [33mstroke-linejoin[31m=[32m"round"[31m
+                [33mstroke-width[31m=[32m"2"[31m
+                [33mviewBox[31m=[32m"0 0 24 24"[31m
+                [33mwidth[31m=[32m"24"[31m
+                [33mxmlns[31m=[32m"http://www.w3.org/2000/svg"[31m
+              [36m>[31m
+                [36m<path[31m
+                  [33md[31m=[32m"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"[31m
+                [36m/>[31m
+              [36m</svg>[31m
+              [0mauth.twoFactor.submit[0m
+            [36m</button>[31m
+            [36m<a[31m
+              [33mclass[31m=[32m"block text-center text-xs text-slate-500 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-white"[31m
+              [33mhref[31m=[32m"/login"[31m
+            [36m>[31m
+              [0mRetour à la connexion[0m
+            [36m</a>[31m
+          [36m</form>[31m
+        [36m</div>[31m
+      [36m</div>[31m
+    [36m</div>[31m
+  [36m</div>[31m
+[36m</body>[31m
+
+Ignored nodes: comments, script, style
+[36m<body>[31m
+  [36m<div>[31m
+    [36m<div[31m
+      [33mclass[31m=[32m"relative flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-white to-sky-50/30 px-4 py-12 dark:from-slate-950 dark:via-slate-900 dark:to-sky-950/30"[31m
+    [36m>[31m
+      [36m<div[31m
+        [33mclass[31m=[32m"pointer-events-none absolute inset-0 overflow-hidden"[31m
+      [36m>[31m
+        [36m<div[31m
+          [33mclass[31m=[32m"absolute -left-32 top-1/3 h-72 w-72 rounded-full bg-sky-200/30 blur-3xl dark:bg-sky-900/20"[31m
+        [36m/>[31m
+        [36m<div[31m
+          [33mclass[31m=[32m"absolute -right-32 bottom-1/4 h-72 w-72 rounded-full bg-violet-200/20 blur-3xl dark:bg-violet-900/20"[31m
+        [36m/>[31m
+      [36m</div>[31m
+      [36m<div[31m
+        [33mclass[31m=[32m"relative w-full max-w-sm"[31m
+      [36m>[31m
+        [36m<div[31m
+          [33mclass[31m=[32m"mb-6 flex items-center justify-center gap-2 text-slate-900 dark:text-white"[31m
+        [36m>[31m
+          [36m<div[31m
+            [33mclass[31m=[32m"flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 text-white shadow-md dark:from-white dark:to-slate-100 dark:text-slate-900"[31m
+          [36m>[31m
+            [36m<svg[31m
+              [33mclass[31m=[32m"lucide lucide-sparkles h-4 w-4"[31m
+              [33mfill[31m=[32m"none"[31m
+              [33mheight[31m=[32m"24"[31m
+              [33mstroke[31m=[32m"currentColor"[31m
+              [33mstroke-linecap[31m=[32m"round"[31m
+              [33mstroke-linejoin[31m=[32m"round"[31m
+              [33mstroke-width[31m=[32m"2"[31m
+              [33mviewBox[31m=[32m"0 0 24 24"[31m
+              [33mwidth[31m=[32m"24"[31m
+              [33mxmlns[31m=[32m"http://www.w3.org/2000/svg"[31m
+            [36m>[31m
+              [36m<path[31m
+                [33md[31m=[32m"M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"[31m
+              [36m/>[31m
+              [36m<path[31m
+                [33md[31m=[32m"M20 3v4"[31m
+              [36m/>[31m
+              [36m<path[31m
+                [33md[31m=[32m"M22 5h-4"[31m
+              [36m/>[31m
+              [36m<path[31m
+                [33md[31m=[32m"M4 17v2"[31m
+              [36m/>[31m
+              [36m<path[31m
+                [33md[31m=[32m"M5 18H3"[31m
+              [36m/>[31m
+            [36m</svg>[31m
+          [36m</div>[31m
+          [36m<div[31m
+            [33mclass[31m=[32m"text-base font-semibold tracking-tight"[31m
+          [36m>[31m
+            [0mAxion CRM Pro[0m
+          [36m</div>[31m
+        [36m</div>[31m
+        [36m<div[31m
+          [33mclass[31m=[32m"rounded-2xl transition-shadow bg-white/80 backdrop-blur-sm ring-1 ring-slate-200/60 shadow-[var(--shadow-card)] dark:bg-slate-900/80 dark:ring-slate-800/70 p-6 backdrop-blur-md"[31m
+        [36m>[31m
+          [36m<h1[31m
+            [33mclass[31m=[32m"mb-1 text-xl font-semibold tracking-tight text-slate-900 dark:text-white"[31m
+          [36m>[31m
+            [0mauth.twoFactor.title[0m
+          [36m</h1>[31m
+          [36m<p[31m
+            [33mclass[31m=[32m"mb-5 text-sm text-slate-500 dark:text-slate-400"[31m
+          [36m>[31m
+            [0mSaisis le code à 6 chiffres généré par ton authenticator.[0m
+          [36m</p>[31m
+          [36m<form[31m
+            [33mclass[31m=[32m"space-y-4"[31m
+          [36m>[31m
+            [36m<input[31m
+              [33maria-label[31m=[32m"Code à 6 chiffres"[31m
+              [33mautocomplete[31m=[32m"one-time-code"[31m
+              [33mclass[31m=[32m"w-full rounded-lg bg-white px-3 py-3 text-center text-2xl font-semibold tracking-[0.5em] text-slate-900 ring-1 ring-slate-200 transition focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700"[31m
+              [33minputmode[31m=[32m"numeric"[31m
+              [33mmaxlength[31m=[32m"6"[31m
+              [33mpattern[31m=[32m"[0-9]*"[31m
+              [33mplaceholder[31m=[32m"••••••"[31m
+              [33mrequired[31m=[32m""[31m
+              [33mvalue[31m=[32m""[31m
+            [36m/>[31m
+            [36m<button[31m
+              [33mclass[31m=[32m"inline-flex items-center justify-center font-medium transition-[transform,background-color,box-shadow,color,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none bg-gradient-to-b from-slate-900 to-slate-800 text-white shadow-sm shadow-slate-900/10 hover:from-slate-800 hover:to-slate-700 active:scale-[0.98] focus-visible:ring-slate-900 dark:from-white dark:to-slate-100 dark:text-slate-900 dark:hover:from-slate-100 dark:hover:to-white h-9 px-4 text-sm gap-2 rounded-lg w-full"[31m
+              [33mdisabled[31m=[32m""[31m
+              [33mtype[31m=[32m"submit"[31m
+            [36m>[31m
+              [36m<svg[31m
+                [33mclass[31m=[32m"lucide lucide-shield h-3.5 w-3.5"[31m
+                [33mfill[31m=[32m"none"[31m
+                [33mheight[31m=[32m"24"[31m
+                [33mstroke[31m=[32m"currentColor"[31m
+                [33mstroke-linecap[31m=[32m"round"[31m
+                [33mstroke-linejoin[31m=[32m"round"[31m
+                [33mstroke-width[31m=[32m"2"[31m
+                [33mviewBox[31m=[32m"0 0 24 24"[31m
+                [33mwidth[31m=[32m"24"[31m
+                [33mxmlns[31m=[32m"http://www.w3.org/2000/svg"[31m
+              [36m>[31m
+                [36m<path[31m
+                  [33md[31m=[32m"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"[31m
+                [36m/>[31m
+              [36m</svg>[31m
+              [0mauth.twoFactor.submit[0m
+            [36m</button>[31m
+            [36m<a[31m
+              [33mclass[31m=[32m"block text-center text-xs text-slate-500 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-white"[31m
+              [33mhref[31m=[32m"/login"[31m
+            [36m>[31m
+              [0mRetour à la connexion[0m
+            [36m</a>[31m
+          [36m</form>[31m
+        [36m</div>[31m
+      [36m</div>[31m
+    [36m</div>[31m
+  [36m</div>[31m
+[36m</body>[31m[39m
+   [33m[2m✓[22m[39m Enrôlement de la double authentification[2m > [22mdemande simplement le code quand la 2FA est déjà active [33m347[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 1 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/components/TwoFactorEnrolement.test.tsx[2m > [22mEnrôlement de la double authentification[2m > [22mpropose d'activer la 2FA quand le compte ne l'a pas encore, et va jusqu'aux codes de secours
+[31m[1mTestingLibraryElementError[22m[39m: Unable to find role="button" and name `/commencer/i`
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"relative flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-white to-sky-50/30 px-4 py-12 dark:from-slate-950 dark:via-slate-900 dark:to-sky-950/30"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"pointer-events-none absolute inset-0 overflow-hidden"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"absolute -left-32 top-1/3 h-72 w-72 rounded-full bg-sky-200/30 blur-3xl dark:bg-sky-900/20"[39m
+        [36m/>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"absolute -right-32 bottom-1/4 h-72 w-72 rounded-full bg-violet-200/20 blur-3xl dark:bg-violet-900/20"[39m
+        [36m/>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"relative w-full max-w-sm"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"mb-6 flex items-center justify-center gap-2 text-slate-900 dark:text-white"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 text-white shadow-md dark:from-white dark:to-slate-100 dark:text-slate-900"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33mclass[39m=[32m"lucide lucide-sparkles h-4 w-4"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M20 3v4"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M22 5h-4"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M4 17v2"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M5 18H3"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+          [36m</div>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"text-base font-semibold tracking-tight"[39m
+          [36m>[39m
+            [0mAxion CRM Pro[0m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"rounded-2xl transition-shadow bg-white/80 backdrop-blur-sm ring-1 ring-slate-200/60 shadow-[var(--shadow-card)] dark:bg-slate-900/80 dark:ring-slate-800/70 p-6 backdrop-blur-md"[39m
+        [36m>[39m
+          [36m<h1[39m
+            [33mclass[39m=[32m"mb-1 text-xl font-semibold tracking-tight text-slate-900 dark:text-white"[39m
+          [36m>[39m
+            [0mauth.twoFactor.title[0m
+          [36m</h1>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"mb-5 text-sm text-slate-500 dark:text-slate-400"[39m
+          [36m>[39m
+            [0mSaisis le code à 6 chiffres généré par ton authenticator.[0m
+          [36m</p>[39m
+          [36m<form[39m
+            [33mclass[39m=[32m"space-y-4"[39m
+          [36m>[39m
+            [36m<input[39m
+              [33maria-label[39m=[32m"Code à 6 chiffres"[39m
+              [33mautocomplete[39m=[32m"one-time-code"[39m
+              [33mclass[39m=[32m"w-full rounded-lg bg-white px-3 py-3 text-center text-2xl font-semibold tracking-[0.5em] text-slate-900 ring-1 ring-slate-200 transition focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700"[39m
+              [33minputmode[39m=[32m"numeric"[39m
+              [33mmaxlength[39m=[32m"6"[39m
+              [33mpattern[39m=[32m"[0-9]*"[39m
+              [33mplaceholder[39m=[32m"••••••"[39m
+              [33mrequired[39m=[32m""[39m
+              [33mvalue[39m=[32m""[39m
+            [36m/>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"inline-flex items-center justify-center font-medium transition-[transform,background-color,box-shadow,color,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none bg-gradient-to-b from-slate-900 to-slate-800 text-white shadow-sm shadow-slate-900/10 hover:from-slate-800 hover:to-slate-700 active:scale-[0.98] focus-visible:ring-slate-900 dark:from-white dark:to-slate-100 dark:text-slate-900 dark:hover:from-slate-100 dark:hover:to-white h-9 px-4 text-sm gap-2 rounded-lg w-full"[39m
+              [33mdisabled[39m=[32m""[39m
+              [33mtype[39m=[32m"submit"[39m
+            [36m>[39m
+              [36m<svg[39m
+                [33mclass[39m=[32m"lucide lucide-shield h-3.5 w-3.5"[39m
+                [33mfill[39m=[32m"none"[39m
+                [33mheight[39m=[32m"24"[39m
+                [33mstroke[39m=[32m"currentColor"[39m
+                [33mstroke-linecap[39m=[32m"round"[39m
+                [33mstroke-linejoin[39m=[32m"round"[39m
+                [33mstroke-width[39m=[32m"2"[39m
+                [33mviewBox[39m=[32m"0 0 24 24"[39m
+                [33mwidth[39m=[32m"24"[39m
+                [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+              [36m>[39m
+                [36m<path[39m
+                  [33md[39m=[32m"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"[39m
+                [36m/>[39m
+              [36m</svg>[39m
+              [0mauth.twoFactor.submit[0m
+            [36m</button>[39m
+            [36m<a[39m
+              [33mclass[39m=[32m"block text-center text-xs text-slate-500 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-white"[39m
+              [33mhref[39m=[32m"/login"[39m
+            [36m>[39m
+              [0mRetour à la connexion[0m
+            [36m</a>[39m
+          [36m</form>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"relative flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-white to-sky-50/30 px-4 py-12 dark:from-slate-950 dark:via-slate-900 dark:to-sky-950/30"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"pointer-events-none absolute inset-0 overflow-hidden"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"absolute -left-32 top-1/3 h-72 w-72 rounded-full bg-sky-200/30 blur-3xl dark:bg-sky-900/20"[39m
+        [36m/>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"absolute -right-32 bottom-1/4 h-72 w-72 rounded-full bg-violet-200/20 blur-3xl dark:bg-violet-900/20"[39m
+        [36m/>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"relative w-full max-w-sm"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"mb-6 flex items-center justify-center gap-2 text-slate-900 dark:text-white"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 text-white shadow-md dark:from-white dark:to-slate-100 dark:text-slate-900"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33mclass[39m=[32m"lucide lucide-sparkles h-4 w-4"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M20 3v4"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M22 5h-4"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M4 17v2"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M5 18H3"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+          [36m</div>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"text-base font-semibold tracking-tight"[39m
+          [36m>[39m
+            [0mAxion CRM Pro[0m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"rounded-2xl transition-shadow bg-white/80 backdrop-blur-sm ring-1 ring-slate-200/60 shadow-[var(--shadow-card)] dark:bg-slate-900/80 dark:ring-slate-800/70 p-6 backdrop-blur-md"[39m
+        [36m>[39m
+          [36m<h1[39m
+            [33mclass[39m=[32m"mb-1 text-xl font-semibold tracking-tight text-slate-900 dark:text-white"[39m
+          [36m>[39m
+            [0mauth.twoFactor.title[0m
+          [36m</h1>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"mb-5 text-sm text-slate-500 dark:text-slate-400"[39m
+          [36m>[39m
+            [0mSaisis le code à 6 chiffres généré par ton authenticator.[0m
+          [36m</p>[39m
+          [36m<form[39m
+            [33mclass[39m=[32m"space-y-4"[39m
+          [36m>[39m
+            [36m<input[39m
+              [33maria-label[39m=[32m"Code à 6 chiffres"[39m
+              [33mautocomplete[39m=[32m"one-time-code"[39m
+              [33mclass[39m=[32m"w-full rounded-lg bg-white px-3 py-3 text-center text-2xl font-semibold tracking-[0.5em] text-slate-900 ring-1 ring-slate-200 transition focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700"[39m
+              [33minputmode[39m=[32m"numeric"[39m
+              [33mmaxlength[39m=[32m"6"[39m
+              [33mpattern[39m=[32m"[0-9]*"[39m
+              [33mplaceholder[39m=[32m"••••••"[39m
+              [33mrequired[39m=[32m""[39m
+              [33mvalue[39m=[32m""[39m
+            [36m/>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"inline-flex items-center justify-center font-medium transition-[transform,background-color,box-shadow,color,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none bg-gradient-to-b from-slate-900 to-slate-800 text-white shadow-sm shadow-slate-900/10 hover:from-slate-800 hover:to-slate-700 active:scale-[0.98] focus-visible:ring-slate-900 dark:from-white dark:to-slate-100 dark:text-slate-900 dark:hover:from-slate-100 dark:hover:to-white h-9 px-4 text-sm gap-2 rounded-lg w-full"[39m
+              [33mdisabled[39m=[32m""[39m
+              [33mtype[39m=[32m"submit"[39m
+            [36m>[39m
+              [36m<svg[39m
+                [33mclass[39m=[32m"lucide lucide-shield h-3.5 w-3.5"[39m
+                [33mfill[39m=[32m"none"[39m
+                [33mheight[39m=[32m"24"[39m
+                [33mstroke[39m=[32m"currentColor"[39m
+                [33mstroke-linecap[39m=[32m"round"[39m
+                [33mstroke-linejoin[39m=[32m"round"[39m
+                [33mstroke-width[39m=[32m"2"[39m
+                [33mviewBox[39m=[32m"0 0 24 24"[39m
+                [33mwidth[39m=[32m"24"[39m
+                [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+              [36m>[39m
+                [36m<path[39m
+                  [33md[39m=[32m"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"[39m
+                [36m/>[39m
+              [36m</svg>[39m
+              [0mauth.twoFactor.submit[0m
+            [36m</button>[39m
+            [36m<a[39m
+              [33mclass[39m=[32m"block text-center text-xs text-slate-500 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-white"[39m
+              [33mhref[39m=[32m"/login"[39m
+            [36m>[39m
+              [0mRetour à la connexion[0m
+            [36m</a>[39m
+          [36m</form>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+[90m [2m❯[22m waitForWrapper ../../Axion-CRM-Pro/frontend/node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/wait-for.js:[2m163:27[22m[39m
+[90m [2m❯[22m findByRole ../../Axion-CRM-Pro/frontend/node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/query-helpers.js:[2m86:33[22m[39m
+[36m [2m❯[22m tests/components/TwoFactorEnrolement.test.tsx:[2m65:36[22m[39m
+    [90m 63| [39m
+    [90m 64| [39m    [90m// 1. Il existe un moyen de commencer. C'est précisément ce qui ma[39m…
+    [90m 65| [39m    [35mconst[39m commencer [33m=[39m [35mawait[39m screen[33m.[39m[34mfindByRole[39m([32m'button'[39m[33m,[39m { name[33m:[39m [36m/comme[39m…
+    [90m   | [39m                                   [31m^[39m
+    [90m 66| [39m    [35mawait[39m userEvent[33m.[39m[34mclick[39m(commencer)[33m;[39m
+    [90m 67| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 18:25:19
+[2m   Duration [22m 12.93s[2m (transform 900ms, setup 3.45s, collect 434ms, tests 3.65s, environment 3.74s, prepare 1.01s)[22m
+

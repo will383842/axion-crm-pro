@@ -1,0 +1,19 @@
+
+[P5-H] CHAINE COMPLETE, COMPTE NEUF
+       1. POST /auth/login              -> 200  requires_2fa=false
+       2. GET  /auth/me                 -> 200  le corps porte-t-il `user.totp_enabled_at` ? OUI
+          corps de /auth/me : {"user":{"id":"119334ef-bc70-41c9-b593-2a9dacb0328a","email":"p5h-neuf@p5.test","name":"Neuf","locale":"fr","timezone":"Europe\/Paris","current_workspace_id":"14d945a9-8f22-4027-ae92-ed81cd02e4fd","totp_enabled_at":null,"first_login_completed_at":null,"onboarding_tour_completed_at":null},"roles":[]}
+       3. POST /auth/2fa/setup          -> 200  secret=fourni  qr_url=fourni
+       4. POST /auth/2fa/confirm        -> 200  codes de secours : 10
+       5. GET  /contacts                -> 403  erreur='two_factor_required'
+       6. POST /auth/2fa/verify         -> 200
+       7. GET  /contacts                -> 200  erreur=NULL
+       8. GET  /audit-logs (ActivityFeed)-> 403
+
+   PASS  Tests\Feature\Auth\SondeP5ChaineTest
+  ✓ P5-H — chaine complete, compte neuf                                120.47s  
+
+  Tests:    1 passed (1 assertions)
+  Duration: 155.82s
+  Random Order Seed: 1787156432
+

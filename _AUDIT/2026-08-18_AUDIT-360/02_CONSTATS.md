@@ -2807,3 +2807,63 @@ base.* **C'était le soupçon le plus lourd du §10 du mandat, et il ne tient pa
 
 **Restauration** : **20 restaurations vérifiées une à une**, puis `diff -rq` **intégral** sur les deux
 conteneurs → identiques. `git status --porcelain -- backend frontend workers infra .github` → **vide**.
+
+---
+
+## Agent 25 — les cinq états d'écran
+**Rapport** : `11_GRILLES/agent-25_etats-ecran.md` · **Preuves** : `04_PREUVES/agent-25/` (dont 2 bancs de mesure)
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **D25-003** | **S1** | 🔴 **`/console/arbitrage` n'affiche pas seulement un zéro : il énonce une CONCLUSION MÉTIER FAUSSE** — « **Tous les événements entrants ont trouvé leur entreprise** ». *Or `B13-001` mesure que **100 %** restent en `pending_match`.* **L'écran dit à l'opérateur l'exact contraire de la vérité** |
+| **D25-001** | **S1** | **37 écrans sur 37 rendent un texte strictement identique sous 403 et sous 500** : **aucun** ne distingue un refus de droits d'une panne serveur |
+| **D25-002** | **S1** | Sur les 30 écrans qui lisent une donnée, **23 rendent un texte identique** selon que la base est **vide** ou que la requête a **échoué** — et **19 affirment « 0 » ou « aucun »** *(chiffre affiné de `D22-002`)* |
+| **D25-009** | **S1** | **9 écrans de liste ne demandent aucune limite au serveur** et rendent tout ce qu'il envoie : `/users` à 10 000 lignes construit **160 025 nœuds et 18 Mo de HTML**, et **n'aboutit plus à 100 000** |
+| **D25-004** | **S2** | Trois écrans **ne sont pas « blancs » : ils sont bloqués en chargement pour toujours** — la condition de sortie teste **la donnée**, pas **l'état de la requête** |
+| **D25-005** | **S2** | **Un 500 et un 403 sont présentés comme une fiche supprimée** : trois écrans de détail affichent « **introuvable · 404** » sur une panne |
+| **D25-008** | **S2** | Le tableau de bord **n'affiche jamais son squelette** : `placeholderData` est un **objet de zéros** — *le premier écran du CRM est une grille de zéros avant toute réponse* |
+| D25-006, D25-007, D25-010, D25-011 | S2 | La frontière d'erreur **est écrite, traduite, livrée dans le bundle — et montée nulle part** : toute exception affiche « **Something went wrong!** » **en anglais, hors coquille** · **aucun état d'écran n'est dans l'URL** · le vocabulaire de l'erreur **est traduit et n'est presque jamais appelé** · 3 écrans lisent un champ imbriqué **sans garde** : *une seule clef absente emporte l'écran entier* |
+
+🔑 **`D25-003` est le pire défaut d'interface de l'audit**, et il est d'une autre nature que les autres :
+les écrans qui affirment « 0 » sur une erreur **taisent** une information ; celui-ci **en invente une**.
+*« Tous les événements entrants ont trouvé leur entreprise » est exactement la phrase qui empêcherait
+quelqu'un d'aller voir pourquoi le canal ne crée aucune fiche.*
+
+---
+
+## Agent 28 — accessibilité
+**Rapport** : `11_GRILLES/agent-28_accessibilite.md` · **Preuves** : `04_PREUVES/agent-28/`
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **D28-002** | **S1** | 🔴 **La porte `a11y.yml` mesure quatre écrans VIDES et n'assert que sur `critical`** : elle **ne peut rougir sur aucun des 88 défauts sérieux** du produit, **et les 14 défauts critiques qui existent sont hors de sa portée**. *Quinzième cas du patron `A-011`* |
+| **D28-001** | **S1** | **9 écrans construisent leurs tableaux avec `role="row"` sans conteneur ni cellule** : **14 violations critiques** apparaissent **dès que la liste a des lignes** — *donc jamais visibles sur les écrans vides que la porte mesure* |
+| **D28-011** | **S1** | **Le mode sombre est le mode le plus contrasté… à l'envers** : **76 défauts de contraste sur 31 écrans**, dont le raccourci de recherche de l'en-tête à **1,36:1** |
+| **D28-005** | **S1** | **Le lien d'évitement — seul dispositif de saut de navigation du produit — est illisible en mode clair : 1,19:1 mesuré au pixel** |
+| **D28-003** | **S2** | `Modal`, `Drawer` et `GlobalSearch` déclarent `aria-modal="true"` **sans piéger le focus, sans le déplacer à l'ouverture, sans le restituer, et sans neutraliser l'arrière-plan** |
+| D28-007, D28-004, D28-008 | S2 | **15 emplacements de champ sans libellé associé** — dont `SearchInput`, **composant du système employé par 8 écrans, qui n'expose aucun moyen d'en poser un** · **5 `<button>` imbriqués** dans un `<button>` · `role="menu"` et `role="tab"` **annoncés sans le clavier qu'ils promettent** |
+| D28-009, D28-010, D28-006, D28-012, D28-013, D28-014 | S2/S3 | **113 tailles de police en pixels absolus** : le réglage du navigateur **ne les atteint pas** · le mode sombre **n'est pas appliqué sur 5 écrans hors coquille, dont la connexion** · **les 37 écrans partagent le même titre de document** · la barre émet **6 `<h3>` avant le `<h1>`** · **le `404` n'a aucun élément atteignable au clavier** · **3 régions d'annonce dans tout le produit** |
+
+🔑 **`D28-002` est le cas le plus pur du patron `A-011` de tout l'audit** : la porte d'accessibilité
+**mesure des écrans vides** — c'est-à-dire précisément l'état dans lequel **les 14 violations critiques
+n'apparaissent pas**, puisqu'elles naissent **des lignes de tableau**. *Une garde qui regarde au bon
+endroit, au mauvais moment.*
+
+---
+
+## Agent 30 — mobile et responsive, à 375 px
+**Rapport** : `11_GRILLES/agent-30_mobile-responsive.md` · **Preuves** : `04_PREUVES/agent-30/` (captures 375 px)
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **D30-003** | **S1** | 🔴 **461 cibles tactiles sur 473 mesurent moins de 44 × 44 px**, dont **82 moins de 24 × 24** — **et la coquille de navigation elle-même n'en a aucune conforme** |
+| **D30-002** | **S1** | Les **9 tableaux « grille » exigent 718 à 1 088 px** et **ne sont enfermés dans aucun conteneur défilable** : **entre 52 % et 68 % de chaque ligne est inatteignable sur téléphone** |
+| **D30-001** | **S1** | **Le conteneur principal rogne au lieu de laisser défiler** : ce qui dépasse 375 px est **perdu, sans barre ni geste pour y accéder** |
+| **D30-004** | **S1** | **La barre basse à cinq entrées exigée par le §23.3 n'existe pas**, et **rien n'en tient lieu** : la seule navigation sur téléphone est **un hamburger de 28 × 28 px** |
+| **D30-005** | **S2** | Le tiroir **ne se referme pas après une navigation**, couvre tout l'écran **sans voile atteignable**, et laisse **115 px de bande morte** : *chaque parcours coûte **4 appuis au lieu de 2 clics*** — **le §23.4 exige le même budget sur téléphone** |
+| **D30-008** | **S2** | `PageHeader` pose `shrink-0` sur son bloc d'actions, **ce qui annule le `flex-wrap` qu'il porte lui-même** : **le repli est écrit et ne peut pas se produire, sur 27 écrans** |
+| D30-006, D30-007, D30-009, D30-010 | S2 | La barre repliée **ne se replie pas « aux mêmes positions »** (66 à 78 px d'écart, **jusqu'à 19 des 20 entrées absentes** dans l'autre mode) · le fil d'Ariane, **seul repère de position sur téléphone**, est **écrasé à 94 px** sur 32 écrans · la recherche demande **deux appuis** et **s'annonce en raccourcis clavier** · **23 des 49 fichiers d'écran ne portent aucune règle de mise en page pour petit écran** |
+
+🔑 **`D30-008` mérite d'être lu deux fois** : le composant **déclare** le repli responsive **et
+l'annule dans la même classe**. *Ce n'est pas un oubli de responsive — c'est un responsive écrit, puis
+neutralisé, sur 27 écrans.* **Personne ne pouvait le voir sans mesurer le rendu.**

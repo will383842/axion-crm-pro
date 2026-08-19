@@ -1,0 +1,18 @@
+AGENT 25 — REPRISE : etat partiel de /console/contacts, et isolement de la cause
+Reference : main 8db8229
+
+### A. ligne complete, /crm/contacts-hub/counts -> 500
+  l ecran CASSE-T-IL ? NON
+  rendu : « ContactsTous les types — Contacts actifsClients0Prospects0Opportunités0Dormants0Tous0Prospects0Clients0Presse & médias0Partenaires0Investisseurs0Conférences0Newsletter0Fournisseurs0Tous paysFranceRoumanieTous statutsContactables (e-mail exploitable)Partiels (e-mail incertain)Collectés, pas encore enrichisSans e-mail (archivés)Contacts actifsProspection (base froide)ToutACMEClients · ClientLyongeo-69 »
+
+  => l ecran tient ; reste a savoir ce qu il affiche a la place des compteurs
+
+### B. TEMOIN POSITIF — ligne complete, compteurs 200
+  l ecran CASSE-T-IL ? NON
+  rendu : « ContactsTous les types — Contacts actifsClients7Prospects0Opportunités0Dormants0Tous7Prospects0Clients7Presse & médias0Partenaires0Investisseurs0Conférences0Newsletter0Fournisseurs0Tous paysFranceRoumanieTous statutsContactables (e-mail exploitable)Partiels (e-mail incertain)Collectés, pas encore enrichisSans e-mail (archivés)Contacts actifsProspection (base froide)ToutACMEClients · ClientLyongeo-69 »
+
+### C. TEMOIN D ISOLEMENT — ligne SANS tags ni contacts, compteurs 200
+  l ecran CASSE-T-IL ? OUI
+  rendu : « Something went wrong!Hide ErrorCannot read properties of undefined (reading 'length') »
+
+  => CASSE alors que RIEN n echoue cote reseau : la cause est bien le CHAMP MANQUANT (ContactsHubPage.tsx:205 `company.contacts.length`, :226 `company.tags.length`), PAS l etat partiel. Ma premiere mesure accusait le mauvais objet.

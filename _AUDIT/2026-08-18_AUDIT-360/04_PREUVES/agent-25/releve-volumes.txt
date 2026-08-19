@@ -1,0 +1,56 @@
+AGENT 25 — TENUE AUX VOLUMES (montage reel, jsdom, MSW)
+Reference : main 8db8229
+
+jsdom n a PAS de moteur de rendu : les durees mesurent la CONSTRUCTION
+du DOM par React, pas la peinture. Le nombre de NOEUDS est en revanche
+exactement celui que le navigateur devrait peindre — c est la mesure qui
+porte le verdict.
+
+pagination offerte, par ecran :
+  /companies       OUI (Pagination) + useVirtualizer — le SEUL ecran virtualise
+  /users           NON — ni pagination, ni per_page demande
+  /audit-logs      NON — ni pagination, ni per_page demande
+  /tags            NON — aucune pagination
+  /audiences       NON — aucune pagination
+
+=== TEMOIN : cout du BANC D ESSAI seul (fabrication + serialisation, sans montage) ===
+        0 lignes :     0 ms | json=0 Ko | heap 59 -> 59 Mo
+        1 lignes :     0 ms | json=0 Ko | heap 59 -> 59 Mo
+      100 lignes :     0 ms | json=22 Ko | heap 59 -> 59 Mo
+    10000 lignes :    34 ms | json=2234 Ko | heap 59 -> 59 Mo
+   100000 lignes :   604 ms | json=22537 Ko | heap 59 -> 103 Mo
+
+=== MESURES D ECRAN ===
+route            |  lignes servies |    ms | noeuds DOM | lignes rendues |  html (Ko) | heap (Mo) | note
+/companies       |               0 |  1223 |        147 |              0 |         16 |       114 | 
+/companies       |               1 |   311 |        155 |              0 |         16 |        67 | 
+/companies       |             100 |   282 |        155 |              0 |         16 |        76 | 
+/companies       |           10000 |  1249 |        155 |              0 |         16 |       178 | 
+/companies       |          100000 | 11033 |        155 |              0 |         16 |       181 | 
+/users           |               0 |   156 |         33 |              0 |          3 |       185 | 
+/users           |               1 |   208 |         41 |              2 |          4 |       188 | 
+/users           |             100 |   997 |       1625 |            101 |        186 |       171 | 
+/users           |           10000 | 32450 |     160025 |          10001 |      18397 |      1101 | 
+/users           |          100000 |     ? |          ? |              ? |          ? |         ? | N ABOUTIT PAS — voir ci-dessous
+
+=== /users a 100 000 lignes : LE RENDU N ABOUTIT PAS ===
+Mesure du processus, releve par Get-Process pendant l essai :
+  demarrage du worker vitest        14:57:22
+  releve a 15:14 (soit +17 min)     WS = 3 141 Mo, CPU cumule = 377 s, toujours en cours
+  la ligne /users|10000 a ete ecrite a 15:00 ; AUCUNE ligne n a suivi.
+Le premier essai (heap Node par defaut, ~4 Go) etait mort en
+  « FATAL ERROR: Reached heap limit — JavaScript heap out of memory »
+  precede de deux « Mark-Compact ... allocation failure; scavenge might not succeed »
+  (log : tache b8j7esbzj, horodatage 482 153 ms et 491 091 ms).
+Le second essai, avec --max-old-space-size=8192, ne meurt plus : il n en finit pas.
+
+CE QUE CELA VEUT DIRE POUR UN NAVIGATEUR, ET QUI EST LE VRAI POINT :
+  React construit ce DOM dans un rendu SYNCHRONE. Rien ne peut l interrompre —
+  ni le timeout de vitest, ni un `waitFor`, ni, dans un navigateur, l utilisateur.
+  L onglet est fige, sans sablier et sans message, tant que le rendu n a pas fini.
+  Ce n est donc pas « c est lent » : c est « la page ne repond plus ».
+
+EXTRAPOLATION, DECLAREE COMME TELLE (non mesuree) :
+  a 10 000 lignes, /users construit 160 025 noeuds, soit 16,0 noeuds par ligne.
+  a 100 000 lignes cela ferait ~1 600 000 noeuds et ~184 Mo de HTML.
+  Je n avance PAS de duree : je n ai pas su la mesurer, et c est precisement le constat.

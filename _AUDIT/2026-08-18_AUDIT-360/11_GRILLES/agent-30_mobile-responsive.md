@@ -1,6 +1,6 @@
 # AGENT 30 — Auditeur mobile et responsive
 
-- **Référence mesurée** : `main = 7be3753` au moment de la clôture (`git log` relu au début **et** à la fin ; `main` a avancé de `e8924b8` → `8db8229` → `7777f27` → `a3c42d6` → `7be3753` pendant ma mission). **`frontend/` n'a pas bougé d'une ligne** : `git diff --stat e8924b8 HEAD -- frontend/` rend une **sortie vide**. Mes constats valent donc sur la même référence que les agents 22, 23 et 27.
+- **Référence mesurée** : `main = 4ca52c9` à la toute dernière relecture (`git log` rejoué au début, en cours et à la fin ; `main` a avancé **cinq fois** pendant ma mission : `e8924b8` → `8db8229` → `7777f27` → `a3c42d6` → `7be3753` → `4ca52c9`, toutes des livraisons d'agents d'audit). **`frontend/` n'a pas bougé d'une ligne** : `git diff --stat e8924b8 HEAD -- frontend/` rend une **sortie vide**, revérifié à la clôture. Mes constats valent donc sur la même référence que les agents 22, 23 et 27, et je les note **`main 4ca52c9 (frontend = e8924b8)`**.
 - **Artefact mesuré** : `/assets/index-BVK1vh1a.js` — le bundle **officiel reconstruit** par le chef de chantier, celui que l'agent 22 a identifié comme référence. Conformité **D-011** établie. Aucune mesure sur le bundle périmé de D23-001.
 - **Périmètre** : les **37 écrans** de `routeTree.tsx`, à **375 × 812 px**, plus la barre latérale repliée, le tiroir de navigation mobile, la recherche mobile, les tableaux larges et les cibles tactiles.
 - **Écrans réellement ouverts à 375 px dans un vrai navigateur** : **37 / 37**, deux fois, avec deux instruments indépendants.
@@ -11,7 +11,7 @@
   - `03_statique-barre-basse-et-tableaux.txt` — le code, avec témoin positif
   - `04_largeurs-tableaux.txt` — largeur minimale **mesurée** des 9 tableaux-grille
   - `05_parcours-et-tiroir.txt` — budget de gestes bureau vs téléphone
-  - `captures-375/` — **39 captures** (les 37 écrans + le tiroir + la recherche mobile) et les 2 états de la barre
+  - `captures-375/` — **41 captures** : les 37 écrans, le tiroir de navigation, la recherche mobile, et les deux états de la barre latérale
   - `scripts/` — les 4 scripts, rejouables par une commande
 
 ---
@@ -288,7 +288,7 @@ C'est **D27-005 vu de profil** : les trois idiomes de tableau ne divergent pas s
 ### [D30-001] Le conteneur principal rogne au lieu de laisser défiler : ce qui dépasse 375 px est perdu, sans barre ni geste pour y accéder
 - Sévérité      : S1 grave
 - Domaine       : interface / UX
-- Référence     : main 7be3753 (`frontend/` identique à e8924b8, `git diff` vide)
+- Référence     : main 4ca52c9 — `frontend/` identique à e8924b8 (`git diff --stat e8924b8 HEAD -- frontend/` vide)
 - Emplacement   : `frontend/src/app/RootLayout.tsx:100`
 - Constat       : `<main id="main">` porte `overflow-x-hidden`, et sur trois écrans son contenu mesure 422 à 606 px pour 375 px visibles ; les 47 à 231 px excédentaires ne sont atteignables par aucun moyen.
 - Preuve        : `node scripts/mesure375.mjs` → `01_mesure-375px.json`. `getComputedStyle(main).overflowX = "hidden"` sur **37/37** écrans. Trois écrans hors écran : `/` **458/375 (83 px)**, `/companies` **422/375 (47 px)**, `/rgpd/requests` **606/375 (231 px)**. Sur les mêmes écrans, `document.documentElement.scrollWidth = 375` : **la page ne défile pas**, et aucun conteneur défilable n'existe (`scrollers = 0` sur les 37). Captures : `captures-375/accueil.png` (le bouton « Actualiser » coupé au bord droit), `captures-375/rgpd_requests.png`.
@@ -303,7 +303,7 @@ C'est **D27-005 vu de profil** : les trois idiomes de tableau ne divergent pas s
 ### [D30-002] Les neuf tableaux « grille » exigent 718 à 1088 px et ne sont enfermés dans aucun conteneur défilable : entre 52 % et 68 % de chaque ligne est inatteignable sur téléphone
 - Sévérité      : S1 grave
 - Domaine       : interface / UX
-- Référence     : main 7be3753 (`frontend/` = e8924b8)
+- Référence     : main 4ca52c9 (`frontend/` = e8924b8)
 - Emplacement   : `ContactsListPage.tsx:58` · `CompanyRow.tsx:32` · `LlmRouterPage.tsx:53` · `ProxyProvidersPage.tsx:34` · `RotationsPage.tsx:35` · `AiActRegisterPage.tsx:50` · `AuditLogsPage.tsx:45` · `RgpdRequestsPage.tsx:64` · `UsersPage.tsx:37` — et `CampaignDetailPage.tsx:338,385,422` · `MediaDetailPage.tsx:176` · `ObservabilityPage.tsx:134` pour l'idiome `<table>`
 - Constat       : les gabarits de colonnes déclarés imposent une largeur minimale de 718 à 1088 px, le conteneur visible en fait 343, et ni le `<Card padding="none" className="overflow-hidden">` ni le `<main>` ne sont défilables.
 - Preuve        : `node scripts/largeurs-tableaux.mjs` → `04_largeurs-tableaux.txt`. Le patron **exact** du produit est injecté dans le `<main>` réel à 375 px et sa `scrollWidth` est lue : `/audit-logs` **1088 px**, `/rgpd/requests` **1086**, `/contacts` **1046**, `/users` **1004**, `/rgpd/ai-act` **986**, `/llm/proxy-providers` **968**, `/llm/router` **936**, `/companies` **858**, `/llm/rotations` **718** — pour **343 px** visibles. `overflow-x` mesuré : `Card = hidden`, `main = hidden`. Côté `<table>` : `grep -rn -B4 "<table" frontend/src/features` → **4 des 7** écrans ont un `overflow-x-auto` (`/media` `min-w-[860px]`, `/journalists` `min-w-[760px]`, `/audiences/$id`, `/international/roumanie`) et **3 n'en ont pas** (`/campaigns/$id` — trois tables —, `/media/$id`, `/admin/observability`). Inventaire complet des conteneurs défilables du dépôt : **5 occurrences, 4 fichiers**.
@@ -318,7 +318,7 @@ C'est **D27-005 vu de profil** : les trois idiomes de tableau ne divergent pas s
 ### [D30-003] 461 cibles tactiles sur 473 mesurent moins de 44 × 44 px, dont 82 moins de 24 × 24 ; la coquille de navigation elle-même n'en a aucune conforme
 - Sévérité      : S2 défaut
 - Domaine       : interface / UX
-- Référence     : main 7be3753 (`frontend/` = e8924b8)
+- Référence     : main 4ca52c9 (`frontend/` = e8924b8)
 - Emplacement   : `components/layout/Header.tsx:27-77` (les 8 cibles de coquille présentes sur les 32 écrans à coquille) · `components/ui/Button.tsx` (`SIZES.md` → 36 px de haut) · `components/ui/IconButton.tsx` (`size="sm"` → 28 px) · `components/ui/DarkModeToggle.tsx` (24 px) · `components/layout/Sidebar.tsx:340` (entrées 32 px, 28 px en replié)
 - Constat       : sur les 37 écrans à 375 px, 473 éléments interactifs sont visibles et 461 ne remplissent pas 44 × 44 px, la hauteur étant le facteur limitant dans la quasi-totalité des cas.
 - Preuve        : `01_mesure-375px.json`. Totaux : **473 cibles · 461 sous 44 × 44 (97,5 %) · 82 sous 24 × 24 (17,3 %) · 12 conformes**. Répartition des hauteurs : 16 px ×8, 20 px ×42, 24 px ×131, 25 px ×42, 28 px ×99, 32 px ×31, 36 px ×58, 38 px ×10, 40 px ×40, **44 px ×1**, 52 px ×6, 56 px ×1, puis 3 zones de saisie et 1 canevas. La coquille contribue **263** des 461 (8 à 9 par écran, sur 32 écrans) : hamburger 28×28, recherche 28×28, notifications 28×28, les trois bascules de thème 26×24 / 26×24 / 23×24, le lien du fil d'Ariane 66×20, l'avatar 44×**40**. Détail complet de `/companies` : **33 cibles, 33 non conformes, aucune exception**. Les 12 conformes se réduisent en pratique à **6 contrôles atteignables** : 5 des 12 sont les boutons de `/rgpd/requests` **hors écran** (D30-001) et 1 est le canevas MapLibre de `/coverage`.
@@ -333,7 +333,7 @@ C'est **D27-005 vu de profil** : les trois idiomes de tableau ne divergent pas s
 ### [D30-004] La barre basse à cinq entrées exigée par le §23.3 n'existe pas, et rien n'en tient lieu : la seule navigation sur téléphone est un hamburger de 28 × 28 px
 - Sévérité      : S2 défaut
 - Domaine       : navigation / UX
-- Référence     : main 7be3753 (`frontend/` = e8924b8)
+- Référence     : main 4ca52c9 (`frontend/` = e8924b8)
 - Emplacement   : absence — `frontend/src/app/RootLayout.tsx` (aucun élément de bas d'écran) · `frontend/src/components/layout/Header.tsx:27` (le hamburger qui en tient lieu)
 - Constat       : aucun composant ni aucun élément ancré au bas du viewport ne porte les entrées *Aujourd'hui · Contacts · Échanges · Rechercher · Plus*, ni sur les 37 écrans mesurés, ni dans le code.
 - Preuve        : `03_statique-barre-basse-et-tableaux.txt` §A. Six noms cherchés (`BottomBar`, `BottomNav`, `TabBar`, `MobileNav`, `bottom-nav`, `BarreBasse`) → **0 fichier chacun**. `grep -rn "bottom-0" frontend/src` → **une seule ligne**, `components/ui/Modal.tsx:124`, le pied de modale. Le libellé « Échanges » → **0 occurrence** dans tout `frontend/src`. Et dans le navigateur, sur les 37 écrans à 375 px : `nBarreBasse = 0` (`01_mesure-375px.json`, `totalBarresBasses: 0`).
@@ -348,7 +348,7 @@ C'est **D27-005 vu de profil** : les trois idiomes de tableau ne divergent pas s
 ### [D30-005] Le tiroir de navigation ne se referme pas après une navigation, couvre tout l'écran sans voile atteignable, et laisse 115 px de bande morte : chaque parcours coûte 4 appuis au lieu de 2 clics
 - Sévérité      : S2 défaut
 - Domaine       : navigation / UX
-- Référence     : main 7be3753 (`frontend/` = e8924b8)
+- Référence     : main 4ca52c9 (`frontend/` = e8924b8)
 - Emplacement   : `frontend/src/app/RootLayout.tsx:69-93` (état `mobileSidebarOpen`, jamais remis à `false` sur changement de route) · `frontend/src/components/ui/Modal.tsx:106-115` (`Drawer` : panneau `w-full max-w-sm`) · `frontend/src/components/layout/Sidebar.tsx:197` (`w-[260px]` fixe à l'intérieur)
 - Constat       : après un appui sur une entrée du menu, l'URL change et le tiroir reste ouvert par-dessus la destination, et à 375 px il n'existe aucune zone de voile ni aucun geste latéral pour le refermer.
 - Preuve        : `05_parcours-et-tiroir.txt`, joué sous Playwright à 375 × 812, `hasTouch: true`.
@@ -369,7 +369,7 @@ C'est **D27-005 vu de profil** : les trois idiomes de tableau ne divergent pas s
 ### [D30-006] La barre repliée ne se replie pas « aux mêmes positions » : 66 à 78 px d'écart, et jusqu'à 19 des 20 entrées n'existent pas dans l'autre mode
 - Sévérité      : S2 défaut
 - Domaine       : navigation / UX
-- Référence     : main 7be3753 (`frontend/` = e8924b8)
+- Référence     : main 4ca52c9 (`frontend/` = e8924b8)
 - Emplacement   : `frontend/src/components/layout/Sidebar.tsx:270-272` (`const deplie = collapsed || ouverte`) · `:184-186` (une seule section ouverte à la fois) · `:340` (entrées `px-2 py-1.5`)
 - Constat       : en mode déployé la barre n'affiche que les entrées de la section ouverte, en mode replié elle les affiche toutes, et aucune entrée ne conserve sa position verticale entre les deux modes.
 - Preuve        : `02_barre-tableaux-temoins.txt` §1, mesuré à 1280 × 900 dans un vrai navigateur, deux routes.
@@ -390,12 +390,12 @@ C'est **D27-005 vu de profil** : les trois idiomes de tableau ne divergent pas s
 ### [D30-007] Sur téléphone, le fil d'Ariane est le seul repère de position, et il est écrasé à 94 px sur les 32 écrans qui en ont un
 - Sévérité      : S2 défaut
 - Domaine       : navigation / UX
-- Référence     : main 7be3753 (`frontend/` = e8924b8)
+- Référence     : main 4ca52c9 (`frontend/` = e8924b8)
 - Emplacement   : `frontend/src/components/layout/Header.tsx:39` (`<div className="min-w-0 flex-1 truncate">`)
 - Constat       : le conteneur du fil d'Ariane reçoit 94 px de large à 375 px, alors que son contenu en demande de 115 à 275, et la barre latérale qui porterait l'information est masquée à cette largeur.
 - Preuve        : `01_mesure-375px.json`, colonne `filAriane` — mesuré sur les 32 écrans à coquille, `clientWidth = 94` **partout**, `scrollWidth` de **115** (`/tags`) à **275** (`/console/personnes/$k`). Exemples : `/console/personnes/abc123` demande 275 px pour rendre `Accueil › / › Console › / › Personnes › / › Abc123` ; `/international/roumanie` 237 ; `/rgpd/ai-act` 226 ; `/campaigns/$id` 223. Capture : `captures-375/rgpd_requests.png`, où l'en-tête affiche `Accueil / R(` — le fil est coupé au deuxième segment.
 - Témoin négatif: le même relevé rend `filAriane = null` sur les 4 écrans d'authentification et le 404 — ils n'ont pas de coquille, et le contrôle ne leur invente pas de fil d'Ariane. Sur `/` il rend **94/94**, c'est-à-dire **aucune troncature** : le fil « Accueil » tient. Le détecteur distingue donc bien tronqué et non tronqué.
-- Impact        : à 375 px, la barre latérale est masquée et le tiroir est fermé : le fil d'Ariane est **le seul élément persistant qui dise où l'on est**. Réduit à 94 px, il n'en montre qu'un segment et demi. Sur la fiche 360° (`/console/personnes/$k`), l'écran le plus profond du produit, on lit `Accueil / C…`. Les 94 px viennent d'un `flex-1` mis en concurrence, dans la même rangée, avec **cinq blocs de contrôles** — hamburger, loupe, cloche, bascule de thème (3 boutons), menu du compte — dont **aucun ne cède** : `flex-1` obtient ce qui reste, et il ne reste que 94 px.
+- Impact        : à 375 px, la barre latérale est masquée et le tiroir est fermé : le fil d'Ariane est **le seul élément persistant qui dise où l'on est**. Réduit à 94 px, il n'en montre qu'un segment et demi — et **sans points de suspension** : la classe `truncate` ne peut pas ellipser un enfant `flex`, la coupe se fait **au milieu d'un caractère**. La capture `captures-375/rgpd_requests.png` montre littéralement `Accueil / R(`. Sur la fiche 360° (`/console/personnes/$k`), l'écran le plus profond du produit, le fil demande 275 px et en reçoit 94. Les 94 px viennent d'un `flex-1` mis en concurrence, dans la même rangée, avec **cinq blocs de contrôles** — hamburger, loupe, cloche, bascule de thème (3 boutons), menu du compte — dont **aucun ne cède** : `flex-1` obtient ce qui reste, et il ne reste que 94 px.
 - Reproduction  : ouvrir n'importe quel écran à 375 px et lire `document.querySelector('header .truncate')` → `clientWidth = 94`.
 - Correctif     : sous `md:`, n'afficher que **le dernier segment** du fil (le nom de l'écran courant), en clair et sur toute la largeur disponible — c'est l'information utile, les ancêtres ne sont pas cliquables utilement sur 94 px. Alternative : déplacer le fil sur une deuxième ligne sous les contrôles. **Coût : ~2 h** dans `AutoBreadcrumbs` + `Header`.
 - Statut        : ouvert
@@ -405,7 +405,7 @@ C'est **D27-005 vu de profil** : les trois idiomes de tableau ne divergent pas s
 ### [D30-008] `PageHeader` pose `shrink-0` sur son bloc d'actions, ce qui annule le `flex-wrap` qu'il porte lui-même : le repli est écrit et ne peut pas se produire, sur 27 écrans
 - Sévérité      : S2 défaut
 - Domaine       : interface
-- Référence     : main 7be3753 (`frontend/` = e8924b8)
+- Référence     : main 4ca52c9 (`frontend/` = e8924b8)
 - Emplacement   : `frontend/src/components/ui/PageHeader.tsx:18` et `:37`
 - Constat       : l'en-tête déclare `flex flex-wrap` à la ligne 18 et `shrink-0` sur le bloc d'actions à la ligne 37 ; un bloc qui ne peut pas se réduire conserve sa largeur `max-content` et sort de l'écran au lieu de se replier.
 - Preuve        : mesure dans le navigateur à 375 px (`01_mesure-375px.json`, champ `offenders`). Sur `/` : `div [flex shrink-0 flex-wrap items-center gap-2]` **w = 418 px**, bord droit à **x = 458** pour un écran de 375. Sur `/companies` : le même bloc, **w = 382 px**, bord droit à **x = 422**, contenu « Importer Exporter Lancer scraping → ». `grep -rl "PageHeader" frontend/src/features` → **27 écrans**.
@@ -420,7 +420,7 @@ C'est **D27-005 vu de profil** : les trois idiomes de tableau ne divergent pas s
 ### [D30-009] Sur téléphone, la recherche demande deux appuis pour arriver à un champ, et le résultat s'annonce en raccourcis clavier
 - Sévérité      : S3 finition
 - Domaine       : navigation / UX
-- Référence     : main 7be3753 (`frontend/` = e8924b8)
+- Référence     : main 4ca52c9 (`frontend/` = e8924b8)
 - Emplacement   : `frontend/src/app/RootLayout.tsx:105-113` (`<Modal title="Recherche"><GlobalSearch/></Modal>`) · `frontend/src/components/ui/GlobalSearch.tsx:14` et `:49` (le composant porte **son propre** état `open` et **son propre** bouton déclencheur)
 - Constat       : la modale de recherche mobile contient le déclencheur de la palette au lieu de la palette elle-même, ce qui empile deux dialogues et impose un second appui.
 - Preuve        : `05_parcours-et-tiroir.txt`. Après appui sur l'icône loupe de l'en-tête : **1 dialogue**, contenu `"Recherche | 🔍 | Rechercher | ⌘K"`, contrôles `["Fermer 28x28", "Recherche globale 169x34"]` — **aucun champ de saisie**. Après le second appui : **2 dialogues empilés**, contenu `"Recherche | 🔍 | Esc | Tape au moins 2 caractères pour rechercher. | ⌘K pour ouvrir / fermer | ↑↓ naviguer · ↵ ouvrir"`. Capture : `captures-375/recherche-mobile.png`. Le champ obtenu mesure **217 × 44** — l'un des rares contrôles conformes du produit.
@@ -435,7 +435,7 @@ C'est **D27-005 vu de profil** : les trois idiomes de tableau ne divergent pas s
 ### [D30-010] Vingt-trois des quarante-neuf fichiers d'écran ne portent aucune règle de mise en page pour petit écran
 - Sévérité      : S3 finition
 - Domaine       : interface
-- Référence     : main 7be3753 (`frontend/` = e8924b8)
+- Référence     : main 4ca52c9 (`frontend/` = e8924b8)
 - Emplacement   : `frontend/src/features/` — 23 fichiers sur 49
 - Constat       : 96 préfixes responsive (`sm:` `md:` `lg:` `xl:`) existent dans tout `frontend/src`, et 23 des 49 fichiers de `features/` n'en portent aucun.
 - Preuve        : `03_statique-barre-basse-et-tableaux.txt` §F. `sm:` **21**, `md:` **34**, `lg:` **34**, `xl:` **7** → **96** au total sur **84** fichiers `.tsx`. Boucle sur `features/` : **23 fichiers sur 49** sans une seule occurrence. Comparaison utile : la coquille seule (`RootLayout`, `Header`, `Sidebar`) en concentre une part importante.
@@ -458,4 +458,4 @@ C'est **D27-005 vu de profil** : les trois idiomes de tableau ne divergent pas s
 7. **Le seuil de 44 px lui-même.** Je le tiens du mandat. Il correspond à WCAG 2.1 **AAA** (2.5.5) et aux règles d'Apple. Le seuil **AA** de WCAG 2.2 (2.5.8) est de **24 × 24**, et je donne les deux chiffres (461 et 82) pour que l'arbitrage soit fait sur des faits et non sur un seul seuil. **Je n'ai pas mesuré les exceptions prévues par 2.5.8** (espacement suffisant, équivalent en ligne) : le décompte de 82 est donc un **majorant**, et je ne le présente pas autrement.
 8. **Le §23.4 au-delà de trois intentions.** J'ai mesuré 3 parcours sur les 20 que l'agent 23 a instruits. Les trois donnent le même résultat (2 → 4), et la cause est structurelle, mais **17 parcours n'ont pas été joués**.
 9. **Le coût de mes correctifs.** Ce sont des ordres de grandeur, pas des mesures. Le seul dont je sois sûr est celui de D30-005 : trois modifications de moins de dix lignes chacune.
-10. **La stabilité de la référence.** `main` a avancé **quatre fois** pendant ma mission (`e8924b8` → `7be3753`). J'ai revérifié à la clôture que `git diff --stat e8924b8 HEAD -- frontend/` rend une sortie vide. **Si une PR touchant `frontend/` atterrit après cette lecture, mes numéros de ligne se décalent** — à re-vérifier avant tout correctif.
+10. **La stabilité de la référence.** `main` a avancé **cinq fois** pendant ma mission (`e8924b8` → `4ca52c9`). J'ai revérifié à la clôture que `git diff --stat e8924b8 HEAD -- frontend/` rend une sortie vide. **Si une PR touchant `frontend/` atterrit après cette lecture, mes numéros de ligne se décalent** — à re-vérifier avant tout correctif.

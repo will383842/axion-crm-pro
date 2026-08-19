@@ -1,1 +1,25 @@
-EXIT=143
+EXECUTION ARRETEE VOLONTAIREMENT PAR L'AGENT 26 (kill 6392) — voir le rapport, §4 point 4.
+
+Commande : ./vendor/bin/pest -c /tmp/phpunit-a26.xml --filter=SymetrieEvaluateurs
+Duree avant arret : ~25 min, sans avoir rendu la main. Sortie : EXIT=143 (SIGTERM).
+
+DEUX RAISONS, dans cet ordre :
+
+1. Elle ne visait PAS la base que je croyais. `backend/tests/bootstrap.php:26-33` epingle en dur
+   `const TEST_DATABASE_NAME = 'axion_crm_test'` dans $_SERVER + $_ENV + putenv() avant le
+   demarrage de l'application, et `Tests\TestCase::setUp()` refuse de demarrer si le nom de base
+   ne commence pas par cette valeur. Ma configuration PHPUnit dediee (/tmp/phpunit-a26.xml,
+   base axion_crm_a26) etait donc SANS EFFET : l'execution operait sur la base PARTAGEE
+   `axion_crm_test`, en concurrence avec les autres agents. La laisser courir ne pouvait plus
+   qu'endommager leur travail (RefreshDatabase => DROP TABLE ... CASCADE).
+
+2. Son resultat n'etait plus necessaire. Le constat D26-001 est etabli DEUX FOIS sans elle :
+   - 02-neq-notin-null.txt : vrai service, 300 000 fiches, axion_crm_perf, lecture seule ;
+   - 05-asymetrie-residuelle.txt : jeu mixte, 4 asymetries + 4 temoins negatifs internes.
+   Ce que cette execution aurait ajoute (les 22 cas VALIDES restent verts) est deja couvert par
+   les 4 temoins negatifs de 05.
+
+Consequence utile pour l'audit, rapportee au §4 point 3 du rapport : l'instruction du §5 bis
+point 2 du dossier commun (« cree ta propre base axion_crm_<ton-id> ») N'EST PAS EXECUTABLE pour
+la suite Pest du back-end sans modifier un fichier du produit. C'est la raison mecanique pour
+laquelle B11-005 continue de se produire.

@@ -1,0 +1,35 @@
+AGENT 25 — TENUE AUX VOLUMES (montage reel, jsdom, MSW)
+Reference : main 8db8229
+
+jsdom n a PAS de moteur de rendu : les durees mesurent la CONSTRUCTION
+du DOM par React, pas la peinture. Le nombre de NOEUDS est en revanche
+exactement celui que le navigateur devrait peindre — c est la mesure qui
+porte le verdict.
+
+pagination offerte, par ecran :
+  /companies       OUI (Pagination) + useVirtualizer — le SEUL ecran virtualise
+  /users           NON — ni pagination, ni per_page demande
+  /audit-logs      NON — ni pagination, ni per_page demande
+  /tags            NON — aucune pagination
+  /audiences       NON — aucune pagination
+
+=== TEMOIN : cout du BANC D ESSAI seul (fabrication + serialisation, sans montage) ===
+        0 lignes :     0 ms | json=0 Ko | heap 72 -> 72 Mo
+        1 lignes :     0 ms | json=0 Ko | heap 72 -> 72 Mo
+      100 lignes :     0 ms | json=22 Ko | heap 72 -> 72 Mo
+    10000 lignes :    29 ms | json=2234 Ko | heap 72 -> 77 Mo
+
+=== MESURES D ECRAN ===
+route            |  lignes servies |    ms | noeuds DOM | lignes rendues |  html (Ko) | heap (Mo) | note
+/audit-logs      |               0 |   766 |         37 |              0 |          4 |        83 | 
+/audit-logs      |               1 |   345 |         48 |              2 |          5 |        65 | 
+/audit-logs      |             100 |   583 |       1038 |            101 |         98 |        90 | 
+/audit-logs      |           10000 | 20428 |     100038 |          10001 |       9436 |       674 | 
+/tags            |               0 |   423 |         54 |              0 |          6 |        68 | 
+/tags            |               1 |   232 |         58 |              0 |          6 |        71 | 
+/tags            |             100 |   935 |       1048 |              0 |         87 |        94 | 
+/tags            |           10000 | 26893 |     100048 |              0 |       8264 |       792 | 
+/audiences       |               0 |   246 |         47 |              0 |          5 |       759 | 
+/audiences       |               1 |   263 |         13 |              0 |          1 |       765 | 
+/audiences       |             100 |   277 |         13 |              0 |          1 |       770 | 
+/audiences       |           10000 |  2904 |         13 |              0 |          1 |       864 | 

@@ -1,0 +1,19 @@
+AGENT 25 — ETAT D URL ET RETOUR ARRIERE (gestes reels)
+Reference : main 8db8229
+
+### /media — un filtre saisi à l écran part-il dans l URL du navigateur ?
+  champ de recherche trouvé : OUI
+  URL du routeur AVANT filtre : /media
+  URL du routeur APRES filtre : /media
+  DERNIERE requete API envoyee : https://api.localhost/api/v1/media?page=1&per_page=100&filter%5Bdepartment_code%5D=PRO
+  => l API reçoit bien le filtre ; l URL du navigateur, NON : CONFIRME (identique)
+
+### /media — aller-retour vers une fiche
+  valeur du filtre AVANT le départ : « PRO »
+  valeur du filtre APRES le retour : «  »
+  => le filtre survit : NON — il est PERDU
+
+### /audit-logs — URL partagée avec ?severity=critical&q=erasure
+  URL visitée : /audit-logs?severity=critical&q=erasure
+  l écran affiche-t-il ENCORE les lignes non filtrées ? OUI — le paramètre d URL est IGNORE
+  extrait : « Journaux d’auditJournal append-only avec chaîne cryptographique SHA-256 vérifiable.Vérifier la chaîneToutes sévéritésInfoAttentionErreurCritiqueQuandÉvénementCheminActeurSévéritéIPEmpreinte19/08/2026 12:00:00auth.login—willinfo—aaaaaaaaaaaa…19/08/2026 12:01:00rgpd.erasure—willcritical—bbbbbbbbbbbb… »

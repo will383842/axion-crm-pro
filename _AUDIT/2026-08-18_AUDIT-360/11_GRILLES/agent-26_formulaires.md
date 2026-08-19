@@ -490,20 +490,23 @@ ne portent pas de constat :
    service, 300 000 fiches) et par `05-asymetrie-residuelle.txt` (jeu mixte, témoin négatif interne).
    Ce que cette exécution aurait ajouté — la confirmation que les 22 cas valides restent verts — est
    déjà couvert par les 4 témoins négatifs du second fichier.
-4. **Le second témoin négatif de `02-neq-notin-null.txt` est non concluant** et je le dis :
-   `axion_crm_perf` ne contient **aucune** fiche à `sector_main` renseigné, donc je n'ai pas pu
-   vérifier sur cette base que `neq` exclut bien une valeur qui correspond. Le premier témoin (le SQL
-   naïf rendant 0) suffit à établir l'écart, et `SymetrieEvaluateursTest` couvre le jeu mixte.
-5. **Le comportement 419** de D26-013 est lu dans le code, **pas joué**.
-6. **La troncature au collage** (D26-010) est établie par la spécification de `maxLength` et par le
+5. **Le second témoin négatif de `02-neq-notin-null.txt` était non concluant — il l'est resté, mais
+   la lacune est comblée ailleurs.** `axion_crm_perf` ne contient **aucune** fiche à `sector_main`
+   renseigné : sur cette base je n'ai pas pu vérifier que `neq` exclut bien une valeur qui
+   correspond. Le premier témoin (le SQL naïf rendant 0) suffisait à établir l'écart ; et
+   `05-asymetrie-residuelle.txt`, lui, **exerce bien une valeur renseignée** — `in avec tableau`
+   rend 1/1, donc une fiche portait `sector_main = 'btp'` et les deux évaluateurs l'ont retenue.
+   Le trou de mesure est donc fermé, mais par un autre fichier que celui où il s'est ouvert.
+6. **Le comportement 419** de D26-013 est lu dans le code, **pas joué**.
+7. **La troncature au collage** (D26-010) est établie par la spécification de `maxLength` et par le
    code, **pas par un collage réel dans un navigateur**.
-7. **Écart non élucidé, signalé sans conclusion** : ma base `axion_crm_a26`, migrée depuis
+8. **Écart non élucidé, signalé sans conclusion** : ma base `axion_crm_a26`, migrée depuis
    `8db8229`, compte **66 lignes** dans `migrations` pour **58 fichiers** dans
    `backend/database/migrations/` ; `axion_crm` en compte 58 et `axion_crm_perf` **57**. L'écart vient
    probablement de migrations publiées par des paquets tiers, mais **je ne l'ai pas vérifié** et il
    n'entre pas dans mon périmètre. Il mérite d'être regardé par qui audite les migrations, car il
    signifie que **les bases locales ne sont pas au même niveau de schéma**.
-8. **Je n'ai pas audité** les 30 champs bruts des 13 autres écrans (D27-008) : hors périmètre.
+9. **Je n'ai pas audité** les 30 champs bruts des 13 autres écrans (D27-008) : hors périmètre.
    Ce que j'ajoute à D27-008 est que `FormField` est absent des **7 écrans de saisie**, pas
    seulement sous-employé.
 

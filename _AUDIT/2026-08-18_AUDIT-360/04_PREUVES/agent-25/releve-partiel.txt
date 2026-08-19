@@ -1,0 +1,44 @@
+AGENT 25 — ETAT PARTIEL : une source repond, l autre tombe (500)
+Reference : main 8db8229
+
+### / (stats OK, couverture KO)
+  source(s) en echec : /coverage
+  attendu : la carte « top départements » doit dire qu elle n a pas pu être chargée
+  l ecran SIGNALE-T-IL l echec partiel ? NON
+  rendu : « Bonjour Will 👋Tableau de bordVue d'ensemble · derniers 30 joursEn direct· actualisé toutes les 30s7j30j90j⟳ActualiserTotal entreprises1 234Toutes périodes confonduesEnrichies 24h12Fiches enrichies sur 24hNouvelles 7j4Découvertes sur 7 joursQualité moyenne79/100Score pondéré qualitéQualitéDistribution qualité des fichesScore moyen79/100Complète1058.8%Partielle529.4%Basique211.8%Taille d'entreprise (INSEE)Distribution par catégorieTotal classé10001000ArtisanTPEPMEETIGrandeCouvertureTop 5 départem »
+
+### /console/contacts (liste OK, compteurs KO)
+  source(s) en echec : /crm/contacts-hub/counts
+  attendu : les onglets ne doivent pas afficher « 0 » comme un compte mesuré
+  l ecran SIGNALE-T-IL l echec partiel ? NON
+  rendu : « Something went wrong!Hide ErrorCannot read properties of undefined (reading 'length') »
+
+### /console/vivier (liste OK, compteurs KO)
+  source(s) en echec : /crm/candidates/counts
+  attendu : idem — les 4 vignettes À qualifier / Présélection / Entretien / Vivier
+  l ecran SIGNALE-T-IL l echec partiel ? NON
+  rendu : « Something went wrong!Hide ErrorCannot read properties of undefined (reading 'length') »
+
+### /llm/router (cas d usage OK, coûts KO)
+  source(s) en echec : /llm/usage/summary
+  attendu : le coût 30 j ne doit pas afficher 0,00 € quand il n a pas pu être lu
+  l ecran SIGNALE-T-IL l echec partiel ? NON
+  rendu : « LLM Router9 use cases × 5 providers + fallback chain + cost tracking + idempotency cache 24h.Cas d'usage1FournisseursPromptsUsage 30jCas d'usageFournisseurModèleChaîne de repliPlafond €Étatx—OFF »
+
+### /audiences/$id (fiche OK, membres KO)
+  source(s) en echec : /audiences/a-1/members
+  attendu : l onglet Membres doit dire qu il n a pas pu charger, pas « aucun membre »
+  l ecran SIGNALE-T-IL l echec partiel ? NON
+  rendu : «  »
+
+### /campaigns/$id (fiche OK, stats KO)
+  source(s) en echec : /campaigns/k-1/stats
+  attendu : les compteurs de progression ne doivent pas valoir 0 par défaut
+  l ecran SIGNALE-T-IL l echec partiel ? NON
+  rendu : «  »
+
+### /companies (liste OK, référentiel géo KO)
+  source(s) en echec : /referentiels/geo
+  attendu : les listes déroulantes région/département doivent dire pourquoi elles sont vides
+  l ecran SIGNALE-T-IL l echec partiel ? NON
+  rendu : « EntreprisesPipeline de prospection · 1 entreprises activesImporterExporterLancer scraping →Total1Page 1 · 1 affichéesEnrichies0%dont email + téléphone vérifiésTop taillePME100% de l'échantillonTop NAF62.01Z1 sociétésTousProspectablesPartielsPendingArchivésToutes taillesArtisanTPEPMEETIGrande entrepriseTous effectifs0 salarié1 à 2 salariés3 à 5 salariés6 à 9 salariés10 à 19 salariés20 à 49 salariés50 à 99 salariés100 à 199 salariés200 à 249 salariés250 à 499 salariés500 à 999 salariés1 000 à 1 99 »

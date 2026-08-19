@@ -1,0 +1,594 @@
+AGENT 25 — RELEVE BRUT DES CINQ ETATS (montage reel, MSW reseau)
+Reference : main 8db8229
+
+### /  [EN-VOL]  => CHARGEMENT (spinner)
+    DOM : pulse=0 spin=1 ariaBusy=0 elements=30 html=3677o boutons=5
+    « Bonjour Will 👋Tableau de bordVue d'ensemble · derniers 30 joursEn direct· actualisé toutes les 30s7j30j90jActualiser🚀Lance ton premier scrapeAucune entreprise collectée pour l'instant. Choisis un département sur la carte France et démarre la couverture en un clic.Démarrer sur /coverage → »
+
+### /  [VIDE]  => VIDE annonce
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=28 html=3398o boutons=5
+    « Bonjour Will 👋Tableau de bordVue d'ensemble · derniers 30 joursEn direct· actualisé toutes les 30s7j30j90j⟳Actualiser🚀Lance ton premier scrapeAucune entreprise collectée pour l'instant. Choisis un département sur la carte France et démarre la couverture en un clic.Démarrer sur /coverage → »
+
+### /  [ERREUR]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=28 html=3398o boutons=5
+    « Bonjour Will 👋Tableau de bordVue d'ensemble · derniers 30 joursEn direct· actualisé toutes les 30s7j30j90j⟳Actualiser🚀Lance ton premier scrapeAucune entreprise collectée pour l'instant. Choisis un département sur la carte France et démarre la couverture en un clic.Démarrer sur /coverage → »
+
+### /  [REFUS]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=28 html=3398o boutons=5
+    « Bonjour Will 👋Tableau de bordVue d'ensemble · derniers 30 joursEn direct· actualisé toutes les 30s7j30j90j⟳Actualiser🚀Lance ton premier scrapeAucune entreprise collectée pour l'instant. Choisis un département sur la carte France et démarre la couverture en un clic.Démarrer sur /coverage → »
+
+### /companies  [EN-VOL]  => CHARGEMENT (squelette)
+    DOM : pulse=11 spin=0 ariaBusy=1 elements=153 html=16140o boutons=8
+    « EntreprisesPipeline de prospection · 0 entreprises activesImporterExporterLancer scraping →Total0Page 1 · 0 affichéesEnrichies0%dont email + téléphone vérifiésTop taille—0% de l'échantillonTop NAF——TousProspectablesPartielsPendingArchivésToutes taillesArtisanTPEPMEETIGrande entrepriseTous effectifs0 salarié1 à 2 salariés3 à 5 salariés6 à 9 salariés10 à 19 salariés20 à 49 salariés50 à 99 salariés100 à 199 salariés200 à 249 salariés250 à 499 salariés500 à 999 salariés1 000 à 1 999 salariés2 000 à 4 999 salariés5 000 à 9 999 salariés10 000 salariés et +Tous secteursIT / SaaSBTPSantéCommerceServic »
+
+### /companies  [VIDE]  => VIDE annonce
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=147 html=16001o boutons=9
+    « EntreprisesPipeline de prospection · 0 entreprises activesImporterExporterLancer scraping →Total0Page 1 · 0 affichéesEnrichies0%dont email + téléphone vérifiésTop taille—0% de l'échantillonTop NAF——TousProspectablesPartielsPendingArchivésToutes taillesArtisanTPEPMEETIGrande entrepriseTous effectifs0 salarié1 à 2 salariés3 à 5 salariés6 à 9 salariés10 à 19 salariés20 à 49 salariés50 à 99 salariés100 à 199 salariés200 à 249 salariés250 à 499 salariés500 à 999 salariés1 000 à 1 999 salariés2 000 à 4 999 salariés5 000 à 9 999 salariés10 000 salariés et +Tous secteursIT / SaaSBTPSantéCommerceServic »
+
+### /companies  [ERREUR]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=147 html=16001o boutons=9
+    « EntreprisesPipeline de prospection · 0 entreprises activesImporterExporterLancer scraping →Total0Page 1 · 0 affichéesEnrichies0%dont email + téléphone vérifiésTop taille—0% de l'échantillonTop NAF——TousProspectablesPartielsPendingArchivésToutes taillesArtisanTPEPMEETIGrande entrepriseTous effectifs0 salarié1 à 2 salariés3 à 5 salariés6 à 9 salariés10 à 19 salariés20 à 49 salariés50 à 99 salariés100 à 199 salariés200 à 249 salariés250 à 499 salariés500 à 999 salariés1 000 à 1 999 salariés2 000 à 4 999 salariés5 000 à 9 999 salariés10 000 salariés et +Tous secteursIT / SaaSBTPSantéCommerceServic »
+
+### /companies  [REFUS]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=147 html=16001o boutons=9
+    « EntreprisesPipeline de prospection · 0 entreprises activesImporterExporterLancer scraping →Total0Page 1 · 0 affichéesEnrichies0%dont email + téléphone vérifiésTop taille—0% de l'échantillonTop NAF——TousProspectablesPartielsPendingArchivésToutes taillesArtisanTPEPMEETIGrande entrepriseTous effectifs0 salarié1 à 2 salariés3 à 5 salariés6 à 9 salariés10 à 19 salariés20 à 49 salariés50 à 99 salariés100 à 199 salariés200 à 249 salariés250 à 499 salariés500 à 999 salariés1 000 à 1 999 salariés2 000 à 4 999 salariés5 000 à 9 999 salariés10 000 salariés et +Tous secteursIT / SaaSBTPSantéCommerceServic »
+
+### /companies/$companyId  [EN-VOL]  => CHARGEMENT (spinner)
+    DOM : pulse=0 spin=1 ariaBusy=0 elements=14 html=681o boutons=0
+    « Chargement… Chargement de la fiche entreprise… »
+
+### /companies/$companyId  [VIDE]  => ERREUR explicite (+ zeros affiches)
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=111 html=11079o boutons=9
+    « Entreprises/?SIREN ·Dept —·Inconnue·🔴BasiqueEnrichir maintenantExporterIdentité légaleInformations entrepriseSIRENForme juridique—NAF—Effectif INSEE—Adresse—Site web—Téléphone—LinkedIn—Date création—Enrichi leJamaisPipeline d'enrichissementAucune trace d'enrichissement disponible pour le moment.DebugDonnées brutes (signals)Contacts (0)Aucun contact identifié.Score de qualitéQualité de la donnée—🔴BasiqueDétail par dimension indisponible pour cette entreprise.Actions rapidesWorkflowEnrichir maintenantExporter (vCard / VCF)Marquer obsolète »
+
+### /companies/$companyId  [ERREUR]  => ERREUR explicite
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=13 html=592o boutons=0
+    « Entreprise introuvable404Cette entreprise n'existe pas ou a été supprimée. »
+
+### /companies/$companyId  [REFUS]  => ERREUR explicite
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=13 html=592o boutons=0
+    « Entreprise introuvable404Cette entreprise n'existe pas ou a été supprimée. »
+
+### /contacts  [EN-VOL]  => CHARGEMENT (squelette)
+    DOM : pulse=7 spin=0 ariaBusy=1 elements=44 html=3411o boutons=0
+    « Contacts… décideurs identifiés (waterfall + Direction Finder)Tous statuts e-mailValideCatch-allInconnuInvalideRôle génériqueJetableTous paysFranceRoumanieTous statutsContactables (e-mail exploitable)Partiels (e-mail incertain)Collectés, pas encore enrichisSans e-mail (archivés) »
+
+### /contacts  [VIDE]  => VIDE annonce
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=44 html=3649o boutons=0
+    « Contacts0 décideurs identifiés (waterfall + Direction Finder)Tous statuts e-mailValideCatch-allInconnuInvalideRôle génériqueJetableTous paysFranceRoumanieTous statutsContactables (e-mail exploitable)Partiels (e-mail incertain)Collectés, pas encore enrichisSans e-mail (archivés)Aucun contactLance l'enrichissement d'entreprises depuis la liste Entreprises. »
+
+### /contacts  [ERREUR]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=44 html=3649o boutons=0
+    « Contacts… décideurs identifiés (waterfall + Direction Finder)Tous statuts e-mailValideCatch-allInconnuInvalideRôle génériqueJetableTous paysFranceRoumanieTous statutsContactables (e-mail exploitable)Partiels (e-mail incertain)Collectés, pas encore enrichisSans e-mail (archivés)Aucun contactLance l'enrichissement d'entreprises depuis la liste Entreprises. »
+
+### /contacts  [REFUS]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=44 html=3649o boutons=0
+    « Contacts… décideurs identifiés (waterfall + Direction Finder)Tous statuts e-mailValideCatch-allInconnuInvalideRôle génériqueJetableTous paysFranceRoumanieTous statutsContactables (e-mail exploitable)Partiels (e-mail incertain)Collectés, pas encore enrichisSans e-mail (archivés)Aucun contactLance l'enrichissement d'entreprises depuis la liste Entreprises. »
+
+### /media  [EN-VOL]  => CHARGEMENT (texte)
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=91 html=10460o boutons=3
+    « MédiasBase médias & presse · 0 médiasExporter CSVTotal0Page 1 · 0 affichésAvec site web0%de la pageAvec email0%email rédactionTop type—de la pageToutes familles📝 Rédactionnel🎥 Production audiovisuelleTous types📰 Journal📓 Revue / périodique🗞️ Autre presse📻 Radio📺 Télévision🎬 Émission TV🛰️ Agence de presse🌐 Portail / site info✍️ Blog🎥 Production audiovisuelleToute périodicitéQuotidienHebdomadaireMensuelBimensuelTrimestrielSite : tousAvec site webSans site webEmail : tousAvec emailSans emailConfiance : toutesA · email = domaine du siteB · domaine proC · boîte grand publicChargement…Pag »
+
+### /media  [VIDE]  => VIDE annonce
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=94 html=10664o boutons=3
+    « MédiasBase médias & presse · 0 médiasExporter CSVTotal0Page 1 · 0 affichésAvec site web0%de la pageAvec email0%email rédactionTop type—de la pageToutes familles📝 Rédactionnel🎥 Production audiovisuelleTous types📰 Journal📓 Revue / périodique🗞️ Autre presse📻 Radio📺 Télévision🎬 Émission TV🛰️ Agence de presse🌐 Portail / site info✍️ Blog🎥 Production audiovisuelleToute périodicitéQuotidienHebdomadaireMensuelBimensuelTrimestrielSite : tousAvec site webSans site webEmail : tousAvec emailSans emailConfiance : toutesA · email = domaine du siteB · domaine proC · boîte grand public📰Aucun médiaL »
+
+### /media  [ERREUR]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=94 html=10664o boutons=3
+    « MédiasBase médias & presse · 0 médiasExporter CSVTotal0Page 1 · 0 affichésAvec site web0%de la pageAvec email0%email rédactionTop type—de la pageToutes familles📝 Rédactionnel🎥 Production audiovisuelleTous types📰 Journal📓 Revue / périodique🗞️ Autre presse📻 Radio📺 Télévision🎬 Émission TV🛰️ Agence de presse🌐 Portail / site info✍️ Blog🎥 Production audiovisuelleToute périodicitéQuotidienHebdomadaireMensuelBimensuelTrimestrielSite : tousAvec site webSans site webEmail : tousAvec emailSans emailConfiance : toutesA · email = domaine du siteB · domaine proC · boîte grand public📰Aucun médiaL »
+
+### /media  [REFUS]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=94 html=10664o boutons=3
+    « MédiasBase médias & presse · 0 médiasExporter CSVTotal0Page 1 · 0 affichésAvec site web0%de la pageAvec email0%email rédactionTop type—de la pageToutes familles📝 Rédactionnel🎥 Production audiovisuelleTous types📰 Journal📓 Revue / périodique🗞️ Autre presse📻 Radio📺 Télévision🎬 Émission TV🛰️ Agence de presse🌐 Portail / site info✍️ Blog🎥 Production audiovisuelleToute périodicitéQuotidienHebdomadaireMensuelBimensuelTrimestrielSite : tousAvec site webSans site webEmail : tousAvec emailSans emailConfiance : toutesA · email = domaine du siteB · domaine proC · boîte grand public📰Aucun médiaL »
+
+### /media/$mediaId  [EN-VOL]  => CHARGEMENT (spinner seul, sans texte)
+    DOM : pulse=0 spin=1 ariaBusy=0 elements=9 html=369o boutons=0
+    «  »
+
+### /media/$mediaId  [VIDE]  => VIDE annonce
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=76 html=5029o boutons=1
+    « Médias / —InformationsType—Famille—Périodicité—Thème éditorial—Zone de diffusion—Éditeur—Département—Région—Ville—Code postal—SIREN—N° CPPAP—N° ARCOM—Source—Contact rédactionSite web—Email rédaction—Téléphone—Journalistes Aucun journaliste rattaché. Le contact presse fiable reste l'email rédaction ci-dessus (+ le directeur de publication en mentions légales). »
+
+### /media/$mediaId  [ERREUR]  => ERREUR explicite
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=10 html=412o boutons=0
+    « 📰Média introuvableCe média n'existe pas ou a été supprimé. »
+
+### /media/$mediaId  [REFUS]  => ERREUR explicite
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=10 html=412o boutons=0
+    « 📰Média introuvableCe média n'existe pas ou a été supprimé. »
+
+### /journalists  [EN-VOL]  => CHARGEMENT (texte)
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=44 html=5713o boutons=3
+    « JournalistesContacts rédaction · 0 journalistesExporter CSVTotal0Page 1Avec email0sur la pageOpt-out0opposition RGPDChargement…Page 1 / 1← PrécédentSuivant → »
+
+### /journalists  [VIDE]  => VIDE annonce
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=47 html=5950o boutons=3
+    « JournalistesContacts rédaction · 0 journalistesExporter CSVTotal0Page 1Avec email0sur la pageOpt-out0opposition RGPD🎙️Aucun journalisteLa base des journalistes se remplira quand l'extraction des rédactions (Phase 3, RGPD-encadrée) sera lancée.Page 1 / 1← PrécédentSuivant → »
+
+### /journalists  [ERREUR]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=47 html=5950o boutons=3
+    « JournalistesContacts rédaction · 0 journalistesExporter CSVTotal0Page 1Avec email0sur la pageOpt-out0opposition RGPD🎙️Aucun journalisteLa base des journalistes se remplira quand l'extraction des rédactions (Phase 3, RGPD-encadrée) sera lancée.Page 1 / 1← PrécédentSuivant → »
+
+### /journalists  [REFUS]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=47 html=5950o boutons=3
+    « JournalistesContacts rédaction · 0 journalistesExporter CSVTotal0Page 1Avec email0sur la pageOpt-out0opposition RGPD🎙️Aucun journalisteLa base des journalistes se remplira quand l'extraction des rédactions (Phase 3, RGPD-encadrée) sera lancée.Page 1 / 1← PrécédentSuivant → »
+
+### /international/roumanie  [EN-VOL]  => CHARGEMENT (texte)
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=26 html=3222o boutons=13
+    « Présence française — RoumanieEntreprises françaises implantées, entités locales et organismes francophones. Collecte : annuaire public CCIFER + DG Trésor.ToutEntreprisesAssociationsCabinetsEnseignementInstitutionsChambres de commerceMédiasTousProspectablesPartielsPendingArchivésChargement… »
+
+### /international/roumanie  [VIDE]  => VIDE annonce
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=44 html=4146o boutons=15
+    « Présence française — RoumanieEntreprises françaises implantées, entités locales et organismes francophones. Collecte : annuaire public CCIFER + DG Trésor.ToutEntreprisesAssociationsCabinetsEnseignementInstitutionsChambres de commerceMédiasTousProspectablesPartielsPendingArchivés0 ficheDénominationNatureVilleE-mailTéléphoneSiteStatutAucune fiche pour cette nature.PrécédentPage 1Suivant »
+
+### /international/roumanie  [ERREUR]  => ERREUR explicite
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=26 html=3250o boutons=13
+    « Présence française — RoumanieEntreprises françaises implantées, entités locales et organismes francophones. Collecte : annuaire public CCIFER + DG Trésor.ToutEntreprisesAssociationsCabinetsEnseignementInstitutionsChambres de commerceMédiasTousProspectablesPartielsPendingArchivésImpossible de charger le vivier Roumanie. »
+
+### /international/roumanie  [REFUS]  => ERREUR explicite
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=26 html=3250o boutons=13
+    « Présence française — RoumanieEntreprises françaises implantées, entités locales et organismes francophones. Collecte : annuaire public CCIFER + DG Trésor.ToutEntreprisesAssociationsCabinetsEnseignementInstitutionsChambres de commerceMédiasTousProspectablesPartielsPendingArchivésImpossible de charger le vivier Roumanie. »
+
+### /console/contacts  [EN-VOL]  => CHARGEMENT (squelette)
+    DOM : pulse=8 spin=0 ariaBusy=0 elements=83 html=10162o boutons=12
+    « ContactsTous les types — Contacts actifsClients0Prospects0Opportunités0Dormants0Tous0Prospects0Clients0Presse & médias0Partenaires0Investisseurs0Conférences0Newsletter0Fournisseurs0Tous paysFranceRoumanieTous statutsContactables (e-mail exploitable)Partiels (e-mail incertain)Collectés, pas encore enrichisSans e-mail (archivés)Contacts actifsProspection (base froide)Tout »
+
+### /console/contacts  [VIDE]  => VIDE annonce
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=77 html=9861o boutons=12
+    « ContactsTous les types — Contacts actifsClients0Prospects0Opportunités0Dormants0Tous0Prospects0Clients0Presse & médias0Partenaires0Investisseurs0Conférences0Newsletter0Fournisseurs0Tous paysFranceRoumanieTous statutsContactables (e-mail exploitable)Partiels (e-mail incertain)Collectés, pas encore enrichisSans e-mail (archivés)Contacts actifsProspection (base froide)ToutAucun contact dans cette vueLes fiches arrivent automatiquement depuis le site (formulaires, RDV, avis) — rien à créer ici. »
+
+### /console/contacts  [ERREUR]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=77 html=9861o boutons=12
+    « ContactsTous les types — Contacts actifsClients0Prospects0Opportunités0Dormants0Tous0Prospects0Clients0Presse & médias0Partenaires0Investisseurs0Conférences0Newsletter0Fournisseurs0Tous paysFranceRoumanieTous statutsContactables (e-mail exploitable)Partiels (e-mail incertain)Collectés, pas encore enrichisSans e-mail (archivés)Contacts actifsProspection (base froide)ToutAucun contact dans cette vueLes fiches arrivent automatiquement depuis le site (formulaires, RDV, avis) — rien à créer ici. »
+
+### /console/contacts  [REFUS]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=77 html=9861o boutons=12
+    « ContactsTous les types — Contacts actifsClients0Prospects0Opportunités0Dormants0Tous0Prospects0Clients0Presse & médias0Partenaires0Investisseurs0Conférences0Newsletter0Fournisseurs0Tous paysFranceRoumanieTous statutsContactables (e-mail exploitable)Partiels (e-mail incertain)Collectés, pas encore enrichisSans e-mail (archivés)Contacts actifsProspection (base froide)ToutAucun contact dans cette vueLes fiches arrivent automatiquement depuis le site (formulaires, RDV, avis) — rien à créer ici. »
+
+### /console/vivier  [EN-VOL]  => CHARGEMENT (squelette)
+    DOM : pulse=8 spin=0 ariaBusy=0 elements=60 html=7060o boutons=5
+    « Vivier candidatsUnivers étanche — base légale et durées de conservation distinctes de la base commerciale.À qualifier0Présélection0Entretien0Conservés en vivier0Tous les candidats0Commercial0Vidéo0Tech0Autres métiers0 »
+
+### /console/vivier  [VIDE]  => VIDE annonce
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=54 html=6752o boutons=5
+    « Vivier candidatsUnivers étanche — base légale et durées de conservation distinctes de la base commerciale.À qualifier0Présélection0Entretien0Conservés en vivier0Tous les candidats0Commercial0Vidéo0Tech0Autres métiers0Aucun candidat dans cette vueLes candidatures arrivent depuis le site, avec leur consentement v2 — rien à créer ici. »
+
+### /console/vivier  [ERREUR]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=54 html=6752o boutons=5
+    « Vivier candidatsUnivers étanche — base légale et durées de conservation distinctes de la base commerciale.À qualifier0Présélection0Entretien0Conservés en vivier0Tous les candidats0Commercial0Vidéo0Tech0Autres métiers0Aucun candidat dans cette vueLes candidatures arrivent depuis le site, avec leur consentement v2 — rien à créer ici. »
+
+### /console/vivier  [REFUS]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=54 html=6752o boutons=5
+    « Vivier candidatsUnivers étanche — base légale et durées de conservation distinctes de la base commerciale.À qualifier0Présélection0Entretien0Conservés en vivier0Tous les candidats0Commercial0Vidéo0Tech0Autres métiers0Aucun candidat dans cette vueLes candidatures arrivent depuis le site, avec leur consentement v2 — rien à créer ici. »
+
+### /console/arbitrage  [EN-VOL]  => CHARGEMENT (squelette)
+    DOM : pulse=5 spin=0 ariaBusy=0 elements=16 html=928o boutons=0
+    « Rapprochements à arbitrer0 événement(s) reçus sans SIREN — à rattacher ou à écarter. »
+
+### /console/arbitrage  [VIDE]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=13 html=806o boutons=0
+    « Rapprochements à arbitrer0 événement(s) reçus sans SIREN — à rattacher ou à écarter.Rien à arbitrerTous les événements entrants ont trouvé leur entreprise. »
+
+### /console/arbitrage  [ERREUR]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=13 html=806o boutons=0
+    « Rapprochements à arbitrer0 événement(s) reçus sans SIREN — à rattacher ou à écarter.Rien à arbitrerTous les événements entrants ont trouvé leur entreprise. »
+
+### /console/arbitrage  [REFUS]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=13 html=806o boutons=0
+    « Rapprochements à arbitrer0 événement(s) reçus sans SIREN — à rattacher ou à écarter.Rien à arbitrerTous les événements entrants ont trouvé leur entreprise. »
+
+### /console/personnes/$personKey  [EN-VOL]  => CHARGEMENT (squelette, sans texte)
+    DOM : pulse=6 spin=0 ariaBusy=0 elements=13 html=560o boutons=0
+    «  »
+
+### /console/personnes/$personKey  [VIDE]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=13 html=607o boutons=1
+    « Something went wrong!Hide ErrorCannot read properties of undefined (reading 'business') »
+
+### /console/personnes/$personKey  [ERREUR]  => ERREUR explicite (+ zeros affiches)
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=9 html=361o boutons=0
+    « Fiche introuvableCette personne n’existe dans aucun univers accessible. »
+
+### /console/personnes/$personKey  [REFUS]  => ERREUR explicite (+ zeros affiches)
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=9 html=361o boutons=0
+    « Fiche introuvableCette personne n’existe dans aucun univers accessible. »
+
+### /campaigns  [EN-VOL]  => CHARGEMENT (squelette)
+    DOM : pulse=24 spin=0 ariaBusy=0 elements=96 html=11049o boutons=7
+    « En direct· actualisé toutes les 10sCollectesLance et supervise des campagnes multi-sources avec budgets et auto-pause anti-blacklist.Nouvelle campagneTotal0campagnesEn cours0en exécutionTerminées0succès completsEntreprises créées0cumul toutes campagnesToutes0Brouillons0Planifiées0En cours0En pause0Terminées0 »
+
+### /campaigns  [VIDE]  => VIDE annonce
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=77 html=10021o boutons=8
+    « En direct· actualisé toutes les 10sCollectesLance et supervise des campagnes multi-sources avec budgets et auto-pause anti-blacklist.Nouvelle campagneTotal0campagnesEn cours0en exécutionTerminées0succès completsEntreprises créées0cumul toutes campagnesToutes0Brouillons0Planifiées0En cours0En pause0Terminées0Aucune campagne pour l’instantLance ta première campagne en 3 clics : zones cibles, sources, budget.Créer une campagne »
+
+### /campaigns  [ERREUR]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=77 html=10021o boutons=8
+    « En direct· actualisé toutes les 10sCollectesLance et supervise des campagnes multi-sources avec budgets et auto-pause anti-blacklist.Nouvelle campagneTotal0campagnesEn cours0en exécutionTerminées0succès completsEntreprises créées0cumul toutes campagnesToutes0Brouillons0Planifiées0En cours0En pause0Terminées0Aucune campagne pour l’instantLance ta première campagne en 3 clics : zones cibles, sources, budget.Créer une campagne »
+
+### /campaigns  [REFUS]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=77 html=10021o boutons=8
+    « En direct· actualisé toutes les 10sCollectesLance et supervise des campagnes multi-sources avec budgets et auto-pause anti-blacklist.Nouvelle campagneTotal0campagnesEn cours0en exécutionTerminées0succès completsEntreprises créées0cumul toutes campagnesToutes0Brouillons0Planifiées0En cours0En pause0Terminées0Aucune campagne pour l’instantLance ta première campagne en 3 clics : zones cibles, sources, budget.Créer une campagne »
+
+### /campaigns/$campaignId  [EN-VOL]  => CHARGEMENT (spinner seul, sans texte)
+    DOM : pulse=0 spin=1 ariaBusy=0 elements=9 html=373o boutons=0
+    «  »
+
+### /campaigns/$campaignId  [VIDE]  => CHARGEMENT (spinner seul, sans texte)
+    DOM : pulse=0 spin=1 ariaBusy=0 elements=9 html=373o boutons=0
+    «  »
+
+### /campaigns/$campaignId  [ERREUR]  => CHARGEMENT (spinner seul, sans texte)
+    DOM : pulse=0 spin=1 ariaBusy=0 elements=9 html=373o boutons=0
+    «  »
+
+### /campaigns/$campaignId  [REFUS]  => CHARGEMENT (spinner seul, sans texte)
+    DOM : pulse=0 spin=1 ariaBusy=0 elements=9 html=373o boutons=0
+    «  »
+
+### /scraper-runs  [EN-VOL]  => CHARGEMENT (squelette)
+    DOM : pulse=57 spin=0 ariaBusy=1 elements=137 html=13558o boutons=7
+    « En direct· actualisé toutes les 10sJournaux de collecteMonitoring des jobs de scraping en temps réel.Exporter en CSVTotal0runs sur la fenêtreEn cours0en coursTaux de succès0%0 OK / 0 closÉchecs0aucun échecTous0En cours0En attente0Terminés0Échec0Annulés00 run »
+
+### /scraper-runs  [VIDE]  => ERREUR explicite (+ zeros affiches)
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=78 html=10135o boutons=9
+    « En direct· actualisé toutes les 10sJournaux de collecteMonitoring des jobs de scraping en temps réel.Exporter en CSVTotal0runs sur la fenêtreEn cours0en coursTaux de succès0%0 OK / 0 closÉchecs0aucun échecTous0En cours0En attente0Terminés0Échec0Annulés00 runAucun run pour l’instantLance ton premier scrape depuis la page Couverture France.Lancer un scrape »
+
+### /scraper-runs  [ERREUR]  => ERREUR explicite (+ zeros affiches)
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=78 html=10135o boutons=9
+    « En direct· actualisé toutes les 10sJournaux de collecteMonitoring des jobs de scraping en temps réel.Exporter en CSVTotal0runs sur la fenêtreEn cours0en coursTaux de succès0%0 OK / 0 closÉchecs0aucun échecTous0En cours0En attente0Terminés0Échec0Annulés00 runAucun run pour l’instantLance ton premier scrape depuis la page Couverture France.Lancer un scrape »
+
+### /scraper-runs  [REFUS]  => ERREUR explicite (+ zeros affiches)
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=78 html=10135o boutons=9
+    « En direct· actualisé toutes les 10sJournaux de collecteMonitoring des jobs de scraping en temps réel.Exporter en CSVTotal0runs sur la fenêtreEn cours0en coursTaux de succès0%0 OK / 0 closÉchecs0aucun échecTous0En cours0En attente0Terminés0Échec0Annulés00 runAucun run pour l’instantLance ton premier scrape depuis la page Couverture France.Lancer un scrape »
+
+### /audiences  [EN-VOL]  => CHARGEMENT (squelette)
+    DOM : pulse=24 spin=0 ariaBusy=0 elements=65 html=6523o boutons=1
+    « AudiencesSegments dynamiques d'entreprises et contacts, prêts pour campagne email.Nouvelle audienceTotal audiences0segments configurésActives0exécutées au refresh autoMembres cumul0entreprises × audiences »
+
+### /audiences  [VIDE]  => VIDE annonce
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=47 html=5577o boutons=2
+    « AudiencesSegments dynamiques d'entreprises et contacts, prêts pour campagne email.Nouvelle audienceTotal audiences0segments configurésActives0exécutées au refresh autoMembres cumul0entreprises × audiencesAucune audience pour l'instantCrée ton premier segment dynamique : filtre par département, taille, secteur, statut prospect…Créer une audience »
+
+### /audiences  [ERREUR]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=47 html=5577o boutons=2
+    « AudiencesSegments dynamiques d'entreprises et contacts, prêts pour campagne email.Nouvelle audienceTotal audiences0segments configurésActives0exécutées au refresh autoMembres cumul0entreprises × audiencesAucune audience pour l'instantCrée ton premier segment dynamique : filtre par département, taille, secteur, statut prospect…Créer une audience »
+
+### /audiences  [REFUS]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=47 html=5577o boutons=2
+    « AudiencesSegments dynamiques d'entreprises et contacts, prêts pour campagne email.Nouvelle audienceTotal audiences0segments configurésActives0exécutées au refresh autoMembres cumul0entreprises × audiencesAucune audience pour l'instantCrée ton premier segment dynamique : filtre par département, taille, secteur, statut prospect…Créer une audience »
+
+### /audiences/$audienceId  [EN-VOL]  => CHARGEMENT (spinner seul, sans texte)
+    DOM : pulse=0 spin=1 ariaBusy=0 elements=9 html=373o boutons=0
+    «  »
+
+### /audiences/$audienceId  [VIDE]  => CHARGEMENT (spinner seul, sans texte)
+    DOM : pulse=0 spin=1 ariaBusy=0 elements=9 html=373o boutons=0
+    «  »
+
+### /audiences/$audienceId  [ERREUR]  => CHARGEMENT (spinner seul, sans texte)
+    DOM : pulse=0 spin=1 ariaBusy=0 elements=9 html=373o boutons=0
+    «  »
+
+### /audiences/$audienceId  [REFUS]  => CHARGEMENT (spinner seul, sans texte)
+    DOM : pulse=0 spin=1 ariaBusy=0 elements=9 html=373o boutons=0
+    «  »
+
+### /admin/observability  [EN-VOL]  => CHARGEMENT (texte)
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=6 html=87o boutons=0
+    « Chargement de l'observabilité… »
+
+### /admin/observability  [VIDE]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=13 html=603o boutons=1
+    « Something went wrong!Hide ErrorCannot read properties of undefined (reading 'used') »
+
+### /admin/observability  [ERREUR]  => ERREUR explicite
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=6 html=108o boutons=0
+    « Impossible de charger les métriques d'observabilité. »
+
+### /admin/observability  [REFUS]  => ERREUR explicite
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=6 html=108o boutons=0
+    « Impossible de charger les métriques d'observabilité. »
+
+### /rgpd/requests  [EN-VOL]  => CHARGEMENT (squelette)
+    DOM : pulse=6 spin=0 ariaBusy=1 elements=32 html=3706o boutons=7
+    « Requêtes RGPDArticles 15-22 : accès / portabilité / suppression / rectification / opposition.Nouvelle requêteToutesAccès · art. 15Portabilité · art. 20Suppression · art. 17Rectification · art. 16Opposition · art. 21 »
+
+### /rgpd/requests  [VIDE]  => VIDE annonce
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=43 html=5161o boutons=8
+    « Requêtes RGPDArticles 15-22 : accès / portabilité / suppression / rectification / opposition.Nouvelle requêteToutesAccès · art. 15Portabilité · art. 20Suppression · art. 17Rectification · art. 16Opposition · art. 21Aucune requête RGPDLes requêtes apparaitront ici après création par les sujets concernés.Créer une requête »
+
+### /rgpd/requests  [ERREUR]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=43 html=5161o boutons=8
+    « Requêtes RGPDArticles 15-22 : accès / portabilité / suppression / rectification / opposition.Nouvelle requêteToutesAccès · art. 15Portabilité · art. 20Suppression · art. 17Rectification · art. 16Opposition · art. 21Aucune requête RGPDLes requêtes apparaitront ici après création par les sujets concernés.Créer une requête »
+
+### /rgpd/requests  [REFUS]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=43 html=5161o boutons=8
+    « Requêtes RGPDArticles 15-22 : accès / portabilité / suppression / rectification / opposition.Nouvelle requêteToutesAccès · art. 15Portabilité · art. 20Suppression · art. 17Rectification · art. 16Opposition · art. 21Aucune requête RGPDLes requêtes apparaitront ici après création par les sujets concernés.Créer une requête »
+
+### /rgpd/ai-act  [EN-VOL]  => CHARGEMENT (squelette)
+    DOM : pulse=4 spin=0 ariaBusy=1 elements=63 html=5772o boutons=0
+    « Registre AI ActConformité UE 2024/1689 — systèmes IA + classification risque + supervision humaine documentés.Article 9 AI Act — tout système classé high doit être documenté ici avec DPIA, mesures de mitigation, supervision humaine et révision annuelle.Total registres0Risque élevé0dont prohibésEn production0—Dernière revue—Annuelle obligatoire »
+
+### /rgpd/ai-act  [VIDE]  => VIDE annonce
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=69 html=6287o boutons=0
+    « Registre AI ActConformité UE 2024/1689 — systèmes IA + classification risque + supervision humaine documentés.Article 9 AI Act — tout système classé high doit être documenté ici avec DPIA, mesures de mitigation, supervision humaine et révision annuelle.Total registres0Risque élevé0dont prohibésEn production0—Dernière revue—Annuelle obligatoireAucun système IA enregistréLe LLM Router devrait apparaître ici après seed initial (AiActRegisterSeeder). »
+
+### /rgpd/ai-act  [ERREUR]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=69 html=6287o boutons=0
+    « Registre AI ActConformité UE 2024/1689 — systèmes IA + classification risque + supervision humaine documentés.Article 9 AI Act — tout système classé high doit être documenté ici avec DPIA, mesures de mitigation, supervision humaine et révision annuelle.Total registres0Risque élevé0dont prohibésEn production0—Dernière revue—Annuelle obligatoireAucun système IA enregistréLe LLM Router devrait apparaître ici après seed initial (AiActRegisterSeeder). »
+
+### /rgpd/ai-act  [REFUS]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=69 html=6287o boutons=0
+    « Registre AI ActConformité UE 2024/1689 — systèmes IA + classification risque + supervision humaine documentés.Article 9 AI Act — tout système classé high doit être documenté ici avec DPIA, mesures de mitigation, supervision humaine et révision annuelle.Total registres0Risque élevé0dont prohibésEn production0—Dernière revue—Annuelle obligatoireAucun système IA enregistréLe LLM Router devrait apparaître ici après seed initial (AiActRegisterSeeder). »
+
+### /audit-logs  [EN-VOL]  => CHARGEMENT (squelette)
+    DOM : pulse=11 spin=0 ariaBusy=1 elements=40 html=3715o boutons=1
+    « Journaux d’auditJournal append-only avec chaîne cryptographique SHA-256 vérifiable.Vérifier la chaîneToutes sévéritésInfoAttentionErreurCritique »
+
+### /audit-logs  [VIDE]  => ERREUR explicite (+ zeros affiches)
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=37 html=3813o boutons=1
+    « Journaux d’auditJournal append-only avec chaîne cryptographique SHA-256 vérifiable.Vérifier la chaîneToutes sévéritésInfoAttentionErreurCritiqueAucun journal d'auditLes événements sensibles (auth, RGPD, admin) seront tracés ici de manière append-only. »
+
+### /audit-logs  [ERREUR]  => ERREUR explicite (+ zeros affiches)
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=37 html=3813o boutons=1
+    « Journaux d’auditJournal append-only avec chaîne cryptographique SHA-256 vérifiable.Vérifier la chaîneToutes sévéritésInfoAttentionErreurCritiqueAucun journal d'auditLes événements sensibles (auth, RGPD, admin) seront tracés ici de manière append-only. »
+
+### /audit-logs  [REFUS]  => ERREUR explicite (+ zeros affiches)
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=37 html=3813o boutons=1
+    « Journaux d’auditJournal append-only avec chaîne cryptographique SHA-256 vérifiable.Vérifier la chaîneToutes sévéritésInfoAttentionErreurCritiqueAucun journal d'auditLes événements sensibles (auth, RGPD, admin) seront tracés ici de manière append-only. »
+
+### /users  [EN-VOL]  => CHARGEMENT (squelette)
+    DOM : pulse=6 spin=0 ariaBusy=1 elements=24 html=2006o boutons=1
+    « Utilisateurs4 rôles RBAC : owner / admin / operator / viewer (Spatie Permission teams).Inviter un utilisateur »
+
+### /users  [VIDE]  => VIDE annonce
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=33 html=3358o boutons=2
+    « Utilisateurs4 rôles RBAC : owner / admin / operator / viewer (Spatie Permission teams).Inviter un utilisateurAucun utilisateurInvite ton premier collaborateur.Inviter »
+
+### /users  [ERREUR]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=33 html=3358o boutons=2
+    « Utilisateurs4 rôles RBAC : owner / admin / operator / viewer (Spatie Permission teams).Inviter un utilisateurAucun utilisateurInvite ton premier collaborateur.Inviter »
+
+### /users  [REFUS]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=33 html=3358o boutons=2
+    « Utilisateurs4 rôles RBAC : owner / admin / operator / viewer (Spatie Permission teams).Inviter un utilisateurAucun utilisateurInvite ton premier collaborateur.Inviter »
+
+### /settings  [EN-VOL]  => CHARGEMENT (texte)
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=44 html=4988o boutons=4
+    « ParamètresWorkspace, intégrations, observabilité, apparence. Workspace : …WorkspaceIntégrationsObservabilitéApparenceWorkspaceIdentité et limitesChargement… »
+
+### /settings  [VIDE]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=61 html=7329o boutons=5
+    « ParamètresWorkspace, intégrations, observabilité, apparence. Workspace : WorkspaceIntégrationsObservabilitéApparenceWorkspaceIdentité et limitesNomSlug (URL)Non modifiablePlafond LLM mensuel (€)Kill-switch automatique LLM quand atteintEnregistrer »
+
+### /settings  [ERREUR]  => BLOQUE SUR CHARGEMENT
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=44 html=4988o boutons=4
+    « ParamètresWorkspace, intégrations, observabilité, apparence. Workspace : …WorkspaceIntégrationsObservabilitéApparenceWorkspaceIdentité et limitesChargement… »
+
+### /settings  [REFUS]  => BLOQUE SUR CHARGEMENT
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=44 html=4988o boutons=4
+    « ParamètresWorkspace, intégrations, observabilité, apparence. Workspace : …WorkspaceIntégrationsObservabilitéApparenceWorkspaceIdentité et limitesChargement… »
+
+### /tags  [EN-VOL]  => CHARGEMENT (squelette)
+    DOM : pulse=3 spin=0 ariaBusy=0 elements=44 html=4883o boutons=1
+    « TagsClassification multi-axes des entreprises (géographie, secteur, taille, intent, custom).Nouveau tagTotal tags0tous axes confondusAuto0géo, secteur, tailleManuel0créés par l'équipeLLM0intent classification IA »
+
+### /tags  [VIDE]  => VIDE annonce
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=54 html=6352o boutons=2
+    « TagsClassification multi-axes des entreprises (géographie, secteur, taille, intent, custom).Nouveau tagTotal tags0tous axes confondusAuto0géo, secteur, tailleManuel0créés par l'équipeLLM0intent classification IAAucun tagCrée ton premier tag manuel ou attends que le pipeline d'enrichissement génère les tags auto.Créer un tag »
+
+### /tags  [ERREUR]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=54 html=6352o boutons=2
+    « TagsClassification multi-axes des entreprises (géographie, secteur, taille, intent, custom).Nouveau tagTotal tags0tous axes confondusAuto0géo, secteur, tailleManuel0créés par l'équipeLLM0intent classification IAAucun tagCrée ton premier tag manuel ou attends que le pipeline d'enrichissement génère les tags auto.Créer un tag »
+
+### /tags  [REFUS]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=54 html=6352o boutons=2
+    « TagsClassification multi-axes des entreprises (géographie, secteur, taille, intent, custom).Nouveau tagTotal tags0tous axes confondusAuto0géo, secteur, tailleManuel0créés par l'équipeLLM0intent classification IAAucun tagCrée ton premier tag manuel ou attends que le pipeline d'enrichissement génère les tags auto.Créer un tag »
+
+### /llm/router  [EN-VOL]  => CHARGEMENT (squelette)
+    DOM : pulse=6 spin=0 ariaBusy=1 elements=42 html=3753o boutons=4
+    « LLM Router9 use cases × 5 providers + fallback chain + cost tracking + idempotency cache 24h.Cas d'usageFournisseursPromptsUsage 30j »
+
+### /llm/router  [VIDE]  => VIDE annonce
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=46 html=4129o boutons=4
+    « LLM Router9 use cases × 5 providers + fallback chain + cost tracking + idempotency cache 24h.Cas d'usageFournisseursPromptsUsage 30jAucun cas d'usage configuréLes cas d'usage LLM sont initialisés au déploiement (LlmUseCaseSeeder). »
+
+### /llm/router  [ERREUR]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=46 html=4129o boutons=4
+    « LLM Router9 use cases × 5 providers + fallback chain + cost tracking + idempotency cache 24h.Cas d'usageFournisseursPromptsUsage 30jAucun cas d'usage configuréLes cas d'usage LLM sont initialisés au déploiement (LlmUseCaseSeeder). »
+
+### /llm/router  [REFUS]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=46 html=4129o boutons=4
+    « LLM Router9 use cases × 5 providers + fallback chain + cost tracking + idempotency cache 24h.Cas d'usageFournisseursPromptsUsage 30jAucun cas d'usage configuréLes cas d'usage LLM sont initialisés au déploiement (LlmUseCaseSeeder). »
+
+### /llm/proxy-providers  [EN-VOL]  => CHARGEMENT (squelette)
+    DOM : pulse=5 spin=0 ariaBusy=1 elements=16 html=882o boutons=0
+    « Fournisseurs de proxiesWebshare datacenter + IPRoyal résidentiel + Mock — bascule automatique selon zone. »
+
+### /llm/proxy-providers  [VIDE]  => ERREUR explicite (+ zeros affiches)
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=22 html=2230o boutons=1
+    « Fournisseurs de proxiesWebshare datacenter + IPRoyal résidentiel + Mock — bascule automatique selon zone.Aucun fournisseur configuréConfigure WEBSHARE_API_KEY ou IPROYAL_USERNAME dans .env serveur pour activer les proxies.Voir la documentation »
+
+### /llm/proxy-providers  [ERREUR]  => ERREUR explicite (+ zeros affiches)
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=22 html=2230o boutons=1
+    « Fournisseurs de proxiesWebshare datacenter + IPRoyal résidentiel + Mock — bascule automatique selon zone.Aucun fournisseur configuréConfigure WEBSHARE_API_KEY ou IPROYAL_USERNAME dans .env serveur pour activer les proxies.Voir la documentation »
+
+### /llm/proxy-providers  [REFUS]  => ERREUR explicite (+ zeros affiches)
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=22 html=2230o boutons=1
+    « Fournisseurs de proxiesWebshare datacenter + IPRoyal résidentiel + Mock — bascule automatique selon zone.Aucun fournisseur configuréConfigure WEBSHARE_API_KEY ou IPROYAL_USERNAME dans .env serveur pour activer les proxies.Voir la documentation »
+
+### /llm/rotations  [EN-VOL]  => CHARGEMENT (squelette)
+    DOM : pulse=6 spin=0 ariaBusy=1 elements=17 html=950o boutons=0
+    « Rotations5 dimensions de rotation : proxies + user-agents + targets + moteurs de recherche + LLM providers. »
+
+### /llm/rotations  [VIDE]  => VIDE annonce
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=19 html=1313o boutons=0
+    « Rotations5 dimensions de rotation : proxies + user-agents + targets + moteurs de recherche + LLM providers.Aucune rotation configuréeConfigure des rotations pour fluidifier le scraping et éviter le rate-limiting des providers. »
+
+### /llm/rotations  [ERREUR]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=19 html=1313o boutons=0
+    « Rotations5 dimensions de rotation : proxies + user-agents + targets + moteurs de recherche + LLM providers.Aucune rotation configuréeConfigure des rotations pour fluidifier le scraping et éviter le rate-limiting des providers. »
+
+### /llm/rotations  [REFUS]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=19 html=1313o boutons=0
+    « Rotations5 dimensions de rotation : proxies + user-agents + targets + moteurs de recherche + LLM providers.Aucune rotation configuréeConfigure des rotations pour fluidifier le scraping et éviter le rate-limiting des providers. »
+
+### /coverage  [EN-VOL]  => contenu sans marqueur de chargement
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=13 html=577o boutons=1
+    « Something went wrong!Hide ErrorFailed to initialize WebGL »
+
+### /coverage  [VIDE]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=13 html=577o boutons=1
+    « Something went wrong!Hide ErrorFailed to initialize WebGL »
+
+### /coverage  [ERREUR]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=13 html=577o boutons=1
+    « Something went wrong!Hide ErrorFailed to initialize WebGL »
+
+### /coverage  [REFUS]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=13 html=577o boutons=1
+    « Something went wrong!Hide ErrorFailed to initialize WebGL »
+
+### /campaigns/new  [EN-VOL]  => contenu sans marqueur de chargement
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=63 html=7257o boutons=5
+    « Collectes/NouvelleNouvelle campagneConfigure ta campagne en 4 étapes : identité, zones, sources, budget.1Identité2Zones3Sources4Budget & sécuritéIdentitéNom et description visibles dans la liste des campagnes.Nom de la campagne *Description (optionnel) Planification Lancer maintenantPlanifier plus tardAnnulerContinuer »
+
+### /campaigns/new  [VIDE]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=63 html=7257o boutons=5
+    « Collectes/NouvelleNouvelle campagneConfigure ta campagne en 4 étapes : identité, zones, sources, budget.1Identité2Zones3Sources4Budget & sécuritéIdentitéNom et description visibles dans la liste des campagnes.Nom de la campagne *Description (optionnel) Planification Lancer maintenantPlanifier plus tardAnnulerContinuer »
+
+### /campaigns/new  [ERREUR]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=63 html=7257o boutons=5
+    « Collectes/NouvelleNouvelle campagneConfigure ta campagne en 4 étapes : identité, zones, sources, budget.1Identité2Zones3Sources4Budget & sécuritéIdentitéNom et description visibles dans la liste des campagnes.Nom de la campagne *Description (optionnel) Planification Lancer maintenantPlanifier plus tardAnnulerContinuer »
+
+### /campaigns/new  [REFUS]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=63 html=7257o boutons=5
+    « Collectes/NouvelleNouvelle campagneConfigure ta campagne en 4 étapes : identité, zones, sources, budget.1Identité2Zones3Sources4Budget & sécuritéIdentitéNom et description visibles dans la liste des campagnes.Nom de la campagne *Description (optionnel) Planification Lancer maintenantPlanifier plus tardAnnulerContinuer »
+
+### /audiences/new  [EN-VOL]  => *** AFFIRME 0 PENDANT LE CHARGEMENT ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=273 html=28795o boutons=45
+    « Audiences/NouvelleNouvelle audienceCompose un segment dynamique. La preview se met à jour à chaque modification.InformationsNom *Description (optionnel) GéographieDépartements Aucun département75Paris92Hauts-de-Seine93Seine-Saint-Denis69Rhône13Bouches-du-Rhône33Gironde31Haute-Garonne59Nord67Bas-Rhin44Loire-AtlantiqueRégions Aucune région11Île-de-France24Centre-Val de Loire27Bourgogne-Franche-Comté28Normandie32Hauts-de-France44Grand Est52Pays de la Loire53Bretagne75Nouvelle-Aquitaine76Occitanie84Auvergne-Rhône-Alpes93Provence-Alpes-Côte d'Azur94CorseTaille et secteurTailles d'entreprise Toutes  »
+
+### /audiences/new  [VIDE]  => VIDE annonce
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=273 html=28795o boutons=45
+    « Audiences/NouvelleNouvelle audienceCompose un segment dynamique. La preview se met à jour à chaque modification.InformationsNom *Description (optionnel) GéographieDépartements Aucun département75Paris92Hauts-de-Seine93Seine-Saint-Denis69Rhône13Bouches-du-Rhône33Gironde31Haute-Garonne59Nord67Bas-Rhin44Loire-AtlantiqueRégions Aucune région11Île-de-France24Centre-Val de Loire27Bourgogne-Franche-Comté28Normandie32Hauts-de-France44Grand Est52Pays de la Loire53Bretagne75Nouvelle-Aquitaine76Occitanie84Auvergne-Rhône-Alpes93Provence-Alpes-Côte d'Azur94CorseTaille et secteurTailles d'entreprise Toutes  »
+
+### /audiences/new  [ERREUR]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=273 html=28795o boutons=45
+    « Audiences/NouvelleNouvelle audienceCompose un segment dynamique. La preview se met à jour à chaque modification.InformationsNom *Description (optionnel) GéographieDépartements Aucun département75Paris92Hauts-de-Seine93Seine-Saint-Denis69Rhône13Bouches-du-Rhône33Gironde31Haute-Garonne59Nord67Bas-Rhin44Loire-AtlantiqueRégions Aucune région11Île-de-France24Centre-Val de Loire27Bourgogne-Franche-Comté28Normandie32Hauts-de-France44Grand Est52Pays de la Loire53Bretagne75Nouvelle-Aquitaine76Occitanie84Auvergne-Rhône-Alpes93Provence-Alpes-Côte d'Azur94CorseTaille et secteurTailles d'entreprise Toutes  »
+
+### /audiences/new  [REFUS]  => *** AFFIRME 0/AUCUN ***
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=273 html=28795o boutons=45
+    « Audiences/NouvelleNouvelle audienceCompose un segment dynamique. La preview se met à jour à chaque modification.InformationsNom *Description (optionnel) GéographieDépartements Aucun département75Paris92Hauts-de-Seine93Seine-Saint-Denis69Rhône13Bouches-du-Rhône33Gironde31Haute-Garonne59Nord67Bas-Rhin44Loire-AtlantiqueRégions Aucune région11Île-de-France24Centre-Val de Loire27Bourgogne-Franche-Comté28Normandie32Hauts-de-France44Grand Est52Pays de la Loire53Bretagne75Nouvelle-Aquitaine76Occitanie84Auvergne-Rhône-Alpes93Provence-Alpes-Côte d'Azur94CorseTaille et secteurTailles d'entreprise Toutes  »
+
+### /login  [EN-VOL]  => contenu sans marqueur de chargement
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=47 html=5230o boutons=4
+    « Axion CRM ProConnexionConnecte-toi à ton workspace Axion CRM Pro.Adresse e-mailMot de passeSe souvenir de moiSe connecterRecevoir un lien magiqueMot de passe oublié ? »
+
+### /login  [VIDE]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=47 html=5230o boutons=4
+    « Axion CRM ProConnexionConnecte-toi à ton workspace Axion CRM Pro.Adresse e-mailMot de passeSe souvenir de moiSe connecterRecevoir un lien magiqueMot de passe oublié ? »
+
+### /login  [ERREUR]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=47 html=5230o boutons=4
+    « Axion CRM ProConnexionConnecte-toi à ton workspace Axion CRM Pro.Adresse e-mailMot de passeSe souvenir de moiSe connecterRecevoir un lien magiqueMot de passe oublié ? »
+
+### /login  [REFUS]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=47 html=5230o boutons=4
+    « Axion CRM ProConnexionConnecte-toi à ton workspace Axion CRM Pro.Adresse e-mailMot de passeSe souvenir de moiSe connecterRecevoir un lien magiqueMot de passe oublié ? »
+
+### /2fa  [EN-VOL]  => contenu sans marqueur de chargement
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=28 html=3578o boutons=2
+    « Axion CRM ProCode à 6 chiffresSaisis le code à 6 chiffres généré par ton authenticator.VérifierRetour à la connexion »
+
+### /2fa  [VIDE]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=28 html=3578o boutons=2
+    « Axion CRM ProCode à 6 chiffresSaisis le code à 6 chiffres généré par ton authenticator.VérifierRetour à la connexion »
+
+### /2fa  [ERREUR]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=28 html=3578o boutons=2
+    « Axion CRM ProCode à 6 chiffresSaisis le code à 6 chiffres généré par ton authenticator.VérifierRetour à la connexion »
+
+### /2fa  [REFUS]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=28 html=3578o boutons=2
+    « Axion CRM ProCode à 6 chiffresSaisis le code à 6 chiffres généré par ton authenticator.VérifierRetour à la connexion »
+
+### /magic-link  [EN-VOL]  => contenu sans marqueur de chargement
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=32 html=3704o boutons=2
+    « Axion CRM ProRecevoir un lien magiqueReçois un lien de connexion par email — pas besoin de mot de passe.Adresse e-mailEnvoyer le lienRetour à la connexion »
+
+### /magic-link  [VIDE]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=32 html=3704o boutons=2
+    « Axion CRM ProRecevoir un lien magiqueReçois un lien de connexion par email — pas besoin de mot de passe.Adresse e-mailEnvoyer le lienRetour à la connexion »
+
+### /magic-link  [ERREUR]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=32 html=3704o boutons=2
+    « Axion CRM ProRecevoir un lien magiqueReçois un lien de connexion par email — pas besoin de mot de passe.Adresse e-mailEnvoyer le lienRetour à la connexion »
+
+### /magic-link  [REFUS]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=32 html=3704o boutons=2
+    « Axion CRM ProRecevoir un lien magiqueReçois un lien de connexion par email — pas besoin de mot de passe.Adresse e-mailEnvoyer le lienRetour à la connexion »
+
+### /password-reset  [EN-VOL]  => contenu sans marqueur de chargement
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=32 html=3800o boutons=2
+    « Axion CRM ProRéinitialiser le mot de passeSaisis l'email associé à ton compte, on t'envoie un lien sécurisé.EmailEnvoyer le lienRetour à la connexion »
+
+### /password-reset  [VIDE]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=32 html=3800o boutons=2
+    « Axion CRM ProRéinitialiser le mot de passeSaisis l'email associé à ton compte, on t'envoie un lien sécurisé.EmailEnvoyer le lienRetour à la connexion »
+
+### /password-reset  [ERREUR]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=32 html=3800o boutons=2
+    « Axion CRM ProRéinitialiser le mot de passeSaisis l'email associé à ton compte, on t'envoie un lien sécurisé.EmailEnvoyer le lienRetour à la connexion »
+
+### /password-reset  [REFUS]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=32 html=3800o boutons=2
+    « Axion CRM ProRéinitialiser le mot de passeSaisis l'email associé à ton compte, on t'envoie un lien sécurisé.EmailEnvoyer le lienRetour à la connexion »
+
+### /cold-email  [EN-VOL]  => contenu sans marqueur de chargement
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=12 html=559o boutons=0
+    « Cold emailPhase 2 — bientôt disponibleCe module est scaffoldé : DB + UI prêtes, logique métier reportée à la Phase 2. »
+
+### /cold-email  [VIDE]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=12 html=559o boutons=0
+    « Cold emailPhase 2 — bientôt disponibleCe module est scaffoldé : DB + UI prêtes, logique métier reportée à la Phase 2. »
+
+### /cold-email  [ERREUR]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=12 html=559o boutons=0
+    « Cold emailPhase 2 — bientôt disponibleCe module est scaffoldé : DB + UI prêtes, logique métier reportée à la Phase 2. »
+
+### /cold-email  [REFUS]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=12 html=559o boutons=0
+    « Cold emailPhase 2 — bientôt disponibleCe module est scaffoldé : DB + UI prêtes, logique métier reportée à la Phase 2. »
+
+### /linkedin  [EN-VOL]  => contenu sans marqueur de chargement
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=12 html=566o boutons=0
+    « LinkedIn outreachPhase 2 — bientôt disponibleCe module est scaffoldé : DB + UI prêtes, logique métier reportée à la Phase 2. »
+
+### /linkedin  [VIDE]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=12 html=566o boutons=0
+    « LinkedIn outreachPhase 2 — bientôt disponibleCe module est scaffoldé : DB + UI prêtes, logique métier reportée à la Phase 2. »
+
+### /linkedin  [ERREUR]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=12 html=566o boutons=0
+    « LinkedIn outreachPhase 2 — bientôt disponibleCe module est scaffoldé : DB + UI prêtes, logique métier reportée à la Phase 2. »
+
+### /linkedin  [REFUS]  => contenu, sans marqueur
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=12 html=566o boutons=0
+    « LinkedIn outreachPhase 2 — bientôt disponibleCe module est scaffoldé : DB + UI prêtes, logique métier reportée à la Phase 2. »
+
+### (NotFoundPage monté seul)  [EN-VOL]  => contenu sans marqueur de chargement
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=9 html=342o boutons=1
+    « 404Page introuvableRetour au tableau de bord »
+
+### (NotFoundPage monté seul)  [VIDE]  => ERREUR explicite
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=9 html=342o boutons=1
+    « 404Page introuvableRetour au tableau de bord »
+
+### (NotFoundPage monté seul)  [ERREUR]  => ERREUR explicite
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=9 html=342o boutons=1
+    « 404Page introuvableRetour au tableau de bord »
+
+### (NotFoundPage monté seul)  [REFUS]  => ERREUR explicite
+    DOM : pulse=0 spin=0 ariaBusy=0 elements=9 html=342o boutons=1
+    « 404Page introuvableRetour au tableau de bord »

@@ -188,7 +188,7 @@ L'agent 22 en comptait **12**, à l'œil, sur la seule condition que son montage
 | écran | ce qu'il fait à la place | est-ce mieux ? |
 |---|---|---|
 | `/international/roumanie` | « Impossible de charger le vivier Roumanie. » | ✅ **oui** — vrai état d'erreur |
-| `/admin/observability` | « Impossible de charger les métriques d'observabilité. » | ✅ **oui** — mais après ~93 s (§2.5) |
+| `/admin/observability` | « Impossible de charger les métriques d'observabilité. » | ✅ **oui** — mais après un long silence (§2.5) |
 | `/companies/$companyId` | « Entreprise introuvable · 404 » | ❌ **non** — impute la panne à la donnée |
 | `/media/$mediaId` | « Média introuvable » | ❌ **non** — idem |
 | `/console/personnes/$personKey` | « Fiche introuvable » | ❌ **non** — idem |
@@ -254,25 +254,33 @@ l'onglet annonce « Tous **0** » et **la fiche est visible dessous**.
 « Clients **7** · Tous **7** » avec la même fiche — la sonde lit donc bien les compteurs quand ils arrivent, et le
 « 0 » du cas A est bien la conséquence de l'échec, pas de mon jeu d'essai.
 
-### 2.5 Le délai avant le premier aveu : **~93 secondes**, chronométrées
+### 2.5 Le délai avant le premier aveu : **~93 secondes — CALCULÉES, pas chronométrées**
 
-Trois constantes du produit se composent, chacune lue dans le code :
+⚠️ **Lire d'abord le statut de ce chiffre.** J'ai voulu le chronométrer, et **je n'y suis pas arrivé** : le banc
+monté sur `/admin/observability` avec **une copie exacte du `QueryClient` de production** et un serveur qui accepte
+la connexion sans jamais répondre **n'a pas conclu** — ni le délai d'expiration d'axios ni le plafond de mon propre
+`waitFor` n'ont rendu la main sous jsdom + MSW, et j'ai dû interrompre la mesure. **Le banc est archivé
+(`bancs-de-mesure/delai.test.tsx`) avec ce résultat négatif** ; il faudra un vrai navigateur pour le chronométrer.
+
+Le chiffre ci-dessous est donc une **composition de trois constantes, chacune lue dans le code** — pas une mesure :
 
 ```
 src/lib/api.ts:9       timeout: 30_000                        -> 30 s par tentative
 src/main.tsx:19-22     retry: (count, …) => … && count < 2    -> 3 tentatives
 react-query (défaut)   retryDelay = min(1000 * 2**n, 30_000)  -> 1 s puis 2 s
-                                              30 + 1 + 30 + 2 + 30 = 93 s
+                                              30 + 1 + 30 + 2 + 30 ≈ 93 s
 ```
 
-Chronométré sur `/admin/observability`, avec **une copie exacte du `QueryClient` de production**, face à un serveur
-qui accepte la connexion et ne répond jamais — c'est-à-dire **le cas A-010 / A-009**, pas une hypothèse.
-*(Valeur mesurée : `04_PREUVES/agent-25/releve-delai.txt`.)*
+Ce que j'avance sans réserve, parce que je l'ai lu : **sur un serveur qui n'a pas répondu, l'écran fait trois
+tentatives de 30 secondes avant de renoncer**, et **rien n'est affiché entre-temps que le squelette**. C'est
+exactement le cas **A-010 / A-009**, pas une hypothèse de laboratoire.
 
 **C'est la réconciliation entre l'agent 22 et moi** : il a vu « Chargement de l'observabilité… » et conclu que
-l'état d'erreur était absent ; j'ai vu le message d'erreur. Nous avons tous les deux raison — il regardait
-**pendant** la minute et demie de silence. **Et pour les 19 écrans sans état d'erreur, ce silence n'a pas de fin** :
-passé le squelette, ils affichent « 0 » et ne se corrigent jamais.
+l'état d'erreur était absent ; j'ai vu le message d'erreur. **Nous avons tous les deux raison** — il regardait
+**pendant** l'attente, moi après. *Son relevé est d'ailleurs la meilleure preuve empirique dont on dispose que
+cette attente est longue : elle a duré plus longtemps que sa patience.*
+**Et pour les 19 écrans sans état d'erreur, ce silence n'a pas de fin** : passé le squelette, ils affichent « 0 »
+et ne se corrigent jamais.
 
 ---
 
@@ -598,13 +606,13 @@ prend une autre : c'est un saut de mise en page par construction.** *(Non chiffr
 - Correctif     : passer une **fonction** à `placeholderData` (ou la retirer : `keepPreviousData` n'a pas de sens pour une requête sans clé variable), ce qui rend `isLoading` vrai au premier chargement et réveille `DashboardSkeleton`. Coût **0,25 j**.
 - Statut        : ouvert
 
-### [D25-009] Une seule liste sur 37 tient le volume : `/users` à 10 000 lignes construit 160 025 nœuds et 18 Mo de HTML, et neuf écrans ne demandent aucune limite au serveur
+### [D25-009] Neuf écrans de liste ne demandent aucune limite au serveur et rendent tout ce qu'il envoie : `/users` à 10 000 lignes construit 160 025 nœuds et 18 Mo de HTML, et n'aboutit plus à 100 000
 - Sévérité      : **S2** défaut
 - Domaine       : performance / interface
 - Référence     : main 8db8229
 - Emplacement   : `frontend/src/features/companies/CompaniesListPage.tsx:297` (seul `useVirtualizer` du dépôt) · `users/UsersPage.tsx:62-64` · `rgpd/AuditLogsPage.tsx:60-63` · `tags/TagsManagerPage.tsx:99-102` · `audiences/AudiencesListPage.tsx:65-71` · `rgpd/RgpdRequestsPage.tsx:75-78` · `rgpd/AiActRegisterPage.tsx:55-58` · `llm/LlmRouterPage.tsx:58-68` · `llm/ProxyProvidersPage.tsx` · `llm/RotationsPage.tsx:38-41` — **aucun de ces neuf n'envoie de `per_page` ni n'offre de pagination**
 - Constat       : `@tanstack/react-virtual` n'est importé que par `CompaniesListPage` ; `@tanstack/react-table`, pourtant déclaré dans `package.json`, n'est importé **nulle part** ; neuf écrans rendent intégralement ce que le serveur veut bien leur envoyer.
-- Preuve        : 25 montages réels, jeux de 0 / 1 / 100 / 10 000 / 100 000 lignes — `04_PREUVES/agent-25/releve-volumes.txt`. Extrait : `/companies` garde **155 nœuds** de 1 à 100 000 lignes (la virtualisation fait son travail) ; `/users` passe de **41 nœuds** (1 ligne) à **1 625** (100) puis **160 025 nœuds, 18 397 Ko de HTML et 1,1 Go de tas** (10 000). Inventaire statique : `04_PREUVES/agent-25/04-volumes-pagination-keys.txt`.
+- Preuve        : 28 montages réels, jeux de 0 / 1 / 100 / 10 000 / 100 000 lignes — `04_PREUVES/agent-25/releve-volumes.txt`, `-2.txt`, `-3.txt`. Croissance **strictement linéaire** : **16,0 nœuds par ligne** sur `/users`, **10,0** sur `/audit-logs`, **10,0** sur `/tags`. À 10 000 lignes : `/users` **160 025 nœuds / 18 397 Ko / 1 101 Mo de tas / 32,4 s** ; `/audit-logs` **100 038 nœuds / 9 436 Ko / 20,4 s** ; `/tags` **100 048 nœuds / 8 264 Ko / 26,9 s**. À 100 000, `/users` **n'aboutit pas** (§3.5). En regard, `/companies` — le seul virtualisé — garde **155 nœuds de 1 à 100 000 lignes**. Inventaire statique : `04_PREUVES/agent-25/04-volumes-pagination-keys.txt`.
 - Témoin négatif: **obligatoire ici, et il est dans le relevé** — la fabrication et la sérialisation du jeu de 100 000 lignes, **sans monter aucun écran**, coûtent **604 ms et 44 Mo**. Tout ce qui dépasse est imputable à l'écran et non au banc. Par ailleurs le contrôle statique **trouve bien** les 2 occurrences de `useVirtualizer` et les 39 fichiers important `@tanstack/react-query` : il sait repérer un import quand il existe.
 - Impact        : la production porte **4,29 M d'entreprises** et **1 319 567 personnes** (**C19-007**). Les écrans concernés sont aujourd'hui vides, donc le défaut est **invisible** — exactement comme la sérialisation d'**A-010** est invisible à un seul utilisateur. Le jour où `/audit-logs` contiendra un an de journal, l'écran demandera **tout** le journal et tentera d'en peindre chaque ligne : sur les mesures ci-dessus, 10 000 entrées suffisent à dépasser le gigaoctet. **B16-004** ajoute que cette route rend le journal de **tous** les espaces : le volume servi n'est même pas borné par l'espace de travail.
 - Reproduction  : `npx vitest run --config tmp/agent25/vitest.a25.config.ts tmp/agent25/volumes.test.tsx`.
@@ -643,7 +651,7 @@ prend une autre : c'est un saut de mise en page par construction.** *(Non chiffr
 
 Ce n'est pas un aveu : c'est la partie du travail qu'un autre agent, ou Will, doit reprendre.
 
-### 6.1 `/coverage` — 4 cases sur 185 (les seules non vérifiables)
+### 6.1 `/coverage` — 5 cases sur 185 (les seules non vérifiables)
 
 `maplibre-gl` appelle `window.URL.createObjectURL` au chargement du module, puis initialise un contexte **WebGL**.
 jsdom n'a ni l'un ni l'autre : j'ai comblé la première lacune dans **mon propre** socle de mesure

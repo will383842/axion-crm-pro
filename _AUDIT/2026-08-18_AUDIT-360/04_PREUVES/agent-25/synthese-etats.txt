@@ -1,0 +1,38 @@
+route | EN-VOL | VIDE | ERREUR | REFUS
+/ | CHARGEMENT (spinner) | VIDE annonce | *** AFFIRME 0/AUCUN *** | *** AFFIRME 0/AUCUN ***
+/companies | CHARGEMENT (squelette) | VIDE annonce | *** AFFIRME 0/AUCUN *** | *** AFFIRME 0/AUCUN ***
+/companies/$companyId | CHARGEMENT (spinner) | ERREUR explicite (+ zeros affiches) | ERREUR explicite | ERREUR explicite
+/contacts | CHARGEMENT (squelette) | VIDE annonce | *** AFFIRME 0/AUCUN *** | *** AFFIRME 0/AUCUN ***
+/media | CHARGEMENT (texte) | VIDE annonce | *** AFFIRME 0/AUCUN *** | *** AFFIRME 0/AUCUN ***
+/media/$mediaId | CHARGEMENT (spinner seul, sans texte) | VIDE annonce | ERREUR explicite | ERREUR explicite
+/journalists | CHARGEMENT (texte) | VIDE annonce | *** AFFIRME 0/AUCUN *** | *** AFFIRME 0/AUCUN ***
+/international/roumanie | CHARGEMENT (texte) | VIDE annonce | ERREUR explicite | ERREUR explicite
+/console/contacts | CHARGEMENT (squelette) | VIDE annonce | *** AFFIRME 0/AUCUN *** | *** AFFIRME 0/AUCUN ***
+/console/vivier | CHARGEMENT (squelette) | VIDE annonce | *** AFFIRME 0/AUCUN *** | *** AFFIRME 0/AUCUN ***
+/console/arbitrage | CHARGEMENT (squelette) | contenu, sans marqueur | contenu, sans marqueur | contenu, sans marqueur
+/console/personnes/$personKey | CHARGEMENT (squelette, sans texte) | contenu, sans marqueur | ERREUR explicite (+ zeros affiches) | ERREUR explicite (+ zeros affiches)
+/campaigns | CHARGEMENT (squelette) | VIDE annonce | *** AFFIRME 0/AUCUN *** | *** AFFIRME 0/AUCUN ***
+/campaigns/$campaignId | CHARGEMENT (spinner seul, sans texte) | CHARGEMENT (spinner seul, sans texte) | CHARGEMENT (spinner seul, sans texte) | CHARGEMENT (spinner seul, sans texte)
+/scraper-runs | CHARGEMENT (squelette) | ERREUR explicite (+ zeros affiches) | ERREUR explicite (+ zeros affiches) | ERREUR explicite (+ zeros affiches)
+/audiences | CHARGEMENT (squelette) | VIDE annonce | *** AFFIRME 0/AUCUN *** | *** AFFIRME 0/AUCUN ***
+/audiences/$audienceId | CHARGEMENT (spinner seul, sans texte) | CHARGEMENT (spinner seul, sans texte) | CHARGEMENT (spinner seul, sans texte) | CHARGEMENT (spinner seul, sans texte)
+/admin/observability | CHARGEMENT (texte) | contenu, sans marqueur | ERREUR explicite | ERREUR explicite
+/rgpd/requests | CHARGEMENT (squelette) | VIDE annonce | *** AFFIRME 0/AUCUN *** | *** AFFIRME 0/AUCUN ***
+/rgpd/ai-act | CHARGEMENT (squelette) | VIDE annonce | *** AFFIRME 0/AUCUN *** | *** AFFIRME 0/AUCUN ***
+/audit-logs | CHARGEMENT (squelette) | ERREUR explicite (+ zeros affiches) | ERREUR explicite (+ zeros affiches) | ERREUR explicite (+ zeros affiches)
+/users | CHARGEMENT (squelette) | VIDE annonce | *** AFFIRME 0/AUCUN *** | *** AFFIRME 0/AUCUN ***
+/settings | CHARGEMENT (texte) | contenu, sans marqueur | BLOQUE SUR CHARGEMENT | BLOQUE SUR CHARGEMENT
+/tags | CHARGEMENT (squelette) | VIDE annonce | *** AFFIRME 0/AUCUN *** | *** AFFIRME 0/AUCUN ***
+/llm/router | CHARGEMENT (squelette) | VIDE annonce | *** AFFIRME 0/AUCUN *** | *** AFFIRME 0/AUCUN ***
+/llm/proxy-providers | CHARGEMENT (squelette) | ERREUR explicite (+ zeros affiches) | ERREUR explicite (+ zeros affiches) | ERREUR explicite (+ zeros affiches)
+/llm/rotations | CHARGEMENT (squelette) | VIDE annonce | *** AFFIRME 0/AUCUN *** | *** AFFIRME 0/AUCUN ***
+/coverage | contenu sans marqueur de chargement | contenu, sans marqueur | contenu, sans marqueur | contenu, sans marqueur
+/campaigns/new | contenu sans marqueur de chargement | contenu, sans marqueur | contenu, sans marqueur | contenu, sans marqueur
+/audiences/new | *** AFFIRME 0 PENDANT LE CHARGEMENT *** | VIDE annonce | *** AFFIRME 0/AUCUN *** | *** AFFIRME 0/AUCUN ***
+/login | contenu sans marqueur de chargement | contenu, sans marqueur | contenu, sans marqueur | contenu, sans marqueur
+/2fa | contenu sans marqueur de chargement | contenu, sans marqueur | contenu, sans marqueur | contenu, sans marqueur
+/magic-link | contenu sans marqueur de chargement | contenu, sans marqueur | contenu, sans marqueur | contenu, sans marqueur
+/password-reset | contenu sans marqueur de chargement | contenu, sans marqueur | contenu, sans marqueur | contenu, sans marqueur
+/cold-email | contenu sans marqueur de chargement | contenu, sans marqueur | contenu, sans marqueur | contenu, sans marqueur
+/linkedin | contenu sans marqueur de chargement | contenu, sans marqueur | contenu, sans marqueur | contenu, sans marqueur
+(NotFoundPage monté seul) | contenu sans marqueur de chargement | ERREUR explicite | ERREUR explicite | ERREUR explicite

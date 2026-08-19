@@ -1,0 +1,30 @@
+AGENT 25 — ETAT HORS LIGNE (onlineManager.setOnline(false))
+Reference : main 8db8229
+
+react-query v5 : networkMode="online" par defaut, non surcharge dans src/main.tsx.
+Hors ligne, la requete n est pas emise mais MISE EN PAUSE : isPending reste VRAI.
+
+### /users — HORS LIGNE
+  DOM : pulse=0 spin=0 elements=33
+  l ecran mentionne-t-il la perte de reseau ? NON
+  rendu : « Utilisateurs4 rôles RBAC : owner / admin / operator / viewer (Spatie Permission teams).Inviter un utilisateurAucun utilisateurInvite ton premier collaborateur.Inviter »
+
+### /companies — HORS LIGNE
+  DOM : pulse=0 spin=0 elements=147
+  l ecran mentionne-t-il la perte de reseau ? NON
+  rendu : « EntreprisesPipeline de prospection · 0 entreprises activesImporterExporterLancer scraping →Total0Page 1 · 0 affichéesEnrichies0%dont email + téléphone vérifiésTop taille—0% de l'échantillonTop NAF——TousProspectablesPartielsPendingArchivésToutes taillesArtisanTPEPMEETIGrande entrepriseTous effectifs0 salarié1 à 2 salariés3 à 5 salariés6 à 9 salariés10 à 19 salariés20 à 49 salariés50 à 99 salariés10 »
+
+### /admin/observability — HORS LIGNE
+  DOM : pulse=0 spin=0 elements=6
+  l ecran mentionne-t-il la perte de reseau ? NON
+  rendu : « Impossible de charger les métriques d'observabilité. »
+
+### /campaigns/$id — HORS LIGNE
+  DOM : pulse=0 spin=1 elements=9
+  l ecran mentionne-t-il la perte de reseau ? NON
+  rendu : «  »
+
+### /console/arbitrage — HORS LIGNE
+  DOM : pulse=0 spin=0 elements=13
+  l ecran mentionne-t-il la perte de reseau ? NON
+  rendu : « Rapprochements à arbitrer0 événement(s) reçus sans SIREN — à rattacher ou à écarter.Rien à arbitrerTous les événements entrants ont trouvé leur entreprise. »

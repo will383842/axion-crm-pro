@@ -8,3 +8,17 @@ a3c42d6 audit(360): A-015 — le quatrieme verrou, et il est derriere les trois 
 
 === git diff --stat e8924b8..HEAD -- frontend/ .github/workflows/a11y.yml (vide => code frontend identique a la reference du dossier commun) ===
 (fin)
+
+=== RE-VERIFICATION EN FIN DE SESSION (2026-08-19 15:23) ===
+git rev-parse HEAD =
+4ca52c949f7c51ef9aa1939771778f12671396d0
+
+4ca52c9 audit(360): agent 45 final — 20 sabotages, et la contre-verification de la regle 7 est POSITIVE
+70f0075 audit(360): agents 35 et 42 — A-001 a deux causes, et j'avais loue un script a tort
+b46877f audit(360): agents 39 et 48 — une restauration reelle, et une date de saturation
+
+git diff --stat e8924b8..HEAD -- frontend/ .github/workflows/a11y.yml :
+(vide => le code frontend et la porte a11y sont IDENTIQUES a e8924b8)
+
+=== build isole : mon --outDir pointe hors du depot ===
+frontend/dist (autre agent, 14:22) et bac a sable (le mien, 14:32) portent le meme hachage index-C8i6k4WZ.js

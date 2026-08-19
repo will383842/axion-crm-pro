@@ -46,31 +46,75 @@ Six groupes de constats décrivent le **même** défaut vu par des agents diffé
 
 ---
 
-## 1 bis. Le décompte S0 exact — **recompté, et je l'avais sous-évalué**
+## 1 bis. Le décompte S0 exact — **recompté une seconde fois, sur le registre complet**
 
-⚠️ **Ce document annonçait « 12 » puis « 15 » défauts S0. Les deux chiffres étaient trop bas.**
-Ils dataient d'avant les rendus des agents 15, 22, 36 et 37. **Recompté ligne à ligne sur le registre :
-27 constats sont classés S0 par leur agent ; après dédoublonnage, ils décrivent 26 défauts distincts,
-dont 1 réfuté pour la production.**
+⚠️ **Ce document a annoncé « 12 », puis « 15 », puis « 26 ». Le bon chiffre est 29.**
+⚠️ **Et l'agent 35, en clôture, en a annoncé 32. Les deux chiffres sont explicables ; ni l'un ni
+l'autre n'est un mensonge — ils ne comptent pas la même chose.** C'est écrit plus bas.
 
-*Corriger ce chiffre plutôt que de le laisser courir est la moindre des choses : sous-évaluer un
-décompte de S0 dans un document de synthèse est **exactement** le défaut de clôture que ce même
-document dénonce sous `A-013`.*
+**Méthode, énoncée avant le chiffre** — c'est elle qui fait la différence, pas l'arithmétique :
+
+1. on relève **tout constat porté S0 par son agent** dans `02_CONSTATS.md` ;
+2. on **fusionne les confirmations** — quand un agent mesure autrement le même défaut, c'est
+   **une preuve de plus, pas un défaut de plus** ;
+3. on **écarte** ce qui est réfuté pour la production ;
+4. on **ne compte pas deux fois** un constat composite et ses composants.
+
+**Relevé brut : 36 constats portent l'étiquette S0** (37 lignes, dont `D24-001` qui est devenu
+`A-015` — même défaut, deux noms).
+
+### Les deux erreurs de mon tableau précédent, corrigées
+
+| # | L'erreur | La correction |
+|---|---|---|
+| **1** | La ligne « Isolés » comptait **6** défauts S0, dont **`A08-008`** — qui est **S1** (`02_CONSTATS.md:1597`), pas S0. *Un S1 comptait parmi les S0.* | Isolés = **5**. Le total du tableau retombe alors sur **26**, qui était le chiffre du texte : **c'est la ligne qui était fausse, pas la somme.** |
+| **2** | Le tableau **datait d'avant trois rendus** : `G41-001`, `G41-002` et le second chemin de `F35-002` n'y figuraient pas. | **+3 défauts**, dont **un groupe entier qui manquait** (voir `G7`). |
+
+> Je note le motif, parce qu'il est le même que celui que ce document dénonce sous `A-013` : mon
+> tableau **additionnait juste** et **classait faux**, et il **ne s'était pas rouvert** quand de
+> nouveaux rendus sont arrivés. Un tableau de synthèse qui ne se rouvre pas est un tableau qui ment
+> par retard. **C'est la troisième fois que je corrige ce même chiffre.**
+
+### Le décompte, groupe par groupe
 
 | Groupe | Défauts distincts | Les constats |
 |---|---:|---|
 | **G1 — le journal d'audit ne prouve rien** | **3** | tronquable par la queue sans détection (`B16-002`) · horodatage **hors du hachage** (`B16-003`) · **aucune RLS**, lisible tous espaces (`B16-004` + `F36-004`, confirmé en session réelle) |
 | **G2 — le cloisonnement s'arrête à la porte** | **3** | 26 tâches planifiées sur 33 sans contexte (`B11-001`) · 5 jobs sur 6 (`B11-002`) · fiche d'un autre locataire rendue (`B12-001` + `F36-005`) |
 | **G3 — l'effacement n'efface pas** | **5** | `erasure` sans effet (`B14-002` + `E31-001`) · export sur **4 tables sur 31** (`B15-003`) · adresse et téléphone **en clair dans 6 tables** après effacement (`B15-006`) · `candidates` **ni exportée ni effacée** (`B10-004`) · **retour au vivier** d'une personne effacée (`B15-001`) |
-| **G4 — personne ne peut entrer** | **4** | `MAIL_MAILER` défini nulle part (`F40-002`) · enrôlement 2FA sur colonnes inexistantes (`A07-001`) · **aucun écran ne l'expose** (`D22-001`) · et **le quatrième verrou** : l'écran d'accueil **s'efface entièrement dès qu'`audit_logs` contient une ligne** — il y en a **64 en production** (`A-015`) |
+| **G4 — personne ne peut entrer** | **5** | `MAIL_MAILER` défini nulle part (`F40-002`) · enrôlement 2FA sur colonnes inexistantes (`A07-001`) · **aucun écran ne l'expose** (`D22-001`) · l'écran d'accueil **s'efface dès qu'`audit_logs` contient une ligne** — **64 en production** (`A-015`) · **et l'écran d'invitation lui-même est cassé** : `UsersController:33` lit `two_factor_enabled`, colonne inexistante (`F35-002`, **second chemin**) |
 | **G5 — la production ne peut pas porter le produit** | **1** | `php -S` mono-processus, requêtes sérialisées (`A-010`) |
 | **G6 — l'autorisation n'existe pas** | **5** | 11 policies **jamais invoquées** (`F36-001`) · `authorize()` **fatal** dans 35 contrôleurs (`F36-002`) · un `viewer` **supprime définitivement** (`F36-003` + `B12-003`) · un `viewer` **exporte 4 295 349 fiches** (`F36-011`) · routes RGPD **sans aucune permission** (`B15-010`) |
-| **Isolés** | **6** | signature HMAC **forgeable en production** (`F37-001`, ex-`B12-004`) · **6 services mockés en production** (`C18-016` / `F37-002`) · base légale sans mise en balance ni art. 14 (`C19-007`) · **aucune route ne crée une fiche personne** (`I48-001`) · runbook de rotation qui ne tourne rien (`A07-003`) · sauvegarde qui **ne restaure pas les droits** (`A08-008`) |
+| **G7 — la base ne tient pas le volume** *(groupe neuf)* | **2** | l'écran d'accueil de la console : **3 min 08 au volume de production**, application gelée (`G41-001`) · la recherche du hub : **61,8 s par caractère**, et l'index que son commentaire invoque **n'existe pas** (`G41-002`) |
+| **Isolés** | **5** | signature HMAC **forgeable en production** (`F37-001`, ex-`B12-004`) · **6 services mockés en production** (`C18-016` / `F37-002`) · base légale sans mise en balance ni art. 14 (`C19-007`) · **aucune route ne crée une fiche personne** (`I48-001`) · runbook de rotation qui ne tourne rien (`A07-003`) |
 | **Réfuté pour la production** | *(1)* | `B16-001` — secret de chaîne d'audit **vide en local, 64 caractères en production** |
 
-**→ 26 défauts S0 distincts et ouverts.** Et deux d'entre eux — `F37-001` et `C18-016`/`F37-002` —
-ne sont pas des défauts de conception à corriger posément : **ce sont deux portes ouvertes sur la base
-de production, mesurées sur le serveur qui tourne.**
+**→ 29 défauts S0 distincts, ouverts, et vrais pour la production.**
+
+### Pourquoi l'agent 35 a dit 32, et pourquoi ce n'est pas une contradiction
+
+Il a compté **les identifiants distincts au registre**, sans fusionner les confirmations. Sur ce
+critère, son chiffre est juste : 36 étiquettes S0, moins `B16-001` (réfuté), moins `A-012` et
+`D24-001` (un composite et un alias), moins la paire `B12-004`/`F37-001` qu'il a vue nommée
+« ex- » → **32**.
+
+**L'écart de 3 n'est pas une erreur de l'un des deux : c'est la différence entre compter des
+constats et compter des défauts.** Un `viewer` qui supprime une entreprise a été mesuré deux fois,
+par deux agents, sur deux bancs. Cela fait **deux preuves** et **un seul correctif**.
+
+> **La règle que j'en tire, et qui vaut pour P3** : le chiffre qui compte pour ordonner le travail
+> est **29** — un défaut = un correctif. Le chiffre qui compte pour juger la solidité de l'audit est
+> **36** — parce que **sept défauts ont été trouvés deux fois, indépendamment**, et c'est la
+> meilleure nouvelle du registre.
+
+### Ce que ce décompte ne dit pas
+
+- Il **ne compte que les S0**. Le registre porte aussi **132 constats S1**, non dédoublonnés.
+- **G7 est un plancher**, l'agent 41 le pose lui-même : mesures **base seule, sans PHP**, **RLS non
+  armée**, et **2,8 M de lignes au lieu de 4,29 M**, avec `contacts`, `activities` et `company_tag`
+  **vides**. Les 3 min 08 ne sont pas un pire cas.
+- **Aucun de ces 29 défauts n'a été mesuré sur la production**, sauf `F37-001`, `C18-016`/`F37-002`,
+  `A-010`, `A-015` (64 lignes comptées) et `F40-002`. Les autres sont mesurés sur banc.
 
 ---
 

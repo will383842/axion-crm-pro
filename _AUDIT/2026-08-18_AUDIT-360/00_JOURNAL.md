@@ -416,3 +416,47 @@ passage. *Sans ce doute, tout son rapport était faux et personne ne l'aurait su
 Et son corollaire, qui résume l'audit entier : **son compte de débordements est bas pour une mauvaise
 raison** — `overflow-x-hidden` fait que **rien ne défile, tout est rogné**. *Un contrôle naïf aurait
 conclu « aucun débordement » et se serait trompé trois fois.*
+
+---
+
+## 2026-08-19 — P4 · le décompte S0 tranché par recomptage, et deux erreurs à moi
+
+**Point de départ** : l'agent 35, en clôture, annonce **32** défauts S0 ; mon dossier en annonçait
+**26** au `02bis` et **27** au rapport final. J'ai refusé d'absorber son chiffre sans mesurer, et
+refusé de défendre le mien. J'ai recompté.
+
+**Relevé brut** : `grep -n 'S0' 02_CONSTATS.md` → **37 lignes portant l'étiquette**, dont `D24-001`
+devenu `A-015` (même défaut, deux noms) → **36 constats S0 distincts par l'identifiant**.
+
+**Deux erreurs trouvées dans mon propre tableau `02bis` §1 bis** :
+
+1. La ligne « Isolés » annonçait **6** défauts S0 et incluait **`A08-008`** — vérifié à
+   `02_CONSTATS.md:1597` : **il est S1**. *Un S1 comptait parmi les S0.* Une fois retiré, la somme
+   du tableau retombe sur **26**, qui était le chiffre du texte : **c'était la ligne qui était
+   fausse, pas la somme.**
+2. Le tableau **datait d'avant trois rendus** — `G41-001`, `G41-002` et le second chemin de
+   `F35-002`. Les deux premiers forment un **groupe entier absent** : `G7 — la base ne tient pas le
+   volume`.
+
+**→ 29 défauts S0 distincts, ouverts, vrais pour la production.**
+
+**Et l'écart avec l'agent 35 s'explique sans que personne ait tort** : il comptait des
+**identifiants**, je compte des **défauts**. Sept défauts ont été trouvés **deux fois, par deux
+agents, sur deux bancs** ; cela fait deux preuves et un seul correctif. J'ai écrit la règle dans
+`02bis` : **29 pour ordonner P3, 36 pour juger la solidité du registre.**
+
+**Ce que je retiens contre moi** : c'est la **troisième fois** que je corrige ce chiffre, et les
+trois fois **vers le haut**. La cause n'est pas l'arithmétique, c'est qu'un tableau de synthèse
+**ne se rouvrait pas** à l'arrivée de nouveaux rendus. C'est exactement `A-013`, le défaut de
+clôture que ce dossier dénonce — reproduit une fois de plus dans le document qui le dénonce.
+*Mesure prise* : le §1 bis porte désormais sa méthode **avant** son chiffre, pour qu'un tiers puisse
+le recompter sans me croire.
+
+**Propagé** : `07_RAPPORT-FINAL.md` (registre des auto-corrections + « vingt-sept » → « vingt-neuf »)
+et `06_RESTE-WILL.md`, qui portait encore **« douze »** — le plus périmé des trois, et c'est la page
+que Will lit en premier.
+
+**Note d'atelier, sans gravité** : `root.crt` (631 o, certificat **public**, daté du 17/08 — donc
+antérieur à l'audit, il n'est pas de moi) traîne **non suivi et non ignoré** à la racine du dépôt.
+Pas un secret ; mais un `git add .` distrait le committerait. **Je n'y touche pas** — ce n'est pas
+mon fichier. Signalé, c'est tout.

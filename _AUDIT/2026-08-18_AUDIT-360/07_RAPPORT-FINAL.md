@@ -140,7 +140,7 @@ Sept corrections du chef de chantier, **toutes conservées dans le registre avec
 | **Hypothèse RGPD** | **Morte** : les lignes de journal venaient de **la suite de tests**, qui écrit dans le même fichier. *J'avais pris la preuve qu'une garde fonctionne pour la preuve d'un défaut* | agent 13 |
 | **A-011 cas 5** | Le cas fondateur du mandat **n'en était pas un** → devenu `A-013` | agent 6 |
 | **`02bis` §5** | 🔴 **J'ai reproduit `A-013` dans le document qui le dénonce** | agent 50 |
-| **Décompte S0** | J'annonçais **12** puis **16** défauts S0. Recompté ligne à ligne : **26**. Les deux chiffres dataient d'avant quatre rendus d'agents et **je les avais laissés courir** — *sous-évaluer un décompte de S0 dans une synthèse est littéralement le défaut de clôture que ce rapport dénonce* | re-comptage du chef de chantier |
+| **Décompte S0** | J'ai annoncé **12**, puis **16**, puis **26**. Recompté une troisième fois sur le registre complet : **29**. À chaque fois le chiffre était **trop bas**, et à chaque fois pour la même raison : le tableau de synthèse **ne se rouvrait pas** quand de nouveaux rendus arrivaient. La dernière passe a trouvé en outre **un S1 (`A08-008`) compté parmi les S0** et **un groupe entier manquant** (`G7`, la base ne tient pas le volume). *Sous-évaluer trois fois de suite un décompte de S0 dans une synthèse est littéralement le défaut de clôture que ce rapport dénonce sous `A-013`.* | re-comptage, `02bis` §1 bis |
 
 **Quatre sur sept viennent d'avoir généralisé une mesure au-delà de ce qu'elle mesurait.** C'est le
 catalogue exact que la doctrine énumère — et les avoir commises malgré cela dit qu'énumérer ne suffit
@@ -166,5 +166,5 @@ L'ordonnancement complet et raisonné est au **§4 de `02bis`**. En trois lignes
 des gardes du même genre que celles qu'il corrige.*
 
 **Ce qui revient au dirigeant** est dans `06_RESTE-WILL.md` — une page, dont **un geste qui bloque la
-publication de ce dossier** : le dépôt est **public**, et ce rapport décrit **vingt-sept défauts S0 ouverts**
+publication de ce dossier** : le dépôt est **public**, et ce rapport décrit **vingt-neuf défauts S0 ouverts**
 sur une production qui porte **1 319 567 personnes**.

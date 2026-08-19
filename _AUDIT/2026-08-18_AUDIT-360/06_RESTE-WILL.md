@@ -106,7 +106,7 @@ sécurité, et ce témoin-là n'a donc pas été joué : la démonstration repos
 Je ne l'ai PAS poussé.**
 
 `will383842/axion-crm-pro` est **PUBLIC** (mesuré, pas supposé). Et ce dossier réunit, en un document
-unique, vérifié et daté, **douze défauts S0 actuellement ouverts** sur une production vivante qui
+unique, vérifié et daté, **vingt-neuf défauts S0 actuellement ouverts** sur une production vivante qui
 porte les données personnelles de **1 319 567 personnes** : comment **forger une signature acceptée**
 et pourquoi elle passe · que `GET /audit-logs` rend le journal **de tous les espaces à tout compte
 authentifié** · que la chaîne d'audit est **tronquable sans détection** · qu'un compte `viewer`

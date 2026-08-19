@@ -193,6 +193,69 @@ vide — **et il tombera en silence, puisque le contrôle est fail-open.***
 
 ---
 
+## 6. Résultat n° 4 — le pire constat du dossier, attaqué : **il tient, et il est pire qu'écrit**
+
+**Objet attaqué** : `B15-002` / dixième cas de `A-011` — *« `AntiReinsertionTest` est vert et mesure
+le mauvais objet »*, et le constat `B15-001` (S0) qu'il laisse passer : *« une personne effacée par
+la console REVIENT au vivier à la candidature suivante »*.
+
+**Pourquoi celui-là** : c'est l'accusation la plus lourde de tout l'audit — une garde qui
+*consacre par une assertion* le réglage exact qui fait revenir une personne effacée. Si elle est
+fausse, c'est ma faute la plus grave. **Elle méritait d'être attaquée avant d'être publiée.**
+
+**Méthode** : entièrement **statique**, sans lancer un test — un autre agent mesurait en parallèle
+sur la pile locale, et le serveur PHP est mono-processus (`A-010`). *Contrainte assumée : ce qui
+suit est prouvé par le code et le schéma, pas par une exécution.*
+
+### La chaîne, bout en bout
+
+| # | Où | Ce qui se passe |
+|---|---|---|
+| 1 | `GdprErasureService:91` | l'effacement **par la console** appelle `dedup->addOptOut($email, $phone, source: 'gdpr_erasure')` |
+| 2 | `DeduplicationService:263` | l'insertion dans `opt_out` **ne pose AUCUNE clé `scope`** — et la méthode **n'a pas de paramètre `scope`** |
+| 3 | migration `2026_08_14_000004`, l. 3 | `ALTER TABLE opt_out ADD COLUMN scope TEXT NOT NULL **DEFAULT 'business'**` → la ligne atterrit en **`business`** |
+| 4 | `SiteSyncIngestService:112-113` | à la candidature suivante, `oppositionScope()` rend **`vivier`**, et `hasOpposed()` interroge `->where('scope', **'vivier'**)` |
+| 5 | — | **aucune correspondance. La personne revient au vivier.** |
+| 6 | `AntiReinsertionTest:45` | `->and($ligne->scope)->toBe(**'business'**)` — *« La garde du funnel filtre sur ce scope : sans lui, elle ne voit rien. »* |
+
+**→ `B15-001` et `B15-002` sont CONFIRMÉS, par un chemin que le registre ne nommait pas.**
+La garde n'échoue pas à voir le défaut : **elle l'inscrit en assertion.** Elle est verte parce
+qu'elle vérifie que l'effacement écrit bien `business` — c'est-à-dire exactement la valeur qui
+empêchera la garde du vivier de la trouver. *Elle mesure le funnel de scraping, qui est protégé ;
+elle ne touche jamais le chemin de la candidature, qui ne l'est pas.*
+
+### 🔑 Et voici ce que l'attaque a trouvé de neuf, qui rend le constat plus grave
+
+**Ce défaut exact a déjà été trouvé, compris et réparé dans ce dépôt — sur la porte d'à côté.**
+`SiteSyncIngestService:455-470` le raconte lui-même, en toutes lettres :
+
+> *« l'opposition était inscrite en `scope = business` → `hasOpposed()`, qui interroge
+> `scope = vivier` pour une candidature, ne la voyait pas : **la fiche revenait au vivier au dépôt
+> suivant** »* — **constaté en E2E le 2026-08-17.**
+
+Et le correctif est là, bon, soigné : `oppositionScope()` exige **deux** confirmations concordantes
+(le `payload.scope` déclaré **et** le `subject_ref`), pour qu'un émetteur compromis ne choisisse pas
+son univers d'atterrissage.
+
+> **Le savoir existait. Le correctif existait. Il n'a simplement pas été porté à la seconde porte.**
+> Le chemin *site → CRM* est réparé ; le chemin *console → CRM*, qui écrit par
+> `DeduplicationService::addOptOut()` **sans paramètre `scope`**, ne l'a jamais été.
+> *Ce n'est donc pas un défaut qu'on n'avait pas vu : c'est un défaut qu'on avait vu, nommé, daté et
+> réparé — d'un seul côté.* **C'est la meilleure illustration de `A-013` que ce dossier ait
+> produite : le problème n'est pas de mesurer, il est de clore.**
+
+**Correctif, et il est petit** : donner un paramètre `scope` à `addOptOut()`, le faire poser par
+`GdprErasureService` selon l'univers de la personne effacée — **ou**, plus sûr, écrire **les deux
+lignes** (`business` **et** `vivier`) sur un effacement de la console, puisqu'un effacement RGPD
+n'est pas une désinscription thématique. **Et réécrire `AntiReinsertionTest` pour qu'il parte d'une
+candidature, pas du funnel** — sinon la garde restera verte par-dessus le correctif.
+
+⚠️ **Limite déclarée** : chaîne prouvée **statiquement**. Elle doit être rejouée en exécution — un
+effacement console, puis une candidature — avant d'être portée comme close. *Le test qui le prouvera
+est exactement celui qui manque.*
+
+---
+
 ## 3. Journal de la passe
 
 | Date | Objet | Verdict |
@@ -200,3 +263,4 @@ vide — **et il tombera en silence, puisque le contrôle est fail-open.***
 | 2026-08-19 | Décompte S0 (`02bis` §1 bis) | 🔴 **Faux, trois fois de suite et toujours trop bas.** Corrigé à **29**, propagé au rapport final et à `06_RESTE-WILL` (qui portait encore **« douze »** — la page que Will lit en premier) |
 | 2026-08-19 | `02bis` §5 — « la suite de tests est saine, zéro exclusion silencieuse » | ✅ **Confirmée**, et sur le fichier que la CI ouvre vraiment (`phpunit-ci.xml`), ce qui n'avait pas été fait. Quarantaine levée vérifiée **fichier par fichier : 23/23 présents**. Le couplage entre tests contourné par l'ordre reste ouvert — mais c'est `H44-011`, **déjà connu** : redécouverte, pas trouvaille |
 | 2026-08-19 | La tension `02bis` §5 « canal HMAC exemplaire » vs `F37-001` « canal HMAC forgeable » | ✅ **Pas de contradiction : deux canaux distincts**, les deux affirmations tiennent. 🔴 Mais **constat neuf `P5-HMAC-001` (S2)** : deux commentaires — dont le docbloc de la classe durcie — **désignent le canal troué comme le patron de référence**. Une hypothèse à moi (`config:cache` neutralisant le secret) **poursuivie puis réfutée**, archivée avec sa réponse |
+| 2026-08-19 | `B15-001` + `B15-002` — « la personne effacée revient au vivier » et la garde qui l'entérine | 🔴 **Confirmés**, chaîne prouvée en 6 maillons du code au schéma. **Et pire qu'écrit** : le même défaut a été trouvé, daté (E2E du 17/08) et **réparé sur la porte voisine** ; le chemin de la console n'a jamais été porté. *Vu, nommé, réparé — d'un seul côté.* |

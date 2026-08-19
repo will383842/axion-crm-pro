@@ -12,20 +12,34 @@
 > retard — ce qui se fait, mais se motive.
 >
 > ⚠️ Une notification peut être faite **de façon échelonnée** (art. 33-4) quand
-> tout n'est pas encore connu. C'est le cas ici : la durée d'exposition et
-> l'existence d'accès non autorisés ne sont **pas** établissables.
+> tout n'est pas encore connu. Ici la durée d'exposition **est** établie
+> (94 jours, mesurée), mais l'existence ou non d'accès non autorisés ne l'est
+> **pas** — les journaux de connexion n'étaient pas conservés.
 
 ---
 
 ## 1. Identité du responsable de traitement
 
-| Champ | À compléter par Will |
+> ✅ **Renseigné le 2026-08-19** — relevé sur les mentions légales publiées
+> (`https://axion-ia.com/fr/mentions-legales`), pas demandé ni supposé.
+
+| Champ | Valeur |
 |---|---|
-| Raison sociale | *(Axion-IA OÜ — à confirmer : c'est l'entité qui exploite le CRM)* |
-| N° SIREN / immatriculation | *(à compléter)* |
-| Adresse | *(à compléter)* |
-| Délégué à la protection des données | *(à préciser : DPO désigné ou non)* |
-| Contact pour cette notification | *(nom, fonction, e-mail, téléphone)* |
+| Raison sociale | **AXION IA SAS** — société par actions simplifiée, capital 1 000 € |
+| SIREN | **108 018 631** |
+| SIRET (siège) | **108 018 631 00011** |
+| TVA intracommunautaire | **FR51108018631** |
+| RCS | **Grenoble** |
+| Siège social | ELITE BUREAUX — boîte 53, 11 avenue Paul Verlaine, 38100 Grenoble |
+| Directeur de la publication | **Williams Jullin** |
+| Contact | contact@axion-ia.com |
+| Délégué à la protection des données | **Aucun DPO désigné** — sa désignation n'est pas obligatoire au regard de l'activité (position déjà publiée dans les mentions légales). Le formulaire CNIL accepte l'absence de DPO ; c'est alors le représentant légal qui est l'interlocuteur. |
+| Interlocuteur pour cette notification | Williams Jullin, président — contact@axion-ia.com *(téléphone à saisir dans le formulaire)* |
+
+⚠️ **Seule chose à vérifier** : que c'est bien **AXION IA SAS**, et non une
+autre entité, qui exploite le serveur du CRM. Les mentions légales décrivent
+l'éditeur du **site** ; si le CRM est exploité par la même société — ce qui est
+le cas selon toute vraisemblance — il n'y a rien à changer.
 
 ---
 
@@ -64,15 +78,14 @@ interne. Elle donnait un accès de niveau administrateur, en lecture et en
 
 | Date | Événement |
 |---|---|
-| *(à compléter — mise en service du serveur)* | Début probable de l'exposition. La configuration fautive est présente depuis l'origine. |
+| **2026-05-17** | **Mise en service du serveur** — début de l'exposition. Mesuré, non supposé : volume Postgres créé à 09:37 UTC, dossier de déploiement à 08:53 UTC, première fiche enregistrée à 18:16 UTC. La configuration fautive est présente depuis l'origine. |
 | **2026-08-19, matin** | Découverte lors d'un audit interne de l'infrastructure, en préparation d'un environnement de préproduction. |
 | **2026-08-19, matin** | **Confinement immédiat** : règles `iptables` (chaîne `DOCKER-USER`) bloquant tout accès externe aux ports 5432 et 6379, sans interruption de service. Vérifié depuis l'extérieur. |
 | **2026-08-19** | Règles rendues **persistantes** au redémarrage (`iptables-persistent`). |
 | **2026-08-19** | **Correctif de fond** déployé : suppression de la publication des ports à la source, puis recréation des conteneurs concernés. Vérifié : les redirections réseau ont disparu, les ports ne répondent plus depuis internet. |
 | **2026-08-19** | Mise en place d'un **contrôle automatique** vérifiant, à chaque déploiement, qu'aucun port autre que 80 et 443 n'est exposé. |
 
-⚠️ **Durée exacte de l'exposition : non établissable.** La configuration fautive
-est présente depuis la mise en service. Les journaux de connexion de PostgreSQL
+**Durée de l'exposition : 94 jours**, du 2026-05-17 au 2026-08-19. Les journaux de connexion de PostgreSQL
 n'étant pas conservés, il n'est **pas possible de démontrer** qu'aucun accès non
 autorisé n'a eu lieu. Cette incertitude est signalée en toute transparence ; elle
 est la raison principale de la présente notification.
@@ -146,7 +159,7 @@ des fins de prospection non sollicitée par un tiers.
 
 **Décidées** :
 5. journalisation des connexions à la base, afin qu'un incident futur soit
-   analysable *(à confirmer par Will — non fait à ce jour)* ;
+   analysable — **non fait à ce jour**, à décider ;
 6. environnement de préproduction distinct, rempli de données **synthétiques**,
    afin que les essais ne se fassent plus au contact des données réelles *(mis
    en service le 2026-08-19)*.

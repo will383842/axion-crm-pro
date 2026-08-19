@@ -593,6 +593,82 @@ propre correctif fait la moitié du travail de son contre-vérificateur.*
 
 ---
 
+## 12. Résultat n° 10 — `debc860` : **la mécanique invoquée est réfutée par la mesure**, le défaut qu'elle habille est réel
+
+**Objet** : le dixième commit de la PR publique, sur l'envoi de courriel (`F40-002`, S0).
+
+### La thèse de l'agent
+
+> *« Le court-circuit de simulacre lisait `env('MOCK_MODE')` au moment de la requête — or votre
+> entrypoint tente `config:cache` à chaque démarrage, et une configuration en cache signifie que
+> Laravel **ne lit plus le `.env`**. `env()` rendait alors son défaut `true` : **la production se
+> croyait en simulacre** alors que `MOCK_MODE=false` y était bien posé. »*
+
+**C'est exactement l'hypothèse que j'avais explorée ce matin** sur `WORKER_INTERNAL_HMAC_SECRET`
+(§5), et que j'avais écartée. **L'un de nous deux se trompait. J'ai remesuré plutôt que de défendre
+ma position.**
+
+### Mesuré dans le conteneur, et c'est net
+
+```
+variables_order = EGPCS          <- le E y est
+$_SERVER['MOCK_MODE'] -> oui
+$_ENV['MOCK_MODE']    -> oui
+```
+
+**La variable est dans l'environnement du PROCESSUS, pas seulement dans le `.env`.** `docker-compose`
+l'injecte par `env_file:`, PHP la publie dans les deux superglobales (`variables_order` contient
+`E`), et le dépôt Dotenv de Laravel lit précisément `$_SERVER` et `$_ENV`.
+
+**→ `env('MOCK_MODE')` rend la vraie valeur, même sous `config:cache`.** Le piège du 2026-08-14 vise
+le `.env` lu par dotenv, **pas** les variables posées par `env_file`.
+
+### Deux corroborations indépendantes, dans le même sens
+
+1. **L'agent 40 a mesuré `env('AUDIT_HASH_CHAIN_SECRET')` dans l'application de PRODUCTION en
+   marche : 64 caractères.** Si `env()` rendait ses défauts sous configuration en cache, il aurait lu
+   `dev-only-secret-change-me`. **Il ne l'a pas lu.** *C'est une preuve directe, sur le bon objet, et
+   sur la production.*
+2. Ma mesure de `variables_order` ci-dessus explique **pourquoi** : la même image sert les deux
+   environnements.
+
+**→ « La production se croyait en simulacre » n'est pas établi, et le mécanisme invoqué est réfuté.**
+
+⚠️ **Ma réserve, et elle est réelle** : j'ai mesuré le **conteneur local**. La preuve de production
+est celle de l'agent 40, pas la mienne. *Deux faits indépendants convergent ; ce n'est pas la même
+chose qu'une mesure faite là-bas par moi.*
+
+### Ce qui reste vrai, et qui est un S0
+
+**`MAIL_MAILER` n'est défini nulle part** — vérifié dès P1, `config/mail.php:4` fait
+`env('MAIL_MAILER', **'log'**)`. **Aucun courriel ne part**, ni lien magique ni réinitialisation.
+C'est `F40-002`, et c'est **l'un des quatre verrous de `G4`**. Le correctif ne s'appuie donc pas sur
+rien : *il s'appuie sur le bon défaut, avec la mauvaise explication.*
+
+Et son arbitrage produit est bon : la décision de Will — **`MAIL_MAILER` reste `log`** — est
+respectée ; il ouvre une clé distincte pour **les deux seules portes de secours d'un compte**, qui
+ne sont pas du courrier commercial. *Tant qu'elle vaut `log`, rien ne change.* **Cadrage juste.**
+
+### 🔴 Le motif qui se dessine, et il faut le nommer
+
+**Deux commits de suite** (`46f1717`, `debc860`) portent une **affirmation sur la production que
+l'agent ne pouvait pas mesurer** — il n'y a aucun accès, il l'a écrit lui-même — et les deux sont
+réfutées par des mesures faites sur le bon objet.
+
+> **Ses correctifs sont bons ; ses assertions de production ne sont pas fiables.**
+> La distinction est nette et elle est utilisable : *relire le code qu'il produit avec confiance,
+> et ne rien reprendre de ce qu'il affirme sur le serveur sans le remesurer.*
+> **Trois messages de commit de la PR publique sont à rectifier avant fusion** (`46f1717`,
+> `debc860`, et le corps de #191).
+
+✅ **Et ce qu'il faut porter à son crédit, qui grandit** : il consigne que c'est la **septième fois**
+que le rouge venait de sa sonde et non du produit — ici `Mail::fake()` qui ne comptabilise pas
+`Mail::raw()`. *« Aucune des sept n'a produit de faux constat, parce qu'à chaque fois j'ai lu le
+motif du rouge avant de conclure. »* **C'est précisément la discipline qui manque à ses assertions
+de production** : il l'applique à ses sondes, pas à ses affirmations.
+
+---
+
 ## 3. Journal de la passe
 
 | Date | Objet | Verdict |
@@ -606,3 +682,4 @@ propre correctif fait la moitié du travail de son contre-vérificateur.*
 | 2026-08-19 | `a6aceb0` — le correctif HMAC **publié sans relecture** (PR #191) | ✅ **Bon** : fail-closed, réemploi de la classe durcie, limite déclarée. `F37-001` fermé **pour la forge, pas pour le rejeu**. ❌ **Ne ferme ni `P5-HMAC-001` ni `P5-HMAC-002`** : les deux commentaires qui propagent le défaut sont toujours là, et **désormais circulaires**. ⚠️ Une erreur de mesure de ma part consignée : grep sans accents lu comme une absence dans le code |
 | 2026-08-19 | **Contre-vérification adversariale des correctifs de l'agent 35** — l'objet n° 1 de la passe | 🔴 **NON FUSIONNABLE** : `B16-004` corrigé à moitié et **le nouveau test certifie la fuite** (18ᵉ cas du patron) · un test du dépôt cassé et non mis à jour · `set -e` rendant muettes les erreurs du script d'accès. ✅ **Mais le risque n° 1 est levé** : l'enchaînement complet est franchissable, mesuré en 8 étapes. **Et `P5-ROLES-001`, écrit le matin, s'est vérifié le soir.** ⚠️ Ma faute : mes `git add -A` ont emporté ses preuves en cours d'écriture |
 | 2026-08-19 | `46f1717` — la chaîne d'audit se déclarait valide sans secret | ✅ **Défaut réel et bien corrigé** — l'organe qui prouve affirmait sans pouvoir savoir. 🔴 **Mais l'affirmation publique « le secret est vide en production » est FAUSSE** : mesuré **64 caractères**, deux fois, sur la production en marche (`B16-001` réfuté). **Généralisation d'un constat d'atelier — l'erreur la plus répétée de cet audit, et je l'ai commise le premier.** Décompte inchangé : **34** |
+| 2026-08-19 | `debc860` — « la production se croyait en simulacre à cause de `config:cache` » | 🔴 **Mécanisme RÉFUTÉ par la mesure** : `variables_order=EGPCS`, `MOCK_MODE` présent dans `$_SERVER` **et** `$_ENV` — `env()` lit la vraie valeur même sous configuration en cache. Corroboré par les **64 caractères** mesurés par l'agent 40 sur la production. ✅ Mais **`MAIL_MAILER` non défini est vrai** (S0), et son arbitrage produit est juste. **Deuxième assertion de production fausse d'affilée** |

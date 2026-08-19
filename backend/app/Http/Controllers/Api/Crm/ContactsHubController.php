@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Crm;
 
+use App\Crm\Console\CompteursHub;
 use App\Crm\Taxonomy;
 use App\Models\Company;
 use App\Models\Contact;
@@ -84,45 +85,22 @@ class ContactsHubController extends ConsoleController
 
     /**
      * Compteurs par type de relation — ce sont les pastilles de la navigation
-     * (conception §2.2). Une seule requête agrégée : un compteur par entrée de
-     * menu aurait fait huit requêtes à chaque rendu de page.
+     * (conception §2.2). Le calcul, son cache et son invalidation vivent dans
+     * `App\Crm\Console\CompteursHub` : mesuré à 337-476 ms sur 300 000 fiches
+     * et de l'ordre de 3 s sur les 4,29 M de la production, il n'a rien à faire
+     * en ligne dans un contrôleur d'affichage
+     * (`_REPORTS/2026-08-18_MESURE-PERFORMANCE-REFERENCE.md` §4 n°1).
+     *
+     * `fresh_for_seconds` est rendu au client pour qu'un écran puisse dire
+     * « chiffres arrêtés à … » : un compteur mis en cache qui se présente comme
+     * instantané est un mensonge d'interface.
      */
     public function counts(Request $request): JsonResponse
     {
         $workspaceId = $this->businessWorkspace($request);
 
-        /** @var array<string, int> $byType */
-        $byType = array_fill_keys(Taxonomy::BUSINESS_RELATION_TYPES, 0);
-        /** @var array<string, int> $byStage */
-        $byStage = array_fill_keys(Taxonomy::BUSINESS_LIFECYCLE_STAGES, 0);
-
-        $rows = DB::table('companies')
-            ->selectRaw('relation_type, lifecycle_stage, count(*) AS total')
-            ->where('workspace_id', $workspaceId)
-            ->whereNull('deleted_at')
-            ->groupBy('relation_type', 'lifecycle_stage')
-            ->get();
-
-        $total = 0;
-        foreach ($rows as $row) {
-            $count = (int) $row->total;
-            $total += $count;
-
-            $type = is_string($row->relation_type) ? $row->relation_type : '';
-            if (array_key_exists($type, $byType)) {
-                $byType[$type] += $count;
-            }
-
-            $stage = is_string($row->lifecycle_stage) ? $row->lifecycle_stage : '';
-            if (array_key_exists($stage, $byStage)) {
-                $byStage[$stage] += $count;
-            }
-        }
-
-        return $this->ok([
-            'total' => $total,
-            'by_relation_type' => $byType,
-            'by_lifecycle_stage' => $byStage,
+        return $this->ok(CompteursHub::pour($workspaceId) + [
+            'fresh_for_seconds' => CompteursHub::FRAIS_SECONDES,
         ]);
     }
 

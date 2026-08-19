@@ -104,6 +104,16 @@ export interface CountsResponse {
   total: number;
   by_relation_type: Record<string, number>;
   by_lifecycle_stage: Record<string, number>;
+  /**
+   * Compteurs du hub uniquement (pas ceux du vivier) : ils sont servis depuis un
+   * cache court côté serveur — le calcul balayait `companies` en entier, mesuré
+   * à ~3 s sur les 4,29 M de fiches de la production. `computed_at` est en temps
+   * universel (§29 n°16) et `fresh_for_seconds` dit la largeur de la fenêtre de
+   * fraîcheur, pour qu'un écran puisse afficher « chiffres arrêtés à … » plutôt
+   * que de laisser croire à un total à la seconde près.
+   */
+  computed_at?: string;
+  fresh_for_seconds?: number;
 }
 
 export interface CandidateRow {

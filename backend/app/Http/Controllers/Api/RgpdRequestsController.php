@@ -112,11 +112,26 @@ class RgpdRequestsController extends ApiController
             $this->queueOutboundErasure($req->subject_email, $req->id);
         }
 
+        // 🔴 LE JETON DE TELECHARGEMENT NE SE PERSISTE PAS EN CLAIR.
+        //
+        // `$result` porte, pour une demande de portabilite, le jeton EN CLAIR qui
+        // ouvre l'archive chiffree des donnees personnelles de la personne. Il
+        // partait tel quel dans `rgpd_requests.metadata` - alors que la colonne
+        // dediee, elle, ne garde deliberement qu'un HACHAGE (`export_token`).
+        // Quiconque lisait cette table, ou la reponse de l'API, pouvait
+        // telecharger l'export complet de n'importe qui.
+        // Mesure le 2026-08-19 (audit 360, B15-013).
+        //
+        // Le jeton reste rendu a l'operateur qui declenche le traitement - il
+        // doit bien le transmettre a la personne - mais il n'est plus ECRIT.
+        $resultatArchive = $result;
+        unset($resultatArchive['token']);
+
         $req->update([
             'status' => 'done',
             'processed_at' => now(),
             'processed_by' => $r->user()?->id,
-            'metadata' => array_merge((array) $req->metadata, ['result' => $result]),
+            'metadata' => array_merge((array) $req->metadata, ['result' => $resultatArchive]),
         ]);
 
         return $this->ok(['request' => $req->fresh(), 'result' => $result]);

@@ -210,12 +210,33 @@ Route::prefix('v1')->group(function () {
         Route::post('/notifications/read-all', [NotificationsController::class, 'markAllRead']);
 
         // RGPD + AI Act + audit
-        Route::get('/rgpd/requests', [RgpdRequestsController::class, 'index']);
-        Route::post('/rgpd/requests', [RgpdRequestsController::class, 'store']);
-        Route::post('/rgpd/requests/{req}/process', [RgpdRequestsController::class, 'process']);
+        //
+        // 🔴 CES ROUTES N'EXIGEAIENT AUCUNE PERMISSION. N'importe quel compte
+        // authentifie - y compris un `viewer`, cense etre en LECTURE SEULE -
+        // pouvait deposer une demande d'effacement et la TRAITER, donc effacer
+        // ou exporter les donnees de n'importe quelle personne.
+        // Mesure le 2026-08-19 (audit 360, B15-010, S0).
+        //
+        // Les permissions existaient deja et le modele etait juste : `viewer` et
+        // `operator` ont `rgpd.view` (consulter), seuls `owner` et `admin` ont
+        // `rgpd.handle` (agir). Elles n'etaient simplement jamais exigees.
+        Route::get('/rgpd/requests', [RgpdRequestsController::class, 'index'])
+            ->middleware('permission:rgpd.view');
+        Route::post('/rgpd/requests', [RgpdRequestsController::class, 'store'])
+            ->middleware('permission:rgpd.handle');
+        // `whereNumber` : la cle de `rgpd_requests` est un ENTIER. Sans cette
+        // contrainte, un identifiant malforme atteint Postgres et rend 500 au
+        // lieu de 404 - la route ne doit pas laisser passer ce qu'elle ne sait
+        // pas resoudre.
+        Route::post('/rgpd/requests/{req}/process', [RgpdRequestsController::class, 'process'])
+            ->whereNumber('req')
+            ->middleware('permission:rgpd.handle');
         Route::get('/ai-act/register', [AiActRegisterController::class, 'index']);
         Route::post('/ai-act/register', [AiActRegisterController::class, 'store']);
-        Route::get('/audit-logs', [AuditLogsController::class, 'index']);
+        // Le journal d'audit est un element de preuve : il se consulte avec
+        // `audit.view`, que ni `viewer` ni `operator` ne portent (B16-004).
+        Route::get('/audit-logs', [AuditLogsController::class, 'index'])
+            ->middleware('permission:audit.view');
         Route::get('/audit-logs/verify-chain', [AuditLogsController::class, 'verifyChain']);
 
         // Sprint H4 — Dashboard observabilité (KPI cards + recent events)

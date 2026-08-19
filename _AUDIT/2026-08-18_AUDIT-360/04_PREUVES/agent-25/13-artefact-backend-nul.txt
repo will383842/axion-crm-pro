@@ -1,0 +1,39 @@
+AGENT 25 — OBSERVATION INCIDENTE : un fichier `backend/nul` est apparu PENDANT l'audit
+Reference : main 5874ed5 — releve le 2026-08-19
+
+CE N'EST PAS MON FICHIER, ET CE N'EST PAS UN DEFAUT DU PRODUIT.
+Je le signale parce qu'il est apparu dans l'arbre du produit pendant la mission,
+qu'il n'est PAS ignore par git, et qu'il est dangereux a committer.
+
+=== CHRONOLOGIE (stat -c %y) ===
+  dernier ecrit de mes mesures  2026-08-19 15:30:01
+  mon rapport                   2026-08-19 15:31:40
+  backend/nul                   2026-08-19 15:46:21   <- 15 min APRES ma derniere ecriture
+  => cree par une autre session (un autre agent de l'audit, ou le chef de chantier).
+
+=== CE QUE C'EST ===
+  taille   1835 octets
+  contenu  la page d'accueil Laravel du produit (<title>Axion CRM Pro</title>)
+  cause probable : une commande lancee depuis `backend/` avec une redirection
+  Windows `> nul` (curl, artisan...). Sous cmd.exe `nul` est un PERIPHERIQUE ;
+  sous Git Bash / MSYS c'est un NOM DE FICHIER ORDINAIRE. La redirection a donc
+  cree un vrai fichier au lieu de jeter la sortie.
+
+=== POURQUOI C'EST A NETTOYER, ET PAS SEULEMENT A RANGER ===
+  git check-ignore -v backend/nul  ->  code 1  (NON ignore)
+  => un `git add -A` le committerait.
+
+  Or `nul` fait partie des noms de peripheriques RESERVES de Windows
+  (CON, PRN, AUX, NUL, COM1..9, LPT1..9). Un depot qui contient un fichier
+  nomme `nul` N'EST PAS CLONABLE / CHECKOUTABLE sous Windows.
+
+  TEMOIN JOUE, depuis backend/ :
+    cmd //c "type nul"   -> sortie VIDE (cmd lit le peripherique)
+    wc -c backend/nul    -> 1835 (Git Bash lit le fichier)
+  Les deux outils, sur le meme chemin, ne voient pas le meme objet.
+  C'est exactement la famille du piege 1 du dossier (Windows / CRLF).
+
+=== GESTE PROPOSE (je ne l'ai PAS fait : le fichier n'est pas le mien) ===
+  rm backend/nul          (depuis Git Bash — cmd.exe ne SAIT PAS le supprimer
+                           par ce nom ; il faudrait \?\ + chemin absolu)
+  et verifier qu'aucun `git add -A` ne l'a capture entre-temps.

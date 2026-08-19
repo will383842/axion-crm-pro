@@ -167,3 +167,34 @@ n'est pas un correctif.
 Aucune variable d'environnement de production touchée, aucune donnée de production
 modifiée, aucun e-mail envoyé. La rotation des secrets reste refusée par Will et n'est pas
 reproposée.
+
+---
+
+## Ajout : le quatrième verrou (A-015), corrigé lui aussi
+
+**D7 — Je sors de mon périmètre, une fois, et je dis pourquoi.** `A-015` / `D24-001` (S0)
+est un constat de l'**agent 24**, pas de moi. Je le corrige quand même, parce qu'il est le
+**dernier maillon de la chaîne d'accès** que répare mon premier commit : sans lui, mes 14
+correctifs d'authentification ouvrent une porte sur une pièce noire.
+
+`ActivityFeed` lisait `log.action`, `log.actor_name`, `log.resource_type`. **Aucun de ces
+champs n'existe** : `GET /api/v1/audit-logs` rend les attributs bruts du modèle, et la
+table porte `event_type`, `path`, `status_code`. `humanizeAction(undefined)` appelait
+`.replace()` sur `undefined` ; aucun `errorComponent` n'étant posé, React démontait
+**l'application entière, barre latérale comprise**. Une seule ligne dans `audit_logs`
+suffisait — et **la connexion elle-même en écrit une**. 64 lignes déjà en production.
+
+**Garde vue rougir sur le vrai objet** : `frontend/tests/components/ActivityFeed.test.tsx`,
+rejouée contre le code d'origine restauré depuis `HEAD` →
+**2 tests échouent, à `ActivityFeed.tsx:76`**. Correctif remis → **2 tests passent**.
+`tsc --noEmit` : propre (et il a lui-même rougi tant que l'interface n'était pas alignée —
+5 erreurs `TS2339`, ce qui prouve que le typage n'était pas décoratif).
+
+**Ce que je NE corrige pas** : `D24-008` — `ErrorBoundary` est écrit, exporté, **monté
+nulle part**, et aucun `errorComponent` n'est posé sur les routes. C'est ce qui transforme
+n'importe quelle erreur de rendu en écran blanc total, sur **8 écrans mesurés**. C'est une
+modification de routage qui dépasse ce lot et appartient à l'agent du frontend. **Elle
+reste ouverte**, et elle est la vraie cause de gravité : sans elle, le prochain champ
+renommé refera exactement la même chose.
+
+Commit : `bdd25eb`.

@@ -779,7 +779,23 @@ Deux processus de mesure ont dû être **interrompus** par moi et le sont explic
 100 000 lignes (§3.5) et le banc de chronométrage (§6.5). Aucun n'a été relancé en silence, aucun n'a servi de
 demi-résultat.
 
-**Vérification finale jouée** : `git status --short -- frontend backend infra` → **vide**.
+**Vérification finale jouée**, à la clôture de ma mission : `git status --short -- frontend backend infra`
+→ **vide**. **Aucun fichier du produit n'a été modifié par moi.**
+
+⚠️ **Observation incidente, qui n'est ni de moi ni un défaut du produit** — je la signale parce qu'elle est
+apparue dans l'arbre du produit **pendant** l'audit et qu'elle est dangereuse à committer. En rejouant le contrôle
+un quart d'heure plus tard, `git status` n'était plus vide : un fichier **`backend/nul`** (1 835 o, la page
+d'accueil Laravel) est apparu à **15:46:21**, soit **15 minutes après ma dernière écriture** (15:30:01) — il vient
+donc d'une autre session. Cause probable : une redirection Windows `> nul` lancée depuis `backend/` ; sous Git Bash,
+`nul` n'est pas un périphérique mais **un nom de fichier ordinaire**.
+
+Pourquoi cela mérite un geste : `git check-ignore -v backend/nul` rend **1** — le fichier **n'est pas ignoré**,
+donc un `git add -A` le committerait. Or `nul` est un **nom de périphérique réservé** de Windows : un dépôt qui en
+contient un **n'est plus checkoutable sous Windows**. *Témoin joué depuis `backend/` : `cmd //c "type nul"` rend une
+sortie **vide** (cmd lit le périphérique) tandis que `wc -c backend/nul` rend **1 835** — deux outils, un même
+chemin, deux objets différents.* C'est la famille du **piège 1** du dossier.
+**Je ne l'ai pas supprimé : ce n'est pas mon fichier.** Détail et geste proposé :
+`04_PREUVES/agent-25/13-artefact-backend-nul.txt`.
 
 **Aucun fichier du produit n'a été modifié** — ni `frontend/src/`, ni `frontend/tests/`, ni `backend/`.
 Le complément de socle jsdom (`URL.createObjectURL`) vit dans **mon** fichier de mise en place, jamais dans

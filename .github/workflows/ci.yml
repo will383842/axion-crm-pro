@@ -153,6 +153,16 @@ jobs:
       # redémarrage — c'est-à-dire trop tard.
 
       - name: TÉMOIN — ce contrôle sait-il seulement échouer ?
+        # 🔴 `shell: bash` sans `-e`. GitHub Actions exécute par défaut
+        # `/usr/bin/bash -e {0}` : la moindre commande non nulle interrompt
+        # l'étape. Or CETTE étape lance délibérément une commande qui DOIT
+        # échouer — avec le défaut, elle mourait à l'affectation de `sortie`,
+        # avant même de pouvoir constater que le témoin avait bien fonctionné.
+        # Mesuré : la première version de ce job a rougi pour cette seule
+        # raison, sans afficher aucune de ses erreurs (le job échouait avant).
+        # Localement, hors `-e`, elle passait — l'écart d'environnement le plus
+        # classique, et le plus trompeur.
+        shell: bash {0}
         run: |
           set -uo pipefail
           # Une garde jamais vue rouge ne garde rien (§28.3). Plutôt que de

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Crm;
 
+use App\Crm\Console\CompteursHub;
 use App\Crm\Ingest\SiteSyncClassifier;
 use App\Crm\Taxonomy;
 use App\Support\WorkspaceContext;
@@ -205,6 +206,22 @@ class BulkController extends ConsoleController
                 ->update(['lifecycle_stage' => $stage, 'updated_at' => now()]);
 
             $this->journal($workspaceId, $isCandidate, $toUpdate, $stage, $request);
+
+            // Les pastilles de la navigation comptent PAR ÉTAPE : déplacer des
+            // fiches d'une case à l'autre sans oublier le cache laisserait
+            // l'écran afficher jusqu'à cinq minutes des chiffres que l'on vient
+            // soi-même de contredire.
+            //
+            // `afterCommit` et non ici même : nous sommes dans une transaction.
+            // Vider le cache avant le COMMIT ouvre la fenêtre où une lecture
+            // concurrente le REMPLIT avec les valeurs d'AVANT — et les fige
+            // alors pour toute la fenêtre de fraîcheur. L'oubli doit suivre le
+            // commit, jamais le précéder.
+            if (! $isCandidate) {
+                DB::afterCommit(static function () use ($workspaceId): void {
+                    CompteursHub::oublier($workspaceId);
+                });
+            }
         }
 
         return [

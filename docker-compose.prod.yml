@@ -101,6 +101,15 @@ services:
     restart: unless-stopped
     volumes: !override []
 
+  # `reverb` n'est PAS démarré par le déploiement (il est volontairement absent
+  # de la liste `docker compose up -d … api app horizon scheduler` : Echo est
+  # désactivé côté frontend et le Caddyfile n'a aucune route WebSocket). Mais
+  # `docker-compose.yml` publie son port 8080 : le jour où quelqu'un le
+  # démarrerait « pour voir », il rouvrirait un port sur `0.0.0.0`. On ferme le
+  # piège maintenant, tant qu'il ne coûte rien.
+  reverb:
+    ports: !override []
+
   # 🔴 `postgres` et `redis` n'avaient AUCUNE politique de redemarrage, alors
   # que les quatre services applicatifs en ont une. Apres un redemarrage du
   # serveur ou du demon Docker, l'API, le frontend, Horizon et le scheduler se
@@ -108,9 +117,43 @@ services:
   # absente. Les conteneurs qui redemarrent masquaient la cause.
   postgres:
     restart: unless-stopped
+    # 🔴 CORRECTIF DE SÉCURITÉ — 2026-08-19, faille MESURÉE, pas supposée.
+    #
+    # `docker-compose.yml` publie `55432:5432`. Sur le serveur de production,
+    # cela ouvre le port sur `0.0.0.0` — et Docker insère ses règles dans
+    # iptables AVANT celles d'`ufw`. Résultat : `ufw status` annonce « seuls
+    # 22/80/443 », et la chaîne DOCKER accepte pourtant
+    # `0.0.0.0/0 -> 172.18.0.4:5432`. Le pare-feu dit une chose, la machine en
+    # fait une autre.
+    #
+    # Aggravant : le mot de passe `POSTGRES_PASSWORD: axion_dev_only` est écrit
+    # en clair dans `docker-compose.yml`, dans un dépôt PUBLIC.
+    #
+    # Preuve rejouée depuis un poste extérieur, par internet, le 2026-08-19 :
+    #   psql -h <ip-prod> -p 55432 -U axion -d axion_crm -c "select count(*) from companies"
+    #   -> 4 295 349
+    # Connexion SUPERUTILISATEUR, lecture ET écriture, sur les données
+    # personnelles de 4,29 M de fiches.
+    #
+    # La production n'a AUCUN besoin de ce port publié : l'API, Horizon et le
+    # scheduler joignent Postgres par le réseau Docker (`postgres:5432`). Le
+    # port n'existait que pour le confort du poste de développement.
+    #
+    # `!override` et non `ports: []` : Compose FUSIONNE les listes entre
+    # fichiers, il ne les remplace pas. Sans le tag, la publication de
+    # `docker-compose.yml` survivrait — c'est exactement le piège qui avait
+    # rendu l'overlay inopérant sur `volumes` en août (voir en-tête de ce
+    # fichier). Garde : job CI `config-prod` (`.github/workflows/ci.yml`).
+    ports: !override []
 
   redis:
     restart: unless-stopped
+    # Même faille, même correctif — et Redis, lui, n'a AUCUN mot de passe
+    # (`docker-compose.yml` ne pose pas `requirepass`). Le port 56379 était donc
+    # une console d'administration anonyme sur le cache et les sessions :
+    # `FLUSHALL`, lecture des jetons, `CONFIG SET` — vérifié ouvert depuis
+    # l'extérieur le 2026-08-19.
+    ports: !override []
 
 volumes:
   # `storage/` est le seul dossier que l'application ÉCRIT. Sans ce volume, les

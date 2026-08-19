@@ -2,21 +2,46 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardEyebrow, Avatar, EmptyState } from '@/components/ui';
 import { api } from '@/lib/api';
 
+/**
+ * Les champs REELS renvoyes par GET /api/v1/audit-logs.
+ *
+ * Le controleur rend les attributs bruts du modele `AuditLog`, et la table
+ * `audit_logs` porte : id, workspace_id, user_id, event_type, path, status_code,
+ * ip, user_agent, payload_hash, prev_hash, current_hash, created_at.
+ *
+ * Ce composant declarait `action`, `actor_name`, `resource_type`, `resource_id`.
+ * AUCUN de ces champs n'existe. `humanizeAction(log.action)` appelait donc
+ * `.replace()` sur `undefined` ; l'exception remontait, et - aucun
+ * `errorComponent` n'etant pose sur la route - L'ECRAN D'ACCUEIL S'EFFACAIT
+ * ENTIEREMENT, barre laterale comprise, des qu'`audit_logs` contenait UNE SEULE
+ * ligne. Or la connexion elle-meme en ecrit une : le proprietaire du CRM ne
+ * pouvait pas voir sa propre console. 64 lignes deja en production.
+ * Mesure le 2026-08-19 (audit 360, A-015 / D24-001, S0).
+ */
 interface AuditLog {
   id: string;
-  action: string;
+  event_type?: string | null;
+  path?: string | null;
+  status_code?: number | null;
+  user_id?: string | null;
+  created_at: string;
+  /** Tolere l'ancien nom, au cas ou une autre source alimenterait ce flux. */
+  action?: string | null;
   actor_name?: string | null;
   actor_email?: string | null;
-  resource_type?: string | null;
-  resource_id?: string | null;
-  created_at: string;
 }
 
 interface AuditLogsResponse {
   data: AuditLog[];
 }
 
-function humanizeAction(a: string): string {
+/**
+ * Rend lisible un type d'evenement. Tolere l'absence de valeur : un champ
+ * manquant ne doit JAMAIS pouvoir effacer l'application - c'est exactement ce
+ * qui arrivait (A-015).
+ */
+function humanizeAction(a?: string | null): string {
+  if (typeof a !== 'string' || a === '') return 'Evenement';
   return a.replace(/[._-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
@@ -89,11 +114,11 @@ export function ActivityFeed() {
                 <div className="min-w-0 flex-1 pt-0.5">
                   <p className="truncate text-xs text-slate-800 dark:text-slate-200">
                     <span className="font-medium">{name}</span>
-                    <span className="text-slate-500 dark:text-slate-400"> · {humanizeAction(log.action)}</span>
+                    <span className="text-slate-500 dark:text-slate-400"> · {humanizeAction(log.event_type ?? log.action)}</span>
                   </p>
-                  {log.resource_type ? (
+                  {log.path ? (
                     <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
-                      {log.resource_type}{log.resource_id ? ` #${String(log.resource_id).slice(0, 8)}` : ''}
+                      {log.path}{log.status_code ? ` · ${log.status_code}` : ''}
                     </p>
                   ) : null}
                   <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">{timeAgo(log.created_at)}</p>

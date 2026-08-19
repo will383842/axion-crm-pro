@@ -1,8 +1,17 @@
 # BROUILLON — Notification de violation de données à la CNIL (article 33 RGPD)
 
-> ⚠️ **CE DOCUMENT EST UN BROUILLON.** Il est rédigé par l'autopilote à partir de
-> faits mesurés et datés. **Il n'est ni validé ni envoyé.** La décision de
-> notifier, la validation du contenu et l'envoi reviennent au dirigeant.
+> ✅ **DÉCISION PRISE PAR LE DIRIGEANT LE 2026-08-19 : NOTIFIER.**
+> Williams Jullin a validé la recommandation de notifier la CNIL au titre de
+> l'article 33, et de **ne pas** informer individuellement les personnes
+> concernées (article 34). Il a également confirmé que **AXION IA SAS est bien
+> l'entité qui exploite le serveur du CRM** — la dernière incertitude du §1 est
+> donc levée.
+>
+> ⚠️ **CE DOCUMENT RESTE UN BROUILLON À SAISIR.** Il est rédigé par l'autopilote
+> à partir de faits mesurés et datés. **L'envoi n'a pas eu lieu** : la saisie du
+> formulaire et sa transmission sont un acte du responsable de traitement, qui
+> exige un compte personnel sur le téléservice. L'autopilote rédige, il ne
+> signe pas.
 >
 > **Où l'envoyer** : téléservice CNIL — `notifications.cnil.fr`, rubrique
 > « Notifier une violation de données personnelles ». Compte requis.
@@ -36,10 +45,8 @@
 | Délégué à la protection des données | **Aucun DPO désigné** — sa désignation n'est pas obligatoire au regard de l'activité (position déjà publiée dans les mentions légales). Le formulaire CNIL accepte l'absence de DPO ; c'est alors le représentant légal qui est l'interlocuteur. |
 | Interlocuteur pour cette notification | Williams Jullin, président — contact@axion-ia.com *(téléphone à saisir dans le formulaire)* |
 
-⚠️ **Seule chose à vérifier** : que c'est bien **AXION IA SAS**, et non une
-autre entité, qui exploite le serveur du CRM. Les mentions légales décrivent
-l'éditeur du **site** ; si le CRM est exploité par la même société — ce qui est
-le cas selon toute vraisemblance — il n'y a rien à changer.
+✅ **Confirmé par le dirigeant le 2026-08-19** : c'est bien **AXION IA SAS** qui
+exploite le serveur du CRM. Aucune autre entité n'est concernée.
 
 ---
 
@@ -192,8 +199,9 @@ En outre, l'information individuelle de 1,32 million de personnes dont l'adresse
 a été collectée en prospection constituerait elle-même un envoi de masse non
 sollicité — un remède disproportionné au regard du risque.
 
-⚠️ **Cette appréciation appartient au responsable de traitement.** La CNIL peut,
-après examen, demander que les personnes soient informées.
+✅ **Position retenue par le dirigeant le 2026-08-19** : pas d'information
+individuelle. ⚠️ La CNIL peut, après examen, demander que les personnes soient
+informées — cette possibilité reste ouverte quelle que soit la position initiale.
 
 ---
 

@@ -1,0 +1,148 @@
+# 07 — RAPPORT FINAL
+
+> **Audit 360° d'Axion CRM Pro** — mandat `_PROMPTS/PROMPT_AUDIT_360_CRM_PRO_2026-08-18.md` v2.1.
+> **Référence : `main = e8924b8`** (code identique à `c0c453d`). Mesuré le **2026-08-19**.
+> Registre complet : `02_CONSTATS.md` · consolidation : `02bis` · décisions : `05` · réserves : `06`.
+
+---
+
+# LE VERDICT, EN UNE PAGE
+
+## Ce que dit l'audit, en une phrase
+
+**Le CRM Pro n'a jamais été utilisé par personne, et c'est ce fait qui explique presque tout le reste :
+un produit où nul n'entre ne révèle aucun de ses défauts.**
+
+## La question posée, et la réponse
+
+Le mandat a reformulé sa propre question le 19/08, et c'est la bonne : *l'étape 1a a commencé — sur
+quoi le chantier est-il en train de bâtir, et qu'est-ce qui va lui casser dans les mains ?*
+
+**Réponse : il bâtit sur des fondations dont trois sont mesurées cassées, et sur une couche de sécurité
+qui est du code mort.** Ce n'est pas un jugement : c'est ce que rendent les commandes jouées.
+
+## Les sept faits qui portent tout le rapport
+
+| # | Le fait | La preuve, en un chiffre |
+|---|---|---|
+| **1** | **Personne ne s'est jamais connecté au CRM en production.** Trois verrous se referment l'un sur l'autre : mot de passe initial jamais reçu, `MAIL_MAILER` défini nulle part (donc ni lien magique ni réinitialisation), et l'enrôlement 2FA **écrit trois colonnes qui n'existent pas** — qu'aucun écran n'expose. | 1 compte · **0 session** · **0 jeton**, depuis le 2026-05-17. Flux rejoué : login **200** → écran **403** → 2FA **500** |
+| **2** | **La couche d'autorisation est inerte.** Aucune des 11 policies n'est jamais appelée. | Les 11 policies **réécrites en refus total** : l'API répond **à l'identique**, **15 tests restent verts**. **118/118 routes sans policy** |
+| **3** | **La production ne peut pas porter dix utilisateurs.** Elle sert l'API par `php -S`, **un seul processus** : les requêtes sont **sérialisées**. | Escalier de **15 ms** sur 12 requêtes simultanées ; témoin séquentiel **plat**. Principe 8 et critère 17 **inatteignables par construction** |
+| **4** | **Le canal ne crée aucune fiche.** Aucun émetteur du site ne transmet de SIREN, et aucun formulaire n'en collecte. | **100 %** des leads en arbitrage manuel · **0 fiche en 5 jours** · **0 contact sur 1 319 567** porte une `person_key` |
+| **5** | **L'effacement n'efface pas.** `erasure` traverse, le site répond « 200 applied », rien ne se passe. Et une personne effacée **revient au vivier** à la candidature suivante. | Export RGPD sur **4 tables sur 31** · effacement sur **8** · `candidates` dans **ni l'un ni l'autre** |
+| **6** | **Le journal d'audit ne prouve rien.** Tronquable par la queue sans détection, horodatage hors hachage, et **seule table cloisonnée sans RLS**. | `owner2` de l'espace BETA lit **49 entrées de ALPHA** et `total: 68` = **toute la table** |
+| **7** | **Deux portes sont ouvertes sur la base de production, aujourd'hui.** Signature HMAC forgeable (secret **vide**, contrôle **fail-open**, funnel **ouvert**) et **6 services mockés en production**, dont le LLM qui **écrit des classifications fabriquées**. | Mesuré **sur le serveur qui tourne**, pas déduit |
+
+## Le défaut qui explique les autres
+
+**Ce dépôt n'a pas un problème de mesure. Il a un problème de clôture.**
+
+Le rapport pare-feu du 18 août **prédisait la faille du 19 août en toutes lettres** — ports,
+contournement d'`ufw`, mot de passe superutilisateur, correctif, commande de vérification, et jusqu'à
+la notification CNIL — et se terminait par « **F12 n'est PAS soldé** ». **La ligne a été cochée ✅
+par-dessus.** Le lendemain, 4 295 349 fiches étaient joignables depuis internet.
+
+Le motif se répète : le README du harnais écrit « 31 écrans sur 37 restent » ; `vitest.config.ts`
+documente ses propres seuils comme « **DÉCORATIFS** » ; `A08-008` était **écrit d'avance**, avec la
+date à laquelle il se déclencherait. **Dans chaque cas, l'information exacte existait, écrite, au bon
+endroit.** Ce qui a manqué, c'est la relecture — et le tableau de synthèse qui a transformé un
+« je n'ai pas pu mesurer » en un ✅.
+
+Et il a un jumeau technique : **dix gardes mesurent le mauvais objet**. La plus retorse porte le nom
+du défaut qu'elle laisse passer — `AntiReinsertionTest` **consacre en assertion le réglage exact** qui
+fait revenir une personne effacée, et **reste verte pendant qu'elle revient**.
+
+## Le verdict par domaine — pas de feu vert global
+
+| Domaine | Verdict |
+|---|---|
+| **Données** | 🔴 **Le modèle dit le contraire de sa cible.** Le type vit sur l'organisation, pas sur la personne ; une personne ne peut exister **ni sans entreprise ni sans nom** ; **42 tables sur 102** ne sont nommées par aucun code ; et **aucune route ne crée une fiche personne** |
+| **Canal** | 🟠 **Entrant exemplaire, sortant absent, et l'entrant ne crée rien.** **13 événements émis sur 67 exigés**, un seul avec un effet conforme. La famille « Livraison » — **22 événements** — est entièrement vide |
+| **Interface et navigation** | 🟡 **Plus avancé que le mandat ne le croit** : la barre est refondue, 8 des 10 « défauts » listés sont corrigés. Reste le groupe **ÉCHANGES** entier, **tous les compteurs**, et **30 % des intentions sont impossibles** |
+| **Conformité** | 🔴 **Le produit n'est pas en règle sur ses fondations.** Intérêt légitime **sans mise en balance ni information art. 14** pour 1 319 567 personnes ; registre AI Act **vide et servi en dur** ; les deux seules purges CNIL correctes **ne s'exécutent jamais** |
+| **Sécurité** | 🔴 **Réelle là où on l'a durcie, absente là où elle prouve.** 38 tables en FORCE RLS — mais `audit_logs` non ; **26 tâches sur 33 et 5 jobs sur 6 sans contexte d'espace** ; autorisation inerte |
+| **Exploitation** | 🔴 **La production ne peut pas porter le produit qu'on lui construit**, et personne n'y est jamais entré |
+| **Tests** | 🟠 **La suite est saine, son câblage ne l'est pas.** 780 tests / 6 503 assertions, PHPStan niveau 8 `[OK]`, **zéro exclusion silencieuse** — mais **4 contextes requis sur 36 jobs**, **267 tests Playwright sur 285 ne tournent nulle part**, et **27 écrans sur 37 ne sont couverts par rien** |
+
+## Ce qui est sain, et qu'aucun correctif ne doit casser
+
+Le **canal entrant** (HMAC vérifié avant le drapeau, **1 témoin positif et 4 négatifs joués**,
+idempotence sur index UNIQUE réel, 503 sans écriture) · la **suite de tests backend** ·
+**`SocleCrmTest`**, la seule garde qui compare les `CHECK` **réellement en base** aux constantes ·
+**203/203 colonnes temporelles en `timestamptz`** · **la sauvegarde se restaure pour de vrai**
+(**20 726 338 lignes, écart nul**, policies préservées) · les **deux purges RGPD**, finement gardées ·
+et la **pièce 1 de l'étape 1a**, qui retirait un **point de blocage global** sans que personne l'ait vu.
+
+---
+
+# CE QUE CET AUDIT N'A PAS FAIT
+
+**Le mandat annonce 50 agents et trois passes. Ce rapport en livre une.** Le dire est la condition
+pour que le reste soit utilisable.
+
+| Phase | État |
+|---|---|
+| **P0** amorçage | ✅ — mais le terrain n'était **pas** praticable : console inaccessible, API sérialisée, `migrate:fresh` en échec au premier passage |
+| **P1** fan-out | ⚠️ **34 rapports rendus sur 46 agents** |
+| **P2** consolidation | ✅ — puis **révisée** après la critique de complétude |
+| **P3** correction | ❌ **0 correctif, 0 PR, 0 test vu rouge en correction** |
+| **P4** vérification | ❌ — *mais une vérification croisée réelle a eu lieu dès P1 : le chef de chantier a été **corrigé six fois*** |
+| **P5** adversariale | ❌ **jamais lancée** |
+| **P6** regard neuf | ❌ **jamais lancée** |
+| **P7** clôture | ⚠️ ce document, `08` et `09` **absents** |
+
+**Définition de fini (§12) : 3 points tenus sur 16.**
+**§11 (le geste réel) : non satisfait** — les 37 écrans ont été ouverts **non connectés**, **aucun des
+21 parcours n'a été joué**, et **12 captures** existent dans tout le dossier. *La cause n'est pas la
+paresse : c'est le fait n° 1 — le produit ne laisse entrer personne.* **Débloquer coûte ~2 h.**
+
+**Les grilles** : ROUTE est **complète** (117 lignes × 18 colonnes, **0 case vide, vérifié et non
+cru**) ; TABLE et AUTOMATISME sont remplies ; **ÉCRAN est à 8 points sur 25** (629 cases absentes) ;
+**FONCTIONNALITÉ, RACCORDEMENT et PARCOURS n'existent pas**.
+
+**Le plus rentable qui reste** : **~12 h de rédaction sur des mesures déjà archivées** rendraient les
+11 policies, les deux bascules d'heure, la non-régression de la console et les `EXPLAIN`.
+**Le travail est fait ; il n'est pas écrit.** *Encore un défaut de clôture — le même que celui que ce
+rapport dénonce.*
+
+---
+
+# CE QUE L'AUDIT S'EST TROMPÉ, ET COMMENT IL L'A SU
+
+Six corrections du chef de chantier, **toutes conservées dans le registre avec leur énoncé d'origine** :
+
+| Constat | L'erreur | Ce qui l'a levée |
+|---|---|---|
+| **A-001** | S1 → **S2** : j'avais généralisé un `curl` nu à « tous les clients ». **Un `curl` n'est pas un navigateur** — le SPA pose l'en-tête `Accept` et n'est pas touché | agent 13, qui a refusé de crier à la réfutation |
+| **A-007** | J'annonçais « 56 erreurs/min, 9× le journal ». **C'est 5,5.** Je comptais des occurrences d'une chaîne qui apparaît **7 fois par entrée**. *Le journal de construction avait raison* | agent 40 + re-mesure |
+| **A-004** | S2 → **S3** : quota ACME mal compris | agent 40 |
+| **Hypothèse RGPD** | **Morte** : les lignes de journal venaient de **la suite de tests**, qui écrit dans le même fichier. *J'avais pris la preuve qu'une garde fonctionne pour la preuve d'un défaut* | agent 13 |
+| **A-011 cas 5** | Le cas fondateur du mandat **n'en était pas un** → devenu `A-013` | agent 6 |
+| **`02bis` §5** | 🔴 **J'ai reproduit `A-013` dans le document qui le dénonce** | agent 50 |
+
+**Quatre sur six viennent d'avoir généralisé une mesure au-delà de ce qu'elle mesurait.** C'est le
+catalogue exact que la doctrine énumère — et les avoir commises malgré cela dit qu'énumérer ne suffit
+pas.
+
+**Un registre qui efface ses erreurs ne permet pas de juger ce que valent ses constats non corrigés.**
+
+---
+
+# LA SUITE, DANS L'ORDRE
+
+L'ordonnancement complet et raisonné est au **§4 de `02bis`**. En trois lignes :
+
+1. **Les deux portes ouvertes** (`F37-001`, `F37-002`) — correctif d'**une ligne** pour la première,
+   la garde existe déjà dans la classe voisine et n'a jamais été rétroportée.
+2. **Sortir la production de `php -S`**, puis **rendre le produit accessible** — sans quoi ni le §11
+   du mandat ni le principe 7 du CDC ne peuvent être éprouvés.
+3. **Le journal d'audit**, parce que c'est l'instrument de preuve de tout le reste, **y compris de cet
+   audit**.
+
+**Et avant tout correctif** : écrire dans `CONTRIBUTING.md` la règle de clôture (`A-013`) et la règle
+« une garde ne vaut que si elle rougit **sur l'objet qui casse** » (`A-011`). *Sans elles, P3 produira
+des gardes du même genre que celles qu'il corrige.*
+
+**Ce qui revient au dirigeant** est dans `06_RESTE-WILL.md` — une page, dont **un geste qui bloque la
+publication de ce dossier** : le dépôt est **public**, et ce rapport décrit **seize défauts S0 ouverts**
+sur une production qui porte **1 319 567 personnes**.

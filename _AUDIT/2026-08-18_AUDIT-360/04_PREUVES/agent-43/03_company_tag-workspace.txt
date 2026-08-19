@@ -1,0 +1,45 @@
+=== company_tag : colonnes ===
+                                 Table "public.company_tag"
+    Column    |           Type           | Collation | Nullable |          Default          
+--------------+--------------------------+-----------+----------+---------------------------
+ company_id   | bigint                   |           | not null | 
+ tag_id       | bigint                   |           | not null | 
+ workspace_id | uuid                     |           |          | 
+ assigned_at  | timestamp with time zone |           | not null | now()
+ assigned_by  | character varying(32)    |           | not null | 'user'::character varying
+Indexes:
+    "company_tag_pkey" PRIMARY KEY, btree (company_id, tag_id)
+    "idx_company_tag_workspace" btree (workspace_id)
+Check constraints:
+    "company_tag_assigned_by_check" CHECK (assigned_by::text = ANY (ARRAY['auto-rule'::character varying, 'llm'::character varying, 'user'::character varying, 'backfill-src'::character varying]::text[]))
+Foreign-key constraints:
+    "company_tag_company_id_fkey" FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+    "company_tag_tag_id_fkey" FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+Policies (forced row security enabled):
+    POLICY "company_tag_workspace_isolation"
+      USING (((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text)))
+      WITH CHECK (((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text)))
+
+=== company_tag.workspace_id distribution dans axion_crm_perf ===
+ workspace_id | count  
+--------------+--------
+              | 300000
+(1 row)
+
+=== tags.workspace_id dans axion_crm_perf ===
+             workspace_id             | count 
+--------------------------------------+-------
+ 20cd81e4-de5d-4875-a759-07d64fe1f168 |    43
+ 95cbe9b3-378e-4c9a-87cf-1d0faa629643 |    16
+(2 rows)
+
+=== la MEME chose dans la base de travail axion_crm (temoin) ===
+ workspace_id | count 
+--------------+-------
+(0 rows)
+
+=== et dans axion_crm_perf4m ===
+ workspace_id | count 
+--------------+-------
+(0 rows)
+

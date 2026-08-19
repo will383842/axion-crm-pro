@@ -1,1 +1,78 @@
 ############ PLAN role=axion (BYPASSRLS) ############
+ 399965 | 20cd81e4-de5d-4875-a759-07d64fe1f168 | 500049960 |       | Atelier Laurent 49960  | atelier laurent 49960   |     |            |                |              |              |               | f          |         | 86460    | Ville 4960 |       |     |     |           | https://exemple-49960.fr | 0600049960 |              |                  |          |            25 | basique       | {}      | {}       |             |              | 2024-05-06 20:17:44.401918+00 | 2026-08-19 02:01:44.767251+00 |            |               | pending            | 02          | 86              |              |           |             |                | pending        |                |                    |                        |          |                       | newsletter    | nouveau         |             |                 |            |                  |               | {}            |              | FR           |            | 
+ 399964 | 20cd81e4-de5d-4875-a759-07d64fe1f168 | 500049959 |       | Institut Simon 49959   | institut simon 49959    |     |            |                |              |              |               | f          |         | 85459    | Ville 4959 |       |     |     |           | https://exemple-49959.fr | 0600049959 |              |                  |          |            25 | basique       | {}      | {}       |             |              | 2025-04-29 13:10:57.739055+00 | 2026-08-19 02:01:44.767251+00 |            |               | pending            | 01          | 85              |              |           |             |                | pending        |                |                    |                        |          |                       | conference    | perdu           |             |                 |            |                  |               | {}            |              | FR           |            | 
+ 399963 | 20cd81e4-de5d-4875-a759-07d64fe1f168 | 500049958 |       | Agence Moreau 49958    | agence moreau 49958     |     |            |                |              |              |               | f          |         | 84458    | Ville 4958 |       |     |     |           | https://exemple-49958.fr | 0600049958 |              |                  |          |            25 | basique       | {}      | {}       |             |              | 2025-05-23 21:55:00.191584+00 | 2026-08-19 02:01:44.767251+00 |            |               | pending            | 13          | 84              |              |           |             |                | pending        |                |                    |                        |          |                       | investisseur  | dormant         |             |                 |            |                  |               | {}            |              | FR           |            | 
+ 399962 | 20cd81e4-de5d-4875-a759-07d64fe1f168 | 500049957 |       | Maison Richard 49957   | maison richard 49957    |     |            |                |              |              |               | f          |         | 83457    | Ville 4957 |       |     |     |           | https://exemple-49957.fr | 0600049957 |              |                  |          |            25 | basique       | {}      | {}       |             |              | 2026-05-29 14:54:32.054084+00 | 2026-08-19 02:01:44.767251+00 |            |               | pending            | 12          | 83              |              |           |             |                | pending        |                |                    |                        |          |                       | partenaire    | client          |             |                 |            |                  |               | {}            |              | FR           |            | 
+ 399961 | 20cd81e4-de5d-4875-a759-07d64fe1f168 | 500049956 |       | Clinique Robert 49956  | clinique robert 49956   |     |            |                |              |              |               | f          |         | 82456    | Ville 4956 |       |     |     |           | https://exemple-49956.fr | 0600049956 |              |                  |          |            25 | basique       | {}      | {}       |             |              | 2022-07-05 00:03:16.810904+00 | 2026-08-19 02:01:44.767251+00 |            |               | pending            | 11          | 82              |              |           |             |                | pending        |                |                    |                        |          |                       | presse_media  | client          |             |                 |            |                  |               | {}            |              | FR           |            | 
+ 399960 | 20cd81e4-de5d-4875-a759-07d64fe1f168 | 500049955 |       | Studio Petit 49955     | studio petit 49955      |     |            |                |              |              |               | f          |         | 81455    | Ville 4955 |       |     |     |           | https://exemple-49955.fr | 0600049955 |              |                  |          |            25 | basique       | {}      | {}       |             |              | 2025-02-16 03:46:07.034608+00 | 2026-08-19 02:01:44.767251+00 |            |               | pending            | 10          | 81              |              |           |             |                | pending        |                |                    |                        |          |                       | client        | opportunite     |             |                 |            |                  |               | {}            |              | FR           |            | 
+ 399959 | 20cd81e4-de5d-4875-a759-07d64fe1f168 | 500049954 |       | Groupe Bernard 49954   | groupe bernard 49954    |     |            |                |              |              |               | f          |         | 80454    | Ville 4954 |       |     |     |           | https://exemple-49954.fr | 0600049954 |              |                  |          |            25 | basique       | {}      | {}       |             |              | 2021-12-28 19:36:06.438509+00 | 2026-08-19 02:01:44.767251+00 |            |               | pending            | 09          | 80              |              |           |             |                | pending        |                |                    |                        |          |                       | client        | qualifie        |             |                 |            |                  |               | {}            |              | FR           |            | 
+ 399958 | 20cd81e4-de5d-4875-a759-07d64fe1f168 | 500049953 |       | Cabinet Martin 49953   | cabinet martin 49953    |     |            |                |              |              |               | f          |         | 79453    | Ville 4953 |       |     |     |           | https://exemple-49953.fr | 0600049953 |              |                  |          |            25 | basique       | {}      | {}       |             |              | 2026-07-12 12:04:33.412757+00 | 2026-08-19 02:01:44.767251+00 |            |               | pending            | 08          | 79              |              |           |             |                | pending        |                |                    |                        |          |                       | prospect      | qualifie        |             |                 |            |                  |               | {}            |              | FR           |            | 
+ 399957 | 20cd81e4-de5d-4875-a759-07d64fe1f168 | 500049952 |       | Atelier Durand 49952   | atelier durand 49952    |     |            |                |              |              |               | f          |         | 78452    | Ville 4952 |       |     |     |           | https://exemple-49952.fr | 0600049952 |              |                  |          |            25 | basique       | {}      | {}       |             |              | 2021-09-21 08:09:45.198517+00 | 2026-08-19 02:01:44.767251+00 |            |               | pending            | 07          | 78              |              |           |             |                | pending        |                |                    |                        |          |                       | prospect      | nouveau         |             |                 |            |                  |               | {}            |              | FR           |            | 
+ 399956 | 20cd81e4-de5d-4875-a759-07d64fe1f168 | 500049951 |       | Institut Vincent 49951 | institut vincent 49951  |     |            |                |              |              |               | f          |         | 77451    | Ville 4951 |       |     |     |           | https://exemple-49951.fr | 0600049951 |              |                  |          |            25 | basique       | {}      | {}       |             |              | 2024-03-29 14:12:48.437288+00 | 2026-08-19 02:01:44.767251+00 |            |               | pending            | 06          | 77              |              |           |             |                | pending        |                |                    |                        |          |                       | prospect      | perdu           |             |                 |            |                  |               | {}            |              | FR           |            | 
+ 399955 | 20cd81e4-de5d-4875-a759-07d64fe1f168 | 500049950 |       | Agence Roux 49950      | agence roux 49950       |     |            |                |              |              |               | f          |         | 76450    | Ville 4950 |       |     |     |           | https://exemple-49950.fr | 0600049950 |              |                  |          |            25 | basique       | {}      | {}       |             |              | 2024-06-01 01:17:23.801875+00 | 2026-08-19 02:01:44.767251+00 |            |               | pending            | 05          | 76              |              |           |             |                | pending        |                |                    |                        |          |                       | fournisseur   | dormant         |             |                 |            |                  |               | {}            |              | FR           |            | 
+(51 rows)
+
+                                                                           QUERY PLAN                                                                           
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.42..1030.12 rows=51 width=2047) (actual time=288.158..288.254 rows=51 loops=1)
+   Buffers: shared hit=1 read=2212
+   ->  Index Scan using idx_companies_ws_updated_id on companies  (cost=0.42..3456469.11 rows=171195 width=2047) (actual time=288.155..288.243 rows=51 loops=1)
+         Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+         Filter: ((lifecycle_stage <> 'nouveau'::text) OR (hashed SubPlan 2))
+         Buffers: shared hit=1 read=2212
+         SubPlan 2
+           ->  Hash Join  (cost=3.18..6055.23 rows=136842 width=8) (actual time=143.232..185.314 rows=50000 loops=1)
+                 Hash Cond: (company_tag.tag_id = tags.id)
+                 Buffers: shared read=2208
+                 ->  Seq Scan on company_tag  (cost=0.00..5206.00 rows=300000 width=16) (actual time=0.083..109.952 rows=300000 loops=1)
+                       Buffers: shared read=2206
+                 ->  Hash  (cost=2.85..2.85 rows=26 width=8) (actual time=0.118..0.121 rows=20 loops=1)
+                       Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                       Buffers: shared read=2
+                       ->  Seq Scan on tags  (cost=0.00..2.85 rows=26 width=8) (actual time=0.028..0.069 rows=20 loops=1)
+                             Filter: ((slug !~~ 'src:scraping-%'::text) AND (slug ~~ 'src:%'::text))
+                             Rows Removed by Filter: 39
+                             Buffers: shared read=2
+ Planning:
+   Buffers: shared read=5
+ Planning Time: 1.184 ms
+ Execution Time: 288.462 ms
+(23 rows)
+
+
+############ PLAN role=axion_app (RLS) ############
+SET
+                                                                                                    QUERY PLAN                                                                                                    
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.42..217896.95 rows=51 width=2047) (actual time=480.713..497.110 rows=51 loops=1)
+   Buffers: shared read=2212
+   ->  Index Scan using idx_companies_ws_updated_id on companies  (cost=0.42..3657244.11 rows=856 width=2047) (actual time=253.876..270.265 rows=51 loops=1)
+         Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+         Filter: (((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text)) AND ((lifecycle_stage <> 'nouveau'::text) OR (hashed SubPlan 2)))
+         Rows Removed by Filter: 8
+         Buffers: shared read=2212
+         SubPlan 2
+           ->  Gather  (cost=1003.58..7185.25 rows=26 width=8) (actual time=253.289..269.562 rows=0 loops=1)
+                 Workers Planned: 1
+                 Workers Launched: 1
+                 Buffers: shared read=2206
+                 ->  Hash Join  (cost=3.58..6182.65 rows=15 width=8) (actual time=151.762..151.765 rows=0 loops=2)
+                       Hash Cond: (company_tag.tag_id = tags.id)
+                       Buffers: shared read=2206
+                       ->  Parallel Seq Scan on company_tag  (cost=0.00..6176.59 rows=882 width=16) (actual time=151.756..151.757 rows=0 loops=2)
+                             Filter: ((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text))
+                             Rows Removed by Filter: 150000
+                             Buffers: shared read=2206
+                       ->  Hash  (cost=3.57..3.57 rows=1 width=8) (never executed)
+                             ->  Seq Scan on tags  (cost=0.00..3.57 rows=1 width=8) (never executed)
+                                   Filter: (((workspace_id)::text = NULLIF(current_setting('app.current_workspace_id'::text, true), ''::text)) AND (slug !~~ 'src:scraping-%'::text) AND (slug ~~ 'src:%'::text))
+ Planning:
+   Buffers: shared hit=900 read=110
+ Planning Time: 52.223 ms
+ JIT:
+   Functions: 42
+   Options: Inlining false, Optimization false, Expressions true, Deforming true
+   Timing: Generation 120.538 ms, Inlining 0.000 ms, Optimization 19.067 ms, Emission 251.179 ms, Total 390.784 ms
+ Execution Time: 841.347 ms
+(30 rows)
+

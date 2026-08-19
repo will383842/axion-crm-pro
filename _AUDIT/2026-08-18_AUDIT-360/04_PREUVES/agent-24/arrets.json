@@ -1,0 +1,660 @@
+{
+  "companies AVANT sélection": [
+    {
+      "libelle": "Importer",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Exporter",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Tous",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Prospectables",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Partiels",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Pending",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Archivés",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "← Précédent",
+      "desactive": true,
+      "visible": true
+    },
+    {
+      "libelle": "1",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "2",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "3",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "4",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "5",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "6",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "7",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Suivant →",
+      "desactive": false,
+      "visible": true
+    }
+  ],
+  "companies APRÈS 1 case cochée": [
+    {
+      "libelle": "Importer",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Exporter",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Tous",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Prospectables",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Partiels",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Pending",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Archivés",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Poser le tag",
+      "desactive": true,
+      "visible": true
+    },
+    {
+      "libelle": "Retirer",
+      "desactive": true,
+      "visible": true
+    },
+    {
+      "libelle": "Annuler la sélection",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "← Précédent",
+      "desactive": true,
+      "visible": true
+    },
+    {
+      "libelle": "1",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "2",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "3",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "4",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "5",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "6",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "7",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Suivant →",
+      "desactive": false,
+      "visible": true
+    }
+  ],
+  "companies nb cases": 20,
+  "arbitrage": [
+    {
+      "libelle": "Rattacher",
+      "desactive": true,
+      "visible": true
+    },
+    {
+      "libelle": "Écarter",
+      "desactive": true,
+      "visible": true
+    }
+  ],
+  "arbitrage champs": [
+    {
+      "type": "text",
+      "placeholder": "ex. 1842",
+      "aria": null
+    },
+    {
+      "type": "text",
+      "placeholder": "ex. entreprise inexistante au RNE",
+      "aria": null
+    }
+  ],
+  "scraper-runs": [
+    {
+      "libelle": "Exporter en CSV",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Tous 1",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "En cours 0",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "En attente 0",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Terminés 1",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Échec 0",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Annulés 0",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "",
+      "desactive": false,
+      "visible": true
+    }
+  ],
+  "settings": [
+    {
+      "libelle": "Workspace",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Intégrations",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Observabilité",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Apparence",
+      "desactive": false,
+      "visible": true
+    },
+    {
+      "libelle": "Enregistrer",
+      "desactive": false,
+      "visible": true
+    }
+  ]
+}

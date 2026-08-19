@@ -1,0 +1,11 @@
+=== G43 : company_tag sans workspace_id sous la RLS de PRODUCTION (role axion_app) ===
+--- (1) TEMOIN POSITIF : insertion AVEC workspace_id (ce que fait BulkController) ---
+
+--- (2) MESURE : insertion SANS workspace_id (ce que fait CompanyTagsBulkController::poser) ---
+
+--- (3) visibilite des 300 000 lignes company_tag a workspace_id NULL, par role ---
+role axion (BYPASSRLS, config LOCALE) :
+300000
+role axion_app (RLS, config PRODUCTION) :
+SET
+0

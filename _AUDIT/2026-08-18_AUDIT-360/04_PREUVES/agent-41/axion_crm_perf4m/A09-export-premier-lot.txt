@@ -1,0 +1,35 @@
+############ A09-export-premier-lot
+### base   : axion_crm_perf4m   (datcollate = C)
+### date   : 2026-08-19T14:34:27+02:00
+### SQL    :
+select * from "companies" where "deleted_at" is null and "workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168' order by "id" asc limit 1000;
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                                    QUERY PLAN                                                                    
+--------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.43..58.09 rows=1000 width=2078) (actual time=3.706..12.746 rows=1000 loops=1)
+   Buffers: shared hit=6 read=26
+   ->  Index Scan using companies_pkey on companies  (cost=0.43..161449.43 rows=2800000 width=2078) (actual time=3.702..12.618 rows=1000 loops=1)
+         Filter: ((deleted_at IS NULL) AND (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid))
+         Buffers: shared hit=6 read=26
+ Planning:
+   Buffers: shared hit=720 read=86
+ Planning Time: 14.724 ms
+ Execution Time: 13.105 ms
+(9 rows)
+
+
+===== CHAUD (4e exécution) =====
+                                                                   QUERY PLAN                                                                    
+-------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.43..58.09 rows=1000 width=2078) (actual time=4.201..5.763 rows=1000 loops=1)
+   Buffers: shared hit=32
+   ->  Index Scan using companies_pkey on companies  (cost=0.43..161449.43 rows=2800000 width=2078) (actual time=4.194..5.656 rows=1000 loops=1)
+         Filter: ((deleted_at IS NULL) AND (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid))
+         Buffers: shared hit=32
+ Planning:
+   Buffers: shared hit=806
+ Planning Time: 18.544 ms
+ Execution Time: 6.046 ms
+(9 rows)
+

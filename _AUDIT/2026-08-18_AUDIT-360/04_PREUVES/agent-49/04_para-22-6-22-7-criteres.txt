@@ -144,3 +144,53 @@ src/content/formations/modules/ia-pour-la-banque-assurance.ts:554:        "La m�
 [fin]
 [recherche tuee a 120 s — resultat partiel, coherent avec les greps cibles
  T11/T11b ci-dessus qui, eux, ont abouti et rendent zero]
+
+--- COMPLEMENT CRITERE 5 : la cadence REELLE du sens site -> CRM ---
+(mesuree par moi, et non plus reprise de l'agent 14)
+$ ls src/server/queue/  -> connection.ts lib queues.ts types.ts worker.ts workers
+$ ls workers/ a la racine -> n'existe pas ; la file est BullMQ, definie dans src/server/queue/queues.ts
+$ sed -n '1029,1045p' src/server/queue/queues.ts
+  // ── Lot L2 — balayage de l'outbox CRM ────────────────────────────────────
+  // Toutes les 10 minutes. C'est le RATTRAPAGE : l'émission immédiate est un
+  // confort, ce passage est la garantie de livraison. Il tourne même quand le
+  // drapeau `CRM_SYNC_ENABLED` est à OFF — et ne trouve alors rien, puisque
+  // dans cet état aucune ligne n'est jamais écrite.
+  if (crmSyncQueue) {
+    await crmSyncQueue.removeRepeatable(
+      "sweep",
+      { pattern: "*/10 * * * *" },
+      "crm-sync-sweep-cron",
+    );
+    await crmSyncQueue.add(
+      "sweep",
+      { type: "sweep" },
+      { repeat: { pattern: "*/10 * * * *" }, jobId: "crm-sync-sweep-cron" },
+    );
+
+
+$ sed -n '1046,1064p' src/server/queue/queues.ts   # reconciliation quotidienne
+    // ── Lot L5 — réconciliation QUOTIDIENNE ────────────────────────────────
+    // 04 h 30 UTC : creux de trafic, et surtout APRÈS que la nuit a laissé au
+    // balayage toutes ses chances de rattraper. Comparer avant les rattrapages
+    // ferait remonter comme « manquant » ce qui n'était que « pas encore parti ».
+    //
+    // Le balayage donne la FRAÎCHEUR, ce passage donne la GARANTIE : il compare
+    // les enregistrements source aux `subject_ref` réellement émis et journalise
+    // ses compteurs même quand tout va bien (l'absence de nouvelles doit être
+    // visible, leçon IndexNow). Drapeau à OFF ⇒ sortie immédiate.
+    await crmSyncQueue.removeRepeatable(
+      "reconcile",
+      { pattern: "30 4 * * *" },
+      "crm-sync-reconcile-cron",
+    );
+    await crmSyncQueue.add(
+      "reconcile",
+      { type: "reconcile" },
+      { repeat: { pattern: "30 4 * * *" }, jobId: "crm-sync-reconcile-cron" },
+    );
+
+=> BALAYAGE '*/10 * * * *' = 10 MINUTES, et le commentaire du produit dit lui-meme :
+   « l'emission immediate est un CONFORT, ce passage est la GARANTIE de livraison ».
+   Le chemin GARANTI du sens site -> CRM est donc a 10 min, soit 10x le budget
+   de 60 s du critere 5. Le chemin immediat (BullMQ pousse a l'enqueue) tient
+   le budget, mais il n'est pas celui qui garantit.

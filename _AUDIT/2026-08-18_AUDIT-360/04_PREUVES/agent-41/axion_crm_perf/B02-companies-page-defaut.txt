@@ -1,0 +1,21 @@
+############ B02-companies-page-defaut
+### base   : axion_crm_perf   (datcollate = C)
+### date   : 2026-08-19T14:36:44+02:00
+### SQL    :
+select * from "companies" where "deleted_at" is null and "workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168' order by "quality_score" desc limit 100 offset 0;
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                                           QUERY PLAN                                                                            
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.42..10.55 rows=100 width=2047) (actual time=290.660..446.911 rows=100 loops=1)
+   Buffers: shared read=7
+   ->  Index Scan using idx_companies_workspace_score on companies  (cost=0.42..30382.11 rows=300000 width=2047) (actual time=290.654..446.877 rows=100 loops=1)
+         Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+         Filter: (deleted_at IS NULL)
+         Buffers: shared read=7
+ Planning:
+   Buffers: shared hit=794 read=11
+ Planning Time: 19.778 ms
+ Execution Time: 447.113 ms
+(10 rows)
+

@@ -1,0 +1,49 @@
+############ B01-companies-count
+### base   : axion_crm_perf   (datcollate = C)
+### date   : 2026-08-19T14:36:11+02:00
+### SQL    :
+select count(*) as aggregate from "companies" where "deleted_at" is null and "workspace_id" = '20cd81e4-de5d-4875-a759-07d64fe1f168';
+
+===== FROID (1re exécution de cette requête, session neuve) =====
+                                                                                    QUERY PLAN                                                                                    
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate  (cost=5893.14..5893.15 rows=1 width=8) (actual time=1047.337..1452.235 rows=1 loops=1)
+   Buffers: shared hit=1 read=268
+   ->  Gather  (cost=5892.92..5893.13 rows=2 width=8) (actual time=396.515..1452.200 rows=3 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=1 read=268
+         ->  Partial Aggregate  (cost=4892.92..4892.93 rows=1 width=8) (actual time=242.045..242.047 rows=1 loops=3)
+               Buffers: shared hit=1 read=268
+               ->  Parallel Index Only Scan using idx_companies_ws_counts on companies  (cost=0.42..4580.42 rows=125000 width=0) (actual time=4.261..222.608 rows=100000 loops=3)
+                     Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+                     Heap Fetches: 0
+                     Buffers: shared hit=1 read=268
+ Planning:
+   Buffers: shared hit=525 read=50
+ Planning Time: 24.050 ms
+ Execution Time: 1452.536 ms
+(16 rows)
+
+
+===== CHAUD (4e exécution) =====
+                                                                                   QUERY PLAN                                                                                    
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate  (cost=5893.14..5893.15 rows=1 width=8) (actual time=71.308..88.185 rows=1 loops=1)
+   Buffers: shared hit=270
+   ->  Gather  (cost=5892.92..5893.13 rows=2 width=8) (actual time=65.057..88.152 rows=3 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=270
+         ->  Partial Aggregate  (cost=4892.92..4892.93 rows=1 width=8) (actual time=60.692..60.694 rows=1 loops=3)
+               Buffers: shared hit=270
+               ->  Parallel Index Only Scan using idx_companies_ws_counts on companies  (cost=0.42..4580.42 rows=125000 width=0) (actual time=0.071..33.812 rows=100000 loops=3)
+                     Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+                     Heap Fetches: 0
+                     Buffers: shared hit=270
+ Planning:
+   Buffers: shared hit=575
+ Planning Time: 3.714 ms
+ Execution Time: 88.427 ms
+(16 rows)
+

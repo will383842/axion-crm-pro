@@ -1,0 +1,77 @@
+===== SONDE COURTE AGENT 35 — main e8924b8 — 2026-08-19T14:27:42+02:00 =====
+APP_ENV=local APP_DEBUG=false session.driver=redis base=axion_crm_test_a35
+
+----- [1] TEMOIN : la sonde envoie-t-elle vraiment ses en-tetes ? -----
+  navigateur    Accept recu='text/html,application/xhtml+xml,*/*;q=0.8'    expectsJson=false
+  curl */*      Accept recu='*/*'                                          expectsJson=false
+  aucun Accept  Accept recu='text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' expectsJson=false
+  client JSON   Accept recu='application/json'                             expectsJson=true
+  SPA axios     Accept recu='application/json'                             expectsJson=true
+
+----- [2] A-001 : etendue reelle -----
+route('login') existe ? NON
+  GET /api/v1/auth/me       500   500   500   401   401      (ordre des colonnes = ordre du bloc [1])
+  GET /api/v1/contacts      500   500   500   401   401      (ordre des colonnes = ordre du bloc [1])
+  exception (profil navigateur) = Symfony\Component\Routing\Exception\RouteNotFoundException :: Route [login] not defined.
+  corps (profil client JSON) = {"message":"Unauthenticated."}
+
+----- [3] Correctif : les deux moities -----
+PHPUnit 11.5.50 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.3.32
+Configuration: /tmp/a35/phpunit-slim.xml
+
+===== SONDE COURTE AGENT 35 — main e8924b8 — 2026-08-19T14:27:42+02:00 =====
+APP_ENV=local APP_DEBUG=false session.driver=redis base=axion_crm_test_a35
+
+----- [1] TEMOIN : la sonde envoie-t-elle vraiment ses en-tetes ? -----
+  navigateur    Accept recu='text/html,application/xhtml+xml,*/*;q=0.8'    expectsJson=false
+  curl */*      Accept recu='*/*'                                          expectsJson=false
+  aucun Accept  Accept recu='text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' expectsJson=false
+  client JSON   Accept recu='application/json'                             expectsJson=true
+  SPA axios     Accept recu='application/json'                             expectsJson=true
+
+----- [2] A-001 : etendue reelle -----
+route('login') existe ? NON
+  GET /api/v1/auth/me       500   500   500   401   401      (ordre des colonnes = ordre du bloc [1])
+  GET /api/v1/contacts      500   500   500   401   401      (ordre des colonnes = ordre du bloc [1])
+  exception (profil navigateur) = Symfony\Component\Routing\Exception\RouteNotFoundException :: Route [login] not defined.
+  corps (profil client JSON) = {"message":"Unauthenticated."}
+
+----- [3] Correctif : les deux moities -----
+E                                                                   1 / 1 (100%)
+
+Time: 19:12.539, Memory: 12.00 MB
+
+There was 1 error:
+
+1) A35Slim\A35SlimTest::test_tout
+Error: Call to undefined method NunoMaduro\Collision\Adapters\Laravel\ExceptionHandler::shouldRenderJsonWhen()
+
+/tmp/a35/slim/A35SlimTest.php:126
+
+ERRORS!
+Tests: 1, Assertions: 0, Errors: 1.
+
+=== LECTURE DE CETTE SORTIE (agent 35) ===
+Bloc [1] — TEMOIN OBLIGATOIRE, joue AVANT toute conclusion : il prouve que la sonde
+envoie bien l'en-tete qu'elle croit envoyer, et que `expectsJson()` vaut false pour
+les trois premiers profils et true pour les deux derniers. Sans ce temoin, la matrice
+du bloc [2] ne vaudrait rien (mon premier jet utilisait TestCase::call(), qui n'envoie
+PAS les en-tetes : les 5 colonnes rendaient 500 et j'aurais conclu a tort que le SPA
+etait touche — cf. sonde-run1-INVALIDE-headers-non-envoyes.txt).
+
+Bloc [2] — A-001 mesure :
+  profil                  GET /auth/me   GET /contacts
+  navigateur (text/html)      500            500
+  curl (Accept: */*)          500            500
+  aucun en-tete Accept        500            500
+  client JSON                 401            401
+  SPA axios (json + XHR)      401            401
+  exception = RouteNotFoundException :: Route [login] not defined.
+  corps du 401 = {"message":"Unauthenticated."}
+
+Bloc [3] — INTERROMPU : le banc de test remplace le gestionnaire d'exceptions par
+celui de Collision (NunoMaduro\Collision\Adapters\Laravel\ExceptionHandler), qui n'a
+pas de methode shouldRenderJsonWhen(). Rejoue dans sonde-courte-2.txt en reposant le
+VRAI gestionnaire de Laravel, celui que bootstrap/app.php configure en production.

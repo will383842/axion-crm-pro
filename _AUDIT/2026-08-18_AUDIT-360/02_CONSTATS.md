@@ -2091,7 +2091,7 @@ d'alerte de trajectoire disque.**
 
 ---
 
-### [F36-001] 🔴 Un compte en lecture seule peut exporter les 4 295 349 fiches nominatives — **garde vue rouge**
+### [F36-011] 🔴 Un compte en lecture seule peut exporter les 4 295 349 fiches nominatives — **garde vue rouge**
 - **Sévérité**      : **S0**
 - **Domaine**       : sécurité / conformité
 - **Référence**     : `e8924b8`
@@ -2307,3 +2307,96 @@ qu'un autre agent de l'audit analysait le même dépôt dans le même conteneur*
 et restauré aussitôt, mais il écrit que *« un `[OK] No errors` mesuré dans ces conditions ne vaut rien,
 et personne ne peut le savoir après coup »*. Et sa **première sonde CRLF, écrite en `sh`, rendait 0 des
 deux côtés** : **le piège 1 du dossier, attrapé en flagrant délit sur lui-même**. Sonde refaite en PHP.
+
+---
+
+## Agent 36 — les permissions : **la couche d'autorisation est du code mort**
+**Rapport** : `11_GRILLES/agent-36_permissions.md` (695 l., tableau de 118 routes) · **Preuves** : `04_PREUVES/agent-36/` (12 fichiers)
+
+*(Note d'identifiants : j'avais publié en avance la garde rouge trouvée dans ses preuves, sous le
+numéro `F36-001` que l'agent a ensuite employé pour autre chose. **Ma publication est renumérotée
+`F36-011`** ; les numéros de l'agent font foi.)*
+
+### 🔴 Le constat central, et sa démonstration est décisive
+
+**Aucune des 11 policies n'est jamais appelée.** Trois mesures convergentes, dont la dernière est
+imparable :
+
+1. **0 intergiciel `can:`** et **0 `authorize()`** dans tout `app/` ;
+2. **instrumentation** → **0 appel sur 117 requêtes** réelles ;
+3. 🔑 **les 11 policies réécrites en REFUS TOTAL** → **l'API répond strictement à l'identique**
+   (12 codes 200 inchangés) **et les 15 tests restent verts**.
+
+*Interdire tout, à tout le monde, ne change rien.* C'est la preuve que la couche entière est
+**inerte**. **`B16-004` n'était pas un cas isolé — c'était la règle.**
+
+Et le verrou est plus profond qu'un oubli : **`$this->authorize()` est FATAL dans les 35 contrôleurs
+d'API** (`BadMethodCallException` mesuré) — `ApiController` étend `Illuminate\Routing\Controller`
+**sans le trait `AuthorizesRequests`**. *Quelqu'un qui voudrait bien faire, aujourd'hui, casserait la
+route qu'il essaie de protéger.*
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **F36-001** | **S0** | **Aucune des 11 policies n'est jamais invoquée** : la couche d'autorisation est **du code mort** |
+| **F36-002** | **S0** | **`$this->authorize()` est fatal dans les 35 contrôleurs d'API** |
+| **F36-003** | **S0** | Un compte **lecture seule** crée, modifie et **supprime définitivement** entreprises et étiquettes (`DELETE` → **204**, ligne disparue) |
+| **F36-004** | **S0** | `/audit-logs` : ni garde ni cloisonnement. `owner2` de l'espace **BETA** reçoit **200** avec **49 entrées appartenant toutes à ALPHA**, et `total: 68` = **toute la table**. `viewer` aussi *(confirme et étend `B16-004`)* |
+| **F36-005** | **S0** | `GET /contacts/{id}` et `/companies/{id}` **rendent la fiche d'un autre locataire** *(confirme `B12-001`, cette fois **par une session HTTP réelle**)* |
+| **F36-008** | **S1** | `/media/export` et `/journalists/export` rendent **500 pour tout ayant droit** (`TypeError`) : **les portes d'opposition RGPD ne s'exécutent jamais** |
+| **F36-010** | **S1** | **Aucune interface pour créer un compte, poser un rôle, ou même le voir** |
+| **F36-006** | **S1** | `contacts.view_pii` **protège la liste, pas la fiche** : `p***@…` en liste, **adresse complète** en fiche *(confirme `B12-002`, `B10-005`, `B15-005` — quatrième mesure)* |
+| **F36-007** | **S1** | **RLS inerte en local** : le rôle `axion` est **superutilisateur `rolbypassrls`** — *septième divergence atelier ↔ production* |
+| F36-009 | S2 | **Zéro couverture de test des policies** |
+
+**Les rôles, eux, existent vraiment** : `owner`, `admin`, `operator`, `viewer`, **16 permissions**,
+répartition cohérente, confirmés **sur six sessions HTTP réelles**. **Mais on ne peut pas en créer un
+par le produit** : `POST/PUT/DELETE /users` → **501**, `GET /users` ne projette même pas le rôle, et
+**aucune des 118 routes n'attribue ni ne retire un rôle**. L'agent a dû créer ses six comptes **par
+insertion en base** — seul chemin possible.
+
+**Recompte** : le noyau publie **118** routes d'API, et non 112 — *c'est le compte des lignes de
+déclaration ; `apiResource` en produit 5*. **118/118 sans policy** ; **114/118 sans aucune garde
+d'autorisation** ; **102 des 106 routes authentifiées** n'en ont aucune.
+
+🔑 **Règles 2 et 3 honorées de bout en bout** : retrait de `permission:data.export` → **3 failed** ;
+restauration → **6 passed**. Et le **témoin négatif** est exemplaire : une policy **branchée
+volontairement** produit **5 appels tracés et 3 codes 403** — le code réel en produit **0 sur 117
+requêtes**. *L'instrument voit donc parfaitement les appels quand il y en a.*
+
+⚠️ **Et une fausse piste levée, que je porte au crédit de l'agent** : un premier passage rendait **403
+à tout le monde** sur les exports. Il a failli l'écrire. C'était **un cache Spatie périmé dans son
+propre atelier**, pas un défaut produit. **Non rapporté.**
+
+⚠️ **`A-009` aggravé, avec la cause enfin isolée** : `require vendor/autoload.php` prend **82,69 s**
+sur le montage Windows. En copiant le dépôt **dans** le conteneur, `/up` répond en **5,4 s**.
+*C'est la même cause que `H45-009` (~115× plus lent), mesurée par un autre chemin.*
+
+---
+
+### Précision apportée par l'agent 49 sur `I49-008` — et elle durcit le constat
+
+L'agent est **allé mesurer lui-même** une cadence qu'il n'avait reprise que de l'agent 14 — *plutôt
+que de la laisser reposer sur un pair*. `src/server/queue/queues.ts:1029-1045` →
+`repeat: { pattern: "*/10 * * * *" }`, et **le commentaire du produit tranche lui-même** :
+
+> « l'émission immédiate est un **confort**, ce passage est la **garantie de livraison** »
+
+**Le constat en devient plus dur, pas moins** :
+
+> **Aucun des deux sens ne tient les 60 secondes sur son chemin garanti** — balayage à **10 minutes**
+> côté site, `everyFiveMinutes()` côté CRM. **Le seul chemin qui tient le budget est celui que le
+> produit qualifie lui-même de « confort »**, par opposition au balayage qui est « la garantie de
+> livraison ».
+> **Un critère d'acceptation ne peut pas s'appuyer sur le chemin que le produit désigne comme non
+> garanti.**
+
+**Témoin négatif** : le même contrôle **trouve bien** les autres cadences déclarées (`"30 4 * * *"`
+pour la réconciliation, 05:00 UTC pour le vivier) — *il sait lire une cadence, et il n'en trouve
+aucune sous les 10 minutes*.
+
+**Et deux mots du critère 18 que l'agent laisse explicitement ouverts plutôt que de trancher à la
+place du dirigeant** — ils sont à porter au cahier des charges, pas au produit :
+- « **inscriptions** » : newsletter, ou inscription à une **session** (qui n'a **aucun émetteur**) ?
+- « **reçus** » : **acquitté**, ou **ayant produit une fiche** ? *Tant que ce mot n'est pas tranché,
+  le critère 18 serait **vert sur un CRM qui n'a créé aucune fiche** — c'est-à-dire exactement l'état
+  que `B13-001` a mesuré.*

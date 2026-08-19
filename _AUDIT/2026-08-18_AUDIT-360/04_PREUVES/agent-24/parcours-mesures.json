@@ -1,0 +1,593 @@
+{
+  "resultats": [
+    {
+      "parcours": "A1 · lancer une collecte sur un département (carte)",
+      "budgetCdc": "hors §23.4",
+      "clicsMesures": 4,
+      "dureeMs": 17327,
+      "arret": null,
+      "trace": [
+        {
+          "etape": 1,
+          "quoi": "déplier la section « Collecte »",
+          "clicsCumules": 1,
+          "url": "/",
+          "titreEcran": "Tableau de bord"
+        },
+        {
+          "etape": 2,
+          "quoi": "cliquer l'entrée « Couverture France »",
+          "clicsCumules": 2,
+          "url": "/coverage",
+          "titreEcran": "Couverture France"
+        },
+        {
+          "etape": 3,
+          "quoi": "cliquer « Action »",
+          "clicsCumules": 3,
+          "url": "/coverage",
+          "titreEcran": "Couverture France"
+        },
+        {
+          "etape": 4,
+          "quoi": "cliquer la zone « Isère » sur la carte",
+          "clicsCumules": 4,
+          "url": "/coverage",
+          "titreEcran": "Couverture France"
+        }
+      ]
+    },
+    {
+      "parcours": "A2 · créer une collecte multi-sources (assistant 4 étapes)",
+      "budgetCdc": "hors §23.4",
+      "clicsMesures": 5,
+      "dureeMs": 11552,
+      "arret": null,
+      "trace": [
+        {
+          "etape": 1,
+          "quoi": "déplier la section « Collecte »",
+          "clicsCumules": 1,
+          "url": "/",
+          "titreEcran": "Tableau de bord"
+        },
+        {
+          "etape": 2,
+          "quoi": "cliquer l'entrée « Collectes »",
+          "clicsCumules": 2,
+          "url": "/campaigns",
+          "titreEcran": "Collectes"
+        },
+        {
+          "etape": 3,
+          "quoi": "cliquer « Nouvelle campagne »",
+          "clicsCumules": 3,
+          "url": "/campaigns/new",
+          "titreEcran": "Nouvelle campagne"
+        },
+        {
+          "etape": 4,
+          "quoi": "saisir le nom",
+          "clicsCumules": 4,
+          "url": "/campaigns/new",
+          "titreEcran": "Nouvelle campagne"
+        },
+        {
+          "etape": 5,
+          "quoi": "cliquer « Continuer »",
+          "clicsCumules": 5,
+          "url": "/campaigns/new",
+          "titreEcran": "Nouvelle campagne"
+        }
+      ]
+    },
+    {
+      "parcours": "A3 · retrouver une entreprise et ouvrir sa fiche",
+      "budgetCdc": "≤ 3 clics (§7.3)",
+      "clicsMesures": 3,
+      "dureeMs": 11252,
+      "arret": null,
+      "trace": [
+        {
+          "etape": 1,
+          "quoi": "déplier la section « Contacts »",
+          "clicsCumules": 1,
+          "url": "/",
+          "titreEcran": "Tableau de bord"
+        },
+        {
+          "etape": 2,
+          "quoi": "cliquer l'entrée « Entreprises »",
+          "clicsCumules": 2,
+          "url": "/companies",
+          "titreEcran": "Entreprises"
+        },
+        {
+          "etape": 3,
+          "quoi": "ouvrir la fiche de la 1re ligne",
+          "clicsCumules": 3,
+          "url": "/companies/1",
+          "titreEcran": ""
+        }
+      ]
+    },
+    {
+      "parcours": "A4 · exporter les entreprises en CSV",
+      "budgetCdc": "hors §23.4",
+      "clicsMesures": 3,
+      "dureeMs": 10304,
+      "arret": null,
+      "trace": [
+        {
+          "etape": 1,
+          "quoi": "déplier la section « Contacts »",
+          "clicsCumules": 1,
+          "url": "/",
+          "titreEcran": "Tableau de bord"
+        },
+        {
+          "etape": 2,
+          "quoi": "cliquer l'entrée « Entreprises »",
+          "clicsCumules": 2,
+          "url": "/companies",
+          "titreEcran": "Entreprises"
+        },
+        {
+          "etape": 3,
+          "quoi": "cliquer « Exporter »",
+          "clicsCumules": 3,
+          "url": "/companies",
+          "titreEcran": "Entreprises"
+        }
+      ]
+    },
+    {
+      "parcours": "A5 · sélectionner une page et poser un tag en masse",
+      "budgetCdc": "hors §23.4",
+      "clicsMesures": null,
+      "dureeMs": 15427,
+      "arret": {
+        "etape": 4,
+        "quoi": "poser le tag",
+        "clicsAvantArret": 3,
+        "erreur": "TimeoutError: locator.click: Timeout 6000ms exceeded.",
+        "ecran": {
+          "url": "/companies",
+          "titre": "Entreprises"
+        }
+      },
+      "trace": [
+        {
+          "etape": 1,
+          "quoi": "déplier la section « Contacts »",
+          "clicsCumules": 1,
+          "url": "/",
+          "titreEcran": "Tableau de bord"
+        },
+        {
+          "etape": 2,
+          "quoi": "cliquer l'entrée « Entreprises »",
+          "clicsCumules": 2,
+          "url": "/companies",
+          "titreEcran": "Entreprises"
+        },
+        {
+          "etape": 3,
+          "quoi": "cocher la sélection de la page",
+          "clicsCumules": 3,
+          "url": "/companies",
+          "titreEcran": "Entreprises"
+        }
+      ]
+    },
+    {
+      "parcours": "A6 · ouvrir la fiche d’un média",
+      "budgetCdc": "hors §23.4",
+      "clicsMesures": 3,
+      "dureeMs": 9093,
+      "arret": null,
+      "trace": [
+        {
+          "etape": 1,
+          "quoi": "déplier la section « Contacts »",
+          "clicsCumules": 1,
+          "url": "/",
+          "titreEcran": "Tableau de bord"
+        },
+        {
+          "etape": 2,
+          "quoi": "cliquer l'entrée « Médias »",
+          "clicsCumules": 2,
+          "url": "/media",
+          "titreEcran": "Médias"
+        },
+        {
+          "etape": 3,
+          "quoi": "ouvrir la fiche du 1er média",
+          "clicsCumules": 3,
+          "url": "/media/1",
+          "titreEcran": ""
+        }
+      ]
+    },
+    {
+      "parcours": "A7 · arbitrer un rapprochement (rattacher)",
+      "budgetCdc": "hors §23.4",
+      "clicsMesures": null,
+      "dureeMs": 14972,
+      "arret": {
+        "etape": 3,
+        "quoi": "cliquer « Rattacher »",
+        "clicsAvantArret": 2,
+        "erreur": "TimeoutError: locator.click: Timeout 8000ms exceeded.",
+        "ecran": {
+          "url": "/console/arbitrage",
+          "titre": "Rapprochements à arbitrer"
+        }
+      },
+      "trace": [
+        {
+          "etape": 1,
+          "quoi": "déplier la section « Contacts »",
+          "clicsCumules": 1,
+          "url": "/",
+          "titreEcran": "Tableau de bord"
+        },
+        {
+          "etape": 2,
+          "quoi": "cliquer l'entrée « À arbitrer »",
+          "clicsCumules": 2,
+          "url": "/console/arbitrage",
+          "titreEcran": "Rapprochements à arbitrer"
+        }
+      ]
+    },
+    {
+      "parcours": "A8 · relancer un run de collecte échoué",
+      "budgetCdc": "hors §23.4",
+      "clicsMesures": null,
+      "dureeMs": 14714,
+      "arret": {
+        "etape": 3,
+        "quoi": "filtrer les runs en échec",
+        "clicsAvantArret": 2,
+        "erreur": "TimeoutError: locator.click: Timeout 8000ms exceeded.",
+        "ecran": {
+          "url": "/scraper-runs",
+          "titre": "Journaux de collecte"
+        }
+      },
+      "trace": [
+        {
+          "etape": 1,
+          "quoi": "déplier la section « Collecte »",
+          "clicsCumules": 1,
+          "url": "/",
+          "titreEcran": "Tableau de bord"
+        },
+        {
+          "etape": 2,
+          "quoi": "cliquer l'entrée « Journaux de collecte »",
+          "clicsCumules": 2,
+          "url": "/scraper-runs",
+          "titreEcran": "Journaux de collecte"
+        }
+      ]
+    },
+    {
+      "parcours": "A9 · voir le vivier candidats et ouvrir une fiche candidat",
+      "budgetCdc": "hors §23.4",
+      "clicsMesures": null,
+      "dureeMs": 13029,
+      "arret": {
+        "etape": 3,
+        "quoi": "ouvrir la fiche du 1er candidat",
+        "clicsAvantArret": 2,
+        "erreur": "TimeoutError: locator.click: Timeout 6000ms exceeded.",
+        "ecran": {
+          "url": "/console/vivier",
+          "titre": "Vivier candidats"
+        }
+      },
+      "trace": [
+        {
+          "etape": 1,
+          "quoi": "déplier la section « Contacts »",
+          "clicsCumules": 1,
+          "url": "/",
+          "titreEcran": "Tableau de bord"
+        },
+        {
+          "etape": 2,
+          "quoi": "cliquer l'entrée « Vivier candidats »",
+          "clicsCumules": 2,
+          "url": "/console/vivier",
+          "titreEcran": "Vivier candidats"
+        }
+      ]
+    },
+    {
+      "parcours": "B1 · §23.4 répondre à un message entrant (départ : notification)",
+      "budgetCdc": "2 clics",
+      "clicsMesures": null,
+      "dureeMs": 10187,
+      "arret": {
+        "etape": 2,
+        "quoi": "ouvrir le message reçu (un panneau doit s’être ouvert)",
+        "clicsAvantArret": 1,
+        "erreur": "TimeoutError: locator.waitFor: Timeout 4000ms exceeded.",
+        "ecran": {
+          "url": "/",
+          "titre": "Tableau de bord"
+        }
+      },
+      "trace": [
+        {
+          "etape": 1,
+          "quoi": "cliquer la cloche « Notifications » de l’en-tête",
+          "clicsCumules": 1,
+          "url": "/",
+          "titreEcran": "Tableau de bord"
+        }
+      ]
+    },
+    {
+      "parcours": "B2 · §23.4 créer un contact complet (depuis n’importe quel écran)",
+      "budgetCdc": "1 clic + saisie",
+      "clicsMesures": null,
+      "dureeMs": 8573,
+      "arret": {
+        "etape": 1,
+        "quoi": "trouver un bouton de création de personne (en-tête, barre ou écran)",
+        "clicsAvantArret": 0,
+        "erreur": "TimeoutError: locator.click: Timeout 5000ms exceeded.",
+        "ecran": {
+          "url": "/",
+          "titre": "Tableau de bord"
+        }
+      },
+      "trace": []
+    },
+    {
+      "parcours": "B3 · §23.4 consigner un appel (départ : la fiche 360°)",
+      "budgetCdc": "1 clic",
+      "clicsMesures": null,
+      "dureeMs": 8038,
+      "arret": {
+        "etape": 1,
+        "quoi": "cliquer « Consigner un appel » sur la fiche",
+        "clicsAvantArret": 0,
+        "erreur": "TimeoutError: locator.click: Timeout 5000ms exceeded.",
+        "ecran": {
+          "url": "/console/personnes/pk-demo",
+          "titre": "Marie DUPONT"
+        }
+      },
+      "trace": []
+    },
+    {
+      "parcours": "B4 · §23.4 lancer la visio d’un rendez-vous (départ : accueil)",
+      "budgetCdc": "1 clic",
+      "clicsMesures": null,
+      "dureeMs": 9929,
+      "arret": {
+        "etape": 1,
+        "quoi": "cliquer « Lancer la visio » sur l’accueil",
+        "clicsAvantArret": 0,
+        "erreur": "TimeoutError: locator.click: Timeout 5000ms exceeded.",
+        "ecran": {
+          "url": "/",
+          "titre": "Tableau de bord"
+        }
+      },
+      "trace": []
+    },
+    {
+      "parcours": "B5 · §23.4 retrouver ce qui a été dit (⌘K → fiche)",
+      "budgetCdc": "< 10 s",
+      "clicsMesures": 2,
+      "dureeMs": 9423,
+      "arret": null,
+      "trace": [
+        {
+          "etape": 1,
+          "quoi": "ouvrir la recherche globale (⌘K)",
+          "clicsCumules": 1,
+          "url": "/",
+          "titreEcran": "Tableau de bord"
+        },
+        {
+          "etape": 2,
+          "quoi": "taper « Dupont »",
+          "clicsCumules": 1,
+          "url": "/",
+          "titreEcran": "Tableau de bord"
+        },
+        {
+          "etape": 3,
+          "quoi": "cliquer le résultat PERSONNE",
+          "clicsCumules": 2,
+          "url": "/contacts",
+          "titreEcran": "Contacts"
+        }
+      ]
+    },
+    {
+      "parcours": "B6 · §23.4 valider un compte rendu d’entretien",
+      "budgetCdc": "1 écran",
+      "clicsMesures": null,
+      "dureeMs": 9020,
+      "arret": {
+        "etape": 1,
+        "quoi": "trouver « Comptes rendus à valider » dans la barre",
+        "clicsAvantArret": 0,
+        "erreur": "TimeoutError: locator.click: Timeout 5000ms exceeded.",
+        "ecran": {
+          "url": "/",
+          "titre": "Tableau de bord"
+        }
+      },
+      "trace": []
+    },
+    {
+      "parcours": "B7 · §23.4 envoyer le devis après un rendez-vous (fiche → console)",
+      "budgetCdc": "1 clic",
+      "clicsMesures": null,
+      "dureeMs": 7518,
+      "arret": {
+        "etape": 1,
+        "quoi": "cliquer « Créer le devis » sur la fiche",
+        "clicsAvantArret": 0,
+        "erreur": "TimeoutError: locator.click: Timeout 5000ms exceeded.",
+        "ecran": {
+          "url": "/console/personnes/pk-demo",
+          "titre": "Marie DUPONT"
+        }
+      },
+      "trace": []
+    },
+    {
+      "parcours": "B8 · §23.4 voir depuis la console qui est ce client (lien permanent)",
+      "budgetCdc": "1 clic",
+      "clicsMesures": null,
+      "dureeMs": 8134,
+      "arret": {
+        "etape": 1,
+        "quoi": "trouver le lien « ↗ Console axionia » au pied de la barre",
+        "clicsAvantArret": 0,
+        "erreur": "TimeoutError: locator.click: Timeout 5000ms exceeded.",
+        "ecran": {
+          "url": "/",
+          "titre": "Tableau de bord"
+        }
+      },
+      "trace": []
+    },
+    {
+      "parcours": "B9 · §23.4 déplacer un candidat d’étape",
+      "budgetCdc": "glisser-déposer ou 1 clic",
+      "clicsMesures": null,
+      "dureeMs": 12285,
+      "arret": {
+        "etape": 3,
+        "quoi": "déplacer le candidat vers l’étape suivante",
+        "clicsAvantArret": 2,
+        "erreur": "TimeoutError: locator.click: Timeout 5000ms exceeded.",
+        "ecran": {
+          "url": "/console/vivier",
+          "titre": "Vivier candidats"
+        }
+      },
+      "trace": [
+        {
+          "etape": 1,
+          "quoi": "déplier la section « Contacts »",
+          "clicsCumules": 1,
+          "url": "/",
+          "titreEcran": "Tableau de bord"
+        },
+        {
+          "etape": 2,
+          "quoi": "cliquer l'entrée « Vivier candidats »",
+          "clicsCumules": 2,
+          "url": "/console/vivier",
+          "titreEcran": "Vivier candidats"
+        }
+      ]
+    },
+    {
+      "parcours": "B10 · §23.4 programmer un rappel (départ : la fiche)",
+      "budgetCdc": "1 clic + une date",
+      "clicsMesures": null,
+      "dureeMs": 10022,
+      "arret": {
+        "etape": 1,
+        "quoi": "cliquer « Programmer un rappel » sur la fiche",
+        "clicsAvantArret": 0,
+        "erreur": "TimeoutError: locator.click: Timeout 5000ms exceeded.",
+        "ecran": {
+          "url": "/console/personnes/pk-demo",
+          "titre": "Marie DUPONT"
+        }
+      },
+      "trace": []
+    },
+    {
+      "parcours": "B11 · §23.4 modifier un questionnaire (console du CRM)",
+      "budgetCdc": "aperçu avant publication",
+      "clicsMesures": null,
+      "dureeMs": 12619,
+      "arret": {
+        "etape": 3,
+        "quoi": "ouvrir l’onglet des questionnaires / trames d’entretien",
+        "clicsAvantArret": 2,
+        "erreur": "TimeoutError: locator.click: Timeout 5000ms exceeded.",
+        "ecran": {
+          "url": "/settings",
+          "titre": "Paramètres"
+        }
+      },
+      "trace": [
+        {
+          "etape": 1,
+          "quoi": "déplier la section « Réglages »",
+          "clicsCumules": 1,
+          "url": "/",
+          "titreEcran": "Tableau de bord"
+        },
+        {
+          "etape": 2,
+          "quoi": "cliquer l'entrée « Paramètres »",
+          "clicsCumules": 2,
+          "url": "/settings",
+          "titreEcran": "Paramètres"
+        }
+      ]
+    },
+    {
+      "parcours": "C1 · l’état des filtres et de la page survit-il au retour arrière ?",
+      "trace": [],
+      "urlApresFiltreEtPage3": "/companies",
+      "etatAvant": {
+        "boutonsActifs": [
+          "3"
+        ],
+        "texteHaut": "Entreprises Pipeline de prospection · 137 entreprises actives Importer Exporter Lancer scraping → TOTAL 137 Page 3 · 20 affichées ENRICHIES 100% dont "
+      },
+      "urlFiche": "/companies/1",
+      "urlApresRetour": "/companies",
+      "etatApres": {
+        "boutonsActifs": [
+          "1"
+        ],
+        "texteHaut": "Entreprises Pipeline de prospection · 137 entreprises actives Importer Exporter Lancer scraping → TOTAL 137 Page 1 · 20 affichées ENRICHIES 100% dont "
+      },
+      "etatConserve": false,
+      "liensDeRetourSurLaFiche": [
+        "/",
+        "/console/contacts",
+        "/console/vivier",
+        "/console/arbitrage",
+        "/companies",
+        "/journalists",
+        "/media",
+        "/coverage",
+        "/campaigns",
+        "/scraper-runs",
+        "/international/roumanie",
+        "/audiences",
+        "/admin/observability",
+        "/rgpd/requests",
+        "/rgpd/ai-act",
+        "/audit-logs",
+        "/users",
+        "/settings",
+        "/tags",
+        "/llm/router",
+        "/llm/proxy-providers",
+        "/llm/rotations"
+      ]
+    }
+  ],
+  "nbAppelsApiDoubles": 130
+}

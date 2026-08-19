@@ -16,7 +16,7 @@
 > de « déduit » à « mesuré sur le serveur de production »** : `F37-001` et `F37-002`.
 > Le détail de cette mise à jour est au **§6**, en fin de document.
 
-Cinq groupes de constats décrivent le **même** défaut vu par des agents différents. C'est un bon signe
+Six groupes de constats décrivent le **même** défaut vu par des agents différents. C'est un bon signe
 (plusieurs mesures indépendantes convergent), mais il ne faut pas les compter deux fois.
 
 | Groupe | Constats fusionnés | Le défaut, en une phrase |
@@ -27,20 +27,22 @@ Cinq groupes de constats décrivent le **même** défaut vu par des agents diff�
 | **G4 — personne ne peut entrer** | `A-012` · `F40-002` · `A07-001` · `A06-002` | `MAIL_MAILER` n'est défini **nulle part** → ni lien magique ni réinitialisation ; le mot de passe initial n'a été annoncé qu'une fois ; **et l'enrôlement 2FA écrit trois colonnes qui n'existent pas** — donc même avec un mot de passe, **la première connexion ne peut pas aboutir**. |
 | **G5 — la production ne peut pas porter le produit** | `A-010` · `A-009` · `A06-003` | `php -S`, **un seul processus**, requêtes **sérialisées** (escalier de 15 ms, témoin positif plat). **Principe directeur 8 et critère 17 inatteignables par construction.** php-fpm **est dans l'image** et n'est jamais lancé. |
 
+| **G6 — l'autorisation n'existe pas** | `F36-001` · `F36-002` · `F36-003` · `F36-011` · `B12-003` · `B15-010` | 🔴 **Aucune des 11 policies n'est jamais invoquée.** Démonstration décisive : **réécrites en refus total, l'API répond à l'identique et les 15 tests restent verts.** Et `$this->authorize()` est **fatal** dans les 35 contrôleurs d'API (`ApiController` n'a pas `AuthorizesRequests`) — *qui voudrait bien faire casserait la route qu'il protège*. Conséquences mesurées en session réelle : un `viewer` **supprime définitivement** une entreprise (204), **exporte les 4 295 349 fiches** (200 au lieu de 403), et **les routes RGPD n'exigent aucune permission**. **118/118 routes sans policy.** |
+
 **Les sept S0 restants, distincts :**
 
 | Id | Le défaut |
 |---|---|
 | `B12-003` | **Aucune policy n'est jamais appelée** : un `viewer` a **supprimé définitivement** une entreprise (`Company` n'a pas `SoftDeletes`, la doc annonce l'inverse). ⚠️ **Réserve de l'agent 12, que j'avais omise — elle est rétablie** : mesuré là où `CRM_DB_APP_ROLE_ENABLED=false`, alors que la **production est à `true`**. **À rejouer en P4 dans la configuration de production** avant de conclure sur sa portée réelle. Idem pour `B12-001` |
 | `B12-004` → **`F37-001`** | `POST /internal/scraper-result` **accepte une signature forgée**. ⚠️ **Constat REMPLACÉ** : l'agent 12 l'avait déduit de `.env.example` ; **`F37-001` l'a mesuré sur le serveur** — secret **vide en production**, contrôle **fail-open**, funnel **ouvert**. **Rang 0 bis** |
-| **`F36-001`** | 🔴 **Un compte `viewer` exporte les 4 295 349 fiches nominatives** (200 au lieu de 403) — **garde vue ROUGE**, correctif et test **déjà écrits**. Croisé avec `B12-010` (aucune trace au journal) et `B15-010` : *un lecteur emporte tout, sans obstacle et sans trace* |
+| **`F36-011`** | 🔴 **Un compte `viewer` exporte les 4 295 349 fiches nominatives** (200 au lieu de 403) — **garde vue ROUGE**, correctif et test **déjà écrits**. Croisé avec `B12-010` (aucune trace au journal) et `B15-010` : *un lecteur emporte tout, sans obstacle et sans trace* |
 | `C18-016` | `MockServicesProvider` **sans garde d'environnement, défaut = mock** ; `MockLLMClient` **écrit des classifications fabriquées en base de production** (reclassé S0, `D-012`) |
 | `C19-007` | Base légale « intérêt légitime » **sans mise en balance écrite ni information art. 14**, pour **1 319 567 personnes** |
 | `I48-001` | **Le CRM n'a aucune route pour créer une fiche personne** ; la modifier ou la supprimer rend **501** |
 | `A07-003` | Le **runbook de rotation des secrets** prescrit `docker compose restart` : **un secret réputé tourné ne l'est pas** |
 | `A08-008` | La sauvegarde restaure **les données mais pas les droits** (`--no-acl`) : une restauration de secours livre **une application incapable de lire** — et le script annonce « Restore complet » |
 
-**15 défauts S0 distincts** (voir le §6 pour les quatre ajouts et les deux requalifications).
+**16 défauts S0 distincts** (voir le §6 pour les quatre ajouts et les deux requalifications).
 
 ---
 

@@ -20,3 +20,5 @@ UTC 2026-08-19T09:58:23Z
 ### GET /api/v1/search?q=ab (non auth, json) -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)
 
 --- 4. internal : temoin NEGATIF (mauvaise signature) ------
+### POST /internal/scraper-result SIG BIDON -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)
+### POST /internal/scraper-result SANS SIG -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)

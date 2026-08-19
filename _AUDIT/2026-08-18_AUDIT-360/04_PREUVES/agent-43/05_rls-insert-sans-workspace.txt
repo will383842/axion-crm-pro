@@ -1,0 +1,11 @@
+=== (1) TEMOIN POSITIF : insertion AVEC workspace_id (patron de Crm/BulkController::addTag) ===
+BEGIN
+SET
+INSERT 0 1
+ROLLBACK
+
+=== (2) MESURE : insertion SANS workspace_id (CompanyTagsBulkController::poser, l.128-133) ===
+BEGIN
+SET
+ROLLBACK
+ERROR:  new row violates row-level security policy for table "company_tag"

@@ -1,7 +1,11 @@
 # AGENT 36 — Auditeur des permissions
 
 > **Référence mesurée** : dépôt CRM, `main = e8924b81ad64c0b236acd99ac5cbac4cd68eada7` (`e8924b8`).
-> `git log` relu au début et à la fin de la mission. Aucun commit produit n'a bougé pendant.
+> `git log` relu au début **et à la fin** de la mission, comme l'exige le dossier commun. `main` a
+> avancé pendant l'audit (`8db8229`, puis `6c90194`), mais `git diff --stat e8924b8..HEAD --
+> backend/ frontend/ infra/` ne rend qu'**une seule ligne** : l'ajout de
+> `infra/scripts/verifier-serveur-http.sh`. **Aucun fichier de `backend/` n'a bougé.** Tous les
+> constats ci-dessous restent donc valides sur `main` au moment où j'écris.
 >
 > **Méthode** : celle exigée par le mandat. Base jetable `axion_crm_a36`, conteneur d'API dédié
 > `a36-api` (port 58136), **six comptes créés**, **six sessions HTTP réellement ouvertes**
@@ -524,7 +528,13 @@ C'est un livrable, pas un aveu.
 5. **Les 4 routes `api/internal`** (HMAC) : elles rendent 401/503 sans signature valide. Je n'ai
    pas fabriqué de signature HMAC valide — hors périmètre « permissions par rôle », et l'agent
    dédié au canal interne est mieux placé.
-6. **Mesures expirées, et dites comme telles** : le premier balayage de la matrice par rôle a
+6. **Comment reproduire.** La base jetable `axion_crm_a36` et le conteneur `a36-api` sont
+   **conservés** (conteneur arrêté, pour ne pas peser sur un atelier déjà saturé).
+   `docker start a36-api` puis `sh /tmp/login.sh a36-viewer@test.local viewer` et
+   `sh /tmp/sweep.sh viewer` rejouent l'ensemble. Mot de passe des six comptes :
+   `MotDePasseA36!2026`. Espaces : ALPHA `c6a16436-…`, BETA `5c654b31-…`. La base de test
+   `axion_crm_a36_test` a été supprimée après usage.
+7. **Mesures expirées, et dites comme telles** : le premier balayage de la matrice par rôle a
    dépassé 10 min et n'a rien produit ; il a été relancé en arrière-plan. Deux requêtes `psql` ont
    également expiré à 300 s et ont été rejouées. Aucune conclusion n'a été tirée d'une mesure
    expirée. La ligne `/workspace` de la matrice §4 a été perdue à l'écriture concurrente du

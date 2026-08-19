@@ -31,3 +31,31 @@ select * from "companies" where "deleted_at" is null and "workspace_id" = '20cd8
  Execution Time: 61840.881 ms
 (22 rows)
 
+
+===== CHAUD (4e exécution) =====
+                                                                             QUERY PLAN                                                                             
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.43..4595.70 rows=51 width=2078) (actual time=56616.720..56616.728 rows=0 loops=1)
+   Buffers: shared hit=534216 read=2287836 written=1888
+   ->  Index Scan using idx_companies_ws_updated_id on companies  (cost=0.43..63078588.79 rows=700070 width=2078) (actual time=56616.716..56616.723 rows=0 loops=1)
+         Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+         Filter: (((denomination ~~* 'marti%'::text) OR (hashed SubPlan 4)) AND ((lifecycle_stage <> 'nouveau'::text) OR (hashed SubPlan 2)))
+         Rows Removed by Filter: 2800000
+         Buffers: shared hit=534216 read=2287836 written=1888
+         SubPlan 4
+           ->  Seq Scan on contacts  (cost=0.00..11.50 rows=1 width=8) (actual time=1.957..1.958 rows=0 loops=1)
+                 Filter: ((last_name ~~* 'marti%'::text) OR (email ~~* 'marti%'::citext))
+                 Buffers: shared read=1
+         SubPlan 2
+           ->  Hash Join  (cost=3.18..20.03 rows=246 width=8) (never executed)
+                 Hash Cond: (company_tag.tag_id = tags.id)
+                 ->  Seq Scan on company_tag  (cost=0.00..15.40 rows=540 width=16) (never executed)
+                 ->  Hash  (cost=2.85..2.85 rows=26 width=8) (never executed)
+                       ->  Seq Scan on tags  (cost=0.00..2.85 rows=26 width=8) (never executed)
+                             Filter: ((slug !~~ 'src:scraping-%'::text) AND (slug ~~ 'src:%'::text))
+ Planning:
+   Buffers: shared hit=1158 read=107
+ Planning Time: 625.742 ms
+ Execution Time: 56624.343 ms
+(22 rows)
+

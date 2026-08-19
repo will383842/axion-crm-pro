@@ -45,39 +45,142 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # L'environnement staging Coolify N'EXISTE PAS (secrets jamais posés : le
-  # webhook partait vers l'URL vide "" avec « Bearer  » — curl exit 3). Ce
-  # workflow avait donc échoué 100 fois sur 100 depuis sa création, et ce rouge
-  # PERPÉTUEL masquait les échecs réels : le 2026-08-15, deux vrais défauts de
-  # build (lock composer, corepack) ont dû être triés au milieu de ce bruit.
-  # Un état rouge qui ne peut jamais passer au vert ne signale rien.
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # 🔴 RÉÉCRIT le 2026-08-19 — Coolify RETIRÉ, remplacé par le patron SSH.
   #
-  # Les jobs webhook + smoke sont donc CONDITIONNÉS à l'existence des secrets :
-  # le jour où un staging existe, poser COOLIFY_STAGING_TOKEN +
-  # COOLIFY_STAGING_WEBHOOK suffit à les réactiver, sans toucher au YAML.
-  # Le job de build, lui, garde toute sa valeur (images :staging et :sha sur
-  # GHCR à chaque push main) et reste inconditionnel.
-  trigger-coolify:
-    name: Trigger Coolify pull
+  # Ce qui était là avant : deux jobs `trigger-coolify` + `smoke` conditionnés à
+  # `vars.COOLIFY_STAGING_ENABLED`. Ils n'ont JAMAIS tourné, et pour une raison
+  # de fond : **le CRM ne se déploie pas par Coolify.** Il se déploie par
+  # `deploy-direct-ssh.yml` (SSH + `git reset --hard` + `docker compose`).
+  # Coolify déploie le SITE Axion-IA, pas ce produit — une confusion durable
+  # entre les deux dépôts.
+  #
+  # Bâtir la préproduction sur Coolify aurait créé un SECOND mécanisme de
+  # déploiement, différent de celui de la production : une préproduction qui ne
+  # prouve rien sur le chemin réel, et qui contredit le §28.5 (« on étend, on ne
+  # réinvente pas »). Ce job rejoue donc EXACTEMENT le patron de production.
+  #
+  # ⚠️ La production ne dépend PAS de ce job (§6.6 point 8 de l'inventaire) :
+  # d'abord prouver que la préproduction vit, ensuite seulement brancher la
+  # dépendance. Faire l'inverse casserait le déploiement de production avant
+  # même que la préproduction existe.
+  #
+  # Prérequis, à jouer UNE FOIS : `infra/scripts/bootstrap-preprod.sh` sur le
+  # serveur (clone dans /opt/axion-crm-pro-staging, .env dédié, première pile).
+  # ══════════════════════════════════════════════════════════════════════════
+  deploy-staging:
+    name: SSH Hetzner — préproduction
     runs-on: ubuntu-24.04
     needs: build-and-push
-    if: vars.COOLIFY_STAGING_ENABLED == 'true'
+    environment:
+      name: staging-direct-ssh
+      url: https://staging.axion-crm-pro.com
     steps:
-      - name: Webhook Coolify staging
+      - name: Les secrets sont-ils là ?
         run: |
-          curl -fsS -X POST \
-            -H "Authorization: Bearer ${{ secrets.COOLIFY_STAGING_TOKEN }}" \
-            "${{ secrets.COOLIFY_STAGING_WEBHOOK }}"
+          set -e
+          if [ -z "${{ secrets.HETZNER_SSH_PRIVATE_KEY }}" ]; then
+            echo "::error::Secret HETZNER_SSH_PRIVATE_KEY manquant."
+            exit 1
+          fi
+          if [ -z "${{ secrets.HETZNER_HOST }}" ]; then
+            echo "::error::Secret HETZNER_HOST manquant."
+            exit 1
+          fi
 
-  smoke:
-    name: Smoke staging
-    runs-on: ubuntu-24.04
-    needs: trigger-coolify
-    if: vars.COOLIFY_STAGING_ENABLED == 'true'
-    steps:
-      - name: Wait for staging
-        run: sleep 60
-      - name: GET /up
-        run: curl -fsS https://staging-api.axion-crm-pro.com/up
-      - name: GET app
-        run: curl -fsS https://staging.axion-crm-pro.com -o /dev/null
+      - uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Confiance dans la clé d'hôte
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Déploiement de la préproduction
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # Heredoc QUOTÉ : le script part tel quel sur le serveur. Les valeurs
+          # voyagent en arguments.
+          # ⚠️ Chaque `docker exec` DOIT lire sur /dev/null : sinon il consomme le
+          # reste du script (qui arrive par l'entrée standard) et tout ce qui suit
+          # est silencieusement AVALÉ — défaut mesuré sur le déploiement b84100f,
+          # où le job est resté VERT sans avoir rien exécuté.
+          ssh -o StrictHostKeyChecking=no "$USER@$HOST" 'bash -s' -- \
+            "$EXPECTED_SHA" <<'REMOTE'
+          set -euo pipefail
+          EXPECTED_SHA="$1"
+          CHEMIN="/opt/axion-crm-pro-staging"
+
+          if [ ! -d "$CHEMIN/.git" ]; then
+            echo "::error::$CHEMIN absent — lancer infra/scripts/bootstrap-preprod.sh d'abord."
+            exit 1
+          fi
+
+          cd "$CHEMIN"
+          git fetch --depth 50 origin main
+          git reset --hard "$EXPECTED_SHA"
+          echo "HEAD = $(git rev-parse --short HEAD)"
+
+          export COMPOSE_FILE="docker-compose.yml:docker-compose.staging.yml"
+          export COMPOSE_PROJECT_NAME="axion-crm-staging"
+
+          # 🔴 Les services sont NOMMÉS. Un `up -d` global démarrerait le service
+          # `caddy` hérité de docker-compose.yml — qui prendrait 80/443 et
+          # TUERAIT le Caddy de PRODUCTION. L'overlay le met sous profil pour
+          # cette raison ; ce nommage est la seconde ceinture.
+          echo "::group::build + up"
+          docker compose up -d --build --force-recreate --no-deps api app horizon scheduler
+          # postgres et redis sans --force-recreate : les redémarrer à chaque
+          # déploiement ne sert à rien et coupe la base pour rien.
+          docker compose up -d --no-deps postgres redis
+          echo "::endgroup::"
+
+          echo "::group::migrations"
+          docker exec axion-crm-staging-api php artisan migrate --force --database=pgsql_owner < /dev/null
+          echo "::endgroup::"
+
+          # ── Vérifications. Un déploiement vert qui n'a rien appliqué, on
+          #    connaît : c'est le §7 du journal du 19/08.
+          echo "::group::vérifications"
+          ok=1
+
+          echo -n "API préprod (127.0.0.1:8082/up) : "
+          curl -fsS --max-time 15 http://127.0.0.1:8082/up > /dev/null 2>&1 \
+            && echo "répond" || { echo "MUETTE"; ok=0; }
+
+          echo -n "Frontend préprod (127.0.0.1:8081) : "
+          curl -fsS --max-time 15 -o /dev/null http://127.0.0.1:8081 2>&1 \
+            && echo "répond" || { echo "MUET"; ok=0; }
+
+          # TÉMOIN POSITIF — la PRODUCTION n'a pas bougé. Sans lui, « la préprod
+          # répond » ne dirait rien de ce qu'on aurait pu casser à côté.
+          echo -n "PRODUCTION intacte : "
+          curl -fsS --max-time 15 -o /dev/null -H 'Host: app.axion-crm-pro.com' http://127.0.0.1/ 2>&1 \
+            && echo "oui" || { echo "NON — ALERTE"; ok=0; }
+
+          # La préprod ne doit RIEN publier vers internet.
+          echo "-- ports publiés par la pile de préproduction --"
+          bash "$CHEMIN/infra/scripts/verifier-ports-publies.sh" axion-crm-staging "8081 8082" \
+            || echo "(contrôle des ports en échec — voir ci-dessus)"
+
+          echo "::endgroup::"
+          [ "$ok" -eq 1 ] || { echo "::error::Vérifications post-déploiement en échec."; exit 1; }
+          echo "Préproduction déployée sur $EXPECTED_SHA."
+          REMOTE
+
+      - name: Contrôle depuis l'extérieur
+        run: |
+          set -euo pipefail
+          # Le contrôle interne ne prouve pas que Caddy route correctement. Seul
+          # un appel depuis internet le fait.
+          curl -fsS --max-time 30 https://staging-api.axion-crm-pro.com/up > /dev/null
+          curl -fsS --max-time 30 -o /dev/null https://staging.axion-crm-pro.com
+          echo "OK — la préproduction répond depuis internet."

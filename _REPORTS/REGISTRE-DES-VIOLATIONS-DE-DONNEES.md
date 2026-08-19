@@ -79,8 +79,8 @@ Chiffres mesurés en base le 2026-08-19 :
 | `companies` | 4 295 349 | identification d'**entreprises** (dénomination, SIREN, adresse, secteur), issues de registres **publics** (INSEE/Sirene, BODACC, annuaires professionnels) |
 | `contacts` | **1 319 567 personnes physiques** | coordonnées **professionnelles** : nom, prénom, fonction, e-mail professionnel, téléphone professionnel, profil LinkedIn public |
 | `candidates` (vivier) | **0** | aucune candidature, aucun CV |
-| `users` (comptes applicatifs) | 1 | mot de passe sous forme d'empreinte, compte jamais utilisé |
-| sessions / jetons | **0** | aucun utilisateur ne s'était jamais connecté |
+| `users` (comptes applicatifs) | 1 | le dirigeant. Mot de passe sous forme d'empreinte. ⚠️ Ce compte a servi le 2026-05-17 — voir §5 bis |
+| sessions / jetons | **0 au 2026-08-19** | ⚠️ voir la rectification au §5 bis : cela ne signifie **pas** qu'aucune session n'a jamais existé |
 
 **Catégories particulières (art. 9)** : aucune. Pas de données de santé,
 d'opinions, de convictions, d'orientation, ni de données de mineurs.
@@ -100,6 +100,49 @@ d'effet constaté n'est donc pas une preuve d'absence d'accès.
 
 **Risque théorique principal** : réutilisation des coordonnées professionnelles
 par un tiers à des fins de prospection non sollicitée.
+
+### 5 bis. ⚠️ RECTIFICATION — une affirmation favorable de ce registre était fausse
+
+**Portée le 2026-08-19, le jour même, avant tout usage de ce registre.**
+
+La première rédaction affirmait qu'« aucun utilisateur ne s'était jamais
+connecté ». C'était une **déduction**, tirée de deux compteurs à zéro
+(`sessions` = 0, `personal_access_tokens` = 0) mesurés le 2026-08-19. Elle a été
+**réfutée le même jour** par la table `users` :
+
+```
+première connexion  : 2026-05-17 12:18:43 UTC
+parcours d'accueil terminé : 2026-05-17 12:33:15 UTC
+```
+
+Une session a donc bel et bien existé, **le jour même de la mise en service** —
+c'est-à-dire à l'intérieur de la fenêtre d'exposition. Des compteurs à zéro au
+19 août signifient que les sessions avaient **expiré**, pas qu'il n'y en a jamais
+eu.
+
+**Conséquence sur l'analyse du risque.** Redis était joignable depuis internet
+**et dépourvu de tout mot de passe** ; c'est lui qui stocke les sessions
+(`SESSION_DRIVER=redis`). Le vol d'un jeton de session pendant la fenêtre
+**ne peut donc pas être exclu**.
+
+**Portée réelle de ce risque, sans le minimiser ni l'exagérer** : la session
+concernée est celle de **l'unique compte administrateur** (le dirigeant), et non
+celles des personnes dont les données figurent dans la base — aucune personne
+concernée n'a de compte sur cet outil. Le risque porte donc sur l'**accès à
+l'outil**, non sur un identifiant appartenant à l'une des 1,32 million de
+personnes. Il ne modifie pas l'appréciation du risque **pour les droits et
+libertés des personnes concernées**, qui est l'objet des articles 33 et 34.
+
+**Observation associée** : l'authentification à deux facteurs de ce compte est
+**désactivée** (`totp_enabled_at` = null au 2026-08-19). Pour le compte qui
+détient 1,32 million de fiches, c'est une faiblesse à traiter, indépendamment de
+la présente violation.
+
+**Pourquoi cette rectification figure ici plutôt que d'être une correction
+silencieuse** : un registre qui contient une affirmation favorable et fausse perd
+toute valeur devant un contrôle. Mieux vaut une erreur corrigée et datée qu'une
+affirmation confortable jamais vérifiée. La cause de l'erreur est identifiable et
+générale : *un compteur à zéro décrit un instant, jamais une histoire.*
 
 ### 6. Mesures prises
 
@@ -158,8 +201,11 @@ physiques ».
 - **aucune catégorie particulière** de données au sens de l'article 9 ;
 - **aucune donnée bancaire ou financière** ;
 - **aucune donnée de candidature**, aucun CV ;
-- **aucun identifiant de connexion** d'une personne concernée : aucune session,
-  aucun jeton, un seul compte applicatif jamais utilisé ;
+- **aucun identifiant de connexion appartenant à une personne concernée** :
+  aucune des 1,32 million de personnes n'a de compte sur cet outil. ⚠️ Une
+  session du compte administrateur a existé pendant la fenêtre et son vol ne peut
+  être exclu (§5 bis) — cela concerne l'accès à l'outil, non un identifiant
+  d'une personne concernée ;
 - **aucun effet constaté** : ni modification anormale, ni rançon, ni fuite, ni
   réclamation ;
 - la violation a été **corrigée le jour même de sa découverte**, et une garde
@@ -172,7 +218,9 @@ physiques ».
   seulement la confidentialité ;
 - les identifiants étaient **publiés** dans un dépôt public ;
 - **l'absence d'accès non autorisé ne peut pas être démontrée** faute de
-  journalisation.
+  journalisation ;
+- une **session administrateur** a existé dans la fenêtre, sur un Redis sans mot
+  de passe et joignable depuis internet (§5 bis).
 
 **Information des personnes concernées (article 34)** : non. Cette obligation ne
 s'applique qu'en cas de risque **élevé**, non retenu ici.

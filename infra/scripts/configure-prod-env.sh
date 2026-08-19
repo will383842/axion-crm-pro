@@ -33,6 +33,15 @@ echo "[axion-config] Application credentials production…"
 
 # --- Désactivation MOCK pour sources réelles ---
 set_env "MOCK_MODE"                  "false"
+# MAIL_MAILER n'etait pose NULLE PART : Laravel retombait sur son defaut `log`,
+# et aucun courriel ne partait. La decision de Will est bien « log » — on
+# l'ECRIT, pour qu'elle cesse d'etre un defaut implicite.
+set_env "MAIL_MAILER"                "log"
+# ... mais le lien magique et la reinitialisation de mot de passe ne sont pas du
+# courrier commercial : ce sont les deux portes de secours d'un compte, et `log`
+# les coupait aussi. C'est l'une des raisons pour lesquelles personne ne s'est
+# jamais connecte au CRM. Poser `smtp` ici les laisse sortir, et EUX SEULS.
+set_env "MAIL_MAILER_AUTH"           "log"
 set_env "MOCK_LLM"                   "false"
 set_env "MOCK_INSEE"                 "false"
 set_env "MOCK_ANNUAIRE_ENTREPRISES"  "false"

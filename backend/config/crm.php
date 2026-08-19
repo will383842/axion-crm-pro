@@ -53,6 +53,28 @@ return [
     'strict_workspace_scope' => env('CRM_STRICT_WORKSPACE_SCOPE', false),
 
     /*
+    |--------------------------------------------------------------------------
+    | Mode simulacre
+    |--------------------------------------------------------------------------
+    |
+    | 🔴 CETTE CLE EXISTE PARCE QUE `env('MOCK_MODE', true)` ETAIT LU AU MOMENT
+    | DE LA REQUETE, dans le code applicatif.
+    |
+    | Quand `php artisan config:cache` a tourne - et l'entrypoint de production
+    | le tente a chaque demarrage - Laravel NE CHARGE PLUS le fichier `.env`.
+    | `env()` rend alors sa valeur PAR DEFAUT, ici `true` : la production se
+    | croyait en mode simulacre, et les courriels d'authentification (lien
+    | magique, reinitialisation) n'etaient jamais envoyes, meme avec un SMTP
+    | parfaitement configure. `MOCK_MODE=false` etait pourtant bien pose sur le
+    | serveur - il n'etait simplement plus lu.
+    |
+    | C'est la raison pour laquelle on ne lit jamais `env()` ailleurs que dans un
+    | fichier de configuration. Mesure le 2026-08-19 (audit 360, F40-002).
+    |
+    */
+    'mock_mode' => env('MOCK_MODE', true),
+
+    /*
     | L2 — ingestion site → CRM (`POST /api/internal/site-sync`).
     |
     | `enabled` : drapeau MAÎTRE. À false (défaut), l'endpoint répond 503

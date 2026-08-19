@@ -47,14 +47,19 @@ class PasswordResetController extends ApiController
             ['token' => hash('sha256', $token), 'created_at' => now()],
         );
 
-        if (env('MOCK_MODE', true)) {
+        // `config()`, jamais `env()` : avec `config:cache` - que l'entrypoint de
+        // production tente a chaque demarrage - le `.env` n'est plus lu, et
+        // `env('MOCK_MODE', true)` rendait alors TRUE en production. Le courriel
+        // n'etait donc jamais envoye, meme avec un SMTP configure (F40-002).
+        if (config('crm.mock_mode', true)) {
             \Log::info('Mock password reset link (would be emailed)', [
                 'email' => $email,
                 'link'  => config('app.frontend_url') . '/password-reset?token=' . $token . '&email=' . urlencode($email),
             ]);
         } else {
             $link = config('app.frontend_url') . '/password-reset?token=' . $token . '&email=' . urlencode($email);
-            Mail::raw("Réinitialisez votre mot de passe :\n\n{$link}\n\nValide 60 minutes.", function ($m) use ($email) {
+            // Transport DEDIE a l'authentification (cf. config/mail.php).
+            Mail::mailer(config('mail.auth_mailer'))->raw("Réinitialisez votre mot de passe :\n\n{$link}\n\nValide 60 minutes.", function ($m) use ($email) {
                 $m->to($email)->subject('Réinitialisation du mot de passe — Axion CRM Pro');
             });
         }

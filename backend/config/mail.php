@@ -3,6 +3,28 @@
 return [
     'default' => env('MAIL_MAILER', 'log'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Transport des courriels D'AUTHENTIFICATION
+    |--------------------------------------------------------------------------
+    |
+    | Le lien magique et la reinitialisation de mot de passe ne sont pas du
+    | courrier commercial : ce sont les deux seules portes de secours d'un compte.
+    |
+    | La decision « MAIL_MAILER reste `log` » est respectee et reste le defaut.
+    | Mais elle coupait AUSSI ces deux portes - personne ne l'avait vu, et c'est
+    | l'une des raisons pour lesquelles personne ne s'est jamais connecte au CRM
+    | en production. Laravel permet de designer un transport par envoi : la
+    | decision tient donc SANS exception, et sans qu'aucun courriel commercial ne
+    | parte.
+    |
+    | Poser `MAIL_MAILER_AUTH=smtp` laisse sortir ces deux courriels, et EUX
+    | SEULS. Tant que la variable n'est pas posee, le comportement est identique
+    | a aujourd'hui.
+    |
+    */
+    'auth_mailer' => env('MAIL_MAILER_AUTH', env('MAIL_MAILER', 'log')),
+
     'mailers' => [
         'smtp' => [
             'transport' => 'smtp',

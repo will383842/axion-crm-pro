@@ -54,12 +54,19 @@ class MagicLinkService
 
         $link = config('app.frontend_url', 'https://app.localhost') . '/magic-link/verify?token=' . $token;
 
-        if (env('MOCK_MODE', true)) {
+        // `config()`, jamais `env()` : avec `config:cache` - que l'entrypoint de
+        // production tente a chaque demarrage - le `.env` n'est plus lu, et
+        // `env('MOCK_MODE', true)` rendait alors TRUE en production. Le courriel
+        // n'etait donc jamais envoye, meme avec un SMTP configure (F40-002).
+        if (config('crm.mock_mode', true)) {
             \Log::info('Mock magic link (would be emailed)', ['email' => $email, 'link' => $link]);
             return;
         }
 
-        Mail::raw("Connexion à Axion CRM Pro :\n\n{$link}\n\nLien valable 15 minutes, à usage unique.", function ($m) use ($email) {
+        // Transport DEDIE a l'authentification : la decision « MAIL_MAILER reste
+        // log » est respectee pour le courrier commercial, sans couper la seule
+        // porte de secours d'un compte (cf. config/mail.php).
+        Mail::mailer(config('mail.auth_mailer'))->raw("Connexion à Axion CRM Pro :\n\n{$link}\n\nLien valable 15 minutes, à usage unique.", function ($m) use ($email) {
             $m->to($email)->subject('Lien de connexion Axion CRM Pro');
         });
     }

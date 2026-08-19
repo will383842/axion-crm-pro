@@ -64,32 +64,37 @@ echo
 #
 #   1. `9000/tcp` — port simplement EXPOSÉ entre conteneurs. Ne sort pas de la
 #      machine. Hors sujet.
-#   2. `127.0.0.1:8081->5173/tcp` — publication sur la BOUCLE LOCALE. Joignable
-#      depuis l'hôte, PAS depuis internet. C'est le mécanisme retenu pour la
-#      préproduction (2026-08-19) : le Caddy de production l'atteint par
-#      `host-gateway`, personne d'autre ne peut. Autorisé.
+#   2. `172.17.0.1:8081->5173/tcp` — publication sur une adresse PRIVEE (boucle
+#      locale ou passerelle de pont Docker). Joignable par l'hote et par les
+#      conteneurs, JAMAIS depuis internet : ces plages ne sont pas routables.
+#      C'est le mecanisme retenu pour la preproduction (2026-08-19) : le Caddy
+#      de production l'atteint par `host.docker.internal`, personne d'autre.
 #      ⚠️ Sans cette exception, ce script rougirait sur un montage légitime — et
 #      la réaction naturelle serait de l'affaiblir. Une garde qu'on est tenté de
 #      désarmer finit désarmée.
 #   3. `0.0.0.0:55432->5432/tcp` — publication sur TOUTES les interfaces. C'est
 #      la faille du 2026-08-19, et le seul cas que ce contrôle doit attraper.
 #
-# `127.0.0.0/8` en entier, pas seulement `127.0.0.1` : la boucle locale est un
-# /8, et `127.0.1.1` est une adresse d'hôte courante sous Debian.
+# Plages traitees comme non routables : `127.0.0.0/8` et `::1` (boucle locale),
+# `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16` (RFC 1918 — ponts Docker et
+# reseaux locaux). `0.0.0.0` et `[::]` n'en font PAS partie : ils ecoutent aussi
+# sur l'adresse publique du serveur, et c'est exactement le cas a attraper.
 PUBLIES="$(echo "$LIGNES" \
   | grep -oE '(([0-9]{1,3}\.){3}[0-9]{1,3}|\[::\]|\[::1\]):[0-9]+->' \
-  | grep -vE '^(127\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|\[::1\]):' \
+  | grep -vE '^(127\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|192\.168\.[0-9]{1,3}\.[0-9]{1,3}|172\.(1[6-9]|2[0-9]|3[01])\.[0-9]{1,3}\.[0-9]{1,3}|\[::1\]):' \
   | sed -E 's/.*:([0-9]+)->/\1/' \
   | sort -un)"
 
-# Ce qui est publié sur la boucle locale est AFFICHÉ, jamais tu : un contrôle
-# qui masque ce qu'il a décidé d'ignorer empêche de vérifier sa propre décision.
+# Ce qui est publie sur une adresse privee est AFFICHE, jamais taire : un
+# controle qui masque ce qu'il a decide d'ignorer empeche de verifier sa propre
+# decision.
 LOOPBACK="$(echo "$LIGNES" \
-  | grep -oE '(127\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|\[::1\]):[0-9]+->' \
+  | grep -oE '(([0-9]{1,3}\.){3}[0-9]{1,3}|\[::1\]):[0-9]+->' \
+  | grep -E '^(127\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|192\.168\.[0-9]{1,3}\.[0-9]{1,3}|172\.(1[6-9]|2[0-9]|3[01])\.[0-9]{1,3}\.[0-9]{1,3}|\[::1\]):' \
   | sed -E 's/.*:([0-9]+)->/\1/' \
   | sort -un | tr '\n' ' ')"
 if [ -n "$LOOPBACK" ]; then
-  echo "Ports sur la boucle locale (hors internet, autorisés) : $LOOPBACK"
+  echo "Ports sur adresse privee (hors internet, autorises) : $LOOPBACK"
 fi
 
 if [ -z "$PUBLIES" ]; then

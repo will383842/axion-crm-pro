@@ -39,10 +39,24 @@
 #    deviendrait indéterminé. Compose ajoute toujours le nom du service comme
 #    alias réseau ; on ne peut pas le retirer.
 #
-#    D'où la publication sur la BOUCLE LOCALE (`127.0.0.1`) ci-dessous : les
-#    deux réseaux restent totalement étanches, et le Caddy de production joint
-#    la préproduction par `host-gateway`. Joignable depuis l'hôte, jamais depuis
-#    internet.
+#    D'où la publication sur la PASSERELLE DU PONT DOCKER (`172.17.0.1`)
+#    ci-dessous : les deux réseaux restent totalement étanches, et le Caddy de
+#    production joint la préproduction par `host.docker.internal`. Adresse
+#    privée, jamais joignable depuis internet.
+#
+#    🔴 CETTE ADRESSE A ÉTÉ CORRIGÉE LE 2026-08-19, APRÈS UN 502 EN CONDITIONS
+#    RÉELLES. La première version liait les ports à `127.0.0.1`, ce qui SEMBLE
+#    plus sûr et ne marche pas : un port lié à la boucle locale n'écoute PAS sur
+#    l'adresse par laquelle un conteneur voit l'hôte. Mesuré sur le serveur :
+#
+#      $ docker exec axion-crm-caddy getent hosts host.docker.internal
+#      172.17.0.1
+#      $ ss -ltn | grep 8081
+#      LISTEN 127.0.0.1:8081
+#
+#    Deux adresses différentes — Caddy tapait sur 172.17.0.1:8081, où rien
+#    n'écoutait. `172.17.0.1` est la passerelle de `docker0`, c'est-à-dire
+#    exactement ce que Docker désigne par `host-gateway`.
 #
 # 4. Le bundle frontend est bâti À LA CONSTRUCTION (`VITE_API_BASE_URL` en
 #    build-arg) : la préproduction a besoin de sa PROPRE image, bâtie avec
@@ -52,7 +66,8 @@
 # 5. `ports: !override []` vaut AUSSI ici : la faille du 2026-08-19 (Postgres et
 #    Redis publiés sur `0.0.0.0`) ne doit pas être réintroduite par une seconde
 #    pile. Garde : `infra/scripts/verifier-ports-publies.sh`, qui mesure les
-#    CONTENEURS et connaît la différence entre `0.0.0.0:` et `127.0.0.1:`.
+#    CONTENEURS et connaît la différence entre `0.0.0.0:` (tout internet) et une
+#    adresse privée non routable.
 #
 # ── DONNÉES : SYNTHÉTIQUES, JAMAIS UN EXPORT DE PRODUCTION ──────────────────
 #
@@ -113,10 +128,14 @@ services:
       # Les envois réels ne partent JAMAIS de la préproduction. Un compte rendu
       # de test expédié à un vrai contact est une faute qu'on ne rattrape pas.
       MAIL_MAILER: log
-    # Contrainte 3 : joignable depuis l'hôte (donc depuis le Caddy de
-    # production via `host-gateway`), jamais depuis internet.
+    # Contrainte 3 : lié à la passerelle du pont `docker0` — l'adresse que
+    # `host.docker.internal` résout depuis un conteneur. Joignable par le Caddy
+    # de production, jamais depuis internet (adresse privée).
+    # `STAGING_BIND_IP` permet de la corriger sans toucher au fichier si Docker
+    # attribue un jour un autre pont ; une préproduction en 502 n'est pas une
+    # panne de production, le mode de défaillance est contenu.
     ports: !override
-      - '127.0.0.1:8082:80'
+      - '${STAGING_BIND_IP:-172.17.0.1}:8082:80'
     healthcheck:
       test: ['CMD-SHELL', 'curl -fsS http://localhost/up || exit 1']
       interval: 30s
@@ -175,7 +194,7 @@ services:
     restart: unless-stopped
     volumes: !override []
     ports: !override
-      - '127.0.0.1:8081:5173'
+      - '${STAGING_BIND_IP:-172.17.0.1}:8081:5173'
 
   # `reverb` reste absent du déploiement (Echo est désactivé côté frontend et le
   # Caddyfile n'a aucune route WebSocket). On ferme quand même sa publication :

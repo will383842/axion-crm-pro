@@ -1,0 +1,41 @@
+# Fins de ligne — posé le 2026-08-19, après une panne.
+#
+# Ce dépôt n'avait AUCUN `.gitattributes`. Avec `core.autocrlf=true` sous
+# Windows, git enregistrait bien du LF, mais la COPIE DE TRAVAIL était en CRLF.
+# Tant qu'on ne fait que commiter, ça ne se voit pas.
+#
+# Ça se voit le jour où l'on envoie un fichier de la copie de travail
+# DIRECTEMENT sur un serveur Linux (`scp`), sans passer par git :
+#
+#   /root/verifier-ports-publies.sh: line 39: $'\r': command not found
+#   /root/verifier-ports-publies.sh: line 83: syntax error near unexpected token `|'
+#
+# Un script shell avec des retours chariot est inexécutable sous Linux. Et le
+# défaut est SILENCIEUX côté dépôt : `git diff` ne montre rien, la CI est verte,
+# puisque ce qui est enregistré est correct.
+#
+# `eol=lf` force la copie de travail elle-même en LF pour tout ce qui est
+# exécuté par une machine — plus de divergence entre ce qu'on lit, ce qu'on
+# commite et ce qu'on envoie.
+
+* text=auto eol=lf
+
+# Fichiers exécutés ou interprétés : LF obligatoire, jamais de conversion.
+*.sh        text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+Dockerfile* text eol=lf
+Caddyfile*  text eol=lf
+*.env       text eol=lf
+
+# Binaires : aucune conversion, jamais. `text eol=lf` sur un SVG ferait ENTRER
+# des CRLF dans un fichier traité comme du texte — piège déjà payé sur l'autre
+# dépôt le 2026-08-18.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.woff binary
+*.woff2 binary

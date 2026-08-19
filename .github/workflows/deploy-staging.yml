@@ -168,7 +168,11 @@ jobs:
 
           # La préprod ne doit RIEN publier vers internet.
           echo "-- ports publiés par la pile de préproduction --"
-          bash "$CHEMIN/infra/scripts/verifier-ports-publies.sh" axion-crm-staging "8081 8082" \
+          # Liste des ports publics autorises VIDE : la preproduction ne doit rien
+          # publier sur internet du tout, ses deux publications sont sur 172.17.0.1.
+          # Passer « 8081 8082 » ici ferait rougir le temoin positif de la garde sur
+          # une pile parfaitement conforme.
+          bash "$CHEMIN/infra/scripts/verifier-ports-publies.sh" axion-crm-staging "" \
             || echo "(contrôle des ports en échec — voir ci-dessus)"
 
           echo "::endgroup::"

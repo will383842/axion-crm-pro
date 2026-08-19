@@ -97,9 +97,15 @@ if [ -n "$LOOPBACK" ]; then
   echo "Ports sur adresse privee (hors internet, autorises) : $LOOPBACK"
 fi
 
-if [ -z "$PUBLIES" ]; then
-  echo "ERREUR : aucune publication détectée — même 80 et 443 sont absents." >&2
-  echo "         La pile ne peut pas servir le site : la mesure est suspecte." >&2
+# TÉMOIN DE MESURE. Il ne porte PAS sur les ports publics : une pile
+# entièrement privée est un cas LÉGITIME — c'est exactement celui de la
+# préproduction, dont les deux seules publications sont sur 172.17.0.1.
+# La première version exigeait au moins un port public et aurait donc rougi sur
+# une pile parfaitement conforme, en annonçant « la mesure est suspecte ».
+# Ce qu'il faut prouver, c'est qu'on a mesuré QUELQUE CHOSE.
+if [ -z "$PUBLIES" ] && [ -z "$LOOPBACK" ]; then
+  echo "ERREUR : aucune publication d'aucune sorte — la mesure n'a rien vu." >&2
+  echo "         Une pile qui ne publie RIEN ne sert personne : contrôle suspect." >&2
   exit 2
 fi
 
@@ -117,6 +123,9 @@ done
 # qu'il croit (mauvais projet, pile arrêtée, filtre cassé). Sans lui, une pile
 # éteinte passerait au VERT — c'est exactement le défaut qu'avait la première
 # version de la garde `config-prod`.
+# `AUTORISES` vide = « rien ne doit être public ». C'est le cas de la
+# préproduction. Le témoin positif ci-dessous n'a alors pas d'objet — celui de
+# la mesure, plus haut, a déjà fait son travail.
 MANQUANTS=""
 for attendu in $AUTORISES; do
   echo "$PUBLIES" | grep -qx "$attendu" || MANQUANTS="$MANQUANTS $attendu"
@@ -146,4 +155,8 @@ if [ -n "$INTERDITS" ]; then
   exit 1
 fi
 
-echo "OK : la pile ne publie que $AUTORISES — mesuré sur les conteneurs, pas sur le fichier."
+if [ -z "$AUTORISES" ]; then
+  echo "OK : la pile ne publie RIEN sur internet — mesuré sur les conteneurs, pas sur le fichier."
+else
+  echo "OK : la pile ne publie que $AUTORISES — mesuré sur les conteneurs, pas sur le fichier."
+fi

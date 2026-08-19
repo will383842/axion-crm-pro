@@ -1,2 +1,57 @@
 [2026-08-19 15:18:15] local.INFO: Remplissage des empreintes d’opposition {"table":"opt_out","empreintes_calculees":0} 
 [2026-08-19 15:18:16] local.INFO: Remplissage des empreintes d’opposition {"table":"email_suppressions","empreintes_calculees":0} 
+
+Base                 : axion_crm_test
+Fiches du workspace  : 4
+
+ENTREE                         | SQL rend  | MEM rend  | DIRECTION
+--------------------------------------------------------------------------------------------
+has_email avec op neq          |         4 |         2 | DESACCORD (SQL elargit a TOUT / memoire restreint)
+in avec valeur scalaire        |         4 |         0 | DESACCORD (SQL elargit a TOUT / memoire ne vise PERSONNE)
+not_in avec valeur scalaire    |         4 |         0 | DESACCORD (SQL elargit a TOUT / memoire ne vise PERSONNE)
+champ hors liste blanche       |         4 |         0 | DESACCORD (SQL elargit a TOUT / memoire ne vise PERSONNE)
+
+=== TEMOIN NEGATIF : une condition BIEN formee, sur les memes fiches ===
+Si le controle sait distinguer, ces lignes doivent dire « accord ».
+has_email eq true (bien forme)   | SQL=2 | MEM=2 | accord
+in avec tableau (bien forme)     | SQL=1 | MEM=1 | accord
+not_in tableau sur NULL          | SQL=3 | MEM=3 | accord
+neq sur colonne NULL             | SQL=3 | MEM=3 | accord
+
+
+   FAIL  Tmp\testsa26\AsymetrieResiduelleTest
+  ⨯ AGENT 26 — les quatre entrees mal formees que la validation laiss… 837.14s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tmp\testsa26\AsymetrieResiduelleTest > AGENT 26 — les quatre entr…   
+  Asymetries residuelles :
+  has_email avec op neq : SQL=4 memoire=2
+  in avec valeur scalaire : SQL=4 memoire=0
+  not_in avec valeur scalaire : SQL=4 memoire=0
+  champ hors liste blanche : SQL=4 memoire=0
+Failed asserting that two arrays are identical.
+  -Array &0 []
+  +Array &0 [
+  +    0 => 'has_email avec op neq : SQL=4 memoire=2',
+  +    1 => 'in avec valeur scalaire : SQL=4 memoire=0',
+  +    2 => 'not_in avec valeur scalaire : SQL=4 memoire=0',
+  +    3 => 'champ hors liste blanche : SQL=4 memoire=0',
+  +]
+  
+
+  at /tmp/tests-a26/AsymetrieResiduelleTest.php:174
+    170▕     }
+    171▕ 
+    172▕     echo "\n";
+    173▕ 
+  ➜ 174▕     expect($ecarts)->toBe([], "Asymetries residuelles :\n  " . implode("\n  ", $ecarts));
+    175▕ });
+    176▕
+
+  1   /tmp/tests-a26/AsymetrieResiduelleTest.php:174
+
+
+  Tests:    1 failed (1 assertions)
+  Duration: 1215.95s
+  Random Order Seed: 1787144591
+
+EXIT=1

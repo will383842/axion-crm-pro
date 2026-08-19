@@ -291,6 +291,19 @@ Les autres cherchent des sous-chaînes sans fin de ligne. Le piège existe, il n
 - Correctif     : dans `pest-worktree.sh`, remplacer les montages par un `docker cp` de l'arbre dans un conteneur de longue durée (le `vendor` ne bouge qu'au `composer install`, la vérification `cmp composer.lock` déjà présente sait quand recopier). **~1 h**, et la suite locale passe sous la minute.
 - Statut        : ouvert
 
+### [H45-010] 25 des 35 tâches planifiées ne sont citées par aucun test — dont quatre destructives — et 8 des 19 `--dry-run` non plus
+- Sévérité      : S2 défaut
+- Domaine       : tests
+- Référence     : main e8924b8
+- Emplacement   : `backend/routes/console.php` ; `backend/app/Console/Commands/`
+- Constat       : croisement nom de commande × fichiers de test. **10** des 35 commandes planifiées sont citées par au moins un test ; **25** ne le sont par aucun. Parmi ces 25 : `retention:purge` (DELETE quotidien à 04:00), `retention:prune-scraper-runs` (04:20), `rgpd:anonymize-ips`, `media:clean-emails`. Côté option `--dry-run` : **19** commandes l'offrent, **8** ne sont citées par aucun test — la promesse « je ne toucherai à rien » n'est donc vérifiée nulle part pour elles, et H45-002 montre ce que ça coûte.
+- Preuve        : `04_PREUVES/agent-45/09_planifiees-vs-tests.txt` (boucle de croisement, sortie brute).
+- Témoin négatif: le même croisement **trouve** bien les 10 commandes couvertes (`rgpd:purge-vivier`, `rgpd:purge-business-prospects`, `crm:flush-outbound`, `companies:rescrape-archives`, `media:*` ×6) : le contrôle sait distinguer « cité » de « non cité ».
+- Impact        : les deux purges RGPD sont, elles, gardées finement (bornes des deux côtés : 2 ans / J+90 / 3 ans, et « jamais une personne qui a interagi » — vérifié, ces tests sont bons). Les quatre autres commandes destructives tournent chaque nuit sans qu'aucune garde ne dise ce qu'elles font.
+- Reproduction  : `grep -n "Schedule::command" backend/routes/console.php | sed "s/.*command('//; s/'.*//" | sort -u` puis `grep -rl <commande> backend/tests/`
+- Correctif     : un test par commande destructive, sur le modèle exact de `SiteGdprTest` (semer les deux côtés de la borne, jouer, vérifier qui reste). **~2 h pour les quatre.**
+- Statut        : ouvert
+
 ### [H45-011] La garde de plan des compteurs rougit au hasard : sur une table de deux lignes, le planificateur hésite entre deux index à 0,01 de coût près
 - Sévérité      : S3 finition
 - Domaine       : tests
@@ -304,19 +317,6 @@ Les autres cherchent des sous-chaînes sans fin de ligne. Le piège existe, il n
 - Impact        : un rouge sur quinze, sur une garde de performance, c'est le taux à partir duquel on relance au lieu de lire. Et la garde est **récente** (2026-08-19) : c'est maintenant qu'elle se stabilise, pas après la troisième relance.
 - Reproduction  : jouer `tests/Feature/Crm/CompteursHubTest.php` en boucle sur une base fraîche ; le plan bascule selon l'état des statistiques.
 - Correctif     : semer une centaine de lignes plutôt que deux (le planificateur cesse alors d'hésiter), **ou** — plus sûr et plus rapide — `ANALYZE companies` avant l'`EXPLAIN`, **ou** interroger `pg_stat_user_indexes` après avoir exécuté la vraie requête pour affirmer que c'est bien `idx_companies_ws_counts` dont `idx_scan` a bougé. **~30 min.**
-- Statut        : ouvert
-
-### [H45-010] 25 des 35 tâches planifiées ne sont citées par aucun test — dont quatre destructives — et 8 des 19 `--dry-run` non plus
-- Sévérité      : S2 défaut
-- Domaine       : tests
-- Référence     : main e8924b8
-- Emplacement   : `backend/routes/console.php` ; `backend/app/Console/Commands/`
-- Constat       : croisement nom de commande × fichiers de test. **10** des 35 commandes planifiées sont citées par au moins un test ; **25** ne le sont par aucun. Parmi ces 25 : `retention:purge` (DELETE quotidien à 04:00), `retention:prune-scraper-runs` (04:20), `rgpd:anonymize-ips`, `media:clean-emails`. Côté option `--dry-run` : **19** commandes l'offrent, **8** ne sont citées par aucun test — la promesse « je ne toucherai à rien » n'est donc vérifiée nulle part pour elles, et H45-002 montre ce que ça coûte.
-- Preuve        : `04_PREUVES/agent-45/09_planifiees-vs-tests.txt` (boucle de croisement, sortie brute).
-- Témoin négatif: le même croisement **trouve** bien les 10 commandes couvertes (`rgpd:purge-vivier`, `rgpd:purge-business-prospects`, `crm:flush-outbound`, `companies:rescrape-archives`, `media:*` ×6) : le contrôle sait distinguer « cité » de « non cité ».
-- Impact        : les deux purges RGPD sont, elles, gardées finement (bornes des deux côtés : 2 ans / J+90 / 3 ans, et « jamais une personne qui a interagi » — vérifié, ces tests sont bons). Les quatre autres commandes destructives tournent chaque nuit sans qu'aucune garde ne dise ce qu'elles font.
-- Reproduction  : `grep -n "Schedule::command" backend/routes/console.php | sed "s/.*command('//; s/'.*//" | sort -u` puis `grep -rl <commande> backend/tests/`
-- Correctif     : un test par commande destructive, sur le modèle exact de `SiteGdprTest` (semer les deux côtés de la borne, jouer, vérifier qui reste). **~2 h pour les quatre.**
 - Statut        : ouvert
 
 ---

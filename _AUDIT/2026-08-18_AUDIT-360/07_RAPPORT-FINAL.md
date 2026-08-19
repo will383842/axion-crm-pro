@@ -73,6 +73,25 @@ idempotence sur index UNIQUE réel, 503 sans écriture) · la **suite de tests b
 (**20 726 338 lignes, écart nul**, policies préservées) · les **deux purges RGPD**, finement gardées ·
 et la **pièce 1 de l'étape 1a**, qui retirait un **point de blocage global** sans que personne l'ait vu.
 
+### 🔑 Et un résultat qu'il faut dire aussi fort que les défauts : **la contre-vérification de la règle 7 est POSITIVE**
+
+Le dirigeant avait demandé expressément de **contre-vérifier le travail écrit les 18 et 19 août**
+plutôt que de le reprendre. Fait, par **20 sabotages** dont **17 suivis de la suite entière**
+(780 tests chacun) :
+
+- **Les rouges annoncés le 19/08 sont reproductibles.** `CompteursHubTest` : **4 sabotages,
+  4 rouges, rayon 0 à chaque fois**, et **chacun sur le bon objet**. `ActivitesEtMotifsTest` :
+  le sabotage du semis fait rougir **exactement les deux gardes concernées**.
+- **Aucun sabotage n'a fait rougir plus de 4 tests par sa propre cause : la suite est PRÉCISE.**
+  *C'est la qualité qu'on ne mesure jamais — une suite qui rougit à tout n'apprend rien.*
+- **Les deux soupçons les plus lourds du §10 du mandat ne tiennent pas** : ni « le test pré-insère
+  ce qu'il doit produire », ni « le mock teste le mock » n'ont **de cas avéré côté backend**.
+
+**En regard, 7 sabotages sur 20 n'ont fait rougir personne** — dont celui qui compte le plus :
+la famille de gardes « sans authentification → 401, jamais 500 » **n'interroge que le chemin JSON**.
+Mesuré **sur la production** : `Accept: application/json` → **401**, `Accept: text/html` → **500**,
+**5 adresses sur 5**. ***A-001 est vivant en production, et la suite le certifie absent.***
+
 ---
 
 # CE QUE CET AUDIT N'A PAS FAIT

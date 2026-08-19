@@ -190,7 +190,34 @@ Le mandat les désigne sans les nommer. Mesurés, ils sont :
 
   Le prédicat produit est **`"workspace_id" = ?`** : le critère a purement disparu.
   Script joué : `04_PREUVES/agent-26/mesure-null.php`.
-- Témoin négatif: **le même script, sur les mêmes fiches, avec des conditions BIEN formées, rend l'accord** — `A neq btp` 300 000/GARDE, `B not_in` 300 000/GARDE, `C eq btp` 0/EXCLUE, `D gte 50` 0/EXCLUE. Le contrôle sait donc dire « accord » ; il ne dit « désaccord » que sur les quatre entrées mal formées. Et `SymetrieEvaluateursTest` (22 conditions × 2 combinateurs) est **vert** sur ces mêmes chemins : il ne couvre **que** des conditions valides, ces quatre entrées ne sont dans aucun de ses cas.
+
+  **Confirmé une seconde fois, sur un jeu MIXTE** (`04_PREUVES/agent-26/05-asymetrie-residuelle.txt`),
+  par un test Pest écrit pour l'occasion (`AsymetrieResiduelleTest.php`) sur 4 fiches dont une avec
+  `email_generic`, une avec un contact `valid`, deux sans rien :
+
+  ```
+  ENTREE                         | SQL rend  | MEM rend  | DIRECTION
+  has_email avec op neq          |         4 |         2 | DESACCORD (SQL elargit a TOUT / memoire restreint)
+  in avec valeur scalaire        |         4 |         0 | DESACCORD (SQL elargit a TOUT / memoire ne vise PERSONNE)
+  not_in avec valeur scalaire    |         4 |         0 | DESACCORD (SQL elargit a TOUT / memoire ne vise PERSONNE)
+  champ hors liste blanche       |         4 |         0 | DESACCORD (SQL elargit a TOUT / memoire ne vise PERSONNE)
+  ```
+
+  Le cas `has_email` + `neq` est le plus parlant : ce n'est pas « tout contre rien », c'est
+  **4 fiches contre 2** — deux audiences réellement différentes, toutes deux plausibles, selon le
+  chemin qui les a calculées.
+- Témoin négatif: **quatre conditions BIEN formées, jouées par le même test, sur les mêmes 4 fiches, dans la même exécution, s'accordent toutes les quatre** :
+  ```
+  has_email eq true (bien forme)   | SQL=2 | MEM=2 | accord
+  in avec tableau (bien forme)     | SQL=1 | MEM=1 | accord
+  not_in tableau sur NULL          | SQL=3 | MEM=3 | accord
+  neq sur colonne NULL             | SQL=3 | MEM=3 | accord
+  ```
+  Le contrôle sait donc dire « accord » ; il ne dit « désaccord » que sur les quatre entrées mal
+  formées. *(Les deux dernières lignes reconfirment au passage §2.3 sur un jeu mixte : 3 des 4 fiches
+  ont `sector_main` NULL et sont bien gardées par « tout sauf btp », des deux côtés.)*
+  Enfin, `SymetrieEvaluateursTest` **ne couvre aucune de ces quatre entrées** : ses 22 conditions
+  sont toutes valides. Le défaut n'est donc gardé par rien.
 - Impact        : ce service décide **à qui part un courriel**. Deux des quatre entrées franchissent `StoreEmailAudienceRequest` et sont donc **persistées** : `has_email` avec `neq` (les deux sont dans les listes blanches) et `in`/`not_in` avec une valeur scalaire (**`criteria.*.value` n'est validée nulle part**). Les quatre franchissent `POST /audiences/preview`, qui ne valide que `criteria => required|array` : l'aperçu affiche alors **le compte du workspace entier** pour un critère qui n'a pas été appliqué, et c'est ce chiffre que l'utilisateur lit pour décider d'envoyer. L'invariant que le test d'origine se donne dans son propre en-tête — « le contenu d'une même audience ne doit pas dépendre du chemin qui l'a calculée » — est rompu sur ces entrées.
 - Reproduction  : `docker cp _AUDIT/…/agent-26/mesure-null.php axion-crm-api:/tmp/` puis `docker exec axion-crm-api php /tmp/mesure-null.php`.
 - Correctif     : faire répondre `buildPositive()` par `fn ($q) => $q->whereRaw('1 = 0')` — le patron **déjà retenu** pour `tags` avec une liste vide, ligne 368, et pour la même raison écrite en commentaire (« une condition inexploitable ne vise PERSONNE, elle n'est pas ignorée ») — au lieu de `null`, dans les 3 cas de `buildPositive` ; et faire de même dans `applyCondition` pour le champ/op hors liste blanche. Ajouter `criteria.*.value` aux règles de `StoreEmailAudienceRequest`, et faire valider `POST /audiences/preview` par la même règle que `store`. **Coût : ~0,5 j**, plus l'extension de `symetrieCas()` aux quatre entrées (le fichier `04_PREUVES/agent-26/AsymetrieResiduelleTest.php` les code déjà).
@@ -393,6 +420,28 @@ Le mandat les désigne sans les nommer. Mesurés, ils sont :
 
 ---
 
+## 3 bis. Ce que j'ai vérifié et qui est SAIN — à ne pas rouvrir
+
+Un audit qui ne rapporte que des défauts ne dit pas où il a regardé. Ces points ont été mesurés et
+ne portent pas de constat :
+
+- **L'aiguillage 2FA de la connexion est correct.** `LoginPage.tsx:69` lit `data.requires_2fa` ;
+  `ApiController::ok()` (`:49-52`) fait `response()->json($data)` **sans enveloppe**, et
+  `AuthController.php:58-61` rend bien `{user, requires_2fa}` au premier niveau. Les deux
+  correspondent. *J'ai cherché un décalage d'enveloppe — il n'y en a pas.*
+- **Le retour arrière dans l'assistant préserve la saisie** (§2.4), et **aucune étape n'est
+  contournable** : les puces du `Stepper` sont des `<span>` inertes et les 4 conditions sont
+  revérifiées avant création (`:320`, `:330`).
+- **`FormField` lui-même est correct et testé** : `aria-invalid`, `aria-describedby`,
+  `role="alert"`, 7 cas dans `frontend/tests/components/FormField.test.tsx`. Le défaut est son
+  absence d'emploi (D26-011), pas sa qualité.
+- **`AudienceBuilderPage` est le seul écran du périmètre réellement testé** : 8 cas dans
+  `frontend/tests/screens/AudienceBuilderPage.test.tsx`, dont un qui garde explicitement
+  « aperçu en échec : l'écran affiche le message du serveur, jamais un compte faux ».
+- **La validation serveur de la campagne est complète** : `StoreScrapingCampaignRequest` couvre les
+  14 clefs avec bornes, `Rule::in` et `after:now`. Le défaut est que le client ne s'y aligne pas
+  (D26-005, D26-007), pas que le serveur soit permissif.
+
 ## 4. Ce que je n'ai PAS pu vérifier, et pourquoi
 
 1. **Aucune soumission de formulaire authentifié.** La console est inutilisable (403 puis 500 sur
@@ -404,18 +453,43 @@ Le mandat les désigne sans les nommer. Mesurés, ils sont :
    (`04_PREUVES/agent-26/01-login-json-mauvais.txt`), et `netstat` dans `axion-crm-api` montre une
    file d'attente de **129** connexions sur le `php -S` du port 80. **Je n'ai donc pas re-mesuré
    B12-009** (302 au lieu de 422 sans en-tête JSON) et je ne le rapporte pas.
-3. **`04-symetrie-evaluateurs.txt` et `05-asymetrie-residuelle.txt` sont vides** au moment où
-   j'écris : les deux exécutions Pest, lancées sur ma propre base `axion_crm_a26` (116 tables) via
-   une configuration PHPUnit dédiée `/tmp/phpunit-a26-mine.xml`, n'avaient pas rendu la main après
-   ~20 min. **Elles n'ont pas échoué** : `ps aux` dans le conteneur montre les deux processus
-   toujours vivants et consommant du temps CPU — c'est la sérialisation de A-010/A-009 qui les
-   étrangle, pas une erreur. Elles auraient **confirmé D26-001 sur un jeu mixte** (fiches avec et
-   sans courriel) plutôt que sur le jeu homogène de `axion_crm_perf`. **D26-001 ne repose pas
-   dessus** : il est établi par `02-neq-notin-null.txt`, joué par le vrai service. Le fichier de test
-   est archivé (`04_PREUVES/agent-26/AsymetrieResiduelleTest.php`) et rejouable.
-   *Note de méthode : `backend/phpunit.xml:44` fixe `DB_DATABASE=axion_crm_test` avec `force="true"` —
-   il est donc **impossible** de dépointer la base par une variable d'environnement. C'est B11-005
-   vu de l'intérieur : pour respecter le §5 bis j'ai dû fabriquer une configuration PHPUnit entière.*
+3. 🔴 **J'ai cru mesurer sur ma propre base ; j'ai mesuré sur la base PARTAGÉE — et je le déclare.**
+   Le §5 bis point 2 prescrit « crée ta propre base (`axion_crm_<ton-id>`) ». Je l'ai fait :
+   `axion_crm_a26`, migrée, 116 tables. J'ai fabriqué une configuration PHPUnit dédiée pour la viser.
+   **Cela n'a servi à rien.** La sortie de mon test dit `Base : axion_crm_test`.
+
+   Cause, lue après coup dans `backend/tests/bootstrap.php:26-33` : le fichier **épingle en dur**
+   `const TEST_DATABASE_NAME = 'axion_crm_test'` et l'écrit dans `$_SERVER`, `$_ENV` **et**
+   `putenv()` avant tout démarrage de l'application — précisément pour neutraliser un `<env>` de
+   PHPUnit, ce que son propre commentaire explique. `Tests\TestCase::setUp()` (`:31-38`) ajoute une
+   garde qui **refuse de démarrer** si le nom de la base ne commence pas par `axion_crm_test`.
+
+   **Conséquence pour l'audit entier, et c'est le point utile** : l'instruction du §5 bis point 2
+   **n'est pas exécutable** pour la suite Pest du back-end. Aucun agent ne peut isoler sa base sans
+   modifier un fichier du produit. C'est la raison mécanique pour laquelle **B11-005 continue de se
+   produire**, et une contre-mesure qui ne peut pas être appliquée n'en est pas une. *(Le seul
+   contournement légitime existant est `php artisan test --parallel`, qui fait suffixer la base par
+   Laravel — la garde valide le PRÉFIXE, pas l'égalité.)*
+
+   **Ce que cela coûte, et ce que cela ne coûte pas.** J'ai donc exécuté `RefreshDatabase` sur
+   `axion_crm_test` : **j'ai pu détruire la mesure d'un autre agent en cours**, et je le signale
+   plutôt que de le taire. En revanche **la mienne reste valide** : le jeu d'essai est créé dans
+   `beforeEach` sous un `workspace_id` en UUID neuf, et **toutes** les requêtes des deux évaluateurs
+   filtrent sur ce `workspace_id` ; des lignes laissées par un voisin dans un autre workspace sont
+   exclues par construction. Sa cohérence interne le confirme : les 4 conditions bien formées
+   s'accordent (2/2, 1/1, 3/3, 3/3) dans la même exécution que les 4 désaccords.
+
+4. **`04-symetrie-evaluateurs.txt` est vide : je l'ai arrêté, délibérément.** L'exécution de
+   `SymetrieEvaluateursTest` (22 conditions × 2 combinateurs, chacune créant puis supprimant une
+   audience sonde et balayant 12 fiches) tournait encore après **25 minutes** — le second test a mis
+   **1 216 s pour un seul cas**, la sérialisation de A-010/A-009 étrangle tout. Surtout, ayant
+   compris le point 3, je savais qu'elle opérait sur `axion_crm_test` **en concurrence avec ma propre
+   seconde exécution et avec celles des autres agents** : la laisser courir ne pouvait plus
+   qu'endommager le travail d'autrui pour un résultat dont je n'avais plus besoin. `kill 6392`.
+   **D26-001 ne repose pas dessus** : il est établi deux fois, par `02-neq-notin-null.txt` (vrai
+   service, 300 000 fiches) et par `05-asymetrie-residuelle.txt` (jeu mixte, témoin négatif interne).
+   Ce que cette exécution aurait ajouté — la confirmation que les 22 cas valides restent verts — est
+   déjà couvert par les 4 témoins négatifs du second fichier.
 4. **Le second témoin négatif de `02-neq-notin-null.txt` est non concluant** et je le dis :
    `axion_crm_perf` ne contient **aucune** fiche à `sector_main` renseigné, donc je n'ai pas pu
    vérifier sur cette base que `neq` exclut bien une valeur qui correspond. Le premier témoin (le SQL

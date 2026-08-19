@@ -1,0 +1,81 @@
+Timing is on.
+=== /coverage : la vue matérialisée coverage_matrix_cells (base axion_crm_a41, copie jetable, 450 000 fiches) ===
+ relispopulated 
+----------------
+ f
+(1 row)
+
+Time: 78.757 ms
+--- REFRESH MATERIALIZED VIEW (tache planifiee horaire coverage:refresh-matrix)
+REFRESH MATERIALIZED VIEW
+Time: 7800.121 ms (00:07.800)
+ cellules 
+----------
+    17100
+(1 row)
+
+Time: 12.548 ms
+--- la requete de l ecran /coverage?level=department
+                                                                          QUERY PLAN                                                                          
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=209.26..209.47 rows=86 width=192) (actual time=14.952..14.958 rows=0 loops=1)
+   Sort Key: (sum(cm.company_count)) DESC NULLS LAST
+   Sort Method: quicksort  Memory: 25kB
+   Buffers: shared hit=4 read=105
+   ->  HashAggregate  (cost=204.99..206.49 rows=86 width=192) (actual time=14.459..14.464 rows=0 loops=1)
+         Group Key: cm.dept_code, d.name, d.region_code
+         Batches: 1  Memory Usage: 24kB
+         Buffers: shared hit=1 read=105
+         ->  Hash Join  (cost=25.75..203.70 rows=86 width=120) (actual time=14.447..14.451 rows=0 loops=1)
+               Hash Cond: (cm.dept_code = d.code)
+               Buffers: shared hit=1 read=105
+               ->  Bitmap Heap Scan on coverage_matrix_cells cm  (cost=4.95..182.67 rows=86 width=56) (actual time=14.320..14.321 rows=1 loops=1)
+                     Recheck Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+                     Heap Blocks: exact=1
+                     Buffers: shared hit=1 read=105
+                     ->  Bitmap Index Scan on idx_coverage_matrix_cells_pk  (cost=0.00..4.93 rows=86 width=0) (actual time=14.128..14.129 rows=17100 loops=1)
+                           Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+                           Buffers: shared read=105
+               ->  Hash  (cost=14.80..14.80 rows=480 width=96) (actual time=0.031..0.032 rows=0 loops=1)
+                     Buckets: 1024  Batches: 1  Memory Usage: 8kB
+                     ->  Seq Scan on departments d  (cost=0.00..14.80 rows=480 width=96) (actual time=0.030..0.030 rows=0 loops=1)
+ Planning:
+   Buffers: shared hit=83 read=13
+ Planning Time: 36.088 ms
+ Execution Time: 16.040 ms
+(25 rows)
+
+Time: 89.191 ms
+--- la requete de l ecran /coverage?level=city (jointure sur LEFT(cm.postcode,2))
+                                                                            QUERY PLAN                                                                            
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=214.16..214.48 rows=129 width=132) (actual time=1.671..1.675 rows=0 loops=1)
+   Buffers: shared hit=106
+   ->  Sort  (cost=214.16..214.48 rows=129 width=132) (actual time=1.668..1.671 rows=0 loops=1)
+         Sort Key: (sum(cm.company_count)) DESC NULLS LAST
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=106
+         ->  HashAggregate  (cost=208.02..209.63 rows=129 width=132) (actual time=1.652..1.655 rows=0 loops=1)
+               Group Key: ci.code_insee
+               Batches: 1  Memory Usage: 40kB
+               Buffers: shared hit=106
+               ->  Hash Join  (cost=21.70..207.38 rows=129 width=108) (actual time=1.644..1.646 rows=0 loops=1)
+                     Hash Cond: ("left"(cm.postcode, 2) = ci.department)
+                     Buffers: shared hit=106
+                     ->  Bitmap Heap Scan on coverage_matrix_cells cm  (cost=4.95..182.67 rows=86 width=40) (actual time=1.470..1.471 rows=1 loops=1)
+                           Recheck Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+                           Heap Blocks: exact=1
+                           Buffers: shared hit=106
+                           ->  Bitmap Index Scan on idx_coverage_matrix_cells_pk  (cost=0.00..4.93 rows=86 width=0) (actual time=1.436..1.436 rows=17100 loops=1)
+                                 Index Cond: (workspace_id = '20cd81e4-de5d-4875-a759-07d64fe1f168'::uuid)
+                                 Buffers: shared hit=105
+                     ->  Hash  (cost=13.00..13.00 rows=300 width=100) (actual time=0.160..0.161 rows=0 loops=1)
+                           Buckets: 1024  Batches: 1  Memory Usage: 8kB
+                           ->  Seq Scan on cities ci  (cost=0.00..13.00 rows=300 width=100) (actual time=0.158..0.159 rows=0 loops=1)
+ Planning:
+   Buffers: shared hit=119 read=7
+ Planning Time: 29.767 ms
+ Execution Time: 1.946 ms
+(27 rows)
+
+Time: 53.604 ms

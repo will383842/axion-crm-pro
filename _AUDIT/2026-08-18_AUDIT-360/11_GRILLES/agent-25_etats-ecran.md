@@ -6,8 +6,11 @@
 - **Périmètre** : les **37 écrans** de `src/app/routeTree.tsx` (inventaire de l'agent 22, recompté ici :
   37 `createRoute`, dont 4 hors coquille, 2 bouchons Phase 2, 1 route introuvable).
 - **Écrans effectivement montés et mesurés** : **37 / 37**, sous **4 conditions réseau chacun** = **148 montages réels**,
-  plus 7 montages « état partiel », 5 « hors ligne », 3 « retour arrière », 25 « volumes », 1 « délai ».
-- **Cases non vérifiables** : **4** sur 185 (les 4 conditions de `/coverage`), raison nommée au §6.
+  auxquels s'ajoutent 10 montages « état partiel » (7 + 3 de reprise), 5 « hors ligne », 3 « retour arrière »,
+  28 « volumes » et 1 « délai » — **195 montages** au total.
+- **Cases de grille** : **185** (37 écrans × 5 états). **Renseignées : 180.** **Non vérifiables : 5** — les cinq
+  états de `/coverage`, pour une raison nommée et bornée au §6.1 (jsdom n'a pas de WebGL). Elles sont **lues dans le
+  code** et déclarées comme telles, jamais présentées comme mesurées.
 
 ---
 
@@ -103,7 +106,7 @@ Légende : **⏳** chargement · **∅** vide · **⚠** erreur · **⛔** permi
 
 | écran | ⏳ chargement | ∅ vide | ⚠ erreur | ⛔ permission refusée | ◐ partiel / hors ligne | verdict |
 |---|---|---|---|---|---|---|
-| `/` | 🔴 **le squelette n'est JAMAIS rendu** — `placeholderData` est un **objet de zéros** (`DashboardPage.tsx:82-92`), donc `isLoading` est toujours faux et `DashboardSkeleton` (l. 243-278) est **du code mort**. Mesuré : `pulse=0`. **Le premier écran du CRM est une grille de zéros, avant toute réponse** (**D25-008**) | **dessiné et utile** : « Aucune entreprise collectée… **Démarrer sur /coverage →** » — dit quoi faire | 🔴 **ABSENT** — rend **le texte strictement identique** à l'état vide | 🔴 **ABSENT** — identique au 500 | ◐ **muet** : `/coverage` KO → la carte « Top départements » affiche **« Aucune donnée de couverture »**, sans dire qu'elle n'a pas pu lire | 🔴 **MENT** (D22-002 ; chiffré ici **D25-002**) — et `/dashboard/stats` est en outre un bouchon de zéros (`routes/api.php:86-99`) |
+| `/` | 🔴 **le squelette n'est JAMAIS rendu** — `placeholderData` est un **objet de zéros** (`DashboardPage.tsx:82-92`), donc `isLoading` est toujours faux et `DashboardSkeleton` (l. 243-278) est **du code mort**. Mesuré : `pulse=0`. **Le premier écran du CRM est une grille de zéros, avant toute réponse** (**D25-008**) | **dessiné et utile** : « Aucune entreprise collectée… **Démarrer sur /coverage →** » — dit quoi faire | 🔴 **ABSENT** — rend **le texte strictement identique** à l'état vide | 🔴 **ABSENT** — identique au 500 | ◐ **muet, et sciemment** : `/coverage` KO → la carte affiche « **Aucun département couvert — Lance un scrape pour commencer à couvrir la France.** ». Le commentaire de `TopDeptsCard.tsx:15` l'écrit noir sur blanc : « *Si l'endpoint renvoie 404/500 ou rien, **on tombe sur EmptyState***. » | 🔴 **MENT** (D22-002 ; chiffré ici **D25-002**) — et `/dashboard/stats` est en outre un bouchon de zéros (`routes/api.php:86-99`) |
 | `/contacts` | **squelette** `CompaniesTableSkeleton rows={6}` + `isPlaceholderData` (le seul écran à traiter les deux) | **dessiné** : « Aucun contact — Lance l'enrichissement… » | 🔴 **ABSENT** — corps identique. **Seule fuite du produit** : le sous-titre passe de « **0** décideurs » à « **…** décideurs » (`total` indéfini). Un « … » de trois pixels est la seule différence entre une base vide et un serveur mort | 🔴 **ABSENT** | ◐ s.o. (source unique) | 🔴 **MENT** — orphelin conditionnel par ailleurs (**D22-005**) |
 | `/companies` | **squelette** `CompaniesTableSkeleton` | **dessiné** : « Aucune entreprise » | 🔴 **ABSENT** — « Pipeline de prospection · **0 entreprises actives** · Total **0** · Enrichies **0 %** » | 🔴 **ABSENT** | ◐ **muet** : `/referentiels/geo` KO → les listes « Toutes régions / Tous départements » restent vides **sans un mot** | 🔴 **MENT** — mais **seul écran qui tient le volume** (§3) |
 | `/companies/$companyId` | **sablier** (`Spinner` + « Chargement de la fiche entreprise… ») — texte présent, pas de squelette → saut | **s.o.** (fiche unique) | ⚠ **présent mais FAUX SUR LA CAUSE** : un 500 et un 403 affichent « **Entreprise introuvable · 404 · Cette entreprise n'existe pas ou a été supprimée** » (**D25-005**) | 🔴 **ABSENT** — même écran « 404 » | ◐ s.o. | **DÉFAUT** — accuse la donnée d'être absente quand c'est le serveur qui a refusé |
@@ -237,14 +240,19 @@ Sept écrans consomment deux sources ou plus. Mesure : la première répond `200
 | `/` | `/coverage` | « Total entreprises **1 234** » (vrai) **à côté de** « Couverture · Top 5 départements » vide | **non** |
 | `/companies` | `/referentiels/geo` | la liste s'affiche ; les listes déroulantes région/département sont **vides sans un mot** | **non** |
 | `/llm/router` | `/llm/usage/summary` | les cas d'usage s'affichent ; l'onglet *Usage 30 j* rend **0,00 €** | **non** |
-| `/console/contacts` | `/crm/contacts-hub/counts` | la ligne s'affiche sous des onglets à **0** | **non** |
+| `/console/contacts` | `/crm/contacts-hub/counts` | « Clients **0** · Prospects **0** · Tous **0** » — **et, juste en dessous, la fiche ACME bien affichée** | **non** |
 | `/console/vivier` | `/crm/candidates/counts` | idem | **non** |
 | `/audiences/$id` | `…/members` | **sablier éternel** (D25-004) | **non** |
 | `/campaigns/$id` | `…/stats` | **sablier éternel** (D25-004) | **non** |
 
-**C'est la forme la plus dangereuse du défaut** : sur `/` et `/llm/router`, des chiffres **vrais** et des chiffres
-**inventés par défaut** cohabitent dans la même grille, sans rien qui les distingue. L'utilisateur n'a aucune raison
-de se méfier d'une carte, puisque celle d'à côté est juste.
+**C'est la forme la plus dangereuse du défaut** : des chiffres **vrais** et des chiffres **inventés par défaut**
+cohabitent dans la même grille, sans rien qui les distingue. L'utilisateur n'a aucune raison de se méfier d'une
+carte, puisque celle d'à côté est juste. Le cas de `/console/contacts` est **auto-contradictoire à l'écran** :
+l'onglet annonce « Tous **0** » et **la fiche est visible dessous**.
+
+**Témoin positif joué** (`releve-partiel-2.txt`, cas B) : les **mêmes** compteurs en `200` rendent
+« Clients **7** · Tous **7** » avec la même fiche — la sonde lit donc bien les compteurs quand ils arrivent, et le
+« 0 » du cas A est bien la conséquence de l'échec, pas de mon jeu d'essai.
 
 ### 2.5 Le délai avant le premier aveu : **~93 secondes**, chronométrées
 
@@ -277,9 +285,9 @@ passé le squelette, ils affichent « 0 » et ne se corrigent jamais.
 | mécanisme | où | portée |
 |---|---|---|
 | `useVirtualizer` (`@tanstack/react-virtual`) | **`CompaniesListPage.tsx:297`, et nulle part ailleurs** | **1 écran sur 37** |
-| composant `Pagination` | `/companies`, `/scraper-runs` | **2 écrans** |
-| `per_page` demandé au serveur | `/companies` et `/media` (100), `/contacts`, `/scraper-runs`, `/console/*` (50) | 7 écrans |
-| **rien du tout** | `/users`, `/audit-logs`, `/tags`, `/audiences`, `/rgpd/requests`, `/rgpd/ai-act`, `/llm/*` | **9 écrans demandent tout, et rendent tout** |
+| pagination offerte à l'utilisateur | `/companies` (composant `Pagination`) · `/media`, `/journalists`, `/international/roumanie`, `/scraper-runs` (boutons *Précédent / Suivant* écrits sur place, quatre fois) | **5 écrans** |
+| `per_page` demandé au serveur | `/companies`, `/media`, `/journalists` (100) · `/contacts`, `/scraper-runs`, `/console/*` (50) | 8 écrans |
+| **rien du tout — ni limite demandée, ni pagination** | `/users` · `/audit-logs` · `/tags` · `/audiences` · `/rgpd/requests` · `/rgpd/ai-act` · `/llm/router` · `/llm/proxy-providers` · `/llm/rotations` | **9 écrans demandent tout, et rendent tout** |
 | `@tanstack/react-table` | **déclaré dans `package.json`, importé nulle part** | 0 |
 | clés React `key={index}` | 4 fichiers (`ScraperRuns`, `Audiences`, `Campaigns`, `Tags`) — **uniquement sur des squelettes**, jamais sur des données | sans conséquence |
 
@@ -506,6 +514,7 @@ prend une autre : c'est un saut de mise en page par construction.** *(Non chiffr
 - Constat       : ces 19 écrans partagent un même arbre de rendu — `isLoading ? <Squelette/> : rows.length === 0 ? <ÉtatVide/> : <Liste/>` avec `rows = data?.data ?? []` — dans lequel **la branche d'erreur n'existe pas** : une requête échouée laisse `data` indéfini, donc `rows` vide, donc l'état vide.
 - Preuve        : **chiffrage exact** du constat **D22-002** (S1, agent 22), que je ne rouvre pas mais qui portait sur **12** écrans estimés sur la seule condition « API injoignable ». Mesuré ici sur **37 écrans × 4 conditions**, montages réels : **19** écrans affirment « 0 »/« aucun » sur un `500`, et la comparaison caractère par caractère `200-vide` vs `500` rend **23 identiques sur 30**. Sorties : `04_PREUVES/agent-25/10-vide-vs-erreur-indiscernables.txt`, `synthese-etats.txt`, `releve-etats.txt`. **Trois classements automatiques ont été corrigés à la main contre mon propre résultat** (§0.4) : sans cette relecture j'aurais annoncé 16.
 - Témoin négatif: sur les **mêmes** montages et au **même** instant, `/international/roumanie` rend « Impossible de charger le vivier Roumanie. » et `/admin/observability` « Impossible de charger les métriques d'observabilité. » — **le rendu dépend donc bien de l'état de la requête**, et l'affirmation « 0 » n'est pas une fatalité du harnais. Complément statique : `grep -c "isError"` vaut **0** sur les 19 fichiers listés, et **≠ 0** sur `CompanyDetailPage`, `MediaDetailPage`, `RoumaniePage` — le contrôle sait trouver `isError` quand il est là.
+- ⚠️ **Ce n'est pas un oubli, c'est une convention écrite** : `dashboard/components/TopDeptsCard.tsx:15` porte le commentaire « *Si l'endpoint renvoie **404/500** ou rien, **on tombe sur EmptyState***. » Le comportement a donc été **choisi et documenté**, ce qui explique qu'il soit si régulier sur 19 écrans — et ce qui veut dire que le corriger suppose de **trancher la convention**, pas seulement de rustiner des fichiers.
 - Impact        : pour un CRM, c'est le mensonge le plus coûteux, et il est **plus large que mesuré jusqu'ici**. `/users` annonce « Aucun utilisateur » quand un utilisateur existe. `/audit-logs` — un **journal d'audit** — annonce « Aucun journal d'audit ». `/rgpd/requests` et `/rgpd/ai-act` — deux écrans à **obligation légale** — annoncent qu'il n'y a rien à traiter. `/llm/router` affiche **0,00 €** de dépenses. `/scraper-runs` affirme « **aucun échec** » au moment précis où la lecture a échoué.
 - Reproduction  : `npx vitest run --config tmp/agent25/vitest.a25.config.ts tmp/agent25/etats.test.tsx` ; lire les blocs `[VIDE]` et `[ERREUR]` de chaque écran.
 - Correctif     : un composant partagé `<ÉtatDeRequête query={…}>` qui distingue `isPending` / `isError` / `data.length === 0`, rend un message en langage courant **avec la cause** (le message du serveur est déjà extrait par `extractApiMessage`, aujourd'hui réservé aux toasts de mutation) et **un bouton *Réessayer*** — dont la traduction `common.retry` **existe déjà et n'est jamais appelée** (§4.4). Coût **2 à 3 j** pour les 19 écrans, dont ~0,5 j pour le composant.
@@ -613,6 +622,19 @@ prend une autre : c'est un saut de mise en page par construction.** *(Non chiffr
 - Impact        : deux conséquences. D'abord, **aucune des 19 listes de D25-002 ne pourrait afficher la cause même si elle le voulait** : le message du serveur n'est extrait que dans le chemin des mutations. Ensuite, **le correctif de D25-002 est moins cher qu'il n'y paraît** : les libellés sont écrits, traduits en français et en anglais, et une fonction d'extraction existe déjà en 8 exemplaires — il reste à les brancher, et à en garder **une** (piège 15 : une constante dupliquée ne signale jamais qu'elle a divergé).
 - Reproduction  : `grep -rn "common.retry" frontend/src --include=*.tsx` → vide.
 - Correctif     : remonter `extractApiMessage` dans `src/lib/api.ts` (une seule copie), et l'appeler depuis le composant d'état de **D25-002**. Coût **0,5 j**, inclus dans D25-002.
+- Statut        : ouvert
+
+### [D25-011] Trois écrans lisent un champ imbriqué de la réponse d'API sans garde : une seule clef absente emporte l'écran entier
+- Sévérité      : **S2** défaut
+- Domaine       : interface
+- Référence     : main 8db8229
+- Emplacement   : `frontend/src/features/crm-console/ContactsHubPage.tsx:205` (`company.contacts.length`) et `:226` (`company.tags.length`) · `frontend/src/features/crm-console/CandidatesPage.tsx` (même patron) · `frontend/src/features/audiences/AudiencesListPage.tsx:230` (`audience.member_count.toLocaleString`)
+- Constat       : ces lectures ne sont ni optionnelles (`?.`) ni repliées (`?? []`), alors que le reste des mêmes composants l'est (`company.denomination ?? company.siren`, `counts.data?.by_relation_type ?? {}`) ; une réponse à laquelle il manque `tags`, `contacts` ou `member_count` fait lever le rendu.
+- Preuve        : **découvert contre moi-même.** Mes premières lignes d'essai omettaient ces champs, et les trois écrans ont rendu « **Something went wrong! · Cannot read properties of undefined (reading 'length')** » (resp. `'toLocaleString'`). **Témoin d'isolement joué** (`04_PREUVES/agent-25/releve-partiel-2.txt`, cas C) : la **même** ligne incomplète avec **tout le réseau en 200** plante identiquement — la cause est donc bien le **champ manquant**, et non l'échec réseau que j'avais d'abord accusé.
+- Témoin négatif: le cas **B** du même relevé — ligne **complète**, réseau en 200 — rend l'écran normalement ; et le cas **A** — ligne complète, compteurs en 500 — le rend aussi. La sonde ne plante donc pas d'elle-même : elle plante **exactement** quand le champ manque.
+- Impact        : *portée à déclarer honnêtement — **je n'ai pas démontré que l'API omet un jour ces champs**.* Ce que j'ai démontré, c'est qu'**il n'y a aucun amortisseur si elle le fait** : combiné à **D25-006** (aucune frontière d'erreur montée), une seule clef manquante fait passer l'utilisateur de la console CRM à un message anglais sans coquille ni retour. Le risque n'est pas théorique dans ce dépôt : **A-002 / B10-013** montrent que 9 routes rendent déjà des corps figés.
+- Reproduction  : monter `ContactsHubPage` avec une ligne dépourvue de `tags` et `contacts`, tout le réseau en 200.
+- Correctif     : `(company.contacts ?? []).length`, `(company.tags ?? []).length`, `(audience.member_count ?? 0).toLocaleString(…)` — **0,1 j** ; et monter la frontière d'erreur de **D25-006**, qui vaut pour tous les cas non encore trouvés.
 - Statut        : ouvert
 
 ---

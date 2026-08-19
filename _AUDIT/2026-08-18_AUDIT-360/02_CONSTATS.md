@@ -2759,3 +2759,51 @@ recherche occupe l'unique processus PHP et fait attendre tout le monde.**
 ✅ **Et deux griefs classiques qu'il a écartés contre ses propres brouillons** : les contextes trop
 larges (**aucun n'existe**) et les clés de liste par index (**10 des 12 portent sur des squelettes
 constants**). *Il corrige ses propres hypothèses avant de les publier.*
+
+---
+
+### Agent 45 — rendu final : **20 sabotages, et la contre-vérification de la règle 7**
+
+*(Complète la section « Agent 45 » plus haut, écrite sur son rendu intermédiaire.)*
+
+**20 sabotages joués — 17 suivis de la suite ENTIÈRE (780 tests chacun), 3 ciblés.**
+**13 ont fait rougir la garde visée. 7 ne l'ont pas fait.**
+
+✅ **Et un résultat positif qu'il faut dire aussi fort que les défauts** :
+**aucun sabotage n'a fait rougir plus de 4 tests par sa propre cause. La suite est PRÉCISE.**
+*C'est la qualité qu'on ne mesure jamais : une suite qui rougit à tout n'apprend rien, et celle-ci ne
+le fait pas.*
+
+**Les 7 fausses assurances, chacune nommée** :
+1. 🔴 **La famille « sans auth → 401, jamais 500 » (25 cas) n'interroge que le chemin JSON.** Mesuré
+   **sur la PRODUCTION** : `Accept: application/json` → **401**, `Accept: text/html` → **500**,
+   **5 adresses sur 5**. → ***A-001 est vivant en production, et la suite le certifie absent.***
+2. Clé de cache HIBP rendue **globale** → **les 780 tests restent verts** (le test affirme `expect(true)->toBeTrue()`).
+3. En-tête de la requête HIBP **supprimé** → **780 tests verts**.
+4. Le vrai `WorkspaceContext::run(` **retiré** → la garde **le trouve dans un commentaire** et reste verte.
+5. `reportUnmatchedIgnoredErrors` **mis en commentaire** → verte (*elle rougit si on écrit `false`, pas si on commente*).
+6. `DB_TIMEZONE` **retiré** → la garde reste verte, alors que **ses 6 sœurs de comportement rougissent**.
+7. L'**anti-rejeu du canal** désarmé par configuration → **aucun** des 780 tests ne rougit.
+
+### 🔑 La contre-vérification de la règle 7 sur le travail des 18 et 19 août — **elle est POSITIVE**
+
+C'est ce que le dirigeant avait explicitement demandé : *« une partie de ce que tu vas auditer a été
+écrite aujourd'hui même par un agent — contre-vérifie ces constats plutôt que de les reprendre. »*
+**Fait, et le résultat honore le travail contrôlé** :
+
+- **`CompteursHubTest`** : **4 sabotages, 4 rouges, rayon 0 à chaque fois** — et **chacun sur le bon
+  objet** (plan `EXPLAIN` réel, requêtes SQL comptées, chiffres servis à deux univers).
+  *Les rouges annoncés le 19/08 sont reproductibles.*
+- **`ActivitesEtMotifsTest`** : `insertOrIgnore → upsert` fait rougir **exactement les deux gardes de
+  re-semis**, ni plus ni moins.
+- **Une seule réserve, et elle est mineure** : la garde de plan **rougit au hasard 1 fois sur 15** —
+  le planificateur hésite entre deux index à **0,01 de coût près** sur une table de 2 lignes.
+  → `H45-011`, S3.
+
+✅ **Et deux soupçons du mandat levés côté backend** : les pathologies « le test pré-insère ce qu'il
+doit produire » et « le mock teste le mock » **n'ont aucun cas avéré** — *les tests qui semblent
+pré-insérer relisent en fait ce que la **base** a fait, et les doublures sont affirmées sur l'effet en
+base.* **C'était le soupçon le plus lourd du §10 du mandat, et il ne tient pas ici.**
+
+**Restauration** : **20 restaurations vérifiées une à une**, puis `diff -rq` **intégral** sur les deux
+conteneurs → identiques. `git status --porcelain -- backend frontend workers infra .github` → **vide**.

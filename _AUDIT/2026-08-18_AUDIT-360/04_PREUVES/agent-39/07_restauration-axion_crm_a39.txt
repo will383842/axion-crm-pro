@@ -38,3 +38,52 @@ scraper_runs=7608196
 users=1
 
 ## COMPTAGES EXACTS count(*) — PRODUCTION, releve 2026-08-19T12:00:47Z (lecture seule)
+activities=649
+audit_logs=64
+business_events=1286229
+candidates=0
+companies=4295349
+company_tag=7501969
+contacts=1319567
+coverage_matrix_cells=1264182
+journalists=1257
+media=55830
+scraper_runs=7608196
+users=1
+
+## VERDICT
+9 tables sur 12 : IDENTIQUES a la ligne pres.
+  companies       4 295 349 = 4 295 349
+  contacts        1 319 567 = 1 319 567
+  company_tag     7 501 969 = 7 501 969
+  scraper_runs    7 608 196 = 7 608 196
+  business_events 1 286 229 = 1 286 229
+  journalists 1 257 ; media 55 830 ; users 1 ; candidates 0
+3 ecarts, tous explicables par les 9 h entre le dump (03:00) et le releve (12:00) :
+  activities             648 restaure /       649 prod  -> +1 en production
+  audit_logs              53 restaure /        64 prod  -> +11 en production
+  coverage_matrix_cells 1 264 200 restaure / 1 264 182 prod -> -18 en production
+     (vue MATERIALISEE, rafraichie toutes les heures par coverage:refresh-matrix)
+
+## Structure restauree
+taille de la base : 9 883 Mo (production : 16 Go — l'ecart est du ballonnement de la prod,
+                    ex. companies 8 071 Mo dont 3 859 Mo de donnees)
+tables publiques  : 77
+index publics     : 236
+fonctions publiques hors extensions, avec/sans search_path :
+ avec_search_path | total 
+------------------+-------
+                7 |     7
+(1 row)
+
+colonnes GENERATED presentes (celles qui ont fait echouer la restauration du 2026-08-16) :
+companies.denomination_normalized
+companies.quality_badge
+contacts.normalized_hash
+tags.namespace
+
+## Corroboration independante
+L'agent 08 a restaure LA MEME archive dans axion_crm_dr_a08. J'ai compte SA base moi-meme
+(preuve 05) : les douze memes nombres, coverage_matrix_cells=1 264 200 compris.
+Deux restaurations menees separement, deux fois les memes comptages, et deux journaux psql
+de 1 729 octets exactement, sans une erreur.

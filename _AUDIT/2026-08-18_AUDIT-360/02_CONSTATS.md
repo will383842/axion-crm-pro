@@ -3044,3 +3044,44 @@ lit « je recharge » ; un sablier se lit « ça travaille »* · et **19 au lie
 ⚠️ **Deux mesures interrompues, déclarées comme telles** : le rendu à 100 000 lignes, et un
 chronométrage qui n'a pas abouti — **le « ~93 s » est donc présenté comme un calcul, pas comme une
 mesure**.
+
+---
+
+### Agent 39 — rendu final : **la restauration croisée par deux agents indépendants**
+
+**C'est la seule mesure de tout l'audit qu'un second agent a refaite et recomptée lui-même.**
+L'agent 39 a restauré la même archive que l'agent 8, séparément — puis **il est allé compter la base
+de l'agent 8** : **les douze mêmes nombres**, journal `psql` de 1 729 octets **dans les deux cas**.
+
+**Restauration** : 724 926 343 o, `sha256` **identique des deux côtés**, `gzip -t` OK, **5 212 s**,
+code de sortie **0**, **0 `ERROR`, 0 `FATAL`**.
+
+| Table | Restauré | Production | |
+|---|---:|---:|---|
+| `companies` | **4 295 349** | 4 295 349 | = |
+| `contacts` | **1 319 567** | 1 319 567 | = |
+| `company_tag` | **7 501 969** | 7 501 969 | = |
+| `scraper_runs` | **7 608 196** | 7 608 196 | = |
+| `business_events` | **1 286 229** | 1 286 229 | = |
+| `activities` · `audit_logs` · vue matérialisée | 648 · 53 · 1 264 200 | 649 · 64 · 1 264 182 | **écarts expliqués par l'activité écoulée entre 03:00 et 12:00** |
+
+✅ Et **le correctif `search_path` tient dans la base restaurée** : **7/7 fonctions** avec `proconfig`,
+colonnes normalisées présentes.
+
+**Chiffres précisés** :
+- **RPO = 24 h** — et **trois valeurs déclarées coexistent** : le `Makefile` dit **1 h**, `dr-drill.sh`
+  code **36 h**, le dispositif fait **24 h**.
+- **RTO = 1 h 28** pour la base seule (40 s de rapatriement + 1 h 27 de restauration).
+  **Provisionnement, déploiement et bascule DNS ne sont chronométrés par rien.**
+- **Saturation : 2026-10-06, dans 48 jours.** 24,25 Gio libres, **511 Mio/jour** mesurés sur 900 s et
+  **confirmés sur une fenêtre indépendante de 180 s**. Dont **166 Mio/jour de journaux** — et
+  `LOG_STACK` vaut par défaut `single,stderr`, **donc le flot part deux fois**.
+- **Les sauvegardes locales sont sur le disque qu'elles sauvegardent** (plus une copie hors-site
+  Hetzner, **taille identique à l'octet**, empreinte non vérifiable en lecture seule).
+
+🔴 **Et la réponse à « qu'est-ce qui alerterait réellement un humain ? » tient en une ligne :
+UNE SEULE CHOSE** — le workflow de surveillance des sauvegardes, **vu rouge 2 fois le 17/08**.
+Tout le reste est muet : aucun des 8 services d'observabilité n'est déployé, les 8 règles visent des
+cibles **inexistantes**, Slack et Telegram n'ont **pas de secrets en production**, **Sentry a un DSN
+mais `withExceptions()` est vide** — *les 500 de `A-001` n'existent pour personne* — et **aucune des
+35 tâches planifiées n'a de `onFailure`**.

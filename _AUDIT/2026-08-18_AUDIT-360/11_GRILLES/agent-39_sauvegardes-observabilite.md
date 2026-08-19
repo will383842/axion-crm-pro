@@ -8,16 +8,23 @@
 > ici n'a bougé entre les deux références.**
 > **Production** : `46.62.248.239`, accédée **en lecture seule** par SSH. Aucune écriture,
 > aucune suppression, aucune restauration n'a été faite sur la production.
-> **Restauration** : faite **en local**, sur la base jetable `axion_crm_a39`.
+> **Restauration** : faite **en local**, sur la base jetable `axion_crm_a39`. Elle est
+> **conservée** (9 883 Mo) pour qu'un tiers puisse recompter sans me croire sur parole —
+> `docker exec axion-crm-postgres psql -U axion -d axion_crm_a39 -tAc "select count(*) from companies"`.
+> À supprimer quand la place manquera : `DROP DATABASE axion_crm_a39 WITH (FORCE);`.
 > Sorties brutes : `_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-39/`.
 
 ---
 
 ## 0. La mission centrale, en une phrase
 
-**Une sauvegarde de production a été restaurée pour de vrai, en local, et les lignes ont été
-comptées table par table.** Le détail est au §2. Ce qui suit ne remplace pas cette mesure : il
-la complète.
+**OUI. Une sauvegarde de production a été restaurée pour de vrai**, en local, sur la base jetable
+`axion_crm_a39`, **et les lignes ont été comptées table par table**. Archive
+`axion_crm_20260819T030001Z.sql.gz` (692 Mio), restauration de **1 h 26 min 52 s** terminée le
+2026-08-19 à 14:02:22 UTC, **0 erreur**, code de sortie **0**. `companies` = **4 295 349**,
+`contacts` = **1 319 567**, `company_tag` = **7 501 969**, `scraper_runs` = **7 608 196** —
+**identiques à la production**. Le détail, les douze tables et les trois écarts expliqués sont au
+§2. Ce qui suit ne remplace pas cette mesure : il la complète.
 
 ---
 
@@ -42,7 +49,7 @@ la complète.
 | `infra/runbooks/{01,02,03}` | oui | s'appuient sur des alertes (`HorizonQueueBacklog`, `DiskSpaceLow`, `ApiDown`, Uptime Kuma) qui **ne peuvent pas se déclencher** ; `DiskSpaceLow` **n'existe même pas** dans `alerts.yml` | non | `grep -c DiskSpaceLow alerts.yml` → **0** | **F39-011** |
 | Tâches planifiées (35) | oui | **aucune ne prévient personne quand elle échoue** | non | 0 occurrence de `onFailure`/`emailOutputOnFailure`/`pingOnFailure` dans tout `backend/` | **F39-006** |
 | RPO annoncé (`Makefile`, runbook 04) | « ≤ 1 h » | **faux d'un facteur 24** — la sauvegarde est quotidienne ; `dr-drill.sh` lui-même tolère 36 h | n/a | RPO mesuré : **24 h** (9 h 00 au moment de la mesure) | **F39-009** |
-| RTO annoncé (`Makefile`, runbook 04) | « ≤ 4 h » | tenu, mais la marge n'est pas celle qu'on croit | n/a | RTO mesuré : voir §3 | F39-009 |
+| RTO annoncé (`Makefile`, runbook 04) | « ≤ 4 h » | tenu **pour la base seule** ; rien d'autre n'est chronométré | n/a | RTO mesuré : **1 h 28** (dont 1 h 26 min 52 de restauration) | F39-009 |
 | Trajectoire du disque de production | 25 Go libres | **rien ne la surveille** | non | consommation nette **511 Mio/j** mesurée sur 900 s | **F39-011** |
 
 ---
@@ -59,7 +66,8 @@ la complète.
    `gzip -t` : OK. L'archive rapatriée est **bit à bit** celle du serveur.
 4. Base jetable créée : `CREATE DATABASE axion_crm_a39 OWNER axion` sur le Postgres **local**
    (16.9, PostGIS + `vector` disponibles). Aucune base d'un autre agent n'a été touchée.
-5. `gzip -dc … | psql -q` dans `axion_crm_a39`.
+5. `gzip -dc …` puis `psql -q` dans `axion_crm_a39` — **début 12:35:30 UTC, fin 14:02:22 UTC**,
+   code de sortie **0**, **0 ligne `ERROR`**, **0 ligne `FATAL`** dans le journal `psql`.
 6. Comptages exacts (`count(*)`, **pas** d'estimation `n_live_tup`) comparés à la production.
 
 > **Note d'atelier, à retenir pour qui rejouera l'exercice depuis Windows.** La première tentative
@@ -96,27 +104,37 @@ cron de production à 03:00:01 UTC. **Journal `psql` : 0 ligne `ERROR`, 0 ligne 
 | `candidates` | **0** | 0 | **=** |
 | `activities` | 648 | 649 | +1 en production |
 | `audit_logs` | 53 | 64 | +11 en production |
+| `coverage_matrix_cells` *(vue matérialisée)* | 1 264 200 | 1 264 182 | −18 en production |
 
-**Neuf tables sur onze sont identiques à la ligne près.** Les deux écarts vont tous les deux
-dans le même sens — la production a **plus** de lignes que l'archive — et s'expliquent par les
-**neuf heures** écoulées entre le dump de 03:00 et le relevé de 12:00. Aucune table restaurée ne
-contient plus de lignes que la production, aucune n'est vide.
+**Neuf tables sur douze sont identiques à la ligne près.** Les trois écarts s'expliquent tous par
+les **neuf heures** écoulées entre le dump de 03:00 et le relevé de 12:00 : deux tables ont gagné
+des lignes en production, et `coverage_matrix_cells` — qui est une **vue matérialisée** rafraîchie
+toutes les heures par `Schedule::command('coverage:refresh-matrix')->hourly()` — en a perdu 18.
+**Aucune table restaurée n'est vide, aucune n'est amputée.**
 
 Les valeurs annoncées dans mon mandat (`companies ≈ 4 295 349`, `contacts ≈ 1 319 567`,
 `activities = 649`, `candidates = 0`) sont donc **retrouvées**, à l'activité de la journée près.
 
+**Structure restaurée** : 77 tables publiques, 236 index, 9 883 Mo. La base restaurée est plus
+petite que les 16 Go de la production parce que ses index sont reconstruits compacts : la
+production porte du ballonnement (`companies` = 8 071 Mo dont **3 859 Mo** de données réelles).
+
+**Et le point qui compte pour le correctif du 2026-08-16** : la base restaurée porte **7 fonctions
+sur 7 avec un `search_path` fixé**, et les colonnes générées qui avaient fait échouer la
+restauration ce jour-là sont bien là — `companies.denomination_normalized`,
+`contacts.normalized_hash`, `companies.quality_badge`, `tags.namespace`.
+
 > **Corroboration indépendante.** L'agent 08 a restauré **la même archive** dans
 > `axion_crm_dr_a08`. Je n'ai pas produit cette base : je l'ai comptée moi-même (preuve 05), et
-> elle rend **les onze mêmes nombres**. Deux restaurations menées séparément, deux fois les mêmes
-> comptages — et deux journaux `psql` de **1 729 octets** exactement, sans une erreur.
-> Elle porte en plus `coverage_matrix_cells = 1 264 200` contre **1 264 182** en production : la
-> vue matérialisée, rafraîchie toutes les heures par `coverage:refresh-matrix`, a **perdu 18
-> cellules** en production depuis le dump. Écart réel, mais dans le sens inverse des deux autres,
-> et sans rapport avec la sauvegarde.
+> elle rend **les douze mêmes nombres**, `coverage_matrix_cells = 1 264 200` compris. Deux
+> restaurations menées séparément, deux fois les mêmes comptages — et deux journaux `psql` de
+> **1 729 octets** exactement, sans une seule erreur.
 
 ### 2.3 Ce que la restauration prouve, et ce qu'elle ne prouve pas
 
 - Elle prouve que **l'archive du 2026-08-19 03:00 UTC est restaurable** et **complète**.
+- Elle prouve que **le dispositif de sauvegarde de production fonctionne aujourd'hui** — ce qui
+  n'était pas le cas il y a trois jours, et n'avait jamais été vérifié avant le 2026-08-16.
 - Elle prouve que le correctif `fixer_search_path_des_fonctions` **tient encore aujourd'hui** :
   aucune erreur `function unaccent(text) does not exist`, `companies` et `contacts` restaurées
   avec leurs colonnes générées.
@@ -133,9 +151,32 @@ Les valeurs annoncées dans mon mandat (`companies ≈ 4 295 349`, `contacts ≈
 | | Annoncé (`Makefile:140`, `infra/runbooks/04-restore-dr.md:3`) | Mesuré |
 |---|---|---|
 | **RPO** | « ≤ 1 h » | **24 h** — la sauvegarde est quotidienne (cron `0 3 * * *`). Au moment de la mesure (12:00 UTC), la dernière sauvegarde datait de **9 h 00** (archive `20260819T030001Z`). `dr-drill.sh` lui-même code `RPO_CIBLE_S=129600`, soit **36 h** : le script contredit le `Makefile` qui l'appelle. |
-| **RTO** | « ≤ 4 h » | voir ci-dessous |
+| **RTO** | « ≤ 4 h » | **1 h 27 min pour la base seule** — et c'est tout ce qui a été mesuré. |
 
-<!-- RTO -->
+Décomposition du RTO mesuré, du geste « je restaure » à « la base est debout » :
+
+| Étape | Mesuré |
+|---|---|
+| Rapatriement de l'archive (692 Mio, `scp` depuis la production) | **40,3 s** |
+| Contrôle d'intégrité (`sha256sum` × 2, `gzip -t`) | ≈ 60 s |
+| Restauration `gzip -dc` → `psql` (début 12:35:30Z → fin 14:02:22Z) | **5 212 s = 1 h 26 min 52 s** |
+| **Total** | **≈ 1 h 28 min** |
+
+**Ce chiffre tient sous la cible de 4 h — mais il ne mesure que la base.** Un RTO réel comprend
+aussi le provisionnement d'un serveur, l'installation de Docker, le déploiement de l'application
+et la bascule DNS, qu'aucun script ne chronomètre et qu'aucun exercice n'a jamais joués.
+`infra/runbooks/04-restore-dr.md` les décrit — avec `hcloud`, `cf-cli` et une procédure PITR qui
+n'existe pas (F39-008). **La marge réelle sur 4 h est donc inconnue, pas confortable.**
+
+Deux réserves de méthode, à dire plutôt qu'à taire :
+- la mesure a été faite sur un **poste Windows saturé** (constat A-009 : quinze conteneurs
+  d'agents en concurrence, `axion-crm-postgres` à 300 % de CPU). L'en-tête de `dr-drill.sh`
+  annonce **21 min pour 16 Go** sur sa machine de référence du 2026-08-16 : mon 1 h 27 est un
+  **majorant**, pas la performance du dispositif ;
+- la première tentative, par la voie que `dr-drill.sh` code (`zcat | docker exec -i psql` depuis
+  Windows), avançait **cinq fois plus lentement** et n'aurait pas fini avant 8 h. Le RTO dépend
+  donc autant du **chemin choisi** que du dispositif — et le chemin codé dans le script est le
+  mauvais sur le seul poste qui a la place de l'exécuter.
 
 ---
 
@@ -271,7 +312,15 @@ Tout le reste est muet :
   $ grep -rn "proconfig\|pg_get_function_identity_arguments" --include=*.php --include=*.yml --include=*.sh .
     1 seul résultat : un COMMENTAIRE dans la migration
   ```
-  et la restauration du §2 : 0 erreur `function unaccent(text) does not exist`, `companies` et `contacts` restaurées.
+  et la restauration du §2, qui est le témoin positif : **0** ligne `ERROR` dans le journal `psql`, donc **0** `function unaccent(text) does not exist` ; `companies` = 4 295 349 et `contacts` = 1 319 567 restaurées ; la base restaurée porte **7 fonctions sur 7** avec `proconfig` non nul, et les colonnes générées fautives sont bien présentes :
+  ```
+  $ psql -d axion_crm_a39 -tAc "select table_name||'.'||column_name from information_schema.columns
+                                where is_generated='ALWAYS' and table_schema='public'"
+    companies.denomination_normalized
+    companies.quality_badge
+    contacts.normalized_hash
+    tags.namespace
+  ```
 - Témoin négatif: la même requête, sur la même base, **trouve** bien les 7 fonctions et leurs valeurs — elle rendrait `proconfig` à `NULL` pour une huitième non traitée. Et l'historique fournit le témoin positif ultime : le 2026-08-16, avec `proconfig` vide, la restauration rendait une base **sans `companies` ni `contacts`**.
 - Impact        : la prochaine migration qui crée une fonction SQL référençant un objet non qualifié (`unaccent`, une table, un opérateur PostGIS) réintroduit **exactement** la panne du 2026-08-16 : dump vert, `verifier-sauvegarde.sh` vert (le fichier est gros et récent), et une base non restaurable. Le défaut ne se voit **qu'au moment de restaurer**, c'est-à-dire au pire moment.
 - Reproduction  : les deux commandes ci-dessus.

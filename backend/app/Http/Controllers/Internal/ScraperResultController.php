@@ -6,6 +6,7 @@ use App\Crm\Scraping\ScrapedRecord;
 use App\Crm\Scraping\ScrapedRecordIngestService;
 use App\Crm\Scraping\ScrapeIngestRejection;
 use App\Http\Controllers\Api\ApiController;
+use App\Support\HmacSignature;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -36,9 +37,40 @@ class ScraperResultController extends ApiController
         $sig = $r->header('X-Worker-Signature');
         $secret = (string) env('WORKER_INTERNAL_HMAC_SECRET', '');
         $body = $r->getContent();
-        $expected = hash_hmac('sha256', $body, $secret);
 
-        if ($sig === null || ! hash_equals($expected, $sig)) {
+        // -- SECRET ABSENT : ON REFUSE. On ne verifie pas « quand meme ». -----
+        //
+        // Ce controle etait FAIL-OPEN, et le secret est VIDE sur le serveur de
+        // production. `hash_hmac('sha256', $body, '')` produit un condensé
+        // parfaitement valide - avec une cle que TOUT LE MONDE connait, puisque
+        // c'est la chaine vide. N'importe qui pouvait donc forger
+        // `X-Worker-Signature` et pousser des enregistrements dans la base de
+        // production, le funnel d'ingestion etant ouvert.
+        // Mesure le 2026-08-19 (audit 360, F37-001, S0).
+        //
+        // Un secret manquant est une faute de CONFIGURATION, pas une requete
+        // malformee : on rend 503, comme le fait deja le webhook ZeptoMail. Le
+        // 401 reste reserve a une signature reellement fausse.
+        if ($secret === '') {
+            Log::error('scraper-result : WORKER_INTERNAL_HMAC_SECRET est vide - canal refuse', [
+                'ip' => $r->ip(),
+            ]);
+
+            return response()->json([
+                'error' => 'signature_secret_absent',
+                'message' => "Le canal interne n'est pas configuré côté serveur.",
+            ], 503);
+        }
+
+        // On reprend la classe DURCIE deja en place sur SiteSync et Gdpr plutot
+        // que de recopier le patron : elle refuse un secret vide, elle tolere le
+        // prefixe `sha256=`, et elle compare a temps constant. La migration vers
+        // cette classe avait ete faite pour SiteSync et jamais retroportee ici -
+        // c'est precisement l'origine du defaut.
+        // Le format signe reste le CORPS BRUT, sans horodatage : y ajouter la
+        // fenetre temporelle casserait les workers Node en place. Le rejeu tardif
+        // reste donc ouvert, et c'est note comme tel.
+        if (! HmacSignature::verify($secret, $body, $sig)) {
             Log::warning('Internal scraper result rejected (bad HMAC)', ['ip' => $r->ip()]);
 
             return response()->json(['error' => 'bad_signature'], 401);

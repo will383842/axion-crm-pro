@@ -103,6 +103,34 @@ beforeEach(function () {
     $this->seed(ScrapingSourcesSeeder::class);
 });
 
+/**
+ * Impose un VRAI secret au canal interne, sur les trois canaux de variables.
+ *
+ * 🔴 Ces tests signaient auparavant avec `env('WORKER_INTERNAL_HMAC_SECRET', '')`
+ * — c'est-a-dire avec la CHAINE VIDE, puisque cette variable n'est definie nulle
+ * part dans l'environnement de test. Ils passaient parce que la verification
+ * etait FAIL-OPEN : `hash_hmac($body, '')` produit un condense valide, calculable
+ * par n'importe qui. Ces tests certifiaient donc, sans le dire, qu'un canal sans
+ * secret accepte quand meme les messages (audit 360, F37-001, S0).
+ *
+ * Le canal refuse desormais un secret vide (503). Les tests posent donc un vrai
+ * secret : ils verifient le comportement du FUNNEL, pas l'absence de controle.
+ *
+ * `putenv()` seul ne suffit pas — le depot de variables de Laravel interroge
+ * `ServerConstAdapter` ($_SERVER) en premier, et `variables_order = EGPCS` y
+ * place les variables du conteneur. Meme piege que `tests/bootstrap.php`.
+ */
+const SECRET_CANAL_INTERNE_TEST = 'secret-de-test-du-canal-interne-2026';
+
+function poserSecretCanalInterne(): string
+{
+    $_SERVER['WORKER_INTERNAL_HMAC_SECRET'] = SECRET_CANAL_INTERNE_TEST;
+    $_ENV['WORKER_INTERNAL_HMAC_SECRET'] = SECRET_CANAL_INTERNE_TEST;
+    putenv('WORKER_INTERNAL_HMAC_SECRET=' . SECRET_CANAL_INTERNE_TEST);
+
+    return SECRET_CANAL_INTERNE_TEST;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. INERTIE — drapeau OFF, l'endpoint garde le comportement HISTORIQUE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,9 +143,9 @@ test('drapeau à OFF : /internal/scraper-result garde son comportement historiqu
     $legacy = ['run_id' => 'r-1', 'source' => 'google-maps', 'status' => 'success', 'payload' => ['x' => 1]];
     $body = json_encode($legacy, JSON_THROW_ON_ERROR);
 
-    // On signe avec LE secret que l'application voit (dotenv est immuable :
-    // un putenv() de test n'écrase pas une variable déjà chargée du .env).
-    $secret = (string) env('WORKER_INTERNAL_HMAC_SECRET', '');
+    // On pose un VRAI secret et on signe avec lui. Signer avec la chaine vide
+    // ne prouvait rien : c'etait le defaut F37-001 qui rendait ce test vert.
+    $secret = poserSecretCanalInterne();
 
     $response = test()->call('POST', '/api/internal/scraper-result', [], [], [], [
         'CONTENT_TYPE' => 'application/json',
@@ -134,7 +162,7 @@ test('drapeau à OFF : /internal/scraper-result garde son comportement historiqu
 test('drapeau à ON : le MÊME endpoint valide le pivot et ingère réellement', function () {
     $record = scrapedRecord();
     $body = json_encode($record, JSON_THROW_ON_ERROR);
-    $secret = (string) env('WORKER_INTERNAL_HMAC_SECRET', '');
+    $secret = poserSecretCanalInterne();
 
     $response = test()->call('POST', '/api/internal/scraper-result', [], [], [], [
         'CONTENT_TYPE' => 'application/json',

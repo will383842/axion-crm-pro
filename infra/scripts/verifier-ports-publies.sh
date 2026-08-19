@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# Vérifie que la pile de production, TELLE QU'ELLE TOURNE, ne publie sur
+# l'extérieur que 80 et 443.
+#
+# ── Pourquoi ce script existe ───────────────────────────────────────────────
+# Le 2026-08-19, la garde CI `config-prod` était VERTE, le déploiement était
+# VERT, et `docker ps` sur la production montrait :
+#
+#   axion-crm-postgres :: 0.0.0.0:55432->5432/tcp
+#   axion-crm-redis    :: 0.0.0.0:56379->6379/tcp
+#
+# La configuration fusionnée, elle, ne publiait bien que 80 et 443 : le
+# correctif `ports: !override []` était juste. Mais
+# `.github/workflows/deploy-direct-ssh.yml` ne recrée que
+# `api app horizon scheduler`, avec `--no-deps` — choix délibéré pour ne pas
+# redémarrer la base à chaque mise en production. Conséquence jamais tirée :
+# une modification de `docker-compose*.yml` portant sur `postgres`, `redis` ou
+# `reverb` est INAPPLICABLE par le déploiement. Ces conteneurs gardent la
+# configuration de leur création, indéfiniment.
+#
+# `config-prod` prouve que le FICHIER est juste. Ce script prouve que le RÉEL
+# l'est. Entre les deux il y a un déploiement qui, pour ces services, ne fait
+# rien — et c'est dans cet écart qu'une base de 4,29 M de fiches est restée
+# ouverte sur internet.
+#
+# Règle à retenir : une garde ne vaut que si elle rougit SUR L'OBJET QUI CASSE.
+#
+# Usage, sur le serveur de production :
+#   bash verifier-ports-publies.sh
+# Sortie 0 = conforme · 1 = un port interdit est publié · 2 = mesure impossible
+set -uo pipefail
+
+PROJET="${1:-axion-crm-pro}"
+AUTORISES="80 443"
+
+if ! command -v docker > /dev/null 2>&1; then
+  echo "ERREUR : docker introuvable — mesure impossible." >&2
+  exit 2
+fi
+
+# `docker ps` du projet Compose. On lit les ports RÉELLEMENT publiés par le
+# démon, pas ce que le fichier déclare : c'est tout l'objet du contrôle.
+LIGNES="$(docker ps --filter "label=com.docker.compose.project=${PROJET}" \
+  --format '{{.Names}}|{{.Ports}}' 2>/dev/null)"
+
+if [ -z "$LIGNES" ]; then
+  # Témoin négatif : « aucun port interdit » ne vaut rien si la mesure n'a rien
+  # regardé. Sans conteneur trouvé, on échoue au lieu de rassurer.
+  echo "ERREUR : aucun conteneur du projet « ${PROJET} » — la mesure n'a rien vu." >&2
+  echo "         (un résultat « conforme » sur zéro conteneur serait un mensonge)" >&2
+  exit 2
+fi
+
+echo "=== ports publiés par la pile « ${PROJET} » ==="
+echo "$LIGNES" | tr '|' ' '
+echo
+
+# On ne retient que les publications vers l'HÔTE (`0.0.0.0:` ou `[::]:` ou une
+# adresse explicite suivie de `->`). Les ports simplement EXPOSÉS entre
+# conteneurs (`9000/tcp`) ne sortent pas de la machine et ne sont pas concernés.
+PUBLIES="$(echo "$LIGNES" \
+  | grep -oE '(([0-9]{1,3}\.){3}[0-9]{1,3}|\[::\]):[0-9]+->' \
+  | sed -E 's/.*:([0-9]+)->/\1/' \
+  | sort -un)"
+
+if [ -z "$PUBLIES" ]; then
+  echo "ERREUR : aucune publication détectée — même 80 et 443 sont absents." >&2
+  echo "         La pile ne peut pas servir le site : la mesure est suspecte." >&2
+  exit 2
+fi
+
+echo "Ports publiés sur l'hôte : $(echo "$PUBLIES" | tr '\n' ' ')"
+
+INTERDITS=""
+for port in $PUBLIES; do
+  case " $AUTORISES " in
+    *" $port "*) ;;
+    *) INTERDITS="$INTERDITS $port" ;;
+  esac
+done
+
+# Témoin POSITIF : si 80 et 443 ne sont pas là, le contrôle ne mesure pas ce
+# qu'il croit (mauvais projet, pile arrêtée, filtre cassé). Sans lui, une pile
+# éteinte passerait au VERT — c'est exactement le défaut qu'avait la première
+# version de la garde `config-prod`.
+MANQUANTS=""
+for attendu in $AUTORISES; do
+  echo "$PUBLIES" | grep -qx "$attendu" || MANQUANTS="$MANQUANTS $attendu"
+done
+
+if [ -n "$MANQUANTS" ]; then
+  echo >&2
+  echo "ÉCHEC (témoin positif) : ports attendus absents :$MANQUANTS" >&2
+  echo "  La pile ne publie pas ce qu'elle doit publier. Le contrôle ne prouve" >&2
+  echo "  rien sur les ports interdits tant que celui-ci ne passe pas." >&2
+  exit 2
+fi
+
+if [ -n "$INTERDITS" ]; then
+  echo >&2
+  echo "ÉCHEC : ports publiés sur internet alors qu'ils ne devraient pas :$INTERDITS" >&2
+  echo >&2
+  echo "  Le fichier a probablement raison et le conteneur a tort : le" >&2
+  echo "  déploiement ne recrée que « api app horizon scheduler » (--no-deps)." >&2
+  echo "  Un changement de « ports » sur postgres, redis ou reverb exige donc" >&2
+  echo "  une recréation explicite :" >&2
+  echo >&2
+  echo "    docker compose -f docker-compose.yml -f docker-compose.prod.yml \\" >&2
+  echo "      up -d --force-recreate --no-deps postgres redis" >&2
+  echo >&2
+  echo "  ⚠️ Quelques secondes d'interruption de la base." >&2
+  exit 1
+fi
+
+echo "OK : la pile ne publie que $AUTORISES — mesuré sur les conteneurs, pas sur le fichier."

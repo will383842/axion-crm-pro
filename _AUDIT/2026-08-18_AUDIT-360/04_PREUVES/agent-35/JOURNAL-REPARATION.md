@@ -198,3 +198,36 @@ reste ouverte**, et elle est la vraie cause de gravité : sans elle, le prochain
 renommé refera exactement la même chose.
 
 Commit : `bdd25eb`.
+
+---
+
+## Vague 2 — au-delà de mon périmètre, sur ordre de Will
+
+Will a demandé, en cours de session : « puis il faut que tu fixes tous les problèmes non ? ».
+Je suis donc sorti de mon périmètre, en prenant les S0 dans l'ordre du danger et de la
+tractabilité. Chacun garde la trace de qui l'a trouvé.
+
+| Constat | Agent d'origine | Ce qui était cassé | Commit |
+|---|---|---|---|
+| **A-015 / D24-001** (S0) | 24 | L'écran d'accueil s'effaçait entièrement dès qu'`audit_logs` portait une ligne — et la connexion en écrit une | `bdd25eb` |
+| **D22-001** (S0) | 22 | **Aucun écran** n'appelait `/auth/2fa/setup` : le serveur exigeait un enrôlement qu'il était impossible de déclencher | `26fa980` |
+| **B15-010** (S0) | 15 | Les routes RGPD n'exigeaient **aucune permission** : un `viewer` pouvait déposer ET traiter une demande d'effacement | *(en cours)* |
+| **B16-004** (S0) | 16 | `GET /audit-logs` sans garde : le `viewer` recevait **200** et lisait le journal | *(en cours)* |
+
+**Le modèle de droits était juste depuis le début.** `viewer` porte `rgpd.view` mais pas
+`rgpd.handle`, ni `audit.view` ; seuls `owner` et `admin` les portent. Les permissions
+existaient dans le seeder — **elles n'étaient simplement jamais exigées par les routes**.
+Le correctif est donc d'exiger ce qui existait, pas d'inventer un modèle.
+
+**Rouge mesuré avant correctif** : `viewer` → 422 sur le dépôt d'une demande (il franchit
+la garde, seule la validation l'arrête), **500** sur le traitement, et **200** sur le
+journal d'audit. Les trois témoins (le `viewer` peut consulter, l'`owner` peut traiter,
+l'`admin` peut lire) passaient **déjà** : la garde discrimine l'action, pas la personne.
+
+**Et une fois de plus, ma sonde avait tort avant le produit.** Ma garde sur le traitement
+d'une demande inventait un identifiant UUID. Or la clé de `rgpd_requests` est un **entier**,
+et la résolution du modèle passe **avant** la garde de permission dans la pile : l'appel
+mourait sur Postgres (500) sans que le droit ne s'exprime jamais. Deux conséquences :
+la garde a été réécrite pour créer une **vraie** demande, et la route porte désormais
+`->whereNumber('req')` — un identifiant malformé rend **404** au lieu de **500**.
+

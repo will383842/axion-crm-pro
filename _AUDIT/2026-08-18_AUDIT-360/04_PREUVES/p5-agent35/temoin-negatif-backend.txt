@@ -1,0 +1,346 @@
+TEMOIN NEGATIF — branche fix/a35-authentification (bdd25eb) contre main (e8924b8)
+date : 2026-08-19T15:46:57Z
+base de test dediee : axion_crm_test_p5a35 (59 migrations)
+
+############ F35-001 ############
+--- fichiers ramenes a main :
+    backend/bootstrap/app.php
+
+   FAIL  Tests\Feature\Auth\GardesAuthentificationAgent35Test
+  ⨯ F35-001 — une route protegee rend 401, jamais 500, quel que soit…  149.85s  
+  ✓ F35-001 — aucune route nommee login n est requise par l application  0.88s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-001 —…    
+  Failed asserting that 500 is identical to 401.
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:320
+    316▕         ['Accept' => '*/*'],
+    317▕         ['Accept' => 'application/json'],
+    318▕         ['Accept' => 'application/json', 'X-Requested-With' => 'XMLHttpRequest'],
+    319▕     ] as $entetes) {
+  ➜ 320▕         expect(test()->get('/api/v1/auth/me', $entetes)->status())->toBe(401);
+    321▕         expect(test()->get('/api/v1/contacts', $entetes)->status())->toBe(401);
+    322▕     }
+    323▕ });
+    324▕
+
+  1   tests/Feature/Auth/GardesAuthentificationAgent35Test.php:320
+
+
+  Tests:    1 failed, 1 passed (2 assertions)
+  Duration: 158.03s
+  Random Order Seed: 1787154427
+
+--- restauration de la branche
+
+############ F35-002 ############
+--- fichiers ramenes a main :
+    backend/app/Services/Auth/TwoFactorService.php
+    backend/app/Models/User.php
+    backend/app/Http/Controllers/Api/UsersController.php
+
+   FAIL  Tests\Feature\Auth\GardesAuthentificationAgent35Test
+  ⨯ F35-002 — un code de secours ne sert qu une fois                    39.64s  
+  ⨯ F35-002 — l enrolement 2FA ecrit des colonnes qui existent vraiment  1.38s  
+  ✓ F35-002 — GET /users ne selectionne aucune colonne inexistante       5.45s  
+  ⨯ F35-002 — confirmer l enrolement pose first_login_completed_at et r… 0.66s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35T…  QueryException   
+  SQLSTATE[42703]: Undefined column: 7 ERROR:  column "two_factor_secret" of relation "users" does not exist
+LINE 1: update "users" set "two_factor_secret" = $1, "updated_at" = ...
+                           ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm_test, SQL: update "users" set "two_factor_secret" = eyJpdiI6IjJMZzV6RmwxTHBIemtZc01NeTNlaUE9PSIsInZhbHVlIjoieW8vWWtQeDlWSld1UUxQUUk3OExLRkIvZUtydktnNktZUEsyRFZSYjY4ND0iLCJtYWMiOiJkZDVjZThjMTE5ZDAwZDVmY2FkZTcxMGQwYzRmZjM1NzdhZjU5YTY1ZTBlMzBhZTdiOGQ1MDY4ZDkyMzk3MjkyIiwidGFnIjoiIn0=, "updated_at" = 2026-08-19 17:50:31 where "id" = c48861cd-c6c0-4d48-954d-0962b6bc53cf)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:609
+    605▕             $statement = $this->getPdo()->prepare($query);
+    606▕ 
+    607▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    608▕ 
+  ➜ 609▕             $statement->execute();
+    610▕ 
+    611▕             $this->recordsHaveBeenModified(
+    612▕                 ($count = $statement->rowCount()) > 0
+    613▕             );
+
+      [2m+9 vendor frames [22m
+  10  app/Services/Auth/TwoFactorService.php:30
+  11  tests/Feature/Auth/GardesAuthentificationAgent35Test.php:153
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35T…  QueryException   
+  SQLSTATE[42703]: Undefined column: 7 ERROR:  column "two_factor_secret" of relation "users" does not exist
+LINE 1: update "users" set "two_factor_secret" = $1, "updated_at" = ...
+                           ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm_test, SQL: update "users" set "two_factor_secret" = eyJpdiI6InZlSmtPTmJ0UitKYmpOVWNrQ0hieVE9PSIsInZhbHVlIjoiU0pZcTdRVnVoTUhZNzRmRWc0VlVaYkhhUXAwZUN5UC9LdmI0YzIwU2ErMD0iLCJtYWMiOiI3ODYwOGY2NjE5OTBiZjBjNjA1YTZkODEwMmQzODQ1YTZhNTE5NDNiMGViZDUyMTliZTcxZGJlMmEzNTdlZjVkIiwidGFnIjoiIn0=, "updated_at" = 2026-08-19 17:50:34 where "id" = 3825cd3e-b8ea-4a96-9d69-458e816d2684)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:609
+    605▕             $statement = $this->getPdo()->prepare($query);
+    606▕ 
+    607▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    608▕ 
+  ➜ 609▕             $statement->execute();
+    610▕ 
+    611▕             $this->recordsHaveBeenModified(
+    612▕                 ($count = $statement->rowCount()) > 0
+    613▕             );
+
+      [2m+9 vendor frames [22m
+  10  app/Services/Auth/TwoFactorService.php:30
+  11  tests/Feature/Auth/GardesAuthentificationAgent35Test.php:127
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35T…  QueryException   
+  SQLSTATE[42703]: Undefined column: 7 ERROR:  column "two_factor_secret" of relation "users" does not exist
+LINE 1: update "users" set "two_factor_secret" = $1, "updated_at" = ...
+                           ^ (Connection: pgsql, Host: postgres, Port: 5432, Database: axion_crm_test, SQL: update "users" set "two_factor_secret" = eyJpdiI6IjlnSFdxbmJ4MklNNUg3MGM4cFlIemc9PSIsInZhbHVlIjoiSU82eUxWYXBCdVhHQ1kvak9KLzFHSzJhTjc4TmxHY1E1dDBDYXhGYlg0VT0iLCJtYWMiOiJmOWY5Y2M5ZGZhYjlkNjQ3OTY3Yjc3NzJjZmI0ZWU5YzMxOWJhZmQxZDUyODJiYTkxMDNkYzZjODZlM2ExNmVjIiwidGFnIjoiIn0=, "updated_at" = 2026-08-19 17:50:40 where "id" = 254ed288-5379-45b8-80c2-1173a76ef5cc)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:609
+    605▕             $statement = $this->getPdo()->prepare($query);
+    606▕ 
+    607▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    608▕ 
+  ➜ 609▕             $statement->execute();
+    610▕ 
+    611▕             $this->recordsHaveBeenModified(
+    612▕                 ($count = $statement->rowCount()) > 0
+    613▕             );
+
+      [2m+9 vendor frames [22m
+  10  app/Services/Auth/TwoFactorService.php:30
+  11  tests/Feature/Auth/GardesAuthentificationAgent35Test.php:139
+
+
+  Tests:    3 failed, 1 passed (1 assertions)
+  Duration: 52.56s
+  Random Order Seed: 1787154591
+
+--- restauration de la branche
+
+############ F35-003 ############
+--- fichiers ramenes a main :
+    backend/bootstrap/app.php
+
+   FAIL  Tests\Feature\Auth\GardesAuthentificationAgent35Test
+  ✓ F35-003 — les routes de la liste blanche restent joignables avant…  49.64s  
+  ⨯ F35-003 — un compte a 2FA active ne franchit rien tant que le code…  2.05s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-003 —…    
+  Expected response status code [403] but received 200.
+Failed asserting that 200 is identical to 403.
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:182
+    178▕     expect($login->status())->toBe(200);
+    179▕     expect($login->json('requires_2fa'))->toBeTrue();
+    180▕ 
+    181▕     // Route métier, SANS avoir appelé /auth/2fa/verify.
+  ➜ 182▕     test()->getJson('/api/v1/contacts')->assertStatus(403)
+    183▕         ->assertJsonPath('error', 'two_factor_required');
+    184▕ 
+    185▕     // Après vérification du code, la même route s'ouvre.
+    186▕     test()->postJson('/api/v1/auth/2fa/verify', ['code' => $g->getCurrentOtp($secret)])->assertOk();
+
+
+  Tests:    1 failed, 1 passed (4 assertions)
+  Duration: 61.56s
+  Random Order Seed: 1787154656
+
+--- restauration de la branche
+
+############ F35-004 ############
+--- fichiers ramenes a main :
+    backend/app/Services/Auth/HibpChecker.php
+    backend/app/Rules/NotPwnedPassword.php
+
+   FAIL  Tests\Feature\Auth\GardesAuthentificationAgent35Test
+  ✓ F35-004 — TEMOIN : HIBP joignable et mot de passe compromis, la re… 44.61s  
+  ⨯ F35-004 — HIBP injoignable : le mot de passe est REFUSE, jamais acc… 2.47s  
+  ✓ F35-004 — TEMOIN : HIBP joignable et mot de passe sain, la regle la… 1.23s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-004 —…    
+  Failed asserting that false is true.
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:208
+    204▕     app()->instance(HibpChecker::class, new HibpChecker(new Client(['handler' => $pile])));
+    205▕ 
+    206▕     $validation = Validator::make(['password' => 'password'], ['password' => [new NotPwnedPassword()]]);
+    207▕ 
+  ➜ 208▕     expect($validation->fails())->toBeTrue();
+    209▕     expect($validation->errors()->first('password'))->toContain('indisponible');
+    210▕ });
+    211▕ 
+    212▕ test('F35-004 — TEMOIN : HIBP joignable et mot de passe sain, la regle laisse passer', function () {
+
+  1   tests/Feature/Auth/GardesAuthentificationAgent35Test.php:208
+
+
+  Tests:    1 failed, 2 passed (4 assertions)
+  Duration: 58.24s
+  Random Order Seed: 1787154727
+
+--- restauration de la branche
+
+############ F35-005 ############
+--- fichiers ramenes a main :
+    backend/app/Http/Controllers/Api/Auth/PasswordResetController.php
+
+   FAIL  Tests\Feature\Auth\GardesAuthentificationAgent35Test
+  ⨯ F35-005 — un jeton de reinitialisation de plus de 60 minutes est r… 71.72s  
+  ✓ F35-005 — TEMOIN : un jeton frais est accepte                        1.68s  
+  ✓ F35-005 — un jeton de reinitialisation ne sert qu une fois           1.46s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-005 —…    
+  Expected response status code [401] but received 200.
+Failed asserting that 200 is identical to 401.
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:250
+    246▕         'email' => $utilisateur->email,
+    247▕         'token' => $jeton,
+    248▕         'password' => 'MotDePasseTresLong2026!',
+    249▕         'password_confirmation' => 'MotDePasseTresLong2026!',
+  ➜ 250▕     ])->assertStatus(401)->assertJsonPath('error', 'expired_token');
+    251▕ });
+    252▕ 
+    253▕ test('F35-005 — TEMOIN : un jeton frais est accepte', function () {
+    254▕     $utilisateur = utilisateurA35('reset-frais@a35.test');
+
+
+  Tests:    1 failed, 2 passed (4 assertions)
+  Duration: 93.26s
+  Random Order Seed: 1787154805
+
+--- restauration de la branche
+
+############ F35-006 ############
+--- fichiers ramenes a main :
+    backend/app/Http/Controllers/Api/Auth/PasswordResetController.php
+
+   FAIL  Tests\Feature\Auth\GardesAuthentificationAgent35Test
+  ⨯ F35-006 — reinitialiser le mot de passe revoque les jetons d API    44.88s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-006 —…    
+  Failed asserting that 1 is identical to 0.
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:304
+    300▕         'password' => 'MotDePasseTresLong2026!',
+    301▕         'password_confirmation' => 'MotDePasseTresLong2026!',
+    302▕     ])->assertOk();
+    303▕ 
+  ➜ 304▕     expect(DB::table('personal_access_tokens')->where('tokenable_id', $utilisateur->id)->count())->toBe(0);
+    305▕ 
+    306▕     app('auth')->forgetGuards();
+    307▕     test()->withHeaders(['Authorization' => 'Bearer ' . $jetonApi])
+    308▕         ->getJson('/api/v1/auth/me')->assertUnauthorized();
+
+  1   tests/Feature/Auth/GardesAuthentificationAgent35Test.php:304
+
+
+  Tests:    1 failed (2 assertions)
+  Duration: 56.07s
+  Random Order Seed: 1787154902
+
+--- restauration de la branche
+
+############ F35-009 ############
+--- fichiers ramenes a main :
+    backend/app/Services/Auth/AuthService.php
+
+   FAIL  Tests\Feature\Auth\GardesAuthentificationAgent35Test
+  ⨯ F35-009 — un compte inconnu coute le meme travail cryptographique…  45.08s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-009 —…    
+  medianes : compte connu 109.8 ms, compte inconnu 16.0 ms, rapport 6.85
+Failed asserting that 6.84733006098468 is less than 3.0.
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:390
+    386▕ 
+    387▕     // Le rapport des médianes doit rester proche de 1. Sans hachage factice, il
+    388▕     // est de l'ordre de 10 (bcrypt coût 12 d'un côté, rien de l'autre).
+    389▕     $rapport = max($connu, $inconnu) / max(min($connu, $inconnu), 1e-6);
+  ➜ 390▕     expect($rapport)->toBeLessThan(3.0, sprintf(
+    391▕         'medianes : compte connu %.1f ms, compte inconnu %.1f ms, rapport %.2f',
+    392▕         $connu * 1000, $inconnu * 1000, $rapport
+    393▕     ));
+    394▕ });
+
+  1   tests/Feature/Auth/GardesAuthentificationAgent35Test.php:390
+
+
+  Tests:    1 failed (11 assertions)
+  Duration: 54.60s
+  Random Order Seed: 1787154965
+
+--- restauration de la branche
+
+############ F35-010 ############
+--- fichiers ramenes a main :
+    backend/config/sanctum.php
+
+   FAIL  Tests\Feature\Auth\GardesAuthentificationAgent35Test
+  ✓ F35-010 — TEMOIN : sans duree de vie configuree, le meme jeton vie… 57.71s  
+  ⨯ F35-010 — un jeton d API cesse d etre accepte passe sa duree de vie  1.68s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-010 —…    
+  Expecting null not to be null .
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:406
+    402▕  * l'authentification. On garde donc le COMPORTEMENT : un jeton trop vieux est
+    403▕  * refusé.
+    404▕  */
+    405▕ test('F35-010 — un jeton d API cesse d etre accepte passe sa duree de vie', function () {
+  ➜ 406▕     expect(config('sanctum.expiration'))->not->toBeNull();
+    407▕ 
+    408▕     $utilisateur = utilisateurA35('jeton@a35.test');
+    409▕     $jeton = $utilisateur->createToken('a35');
+    410▕     $entetes = ['Authorization' => 'Bearer ' . $jeton->plainTextToken];
+
+  1   tests/Feature/Auth/GardesAuthentificationAgent35Test.php:406
+
+
+  Tests:    1 failed, 1 passed (2 assertions)
+  Duration: 68.73s
+  Random Order Seed: 1787155028
+
+--- restauration de la branche
+
+############ F35-011 ############
+--- fichiers ramenes a main :
+    backend/app/Http/Requests/Auth/LoginRequest.php
+
+   FAIL  Tests\Feature\Auth\GardesAuthentificationAgent35Test
+  ✓ F35-011 — TEMOIN : un mot de passe court et FAUX est refuse par l…  52.28s  
+  ⨯ F35-011 — un mot de passe court mais CORRECT ouvre bien la session   2.36s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\GardesAuthentificationAgent35Test > F35-011 —…    
+  Expected response status code [200] but received 422.
+Failed asserting that 422 is identical to 200.
+
+The following errors occurred during the last request:
+
+{
+    "message": "validation.min.string",
+    "errors": {
+        "password": [
+            "validation.min.string"
+        ]
+    }
+}
+
+  at tests/Feature/Auth/GardesAuthentificationAgent35Test.php:440
+    436▕ // ─────────────────────────────────────────────────────────────── F35-011
+    437▕ test('F35-011 — un mot de passe court mais CORRECT ouvre bien la session', function () {
+    438▕     utilisateurA35('court@a35.test', 'court');
+    439▕ 
+  ➜ 440▕     connexionA35('court@a35.test', 'court')->assertOk();
+    441▕ });
+    442▕ 
+    443▕ test('F35-011 — TEMOIN : un mot de passe court et FAUX est refuse par l authentification', function () {
+    444▕     utilisateurA35('court2@a35.test', 'court');
+
+
+  Tests:    1 failed, 1 passed (2 assertions)
+  Duration: 68.91s
+  Random Order Seed: 1787155109
+
+--- restauration de la branche
+
+############ F35-012 ############
+--- fichiers ramenes a main :
+    backend/app/Services/Auth/AuthService.php

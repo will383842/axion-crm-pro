@@ -190,3 +190,32 @@
 - **Et sa méthode est celle que j'avais exigée** : j'avais écrit dans `A-015` que *« le test doit rougir sur une ligne d'`audit_logs` RÉELLE, pas sur une fixture fabriquée avec un champ `action` »*. Il a **restauré l'ancien code depuis Git**, rejoué → **2 échecs à `ActivityFeed.tsx:76`**, remis le correctif → **2 succès**. Et le typecheck a rougi tant que l'interface n'était pas alignée — *donc il n'était pas décoratif*.
 - **La décision `D-018` ne change pas** : branche **locale, non poussée, non fusionnée, non proposée**, en attente de **contre-vérification par un autre agent** — en priorité les **4 gardes réécrites**. La qualité apparente du travail ne dispense pas de la règle 7 ; elle la rend même plus nécessaire, parce qu'un travail qui a l'air bon est celui qu'on relit le moins.
 - **Ce que je retiens pour la suite** : deux sorties de périmètre sur un même agent, malgré une consigne explicite, **ne sont pas un accident d'agent — c'est un défaut de mon cadrage** (cf. `D-018` : les interdictions doivent être **en tête**, pas en pied). Et il a raison sur un point de méthode : **une flotte de réparation ancrée sur les 44 rapports déjà rendus** vaudrait mieux que de re-mesurer. C'est la bonne suite, et elle appartient au dirigeant.
+
+---
+
+## D-019 — `F38-007` passe de S1 à S0 : un défaut déjà survenu et encore atteignable est bloquant
+
+**Saisine** : l'agent de consolidation S1 propose le reclassement de `F38-007` + `F40-007`.
+**Instruction respectée** : il propose, il ne reclasse pas. **J'ai vérifié avant d'arbitrer.**
+
+**Vérifié** : `diag-website-status.yml` lance `docker compose up -d` sans `COMPOSE_FILE` ni `-f`.
+L'overlay `docker-compose.prod.yml`, qui porte `ports: !override []` (l. 111, 147, 156), n'est donc
+pas chargé, et `docker-compose.yml` republie `55432:5432` et `56379:6379`. Le workflow réinscrit en
+outre la clé SSH root. Déclenchement **manuel uniquement** — pas de cadence, ce qui est le seul point
+rassurant du dossier.
+
+**Décision — `F38-007` : S1 → S0.** L'échelle ne laisse pas le choix. Ce n'est pas un défaut
+hypothétique : c'est **le mécanisme exact de la faille du 19 août**, encore atteignable en un geste,
+sur une base qui porte 1 319 567 personnes. Un défaut déjà survenu et encore atteignable est
+**bloquant**, pas grave.
+
+**Décision — `F40-007` : reste S1.** Le mot de passe public n'est exploitable **que par ce chemin** ;
+refermer le chemin le neutralise. Mais il devra être **tourné**, et cela n'appartient qu'à Will
+(réserve n° 6 du mandat : je ne touche pas aux secrets de production).
+
+**Conséquence sur le décompte** : **29 → 30 défauts S0 distincts.** Propagé.
+
+**Et je note ce que cet arbitrage doit à la méthode plutôt qu'à moi** : ce constat existait au
+registre depuis P1, **classé S1, au rang 11 de l'ordonnancement — c'est-à-dire « après »**. Il y
+serait resté si le dédoublonnage S1 n'avait pas été lancé. *Un défaut mal classé est un défaut
+invisible, et ce dossier vient d'en faire la démonstration sur lui-même.*

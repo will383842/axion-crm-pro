@@ -91,6 +91,12 @@ l'autre n'est un mensonge — ils ne comptent pas la même chose.** C'est écrit
 
 **→ 29 défauts S0 distincts, ouverts, et vrais pour la production.**
 
+> ⚠️ **Mis à jour le 2026-08-19 — 30.** La passe P5 a reclassé **`F38-007` de S1 en S0**
+> (décision `D-019`) : `diag-website-status.yml` rouvre les ports 55432/56379 de la production en un
+> `workflow_dispatch`, faute de charger l'overlay. **C'est la faille du 19 août, encore
+> atteignable.** Il forme un huitième groupe avec `F40-007` (S1, le mot de passe public).
+> *Il était au rang 11 de l'ordonnancement — « après ».*
+
 ### Pourquoi l'agent 35 a dit 32, et pourquoi ce n'est pas une contradiction
 
 Il a compté **les identifiants distincts au registre**, sans fusionner les confirmations. Sur ce

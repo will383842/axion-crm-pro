@@ -10,6 +10,39 @@
 
 ---
 
+## A0 bis. 🔴 **À lire avant tout le reste, et c'est la seule ligne urgente de cette page**
+
+**Ne lance pas le workflow GitHub « Recover scraping + restore access »
+(`diag-website-status.yml`) tant que le correctif n'est pas déployé.**
+
+Ce qu'il fait aujourd'hui, mesuré : il exécute `docker compose up -d` **sans charger l'overlay de
+production**. La pile repart alors sur `docker-compose.yml` seul, qui **republie les ports 55432
+(Postgres) et 56379 (Redis)** sur l'interface publique. Au bout : le mot de passe **écrit dans ce
+dépôt public**, sur un rôle **SUPERUSER + BYPASSRLS**, et un Redis **sans mot de passe**.
+**C'est exactement la faille du 19 août, en un seul clic.** Le même dispatch **réinscrit aussi la
+clé SSH root**.
+
+Ce n'est pas une menace théorique : le correctif `ports: !override []` que tu as déjà en place
+**n'est chargé que par l'overlay**, et ce workflow ne le charge pas.
+
+**Ce que j'ai fait** : corrigé les **trois** chemins qui contournaient l'overlay — ce workflow, le
+runbook de panne, et **le runbook de reprise après sinistre** (celui-là repartait sur une machine
+neuve avec les ports grands ouverts, dans l'urgence, quand personne ne vérifie). Vérifié aussi que
+la préproduction, elle, est correctement fermée.
+
+**Ce qu'il te reste** :
+1. **Ne pas lancer ce workflow** d'ici là — c'est tout ce qui est demandé dans l'immédiat, et ça ne
+   coûte rien.
+2. Déployer le correctif (il est dans les commits locaux, non poussés — cf. §F).
+3. **Tourner le mot de passe Postgres** ensuite. Il est dans un dépôt public ; le refermer ne le
+   rend pas secret. *Cela n'appartient qu'à toi : je ne touche pas aux secrets de production.*
+
+*Et une chose à savoir, parce qu'elle explique comment c'est passé* : la garde qui vérifie les ports
+réellement publiés **existe et elle est bonne** — elle est simplement branchée **uniquement sur la
+préproduction**, qui n'a jamais eu le défaut. La production n'a jamais été mesurée par elle.
+
+---
+
 ## A. Une échéance datée, et deux interruptions de service à autoriser
 
 | # | Geste | Coût réel | Recommandation |
@@ -106,7 +139,7 @@ sécurité, et ce témoin-là n'a donc pas été joué : la démonstration repos
 Je ne l'ai PAS poussé.**
 
 `will383842/axion-crm-pro` est **PUBLIC** (mesuré, pas supposé). Et ce dossier réunit, en un document
-unique, vérifié et daté, **vingt-neuf défauts S0 actuellement ouverts** sur une production vivante qui
+unique, vérifié et daté, **trente défauts S0 actuellement ouverts** sur une production vivante qui
 porte les données personnelles de **1 319 567 personnes** : comment **forger une signature acceptée**
 et pourquoi elle passe · que `GET /audit-logs` rend le journal **de tous les espaces à tout compte
 authentifié** · que la chaîne d'audit est **tronquable sans détection** · qu'un compte `viewer`

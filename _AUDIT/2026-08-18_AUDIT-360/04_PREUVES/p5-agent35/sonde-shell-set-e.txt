@@ -1,0 +1,14 @@
+== [1] TEMOIN POSITIF : ancien reglage (set -uo pipefail), sortie non nulle ==
+  branche INTROUVABLE atteinte -> message rendu a l operateur
+  fin de script atteinte, code=0
+  code de retour du sous-shell : 0
+
+== [2] MESURE : nouveau reglage (set -euo pipefail), meme sortie ==
+  code de retour du sous-shell : 1  (aucune ligne au-dessus = le script est mort a l affectation)
+
+== [3] MEME MESURE SOUS bash (le script se lance par 'bash definir-...') ==
+  code de retour bash : 1
+
+== [4] TEMOIN : sous bash, une sortie a 0 laisse bien continuer ==
+  affectation survecue, SORTIE=A35_OK
+  code de retour bash : 0

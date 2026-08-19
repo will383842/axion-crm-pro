@@ -26,6 +26,15 @@ class GdprErasureService
             $email = strtolower(trim($subjectEmail));
             $deleted = [];
 
+            // On releve les `person_key` AVANT de supprimer : c'est par elles que
+            // la timeline (`activities`) est rattachee a la personne. Les
+            // supprimer d'abord rendrait leurs activites orphelines et
+            // introuvables - or ce sont elles qui portent le telephone en clair.
+            $clesPersonne = array_values(array_filter(array_unique(array_merge(
+                DB::table('contacts')->where('email', $email)->pluck('person_key')->all(),
+                DB::table('candidates')->where('email', $email)->pluck('person_key')->all(),
+            ))));
+
             $deleted['contacts'] = DB::table('contacts')->where('email', $email)->delete();
             $deleted['email_validations'] = DB::table('email_validations')->where('email', $email)->delete();
             $deleted['rgpd_requests'] = DB::table('rgpd_requests')->where('subject_email', $email)->where('type', '!=', 'erasure')->delete();
@@ -49,8 +58,75 @@ class GdprErasureService
                     'deleted_at' => now(),
                 ]);
 
-            // Médias : neutralise un email de contact rédaction correspondant au sujet.
-            $deleted['media_email'] = DB::table('media')->where('email', $email)->update(['email' => null]);
+            // Médias : neutralise l'email ET LE TELEPHONE du contact redaction.
+            // Le telephone restait en clair : neutraliser la seule adresse laissait
+            // un moyen de joindre la personne (B15-006).
+            $deleted['media_email'] = DB::table('media')->where('email', $email)->update([
+                'email' => null,
+                'phone' => null,
+            ]);
+
+            // ── CANDIDATS ────────────────────────────────────────────────────
+            // `candidates` porte `email`, `phone`, nom et prenom. Le service
+            // d'effacement du CANAL (SiteGdprService) les supprimait pour le
+            // vivier ; celui-ci, appele depuis la console et l'API, ne les
+            // touchait pas du tout. Une meme personne etait donc effacee ou non
+            // selon la porte par laquelle la demande arrivait (B15-006).
+            $deleted['candidates'] = DB::table('candidates')
+                ->where(function ($q) use ($email, $phone) {
+                    $q->where('email', $email);
+                    if ($phone !== null && $phone !== '') {
+                        $q->orWhere('phone', $phone);
+                    }
+                })
+                ->delete();
+
+            // ── LA TIMELINE, ET C'EST LA QUE LE TELEPHONE SURVIVAIT ──────────
+            //
+            // 🔴 `activities.payload` est un JSONB qui garde `{"tel":"+33…",
+            // "email":"jean.dupont@…"}` EN CLAIR. La cle etrangere vers le
+            // contact est en `SET NULL` : supprimer le contact laissait donc la
+            // ligne d'activite, et avec elle le telephone et l'adresse de la
+            // personne qui venait de demander son effacement. Mesure le
+            // 2026-08-19 (audit 360, B15-006, S0).
+            //
+            // On supprime par `person_key` - le lien stable - ET par contenu,
+            // parce qu'une activite nee de la COLLECTE peut porter l'adresse sans
+            // porter la cle. Le balayage est couteux ; un effacement est rare, et
+            // la justesse prime ici sur la vitesse.
+            $requeteActivites = DB::table('activities')->where(function ($q) use ($clesPersonne, $email, $phone) {
+                if ($clesPersonne !== []) {
+                    $q->orWhereIn('person_key', $clesPersonne);
+                }
+                $q->orWhereRaw('payload::text ILIKE ?', ['%' . $email . '%'])
+                    ->orWhereRaw("coalesce(content, '') ILIKE ?", ['%' . $email . '%'])
+                    ->orWhereRaw("coalesce(title, '') ILIKE ?", ['%' . $email . '%']);
+                if ($phone !== null && $phone !== '') {
+                    $q->orWhereRaw('payload::text ILIKE ?', ['%' . $phone . '%']);
+                }
+            });
+            $deleted['activities'] = $requeteActivites->delete();
+
+            // ── COURRIELS ECHANGES ───────────────────────────────────────────
+            // `email_messages` garde l'expediteur et les destinataires en clair.
+            $deleted['email_messages'] = DB::table('email_messages')
+                ->where(function ($q) use ($email) {
+                    $q->whereRaw('lower(from_address::text) = ?', [$email])
+                        ->orWhereRaw('to_addresses::text ILIKE ?', ['%' . $email . '%']);
+                })
+                ->delete();
+
+            // ── CE QU'ON NE SUPPRIME **PAS**, ET POURQUOI ────────────────────
+            //
+            // `opt_out` et `dnc_entries` ne sont PAS purgees, et ce n'est pas un
+            // oubli : ce sont les listes qui EMPECHENT de recontacter la personne.
+            // Les effacer ferait exactement l'inverse de ce que la personne
+            // demande - elle redeviendrait joignable a la prochaine collecte.
+            // `opt_out` ne conserve d'ailleurs qu'un HACHAGE d'adresse, jamais
+            // l'adresse elle-meme (cf. SiteGdprService::optOut).
+            // Le journal d'audit garde de meme la PREUVE de l'effacement, sous
+            // forme de hachage : detruire la preuve d'un effacement rendrait
+            // l'effacement indemontrable.
 
             // 🔴 PRATICIENS DE SANTÉ — DONNÉE DE L'ARTICLE 9 (catégorie particulière).
             //

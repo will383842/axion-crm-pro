@@ -2867,3 +2867,60 @@ endroit, au mauvais moment.*
 🔑 **`D30-008` mérite d'être lu deux fois** : le composant **déclare** le repli responsive **et
 l'annule dans la même classe**. *Ce n'est pas un oubli de responsive — c'est un responsive écrit, puis
 neutralisé, sur 27 écrans.* **Personne ne pouvait le voir sans mesurer le rendu.**
+
+---
+
+### Agent 28 — rendu final : **il corrige deux constats de l'agent 27 et en nuance un troisième**
+
+*(Complète la section « Agent 28 » ci-dessus, écrite sur son rendu intermédiaire.)*
+
+C'est exactement ce que la rotation du §7 doit produire : **un agent qui mesure autrement corrige le
+précédent, dans les deux sens.**
+
+| Constat corrigé | Ce que l'agent 27 avait écrit | Ce que l'agent 28 a **mesuré** |
+|---|---|---|
+| **`D27-004`** | les 23 écrans qui recopient du balisage **« perdent l'anneau de focus clavier »** | 🔴 **Faux.** **0 élément sans indicateur de focus sur les 37 écrans.** Les 30 boutons recopiés **n'écrivent pas `outline-none`** : ils gardent l'anneau `:focus-visible` du navigateur. → **incohérence d'anneau (S3), pas perte d'accès (S1)** |
+| **`D27-006`** | `QualityBadge` et `SizeCategoryBadge` **« n'ont aucun mode sombre »** | ⚠️ **Vrai littéralement, faux dans l'effet** : mesurés à **6,4 à 8,2:1 en sombre — parfaitement lisibles**. Ils gardent leur rendu clair à l'identique : **îlot pastel sur fond noir, défaut de cohérence, pas de contraste** |
+| **`H44-002`** | le seul job qui exécute Playwright **« ne bloque rien »** | ⚠️ **Nuancé** : `a11y.yml` **tourne et passe** — **25 exécutions**, `4 passed` + `14 passed`. *Elle ne « mesure pas rien ».* Le défaut est **ailleurs**, en trois couches |
+| **`D27-002`** | 4 `!important` neutralisent 174 déclarations `dark:` | ✅ **Corroboré par une autre méthode** : son témoin bas bascule de **1,49 (échec, clair)** à **12,21 (sombre)** |
+
+**Les trois couches du défaut de la porte d'accessibilité, mesurées** :
+1. `expect(critical).toEqual([])` — **elle écarte 100 % de ce qu'axe trouve** (0 critique, **88 à 108 sérieux**) ;
+2. **4 URL sur 37** ;
+3. 🔑 **et surtout, elle mesure le produit VIDE.** *Rejouée à l'identique sur ses 4 URL → **passe ×4**.
+   La même porte, sur son propre `/companies` **avec 5 fiches** → **ÉCHOUE, 14 critiques**.*
+   **La garde attraperait le seul défaut critique du produit — et elle ne le rencontrera jamais.**
+
+**Les chiffres d'`axe`, reconstruits et servis exactement comme la porte le fait** :
+
+| état coquille sans API | critique | sérieux |
+|---|--:|--:|
+| clair | **0** | **88** |
+| sombre | **0** | **108** |
+
+| état avec données — *ce que la porte ne voit jamais* | |
+|---|---|
+| `/companies` avec **5 fiches** | **30 nœuds, dont 14 CRITIQUES** |
+| `/campaigns/new` étape 2 | **103 nœuds** |
+
+**Contrastes mesurés au pixel** (canvas 1×1, `oklch` résolu, filet `!important` inclus) : le **lien
+d'évitement à 1,19:1** en clair — *le seul dispositif de saut de navigation du produit est invisible* ·
+le raccourci `⌘K` de l'en-tête à **1,36:1** en sombre, **présent sur tous les écrans** · `StatusPill`
+**conforme dans les deux modes** (4,85 → 12,33).
+
+**Verdict clavier, et il est meilleur qu'attendu** : **atteignabilité ✅** (aucun piège, aucun
+inatteignable — **sauf le `404`, qui a 0 élément focalisable**), **ordre ✅** (suit le DOM, 0 `tabindex`
+positif), **focus visible ✅**. **Ce qui casse, ce sont les dialogues** : `Modal`, `Drawer` et
+`GlobalSearch` déclarent `aria-modal="true"` et **6/6, 10/10 et 8/8 tabulations sortent du dialogue**,
+arrière-plan ni `inert` ni `aria-hidden`, focus non restitué.
+
+✅ **À porter au crédit du produit** : `lang="fr"` sur **37/37**, et **aucun écran sur 27 ne déborde à
+320 px**.
+
+**Trois correctifs à très fort rendement, chiffrés** : le lien d'évitement **10 min** · les 2 cibles
+sous 24 px **20 min**, *ce qui débloque 33 écrans pour la porte* · le crochet de piège de focus
+**4 h**, *qui corrige les 3 dispositifs d'un coup*.
+
+⚠️ **Et la limite qu'il pose lui-même, qui vaut pour tout le bloc D** : *sans session authentifiée,
+**ses comptes sont un plancher**.* Le passage de `/companies` de **1 à 30 nœuds** dès qu'on lui donne
+cinq lignes en donne l'ordre de grandeur.

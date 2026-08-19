@@ -23,3 +23,14 @@ UTC 2026-08-19T09:58:23Z
 ### POST /internal/scraper-result SIG BIDON -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)
 ### POST /internal/scraper-result SANS SIG -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)
 ### POST /internal/site-sync SIG BIDON -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)
+### POST /internal/site-sync/gdpr SIG BIDON -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)
+### POST /internal/email/zeptomail SANS JETON -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)
+### POST /internal/email/zeptomail MAUVAIS JETON -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)
+
+--- 5. internal : temoin POSITIF (signature calculee avec secret VIDE) ---
+corps  = {"run_id":424242,"source":"audit-agent-12","status":"ok"}
+secret = (chaine vide, valeur de WORKER_INTERNAL_HMAC_SECRET dans .env)
+sig    = 5c8e748281d8ccf3aa57ad9a991db73b5993ee8d64151cde35679ee290021e0b
+### POST /internal/scraper-result SIG FORGEE(secret vide) -> AUCUNE REPONSE apres 20 tentatives (conteneur sature)
+
+--- 5bis. REJEU a l'identique de la meme requete forgee ----

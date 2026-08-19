@@ -141,7 +141,7 @@ Légende : **⏳** chargement · **∅** vide · **⚠** erreur · **⛔** permi
 | `/audiences` | **squelette** `ListSkeleton` | **dessiné** : « Aucune audience — crée ton premier segment » | 🔴 **ABSENT** — « Total audiences **0** · Actives **0** · Membres cumul **0** » | 🔴 **ABSENT** | ◐ s.o. | 🔴 **MENT** |
 | `/audiences/new` | **rendu complet** (formulaire) | **s.o.** — les « Aucun département » sont des **espaces réservés de listes déroulantes**, pas une donnée (corrigé §0.4) | ⚠ **`setPreviewError`** — le **seul** endroit du produit où le message du serveur alimente un **état d'écran** de lecture, et non un toast | 🔴 **ABSENT** | ◐ prévisualisation KO → message dédié | **OK** — second meilleur écran, et **le patron à généraliser** |
 | `/audiences/$audienceId` | **sablier sans texte** | 🔴 **SABLIER ÉTERNEL** | 🔴 **SABLIER ÉTERNEL** | 🔴 **SABLIER ÉTERNEL** | 🔴 fiche OK + membres KO → **l'onglet Membres reste un sablier** | 🔴 **GRAVE** (**D25-004**) — `if (isLoading \|\| !audience)`, même faute |
-| `/admin/observability` | **texte nu** « Chargement de l'observabilité… » | ∅ **NON DESSINÉ** — l'écran rend ses vignettes à 0 sans état vide propre | ✅ **PRÉSENT** : « **Impossible de charger les métriques d'observabilité.** » — **cause NON, action NON**. ⚠️ **Corrige l'agent 22**, qui l'avait noté « ⚠ absent » : le message existe, mais il met **jusqu'à 93 s** à venir (§2.5) | 🔴 **ABSENT** — même message | ◐ s.o. | **DÉFAUT** — vrai état d'erreur, mais muet pendant une minute et demie |
+| `/admin/observability` | **texte nu** « Chargement de l'observabilité… » | ∅ **NON DESSINÉ** — l'écran rend ses vignettes à 0 sans état vide propre | ✅ **PRÉSENT** : « **Impossible de charger les métriques d'observabilité.** » — **cause NON, action NON**. ⚠️ **Corrige l'agent 22**, qui l'avait noté « ⚠ absent » : le message existe, mais il n'arrive qu'après trois tentatives de 30 s (§2.5) | 🔴 **ABSENT** — même message | ◐ s.o. | **DÉFAUT** — vrai état d'erreur, mais muet pendant tout ce temps |
 
 ### 1.6 Conformité
 
@@ -685,18 +685,28 @@ docker cp axion-crm-caddy:/data/caddy/pki/authorities/local/root.crt %TEMP%\cadd
 puis importer dans « Autorités de certification racines de confiance »
 ```
 
-### 6.5 Le comportement des mutations sous erreur
+### 6.5 Le chronométrage du silence avant l'aveu d'échec — **mesure tentée, non aboutie**
+
+Le banc existe et est archivé (`bancs-de-mesure/delai.test.tsx`) : il monte `/admin/observability` avec une copie
+exacte du `QueryClient` de production, face à un serveur qui accepte la connexion et ne répond jamais.
+**Il n'a pas rendu la main** — ni le `timeout: 30_000` d'axios ni le plafond de 150 s de mon propre `waitFor`
+n'ont abouti sous jsdom + MSW, et j'ai dû interrompre le processus. **Je ne sais pas dire lequel des deux est en
+cause**, et je ne le devine pas.
+Conséquence assumée : le **~93 s du §2.5 est un calcul**, pas une mesure. Il est présenté comme tel partout.
+→ **Reprise possible** : un vrai navigateur (§6.4), un `tcpdump`/onglet Réseau, et un chronomètre.
+
+### 6.6 Le comportement des mutations sous erreur
 
 Ma grille porte sur les états de **lecture**. Les toasts d'erreur des mutations (`onError`) ont été **lus** —
 21 usages, tous nommés au §4.4 — mais **aucune mutation n'a été jouée** contre un serveur en erreur.
 
-### 6.6 Les durées réelles de rendu
+### 6.7 Les durées réelles de rendu
 
 Les millisecondes du §3 sont des durées de **construction de DOM sous jsdom**, sur un poste partagé avec les autres
 agents de l'audit. **Elles ne valent pas comme mesure de performance navigateur** et ne doivent pas être citées
 comme telles. Le **nombre de nœuds**, lui, est exact et transposable.
 
-### 6.7 La recherche globale et le rendu mobile
+### 6.8 La recherche globale et le rendu mobile
 
 `GlobalSearch` (qui appelle `/search`, un bouchon — **A-002 / B10-013**) et la barre latérale en tiroir vivent dans
 `RootLayout`, hors de mes 37 écrans. Non mesurés, comme chez l'agent 22.
@@ -710,7 +720,7 @@ Trois écarts, tous dans le même sens — **son montage ne pouvait pas attendre
 
 | écran | agent 22 | mesuré ici | pourquoi l'écart |
 |---|---|---|---|
-| `/admin/observability` | « ⚠ **absent** — reste sur *Chargement de l'observabilité…* » | ⚠ **présent** : « Impossible de charger les métriques d'observabilité. » (`ObservabilityPage.tsx:41-47`) | l'erreur met **jusqu'à 93 s** à venir (§2.5) ; il observait pendant le silence |
+| `/admin/observability` | « ⚠ **absent** — reste sur *Chargement de l'observabilité…* » | ⚠ **présent** : « Impossible de charger les métriques d'observabilité. » (`ObservabilityPage.tsx:41-47`) | l'erreur n'arrive qu'après **3 tentatives de 30 s** (§2.5) ; il observait pendant le silence |
 | `/campaigns/$id`, `/audiences/$id` | « 🔴 **ÉCRAN BLANC**, `<main>` entièrement vide » | **sablier éternel** (`spin=1`, 0 caractère) | `innerText` d'un `<svg>` est vide ; la cause est une condition de sortie, pas un rendu manquant (**D25-004**) |
 | écrans affirmant « 0 » sur une erreur | **12** | **19** | il ne pouvait mesurer qu'une condition ; le compte exhaustif est plus lourd que le sien |
 

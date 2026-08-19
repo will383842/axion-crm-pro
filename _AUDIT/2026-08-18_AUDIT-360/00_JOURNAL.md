@@ -385,3 +385,34 @@ contenu : **0 `Message-ID:`, 0 `To:`, 0 `magic-link/verify`**. **Témoin positif
 il n'est pas réalisé** : consigné comme non-constat, pas comme découverte.
 
 *Sixième fois que je vérifie avant d'écrire et que la vérification tue l'hypothèse. C'est le bon ratio.*
+
+## 2026-08-19T15:40Z — P1 close : 43 rapports, 883 preuves, et la rotation a fonctionné
+
+**Tous les agents lancés ont rendu.** 43 rapports dans `11_GRILLES/`, **883 fichiers de preuves**.
+
+**Ce que la rotation a produit, et c'est le meilleur indicateur de l'audit** — des agents se sont
+corrigés les uns les autres, **dans les deux sens** :
+
+- l'agent **28** corrige l'agent **27** : les 23 écrans qui recopient du balisage **ne perdent pas**
+  l'anneau de focus (0 élément sans indicateur sur 37 écrans) → **S1 ramené à S3** ; et les deux
+  badges sans mode sombre sont **parfaitement lisibles** (6,4 à 8,2:1) → défaut de **cohérence**, pas
+  de contraste. Il **corrobore** en revanche `D27-002` **par une autre méthode**.
+- l'agent **28** nuance l'agent **44** : `a11y.yml` **tourne et passe** (25 exécutions) — elle ne
+  « mesure pas rien ».
+- l'agent **13** avait corrigé le chef de chantier sur `A-001` ; l'agent **35** en a trouvé **la
+  seconde cause** ; l'agent **45** l'a mesuré **vivant en production** pendant que la suite le
+  certifie absent.
+- l'agent **26** m'a montré que **ma consigne d'isolation n'était pas exécutable** (`D-017`).
+- l'agent **50** m'a pris à **reproduire `A-013` dans le document qui le dénonce**.
+
+**Sept fois que je suis corrigé, trois de mes décisions révisées.** C'est le fonctionnement attendu,
+et c'est la seule raison pour laquelle on peut accorder du crédit aux constats **non** corrigés.
+
+**Le fait de méthode le plus instructif de la journée**, et il vient de l'agent 30 : `resize_window` a
+**menti** — « Successfully resized to 375x812 », et `innerWidth` valait **toujours 1920**. Il l'a vu,
+a mesuré avec **deux instruments indépendants** qui s'accordent, et a **écarté un faux constat** au
+passage. *Sans ce doute, tout son rapport était faux et personne ne l'aurait su.*
+
+Et son corollaire, qui résume l'audit entier : **son compte de débordements est bas pour une mauvaise
+raison** — `overflow-x-hidden` fait que **rien ne défile, tout est rogné**. *Un contrôle naïf aurait
+conclu « aucun débordement » et se serait trompé trois fois.*

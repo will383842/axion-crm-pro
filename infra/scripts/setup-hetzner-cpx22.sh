@@ -14,7 +14,8 @@
 #
 # Il NE remplit PAS les credentials sensibles (MISTRAL_API_KEY, etc.) — tu dois
 # éditer .env après avec `nano /opt/axion-crm-pro/.env` puis relancer
-# `docker compose restart api horizon scheduler`.
+# `docker compose up -d api horizon scheduler` (JAMAIS `restart` : il ne relit
+# pas `env_file`, donc les variables ne seraient pas appliquees).
 # ==========================================================================
 
 set -euo pipefail
@@ -142,7 +143,7 @@ log "==============================================="
 log ""
 log "Prochaines étapes manuelles :"
 log "  1. nano $REPO_DIR/.env  → renseigne credentials (MISTRAL_API_KEY etc.)"
-log "  2. docker compose restart api horizon scheduler"
+log "  2. docker compose up -d api horizon scheduler   (up -d, PAS restart)"
 log "  3. Sur Cloudflare DNS : vérifie que @, api, app pointent vers cette IP"
 log "  4. Tester : curl https://api.axion-crm-pro.com/up (depuis ton PC)"
 log ""

@@ -81,12 +81,33 @@ set_env "OWNER_INITIAL_NAME"         "Williams Jullin"
 # --- Contraintes CPX22 (4 GB RAM) ---
 set_env "WORKER_CONCURRENCY"         "1"
 
-echo "[axion-config] Restart services…"
+# 🔴 `up -d`, JAMAIS `restart`.
+#
+# Ce script vient d'ecrire des variables dans le `.env` — et
+# `docker compose restart` NE RELIT PAS `env_file` : il relance le processus
+# DANS le conteneur existant, dont l'environnement a ete fige a la creation.
+# Autrement dit, ce script annoncait « Restart services… » puis rendait la main
+# sans qu'AUCUNE des variables qu'il venait d'ecrire ne soit appliquee. Un
+# operateur repartait convaincu du contraire : pas une panne, une fausse
+# assurance. Mesure le 2026-08-19 (audit 360, meme famille que A07-003).
+echo "[axion-config] Recreation des services (up -d, pas restart)…"
 cd /opt/axion-crm-pro
-docker compose restart api horizon scheduler
+docker compose up -d api horizon scheduler
 
 echo "[axion-config] Attente healthcheck (30s)…"
 sleep 30
+
+# On NE SUPPOSE PAS que les variables sont appliquees : on les LIT dans le
+# conteneur qui tourne. Sans ce controle, l'erreur ci-dessus etait indetectable.
+echo "[axion-config] Verification des variables REELLEMENT appliquees :"
+for cle in APP_ENV MAIL_MAILER MAIL_MAILER_AUTH MOCK_MODE; do
+  valeur="$(docker inspect axion-crm-api --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep "^${cle}=" || true)"
+  if [ -z "$valeur" ]; then
+    echo "  ⚠️  ${cle} : ABSENTE du conteneur — la variable n'a PAS ete appliquee." >&2
+  else
+    echo "  ✓ ${valeur}"
+  fi
+done
 
 echo "[axion-config] Vérification finale :"
 if curl -fsS http://localhost/up >/dev/null 2>&1; then

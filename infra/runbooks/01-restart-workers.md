@@ -16,6 +16,10 @@ Vérifier :
 ## 2. Restart graceful
 ```bash
 docker compose restart worker-google-maps worker-pages-jaunes worker-google-search
+
+# ⚠️ `restart` convient ICI parce qu'on ne fait que relancer des processus.
+# Si une VARIABLE D'ENVIRONNEMENT a change, `restart` ne la relit PAS :
+# il faut `docker compose up -d <service>`, qui recree le conteneur.
 ```
 
 ## 3. Vider la queue si elle est gelée

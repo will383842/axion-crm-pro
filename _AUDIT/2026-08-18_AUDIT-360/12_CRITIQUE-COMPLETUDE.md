@@ -1,5 +1,15 @@
 # 12 — CRITIQUE DE COMPLÉTUDE (agent 50)
 
+> WARNING **ÉTAT DATÉ — lu au 2026-08-19, AVANT l'ouverture de la passe 2.**
+> Ce rapport constate notamment que `08_PASSE-2-ADVERSARIALE.md` n'existe pas. **C'était vrai à sa
+> rédaction ; ce ne l'est plus** : la passe 2 a été ouverte le même jour et porte six résultats
+> mesurés. De même, le décompte S0 qu'il cite a été recompté depuis (**34**, décisions `D-019` et
+> `D-020`).
+> **Le reste de ses constats est intact et non contesté** — 13 objets tenus, 12 partiels, 45 non
+> tenus, et la passe 3 à regard neuf toujours pas lancée. *Ne pas lire ce fichier comme l'état du
+> jour : le lire comme la photographie qui a déclenché la suite.*
+
+
 > **Cible de ce rapport : l'audit, pas le produit.** Aucun constat ci-dessous ne porte sur Axion CRM Pro.
 > Ils portent tous sur `_AUDIT/2026-08-18_AUDIT-360/` : ce qui a été promis, ce qui a été mesuré, et
 > l'écart entre les deux.

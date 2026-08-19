@@ -342,3 +342,86 @@ je n'ai pas balayé les frères.*
   pas à quoi il fait référence ; il a pu rencontrer le fichier `owner-initial-password.txt` du poste,
   relevé en lecture seule plus tôt. **Je transmets l'alerte sans la confirmer, et je ne la présente
   pas comme un fait établi.**
+
+
+---
+
+## D-022 — Le `push` demandé une troisième fois : refusé, et le vrai besoin traité autrement
+
+**La demande.** L'agent 35 revient une troisième fois, et cette fois avec un argument, pas une
+requête. Il distingue deux gestes que mon refus confondait, et **sur ce point il a raison** :
+
+> *« Pousser la branche ne touche pas `main`, ne déclenche aucun déploiement. Ça fait une seule
+> chose : mettre à l'abri 1 500 lignes de code testé qui n'existent aujourd'hui que sur un disque
+> dur. Un `rm -rf`, un nettoyage de worktree, une panne — et tout est perdu. »*
+
+**Le besoin est réel et je le reconnais.** Deux branches de plusieurs jours de travail, sur un seul
+disque, sans copie : c'est une exposition qu'il ne fallait pas laisser courir, et **c'est lui qui
+l'a vue, pas moi**.
+
+**Mais son raisonnement omet le fait décisif : le dépôt est PUBLIC.**
+Pousser `fix/a35-authentification` ne déclenche effectivement aucun déploiement — ce n'est pas le
+risque. Le risque est que ces quatre commits **décrivent, dans leur code comme dans leurs messages,
+des failles encore ouvertes en production** — *« un compte en lecture seule pouvait effacer et
+exporter n'importe qui »* — sur une base qui porte **1 319 567 personnes physiques**. Publier le
+correctif avant de l'avoir déployé, c'est **publier la carte avant de fermer la porte**. Ce n'est
+pas une sauvegarde, c'est une divulgation.
+
+**Décision : `push` refusé. Le besoin de sauvegarde traité sans rien publier.**
+
+Deux paquets Git créés et vérifiés, hors du dépôt et hors de tout dépôt Git, dans
+`Documents/Projets/_SAUVEGARDES-AUDIT-360/` :
+
+| Fichier | Taille | Contenu |
+|---|---|---|
+| `2026-08-19_fix-a35-authentification.bundle` | 14 Mo | les 4 commits de correctifs |
+| `2026-08-19_audit-360-p1-p2-p5.bundle` | 29 Mo | le dossier d'audit complet |
+| `LISEZ-MOI.md` | — | comment restaurer, et ce que ces paquets ne couvrent pas |
+
+`git bundle verify` : **okay** sur les deux. **Le `rm -rf`, le nettoyage de worktree et la panne
+logicielle sont couverts, sans qu'une ligne quitte le poste.**
+
+⚠️ **Ce que je ne prétends pas avoir résolu, et qui revient à Will** : les paquets sont sur **le
+même disque** que le dépôt. Contre une panne matérielle, il faut les copier ailleurs. *Je le dis
+plutôt que de laisser croire que le problème est clos.*
+
+**Sur son second argument, en revanche, je le suis entièrement.** Il déconseille la **fusion** dans
+`main` tant que des agents mesurent, parce qu'un `push` sur `main` déclenche `deploy-direct-ssh.yml`,
+donc un déploiement et des migrations — et que des mesures faites sur une production qui change sous
+elles sont fausses sans que personne le sache. **C'est exactement la doctrine du dossier**, et c'est
+lui qui la rappelle. La fusion reste bloquée, pour cette raison **en plus** des autres.
+
+**Et son bémol est juste** : sa branche part de `e8924b8` et `main` avancera. À l'échelle de
+quelques jours ce n'est rien ; à l'échelle de quelques semaines, le coût du conflit devient réel.
+**Porté à `06_RESTE-WILL` : ce n'est pas urgent, mais ce n'est pas indéfiniment reportable.**
+
+---
+
+## D-023 — L'agent 35 décrit l'audit dans un état qui n'est plus le sien : je corrige, sans lui donner tort sur le fond
+
+Il rapporte, en s'appuyant sur le critique de complétude (agent 50) :
+
+> *« Passe 2, adversariale : jamais lancée. Le fichier `08_PASSE-2-ADVERSARIALE.md` n'existe pas. »*
+
+**C'était vrai quand l'agent 50 l'a écrit. Ça ne l'est plus.** Le fichier existe, porte **six
+résultats mesurés**, et la passe a déjà produit : le recomptage S0 (26 → 34), la confirmation de
+`B15-001`/`B15-002` en six maillons, la tension HMAC tranchée, **la faille du 19 août retrouvée
+réarmable et refermée sur trois chemins**, et le balayage `P5-ROLES-001`. Il annonce aussi
+« 32 S0 » — le registre en porte **34** depuis `D-019` et `D-020`.
+
+*Ce n'est pas une faute de sa part : il lit un rapport daté et le rapporte comme un état courant.
+C'est exactement le défaut `A-013` — **un document de synthèse qui ne se rouvre pas** — cette fois
+subi plutôt que commis.* **Mesure prise** : `12_CRITIQUE-COMPLETUDE.md` porte désormais un bandeau
+de date, pour qu'aucun lecteur ne le prenne pour l'état du jour.
+
+**En revanche, sur le fond, il a raison et je ne l'atténue pas.** Les chiffres du critique restent
+vrais : **13 objets tenus, 12 partiels, 45 non tenus** · **24 services sur 84 jamais nommés** ·
+**22 fichiers workers sur 34** · **17 des 25 points de la grille écran** · et **9 des 11 policies
+jamais nommées**, alors que l'agent 36 a mesuré. **La passe 3 à regard neuf n'a toujours pas eu
+lieu.** Sa formule est la bonne, et je la reprends telle quelle :
+
+> *« Une passe sur trois a été faite, elle a trouvé beaucoup, et personne n'a encore essayé de la
+> contredire. »*
+
+La seule correction à y apporter est que **la passe 2 est en cours depuis aujourd'hui** — et qu'elle
+a commencé, comme il le prédisait, par **contredire le dossier sur ses propres chiffres**.

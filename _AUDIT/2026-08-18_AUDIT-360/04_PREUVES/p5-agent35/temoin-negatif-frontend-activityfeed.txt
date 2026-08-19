@@ -1,0 +1,203 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/willi/Documents/Projets/crmpro-wt-p5a35/frontend[39m
+
+[90mstderr[2m | tests/components/ActivityFeed.test.tsx[2m > [22m[2mActivityFeed[2m > [22m[2mne s'effondre pas sur la charge utile réelle de l'API, et affiche l'évènement
+[22m[39mTypeError: Cannot read properties of undefined (reading 'replace')
+    at humanizeAction [90m(C:\Users\willi\Documents\Projets\crmpro-wt-p5a35\frontend\[39msrc\features\dashboard\components\ActivityFeed.tsx:20:12[90m)[39m
+    at map [90m(C:\Users\willi\Documents\Projets\crmpro-wt-p5a35\frontend\[39msrc\features\dashboard\components\ActivityFeed.tsx:92:78[90m)[39m
+    at Array.map (<anonymous>)
+    at ActivityFeed [90m(C:\Users\willi\Documents\Projets\crmpro-wt-p5a35\frontend\[39msrc\features\dashboard\components\ActivityFeed.tsx:76:18[90m)[39m
+    at Object.react_stack_bottom_frame (C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\node_modules\[4m.pnpm[24m\react-dom@19.2.6_react@19.2.6\node_modules\[4mreact-dom[24m\cjs\react-dom-client.development.js:25904:20)
+    at renderWithHooks (C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\node_modules\[4m.pnpm[24m\react-dom@19.2.6_react@19.2.6\node_modules\[4mreact-dom[24m\cjs\react-dom-client.development.js:7662:22)
+    at updateFunctionComponent (C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\node_modules\[4m.pnpm[24m\react-dom@19.2.6_react@19.2.6\node_modules\[4mreact-dom[24m\cjs\react-dom-client.development.js:10166:19)
+    at beginWork (C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\node_modules\[4m.pnpm[24m\react-dom@19.2.6_react@19.2.6\node_modules\[4mreact-dom[24m\cjs\react-dom-client.development.js:11778:18)
+    at runWithFiberInDEV (C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\node_modules\[4m.pnpm[24m\react-dom@19.2.6_react@19.2.6\node_modules\[4mreact-dom[24m\cjs\react-dom-client.development.js:874:13)
+    at performUnitOfWork (C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\node_modules\[4m.pnpm[24m\react-dom@19.2.6_react@19.2.6\node_modules\[4mreact-dom[24m\cjs\react-dom-client.development.js:17641:22) {
+  stackStr: [32m"TypeError: Cannot read properties of undefined (reading 'replace')\n"[39m +
+    [32m'    at humanizeAction (C:\\Users\\willi\\Documents\\Projets\\crmpro-wt-p5a35\\frontend\\src\\features\\dashboard\\components\\ActivityFeed.tsx:20:12)\n'[39m +
+    [32m'    at map (C:\\Users\\willi\\Documents\\Projets\\crmpro-wt-p5a35\\frontend\\src\\features\\dashboard\\components\\ActivityFeed.tsx:92:78)\n'[39m +
+    [32m'    at Array.map (<anonymous>)\n'[39m +
+    [32m'    at ActivityFeed (C:\\Users\\willi\\Documents\\Projets\\crmpro-wt-p5a35\\frontend\\src\\features\\dashboard\\components\\ActivityFeed.tsx:76:18)\n'[39m +
+    [32m'    at Object.react_stack_bottom_frame (C:\\Users\\willi\\Documents\\Projets\\Axion-CRM-Pro\\frontend\\node_modules\\.pnpm\\react-dom@19.2.6_react@19.2.6\\node_modules\\react-dom\\cjs\\react-dom-client.development.js:25904:20)\n'[39m +
+    [32m'    at renderWithHooks (C:\\Users\\willi\\Documents\\Projets\\Axion-CRM-Pro\\frontend\\node_modules\\.pnpm\\react-dom@19.2.6_react@19.2.6\\node_modules\\react-dom\\cjs\\react-dom-client.development.js:7662:22)\n'[39m +
+    [32m'    at updateFunctionComponent (C:\\Users\\willi\\Documents\\Projets\\Axion-CRM-Pro\\frontend\\node_modules\\.pnpm\\react-dom@19.2.6_react@19.2.6\\node_modules\\react-dom\\cjs\\react-dom-client.development.js:10166:19)\n'[39m +
+    [32m'    at beginWork (C:\\Users\\willi\\Documents\\Projets\\Axion-CRM-Pro\\frontend\\node_modules\\.pnpm\\react-dom@19.2.6_react@19.2.6\\node_modules\\react-dom\\cjs\\react-dom-client.development.js:11778:18)\n'[39m +
+    [32m'    at runWithFiberInDEV (C:\\Users\\willi\\Documents\\Projets\\Axion-CRM-Pro\\frontend\\node_modules\\.pnpm\\react-dom@19.2.6_react@19.2.6\\node_modules\\react-dom\\cjs\\react-dom-client.development.js:874:13)\n'[39m +
+    [32m'    at performUnitOfWork (C:\\Users\\willi\\Documents\\Projets\\Axion-CRM-Pro\\frontend\\node_modules\\.pnpm\\react-dom@19.2.6_react@19.2.6\\node_modules\\react-dom\\cjs\\react-dom-client.development.js:17641:22)'[39m,
+  nameStr: [32m'TypeError'[39m,
+  expected: [32m'undefined'[39m,
+  actual: [32m'undefined'[39m
+}
+An error occurred in the <ActivityFeed> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+
+[90mstderr[2m | tests/components/ActivityFeed.test.tsx[2m > [22m[2mActivityFeed[2m > [22m[2msurvit à une ligne dont TOUS les champs optionnels manquent
+[22m[39mTypeError: Cannot read properties of undefined (reading 'replace')
+    at humanizeAction [90m(C:\Users\willi\Documents\Projets\crmpro-wt-p5a35\frontend\[39msrc\features\dashboard\components\ActivityFeed.tsx:20:12[90m)[39m
+    at map [90m(C:\Users\willi\Documents\Projets\crmpro-wt-p5a35\frontend\[39msrc\features\dashboard\components\ActivityFeed.tsx:92:78[90m)[39m
+    at Array.map (<anonymous>)
+    at ActivityFeed [90m(C:\Users\willi\Documents\Projets\crmpro-wt-p5a35\frontend\[39msrc\features\dashboard\components\ActivityFeed.tsx:76:18[90m)[39m
+    at Object.react_stack_bottom_frame (C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\node_modules\[4m.pnpm[24m\react-dom@19.2.6_react@19.2.6\node_modules\[4mreact-dom[24m\cjs\react-dom-client.development.js:25904:20)
+    at renderWithHooks (C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\node_modules\[4m.pnpm[24m\react-dom@19.2.6_react@19.2.6\node_modules\[4mreact-dom[24m\cjs\react-dom-client.development.js:7662:22)
+    at updateFunctionComponent (C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\node_modules\[4m.pnpm[24m\react-dom@19.2.6_react@19.2.6\node_modules\[4mreact-dom[24m\cjs\react-dom-client.development.js:10166:19)
+    at beginWork (C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\node_modules\[4m.pnpm[24m\react-dom@19.2.6_react@19.2.6\node_modules\[4mreact-dom[24m\cjs\react-dom-client.development.js:11778:18)
+    at runWithFiberInDEV (C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\node_modules\[4m.pnpm[24m\react-dom@19.2.6_react@19.2.6\node_modules\[4mreact-dom[24m\cjs\react-dom-client.development.js:874:13)
+    at performUnitOfWork (C:\Users\willi\Documents\Projets\Axion-CRM-Pro\frontend\node_modules\[4m.pnpm[24m\react-dom@19.2.6_react@19.2.6\node_modules\[4mreact-dom[24m\cjs\react-dom-client.development.js:17641:22) {
+  stackStr: [32m"TypeError: Cannot read properties of undefined (reading 'replace')\n"[39m +
+    [32m'    at humanizeAction (C:\\Users\\willi\\Documents\\Projets\\crmpro-wt-p5a35\\frontend\\src\\features\\dashboard\\components\\ActivityFeed.tsx:20:12)\n'[39m +
+    [32m'    at map (C:\\Users\\willi\\Documents\\Projets\\crmpro-wt-p5a35\\frontend\\src\\features\\dashboard\\components\\ActivityFeed.tsx:92:78)\n'[39m +
+    [32m'    at Array.map (<anonymous>)\n'[39m +
+    [32m'    at ActivityFeed (C:\\Users\\willi\\Documents\\Projets\\crmpro-wt-p5a35\\frontend\\src\\features\\dashboard\\components\\ActivityFeed.tsx:76:18)\n'[39m +
+    [32m'    at Object.react_stack_bottom_frame (C:\\Users\\willi\\Documents\\Projets\\Axion-CRM-Pro\\frontend\\node_modules\\.pnpm\\react-dom@19.2.6_react@19.2.6\\node_modules\\react-dom\\cjs\\react-dom-client.development.js:25904:20)\n'[39m +
+    [32m'    at renderWithHooks (C:\\Users\\willi\\Documents\\Projets\\Axion-CRM-Pro\\frontend\\node_modules\\.pnpm\\react-dom@19.2.6_react@19.2.6\\node_modules\\react-dom\\cjs\\react-dom-client.development.js:7662:22)\n'[39m +
+    [32m'    at updateFunctionComponent (C:\\Users\\willi\\Documents\\Projets\\Axion-CRM-Pro\\frontend\\node_modules\\.pnpm\\react-dom@19.2.6_react@19.2.6\\node_modules\\react-dom\\cjs\\react-dom-client.development.js:10166:19)\n'[39m +
+    [32m'    at beginWork (C:\\Users\\willi\\Documents\\Projets\\Axion-CRM-Pro\\frontend\\node_modules\\.pnpm\\react-dom@19.2.6_react@19.2.6\\node_modules\\react-dom\\cjs\\react-dom-client.development.js:11778:18)\n'[39m +
+    [32m'    at runWithFiberInDEV (C:\\Users\\willi\\Documents\\Projets\\Axion-CRM-Pro\\frontend\\node_modules\\.pnpm\\react-dom@19.2.6_react@19.2.6\\node_modules\\react-dom\\cjs\\react-dom-client.development.js:874:13)\n'[39m +
+    [32m'    at performUnitOfWork (C:\\Users\\willi\\Documents\\Projets\\Axion-CRM-Pro\\frontend\\node_modules\\.pnpm\\react-dom@19.2.6_react@19.2.6\\node_modules\\react-dom\\cjs\\react-dom-client.development.js:17641:22)'[39m,
+  nameStr: [32m'TypeError'[39m,
+  expected: [32m'undefined'[39m,
+  actual: [32m'undefined'[39m
+}
+An error occurred in the <ActivityFeed> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+
+ [31m❯[39m tests/components/ActivityFeed.test.tsx [2m([22m[2m2 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[33m 3360[2mms[22m[39m
+[31m   [31m×[31m ActivityFeed[2m > [22mne s'effondre pas sur la charge utile réelle de l'API, et affiche l'évènement[33m 2311[2mms[22m[31m[39m
+[31m     → Unable to find an element with the text: /Auth Login/i. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<body>[31m
+  [36m<div />[31m
+[36m</body>[31m
+
+Ignored nodes: comments, script, style
+[36m<body>[31m
+  [36m<div />[31m
+[36m</body>[31m[39m
+[31m   [31m×[31m ActivityFeed[2m > [22msurvit à une ligne dont TOUS les champs optionnels manquent[33m 1042[2mms[22m[31m[39m
+[31m     → Unable to find an element with the text: /Evenement/i. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<body>[31m
+  [36m<div />[31m
+[36m</body>[31m
+
+Ignored nodes: comments, script, style
+[36m<body>[31m
+  [36m<div />[31m
+[36m</body>[31m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 2 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/components/ActivityFeed.test.tsx[2m > [22mActivityFeed[2m > [22mne s'effondre pas sur la charge utile réelle de l'API, et affiche l'évènement
+[31m[1mTestingLibraryElementError[22m: Unable to find an element with the text: /Auth Login/i. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<body>[31m
+  [36m<div />[31m
+[36m</body>[31m
+
+Ignored nodes: comments, script, style
+[36m<body>[31m
+  [36m<div />[31m
+[36m</body>[31m[39m
+[90m [2m❯[22m waitForWrapper ../../Axion-CRM-Pro/frontend/node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/wait-for.js:[2m163:27[22m[39m
+[90m [2m❯[22m findByText ../../Axion-CRM-Pro/frontend/node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/query-helpers.js:[2m86:33[22m[39m
+[36m [2m❯[22m tests/components/ActivityFeed.test.tsx:[2m64:25[22m[39m
+    [90m 62| [39m
+    [90m 63| [39m    [90m// Le `event_type` est rendu lisible, pas ignoré.[39m
+    [90m 64| [39m    [34mexpect[39m([35mawait[39m screen[33m.[39m[34mfindByText[39m([36m/Auth Login/i[39m))[33m.[39m[34mtoBeTruthy[39m()[33m;[39m
+    [90m   | [39m                        [31m^[39m
+    [90m 65| [39m  })[33m;[39m
+    [90m 66| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/components/ActivityFeed.test.tsx[2m > [22mActivityFeed[2m > [22msurvit à une ligne dont TOUS les champs optionnels manquent
+[31m[1mTestingLibraryElementError[22m: Unable to find an element with the text: /Evenement/i. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<body>[31m
+  [36m<div />[31m
+[36m</body>[31m
+
+Ignored nodes: comments, script, style
+[36m<body>[31m
+  [36m<div />[31m
+[36m</body>[31m[39m
+[90m [2m❯[22m waitForWrapper ../../Axion-CRM-Pro/frontend/node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/wait-for.js:[2m163:27[22m[39m
+[90m [2m❯[22m findByText ../../Axion-CRM-Pro/frontend/node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/query-helpers.js:[2m86:33[22m[39m
+[36m [2m❯[22m tests/components/ActivityFeed.test.tsx:[2m78:25[22m[39m
+    [90m 76| [39m    [90m// doit jamais pouvoir effacer l'application.[39m
+    [90m 77| [39m    [34mexpect[39m(() [33m=>[39m [34mrender[39m([33m<[39m[33mActivityFeed[39m [33m/[39m[33m>[39m[33m,[39m { wrapper[33m:[39m enveloppe }))[33m.[39mnot…
+    [90m 78| [39m    [34mexpect[39m([35mawait[39m screen[33m.[39m[34mfindByText[39m([36m/Evenement/i[39m))[33m.[39m[34mtoBeTruthy[39m()[33m;[39m
+    [90m   | [39m                        [31m^[39m
+    [90m 79| [39m  })[33m;[39m
+    [90m 80| [39m})[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯[1m[7m Unhandled Errors [27m[22m⎯⎯⎯⎯⎯⎯[39m
+[31m[1m
+Vitest caught 2 unhandled errors during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.[22m[39m
+
+[31m⎯⎯⎯⎯⎯[1m[7m Uncaught Exception [27m[22m⎯⎯⎯⎯⎯[39m
+[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'replace')[39m
+[36m [2m❯[22m humanizeAction src/features/dashboard/components/ActivityFeed.tsx:[2m20:12[22m[39m
+    [90m 18| [39m
+    [90m 19| [39m[35mfunction[39m [34mhumanizeAction[39m(a[33m:[39m string)[33m:[39m string {
+    [90m 20| [39m  [35mreturn[39m a[33m.[39m[34mreplace[39m([36m/[._-]+/g[39m[33m,[39m [32m' '[39m)[33m.[39m[34mreplace[39m([36m/\b\w/g[39m[33m,[39m (c) [33m=>[39m c[33m.[39m[34mtoUpperCa[39m…
+    [90m   | [39m           [31m^[39m
+    [90m 21| [39m}
+    [90m 22| [39m
+[90m [2m❯[22m map src/features/dashboard/components/ActivityFeed.tsx:[2m92:78[22m[39m
+[90m [2m❯[22m ActivityFeed src/features/dashboard/components/ActivityFeed.tsx:[2m76:18[22m[39m
+[90m [2m❯[22m Object.react_stack_bottom_frame ../../Axion-CRM-Pro/frontend/node_modules/.pnpm/react-dom@19.2.6_react@19.2.6/node_modules/react-dom/cjs/react-dom-client.development.js:[2m25904:20[22m[39m
+[90m [2m❯[22m renderWithHooks ../../Axion-CRM-Pro/frontend/node_modules/.pnpm/react-dom@19.2.6_react@19.2.6/node_modules/react-dom/cjs/react-dom-client.development.js:[2m7662:22[22m[39m
+[90m [2m❯[22m updateFunctionComponent ../../Axion-CRM-Pro/frontend/node_modules/.pnpm/react-dom@19.2.6_react@19.2.6/node_modules/react-dom/cjs/react-dom-client.development.js:[2m10166:19[22m[39m
+[90m [2m❯[22m beginWork ../../Axion-CRM-Pro/frontend/node_modules/.pnpm/react-dom@19.2.6_react@19.2.6/node_modules/react-dom/cjs/react-dom-client.development.js:[2m11778:18[22m[39m
+[90m [2m❯[22m runWithFiberInDEV ../../Axion-CRM-Pro/frontend/node_modules/.pnpm/react-dom@19.2.6_react@19.2.6/node_modules/react-dom/cjs/react-dom-client.development.js:[2m874:13[22m[39m
+[90m [2m❯[22m performUnitOfWork ../../Axion-CRM-Pro/frontend/node_modules/.pnpm/react-dom@19.2.6_react@19.2.6/node_modules/react-dom/cjs/react-dom-client.development.js:[2m17641:22[22m[39m
+
+[31mThis error originated in "[1mtests/components/ActivityFeed.test.tsx[22m" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.[39m
+[31mThe latest test that might've caused the error is "[1mne s'effondre pas sur la charge utile réelle de l'API, et affiche l'évènement[22m". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.[39m
+
+[31m⎯⎯⎯⎯⎯[1m[7m Uncaught Exception [27m[22m⎯⎯⎯⎯⎯[39m
+[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'replace')[39m
+[36m [2m❯[22m humanizeAction src/features/dashboard/components/ActivityFeed.tsx:[2m20:12[22m[39m
+    [90m 18| [39m
+    [90m 19| [39m[35mfunction[39m [34mhumanizeAction[39m(a[33m:[39m string)[33m:[39m string {
+    [90m 20| [39m  [35mreturn[39m a[33m.[39m[34mreplace[39m([36m/[._-]+/g[39m[33m,[39m [32m' '[39m)[33m.[39m[34mreplace[39m([36m/\b\w/g[39m[33m,[39m (c) [33m=>[39m c[33m.[39m[34mtoUpperCa[39m…
+    [90m   | [39m           [31m^[39m
+    [90m 21| [39m}
+    [90m 22| [39m
+[90m [2m❯[22m map src/features/dashboard/components/ActivityFeed.tsx:[2m92:78[22m[39m
+[90m [2m❯[22m ActivityFeed src/features/dashboard/components/ActivityFeed.tsx:[2m76:18[22m[39m
+[90m [2m❯[22m Object.react_stack_bottom_frame ../../Axion-CRM-Pro/frontend/node_modules/.pnpm/react-dom@19.2.6_react@19.2.6/node_modules/react-dom/cjs/react-dom-client.development.js:[2m25904:20[22m[39m
+[90m [2m❯[22m renderWithHooks ../../Axion-CRM-Pro/frontend/node_modules/.pnpm/react-dom@19.2.6_react@19.2.6/node_modules/react-dom/cjs/react-dom-client.development.js:[2m7662:22[22m[39m
+[90m [2m❯[22m updateFunctionComponent ../../Axion-CRM-Pro/frontend/node_modules/.pnpm/react-dom@19.2.6_react@19.2.6/node_modules/react-dom/cjs/react-dom-client.development.js:[2m10166:19[22m[39m
+[90m [2m❯[22m beginWork ../../Axion-CRM-Pro/frontend/node_modules/.pnpm/react-dom@19.2.6_react@19.2.6/node_modules/react-dom/cjs/react-dom-client.development.js:[2m11778:18[22m[39m
+[90m [2m❯[22m runWithFiberInDEV ../../Axion-CRM-Pro/frontend/node_modules/.pnpm/react-dom@19.2.6_react@19.2.6/node_modules/react-dom/cjs/react-dom-client.development.js:[2m874:13[22m[39m
+[90m [2m❯[22m performUnitOfWork ../../Axion-CRM-Pro/frontend/node_modules/.pnpm/react-dom@19.2.6_react@19.2.6/node_modules/react-dom/cjs/react-dom-client.development.js:[2m17641:22[22m[39m
+
+[31mThis error originated in "[1mtests/components/ActivityFeed.test.tsx[22m" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.[39m
+[31mThe latest test that might've caused the error is "[1msurvit à une ligne dont TOUS les champs optionnels manquent[22m". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.[39m
+[31m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[90m (2)[39m
+[2m     Errors [22m [1m[31m2 errors[39m[22m
+[2m   Start at [22m 18:11:46
+[2m   Duration [22m 9.02s[2m (transform 502ms, setup 1.58s, collect 146ms, tests 3.36s, environment 2.58s, prepare 346ms)[22m
+

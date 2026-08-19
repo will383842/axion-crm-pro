@@ -390,6 +390,64 @@ un rôle par un chemin que mon motif ne connaît pas m'aurait échappé.*
 
 ---
 
+## 9. Résultat n° 7 — contre-vérification de `a6aceb0`, **le commit public que personne n'avait relu**
+
+**Pourquoi en urgence** : c'est le correctif le plus dangereux du lot (`F37-001`, S0 — la signature
+du canal machine forgeable en production), **il est en ligne sur un dépôt public depuis 16 h 14**,
+proposé à la fusion dans la PR #191, et **son auteur est le seul à l'avoir vu**. La règle 7 n'est pas
+optionnelle parce qu'un travail est pressé ; elle l'est d'autant moins qu'il est déjà publié.
+
+**Méthode** : lecture du diff publié, statique. *Et j'y ai commis une erreur de mesure que je
+consigne parce qu'elle est instructive — voir la note en fin de section.*
+
+### ✅ Ce que le correctif fait bien, et il faut le dire
+
+| Point | Verdict |
+|---|---|
+| Garde de secret vide | ✅ **`if ($secret === '')` → 503 explicite**, journalisé avec l'IP. *Fail-closed.* Et le choix du **503** plutôt que du 401 est juste et argumenté : *un secret manquant est une faute de configuration, pas une requête malformée* — aligné sur le webhook ZeptoMail |
+| Vérification | ✅ **Passe par `HmacSignature::verify()`**, la classe durcie déjà en place sur `SiteSync` — *au lieu de recopier le patron.* **C'est exactement le correctif que `P5-HMAC-001` préconisait**, écrit indépendamment |
+| Honnêteté du commentaire | ✅ **Il déclare sa propre limite** : le corps signé reste le **corps brut, sans horodatage**, parce qu'y ajouter la fenêtre casserait les workers Node en place. **« Le rejeu tardif reste donc ouvert, et c'est noté comme tel. »** *Un correctif qui borne ce qu'il ne couvre pas vaut mieux qu'un correctif qui laisse croire qu'il couvre tout.* |
+
+**`F37-001` est donc fermé pour la forge.** Pas pour le rejeu — et c'est écrit.
+
+### ❌ Ce qu'il ne ferme pas, et qui était déjà au dossier
+
+| Constat | État après `a6aceb0` |
+|---|---|
+| **`P5-HMAC-001`** (S2) — les deux commentaires qui **désignent le canal troué comme le patron de référence** | 🔴 **TOUJOURS LÀ.** `routes/api.php:331` dit encore que `/site-sync` suit *« le même patron que scraper-result »*, et le docbloc de `HmacSignature` dit encore *« reprend le patron déjà en place sur `POST /internal/scraper-result` »*. **Et c'est désormais doublement faux** : la classe durcie déclare dériver de `scraper-result`, qui vient précisément de se mettre à dériver d'elle. *Circulaire, et trompeur pour le suivant.* **Correctif : deux lignes de commentaire.** |
+| **`P5-HMAC-002`** (S3) — le secret lu par **`env()` brut**, sans aucune entrée `config/` | 🔴 **TOUJOURS LÀ** : `ScraperResultController:38` reste `env('WORKER_INTERNAL_HMAC_SECRET', '')`, et `config/services.php` n'en porte **aucune** entrée |
+
+> **Quatrième cas du même motif dans la même journée — et cette fois à l'intérieur du correctif.**
+> Le commit répare l'endpoint et **ne balaye pas les deux lignes qui rejouteront le défaut au
+> prochain canal machine-à-machine écrit dans ce dépôt.** *Le trou est bouché ; le plan qui mène au
+> trou est toujours affiché au mur.*
+
+### ⚠️ Mon erreur de mesure, consignée — elle vaut mieux qu'un verdict propre
+
+Mon premier contrôle a conclu que **les deux commentaires étaient corrigés**. Ils ne l'étaient pas.
+J'avais cherché `'meme patron que scraper-result'` et `'deja en place sur'` — **sans accents**,
+sur un fichier qui écrit *« même »* et *« déjà »*. **Zéro résultat, et j'ai lu ce zéro comme une
+absence dans le code alors qu'il était une absence dans ma requête.**
+
+*C'est le patron `A-011` à l'échelle d'une commande shell : la mesure était irréprochable, elle
+portait sur le mauvais objet.* Rattrapé au tour suivant parce que le résultat était trop beau — un
+correctif d'urgence qui nettoie en passant deux commentaires cosmétiques, cela ne se produit pas.
+**Règle que j'en tire : un contrôle en français doit être joué sur une sous-chaîne sans lettre
+accentuée, ou pas du tout.**
+
+### Verdict sur `a6aceb0`
+
+**Le correctif est bon et je ne m'y oppose pas.** Il ferme un S0 réel, par le bon moyen, en réemployant
+une pièce existante plutôt qu'en la recopiant, et il déclare ce qu'il ne couvre pas.
+**Trois compléments avant fusion**, tous petits :
+
+1. les deux lignes de commentaire de `P5-HMAC-001` — **sans elles, le défaut se réécrira** ;
+2. une entrée `config/services.php` pour le secret (`P5-HMAC-002`) ;
+3. **le rejeu tardif, déclaré ouvert, doit devenir un constat au registre** et non rester une note
+   de commentaire — sinon il disparaîtra avec la PR.
+
+---
+
 ## 3. Journal de la passe
 
 | Date | Objet | Verdict |
@@ -400,3 +458,4 @@ un rôle par un chemin que mon motif ne connaît pas m'aurait échappé.*
 | 2026-08-19 | `B15-001` + `B15-002` — « la personne effacée revient au vivier » et la garde qui l'entérine | 🔴 **Confirmés**, chaîne prouvée en 6 maillons du code au schéma. **Et pire qu'écrit** : le même défaut a été trouvé, daté (E2E du 17/08) et **réparé sur la porte voisine** ; le chemin de la console n'a jamais été porté. *Vu, nommé, réparé — d'un seul côté.* |
 | 2026-08-19 | `F38-007` — « la faille du 19/08 est réarmable en un clic » (signalé par l'agent S1) | 🔴 **Vérifié, vrai, et plus large : le dispatch rouvre AUSSI l'accès root SSH.** Reclassé **S1 → S0** (`D-019`). **Trois fichiers corrigés**, dont le runbook de reprise après sinistre. **Seizième cas de `A-011`** : la garde dynamique des ports n'est câblée que sur la préproduction, déjà saine |
 | 2026-08-19 | *« Il y en a probablement d'autres »* — l'intuition de l'agent 35 sur les tests qui certifient un défaut | 🔴 **Vérifiée et étendue** : **17 fichiers** prennent une identité sans rôle et attendent un succès ; **six** exercent un geste destructeur ou des données personnelles. **`P5-ROLES-001` (S1), dix-septième cas de `A-011`** — espèce « la garde inscrit le défaut en assertion ». **Chiffre le coût caché du correctif `F36-001`** |
+| 2026-08-19 | `a6aceb0` — le correctif HMAC **publié sans relecture** (PR #191) | ✅ **Bon** : fail-closed, réemploi de la classe durcie, limite déclarée. `F37-001` fermé **pour la forge, pas pour le rejeu**. ❌ **Ne ferme ni `P5-HMAC-001` ni `P5-HMAC-002`** : les deux commentaires qui propagent le défaut sont toujours là, et **désormais circulaires**. ⚠️ Une erreur de mesure de ma part consignée : grep sans accents lu comme une absence dans le code |

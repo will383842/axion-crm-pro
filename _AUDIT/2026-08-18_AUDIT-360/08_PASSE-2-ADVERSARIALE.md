@@ -78,8 +78,60 @@ méthode avant son chiffre**, pour qu'un tiers puisse le recompter sans me croir
 
 ---
 
+## 4. Résultat n° 2 — la première contre-vérification d'une **bonne nouvelle** : elle tient
+
+**Objet attaqué** : `02bis` §5, la ligne *« La suite de tests backend — 780 tests, 6 503 assertions,
+PHPStan niveau 8 `[OK]`, et **zéro exclusion silencieuse** »*.
+
+**Pourquoi celle-là d'abord** : c'est la bonne nouvelle **la plus portante** du dossier. Tout le
+plan de correction de P3 suppose qu'on dispose d'un filet pour savoir si un correctif casse quelque
+chose. Si ce filet est troué, **P3 se fait à l'aveugle** — et c'est le genre d'affirmation
+rassurante que `A-013` désigne comme le défaut de clôture typique. J'avais d'ailleurs déjà été pris
+une fois sur cette ligne exacte : j'y avais écrit *« la CI backend, bloquante et requise »*, ce qui
+contredisait trois constats de mon propre dossier.
+
+**Comment je l'ai attaquée** : par l'angle que le contrôle initial n'avait pas pris.
+Le mandat de la CI n'exécute **pas** `phpunit.xml` — le job `backend` de `ci.yml:195` lance
+`php vendor/bin/pest --configuration **phpunit-ci.xml**`. *Un contrôle d'exclusions mené sur le
+fichier que la CI n'ouvre pas serait le seizième cas du patron `A-011`.*
+
+**Mesuré** :
+
+| Ce qui est affirmé | Mesure | Verdict |
+|---|---|---|
+| 0 exclusion dans la configuration | `phpunit.xml` **et** `phpunit-ci.xml` : `0 <exclude>`, `0 @group`, `0 #[Group]` | ✅ **vrai sur les deux fichiers** |
+| 0 saut silencieux | **1 seul** `markTestSkipped` dans tout `tests/` — `NeDoitPasRegresserTest.php:169` | ✅ **et c'est un contre-exemple parfait** : il nomme le binaire absent, où le contrôle tourne pour de vrai, et écrit *« un `skip` est un aveu, pas une victoire »*. **L'inverse d'un saut silencieux** |
+| 0 `->skip()`, `->todo()`, `->only()` | vérifié, **0 des trois** | ✅ |
+| La quarantaine est levée | **les 23 fichiers de `QUARANTAINE.md` sont TOUS présents dans `tests/`** — vérifié un par un | ✅ **et plus fort que l'énoncé** : l'en-tête dit « réparés **ou supprimés** » ; en fait **23 réparés, 0 supprimé** |
+| Seule différence entre les deux configs | `executionOrder` : `random` en local, `default` en CI | ✅ conforme à ce qui est écrit |
+
+**→ La bonne nouvelle tient. Je la confirme, par un chemin que personne n'avait pris.**
+
+### Ce que l'attaque a rapporté quand même
+
+`executionOrder="default"` en CI n'est pas neutre, et le fichier l'assume : *« Deux exécutions du
+MÊME commit avaient donné **262 verts puis 48 rouges** — du couplage entre tests. »* Le couplage
+**n'a pas été réparé : il a été contourné par l'ordre.** La porte tourne donc dans l'ordre où elle
+passe, et l'ordre aléatoire qui le débusquerait **ne garde rien**.
+
+⚠️ **Et voici l'honnêteté que cette passe se doit** : ce n'est **pas** un constat neuf. C'est
+`H44-011` (S2), déjà au registre — et la comparaison des deux fichiers `phpunit` y figure déjà
+(`02_CONSTATS.md:1004-1005`). **Mon attaque a redécouvert un constat existant, elle ne l'a pas
+trouvé.** C'est un résultat de moindre valeur, et je le dis plutôt que de le présenter comme une
+trouvaille.
+
+> **Ce que j'en retiens pour la suite de la passe** : contre-vérifier une bonne nouvelle **coûte peu
+> et rapporte deux fois** — soit elle tombe, soit elle devient opposable. Ici elle est devenue
+> opposable : on peut désormais écrire *« la suite est saine »* en sachant que c'est vrai **sur le
+> fichier que la CI ouvre réellement**, ce qui n'était pas établi. Cela ne change rien au fait que
+> **son câblage**, lui, reste troué (`F38-002`, `A08-005`, `H44-003`) : *la suite est saine, la
+> porte ne l'est pas, et les deux ne se confondent pas.*
+
+---
+
 ## 3. Journal de la passe
 
 | Date | Objet | Verdict |
 |---|---|---|
 | 2026-08-19 | Décompte S0 (`02bis` §1 bis) | 🔴 **Faux, trois fois de suite et toujours trop bas.** Corrigé à **29**, propagé au rapport final et à `06_RESTE-WILL` (qui portait encore **« douze »** — la page que Will lit en premier) |
+| 2026-08-19 | `02bis` §5 — « la suite de tests est saine, zéro exclusion silencieuse » | ✅ **Confirmée**, et sur le fichier que la CI ouvre vraiment (`phpunit-ci.xml`), ce qui n'avait pas été fait. Quarantaine levée vérifiée **fichier par fichier : 23/23 présents**. Le couplage entre tests contourné par l'ordre reste ouvert — mais c'est `H44-011`, **déjà connu** : redécouverte, pas trouvaille |

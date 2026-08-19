@@ -1,0 +1,44 @@
+== 1. Reglage « taille de police » du navigateur : 16 px -> 24 px ==
+  a 16 px : {"text-xs":"12px","text-sm":"14px","text-base":"16px","text-[10px]":"10px","text-[11px]":"11px","_racine":"16px"}
+  a 24 px : {"text-xs":"18px","text-sm":"21px","text-base":"24px","text-[10px]":"10px","text-[11px]":"11px","_racine":"24px"}
+  (les classes text-[10px]/text-[11px] ne bougent pas : 113 occurrences dans 41 fichiers)
+
+== 2. Reflow a 320 px (WCAG 1.4.10) : debordement horizontal ==
+  login                  scrollWidth=320 clientWidth=320 
+  dashboard              scrollWidth=320 clientWidth=320 
+  companies              scrollWidth=320 clientWidth=320 
+  companies-$id          scrollWidth=320 clientWidth=320 
+  contacts               scrollWidth=320 clientWidth=320 
+  roumanie               scrollWidth=320 clientWidth=320 
+  media                  scrollWidth=320 clientWidth=320 
+  journalists            scrollWidth=320 clientWidth=320 
+  coverage               scrollWidth=320 clientWidth=320 
+  scraper-runs           scrollWidth=320 clientWidth=320 
+  llm-router             scrollWidth=320 clientWidth=320 
+  llm-proxy-providers    scrollWidth=320 clientWidth=320 
+  llm-rotations          scrollWidth=320 clientWidth=320 
+  rgpd-requests          scrollWidth=320 clientWidth=320 
+  rgpd-ai-act            scrollWidth=320 clientWidth=320 
+  audit-logs             scrollWidth=320 clientWidth=320 
+  users                  scrollWidth=320 clientWidth=320 
+  settings               scrollWidth=320 clientWidth=320 
+  campaigns              scrollWidth=320 clientWidth=320 
+  campaigns-new          scrollWidth=320 clientWidth=320 
+  tags                   scrollWidth=320 clientWidth=320 
+  audiences              scrollWidth=320 clientWidth=320 
+  audiences-new          scrollWidth=320 clientWidth=320 
+  admin-observability    scrollWidth=320 clientWidth=320 
+  console-contacts       scrollWidth=320 clientWidth=320 
+  console-vivier         scrollWidth=320 clientWidth=320 
+  console-arbitrage      scrollWidth=320 clientWidth=320 
+  >>> 0 ecran(s) sur 27 debordent horizontalement a 320 px
+
+== 3. TEMOIN de la sonde de debordement ==
+  page volontairement large : {"scroll":900,"client":320}
+  page sage                 : {"scroll":320,"client":320}
+
+== 4. Hierarchie de titres, ecran par ecran (echantillon) ==
+  /companies : ["H3 « Aujourd'hui »","H3 « Contacts »","H3 « Collecte »","H3 « Pilotage »","H3 « Conformité »","H3 « Réglages »","H1 « Entreprises »"]
+  /settings : ["H3 « Aujourd'hui »","H3 « Contacts »","H3 « Collecte »","H3 « Pilotage »","H3 « Conformité »","H3 « Réglages »","H1 « Paramètres »","H3 « Identité et limites »"]
+  /coverage : ["H3 « Aujourd'hui »","H3 « Contacts »","H3 « Collecte »","H3 « Pilotage »","H3 « Conformité »","H3 « Réglages »","H1 « Couverture France »"]
+  /tags : ["H3 « Aujourd'hui »","H3 « Contacts »","H3 « Collecte »","H3 « Pilotage »","H3 « Conformité »","H3 « Réglages »","H1 « Tags »"]

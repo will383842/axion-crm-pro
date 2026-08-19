@@ -1,0 +1,50 @@
+══ A. Recherche globale (⌘K) — piège de focus, restitution du focus ══
+  dialog present : 1
+  focus a l ouverture : {"tag":"INPUT","id":"radix-_r_2_","nom":"","dansDialog":true,"dansMenu":false}
+  6 Tab : ["BUTTON\"Notifications\" dialog=false","BUTTON\"Theme light\" dialog=false","BUTTON\"Theme system\" dialog=false","BUTTON\"Theme dark\" dialog=false","BUTTON\"UUtilisateur\" dialog=false","BUTTON\"Importer\" dialog=false"]
+  >>> SORTIES du dialogue : 6 / 6
+  apres Escape, dialogue ferme ? true
+  focus restitue a : {"tag":"BUTTON","id":"","nom":"Importer","dansDialog":false,"dansMenu":false}
+
+══ B. Drawer mobile (barre laterale) — piege de focus ══
+  drawer present : 1
+  focus a l ouverture : {"tag":"BUTTON","id":"","nom":"Ouvrir le menu","dansDialog":false,"dansMenu":false}
+  10 Tab, dans le dialogue ? : [false,false,false,false,false,false,false,false,false,false]
+  >>> SORTIES du dialogue : 10 / 10
+  arriere-plan encore atteignable au clavier ? true
+  arriere-plan inert/aria-hidden ? {"inert":false,"ariaHidden":null}
+  Escape ferme ? true
+  focus restitue a : {"tag":"A","id":"","nom":"Lancer scraping →","dansDialog":false,"dansMenu":false}
+
+══ C. Modal mobile (recherche) — piege de focus + axe SUR LA MODALE OUVERTE ══
+  modale presente : 1
+  aria-labelledby sur la modale ? {"ariaLabel":null,"ariaLabelledby":null,"titreH2":"Recherche"}
+  focus a l ouverture : {"tag":"BUTTON","id":"","nom":"Rechercher","dansDialog":false,"dansMenu":false}
+  >>> SORTIES du dialogue : 8 / 8
+  axe sur la modale ouverte : ["target-size[serious]x1"]
+
+══ D. Menu utilisateur (DropdownMenu) — bouton imbrique, clavier, axe ══
+  declencheurs aria-haspopup=menu : 2
+  boutons imbriques dans le declencheur : 0
+  menu ouvert : 1
+  focus juste apres ouverture : {"tag":"BUTTON","id":"","nom":"MWMon workspace","dansDialog":false,"dansMenu":false}
+  apres FlecheBas : {"tag":"BUTTON","id":"","nom":"MWMon workspace","dansDialog":false,"dansMenu":false} (un menu ARIA doit deplacer le focus)
+  apres Tab : {"tag":"BUTTON","id":"","nom":"MWMon workspace","dansDialog":false,"dansMenu":true}
+  axe menu ouvert : ["target-size[serious]x2"]
+  Escape ferme ? true | focus : {"tag":"BODY","id":"","nom":"Aller au contenuAAxion CRM Pro","dansDialog":false,"dansMenu":false}
+
+══ E. Onglets (role=tab) — fleches, aria-controls, tabpanel ══
+  role=tablist : 1 | role=tab : 4 | role=tabpanel : 0
+  onglets avec aria-controls : 0
+  FlecheDroite deplace-t-elle le focus ? Workspace -> Workspace | NON
+  tabindex des onglets (roving ?) : [null,null,null,null]
+
+══ F. /coverage — le SegmentedControl local a-t-il perdu tablist/aria-selected ? ══
+  /coverage : role=tablist = 0 | role=tab = 0 | aria-selected = 0
+  TEMOIN /dashboard (SegmentedControl du DS) : role=tablist = 1 | role=tab = 3 | aria-selected = 3
+
+══ G. Lien d evitement (skip-link) ══
+  1er Tab : {"tag":"A","id":"","nom":"Aller au contenu","dansDialog":false,"dansMenu":false}
+  styles calcules du lien focalise : {"left":"16px","top":"16px","background":"rgba(0, 0, 0, 0)","color":"rgb(11, 11, 11)","padding":"0px","zIndex":"9999","rect":{"x":16,"y":16,"w":116,"h":24}}
+  couleur derriere le lien (element a ce point) : [{"tag":"A","cls":"skip-link","bg":"rgba(0, 0, 0, 0)"},{"tag":"SPAN","cls":"text-sm font-bold tracking-tight text-wh","bg":"rgba(0, 0, 0, 0)"},{"tag":"A","cls":"flex items-center gap-2 px-1 py-0.5","bg":"rgba(0, 0, 0, 0)"},{"tag":"DIV","cls":"flex flex-col gap-2 border-b border-side","bg":"rgba(0, 0, 0, 0)"}]
+  apres Entree sur le lien, focus : {"tag":"BODY","id":"","nom":"Aller au contenuAAxion CRM Pro","dansDialog":false,"dansMenu":false} | hash = #main

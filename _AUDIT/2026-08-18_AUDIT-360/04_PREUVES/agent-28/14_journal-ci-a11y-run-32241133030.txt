@@ -1,0 +1,40 @@
+##[group]Run pnpm exec playwright test tests/e2e/a11y.spec.ts --project=chromium --reporter=html
+[36;1mpnpm exec playwright test tests/e2e/a11y.spec.ts --project=chromium --reporter=html[0m
+shell: /usr/bin/bash -e {0}
+env:
+  PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+  E2E_PREVIEW: true
+  E2E_BASE_URL: http://127.0.0.1:4173
+##[endgroup]
+
+Running 4 tests using 2 workers
+····
+  4 passed (10.3s)
+##[group]Run pnpm exec playwright test tests/e2e/navigation.spec.ts --project=chromium --reporter=line
+[36;1mpnpm exec playwright test tests/e2e/navigation.spec.ts --project=chromium --reporter=line[0m
+shell: /usr/bin/bash -e {0}
+env:
+  PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+  E2E_PREVIEW: true
+  E2E_BASE_URL: http://127.0.0.1:4173
+##[endgroup]
+
+Running 14 tests using 2 workers
+
+[1A[2K[1/14] [chromium] › tests/e2e/navigation.spec.ts:67:3 › Navigation smoke › sidebar : entreprises link
+[1A[2K[2/14] [chromium] › tests/e2e/navigation.spec.ts:62:3 › Navigation smoke › sidebar : dashboard link visible
+[1A[2K[3/14] [chromium] › tests/e2e/navigation.spec.ts:73:3 › Navigation smoke › sidebar : contacts link
+[1A[2K[4/14] [chromium] › tests/e2e/navigation.spec.ts:79:3 › Navigation smoke › sidebar : médias link
+[1A[2K[5/14] [chromium] › tests/e2e/navigation.spec.ts:85:3 › Navigation smoke › sidebar : journalistes link
+[1A[2K[6/14] [chromium] › tests/e2e/navigation.spec.ts:91:3 › Navigation smoke › page médias : se charge sans erreur
+[1A[2K[7/14] [chromium] › tests/e2e/navigation.spec.ts:96:3 › Navigation smoke › sidebar : couverture France link
+[1A[2K[8/14] [chromium] › tests/e2e/navigation.spec.ts:102:3 › Navigation smoke › sidebar : LLM Router sous Réglages
+[1A[2K[9/14] [chromium] › tests/e2e/navigation.spec.ts:108:3 › Navigation smoke › sidebar : Conformité
+[1A[2K[10/14] [chromium] › tests/e2e/navigation.spec.ts:115:3 › Navigation smoke › sidebar : Réglages
+[1A[2K[11/14] [chromium] › tests/e2e/navigation.spec.ts:122:3 › Navigation smoke › sidebar : rangée (étape 0, F17) — six groupes, une seule entrée Contacts, aucun cadenas
+[1A[2K[12/14] [chromium] › tests/e2e/navigation.spec.ts:147:3 › Navigation smoke › header : recherche globale visible
+[1A[2K[13/14] [chromium] › tests/e2e/navigation.spec.ts:153:3 › Navigation smoke › header : dark mode toggle
+[1A[2K[14/14] [chromium] › tests/e2e/navigation.spec.ts:158:3 › Navigation smoke › skip-link a11y présent
+[1A[2K  14 passed (12.6s)
+
+[exited with code 0]

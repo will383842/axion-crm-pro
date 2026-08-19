@@ -7,8 +7,9 @@
 > points de contact sont strictement additifs et tous testés. En revanche l'établissement de la
 > ligne de base a fait sortir **six défauts qui n'ont rien à voir avec le CRM** mais qui portent sur
 > les mêmes fonctions — dont **deux graves** : la production affirme une certification que le dépôt
-> dit non délivrée (**E34-003**), et le contrôle de cloisonnement Qualiopi est **rouge sur 24
-> fichiers, dont tout le module planning**, sans que personne puisse le voir (**E34-007**).
+> dit non délivrée (**E34-003**), et les deux contrôles de cloisonnement du périmètre sont **rouges
+> — 47 et 24 violations, dont les onze fichiers du module planning** — sans être câblés nulle part,
+> donc sans que personne ait jamais pu les voir rouges (**E34-007**).
 >
 > **Huit constats : E34-001 (S1) · E34-002 (S2) · E34-003 (S1) · E34-004 (S2) · E34-005 (S2) ·
 > E34-006 (S2) · E34-007 (S1) · E34-008 (S2).**
@@ -49,9 +50,9 @@ continue · **Régression CRM ?** = verdict.
 | 4 | **Paiements** | `/qualiopi/facturation` (`/paiements` est un **308**) | non | idem | vert | Gate A · Vitest | **non** — même gate, **E34-004** |
 | 5 | **Sessions de formation** | `/qualiopi/sessions`, `/qualiopi/dossiers` | non | `src/server/qualiopi` : **251** fichiers de test / 518 fichiers | vert | Gate A · Vitest | **non** |
 | 6 | **Qualiopi** (portail stagiaire, conformité, pièces) | `/qualiopi/*`, `/portail/*` | non | 251 + 40 + 6 fichiers | **vert, sauf 1** (`confirmations.spec.ts`, **E34-006**) | Gate A · Vitest ; **`qualiopi:isolation-check` est ROUGE et ne tourne nulle part** (**E34-007**) | **non** — mais **E34-003** (affirmation de certification) |
-| 7 | **Banque d'images** | `/image-bank/*` (10 entrées de nav) | non | **7 fichiers / 46 tests** pour ~30 fichiers de code | vert | Gate A · Vitest ; **`image-bank:isolation-check` ne tourne nulle part** (**E34-007**) | **non** |
+| 7 | **Banque d'images** | `/image-bank/*` (10 entrées de nav) | non | **7 fichiers / 46 tests** pour ~30 fichiers de code | vert | Gate A · Vitest ; **`image-bank:isolation-check` est ROUGE (24, signal poreux) et ne tourne nulle part** (**E34-007**) | **non** |
 | 8 | **Contenus du site** | `/blog`, `/connaissances`, `/faq`, `/case-studies`, `/catalogue-imprime` | non | `src/content` : 40 fichiers | vert **en CI** — mais **12 710 tests sautés** (**E34-005**) | Gate A · Vitest, avec un `describe.skipIf(CI)` | **non** |
-| 9 | **Planning** (intervenants) | `/planning`, `/planning/{hub,timeline,charge,pipeline,previsionnel,ics}` | non | `src/features/admin-planning` : **13 fichiers** | vert | Gate A · Vitest — mais **6 de ses fichiers violent le cloisonnement Qualiopi**, contrôle rouge et non câblé (**E34-007**) | **non** |
+| 9 | **Planning** (intervenants) | `/planning`, `/planning/{hub,timeline,charge,pipeline,previsionnel,ics}` | non | `src/features/admin-planning` : **13 fichiers** | vert | Gate A · Vitest — mais **11 de ses fichiers violent le cloisonnement Qualiopi** (5 écrans + 6 modules de requêtes), contrôle rouge et non câblé (**E34-007**) | **non** |
 | 10 | **Booking / réservations** | ⚠️ `/reservations` est **mort, 308** vers `/qualiopi/dossiers` | non | `src/features/booking` : 5 fichiers (code serveur **toujours vivant**) | vert | Gate A · Vitest | **non** — mais **E34-008** (piège de nommage) |
 | 11 | **Canal CRM lui-même** (`crm-sync`, hors périmètre strict, mesuré pour la parité) | `/synchro-crm` | **oui** | 2 fichiers + `tests/e2e-crm-sync/contract.spec.ts` — **67 tests** | vert | Gate A · Vitest | — |
 | 12 | **Réservation d'appel Calendly** (point de capture partagé) | `/qualiopi/entrees` | **oui** | `src/server/calendly` : 6 fichiers | vert (après réexamen avec témoin de lenteur) | Gate A · Vitest | **OUI — E34-001**, réparée le 2026-08-17 |
@@ -129,8 +130,8 @@ exactement celui qui a cassé.
 | **Lighthouse CI** | 5 URLs | Gate B (`continue-on-error`) + post-deploy | **NON** en PR |
 | `admin-nav:routes-check` | 153 entrées | Gate A | **OUI** |
 | `content-gen:isolation-check` | — | Gate A | **OUI** |
-| **`qualiopi:isolation-check`** | 18 zones autorisées | **NULLE PART** — et il est **ROUGE** (E34-007) | **NON** |
-| **`image-bank:isolation-check`** | — | **NULLE PART** (E34-007) — verdict non obtenu | **NON** |
+| **`qualiopi:isolation-check`** | 18 zones autorisées | **NULLE PART** — et il est **ROUGE : 47 violations** (E34-007) | **NON** |
+| **`image-bank:isolation-check`** | zones §7.1 | **NULLE PART** — et il est **ROUGE : 24 violations**, mais par marqueur textuel, donc à qualifier (E34-007) | **NON** |
 
 ### 3.2 La suite complète — chiffres CI, sur `82425496`
 
@@ -359,6 +360,11 @@ drapeau de bascule console↔CRM doit être un `SiteSetting`, jamais une variabl
 - **0** entrée de navigation ne pointe vers le CRM (conforme à E32).
 - **Suite Vitest de référence** : 817 fichiers en CI (816 verts, 1 sauté), **10 725 tests exécutés**.
   C'est ce nombre-là, et non 23 435, qui doit rester stable d'un palier à l'autre.
+- **Cloisonnement de référence** : `qualiopi:isolation-check` = **47 violations**,
+  `image-bank:isolation-check` = **24** (E34-007). Ces deux nombres sont le zéro : un palier qui
+  déplacerait du code de la console **doit les faire baisser, jamais monter**. Et **onze** des 47
+  sont dans le module `planning` — celui que le CDC demande de conserver : le déplacer un jour
+  suppose de déplacer ses onze attaches Qualiopi avec lui, ou de les couper d'abord.
 
 ---
 
@@ -499,15 +505,14 @@ drapeau de bascule console↔CRM doit être un `SiteSetting`, jamais une variabl
 3. **Si le certificat Qualiopi est détenu ou non.** C'est un fait d'entreprise, pas un fait de code.
    J'ai mesuré la contradiction entre le message de `eb754332` (2026-08-19) et l'état de production ;
    je ne la tranche pas. Voir E34-003.
-4. **`image-bank:isolation-check`.** Lancé à la suite du contrôle Qualiopi, il n'avait pas rendu la
-   main au moment d'écrire (le contrôle Qualiopi, lui, a demandé ~20 min). Son **absence de câblage**
-   est mesurée et certaine (E34-007) ; c'est son **verdict** qui manque. Celui du contrôle Qualiopi,
-   en revanche, a été obtenu : **rouge, 24 violations** (E34-007). La liste que j'ai archivée est
-   **tronquée par mon propre `tail -25`** ; la sortie complète est dans
-   `24_qualiopi-isolation-complet.txt` — relance lancée, **encore en cours à l'heure d'écrire** (le
-   contrôle demande ~20 min sur ce poste). Le compte exact peut donc être **supérieur à 24** : je
-   l'écris comme un **plancher**, jamais comme un total. Ce qui est certain et suffisant pour le
-   constat : **le contrôle sort en 1**, et il sort en 1 sur des fichiers du périmètre.
+4. **La QUALIFICATION des 24 violations `image-bank`.** Les deux contrôles ont fini par rendre leur
+   verdict — **47 et 24, tous deux rouges** (E34-007) — mais ils ne mesurent pas la même chose : le
+   contrôle Qualiopi résout des **symboles**, celui de la banque d'images cherche un **marqueur
+   textuel**. Ses 24 incluent `src/app/admin.css` et `src/lib/admin-nav.test.ts`, qui ne font que
+   contenir la chaîne. **Je n'ai pas trié les 24 une par une** : dire lesquelles sont de vraies
+   fuites de cloisonnement demande de lire chaque fichier, et ce tri appartient à qui décidera du
+   correctif. Le **47**, lui, est un compte de fautes ; le **24** est une alerte à qualifier. Je ne
+   les additionne pas.
 5. **La suite Playwright.** `tests/e2e/**` est exclu de Vitest et ne tourne qu'en Gate B, en
    `continue-on-error`. Je ne l'ai pas jouée : elle exige un `next build` (≈ 25 min sur ce poste,
    17 629 routes) que le budget de cette mission ne portait pas.

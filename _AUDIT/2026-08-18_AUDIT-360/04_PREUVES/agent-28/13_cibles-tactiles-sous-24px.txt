@@ -1,0 +1,6 @@
+== /login
+   .pointer-events-auto | Target has insufficient size (20px by 20px, should be at least 24px by 24px) | {"minSize":24,"width":20,"height":20}
+   boutons < 24px : [{"n":"Afficher le mot de passe","w":20,"h":20}]
+== /companies
+   button[aria-label="Theme dark"] | Target has insufficient size (22.9px by 24px, should be at least 24px by 24px) | {"minSize":24,"width":22.9,"height":24}
+   boutons < 24px : [{"n":"Aujourd'hui","w":243,"h":23},{"n":"Contacts","w":243,"h":23},{"n":"Collecte","w":243,"h":23},{"n":"Pilotage","w":243,"h":23},{"n":"Conformité","w":243,"h":23},{"n":"Réglages","w":243,"h":23},{"n":"Ouvrir le menu","w":0,"h":0},{"n":"Rechercher","w":0,"h":0},{"n":"Theme dark","w":23,"h":24}]

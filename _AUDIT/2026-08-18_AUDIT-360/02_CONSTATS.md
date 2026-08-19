@@ -2520,7 +2520,7 @@ existante**. *C'est exactement celui qui a cassé.*
 | Id | Sév. | Titre |
 |---|---|---|
 | **E34-003** | **S1** | La production **affirme la certification Qualiopi** le jour même où un commit du dépôt écrit qu'elle **n'est pas délivrée** → **porté en `06_RESTE-WILL.md` §C bis, comme une question, pas comme une accusation** |
-| **E34-007** | **S1** | `qualiopi:isolation-check` est **ROUGE** (≥ 24 violations) — **et ne tourne nulle part**, tout en **affirmant dans son en-tête être câblé au pré-envoi**. *Douzième cas du patron `A-011`* |
+| **E34-007** | **S1** | **Les deux contrôles d'isolation du périmètre sont ROUGES — 47 et 24 violations, dont 11 fichiers du module planning — et aucun n'est câblé**, l'un affirmant pourtant dans son en-tête l'être. *Douzième cas du patron `A-011`*<br>✅ **Et l'agent refuse d'additionner les deux chiffres** : le **24** vient d'un contrôle **par marqueur textuel**, pas par symbole — il le rapporte comme **alerte à qualifier**, pas comme compte de fautes, et **ne l'ajoute pas au 47**. *Deux nombres de natures différentes ne se somment pas, même quand la somme serait plus impressionnante.* |
 | **E34-001** | **S1** | Le canal CRM a rendu **la suite du site rouge pendant 3 jours** et le hook de pré-envoi **infranchissable pour tout le monde** (la PR ajoute l'appel, le mock arrive **3 jours plus tard**) |
 | E34-005 | S2 | Suite **verte**, mais **54 % des tests ne s'exécutent pas en CI** — **12 710 sautés sur 23 435** |
 | E34-006 | S2 | Le verrou LF du 18/08 **n'a pas été appliqué à la copie de travail** : **4 877 fichiers portent encore des CR**, et **le test qu'il devait sauver rougit toujours** *(même défaut que `A-003`, à l'échelle de l'autre dépôt)* |
@@ -2531,6 +2531,11 @@ existante**. *C'est exactement celui qui a cassé.*
 2 nominatifs, **le filtre est dans la requête**, **la garde rejoue le `where` contre des fixtures**
 (*elle mesure le bon objet*), et les 4 écrans passent par un point d'entrée unique. **Les 8 lectures
 accessibles par jeton stagiaire ou formateur ont été passées au crible : toutes cloisonnées.**
+
+⚠️ **Un témoin qui a ÉCHOUÉ, et l'agent le dit plutôt que de conclure** : l'oracle de `E34-004` ne
+discrimine pas — **le témoin non gaté rend le même 404 que la page gatée**. L'état réel de
+`FACTURATION_HUB_ENABLED` en production reste donc **non vérifié**, et c'est écrit comme tel.
+*C'est exactement ce que la règle 3 demande : un contrôle qui ne sait pas distinguer ne prouve rien.*
 
 ⚠️ **Et une mesure de charge qui recoupe `H45-009`** : le poste est **≈40× plus lent** que le runner
 de CI (36 s par fichier de test). Les 4 rouges initiaux de l'agent étaient **des expirations à
@@ -2603,3 +2608,56 @@ d'édition concurrente (jouée sur `id=1`, inexistant — elle rendait `UPDATE 0
 raison**). Et son protocole du critère 17, écrit **en extension** des deux mesures de référence
 existantes, impose une **passe B de témoin séquentiel obligatoire** : *sans elle, un p95 dégradé ne
 prouve pas que la concurrence en est la cause.*
+
+---
+
+## Agent 39 — sauvegardes et observabilité : **une restauration réelle, et une date de saturation**
+**Rapport** : `11_GRILLES/agent-39_sauvegardes-observabilite.md` · **Preuves** : `04_PREUVES/agent-39/`
+**Aucune suppression, aucune restauration sur la production.**
+
+**Deuxième restauration réelle de l'audit, par un autre chemin que celle de l'agent 8** : l'archive
+`20260819T030001Z` **est restaurable et complète**, `companies` et `contacts` restaurées, **aucune
+erreur `function unaccent(text) does not exist`**. Et l'agent dit **ce que sa mesure ne prouve pas** :
+la copie **hors-site** n'a pas été vérifiée (la comparaison d'empreinte exigerait d'écrire en production).
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **F39-011** | **S1** | 🔴 **Le disque de production se remplit de 511 Mio/jour et sature vers le 6 octobre 2026** — **aucune garde ne regarde cette trajectoire** |
+| **F39-009** | **S1** | **Le RPO annoncé est faux d'un facteur 24** : « ≤ 1 h » au `Makefile` et au runbook, **24 h en réalité** (la sauvegarde est quotidienne — `dr-drill.sh` lui-même tolère 36 h). Et **la profondeur réelle est de 3 jours, pas 30** |
+| **F39-010** | **S1** | **Le script de restauration a pour cible par défaut la BASE DE PRODUCTION** |
+| **F39-006** | **S1** | Le DSN Sentry **est configuré en production**, mais **aucune exception non rattrapée ne lui parvient** : le branchement obligatoire du paquet **n'a pas été fait**. *Croisé avec `B16-006` : le contrôle d'intégrité du journal d'audit n'avertit personne, et voilà pourquoi* |
+| **F39-002** | **S2** | La surveillance des sauvegardes vérifie qu'un fichier **existe**, qu'il est **récent** et qu'il est **gros** — **jamais qu'il est restaurable**. *Treizième cas du patron `A-011`* |
+| **F39-007** | **S2** | **7 des 8 rubriques** du résumé d'observabilité **renvoient zéro en avalant l'exception** : *« rien à signaler » et « je n'ai pas pu regarder » y ont la même apparence* |
+| **F39-012** | **S2** | L'exercice de restauration compare un dump de 03:00 aux comptages **VIVANTS** de la production : **il rougira à tort le premier jour où la prospection tourne** |
+| F39-001, F39-003, F39-008 | S2 | Les 8 services d'observabilité et les 12 règles d'alerte **n'existent que dans le dépôt** · l'exercice de restauration **n'est déclenché par rien** · le runbook décrit **un dispositif qui n'existe pas** (S3, WAL streaming, Backblaze B2, PITR) |
+| F39-005 | S2 | Le correctif qui a rendu la sauvegarde restaurable repose sur **7 noms écrits en dur, sans garde** : **la huitième fonction rejouera la panne** *(confirme `B10-010`)* |
+
+⚠️ **Une nuance qui corrige la portée de `A-003`, et je la prends** : les trois scripts de sauvegarde
+de la **copie de travail** sont syntaxiquement invalides sous Linux — **mais ceux qui tournent en
+production ne le sont pas** (`F39-004`). *Le défaut est donc bien réel côté poste, et il ne menace pas
+la sauvegarde qui tourne.* C'est exactement la distinction que `A-003` devait porter et qu'il ne
+portait qu'à moitié.
+
+---
+
+## Agent 48 — aptitude au cahier des charges
+**Rapport** : `11_GRILLES/agent-48_aptitude-cdc.md` (604 l., les 26 chapitres en 3 colonnes)
+
+*(Son verdict par domaine est repris tel quel dans `07_RAPPORT-FINAL.md` — il en constitue l'ossature.)*
+
+| Id | Sév. | Titre |
+|---|---|---|
+| **I48-001** | **S0** | **Le CRM n'a aucune route pour créer une fiche personne** ; la modifier ou la supprimer rend **501** |
+| **I48-002** | **S1** | La recherche globale rend **une charge codée en dur** : le **critère 1** n'est pas « non mesuré », il est **NON TENU** — et `/search` est **déclaré deux fois** |
+| **I48-003** | **S1** | Une personne ne peut exister **ni sans organisation ni sans nom de famille** : deux `NOT NULL` **contre le principe 5** — *cause mécanique de `B13-002`* |
+| **I48-005** | **S1** | **Quinze objets du code contredisent la cible : ils devront être DÉFAITS, pas complétés** — et **six d'entre eux sont une seule question posée six fois** |
+| I48-004 | S1 | La **pièce 2 de l'étape 1a** est en base **sans route, sans contrôleur, ni écran** — et **se justifie par un critère (§29-2) qu'elle ne rend pas atteignable** |
+| I48-006 | S2 | `notifications` : **zéro écrivain, zéro lecteur, trois suppresseurs** — *et l'inventaire qui fixe l'ordre des pièces la déclare « vivante, 10 fichiers applicatifs »* |
+| I48-007 | S2 | **Le mot « console » désigne déjà autre chose que le §19** : le **critère 24 est perdu avant le premier écran de réglage** |
+| I48-008 | S2 | Le seul endroit où le produit **DÉPASSE** son périmètre → porté au dirigeant (`06_RESTE-WILL` §B2) |
+
+🔑 **Sa contribution la plus utile est la liste de ce qui va casser dans les mains du chantier**, dans
+l'ordre, chaque élément avec *la pièce de l'étape 1a qui s'y appuie*. Et son pendant, qu'un audit
+oublie toujours : **ce qui peut continuer sans attendre** — dont **cinq chapitres entiers en terrain
+vierge** (§4 questionnaires, §5 notation, §6 écran d'entretien, §14 documents, §16 après-vente),
+**0 contradiction à payer**, où l'on écrit directement la cible.

@@ -1,0 +1,4 @@
+{"id":"A","verdict":"AUCUN","outlineStyle":"none","outlineWidth":"3px","boxShadow":"none"}
+{"id":"B","verdict":"box-shadow","outlineStyle":"none","outlineWidth":"3px","boxShadow":"rgb(0, 0, 0) 0px 0px 0px 2px"}
+{"id":"C","verdict":"outline","outlineStyle":"auto","outlineWidth":"1px","boxShadow":"none"}
+temoin piege de focus (modale SANS piege) : [{"id":"derriere2","dansModale":false},{"id":"","dansModale":false},{"id":"derriere1","dansModale":false},{"id":"m1","dansModale":true}]

@@ -70,3 +70,100 @@ CREATE INDEX
 Time: 7920.850 ms (00:07.921)
 CREATE INDEX
 Time: 2447.060 ms (00:02.447)
+CREATE INDEX
+Time: 39440.946 ms (00:39.441)
+CREATE INDEX
+Time: 3817.792 ms (00:03.818)
+CREATE INDEX
+Time: 1018.742 ms (00:01.019)
+CREATE INDEX
+Time: 1502.860 ms (00:01.503)
+CREATE INDEX
+Time: 2509.068 ms (00:02.509)
+CREATE INDEX
+Time: 1475.544 ms (00:01.476)
+=== TOUR 3 (témoin) : insertion de 50 000 fiches AVEC les 27 index de nouveau ===
+                                                                        QUERY PLAN                                                                         
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Insert on companies  (cost=0.42..5164.85 rows=0 width=0) (actual rows=0 loops=1)
+   Buffers: shared hit=2543137 read=3305 dirtied=6849 written=4265
+   ->  Subquery Scan on "*SELECT*"  (cost=0.42..5164.85 rows=50000 width=2163) (actual rows=50000 loops=1)
+         Buffers: shared hit=50244 read=1247 dirtied=1
+         ->  Limit  (cost=0.42..4414.85 rows=50000 width=695) (actual rows=50000 loops=1)
+               Buffers: shared hit=244 read=1247
+               ->  WindowAgg  (cost=0.42..30901.42 rows=350000 width=695) (actual rows=50000 loops=1)
+                     Buffers: shared hit=244 read=1247
+                     ->  Index Scan using companies_pkey on companies companies_1  (cost=0.42..20401.42 rows=350000 width=647) (actual rows=50000 loops=1)
+                           Buffers: shared hit=244 read=1247
+ Planning:
+   Buffers: shared hit=158 read=6
+ Planning Time: 372.705 ms
+ Trigger for constraint companies_workspace_id_fkey: calls=50000
+ Execution Time: 195041.459 ms
+(15 rows)
+
+Time: 202743.632 ms (03:22.744)
+ count  
+--------
+ 400000
+(1 row)
+
+Time: 24690.298 ms (00:24.690)
+  tas  | index  
+-------+--------
+ 88 MB | 215 MB
+(1 row)
+
+Time: 423.602 ms
+Timing is on.
+ count  
+--------
+ 400000
+(1 row)
+
+Time: 375.377 ms
+DROP INDEX
+Time: 4888.741 ms (00:04.889)
+DROP INDEX
+Time: 1202.901 ms (00:01.203)
+DROP INDEX
+Time: 112.420 ms
+DROP INDEX
+Time: 1191.798 ms (00:01.192)
+DROP INDEX
+Time: 893.216 ms
+DROP INDEX
+Time: 191.088 ms
+DROP INDEX
+Time: 49.096 ms
+DROP INDEX
+Time: 595.239 ms
+DROP INDEX
+Time: 324.524 ms
+=== TOUR 4 (contre-temoin) : 50 000 insertions SANS les 9 index, sur une table ENCORE PLUS GROSSE que le tour 3 ===
+                                                                        QUERY PLAN                                                                         
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Insert on companies  (cost=0.42..5343.15 rows=0 width=0) (actual rows=0 loops=1)
+   Buffers: shared hit=1730484 read=1254 dirtied=5945 written=2932
+   ->  Subquery Scan on "*SELECT*"  (cost=0.42..5343.15 rows=50000 width=2163) (actual rows=50000 loops=1)
+         Buffers: shared hit=50348 read=1155 dirtied=1
+         ->  Limit  (cost=0.42..4593.15 rows=50000 width=695) (actual rows=50000 loops=1)
+               Buffers: shared hit=339 read=1152
+               ->  WindowAgg  (cost=0.42..36242.17 rows=394556 width=695) (actual rows=50000 loops=1)
+                     Buffers: shared hit=339 read=1152
+                     ->  Index Scan using companies_pkey on companies companies_1  (cost=0.42..24405.49 rows=394556 width=647) (actual rows=50000 loops=1)
+                           Buffers: shared hit=339 read=1152
+ Planning:
+   Buffers: shared hit=109 read=15 dirtied=7
+ Planning Time: 228.957 ms
+ Trigger for constraint companies_workspace_id_fkey: calls=50000
+ Execution Time: 66143.243 ms
+(15 rows)
+
+Time: 66714.357 ms (01:06.714)
+ count  
+--------
+ 450000
+(1 row)
+
+Time: 1599.840 ms (00:01.600)

@@ -1,0 +1,63 @@
+== 1. La porte a11y.yml, rejouee a l identique, puis avec des donnees ==
+   (tags de tests/e2e/a11y.spec.ts : wcag2a, wcag2aa, wcag22aa ; filtre : impact === "critical")
+
+  --- SANS API (etat exact du runner GitHub) ---
+   /login           #root vide=false | violations=1 regles / 1 noeuds | {"critical":0,"serious":1,"moderate":0,"minor":0}
+                    regles: target-size[serious]x1
+                    >>> LE TEST PASSE (il n assert que sur critical) — critical retenus : aucun
+   /companies       #root vide=false | violations=1 regles / 1 noeuds | {"critical":0,"serious":1,"moderate":0,"minor":0}
+                    regles: target-size[serious]x1
+                    >>> LE TEST PASSE (il n assert que sur critical) — critical retenus : aucun
+   /coverage        #root vide=false | violations=1 regles / 1 noeuds | {"critical":0,"serious":1,"moderate":0,"minor":0}
+                    regles: target-size[serious]x1
+                    >>> LE TEST PASSE (il n assert que sur critical) — critical retenus : aucun
+   /rgpd/requests   #root vide=false | violations=1 regles / 1 noeuds | {"critical":0,"serious":1,"moderate":0,"minor":0}
+                    regles: target-size[serious]x1
+                    >>> LE TEST PASSE (il n assert que sur critical) — critical retenus : aucun
+
+  --- AVEC 5 fiches servies sur /companies ---
+   /login           #root vide=false | violations=1 regles / 1 noeuds | {"critical":0,"serious":1,"moderate":0,"minor":0}
+                    regles: target-size[serious]x1
+                    >>> LE TEST PASSE (il n assert que sur critical) — critical retenus : aucun
+   /companies       #root vide=false | violations=6 regles / 30 noeuds | {"critical":14,"serious":16,"moderate":0,"minor":0}
+                    regles: aria-allowed-attr[critical]x6, aria-required-children[critical]x6, aria-required-parent[critical]x2, color-contrast[serious]x10, nested-interactive[serious]x5, target-size[serious]x1
+                    >>> LE TEST ECHOUE (il n assert que sur critical) — critical retenus : aria-allowed-attr, aria-required-children, aria-required-parent
+   /coverage        #root vide=false | violations=1 regles / 1 noeuds | {"critical":0,"serious":1,"moderate":0,"minor":0}
+                    regles: target-size[serious]x1
+                    >>> LE TEST PASSE (il n assert que sur critical) — critical retenus : aucun
+   /rgpd/requests   #root vide=false | violations=1 regles / 1 noeuds | {"critical":0,"serious":1,"moderate":0,"minor":0}
+                    regles: target-size[serious]x1
+                    >>> LE TEST PASSE (il n assert que sur critical) — critical retenus : aucun
+
+
+== 2. Champs de formulaire : nom accessible et sa provenance (37 ecrans) ==
+  login                  champs= 3 sansNomAccessible= 0 (dont 0 avec placeholder seul)
+  2fa                    champs= 1 sansNomAccessible= 0 (dont 0 avec placeholder seul)
+  magic-link             champs= 1 sansNomAccessible= 0 (dont 0 avec placeholder seul)
+  password-reset         champs= 1 sansNomAccessible= 0 (dont 0 avec placeholder seul)
+  companies              champs=16 sansNomAccessible= 1 (dont 1 avec placeholder seul)
+     -> <input type=text> placeholder="Rechercher une entreprise…" implicite=false premierEtiquetable=false
+  contacts               champs= 4 sansNomAccessible= 1 (dont 1 avec placeholder seul)
+     -> <input type=text> placeholder="Nom de famille…" implicite=false premierEtiquetable=false
+  media                  champs= 8 sansNomAccessible= 1 (dont 1 avec placeholder seul)
+     -> <input type=text> placeholder="Rechercher un média…" implicite=false premierEtiquetable=false
+  journalists            champs= 1 sansNomAccessible= 1 (dont 1 avec placeholder seul)
+     -> <input type=text> placeholder="Rechercher par nom…" implicite=false premierEtiquetable=false
+  scraper-runs           champs= 1 sansNomAccessible= 1 (dont 1 avec placeholder seul)
+     -> <input type=text> placeholder="Rechercher source, dept, id…" implicite=false premierEtiquetable=false
+  audit-logs             champs= 2 sansNomAccessible= 1 (dont 1 avec placeholder seul)
+     -> <input type=text> placeholder="Événement, chemin, IP, acteur…" implicite=false premierEtiquetable=false
+  campaigns              champs= 1 sansNomAccessible= 1 (dont 1 avec placeholder seul)
+     -> <input type=text> placeholder="Rechercher par nom…" implicite=false premierEtiquetable=false
+  campaigns-new          champs= 2 sansNomAccessible= 0 (dont 0 avec placeholder seul)
+  audiences-new          champs= 5 sansNomAccessible= 0 (dont 0 avec placeholder seul)
+
+  TOTAL (etat SANS API) : 46 champs rendus, 7 SANS nom accessible, dont 7 n'ont qu'un placeholder.
+
+  -- TEMOIN de la sonde de libelle --
+     a -> nom=OUI (explicite=true implicite=false premier=false aria=null)
+     b -> nom=OUI (explicite=false implicite=true premier=true aria=null)
+     c -> nom=NON (explicite=false implicite=true premier=false aria=null)
+     d -> nom=NON (explicite=false implicite=false premier=false aria=null)
+     e -> nom=OUI (explicite=false implicite=false premier=false aria=E aria-label)
+     attendu : a=OUI b=OUI c=NON d=NON e=OUI

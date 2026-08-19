@@ -1,0 +1,1679 @@
+[
+ {
+  "nom": "login",
+  "url": "/login",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": false,
+  "total": 1,
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [],
+  "tailleDom": 60
+ },
+ {
+  "nom": "2fa",
+  "url": "/2fa",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": false,
+  "total": 0,
+  "parImpact": {
+   "critical": 0,
+   "serious": 0,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [],
+  "contrastes": [],
+  "tailleDom": 41
+ },
+ {
+  "nom": "magic-link",
+  "url": "/magic-link",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": false,
+  "total": 0,
+  "parImpact": {
+   "critical": 0,
+   "serious": 0,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [],
+  "contrastes": [],
+  "tailleDom": 45
+ },
+ {
+  "nom": "password-reset",
+  "url": "/password-reset",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": false,
+  "total": 0,
+  "parImpact": {
+   "critical": 0,
+   "serious": 0,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [],
+  "contrastes": [],
+  "tailleDom": 45
+ },
+ {
+  "nom": "dashboard",
+  "url": "/",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 4,
+  "parImpact": {
+   "critical": 0,
+   "serious": 4,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 3,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   },
+   {
+    "cible": ".border-2 > p",
+    "fg": "#45556c",
+    "bg": "#13161a",
+    "ratio": 2.39,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   }
+  ],
+  "tailleDom": 323
+ },
+ {
+  "nom": "companies",
+  "url": "/companies",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 3,
+  "parImpact": {
+   "critical": 0,
+   "serious": 3,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 2,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 449
+ },
+ {
+  "nom": "companies-$id",
+  "url": "/companies/1",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 3,
+  "parImpact": {
+   "critical": 0,
+   "serious": 3,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 2,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 313
+ },
+ {
+  "nom": "contacts",
+  "url": "/contacts",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 3,
+  "parImpact": {
+   "critical": 0,
+   "serious": 3,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 2,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 340
+ },
+ {
+  "nom": "roumanie",
+  "url": "/international/roumanie",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 3,
+  "parImpact": {
+   "critical": 0,
+   "serious": 3,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 2,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 325
+ },
+ {
+  "nom": "media",
+  "url": "/media",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 4,
+  "parImpact": {
+   "critical": 0,
+   "serious": 4,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 3,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   },
+   {
+    "cible": ".transition-shadow",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   }
+  ],
+  "tailleDom": 387
+ },
+ {
+  "nom": "media-$id",
+  "url": "/media/1",
+  "mode": "sombre",
+  "erreur": "TimeoutError: page.goto: Timeout 25000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:4188/media/1\", waiting until \"networkidle\"\u001b[22m\n",
+  "htmlDark": null,
+  "total": 0,
+  "parImpact": {
+   "critical": 0,
+   "serious": 0,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [],
+  "contrastes": []
+ },
+ {
+  "nom": "journalists",
+  "url": "/journalists",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 4,
+  "parImpact": {
+   "critical": 0,
+   "serious": 4,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 3,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   },
+   {
+    "cible": ".transition-shadow",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   }
+  ],
+  "tailleDom": 340
+ },
+ {
+  "nom": "coverage",
+  "url": "/coverage",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 7,
+  "parImpact": {
+   "critical": 0,
+   "serious": 7,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 6,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   },
+   {
+    "cible": ".px-2\\.5.px-3\\.5.hover\\:text-slate-900:nth-child(1)",
+    "fg": "#45556c",
+    "bg": "#13161a",
+    "ratio": 2.39,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   },
+   {
+    "cible": ".px-2\\.5.px-3\\.5.hover\\:text-slate-900:nth-child(3)",
+    "fg": "#45556c",
+    "bg": "#13161a",
+    "ratio": 2.39,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   },
+   {
+    "cible": ".mb-1.text-slate-600.text-sm",
+    "fg": "#45556c",
+    "bg": "#0c1014",
+    "ratio": 2.51,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": ".text-center > p",
+    "fg": "#62748e",
+    "bg": "#0c1014",
+    "ratio": 4,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 383
+ },
+ {
+  "nom": "scraper-runs",
+  "url": "/scraper-runs",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 3,
+  "parImpact": {
+   "critical": 0,
+   "serious": 3,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 2,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 433
+ },
+ {
+  "nom": "llm-router",
+  "url": "/llm/router",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 3,
+  "parImpact": {
+   "critical": 0,
+   "serious": 3,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 2,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 341
+ },
+ {
+  "nom": "llm-proxy-providers",
+  "url": "/llm/proxy-providers",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 3,
+  "parImpact": {
+   "critical": 0,
+   "serious": 3,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 2,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 315
+ },
+ {
+  "nom": "llm-rotations",
+  "url": "/llm/rotations",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 3,
+  "parImpact": {
+   "critical": 0,
+   "serious": 3,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 2,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 316
+ },
+ {
+  "nom": "rgpd-requests",
+  "url": "/rgpd/requests",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 3,
+  "parImpact": {
+   "critical": 0,
+   "serious": 3,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 2,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 331
+ },
+ {
+  "nom": "rgpd-ai-act",
+  "url": "/rgpd/ai-act",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 3,
+  "parImpact": {
+   "critical": 0,
+   "serious": 3,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 2,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 362
+ },
+ {
+  "nom": "audit-logs",
+  "url": "/audit-logs",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 3,
+  "parImpact": {
+   "critical": 0,
+   "serious": 3,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 2,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 336
+ },
+ {
+  "nom": "users",
+  "url": "/users",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 3,
+  "parImpact": {
+   "critical": 0,
+   "serious": 3,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 2,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 320
+ },
+ {
+  "nom": "settings",
+  "url": "/settings",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 4,
+  "parImpact": {
+   "critical": 0,
+   "serious": 4,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 3,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   },
+   {
+    "cible": ".rounded-2xl > p",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   }
+  ],
+  "tailleDom": 340
+ },
+ {
+  "nom": "campaigns",
+  "url": "/campaigns",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 3,
+  "parImpact": {
+   "critical": 0,
+   "serious": 3,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 2,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 392
+ },
+ {
+  "nom": "campaigns-new",
+  "url": "/campaigns/new",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 3,
+  "parImpact": {
+   "critical": 0,
+   "serious": 3,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 2,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 362
+ },
+ {
+  "nom": "campaigns-$id",
+  "url": "/campaigns/1",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 3,
+  "parImpact": {
+   "critical": 0,
+   "serious": 3,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 2,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 308
+ },
+ {
+  "nom": "tags",
+  "url": "/tags",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 3,
+  "parImpact": {
+   "critical": 0,
+   "serious": 3,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 2,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 340
+ },
+ {
+  "nom": "audiences",
+  "url": "/audiences",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 3,
+  "parImpact": {
+   "critical": 0,
+   "serious": 3,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 2,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 361
+ },
+ {
+  "nom": "audiences-new",
+  "url": "/audiences/new",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 5,
+  "parImpact": {
+   "critical": 0,
+   "serious": 5,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 4,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   },
+   {
+    "cible": ".bg-sky-500 > .opacity-70.font-mono.text-\\[10px\\]",
+    "fg": "#b3e4fc",
+    "bg": "#00a6f4",
+    "ratio": 1.98,
+    "attendu": "4.5:1",
+    "taille": "7.5pt (10px)"
+   },
+   {
+    "cible": ".bg-sky-500 > span:nth-child(2)",
+    "fg": "#ffffff",
+    "bg": "#00a6f4",
+    "ratio": 2.7,
+    "attendu": "4.5:1",
+    "taille": "8.3pt (11px)"
+   }
+  ],
+  "tailleDom": 572
+ },
+ {
+  "nom": "audiences-$id",
+  "url": "/audiences/1",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 3,
+  "parImpact": {
+   "critical": 0,
+   "serious": 3,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 2,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 308
+ },
+ {
+  "nom": "admin-observability",
+  "url": "/admin/observability",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 3,
+  "parImpact": {
+   "critical": 0,
+   "serious": 3,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 2,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 305
+ },
+ {
+  "nom": "console-contacts",
+  "url": "/console/contacts",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 4,
+  "parImpact": {
+   "critical": 0,
+   "serious": 4,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 3,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   },
+   {
+    "cible": "p",
+    "fg": "#45556c",
+    "bg": "#13161a",
+    "ratio": 2.39,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   }
+  ],
+  "tailleDom": 308
+ },
+ {
+  "nom": "console-vivier",
+  "url": "/console/vivier",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 4,
+  "parImpact": {
+   "critical": 0,
+   "serious": 4,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 3,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   },
+   {
+    "cible": "p",
+    "fg": "#45556c",
+    "bg": "#13161a",
+    "ratio": 2.39,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   }
+  ],
+  "tailleDom": 308
+ },
+ {
+  "nom": "console-arbitrage",
+  "url": "/console/arbitrage",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 4,
+  "parImpact": {
+   "critical": 0,
+   "serious": 4,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 3,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   },
+   {
+    "cible": "p",
+    "fg": "#45556c",
+    "bg": "#13161a",
+    "ratio": 2.39,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   }
+  ],
+  "tailleDom": 308
+ },
+ {
+  "nom": "console-personnes-$k",
+  "url": "/console/personnes/abc",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 4,
+  "parImpact": {
+   "critical": 0,
+   "serious": 4,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 3,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   },
+   {
+    "cible": "p",
+    "fg": "#45556c",
+    "bg": "#13161a",
+    "ratio": 2.39,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   }
+  ],
+  "tailleDom": 311
+ },
+ {
+  "nom": "cold-email",
+  "url": "/cold-email",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 3,
+  "parImpact": {
+   "critical": 0,
+   "serious": 3,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 2,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 308
+ },
+ {
+  "nom": "linkedin",
+  "url": "/linkedin",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": true,
+  "total": 3,
+  "parImpact": {
+   "critical": 0,
+   "serious": 3,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "noeuds": 2,
+    "aide": "Elements must meet minimum color contrast ratio thresholds"
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "noeuds": 1,
+    "aide": "All touch targets must be 24px large, or leave sufficient space"
+   }
+  ],
+  "contrastes": [
+   {
+    "cible": ".border-slate-300 > span:nth-child(2)",
+    "fg": "#62748e",
+    "bg": "#13161a",
+    "ratio": 3.8,
+    "attendu": "4.5:1",
+    "taille": "10.5pt (14px)"
+   },
+   {
+    "cible": "kbd",
+    "fg": "#45556c",
+    "bg": "#314158",
+    "ratio": 1.36,
+    "attendu": "4.5:1",
+    "taille": "9.0pt (12px)"
+   }
+  ],
+  "tailleDom": 308
+ },
+ {
+  "nom": "404",
+  "url": "/route-qui-nexiste-pas",
+  "mode": "sombre",
+  "erreur": null,
+  "htmlDark": false,
+  "total": 0,
+  "parImpact": {
+   "critical": 0,
+   "serious": 0,
+   "moderate": 0,
+   "minor": 0
+  },
+  "regles": [],
+  "contrastes": [],
+  "tailleDom": 19
+ }
+]

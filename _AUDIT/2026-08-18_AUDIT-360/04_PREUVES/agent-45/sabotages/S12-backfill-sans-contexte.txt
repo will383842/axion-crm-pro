@@ -1,0 +1,22 @@
+######## SABOTAGE S12-backfill-sans-contexte
+######## FICHIER SABOTE : app/Console/Commands/ScrapingBackfillSrcTags.php
+######## DATE : 2026-08-19T12:57:27Z
+######## DIFF APPLIQUE (preuve que le sabotage a atterri) ########
+--- /var/www/html.orig/app/Console/Commands/ScrapingBackfillSrcTags.php
++++ /var/www/html/app/Console/Commands/ScrapingBackfillSrcTags.php
+@@ -95,7 +95,8 @@
+      */
+     private function backfillWorkspace(string $workspaceId, array $sources, int $chunk, int $sleep, bool $dryRun): void
+     {
+-        WorkspaceContext::run($workspaceId, function () use ($workspaceId, $sources, $chunk, $sleep, $dryRun): void {
++        // SABOTAGE A45 : le vrai appel WorkspaceContext::run( a disparu, seul le commentaire le mentionne encore.
++        (function () use ($workspaceId, $sources, $chunk, $sleep, $dryRun): void {
+             $this->backfillWorkspaceScoped($workspaceId, $sources, $chunk, $sleep, $dryRun);
+         });
+     }
+  ⨯ POST /coverage/launch accepte body valide                            0.83s  
+   FAILED  Tests\Feature\Controllers\CoverageControllerTest > POST /coverage…   
+  Tests:    1 failed, 1 skipped, 778 passed (6492 assertions)
+######## CODE PEST : 1 ########
+######## RESTAURATION ########
+RESTAURE-IDENTIQUE: app/Console/Commands/ScrapingBackfillSrcTags.php

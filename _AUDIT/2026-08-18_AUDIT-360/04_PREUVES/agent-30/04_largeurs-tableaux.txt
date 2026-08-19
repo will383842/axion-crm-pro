@@ -1,0 +1,23 @@
+AGENT 30 — largeur MINIMALE reelle des 9 tableaux « grille role=row », mesuree dans le navigateur a 375 px
+Methode : on injecte dans <main> le patron EXACT du produit (Card padding=none overflow-hidden
+          + div role=row avec la chaine sticky de 210 car. + le gridTemplateColumns du fichier),
+          puis on lit scrollWidth. Aucun fichier du produit n est modifie.
+Ecran de reference : 375 px ; <main> a px-4 => 343 px utiles ; <Card> => 343 px.
+
+ecran                   source                      largeur mini  visible  hors ecran  facteur
+/companies              CompanyRow.tsx:32                 858px     343px       515px     x2.5
+/contacts               ContactsListPage.tsx:58          1046px     343px       703px     x3.0
+/llm/router             LlmRouterPage.tsx:53              936px     343px       593px     x2.7
+/llm/proxy-providers    ProxyProvidersPage.tsx:34         968px     343px       625px     x2.8
+/llm/rotations          RotationsPage.tsx:35              718px     343px       375px     x2.1
+/rgpd/ai-act            AiActRegisterPage.tsx:50          986px     343px       643px     x2.9
+/audit-logs             AuditLogsPage.tsx:45             1088px     343px       745px     x3.2
+/rgpd/requests          RgpdRequestsPage.tsx:64          1086px     343px       743px     x3.2
+/users                  UsersPage.tsx:37                 1004px     343px       661px     x2.9
+
+overflow-x du conteneur <Card> : hidden   overflow-x de <main> : hidden
+=> aucun de ces conteneurs n est defilable par l utilisateur (ni barre, ni geste tactile) :
+   le contenu au-dela de 343 px est INATTEIGNABLE sur telephone.
+
+TEMOIN : le meme patron avec un conteneur overflow-x-auto (cf. 02_barre-tableaux-temoins.txt, SONDE B)
+         rend defilableParUtilisateur=true. Le controle sait donc distinguer les deux issues.

@@ -1,7 +1,11 @@
 # AGENT 35 — Auditeur d'authentification
 
-**Référence mesurée** : `main = e8924b81ad64c0b236acd99ac5cbac4cd68eada7` (`e8924b8`), relue par
-`git rev-parse HEAD` au début **et** en fin de session — identique. Aucune PR n'a été ouverte.
+**Référence mesurée** : `main = e8924b81ad64c0b236acd99ac5cbac4cd68eada7` (`e8924b8`).
+⚠️ **`HEAD` a bougé pendant ma session** — relu en fin de session : `7be3753`, puis `d95de24`
+(7 commits de l'audit lui-même). **Vérifié** : `git diff --name-only e8924b8..HEAD -- backend/
+frontend/ infra/ workers/` ne rend qu'un seul fichier, `infra/scripts/verifier-serveur-http.sh`,
+**neuf et hors de mon périmètre**. **Aucun fichier de mon périmètre n'a bougé** : tous mes
+constats restent valides sur `d95de24`. Aucune PR n'a été ouverte par moi.
 **Atelier** : conteneur **dédié** `a35-api` (image `axion-crm-pro-api`, réseau `axion-crm`,
 port 58135), bases **dédiées** `axion_crm_a35` et `axion_crm_test_a35`. Aucun conteneur ni
 aucune base partagée avec les autres agents n'a été muté.
@@ -50,7 +54,7 @@ Légende : ✅ conforme · ⚠️ défaut · 🔴 grave · ⬜ non vérifié (ra
 | 29 | `OwnerUserSeeder` (chemin d'identifiant) | oui | mot de passe généré **en clair** sur disque, **sans chmod**, + sur la sortie standard | lecture + fichier présent | ⚠️ | F35-008 |
 | 30 | `LoginRequest` | oui | `Password::min(12)` appliqué **à la connexion** | lecture + test du dépôt | ⚠️ | F35-011 |
 | 31 | `GET /api/v1/users` | oui | `select` d'une colonne inexistante `two_factor_enabled` | lecture + schéma joué | 🔴 | F35-002 |
-| 32 | A-001 rejoué **en production** | — | **non joué** — refus d'outillage + consigne « aucune tentative d'authentification » | ⬜ | ⬜ | §5 |
+| 32 | A-001 rejoué **en production** | — | **non joué par moi** ; joué par un autre agent, **même résultat** (500 sans `Accept`, 401 avec) | preuve d'un tiers | 🔴 | F35-001, §5 |
 | 33 | Parcours navigateur réel (Chrome) sur `/login` | — | **non joué** — l'atelier partagé ne répondait plus en HTTP | ⬜ | ⬜ | §5 |
 | 34 | Matrice A-001 à 5 profils de client | — | 500 pour navigateur / curl / sans `Accept` ; **401** pour JSON et SPA | **joué** (témoin d'en-têtes d'abord) | 🔴 | F35-001 |
 | 35 | Correctif A-001 prouvé à 4 états | — | (0)=500 · (1) seul=500 · (2) seul=500 · **(3) les deux=401** | **joué** | 🔴 | F35-001 |
@@ -233,8 +237,21 @@ réduit mécaniquement A-007.
 
 ## 3. Constats
 
-### [F35-001] Toute route `auth:sanctum` répond 500 au lieu de 401 à tout client qui n'attend pas du JSON
-- Sévérité      : S1
+**Positionnement par rapport à ce qui existe déjà** — vérifié en fin de session contre
+`02_CONSTATS.md` et `02bis_P2-CONSOLIDATION.md` sur `d95de24`, pour ne rien compter deux fois :
+
+| Constat | Statut vis-à-vis de l'existant |
+|---|---|
+| F35-001 | **complète A-001** (déjà trouvé, déjà abaissé à S2) : j'y ajoute la cause exacte, le correctif prouvé à 4 états, et le coût en journal |
+| F35-002 | **confirme A07-001** (S0, déjà porté) par un chemin indépendant, **et l'étend** : `GET /api/v1/users` casse pour la même raison |
+| F35-003 · F35-004 · F35-005 · F35-006 · F35-007 · F35-008 · F35-009 · F35-010 · F35-011 · F35-012 · F35-013 · F35-014 | **nouveaux** — aucune occurrence de `2fa_passed_at`, `HibpChecker`, `diffInMinutes`, `argv`, `owner-initial-password`, `sanctum.expiration`, `Password::min(12)`, `locked_until` ni `magic_links` dans les constats consolidés |
+
+Les mentions existantes de « fail-open » portent sur le **HMAC** (`F37-001`), pas sur HIBP :
+F35-004 est bien un second fail-open, sur un autre chemin.
+
+### [F35-001] A-001 : la cause exacte, le correctif en deux lignes, et son coût caché en journal
+- Sévérité      : S2 *(alignée sur A-001, abaissée de S1 à S2 par la consolidation — mon
+  périmètre confirme cette sévérité : le SPA n'est pas touché)*
 - Domaine       : backend / sécurité
 - Référence     : main e8924b8
 - Emplacement   : `backend/bootstrap/app.php:44` (bloc `withExceptions` vide) et `backend/routes/web.php` (aucune route nommée `login`)
@@ -244,20 +261,20 @@ réduit mécaniquement A-007.
 - Impact        : tout client non-navigateur (supervision, client machine, futur client mobile, `curl`, Postman) reçoit « le serveur est cassé » là où la vérité est « vous n'êtes pas connecté ». Corollaire mesuré : **8 475 octets** de journal par requête, qui alimentent A-007.
 - Reproduction  : `curl -s -o /dev/null -w '%{http_code}' -H 'Accept: text/html' http://<api>/api/v1/auth/me` → 500 ; avec `-H 'Accept: application/json'` → 401.
 - Correctif     : deux lignes dans `bootstrap/app.php` (`$middleware->redirectGuestsTo(fn () => null);` **et** `$exceptions->shouldRenderJsonWhen(fn ($r, $e) => $r->is('api/*') || $r->expectsJson());`) + le test ci-dessus. Coût : < 1 h, correction P3.
-- Statut        : ouvert (approfondit A-001 : en donne la cause exacte, l'étendue réelle, et la limite — le SPA n'est pas touché)
+- Statut        : ouvert — **complète A-001, ne le redécouvre pas.** L'étendue (500 sans `Accept`, 401 avec) avait déjà été trouvée et corrigée par la consolidation, qui a abaissé A-001 à S2. Ce que j'apporte, et qui n'y figurait pas : **(a)** la cause exacte, frame par frame, et le fait qu'elle vient d'un rappel posé **par le framework lui-même** (`ApplicationBuilder::withMiddleware()` l.278), pas d'un oubli du produit ; **(b)** le correctif en **deux** lignes, avec la démonstration à quatre états qu'**aucune des deux ne suffit seule** ; **(c)** le coût caché : **8 475 octets de journal par requête refusée**, contributeur direct de A-007.
 
-### [F35-002] Trois colonnes de la 2FA n'existent dans aucune migration : l'enrôlement est impossible, et `EnforceFirstLoginSetup` verrouille alors le produit entier
-- Sévérité      : **S0**
+### [F35-002] ⚠️ **CONFIRMATION INDÉPENDANTE de A07-001**, plus un second chemin de rupture que personne n'avait relevé : `GET /api/v1/users`
+- Sévérité      : **S0** *(celle de A07-001 ; je ne rouvre pas le constat, je le confirme et je l'étends)*
 - Domaine       : backend / sécurité / conformité
 - Référence     : main e8924b8
 - Emplacement   : `backend/app/Services/Auth/TwoFactorService.php:29,47,65-67,76-90` · `backend/app/Models/User.php:51-52,73-76` · `backend/app/Http/Controllers/Api/UsersController.php:33` · `backend/database/migrations/2026_05_16_000002_create_auth_tenant_audit_schema.php:52`
-- Constat       : la table `users` porte `totp_secret`, `totp_enabled_at` et `totp_recovery_codes` ; le modèle et le service écrivent `two_factor_secret`, `two_factor_enabled` et `two_factor_recovery_codes`, qui n'apparaissent dans **aucune** des 58 migrations.
+- Constat       : la table `users` porte `totp_secret`, `totp_enabled_at` et `totp_recovery_codes` ; le modèle et le service écrivent `two_factor_secret`, `two_factor_enabled` et `two_factor_recovery_codes`, qui n'apparaissent dans **aucune** des 58 migrations. **Ce fait est déjà porté par A07-001 (S0)** — je l'ai atteint indépendamment, par mon propre chemin, et je le confirme. **Ce que j'ajoute** : la même dérive casse un **second** point du produit, hors 2FA — `UsersController.php:33` fait un `select` de `two_factor_enabled`, donc `GET /api/v1/users` échoue pour la même raison. Ce chemin-là n'est pas dans A07-001, qui ne rapporte sur ce contrôleur que les 501 de `store/update/destroy`.
 - Preuve        : `04_PREUVES/agent-35/f35-002-colonnes-2fa.txt` — colonnes réelles d'une base migrée à neuf, `grep` du code, et la panne relevée en base réelle : `SQLSTATE[42703] Undefined column: column "two_factor_secret" of relation "users" does not exist`, pile `#7 app/Services/Auth/TwoFactorService.php(30)`.
 - Témoin négatif: le **même** `grep`, dans le **même** dossier `database/migrations/`, trouve bien `totp_secret` (fichier `2026_05_16_000002`, l.52). La recherche sait donc voir une colonne quand elle existe : c'est bien `two_factor_*` qui est absent.
 - Impact        : `POST /auth/2fa/setup` et `POST /auth/2fa/confirm` échouent. Or `confirmEnrolment()` est le **seul** endroit de tout `app/` qui pose `first_login_completed_at` (vérifié par `grep`), et `EnforceFirstLoginSetup` renvoie **403 `first_login_required`** sur toute route hors liste blanche tant que ce champ est nul. Un compte neuf ne peut donc **jamais** franchir le premier login : il tourne indéfiniment entre `/auth/me`, `/auth/logout` et trois routes 2FA qui échouent. En prime, `GET /api/v1/users` `select` la colonne inexistante `two_factor_enabled` et casse pour la même raison.
 - Reproduction  : base migrée à neuf ; créer un utilisateur avec `first_login_completed_at = null` ; se connecter ; appeler `POST /api/v1/auth/2fa/setup` ; puis `GET /api/v1/contacts`.
 - Correctif     : une migration qui **renomme** les trois colonnes du code vers celles de la base (`two_factor_secret` → `totp_secret`, `two_factor_recovery_codes` → `totp_recovery_codes`) et ajoute `two_factor_enabled` **ou**, mieux, aligner le code sur le schéma (3 fichiers : `TwoFactorService`, `User`, `UsersController`) — le schéma est cohérent, c'est le code qui a dérivé. Ajouter un test qui joue l'enrôlement de bout en bout. Coût : 2-3 h.
-- Statut        : ouvert
+- Statut        : ouvert — **à fusionner avec A07-001**, dont il ne faut pas gonfler le compte. Ma contribution propre se réduit à deux choses : la **troisième mesure indépendante** du même défaut (par un autre agent, un autre atelier, une autre méthode), et le **second chemin de rupture** `GET /api/v1/users`.
 
 ### [F35-003] La double authentification n'est jamais exigée par le serveur : `2fa_passed_at` est écrit et jamais relu
 - Sévérité      : S1
@@ -420,17 +437,19 @@ réduit mécaniquement A-007.
 
 ## 4. Le produit a-t-il jamais été utilisable ?
 
-**Non. Et A-001 n'y est pour rien.**
+**Non. Et A-001 n'y est pour rien** — ma mesure le montre : le SPA reçoit un **401 propre**,
+pas un 500. Le 500 ne touche que les clients qui n'annoncent pas attendre du JSON.
 
-Le fait de départ est celui du dossier : en production, 1 utilisateur, **0 session, 0 jeton**,
-depuis le 2026-05-17. Trois causes ont été avancées jusqu'ici — mot de passe initial perdu
-dans un journal, `MAIL_MAILER=log` qui empêche tout envoi, et A-001. Les deux premières
-expliquent qu'on ne puisse pas **entrer**. Elles sont réparables en une commande, et le
-script `definir-mot-de-passe-crm.sh` du 19/08 les répare précisément.
+⚠️ **La réponse à cette question était déjà trouvée quand je suis arrivé** : c'est
+**A07-001**, croisé avec **A-012**. Je ne la revendique pas. Ce que j'apporte, c'est une
+**vérification indépendante** — atelier différent, méthode différente, chemin différent —
+et un **second chemin de rupture** que personne n'avait relevé.
 
-La mesure en ajoute une quatrième, que personne n'avait vue, et qui n'est pas réparable par
-un mot de passe : **même avec des identifiants valides, un compte neuf ne peut pas franchir
-le premier login** (F35-002).
+Le fait de départ : en production, 1 utilisateur, **0 session, 0 jeton**, depuis le
+2026-05-17. Mot de passe initial perdu dans un journal, `MAIL_MAILER=log` qui empêche tout
+envoi : ces deux causes expliquent qu'on ne puisse pas **entrer**, et le script
+`definir-mot-de-passe-crm.sh` du 19/08 les répare. Mais **même avec des identifiants
+valides, un compte neuf ne peut pas franchir le premier login**.
 
 La chaîne est fermée, et chaque maillon est mesuré :
 
@@ -444,8 +463,14 @@ La chaîne est fermée, et chaque maillon est mesuré :
 4. Donc `POST /auth/2fa/setup` et `POST /auth/2fa/confirm` échouent, `first_login_completed_at`
    reste nul, et **toutes** les routes métier renvoient 403 `first_login_required`,
    indéfiniment.
-5. Confirmation indépendante par un autre chemin : `GET /api/v1/users` casse sur la même
-   colonne absente (`UsersController:33`).
+5. **Ce que j'ajoute** : la même dérive de schéma casse un **second** point du produit,
+   hors 2FA. `UsersController.php:33` fait `->select([... 'two_factor_enabled' ...])`, et
+   la requête échoue en SQL — joué :
+   `ERROR: column "two_factor_enabled" does not exist`, avec pour témoin négatif la même
+   requête privée de cette seule colonne, qui s'exécute sans erreur. **`GET /api/v1/users`
+   est donc cassé pour la même raison**, et ce chemin n'est dans aucun constat existant.
+   Il compte : c'est l'écran de gestion des utilisateurs — celui par lequel le propriétaire
+   inviterait quelqu'un d'autre.
 
 Autrement dit : le mot de passe rend l'**entrée**, il ne rend pas l'**usage**. Le CRM n'a
 jamais été franchissable au-delà de son écran de première configuration — ce qui explique
@@ -453,26 +478,40 @@ aussi, sans contradiction, pourquoi personne n'a jamais signalé le 403 : person
 jamais allé assez loin pour le voir.
 
 **Conséquence pour le chantier.** Le geste « rendre l'accès » n'est pas terminé avec
-`definir-mot-de-passe-crm.sh`. Il manque **F35-002** — et c'est un préalable à la §11 du
-prompt d'audit (ouvrir les 37 écrans à la main dans un vrai navigateur) : sans lui, tout
-écran autre que la 2FA rendra 403. Ordre suggéré : F35-002 d'abord, F35-001 ensuite,
-F35-003 dans la foulée.
+`definir-mot-de-passe-crm.sh` : il rend le mot de passe, pas l'usage. Ordre suggéré, du
+bloquant au gênant : **A07-001** (les colonnes, plus `UsersController:33`) d'abord — c'est
+le préalable à la §11 du prompt d'audit, ouvrir les 37 écrans dans un vrai navigateur ;
+puis **F35-003** (la 2FA n'est exigée par personne), qui deviendra visible dès que
+l'enrôlement marchera ; puis **F35-001** et **F35-005**.
+
+Et une remarque qui vaut pour tout le chantier : **le CRM n'a jamais été franchissable
+au-delà de son écran de première configuration.** Cela explique, sans contradiction,
+pourquoi personne n'a jamais signalé le 403 — personne n'est jamais allé assez loin pour
+le voir. Un produit que personne n'utilise ne produit aucun signalement : l'absence de
+plainte n'a jamais été une preuve de bon fonctionnement, et ici elle en était l'exact
+contraire.
 
 ---
 
 ## 5. Ce que je n'ai PAS pu vérifier, et pourquoi
 
-1. **A-001 rejoué contre la production.** Deux raisons cumulées, et j'ai préféré m'arrêter
-   plutôt que contourner : (a) la consigne « aucune tentative d'authentification contre la
-   production » — une requête sans identifiant n'en est pas une, mais le doute n'est pas à
-   moi de le trancher ; (b) l'outillage a refusé l'appel `curl` vers
-   `api.axion-crm-pro.com`. Ce que je peux affirmer sans l'avoir joué : la cause est
-   **identique** en production, puisqu'elle tient à deux fichiers non conditionnés par
-   l'environnement (`bootstrap/app.php` et `routes/web.php`) et à une version de framework
-   figée par `composer.lock`. L'étendue mesurée localement (500 pour tout client non-JSON,
-   401 pour le SPA) se transpose donc telle quelle. **Un agent autorisé devrait la confirmer
-   par deux `GET` sans identifiant** — en sachant que chacun coûtera 8 475 octets au journal
-   de 265 Mo.
+1. **A-001 rejoué contre la production — par moi, non.** Deux raisons cumulées : (a) la
+   consigne « aucune tentative d'authentification contre la production » — une requête sans
+   identifiant n'en est pas une, mais le doute n'était pas à moi de le trancher ;
+   (b) l'outillage a refusé l'appel `curl` vers `api.axion-crm-pro.com`.
+   **Le manque est comblé par un autre agent**, dont la sortie brute est archivée dans
+   `04_PREUVES/P0/a001-recontrole.txt` et `prod-401-vs-500.txt` :
+   ```
+   PRODUCTION, sans en-tete Accept :        PRODUCTION, avec Accept: application/json :
+     /api/v1/crm/arbitrage    -> 500          /api/v1/crm/arbitrage    -> 401
+     /api/v1/config/features  -> 500          /api/v1/config/features  -> 401
+     /api/v1/contacts         -> 500          /api/v1/contacts         -> 401
+   ```
+   **Cette mesure de production et la mienne, faite en local et indépendamment, donnent le
+   même résultat au code près.** C'est le meilleur contrôle que je pouvais espérer : deux
+   agents, deux environnements, deux méthodes (HTTPS réel *vs* noyau HTTP), même verdict.
+   Ce qui reste non joué de mon côté est le **correctif** appliqué en production — normal,
+   la correction est P3.
 2. 🔴 **L'essentiel de ce que je voulais REJOUER n'a pas pu l'être : l'atelier n'a pas tenu.**
    C'est le manque le plus important de ce rapport, et il faut le dire net.
    - Le conteneur partagé `axion-crm-api` ne répondait plus en HTTP pendant toute ma

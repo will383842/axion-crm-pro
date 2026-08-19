@@ -1,0 +1,62 @@
+
+== /companies PEUPLE (5 fiches) -- mode clair ==
+  role=row : 6 | role=table/grid : 0 | role=columnheader : 0 | role=cell/gridcell : 0
+  declencheurs aria-haspopup=menu : 7 | dont contenant un <button> IMBRIQUE : 5
+  cases a cocher sans libelle : 0 / 6
+  axe : 30 noeuds | {"critical":14,"serious":16,"moderate":0,"minor":0}
+   - aria-allowed-attr [critical] x6 : Elements must only use supported ARIA attributes
+       .h-\[600px\]
+       div[aria-rowindex="1"]
+       div[aria-rowindex="2"]
+       div[aria-rowindex="3"]
+   - aria-required-children [critical] x6 : Certain ARIA roles must contain particular children
+       .z-10
+       div[aria-rowindex="1"] > .border-slate-100.transition-colors.dark\:hover\:bg-slate-800\/60
+       div[aria-rowindex="2"] > .border-slate-100.transition-colors.dark\:hover\:bg-slate-800\/60
+       div[aria-rowindex="3"] > .border-slate-100.transition-colors.dark\:hover\:bg-slate-800\/60
+   - aria-required-parent [critical] x2 : Certain ARIA roles must be contained by particular parents
+       .z-10
+       .h-\[600px\]
+   - color-contrast [serious] x10 : Elements must meet minimum color contrast ratio thresholds
+       div[aria-rowindex="1"] > .border-slate-100.transition-colors.dark\:hover\:bg-slate-800\/60 > .min-w-0.gap-3.fl (fg #90a1b9 / bg #ffffff = 2.63:1)
+       div[aria-rowindex="1"] > .border-slate-100.transition-colors.dark\:hover\:bg-slate-800\/60 > .text-slate-600.d (fg #90a1b9 / bg #ffffff = 2.63:1)
+       div[aria-rowindex="2"] > .border-slate-100.transition-colors.dark\:hover\:bg-slate-800\/60 > .min-w-0.gap-3.fl (fg #90a1b9 / bg #ffffff = 2.63:1)
+       div[aria-rowindex="2"] > .border-slate-100.transition-colors.dark\:hover\:bg-slate-800\/60 > .text-slate-600.d (fg #90a1b9 / bg #ffffff = 2.63:1)
+   - nested-interactive [serious] x5 : Interactive controls must not be nested
+       div[aria-rowindex="1"] > .border-slate-100.transition-colors.dark\:hover\:bg-slate-800\/60 > .justify-end.flex
+       div[aria-rowindex="2"] > .border-slate-100.transition-colors.dark\:hover\:bg-slate-800\/60 > .justify-end.flex
+       div[aria-rowindex="3"] > .border-slate-100.transition-colors.dark\:hover\:bg-slate-800\/60 > .justify-end.flex
+       div[aria-rowindex="4"] > .border-slate-100.transition-colors.dark\:hover\:bg-slate-800\/60 > .justify-end.flex
+   - target-size [serious] x1 : All touch targets must be 24px large, or leave sufficient space
+       button[aria-label="Theme dark"]
+  >>> ce que la porte a11y.yml retiendrait (elle ne garde QUE impact === "critical") : aria-allowed-attr x6, aria-required-children x6, aria-required-parent x2
+
+== /companies PEUPLE (5 fiches) -- mode sombre ==
+  role=row : 6 | role=table/grid : 0 | role=columnheader : 0 | role=cell/gridcell : 0
+  declencheurs aria-haspopup=menu : 7 | dont contenant un <button> IMBRIQUE : 5
+  cases a cocher sans libelle : 0 / 6
+  axe : 22 noeuds | {"critical":14,"serious":8,"moderate":0,"minor":0}
+   - aria-allowed-attr [critical] x6 : Elements must only use supported ARIA attributes
+       .h-\[600px\]
+       div[aria-rowindex="1"]
+       div[aria-rowindex="2"]
+       div[aria-rowindex="3"]
+   - aria-required-children [critical] x6 : Certain ARIA roles must contain particular children
+       .z-10
+       div[aria-rowindex="1"] > .border-slate-100.transition-colors.dark\:hover\:bg-slate-800\/60
+       div[aria-rowindex="2"] > .border-slate-100.transition-colors.dark\:hover\:bg-slate-800\/60
+       div[aria-rowindex="3"] > .border-slate-100.transition-colors.dark\:hover\:bg-slate-800\/60
+   - aria-required-parent [critical] x2 : Certain ARIA roles must be contained by particular parents
+       .z-10
+       .h-\[600px\]
+   - color-contrast [serious] x2 : Elements must meet minimum color contrast ratio thresholds
+       .hover\:border-slate-400 > span:nth-child(2) (fg #62748e / bg #13161a = 3.8:1)
+       kbd (fg #45556c / bg #314158 = 1.36:1)
+   - nested-interactive [serious] x5 : Interactive controls must not be nested
+       div[aria-rowindex="1"] > .border-slate-100.transition-colors.dark\:hover\:bg-slate-800\/60 > .justify-end.flex
+       div[aria-rowindex="2"] > .border-slate-100.transition-colors.dark\:hover\:bg-slate-800\/60 > .justify-end.flex
+       div[aria-rowindex="3"] > .border-slate-100.transition-colors.dark\:hover\:bg-slate-800\/60 > .justify-end.flex
+       div[aria-rowindex="4"] > .border-slate-100.transition-colors.dark\:hover\:bg-slate-800\/60 > .justify-end.flex
+   - target-size [serious] x1 : All touch targets must be 24px large, or leave sufficient space
+       .bg-brand-600
+  >>> ce que la porte a11y.yml retiendrait (elle ne garde QUE impact === "critical") : aria-allowed-attr x6, aria-required-children x6, aria-required-parent x2

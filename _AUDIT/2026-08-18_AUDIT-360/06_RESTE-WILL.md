@@ -10,11 +10,12 @@
 
 ---
 
-## A. Deux interruptions de service à autoriser — c'est le seul obstacle
+## A. Une échéance datée, et deux interruptions de service à autoriser
 
 | # | Geste | Coût réel | Recommandation |
 |---|---|---|---|
 | **A1** | **Sortir la production du serveur de développement PHP.** Elle tourne sous `php -S`, **un seul processus** : toutes les requêtes sont **sérialisées**. Mesuré : 12 requêtes simultanées forment un escalier de 15 ms, quand les mêmes en séquentiel restent plates. | **Quelques secondes** de recréation du conteneur `api`. php-fpm est **déjà dans l'image**. | **Oui, et en premier.** Tant que ce n'est pas fait, *une seule requête lente gèle l'application pour tout le monde* — et les compteurs du hub ont été chronométrés à **17,5 s cache froid**. Le CDC exige dix utilisateurs **dès le premier jour** : aujourd'hui c'est **impossible par construction**, pas « non mesuré ». Repli en 15 min si php-fpm demande trop de travail : poser `PHP_CLI_SERVER_WORKERS=8`. |
+| **A0** | 🔴 **Une date, et c'est la seule de tout ce rapport : le disque de production sature vers le 6 OCTOBRE 2026.** Il se remplit de **511 Mio par jour**, il reste **25 Go**, et **aucune garde ne regarde cette trajectoire**. | Le geste immédiat est **A2** ci-dessous : ~90 Mo/jour viennent du seul défaut Telescope. | **Oui, et c'est le moins cher de la liste.** Poser `TELESCOPE_ENABLED=false` **recule la date de plusieurs semaines à lui seul**. Le reste (journaux de conteneurs sans `daemon.json`, cache de construction) se traite à froid. *Une saturation disque sur ce serveur arrête la base de données, pas seulement l'application.* |
 | **A2** | **Redémarrer `api` après avoir posé `TELESCOPE_ENABLED=false`.** | Quelques secondes, **même fenêtre que A1**. | **Oui, dans le même geste.** Le journal de production pèse **270 Mo**, grossit de **~90 Mo/jour**, et **100 % de ses erreurs sont le même défaut** — une vraie erreur y passe inaperçue. C'est mécaniquement ce qui a permis à deux pannes de durer 71 h sans témoin. |
 
 ---

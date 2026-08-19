@@ -1,0 +1,88 @@
+=== AGENT 42 — la seule garde de performance du depot ===
+--- .github/workflows/a11y.yml, job lighthouse ---
+  lighthouse:
+    name: Lighthouse CI
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v7
+        with: { node-version: '22' }
+      - run: npm install -g @lhci/cli@0.13
+      - run: lhci autorun --upload.target=temporary-public-storage --collect.url=https://staging.axion-crm-pro.com
+        continue-on-error: true
+
+--- recherche d'un fichier de configuration Lighthouse ---
+(ci-dessus : vide = aucune assertion declaree)
+
+--- recherche d'un budget de bundle ---
+(vide = aucun)
+
+--- TEMOIN NEGATIF : la recherche sait trouver une garde bloquante ---
+4:# CI BLOQUANTE — durcie le 2026-08-13 (PR « fix/ci-reelle », Gate 0 autopilot CRM)
+274:      - name: Install (BLOQUANT)
+278:      - name: PHPStan niveau 8 (BLOQUANT — baseline figée)
+282:      - name: Pint — format des fichiers PHP modifiés (BLOQUANT)
+317:          # ⚠️ 2026-08-16 — ce repli faisait dépendre un gate BLOQUANT de la
+391:      - name: Pest (BLOQUANT)
+--- TEMOIN : un job du MEME fichier qui n'a PAS continue-on-error ---
+  axe-playwright:
+    name: axe-core Playwright
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v7
+        with: { node-version: '22', cache: 'pnpm', cache-dependency-path: frontend/pnpm-lock.yaml }
+      - name: Install deps
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile || pnpm install
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+      # La cible doit EXISTER sur le runner. `http://app:5173` était le nom de
+      # service du docker-compose local : sur un runner GitHub il ne résout pas
+      # (`net::ERR_NAME_NOT_RESOLVED`), et `webServer` est neutralisé quand
+      # `CI=true`. Depuis la création de ce job, les 4 pages échouaient donc
+      # AVANT le premier contrôle axe : la porte n'a jamais mesuré une seule
+      # règle d'accessibilité, elle a seulement toujours rougi.
+      # On construit l'application et on la sert réellement ; c'est
+      # `playwright.config.ts` qui démarre et arrête `vite preview`.
+      - name: Build frontend (la cible que la porte doit mesurer)
+        working-directory: frontend
+        run: pnpm build
+      - name: Run a11y E2E
+        working-directory: frontend
+
+--- job frontend de ci.yml (aucune etape de budget) ---
+  frontend:
+    name: Frontend React/Vite
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install (BLOQUANT — lockfile figé)
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        working-directory: frontend
+        run: pnpm typecheck
+      - name: Lint (BLOQUANT)
+        working-directory: frontend
+        run: pnpm lint
+      - name: Test
+        working-directory: frontend
+        run: pnpm test
+      - name: Build
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: https://api.localhost
+        run: pnpm build

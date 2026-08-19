@@ -89,12 +89,40 @@ Rayon d'explosion = nombre de tests rouges **hors** l'échec de ligne de base
 | **S14** | `SiteSyncIngestTest` + `SiteGdprTest` › *signature invalide : 401* | la vérification HMAC du canal entrant | `HmacSignature::verify()` rend toujours `true` | **OUI, 2** | **0** | **Oui** — les deux tests posent une **mauvaise signature** sur le réseau et exigent 401 **et** zéro écriture | **GARDE RÉELLE** |
 | **S15** | `EtancheiteUniversTest` › *le hub business est fermé à un membre du seul vivier* | la frontière vivier / commercial dans la console | `ConsoleAccess::businessWorkspaceId()` rend l'univers courant sans écarter le vivier | **OUI, 1** | **0** | **Oui** — mais **une seule** des cinq gardes d'étanchéité voit ce sabotage : le cas phare *🔴 un viewer VIVIER ne lit AUCUNE fiche business* interroge `/companies` et `/contacts`, pas la console | **GARDE RÉELLE, étroite** |
 | **S16** | `MasquageCoordonneesTest` (téléphone) | le masque du numéro de téléphone | `telephone()` rend le numéro entier | **OUI, 3** | **0** | **Oui** | **GARDE RÉELLE** |
+| **S10** | `PasswordResetWithHibpTest` › *HIBP cache prefix unique par 5 chars du sha1*, à l'échelle de la suite | que la réponse HIBP d'un mot de passe ne serve pas pour un autre | `$cacheKey = 'hibp:range'` — clé de cache **globale** | **NON** | **0** | **Non — le test affirme `true`, il n'observe jamais la clé** | **FAUSSE ASSURANCE — les 780 tests restent verts** → H45-003 |
+| **S11** | `PasswordResetWithHibpTest` › *HIBP user-agent inclus dans la requête* | que la requête envoyée à HIBP porte un `User-Agent` (HIBP le **exige**) | l'en-tête `User-Agent` retiré du client Guzzle | **NON** | **0** | **Non — le test affirme seulement que la requête a été construite** (`expect($captured)->not->toBeNull()`), il ne lit jamais l'en-tête | **FAUSSE ASSURANCE — les 780 tests restent verts** → H45-003 |
+| **S12** | `RlsTest` › *la commande de backfill pose bien son contexte workspace (correctif du 2026-08-15)* | que `ScrapingBackfillSrcTags` enveloppe son travail dans `WorkspaceContext::run` | le vrai appel **retiré** (le travail n'est plus exécuté du tout), la chaîne `WorkspaceContext::run(` laissée **dans un commentaire** | **NON — `✓ la commande de backfill pose bien son contexte workspace … 0.37s`** | **0** | **Non — elle lit `file_get_contents(app_path(…))`, commentaires compris** | **FAUSSE ASSURANCE** → H45-004 |
 | **M1** | `NeDoitPasRegresserTest` › *ACQUIS 3 — le réglage qui rend le verrou capable de rougir est toujours en place* | que `DB_TIMEZONE` soit toujours posé dans les deux fichiers PHPUnit | `<env name="DB_TIMEZONE">` **retiré**, le mot laissé dans un commentaire XML | **NON — restée VERTE** | 6 autres tests rougissent (les tests **de comportement** du fuseau) | **Non — elle lit le fichier qui décrit l'objet, commentaires compris** | **FAUSSE ASSURANCE (locale)** — la famille rattrape, la garde elle-même ne garde rien → H45-004 |
 | **M2** | `PhpstanBaselineNeGrossitPasTest` › *reportUnmatchedIgnoredErrors reste activé* | que le drapeau reste à `true` | la ligne **mise en commentaire** (`# reportUnmatchedIgnoredErrors: true`) — PHPStan revient donc à `false` | **NON — 5 tests verts sur 5** | **0** | **Non — la chaîne cherchée est trouvée dans le commentaire** | **FAUSSE ASSURANCE** → H45-004 |
 | **M4** | `PasswordResetWithHibpTest` › *HIBP cache prefix unique par 5 chars du sha1* | que la clé de cache HIBP porte le préfixe SHA-1 | `$cacheKey = 'hibp:range'` (clé globale) | **NON — 12 tests verts sur 12** | **0** | **Non — le test affirme `true`** | **FAUSSE ASSURANCE** → H45-003 |
-| **S10** | `PasswordResetWithHibpTest` › *HIBP cache prefix unique par 5 chars du sha1*, à l'échelle de la suite | que la réponse HIBP d'un mot de passe ne serve pas pour un autre | `$cacheKey = 'hibp:range'` — clé de cache **globale** | **NON** | **0** | **Non — le test affirme `true`, il n'observe jamais la clé** | **FAUSSE ASSURANCE — les 780 tests restent verts** → H45-003 |
-| **S11** | `PasswordResetWithHibpTest` › *HIBP user-agent inclus dans la requête* | que la requête envoyée à HIBP porte un `User-Agent` (HIBP le **exige**) | l'en-tête `User-Agent` retiré du client Guzzle | **NON** | **0** | **Non — le test affirme seulement que la requête a été construite** (`expect($captured)->not->toBeNull()`), il ne lit jamais l'en-tête | **FAUSSE ASSURANCE — les 780 tests restent verts** → H45-003 |
-| **S12** | `RlsTest` › *la commande de backfill pose bien son contexte workspace* | que `ScrapingBackfillSrcTags` enveloppe son travail dans `WorkspaceContext::run` | le vrai appel retiré, la chaîne `WorkspaceContext::run(` laissée **dans un commentaire** | *(voir ci-dessous)* | | | |
+
+### Le décompte
+
+**20 sabotages joués** — 17 suivis de la **suite complète** (780 tests chacun, ≈ 2 h de calcul) et 3
+ciblés. **13 ont fait rougir la garde visée. 7 ne l'ont pas fait.** Aucun sabotage n'a fait rougir
+plus de **4** tests par sa propre cause : la suite est **précise**, ce qui est le vrai résultat de
+cette grille — un sabotage qui fait rougir trente tests n'apprend rien à personne.
+
+**Les sept fausses assurances**, dans l'ordre de gravité :
+
+1. la famille « **sans auth → 401, jamais 500** » (25 cas) — n'interroge que le chemin JSON, et
+   **A-001 est vivant en production** (H45-001, mesuré sur la prod, 5/5) ;
+2. `PasswordResetWithHibpTest › HIBP cache prefix unique par 5 chars du sha1` — clé de cache rendue
+   **globale**, les 780 tests restent verts (H45-003) ;
+3. `PasswordResetWithHibpTest › HIBP user-agent inclus dans la requête` — en-tête **supprimé**, les
+   780 tests restent verts (H45-003) ;
+4. `RlsTest › la commande de backfill pose bien son contexte workspace` — vrai appel **retiré**, la
+   garde le trouve **dans un commentaire** et reste verte (H45-004) ;
+5. `PhpstanBaselineNeGrossitPasTest › reportUnmatchedIgnoredErrors reste activé` — la ligne **mise en
+   commentaire** laisse la garde verte (H45-004) ;
+6. `NeDoitPasRegresserTest › ACQUIS 3 — le réglage qui rend le verrou capable de rougir est toujours
+   en place` — `DB_TIMEZONE` **retiré**, la garde le trouve dans un commentaire et reste verte
+   (H45-004) — ses six sœurs de comportement, elles, rougissent ;
+7. l'**anti-rejeu du canal** : la fenêtre d'horodatage désarmée par configuration (`<= 0`) ne fait
+   rougir **aucun** des 780 tests (H45-007).
+
+À quoi s'ajoute ce qui n'a **aucune** garde du tout et détruit des données : `retention:purge --dry-run`
+(H45-002), prouvé destructif sur base jetable.
 
 ### Ce que la grille dit, en une phrase
 

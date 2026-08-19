@@ -1,0 +1,10 @@
+=== git rev-parse HEAD ===
+d95de24cf5b875a7053790ca0827c301c6c876bb
+
+=== git log --oneline -3 ===
+d95de24 audit(360): agent 43 — la mesure de reference du §29 a ete jouee dans la mauvaise configuration
+7be3753 audit(360): agents 24, 26, 34 — les parcours, les refus silencieux, et une question hors CRM
+a3c42d6 audit(360): A-015 — le quatrieme verrou, et il est derriere les trois autres
+
+=== git diff --stat e8924b8..HEAD -- frontend/ .github/workflows/a11y.yml (vide => code frontend identique a la reference du dossier commun) ===
+(fin)

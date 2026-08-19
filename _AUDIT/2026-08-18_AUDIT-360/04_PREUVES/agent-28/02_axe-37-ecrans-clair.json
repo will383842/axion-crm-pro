@@ -1,0 +1,925 @@
+[
+ {
+  "nom": "login",
+  "url": "/login",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     ".pointer-events-auto"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "2fa",
+  "url": "/2fa",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [],
+  "parImpact": {
+   "critical": 0,
+   "serious": 0,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 0
+ },
+ {
+  "nom": "magic-link",
+  "url": "/magic-link",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [],
+  "parImpact": {
+   "critical": 0,
+   "serious": 0,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 0
+ },
+ {
+  "nom": "password-reset",
+  "url": "/password-reset",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [],
+  "parImpact": {
+   "critical": 0,
+   "serious": 0,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 0
+ },
+ {
+  "nom": "dashboard",
+  "url": "/",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "help": "Elements must meet minimum color contrast ratio thresholds",
+    "noeuds": 1,
+    "exemples": [
+     ".text-sky-600\\/70"
+    ]
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 2,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 2
+ },
+ {
+  "nom": "companies",
+  "url": "/companies",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "companies-$id",
+  "url": "/companies/1",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "contacts",
+  "url": "/contacts",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "roumanie",
+  "url": "/international/roumanie",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "media",
+  "url": "/media",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "media-$id",
+  "url": "/media/1",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "journalists",
+  "url": "/journalists",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "coverage",
+  "url": "/coverage",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "scraper-runs",
+  "url": "/scraper-runs",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "help": "Elements must meet minimum color contrast ratio thresholds",
+    "noeuds": 1,
+    "exemples": [
+     ".text-sky-600\\/70"
+    ]
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 2,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 2
+ },
+ {
+  "nom": "llm-router",
+  "url": "/llm/router",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "llm-proxy-providers",
+  "url": "/llm/proxy-providers",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "llm-rotations",
+  "url": "/llm/rotations",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "rgpd-requests",
+  "url": "/rgpd/requests",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "rgpd-ai-act",
+  "url": "/rgpd/ai-act",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "audit-logs",
+  "url": "/audit-logs",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "users",
+  "url": "/users",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "settings",
+  "url": "/settings",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "campaigns",
+  "url": "/campaigns",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "help": "Elements must meet minimum color contrast ratio thresholds",
+    "noeuds": 1,
+    "exemples": [
+     ".text-sky-600\\/70"
+    ]
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 2,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 2
+ },
+ {
+  "nom": "campaigns-new",
+  "url": "/campaigns/new",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "campaigns-$id",
+  "url": "/campaigns/1",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "tags",
+  "url": "/tags",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "audiences",
+  "url": "/audiences",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "audiences-new",
+  "url": "/audiences/new",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "help": "Elements must meet minimum color contrast ratio thresholds",
+    "noeuds": 52,
+    "exemples": [
+     ".ring-slate-200\\/70.dark\\:ring-slate-800.rounded-2xl:nth-child(2) > .block:nth-child(2) > .space-y-2 > .italic.text-slate-400.text-\\[11px\\]",
+     ".ring-slate-200\\/70.dark\\:ring-slate-800.rounded-2xl:nth-child(2) > .block:nth-child(2) > .space-y-2 > .flex-wrap.gap-1\\.5 > .hover\\:bg-slate-200.px-2\\.5.bg-slate-100:nth-child(1) > .opacity-70.font-mono.text-\\[10px\\]",
+     ".ring-slate-200\\/70.dark\\:ring-slate-800.rounded-2xl:nth-child(2) > .block:nth-child(2) > .space-y-2 > .flex-wrap.gap-1\\.5 > .hover\\:bg-slate-200.px-2\\.5.bg-slate-100:nth-child(2) > .opacity-70.font-mono.text-\\[10px\\]"
+    ]
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 53,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 53
+ },
+ {
+  "nom": "audiences-$id",
+  "url": "/audiences/1",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "admin-observability",
+  "url": "/admin/observability",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "console-contacts",
+  "url": "/console/contacts",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "console-vivier",
+  "url": "/console/vivier",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "console-arbitrage",
+  "url": "/console/arbitrage",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "console-personnes-$k",
+  "url": "/console/personnes/abc",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "cold-email",
+  "url": "/cold-email",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "linkedin",
+  "url": "/linkedin",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "noeuds": 1,
+    "exemples": [
+     "button[aria-label=\"Theme dark\"]"
+    ]
+   }
+  ],
+  "parImpact": {
+   "critical": 0,
+   "serious": 1,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 1
+ },
+ {
+  "nom": "404",
+  "url": "/route-qui-nexiste-pas",
+  "erreur": null,
+  "rootVide": false,
+  "violations": [],
+  "parImpact": {
+   "critical": 0,
+   "serious": 0,
+   "moderate": 0,
+   "minor": 0,
+   "null": 0
+  },
+  "total": 0
+ }
+]

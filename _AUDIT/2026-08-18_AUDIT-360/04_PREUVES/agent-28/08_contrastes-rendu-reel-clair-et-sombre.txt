@@ -1,0 +1,46 @@
+
+══════ MODE CLAIR (html.dark=false) ══════
+composant                              texte     fond       ratio  seuil verdict
+QualityBadge complete                  #006045   #d0fae5      6.7   4.5   OK 
+QualityBadge partielle                 #973c00   #fef3c6     6.36   4.5   OK 
+QualityBadge basique                   #a50036   #ffe4e6     6.59   4.5   OK 
+SizeCategoryBadge artisan              #9f2d00   #ffedd4     6.43   4.5   OK 
+SizeCategoryBadge tpe                  #00598a   #dff2fe     6.53   4.5   OK 
+SizeCategoryBadge pme                  #372aac   #e0e7ff     8.16   4.5   OK 
+SizeCategoryBadge eti                  #5d0ec0   #ede9fe     7.73   4.5   OK 
+SizeCategoryBadge grande               #8a0194   #fae8ff     7.18   4.5   OK 
+SizeCategoryBadge inconnue             #45556c   #f1f5f9     6.92   4.5   OK 
+StatusPill neutral                     #314158   #f1f5f9     9.45   4.5   OK 
+StatusPill success                     #007a55   #ecfdf5     5.09   4.5   OK 
+StatusPill warning                     #bb4d00   #fffbeb     4.85   4.5   OK 
+StatusPill danger                      #c70036   #fff1f2     5.49   4.5   OK 
+StatusPill info                        #0069a8   #f0f9ff     5.49   4.5   OK 
+StatusPill pending                     #45556c   #f1f5f9     6.92   4.5   OK 
+Card + texte secondaire                #62748e   #ffffff     4.76   4.5   OK 
+Input placeholder                      #90a1b9   #ffffff     2.63   4.5   ECHEC AA 
+TEMOIN bon (slate-900 sur blanc)       #0f172b   #ffffff    17.83   4.5   OK 
+TEMOIN mauvais (slate-300 sur blanc)   #cad5e2   #ffffff     1.49   4.5   ECHEC AA 
+LIEN D EVITEMENT (.skip-link:focus)    #0b0b0b   #f6f9fc    18.63   4.5   OK | fond propre alpha=0 padding 0px
+
+══════ MODE SOMBRE (html.dark=true) ══════
+composant                              texte     fond       ratio  seuil verdict
+QualityBadge complete                  #006045   #d0fae5      6.7   4.5   OK 
+QualityBadge partielle                 #973c00   #fef3c6     6.36   4.5   OK 
+QualityBadge basique                   #a50036   #ffe4e6     6.59   4.5   OK 
+SizeCategoryBadge artisan              #9f2d00   #ffedd4     6.43   4.5   OK 
+SizeCategoryBadge tpe                  #00598a   #dff2fe     6.53   4.5   OK 
+SizeCategoryBadge pme                  #372aac   #e0e7ff     8.16   4.5   OK 
+SizeCategoryBadge eti                  #5d0ec0   #ede9fe     7.73   4.5   OK 
+SizeCategoryBadge grande               #8a0194   #fae8ff     7.18   4.5   OK 
+SizeCategoryBadge inconnue             #45556c   #f1f5f9     6.92   4.5   OK 
+StatusPill neutral                     #cad5e2   #1d293d     9.83   4.5   OK 
+StatusPill success                     #5ee9b5   #071c1a     11.6   4.5   OK 
+StatusPill warning                     #ffd230   #23140c    12.33   4.5   OK 
+StatusPill danger                      #ffa1ad   #260a16     9.63   4.5   OK 
+StatusPill info                        #74d4ff   #091c2a    10.41   4.5   OK 
+StatusPill pending                     #90a1b9   #1d293d     5.56   4.5   OK 
+Card + texte secondaire                #90a1b9   #13161a      6.9   4.5   OK 
+Input placeholder                      #90a1b9   #13161a      6.9   4.5   OK 
+TEMOIN bon (slate-900 sur blanc)       #eeeeee   #13161a    15.64   4.5   OK 
+TEMOIN mauvais (slate-300 sur blanc)   #cad5e2   #13161a    12.21   4.5   OK 
+LIEN D EVITEMENT (.skip-link:focus)    #eeeeee   #0c1014    16.46   4.5   OK | fond propre alpha=0 padding 0px

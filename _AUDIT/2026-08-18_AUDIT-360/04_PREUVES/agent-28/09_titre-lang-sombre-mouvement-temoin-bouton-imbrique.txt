@@ -1,0 +1,73 @@
+══ 1. Lien d'évitement — couleur RÉELLEMENT peinte sous le lien ══
+  clair   | texte rgb(11,11,11) | fond peint dominant rgb(4,32,58) (1478 px) | ratio 1.19 | seuil 4.5 -> ECHEC AA
+          | fond propre du lien : rgba(0, 0, 0, 0) | padding : 0px | position 16,16
+          | 3 couleurs les plus presentes : [["4,32,58",1478],["255,255,255",173],["3,31,57",80]]
+  sombre  | texte rgb(238,238,238) | fond peint dominant rgb(4,32,58) (1478 px) | ratio 14.22 | seuil 4.5 -> OK
+          | fond propre du lien : rgba(0, 0, 0, 0) | padding : 0px | position 16,16
+          | 3 couleurs les plus presentes : [["4,32,58",1478],["255,255,255",173],["3,31,57",80]]
+
+══ 2. Titre de page (WCAG 2.4.2), lang (3.1.1), mode sombre, h1 ══
+  ecran                  | titre du document                | lang | .dark | h1 | landmarks main/nav/banner
+  login                  | Axion CRM Pro                    | fr   | false |  1 | 0/0/0 
+  2fa                    | Axion CRM Pro                    | fr   | false |  1 | 0/0/0 
+  magic-link             | Axion CRM Pro                    | fr   | false |  1 | 0/0/0 
+  password-reset         | Axion CRM Pro                    | fr   | false |  1 | 0/0/0 
+  dashboard              | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  companies              | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  companies-$id          | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  contacts               | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  roumanie               | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  media                  | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  media-$id              | Axion CRM Pro                    | fr   | true  |  0 | 1/2/1 | SAUT DE NIVEAU
+  journalists            | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  coverage               | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  scraper-runs           | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  llm-router             | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  llm-proxy-providers    | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  llm-rotations          | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  rgpd-requests          | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  rgpd-ai-act            | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  audit-logs             | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  users                  | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  settings               | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  campaigns              | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  campaigns-new          | Axion CRM Pro                    | fr   | true  |  1 | 1/3/2 | SAUT DE NIVEAU
+  campaigns-$id          | Axion CRM Pro                    | fr   | true  |  0 | 1/2/1 | SAUT DE NIVEAU
+  tags                   | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  audiences              | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  audiences-new          | Axion CRM Pro                    | fr   | true  |  1 | 1/3/2 | SAUT DE NIVEAU
+  audiences-$id          | Axion CRM Pro                    | fr   | true  |  0 | 1/2/1 | SAUT DE NIVEAU
+  admin-observability    | Axion CRM Pro                    | fr   | true  |  0 | 1/2/1 | SAUT DE NIVEAU
+  console-contacts       | Axion CRM Pro                    | fr   | true  |  0 | 1/2/1 | SAUT DE NIVEAU
+  console-vivier         | Axion CRM Pro                    | fr   | true  |  0 | 1/2/1 | SAUT DE NIVEAU
+  console-arbitrage      | Axion CRM Pro                    | fr   | true  |  0 | 1/2/1 | SAUT DE NIVEAU
+  console-personnes-$k   | Axion CRM Pro                    | fr   | true  |  0 | 1/2/1 | SAUT DE NIVEAU
+  cold-email             | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  linkedin               | Axion CRM Pro                    | fr   | true  |  1 | 1/2/2 | SAUT DE NIVEAU
+  404                    | Axion CRM Pro                    | fr   | false |  0 | 0/0/0 
+  >>> titres de document DISTINCTS sur 37 ecrans : 1 ["Axion CRM Pro"]
+
+══ 3. Mouvement (WCAG 2.2.2 / 2.3.3) ══
+  sous prefers-reduced-motion: reduce, la classe .axion-pulse-dot : {"animationName":"axion-pulse-dot","duree":"2s","iterations":"infinite"}
+  (iterations=infinite + duree>0 => le mouvement continue malgre la preference)
+
+══ 4. TEMOIN — ce qu'axe dit du motif <button><button></button></button> ══
+   [
+ {
+  "regle": "button-name",
+  "impact": "critical",
+  "noeuds": 1,
+  "cibles": [
+   ".inline-flex[aria-haspopup=\"menu\"]:nth-child(1)"
+  ]
+ },
+ {
+  "regle": "target-size",
+  "impact": "serious",
+  "noeuds": 1,
+  "cibles": [
+   ".inline-flex[aria-haspopup=\"menu\"]:nth-child(1)"
+  ]
+ }
+]
+  (le 2e declencheur, avec un <span>, est le motif de UserMenu/WorkspaceSelector : il ne doit PAS etre releve)

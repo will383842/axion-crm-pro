@@ -1,0 +1,18 @@
+AGENT 30 — budget de gestes pour atteindre un ecran depuis le tableau de bord
+CDC 23.4 : « chaque parcours tient au meme budget de clics sur telephone, aux gestes tactiles pres »
+Depart : / (tableau de bord). Barre laterale deployee (etat par defaut, localStorage vide).
+
+BUREAU  1280px  Paramètres               -> 2 clic(s)   arrive=/settings
+BUREAU  1280px  Journaux d’audit         -> 2 clic(s)   arrive=/audit-logs
+BUREAU  1280px  Journaux de collecte     -> 2 clic(s)   arrive=/scraper-runs
+
+TELEPHONE 375px Paramètres               -> 4 appui(s)  arrive=/settings   tiroir reste ouvert apres navigation=true  appui supplementaire sur ✕ (36x36) OBLIGATOIRE
+TELEPHONE 375px Journaux d’audit         -> 4 appui(s)  arrive=/audit-logs   tiroir reste ouvert apres navigation=true  appui supplementaire sur ✕ (36x36) OBLIGATOIRE
+TELEPHONE 375px Journaux de collecte     -> 4 appui(s)  arrive=/scraper-runs   tiroir reste ouvert apres navigation=true  appui supplementaire sur ✕ (36x36) OBLIGATOIRE
+
+GEOMETRIE DU TIROIR a 375px : voile x=0,375  panneau x=0,375  barre a l interieur x=0,260
+  -> le panneau couvre TOUT l ecran (0->375) : le voile n est atteignable NULLE PART.
+  -> la barre ne fait que 260px : bande morte de 115px a droite. Element sous le doigt en x=330 : DIV.-mx-6 -my-4
+  appui dans la bande morte (330,600) -> tiroir encore ouvert : true
+  appui a gauche (10,400), la ou le voile serait sur un ecran large -> tiroir encore ouvert : true
+  TEMOIN : touche Echap -> tiroir encore ouvert : false  (Echap fonctionne, mais un telephone n a pas de touche Echap)

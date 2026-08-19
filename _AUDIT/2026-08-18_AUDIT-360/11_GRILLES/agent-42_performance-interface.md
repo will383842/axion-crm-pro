@@ -66,6 +66,8 @@ Une ligne par objet du périmètre, une colonne par point de grille.
 | Cache des assets fingerprintés | ✅ | `Cache-Control: public, max-age=31536000, immutable` | ✅ | — |
 | Cache du GeoJSON de la carte | ✅ | **aucun `Cache-Control`**, `cf-cache-status: DYNAMIC` sur 1 079 714 o | ❌ | G42-003 |
 | `console.*` retirés au build | ✅ | **non** : `[Boot]` ×2 et le journal `[FranceMap]` (32 appels) sont dans le bundle de production | ⚠️ S3 | G42-011 |
+| **Garde de budget de bundle** | ✅ | **aucune** : ni `size-limit`, ni `bundlesize`, ni seuil dans `ci.yml` | ❌ | G42-013 |
+| **Garde de performance (Lighthouse)** | ✅ | existe, mais `continue-on-error: true`, **aucun `lighthouserc`**, et pointe sur **`staging`** (le code d'avant la PR) | ❌ **mesure le mauvais objet** | G42-013 |
 
 ### 1.2 Les listes longues
 
@@ -148,7 +150,11 @@ DOM totaux**. Fichier de mesure : `04_PREUVES/agent-42/listes.test.tsx` ; sortie
 **Bornes.** (a) jsdom : pas de mise en page, pas de peinture — le navigateur ferait **plus**, jamais
 moins ; (b) aucun réseau réel, donc **A-010 n'entre pas** dans ces chiffres ; (c) mesures prises sur
 un poste par ailleurs occupé — la colonne « nœuds DOM » est **déterministe** et doit primer sur la
-colonne « ms », qui varie (voir la passe 1 vs la passe 2 sur la ligne 10 000).
+colonne « ms », qui varie (voir la passe 1 vs la passe 2 sur la ligne 10 000) ; (d) la colonne
+« tas Node » est **cumulative sur le processus de test** : les 1,5 Go affichés en face de
+`CompaniesListPage` sont l'héritage du cas `ContactsListPage / 10 000` qui l'a précédé dans le
+même travailleur, **pas le coût de cet écran**. Elle n'est lisible qu'en **variation à l'intérieur
+d'un même écran** (`ContactsListPage` : 62 Mo → 85 → 170 → **1 519**).
 
 | écran | idiome | lignes servies | ms | lignes rendues | nœuds DOM | tas Node |
 |---|---|---:|---:|---:|---:|---:|
@@ -157,7 +163,7 @@ colonne « ms », qui varie (voir la passe 1 vs la passe 2 sur la ligne 10 000).
 | `ContactsListPage` | non virtualisé | 100 | 1 579 | 101 | **2 545** | 85 Mo |
 | `ContactsListPage` | non virtualisé | 500 | 5 428 | 501 | **12 545** | 170 Mo |
 | `ContactsListPage` | non virtualisé | 10 000 | **84 722** *(36 236 en passe 1)* | 10 001 | **250 045** | 1 519 Mo |
-| `ContactsListPage` | non virtualisé | 100 000 | *voir encadré* | — | — | — |
+| `ContactsListPage` | non virtualisé | 100 000 | **n'aboutit pas** (11,4 min, 8 117 Mo engagés) | — | — | voir encadré |
 | `CompaniesListPage` | **virtualisé** | 0 | 632 | 0 | **147** | 1 536 Mo |
 | `CompaniesListPage` | virtualisé | 1 | 814 | 1 | **155** | 1 543 Mo |
 | `CompaniesListPage` | virtualisé | 100 | 862 | 1 | **155** | 1 551 Mo |
@@ -191,16 +197,30 @@ colonne « ms », qui varie (voir la passe 1 vs la passe 2 sur la ligne 10 000).
 > celui de l'écran non virtualisé lui est proportionnel. Le nombre exact de lignes de la fenêtre,
 > lui, n'est pas mesuré ici.
 
-> 🔴 **Le volume 100 000 : la mesure qui n'aboutit pas.**
-> Première tentative (passe 0, `ContactsListPage`) : le processus vitest a consommé **plus de
-> 240 secondes de temps processeur et plus de 3,5 Go de mémoire résidente sans produire de
-> résultat** ; je l'ai arrêté au bout de **8 minutes**. `PowerShell Get-Process` relevait alors
-> `WorkingSet` négatif — l'entier 32 bits avait débordé, donc > 2 Go. La deuxième tentative,
-> menée seule avec `--max-old-space-size=12288`, est consignée dans
-> `04_PREUVES/agent-42/chronos-100k.txt`. **Résultat : voir l'encadré de clôture ci-dessous.**
-> Le rendu React d'une liste est **synchrone** : il ne peut pas être interrompu par le délai
-> d'expiration de vitest. C'est exactement ce qui se passerait dans un navigateur — l'onglet
-> ne répond plus, et il n'y a pas d'échappatoire.
+> 🔴 **Le volume 100 000 : la mesure n'aboutit pas, et c'est le résultat.**
+> **Deux tentatives, toutes deux arrêtées à la main, aucune n'a rendu de chiffre.**
+>
+> - **Tentative 1** (`ContactsListPage`, suite complète) : arrêtée au bout de **8 minutes**, après
+>   **240 s de temps processeur**. `Get-Process` rendait alors un `WorkingSet` **négatif** —
+>   l'entier signé 32 bits avait débordé, donc **plus de 2 Go** résidents.
+> - **Tentative 2** (le volume 100 000 **seul**, `--max-old-space-size=12288`, aucune autre mesure
+>   en parallèle) : arrêtée au bout de **11,4 minutes**. Relevé pris juste avant l'arrêt et
+>   archivé dans `04_PREUVES/agent-42/chronos-100k.txt` :
+>   ```
+>   PID=23152  CPU=237s  WorkingSet=29Mo  PagedMemory=8117Mo  ecoule=11,4min
+>   ```
+>   **8 117 Mo de mémoire engagée pour 29 Mo résidents** : le processus ne calculait plus, il
+>   paginait. Le temps processeur n'avait progressé que de 3 secondes en 4 minutes d'horloge.
+>
+> **Extrapolation, donnée pour ce qu'elle vaut** : à 25 nœuds par ligne, 100 000 lignes
+> demanderaient **2 500 000 nœuds DOM**. Je ne l'ai pas atteint et je ne le présente pas comme
+> mesuré.
+>
+> **Ce que ce non-résultat vaut quand même.** Le rendu React d'une liste est **synchrone** : ni le
+> délai d'expiration de vitest, ni celui d'un navigateur, ne peuvent l'interrompre. Ce que j'ai
+> observé — engagement mémoire qui explose, calcul qui s'arrête, aucune sortie — est très
+> exactement ce qu'un onglet fait avant de se faire tuer par le navigateur. **« Ne converge pas
+> en 11 minutes et 8 Go » est une mesure ; ce n'est pas une mesure manquante.**
 
 > ✅ **Le plafond qui sauve aujourd'hui — et pourquoi il ne rassure pas.** Aucun utilisateur ne
 > peut atteindre 10 000 lignes : les contrôleurs plafonnent (`min(100, per_page)` × 5 ;
@@ -585,6 +605,58 @@ que le produit émet.
 
 ---
 
+### [G42-013] La seule garde de performance du dépôt est inerte trois fois : elle n'assure rien, elle ne bloque rien, et elle mesure la préproduction déjà déployée au lieu de la modification en revue
+
+- Sévérité      : **S2**
+- Domaine       : performance / tests
+- Référence     : `frontend/` identique de `c0c453d` à `a3c42d6`
+- Emplacement   : `.github/workflows/a11y.yml:65-75` · `.github/workflows/ci.yml:435-464`
+- Constat       : le dépôt contient **un seul** dispositif de mesure de performance, le job
+  `lighthouse` de `a11y.yml`. Il porte **`continue-on-error: true`**, il n'a **aucun fichier
+  `lighthouserc`** (donc **aucune assertion** : `lhci autorun` collecte, téléverse, et n'échoue
+  sur rien), et son unique URL est **`https://staging.axion-crm-pro.com`** — la préproduction
+  **déjà déployée**, c'est-à-dire *le code d'avant la PR*. Par ailleurs le job `frontend` de
+  `ci.yml` fait `install / typecheck / lint / test / build` : **aucun budget de taille de bundle**.
+- Preuve        :
+  ```yaml
+  # .github/workflows/a11y.yml:65-75
+  lighthouse:
+    if: github.event_name == 'pull_request'
+    steps:
+      - run: npm install -g @lhci/cli@0.13
+      - run: lhci autorun --upload.target=temporary-public-storage --collect.url=https://staging.axion-crm-pro.com
+        continue-on-error: true          # ← ne peut pas rougir
+  ```
+  ```
+  $ find . -maxdepth 3 -iname "lighthouserc*" | grep -v node_modules
+  (aucun résultat)                       # ← aucune assertion déclarée
+  $ grep -rn "size-limit\|bundlesize" .github/workflows/
+  (aucun résultat)                       # ← aucun budget de bundle
+  ```
+- Témoin négatif : la recherche sait trouver une garde quand il y en a une — le **même** balayage
+  de `.github/workflows/` trouve bien les étapes marquées `(BLOQUANT)` du job `frontend`
+  (`pnpm install --frozen-lockfile`, `pnpm lint`), et le job `axe-playwright` du même fichier,
+  lui, **n'a pas** de `continue-on-error`. Ce n'est donc pas la CI qui est molle en général :
+  c'est cette garde-là, précisément, qui ne peut rien attraper.
+- Impact        : **c'est le piège 19 du dossier commun, appliqué à mon propre domaine.** Une revue
+  qui écrirait « le risque de régression de performance est couvert par Lighthouse CI » raisonnerait
+  sur une fausse sécurité, à trois titres cumulés : (a) le job ne peut pas échouer ; (b) sans
+  `lighthouserc`, il n'assure rien même s'il le pouvait ; (c) même assuré et bloquant, **il mesure
+  le mauvais objet** — une URL de préproduction qui ne contient pas le code de la PR. Les
+  2 178 093 octets du constat G42-001 ont traversé toute la construction du produit sans qu'aucune
+  garde ne s'en aperçoive : c'est la conséquence directe, et elle est mesurée.
+- Reproduction  : lire `.github/workflows/a11y.yml:65-75` ; `find . -iname "lighthouserc*"`.
+- Correctif     : deux gestes, dans cet ordre. (1) **Un budget de bundle qui rougit** —
+  `size-limit` sur `dist/assets/*.js` avec les valeurs mesurées aujourd'hui comme plafond
+  (630 000 o gzip au premier écran), sans `continue-on-error`, dans le job `frontend` : ~1 h, et
+  c'est **le préalable à tout correctif de ce rapport** (§5, point 9). (2) Si l'on veut garder
+  Lighthouse, le faire tourner **sur un `vite preview` du build de la PR**, avec un
+  `lighthouserc.json` portant des assertions, et sans `continue-on-error` : ~2 h. En l'état,
+  le job coûte 2 minutes de CI par PR et ne rend aucun service.
+- Statut        : ouvert
+
+---
+
 ## 5. Ce que je n'ai PAS pu vérifier, et pourquoi
 
 Cette liste est un livrable.
@@ -606,10 +678,11 @@ Cette liste est un livrable.
    que le code **fait** — pas ce qui s'affiche. **Le mandat demandait « est-ce tenable ? » : sur
    96 polygones et 31 244 points, oui, le rendu l'est ; c'est le transport et le montage qui ne
    le sont pas.**
-5. **Le volume 100 000 lignes sur `CompaniesListPage` et `ContactsHubPage`.** Voir §2 : la mesure
-   à 100 000 sur `ContactsListPage` a consommé **plus de 3,5 Go et plus de 8 minutes de temps
-   processeur sans aboutir**, et j'ai arrêté le processus. C'est un résultat — le rendu **ne
-   converge pas** — mais je ne peux pas en donner de chrono, et je ne l'extrapole pas.
+5. **Le volume 100 000 lignes.** Voir §2 : **deux tentatives, deux arrêts manuels, aucun chrono.**
+   La seconde a engagé **8 117 Mo** de mémoire pour **29 Mo résidents** après **11,4 minutes**, le
+   temps processeur ayant cessé de progresser. Je consigne le non-résultat (« ne converge pas »),
+   je ne l'extrapole pas en millisecondes, et je n'ai donc **aucun chiffre à 100 000 lignes** pour
+   `CompaniesListPage` ni pour `ContactsHubPage` non plus.
 6. **Le coût CPU du re-rendu par frappe, chiffré.** J'ai établi la **cause** (0 `memo`, état de
    recherche porté par la page) et le **volume de DOM** re-rendu. Le mesurer en millisecondes
    demanderait le profileur React dans un vrai navigateur — cf. point 1.
@@ -619,14 +692,14 @@ Cette liste est un livrable.
 8. **Toute comparaison avant/après d'un correctif.** Je n'ai modifié aucun fichier du produit.
    Les gains annoncés dans les rubriques « Correctif » sont des **calculs sur les octets mesurés**,
    pas des mesures de bundles corrigés.
-9. **⚠️ Point de méthode, à transmettre au chef de chantier.** Le dépôt frontend **n'a aucune
-   garde de budget de bundle** : `pnpm build` n'échoue à aucun seuil, il se contente d'un
-   avertissement Rollup (`chunkSizeWarningLimit: 500`, très largement dépassé par deux chunks à
-   chaque build depuis longtemps). Il n'y a ni `size-limit`, ni Lighthouse CI, ni budget dans
-   `ci.yml` pour ce dépôt. **Aucune PR qui alourdit ce bundle ne rougira.** Tout correctif issu
-   de ce rapport doit donc être mesuré **à la main, avant et après**, exactement comme ici.
-   (C'est le même piège que celui déjà consigné pour le dépôt du site : une gate réputée
-   bloquante qui ne l'est pas. Ici, il n'y a même pas de gate.)
+9. **⚠️ Point de méthode, à transmettre au chef de chantier — voir G42-013.** Le dépôt **n'a
+   aucune garde de budget de bundle** : `pnpm build` n'échoue à aucun seuil, il se contente d'un
+   avertissement Rollup (`chunkSizeWarningLimit: 500`, dépassé par deux chunks à chaque build).
+   Le seul job de performance existant (`a11y.yml`, `lighthouse`) porte `continue-on-error: true`,
+   n'a **aucun** `lighthouserc` (donc aucune assertion), et pointe sur **la préproduction déjà
+   déployée** plutôt que sur le build de la PR. **Aucune PR qui alourdit ce bundle ne rougira.**
+   Tout correctif issu de ce rapport doit donc être mesuré **à la main, avant et après**,
+   exactement comme ici — et le premier correctif à faire est **la garde elle-même**.
 
 ---
 

@@ -125,7 +125,7 @@ Chiffres **mesurés en base** le 2026-08-19 :
 | `contacts` | **1 319 567 personnes physiques** | Coordonnées **professionnelles** : nom, prénom, fonction, adresse e-mail professionnelle, téléphone professionnel, profil LinkedIn public. Collectées dans le cadre d'une prospection B2B sur données publiques. |
 | `candidates` (vivier de recrutement) | **0** | ✅ **Aucune donnée de candidature n'était présente.** |
 | `users` (comptes applicatifs) | **1** | Mot de passe stocké sous forme d'empreinte. Ce compte n'a jamais été utilisé. |
-| Sessions et jetons d'authentification | **0** | ✅ Aucun jeton de session n'existait : aucun utilisateur ne s'est jamais connecté à cet environnement. |
+| Sessions et jetons d'authentification | **0 au 2026-08-19** | ⚠️ **Affirmation rectifiée le jour même** : des compteurs à zéro décrivent un instant, pas une histoire. Une session du compte administrateur a existé le 2026-05-17, dans la fenêtre d'exposition. Voir §5 bis du registre. |
 
 **Catégories particulières de données (art. 9)** : **aucune**. Pas de données de
 santé, d'opinions, d'orientation, ni de données relatives à des mineurs.
@@ -151,7 +151,10 @@ santé, d'opinions, d'orientation, ni de données relatives à des mineurs.
 - **aucune catégorie particulière** de données, aucune donnée bancaire, aucun
   document de candidature ;
 - **aucun identifiant de connexion** d'une personne concernée n'était exposé
-  (aucune session, aucun jeton, un seul compte applicatif jamais utilisé) ;
+  — aucune des 1,32 million de personnes n'a de compte sur cet outil. ⚠️ Une
+  session du compte ADMINISTRATEUR a existé dans la fenêtre et son vol ne peut
+  être exclu (Redis sans mot de passe, joignable) : cela concerne l'accès à
+  l'outil, non un identifiant d'une personne concernée. Voir §5 bis du registre ;
 - aucun élément ne laisse penser qu'un accès non autorisé ait eu lieu (pas de
   modification anormale constatée, pas de rançon, pas de fuite observée).
 

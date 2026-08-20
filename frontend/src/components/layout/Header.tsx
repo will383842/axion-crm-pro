@@ -7,9 +7,10 @@
  *  - `data-tour="global-search"` et `data-tour="dark-mode"` préservés (onboarding Joyride).
  *  - GlobalSearch + DarkModeToggle réutilisés tels quels.
  */
-import { Menu, Bell, Search as SearchIcon } from 'lucide-react';
+import { Menu, Search as SearchIcon } from 'lucide-react';
 import { DarkModeToggle, GlobalSearch, IconButton } from '@/components/ui';
 import { AutoBreadcrumbs } from './AutoBreadcrumbs';
+import { NotificationsBell } from './NotificationsBell';
 import { UserMenu } from './UserMenu';
 
 export interface HeaderProps {
@@ -59,15 +60,15 @@ export function Header({ onOpenMobileSidebar, onOpenMobileSearch }: HeaderProps)
         </IconButton>
       </div>
 
-      {/* Notifications */}
-      <IconButton
-        label="Notifications"
-        variant="ghost"
-        size="sm"
-        className="text-sidebar-fg hover:bg-white/10 hover:text-white"
-      >
-        <Bell className="h-4 w-4" />
-      </IconButton>
+      {/*
+        Notifications — D24-002.
+        Cet emplacement portait un `IconButton` SANS `onClick` : le clic
+        reussissait et rien ne s'ouvrait, alors que `GET /notifications` etait
+        deja reel cote serveur. Tout le comportement (panneau, compteur de
+        non-lues, etats d'echec, aveu sur le marquage non implemente) vit
+        desormais dans `NotificationsBell`.
+      */}
+      <NotificationsBell />
 
       {/* Dark mode */}
       <div data-tour="dark-mode">

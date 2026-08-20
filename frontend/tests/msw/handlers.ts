@@ -203,6 +203,12 @@ export const defaultHandlers: HttpHandler[] = [
   http.get(`${API_ORIGIN}/sanctum/csrf-cookie`, () => new HttpResponse(null, { status: 204 })),
   getJson('/auth/me', ME_FIXTURE),
   getJson('/config/features', CONSOLE_FEATURES_CLOSED),
+  // D24-002 — depuis que la cloche de l'en-tete est branchee, `RootLayout`
+  // interroge `/notifications` au montage, exactement comme `/auth/me`. Sans
+  // ce socle, TOUT test monte avec `withLayout: true` rougirait sur
+  // `onUnhandledRequest: 'error'` pour une raison etrangere a ce qu'il teste.
+  // Corps NEUTRE : aucune notification, aucune non lue.
+  getJson('/notifications', { data: [], unread_count: 0 }),
 ];
 
 // Ré-export DIRECT (`export … from`) et non `import` puis `export { … }` :

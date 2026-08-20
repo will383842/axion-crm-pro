@@ -9,11 +9,18 @@ import { routeTree } from './app/routeTree';
 // `document.getElementById('root')` est nul sous vitest.
 import { AppRoot } from './app/AppRoot';
 import { initSentry } from './lib/sentry';
+// D26-003 — la densite d'affichage etait un `useState` local a /settings, sans
+// effet et sans persistance. Elle est relue ici, a l'amorcage, comme le theme :
+// un reglage d'apparence qui n'existe que dans l'ecran qui le regle n'en est
+// pas un.
+import { appliquerDensite, lireDensite } from './lib/densite';
 import './styles/index.css';
 import './lib/i18n';
 
 // Sprint 18.8 — Sentry init (compatible GlitchTip self-hosted, no-op si pas de DSN)
 initSentry();
+
+appliquerDensite(lireDensite());
 
 const queryClient = new QueryClient({
   defaultOptions: {

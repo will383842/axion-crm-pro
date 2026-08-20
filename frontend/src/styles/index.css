@@ -178,3 +178,22 @@ body {
 @media print {
   .no-print { display: none !important; }
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   DENSITÉ D'AFFICHAGE — D26-003, onglet « Apparence » de /settings.
+
+   Le sélecteur « Confortable / Compacte » était un `useState` local : il ne
+   pilotait que la couleur de ses propres boutons. Il pose désormais
+   `data-density` sur `<html>` (cf. `src/lib/densite.ts`), et voici ce que cet
+   attribut PRODUIT réellement.
+
+   ⚠️ Spécificité : `:root[data-density='compact'] table :is(th, td)` pèse
+   (0,2,2) et l'emporte donc sur les utilitaires Tailwind `px-*`/`py-*` (0,1,0)
+   posés sur les cellules. Sans cela, la règle serait décorative — c'est-à-dire
+   exactement le défaut qu'on ferme.
+   ────────────────────────────────────────────────────────────────────────── */
+:root[data-density='compact'] table :is(th, td) {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  line-height: 1.25rem;
+}

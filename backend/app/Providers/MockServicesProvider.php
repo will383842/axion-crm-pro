@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use App\Contracts\LLMClient;
 use App\Contracts\ProxyProvider;
@@ -47,17 +48,50 @@ use App\Services\Scraping\PlaywrightSearchEngine;
 use App\Services\Scraping\PlaywrightDirectionFinder;
 
 /**
- * Bind real vs mock implementations based on env (.env MOCK_MODE / MOCK_<SERVICE>).
- * Cf. MOCKS-STRATEGY.md.
+ * Branche les implémentations RÉELLES ou SIMULÉES des services externes.
+ *
+ * 🔴 CONSTAT C18-016 / F37-002 (S0). CE FICHIER AVAIT LE DÉFAUT DANS LE MAUVAIS SENS.
+ *
+ * Il commençait par :
+ *
+ *     $master = (bool) env('MOCK_MODE', true);
+ *
+ * **Le défaut était `true`.** Une variable absente du conteneur, mal orthographiée, perdue lors
+ * d'un redéploiement ou d'un `docker compose restart` (qui ne relit pas `env_file` — constat
+ * A07-003), et les six services basculaient sur des simulacres. **En production. Sans que rien
+ * ne le signale.**
+ *
+ * Le pire des six est le modèle de langage : `MockLLMClient` écrit des classifications
+ * **fabriquées** dans la base — des données fausses, indiscernables des vraies, sur des fiches
+ * de personnes réelles. Un simulacre qui remplit un écran se voit ; un simulacre qui remplit
+ * une base ne se voit jamais.
+ *
+ * ── LE PRINCIPE, ET IL EST INVERSÉ PAR RAPPORT À AVANT ─────────────────────
+ *
+ * **Le défaut suit l'ENVIRONNEMENT, jamais l'inverse.** En `local` et en `testing`, simuler est
+ * la norme : le défaut y reste `true`. En `production` et en `staging`, le service réel est la
+ * norme : le défaut y est `false`.
+ *
+ * Et en **production**, un simulacre est refusé *même s'il est explicitement demandé*. Ce n'est
+ * pas une précaution excessive : il n'existe aucune raison légitime de servir des données
+ * fabriquées à des utilisateurs réels, et une variable posée par erreur ne doit pas pouvoir le
+ * décider. Le refus est **journalisé au niveau critique**, une fois par processus.
+ *
+ * Garde : `backend/tests/Feature/Infra/AucunSimulacreEnProductionTest.php`.
  */
 class MockServicesProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $master = (bool) env('MOCK_MODE', true);
+        // En production et en préproduction, le service RÉEL est le défaut.
+        // Ailleurs (local, testing), le simulacre l'est — sinon toute la suite
+        // de tests tomberait, et ce serait un correctif pire que le défaut.
+        $defautSimulacre = ! $this->app->environment(['production', 'staging']);
+
+        $master = $this->drapeau('MOCK_MODE', $defautSimulacre);
 
         $bind = function (string $contract, string $real, string $mock, string $envFlag) use ($master) {
-            $useMock = (bool) env($envFlag, $master);
+            $useMock = $this->drapeau($envFlag, $master);
             $this->app->bind($contract, $useMock ? $mock : $real);
         };
 
@@ -85,6 +119,52 @@ class MockServicesProvider extends ServiceProvider
         $bind(WebsiteScraper::class,           PlaywrightWebsiteScraper::class,   MockWebsiteScraper::class,          'MOCK_SCRAPERS');
         $bind(SearchEngine::class,             PlaywrightSearchEngine::class,     MockSearchEngine::class,            'MOCK_SCRAPERS');
         $bind(DirectionFinder::class,          PlaywrightDirectionFinder::class,  MockDirectionFinder::class,         'MOCK_SCRAPERS');
+    }
+
+    /** N'alerte qu'une fois par processus : sinon le journal noie son propre signal. */
+    private static bool $refusSignale = false;
+
+    /**
+     * Lit un drapeau de simulacre — et REFUSE toute simulation en production.
+     *
+     * ⚠️ `filter_var(..., FILTER_VALIDATE_BOOLEAN)` et non `(bool)`. L'ancien code faisait
+     * `(bool) env($flag, $master)` : or `(bool) "false"` vaut **`true`** en PHP, comme
+     * `(bool) "0.0"` ou `(bool) "off"`. Laravel normalise `"false"` dans `env()`, mais pas les
+     * autres formes — et une variable posée à `"off"` par un opérateur qui croit la désactiver
+     * l'activait. Le validateur, lui, reconnaît `false`, `0`, `off`, `no` et la chaîne vide.
+     *
+     * 🔴 LE REFUS EN PRODUCTION N'EST PAS CONTOURNABLE, ET C'EST VOULU.
+     *
+     * Il n'existe aucune raison légitime de servir des données fabriquées à des utilisateurs
+     * réels. Rendre le refus contournable par une variable, c'est reconstruire exactement le
+     * défaut qu'on répare : il suffirait qu'un `MOCK_LLM=true` traîne dans un `.env` pour que
+     * la base se remplisse de classifications inventées.
+     *
+     * Le refus est journalisé au niveau **critique**, parce qu'il révèle une configuration de
+     * production fautive — le silence ici redonnerait le défaut d'origine, qui était
+     * précisément de ne rien dire.
+     */
+    private function drapeau(string $variable, bool $defaut): bool
+    {
+        $demande = filter_var(env($variable, $defaut), FILTER_VALIDATE_BOOLEAN);
+
+        if (! $demande || ! $this->app->environment('production')) {
+            return $demande;
+        }
+
+        if (! self::$refusSignale) {
+            self::$refusSignale = true;
+            Log::critical(
+                "Simulacre REFUSE en production : {$variable} demande un service simule. "
+                . 'Constat C18-016/F37-002 (S0) : un simulacre en production ecrit des donnees '
+                . 'FABRIQUEES en base, indiscernables des vraies. Le service reel est branche a '
+                . 'la place. Verifiez la configuration du conteneur (docker inspect), pas le '
+                . '.env : `docker compose restart` ne relit pas env_file.',
+                ['variable' => $variable, 'environnement' => $this->app->environment()],
+            );
+        }
+
+        return false;
     }
 
     public function boot(): void

@@ -45,6 +45,49 @@ test('Phase2 stubs sans auth retournent 401', function () {
     $this->getJson('/api/v1/linkedin')->assertUnauthorized();
 });
 
+/**
+ * H45-001 (S1) — LE 25e CAS DE LA FAMILLE « sans auth -> 401, jamais 500 ».
+ *
+ * Le test ci-dessus n'interroge le produit que par `getJson()`, qui pose
+ * `Accept: application/json`. C'est le seul en-tete qui EVITAIT le defaut
+ * A-001 : sans lui, `Authenticate` demandait `route('login')`, qui n'existe pas
+ * dans cette API, et la reponse partait en 500 (`RouteNotFoundException`) au
+ * lieu de 401. Mesure de l'agent 45 sur la PRODUCTION : 5 adresses sur 5,
+ * `Accept: application/json` -> 401, `Accept: text/html` -> 500.
+ *
+ * Les 24 autres cas sont dans `Sprint189NoFiveHundredTest` ; l'explication
+ * complete du mecanisme et du correctif y est ecrite. Les DEUX sites devaient
+ * etre repares : l'audit en nomme souvent un, il y en a souvent deux.
+ *
+ * Le cas JSON reste joue ci-dessus, sur les MEMES trois adresses : c'est lui le
+ * temoin. S'il rougissait en meme temps que celui-ci, on ne mesurerait plus
+ * l'en-tete `Accept` mais la disparition des routes.
+ */
+test('H45-001 — Phase2 stubs sans auth ET sans Accept JSON retournent 401, jamais 500', function () {
+    // ⚠️ `$this->get($uri, $entetes)` et NON `call()` : `call()` n'envoie pas
+    // les en-tetes, et une sonde de l'audit s'y est deja fait prendre.
+    $navigateur = ['Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'];
+    $clientNu = ['Accept' => '*/*'];
+
+    foreach (['/api/v1/campaigns', '/api/v1/cold-email', '/api/v1/linkedin'] as $url) {
+        foreach ([$navigateur, $clientNu] as $entetes) {
+            $reponse = $this->get($url, $entetes);
+
+            // 401 EXACTEMENT, pas « moins que 500 » : un 404 (route disparue)
+            // rendrait cette garde verte par vacuite.
+            $this->assertSame(401, $reponse->getStatusCode(), sprintf(
+                'A-001 est de retour : %s rend %d avec « Accept: %s », la ou il '
+                . 'rend 401 avec « Accept: application/json ». Correctif : les '
+                . 'deux pieces de bootstrap/app.php (redirectGuestsTo(fn () => null) '
+                . 'ET shouldRenderJsonWhen sur api/*).',
+                $url,
+                $reponse->getStatusCode(),
+                $entetes['Accept'],
+            ));
+        }
+    }
+});
+
 test('campaigns n\'est plus un bouchon Phase 2 : 200 + liste paginée', function () {
     $u = makePhase2User();
 

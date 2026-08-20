@@ -301,14 +301,64 @@ test('runWithoutScope exige une justification écrite', function () {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 4. INERTIE — drapeaux à OFF, le comportement est celui d'avant le lot L0
+//
+// 🔴 A08-003 (S1), 2026-08-20 — CES TROIS TESTS ONT ÉTÉ RENOMMÉS, ET LEURS
+// ASSERTIONS N'ONT PAS BOUGÉ D'UN CARACTÈRE.
+//
+// Ils s'appelaient « drapeaux PAR DÉFAUT : aucun durcissement actif » et
+// « drapeau db_app_role à OFF : la connexion par défaut reste le rôle
+// historique ». Lus dans un rapport ou dans une sortie de CI, ces deux titres
+// se lisent comme des phrases sur LE PRODUIT. Ils n'en sont pas : ils décrivent
+// la configuration sous laquelle la suite tourne, et rien d'autre.
+//
+// Or ce dépôt affirme, en quatre endroits datés du même jour, que la PRODUCTION
+// tourne avec le rôle applicatif ARMÉ (constat A08-001 : « coverage:refresh-matrix
+// échoue 71 fois sur 71 en production depuis l'armement du rôle applicatif »,
+// cf. `app/Console/Commands/CoverageRefreshMatrix.php`). Ces titres annonçaient
+// donc, mot pour mot, l'inverse de ce qui tourne — sans que rien ne signale que
+// les deux phrases ne parlent pas du même système.
+//
+// ── LA MESURE QUI TRANCHE, ET QUI VA PLUS LOIN QUE LE CONSTAT ────────────────
+//
+// La suite ne se contente pas de ne PAS tourner dans la configuration de la
+// production : elle NE PEUT PAS y tourner. Mesuré le 2026-08-20 en injectant le
+// drapeau dans l'exécution, sans toucher un fichier :
+//
+//   $ docker exec -e CRM_DB_APP_ROLE_ENABLED=true a35r \
+//       ./vendor/bin/pest -c /tmp/a35r/phpunit-lot11.xml tests/Feature/RlsTest.php --filter=drapeau
+//     SQLSTATE[42501]: Insufficient privilege: 7
+//     ERROR:  must be owner of table activities
+//     (SQL: drop table "public"."activities", … cascade)
+//
+// `RefreshDatabase` émet un `DROP TABLE … CASCADE` sur la connexion par défaut.
+// Sous le rôle applicatif non-propriétaire, PostgreSQL le refuse. Ce n'est pas
+// ces trois tests qui tombent, c'est le trait `RefreshDatabase` : la suite
+// entière est indisponible sous la configuration que la production est censée
+// avoir.
+//
+// ── CE QUI N'A PAS ÉTÉ FAIT, ET POURQUOI ─────────────────────────────────────
+//
+// On n'a PAS changé les assertions : elles sont exactes. On n'a PAS armé le
+// drapeau dans une configuration de test : cela changerait la sémantique de
+// 159 fichiers de tests, et le mandat l'interdit (règle 10). On n'a PAS tranché
+// l'état réel de la production : elle n'est pas observable depuis ce dépôt, et
+// le dépôt se contredit lui-même (`app/Console/Commands/PartmanMaintenir.php`
+// écrit, le même jour, « aujourd'hui CRM_DB_APP_ROLE_ENABLED vaut false »).
+//
+// La divergence est désormais FIGÉE par une garde dédiée :
+// `tests/Feature/Infra/LaSuiteNeTourneJamaisEnConfigDeProdTest.php`.
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('drapeaux par défaut : aucun durcissement actif', function () {
+test('INERTIE — sous CETTE configuration de test, aucun durcissement n est actif (ne dit rien de la production)', function () {
+    // ⚠️ Ce que ce test mesure : la valeur que `config/crm.php` rend quand
+    // AUCUNE configuration de test ne pose les deux variables — et aucune ne les
+    // pose (vérifié par la garde A08-003). Il mesure donc le DÉFAUT DU CODE.
+    // Il ne mesure pas, et ne peut pas mesurer, l'état du serveur.
     expect(config('crm.db_app_role'))->toBeFalsy()
         ->and(config('crm.strict_workspace_scope'))->toBeFalsy();
 });
 
-test('drapeaux OFF : une requête sans contexte se comporte comme avant (aucune exception)', function () {
+test('INERTIE — sous CETTE configuration de test, une requête sans contexte se comporte comme avant (aucune exception)', function () {
     [$wsA, $wsB] = rlsSeedTwoWorkspaces();
     config(['crm.strict_workspace_scope' => false]);
     WorkspaceContext::clear();
@@ -320,7 +370,12 @@ test('drapeaux OFF : une requête sans contexte se comporte comme avant (aucune 
     }
 });
 
-test('drapeau db_app_role à OFF : la connexion par défaut reste le rôle historique', function () {
+test('INERTIE — sous CETTE configuration de test, la connexion par défaut reste celle du propriétaire', function () {
+    // ⚠️ MÊME AVERTISSEMENT que ci-dessus, et il porte plus loin ici : c'est
+    // exactement cette égalité qui rend `RefreshDatabase` possible. Le jour où
+    // elle cesse d'être vraie — c'est-à-dire le jour où la suite tournerait
+    // comme la production est censée tourner — ce n'est pas ce test qui rougit
+    // en premier, c'est le `DROP TABLE … CASCADE` de chaque fichier de la suite.
     expect(config('database.connections.pgsql.username'))
         ->toBe(config('database.connections.pgsql_owner.username'));
 });

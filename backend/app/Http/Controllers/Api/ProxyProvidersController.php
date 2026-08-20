@@ -70,15 +70,71 @@ class ProxyProvidersController extends ApiController
  return $this->notImplemented('4'); }
 
     /**
-     * @OA\Post(path="/proxy-providers/{p}/test", tags={"LLM"}, summary="Health check live d'un provider",
+     * 🔴 CONSTAT C19-008 (S1) — UN CONTROLE DE SANTE QUI DISAIT TOUJOURS
+     * « EN BONNE SANTE ».
+     *
+     * Cette methode s'ecrivait :
+     *
+     *     public function test(ProxyProvider $p): JsonResponse { return $this->ok(['healthy' => true]); }
+     *
+     * ...tandis que sa documentation OpenAPI annoncait « Health check live d'un
+     * provider ». Identifiants absents, quota epuise, fournisseur injoignable :
+     * tout repondait « sain ». `ProxyProvidersPage.tsx` traduit fidelement ce
+     * mensonge en « Operationnel ✓ » dans un bandeau vert.
+     *
+     * *Le seul bouton de diagnostic du sous-systeme mandataire etait celui
+     * auquel on ne pouvait pas se fier — et il ne rougissait jamais, y compris
+     * le jour ou le mandataire EST la cause de la panne.*
+     *
+     * ─────────────────────────────────────────────────────────────────────────
+     * POURQUOI 501 ET PAS UN VRAI CONTROLE — LA MESURE, PUIS LA DECISION
+     * ─────────────────────────────────────────────────────────────────────────
+     *
+     * Deux `healthCheck()` REELS existent bien (`WebshareProvider:67`,
+     * `IPRoyalProvider:53` : requete via le mandataire vers `api.ipify.org`), et
+     * aucun controleur ne les appelle. La tentation evidente est de brancher.
+     *
+     * ⚠️ **Le brancher aujourd'hui reproduirait exactement le meme mensonge, une
+     * couche plus bas.** Deux mesures le disent :
+     *
+     *  1. `MockServicesProvider:106` lie `App\Contracts\ProxyProvider` a
+     *     `WebshareProvider` OU `MockProxyProvider` selon `MOCK_PROXIES` — et le
+     *     defaut de ce depot est `MOCK_PROXIES=true`. Or
+     *     `MockProxyProvider::healthCheck()` s'ecrit `return true;`. On aurait
+     *     donc remplace un `true` en dur dans le controleur par un `true` en dur
+     *     dans le simulacre : meme reponse, mensonge mieux cache.
+     *
+     *  2. Le conteneur ne lie QU'UN SEUL fournisseur. La route, elle, recoit un
+     *     `{p}` — une LIGNE de `proxy_providers_config`. Tester la ligne
+     *     « iproyal-eu » interrogerait Webshare. Resoudre le bon fournisseur
+     *     depuis le `slug` de la ligne est un choix de conception (fabrique,
+     *     table de correspondance, gestion du fournisseur inconnu) : cela change
+     *     la semantique de la route et ne se prend pas au detour d'un correctif.
+     *
+     * `501` est donc l'etat HONNETE, et c'est aussi celui que l'audit prescrit
+     * en premier ressort. C'est enfin ce que fait deja `update()` douze lignes
+     * plus haut : le controleur savait dire « pas implemente » ; `test()` avait
+     * ete ecrit pour dire « sain » a la place.
+     *
+     * ⚠️ CE QUI RESTE A FAIRE, ET QUI N'EST PAS DANS CE PERIMETRE.
+     * `ProxyProvidersPage.tsx:47` traduit toute erreur par « Echec du test ».
+     * Un `501` y affichera donc « Echec du test » plutot que « Diagnostic non
+     * disponible ». C'est imprecis, mais ce n'est plus faux — et le frontend est
+     * hors du perimetre de ce lot.
+     *
+     * Garde : `tests/Feature/Api/CorpsCodeEnDurTest.php`.
+     *
+     * @OA\Post(path="/proxy-providers/{p}/test", tags={"LLM"}, summary="Health check live d'un provider (Sprint 4)",
      *     security={{"sanctumCookie":{}}},
      *     @OA\Parameter(name="p", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\Response(response=200, description="Healthy"))
+     *     @OA\Response(response=501, description="Not implemented"))
      */
     public function test(ProxyProvider $p): JsonResponse {
         // Constat B12-001 / F36-005 : la resolution de route rendait
         // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
         // « interdit » confirmerait son existence.
         $this->refuserHorsEspace($p);
- return $this->ok(['healthy' => true]); }
+
+        return $this->notImplemented('4');
+    }
 }

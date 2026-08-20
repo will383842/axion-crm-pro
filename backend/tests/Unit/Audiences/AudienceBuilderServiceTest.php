@@ -22,12 +22,37 @@ beforeEach(function () {
     $this->service = new AudienceBuilderService;
 });
 
+/**
+ * ⚠️ `quality_score` est une colonne DERIVEE depuis le correctif C21-004
+ * (migration `2026_08_20_000001_quality_score_declencheur_complet`) : le
+ * declencheur `companies_recompute_score` est passe en `BEFORE INSERT OR
+ * UPDATE OF …` et ecrase donc, a l'insertion, toute valeur choisie par
+ * l'appelant. C'etait deja l'intention — aucun chemin applicatif n'y ecrit de
+ * valeur arbitraire — mais ce n'etait pas ce que la base FAISAIT, d'ou 82,58 %
+ * de scores faux mesures en production le 2026-08-19.
+ *
+ * Ces tests ne portent pas sur la PROVENANCE du score : ils portent sur le
+ * filtre `quality_score` d'`AudienceBuilderService`. On pose donc la valeur par
+ * un `UPDATE` de la seule colonne `quality_score`, qui n'est PAS dans la liste
+ * ecoutee par le declencheur et ne doit jamais y entrer (recursion). Les fiches
+ * portent exactement les memes scores qu'avant : rien n'est affaibli ici.
+ */
 function mkCompany(string $wsId, array $attrs = []): Company
 {
-    return Company::create(array_merge([
+    $scoreImpose = $attrs['quality_score'] ?? null;
+    unset($attrs['quality_score']);
+
+    $company = Company::create(array_merge([
         'workspace_id' => $wsId,
         'siren' => str_pad((string) random_int(1, 999999999), 9, '0', STR_PAD_LEFT),
     ], $attrs));
+
+    if ($scoreImpose !== null) {
+        DB::table('companies')->where('id', $company->id)->update(['quality_score' => $scoreImpose]);
+        $company->refresh();
+    }
+
+    return $company;
 }
 
 /**

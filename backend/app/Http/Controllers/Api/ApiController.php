@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 
@@ -46,6 +47,35 @@ use Illuminate\Routing\Controller;
  */
 abstract class ApiController extends Controller
 {
+    /**
+     * 🔴 CONSTAT F36-002 (S0) — `$this->authorize()` ETAIT UN APPEL FATAL DANS LES
+     * 37 CONTROLEURS D'API, ET C'EST POURQUOI F36-001 EXISTE.
+     *
+     * Cette classe etend `Illuminate\Routing\Controller`, celle du framework, qui ne porte PAS
+     * `AuthorizesRequests` depuis Laravel 11. La classe de base du depot
+     * (`App\Http\Controllers\Controller`) la porte, elle — mais aucun controleur d'API ne
+     * l'etend. Consequence mesuree : `$this->authorize()` levait
+     * « Call to undefined method », et le depot n'en contenait **AUCUNE occurrence**.
+     *
+     * C'est la cause mecanique de `F36-001` : « aucune des policies n'est jamais invoquee, la
+     * couche d'autorisation du produit est du code mort ». Dix policies sont enregistrees dans
+     * `AuthServiceProvider`, ecrites, testables — et structurellement inatteignables depuis les
+     * routes. *Une porte fermee a clef dont la serrure n'est reliee a rien.*
+     *
+     * ⚠️ CE QUE CE TRAIT NE FAIT PAS, ET IL FAUT LE DIRE.
+     *
+     * Il rend `authorize()` APPELABLE. Il n'appelle rien. Les 37 controleurs restent sans
+     * verification de policy, et `F36-001` reste OUVERT — le cabler route par route est un
+     * choix de conception qui change le comportement de ~110 points d'API, et cela ne se prend
+     * pas au detour d'un correctif (regle 7 du mandat).
+     *
+     * Ce qui change : la piece cesse d'etre inatteignable. Le jour ou on cablera, on n'aura pas
+     * a decouvrir en meme temps que la methode n'existe pas.
+     *
+     * Garde : `backend/tests/Feature/Rgpd/CoucheAutorisationAtteignableTest.php`.
+     */
+    use AuthorizesRequests;
+
     /**
      * Refuse un enregistrement qui appartient a un AUTRE espace de travail.
      *

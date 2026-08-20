@@ -14,6 +14,7 @@ use App\Services\Audiences\AudienceBuilderService;
 use App\Services\Classification\AutoClassifierService;
 use App\Services\Dedup\DeduplicationService;
 use App\Services\Domain\DomainFinderService;
+use App\Services\Http\SsrfGuard;
 use App\Services\Legal\MentionsLegalesScraperService;
 use App\Services\Scraping\GooglePlacesClient;
 use App\Services\Tags\AutoTaggerService;
@@ -323,8 +324,38 @@ class WaterfallOrchestrator
                 $touched = true;
             }
             if (! $company->website && $data['website']) {
-                $company->website = $data['website'];
-                $touched = true;
+                // ── C19-001 — SITE JUMEAU NON PORTE (mesure du 2026-08-20) ──
+                // `$data['website']` est le champ `places.websiteUri` rendu par
+                // l'API Google Places : une valeur fournie par un TIERS, donc de
+                // la donnee, exactement au meme titre que le resultat de l'API
+                // Brave et que le `href` extrait de Pages Jaunes. Ces deux-la
+                // ont ete gardes le meme jour dans `DomainFinderService`
+                // (lignes 475 et 526) ; celui-ci ne l'avait pas ete —
+                // `grep -n SsrfGuard` sur ce fichier rendait 0 resultat.
+                //
+                // Ce qu'on empeche, precisement : qu'une adresse interne soit
+                // PERSISTEE dans `companies.website`. Le fetch aval la refuse
+                // deja (MentionsLegales, passe 3), donc ce n'est pas la lecture
+                // de l'infrastructure qu'on ferme ici, c'est sa PROPAGATION :
+                // une fois en base, la valeur est affichee dans la fiche,
+                // exportee en CSV, et renvoyee au worker Playwright comme
+                // `target_url` (etape 4, ligne ~418). Un seul champ empoisonne
+                // se propage a toute la chaine, et chaque garde aval devient un
+                // point unique de defaillance.
+                //
+                // On ne refuse QUE ce champ : le telephone, l'adresse et les
+                // coordonnees du meme `place` restent ecrits. Un refus qui fait
+                // sauter toute l'etape ne serait pas un correctif, ce serait une
+                // panne.
+                if (SsrfGuard::check((string) $data['website'])['ok']) {
+                    $company->website = $data['website'];
+                    $touched = true;
+                } else {
+                    Log::warning('google-places: websiteUri refuse par la garde SSRF', [
+                        'company_id' => $company->id,
+                        'website' => $data['website'],
+                    ]);
+                }
             }
             if (! $company->address && $data['address']) {
                 $company->address = $data['address'];

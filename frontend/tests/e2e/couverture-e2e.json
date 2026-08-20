@@ -1,0 +1,38 @@
+{
+  "_lisez_moi": [
+    "REGISTRE DE COUVERTURE DES SUITES E2E — defaut P6-UI-008 (S1).",
+    "",
+    "Constat mesure le 2026-08-20 : le depot portait 17 fichiers `tests/e2e/*.spec.ts`",
+    "et 3 seulement etaient joues par un workflow (`a11y.yml` : a11y, dark-contraste,",
+    "navigation). Les 14 autres existaient, donnaient l'apparence d'une couverture, et",
+    "n'etaient executes NULLE PART. Mesure a l'appui : joues a la main sur le build",
+    "(`vite preview`, chromium 1234), 4 d'entre eux etaient ROUGES depuis un temps",
+    "indetermine — personne ne pouvait le savoir.",
+    "",
+    "REGLE, tenue par `frontend/tests/couverture-e2e.test.ts` (bloquante via `pnpm test`,",
+    "job `frontend` de `.github/workflows/ci.yml`) :",
+    "  toute suite `tests/e2e/*.spec.ts` est SOIT jouee par un workflow de",
+    "  `.github/workflows/`, SOIT inscrite ci-dessous avec un motif ECRIT.",
+    "Ajouter un fichier de suite sans faire l'un des deux fait rougir la garde.",
+    "",
+    "Un motif n'est pas une excuse : il dit POURQUOI la suite ne peut pas tourner en CI,",
+    "avec le chiffre ou la sortie mesuree, et il nomme la reparation attendue."
+  ],
+  "exclues": {
+    "console-locale.spec.ts": {
+      "depuis": "2026-08-20",
+      "motif": "Cette suite n'est pas un test de composant : elle exige la PILE LOCALE COMPLETE. Elle ouvre https://app.localhost servi par Caddy avec un certificat `tls internal`, se connecte avec le compte de verification `console-locale@axion-ia.test` qui doit exister en base, franchit l'ecran 2FA en calculant un code TOTP, et va lire le secret via `docker exec axion-crm-api php artisan tinker` quand `E2E_TOTP_SECRET` n'est pas pose. Aucun de ces elements n'existe sur un runner GitHub : ni le conteneur `axion-crm-api`, ni la base peuplee, ni l'origine `app.localhost`. La cabler la rendrait rouge a chaque execution sans jamais rien mesurer. C'est une PREUVE LOCALE, jouee a la main, documentee par `_REPORTS/RUNBOOK-CONSOLE-LOCALE.md`.",
+      "reparation_attendue": "Aucune tant que la CI ne monte pas le docker-compose complet avec un jeu de donnees seme. Si un jour un job `e2e-integration` monte la pile, cabler cette suite la, jamais dans le job qui ne sert qu'un build statique."
+    },
+    "auth.spec.ts": {
+      "depuis": "2026-08-20",
+      "motif": "ROUGE MESURE le 2026-08-20 sur le build servi par `vite preview` : 3 tests sur 4 echouent, pour TROIS causes distinctes. (1) Le navigateur de test annonce `en-US` ; `src/lib/i18n.ts:17` detecte la langue via `navigator` et sert donc l'anglais : l'ecran affiche `heading \"Sign in\"`, `Email address`, `Password`, alors que la suite cherche /connexion/i et /adresse e-mail/i. Avec `test.use({ locale: 'fr-FR' })`, le francais revient et `magic-link` passe (mesure). (2) Meme sous fr-FR, `getByLabel(/mot de passe/i)` VIOLE le mode strict : il resout 2 elements, le champ `aria-label=\"Mot de passe\"` ET le bouton `aria-label=\"Afficher le mot de passe\"`. (3) `/2fa` affiche `Double authentification / Un instant... / Chargement...` : l'ecran attend une connexion EN COURS ; sans POST prealable sur /auth/login, le champ a 6 chiffres n'apparait jamais. Ce dernier point n'est pas reparable par une assertion : il demande un etat de session.",
+      "reparation_attendue": "Poser `test.use({ locale: 'fr-FR' })` en tete de suite ; viser le champ par `getByRole('textbox', { name: 'Mot de passe' })` au lieu de `getByLabel` ; et donner a `/2fa` l'etat qu'il attend (simuler /auth/login et sa reponse `2fa_required`) ou retirer ce test au profit du parcours complet deja couvert par `console-locale.spec.ts`. Non pris ici : `auth.spec.ts` est le fichier du lot AUTHENTIFICATION en cours, et l'etape /2fa touche a ce que l'utilisateur traverse reellement."
+    },
+    "coverage.spec.ts": {
+      "depuis": "2026-08-20",
+      "motif": "ROUGE MESURE le 2026-08-20 : 2 tests sur 2. Les libelles du produit ont ete renommes et la suite est restee sur les anciens. Boutons reellement rendus sur /coverage, releves a la sonde : `Visualisation`, `Recherche`, `Action`, `Regions`, `Departements`, `Villes` (source : `src/features/coverage/CoveragePage.tsx:12,18,19`). La suite cherche `/^Visu$/` et le nom exact `region` : aucun des deux n'existe plus. Le second test assure en outre `toHaveClass(/bg-slate-900/)` sur le bouton actif, or la classe MESUREE du bouton actif est `bg-white text-slate-900 shadow-sm ring-1 ring-slate-200` : il n'y a pas de `bg-slate-900`, et il n'y en a probablement jamais eu depuis le changement de style.",
+      "reparation_attendue": "Renommer les cibles (`Visualisation`, `Regions`) est mecanique. Mais assurer l'etat ACTIF sur une classe utilitaire Tailwind est une garde en sable : elle rougira au prochain coup de peinture sans qu'aucun comportement n'ait bouge. La bonne reparation est d'assurer sur `aria-pressed`, ce que ces boutons n'exposent PAS aujourd'hui. Cela demande de modifier le produit — un changement de semantique d'accessibilite — donc hors de ce lot de cablage."
+    }
+  }
+}

@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use App\Models\Workspace;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -14,8 +13,11 @@ use Illuminate\Support\Facades\Http;
  *   - spel   : Services de presse en ligne reconnus (~1 331, AVEC url du site)
  *   - agences: Agences de presse agréées (~176)
  *
- * Idempotent = full-refresh PAR SOURCE (DELETE source=… puis ré-insertion) →
- * relançable sans doublon. Récupère TOUT le dataset via l'endpoint /exports/json.
+ * Idempotent = FUSION par source (B17-008, 2026-08-20). Le full-refresh
+ * (DELETE source=… puis ré-insertion) a été retiré : rejoué 3 fois par semaine,
+ * il recréait les fiches avec un id neuf, ce qui DÉTACHAIT les journalistes
+ * (FK ON DELETE SET NULL) et effaçait tout l'enrichissement de la semaine.
+ * Voir {@see ImportMediaMerge}. Récupère TOUT le dataset via /exports/json.
  *
  * ⚠️ PÉRIODICITÉ — enquête 2026-07-14 (audit).
  * Le dataset `liste-des-publications-de-presse` (data.culture.gouv.fr) expose
@@ -32,6 +34,8 @@ use Illuminate\Support\Facades\Http;
  */
 class ImportMediaFromOpendatasoft extends Command
 {
+    use ImportMediaMerge;
+
     protected $signature = 'media:import-opendatasoft {source : cppap|spel|agences} {--workspace=}';
 
     protected $description = 'Importe les médias depuis les registres CPPAP (publications, services en ligne, agences).';
@@ -125,20 +129,40 @@ class ImportMediaFromOpendatasoft extends Command
             ];
         }
 
-        // Full-refresh idempotent par source (transaction).
-        $inserted = 0;
-        DB::transaction(function () use ($cfg, $workspaceId, $rows, &$inserted) {
-            DB::table('media')
-                ->where('source', $cfg['source_tag'])
-                ->where('workspace_id', $workspaceId)
-                ->delete();
-            foreach (array_chunk($rows, 500) as $chunk) {
-                DB::table('media')->insert($chunk);
-                $inserted += count($chunk);
-            }
-        });
+        // ── B17-008 : FUSION, plus de full-refresh ───────────────────────────
+        // Avant (mesuré sur ce dépôt le 2026-08-20) : DELETE source=… puis INSERT,
+        // rejoué 3 fois par semaine (routes/console.php:149-151). L'id de la fiche
+        // changeait à chaque rejeu (1 → 2 dans la garde) → journalistes détachés
+        // (FK ON DELETE SET NULL), email / phone / socials / enrich_status /
+        // company_id perdus, et une réponse 200 au corps vide faisait tomber la
+        // source de 1 fiche à 0.
+        // Après : {@see ImportMediaMerge::mergeMediaRows()} — la fiche garde son id.
+        if ($rows === []) {
+            $this->refuseLotVide($cfg['source_tag']);
 
-        $this->info("✓ {$inserted} médias importés (source={$cfg['source_tag']}).");
+            return self::FAILURE;
+        }
+
+        $stats = $this->mergeMediaRows(
+            sourceTag: $cfg['source_tag'],
+            workspaceId: (string) $workspaceId,
+            rows: $rows,
+            // Clé naturelle : le n° CPPAP quand la source en porte un (il y a déjà
+            // un index UNIQUE partiel dessus, migration 2026_07_06_000002:75) ;
+            // sinon le nom normalisé (cas `agences`, dont le dataset n'expose
+            // aucun identifiant — cf. self::SOURCES['agences']['map']).
+            keyOf: static fn (array $r): string => ($r['cppap_number'] ?? null) !== null && $r['cppap_number'] !== ''
+                ? 'cppap:' . mb_strtolower(trim((string) $r['cppap_number']))
+                : 'nom:' . mb_strtolower(trim((string) ($r['name'] ?? ''))),
+            // Le registre possède l'identité et la géographie déclarée.
+            sourceOwned: ['name', 'media_type', 'media_family', 'publisher', 'department_code', 'cppap_number'],
+            // Le site SPEL et la périodicité ne sont posés que si la base est vide
+            // dessus : media:find-websites / media:backfill-periodicity ont pu
+            // trouver mieux entre deux imports.
+            backfillOnly: ['website', 'periodicity'],
+        );
+        $this->afficheFusion($cfg['source_tag'], $stats);
+
         $withSite = collect($rows)->whereNotNull('website')->count();
         if ($withSite > 0) {
             $this->info("  dont {$withSite} avec un site web fourni par la source.");

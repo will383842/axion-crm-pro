@@ -232,7 +232,47 @@ class JournalistsController extends ApiController
         // « interdit » confirmerait son existence.
         $this->refuserHorsEspace($journalist);
 
+        // L'email est lu AVANT l'effacement : le soft-delete conserve les
+        // attributs, mais dépendre de ce détail rendrait le code faux le jour
+        // où l'effacement deviendra une anonymisation.
+        $email = $journalist->email;
+
         $journalist->delete();
+
+        // 🔴 CONSTAT B14-010 (S1), mesuré le 2026-08-20. L'effacement n'émettait
+        // RIEN, dans le contrôleur même où `optOut()` — deux méthodes plus haut —
+        // émet correctement depuis le lot L5. Patron A-011 du dépôt : le
+        // correctif existait déjà à quelques lignes de là et n'avait pas été
+        // porté.
+        //
+        // Conséquence : le site continuait d'adresser une personne dont le CRM
+        // a effacé la fiche, et la prochaine synchro site → CRM la recréait.
+        // L'article 17 n'est pas « effacer ici », c'est « effacer partout où on
+        // l'a diffusée » — le canal CRM → site EST le moyen de le tenir.
+        //
+        // Sans email, il n'y a pas de hash — donc rien que le site puisse
+        // rapprocher : on ne met rien en file plutôt qu'un message inexploitable
+        // qui grossirait un backlog ne convergeant jamais.
+        if (is_string($email) && trim($email) !== '') {
+            try {
+                app(ConsentOutboundRecorder::class)->recordForEmail(
+                    'erasure',
+                    $email,
+                    'business',
+                    payload: ['surface' => 'console:journalists', 'journalist_id' => $journalist->id],
+                );
+            } catch (\Throwable $e) {
+                // Une panne de la mini-outbox ne fait pas échouer un droit à
+                // l'effacement déjà acté en base. Journalisé, jamais avalé —
+                // même règle qu'en `optOut()`.
+                Log::error('crm.outbound.record_failed', [
+                    'event_type' => 'erasure',
+                    'journalist_id' => $journalist->id,
+                    'exception' => $e->getMessage(),
+                ]);
+                report($e);
+            }
+        }
 
         return response()->json(null, 204);
     }

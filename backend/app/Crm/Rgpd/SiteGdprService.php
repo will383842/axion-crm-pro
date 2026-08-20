@@ -26,6 +26,57 @@ use Illuminate\Support\Facades\DB;
  * L'effacement journalise dans `rgpd_requests` (le journal d'exécution
  * existant, un par workspace touché) + la chaîne d'audit. L'opt-out par
  * univers (email hashé) survit à l'effacement : c'est l'anti-réinsertion.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * C21-001 — POURQUOI LES RECHERCHES PAR E-MAIL DE CE FICHIER S'ÉCRIVENT
+ * `->where('email', $email)` ET NON `->whereRaw('lower(email::text) = ?')`.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Les cinq recherches par adresse de ce service s'écrivaient :
+ *
+ *     ->whereRaw('lower(email::text) = ?', [$email])
+ *
+ * `contacts.email`, `candidates.email` et `health_practitioners.email` sont de
+ * type **`citext`** : la comparaison y est DÉJÀ insensible à la casse. Le
+ * `lower()` ne changeait donc RIEN à la sémantique — d'autant que `export()` et
+ * `erase()` mettent l'adresse en minuscules dès leur première ligne. Il ne
+ * faisait qu'une chose : transformer la colonne en EXPRESSION (`citext → text`,
+ * puis `lower()`), et un index B-tree posé sur la COLONNE ne couvre pas une
+ * expression. Postgres n'avait plus que le balayage séquentiel — alors que
+ * `idx_contacts_email` et `idx_candidates_email` étaient là, et pesaient.
+ * C'est `G41-003` mot pour mot : l'index existe et ne sert pas.
+ *
+ * Mesure du 2026-08-20 sur le banc, 20 000 lignes par table, `EXPLAIN` du SQL
+ * RÉELLEMENT émis par ce service (intercepté par `DB::listen`) :
+ *
+ *   AVANT   Seq Scan on contacts .................. 13,172 ms · 589 tampons
+ *             Filter: (workspace_id = … AND (person_key = … OR
+ *                      lower((email)::text) = 'fe7ecc…@exemple.fr'))
+ *
+ *   APRÈS   BitmapOr(idx_contacts_workspace_person_key,
+ *                    idx_contacts_email) ........... 0,094 ms ·   6 tampons
+ *
+ * Soit 140 fois moins de temps et 98 fois moins de pages lues — sur 20 000
+ * lignes seulement. `health_practitioners` : 11,764 ms → 0,034 ms.
+ * `candidates` : 9,500 ms → 0,049 ms.
+ *
+ * Le coût d'un balayage croît LINÉAIREMENT avec la table ; celui de l'index,
+ * logarithmiquement. Une demande d'accès ou d'effacement est un droit avec un
+ * délai légal, pas une requête de confort.
+ *
+ * ⚠️ NE PAS RÉINTRODUIRE `lower(email::text)` ICI. Une garde le vérifie
+ * littéralement : `tests/Feature/Infra/IndexEmailRgpdServentLesRequetesTest.php`,
+ * test « les chemins repares n emploient plus lower(email::text) » ; et les
+ * quatre mesures voisines redemandent à Postgres, par `EXPLAIN`, si le plan
+ * emploie l'index.
+ *
+ * ⚠️ CE N'EST PAS FINI AILLEURS, et c'est consigné plutôt que tu. La même forme
+ * survit dans `app/Services/Rgpd/GdprErasureService.php` (1 occurrence, sur
+ * `email_verification_logs`),
+ * `app/Services/Rgpd/GdprPortabilityService.php` (3), `app/Crm/Ingest/ContactUpserter.php`
+ * (1) et `app/Crm/Ingest/SiteSyncIngestService.php` (1) : SIX occurrences de code,
+ * mesurées le 2026-08-20.
+ * Hors du périmètre du lot qui a réparé celui-ci ; remonté au rapport.
  */
 final class SiteGdprService
 {
@@ -56,7 +107,7 @@ final class SiteGdprService
                     ->where('workspace_id', $businessId)
                     ->where(function ($q) use ($personKey, $email): void {
                         $q->where('person_key', $personKey)
-                            ->orWhereRaw('lower(email::text) = ?', [$email]);
+                            ->orWhere('email', $email);
                     })
                     ->get(['id', 'first_name', 'last_name', 'email', 'phone', 'role', 'linkedin_url', 'discovery_source', 'sources', 'legal_basis', 'consent_version', 'consent_at', 'created_at'])
                     ->map(fn (object $row): array => (array) $row)
@@ -75,7 +126,7 @@ final class SiteGdprService
                     ->where('workspace_id', $vivierId)
                     ->where(function ($q) use ($personKey, $email): void {
                         $q->where('person_key', $personKey)
-                            ->orWhereRaw('lower(email::text) = ?', [$email]);
+                            ->orWhere('email', $email);
                     })
                     ->get(['id', 'first_name', 'last_name', 'email', 'phone', 'relation_type', 'lifecycle_stage', 'source', 'offer_slug', 'legal_basis', 'consent_version', 'consent_at', 'consent_vivier_at', 'attributes', 'experiences', 'cv_ref', 'created_at'])
                     ->map(fn (object $row): array => (array) $row)
@@ -119,7 +170,7 @@ final class SiteGdprService
                             ->where('workspace_id', $businessId)
                             ->where(function ($q) use ($personKey, $email): void {
                                 $q->where('person_key', $personKey)
-                                    ->orWhereRaw('lower(email::text) = ?', [$email]);
+                                    ->orWhere('email', $email);
                             })
                             ->delete();
 
@@ -132,7 +183,7 @@ final class SiteGdprService
                         // couverte par le contexte posé ci-dessus.
                         $praticiens = DB::table('health_practitioners')
                             ->where('workspace_id', $businessId)
-                            ->whereRaw('lower(email::text) = ?', [$email])
+                            ->where('email', $email)
                             ->delete();
 
                         return [
@@ -161,7 +212,7 @@ final class SiteGdprService
                             ->where('workspace_id', $vivierId)
                             ->where(function ($q) use ($personKey, $email): void {
                                 $q->where('person_key', $personKey)
-                                    ->orWhereRaw('lower(email::text) = ?', [$email]);
+                                    ->orWhere('email', $email);
                             })
                             ->delete();
 

@@ -18,6 +18,7 @@ import { Drawer, GlobalSearch, Modal } from '@/components/ui';
 import { OnboardingTour } from '@/components/OnboardingTour';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { RouteErrorBoundary } from './RouteErrorBoundary';
 import { api } from '@/lib/api';
 import { subscribeWorkspaceNotifications } from '@/lib/echo';
 
@@ -98,7 +99,20 @@ export function RootLayout() {
         />
 
         <main id="main" className="flex-1 overflow-x-hidden px-4 py-5 md:px-6 md:py-6 lg:px-10">
-          <Outlet />
+          {/*
+            P6-UI-005 — SITE DE MONTAGE 2/3. La frontiere est posee A
+            L'INTERIEUR de `#main`, et non autour de toute la coquille : c'est
+            ce qui fait la difference entre « un ecran est tombe » et
+            « l'application est morte ». La barre laterale et l'en-tete restent
+            rendus, l'utilisateur clique ailleurs et repart.
+
+            Mesure : sans elle, le filet global de TanStack Router
+            (`Matches.js:36`) remplace TOUT l'arbre de matches — `#main`
+            disparait avec le reste, plus aucune navigation n'est offerte.
+          */}
+          <RouteErrorBoundary level="page">
+            <Outlet />
+          </RouteErrorBoundary>
         </main>
       </div>
 

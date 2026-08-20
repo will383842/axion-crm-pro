@@ -8,6 +8,7 @@ import {
   Drawer,
   EmptyState,
   PageHeader,
+  QueryErrorState,
   SearchInput,
   StatusPill,
   type StatusTone,
@@ -128,7 +129,21 @@ export function AuditLogsPage() {
         }
       />
 
-      {list.isLoading ? (
+      {/* 🔴 D25-001. Le journal d'audit est une PREUVE de conformité : « Aucun
+          journal d'audit » sous 403 ou sous 500 se lit « rien de sensible n'a
+          été tracé ». C'est l'inverse exact de ce que le fichier promet
+          (append-only, chaîne SHA-256) et le pire endroit où confondre un
+          silence avec un vide. Ici encore le texte rendu était le même sous
+          403, sous 500 et sur un journal réellement vide.
+          `list.data === undefined` : on n'efface pas des lignes déjà obtenues
+          si c'est un rafraîchissement qui a échoué (React Query v5 les garde). */}
+      {list.error !== null && list.data === undefined ? (
+        <QueryErrorState
+          error={list.error}
+          contexte="les journaux d’audit"
+          onRetry={() => void list.refetch()}
+        />
+      ) : list.isLoading ? (
         <CompaniesTableSkeleton rows={10} />
       ) : rows.length === 0 ? (
         <EmptyState

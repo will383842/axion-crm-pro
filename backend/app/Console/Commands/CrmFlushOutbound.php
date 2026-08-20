@@ -30,14 +30,36 @@ use stdClass;
  *     invalide ; le rejouer échouera éternellement. On brûle le budget de
  *     retry pour rien et on masque le vrai problème derrière un compteur qui
  *     grimpe lentement. Symétrique du 422 que le CRM renvoie au site (L2).
- *   - 503 : on attend, SANS consommer d'essai. Le site est temporairement
- *     indisponible (drapeau à OFF, maintenance) — ce n'est pas un échec de CE
- *     message. Compter ces cycles comme des essais ferait abandonner des
- *     oppositions parfaitement valides après une nuit de maintenance ; or une
- *     opposition abandonnée, c'est une divergence RGPD durable.
- *   - autre / réseau : essai CONSOMMÉ, backoff exponentiel plafonné, puis
- *     `gave_up` au plafond d'essais (8 par défaut) — état terminal qui doit
- *     alerter (plan §2.9), jamais un silence.
+ *   - INDISPONIBILITÉ TEMPORAIRE : on attend, SANS consommer d'essai. Ce n'est
+ *     pas un échec de CE message, c'est l'absence de l'interlocuteur. Compter
+ *     ces cycles comme des essais ferait abandonner des oppositions
+ *     parfaitement valides après une panne ; or une opposition abandonnée,
+ *     c'est une divergence RGPD durable. Voir `STATUTS_INDISPONIBILITE`.
+ *   - autre (500 applicatif…) : essai CONSOMMÉ, backoff exponentiel plafonné,
+ *     puis `gave_up` au plafond d'essais (8 par défaut) — état terminal qui
+ *     doit alerter (plan §2.9), jamais un silence.
+ *
+ * ── 🔴 CONSTAT B14-005 (S1), mesuré le 2026-08-20 ───────────────────────────
+ * Cette classe n'a longtemps reconnu qu'UN SEUL visage de l'indisponibilité :
+ * le 503 applicatif. Or un 503 suppose que le site soit DEBOUT et refuse
+ * volontairement (drapeau fermé, maintenance annoncée). Les visages RÉELS
+ * d'un site tombé sont tout autres :
+ *
+ *   - le conteneur est arrêté          → `ConnectionException` (rien n'écoute)
+ *   - le reverse-proxy survit à l'app  → 502 / 504
+ *   - un limiteur nous freine          → 429
+ *
+ * Ces trois-là tombaient dans `consumeAttempt()`. Avec `max_attempts = 8` et
+ * le backoff plafonné (1, 2, 4, 8, 16, 32, 60, 60 min), il ne faut que
+ * 2+4+8+16+32+60+60 = 182 minutes — TROIS HEURES DEUX — pour qu'une opposition
+ * passe en `gave_up`, état TERMINAL que rien ne rejoue jamais. Une panne d'une
+ * demi-journée effaçait donc définitivement des oppositions ; la garde « ne
+ * consomme pas d'essai » n'attrapait que le cas où le site va bien.
+ *
+ * Le prix assumé du correctif : sur une indisponibilité, la ligne ne meurt
+ * PLUS d'elle-même. C'est délibéré — perdre une opposition est pire qu'un
+ * backlog. En contrepartie, le report cesse d'être muet : au-delà de
+ * `HEURES_AVANT_ALERTE_REPORT`, chaque passage journalise en `error`.
  */
 class CrmFlushOutbound extends Command
 {
@@ -47,6 +69,38 @@ class CrmFlushOutbound extends Command
 
     protected $description = 'Émet vers le site les événements de consentement nés dans le CRM (mini-outbox L5)';
 
+    /**
+     * Codes qui disent « pas maintenant », et non « pas CE message ».
+     *
+     * Constat B14-005 : n'y voir que le 503 revenait à ne reconnaître
+     * l'indisponibilité que lorsque le site est assez vivant pour l'annoncer.
+     *
+     *   408 — le site a coupé une requête trop lente ; rien n'a été appliqué.
+     *   429 — un limiteur nous freine ; c'est une invitation explicite à
+     *         revenir, la traiter en échec serait absurde.
+     *   502 — le proxy est debout, l'application derrière ne répond pas.
+     *   503 — indisponibilité annoncée (maintenance, drapeau du site fermé).
+     *   504 — l'application n'a pas répondu dans le délai du proxy.
+     *
+     * Le 500 n'y est PAS, volontairement : il peut être le site qui casse sur
+     * CE message précis. Le rejouer éternellement masquerait le défaut au lieu
+     * de le faire remonter en `gave_up`.
+     */
+    private const STATUTS_INDISPONIBILITE = [408, 429, 502, 503, 504];
+
+    /**
+     * Au-delà de cet âge, un événement toujours reporté n'est plus une
+     * maintenance : c'est une panne, et elle doit se voir.
+     *
+     * Puisqu'une indisponibilité ne consomme plus d'essai (B14-005), la ligne
+     * ne finira JAMAIS en `gave_up` de son propre chef — le seul mécanisme
+     * d'alerte qui existait pour ce chemin a donc disparu avec le défaut. Sans
+     * ce seuil, le correctif échangerait une perte bruyante contre un silence,
+     * ce qui est exactement le piège de B17-009 (purges RGPD sautées sans
+     * trace pendant des mois).
+     */
+    private const HEURES_AVANT_ALERTE_REPORT = 6;
+
     public function handle(): int
     {
         if (! filter_var(config('crm.outbound_enabled', false), FILTER_VALIDATE_BOOLEAN)) {
@@ -55,16 +109,46 @@ class CrmFlushOutbound extends Command
             return self::FAILURE;
         }
 
+        // ── 🔴 CONSTAT B14-013 (S1) : LE CANAL À MOITIÉ OUVERT ──────────────
+        //
+        // Les deux branches ci-dessous décrivent le MÊME état : le drapeau
+        // d'émission est ouvert, mais il manque de quoi émettre. Or, drapeau
+        // ouvert, le `skip()` du planificateur ne retient plus rien
+        // (`routes/console.php`) : la commande tourne toutes les 5 minutes et
+        // sort en échec — dans une sortie standard que le planificateur jette.
+        //
+        // Le sens site → CRM, lui, n'a besoin que de `CRM_INGEST_ENABLED`
+        // (`SiteSyncController`). L'ouverture des deux sens n'exige donc PAS
+        // le même nombre de gestes : ouvrir le canal en croyant l'avoir ouvert
+        // dans les deux sens laisse les oppositions décidées dans la console
+        // s'empiler sans jamais partir, en silence. C'est exactement la forme
+        // du constat. Le silence est ce qui est réparé ici : la mauvaise
+        // configuration LAISSE UNE TRACE DATÉE à chaque passage.
+        //
+        // ⚠️ Le drapeau FERMÉ, lui, n'alerte pas (branche du dessus) : c'est
+        // l'état nominal d'avant-bascule, une décision et non une panne. Une
+        // alerte qui part toujours n'est plus une alerte.
         $url = trim((string) config('crm.outbound.site_webhook_url', ''));
         if ($url === '') {
-            $this->error('SITE_CRM_WEBHOOK_URL est vide — impossible de savoir où pousser les consentements.');
+            $message = 'crm.outbound.destination_absente : CRM_OUTBOUND_ENABLED est a true mais '
+                . 'SITE_CRM_WEBHOOK_URL est vide. Le canal est ouvert dans le sens site -> CRM et '
+                . 'ferme dans le sens CRM -> site : les oppositions decidees dans la console '
+                . 's\'accumulent sans jamais partir.';
+
+            $this->error($message);
+            Log::error($message, ['en_attente' => $this->nombreEnAttente()]);
 
             return self::FAILURE;
         }
 
         $secret = (string) config('crm.ingest.hmac_secret', '');
         if ($secret === '') {
-            $this->error('SITE_SYNC_HMAC_SECRET est vide — un webhook non signé serait refusé par le site (et devrait l\'être).');
+            $message = 'crm.outbound.secret_absent : CRM_OUTBOUND_ENABLED est a true mais '
+                . 'SITE_SYNC_HMAC_SECRET est vide. Un webhook non signe serait refuse par le site '
+                . '(et devrait l\'etre) : rien ne part, et rien ne le dit.';
+
+            $this->error($message);
+            Log::error($message, ['en_attente' => $this->nombreEnAttente()]);
 
             return self::FAILURE;
         }
@@ -139,7 +223,12 @@ class CrmFlushOutbound extends Command
                 ->withBody($body, 'application/json')
                 ->post($url);
         } catch (ConnectionException $e) {
-            return $this->consumeAttempt($row, 'connexion : ' . $e->getMessage());
+            // 🔴 B14-005 : CE cas — pas le 503 — est ce qui se produit quand le
+            // site est réellement tombé (conteneur arrêté, DNS, TLS, délai
+            // dépassé). Rien n'a atteint le site : le message n'a donc PAS
+            // échoué, il n'a pas été présenté. Le compter comme un essai
+            // revenait à abandonner l'opposition au bout de ~3 h de panne.
+            return $this->reporter($row, 'site injoignable (' . $this->excerpt($e->getMessage()) . ')');
         }
 
         $status = $response->status();
@@ -173,19 +262,64 @@ class CrmFlushOutbound extends Command
             return 'gave_up';
         }
 
-        if ($status === 503) {
+        if (in_array($status, self::STATUTS_INDISPONIBILITE, true)) {
             // Indisponibilité TEMPORAIRE du site : on repousse sans consommer
             // d'essai — `attempts` reste strictement inchangé.
-            DB::table('crm_outbound_events')->where('id', $row->id)->update([
-                'last_error' => 'HTTP 503 (site temporairement indisponible) : ' . $this->excerpt($response->body()),
-                'next_attempt_at' => now()->addMinutes($this->backoffMinutes((int) $row->attempts)),
-                'updated_at' => now(),
-            ]);
-
-            return 'deferred';
+            return $this->reporter(
+                $row,
+                'HTTP ' . $status . ' (site temporairement indisponible) : ' . $this->excerpt($response->body()),
+            );
         }
 
         return $this->consumeAttempt($row, 'HTTP ' . $status . ' : ' . $this->excerpt($response->body()));
+    }
+
+    /**
+     * REPORT sans consommer d'essai : l'interlocuteur est absent, ce message
+     * n'a pas échoué.
+     *
+     * `attempts` n'est PAS incrémenté — c'est tout l'objet de la garde. La
+     * contrepartie, c'est qu'aucun plafond ne fera plus mourir cette ligne :
+     * l'alerte de report prolongé ci-dessous est donc le SEUL signal qui reste
+     * sur ce chemin, et elle n'est pas facultative.
+     *
+     * @return 'deferred'
+     */
+    private function reporter(stdClass $row, string $raison): string
+    {
+        DB::table('crm_outbound_events')->where('id', $row->id)->update([
+            'last_error' => $raison,
+            'next_attempt_at' => now()->addMinutes($this->backoffMinutes((int) $row->attempts)),
+            'updated_at' => now(),
+        ]);
+
+        $ageEnHeures = Carbon::parse((string) $row->created_at)->diffInHours(now());
+
+        if ($ageEnHeures >= self::HEURES_AVANT_ALERTE_REPORT) {
+            Log::error(
+                'crm.outbound.deferred_long : un evenement de consentement attend depuis plus de '
+                . self::HEURES_AVANT_ALERTE_REPORT . ' h sans pouvoir partir. Ce n\'est plus une '
+                . 'maintenance du site : tant que ce report dure, le CRM et le site divergent sur '
+                . 'une opposition RGPD.',
+                [
+                    'event_id' => (string) $row->event_id,
+                    'event_type' => (string) $row->event_type,
+                    'age_heures' => $ageEnHeures,
+                    'attempts' => (int) $row->attempts,
+                    'raison' => $raison,
+                ],
+            );
+        }
+
+        return 'deferred';
+    }
+
+    /** Combien d'événements attendent encore de partir (contexte d'alerte). */
+    private function nombreEnAttente(): int
+    {
+        return (int) DB::table('crm_outbound_events')
+            ->whereIn('status', ['pending', 'failed'])
+            ->count();
     }
 
     /**

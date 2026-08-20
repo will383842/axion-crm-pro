@@ -2,6 +2,7 @@
 
 namespace App\Services\Legal;
 
+use App\Crm\Identite\CleDePersonne;
 use App\Models\Company;
 use App\Services\Email\EmailConfidenceService;
 use App\Services\Email\MxEmailValidator;
@@ -576,6 +577,13 @@ class MentionsLegalesScraperService
                 'role'             => $class['role'],
                 'email'            => $email,
                 'email_status'     => $emailStatus,
+                // A05-001 (S1) : SITE JUMEAU de `ScrapedRecordIngestService`.
+                // Ce chemin-ci fabrique lui aussi des fiches personne PORTEUSES
+                // D'UNE ADRESSE, et n'a jamais posé la clé de rapprochement —
+                // il compte donc parmi les 1 319 567 contacts sans `person_key`
+                // mesurés le 2026-08-18. `null` si le secret n'est pas
+                // configuré : on ne fabrique jamais de clé de complaisance.
+                'person_key'       => CleDePersonne::pour($email),
                 // Score de confiance A/B/C (déterministe, sans SMTP) posé dès la
                 // capture — priorise l'envoi via ESP. Additif : n'altère rien.
                 'email_confidence' => (new EmailConfidenceService())->score($email, $company->website),

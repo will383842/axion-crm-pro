@@ -93,10 +93,21 @@ class ScraperRunsController extends ApiController
             'error'       => $run->error ?: 'Annulé par utilisateur.',
         ]);
 
-        // Flag Redis lu par les workers Node (BullMQ) pour interrompre le job en cours.
-        // TTL 1h : suffisant pour qu'un worker en cours détecte l'annulation.
+        // 🔴 CONSTAT C18-008. Ce commentaire annoncait « flag Redis lu par les
+        // workers Node (BullMQ) ». Il etait faux : au 2026-08-20,
+        //     grep -rn "cancelled:scraper-run" backend/ frontend/
+        // rendait 2 ECRITURES (ici et ScrapingCampaignsController:315) et ZERO
+        // lecture, dans tout le depot. Le bouton « arreter » ecrivait un statut
+        // et une cle que personne n'ouvrait ; la collecte continuait, et le job
+        // repassait meme le run en « success » par-dessus l'annulation.
+        //
+        // Le lecteur existe desormais : `LaunchZoneScrapingJob::motifArretDistant()`
+        // relit cette cle (constante `LaunchZoneScrapingJob::CLE_ANNULATION`)
+        // toutes les 10 entreprises, en plus du statut en base.
+        // ⚠️ Si tu changes ce prefixe, change-le LA-BAS AUSSI.
+        // TTL 1h : suffisant pour qu'un job en cours détecte l'annulation.
         try {
-            Redis::setex('cancelled:scraper-run:' . $run->id, 3600, '1');
+            Redis::setex(LaunchZoneScrapingJob::CLE_ANNULATION . $run->id, 3600, '1');
         } catch (\Throwable $e) {
             Log::warning('scraper-runs.cancel: Redis flag failed', [
                 'run_id'    => $run->id,

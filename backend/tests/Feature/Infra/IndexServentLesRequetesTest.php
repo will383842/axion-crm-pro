@@ -56,10 +56,31 @@ function plan(string $sql): string
         ->implode("\n");
 }
 
-test('G41-003 — TEMOIN : sans volume, la mesure ne mesure rien', function () {
-    // Ce test ne verifie pas le produit : il verifie que la garde ci-dessous
-    // sait ce qu'elle fait. Sur trois lignes, Postgres balaie -- et c'est le bon
-    // choix. Une garde de performance qui l'ignore rend un verdict faux.
+test('G41-003 — TEMOIN : EXPLAIN distingue une colonne indexee d une colonne nue', function () {
+    // Ce test ne verifie pas le produit : il verifie que L'INSTRUMENT discrimine.
+    // Sans lui, la garde ci-dessous pourrait rendre « index employe » sur
+    // n'importe quoi, et personne ne le saurait.
+    //
+    // ⚠️ PIEGE PAYE LE 2026-08-20, ET IL A FALLU LIRE LE PLAN COMPLET POUR LE VOIR.
+    //
+    // La premiere version inserait UNE ligne et affirmait « sur une table
+    // minuscule, le planificateur DOIT balayer ». Elle a rougi, avec :
+    //
+    //     Bitmap Heap Scan on companies  (cost=1126.75..1130.76 rows=1 width=8)
+    //
+    // Un cout de demarrage de 1 126 sur une table censee porter UNE ligne.
+    //
+    // La cause n'etait ni le produit ni la flotte : la base de mesure avait ete
+    // peuplee a 150 000 lignes le matin meme, a la main, pour mesurer les index.
+    // `RefreshDatabase` annule les LIGNES ; il ne rend ni les pages du fichier ni
+    // les statistiques. Le planificateur continuait donc de croire la table
+    // grosse -- et il avait raison de preferer l'index.
+    //
+    // 🔑 LA LECON : un temoin qui depend d'un SEUIL DE VOLUME mesure l'histoire du
+    // banc, pas le produit. Celui-ci n'en depend plus. Il compare deux colonnes de
+    // la MEME table, au MEME instant : l'une est couverte par un index
+    // trigrammes, l'autre non. La difference de plan tient a n'importe quel
+    // volume, sur n'importe quelle base, propre ou dilatee.
     $espace = Workspace::create([
         'id' => (string) Str::uuid(), 'slug' => 'vol-' . Str::random(6), 'name' => 'Volume',
     ]);
@@ -70,13 +91,24 @@ test('G41-003 — TEMOIN : sans volume, la mesure ne mesure rien', function () {
         'siren' => '123456789',
         'created_at' => now(), 'updated_at' => now(),
     ]);
-    DB::statement('ANALYZE companies');
+
+    // `legal_form` ne porte AUCUN index trigrammes : une recherche par
+    // sous-chaine dessus ne peut structurellement pas en employer un.
+    $planNu = plan("SELECT id FROM companies WHERE legal_form ILIKE '%zzz%' LIMIT 10");
+
+    $this->assertStringNotContainsString(
+        'idx_companies_denomination_trgm',
+        $planNu,
+        "Le plan d'une colonne NUE cite l'index d'une AUTRE colonne. La lecture du plan est "
+        . "donc fausse, et tout ce fichier avec elle.\n\n" . $planNu
+    );
 
     $this->assertStringContainsString(
         'Seq Scan',
-        plan("SELECT id FROM companies WHERE denomination_normalized ILIKE '%seule%' LIMIT 10"),
-        "Sur une table minuscule, le planificateur DOIT balayer. Si ce test rougit, c'est "
-        . 'que le seuil a change et que la garde ci-dessous mesure autre chose.'
+        $planNu,
+        "Sur une colonne sans index trigrammes, le plan doit etre un balayage. S'il ne l'est "
+        . "pas, EXPLAIN ne discrimine plus rien et la garde ci-dessous ne prouve RIEN.\n\n"
+        . $planNu
     );
 });
 

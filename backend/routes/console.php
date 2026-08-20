@@ -1,6 +1,8 @@
 <?php
 
 use App\Console\Commands\AuditVerifyChain;
+use App\Console\Commands\CoverageRefreshMatrix;
+use App\Console\Commands\PartmanMaintenir;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
@@ -11,7 +13,25 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // --- Scheduled jobs ---------------------------------------------------------
-Schedule::command('coverage:refresh-matrix')->hourly();
+// 🔴 A08-001 (S1), mesure le 2026-08-20. Cette ligne etait
+// `Schedule::command('coverage:refresh-matrix')->hourly();` — rien d'autre.
+// La commande echouait a CHAQUE passage depuis l'armement du role applicatif
+// (`must be owner of materialized view coverage_matrix_cells` : REFRESH est
+// reserve au proprietaire, aucun GRANT ne l'accorde), et le planificateur de
+// Laravel N'INTERPRETE PAS le code de sortie d'une commande planifiee : 71
+// passages, 71 echecs, zero alerte, une matrice de couverture figee.
+// Le geste lui-meme est repare cote commande (fonction SECURITY DEFINER) ;
+// `onFailure()` est le seul crochet du planificateur qui lise le code de
+// sortie — il couvre le cas ou la commande meurt AVANT d'avoir pu journaliser.
+Schedule::command('coverage:refresh-matrix')
+    ->hourly()
+    ->onFailure(function (): void {
+        Log::critical(
+            CoverageRefreshMatrix::PREFIXE_ALERTE . ' : la tache planifiee horaire s\'est '
+            . 'terminee en echec. La matrice de couverture est figee — voir les lignes '
+            . 'precedentes du journal.',
+        );
+    });
 Schedule::command('blacklists:check')->hourly();
 // 🔴 B16-006 / F39-006 / B17-003 (S1), mesure le 2026-08-20. Cette ligne etait
 // `Schedule::command('audit:verify-chain')->dailyAt('03:00');` — rien d'autre.
@@ -44,6 +64,32 @@ Schedule::command('audit:verify-chain')
 // `--force` est requis par le trait `RefuseUneSuppressionMassive` en contexte
 // non interactif — c'est le meme aveu ecrit que pour les purges prospection.
 Schedule::command('retention:purge --all-workspaces --force')->dailyAt('04:00');
+// 🔴 B10-003 (S1), mesure le 2026-08-20 — « le partitionnement d'audit_logs
+// n'est entretenu par personne ». `Dockerfile.postgres:49-51` compile pg_partman
+// en `NO_BGW=1` et designe explicitement « le cron de partition mgmt sera
+// Laravel scheduler » : CETTE LIGNE-CI est ce remplacant, qui n'avait jamais ete
+// ecrit. Avant elle, `run_maintenance` n'apparaissait qu'a UN endroit du depot :
+// un runbook d'incident MANUEL (infra/runbooks/02-disk-full.md).
+// Mesure : les partitions s'arretaient a `audit_logs_p20270201` (fevrier 2027),
+// et la retention de 24 mois — que pg_partman n'applique QUE dans
+// `run_maintenance` — n'etait declenchee par rien.
+// 01:30 : aucun autre travail planifie a cette heure, et la maintenance passe
+// avant `audit:verify-chain` (03:00) et `retention:purge` (04:00).
+// `onFailure()` : le planificateur de Laravel N'INTERPRETE PAS le code de sortie
+// d'une commande planifiee (patron A08-001 / B16-006 ci-dessus). Sans ce
+// crochet, une maintenance de partitions qui echoue reproduirait exactement le
+// defaut qu'on repare : une piece qui ne tourne plus, et personne pour le voir.
+Schedule::command(PartmanMaintenir::SIGNATURE_PLANIFIEE)
+    ->dailyAt('01:30')
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->onFailure(function (): void {
+        Log::critical(
+            PartmanMaintenir::PREFIXE_ALERTE . " : la tache planifiee de 01:30 s'est terminee en "
+            . "echec. Les partitions a venir d'audit_logs ne sont peut-etre plus creees, et la "
+            . "retention de 24 mois n'est plus appliquee — voir les lignes precedentes du journal."
+        );
+    });
 Schedule::command('rgpd:anonymize-ips')->dailyAt('04:30');
 Schedule::command('anomaly:detect')->everyFifteenMinutes();
 Schedule::command('signals:nightly-scan')->dailyAt('02:00');

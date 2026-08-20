@@ -12,7 +12,16 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { Card, EmptyState, KpiCard, PageHeader, SearchInput, Tabs, Toolbar } from '@/components/ui';
+import {
+  Card,
+  EmptyState,
+  KpiCard,
+  PageHeader,
+  QueryErrorState,
+  SearchInput,
+  Tabs,
+  Toolbar,
+} from '@/components/ui';
 import type { TabItem } from '@/components/ui';
 import { api } from '@/lib/api';
 import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
@@ -77,6 +86,29 @@ function CandidatesContent() {
 
   const rows = list.data?.data ?? [];
 
+  /**
+   * 🔴 D25-001 — « À qualifier : 0 » est un mensonge quand rien n'a été lu.
+   *
+   * Cet écran est l'anti-« 71 candidatures jamais triées » (cf. l'en-tête du
+   * fichier). Sous 403 — le cas NOMINAL pour qui n'est pas membre de l'univers
+   * vivier — il affichait exactement l'écran d'un vivier traité : quatre
+   * compteurs à zéro et « Aucun candidat dans cette vue ». La candidature reste
+   * alors sans réponse, et personne ne signale de panne puisque rien n'en
+   * signale une.
+   *
+   * On remplace TOUT le corps, compteurs et onglets compris : les onglets
+   * portent eux aussi des effectifs issus de `counts`, et un filtre qui ne peut
+   * rien filtrer n'est pas une information. Le titre reste, pour que
+   * l'utilisateur sache où il se trouve.
+   *
+   * ⚠️ `data === undefined` : React Query v5 garde la dernière réponse réussie
+   * quand un rafraîchissement échoue. On n'efface donc que ce qu'on n'a jamais
+   * réussi à charger.
+   */
+  const echecListe = list.error !== null && list.data === undefined;
+  const echecCompteurs = counts.error !== null && counts.data === undefined;
+  const echec = echecListe || echecCompteurs;
+
   return (
     <div className="px-6 py-6">
       <PageHeader
@@ -84,6 +116,19 @@ function CandidatesContent() {
         subtitle="Univers étanche — base légale et durées de conservation distinctes de la base commerciale."
       />
 
+      {echec ? (
+        <QueryErrorState
+          // L'échec de la liste prime : c'est lui qui explique le mieux ce que
+          // l'utilisateur ne voit pas.
+          error={echecListe ? list.error : counts.error}
+          contexte="la liste des candidats"
+          onRetry={() => {
+            void list.refetch();
+            void counts.refetch();
+          }}
+        />
+      ) : (
+        <>
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {/* « À qualifier » est le SEUL compteur qui appelle une action : c'est
             l'écran anti-« 71 candidatures jamais triées ». */}
@@ -170,6 +215,8 @@ function CandidatesContent() {
           </Card>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }

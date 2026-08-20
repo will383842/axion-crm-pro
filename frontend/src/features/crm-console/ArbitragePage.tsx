@@ -15,7 +15,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Button, Card, EmptyState, Input, PageHeader } from '@/components/ui';
+import { Button, Card, EmptyState, Input, PageHeader, QueryErrorState } from '@/components/ui';
 import { api } from '@/lib/api';
 import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
 import type { ArbitrageResponse, ArbitrageRow } from './types';
@@ -75,14 +75,45 @@ function ArbitrageContent() {
 
   const rows = list.data?.data ?? [];
 
+  /**
+   * 🔴 D25-001 — l'échec n'est PAS un état vide.
+   *
+   * Avant ce correctif, `list.data?.data ?? []` rendait `[]` sous 403 comme
+   * sous 500, et l'écran affichait « Rien à arbitrer — tous les événements
+   * entrants ont trouvé leur entreprise ». Mesuré : le texte rendu sous 403,
+   * sous 500 et sous 200-liste-vide était STRICTEMENT le même. Un opérateur
+   * sans le rôle lisait donc que la file était traitée, alors qu'il n'avait
+   * simplement pas le droit de la lire.
+   *
+   * ⚠️ `list.data === undefined` fait partie de la condition, et ce n'est pas
+   * une précaution de style : React Query v5 CONSERVE la dernière page réussie
+   * quand un rafraîchissement échoue (`status: 'error'`, `data` intacte).
+   * Effacer l'écran dans ce cas ferait PERDRE à l'opérateur la file qu'il avait
+   * sous les yeux — on remplacerait un mensonge par une régression.
+   */
+  const echec = list.error !== null && list.data === undefined;
+
   return (
     <div className="px-6 py-6">
       <PageHeader
         title="Rapprochements à arbitrer"
-        subtitle={`${list.data?.meta.total ?? 0} événement(s) reçus sans SIREN — à rattacher ou à écarter.`}
+        // Le sous-titre annonçait « 0 événement(s) reçus sans SIREN » alors que
+        // la file n'avait JAMAIS été lue. Ce zéro-là est le même mensonge que
+        // l'état vide, en plus discret : sous échec, on ne chiffre pas.
+        subtitle={
+          echec
+            ? 'Événements reçus sans SIREN — à rattacher ou à écarter.'
+            : `${list.data?.meta.total ?? 0} événement(s) reçus sans SIREN — à rattacher ou à écarter.`
+        }
       />
 
-      {list.isLoading ? (
+      {echec ? (
+        <QueryErrorState
+          error={list.error}
+          contexte="la file d’arbitrage"
+          onRetry={() => void list.refetch()}
+        />
+      ) : list.isLoading ? (
         <ConsoleListSkeleton rows={5} />
       ) : rows.length === 0 ? (
         <EmptyState

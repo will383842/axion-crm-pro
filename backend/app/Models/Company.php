@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
@@ -59,6 +60,35 @@ class Company extends Model
 {
     use BelongsToWorkspace;
     use HasFactory;
+    /**
+     * 🔴 B10-016 — la table porte `deleted_at` depuis l'origine (migration
+     * 2026_05_16_000003, ligne 57) et TOUT le code de lecture s'appuie dessus :
+     * `CompaniesController::buildFilteredQuery()` (ligne 136, partagee par la
+     * liste ET l'export), CompanyTagsBulkController:90, ArbitrageController:118,
+     * CompteursHub:151, EligibiliteCampagne:76/99/250, GlobalSearchController,
+     * plus CINQ index partiels `WHERE deleted_at IS NULL` (migrations
+     * 2026_08_15_000002, 000003, 000006, 2026_08_17_000001, 2026_08_19_000001).
+     *
+     * Le modele, lui, ne declarait pas le trait : `$company->delete()`
+     * (CompaniesController ligne 442) emettait un `DELETE FROM` sec, alors que
+     * la documentation OpenAPI DOUZE LIGNES PLUS HAUT (ligne 427) promet
+     * « Soft-delete une entreprise (deleted_at pose) ». Le fichier se
+     * contredisait lui-meme, et le test cense l'attester ne verifiait que le
+     * code HTTP 204 (`CompaniesControllerTest.php:115`, nomme « destroy
+     * soft-deletes company » — il n'a jamais relu la ligne).
+     *
+     * Le cout mesure ne s'arrete pas a la fiche : `contacts.company_id`
+     * REFERENCE `companies(id) ON DELETE CASCADE` (migration 000003, ligne 74).
+     * Un DELETE dur emportait donc AUSSI tous les contacts, sans passer par
+     * Eloquent — donc sans evenement ni journal. Garde jouee le 2026-08-20 :
+     * trois contacts crees, `->delete()` sur l'entreprise, il en restait ZERO.
+     *
+     * ⚠️ Les purges RGPD ne sont pas touchees : GdprErasureService,
+     * RetentionPurge, RgpdPurgeBusinessProspects, RgpdPurgeVivier et
+     * ProspectionPurgeNonDiffusible passent tous par `DB::table(...)`, que les
+     * traits Eloquent n'atteignent pas. Le droit a l'effacement reste dur.
+     */
+    use SoftDeletes;
 
     // ATTENTION : `denomination_normalized` et `quality_badge` sont GENERATED COLUMNS
     // côté Postgres (migration 000003) — exclues de fillable → toute tentative

@@ -56,6 +56,19 @@ test.describe('Onboarding tour (Sprint 18.4)', () => {
       postCalled = true;
       route.fulfill({ json: { onboarding_tour_completed_at: new Date().toISOString() } });
     });
+    // P6-UI-008 (2026-08-20) — SANS cette simulation, le POST n'a JAMAIS lieu.
+    //
+    // Mesure a la sonde sur le build (`vite preview`, chromium 1234), suite des
+    // requetes emises apres un clic sur « Passer » :
+    //   GET  /sanctum/csrf-cookie   ← l'intercepteur axios l'exige d'abord
+    //   POST /api/v1/auth/onboarding/complete
+    // Le premier appel part vers https://api.localhost, qui n'existe pas sur le
+    // runner : il echoue en CORS/ERR_FAILED et le POST n'est jamais emis. Le
+    // produit est CORRECT (`OnboardingTour.tsx:110-114` appelle bien
+    // `completeMutation.mutate()` sur STATUS.SKIPPED) ; c'est la garde qui
+    // oubliait le prealable CSRF. Elle a donc ete rouge en silence, jamais
+    // jouee par aucun workflow.
+    await page.route('**/sanctum/csrf-cookie', (route) => route.fulfill({ status: 204, body: '' }));
     await page.route('**/api/v1/auth/me', (route) =>
       route.fulfill({
         json: {
@@ -67,11 +80,17 @@ test.describe('Onboarding tour (Sprint 18.4)', () => {
     await page.goto('/');
     await expect(page.locator('.react-joyride__overlay').first()).toBeVisible({ timeout: 5000 });
     // Click Skip button
+    //
+    // ⚠️ L'ancien `if (await skipBtn.isVisible()) { ... }` etait un VERT
+    // DEGUISE : le jour ou le bouton « Passer » disparait, le corps du test
+    // n'est plus execute et le test passe quand meme. On assure d'abord sa
+    // presence, PUIS on clique — la disparition du bouton doit rougir.
     const skipBtn = page.locator('button:has-text("Passer")').first();
-    if (await skipBtn.isVisible()) {
-      await skipBtn.click();
-      await page.waitForTimeout(500);
-      expect(postCalled).toBe(true);
-    }
+    await expect(skipBtn).toBeVisible();
+    await skipBtn.click();
+    // L'aller-retour CSRF precede le POST : une attente fixe de 500 ms etait
+    // trop courte et surtout arbitraire. `expect.poll` attend le fait, pas une
+    // duree, et rougit tout de meme si le POST ne vient pas (5 s de plafond).
+    await expect.poll(() => postCalled, { timeout: 5_000 }).toBe(true);
   });
 });

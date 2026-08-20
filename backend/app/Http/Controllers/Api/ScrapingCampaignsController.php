@@ -7,6 +7,7 @@ use App\Http\Requests\StoreScrapingCampaignRequest;
 use App\Http\Requests\UpdateScrapingCampaignRequest;
 use App\Http\Resources\ScrapingCampaignResource;
 use App\Jobs\LaunchCampaignJob;
+use App\Jobs\LaunchZoneScrapingJob;
 use App\Jobs\MonitorCampaignProgressJob;
 use App\Models\ScrapingCampaign;
 use Illuminate\Http\JsonResponse;
@@ -310,9 +311,19 @@ class ScrapingCampaignsController extends ApiController
                     'error'       => 'Campagne annulée',
                 ]);
 
+            // 🔴 CONSTAT C18-008. Annuler une campagne ne purge PAS la file :
+            // `LaunchCampaignJob` y a pousse un `LaunchZoneScrapingJob` par
+            // (zone x source), decale de `ceil(60 / max_requests_per_minute)` s
+            // chacun, et Laravel ne sait pas retirer un job precis d'une file.
+            // Le statut `cancelled` ecrit ci-dessus ne suffisait donc pas : les
+            // jobs restants s'executaient quand meme et creaient des entreprises
+            // apres l'arret. Ce qui arrete vraiment, c'est la LECTURE de l'arret
+            // a l'execution — `LaunchZoneScrapingJob::motifArretCampagne()` pour
+            // les jobs pas encore demarres, `::motifArretDistant()` pour celui
+            // qui tourne. Les deux relisent ce statut et la cle ci-dessous.
             foreach ($runsToCancel as $runId) {
                 try {
-                    Redis::setex('cancelled:scraper-run:' . $runId, 3600, '1');
+                    Redis::setex(LaunchZoneScrapingJob::CLE_ANNULATION . $runId, 3600, '1');
                 } catch (\Throwable $e) {
                     Log::warning('campaigns.cancel: Redis flag failed', [
                         'run_id'    => $runId,

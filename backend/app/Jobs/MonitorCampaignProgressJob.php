@@ -47,8 +47,20 @@ class MonitorCampaignProgressJob implements ShouldQueue
             return;
         }
 
-        // 1+3) Aggrégats côté runs
-        $aggregates = ['runs_completed' => 0, 'companies_created' => 0, 'duration_seconds_used' => 0];
+        // 1+3) Aggrégats côté runs.
+        //
+        // 🔴 C18-007 (second chemin). Ces valeurs de depart etaient a 0, et elles
+        // sont ecrites telles quelles par le `update()` plus bas des que le
+        // recompte echoue — table `scraper_runs` absente, ou exception attrapee
+        // par le `catch` ci-dessous. Autrement dit : une base momentanement
+        // indisponible remettait le compteur de quota a zero, en silence, toutes
+        // les 60 s. On part donc de l'etat courant : a defaut de savoir
+        // recompter, le moniteur ne DEFAIT rien.
+        $aggregates = [
+            'runs_completed'        => (int) $campaign->runs_completed,
+            'companies_created'     => (int) $campaign->companies_created,
+            'duration_seconds_used' => (int) $campaign->duration_seconds_used,
+        ];
 
         try {
             if (Schema::hasTable('scraper_runs')) {
@@ -81,7 +93,29 @@ class MonitorCampaignProgressJob implements ShouldQueue
                 if ($row) {
                     $aggregates['runs_completed'] = (int) ($row->runs_completed ?? 0);
                     $aggregates['duration_seconds_used'] = (int) ($row->duration_seconds_used ?? 0);
-                    $aggregates['companies_created'] = (int) ($row->companies_created ?? 0);
+
+                    // 🔴 CONSTAT C18-007. Ce recompte VALAIT TOUJOURS 0 pour une
+                    // campagne de decouverte, et il ECRASAIT le compteur.
+                    // `LaunchZoneScrapingJob` cree son run SANS `company_id`
+                    // (colonne nullable, cf. `\d scraper_runs`) puis incremente
+                    // `companies_created` par `UPDATE … companies_created + N`.
+                    // Le moniteur, re-dispatche toutes les 60 s, remettait donc
+                    // ce compteur a zero chaque minute : `shouldAutoPause()` ne
+                    // voyait jamais `companies_created >= max_companies`, et le
+                    // plafond `max_companies` ne freinait rien.
+                    //
+                    // `max(…)` et pas le recompte seul : un compteur de quota ne
+                    // doit JAMAIS redescendre — c'est exactement la maladie deja
+                    // nommee quelques lignes plus haut a propos du `GREATEST(0, …)`
+                    // sur les durees, « un plafond qui se relache tout seul ».
+                    // Le recompte reste utile : il RATTRAPE les entreprises
+                    // ingerees par un autre canal (runs Node portant un
+                    // `company_id`, cf. `/internal/scraper-result`), qui
+                    // n'incrementent pas le compteur eux-memes.
+                    $aggregates['companies_created'] = max(
+                        (int) $campaign->companies_created,
+                        (int) ($row->companies_created ?? 0),
+                    );
                 }
             }
         } catch (\Throwable $e) {

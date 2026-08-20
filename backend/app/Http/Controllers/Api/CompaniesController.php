@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Jobs\EnrichCompanyJob;
 use App\Models\Company;
 use App\Services\Email\EmailConfidenceService;
@@ -23,6 +24,11 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CompaniesController extends ApiController
 {
+    // 🔴 G43-005 (S0) — verrouillage optimiste OPTIONNEL sur `update()`. Le trait
+    // ne s'active que si le client annonce l'etat qu'il modifiait ; sans jeton,
+    // rien ne change. Cf. `App\Http\Controllers\Concerns\VerrouOptimiste`.
+    use VerrouOptimiste;
+
     public function __construct(private readonly WaterfallOrchestrator $waterfall) {}
 
     /**
@@ -330,7 +336,11 @@ class CompaniesController extends ApiController
             'discovery_source' => $validated['discovery_source'] ?? 'manual',
         ]);
 
-        return $this->ok($company, 201);
+        // Meme regle qu'a la fiche : ce qui sort porte `phone` et
+        // `email_generic`. Une creation par un role sans `contacts.view_pii`
+        // (role sur mesure : le referentiel seme n'en produit pas) ne doit pas
+        // devenir la porte que `show()` vient de fermer.
+        return $this->ok(MasquageCoordonnees::masquerSiRequis($company), 201);
     }
 
     /**
@@ -357,7 +367,20 @@ class CompaniesController extends ApiController
             $relations[] = 'healthPractitioners';
         }
 
-        return $this->ok($company->load($relations));
+        // 🔴 B12-002 / F36-006 (S1). Le masquage couvrait TROIS listes et
+        // AUCUNE fiche. Ici la fiche charge `contacts` : elle livrait donc les
+        // coordonnees NOMINATIVES, pas seulement l'accueil de la societe. Et
+        // cette route ne porte aucune permission au-dela du groupe
+        // (routes/api.php:138) : un `viewer` -- qui n'a que `companies.view`,
+        // `llm.view_usage`, `rgpd.view` -- l'atteint. Les identifiants de
+        // `companies` etant des entiers consecutifs, il suffisait de lire la
+        // liste masquee, d'y relever les identifiants, puis de rappeler chaque
+        // fiche une par une. Le masquage des listes ne coutait rien.
+        //
+        // `masquerSiRequis` descend dans les relations DEJA chargees : la regle
+        // ne vit plus dans l'appelant, qui n'a plus a savoir quelles colonnes
+        // portent une coordonnee.
+        return $this->ok(MasquageCoordonnees::masquerSiRequis($company->load($relations)));
     }
 
     /**
@@ -368,6 +391,10 @@ class CompaniesController extends ApiController
      *     security={{"sanctumCookie":{}}},
      *
      *     @OA\Parameter(name="company", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Parameter(name="If-Match", in="header", required=false,
+     *         description="Jeton de version OPTIONNEL (G43-005) : celui de l'en-tête `ETag` d'une réponse 200. La mise à jour est refusée en 409 si la fiche a changé depuis. Sans cet en-tête, aucun contrôle de concurrence — comportement historique.",
+     *
+     *         @OA\Schema(type="string", example="3f1c9a0b2d4e6f8091a2b3c4d5e6f708")),
      *
      *     @OA\RequestBody(@OA\JsonContent(
      *
@@ -376,9 +403,12 @@ class CompaniesController extends ApiController
      *         @OA\Property(property="website", type="string", format="url"),
      *         @OA\Property(property="phone", type="string"),
      *         @OA\Property(property="linkedin_url", type="string", format="url"),
+     *         @OA\Property(property="updated_at", type="string", format="date-time",
+     *             description="Forme dégradée du jeton de version, alternative à `If-Match`. À prendre dans un GET, jamais dans le corps d'un PUT : celui-ci rend l'horodatage calculé par PHP, pas celui posé par le trigger Postgres."),
      *     )),
      *
-     *     @OA\Response(response=200, description="Updated"),
+     *     @OA\Response(response=200, description="Updated — l'en-tête `ETag` porte le jeton de l'état d'après"),
+     *     @OA\Response(response=409, description="version_conflict — la fiche a été modifiée depuis la lecture du client. Le corps porte `current_version`, avec lequel rejouer."),
      * )
      */
     public function update(Request $r, Company $company): JsonResponse
@@ -387,6 +417,27 @@ class CompaniesController extends ApiController
         // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
         // « interdit » confirmerait son existence.
         $this->refuserHorsEspace($company);
+
+        // 🔴 G43-005 (S0) — DEUX SAISIES SIMULTANEES, UNE DISPARAISSAIT EN SILENCE.
+        //
+        // Cette methode ecrivait sur ce que la resolution de route avait charge,
+        // sans jamais comparer avec l'etat que le client croyait modifier. Deux
+        // commerciaux ouvrent la meme fiche, enregistrent chacun leur
+        // formulaire : les DEUX recoivent 200, la premiere saisie est effacee,
+        // personne n'est averti. Mesure le 2026-08-20 par
+        // `tests/Feature/EditionConcurrenteTest.php`.
+        //
+        // Le controle est OPTIONNEL, et c'est delibere. Le client qui veut etre
+        // protege envoie l'etat sur lequel il travaillait (`If-Match`, ou
+        // `updated_at` dans le corps) et recoit 409 s'il a ete double. Celui qui
+        // n'envoie rien garde EXACTEMENT le comportement d'avant : imposer le
+        // jeton reviendrait a rendre 409 a tout appelant existant, c'est-a-dire
+        // a changer le contrat de la route au lieu de corriger un defaut.
+        //
+        // Ce controle precede la validation : un conflit d'edition n'est pas une
+        // faute de saisie, et le signaler en premier evite d'annoncer un 422 sur
+        // un formulaire qui, de toute facon, ne devait pas etre ecrit.
+        $this->refuserSiVersionPerimee($r, $company);
 
         $validated = $r->validate([
             'priority' => ['nullable', Rule::in(['haute', 'moyenne', 'basse', 'gelee'])],
@@ -397,7 +448,17 @@ class CompaniesController extends ApiController
         ]);
         $company->update($validated);
 
-        return $this->ok($company);
+        // L'ecriture est faite AVANT le masquage : ce qui part en reponse est
+        // masque, ce qui est en base ne l'est pas. Une garde relit la base
+        // apres coup pour l'interdire (MasquageFicheDetailleeTest).
+        //
+        // L'en-tete `ETag` porte le jeton de l'etat d'APRES : sans lui, aucun
+        // client ne pourrait obtenir de jeton, et le verrou serait du decor. Le
+        // CORPS de la reponse, lui, n'est pas modifie d'un octet.
+        return $this->avecJetonDeVersion(
+            $this->ok(MasquageCoordonnees::masquerSiRequis($company)),
+            $company,
+        );
     }
 
     /**
@@ -445,7 +506,9 @@ class CompaniesController extends ApiController
 
         $this->waterfall->enrich($company);
 
-        return $this->ok($company->fresh()->load('contacts'));
+        // Quatrieme site qui rend une coordonnee : l'enrichissement RENVOIE
+        // les contacts qu'il vient de decouvrir -- c'est meme sa raison d'etre.
+        return $this->ok(MasquageCoordonnees::masquerSiRequis($company->fresh()->load('contacts')));
     }
 
     /**
@@ -495,6 +558,6 @@ class CompaniesController extends ApiController
 
         DB::statement('SELECT recompute_company_quality_score(?)', [$company->id]);
 
-        return $this->ok($company->fresh());
+        return $this->ok(MasquageCoordonnees::masquerSiRequis($company->fresh()));
     }
 }

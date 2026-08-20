@@ -8,6 +8,7 @@ use App\Models\EmailAudience;
 use App\Models\Tag;
 use App\Models\Workspace;
 use App\Services\Audiences\AudienceBuilderService;
+use App\Services\Audiences\CritereAudienceInvalide;
 use Illuminate\Bus\PendingBatch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -210,15 +211,27 @@ it('evaluateForCompany returns matching audience IDs', function () {
     expect($matches)->toContain($a1->id)->not->toContain($a2->id);
 });
 
-it('skips invalid fields/ops silently', function () {
+// 🔴 CE TEST GARDAIT LE DÉFAUT (constat D26-001, S1).
+//
+// Il s'appelait « skips invalid fields/ops silently » et assertait
+// `toBe(1)` : une base d'UNE fiche, un critère demandant tout autre chose, et
+// le résultat était la fiche. Autrement dit il assertait que le critère avait
+// été EFFACÉ et que l'audience était devenue le workspace entier. Le mode de
+// panne le plus grave d'un ciblage était donc protégé par un vert.
+//
+// Le comportement attendu est le refus. Le détail des formes refusées
+// (opérateur, valeur, bloc inconnu, `not`, non-destruction au refresh) vit
+// dans `tests/Unit/Audiences/CriteresInvalidesRefusesTest.php`.
+it('refuse un champ ou un operateur hors liste blanche, au lieu de l effacer', function () {
     mkCompany($this->ws->id);
-    $preview = $this->service->preview($this->ws->id, [
-        'all' => [
-            ['field' => 'DROP TABLE users', 'op' => 'eq', 'value' => 'x'],
-            ['field' => 'department_code', 'op' => 'INVALID', 'value' => '75'],
-        ],
-    ]);
-    expect($preview['companies'])->toBe(1);
+
+    expect(fn () => $this->service->preview($this->ws->id, [
+        'all' => [['field' => 'DROP TABLE users', 'op' => 'eq', 'value' => 'x']],
+    ]))->toThrow(CritereAudienceInvalide::class);
+
+    expect(fn () => $this->service->preview($this->ws->id, [
+        'all' => [['field' => 'department_code', 'op' => 'INVALID', 'value' => '75']],
+    ]))->toThrow(CritereAudienceInvalide::class);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

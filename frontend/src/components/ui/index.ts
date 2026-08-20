@@ -30,6 +30,10 @@ export { PageShell, type PageShellProps } from './PageShell';
 export { QualityBadge } from './QualityBadge';
 export { SizeCategoryBadge } from './SizeCategoryBadge';
 export { EmptyState } from './EmptyState';
+// D25-001 — l'état d'échec, DISTINCT de l'état vide. `EmptyState` dit « il n'y
+// a rien » ; `QueryErrorState` dit « on n'a pas pu savoir, et voici pourquoi ».
+// Les confondre, c'était le défaut mesuré sur 31 écrans sur 35.
+export { QueryErrorState, type QueryErrorStateProps } from './QueryErrorState';
 export { ErrorBoundary } from './ErrorBoundary';
 export { Skeleton, CompaniesTableSkeleton } from './Skeleton';
 export { FormField } from './FormField';

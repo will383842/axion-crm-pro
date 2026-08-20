@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -36,6 +37,34 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, HasRoles, Notifiable;
+
+    /**
+     * 🔴 B10-016 — c'est ici que l'ecart coutait le plus cher.
+     *
+     * `users.deleted_at` existe depuis la migration 2026_05_16_000002 (ligne 65)
+     * et LES QUATRE portes d'entree de l'authentification la filtrent deja :
+     * AuthService:78 (mot de passe), MagicLinkService:22 et :96 (lien magique),
+     * PasswordResetController:110 (reinitialisation). Ces quatre filtres ne
+     * protegeaient RIEN : sans le trait, rien ne posait jamais `deleted_at`, et
+     * l'etat « compte desactive » etait tout simplement INATTEIGNABLE. Le
+     * produit n'avait aucun moyen de fermer un compte autrement qu'en
+     * detruisant la ligne.
+     *
+     * Le trait rend cet etat atteignable, et `config/auth.php` le rend
+     * OPPOSABLE : le fournisseur y est `eloquent` sur ce modele, donc
+     * `EloquentUserProvider::retrieveById()` construit une requete du modele et
+     * subit le scope global. Un compte ferme perd donc aussi ses sessions et
+     * ses jetons Sanctum deja emis — ce que les quatre filtres ci-dessus, qui
+     * ne couvrent que l'ouverture de session, ne faisaient pas.
+     *
+     * ⚠️ Limite connue, NON corrigee ici (ce serait une migration, hors
+     * perimetre) : `users.email` porte un UNIQUE inconditionnel (ligne 45),
+     * tandis que l'index `idx_users_email_active` (ligne 67) est partiel sur
+     * `deleted_at IS NULL`. Le schema a donc ete pense pour qu'un compte ferme
+     * LIBERE son adresse — mais le UNIQUE inconditionnel l'en empeche. Une
+     * adresse reste donc squattee par le compte ferme.
+     */
+    use SoftDeletes;
 
     protected $keyType = 'string';
 

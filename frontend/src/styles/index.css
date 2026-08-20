@@ -85,10 +85,83 @@ body {
   background: oklch(0.13 0.01 250);
   color: oklch(0.95 0 0);
 }
-.dark .bg-white { background: oklch(0.20 0.01 250) !important; }
-.dark .bg-slate-50 { background: oklch(0.17 0.01 250) !important; }
-.dark .text-slate-900 { color: oklch(0.95 0 0) !important; }
-.dark .border-slate-200 { border-color: oklch(0.30 0.01 250) !important; }
+/* ── Repli mode sombre pour les utilitaires ECRITS POUR LE CLAIR ──────────────
+   Beaucoup de composants n'ont jamais recu de variante `dark:` : ils posent
+   `bg-white`, `text-slate-600`… et rien d'autre. Sans repli, le mode sombre
+   les laisse en blanc sur blanc. Ces regles comblent ce vide.
+
+   ⚠️ CE QU'ELLES NE DOIVENT PLUS FAIRE (defaut D27-002, mesure le 2026-08-20)
+   Elles s'ecrivaient ainsi :
+
+       .dark .bg-white { background: oklch(0.20 0.01 250) !important; }
+
+   Specificite (0,2,0) + `!important` contre (0,1,0) pour l'utilitaire
+   `.dark\:bg-slate-900:where(.dark,.dark *)` que Tailwind v4 genere (le
+   `:where()` du `@variant dark` ligne 4 ne pese RIEN) : la feuille globale
+   ecrasait la declaration `dark:` du composant chaque fois qu'elle portait sur
+   la MEME propriete. Denombrement du 2026-08-20 sur `src/` — attributs de
+   classe, pas occurrences a l'ecran :
+       bg-white         + dark:bg-      :  48
+       bg-slate-50      + dark:bg-      :  31
+       text-slate-900   + dark:text-    : 113
+       border-slate-200 + dark:border-  :  16   → 208 au total,
+   sur 598 occurrences de `dark:` reparties dans 63 fichiers. Une `Card`
+   declarant `bg-white … dark:bg-slate-900` etait peinte #13161a, pas #0f172b.
+
+   Retirer le seul `!important` n'aurait rien change : (0,2,0) bat deja
+   (0,1,0), et tout est HORS couche (`@layer`) dans la sortie Tailwind — la
+   couche ne peut donc pas servir d'arbitre non plus.
+
+   Le levier retenu est le `:not([class*="dark:…"])` : le repli ne s'applique
+   QUE si l'element n'a rien declare lui-meme pour le sombre. Le nom de classe
+   Tailwind contient litteralement `dark:bg-` / `dark:text-` / `dark:border-`,
+   y compris pour les valeurs arbitraires (`dark:bg-[#123]`) et les opacites
+   (`dark:bg-slate-900/40`) : le test de sous-chaine les couvre toutes.
+
+   ⚠️ SECOND VOLET DU DEFAUT — le repli noircissait le FOND sans toucher au
+   TEXTE. Un texte ecrit pour du blanc (`text-slate-600`) se retrouvait sur du
+   #13161a. Mesures du 2026-08-20 sur le build (`vite preview`, chromium 1223) :
+     · description d'`EmptyState` (27 usages)  → 2,39:1
+     · « Aucune donnee pour l'instant » (/coverage) → 2,52:1
+     · onglets « Regions » / « Villes »        → 2,39:1
+     · `<kbd>⌘K</kbd>` de la recherche globale  → 1,37:1
+   soit tres en dessous des 4,5:1 exiges par WCAG 2.2 AA. On apparie donc
+   chaque fond force a une echelle de texte claire. Les valeurs sont choisies
+   pour tenir AUSSI sur `dark:bg-slate-700` (#314158), le fond sombre le plus
+   CLAIR du produit — c'est lui qui contraint, pas le fond de page.
+
+   ⚠️ CONTREPARTIE ASSUMEE : ces regles (0,3,0) l'emportent sur les utilitaires
+   d'etat de meme famille. C'est pourquoi les variantes `hover:text-slate-*`
+   sont repliees explicitement plus bas ; sans elles, le survol perdrait tout
+   effet en sombre.
+
+   Garde : `tests/e2e/dark-contraste.spec.ts` (mesure le RATIO, pas la classe). */
+
+.dark .bg-white:not([class*="dark:bg-"]) { background-color: oklch(0.20 0.01 250); }
+.dark .bg-slate-50:not([class*="dark:bg-"]) { background-color: oklch(0.17 0.01 250); }
+/* `bg-slate-100` ne figurait PAS dans le repli d'origine, et c'est ce qui
+   manquait : `SizeCategoryBadge` (« Inconnue ») et le SegmentedControl recopie
+   dans `CoveragePage.tsx:190` posent `bg-slate-100` + `text-slate-600` sans
+   variante sombre. Le fond restait clair pendant que le texte s'eclaircissait :
+   mesure 1,44:1 sur /coverage avant l'ajout de cette ligne. */
+.dark .bg-slate-100:not([class*="dark:bg-"]) { background-color: oklch(0.24 0.01 250); }
+.dark .border-slate-200:not([class*="dark:border-"]) { border-color: oklch(0.30 0.01 250); }
+
+.dark .text-slate-900:not([class*="dark:text-"]) { color: oklch(0.95 0 0); }
+.dark .text-slate-800:not([class*="dark:text-"]) { color: oklch(0.92 0.01 250); }
+.dark .text-slate-700:not([class*="dark:text-"]) { color: oklch(0.89 0.015 250); }
+.dark .text-slate-600:not([class*="dark:text-"]) { color: oklch(0.85 0.02 250); }
+.dark .text-slate-500:not([class*="dark:text-"]) { color: oklch(0.80 0.025 250); }
+
+/* `text-slate-400` n'est PAS repliee : mesuree a 7,0:1 sur les fonds sombres
+   du produit, elle reste lisible et sert d'echelle « attenuee ». La replier
+   ecraserait en outre les 143 `dark:text-slate-400` volontaires. */
+
+/* Survol — sans ces deux lignes, les 29 `hover:text-slate-700|900` du produit
+   (0,2,0) perdraient contre le repli ci-dessus (0,3,0) et le survol n'aurait
+   plus aucun effet visible en sombre. */
+.dark .hover\:text-slate-700:hover:not([class*="dark:hover:text-"]) { color: oklch(0.95 0 0); }
+.dark .hover\:text-slate-900:hover:not([class*="dark:hover:text-"]) { color: oklch(1 0 0); }
 
 /* Skip-link a11y */
 .skip-link {

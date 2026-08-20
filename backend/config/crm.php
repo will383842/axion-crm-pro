@@ -108,6 +108,32 @@ return [
     ],
 
     /*
+    | 🔴 A05-001 (S1) — CLÉ DE RAPPROCHEMENT DES PERSONNES.
+    |
+    | Mesure du 2026-08-18 en production : 1 319 567 contacts, 410 481 avec
+    | e-mail, **0 avec `person_key`**. La fiche 360°
+    | (`/console/personnes/$personKey`) et le rapprochement site ↔ CRM étaient
+    | donc inatteignables pour 100 % du stock.
+    |
+    | La clé n'est pas un « sel incalculable » : c'est un HMAC-SHA256 dont la
+    | formule est écrite dans `axionia/src/lib/security/email-hash.ts` —
+    | `HMAC(PII_ENCRYPTION_KEY, "submission-email-index-v1:" + trim(lower(email)))`.
+    | Seul le SECRET vit côté site.
+    |
+    | ⚠️ `secret` DOIT valoir exactement le `PII_ENCRYPTION_KEY` du site. Une
+    | valeur différente fabriquerait des clés d'apparence valide qui ne
+    | rapprocheraient RIEN, et rendraient muets l'export art. 15 et
+    | l'effacement art. 17 servis par `POST /internal/site-sync/gdpr`.
+    |
+    | Vide par défaut, et c'est voulu : sans secret, aucune clé n'est écrite et
+    | la commande de remplissage refuse. Inventer un sel serait le seul geste
+    | irréversible de ce lot.
+    */
+    'person_key' => [
+        'secret' => env('CRM_PERSON_KEY_SECRET', ''),
+    ],
+
+    /*
     | L3 — funnel d'ingestion de la COLLECTE (schéma pivot ScrapedRecord).
     |
     | `enabled` : à false (défaut), `POST /internal/scraper-result` garde son
@@ -180,8 +206,44 @@ return [
     | Un seul secret à faire tourner, un seul à ne pas perdre — deux secrets
     | pour un même couple de systèmes finissent toujours par diverger.
     |
-    | `max_attempts` : essais CONSOMMÉS avant `gave_up`. Un 503 du site n'en
-    | consomme aucun (cf. CrmFlushOutbound).
+    | `max_attempts` : essais CONSOMMÉS avant `gave_up`. Une indisponibilité
+    | temporaire du site n'en consomme AUCUN — ni le 503, ni les 408/429/502/504,
+    | ni une connexion refusée (constat B14-005, cf. CrmFlushOutbound).
+    |
+    | ── 🔴 CONSTAT B14-013 (S1) : LES DEUX SENS NE S'OUVRENT PAS PAREIL ────────
+    |
+    | Ce qui est MESURÉ ici, c'est le code livré ; la production n'est pas
+    | observable depuis ce dépôt, et rien dans ce dépôt ne l'ouvre. Relevé le
+    | 2026-08-20 sur la branche `fix/a35-authentification` :
+    |
+    |   - `CRM_INGEST_ENABLED`   : défaut `false` (ligne ~101), `false` dans
+    |     `.env.example:86`. Aucun `docker-compose*.yml`, aucun `infra/`, aucun
+    |     `.github/` ne le pose.
+    |   - `CRM_OUTBOUND_ENABLED` : défaut `false` (ci-dessous), `false` dans
+    |     `.env.example:268`. Idem, posé nulle part.
+    |
+    | Donc, PAR DÉFAUT, les deux sens sont fermés — l'asymétrie annoncée n'est
+    | PAS dans les défauts. Elle est dans le NOMBRE DE GESTES qu'il faut pour
+    | ouvrir chaque sens :
+    |
+    |   site → CRM : un drapeau (`CRM_INGEST_ENABLED`) et le secret partagé,
+    |                que l'authentification de l'endpoint exige de toute façon.
+    |   CRM → site : le drapeau `CRM_OUTBOUND_ENABLED`, le MÊME secret, ET
+    |                `SITE_CRM_WEBHOOK_URL` — qui n'a aucun défaut utilisable et
+    |                n'est posé dans AUCUN fichier de ce dépôt.
+    |
+    | Un exploitant qui « ouvre le canal » à la bascule ouvre donc l'ingestion
+    | et croit avoir ouvert l'émission. Ce qu'il obtient : `crm:flush-outbound`
+    | tourne toutes les 5 minutes, refuse faute de destination, et empile les
+    | oppositions décidées dans la console. Ce n'est pas réparable par un défaut
+    | — poser une URL de production ici serait deviner. Ce qui EST réparé, c'est
+    | le silence : les deux refus se journalisent désormais en `error`
+    | (`crm.outbound.destination_absente`, `crm.outbound.secret_absent`).
+    |
+    | POUR OUVRIR LE SENS CRM → SITE, les trois clés vont ENSEMBLE :
+    |   CRM_OUTBOUND_ENABLED=true
+    |   SITE_CRM_WEBHOOK_URL=https://<site>/api/internal/crm-webhook
+    |   SITE_SYNC_HMAC_SECRET=<le MÊME secret que le sens site → CRM>
     */
     'outbound_enabled' => env('CRM_OUTBOUND_ENABLED', false),
 

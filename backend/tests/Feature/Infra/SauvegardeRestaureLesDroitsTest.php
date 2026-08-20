@@ -1,0 +1,416 @@
+<?php
+
+/**
+ * GARDE DE LA SAUVEGARDE — constat A08-008 (S1).
+ *
+ * « La sauvegarde restaure les donnees mais pas les droits : une restauration
+ *   de secours livre une application incapable de lire quoi que ce soit. »
+ *
+ * ── CE QUI ETAIT MESURE DANS LES SCRIPTS ────────────────────────────────────
+ *
+ * `infra/scripts/backup-postgres.sh:97-104` appelait :
+ *
+ *     pg_dump -U axion -Fp --no-owner --no-acl --clean --if-exists axion_crm
+ *
+ * `--no-acl` retire les GRANT. Et rien n'appelait `pg_dumpall --globals-only`,
+ * qui est le SEUL moyen d'emporter les ROLES. Il manquait donc les deux moities
+ * du meme mur.
+ *
+ * Ce n'est pas une deduction. Mesure du 2026-08-20 sur la base de test, avec les
+ * options exactes du script :
+ *
+ *     $ pg_dump -U axion -Fp --no-owner --schema-only -t companies … \
+ *         | grep -E 'GRANT'
+ *     GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.companies TO axion_app;
+ *     GRANT SELECT,USAGE ON SEQUENCE public.companies_id_seq TO axion_app;
+ *
+ *     $ pg_dump -U axion -Fp --no-owner --no-acl --schema-only -t companies … \
+ *         | grep -cE 'GRANT'
+ *     0
+ *
+ * Et `pg_dumpall --globals-only` emporte bien ce que le dump ne contient pas :
+ *
+ *     CREATE ROLE axion_app;
+ *     ALTER ROLE axion_app WITH NOSUPERUSER … LOGIN … PASSWORD 'SCRAM-SHA-256$…';
+ *
+ * ── POURQUOI CE ROLE EST TOUT LE SUJET ──────────────────────────────────────
+ *
+ * `2026_08_14_000001_harden_workspace_isolation.php` cree `axion_app`, un role
+ * NON-PROPRIETAIRE, NOSUPERUSER, NOBYPASSRLS, et lui accorde
+ * `SELECT, INSERT, UPDATE, DELETE` sur les tables du schema `public`. C'est le
+ * role par lequel l'application se connecte des que `CRM_DB_APP_ROLE_ENABLED`
+ * vaut vrai — et c'est lui qui rend la RLS mordante.
+ *
+ * Sur un serveur RECONSTRUIT apres sinistre, ce role N'EXISTE PAS : il n'est pas
+ * dans le dump. Meme s'il existait, aucun GRANT ne l'accompagnerait. La
+ * restauration rendrait donc une base pleine et une application aveugle.
+ *
+ * ── ET POURQUOI PERSONNE NE L'AVAIT VU ──────────────────────────────────────
+ *
+ * `infra/scripts/dr-drill.sh` — l'exercice de restauration, celui qui EXISTE
+ * pour attraper ce genre de chose — restaure puis compte :
+ *
+ *     docker exec axion-crm-postgres psql -U axion -d "$BASE_DRILL" -tAc "…"
+ *
+ * `-U axion`, c'est-a-dire le SUPERUTILISATEUR (mesure : `rolsuper=t`,
+ * `rolbypassrls=t`). Un superutilisateur lit tout, quels que soient les GRANT et
+ * quelle que soit la RLS. L'exercice ne pouvait STRUCTURELLEMENT pas s'apercevoir
+ * du probleme : il verifiait la seule chose qui ne pouvait pas echouer.
+ *
+ * C'est le defaut le plus couteux de la famille : un controle qui rassure.
+ *
+ * ── CE QUE CETTE GARDE MESURE ───────────────────────────────────────────────
+ *
+ * 1. LE MECANISME, EN VRAI, AVEC LE ROLE APPLICATIF. Elle fabrique une base
+ *    exactement comme `--no-owner --no-acl` la laisse (objets appartenant au
+ *    restaurateur, zero GRANT), s'y connecte AVEC `axion_app` — pas avec
+ *    `axion` — et exige « permission denied ». Puis elle pose le GRANT et exige
+ *    que la lecture passe. Sans cette seconde moitie, la garde serait verte sur
+ *    une base vide, un role absent ou une connexion cassee.
+ *
+ * 2. Que les trois scripts portent le correctif.
+ *
+ * ⚠️ Le conteneur de mesure n'a ni `pg_dump` ni `docker` : ces scripts ne
+ * peuvent pas etre JOUES depuis ce banc, et `backup-postgres.sh` televerse de
+ * surcroit sur une Storage Box reelle. Ce que la garde prouve en direct, c'est
+ * le MECANISME (droits) ; ce qu'elle prouve par lecture, c'est que les scripts
+ * portent le remede. Les deux moities sont dites, aucune n'est maquillee en
+ * l'autre.
+ */
+
+use Tests\TestCase;
+
+uses(TestCase::class);
+
+/**
+ * La racine du depot — `infra/` vit AU-DESSUS de l'application.
+ */
+function racineDepotSauvegarde(): string
+{
+    return realpath(base_path('..')) ?: base_path('..');
+}
+
+/** Nom de la base jetable de la garde. Explicite : personne ne doit la confondre. */
+const BASE_JETABLE_DROITS = 'axion_crm_test_lot1_a35_droits';
+
+/**
+ * Ouvre une connexion PDO directe.
+ *
+ * On n'emprunte pas le gestionnaire de connexions de Laravel : il faut ouvrir
+ * une session AVEC LE ROLE APPLICATIF sur une base qui n'est pas celle des
+ * tests, et pouvoir observer l'echec d'autorisation tel que Postgres le rend.
+ */
+function connexionPostgres(string $base, string $utilisateur, string $motDePasse): PDO
+{
+    $hote = (string) config('database.connections.pgsql_owner.host');
+    $port = (string) config('database.connections.pgsql_owner.port');
+
+    return new PDO(
+        "pgsql:host={$hote};port={$port};dbname={$base}",
+        $utilisateur,
+        $motDePasse,
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
+    );
+}
+
+test('A08-008 — TEMOIN : le banc a bien un role applicatif distinct du proprietaire', function () {
+    $proprietaire = (string) config('database.connections.pgsql_owner.username');
+    $roleApp = (string) config('database.connections.pgsql_app.username');
+    $mdpApp = (string) config('database.connections.pgsql_app.password');
+
+    expect($roleApp)->not->toBe(
+        $proprietaire,
+        "Le role applicatif et le role proprietaire sont le MEME (« {$roleApp} »). La garde "
+        . "ci-dessous se connecterait avec le proprietaire, qui lit tout par construction : "
+        . 'elle serait verte quoi qu il arrive. C est exactement le defaut de `dr-drill.sh`.'
+    );
+
+    // Sans mot de passe, impossible d'ouvrir une session avec ce role : la
+    // garde ne pourrait pas mesurer, et un `markTestSkipped` serait un vert
+    // deguise. On ECHOUE en le disant.
+    expect($mdpApp)->not->toBe(
+        '',
+        "`DB_APP_PASSWORD` est vide sur ce banc : impossible d'ouvrir une session avec le "
+        . "role applicatif. La garde ne mesurerait RIEN. Ajouter "
+        . '`<env name="DB_APP_PASSWORD" value="…"/>` a la configuration phpunit du lot.'
+    );
+
+    // Le role doit exister dans le cluster, et NE PAS etre superutilisateur —
+    // un superutilisateur contournerait GRANT et RLS, et rendrait la mesure
+    // vide de sens.
+    $admin = connexionPostgres(
+        'postgres',
+        $proprietaire,
+        (string) config('database.connections.pgsql_owner.password'),
+    );
+
+    $ligne = $admin->query(
+        "SELECT rolsuper, rolbypassrls, rolcanlogin FROM pg_roles WHERE rolname = "
+        . $admin->quote($roleApp)
+    )->fetch(PDO::FETCH_ASSOC);
+
+    expect($ligne)->not->toBeFalse(
+        "Le role applicatif « {$roleApp} » n'existe pas dans ce cluster. Il est cree par la "
+        . 'migration `2026_08_14_000001_harden_workspace_isolation` : la base du lot n est pas '
+        . 'migree, et la garde ne mesurerait rien.'
+    );
+    expect($ligne['rolsuper'])->toBeFalse("Le role applicatif « {$roleApp} » est SUPERUTILISATEUR : il lirait tout, GRANT ou pas.");
+    expect($ligne['rolbypassrls'])->toBeFalse("Le role applicatif « {$roleApp} » porte BYPASSRLS.");
+    expect($ligne['rolcanlogin'])->toBeTrue("Le role applicatif « {$roleApp} » ne peut pas ouvrir de session.");
+});
+
+test('A08-008 — TEMOIN DU MECANISME : sans GRANT le role applicatif ne lit RIEN, avec GRANT il lit', function () {
+    $proprietaire = (string) config('database.connections.pgsql_owner.username');
+    $mdpProprietaire = (string) config('database.connections.pgsql_owner.password');
+    $roleApp = (string) config('database.connections.pgsql_app.username');
+    $mdpApp = (string) config('database.connections.pgsql_app.password');
+
+    $admin = connexionPostgres('postgres', $proprietaire, $mdpProprietaire);
+
+    // Base jetable, refaite a neuf : on ne mesure jamais sur un reste.
+    $admin->exec('DROP DATABASE IF EXISTS ' . BASE_JETABLE_DROITS . ' WITH (FORCE)');
+    $admin->exec('CREATE DATABASE ' . BASE_JETABLE_DROITS);
+
+    try {
+        // ── Ce que `--no-owner --no-acl` produit, reproduit fidelement ──
+        // Une table creee par le restaurateur, sans le moindre GRANT. C'est
+        // EXACTEMENT l'etat d'une base restauree par le script d'origine.
+        $proprio = connexionPostgres(BASE_JETABLE_DROITS, $proprietaire, $mdpProprietaire);
+        $proprio->exec('CREATE TABLE public.fiches_restaurees (id integer PRIMARY KEY, nom text)');
+        $proprio->exec("INSERT INTO public.fiches_restaurees VALUES (1, 'une fiche restauree')");
+
+        // Le proprietaire, lui, lit sans probleme — c'est ce que `dr-drill.sh`
+        // mesurait, et c'est pourquoi il ne voyait rien.
+        expect((int) $proprio->query('SELECT count(*) FROM public.fiches_restaurees')->fetchColumn())
+            ->toBe(1);
+
+        // ── LA MESURE QUI COMPTE : avec le ROLE APPLICATIF ──
+        $app = connexionPostgres(BASE_JETABLE_DROITS, $roleApp, $mdpApp);
+
+        $refus = null;
+        try {
+            $app->query('SELECT count(*) FROM public.fiches_restaurees')->fetchColumn();
+        } catch (PDOException $e) {
+            $refus = $e->getMessage();
+        }
+
+        expect($refus)->not->toBeNull(
+            "Le role applicatif « {$roleApp} » a pu lire une table SANS AUCUN GRANT. "
+            . 'Ou bien un GRANT traine au niveau du schema, ou bien ce role a plus de '
+            . 'privileges que prevu : la garde ne prouverait plus rien sur la restauration.'
+        );
+        // ⚠️ Sous-chaine SANS LETTRE ACCENTUEE, et en anglais : c'est Postgres
+        // qui parle ici, pas nous.
+        $this->assertStringContainsString(
+            'permission denied',
+            (string) $refus,
+            "Le refus attendu n'est pas un refus d'autorisation : « {$refus} »."
+        );
+
+        // ── ET LE TEMOIN INVERSE : la garde SAIT passer au vert ──
+        // Sans lui, un test qui echouerait pour n'importe quelle raison (base
+        // absente, connexion morte) serait pris pour une preuve.
+        $proprio->exec('GRANT USAGE ON SCHEMA public TO ' . $roleApp);
+        $proprio->exec('GRANT SELECT ON public.fiches_restaurees TO ' . $roleApp);
+
+        $app2 = connexionPostgres(BASE_JETABLE_DROITS, $roleApp, $mdpApp);
+        expect((int) $app2->query('SELECT count(*) FROM public.fiches_restaurees')->fetchColumn())
+            ->toBe(
+                1,
+                'Le GRANT vient d etre pose et le role applicatif ne lit toujours pas : la '
+                . 'mesure ci-dessus ne prouvait donc pas ce qu elle pretend.'
+            );
+
+        unset($app, $app2, $proprio);
+    } finally {
+        // On rend le cluster propre meme si la garde a rougi.
+        $admin->exec('DROP DATABASE IF EXISTS ' . BASE_JETABLE_DROITS . ' WITH (FORCE)');
+    }
+});
+
+/**
+ * Les trois scripts de la chaine de sauvegarde.
+ *
+ * @return list<string>
+ */
+function scriptsDeSauvegarde(): array
+{
+    return [
+        'infra/scripts/backup-postgres.sh',
+        'infra/scripts/restore-postgres.sh',
+        'infra/scripts/dr-drill.sh',
+    ];
+}
+
+function contenuScriptSauvegarde(string $relatif): string
+{
+    return (string) file_get_contents(racineDepotSauvegarde() . '/' . $relatif);
+}
+
+/** Une invocation de `pg_dump` retire-t-elle les ACL ? (`--no-acl` ou son alias `-x`) */
+function dumpRetireLesAcl(string $contenu): bool
+{
+    foreach (explode("\n", $contenu) as $ligne) {
+        $nue = trim($ligne);
+        if ($nue === '' || str_starts_with($nue, '#')) {
+            continue;
+        }
+        if (preg_match('/(^|\s)(--no-acl|-x)(\s|$|\\\\)/', $nue) === 1) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/** Le script emporte-t-il les roles du cluster ? */
+function dumpPorteLesRoles(string $contenu): bool
+{
+    return preg_match('/pg_dumpall[^\n]*--globals-only|--globals-only[^\n]*pg_dumpall/', $contenu) === 1;
+}
+
+/**
+ * Le script verifie-t-il les droits AVEC LE ROLE APPLICATIF ?
+ *
+ * `has_table_privilege` est le seul artefact qui ne peut pas s'y trouver par
+ * hasard : c'est la fonction Postgres qui repond exactement a la question
+ * « ce role peut-il lire cette table ». Un comptage `SELECT count(*)` joue en
+ * superutilisateur — ce que faisait `dr-drill.sh` — ne la contient pas.
+ */
+function verifieLesDroitsDuRoleApplicatif(string $contenu): bool
+{
+    return str_contains($contenu, 'has_table_privilege');
+}
+
+test('A08-008 — TEMOIN : le banc voit les trois scripts de la chaine', function () {
+    $manquants = [];
+    foreach (scriptsDeSauvegarde() as $relatif) {
+        if (! is_file(racineDepotSauvegarde() . '/' . $relatif)) {
+            $manquants[] = $relatif;
+        }
+    }
+
+    expect($manquants)->toBe(
+        [],
+        'Le banc ne voit pas ces scripts : ' . implode(', ', $manquants)
+        . '. Les gardes qui suivent seraient vertes sur ZERO fichier. Racine vue : '
+        . racineDepotSauvegarde()
+    );
+});
+
+test('A08-008 — TEMOIN NEGATIF : les balayages savent reperer le defaut ET le correctif', function () {
+    // `--no-acl` sous ses deux formes, y compris coupee par une continuation de
+    // ligne — c'est ainsi que le script d'origine l'ecrivait.
+    expect(dumpRetireLesAcl("pg_dump \\\n  --no-owner \\\n  --no-acl \\\n  axion_crm"))->toBeTrue();
+    expect(dumpRetireLesAcl('pg_dump -U axion -x axion_crm'))->toBeTrue();
+    // Et il ne crie pas sur la forme correcte, ni sur un commentaire qui en parle.
+    expect(dumpRetireLesAcl("pg_dump \\\n  --no-owner \\\n  axion_crm"))->toBeFalse();
+    expect(dumpRetireLesAcl('# on ne passe plus --no-acl, cf. A08-008'))->toBeFalse();
+
+    expect(dumpPorteLesRoles('pg_dumpall -U axion --globals-only'))->toBeTrue();
+    expect(dumpPorteLesRoles('pg_dump -U axion axion_crm'))->toBeFalse();
+
+    expect(verifieLesDroitsDuRoleApplicatif("has_table_privilege('axion_app', t, 'SELECT')"))->toBeTrue();
+    expect(verifieLesDroitsDuRoleApplicatif('psql -U axion -tAc "SELECT count(*) FROM companies"'))->toBeFalse();
+});
+
+test('A08-008 — la sauvegarde emporte les ROLES du cluster', function () {
+    expect(dumpPorteLesRoles(contenuScriptSauvegarde('infra/scripts/backup-postgres.sh')))->toBeTrue(
+        "`backup-postgres.sh` n'appelle pas `pg_dumpall --globals-only`.\n\n"
+        . "Un `pg_dump` ne contient AUCUN role : ni `axion`, ni `axion_app`. Sur un serveur "
+        . "reconstruit apres sinistre, le role applicatif n'existerait donc pas et "
+        . "l'application ne pourrait meme pas OUVRIR de session.\n\n"
+        . "Mesure du 2026-08-20, `pg_dumpall -U axion --globals-only` :\n"
+        . "    CREATE ROLE axion_app;\n"
+        . "    ALTER ROLE axion_app WITH NOSUPERUSER … LOGIN … PASSWORD 'SCRAM-SHA-256\$…';\n\n"
+        . 'Correctif : emettre cette section dans l archive, avant la charge utile.'
+    );
+});
+
+test('A08-008 — la sauvegarde emporte les GRANT', function () {
+    expect(dumpRetireLesAcl(contenuScriptSauvegarde('infra/scripts/backup-postgres.sh')))->toBeFalse(
+        "`backup-postgres.sh` passe encore `--no-acl` (ou `-x`) a `pg_dump`.\n\n"
+        . "Mesure du 2026-08-20, avec et sans l option, sur la table `companies` :\n"
+        . "    sans --no-acl : GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.companies TO axion_app;\n"
+        . "    avec --no-acl : 0 ligne GRANT\n\n"
+        . "Le role applicatif est NON-PROPRIETAIRE (migration harden_workspace_isolation) : "
+        . "sans GRANT il ne lit rien. Le temoin du mecanisme, plus haut, le montre en direct "
+        . "— « permission denied » sur une table restauree sans ACL.\n\n"
+        . 'Correctif : retirer `--no-acl`. `--no-owner` peut rester : la propriete revient au '
+        . 'restaurateur, ce qui est deja le cas en production.'
+    );
+});
+
+test('A08-008 — la restauration REPOSE les roles et VERIFIE avec le role applicatif', function () {
+    $restore = contenuScriptSauvegarde('infra/scripts/restore-postgres.sh');
+
+    expect(dumpPorteLesRoles($restore) || str_contains($restore, 'GLOBALS'))->toBeTrue(
+        "`restore-postgres.sh` n'applique pas la section des roles de l archive.\n\n"
+        . 'Sans elle, les `GRANT … TO axion_app` de la charge utile echouent sur '
+        . '« role "axion_app" does not exist », et avec `--single-transaction -v '
+        . 'ON_ERROR_STOP=1` c est TOUTE la restauration qui est annulee.'
+    );
+
+    expect(verifieLesDroitsDuRoleApplicatif($restore))->toBeTrue(
+        "`restore-postgres.sh` ne verifie pas les droits du role applicatif.\n\n"
+        . "Sa verification finale compte les TABLES (`information_schema.tables`) : une base "
+        . "restauree sans un seul GRANT passe ce controle haut la main, puis l'application "
+        . "n'y lit rien. Un controle qui ne peut pas echouer sur le defaut qu'on repare est "
+        . "pire qu'aucun controle.\n\n"
+        . "Correctif : interroger `has_table_privilege('<role applicatif>', …, 'SELECT')` sur "
+        . 'les tables du schema public, et sortir en erreur s il en reste une seule illisible.'
+    );
+});
+
+test('A08-008 — les trois scripts partagent LES MEMES marqueurs de section', function () {
+    // La section des roles est isolee dans l'archive par deux marqueurs
+    // textuels. `backup-postgres.sh` les ECRIT, `restore-postgres.sh` et
+    // `dr-drill.sh` les CHERCHENT. C'est un contrat entre trois fichiers, et
+    // c'est exactement la forme que prend le patron A-011 dans ce depot :
+    // quelqu'un renomme d'un cote, oublie les deux autres, et la restauration
+    // se casse EN SILENCE — on ne s'en apercoit qu'un jour de sinistre.
+    //
+    // Le mode de defaillance n'est meme pas une erreur : `sed` sur un marqueur
+    // introuvable ne supprime rien et ne dit rien. La charge utile partirait
+    // alors avec les `CREATE ROLE` dedans, et `ON_ERROR_STOP=1` annulerait
+    // TOUTE la restauration.
+    $marqueurs = [];
+    foreach (scriptsDeSauvegarde() as $relatif) {
+        preg_match_all(
+            '/-- >>> AXION-GLOBALS-(DEBUT|FIN)/',
+            contenuScriptSauvegarde($relatif),
+            $trouves,
+        );
+        $marqueurs[$relatif] = array_values(array_unique($trouves[0]));
+        sort($marqueurs[$relatif]);
+    }
+
+    $attendu = ['-- >>> AXION-GLOBALS-DEBUT', '-- >>> AXION-GLOBALS-FIN'];
+
+    foreach ($marqueurs as $relatif => $trouves) {
+        expect($trouves)->toBe(
+            $attendu,
+            "« {$relatif} » ne porte pas les deux marqueurs de la section des roles.\n\n"
+            . "Trouve : " . (implode(', ', $trouves) ?: '(aucun)') . "\n"
+            . "Attendu : " . implode(', ', $attendu) . "\n\n"
+            . "Ces marqueurs sont un CONTRAT entre les trois scripts. Un `sed` sur un "
+            . "marqueur introuvable ne supprime rien ET NE DIT RIEN : la section des roles "
+            . "partirait dans la charge utile, ou `CREATE ROLE axion;` echouerait sur un "
+            . "cluster existant — et `ON_ERROR_STOP=1` annulerait toute la restauration."
+        );
+    }
+});
+
+test('A08-008 — l exercice de restauration ne se contente plus de compter en superutilisateur', function () {
+    $drill = contenuScriptSauvegarde('infra/scripts/dr-drill.sh');
+
+    expect(verifieLesDroitsDuRoleApplicatif($drill))->toBeTrue(
+        "`dr-drill.sh` verifie toujours la restauration UNIQUEMENT en superutilisateur.\n\n"
+        . "Ses etapes 2 et 4 jouent `psql -U axion` — mesure : `rolsuper=t`, `rolbypassrls=t`. "
+        . "Un superutilisateur lit tout, quels que soient les GRANT et quelle que soit la RLS. "
+        . "Cet exercice ne pouvait donc STRUCTURELLEMENT pas s'apercevoir du constat A08-008 : "
+        . "il verifiait la seule chose qui ne pouvait pas echouer, et il rassurait.\n\n"
+        . "Correctif : ajouter une etape qui interroge "
+        . "`has_table_privilege('<role applicatif>', …, 'SELECT')` sur la base restauree."
+    );
+});

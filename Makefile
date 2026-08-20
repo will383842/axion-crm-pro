@@ -84,13 +84,33 @@ fresh: ## migrate:fresh --seed (reset DB complet local)
 #   backend/tests/Feature/Database/AuditLogsPartitionnementTest.php (cause 2)
 # Elles tournent dans le job `backend` de la CI (Pest, bloquant).
 
+# 🔴 B10-001 (S1), mesuré le 2026-08-20 — LE CORRECTIF ÉTAIT INATTEIGNABLE PAR
+# CE CHEMIN. `migrate:fresh` fait (1) `db:wipe`, un seul `DROP TABLE … CASCADE`
+# sur tout le search_path, puis (2) les migrations. Sur une base où pg_partman
+# vit dans `public`, l'étape (1) échoue et l'étape (2) N'A JAMAIS LIEU :
+# `2026_08_18_100001_partman_dans_son_propre_schema` ne peut pas s'exécuter,
+# précisément sur les bases qui en ont besoin. Reproduit end-to-end le
+# 2026-08-20 sur `axion_crm_b10_e2e` :
+#   $ php artisan db:wipe --force
+#     SQLSTATE[2BP01] cannot drop table part_config because extension
+#     pg_partman requires it
+#
+# `db:partman-relocaliser` est le même geste, joué AU BON MOMENT — c'est-à-dire
+# avant le DROP. Il est aussi armé sur l'événement `CommandStarting` de
+# `migrate:fresh` (AppServiceProvider), ce qui couvre `RefreshDatabase` et donc
+# toute la suite Pest, qui n'ouvre jamais ce Makefile. La ligne ci-dessous reste
+# utile : elle rend le geste VISIBLE dans la sortie de `make`, et elle tient si
+# quelqu'un retire un jour le crochet.
 db-rebuild-local: ## Reconstruit la base locale de zéro (migrate:fresh + seeds), pg_partman compris
+	docker exec -e TELESCOPE_ENABLED=false axion-crm-api php artisan db:partman-relocaliser
 	docker exec -e TELESCOPE_ENABLED=false axion-crm-api php artisan migrate:fresh --seed --force
 	@echo "--- extensions de la base reconstruite ---"
 	docker exec axion-crm-postgres psql -U axion -d axion_crm \
 	  -c "select extname, extversion, n.nspname as schema from pg_extension e join pg_namespace n on n.oid = e.extnamespace order by 1;"
 
 db-rebuild-check: ## GARDE — exige que migrate:fresh passe DEUX FOIS DE SUITE (c'est le vrai critère)
+	@echo "== relocalisation préalable (sans elle, la n°1 meurt AVANT toute migration) =="
+	docker exec -e TELESCOPE_ENABLED=false axion-crm-api php artisan db:partman-relocaliser
 	@echo "== reconstruction n°1 =="
 	docker exec -e TELESCOPE_ENABLED=false axion-crm-api php artisan migrate:fresh --force
 	@echo "== reconstruction n°2 (celle qui échouait) =="

@@ -1,5 +1,6 @@
 import { createRootRoute, createRoute, Outlet } from '@tanstack/react-router';
 import { RootLayout } from './RootLayout';
+import { RouteErrorBoundary } from './RouteErrorBoundary';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { TwoFactorPage } from '@/features/auth/TwoFactorPage';
 import { MagicLinkPage } from '@/features/auth/MagicLinkPage';
@@ -50,7 +51,25 @@ import { PersonTimelinePage } from '@/features/crm-console/PersonTimelinePage';
 import { ColdEmailStub } from '@/features/phase2-scaffold/ColdEmailStub';
 import { LinkedInStub } from '@/features/phase2-scaffold/LinkedInStub';
 
-export const rootRoute = createRootRoute({ component: () => <Outlet /> });
+// P6-UI-005 — SITE DE MONTAGE 1/3 de la frontiere d'erreur (cf.
+// `RouteErrorBoundary.tsx` pour la mesure et la justification des trois sites).
+//
+// Cette frontiere-ci couvre ce que la coquille ne couvre PAS : les quatre
+// ecrans d'authentification ci-dessous (`/login`, `/2fa`, `/magic-link`,
+// `/password-reset`) sont enfants de `rootRoute`, pas de `layoutRoute`. Une
+// reparation qui n'aurait touche que `RootLayout` les aurait laisses sur
+// l'ecran anglais « Something went wrong! » de TanStack Router.
+//
+// Elle est posee A L'INTERIEUR du routeur, donc SOUS le filet global de la
+// librairie (`@tanstack/react-router/dist/esm/Matches.js:36`) : une frontiere
+// React plus profonde attrape en premier, et c'est notre message qui gagne.
+export const rootRoute = createRootRoute({
+  component: () => (
+    <RouteErrorBoundary level="root">
+      <Outlet />
+    </RouteErrorBoundary>
+  ),
+});
 
 const layoutRoute = createRoute({
   getParentRoute: () => rootRoute,

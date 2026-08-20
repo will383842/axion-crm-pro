@@ -128,7 +128,18 @@ class ContactsController extends ApiController
         // l'identifiant — et ce sont des entiers consecutifs (F36-005, S0).
         $this->refuserHorsEspace($contact);
 
-        return $this->ok($contact);
+        // 🔴 SITE JUMEAU de B12-002 / F36-006, que l'audit ne nomme pas.
+        // La LISTE des contacts masque depuis le 2026-08-15, via `present()`
+        // (ligne 103). Sa FICHE rendait le modele brut. Comme pour les
+        // entreprises, la route ne porte aucune permission au-dela du groupe
+        // (routes/api.php:157) : un `viewer` la lit. Le defaut caracteristique
+        // de ce depot -- le correctif existe et n'a pas ete porte au site
+        // jumeau -- s'appliquait deux fois au meme constat.
+        //
+        // On masque le MODELE plutot que de rendre `present()` : `show()` sert
+        // aussi les colonnes que la projection de liste ne porte pas, et une
+        // fiche detaillee amputee serait une refonte d'API deguisee en garde.
+        return $this->ok(MasquageCoordonnees::masquerSiRequis($contact));
     }
 
     /**

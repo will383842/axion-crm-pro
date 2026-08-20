@@ -13,6 +13,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
 
 /**
  * Lance le scraping de découverte pour une zone géo via une source donnée.
@@ -39,6 +40,28 @@ class LaunchZoneScrapingJob implements ShouldQueue
     public int $tries = 2;
     public int $timeout = 1800;
 
+    /**
+     * 🔴 C18-008. Prefixe de la cle Redis d'annulation. C'est LA cle qu'ecrivent
+     * `ScraperRunsController::cancel()` et `ScrapingCampaignsController::cancel()`
+     * depuis le Sprint 18, et que PERSONNE ne lisait :
+     *     grep -rn "cancelled:scraper-run" backend/ frontend/
+     *     → 2 ecritures, 1 commentaire (« les workers verifient egalement le
+     *       flag Redis », ScraperRunCancelled.php:15), 0 LECTURE.
+     * Le lecteur decrit par ce commentaire n'existait pas. Le voici.
+     */
+    public const CLE_ANNULATION = 'cancelled:scraper-run:';
+
+    /**
+     * 🔴 C18-008. Cadence de relecture des canaux d'arret DISTANTS (Redis +
+     * base). Un controle a chaque entreprise triplerait le nombre de requetes
+     * de la boucle (l'upsert en fait deja 2) ; un controle trop rare laisse la
+     * collecte deborder apres le clic « arreter ».
+     * 10 : au pire 9 entreprises collectees apres l'arret, pour +20 % de
+     * requetes. Le plafond `max_companies`, lui, est verifie a CHAQUE tour —
+     * il se calcule en memoire et ne coute rien (cf. `motifArretLocal()`).
+     */
+    private const CADENCE_CONTROLE_ARRET = 10;
+
     public function __construct(
         public readonly string $workspaceId,
         public readonly string $department,
@@ -52,6 +75,28 @@ class LaunchZoneScrapingJob implements ShouldQueue
 
     public function handle(InseeClient $insee, FranceTravailDiscoveryClient $ftDiscovery): void
     {
+        // 🔴 C18-008. PREMIER point de lecture de l'arret : avant meme de creer
+        // un run. `LaunchCampaignJob` pousse un job par (zone x source) avec un
+        // decalage de `ceil(60 / max_requests_per_minute)` s chacun — la file
+        // porte donc, a tout instant, des jobs qui n'ont pas encore demarre.
+        // Aucun d'eux ne demandait a la campagne si elle tournait encore :
+        // « annuler » n'ecrivait qu'un statut, et la collecte continuait.
+        // Laravel ne sait pas retirer un job precis d'une file ; le seul arret
+        // qui tienne est celui-ci, a l'execution.
+        if ($this->campaignId !== null) {
+            $motif = $this->motifArretCampagne();
+            if ($motif !== null) {
+                Log::info('LaunchZoneScrapingJob: arret lu avant demarrage, aucun run cree', [
+                    'campaign_id' => $this->campaignId,
+                    'department'  => $this->department,
+                    'source'      => $this->source,
+                    'motif'       => $motif,
+                ]);
+
+                return;
+            }
+        }
+
         $run = ScraperRun::create([
             'workspace_id'    => $this->workspaceId,
             'campaign_id'     => $this->campaignId,
@@ -73,11 +118,43 @@ class LaunchZoneScrapingJob implements ShouldQueue
         $companiesNew = 0;
         $companiesRefreshed = 0;
 
+        // 🔴 C18-007. Ce qui reste a collecter avant de toucher `max_companies`,
+        // lu UNE fois au demarrage. Le report au compteur de campagne ne se fait
+        // qu'a la fin du job (plus bas) : relire la base a chaque tour rendrait
+        // la meme valeur. La relecture periodique de `motifArretCampagne()`
+        // couvre le cas de plusieurs jobs concurrents sur la meme campagne.
+        $plafondRestant = $this->plafondRestantAuDemarrage();
+
+        // Motif d'interruption de la boucle, null si elle est allee au bout.
+        $motifArret = null;
+
         try {
             $results = $this->discoverEntreprises($insee, $ftDiscovery);
             $companiesFound = count($results);
 
-            foreach ($results as $data) {
+            foreach ($results as $rang => $data) {
+                // 🔴 C18-007. Le plafond se verifie a CHAQUE tour : c'est ce qui
+                // fait qu'une campagne plafonnee a N s'arrete a N, et non a la
+                // taille du lot rendu par la source. Mesure du 2026-08-20 : sans
+                // ce controle, une campagne a `max_companies=3` face a une source
+                // rendant 10 resultats en creait 10.
+                if ($plafondRestant !== null && ($companiesNew + $companiesRefreshed) >= $plafondRestant) {
+                    $motifArret = 'quota_companies';
+                    break;
+                }
+
+                // 🔴 C18-008. Canaux d'arret distants (drapeau Redis + statuts en
+                // base), relus a la cadence `CADENCE_CONTROLE_ARRET`. Le tour 0
+                // est toujours controle : un arret pose pendant la phase de
+                // decouverte (qui peut durer des minutes) est vu avant le
+                // premier upsert.
+                if ($rang % self::CADENCE_CONTROLE_ARRET === 0) {
+                    $motifArret = $this->motifArretDistant($run);
+                    if ($motifArret !== null) {
+                        break;
+                    }
+                }
+
                 $company = Company::query()->updateOrCreate(
                     ['workspace_id' => $this->workspaceId, 'siren' => $data->siren],
                     [
@@ -106,15 +183,27 @@ class LaunchZoneScrapingJob implements ShouldQueue
             }
             $companiesCreated = $companiesNew + $companiesRefreshed;
 
+            // 🔴 C18-008. Un run interrompu ne doit PAS repasser « success » :
+            // avant ce correctif, un run que l'exploitant venait de passer
+            // « cancelled » etait reecrit en « success » par la fin du job — le
+            // bouton « arreter » s'effacait de l'historique. `partial` sur un
+            // arret par plafond (le job a fait une partie de son travail),
+            // `cancelled` sur un arret demande.
             $run->update([
-                'status'           => 'success',
+                'status'           => $motifArret === null
+                    ? 'success'
+                    : ($motifArret === 'quota_companies' ? 'partial' : 'cancelled'),
                 'finished_at'      => now(),
+                'error'            => $motifArret === null
+                    ? $run->error
+                    : 'Collecte interrompue : ' . $motifArret,
                 'response_payload' => [
                     'companies_found'     => $companiesFound,
                     'companies_processed' => $companiesCreated,
                     'companies_new'       => $companiesNew,
                     'companies_refreshed' => $companiesRefreshed,
                     'source'              => $this->source,
+                    'motif_arret'         => $motifArret,
                 ],
             ]);
 
@@ -157,6 +246,112 @@ class LaunchZoneScrapingJob implements ShouldQueue
             }
             throw $e;
         }
+    }
+
+    // ------------------------------------------------------------------
+    // 🔴 C18-008 / C18-007 — lecture de l'arret
+    // ------------------------------------------------------------------
+
+    /**
+     * Motif d'arret porte par la CAMPAGNE, ou null s'il faut continuer.
+     *
+     * Trois causes, toutes lues en base — la seule source qui soit toujours
+     * disponible, y compris quand Redis est tombe :
+     *   - la campagne a disparu (ou a ete supprimee en douceur) ;
+     *   - elle n'est plus `running` (cancelled / paused / completed) : c'est
+     *     ce que posent `ScrapingCampaignsController::cancel()` et `::pause()` ;
+     *   - son plafond `max_companies` est deja atteint.
+     *
+     * On interroge la table directement plutot que le modele : `ScrapingCampaign`
+     * porte `SoftDeletes`, dont le scope global masquerait une campagne
+     * supprimee et ferait repondre « campagne absente » au lieu du vrai motif.
+     */
+    private function motifArretCampagne(int $collecteesNonReportees = 0): ?string
+    {
+        if ($this->campaignId === null) {
+            return null;
+        }
+
+        $campagne = DB::table('scraping_campaigns')
+            ->where('id', $this->campaignId)
+            ->first(['status', 'max_companies', 'companies_created', 'deleted_at']);
+
+        if ($campagne === null) {
+            return 'campagne_absente';
+        }
+        if ($campagne->deleted_at !== null) {
+            return 'campagne_supprimee';
+        }
+        if ($campagne->status !== 'running') {
+            return 'campagne_' . $campagne->status;
+        }
+
+        $plafond = (int) $campagne->max_companies;
+        $deja = (int) $campagne->companies_created + $collecteesNonReportees;
+        if ($plafond > 0 && $deja >= $plafond) {
+            return 'quota_companies';
+        }
+
+        return null;
+    }
+
+    /**
+     * Ce qu'il reste a collecter avant le plafond, ou null si aucune campagne
+     * (mode `/coverage/launch` legacy) ou plafond non renseigne.
+     */
+    private function plafondRestantAuDemarrage(): ?int
+    {
+        if ($this->campaignId === null) {
+            return null;
+        }
+
+        $campagne = DB::table('scraping_campaigns')
+            ->where('id', $this->campaignId)
+            ->first(['max_companies', 'companies_created']);
+
+        if ($campagne === null || (int) $campagne->max_companies <= 0) {
+            return null;
+        }
+
+        return max(0, (int) $campagne->max_companies - (int) $campagne->companies_created);
+    }
+
+    /**
+     * Motif d'arret porte par un canal DISTANT (Redis ou base), ou null.
+     *
+     * L'ordre compte : le drapeau Redis est le canal le plus rapide (pose par
+     * les deux controleurs au moment du clic, TTL 3600 s), la base est le canal
+     * le plus sur. On lit les deux ; il suffit qu'UN SEUL dise stop.
+     */
+    private function motifArretDistant(ScraperRun $run): ?string
+    {
+        // a) Le drapeau que personne ne lisait.
+        try {
+            $drapeau = Redis::get(self::CLE_ANNULATION . $run->id);
+            // Selon le client (predis rend null, phpredis rend false), l'absence
+            // ne se teste pas de la meme facon : on n'accepte que du contenu.
+            if ($drapeau !== null && $drapeau !== false && (string) $drapeau !== '') {
+                return 'run_annule_redis';
+            }
+        } catch (\Throwable $e) {
+            // Redis indisponible n'est PAS une autorisation de continuer : on
+            // se rabat sur la base ci-dessous, qui porte la meme information.
+            Log::warning('LaunchZoneScrapingJob: lecture du drapeau Redis impossible', [
+                'run_id'    => $run->id,
+                'exception' => $e->getMessage(),
+            ]);
+        }
+
+        // b) Statut du run en base : c'est ce qu'ecrivent
+        //    `ScraperRunsController::cancel()` et `ScrapingCampaignsController::cancel()`.
+        $statut = DB::table('scraper_runs')->where('id', $run->id)->value('status');
+        if ($statut === 'cancelled') {
+            return 'run_annule';
+        }
+
+        // c) Campagne (annulee, mise en pause, ou plafond atteint entre-temps
+        //    par un job concurrent).
+        return $this->motifArretCampagne();
     }
 
     /**

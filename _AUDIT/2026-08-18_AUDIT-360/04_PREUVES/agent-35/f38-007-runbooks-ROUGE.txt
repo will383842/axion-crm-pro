@@ -1,0 +1,103 @@
+
+   FAIL  Tests\Feature\Infra\PileDeProductionSansOverlayTest
+  ✓ F38-007 — TEMOIN : le banc voit bien les fichiers de pilotage de l… 11.73s  
+  ✓ F38-007 — TEMOIN NEGATIF : le balayage SAIT reperer une invocation…  0.56s  
+  ⨯ F38-007 — aucune commande visant la production ne recree la pile SA… 1.28s  
+  ✓ F38-007 — les services applicatifs dependent bien de postgres et re… 0.79s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Infra\PileDeProductionSansOverlayTest > F38-007 — a…   
+  Ces commandes recreent la pile de PRODUCTION sans `docker-compose.prod.yml`.
+
+Compose repart alors du seul `docker-compose.yml`, qui PUBLIE Postgres sur 55432 et Redis sur 56379. Il voit une configuration differente de celle des conteneurs en place et il les RECREE, ports compris. C'est la faille du 2026-08-19, reouverte.
+
+Redis n'a aucun mot de passe : FLUSHALL, lecture des jetons, CONFIG SET.
+
+Correctif : `export COMPOSE_FILE="docker-compose.yml:docker-compose.prod.yml"` avant la commande, comme le fait deja `deploy-direct-ssh.yml`.
+
+Commandes nues :
+  - infra/runbooks/01-restart-workers.md:22  →  # il faut `docker compose up -d <service>`, qui recree le conteneur.
+  - infra/runbooks/03-site-down.md:36  →  docker compose up -d --force-recreate api caddy
+  - infra/runbooks/04-restore-dr.md:12  →  # Installer docker + restaurer infra : git clone + docker compose up -d
+  - infra/runbooks/05-rotate-secrets.md:22  →  > **Partout dans ce document : `docker compose up -d <service>`, jamais `restart`.**
+  - infra/runbooks/05-rotate-secrets.md:43  →  docker compose up -d api horizon scheduler
+  - infra/runbooks/05-rotate-secrets.md:58  →  3. `AUDIT_HASH_CHAIN_SECRET=<nouveau>` puis **`docker compose up -d api`** (jamais `restart`), et vérifier par `docker inspect` que la valeur est bien celle attendue
+  - infra/runbooks/05-rotate-secrets.md:64  →  3. **`docker compose up -d api horizon`** (jamais `restart` : il ne relit pas `env_file`), puis vérifier par `docker inspect`
+Failed asserting that two arrays are identical.
+  -Array &0 []
+  +Array &0 [
+  +    0 => 'infra/runbooks/01-restart-workers.md:22  →  # il faut `docker compose up -d <service>`, qui recree le conteneur.',
+  +    1 => 'infra/runbooks/03-site-down.md:36  →  docker compose up -d --force-recreate api caddy',
+  +    2 => 'infra/runbooks/04-restore-dr.md:12  →  # Installer docker + restaurer infra : git clone + docker compose up -d',
+  +    3 => 'infra/runbooks/05-rotate-secrets.md:22  →  > **Partout dans ce document : `docker compose up -d <service>`, jamais `restart`.**',
+  +    4 => 'infra/runbooks/05-rotate-secrets.md:43  →  docker compose up -d api horizon scheduler',
+  +    5 => 'infra/runbooks/05-rotate-secrets.md:58  →  3. `AUDIT_HASH_CHAIN_SECRET=<nouveau>` puis **`docker compose up -d api`** (jamais `restart`), et vérifier par `docker inspect` que la valeur est bien celle attendue',
+  +    6 => 'infra/runbooks/05-rotate-secrets.md:64  →  3. **`docker compose up -d api horizon`** (jamais `restart` : il ne relit pas `env_file`), puis vérifier par `docker inspect`',
+  +]
+  
+
+  at tests/Feature/Infra/PileDeProductionSansOverlayTest.php:197
+    193▕             }
+    194▕         }
+    195▕     }
+    196▕ 
+  ➜ 197▕     expect($nues)->toBe(
+    198▕         [],
+    199▕         "Ces commandes recreent la pile de PRODUCTION sans `docker-compose.prod.yml`.\n\n"
+    200▕         . "Compose repart alors du seul `docker-compose.yml`, qui PUBLIE Postgres sur 55432 et "
+    201▕         . "Redis sur 56379. Il voit une configuration differente de celle des conteneurs en "
+
+  1   tests/Feature/Infra/PileDeProductionSansOverlayTest.php:197
+
+
+  Tests:    1 failed, 3 passed (11 assertions)
+  Duration: 20.47s
+
+
+=== CONDITIONS DE CE ROUGE (agent 35, 2026-08-20, second tour) ===
+
+CE QUI S'EST PASSE, ET C'EST LA LECON DE LA JOURNEE.
+
+La premiere version de cette garde couvrait les workflows GitHub et les scripts
+d'infrastructure. Elle a rougi sur QUATRE invocations nues, dans TROIS fichiers.
+Corrigees, vertes, committees, poussees.
+
+Une note de memoire de session signalait ensuite que le meme defaut avait ete
+releve le 19/08 dans DEUX RUNBOOKS -- corrige alors sur une autre branche, et
+jamais porte ici. J'ai donc etendu le perimetre de la garde aux cinq runbooks.
+
+RESULTAT : SEPT invocations nues de plus, dans QUATRE fichiers.
+
+  01-restart-workers.md:22 .... prose prescriptive : « il faut docker compose up -d »
+  03-site-down.md:36 .......... docker compose up -d --force-recreate api caddy
+  04-restore-dr.md:12 ......... la REPRISE APRES SINISTRE, sur machine neuve
+  05-rotate-secrets.md:22 ..... « Partout dans ce document : up -d, jamais restart »
+  05-rotate-secrets.md:43 ..... docker compose up -d api horizon scheduler
+  05-rotate-secrets.md:58 ..... rotation de AUDIT_HASH_CHAIN_SECRET
+  05-rotate-secrets.md:64 ..... rotation des jetons de fournisseurs
+
+LE PIRE DES SEPT EST LE 04. La reprise apres sinistre se joue sur une machine
+NEUVE : aucun shell ne porte l'export du preambule, la pile se remonte de zero,
+en urgence, et personne ne regarde les ports. C'est le pire moment pour rouvrir
+F38-007, et c'est celui ou il se serait rouvert.
+
+Le 05 est le second pire : c'est le runbook de ROTATION DES SECRETS. Tourner un
+secret en rouvrant la porte par laquelle on le lit annule le geste.
+
+=== ET C'EST MOI QUI AI COMMIS LE PATRON, DANS SON PROPRE CORRECTIF ===
+
+J'ai reparé les trois exemplaires que j'avais sous les yeux -- ceux que mon grep
+avait rendus -- et je n'ai pas balaye leurs freres. C'est A-011 exactement :
+« le correctif existe deja quelque part et n'a pas ete porte aux autres
+endroits », commis dans le correctif qui poursuit ce patron.
+
+Ce qui l'a rattrape n'est pas ma rigueur : c'est une NOTE DE MEMOIRE ecrite la
+veille par une autre session. Sans elle, les sept seraient encore la, et la
+garde -- verte -- aurait certifie qu'il n'en restait aucune.
+
+REGLE : quand une garde enumere un perimetre a la main, ce n'est pas la garde
+qu'il faut croire, c'est l'enumeration qu'il faut challenger. Le temoin de
+montage prouve qu'on inspecte bien les fichiers de la liste. Il ne prouve RIEN
+sur ce que la liste omet.
+
+APRES CORRECTIF : 4 verts sur cette garde, et un preambule d'overlay pose en
+tete des quatre runbooks qui pilotent la production.

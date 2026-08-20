@@ -947,3 +947,120 @@ motif du rouge a été lu avant de conclure.
 pas** : le faux vert ne présente aucun motif à lire. Contre lui, il n'y a que deux
 protections, et il faut les deux — **le témoin intégré** (une garde qui ne peut pas passer
 sans avoir vraiment mesuré) et **le refus de croire un résultat impossible**.
+
+---
+
+## Vague 17 — P6, le regard neuf : cinq S0, dont deux dans le travail du matin
+
+La phase P6 du mandat n'avait **jamais** été exécutée. Elle exige des agents **neufs**, sans
+accès aux rapports des passes 1 et 2 ni à `02_CONSTATS.md` : le code, le CDC, le mandat, rien
+d'autre. Quatre ont été lancés — API, automatismes, infrastructure, frontend.
+
+🔑 **C'est la raison pour laquelle elle se délègue et ne s'improvise pas.** Je connais les 508
+constats ; je ne peux pas les oublier, et tout ce que je « retrouverais » serait suspect de
+l'avoir été de mémoire. *Un regard neuf ne se simule pas : il se recrute.*
+
+### ✅ Ce qu'elle confirme, et il faut le dire en premier
+
+Sans avoir lu une ligne du registre, l'agent des automatismes retrouve `A08-006`, `B17-001`,
+`B10-003`, `B11-001`, `B11-003` et `B15-008` — **et il les retrouve avec le mécanisme exact**,
+ce que la passe 1 n'avait pas toujours :
+
+- `rgpd:anonymize-ips` : la preuve jouée sur un Postgres tiers (`operator does not exist:
+  cidr / integer`), **avec témoin négatif** (`set_masklen` fonctionne, lui). Et l'explication
+  de sa survie : *la branche `--dry-run` passe par un `count()` et n'atteint jamais le SQL
+  fautif* — c'est ce qui l'a rendue invisible à toute vérification manuelle.
+- `retention:purge --dry-run` : un `preg_replace` sans modificateur `s` ne franchit pas le
+  saut de ligne du SQL ; l'`UPDATE` part **intact** dans `DB::selectOne()`. Et **PHPStan
+  signalait ces deux lignes exactes** — gelées dans la baseline.
+
+> **Une passe indépendante qui converge par ses propres mesures valide la passe 1 bien mieux
+> qu'une relecture ne le ferait.** C'est la meilleure nouvelle du dossier.
+
+Elle confirme au passage que `B15-008` devait rester « partiel » plutôt que d'être déclaré
+fermé : `media:clean-emails` détruit des adresses **tous les jours à 05:05**, et le trait
+`RefuseUneSuppressionMassive` **existe dans le dépôt sans être branché**.
+
+### 🔴 Et cinq S0 que ni P1 ni P2 n'avaient vus
+
+**Deux d'entre eux sont dans mon travail du matin.**
+
+#### `P6-API-001/002` — les LISTES n'étaient pas cloisonnées
+
+`GET /journalists` et `GET /rgpd/requests` rendaient les lignes de **tous les espaces** — nom,
+adresse, téléphone ; `subject_email` en clair. Deux autres suivaient.
+
+**Pourquoi ma garde du matin ne l'a pas vu**, et c'est le plus dur à écrire : j'avais posé un
+contrôle de complétude censé empêcher qu'un site échappe à la garde. Il énumérait **les
+méthodes qui reçoivent un modèle par résolution de route**. Un `index()` n'en reçoit aucun.
+Les listes lui étaient **structurellement invisibles** — et il était vert.
+
+*Troisième fois de la journée que mon énumération est mon angle mort.* La garde neuve ne
+greppe plus : elle crée deux espaces, deux enregistrements, appelle, et **inspecte le corps
+aplati de la réponse**. Trois balayages statiques successifs avaient rendu trois comptes
+différents — 20, 5, 7 — parce qu'un contrôleur peut filtrer dans un helper privé, par un
+scope, ou sous un autre nom de colonne. *Un motif de recherche ne suit pas l'indirection.*
+
+#### `P6-UI-019` — la CI ne pouvait pas passer, et personne ne l'avait joué
+
+`pnpm lint`, déclarée « Lint (BLOQUANT) » dans `ci.yml`, rendait **16 erreurs**, toutes dans
+les quatre fichiers frontend que cette branche touche. Vérifié : sur `main`, ces mêmes
+fichiers passent. **La PR était déclarée fusionnable par GitHub — au sens de git — et aurait
+rougi à la première exécution de CI.**
+
+Effet de bord qu'il fallait voir : une fois les 16 corrigées, la porte a échoué **autrement**
+— code 2, *« suppressions left that do not occur anymore »*. Le dépôt porte un
+`eslint-suppressions.json`, et les entrées de ces deux fichiers n'avaient plus d'objet.
+Autrement dit **ces défauts étaient déjà connus et supprimés** ; la branche en avait ajouté
+au-delà du compte supprimé. Purgées : neuf lignes.
+
+#### Les trois autres, non réparés et dits comme tels
+
+- **`P6-UI-001`** — `/dashboard/stats` est une closure à zéros en dur ; comme l'écran teste
+  `companies_total === 0`, la console affiche en permanence *« aucune entreprise collectée »*
+  sur 4,29 millions de fiches. **Pourquoi P1 ne l'a pas vu** : le mandat exigeait d'ouvrir
+  chaque écran à la main. *La console ne tourne pas.* Un défaut qui saute aux yeux en trois
+  secondes d'usage a survécu à un audit de 46 agents.
+- **`P6-UI-002`** — `GET /search` est déclarée deux fois et rend trois tableaux vides en dur.
+  **Le test e2e mocke l'endpoint** et reste vert. *Un test qui mocke précisément la pièce qui
+  n'existe pas certifie son existence.*
+- **`P6-INFRA-003`** — `docker-compose.observability.yml` **prescrit** la combinaison qui
+  republie 55432, 56379 et neuf ports d'administration. **Douzième** chemin vers la faille du
+  19 août, et encore un que mon énumération n'atteignait pas : elle listait workflows, scripts
+  et runbooks, pas les fichiers Compose.
+
+#### `P6-INFRA-001` — vu par P1, mais replié en note
+
+La porte dérobée `root` de `diag-website-status.yml` figurait dans la file de travail comme
+une incise (« *et :45-54 pour la clé SSH* »). Elle n'a donc jamais eu de sévérité, ni de ligne
+dans `06_RESTE-WILL`, et le correctif de `F38-007` ne la touche pas.
+
+**Non retirée, délibérément** : c'est un mécanisme d'accès au serveur de l'exploitant, et le
+supprimer sans le lui demander pourrait l'enfermer dehors. Porté à `RESTE-WILL` avec le geste
+exact et l'ordre des opérations — *retirer le bloc du workflow AVANT la clé du serveur, sinon
+le prochain clic la repose*.
+
+### ⚠️ Le défaut de dispositif, et il est de moi
+
+Trois des quatre agents ont noté que **la branche bougeait pendant leur mesure** : je
+committais sur le même arbre de travail. L'un a vérifié lui-même que l'écart ne touchait pas
+son périmètre, et l'a consigné comme un défaut de dispositif. Il a raison.
+
+C'est la même faute que celle relevée au §10 de la passe adversariale — *« mes `git add -A` ont
+ramassé ses fichiers de preuve au milieu de leur écriture »* — sous une autre forme : **on ne
+fait pas mesurer un arbre qu'on modifie**. Prochaine vague : un worktree en lecture seule par
+agent, figé sur un SHA nommé.
+
+### Et une onzième faute de banc, dans la même heure
+
+La garde des listes a d'abord été jouée **pendant que la suite complète tournait sur la même
+base**. Deadlock Postgres au milieu des migrations :
+
+```
+SQLSTATE[40P01]: Deadlock detected
+Process 14006 waits for ShareRowExclusiveLock ... blocked by process 14020.
+```
+
+Le rouge obtenu ne mesurait rien, et la suite complète de ce moment-là est **invalidée**.
+*Une base de test est une ressource exclusive : deux `RefreshDatabase` concurrents ne
+s'ignorent pas, ils se bloquent.*

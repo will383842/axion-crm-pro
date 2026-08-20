@@ -173,17 +173,88 @@ Deux S0 vivent dans le **dépôt du site** (`Axion-IA`) : `B14-002 / E31-001` et
 - **Changer le mot de passe propriétaire** : il a transité par un canal non sûr.
 - **Supprimer** `storage/app/private/seeders/owner-initial-password.txt` sur le serveur.
 - **Trancher `MAIL_MAILER_AUTH`** : par quel relais les courriels d'authentification partent.
+- 🔴 **La porte dérobée `root` de `diag-website-status.yml`** — trouvée par la passe P6, et
+  **je ne l'ai pas retirée moi-même** : c'est un mécanisme d'accès délibéré à votre serveur, et
+  le supprimer sans vous demander pourrait vous enfermer dehors.
+
+  Sa **première action**, avant tout diagnostic, est d'ajouter une clé publique en dur au
+  `authorized_keys` du compte **root** de production (`:45-54`). Deux conséquences, et la
+  seconde est la vraie :
+
+  1. Le workflow est en `workflow_dispatch`, sans `environment:` ni approbation : **un clic
+     repose la clé**. Autrement dit, *la retirer du serveur ne tient pas.*
+  2. La clé s'appelle `claude-code-axion-ia-20260510` — elle est rattachée à **un autre
+     produit**. Qui détient la clé privée correspondante a `root` sur la production du CRM.
+
+  ⚠️ *Une clé **publique** dans un dépôt public n'est pas une fuite d'identifiant en soi : seule
+  la clé privée ouvre. Le défaut n'est pas la publication, c'est la **réinstallation
+  automatique** et le **périmètre** de la clé.*
+
+  **Le geste** : décider si cet accès doit exister. S'il doit exister, retirer le bloc du
+  workflow et poser la clé à la main, une fois, avec une clé propre au CRM. S'il ne doit pas,
+  retirer le bloc **et** la clé du serveur — dans cet ordre, sinon le prochain clic la repose.
+
 - **Une requête en lecture seule sur la production**, pour trancher le chiffre de `B17-012` :
   ```sql
   SELECT count(*) FILTER (WHERE legal_form IS NULL), count(*) FROM companies;
   ```
   *C'est la question à poser, pas un fait établi.* Voir `_AUDIT/RECTIFICATIF-PR-191.md`.
 
-## 11. P6 — le regard neuf, toujours jamais lancée
+## 11. P6 — le regard neuf, LANCÉE le 2026-08-20 (première vague)
 
-La phase P6 du mandat (`_PROMPTS/PROMPT_AUDIT_360_CRM_PRO_2026-08-18.md` §8) n'a **jamais été
-exécutée**. Elle demande des agents **neufs**, sans accès aux rapports des passes 1 et 2 ni à
-`02_CONSTATS.md`, refaisant l'audit de zéro sur le périmètre des §4 et §5 — puis la
-comparaison des trois passes, tout écart étant **en soi un défaut de méthode**.
+**Quatre agents neufs**, sans accès à `02_CONSTATS.md`, au rapport final, à la passe
+adversariale, aux grilles ni aux preuves. Ils ont reçu le code, le CDC et le mandat.
+Rapports dans `09_PASSE-3-REGARD-NEUF/`, comparaison des trois passes en `05_`.
 
-La définition de fini du §12 est à **3 points sur 16**.
+### ✅ Ce qu'elle confirme, et c'est la meilleure nouvelle du dossier
+
+Sans avoir lu une ligne du registre, l'agent des automatismes retrouve `A08-006`, `B17-001`,
+`B10-003`, `B11-001`, `B11-003`, `B15-008` — **avec le mécanisme exact**, que la passe 1
+n'avait pas toujours. *Une passe indépendante qui converge par ses propres mesures valide la
+passe 1 bien mieux qu'une relecture.*
+
+Elle confirme aussi que `B15-008` devait rester « partiel » : `media:clean-emails` détruit des
+adresses **tous les jours à 05:05**, et le trait `RefuseUneSuppressionMassive` **existe dans le
+dépôt sans être branché**.
+
+### 🔴 Cinq S0 que ni P1 ni P2 n'avaient vus — dont deux dans le travail du 20 août
+
+| Constat | Pourquoi il a échappé aux deux premières passes | État |
+|---|---|---|
+| `P6-API-001/002` — les **listes** ne sont pas cloisonnées | P1 s'est arrêtée aux *fiches* ; P2 hérite du périmètre de P1 ; **ma** garde de complétude énumérait les méthodes recevant un modèle par liaison de route, et un `index()` n'en reçoit aucun | ✅ **fermé** (`cb81284`) |
+| `P6-UI-019` — `pnpm lint`, gate **BLOQUANTE**, échouait | personne ne l'avait jouée. 16 erreurs, toutes introduites par cette branche : **#191 ne pouvait pas passer la CI** | ✅ **fermé** (`46ecb80`) |
+| `P6-UI-001` — l'accueil affiche « aucune entreprise » sur 4,29 M | `/dashboard/stats` est une closure à zéros en dur. Le mandat exigeait d'ouvrir chaque écran à la main : **la console ne tourne pas**, personne ne l'a ouvert | 🔴 ouvert |
+| `P6-UI-002` — la palette ⌘K ne peut rien trouver | `GET /search` déclarée deux fois, trois tableaux vides en dur. **Le test e2e mocke l'endpoint** et reste vert | 🔴 ouvert |
+| `P6-INFRA-001` — porte dérobée `root` réarmable en un clic | P1 l'avait vue, mais **repliée en note** dans `F38-007` : jamais de sévérité, jamais de ligne dans `RESTE-WILL` | 🔴 **RESTE WILL** (§10) |
+| `P6-INFRA-003` — un **douzième** chemin vers la faille du 19/08 | `docker-compose.observability.yml` prescrit la combinaison qui republie 55432, 56379 et neuf ports d'admin. La garde CI ne rend jamais cette combinaison | 🔴 ouvert |
+
+### ⚠️ Un défaut de dispositif, et il est de moi
+
+Trois des quatre agents ont noté que **la branche bougeait pendant leur mesure** : je
+committais sur le même arbre de travail. Même faute que celle relevée au §10 de la passe
+adversariale, sous une autre forme. **Pour la prochaine vague : un worktree en lecture seule
+par agent, figé sur un SHA nommé.**
+
+### Ce qui reste de P6
+
+Quatre périmètres sur les onze du §4. **Restent** : les 68 services, les 34 workers, le côté
+site (`Axion-IA`), les 23 fonctionnalités et la matrice de raccordement, les 13 parcours.
+Le mandat exige de **boucler jusqu'à ce qu'une passe complète ne trouve plus rien de
+sévérité ≥ S2** : cette première vague en a trouvé **cinq S0**.
+
+---
+
+## 12. Rappel — ce que P6 exige, et pourquoi elle ne s'improvise pas
+
+La phase P6 (`_PROMPTS/PROMPT_AUDIT_360_CRM_PRO_2026-08-18.md` §8) demande des agents
+**neufs**, sans accès aux rapports des passes 1 et 2 ni à `02_CONSTATS.md`, refaisant l'audit
+de zéro sur le périmètre des §4 et §5 — puis la comparaison des trois passes, tout écart étant
+**en soi un défaut de méthode**.
+
+🔑 **C'est la raison pour laquelle elle se délègue.** L'agent qui a mené les réparations des 19
+et 20 août connaît les 508 constats ; il ne peut pas les oublier, et tout ce qu'il
+« retrouverait » serait suspect de l'avoir été de mémoire. *Un regard neuf ne se simule pas :
+il se recrute.* La première vague, lancée le 20/08, l'a démontré en trouvant cinq S0 en
+quelques heures — dont deux dans le travail de réparation du jour même.
+
+La définition de fini du §12 reste à **3 points sur 16**.

@@ -1,0 +1,174 @@
+
+   FAIL  Tests\Feature\Rgpd\CloisonnementDesListesTest
+  ✓ P6-API — TEMOIN NEGATIF : l aplatissement retrouve bien une valeur… 16.75s  
+  ⨯ P6-API-002 — GET /rgpd/requests ne rend PAS les demandes d un autre… 3.17s  
+  ⨯ P6-API-001 — GET /journalists ne rend PAS les journalistes d un aut… 0.68s  
+  ⨯ P6-API — GET /proxy-providers ne rend PAS les fournisseurs d un aut… 0.81s  
+  ⨯ P6-API — GET /llm/use-cases ne rend PAS les cas d usage d un autre…  0.67s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Rgpd\CloisonnementDesListesTest > P6-API-002 — GET…    
+  🔴 /api/v1/rgpd/requests rend une ligne d'un AUTRE espace de travail.
+
+Une fuite par la LISTE est pire qu'une fuite par la fiche : la fiche demande de deviner un identifiant, la liste les donne tous.
+
+Le correctif de cloisonnement du 2026-08-20 a ete porte sur 36 methodes unitaires (show/update/destroy) et sur AUCUNE liste : le controle de completude enumerait les methodes qui recoivent un modele par resolution de route, et un `index()` n'en recoit aucun.
+Failed asserting that an array does not contain 'alpha-secret@rgpd.test'.
+
+  at tests/Feature/Rgpd/CloisonnementDesListesTest.php:146
+    142▕         "{$route} ne rend pas la ligne de B : ce vert ne prouverait pas le cloisonnement, "
+    143▕         . 'seulement que la route est muette ou cassee.'
+    144▕     );
+    145▕ 
+  ➜ 146▕     test()->assertNotContains(
+    147▕         $marqueurDeA,
+    148▕         $valeurs,
+    149▕         "🔴 {$route} rend une ligne d'un AUTRE espace de travail.\n\n"
+    150▕         . "Une fuite par la LISTE est pire qu'une fuite par la fiche : la fiche demande de "
+
+  1   tests/Feature/Rgpd/CloisonnementDesListesTest.php:146
+  2   tests/Feature/Rgpd/CloisonnementDesListesTest.php:186
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Rgpd\CloisonnementDesListesTest > P6-API-001 — GET…    
+  🔴 /api/v1/journalists rend une ligne d'un AUTRE espace de travail.
+
+Une fuite par la LISTE est pire qu'une fuite par la fiche : la fiche demande de deviner un identifiant, la liste les donne tous.
+
+Le correctif de cloisonnement du 2026-08-20 a ete porte sur 36 methodes unitaires (show/update/destroy) et sur AUCUNE liste : le controle de completude enumerait les methodes qui recoivent un modele par resolution de route, et un `index()` n'en recoit aucun.
+Failed asserting that an array does not contain 'alpha-secret@presse.test'.
+
+  at tests/Feature/Rgpd/CloisonnementDesListesTest.php:146
+    142▕         "{$route} ne rend pas la ligne de B : ce vert ne prouverait pas le cloisonnement, "
+    143▕         . 'seulement que la route est muette ou cassee.'
+    144▕     );
+    145▕ 
+  ➜ 146▕     test()->assertNotContains(
+    147▕         $marqueurDeA,
+    148▕         $valeurs,
+    149▕         "🔴 {$route} rend une ligne d'un AUTRE espace de travail.\n\n"
+    150▕         . "Une fuite par la LISTE est pire qu'une fuite par la fiche : la fiche demande de "
+
+  1   tests/Feature/Rgpd/CloisonnementDesListesTest.php:146
+  2   tests/Feature/Rgpd/CloisonnementDesListesTest.php:209
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Rgpd\CloisonnementDesListesTest > P6-API — GET /pro…   
+  🔴 /api/v1/proxy-providers rend une ligne d'un AUTRE espace de travail.
+
+Une fuite par la LISTE est pire qu'une fuite par la fiche : la fiche demande de deviner un identifiant, la liste les donne tous.
+
+Le correctif de cloisonnement du 2026-08-20 a ete porte sur 36 methodes unitaires (show/update/destroy) et sur AUCUNE liste : le controle de completude enumerait les methodes qui recoivent un modele par resolution de route, et un `index()` n'en recoit aucun.
+Failed asserting that an array does not contain 'alpha-proxy-secret'.
+
+  at tests/Feature/Rgpd/CloisonnementDesListesTest.php:146
+    142▕         "{$route} ne rend pas la ligne de B : ce vert ne prouverait pas le cloisonnement, "
+    143▕         . 'seulement que la route est muette ou cassee.'
+    144▕     );
+    145▕ 
+  ➜ 146▕     test()->assertNotContains(
+    147▕         $marqueurDeA,
+    148▕         $valeurs,
+    149▕         "🔴 {$route} rend une ligne d'un AUTRE espace de travail.\n\n"
+    150▕         . "Une fuite par la LISTE est pire qu'une fuite par la fiche : la fiche demande de "
+
+  1   tests/Feature/Rgpd/CloisonnementDesListesTest.php:146
+  2   tests/Feature/Rgpd/CloisonnementDesListesTest.php:236
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Rgpd\CloisonnementDesListesTest > P6-API — GET /llm…   
+  🔴 /api/v1/llm/use-cases rend une ligne d'un AUTRE espace de travail.
+
+Une fuite par la LISTE est pire qu'une fuite par la fiche : la fiche demande de deviner un identifiant, la liste les donne tous.
+
+Le correctif de cloisonnement du 2026-08-20 a ete porte sur 36 methodes unitaires (show/update/destroy) et sur AUCUNE liste : le controle de completude enumerait les methodes qui recoivent un modele par resolution de route, et un `index()` n'en recoit aucun.
+Failed asserting that an array does not contain 'alpha-usecase-secret'.
+
+  at tests/Feature/Rgpd/CloisonnementDesListesTest.php:146
+    142▕         "{$route} ne rend pas la ligne de B : ce vert ne prouverait pas le cloisonnement, "
+    143▕         . 'seulement que la route est muette ou cassee.'
+    144▕     );
+    145▕ 
+  ➜ 146▕     test()->assertNotContains(
+    147▕         $marqueurDeA,
+    148▕         $valeurs,
+    149▕         "🔴 {$route} rend une ligne d'un AUTRE espace de travail.\n\n"
+    150▕         . "Une fuite par la LISTE est pire qu'une fuite par la fiche : la fiche demande de "
+
+  1   tests/Feature/Rgpd/CloisonnementDesListesTest.php:146
+  2   tests/Feature/Rgpd/CloisonnementDesListesTest.php:258
+
+
+  Tests:    4 failed, 1 passed (15 assertions)
+  Duration: 26.61s
+
+
+=== CONDITIONS DE CE ROUGE (agent 35, 2026-08-20) ===
+
+Constats P6-API-001 et P6-API-002 (S0), releves par la passe P6 « regard neuf »
+-- des agents NEUFS, sans acces aux rapports des passes 1 et 2.
+
+CE QU'ILS ONT TROUVE, ET QUI EST UN TROU DANS MON PROPRE TRAVAIL DU JOUR.
+
+Le matin meme, le cloisonnement a ete porte sur 36 sites de liaison de route
+(show / update / destroy), avec un controle de completude cense empecher qu'un
+trente-neuvieme apparaisse sans garde. Ce controle enumerait les methodes qui
+RECOIVENT un modele par resolution de route.
+
+Un `index()` n'en recoit aucun. Les LISTES lui etaient donc structurellement
+invisibles -- et il etait VERT. Mesure de l'agent P6 : `refuserHorsEspace`
+couvrait 20 methodes unitaires et ZERO liste.
+
+Une fuite par la LISTE est pire qu'une fuite par la fiche : la fiche demande de
+deviner un identifiant, la liste les donne tous.
+
+RESULTAT : 4 echecs sur 5.
+
+  GET /api/v1/rgpd/requests ..... rend les demandes RGPD de tous les espaces,
+                                  `subject_email` EN CLAIR
+  GET /api/v1/journalists ....... rend nom, adresse et telephone des
+                                  journalistes de tous les espaces. L'unique
+                                  `where('workspace_id')` du fichier vit dans
+                                  `export()` : la liste fuyait, l'export non
+  GET /api/v1/proxy-providers ... rend les fournisseurs de tous les espaces
+  GET /api/v1/llm/use-cases ..... idem
+
+  VERT ATTENDU : le temoin negatif de l'aplatissement. Sans lui,
+  `valeursAPlat()` pourrait rendre un tableau vide sur toutes les formes de
+  reponse, et les quatre gardes passeraient au vert sans rien inspecter.
+
+POURQUOI CETTE GARDE NE GREPPE PAS.
+
+Trois balayages statiques successifs ont rendu TROIS COMPTES DIFFERENTS -- 20, 5,
+7 -- parce qu'un controleur peut filtrer dans un helper prive
+(`JournalistsController::buildFilteredQuery`), par un scope, ou sous un autre nom
+de colonne (`users.current_workspace_id`). Un motif de recherche ne suit pas
+l'indirection.
+
+On ne cherche donc plus la garde dans le code : on regarde CE QUE LA ROUTE REND.
+Deux espaces, deux enregistrements, un appel, et l'on inspecte le corps aplati.
+C'est la seule mesure qu'aucune indirection ne trompe.
+
+=== QUATRE DEFAUTS DE MESURE PAYES POUR OBTENIR CE ROUGE ===
+
+1. `expect()->toContain($valeur, $message)` -- QUATRIEME fois de la journee.
+   Pest est variadique : le message devient une deuxieme valeur a chercher. Ce
+   piege a ete documente dans trois fichiers le matin meme, et il s'est referme
+   ici l'apres-midi. Le savoir ne suffit pas ; il faut la regle mecanique :
+   AUCUN message dans un `toContain`, jamais.
+
+2. Un DEADLOCK Postgres : cette garde a d'abord ete jouee pendant que la suite
+   complete tournait en tache de fond SUR LA MEME BASE. Les deux migrations se
+   sont bloquees mutuellement, et le rouge obtenu ne mesurait rien. La suite
+   complete de ce moment-la est invalidee et rejouee.
+
+3. Des colonnes de fixture inventees (`journalists.full_name`,
+   `llm_use_cases.key`) : le schema reel dit `last_name` et `slug`. Lu dans
+   `\d`, plus recopie de memoire.
+
+4. Un test qui se declarait IGNORE parce qu'il cherchait `proxy_providers`
+   quand la table s'appelle `proxy_providers_config`. Un test ignore est un vert
+   deguise : il ne prouve rien et ne le dit pas. Le nom est desormais LU dans
+   `ProxyProvider::$table`, et l'absence de la table fait ECHOUER la garde au
+   lieu de l'ignorer.
+
+APRES CORRECTIF : 5 verts, 0 ignore.

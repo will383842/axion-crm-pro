@@ -7,7 +7,7 @@
  *  - Progress bars (entreprises + temps)
  *  - 4 KpiCards : companies / runs / req per min / ETA
  *  - 5 tabs : Suivi temps réel | Sources | Zones | Runs | Configuration
- *  - Refresh 5s via refetchInterval
+ *  - Refresh 5s via refetchInterval, COUPÉ sur un état terminal (G42-007)
  */
 import { useState } from 'react';
 import { Link, useParams, useNavigate } from '@tanstack/react-router';
@@ -35,6 +35,7 @@ import {
   ALL_SOURCES,
   PAUSED_REASON_LABEL,
   STATUS_LABEL,
+  estTerminee,
   statusToTone,
   type Campaign,
   type CampaignStatsResponse,
@@ -58,17 +59,46 @@ export function CampaignDetailPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<DetailTab>('live');
 
+  // ═══ G42-007 — la scrutation s'ARRÊTE sur un état terminal ═══════════════
+  //
+  // Mesure du 2026-08-20 : cet écran portait DEUX `refetchInterval: 5_000`,
+  // soit **24 requêtes par minute**, indéfiniment — y compris sur une
+  // campagne `completed` que le serveur ne peut plus faire bouger. Un onglet
+  // laissé ouvert sur une collecte finie de la veille interrogeait
+  // `/campaigns/{id}` et `/campaigns/{id}/stats` 1 440 fois par heure pour
+  // recevoir exactement la même réponse.
+  //
+  // La cadence devient une EXPRESSION : `false` sur un état terminal, 5 s
+  // sinon. Rien ne change pendant qu'une campagne tourne — c'est voulu, c'est
+  // là que le direct sert.
+  //
+  // ⚠️ Ce n'est pas une mise en sommeil définitive : `startMutation` invalide
+  // `['campaign', id]`, la donnée revient, le statut redevient `running` et
+  // la cadence reprend au rendu suivant. React Query relit ses options à
+  // chaque rendu.
+  //
+  // ⚠️ CE QUI N'EST PAS RÉPARÉ, et qui est le cœur de G42-007 : pendant qu'une
+  // campagne TOURNE, l'écran fait toujours 24 req/min pour deux ressources qui
+  // décrivent le même objet. Les fondre demande au serveur d'exposer les
+  // statistiques DANS la ressource campagne — un changement de contrat d'API,
+  // hors périmètre d'un lot frontend. Voir le rapport du lot.
   const { data: campaign, isLoading } = useQuery({
     queryKey: ['campaign', id],
     queryFn: async () => (await api.get<Campaign>(`/campaigns/${id}`)).data,
-    refetchInterval: 5_000,
+    // Forme FONCTION : cette requête est la seule à connaître son propre
+    // statut, et elle ne peut pas se lire elle-même depuis `campaign` (zone
+    // morte temporelle — la variable est en cours de déclaration).
+    refetchInterval: (requete) =>
+      estTerminee(requete.state.data?.status) ? false : 5_000,
     enabled: Number.isFinite(id) && id > 0,
   });
 
   const { data: stats } = useQuery({
     queryKey: ['campaign-stats', id],
     queryFn: async () => (await api.get<CampaignStatsResponse>(`/campaigns/${id}/stats`)).data,
-    refetchInterval: 5_000,
+    // Les statistiques ne portent pas le statut : on lit celui de la requête
+    // précédente, déjà résolue à ce point du rendu.
+    refetchInterval: estTerminee(campaign?.status) ? false : 5_000,
     enabled: Number.isFinite(id) && id > 0,
   });
 
@@ -101,7 +131,10 @@ export function CampaignDetailPage() {
 
   const isLive = campaign.status === 'running';
   const isPaused = campaign.status === 'paused';
-  const isCompleted = campaign.status === 'completed' || campaign.status === 'cancelled' || campaign.status === 'failed';
+  // G42-007 — la liste des états terminaux vivait ici EN DOUBLE. Elle est
+  // désormais partagée avec la coupure de scrutation (`./types`), pour que
+  // les deux ne puissent plus diverger.
+  const isCompleted = estTerminee(campaign.status);
 
   const companiesPercent = Math.min(100, Math.round((campaign.companies_created / Math.max(1, campaign.max_companies)) * 100));
   const durationPercent = Math.min(100, Math.round((campaign.elapsed_minutes / Math.max(1, campaign.max_duration_minutes)) * 100));

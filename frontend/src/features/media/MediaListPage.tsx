@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Button, Card, EmptyState, KpiCard, PageHeader, SearchInput, cn } from "@/components/ui";
 import { api } from "@/lib/api";
+import { useAntiRebond } from "@/hooks/useAntiRebond";
 import { toast } from "sonner";
 
 export interface MediaItem {
@@ -118,24 +119,43 @@ export function MediaListPage() {
   const [filter, setFilter] = useState<Filter>(EMPTY_FILTER);
   const [exporting, setExporting] = useState(false);
 
-  function filterParams(): Record<string, string> {
+  // G42-010 — les DEUX champs de saisie libre de cet ecran (« Rechercher un
+  // media » et le code departement) sont differes de 300 ms avant d'atteindre
+  // la requete. Les listes deroulantes ne le sont PAS : un choix dans un menu
+  // est un geste unique, le retarder se verrait.
+  //
+  // Mesure du 2026-08-20 sur `/companies`, meme cablage (voir
+  // `tests/perf/recherche-anti-rebond.test.tsx`) : 11 caracteres tapes
+  // lancaient 11 requetes serveur. Apres : 1.
+  const rechercheDifferee = useAntiRebond(filter.search);
+  const departementDiffere = useAntiRebond(filter.department_code);
+  const filtreInterroge = useMemo<Filter>(
+    () => ({ ...filter, search: rechercheDifferee, department_code: departementDiffere }),
+    [filter, rechercheDifferee, departementDiffere],
+  );
+
+  // ⚠️ `source` explicite : la LISTE interroge avec le filtre differe, l'EXPORT
+  // avec le filtre immediat. L'export est declenche par un clic delibere, et
+  // ce qu'il doit reproduire est ce que l'operateur LIT dans ses champs.
+  // Fenetre de divergence : 300 ms au plus.
+  function filterParams(source: Filter): Record<string, string> {
     return {
-      ...(filter.search ? { "filter[name]": filter.search } : {}),
-      ...(filter.media_type ? { "filter[media_type]": filter.media_type } : {}),
-      ...(filter.media_family ? { "filter[media_family]": filter.media_family } : {}),
-      ...(filter.periodicity ? { "filter[periodicity]": filter.periodicity } : {}),
-      ...(filter.department_code ? { "filter[department_code]": filter.department_code } : {}),
-      ...(filter.region_code ? { "filter[region_code]": filter.region_code } : {}),
-      ...(filter.has_website ? { "filter[has_website]": filter.has_website } : {}),
-      ...(filter.has_email ? { "filter[has_email]": filter.has_email } : {}),
-      ...(filter.email_confidence ? { "filter[email_confidence]": filter.email_confidence } : {}),
+      ...(source.search ? { "filter[name]": source.search } : {}),
+      ...(source.media_type ? { "filter[media_type]": source.media_type } : {}),
+      ...(source.media_family ? { "filter[media_family]": source.media_family } : {}),
+      ...(source.periodicity ? { "filter[periodicity]": source.periodicity } : {}),
+      ...(source.department_code ? { "filter[department_code]": source.department_code } : {}),
+      ...(source.region_code ? { "filter[region_code]": source.region_code } : {}),
+      ...(source.has_website ? { "filter[has_website]": source.has_website } : {}),
+      ...(source.has_email ? { "filter[has_email]": source.has_email } : {}),
+      ...(source.email_confidence ? { "filter[email_confidence]": source.email_confidence } : {}),
     };
   }
 
   async function exportCsv() {
     setExporting(true);
     try {
-      const params = new URLSearchParams(filterParams());
+      const params = new URLSearchParams(filterParams(filter));
       const r = await api.get<Blob>(`/media/export?${params.toString()}`, { responseType: "blob" });
       const url = URL.createObjectURL(r.data);
       const a = document.createElement("a");
@@ -154,9 +174,9 @@ export function MediaListPage() {
   }
 
   const { data, isLoading } = useQuery<MediaResponse>({
-    queryKey: ["media", page, filter],
+    queryKey: ["media", page, filtreInterroge],
     queryFn: async () => {
-      const params = new URLSearchParams({ page: String(page), per_page: "100", ...filterParams() });
+      const params = new URLSearchParams({ page: String(page), per_page: "100", ...filterParams(filtreInterroge) });
       const r = await api.get<MediaResponse>(`/media?${params.toString()}`);
       return r.data;
     },

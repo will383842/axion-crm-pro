@@ -24,6 +24,7 @@ import {
 } from '@/components/ui';
 import type { TabItem } from '@/components/ui';
 import { api } from '@/lib/api';
+import { useAntiRebond } from '@/hooks/useAntiRebond';
 import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
 import {
   CANDIDATE_FAMILIES,
@@ -55,6 +56,15 @@ export function CandidatesPage() {
 function CandidatesContent() {
   const [tab, setTab] = useState<TabId>('tous');
   const [search, setSearch] = useState('');
+  // G42-010 — anti-rebond de 300 ms AVANT la requete.
+  //
+  // Mesure du 2026-08-20 sur `/companies`, meme cablage (voir
+  // `tests/perf/recherche-anti-rebond.test.tsx`) : taper « boulangerie »
+  // (11 caracteres) lancait 11 requetes serveur. Apres : 1.
+  //
+  // ⚠️ Le champ garde `search` (valeur IMMEDIATE) pour son `value` : la
+  // lettre s'affiche sans attendre. Seule la requete patiente.
+  const rechercheDifferee = useAntiRebond(search);
 
   const counts = useQuery<CountsResponse>({
     queryKey: ['crm', 'candidates', 'counts'],
@@ -62,11 +72,11 @@ function CandidatesContent() {
   });
 
   const list = useQuery<CursorResponse<CandidateRow>>({
-    queryKey: ['crm', 'candidates', tab, search],
+    queryKey: ['crm', 'candidates', tab, rechercheDifferee],
     queryFn: async () => {
       const params = new URLSearchParams({ per_page: '50' });
       if (tab !== 'tous') params.set('relation_type', tab);
-      if (search.trim().length > 0) params.set('q', search.trim());
+      if (rechercheDifferee.trim().length > 0) params.set('q', rechercheDifferee.trim());
       return (await api.get<CursorResponse<CandidateRow>>(`/crm/candidates?${params.toString()}`)).data;
     },
     placeholderData: (previous) => previous,

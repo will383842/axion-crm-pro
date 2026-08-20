@@ -64,9 +64,6 @@
     }
   },
   "src/features/coverage/FranceCoverageMap.tsx": {
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 1
-    },
     "@typescript-eslint/no-unsafe-assignment": {
       "count": 4
     }

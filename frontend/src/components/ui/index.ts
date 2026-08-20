@@ -17,6 +17,16 @@ export { Tabs, type TabItem } from './Tabs';
 export { Spinner } from './Spinner';
 export { Tooltip } from './Tooltip';
 export { Modal, Drawer, type ModalProps } from './Modal';
+// D30-002 — le conteneur à défilement des tableaux « grille ». Sans lui, dix
+// écrans amputaient de 52 % à 68 % de chaque ligne sur téléphone.
+export {
+  TableScroll,
+  largeurMinimaleGrille,
+  type TableScrollProps,
+  type OptionsLargeurGrille,
+} from './TableScroll';
+// D28-003 — le piège de focus qui tient la promesse de `aria-modal="true"`.
+export { usePiegeFocus, elementsFocalisables, type OptionsPiegeFocus } from './useFocusTrap';
 export { DropdownMenu, type MenuItem } from './DropdownMenu';
 export { Breadcrumbs, type Crumb } from './Breadcrumbs';
 export { PageHeader, LiveBadge, type PageHeaderProps } from './PageHeader';

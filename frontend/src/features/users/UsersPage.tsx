@@ -13,6 +13,7 @@ import {
   QueryErrorState,
   StatusPill,
   cn,
+  TableScroll,
 } from '@/components/ui';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -133,6 +134,10 @@ export function UsersPage() {
         />
       ) : (
         <Card padding="none" className="overflow-hidden">
+          {/* D30-002 — conteneur a defilement horizontal. Sans lui, les 1020 px
+              de largeur minimale de ce tableau etaient coupes net par le
+              `overflow-hidden` de la Card, sans aucun moyen de les atteindre. */}
+          <TableScroll template={GRID}>
           <div
             role="row"
             className={cn(
@@ -192,6 +197,7 @@ export function UsersPage() {
               </div>
             ))}
           </div>
+          </TableScroll>
         </Card>
       )}
 

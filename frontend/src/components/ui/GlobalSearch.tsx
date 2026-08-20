@@ -1,8 +1,10 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Command } from 'cmdk';
 import { useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { useAntiRebond } from '@/hooks/useAntiRebond';
+import { usePiegeFocus } from './useFocusTrap';
 
 interface SearchResults {
   companies: { id: number; siren: string; denomination?: string|null }[];
@@ -28,13 +30,26 @@ export function GlobalSearch() {
     return () => document.removeEventListener('keydown', down);
   }, []);
 
+  // G42-010 — la palette Cmd+K interrogeait `/search` a CHAQUE touche des la
+  // deuxieme lettre. C'est le pire des huit sites : la palette est concue pour
+  // qu'on y tape vite, et `/search` interroge TROIS tables (entreprises,
+  // contacts, tags) en une requete.
+  //
+  // Mesure du 2026-08-20 sur `/companies`, meme cablage (voir
+  // `tests/perf/recherche-anti-rebond.test.tsx`) : 11 caracteres tapes
+  // lancaient 11 requetes. Apres : 1.
+  //
+  // ⚠️ Le champ garde `search` : les lettres s'affichent sans attendre, et le
+  // message « Aucun resultat pour « … » » cite bien ce que l'operateur a tape.
+  const rechercheDifferee = useAntiRebond(search);
+
   const { data } = useQuery({
-    queryKey: ['global-search', search],
+    queryKey: ['global-search', rechercheDifferee],
     queryFn: async () => {
-      if (search.length < 2) return { companies: [], contacts: [], tags: [] };
-      return (await api.get<SearchResults>(`/search?q=${encodeURIComponent(search)}`)).data;
+      if (rechercheDifferee.length < 2) return { companies: [], contacts: [], tags: [] };
+      return (await api.get<SearchResults>(`/search?q=${encodeURIComponent(rechercheDifferee)}`)).data;
     },
-    enabled: open && search.length >= 2,
+    enabled: open && rechercheDifferee.length >= 2,
     staleTime: 30_000,
   });
 
@@ -43,9 +58,33 @@ export function GlobalSearch() {
     setSearch('');
   }, []);
 
+  /**
+   * D28-003 — le déclencheur DISPARAÎT pendant l'ouverture (ce composant rend
+   * soit le bouton, soit le dialogue, jamais les deux). Le nœud DOM mémorisé
+   * par le piège n'existe donc plus à la fermeture, et `focus()` sur un nœud
+   * détaché ne fait rien : c'est ainsi que l'agent 28 mesurait un retour du
+   * focus sur `BUTTON "Importer"`, un bouton au hasard de la page.
+   *
+   * On ne restructure PAS le rendu pour garder le bouton monté (cela le
+   * laisserait visible sous le voile, changement visuel non demandé) : on
+   * signale la disparition, et le bouton reconstruit se reprend le focus.
+   */
+  const refDeclencheur = useRef<HTMLButtonElement | null>(null);
+  const [aRendreLeFocus, setARendreLeFocus] = useState(false);
+  const refDialogue = usePiegeFocus<HTMLDivElement>(open, {
+    surDeclencheurDisparu: () => setARendreLeFocus(true),
+  });
+
+  useEffect(() => {
+    if (!aRendreLeFocus) return;
+    refDeclencheur.current?.focus();
+    setARendreLeFocus(false);
+  }, [aRendreLeFocus]);
+
   if (!open) {
     return (
       <button
+        ref={refDeclencheur}
         onClick={() => setOpen(true)}
         className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-500 hover:border-slate-400 dark:border-slate-600 dark:bg-slate-800"
         aria-label="Recherche globale"
@@ -59,6 +98,7 @@ export function GlobalSearch() {
 
   return (
     <div
+      ref={refDialogue}
       className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/50 p-4 pt-24"
       onClick={close}
       role="dialog"

@@ -55,6 +55,11 @@ export function CompanyRow({
         'dark:border-slate-800 dark:hover:bg-slate-800/60',
         className,
       )}
+      // TABLEAU-DEFILABLE: enferme par CompaniesListPage.tsx — D30-002. Le
+      // conteneur a defilement ne peut PAS vivre ici : cette ligne est montee
+      // en position absolue par le virtualiseur, une par une. C'est la liste
+      // qui enferme l'en-tete ET le corps virtualise dans un meme
+      // <TableScroll>, faute de quoi ils defileraient separement.
       style={{ gridTemplateColumns: GRID }}
     >
       {/* Case de sélection. Rendue même sans gestionnaire (désactivée) : la

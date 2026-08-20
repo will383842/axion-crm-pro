@@ -1,8 +1,31 @@
-import { useMemo, useState } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { FranceCoverageMap, type CoverageMode } from './FranceCoverageMap';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+
+// G42-003 — la carte est chargee A LA DEMANDE, sur ce seul ecran.
+//
+// Mesure du 2026-08-20 (`pnpm build`, vite 6.4.2) : `maplibre-gl` et sa
+// feuille de style pesent 802 715 o de morceau produit, et l'import STATIQUE
+// qui se trouvait ici les faisait remonter jusqu'a `src/main.tsx` via
+// `routeTree.tsx` — donc jusqu'a `dist/index.html`, qui portait :
+//     <link rel="modulepreload" href="/assets/maplibre-CaQzARel.js">
+// 802 715 o telecharges pour afficher `/login`, sur les 37 routes, alors
+// qu'UN seul ecran sur 37 emploie la carte.
+//
+// ⚠️ Le morceau nomme de `vite.config.ts` (`manualChunks: { maplibre: [...] }`)
+// ne suffisait PAS et ne pouvait pas suffire : il choisit dans QUEL fichier le
+// code atterrit, pas QUAND il est telecharge. Tant qu'une arete statique y
+// mene, Rollup en fait une dependance statique de l'entree et Vite la
+// prefetche. Seul `import()` coupe l'arete.
+//
+// `type CoverageMode` reste un import de TYPE : il s'efface au build
+// (`verbatimModuleSyntax`), il ne recree aucune arete.
+import type { CoverageMode } from './FranceCoverageMap';
+
+const FranceCoverageMap = lazy(async () => ({
+  default: (await import('./FranceCoverageMap')).FranceCoverageMap,
+}));
 
 interface Cell { code: string; name: string; total: number; complete?: number; partial?: number; lat?: number; lon?: number }
 
@@ -141,14 +164,28 @@ export function CoveragePage() {
       {/* Map + Sidebar */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
         <div className="rounded-2xl bg-white/80 p-1 shadow-[0_8px_32px_-12px_rgb(0_0_0/0.12)] ring-1 ring-slate-200/60 backdrop-blur-sm">
-          <FranceCoverageMap
-            cells={cells}
-            mode={mode}
-            onZoneClick={(code) => {
-              setSelected(code);
-              if (mode === 'action') void recuperer(code);
-            }}
-          />
+          {/* La reserve d'espace fait EXACTEMENT la hauteur de la carte
+              (h-[640px], cf. FranceCoverageMap) : le chargement differe ne
+              doit pas produire de decalage de mise en page a l'arrivee. */}
+          <Suspense
+            fallback={
+              <div
+                className="flex h-[640px] w-full items-center justify-center rounded-2xl bg-slate-50 text-sm text-slate-500"
+                role="status"
+              >
+                Chargement de la carte…
+              </div>
+            }
+          >
+            <FranceCoverageMap
+              cells={cells}
+              mode={mode}
+              onZoneClick={(code) => {
+                setSelected(code);
+                if (mode === 'action') void recuperer(code);
+              }}
+            />
+          </Suspense>
         </div>
 
         <aside className="flex flex-col gap-4">

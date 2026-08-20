@@ -162,24 +162,21 @@ export function FranceCoverageMap({
         ?? '/tiles/admin/departements.geojson';
       LOG('adding source — url=', geojsonUrl);
 
-      // Fetch en parallèle pour mesurer perf + détecter 404/CSP/CORS hors-map.
-      fetch(geojsonUrl, { credentials: 'same-origin' })
-        .then(async (r) => {
-          LOG('fetch geojson — status=', r.status, 'content-type=', r.headers.get('content-type'), 'content-length=', r.headers.get('content-length'));
-          if (!r.ok) {
-            LOG('⚠️ fetch geojson FAILED — status', r.status);
-            return;
-          }
-          const text = await r.text();
-          LOG('fetch geojson — body length=', text.length, 'first 80 chars=', text.slice(0, 80));
-          try {
-            const json = JSON.parse(text) as { features?: unknown[]; type?: string };
-            LOG('fetch geojson — parsed OK, type=', json.type, 'features=', json.features?.length);
-          } catch (err) {
-            LOG('⚠️ fetch geojson — JSON parse FAILED', err);
-          }
-        })
-        .catch((err) => LOG('⚠️ fetch geojson — network error', err));
+      // G42-003 — RETIRÉ le 2026-08-20 : un `fetch(geojsonUrl)` de diagnostic
+      // tournait ici EN PLUS de l'`addSource` ci-dessous. Il téléchargeait le
+      // fichier ENTIER (1 079 714 o, chiffre de l'audit), en lisait le corps
+      // (`await r.text()`), le parsait (`JSON.parse`)… pour écrire quatre
+      // lignes dans la console. Soit 2 159 428 o par ouverture de `/coverage`
+      // au lieu de 1 079 714 o, dont la moitié jetée sans rien afficher.
+      //
+      // ⚠️ Ce n'était pas seulement du gaspillage : c'est CE fetch-là que
+      // `src/main.tsx:47` accuse d'« AbortError sur fetch geojson » au
+      // double-montage, et pour lequel `StrictMode` a été désactivé sur toute
+      // l'application. `map.addSource` gère son propre abandon.
+      //
+      // Ce qu'on perd : le diagnostic 404/CSP/CORS hors-map. Il n'est pas
+      // perdu — `map.on('error')` (plus bas) reçoit déjà l'erreur de source,
+      // avec `status` et `url`, et l'affiche à l'utilisateur.
 
       map.addSource('departements', {
         type: 'geojson',

@@ -3,6 +3,85 @@
 # Reverse proxy Caddy expose https://api.localhost + https://app.localhost
 # (certificat local auto Caddy ; ajouter au store de confiance via Caddy CA si besoin)
 
+# ── PLAFOND DES JOURNAUX DOCKER — constat F39-011 (S1), 2026-08-20 ───────────
+#
+# 🔴 CE DÉPÔT NE PORTAIT AUCUNE DIRECTIVE `logging:`, DANS AUCUN DE SES SEPT
+# FICHIERS COMPOSE. Le pilote par défaut de Docker est `json-file`, et son
+# défaut est **illimité** : `/var/lib/docker/containers/<id>/<id>-json.log`
+# grossit jusqu'à ce que le disque soit plein. `infra/scripts/setup-hetzner-cpx22.sh`
+# installe Docker par `get.docker.com` et n'écrit AUCUN `/etc/docker/daemon.json` :
+# il n'y avait donc pas non plus de plafond côté démon.
+#
+# Mesuré le 2026-08-20, sur un conteneur créé À L'INSTANT depuis ce fichier-ci
+# fusionné avec `docker-compose.prod.yml` :
+#
+#   $ docker compose -p a35mesure -f docker-compose.yml -f docker-compose.prod.yml \
+#         -f <overlay jetable> up -d --no-deps redis
+#   $ docker inspect --format '{{json .HostConfig.LogConfig}}' a35-mesure-journal-redis
+#   {"Type":"json-file","Config":{}}
+#
+# `Config` VIDE : ni `max-size`, ni `max-file`. Les trois conteneurs de la pile
+# locale (`axion-crm-app`, `axion-crm-caddy`, `axion-crm-postgres`) rendaient
+# exactement la même chose.
+#
+# ⚠️ AGGRAVANT, ET C'EST LE MÊME TEXTE COMPTÉ DEUX FOIS : `config/logging.php`
+# envoie la pile de journaux sur `stderr` à `LOG_LEVEL=debug`. Chaque ligne
+# écrite par l'application atterrit donc ICI, en plus du fichier.
+#
+# ── POURQUOI DANS LE FICHIER DE BASE, ET PAS DANS L'OVERLAY DE PRODUCTION ────
+#
+# Le constat F38-007 a dénombré **douze** chemins qui lancent `docker compose up`
+# sans `docker-compose.prod.yml` (workflows, scripts, runbooks, un en-tête de
+# fichier Compose). Un plafond posé dans le seul overlay laisserait chacun de ces
+# douze chemins recréer des conteneurs sans borne. Il est donc ici, dans le
+# fichier que TOUTES les invocations lisent.
+#
+# ── LE CHIFFRE ──────────────────────────────────────────────────────────────
+#
+# 10 Mio × 5 fichiers = **50 Mio par conteneur**, 8 services = **400 Mio de
+# plafond CUMULÉ**, et ce total ne bouge plus jamais. À comparer aux 511 Mio de
+# croissance QUOTIDIENNE du constat.
+#
+# ⚠️ C'est un plafond, pas une fenêtre de temps : sur un service bavard, 50 Mio
+# peuvent ne représenter que quelques heures. La trace longue se lit dans
+# `storage/logs/laravel-AAAA-MM-JJ.log` (canal `daily`, 14 jours) — et, le jour
+# où la pile d'observabilité sera vraiment branchée, dans Loki.
+#
+# ── ⚠️ ATTEINDRE LA PRODUCTION : DEUX SERVICES NE SERONT PAS SERVIS ─────────
+#
+# Le plafond est appliqué à la CRÉATION du conteneur. `deploy-direct-ssh.yml`
+# recrée `api app horizon scheduler` (`--force-recreate`) puis `postgres redis`
+# (`up -d --no-deps`, qui recrée dès que la configuration fusionnée change) :
+# ces six-là recevront le plafond au prochain déploiement, tout seuls.
+#
+# **`caddy` et `reverb` ne figurent dans AUCUNE de ces deux listes.** Ils
+# garderont donc leur journal sans plafond indéfiniment. `reverb` est à l'arrêt
+# depuis des semaines et ne coûte rien ; `caddy`, lui, tourne — c'est la porte
+# d'entrée du site. Il faut un geste explicite, UNE fois :
+#
+#   cd /opt/axion-crm-pro
+#   export COMPOSE_FILE="docker-compose.yml:docker-compose.prod.yml"
+#   docker compose up -d --no-deps caddy
+#   docker inspect --format '{{json .HostConfig.LogConfig}}' axion-crm-caddy
+#   # attendu : {"Type":"json-file","Config":{"max-file":"5","max-size":"10m"}}
+#
+# C'est exactement le piège déjà consigné pour `extra_hosts` sur `caddy` dans
+# `docker-compose.prod.yml` : un réglage juste dans le fichier, et un conteneur
+# que le déploiement ne touche jamais. Le fichier a raison, la machine a tort.
+#
+# Garde : `backend/tests/Feature/Infra/BorneDeCroissanceDuDisqueTest.php`, qui
+# calcule le plafond sur la configuration FUSIONNÉE (base + overlay) — parce que
+# Compose fusionne, et que lire un seul fichier ment. Ce dépôt a déjà payé ce
+# piège deux fois, sur `volumes` puis sur `ports`.
+#
+# ⚠️ La garde mesure le FICHIER. Elle ne peut pas voir un conteneur de
+# production : elle ne remplace donc pas le `docker inspect` ci-dessus.
+x-journal: &journal
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '5'
+
 services:
   postgres:
     # Sprint 19.3 : image custom GHCR (pgvector + pg_partman + postgis), fallback build local
@@ -11,6 +90,9 @@ services:
       context: .
       dockerfile: Dockerfile.postgres
     container_name: axion-crm-postgres
+    # Plafond du journal Docker — constat F39-011. Voir l ancre `x-journal`
+    # en tete de fichier : 10 Mio x 5 = 50 Mio par conteneur, jamais plus.
+    logging: *journal
     environment:
       POSTGRES_DB: axion_crm
       POSTGRES_USER: axion
@@ -32,6 +114,9 @@ services:
   redis:
     image: redis:7.2-alpine
     container_name: axion-crm-redis
+    # Plafond du journal Docker — constat F39-011. Voir l ancre `x-journal`
+    # en tete de fichier : 10 Mio x 5 = 50 Mio par conteneur, jamais plus.
+    logging: *journal
     command: >
       redis-server
       --appendonly yes
@@ -56,6 +141,9 @@ services:
       dockerfile: Dockerfile.laravel
       target: dev
     container_name: axion-crm-api
+    # Plafond du journal Docker — constat F39-011. Voir l ancre `x-journal`
+    # en tete de fichier : 10 Mio x 5 = 50 Mio par conteneur, jamais plus.
+    logging: *journal
     env_file: .env
     environment:
       # 🔴 `${APP_URL:-…}` ET NON UNE VALEUR EN DUR.
@@ -99,6 +187,9 @@ services:
       dockerfile: Dockerfile.laravel
       target: dev
     container_name: axion-crm-horizon
+    # Plafond du journal Docker — constat F39-011. Voir l ancre `x-journal`
+    # en tete de fichier : 10 Mio x 5 = 50 Mio par conteneur, jamais plus.
+    logging: *journal
     command: php artisan horizon
     env_file: .env
     environment:
@@ -121,6 +212,9 @@ services:
       dockerfile: Dockerfile.laravel
       target: dev
     container_name: axion-crm-reverb
+    # Plafond du journal Docker — constat F39-011. Voir l ancre `x-journal`
+    # en tete de fichier : 10 Mio x 5 = 50 Mio par conteneur, jamais plus.
+    logging: *journal
     command: php artisan reverb:start --host=0.0.0.0 --port=8080
     env_file: .env
     environment:
@@ -145,6 +239,9 @@ services:
       dockerfile: Dockerfile.laravel
       target: dev
     container_name: axion-crm-scheduler
+    # Plafond du journal Docker — constat F39-011. Voir l ancre `x-journal`
+    # en tete de fichier : 10 Mio x 5 = 50 Mio par conteneur, jamais plus.
+    logging: *journal
     command: php artisan schedule:work
     env_file: .env
     environment:
@@ -176,6 +273,9 @@ services:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://app.axion-crm-pro.com}
         VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
     container_name: axion-crm-app
+    # Plafond du journal Docker — constat F39-011. Voir l ancre `x-journal`
+    # en tete de fichier : 10 Mio x 5 = 50 Mio par conteneur, jamais plus.
+    logging: *journal
     restart: unless-stopped
     networks:
       - axion-crm
@@ -189,6 +289,9 @@ services:
   caddy:
     image: caddy:2-alpine
     container_name: axion-crm-caddy
+    # Plafond du journal Docker — constat F39-011. Voir l ancre `x-journal`
+    # en tete de fichier : 10 Mio x 5 = 50 Mio par conteneur, jamais plus.
+    logging: *journal
     restart: unless-stopped
     ports:
       - "80:80"

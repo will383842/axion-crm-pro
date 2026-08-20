@@ -10,10 +10,73 @@ docker exec axion-crm-postgres df -h /var/lib/postgresql/data
 ```
 
 ## 2. Nettoyage Docker
+
+> ### 🔴 `docker logs --tail=0` NE TRONQUE RIEN. Constat F39-011 (S1), 2026-08-20.
+>
+> Ce runbook prescrivait ici :
+>
+> ```bash
+> docker logs axion-crm-api --tail=0       # tronque logs verbeux
+> ```
+>
+> **Le commentaire est faux.** `docker logs` est une commande de LECTURE :
+> `--tail=0` demande d'afficher zéro ligne, il n'efface pas un octet. Mesuré sur
+> un conteneur réel le 2026-08-20 :
+>
+> ```
+> $ docker logs axion-crm-caddy | wc -c            # 461154
+> $ docker logs axion-crm-caddy --tail=0 | wc -c   # 0   (affichage, pas suppression)
+> $ docker logs axion-crm-caddy | wc -c            # 461154   ← INCHANGÉ
+> ```
+>
+> En incident, un opérateur qui suit cette ligne croit avoir libéré de la place
+> et n'en a libéré **aucune**. C'est pire qu'une étape manquante : c'est une
+> étape qui rassure.
+
 ```bash
-docker system prune -a --volumes -f       # ATTENTION : confirme avec Will d'abord
-docker logs axion-crm-api --tail=0       # tronque logs verbeux
+# a) Voir OÙ est la place. `docker system df` ne montre PAS les journaux des
+#    conteneurs : ils vivent dans /var/lib/docker/containers/ et n'entrent dans
+#    aucune de ses lignes. On les compte séparément.
+docker system df
+du -sh /var/lib/docker/containers/*/*-json.log 2>/dev/null | sort -h | tail -10
+
+# b) Images et couches orphelines : c'est là que se trouvent les gigaoctets.
+#    Le déploiement reconstruit les images à chaque livraison (`--build`) et ne
+#    purge rien ; chaque build laisse l'image précédente en suspens.
+docker image prune -af                    # images non référencées, sans toucher aux volumes
+docker builder prune -af                  # cache de construction
+
+# c) Purge totale — ATTENTION : `--volumes` DÉTRUIT postgres-data et redis-data.
+#    Confirme avec Will d'abord, et jamais sans sauvegarde vérifiée.
+# docker system prune -a --volumes -f
+
+# d) VRAIMENT tronquer le journal d'un conteneur (le geste que la ligne fausse
+#    ci-dessus prétendait faire). On écrit dans le fichier, on ne le supprime
+#    pas : Docker garde son descripteur ouvert, un `rm` ne rendrait rien.
+truncate -s 0 "$(docker inspect --format='{{.LogPath}}' axion-crm-api)"
 ```
+
+> ### Le plafond, pour ne plus revenir ici
+>
+> Depuis le 2026-08-20, `docker-compose.yml` porte une ancre `x-journal`
+> (`max-size: 10m`, `max-file: 5`) sur chacun de ses services : **50 Mio par
+> conteneur, 400 Mio pour la pile, et ce total ne bouge plus.** Avant, il n'y
+> avait aucun plafond — `docker inspect` rendait `{"Type":"json-file","Config":{}}`
+> sur tous les conteneurs mesurés.
+>
+> ⚠️ Le plafond s'applique à la **création** du conteneur. `caddy` n'est recréé
+> par aucun déploiement : si `docker inspect --format '{{json .HostConfig.LogConfig}}'
+> axion-crm-caddy` rend un `Config` vide, c'est qu'il attend encore d'être
+> recréé une fois, à la main :
+>
+> ```bash
+> cd /opt/axion-crm-pro
+> # 🔴 L'overlay de production n'est PAS optionnel : sans lui, Compose repart du
+> # seul docker-compose.yml, qui PUBLIE Postgres sur 55432 et Redis sur 56379.
+> # C'est la faille du 2026-08-19 (constat F38-007).
+> export COMPOSE_FILE="docker-compose.yml:docker-compose.prod.yml"
+> docker compose up -d --no-deps caddy
+> ```
 
 ## 3. Postgres bloat
 

@@ -146,8 +146,16 @@ services:
       # la préproduction affiche ses traces.
       #
       # Pour diagnostiquer sur la préproduction : `docker logs
-      # axion-crm-staging-api` et `storage/logs/laravel.log`. La trace y est
-      # entière, et elle ne part pas sur internet.
+      # axion-crm-staging-api` et `storage/logs/laravel-AAAA-MM-JJ.log`. La
+      # trace y est entière, et elle ne part pas sur internet.
+      #
+      # ⚠️ LE NOM DU FICHIER A CHANGÉ LE 2026-08-20 — constat F39-011 (S1).
+      # Il s'appelait `laravel.log` et n'était JAMAIS tourné : 968 Mo mesurés
+      # sur le serveur au 2026-08-16. La pile de journaux par défaut est passée
+      # de `single,stderr` à `daily,stderr` (`backend/config/logging.php`), donc
+      # un fichier par jour, gardé `LOG_DAILY_DAYS` jours (14 par défaut).
+      # Un `tail storage/logs/laravel.log` ne trouvera plus rien : prendre
+      # l'entrée du jour, ou `ls -t storage/logs/ | head -1`.
       APP_DEBUG: 'false'
       APP_URL: https://staging.axion-crm-pro.com
       DB_DATABASE: axion_crm_staging

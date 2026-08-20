@@ -21,10 +21,30 @@
 # Sur un poste de developpement, remplacer `prod` par `local`.
 # 6 services : Prometheus + Grafana + Loki + Tempo + GlitchTip + Uptime Kuma
 
+# ── PLAFOND DES JOURNAUX DOCKER — constat F39-011 (S1), 2026-08-20 ───────────
+#
+# Meme ancre que `docker-compose.yml`, REPETEE ici et non partagee : une ancre
+# YAML ne franchit pas la frontiere d'un document. Ce fichier declare huit
+# services de plus, et ils etaient tous sans plafond — dont `promtail`, dont le
+# metier est precisement de LIRE des journaux, et `glitchtip`, qui empile des
+# traces d'erreur.
+#
+# 8 x 50 Mio = 400 Mio de plafond cumule pour cette pile, qui ne bouge plus.
+#
+# ⚠️ Si un service est ajoute ici sans `logging: *journal`, la garde
+# `backend/tests/Feature/Infra/BorneDeCroissanceDuDisqueTest.php` rougit.
+x-journal: &journal
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '5'
+
 services:
   prometheus:
     image: prom/prometheus:v2.55.0
     container_name: axion-crm-prometheus
+    # Plafond F39-011 : 10 Mio x 5 = 50 Mio par conteneur.
+    logging: *journal
     volumes:
       - ./infra/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./infra/monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
@@ -51,6 +71,8 @@ services:
   alertmanager:
     image: prom/alertmanager:v0.27.0
     container_name: axion-crm-alertmanager
+    # Plafond F39-011 : 10 Mio x 5 = 50 Mio par conteneur.
+    logging: *journal
     volumes:
       - ./infra/monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     ports:
@@ -60,6 +82,8 @@ services:
   grafana:
     image: grafana/grafana:11.3.0
     container_name: axion-crm-grafana
+    # Plafond F39-011 : 10 Mio x 5 = 50 Mio par conteneur.
+    logging: *journal
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-axion_grafana_dev}
       GF_INSTALL_PLUGINS: grafana-piechart-panel,redis-datasource
@@ -75,6 +99,8 @@ services:
   loki:
     image: grafana/loki:3.2.0
     container_name: axion-crm-loki
+    # Plafond F39-011 : 10 Mio x 5 = 50 Mio par conteneur.
+    logging: *journal
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
       - loki-data:/loki
@@ -85,6 +111,8 @@ services:
   promtail:
     image: grafana/promtail:3.2.0
     container_name: axion-crm-promtail
+    # Plafond F39-011 : 10 Mio x 5 = 50 Mio par conteneur.
+    logging: *journal
     volumes:
       - ./infra/monitoring/promtail/promtail.yml:/etc/promtail/config.yml:ro
       - /var/log:/var/log:ro
@@ -95,6 +123,8 @@ services:
   tempo:
     image: grafana/tempo:2.6.0
     container_name: axion-crm-tempo
+    # Plafond F39-011 : 10 Mio x 5 = 50 Mio par conteneur.
+    logging: *journal
     command: ['-config.file=/etc/tempo.yaml']
     volumes:
       - ./infra/monitoring/tempo/tempo.yaml:/etc/tempo.yaml:ro
@@ -108,6 +138,8 @@ services:
   glitchtip:
     image: glitchtip/glitchtip:v4.2
     container_name: axion-crm-glitchtip
+    # Plafond F39-011 : 10 Mio x 5 = 50 Mio par conteneur.
+    logging: *journal
     environment:
       DATABASE_URL: postgres://axion:axion_dev_only@postgres:5432/glitchtip
       SECRET_KEY: ${GLITCHTIP_SECRET_KEY:-axion-glitchtip-dev-secret}
@@ -122,6 +154,8 @@ services:
   uptime-kuma:
     image: louislam/uptime-kuma:1.23
     container_name: axion-crm-uptime-kuma
+    # Plafond F39-011 : 10 Mio x 5 = 50 Mio par conteneur.
+    logging: *journal
     volumes:
       - uptime-data:/app/data
     ports:

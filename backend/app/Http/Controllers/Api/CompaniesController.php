@@ -9,6 +9,7 @@ use App\Services\Waterfall\WaterfallOrchestrator;
 use App\Support\CompanyQueryFilters;
 use App\Support\EligibiliteCampagne;
 use App\Support\MasquageCoordonnees;
+use App\Support\PlafondExport;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
@@ -185,11 +186,20 @@ class CompaniesController extends ApiController
             EligibiliteCampagne::exclureOpposes($relation->getQuery(), 'contacts.email');
         };
 
+        // `getEloquentBuilder()` : `buildFilteredQuery()` rend un
+        // `Spatie\QueryBuilder\QueryBuilder`, enveloppe qui n'étend PLUS
+        // `Eloquent\Builder` depuis la v6. Ici le code tournait — `chunkById`
+        // est reforwardé par `__call` — mais le même geste, en `MediaController`
+        // et `JournalistsController`, levait un TypeError et rendait 500
+        // (constat F36-008). On déballe donc explicitement, pour que le plafond
+        // partagé reçoive un vrai Builder et que les trois exports parlent le
+        // même langage.
         $query = $this->buildFilteredQuery()
             ->where('workspace_id', $workspaceId)
             ->with($hasSante
                 ? ['contacts' => $chargeContacts, 'healthPractitioners']
-                : ['contacts' => $chargeContacts]);
+                : ['contacts' => $chargeContacts])
+            ->getEloquentBuilder();
 
         $confidenceScorer = new EmailConfidenceService;
 
@@ -202,54 +212,59 @@ class CompaniesController extends ApiController
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // BOM UTF-8 → Excel FR lit les accents
             fputcsv($out, $header);
-            // chunkById(id) = pagination stable en mémoire bornée (gros volumes OK).
-            $query->chunkById(1000, function ($companies) use ($out, $confidenceScorer, $hasSante) {
-                foreach ($companies as $c) {
-                    $contacts = $c->contacts
-                        ->map(function ($ct) {
-                            $name = trim(($ct->first_name ?? '') . ' ' . ($ct->last_name ?? ''));
-                            $bits = array_filter([
-                                $name,
-                                $ct->role ? "({$ct->role})" : '',
-                                $ct->email ?? '',
-                                $ct->phone ?? '',
-                            ]);
+            // 🔴 PLAFOND (constat G41-007, S1). `chunkById(1000)` était stable
+            // en mémoire, mais SANS BORNE : au volume mesuré — 4 295 349 fiches
+            // — cela fait 4 296 allers-retours SQL et gèle un worker PHP-FPM au
+            // moins deux minutes. Le plafond rend le pire cas FINI, et le
+            // fichier DIT qu'il est coupé. Cf. App\Support\PlafondExport.
+            $tronque = PlafondExport::parcourirBorne($query, function ($c) use ($out, $confidenceScorer, $hasSante) {
+                $contacts = $c->contacts
+                    ->map(function ($ct) {
+                        $name = trim(($ct->first_name ?? '') . ' ' . ($ct->last_name ?? ''));
+                        $bits = array_filter([
+                            $name,
+                            $ct->role ? "({$ct->role})" : '',
+                            $ct->email ?? '',
+                            $ct->phone ?? '',
+                        ]);
 
-                            return trim(implode(' ', $bits));
-                        })
-                        ->filter()
-                        ->implode(' | ');
-                    $specialites = $hasSante
-                        ? $c->healthPractitioners->pluck('specialite')->filter()->unique()->implode(', ')
-                        : '';
-                    // Lien Google Maps : coordonnées GPS si dispo (précis), sinon
-                    // requête textuelle sur l'adresse postale.
-                    if ($c->lat !== null && $c->lon !== null) {
-                        $mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' . $c->lat . ',' . $c->lon;
-                    } else {
-                        $mapsUrl = 'https://www.google.com/maps/search/?api=1&query='
-                            . rawurlencode(trim(($c->address ?? '') . ', ' . ($c->postcode ?? '') . ' ' . ($c->city_name ?? $c->city ?? '')));
-                    }
-                    fputcsv($out, [
-                        $c->siren,
-                        $c->denomination,
-                        $c->enseigne,
-                        $c->naf,
-                        $c->size_category,
-                        $c->department_code,
-                        $c->city_name,
-                        $c->email_generic,
-                        $this->resolveBestConfidence($c, $confidenceScorer),
-                        $c->phone,
-                        $c->website,
-                        $mapsUrl,
-                        $contacts,
-                        $specialites,
-                    ]);
+                        return trim(implode(' ', $bits));
+                    })
+                    ->filter()
+                    ->implode(' | ');
+                $specialites = $hasSante
+                    ? $c->healthPractitioners->pluck('specialite')->filter()->unique()->implode(', ')
+                    : '';
+                // Lien Google Maps : coordonnées GPS si dispo (précis), sinon
+                // requête textuelle sur l'adresse postale.
+                if ($c->lat !== null && $c->lon !== null) {
+                    $mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' . $c->lat . ',' . $c->lon;
+                } else {
+                    $mapsUrl = 'https://www.google.com/maps/search/?api=1&query='
+                        . rawurlencode(trim(($c->address ?? '') . ', ' . ($c->postcode ?? '') . ' ' . ($c->city_name ?? $c->city ?? '')));
                 }
+                fputcsv($out, [
+                    $c->siren,
+                    $c->denomination,
+                    $c->enseigne,
+                    $c->naf,
+                    $c->size_category,
+                    $c->department_code,
+                    $c->city_name,
+                    $c->email_generic,
+                    $this->resolveBestConfidence($c, $confidenceScorer),
+                    $c->phone,
+                    $c->website,
+                    $mapsUrl,
+                    $contacts,
+                    $specialites,
+                ]);
             });
+            if ($tronque) {
+                PlafondExport::ecrireAvertissement($out, count($header));
+            }
             fclose($out);
-        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8'] + PlafondExport::entetes());
     }
 
     /**

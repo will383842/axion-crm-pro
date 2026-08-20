@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\Media;
 use App\Support\EligibiliteCampagne;
+use App\Support\PlafondExport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -111,8 +112,31 @@ class MediaController extends ApiController
         // s'est opposée y figurait quand même. Constaté le 2026-08-16 — c'est
         // le seul des trois exports qui n'avait aucun filtre d'opposition,
         // même approximatif.
+        // 🔴 `getEloquentBuilder()` N'EST PAS UN DÉTAIL DE STYLE — c'est la
+        // cause du 500. Constat F36-008 (S1), mesuré le 2026-08-20 :
+        //
+        //   TypeError: App\Support\EligibiliteCampagne::exclureOpposes():
+        //   Argument #1 ($query) must be of type
+        //   Illuminate\Database\Eloquent\Builder,
+        //   Spatie\QueryBuilder\QueryBuilder given, called in
+        //   .../MediaController.php on line 114
+        //
+        // `buildFilteredQuery()` rend un `Spatie\QueryBuilder\QueryBuilder`, qui
+        // en v6 N'ÉTEND PLUS `Eloquent\Builder` : c'est une enveloppe qui
+        // reforwarde ses appels (`__call`), et `->where(...)` lui renvoie donc
+        // `$this` — l'enveloppe, pas le Builder. `GET /media/export` rendait
+        // ainsi 500 à TOUS les comptes habilités (owner, admin, opérateur).
+        //
+        // Le défaut vivait ici depuis l'ajout de la garde d'opposition
+        // (2026-08-16) et personne ne l'a vu : la seule garde posée sur cette
+        // route vérifiait le REFUS opposé au `viewer`, et un 403 n'entre jamais
+        // dans le contrôleur. « La garde est la seule partie qui fonctionne. »
+        //
+        // `getEloquentBuilder()` rend le sujet réel, celui que
+        // `allowedFilters()` a DÉJÀ modifié (Spatie applique les filtres à la
+        // construction, pas à l'exécution) : aucun filtre n'est perdu.
         $query = EligibiliteCampagne::exclureOpposes(
-            $this->buildFilteredQuery()->where('workspace_id', $workspaceId),
+            $this->buildFilteredQuery()->where('workspace_id', $workspaceId)->getEloquentBuilder(),
             'media.email',
         );
 
@@ -120,30 +144,32 @@ class MediaController extends ApiController
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // BOM UTF-8 → Excel FR lit les accents
             fputcsv($out, $header);
-            $query->chunkById(1000, function ($medias) use ($out) {
-                foreach ($medias as $m) {
-                    fputcsv($out, [
-                        $m->name,
-                        $m->media_type,
-                        $m->media_family === 'audiovisual_production' ? 'Production audiovisuelle' : 'Rédactionnel',
-                        $m->periodicity,
-                        $m->editorial_theme,
-                        $m->diffusion_zone,
-                        $m->department_code,
-                        $m->region_code,
-                        $m->city,
-                        $m->publisher,
-                        $m->website,
-                        $m->email,
-                        $m->email_confidence,
-                        $m->phone,
-                        $m->cppap_number,
-                        $m->arcom_id,
-                    ]);
-                }
+            // Plafond partagé (constat G41-007) : cf. App\Support\PlafondExport.
+            $tronque = PlafondExport::parcourirBorne($query, function ($m) use ($out) {
+                fputcsv($out, [
+                    $m->name,
+                    $m->media_type,
+                    $m->media_family === 'audiovisual_production' ? 'Production audiovisuelle' : 'Rédactionnel',
+                    $m->periodicity,
+                    $m->editorial_theme,
+                    $m->diffusion_zone,
+                    $m->department_code,
+                    $m->region_code,
+                    $m->city,
+                    $m->publisher,
+                    $m->website,
+                    $m->email,
+                    $m->email_confidence,
+                    $m->phone,
+                    $m->cppap_number,
+                    $m->arcom_id,
+                ]);
             });
+            if ($tronque) {
+                PlafondExport::ecrireAvertissement($out, count($header));
+            }
             fclose($out);
-        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8'] + PlafondExport::entetes());
     }
 
     public function show(Media $media): JsonResponse

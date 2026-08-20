@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Crm\Outbound\ConsentOutboundRecorder;
 use App\Models\Journalist;
 use App\Support\EligibiliteCampagne;
+use App\Support\PlafondExport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -124,10 +125,24 @@ class JournalistsController extends ApiController
         //
         // On garde le filtre local (il dit quelque chose de vrai) et on ajoute
         // les deux portes partagées.
+        // 🔴 `getEloquentBuilder()` — MÊME DÉFAUT QU'EN `MediaController`, et
+        // c'est le patron A-011 du dépôt : le même geste faux recopié à deux
+        // endroits. Constat F36-008 (S1), mesuré le 2026-08-20 :
+        //
+        //   TypeError: App\Support\EligibiliteCampagne::exclureOpposes():
+        //   Argument #1 ($query) must be of type
+        //   Illuminate\Database\Eloquent\Builder,
+        //   Spatie\QueryBuilder\QueryBuilder given
+        //
+        // `Spatie\QueryBuilder\QueryBuilder` v6 n'étend plus `Eloquent\Builder`
+        // (enveloppe à `__call`) : `->where(...)` rend l'enveloppe.
+        // `GET /journalists/export` rendait donc 500 à tous les ayants droit.
+        // `getEloquentBuilder()` rend le sujet réel, filtres déjà appliqués.
         $query = EligibiliteCampagne::exclureOpposes(
             $this->buildFilteredQuery()
                 ->where('workspace_id', $workspaceId)
-                ->where('opt_out', false),
+                ->where('opt_out', false)
+                ->getEloquentBuilder(),
             'journalists.email',
         )->with('media');
 
@@ -135,23 +150,25 @@ class JournalistsController extends ApiController
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF");
             fputcsv($out, $header);
-            $query->chunkById(1000, function ($journalists) use ($out) {
-                foreach ($journalists as $j) {
-                    fputcsv($out, [
-                        $j->first_name,
-                        $j->last_name,
-                        $j->role,
-                        $j->beat,
-                        $j->email,
-                        $j->phone,
-                        $j->media?->name,
-                        $j->opt_out ? 'oui' : 'non',
-                        $j->source,
-                    ]);
-                }
+            // Plafond partagé (constat G41-007) : cf. App\Support\PlafondExport.
+            $tronque = PlafondExport::parcourirBorne($query, function ($j) use ($out) {
+                fputcsv($out, [
+                    $j->first_name,
+                    $j->last_name,
+                    $j->role,
+                    $j->beat,
+                    $j->email,
+                    $j->phone,
+                    $j->media?->name,
+                    $j->opt_out ? 'oui' : 'non',
+                    $j->source,
+                ]);
             });
+            if ($tronque) {
+                PlafondExport::ecrireAvertissement($out, count($header));
+            }
             fclose($out);
-        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8'] + PlafondExport::entetes());
     }
 
     public function show(Journalist $journalist): JsonResponse

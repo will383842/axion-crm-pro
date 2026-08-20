@@ -1,343 +1,343 @@
 
    PASS  Tests\Unit\AnnuaireEntreprises\HttpAnnuaireEntreprisesAddressTest
-  ✓ it exposes siège address from geo_adresse                           13.36s  
-  ✓ it reconstructs siège address from voie components when geo_adresse… 0.38s  
-  ✓ it returns null address when siège absent                            0.42s  
+  ✓ it exposes siège address from geo_adresse                            9.94s  
+  ✓ it reconstructs siège address from voie components when geo_adresse… 0.45s  
+  ✓ it returns null address when siège absent                            0.35s  
 
    PASS  Tests\Unit\Audiences\AudienceBuilderServiceTest
-  ✓ it preview returns count for simple criteria                        17.55s  
-  ✓ it preview uses any combinator (OR)                                  0.63s  
-  ✓ it filters by quality_score range                                    1.42s  
-  ✓ it filters by has_email contacts                                     0.55s  
-  ✓ it refresh populates audience_members                                1.79s  
-  ✓ it refresh is idempotent (run twice = same count)                    0.62s  
-  ✓ it evaluateForCompany returns matching audience IDs                  0.72s  
-  ✓ it skips invalid fields/ops silently                                 0.64s  
-  ✓ it not exclut les fiches qui matchent la condition                   0.60s  
-  ✓ it not sur un champ NULL garde la fiche : inconnu n est pas egal     0.80s  
-  ✓ it not : SQL et evaluateur en memoire donnent le MEME nombre (champ… 0.47s  
-  ✓ it not + in sur un champ NULL garde la fiche, comme en memoire       0.65s  
-  ✓ it not + neq sur un champ NULL exclut la fiche, des deux cotes       0.51s  
-  ✓ it not : is_not_null garde les fiches dont le champ est NULL         0.64s  
-  ✓ it neq garde les fiches dont le champ est NULL, comme en memoire     1.30s  
-  ✓ it not_in garde les fiches dont le champ est NULL, comme en memoire  0.92s  
-  ✓ it neq sur un champ renseigne ne change pas de comportement          0.49s  
-  ✓ it tags contains_any ne retient que les fiches portant un des slugs  0.69s  
-  ✓ it tags contains_any accepte plusieurs slugs (union, pas intersecti… 0.59s  
-  ✓ it not + tags contains_any garde les fiches SANS le tag              0.56s  
-  ✓ it tags : SQL et evaluateur en memoire donnent le MEME nombre        0.66s  
-  ✓ it tags contains_any avec une liste VIDE ne vise personne            0.81s  
-  ✓ it tags avec un operateur non supporte ne vise personne              0.82s  
-  ✓ it refresh reste en ligne a exactement 5 000 fiches (le seuil est s… 4.05s  
-  ✓ it refresh bascule en Bus::batch au-dela de 5 000 fiches             4.85s  
-  ✓ it le chemin batch remet l audience a zero AVANT de dispatcher       1.51s  
+  ✓ it preview returns count for simple criteria                        12.78s  
+  ✓ it preview uses any combinator (OR)                                  0.41s  
+  ✓ it filters by quality_score range                                    0.48s  
+  ✓ it filters by has_email contacts                                     0.49s  
+  ✓ it refresh populates audience_members                                2.18s  
+  ✓ it refresh is idempotent (run twice = same count)                    0.55s  
+  ✓ it evaluateForCompany returns matching audience IDs                  0.53s  
+  ✓ it skips invalid fields/ops silently                                 0.40s  
+  ✓ it not exclut les fiches qui matchent la condition                   0.48s  
+  ✓ it not sur un champ NULL garde la fiche : inconnu n est pas egal     0.40s  
+  ✓ it not : SQL et evaluateur en memoire donnent le MEME nombre (champ… 0.42s  
+  ✓ it not + in sur un champ NULL garde la fiche, comme en memoire       0.47s  
+  ✓ it not + neq sur un champ NULL exclut la fiche, des deux cotes       0.59s  
+  ✓ it not : is_not_null garde les fiches dont le champ est NULL         0.46s  
+  ✓ it neq garde les fiches dont le champ est NULL, comme en memoire     0.47s  
+  ✓ it not_in garde les fiches dont le champ est NULL, comme en memoire  0.67s  
+  ✓ it neq sur un champ renseigne ne change pas de comportement          0.44s  
+  ✓ it tags contains_any ne retient que les fiches portant un des slugs  0.47s  
+  ✓ it tags contains_any accepte plusieurs slugs (union, pas intersecti… 0.52s  
+  ✓ it not + tags contains_any garde les fiches SANS le tag              0.46s  
+  ✓ it tags : SQL et evaluateur en memoire donnent le MEME nombre        0.43s  
+  ✓ it tags contains_any avec une liste VIDE ne vise personne            0.51s  
+  ✓ it tags avec un operateur non supporte ne vise personne              0.55s  
+  ✓ it refresh reste en ligne a exactement 5 000 fiches (le seuil est s… 2.14s  
+  ✓ it refresh bascule en Bus::batch au-dela de 5 000 fiches             2.44s  
+  ✓ it le chemin batch remet l audience a zero AVANT de dispatcher       1.10s  
 
    PASS  Tests\Unit\Audit\AuditHashChainExtendedTest
-  ✓ B16-001 — TEMOIN : sans secret utilisable, la chaine refuse de se d… 1.41s  
-  ✓ AuditHashChain record retourne un id positif                         0.61s  
-  ✓ AuditHashChain verifyChain retourne true sur chaîne vide             0.50s  
-  ✓ AuditHashChain verifyChain retourne true sur 1 record                0.51s  
-  ✓ AuditHashChain verifyChain retourne true sur 10 records              1.08s  
-  ✓ AuditHashChain verifyChain détecte tampering manuel                  0.65s  
-  ✓ AuditHashChain canonical respecte l'ordre des clés                   0.55s  
-  ✓ AuditHashChain enchaine prev_hash correctement                       0.78s  
-  ✓ AuditHashChain premier record a prev_hash = 0*64                     1.15s  
+  ✓ B16-001 — TEMOIN : sans secret utilisable, la chaine refuse de se d… 0.65s  
+  ✓ AuditHashChain record retourne un id positif                         0.67s  
+  ✓ AuditHashChain verifyChain retourne true sur chaîne vide             0.36s  
+  ✓ AuditHashChain verifyChain retourne true sur 1 record                0.42s  
+  ✓ AuditHashChain verifyChain retourne true sur 10 records              0.44s  
+  ✓ AuditHashChain verifyChain détecte tampering manuel                  0.50s  
+  ✓ AuditHashChain canonical respecte l'ordre des clés                   0.38s  
+  ✓ AuditHashChain enchaine prev_hash correctement                       0.34s  
+  ✓ AuditHashChain premier record a prev_hash = 0*64                     0.82s  
 
    PASS  Tests\Unit\Audit\AuditHashChainTest
-  ✓ B16-001 — TEMOIN (bis) : sans secret utilisable, la chaine refuse d… 0.66s  
-  ✓ first record uses the 64-zero genesis prev hash                      0.47s  
-  ✓ subsequent record chains to previous hash                            0.52s  
-  ✓ verifyChain returns true for untampered chain                        0.54s  
-  ✓ verifyChain detects tampering                                        0.46s  
-  ✓ verifyChain detects tampering on event_type (the HTTP verb)          1.07s  
-  ✓ verifyChain detects a rewritten prev_hash link                       0.78s  
+  ✓ B16-001 — TEMOIN (bis) : sans secret utilisable, la chaine refuse d… 0.64s  
+  ✓ first record uses the 64-zero genesis prev hash                      0.41s  
+  ✓ subsequent record chains to previous hash                            0.49s  
+  ✓ verifyChain returns true for untampered chain                        0.63s  
+  ✓ verifyChain detects tampering                                        0.44s  
+  ✓ verifyChain detects tampering on event_type (the HTTP verb)          0.50s  
+  ✓ verifyChain detects a rewritten prev_hash link                       0.47s  
 
    PASS  Tests\Unit\Auth\AuthServiceTest
-  ✓ AuthService::attemptLogin avec bons credentials retourne user + req… 0.92s  
-  ✓ AuthService::attemptLogin avec totp_enabled_at retourne requires_2f… 0.52s  
-  ✓ AuthService::attemptLogin avec mauvais password lance ValidationExc… 1.42s  
-  ✓ AuthService::attemptLogin reset failed_login_count après login OK    0.51s  
-  ✓ AuthService::attemptLogin rejette account avec locked_until future   0.63s  
+  ✓ AuthService::attemptLogin avec bons credentials retourne user + req… 1.14s  
+  ✓ AuthService::attemptLogin avec totp_enabled_at retourne requires_2f… 0.41s  
+  ✓ AuthService::attemptLogin avec mauvais password lance ValidationExc… 1.04s  
+  ✓ AuthService::attemptLogin reset failed_login_count après login OK    0.56s  
+  ✓ AuthService::attemptLogin rejette account avec locked_until future   0.43s  
   ✓ AuthService::attemptLogin trace last_login_ip + user_agent           0.58s  
-  ✓ AuthService constants exposed                                        0.51s  
+  ✓ AuthService constants exposed                                        0.37s  
 
    PASS  Tests\Unit\Auth\HibpCheckerTest
-  ✓ HibpChecker returns 0 quand suffix absent                            0.71s  
+  ✓ HibpChecker returns 0 quand suffix absent                            0.33s  
   ✓ HibpChecker retourne le count si suffix trouvé                       0.46s  
-  ✓ HibpChecker isBreached respecte le threshold                         0.50s  
-  ✓ HibpChecker rend null - et surtout pas 0 - quand le reseau echoue    0.73s  
-  ✓ HibpChecker rend null sur un statut HTTP autre que 200               0.86s  
-  ✓ HibpChecker retourne 0 pour password vide sans appel API             0.67s  
-  ✓ HibpChecker met en cache le résultat 24h                             0.42s  
-  ✓ HibpChecker parse correctement les newlines mixtes                   0.48s  
-  ✓ HibpChecker isBreached rend null quand le service est injoignable    0.82s  
+  ✓ HibpChecker isBreached respecte le threshold                         0.46s  
+  ✓ HibpChecker rend null - et surtout pas 0 - quand le reseau echoue    0.67s  
+  ✓ HibpChecker rend null sur un statut HTTP autre que 200               1.13s  
+  ✓ HibpChecker retourne 0 pour password vide sans appel API             0.34s  
+  ✓ HibpChecker met en cache le résultat 24h                             0.51s  
+  ✓ HibpChecker parse correctement les newlines mixtes                   0.54s  
+  ✓ HibpChecker isBreached rend null quand le service est injoignable    0.39s  
 
    PASS  Tests\Unit\Auth\MagicLinkServiceTest
-  ✓ issue creates a magic_links row with hashed token and 15min TTL      0.71s  
-  ✓ issue pour une adresse inconnue n ecrit rien, et ne leve rien        1.49s  
-  ✓ TEMOIN : issue pour une adresse CONNUE ecrit bien une ligne rattach… 0.41s  
+  ✓ issue creates a magic_links row with hashed token and 15min TTL      0.36s  
+  ✓ issue pour une adresse inconnue n ecrit rien, et ne leve rien        0.37s  
+  ✓ TEMOIN : issue pour une adresse CONNUE ecrit bien une ligne rattach… 0.73s  
 
    PASS  Tests\Unit\Auth\NotPwnedPasswordRuleTest
-  ✓ NotPwnedPassword laisse passer si password non breached              0.51s  
-  ✓ NotPwnedPassword bloque si count > threshold                         0.50s  
-  ✓ NotPwnedPassword laisse passer si count = threshold                  0.60s  
-  ✓ NotPwnedPassword threshold custom respecté                           0.54s  
-  ✓ NotPwnedPassword ignore les types non-string                         0.51s  
-  ✓ NotPwnedPassword ignore les strings vides                            0.50s  
+  ✓ NotPwnedPassword laisse passer si password non breached              0.44s  
+  ✓ NotPwnedPassword bloque si count > threshold                         0.40s  
+  ✓ NotPwnedPassword laisse passer si count = threshold                  0.57s  
+  ✓ NotPwnedPassword threshold custom respecté                           0.40s  
+  ✓ NotPwnedPassword ignore les types non-string                         0.59s  
+  ✓ NotPwnedPassword ignore les strings vides                            0.49s  
 
    PASS  Tests\Unit\Broadcasting\AutorisationCanauxTest
-  ✓ deux UUID DIFFÉRENTS ne s’autorisent pas                             0.76s  
-  ✓ un UUID s’autorise lui-même                                          0.58s  
-  ✓ LA PREUVE DU DÉFAUT : le cast en entier autorisait deux UUID étrang… 0.97s  
-  ✓ routes/channels.php ne type plus ces paramètres en int               0.35s  
+  ✓ deux UUID DIFFÉRENTS ne s’autorisent pas                             0.45s  
+  ✓ un UUID s’autorise lui-même                                          0.32s  
+  ✓ LA PREUVE DU DÉFAUT : le cast en entier autorisait deux UUID étrang… 0.35s  
+  ✓ routes/channels.php ne type plus ces paramètres en int               0.50s  
 
    PASS  Tests\Unit\Classification\AutoClassifierServiceTest
-  ✓ it extracts dept 75 from postcode 75008                              0.59s  
-  ✓ it extracts dept 2A for Corse-du-Sud postcode 20000                  0.64s  
-  ✓ it extracts dept 2B for Haute-Corse postcode 20200                   0.62s  
-  ✓ it extracts dept 971 for DOM postcode 97110                          2.31s  
-  ✓ it classifies effectif_range 21 as PME                               1.04s  
-  ✓ it classifies effectif_range 52 as grande entreprise                 0.74s  
-  ✓ it maps NAF 6201Z to it_saas                                         0.75s  
-  ✓ it maps NAF 4321A to btp                                             0.45s  
-  ✓ it falls back to "autre" for unknown NAF prefix                      0.65s  
-  ✓ it extracts commune code and city name from signals.ban              0.50s  
+  ✓ it extracts dept 75 from postcode 75008                              0.56s  
+  ✓ it extracts dept 2A for Corse-du-Sud postcode 20000                  0.69s  
+  ✓ it extracts dept 2B for Haute-Corse postcode 20200                   0.83s  
+  ✓ it extracts dept 971 for DOM postcode 97110                          0.41s  
+  ✓ it classifies effectif_range 21 as PME                               0.58s  
+  ✓ it classifies effectif_range 52 as grande entreprise                 0.45s  
+  ✓ it maps NAF 6201Z to it_saas                                         0.35s  
+  ✓ it maps NAF 4321A to btp                                             0.36s  
+  ✓ it falls back to "autre" for unknown NAF prefix                      0.59s  
+  ✓ it extracts commune code and city name from signals.ban              0.41s  
 
    PASS  Tests\Unit\Classification\AutoTagApplierTest
-  ✓ matches simple equality rule                                         0.56s  
-  ✓ matches starts_with rule                                             1.01s  
-  ✓ matches all-of compound rule                                         0.63s  
+  ✓ matches simple equality rule                                         0.41s  
+  ✓ matches starts_with rule                                             0.39s  
+  ✓ matches all-of compound rule                                         0.43s  
   ✓ matches any-of compound rule                                         0.43s  
-  ✓ regex operator works                                                 0.41s  
-  ✓ in operator works on array values                                    0.42s  
-  ✓ numeric comparison operators                                         0.74s  
+  ✓ regex operator works                                                 0.45s  
+  ✓ in operator works on array values                                    0.58s  
+  ✓ numeric comparison operators                                         0.32s  
 
    PASS  Tests\Unit\Container\DependancesOptionnellesTest
-  ✓ les dépendances optionnelles sont RÉELLEMENT injectées par le conte… 0.81s  
-  ✓ les dépendances optionnelles sont RÉELLEMENT injectées par le conte… 0.77s  
-  ✓ les dépendances optionnelles sont RÉELLEMENT injectées par le conte… 0.49s  
-  ✓ les dépendances optionnelles sont RÉELLEMENT injectées par le conte… 0.87s  
-  ✓ le conteneur sait résoudre les classes concrètes bindées with ('App… 0.48s  
-  ✓ le conteneur sait résoudre les classes concrètes bindées with ('App… 0.43s  
-  ✓ le conteneur sait résoudre les classes concrètes bindées with ('App… 0.44s  
+  ✓ les dépendances optionnelles sont RÉELLEMENT injectées par le conte… 0.34s  
+  ✓ les dépendances optionnelles sont RÉELLEMENT injectées par le conte… 0.35s  
+  ✓ les dépendances optionnelles sont RÉELLEMENT injectées par le conte… 0.42s  
+  ✓ les dépendances optionnelles sont RÉELLEMENT injectées par le conte… 0.58s  
+  ✓ le conteneur sait résoudre les classes concrètes bindées with ('App… 0.46s  
+  ✓ le conteneur sait résoudre les classes concrètes bindées with ('App… 1.01s  
+  ✓ le conteneur sait résoudre les classes concrètes bindées with ('App… 0.47s  
 
    PASS  Tests\Unit\Dedup\DeduplicationServiceTest
-  ✓ buildDedupKey is stable for same inputs                              0.56s  
-  ✓ buildDedupKey differs across sources                                 0.45s  
-  ✓ buildDedupKey for google-maps incorporates query + coords            0.40s  
-  ✓ computeContactHash matches expected sha256 pattern                   0.64s  
-  ✓ computeContactHash is case + accents insensitive                     0.83s  
-  ✓ SOURCE_TTL_DAYS contains all 14 sources                              0.68s  
+  ✓ buildDedupKey is stable for same inputs                              0.38s  
+  ✓ buildDedupKey differs across sources                                 0.50s  
+  ✓ buildDedupKey for google-maps incorporates query + coords            0.37s  
+  ✓ computeContactHash matches expected sha256 pattern                   0.39s  
+  ✓ computeContactHash is case + accents insensitive                     0.56s  
+  ✓ SOURCE_TTL_DAYS contains all 14 sources                              0.37s  
 
    PASS  Tests\Unit\Dedup\OptOutTest
-  ✓ isOptedOut returns false when no opt_out entry                       0.52s  
-  ✓ isOptedOut returns true after addOptOut                              0.49s  
-  ✓ isOptedOut normalizes email (trim + lowercase)                       0.59s  
-  ✓ isOptedOut normalizes phone (strip separators)                       0.68s  
-  ✓ isOptedOut cross-workspace (table sans workspace_id)                 0.91s  
+  ✓ isOptedOut returns false when no opt_out entry                       0.41s  
+  ✓ isOptedOut returns true after addOptOut                              0.44s  
+  ✓ isOptedOut normalizes email (trim + lowercase)                       0.51s  
+  ✓ isOptedOut normalizes phone (strip separators)                       0.42s  
+  ✓ isOptedOut cross-workspace (table sans workspace_id)                 0.33s  
 
    PASS  Tests\Unit\Domain\DomainFinderRevalidateTest
-  ✓ it marque VIVANT un site qui répond 200                              0.69s  
-  ✓ it marque VIVANT même un 404/500 (le serveur répond = hébergement v… 0.83s  
-  ✓ it marque MORT un site dont la requête lève une ConnectionException  0.74s  
-  ✓ it mélange vivant + mort dans un même lot                            0.54s  
-  ✓ it ignore (skip) les entreprises sans website                        0.58s  
+  ✓ it marque VIVANT un site qui répond 200                              0.49s  
+  ✓ it marque VIVANT même un 404/500 (le serveur répond = hébergement v… 0.58s  
+  ✓ it marque MORT un site dont la requête lève une ConnectionException  0.38s  
+  ✓ it mélange vivant + mort dans un même lot                            0.35s  
+  ✓ it ignore (skip) les entreprises sans website                        0.52s  
 
    PASS  Tests\Unit\Domain\DomainFinderServiceTest
-  ✓ it returns signals.legal.siteweb when present                        0.38s  
-  ✓ it returns first non-blacklist URL from Brave Search                 0.45s  
-  ✓ it falls back to Pages Jaunes when MOCK_SCRAPERS=false and Brave em… 2.99s  
-  ✓ it skips Pages Jaunes when MOCK_SCRAPERS=true                        0.73s  
-  ✓ it returns null when Brave key absent and PJ scrapers disabled       0.53s  
-  ✓ it returns null when denomination missing                            1.12s  
-  ✓ it pass 1 candidates = 4 variantes prioritaires                      0.49s  
-  ✓ it pass 2 candidates ajoute TLD alternatifs, deux premiers mots et…  0.46s  
-  ✓ it acronyme non généré si moins de 3 tokens                          0.54s  
+  ✓ it returns signals.legal.siteweb when present                        0.47s  
+  ✓ it returns first non-blacklist URL from Brave Search                 0.46s  
+  ✓ it falls back to Pages Jaunes when MOCK_SCRAPERS=false and Brave em… 2.92s  
+  ✓ it skips Pages Jaunes when MOCK_SCRAPERS=true                        0.80s  
+  ✓ it returns null when Brave key absent and PJ scrapers disabled       0.48s  
+  ✓ it returns null when denomination missing                            0.42s  
+  ✓ it pass 1 candidates = 4 variantes prioritaires                      0.32s  
+  ✓ it pass 2 candidates ajoute TLD alternatifs, deux premiers mots et…  0.44s  
+  ✓ it acronyme non généré si moins de 3 tokens                          0.34s  
 
    PASS  Tests\Unit\Email\EmailFinderServiceTest
-  ✓ PATTERNS contains 18 entries                                         0.57s  
-  ✓ generateCandidates produces 12+ unique valid emails for typical inp… 0.77s  
-  ✓ renderPattern handles accents + apostrophes                          0.60s  
-  ✓ aucun accent ne peut faire entrer de ponctuation dans une adresse    0.37s  
-  ✓ les initiales aussi sont ASCII (motif {f}.{last})                    0.38s  
+  ✓ PATTERNS contains 18 entries                                         0.37s  
+  ✓ generateCandidates produces 12+ unique valid emails for typical inp… 0.49s  
+  ✓ renderPattern handles accents + apostrophes                          0.44s  
+  ✓ aucun accent ne peut faire entrer de ponctuation dans une adresse    0.50s  
+  ✓ les initiales aussi sont ASCII (motif {f}.{last})                    0.50s  
   ✓ detectPatternFromKnownEmails returns dominant pattern                0.46s  
-  ✓ verifyEmail returns skipped_catchall_provider for big mail provider… 0.39s  
-  ✓ verifyEmail returns unknown when no Hunter verifier wired (Sprint H… 0.52s  
-  ✓ verifyEmail returns invalid for malformed addresses (Sprint H2)      0.96s  
+  ✓ verifyEmail returns skipped_catchall_provider for big mail provider… 0.35s  
+  ✓ verifyEmail returns unknown when no Hunter verifier wired (Sprint H… 0.34s  
+  ✓ verifyEmail returns invalid for malformed addresses (Sprint H2)      0.41s  
 
    PASS  Tests\Unit\Email\HunterEmailVerifierTest
   ✓ it returns unknown when API key is missing                           0.50s  
-  ✓ it returns deliverable result when Hunter returns deliverable        0.68s  
-  ✓ it returns unknown with http_error when API responds 5xx             1.53s  
-  ✓ it does NOT cache a transport failure — un 5xx doit rester réessaya… 1.06s  
-  ✓ it caches result for 30 days to avoid quota waste                    0.38s  
+  ✓ it returns deliverable result when Hunter returns deliverable        0.37s  
+  ✓ it returns unknown with http_error when API responds 5xx             1.57s  
+  ✓ it does NOT cache a transport failure — un 5xx doit rester réessaya… 0.46s  
+  ✓ it caches result for 30 days to avoid quota waste                    0.39s  
 
    PASS  Tests\Unit\Email\MxEmailValidatorTest
-  ✓ it returns invalid for malformed syntax                              0.56s  
-  ✓ it returns disposable for known throwaway domains                    0.44s  
-  ✓ it returns role for role-based prefixes                              0.55s  
-  ✓ it returns risky for free providers (gmail, orange, etc) — assuming… 0.69s  
-  ✓ it returns invalid when domain has no MX records                     0.56s  
-  ✓ it full validate returns structured payload                          0.46s  
-  ✓ it lowercases and trims input                                        0.53s  
-  ✓ it rejects emails longer than 254 chars (RFC 5321)                   0.40s  
+  ✓ it returns invalid for malformed syntax                              0.50s  
+  ✓ it returns disposable for known throwaway domains                    0.36s  
+  ✓ it returns role for role-based prefixes                              0.31s  
+  ✓ it returns risky for free providers (gmail, orange, etc) — assuming… 0.46s  
+  ✓ it returns invalid when domain has no MX records                     0.53s  
+  ✓ it full validate returns structured payload                          0.31s  
+  ✓ it lowercases and trims input                                        0.46s  
+  ✓ it rejects emails longer than 254 chars (RFC 5321)                   0.44s  
 
    PASS  Tests\Unit\Email\SmtpProberTest
-  ✓ mock prober returns valid for known email                            0.48s  
-  ✓ mock prober detects role email                                       0.47s  
-  ✓ mock prober detects disposable domain                                0.85s  
-  ✓ mock prober defaults to valid for unknown email in fixture           0.49s  
-  ✓ email normalization (trim + lowercase)                               0.79s  
+  ✓ mock prober returns valid for known email                            0.49s  
+  ✓ mock prober detects role email                                       0.37s  
+  ✓ mock prober detects disposable domain                                0.36s  
+  ✓ mock prober defaults to valid for unknown email in fixture           0.72s  
+  ✓ email normalization (trim + lowercase)                               0.32s  
 
    PASS  Tests\Unit\Events\BroadcastEventsTest
-  ✓ ScrapeJobCompleted broadcastWith expose les bons champs              1.46s  
-  ✓ ScrapeJobCompleted broadcast sur channel private workspace           1.57s  
-  ✓ ScrapeJobCompleted alias broadcast name                              0.43s  
-  ✓ CompanyEnriched payload                                              0.49s  
-  ✓ NotificationCreated route vers channel user si userId fourni         0.67s  
-  ✓ NotificationCreated route vers channel workspace si userId null      0.47s  
-  ✓ NotificationCreated payload contient severity                        0.62s  
+  ✓ ScrapeJobCompleted broadcastWith expose les bons champs              0.37s  
+  ✓ ScrapeJobCompleted broadcast sur channel private workspace           0.53s  
+  ✓ ScrapeJobCompleted alias broadcast name                              0.46s  
+  ✓ CompanyEnriched payload                                              0.45s  
+  ✓ NotificationCreated route vers channel user si userId fourni         0.54s  
+  ✓ NotificationCreated route vers channel workspace si userId null      0.66s  
+  ✓ NotificationCreated payload contient severity                        0.61s  
 
    PASS  Tests\Unit\FranceTravail\FranceTravailDiscoveryClientTest
-  ✓ it returns empty when client credentials missing                     0.78s  
-  ✓ it returns deduplicated entreprises from offres                      0.59s  
-  ✓ it returns empty on 204 No Content                                   0.64s  
-  ✓ it skips offres with invalid SIRET                                   0.83s  
-  ✓ it Sprint H3: filters out radiées entreprises via INSEE check        0.56s  
-  ✓ it Sprint H3: graceful fallback if InseeClient throws                0.51s  
+  ✓ it returns empty when client credentials missing                     0.49s  
+  ✓ it returns deduplicated entreprises from offres                      0.46s  
+  ✓ it returns empty on 204 No Content                                   0.40s  
+  ✓ it skips offres with invalid SIRET                                   0.42s  
+  ✓ it Sprint H3: filters out radiées entreprises via INSEE check        0.39s  
+  ✓ it Sprint H3: graceful fallback if InseeClient throws                0.32s  
 
    PASS  Tests\Unit\Http\ProxiedHttpClientTest
-  ✓ it reports proxy disabled by default                                 0.45s  
-  ✓ it reports proxy enabled when flag set                               0.66s  
-  ✓ it builds a PendingRequest without proxy option when disabled        0.57s  
-  ✓ it applies proxy option when enabled with credentials                1.26s  
-  ✓ it skips proxy option when enabled but credentials missing           0.47s  
+  ✓ it reports proxy disabled by default                                 0.38s  
+  ✓ it reports proxy enabled when flag set                               0.40s  
+  ✓ it builds a PendingRequest without proxy option when disabled        0.48s  
+  ✓ it applies proxy option when enabled with credentials                0.35s  
+  ✓ it skips proxy option when enabled but credentials missing           0.36s  
 
    PASS  Tests\Unit\Http\SsrfGuardExtendedTest
-  ✓ SsrfGuard rejette URL invalide                                       0.50s  
-  ✓ SsrfGuard rejette scheme non-http(s)                                 0.54s  
-  ✓ SsrfGuard rejette ftp                                                0.43s  
-  ✓ SsrfGuard rejette URL vide                                           0.36s  
-  ✓ SsrfGuard rejette metadata AWS                                       0.57s  
-  ✓ SsrfGuard rejette metadata GCP                                       0.38s  
-  ✓ SsrfGuard rejette metadata Azure                                     0.50s  
-  ✓ SsrfGuard rejette metadata Alibaba                                   0.82s  
-  ✓ SsrfGuard rejette localhost                                          0.54s  
-  ✓ SsrfGuard rejette 127.0.0.1                                          1.01s  
-  ✓ SsrfGuard rejette 0.0.0.0                                            0.50s  
-  ✓ SsrfGuard rejette 10.0.0.0/8                                         0.41s  
-  ✓ SsrfGuard rejette 192.168.0.0/16                                     0.33s  
-  ✓ SsrfGuard rejette 172.16-31                                          0.43s  
-  ✓ SsrfGuard rejette 169.254.x.x link-local                             0.48s  
-  ✓ SsrfGuard ensure() lance exception si denied                         0.87s  
+  ✓ SsrfGuard rejette URL invalide                                       0.33s  
+  ✓ SsrfGuard rejette scheme non-http(s)                                 0.39s  
+  ✓ SsrfGuard rejette ftp                                                0.53s  
+  ✓ SsrfGuard rejette URL vide                                           0.41s  
+  ✓ SsrfGuard rejette metadata AWS                                       0.48s  
+  ✓ SsrfGuard rejette metadata GCP                                       0.35s  
+  ✓ SsrfGuard rejette metadata Azure                                     0.39s  
+  ✓ SsrfGuard rejette metadata Alibaba                                   0.44s  
+  ✓ SsrfGuard rejette localhost                                          0.49s  
+  ✓ SsrfGuard rejette 127.0.0.1                                          0.32s  
+  ✓ SsrfGuard rejette 0.0.0.0                                            0.51s  
+  ✓ SsrfGuard rejette 10.0.0.0/8                                         0.57s  
+  ✓ SsrfGuard rejette 192.168.0.0/16                                     0.40s  
+  ✓ SsrfGuard rejette 172.16-31                                          0.31s  
+  ✓ SsrfGuard rejette 169.254.x.x link-local                             0.33s  
+  ✓ SsrfGuard ensure() lance exception si denied                         0.59s  
 
    PASS  Tests\Unit\Http\SsrfGuardTest
-  ✓ blocks AWS metadata endpoint                                         0.68s  
+  ✓ blocks AWS metadata endpoint                                         0.43s  
   ✓ blocks the whole link-local range 169.254/16 by CIDR (not by hostna… 0.45s  
-  ✓ blocks GCP metadata hostname                                         0.59s  
-  ✓ blocks localhost                                                     0.51s  
-  ✓ blocks 127.0.0.1                                                     0.52s  
-  ✓ blocks RFC 1918 192.168/16                                           0.41s  
-  ✓ blocks RFC 1918 10/8                                                 0.54s  
-  ✓ blocks RFC 1918 172.16/12                                            0.36s  
-  ✓ blocks CGNAT 100.64/10                                               0.38s  
-  ✓ blocks ftp scheme                                                    0.48s  
-  ✓ blocks file scheme                                                   0.36s  
-  ✓ ensure throws when blocked                                           0.46s  
-  ✓ invalid URL is rejected                                              1.01s  
+  ✓ blocks GCP metadata hostname                                         0.31s  
+  ✓ blocks localhost                                                     0.43s  
+  ✓ blocks 127.0.0.1                                                     0.32s  
+  ✓ blocks RFC 1918 192.168/16                                           0.33s  
+  ✓ blocks RFC 1918 10/8                                                 0.41s  
+  ✓ blocks RFC 1918 172.16/12                                            0.45s  
+  ✓ blocks CGNAT 100.64/10                                               0.51s  
+  ✓ blocks ftp scheme                                                    0.37s  
+  ✓ blocks file scheme                                                   0.68s  
+  ✓ ensure throws when blocked                                           0.39s  
+  ✓ invalid URL is rejected                                              0.44s  
 
    PASS  Tests\Unit\Legal\MentionsLegalesScraperServiceTest
-  ✓ it extracts email and phone from mentions-legales page               0.61s  
-  ✓ it skips technical email prefixes                                    0.59s  
-  ✓ it returns false when body too short on all paths                    0.53s  
-  ✓ it returns false when website missing                                0.41s  
-  ✓ it tries fallback path when first 404                                0.57s  
-  ✓ it captures ALL emails and ALL phones (not just the first)           1.26s  
-  ✓ it deduces service roles and picks a service email as generic        0.48s  
+  ✓ it extracts email and phone from mentions-legales page               0.37s  
+  ✓ it skips technical email prefixes                                    0.58s  
+  ✓ it returns false when body too short on all paths                    0.43s  
+  ✓ it returns false when website missing                                0.47s  
+  ✓ it tries fallback path when first 404                                0.98s  
+  ✓ it captures ALL emails and ALL phones (not just the first)           0.50s  
+  ✓ it deduces service roles and picks a service email as generic        0.74s  
 
    PASS  Tests\Unit\Media\ImportMediaFromArcomTest
-  ✓ it parse la base ARCOM et dédoublonne les stations par nom+type      0.63s  
+  ✓ it parse la base ARCOM et dédoublonne les stations par nom+type      0.53s  
 
    PASS  Tests\Unit\Media\PressKitImportTest
-  ✓ it parse 193 émissions TV bien formées                               1.11s  
-  ✓ it parse les médias de diffusion national + départementaux           0.52s  
-  ✓ it rejette un email bidon et garde un email rédaction (role)         0.36s  
+  ✓ it parse 193 émissions TV bien formées                               1.18s  
+  ✓ it parse les médias de diffusion national + départementaux           0.42s  
+  ✓ it rejette un email bidon et garde un email rédaction (role)         0.44s  
 
    PASS  Tests\Unit\PhpstanBaselineNeGrossitPasTest
-  ✓ le parseur de baseline lit vraiment des entrées                      0.41s  
-  ✓ la baseline PHPStan ne grossit pas                                   0.64s  
-  ✓ l'en-tête de la baseline annonce les nombres réellement présents     0.37s  
-  ✓ aucune entrée de baseline ne vise le socle CRM                       0.43s  
-  ✓ reportUnmatchedIgnoredErrors reste activé                            0.94s  
+  ✓ le parseur de baseline lit vraiment des entrées                      0.48s  
+  ✓ la baseline PHPStan ne grossit pas                                   0.39s  
+  ✓ l'en-tête de la baseline annonce les nombres réellement présents     0.44s  
+  ✓ aucune entrée de baseline ne vise le socle CRM                       0.77s  
+  ✓ reportUnmatchedIgnoredErrors reste activé                            0.69s  
 
    PASS  Tests\Unit\Rotations\SearchEngineRotatorTest
-  ✓ SearchEngineRotator retourne null si aucun moteur enabled            0.64s  
-  ✓ SearchEngineRotator retourne un engine si dispo                      0.65s  
-  ✓ SearchEngineRotator pondère par weight statistiquement               0.66s  
-  ✓ SearchEngineRotator retourne null si total weight = 0                0.45s  
+  ✓ SearchEngineRotator retourne null si aucun moteur enabled            0.46s  
+  ✓ SearchEngineRotator retourne un engine si dispo                      0.45s  
+  ✓ SearchEngineRotator pondère par weight statistiquement               0.53s  
+  ✓ SearchEngineRotator retourne null si total weight = 0                0.37s  
 
    PASS  Tests\Unit\Rotations\WeightedRoundRobinTest
-  ✓ WeightedRoundRobin pick retourne null si aucun item                  1.15s  
-  ✓ WeightedRoundRobin pick retourne un item disponible                  0.74s  
-  ✓ WeightedRoundRobin incrémente le compteur metadata.count             0.58s  
-  ✓ WeightedRoundRobin skip items disabled                               0.67s  
-  ✓ WeightedRoundRobin respecte cooldown                                 0.61s  
-  ✓ WeightedRoundRobin pondère par weight (1 vs 10)                      0.59s  
-  ✓ WeightedRoundRobin pick ne croise pas les workspaces                 0.65s  
+  ✓ WeightedRoundRobin pick retourne null si aucun item                  0.57s  
+  ✓ WeightedRoundRobin pick retourne un item disponible                  0.73s  
+  ✓ WeightedRoundRobin incrémente le compteur metadata.count             0.48s  
+  ✓ WeightedRoundRobin skip items disabled                               0.47s  
+  ✓ WeightedRoundRobin respecte cooldown                                 0.35s  
+  ✓ WeightedRoundRobin pondère par weight (1 vs 10)                      0.42s  
+  ✓ WeightedRoundRobin pick ne croise pas les workspaces                 0.41s  
 
    PASS  Tests\Unit\Rules\PasswordResetWithHibpTest
   ✓ HIBP integration : password "password" est compromis                 0.42s  
-  ✓ HIBP intégration : password long custom est sain                     0.36s  
-  ✓ HIBP cache prefix unique par 5 chars du sha1                         0.35s  
-  ✓ HIBP user-agent inclus dans la requête                               0.52s  
+  ✓ HIBP intégration : password long custom est sain                     0.35s  
+  ✓ HIBP cache prefix unique par 5 chars du sha1                         0.32s  
+  ✓ HIBP user-agent inclus dans la requête                               0.36s  
 
    PASS  Tests\Unit\Scraping\GooglePlacesClientTest
-  ✓ it returns null when API key is missing                              2.15s  
-  ✓ it returns first place when API responds with results                1.35s  
-  ✓ it caches result for 30 days to avoid quota waste                    1.22s  
-  ✓ it returns null on HTTP error                                        1.07s  
-  ✓ it returns null on empty places array                                0.37s  
-  ✓ it flatten returns null-safe payload when place is null              0.74s  
-  ✓ it flatten extracts phone with fallback international → national     0.56s  
-  ✓ it flatten extracts opening hours weekday descriptions               0.45s  
+  ✓ it returns null when API key is missing                              0.44s  
+  ✓ it returns first place when API responds with results                0.42s  
+  ✓ it caches result for 30 days to avoid quota waste                    0.34s  
+  ✓ it returns null on HTTP error                                        0.91s  
+  ✓ it returns null on empty places array                                0.45s  
+  ✓ it flatten returns null-safe payload when place is null              0.31s  
+  ✓ it flatten extracts phone with fallback international → national     0.37s  
+  ✓ it flatten extracts opening hours weekday descriptions               0.38s  
 
    PASS  Tests\Unit\Scraping\GooglePlacesQuotaTest
-  ✓ it skips API call when monthly quota is exceeded                     0.54s  
-  ✓ it allows API call when under monthly quota                          0.43s  
-  ✓ it increments monthly usage counter after successful call            0.39s  
-  ✓ it isQuotaExceeded reflects current_month_usage vs limit             0.64s  
+  ✓ it skips API call when monthly quota is exceeded                     0.41s  
+  ✓ it allows API call when under monthly quota                          0.33s  
+  ✓ it increments monthly usage counter after successful call            0.51s  
+  ✓ it isQuotaExceeded reflects current_month_usage vs limit             0.35s  
   ✓ it does not increment quota when call uses cache hit                 0.42s  
-  ✓ it quota counter is per-month (key includes YYYY-MM)                 0.74s  
+  ✓ it quota counter is per-month (key includes YYYY-MM)                 0.48s  
 
    PASS  Tests\Unit\Scraping\GooglePlacesSmartSkipTest
-  ✓ it skips Google Places when company already has email_generic (H16…  0.72s  
-  ✓ it does NOT skip when company is missing email (H16 — appelle Googl… 0.79s  
-  ✓ it skips Google Places even if phone+website are missing, as long a… 0.72s  
-  ✓ it skip is disabled when smart_skip config is false                  1.14s  
-  ✓ it considers contact with email_status=valid as sufficient email     0.58s  
+  ✓ it skips Google Places when company already has email_generic (H16…  0.76s  
+  ✓ it does NOT skip when company is missing email (H16 — appelle Googl… 0.36s  
+  ✓ it skips Google Places even if phone+website are missing, as long a… 0.36s  
+  ✓ it skip is disabled when smart_skip config is false                  0.54s  
+  ✓ it considers contact with email_status=valid as sufficient email     0.53s  
 
    PASS  Tests\Unit\SmokeTest
-  ✓ mock LLM client returns a generic response for known use case        0.43s  
-  ✓ LLMResponseData decodes JSON text via asJson()                       0.34s  
+  ✓ mock LLM client returns a generic response for known use case        0.50s  
+  ✓ LLMResponseData decodes JSON text via asJson()                       0.43s  
 
    PASS  Tests\Unit\Support\AuditLoggerTest
-  ✓ it skips silently when workspace_id missing                          1.22s  
-  ✓ it fails open when DB insert throws (table missing)                  0.44s  
+  ✓ it skips silently when workspace_id missing                          0.54s  
+  ✓ it fails open when DB insert throws (table missing)                  0.31s  
 
    PASS  Tests\Unit\Support\WaterfallSentryTest
-  ✓ it captures without throwing when Sentry class missing               0.78s  
-  ✓ it handles null company without crashing                             0.61s  
+  ✓ it captures without throwing when Sentry class missing               0.52s  
+  ✓ it handles null company without crashing                             0.51s  
 
    PASS  Tests\Unit\Tags\AutoTaggerServiceTest
-  ✓ it creates dept and region tags from geo attributes                  0.59s  
-  ✓ it creates size and sector tags                                      0.46s  
-  ✓ it imports LLM classification tags as intent category                0.49s  
-  ✓ it preserves manual tags on resync                                   0.76s  
-  ✓ it removes auto-rule tag when attribute changes                      0.45s  
-  ✓ it never removes a src: provenance tag on resync                     0.40s  
-  ✓ it never removes a locked governed tag on resync                     0.68s  
-  ✓ it idempotent on second call                                         0.66s  
+  ✓ it creates dept and region tags from geo attributes                  0.35s  
+  ✓ it creates size and sector tags                                      0.41s  
+  ✓ it imports LLM classification tags as intent category                0.65s  
+  ✓ it preserves manual tags on resync                                   0.45s  
+  ✓ it removes auto-rule tag when attribute changes                      0.56s  
+  ✓ it never removes a src: provenance tag on resync                     0.44s  
+  ✓ it never removes a locked governed tag on resync                     0.47s  
+  ✓ it idempotent on second call                                         0.35s  
 
   Tests:    261 passed (4807 assertions)
-  Duration: 224.26s
+  Duration: 161.97s
 

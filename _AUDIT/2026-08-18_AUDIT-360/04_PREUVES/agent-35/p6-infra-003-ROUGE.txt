@@ -1,0 +1,158 @@
+
+   FAIL  Tests\Feature\Infra\PileDeProductionSansOverlayTest
+  ✓ F38-007 — TEMOIN : le banc voit bien les fichiers de pilotage de la… 7.80s  
+  ✓ F38-007 — TEMOIN NEGATIF : le balayage SAIT reperer une invocation…  0.61s  
+  ⨯ F38-007 — aucune commande visant la production ne recree la pile SA… 0.72s  
+  ✓ F38-007 — les services applicatifs dependent bien de postgres et re… 0.49s  
+  ⨯ P6-INFRA-003 — les consoles d administration ne se publient pas sur… 0.31s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Infra\PileDeProductionSansOverlayTest > F38-007 — a…   
+  Ces commandes recreent la pile de PRODUCTION sans `docker-compose.prod.yml`.
+
+Compose repart alors du seul `docker-compose.yml`, qui PUBLIE Postgres sur 55432 et Redis sur 56379. Il voit une configuration differente de celle des conteneurs en place et il les RECREE, ports compris. C'est la faille du 2026-08-19, reouverte.
+
+Redis n'a aucun mot de passe : FLUSHALL, lecture des jetons, CONFIG SET.
+
+Correctif : `export COMPOSE_FILE="docker-compose.yml:docker-compose.prod.yml"` avant la commande, comme le fait deja `deploy-direct-ssh.yml`.
+
+Commandes nues :
+  - docker-compose.observability.yml:2  →  # Usage : `docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d`
+Failed asserting that two arrays are identical.
+  -Array &0 []
+  +Array &0 [
+  +    0 => 'docker-compose.observability.yml:2  →  # Usage : `docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d`',
+  +]
+  
+
+  at tests/Feature/Infra/PileDeProductionSansOverlayTest.php:214
+    210▕             }
+    211▕         }
+    212▕     }
+    213▕ 
+  ➜ 214▕     expect($nues)->toBe(
+    215▕         [],
+    216▕         "Ces commandes recreent la pile de PRODUCTION sans `docker-compose.prod.yml`.\n\n"
+    217▕         . "Compose repart alors du seul `docker-compose.yml`, qui PUBLIE Postgres sur 55432 et "
+    218▕         . "Redis sur 56379. Il voit une configuration differente de celle des conteneurs en "
+
+  1   tests/Feature/Infra/PileDeProductionSansOverlayTest.php:214
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Infra\PileDeProductionSansOverlayTest > P6-INFRA-00…   
+  Ces consoles d'administration se publient sur TOUTES les interfaces.
+
+Docker insere ses regles iptables AVANT celles d'ufw : `ufw status` annoncera « 22/80/443 seulement » pendant que la chaine DOCKER acceptera 0.0.0.0/0 vers chacune d'elles. C'est le mecanisme exact de la faille du 2026-08-19, et la raison pour laquelle le rapport pare-feu de l'etape 0 concluait a tort que tout allait bien.
+
+Correctif : lier a la boucle locale (`127.0.0.1:3000:3000`) et atteindre ces consoles par un tunnel SSH.
+
+Ports nus :
+  - ligne 18 : 9090:9090
+  - ligne 27 : 9093:9093
+  - ligne 42 : 3000:3000
+  - ligne 52 : 3100:3100
+  - ligne 73 : 3200:3200
+  - ligne 74 : 4317:4317
+  - ligne 75 : 4318:4318
+  - ligne 88 : 8080:8080
+  - ligne 98 : 3001:3001
+Failed asserting that two arrays are identical.
+  -Array &0 []
+  +Array &0 [
+  +    0 => 'ligne 18 : 9090:9090',
+  +    1 => 'ligne 27 : 9093:9093',
+  +    2 => 'ligne 42 : 3000:3000',
+  +    3 => 'ligne 52 : 3100:3100',
+  +    4 => 'ligne 73 : 3200:3200',
+  +    5 => 'ligne 74 : 4317:4317',
+  +    6 => 'ligne 75 : 4318:4318',
+  +    7 => 'ligne 88 : 8080:8080',
+  +    8 => 'ligne 98 : 3001:3001',
+  +]
+  
+
+  at tests/Feature/Infra/PileDeProductionSansOverlayTest.php:308
+    304▕             $nues[] = 'ligne ' . ($i + 1) . ' : ' . $valeur;
+    305▕         }
+    306▕     }
+    307▕ 
+  ➜ 308▕     expect($nues)->toBe(
+    309▕         [],
+    310▕         "Ces consoles d'administration se publient sur TOUTES les interfaces.\n\n"
+    311▕         . "Docker insere ses regles iptables AVANT celles d'ufw : `ufw status` annoncera "
+    312▕         . "« 22/80/443 seulement » pendant que la chaine DOCKER acceptera 0.0.0.0/0 vers "
+
+  1   tests/Feature/Infra/PileDeProductionSansOverlayTest.php:308
+
+
+  Tests:    2 failed, 3 passed (13 assertions)
+  Duration: 14.36s
+
+
+=== CONDITIONS DE CE ROUGE (agent 35, 2026-08-20) ===
+
+Constat P6-INFRA-003 (S0), releve par la passe P6 « regard neuf » -- des agents
+NEUFS, sans acces aux rapports des passes 1 et 2.
+
+DEUX DEFAUTS DANS LE MEME FICHIER, ET LE DEUXIEME EST LE PLUS LARGE.
+
+1. `docker-compose.observability.yml:2` PRESCRIVAIT une combinaison de fichiers
+   qui omet `docker-compose.prod.yml`. Compose repart alors du seul fichier de
+   base, qui publie Postgres sur 55432 et Redis sur 56379 ; voyant une
+   configuration differente de celle des conteneurs en place, il les RECREE,
+   ports compris.
+
+   DOUZIEME chemin vers la faille du 19/08. Les onze premiers ont ete fermes le
+   matin meme, en deux fois : 4 dans les workflows et scripts, puis 7 dans les
+   runbooks. Ma garde ne couvrait pas les fichiers Compose eux-memes -- je
+   n'avais pas envisage qu'un fichier Compose puisse PRESCRIRE une commande.
+
+   La garde CI `config-prod` ne rend jamais cette combinaison de fichiers : elle
+   ne pouvait donc structurellement pas la voir.
+
+2. NEUF ports d'administration publies sur 0.0.0.0 :
+
+     9090 Prometheus     9093 Alertmanager   3000 Grafana
+     3100 Loki           3200 Tempo          4317/4318 OTLP
+     8080 GlitchTip      3001 Uptime Kuma
+
+   Un `- "3000:3000"` sans adresse se lie a toutes les interfaces. Et Docker
+   insere ses regles iptables AVANT celles d'ufw : `ufw status` annoncerait
+   « 22/80/443 seulement » pendant que la chaine DOCKER accepterait le monde
+   entier. C'est le mecanisme EXACT de la faille du 19/08, et la raison pour
+   laquelle le rapport pare-feu de l'etape 0 concluait a tort que tout allait
+   bien.
+
+   Le Grafana ainsi expose porte son mot de passe d'administration dans le meme
+   fichier.
+
+RESULTAT DU ROUGE : 2 echecs.
+
+  - l'usage de la ligne 2, invocation nue ;
+  - les neuf ports, un par un, avec leur numero de ligne.
+
+  VERTS ATTENDUS : les deux temoins (montage et negatif) et le test qui fige la
+  raison (depends_on, publication des ports du fichier de base, `!override` de
+  l'overlay).
+
+=== LE TEMOIN DE MONTAGE A SERVI, ET C'ETAIT SON OFFICE ===
+
+Premiere execution apres elargissement : le temoin de montage a ECHOUE. Le
+conteneur de mesure monte les fichiers Compose UN PAR UN, et
+`docker-compose.observability.yml` n'en faisait pas partie. Sans ce temoin, le
+test « aucune commande nue » serait passe au VERT sur un fichier absent -- le
+pire des verts, et exactement le defaut trouve le 19/08 sur les gardes de ce
+dossier.
+
+=== ET MON PROPRE COMMENTAIRE A ETE SIGNALE, POUR LA DEUXIEME FOIS ===
+
+Apres correctif, le balayage a signale une invocation nue de plus : le
+commentaire que je venais d'ecrire pour EXPLIQUER le correctif, et qui citait la
+commande fautive.
+
+C'est la deuxieme fois de la journee -- la premiere etait dans
+`diag-website-status.yml`. Le motif est P5-HMAC-001 : ne pas ecrire la forme
+defectueuse la ou quelqu'un peut la recopier. Le commentaire dit desormais que
+la forme fautive « n'est pas recopiee ici, pour qu'on ne puisse pas la reprendre
+par inadvertance ».
+
+APRES CORRECTIF : 29 verts sur tout tests/Feature/Infra.

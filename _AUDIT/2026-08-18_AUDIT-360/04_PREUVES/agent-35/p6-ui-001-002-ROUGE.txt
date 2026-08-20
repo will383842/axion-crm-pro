@@ -1,0 +1,174 @@
+
+   FAIL  Tests\Feature\Console\AccueilEtRechercheTest
+  ⨯ P6-UI-001 — /dashboard/stats compte les entreprises REELLES, pas z… 28.20s  
+  ✓ P6-UI-001 — TEMOIN : une base VIDE rend bien zero, et c est legitim… 0.77s  
+  ⨯ P6-UI-001 — /dashboard/stats ne compte PAS les entreprises d un aut… 0.62s  
+  ✓ P6-UI-001 — la forme du contrat attendue par l ecran est respectee   0.96s  
+  ⨯ P6-UI-002 — /search retrouve une entreprise par sa denomination      0.79s  
+  ⨯ P6-UI-002 — /search retrouve une personne par son nom                0.72s  
+  ⨯ P6-UI-002 — /search ne rend RIEN d un autre espace de travail        0.88s  
+  ✓ P6-UI-002 — TEMOIN : sous deux caracteres, on ne balaie pas la base  0.65s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Console\AccueilEtRechercheTest > P6-UI-001 — /dashb…   
+  L'ecran d'accueil affichera « Lance ton premier scrape — aucune entreprise collectee » alors que la base en porte trois. En production, elle en porte 4 295 349.
+Failed asserting that 0 is identical to 3.
+
+  at tests/Feature/Console/AccueilEtRechercheTest.php:106
+    102▕ 
+    103▕     // C'EST L'ASSERTION QUI COMPTE. `DashboardPage.tsx` teste
+    104▕     // `companies_total === 0` pour afficher « aucune entreprise collectee ».
+    105▕     // Tant que cette route rend 0, l'ecran d'accueil ment a son utilisateur.
+  ➜ 106▕     expect($reponse->json('companies_total'))->toBe(
+    107▕         3,
+    108▕         "L'ecran d'accueil affichera « Lance ton premier scrape — aucune entreprise "
+    109▕         . "collectee » alors que la base en porte trois. En production, elle en porte "
+    110▕         . '4 295 349.'
+
+  1   tests/Feature/Console/AccueilEtRechercheTest.php:106
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Console\AccueilEtRechercheTest > P6-UI-001 — /dashb…   
+  Le compteur d'accueil revele le volume d'activite d'un AUTRE client. Un compteur ne montre aucune fiche, mais il en dit le nombre.
+Failed asserting that 0 is identical to 1.
+
+  at tests/Feature/Console/AccueilEtRechercheTest.php:144
+    140▕     // REVELE UN VOLUME. On le mesure donc explicitement.
+    141▕     $reponse = $this->actingAs($b)->getJson('/api/v1/dashboard/stats');
+    142▕     $reponse->assertOk();
+    143▕ 
+  ➜ 144▕     expect($reponse->json('companies_total'))->toBe(
+    145▕         1,
+    146▕         "Le compteur d'accueil revele le volume d'activite d'un AUTRE client. "
+    147▕         . "Un compteur ne montre aucune fiche, mais il en dit le nombre."
+    148▕     );
+
+  1   tests/Feature/Console/AccueilEtRechercheTest.php:144
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Console\AccueilEtRechercheTest > P6-UI-002 — /searc…   
+  La palette ⌘K est presente sur TOUS les ecrans et vantee par la visite guidee. Tant que cette route rend un tableau vide, elle ne peut RIEN trouver.
+Failed asserting that an array contains 'Boulangerie Martin'.
+
+  at tests/Feature/Console/AccueilEtRechercheTest.php:184
+    180▕     $reponse->assertOk();
+    181▕ 
+    182▕     $noms = collect($reponse->json('companies'))->pluck('denomination')->all();
+    183▕ 
+  ➜ 184▕     $this->assertContains(
+    185▕         'Boulangerie Martin',
+    186▕         $noms,
+    187▕         'La palette ⌘K est presente sur TOUS les ecrans et vantee par la visite guidee. '
+    188▕         . "Tant que cette route rend un tableau vide, elle ne peut RIEN trouver."
+
+  1   tests/Feature/Console/AccueilEtRechercheTest.php:184
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Console\AccueilEtRechercheTest > P6-UI-002 — /searc…   
+  Failed asserting that an array contains 'Bernadette'.
+
+  at tests/Feature/Console/AccueilEtRechercheTest.php:210
+    206▕     $reponse = $this->actingAs($compte)->getJson('/api/v1/search?q=Bernadette');
+    207▕     $reponse->assertOk();
+    208▕ 
+    209▕     expect(collect($reponse->json('contacts'))->pluck('last_name')->all())
+  ➜ 210▕         ->toContain('Bernadette');
+    211▕ });
+    212▕ 
+    213▕ test('P6-UI-002 — /search ne rend RIEN d un autre espace de travail', function () {
+    214▕     [, $espaceA] = compteAccueil('ALPHA');
+
+  1   tests/Feature/Console/AccueilEtRechercheTest.php:210
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Console\AccueilEtRechercheTest > P6-UI-002 — /searc…   
+  Failed asserting that an array contains 'Public Beta SARL'.
+
+  at tests/Feature/Console/AccueilEtRechercheTest.php:227
+    223▕     $noms = collect($reponse->json('companies'))->pluck('denomination')->all();
+    224▕ 
+    225▕     // TEMOIN INTEGRE : B doit voir la sienne, sinon on ne prouverait que la
+    226▕     // panne de la route.
+  ➜ 227▕     $this->assertContains('Public Beta SARL', $noms);
+    228▕     $this->assertNotContains(
+    229▕         'Secret Alpha SARL',
+    230▕         $noms,
+    231▕         "La recherche globale rend une fiche d'un AUTRE espace. Une palette de recherche "
+
+  1   tests/Feature/Console/AccueilEtRechercheTest.php:227
+
+
+  Tests:    5 failed, 3 passed (27 assertions)
+  Duration: 39.42s
+
+
+=== CONDITIONS DE CE ROUGE (agent 35, 2026-08-20) ===
+
+Constats P6-UI-001 et P6-UI-002 (S0), releves par la passe P6 « regard neuf ».
+
+CODE MESURE : l'etat du commit af4b6a3, ou `/dashboard/stats` et `/search` sont
+DEUX CLOSURES dans `routes/api.php` rendant des zeros et des tableaux vides
+ecrits en dur.
+
+RESULTAT : 5 echecs sur 8.
+
+  companies_total ....... 0 attendu 3 -> l'ecran affiche « aucune entreprise »
+  size_distribution ..... gabarit fige, pas les donnees
+  cloisonnement ......... le compteur ne distinguait pas les espaces
+  /search denomination .. rien trouve
+  /search personne ...... rien trouve
+  /search cloisonnement . rien rendu, donc rien a cloisonner
+
+  TROIS VERTS ATTENDUS, ET ILS COMPTENT :
+  - l'etat VIDE rend bien zero (c'est un vrai etat du produit, pas un defaut :
+    sans ce temoin, un correctif rendant un nombre arbitraire passerait) ;
+  - la FORME du contrat attendue par l'ecran est respectee, meme par la closure
+    (le defaut n'etait pas la forme, c'etaient les valeurs) ;
+  - sous deux caracteres, on ne balaie pas la base.
+
+=== TROIS DECOUVERTES FAITES EN REPARANT, ET LA DEUXIEME EST LA PLUS COUTEUSE ===
+
+1. `/search` ETAIT DECLAREE DEUX FOIS, ET LES DEUX ETAIENT VIDES. Une closure,
+   et `GlobalSearchController::index()` -- un bouchon rendant lui aussi trois
+   tableaux vides. Les deux dans le MEME groupe de middleware : la closure
+   gagnait, et le controleur etait du code mort qui donnait l'apparence d'une
+   implementation. Le vrai code va dans la classe existante ; une seule
+   declaration subsiste.
+
+2. J'AI REFAIT G41-003 EN LE REPARANT. Ma migration creait
+   `idx_companies_denomination_trgm` sur `denomination`. Un index de CE NOM
+   existait depuis le 2026-05-16, sur `denomination_normalized`. Le
+   `CREATE INDEX IF NOT EXISTS` a donc silencieusement ne rien fait, et la
+   migration s'est declaree passee.
+
+   Mesure sur 150 000 lignes :
+       WHERE denomination ILIKE '%...%' ............ Seq Scan       24,6 ms
+       WHERE denomination_normalized ILIKE '%...%' . Bitmap Index    1,2 ms
+
+   Un `IF NOT EXISTS` sur un nom deja pris est un SILENCE, pas une idempotence.
+   Garde neuve : `IndexServentLesRequetesTest`, qui demande a Postgres par
+   EXPLAIN si le plan emploie l'index -- aucune lecture de `pg_indexes` ne
+   l'aurait dit, puisque l'index existait et portait le bon nom.
+
+3. LE SEUIL DE SELECTIVITE, MESURE ET NON SUPPOSE. Sur 20 000 lignes :
+       '%c3a%'   (3 car., ~2 % des lignes) ... Seq Scan
+       '%c3a4%'  (4 car., ~0,01 %) ........... Bitmap Heap Scan
+   Ce n'est PAS un defaut : sur un terme tres commun, un balayage trouve ses dix
+   resultats presque tout de suite. L'index sert les termes SELECTIFS, qui sont
+   precisement ceux ou un balayage couterait cher. La garde mesure donc le cas
+   qui compte, et le dit.
+
+=== SIXIEME OCCURRENCE DU PIEGE `toContain`, ET LA REGLE DEVIENT MECANIQUE ===
+
+Le temoin de `IndexServentLesRequetesTest` a rougi sur son propre message :
+`expect(...)->toContain('Seq Scan', 'message')`. Pest est variadique.
+
+C'est la SIXIEME fois de la journee, dont TROIS APRES que le piege ait ete
+documente en tete de trois fichiers. Le savoir ne suffit pas.
+
+Garde neuve : `AucunMessageDansToContainTest` balaie tout `tests/`, distingue un
+message d'une vraie liste de valeurs (le depot en contient plusieurs
+legitimes), porte son temoin negatif ET un temoin de couverture. Verte : les six
+occurrences sont soldees, et la septieme ne passera plus.
+
+APRES CORRECTIF : 8 verts sur cette garde. Suite complete : 657 Feature + 261
+Unit = 918 verts, 0 echec. Workers : 61 verts sur 61.

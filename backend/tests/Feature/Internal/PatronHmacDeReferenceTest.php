@@ -40,23 +40,65 @@
  * l'était pas. Les motifs ci-dessous sont donc tous sans accent.
  */
 
-use Illuminate\Support\Facades\Route;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-uses(TestCase::class);
+/**
+ * 🔴 `RefreshDatabase` EST INDISPENSABLE ICI, ET IL A COUTE UNE SUITE COMPLETE.
+ *
+ * Deux tests de ce fichier appellent reellement
+ * `POST /api/internal/scraper-result`. Le middleware `AuditHashChainLogger`
+ * ecrit une ligne dans `audit_logs` a chaque requete. Sans `RefreshDatabase`,
+ * ces lignes sont COMMITEES et survivent au fichier.
+ *
+ * Consequence mesuree le 2026-08-20, sur la suite complete : six tests de la
+ * chaine d'audit -- `AuditHashChainTest`, `AuditHashChainExtendedTest`,
+ * `ChaineAuditSecretTest` -- sont passes au rouge, dans des fichiers que rien
+ * n'avait touches. Le plus parlant :
+ *
+ *     first record uses the 64-zero genesis prev hash
+ *     -'0000...0000'
+ *     +'e2f287a4f28c63da34edb0951b3f02a242a47a5bcfd2125c450c6ea854e97b1e'
+ *
+ * Ce n'etait pas « le premier maillon » : c'etait le maillon suivant ceux que
+ * CE fichier avait laisses derriere lui. Les six tests etaient verts en
+ * isolation et rouges dans la suite -- la pire forme de rouge, parce qu'elle
+ * accuse le mauvais fichier.
+ *
+ * La lecon vaut au-dela de ce lot : un test qui emet une VRAIE requete HTTP
+ * ecrit au journal d'audit, meme s'il ne parle pas de journal d'audit.
+ */
+uses(TestCase::class, RefreshDatabase::class);
 
-function racineDepotHmac(): string
-{
-    return realpath(base_path('..')) ?: base_path('..');
-}
-
+/**
+ * Résout un chemin donné depuis la RACINE DU DÉPÔT, où que l'application soit
+ * montée.
+ *
+ * ⚠️ PIÈGE PAYÉ, ET CONSIGNÉ POUR LE SUIVANT. La première version faisait
+ * `base_path('..') . '/backend/routes/api.php'`. C'est juste dans le dépôt
+ * (`<depot>/backend/...`) et FAUX sur le banc de mesure, où le conteneur monte
+ * `backend/` sur `/var/www/html` : le chemin devenait `/var/www/backend/...`,
+ * qui n'existe pas.
+ *
+ * Le témoin de montage l'a attrapé — c'est exactement son office — mais la garde
+ * aurait été rouge en local et verte en CI, c'est-à-dire inutilisable. Un chemin
+ * de test doit valoir dans les deux, sinon il mesure l'atelier et non le produit.
+ *
+ * On passe donc par `base_path()`, que Laravel résout toujours vers le dossier
+ * de l'application, et on n'utilise `base_path('..')` que pour ce qui vit
+ * réellement au-dessus (infra, Dockerfile, workflows).
+ */
 function lireFichierHmac(string $relatif): string
 {
-    $chemin = racineDepotHmac() . '/' . ltrim($relatif, '/');
+    $relatif = ltrim($relatif, '/');
+
+    $chemin = str_starts_with($relatif, 'backend/')
+        ? base_path(substr($relatif, strlen('backend/')))
+        : (realpath(base_path('..')) ?: base_path('..')) . '/' . $relatif;
 
     expect(file_exists($chemin))->toBeTrue(
-        "Le banc ne voit pas {$relatif}. Une garde qui n'a rien a inspecter passe au vert "
-        . 'sans rien prouver : monte la racine du depot avant de la croire.'
+        "Le banc ne voit pas {$relatif} (cherche en {$chemin}). Une garde qui n'a rien a "
+        . 'inspecter passe au vert sans rien prouver : monte la racine du depot avant de la croire.'
     );
 
     return (string) file_get_contents($chemin);
@@ -134,8 +176,13 @@ test('P5-HMAC-002 — le controleur lit son secret par config(), pas par env() b
         . '`env_file:`, et cela cesse de l\'etre au premier changement de mode d\'injection.'
     );
 
+    // La parenthese fermante n'est PAS dans le motif : le controleur ecrit
+    // `config('services.worker_internal.hmac_secret', '')`, avec un defaut. Un
+    // motif trop long ne mesure pas ce qu'il annonce -- il mesure une mise en
+    // forme. Meme piege que le second argument de `toContain()`, deux fichiers
+    // plus tot.
     $this->assertStringContainsString(
-        "config('services.worker_internal.hmac_secret')",
+        "config('services.worker_internal.hmac_secret'",
         $controleur,
         'Le controleur doit lire son secret par la configuration.'
     );

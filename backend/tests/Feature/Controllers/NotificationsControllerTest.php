@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Models\Workspace;
+use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -24,6 +25,30 @@ function makeNotifUser(): User
         'current_workspace_id'          => $workspace->id,
         'first_login_completed_at'      => now(),
     ]);
+}
+
+/**
+ * Le meme compte, mais porteur d'un role -- constat P5-35-006.
+ *
+ * `makeNotifUser()` ne pose AUCUN role. C'etait sans consequence tant qu'aucune
+ * route n'exigeait de permission ; le commit 46848d4 a pose `audit.view` sur
+ * GET /api/v1/audit-logs, et ce fichier s'est mis a rougir sans avoir ete
+ * touche par la branche.
+ *
+ * Ce rouge est LA PREUVE QUE LA GARDE MARCHE. La pente naturelle serait de
+ * relacher la route pour reverdir le test : ce serait rouvrir la fuite que le
+ * correctif vient de fermer. On donne donc un role au test.
+ *
+ * Spatie tourne en mode « teams » : le role est attribue PAR espace de travail,
+ * d'ou `setPermissionsTeamId()` avant `assignRole()`.
+ */
+function makeNotifUserAvecRole(string $role = 'admin'): User
+{
+    $u = makeNotifUser();
+    setPermissionsTeamId($u->current_workspace_id);
+    $u->assignRole($role);
+
+    return $u;
 }
 
 test('GET /notifications sans auth → 401', function () {
@@ -55,9 +80,20 @@ test('GET /tags authentifié → OK', function () {
     $this->actingAs($u)->getJson('/api/v1/tags')->assertOk();
 });
 
-test('GET /audit-logs authentifié → OK', function () {
-    $u = makeNotifUser();
+test('GET /audit-logs avec la permission audit.view -> OK', function () {
+    $this->seed(PermissionsAndRolesSeeder::class);
+    $u = makeNotifUserAvecRole('admin');
     $this->actingAs($u)->getJson('/api/v1/audit-logs')->assertOk();
+});
+
+test('P5-35-006 -- GET /audit-logs SANS la permission audit.view -> 403', function () {
+    // Le pendant du test ci-dessus, et la raison pour laquelle on ne relache
+    // pas la route : un compte authentifie mais sans `audit.view` ne doit pas
+    // atteindre le journal d'audit. Sans cette assertion, un futur relachement
+    // de la route reverdirait ce fichier sans que personne ne le voie passer.
+    $this->seed(PermissionsAndRolesSeeder::class);
+    $u = makeNotifUser();
+    $this->actingAs($u)->getJson('/api/v1/audit-logs')->assertForbidden();
 });
 
 test('GET /llm/use-cases authentifié → OK', function () {

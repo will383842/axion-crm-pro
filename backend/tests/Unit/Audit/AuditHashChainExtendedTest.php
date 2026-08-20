@@ -7,6 +7,62 @@ use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
+/**
+ * 🔴 CE FICHIER A ETE CASSE PAR `46f1717`, ET NON MIS A JOUR PAR LUI.
+ *
+ * Le correctif B16-001 fait que `verifyChain()` REFUSE de se declarer valide
+ * quand le secret n'est pas utilisable. C'est tout l'objet du correctif : une
+ * chaine hachee sans secret reste parfaitement coherente avec elle-meme, si
+ * bien que la verification repondait `valid: true` sur un journal que
+ * n'importe qui pouvait reecrire. Un controle d'integrite qui affirme « tout
+ * va bien » sans pouvoir le savoir est pire qu'un controle absent.
+ *
+ * Le banc de test ne pose aucun `AUDIT_HASH_CHAIN_SECRET` : les quatre tests
+ * qui attendaient `verifyChain() === true` sont donc passes au rouge sans avoir
+ * ete touches. **Ce rouge est la preuve que le correctif marche.**
+ *
+ * La pente naturelle serait de relacher `secretEstUtilisable()` pour reverdir.
+ * Ce serait rouvrir le defaut. On pose donc un vrai secret au banc -- ce que la
+ * production doit avoir de toute facon, et qu'elle a : mesure 64 caracteres.
+ *
+ * Meme geste que pour `P5-35-006` sur `NotificationsControllerTest` : donner au
+ * test ce qui lui manque, jamais affaiblir la garde.
+ */
+const SECRET_CHAINE_DE_TEST = 'secret-de-banc-pour-la-chaine-d-audit-2026';
+
+beforeEach(function () {
+    // `AuditHashChain` lit `config('services.audit.hash_chain_secret')` depuis
+    // P5-HMAC-002. La config est resolue a l'amorcage : on la pose ici, apres.
+    config(['services.audit.hash_chain_secret' => SECRET_CHAINE_DE_TEST]);
+});
+
+/**
+ * TEMOIN NEGATIF, et c'est lui qui donne sa valeur aux quatre verts ci-dessus.
+ *
+ * Sans ce cas, on ne saurait pas si la chaine est verifiee ou si le secret est
+ * simplement toujours accepte. Il fige le correctif B16-001 : SANS secret
+ * utilisable, la verification ne repond PAS « valide ».
+ */
+test('B16-001 — TEMOIN : sans secret utilisable, la chaine refuse de se declarer valide', function () {
+    config(['services.audit.hash_chain_secret' => '']);
+
+    $chaine = new AuditHashChain;
+    $chaine->record(['method' => 'POST', 'path' => '/temoin', 'status' => 200]);
+
+    expect($chaine->verifyChain())->toBeFalse(
+        "Sans secret, la chaine se declare valide : c'est exactement le defaut B16-001. "
+        . "Elle est coherente avec elle-meme, et ne prouve rien."
+    );
+
+    // Et la valeur de developpement publiee dans le code source ne vaut pas
+    // mieux qu'une absence : quiconque lit le depot peut reforger la chaine.
+    config(['services.audit.hash_chain_secret' => AuditHashChain::SECRET_DE_DEVELOPPEMENT]);
+    expect((new AuditHashChain)->verifyChain())->toBeFalse(
+        'La valeur de developpement est ecrite en clair dans un depot public : '
+        . "l'accepter reviendrait a n'avoir aucun secret."
+    );
+});
+
 test('AuditHashChain record retourne un id positif', function () {
     $chain = new AuditHashChain;
     $id = $chain->record([

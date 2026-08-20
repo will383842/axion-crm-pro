@@ -48,6 +48,19 @@
         <env name="APP_ENV" value="testing" force="true"/>
         <env name="APP_KEY" value="base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="/>
         <env name="MOCK_MODE" value="true"/>
+        <!-- 🔴 MOCK_INSEE vivait UNIQUEMENT dans .github/workflows/ci.yml:415.
+
+             Consequence mesuree le 2026-08-20 : `POST /api/v1/coverage/launch`
+             rougit en 500 pour quiconque lance la suite en local avec ce
+             fichier-ci, et VERDIT en CI. La queue est en `sync`, le job part
+             donc en ligne, atteint `HttpInseeClient::token()` et leve
+             « INSEE auth requires either INSEE_API_KEY ... ».
+
+             Un vert qui depend d'une variable absente du fichier de
+             configuration est un vert de CI, pas un vert de la suite. On le
+             ramene ici pour que local et CI mesurent la MEME chose : c'est la
+             regle 6 du mandat, verifier sur la bonne reference. -->
+        <env name="MOCK_INSEE" value="true"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array" force="true"/>
         <!-- `force="true"` : cf. la note detaillee dans phpunit.xml. Necessaire mais

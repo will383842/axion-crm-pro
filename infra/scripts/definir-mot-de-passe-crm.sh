@@ -128,7 +128,23 @@ docker cp "$TRAVAIL/definir.php" "$CONTENEUR":/tmp/definir.php > /dev/null
 
 # Le mot de passe traverse un TUBE jusqu'à l'entrée standard du conteneur.
 # `-i` est indispensable pour que `docker exec` relaie stdin.
-SORTIE="$(printf '%s' "$MDP" | docker exec -i -e CRM_COMPTE="$COMPTE" "$CONTENEUR" php artisan tinker /tmp/definir.php 2>&1 | tr -d '\r')"
+# 🔴 `|| true` — constat P5-35-004 (S1).
+#
+# Le script tourne sous `set -e`. Le code PHP appelle `exit(1)` sur
+# `A35_INTROUVABLE` et sur `A35_ECHEC_MDP_VIDE` : sous `set -e`, une
+# affectation dont la substitution de commande rend un code non nul TUE le
+# script sur-le-champ. Le `case "$VERDICT"` plus bas, et tous ses messages,
+# n'étaient alors JAMAIS atteints.
+#
+# Mesuré avant correctif : sur un compte inexistant — une faute de frappe sur
+# l'adresse suffit — l'opérateur ne voyait RIEN. Ni « aucun compte », ni le
+# bloc de diagnostic prévu pour ce cas. Juste un code 1 muet, sur le geste même
+# par lequel l'exploitant reprend l'accès à son produit.
+#
+# Le code de retour est ici redondant : le verdict se lit sur la DERNIÈRE
+# ligne, à l'égalité stricte. On garde donc `set -e` pour tout le reste du
+# script, et on l'écarte sur cette seule affectation.
+SORTIE="$(printf '%s' "$MDP" | docker exec -i -e CRM_COMPTE="$COMPTE" "$CONTENEUR" php artisan tinker /tmp/definir.php 2>&1 | tr -d '\r')" || true
 
 docker exec "$CONTENEUR" rm -f /tmp/definir.php < /dev/null > /dev/null 2>&1
 

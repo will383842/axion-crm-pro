@@ -79,6 +79,39 @@ jobs:
             docker compose ps 2>&1
 
             echo ""
+            echo "==================== 3 bis. PORTS REELLEMENT PUBLIES ===================="
+            # 🔴 F38-003 / F40-004 elargi (2026-08-20) — LE TROISIEME SITE.
+            #
+            # L'audit nomme deux fichiers : deploy-staging.yml (seul appel, code
+            # de retour avale) et deploy-direct-ssh.yml (aucun appel). Il y en a
+            # TROIS, et celui-ci est le plus dangereux des trois :
+            #
+            #   - il est en `workflow_dispatch` : declenchable en un clic depuis
+            #     l'interface GitHub, par n'importe qui ayant acces au depot ;
+            #   - son `docker compose up -d` ci-dessus ne porte NI `--no-deps`
+            #     NI nom de service : il recree TOUTE la pile, postgres et redis
+            #     compris. Les deux seuls conteneurs que le deploiement normal
+            #     ne touche jamais sont justement ceux-ci.
+            #
+            # L'overlay a ete rebranche ligne 75 (constat F38-007), et c'est la
+            # bonne reparation. Mais elle porte sur le FICHIER. Ce qui suit
+            # mesure le REEL — `docker ps`, pas `docker compose config` — parce
+            # que le 2026-08-19 le fichier etait juste et le conteneur publiait
+            # quand meme 55432 devant 4 295 349 fiches.
+            #
+            # ⚠️ Ce script est sous `set -uo pipefail` SANS `-e` : un echec ne
+            # sort pas tout seul. On retient donc le verdict et on sort a la
+            # FIN, pour que le diagnostic qui suit s'imprime quand meme --
+            # perdre l'etat du serveur le jour d'un incident serait payer la
+            # securite avec l'exploitabilite.
+            PORTS_OK=1
+            if ! bash infra/scripts/verifier-ports-publies.sh axion-crm-pro; then
+              PORTS_OK=0
+              echo "::error::La relance a laisse la production publier un port interdit,"
+              echo "::error::ou la mesure n'a rien pu voir. Ce job sortira en echec a la fin."
+            fi
+
+            echo ""
             echo "==================== 4. REDEMARRE LE SCRAPING (systemd) ===================="
             systemctl restart axion-find-websites 2>&1 && echo "restart demande" || echo "(service systemd absent ?)"
             sleep 3
@@ -110,4 +143,10 @@ jobs:
 
             echo ""
             echo "==================== FIN ===================="
+
+            # Le verdict des ports, retenu au §3 bis, est rendu ICI — apres que
+            # tout le diagnostic se soit imprime. Sans cette ligne, le `::error::`
+            # du §3 bis serait un simple texte rouge dans un job VERT : c'est
+            # exactement la forme du defaut F38-003 qu'on repare aujourd'hui.
+            [ "$PORTS_OK" -eq 1 ] || exit 1
           EOF

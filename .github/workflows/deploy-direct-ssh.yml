@@ -198,6 +198,34 @@ jobs:
           # décision produit : elle passe par l'overlay de prod, pas par cette
           # ligne.
           docker compose up -d --build --force-recreate --no-deps api app horizon scheduler
+
+          # 🔴 F40-005 (2026-08-20) — LE PIÈGE 18, RÉPARÉ POUR LA PRÉPRODUCTION
+          # LE 19/08 (`deploy-staging.yml:143`) ET JAMAIS RÉTROPORTÉ ICI.
+          #
+          # La ligne ci-dessus nomme ses services ET porte `--no-deps` : elle
+          # n'emporte donc PAS `postgres` ni `redis`. Conséquence jamais tirée
+          # jusqu'ici : aucun pas de ce déploiement ne pouvait appliquer une
+          # modification de `docker-compose*.yml` portant sur `postgres`,
+          # `redis` ou `reverb`. Ces conteneurs gardaient la configuration de
+          # leur création, indéfiniment.
+          #
+          # C'est l'écart mesuré le 2026-08-19 : `docker-compose.prod.yml`
+          # portait bien `ports: !override []`, la garde `config-prod` était
+          # VERTE sur la configuration fusionnée, et le conteneur publiait quand
+          # même 55432 devant 4 295 349 fiches. Le fichier avait raison, le
+          # conteneur avait tort, et le déploiement n'avait aucun moyen de les
+          # réconcilier. Les huit réglages de l'overlay n'étaient en place que
+          # parce que quelqu'un avait joué les `--force-recreate` à la main.
+          #
+          # ⚠️ SANS `--force-recreate`, délibérément. `up -d` ne recrée un
+          # conteneur que si sa configuration fusionnée a réellement changé :
+          # dans le cas courant c'est un no-op, et la base n'est pas coupée. Le
+          # jour où l'overlay change pour `postgres` ou `redis`, il coupe
+          # quelques secondes — et c'est précisément le but.
+          #
+          # ⚠️ `reverb` reste VOLONTAIREMENT absent, pour la raison exposée
+          # ci-dessus : l'ajouter ici le DÉMARRERAIT.
+          docker compose up -d --no-deps postgres redis
           echo "::endgroup::"
 
           if [ "$SKIP_MIGRATE" != "true" ]; then
@@ -251,6 +279,50 @@ jobs:
             esac
             echo "OK — $svc : $state ($status)"
           done
+          echo "::endgroup::"
+
+          # ── 🔴 F38-003 / F40-004 (2026-08-20) ────────────────────────────
+          # LA SEULE GARDE QUI MESURE LE RÉEL N'ÉTAIT BRANCHÉE NULLE PART ICI.
+          #
+          # `infra/scripts/verifier-ports-publies.sh` a été écrit le 19/08
+          # PRÉCISÉMENT pour la panne de PRODUCTION — et jusqu'à aujourd'hui son
+          # unique appel exécutable du dépôt était dans le workflow de
+          # PRÉPRODUCTION, code de retour avalé par un `|| echo`. La pile qui a
+          # été percée n'était mesurée par AUCUN job.
+          #
+          # Ce que ce script ajoute au job `config-prod` : `config-prod` valide
+          # le FICHIER fusionné, celui-ci lit `docker ps` — donc l'état qui
+          # tourne. Le 19/08 le premier était vert pendant que le second aurait
+          # rendu `exit 1`.
+          #
+          # Rejoué en lecture seule le 2026-08-20 sur le poste de développement,
+          # dont la pile `axion-crm-pro` publie encore 55432 (c'est le confort
+          # du poste, `docker-compose.yml` sans overlay) :
+          #   axion-crm-pro (défaut « 80 443 ») → exit 1, « ports publiés sur
+          #     internet alors qu'ils ne devraient pas : 55432 »
+          #   projet inexistant                 → exit 2, « la mesure n'a rien vu »
+          #   bookforge « 5433 6380 »           → exit 0
+          #   bookforge liste vide              → exit 1
+          # Il sait rougir, et sur exactement le défaut du 19/08.
+          #
+          # ⚠️ AUCUNE TOLÉRANCE ICI, et c'est le cœur du correctif. Un `|| echo`
+          # ou un `|| true` n'affaiblirait pas ce contrôle : il l'annulerait,
+          # `exit 2` compris — c'est-à-dire le refus du script de rassurer quand
+          # il n'a rien pu mesurer.
+          #
+          # ⚠️ Mesure de référence sur la production, 2026-08-19 :
+          # « OK : la pile ne publie que 80 443 » (exit 0). Ce contrôle ne doit
+          # donc pas rougir au prochain déploiement. S'il rougit, la production
+          # a dérivé depuis — le lire comme une vraie alerte, pas comme un
+          # défaut de la garde.
+          echo "::group::vérification post-déploiement — ports RÉELLEMENT publiés"
+          if ! bash "$PROJECT_PATH/infra/scripts/verifier-ports-publies.sh" axion-crm-pro; then
+            echo "::error::La pile de PRODUCTION publie un port qui ne devrait pas l'être,"
+            echo "::error::ou la mesure n'a rien pu voir. Voir la sortie ci-dessus."
+            echo "::error::C'est la faille du 2026-08-19 : Postgres et Redis (SANS mot de passe)"
+            echo "::error::joignables depuis internet devant 4 295 349 fiches."
+            exit 1
+          fi
           echo "::endgroup::"
 
           echo "::group::vérification post-déploiement — migrations appliquées"

@@ -14,9 +14,58 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # ══════════════════════════════════════════════════════════════════════════
+  # H44-003 (S1) — « la préproduction est déployée à chaque poussée sur main
+  # sans qu'un seul test soit joué ».
+  #
+  # CE QUI ÉTAIT LÀ AVANT CE JOB : `build-and-push` partait directement sur
+  # `push: branches: [main]`, puis `deploy-staging` derrière lui. Aucune
+  # dépendance vers la CI. Un commit qui casse Pest, PHPStan, Pint, le
+  # typecheck du frontend ou le build des workers atterrissait quand même sur
+  # `staging.axion-crm-pro.com` — et la préproduction, qui existe justement
+  # pour attraper ce qui échappe à la CI, servait alors du code que la CI
+  # n'avait même pas regardé.
+  #
+  # L'écart est d'autant plus voyant que la PRODUCTION, elle, est câblée :
+  # `deploy-direct-ssh.yml` porte ce même job `ci` et son `deploy` a
+  # `needs: [ci]` + `if: needs.ci.result == 'success'` depuis le 2026-08-13.
+  # Le correctif existait donc DÉJÀ dans le dépôt, à un fichier d'ici, et
+  # n'avait pas été porté sur le second site — c'est le défaut A-011,
+  # caractéristique de ce dépôt (25 cas recensés par l'audit 360).
+  #
+  # ⚠️ `needs` ne fonctionne qu'à l'intérieur d'un même workflow : `ci.yml` est
+  # donc appelé comme workflow RÉUTILISABLE (`workflow_call`, déjà déclaré en
+  # tête de `ci.yml`), exactement comme le fait la production. On n'invente
+  # rien, on étend l'existant.
+  #
+  # ⚠️ Les deux appels de `ci.yml` (production et préproduction) ne se
+  # concurrencent pas : le groupe de concurrence de `ci.yml` est
+  # `ci-${{ github.workflow }}-${{ github.ref }}`, et `github.workflow` vaut le
+  # nom du workflow APPELANT. « Deploy Staging » et « Deploy direct SSH
+  # Hetzner » tombent donc dans deux groupes distincts, et `cancel-in-progress`
+  # y vaut `false` (il n'est vrai que sur `pull_request`). Aucun des deux ne
+  # peut affamer l'autre.
+  # ══════════════════════════════════════════════════════════════════════════
+  ci:
+    name: CI (gate bloquant)
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      # `packages: read` et non `write` : un workflow appelé ne peut que
+      # RESTREINDRE les droits de l'appelant, et `ci.yml` n'a besoin que de
+      # LIRE GHCR (l'image Postgres du job backend). Même déclaration que dans
+      # `deploy-direct-ssh.yml`.
+      packages: read
+    secrets: inherit
+
   build-and-push:
     name: Build + push GHCR
     runs-on: ubuntu-24.04
+    # Rien ne part vers GHCR tant que la CI n'est pas verte. Construire puis
+    # jeter coûterait ~25 min de runner pour rien, et surtout une image
+    # `:staging` publiée est immédiatement tirable par le serveur.
+    needs: [ci]
+    if: ${{ needs.ci.result == 'success' }}
     strategy:
       matrix:
         include:
@@ -172,8 +221,26 @@ jobs:
           # publier sur internet du tout, ses deux publications sont sur 172.17.0.1.
           # Passer « 8081 8082 » ici ferait rougir le temoin positif de la garde sur
           # une pile parfaitement conforme.
+          # 🔴 F38-003 / F40-004 (2026-08-20) — c'était `|| echo "(contrôle des
+          # ports en échec — voir ci-dessus)"`, et ce `echo` ANNULAIT la garde.
+          #
+          # Il ne la dégradait pas : il l'annulait. Le `||` retombait sur une
+          # commande qui réussit toujours, donc le code de retour disparaissait
+          # — y compris le `exit 2` « aucun conteneur trouvé, la mesure n'a rien
+          # vu », qui est le témoin INTERNE du script, celui qui refuse de
+          # rassurer sur du vide. La variable `ok` évaluée dix lignes plus bas
+          # n'était pas touchée : ce contrôle ne pouvait faire rougir AUCUN
+          # déploiement, nulle part.
+          #
+          # `|| ok=0` alimente la variable que la ligne `[ "$ok" -eq 1 ]`
+          # évalue juste après. L'échec redevient un échec.
+          #
+          # Mesuré le 2026-08-20 sur ce poste, en lecture seule : le script sait
+          # rougir (`axion-crm-pro` par défaut → exit 1 sur 55432) et sait dire
+          # qu'il n'a rien mesuré (projet inexistant → exit 2). Le défaut
+          # n'était pas dans le script, il était dans cette ligne.
           bash "$CHEMIN/infra/scripts/verifier-ports-publies.sh" axion-crm-staging "" \
-            || echo "(contrôle des ports en échec — voir ci-dessus)"
+            || ok=0
 
           echo "::endgroup::"
           [ "$ok" -eq 1 ] || { echo "::error::Vérifications post-déploiement en échec."; exit 1; }

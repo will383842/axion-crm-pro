@@ -5,6 +5,7 @@ namespace App\Services\Legal;
 use App\Models\Company;
 use App\Services\Email\EmailConfidenceService;
 use App\Services\Email\MxEmailValidator;
+use App\Services\Http\SsrfGuard;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -239,6 +240,32 @@ class MentionsLegalesScraperService
     private function fetchAnyMentionsLegalesPage(string $website): ?string
     {
         $base = rtrim($website, '/');
+
+        // ── C19-001 — LA GARDE SSRF, ENFIN BRANCHÉE ─────────────────────────
+        // `$website` vient de `companies.website` (ou de `medias.website`) :
+        // c'est de la DONNÉE, écrite par l'import, par le DomainFinder ou à la
+        // main. Elle n'était jusqu'ici soumise à aucun contrôle, alors que
+        // `SsrfGuard` existait et était testé. Une seule ligne en base suffisait
+        // à faire lire 169.254.169.254, Redis en 127.0.0.1:6379 ou un service
+        // du réseau privé — et le corps était ensuite PARSÉ et PERSISTÉ en
+        // fiches contact, donc exfiltré vers l'IHM.
+        //
+        // Un contrôle sur `$base` couvre les 8 requêtes de la salve : elles
+        // partagent toutes le même hôte, seul le chemin change.
+        //
+        // Note : une URL sans schéma (`acme.fr`) est refusée ici comme
+        // `invalid_url`. Ce n'est pas une régression — Guzzle refusait déjà une
+        // URI relative, l'exception était avalée et la fonction rendait `null`.
+        $verdict = SsrfGuard::check($base . '/');
+        if (! $verdict['ok']) {
+            Log::warning('MentionsLegales: URL refusee par la garde SSRF', [
+                'website' => $website,
+                'motif' => $verdict['reason'],
+            ]);
+
+            return null;
+        }
+
         $paths = array_slice(self::PATHS, 0, 8);
 
         try {
@@ -249,6 +276,12 @@ class MentionsLegalesScraperService
                     $out[] = $pool->as((string) $i)
                         ->timeout(self::HTTP_TIMEOUT_SECONDS)
                         ->connectTimeout(self::HTTP_CONNECT_TIMEOUT)
+                        // C19-003 : le contrôle ci-dessus ne vaut que pour l'URL
+                        // de DÉPART. Sans ceci, un site public répondant
+                        // `302 Location: http://169.254.169.254/…` faisait
+                        // suivre le backend jusqu'aux métadonnées (5 sauts
+                        // autorisés par défaut). Chaque saut est re-vérifié.
+                        ->withOptions(SsrfGuard::redirectOptions())
                         ->withHeaders([
                             'User-Agent' => $ua,
                             'Accept' => 'text/html,application/xhtml+xml',
@@ -292,13 +325,35 @@ class MentionsLegalesScraperService
         return $accumulated !== '' ? $accumulated : null;
     }
 
+    /**
+     * ⚠️ SITE JUMEAU. Cette méthode n'a plus AUCUN appelant depuis le passage à
+     * la salve concurrente (`grep -n 'this->fetch(' ` → 0 résultat, mesuré le
+     * 2026-08-20) : c'est le chemin séquentiel historique, resté en place.
+     *
+     * Elle est durcie quand même, et c'est délibéré. Le défaut caractéristique
+     * de ce dépôt (patron A-011, 20+ cas) est précisément qu'un correctif est
+     * écrit à un endroit et pas au jumeau. Une méthode morte qu'on ressuscite
+     * six mois plus tard est le meilleur véhicule connu pour réintroduire un
+     * trou déjà bouché.
+     */
     private function fetch(string $url): ?string
     {
         $ua = self::USER_AGENTS[array_rand(self::USER_AGENTS)];
 
+        $verdict = SsrfGuard::check($url);
+        if (! $verdict['ok']) {
+            Log::warning('MentionsLegales: URL refusee par la garde SSRF', [
+                'url' => $url,
+                'motif' => $verdict['reason'],
+            ]);
+
+            return null;
+        }
+
         try {
             $response = Http::timeout(self::HTTP_TIMEOUT_SECONDS)
                 ->connectTimeout(self::HTTP_CONNECT_TIMEOUT)
+                ->withOptions(SsrfGuard::redirectOptions())
                 ->withHeaders([
                     'User-Agent' => $ua,
                     'Accept' => 'text/html,application/xhtml+xml',

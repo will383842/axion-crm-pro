@@ -5,6 +5,7 @@ namespace App\Services\Domain;
 use App\Models\Company;
 use App\Models\Media;
 use App\Services\Http\ProxiedHttpClient;
+use App\Services\Http\SsrfGuard;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -51,6 +52,23 @@ class DomainFinderService
         $signals = $company->signals ?? [];
         $existing = $signals['legal']['siteweb'] ?? null;
         if ($existing && is_string($existing) && filter_var($existing, FILTER_VALIDATE_URL)) {
+            // C19-001 — `signals.legal.siteweb` est de la DONNÉE : il est rempli
+            // par l'import AnnuaireEntreprises, donc par un tiers. `find()`
+            // n'émet aucune requête ici, mais ce qu'il rend est écrit dans
+            // `companies.website`, puis re-scrapé par MentionsLegales et par la
+            // passe 3. Laisser passer `http://169.254.169.254/` ici, c'est
+            // empoisonner toute la chaîne depuis un seul champ.
+            // `filter_var(…, FILTER_VALIDATE_URL)` ne protège de rien : il
+            // accepte `http://127.0.0.1/` sans broncher.
+            if (! SsrfGuard::check($existing)['ok']) {
+                Log::warning('DomainFinder: signals.legal.siteweb refuse par la garde SSRF', [
+                    'company_id' => $company->id,
+                    'siteweb' => $existing,
+                ]);
+
+                return null;
+            }
+
             return $this->canonicalize($existing);
         }
 
@@ -201,6 +219,18 @@ class DomainFinderService
                     $out[] = $pool->as($key)
                         ->timeout(self::GUESS_TIMEOUT)
                         ->connectTimeout(self::GUESS_CONNECT_TIMEOUT)
+                        // C19-003 — pas de contrôle SSRF à l'ENTRÉE ici, et c'est
+                        // un choix mesuré, pas un oubli : `candidateDomains()` ne
+                        // fabrique que des `slug.fr` / `slug.com` construits à
+                        // partir de la dénomination, jamais une IP ni un nom
+                        // interdit — un contrôle d'entrée y serait provablement
+                        // sans effet, et il coûterait ce que le commentaire
+                        // ci-dessus a déjà mesuré : le pré-filtre DNS séquentiel
+                        // DIVISAIT le débit par ~2,5. La redirection, elle, est
+                        // hors de notre contrôle : le domaine deviné peut
+                        // appartenir à n'importe qui et répondre
+                        // `302 → 169.254.169.254`. Elle, on la vérifie.
+                        ->withOptions(SsrfGuard::redirectOptions())
                         ->withHeaders(['User-Agent' => self::USER_AGENT])
                         ->get("https://{$it['domain']}/");
                 }
@@ -254,6 +284,26 @@ class DomainFinderService
             if ($url === '') {
                 continue; // pas de site à re-valider → on ne se prononce pas
             }
+
+            // ── C19-001 — LA GARDE SSRF, ENFIN BRANCHÉE ─────────────────────
+            // C'est ICI la surface la plus directe des trois : `companies.website`
+            // lu tel quel et appelé, sans aucun contrôle. La passe 3 tourne sur
+            // des millions de lignes, 400 requêtes par salve : une seule ligne
+            // empoisonnée en base suffisait à faire frapper la boucle locale ou
+            // le réseau privé de l'hôte. On refuse ET on marque « mort » — un
+            // site interne n'est pas un lead.
+            $verdict = SsrfGuard::check($url);
+            if (! $verdict['ok']) {
+                Log::warning('DomainFinder passe 3: website refuse par la garde SSRF', [
+                    'company_id' => $c->id,
+                    'website' => $url,
+                    'motif' => $verdict['reason'],
+                ]);
+                $result[$c->id] = false;
+
+                continue;
+            }
+
             $result[$c->id] = false;
             $reqs['k' . ($n++)] = ['id' => $c->id, 'url' => $url];
         }
@@ -268,6 +318,9 @@ class DomainFinderService
                     $out[] = $pool->as($key)
                         ->timeout(self::GUESS_TIMEOUT)
                         ->connectTimeout(self::GUESS_CONNECT_TIMEOUT)
+                        // C19-003 — l'URL de départ a été contrôlée plus haut ;
+                        // chaque saut de redirection l'est ici.
+                        ->withOptions(SsrfGuard::redirectOptions())
                         ->withHeaders(['User-Agent' => self::USER_AGENT])
                         ->get($it['url']);
                 }
@@ -297,6 +350,9 @@ class DomainFinderService
         try {
             $resp = Http::timeout(self::GUESS_TIMEOUT)
                 ->connectTimeout(self::GUESS_CONNECT_TIMEOUT)
+                // C19-003 — site jumeau séquentiel de `guessDomainsBatch()` :
+                // même domaine deviné, même redirection possible, même garde.
+                ->withOptions(SsrfGuard::redirectOptions())
                 ->withHeaders(['User-Agent' => self::USER_AGENT])
                 ->get("https://{$domain}/");
         } catch (\Throwable $e) {
@@ -381,6 +437,7 @@ class DomainFinderService
                     'X-Subscription-Token' => $apiKey,
                     'Accept'               => 'application/json',
                 ])
+                ->withOptions(SsrfGuard::redirectOptions())
                 ->retry(2, 500, function (\Throwable $e) {
                     return $e instanceof \Illuminate\Http\Client\ConnectionException;
                 })
@@ -408,6 +465,16 @@ class DomainFinderService
                 }
                 $host = parse_url($url, PHP_URL_HOST);
                 if (!$host || $this->isBlacklisted($host)) {
+                    continue;
+                }
+                // C19-001 — cette URL vient d'une API TIERCE (Brave). Elle est
+                // aussi « issue de la donnée » qu'un champ de la base : la
+                // liste noire ci-dessus filtre LinkedIn et les annuaires, elle
+                // ne dit rien de 169.254.169.254. La valeur rendue devient
+                // `companies.website`.
+                if (! SsrfGuard::check($url)['ok']) {
+                    Log::warning('DomainFinder Brave: resultat refuse par la garde SSRF', ['url' => $url]);
+
                     continue;
                 }
                 return $this->canonicalize($url);
@@ -452,7 +519,11 @@ class DomainFinderService
             if (preg_match('/<a[^>]+class="[^"]*company-website[^"]*"[^>]+href="([^"]+)"/i', $response->body(), $m)) {
                 $href = $m[1];
                 $host = parse_url($href, PHP_URL_HOST);
-                if ($host && !$this->isBlacklisted($host)) {
+                // C19-001 — `$href` est extrait du HTML d'un TIERS (Pages Jaunes,
+                // ou de ce que renvoie le proxy Webshare). C'est la définition
+                // même d'une URL issue de la donnée, et elle devient
+                // `companies.website`.
+                if ($host && !$this->isBlacklisted($host) && SsrfGuard::check($href)['ok']) {
                     return $this->canonicalize($href);
                 }
             }

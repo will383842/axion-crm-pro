@@ -360,9 +360,19 @@ Route::prefix('v1')->group(function () {
 Route::prefix('internal')->group(function () {
     Route::post('/scraper-result', [ScraperResultController::class, 'store'])->name('internal.scraper-result');
 
-    // Lot L2 — ingestion des événements du site axion-ia.com. Signée HMAC
-    // (même patron que scraper-result) et gatée par CRM_INGEST_ENABLED : tant
-    // que le drapeau est à OFF, l'endpoint répond 503 et n'écrit rien.
+    // Lot L2 — ingestion des événements du site axion-ia.com. Signée HMAC par
+    // la classe durcie `App\Support\HmacSignature` — secret vide = porte
+    // fermée, horodatage DANS le corps signé, comparaison à temps constant —
+    // et gatée par CRM_INGEST_ENABLED : tant que le drapeau est à OFF,
+    // l'endpoint répond 503 et n'écrit rien.
+    //
+    // 🔑 C'EST CE CANAL-CI LE PATRON À COPIER, pas `/scraper-result`.
+    // Constat P5-HMAC-001 : cette ligne disait « même patron que
+    // scraper-result », et c'était à l'envers. `/scraper-result` portait la
+    // vérification réimplémentée à la main qui a produit F37-001 (S0) : secret
+    // vide = porte OUVERTE, aucun horodatage. Elle est désormais corrigée et
+    // passe par la même classe — mais le prochain canal machine-à-machine se
+    // copie sur `HmacSignature`, pas sur un contrôleur.
     Route::post('/site-sync', [SiteSyncController::class, 'store'])
         ->middleware('throttle:internal')
         ->name('internal.site-sync');

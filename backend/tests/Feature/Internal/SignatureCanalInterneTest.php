@@ -9,9 +9,16 @@
  * `hash_hmac('sha256', $body, '')` — un condensé parfaitement valide, calculable
  * par n'importe qui, puisque la clé est la chaîne vide.
  *
- * Mesuré le 2026-08-19 : le secret est **vide sur le serveur de production**, et
- * le funnel d'ingestion y est **ouvert**. N'importe qui pouvait donc pousser des
- * enregistrements dans la base de production.
+ * Mesuré le 2026-08-19 : le secret est **vide dans les trois fichiers `.env` du
+ * dépôt** (`.env`, `.env.example`, `backend/.env`), et le funnel d'ingestion est
+ * activable par drapeau.
+ *
+ * ⚠️ RECTIFICATION du 2026-08-20. La première rédaction de cet en-tête écrivait
+ * « le secret est vide **sur le serveur de production** ». Ce n'était pas
+ * mesuré : l'agent qui l'a écrit n'avait aucun accès à la production. Ce qui est
+ * mesuré, c'est le dépôt. Le défaut ne dépend d'ailleurs pas de cette valeur —
+ * un contrôle fail-open est faux quelle que soit la configuration qu'il
+ * rencontre — mais une affirmation invérifiée n'a pas sa place dans une garde.
  *
  * La classe durcie `HmacSignature` — déjà en place sur SiteSync et Gdpr — porte
  * exactement la garde qui manquait (`if ($secret === '') return false`). Elle
@@ -24,18 +31,36 @@ use Tests\TestCase;
 uses(TestCase::class, RefreshDatabase::class);
 
 /**
- * Impose une valeur à une variable d'environnement, sur les TROIS canaux.
+ * Impose une valeur à une variable d'environnement, sur les TROIS canaux, ET
+ * dans la configuration résolue.
  *
  * `putenv()` seul ne suffit pas : le dépôt de variables de Laravel interroge
  * `ServerConstAdapter` ($_SERVER) en premier, et `variables_order = EGPCS` y
  * place les variables du conteneur. C'est le même piège que documente
  * `tests/bootstrap.php`.
+ *
+ * 🔴 Et la configuration ne suit PAS. Depuis P5-HMAC-002, le contrôleur lit
+ * `config('services.worker_internal.hmac_secret')` et non plus `env()` brut. Or
+ * `config/` est résolu UNE FOIS à l'amorçage de l'application : une variable
+ * d'environnement posée après ce moment-là n'y arrive jamais. Sans la ligne
+ * `config([...])` ci-dessous, ces gardes mesureraient la valeur d'amorçage —
+ * la chaîne vide — quel que soit le secret qu'elles croient poser, et les trois
+ * témoins positifs rendraient 503 en silence.
+ *
+ * C'est le même motif que celui que tout ce lot poursuit : une garde qui mesure
+ * autre chose que ce qu'elle annonce.
  */
 function imposerEnv(string $cle, ?string $valeur): void
 {
+    $clesConfig = ['WORKER_INTERNAL_HMAC_SECRET' => 'services.worker_internal.hmac_secret'];
+
     if ($valeur === null) {
         unset($_SERVER[$cle], $_ENV[$cle]);
         putenv($cle);
+
+        if (isset($clesConfig[$cle])) {
+            config([$clesConfig[$cle] => '']);
+        }
 
         return;
     }
@@ -43,6 +68,10 @@ function imposerEnv(string $cle, ?string $valeur): void
     $_SERVER[$cle] = $valeur;
     $_ENV[$cle] = $valeur;
     putenv("{$cle}={$valeur}");
+
+    if (isset($clesConfig[$cle])) {
+        config([$clesConfig[$cle] => $valeur]);
+    }
 }
 
 function appelerCanalInterne(string $corps, string $signature)

@@ -5,9 +5,25 @@ namespace App\Support;
 /**
  * Vérification de signature HMAC-SHA256 pour les canaux machine-à-machine.
  *
- * Reprend le patron déjà en place sur `POST /internal/scraper-result`
- * (`X-Worker-Signature`, `hash_equals`) — le seul canal machine authentifié du
- * CRM, l'API v1 étant en Sanctum cookie SPA — en y ajoutant l'horodatage signé.
+ * 🔑 CETTE CLASSE EST LE PATRON DE RÉFÉRENCE DU DÉPÔT. Tout nouveau canal
+ * machine-à-machine passe par elle. Ne recopiez pas la vérification à la main
+ * dans un contrôleur : c'est exactement ce qui a produit F37-001 (S0).
+ *
+ * ⚠️ RECTIFICATION — constat P5-HMAC-001. Ce docbloc affirmait « reprend le
+ * patron déjà en place sur `POST /internal/scraper-result` … le seul canal
+ * machine authentifié du CRM ». Les deux moitiés étaient trompeuses :
+ *
+ *   - `/internal/scraper-result` n'était pas un patron, c'était la version
+ *     FAIBLE — secret vide accepté (fail-open), aucun horodatage, donc
+ *     rejouable indéfiniment. C'est le défaut F37-001, corrigé depuis en le
+ *     faisant passer par cette classe-ci ;
+ *   - l'affirmation est devenue circulaire : la classe écrite pour corriger le
+ *     défaut se déclarait dérivée du code défectueux, lequel dérive maintenant
+ *     d'elle.
+ *
+ * Ce que la classe apporte par rapport à une vérification écrite à la main :
+ * secret vide = `return false` (porte fermée, jamais ouverte), tolérance du
+ * préfixe `sha256=`, comparaison à temps constant, et l'horodatage signé.
  *
  * Ce que l'horodatage apporte : sans lui, une requête légitime interceptée peut
  * être REJOUÉE indéfiniment (la signature reste valide pour toujours). Ici, le

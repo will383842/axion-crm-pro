@@ -119,6 +119,13 @@ beforeEach(function () {
  * `putenv()` seul ne suffit pas — le depot de variables de Laravel interroge
  * `ServerConstAdapter` ($_SERVER) en premier, et `variables_order = EGPCS` y
  * place les variables du conteneur. Meme piege que `tests/bootstrap.php`.
+ *
+ * 🔴 Et depuis P5-HMAC-002, le controleur lit
+ * `config('services.worker_internal.hmac_secret')` et non plus `env()` brut :
+ * `config/` etant resolu UNE FOIS a l'amorcage, une variable posee apres coup
+ * n'y arrive jamais. La ligne `config([...])` est donc indispensable, sinon ces
+ * tests reprendraient exactement le defaut qu'ils ferment : signer avec un
+ * secret que le controleur ne lit pas.
  */
 const SECRET_CANAL_INTERNE_TEST = 'secret-de-test-du-canal-interne-2026';
 
@@ -127,6 +134,7 @@ function poserSecretCanalInterne(): string
     $_SERVER['WORKER_INTERNAL_HMAC_SECRET'] = SECRET_CANAL_INTERNE_TEST;
     $_ENV['WORKER_INTERNAL_HMAC_SECRET'] = SECRET_CANAL_INTERNE_TEST;
     putenv('WORKER_INTERNAL_HMAC_SECRET=' . SECRET_CANAL_INTERNE_TEST);
+    config(['services.worker_internal.hmac_secret' => SECRET_CANAL_INTERNE_TEST]);
 
     return SECRET_CANAL_INTERNE_TEST;
 }

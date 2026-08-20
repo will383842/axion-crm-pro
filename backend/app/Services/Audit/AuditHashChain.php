@@ -43,16 +43,32 @@ class AuditHashChain
 
     public function __construct()
     {
-        $this->secret = (string) env('AUDIT_HASH_CHAIN_SECRET', '');
+        // Constat P5-HMAC-002, deuxieme cas. Ce secret etait lu par `env()`
+        // brut, sans entree `config/` -- voir `config/services.php`.
+        $this->secret = (string) config('services.audit.hash_chain_secret', '');
     }
 
     /**
      * Le secret est-il utilisable ? Sinon la chaine ne prouve RIEN.
      *
-     * 🔴 Mesure le 2026-08-19 (audit 360, B16-001, S0) : `AUDIT_HASH_CHAIN_SECRET`
-     * est la CHAINE VIDE en production, et le code livrait par defaut une valeur
-     * publique. Dans les deux cas, quiconque peut lire une ligne peut en forger
-     * une autre : la chaine cesse d'etre une preuve et devient une decoration.
+     * 🔴 Mesure le 2026-08-19 (audit 360, B16-001, S0) : le code livrait par
+     * defaut une valeur PUBLIQUE, ecrite en clair dans un depot public. Quiconque
+     * peut lire cette ligne peut forger n'importe quel maillon : la chaine cesse
+     * d'etre une preuve et devient une decoration.
+     *
+     * ⚠️ RECTIFICATION du 2026-08-20. Ce commentaire affirmait que le secret
+     * « est la CHAINE VIDE en production ». C'est FAUX, et c'etait invérifiable
+     * par celui qui l'a ecrit : il n'a aucun acces au serveur. L'agent 40, qui
+     * l'avait, a mesure DEUX FOIS sur l'application de production en marche,
+     * sans jamais afficher la valeur : longueur 64 caracteres, differente de la
+     * chaine vide ET de la valeur de developpement. Le constat B16-001 est donc
+     * REFUTE POUR LA PRODUCTION au registre.
+     *
+     * Le defaut que ce code corrige subsiste entierement : il ne porte pas sur
+     * la valeur du secret, mais sur CE QUE LA VERIFICATION REPOND quand le
+     * secret manque. Elle repondait `valid: true`. Un controle d'integrite qui
+     * affirme « tout va bien » sans pouvoir le savoir est pire qu'un controle
+     * absent : il endort celui qui le lit.
      */
     public function secretEstUtilisable(): bool
     {

@@ -35,13 +35,27 @@ class ScraperResultController extends ApiController
     public function store(Request $r): JsonResponse
     {
         $sig = $r->header('X-Worker-Signature');
-        $secret = (string) env('WORKER_INTERNAL_HMAC_SECRET', '');
+
+        // Constat P5-HMAC-002 : ce secret etait le SEUL du depot lu par `env()`
+        // brut, sans entree `config/`. Il passe par la configuration comme tous
+        // les autres -- voir le commentaire de `config/services.php`.
+        $secret = (string) config('services.worker_internal.hmac_secret', '');
         $body = $r->getContent();
 
         // -- SECRET ABSENT : ON REFUSE. On ne verifie pas « quand meme ». -----
         //
-        // Ce controle etait FAIL-OPEN, et le secret est VIDE sur le serveur de
-        // production. `hash_hmac('sha256', $body, '')` produit un condensé
+        // Ce controle etait FAIL-OPEN, et le secret est VIDE dans les trois
+        // fichiers `.env` du depot (`.env`, `.env.example`, `backend/.env`).
+        //
+        // ⚠️ RECTIFICATION du 2026-08-20. La premiere redaction de ce
+        // commentaire ecrivait « le secret est VIDE sur le serveur de
+        // production ». Ce n'etait pas mesure : l'agent qui l'a ecrit n'a aucun
+        // acces a la production, et l'a dit lui-meme. Ce qui est mesure, c'est
+        // le depot. La valeur reelle sur le serveur est inconnue de ce lot.
+        // Le defaut, lui, ne depend pas de cette valeur : un controle fail-open
+        // est faux quelle que soit la configuration qu'il rencontre.
+        //
+        // `hash_hmac('sha256', $body, '')` produit un condensé
         // parfaitement valide - avec une cle que TOUT LE MONDE connait, puisque
         // c'est la chaine vide. N'importe qui pouvait donc forger
         // `X-Worker-Signature` et pousser des enregistrements dans la base de
@@ -70,6 +84,13 @@ class ScraperResultController extends ApiController
         // Le format signe reste le CORPS BRUT, sans horodatage : y ajouter la
         // fenetre temporelle casserait les workers Node en place. Le rejeu tardif
         // reste donc ouvert, et c'est note comme tel.
+        //
+        // ⚠️ Ce n'est plus seulement une note : c'est le constat P5-HMAC-003
+        // (S2) au registre de l'audit 360, avec sa garde
+        // (`tests/Feature/Internal/PatronHmacDeReferenceTest.php`). Une limite
+        // ecrite en commentaire disparait avec la PR ; un constat, non.
+        // `/internal/site-sync` est protege du rejeu, celui-ci ne l'est pas :
+        // l'ecart entre les deux canaux est reel et il est suivi.
         if (! HmacSignature::verify($secret, $body, $sig)) {
             Log::warning('Internal scraper result rejected (bad HMAC)', ['ip' => $r->ip()]);
 

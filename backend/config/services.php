@@ -128,4 +128,48 @@ return [
         'journalists_enabled' => filter_var(env('MEDIA_JOURNALISTS_ENABLED', false), FILTER_VALIDATE_BOOL),
     ],
 
+    /* ---------------------------------------------------------------------
+     | Canal interne workers -> CRM  (POST /api/internal/scraper-result)
+     | ---------------------------------------------------------------------
+     | Constat P5-HMAC-002. Ce secret etait le SEUL du depot lu par `env()`
+     | brut, sans aucune entree ici. Il fonctionnait par la grace d'un detail
+     | de `docker-compose` : `env_file:` injecte la variable dans
+     | l'environnement du PROCESSUS, si bien que `env()` la rend encore sous
+     | `config:cache` (mesure le 2026-08-19 : variables_order = EGPCS, la
+     | variable est dans $_SERVER et dans $_ENV).
+     |
+     | Ce n'est pas une garantie, c'est une coincidence de configuration. Le
+     | jour ou la production passe en `environment:` explicite ou en secrets
+     | Docker, `env()` tombe a vide. La porte se ferme alors proprement (503,
+     | depuis F37-001) au lieu de s'ouvrir -- mais le canal s'arrete, et on
+     | veut que la lecture du secret ne depende plus de ce detail.
+     |
+     | La signature du canal reste le CORPS BRUT, sans horodatage : le rejeu
+     | tardif est ouvert et suivi au registre sous P5-HMAC-003.
+     | --------------------------------------------------------------------- */
+    'worker_internal' => [
+        'hmac_secret' => (string) env('WORKER_INTERNAL_HMAC_SECRET', ''),
+    ],
+
+    /* ---------------------------------------------------------------------
+     | Chaine de hachage du journal d'audit
+     | ---------------------------------------------------------------------
+     | Meme motif que `worker_internal` ci-dessus, et deuxieme cas mesure.
+     |
+     | ⚠️ La contre-verification adversariale (§5 de 08_PASSE-2-ADVERSARIALE)
+     | ecrit que WORKER_INTERNAL_HMAC_SECRET est « le SEUL secret du depot sans
+     | entree config/ ». Remesure le 2026-08-20 : il y en avait DEUX.
+     | `AuditHashChain::__construct()` lisait `env('AUDIT_HASH_CHAIN_SECRET')`
+     | directement, sans entree ici non plus.
+     |
+     | Il n'y a PAS de valeur par defaut, et c'est le correctif B16-001 : une
+     | chaine hachee sans secret reste parfaitement coherente avec elle-meme,
+     | si bien que la verification repondait `valid: true` sur un journal que
+     | n'importe qui pouvait reecrire. Le service refuse desormais de se
+     | declarer valide sans secret utilisable, et dit pourquoi.
+     | --------------------------------------------------------------------- */
+    'audit' => [
+        'hash_chain_secret' => (string) env('AUDIT_HASH_CHAIN_SECRET', ''),
+    ],
+
 ];

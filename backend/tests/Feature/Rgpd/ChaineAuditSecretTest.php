@@ -25,18 +25,29 @@ use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
+/**
+ * ⚠️ Depuis P5-HMAC-002, `AuditHashChain` lit
+ * `config('services.audit.hash_chain_secret')` et non plus `env()` brut. Or
+ * `config/` est resolu UNE FOIS a l'amorcage : une variable d'environnement
+ * posee apres coup n'y arrive jamais. Sans la ligne `config([...])`, ces gardes
+ * mesureraient la valeur d'amorcage quel que soit le secret qu'elles croient
+ * poser -- c'est-a-dire qu'elles mesureraient autre chose que ce qu'elles
+ * annoncent, le defaut meme que tout ce lot poursuit.
+ */
 function imposerSecretChaine(?string $valeur): void
 {
     $cle = 'AUDIT_HASH_CHAIN_SECRET';
     if ($valeur === null) {
         unset($_SERVER[$cle], $_ENV[$cle]);
         putenv($cle);
+        config(['services.audit.hash_chain_secret' => '']);
 
         return;
     }
     $_SERVER[$cle] = $valeur;
     $_ENV[$cle] = $valeur;
     putenv("{$cle}={$valeur}");
+    config(['services.audit.hash_chain_secret' => $valeur]);
 }
 
 /** Un compte admin, seul role autorise a lire l'etat de la chaine. */

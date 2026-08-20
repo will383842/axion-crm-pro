@@ -160,7 +160,25 @@ test('drapeau à OFF : /internal/scraper-result garde son comportement historiqu
         'HTTP_X_WORKER_SIGNATURE' => hash_hmac('sha256', $body, $secret),
     ], $body);
 
-    $response->assertOk()->assertJsonPath('ingested', true);
+    // 🔴 C18-001 (S1) — CETTE ASSERTION CERTIFIAIT LE DEFAUT, ET LES TROIS
+    // LIGNES SUIVANTES LE PROUVAIENT DANS LE MEME SOUFFLE.
+    //
+    // Elle exigeait `ingested: true`. Trois lignes plus bas, le MEME test verifie
+    // que `companies`, `scraper_runs` et `activities` sont a ZERO. Le test disait
+    // donc, en meme temps : « l'API confirme l'ingestion » et « rien n'a ete
+    // ingere ». C'est la lecon IndexNow — un job vert qui ne relaie rien — gravee
+    // dans une garde, ce qui la rendait inattaquable.
+    //
+    // Ce que le drapeau OFF preserve, c'est l'INERTIE DE LA BASE, et elle est
+    // toujours verifiee ci-dessous, a l'identique. Ce n'est pas le mensonge de la
+    // reponse : celui-la n'a jamais ete un choix de conception.
+    // Correctif : `ScraperResultController::store()`, branche funnel ferme.
+    // Garde dediee : `tests/Feature/Internal/ReponseVeridiqueIngestionTest.php`.
+    // Rouge mesure le 2026-08-20 avant correctif :
+    //   « Failed asserting that false is identical to true » a cette ligne meme.
+    $response->assertOk()
+        ->assertJsonPath('ingested', false)
+        ->assertJsonPath('raison', 'funnel_ferme');
 
     expect(DB::table('companies')->count())->toBe(0)
         ->and(DB::table('scraper_runs')->count())->toBe(0)

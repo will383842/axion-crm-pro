@@ -136,9 +136,20 @@ return [
     /*
     | L3 — funnel d'ingestion de la COLLECTE (schéma pivot ScrapedRecord).
     |
-    | `enabled` : à false (défaut), `POST /internal/scraper-result` garde son
-    | comportement HISTORIQUE (log-only, 200 `ingested: true`) — le funnel est
-    | livré mais inerte, fusion sans risque. À true, le même endpoint valide le
+    | `enabled` : à false (défaut), `POST /internal/scraper-result` n'écrit RIEN
+    | — le message est journalisé, et la réponse le DIT depuis le 2026-08-20 :
+    | `200 {"ingested": false, "raison": "funnel_ferme"}`. Le funnel est livré
+    | mais inerte, fusion sans risque.
+    |
+    | 🔴 CE PARAGRAPHE ÉCRIVAIT « log-only, 200 `ingested: true` », ET C'ÉTAIT LE
+    | DÉFAUT LUI-MÊME, DOCUMENTÉ. Constat C18-001 (S1) : l'endpoint confirmait
+    | une ingestion qui n'avait pas lieu. La porte fermée est un choix de
+    | conception ; l'accusé de réception mensonger n'en était pas un — c'est la
+    | leçon IndexNow que ce dépôt cite par ailleurs. Seule la réponse a changé,
+    | pas l'inertie. Gardes : `tests/Feature/Internal/ReponseVeridiqueIngestionTest.php`
+    | et `workers/tests/reponse-ingestion-veridique.test.ts`.
+    |
+    | À true, le même endpoint valide le
     | pivot, ingère (registre → idempotence → dédup → backfill-only → tags →
     | timeline) et répond avec l'outcome. Les autres portes (waterfall PHP,
     | `scraping:ingest-file`) ne dépendent PAS de ce drapeau : elles n'ont pas

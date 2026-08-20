@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Auth\MagicLinkController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
 use App\Http\Controllers\Api\Auth\TwoFactorController;
 use App\Http\Controllers\Api\CompaniesController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\CompanyTagsBulkController;
 use App\Http\Controllers\Api\ContactsController;
 use App\Http\Controllers\Api\CoverageController;
@@ -83,26 +84,27 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', 'workspace', 'first-login'])->group(function () {
 
         // Dashboard (stub MVP — endpoints détaillés Sprint 19)
-        Route::get('/dashboard/stats', function () {
-            return response()->json([
-                'companies_total' => 0,
-                'companies_enriched_24h' => 0,
-                'contacts_qualified' => 0,
-                'scraper_runs_24h' => 0,
-                'llm_cost_eur_month' => 0,
-                'quality_distribution' => ['complete' => 0, 'partielle' => 0, 'basique' => 0],
-                'size_distribution' => [
-                    'artisan' => 0, 'tpe' => 0, 'pme' => 0, 'eti' => 0, 'grande_entreprise' => 0,
-                ],
-            ]);
-        });
-        Route::get('/search', function (Request $request) {
-            return response()->json([
-                'companies' => [],
-                'contacts' => [],
-                'tags' => [],
-            ]);
-        });
+        // 🔴 CES DEUX ROUTES ETAIENT DES CLOSURES A ZEROS EN DUR.
+        //
+        // `/dashboard/stats` rendait des zeros, et `DashboardPage.tsx` teste
+        // `companies_total === 0` pour afficher son etat vide : l'ecran
+        // d'accueil du CRM annoncait donc en permanence « Lance ton premier
+        // scrape — aucune entreprise collectee », sur une base de 4 295 349
+        // fiches. Constat P6-UI-001 (S0).
+        //
+        // `/search` rendait trois tableaux vides : la palette ⌘K, presente sur
+        // TOUS les ecrans et vantee par la visite guidee, ne pouvait rien
+        // trouver. Et le test e2e MOCKE l'endpoint, donc il restait vert.
+        // Constat P6-UI-002 (S0).
+        //
+        // Les deux ont ete trouves par la passe P6 « regard neuf », apres avoir
+        // survecu a un audit de 46 agents -- parce que le mandat exigeait
+        // d'ouvrir chaque ecran a la main et que la console ne tourne pas.
+        Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
+        // `/search` est declaree PLUS BAS, sur `GlobalSearchController`. Elle
+        // l'etait deja : la closure supprimee ici la MASQUAIT, la premiere route
+        // qui correspond l'emportant. Deux implementations vides du meme point
+        // d'entree, dont une invisible -- on n'en garde qu'une, la vraie.
 
         // Workspace + users
         Route::get('/workspace', [WorkspaceController::class, 'show']);

@@ -52,6 +52,29 @@ return new class extends Migration
         SQL);
 
         // RLS — chaque workspace ne voit que ses propres logs
+        //
+        // 🔴 A07-002 (constaté le 2026-08-20) — LA POLICY CI-DESSOUS EST UN REPLI
+        // PERMISSIF, et elle a SURVÉCU au durcissement du lot L0. Sans contexte
+        // workspace, `NULLIF(...)` rend NULL, le `COALESCE` retombe donc sur
+        // `workspace_id::TEXT`, et le prédicat devient
+        // `workspace_id::TEXT = workspace_id::TEXT` — TOUJOURS VRAI.
+        // Mesuré : 2 lignes appartenant à 2 espaces distincts, visibles au lieu de 0.
+        //
+        // `2026_08_14_000001_harden_workspace_isolation.php` fait pourtant bien un
+        // `DROP POLICY IF EXISTS <table>_workspace_isolation`. Mais le nom ci-dessous
+        // est RACCOURCI (`email_verif_…` et non `email_verification_logs_…`) : le
+        // DROP l'a manquée, en silence, et la policy stricte s'est ajoutée à côté.
+        //
+        // Elle est supprimée par la migration
+        // `2026_08_20_100000_supprimer_policy_permissive_survivante_email_verification_logs.php`.
+        // On ne réécrit PAS l'histoire ici : cette migration est déjà jouée partout,
+        // la corriger sur place ne changerait rien aux bases existantes et ferait
+        // diverger le source de ce qui a réellement été appliqué.
+        //
+        // ⚠️ Toute NOUVELLE policy d'isolation doit s'appeler
+        // `<table>_workspace_isolation`, faute de quoi elle échappera au
+        // remplacement du durcissement. Garde :
+        // tests/Feature/Rgpd/CloisonnementJournauxVerificationEmailTest.php
         DB::statement('ALTER TABLE email_verification_logs ENABLE ROW LEVEL SECURITY');
         DB::statement(<<<'SQL'
             CREATE POLICY email_verif_workspace_isolation

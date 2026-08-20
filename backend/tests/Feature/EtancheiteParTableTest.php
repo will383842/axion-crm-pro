@@ -20,6 +20,10 @@ uses(TestCase::class, RefreshDatabase::class);
  * produit sur `email_verification_logs` (cf. plus bas). La structure ne
  * remplace pas la mesure.
  *
+ * (Mise à jour 2026-08-20 : la fuite de `email_verification_logs` est FERMÉE —
+ * cf. section 3. L'exemple reste cité parce qu'il reste la meilleure
+ * démonstration de ce qu'une garde structurelle seule ne voit pas.)
+ *
  * ── CE QUE CE FICHIER MESURE, EXACTEMENT ────────────────────────────────────
  *
  * La BARRIÈRE SQL, et elle seule : toutes les lectures passent par la connexion
@@ -376,57 +380,90 @@ test('aucune policy ne rouvre un repli permissif — y compris sous la forme COA
         "Policies conservant un repli « pas de contexte ⇒ je vois tout » : \n  - " . implode("\n  - ", $inconnues),
     );
 
-    // TÉMOIN — le détecteur SAIT voir la forme COALESCE : il trouve bel et bien
-    // la policy fautive de `email_verification_logs`. Sans ce contrôle, un
-    // détecteur devenu aveugle (motif mal écrit, colonne renommée) rendrait la
-    // liste vide et le test vert, exactement comme l'ancien.
-    expect(in_array('email_verification_logs.email_verif_workspace_isolation', $connues, true))->toBeTrue(
-        'Le détecteur ne trouve plus la policy permissive connue de email_verification_logs. '
-        . 'Soit elle a été CORRIGÉE — auquel cas retirer la table de EtancheiteWorkspace::DEFAUTS_CONNUS '
-        . 'et supprimer le test « DÉFAUT CONNU » —, soit le détecteur est devenu AVEUGLE, '
-        . "et c'est exactement le défaut qu'il remplace.",
-    );
     expect($noms)->toHaveCount(count($connues) + count($inconnues));
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. DÉFAUT CONNU, MESURÉ, ÉPINGLÉ
+// 3. LE DÉFAUT ÉPINGLÉ A ÉTÉ CORRIGÉ — ce que sa disparition oblige à prouver
 //
-// Cette section n'est pas une exemption : c'est une dette datée dont la
-// correction FAIT ROUGIR le test. On ne peut pas la corriger sans venir ici.
+// 🔴 Ce qui vivait ici : « DÉFAUT CONNU — email_verification_logs fuit SANS
+// contexte ». Sa policy d'origine `email_verif_workspace_isolation`
+// (2026_05_19_000001) portait un repli permissif écrit en COALESCE et, son nom
+// étant RACCOURCI, avait échappé au `DROP POLICY IF EXISTS
+// <table>_workspace_isolation` du durcissement L0. Mesuré le 2026-08-18 :
+// 2 lignes de 2 espaces visibles sans contexte, au lieu de 0.
+//
+// Corrigé le 2026-08-20 (constat A07-002) par la migration
+// `2026_08_20_100000_supprimer_policy_permissive_survivante_email_verification_logs.php`.
+// Le mécanisme a fait ce pour quoi il était écrit : les DEUX tests épinglés ici
+// ont rougi le jour de la correction, et c'est ce rougissement qui a forcé
+// cette mise à jour. `EtancheiteWorkspace::DEFAUTS_CONNUS` est désormais VIDE,
+// et la table est passée dans le contrôle GÉNÉRAL, au-dessus.
+//
+// La preuve détaillée de la fermeture vit dans
+// `tests/Feature/Rgpd/CloisonnementJournauxVerificationEmailTest.php`.
+//
+// ⚠️ Le TÉMOIN du détecteur ci-dessus s'appuyait sur ce défaut réel. Il ne
+// pouvait pas simplement disparaître avec lui : sans témoin, un détecteur
+// devenu aveugle rendrait une liste vide et le test resterait vert. Il est
+// remplacé, juste en dessous, par un témoin FABRIQUÉ — même démonstration, sur
+// une table jetable, et qui ne dépend plus de la survie d'un trou en production.
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('DÉFAUT CONNU — email_verification_logs fuit SANS contexte (à corriger par une migration)', function () {
-    expect(EtancheiteWorkspace::DEFAUTS_CONNUS)->toHaveKey('email_verification_logs');
+test('TÉMOIN — le détecteur de repli permissif SAIT voir la forme COALESCE', function () {
+    // Le détecteur d'origine (RlsTest) cherchait `qual LIKE '%IS NULL%'` et ne
+    // voyait donc pas la forme COALESCE — c'est précisément ce qui a laissé
+    // passer `email_verification_logs` pendant trois mois. On fabrique ici les
+    // DEUX formes de repli sur une table jetable, et on exige que la requête du
+    // test ci-dessus les remonte toutes les deux.
+    $owner = etancheiteOwner();
 
-    [$wsA, $wsB, $referentiels] = etancheiteSemerDeuxUnivers();
+    $owner->statement('DROP TABLE IF EXISTS zz_temoin_repli');
+    $owner->statement('CREATE TABLE zz_temoin_repli (workspace_id uuid NOT NULL)');
 
     try {
-        etancheitePoserContexte(null);
-        $vues = etancheiteApp()->table('email_verification_logs')->count();
+        $owner->statement('ALTER TABLE zz_temoin_repli ENABLE ROW LEVEL SECURITY');
 
-        expect($vues)->toBeGreaterThan(
-            0,
-            "LE DÉFAUT EST CORRIGÉ — et c'est une bonne nouvelle. Retirer maintenant "
-            . "« email_verification_logs » de EtancheiteWorkspace::DEFAUTS_CONNUS pour qu'elle "
-            . 'rentre dans le contrôle général, puis supprimer ce test.',
+        // Forme 1 — le repli écrit en COALESCE (celui qui avait échappé).
+        $owner->statement(
+            "CREATE POLICY zz_temoin_repli_coalesce ON zz_temoin_repli FOR ALL
+             USING (workspace_id::TEXT = COALESCE(
+                 NULLIF(current_setting('app.current_workspace_id', true), ''),
+                 workspace_id::TEXT))",
         );
 
-        // La cause, nommée : la policy permissive héritée de 2026_05_19_000001 a
-        // survécu au durcissement parce que son nom est RACCOURCI
-        // (`email_verif_…` et non `email_verification_logs_…`), et que la
-        // migration ne fait un DROP que sur le nom canonique.
-        $survivante = etancheiteOwner()->selectOne(
-            "SELECT policyname, qual FROM pg_policies
+        // Forme 2 — le repli écrit en IS NULL (celui que l'ancien détecteur voyait).
+        $owner->statement(
+            "CREATE POLICY zz_temoin_repli_isnull ON zz_temoin_repli FOR ALL
+             USING (NULLIF(current_setting('app.current_workspace_id', true), '') IS NULL
+                    OR workspace_id::TEXT = NULLIF(current_setting('app.current_workspace_id', true), ''))",
+        );
+
+        // Forme 3, TÉMOIN INVERSE — une policy STRICTE ne doit PAS être signalée.
+        // Sans elle, un détecteur qui remonterait toute policy citant
+        // `current_setting` passerait ce témoin en n'ayant rien discriminé.
+        $owner->statement(
+            "CREATE POLICY zz_temoin_repli_stricte ON zz_temoin_repli FOR ALL
+             USING (workspace_id::TEXT = NULLIF(current_setting('app.current_workspace_id', true), ''))",
+        );
+
+        $vues = $owner->select(
+            "SELECT policyname
+               FROM pg_policies
               WHERE schemaname = current_schema()
-                AND tablename = 'email_verification_logs'
-                AND policyname = 'email_verif_workspace_isolation'",
+                AND tablename = 'zz_temoin_repli'
+                AND qual LIKE '%current_setting%'
+                AND (qual LIKE '%IS NULL%' OR qual LIKE '%COALESCE%')
+              ORDER BY policyname",
         );
 
-        expect($survivante)->not->toBeNull()
-            ->and($survivante->qual)->toContain('COALESCE');
+        $noms = array_map(static fn (object $r): string => $r->policyname, $vues);
+
+        $this->assertContains('zz_temoin_repli_coalesce', $noms, 'Le detecteur est AVEUGLE a la forme COALESCE — le defaut A07-002 repasserait inapercu.');
+        $this->assertContains('zz_temoin_repli_isnull', $noms, 'Le detecteur est AVEUGLE a la forme IS NULL.');
+        $this->assertNotContains('zz_temoin_repli_stricte', $noms, 'Le detecteur signale une policy STRICTE : il ne discrimine rien.');
     } finally {
-        SemeurTablesScopees::nettoyer(etancheiteOwner(), [$wsA, $wsB], $referentiels);
+        $owner->statement('DROP TABLE IF EXISTS zz_temoin_repli');
     }
 });
 

@@ -236,8 +236,13 @@ test('le rôle applicatif n’est ni superutilisateur ni BYPASSRLS ni propriéta
 //     `COALESCE(NULLIF(current_setting(...), ''), workspace_id::text)`, qui a
 //     exactement le même effet. C'est cette policy-là qui a survécu au
 //     durcissement sur `email_verification_logs` (nom raccourci → le
-//     `DROP POLICY` de la migration l'a manquée), et cette table rend
-//     aujourd'hui TOUTES ses lignes sans contexte. Mesuré, pas déduit.
+//     `DROP POLICY` de la migration l'a manquée), et cette table rendait
+//     TOUTES ses lignes sans contexte. Mesuré, pas déduit.
+//     ✅ FERMÉ le 2026-08-20 (constat A07-002) par la migration
+//     `2026_08_20_100000_supprimer_policy_permissive_survivante_email_verification_logs.php`.
+//     Preuve : `tests/Feature/Rgpd/CloisonnementJournauxVerificationEmailTest.php`.
+//     Ce paragraphe reste écrit au passé plutôt que supprimé : c'est le seul
+//     endroit qui explique POURQUOI le détecteur a changé de forme.
 //
 // Ce fichier garde ce qu'il prouve le mieux : la barrière en situation sur
 // `companies` et `tags`, la configuration du rôle, la ceinture applicative et

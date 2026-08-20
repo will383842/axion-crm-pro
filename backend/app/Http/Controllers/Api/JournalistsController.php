@@ -58,9 +58,33 @@ class JournalistsController extends ApiController
         }
     }
 
+    /**
+     * 🔴 CONSTAT P6-API-001 (S0). Cette requete de base ne portait AUCUN filtre
+     * d'espace. L'unique `where('workspace_id')` du fichier vivait dans
+     * `export()` : la LISTE fuyait, l'export ne fuyait pas. Un compte en
+     * lecture seule lisait donc nom, adresse et telephone des journalistes de
+     * tous les clients.
+     *
+     * `Journalist` ne porte pas le trait `BelongsToWorkspace`, le scope global
+     * est inerte par defaut (`CRM_STRICT_WORKSPACE_SCOPE=false`), et la RLS est
+     * contournee par le role de connexion. Le filtre est donc pose ICI, a la
+     * source de toutes les lectures du controleur.
+     *
+     * Sans contexte d'espace : on ne rend RIEN.
+     */
     private function buildFilteredQuery(): QueryBuilder
     {
-        return QueryBuilder::for(Journalist::query()->whereNull('deleted_at'))
+        $espaceCourant = $this->espaceCourantOuNull();
+
+        return QueryBuilder::for(
+            Journalist::query()
+                ->whereNull('deleted_at')
+                ->when(
+                    $espaceCourant !== null,
+                    fn ($q) => $q->where('workspace_id', $espaceCourant),
+                    fn ($q) => $q->whereRaw('1 = 0'),
+                )
+        )
             ->allowedFilters(...[
                 AllowedFilter::exact('media_id'),
                 AllowedFilter::exact('beat'),

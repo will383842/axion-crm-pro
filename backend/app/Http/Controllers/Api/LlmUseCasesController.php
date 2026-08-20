@@ -22,7 +22,33 @@ class LlmUseCasesController extends ApiController
         }
 
         try {
-            return $this->ok(['data' => LlmUseCase::query()->orderBy('slug')->limit(50)->get()]);
+        // 🔴 CONSTATS P6-API-001 / P6-API-002 (S0). Cette liste ne portait AUCUN
+        // filtre d'espace de travail : elle rendait les lignes de TOUS les
+        // clients a tout compte authentifie.
+        //
+        // Le correctif de cloisonnement du 2026-08-20 avait porte
+        // `refuserHorsEspace()` sur 36 methodes UNITAIRES (show/update/destroy)
+        // et sur AUCUNE liste -- parce que son controle de completude enumerait
+        // les methodes qui recoivent un modele par RESOLUTION DE ROUTE, et
+        // qu'un `index()` n'en recoit aucun. Les listes lui etaient
+        // structurellement invisibles, et il etait vert.
+        //
+        // Une fuite par la LISTE est pire qu'une fuite par la fiche : la fiche
+        // demande de deviner un identifiant, la liste les donne tous.
+        //
+        // Sans contexte d'espace, on ne rend RIEN : le doute se tranche en
+        // faveur du silence. La garde est
+        // `tests/Feature/Rgpd/CloisonnementDesListesTest.php`, et elle mesure
+        // le CORPS de la reponse -- pas la presence d'un appel de methode.
+        $espaceCourant = $this->espaceCourantOuNull();
+
+            return $this->ok(['data' => LlmUseCase::query()
+                ->when(
+                    $espaceCourant !== null,
+                    fn ($q) => $q->where('workspace_id', $espaceCourant),
+                    fn ($q) => $q->whereRaw('1 = 0'),
+                )
+                ->orderBy('slug')->limit(50)->get()]);
         } catch (\Throwable $e) {
             Log::error('llm.use-cases.index failed', ['exception' => $e->getMessage()]);
             report($e);

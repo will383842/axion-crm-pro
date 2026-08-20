@@ -34,8 +34,26 @@ class RgpdRequestsController extends ApiController
             return $this->ok(['data' => [], 'meta' => ['total' => 0]]);
         }
 
+        // 🔴 CONSTAT P6-API-002 (S0). Cette liste rendait les demandes RGPD de
+        // TOUS les espaces, `subject_email` EN CLAIR, a tout compte
+        // authentifie. Le controleur voisin `AuditLogsController` porte, ecrit
+        // noir sur blanc, le raisonnement qui manquait ici -- « une permission
+        // separe les ROLES, jamais les CLIENTS » -- et cette route-ci n'avait
+        // recu que la permission.
+        //
+        // Une fuite par la LISTE est pire qu'une fuite par la fiche : la fiche
+        // demande de deviner un identifiant, la liste les donne tous.
+        $espaceCourant = $this->espaceCourantOuNull();
+
         try {
             $rows = RgpdRequest::query()
+                ->when(
+                    $espaceCourant !== null,
+                    fn ($q) => $q->where('workspace_id', $espaceCourant),
+                    // Sans contexte d'espace, on ne rend RIEN : sur des donnees
+                    // nominatives, le doute se tranche en faveur du silence.
+                    fn ($q) => $q->whereRaw('1 = 0'),
+                )
                 ->when($r->query('status'), fn ($q, $s) => $q->where('status', $s))
                 ->orderByDesc('requested_at')
                 ->paginate(25);

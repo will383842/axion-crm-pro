@@ -168,7 +168,7 @@ export function TwoFactorPage() {
           >
             {copie ? 'Copiés' : 'Copier les codes'}
           </Button>
-          <Button type="button" variant="primary" full onClick={() => navigate({ to: '/' })}>
+          <Button type="button" variant="primary" full onClick={() => void navigate({ to: '/' })}>
             J&apos;ai noté mes codes, continuer
           </Button>
         </div>
@@ -195,13 +195,13 @@ export function TwoFactorPage() {
               full
               loading={loading}
               iconLeft={<Shield className="h-3.5 w-3.5" />}
-              onClick={demarrerEnrolement}
+              onClick={() => void demarrerEnrolement()}
             >
               Commencer
             </Button>
           </div>
         ) : (
-          <form onSubmit={confirmerEnrolement} className="space-y-4">
+          <form onSubmit={(e) => void confirmerEnrolement(e)} className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm text-slate-600 dark:text-slate-300">
                 <span className="font-medium">1.</span> Dans votre application, ajoutez un compte par
@@ -254,7 +254,7 @@ export function TwoFactorPage() {
       title={t('auth.twoFactor.title')}
       description="Saisis le code à 6 chiffres généré par ton authenticator."
     >
-      <form onSubmit={verifierCode} className="space-y-4">
+      <form onSubmit={(e) => void verifierCode(e)} className="space-y-4">
         {champCode}
 
         <Button

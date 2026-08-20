@@ -23,8 +23,8 @@ const mockNavigate = vi.fn();
 
 vi.mock('@/lib/api', () => ({
   api: {
-    get: (...a: unknown[]) => mockGet(...a),
-    post: (...a: unknown[]) => mockPost(...a),
+    get: (...a: unknown[]): unknown => mockGet(...a),
+    post: (...a: unknown[]): unknown => mockPost(...a),
   },
 }));
 

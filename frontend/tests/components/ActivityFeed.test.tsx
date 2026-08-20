@@ -21,7 +21,7 @@ import type { ReactNode } from 'react';
 const mockGet = vi.fn();
 vi.mock('@/lib/api', () => ({
   api: {
-    get: (...args: unknown[]) => mockGet(...args),
+    get: (...args: unknown[]): unknown => mockGet(...args),
   },
 }));
 

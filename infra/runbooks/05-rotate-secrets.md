@@ -6,6 +6,34 @@
 - Tokens API providers (Anthropic, Mistral, Webshare, IPRoyal, 2captcha) : tous les 180 jours
 - `OWNER_INITIAL_PASSWORD` : jamais réutilisé (one-shot bootstrap)
 
+> ## 🔴 AVANT TOUTE COMMANDE DE CE RUNBOOK — l'overlay de production
+>
+> **Sur l'hôte de production, exporte ceci une fois, dans le shell d'où tu joues
+> ce runbook :**
+>
+> ```bash
+> cd /opt/axion-crm-pro
+> export COMPOSE_FILE="docker-compose.yml:docker-compose.prod.yml"
+> ```
+>
+> **Pourquoi ce n'est pas un détail.** `docker-compose.yml` publie Postgres sur
+> `55432` et Redis sur `56379` — le confort du poste de développement. C'est
+> l'overlay `docker-compose.prod.yml` qui retire ces publications, avec
+> `ports: !override []`.
+>
+> Un `docker compose up -d` lancé **sans** l'overlay repart du seul fichier de
+> base : Compose voit une configuration différente de celle des conteneurs en
+> place, et **il les recrée — ports compris**. Ces deux ports ont été trouvés
+> ouverts depuis l'extérieur le 2026-08-19, et Redis n'a **aucun mot de passe**.
+>
+> Et le piège se referme même si tu ne nommes pas la base : `api`, `horizon` et
+> `scheduler` portent tous `depends_on: [postgres, redis]`, et Compose monte les
+> dépendances sauf si on lui dit `--no-deps`.
+>
+> Constat `F38-007` (S0). Un runbook qui prescrit le défaut le reproduira aussi
+> sûrement qu'un script qui l'exécute.
+
+
 ## Procédure rotation APP_KEY
 
 > ## 🔴 `docker compose restart` NE RELIT PAS `env_file`

@@ -76,6 +76,28 @@ function fichiersDeProduction(): array
         '.github/workflows/deploy-direct-ssh.yml',
         'infra/scripts/configure-prod-env.sh',
         'infra/scripts/setup-hetzner-cpx22.sh',
+
+        // 🔴 AJOUTES LE 2026-08-20, APRES COUP, ET C'EST LA LECON.
+        //
+        // La premiere version de cette garde ne couvrait que les workflows et
+        // les scripts. Les RUNBOOKS n'y etaient pas -- et ils portaient SEPT
+        // invocations nues de plus, dont celle de la reprise apres sinistre.
+        //
+        // Le defaut avait ete repare une premiere fois sur une autre branche,
+        // et n'avait jamais ete porte ici. J'ai moi-meme corrige les trois
+        // exemplaires que j'avais sous les yeux sans balayer leurs freres :
+        // c'est exactement le patron A-011, commis dans le correctif qui le
+        // poursuit.
+        //
+        // Un runbook est du CODE que l'operateur execute a la main, en urgence.
+        // Le 04 est joue sur une machine NEUVE, ou aucun shell ne porte
+        // l'export : c'est le pire moment pour rouvrir la faille, et le moment
+        // ou personne ne regarde.
+        'infra/runbooks/01-restart-workers.md',
+        'infra/runbooks/02-disk-full.md',
+        'infra/runbooks/03-site-down.md',
+        'infra/runbooks/04-restore-dr.md',
+        'infra/runbooks/05-rotate-secrets.md',
     ];
 }
 

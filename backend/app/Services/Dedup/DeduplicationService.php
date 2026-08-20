@@ -22,6 +22,18 @@ use Illuminate\Support\Facades\DB;
  */
 class DeduplicationService
 {
+    /**
+     * Les DEUX univers d'opposition, dans l'ordre où `opt_out.scope` les
+     * autorise — mesure : `\d opt_out` →
+     * `CHECK (scope = ANY (ARRAY['business'::text, 'vivier'::text]))`.
+     *
+     * Un effacement demandé par une personne ne connaît pas nos univers : il
+     * doit fermer les deux portes. C'est le constat B15-001 (S0) de l'audit 360.
+     *
+     * @var list<string>
+     */
+    public const UNIVERS_OPPOSITION = ['business', 'vivier'];
+
     /** TTL revalidation par source (en jours). */
     public const SOURCE_TTL_DAYS = [
         'insee' => 90,
@@ -233,9 +245,40 @@ class DeduplicationService
      * que « le hash survit à l'effacement » ; l'écriture ne produisait pas ce
      * hash. La promesse et le code se contredisaient depuis l'origine.
      *
-     * `scope` est laissé au DEFAULT SQL (`'business'`) : cette méthode ne sert
-     * que l'univers business. Une opposition « vivier » passe par
-     * `SiteGdprService`, qui pose le scope explicitement.
+     * 🔴 ET ELLE ÉCRIT LES **DEUX** UNIVERS (2026-08-20, audit 360 B15-001, S0).
+     *
+     * `scope` était laissé au DEFAULT SQL. Mesure sur `axion_crm_test_lot1` :
+     * `\d opt_out` → `scope | text | not null | 'business'::text`. Une
+     * opposition née d'un effacement CONSOLE n'existait donc QUE dans l'univers
+     * business.
+     *
+     * Or la garde du VIVIER interroge l'autre :
+     * `SiteSyncIngestService::hasOpposed()` filtre `where('scope', 'vivier')`
+     * pour une `application_submitted` (classée `vivier` par
+     * `SiteSyncClassifier::universe()`). Les deux ne se rencontraient jamais —
+     * **la personne effacée revenait au vivier à la candidature suivante**,
+     * avec nom, prénom, adresse et téléphone. Reproduit en test avant
+     * correctif : le funnel répondait `created` là où il doit répondre
+     * `opted_out` (`EffacementConsoleAntiReinsertionTest`).
+     *
+     * Le voisin le faisait DÉJÀ bien (patron A-011, le défaut caractéristique
+     * de ce dépôt) : `SiteGdprService::erase()` appelle `optOut(…, 'business')`
+     * ET `optOut(…, 'vivier')` quand la portée vaut `both`. Le correctif
+     * existait à côté et n'avait pas été porté ici.
+     *
+     * Pourquoi « les deux » est le défaut correct, et non une sur-correction :
+     * l'unique appelant de production est `GdprErasureService::erase()`, un
+     * effacement TOTAL — il supprime contacts, candidats, journalistes,
+     * praticiens et médias sans distinction d'univers. Son propre en-tête
+     * l'annonçait déjà (« un opt-out cross-workspace est créé pour bloquer
+     * toute future collecte ») ; le code ne tenait pas cette promesse. Un
+     * appelant qui ne voudrait qu'un univers le nomme explicitement.
+     *
+     * L'écriture est IDEMPOTENTE par `(scope, empreinte)` — comme celle du
+     * voisin. Une demande d'effacement se rejoue (reprise de file, double clic
+     * dans la console) et `opt_out` ne porte AUCUNE contrainte d'unicité pour
+     * l'en empêcher : mesure `\d opt_out`, seul `opt_out_pkey` est unique,
+     * `idx_opt_out_scope_email_hash` est un simple btree.
      *
      * 🔴 ET ELLE N'ÉCRIT PLUS L'ADRESSE EN CLAIR (2026-08-17, E2E n°2).
      *
@@ -257,22 +300,55 @@ class DeduplicationService
      * ⚠️ `phone` reste en clair : il n'existe pas de colonne d'empreinte pour
      * lui, et `isOptedOut()` le compare directement. Le corriger demande une
      * migration — consigné, non traité ici.
+     *
+     * @param  list<string>  $scopes  Univers d'opposition. Les DEUX par défaut :
+     *                                un effacement console est total.
      */
-    public function addOptOut(?string $email, ?string $phone, string $source, ?string $reason = null): void
-    {
-        DB::table('opt_out')->insert([
-            'email' => null,
-            // `ListeSuppression::empreinte()` et non `hash('sha256', strtolower(…))` :
-            // le SSOT emploie `mb_strtolower`, comme `SiteSyncEvent::emailHash()`
-            // côté site. Deux normalisations pour une même adresse, ce sont
-            // deux empreintes — donc une opposition écrite ici que la garde du
-            // site ne heurterait jamais, et réciproquement.
-            'email_hash' => $email !== null && trim($email) !== '' ? ListeSuppression::empreinte($email) : null,
-            'phone' => $phone ? preg_replace('/[\s.-]/', '', $phone) : null,
-            'source' => $source,
-            'reason' => $reason,
-            'created_at' => now(),
-        ]);
+    public function addOptOut(
+        ?string $email,
+        ?string $phone,
+        string $source,
+        ?string $reason = null,
+        array $scopes = self::UNIVERS_OPPOSITION,
+    ): void {
+        // `ListeSuppression::empreinte()` et non `hash('sha256', strtolower(…))` :
+        // le SSOT emploie `mb_strtolower`, comme `SiteSyncEvent::emailHash()`
+        // côté site. Deux normalisations pour une même adresse, ce sont deux
+        // empreintes — donc une opposition écrite ici que la garde du site ne
+        // heurterait jamais, et réciproquement.
+        $empreinte = $email !== null && trim($email) !== '' ? ListeSuppression::empreinte($email) : null;
+        $telephone = $phone ? preg_replace('/[\s.-]/', '', $phone) : null;
+
+        if ($empreinte === null && $telephone === null) {
+            // Rien à opposer : une ligne sans empreinte ni téléphone ne
+            // heurterait jamais personne et polluerait la table.
+            return;
+        }
+
+        foreach ($scopes as $scope) {
+            // Idempotence par (univers, identifiant) — l'écriture du voisin
+            // (`SiteGdprService::optOut`) fait exactement ce contrôle, faute de
+            // contrainte d'unicité en base.
+            $dejaOppose = DB::table('opt_out')
+                ->where('scope', $scope)
+                ->when($empreinte !== null, fn ($q) => $q->where('email_hash', $empreinte))
+                ->when($empreinte === null, fn ($q) => $q->where('phone', $telephone))
+                ->exists();
+
+            if ($dejaOppose) {
+                continue;
+            }
+
+            DB::table('opt_out')->insert([
+                'email' => null,
+                'email_hash' => $empreinte,
+                'phone' => $telephone,
+                'scope' => $scope,
+                'source' => $source,
+                'reason' => $reason,
+                'created_at' => now(),
+            ]);
+        }
     }
 
     /**

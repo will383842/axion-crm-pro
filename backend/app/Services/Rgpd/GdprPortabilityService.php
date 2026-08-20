@@ -73,12 +73,72 @@ class GdprPortabilityService
                 })
                 ->get()->toArray(),
 
-            // L'etat d'opposition CONCERNE la personne : elle a le droit de
-            // savoir qu'elle y figure, et depuis quand. On n'exporte que le
-            // marqueur, jamais le hachage - qui ne lui apprendrait rien.
+            // 🔴 LE VERDICT DE DELIVRABILITE — LE JUMEAU OUBLIE (B10-004).
+            //
+            // `email_validations` etait exportee ET effacee ;
+            // `email_verification_logs` ne l'etait NI l'une NI l'autre. Les deux
+            // portent la meme chose : son adresse, un statut, un score, et la
+            // reponse brute du fournisseur (`raw_response`). C'est le patron
+            // A-011 dans sa forme la plus pure - un correctif pose sur une
+            // table, jamais porte sur sa jumelle. Mesure le 2026-08-20.
+            'email_verification_logs' => DB::table('email_verification_logs')
+                ->whereRaw('lower(email::text) = ?', [$email])
+                ->get(['status', 'score', 'provider', 'raw_response', 'verified_at'])->toArray(),
+
+            // Les NOTIFICATIONS internes qui la nomment. L'effacement les
+            // supprime (`body ILIKE '%adresse%'`) : par l'invariant que ce
+            // service se donne - « ce qu'on sait effacer, on doit savoir
+            // l'exporter » - il faut donc savoir les montrer.
+            // On ne rend QUE le contenu : `user_id` designe un TIERS
+            // (l'operateur destinataire), dont l'identifiant n'a rien a faire
+            // dans l'export d'une autre personne.
+            'notifications' => DB::table('notifications')
+                ->whereRaw('body ILIKE ?', ['%' . $email . '%'])
+                ->get(['type', 'title', 'body', 'created_at'])->toArray(),
+
+            // ── LES QUATRE REGISTRES D'OPPOSITION ────────────────────────────
+            //
+            // Ils ne sont PAS effaces - les effacer rendrait la personne
+            // joignable a la prochaine collecte, exactement l'inverse de ce
+            // qu'elle demande. Mais ils la CONCERNENT : elle a le droit de
+            // savoir qu'elle y figure, pourquoi, et depuis quand. Seul
+            // `opt_out` etait exporte avant le 2026-08-20 ; les trois autres ne
+            // figuraient dans AUCUN des deux services (B10-004).
+            //
+            // 🔴 On n'exporte JAMAIS l'empreinte. Elle n'apprendrait rien a la
+            // personne - c'est le hachage de sa propre adresse - et la publier
+            // affaiblirait la seule protection qui subsiste apres un
+            // effacement. Un test verifie qu'aucune empreinte ne fuit ici.
+
+            // 1. OPPOSITION : une volonte exprimee.
             'oppositions' => DB::table('opt_out')
                 ->where('email_hash', hash('sha256', $email))
                 ->get(['scope', 'source', 'created_at'])->toArray(),
+
+            // 2. SUPPRESSION TECHNIQUE : un fait constate (rebond, plainte).
+            // Le motif compte pour elle : « plainte » et « rebond dur » ne
+            // disent pas la meme chose de ce qui s'est passe.
+            'suppressions_techniques' => DB::table('email_suppressions')
+                ->where('email_hash', hash('sha256', $email))
+                ->get(['scope', 'reason', 'source', 'occurrences', 'first_seen_at', 'last_seen_at'])->toArray(),
+
+            // 3. DESABONNEMENT : son propre geste, sur un lien d'envoi.
+            'desabonnements' => DB::table('unsubscribes')
+                ->whereRaw('lower(email::text) = ?', [$email])
+                ->get(['source', 'reason', 'unsubscribed_at'])->toArray(),
+
+            // 4. « NE PAS APPELER » : liste souvent importee de l'exterieur -
+            // raison de plus pour qu'elle puisse la consulter.
+            'listes_ne_pas_appeler' => DB::table('dnc_entries')
+                ->whereRaw('lower(email::text) = ?', [$email])
+                ->get(['email', 'phone', 'created_at'])->toArray(),
+
+            // Les SIGNAUX transmis au site a son sujet (opposition, effacement).
+            // La table les conserve comme preuve de transmission ; la personne
+            // a le droit de savoir que le signal est parti, et quand.
+            'signaux_envoyes_au_site' => DB::table('crm_outbound_events')
+                ->where('email_hash', hash('sha256', $email))
+                ->get(['event_type', 'scope', 'status', 'sent_at', 'created_at'])->toArray(),
         ];
 
         $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);

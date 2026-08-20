@@ -37,6 +37,23 @@ class GdprErasureService
 
             $deleted['contacts'] = DB::table('contacts')->where('email', $email)->delete();
             $deleted['email_validations'] = DB::table('email_validations')->where('email', $email)->delete();
+
+            // 🔴 LE JUMEAU D'`email_validations` (B10-004, mesure 2026-08-20).
+            //
+            // Deux tables portent le verdict de delivrabilite d'une adresse :
+            // `email_validations` (cache 30 j de la deduplication) et
+            // `email_verification_logs` (journal du fournisseur Hunter, ecrit
+            // par `HunterEmailVerifier::journaliser`). La premiere etait
+            // effacee et exportee ; la seconde ne l'etait NI l'une NI l'autre,
+            // alors qu'elle garde en plus la reponse BRUTE du fournisseur
+            // (`raw_response` JSONB), c'est-a-dire tout ce que le prestataire a
+            // dit de cette personne.
+            //
+            // C'est le patron A-011 : le correctif existait sur une table et
+            // n'avait jamais ete porte sur sa jumelle.
+            $deleted['email_verification_logs'] = DB::table('email_verification_logs')
+                ->whereRaw('lower(email::text) = ?', [$email])
+                ->delete();
             $deleted['rgpd_requests'] = DB::table('rgpd_requests')->where('subject_email', $email)->where('type', '!=', 'erasure')->delete();
             $deleted['notifications'] = DB::table('notifications')->whereRaw('body ILIKE ?', ['%' . $email . '%'])->delete();
             $deleted['magic_links'] = DB::table('magic_links')->where('email', $email)->delete();
@@ -163,8 +180,26 @@ class GdprErasureService
                 'payload_hash' => hash('sha256', $email . '|' . ($phone ?? '')),
             ]);
 
-            // Opt-out cross-workspace (bloque future collecte)
-            $this->dedup->addOptOut($email, $phone, source: 'gdpr_erasure', reason: $reason);
+            // ── OPPOSITION, DANS LES DEUX UNIVERS (B15-001, S0) ──────────────
+            //
+            // Cet appel n'ecrivait qu'`opt_out.scope = 'business'` (le DEFAULT
+            // SQL de la colonne). La garde du VIVIER interroge l'autre univers
+            // — `SiteSyncIngestService::hasOpposed()` filtre
+            // `where('scope', 'vivier')` pour une `application_submitted` :
+            // **la personne effacee ici revenait au vivier a la candidature
+            // suivante**, nom, adresse et telephone compris.
+            //
+            // `addOptOut()` ecrit desormais les deux univers par defaut ; le
+            // parametre reste disponible pour un appelant qui n'en voudrait
+            // qu'un. Le voisin, `SiteGdprService::erase()`, le faisait deja
+            // (patron A-011 : le correctif existait, il n'avait pas ete porte).
+            $this->dedup->addOptOut(
+                $email,
+                $phone,
+                source: 'gdpr_erasure',
+                reason: $reason,
+                scopes: DeduplicationService::UNIVERS_OPPOSITION,
+            );
 
             Log::info('GDPR erasure complete', ['email' => $email, 'deleted' => $deleted]);
 

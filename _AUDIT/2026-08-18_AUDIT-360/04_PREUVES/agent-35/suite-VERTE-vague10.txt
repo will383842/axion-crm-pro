@@ -1,0 +1,248 @@
+
+   PASS  Tests\Feature\Auth\CourrielAuthentificationTest
+  ✓ F40-002 — hors simulacre, le lien magique PART reellement          152.27s  
+  ✓ F40-002 — hors simulacre, la reinitialisation PART reellement       11.01s  
+  ✓ F40-002 — TEMOIN : en simulacre, rien ne part et le lien est journa… 1.40s  
+  ✓ F40-002 — le transport des courriels d authentification est configu… 0.79s  
+
+   PASS  Tests\Feature\Auth\GardesAuthentificationAgent35Test
+  ✓ F35-002 — l enrolement 2FA ecrit des colonnes qui existent vraiment  2.42s  
+  ✓ F35-002 — confirmer l enrolement pose first_login_completed_at et r… 3.73s  
+  ✓ F35-002 — un code de secours ne sert qu une fois                     1.90s  
+  ✓ F35-002 — GET /users ne selectionne aucune colonne inexistante       1.87s  
+  ✓ F35-003 — un compte a 2FA active ne franchit rien tant que le code…  2.01s  
+  ✓ F35-003 — les routes de la liste blanche restent joignables avant l… 0.60s  
+  ✓ F35-004 — HIBP injoignable : le mot de passe est REFUSE, jamais acc… 2.20s  
+  ✓ F35-004 — TEMOIN : HIBP joignable et mot de passe sain, la regle la… 1.29s  
+  ✓ F35-004 — TEMOIN : HIBP joignable et mot de passe compromis, la reg… 0.58s  
+  ✓ F35-005 — un jeton de reinitialisation de plus de 60 minutes est re… 1.41s  
+  ✓ F35-005 — TEMOIN : un jeton frais est accepte                        0.93s  
+  ✓ F35-005 — un jeton de reinitialisation ne sert qu une fois           1.06s  
+  ✓ F35-006 — reinitialiser le mot de passe revoque les jetons d API     1.02s  
+  ✓ F35-001 — une route protegee rend 401, jamais 500, quel que soit l…  0.58s  
+  ✓ F35-001 — aucune route nommee login n est requise par l application  0.81s  
+  ✓ F35-009 — un compte inconnu coute le meme travail cryptographique q… 2.71s  
+  ✓ F35-010 — un jeton d API cesse d etre accepte passe sa duree de vie  1.50s  
+  ✓ F35-010 — TEMOIN : sans duree de vie configuree, le meme jeton viei… 0.81s  
+  ✓ F35-011 — un mot de passe court mais CORRECT ouvre bien la session   2.56s  
+  ✓ F35-011 — TEMOIN : un mot de passe court et FAUX est refuse par l a… 0.85s  
+  ✓ F35-012 — un compte verrouille est refuse AVANT toute verification…  1.44s  
+  ✓ F35-012 — le compteur d echecs retombe apres la fenetre d oubli      0.99s  
+  ✓ F35-013 — aucun lien magique n est cree pour une adresse inconnue    2.40s  
+  ✓ F35-013 — un lien magique orphelin n ouvre pas de session sur un co… 1.93s  
+  ✓ F35-013 — TEMOIN : un lien magique normal ouvre bien la session, un… 1.43s  
+
+   PASS  Tests\Feature\Auth\LoginTest
+  ✓ login with correct credentials succeeds                              1.29s  
+  ✓ login with wrong password fails 422                                  0.76s  
+  ✓ login increments failed_login_count on wrong password                0.81s  
+  ✓ login locks user after 10 failed attempts                            1.09s  
+  ✓ login rejects locked account even with correct password              0.71s  
+  ✓ un mot de passe court et faux est refusé par l authentification, pa… 1.27s  
+  ✓ un mot de passe court mais CORRECT ouvre la session                  1.51s  
+  ✓ login throttles after 5 attempts per minute                          1.18s  
+  ✓ me endpoint returns 401 when not authenticated                       1.55s  
+  ✓ une requête SANS session reçoit un refus explicite, jamais une 500   1.27s  
+
+   PASS  Tests\Feature\Auth\OnboardingTourTest
+  ✓ POST /auth/onboarding/complete sans auth → 401                       3.21s  
+  ✓ POST /auth/onboarding/complete authentifié pose onboarding_tour_com… 2.36s  
+  ✓ POST /auth/onboarding/complete idempotent ne change pas la date      5.59s  
+  ✓ GET /auth/me expose onboarding_tour_completed_at                     2.16s  
+
+   PASS  Tests\Unit\Auth\AuthServiceTest
+  ✓ AuthService::attemptLogin avec bons credentials retourne user + req… 3.13s  
+  ✓ AuthService::attemptLogin avec totp_enabled_at retourne requires_2f… 1.97s  
+  ✓ AuthService::attemptLogin avec mauvais password lance ValidationExc… 2.98s  
+  ✓ AuthService::attemptLogin reset failed_login_count après login OK    2.08s  
+  ✓ AuthService::attemptLogin rejette account avec locked_until future   1.67s  
+  ✓ AuthService::attemptLogin trace last_login_ip + user_agent           1.41s  
+  ✓ AuthService constants exposed                                        0.72s  
+
+   PASS  Tests\Unit\Auth\HibpCheckerTest
+  ✓ HibpChecker returns 0 quand suffix absent                            0.88s  
+  ✓ HibpChecker retourne le count si suffix trouvé                       0.81s  
+  ✓ HibpChecker isBreached respecte le threshold                         0.94s  
+  ✓ HibpChecker rend null - et surtout pas 0 - quand le reseau echoue    0.79s  
+  ✓ HibpChecker rend null sur un statut HTTP autre que 200               1.34s  
+  ✓ HibpChecker retourne 0 pour password vide sans appel API             1.36s  
+  ✓ HibpChecker met en cache le résultat 24h                             4.33s  
+  ✓ HibpChecker parse correctement les newlines mixtes                   1.65s  
+  ✓ HibpChecker isBreached rend null quand le service est injoignable    1.07s  
+
+   PASS  Tests\Unit\Auth\MagicLinkServiceTest
+  ✓ issue creates a magic_links row with hashed token and 15min TTL      1.53s  
+  ✓ issue pour une adresse inconnue n ecrit rien, et ne leve rien        4.45s  
+  ✓ TEMOIN : issue pour une adresse CONNUE ecrit bien une ligne rattach… 2.99s  
+
+   PASS  Tests\Unit\Auth\NotPwnedPasswordRuleTest
+  ✓ NotPwnedPassword laisse passer si password non breached              0.99s  
+  ✓ NotPwnedPassword bloque si count > threshold                         1.30s  
+  ✓ NotPwnedPassword laisse passer si count = threshold                  3.02s  
+  ✓ NotPwnedPassword threshold custom respecté                           1.60s  
+  ✓ NotPwnedPassword ignore les types non-string                         0.97s  
+  ✓ NotPwnedPassword ignore les strings vides                            1.20s  
+
+   PASS  Tests\Feature\Rgpd\AntiReinsertionTest
+  ✓ un effacement écrit l’EMPREINTE, que la garde du scraping sait lire  1.72s  
+  ✓ une opposition née du SITE (hash seul, sans email) est vue par isOp… 1.08s  
+  ✓ la normalisation de casse et d’espaces vaut pour l’empreinte comme…  1.14s  
+  ✓ une adresse jamais opposée reste scrapable                           3.74s  
+
+   PASS  Tests\Feature\Rgpd\ChaineAuditSecretTest
+  ✓ B16-001 — sans secret, la chaine ne se declare JAMAIS valide         0.81s  
+  ✓ B16-001 — le secret de developpement publie dans le code est REFUSE  0.66s  
+  ✓ B16-001 — TEMOIN : avec un vrai secret, une chaine intacte est vali… 0.66s  
+  ✓ B16-001 — TEMOIN : avec un vrai secret, une ligne falsifiee est det… 0.67s  
+  ✓ B16-001 — l endpoint dit POURQUOI il ne peut pas verifier            1.49s  
+
+   PASS  Tests\Feature\Rgpd\CloisonnementEspacesTest
+  ✓ F36-005 — un compte ne lit PAS la fiche entreprise d un autre espac… 3.73s  
+  ✓ F36-005 — un compte ne lit PAS la fiche contact d un autre espace    2.99s  
+  ✓ F36-005 — TEMOIN : chacun lit bien LES SIENNES                       6.62s  
+  ✓ F36-005 — les identifiants sont consecutifs : deviner ne coute rien  3.54s  
+
+   PASS  Tests\Feature\Rgpd\EffacementResiduTest
+  ✓ B15-006 — apres effacement, ni le telephone ni l adresse ne subsist… 1.62s  
+  ✓ B15-006 — le telephone d un contact media est neutralise, pas seule… 0.99s  
+  ✓ B15-006 — TEMOIN : ce qui appartient a QUELQU UN D AUTRE n est pas…  0.84s  
+  ✓ B15-006 — TEMOIN : les listes d opposition SURVIVENT a l effacement  2.10s  
+
+   PASS  Tests\Feature\Rgpd\EffacementSanteTest
+  ✓ l’effacement console SUPPRIME le praticien de santé, il ne l’anonym… 0.65s  
+  ✓ l’effacement atteint aussi le praticien retrouvé par son TÉLÉPHONE   0.71s  
+  ✓ un praticien SANS rapport avec le sujet n’est jamais touché          1.64s  
+  ✓ aucune trace identifiante ne subsiste après effacement               0.73s  
+
+   PASS  Tests\Feature\Rgpd\EmpreinteSqlEtPhpTest
+  ✓ 🔴 empreinte SQL et empreinte PHP coïncident sur toutes les formes…  0.83s  
+  ✓ témoin — l’empreinte PHP est bien sha256(mb_strtolower(trim)), sans… 1.35s  
+  ✓ 🔴 ÉCART CONNU ET DÉLIBÉRÉMENT FIGÉ — majuscule non-ASCII            1.03s  
+  ✓ la minuscule non-ASCII, elle, ne pose aucun problème                 0.44s  
+
+   PASS  Tests\Feature\Rgpd\ExportsRespectentOppositionsTest
+  ✓ un contact opposé par ADRESSE EN CLAIR est exclu                     1.07s  
+  ✓ un contact opposé par EMPREINTE SEULE (effacement) est exclu         1.10s  
+  ✓ un contact présent en liste de SUPPRESSION est exclu                 0.81s  
+  ✓ un contact SANS email traverse la garde — il ne s’est opposé à rien  0.71s  
+  ✓ un contact sans rapport reste exportable                             1.53s  
+  ✓ la casse et les espaces ne permettent pas de contourner la garde     0.91s  
+
+   PASS  Tests\Feature\Rgpd\GdprErasureTest
+  ✓ erasure deletes contacts matching email                              0.96s  
+  ✓ erasure adds opt_out entry                                           1.09s  
+  ✓ erasure runs in atomic transaction (rollback on failure)             0.94s  
+  ✓ erasure deletes email_validations entry                              0.63s  
+
+   PASS  Tests\Feature\Rgpd\JetonExportNonPersisteTest
+  ✓ B15-013 — le jeton de telechargement n est jamais ECRIT en base      9.51s  
+  ✓ B15-013 — TEMOIN : le reste du resultat est bien conserve           18.43s  
+
+   PASS  Tests\Feature\Rgpd\OppositionEmpreinteSeuleTest
+  ✓ 🔴 signal EN CLAIR côté appelant, empreinte en base : la fiche sort… 1.76s  
+  ✓ 🔴 signal HACHÉ en base (site), appelant qui ne connaît que le clai… 1.07s  
+  ✓ les PERSONNES sont protégées comme les entreprises                   0.72s  
+  ✓ un contact SANS adresse traverse la garde : on n’exclut personne po… 1.14s  
+  ✓ les deux univers restent étanches                                    0.97s  
+  ✓ 🔴 une opposition écrite par le SITE est vue par la garde du scrapi… 1.61s  
+  ✓ 🔴 une opposition écrite par un EFFACEMENT est vue par le site — ac… 1.20s  
+  ✓ un téléphone seul reste une opposition valable, sans empreinte d’ad… 1.80s  
+  ✓ 🔴 une ligne porteuse d’adresse SANS empreinte est REFUSÉE par la b… 0.76s  
+  ✓ 🔴 aucune ligne d’opposition ne porte plus d’adresse en clair après… 0.45s  
+  ✓ 🔴 la migration remplit l’empreinte des lignes héritées, avec le ca… 0.82s  
+  ✓ 🔴 la migration ÉCHOUE BRUYAMMENT sur une ligne irrécupérable, elle… 0.41s  
+
+   PASS  Tests\Feature\Rgpd\PermissionsEcrituresTest
+  ✓ F36-003 — un compte LECTURE SEULE ne peut pas creer une etiquette    1.04s  
+  ✓ F36-003 — un compte LECTURE SEULE ne peut pas supprimer une etiquet… 2.22s  
+  ✓ F36-003 — un compte LECTURE SEULE ne peut pas creer une entreprise   4.81s  
+  ✓ F36-003 — un compte LECTURE SEULE ne peut pas supprimer une entrepr… 1.41s  
+  ✓ F36-003 — un OPERATEUR peut modifier mais PAS detruire (« CRUD sans… 1.84s  
+  ✓ F36-003 — TEMOIN : un ADMIN franchit toutes ces gardes               2.14s  
+  ✓ F36-003 — TEMOIN : la LECTURE reste ouverte a tous                   1.74s  
+
+   PASS  Tests\Feature\Rgpd\PermissionsRoutesRgpdTest
+  ✓ B15-010 — un compte en LECTURE SEULE ne peut pas deposer de demande… 1.51s  
+  ✓ B15-010 — un compte en LECTURE SEULE ne peut pas TRAITER une demand… 1.54s  
+  ✓ B15-010 — TEMOIN : le meme compte peut CONSULTER les demandes        1.83s  
+  ✓ B15-010 — TEMOIN : un OWNER peut, lui, traiter une demande           1.87s  
+  ✓ B16-004 — un compte en LECTURE SEULE ne peut pas lire le journal d…  1.45s  
+  ✓ B16-004 — TEMOIN : un ADMIN peut lire le journal d audit             1.72s  
+
+   PASS  Tests\Feature\Rgpd\PortabiliteCompleteTest
+  ✓ B15-003 — l export contient la TIMELINE de la personne               1.57s  
+  ✓ B15-003 — l export contient la fiche CANDIDAT                        1.65s  
+  ✓ B15-003 — TEMOIN : l export ne contient PAS les donnees de quelqu u… 1.88s  
+  ✓ B15-003 — INVARIANT : tout ce que l effacement supprime, l export l… 1.00s  
+
+   PASS  Tests\Feature\Rgpd\RgpdRequestsControllerTest
+  ✓ GET /rgpd/requests sans auth → 401                                   1.50s  
+  ✓ GET /rgpd/requests authentifié → OK                                  1.70s  
+  ✓ POST /rgpd/requests crée une demande                                 1.39s  
+  ✓ POST /rgpd/requests valide le type                                   1.38s  
+  ✓ POST /rgpd/requests valide email                                     1.47s  
+  ✓ POST /rgpd/requests accepte les 5 types valides                      1.82s  
+  ✓ GET /rgpd/export/{token} avec token invalide → 404                   0.38s  
+  ✓ GET /audit-logs/verify-chain authentifié → OK                        1.50s  
+  ✓ le lien de portabilité s’ouvre SANS authentification                 0.57s  
+  ✓ un jeton EXPIRÉ ne livre rien                                        1.35s  
+
+   PASS  Tests\Feature\Internal\SignatureCanalInterneTest
+  ✓ F37-001 — secret ABSENT : le canal refuse, il ne verifie pas « quan… 1.30s  
+  ✓ F37-001 — TEMOIN : avec un vrai secret, une signature VALIDE passe   1.41s  
+  ✓ F37-001 — TEMOIN : avec un vrai secret, une signature FAUSSE est re… 0.66s  
+  ✓ F37-001 — la signature de la CLE VIDE ne passe pas non plus quand u… 0.39s  
+
+   PASS  Tests\Feature\Infra\RedemarrageNeRelitPasEnvTest
+  ✓ A07-003 — aucun script d infrastructure ne PRESCRIT « docker compos… 0.79s  
+  ✓ A07-003 — le script qui ECRIT les variables de production les VERIF… 0.71s  
+  ✓ A07-003 — TEMOIN : la garde SAIT reperer une prescription fautive    0.42s  
+  ✓ A07-003 — la garde a bien des fichiers a inspecter                   0.50s  
+
+   PASS  Tests\Feature\Crm\ScrapedIngestTest
+  ✓ drapeau à OFF : /internal/scraper-result garde son comportement his… 0.90s  
+  ✓ drapeau à ON : le MÊME endpoint valide le pivot et ingère réellemen… 2.90s  
+  ✓ valeur par défaut du drapeau : fermé                                 0.99s  
+  ✓ une source hors registre est refusée (422), une source coupée est d… 0.54s  
+  ✓ le re-seed du registre ne RÉACTIVE jamais une source coupée à la ma… 0.45s  
+  ✓ chaque source du registre a son tag gouverné dérivé                  1.71s  
+  ✓ un champ inconnu fait REJETER le message (schéma pivot strict)       1.19s  
+  ✓ un scrapé naît FROID : prospect / nouveau / intérêt légitime, tagué… 1.19s  
+  ✓ le TÉLÉPHONE est posé sur la fiche personne (réparation de la perte… 1.33s  
+  ✓ le froid ne se réchauffe JAMAIS : un re-scrape ne touche ni cycle d… 2.14s  
+  ✓ BACKFILL-ONLY : le collecté n'écrase ni une valeur existante ni un…  1.46s  
+  ✓ rejouer le MÊME run est idempotent                                   1.85s  
+  ✓ sans SIREN : AUCUNE fiche créée, l'événement part en arbitrage avec… 1.78s  
+  ✓ un run en échec est consigné, aucune donnée écrite                   0.97s  
+  ✓ le dry-run parcourt le vrai funnel puis ne laisse RIEN en base       1.21s  
+  ✓ ANTI-RÉINSERTION : une personne opposée ne revient jamais par un re… 2.41s  
+  ✓ une boîte service ne devient JAMAIS une fiche personne               1.55s  
+  ✓ un email au domaine non résolvable est rejeté : pas de fiche sur un… 2.17s  
+  ✓ le marqueur backfill-src est accepté et rend le rollback CHIRURGICA… 1.55s  
+  ✓ le vocabulaire de assigned_by reste FERMÉ : une valeur inventée est… 1.43s  
+  ✓ implantations : un code pays invalide ou une clé inconnue rejettent… 2.10s  
+  ✓ une implantation est fusionnée dans signals et le tag implantation-<pays>… 1.85s  
+  ✓ BACKFILL-ONLY sur les implantations : une valeur existante n'est ja… 0.77s  
+  ✓ la resync AutoTagger ne supprime NI le tag src: NI le tag implantat… 0.98s  
+  ✓ filter[tag] retrouve le segment implantation-ro dans la liste (et d… 1.32s  
+  ✓ une entité SANS siren est créée, ancrée sur (pays, foreign_id)       1.24s  
+  ✓ les tags pays et nature sont posés : cibler les associations de Rou… 1.72s  
+  ✓ rejouer la MÊME entité ne crée pas de doublon (dédup par foreign_id… 0.89s  
+  ✓ deux entités étrangères DIFFÉRENTES coexistent (siren NULL ne les c… 1.68s  
+  ✓ BACKFILL-ONLY : une nature déjà posée n'est jamais réécrite          1.66s  
+  ✓ foreign_id sans country est REFUSÉ : un identifiant sans registre e… 1.01s  
+  ✓ une nature inventée est REFUSÉE (liste fermée, alignée sur le CHECK… 0.57s  
+  ✓ un siren annoncé avec un pays non-FR est REFUSÉ (contradiction)      0.72s  
+  ✓ ni siren ni foreign_id ni match_hint : refusé à la porte             1.26s  
+  ✓ les fiches FRANÇAISES existantes gardent country_code FR et aucun t… 0.90s  
+
+   PASS  Tests\Feature\Seeders\OwnerUserSeederTest
+  ✓ OwnerUserSeeder crée workspace + owner avec password depuis env      1.54s  
+  ✓ OwnerUserSeeder n écrit AUCUN secret quand OWNER_INITIAL_PASSWORD e… 1.60s  
+  ✓ OwnerUserSeeder pose bien le mot de passe quand OWNER_INITIAL_PASSW… 2.53s  
+  ✓ OwnerUserSeeder est idempotent (re-run ne casse pas)                 1.88s  
+  ✓ OwnerUserSeeder pose pivot user_workspaces avec role owner           9.27s  
+
+  Tests:    192 passed (490 assertions)
+  Duration: 520.18s
+

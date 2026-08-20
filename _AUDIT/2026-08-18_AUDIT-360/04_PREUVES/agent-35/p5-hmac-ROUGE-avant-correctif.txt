@@ -1,0 +1,152 @@
+
+   FAIL  Tests\Feature\Internal\PatronHmacDeReferenceTest
+  ✓ P5-HMAC-001 — TEMOIN : le banc voit bien les deux fichiers a inspe… 17.19s  
+  ⨯ P5-HMAC-001 — aucun commentaire ne designe scraper-result comme le…  0.74s  
+  ✓ P5-HMAC-001 — TEMOIN NEGATIF : la garde SAIT reperer une designatio… 0.32s  
+  ⨯ P5-HMAC-002 — le secret du canal interne a une entree config, comme… 0.36s  
+  ⨯ P5-HMAC-002 — le controleur lit son secret par config(), pas par en… 0.38s  
+  ✓ P5-HMAC-002 — TEMOIN : deplacer la lecture du secret ne rouvre pas…  1.48s  
+  ⨯ P5-HMAC-002 — TEMOIN : avec un secret pose, une signature juste pas… 0.53s  
+  ✓ P5-HMAC-003 — le rejeu tardif reste ouvert sur scraper-result, et l… 0.33s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Internal\PatronHmacDeReferenceTest > P5-HMAC-001 —…    
+  Expected: <?php\n
+  \n
+  use App\Http\Controllers\Api\AiActRegisterController;\n
+  ... (380 more lines)
+
+  Not to contain: patron que scraper-result
+
+  at tests/Feature/Internal/PatronHmacDeReferenceTest.php:130
+    126▕     foreach ($fichiers as $relatif) {
+    127▕         $contenu = lireFichierHmac($relatif);
+    128▕ 
+    129▕         foreach ($formulesFautives as $formule) {
+  ➜ 130▕             $this->assertStringNotContainsString(
+    131▕                 $formule,
+    132▕                 $contenu,
+    133▕                 "{$relatif} designe encore `/internal/scraper-result` comme le patron de reference. "
+    134▕                 . "C'est le canal qui portait le defaut F37-001 (secret vide = porte ouverte, aucun "
+
+  1   tests/Feature/Internal/PatronHmacDeReferenceTest.php:130
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Internal\PatronHmacDeReferenceTest > P5-HMAC-002 —…    
+  Expecting null not to be null '`services.worker_internal.hma… vide.'.
+
+  at tests/Feature/Internal/PatronHmacDeReferenceTest.php:158
+    154▕     );
+    155▕ });
+    156▕ 
+    157▕ test('P5-HMAC-002 — le secret du canal interne a une entree config, comme tous les autres', function () {
+  ➜ 158▕     expect(config('services.worker_internal.hmac_secret'))->not->toBeNull(
+    159▕         "`services.worker_internal.hmac_secret` n'existe pas. WORKER_INTERNAL_HMAC_SECRET etait le "
+    160▕         . "SEUL secret du depot sans entree `config/` : il fonctionnait par la grace d'un detail de "
+    161▕         . '`docker-compose` (env_file injecte la variable dans l\'environnement du processus, si bien '
+    162▕         . "que `env()` la lit encore sous `config:cache`). Le jour ou la production passe en "
+
+  1   tests/Feature/Internal/PatronHmacDeReferenceTest.php:158
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Internal\PatronHmacDeReferenceTest > P5-HMAC-002 —…    
+  Expected: <?php\n
+  \n
+  namespace App\Http\Controllers\Internal;\n
+  ... (112 more lines)
+
+  Not to contain: env('WORKER_INTERNAL_HMAC_SECRET'
+
+  at tests/Feature/Internal/PatronHmacDeReferenceTest.php:170
+    166▕ 
+    167▕ test('P5-HMAC-002 — le controleur lit son secret par config(), pas par env() brut', function () {
+    168▕     $controleur = lireFichierHmac('backend/app/Http/Controllers/Internal/ScraperResultController.php');
+    169▕ 
+  ➜ 170▕     $this->assertStringNotContainsString(
+    171▕         "env('WORKER_INTERNAL_HMAC_SECRET'",
+    172▕         $controleur,
+    173▕         "Le controleur lit encore le secret par `env()` brut. `env()` hors de `config/` est "
+    174▕         . "explicitement deconseille par Laravel : sous `config:cache`, il ne rend la vraie valeur "
+
+  1   tests/Feature/Internal/PatronHmacDeReferenceTest.php:170
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Internal\PatronHmacDeReferenceTest > P5-HMAC-002 —…    
+  Expected response status code [200] but received 503.
+Failed asserting that 503 is identical to 200.
+
+  at tests/Feature/Internal/PatronHmacDeReferenceTest.php:231
+    227▕             'CONTENT_TYPE' => 'application/json',
+    228▕             'HTTP_ACCEPT' => 'application/json',
+    229▕         ],
+    230▕         $corps
+  ➜ 231▕     )->assertOk();
+    232▕ 
+    233▕     // Signature fausse -> 401. Sans ce second cas, un controleur qui accepterait
+    234▕     // tout passerait le premier.
+    235▕     $this->call(
+
+
+  Tests:    4 failed, 4 passed (17 assertions)
+  Duration: 26.12s
+
+
+=== CONDITIONS DE CE ROUGE (agent 35, 2026-08-20) ===
+
+Constats P5-HMAC-001 (S2), P5-HMAC-002 (S3) et P5-HMAC-003 (S2, neuf), releves
+au §5 et au §9 de 08_PASSE-2-ADVERSARIALE.md.
+
+Code mesure : l'etat exact du commit 22d1fd0 pour les quatre fichiers du lot
+(`git checkout 22d1fd0 -- ...`), c'est-a-dire le depot APRES le correctif
+a6aceb0 qui bouche F37-001, et AVANT les trois complements demandes.
+
+RESULTAT : 4 echecs sur 8.
+
+  P5-HMAC-001 ... routes/api.php designe encore `/internal/scraper-result`
+                  comme le patron de reference
+  P5-HMAC-002 ... `services.worker_internal.hmac_secret` n'existe pas
+  P5-HMAC-002 ... le controleur lit encore `env('WORKER_INTERNAL_HMAC_SECRET')`
+  P5-HMAC-002 ... TEMOIN de bout en bout : avec un secret pose PAR LA CONFIG,
+                  une signature juste ne passe pas -- puisque le controleur ne
+                  lit pas la config
+
+  VERTS ATTENDUS, et ils le sont :
+  - le temoin de montage (le banc voit les deux fichiers) ;
+  - le temoin NEGATIF (le balayage sait reperer une designation fautive
+    fabriquee) ;
+  - le temoin « secret absent => 503 », qui doit tenir des deux cotes : le
+    correctif deplace la lecture du secret, il ne doit pas rouvrir la porte ;
+  - P5-HMAC-003, deja vrai : a6aceb0 declarait honnetement que le rejeu tardif
+    reste ouvert. La garde le FIGE au registre au lieu de le laisser en note.
+
+=== UNE FAUSSE MESURE, PRISE SUR LE FAIT, ET C'EST LA PLUS INSTRUCTIVE ===
+
+Premiere tentative de ce rouge : la garde est passee VERTE sur le code d'avant.
+
+Un vert sur du code casse est impossible. En cherchant pourquoi : les quatre
+fichiers etaient DEJA COMMITES quand j'ai lance `git stash push` dessus. Le
+stash n'avait donc rien a prendre, il n'a rien pris, et il a rendu la main sans
+erreur -- j'ai mesure le code CORRIGE en croyant mesurer le code d'avant.
+
+C'est la neuvieme fois de la session qu'un resultat vient du banc et non du
+produit, et la premiere ou le banc rend un FAUX VERT plutot qu'un faux rouge.
+Un faux rouge se remarque ; un faux vert, non. Il n'a ete attrape que parce que
+le resultat etait impossible.
+
+Regle : pour revenir a un etat anterieur, `git checkout <sha> -- <fichiers>`, et
+VERIFIER que le fichier porte bien la forme d'avant avant de mesurer. `git stash`
+ne dit pas qu'il n'a rien pris.
+
+=== ET UNE DEUXIEME, DANS LA MEME MINUTE ===
+
+En verifiant l'etat revenu, j'ai joue :
+
+    grep -c "meme patron que scraper-result" backend/routes/api.php   ->  0
+
+et j'ai failli en conclure que le commentaire n'y etait pas. Le fichier ecrit
+« même ». C'est EXACTEMENT l'erreur que le contradicteur consigne au §9, refaite
+a l'identique, deux heures apres l'avoir lue et alors que la garde ci-dessus est
+ecrite tout entiere pour s'en premunir.
+
+La garde, elle, ne s'y trompe pas : ses motifs sont sans lettre accentuee, et
+`patron que scraper-result` reconnait bien `(même patron que scraper-result)`.
+La regle tient. C'est la main qui l'oublie.

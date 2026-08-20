@@ -1,0 +1,118 @@
+
+   FAIL  Tests\Feature\Rgpd\JournalAuditCloisonneTest
+  ⨯ P5-35-007 — l administrateur d un espace ne lit QUE le journal de…  32.19s  
+  ⨯ P5-35-007 — le total annonce ne compte pas les lignes des autres es… 1.02s  
+  ⨯ P5-35-007 — TEMOIN : chaque espace voit bien SON journal, pas un jo… 1.92s  
+  ✓ B16-004 — un compte en LECTURE SEULE reste refuse, meme sur son pro… 1.45s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Rgpd\JournalAuditCloisonneTest > P5-35-007 — l admi…   
+  Le journal d'un AUTRE espace de travail est rendu. La permission `audit.view` a bien ete posee, mais elle ne dit rien de l'espace : elle separe les roles, pas les clients.
+Failed asserting that an array does not contain '/api/v1/chez-le-voisin'.
+
+  at tests/Feature/Rgpd/JournalAuditCloisonneTest.php:122
+    118▕         'La route ne rend rien du tout : ce vert ne prouverait pas le cloisonnement, '
+    119▕         . 'seulement que la route est muette.'
+    120▕     );
+    121▕ 
+  ➜ 122▕     $this->assertNotContains(
+    123▕         '/api/v1/chez-le-voisin',
+    124▕         $chemins,
+    125▕         'Le journal d\'un AUTRE espace de travail est rendu. La permission `audit.view` '
+    126▕         . 'a bien ete posee, mais elle ne dit rien de l\'espace : elle separe les roles, '
+
+  1   tests/Feature/Rgpd/JournalAuditCloisonneTest.php:122
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Rgpd\JournalAuditCloisonneTest > P5-35-007 — le tot…   
+  Failed asserting that 5 is identical to 2.
+
+  at tests/Feature/Rgpd/JournalAuditCloisonneTest.php:146
+    142▕     $reponse->assertOk();
+    143▕ 
+    144▕     // Un total qui compte les lignes du voisin est une fuite en soi : il révèle
+    145▕     // le volume d'activité d'un autre client, même sans en montrer le détail.
+  ➜ 146▕     expect($reponse->json('meta.total'))->toBe(2);
+    147▕ });
+    148▕ 
+    149▕ test('P5-35-007 — TEMOIN : chaque espace voit bien SON journal, pas un journal vide', function () {
+    150▕     [$espaceA, $adminA] = espaceEtCompte('a');
+
+  1   tests/Feature/Rgpd/JournalAuditCloisonneTest.php:146
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Rgpd\JournalAuditCloisonneTest > P5-35-007 — TEMOIN…   
+  Failed asserting that two arrays are identical.
+   Array &0 [
+  -    0 => '/api/v1/propre-a-a',
+  +    0 => '/api/v1/propre-a-b',
+  +    1 => '/api/v1/propre-a-a',
+   ]
+  
+
+  at tests/Feature/Rgpd/JournalAuditCloisonneTest.php:162
+    158▕ 
+    159▕     // La garde doit distinguer « cloisonné » de « cassé pour tout le monde ».
+    160▕     // Un correctif qui rendrait la liste vide passerait les deux tests
+    161▕     // précédents ; il échoue ici.
+  ➜ 162▕     expect($vuDeA)->toBe(['/api/v1/propre-a-a']);
+    163▕     expect($vuDeB)->toBe(['/api/v1/propre-a-b']);
+    164▕ });
+    165▕ 
+    166▕ test('B16-004 — un compte en LECTURE SEULE reste refuse, meme sur son propre espace', function () {
+
+  1   tests/Feature/Rgpd/JournalAuditCloisonneTest.php:162
+
+
+  Tests:    3 failed, 1 passed (7 assertions)
+  Duration: 43.52s
+
+
+=== CONDITIONS DE CE ROUGE (agent 35, 2026-08-20) ===
+
+Constat : P5-35-007 (S1), releve par la contre-verification adversariale au §10 de
+08_PASSE-2-ADVERSARIALE.md. B16-004 n'etait ferme qu'a moitie : le commit 46848d4
+a pose la permission `audit.view` sur GET /api/v1/audit-logs, ce qui repousse bien
+le compte en lecture seule -- mais une permission separe les ROLES, jamais les
+CLIENTS. L'administrateur de l'espace A lisait toujours le journal de l'espace B.
+
+Code mesure : AuditLogsController::index() dans l'etat exact du commit 46848d4,
+c'est-a-dire `AuditLog::query()->orderByDesc('id')->paginate(50)`, sans aucun
+filtre d'espace. Le correctif a ete mis de cote (git stash) le temps de la mesure.
+
+Banc : conteneur `a35r`, base dediee `axion_crm_test_a35r`, configuration
+/tmp/a35r/phpunit-journal.xml avec failOnRisky="true" et failOnWarning="true"
+-- la severite de la CI, pas une severite de confort.
+
+RESULTAT : 3 echecs sur 4.
+
+  1. « Le journal d'un AUTRE espace de travail est rendu » -- l'admin de A voit
+     /api/v1/chez-le-voisin. C'EST LA FUITE, mesuree.
+  2. meta.total annonce 5 au lieu de 2 : le total revele le volume d'activite
+     d'un autre client, meme sans en montrer le detail.
+  3. Le temoin croise : A voit ['/propre-a-b', '/propre-a-a'] au lieu de
+     ['/propre-a-a'].
+
+  4. VERT ATTENDU : le viewer reste refuse (403). Non-regression du premier
+     correctif -- le cloisonnement s'ajoute a la permission, il ne la remplace pas.
+
+TEMOIN INTEGRE, et il a joue : l'assertion `assertContains('/api/v1/chez-moi')`
+est PASSEE avant que la suivante echoue. La route rend donc bien quelque chose.
+Sans ce temoin, un correctif qui viderait la reponse passerait pour un
+cloisonnement.
+
+=== UN DEFAUT DE LA GARDE ELLE-MEME, TROUVE ET CORRIGE A CETTE OCCASION ===
+
+Premiere execution : le test n° 1 rougissait sur
+
+    Failed asserting that an array contains 'La route ne rend rien du tout : ...'
+
+`expect()->toContain()` de Pest prend des VALEURS, pas un message : le second
+argument y etait asserte comme une DEUXIEME valeur a chercher. La garde cherchait
+donc sa propre phrase d'explication dans la reponse HTTP, et aurait rougi
+ETERNELLEMENT -- y compris une fois le cloisonnement pose.
+
+C'est exactement le motif que ce fichier denonce : une garde qui mesure autre
+chose que ce qu'elle annonce. Vingtieme cas du patron A-011, releve sur la garde
+ecrite pour reparer le dix-huitieme. Remplace par assertContains() /
+assertNotContains(), qui portent un vrai message d'echec -- visible en tete du
+rouge ci-dessus.

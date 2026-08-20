@@ -1,0 +1,112 @@
+
+   FAIL  Tests\Feature\Infra\PileDeProductionSansOverlayTest
+  ✓ F38-007 — TEMOIN : le banc voit bien les fichiers de pilotage de la… 9.03s  
+  ✓ F38-007 — TEMOIN NEGATIF : le balayage SAIT reperer une invocation…  0.80s  
+  ⨯ F38-007 — aucune commande visant la production ne recree la pile SA… 0.89s  
+  ✓ F38-007 — les services applicatifs dependent bien de postgres et re… 1.09s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Infra\PileDeProductionSansOverlayTest > F38-007 — a…   
+  Ces commandes recreent la pile de PRODUCTION sans `docker-compose.prod.yml`.
+
+Compose repart alors du seul `docker-compose.yml`, qui PUBLIE Postgres sur 55432 et Redis sur 56379. Il voit une configuration differente de celle des conteneurs en place et il les RECREE, ports compris. C'est la faille du 2026-08-19, reouverte.
+
+Redis n'a aucun mot de passe : FLUSHALL, lecture des jetons, CONFIG SET.
+
+Correctif : `export COMPOSE_FILE="docker-compose.yml:docker-compose.prod.yml"` avant la commande, comme le fait deja `deploy-direct-ssh.yml`.
+
+Commandes nues :
+  - .github/workflows/diag-website-status.yml:62  →  docker compose up -d 2>&1 | tail -30
+  - infra/scripts/configure-prod-env.sh:95  →  docker compose up -d api horizon scheduler
+  - infra/scripts/setup-hetzner-cpx22.sh:17  →  # `docker compose up -d api horizon scheduler` (JAMAIS `restart` : il ne relit
+  - infra/scripts/setup-hetzner-cpx22.sh:146  →  log "  2. docker compose up -d api horizon scheduler   (up -d, PAS restart)"
+Failed asserting that two arrays are identical.
+  -Array &0 []
+  +Array &0 [
+  +    0 => '.github/workflows/diag-website-status.yml:62  →  docker compose up -d 2>&1 | tail -30',
+  +    1 => 'infra/scripts/configure-prod-env.sh:95  →  docker compose up -d api horizon scheduler',
+  +    2 => 'infra/scripts/setup-hetzner-cpx22.sh:17  →  # `docker compose up -d api horizon scheduler` (JAMAIS `restart` : il ne relit',
+  +    3 => 'infra/scripts/setup-hetzner-cpx22.sh:146  →  log "  2. docker compose up -d api horizon scheduler   (up -d, PAS restart)"',
+  +]
+  
+
+  at tests/Feature/Infra/PileDeProductionSansOverlayTest.php:175
+    171▕             }
+    172▕         }
+    173▕     }
+    174▕ 
+  ➜ 175▕     expect($nues)->toBe(
+    176▕         [],
+    177▕         "Ces commandes recreent la pile de PRODUCTION sans `docker-compose.prod.yml`.\n\n"
+    178▕         . "Compose repart alors du seul `docker-compose.yml`, qui PUBLIE Postgres sur 55432 et "
+    179▕         . "Redis sur 56379. Il voit une configuration differente de celle des conteneurs en "
+
+  1   tests/Feature/Infra/PileDeProductionSansOverlayTest.php:175
+
+
+  Tests:    1 failed, 3 passed (11 assertions)
+  Duration: 16.79s
+
+
+=== CONDITIONS DE CE ROUGE (agent 35, 2026-08-20) ===
+
+Constat : F38-007 (S0), premiere ligne de la file du danger.
+
+CE QUE C'EST. `docker-compose.yml` publie Postgres sur 55432 et Redis sur 56379
+-- le confort du poste de developpement. L'overlay `docker-compose.prod.yml`
+retire ces publications avec `ports: !override []`, et le tag est indispensable :
+Compose FUSIONNE les listes entre fichiers, il ne les remplace pas.
+
+Ces deux ports ont ete trouves OUVERTS DEPUIS L'EXTERIEUR sur la production le
+2026-08-19. Redis n'a aucun mot de passe : FLUSHALL, lecture des jetons,
+CONFIG SET. Le correctif a referme la porte. Il restait le moyen de la rouvrir.
+
+Un `docker compose up -d` lance sur le serveur SANS overlay repart du seul
+fichier de base : Compose voit une configuration differente de celle des
+conteneurs en place, et il les RECREE -- avec les ports publies.
+
+RESULTAT : 1 echec sur 4. QUATRE invocations nues, dans TROIS fichiers.
+
+  .github/workflows/diag-website-status.yml:62
+      docker compose up -d
+      -> workflow_dispatch : declenchable DEPUIS L'INTERFACE GITHUB, en un clic,
+         et il relance TOUTE la pile.
+
+  infra/scripts/configure-prod-env.sh:95
+      docker compose up -d api horizon scheduler
+      -> LE PIEGE DANS LE PIEGE. La commande ne nomme que trois services, et on
+         pourrait croire postgres et redis hors de portee. Les trois portent
+         `depends_on: [postgres, redis]`, et Compose monte les dependances sauf
+         si on lui dit --no-deps. Le script qui sert a CONFIGURER la production
+         rouvrait donc la faille.
+
+  infra/scripts/setup-hetzner-cpx22.sh:17 et :146
+      la meme commande, en commentaire d'en-tete et en instruction imprimee a
+      l'operateur en fin de script.
+      -> Un runbook qui prescrit le defaut le reproduira aussi surement qu'un
+         script qui l'execute.
+
+  VERTS ATTENDUS, et ils le sont :
+  - le temoin de montage (le banc voit les quatre fichiers -- il a d'ailleurs
+    servi : le conteneur ne monte pas `.github/`, il a fallu l'y copier) ;
+  - le temoin NEGATIF, qui verifie DEUX choses : que le balayage reconnait une
+    invocation nue fabriquee, ET qu'il reconnait la forme correcte comme
+    correcte -- sans quoi il rougirait sur son propre correctif ;
+  - le test qui fige la RAISON : les services applicatifs dependent bien de
+    postgres et redis, le fichier de base publie bien 55432 et 56379, et
+    l'overlay les retire bien avec `!override`. Sans ce test, quelqu'un
+    « simplifierait » l'overlay en se disant que la commande ne parle pas de
+    base de donnees.
+
+=== UN DERNIER ROUGE, ET IL ETAIT DE MOI ===
+
+Apres correctif, le balayage a signale une invocation nue de plus, a la ligne 62
+du workflow : MON PROPRE COMMENTAIRE, qui citait la commande fautive pour
+expliquer ce qui avait ete corrige.
+
+C'est exactement `P5-HMAC-001`, commis en le reparant : ne pas ecrire la forme
+defectueuse la ou quelqu'un peut la recopier. Le commentaire dit desormais
+« cette ligne ne portait AUCUN overlay » -- ce qui est plus clair, et ne laisse
+pas trainer le mauvais exemple.
+
+APRES CORRECTIF : 24 tests verts sur tout `tests/Feature/Infra`, dont les quatre
+de cette garde.

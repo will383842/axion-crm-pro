@@ -1,0 +1,160 @@
+
+   FAIL  Tests\Feature\Infra\ServeurHttpDeProductionTest
+  ✓ A-010 — TEMOIN : le banc voit bien les fichiers de deploiement      12.22s  
+  ⨯ A-010 — aucune image ne sert HTTP par le serveur integre de PHP      0.96s  
+  ⨯ A-010 — le service api demarre php-fpm, et le declare                0.41s  
+  ⨯ A-010 — le pool php-fpm tient au moins les dix utilisateurs du cahi… 0.53s  
+  ⨯ A-010 — Caddy parle FastCGI a l api, plus HTTP                       0.85s  
+  ⨯ A-010 — le controle de sante n interroge plus un port HTTP disparu   0.67s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Infra\ServeurHttpDeProductionTest > A-010 — aucune…    
+  Expecting 'CMD ["php", "-S", "0.0.0.0:80…blic"]' not to match '/\b(CMD|ENTRYPOINT)\b.*php.*[…"']?/i' 'Cette ligne du Dockerfile ser…blic"]'.
+
+  at tests/Feature/Infra/ServeurHttpDeProductionTest.php:97
+     93▕         fn (string $ligne) => ! str_starts_with(ltrim($ligne), '#') && trim($ligne) !== ''
+     94▕     ));
+     95▕ 
+     96▕     foreach ($directives as $ligne) {
+  ➜  97▕         expect($ligne)->not->toMatch(
+     98▕             '/\b(CMD|ENTRYPOINT)\b.*php.*["\']?-S["\']?/i',
+     99▕             "Cette ligne du Dockerfile sert HTTP par `php -S`, qui traite une requête à la fois :\n    {$ligne}"
+    100▕         );
+    101▕     }
+
+  1   tests/Feature/Infra/ServeurHttpDeProductionTest.php:97
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Infra\ServeurHttpDeProductionTest > A-010 — le serv…   
+  Expected: # Axion CRM Pro — Dockerfile Laravel 12 + PHP 8.3 multi-stage\n
+  # Stages : composer-deps → php-base → dev → builder → prod\n
+  \n
+  ... (119 more lines)
+
+  To contain: CMD ["php-fpm", "-F"]
+
+  at tests/Feature/Infra/ServeurHttpDeProductionTest.php:113
+    109▕     // argument est donc cherché dans le fichier, et la garde rougit éternellement
+    110▕     // — y compris une fois le correctif posé. Vingtième cas du patron A-011,
+    111▕     // relevé le 2026-08-20 sur les gardes de cette branche elle-même.
+    112▕     // `assertStringContainsString()` porte, lui, un vrai message d'échec.
+  ➜ 113▕     $this->assertStringContainsString(
+    114▕         'CMD ["php-fpm", "-F"]',
+    115▕         $dockerfile,
+    116▕         'L\'étape `prod` doit démarrer php-fpm au premier plan.'
+    117▕     );
+
+  1   tests/Feature/Infra/ServeurHttpDeProductionTest.php:113
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Infra\ServeurHttpDeProductionTest > A-010 — le pool…   
+  Le banc ne voit pas infra/php/fpm-axion.conf. Une garde qui n'a rien à inspecter passe au vert sans rien prouver : monte la racine du dépôt avant de la croire.
+Failed asserting that false is true.
+
+  at tests/Feature/Infra/ServeurHttpDeProductionTest.php:63
+     59▕ 
+     60▕ function lireFichierDepot(string $relatif): string
+     61▕ {
+     62▕     $chemin = racineDepotHttp() . '/' . ltrim($relatif, '/');
+  ➜  63▕     expect(file_exists($chemin))->toBeTrue(
+     64▕         "Le banc ne voit pas {$relatif}. Une garde qui n'a rien à inspecter passe au vert " .
+     65▕         'sans rien prouver : monte la racine du dépôt avant de la croire.'
+     66▕     );
+     67▕
+
+  1   tests/Feature/Infra/ServeurHttpDeProductionTest.php:63
+  2   tests/Feature/Infra/ServeurHttpDeProductionTest.php:126
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Infra\ServeurHttpDeProductionTest > A-010 — Caddy p…   
+  Expected: # Axion CRM Pro — Caddy reverse proxy\n
+  # Dev local : api.localhost / app.localhost (cert auto-signe via tls internal)\n
+  # Prod : app.axion-crm-pro.com (single origin : /api + /sanctum -> backend, reste -> frontend)\n
+  ... (202 more lines)
+
+  Not to contain: reverse_proxy api:80
+
+  at tests/Feature/Infra/ServeurHttpDeProductionTest.php:152
+    148▕ 
+    149▕ test('A-010 — Caddy parle FastCGI a l api, plus HTTP', function () {
+    150▕     $caddy = lireFichierDepot('infra/caddy/Caddyfile');
+    151▕ 
+  ➜ 152▕     $this->assertStringNotContainsString(
+    153▕         'reverse_proxy api:80',
+    154▕         $caddy,
+    155▕         'L\'API n\'écoute plus en HTTP : un mandataire vers `api:80` renverrait 502.'
+    156▕     );
+
+  1   tests/Feature/Infra/ServeurHttpDeProductionTest.php:152
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Infra\ServeurHttpDeProductionTest > A-010 — le cont…   
+  Expecting '      test: ['CMD-SHELL', 'cu…it 1']' not to match '/healthcheck|test:|HEALTHCHEC…HELL/i' 'Contrôle de santé en HTTP sur…it 1']'.
+
+  at tests/Feature/Infra/ServeurHttpDeProductionTest.php:189
+    185▕             }
+    186▕             // Un contrôle de santé qui interroge en HTTP un conteneur devenu
+    187▕             // FastCGI échoue toujours : le conteneur est déclaré malsain, et
+    188▕             // le déploiement le redémarre en boucle.
+  ➜ 189▕             expect($ligne)->not->toMatch(
+    190▕                 '/healthcheck|test:|HEALTHCHECK|CMD-SHELL/i',
+    191▕                 "Contrôle de santé en HTTP sur un service qui ne sert plus HTTP, dans {$f} :\n    {$ligne}"
+    192▕             );
+    193▕         }
+
+  1   tests/Feature/Infra/ServeurHttpDeProductionTest.php:189
+
+
+  Tests:    5 failed, 1 passed (49 assertions)
+  Duration: 22.86s
+
+
+=== CONDITIONS DE CE ROUGE (agent 35, 2026-08-20) ===
+
+Constat : A-010 (S0). La PRODUCTION sert toute l'API par `php -S`, le serveur de
+developpement mono-processus de PHP. Mesure sur banc isole, douze requetes
+simultanees sur un script de 50 ms :
+
+  php -S, un processus ............ 0,054 -> 0,562 s   escalier, pas ~47 ms
+  php-fpm, reglage d'usine ........ 0,080 -> 0,316 s   encore un gradient
+  php-fpm, pool porte a 16 ........ 0,099 -> 0,190 s   plat
+
+Le reglage d'usine de l'image Docker officielle est `pm.max_children = 5`.
+Basculer sur php-fpm SANS toucher au pool aurait plafonne la concurrence a cinq,
+quand le principe directeur 8 du cahier des charges en demande dix : le pool
+fait partie du correctif, pas de son decor.
+
+Code mesure : l'etat exact du commit 22d1fd0 -- les cinq fichiers du correctif
+remis de cote par git stash, et `infra/php/fpm-axion.conf` (fichier neuf)
+deplace hors du depot le temps de la mesure.
+
+RESULTAT : 5 echecs sur 6.
+
+  Dockerfile.laravel ....... CMD ["php", "-S", "0.0.0.0:80", "-t", "public"]
+                             deux fois, dont l'etape `prod`
+  php-fpm non declare ...... 'CMD ["php-fpm", "-F"]' absent
+  pool ..................... infra/php/fpm-axion.conf n'existe pas ;
+                             c'est le TEMOIN DE MONTAGE qui le dit, pas un
+                             faux vert sur zero fichier
+  Caddy .................... ne parle pas FastCGI a l'api
+  controle de sante ........ interroge encore un port HTTP
+
+  VERT ATTENDU : le temoin de montage global (« le banc voit bien les fichiers
+  de deploiement »). Sans lui, cette garde passerait au vert sur zero fichier --
+  le pire des verts, et le defaut exact qui a ete trouve sur elle le 19/08 :
+  le conteneur ne montait que `backend/`.
+
+=== UN DEFAUT DE LA GARDE ELLE-MEME, TROUVE ET CORRIGE AVANT CE ROUGE ===
+
+Six assertions de ce fichier passaient un message d'echec en second argument de
+`expect()->toContain()`. Or `toContain()` de Pest est VARIADIQUE : ses arguments
+sont tous des valeurs a chercher. La garde cherchait donc sa propre phrase
+d'explication dans le Dockerfile et le Caddyfile, et serait restee ROUGE une
+fois le correctif pose.
+
+Le rouge du 19/08 (« 5 echecs sur 6 ») etait donc juste par accident : trois de
+ces cinq echecs portaient sur le mauvais objet. Remplacees par
+`assertStringContainsString()` / `assertStringNotContainsString()`, qui portent
+un vrai message. Le rouge ci-dessus est le rouge REMESURE, apres redressement.
+
+Vingtieme cas du patron A-011, releve sur les gardes de cette branche
+elles-memes -- le meme motif que P5-35-007, dans le meme lot.

@@ -139,6 +139,25 @@ return [
     | L4 — purges automatiques par univers (plan §2.8.3). À false, les
     | commandes `rgpd:purge-vivier` / `rgpd:purge-business-prospects` refusent
     | et le scheduler les saute : construites, testées, inertes.
+    |
+    | 🔴 B17-009 (S0), mesuré le 2026-08-20. « Inerte » n'est pas un état
+    | transitoire ici : `CRM_PURGE_ENABLED` n'apparaît que DEUX fois dans tout
+    | le dépôt — cette ligne, et `.env.example:258` — et vaut `false` aux deux.
+    | Aucun `docker-compose*.yml`, aucun fichier d'`infra/`, aucun workflow
+    | `.github/` ne le pose. Les deux SEULES purges RGPD correctement écrites du
+    | dépôt n'ont donc jamais tourné, et l'échéance CNIL (CVthèque 2 ans,
+    | prospection 3 ans) n'est tenue par aucun automatisme.
+    |
+    | Ce défaut ne se répare PAS en basculant ce défaut à `true` : cela
+    | déclencherait en production la suppression mensuelle de fiches candidats
+    | réelles. C'est un geste d'exploitant (STOP & ASK), pas un correctif
+    | d'audit. Ce qui a été réparé, c'est le SILENCE : le saut se journalise
+    | désormais en `warning` à chaque passage (cf. `routes/console.php`, closure
+    | `$purgeRgpdRetenue`), de sorte que l'inaction laisse une trace datée.
+    |
+    | POUR ACTIVER : poser `CRM_PURGE_ENABLED=true` dans l'environnement de
+    | production, puis vérifier une première fois à la main avec
+    | `artisan rgpd:purge-vivier --dry-run`.
     */
     'purges_enabled' => env('CRM_PURGE_ENABLED', false),
 

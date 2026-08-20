@@ -1,7 +1,9 @@
 <?php
 
+use App\Console\Commands\AuditVerifyChain;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
@@ -11,8 +13,37 @@ Artisan::command('inspire', function () {
 // --- Scheduled jobs ---------------------------------------------------------
 Schedule::command('coverage:refresh-matrix')->hourly();
 Schedule::command('blacklists:check')->hourly();
-Schedule::command('audit:verify-chain')->dailyAt('03:00');
-Schedule::command('retention:purge')->dailyAt('04:00');
+// 🔴 B16-006 / F39-006 / B17-003 (S1), mesure le 2026-08-20. Cette ligne etait
+// `Schedule::command('audit:verify-chain')->dailyAt('03:00');` — rien d'autre.
+// Le planificateur de Laravel N'INTERPRETE PAS le code de sortie d'une commande
+// planifiee : le `return self::FAILURE` de `AuditVerifyChain` disparaissait, et
+// sa sortie `$this->error(...)` partait sur un flux sans lecteur (ni
+// `sendOutputTo`, ni `emailOutputOnFailure` ici). Resultat mesure : une chaine
+// d'audit rompue restait rompue en silence jusqu'a ce que quelqu'un ouvre la
+// route de verification a la main. Une preuve dont la rupture n'alerte personne
+// n'est pas une preuve.
+//
+// `onFailure()` est le seul crochet du planificateur qui lise le code de sortie.
+// Il double l'alerte que la commande emet deja : la commande couvre l'appel
+// manuel, ce rappel couvre le cas ou elle meurt avant d'alerter (fatale, OOM,
+// conteneur tue) — dans ce cas elle n'a rien journalise, mais le planificateur
+// voit tout de meme un code de sortie non nul.
+Schedule::command('audit:verify-chain')
+    ->dailyAt('03:00')
+    ->onFailure(function (): void {
+        Log::critical(
+            AuditVerifyChain::PREFIXE_ALERTE . " : la tache planifiee de 03:00 "
+            . "s'est terminee en echec. La chaine d'audit est rompue ou "
+            . 'inverifiable — voir les lignes precedentes du journal.'
+        );
+    });
+// 🔴 B11-003 (S1) — la portee de `retention:purge` est desormais OBLIGATOIRE :
+// sans `--workspace=` ni `--all-workspaces`, la commande REFUSE (un `artisan`
+// lance sans y penser purgeait auparavant tous les locataires a la fois). La
+// tache PLANIFIEE, elle, veut bel et bien tous les espaces : on l'ecrit.
+// `--force` est requis par le trait `RefuseUneSuppressionMassive` en contexte
+// non interactif — c'est le meme aveu ecrit que pour les purges prospection.
+Schedule::command('retention:purge --all-workspaces --force')->dailyAt('04:00');
 Schedule::command('rgpd:anonymize-ips')->dailyAt('04:30');
 Schedule::command('anomaly:detect')->everyFifteenMinutes();
 Schedule::command('signals:nightly-scan')->dailyAt('02:00');
@@ -145,17 +176,51 @@ Schedule::command('media:clean-emails --threshold=10')->dailyAt('05:05')->withou
 // INERTES : le skip() saute le run tant que CRM_PURGE_ENABLED n'est pas à
 // true (et la commande elle-même refuse, double verrou). Mensuel vivier
 // (CNIL CVthèque 2 ans + refusés J+90), mensuel business (prospection 3 ans).
+//
+// 🔴 B17-009 (S0), mesuré le 2026-08-20 — « LES DEUX SEULES PURGES RGPD
+// CORRECTEMENT CONSTRUITES NE S'EXÉCUTENT JAMAIS ».
+//
+// `CRM_PURGE_ENABLED` vaut `false` aux deux seuls endroits où il est écrit
+// (`config/crm.php:143` par défaut, `.env.example:258`) et n'est écrit NULLE
+// PART ailleurs : ni `docker-compose.prod.yml`, ni `infra/`, ni `.github/`.
+// Recherche jouée sur tout le dépôt : 2 occurrences, toutes deux à `false`.
+// Ces deux purges sont donc sautées à CHAQUE passage mensuel depuis leur
+// écriture, et l'échéance CNIL (CVthèque 2 ans, prospection 3 ans) n'est tenue
+// par AUCUN automatisme.
+//
+// CE QUI EST RÉPARÉ ICI, ET CE QUI NE L'EST PAS.
+// Ouvrir le drapeau déclencherait en production la suppression mensuelle de
+// fiches candidats : c'est une décision d'exploitant, pas un correctif d'audit.
+// Ce qui EST un défaut réparable, en revanche, c'est que le saut était
+// **silencieux** : `->skip()` de Laravel n'écrit rien nulle part. Une échéance
+// légale suspendue sans trace est indistinguable d'une échéance tenue — c'est
+// exactement pour cela que personne ne s'en est aperçu. Le saut se JOURNALISE
+// désormais, en nommant le drapeau qui le retient.
+$purgeRgpdRetenue = function (string $commande): bool {
+    $ferme = ! filter_var(config('crm.purges_enabled', false), FILTER_VALIDATE_BOOLEAN);
+
+    if ($ferme) {
+        Log::warning(
+            "[RGPD] Purge « {$commande} » SAUTEE : CRM_PURGE_ENABLED n'est pas a true. "
+            . "L'echeance CNIL correspondante n'est tenue par aucun automatisme tant que "
+            . 'ce drapeau reste ferme (config crm.purges_enabled).'
+        );
+    }
+
+    return $ferme;
+};
+
 Schedule::command('rgpd:purge-vivier')
     ->monthlyOn(2, '03:30')
     ->withoutOverlapping()
     ->onOneServer()
-    ->skip(fn (): bool => ! filter_var(config('crm.purges_enabled', false), FILTER_VALIDATE_BOOLEAN));
+    ->skip(fn (): bool => $purgeRgpdRetenue('rgpd:purge-vivier'));
 
 Schedule::command('rgpd:purge-business-prospects')
     ->monthlyOn(2, '04:15')
     ->withoutOverlapping()
     ->onOneServer()
-    ->skip(fn (): bool => ! filter_var(config('crm.purges_enabled', false), FILTER_VALIDATE_BOOLEAN));
+    ->skip(fn (): bool => $purgeRgpdRetenue('rgpd:purge-business-prospects'));
 
 // Lot L5 (2026-08-14) — mini-outbox CRM → site : les oppositions nées dans la
 // console convergent vers le site (sinon les deux systèmes se réécrivent à des

@@ -98,6 +98,23 @@ function fichiersDeProduction(): array
         'infra/runbooks/03-site-down.md',
         'infra/runbooks/04-restore-dr.md',
         'infra/runbooks/05-rotate-secrets.md',
+
+        // 🔴 TROISIEME ELARGISSEMENT, ET LE MOTIF EST TOUJOURS LE MEME.
+        //
+        // Cette garde a d'abord couvert les workflows et les scripts : elle a
+        // trouve 4 invocations nues. Puis les runbooks : 7 de plus. Une passe a
+        // REGARD NEUF a ensuite trouve le douzieme chemin, ici, dans un fichier
+        // Compose -- que ma liste n'atteignait pas parce que je n'avais pas
+        // pense qu'un fichier Compose puisse PRESCRIRE une commande.
+        //
+        // Sa ligne 2 ecrit noir sur blanc :
+        //   docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
+        // c'est-a-dire SANS l'overlay de production.
+        //
+        // La lecon a ete payee trois fois : quand une garde enumere son
+        // perimetre a la main, ce n'est pas la garde qu'il faut croire, c'est
+        // l'ENUMERATION qu'il faut challenger.
+        'docker-compose.observability.yml',
     ];
 }
 
@@ -239,5 +256,64 @@ test('F38-007 — les services applicatifs dependent bien de postgres et redis',
         2,
         "L'overlay ne retire plus les publications de ports avec `!override`. Sans ce tag, "
         . 'Compose FUSIONNE les listes et la publication du fichier de base survit.'
+    );
+});
+
+/**
+ * LES NEUF PORTS D'ADMINISTRATION DE L'OBSERVABILITE — constat P6-INFRA-003 (S0).
+ *
+ * `docker-compose.observability.yml` publie Prometheus (9090), Alertmanager
+ * (9093), Grafana (3000), Loki (3100), Tempo (3200), OTLP (4317/4318),
+ * GlitchTip (8080) et Uptime Kuma (3001) — **tous sur toutes les interfaces**.
+ *
+ * Un `ports: - "3000:3000"` sans adresse se lie à `0.0.0.0`. Sur l'hôte de
+ * production, ces neuf portes sont donc ouvertes sur internet, dont un Grafana
+ * dont le mot de passe d'administration vit dans le même fichier.
+ *
+ * 🔑 **Et c'est le même mécanisme que la faille du 19 août** : Docker insère ses
+ * règles iptables AVANT celles d'ufw. `ufw status` annoncerait « 22/80/443
+ * seulement » pendant que la chaîne `DOCKER` accepterait `0.0.0.0/0 -> 3000`.
+ * C'est précisément ce qui avait fait conclure au rapport pare-feu de l'étape 0
+ * que tout allait bien.
+ *
+ * Le correctif est de lier à la boucle locale (`127.0.0.1:3000:3000`) : on
+ * atteint alors ces consoles par un tunnel SSH, ce qui est le seul mode d'accès
+ * légitime à une console d'administration.
+ */
+test('P6-INFRA-003 — les consoles d administration ne se publient pas sur toutes les interfaces', function () {
+    $chemin = racineDepotOverlay() . '/docker-compose.observability.yml';
+
+    expect(is_file($chemin))->toBeTrue(
+        "Le banc ne voit pas docker-compose.observability.yml : cette garde ne mesurerait rien."
+    );
+
+    $lignes = explode("\n", (string) file_get_contents($chemin));
+    $nues = [];
+
+    foreach ($lignes as $i => $ligne) {
+        // Une publication de port, hors montage de volume (`:ro`).
+        if (preg_match('/^\s*-\s*"(\S+)"/', $ligne, $m) !== 1) {
+            continue;
+        }
+        $valeur = $m[1];
+        if (str_contains($valeur, ':ro') || ! preg_match('/^[0-9.:]+$/', $valeur)) {
+            continue;
+        }
+        // `hote:conteneur` sans adresse = 0.0.0.0. Avec adresse, il y a deux ':'.
+        if (substr_count($valeur, ':') === 1) {
+            $nues[] = 'ligne ' . ($i + 1) . ' : ' . $valeur;
+        }
+    }
+
+    expect($nues)->toBe(
+        [],
+        "Ces consoles d'administration se publient sur TOUTES les interfaces.\n\n"
+        . "Docker insere ses regles iptables AVANT celles d'ufw : `ufw status` annoncera "
+        . "« 22/80/443 seulement » pendant que la chaine DOCKER acceptera 0.0.0.0/0 vers "
+        . "chacune d'elles. C'est le mecanisme exact de la faille du 2026-08-19, et la raison "
+        . "pour laquelle le rapport pare-feu de l'etape 0 concluait a tort que tout allait "
+        . "bien.\n\n"
+        . "Correctif : lier a la boucle locale (`127.0.0.1:3000:3000`) et atteindre ces "
+        . "consoles par un tunnel SSH.\n\nPorts nus :\n  - " . implode("\n  - ", $nues)
     );
 });

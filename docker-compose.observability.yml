@@ -1,5 +1,24 @@
 # Axion CRM Pro — stack observabilité auto-hébergée
-# Usage : `docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d`
+# ── L'OVERLAY DE PRODUCTION N'EST PAS OPTIONNEL DANS CETTE COMMANDE ─────────
+#
+# Cette ligne prescrivait la meme commande que ci-dessous, mais SANS
+# `docker-compose.prod.yml` -- la forme fautive n'est pas recopiee ici, pour
+# qu'on ne puisse pas la reprendre par inadvertance.
+#
+# Compose repart alors du seul fichier de base, qui PUBLIE Postgres sur 55432 et
+# Redis sur 56379 ; voyant une configuration differente de celle des conteneurs
+# en place, il les RECREE, ports compris. Ces deux ports ont ete trouves ouverts
+# depuis l'exterieur le 2026-08-19, et Redis n'a AUCUN mot de passe.
+#
+# La garde CI `config-prod` ne rend jamais cette combinaison de fichiers : elle
+# ne pouvait donc pas la voir. Constat P6-INFRA-003 (S0), releve par la passe a
+# regard neuf -- douzieme chemin vers la meme faille.
+#
+# Usage, SUR LA PRODUCTION :
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+#                  -f docker-compose.observability.yml up -d
+#
+# Sur un poste de developpement, remplacer `prod` par `local`.
 # 6 services : Prometheus + Grafana + Loki + Tempo + GlitchTip + Uptime Kuma
 
 services:
@@ -15,7 +34,18 @@ services:
       - --storage.tsdb.retention.time=30d
       - --web.enable-lifecycle
     ports:
-      - "9090:9090"
+    # 🔴 Lie a la BOUCLE LOCALE — constat P6-INFRA-003 (S0).
+    #
+    # `- "PORT:PORT"` sans adresse se lie a 0.0.0.0, donc a internet. Et Docker
+    # insere ses regles iptables AVANT celles d'ufw : `ufw status` annoncerait
+    # « 22/80/443 seulement » pendant que la chaine DOCKER accepterait le monde
+    # entier. C'est le mecanisme exact de la faille du 19/08, et la raison pour
+    # laquelle le rapport pare-feu de l'etape 0 concluait a tort que tout allait
+    # bien.
+    #
+    # Ces consoles s'atteignent par un tunnel SSH :
+    #   ssh -L PORT:127.0.0.1:PORT root@<serveur>
+      - "127.0.0.1:9090:9090"
     networks: [axion-crm]
 
   alertmanager:
@@ -24,7 +54,7 @@ services:
     volumes:
       - ./infra/monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     ports:
-      - "9093:9093"
+      - "127.0.0.1:9093:9093"
     networks: [axion-crm]
 
   grafana:
@@ -39,7 +69,7 @@ services:
       - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./infra/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     networks: [axion-crm]
 
   loki:
@@ -49,7 +79,7 @@ services:
     volumes:
       - loki-data:/loki
     ports:
-      - "3100:3100"
+      - "127.0.0.1:3100:3100"
     networks: [axion-crm]
 
   promtail:
@@ -70,9 +100,9 @@ services:
       - ./infra/monitoring/tempo/tempo.yaml:/etc/tempo.yaml:ro
       - tempo-data:/tmp/tempo
     ports:
-      - "3200:3200"
-      - "4317:4317"  # OTLP gRPC
-      - "4318:4318"  # OTLP HTTP
+      - "127.0.0.1:3200:3200"
+      - "127.0.0.1:4317:4317"  # OTLP gRPC
+      - "127.0.0.1:4318:4318"  # OTLP HTTP
     networks: [axion-crm]
 
   glitchtip:
@@ -85,7 +115,7 @@ services:
       GLITCHTIP_DOMAIN: http://glitchtip.localhost
       DEFAULT_FROM_EMAIL: noreply@axion-crm.local
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     networks: [axion-crm]
     depends_on: [postgres]
 
@@ -95,7 +125,7 @@ services:
     volumes:
       - uptime-data:/app/data
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
     networks: [axion-crm]
 
 volumes:

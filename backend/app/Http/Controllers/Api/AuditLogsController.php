@@ -24,8 +24,34 @@ class AuditLogsController extends ApiController
             return $this->ok(['data' => []]);
         }
 
+        // 🔴 CLOISONNEMENT PAR ESPACE DE TRAVAIL — constats B16-004 et P5-35-007.
+        //
+        // Cette requete etait `AuditLog::query()`, sans aucun filtre : le
+        // journal de TOUS les espaces etait rendu a quiconque franchissait la
+        // route. Un premier correctif a pose la permission `audit.view`, ce qui
+        // a repousse le compte en lecture seule — mais une permission separe
+        // les ROLES, jamais les CLIENTS. L'administrateur de l'espace A lisait
+        // toujours le journal de l'espace B.
+        //
+        // Le filtre est pose ICI, explicitement, et non par le global scope :
+        // `AuditLog` ne porte pas `BelongsToWorkspace`, et le drapeau
+        // `crm.strict_workspace_scope` est eteint. Un cloisonnement qui depend
+        // d'un drapeau eteint n'est pas un cloisonnement.
+        //
+        // Sans contexte d'espace, on ne rend RIEN : sur un journal d'audit, le
+        // doute se tranche en faveur du silence, jamais de la divulgation.
+        $espaceCourant = app()->bound('workspace.id') ? (string) app('workspace.id') : null;
+
         try {
-            $page = AuditLog::query()->orderByDesc('id')->paginate(50);
+            $page = AuditLog::query()
+                ->when(
+                    $espaceCourant !== null && $espaceCourant !== '',
+                    fn ($q) => $q->where('workspace_id', $espaceCourant),
+                    fn ($q) => $q->whereRaw('1 = 0'),
+                )
+                ->orderByDesc('id')
+                ->paginate(50);
+
             return $this->ok([
                 'data' => $page->items(),
                 'meta' => [

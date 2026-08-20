@@ -1,0 +1,59 @@
+
+   FAIL  Tests\Feature\Console\VerrousDuPlanificateurTest
+  ⨯ B17-002 — aucune tache planifiee ne garde le verrou par defaut de…  50.90s  
+  ✓ B17-002 — TEMOIN DE COUVERTURE : un balayage qui ne voit rien rougi… 3.46s  
+  ✓ B17-002 — TEMOIN NEGATIF : l instrument voit un TTL de 24 h et lais… 1.98s  
+  ✓ B17-002 — a 1440 le verrou tient encore 30 min plus tard, a 10 il e… 1.82s  
+  ✓ B17-002 — schedule:clear-cache RETIRE reellement un verrou reste po… 5.80s  
+  ⨯ B17-002 — le demarrage du planificateur libere les verrous restes p… 2.94s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Console\VerrousDuPlanificateurTest > B17-002 — aucu…   
+  Des verrous planifies ont un TTL hors bornes.
+Un verrou de 24 h laisse une tache tuee par un redeploiement a l arret pendant 24 h.
+TTL 1440 min (plafond 360) — '/usr/local/bin/php' 'artisan' rgpd:purge-vivier
+Failed asserting that two arrays are identical.
+  -Array &0 []
+  +Array &0 [
+  +    0 => 'TTL 1440 min (plafond 360) — '/usr/local/bin/php' 'artisan' rgpd:purge-vivier',
+  +]
+  
+
+  at tests/Feature/Console/VerrousDuPlanificateurTest.php:187
+    183▕     );
+    184▕ 
+    185▕     $reproches = b17002Reproches($evenements);
+    186▕ 
+  ➜ 187▕     $this->assertSame(
+    188▕         [],
+    189▕         $reproches,
+    190▕         "Des verrous planifies ont un TTL hors bornes.\n"
+    191▕         . "Un verrou de 24 h laisse une tache tuee par un redeploiement a l arret pendant 24 h.\n"
+
+  1   tests/Feature/Console/VerrousDuPlanificateurTest.php:187
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Console\VerrousDuPlanificateurTest > B17-002 — le d…   
+  Expected: #!/bin/sh\n
+  # =============================================================================\n
+  # Entrypoint de l'image `prod` — construit les caches AU DÉMARRAGE.\n
+  ... (79 more lines)
+
+  To contain: schedule:clear-cache
+
+  at tests/Feature/Console/VerrousDuPlanificateurTest.php:337
+    333▕ 
+    334▕     // TEMOIN — on lit bien l entrypoint de production, pas un autre fichier.
+    335▕     $this->assertStringContainsString('exec "$@"', $script);
+    336▕ 
+  ➜ 337▕     $this->assertStringContainsString(
+    338▕         'schedule:clear-cache',
+    339▕         $script,
+    340▕         'Le demarrage du planificateur doit liberer les verrous laisses par le processus tue. '
+    341▕         . 'Sans cela, le TTL borne est le SEUL filet, et il coute jusqu a ' . b17002Plafond() . ' minutes.',
+
+  1   tests/Feature/Console/VerrousDuPlanificateurTest.php:337
+
+
+  Tests:    2 failed, 4 passed (26 assertions)
+  Duration: 99.69s
+

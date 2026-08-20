@@ -1,0 +1,1141 @@
+
+   PASS  Tests\Feature\ActionsDeMasseTagsTest
+  ✓ poser un tag sur une sélection                                      50.61s  
+  ✓ reposer un tag déjà présent n’est pas une erreur, c’est une non-act… 1.02s  
+  ✓ retirer un tag d’une sélection                                       1.22s  
+  ✓ 🔴 un tag VERROUILLÉ est refusé — on ne fabrique pas une provenance  1.04s  
+  ✓ 🔴 un tag INCONNU est refusé — pas de création à la volée            0.91s  
+  ✓ 🔴 une fiche d’un AUTRE univers est ignorée, et le dit               1.35s  
+  ✓ 🔴 la sélection est BORNÉE — 501 identifiants sont refusés           1.31s  
+  ✓ un VIEWER ne peut rien modifier en masse                             1.51s  
+  ✓ l’action est posée comme décision HUMAINE, pas comme observation     1.30s  
+
+   PASS  Tests\Feature\ArretCollecteEtQuotaTest
+  ✓ C18-007 — le moniteur ne remet PAS companies_created a zero          2.20s  
+  ✓ C18-007 TEMOIN — le moniteur remonte bien le compteur quand les run… 0.65s  
+  ✓ C18-007 — une campagne plafonnee a 3 s'arrete a 3 entreprises       10.57s  
+  ✓ C18-007 TEMOIN — sans plafond atteint, les 10 entreprises sont bien… 4.67s  
+  ✓ C18-008 — apres annulation de la campagne, un job deja en file ne c… 1.59s  
+  ✓ C18-008 TEMOIN — sans annulation, le meme job collecte bien les 10   4.47s  
+  ✓ C18-008 — un arret en VOL interrompt la boucle du run en cours       8.70s  
+  ✓ C18-008 — le drapeau Redis cancelled:scraper-run:{id} est LU par le… 0.92s  
+  ✓ C18-008 TEMOIN — drapeau Redis absent : la collecte se fait normale… 0.83s  
+
+   PASS  Tests\Feature\Audiences\AudiencesLivreesCompilentTest
+  ✓ les sept audiences livrees par les seeders compilent toutes          0.85s  
+  ✓ TEMOIN : la meme boucle trouve une audience deliberement cassee      0.96s  
+
+   PASS  Tests\Feature\Audiences\SymetrieEvaluateursTest
+  ✓ 🔴 SQL et mémoire rendent le MÊME ensemble — dix opérateurs, deux c… 5.24s  
+  ✓ témoin — le jeu d’essai discrimine, et la sémantique arbitrée est e… 1.34s  
+
+   PASS  Tests\Feature\Auth\CourrielAuthentificationTest
+  ✓ F40-002 — hors simulacre, le lien magique PART reellement            3.28s  
+  ✓ F40-002 — hors simulacre, la reinitialisation PART reellement        0.89s  
+  ✓ F40-002 — TEMOIN : en simulacre, rien ne part et le lien est journa… 1.26s  
+  ✓ F40-002 — le transport des courriels d authentification est configu… 0.50s  
+
+   PASS  Tests\Feature\Auth\EffacementDouxAgent35Test
+  ✓ B10-016 TEMOIN — les quatre tables du lot portent reellement une co… 1.22s  
+  ✓ B10-016 TEMOIN — le banc cree bien les quatre sortes de lignes et s… 1.40s  
+  ✓ B10-016 — supprimer une entreprise la MASQUE et ne la detruit pas    0.69s  
+  ✓ B10-016 — supprimer un contact le MASQUE et ne le detruit pas        1.10s  
+  ✓ B10-016 — supprimer un compte le MASQUE et ne le detruit pas         0.87s  
+  ✓ B10-016 — supprimer un espace de travail le MASQUE et ne le detruit… 0.68s  
+  ✓ B10-016 — supprimer une entreprise n emporte pas ses contacts par c… 0.74s  
+  ✓ B10-016 — un compte supprime ne peut plus ouvrir de session          1.72s  
+  ✓ B10-016 — supprimer un compte invalide ses jetons d API deja emis    1.67s  
+  ✓ B10-016 — tout modele assis sur une table a deleted_at declare Soft… 2.16s  
+
+   PASS  Tests\Feature\Auth\GardesAuthentificationAgent35Test
+  ✓ F35-002 — l enrolement 2FA ecrit des colonnes qui existent vraiment  1.05s  
+  ✓ F35-002 — confirmer l enrolement pose first_login_completed_at et r… 0.86s  
+  ✓ F35-002 — un code de secours ne sert qu une fois                     1.01s  
+  ✓ F35-002 — GET /users ne selectionne aucune colonne inexistante       1.33s  
+  ✓ F35-003 — un compte a 2FA active ne franchit rien tant que le code…  2.52s  
+  ✓ F35-003 — les routes de la liste blanche restent joignables avant l… 0.72s  
+  ✓ F35-004 — HIBP injoignable : le mot de passe est REFUSE, jamais acc… 5.27s  
+  ✓ F35-004 — TEMOIN : HIBP joignable et mot de passe sain, la regle la… 1.04s  
+  ✓ F35-004 — TEMOIN : HIBP joignable et mot de passe compromis, la reg… 0.84s  
+  ✓ F35-005 — un jeton de reinitialisation de plus de 60 minutes est re… 2.84s  
+  ✓ F35-005 — TEMOIN : un jeton frais est accepte                        1.20s  
+  ✓ F35-005 — un jeton de reinitialisation ne sert qu une fois           0.85s  
+  ✓ F35-006 — reinitialiser le mot de passe revoque les jetons d API     1.06s  
+  ✓ F35-001 — une route protegee rend 401, jamais 500, quel que soit l…  0.77s  
+  ✓ F35-001 — aucune route nommee login n est requise par l application  0.74s  
+  ✓ F35-009 — un compte inconnu coute le meme travail cryptographique q… 1.70s  
+  ✓ F35-010 — un jeton d API cesse d etre accepte passe sa duree de vie  0.56s  
+  ✓ F35-010 — TEMOIN : sans duree de vie configuree, le meme jeton viei… 0.70s  
+  ✓ F35-011 — un mot de passe court mais CORRECT ouvre bien la session   0.51s  
+  ✓ F35-011 — TEMOIN : un mot de passe court et FAUX est refuse par l a… 0.78s  
+  ✓ F35-012 — un compte verrouille est refuse AVANT toute verification…  0.83s  
+  ✓ F35-012 — le compteur d echecs retombe apres la fenetre d oubli      0.69s  
+  ✓ F35-013 — aucun lien magique n est cree pour une adresse inconnue    0.80s  
+  ✓ F35-013 — un lien magique orphelin n ouvre pas de session sur un co… 0.57s  
+  ✓ F35-013 — TEMOIN : un lien magique normal ouvre bien la session, un… 0.88s  
+
+   PASS  Tests\Feature\Auth\LoginTest
+  ✓ login with correct credentials succeeds                              0.59s  
+  ✓ login with wrong password fails 422                                  0.73s  
+  ✓ login increments failed_login_count on wrong password                0.57s  
+  ✓ login locks user after 10 failed attempts                            0.90s  
+  ✓ login rejects locked account even with correct password              0.50s  
+  ✓ un mot de passe court et faux est refusé par l authentification, pa… 0.49s  
+  ✓ un mot de passe court mais CORRECT ouvre la session                  0.53s  
+  ✓ login throttles after 5 attempts per minute                          0.70s  
+  ✓ me endpoint returns 401 when not authenticated                       0.42s  
+  ✓ une requête SANS session reçoit un refus explicite, jamais une 500   0.67s  
+
+   PASS  Tests\Feature\Auth\OnboardingTourTest
+  ✓ POST /auth/onboarding/complete sans auth → 401                       0.69s  
+  ✓ POST /auth/onboarding/complete authentifié pose onboarding_tour_com… 0.66s  
+  ✓ POST /auth/onboarding/complete idempotent ne change pas la date      1.97s  
+  ✓ GET /auth/me expose onboarding_tour_completed_at                     0.44s  
+
+   PASS  Tests\Feature\CampaignsTest
+  ✓ store — création campagne draft par défaut                           0.65s  
+  ✓ store — scheduled_at futur → status scheduled                        0.42s  
+  ✓ store — sources hors whitelist rejetées                              0.52s  
+  ✓ store — zones vides rejetées                                         0.85s  
+  ✓ store — max_companies hors borne rejeté                              0.59s  
+  ✓ index — paginé + filtre status                                       1.11s  
+  ✓ show — campagne avec runs nested                                     0.67s  
+  ✓ show — cross-workspace → 404 (pas 403)                               0.43s  
+  ✓ update — autorisé en draft uniquement                                0.56s  
+  ✓ start — draft → running + LaunchCampaignJob dispatched               0.75s  
+  ✓ start — completed → 422 invalid_state                                0.59s  
+  ✓ pause — running → paused                                             0.51s  
+  ✓ resume — paused → running + monitor dispatched                       0.83s  
+  ✓ cancel — running → cancelled + runs cancelled                        5.32s  
+  ✓ destroy — soft delete                                                0.50s  
+  ✓ start cross-workspace → 404                                          0.56s  
+  ✓ shouldAutoPause — quota companies atteint                            0.58s  
+  ✓ shouldAutoPause — quota duration atteint                             0.41s  
+  ✓ shouldAutoPause — sous quotas → null                                 0.81s  
+  ✓ shouldAutoPause — campagne paused → null (pas de double pause)       0.47s  
+
+   PASS  Tests\Feature\Commands\AutomatismesDePurgeTest
+  ✓ A08-006 — rgpd:anonymize-ips tronque REELLEMENT les IP de plus de 3… 0.56s  
+  ✓ A08-006 — rgpd:anonymize-ips efface l IP des sessions anciennes, et… 0.65s  
+  ✓ B17-001 — retention:purge --dry-run n ECRIT RIEN, pas meme l UPDATE  0.44s  
+  ✓ B17-001 — TEMOIN POSITIF : sans --dry-run, la purge FAIT son travai… 0.64s  
+  ✓ B11-003 — retention:purge REFUSE de purger sans portee explicite     0.93s  
+  ✓ B11-003 — retention:purge --workspace ne touche QUE l espace vise    0.43s  
+  ✓ B11-003 — --all-workspaces purge bien les DEUX espaces (temoin)      0.68s  
+  ✓ B11-003 — la ligne PLANIFIEE de retention:purge porte sa portee, et… 1.47s  
+  ✓ B17-009 — les deux purges RGPD sont bien PLANIFIEES                  0.77s  
+  ✓ B17-009 — drapeau ferme : la purge est sautee, mais elle le DIT      0.65s  
+  ✓ B17-009 — TEMOIN : drapeau ouvert, la purge N EST PLUS sautee        0.60s  
+
+   PASS  Tests\Feature\Commands\GenerateMediaRedactionEmailsTest
+  ✓ it écrit redaction@ sur un domaine qui a des MX et laisse null les…  0.62s  
+  ✓ it --dry-run ne persiste aucun email                                 0.66s  
+  ✓ it est reprenable : ne retraite pas un média déjà pourvu d'un email  0.70s  
+
+   PASS  Tests\Feature\Commands\ImportMediaEmissionsFromWikidataTest
+  ✓ it parse une réponse SPARQL fake et insère émissions + présentateur… 1.63s  
+  ✓ it est idempotent : un 2e run n'ajoute aucun doublon                 1.26s  
+  ✓ it --dry-run ne persiste rien                                        0.72s  
+
+   PASS  Tests\Feature\Commands\ImportMediaRejeuSourceTest
+  ✓ it media:import-opendatasoft rejoue la meme source sans detruire en… 0.60s  
+  ✓ it media:import-opendatasoft ne vide pas la source quand la reponse… 0.47s  
+  ✓ it media:import-arcom rejoue la meme source sans detruire enrichiss… 0.60s  
+  ✓ it media:import-arcom ne vide pas la source quand le fichier ne con… 0.66s  
+  ✓ it archive au lieu de supprimer une fiche sortie du registre, et la… 2.01s  
+  ✓ it media:import-arcom --limit n archive pas les stations hors du lo… 0.66s  
+
+   PASS  Tests\Feature\Commands\JournalistsScrapeLlmTest
+  ✓ it upsert 2 journalistes quand le LLM en renvoie 2                   1.74s  
+  ✓ it ne crée aucun journaliste quand le LLM renvoie une liste vide     0.80s  
+  ✓ it refuse si MEDIA_JOURNALISTS_ENABLED est false                     0.61s  
+
+   PASS  Tests\Feature\Commands\MediaLinkToCompaniesTest
+  ✓ it rattache par SIREN exact                                          1.35s  
+  ✓ it rattache par nom exact UNIQUE (publisher)                         0.56s  
+  ✓ it NE rattache PAS un nom ambigu (2 companies même nom normalisé)    0.55s  
+  ✓ it NE rattache PAS quand aucune company ne correspond                0.87s  
+  ✓ it est idempotent et --dry-run n'écrit rien                          0.62s  
+
+   PASS  Tests\Feature\Commands\MediaSyncEmissionsFromParentTest
+  ✓ it fait hériter l'émission sans email/site/tél de sa chaîne parente  0.59s  
+  ✓ it N'ÉCRASE PAS un champ déjà rempli sur l'émission                  0.50s  
+  ✓ it est idempotent : un 2e run n'affecte aucune ligne                 0.65s  
+  ✓ it --dry-run ne persiste rien                                        0.63s  
+
+   PASS  Tests\Feature\Commands\MediaTagEmissionsStatusTest
+  ✓ it marque terminée l'émission avec P582 et actuelle celle sans       0.84s  
+  ✓ it parse correctement une réponse SANS aucun P582 (tout actuel)      1.27s  
+  ✓ it --dry-run ne persiste rien                                        1.16s  
+
+   PASS  Tests\Feature\Commands\ProspectionEnrichTest
+  ✓ it --with-website ne sélectionne que les entreprises à site vivant   0.80s  
+  ✓ it sans --with-website, la sélection est inchangée (inclut les sans… 0.90s  
+  ✓ it --shards=2 --shard=0 ne prend que les id pairs                    0.59s  
+  ✓ it --shard hors plage échoue proprement                              1.73s  
+
+   PASS  Tests\Feature\Commands\RescrapeArchivesCommandTest
+  ✓ it dispatches only companies older than --age-days threshold         0.86s  
+  ✓ it respects --workspace filter                                       0.61s  
+  ✓ it --dry-run does not push any job                                   0.60s  
+  ✓ it rejects invalid limit / reason                                    0.61s  
+
+   PASS  Tests\Feature\CompaniesControllerTest
+  ✓ index returns paginated empty list                                   1.41s  
+  ✓ store validates siren format 9 digits                                0.83s  
+  ✓ store creates company with valid siren                               1.35s  
+  ✓ update validates priority enum                                       1.41s  
+  ✓ update with valid priority succeeds                                  0.82s  
+  ✓ destroy soft-deletes company                                         0.85s  
+  ✓ recompute-score endpoint calls SQL function                          0.97s  
+  ✓ bulkEnrich queues jobs                                               0.93s  
+  ✓ F36-003 — un compte en LECTURE SEULE ne cree, ne modifie ni ne supp… 1.11s  
+
+   PASS  Tests\Feature\CompaniesExportTest
+  ✓ la colonne des spécialités santé porte la donnée, pas du vide        1.27s  
+  ✓ deux spécialités sur une même fiche sont jointes, sans doublon       1.13s  
+  ✓ une fiche sans praticien exporte une cellule vide, pas une erreur    1.22s  
+  ✓ l’export reste borné au workspace courant                            1.46s  
+
+   PASS  Tests\Feature\Console\AccueilEtRechercheTest
+  ✓ P6-UI-001 — /dashboard/stats compte les entreprises REELLES, pas ze… 0.98s  
+  ✓ P6-UI-001 — TEMOIN : une base VIDE rend bien zero, et c est legitim… 0.90s  
+  ✓ P6-UI-001 — /dashboard/stats ne compte PAS les entreprises d un aut… 0.98s  
+  ✓ P6-UI-001 — la forme du contrat attendue par l ecran est respectee   1.00s  
+  ✓ P6-UI-002 — /search retrouve une entreprise par sa denomination      0.96s  
+  ✓ P6-UI-002 — /search retrouve une personne par son nom                0.99s  
+  ✓ P6-UI-002 — /search ne rend RIEN d un autre espace de travail        1.11s  
+  ✓ P6-UI-002 — TEMOIN : sous deux caracteres, on ne balaie pas la base  1.10s  
+
+   PASS  Tests\Feature\Console\AlerteIntegriteChaineTest
+  ✓ B16-006 — une chaine ROMPUE fait sortir la commande en echec ET eme… 2.20s  
+  ✓ B16-006 — TEMOIN : une chaine INTACTE ne reveille personne           0.91s  
+  ✓ B16-006 — un secret inutilisable est annonce comme tel, pas comme u… 0.72s  
+  ✓ B16-006 — la tache de 03:00 existe bien et porte cet horaire         0.57s  
+  ✓ B16-006 — quand la tache de 03:00 ECHOUE, une alerte critique part   0.82s  
+  ✓ B16-006 — TEMOIN : quand la tache de 03:00 REUSSIT, rien ne part     0.51s  
+
+   PASS  Tests\Feature\ContactsIndexTest
+  ✓ la liste renvoie les contacts existants — pas un tableau vide        0.58s  
+  ✓ chaque ligne porte les champs que l’écran affiche                    0.81s  
+  ✓ la projection n’expose PAS les colonnes internes                     0.60s  
+  ✓ un contact d’un AUTRE workspace n’apparaît jamais                    1.10s  
+  ✓ filtre par statut e-mail                                             0.99s  
+  ✓ recherche par nom : préfixe, insensible à la casse, et JAMAIS « con… 1.37s  
+  ✓ filtre par pays — via l’entreprise rattachée                         1.11s  
+  ✓ filtre par statut de prospection — « contactables » ne ramène que l… 0.60s  
+  ✓ pays et statut se COMBINENT — c’est le cas d’usage réel              0.88s  
+  ✓ la pagination est bornée : per_page=1000 ne ramène pas 1000 lignes   0.79s  
+
+   PASS  Tests\Feature\Controllers\CoverageControllerTest
+  ✓ GET /coverage sans auth → 401                                        0.76s  
+  ✓ GET /coverage authentifié → OK avec cells                            0.75s  
+  ✓ GET /coverage?level=region authentifié → OK                          0.55s  
+  ✓ GET /coverage?level=city authentifié → OK                            0.60s  
+  ✓ GET /coverage/next-zone authentifié → OK                             0.86s  
+  ✓ POST /coverage/launch valide le département                          1.38s  
+  ✓ POST /coverage/launch accepte body valide                            1.15s  
+  ✓ POST /coverage/launch refuse limit > 1000                            1.18s  
+  ✓ GET /coverage/cells/42 retourne le détail cell                       0.79s  
+
+   PASS  Tests\Feature\Controllers\GlobalSearchAndDashboardTest
+  ✓ GET /search sans auth → 401                                          0.63s  
+  ✓ GET /search authentifié → OK structure groups                        0.86s  
+  ✓ GET /dashboard/stats sans auth → 401                                 0.64s  
+  ✓ GET /dashboard/stats authentifié → OK keys                           1.02s  
+  ✓ GET /dashboard/stats expose 5 quality buckets                        0.85s  
+  ✓ GET /dashboard/stats expose 5 size buckets                           0.81s  
+
+   PASS  Tests\Feature\Controllers\NotificationsControllerTest
+  ✓ GET /notifications sans auth → 401                                   0.86s  
+  ✓ GET /notifications authentifié → OK                                  0.91s  
+  ✓ POST /notifications/1/read retourne 501                              1.05s  
+  ✓ POST /notifications/read-all retourne 501                            0.60s  
+  ✓ GET /saved-views authentifié → OK liste vide                         1.43s  
+  ✓ GET /tags authentifié → OK                                           1.12s  
+  ✓ GET /audit-logs avec la permission audit.view -> OK                  1.13s  
+  ✓ P5-35-006 -- GET /audit-logs SANS la permission audit.view -> 403    0.84s  
+  ✓ GET /llm/use-cases authentifié → OK                                  0.73s  
+  ✓ GET /llm/usage authentifié → OK                                      0.71s  
+  ✓ GET /llm/usage/summary authentifié → OK                              0.62s  
+  ✓ GET /proxy-providers authentifié → OK                                1.28s  
+  ✓ GET /rotations authentifié → OK                                      0.68s  
+  ✓ GET /ai-act/register authentifié → OK                                1.73s  
+  ✓ GET /scraper-runs authentifié → OK                                   0.99s  
+  ✓ GET /contacts authentifié → OK                                       0.76s  
+
+   PASS  Tests\Feature\Controllers\Phase2StubsExtendedTest
+  ✓ Phase2 stubs sans auth retournent 401                                0.76s  
+  ✓ campaigns n'est plus un bouchon Phase 2 : 200 + liste paginée        0.87s  
+  ✓ Phase2 cold-email avec auth → 501                                    0.78s  
+  ✓ Phase2 linkedin avec auth → 501                                      0.55s  
+  ✓ Phase2 response shape inclus sprint metadata                         0.73s  
+
+   PASS  Tests\Feature\Controllers\Sprint189NoFiveHundredTest
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "works… 0.73s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "users… 0.76s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "compa… 0.95s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "conta… 1.26s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "cover… 1.04s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "cover… 1.04s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "cover… 0.61s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "cover… 0.49s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "cover… 0.86s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "rgpd…  0.96s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "ai-ac… 0.78s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "rotat… 0.82s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "proxy… 0.63s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "scrap… 1.03s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "audit… 0.93s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "audit… 1.02s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "tags"  0.72s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "llm u… 0.89s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "llm u… 0.72s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "llm u… 0.59s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "notif… 0.66s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "saved… 0.65s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "dashb… 0.68s  
+  ✓ endpoint {0} authentifié ne retourne JAMAIS 500 with dataset "searc… 0.70s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "work… 0.59s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "user… 0.73s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "comp… 0.86s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "cont… 1.04s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "cove… 1.16s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "cove… 0.77s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "cove… 1.08s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "cove… 0.71s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "cove… 0.61s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "rgpd… 0.78s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "ai-a… 0.69s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "rota… 0.64s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "prox… 0.53s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "scra… 0.72s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "audi… 0.71s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "audi… 1.11s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "tags… 1.63s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "llm…  0.60s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "llm…  0.83s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "llm…  0.57s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "noti… 0.47s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "save… 0.63s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "dash… 0.72s  
+  ✓ endpoint {0} sans auth retourne 401 (jamais 500) with dataset "sear… 0.60s  
+  ✓ broadcasting default = log par défaut sans REVERB_APP_KEY            0.80s  
+  ✓ routes/channels.php skip enregistrement quand driver = log           0.50s  
+  ✓ coverage cells endpoint retourne 200 même sans data                  0.64s  
+
+   PASS  Tests\Feature\Controllers\WorkspaceControllerTest
+  ✓ GET /workspace sans auth → 401                                       0.58s  
+  ✓ GET /workspace authentifié retourne le workspace courant             0.86s  
+  ✓ PUT /workspace retourne 501 (Sprint 3 stub)                          0.48s  
+  ✓ GET /users sans auth → 401                                           0.55s  
+  ✓ GET /users authentifié retourne liste vide stub                      0.88s  
+  ✓ POST /users retourne 501                                             0.58s  
+
+   PASS  Tests\Feature\Coverage\CooldownZoneTest
+  ✓ LANCER une zone pose désormais son cooldown                          1.09s  
+  ✓ relancer la MÊME zone met à jour la ligne, il n’y en a pas deux      0.49s  
+  ✓ deux zones DIFFÉRENTES ont chacune leur cooldown                     0.68s  
+  ✓ un département INEXISTANT ne casse pas le lancement — le cooldown e… 0.58s  
+  ✓ isZoneInCooldown bascule avec le marquage, et respecte l’échéance    0.63s  
+
+   PASS  Tests\Feature\Crm\ActivitesEtMotifsTest
+  ✓ les cinq activités du §2.3 sont livrées d'origine                    0.58s  
+  ✓ la formation est la SEULE activité soumise à Qualiopi                0.93s  
+  ✓ les onze motifs non commerciaux du §2.3 sont livrés d'origine        0.62s  
+  ✓ la candidature est le seul motif réservé à l'espace vivier           0.42s  
+  ✓ le code et la base disent la même chose                              0.48s  
+  ✓ un motif maison s'ajoute SANS migration (§29 critère 2)              0.70s  
+  ✓ une activité maison s'ajoute SANS migration                          0.51s  
+  ✓ un libellé modifié depuis la console SURVIT à un re-semis            0.43s  
+  ✓ un motif DÉSACTIVÉ depuis la console ne se rallume pas tout seul     0.64s  
+  ✓ un re-semis ne duplique aucune ligne                                 0.64s  
+  ✓ un motif ajouté à la main survit à un re-semis                       0.57s  
+  ✓ un slug en double est refusé par la base                             0.92s  
+  ✓ un espace hors référentiel est refusé par la base                    0.62s  
+  ✓ un libellé vide est refusé par la base                               0.55s  
+  ✓ les espaces reconnus sont exactement ceux du CHECK en base           0.49s  
+
+   PASS  Tests\Feature\Crm\BaseLegaleEtJoignabiliteTest
+  ✓ les quatre colonnes du constat existent — sinon la mesure ne mesure… 0.64s  
+  ✓ la mesure REFUSE de compter si une colonne du constat disparait      0.60s  
+  ✓ la mesure compte exactement les fiches sans AUCUN moyen de contact   0.76s  
+  ✓ la mesure compte exactement les fiches sans base legale, et par sou… 0.99s  
+  ✓ la colonne ne peut PAS contenir la chaine vide : le seul vide possi… 0.60s  
+  ✓ les fiches en suppression douce sont comptees A PART, jamais escamo… 0.99s  
+  ✓ les fiches sans provenance ne disparaissent pas du detail par sourc… 0.90s  
+  ✓ les fiches des DEUX espaces de travail sont comptees — la RLS n en…  0.88s  
+  ✓ une mesure qui ne trouve AUCUNE fiche echoue au lieu de rendre 0 %   0.94s  
+  ✓ sur zero fiche la part n est pas 0 % mais « non mesurable »          0.98s  
+  ✓ le drapeau --autoriser-base-vide rend le vide EXPLICITE, il ne le m… 1.28s  
+  ✓ au-dessus du seuil, la commande sort en echec et nomme le depasseme… 1.43s  
+  ✓ sous le seuil, la commande sort en succes                            0.95s  
+  ✓ la commande N ECRIT RIEN : aucune base legale n apparait apres son…  2.12s  
+  ✓ l ingestion du site pose une base legale sur la fiche personne qu e… 1.32s  
+  ✓ l ingestion RATTRAPE une fiche collectee qui n avait aucune base le… 1.05s  
+  ✓ la base legale posee appartient au vocabulaire ferme declare par Ta… 0.77s  
+
+   PASS  Tests\Feature\Crm\CanalSiteCrmTest
+  ✓ B14-005 : un site INJOIGNABLE (connexion refusee) ne consomme aucun… 1.18s  
+  ✓ B14-005 : 502 et 504 (passerelle) ne consomment aucun essai with (5… 0.66s  
+  ✓ B14-005 : 502 et 504 (passerelle) ne consomment aucun essai with (5… 0.68s  
+  ✓ B14-005 : un 429 (le site nous freine) ne consomme aucun essai       0.85s  
+  ✓ B14-005 : trois heures de panne ne perdent PAS l'opposition          1.08s  
+  ✓ B14-005 : le report PROLONGE laisse une trace datee (jamais de sile… 0.59s  
+  ✓ B14-005 : une ligne FRAICHE reportee n'alerte pas (une alerte perma… 0.48s  
+  ✓ B14-005 : un 500 consomme TOUJOURS un essai (ce n'est pas une indis… 0.54s  
+  ✓ B14-005 : un 422 abandonne toujours immediatement                    0.59s  
+  ✓ B14-010 : effacer un journaliste met un evenement erasure en file    1.07s  
+  ✓ B14-010 : un journaliste SANS email s'efface quand meme, sans messa… 0.65s  
+  ✓ B14-010 : un effacement HORS ESPACE (404) n'emet rien                0.60s  
+  ✓ B14-013 : les DEUX sens du canal sont fermes par defaut, symetrique… 0.94s  
+  ✓ B14-013 : canal a MOITIE ouvert (drapeau ON, destination absente) :… 0.50s  
+  ✓ B14-013 : drapeau OFF : aucune alerte (l'inertie est l'etat NOMINAL… 0.85s  
+
+   PASS  Tests\Feature\Crm\CleDePersonneTest
+  ✓ la derivation PHP reproduit au bit pres celle du site                0.45s  
+  ✓ la derivation SQL du remplissage rend la MEME cle que PHP et que le… 0.58s  
+  ✓ la normalisation est celle du site : espaces rognes, casse abaissee  0.56s  
+  ✓ sans secret configure, AUCUNE cle n est fabriquee — le CRM n invent… 0.51s  
+  ✓ sans email, pas de cle : on ne fabrique pas une identite depuis aut… 0.46s  
+  ✓ la COLLECTE pose desormais la cle sur la fiche personne qu elle cre… 0.99s  
+  ✓ le remplissage pose la cle sur le stock, par lots, et est rejouable  0.68s  
+  ✓ sans secret, le remplissage REFUSE et n ecrit rien                   0.70s  
+  ✓ la migration de remplissage remplit le stock, et se TAIT sans faire… 1.64s  
+
+   PASS  Tests\Feature\Crm\CompteursHubTest
+  ✓ les compteurs sont servis par un index couvrant, jamais par un bala… 1.01s  
+  ✓ deux affichages de suite ne recalculent pas les compteurs            1.62s  
+  ✓ la réponse dit à quand les chiffres remontent                        1.21s  
+  ✓ le cache des compteurs ne fuit pas vers un autre workspace           2.00s  
+  ✓ une action de masse fait bouger la pastille tout de suite            0.74s  
+  ✓ le calcul pose lui-même le contexte de workspace                     0.79s  
+
+   PASS  Tests\Feature\Crm\ConsoleV2Test
+  ✓ drapeau ferme : toutes les routes de la console repondent 404        1.03s  
+  ✓ drapeau ferme : /config/features reste joignable et annonce console… 0.81s  
+  ✓ drapeau ouvert : /config/features annonce les univers accessibles    0.86s  
+  ✓ contacts-hub liste les entreprises du workspace et filtre par type   0.69s  
+  ✓ contacts-hub ne voit jamais les entreprises d un autre workspace     0.84s  
+  ✓ contacts-hub : la vue par defaut ecarte la base froide               0.79s  
+  ✓ contacts-hub/counts agrege par type et par etape                     0.91s  
+  ✓ etancheite : un utilisateur business-only prend 403 sur le vivier    0.80s  
+  ✓ etancheite : un utilisateur business-only ne peut pas agir en masse… 0.73s  
+  ✓ etancheite : un membre du vivier lit le vivier                       0.64s  
+  ✓ etancheite : une appartenance REVOQUEE ne donne plus acces au vivie… 0.52s  
+  ✓ etancheite : le pointeur current_workspace_id ne suffit PAS a ouvri… 0.54s  
+  ✓ etancheite : l arbitrage n existe pas dans l univers vivier          0.72s  
+  ✓ timeline : agrege les activites business de la personne              0.75s  
+  ✓ timeline : un business-only voit le BOOLEEN vivier, jamais son cont… 0.83s  
+  ✓ timeline : un membre des deux univers voit les deux                  0.89s  
+  ✓ timeline : une cle malformee repond 404 sans interroger la base      0.65s  
+  ✓ arbitrage : la file liste les evenements orphelins, les plus ancien… 0.48s  
+  ✓ arbitrage : rattacher cree la fiche personne dedupliquee             0.87s  
+  ✓ arbitrage : rattacher NE DUPLIQUE PAS une personne deja connue       0.52s  
+  ✓ arbitrage : sans nom transmis, aucune fiche personne n est fabrique… 0.61s  
+  ✓ arbitrage : rattacher deux fois repond 409                           0.94s  
+  ✓ arbitrage : une entreprise d un autre workspace est introuvable      0.56s  
+  ✓ arbitrage : ecarter sort de la file et exige un motif                0.73s  
+  ✓ bulk set_lifecycle NE RECULE JAMAIS une etape business               0.58s  
+  ✓ bulk set_lifecycle NE RECULE JAMAIS une etape vivier                 0.61s  
+  ✓ bulk set_lifecycle journalise un stage_changed par fiche modifiee    0.69s  
+  ✓ bulk set_lifecycle refuse une etape hors de l univers demande        0.50s  
+  ✓ bulk add_tag et remove_tag posent et retirent le tag                 0.67s  
+  ✓ bulk add_tag refuse un tag hors referentiel du workspace             0.53s  
+  ✓ bulk n expose AUCUNE action de reclassement de type                  0.92s  
+  ✓ bulk ignore silencieusement les identifiants d un autre workspace    1.93s  
+
+   PASS  Tests\Feature\Crm\CrmOutboundTest
+  ✓ un événement d'origine SITE est REFUSÉ et ne laisse aucune ligne     0.55s  
+  ✓ les oppositions VENUES du site n'alimentent jamais l'outbox          0.57s  
+  ✓ la base elle-même refuse une origine autre que crm                   0.69s  
+  ✓ drapeau OFF : le producteur écrit, l'émetteur REFUSE, rien ne part   0.53s  
+  ✓ drapeau ON mais destination vide : l'émetteur refuse plutôt que de…  0.50s  
+  ✓ un 2xx solde la ligne et le corps est signé <timestamp>.<corps>                        0.65s  
+  ✓ le corps ne transporte JAMAIS l'email en clair                       0.50s  
+  ✓ un 422 abandonne IMMÉDIATEMENT (le rejeu échouerait éternellement)   0.52s  
+  ✓ un 503 fait ATTENDRE sans consommer de tentative                     0.42s  
+  ✓ un 500 consomme une tentative et programme un backoff                0.46s  
+  ✓ au plafond d'essais, la ligne passe en gave_up (état terminal visib… 0.52s  
+  ✓ une ligne non encore due n'est pas rejouée                           0.53s  
+  ✓ deux oppositions identiques encore en attente ne font qu'un message  0.41s  
+  ✓ une opposition décidée dans la console met un événement en file      0.61s  
+  ✓ le résumé d'observabilité expose les réceptions et le backlog        1.13s  
+
+   PASS  Tests\Feature\Crm\DoublonsPersonnesTest
+  ✓ elle compte exactement les doublons semes, casse repliee             0.53s  
+  ✓ la casse seule ne fait pas echapper un doublon                       0.75s  
+  ✓ la fiche en suppression douce est comptee a part, car l index UNIQU… 0.53s  
+  ✓ elle ne compte aucun doublon quand toutes les adresses sont distinc… 0.63s  
+  ✓ une base sans aucune fiche joignable ne rend PAS le verdict AMELIOR… 0.70s  
+  ✓ la meme adresse dans DEUX espaces n est pas un doublon               0.59s  
+  ✓ une table absente FAIT ECHOUER la mesure, elle ne la rend pas nulle  0.50s  
+  ✓ une table hors liste blanche est refusee, le nom de table n est jam… 0.43s  
+  ✓ le chiffre de production est fige, non nul, et coherent avec lui-me… 0.51s  
+  ✓ la comparaison au repere sait dire EMPIRE, STABLE et AMELIORE        0.47s  
+  ✓ le plafond fait echouer une tache planifiee quand la mesure le depa… 0.51s  
+  ✓ la mesure ne rend jamais une adresse en entier                       0.49s  
+  ✓ poser l unicite MAINTENANT echouerait en 23505, et le MEME index pa… 0.60s  
+  ✓ la meme absence d unicite frappe les tables de personne jumelles     0.42s  
+  ✓ elle mesure les quatre tables de personne, et ne fige un repere que… 0.60s  
+
+   PASS  Tests\Feature\Crm\ScrapedIngestTest
+  ✓ drapeau à OFF : /internal/scraper-result garde son comportement his… 0.65s  
+  ✓ drapeau à ON : le MÊME endpoint valide le pivot et ingère réellemen… 0.92s  
+  ✓ valeur par défaut du drapeau : fermé                                 0.70s  
+  ✓ une source hors registre est refusée (422), une source coupée est d… 0.64s  
+  ✓ le re-seed du registre ne RÉACTIVE jamais une source coupée à la ma… 0.58s  
+  ✓ chaque source du registre a son tag gouverné dérivé                  0.54s  
+  ✓ un champ inconnu fait REJETER le message (schéma pivot strict)       0.73s  
+  ✓ un scrapé naît FROID : prospect / nouveau / intérêt légitime, tagué… 0.69s  
+  ✓ le TÉLÉPHONE est posé sur la fiche personne (réparation de la perte… 0.70s  
+  ✓ le froid ne se réchauffe JAMAIS : un re-scrape ne touche ni cycle d… 0.78s  
+  ✓ BACKFILL-ONLY : le collecté n'écrase ni une valeur existante ni un…  0.56s  
+  ✓ rejouer le MÊME run est idempotent                                   0.62s  
+  ✓ sans SIREN : AUCUNE fiche créée, l'événement part en arbitrage avec… 0.48s  
+  ✓ un run en échec est consigné, aucune donnée écrite                   0.46s  
+  ✓ le dry-run parcourt le vrai funnel puis ne laisse RIEN en base       0.66s  
+  ✓ ANTI-RÉINSERTION : une personne opposée ne revient jamais par un re… 0.50s  
+  ✓ une boîte service ne devient JAMAIS une fiche personne               0.56s  
+  ✓ un email au domaine non résolvable est rejeté : pas de fiche sur un… 0.91s  
+  ✓ le marqueur backfill-src est accepté et rend le rollback CHIRURGICA… 0.44s  
+  ✓ le vocabulaire de assigned_by reste FERMÉ : une valeur inventée est… 0.53s  
+  ✓ implantations : un code pays invalide ou une clé inconnue rejettent… 0.95s  
+  ✓ une implantation est fusionnée dans signals et le tag implantation-<pays>… 0.70s  
+  ✓ BACKFILL-ONLY sur les implantations : une valeur existante n'est ja… 0.94s  
+  ✓ la resync AutoTagger ne supprime NI le tag src: NI le tag implantat… 0.53s  
+  ✓ filter[tag] retrouve le segment implantation-ro dans la liste (et d… 0.59s  
+  ✓ une entité SANS siren est créée, ancrée sur (pays, foreign_id)       0.51s  
+  ✓ les tags pays et nature sont posés : cibler les associations de Rou… 0.65s  
+  ✓ rejouer la MÊME entité ne crée pas de doublon (dédup par foreign_id… 0.48s  
+  ✓ deux entités étrangères DIFFÉRENTES coexistent (siren NULL ne les c… 0.53s  
+  ✓ BACKFILL-ONLY : une nature déjà posée n'est jamais réécrite          0.65s  
+  ✓ foreign_id sans country est REFUSÉ : un identifiant sans registre e… 0.49s  
+  ✓ une nature inventée est REFUSÉE (liste fermée, alignée sur le CHECK… 0.44s  
+  ✓ un siren annoncé avec un pays non-FR est REFUSÉ (contradiction)      0.54s  
+  ✓ ni siren ni foreign_id ni match_hint : refusé à la porte             0.49s  
+  ✓ les fiches FRANÇAISES existantes gardent country_code FR et aucun t… 0.54s  
+
+   PASS  Tests\Feature\Crm\SiteGdprTest
+  ✓ canal fermé : 503, la demande sera rejouée à la bascule              0.61s  
+  ✓ signature invalide : 401, et rien n'est appris de l'état du système  0.64s  
+  ✓ contrat strict : champ inconnu, action inconnue, clé invalide → 422  0.56s  
+  ✓ l'effacement atteint la fiche SYNCHRO (person_key) ET la fiche COLL… 0.68s  
+  ✓ l'effacement laisse le HASH en opposition par univers, jamais l'ema… 1.02s  
+  ✓ scope=vivier n'efface QUE le vivier                                  0.53s  
+  ✓ l'export agrège contacts, candidats, timelines et oppositions des d… 0.52s  
+  ✓ les purges refusent tant que CRM_PURGE_ENABLED est à OFF             0.73s  
+  ✓ purge vivier : 2 ans après la dernière interaction, refusés à J+90…  0.55s  
+  ✓ purge business : 3 ans sans interaction — jamais une personne qui a… 0.74s  
+
+   PASS  Tests\Feature\Crm\SiteSyncIngestTest
+  ✓ drapeau maître à OFF : 503 et aucune écriture                        0.74s  
+  ✓ drapeau candidats à OFF : le flux vivier reste fermé (503), rien n’… 0.66s  
+  ✓ valeurs par défaut des drapeaux : tout est fermé                     0.57s  
+  ✓ signature invalide : 401 et aucune écriture                          0.54s  
+  ✓ signature valide mais horodatage périmé : 401 (anti-rejeu)           0.79s  
+  ✓ secret absent côté CRM : aucune requête ne passe                     0.60s  
+  ✓ un champ inconnu fait REJETER le message (schéma strict)             1.16s  
+  ✓ le site ne peut pas choisir le type de relation ni le workspace      0.55s  
+  ✓ type d’événement, type de formulaire et person_key sont contrôlés    1.34s  
+  ✓ un tag hors namespace gouverné est refusé                            0.51s  
+  ✓ une demande d’audit crée une fiche classée, taguée et horodatée      0.56s  
+  ✓ une inscription newsletter porte la base légale CONSENTEMENT         0.71s  
+  ✓ le cycle de vie ne RECULE jamais                                     0.59s  
+  ✓ un lead SANS SIREN ne crée aucune fiche : il part en arbitrage       0.49s  
+  ✓ chaque type de formulaire accepté a un tag de provenance GOUVERNÉ    0.58s  
+  ✓ les slugs de provenance envoyés par le site sont tous gouvernés      0.75s  
+  ✓ un lead du simulateur de gains est accepté et porte sa provenance    0.67s  
+  ✓ rejouer le MÊME événement ne crée pas de doublon                     0.59s  
+  ✓ deux événements distincts de la même personne alimentent UNE fiche   1.12s  
+  ✓ fiche SCRAPÉE puis lead ENTRANT : fusion, pas de doublon, le déclar… 0.52s  
+  ✓ une candidature SANS consentement v2 est REJETÉE                     0.76s  
+  ✓ une candidature sans AUCUN consentement est REJETÉE                  0.55s  
+  ✓ une candidature v2 entre dans le VIVIER, jamais dans la base commer… 0.51s  
+  ✓ rejouer une candidature ne crée pas un second candidat               1.11s  
+  ✓ integration du STOCK (information + 30 j sans opposition) entre au…  0.74s  
+  ✓ une personne opposée n’est jamais réinsérée                          0.69s  
+  ✓ l’opposition d’un univers ne ferme pas l’autre                       0.53s  
+  ✓ une désinscription newsletter inscrit l’opposition côté business     0.49s  
+  ✓ une opposition n’écrit JAMAIS l’adresse en clair                     0.62s  
+  ✓ une opposition VIVIER est inscrite en scope vivier, pas business     0.44s  
+  ✓ une opposition VIVIER empêche le retour au vivier                    0.64s  
+  ✓ une opposition VIVIER ne désinscrit pas des communications business  0.69s  
+  ✓ un opt_out ne peut pas se DÉCLARER vivier sans viser une candidatur… 0.78s  
+
+   PASS  Tests\Feature\Crm\SocleCrmTest
+  ✓ les CHECK en base correspondent exactement à App\Crm\Taxonomy        0.91s  
+  ✓ Podcast et Autres sont des VUES, pas des types de relation           0.39s  
+  ✓ le référentiel de tags gouvernés est entièrement namespacé et catég… 1.68s  
+  ✓ les familles de métiers candidats forment une liste FERMÉE de quatr… 0.75s  
+  ✓ une company ne peut PAS porter un relation_type candidat             0.47s  
+  ✓ un candidat ne peut PAS porter un relation_type business             0.84s  
+  ✓ un candidat ne peut PAS vivre dans un workspace business (trigger)   0.45s  
+  ✓ déplacer un candidat vers un workspace business est refusé           0.53s  
+  ✓ candidates et candidate_tag portent FORCE RLS et une policy stricte  0.63s  
+  ✓ le workspace du vivier existe et est distinct du business            0.42s  
+  ✓ external_ref est unique par workspace — rejouer un import ne dupliq… 0.46s  
+  ✓ person_key LIE les deux univers sans jamais les fusionner            0.54s  
+  ✓ la conservation en vivier exige une version de consentement v2       0.43s  
+  ✓ une base légale hors référentiel est refusée                         0.40s  
+  ✓ l’opposition est portée par univers et par hash d’email              0.79s  
+  ✓ le namespace d’un tag est déduit de son slug, et vaut NULL sans nam… 0.71s  
+  ✓ tous les namespaces gouvernés se rattachent à une catégorie valide   0.63s  
+  ✓ un candidat peut être tagué par le pivot dédié                       0.58s  
+  ✓ les colonnes ajoutées portent des valeurs par défaut sûres           1.11s  
+
+   PASS  Tests\Feature\Database\AuditLogsPartitionnementTest
+  ✓ it convertit audit_logs en table partitionnée sans perdre les ligne… 1.52s  
+
+   PASS  Tests\Feature\Database\MaintenancePartitionsAuditTest
+  ✓ B10-003 : la maintenance des partitions est PLANIFIEE, elle ne depe… 0.43s  
+  ✓ B10-003 : la commande repousse REELLEMENT l horizon des partitions   1.06s  
+  ✓ B10-003 : sur une table qui n ecrit plus, la commande DIT pourquoi…  0.58s  
+  ✓ B10-003 : la commande REFUSE de rendre 0 quand pg_partman ne gere p… 0.56s  
+  ✓ B10-003 : la commande REFUSE de rendre 0 quand des lignes futures s… 0.65s  
+
+   PASS  Tests\Feature\Database\RafraichissementMatriceCouvertureTest
+  ✓ TEMOIN — le role applicatif ne peut PAS rafraichir la vue en direct  1.59s  
+  ✓ coverage:refresh-matrix aboutit lorsqu il tourne sur le role applic… 0.53s  
+  ✓ un echec de rafraichissement N EST PLUS MUET : code de sortie non n… 1.22s  
+
+   PASS  Tests\Feature\Database\ReconstructionAtteignableTest
+  ✓ TEMOIN — pg_partman dans public fait echouer le DROP global de migr… 2.14s  
+  ✓ la relocalisation rend le DROP global possible, et elle est rejouab… 1.35s  
+  ✓ la commande db:partman-relocaliser joue ce geste sur la connexion d… 1.01s  
+  ✓ le crochet migrate:fresh est arme : l evenement CommandStarting dec… 0.95s  
+  ✓ TEMOIN — le crochet ne se declenche PAS sur une autre commande       0.78s  
+
+   PASS  Tests\Feature\Database\ReconstructionBaseTest
+  ✓ it n'expose aucune table d'extension au DROP TABLE global de migrat… 0.59s  
+
+   PASS  Tests\Feature\EditionConcurrenteTest
+  ✓ TEMOIN de presence : la route ecrit vraiment, et la fiche existe en… 0.74s  
+  ✓ TEMOIN de compatibilite : SANS jeton, deux saisies concurrentes rep… 0.87s  
+  ✓ TEMOIN anti-409-systematique : un jeton A JOUR passe en 200 et l ec… 0.99s  
+  ✓ la reponse 200 porte un en-tete ETag, sinon aucun client ne peut ob… 0.97s  
+  ✓ If-Match perime : la seconde saisie est REFUSEE en 409 et la premie… 1.55s  
+  ✓ updated_at perime dans le corps : la seconde saisie est REFUSEE en…  1.52s  
+  ✓ TEMOIN : un updated_at A JOUR passe, a la precision entiere comme t… 0.75s  
+  ✓ MEME TRANSACTION : If-Match detecte encore le conflit, la ou update… 1.45s  
+  ✓ apres un 409, le jeton rendu permet de rejouer : le client CONVERGE… 1.08s  
+  ✓ un If-Match illisible est un conflit, pas une erreur serveur         0.64s  
+  ✓ le verrou ne parle JAMAIS avant le cloisonnement : une fiche d un a… 0.77s  
+  ✓ TEMOIN de non-contamination : PUT /tags reste inchange avec un If-M… 0.66s  
+
+   PASS  Tests\Feature\EligibiliteCampagneTest
+  ✓ sans adresse, une fiche n’est jamais éligible                        0.73s  
+  ✓ une opposition retire la fiche — comparaison sur l’empreinte         0.72s  
+  ✓ une opposition arrivée HACHÉE retire aussi la fiche                  0.73s  
+  ✓ une opposition de l’univers VIVIER ne retire pas une fiche business  0.62s  
+  ✓ le palier de confiance CIBLE, il ne conditionne pas le droit         0.55s  
+  ✓ l’inverse montre le RESTE À FAIRE, pas un ensemble vide              0.92s  
+  ✓ 🔴 la définition est FRAÎCHE : une opposition postérieure retire au… 0.44s  
+  ✓ le filtre HTTP expose la même définition                             0.64s  
+
+   PASS  Tests\Feature\Email\ZeptoMailWebhookTest
+  ✓ it répond 503 et n’écrit rien tant que le jeton n’est pas configuré… 0.77s  
+  ✓ it rejette un jeton absent ou faux (401) sans rien écrire            1.31s  
+  ✓ it inscrit un rebond dur par empreinte, jamais l’adresse en clair    0.94s  
+  ✓ it inscrit une plainte                                               0.71s  
+  ✓ it un rebond mou ne supprime qu’au seuil                             0.46s  
+  ✓ it rejouer le même webhook ne crée pas de doublon                    0.57s  
+  ✓ it un corps sans événement reconnu rend 200 avec des compteurs à zé… 0.94s  
+  ✓ it retrouve le destinataire dans email_info.to quand les détails ne… 0.48s  
+
+   PASS  Tests\Feature\EtancheiteParTableTest
+  ✓ l’inventaire des tables scopées est CALCULÉ, et ses exclusions sont… 1.04s  
+  ✓ les exclusions de la MIGRATION et celles des TESTS sont la même lis… 0.69s  
+  ✓ le semeur couvre TOUTES les tables scopées — aucune table nouvelle…  1.02s  
+  ✓ SANS contexte workspace, AUCUNE table scopée ne rend la moindre lig… 1.75s  
+  ✓ AVEC le contexte du workspace A, chaque table scopée ne rend QUE le… 1.91s  
+  ✓ toutes les tables scopées portent ENABLE + FORCE ROW LEVEL SECURITY  0.58s  
+  ✓ aucune policy ne rouvre un repli permissif — y compris sous la form… 0.69s  
+  ✓ TÉMOIN — le détecteur de repli permissif SAIT voir la forme COALESC… 0.77s  
+  ✓ TÉMOIN — la sonde « 0 ligne sans contexte » détecte réellement une…  0.82s  
+  ✓ TÉMOIN — FORCE ROW LEVEL SECURITY change bien le comportement du PR… 0.60s  
+  ✓ health_practitioners : le commentaire de 2026_07_04 annonce une pol… 2.23s  
+
+   PASS  Tests\Feature\EtancheiteUniversTest
+  ✓ 🔴 un viewer VIVIER ne lit AUCUNE fiche business                     1.66s  
+  ✓ le hub de contacts business est fermé à un membre du seul vivier     0.86s  
+  ✓ l’arbitrage des rapprochements, surface purement business, est ferm… 0.81s  
+  ✓ l’inverse tient aussi : un membre business ne lit pas le vivier      0.83s  
+  ✓ le pointeur d’univers ne vaut PAS appartenance                       1.64s  
+
+   PASS  Tests\Feature\ExportPermissionTest
+  ✓ un propriétaire peut exporter — la garde ne verrouille pas les ayan… 1.18s  
+  ✓ un opérateur peut exporter (la permission existe pour lui)           0.94s  
+  ✓ un viewer NE PEUT PAS exporter les entreprises                       1.39s  
+  ✓ un compte SANS aucun rôle ne peut pas exporter                       1.54s  
+  ✓ la garde couvre AUSSI les médias et les journalistes                 0.92s  
+  ✓ un viewer garde l’accès en LECTURE — on ferme l’export, pas la cons… 1.05s  
+
+   PASS  Tests\Feature\ExportsNominatifsTest
+  ✓ F36-008 : un ayant droit obtient bien le CSV des medias, pas un 500  1.02s  
+  ✓ F36-008 : un ayant droit obtient bien le CSV des journalistes, pas…  0.86s  
+  ✓ F36-008 : reparer le 500 ne rouvre PAS la porte aux opposes          0.86s  
+  ✓ B16-008 : les quatre exports laissent une trace au journal           0.85s  
+  ✓ B16-008 : le jeton de portabilite RGPD ne part PAS en clair au jour… 0.94s  
+  ✓ B16-008 : on trace les exports, PAS toutes les lectures              0.88s  
+  ✓ G41-007 : l export des entreprises s arrete au plafond et le DIT     1.21s  
+  ✓ G41-007 : sous le plafond, rien n est tronque ni annonce comme tel   1.43s  
+  ✓ G41-007 : le plafond couvre AUSSI les medias et les journalistes     0.89s  
+  ✓ G41-007 : le plafond par defaut est fini, et il est bas              0.74s  
+
+   PASS  Tests\Feature\FiltresDatesEtGeoTest
+  ✓ filtre « créées après » — la borne basse inclut le jour demandé      0.75s  
+  ✓ filtre « créées avant » — la borne haute couvre la JOURNÉE entière   0.68s  
+  ✓ les deux bornes se combinent en fenêtre                              0.53s  
+  ✓ une date ABÎMÉE ne filtre pas au hasard et ne casse rien             0.47s  
+  ✓ filtre par région et par département                                 0.61s  
+  ✓ le référentiel géographique sert les valeurs de la BASE              0.64s  
+  ✓ le filtre par tag reste utilisable — segment de campagne             0.71s  
+
+   PASS  Tests\Feature\HorodatagesFuseauTest
+  ✓ la session Postgres est alignée sur le fuseau de l’application       0.55s  
+  ✓ un horodatage écrit puis relu revient au même instant                0.53s  
+  ✓ l’auto-pause sur quota de durée mord APRÈS un aller-retour en base   0.62s  
+  ✓ ce que Postgres écrit lui-même reste juste                           0.55s  
+  ✓ une date reçue en UTC par l’ingestion survit à l’aller-retour en ba… 0.37s  
+
+   PASS  Tests\Feature\Infra\AucunMessageDansToContainTest
+  ✓ toContain — TEMOIN NEGATIF : le balayage sait distinguer un message… 0.86s  
+  ✓ toContain — aucun test du depot ne passe un MESSAGE a toContain      3.87s  
+
+   PASS  Tests\Feature\Infra\AucunSimulacreEnProductionTest
+  ✓ C18-016 — la carte de la garde couvre TOUTES les liaisons du provid… 0.41s  
+  ✓ C18-016 — TEMOIN : en TEST, les simulacres se branchent bien (les 1… 1.38s  
+  ✓ C18-016 — en PRODUCTION, un simulacre explicitement demande est REF… 1.36s  
+  ✓ C18-016 — en PRODUCTION sans AUCUNE variable, le defaut est le serv… 0.60s  
+  ✓ C18-016 — en PREPRODUCTION aussi, le defaut est le service REEL (le… 1.00s  
+  ✓ C18-016 — une valeur AMBIGUE ne rebranche pas un simulacre           0.43s  
+  ✓ C18-016 — TEMOIN NEGATIF : la mesure sait reperer un service laisse… 0.51s  
+
+   PASS  Tests\Feature\Infra\DebogageHorsLocalTest
+  ✓ F37-003 — TEMOIN : la sonde demarre et sait rendre une valeur        2.94s  
+  ✓ F37-003 — APP_DEBUG=true ne prend PAS effet en production            2.47s  
+  ✓ F37-003 — APP_DEBUG=true ne prend PAS effet en preproduction         3.12s  
+  ✓ F37-003 — le debogage reste possible sur un poste de developpement  10.72s  
+  ✓ F37-003 — TEMOIN : le banc voit les fichiers qui posent APP_DEBUG    0.63s  
+  ✓ F37-003 — TEMOIN NEGATIF : le balayage SAIT reperer un APP_DEBUG vr… 0.90s  
+  ✓ F37-003 — aucun fichier de deploiement ne pose APP_DEBUG a vrai      0.56s  
+
+   PASS  Tests\Feature\Infra\DiagnosticConnexionSansEcritureTest
+  ✓ diagnostic — TEMOIN : le banc voit bien le script                    0.41s  
+  ✓ diagnostic — TEMOIN NEGATIF : le filtre SAIT distinguer l execute d… 0.47s  
+  ✓ le diagnostic de connexion n EXECUTE aucune ecriture                 0.59s  
+  ✓ le diagnostic reste lisible meme quand tout echoue                   0.57s  
+
+   PASS  Tests\Feature\Infra\IndexEmailRgpdServentLesRequetesTest
+  ✓ C21-001 — TEMOIN : sans volume, la mesure ne mesure rien             0.50s  
+  ✓ C21-001 — TEMOIN : le volume est en place et la ligne cherchee EXI… 34.37s  
+  ✓ C21-001 — la deduplication par e-mail du scraping EMPLOIE son inde… 32.57s  
+  ✓ C21-001 — les chemins RGPD (art. 15 et art. 17) EMPLOIENT tous un…  30.96s  
+  ✓ C21-001 — les chemins repares n emploient plus lower(email::text)    1.21s  
+
+   PASS  Tests\Feature\Infra\IndexServentLesRequetesTest
+  ✓ G41-003 — TEMOIN : EXPLAIN distingue une colonne indexee d une colo… 0.60s  
+  ✓ G41-003 — la recherche par denomination EMPLOIE bien son index trig… 6.67s  
+  ✓ G41-003 — aucun nom d index n est reutilise pour une autre colonne   0.81s  
+
+   PASS  Tests\Feature\Infra\PileDeProductionSansOverlayTest
+  ✓ F38-007 — TEMOIN : le banc voit bien les fichiers de pilotage de la… 0.51s  
+  ✓ F38-007 — TEMOIN NEGATIF : le balayage SAIT reperer une invocation…  0.82s  
+  ✓ F38-007 — aucune commande visant la production ne recree la pile SA… 0.64s  
+  ✓ F38-007 — les services applicatifs dependent bien de postgres et re… 0.44s  
+  ✓ P6-INFRA-003 — les consoles d administration ne se publient pas sur… 0.46s  
+
+   PASS  Tests\Feature\Infra\PurgesDestructricesTest
+  ✓ B15-004 — la purge REFUSE d effacer la quasi-totalite de la base     0.57s  
+  ✓ B15-004 — l essai a blanc ne supprime RIEN                           0.60s  
+  ✓ B15-004 — TEMOIN : sous le plafond et avec --force, la purge FAIT s… 0.74s  
+  ✓ B15-004 — la purge des non diffusibles porte la MEME garde           1.09s  
+
+   PASS  Tests\Feature\Infra\RedemarrageNeRelitPasEnvTest
+  ✓ A07-003 — aucun script d infrastructure ne PRESCRIT « docker compos… 0.90s  
+  ✓ A07-003 — le script qui ECRIT les variables de production les VERIF… 0.84s  
+  ✓ A07-003 — TEMOIN : la garde SAIT reperer une prescription fautive    0.84s  
+  ✓ A07-003 — la garde a bien des fichiers a inspecter                   1.02s  
+
+   PASS  Tests\Feature\Infra\RunbookDisquePleinTest
+  ✓ B16-009 — retirer les PREMIERS maillons casse la chaine DEFINITIVEM… 0.60s  
+  ✓ B16-009 — le runbook AVERTIT avant de detacher des partitions audit… 0.58s  
+  ✓ B16-009 — l avertissement est AVANT la commande dangereuse, pas apr… 0.51s  
+
+   PASS  Tests\Feature\Infra\RunbookRestaurationDrTest
+  ✓ P6-DR — TEMOIN : le banc voit le runbook, et c est bien celui de la… 0.49s  
+  ✓ P6-DR — TEMOIN : le corpus du depot est bien peuple                  0.53s  
+  ✓ P6-DR — MESURE : le role axion contourne la RLS, son COUNT ne peut…  2.20s  
+  ✓ P6-DR — TEMOIN NEGATIF : le balayage des outils voit les fantomes d… 0.50s  
+  ✓ P6-DR — TEMOIN NEGATIF : « present dans le depot » ignore les comme… 1.47s  
+  ✓ P6-DR — TEMOIN NEGATIF : les balayages de chemins et de roles voien… 1.18s  
+  ✓ P6-DR — TEMOIN NEGATIF : un bloc non etiquete hors citation est rep… 0.37s  
+  ✓ P6-DR — le runbook ne nomme QUE des outils invoques ailleurs dans l… 1.25s  
+  ✓ P6-DR — tous les chemins de depot nommes par le runbook EXISTENT     0.44s  
+  ✓ P6-DR — le runbook nomme le VRAI chemin de restauration              0.53s  
+  ✓ P6-DR — aucun controle du runbook ne s appuie sur un role qui conto… 0.42s  
+  ✓ P6-DR — le runbook ne promet plus une sauvegarde horaire ni un stoc… 0.38s  
+
+   PASS  Tests\Feature\Infra\SauvegardeRestaureLesDroitsTest
+  ✓ A08-008 — TEMOIN : le banc a bien un role applicatif distinct du pr… 0.68s  
+  ✓ A08-008 — TEMOIN DU MECANISME : sans GRANT le role applicatif ne li… 0.69s  
+  ✓ A08-008 — TEMOIN : le banc voit les trois scripts de la chaine       0.49s  
+  ✓ A08-008 — TEMOIN NEGATIF : les balayages savent reperer le defaut E… 0.57s  
+  ✓ A08-008 — la sauvegarde emporte les ROLES du cluster                 0.48s  
+  ✓ A08-008 — la sauvegarde emporte les GRANT                            0.40s  
+  ✓ A08-008 — la restauration REPOSE les roles et VERIFIE avec le role…  0.56s  
+  ✓ A08-008 — les trois scripts partagent LES MEMES marqueurs de sectio… 1.34s  
+  ✓ A08-008 — l exercice de restauration ne se contente plus de compter… 0.53s  
+
+   PASS  Tests\Feature\Infra\ScriptMotDePasseVerdictsTest
+  ✓ P5-35-005 — TEMOIN : le banc voit bien le script                     0.68s  
+  ✓ P5-35-004 — un compte inexistant le DIT a l operateur                0.86s  
+  ✓ P5-35-004 — un mot de passe qui n arrive pas au conteneur le DIT     1.09s  
+  ✓ P5-35-004 — une sortie inattendue rend le diagnostic brut            1.22s  
+  ✓ P5-35-004 — TEMOIN : le succes reste un succes, et ne dit pas l ech… 1.23s  
+  ✓ F35-014 — TEMOIN : une banniere contenant OK ne passe pas pour un s… 1.10s  
+
+   PASS  Tests\Feature\Infra\ServeurHttpDeProductionTest
+  ✓ A-010 — TEMOIN : le banc voit bien les fichiers de deploiement       0.65s  
+  ✓ A-010 — aucune image ne sert HTTP par le serveur integre de PHP      0.50s  
+  ✓ A-010 — le service api demarre php-fpm, et le declare                0.87s  
+  ✓ A-010 — le pool php-fpm tient au moins les dix utilisateurs du cahi… 0.61s  
+  ✓ A-010 — Caddy parle FastCGI a l api, plus HTTP                       0.72s  
+  ✓ A-010 — le controle de sante n interroge plus un port HTTP disparu   0.47s  
+
+   PASS  Tests\Feature\Infra\TelescopeDesactiveParDefautTest
+  ✓ A-007 — TEMOIN : le paquet Telescope est bien la, et la sonde dema… 14.36s  
+  ✓ A-007 — sans TELESCOPE_ENABLED, Telescope N ENREGISTRE PAS en prod… 14.54s  
+  ✓ A-007 — sans TELESCOPE_ENABLED, Telescope N ENREGISTRE PAS en prep… 12.30s  
+  ✓ A-007 — le chemin deja emprunte par la suite de tests reste intact  14.68s  
+  ✓ A-007 — Telescope reste ACTIVABLE deliberement, sans redeploiement  16.77s  
+  ✓ A-007 — sous config:cache, les DEUX fournisseurs prennent la MEME…  34.48s  
+  ✓ A-007 — les DEUX fournisseurs prennent la meme decision             26.60s  
+
+   WARN  Tests\Feature\Infra\VolumeDeProductionHubConsoleTest
+  ✓ TEMOIN — le volume est REELLEMENT atteint                            6.42s  
+  ✓ TEMOIN — la garde DETECTE le defaut : la forme d avant correctif b… 11.02s  
+  ✓ G41-001 — l ecran d accueil ne balaie pas la table des etiquettes   15.39s  
+  ✓ G41-002 — la recherche du hub interroge la colonne INDEXEE          14.92s  
+  … G41-002 — RESTE OUVERT : le OU multi-champs annule l index trigramm… 6.34s  
+  ✓ G41-003 — le filtre par denomination EMPLOIE l index trigrammes      9.33s  
+  ✓ G41-004 — la liste entreprises partage le correctif du filtre        8.63s  
+  ✓ G41-002 — chercher sur la colonne normalisee TROUVE accents et arti… 7.96s  
+  ✓ G41-003 — le filtre par denomination TROUVE lui aussi accents et ar… 5.57s  
+  ✓ G41-001 — la vue par defaut garde EXACTEMENT le meme decoupage chau… 0.65s  
+
+   PASS  Tests\Feature\Internal\PatronHmacDeReferenceTest
+  ✓ P5-HMAC-001 — TEMOIN : le banc voit bien les deux fichiers a inspec… 0.71s  
+  ✓ P5-HMAC-001 — aucun commentaire ne designe scraper-result comme le…  0.37s  
+  ✓ P5-HMAC-001 — TEMOIN NEGATIF : la garde SAIT reperer une designatio… 0.44s  
+  ✓ P5-HMAC-002 — le secret du canal interne a une entree config, comme… 0.67s  
+  ✓ P5-HMAC-002 — le controleur lit son secret par config(), pas par en… 0.57s  
+  ✓ P5-HMAC-002 — TEMOIN : deplacer la lecture du secret ne rouvre pas…  0.47s  
+  ✓ P5-HMAC-002 — TEMOIN : avec un secret pose, une signature juste pas… 0.56s  
+  ✓ P5-HMAC-003 — le rejeu tardif reste ouvert sur scraper-result, et l… 0.49s  
+
+   PASS  Tests\Feature\Internal\SignatureCanalInterneTest
+  ✓ F37-001 — secret ABSENT : le canal refuse, il ne verifie pas « quan… 0.62s  
+  ✓ F37-001 — TEMOIN : avec un vrai secret, une signature VALIDE passe   0.56s  
+  ✓ F37-001 — TEMOIN : avec un vrai secret, une signature FAUSSE est re… 0.47s  
+  ✓ F37-001 — la signature de la CLE VIDE ne passe pas non plus quand u… 0.54s  
+
+   PASS  Tests\Feature\ListeSuppressionTest
+  ✓ un rebond dur retire la fiche des éligibles                          0.81s  
+  ✓ une plainte retire la fiche — c’est la réputation du domaine qui es… 0.46s  
+  ✓ la casse n’ouvre aucune brèche                                       1.19s  
+  ✓ un signal HACHÉ retire aussi la fiche                                1.24s  
+  ✓ une suppression du VIVIER ne retire pas une fiche business           0.62s  
+  ✓ deux signaux ne créent pas deux lignes — ils incrémentent            0.43s  
+  ✓ 🔴 une plainte ne se fait JAMAIS rétrograder par un rebond           0.77s  
+  ✓ un rebond TEMPORAIRE ne supprime pas au premier coup                 0.78s  
+  ✓ estSupprimee répond sur l’adresse quelle que soit sa casse           0.62s  
+  ✓ opposition ET suppression ferment chacune la porte, indépendamment   0.67s  
+  ✓ les adresses de PERSONNES sont protégées comme celles des entrepris… 0.99s  
+  ✓ une opposition retire aussi une PERSONNE                             0.62s  
+  ✓ peutRecevoir répond sur une adresse seule, quelle que soit sa prove… 0.65s  
+
+   PASS  Tests\Feature\MasquageCoordonneesTest
+  ✓ 🔴 un propriétaire voit les coordonnées EN CLAIR                     1.98s  
+  ✓ un opérateur aussi — il travaille la donnée                          1.72s  
+  ✓ un VIEWER ne voit que des coordonnées masquées                       1.49s  
+  ✓ un compte SANS rôle est masqué — la garde ferme par défaut           1.35s  
+  ✓ le masquage couvre AUSSI la liste entreprises et le hub console      0.93s  
+  ✓ le masque garde le domaine et la première lettre                     1.07s  
+  ✓ le masque du téléphone laisse de quoi vérifier, pas de quoi reconst… 1.77s  
+
+   PASS  Tests\Feature\MasquageFicheDetailleeTest
+  ✓ TEMOIN a clair : un proprietaire lit la fiche detaillee en entier    1.58s  
+  ✓ TEMOIN de presence : la fiche vue par un viewer porte bien une entr… 1.11s  
+  ✓ un viewer ne lit PAS la fiche entreprise en clair                    1.30s  
+  ✓ un viewer ne lit PAS les contacts imbriques de la fiche entreprise…  1.60s  
+  ✓ un viewer ne lit PAS la fiche contact en clair (site jumeau, non no… 4.22s  
+  ✓ un compte SANS role est masque sur la fiche detaillee — la garde fe… 2.47s  
+  ✓ le masquage de la fiche ne PERSISTE pas la valeur masquee en base    1.90s  
+
+   WARN  Tests\Feature\NeDoitPasRegresserTest
+  ✓ ACQUIS 1 — sans contexte workspace, le rôle applicatif ne voit AUCU… 1.87s  
+  ✓ ACQUIS 1 (suite) — le rôle applicatif n’est ni superutilisateur ni…  0.72s  
+  - ACQUIS 2 — un dump produit avec la recette de production se restaur… 0.86s  
+  ✓ ACQUIS 2 (suite) — la surveillance et l’exercice de restauration ex… 0.85s  
+  ✓ ACQUIS 3 — la session Postgres est alignée sur le fuseau de l’appli… 0.83s  
+  ✓ ACQUIS 3 — une date reçue en UTC survit à l’aller-retour en base     0.77s  
+  ✓ ACQUIS 3 — le réglage qui rend le verrou capable de rougir est touj… 1.14s  
+  ✓ ACQUIS 4 — l’export RGPD trouve la fiche par son EMPREINTE, même qu… 1.79s  
+  ✓ ACQUIS 4 (suite) — une empreinte INCONNUE ne rend rien : le filtre…  1.74s  
+
+   PASS  Tests\Feature\PasDeStub501SousCrmEtAnalyticsTest
+  ✓ 🔴 A1 — aucune route sous /crm ni /analytics n’est servie par un co… 1.17s  
+  ✓ 🔴 A2 — aucun fourre-tout {any} ne capture les sous-chemins de /crm… 0.93s  
+  ✓ 🔴 B — les routes RÉELLES de la console v2 sous /crm sont toujours…  0.86s  
+  ✓ 🔴 C1 — /api/v1/crm et /api/v1/analytics ne répondent 501 sur aucun… 1.34s  
+  ✓ 🔴 C2 — un sous-chemin inexistant sous /crm ou /analytics répond 40… 1.20s  
+  ✓ 🔴 C3 — le drapeau console v2 ouvert, /crm sert du code réel (200),… 0.77s  
+  ✓ /cold-email et /linkedin restent des bouchons 501 — choix assumé, h… 1.43s  
+
+   PASS  Tests\Feature\Phase2StubsTest
+  ✓ Phase 2 cold-email endpoint returns 501                              1.02s  
+  ✓ Phase 2 linkedin endpoint returns 501                                1.49s  
+  ✓ 501 response includes sprint Phase 2 marker                          1.46s  
+
+   PASS  Tests\Feature\Rgpd\AntiReinsertionTest
+  ✓ un effacement écrit l’EMPREINTE, que la garde du scraping sait lire  1.09s  
+  ✓ une opposition née du SITE (hash seul, sans email) est vue par isOp… 1.07s  
+  ✓ la normalisation de casse et d’espaces vaut pour l’empreinte comme…  1.12s  
+  ✓ une adresse jamais opposée reste scrapable                           0.82s  
+
+   PASS  Tests\Feature\Rgpd\ChaineAuditSecretTest
+  ✓ B16-001 — sans secret, la chaine ne se declare JAMAIS valide         0.89s  
+  ✓ B16-001 — le secret de developpement publie dans le code est REFUSE  1.56s  
+  ✓ B16-001 — TEMOIN : avec un vrai secret, une chaine intacte est vali… 1.68s  
+  ✓ B16-001 — TEMOIN : avec un vrai secret, une ligne falsifiee est det… 1.64s  
+  ✓ B16-001 — l endpoint dit POURQUOI il ne peut pas verifier            1.48s  
+
+   PASS  Tests\Feature\Rgpd\CloisonnementDesListesTest
+  ✓ P6-API — TEMOIN NEGATIF : l aplatissement retrouve bien une valeur…  1.36s  
+  ✓ P6-API-002 — GET /rgpd/requests ne rend PAS les demandes d un autre… 1.62s  
+  ✓ P6-API-001 — GET /journalists ne rend PAS les journalistes d un aut… 1.99s  
+  ✓ P6-API — GET /proxy-providers ne rend PAS les fournisseurs d un aut… 3.48s  
+  ✓ P6-API — GET /llm/use-cases ne rend PAS les cas d usage d un autre…  1.45s  
+
+   PASS  Tests\Feature\Rgpd\CloisonnementEspacesTest
+  ✓ F36-005 — un compte ne lit PAS la fiche entreprise d un autre espac… 1.28s  
+  ✓ F36-005 — un compte ne lit PAS la fiche contact d un autre espace    1.03s  
+  ✓ F36-005 — TEMOIN : chacun lit bien LES SIENNES                       1.26s  
+  ✓ F36-005 — les identifiants sont consecutifs : deviner ne coute rien  1.99s  
+
+   PASS  Tests\Feature\Rgpd\CloisonnementJournauxVerificationEmailTest
+  ✓ SANS contexte, le role applicatif ne voit AUCUN journal de verifica… 1.38s  
+  ✓ AVEC le contexte de l espace B, l espace A reste invisible           1.20s  
+  ✓ une ecriture SANS contexte est refusee, pas silencieusement ignoree  0.70s  
+  ✓ la policy permissive au nom raccourci n existe plus, et la stricte…  0.61s  
+  ✓ aucune table scopee ne porte de policy hors du nom canonique         0.97s  
+
+   PASS  Tests\Feature\Rgpd\CloisonnementTousLesSitesTest
+  ✓ B12-001 — ECRIRE sur une entreprise d un autre espace est refuse     1.08s  
+  ✓ B12-001 — ECRIRE sur un contact d un autre espace est refuse         1.15s  
+  ✓ B12-001 — une etiquette d un autre espace n est ni modifiable ni su… 1.83s  
+  ✓ B12-001 — SANS contexte d espace, on ne rend RIEN : la garde est fa… 2.08s  
+  ✓ B12-001 — TEMOIN : le banc voit bien des sites de liaison a inspect… 3.63s  
+  ✓ B12-001 — TEMOIN NEGATIF : le balayage SAIT reperer un site sans ga… 1.24s  
+  ✓ B12-001 — AUCUNE methode liant un modele cloisonne n est depourvue…  1.38s  
+
+   PASS  Tests\Feature\Rgpd\CoucheAutorisationAtteignableTest
+  ✓ F36-002 — authorize() EXISTE sur les controleurs d API               0.56s  
+  ✓ F36-002 — TEMOIN NEGATIF : le controle SAIT reperer une classe sans… 1.21s  
+  ✓ F36-002 — une policy appelee a travers la couche est REELLEMENT exe… 1.33s  
+  ✓ F36-001 — combien de controleurs invoquent REELLEMENT la couche : l… 1.45s  
+
+   PASS  Tests\Feature\Rgpd\EffacementConsoleAntiReinsertionTest
+  ✓ B15-001 — une personne effacee par la CONSOLE ne revient PAS au viv… 1.27s  
+  ✓ B15-001 — TEMOIN : une adresse jamais opposee entre bien au vivier   0.86s  
+  ✓ B15-001 — un effacement console inscrit l’opposition dans les DEUX…  0.69s  
+  ✓ B15-001 — la garde du VIVIER, requete a l’identique, voit l’opposit… 0.66s  
+  ✓ B15-001 — TEMOIN : une adresse jamais effacee n’est opposee dans AU… 0.69s  
+  ✓ B15-001 — un second effacement de la meme adresse ne duplique pas l… 0.83s  
+
+   PASS  Tests\Feature\Rgpd\EffacementResiduTest
+  ✓ B15-006 — apres effacement, ni le telephone ni l adresse ne subsist… 0.86s  
+  ✓ B15-006 — le telephone d un contact media est neutralise, pas seule… 1.01s  
+  ✓ B15-006 — TEMOIN : ce qui appartient a QUELQU UN D AUTRE n est pas…  0.81s  
+  ✓ B15-006 — TEMOIN : les listes d opposition SURVIVENT a l effacement  1.33s  
+
+   PASS  Tests\Feature\Rgpd\EffacementSanteTest
+  ✓ l’effacement console SUPPRIME le praticien de santé, il ne l’anonym… 0.84s  
+  ✓ l’effacement atteint aussi le praticien retrouvé par son TÉLÉPHONE   1.13s  
+  ✓ un praticien SANS rapport avec le sujet n’est jamais touché          1.31s  
+  ✓ aucune trace identifiante ne subsiste après effacement               1.56s  
+
+   PASS  Tests\Feature\Rgpd\EmpreinteCorpsConnexionTest
+  ✓ B16-005 — deux mots de passe differents laissent la MEME empreinte   0.92s  
+  ✓ B16-005 — TEMOIN : l empreinte distingue toujours DEUX COMPTES diff… 0.73s  
+  ✓ B16-005 — le masquage tient sur un corps IMBRIQUE                    0.68s  
+  ✓ B16-005 — les variantes du champ mot de passe sont couvertes         1.50s  
+  ✓ B16-005 — TEMOIN : un champ metier ordinaire entre TOUJOURS dans l…  2.19s  
+  ✓ B16-005 — MESURE : la ligne de connexion n est PAS servie par la ro… 2.06s  
+  ✓ B16-005 — la reinitialisation de mot de passe est couverte, comme l… 1.26s  
+
+   PASS  Tests\Feature\Rgpd\EmpreinteSqlEtPhpTest
+  ✓ 🔴 empreinte SQL et empreinte PHP coïncident sur toutes les formes…  0.94s  
+  ✓ témoin — l’empreinte PHP est bien sha256(mb_strtolower(trim)), sans… 1.00s  
+  ✓ 🔴 ÉCART CONNU ET DÉLIBÉRÉMENT FIGÉ — majuscule non-ASCII            0.78s  
+  ✓ la minuscule non-ASCII, elle, ne pose aucun problème                 1.12s  
+
+   PASS  Tests\Feature\Rgpd\ExportsRespectentOppositionsTest
+  ✓ un contact opposé par ADRESSE EN CLAIR est exclu                     0.85s  
+  ✓ un contact opposé par EMPREINTE SEULE (effacement) est exclu         1.14s  
+  ✓ un contact présent en liste de SUPPRESSION est exclu                 1.29s  
+  ✓ un contact SANS email traverse la garde — il ne s’est opposé à rien  0.98s  
+  ✓ un contact sans rapport reste exportable                             1.34s  
+  ✓ la casse et les espaces ne permettent pas de contourner la garde     1.01s  
+
+   PASS  Tests\Feature\Rgpd\GdprErasureTest
+  ✓ erasure deletes contacts matching email                              1.13s  
+  ✓ erasure adds opt_out entry                                           0.90s  
+  ✓ erasure runs in atomic transaction (rollback on failure)             2.23s  
+  ✓ erasure deletes email_validations entry                              1.11s  
+
+   PASS  Tests\Feature\Rgpd\JetonExportNonPersisteTest
+  ✓ B15-013 — le jeton de telechargement n est jamais ECRIT en base      4.76s  
+  ✓ B15-013 — TEMOIN : le reste du resultat est bien conserve            1.71s  
+
+   PASS  Tests\Feature\Rgpd\JournalAuditCloisonneTest
+  ✓ P5-35-007 — l administrateur d un espace ne lit QUE le journal de s… 2.18s  
+  ✓ P5-35-007 — le total annonce ne compte pas les lignes des autres es… 1.51s  
+  ✓ P5-35-007 — TEMOIN : chaque espace voit bien SON journal, pas un jo… 1.42s  
+  ✓ B16-004 — un compte en LECTURE SEULE reste refuse, meme sur son pro… 1.08s  
+
+   PASS  Tests\Feature\Rgpd\OppositionEmpreinteSeuleTest
+  ✓ 🔴 signal EN CLAIR côté appelant, empreinte en base : la fiche sort… 0.95s  
+  ✓ 🔴 signal HACHÉ en base (site), appelant qui ne connaît que le clai… 1.07s  
+  ✓ les PERSONNES sont protégées comme les entreprises                   0.94s  
+  ✓ un contact SANS adresse traverse la garde : on n’exclut personne po… 0.53s  
+  ✓ les deux univers restent étanches                                    0.82s  
+  ✓ 🔴 une opposition écrite par le SITE est vue par la garde du scrapi… 0.99s  
+  ✓ 🔴 une opposition écrite par un EFFACEMENT est vue par le site — ac… 0.69s  
+  ✓ un téléphone seul reste une opposition valable, sans empreinte d’ad… 1.07s  
+  ✓ 🔴 une ligne porteuse d’adresse SANS empreinte est REFUSÉE par la b… 0.74s  
+  ✓ 🔴 aucune ligne d’opposition ne porte plus d’adresse en clair après… 1.17s  
+  ✓ 🔴 la migration remplit l’empreinte des lignes héritées, avec le ca… 0.82s  
+  ✓ 🔴 la migration ÉCHOUE BRUYAMMENT sur une ligne irrécupérable, elle… 0.61s  
+
+   PASS  Tests\Feature\Rgpd\OppositionInseeNonDiffusibleTest
+  ✓ C19-010 — fetchBySiren REFUSE une unite legale non diffusible        0.60s  
+  ✓ C19-010 — fetchBySiren REFUSE aussi la diffusion PARTIELLE (statut…  0.48s  
+  ✓ C19-010 — TEMOIN : fetchBySiren rend bien une unite DIFFUSIBLE       0.56s  
+  ✓ C19-010 — TEMOIN : une unite SANS statut de diffusion reste collect… 0.45s  
+  ✓ C19-010 — la voie /siren ecarte les non diffusibles                  0.50s  
+  ✓ C19-010 — TEMOIN : la voie /siren rend TOUT quand tout est diffusib… 0.89s  
+  ✓ C19-010 — TEMOIN : la voie /siret ecartait DEJA les non diffusibles  1.16s  
+  ✓ C19-010 — RENFORT : l ETABLISSEMENT porte son PROPRE statut de diff… 0.66s  
+  ✓ C19-010 — TEMOIN : un etablissement SANS statut de diffusion reste…  0.71s  
+
+   WARN  Tests\Feature\Rgpd\OppositionVoieJumelleAnnuaireTest
+  ✓ C19-010 — TEMOIN : la voie jumelle rend bien une fiche sur une repo… 0.95s  
+  … C19-010 — RESTE OUVERT : la voie jumelle collecte quel que soit le…  0.62s  
+
+   PASS  Tests\Feature\Rgpd\PermissionsEcrituresTest
+  ✓ F36-003 — un compte LECTURE SEULE ne peut pas creer une etiquette    1.32s  
+  ✓ F36-003 — un compte LECTURE SEULE ne peut pas supprimer une etiquet… 1.24s  
+  ✓ F36-003 — un compte LECTURE SEULE ne peut pas creer une entreprise   1.09s  
+  ✓ F36-003 — un compte LECTURE SEULE ne peut pas supprimer une entrepr… 0.91s  
+  ✓ F36-003 — un OPERATEUR peut modifier mais PAS detruire (« CRUD sans… 0.85s  
+  ✓ F36-003 — TEMOIN : un ADMIN franchit toutes ces gardes               1.15s  
+  ✓ F36-003 — TEMOIN : la LECTURE reste ouverte a tous                   1.41s  
+
+   PASS  Tests\Feature\Rgpd\PermissionsRoutesRgpdTest
+  ✓ B15-010 — un compte en LECTURE SEULE ne peut pas deposer de demande… 2.01s  
+  ✓ B15-010 — un compte en LECTURE SEULE ne peut pas TRAITER une demand… 1.56s  
+  ✓ B15-010 — TEMOIN : le meme compte peut CONSULTER les demandes        1.38s  
+  ✓ B15-010 — TEMOIN : un OWNER peut, lui, traiter une demande           1.08s  
+  ✓ B16-004 — un compte en LECTURE SEULE ne peut pas lire le journal d…  1.03s  
+  ✓ B16-004 — TEMOIN : un ADMIN peut lire le journal d audit             1.45s  
+
+   PASS  Tests\Feature\Rgpd\PortabiliteCompleteTest
+  ✓ B15-003 — l export contient la TIMELINE de la personne               2.27s  
+  ✓ B15-003 — l export contient la fiche CANDIDAT                        2.09s  
+  ✓ B15-003 — TEMOIN : l export ne contient PAS les donnees de quelqu u… 1.52s  
+  ✓ B15-003 — INVARIANT : tout ce que l effacement supprime, l export l… 1.17s  
+  ✓ B10-004 — aucune table porteuse d’un identifiant de personne ne res… 0.59s  
+  ✓ B10-004 — chaque table DÉCIDÉE couverte est réellement lue par l’ex… 0.72s  
+  ✓ B10-004 — l export rend les listes d’opposition et de suppression q… 0.65s  
+  ✓ B10-004 — TEMOIN : les listes de QUELQU UN D AUTRE ne sortent pas d… 1.95s  
+  ✓ B10-004 — le VERDICT DE DELIVRABILITE porte sur son adresse : il es… 2.48s  
+  ✓ B10-004 — les NOTIFICATIONS internes qui la nomment sont exportees,… 1.26s  
+  ✓ B10-004 — les SIGNAUX ENVOYES AU SITE a son sujet sont exportes      1.44s  
+
+   WARN  Tests\Feature\Rgpd\PurgeNonDiffusibleVariantesTest
+  ✓ C19-010 — TEMOIN : la purge SAIT effacer la forme qu elle reconnait  1.40s  
+  … C19-010 — RESTE OUVERT : la purge ne voit ni « [ND] [ND] » ni la fi… 0.94s  
+
+   PASS  Tests\Feature\Rgpd\RegistreAiActTest
+  ✓ B16-007 — la route REND ce que le registre contient                  1.11s  
+  ✓ B16-007 — TEMOIN : un registre reellement vide rend une liste vide   1.28s  
+  ✓ B16-007 — TEMOIN : le registre d un AUTRE espace reste invisible     1.49s  
+  ✓ B16-007 — le registre peut etre RENSEIGNE par le produit             1.69s  
+  ✓ B16-007 — une classe de risque inventee est REFUSEE                  1.01s  
+  ✓ B16-007 — l espace de l entree est IMPOSE, jamais choisi par l appe… 1.38s  
+  ✓ B16-007 — un compte en lecture seule ne peut pas ecrire au registre  0.82s  
+
+   PASS  Tests\Feature\Rgpd\RgpdRequestsControllerTest
+  ✓ GET /rgpd/requests sans auth → 401                                   0.58s  
+  ✓ GET /rgpd/requests authentifié → OK                                  1.01s  
+  ✓ POST /rgpd/requests crée une demande                                 0.94s  
+  ✓ POST /rgpd/requests valide le type                                   1.65s  
+  ✓ POST /rgpd/requests valide email                                     1.58s  
+  ✓ POST /rgpd/requests accepte les 5 types valides                      1.28s  
+  ✓ GET /rgpd/export/{token} avec token invalide → 404                   0.48s  
+  ✓ GET /audit-logs/verify-chain authentifié → OK                        1.24s  
+  ✓ le lien de portabilité s’ouvre SANS authentification                 0.66s  
+  ✓ un jeton EXPIRÉ ne livre rien                                        0.98s  
+
+   PASS  Tests\Feature\Rgpd\RolePorteurDeLaRlsTest
+  ✓ la connexion PAR DEFAUT de la suite utilise un role SUPERUSER et BY… 0.51s  
+  ✓ le role applicatif existe et lui, ne contourne PAS la RLS — la barr… 0.55s  
+  ✓ les policies RLS sont nombreuses, en FORCE — et INERTES sur le chem… 0.61s  
+  ✓ le drapeau qui armerait la RLS est a OFF, et c est la seule chose q… 0.87s  
+
+   PASS  Tests\Feature\RlsTest
+  ✓ le rôle applicatif ne voit que son workspace                         0.91s  
+  ✓ sans contexte workspace, le rôle applicatif ne voit AUCUNE ligne     1.63s  
+  ✓ une écriture dans un AUTRE workspace est rejetée par la policy       1.09s  
+  ✓ une écriture SANS contexte est rejetée (pas un no-op silencieux)     0.92s  
+  ✓ un UPDATE croisé ne touche aucune ligne du workspace voisin          0.92s  
+  ✓ le rôle applicatif n’est ni superutilisateur ni BYPASSRLS ni propri… 0.67s  
+  ✓ en mode strict, une requête sans contexte workspace échoue bruyamme… 0.66s  
+  ✓ en mode strict, WorkspaceContext::run pose le contexte et le restau… 1.11s  
+  ✓ en mode strict, le contexte est restauré même si le job lève une ex… 0.65s  
+  ✓ runWithoutScope exige une justification écrite                       0.67s  
+  ✓ drapeaux par défaut : aucun durcissement actif                       1.16s  
+  ✓ drapeaux OFF : une requête sans contexte se comporte comme avant (a… 0.60s  
+  ✓ drapeau db_app_role à OFF : la connexion par défaut reste le rôle h… 1.11s  
+  ✓ sans contexte, un tag EXISTANT est invisible et son insertion est R… 0.79s  
+  ✓ la commande de backfill pose bien son contexte workspace (correctif… 1.01s  
+
+   PASS  Tests\Feature\ScraperRateLimitTest
+  ✓ coverage/launch — 11ème requête en moins d'1min → 429                1.92s  
+  ✓ scraper-launch limiter applique aussi à cancel + retry               1.46s  
+  ✓ scraper-list limiter : 61ème GET /scraper-runs en moins d'1min → 42… 1.68s  
+  ✓ rate limiter par-user : user A consume, user B pas affecté           1.81s  
+
+   PASS  Tests\Feature\ScraperRunsCancelRetryTest
+  ✓ cancel — run pending → 200 + status=cancelled                        5.29s  
+  ✓ cancel — run running → 200 + status=cancelled                        4.44s  
+  ✓ cancel — run success → 422 invalid_state                             0.86s  
+  ✓ cancel — cross-workspace → 404 (pas 403, pas de leak)                1.89s  
+  ✓ retry — run failed → 201 + nouveau run pending                       1.51s  
+  ✓ retry — run cancelled → 201 + nouveau run pending                    0.86s  
+  ✓ retry — run running → 422 invalid_state                              1.07s  
+  ✓ retry — cross-workspace → 404                                        0.89s  
+
+   PASS  Tests\Feature\Seeders\OwnerUserSeederTest
+  ✓ OwnerUserSeeder crée workspace + owner avec password depuis env      1.49s  
+  ✓ OwnerUserSeeder n écrit AUCUN secret quand OWNER_INITIAL_PASSWORD e… 2.93s  
+  ✓ OwnerUserSeeder pose bien le mot de passe quand OWNER_INITIAL_PASSW… 2.18s  
+  ✓ OwnerUserSeeder est idempotent (re-run ne casse pas)                 1.52s  
+  ✓ OwnerUserSeeder pose pivot user_workspaces avec role owner           1.15s  
+
+  Tests:    3 incomplete, 1 skipped, 909 passed (3183 assertions)
+  Duration: 1302.23s
+

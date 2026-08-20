@@ -1,0 +1,175 @@
+C19-010 (S1) — ROUGE REPRODUIT LE 2026-08-20, banc a35r, base axion_crm_test_lot1.
+
+Methode : le correctif etait deja pose ; pour PROUVER que la garde aurait trouve
+le defaut, j'ai retire temporairement les trois appels portes par le correctif dans
+backend/app/Services/Insee/HttpInseeClient.php (le filtre de la branche /siret,
+seul present a l'origine, a ete LAISSE en place) :
+  - fetchBySiren()            : l'appel a estDiffusible() commente
+  - branche /siren            : l'appel a estDiffusible() commente
+  - branche /siret, renfort   : le test statutDiffusionEtablissement commente
+Fichier restaure a l'identique juste apres (md5 a528a5cc01cf6622db709d583fd0b8c3).
+
+Resultat : 4 rouges, 5 verts. Les 5 verts sont les TEMOINS — ils prouvent que la
+garde ne rougit pas en bloc et qu'elle ne passerait pas au vert sur un client qui
+rendrait toujours vide.
+
+commande : docker exec a35r sh -c 'cd /var/www/html && ./vendor/bin/pest -c /tmp/a35r/phpunit-lot1.xml tests/Feature/Rgpd/OppositionInseeNonDiffusibleTest.php'
+
+════════════════════════════════════════════════════════════════════════════
+
+   FAIL  Tests\Feature\Rgpd\OppositionInseeNonDiffusibleTest
+  ⨯ C19-010 — fetchBySiren REFUSE une unite legale non diffusible       34.63s  
+  ⨯ C19-010 — fetchBySiren REFUSE aussi la diffusion PARTIELLE (statut…  1.57s  
+  ✓ C19-010 — TEMOIN : fetchBySiren rend bien une unite DIFFUSIBLE       1.41s  
+  ✓ C19-010 — TEMOIN : une unite SANS statut de diffusion reste collect… 0.70s  
+  ⨯ C19-010 — la voie /siren ecarte les non diffusibles                  0.94s  
+  ✓ C19-010 — TEMOIN : la voie /siren rend TOUT quand tout est diffusib… 1.65s  
+  ✓ C19-010 — TEMOIN : la voie /siret ecartait DEJA les non diffusibles  1.90s  
+  ⨯ C19-010 — RENFORT : l ETABLISSEMENT porte son PROPRE statut de diff… 1.48s  
+  ✓ C19-010 — TEMOIN : un etablissement SANS statut de diffusion reste…  1.53s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Rgpd\OppositionInseeNonDiffusibleTest > C19-010 — f…   
+  Failed asserting that App\Data\Sources\InseeCompanyData Object #2649 (
+    '_additional' => Array &0 [],
+    '_dataContext' => null,
+    'siren' => '111111111',
+    'denomination' => '[ND] [ND]',
+    'naf' => '62.01Z',
+    'legalForm' => '1000',
+    'effectifRange' => '11',
+    'address' => null,
+    'postcode' => null,
+    'city' => null,
+    'insee' => null,
+    'createdAt' => '2015-03-01',
+    'raw' => Array &1 [
+        'siren' => '111111111',
+        'statutDiffusionUniteLegale' => 'N',
+        'trancheEffectifsUniteLegale' => '11',
+        'dateCreationUniteLegale' => '2015-03-01',
+        'etatAdministratifUniteLegale' => 'A',
+        'periodesUniteLegale' => Array &2 [
+            0 => Array &3 [
+                'denominationUniteLegale' => null,
+                'prenom1UniteLegale' => '[ND]',
+                'nomUniteLegale' => '[ND]',
+                'activitePrincipaleUniteLegale' => '62.01Z',
+                'categorieJuridiqueUniteLegale' => '1000',
+                'etatAdministratifUniteLegale' => 'A',
+            ],
+        ],
+    ],
+    'etatAdministratif' => 'A',
+) is null.
+
+  at tests/Feature/Rgpd/OppositionInseeNonDiffusibleTest.php:148
+    144▕ 
+    145▕     // `WaterfallOrchestrator::step1_insee()` ECRIT `denomination` a partir de
+    146▕     // ce retour. Rendre la fiche masquee, c'est ecrire « [ND] [ND] » sur une
+    147▕     // personne qui a demande a ne pas etre diffusee.
+  ➜ 148▕     expect($rendu)->toBeNull();
+    149▕ });
+    150▕ 
+    151▕ test('C19-010 — fetchBySiren REFUSE aussi la diffusion PARTIELLE (statut P)', function () {
+    152▕     // Depuis 2023 l'INSEE distingue 'N' (non diffusible) et 'P' (partiellement
+
+  1   tests/Feature/Rgpd/OppositionInseeNonDiffusibleTest.php:148
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Rgpd\OppositionInseeNonDiffusibleTest > C19-010 — f…   
+  Failed asserting that App\Data\Sources\InseeCompanyData Object #3066 (
+    '_additional' => Array &0 [],
+    '_dataContext' => null,
+    'siren' => '222222222',
+    'denomination' => '[ND] [ND]',
+    'naf' => '62.01Z',
+    'legalForm' => '1000',
+    'effectifRange' => '11',
+    'address' => null,
+    'postcode' => null,
+    'city' => null,
+    'insee' => null,
+    'createdAt' => '2015-03-01',
+    'raw' => Array &1 [
+        'siren' => '222222222',
+        'statutDiffusionUniteLegale' => 'P',
+        'trancheEffectifsUniteLegale' => '11',
+        'dateCreationUniteLegale' => '2015-03-01',
+        'etatAdministratifUniteLegale' => 'A',
+        'periodesUniteLegale' => Array &2 [
+            0 => Array &3 [
+                'denominationUniteLegale' => null,
+                'prenom1UniteLegale' => '[ND]',
+                'nomUniteLegale' => '[ND]',
+                'activitePrincipaleUniteLegale' => '62.01Z',
+                'categorieJuridiqueUniteLegale' => '1000',
+                'etatAdministratifUniteLegale' => 'A',
+            ],
+        ],
+    ],
+    'etatAdministratif' => 'A',
+) is null.
+
+  at tests/Feature/Rgpd/OppositionInseeNonDiffusibleTest.php:161
+    157▕             'uniteLegale' => uniteLegaleInsee('222222222', 'P', personnePhysique: true),
+    158▕         ], 200),
+    159▕     ]);
+    160▕ 
+  ➜ 161▕     expect((new HttpInseeClient)->fetchBySiren('222222222'))->toBeNull();
+    162▕ });
+    163▕ 
+    164▕ test('C19-010 — TEMOIN : fetchBySiren rend bien une unite DIFFUSIBLE', function () {
+    165▕     // Sans ce temoin, un `return null` inconditionnel passerait la garde
+
+  1   tests/Feature/Rgpd/OppositionInseeNonDiffusibleTest.php:161
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Rgpd\OppositionInseeNonDiffusibleTest > C19-010 — l…   
+  Failed asserting that two arrays are identical.
+   Array &0 [
+       0 => '555555555',
+  +    1 => '666666666',
+  +    2 => '777777777',
+   ]
+  
+
+  at tests/Feature/Rgpd/OppositionInseeNonDiffusibleTest.php:215
+    211▕ 
+    212▕     // TEMOIN INTEGRE : la page contenait bien TROIS unites. Si le fake n'avait
+    213▕     // rien rendu, `$sirens` serait vide et l'assertion « pas de 666666666 »
+    214▕     // passerait sur du neant.
+  ➜ 215▕     expect($sirens)->toBe(['555555555']);
+    216▕ });
+    217▕ 
+    218▕ test('C19-010 — TEMOIN : la voie /siren rend TOUT quand tout est diffusible', function () {
+    219▕     Http::fake([
+
+  1   tests/Feature/Rgpd/OppositionInseeNonDiffusibleTest.php:215
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Rgpd\OppositionInseeNonDiffusibleTest > C19-010 — R…   
+  Failed asserting that two arrays are identical.
+   Array &0 [
+       0 => '303030303',
+  +    1 => '404040404',
+  +    2 => '505050505',
+   ]
+  
+
+  at tests/Feature/Rgpd/OppositionInseeNonDiffusibleTest.php:280
+    276▕     foreach ((new HttpInseeClient)->iterateByCriteria(['department' => '38', 'req_delay_ms' => 0]) as $c) {
+    277▕         $sirens[] = $c->siren;
+    278▕     }
+    279▕ 
+  ➜ 280▕     expect($sirens)->toBe(['303030303']);
+    281▕ });
+    282▕ 
+    283▕ test('C19-010 — TEMOIN : un etablissement SANS statut de diffusion reste collecte', function () {
+    284▕     // Meme raison que pour l'unite legale : le defaut est `'O'`. Ecarter les
+
+  1   tests/Feature/Rgpd/OppositionInseeNonDiffusibleTest.php:280
+
+
+  Tests:    4 failed, 5 passed (10 assertions)
+  Duration: 70.19s
+

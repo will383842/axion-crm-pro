@@ -1,0 +1,89 @@
+
+   FAIL  Tests\Feature\Rgpd\CoucheAutorisationAtteignableTest
+  ⨯ F36-002 — authorize() EXISTE sur les controleurs d API              47.58s  
+  ✓ F36-002 — TEMOIN NEGATIF : le controle SAIT reperer une classe sans… 1.05s  
+  ✓ F36-002 — une policy appelee a travers la couche est REELLEMENT exe… 4.21s  
+  ✓ F36-001 — combien de controleurs invoquent REELLEMENT la couche : l… 1.04s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Rgpd\CoucheAutorisationAtteignableTest > F36-002 —…    
+  `$this->authorize()` n'existe pas sur ApiController. Les 37 controleurs d'API en heritent : tout appel a la couche d'autorisation y est un appel FATAL, et c'est la cause mecanique de F36-001 (« la couche d'autorisation est du code mort »).
+Failed asserting that false is true.
+
+  at tests/Feature/Rgpd/CoucheAutorisationAtteignableTest.php:49
+     45▕ 
+     46▕ test('F36-002 — `authorize()` EXISTE sur les controleurs d API', function () {
+     47▕     // Le defaut n'etait pas subtil : la methode n'existait pas. Un appel la
+     48▕     // trouvait « undefined » et rendait 500.
+  ➜  49▕     expect(method_exists(ApiController::class, 'authorize'))->toBeTrue(
+     50▕         "`\$this->authorize()` n'existe pas sur ApiController. Les 37 controleurs d'API en "
+     51▕         . "heritent : tout appel a la couche d'autorisation y est un appel FATAL, et c'est la "
+     52▕         . "cause mecanique de F36-001 (« la couche d'autorisation est du code mort »)."
+     53▕     );
+
+  1   tests/Feature/Rgpd/CoucheAutorisationAtteignableTest.php:49
+
+
+  Tests:    1 failed, 3 passed (7 assertions)
+  Duration: 66.30s
+
+
+=== CONDITIONS DE CE ROUGE (agent 35, 2026-08-20) ===
+
+Constats F36-002 (S0, la CAUSE) et F36-001 (S0, l'EFFET). L'ordre compte.
+
+F36-001 dit : « aucune des policies n'est jamais invoquee : la couche
+d'autorisation du produit est du code mort ». Dix policies sont enregistrees
+dans AuthServiceProvider, ecrites, testables.
+
+F36-002 en donne la cause MECANIQUE, et elle tient en une ligne :
+`ApiController` etend `Illuminate\Routing\Controller` -- celle du FRAMEWORK, qui
+ne porte pas `AuthorizesRequests` depuis Laravel 11. La classe de base du DEPOT
+(`App\Http\Controllers\Controller`) la porte, elle, avec ce commentaire :
+« Retabli avec les traits standard (autorisation + validation) pour que tout
+controleur suivant la convention fonctionne ». Mais AUCUN controleur d'API ne
+l'etend : les 37 etendent `ApiController`.
+
+Consequence mesuree : `$this->authorize()` levait « Call to undefined method »,
+et le depot n'en contenait AUCUNE occurrence. Une porte fermee a clef dont la
+serrure n'est reliee a rien.
+
+RESULTAT DU ROUGE : 1 echec sur 4.
+
+  authorize() n'existe pas sur ApiController -> ECHEC
+
+  TROIS VERTS, ET LE TROISIEME EST LE PLUS INSTRUCTIF :
+  - le temoin negatif (le controle sait distinguer une classe sans le trait) ;
+  - le compteur de F36-001, a zero ;
+  - « une policy appelee a travers Gate est REELLEMENT executee » -- VERT DES
+    LES DEUX COTES. Le defaut n'est donc PAS dans les policies : elles marchent.
+    Il est dans le fait que les controleurs ne peuvent pas les appeler.
+
+    Ce test remplace la policy par un temoin qui note son propre appel : c'est le
+    seul moyen de distinguer « la policy dit oui » de « personne n'a demande a la
+    policy ». Un `allows()` qui rend true ne dit pas lequel des deux.
+
+=== CE QUE CE CORRECTIF NE FAIT PAS, ET C'EST ECRIT DANS LE CODE ===
+
+Il rend `authorize()` APPELABLE. Il n'appelle rien. Les 37 controleurs restent
+sans verification de policy, et F36-001 RESTE OUVERT : cabler route par route
+change le comportement de ~110 points d'API, c'est un choix de conception, pas un
+correctif (regle 7 du mandat).
+
+Le dernier test FIGE le compte a zero, et rougira au premier cablage -- avec un
+message qui dit « bonne nouvelle, mets a jour le compte, et verifie que chaque
+appel ajoute a sa garde ». Un constat laisse ouvert sans compteur se perd.
+
+=== UN DEFAUT DE LA GARDE, LE TROISIEME DU MEME GENRE AUJOURD'HUI ===
+
+Le compteur signalait `ApiController.php` comme appelant `$this->authorize()` --
+parce que le DOCBLOC qui explique le correctif contient cette chaine. Un compteur
+d'appels qui compte la prose ne compte pas des appels.
+
+C'est la troisieme fois de la journee qu'une garde prend mon commentaire pour du
+code (les deux precedentes : `diag-website-status.yml` et
+`docker-compose.observability.yml`, ou j'avais recopie la commande fautive).
+
+Corrige par `token_get_all()` -- le tokeniseur de PHP, qui sait exactement ou
+finit un commentaire, la ou une expression reguliere ne le sait pas.
+
+APRES CORRECTIF : 4 verts. Et 130 verts sur tout tests/Feature/Rgpd.

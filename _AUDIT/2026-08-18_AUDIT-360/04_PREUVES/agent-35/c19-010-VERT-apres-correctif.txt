@@ -1,0 +1,32 @@
+C19-010 (S1) — VERT APRES CORRECTIF, 2026-08-20, banc a35r, base axion_crm_test_lot1.
+
+Contexte : le dossier ENTIER tests/Feature/Rgpd/ (26 fichiers) a ete joue juste avant
+et rend 143 verts / 2 incomplets / 0 rouge (Duration 675.35s). Les 2 incomplets sont
+VOULUS et documentes : la purge de rattrapage, et la voie jumelle annuaire.
+
+Detail des trois fichiers du constat :
+commande : docker exec a35r sh -c 'cd /var/www/html && ./vendor/bin/pest -c /tmp/a35r/phpunit-lot1.xml tests/Feature/Rgpd/OppositionInseeNonDiffusibleTest.php tests/Feature/Rgpd/PurgeNonDiffusibleVariantesTest.php tests/Feature/Rgpd/OppositionVoieJumelleAnnuaireTest.php'
+════════════════════════════════════════════════════════════════════════════
+
+   PASS  Tests\Feature\Rgpd\OppositionInseeNonDiffusibleTest
+  ✓ C19-010 — fetchBySiren REFUSE une unite legale non diffusible       33.59s  
+  ✓ C19-010 — fetchBySiren REFUSE aussi la diffusion PARTIELLE (statut…  1.81s  
+  ✓ C19-010 — TEMOIN : fetchBySiren rend bien une unite DIFFUSIBLE       3.91s  
+  ✓ C19-010 — TEMOIN : une unite SANS statut de diffusion reste collect… 1.58s  
+  ✓ C19-010 — la voie /siren ecarte les non diffusibles                  0.98s  
+  ✓ C19-010 — TEMOIN : la voie /siren rend TOUT quand tout est diffusib… 1.25s  
+  ✓ C19-010 — TEMOIN : la voie /siret ecartait DEJA les non diffusibles  0.97s  
+  ✓ C19-010 — RENFORT : l ETABLISSEMENT porte son PROPRE statut de diff… 1.20s  
+  ✓ C19-010 — TEMOIN : un etablissement SANS statut de diffusion reste…  0.92s  
+
+   WARN  Tests\Feature\Rgpd\PurgeNonDiffusibleVariantesTest
+  ✓ C19-010 — TEMOIN : la purge SAIT effacer la forme qu elle reconnai… 29.81s  
+  … C19-010 — RESTE OUVERT : la purge ne voit ni « [ND] [ND] » ni la fi… 1.87s  
+
+   WARN  Tests\Feature\Rgpd\OppositionVoieJumelleAnnuaireTest
+  ✓ C19-010 — TEMOIN : la voie jumelle rend bien une fiche sur une repo… 0.87s  
+  … C19-010 — RESTE OUVERT : la voie jumelle collecte quel que soit le…  1.37s  
+
+  Tests:    2 incomplete, 11 passed (20 assertions)
+  Duration: 95.77s
+

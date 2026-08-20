@@ -1,0 +1,12 @@
+
+   PASS  Tests\Feature\Console\VerrousDuPlanificateurTest
+  ✓ B17-002 — aucune tache planifiee ne garde le verrou par defaut de…  61.40s  
+  ✓ B17-002 — TEMOIN DE COUVERTURE : un balayage qui ne voit rien rougi… 3.36s  
+  ✓ B17-002 — TEMOIN NEGATIF : l instrument voit un TTL de 24 h et lais… 3.05s  
+  ✓ B17-002 — a 1440 le verrou tient encore 30 min plus tard, a 10 il e… 2.59s  
+  ✓ B17-002 — schedule:clear-cache RETIRE reellement un verrou reste po… 5.12s  
+  ✓ B17-002 — le demarrage du planificateur libere les verrous restes p… 2.85s  
+
+  Tests:    6 passed (27 assertions)
+  Duration: 102.02s
+

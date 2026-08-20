@@ -1,0 +1,169 @@
+
+   FAIL  Tests\Feature\Infra\AucunSimulacreEnProductionTest
+  ✓ C18-016 — TEMOIN : en TEST, les simulacres se branchent bien        63.70s  
+  ⨯ C18-016 — en PRODUCTION, un simulacre explicitement demande est REF… 1.86s  
+  ⨯ C18-016 — en PRODUCTION sans AUCUNE variable, le defaut est le serv… 0.43s  
+  ⨯ C18-016 — en PREPRODUCTION aussi, le defaut est le service REEL      0.48s  
+  ⨯ C18-016 — une valeur AMBIGUE ne rebranche pas un simulacre en produ… 1.12s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Infra\AucunSimulacreEnProductionTest > C18-016 — en…   
+  Le conteneur resout App\Services\LLM\Mocks\MockLLMClient en production alors que le service reel est LLMRouterService. `MockLLMClient` ecrit des classifications FABRIQUEES en base, sur des fiches de personnes reelles. Il n'existe aucune raison legitime de servir des donnees inventees a des utilisateurs reels : le refus ne doit pas etre contournable par une variable, sinon on reconstruit le defaut qu on repare.
+Failed asserting that two strings are identical.
+  -'App\Services\LLM\LLMRouterService'
+  +'App\Services\LLM\Mocks\MockLLMClient'
+  
+
+  at tests/Feature/Infra/AucunSimulacreEnProductionTest.php:102
+     98▕         'MOCK_MODE' => 'true',
+     99▕         'MOCK_LLM' => 'true',
+    100▕     ]);
+    101▕ 
+  ➜ 102▕     expect($classe)->toBe(
+    103▕         LLMRouterService::class,
+    104▕         "Le conteneur resout {$classe} en production alors que le service reel est "
+    105▕         . 'LLMRouterService. `MockLLMClient` ecrit des classifications FABRIQUEES en base, sur '
+    106▕         . "des fiches de personnes reelles. Il n'existe aucune raison legitime de servir des "
+
+  1   tests/Feature/Infra/AucunSimulacreEnProductionTest.php:102
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Infra\AucunSimulacreEnProductionTest > C18-016 — en…   
+  Sans aucune variable, le conteneur resout App\Services\LLM\Mocks\MockLLMClient au lieu de App\Services\LLM\LLMRouterService. L'ancien code faisait `env('MOCK_MODE', true)` : le DEFAUT etait le simulacre. Une variable absente suffisait a mettre la production sur des donnees fabriquees.
+Failed asserting that two strings are identical.
+  -'App\Services\LLM\LLMRouterService'
+  +'App\Services\LLM\Mocks\MockLLMClient'
+  
+
+  at tests/Feature/Infra/AucunSimulacreEnProductionTest.php:123
+    119▕         [BanGeocoder::class, HttpBanGeocoder::class],
+    120▕     ] as [$contrat, $attendu]) {
+    121▕         $classe = classeResolue('production', $contrat, []);
+    122▕ 
+  ➜ 123▕         expect($classe)->toBe(
+    124▕             $attendu,
+    125▕             "Sans aucune variable, le conteneur resout {$classe} au lieu de {$attendu}. "
+    126▕             . "L'ancien code faisait `env('MOCK_MODE', true)` : le DEFAUT etait le simulacre. "
+    127▕             . 'Une variable absente suffisait a mettre la production sur des donnees fabriquees.'
+
+  1   tests/Feature/Infra/AucunSimulacreEnProductionTest.php:123
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Infra\AucunSimulacreEnProductionTest > C18-016 — en…   
+  Failed asserting that two strings are identical.
+  -'App\Services\Insee\HttpInseeClient'
+  +'App\Services\Insee\Mocks\MockInseeClient'
+  
+
+  at tests/Feature/Infra/AucunSimulacreEnProductionTest.php:135
+    131▕ 
+    132▕ test('C18-016 — en PREPRODUCTION aussi, le defaut est le service REEL', function () {
+    133▕     // La preproduction est une repetition de la production : elle doit se comporter
+    134▕     // comme elle. Un simulacre y masquerait exactement les pannes qu'on veut y decouvrir.
+  ➜ 135▕     expect(classeResolue('staging', InseeClient::class, []))->toBe(HttpInseeClient::class);
+    136▕ });
+    137▕ 
+    138▕ test('C18-016 — une valeur AMBIGUE ne rebranche pas un simulacre en production', function () {
+    139▕     // `(bool) "false"` vaut TRUE en PHP, comme `(bool) "off"` et `(bool) "0.0"`. L'ancien code
+
+  1   tests/Feature/Infra/AucunSimulacreEnProductionTest.php:135
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Infra\AucunSimulacreEnProductionTest > C18-016 — un…   
+  MOCK_LLM=« off » devrait DESACTIVER le simulacre. Avec un cast `(bool)`, cette valeur l activait.
+Failed asserting that two strings are identical.
+  -'App\Services\LLM\LLMRouterService'
+  +'App\Services\LLM\Mocks\MockLLMClient'
+  
+
+  at tests/Feature/Infra/AucunSimulacreEnProductionTest.php:144
+    140▕     // employait `(bool)` : un operateur qui posait `MOCK_LLM=off` en croyant desactiver le
+    141▕     // simulacre l'ACTIVAIT. Le validateur booleen, lui, reconnait ces formes.
+    142▕     foreach (['off', 'false', '0', 'no', ''] as $valeur) {
+    143▕         expect(classeResolue('testing', LLMClient::class, ['MOCK_MODE' => 'true', 'MOCK_LLM' => $valeur]))
+  ➜ 144▕             ->toBe(
+    145▕                 LLMRouterService::class,
+    146▕                 "MOCK_LLM=« {$valeur} » devrait DESACTIVER le simulacre. Avec un cast `(bool)`, "
+    147▕                 . 'cette valeur l activait.'
+    148▕             );
+
+  1   tests/Feature/Infra/AucunSimulacreEnProductionTest.php:144
+
+
+  Tests:    4 failed, 1 passed (6 assertions)
+  Duration: 156.68s
+
+
+=== CONDITIONS DE CE ROUGE (agent 35, 2026-08-20) ===
+
+Constat C18-016 / F37-002 (S0), deuxieme ligne de la file du danger.
+
+LE DEFAUT ETAIT DANS LE MAUVAIS SENS.
+
+    $master = (bool) env('MOCK_MODE', true);
+
+Le DEFAUT etait `true`. Une variable absente du conteneur, mal orthographiee, ou
+perdue lors d'un `docker compose restart` -- qui ne relit pas `env_file`, constat
+A07-003 -- et les six services externes basculaient sur des simulacres. En
+production. Sans que rien ne le signale.
+
+Le pire des six est le modele de langage : `MockLLMClient` ecrit des
+classifications FABRIQUEES dans la base, sur des fiches de personnes reelles. Un
+simulacre qui remplit un ecran se voit ; un simulacre qui remplit une base ne se
+voit jamais.
+
+Code mesure : l'etat de HEAD (`git checkout HEAD -- ...`), avec VERIFICATION que
+le retour arriere avait bien pris -- `env('MOCK_MODE', true)` present ligne 57,
+zero occurrence de `drapeau`. (Le 20/08 au matin, un `git stash` sur des fichiers
+deja commites n'avait rien pris et rendu un FAUX VERT : on ne remesure plus sans
+verifier.)
+
+RESULTAT : 4 echecs sur 5.
+
+  en production, simulacre explicitement demande ... resout MockLLMClient
+  en production, AUCUNE variable .................. resout MockLLMClient
+  en preproduction, AUCUNE variable ............... resout MockInseeClient
+  valeur ambigue (`off`, `no`, `0`) ............... rebranchait le simulacre
+
+  VERT ATTENDU : en TEST, les simulacres se branchent bien. C'est le temoin qui
+  distingue « refuse en production » de « casse pour tout le monde » -- sans lui,
+  un correctif interdisant les simulacres PARTOUT passerait, et ferait tomber la
+  suite entiere.
+
+=== DEUX DEFAUTS DE LA GARDE, ET LE SECOND TOUCHE AU COEUR DU CONSTAT ===
+
+1. `config(['app.env' => ...])` NE CHANGE RIEN pour le provider.
+   `Application::environment()` ne lit pas `config('app.env')` : il lit la
+   liaison `env` du CONTENEUR, posee une fois a l'amorcage. La garde changeait
+   donc une valeur que le code ne consultait jamais, et rougissait sur un
+   correctif qui fonctionnait.
+
+   Ce qui l'a revele : trois cas rouges ET le cas « valeur ambigue » vert, alors
+   qu'ils dependent du meme code. Une incoherence impossible si la mesure etait
+   bonne. C'est le temoin qui a parle, pas moi.
+
+2. `phpunit.xml` impose `MOCK_MODE=true` a toute la suite. Passer un tableau vide
+   ne simulait donc PAS l'absence de variable -- ca simulait « la valeur que le
+   banc a posee ». Or l'ABSENCE est precisement ce que le constat decrit.
+
+   La garde affirmait mesurer l'absence tout en mesurant une presence : le defaut
+   meme qu'elle poursuit. Elle retire desormais vraiment la variable des trois
+   canaux ($_SERVER, $_ENV, putenv).
+
+=== LE CORRECTIF, ET SON PRINCIPE ===
+
+Le defaut suit desormais l'ENVIRONNEMENT, jamais l'inverse : simulacre par defaut
+en `local` et `testing`, service reel par defaut en `production` et `staging`.
+
+Et en production, un simulacre est REFUSE meme s'il est explicitement demande. Ce
+n'est pas une precaution excessive : rendre le refus contournable par une
+variable reconstruirait exactement le defaut repare. Le refus est journalise au
+niveau critique, une fois par processus -- le silence ici redonnerait le defaut
+d'origine, qui etait precisement de ne rien dire.
+
+`filter_var(..., FILTER_VALIDATE_BOOLEAN)` remplace `(bool)` : en PHP,
+`(bool) "false"` vaut TRUE, comme `(bool) "off"`. Un operateur qui posait
+`MOCK_LLM=off` en croyant desactiver le simulacre l'ACTIVAIT.
+
+APRES CORRECTIF : 5 verts sur cette garde. Et 455 verts sur tests/Unit +
+tests/Feature/Crm + tests/Feature/Commands -- les simulacres se branchent
+toujours en test, ce qui etait le risque reel de ce correctif.

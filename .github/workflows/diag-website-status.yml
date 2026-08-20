@@ -59,6 +59,21 @@ jobs:
 
             echo ""
             echo "==================== 3. RELANCE LA STACK ===================="
+            # 🔴 CONSTAT F38-007 (S0). Cette ligne ne portait AUCUN overlay.
+            # Compose repartait alors du seul `docker-compose.yml`,
+            # qui PUBLIE Postgres sur 55432 et Redis sur 56379 ; voyant une
+            # configuration differente de celle des conteneurs en place, il les
+            # RECREAIT, ports compris.
+            #
+            # C'est la faille trouvee ouverte depuis l'exterieur le 2026-08-19
+            # -- Redis n'a AUCUN mot de passe : FLUSHALL, lecture des jetons,
+            # CONFIG SET -- et ce workflow est en `workflow_dispatch` : elle se
+            # rouvrait DEPUIS L'INTERFACE GITHUB, en un clic.
+            #
+            # `COMPOSE_FILE` s'applique a tous les `docker compose` du script,
+            # comme dans `deploy-direct-ssh.yml`.
+            export COMPOSE_FILE="docker-compose.yml:docker-compose.prod.yml"
+            echo "COMPOSE_FILE = $COMPOSE_FILE"
             docker compose up -d 2>&1 | tail -30
             echo "-- attente 12s --"; sleep 12
             docker compose ps 2>&1

@@ -92,6 +92,19 @@ set_env "WORKER_CONCURRENCY"         "1"
 # assurance. Mesure le 2026-08-19 (audit 360, meme famille que A07-003).
 echo "[axion-config] Recreation des services (up -d, pas restart)…"
 cd /opt/axion-crm-pro
+
+# 🔴 CONSTAT F38-007 (S0), et c'est le piege DANS le piege.
+#
+# Cette commande ne nommait que trois services, et on pouvait croire que
+# Postgres et Redis n'etaient pas concernes. Ils le sont : `api`, `horizon` et
+# `scheduler` portent tous `depends_on: [postgres, redis]`, et Compose monte les
+# dependances sauf si on lui dit `--no-deps`. Sans l'overlay de production, il
+# les recreait donc depuis `docker-compose.yml` -- qui PUBLIE 55432 et 56379.
+#
+# C'est la faille du 2026-08-19, rouverte par le script meme qui sert a
+# configurer la production.
+export COMPOSE_FILE="docker-compose.yml:docker-compose.prod.yml"
+echo "[axion-config] COMPOSE_FILE = $COMPOSE_FILE"
 docker compose up -d api horizon scheduler
 
 echo "[axion-config] Attente healthcheck (30s)…"

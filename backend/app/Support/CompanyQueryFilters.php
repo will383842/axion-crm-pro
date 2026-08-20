@@ -74,7 +74,42 @@ final class CompanyQueryFilters
 
                 EligibiliteCampagne::appliquer($query);
             }),
-            AllowedFilter::partial('denomination'),
+            // ── `G41-003` / `G41-004` (S1) : 65 s au volume de production ───
+            //
+            // Ce filtre était `AllowedFilter::partial('denomination')`, qui
+            // émet `LOWER(denomination) LIKE LOWER('%x%')`.
+            //
+            // 🔴 Aucun index ne peut servir cette condition, et le constat le
+            // dit avec précision : « l'index de 110 Mo censé le servir porte
+            // sur une AUTRE colonne ». Vérifié au schéma le 2026-08-20 :
+            // `denomination` ne porte AUCUN index ; c'est
+            // `denomination_normalized` — colonne GENERATED — que couvre
+            // `idx_companies_denomination_trgm`, et ce depuis le 2026-05-16.
+            //
+            // Mesuré sur 150 000 lignes (la production en porte 4,29 M) :
+            //     sur `denomination` .............. Seq Scan          145,7 ms
+            //     sur `denomination_normalized` ... Bitmap Index Scan   2,7 ms
+            //
+            // ⚠️ Le remède n'est PAS d'ajouter un index : il existe déjà. C'est
+            // de chercher sur la colonne qu'il couvre. Un second index
+            // trigrammes sur `denomination` coûterait 110 Mo de plus pour
+            // dupliquer celui-là — et sous le même nom, un
+            // `CREATE INDEX IF NOT EXISTS` serait un SILENCE, pas une
+            // idempotence (c'est l'accident du 2026-08-20, cf.
+            // `IndexServentLesRequetesTest`).
+            //
+            // La condition vit dans `RechercheDenomination`, PARTAGÉE avec
+            // `ContactsHubController::applySearch` (`G41-002`, même défaut) —
+            // patron `A-011` : on l'écrit une fois, les deux sites l'appellent.
+            // Cette liste sert LA LISTE ENTREPRISES *et* LE HUB, donc les deux
+            // sont corrigés d'un coup ici.
+            AllowedFilter::callback('denomination', function (Builder $query, mixed $value): void {
+                RechercheDenomination::appliquer($query, $value);
+            }),
+            // ⚠️ `postcode` reste en `partial` : il n'a ni colonne normalisée
+            // ni index trigrammes, donc il balaie lui aussi. Réparer ça exige
+            // une migration hors du périmètre de ce lot — c'est SIGNALÉ dans le
+            // rapport, pas corrigé au passage.
             AllowedFilter::partial('postcode'),
             // Prospection internationale : cibler « les associations de
             // Roumanie » sans les mélanger aux 4,29 M de fiches françaises.

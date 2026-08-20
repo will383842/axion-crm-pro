@@ -1,230 +1,170 @@
 # TODO — Axion CRM Pro
 
-> **Source de vérité** de ce qu'il reste à faire avant Sprint 1 + production.
-> Dernière mise à jour : 2026-05-16
-> Voir aussi : `spec/AUDIT_v1.md`, `poc/README.md`, `spec/21_couts_roadmap.md`
+> **Ce fichier n'est pas la source de vérité du dépôt.** Il n'en a aucune, et
+> c'est un progrès : la source de vérité, c'est le code, les workflows, et les
+> gardes qui rougissent.
+> Ce qui suit est une **liste de travaux restants**, chacun rattaché à une
+> mesure datée. Un point sans mesure n'a rien à faire ici.
+>
+> Dernière réécriture : **2026-08-20**.
+> Relu par une garde : `backend/tests/Feature/Infra/DocsDeDeploiementDisentLeVraiTest.php`
+> vérifie que chaque commande, chaque cible `make` et **chaque chemin** cités
+> ci-dessous existent réellement.
 
 ---
 
-## Vue d'ensemble — état global
+## Pourquoi ce fichier a été entièrement réécrit
 
-| Bloc | État | Commentaire |
-|------|------|-------------|
-| Spec v1.2 complète | ✅ 100 % | 26 fichiers spec + AUDIT_v1, sur GitHub |
-| 16 P0 audit corrigés | ✅ 100 % | Vérifiés par grep |
-| 7 P1 audit corrigés | ✅ 100 % | OTel, Langfuse, i18next, Terraform, WCAG 2.2, fuzzy filter, métriques business |
-| Frontend design system | ✅ 100 % | Responsive full mobile→desktop, 13 sections UX |
-| POCs codés | ✅ 100 % | 50 fichiers TypeScript prêts dans `./poc/` |
-| **POCs exécutés en réel** | 🟡 **1/5** | POC #5 ✅ VALIDÉ 2026-05-16. POC #4/#3/#1/#2 reportés post-dev (stratégie mocks adoptée) |
-| **Stratégie mocks adoptée** | ✅ 2026-05-16 | Tous services externes via mocks. `MOCKS-STRATEGY.md` créé. Basculement réel en 1 ligne via `MOCK_MODE=false` |
-| **Prompt autopilot Sprint 1→12 prêt** | ✅ 2026-05-16 | `_PROMPTS/PROMPT_AUTOPILOT_SPRINT_1_TO_12.md` à coller dans nouvelle conv Claude Code |
-| **Code Sprint 1 → S12** | 🟡 **Sprint 1 en cours** | Autopilot démarré 2026-05-16. Voir `_REPORTS/PROGRESS.md`. |
-| Conformité avant prod | 🟡 partielle | DPIA + DPA + pentest à produire, voir §3 |
-| Décisions stratégiques | 🟡 4 ouvertes | STOP & ASK, voir §4 |
+Constats **A09-009 / A09-002** (S1). Jusqu'au 2026-08-20, ce fichier :
 
----
+1. se déclarait **« source de vérité de ce qu'il reste à faire avant Sprint 1 »**,
+   daté du 2026-05-16 ;
+2. décrivait un dépôt **d'avant la première ligne de code** : « Démarrer
+   uniquement après POCs validés », « Compte Hetzner Cloud à créer », « Domaine
+   acheté (`axion-pro.com` ou autre) », « Coolify v4 vs k3s » ;
+3. listait comme travaux à faire des choses **déjà faites** — `poc/SYNTHESIS.md`
+   était à créer alors que le fichier existe depuis le 2026-05-16 ;
+4. et renvoyait à un calendrier « Semaine 18 : promotion prod » alors que **la
+   production sert depuis le 17 mai** et a connu, entre-temps, une fuite de
+   données mesurée.
 
-## §1 — POCs à exécuter en réel (~150 € + 1-2 semaines)
-
-Ordre du moins cher au plus coûteux.
-
-### POC #5 — Anti-doublon perf 1 M rows ✅ VALIDÉ 2026-05-16
-
-- [x] Docker Desktop installé (winget upgrade 4.70 → 4.73)
-- [x] `cd poc/05_dedup_performance && pnpm install`
-- [x] `pnpm run docker:up` + `db:migrate` + `db:seed` (10M rows) + `benchmark`
-- [x] `RESULTS.md` généré + commit GitHub + tag `poc05-validated-2026-05-16`
-
-**Résultat : 🟢 GO** — p95 **35.94 ms** < 50 ms cible, idx_runs_dedup utilisé, 0 seq scan.
-
-Voir `poc/SYNTHESIS.md` § POC #5.
-
-### POC #4 — SMTP validation (0-5 €, 1-2 j)
-
-- [ ] Compléter `datasets/emails_gold.json` (100 emails réels étiquetés)
-- [ ] Vérifier port 25 sortant (sinon VPS Hetzner ~5 €/sem)
-- [ ] `cd poc/04_smtp_validation && pnpm install && pnpm run validate`
-
-Critère GO : accuracy ≥ 90 %, FPR < 5 %.
-
-### POC #3 — Direction Finder 20 ETI (~35 $ + 5 €, 4 j)
-
-- [ ] Compte Anthropic + 10 $ → clé `sk-ant-...`
-- [ ] Compte Webshare 10 $/mo → `proxies.txt`
-- [ ] `cd poc/03_direction_finder && pnpm install && pnpm exec playwright install chromium`
-- [ ] `.env` rempli + `pnpm run run`
-
-Critère GO : ≥ 5 ETI/20 avec ≥ 1 C-level email validé.
-
-### POC #1 — Google Maps anti-ban (~40 $, 7 j runtime)
-
-- [ ] IPRoyal residential 30 $ pay-as-you-go
-- [ ] `cd poc/01_google_maps && pnpm install && pnpm exec playwright install chromium`
-- [ ] `.env` rempli + `pnpm run run -- --day 1` à `--day 7`
-- [ ] `pnpm run synthesize`
-
-Critère GO : success rate jour 7 ≥ 75 %.
-
-### POC #2 — Google Search Wrapper (~50 $, 5 j runtime)
-
-- [ ] 2captcha + 20 $
-- [ ] IPRoyal sticky sessions (depuis POC #1)
-- [ ] `cd poc/02_google_search && pnpm install`
-- [ ] `.env` rempli + `pnpm run run -- --day 1` à `--day 5`
-- [ ] `pnpm run synthesize`
-
-Critère GO : captcha rate < 15 %, ≥ 70 % URLs LinkedIn entreprises trouvées.
-
-### Synthèse POCs
-
-- [ ] Créer `poc/SYNTHESIS.md`
-- [ ] Si tout 🟢 : `git tag pocs-validated-YYYY-MM-DD`
-- [ ] Si un POC 🔴 : retravailler stratégie selon recommandations
+Un document qui ment est pire qu'un document absent : on le suit. Celui-ci
+aurait envoyé un lecteur acheter un domaine et choisir entre Coolify et k3s,
+trois mois après que la question a été tranchée par les faits — le CRM se
+déploie par SSH direct, Coolify déploie le **site** Axion-IA, pas ce produit.
 
 ---
 
-## §2 — Code Sprint 1 → S12 (14-17 semaines)
+## Ce qui existe, mesuré le 2026-08-20
 
-Démarrer UNIQUEMENT après POCs validés.
+| Objet | Compté | Où |
+|---|---|---|
+| Migrations Laravel | **65** | `backend/database/migrations` |
+| Fichiers de tests (Pest) | **159** | `backend/tests` |
+| Commandes Artisan du produit | **55** | `backend/app/Console/Commands` |
+| Modèles Eloquent | **18** | `backend/app/Models` |
+| Composants / pages React | **87** `.tsx` | `frontend/src` |
+| Workflows GitHub Actions | **18** | `.github/workflows` |
+| Runbooks d'exploitation | **5** | `infra/runbooks` |
 
-### Pré-requis avant Prompt 1 Bootstrap
-
-- [ ] Compte Hetzner Cloud CRM-Pro dédié créé + clé SSH
-- [ ] Domaine acheté (`axion-pro.com` ou autre)
-- [ ] Compte Cloudflare distinct créé
-- [ ] Doppler ou Infisical compte créé
-- [ ] Tokens API tous stockés dans Doppler : `HETZNER_API_TOKEN`, `CLOUDFLARE_API_TOKEN`, `IPROYAL_*`, `WEBSHARE_*`, `ANTHROPIC_API_KEY`, `MISTRAL_API_KEY`, `CAPTCHA_2CAPTCHA_KEY`, `OWNER_INITIAL_PASSWORD`
-
-### Roadmap 12 sprints (cf. `spec/21_couts_roadmap.md`)
-
-- [ ] S1 Bootstrap : infra Hetzner + Coolify + Postgres + Redis + skeletons + auth + 2FA
-- [ ] S2 Patterns techniques : dedup 6 niveaux + LLM Router + Proxy pluggable + rotations
-- [ ] S3 Sources officielles : INSEE + annuaire-entreprises + BODACC + Coverage Matrix
-- [ ] S4 Google Maps + Pages Jaunes workers
-- [ ] S5 Sites web (emails + équipe + pattern + sociaux)
-- [ ] S6 Google Search Wrapper + Direction Finder + France Travail + MESRI
-- [ ] S7 Crunchbase + Infogreffe + Societe.com + BAN + social light
-- [ ] S8 Email finder + SMTP cascade complète
-- [ ] S9 Carte France interactive 3 modes
-- [ ] S10 Classification LLM + UI 17 pages + Proxy admin
-- [ ] S11 Scaffold Phase 2 (5 pages) + RGPD UI + Monitoring
-- [ ] S12 Pentest + DPIA + DPA + tests E2E + promotion prod
-
-### Prompt à utiliser pour Sprint 1
-
-Le prompt complet est dans `spec/23_interfaces_phase2_execution_pack.md` § B.4 « Prompt 1 — Bootstrap projet ».
+La production tourne sur Hetzner (`/opt/axion-crm-pro`), déployée par
+`.github/workflows/deploy-direct-ssh.yml`, derrière une CI **bloquante** à 6
+jobs. Le pipeline est décrit commande par commande dans
+`_AUDIT/DEPLOY-PIPELINE.md`.
 
 ---
 
-## §3 — Conformité OBLIGATOIRE avant prod publique
+## §1 — Ce qui bloque, et qui n'est PAS réparable par du code
 
-### DPIA (Data Protection Impact Assessment)
+Ces trois points sont des **gestes d'exploitant**. Les traiter comme des
+correctifs serait, dans les trois cas, déclencher en production une action
+irréversible. Ils sont listés ici parce qu'ils sont ouverts, pas parce qu'un
+agent doit les fermer.
 
-- [ ] Produire `_DOCS/DPIA-2026.md` selon plan dans `spec/17_rgpd_aiact_owasp.md` § DPIA
-- [ ] Validation DPO interne (Williams Jullin)
-- [ ] Effort : 4-8 h
+### 1.1 Les purges RGPD n'ont jamais tourné — B17-009 (S0, 2026-08-20)
 
-### DPA sous-processeurs LLM
+`CRM_PURGE_ENABLED` n'apparaît que **deux fois** dans tout le dépôt : sa
+déclaration dans `backend/config/crm.php` et une ligne de `.env.example`. Elle
+vaut `false` aux deux, et **aucun** fichier Compose, aucun script d'`infra`,
+aucun workflow ne la pose. Les deux seules purges correctement écrites du dépôt
+— `php artisan rgpd:purge-vivier` et `php artisan rgpd:purge-business-prospects` —
+n'ont donc **jamais** été exécutées, et l'échéance CNIL (CVthèque 2 ans,
+prospection 3 ans) n'est tenue par aucun automatisme.
 
-- [ ] Signer DPA Anthropic (Trust Center)
-- [ ] Signer DPA Mistral AI
-- [ ] Signer DPA Cloudflare
-- [ ] Signer DPA Webshare + IPRoyal + Backblaze
+Ce qui a été réparé : le **silence**. Le saut se journalise désormais en
+`warning` à chaque passage du planificateur. L'inaction laisse une trace datée.
 
-### Pentest interne avant promotion prod S12
+Ce qui reste, et qui appartient à Will : poser `CRM_PURGE_ENABLED=true` sur le
+serveur, **après** une vérification à la main en `--dry-run`.
 
-- [ ] Burp Suite Community + OWASP ZAP + Nmap
-- [ ] Manual tests SSRF + prompt injection
-- [ ] Critère : 0 vulnérabilité High/Critical
-- [ ] Effort : 1-2 j
+### 1.2 Le sens CRM → site ne s'ouvre pas d'un drapeau — B14-013 (S1)
 
-### DR drill avant promotion prod
+`CRM_OUTBOUND_ENABLED` seul ne suffit pas : `SITE_CRM_WEBHOOK_URL` n'a aucun
+défaut utilisable et n'est posé dans aucun fichier du dépôt. Un exploitant qui
+« ouvre le canal » ouvre en réalité l'ingestion seule, et `crm:flush-outbound`
+tourne toutes les 5 minutes en refusant faute de destination. Les trois clés
+vont ensemble ; le détail est écrit dans `backend/config/crm.php`.
 
-- [ ] Restore depuis pgbackrest sur serveur temporaire
-- [ ] Mesure RTO réel (cible < 4 h)
-- [ ] Validation hash chain post-restore
+### 1.3 L'état du rôle applicatif en production est contredit dans le dépôt
 
----
-
-## §4 — Décisions stratégiques en attente
-
-### Domaine final
-
-- A. `crm.axion-pro.com` (recommandée par défaut)
-- B. `console.axionprospect.io`
-- C. `app.axion-crm.fr`
-
-### Coolify v4 vs k3s
-
-- A. Coolify v4 (recommandé démarrage)
-- B. k3s (si scale dès S1)
-
-### GPU Ollama — quand activer
-
-- A. Plus tard (S10+ si LLM API > 300 €/mois)
-- B. Dès S1
-
-### Secrets manager
-
-- A. Doppler (SaaS gratuit jusqu'à 5 users)
-- B. Infisical (self-hosted)
+Deux fichiers datés du même jour disent l'inverse l'un de l'autre sur
+`CRM_DB_APP_ROLE_ENABLED` : les traces du constat A08-001 l'expliquent par
+« depuis l'armement du rôle applicatif » (donc `true`), quand
+`backend/app/Console/Commands/PartmanMaintenir.php` écrit « aujourd'hui …
+vaut false ». **Tant que ce n'est pas tranché, aucune phrase du dépôt sur ce que
+fait la RLS en production n'est établie.** Voir la note finale de
+`_AUDIT/DEPLOY-PIPELINE.md`.
 
 ---
 
-## §5 — Actions humaines de sécurité
+## §2 — Documents encore périmés (dette de vérité)
 
-### Rotation password `WJullin1974/*` (CRITIQUE)
+Chacun de ces fichiers décrit un dépôt qui n'existe plus. Aucun n'est couvert
+par une garde à ce jour.
 
-- [ ] Considère ce password comme brûlé pour TOUS services
-- [ ] Au déploiement S1 : générer nouveau pwd 32 chars random (Bitwarden/1Password/KeePassXC)
-- [ ] Stocker UNIQUEMENT dans Doppler comme `OWNER_INITIAL_PASSWORD`
-- [ ] Au 1er login UI : activer 2FA + changer pwd via UI
-- [ ] Supprimer `OWNER_INITIAL_PASSWORD` de Doppler après usage
+| Fichier | Ce qu'il prétend | Ce qui est |
+|---|---|---|
+| `_REPORTS/PROGRESS.md` | S2 « en cours », S3 à S12 « pending » | Le produit sert en production depuis le 17 mai |
+| `_AUDIT/TODO-AXION-CRM-PRO.md` | Second fichier TODO, arrêté au 2026-05-18 | Deux listes de tâches concurrentes, aucune à jour |
+| `_PROMPTS/PROMPT_AUTOPILOT_SPRINT_1_TO_12.md` | Plan de sprints à dérouler | Les sprints sont derrière nous |
+| `poc/SYNTHESIS.md` | « 1 / 5 POCs validés », décision d'avant-projet | Les quatre POCs restants n'ont jamais été rejoués, et le produit s'est construit sans eux |
 
-### Surveillance abonnements à résilier si non gardés
-
-- [ ] Webshare 10 $/mo : résilier si stratégie change
-
----
-
-## §6 — Backlog Phase 2 (post-S12)
-
-- [ ] Cold Email orchestrateur + warmup IPs SMTP
-- [ ] LinkedIn Outreach automatisé (Unipile/LiCM)
-- [ ] CRM pipeline kanban (deals, activités, tâches)
-- [ ] Analytics avancées (funnels, cohorts, ROI)
-- [ ] Achat 3-5 domaines secondaires cold email
-- [ ] Compliance avocat cold email B2B
-
-Volume Phase 2 : ~3 mois dev supplémentaires.
+⚠️ `backend/config/crm.php` renvoie en tête à un ordre de mission situé sous
+\_PLANS/ — **répertoire qui n'existe pas dans ce dépôt**. Le renvoi est mort.
+(Il n'est volontairement pas écrit ici comme un chemin : la garde qui relit ce
+fichier exige que tout chemin cité existe.)
 
 ---
 
-## §7 — Calendrier indicatif (si POCs verts)
+## §3 — Conformité
 
-```
-Semaine 1-2   : Exécution 5 POCs (~150 €)
-Semaine 3-4   : Souscriptions services + setup Hetzner + Doppler
-Semaine 5-16  : Sprint 1 → S12 code Phase 1 (~12 sem)
-Semaine 17    : Pentest + DPIA + DPA + DR drill
-Semaine 18    : Promotion prod
-Mois 5-7      : Phase 2 (cold email + LinkedIn + CRM + analytics)
+Produits, datés, et à jour :
+
+- AIPD : `_REPORTS/AIPD_2026-08-18.md` (remplace la DPIA de mai, qui décrivait
+  des mesures « en place » qui ne l'étaient pas).
+- Registre des violations : `_REPORTS/REGISTRE-DES-VIOLATIONS-DE-DONNEES.md`.
+
+Restent ouverts :
+
+- [ ] DPA sous-traitants : Anthropic, Mistral AI, Cloudflare, Webshare, IPRoyal,
+      Backblaze — aucun signé à ce jour.
+- [ ] Pentest externe. `make pentest` joue un auto-contrôle OWASP interne, ce
+      qui n'en tient pas lieu.
+- [ ] Exercice de reprise réel. `make dr-drill` existe ; le RTO mesuré n'est
+      consigné nulle part. La procédure est dans `infra/runbooks/04-restore-dr.md`.
+
+---
+
+## §4 — Gestes de sécurité en attente
+
+- [ ] Rotation du mot de passe `WJullin1974/*` : à considérer comme brûlé sur
+      **tous** les services. Reste ouvert depuis mai.
+- [ ] Suites de la fuite du 2026-08-19 (Postgres 55432 et Redis 56379 ouverts
+      sur internet, 4 295 349 fiches lisibles) : le code est refermé et gardé
+      (`infra/scripts/verifier-ports-publies.sh` est désormais appelé par le
+      déploiement, sans tolérance). Le volet **notification CNIL** est un
+      brouillon, pas un envoi.
+
+---
+
+## §5 — Comment vérifier soi-même
+
+```bash
+make test-backend      # suite Pest complète, dans le conteneur api
+make db-rebuild-check  # exige que migrate:fresh passe DEUX fois de suite
+make audit             # audit:verify-chain (chaîne de hachage)
 ```
 
-Total Phase 1 GO PROD : ~4 mois calendaires.
+Pourquoi `make db-rebuild-check` et pas `make fresh` : la base n'était pas
+reconstructible, et la panne était **invisible au premier passage** — elle
+n'apparaissait qu'à la deuxième reconstruction. Le détail, avec les sorties
+rouges verbatim, est dans `_REPORTS/2026-08-18_RECONSTRUCTION-BASE.md`.
 
 ---
 
-## §8 — Liens utiles
+## §6 — Liens
 
-- Repo GitHub : https://github.com/will383842/axion-crm-pro
-- Spec sommaire : `spec/00_INDEX.md`
-- Audit critique : `spec/AUDIT_v1.md`
-- Roadmap coûts : `spec/21_couts_roadmap.md`
-- Risques : `spec/22_risques_mitigations.md`
-- Setup POCs : `poc/README.md`
-- 12 prompts Claude Code : `spec/23_interfaces_phase2_execution_pack.md` § B.4
-
----
-
-**À mettre à jour à chaque changement majeur (commit + push).**
+- Dépôt : https://github.com/will383842/axion-crm-pro
+- Sommaire de la spécification : `spec/00_INDEX.md`
+- Pipeline de déploiement : `_AUDIT/DEPLOY-PIPELINE.md`
+- Runbooks d'exploitation : `infra/runbooks/04-restore-dr.md` et ses voisins

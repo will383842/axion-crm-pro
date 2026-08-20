@@ -11,6 +11,7 @@ use App\Support\CompanyQueryFilters;
 use App\Support\EligibiliteCampagne;
 use App\Support\MasquageCoordonnees;
 use App\Support\PlafondExport;
+use App\Support\TotalListe;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
@@ -85,7 +86,47 @@ class CompaniesController extends ApiController
                 ->defaultSort('-quality_score')
                 ->where('workspace_id', $workspaceId);
 
-            $page = $query->paginate($perPage);
+            // 🔴 G41-006 (S1) — LE TOTAL COUTAIT 148 FOIS LA PAGE.
+            //
+            // `paginate($perPage)` emet TOUJOURS un `select count(*)` complet
+            // avant d'aller chercher la page. Mesure du 2026-08-20 sur
+            // `axion_crm_perf4m` (2 800 000 fiches), les deux requetes du meme
+            // affichage au MEME instant :
+            //
+            //     count(*) ... Index Only Scan, Heap Fetches: 0
+            //                  1 818,064 ms froid / 490,431 ms chaud
+            //     la page  ... Index Scan, 4 tampons
+            //                      3,310 ms
+            //
+            // Le comptage est DEJA servi par le meilleur index possible
+            // (`idx_companies_ws_counts`) : aucun index ne le reparera, car
+            // compter 2,8 M de lignes exige d'en visiter 2,8 M. Le seul remede
+            // est de ne pas recompter a chaque affichage.
+            //
+            // Le 5e parametre de `paginate()` est le point d'accroche prevu par
+            // le cadre lui-meme (`Eloquent\Builder::paginate()`, l. 1120 :
+            // `$total = value($total) ?? $this->toBase()->getCountForPagination()`).
+            // En le fournissant, on saute le comptage -- et RIEN D'AUTRE ne
+            // change : le paginateur reste un `LengthAwarePaginator`, donc
+            // `total`, `per_page`, `current_page` et `last_page` gardent leur
+            // sens et leurs valeurs. C'est ce qui distingue ce correctif de
+            // `simplePaginate()`, qui aurait supprime deux de ces quatre champs
+            // et casse `CompaniesListPage.tsx:751`.
+            //
+            // Le total reste un comptage EXACT, simplement pas a la seconde
+            // pres (60 s de fraicheur). Cf. `App\Support\TotalListe`.
+            $page = $query->paginate(
+                $perPage,
+                ['*'],
+                'page',
+                null,
+                // `toBase()` et non `getEloquentBuilder()` : un comptage
+                // n'hydrate aucun modele, et `toBase()` est compris a la fois
+                // par l'enveloppe `Spatie\QueryBuilder` (reforwarde par
+                // `__call`) et par l'analyse statique, qui perd le type Spatie
+                // des le premier `->where()`.
+                TotalListe::pour($query->toBase(), $workspaceId),
+            );
 
             // Masquage des coordonnées pour les comptes en lecture seule
             // (§2.10). On ne transforme la sortie QUE dans ce cas : pour les
@@ -329,12 +370,23 @@ class CompaniesController extends ApiController
             'denomination' => ['nullable', 'string', 'max:255'],
             'discovery_source' => ['nullable', 'string', 'max:64'],
         ]);
+        $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
         $company = Company::create([
-            'workspace_id' => app()->bound('workspace.id') ? app('workspace.id') : null,
+            'workspace_id' => $workspaceId,
             'siren' => $validated['siren'],
             'denomination' => $validated['denomination'] ?? null,
             'discovery_source' => $validated['discovery_source'] ?? 'manual',
         ]);
+
+        // G41-006 : le total de la liste est mis en cache 60 s. Sans cet oubli,
+        // l'operateur creerait une fiche, la verrait s'afficher, et le compteur
+        // juste au-dessus continuerait d'annoncer l'ancien nombre pendant une
+        // minute -- le produit contredirait le geste qu'il vient de faire.
+        // Le patron est celui de `CompteursHub::oublier`, appele au meme titre
+        // par `BulkController` apres une action de masse.
+        if (is_string($workspaceId) && $workspaceId !== '') {
+            TotalListe::oublier($workspaceId);
+        }
 
         // Meme regle qu'a la fiche : ce qui sort porte `phone` et
         // `email_generic`. Une creation par un role sans `contacts.view_pii`
@@ -481,6 +533,15 @@ class CompaniesController extends ApiController
         $this->refuserHorsEspace($company);
 
         $company->delete();
+
+        // Meme raison qu'a la creation (G41-006) : la corbeille sort la fiche
+        // de la liste, donc du total. Un compteur qui ne redescend pas apres
+        // une suppression est le defaut le plus visible qu'un cache puisse
+        // produire.
+        $workspaceId = $company->getAttribute('workspace_id');
+        if (is_string($workspaceId) && $workspaceId !== '') {
+            TotalListe::oublier($workspaceId);
+        }
 
         return response()->json(null, 204);
     }

@@ -120,9 +120,35 @@ services:
       - staging-api-storage:/var/www/html/storage
     environment:
       APP_ENV: staging
-      # Le débogage reste ACTIF : c'est tout l'intérêt d'une préproduction —
-      # voir la trace plutôt que « Server Error ». Elle ne sert aucun public.
-      APP_DEBUG: 'true'
+      # 🔴 CORRIGÉ LE 2026-08-20 — constat F37-003 (S1). Valait `'true'`, sous
+      # ce commentaire : « Le débogage reste ACTIF : c'est tout l'intérêt d'une
+      # préproduction — voir la trace plutôt que "Server Error". Elle ne sert
+      # aucun public. »
+      #
+      # LA DERNIÈRE PHRASE ÉTAIT FAUSSE, et `infra/caddy/Caddyfile` le dit :
+      #   ligne 244  staging.axion-crm-pro.com { … }
+      #   ligne 279  staging-api.axion-crm-pro.com { … }
+      # Deux noms PUBLICS, servis par le Caddy de PRODUCTION, avec certificat
+      # public. Aucun `basic_auth`, aucune liste d'adresses autorisées : les
+      # seules directives de restriction sont `X-Robots-Tag: noindex` (qui parle
+      # aux moteurs, pas aux visiteurs) et `X-Frame-Options`.
+      #
+      # Une page de débogage Laravel affiche la valeur de CHAQUE variable
+      # d'environnement du processus (DB_PASSWORD, APP_KEY, jetons tiers), la
+      # configuration résolue, la requête SQL fautive avec ses paramètres et le
+      # code source du chemin d'appel. Provoquer une 500 sur une préproduction
+      # est trivial — c'est même sa raison d'être.
+      #
+      # ⚠️ Cette valeur est désormais SANS EFFET : `config/app.php` n'accorde le
+      # débogage qu'aux environnements `local` et `testing`, et journalise en
+      # critique toute demande refusée. On la corrige quand même — un réglage
+      # faux qui dort reste un réglage faux, et le prochain lecteur croirait que
+      # la préproduction affiche ses traces.
+      #
+      # Pour diagnostiquer sur la préproduction : `docker logs
+      # axion-crm-staging-api` et `storage/logs/laravel.log`. La trace y est
+      # entière, et elle ne part pas sur internet.
+      APP_DEBUG: 'false'
       APP_URL: https://staging.axion-crm-pro.com
       DB_DATABASE: axion_crm_staging
       # Les envois réels ne partent JAMAIS de la préproduction. Un compte rendu

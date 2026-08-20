@@ -135,9 +135,21 @@ services:
     # attribue un jour un autre pont ; une préproduction en 502 n'est pas une
     # panne de production, le mode de défaillance est contenu.
     ports: !override
-      - '${STAGING_BIND_IP:-172.17.0.1}:8082:80'
+      # 9000 et non 80 — constat A-010 : le service parle FastCGI, et le Caddy
+      # de production l'atteint par `transport fastcgi`.
+      - '${STAGING_BIND_IP:-172.17.0.1}:8082:9000'
     healthcheck:
-      test: ['CMD-SHELL', 'curl -fsS http://localhost/up || exit 1']
+      # 🔴 Plus de contrôle HTTP — constat A-010 (S0).
+      #
+      # Ce service ne sert plus HTTP : il parle FastCGI. `curl
+      # http://localhost/up` échouerait TOUJOURS, le conteneur serait déclaré
+      # malsain en permanence et le déploiement le redémarrerait en boucle.
+      # On interroge php-fpm sur son point de vie, dans sa langue.
+      test:
+        - CMD-SHELL
+        - >-
+          SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET
+          cgi-fcgi -bind -connect 127.0.0.1:9000 2>/dev/null | grep -q pong || exit 1
       interval: 30s
       timeout: 10s
       retries: 5

@@ -14,7 +14,27 @@
 api.localhost {
     tls internal
     encode zstd gzip
-    reverse_proxy api:80 {
+    # 🔴 FastCGI, et non HTTP — constat A-010 (S0) de l'audit 360.
+    #
+    # L'API était servie par `php -S`, le serveur de développement de PHP : UN
+    # processus, UNE requête à la fois. Douze requêtes simultanées mesurées en
+    # production formaient un escalier parfait de pas 15 ms. Elle parle désormais
+    # FastCGI, sur 9000, par un pool php-fpm (`infra/php/fpm-axion.conf`).
+    #
+    # `rewrite * /index.php` : Laravel n'a qu'un point d'entrée. Sans cette
+    # réécriture, FastCGI reçoit un `SCRIPT_FILENAME` qui n'existe pas et répond
+    # 404 sur toutes les routes. On n'emploie PAS la directive `php_fastcgi` :
+    # elle teste l'existence des fichiers sur le disque de CADDY, qui ne partage
+    # pas celui de l'API.
+    #
+    # `root` désigne un chemin DANS LE CONTENEUR DE L'API, jamais dans celui-ci :
+    # il ne sert qu'à composer `SCRIPT_FILENAME`.
+    root * /var/www/html/public
+    rewrite * /index.php
+    reverse_proxy api:9000 {
+        transport fastcgi {
+            split .php
+        }
         header_up X-Real-IP {remote_host}
     }
     header {
@@ -61,7 +81,27 @@ app.localhost {
         path /api/* /sanctum/* /docs /docs/* /up /broadcasting/*
     }
     handle @api {
-        reverse_proxy api:80 {
+        # 🔴 FastCGI, et non HTTP — constat A-010 (S0) de l'audit 360.
+        #
+        # L'API était servie par `php -S`, le serveur de développement de PHP : UN
+        # processus, UNE requête à la fois. Douze requêtes simultanées mesurées en
+        # production formaient un escalier parfait de pas 15 ms. Elle parle désormais
+        # FastCGI, sur 9000, par un pool php-fpm (`infra/php/fpm-axion.conf`).
+        #
+        # `rewrite * /index.php` : Laravel n'a qu'un point d'entrée. Sans cette
+        # réécriture, FastCGI reçoit un `SCRIPT_FILENAME` qui n'existe pas et répond
+        # 404 sur toutes les routes. On n'emploie PAS la directive `php_fastcgi` :
+        # elle teste l'existence des fichiers sur le disque de CADDY, qui ne partage
+        # pas celui de l'API.
+        #
+        # `root` désigne un chemin DANS LE CONTENEUR DE L'API, jamais dans celui-ci :
+        # il ne sert qu'à composer `SCRIPT_FILENAME`.
+        root * /var/www/html/public
+        rewrite * /index.php
+        reverse_proxy api:9000 {
+            transport fastcgi {
+                split .php
+            }
             header_up X-Real-IP {remote_host}
         }
     }
@@ -96,7 +136,27 @@ app.axion-crm-pro.com {
         path /api/* /sanctum/* /docs /docs/* /up /broadcasting/*
     }
     handle @api {
-        reverse_proxy api:80 {
+        # 🔴 FastCGI, et non HTTP — constat A-010 (S0) de l'audit 360.
+        #
+        # L'API était servie par `php -S`, le serveur de développement de PHP : UN
+        # processus, UNE requête à la fois. Douze requêtes simultanées mesurées en
+        # production formaient un escalier parfait de pas 15 ms. Elle parle désormais
+        # FastCGI, sur 9000, par un pool php-fpm (`infra/php/fpm-axion.conf`).
+        #
+        # `rewrite * /index.php` : Laravel n'a qu'un point d'entrée. Sans cette
+        # réécriture, FastCGI reçoit un `SCRIPT_FILENAME` qui n'existe pas et répond
+        # 404 sur toutes les routes. On n'emploie PAS la directive `php_fastcgi` :
+        # elle teste l'existence des fichiers sur le disque de CADDY, qui ne partage
+        # pas celui de l'API.
+        #
+        # `root` désigne un chemin DANS LE CONTENEUR DE L'API, jamais dans celui-ci :
+        # il ne sert qu'à composer `SCRIPT_FILENAME`.
+        root * /var/www/html/public
+        rewrite * /index.php
+        reverse_proxy api:9000 {
+            transport fastcgi {
+                split .php
+            }
             header_up X-Real-IP {remote_host}
         }
     }
@@ -119,7 +179,27 @@ app.axion-crm-pro.com {
 # --- PROD : api.axion-crm-pro.com — backend direct (curl/debug)
 api.axion-crm-pro.com {
     encode zstd gzip
-    reverse_proxy api:80 {
+    # 🔴 FastCGI, et non HTTP — constat A-010 (S0) de l'audit 360.
+    #
+    # L'API était servie par `php -S`, le serveur de développement de PHP : UN
+    # processus, UNE requête à la fois. Douze requêtes simultanées mesurées en
+    # production formaient un escalier parfait de pas 15 ms. Elle parle désormais
+    # FastCGI, sur 9000, par un pool php-fpm (`infra/php/fpm-axion.conf`).
+    #
+    # `rewrite * /index.php` : Laravel n'a qu'un point d'entrée. Sans cette
+    # réécriture, FastCGI reçoit un `SCRIPT_FILENAME` qui n'existe pas et répond
+    # 404 sur toutes les routes. On n'emploie PAS la directive `php_fastcgi` :
+    # elle teste l'existence des fichiers sur le disque de CADDY, qui ne partage
+    # pas celui de l'API.
+    #
+    # `root` désigne un chemin DANS LE CONTENEUR DE L'API, jamais dans celui-ci :
+    # il ne sert qu'à composer `SCRIPT_FILENAME`.
+    root * /var/www/html/public
+    rewrite * /index.php
+    reverse_proxy api:9000 {
+        transport fastcgi {
+            split .php
+        }
         header_up X-Real-IP {remote_host}
     }
     header {
@@ -168,7 +248,14 @@ staging.axion-crm-pro.com {
         path /api/* /sanctum/* /docs /docs/* /up /broadcasting/*
     }
     handle @api {
+        # FastCGI comme la production — constat A-010. La préproduction publie
+        # php-fpm sur la boucle locale de l'hôte, plus un serveur HTTP.
+        root * /var/www/html/public
+        rewrite * /index.php
         reverse_proxy host.docker.internal:8082 {
+            transport fastcgi {
+                split .php
+            }
             header_up X-Real-IP {remote_host}
         }
     }
@@ -191,7 +278,14 @@ staging.axion-crm-pro.com {
 # --- PRÉPROD : staging-api.axion-crm-pro.com — backend direct (curl/debug)
 staging-api.axion-crm-pro.com {
     encode zstd gzip
+    # FastCGI comme la production — constat A-010. La préproduction publie
+    # php-fpm sur la boucle locale de l'hôte, plus un serveur HTTP.
+    root * /var/www/html/public
+    rewrite * /index.php
     reverse_proxy host.docker.internal:8082 {
+        transport fastcgi {
+            split .php
+        }
         header_up X-Real-IP {remote_host}
     }
     header {
@@ -201,4 +295,25 @@ staging-api.axion-crm-pro.com {
         Referrer-Policy "strict-origin-when-cross-origin"
         X-Robots-Tag "noindex, nofollow, noarchive"
     }
+}
+
+# ============================================================================
+# ÉCOUTEUR INTERNE — supervision. Constat A-010.
+# ============================================================================
+#
+# Prometheus interrogeait `api:80/metrics`. L'API ne sert plus HTTP : ce
+# relevé serait tombé silencieusement, et un tableau de bord vide ressemble
+# beaucoup à un tableau de bord sain.
+#
+# Ce port n'est PUBLIÉ nulle part (`docker-compose` ne l'expose pas) : il n'est
+# joignable que depuis le réseau Docker interne. Il ne porte donc pas les
+# en-têtes de sécurité des sites publics, et n'en a pas besoin.
+:8080 {
+	root * /var/www/html/public
+	rewrite * /index.php
+	reverse_proxy api:9000 {
+		transport fastcgi {
+			split .php
+		}
+	}
 }

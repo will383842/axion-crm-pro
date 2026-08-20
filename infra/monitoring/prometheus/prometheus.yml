@@ -21,7 +21,7 @@ scrape_configs:
   - job_name: laravel-api
     metrics_path: /metrics
     static_configs:
-      - targets: ['api:80']
+      - targets: ['caddy:8080']   # A-010 : l'API parle FastCGI, Caddy traduit
     scheme: http
 
   - job_name: horizon

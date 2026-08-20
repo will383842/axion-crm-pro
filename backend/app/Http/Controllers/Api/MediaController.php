@@ -148,6 +148,11 @@ class MediaController extends ApiController
 
     public function show(Media $media): JsonResponse
     {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($media);
+
         return $this->ok($media->load(['journalists', 'parent', 'children', 'company']));
     }
 }

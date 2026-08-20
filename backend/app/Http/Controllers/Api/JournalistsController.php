@@ -132,6 +132,11 @@ class JournalistsController extends ApiController
 
     public function show(Journalist $journalist): JsonResponse
     {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($journalist);
+
         return $this->ok($journalist->load('media'));
     }
 
@@ -141,6 +146,11 @@ class JournalistsController extends ApiController
      */
     public function optOut(Journalist $journalist): JsonResponse
     {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($journalist);
+
         $email = $journalist->email;
 
         $journalist->update(['opt_out' => true]);
@@ -176,6 +186,11 @@ class JournalistsController extends ApiController
     /** Droit à l'effacement RGPD : soft-delete. */
     public function destroy(Journalist $journalist): JsonResponse
     {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($journalist);
+
         $journalist->delete();
 
         return response()->json(null, 204);

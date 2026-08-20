@@ -36,7 +36,12 @@ class ProxyProvidersController extends ApiController
      *     @OA\Parameter(name="p", in="path", required=true, @OA\Schema(type="integer")),
      *     @OA\Response(response=501, description="Not implemented"))
      */
-    public function update(Request $r, ProxyProvider $p): JsonResponse { return $this->notImplemented('4'); }
+    public function update(Request $r, ProxyProvider $p): JsonResponse {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($p);
+ return $this->notImplemented('4'); }
 
     /**
      * @OA\Post(path="/proxy-providers/{p}/test", tags={"LLM"}, summary="Health check live d'un provider",
@@ -44,5 +49,10 @@ class ProxyProvidersController extends ApiController
      *     @OA\Parameter(name="p", in="path", required=true, @OA\Schema(type="integer")),
      *     @OA\Response(response=200, description="Healthy"))
      */
-    public function test(ProxyProvider $p): JsonResponse { return $this->ok(['healthy' => true]); }
+    public function test(ProxyProvider $p): JsonResponse {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($p);
+ return $this->ok(['healthy' => true]); }
 }

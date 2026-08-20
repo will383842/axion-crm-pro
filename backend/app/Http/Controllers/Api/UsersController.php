@@ -69,7 +69,12 @@ class UsersController extends ApiController
      *     @OA\Parameter(name="user", in="path", required=true, @OA\Schema(type="string", format="uuid")),
      *     @OA\Response(response=501, description="Not implemented"))
      */
-    public function update(Request $r, User $user): JsonResponse { return $this->notImplemented('3'); }
+    public function update(Request $r, User $user): JsonResponse {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($user, 'current_workspace_id');
+ return $this->notImplemented('3'); }
 
     /**
      * @OA\Delete(path="/users/{user}", tags={"Users"}, summary="Supprime user (Sprint 3)",
@@ -77,5 +82,10 @@ class UsersController extends ApiController
      *     @OA\Parameter(name="user", in="path", required=true, @OA\Schema(type="string", format="uuid")),
      *     @OA\Response(response=501, description="Not implemented"))
      */
-    public function destroy(User $user): JsonResponse { return $this->notImplemented('3'); }
+    public function destroy(User $user): JsonResponse {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($user, 'current_workspace_id');
+ return $this->notImplemented('3'); }
 }

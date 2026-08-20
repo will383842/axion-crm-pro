@@ -148,11 +148,18 @@ class AudiencesController extends ApiController
         return $this->ok(['data' => $rows]);
     }
 
+    /**
+     * 🔴 CONSTAT B12-001 / F36-005. Cette methode etait FAIL-OPEN : `if ($workspaceId && ...)`
+     * ne refusait rien quand le contexte manquait (« tolerant en test/dev »).
+     * Rien ne distingue un test d'une production, et la tolerance devenait la
+     * regle des qu'un appel arrivait avant le middleware.
+     *
+     * Elle delegue desormais a `ApiController::refuserHorsEspace()`, qui repond
+     * 404 quand elle ne sait pas -- et 404, non 403 : « interdit » confirmerait
+     * l'existence de la fiche a qui balaie les identifiants.
+     */
     private function assertWorkspace(EmailAudience $audience): void
     {
-        $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
-        if ($workspaceId && $audience->workspace_id !== $workspaceId) {
-            abort(404);
-        }
+        $this->refuserHorsEspace($audience);
     }
 }

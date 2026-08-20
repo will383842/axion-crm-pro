@@ -93,6 +93,11 @@ class RgpdRequestsController extends ApiController
      */
     public function process(Request $r, RgpdRequest $req): JsonResponse
     {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($req);
+
         if ($req->status === 'done') {
             return response()->json(['error' => 'already_processed'], 409);
         }

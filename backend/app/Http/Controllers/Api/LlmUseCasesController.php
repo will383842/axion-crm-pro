@@ -36,7 +36,12 @@ class LlmUseCasesController extends ApiController
      *     @OA\Parameter(name="useCase", in="path", required=true, @OA\Schema(type="integer")),
      *     @OA\Response(response=501, description="Not implemented"))
      */
-    public function update(Request $r, LlmUseCase $useCase): JsonResponse { return $this->notImplemented('4'); }
+    public function update(Request $r, LlmUseCase $useCase): JsonResponse {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($useCase);
+ return $this->notImplemented('4'); }
 
     /**
      * @OA\Get(path="/llm/use-cases/{useCase}/prompts", tags={"LLM"}, summary="Versions de prompt pour un use case",
@@ -44,7 +49,12 @@ class LlmUseCasesController extends ApiController
      *     @OA\Parameter(name="useCase", in="path", required=true, @OA\Schema(type="integer")),
      *     @OA\Response(response=200, description="OK"))
      */
-    public function prompts(LlmUseCase $useCase): JsonResponse { return $this->ok(['versions' => []]); }
+    public function prompts(LlmUseCase $useCase): JsonResponse {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($useCase);
+ return $this->ok(['versions' => []]); }
 
     /**
      * @OA\Put(path="/llm/use-cases/{useCase}/prompts/{v}", tags={"LLM"}, summary="Update version prompt (Sprint 4)",
@@ -53,5 +63,10 @@ class LlmUseCasesController extends ApiController
      *     @OA\Parameter(name="v", in="path", required=true, @OA\Schema(type="integer")),
      *     @OA\Response(response=501, description="Not implemented"))
      */
-    public function updatePrompt(Request $r, LlmUseCase $useCase, int $v): JsonResponse { return $this->notImplemented('4'); }
+    public function updatePrompt(Request $r, LlmUseCase $useCase, int $v): JsonResponse {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($useCase);
+ return $this->notImplemented('4'); }
 }

@@ -68,13 +68,13 @@ abstract class ApiController extends Controller
      * donc renseignerait un curieux qui balaie les identifiants. « Introuvable »
      * ne renseigne personne.
      */
-    protected function refuserHorsEspace(mixed $modele): void
+    protected function refuserHorsEspace(mixed $modele, string $colonne = 'workspace_id'): void
     {
         if ($modele === null) {
             return;
         }
 
-        $espaceDuModele = $modele->workspace_id ?? null;
+        $espaceDuModele = $modele->{$colonne} ?? null;
 
         // Un enregistrement sans espace n'appartient a personne en particulier
         // (referentiels globaux) : ce n'est pas a cette garde de trancher.
@@ -82,11 +82,74 @@ abstract class ApiController extends Controller
             return;
         }
 
-        $espaceCourant = app()->bound('workspace.id') ? app('workspace.id') : null;
+        $espaceCourant = $this->espaceCourantOuNull();
 
         if ($espaceCourant === null || (string) $espaceDuModele !== (string) $espaceCourant) {
             abort(404);
         }
+    }
+
+    /**
+     * L'espace de travail courant, ou `null`.
+     *
+     * 🔑 DEUX SOURCES, ET C'EST DELIBERE. Le conteneur d'abord : c'est
+     * `SetCurrentWorkspace` qui l'y pose, et c'est la meme frontiere que la RLS
+     * Postgres. Le compte authentifie ensuite, en repli, pour le cas ou le
+     * middleware n'aurait pas tourne.
+     *
+     * Ce repli existait deja -- ecrit deux fois, a l'identique, dans
+     * `ScraperRunsController` et `ScrapingCampaignsController`. Il manquait a la
+     * garde durcie. Dix-neuvieme fois que ce depot porte le meme code a deux
+     * endroits et le correctif a un seul : on le remonte ici, une fois.
+     */
+    protected function espaceCourantOuNull(): ?string
+    {
+        if (app()->bound('workspace.id')) {
+            $id = app('workspace.id');
+            if ($id !== null && $id !== '') {
+                return (string) $id;
+            }
+        }
+
+        $user = request()->user();
+        if ($user && ($user->current_workspace_id ?? null)) {
+            return (string) $user->current_workspace_id;
+        }
+
+        return null;
+    }
+
+    /**
+     * L'enregistrement appartient-il a l'espace courant ?
+     *
+     * 🔴 CONSTAT B12-001 / F36-005, DEUXIEME TOUR. Trois controleurs portaient
+     * chacun leur propre version de ce controle, toutes ecrites ainsi :
+     *
+     *     if ($workspaceId === null) { return true; }   // « tolerant en test/dev »
+     *
+     * C'est un contournement FAIL-OPEN : quand le contexte d'espace manque, la
+     * garde laisse tout passer. Le commentaire d'origine l'assumait -- « Tolerant
+     * si workspace.id n'est pas bound (tests/dev) : ne bloque pas » -- mais rien
+     * dans le code ne distingue un test d'une production : une commande, un job,
+     * un appel arrive avant le middleware, et la tolerance devient la regle.
+     *
+     * C'est le meme motif que `F37-001`, un etage plus haut : un controle qui,
+     * faute de savoir, repond « oui ». Ici la reponse est « non ».
+     */
+    protected function estDeMonEspace(mixed $modele, string $colonne = 'workspace_id'): bool
+    {
+        if ($modele === null) {
+            return true;
+        }
+
+        $espaceDuModele = $modele->{$colonne} ?? null;
+        if ($espaceDuModele === null || $espaceDuModele === '') {
+            return true;
+        }
+
+        $espaceCourant = $this->espaceCourantOuNull();
+
+        return $espaceCourant !== null && (string) $espaceDuModele === (string) $espaceCourant;
     }
 
     protected function ok(mixed $data = null, int $status = 200): JsonResponse

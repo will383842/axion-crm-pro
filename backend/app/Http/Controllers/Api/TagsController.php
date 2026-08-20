@@ -119,10 +119,12 @@ class TagsController extends ApiController
      */
     public function update(Request $r, Tag $tag): JsonResponse
     {
-        $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
-        if ($workspaceId && $tag->workspace_id !== $workspaceId) {
-            return $this->ok(['error' => 'not found'], 404);
-        }
+        // Constat B12-001 : `if ($workspaceId && ...)` ne refusait rien quand le
+        // contexte d'espace manquait, et rendait un 404 dans une enveloppe 200
+        // (`$this->ok(..., 404)` positionne bien le code HTTP, mais le corps
+        // annonce une reussite). La garde durcie de `ApiController` refuse
+        // franchement -- et refuse aussi quand elle ne sait pas.
+        $this->refuserHorsEspace($tag);
         // Garde-fou : on ne modifie pas les tags auto/llm (générés par le système)
         if ($tag->kind !== 'manual') {
             return $this->ok(['error' => 'cannot update auto/llm tag'], 403);
@@ -148,10 +150,12 @@ class TagsController extends ApiController
      */
     public function destroy(Tag $tag): JsonResponse
     {
-        $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
-        if ($workspaceId && $tag->workspace_id !== $workspaceId) {
-            return $this->ok(['error' => 'not found'], 404);
-        }
+        // Constat B12-001 : `if ($workspaceId && ...)` ne refusait rien quand le
+        // contexte d'espace manquait, et rendait un 404 dans une enveloppe 200
+        // (`$this->ok(..., 404)` positionne bien le code HTTP, mais le corps
+        // annonce une reussite). La garde durcie de `ApiController` refuse
+        // franchement -- et refuse aussi quand elle ne sait pas.
+        $this->refuserHorsEspace($tag);
         if ($tag->kind !== 'manual') {
             return $this->ok(['error' => 'cannot delete auto/llm tag (will be re-created by AutoTagger)'], 403);
         }

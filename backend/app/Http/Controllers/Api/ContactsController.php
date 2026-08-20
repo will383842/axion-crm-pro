@@ -141,6 +141,11 @@ class ContactsController extends ApiController
      */
     public function update(Request $r, Contact $contact): JsonResponse
     {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($contact);
+
         return $this->notImplemented('5');
     }
 
@@ -154,6 +159,11 @@ class ContactsController extends ApiController
      */
     public function destroy(Contact $contact): JsonResponse
     {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($contact);
+
         return $this->notImplemented('5');
     }
 }

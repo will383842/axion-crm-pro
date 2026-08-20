@@ -397,13 +397,20 @@ class ScrapingCampaignsController extends ApiController
     // Helpers
     // ------------------------------------------------------------------
 
+    /**
+     * 🔴 CONSTAT B12-001 / F36-005. Cette methode etait FAIL-OPEN : elle rendait
+     * `true` des que le contexte d'espace manquait (« tolerant en test/dev »).
+     * Rien ne distingue un test d'une production, et la tolerance devenait la
+     * regle des qu'un appel arrivait avant le middleware.
+     *
+     * Elle delegue desormais a `ApiController::estDeMonEspace()`, qui repond
+     * « non » quand elle ne sait pas. Le repli sur le compte authentifie, qui
+     * etait la seule vraie valeur de cette version locale, a ete remonte dans
+     * `espaceCourantOuNull()` : plus aucune copie ici.
+     */
     private function belongsToCurrentWorkspace(ScrapingCampaign $campaign): bool
     {
-        $workspaceId = $this->workspaceIdOrNull();
-        if ($workspaceId === null) {
-            return true;
-        }
-        return (string) $campaign->workspace_id === (string) $workspaceId;
+        return $this->estDeMonEspace($campaign);
     }
 
     private function workspaceIdOrNull(): ?string

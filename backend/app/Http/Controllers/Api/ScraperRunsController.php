@@ -169,16 +169,19 @@ class ScraperRunsController extends ApiController
     // ------------------------------------------------------------------
 
     /**
-     * Vérifie qu'un run appartient au workspace courant.
-     * Tolérant si workspace.id n'est pas bound (tests/dev) : ne bloque pas.
+     * 🔴 CONSTAT B12-001 / F36-005. Cette methode etait FAIL-OPEN : elle rendait
+     * `true` des que le contexte d'espace manquait (« tolerant en test/dev »).
+     * Rien ne distingue un test d'une production, et la tolerance devenait la
+     * regle des qu'un appel arrivait avant le middleware.
+     *
+     * Elle delegue desormais a `ApiController::estDeMonEspace()`, qui repond
+     * « non » quand elle ne sait pas. Le repli sur le compte authentifie, qui
+     * etait la seule vraie valeur de cette version locale, a ete remonte dans
+     * `espaceCourantOuNull()` : plus aucune copie ici.
      */
     private function belongsToCurrentWorkspace(ScraperRun $run): bool
     {
-        $workspaceId = $this->workspaceIdOrNull();
-        if ($workspaceId === null) {
-            return true;
-        }
-        return (string) $run->workspace_id === (string) $workspaceId;
+        return $this->estDeMonEspace($run);
     }
 
     private function workspaceIdOrNull(): ?string

@@ -368,6 +368,11 @@ class CompaniesController extends ApiController
      */
     public function update(Request $r, Company $company): JsonResponse
     {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($company);
+
         $validated = $r->validate([
             'priority' => ['nullable', Rule::in(['haute', 'moyenne', 'basse', 'gelee'])],
             'denomination' => ['nullable', 'string', 'max:255'],
@@ -394,6 +399,11 @@ class CompaniesController extends ApiController
      */
     public function destroy(Company $company): JsonResponse
     {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($company);
+
         $company->delete();
 
         return response()->json(null, 204);
@@ -413,6 +423,11 @@ class CompaniesController extends ApiController
      */
     public function enrich(Company $company): JsonResponse
     {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($company);
+
         $this->waterfall->enrich($company);
 
         return $this->ok($company->fresh()->load('contacts'));
@@ -458,6 +473,11 @@ class CompaniesController extends ApiController
      */
     public function recomputeScore(Company $company): JsonResponse
     {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($company);
+
         DB::statement('SELECT recompute_company_quality_score(?)', [$company->id]);
 
         return $this->ok($company->fresh());

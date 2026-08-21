@@ -8,6 +8,7 @@ use App\Models\AudienceMember;
 use App\Models\Contact;
 use App\Models\EmailAudience;
 use App\Services\Audiences\AudienceBuilderService;
+use App\Support\MasquageCoordonnees;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -145,7 +146,16 @@ class AudiencesController extends ApiController
             ->limit($limit)
             ->get();
 
-        return $this->ok(['data' => $rows]);
+        // 🔴 SITE JUMEAU de B12-002 / F36-006, et le plus volumineux : `limit`
+        // monte jusqu'a 500, et une audience est PRECISEMENT une selection de
+        // personnes a demarcher. Un compte en lecture seule y lisait
+        // `ct.email` en clair, 500 par appel, sans plafond d'export ni trace.
+        //
+        // `DB::table(...)->get()` rend des `stdClass`, pas des modeles : c'est
+        // la branche `stdClass` de `masquer()` qui travaille ici. Sans elle,
+        // cet appel aurait traverse la collection SANS RIEN FAIRE, et le vert
+        // aurait ete un vert de facade.
+        return $this->ok(['data' => MasquageCoordonnees::masquerSiRequis($rows)]);
     }
 
     /**

@@ -158,6 +158,79 @@ final class MasquageCoordonnees
     }
 
     /**
+     * Masque, SI le compte courant l'exige, une charge déjà PROJETÉE EN TABLEAU.
+     *
+     * ── Pourquoi une seconde porte d'entrée ─────────────────────────────────
+     *
+     * `masquerSiRequis()` mute des OBJETS en place. Une projection en tableau
+     * associatif — ce que font `CandidatesController::present()`,
+     * `PersonTimelineController` et `GlobalSearchController` — ne contient que
+     * des chaînes : `foreach` les copie, et une mutation « en place » y est un
+     * NO-OP silencieux. Passer un tableau à `masquerSiRequis()` ne masquerait
+     * donc rien, sans lever la moindre erreur. On rend ici une NOUVELLE valeur,
+     * ce qui rend l'oubli visible : ignorer le retour laisse la donnée en clair
+     * de façon évidente à la lecture.
+     *
+     * La liste des colonnes reste UNE seule (`CHAMPS_EMAIL`,
+     * `CHAMPS_TELEPHONE`) : ajouter demain une colonne de coordonnée couvre les
+     * deux portes d'un coup.
+     *
+     * @param  array<array-key, mixed>  $donnees
+     * @return array<array-key, mixed>
+     */
+    public static function masquerTableauSiRequis(array $donnees): array
+    {
+        if (! self::requis()) {
+            return $donnees;
+        }
+
+        return self::masquerTableau($donnees, 0);
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $donnees
+     * @return array<array-key, mixed>
+     */
+    private static function masquerTableau(array $donnees, int $profondeur): array
+    {
+        // Un tableau ne peut pas boucler sur lui-même en PHP (copie à
+        // l'affectation), mais une charge absurdement imbriquée coûterait la
+        // pile. 12 niveaux : la plus profonde de ce dépôt en compte 3.
+        if ($profondeur > 12) {
+            return $donnees;
+        }
+
+        foreach ($donnees as $cle => $valeur) {
+            if (is_array($valeur)) {
+                $donnees[$cle] = self::masquerTableau($valeur, $profondeur + 1);
+
+                continue;
+            }
+
+            // Un modèle ou une ligne brute posée dans un tableau : la porte
+            // « objet » sait déjà le faire, et elle mute en place.
+            if (is_object($valeur)) {
+                $vus = [];
+                self::masquer($valeur, $vus);
+
+                continue;
+            }
+
+            if (! is_string($cle)) {
+                continue;
+            }
+
+            if (in_array($cle, self::CHAMPS_EMAIL, true)) {
+                $donnees[$cle] = self::email(self::enTexte($valeur));
+            } elseif (in_array($cle, self::CHAMPS_TELEPHONE, true)) {
+                $donnees[$cle] = self::telephone(self::enTexte($valeur));
+            }
+        }
+
+        return $donnees;
+    }
+
+    /**
      * @param  array<int, true>  $vus  identités d'objets déjà traitées
      */
     private static function masquer(mixed $noeud, array &$vus): void
@@ -166,6 +239,38 @@ final class MasquageCoordonnees
         if (is_iterable($noeud)) {
             foreach ($noeud as $element) {
                 self::masquer($element, $vus);
+            }
+
+            return;
+        }
+
+        // Ligne brute d'un `DB::table(...)->get()` : un `stdClass`, mutable en
+        // place comme un modèle. La moitié des points d'API nominatifs de ce
+        // dépôt n'utilisent PAS Eloquent (`GlobalSearchController`,
+        // `PersonTimelineController`, `AudiencesController::members`) — sans
+        // cette branche, `masquerSiRequis` les traversait SANS RIEN FAIRE et
+        // rendait un vert silencieux. C'est très exactement la forme de panne
+        // que le constat B12-002 décrit : une pièce correcte, non appelée là
+        // où il fallait — ou appelée, et sans effet.
+        if ($noeud instanceof \stdClass) {
+            $identite = spl_object_id($noeud);
+            if (isset($vus[$identite])) {
+                return;
+            }
+            $vus[$identite] = true;
+
+            foreach (self::CHAMPS_EMAIL as $champ) {
+                // `property_exists` et non `isset` : une colonne sélectionnée
+                // mais NULLE existe, et `isset` la dirait absente.
+                if (property_exists($noeud, $champ)) {
+                    $noeud->{$champ} = self::email(self::enTexte($noeud->{$champ}));
+                }
+            }
+
+            foreach (self::CHAMPS_TELEPHONE as $champ) {
+                if (property_exists($noeud, $champ)) {
+                    $noeud->{$champ} = self::telephone(self::enTexte($noeud->{$champ}));
+                }
             }
 
             return;

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Crm;
 
 use App\Crm\Console\ConsoleAccess;
+use App\Support\MasquageCoordonnees;
 use App\Support\WorkspaceContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -84,8 +85,16 @@ class PersonTimelineController extends ConsoleController
                     'exists' => $vivier !== null && $this->existsInVivier($vivier, $personKey),
                 ],
             ],
-            'subjects' => $subjects,
-            'data' => array_slice($activities, 0, self::MAX_ACTIVITIES),
+            // 🔴 SITE JUMEAU de B12-002 / F36-006, et le plus ironique : la
+            // « fiche 360° » est LA fiche detaillee nominative du chantier CRM
+            // cible. Elle rendait `email` et `phone` en clair des DEUX univers.
+            // Le masquage porte sur `subjects` ET sur `data` : une activite
+            // peut porter la coordonnee dans sa charge utile, et masquer le
+            // seul bloc affiche laisserait la valeur ailleurs dans le JSON.
+            'subjects' => MasquageCoordonnees::masquerTableauSiRequis($subjects),
+            'data' => MasquageCoordonnees::masquerTableauSiRequis(
+                array_slice($activities, 0, self::MAX_ACTIVITIES),
+            ),
         ]);
     }
 

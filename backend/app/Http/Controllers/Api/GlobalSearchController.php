@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Support\MasquageCoordonnees;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -73,11 +74,21 @@ class GlobalSearchController extends ApiController
             return response()->json($vide);
         }
 
-        return response()->json([
+        // 🔴 SITE JUMEAU de B12-002 / F36-006, et le plus accessible des six :
+        // la palette est presente sur TOUS les ecrans, et `chercherPersonnes`
+        // selectionne `email` — puis cherche DEDANS. Un compte en lecture
+        // seule pouvait donc, sans meme ouvrir une fiche, taper `@` puis un
+        // nom de domaine et lire les adresses en clair, ligne apres ligne.
+        // C'est un export deguise en champ de recherche.
+        //
+        // Le masquage porte sur la charge ENTIERE, pas sur `contacts` seul :
+        // une famille de resultats ajoutee demain sera couverte sans qu'on ait
+        // a y penser.
+        return response()->json(MasquageCoordonnees::masquerTableauSiRequis([
             'companies' => $this->chercherEntreprises($espace, $terme),
             'contacts' => $this->chercherPersonnes($espace, $terme),
             'tags' => $this->chercherEtiquettes($espace, $terme),
-        ]);
+        ]));
     }
 
     /** @return list<array<string, mixed>> */

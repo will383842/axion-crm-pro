@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Crm\Outbound\ConsentOutboundRecorder;
 use App\Models\Journalist;
 use App\Support\EligibiliteCampagne;
+use App\Support\MasquageCoordonnees;
 use App\Support\PlafondExport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -39,7 +40,14 @@ class JournalistsController extends ApiController
                 ->paginate($perPage);
 
             return $this->ok([
-                'data' => $page->items(),
+                // 🔴 SITE JUMEAU de B12-002 / F36-006, que l'audit ne nomme pas.
+                // Le constat parlait de « trois listes masquees, une fiche en
+                // clair ». Il en manquait une quatrieme famille, et c'est la
+                // PLUS nominative du depot : un journaliste est une personne
+                // physique nommee, avec son courriel et sa ligne directe. La
+                // route ne porte aucune permission au-dela du groupe
+                // (routes/api.php:170) : un `viewer` la lit.
+                'data' => MasquageCoordonnees::masquerSiRequis($page->items()),
                 'meta' => [
                     'total' => $page->total(),
                     'per_page' => $page->perPage(),
@@ -178,7 +186,12 @@ class JournalistsController extends ApiController
         // « interdit » confirmerait son existence.
         $this->refuserHorsEspace($journalist);
 
-        return $this->ok($journalist->load('media'));
+        // 🔴 SITE JUMEAU de B12-002 / F36-006. La fiche detaillee d'un
+        // journaliste rendait le modele BRUT, courriel et telephone compris —
+        // exactement le defaut decrit sur `companies`, sur la famille de
+        // donnees la plus sensible. `masquerSiRequis` descend aussi dans
+        // `media`, deja chargee.
+        return $this->ok(MasquageCoordonnees::masquerSiRequis($journalist->load('media')));
     }
 
     /**

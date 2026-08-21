@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Crm;
 
 use App\Crm\Taxonomy;
 use App\Models\Candidate;
+use App\Support\MasquageCoordonnees;
 use App\Support\WorkspaceContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -82,10 +83,16 @@ class CandidatesController extends ConsoleController
             $page = $query->orderByDesc($column)->orderByDesc('id')->cursorPaginate($perPage);
 
             return $this->ok([
-                'data' => array_map(
+                // 🔴 SITE JUMEAU de B12-002 / F36-006. Le vivier est le SEUL
+                // univers ou la fiche est nominative par construction : un
+                // candidat n'a pas d'« accueil de societe » derriere lequel
+                // s'abriter. `present()` rend un TABLEAU : `masquerSiRequis`,
+                // qui mute des objets, n'y ferait rien — d'ou la porte
+                // `masquerTableauSiRequis`, qui RETOURNE la valeur masquee.
+                'data' => MasquageCoordonnees::masquerTableauSiRequis(array_map(
                     fn (Candidate $candidate): array => $this->present($candidate),
                     $page->items(),
-                ),
+                )),
                 'meta' => [
                     'per_page' => $page->perPage(),
                     'next_cursor' => $page->nextCursor()?->encode(),

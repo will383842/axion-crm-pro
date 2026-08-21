@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\Media;
 use App\Support\EligibiliteCampagne;
+use App\Support\MasquageCoordonnees;
 use App\Support\PlafondExport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -38,7 +39,12 @@ class MediaController extends ApiController
                 ->paginate($perPage);
 
             return $this->ok([
-                'data' => $page->items(),
+                // 🔴 SITE JUMEAU de B12-002 / F36-006. `media.email` est
+                // l'equivalent exact de `companies.email_generic`, qui EST
+                // masque depuis le correctif : deux colonnes de meme nature,
+                // une seule couverte. C'est le motif A-011 dans sa forme la
+                // plus pure.
+                'data' => MasquageCoordonnees::masquerSiRequis($page->items()),
                 'meta' => [
                     'total' => $page->total(),
                     'per_page' => $page->perPage(),
@@ -179,6 +185,13 @@ class MediaController extends ApiController
         // « interdit » confirmerait son existence.
         $this->refuserHorsEspace($media);
 
-        return $this->ok($media->load(['journalists', 'parent', 'children', 'company']));
+        // 🔴 SITE JUMEAU de B12-002 / F36-006, et le plus grave des six : cette
+        // fiche charge `journalists`. Elle livrait donc, en une requete, le
+        // courriel et le telephone de TOUTE la redaction — des personnes
+        // physiques nommees — a un compte en lecture seule. C'est le meme
+        // mecanisme que la fiche entreprise qui livrait ses `contacts`.
+        return $this->ok(MasquageCoordonnees::masquerSiRequis(
+            $media->load(['journalists', 'parent', 'children', 'company']),
+        ));
     }
 }

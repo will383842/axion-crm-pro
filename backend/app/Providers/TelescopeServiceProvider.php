@@ -3,11 +3,12 @@
 namespace App\Providers;
 
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Laravel\Telescope\Telescope;
 use Laravel\Telescope\TelescopeApplicationServiceProvider;
 
 /**
- * Telescope est ÉTEINT par défaut. Le drapeau `TELESCOPE_ENABLED` le rallume.
+ * Telescope est ÉTEINT par défaut, et REFUSÉ hors `local` / `testing`.
  *
  * ── 🔴 CE QUE CE DOCBLOC AFFIRMAIT, ET QUI ÉTAIT FAUX (constat A-007) ────────
  *
@@ -49,6 +50,18 @@ use Laravel\Telescope\TelescopeApplicationServiceProvider;
  * que l'autre démarrait Telescope. Dans cet état, `Telescope::auth()` et le
  * portillon `viewTelescope` n'étaient jamais définis alors que les routes du
  * paquet, elles, l'étaient. On lit désormais la MÊME source que lui.
+ *
+ * ── ET UN DÉFAUT N'EST PAS UN REFUS ─────────────────────────────────────────
+ *
+ * Le correctif ci-dessus ne fermait que le cas « la variable est absente ».
+ * Mesuré le 2026-08-21, processus neuf, sur le dépôt déjà corrigé :
+ *
+ *     APP_ENV=production TELESCOPE_ENABLED=true → enabled=true, enregistre=true
+ *
+ * `config/telescope.php` neutralise désormais la demande hors `local` /
+ * `testing`, comme `config/app.php` le fait pour `APP_DEBUG` et comme
+ * `MockServicesProvider::drapeau()` le fait pour les simulacres. Ce fichier
+ * n'a plus qu'une chose à ajouter : **ne pas laisser ce refus muet.**
  */
 class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
 {
@@ -67,11 +80,43 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
 
     public function boot(): void
     {
+        // ── LE REFUS DE TELESCOPE NE DOIT PAS ETRE SILENCIEUX — A-007 (S1) ──
+        //
+        // `config/telescope.php` neutralise `TELESCOPE_ENABLED=true` hors
+        // `local`/`testing`. Sans ce signal, l'operateur qui pose la variable
+        // sur la preproduction pour regarder une requete ne verrait RIEN, et
+        // il chercherait la panne ailleurs — ou il « reparerait » la garde.
+        //
+        // Le drapeau est lu dans la CONFIGURATION et non par `env()` : en
+        // production `config:cache` est actif et `env()` hors configuration
+        // rend `null`. Meme raison que `app.debug_refuse` (F37-003).
+        //
+        // ⚠️ Ce test precede le court-circuit : la journalisation doit avoir
+        // lieu PRECISEMENT quand Telescope est eteint contre la demande.
+        if (config('telescope.enabled_refuse') === true && ! self::$refusSignale) {
+            self::$refusSignale = true;
+            Log::critical(
+                'Telescope REFUSE hors poste de developpement : TELESCOPE_ENABLED est a vrai '
+                . 'en environnement « ' . $this->app->environment() . ' ». Constat A-007/F40-003 '
+                . "(S1) : aucune migration Telescope n'existe dans ce depot, donc chaque "
+                . 'enregistrement echoue sur `relation "telescope_entries" does not exist` — '
+                . '270 Mo de journal, environ 90 Mo par jour, 100 % du meme defaut. Et Telescope '
+                . 'journalise les requetes, les requetes SQL avec leurs parametres, les jobs et '
+                . 'les courriels : donc des donnees personnelles et des secrets. Telescope reste '
+                . 'eteint. Corrigez la configuration du conteneur (docker inspect), pas le .env : '
+                . '`docker compose restart` ne relit pas env_file.',
+                ['environnement' => $this->app->environment()],
+            );
+        }
+
         if (! (bool) config('telescope.enabled')) {
             return;
         }
         parent::boot();
     }
+
+    /** N'alerte qu'une fois par processus : sinon le journal noie son propre signal. */
+    private static bool $refusSignale = false;
 
     protected function gate(): void
     {

@@ -61,13 +61,59 @@
 | le verra : elle DEMARRE l'application et interroge `Telescope::isRecording()`,
 | elle ne relit pas ce fichier.
 |
+| ── UN DEFAUT N'EST PAS UN REFUS — ce que la premiere reparation laissait ouvert
+|
+| Mesure du 2026-08-21, processus neuf, sur le depot DEJA corrige :
+|
+|     $ env -u TELESCOPE_ENABLED -u APP_ENV \
+|         APP_ENV=production TELESCOPE_ENABLED=true php sonde-telescope.php
+|     app_env='production'
+|     enabled=true
+|     enregistre=true
+|
+| La production tout entiere ne tenait donc qu'a l'ABSENCE d'une variable. Or
+| c'est precisement par une variable posee de travers que ce depot se blesse :
+| `MOCK_MODE` qui remplissait la base de classifications fabriquees (C18-016),
+| `APP_DEBUG: 'true'` sur deux noms PUBLICS (F37-003), et `docker compose
+| restart` qui ne relit pas `env_file` (A07-003) — donc une valeur fausse qui
+| survit a ce qu'on croit etre sa correction.
+|
+| Un `TELESCOPE_ENABLED=true` colle dans un `.env` de production « le temps de
+| regarder quelque chose » rouvre le constat en entier. Et pas seulement le
+| disque : Telescope journalise les REQUETES, les requetes SQL avec leurs
+| parametres, les jobs et les courriels — donc des donnees personnelles et des
+| secrets, dans une table que rien ici ne purge et qu'aucune migration ne cree.
+|
+| Le patron du depot est deja ecrit deux fois — `MockServicesProvider::drapeau()`
+| et `config/app.php` — et il tient en une phrase : **le defaut suit
+| l'ENVIRONNEMENT, et le refus n'est pas contournable par une variable.** On
+| l'etend ici, on ne le reinvente pas. La liste des environnements permis est
+| celle de `config/app.php`, mot pour mot — `local` et `testing` — et pour la
+| meme raison : ce sont les seuls ou ce qui est enregistre ne peut atteindre
+| personne d'autre que celui qui l'a provoque.
+|
+| La preproduction est dans le refus, et ce n'est pas un exces : elle porte les
+| memes tables que la production — c'est-a-dire aucune table Telescope — sur un
+| disque qu'on surveille encore moins, et elle est servie sur des noms publics
+| par le Caddy de production (cf. `config/app.php`, constat F37-003).
+|
+| ⚠️ LE REFUS NE DOIT PAS ETRE MUET. `enabled_refuse` ci-dessous existe pour
+| que `App\Providers\TelescopeServiceProvider::boot()` puisse le journaliser au
+| niveau critique. Sans ce signal, l'operateur qui pose `TELESCOPE_ENABLED=true`
+| sur la preproduction ne verrait RIEN, chercherait la panne ailleurs, ou
+| « reparerait » la garde. Un refus muet est la moitie d'un defaut.
+| Il est calcule ICI, dans la configuration, et non dans le fournisseur : en
+| production `config:cache` est actif et `env()` hors configuration rend `null`
+| — un signal bati sur `env('TELESCOPE_ENABLED')` dans un fournisseur ne se
+| declencherait donc JAMAIS la ou il sert. Meme lecon que `app.debug_refuse`.
+|
 | ── CE QUI N'EST PAS FERME PAR CE FICHIER ─────────────────────────────────────
 |
-| Le drapeau ne cree pas les tables. Poser `TELESCOPE_ENABLED=true` sans jouer
-| `php artisan telescope:install` puis `migrate` reproduit EXACTEMENT le defaut
-| de production. Telescope reste activable deliberement — c'est voulu, une garde
-| qui vole son outil a celui qui s'en sert finit par etre retiree en entier —
-| mais l'activer sans migrer reste une faute.
+| Le drapeau ne cree pas les tables. Poser `TELESCOPE_ENABLED=true` en `local`
+| sans jouer `php artisan telescope:install` puis `migrate` reproduit EXACTEMENT
+| le defaut de production, en petit. Telescope reste activable deliberement la ou
+| il sert — c'est voulu, une garde qui vole son outil a celui qui s'en sert finit
+| par etre retiree en entier — mais l'activer sans migrer reste une faute.
 */
 
 $configurationDuPaquet = base_path('vendor/laravel/telescope/config/telescope.php');
@@ -79,21 +125,48 @@ $configurationDuPaquet = base_path('vendor/laravel/telescope/config/telescope.ph
  */
 $defauts = is_file($configurationDuPaquet) ? require $configurationDuPaquet : [];
 
+/*
+ * ⚠️ `filter_var(..., FILTER_VALIDATE_BOOLEAN)` et NON `(bool)`, meme lecon que
+ * `MockServicesProvider::drapeau()` et que `config/app.php` : `(bool) "off"`
+ * vaut **true** en PHP. `env()` normalise `"false"`, mais pas `"off"`, `"no"`
+ * ni `"0.0"` — un operateur qui ecrit `TELESCOPE_ENABLED=off` en croyant
+ * eteindre ALLUMERAIT.
+ *
+ * Le defaut est FALSE la ou le paquet met TRUE : c'est la premiere moitie du
+ * correctif, celle qui ferme le cas « la variable est absente ».
+ */
+$telescopeDemande = filter_var(env('TELESCOPE_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
+
+/*
+ * Meme lecture d'environnement que `config/app.php` : `env('APP_ENV')` et non
+ * `$app->environment()`, qui n'existe pas encore quand la configuration est
+ * chargee — et qui, sous `config:cache`, serait de toute facon fige avec elle.
+ *
+ * Les seuls environnements ou ce que Telescope enregistre ne peut atteindre
+ * personne d'autre que celui qui l'a provoque. Liste identique a celle de
+ * `app.debug` : deux garde-fous qui divergeraient finiraient par se contredire.
+ */
+$telescopeAutorise = in_array(env('APP_ENV', 'production'), ['local', 'testing'], true);
+
 return array_merge($defauts, [
 
     /*
      * 🔴 LA SEULE LIGNE QUI CHANGE PAR RAPPORT AU PAQUET.
      *
-     * Defaut FALSE au lieu de TRUE. Les deux lectures — celle du fournisseur
-     * du paquet (`config('telescope.enabled')`) et celle du fournisseur
-     * applicatif (`env('TELESCOPE_ENABLED', false)`) — s'accordent enfin sur
-     * la meme valeur.
-     *
-     * ⚠️ `filter_var(..., FILTER_VALIDATE_BOOLEAN)` et NON `(bool)`, meme
-     * lecon que `MockServicesProvider::drapeau()` et que `config/app.php` :
-     * `(bool) "off"` vaut **true** en PHP. `env()` normalise `"false"`, mais
-     * pas `"off"`, `"no"` ni `"0.0"` — un operateur qui ecrit
-     * `TELESCOPE_ENABLED=off` en croyant eteindre ALLUMERAIT.
+     * Defaut FALSE au lieu de TRUE, ET refus non contournable hors `local` /
+     * `testing`. Les deux lectures — celle du fournisseur du paquet
+     * (`config('telescope.enabled')`) et celle du fournisseur applicatif
+     * (`config('telescope.enabled')` depuis le correctif) — s'accordent sur la
+     * meme valeur, quelle que soit la variable posee.
      */
-    'enabled' => filter_var(env('TELESCOPE_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+    'enabled' => $telescopeDemande && $telescopeAutorise,
+
+    /*
+     * Vrai quand Telescope a ete DEMANDE et REFUSE : le signe d'une
+     * configuration de deploiement fautive, que
+     * `App\Providers\TelescopeServiceProvider::boot()` journalise au niveau
+     * critique. Le silence ici redonnerait le defaut d'origine, qui etait
+     * precisement que personne ne disait rien.
+     */
+    'enabled_refuse' => $telescopeDemande && ! $telescopeAutorise,
 ]);

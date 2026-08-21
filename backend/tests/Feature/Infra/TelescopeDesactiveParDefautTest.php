@@ -115,6 +115,12 @@ function cheminSondeTelescope(): string
         Illuminate\Support\Facades\Gate::has('viewTelescope'),
         true,
     ) . "\n";
+
+    // Telescope a-t-il ete DEMANDE puis REFUSE ? C'est la difference entre
+    // « personne n'a rien demande » et « quelqu'un a pose la variable et le
+    // depot a dit non ». Les deux rendent `enregistre=false` : sans ce
+    // temoin, la garde du refus serait indiscernable de la garde du defaut.
+    echo 'refus=' . var_export((bool) config('telescope.enabled_refuse'), true) . "\n";
     PHP;
 
     $source = str_replace(
@@ -139,7 +145,7 @@ function cheminSondeTelescope(): string
  * scenario de la PRODUCTION — serait impossible a jouer depuis le banc.
  *
  * @param  array<string, string>  $environnement
- * @return array{code: int, sortie: string, enabled: ?bool, enregistre: ?bool, vu: string}
+ * @return array{code: int, sortie: string, enabled: ?bool, enregistre: ?bool, portillon: ?bool, refus: ?bool, vu: string}
  */
 function sondeTelescope(array $environnement): array
 {
@@ -151,6 +157,21 @@ function sondeTelescope(array $environnement): array
         // Coupe le bruit du refus de simulacre (C18-016) en environnement de
         // production, qui n'a rien a voir avec ce qu'on mesure ici.
         'MOCK_MODE' => 'false',
+
+        // ⚠️ MESURE PAYEE, ET ELLE NE VENAIT PAS DU DEPOT MAIS DU BANC.
+        //
+        // Le bootstrap des bancs d'essai de l'audit pose `LOG_CHANNEL=null`
+        // par `putenv()` — donc HERITE par ce processus enfant. Le refus de
+        // Telescope partait alors dans le NullHandler, et la garde du signal
+        // (« le refus n est PAS SILENCIEUX ») rougissait sur un correctif
+        // parfaitement correct : elle aurait mesure la plomberie du banc, pas
+        // le comportement du depot.
+        //
+        // On epingle donc le canal. `stderr` existe dans `config/logging.php`
+        // (ligne 83) et la commande capture `2>&1` : ce que le depot journalise
+        // arrive dans `sortie`, quel que soit le banc qui joue la garde.
+        'LOG_CHANNEL' => 'stderr',
+        'LOG_LEVEL' => 'debug',
     ];
     foreach ($environnement as $cle => $valeur) {
         $commande .= ' ' . escapeshellarg($cle . '=' . $valeur);
@@ -181,6 +202,7 @@ function sondeTelescope(array $environnement): array
         'enabled' => $lire('enabled'),
         'enregistre' => $lire('enregistre'),
         'portillon' => $lire('portillon'),
+        'refus' => $lire('refus'),
         'vu' => $vu,
     ];
 }
@@ -192,9 +214,9 @@ test('A-007 — TEMOIN : le paquet Telescope est bien la, et la sonde demarre', 
     $configPaquet = base_path('vendor/laravel/telescope/config/telescope.php');
     expect(is_file($configPaquet))->toBeTrue(
         "Le paquet `laravel/telescope` n'est plus installe ({$configPaquet} absent). "
-        . "Cette garde ne mesurerait plus rien : soit le paquet a ete retire de composer.json "
-        . "— et il faut alors SUPPRIMER ce fichier de test et `config/telescope.php` — soit le "
-        . "`vendor` du banc est incomplet."
+        . 'Cette garde ne mesurerait plus rien : soit le paquet a ete retire de composer.json '
+        . '— et il faut alors SUPPRIMER ce fichier de test et `config/telescope.php` — soit le '
+        . '`vendor` du banc est incomplet.',
     );
 
     $resultat = sondeTelescope(['APP_ENV' => 'local', 'TELESCOPE_ENABLED' => 'true']);
@@ -202,16 +224,16 @@ test('A-007 — TEMOIN : le paquet Telescope est bien la, et la sonde demarre', 
     expect($resultat['code'])->toBe(
         0,
         "La sonde n'a pas pu demarrer l'application. Tout ce qui suit serait un vert sans "
-        . "mesure.\nSortie :\n" . $resultat['sortie']
+        . "mesure.\nSortie :\n" . $resultat['sortie'],
     );
 
     // TEMOIN POSITIF, LE PLUS IMPORTANT DU FICHIER. Sans lui, une sonde cassee
     // qui repondrait toujours `false` rendrait vertes les gardes ci-dessous
     // sans que Telescope soit desactive pour autant.
     expect($resultat['enregistre'])->toBeTrue(
-        "La sonde ne voit PLUS Telescope enregistrer, meme quand on le lui demande "
+        'La sonde ne voit PLUS Telescope enregistrer, meme quand on le lui demande '
         . "explicitement (TELESCOPE_ENABLED=true en local). Elle ne mesure donc plus rien.\n"
-        . "Sortie :\n" . $resultat['sortie']
+        . "Sortie :\n" . $resultat['sortie'],
     );
 
     // Et elle voit bien les DEUX fournisseurs : c'est le coeur du constat.
@@ -219,8 +241,8 @@ test('A-007 — TEMOIN : le paquet Telescope est bien la, et la sonde demarre', 
         'Laravel\Telescope\TelescopeServiceProvider',
         $resultat['sortie'],
         "Le fournisseur du PAQUET n'apparait plus. C'est lui qui appelait `Telescope::start()` "
-        . "malgre le court-circuit du fournisseur applicatif : sans lui, ce fichier ne garde "
-        . "plus le defaut qu'il decrit."
+        . 'malgre le court-circuit du fournisseur applicatif : sans lui, ce fichier ne garde '
+        . "plus le defaut qu'il decrit.",
     );
 });
 
@@ -235,21 +257,21 @@ test('A-007 — sans TELESCOPE_ENABLED, Telescope N ENREGISTRE PAS en production
         "La sonde n'a pas mesure le DEFAUT : `TELESCOPE_ENABLED` lui est parvenue avec la "
         . "valeur {$resultat['vu']}, probablement depuis un fichier `.env` du depot. Le "
         . "scenario joue n'est donc pas celui de la production, ou la variable est absente.\n"
-        . "Sortie :\n" . $resultat['sortie']
+        . "Sortie :\n" . $resultat['sortie'],
     );
 
     expect($resultat['enabled'])->toBeFalse(
         "`config('telescope.enabled')` vaut VRAI par defaut en production.\n\n"
-        . "`laravel/telescope` est une dependance DURE (composer.json:21, section require) et "
+        . '`laravel/telescope` est une dependance DURE (composer.json:21, section require) et '
         . "AUCUNE migration Telescope n'existe dans backend/database/migrations/. Telescope "
-        . "enregistre a la terminaison de CHAQUE requete et de CHAQUE commande artisan, et "
-        . "chaque enregistrement echoue sur `relation \"telescope_entries\" does not exist` — "
+        . 'enregistre a la terminaison de CHAQUE requete et de CHAQUE commande artisan, et '
+        . 'chaque enregistrement echoue sur `relation "telescope_entries" does not exist` — '
         . "270 Mo de journal, environ 90 Mo par jour, 100 % du meme defaut.\n\n"
-        . "⚠️ Le court-circuit de `App\\Providers\\TelescopeServiceProvider` NE SUFFIT PAS : "
-        . "`composer.json` porte `dont-discover: []`, donc le fournisseur du PAQUET est "
+        . '⚠️ Le court-circuit de `App\\Providers\\TelescopeServiceProvider` NE SUFFIT PAS : '
+        . '`composer.json` porte `dont-discover: []`, donc le fournisseur du PAQUET est '
         . "decouvert et lit `config('telescope.enabled')`, pas `env()`.\n\n"
         . "Correctif : publier `backend/config/telescope.php` avec `enabled` a defaut FALSE.\n\n"
-        . "Sortie de la sonde :\n" . $resultat['sortie']
+        . "Sortie de la sonde :\n" . $resultat['sortie'],
     );
 
     // La question du constat n'est pas « que dit la configuration » mais
@@ -257,7 +279,7 @@ test('A-007 — sans TELESCOPE_ENABLED, Telescope N ENREGISTRE PAS en production
     expect($resultat['enregistre'])->toBeFalse(
         "Telescope ENREGISTRE en production alors qu'aucune de ses tables n'existe. "
         . "C'est le constat A-007 / F40-003 en entier.\n\n"
-        . "Sortie de la sonde :\n" . $resultat['sortie']
+        . "Sortie de la sonde :\n" . $resultat['sortie'],
     );
 });
 
@@ -269,7 +291,7 @@ test('A-007 — sans TELESCOPE_ENABLED, Telescope N ENREGISTRE PAS en preproduct
 
     expect($resultat['enregistre'])->toBeFalse(
         "Telescope ENREGISTRE en preproduction alors qu'aucune de ses tables n'existe.\n"
-        . "Sortie de la sonde :\n" . $resultat['sortie']
+        . "Sortie de la sonde :\n" . $resultat['sortie'],
     );
 });
 
@@ -298,9 +320,9 @@ test('A-007 — Telescope reste ACTIVABLE deliberement, sans redeploiement', fun
     $resultat = sondeTelescope(['APP_ENV' => 'local', 'TELESCOPE_ENABLED' => 'true']);
 
     expect($resultat['enabled'])->toBeTrue(
-        "Le drapeau TELESCOPE_ENABLED=true ne rallume plus Telescope : le correctif a ete "
+        'Le drapeau TELESCOPE_ENABLED=true ne rallume plus Telescope : le correctif a ete '
         . "ecrit trop large et a supprime l'outil au lieu de le ranger.\n"
-        . "Sortie :\n" . $resultat['sortie']
+        . "Sortie :\n" . $resultat['sortie'],
     );
     expect($resultat['enregistre'])->toBeTrue();
 });
@@ -324,8 +346,8 @@ test('A-007 — Telescope reste ACTIVABLE deliberement, sans redeploiement', fun
  * travaillent dans ce depot, et un cache oublie la-bas figerait leur
  * configuration sans qu'ils comprennent pourquoi.
  *
- * @param  array<string, string>  $environnementDuCache      ce que voit `config:cache`
- * @param  array<string, string>  $environnementDExecution   ce que voit le processus ensuite
+ * @param  array<string, string>  $environnementDuCache  ce que voit `config:cache`
+ * @param  array<string, string>  $environnementDExecution  ce que voit le processus ensuite
  * @return array{code: int, sortie: string, enabled: ?bool, enregistre: ?bool, portillon: ?bool, vu: string}
  */
 function sondeTelescopeSousConfigCache(array $environnementDuCache, array $environnementDExecution): array
@@ -354,7 +376,8 @@ function sondeTelescopeSousConfigCache(array $environnementDuCache, array $envir
             return [
                 'code' => 1,
                 'sortie' => "config:cache n'a produit aucun fichier ({$cache}).",
-                'enabled' => null, 'enregistre' => null, 'portillon' => null, 'vu' => '',
+                'enabled' => null, 'enregistre' => null, 'portillon' => null,
+                'refus' => null, 'vu' => '',
             ];
         }
 
@@ -379,13 +402,13 @@ test('A-007 — sous config:cache, les DEUX fournisseurs prennent la MEME decisi
     expect($resultat['vu'])->toBe(
         'NULL',
         "La variable est encore visible via `env()` : le scenario joue n'est pas celui de "
-        . "`config:cache`, et ce test ne prouve rien.\nSortie :\n" . $resultat['sortie']
+        . "`config:cache`, et ce test ne prouve rien.\nSortie :\n" . $resultat['sortie'],
     );
 
     // Le fournisseur du PAQUET lit le cache : Telescope demarre.
     expect($resultat['enabled'])->toBeTrue(
         "Le cache de configuration n'a pas fige TELESCOPE_ENABLED=true : la fissure ne peut "
-        . "pas etre jouee.\nSortie :\n" . $resultat['sortie']
+        . "pas etre jouee.\nSortie :\n" . $resultat['sortie'],
     );
     expect($resultat['enregistre'])->toBeTrue();
 
@@ -394,13 +417,13 @@ test('A-007 — sous config:cache, les DEUX fournisseurs prennent la MEME decisi
     // `/telescope` du paquet enregistrees SANS `Telescope::auth()` ni portillon
     // `viewTelescope`.
     expect($resultat['portillon'])->toBeTrue(
-        "FISSURE : le fournisseur du PAQUET a demarre Telescope, le fournisseur APPLICATIF "
+        'FISSURE : le fournisseur du PAQUET a demarre Telescope, le fournisseur APPLICATIF '
         . "s'est court-circuite. Sous `config:cache`, Laravel ne lit plus `.env` : `env()` "
-        . "rend NULL la ou `config()` rend la valeur figee. Les routes `/telescope` existent "
+        . 'rend NULL la ou `config()` rend la valeur figee. Les routes `/telescope` existent '
         . "alors sans `Telescope::auth()` ni portillon `viewTelescope`.\n\n"
-        . "Correctif : `App\\Providers\\TelescopeServiceProvider` doit lire "
+        . 'Correctif : `App\\Providers\\TelescopeServiceProvider` doit lire '
         . "`config('telescope.enabled')`, la MEME source que le fournisseur du paquet.\n"
-        . "Sortie :\n" . $resultat['sortie']
+        . "Sortie :\n" . $resultat['sortie'],
     );
 });
 
@@ -420,14 +443,283 @@ test('A-007 — les DEUX fournisseurs prennent la meme decision', function () {
     $allume = sondeTelescope(['APP_ENV' => 'local', 'TELESCOPE_ENABLED' => 'true']);
     expect($allume['portillon'])->toBeTrue(
         "Telescope enregistre mais le portillon `viewTelescope` n'est pas defini : le "
-        . "fournisseur du PAQUET a demarre pendant que le fournisseur APPLICATIF se "
+        . 'fournisseur du PAQUET a demarre pendant que le fournisseur APPLICATIF se '
         . "court-circuitait. Les deux ne lisent pas la meme source.\n"
-        . "Sortie :\n" . $allume['sortie']
+        . "Sortie :\n" . $allume['sortie'],
     );
 
     $eteint = sondeTelescope(['APP_ENV' => 'production']);
     expect($eteint['portillon'])->toBeFalse(
         "Le fournisseur applicatif a demarre alors que Telescope est eteint.\n"
-        . "Sortie :\n" . $eteint['sortie']
+        . "Sortie :\n" . $eteint['sortie'],
     );
+});
+
+/*
+|==============================================================================
+| DEUXIEME MOITIE DU CONSTAT : UN DEFAUT N'EST PAS UN REFUS
+|==============================================================================
+|
+| Tout ce qui precede prouve que Telescope est ETEINT PAR DEFAUT. Ca ne prouve
+| pas qu'il est ETEINT. Mesure du 2026-08-21, sur le depot deja corrige :
+|
+|     $ env -u TELESCOPE_ENABLED -u APP_ENV \
+|         APP_ENV=production TELESCOPE_ENABLED=true php sonde-telescope.php
+|     app_env='production'
+|     enabled=true
+|     enregistre=true
+|
+| La production ne tenait donc qu'a l'ABSENCE d'une variable — dans un depot ou
+| `MOCK_MODE` (C18-016) et `APP_DEBUG` (F37-003) ont chacun deja ete poses de
+| travers sur un deploiement reel, et ou `docker compose restart` ne relit pas
+| `env_file` (A07-003), si bien qu'une valeur fausse survit a sa correction.
+|
+| Et l'enjeu n'est pas que le disque. Telescope journalise les requetes HTTP,
+| les requetes SQL avec leurs parametres, les jobs et les courriels : ce qu'il
+| ecrirait en production, ce sont des donnees personnelles et des secrets, dans
+| une table que rien ici ne purge.
+*/
+
+/**
+ * Enumere les environnements de DEPLOIEMENT du depot — par les fichiers qui les
+ * declarent, jamais par une liste ecrite a la main.
+ *
+ * ⚠️ C'est le motif A-011 du depot : une garde de completude qui enumere une
+ * liste ecrite a la main enumere exactement les cas deja repares. On lit donc
+ * le CATALOGUE — les descripteurs de deploiement (`docker-compose*.yml`) et les
+ * ateliers CI (`.github/workflows/*.yml`) — et on retire les deux
+ * environnements ou Telescope reste legitimement activable.
+ *
+ * Si un `docker-compose.preprod2.yml` apparait un jour avec `APP_ENV: qa`, il
+ * entre AUTOMATIQUEMENT dans le balayage ci-dessous.
+ *
+ * @return list<string>
+ */
+function a007EnvironnementsDeployes(): array
+{
+    $racine = realpath(base_path('..')) ?: base_path('..');
+
+    $fichiers = array_merge(
+        glob($racine . '/docker-compose*.yml') ?: [],
+        glob($racine . '/.github/workflows/*.yml') ?: [],
+    );
+
+    $vus = [];
+    foreach ($fichiers as $fichier) {
+        $contenu = (string) file_get_contents($fichier);
+
+        // `APP_ENV: production` (compose) comme `APP_ENV=production` (shell).
+        // Le motif ne mord pas sur `APP_ENV: ${APP_ENV}` : une valeur qu'on ne
+        // peut pas resoudre statiquement n'est pas une valeur mesurable.
+        $motif = '/\bAPP_ENV\b\s*[:=]\s*["\']?([A-Za-z_][A-Za-z0-9_-]*)/';
+
+        if (preg_match_all($motif, $contenu, $trouves) === 0) {
+            continue;
+        }
+
+        foreach ($trouves[1] as $valeur) {
+            $vus[strtolower($valeur)] = true;
+        }
+    }
+
+    // Les deux seuls ou ce que Telescope enregistre ne peut atteindre personne
+    // d'autre que celui qui l'a provoque (meme liste que `config/app.php`).
+    unset($vus['local'], $vus['testing']);
+
+    $liste = array_keys($vus);
+    sort($liste);
+
+    return $liste;
+}
+
+test('A-007 — TEMOIN DE COUVERTURE : le balayage des deploiements voit vraiment quelque chose', function () {
+    // Sans ce cas, un balayage casse — mauvaise racine, glob qui ne trouve
+    // rien, motif qui ne mord plus — rendrait la garde de completude VERTE en
+    // n'enumerant AUCUN environnement. C'est exactement le faux vert que ce
+    // depot a deja paye : une garde qui enumerait une liste de deux fichiers
+    // contenant exactement les deux fichiers deja repares.
+    $environnements = a007EnvironnementsDeployes();
+
+    $this->assertContains(
+        'production',
+        $environnements,
+        'Le balayage des descripteurs de deploiement ne trouve plus `production`. Il '
+        . "n'enumere donc plus rien de ce qu'il doit garder : la garde de completude "
+        . "ci-dessous serait VERTE sans mesurer un seul environnement.\n"
+        . 'Racine balayee : ' . (realpath(base_path('..')) ?: base_path('..')) . "\n"
+        . 'Trouve : ' . (implode(', ', $environnements) ?: '(rien)'),
+    );
+
+    $this->assertContains(
+        'staging',
+        $environnements,
+        'Le balayage ne trouve plus `staging`, alors que `docker-compose.staging.yml` le '
+        . 'declare. La preproduction est servie sur des noms PUBLICS par le Caddy de '
+        . "production (cf. constat F37-003) : c'est le deuxieme environnement a garder, "
+        . "pas un detail.\n"
+        . 'Trouve : ' . (implode(', ', $environnements) ?: '(rien)'),
+    );
+});
+
+test('A-007 — en PRODUCTION, une activation EXPLICITE est REFUSEE', function () {
+    // LE CAS QUE LE PREMIER CORRECTIF LAISSAIT OUVERT.
+    $resultat = sondeTelescope(['APP_ENV' => 'production', 'TELESCOPE_ENABLED' => 'true']);
+
+    // TEMOIN DE SCENARIO : on doit bien avoir DEMANDE Telescope. Si la variable
+    // n'atteignait pas le processus, ce test mesurerait le defaut (deja garde
+    // plus haut) et non le refus, tout en restant vert.
+    expect($resultat['vu'])->toBe(
+        'true',
+        "La sonde n'a pas recu TELESCOPE_ENABLED=true : le scenario joue n'est pas celui du "
+        . "refus, et ce test ne prouve rien.\nSortie :\n" . $resultat['sortie'],
+    );
+
+    expect($resultat['enabled'])->toBeFalse(
+        "`config('telescope.enabled')` est VRAI en production parce qu'une variable le "
+        . "demande. Un DEFAUT n'est pas un REFUS : la production ne doit pas tenir a "
+        . "l'ABSENCE d'une variable, dans un depot ou MOCK_MODE (C18-016) et APP_DEBUG "
+        . '(F37-003) ont chacun deja ete poses de travers sur un deploiement reel, et ou '
+        . "`docker compose restart` ne relit pas env_file (A07-003).\n\n"
+        . 'Correctif : `config/telescope.php` doit neutraliser la demande hors '
+        . '`local`/`testing`, comme `config/app.php` le fait pour APP_DEBUG et comme '
+        . "`MockServicesProvider::drapeau()` le fait pour les simulacres.\n\n"
+        . "Sortie :\n" . $resultat['sortie'],
+    );
+
+    expect($resultat['enregistre'])->toBeFalse(
+        "Telescope ENREGISTRE en production sur simple pose d'une variable, alors qu'aucune "
+        . "de ses tables n'existe — et il journalise les requetes HTTP, les requetes SQL avec "
+        . 'leurs parametres, les jobs et les courriels : donc des donnees personnelles et des '
+        . "secrets.\nSortie :\n" . $resultat['sortie'],
+    );
+
+    expect($resultat['portillon'])->toBeFalse(
+        'Le fournisseur APPLICATIF a demarre alors que Telescope est refuse : les deux '
+        . "fournisseurs ne prennent plus la meme decision.\nSortie :\n" . $resultat['sortie'],
+    );
+});
+
+test('A-007 — dans CHAQUE environnement deploye, une activation explicite est REFUSEE', function () {
+    // GARDE DE COMPLETUDE (motif A-011). Enumeree par le CATALOGUE des
+    // descripteurs de deploiement, pas par une liste ecrite ici : un nouvel
+    // environnement ajoute a `docker-compose*.yml` entre dans ce balayage sans
+    // que personne n'ait a y penser.
+    $environnements = a007EnvironnementsDeployes();
+    expect($environnements)->not->toBeEmpty();
+
+    foreach ($environnements as $environnement) {
+        $resultat = sondeTelescope([
+            'APP_ENV' => $environnement,
+            'TELESCOPE_ENABLED' => 'true',
+        ]);
+
+        expect($resultat['enregistre'])->toBeFalse(
+            "Telescope ENREGISTRE en environnement « {$environnement} » alors qu'une variable "
+            . "l'a explicitement demande. Cet environnement est declare par un descripteur de "
+            . 'deploiement du depot : il porte les memes tables que la production, '
+            . "c'est-a-dire AUCUNE table Telescope.\nSortie :\n" . $resultat['sortie'],
+        );
+    }
+});
+
+test('A-007 — le refus n est PAS SILENCIEUX', function () {
+    // Un refus muet est la moitie d'un defaut : l'operateur qui pose la
+    // variable pour regarder une requete ne verrait RIEN, chercherait la panne
+    // ailleurs, ou « reparerait » la garde. Meme lecon que `app.debug_refuse`.
+    $resultat = sondeTelescope(['APP_ENV' => 'production', 'TELESCOPE_ENABLED' => 'true']);
+
+    expect($resultat['refus'])->toBeTrue(
+        "`config('telescope.enabled_refuse')` est faux alors que Telescope vient d'etre "
+        . "refuse. Sans ce drapeau, aucun signal ne peut etre emis.\n"
+        . "Sortie :\n" . $resultat['sortie'],
+    );
+
+    // ⚠️ Sous-chaine SANS ACCENT : le message journalise est en francais non
+    // accentue, comme les autres refus du depot.
+    $this->assertStringContainsString(
+        'Telescope REFUSE hors poste de developpement',
+        $resultat['sortie'],
+        'Telescope a ete refuse EN SILENCE. `App\\Providers\\TelescopeServiceProvider::boot()` '
+        . "doit journaliser `config('telescope.enabled_refuse')` au niveau critique, avant son "
+        . "court-circuit — c'est le geste deja pose par `AppServiceProvider` pour "
+        . "`app.debug_refuse` (F37-003).\nSortie :\n" . $resultat['sortie'],
+    );
+
+    // ⚠️ Le niveau ET le message, sur la MEME ligne. Chercher `CRITICAL` seul
+    // serait un faux vert : la sonde demarre en environnement de production, ou
+    // d'AUTRES refus du depot journalisent deja au niveau critique — le refus
+    // de simulacre (C18-016) et le refus de debogage (F37-003). L'aiguille doit
+    // donc porter les deux.
+    $this->assertStringContainsString(
+        'CRITICAL: Telescope REFUSE',
+        $resultat['sortie'],
+        'Le refus est journalise, mais pas au niveau critique. Une configuration de '
+        . "production fautive n'est pas une information.\nSortie :\n" . $resultat['sortie'],
+    );
+});
+
+test('A-007 — TEMOIN NEGATIF : aucun cri de refus quand Telescope est legitimement allume', function () {
+    // Prouve que l'instrument DISCRIMINE. Un fournisseur qui crierait au refus
+    // a chaque demarrage rendrait le test precedent vert sans rien garder.
+    $resultat = sondeTelescope(['APP_ENV' => 'local', 'TELESCOPE_ENABLED' => 'true']);
+
+    expect($resultat['enregistre'])->toBeTrue(
+        "Temoin fausse : Telescope n'enregistre plus en local.\nSortie :\n" . $resultat['sortie'],
+    );
+
+    expect($resultat['refus'])->toBeFalse(
+        '`enabled_refuse` est VRAI alors que Telescope tourne. Le drapeau ne distingue plus '
+        . "rien.\nSortie :\n" . $resultat['sortie'],
+    );
+
+    $this->assertStringNotContainsString(
+        'Telescope REFUSE hors poste de developpement',
+        $resultat['sortie'],
+        'Le fournisseur crie au refus alors que Telescope est ALLUME. Le signal ne veut plus '
+        . "rien dire, et le test du refus serait vert quoi qu'il arrive.\n"
+        . "Sortie :\n" . $resultat['sortie'],
+    );
+});
+
+test('A-007 — quand personne ne demande rien : pas de refus, et pas de cri', function () {
+    // La troisieme colonne du tableau. `enregistre=false` a deux causes tres
+    // differentes — « rien demande » et « demande, refuse » — et seule la
+    // seconde doit crier. Sans ce cas, un `enabled_refuse => true` en dur
+    // passerait le test du refus et noierait le journal de production sous un
+    // cri emis a chaque demarrage de chaque processus.
+    $resultat = sondeTelescope(['APP_ENV' => 'production']);
+
+    expect($resultat['vu'])->toBe('NULL');
+
+    expect($resultat['refus'])->toBeFalse(
+        "Le depot signale un refus de Telescope alors que PERSONNE ne l'a demande.\n"
+        . "Sortie :\n" . $resultat['sortie'],
+    );
+
+    $this->assertStringNotContainsString(
+        'Telescope REFUSE hors poste de developpement',
+        $resultat['sortie'],
+        "Message de refus emis alors qu'aucune variable ne demandait Telescope. Un signal "
+        . "emis a chaque demarrage n'est plus un signal.\n"
+        . "Sortie :\n" . $resultat['sortie'],
+    );
+});
+
+test('A-007 — une valeur AMBIGUE n allume pas Telescope', function () {
+    // ⚠️ `(bool) "off"` vaut **true** en PHP, comme `(bool) "no"` et
+    // `(bool) "0.0"`. `env()` normalise `"false"` mais pas ces formes-la. Un
+    // operateur qui ecrit `TELESCOPE_ENABLED=off` en croyant eteindre
+    // ALLUMERAIT — c'est la lecon deja payee par `MockServicesProvider`.
+    //
+    // On mesure en `local`, ou Telescope est AUTORISE : en production, le refus
+    // d'environnement rendrait ce cas vert sans rien dire de la lecture.
+    foreach (['off', 'no', '0.0'] as $valeur) {
+        $resultat = sondeTelescope(['APP_ENV' => 'local', 'TELESCOPE_ENABLED' => $valeur]);
+
+        expect($resultat['enregistre'])->toBeFalse(
+            "TELESCOPE_ENABLED=\"{$valeur}\" ALLUME Telescope. La lecture doit passer par "
+            . "`filter_var(..., FILTER_VALIDATE_BOOLEAN)` et non par `(bool)`.\n"
+            . "Sortie :\n" . $resultat['sortie'],
+        );
+    }
 });

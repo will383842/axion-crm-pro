@@ -2,6 +2,7 @@
 
 use App\Console\Commands\AuditVerifyChain;
 use App\Console\Commands\CoverageRefreshMatrix;
+use App\Console\Commands\CrmSondeCleDePersonne;
 use App\Console\Commands\PartmanMaintenir;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -146,6 +147,36 @@ Schedule::command(PartmanMaintenir::SIGNATURE_PLANIFIEE)
             . "retention de 24 mois n'est plus appliquee — voir les lignes precedentes du journal.",
         );
     });
+// ── SONDE A05-001 : la fiche 360 est-elle atteignable ? ─────────────────────
+//
+// 🔴 LE DEFAUT QU'ELLE FERME N'EST PAS L'ABSENCE DU SECRET, C'EST LE SILENCE.
+//
+// `contacts.person_key` se calcule avec un secret venu du site
+// (`CRM_PERSON_KEY_SECRET`), dont le defaut est la chaine VIDE. Sans lui, la
+// fiche 360 n'est offerte pour AUCUNE personne. Mesure du 2026-08-21 :
+//
+//   - la migration de remplissage s'AJOURNE proprement, en le journalisant UNE
+//     fois, au milieu d'un deploiement ;
+//   - `crm:remplir-cle-personne` n'etait PLANIFIEE NULLE PART ;
+//   - aucune sonde ne verifiait ce secret.
+//
+// Le produit tournait donc sans erreur, et une fonctionnalite entiere n'existait
+// pas. C'est le patron A08-001 / B16-006 : une piece qui ne tourne plus, et
+// personne pour le voir. La sonde ne POSE pas le secret — un secret de
+// production ne se pose pas depuis le depot — elle rend son absence AUDIBLE et
+// dit le geste qui la fait taire.
+Schedule::command(CrmSondeCleDePersonne::SIGNATURE_PLANIFIEE)
+    ->dailyAt('06:10')
+    ->withoutOverlapping(30)
+    ->onOneServer()
+    ->onFailure(function (): void {
+        Log::critical(
+            CrmSondeCleDePersonne::PREFIXE_ALERTE . ' : la sonde de 06:10 est sortie en echec. '
+            . 'Soit `CRM_PERSON_KEY_SECRET` est absent, soit des fiches attendent encore leur cle '
+            . '— voir la ligne precedente du journal, qui nomme le cas et le geste.',
+        );
+    });
+
 Schedule::command('rgpd:anonymize-ips')->dailyAt('04:30');
 Schedule::command('anomaly:detect')->everyFifteenMinutes();
 Schedule::command('signals:nightly-scan')->dailyAt('02:00');

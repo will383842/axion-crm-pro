@@ -119,16 +119,183 @@ test('les compteurs sont servis par un index couvrant, jamais par un balayage', 
     compteursCompany($this->workspace->id, '910000001', ['relation_type' => 'client', 'lifecycle_stage' => 'client']);
     compteursCompany($this->workspace->id, '910000002', ['relation_type' => 'presse_media', 'lifecycle_stage' => 'qualifie']);
 
-    // `enable_seqscan = off` : sur une table de test à deux lignes, PostgreSQL
-    // préfère TOUJOURS le balayage — il a raison, deux lignes tiennent dans une
-    // page. On lui retire ce choix pour lui poser la seule question qui compte
-    // ici et qui vaudra à 4,29 M de lignes : « cette requête a-t-elle un index
-    // qui la COUVRE ? ». Sans la migration `2026_08_19_000001`, la réponse est
-    // non et le plan retombe sur `Seq Scan on companies` malgré la consigne —
-    // c'est exactement la rougeur attendue.
-    DB::statement('SET enable_seqscan = off');
+    // ── CE QUE CE TEST MESURE, ET POURQUOI IL NE MESURE PLUS LE PLAN DE
+    //    `companies` DIRECTEMENT ────────────────────────────────────────────
+    //
+    // 🔴 Cette garde a été VERTE PAR CHANCE jusqu'au 2026-08-21. Elle exigeait
+    // `Index Only Scan using idx_companies_ws_counts` sur la vraie table, et elle
+    // a rougi deux fois en CI sur des commits qui ne touchaient NI `companies`,
+    // NI ses index, NI ce fichier.
+    //
+    // Mesures du 2026-08-21 (psql, sur le banc — la même requête à chaque fois) :
+    //
+    //   table propre, 2 lignes, `ANALYZE` .......... Index Only Scan  ✅
+    //   table BALLONNÉE, 2 lignes, `ANALYZE` ....... Sort + Bitmap    ❌
+    //   table ballonnée, lignes VALIDÉES + VACUUM ... Sort + Bitmap    ❌
+    //   réplique vierge, 600 lignes fraîches ........ Bitmap Heap Scan ❌
+    //
+    // Deux causes, et AUCUNE des deux n'est à la portée du test :
+    //
+    //  1. `RefreshDatabase` annule les DONNÉES entre deux tests, pas l'ÉTAT
+    //     PHYSIQUE. Les tuples morts et le nombre de pages laissés par toute la
+    //     suite restent, et c'est sur eux que le planificateur raisonne.
+    //  2. Un `Index Only Scan` exige que la carte de visibilité déclare les pages
+    //     « toutes visibles ». Seul `VACUUM` la met à jour, il ne peut pas tourner
+    //     dans une transaction, et des lignes écrites par une transaction NON
+    //     VALIDÉE ne peuvent de toute façon jamais y être déclarées.
+    //
+    // Autrement dit : dans une suite transactionnelle, la forme du plan sur
+    // `companies` n'est pas une propriété du schéma, c'est un accident de ce qui
+    // a tourné avant. *Une garde dont le verdict dépend de l'ordre des tests ne
+    // prouve rien — elle finit par être désarmée comme un test capricieux.*
+    //
+    // On mesure donc la même chose en deux temps, et les deux sont déterministes.
 
-    $plan = collect(DB::select(
+    // ── 1. LE CONTRAT : l'index couvrant existe sur `companies`, et il est VALIDE
+    //
+    // C'est la propriété dont la production dépend, et elle se lit sans passer par
+    // le planificateur. `indisvalid` n'est pas décoratif : un `CREATE INDEX
+    // CONCURRENTLY` interrompu laisse un index qui EXISTE et que PostgreSQL
+    // n'utilisera jamais — exactement le piège dont se protège la migration
+    // `2026_08_19_000001`.
+    $index = DB::selectOne(
+        'SELECT pg_get_indexdef(i.indexrelid) AS definition, i.indisvalid
+           FROM pg_index i
+           JOIN pg_class c ON c.oid = i.indexrelid
+          WHERE c.relname = ?',
+        ['idx_companies_ws_counts'],
+    );
+
+    expect($index)->not->toBeNull(
+        'L index couvrant `idx_companies_ws_counts` a DISPARU de `companies`. Le calcul des '
+        . 'compteurs du hub redevient un balayage complet : 337 a 476 ms sur 300 000 fiches '
+        . 'mesurees le 2026-08-19, donc de l ordre de 3 s sur les 4,29 M de la production, a '
+        . 'CHAQUE rendu de navigation. Retablir la migration `2026_08_19_000001`.',
+    );
+    expect((bool) $index->indisvalid)->toBeTrue(
+        'L index `idx_companies_ws_counts` existe mais est INVALIDE : PostgreSQL ne s en '
+        . 'servira jamais, et rien ne le signale. Rejouer la migration `2026_08_19_000001`, '
+        . 'qui sait nettoyer un `CONCURRENTLY` interrompu.',
+    );
+
+    // ⚠️ `str_contains(...)->toBeTrue($message)` et NON `toContain($aiguille, $message)` :
+    // `toContain` est VARIADIQUE dans Pest, le message y deviendrait une seconde
+    // aiguille cherchee dans le texte. Le piege a deja ete paye une fois dans
+    // cette campagne (garde `AucunMessageDansToContain`).
+    expect(str_contains((string) $index->definition, '(workspace_id, relation_type, lifecycle_stage)'))
+        ->toBeTrue('Les colonnes de `idx_companies_ws_counts` ont change : ' . $index->definition);
+
+    // Le PARTIEL compte autant que les colonnes : sans `WHERE deleted_at IS NULL`,
+    // la condition redevient un `Filter` applique APRES lecture, et l'index cesse
+    // de couvrir la requete.
+    expect(str_contains((string) $index->definition, 'WHERE (deleted_at IS NULL)'))
+        ->toBeTrue('`idx_companies_ws_counts` n est plus PARTIEL : ' . $index->definition);
+
+    // ── 2. LE COMPORTEMENT, sur une RÉPLIQUE que ce test contrôle entièrement ──
+    //
+    // `LIKE companies INCLUDING INDEXES` : la réplique hérite du schéma RÉEL et de
+    // ses index réels. Si quelqu'un retire l'index couvrant de `companies`, la
+    // réplique ne l'a pas non plus et ce contrôle rougit — la preuve reste
+    // accrochée au vrai schéma, elle ne mesure pas une maquette.
+    //
+    // Mais la réplique est créée ICI, remplie ICI, et meurt avec la transaction :
+    // aucun test voisin ne peut la ballonner. Son état physique est le même à
+    // chaque passage, donc le plan aussi (vérifié : trois passages, coûts
+    // identiques au centième).
+    DB::statement('CREATE TEMP TABLE compteurs_replique (LIKE companies INCLUDING INDEXES INCLUDING DEFAULTS)');
+
+    $lot = [];
+    for ($i = 0; $i < 600; $i++) {
+        $lot[] = [
+            'workspace_id' => $this->workspace->id,
+            'siren' => str_pad((string) (920000000 + $i), 9, '0'),
+            'denomination' => 'ZZ REPLIQUE ' . $i,
+            'discovery_source' => 'site',
+            'quality_score' => 0,
+            'signals' => '{}',
+            'metadata' => '{}',
+            'relation_type' => $i % 2 === 0 ? 'prospect' : 'client',
+            'lifecycle_stage' => $i % 3 === 0 ? 'nouveau' : 'qualifie',
+            'legal_basis' => 'legitimate_interest_b2b',
+            'field_origins' => '{}',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+    }
+    foreach (array_chunk($lot, 200) as $paquet) {
+        DB::table('compteurs_replique')->insert($paquet);
+    }
+    DB::statement('ANALYZE compteurs_replique');
+
+    // `LIKE` renomme les index : on retrouve le nôtre par sa DÉFINITION, pas par
+    // un nom deviné — un nom deviné qui ne correspond à rien passerait au vert.
+    $couvrant = DB::selectOne(
+        "SELECT indexname
+           FROM pg_indexes
+          WHERE tablename = 'compteurs_replique'
+            AND indexdef LIKE '%(workspace_id, relation_type, lifecycle_stage)%'
+            AND indexdef LIKE '%deleted_at IS NULL%'",
+    );
+
+    expect($couvrant)->not->toBeNull(
+        'La replique n a herite d AUCUN index couvrant : `companies` n en porte donc plus. '
+        . 'Voir le message du controle 1 ci-dessus.',
+    );
+
+    // ⚠️ `SET LOCAL`, et pas `SET`. La connexion est PARTAGÉE entre les tests d'un
+    // même processus : un `SET` que le test n'atteint pas à cause d'une assertion
+    // rouge resterait posé pour TOUS les tests suivants, et fausserait leurs
+    // plans. `SET LOCAL` meurt avec la transaction, échec compris.
+    //
+    // Pourquoi couper les deux : on ne demande pas au planificateur ce qui est le
+    // moins cher sur 600 lignes — sur si peu, tout est bon marché. On lui pose la
+    // seule question qui vaudra à 4,29 M de lignes : « parmi les index, y en
+    // a-t-il un qui COUVRE cette requête ? ».
+    DB::statement('SET LOCAL enable_seqscan = off');
+    DB::statement('SET LOCAL enable_bitmapscan = off');
+
+    $planReplique = collect(DB::select(
+        'EXPLAIN SELECT relation_type, lifecycle_stage, count(*) AS total
+           FROM compteurs_replique
+          WHERE workspace_id = ? AND deleted_at IS NULL
+          GROUP BY relation_type, lifecycle_stage',
+        [$this->workspace->id],
+    ))->map(static fn ($ligne): string => (string) reset($ligne))->implode(PHP_EOL);
+
+    expect(str_contains($planReplique, 'Index Only Scan using ' . $couvrant->indexname))->toBeTrue(
+        "L index couvrant existe mais NE COUVRE PAS cette requete : le plan doit encore aller\n"
+        . "chercher des colonnes dans la table. Verifier que les colonnes lues par\n"
+        . "`CompteursHub` sont bien celles de l index.\n\nPlan obtenu :\n" . $planReplique,
+    );
+
+    // ── 3. TÉMOIN NÉGATIF : ce contrôle SAIT-il rougir ? ───────────────────
+    //
+    // Sans lui, les assertions ci-dessus pourraient passer pour de mauvaises
+    // raisons. On retire l'index de la réplique — la vraie table n'est pas
+    // touchée — et on exige que l'« Index Only Scan » disparaisse. Mesuré le
+    // 2026-08-21 : il retombe sur `Index Scan` + `Filter: (deleted_at IS NULL)`.
+    DB::statement('DROP INDEX ' . $couvrant->indexname);
+
+    $planAmpute = collect(DB::select(
+        'EXPLAIN SELECT relation_type, lifecycle_stage, count(*) AS total
+           FROM compteurs_replique
+          WHERE workspace_id = ? AND deleted_at IS NULL
+          GROUP BY relation_type, lifecycle_stage',
+        [$this->workspace->id],
+    ))->map(static fn ($ligne): string => (string) reset($ligne))->implode(PHP_EOL);
+
+    expect(str_contains($planAmpute, 'Index Only Scan'))->toBeFalse(
+        "Le detecteur est AVEUGLE : la requete est encore servie en `Index Only Scan` alors\n"
+        . "qu on vient de retirer le seul index couvrant. Le controle 2 ne prouve donc rien.\n\n"
+        . "Plan obtenu :\n" . $planAmpute,
+    );
+
+    // ── 4. LA VRAIE TABLE ne retombe pas sur un balayage complet ────────────
+    //
+    // Faible, et volontairement le seul contrôle gardé sur `companies` : c'est le
+    // seul énoncé qui reste VRAI quel que soit l'état physique de la table. Il
+    // attrape le jour où plus AUCUN index ne sert `workspace_id`.
+    $planReel = collect(DB::select(
         'EXPLAIN SELECT relation_type, lifecycle_stage, count(*) AS total
            FROM companies
           WHERE workspace_id = ? AND deleted_at IS NULL
@@ -136,10 +303,9 @@ test('les compteurs sont servis par un index couvrant, jamais par un balayage', 
         [$this->workspace->id],
     ))->map(static fn ($ligne): string => (string) reset($ligne))->implode(PHP_EOL);
 
-    DB::statement('SET enable_seqscan = on');
-
-    expect($plan)->toContain('Index Only Scan using idx_companies_ws_counts');
-    expect($plan)->not->toContain('Seq Scan on companies');
+    expect(str_contains($planReel, 'Seq Scan on companies'))->toBeFalse(
+        "Plus aucun index ne sert `workspace_id` sur `companies`.\nPlan obtenu :\n" . $planReel,
+    );
 });
 
 // ── 2. CACHE — le calcul sort du chemin d'affichage ──────────────────────────

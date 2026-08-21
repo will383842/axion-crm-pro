@@ -108,6 +108,20 @@ docker compose up -d --build --force-recreate --no-deps api app horizon schedule
 # et le conteneur avait tort.
 docker compose up -d --no-deps postgres redis
 
+# 🔴 CADDY DOIT REDÉMARRER APRÈS `api` — panne de production du 2026-08-21.
+#
+# Recréer `api` lui donne une NOUVELLE adresse sur le réseau interne. Caddy
+# n'était ni recréé ni redémarré : il gardait l'ancienne, résolue au démarrage
+# de son propre conteneur, et rendait 502 sur tout le domaine `api`.
+#
+# Mesuré après le déploiement 377febf : les cinq conteneurs `healthy`, les onze
+# migrations passées, `app` en 200 — et l'API en 502 pendant treize minutes.
+#
+# `restart` et NON `up -d --no-deps caddy` : `up -d` ne recrée que si la
+# CONFIGURATION a changé. Ici elle n'a pas bougé — c'est l'adresse de l'amont.
+# `up -d` serait un no-op, et la panne resterait entière.
+docker compose restart caddy
+
 # Migration BLOQUANTE (plus de `|| true`). `--database=pgsql_owner` : les
 # migrations doivent tourner avec le rôle PROPRIÉTAIRE des tables.
 # `</dev/null` n'est pas décoratif : sans lui, `exec -T` consomme le reste du

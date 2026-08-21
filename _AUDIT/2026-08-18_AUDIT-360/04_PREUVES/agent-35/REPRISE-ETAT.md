@@ -709,3 +709,97 @@ dérogation, c'est le registre de ce qui reste à faire.*
 passer le `chmod` des scripts d'infra dans le commit RGPD, dont le message n'en
 disait rien. Redécoupé en trois commits ; l'identité du contenu a été **prouvée**
 (`git diff filet HEAD` vide) avant de retirer le filet.
+
+---
+
+## §14 — Une garde verte par chance, et ce qu'elle cachait
+
+`CompteursHubTest > les compteurs sont servis par un index couvrant` a bloqué la
+PR #192 pendant toute la vague 15. Elle exigeait
+`Index Only Scan using idx_companies_ws_counts` sur `companies`, et elle rougissait
+en CI sur des commits qui ne touchaient **ni la table, ni ses index, ni ce fichier**.
+Jouée seule au banc, elle restait verte — quatre fois de suite.
+
+### 14.1 Deux tentatives, deux aggravations
+
+| tentative | résultat en CI |
+|---|---|
+| `ANALYZE companies` avant l'`EXPLAIN` | **pire** : `Sort` + `GroupAggregate`, plus aucun index |
+| 600 lignes de volume + `ANALYZE` | **pire encore** : `Bitmap Heap Scan` |
+
+Je corrigeais un symptôme sans avoir mesuré la cause. *Deux correctifs posés sur
+une hypothèse, et deux fois le contraire de l'effet voulu.*
+
+### 14.2 La mesure qui a tranché
+
+Cinq plans, la même requête à chaque fois, mesurés en `psql` sur le banc :
+
+| état de la table | plan obtenu |
+|---|---|
+| propre, 2 lignes, `ANALYZE` | `Index Only Scan` ✅ |
+| **ballonnée**, 2 lignes, `ANALYZE` | `Sort` + `Bitmap` ❌ |
+| ballonnée, lignes **validées** + `VACUUM ANALYZE` | `Sort` + `Bitmap` ❌ |
+| réplique **vierge**, 600 lignes fraîches | `Bitmap Heap Scan` ❌ |
+| réplique vierge, `seqscan` **et** `bitmapscan` coupés | `Index Only Scan` ✅ |
+
+Le deuxième cas reproduit l'échec CI **à l'identique** (`Sort` + `GroupAggregate`,
+`rows=2`). Deux causes, et aucune n'est à la portée d'un test :
+
+1. `RefreshDatabase` annule les **données** entre deux tests, pas l'**état
+   physique** — les tuples morts et le nombre de pages que les ~1 478 tests
+   voisins laissent dans `companies` restent, et c'est sur eux que le
+   planificateur raisonne ;
+2. un `Index Only Scan` exige que la carte de visibilité déclare les pages
+   « toutes visibles ». Seul `VACUUM` la met à jour, il ne tourne pas dans une
+   transaction, et il ne peut de toute façon rien déclarer des lignes d'une
+   transaction non validée.
+
+**Donc la garde ne prouvait pas ce qu'elle annonçait.** Son verdict était une
+fonction de l'ordre dans lequel Pest tirait les tests. *Une garde dont le
+résultat dépend de ses voisines finit désarmée comme un test capricieux — et
+c'est la fonctionnalité qu'elle couvrait qui part avec elle.*
+
+### 14.3 Ce qui la remplace
+
+Deux temps, tous deux déterministes :
+
+- **le contrat**, lu dans `pg_index` : l'index existe, il est `indisvalid`, il
+  porte les trois colonnes et le partiel `WHERE deleted_at IS NULL`. `indisvalid`
+  n'est pas décoratif — un `CREATE INDEX CONCURRENTLY` interrompu laisse un index
+  qui **existe** et que PostgreSQL n'utilisera jamais ;
+- **le comportement**, sur une réplique `LIKE companies INCLUDING INDEXES` créée
+  et remplie par le test lui-même. Elle hérite du schéma **réel** — la preuve
+  reste accrochée à la vraie table — mais aucun test voisin ne peut la ballonner.
+  Trois passages, coûts identiques au centième.
+
+Plus un témoin négatif (l'index retiré de la réplique, l'`Index Only Scan` doit
+disparaître) et un dernier contrôle sur la vraie table : le seul énoncé qui reste
+vrai quel que soit son état physique — elle ne retombe pas en `Seq Scan`.
+
+### 14.4 Deux défauts trouvés en réécrivant, dont un que je portais
+
+- **`SET` au lieu de `SET LOCAL`** — la connexion est partagée entre les tests
+  d'un même processus. Un `SET enable_seqscan = off` que le test n'atteint pas à
+  cause d'une assertion rouge restait posé pour **tous les tests suivants** et
+  faussait leurs plans. L'ancienne version portait ce défaut ; il explique
+  peut-être une part des intermittences observées ailleurs.
+- **`toContain($aiguille, $message)`** — j'allais le réécrire ainsi. `toContain`
+  est **variadique** dans Pest : le message y devient une seconde aiguille
+  cherchée dans le texte. Le piège avait déjà été payé dans cette campagne
+  (garde `AucunMessageDansToContain`). Remplacé par
+  `str_contains(...)->toBeTrue($message)`.
+
+### 14.5 Deux mutations qui n'ont rien prouvé, et pourquoi
+
+J'ai d'abord ballonné la table puis supprimé l'index **dans la base du banc**, et
+la garde est restée verte les deux fois. Ce n'était pas la garde qui était
+aveugle : `RefreshDatabase` rejoue `migrate:fresh` au début de chaque run et
+avait effacé mes deux mutations avant que le test ne tourne.
+
+*C'est le même piège que celui du §13.8 : le dispositif de mesure faisait partie
+de ce qu'il fallait mesurer.* Et cela explique enfin pourquoi ce test ne rougissait
+jamais joué seul — la table n'est ballonnée qu'**au milieu** de la suite complète.
+
+La mutation valide a porté sur la **migration** : privée de sa création d'index,
+la garde tombe sur « L index couvrant `idx_companies_ws_counts` a DISPARU ».
+Migration restaurée, quatre passages verts en ordre aléatoire.

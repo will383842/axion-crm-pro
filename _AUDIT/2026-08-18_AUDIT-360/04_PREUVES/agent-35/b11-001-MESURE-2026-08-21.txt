@@ -1,0 +1,43 @@
+B11-001 (S0) — MESURE DU 2026-08-21, sur fix/a35-authentification
+
+  tables cloisonnees (colonne workspace_id) ................ 72
+  taches planifiees distinctes (routes/console.php) ........ 33
+    dont posant un contexte d'espace ....................... 2
+    SANS contexte .......................................... 31
+  parmi les 31, celles qui NOMMENT une table cloisonnee .... 17
+
+Les deux seules qui posent un contexte :
+  rgpd:purge-business-prospects   RgpdPurgeBusinessProspects.php
+  rgpd:purge-vivier               RgpdPurgeVivier.php
+
+Les 17 exposees (table citee litteralement dans le source) :
+  campaigns:start-scheduled            scraping_campaigns
+  journalists:scrape-ours              contacts, journalists
+  media:backfill-periodicity           media
+  media:clean-emails                   media
+  media:enrich                         media
+  media:extract-from-companies         media
+  media:import-arcom                   companies
+  media:import-blogs                   media
+  media:import-emissions-wikidata      journalists, media
+  media:link-emissions-to-channels     media
+  media:link-to-companies              media
+  media:score-confidence               media
+  media:tag-emissions-status           media
+  prospection:score-email-confidence   contacts
+  retention:prune-scraper-runs         scraper_runs
+  retention:purge                      notifications, scraper_runs
+  rgpd:anonymize-ips                   audit_logs, sessions
+
+CE QUE CE CHIFFRE VAUT, ET CE QU'IL NE VAUT PAS.
+
+  17 est un PLANCHER, pas un total. Le balayage cherche le nom de la table en
+  clair dans le source ; une commande qui passe par un modele Eloquent
+  (`Media::query()`) touche la meme table sans la nommer. Le constat d'origine
+  annoncait 26 : l'ecart tient probablement la.
+
+  31 sur 33, en revanche, est un compte EXACT : deux commandes seulement posent
+  un contexte, et ce sont les deux purges RGPD.
+
+COMMANDE REJOUABLE : voir le script en fin de ce fichier, ou refaire la mesure
+depuis `routes/console.php` + `information_schema.columns`.

@@ -247,6 +247,83 @@ function contenuScriptSauvegarde(string $relatif): string
     return (string) file_get_contents(racineDepotSauvegarde() . '/' . $relatif);
 }
 
+/**
+ * 🔴 LE SCRIPT PRIVE DE SES COMMENTAIRES — ajoute le 2026-08-21.
+ *
+ * DEUX DES GARDES DE CE FICHIER NE POUVAIENT PAS ECHOUER, et c'est une mesure,
+ * pas une inquietude. Le 2026-08-21, on a remis les trois moities du defaut
+ * A08-008 dans les scripts pour exiger le rouge :
+ *
+ *   · `--no-acl` reintroduit sur `pg_dump`          → ROUGE. Correct.
+ *   · `pg_dumpall --globals-only` retire du flux    → VERT. Faux vert.
+ *   · `has_table_privilege` retire de `dr-drill.sh` → VERT. Faux vert.
+ *
+ * La cause est la meme dans les deux cas : `dumpPorteLesRoles()` et
+ * `verifieLesDroitsDuRoleApplicatif()` cherchaient leur motif dans le FICHIER
+ * ENTIER, commentaires compris — et ces scripts sont abondamment commentes, par
+ * ce meme lot, avec les mots exacts qu'ils cherchent :
+ *
+ *     backup-postgres.sh:208  #     $ pg_dumpall -U axion --globals-only
+ *     dr-drill.sh:276         # `has_table_privilege` repond exactement a la …
+ *
+ * Autrement dit : on pouvait supprimer le MECANISME et garder la PHRASE qui en
+ * parle, et les gardes applaudissaient. C'est exactement ce que le docbloc de ce
+ * fichier reproche a `dr-drill.sh` — « un controle qui rassure ». Il etait ici
+ * aussi, et il y est reste un jour.
+ */
+function codeDuScriptSansCommentaires(string $contenu): string
+{
+    $lignes = [];
+    foreach (explode("\n", $contenu) as $ligne) {
+        if (str_starts_with(ltrim($ligne), '#')) {
+            continue;
+        }
+        $lignes[] = $ligne;
+    }
+
+    return implode("\n", $lignes);
+}
+
+/**
+ * 🔴 LES INVOCATIONS DU SCRIPT, UNE PAR LIGNE — ajoute le 2026-08-21.
+ *
+ * Retirer les commentaires n'a pas suffi, et la mesure l'a dit tout de suite.
+ * Deuxieme tour du meme jour, `--globals-only` retire du flux :
+ * `dumpPorteLesRoles()` restait VERTE. Deux raisons, toutes deux instructives :
+ *
+ *   1. son motif exigeait `pg_dumpall` ET `--globals-only` SUR LA MEME LIGNE.
+ *      Dans le script, l'invocation est ecrite sur trois lignes avec des
+ *      continuations `\`. Elle n'a donc JAMAIS reconnu le vrai appel — elle
+ *      reconnaissait la trace ecrite ailleurs ;
+ *   2. ce qu'elle reconnaissait, apres le retrait des commentaires, c'etait
+ *      `backup-postgres.sh:345` :
+ *
+ *          log "   À vérifier : que `pg_dumpall --globals-only` tourne, …"
+ *
+ *      un MESSAGE D'ERREUR. Le script pouvait ne plus rien faire et continuer a
+ *      recommander de le faire ; la garde applaudissait.
+ *
+ * On rend donc les invocations REELLES : continuations recollees, et les lignes
+ * qui ne font que PARLER (`log`, `echo`, `printf`) ecartees.
+ */
+function invocationsDuScript(string $contenu): string
+{
+    // Les continuations `\` recollees : une commande = une ligne.
+    $recolle = preg_replace('/\\\\\R\s*/', ' ', codeDuScriptSansCommentaires($contenu));
+
+    $lignes = [];
+    foreach (explode("\n", (string) $recolle) as $ligne) {
+        $nue = ltrim($ligne);
+        // Une ligne qui PARLE n'est pas une ligne qui FAIT.
+        if (preg_match('/^(log|echo|printf)\b/', $nue) === 1) {
+            continue;
+        }
+        $lignes[] = $ligne;
+    }
+
+    return implode("\n", $lignes);
+}
+
 /** Une invocation de `pg_dump` retire-t-elle les ACL ? (`--no-acl` ou son alias `-x`) */
 function dumpRetireLesAcl(string $contenu): bool
 {
@@ -263,10 +340,20 @@ function dumpRetireLesAcl(string $contenu): bool
     return false;
 }
 
-/** Le script emporte-t-il les roles du cluster ? */
+/**
+ * Le script emporte-t-il les roles du cluster ?
+ *
+ * ⚠️ SUR LE CODE, PAS SUR LES COMMENTAIRES : cf. `codeDuScriptSansCommentaires()`.
+ * Cette garde etait verte, le 2026-08-21, sur un `backup-postgres.sh` dont le
+ * `pg_dumpall --globals-only` avait ete retire — le motif survivait dans un
+ * commentaire qui citait la mesure.
+ */
 function dumpPorteLesRoles(string $contenu): bool
 {
-    return preg_match('/pg_dumpall[^\n]*--globals-only|--globals-only[^\n]*pg_dumpall/', $contenu) === 1;
+    return preg_match(
+        '/pg_dumpall[^\n]*--globals-only|--globals-only[^\n]*pg_dumpall/',
+        invocationsDuScript($contenu),
+    ) === 1;
 }
 
 /**
@@ -276,10 +363,15 @@ function dumpPorteLesRoles(string $contenu): bool
  * hasard : c'est la fonction Postgres qui repond exactement a la question
  * « ce role peut-il lire cette table ». Un comptage `SELECT count(*)` joue en
  * superutilisateur — ce que faisait `dr-drill.sh` — ne la contient pas.
+ *
+ * ⚠️ SUR LE CODE, PAS SUR LES COMMENTAIRES : cf. `codeDuScriptSansCommentaires()`.
+ * Cette garde etait verte, le 2026-08-21, sur un `dr-drill.sh` dont le
+ * `has_table_privilege` avait ete remplace par `false` dans la requete — le mot
+ * survivait dans le commentaire qui explique pourquoi on l'emploie.
  */
 function verifieLesDroitsDuRoleApplicatif(string $contenu): bool
 {
-    return str_contains($contenu, 'has_table_privilege');
+    return str_contains(invocationsDuScript($contenu), 'has_table_privilege');
 }
 
 test('A08-008 — TEMOIN : le banc voit les trois scripts de la chaine', function () {
@@ -312,6 +404,42 @@ test('A08-008 — TEMOIN NEGATIF : les balayages savent reperer le defaut ET le 
 
     expect(verifieLesDroitsDuRoleApplicatif("has_table_privilege('axion_app', t, 'SELECT')"))->toBeTrue();
     expect(verifieLesDroitsDuRoleApplicatif('psql -U axion -tAc "SELECT count(*) FROM companies"'))->toBeFalse();
+
+    // 🔴 LE TROU MESURE LE 2026-08-21 : LA PHRASE NE VAUT PAS LE MECANISME.
+    //
+    // Les deux balayages ci-dessus lisaient le fichier ENTIER. On pouvait donc
+    // retirer le mecanisme et garder le commentaire qui en parle — et ils
+    // restaient verts. Les deux cas exacts qu'on a mesures :
+    expect(dumpPorteLesRoles(
+        "#     \$ pg_dumpall -U axion --globals-only\n"
+        . "    docker exec \"\$DB_CONTAINER\" pg_dump -U axion --no-owner axion_crm"
+    ))->toBeFalse();
+
+    // Deuxieme trou du meme jour : un MESSAGE qui recommande le geste n'est pas
+    // le geste. `backup-postgres.sh:345` le prononce dans un `log` d'erreur.
+    expect(dumpPorteLesRoles(
+        "    log \"   À vérifier : que \`pg_dumpall --globals-only\` tourne\"\n"
+        . "    docker exec \"\$C\" pg_dump -U axion axion_crm"
+    ))->toBeFalse();
+
+    // Et troisieme : l'invocation REELLE est ecrite sur trois lignes avec des
+    // continuations. Le motif d'origine, mono-ligne, ne l'a jamais reconnue.
+    expect(dumpPorteLesRoles(
+        "    docker exec \"\$DB_CONTAINER\" pg_dumpall \\\n        -U \"\$DB_USER\" \\\n        --globals-only"
+    ))->toBeTrue();
+    expect(verifieLesDroitsDuRoleApplicatif(
+        "# `has_table_privilege` repond exactement a la question posee par le constat\n"
+        . "ILLISIBLES=\$(psql -tAc \"SELECT count(*) FROM pg_class WHERE false\")"
+    ))->toBeFalse();
+
+    // Et ils ne se trompent pas dans l'autre sens : le mecanisme PRESENT,
+    // commentaire ou pas, reste reconnu.
+    expect(dumpPorteLesRoles(
+        "# un commentaire quelconque\n    docker exec \"\$C\" pg_dumpall -U axion --globals-only"
+    ))->toBeTrue();
+    expect(verifieLesDroitsDuRoleApplicatif(
+        "# un commentaire quelconque\n    AND NOT has_table_privilege('axion_app', c.oid, 'SELECT')"
+    ))->toBeTrue();
 });
 
 test('A08-008 — la sauvegarde emporte les ROLES du cluster', function () {

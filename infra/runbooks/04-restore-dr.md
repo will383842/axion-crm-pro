@@ -94,7 +94,11 @@ document** — eux font foi, pas ce texte.
 **Ce que l'archive contient**, dans cet ordre — trois sections, et la deuxième
 est la plus récente et la moins évidente :
 
-1. neuf `CREATE EXTENSION IF NOT EXISTS` (dont `postgis` et `vector`) ;
+1. un préambule de `CREATE EXTENSION IF NOT EXISTS`, **dérivé de `pg_extension`
+   au moment du dump** (constat F39-005) — donc exactement les extensions que la
+   base portait cette nuit-là, `pg_partman` et son schéma `partman` compris. Ce
+   préambule a été, jusqu'au 2026-08-21, **neuf noms recopiés à la main**, et il
+   en manquait un ; on ne l'aurait su qu'un jour de restauration ;
 2. **les rôles du cluster** (`pg_dumpall --globals-only`), encadrés par deux
    marqueurs textuels `-- >>> AXION-GLOBALS-DEBUT` / `-- >>> AXION-GLOBALS-FIN` ;
 3. le schéma, les données **et les `GRANT`**.
@@ -229,7 +233,7 @@ docker exec axion-crm-postgres sh -c 'df -h /var/lib/postgresql/data'
 bash /opt/axion-crm-pro/infra/scripts/restore-postgres.sh /tmp/restore/axion_crm_20260820T030000Z.sql.gz axion_crm
 ```
 
-Le script fait cinq étapes, et **chacune est là parce qu'elle a manqué un jour** :
+Le script fait six étapes, et **chacune est là parce qu'elle a manqué un jour** :
 
 1. crée la base si elle n'existe pas — elle n'est pas dans l'archive, c'est
    voulu ;
@@ -239,11 +243,17 @@ Le script fait cinq étapes, et **chacune est là parce qu'elle a manqué un jou
 3. déroule la charge utile en `--single-transaction -v ON_ERROR_STOP=1`, la
    section des rôles retirée du flux ;
 4. compte les tables du schéma `public` — moins de 10 ⇒ échec ;
-5. **interroge les droits du rôle applicatif** avec `has_table_privilege`.
+5. **interroge les droits du rôle applicatif** avec `has_table_privilege` ;
+6. **compare les extensions déclarées par l'archive à celles de la base
+   restaurée** (constat F39-005). Les étapes 4 et 5 ne peuvent pas voir une
+   extension manquante : une base privée d'`unaccent` porte le même nombre de
+   tables et donne les mêmes droits. Elle échoue plus tard, sur une requête.
 
 **Codes de sortie :** `1` = usage ou restauration ratée · **`6` = les données
-sont là mais les droits manquent.** Un `6` n'est pas un échec de restauration :
-c'est une archive trop ancienne. Va au §7.3.
+sont là mais les droits ou les extensions manquent.** Un `6` n'est pas un échec
+de restauration. Sur les droits, c'est une archive trop ancienne : va au §7.3.
+Sur les extensions, c'est l'**image Postgres** de ce serveur qui n'est pas la
+bonne — relis l'encadré du §3.
 
 > ⚠️ **Ne restaure pas « à la main » avec un tube `zcat | psql`.** Tu perdrais
 > les deux choses que ce script fait et qu'un tube ne fait pas : appliquer la

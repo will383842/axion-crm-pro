@@ -154,6 +154,24 @@ REFERENCE=$(ssh "$SRV" "docker exec ${PG_CONTENEUR} psql -U axion -d axion_crm -
     UNION ALL SELECT 'journalists='||count(*) FROM journalists\" | sort")
 echo "$REFERENCE" | sed 's/^/    /'
 
+# 🔴 LES EXTENSIONS DE PRODUCTION — constat F39-005 (S1), ajouté le 2026-08-21.
+#
+# Les comptages ci-dessus ne voient pas une extension manquante : une base privée
+# d'`unaccent` porte exactement le même nombre de lignes, et l'étape 5 lui trouve
+# exactement les mêmes droits. C'est pourtant ce qui a fait tomber l'exercice du
+# 2026-08-16 — `function unaccent(text) does not exist` —, et il a fallu lire le
+# journal de restauration pour le comprendre.
+#
+# On relève donc `pg_extension` EN PRODUCTION, avec le schéma de chaque
+# extension (`pg_partman` vit dans `partman`, et s'il atterrit ailleurs la suite
+# de tests meurt — cf. `infra/postgres/init/01-extensions.sql`). Aucune liste
+# n'est écrite ici : les deux côtés sont mesurés, ce qui est le seul moyen de
+# voir une extension qu'on a oublié d'inscrire quelque part.
+REFERENCE_EXTENSIONS=$(ssh "$SRV" "docker exec ${PG_CONTENEUR} psql -U axion -d axion_crm -tAc \"
+    SELECT e.extname||'@'||n.nspname
+    FROM pg_extension e JOIN pg_namespace n ON n.oid = e.extnamespace\" | sort")
+echo "  extensions en production : $(printf '%s\n' "$REFERENCE_EXTENSIONS" | grep -c . || true)"
+
 # --- 3. Restauration --------------------------------------------------------
 echo "[3/6] Restauration dans « ${BASE_DRILL} »…"
 scp "$SRV:${SCRATCH}/${DERNIER}" "$SCRATCH/" >/dev/null
@@ -209,6 +227,31 @@ if [ "$REFERENCE" != "$RESTAURE" ]; then
 fi
 echo "$RESTAURE" | sed 's/^/    /'
 echo "  ✓ Comptages identiques à la production"
+
+# 🔴 Et les EXTENSIONS — constat F39-005. Même comparaison, autre moitié du mur.
+RESTAURE_EXTENSIONS=$(docker exec "$PG_CONTENEUR" psql -U axion -d "$BASE_DRILL" -tAc "
+    SELECT e.extname||'@'||n.nspname
+    FROM pg_extension e JOIN pg_namespace n ON n.oid = e.extnamespace" | sort)
+
+# Témoin de couverture : une comparaison entre deux ensembles VIDES est vraie et
+# ne prouve rien. Si la production n'a rendu aucune extension, c'est la mesure
+# qui a échoué, pas la base qui est saine.
+if [ -z "$(printf '%s' "$REFERENCE_EXTENSIONS" | tr -d '[:space:]')" ]; then
+    echo "❌ Le relevé des extensions de production est VIDE — la mesure a échoué." >&2
+    echo "   Comparer deux ensembles vides serait vert et ne prouverait rien." >&2
+    exit 4
+fi
+
+if [ "$REFERENCE_EXTENSIONS" != "$RESTAURE_EXTENSIONS" ]; then
+    echo "❌ CONSTAT F39-005 : ÉCART d'extensions entre production et restauration :" >&2
+    diff <(echo "$REFERENCE_EXTENSIONS") <(echo "$RESTAURE_EXTENSIONS") | sed 's/^/    /' >&2
+    echo "   Les comptages de lignes ci-dessus sont identiques et ne prouvent RIEN là-dessus :" >&2
+    echo "   une extension manquante n'échoue pas à la restauration, elle échoue à la PREMIÈRE" >&2
+    echo "   requête qui s'en sert — c'est la panne du 2026-08-16, « function unaccent(text)" >&2
+    echo "   does not exist »." >&2
+    exit 4
+fi
+echo "  ✓ Extensions identiques à la production ($(printf '%s\n' "$RESTAURE_EXTENSIONS" | grep -c . || true))"
 
 # --- 5. 🔴 LES DROITS — constat A08-008 (S1), ajouté le 2026-08-20 -----------
 #

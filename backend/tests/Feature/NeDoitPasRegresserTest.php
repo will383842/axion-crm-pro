@@ -317,6 +317,38 @@ test('ACQUIS 2 (suite) — la surveillance et l’exercice de restauration exist
     // `scripts-executables` vert par vacuité.
     $racine = dirname(base_path());
 
+    // ⚠️ TÉMOIN DE MONTAGE — VINGT-ET-UNIÈME CAS DE `A-011`, PORTÉ ICI LE 2026-08-21.
+    //
+    // Ce contrôle accuse un fichier d'avoir DISPARU. Sur le banc `a35r`, `$racine`
+    // vaut `/var/www`, et les deux arbres qu'il inspecte n'y arrivent pas de la
+    // même façon : `infra/` est un montage BIND (une édition du dépôt y est vue
+    // aussitôt), `.github/` est une COPIE `docker cp` qu'il faut rafraîchir à la
+    // main. Le 2026-08-20, cette différence a fait rougir ce test en accusant
+    // `.github/workflows/surveillance-sauvegarde.yml` d'avoir disparu — le
+    // fichier existait, c'est l'arbre qui n'était pas là.
+    //
+    // *Un contrôle d'existence sans témoin de montage n'accuse pas le produit :
+    // il accuse le banc, et il le fait avec les mots du produit.* C'est la forme
+    // la plus coûteuse d'un faux rouge, parce qu'elle envoie chercher un défaut
+    // qui n'existe pas.
+    //
+    // La parade existait déjà dans `tests/Feature/Infra/` ; elle n'avait pas été
+    // portée ici. On la porte : chaque arbre inspecté doit d'abord se PROUVER
+    // présent, et le message dit alors quoi faire — recopier, pas chercher.
+    foreach (['infra/scripts', '.github/workflows'] as $arbre) {
+        $this->assertDirectoryExists(
+            $racine . '/' . $arbre,
+            "L'arbre « {$arbre} » n'est pas visible depuis le banc ({$racine}) : ce contrôle "
+            . "accuserait des fichiers d'avoir disparu alors qu'il ne les a jamais cherchés au "
+            . 'bon endroit.
+
+Sur le banc `a35r`, `/var/www/.github` est une COPIE et non un '
+            . 'montage : la rafraîchir par
+'
+            . '  tar -c --exclude=node_modules .github | docker exec -i a35r tar -x -C /var/www',
+        );
+    }
+
     foreach ([
         'infra/scripts/backup-postgres.sh',
         'infra/scripts/restore-postgres.sh',

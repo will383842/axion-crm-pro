@@ -168,6 +168,108 @@ class GdprErasureService
                 })
                 ->delete();
 
+            // ── LES TITULAIRES DE COMPTE DU CRM (B10-004, ce qui en restait) ──
+            //
+            // `users`, `invitations` et `password_reset_tokens` n'etaient vises
+            // par AUCUNE procedure d'effacement — ni par cette porte, ni par
+            // celle du site. Le tableau de decision du 2026-08-20
+            // (`tests/Feature/Rgpd/PortabiliteCompleteTest.php`) les EXCLUAIT au
+            // motif « autre registre de traitement ». Un registre distinct
+            // change la base legale et la duree de conservation ; il ne suspend
+            // pas l'article 17. Ce sont des personnes IDENTIFIEES : les
+            // utilisateurs du CRM, et les gens qu'on a invites a le devenir.
+            //
+            // 🔴 POURQUOI ON ANONYMISE `users` AU LIEU DE LE SUPPRIMER — ET CE
+            //    N'EST PAS UN GOUT, C'EST LE CATALOGUE QUI LE DIT.
+            //
+            //   SELECT conrelid::regclass, confdeltype FROM pg_constraint
+            //    WHERE contype = 'f' AND confrelid = 'users'::regclass;
+            //
+            // Mesure du 2026-08-21 sur `axion_crm_test_lot8` : 33 contraintes
+            // pointent vers `users`. SEPT d'entre elles BLOQUENT une suppression
+            //   `a` (NO ACTION) — deal_history.changed_by,
+            //     duplicate_flags.reviewed_by, invitations.invited_by,
+            //     invitations.accepted_by, prompt_template_versions.created_by,
+            //     rgpd_requests.processed_by ;
+            //   `r` (RESTRICT)  — scraping_campaigns.created_by.
+            // Un `DELETE` leve donc une violation de cle etrangere des que la
+            // personne a agi une seule fois dans le CRM — et un titulaire de
+            // compte a agi, par definition. Une demande d'effacement se
+            // solderait par une exception, pas par un effacement.
+            //
+            // Les 21 restantes sont en `SET NULL`, et c'est PIRE que le blocage :
+            // `audit_logs.user_id` en fait partie, sur la table mere et ses
+            // douze partitions. Supprimer la ligne DETACHERAIT silencieusement
+            // de son auteur chaque maillon de la chaine d'audit — c'est-a-dire
+            // detruirait la preuve de qui a fait quoi, y compris la preuve de
+            // cet effacement-ci.
+            //
+            // LE DEPOT A DEJA TRANCHE CE CAS, QUARANTE LIGNES PLUS HAUT :
+            // `journalists` est anonymise puis soft-delete « pour conserver la
+            // tracabilite de l'effacement ». On fait pareil. `users` porte
+            // `SoftDeletes` depuis B10-016 et `config/auth.php` rend
+            // `deleted_at` OPPOSABLE : le compte ferme perd ses sessions comme
+            // ses jetons Sanctum deja emis.
+            $comptes = DB::table('users')->where('email', $email)->pluck('id')->all();
+            $deleted['users'] = 0;
+            foreach ($comptes as $idCompte) {
+                $deleted['users'] += DB::table('users')->where('id', $idCompte)->update([
+                    // `email` est NOT NULL **et** UNIQUE (citext) : on ne peut
+                    // ni la vider ni ecrire deux fois la meme valeur. Le TLD
+                    // `.invalid` est reserve par le RFC 2606 — aucune adresse
+                    // n'y sera jamais livrable, et l'identifiant du compte suffit
+                    // a garantir l'unicite.
+                    'email' => 'efface-' . $idCompte . '@compte-efface.invalid',
+                    'name' => 'Compte efface',
+                    'password_hash' => null,
+                    'avatar_url' => null,
+                    'totp_secret' => null,
+                    'totp_recovery_codes' => null,
+                    'totp_enabled_at' => null,
+                    'remember_token' => null,
+                    'last_login_ip' => null,
+                    'last_login_user_agent' => null,
+                    'deleted_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            // Les SESSIONS ouvertes gardent `ip_address` et `user_agent` : le
+            // residu le plus direct qui survit a l'anonymisation de la ligne
+            // `users`. La cle etrangere est bien en CASCADE — mais on ne
+            // supprime PAS la ligne `users`, donc la cascade ne se declenche
+            // JAMAIS ici. C'est exactement le genre de securite qu'on croit
+            // avoir sans l'avoir.
+            $deleted['sessions'] = $comptes === []
+                ? 0
+                : DB::table('sessions')->whereIn('user_id', $comptes)->delete();
+
+            // L'INVITATION porte l'adresse de la personne INVITEE, son role
+            // prevu, et un `token_hash` qui ouvre un compte. Rien n'y refere
+            // (mesure : aucune contrainte `f` de `confrelid = 'invitations'`),
+            // et la ligne n'a aucune valeur une fois la personne effacee :
+            // suppression ferme.
+            //
+            // ⚠️ `invitations` porte FORCE ROW LEVEL SECURITY et une policy
+            // d'isolation par `workspace_id`. Ce service efface a travers TOUS
+            // les espaces, sans contexte pose : il depend donc, ici comme pour
+            // les neuf autres tables a RLS forcee qu'il touche deja (contacts,
+            // activities, candidates, notifications, journalists, media,
+            // health_practitioners, email_verification_logs, rgpd_requests), du
+            // fait que la connexion par defaut porte le role `axion`, qui est
+            // BYPASSRLS. Cet etat est fige par
+            // `tests/Feature/Rgpd/RolePorteurDeLaRlsTest.php` : le jour ou
+            // `CRM_DB_APP_ROLE_ENABLED` passe a vrai, ce fichier-la rougit et
+            // renvoie ici.
+            $deleted['invitations'] = DB::table('invitations')->where('email', $email)->delete();
+
+            // Le jeton de reinitialisation est ephemere et sans valeur pour la
+            // personne — mais la LIGNE, elle, est indexee par son adresse en
+            // clair : elle dit qu'un compte existe a ce nom. Suppression ferme.
+            $deleted['password_reset_tokens'] = DB::table('password_reset_tokens')
+                ->where('email', $email)
+                ->delete();
+
             // Audit log — la suppression elle-même
             $this->audit->record([
                 'workspace_id' => null,

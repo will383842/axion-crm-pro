@@ -1,0 +1,47 @@
+{
+  "_lisez_moi": [
+    "CLIQUET des avis de securite Node — constat H47-001 (site jumeau), 2026-08-21.",
+    "",
+    "Le job `pnpm-audit` de .github/workflows/security.yml portait `|| true`.",
+    "Il MESURAIT correctement (contrairement a `composer audit`, qui n auditait",
+    "rien du tout faute de `--locked`) et jetait le resultat : 29 avis high ou",
+    "critical passaient inapercus a chaque execution.",
+    "",
+    "Retirer `|| true` sans autre forme de proces rendrait ces jobs rouges des la",
+    "premiere PR, pour une dette preexistante que personne ne solde en une seance.",
+    "Une garde toujours rouge se contourne, puis s ignore. Ce fichier fige donc le",
+    "chiffre du jour : la garde rougit sur l AUGMENTATION, pas sur l existant.",
+    "",
+    "CE N EST PAS UNE LISTE D EXCEPTIONS. Ces 29 avis restent des defauts ouverts,",
+    "visibles dans le journal du job (etape « Inventaire lisible »). Le cliquet dit",
+    "seulement : on ne laisse pas la dette grossir en silence.",
+    "",
+    "QUAND LE COMPTE BAISSE, RESSERREZ CE FICHIER. Le job vous le rappelle dans son",
+    "journal. Un cliquet qu on ne resserre jamais se desserre tout seul : au bout de",
+    "quelques montees de version, il autorise plus que ce qu il constatait.",
+    "",
+    "TOUT LOT DE LA MATRICE `pnpm-audit` DOIT FIGURER ICI. Si un lot manque, le job",
+    "sort en 2 (rouge) plutot que de le laisser passer sans reference — un lot",
+    "oublie serait exactement le trou que ce fichier est cense fermer."
+  ],
+  "mesure_le": "2026-08-21",
+  "mesure_par": "pnpm audit --json, sur pnpm-lock.yaml seul (sans node_modules)",
+  "_version_de_pnpm": [
+    "Mesure faite DEUX FOIS, avec pnpm 10.33.4 et avec pnpm 9 (la version que le",
+    "workflow epingle via pnpm/action-setup@v4). Les deux majeures rendent les",
+    "memes comptes sur les deux lots : le releve ne depend donc pas de la version",
+    "de pnpm, et une montee de pnpm ne fera pas rougir le cliquet toute seule.",
+    "Sans cette seconde mesure, le premier passage en CI aurait pu rougir pour une",
+    "raison n ayant rien a voir avec la securite."
+  ],
+  "lots": {
+    "frontend": {
+      "high": 18,
+      "critical": 1
+    },
+    "workers": {
+      "high": 10,
+      "critical": 1
+    }
+  }
+}

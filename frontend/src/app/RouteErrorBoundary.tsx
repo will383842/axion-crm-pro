@@ -81,7 +81,7 @@ export interface RouteErrorBoundaryProps {
 
 export function RouteErrorBoundary({ children, level }: RouteErrorBoundaryProps): ReactElement {
   /**
-   * ⚠️ `loadedAt` ET NON `location.pathname` — corrige par la MESURE.
+   * ⚠️ `pathname` + `status`, ET NON `pathname` SEUL — corrige par la MESURE.
    *
    * Premiere version : `resetKey={pathname}`. La garde « se rearme apres
    * navigation » est restee ROUGE, avec l'ecran d'erreur encore affiche alors
@@ -92,15 +92,35 @@ export function RouteErrorBoundary({ children, level }: RouteErrorBoundaryProps)
    * cle. Elle restait bloquee pour de bon : le rearmement fabriquait
    * exactement la panne qu'il devait eviter.
    *
-   * `loadedAt` est l'horodatage de fin de chargement. C'est la cle que la
-   * librairie utilise elle-meme pour ses deux `CatchBoundary`
-   * (`@tanstack/react-router/dist/esm/Match.js:44` et `Matches.js:32`) : elle
-   * ne bouge qu'une fois les matches en place.
+   * 🔴 LA DEUXIEME VERSION EMPLOYAIT `state.loadedAt`, ET CETTE PROPRIETE
+   *    N'EXISTE PLUS. Mesure du 2026-08-21 :
+   *
+   *      router-core 1.171.2  (installe en local) : RouterState.loadedAt EXISTE
+   *      router-core 1.171.22 (resolu par le lock) : RouterState = { status,
+   *                             isLoading, matches, location, resolvedLocation }
+   *
+   *    `loadedAt` a disparu de la librairie ENTIERE — ni dans l'etat, ni dans
+   *    `router.stores`. Le typecheck passait donc en local et rougissait en CI
+   *    (`TS2339`), parce que le `node_modules` de ce worktree est un LIEN vers
+   *    celui du depot principal, fige a `react-router@1.170.4`. Un typecheck
+   *    joue ici ne prouve rien tant que ce lien existe : la seule reference est
+   *    `pnpm-lock.yaml`.
+   *
+   * La librairie a remplace `loadedAt` par exactement la cle ci-dessous —
+   * `@tanstack/react-router@1.170.27/dist/esm/not-found.js:26` :
+   *
+   *     const resetKey = `not-found-${...location.pathname}-${...status}`
+   *
+   * `status` passe par `pending` avant `idle` : la cle ne prend sa valeur
+   * finale qu'une fois les matches en place. C'est la propriete qui manquait a
+   * `pathname` seul, et c'est pour cela que le couple tient.
    */
-  const loadedAt = useRouterState({ select: (state) => state.loadedAt });
+  const resetKey = useRouterState({
+    select: (state) => `${state.location.pathname}-${state.status}`,
+  });
 
   return (
-    <ErrorBoundary level={level} resetKey={loadedAt}>
+    <ErrorBoundary level={level} resetKey={resetKey}>
       {children}
     </ErrorBoundary>
   );

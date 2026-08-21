@@ -46,11 +46,20 @@ Chacun garde le nom de qui l'a trouvé — je ne m'approprie aucun constat.
 | **D22-001** (S0) | 22 | **Aucun écran** n'appelait `/auth/2fa/setup` : le serveur exigeait un enrôlement impossible à déclencher | `26fa980` |
 | **B15-010** (S0) | 15 | Routes RGPD sans aucune permission : un `viewer` pouvait déposer **et traiter** une demande d'effacement | `46848d4` |
 | **B16-004** (S0) | 16 | `GET /audit-logs` sans garde : le `viewer` recevait **200** et lisait le journal | `46848d4` |
+| **F37-001** (S0) | 37 | Signature HMAC **forgeable par n'importe qui** : secret vide en production, contrôle fail-open, funnel d'ingestion ouvert vers la base | `a6aceb0` |
+| **F36-003** (S0) | 36 | Un `viewer` créait, modifiait et **supprimait définitivement** entreprises et étiquettes — **201 Created** mesuré | `d58d75c` |
+| **B16-001** (S0) | 16 | La chaîne d'audit répondait **`valid: true`** sur un journal que n'importe qui pouvait réécrire — secret vide en production, défaut publié dans le code | `46f1717` |
 
-**Bilan des deux vagues : 5 S0 fermés sur 32.** Suite complète des 16 suites touchées :
-**119 tests verts, 0 échec, 0 avertissement**, à la sévérité de la CI.
+**Bilan : 8 S0 fermés sur 32.** Suite complète des **20 suites touchées** :
+**170 tests verts, 0 échec, 0 avertissement**, à la sévérité de la CI.
 
-⚠️ **Il reste 27 S0.** Ils ne sont pas dans mon périmètre et je ne les ai pas touchés :
+Deux de ces correctifs ne réinventent rien — ils **étendent ce qui existait déjà** :
+`HmacSignature` était en place sur SiteSync et jamais rétroportée sur le canal des workers ;
+et `companies/tags/bulk` exigeait `companies.update` depuis le §2.10, sans que la règle
+n'ait jamais été étendue aux routes unitaires. Dans les deux cas, le bon patron était à
+deux lignes du défaut.
+
+⚠️ **Il reste 24 S0.** Ils ne sont pas dans mon périmètre et je ne les ai pas touchés :
 couche d'autorisation inerte (11 policies jamais appelées), cloisonnement entre espaces
 qui fuit, effacement RGPD qui n'efface pas, chaîne d'audit sans secret et tronquable,
 signature HMAC forgeable, 6 services simulés en production, 26 tâches planifiées sans

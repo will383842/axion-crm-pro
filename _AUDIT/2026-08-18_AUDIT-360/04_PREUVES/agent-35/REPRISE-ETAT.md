@@ -129,10 +129,18 @@ de `FILE-DE-TRAVAIL.md`. Ce sont des **LIGNES**, pas des étiquettes : une ligne
 
 | Sévérité | Lignes | Fermées | Partielles | `resteWill` / hors dépôt | Ouvertes |
 |---|---:|---:|---:|---:|---:|
-| **S0** | 25 | **13** | 2 | — | **10** |
-| **S1** | 116 | **28** | 6 | 2 | **80** |
-| **S2** | 256 | — | — | 1 | **255** |
-| **S3** | 88 | — | — | 1 | **87** |
+| **S0** | 25 | ~~13~~ **16** | ~~2~~ **1** | — | ~~10~~ **8** |
+| **S1** | 116 | ~~28~~ **33** | ~~6~~ **5** | 2 | ~~80~~ **78** |
+| **S2** | 256 | — **1** | — | 1 | **255** |
+| **S3** | 88 | — **1** | — | 1 | **87** |
+| **TOTAL** | **485** | **51** | **6** | — | **428** |
+
+> 📐 **Recompté par script le 2026-08-21 à 10 h**, après la vague 14 et la passe 3
+> du §13 : `+3` S0 et `+5` S1 fermés. Le script de contrôle
+> (`verifier-etats-file-de-travail.py`) rend désormais **0 écart** — il en listait
+> **8** le matin même, dont **six déjà fermés que la file donnait ouverts**.
+> *C'est le coût mesuré de l'écart : le 21/08, quatre agents sur six ont passé
+> leur première heure à redécouvrir un travail fait.*
 
 🔴 **46 lignes marquées « ouvert » sont pourtant nommées par un commit ou par une garde
 existante.** Elles portent désormais ce commit dans leur cellule. Elles n'ont **pas** été

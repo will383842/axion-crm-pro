@@ -803,3 +803,107 @@ jamais joué seul — la table n'est ballonnée qu'**au milieu** de la suite com
 La mutation valide a porté sur la **migration** : privée de sa création d'index,
 la garde tombe sur « L index couvrant `idx_companies_ws_counts` a DISPARU ».
 Migration restaurée, quatre passages verts en ordre aléatoire.
+
+---
+
+## §15 — La famille entière des gardes de plan, et pourquoi personne ne l'avait vue
+
+Le §14 a fermé une garde verte par chance. En jouant enfin la **suite complète**
+plutôt que des fichiers isolés, deux autres sont tombées — de la même famille, et
+pour la même raison.
+
+### 15.1 Le banc ne pouvait pas jouer la suite entière
+
+C'est la découverte qui explique tout le reste.
+
+| tentative | résultat |
+|---|---|
+| `php artisan test` | **mort** à 730 tests — `Allowed memory size of 134217728 bytes exhausted` |
+| `php -d memory_limit=1G artisan test` | **mort** à 816 tests — sortie 255, sans résumé ni message |
+
+*Personne ne voyait ces gardes rougir parce que personne n'allait jusqu'au bout.*
+Jouée fichier par fichier, chacune est verte : la table est alors propre. Jouées
+en suite, les tests voisins y laissent des tuples morts et des pages, et le
+planificateur change d'avis — légitimement. La CI, elle, va au bout, ce qui
+explique qu'elle ait rougi deux fois là où mon banc restait vert.
+
+La suite est désormais jouée **par tranches**, ce qui règle la mémoire et donne
+enfin un verdict complet.
+
+### 15.2 La règle qui se dégage
+
+> Une garde de plan est saine **si et seulement si** son jeu d'essai rend l'index
+> visé réellement sélectif, **et** qu'elle établit ses propres statistiques.
+> Elle est verte par chance dès que le choix se joue à égalité de coût.
+
+Mesure à l'appui, sur le même jeu de 30 fiches :
+
+| statistiques | plan obtenu |
+|---|---|
+| table ballonnée (stats d'un voisin) | le **bon** index ✅ |
+| table neuve (aucune statistique) | le **mauvais**, avec un `Filter` ❌ |
+
+Le `ANALYZE` n'est donc pas un confort : sans lui, une garde hérite du verdict de
+sa voisine. Et il ne suffit pas non plus — il faut d'abord que l'index ait une
+raison de gagner.
+
+### 15.3 `IndexesEmployesParLeProduitTest` — le seul sans ni l'un ni l'autre
+
+Le recensement de la famille est sans ambiguïté :
+
+| fichier | `ANALYZE` | volume |
+|---|---|---|
+| `IndexEmailRgpdServentLesRequetes` | 10 | 13 |
+| `IndexEmailIngestionServentLesRequetes` | 5 | 11 |
+| `VolumeDeProductionHubConsole` | 5 | 9 |
+| `IndexServentLesRequetes` | 1 | 7 |
+| **`IndexesEmployesParLeProduit`** | **0** | **1** |
+
+Le seul fichier sans aucun des deux est exactement celui qui a rougi. Ses gardes
+se jouaient sur **une** fiche — qui ne remplissait **aucun** des prédicats
+qu'elles interrogent. Or quatre des index visés sont **partiels** : sur cette
+fiche, ils sont vides, aucun n'est meilleur, et le planificateur départage
+arbitrairement.
+
+Le jeu d'essai posé : 200 fiches, réparties pour que chaque index partiel soit
+franchement le plus sélectif. Le cas le plus délicat a demandé trois mesures :
+`idx_companies_revalidate` (partiel) concurrence `companies_website_status_index`
+(plein), et tant que les deux portaient le même nombre de lignes, **le plein
+gagnait**. Il a fallu des fiches *déjà revalidées* — celles que la production
+accumule — pour que le partiel soit vraiment plus petit.
+
+Vérifié table neuve **et** table ballonnée (8 000 tuples morts), deux passages :
+les six gardes nomment leur index dans les deux cas.
+
+### 15.4 Un témoin dont la prémisse était fausse
+
+`C21-001/twins — TEMOIN : sans volume, Postgres balaie, et il a raison`.
+
+Mesure, **même ligne unique, même requête** :
+
+| état de `candidates` | plan |
+|---|---|
+| propre | `Seq Scan` (coût 1,01) |
+| ballonnée | `Index Scan using idx_candidates_email` (coût 8,27) |
+
+Un balayage qui doit lire 200 pages perd contre un index qui en lit deux, et le
+planificateur a raison. *Le témoin ne mesurait pas l'instrument, il mesurait ses
+voisins.*
+
+Réécrit pour que sa prémisse soit vraie par construction : il interroge désormais
+`candidates.last_name`, qui ne porte **aucun** index (catalogue vérifié : sept
+index, aucun sur cette colonne). Le balayage est alors le seul plan possible,
+quel que soit l'état de la table — vérifié jusque `enable_seqscan` découragé.
+
+Son pouvoir discriminant n'est pas perdu : le témoin suivant montre qu'**au même
+volume**, la forme `lower(email::text)` reste un balayage là où la forme correcte
+prend l'index. Deux plans opposés dans les mêmes conditions — c'est cela qui
+prouve la mesure, pas une comparaison entre deux états de table incomparables.
+
+### 15.5 Ce que cette vague dit du reste de la campagne
+
+Trois gardes de plan sur les sept fichiers de la famille ne prouvaient pas ce
+qu'elles annonçaient, et toutes trois avaient été écrites **pendant cette
+campagne**. Le défaut n'est pas dans le produit : il est dans ma façon de
+mesurer. *Une garde qu'on n'a jamais vue rougir dans les conditions réelles de la
+CI n'est pas une garde, c'est une conjecture verte.*

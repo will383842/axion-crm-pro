@@ -791,14 +791,26 @@ vrai quel que soit son état physique — elle ne retombe pas en `Seq Scan`.
 
 ### 14.5 Deux mutations qui n'ont rien prouvé, et pourquoi
 
-J'ai d'abord ballonné la table puis supprimé l'index **dans la base du banc**, et
-la garde est restée verte les deux fois. Ce n'était pas la garde qui était
-aveugle : `RefreshDatabase` rejoue `migrate:fresh` au début de chaque run et
-avait effacé mes deux mutations avant que le test ne tourne.
+J'ai d'abord ballonné la table puis supprimé l'index **dans `axion_crm`**, et la
+garde est restée verte les deux fois.
 
-*C'est le même piège que celui du §13.8 : le dispositif de mesure faisait partie
-de ce qu'il fallait mesurer.* Et cela explique enfin pourquoi ce test ne rougissait
-jamais joué seul — la table n'est ballonnée qu'**au milieu** de la suite complète.
+⚠️ **CORRECTION DU 2026-08-21, et elle porte sur ce que j'ai écrit ici même.**
+J'ai d'abord attribué ces deux verts à `migrate:fresh`, qui aurait effacé mes
+mutations avant le test. C'est faux. La vraie raison est plus simple et plus
+gênante : `phpunit.xml` **force** `DB_DATABASE=axion_crm_test`. Les tests
+n'ouvrent **jamais** `axion_crm`. Je mutais une base que personne ne lisait.
+
+*Le dispositif de mesure faisait partie de ce qu'il fallait mesurer* — c'est le
+piège du §13.8, et je viens de le repayer deux fois : une fois en mutant la
+mauvaise base, une fois en expliquant l'échec de ces mutations par une cause
+plausible que je n'avais pas vérifiée.
+
+Ce qui reste vrai : la mutation valide a porté sur la **migration**, jouée par
+`artisan test` — donc sur `axion_crm_test` — et la garde est bien tombée. Et les
+mesures de plan faites en `psql` sur `axion_crm` gardent leur valeur : elles
+portaient sur des tables **temporaires** que je créais moi-même à partir du même
+schéma, et elles mesurent le comportement du planificateur, pas l'état d'une base
+particulière.
 
 La mutation valide a porté sur la **migration** : privée de sa création d'index,
 la garde tombe sur « L index couvrant `idx_companies_ws_counts` a DISPARU ».

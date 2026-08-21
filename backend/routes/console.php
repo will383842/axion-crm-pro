@@ -3,6 +3,7 @@
 use App\Console\Commands\AuditVerifyChain;
 use App\Console\Commands\CoverageRefreshMatrix;
 use App\Console\Commands\CrmSondeCleDePersonne;
+use App\Console\Commands\CrmSondeNonDiffusibles;
 use App\Console\Commands\PartmanMaintenir;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -174,6 +175,30 @@ Schedule::command(CrmSondeCleDePersonne::SIGNATURE_PLANIFIEE)
             CrmSondeCleDePersonne::PREFIXE_ALERTE . ' : la sonde de 06:10 est sortie en echec. '
             . 'Soit `CRM_PERSON_KEY_SECRET` est absent, soit des fiches attendent encore leur cle '
             . '— voir la ligne precedente du journal, qui nomme le cas et le geste.',
+        );
+    });
+
+// ── C19-010 : GUETTER, PLUTOT QUE RATTRAPER ────────────────────────────────
+//
+// Comptage sur la production du 2026-08-21, sur 4 295 349 fiches : 0 fiche
+// marquee `[ND]`, 0 fiche sans denomination, 0 en corbeille. Il n'y avait RIEN a
+// rattraper — et ecrire une commande qui rejoue l'INSEE pour zero ligne aurait
+// produit du code jamais exerce, donc du code qu'on decouvre casse le jour ou on
+// en a besoin.
+//
+// Ce qui reste a defendre, c'est la REAPPARITION. Si une seule fiche non
+// diffusible revient, c'est que l'ENTREE s'est rouverte, et cela doit s'apprendre
+// le jour meme. *On ne repare pas ce qui n'est pas casse ; on installe de quoi
+// savoir si ca casse.*
+Schedule::command(CrmSondeNonDiffusibles::SIGNATURE_PLANIFIEE)
+    ->dailyAt('06:20')
+    ->withoutOverlapping(30)
+    ->onOneServer()
+    ->onFailure(function (): void {
+        Log::critical(
+            CrmSondeNonDiffusibles::PREFIXE_ALERTE . ' : la sonde de 06:20 est sortie en echec. '
+            . 'Des personnes qui ont demande a l INSEE de NE PAS etre publiees sont en base — '
+            . 'voir la ligne precedente du journal, qui compte et dit le geste.',
         );
     });
 

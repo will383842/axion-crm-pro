@@ -118,7 +118,36 @@ class CrmSondeCleDePersonne extends Command
             return self::FAILURE;
         }
 
-        $this->info('Cle de rapprochement : secret pose, et aucune fiche en attente.');
+        // ── 3. LE SILENCE MERITE, MAIS PAS MUET ─────────────────────────────
+        //
+        // ⚠️ « Aucune fiche en attente » est VRAI et pourtant trompeur : la sonde
+        // ne compte que les fiches qui portent une ADRESSE, parce que la cle se
+        // calcule sur elle. Mesure du 2026-08-21 en production :
+        //
+        //     1 319 567  contacts au total
+        //       410 481  avec une adresse .... rattachables, et rattaches
+        //       909 086  SANS adresse ........ hors de portee, par construction
+        //
+        // Un operateur qui lit « rien a faire » peut en conclure que toutes les
+        // personnes ont une fiche 360. Ce n'est pas le cas, et ce n'est pas un
+        // defaut a reparer : c'est une couverture a connaitre. La sonde la DIT.
+        [$rattachees, $sansAdresse] = WorkspaceContext::runWithoutScope(
+            'sonde A05-001 : mesurer la couverture du rapprochement, tous espaces confondus',
+            static fn (): array => [
+                (int) DB::table('contacts')->whereNull('deleted_at')->whereNotNull('person_key')->count(),
+                (int) DB::table('contacts')->whereNull('deleted_at')
+                    ->where(fn ($q) => $q->whereNull('email')->orWhereRaw("btrim(email::text) = ''"))
+                    ->count(),
+            ],
+        );
+
+        $this->info(sprintf(
+            'Cle de rapprochement : secret pose, aucune fiche en attente. '
+            . 'Couverture : %s fiche(s) rattachee(s) ; %s sans adresse, donc hors de portee '
+            . 'du rapprochement (la cle se calcule sur l adresse).',
+            number_format($rattachees, 0, ',', ' '),
+            number_format($sansAdresse, 0, ',', ' '),
+        ));
 
         return self::SUCCESS;
     }

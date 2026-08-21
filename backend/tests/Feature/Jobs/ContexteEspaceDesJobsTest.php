@@ -313,19 +313,59 @@ function cejDispenses(): array
     ];
 }
 
-/** Fichiers de `app/` susceptibles de mettre un job en file. */
+/**
+ * Fichiers de `app/` susceptibles de mettre un job en file.
+ *
+ * ⚠️ `scandir` RECURSIF, ET NON `RecursiveDirectoryIterator`. Mesure du
+ * 2026-08-21, dans le conteneur `a35r` :
+ *
+ *   app/Console/Commands, scandir() / glob() / find ....... 56 fichiers
+ *   app/Console/Commands, RecursiveDirectoryIterator ...... 14
+ *   app/ entier .......................................... 293 contre 251
+ *
+ * Le montage de Docker Desktop pour Windows ne rend pas tout le repertoire a cet
+ * iterateur-la — stable sur trois passages, ce n'est pas un hasard. Or TROIS des
+ * treize points de mise en file de ce constat vivent precisement dans
+ * `app/Console/Commands` (`RescrapeArchives`, `RetryGooglePlaces`,
+ * `StartScheduledCampaigns`). Les enumerations de ce fichier auraient pu les
+ * manquer en silence et se declarer completes.
+ *
+ * (Verification faite : sur ce banc-ci, le tirage de 251 fichiers les contenait
+ * toutes les trois — l'enumeration disait donc vrai. Mais elle le disait par
+ * CHANCE, et une garde qui a raison par chance n'est pas une garde.)
+ *
+ * @return list<string> chemins absolus, ordre stable
+ */
 function cejFichiersApplicatifs(): array
 {
-    $iterateur = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(app_path()));
-    $fichiers = [];
-    foreach ($iterateur as $f) {
-        if ($f->isFile() && $f->getExtension() === 'php') {
-            $fichiers[] = $f->getPathname();
-        }
-    }
+    $fichiers = cejBalayerPhp(app_path());
     sort($fichiers);
 
     return $fichiers;
+}
+
+/**
+ * @return list<string>
+ */
+function cejBalayerPhp(string $dossier): array
+{
+    $trouves = [];
+
+    foreach (scandir($dossier) ?: [] as $entree) {
+        if ($entree === '.' || $entree === '..') {
+            continue;
+        }
+
+        $chemin = $dossier . DIRECTORY_SEPARATOR . $entree;
+
+        if (is_dir($chemin)) {
+            $trouves = array_merge($trouves, cejBalayerPhp($chemin));
+        } elseif (str_ends_with($entree, '.php')) {
+            $trouves[] = $chemin;
+        }
+    }
+
+    return $trouves;
 }
 
 /**

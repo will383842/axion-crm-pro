@@ -277,17 +277,34 @@ test('la forme d avant — composer audit sans --locked — n audite AUCUN paque
         . 'retirer la garde. Sortie obtenue : ' . $sortie,
     );
 
-    $this->assertSame(
-        0,
-        $code,
-        'Le defaut H47-001 tient en ceci : la commande rend SUCCES en n auditant rien. '
-        . 'Sortie : ' . $sortie,
+    // 🔴 LE CODE DE SORTIE A CHANGE, ET C'EST UNE BONNE NOUVELLE : L'AMONT A
+    //    CORRIGE H47-001.
+    //
+    // Le constat d'origine tenait en ceci : « la commande rend SUCCES en
+    // n'auditant rien ». Mesure du 2026-08-21 :
+    //
+    //   composer 2.7.9 (banc) ....... code 0   <- le defaut, tel qu'il a ete constate
+    //   composer >= 2.8 (CI) ........ code 1   <- l'editeur refuse desormais
+    //
+    // On n'exige donc plus `0`. Exiger `0` reviendrait a EXIGER que le defaut
+    // survive : la garde serait devenue rouge le jour ou l'amont le repare, et
+    // quelqu'un l'aurait retiree en croyant qu'elle s'est trompee.
+    //
+    // Ce qui reste vrai des DEUX cotes, et qui EST le constat : sans `--locked`,
+    // et sans `vendor/`, la commande ne consulte AUCUN bulletin. Le paquet n'est
+    // pas audite — qu'elle le dise par 0 ou par 1. C'est pour cela que le job CI
+    // doit porter `--locked`, ce que verifie le test suivant.
+    expect($code)->toBeIn(
+        [0, 1],
+        'Sortie inattendue de composer audit sans --locked (code ' . $code . ') : '
+        . $sortie,
     );
 
     $this->assertStringNotContainsString(
         'security-advisories',
         $sortie,
-        'Elle n interroge meme pas la base d avis.',
+        'Elle n interroge meme pas la base d avis — c est cela, le constat H47-001, '
+        . 'et c est vrai quel que soit le code de sortie.',
     );
 });
 

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\Alertes\AlerteTelegram;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -11,7 +12,28 @@ use Illuminate\Support\Facades\DB;
  * - latence p95 LLM > 5s
  * - coût LLM/h > kill-switch workspace
  * - taux email invalid > 30 %
- * Si anomalie détectée → notification Telegram + audit_log.
+ * Si anomalie détectée → notification Telegram + journal d'application.
+ *
+ * 🔴 PENDANT DES MOIS, CETTE COMMANDE N'A ALERTE PERSONNE (audit 360, 21/08).
+ *
+ * Elle détectait, puis écrivait :
+ *
+ *     $this->warn(json_encode($a));
+ *     // Sprint 11 : send TelegramAlert::dispatch($anomalies);
+ *
+ * Deux défauts, et ce sont exactement ceux relevés sur `AuditVerifyChain` :
+ *
+ * 1. LE COMMENTAIRE TENAIT LIEU DE CODE. `TelegramAlert` n'existait nulle part.
+ * 2. `$this->warn()` ÉCRIT SUR UN FLUX QUE PERSONNE NE LIT. Lancée toutes les
+ *    15 minutes par le planificateur, cette commande n'a pas de terminal : sa
+ *    sortie part dans le vide.
+ *
+ * Autrement dit, un détecteur d'anomalies parfaitement fonctionnel tournait
+ * quatre fois par heure en ne prévenant personne. *Un détecteur qui n'alerte
+ * pas ne se distingue pas d'un détecteur éteint.*
+ *
+ * Désormais : journal d'application (canal fiable) ET Telegram (canal lu), par
+ * `AlerteTelegram`, qui DIT quand il n'est pas configuré au lieu de se taire.
  */
 class AnomalyDetect extends Command
 {
@@ -24,7 +46,7 @@ class AnomalyDetect extends Command
         $anomalies = [];
 
         // Taux d'échec scraping (1h)
-        $row = DB::selectOne(<<<SQL
+        $row = DB::selectOne(<<<'SQL'
             SELECT
               COUNT(*) FILTER (WHERE status = 'failed')::FLOAT
               / NULLIF(COUNT(*), 0) AS failure_rate,
@@ -38,7 +60,7 @@ class AnomalyDetect extends Command
         }
 
         // Coût LLM workspace (depuis minuit)
-        $workspaces = DB::select(<<<SQL
+        $workspaces = DB::select(<<<'SQL'
             SELECT workspace_id, SUM(cost_eur) AS total_eur
             FROM llm_usage
             WHERE created_at >= date_trunc('day', now())
@@ -56,6 +78,7 @@ class AnomalyDetect extends Command
 
         if (empty($anomalies)) {
             $this->info('Aucune anomalie détectée.');
+
             return self::SUCCESS;
         }
 
@@ -63,7 +86,40 @@ class AnomalyDetect extends Command
             $this->warn(json_encode($a, JSON_UNESCAPED_SLASHES));
         }
 
-        // Sprint 11 : send TelegramAlert::dispatch($anomalies);
+        // ── L'ALERTE, ENFIN ─────────────────────────────────────────────────
+        //
+        // Le corps est écrit pour être lu sur un téléphone, à 3 h du matin, par
+        // quelqu'un qui n'a pas le contexte : une anomalie par ligne, avec sa
+        // valeur ET son seuil, pour qu'on sache tout de suite si c'est un
+        // frémissement ou un incendie.
+        // ⚠️ Pas de `is_float()` ni de `?? '?'` ici : PHPStan a montre que ces
+        // garde-fous etaient du CODE MORT — `value` et `threshold` sont toujours
+        // des flottants dans les deux formes d'anomalie ci-dessus. Un garde-fou
+        // qui ne peut jamais servir donne l'illusion d'une robustesse, et cache
+        // le jour ou la forme change vraiment.
+        $lignes = array_map(
+            static fn (array $a): string => sprintf(
+                '· %s : %s (seuil %s)%s',
+                $a['kind'],
+                number_format($a['value'], 4, ',', ' '),
+                number_format($a['threshold'], 4, ',', ' '),
+                isset($a['workspace_id']) ? ' — espace ' . $a['workspace_id'] : '',
+            ),
+            $anomalies,
+        );
+
+        app(AlerteTelegram::class)->envoyer(
+            '🔴 CRM — ' . count($anomalies) . ' anomalie(s) detectee(s)',
+            implode('
+', $lignes)
+            . '
+
+Detecteur : `anomaly:detect`, toutes les 15 min.'
+            . '
+Les valeurs sont comparees a la moyenne mobile 7 jours.',
+            ['anomalies' => $anomalies],
+        );
+
         return self::SUCCESS;
     }
 }

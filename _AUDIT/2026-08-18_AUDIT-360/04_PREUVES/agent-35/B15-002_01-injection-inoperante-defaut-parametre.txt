@@ -1,0 +1,20 @@
+
+   PASS  Tests\Feature\Rgpd\AntiReinsertionTest
+  ✓ un effacement écrit l’EMPREINTE, que la garde du scraping sait li… 168.34s  
+  ✓ une opposition née du SITE (hash seul, sans email) est vue par isOp… 9.11s  
+  ✓ la normalisation de casse et d’espaces vaut pour l’empreinte comme…  5.71s  
+  ✓ une adresse jamais opposée reste scrapable                           7.25s  
+
+   PASS  Tests\Feature\Rgpd\EffacementConsoleAntiReinsertionTest
+  ✓ B15-001 — une personne effacee par la CONSOLE ne revient PAS au vi… 21.85s  
+  ✓ B15-001 — TEMOIN : une adresse jamais opposee entre bien au vivier   5.24s  
+  ✓ B15-001 — un effacement console inscrit l’opposition dans les DEUX… 10.47s  
+  ✓ B15-001 — la garde du VIVIER, requete a l’identique, voit l’opposit… 5.84s  
+  ✓ B15-001 — TEMOIN : une adresse jamais effacee n’est opposee dans AU… 3.08s  
+  ✓ B15-001 — un second effacement de la meme adresse ne duplique pas l… 6.30s  
+
+  Tests:    10 passed (23 assertions)
+  Duration: 290.09s
+
+
+[exited with code 0]

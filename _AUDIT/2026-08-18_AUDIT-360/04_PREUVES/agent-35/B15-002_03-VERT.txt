@@ -1,0 +1,33 @@
+
+   PASS  Tests\Feature\Rgpd\OppositionCouvreTousLesUniversTest
+  ✓ B15-002 — les univers d’opposition sont LUS dans le schema, jamai… 165.34s  
+  ✓ B15-002 — TEMOIN : le lecteur de schema rend VIDE sur une contraint… 2.44s  
+  ✓ B15-002 — la constante du code ne peut pas diverger du CHECK de la…  2.67s  
+  ✓ B15-002 — l’inventaire des points de lecture est BALAYE, jamais re… 23.99s  
+  ✓ B15-002 — TEMOIN : le balayage rend VIDE quand on lui donne un arbr… 3.59s  
+  ✓ B15-002 — aucune enumeration ecrite a la main ne peut oublier un un… 6.32s  
+  ✓ B15-002 — TEMOIN : le balayage des enumerations ne rend rien sur un… 1.37s  
+  ✓ 🔴 B15-002 — un effacement console oppose la personne dans CHAQUE u… 1.17s  
+  ✓ 🔴 B15-002 — apres un effacement, la porte des CAMPAGNES est fermee… 1.74s  
+  ✓ B15-002 — TEMOIN : une adresse jamais effacee reste joignable dans…  2.30s  
+
+   PASS  Tests\Feature\Rgpd\DeduplicationOppositionEmpreinteTest
+  ✓ addOptOut ecrit l’EMPREINTE et jamais l’adresse en clair             1.31s  
+  ✓ la porte du SCRAPING (univers « business ») voit l’empreinte — ET E… 1.07s  
+  ✓ une opposition née du SITE (hash seul, sans email) est vue par isOp… 0.93s  
+  ✓ la normalisation de casse et d’espaces vaut pour l’empreinte comme…  1.28s  
+  ✓ une adresse jamais opposée reste scrapable                           0.93s  
+
+   PASS  Tests\Feature\Rgpd\EffacementConsoleAntiReinsertionTest
+  ✓ B15-001 — une personne effacee par la CONSOLE ne revient PAS au viv… 6.24s  
+  ✓ B15-001 — TEMOIN : une adresse jamais opposee entre bien au vivier   1.28s  
+  ✓ B15-001 — un effacement console inscrit l’opposition dans les DEUX…  1.01s  
+  ✓ B15-001 — la garde du VIVIER, requete a l’identique, voit l’opposit… 0.91s  
+  ✓ B15-001 — TEMOIN : une adresse jamais effacee n’est opposee dans AU… 0.93s  
+  ✓ B15-001 — un second effacement de la meme adresse ne duplique pas l… 1.60s  
+
+  Tests:    21 passed (56 assertions)
+  Duration: 239.98s
+
+
+[exited with code 0]

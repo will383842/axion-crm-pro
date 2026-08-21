@@ -1,0 +1,12 @@
+
+   PASS  Tests\Feature\Rgpd\AntiReinsertionTest
+  ✓ un effacement écrit l’EMPREINTE, que la garde du scraping sait li… 109.74s  
+  ✓ une opposition née du SITE (hash seul, sans email) est vue par isOp… 1.45s  
+  ✓ la normalisation de casse et d’espaces vaut pour l’empreinte comme…  0.89s  
+  ✓ une adresse jamais opposée reste scrapable                           0.76s  
+
+  Tests:    4 passed (9 assertions)
+  Duration: 166.84s
+
+
+[exited with code 0]

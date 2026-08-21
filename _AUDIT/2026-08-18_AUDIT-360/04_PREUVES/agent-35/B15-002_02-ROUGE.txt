@@ -1,0 +1,58 @@
+
+   FAIL  Tests\Feature\Rgpd\OppositionCouvreTousLesUniversTest
+  ✓ B15-002 — les univers d’opposition sont LUS dans le schema, jamais… 80.71s  
+  ✓ B15-002 — TEMOIN : le lecteur de schema rend VIDE sur une contraint… 1.80s  
+  ✓ B15-002 — la constante du code ne peut pas diverger du CHECK de la…  1.73s  
+  ✓ B15-002 — l’inventaire des points de lecture est BALAYE, jamais rec… 6.67s  
+  ✓ B15-002 — TEMOIN : le balayage rend VIDE quand on lui donne un arbr… 1.86s  
+  ⨯ 🔴 B15-002 — un effacement console oppose la personne dans CHAQUE u… 4.42s  
+  ⨯ 🔴 B15-002 — apres un effacement, la porte des CAMPAGNES est fermee… 2.62s  
+  ✓ B15-002 — TEMOIN : une adresse jamais effacee reste joignable dans…  1.13s  
+
+   PASS  Tests\Feature\Rgpd\AntiReinsertionTest
+  ✓ un effacement écrit l’EMPREINTE, que la garde du scraping sait lire  1.74s  
+  ✓ une opposition née du SITE (hash seul, sans email) est vue par isOp… 2.70s  
+  ✓ la normalisation de casse et d’espaces vaut pour l’empreinte comme…  1.36s  
+  ✓ une adresse jamais opposée reste scrapable                           0.94s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Rgpd\OppositionCouvreTousLesUniversTest > 🔴 B15-00…   
+  aucune opposition dans l'univers « vivier » : la porte de cet univers reste ouverte apres un effacement
+Failed asserting that an array contains 'vivier'.
+
+  at tests/Feature/Rgpd/OppositionCouvreTousLesUniversTest.php:218
+    214▕     foreach ($univers as $u) {
+    215▕         // `assertContains` et non `expect()->toContain()` : ce dernier est
+    216▕         // VARIADIQUE chez Pest — un message passe en second argument
+    217▕         // deviendrait une aiguille de plus, et la garde rougirait toujours.
+  ➜ 218▕         $this->assertContains(
+    219▕             $u,
+    220▕             $inscrits,
+    221▕             "aucune opposition dans l'univers « {$u} » : la porte de cet univers reste ouverte apres un effacement",
+    222▕         );
+
+  1   tests/Feature/Rgpd/OppositionCouvreTousLesUniversTest.php:218
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Rgpd\OppositionCouvreTousLesUniversTest > 🔴 B15-00…   
+  une campagne « vivier » peut encore ecrire a une personne effacee
+Failed asserting that true is false.
+
+  at tests/Feature/Rgpd/OppositionCouvreTousLesUniversTest.php:237
+    233▕ 
+    234▕     app(GdprErasureService::class)->erase($courriel);
+    235▕ 
+    236▕     foreach (universAutorisesParLeSchema('opt_out') as $u) {
+  ➜ 237▕         expect(EligibiliteCampagne::peutRecevoir($courriel, $u))->toBeFalse(
+    238▕             "une campagne « {$u} » peut encore ecrire a une personne effacee",
+    239▕         );
+    240▕     }
+    241▕ });
+
+  1   tests/Feature/Rgpd/OppositionCouvreTousLesUniversTest.php:237
+
+
+  Tests:    2 failed, 10 passed (27 assertions)
+  Duration: 133.14s
+
+
+[exited with code 0]

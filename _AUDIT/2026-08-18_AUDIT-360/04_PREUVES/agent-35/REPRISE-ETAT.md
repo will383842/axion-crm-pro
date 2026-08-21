@@ -3,7 +3,7 @@
 > **Mise à jour après chaque correctif.** Si Claude Code se ferme, tout est ici : ce qui est
 > fait, ce qui est en cours, et comment reprendre exactement au même point.
 >
-> **Dernière mise à jour : 2026-08-20.**
+> **Dernière mise à jour : 2026-08-21.**
 
 ---
 
@@ -108,16 +108,45 @@ Les quatorze premiers, plus **huit** du 2026-08-20 :
 À la place : `_AUDIT/RECTIFICATIF-PR-191.md`, le commit `3c2c0cf`, et le corps de la PR — qui
 s'édite sans rien réécrire.
 
-## 7. Compte des constats — révisé le 2026-08-20
+## 7. Compte des constats — recompté MÉCANIQUEMENT le 2026-08-21
 
-| | |
+⚠️ **Les comptes précédents de cette fiche étaient tenus à la main, et ils étaient faux.**
+Ils le sont restés plusieurs jours sans que personne le voie, jusqu'à ce que quatre agents sur
+six, lancés le 21/08, rapportent la même phrase : *« le correctif était déjà posé et commité,
+la file le donne encore ouvert »*. Voir `FILE-DE-TRAVAIL.md` §1.1 bis.
+
+Le compte ci-dessous est lu **par script** dans la dernière cellule de chaque ligne du tableau
+de `FILE-DE-TRAVAIL.md`. Ce sont des **LIGNES**, pas des étiquettes : une ligne comme
+`B16-004 / B11-006 / F36-004 / B10-002` compte pour un. Les 25 lignes S0 portent les
+34 étiquettes S0 du rapport final ; c'est la même chose comptée autrement.
+
+| Sévérité | Lignes | Fermées | Partielles | `resteWill` / hors dépôt | Ouvertes |
+|---|---:|---:|---:|---:|---:|
+| **S0** | 25 | **13** | 2 | — | **10** |
+| **S1** | 116 | **28** | 6 | 2 | **80** |
+| **S2** | 256 | — | — | 1 | **255** |
+| **S3** | 88 | — | — | 1 | **87** |
+
+🔴 **46 lignes marquées « ouvert » sont pourtant nommées par un commit ou par une garde
+existante.** Elles portent désormais ce commit dans leur cellule. Elles n'ont **pas** été
+refermées : un état recopié d'un message de commit ne vaut pas mieux qu'une colonne tenue à la
+main. **Jouer `verifier-etats-file-de-travail.py` avant d'ouvrir un lot** — trente secondes,
+contre une heure perdue.
+
+### 7 bis. RECTIFICATIF — il RESTE des S0 mécaniquement réparables ici
+
+J'ai écrit le 20/08, et répété le 21/08, qu'« aucun S0 mécaniquement réparable ne reste dans ce
+dépôt ». **C'est faux.** En relisant les emplacements ligne par ligne, il en reste **trois** dont
+tout ou partie vit dans le dépôt CRM :
+
+| Constat | Ce qui est réparable ICI |
 |---|---|
-| Constats **uniques** après dédoublonnage | **508** |
-| dont S0 | 34 · **13 fermés** · 21 restants |
-| dont S1 | 121 · 9 fermés · 112 restants |
-| dont S2 | 265 · 12 fermés · 253 restants |
-| dont S3 | 88 · 1 fermé · 87 restants |
-| **Total fermé / restant** | **35 / 473** |
+| `B11-002 / B17-010` (S0, conception) | 5 des 6 jobs de file s'exécutent sans contexte d'espace, alors que `Queue::looping` l'efface. Entièrement CRM : `app/Jobs/*`. |
+| `B14-002 / E31-001` (S0, correctif) | La moitié CRM : `Api/RgpdRequestsController.php`. L'autre moitié (`inbound.ts`) est dans le dépôt du site. |
+| `B10-004` (S0, PARTIEL) | Le reste : `users`, `invitations`, `password_reset_tokens` ne sont couverts par AUCUNE procédure d'effacement. `app/Services/Rgpd/*`. |
+
+`E33-006` et `C19-007`, eux, ne le sont pas : le premier vit entièrement dans le dépôt du site
+(`chatbot/tools/escalader-question.ts`), le second est un acte juridique qui appartient à Will.
 
 Détail complet : **`FILE-DE-TRAVAIL.md`**, dans ce même dossier.
 

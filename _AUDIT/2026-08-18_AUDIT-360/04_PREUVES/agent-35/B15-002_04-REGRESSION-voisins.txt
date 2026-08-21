@@ -1,0 +1,27 @@
+  ✓ 🔴 une opposition écrite par un EFFACEMENT est vue par le site — ac… 1.08s  
+  ✓ un téléphone seul reste une opposition valable, sans empreinte d’ad… 1.81s  
+  ✓ 🔴 une ligne porteuse d’adresse SANS empreinte est REFUSÉE par la b… 2.96s  
+  ✓ 🔴 aucune ligne d’opposition ne porte plus d’adresse en clair après… 1.91s  
+  ✓ 🔴 la migration remplit l’empreinte des lignes héritées, avec le ca… 1.60s  
+  ✓ 🔴 la migration ÉCHOUE BRUYAMMENT sur une ligne irrécupérable, elle… 1.41s  
+
+   PASS  Tests\Feature\ListeSuppressionTest
+  ✓ un rebond dur retire la fiche des éligibles                          1.56s  
+  ✓ une plainte retire la fiche — c’est la réputation du domaine qui es… 1.79s  
+  ✓ la casse n’ouvre aucune brèche                                       2.02s  
+  ✓ un signal HACHÉ retire aussi la fiche                                1.44s  
+  ✓ une suppression du VIVIER ne retire pas une fiche business           1.64s  
+  ✓ deux signaux ne créent pas deux lignes — ils incrémentent            1.37s  
+  ✓ 🔴 une plainte ne se fait JAMAIS rétrograder par un rebond           0.70s  
+  ✓ un rebond TEMPORAIRE ne supprime pas au premier coup                 1.19s  
+  ✓ estSupprimee répond sur l’adresse quelle que soit sa casse           1.49s  
+  ✓ opposition ET suppression ferment chacune la porte, indépendamment   2.45s  
+  ✓ les adresses de PERSONNES sont protégées comme celles des entrepris… 1.25s  
+  ✓ une opposition retire aussi une PERSONNE                             0.85s  
+  ✓ peutRecevoir répond sur une adresse seule, quelle que soit sa prove… 1.36s  
+
+  Tests:    25 passed (79 assertions)
+  Duration: 134.03s
+
+
+[exited with code 0]

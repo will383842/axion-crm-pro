@@ -133,8 +133,6 @@ class RetentionPurge extends Command
     /**
      * Rend l'UUID de l'espace visé, `null` pour « tous les espaces », ou
      * `false` si la portée n'a pas été dite — auquel cas on ne purge rien.
-     *
-     * @return string|null|false
      */
     private function resoudreLaPortee(): string|null|false
     {
@@ -178,10 +176,10 @@ class RetentionPurge extends Command
      * même `Builder`, ce qui rend structurellement impossible la divergence qui
      * a produit B17-001.
      *
-     * @param  \Closure():Builder             $condition
-     * @param  \Closure(Builder):int          $action
-     * @param  string|null                    $portee        UUID de l'espace, ou null pour tous
-     * @param  string|null                    $colonneEspace colonne de rattachement, ou null si la table est globale
+     * @param  \Closure():Builder  $condition
+     * @param  \Closure(Builder):int  $action
+     * @param  string|null  $portee  UUID de l'espace, ou null pour tous
+     * @param  string|null  $colonneEspace  colonne de rattachement, ou null si la table est globale
      */
     private function purger(
         string $libelle,
@@ -199,9 +197,17 @@ class RetentionPurge extends Command
             return;
         }
 
+        // ⚠️ ON NE RE-TESTE PAS `$colonneEspace !== null`, ET CE N'EST PAS UN
+        // OUBLI. La garde ci-dessus renvoie des qu'une portee est demandee sur
+        // une table GLOBALE : passe ce point, « `$portee` non nul » IMPLIQUE
+        // « `$colonneEspace` non nul ». Le re-tester etait du code mort — mesure
+        // du 2026-08-21, PHPStan : « Strict comparison using !== between string
+        // and null will always evaluate to true ». Une condition qui ne peut pas
+        // etre fausse ne protege rien ; elle donne seulement l'impression qu'un
+        // cas est couvert.
         $filtree = function () use ($condition, $portee, $colonneEspace): Builder {
             $q = $condition();
-            if ($portee !== null && $colonneEspace !== null) {
+            if ($portee !== null) {
                 $q->where($colonneEspace, $portee);
             }
 
@@ -211,9 +217,13 @@ class RetentionPurge extends Command
         // Le total sert de dénominateur au plafond du trait. Il est mesuré DANS
         // LA MÊME PORTÉE que la condition : sinon, purger 100 % d'un petit
         // espace passerait pour 0,1 % de la table et échapperait au plafond.
-        $total = DB::table($table)
-            ->when($portee !== null && $colonneEspace !== null, fn ($q) => $q->where($colonneEspace, $portee))
-            ->count();
+        // Meme raison qu'au-dessus pour la condition unique. Le `when()` est
+        // remplace par un branchement : la condition d'un `when()` est evaluee
+        // HORS de sa fermeture, donc le fait que `$colonneEspace` soit non nul
+        // n'y est pas su — `->where()` recevait `string|null`.
+        $total = $portee !== null
+            ? DB::table($table)->where($colonneEspace, $portee)->count()
+            : DB::table($table)->count();
 
         $aPurger = $filtree()->count();
 

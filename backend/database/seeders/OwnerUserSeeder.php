@@ -38,7 +38,7 @@ class OwnerUserSeeder extends Seeder
     public function run(): void
     {
         $email = $this->readEnv('OWNER_INITIAL_EMAIL', 'williamsjullin@gmail.com');
-        $name  = $this->readEnv('OWNER_INITIAL_NAME', 'Williams Jullin');
+        $name = $this->readEnv('OWNER_INITIAL_NAME', 'Williams Jullin');
         $rawPassword = $this->readEnv('OWNER_INITIAL_PASSWORD', '');
         $sansMotDePasse = ($rawPassword === '' || $rawPassword === null);
 
@@ -47,12 +47,12 @@ class OwnerUserSeeder extends Seeder
         if (! $workspaceId) {
             $workspaceId = (string) Str::uuid();
             DB::table('workspaces')->insert([
-                'id'         => $workspaceId,
-                'slug'       => 'axion-ia',
-                'name'       => 'Axion-IA',
-                'settings'   => '{}',
+                'id' => $workspaceId,
+                'slug' => 'axion-ia',
+                'name' => 'Axion-IA',
+                'settings' => '{}',
                 'cost_cap_eur' => 1000,
-                'is_active'  => true,
+                'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -63,13 +63,13 @@ class OwnerUserSeeder extends Seeder
         if (! $userId) {
             $userId = (string) Str::uuid();
             DB::table('users')->insert([
-                'id'                  => $userId,
-                'email'               => $email,
-                'name'                => $name,
-                'password_hash'       => $sansMotDePasse ? null : Hash::make($rawPassword),
-                'current_workspace_id'=> $workspaceId,
-                'created_at'          => now(),
-                'updated_at'          => now(),
+                'id' => $userId,
+                'email' => $email,
+                'name' => $name,
+                'password_hash' => $sansMotDePasse ? null : Hash::make($rawPassword),
+                'current_workspace_id' => $workspaceId,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
         } else {
             // User existant : si pas de password hash → on en pose un (mode rescue)
@@ -77,7 +77,7 @@ class OwnerUserSeeder extends Seeder
             if ($existing && ($existing->password_hash === null || $existing->password_hash === '') && ! $sansMotDePasse) {
                 DB::table('users')->where('id', $userId)->update([
                     'password_hash' => Hash::make($rawPassword),
-                    'updated_at'    => now(),
+                    'updated_at' => now(),
                 ]);
             }
         }
@@ -98,10 +98,10 @@ class OwnerUserSeeder extends Seeder
         if ($roleId) {
             DB::table('model_has_roles')->updateOrInsert(
                 [
-                    'role_id'    => $roleId,
+                    'role_id' => $roleId,
                     'model_type' => 'App\\Models\\User',
-                    'model_id'   => $userId,
-                    'team_id'    => $workspaceId,
+                    'model_id' => $userId,
+                    'team_id' => $workspaceId,
                 ],
                 [],
             );
@@ -122,7 +122,35 @@ class OwnerUserSeeder extends Seeder
         if ($value === false || $value === null || $value === '') {
             return $default;
         }
+
         return (string) $value;
+    }
+
+    /**
+     * Dit une ligne a l'operateur, s'il y a un operateur pour l'entendre.
+     *
+     * 🔴 LE `?->` EST OBLIGATOIRE, ET LARASTAN A TORT DE LE DIRE INUTILE.
+     *
+     * Mesure du 2026-08-21 par reflexion sur `Illuminate\Database\Seeder` :
+     *
+     *   type declare      : AUCUN
+     *   valeur par defaut : NULL
+     *
+     * `$this->command` vaut donc `null` sur toute instance qui n'est pas venue
+     * de la console — et ce seeder-la est joue hors console QUATRE fois, par
+     * `$this->seed(OwnerUserSeeder::class)` dans `OwnerUserSeederTest`. Sans le
+     * `?->`, `null->warn(...)` leve une `Error` et le test « n ecrit AUCUN
+     * secret » tombe. Larastan lit le `@var \Illuminate\Console\Command` du
+     * docblock du framework, qui ne porte pas le `?` : c'est le docblock qui est
+     * faux, pas le code.
+     *
+     * Les quinze appels passent desormais par ici : une seule occurrence a
+     * excuser dans la baseline au lieu de quinze, et la raison est ecrite a
+     * cote du geste plutot que dans un fichier de configuration.
+     */
+    private function avertir(string $ligne): void
+    {
+        $this->command?->warn($ligne);
     }
 
     /**
@@ -130,14 +158,14 @@ class OwnerUserSeeder extends Seeder
      */
     private function expliquerCommentPoserLeMotDePasse(string $email): void
     {
-        $this->command?->warn(str_repeat('=', 72));
-        $this->command?->warn('OwnerUserSeeder — aucun OWNER_INITIAL_PASSWORD fourni.');
-        $this->command?->warn(sprintf('  Compte créé SANS mot de passe : %s', $email));
-        $this->command?->warn('  Pour lui en poser un, sur le serveur, en root :');
-        $this->command?->warn("    read -rsp 'Mot de passe : ' P; echo; \\");
-        $this->command?->warn("      printf '%s' \"\$P\" | bash infra/scripts/definir-mot-de-passe-crm.sh; unset P");
-        $this->command?->warn("  Aucun secret n'est écrit sur disque ni affiché ici : c'est voulu.");
-        $this->command?->warn(str_repeat('=', 72));
+        $this->avertir(str_repeat('=', 72));
+        $this->avertir('OwnerUserSeeder — aucun OWNER_INITIAL_PASSWORD fourni.');
+        $this->avertir(sprintf('  Compte créé SANS mot de passe : %s', $email));
+        $this->avertir('  Pour lui en poser un, sur le serveur, en root :');
+        $this->avertir("    read -rsp 'Mot de passe : ' P; echo; \\");
+        $this->avertir("      printf '%s' \"\$P\" | bash infra/scripts/definir-mot-de-passe-crm.sh; unset P");
+        $this->avertir("  Aucun secret n'est écrit sur disque ni affiché ici : c'est voulu.");
+        $this->avertir(str_repeat('=', 72));
     }
 
     /**
@@ -154,12 +182,12 @@ class OwnerUserSeeder extends Seeder
             return;
         }
 
-        $this->command?->warn(str_repeat('!', 72));
-        $this->command?->warn('ATTENTION : un mot de passe en CLAIR subsiste sur ce serveur, écrit par');
-        $this->command?->warn('une version précédente de ce seeder :');
-        $this->command?->warn('  storage/app/private/' . $chemin);
-        $this->command?->warn("Ce fichier n'est plus écrit ni utilisé. À supprimer à la main, après");
-        $this->command?->warn('avoir changé le mot de passe du compte concerné.');
-        $this->command?->warn(str_repeat('!', 72));
+        $this->avertir(str_repeat('!', 72));
+        $this->avertir('ATTENTION : un mot de passe en CLAIR subsiste sur ce serveur, écrit par');
+        $this->avertir('une version précédente de ce seeder :');
+        $this->avertir('  storage/app/private/' . $chemin);
+        $this->avertir("Ce fichier n'est plus écrit ni utilisé. À supprimer à la main, après");
+        $this->avertir('avoir changé le mot de passe du compte concerné.');
+        $this->avertir(str_repeat('!', 72));
     }
 }

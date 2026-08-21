@@ -57,7 +57,9 @@ class GlobalSearchController extends ApiController
     /**
      * @OA\Get(path="/search", tags={"Workspace"}, summary="Recherche globale ⌘K (companies + contacts + tags)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="q", in="query", required=true, @OA\Schema(type="string", minLength=2)),
+     *
      *     @OA\Response(response=200, description="Résultats groupés"))
      */
     public function index(Request $r): JsonResponse
@@ -94,8 +96,16 @@ class GlobalSearchController extends ApiController
     /** @return list<array<string, mixed>> */
     private function chercherEntreprises(string $espace, string $terme): array
     {
-        return $this->sur('companies', function () use ($espace, $terme) {
-            return DB::table('companies')
+        return $this->sur('companies', function () use ($espace, $terme): array {
+            // `(array) $ligne` rend, pour l'analyse statique, un `array` sans
+            // clefs ni valeurs typees, et `->all()` un `array<int, ...>` et non
+            // une `list`. `sur()` promet pourtant
+            // `list<array<string, mixed>>` a ses appelants. On NOMME donc le
+            // resultat au lieu de laisser la promesse non tenue : sans cela,
+            // tout ce qui consomme la recherche globale travaille sur un type
+            // que personne ne verifie.
+            /** @var list<array<string, mixed>> $lignes */
+            $lignes = DB::table('companies')
                 ->where('workspace_id', $espace)
                 ->whereNull('deleted_at')
                 ->where(function ($q) use ($terme) {
@@ -121,14 +131,24 @@ class GlobalSearchController extends ApiController
                 ->get(['id', 'siren', 'denomination'])
                 ->map(fn ($l) => (array) $l)
                 ->all();
+
+            return $lignes;
         });
     }
 
     /** @return list<array<string, mixed>> */
     private function chercherPersonnes(string $espace, string $terme): array
     {
-        return $this->sur('contacts', function () use ($espace, $terme) {
-            return DB::table('contacts')
+        return $this->sur('contacts', function () use ($espace, $terme): array {
+            // `(array) $ligne` rend, pour l'analyse statique, un `array` sans
+            // clefs ni valeurs typees, et `->all()` un `array<int, ...>` et non
+            // une `list`. `sur()` promet pourtant
+            // `list<array<string, mixed>>` a ses appelants. On NOMME donc le
+            // resultat au lieu de laisser la promesse non tenue : sans cela,
+            // tout ce qui consomme la recherche globale travaille sur un type
+            // que personne ne verifie.
+            /** @var list<array<string, mixed>> $lignes */
+            $lignes = DB::table('contacts')
                 ->where('workspace_id', $espace)
                 ->whereNull('deleted_at')
                 ->where(function ($q) use ($terme) {
@@ -141,14 +161,24 @@ class GlobalSearchController extends ApiController
                 ->get(['id', 'first_name', 'last_name', 'email', 'company_id'])
                 ->map(fn ($l) => (array) $l)
                 ->all();
+
+            return $lignes;
         });
     }
 
     /** @return list<array<string, mixed>> */
     private function chercherEtiquettes(string $espace, string $terme): array
     {
-        return $this->sur('tags', function () use ($espace, $terme) {
-            return DB::table('tags')
+        return $this->sur('tags', function () use ($espace, $terme): array {
+            // `(array) $ligne` rend, pour l'analyse statique, un `array` sans
+            // clefs ni valeurs typees, et `->all()` un `array<int, ...>` et non
+            // une `list`. `sur()` promet pourtant
+            // `list<array<string, mixed>>` a ses appelants. On NOMME donc le
+            // resultat au lieu de laisser la promesse non tenue : sans cela,
+            // tout ce qui consomme la recherche globale travaille sur un type
+            // que personne ne verifie.
+            /** @var list<array<string, mixed>> $lignes */
+            $lignes = DB::table('tags')
                 ->where('workspace_id', $espace)
                 ->where(function ($q) use ($terme) {
                     $q->where('name', 'ILIKE', $this->motif($terme))
@@ -159,6 +189,8 @@ class GlobalSearchController extends ApiController
                 ->get(['id', 'slug', 'name'])
                 ->map(fn ($l) => (array) $l)
                 ->all();
+
+            return $lignes;
         });
     }
 

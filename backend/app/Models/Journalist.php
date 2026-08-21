@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -38,17 +39,33 @@ class Journalist extends Model
         'opt_out' => 'boolean',
     ];
 
-    public function workspace()
+    /**
+     * ⚠️ LES TROIS RELATIONS CI-DESSOUS PORTENT UN TYPE DE RETOUR DEPUIS LE
+     * 2026-08-21, ET CE N'EST PAS COSMETIQUE.
+     *
+     * Sans lui, Larastan ne RECONNAIT PAS ces methodes comme des relations :
+     * il refusait `->with('media')` en `JournalistsController::export()`
+     * (« Relation 'media' is not found in App\Models\Journalist model ») alors
+     * que la relation existe et que l'export fonctionne. Un modele dont les
+     * relations ne sont pas typees est un modele sur lequel l'analyse statique
+     * ne peut RIEN affirmer — ni qu'une relation existe, ni qu'elle n'existe
+     * pas. C'est le silence, pas la garantie.
+     *
+     * @return BelongsTo<Workspace, $this>
+     */
+    public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
     }
 
-    public function media()
+    /** @return BelongsTo<Media, $this> */
+    public function media(): BelongsTo
     {
         return $this->belongsTo(Media::class);
     }
 
-    public function company()
+    /** @return BelongsTo<Company, $this> */
+    public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
     }

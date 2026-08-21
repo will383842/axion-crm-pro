@@ -218,7 +218,15 @@ trait ImportMediaMerge
         );
     }
 
-    /** Rapport de fusion, une ligne, avec les chiffres du run. */
+    /**
+     * Rapport de fusion, une ligne, avec les chiffres du run.
+     *
+     * Les six clefs sont LUES telles quelles ci-dessous : un `array` sans type
+     * de valeur laissait l'analyse incapable de dire qu'une clef manquante ou
+     * non numerique casserait le `sprintf`.
+     *
+     * @param  array{inserted: int, updated: int, unchanged: int, archived: int, revived: int, duplicates: int}  $stats
+     */
     protected function afficheFusion(string $sourceTag, array $stats): void
     {
         $this->info(sprintf(

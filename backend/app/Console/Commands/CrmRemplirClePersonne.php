@@ -178,7 +178,12 @@ class CrmRemplirClePersonne extends Command
             ->count();
     }
 
-    /** @param  list<mixed>  $espaces */
+    /**
+     * @param  array<mixed>  $espaces  et non `list<mixed>` : le corps ne fait qu'un
+     *                                 `foreach`, l'ordre et la contiguite des clefs
+     *                                 lui sont indifferents. Exiger une `list`
+     *                                 obligeait l'appelant a reindexer pour rien.
+     */
     private function compterToutesLesFiches(array $espaces): int
     {
         $reste = 0;

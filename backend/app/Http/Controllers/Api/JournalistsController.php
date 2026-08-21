@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use RuntimeException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -80,6 +81,15 @@ class JournalistsController extends ApiController
      * source de toutes les lectures du controleur.
      *
      * Sans contexte d'espace : on ne rend RIEN.
+     *
+     * ⚠️ `@return QueryBuilder<Journalist>` est OBLIGATOIRE, pas decoratif.
+     * `Spatie\QueryBuilder\QueryBuilder` est `@template TModel of Model` : sans
+     * le parametre, `TModel` reste non resolu et tout ce qui recoit ensuite le
+     * Builder — ici `EligibiliteCampagne::exclureOpposes()`, elle aussi
+     * templatee — devient inanalysable. Mesure du 2026-08-21 : c'est la cause
+     * de 5 des 38 erreurs PHPStan de la branche.
+     *
+     * @return QueryBuilder<Journalist>
      */
     private function buildFilteredQuery(): QueryBuilder
     {
@@ -92,7 +102,7 @@ class JournalistsController extends ApiController
                     $espaceCourant !== null,
                     fn ($q) => $q->where('workspace_id', $espaceCourant),
                     fn ($q) => $q->whereRaw('1 = 0'),
-                )
+                ),
         )
             ->allowedFilters(...[
                 AllowedFilter::exact('media_id'),
@@ -116,6 +126,14 @@ class JournalistsController extends ApiController
         if (! Schema::hasTable('journalists') || $workspaceId === null) {
             return response()->streamDownload(function () use ($header) {
                 $out = fopen('php://output', 'w');
+                if ($out === false) {
+                    // `php://output` ne s'ouvre pas : il n'y a aucun flux ou ecrire. On LEVE
+                    // plutot que de poursuivre — `fputcsv(false, ...)` est une TypeError en
+                    // PHP 8, et le telechargement rendrait un fichier vide ou tronque sans
+                    // que l'operateur puisse savoir que son export est incomplet. C'est le
+                    // defaut meme que le plafond partage (G41-007) sert a rendre VISIBLE.
+                    throw new RuntimeException("Export CSV : impossible d'ouvrir php://output.");
+                }
                 fwrite($out, "\xEF\xBB\xBF");
                 fputcsv($out, $header);
                 fclose($out);
@@ -146,16 +164,34 @@ class JournalistsController extends ApiController
         // (enveloppe à `__call`) : `->where(...)` rend l'enveloppe.
         // `GET /journalists/export` rendait donc 500 à tous les ayants droit.
         // `getEloquentBuilder()` rend le sujet réel, filtres déjà appliqués.
+        // ⚠️ ON NE CHAINE PAS `->where(...)->getEloquentBuilder()`, ET CE N'EST
+        // PAS UN GOUT. `Spatie\QueryBuilder\QueryBuilder` porte
+        // `@mixin EloquentBuilder<TModel>` : pour l'analyse statique, `->where()`
+        // rend un `Eloquent\Builder`, qui n'a AUCUN `getEloquentBuilder()`.
+        // A l'execution le chainage marche — `__call` reforwarde puis rend
+        // l'enveloppe — mais PHPStan ne peut pas le savoir, et il avait raison
+        // de se plaindre : c'est le meme ecart enveloppe/Builder qui a produit
+        // le 500 du constat F36-008. On garde donc l'enveloppe dans une
+        // variable, on la mute, et on ne la deballe qu'une fois.
+        $filtree = $this->buildFilteredQuery();
+        $filtree->where('workspace_id', $workspaceId);
+        $filtree->where('opt_out', false);
+
         $query = EligibiliteCampagne::exclureOpposes(
-            $this->buildFilteredQuery()
-                ->where('workspace_id', $workspaceId)
-                ->where('opt_out', false)
-                ->getEloquentBuilder(),
+            $filtree->getEloquentBuilder(),
             'journalists.email',
         )->with('media');
 
         return response()->streamDownload(function () use ($query, $header) {
             $out = fopen('php://output', 'w');
+            if ($out === false) {
+                // `php://output` ne s'ouvre pas : il n'y a aucun flux ou ecrire. On LEVE
+                // plutot que de poursuivre — `fputcsv(false, ...)` est une TypeError en
+                // PHP 8, et le telechargement rendrait un fichier vide ou tronque sans
+                // que l'operateur puisse savoir que son export est incomplet. C'est le
+                // defaut meme que le plafond partage (G41-007) sert a rendre VISIBLE.
+                throw new RuntimeException("Export CSV : impossible d'ouvrir php://output.");
+            }
             fwrite($out, "\xEF\xBB\xBF");
             fputcsv($out, $header);
             // Plafond partagé (constat G41-007) : cf. App\Support\PlafondExport.

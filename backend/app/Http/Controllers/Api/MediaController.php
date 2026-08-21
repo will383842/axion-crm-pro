@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use RuntimeException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -66,6 +67,15 @@ class MediaController extends ApiController
 
     /**
      * Query filtrée partagée liste (index) ↔ export → l'export = la liste affichée.
+     *
+     * ⚠️ `@return QueryBuilder<Media>` est OBLIGATOIRE, pas decoratif.
+     * `Spatie\QueryBuilder\QueryBuilder` est `@template TModel of Model` : sans
+     * le parametre, `TModel` reste non resolu et tout ce qui recoit ensuite le
+     * Builder — ici `EligibiliteCampagne::exclureOpposes()`, elle aussi
+     * templatee — devient inanalysable. Mesure du 2026-08-21 : c'est la cause
+     * de 5 des 38 erreurs PHPStan de la branche.
+     *
+     * @return QueryBuilder<Media>
      */
     private function buildFilteredQuery(): QueryBuilder
     {
@@ -104,6 +114,14 @@ class MediaController extends ApiController
         if (! Schema::hasTable('media') || $workspaceId === null) {
             return response()->streamDownload(function () use ($header) {
                 $out = fopen('php://output', 'w');
+                if ($out === false) {
+                    // `php://output` ne s'ouvre pas : il n'y a aucun flux ou ecrire. On LEVE
+                    // plutot que de poursuivre — `fputcsv(false, ...)` est une TypeError en
+                    // PHP 8, et le telechargement rendrait un fichier vide ou tronque sans
+                    // que l'operateur puisse savoir que son export est incomplet. C'est le
+                    // defaut meme que le plafond partage (G41-007) sert a rendre VISIBLE.
+                    throw new RuntimeException("Export CSV : impossible d'ouvrir php://output.");
+                }
                 fwrite($out, "\xEF\xBB\xBF");
                 fputcsv($out, $header);
                 fclose($out);
@@ -141,13 +159,33 @@ class MediaController extends ApiController
         // `getEloquentBuilder()` rend le sujet réel, celui que
         // `allowedFilters()` a DÉJÀ modifié (Spatie applique les filtres à la
         // construction, pas à l'exécution) : aucun filtre n'est perdu.
+        // ⚠️ ON NE CHAINE PAS `->where(...)->getEloquentBuilder()`, ET CE N'EST
+        // PAS UN GOUT. `Spatie\QueryBuilder\QueryBuilder` porte
+        // `@mixin EloquentBuilder<TModel>` : pour l'analyse statique, `->where()`
+        // rend un `Eloquent\Builder`, qui n'a AUCUN `getEloquentBuilder()`.
+        // A l'execution le chainage marche — `__call` reforwarde puis rend
+        // l'enveloppe — mais PHPStan ne peut pas le savoir, et il avait raison
+        // de se plaindre : c'est le meme ecart enveloppe/Builder qui a produit
+        // le 500 du constat F36-008. On garde donc l'enveloppe dans une
+        // variable, on la mute, et on ne la deballe qu'une fois.
+        $filtree = $this->buildFilteredQuery();
+        $filtree->where('workspace_id', $workspaceId);
+
         $query = EligibiliteCampagne::exclureOpposes(
-            $this->buildFilteredQuery()->where('workspace_id', $workspaceId)->getEloquentBuilder(),
+            $filtree->getEloquentBuilder(),
             'media.email',
         );
 
         return response()->streamDownload(function () use ($query, $header) {
             $out = fopen('php://output', 'w');
+            if ($out === false) {
+                // `php://output` ne s'ouvre pas : il n'y a aucun flux ou ecrire. On LEVE
+                // plutot que de poursuivre — `fputcsv(false, ...)` est une TypeError en
+                // PHP 8, et le telechargement rendrait un fichier vide ou tronque sans
+                // que l'operateur puisse savoir que son export est incomplet. C'est le
+                // defaut meme que le plafond partage (G41-007) sert a rendre VISIBLE.
+                throw new RuntimeException("Export CSV : impossible d'ouvrir php://output.");
+            }
             fwrite($out, "\xEF\xBB\xBF"); // BOM UTF-8 → Excel FR lit les accents
             fputcsv($out, $header);
             // Plafond partagé (constat G41-007) : cf. App\Support\PlafondExport.

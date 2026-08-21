@@ -124,7 +124,8 @@ final class MesureBaseLegale
             'sans_contact' => $sansContact,
             'sans_base' => $sansBase,
             'supprimees' => $supprimees,
-            'par_source' => array_values($parSource),
+            // `usort()` reindexe deja : `array_values()` n'avait aucun effet.
+            'par_source' => $parSource,
         ];
     }
 

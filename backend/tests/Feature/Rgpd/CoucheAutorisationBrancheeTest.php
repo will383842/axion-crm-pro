@@ -151,8 +151,17 @@ test('F36-001 — lancer une campagne est refuse pour DROIT, et non pour forme',
     // requete etait mal formee, pas interdite. Un corps valide serait passe.
     $r->assertForbidden();
 
-    expect((string) $r->getContent())->not->toContain(
+    // ⚠️ `assertStringNotContainsString` ET NON `->not->toContain(...)`.
+    //
+    // En Pest, `toContain` est VARIADIQUE : le second argument n'est pas un
+    // message d'echec, c'est une SECONDE valeur cherchee. Ecrit avec `toContain`,
+    // ce test aurait exige que la reponse ne contienne pas non plus la phrase
+    // explicative — absente, evidemment : il serait passe au vert pour la
+    // mauvaise raison. La garde `AucunMessageDansToContainTest` traque
+    // exactement cela, et c'est elle qui a rattrape cette ligne en CI.
+    $this->assertStringNotContainsString(
         'validation.required',
+        (string) $r->getContent(),
         'La requete est refusee pour sa FORME et non pour le DROIT : avec un corps valide, '
         . 'ce compte lancerait la campagne.',
     );

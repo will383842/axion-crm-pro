@@ -997,3 +997,48 @@ Trois arbitrages, tous documentés dans le registre et dans les gardes :
    `statut_diffusion` n'apparaît **nulle part** dans le dépôt.
 3. **`G41-002`** — le OU multi-champs de `applySearch` empêche l'index
    trigrammes ; le corriger change une sémantique de recherche.
+
+### 16.6 🔴 CONSTAT NOUVEAU — un déploiement en échec ne prévient personne
+
+En vérifiant le journal GitHub Actions du déploiement `377febf`, j'ai trouvé que
+**j'avais écrit un récit faux** — dans une garde, dans le commentaire du workflow
+de production, et dans mes comptes rendus à Will.
+
+J'affirmais que le déploiement avait « réussi de bout en bout » pendant que l'API
+rendait 502. Le journal dit le contraire :
+
+```
+GET https://api.axion-crm-pro.com/up
+curl: (22) The requested URL returned error: 502
+##[error]Health check failed
+```
+
+L'étape `Smoke test prod` a détecté la panne **dès la 21ᵉ seconde** et fait
+échouer le job.
+
+**Ce que cela change.** Le correctif Caddy est identique et la garde le défend
+toujours. Mais le défaut d'alerte n'est pas celui que je décrivais :
+
+| ce que je croyais | ce qui est |
+|---|---|
+| rien ne détectait la panne | la détection existe, et a marché en 21 s |
+| le déploiement se déclarait vert | le job était **rouge** |
+| — | **personne n'a lu le rouge**, treize minutes durant |
+
+*Une alarme que personne ne reçoit n'est pas une alarme.* Un déploiement en échec
+n'envoie aucune notification : le rouge attend sur GitHub qu'on vienne le
+regarder.
+
+Ce qui a égaré le diagnostic sur le moment, ce sont les conteneurs : tous
+`healthy`, Caddy compris, pendant que Caddy parlait à une adresse morte. **Un
+`healthcheck` qui interroge le conteneur lui-même ne dit rien de ce qu'il
+ATTEINT.**
+
+⚠️ **Arbitrage à Will** : où doit partir l'alerte d'un déploiement rouge ?
+Le canal n'est pas une question technique, c'est un choix (courriel, Slack,
+issue GitHub automatique…), et il n'appartient pas au dépôt d'en décider seul.
+
+— et c'est la **troisième fois** de cette vague que je publie une affirmation
+sans l'avoir vérifiée : la mauvaise base, la cause inventée de deux mutations, et
+ce récit-ci. Les trois ont été corrigées par une mesure, jamais par un
+raisonnement.

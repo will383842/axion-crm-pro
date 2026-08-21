@@ -190,6 +190,11 @@ Côté workers : `pnpm install` puis `pnpm vitest run` — **61 tests verts sur 
 
 ## 9. La file d'attente, dans l'ordre du danger
 
+> ✅ **LES SIX ENTRÉES SONT FERMÉES depuis le 2026-08-21** — quatre l'étaient déjà et
+> cette liste les donnait ouvertes. Chacune a été rouverte **dans le code**, pas dans un
+> rapport : voir §13.11. *Un état recopié ne vaut pas un état relu* — c'est le même défaut
+> que le §7 a mesuré sur les comptes tenus à la main.
+
 1. ~~`F38-007`~~ — ✅ **fermé le 20/08** (`23a0e5f`). Il y avait **quatre** invocations nues,
    dans **trois** fichiers, pas une : le workflow `workflow_dispatch`, le script qui configure
    la production (`depends_on` monte postgres et redis même sans les nommer), et deux
@@ -611,7 +616,68 @@ chaque exécution.
 > avec `--no-deps` (§3 bis point 4) — mais décisif pour toute recréation future.
 > **À arbitrer par Will.**
 
-### 13.11 Les quatorze commits de la vague
+### 13.11 PASSE 3 — la file d'attente du §9, re-mesurée point par point
+
+Le §9 range six entrées « dans l'ordre du danger ». Chacune a été rouverte dans
+le CODE, pas dans un rapport.
+
+| # | entrée du §9 | verdict du 2026-08-21 |
+|---|---|---|
+| 1 | `F38-007` | ✅ déjà fermé le 20/08 (`23a0e5f`) |
+| 2 | `C18-016 / F37-002` (S0) — six services **simulés en production** | ✅ **fermé** — `MockServicesProvider` prend le service RÉEL par défaut en `production`/`staging`, et **refuse** un simulacre en production *même explicitement demandé* |
+| 3 | `B15-001` (S0) — une personne effacée revient au vivier | ✅ **fermé** — `addOptOut()` écrit les **deux** univers par défaut (`UNIVERS_OPPOSITION`), et `GdprErasureService` l'appelle ainsi |
+| 4 | `B10-004` (S0) — export RGPD partiel | ✅ **fermé** par cette vague (`8db4417`) |
+| 5 | `B15-008` — les sept commandes destructives | ✅ **fermé** par cette vague (`b4a5cd8`, `9f15664`) — voir ci-dessous |
+| 6 | `B12-012` (S1) — `sameWorkspace()` compare deux UUID castés en entier | ✅ **fermé** — `BasePolicy:96` fait `hash_equals((string) …, (string) …)` |
+
+**Quatre des six étaient déjà fermés et la file les donnait ouverts.** C'est le
+même défaut que le §7 a mesuré sur les comptes tenus à la main : *un état recopié
+ne vaut pas un état relu.*
+
+#### `B15-008` : pourquoi il était resté « partiel » depuis le début
+
+Le trait `RefuseUneSuppressionMassive` existait, et trois commandes le portaient.
+Les quatre autres ne pouvaient pas le prendre : **sa dernière barrière exige
+`--force` dès que l'entrée n'est pas interactive**, et ces quatre-là tournent
+sous le planificateur. Le poser tel quel les aurait rendues muettes ; lui ajouter
+`--force` dans `console.php` aurait retiré la garde en ayant l'air de la poser.
+
+D'où `ecritureAutoriseeSansOperateur()` — le plafond, sans la confirmation.
+
+| commande | quand | ce qu'elle détruisait sans borne |
+|---|---|---|
+| `media:clean-emails` | **chaque jour 05:05** | `media.email → NULL` sur tout ce que son détecteur juge « sur-partagé » |
+| `retention:prune-scraper-runs` | chaque jour 04:20 | `scraper_runs` de plus de N jours |
+| `rgpd:purge-vivier` | mensuel | `candidates` + leurs `activities` |
+| `rgpd:purge-business-prospects` | mensuel | `contacts` de plus de 3 ans |
+
+⚠️ Les deux purges RGPD portaient bien un `skip()` — mais c'est un **drapeau
+d'activation** (`CRM_PURGE_ENABLED`), pas un plafond : il empêche la commande de
+tourner, il ne borne rien le jour où elle tourne. *C'est exactement le genre de
+garde qu'on prend pour une autre.*
+
+🔑 **La décision, et elle n'est pas neutre : on BLOQUE, même quand l'effacement
+est une obligation légale.** Refuser une purge de rétention retarde une échéance ;
+laisser passer une purge erronée détruit ce qui ne revient pas. *L'irréversible
+l'emporte.*
+
+#### 🔴 Deux défauts que mes propres gardes m'ont trouvés
+
+- **`B10-016-PORTEE PLAFOND` a rougi en CI sur mon commit.** Elle avait raison :
+  mes comptages `DB::table('media')->…->count()` ignoraient `deleted_at`, alors
+  que `media` porte une corbeille vivante — *établi la veille par cette même
+  garde*. Je comptais des lignes archivées **aux deux termes du rapport**. Le
+  plafond n'a pas été relevé : c'est mon code qui était faux.
+- **PHPStan** a signalé que `retention:prune-scraper-runs` n'a pas de `--dry-run`,
+  que le trait suppose. Vrai manque : elle supprime définitivement, chaque jour,
+  sans aucun moyen de voir ce qu'elle ferait — quand les cinq autres l'ont.
+  Ajoutée **et honorée**.
+
+Le recensement du banc porte désormais une **liste vide** : les six commandes qui
+détruisent ont toutes une barrière. *Elle doit rester vide — ce n'est pas une
+dérogation, c'est le registre de ce qui reste à faire.*
+
+### 13.12 Les dix-sept commits de la vague
 
 | commit | contenu |
 |---|---|
@@ -628,6 +694,8 @@ chaque exécution.
 | `b732d75` | les cinq gardes vertes au banc et rouges en CI |
 | `46e41ff` | composer a REPARE H47-001 en amont ; une enumeration avait raison par chance |
 | `ab4bfe1` | `P6-INFRA-003` — la garde des ports ne rendait qu'une combinaison sur trois |
+| `b4a5cd8` | `B15-008` — un automatisme detruisait des adresses chaque nuit, sans plafond |
+| `9f15664` | `B15-008` — les trois dernieres commandes destructives ; constat CLOS |
 
 ⚠️ **Un défaut de dispositif, et il est de moi.** Le premier découpage a fait
 passer le `chmod` des scripts d'infra dans le commit RGPD, dont le message n'en

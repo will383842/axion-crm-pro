@@ -264,10 +264,10 @@ dépôt sans être branché**.
 |---|---|---|
 | `P6-API-001/002` — les **listes** ne sont pas cloisonnées | P1 s'est arrêtée aux *fiches* ; P2 hérite du périmètre de P1 ; **ma** garde de complétude énumérait les méthodes recevant un modèle par liaison de route, et un `index()` n'en reçoit aucun | ✅ **fermé** (`cb81284`) |
 | `P6-UI-019` — `pnpm lint`, gate **BLOQUANTE**, échouait | personne ne l'avait jouée. 16 erreurs, toutes introduites par cette branche : **#191 ne pouvait pas passer la CI** | ✅ **fermé** (`46ecb80`) |
-| `P6-UI-001` — l'accueil affiche « aucune entreprise » sur 4,29 M | `/dashboard/stats` est une closure à zéros en dur. Le mandat exigeait d'ouvrir chaque écran à la main : **la console ne tourne pas**, personne ne l'a ouvert | 🔴 ouvert |
-| `P6-UI-002` — la palette ⌘K ne peut rien trouver | `GET /search` déclarée deux fois, trois tableaux vides en dur. **Le test e2e mocke l'endpoint** et reste vert | 🔴 ouvert |
+| `P6-UI-001` — l'accueil affiche « aucune entreprise » sur 4,29 M | `/dashboard/stats` est une closure à zéros en dur. Le mandat exigeait d'ouvrir chaque écran à la main : **la console ne tourne pas**, personne ne l'a ouvert | ✅ **fermé** — re-mesuré dans le code le 21/08, §13.10 |
+| `P6-UI-002` — la palette ⌘K ne peut rien trouver | `GET /search` déclarée deux fois, trois tableaux vides en dur. **Le test e2e mocke l'endpoint** et reste vert | ✅ **fermé** — re-mesuré dans le code le 21/08, §13.10 |
 | `P6-INFRA-001` — porte dérobée `root` réarmable en un clic | P1 l'avait vue, mais **repliée en note** dans `F38-007` : jamais de sévérité, jamais de ligne dans `RESTE-WILL` | 🔴 **RESTE WILL** (§10) |
-| `P6-INFRA-003` — un **douzième** chemin vers la faille du 19/08 | `docker-compose.observability.yml` prescrit la combinaison qui republie 55432, 56379 et neuf ports d'admin. La garde CI ne rend jamais cette combinaison | 🔴 ouvert |
+| `P6-INFRA-003` — un **douzième** chemin vers la faille du 19/08 | `docker-compose.observability.yml` prescrit la combinaison qui republie 55432, 56379 et neuf ports d'admin. La garde CI ne rend jamais cette combinaison | ⚠️ **gardé** (`ab4bfe1`) mais **ouvert à la source** — §13.10 |
 
 ### ⚠️ Un défaut de dispositif, et il est de moi
 
@@ -555,7 +555,63 @@ et rejoués verts (16 tests)**. Les dix restantes visent des dossiers NON tronqu
 sont donc pas fausses aujourd'hui, mais elles le deviendraient le jour où l'un de
 ces dossiers dépasserait le seuil. **À convertir à la main, une par une.**
 
-### 13.10 Les treize commits de la vague
+### 13.10 PASSE 3 — les trois S0 « ouverts » du §11, re-mesurés dans le CODE
+
+Le §11 les donne ouverts. **Règle 1 : le code fait foi.** Mesure du 2026-08-21 :
+
+| constat | ce que le §11 dit | ce que le code dit |
+|---|---|---|
+| `P6-UI-001` — l'accueil affiche « aucune entreprise » | 🔴 ouvert, `/dashboard/stats` est *« une closure à zéros en dur »* | ✅ **fermé** — la route pointe `DashboardController::stats`, qui compte réellement (`companies_total`, `contacts_qualified`, `scraper_runs_24h`, répartition qualité) et rend des zéros **seulement** hors contexte d'espace |
+| `P6-UI-002` — la palette ⌘K ne peut rien trouver | 🔴 ouvert, *« `GET /search` déclarée deux fois, trois tableaux vides en dur »* | ✅ **fermé** — `/search` n'est déclarée **qu'une fois** (`api.php:238`) et `GlobalSearchController` interroge vraiment `companies`, `contacts`, `tags` |
+| `P6-INFRA-003` — douzième chemin vers la faille du 19/08 | 🔴 ouvert | ⚠️ **réel, et il l'était encore** — voir ci-dessous |
+
+#### `P6-INFRA-003` : documenté n'est pas gardé
+
+Le fichier `docker-compose.observability.yml` porte un avertissement en tête, ne
+recopie pas la forme fautive, et prescrit la bonne commande. **Mais rien ne
+l'empêchait.** La garde CI `config-prod` ne fusionnait que `base + prod` — la
+combinaison prescrite par ce fichier-là n'était **jamais rendue**.
+
+*Le §3 bis point 5 du mandat exige qu'une garde rougisse **sur l'objet qui
+casse**. Ici il n'y avait pas de garde du tout : un commentaire n'arrête
+personne.* Étendue (`ab4bfe1`), et vue rouge sur mutation.
+
+#### 🔴 Et l'extension a trouvé un défaut DANS LA GARDE EXISTANTE
+
+Elle lisait `published:` **sans regarder `host_ip:`** :
+
+```
+base + prod + observabilité, sans host_ip :
+  80 443 3000 3001 3100 3200 4317 4318 8080 9090 9093
+avec host_ip :
+  80 443
+```
+
+Les neuf ports d'observabilité sont liés à `127.0.0.1` — ils n'exposent rien.
+Étendre la garde sans corriger l'extracteur l'aurait fait **rougir à tort** sur
+une configuration saine, *et une garde qui crie faux finit désactivée.*
+
+#### Ce que le témoin négatif établit, et qui reste ouvert
+
+```
+docker-compose.yml SEUL publie : 80 443 8080 55432 56379
+```
+
+**`P6-INFRA-003` est ouvert À LA SOURCE.** Le fichier de base publie Postgres et
+Redis sur `0.0.0.0` ; seul l'overlay `prod` les referme par `ports: !override []`.
+La sécurité repose donc sur *ne jamais oublier un fichier* — **le défaut est
+ouvert, la fermeture est l'exception**. Le job le rappelle en `::warning::` à
+chaque exécution.
+
+> 🔑 **Le geste de fond, non fait, et qui appartient à une décision d'infra :**
+> retirer ces deux ports du fichier de BASE et les poser dans
+> `docker-compose.local.yml`. Le défaut deviendrait *fermé*, et aucun oubli
+> d'overlay ne pourrait plus rouvrir la faille. ⚠️ Sans effet immédiat en
+> production — `deploy-direct-ssh.yml` ne recrée que `api app horizon scheduler`
+> avec `--no-deps` (§3 bis point 4) — mais décisif pour toute recréation future.
+> **À arbitrer par Will.**
+
+### 13.11 Les quatorze commits de la vague
 
 | commit | contenu |
 |---|---|
@@ -571,6 +627,7 @@ ces dossiers dépasserait le seuil. **À convertir à la main, une par une.**
 | `f10c77d` | les trois défauts que Pest a montrés une fois atteint |
 | `b732d75` | les cinq gardes vertes au banc et rouges en CI |
 | `46e41ff` | composer a REPARE H47-001 en amont ; une enumeration avait raison par chance |
+| `ab4bfe1` | `P6-INFRA-003` — la garde des ports ne rendait qu'une combinaison sur trois |
 
 ⚠️ **Un défaut de dispositif, et il est de moi.** Le premier découpage a fait
 passer le `chmod` des scripts d'infra dans le commit RGPD, dont le message n'en

@@ -392,3 +392,88 @@ it('media:import-arcom --limit n archive pas les stations hors du lot tronque', 
     expect(DB::table('media')->where('source', 'arcom')->whereNull('deleted_at')->count())->toBe(2);
     Http::assertSentCount(2);
 });
+
+// ---------------------------------------------------------------------------
+// 4. LA BRANCHE « SANS N° CPPAP » — source `agences` (lundi 02:45)
+//
+// `ImportMediaFromOpendatasoft::SOURCES['agences']` ne mappe QU'UN champ : le nom
+// (le dataset des agences de presse agreees n'expose aucun identifiant). La cle
+// naturelle tombe donc dans le repli `nom:` de `keyOf` — une branche que les
+// scenarios ci-dessus (spel, qui porte toujours un n° CPPAP) n'empruntent JAMAIS.
+//
+// Ce que ce scenario attrape et que les autres ne voient pas : une cle qui
+// s'effondrerait sur une valeur constante pour toutes les agences (p. ex. un
+// `'cppap:' . null` rendu pour chaque ligne). Le compte total resterait plausible
+// au premier coup d'oeil, mais UNE SEULE agence serait vue comme presente et
+// TOUTES les autres archivees a chaque passage hebdomadaire.
+// ---------------------------------------------------------------------------
+
+it('media:import-opendatasoft agences fusionne sur le nom quand la source ne porte aucun n° CPPAP', function () {
+    $ws = b17WorkspaceRejeu();
+    $companyId = b17InsereCompany($ws->id, '555666777');
+
+    $payload = [
+        ['identification_denomination_sociale' => 'Agence Alpha'],
+        ['identification_denomination_sociale' => 'Agence Beta'],
+    ];
+    Http::fake(['data.culture.gouv.fr/*' => function () use (&$payload) {
+        return Http::response($payload);
+    }]);
+
+    // `source_tag` de la source `agences` = 'agence' (pas 'agences').
+    $this->artisan('media:import-opendatasoft', ['source' => 'agences', '--workspace' => $ws->id])
+        ->assertExitCode(0);
+
+    $initiales = DB::table('media')->where('workspace_id', $ws->id)->where('source', 'agence')
+        ->orderBy('id')->get();
+    // ANTI-VERT-DEGUISE : sans les deux lignes, la suite ne prouve rien.
+    expect($initiales)->toHaveCount(2);
+    $idAlpha = (int) $initiales[0]->id;
+    $idBeta = (int) $initiales[1]->id;
+    expect($idAlpha)->toBeGreaterThan(0);
+    expect($idBeta)->toBeGreaterThan($idAlpha);
+    // Aucune des deux ne porte de n° CPPAP : c'est bien la branche `nom:` qui sert.
+    expect($initiales[0]->cppap_number)->toBeNull();
+    expect($initiales[1]->cppap_number)->toBeNull();
+
+    b17PoseEnrichissement($idAlpha, $companyId);
+    $journalisteId = b17InsereJournaliste($ws->id, $idAlpha);
+
+    // ── Rejeu a l'identique : rien ne doit bouger ────────────────────────────
+    $this->artisan('media:import-opendatasoft', ['source' => 'agences', '--workspace' => $ws->id])
+        ->assertExitCode(0);
+
+    $actives = DB::table('media')->where('workspace_id', $ws->id)->where('source', 'agence')
+        ->whereNull('deleted_at')->orderBy('id')->get();
+    expect($actives)->toHaveCount(2);
+    expect((int) $actives[0]->id)->toBe($idAlpha);
+    expect((int) $actives[1]->id)->toBe($idBeta);
+
+    // L'enrichissement de la semaine survit sur Alpha…
+    expect($actives[0]->email)->toBe('redaction@alpha.example');
+    expect($actives[0]->enrich_status)->toBe('enriched');
+    expect((int) $actives[0]->company_id)->toBe($companyId);
+    // …et le journaliste reste rattache (FK ON DELETE SET NULL sinon).
+    expect((int) DB::table('journalists')->where('id', $journalisteId)->value('media_id'))->toBe($idAlpha);
+
+    // Beta n'a PAS ete archivee au passage : c'est exactement ce qu'une cle
+    // effondree sur une constante ferait (une seule vue, l'autre sortie du registre).
+    expect($actives[1]->deleted_at)->toBeNull();
+
+    // ── TEMOIN : l'import importe encore ─────────────────────────────────────
+    // Un « correctif » qui se contenterait de ne plus rien ecrire passerait tous
+    // les tests ci-dessus. Une agence NOUVELLE au registre doit etre creee.
+    $payload[] = ['identification_denomination_sociale' => 'Agence Gamma'];
+    $this->artisan('media:import-opendatasoft', ['source' => 'agences', '--workspace' => $ws->id])
+        ->assertExitCode(0);
+
+    $finales = DB::table('media')->where('workspace_id', $ws->id)->where('source', 'agence')
+        ->whereNull('deleted_at')->orderBy('id')->get();
+    expect($finales)->toHaveCount(3);
+    expect((int) $finales[0]->id)->toBe($idAlpha);
+    expect((int) $finales[1]->id)->toBe($idBeta);
+    $this->assertContains('Agence Gamma', $finales->pluck('name')->all());
+
+    // La source a bien ete interrogee aux TROIS passages.
+    Http::assertSentCount(3);
+});

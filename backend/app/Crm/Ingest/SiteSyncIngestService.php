@@ -309,9 +309,20 @@ final class SiteSyncIngestService
             ->first();
 
         if ($existing === null && $email !== null) {
+            // C21-001 — LE JUMEAU VIVIER DE LA RECHERCHE DE `ContactUpserter`.
+            //
+            // ⚠️ NE PAS RÉÉCRIRE `->whereRaw('lower(email::text) = ?', [$email])`.
+            // `candidates.email` est de type `citext` — elle compare déjà sans
+            // égard à la casse — et `idx_candidates_email btree (email) WHERE
+            // email IS NOT NULL` porte sur la COLONNE, pas sur l'expression :
+            // le `lower()` ne changeait rien à la sémantique, il ne faisait que
+            // condamner l'index. Mesuré sur le banc `a35r` le 2026-08-21 :
+            //     lower(email::text)  Seq Scan on candidates  coût 208,50
+            //     email (citext)      Index Scan idx_candidates_email
+            // Garde : `tests/Feature/Crm/IndexEmailIngestionServentLesRequetesTest.php`.
             $existing = DB::table('candidates')
                 ->where('workspace_id', $workspaceId)
-                ->whereRaw('lower(email::text) = ?', [$email])
+                ->where('email', $email)
                 ->first();
         }
 

@@ -83,4 +83,72 @@ trait RefuseUneSuppressionMassive
 
         return true;
     }
+
+    /**
+     * Même plafond, POUR UNE COMMANDE PLANIFIÉE — et sans confirmation.
+     *
+     * 🔴 POURQUOI CETTE SECONDE PORTE EXISTE (B15-008, 2026-08-21).
+     *
+     * `suppressionAutorisee()` ci-dessus finit par exiger `--force` dès que
+     * l'entrée n'est pas interactive. C'est juste pour une commande qu'un
+     * humain lance. C'est INAPPLICABLE à une commande que le planificateur
+     * lance seul : elle refuserait chaque nuit, en silence, et personne ne
+     * lirait le message.
+     *
+     * La parade n'est donc pas d'ajouter `--force` à la ligne du planificateur —
+     * cela reviendrait à retirer la garde tout en ayant l'air de la poser. C'est
+     * de garder la SEULE barrière qui protège vraiment d'un accident de masse :
+     * le PLAFOND DE PROPORTION. Au-delà, on refuse et on crie ; en deçà, on
+     * laisse l'automatisme faire son travail.
+     *
+     * `media:clean-emails` (tous les jours à 05:05) met `media.email` à NULL sur
+     * les adresses parasites ou sur-partagées. Le jour où son détecteur se
+     * trompe — un domaine grand public mal classé, un seuil trop bas — il
+     * effacerait les adresses de tout le registre presse en une nuit, sans que
+     * rien ne l'arrête. Ce plafond-ci l'arrête.
+     *
+     * ⚠️ Le verbe est paramétrable parce que ces commandes n'effacent pas
+     * toujours des LIGNES : nuller une colonne détruit tout autant, et le
+     * message doit dire ce qui se passe vraiment.
+     *
+     * @param  string  $table  table visée, pour le message
+     * @param  int  $aEcrire  nombre de lignes que la condition sélectionne
+     * @param  int  $total  nombre total de lignes de la table
+     * @param  string  $verbe  ce que la commande fait ("purger", "nuller"…)
+     */
+    protected function ecritureAutoriseeSansOperateur(
+        string $table,
+        int $aEcrire,
+        int $total,
+        string $verbe = 'modifier',
+    ): bool {
+        if ($aEcrire === 0) {
+            $this->info("Rien à {$verbe} dans « {$table} ».");
+
+            return false;
+        }
+
+        $proportion = $total > 0 ? $aEcrire / $total : 1.0;
+        $pourcentage = number_format($proportion * 100, 1, ',', ' ');
+
+        $this->line("Table « {$table} » : {$aEcrire} ligne(s) sur {$total} — {$pourcentage} %.");
+
+        if ($proportion > $this->proportionMaximale && ! (bool) $this->option('force')) {
+            $seuil = number_format($this->proportionMaximale * 100, 0, ',', ' ');
+            $this->error(
+                "REFUS : cette commande va {$verbe} {$pourcentage} % de « {$table} », "
+                . "au-delà du plafond de {$seuil} %.",
+            );
+            $this->line(
+                'Une commande PLANIFIÉE qui touche une telle part de la table est presque '
+                . 'toujours un détecteur qui s\'est trompé, pas un ménage légitime. '
+                . 'Vérifiez avec --dry-run ; si la proportion est VOULUE, relancez à la main '
+                . 'avec --force.',
+            );
+
+            return false;
+        }
+
+        return true;
+    }
 }

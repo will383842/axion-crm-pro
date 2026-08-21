@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Database\Connection;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -125,7 +126,7 @@ test('le role applicatif existe et lui, ne contourne PAS la RLS — la barriere 
 
 test('les policies RLS sont nombreuses, en FORCE — et INERTES sur le chemin par defaut', function () {
     $policies = (int) DB::scalar(
-        "SELECT count(*) FROM pg_policies WHERE schemaname = current_schema()",
+        'SELECT count(*) FROM pg_policies WHERE schemaname = current_schema()',
     );
     $tablesEnForce = (int) DB::scalar(
         "SELECT count(*) FROM pg_class c
@@ -174,7 +175,7 @@ test('les policies RLS sont nombreuses, en FORCE — et INERTES sur le chemin pa
             2,
             "F36-007 A CHANGE D'ETAT : la connexion par defaut ne voit plus les deux espaces. "
             . 'Soit la RLS a ete armee (bonne nouvelle : reecrire ce fichier), soit le semis '
-            . "a echoue et cette suite ne mesure plus rien.",
+            . 'a echoue et cette suite ne mesure plus rien.',
         );
     } finally {
         rlsRoleOwner()->table('companies')->whereIn('workspace_id', [$wsA, $wsB])->delete();
@@ -198,4 +199,181 @@ test('le drapeau qui armerait la RLS est a OFF, et c est la seule chose qui sepa
     // Et la connexion par défaut est bien restée celle du propriétaire historique.
     expect(config('database.connections.pgsql.username'))
         ->toBe(config('database.connections.pgsql_owner.username'));
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. LE RECENSEMENT — quelle PART de la suite mesure dans le monde SANS RLS
+//
+// Les sections 1 à 3 disent que la RLS est inerte sur le chemin par défaut.
+// Reste la question qui décide de la valeur de TOUTES les autres gardes de
+// cloisonnement de ce dépôt : combien d'entre elles passent par ce chemin-là ?
+//
+// ⚠️ L'énumération est faite PAR LE CATALOGUE — l'arborescence `tests/`
+// parcourue à l'exécution —, jamais par une liste écrite à la main. Une liste
+// écrite à la main ne contient jamais que les fichiers qu'on connaissait déjà.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Recense les fichiers de test et sépare ceux qui ouvrent la connexion
+ * applicative (`pgsql_app`, la SEULE où la RLS mord) des autres.
+ *
+ * @return array{total: int, surRoleApplicatif: list<string>}
+ */
+function rlsRoleRecenserLaSuite(): array
+{
+    $racine = base_path('tests');
+
+    $iterateur = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($racine, FilesystemIterator::SKIP_DOTS),
+    );
+
+    $total = 0;
+    $surRoleApplicatif = [];
+
+    foreach ($iterateur as $fichier) {
+        /** @var SplFileInfo $fichier */
+        if (! $fichier->isFile() || ! str_ends_with($fichier->getFilename(), 'Test.php')) {
+            continue;
+        }
+
+        $total++;
+
+        if (str_contains((string) file_get_contents($fichier->getPathname()), 'pgsql_app')) {
+            $surRoleApplicatif[] = str_replace(
+                '\\',
+                '/',
+                substr($fichier->getPathname(), strlen($racine) + 1),
+            );
+        }
+    }
+
+    sort($surRoleApplicatif);
+
+    return ['total' => $total, 'surRoleApplicatif' => $surRoleApplicatif];
+}
+
+test('RECENSEMENT — la suite mesure le cloisonnement presque entierement SANS la RLS', function () {
+    $recensement = rlsRoleRecenserLaSuite();
+    $surRole = $recensement['surRoleApplicatif'];
+    $surSuperutilisateur = $recensement['total'] - count($surRole);
+
+    // TÉMOIN DE COUVERTURE — un balayage qui ne voit rien rendrait tout le
+    // reste de ce test vrai par vacuité. Mesuré le 2026-08-21 : 180 fichiers.
+    expect($recensement['total'])->toBeGreaterThan(
+        150,
+        'Le balayage de tests/ ne trouve presque plus de fichiers : il ne mesure plus rien. '
+        . 'Verifier la racine balayee et le suffixe attendu (« Test.php »).',
+    );
+
+    // LE CHIFFRE, FIGÉ. Mesuré le 2026-08-21 sur `axion_crm_test_lot11` :
+    // 180 fichiers de test, 10 ouvrent `pgsql_app`, 170 ne l'ouvrent jamais.
+    //
+    // Autrement dit : sur ce dépôt, l'écrasante majorité des gardes de
+    // cloisonnement mesure un monde où les 55 policies n'existent pas. Elles
+    // prouvent la CEINTURE applicative — ce qui est utile, et c'est ce que la
+    // production exécute —, elles ne prouvent RIEN de la bretelle SQL.
+    //
+    // Le seuil est un plancher, pas une égalité : plusieurs lots écrivent dans
+    // ce dépôt en même temps et le total bouge d'heure en heure. Ce qui ne doit
+    // pas bouger, c'est l'ORDRE DE GRANDEUR du déséquilibre.
+    expect($surSuperutilisateur)->toBeGreaterThan(
+        150,
+        'Le recensement ne trouve plus une large majorite de fichiers sur le chemin superutilisateur : '
+        . 'soit la suite a bascule sur le role applicatif (bonne nouvelle, reecrire ce fichier), '
+        . 'soit le balayage est casse.',
+    );
+    // ⚠️ PAS de seuil HAUT sur `count($surRole)` ici : à 180 fichiers, un tel
+    // seuil ne pourrait JAMAIS rougir avant celui du dessus (il faudrait plus de
+    // 190 fichiers pour que les deux soient satisfaisables séparément). Une
+    // assertion qu'on ne peut pas voir rougir n'est pas une garde, c'est une
+    // décoration. Le déséquilibre est déjà figé par la ligne précédente.
+
+    // ⚠️ `expect(...)->toContain()` est VARIADIQUE en Pest : un message passé en
+    // deuxième argument y deviendrait une deuxième aiguille cherchée. On emploie
+    // donc `assertContains`.
+    //
+    // Ces trois-là sont les gardes SUR LESQUELLES repose la démonstration que la
+    // barrière SQL est correcte. Si l'une quitte la liste, c'est qu'elle a cessé
+    // de passer par le rôle applicatif — et elle ne prouve alors plus la RLS.
+    foreach ([
+        'Feature/EtancheiteParTableTest.php',
+        'Feature/RlsTest.php',
+        'Feature/NeDoitPasRegresserTest.php',
+    ] as $ancre) {
+        $this->assertContains(
+            $ancre,
+            $surRole,
+            "{$ancre} n ouvre plus la connexion `pgsql_app` : cette garde ne mesure plus la RLS, "
+            . 'seulement le WHERE applicatif.',
+        );
+    }
+});
+
+test('POURQUOI on ne bascule pas la suite d un drapeau : son semis ecrit SANS contexte, et la RLS le refuse', function () {
+    // MESURE DU 2026-08-21, reproduite ici en petit. `CloisonnementDesListesTest`
+    // est VERT sur le chemin par défaut (5 tests, 15 assertions) ; rejoué avec
+    // la connexion par défaut basculée sur `axion_app`, il rend 4 échecs — et
+    // AUCUN sur une assertion : les quatre meurent au SEMIS, avec
+    //
+    //     SQLSTATE[42501] new row violates row-level security policy
+    //     for table "rgpd_requests" / "journalists" / "proxy_providers_config"
+    //     / "llm_use_cases"
+    //
+    // La raison n'est pas un défaut de l'application — en HTTP, le middleware
+    // `SetCurrentWorkspace` pose bien `app.current_workspace_id`. C'est que les
+    // fabriques de test écrivent AVANT et EN DEHORS de toute requête. Armer la
+    // RLS ne coûte donc pas « une variable d'environnement » côté suite : il
+    // faut d'abord que le semis se déclare un espace.
+    $wsA = (string) Str::uuid();
+    $now = now();
+
+    rlsRoleOwner()->table('workspaces')->insert([
+        'id' => $wsA,
+        'slug' => 'zz-f36-semis-' . substr($wsA, 0, 8),
+        'name' => 'ZZ F36 semis',
+        'settings' => '{}',
+        'cost_cap_eur' => 100,
+        'is_active' => true,
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+
+    try {
+        $ecrire = static fn (): bool => rlsRoleApp()->table('journalists')->insert([
+            'workspace_id' => $wsA,
+            'last_name' => 'ZZ F36 semis',
+            'email' => 'zz-f36-' . substr($wsA, 0, 8) . '@semis.test',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        // (a) SANS contexte — ce que fait une fabrique de test : REFUSÉ.
+        rlsRoleApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
+
+        $refus = null;
+        try {
+            $ecrire();
+        } catch (QueryException $e) {
+            $refus = $e;
+        }
+
+        expect($refus)->not->toBeNull(
+            'La RLS ACCEPTE desormais une ecriture sans contexte sur `journalists` : '
+            . 'soit la policy WITH CHECK a disparu, soit le role applicatif la contourne. '
+            . 'Dans les deux cas, les gardes de cloisonnement de ce depot sont a relire.',
+        );
+        $this->assertStringContainsString('42501', (string) $refus->getMessage());
+        $this->assertStringContainsString('row-level security policy', (string) $refus->getMessage());
+
+        // (b) TÉMOIN — AVEC le contexte, la MÊME écriture passe. Sans cette
+        //     moitié, (a) ne prouverait que « le role applicatif ne peut pas
+        //     ecrire », ce qui serait un défaut de droits, pas de la RLS.
+        rlsRoleApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $wsA]);
+        $ecrire();
+
+        expect(rlsRoleApp()->table('journalists')->where('workspace_id', $wsA)->count())->toBe(1);
+    } finally {
+        rlsRoleOwner()->table('journalists')->where('workspace_id', $wsA)->delete();
+        rlsRoleOwner()->table('workspaces')->where('id', $wsA)->delete();
+    }
 });

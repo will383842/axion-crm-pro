@@ -14,6 +14,19 @@ use Illuminate\Support\Str;
  */
 class GdprPortabilityService
 {
+    /**
+     * Les types de demande que CET export solde. L'article 15 (`access`) et
+     * l'article 20 (`portability`) rendent le meme inventaire — l'en-tete de
+     * cette classe le dit depuis le commit ad7ae55 — et il n'y a donc qu'une
+     * seule archive a produire pour les deux.
+     *
+     * La constante existe pour qu'`export()` et le point d'entree
+     * (`RgpdRequestsController::process`) ne puissent pas diverger en silence :
+     * un type route vers cet export mais absent d'ici recevrait un jeton que
+     * `retrieve()` ne retrouverait jamais.
+     */
+    public const TYPES_AVEC_EXPORT = ['access', 'portability'];
+
     public function export(string $subjectEmail): array
     {
         $email = strtolower(trim($subjectEmail));
@@ -36,7 +49,7 @@ class GdprPortabilityService
         ))));
 
         $data = [
-            'subject'  => $email,
+            'subject' => $email,
             'exported' => now()->toIso8601String(),
             'contacts' => DB::table('contacts')->where('email', $email)->get()->toArray(),
             'candidates' => DB::table('candidates')->where('email', $email)->get()->toArray(),
@@ -133,6 +146,54 @@ class GdprPortabilityService
                 ->whereRaw('lower(email::text) = ?', [$email])
                 ->get(['email', 'phone', 'created_at'])->toArray(),
 
+            // ── SON COMPTE DU CRM, ET CE QUI Y MENE (B10-004) ────────────────
+            //
+            // Trois tables restaient hors des DEUX services : `users`,
+            // `invitations`, `password_reset_tokens`. Elles portent des
+            // personnes IDENTIFIEES — les utilisateurs du CRM et les gens
+            // qu'on a invites. L'effacement les traite desormais (par
+            // ANONYMISATION pour `users` : le catalogue interdit la
+            // suppression, cf. GdprErasureService) ; par l'invariant que ce
+            // service se donne, il faut donc savoir les MONTRER.
+            //
+            // 🔴 AUCUN SECRET D'AUTHENTIFICATION NE SORT D'ICI :
+            // ni `password_hash`, ni `totp_secret`, ni `totp_recovery_codes`,
+            // ni `remember_token`, ni le `token_hash` de l'invitation, ni le
+            // `token` de reinitialisation. Ils n'apprendraient rien a la
+            // personne, et les deposer dans un fichier remis a distance
+            // fabriquerait la fuite que cet export pretend prevenir. Un test
+            // cherche chacune de ces valeurs dans tout le JSON.
+            'comptes_crm' => DB::table('users')
+                ->where('email', $email)
+                ->get([
+                    'id', 'email', 'name', 'locale', 'timezone', 'avatar_url',
+                    'email_verified_at', 'first_login_completed_at',
+                    'last_login_at', 'last_login_ip', 'last_login_user_agent',
+                    'totp_enabled_at', 'created_at', 'updated_at', 'deleted_at',
+                ])->toArray(),
+
+            // On ne rend PAS `invited_by` ni `accepted_by` : identifiants de
+            // TIERS (celui qui a invite), meme raison que `notifications.user_id`.
+            'invitations_recues' => DB::table('invitations')
+                ->where('email', $email)
+                ->get(['workspace_id', 'role_slug', 'expires_at', 'accepted_at', 'revoked_at', 'created_at'])
+                ->toArray(),
+
+            // Du jeton de reinitialisation on ne rend que le FAIT et la date :
+            // le jeton lui-meme ouvre un compte.
+            'reinitialisations_mot_de_passe' => DB::table('password_reset_tokens')
+                ->where('email', $email)
+                ->get(['created_at'])->toArray(),
+
+            // Les SESSIONS ouvertes de son compte gardent son IP et son
+            // navigateur. L'effacement les supprime — l'invariant impose donc
+            // de savoir les montrer. On ne rend ni `id` (qui EST le jeton de
+            // session du pilote `database`) ni `payload` (etat serialise, sans
+            // valeur pour elle et porteur du meme jeton).
+            'sessions_ouvertes' => DB::table('sessions')
+                ->whereIn('user_id', DB::table('users')->where('email', $email)->select('id'))
+                ->get(['workspace_id', 'ip_address', 'user_agent', 'last_activity'])->toArray(),
+
             // Les SIGNAUX transmis au site a son sujet (opposition, effacement).
             // La table les conserve comme preuve de transmission ; la personne
             // a le droit de savoir que le signal est parti, et quand.
@@ -149,13 +210,25 @@ class GdprPortabilityService
         Storage::disk('local')->put($path, $encrypted);
 
         $expiresAt = now()->addDays(7);
+        // 🔴 B14-002 — `->where('type', 'portability')` RENDAIT LE JETON MORT-NE
+        // POUR L'ARTICLE 15.
+        //
+        // `retrieve()` retrouve l'archive par `rgpd_requests.export_token` : un
+        // jeton qui n'a ete ecrit sur AUCUNE ligne n'ouvre rien. Tant que
+        // `access` tombait dans le `default => ['noop' => true]` du controleur,
+        // le defaut ne se voyait pas ; des que l'acces est cable sur cet export
+        // — c'est le meme inventaire, et l'en-tete de ce service porte les deux
+        // articles — il produirait un jeton que personne ne pourrait echanger.
+        // Un lien de telechargement qui ne telecharge rien est la meme famille
+        // de defaut que celle qu'on repare : une reponse qui promet plus qu'elle
+        // ne fait.
         DB::table('rgpd_requests')->where('subject_email', $email)
-            ->where('type', 'portability')
+            ->whereIn('type', self::TYPES_AVEC_EXPORT)
             ->whereNull('processed_at')
             ->update([
-                'processed_at'      => now(),
-                'status'            => 'done',
-                'export_token'      => hash('sha256', $token),
+                'processed_at' => now(),
+                'status' => 'done',
+                'export_token' => hash('sha256', $token),
                 'export_expires_at' => $expiresAt,
             ]);
 
@@ -177,6 +250,7 @@ class GdprPortabilityService
             return null;
         }
         $encrypted = Storage::disk('local')->get($path);
+
         return Crypt::decryptString((string) $encrypted);
     }
 }

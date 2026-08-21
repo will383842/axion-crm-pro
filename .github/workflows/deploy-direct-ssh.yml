@@ -226,6 +226,41 @@ jobs:
           # ⚠️ `reverb` reste VOLONTAIREMENT absent, pour la raison exposée
           # ci-dessus : l'ajouter ici le DÉMARRERAIT.
           docker compose up -d --no-deps postgres redis
+
+          # 🔴 CADDY DOIT REDEMARRER APRES `api`, ET C'EST UNE PANNE DE
+          #    PRODUCTION MESUREE QUI L'IMPOSE — 2026-08-21, deploiement 377febf.
+          #
+          # CE QUI S'EST PASSE. La ligne `--force-recreate ... api` ci-dessus
+          # detruit et recree le conteneur `api` : Docker lui attribue alors une
+          # NOUVELLE adresse sur le reseau interne. Caddy, lui, n'etait ni
+          # recree ni redemarre par ce script — il n'y apparaissait que dans la
+          # boucle de VERIFICATION plus bas. Il gardait donc l'ancienne adresse,
+          # resolue au demarrage de son propre conteneur.
+          #
+          # Resultat mesure :
+          #
+          #   les cinq conteneurs .............. running (healthy)
+          #   les migrations ................... « Aucune migration en attente »
+          #   https://app.axion-crm-pro.com .... 200
+          #   https://api.axion-crm-pro.com/up . 502, pendant 13 minutes
+          #
+          # Autrement dit : le deploiement REUSSIT, le serveur se declare en
+          # bonne sante, et l'API est injoignable. Le `docker restart
+          # axion-crm-caddy` joue a la main l'a ramenee en 200 immediatement.
+          #
+          # ⚠️ POURQUOI `restart` ET NON `up -d --no-deps caddy`. `up -d` ne
+          # recree un conteneur que si sa CONFIGURATION FUSIONNEE a change. Ici
+          # la configuration de Caddy n'a pas bouge d'un octet — c'est l'adresse
+          # de son amont qui a change. `up -d` serait donc un no-op, et la panne
+          # resterait entiere. C'est exactement le piege du patron F40-005 note
+          # ci-dessus, sous une autre forme : le fichier a raison, le conteneur
+          # a tort, et rien ne les reconcilie.
+          #
+          # Le cout est de deux ou trois secondes de coupure, a un moment ou le
+          # deploiement coupe deja.
+          echo "::group::redemarrage de Caddy (il doit re-resoudre l'adresse d'api)"
+          docker compose restart caddy
+          echo "::endgroup::"
           echo "::endgroup::"
 
           if [ "$SKIP_MIGRATE" != "true" ]; then

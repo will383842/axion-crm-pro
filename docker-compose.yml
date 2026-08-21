@@ -243,6 +243,31 @@ services:
     # en tete de fichier : 10 Mio x 5 = 50 Mio par conteneur, jamais plus.
     logging: *journal
     command: php artisan schedule:work
+
+    # 🔴 B17-002, LA REPARATION A LA RACINE — ET ELLE MANQUAIT AUX QUATRE
+    # FICHIERS COMPOSE.
+    #
+    # Sans `stop_grace_period`, Docker applique SIGTERM puis SIGKILL **au bout
+    # de 10 secondes**. Or les deux workflows de deploiement recreent
+    # `scheduler` a chaque passage (`--force-recreate`) : une tache planifiee en
+    # cours est donc tuee net, et `Event::removeMutex()` — qui n'est appele que
+    # depuis `finish()` — ne s'execute jamais. Le verrou reste pose.
+    #
+    # Le verrou vit dans Redis (`config/cache.php`), et `redis` n'est PAS recree
+    # par le deploiement (services nommes) : il SURVIT au processus qu'on vient
+    # de tuer. La tache ne repartait donc pas avant l'expiration du TTL —
+    # 1 440 minutes, soit 24 h, le defaut de Laravel.
+    #
+    # Les TTL sont desormais bornes a 360 min dans `routes/console.php`, et
+    # l'entrypoint joue `schedule:clear-cache` au demarrage. Ces deux gestes
+    # REPARENT apres coup. Celui-ci EVITE : cinq minutes suffisent a la quasi
+    # totalite des taches pour finir et retirer proprement leur propre verrou.
+    #
+    # 300 s et non davantage : au-dela, un deploiement attendrait visiblement.
+    # La seule tache qui puisse depasser (`media:link-to-companies`, ensembliste
+    # sur 4,3 M de fiches) reste couverte par son TTL de 360 min et par
+    # `schedule:clear-cache`.
+    stop_grace_period: 300s
     env_file: .env
     environment:
       DB_HOST: postgres

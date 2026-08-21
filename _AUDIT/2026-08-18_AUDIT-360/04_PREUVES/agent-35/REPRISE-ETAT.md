@@ -433,19 +433,103 @@ Quatre trouvailles méritent d'être notées :
   `?->` d'`OwnerUserSeeder` sont **nécessaires**, et c'est le docblock du framework qui ment.
   Centralisés dans un helper — baseline **7 → 1**, et la raison écrite à côté du geste.
 
-### 13.8 Commits de la vague
+### 13.8 🔴 LE RESULTAT LE PLUS IMPORTANT DE LA VAGUE : **le banc ment, six fois**
+
+Débloquer PHPStan a fait atteindre Pest au job CI, **pour la première fois sur
+cette branche**. Verdict : **1454 verts, 10 rouges**. *Aucun des dix ne venait du
+produit.* Tous venaient d'un écart entre le banc `a35r` et le runner.
+
+| # | l'écart | ce qu'il faussait |
+|---|---|---|
+| 1 | **`RecursiveDirectoryIterator` ne rend qu'un quart d'un répertoire** | toute garde qui énumère |
+| 2 | le conteneur monte le **`vendor` du dépôt principal** | `predis` v2 au lieu de v3.5.1 → FATAL en CI |
+| 3 | `node_modules` **lié** au dépôt principal | `react-router@1.170.4` au lieu de `1.170.27` |
+| 4 | la CI fabrique un **`.env`** depuis `.env.example`, pas le banc | la sonde Telescope mesurait ce `.env` |
+| 5 | le banc tourne **en root**, le runner non | trois gardes mesuraient un refus root |
+| 6 | `composer` **2.7.9** au banc, **dernière v2** en CI | une garde figeait la prose de l'outil |
+
+#### Le premier est le plus grave, et il se mesure
+
+```
+app/Console/Commands, dans le conteneur a35r, 2026-08-21 :
+  scandir() / glob() / find (shell) ....... 56 fichiers
+  RecursiveDirectoryIterator .............. 14      <- stable sur trois passages
+  ( app/ entier : 293 fichiers vus par find, 251 par l'itérateur )
+```
+
+Ce n'est **ni aléatoire, ni un problème de droits** : c'est le montage de Docker
+Desktop pour Windows qui ne rend pas tout le répertoire à cet itérateur-là.
+
+**Ce que ça a coûté.** Les plafonds de `B10-016-PORTEE PLAFOND` ont été écrits
+d'après **un quart** du répertoire le plus concerné, puis vus verts :
+
+| table | figé au banc | réel (CI) |
+|---|---:|---:|
+| companies | 16 | **22** |
+| contacts | 23 | **26** |
+| media | 1 | **5** |
+| workspaces | 10 | **17** |
+| **total** | **67** | **87** |
+
+Et la garde `COLONNES MORTES` affirmait « **un seul** site de tout `app/` pose
+`deleted_at` ». C'était faux. Il y en a **deux** :
+
+```
+app/Console/Commands/ImportMediaMerge.php:197
+  DB::table('media')->whereIn('id', $paquet)->update(['deleted_at' => now(), ...])
+```
+
+C'est l'**archivage des médias** sortis du registre, et il tourne en automatisme.
+`media` porte donc une corbeille **vivante** — la seule avec `users` — et les
+cinq lectures aveugles de `media` recensées juste au-dessus lisent des lignes
+archivées comme si elles ne l'étaient pas.
+
+#### ⚠️ CE QUI RESTE À FAIRE, ET QUI N'EST PAS FAIT
+
+**TREIZE gardes de la suite balaient un répertoire avec
+`RecursiveDirectoryIterator`.** Une seule a été réparée (`scandir` récursif, qui
+rend bien 56/56 et 293/293). Sur ce banc, **le « rien trouvé » des douze autres
+ne vaut rien** :
+
+```
+ArretCollecteCoteNodeTest              IndexEmailIngestionServentLesRequetesTest
+AucuneFonctionGlobaleEnDoubleTest      AucunMessageDansToContainTest
+RedemarrageNeRelitPasEnvTest           RunbookRestaurationDrTest
+SauvegardeEmporteLesExtensionsTest     ContexteEspaceDesJobsTest
+CoucheAutorisationAtteignableTest      OppositionCouvreTousLesUniversTest
+RolePorteurDeLaRlsTest                 SsrfCompletudeTest
+```
+
+Elles sont **vertes en CI** (arbre complet), donc non bloquantes — mais toute
+mesure faite **depuis le banc** sur l'une d'elles est à refaire. `ContexteEspaceDesJobsTest`
+porte deux ÉNUMÉRATIONS du lot `B11-002` : leur verdict local ne prouve rien, seul
+celui de la CI compte.
+
+> 🔑 **La règle qui en sort, et elle généralise le §8 :** *un banc n'est fidèle
+> que là où on l'a mesuré.* Les dépendances (`vendor`, `node_modules`), les
+> fichiers de configuration (`.env`, `.github/`), l'identité du processus (root),
+> la version des outils (`composer`, `gitleaks`) et **jusqu'à la façon dont on
+> liste un répertoire** diffèrent — et chacun de ces écarts a produit ici, au
+> moins une fois, un vert qui ne valait rien. La référence est `composer.lock`,
+> `pnpm-lock.yaml`, et la CI.
+
+### 13.9 Les onze commits de la vague
 
 | commit | contenu |
 |---|---|
 | `4a6d574` | `B11-002` — six jobs sur six, pas cinq |
-| `bb2fbb6` | `A-007` — Telescope **refuse** la production au lieu d'y défauter à faux |
+| `bb2fbb6` | `A-007` — Telescope **refuse** la production |
 | `f115af2` | deux scripts d'infra sans bit d'exécution |
 | `8db4417` | `B14-002` + `B10-004` — trois droits RGPD sur cinq |
 | `26ea176` | `B10-016` — la garde qui a contredit son auteur |
 | `c95e673` | `state.loadedAt` disparu — quatre contrôles débloqués |
 | `f1c3344` | Gitleaks — six fausses fuites, témoin négatif à l'appui |
+| `7002de6` | PHPStan 38 → 0, quatre défauts trouvés en chemin |
+| `32f6f46` | Pint — 110 écarts sur les 227 fichiers de la PR |
+| `f10c77d` | les trois défauts que Pest a montrés une fois atteint |
+| `b732d75` | les cinq gardes vertes au banc et rouges en CI |
 
-⚠️ **Un défaut de dispositif, encore de moi.** Le premier découpage a fait passer le `chmod`
-des scripts d'infra dans le commit RGPD, dont le message n'en disait rien. Redécoupé en trois
-commits ; l'identité du contenu a été **prouvée** (`git diff filet HEAD` vide) avant de retirer
-le filet.
+⚠️ **Un défaut de dispositif, et il est de moi.** Le premier découpage a fait
+passer le `chmod` des scripts d'infra dans le commit RGPD, dont le message n'en
+disait rien. Redécoupé en trois commits ; l'identité du contenu a été **prouvée**
+(`git diff filet HEAD` vide) avant de retirer le filet.

@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Models\Workspace;
+use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -10,8 +11,25 @@ use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
+/**
+ * 🔴 CE COMPTE PORTE MAINTENANT UN ROLE, et ce n'est pas un detail de banc.
+ *
+ * Ces tests creaient un utilisateur SANS aucun role. Ils passaient parce que les
+ * routes RGPD n'exigeaient AUCUNE permission : n'importe quel compte
+ * authentifie - y compris un `viewer` cense etre en lecture seule - pouvait
+ * deposer une demande d'effacement et la TRAITER. C'etait le defaut B15-010 (S0),
+ * mesure le 2026-08-19, et ces tests le garantissaient en vert.
+ *
+ * Les routes exigent desormais `rgpd.view` et `rgpd.handle` - des permissions qui
+ * existaient deja dans le seeder, et que seuls `owner` et `admin` portent. Le
+ * compte de test recoit donc `admin` : le test verifie que l'endpoint FONCTIONNE,
+ * pas qu'il est ouvert a tous. La garde du droit, elle, est dans
+ * `PermissionsRoutesRgpdTest`.
+ */
 function makeRgpdUser(): array
 {
+    test()->seed(PermissionsAndRolesSeeder::class);
+
     $workspace = Workspace::create([
         'id' => (string) Str::uuid(),
         'slug' => 'rgpd-' . Str::random(6),
@@ -25,6 +43,9 @@ function makeRgpdUser(): array
         'current_workspace_id' => $workspace->id,
         'first_login_completed_at' => now(),
     ]);
+
+    setPermissionsTeamId($workspace->id);
+    $user->assignRole('admin');
 
     return [$user, $workspace];
 }

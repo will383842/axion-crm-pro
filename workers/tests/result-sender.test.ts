@@ -139,29 +139,71 @@ describe('result-sender — accord avec le vérificateur PHP', () => {
   });
 
   it('le vérificateur PHP signe toujours le corps NU (ni horodatage ni préfixe), en sha256 hexadécimal', () => {
-    const php = lirePhp(CONTROLEUR);
+    // 🔴 CE TEST ÉTAIT ROUGE DEPUIS `a6aceb0`, ET PERSONNE NE L'AVAIT VU.
+    //
+    // Il cherchait `hash_hmac('sha256', $body, $secret)` DANS LE CONTRÔLEUR.
+    // Le correctif F37-001 a justement retiré ce calcul du contrôleur pour le
+    // faire passer par la classe durcie `App\Support\HmacSignature` — ce qui
+    // est le bon geste, et exactement ce que la contre-vérification
+    // préconisait. Mais le test n'a pas suivi, et il vit dans la suite Vitest
+    // des workers : la suite PHP ne pouvait pas le voir rougir.
+    //
+    // Il regarde donc désormais au bon endroit : le CONTRÔLEUR pour le
+    // câblage, la CLASSE pour l'algorithme. Le contrat inter-dépôts qu'il
+    // garde est inchangé — le corps signé est le corps NU, en sha256 hex.
+    const controleur = lirePhp(CONTROLEUR);
+    const verificateur = lirePhp('backend/app/Support/HmacSignature.php');
 
-    expect(php, "le contrôleur ne lit plus l'en-tête X-Worker-Signature").toContain(
+    expect(controleur, "le contrôleur ne lit plus l'en-tête X-Worker-Signature").toContain(
       "$r->header('X-Worker-Signature')",
     );
-    expect(php, 'le contrôleur ne signe plus le corps brut de la requête').toContain('$body = $r->getContent();');
-    expect(php, "l'algorithme ou l'encodage a changé côté PHP").toContain("hash_hmac('sha256', $body, $secret)");
-    expect(php, 'la comparaison à temps constant a disparu').toContain('hash_equals(');
+    expect(controleur, 'le contrôleur ne signe plus le corps brut de la requête').toContain(
+      '$body = $r->getContent();',
+    );
+    expect(controleur, 'le contrôleur ne passe plus par la classe durcie HmacSignature').toContain(
+      'HmacSignature::verify($secret, $body, $sig)',
+    );
 
-    // `App\Support\HmacSignature::signedPayload()` existe déjà et signe
-    // « <horodatage>.<corps> ». Le jour où le contrôleur migre dessus,
-    // `result-sender.ts` DOIT émettre l'horodatage dans le MÊME commit.
+    expect(verificateur, "l'algorithme ou l'encodage a changé côté PHP").toContain(
+      "hash_hmac('sha256', $payload, $secret)",
+    );
+    expect(verificateur, 'la comparaison à temps constant a disparu').toContain('hash_equals(');
+
+    // `HmacSignature::signedPayload()` signe « <horodatage>.<corps> » et sert
+    // au canal `/internal/site-sync`. Le jour où CE contrôleur-ci migre dessus,
+    // `result-sender.ts` DOIT émettre l'horodatage dans le MÊME commit, sinon
+    // tous les envois partent en 401.
+    //
+    // C'est le constat P5-HMAC-003 : le rejeu tardif reste ouvert sur ce canal,
+    // et cette ligne est ce qui empêche de le fermer d'un seul côté.
     expect(
-      php,
-      'Le contrôleur semble migrer vers HmacSignature (corps signé « timestamp.body ») : ' +
+      controleur,
+      'Le contrôleur semble migrer vers le corps signé « timestamp.body » : ' +
         'result-sender.ts signe encore le corps NU et partira en 401. À corriger dans LE MÊME commit.',
     ).not.toContain('signedPayload');
   });
 
   it("le nom de la variable d'environnement du secret est le même des deux côtés", () => {
-    const php = lirePhp(CONTROLEUR);
+    // Côté PHP, le nom de la variable a déménagé du contrôleur vers
+    // `config/services.php` (constat P5-HMAC-002 : c'était le seul secret du
+    // dépôt lu par `env()` brut, sans entrée `config/`). Le contrat entre les
+    // deux dépôts est inchangé — c'est toujours la MÊME variable — mais il faut
+    // désormais le lire là où il vit.
+    //
+    // ⚠️ Ce test est le seul lien qui empêche les deux côtés de diverger en
+    // silence : si le PHP renommait la variable, le worker signerait avec un
+    // secret vide et partirait en 401 sans que rien ne rougisse.
+    const config = lirePhp('backend/config/services.php');
+    const controleur = lirePhp(CONTROLEUR);
     const node = readFileSync(resolve(WORKERS_DIR, 'src/bridge/result-sender.ts'), 'utf-8');
-    expect(php).toContain("env('WORKER_INTERNAL_HMAC_SECRET'");
+
+    expect(config, "config/services.php ne déclare plus le secret du canal interne").toContain(
+      "env('WORKER_INTERNAL_HMAC_SECRET'",
+    );
+    expect(
+      controleur,
+      "le contrôleur doit lire son secret par la configuration, pas par env() brut (P5-HMAC-002)",
+    ).toContain("config('services.worker_internal.hmac_secret'");
     expect(node).toContain("process.env['WORKER_INTERNAL_HMAC_SECRET']");
   });
 });

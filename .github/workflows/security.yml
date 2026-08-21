@@ -167,6 +167,53 @@ jobs:
           ignore-unfixed: true
           exit-code: '0'
 
+  # ⚠️ 2026-08-21 — constat H47-001 (S1). Ce job portait le vice de forme du
+  # `trivy` d'en haut, mais en pire : il ne rendait pas seulement un vert
+  # complaisant, il n'AUDITAIT RIEN. Zéro paquet. Jamais.
+  #
+  # LA MÉCANIQUE, MESURÉE — ce n'est pas une lecture, c'est une exécution.
+  #
+  # `composer audit` audite par défaut le dépôt **INSTALLÉ**
+  # (`vendor/composer/installed.json`), et **PAS** `composer.lock`. Or ce job
+  # ne fait jamais `composer install` : après `actions/checkout` + `setup-php`,
+  # il n'y a pas de `vendor/`. Mesure du 2026-08-21, dans un répertoire ne
+  # contenant que le vrai `backend/composer.json` et `backend/composer.lock` :
+  #
+  #     $ composer audit --no-dev
+  #     No packages - skipping audit.
+  #     $ echo $?
+  #     0
+  #
+  # La preuve décisive que rien n'était regardé : **réseau coupé**
+  # (`COMPOSER_DISABLE_NETWORK=1`), cette commande rend le même texte et le
+  # même `0` — elle n'interroge même pas la base d'avis. La même commande avec
+  # `--locked`, réseau coupé, échoue au contraire sur
+  # « request canceled: https://packagist.org/api/security-advisories/ ».
+  # `--locked` est donc exactement CE QUI FAIT REGARDER LES PAQUETS.
+  #
+  # Le `|| true` était la seconde serrure : le jour où quelqu'un aurait ajouté
+  # `composer install`, l'échec serait resté invisible malgré tout. Deux
+  # défauts indépendants, chacun suffisant à lui seul.
+  #
+  # TÉMOIN NÉGATIF, même jour : le vrai lock avec la seule version de
+  # `guzzlehttp/guzzle` ramenée de 7.15.3 à 7.13.1 rend 6 avis, dont
+  # CVE-2026-69246, et sort en 1. La forme corrigée discrimine.
+  #
+  # Armé alors que `backend/composer.lock` est MESURÉ PROPRE (0 avis, dev
+  # inclus) : allumer la garde ne bloque donc rien au moment où on l'allume.
+  #
+  # POURQUOI JUGER SUR LE CONTENU (`--format=json`) ET NON SUR LE CODE DE
+  # SORTIE. Celui de `composer audit` est un **masque de bits** : 1 =
+  # vulnérabilités, 2 = paquets abandonnés, 3 = les deux. Ce dépôt embarque
+  # `doctrine/annotations`, abandonné. Se fier au code de sortie ferait donc
+  # rougir la garde en permanence pour une question d'hygiène — et une garde
+  # toujours rouge se contourne puis s'ignore, exactement l'état d'où l'on
+  # sort. Lire `advisories` dans le JSON rend aussi la garde indifférente au
+  # basculement annoncé du défaut `--abandoned` en Composer 3.
+  #
+  # Et si la mesure elle-même échoue (packagist injoignable, JSON tronqué), on
+  # sort en 2 : **rouge**. Ne pas savoir n'est pas la même chose que savoir que
+  # tout va bien, et c'est précisément la confusion que `|| true` installait.
   composer-audit:
     name: PHP deps audit
     runs-on: ubuntu-24.04
@@ -174,13 +221,65 @@ jobs:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with: { php-version: '8.3' }
-      - working-directory: backend
-        run: composer audit --no-dev || true
 
+      # 1) L'INVENTAIRE, dev inclus, non bloquant : la mémoire, lisible dans le
+      #    journal du job. Même partage des rôles que le job `trivy`.
+      - name: Inventaire lisible (dev inclus, non bloquant)
+        working-directory: backend
+        run: composer audit --locked --format=table || true
+
+      # 2) LA GARDE : surface de PRODUCTION (`--no-dev`), bloquante.
+      - name: Garde — avis de securite sur composer.lock (BLOQUANT)
+        working-directory: backend
+        run: |
+          set -euo pipefail
+          composer audit --locked --no-dev --format=json > audit-composer.json || true
+          php -r '
+            $brut = @file_get_contents("audit-composer.json");
+            $j = is_string($brut) ? json_decode($brut, true) : null;
+            if (!is_array($j) || !array_key_exists("advisories", $j)) {
+              fwrite(STDERR, "ECHEC DE MESURE : composer audit n a pas rendu de JSON exploitable.\n");
+              fwrite(STDERR, "Ne pas savoir n est pas un feu vert — ce job sort en 2.\n");
+              exit(2);
+            }
+            $n = 0;
+            foreach ((array) $j["advisories"] as $paquet => $avis) {
+              $n += count($avis);
+              fwrite(STDERR, sprintf("  %-40s %d avis\n", $paquet, count($avis)));
+            }
+            printf("Avis de securite sur les dependances de PRODUCTION : %d\n", $n);
+            exit($n > 0 ? 1 : 0);
+          '
+
+  # ⚠️ 2026-08-21 — le SITE JUMEAU du constat H47-001 (motif A-011). Le `|| true`
+  # était ici aussi, et il coûtait plus cher : contrairement à `composer audit`,
+  # `pnpm audit` LIT BIEN le lockfile sans installation. Ce job MESURAIT donc
+  # correctement, et jetait le résultat.
+  #
+  # Ce qu'il jetait, mesuré le 2026-08-21 sur les vrais lockfiles :
+  #
+  #     frontend : 18 high + 1 critical   (`pnpm audit` sort en 1)
+  #     workers  : 10 high + 1 critical   (`pnpm audit` sort en 1)
+  #
+  # POURQUOI UN CLIQUET ET NON UN BLOCAGE SEC. Retirer `|| true` sans autre
+  # forme de procès rendrait ces deux jobs rouges dès la première PR, pour 29
+  # avis préexistants que personne ne corrige en une séance. Le dépôt connaît
+  # la suite : une garde toujours rouge se contourne, puis s'ignore, et l'on
+  # revient au vert menteur par un autre chemin.
+  #
+  # Le cliquet fige donc le chiffre d'AUJOURD'HUI dans
+  # `.github/audit-node-cliquet.json` et rougit sur l'AUGMENTATION : on ne
+  # prétend pas que la dette est réglée, on interdit qu'elle grossisse sans
+  # que personne ne le voie. Quand le compte baisse, le job le DIT et demande
+  # qu'on resserre le cliquet — sans quoi il se déserre tout seul.
+  #
+  # `fail-fast: false` : l'état du frontend ne doit pas masquer celui des
+  # workers, même raison que pour la matrice `trivy`.
   pnpm-audit:
     name: Node deps audit
     runs-on: ubuntu-24.04
     strategy:
+      fail-fast: false
       matrix:
         path: [frontend, workers]
     steps:
@@ -189,8 +288,57 @@ jobs:
         with: { version: 9 }
       - uses: actions/setup-node@v7
         with: { node-version: '22' }
-      - working-directory: ${{ matrix.path }}
-        run: pnpm audit --audit-level=high || true
+
+      # 1) L'INVENTAIRE lisible, non bloquant.
+      - name: Inventaire lisible (non bloquant)
+        working-directory: ${{ matrix.path }}
+        run: pnpm audit || true
+
+      # 2) LE CLIQUET : rouge si high/critical AUGMENTE par rapport au relevé.
+      - name: Garde — le compte high/critical ne doit pas AUGMENTER (BLOQUANT)
+        working-directory: ${{ matrix.path }}
+        env:
+          LOT: ${{ matrix.path }}
+        run: |
+          set -euo pipefail
+          pnpm audit --json > audit-node.json || true
+          node -e '
+            const fs = require("fs");
+            const lot = process.env.LOT;
+            const cheminCliquet = process.env.GITHUB_WORKSPACE + "/.github/audit-node-cliquet.json";
+            let mesure;
+            try {
+              mesure = JSON.parse(fs.readFileSync("audit-node.json", "utf8"));
+            } catch (e) {
+              console.error("ECHEC DE MESURE : pnpm audit n a pas rendu de JSON exploitable (" + e.message + ").");
+              console.error("Ne pas savoir n est pas un feu vert — ce job sort en 2.");
+              process.exit(2);
+            }
+            const v = (mesure.metadata || {}).vulnerabilities;
+            if (!v) {
+              console.error("ECHEC DE MESURE : JSON sans metadata.vulnerabilities.");
+              process.exit(2);
+            }
+            const cliquet = JSON.parse(fs.readFileSync(cheminCliquet, "utf8"));
+            const ref = cliquet.lots && cliquet.lots[lot];
+            if (!ref) {
+              console.error("Aucun releve pour le lot « " + lot + " » dans .github/audit-node-cliquet.json.");
+              console.error("Tout lot de la matrice doit y figurer, sinon la garde ne le regarde pas.");
+              process.exit(2);
+            }
+            const vu = { high: v.high || 0, critical: v.critical || 0 };
+            console.log(lot + " : high=" + vu.high + " (releve " + ref.high + "), critical=" + vu.critical + " (releve " + ref.critical + ")");
+            let rouge = false;
+            for (const s of ["high", "critical"]) {
+              if (vu[s] > ref[s]) {
+                console.error("AUGMENTATION " + s + " : " + ref[s] + " -> " + vu[s] + ". Corriger, ou justifier et resserrer le releve.");
+                rouge = true;
+              } else if (vu[s] < ref[s]) {
+                console.log("Baisse " + s + " : " + ref[s] + " -> " + vu[s] + ". RESSERRER .github/audit-node-cliquet.json a " + vu[s] + ", sinon le cliquet se desserre.");
+              }
+            }
+            process.exit(rouge ? 1 : 0);
+          '
 
   # ⚠️ 2026-08-16 — ce job visait `https://staging.axion-crm-pro.com`, qui
   # N'EXISTE PAS (NXDOMAIN). Il échouait donc TOUTES les semaines depuis au

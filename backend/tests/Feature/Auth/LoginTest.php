@@ -137,10 +137,34 @@ test('login rejects locked account even with correct password', function () {
     ])->assertStatus(422);
 });
 
-test('login validates password min length', function () {
-    $this->postJson('/api/v1/auth/login', ['email' => 'test@test.com', 'password' => 'short'])
-        ->assertStatus(422)
-        ->assertJsonValidationErrorFor('password');
+/**
+ * 🔴 CE TEST GARDAIT UN DÉFAUT. Il exigeait qu'un mot de passe de moins de 12
+ * caractères soit refusé PAR LA VALIDATION, à la connexion. Conséquence : un
+ * compte dont le mot de passe est plus court — créé par un script, une reprise,
+ * un import — recevait « le mot de passe doit contenir au moins 12 caractères »
+ * alors qu'il venait de saisir le bon. Impasse totale, et message qui désigne la
+ * mauvaise cause. Mesuré le 2026-08-19 (audit 360, F35-011).
+ *
+ * La complexité se contrôle là où un mot de passe est CHOISI, pas là où il est
+ * présenté. À la connexion, un mot de passe court est simplement... un mot de
+ * passe : s'il est faux, l'authentification le refuse ; s'il est bon, elle ouvre
+ * la session.
+ */
+test('un mot de passe court et faux est refusé par l authentification, pas par la validation', function () {
+    $reponse = $this->postJson('/api/v1/auth/login', ['email' => 'test@test.com', 'password' => 'short']);
+
+    expect($reponse->status())->toBe(422);
+    // Le refus porte sur les identifiants, pas sur la forme du mot de passe.
+    $reponse->assertJsonValidationErrorFor('email');
+    expect($reponse->json('errors.password'))->toBeNull();
+});
+
+test('un mot de passe court mais CORRECT ouvre la session', function () {
+    $user = makeUser('court@test.com', 'court');
+
+    $this->postJson('/api/v1/auth/login', ['email' => $user->email, 'password' => 'court'])
+        ->assertOk()
+        ->assertJsonStructure(['user', 'requires_2fa']);
 });
 
 /**

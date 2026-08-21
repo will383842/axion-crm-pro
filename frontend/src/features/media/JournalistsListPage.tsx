@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Card, EmptyState, KpiCard, PageHeader, SearchInput } from "@/components/ui";
 import { api } from "@/lib/api";
+import { useAntiRebond } from '@/hooks/useAntiRebond';
 import { toast } from "sonner";
 
 interface JournalistItem {
@@ -24,6 +25,15 @@ interface JournalistsResponse {
 export function JournalistsListPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  // G42-010 — anti-rebond de 300 ms AVANT la requete.
+  //
+  // Mesure du 2026-08-20 sur `/companies`, meme cablage (voir
+  // `tests/perf/recherche-anti-rebond.test.tsx`) : taper « boulangerie »
+  // (11 caracteres) lancait 11 requetes serveur. Apres : 1.
+  //
+  // ⚠️ Le champ garde `search` (valeur IMMEDIATE) pour son `value` : la
+  // lettre s'affiche sans attendre. Seule la requete patiente.
+  const rechercheDifferee = useAntiRebond(search);
   const [exporting, setExporting] = useState(false);
 
   async function exportCsv() {
@@ -48,13 +58,13 @@ export function JournalistsListPage() {
   }
 
   const { data, isLoading } = useQuery<JournalistsResponse>({
-    queryKey: ["journalists", page, search],
+    queryKey: ["journalists", page, rechercheDifferee],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: String(page),
         per_page: "100",
         include: "media",
-        ...(search ? { "filter[last_name]": search } : {}),
+        ...(rechercheDifferee ? { "filter[last_name]": rechercheDifferee } : {}),
       });
       const r = await api.get<JournalistsResponse>(`/journalists?${params.toString()}`);
       return r.data;

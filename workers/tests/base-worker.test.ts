@@ -9,6 +9,7 @@ import {
   type RedisLike,
   type StartWorkerDeps,
   type WorkerHandle,
+  PREFIXE_ANNULATION,
 } from '../src/scrapers/base';
 import type { ScrapeResult } from '../src/bridge/result-sender';
 
@@ -48,6 +49,12 @@ const RACINE_WORKERS = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 function faireRedis(jobs: string[]): RedisLike & {
   remisEnFile: Array<{ file: string; valeur: string }>;
   popsFaits: number;
+  /** Clefs servies par `get()` — c'est ici qu'on pose un drapeau d'annulation. */
+  drapeaux: Record<string, string>;
+  /** Toutes les clefs demandées à `get()`, dans l'ordre : la garde C18-008 les inspecte. */
+  clefsLues: string[];
+  /** Si posée, `get()` lève — pour éprouver le cas « Redis est tombé ». */
+  getLeve?: Error | undefined;
   quandVide?: (() => void) | undefined;
   avantDeRendre?: (() => void) | undefined;
 } {
@@ -55,8 +62,16 @@ function faireRedis(jobs: string[]): RedisLike & {
   const r = {
     remisEnFile,
     popsFaits: 0,
+    drapeaux: {} as Record<string, string>,
+    clefsLues: [] as string[],
+    getLeve: undefined as Error | undefined,
     quandVide: undefined as (() => void) | undefined,
     avantDeRendre: undefined as (() => void) | undefined,
+    async get(clef: string): Promise<string | null> {
+      r.clefsLues.push(clef);
+      if (r.getLeve) throw r.getLeve;
+      return r.drapeaux[clef] ?? null;
+    },
     async brpop(file: string, _timeout: number): Promise<[string, string] | null> {
       await new Promise((resolve) => setTimeout(resolve, 0));
       r.popsFaits += 1;
@@ -398,5 +413,116 @@ describe('arrêt gracieux', () => {
     const h = demarrer(redis, implQuiReussit([]), { concurrency: 1, send: rienEnvoyer });
     await expect(h.whenIdle()).resolves.toBeUndefined();
     await h.drained;
+  });
+});
+
+describe("moteur — arrêt d'urgence (C18-008, site jumeau côté Node)", () => {
+  /**
+   * Mesure du 2026-08-21, avant ce correctif :
+   *     grep -rni "cancel" workers/src --include=*.ts   ->  AUCUN fichier
+   * Les onze files `axion:scrape:*` étaient insensibles au bouton « arrêter » :
+   * le drapeau `cancelled:scraper-run:{id}` écrit par les deux contrôleurs PHP
+   * n'avait aucun lecteur de ce côté-ci du pont, et le job partait au scrape.
+   */
+  it('un job dont le run est annulé n’est PAS scrapé, et aucun résultat n’est renvoyé', async () => {
+    const scrapes: ScrapeRequestJob[] = [];
+    const envoyes: ScrapeResult[] = [];
+    const redis = faireRedis([job({ run_id: 'run-annule', context: { scraper_run_id: 77 } })]);
+    redis.drapeaux[`${PREFIXE_ANNULATION}77`] = '1';
+
+    const h = demarrer(redis, implQuiReussit(scrapes), {
+      concurrency: 1,
+      send: async (r) => {
+        envoyes.push(r);
+      },
+    });
+    await h.drained;
+
+    expect(scrapes).toHaveLength(0);
+    // Pas de résultat non plus : la ligne `scraper_runs` porte déjà
+    // `cancelled` + `finished_at`, et un résultat repasserait par-dessus
+    // l'annulation — la maladie exacte que le correctif PHP a soignée.
+    expect(envoyes).toHaveLength(0);
+    // Le job est abandonné, pas remis en file : le remettre le ferait tourner
+    // en rond jusqu'à l'expiration du drapeau.
+    expect(redis.remisEnFile).toHaveLength(0);
+    // Et c'est BIEN la clef du contrat PHP qui a été ouverte.
+    expect(redis.clefsLues).toContain('cancelled:scraper-run:77');
+  });
+
+  it('TÉMOIN — sans drapeau, le même job est scrapé normalement', async () => {
+    // Sans ce témoin, la garde précédente serait verte même si le moteur avait
+    // cessé de traiter quoi que ce soit.
+    const scrapes: ScrapeRequestJob[] = [];
+    const envoyes: ScrapeResult[] = [];
+    const redis = faireRedis([job({ run_id: 'run-vivant', context: { scraper_run_id: 77 } })]);
+
+    const h = demarrer(redis, implQuiReussit(scrapes), {
+      concurrency: 1,
+      send: async (r) => {
+        envoyes.push(r);
+      },
+    });
+    await h.drained;
+
+    expect(scrapes).toHaveLength(1);
+    expect(envoyes).toHaveLength(1);
+    expect(redis.clefsLues).toContain('cancelled:scraper-run:77');
+  });
+
+  it("TÉMOIN — le drapeau d'un AUTRE run ne stoppe pas celui-ci", async () => {
+    // Une garde qui lirait une clef constante (sans le numéro) serait verte au
+    // test précédent et arrêterait tout le monde ici. Celle-ci le dénoncerait.
+    const scrapes: ScrapeRequestJob[] = [];
+    const redis = faireRedis([job({ context: { scraper_run_id: 77 } })]);
+    redis.drapeaux[`${PREFIXE_ANNULATION}78`] = '1';
+
+    const h = demarrer(redis, implQuiReussit(scrapes), { concurrency: 1, send: rienEnvoyer });
+    await h.drained;
+
+    expect(scrapes).toHaveLength(1);
+  });
+
+  it('un job sans scraper_run_id ne fait AUCUNE lecture — résidu WaterfallOrchestrator', async () => {
+    // Ce chemin-là reste inarrêtable, et ce test le dit tout haut : il n'y a
+    // pas encore de ligne `scraper_runs` au moment du dispatch (elle est créée
+    // à l'ingestion du résultat). Le résidu est compté côté PHP par
+    // `backend/tests/Feature/ArretCollecteCoteNodeTest.php`.
+    const scrapes: ScrapeRequestJob[] = [];
+    const redis = faireRedis([job({ context: { discovery_zone: '75' } })]);
+
+    const h = demarrer(redis, implQuiReussit(scrapes), { concurrency: 1, send: rienEnvoyer });
+    await h.drained;
+
+    expect(scrapes).toHaveLength(1);
+    expect(redis.clefsLues).toHaveLength(0);
+  });
+
+  it('Redis muet ne vaut pas un ordre d’arrêt : le job continue', async () => {
+    // Une lecture qui lève ne doit PAS jeter le travail : une panne Redis
+    // annulerait alors silencieusement toute la collecte en cours.
+    const scrapes: ScrapeRequestJob[] = [];
+    const redis = faireRedis([job({ context: { scraper_run_id: 77 } })]);
+    redis.getLeve = new Error('connexion refusée');
+
+    const h = demarrer(redis, implQuiReussit(scrapes), { concurrency: 1, send: rienEnvoyer });
+    await h.drained;
+
+    expect(scrapes).toHaveLength(1);
+  });
+
+  it('le préfixe exporté est EXACTEMENT celui qu’écrit le PHP', () => {
+    // Contrat inter-langages : `LaunchZoneScrapingJob::CLE_ANNULATION`. Une
+    // divergence d'un caractère rendrait la lecture toujours nulle, donc la
+    // garde de comportement toujours verte pour la mauvaise raison.
+    expect(PREFIXE_ANNULATION).toBe('cancelled:scraper-run:');
+    const sourcePhp = readFileSync(
+      resolve(RACINE_WORKERS, '../backend/app/Jobs/LaunchZoneScrapingJob.php'),
+      'utf-8',
+    );
+    // TÉMOIN DE COUVERTURE : un chemin faux lèverait ci-dessus ; un fichier
+    // vide passerait, d'où la borne sur la taille.
+    expect(sourcePhp.length).toBeGreaterThan(2000);
+    expect(sourcePhp).toContain(`CLE_ANNULATION = '${PREFIXE_ANNULATION}'`);
   });
 });

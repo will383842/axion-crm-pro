@@ -171,11 +171,13 @@ class AudienceBuilderService
         $chunks = (int) ceil($total / self::BATCH_CHUNK_SIZE);
         $jobs = [];
         for ($i = 0; $i < $chunks; $i++) {
-            $jobs[] = new RefreshAudienceChunkJob(
+            // B11-002 : `Bus::batch` ne passe pas par `dispatch()`, on pose
+            // donc l'espace sur l'instance avant de l'empiler.
+            $jobs[] = (new RefreshAudienceChunkJob(
                 audienceId: $audience->id,
                 offset: $i * self::BATCH_CHUNK_SIZE,
                 limit: self::BATCH_CHUNK_SIZE,
-            );
+            ))->pourEspace((string) $audience->workspace_id);
         }
 
         Bus::batch($jobs)
@@ -241,8 +243,138 @@ class AudienceBuilderService
     /**
      * Build query Eloquent à partir d'un DSL criteria pour le workspace donné.
      */
+    /** Les SEULS blocs de premier niveau que le DSL connait. */
+    private const BLOCS = ['all', 'any', 'not'];
+
+    /**
+     * Refuse un jeu de critères mal formé — AVANT de construire quoi que ce soit
+     * (constat D26-001, S1).
+     *
+     * Chaque `return;` silencieux de `applyCondition()`, chaque `is_array()`
+     * non satisfait de `buildQuery()`, chaque clé de premier niveau inconnue
+     * EFFAÇAIT le critère. Ce qui restait, c'était `where workspace_id = ?` :
+     * l'audience devenait le workspace ENTIER. Une garde mesurée le 2026-08-20
+     * le chiffre — sur une base de 3 fiches dont 1 seule visée, un critère
+     * effacé en rendait 3.
+     *
+     * On valide en UN seul endroit, en amont, plutôt que de rendre bruyant
+     * chaque point de chute : c'est le seul moyen qu'aucune branche future
+     * n'oublie de l'être.
+     *
+     * ⚠️ Ce que cette méthode ne refuse PAS, et pourquoi :
+     *  - des critères VIDES (`[]`) : « toute la base » est une audience
+     *    légitime, explicitement demandée. Ce n'est pas une forme cassée.
+     *  - `tags` avec un opérateur non supporté : `buildPositive()` rend déjà
+     *    `1 = 0`, c'est-à-dire PERSONNE. C'est fermé, pas ouvert — et un test
+     *    du dépôt (« tags avec un operateur non supporte ne vise personne »)
+     *    garde cette symétrie avec l'évaluateur en mémoire. On ne casse pas un
+     *    correctif existant pour appliquer une règle à un cas qui ne saigne pas.
+     *
+     * @param  array<mixed>  $criteria
+     *
+     * @throws CritereAudienceInvalide
+     */
+    public static function validerCriteres(array $criteria): void
+    {
+        foreach (array_keys($criteria) as $cle) {
+            if (! in_array($cle, self::BLOCS, true)) {
+                // Cas très réaliste : une faute de frappe (`alll`, `filters`,
+                // `conditions`). Le bloc n'était alors jamais lu, et la requête
+                // sortait SANS AUCUN critère.
+                throw CritereAudienceInvalide::parce(
+                    sprintf('bloc inconnu %s (attendus : %s)', self::citer($cle), implode(', ', self::BLOCS)),
+                );
+            }
+        }
+
+        foreach (self::BLOCS as $bloc) {
+            if (! array_key_exists($bloc, $criteria)) {
+                continue;
+            }
+
+            $conditions = $criteria[$bloc];
+            if (! is_array($conditions)) {
+                throw CritereAudienceInvalide::parce(
+                    sprintf('le bloc %s doit etre une liste de conditions', self::citer($bloc)),
+                );
+            }
+
+            foreach ($conditions as $rang => $cond) {
+                // Une clé de tableau PHP est toujours int ou string : le repère
+                // de position ne peut pas échouer.
+                $ou = sprintf('%s[%s]', $bloc, (string) $rang);
+                if (! is_array($cond)) {
+                    throw CritereAudienceInvalide::parce($ou . ' n est pas une condition');
+                }
+                self::validerCondition($ou, $cond);
+            }
+        }
+    }
+
+    /**
+     * @param  array<mixed>  $cond
+     *
+     * @throws CritereAudienceInvalide
+     */
+    private static function validerCondition(string $ou, array $cond): void
+    {
+        $field = $cond['field'] ?? null;
+        $op = $cond['op'] ?? null;
+
+        if (! is_string($field) || ! in_array($field, self::WHITELIST_FIELDS, true)) {
+            throw CritereAudienceInvalide::parce(
+                $ou . ' : champ ' . self::citer($field) . ' hors liste blanche',
+            );
+        }
+
+        if (! is_string($op) || ! in_array($op, self::WHITELIST_OPS, true)) {
+            throw CritereAudienceInvalide::parce(
+                $ou . ' : operateur ' . self::citer($op) . ' hors liste blanche',
+            );
+        }
+
+        $value = $cond['value'] ?? null;
+
+        // `in` / `not_in` sur une valeur simple : le front qui envoie « 75 » au
+        // lieu de [« 75 »]. `buildPositive()` rendait null, la condition
+        // disparaissait, et « dans ces départements » devenait « tout le monde ».
+        if (in_array($op, ['in', 'not_in'], true) && ! is_array($value)) {
+            throw CritereAudienceInvalide::parce(
+                $ou . ' : ' . self::citer($op) . ' exige une liste de valeurs, recu ' . gettype($value),
+            );
+        }
+
+        // `has_email` n'admet que `eq`. Avec tout autre opérateur,
+        // `buildPositive()` rendait null — et « ceux qui ont un e-mail »
+        // devenait « tout le monde », fiches sans aucune adresse comprises.
+        if ($field === 'has_email' && $op !== 'eq') {
+            throw CritereAudienceInvalide::parce(
+                $ou . ' : le champ has_email n admet que l operateur eq, recu ' . self::citer($op),
+            );
+        }
+    }
+
+    /**
+     * Rend une valeur fautive lisible dans un message de refus, sans jamais
+     * lever elle-même : un message d'erreur qui plante masquerait l'erreur.
+     */
+    private static function citer(mixed $valeur): string
+    {
+        if (is_scalar($valeur)) {
+            return '"' . (string) $valeur . '"';
+        }
+
+        return '(' . gettype($valeur) . ')';
+    }
+
     private function buildQuery(string $workspaceId, array $criteria): Builder
     {
+        // 🔴 Le refus arrive AVANT toute construction — et donc, dans
+        // `refresh()`, avant la transaction qui supprime les membres. Un
+        // critère cassé ne doit ni élargir l'audience ni la VIDER : les deux
+        // sont des pertes, la seconde silencieuse elle aussi.
+        self::validerCriteres($criteria);
+
         $query = Company::query()->where('workspace_id', $workspaceId);
 
         $all = $criteria['all'] ?? [];
@@ -277,11 +409,22 @@ class AudienceBuilderService
         $op = $cond['op'] ?? null;
         $value = $cond['value'] ?? null;
 
+        // 🔴 Ici se trouvaient DEUX `return;` — le coeur du constat D26-001.
+        // Un champ ou un opérateur hors liste blanche faisait sortir la méthode
+        // sans rien ajouter à la requête : le critère était EFFACÉ, et il ne
+        // restait que `where workspace_id = ?`. `validerCriteres()` refuse
+        // désormais en amont ; on garde ces deux gardes en second rideau, mais
+        // elles LÈVENT. Un chemin d'appel futur qui contournerait `buildQuery()`
+        // échouera bruyamment au lieu d'élargir l'audience en silence.
         if (! is_string($field) || ! in_array($field, self::WHITELIST_FIELDS, true)) {
-            return;
+            throw CritereAudienceInvalide::parce(
+                'champ ' . self::citer($field) . ' hors liste blanche',
+            );
         }
         if (! is_string($op) || ! in_array($op, self::WHITELIST_OPS, true)) {
-            return;
+            throw CritereAudienceInvalide::parce(
+                'operateur ' . self::citer($op) . ' hors liste blanche',
+            );
         }
 
         // On construit le prédicat POSITIF (closure), PUIS on applique le
@@ -292,7 +435,16 @@ class AudienceBuilderService
         // symétriques et cohérents avec companyMatchesCriteria().
         $positive = $this->buildPositive($field, $op, $value);
         if ($positive === null) {
-            return; // condition invalide (op/valeur incompatible) → ignorée
+            // Même correction : « op/valeur incompatible → ignorée » voulait dire
+            // « → tout le workspace ». `validerCriteres()` couvre les deux seuls
+            // cas où `buildPositive()` rend null (`in`/`not_in` sur une valeur
+            // simple, `has_email` avec un autre opérateur que `eq`) ; ce rideau
+            // reste, et il lève.
+            throw CritereAudienceInvalide::parce(sprintf(
+                'condition inconstructible sur le champ %s avec l operateur %s',
+                self::citer($field),
+                self::citer($op),
+            ));
         }
 
         match ($combinator) {
@@ -464,6 +616,30 @@ class AudienceBuilderService
      */
     private function companyMatchesCriteria(Company $company, array $criteria): bool
     {
+        // 🔴 Découvert en écrivant la garde de D26-001, non signalé par
+        // l'audit : la version EN MÉMOIRE ferme sur `all` et sur `any` (une
+        // condition fausse fait échouer le bloc) mais OUVRE sur `not` —
+        // `evalCondition()` répond faux pour un champ inconnu, la fiche n'est
+        // donc pas exclue, et elle est retenue. Une audience dont le seul
+        // critère est une exclusion mal écrite rattachait ainsi CHAQUE fiche
+        // enrichie, en silence, par le chemin waterfall step12.
+        //
+        // Ici on ne LÈVE pas : `evaluateForCompany()` est appelé par fiche
+        // pendant l'enrichissement, et une seule audience mal saisie tuerait
+        // l'enrichissement du workspace entier. On ferme (aucun rattachement)
+        // et on le DIT dans le journal. Le SQL, lui, refuse : c'est là que la
+        // décision d'envoi se prend.
+        try {
+            self::validerCriteres($criteria);
+        } catch (CritereAudienceInvalide $e) {
+            Log::warning('Audience aux criteres invalides ignoree en memoire', [
+                'company_id' => $company->id,
+                'raison' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+
         $all = $criteria['all'] ?? [];
         if (is_array($all)) {
             foreach ($all as $cond) {

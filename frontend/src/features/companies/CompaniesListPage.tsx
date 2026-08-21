@@ -12,8 +12,10 @@ import {
   SearchInput,
   Toolbar,
   cn,
+  TableScroll,
 } from "@/components/ui";
 import { api } from "@/lib/api";
+import { useAntiRebond } from "@/hooks/useAntiRebond";
 import {
   versOptions,
   type ReferentielsGeo,
@@ -199,7 +201,30 @@ export function CompaniesListPage() {
   const [filter, setFilter] = useState<Filter>(EMPTY_FILTER);
   const [exporting, setExporting] = useState(false);
 
+  // G42-010 — les TROIS champs de SAISIE LIBRE sont différés de 300 ms avant
+  // d'atteindre la requête. Les listes déroulantes et les dates NE LE SONT
+  // PAS : un choix dans un menu est un geste unique, le retarder se verrait.
+  //
+  // Mesure du 2026-08-20 (`tests/perf/recherche-anti-rebond.test.tsx`) : taper
+  // « boulangerie » (11 caractères) lançait 11 requêtes `GET /companies`,
+  // chacune un `LIKE` sur 4,29 M de fiches. Après : 1.
+  //
+  // ⚠️ Le `value` des champs reste `filter.*`, la valeur IMMÉDIATE : la lettre
+  // s'affiche sans attendre. Seule la requête patiente.
+  const rechercheDifferee = useAntiRebond(filter.search);
+  const nafDiffere = useAntiRebond(filter.naf);
+  const tagDiffere = useAntiRebond(filter.tag);
+  const filtreInterroge = useMemo<Filter>(
+    () => ({ ...filter, search: rechercheDifferee, naf: nafDiffere, tag: tagDiffere }),
+    [filter, rechercheDifferee, nafDiffere, tagDiffere],
+  );
+
   // Construit les mêmes params de filtre que la liste (hors pagination).
+  //
+  // ⚠️ Volontairement sur `filter` (immédiat) et NON sur `filtreInterroge` :
+  // l'export est déclenché par un clic délibéré, et ce qu'il doit reproduire
+  // est ce que l'opérateur LIT dans ses champs. Fenêtre de divergence avec la
+  // liste affichée : 300 ms au plus.
   function filterParams(): URLSearchParams {
     return new URLSearchParams({
       ...(filter.size ? { "filter[size_category]": filter.size } : {}),
@@ -253,35 +278,37 @@ export function CompaniesListPage() {
   }
 
   const { data, isLoading } = useQuery<CompaniesResponse>({
-    queryKey: ["companies", page, filter],
+    // ⚠️ `filtreInterroge`, PAS `filter` : c'est ici que se joue G42-010. La
+    // clé porte la valeur DIFFÉRÉE, donc elle ne change pas à chaque touche.
+    queryKey: ["companies", page, filtreInterroge],
     queryFn: async () => {
+      const f = filtreInterroge;
       const params = new URLSearchParams({
         page: String(page),
         per_page: "100",
-        ...(filter.size ? { "filter[size_category]": filter.size } : {}),
-        ...(filter.effectif ? { "filter[effectif]": filter.effectif } : {}),
-        ...(filter.priority ? { "filter[priority]": filter.priority } : {}),
-        ...(filter.search ? { "filter[denomination]": filter.search } : {}),
-        ...(filter.naf ? { "filter[naf]": filter.naf } : {}),
-        ...(filter.quality ? { "filter[quality]": filter.quality } : {}),
-        ...(filter.prospection_status
-          ? { "filter[prospection_status]": filter.prospection_status }
+        ...(f.size ? { "filter[size_category]": f.size } : {}),
+        ...(f.effectif ? { "filter[effectif]": f.effectif } : {}),
+        ...(f.priority ? { "filter[priority]": f.priority } : {}),
+        ...(f.search ? { "filter[denomination]": f.search } : {}),
+        ...(f.naf ? { "filter[naf]": f.naf } : {}),
+        ...(f.quality ? { "filter[quality]": f.quality } : {}),
+        ...(f.prospection_status
+          ? { "filter[prospection_status]": f.prospection_status }
           : {}),
-        ...(filter.department_code ? { "filter[department_code]": filter.department_code } : {}),
-        ...(filter.region_code ? { "filter[region_code]": filter.region_code } : {}),
-        ...(filter.sector_main ? { "filter[sector_main]": filter.sector_main } : {}),
-      ...(filter.country_code ? { "filter[country_code]": filter.country_code } : {}),
-      ...(filter.best_email_confidence
-        ? { "filter[best_email_confidence]": filter.best_email_confidence }
-        : {}),
-      ...(filter.eligible_campagne
-        ? { "filter[eligible_campagne]": filter.eligible_campagne }
-        : {}),
-      ...(filter.region_code ? { "filter[region_code]": filter.region_code } : {}),
-      ...(filter.tag ? { "filter[tag]": filter.tag } : {}),
-      ...(filter.cree_apres ? { "filter[cree_apres]": filter.cree_apres } : {}),
-      ...(filter.cree_avant ? { "filter[cree_avant]": filter.cree_avant } : {}),
-      ...(filter.entity_nature ? { "filter[entity_nature]": filter.entity_nature } : {}),
+        ...(f.department_code ? { "filter[department_code]": f.department_code } : {}),
+        ...(f.region_code ? { "filter[region_code]": f.region_code } : {}),
+        ...(f.sector_main ? { "filter[sector_main]": f.sector_main } : {}),
+        ...(f.country_code ? { "filter[country_code]": f.country_code } : {}),
+        ...(f.best_email_confidence
+          ? { "filter[best_email_confidence]": f.best_email_confidence }
+          : {}),
+        ...(f.eligible_campagne
+          ? { "filter[eligible_campagne]": f.eligible_campagne }
+          : {}),
+        ...(f.tag ? { "filter[tag]": f.tag } : {}),
+        ...(f.cree_apres ? { "filter[cree_apres]": f.cree_apres } : {}),
+        ...(f.cree_avant ? { "filter[cree_avant]": f.cree_avant } : {}),
+        ...(f.entity_nature ? { "filter[entity_nature]": f.entity_nature } : {}),
       });
       const r = await api.get<CompaniesResponse>(`/companies?${params.toString()}`);
       return r.data;
@@ -676,6 +703,12 @@ export function CompaniesListPage() {
               )}
             </div>
           )}
+          {/* D30-002 — conteneur a defilement horizontal. Sans lui, les 746 px de
+              largeur minimale de ce tableau (32+110+90+110+140+100+36 de colonnes
+              fixes, 8 gouttieres de 12, 2x16 de rembourrage) etaient coupes net par
+              le `overflow-hidden` de la Card. L en-tete ET le corps virtualise sont
+              dedans : sinon ils defileraient separement et ne seraient plus alignes. */}
+          <TableScroll template={GRID}>
 
           {/* Sticky header — must share GRID with CompanyRow */}
           <div
@@ -745,6 +778,7 @@ export function CompaniesListPage() {
               })}
             </div>
           </div>
+          </TableScroll>
         </Card>
       )}
 

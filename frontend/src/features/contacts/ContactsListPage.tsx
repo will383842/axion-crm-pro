@@ -12,8 +12,10 @@ import {
   type StatusTone,
   Toolbar,
   cn,
+  TableScroll,
 } from '@/components/ui';
 import { api } from '@/lib/api';
+import { useAntiRebond } from '@/hooks/useAntiRebond';
 import { COUNTRY_OPTIONS, PROSPECTION_STATUS_OPTIONS } from '@/lib/prospection-referentiels';
 
 interface Contact {
@@ -81,15 +83,24 @@ export function ContactsListPage() {
   const [country, setCountry] = useState('');
   const [prospection, setProspection] = useState('');
   const [search, setSearch] = useState('');
+  // G42-010 — anti-rebond de 300 ms AVANT la requete.
+  //
+  // Mesure du 2026-08-20 sur `/companies`, meme cablage (voir
+  // `tests/perf/recherche-anti-rebond.test.tsx`) : taper « boulangerie »
+  // (11 caracteres) lancait 11 requetes serveur. Apres : 1.
+  //
+  // ⚠️ Le champ garde `search` (valeur IMMEDIATE) pour son `value` : la
+  // lettre s'affiche sans attendre. Seule la requete patiente.
+  const rechercheDifferee = useAntiRebond(search);
 
   const { data, isLoading, isPlaceholderData } = useQuery<ContactsResponse>({
-    queryKey: ['contacts', emailStatus, country, prospection, search],
+    queryKey: ['contacts', emailStatus, country, prospection, rechercheDifferee],
     queryFn: async () => {
       const params = new URLSearchParams({ per_page: '50' });
       if (emailStatus) params.set('filter[email_status]', emailStatus);
       if (country) params.set('filter[country_code]', country);
       if (prospection) params.set('filter[prospection_status]', prospection);
-      if (search) params.set('filter[last_name]', search);
+      if (rechercheDifferee) params.set('filter[last_name]', rechercheDifferee);
       return (await api.get<ContactsResponse>(`/contacts?${params}`)).data;
     },
     // Garde les lignes précédentes pendant le chargement du filtre suivant :
@@ -185,6 +196,10 @@ export function ContactsListPage() {
         />
       ) : (
         <Card padding="none" className="overflow-hidden">
+          {/* D30-002 — conteneur a defilement horizontal. Sans lui, les 1062 px
+              de largeur minimale de ce tableau etaient coupes net par le
+              `overflow-hidden` de la Card, sans aucun moyen de les atteindre. */}
+          <TableScroll template={GRID}>
           <div
             role="row"
             className={cn(
@@ -290,6 +305,7 @@ export function ContactsListPage() {
               );
             })}
           </div>
+          </TableScroll>
         </Card>
       )}
     </div>

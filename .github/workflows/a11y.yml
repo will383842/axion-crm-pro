@@ -46,6 +46,24 @@ jobs:
         # cache — 24 échecs « Executable doesn't exist » qui noyaient le vrai
         # défaut. Élargir à firefox/webkit suppose de les installer ici d'abord.
         run: pnpm exec playwright test tests/e2e/a11y.spec.ts --project=chromium --reporter=html
+      # D28-002 / D27-002 (2026-08-20) — la porte a11y ci-dessus n'assurait que
+      # sur `impact === 'critical'`. axe classe `color-contrast` en `serious` :
+      # les 2 à 6 violations de contraste que le mode sombre produisait sur
+      # chaque écran passaient donc la porte sans la faire rougir. `a11y.spec.ts`
+      # assure désormais sur `critical` ET `serious` (moins un socle nommé et
+      # borné), et visite chaque écran en clair PUIS en sombre.
+      #
+      # `dark-contraste.spec.ts` complète : elle ne regarde aucune classe, elle
+      # CALCULE le rapport de contraste WCAG de chaque texte à partir de la
+      # couleur réellement calculée par le navigateur. C'est elle qui prouve
+      # qu'une déclaration `dark:` d'un composant n'est plus écrasée par la
+      # feuille globale. BLOQUANTE, au même titre que les deux autres.
+      - name: Run dark-mode contrast E2E (BLOQUANT)
+        working-directory: frontend
+        env:
+          E2E_PREVIEW: 'true'
+          E2E_BASE_URL: http://127.0.0.1:4173
+        run: pnpm exec playwright test tests/e2e/dark-contraste.spec.ts --project=chromium --reporter=line
       # Étape 0, F17 (2026-08-18) — `navigation.spec.ts` n'était exécuté NULLE
       # PART : rouge en silence depuis l'accordéon de la PR #84. Il garde la
       # structure de la barre (six groupes, une seule entrée Contacts, aucun

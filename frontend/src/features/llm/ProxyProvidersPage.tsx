@@ -9,6 +9,7 @@ import {
   StatusPill,
   type StatusTone,
   cn,
+  TableScroll,
 } from '@/components/ui';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -70,6 +71,10 @@ export function ProxyProvidersPage() {
         />
       ) : (
         <Card padding="none" className="overflow-hidden">
+          {/* D30-002 — conteneur a defilement horizontal. Sans lui, les 984 px
+              de largeur minimale de ce tableau etaient coupes net par le
+              `overflow-hidden` de la Card, sans aucun moyen de les atteindre. */}
+          <TableScroll template={GRID}>
           <div
             role="row"
             className={cn(
@@ -128,6 +133,7 @@ export function ProxyProvidersPage() {
               </div>
             ))}
           </div>
+          </TableScroll>
         </Card>
       )}
     </div>

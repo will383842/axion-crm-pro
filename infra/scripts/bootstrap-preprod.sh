@@ -93,7 +93,20 @@ if [ ! -f .env ]; then
 
   regler APP_ENV staging
   regler APP_KEY "$CLE"
-  regler APP_DEBUG true
+  # 🔴 CORRIGÉ LE 2026-08-20 — constat F37-003 (S1). Valait `true`.
+  #
+  # SITE JUMEAU de `docker-compose.staging.yml:125` (patron A-011, 23 cas
+  # mesurés dans ce dépôt) : réparer l'overlay sans réparer ce script aurait
+  # rouvert la porte au prochain amorçage, dans le `.env` du serveur, là où
+  # personne ne relit.
+  #
+  # La préproduction est servie PUBLIQUEMENT par le Caddy de production
+  # (`infra/caddy/Caddyfile`, lignes 244 et 279), sans basic_auth ni liste
+  # d'adresses autorisées. Une page de débogage Laravel y afficherait
+  # DB_PASSWORD, APP_KEY et les jetons tiers à quiconque provoque une 500.
+  #
+  # La trace reste lisible où il faut : `docker logs axion-crm-staging-api`.
+  regler APP_DEBUG false
   regler APP_URL https://staging.axion-crm-pro.com
   regler DB_DATABASE axion_crm_staging
   regler SESSION_DOMAIN ''

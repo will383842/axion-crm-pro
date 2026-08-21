@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Crm\Outbound\ConsentOutboundRecorder;
 use App\Models\Journalist;
 use App\Support\EligibiliteCampagne;
+use App\Support\MasquageCoordonnees;
+use App\Support\PlafondExport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use RuntimeException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -38,7 +41,14 @@ class JournalistsController extends ApiController
                 ->paginate($perPage);
 
             return $this->ok([
-                'data' => $page->items(),
+                // 🔴 SITE JUMEAU de B12-002 / F36-006, que l'audit ne nomme pas.
+                // Le constat parlait de « trois listes masquees, une fiche en
+                // clair ». Il en manquait une quatrieme famille, et c'est la
+                // PLUS nominative du depot : un journaliste est une personne
+                // physique nommee, avec son courriel et sa ligne directe. La
+                // route ne porte aucune permission au-dela du groupe
+                // (routes/api.php:170) : un `viewer` la lit.
+                'data' => MasquageCoordonnees::masquerSiRequis($page->items()),
                 'meta' => [
                     'total' => $page->total(),
                     'per_page' => $page->perPage(),
@@ -58,9 +68,42 @@ class JournalistsController extends ApiController
         }
     }
 
+    /**
+     * 🔴 CONSTAT P6-API-001 (S0). Cette requete de base ne portait AUCUN filtre
+     * d'espace. L'unique `where('workspace_id')` du fichier vivait dans
+     * `export()` : la LISTE fuyait, l'export ne fuyait pas. Un compte en
+     * lecture seule lisait donc nom, adresse et telephone des journalistes de
+     * tous les clients.
+     *
+     * `Journalist` ne porte pas le trait `BelongsToWorkspace`, le scope global
+     * est inerte par defaut (`CRM_STRICT_WORKSPACE_SCOPE=false`), et la RLS est
+     * contournee par le role de connexion. Le filtre est donc pose ICI, a la
+     * source de toutes les lectures du controleur.
+     *
+     * Sans contexte d'espace : on ne rend RIEN.
+     *
+     * ⚠️ `@return QueryBuilder<Journalist>` est OBLIGATOIRE, pas decoratif.
+     * `Spatie\QueryBuilder\QueryBuilder` est `@template TModel of Model` : sans
+     * le parametre, `TModel` reste non resolu et tout ce qui recoit ensuite le
+     * Builder — ici `EligibiliteCampagne::exclureOpposes()`, elle aussi
+     * templatee — devient inanalysable. Mesure du 2026-08-21 : c'est la cause
+     * de 5 des 38 erreurs PHPStan de la branche.
+     *
+     * @return QueryBuilder<Journalist>
+     */
     private function buildFilteredQuery(): QueryBuilder
     {
-        return QueryBuilder::for(Journalist::query()->whereNull('deleted_at'))
+        $espaceCourant = $this->espaceCourantOuNull();
+
+        return QueryBuilder::for(
+            Journalist::query()
+                ->whereNull('deleted_at')
+                ->when(
+                    $espaceCourant !== null,
+                    fn ($q) => $q->where('workspace_id', $espaceCourant),
+                    fn ($q) => $q->whereRaw('1 = 0'),
+                ),
+        )
             ->allowedFilters(...[
                 AllowedFilter::exact('media_id'),
                 AllowedFilter::exact('beat'),
@@ -83,6 +126,14 @@ class JournalistsController extends ApiController
         if (! Schema::hasTable('journalists') || $workspaceId === null) {
             return response()->streamDownload(function () use ($header) {
                 $out = fopen('php://output', 'w');
+                if ($out === false) {
+                    // `php://output` ne s'ouvre pas : il n'y a aucun flux ou ecrire. On LEVE
+                    // plutot que de poursuivre — `fputcsv(false, ...)` est une TypeError en
+                    // PHP 8, et le telechargement rendrait un fichier vide ou tronque sans
+                    // que l'operateur puisse savoir que son export est incomplet. C'est le
+                    // defaut meme que le plafond partage (G41-007) sert a rendre VISIBLE.
+                    throw new RuntimeException("Export CSV : impossible d'ouvrir php://output.");
+                }
                 fwrite($out, "\xEF\xBB\xBF");
                 fputcsv($out, $header);
                 fclose($out);
@@ -100,39 +151,83 @@ class JournalistsController extends ApiController
         //
         // On garde le filtre local (il dit quelque chose de vrai) et on ajoute
         // les deux portes partagées.
+        // 🔴 `getEloquentBuilder()` — MÊME DÉFAUT QU'EN `MediaController`, et
+        // c'est le patron A-011 du dépôt : le même geste faux recopié à deux
+        // endroits. Constat F36-008 (S1), mesuré le 2026-08-20 :
+        //
+        //   TypeError: App\Support\EligibiliteCampagne::exclureOpposes():
+        //   Argument #1 ($query) must be of type
+        //   Illuminate\Database\Eloquent\Builder,
+        //   Spatie\QueryBuilder\QueryBuilder given
+        //
+        // `Spatie\QueryBuilder\QueryBuilder` v6 n'étend plus `Eloquent\Builder`
+        // (enveloppe à `__call`) : `->where(...)` rend l'enveloppe.
+        // `GET /journalists/export` rendait donc 500 à tous les ayants droit.
+        // `getEloquentBuilder()` rend le sujet réel, filtres déjà appliqués.
+        // ⚠️ ON NE CHAINE PAS `->where(...)->getEloquentBuilder()`, ET CE N'EST
+        // PAS UN GOUT. `Spatie\QueryBuilder\QueryBuilder` porte
+        // `@mixin EloquentBuilder<TModel>` : pour l'analyse statique, `->where()`
+        // rend un `Eloquent\Builder`, qui n'a AUCUN `getEloquentBuilder()`.
+        // A l'execution le chainage marche — `__call` reforwarde puis rend
+        // l'enveloppe — mais PHPStan ne peut pas le savoir, et il avait raison
+        // de se plaindre : c'est le meme ecart enveloppe/Builder qui a produit
+        // le 500 du constat F36-008. On garde donc l'enveloppe dans une
+        // variable, on la mute, et on ne la deballe qu'une fois.
+        $filtree = $this->buildFilteredQuery();
+        $filtree->where('workspace_id', $workspaceId);
+        $filtree->where('opt_out', false);
+
         $query = EligibiliteCampagne::exclureOpposes(
-            $this->buildFilteredQuery()
-                ->where('workspace_id', $workspaceId)
-                ->where('opt_out', false),
+            $filtree->getEloquentBuilder(),
             'journalists.email',
         )->with('media');
 
         return response()->streamDownload(function () use ($query, $header) {
             $out = fopen('php://output', 'w');
+            if ($out === false) {
+                // `php://output` ne s'ouvre pas : il n'y a aucun flux ou ecrire. On LEVE
+                // plutot que de poursuivre — `fputcsv(false, ...)` est une TypeError en
+                // PHP 8, et le telechargement rendrait un fichier vide ou tronque sans
+                // que l'operateur puisse savoir que son export est incomplet. C'est le
+                // defaut meme que le plafond partage (G41-007) sert a rendre VISIBLE.
+                throw new RuntimeException("Export CSV : impossible d'ouvrir php://output.");
+            }
             fwrite($out, "\xEF\xBB\xBF");
             fputcsv($out, $header);
-            $query->chunkById(1000, function ($journalists) use ($out) {
-                foreach ($journalists as $j) {
-                    fputcsv($out, [
-                        $j->first_name,
-                        $j->last_name,
-                        $j->role,
-                        $j->beat,
-                        $j->email,
-                        $j->phone,
-                        $j->media?->name,
-                        $j->opt_out ? 'oui' : 'non',
-                        $j->source,
-                    ]);
-                }
+            // Plafond partagé (constat G41-007) : cf. App\Support\PlafondExport.
+            $tronque = PlafondExport::parcourirBorne($query, function ($j) use ($out) {
+                fputcsv($out, [
+                    $j->first_name,
+                    $j->last_name,
+                    $j->role,
+                    $j->beat,
+                    $j->email,
+                    $j->phone,
+                    $j->media?->name,
+                    $j->opt_out ? 'oui' : 'non',
+                    $j->source,
+                ]);
             });
+            if ($tronque) {
+                PlafondExport::ecrireAvertissement($out, count($header));
+            }
             fclose($out);
-        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8'] + PlafondExport::entetes());
     }
 
     public function show(Journalist $journalist): JsonResponse
     {
-        return $this->ok($journalist->load('media'));
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($journalist);
+
+        // 🔴 SITE JUMEAU de B12-002 / F36-006. La fiche detaillee d'un
+        // journaliste rendait le modele BRUT, courriel et telephone compris —
+        // exactement le defaut decrit sur `companies`, sur la famille de
+        // donnees la plus sensible. `masquerSiRequis` descend aussi dans
+        // `media`, deja chargee.
+        return $this->ok(MasquageCoordonnees::masquerSiRequis($journalist->load('media')));
     }
 
     /**
@@ -141,6 +236,11 @@ class JournalistsController extends ApiController
      */
     public function optOut(Journalist $journalist): JsonResponse
     {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($journalist);
+
         $email = $journalist->email;
 
         $journalist->update(['opt_out' => true]);
@@ -176,7 +276,52 @@ class JournalistsController extends ApiController
     /** Droit à l'effacement RGPD : soft-delete. */
     public function destroy(Journalist $journalist): JsonResponse
     {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($journalist);
+
+        // L'email est lu AVANT l'effacement : le soft-delete conserve les
+        // attributs, mais dépendre de ce détail rendrait le code faux le jour
+        // où l'effacement deviendra une anonymisation.
+        $email = $journalist->email;
+
         $journalist->delete();
+
+        // 🔴 CONSTAT B14-010 (S1), mesuré le 2026-08-20. L'effacement n'émettait
+        // RIEN, dans le contrôleur même où `optOut()` — deux méthodes plus haut —
+        // émet correctement depuis le lot L5. Patron A-011 du dépôt : le
+        // correctif existait déjà à quelques lignes de là et n'avait pas été
+        // porté.
+        //
+        // Conséquence : le site continuait d'adresser une personne dont le CRM
+        // a effacé la fiche, et la prochaine synchro site → CRM la recréait.
+        // L'article 17 n'est pas « effacer ici », c'est « effacer partout où on
+        // l'a diffusée » — le canal CRM → site EST le moyen de le tenir.
+        //
+        // Sans email, il n'y a pas de hash — donc rien que le site puisse
+        // rapprocher : on ne met rien en file plutôt qu'un message inexploitable
+        // qui grossirait un backlog ne convergeant jamais.
+        if (is_string($email) && trim($email) !== '') {
+            try {
+                app(ConsentOutboundRecorder::class)->recordForEmail(
+                    'erasure',
+                    $email,
+                    'business',
+                    payload: ['surface' => 'console:journalists', 'journalist_id' => $journalist->id],
+                );
+            } catch (\Throwable $e) {
+                // Une panne de la mini-outbox ne fait pas échouer un droit à
+                // l'effacement déjà acté en base. Journalisé, jamais avalé —
+                // même règle qu'en `optOut()`.
+                Log::error('crm.outbound.record_failed', [
+                    'event_type' => 'erasure',
+                    'journalist_id' => $journalist->id,
+                    'exception' => $e->getMessage(),
+                ]);
+                report($e);
+            }
+        }
 
         return response()->json(null, 204);
     }

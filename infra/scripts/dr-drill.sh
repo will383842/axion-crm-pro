@@ -26,7 +26,14 @@
 #      → mesuré le 2026-08-16 : 17 erreurs suffisaient à rendre une base VIDE ;
 #   3. les COMPTAGES restaurés égalent la production
 #      → une restauration « sans erreur » mais à 0 ligne reste un échec ;
-#   4. le RTO reste sous la cible.
+#   4. le RÔLE APPLICATIF peut lire les tables restaurées  ← ajouté 2026-08-20
+#      → constat A08-008 (S1) : les points 1 à 3 se jouent tous en
+#        SUPERUTILISATEUR (`psql -U axion`, mesuré `rolsuper=t rolbypassrls=t`),
+#        qui lit tout quels que soient les GRANT. Ils rendaient donc le même
+#        chiffre sur une base saine et sur une base que l'application ne peut
+#        PAS lire. Cet exercice a validé pendant des mois une sauvegarde qui
+#        n'emportait ni rôles ni GRANT ;
+#   5. le RTO reste sous la cible.
 #
 # ⚠️ La restauration NE SE FAIT PAS sur le serveur de production : la base pèse
 # 16 Go pour 14 Go libres. Ce script attend donc un hôte Docker disposant de la
@@ -52,6 +59,15 @@ SB_PATH="${SB_PATH:-/home/axion-crm-backups}"
 PG_CONTENEUR="${PG_CONTENEUR:-axion-crm-postgres}"
 BASE_DRILL="${BASE_DRILL:-axion_crm_dr}"
 SCRATCH="${SCRATCH:-/tmp/axion-crm-dr-drill}"
+
+# Le rôle NON-PROPRIÉTAIRE par lequel l'application se connecte (migration
+# `2026_08_14_000001_harden_workspace_isolation`). Cf. étape 5.
+ROLE_APPLICATIF="${ROLE_APPLICATIF:-axion_app}"
+
+# ⚠️ CONTRAT PARTAGÉ AVEC `backup-postgres.sh` ET `restore-postgres.sh`.
+# Les trois fichiers portent ces marqueurs à l'identique.
+MARQUEUR_GLOBALS_DEBUT="-- >>> AXION-GLOBALS-DEBUT"
+MARQUEUR_GLOBALS_FIN="-- >>> AXION-GLOBALS-FIN"
 
 # Cible RTO : 4 h. Mesure de référence du 2026-08-16 : 21 min pour 16 Go.
 RTO_CIBLE_S=14400
@@ -92,7 +108,7 @@ fi
 echo "  Place disponible sur le volume de restauration : ${LIBRE_GO} Go"
 
 # --- 1. La copie hors-site est-elle récupérable ET intacte ? -----------------
-echo "[1/5] Récupération de la dernière sauvegarde depuis la Storage Box…"
+echo "[1/6] Récupération de la dernière sauvegarde depuis la Storage Box…"
 mkdir -p "$SCRATCH"
 
 DERNIER=$(ssh "$SRV" "ls -1t ${SRV_BACKUPS}/*.sql.gz 2>/dev/null | head -1 | xargs -r basename")
@@ -129,7 +145,7 @@ fi
 echo "  ✓ Copie hors-site récupérée, empreinte identique"
 
 # --- 2. Comptages de RÉFÉRENCE, pris en production AVANT la restauration ----
-echo "[2/5] Relevé des comptages de production…"
+echo "[2/6] Relevé des comptages de production…"
 REFERENCE=$(ssh "$SRV" "docker exec ${PG_CONTENEUR} psql -U axion -d axion_crm -tAc \"
     SELECT 'companies='||count(*) FROM companies
     UNION ALL SELECT 'contacts='||count(*) FROM contacts
@@ -138,8 +154,26 @@ REFERENCE=$(ssh "$SRV" "docker exec ${PG_CONTENEUR} psql -U axion -d axion_crm -
     UNION ALL SELECT 'journalists='||count(*) FROM journalists\" | sort")
 echo "$REFERENCE" | sed 's/^/    /'
 
+# 🔴 LES EXTENSIONS DE PRODUCTION — constat F39-005 (S1), ajouté le 2026-08-21.
+#
+# Les comptages ci-dessus ne voient pas une extension manquante : une base privée
+# d'`unaccent` porte exactement le même nombre de lignes, et l'étape 5 lui trouve
+# exactement les mêmes droits. C'est pourtant ce qui a fait tomber l'exercice du
+# 2026-08-16 — `function unaccent(text) does not exist` —, et il a fallu lire le
+# journal de restauration pour le comprendre.
+#
+# On relève donc `pg_extension` EN PRODUCTION, avec le schéma de chaque
+# extension (`pg_partman` vit dans `partman`, et s'il atterrit ailleurs la suite
+# de tests meurt — cf. `infra/postgres/init/01-extensions.sql`). Aucune liste
+# n'est écrite ici : les deux côtés sont mesurés, ce qui est le seul moyen de
+# voir une extension qu'on a oublié d'inscrire quelque part.
+REFERENCE_EXTENSIONS=$(ssh "$SRV" "docker exec ${PG_CONTENEUR} psql -U axion -d axion_crm -tAc \"
+    SELECT e.extname||'@'||n.nspname
+    FROM pg_extension e JOIN pg_namespace n ON n.oid = e.extnamespace\" | sort")
+echo "  extensions en production : $(printf '%s\n' "$REFERENCE_EXTENSIONS" | grep -c . || true)"
+
 # --- 3. Restauration --------------------------------------------------------
-echo "[3/5] Restauration dans « ${BASE_DRILL} »…"
+echo "[3/6] Restauration dans « ${BASE_DRILL} »…"
 scp "$SRV:${SCRATCH}/${DERNIER}" "$SCRATCH/" >/dev/null
 DEBUT_RESTAURE=$(date +%s)
 
@@ -149,8 +183,18 @@ docker exec "$PG_CONTENEUR" psql -U axion -d postgres -q \
 
 # Le journal est CONSERVÉ : c'est lui qui a permis d'identifier la panne du
 # 2026-08-16 (`function unaccent(text) does not exist`).
+#
+# ⚠️ LA SECTION DES RÔLES EST RETIRÉE DU FLUX — constat A08-008 (2026-08-20).
+#
+# Depuis le correctif, l'archive porte `pg_dumpall --globals-only` entre deux
+# marqueurs. Rejouée telle quelle ICI, elle produirait `CREATE ROLE axion;` sur
+# un cluster où `axion` existe déjà : autant de lignes `ERROR`, donc un exercice
+# en échec pour une raison qui n'en est pas une. L'exercice restaure sur le
+# cluster de départ, où les rôles sont déjà en place — c'est justement ce que
+# l'étape 5 vérifie.
 JOURNAL="$SCRATCH/restauration.log"
 zcat "$SCRATCH/${DERNIER}" \
+    | sed "\|${MARQUEUR_GLOBALS_DEBUT}|,\|${MARQUEUR_GLOBALS_FIN}|d" \
     | docker exec -i "$PG_CONTENEUR" psql -U axion -d "$BASE_DRILL" -q \
     > "$JOURNAL" 2>&1 || true
 DUREE_RESTAURE=$(( $(date +%s) - DEBUT_RESTAURE ))
@@ -168,7 +212,7 @@ echo "  ✓ Restauration sans erreur"
 # --- 4. Les comptages correspondent-ils ? -----------------------------------
 # LE test. Une restauration « sans erreur » mais vide reste un échec : c'est
 # exactement ce qui s'est produit le 2026-08-16 avant le correctif search_path.
-echo "[4/5] Comparaison des comptages…"
+echo "[4/6] Comparaison des comptages…"
 RESTAURE=$(docker exec "$PG_CONTENEUR" psql -U axion -d "$BASE_DRILL" -tAc "
     SELECT 'companies='||count(*) FROM companies
     UNION ALL SELECT 'contacts='||count(*) FROM contacts
@@ -184,9 +228,88 @@ fi
 echo "$RESTAURE" | sed 's/^/    /'
 echo "  ✓ Comptages identiques à la production"
 
-# --- 5. RTO -----------------------------------------------------------------
+# 🔴 Et les EXTENSIONS — constat F39-005. Même comparaison, autre moitié du mur.
+RESTAURE_EXTENSIONS=$(docker exec "$PG_CONTENEUR" psql -U axion -d "$BASE_DRILL" -tAc "
+    SELECT e.extname||'@'||n.nspname
+    FROM pg_extension e JOIN pg_namespace n ON n.oid = e.extnamespace" | sort)
+
+# Témoin de couverture : une comparaison entre deux ensembles VIDES est vraie et
+# ne prouve rien. Si la production n'a rendu aucune extension, c'est la mesure
+# qui a échoué, pas la base qui est saine.
+if [ -z "$(printf '%s' "$REFERENCE_EXTENSIONS" | tr -d '[:space:]')" ]; then
+    echo "❌ Le relevé des extensions de production est VIDE — la mesure a échoué." >&2
+    echo "   Comparer deux ensembles vides serait vert et ne prouverait rien." >&2
+    exit 4
+fi
+
+if [ "$REFERENCE_EXTENSIONS" != "$RESTAURE_EXTENSIONS" ]; then
+    echo "❌ CONSTAT F39-005 : ÉCART d'extensions entre production et restauration :" >&2
+    diff <(echo "$REFERENCE_EXTENSIONS") <(echo "$RESTAURE_EXTENSIONS") | sed 's/^/    /' >&2
+    echo "   Les comptages de lignes ci-dessus sont identiques et ne prouvent RIEN là-dessus :" >&2
+    echo "   une extension manquante n'échoue pas à la restauration, elle échoue à la PREMIÈRE" >&2
+    echo "   requête qui s'en sert — c'est la panne du 2026-08-16, « function unaccent(text)" >&2
+    echo "   does not exist »." >&2
+    exit 4
+fi
+echo "  ✓ Extensions identiques à la production ($(printf '%s\n' "$RESTAURE_EXTENSIONS" | grep -c . || true))"
+
+# --- 5. 🔴 LES DROITS — constat A08-008 (S1), ajouté le 2026-08-20 -----------
+#
+# CE QUE CET EXERCICE NE POUVAIT PAS VOIR, ET POURQUOI.
+#
+# Les étapes 2 et 4 jouent `psql -U axion`. Mesuré sur le cluster :
+#
+#     SELECT rolname, rolsuper, rolbypassrls FROM pg_roles WHERE rolcanlogin;
+#     axion      | t | t
+#     axion_app  | f | f
+#
+# `axion` est SUPERUTILISATEUR et porte BYPASSRLS : il lit tout, quels que
+# soient les GRANT et quelle que soit la RLS. Un comptage joué avec lui rend le
+# même chiffre sur une base saine et sur une base où l'application ne peut RIEN
+# lire. L'exercice vérifiait donc la seule chose qui ne pouvait pas échouer.
+#
+# C'est le défaut le plus coûteux de la famille : un contrôle qui rassure. La
+# sauvegarde a passé cet exercice pendant tout le temps où elle produisait des
+# archives sans un seul GRANT (`--no-acl`) et sans un seul rôle (pas de
+# `pg_dumpall --globals-only`).
+#
+# `has_table_privilege` répond exactement à la question posée par le constat —
+# « le rôle applicatif peut-il lire cette table » — et à aucune autre : elle ne
+# dépend ni du contenu, ni de la RLS (qui filtre des lignes, pas l'accès).
+echo "[5/6] Droits du rôle applicatif « ${ROLE_APPLICATIF} » sur la base restaurée…"
+
+ROLE_PRESENT=$(docker exec "$PG_CONTENEUR" psql -U axion -d postgres -tAc \
+    "SELECT count(*) FROM pg_roles WHERE rolname = '${ROLE_APPLICATIF}'")
+if [ "$ROLE_PRESENT" -eq 0 ]; then
+    echo "❌ Le rôle applicatif « ${ROLE_APPLICATIF} » n'existe pas sur ce cluster." >&2
+    echo "   L'archive doit le porter (section \`pg_dumpall --globals-only\`) : sur un" >&2
+    echo "   serveur RECONSTRUIT après sinistre, rien d'autre ne le recréerait, et" >&2
+    echo "   l'application ne pourrait même pas ouvrir de session." >&2
+    exit 6
+fi
+
+ILLISIBLES=$(docker exec "$PG_CONTENEUR" psql -U axion -d "$BASE_DRILL" -tAc "
+    SELECT count(*)
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind IN ('r', 'p')
+      AND NOT has_table_privilege('${ROLE_APPLICATIF}', c.oid, 'SELECT')")
+
+if [ "$ILLISIBLES" -gt 0 ]; then
+    echo "❌ CONSTAT A08-008 : ${ILLISIBLES} table(s) publique(s) illisibles par « ${ROLE_APPLICATIF} »." >&2
+    echo "   La restauration a rendu les DONNÉES mais pas les DROITS : l'application" >&2
+    echo "   échouerait sur « permission denied for table … » dès la première requête." >&2
+    echo "   Les comptages de l'étape 4 sont identiques et ne prouvent rien — ils ont" >&2
+    echo "   été pris en superutilisateur." >&2
+    echo "   Cause la plus probable : archive produite avec \`--no-acl\`." >&2
+    exit 6
+fi
+echo "  ✓ Aucune table illisible par le rôle applicatif (${ROLE_APPLICATIF})"
+
+# --- 6. RTO -----------------------------------------------------------------
 DUREE_TOTALE=$(( $(date +%s) - DEBUT ))
-echo "[5/5] RTO simulé : ${DUREE_TOTALE}s ($((DUREE_TOTALE / 60)) min)"
+echo "[6/6] RTO simulé : ${DUREE_TOTALE}s ($((DUREE_TOTALE / 60)) min)"
 if [ "$DUREE_TOTALE" -gt "$RTO_CIBLE_S" ]; then
     echo "❌ RTO violé : > $((RTO_CIBLE_S / 3600)) h" >&2
     exit 5

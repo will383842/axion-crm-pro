@@ -4,6 +4,7 @@ use App\Jobs\LaunchZoneScrapingJob;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Dedup\DeduplicationService;
+use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -12,6 +13,11 @@ use Illuminate\Support\Str;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
+
+beforeEach(function () {
+    // Les roles et permissions doivent exister AVANT `assignRole()`.
+    $this->seed(PermissionsAndRolesSeeder::class);
+});
 
 /**
  * 🔴 LE COOLDOWN DE ZONE N'EXISTAIT QUE SUR LE PAPIER.
@@ -49,6 +55,19 @@ function utilisateurAvecWorkspace(): array
         'current_workspace_id' => $workspace->id,
         'first_login_completed_at' => now(),
     ]);
+
+    // ⚠️ LE ROLE EST OBLIGATOIRE DEPUIS QUE F36-001 EST BRANCHE.
+    //
+    // Cette suite mesure le METIER (creer, lancer, annuler), pas les droits —
+    // et son utilisateur n'en avait aucun. Tant qu'aucune route ne portait
+    // `permission:`, cela ne se voyait pas ; depuis, elle recevait 403 partout.
+    //
+    // On lui donne `admin` : le geste teste ici EST celui d'un administrateur,
+    // et le lui refuser reviendrait a mesurer la garde au lieu du produit. Les
+    // droits sont mesures a leur place, sur trois roles :
+    // `tests/Feature/Rgpd/CoucheAutorisationBrancheeTest.php`.
+    setPermissionsTeamId($workspace->id);
+    $user->assignRole('admin');
 
     // Chaîne de clés étrangères à remonter : `coverage_zones.department` →
     // `departments.code` → `departments.region_code` → `regions.code`.

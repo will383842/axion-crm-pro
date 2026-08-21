@@ -294,12 +294,12 @@ class CoverageController extends ApiController
 
         $cap = (int) ($validated['limit'] ?? 50000);
         $queued = 0;
-        $query->select('id')->chunkById(500, function ($companies) use (&$queued, $cap) {
+        $query->select('id')->chunkById(500, function ($companies) use (&$queued, $cap, $workspaceId) {
             foreach ($companies as $company) {
                 if ($queued >= $cap) {
                     return false;
                 }
-                EnrichCompanyJob::dispatch($company->id);
+                dispatch((new EnrichCompanyJob($company->id))->pourEspace($workspaceId));
                 $queued++;
             }
         });

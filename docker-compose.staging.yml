@@ -120,9 +120,43 @@ services:
       - staging-api-storage:/var/www/html/storage
     environment:
       APP_ENV: staging
-      # Le débogage reste ACTIF : c'est tout l'intérêt d'une préproduction —
-      # voir la trace plutôt que « Server Error ». Elle ne sert aucun public.
-      APP_DEBUG: 'true'
+      # 🔴 CORRIGÉ LE 2026-08-20 — constat F37-003 (S1). Valait `'true'`, sous
+      # ce commentaire : « Le débogage reste ACTIF : c'est tout l'intérêt d'une
+      # préproduction — voir la trace plutôt que "Server Error". Elle ne sert
+      # aucun public. »
+      #
+      # LA DERNIÈRE PHRASE ÉTAIT FAUSSE, et `infra/caddy/Caddyfile` le dit :
+      #   ligne 244  staging.axion-crm-pro.com { … }
+      #   ligne 279  staging-api.axion-crm-pro.com { … }
+      # Deux noms PUBLICS, servis par le Caddy de PRODUCTION, avec certificat
+      # public. Aucun `basic_auth`, aucune liste d'adresses autorisées : les
+      # seules directives de restriction sont `X-Robots-Tag: noindex` (qui parle
+      # aux moteurs, pas aux visiteurs) et `X-Frame-Options`.
+      #
+      # Une page de débogage Laravel affiche la valeur de CHAQUE variable
+      # d'environnement du processus (DB_PASSWORD, APP_KEY, jetons tiers), la
+      # configuration résolue, la requête SQL fautive avec ses paramètres et le
+      # code source du chemin d'appel. Provoquer une 500 sur une préproduction
+      # est trivial — c'est même sa raison d'être.
+      #
+      # ⚠️ Cette valeur est désormais SANS EFFET : `config/app.php` n'accorde le
+      # débogage qu'aux environnements `local` et `testing`, et journalise en
+      # critique toute demande refusée. On la corrige quand même — un réglage
+      # faux qui dort reste un réglage faux, et le prochain lecteur croirait que
+      # la préproduction affiche ses traces.
+      #
+      # Pour diagnostiquer sur la préproduction : `docker logs
+      # axion-crm-staging-api` et `storage/logs/laravel-AAAA-MM-JJ.log`. La
+      # trace y est entière, et elle ne part pas sur internet.
+      #
+      # ⚠️ LE NOM DU FICHIER A CHANGÉ LE 2026-08-20 — constat F39-011 (S1).
+      # Il s'appelait `laravel.log` et n'était JAMAIS tourné : 968 Mo mesurés
+      # sur le serveur au 2026-08-16. La pile de journaux par défaut est passée
+      # de `single,stderr` à `daily,stderr` (`backend/config/logging.php`), donc
+      # un fichier par jour, gardé `LOG_DAILY_DAYS` jours (14 par défaut).
+      # Un `tail storage/logs/laravel.log` ne trouvera plus rien : prendre
+      # l'entrée du jour, ou `ls -t storage/logs/ | head -1`.
+      APP_DEBUG: 'false'
       APP_URL: https://staging.axion-crm-pro.com
       DB_DATABASE: axion_crm_staging
       # Les envois réels ne partent JAMAIS de la préproduction. Un compte rendu
@@ -135,9 +169,21 @@ services:
     # attribue un jour un autre pont ; une préproduction en 502 n'est pas une
     # panne de production, le mode de défaillance est contenu.
     ports: !override
-      - '${STAGING_BIND_IP:-172.17.0.1}:8082:80'
+      # 9000 et non 80 — constat A-010 : le service parle FastCGI, et le Caddy
+      # de production l'atteint par `transport fastcgi`.
+      - '${STAGING_BIND_IP:-172.17.0.1}:8082:9000'
     healthcheck:
-      test: ['CMD-SHELL', 'curl -fsS http://localhost/up || exit 1']
+      # 🔴 Plus de contrôle HTTP — constat A-010 (S0).
+      #
+      # Ce service ne sert plus HTTP : il parle FastCGI. `curl
+      # http://localhost/up` échouerait TOUJOURS, le conteneur serait déclaré
+      # malsain en permanence et le déploiement le redémarrerait en boucle.
+      # On interroge php-fpm sur son point de vie, dans sa langue.
+      test:
+        - CMD-SHELL
+        - >-
+          SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET
+          cgi-fcgi -bind -connect 127.0.0.1:9000 2>/dev/null | grep -q pong || exit 1
       interval: 30s
       timeout: 10s
       retries: 5

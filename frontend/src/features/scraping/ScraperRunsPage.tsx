@@ -23,7 +23,29 @@ import {
   Tooltip,
   type MenuItem,
   type TabItem,
+  TableScroll,
 } from '@/components/ui';
+
+/**
+ * D30-002 — le gabarit de colonnes, en UN seul endroit.
+ *
+ * Il vivait en double, recopié dans deux `className` Tailwind — la classe
+ * arbitraire `grid-cols` suivie du gabarit entre crochets — une fois pour
+ * l'en-tête et une fois pour la ligne. (Le gabarit n'est PAS réécrit ici en
+ * toutes lettres : la garde `tests/components/tableaux-defilables.test.tsx`
+ * cherche ce motif dans les sources, commentaires compris, et le prendrait pour
+ * un onzième tableau non enfermé.) Deux copies d'un gabarit, c'est deux
+ * occasions de le
+ * désaccorder, et surtout aucun endroit d'où `TableScroll` puisse calculer la
+ * largeur minimale. Somme des minima : 80+120+80+140+140+140+72 = 772 px,
+ * plus 6 gouttières de 12 et 2×16 de rembourrage → **876 px** exigés, pour
+ * 343 px visibles sur téléphone.
+ *
+ * ⚠️ Ce tableau n'était PAS dans la liste des neuf de D30-002 : l'audit les a
+ * cherchés par `gridTemplateColumns` et celui-ci passait par une classe. C'est
+ * le même défaut, exactement, sur un dixième écran.
+ */
+const RUNS_GRID = '80px minmax(120px,1fr) 80px 140px 140px minmax(140px,1.2fr) 72px';
 
 // ---------------------------------------------------------------------------
 // Types — alignés sur ScraperRunsController@index (response: { data: Run[] })
@@ -420,8 +442,15 @@ export function ScraperRunsPage() {
         />
       ) : (
         <Card padding="none" className="overflow-hidden" data-testid="scraper-runs-table">
+          {/* D30-002 — conteneur a defilement horizontal. Sans lui, les 876 px
+              de largeur minimale de ce tableau etaient coupes net par le
+              `overflow-hidden` de la Card, sans aucun moyen de les atteindre. */}
+          <TableScroll template={RUNS_GRID}>
           {/* Header (sticky) */}
-          <div className="sticky top-0 z-10 grid grid-cols-[80px_minmax(120px,1fr)_80px_140px_140px_minmax(140px,1.2fr)_72px] gap-3 border-b border-slate-200/70 bg-slate-50/80 px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+          <div
+            className="sticky top-0 z-10 grid gap-3 border-b border-slate-200/70 bg-slate-50/80 px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400"
+            style={{ gridTemplateColumns: RUNS_GRID }}
+          >
             <div>ID</div>
             <div>Source</div>
             <div>Zone</div>
@@ -444,6 +473,7 @@ export function ScraperRunsPage() {
               />
             ))}
           </div>
+          </TableScroll>
 
           {/* Pagination */}
           {totalPages > 1 ? (
@@ -582,9 +612,12 @@ function RunRow({
       data-testid={`run-row-${run.id}`}
       data-run-id={run.id}
       className={cn(
-        'grid cursor-pointer grid-cols-[80px_minmax(120px,1fr)_80px_140px_140px_minmax(140px,1.2fr)_72px] items-center gap-3 px-4 py-3 text-sm transition-colors',
+        'grid cursor-pointer items-center gap-3 px-4 py-3 text-sm transition-colors',
         'hover:bg-slate-50 dark:hover:bg-slate-800/40 focus:outline-none focus-visible:bg-slate-50 dark:focus-visible:bg-slate-800/40',
       )}
+      // TABLEAU-DEFILABLE: enferme par ScraperRunsPage.tsx — cette ligne est
+      // montee a l'interieur du <TableScroll> de la liste, pas ici.
+      style={{ gridTemplateColumns: RUNS_GRID }}
     >
       <div className="font-mono text-xs text-slate-500 tabular-nums dark:text-slate-400">#{run.id}</div>
       <div className="min-w-0 truncate font-medium text-slate-900 dark:text-white" title={run.source}>

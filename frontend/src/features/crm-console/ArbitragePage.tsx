@@ -15,7 +15,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Button, Card, EmptyState, Input, PageHeader } from '@/components/ui';
+import { Button, Card, EmptyState, Input, PageHeader, QueryErrorState } from '@/components/ui';
 import { api } from '@/lib/api';
 import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
 import type { ArbitrageResponse, ArbitrageRow } from './types';
@@ -75,19 +75,82 @@ function ArbitrageContent() {
 
   const rows = list.data?.data ?? [];
 
+  /**
+   * 🔴 D25-001 — l'échec n'est PAS un état vide.
+   *
+   * Avant ce correctif, `list.data?.data ?? []` rendait `[]` sous 403 comme
+   * sous 500, et l'écran affichait « Rien à arbitrer — tous les événements
+   * entrants ont trouvé leur entreprise ». Mesuré : le texte rendu sous 403,
+   * sous 500 et sous 200-liste-vide était STRICTEMENT le même. Un opérateur
+   * sans le rôle lisait donc que la file était traitée, alors qu'il n'avait
+   * simplement pas le droit de la lire.
+   *
+   * ⚠️ `list.data === undefined` fait partie de la condition, et ce n'est pas
+   * une précaution de style : React Query v5 CONSERVE la dernière page réussie
+   * quand un rafraîchissement échoue (`status: 'error'`, `data` intacte).
+   * Effacer l'écran dans ce cas ferait PERDRE à l'opérateur la file qu'il avait
+   * sous les yeux — on remplacerait un mensonge par une régression.
+   */
+  const echec = list.error !== null && list.data === undefined;
+
+  /**
+   * 🔴 D25-003 — LE ZÉRO N'EST PAS SEULEMENT AFFICHÉ SOUS ÉCHEC.
+   *
+   * Le correctif D25-001 avait neutralisé le compteur sous `echec`. Mais
+   * `list.data?.meta.total ?? 0` vaut AUSSI `0` PENDANT LE CHARGEMENT : entre
+   * le montage et la réponse, l'écran annonçait « 0 événement(s) reçus sans
+   * SIREN » sans avoir rien lu du tout. Mesuré (garde
+   * `arbitrage-conclusion-metier.test.tsx`, cas « PENDANT LE CHARGEMENT »).
+   *
+   * On chiffre donc sur la SEULE condition qui l'autorise : une réponse
+   * existe. `undefined` couvre l'échec ET l'en-vol, sans les confondre — la
+   * branche d'affichage plus bas les distingue, elle.
+   */
+  const total = list.data?.meta.total;
+
   return (
     <div className="px-6 py-6">
       <PageHeader
         title="Rapprochements à arbitrer"
-        subtitle={`${list.data?.meta.total ?? 0} événement(s) reçus sans SIREN — à rattacher ou à écarter.`}
+        subtitle={
+          total === undefined
+            ? 'Événements reçus sans SIREN — à rattacher ou à écarter.'
+            : `${total} événement(s) reçus sans SIREN — à rattacher ou à écarter.`
+        }
       />
 
-      {list.isLoading ? (
+      {echec ? (
+        <QueryErrorState
+          error={list.error}
+          contexte="la file d’arbitrage"
+          onRetry={() => void list.refetch()}
+        />
+      ) : list.isLoading ? (
         <ConsoleListSkeleton rows={5} />
       ) : rows.length === 0 ? (
+        /*
+          🔴 D25-003 — CE TEXTE DISAIT : « Tous les événements entrants ont
+          trouvé leur entreprise. »
+
+          Ce n'était pas un compteur à zéro, c'était une AFFIRMATION SUR L'ÉTAT
+          DU SYSTÈME — et une affirmation que cet écran n'est pas en position de
+          faire. Il ne voit QUE ce que l'ingestion lui dépose ; il ne sait rien
+          des événements qui n'y sont jamais arrivés. B13-001 mesure justement
+          qu'aucun émetteur du site ne transmet de SIREN : la phrase était donc
+          fausse même quand la file était réellement vide, et fausse de la façon
+          la plus rassurante possible. Un dirigeant qui l'a lue en concluait que
+          le rapprochement automatique fonctionnait parfaitement.
+
+          Ce qui la remplace est un FAIT, borné à ce que l'écran a vraiment lu,
+          et qui nomme sa propre limite.
+        */
         <EmptyState
           title="Rien à arbitrer"
-          description="Tous les événements entrants ont trouvé leur entreprise."
+          description={
+            'Aucun événement n’attend d’arbitrage dans cette file. ' +
+            'Cet écran ne voit que ce que l’ingestion y dépose : il ne dit rien ' +
+            'des événements qui ne sont jamais arrivés jusqu’ici.'
+          }
         />
       ) : (
         <div className="flex flex-col gap-3">

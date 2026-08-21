@@ -10,8 +10,10 @@ import {
   Input,
   Modal,
   PageHeader,
+  QueryErrorState,
   StatusPill,
   cn,
+  TableScroll,
 } from '@/components/ui';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -59,7 +61,7 @@ export function UsersPage() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('operator');
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['users'],
     queryFn: async () => (await api.get<{ data: UserRow[] }>('/users')).data,
   });
@@ -79,6 +81,22 @@ export function UsersPage() {
 
   const rows = data?.data ?? [];
 
+  /**
+   * 🔴 D25-001 — l'écran d'administration où le mensonge coûtait le plus cher.
+   *
+   * `/users` est une route ADMIN : un opérateur sans le rôle reçoit 403, et
+   * c'est le cas NOMINAL, pas l'exception. Il lisait alors « Aucun utilisateur
+   * — Invite ton premier collaborateur », bouton « Inviter » compris : l'écran
+   * lui affirmait que l'équipe était vide ET l'invitait à recruter, sur un
+   * espace de travail peuplé qu'il n'avait pas le droit de voir. Le POST
+   * d'invitation qui aurait suivi serait reparti en 403, sans plus
+   * d'explication.
+   *
+   * ⚠️ `data === undefined` : React Query v5 conserve la dernière liste réussie
+   * si un rafraîchissement échoue ; on ne l'efface pas.
+   */
+  const echec = error !== null && data === undefined;
+
   return (
     <div className="px-6 py-6">
       <PageHeader
@@ -95,7 +113,13 @@ export function UsersPage() {
         }
       />
 
-      {isLoading ? (
+      {echec ? (
+        <QueryErrorState
+          error={error}
+          contexte="la liste des membres de l’espace de travail"
+          onRetry={() => void refetch()}
+        />
+      ) : isLoading ? (
         <CompaniesTableSkeleton rows={5} />
       ) : rows.length === 0 ? (
         <EmptyState
@@ -110,6 +134,10 @@ export function UsersPage() {
         />
       ) : (
         <Card padding="none" className="overflow-hidden">
+          {/* D30-002 — conteneur a defilement horizontal. Sans lui, les 1020 px
+              de largeur minimale de ce tableau etaient coupes net par le
+              `overflow-hidden` de la Card, sans aucun moyen de les atteindre. */}
+          <TableScroll template={GRID}>
           <div
             role="row"
             className={cn(
@@ -169,6 +197,7 @@ export function UsersPage() {
               </div>
             ))}
           </div>
+          </TableScroll>
         </Card>
       )}
 

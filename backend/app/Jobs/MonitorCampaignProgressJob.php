@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\RunsInWorkspace;
 use App\Models\ScrapingCampaign;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -28,7 +29,7 @@ use Illuminate\Support\Facades\Schema;
  */
 class MonitorCampaignProgressJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, RunsInWorkspace, SerializesModels;
 
     public int $tries = 1;
 
@@ -36,7 +37,32 @@ class MonitorCampaignProgressJob implements ShouldQueue
 
     public function __construct(public readonly int $campaignId) {}
 
+    /**
+     * 🔴 CONSTAT B11-002 / B17-010. Ce moniteur tourne toutes les 60 s en se
+     * re-dispatchant lui-meme, et il ECRIT dans `scraping_campaigns`
+     * (compteurs de quota, auto-pause). `Queue::looping` efface le contexte
+     * entre deux jobs : il n'en avait aucun. Sous policy stricte, son
+     * `ScrapingCampaign::find()` rend `null` et le `return` de la ligne
+     * suivante est SILENCIEUX — une campagne ne se mettrait plus jamais en
+     * pause sur quota. Le corps s'execute desormais sous l'espace de sa
+     * campagne.
+     */
     public function handle(): void
+    {
+        $espace = $this->espaceDuJob() ?? $this->espaceDepuisLaLigne('scraping_campaigns', $this->campaignId);
+
+        if ($espace === null) {
+            Log::warning('MonitorCampaignProgressJob: aucun espace de travail — suivi abandonne (constat B11-002)', [
+                'campaign_id' => $this->campaignId,
+            ]);
+
+            return;
+        }
+
+        $this->inWorkspace($espace, fn () => $this->suivre());
+    }
+
+    private function suivre(): void
     {
         /** @var ScrapingCampaign|null $campaign */
         $campaign = ScrapingCampaign::find($this->campaignId);
@@ -47,8 +73,20 @@ class MonitorCampaignProgressJob implements ShouldQueue
             return;
         }
 
-        // 1+3) Aggrégats côté runs
-        $aggregates = ['runs_completed' => 0, 'companies_created' => 0, 'duration_seconds_used' => 0];
+        // 1+3) Aggrégats côté runs.
+        //
+        // 🔴 C18-007 (second chemin). Ces valeurs de depart etaient a 0, et elles
+        // sont ecrites telles quelles par le `update()` plus bas des que le
+        // recompte echoue — table `scraper_runs` absente, ou exception attrapee
+        // par le `catch` ci-dessous. Autrement dit : une base momentanement
+        // indisponible remettait le compteur de quota a zero, en silence, toutes
+        // les 60 s. On part donc de l'etat courant : a defaut de savoir
+        // recompter, le moniteur ne DEFAIT rien.
+        $aggregates = [
+            'runs_completed' => (int) $campaign->runs_completed,
+            'companies_created' => (int) $campaign->companies_created,
+            'duration_seconds_used' => (int) $campaign->duration_seconds_used,
+        ];
 
         try {
             if (Schema::hasTable('scraper_runs')) {
@@ -81,7 +119,29 @@ class MonitorCampaignProgressJob implements ShouldQueue
                 if ($row) {
                     $aggregates['runs_completed'] = (int) ($row->runs_completed ?? 0);
                     $aggregates['duration_seconds_used'] = (int) ($row->duration_seconds_used ?? 0);
-                    $aggregates['companies_created'] = (int) ($row->companies_created ?? 0);
+
+                    // 🔴 CONSTAT C18-007. Ce recompte VALAIT TOUJOURS 0 pour une
+                    // campagne de decouverte, et il ECRASAIT le compteur.
+                    // `LaunchZoneScrapingJob` cree son run SANS `company_id`
+                    // (colonne nullable, cf. `\d scraper_runs`) puis incremente
+                    // `companies_created` par `UPDATE … companies_created + N`.
+                    // Le moniteur, re-dispatche toutes les 60 s, remettait donc
+                    // ce compteur a zero chaque minute : `shouldAutoPause()` ne
+                    // voyait jamais `companies_created >= max_companies`, et le
+                    // plafond `max_companies` ne freinait rien.
+                    //
+                    // `max(…)` et pas le recompte seul : un compteur de quota ne
+                    // doit JAMAIS redescendre — c'est exactement la maladie deja
+                    // nommee quelques lignes plus haut a propos du `GREATEST(0, …)`
+                    // sur les durees, « un plafond qui se relache tout seul ».
+                    // Le recompte reste utile : il RATTRAPE les entreprises
+                    // ingerees par un autre canal (runs Node portant un
+                    // `company_id`, cf. `/internal/scraper-result`), qui
+                    // n'incrementent pas le compteur eux-memes.
+                    $aggregates['companies_created'] = max(
+                        (int) $campaign->companies_created,
+                        (int) ($row->companies_created ?? 0),
+                    );
                 }
             }
         } catch (\Throwable $e) {
@@ -121,6 +181,8 @@ class MonitorCampaignProgressJob implements ShouldQueue
         }
 
         // 6) Sinon, re-self-dispatch
-        self::dispatch($campaign->id)->delay(now()->addSeconds(60));
+        dispatch((new self($campaign->id))
+            ->pourEspace((string) $campaign->workspace_id))
+            ->delay(now()->addSeconds(60));
     }
 }

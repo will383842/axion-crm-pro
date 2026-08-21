@@ -47,5 +47,35 @@ for etape in config route view; do
     fi
 done
 
+# 🔴 B17-002 (S1), mesuré le 2026-08-21 — LIBÉRER LES VERROUS DU PLANIFICATEUR.
+#
+# `Schedule::…->withoutOverlapping($ttl)` pose un verrou dans le cache (Redis en
+# production) et ne le retire que dans `Event::finish()` : uniquement si le
+# processus va au bout. Or le déploiement recrée le conteneur `scheduler`
+# (`up -d --force-recreate … scheduler`, deploy-direct-ssh.yml:200 et
+# deploy-staging.yml:189) et Docker n'accorde que 10 s avant SIGKILL — aucun
+# `stop_grace_period` n'est déclaré dans les quatre fichiers Compose. Une tâche
+# longue est donc tuée net, son verrou reste posé, et comme `redis` n'est PAS
+# recréé par le même déploiement (`--no-deps`), le verrou SURVIT au processus
+# mort. Sans TTL explicite il vaut 1 440 minutes : 24 h d'arrêt silencieux.
+#
+# On retire donc les verrous au (re)démarrage du planificateur. C'est le seul
+# instant où l'on SAIT qu'aucune tâche planifiée ne tourne : le planificateur
+# est le seul processus qui les lance, et il démarre à peine.
+#
+# ⚠️ CONDITIONNÉ à `schedule:work`, À DESSEIN. Ce même entrypoint sert `php-fpm`
+# et `horizon` : purger les verrous depuis l'API ou depuis un consommateur de
+# files retirerait le verrou d'une tâche EN COURS, et autoriserait précisément
+# le recouvrement que `withoutOverlapping` sert à empêcher.
+#
+# `|| true` : un cache injoignable au démarrage ne doit pas empêcher le
+# planificateur de démarrer — même raison que pour les caches ci-dessus.
+case " $* " in
+    *" schedule:work "* | *" schedule:run "*)
+        echo "[entrypoint] planificateur : liberation des verrous withoutOverlapping restes poses"
+        php artisan schedule:clear-cache || true
+        ;;
+esac
+
 echo "[entrypoint] demarrage : $*"
 exec "$@"

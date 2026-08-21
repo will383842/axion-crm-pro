@@ -59,7 +59,9 @@ Logs : `/var/log/axion-setup.log`
 3. Redémarrer les services :
    ```bash
    cd /opt/axion-crm-pro
-   docker compose restart api horizon scheduler
+   # `up -d` et NON `restart` : `restart` ne relit pas `env_file`, les
+   # variables qu'on vient d'ecrire ne seraient pas appliquees.
+   docker compose up -d api horizon scheduler
    ```
 4. Tester depuis ton PC :
    ```powershell

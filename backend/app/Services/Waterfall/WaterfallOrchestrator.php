@@ -8,12 +8,15 @@ use App\Contracts\BodaccClient;
 use App\Contracts\InseeClient;
 use App\Contracts\LLMClient;
 use App\Data\LLM\LLMRequestData;
+use App\Jobs\DispatchScrapeJob;
 use App\Models\AudienceMember;
 use App\Models\Company;
 use App\Services\Audiences\AudienceBuilderService;
 use App\Services\Classification\AutoClassifierService;
 use App\Services\Dedup\DeduplicationService;
 use App\Services\Domain\DomainFinderService;
+use App\Services\Email\EmailFinderService;
+use App\Services\Http\SsrfGuard;
 use App\Services\Legal\MentionsLegalesScraperService;
 use App\Services\Scraping\GooglePlacesClient;
 use App\Services\Tags\AutoTaggerService;
@@ -50,7 +53,7 @@ class WaterfallOrchestrator
         private readonly BanGeocoder $ban,
         private readonly LLMClient $llm,
         private readonly DeduplicationService $dedup,
-        private readonly \App\Services\Email\EmailFinderService $emailFinder,
+        private readonly EmailFinderService $emailFinder,
         // Sprint Pipeline 360° — nouveaux services injectés
         private readonly DomainFinderService $domainFinder,
         private readonly MentionsLegalesScraperService $mentionsLegales,
@@ -76,6 +79,7 @@ class WaterfallOrchestrator
                 Log::info('Waterfall short-circuit (entreprise radiée)', [
                     'company_id' => $company->id, 'siren' => $company->siren,
                 ]);
+
                 return;
             }
         } catch (\Throwable $e) {
@@ -121,21 +125,23 @@ class WaterfallOrchestrator
         // Sprint H3 — Garde-fou état admin : entreprise radiée → archived_no_email + reason
         if ($data->etatAdministratif !== null && $data->etatAdministratif !== 'A') {
             $company->forceFill([
-                'denomination'        => $data->denomination ?? $company->denomination,
-                'prospection_status'  => 'archived_no_email',
-                'archive_reason'      => 'entreprise_radiee',
+                'denomination' => $data->denomination ?? $company->denomination,
+                'prospection_status' => 'archived_no_email',
+                'archive_reason' => 'entreprise_radiee',
             ])->save();
             $this->recordRun($company, 'insee', 'success');
+
             return 'archived';
         }
 
         $company->forceFill([
-            'denomination'   => $data->denomination ?? $company->denomination,
-            'naf'            => $data->naf ?? $company->naf,
-            'legal_form'     => $data->legalForm ?? $company->legal_form,
+            'denomination' => $data->denomination ?? $company->denomination,
+            'naf' => $data->naf ?? $company->naf,
+            'legal_form' => $data->legalForm ?? $company->legal_form,
             'effectif_range' => $data->effectifRange ?? $company->effectif_range,
         ])->save();
         $this->recordRun($company, 'insee', 'success');
+
         return 'ok';
     }
 
@@ -147,10 +153,10 @@ class WaterfallOrchestrator
         }
         $signals = $company->signals ?: [];
         $signals['legal'] = [
-            'ca'               => $data->chiffreAffaires,
-            'resultat_net'     => $data->resultatNet,
+            'ca' => $data->chiffreAffaires,
+            'resultat_net' => $data->resultatNet,
             'bilans_last_year' => $data->bilansLastYear,
-            'dirigeants'       => $data->representatives,
+            'dirigeants' => $data->representatives,
         ];
         $company->signals = $signals;
 
@@ -174,16 +180,16 @@ class WaterfallOrchestrator
         foreach ($data->representatives as $rep) {
             try {
                 DB::table('contacts')->insertOrIgnore([[
-                    'workspace_id'      => $company->workspace_id,
-                    'company_id'        => $company->id,
-                    'first_name'        => $rep['first_name'] ?? null,
-                    'last_name'         => $rep['last_name'],
-                    'role'              => $rep['role'] ?? 'dirigeant',
-                    'discovery_source'  => 'annuaire-entreprises',
-                    'sources'           => json_encode(['annuaire-entreprises']),
-                    'metadata'          => json_encode($rep),
-                    'created_at'        => now(),
-                    'updated_at'        => now(),
+                    'workspace_id' => $company->workspace_id,
+                    'company_id' => $company->id,
+                    'first_name' => $rep['first_name'] ?? null,
+                    'last_name' => $rep['last_name'],
+                    'role' => $rep['role'] ?? 'dirigeant',
+                    'discovery_source' => 'annuaire-entreprises',
+                    'sources' => json_encode(['annuaire-entreprises']),
+                    'metadata' => json_encode($rep),
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ]]);
             } catch (\Throwable $e) {
                 \Log::warning('contact insert failed', ['rep' => $rep, 'error' => $e->getMessage()]);
@@ -273,11 +279,12 @@ class WaterfallOrchestrator
             $signals = $existingSignals;
             $signals['google_places_skipped'] = [
                 'reason' => 'has_essential_data',
-                'at'     => now()->toIso8601String(),
+                'at' => now()->toIso8601String(),
             ];
             unset($signals['google_places_pending']);
             $company->signals = $signals;
             $company->save();
+
             return;
         }
         try {
@@ -290,12 +297,13 @@ class WaterfallOrchestrator
             if ($place === null && $reason === 'quota_exceeded') {
                 $signals = $company->signals ?: [];
                 $signals['google_places_pending'] = [
-                    'reason'     => 'monthly_quota_exceeded',
-                    'queued_at'  => now()->toIso8601String(),
+                    'reason' => 'monthly_quota_exceeded',
+                    'queued_at' => now()->toIso8601String(),
                 ];
                 $company->signals = $signals;
                 $company->save();
                 $this->recordRun($company, 'google-places', 'partial');
+
                 return;
             }
 
@@ -307,11 +315,12 @@ class WaterfallOrchestrator
                     $signals = $company->signals ?: [];
                     $signals['google_places_skipped'] = [
                         'reason' => $reason,
-                        'at'     => now()->toIso8601String(),
+                        'at' => now()->toIso8601String(),
                     ];
                     $company->signals = $signals;
                     $company->save();
                 }
+
                 return;
             }
             $data = $this->googlePlaces->flatten($place);
@@ -323,8 +332,38 @@ class WaterfallOrchestrator
                 $touched = true;
             }
             if (! $company->website && $data['website']) {
-                $company->website = $data['website'];
-                $touched = true;
+                // ── C19-001 — SITE JUMEAU NON PORTE (mesure du 2026-08-20) ──
+                // `$data['website']` est le champ `places.websiteUri` rendu par
+                // l'API Google Places : une valeur fournie par un TIERS, donc de
+                // la donnee, exactement au meme titre que le resultat de l'API
+                // Brave et que le `href` extrait de Pages Jaunes. Ces deux-la
+                // ont ete gardes le meme jour dans `DomainFinderService`
+                // (lignes 475 et 526) ; celui-ci ne l'avait pas ete —
+                // `grep -n SsrfGuard` sur ce fichier rendait 0 resultat.
+                //
+                // Ce qu'on empeche, precisement : qu'une adresse interne soit
+                // PERSISTEE dans `companies.website`. Le fetch aval la refuse
+                // deja (MentionsLegales, passe 3), donc ce n'est pas la lecture
+                // de l'infrastructure qu'on ferme ici, c'est sa PROPAGATION :
+                // une fois en base, la valeur est affichee dans la fiche,
+                // exportee en CSV, et renvoyee au worker Playwright comme
+                // `target_url` (etape 4, ligne ~418). Un seul champ empoisonne
+                // se propage a toute la chaine, et chaque garde aval devient un
+                // point unique de defaillance.
+                //
+                // On ne refuse QUE ce champ : le telephone, l'adresse et les
+                // coordonnees du meme `place` restent ecrits. Un refus qui fait
+                // sauter toute l'etape ne serait pas un correctif, ce serait une
+                // panne.
+                if (SsrfGuard::check((string) $data['website'])['ok']) {
+                    $company->website = $data['website'];
+                    $touched = true;
+                } else {
+                    Log::warning('google-places: websiteUri refuse par la garde SSRF', [
+                        'company_id' => $company->id,
+                        'website' => $data['website'],
+                    ]);
+                }
             }
             if (! $company->address && $data['address']) {
                 $company->address = $data['address'];
@@ -346,15 +385,15 @@ class WaterfallOrchestrator
             // (Sprint H12 : enriched_at sert au skip ré-enrichissement + traçabilité)
             $signals = $company->signals ?: [];
             $signals['google_places'] = [
-                'place_id'         => $data['google_place_id'],
-                'display_name'     => $data['display_name'],
-                'rating'           => $data['rating'],
-                'user_rating_count'=> $data['user_rating_count'],
-                'business_status'  => $data['business_status'],
-                'primary_type'     => $data['primary_type'],
-                'types'            => $data['types'],
-                'opening_hours'    => $data['opening_hours'],
-                'enriched_at'      => now()->toIso8601String(),
+                'place_id' => $data['google_place_id'],
+                'display_name' => $data['display_name'],
+                'rating' => $data['rating'],
+                'user_rating_count' => $data['user_rating_count'],
+                'business_status' => $data['business_status'],
+                'primary_type' => $data['primary_type'],
+                'types' => $data['types'],
+                'opening_hours' => $data['opening_hours'],
+                'enriched_at' => now()->toIso8601String(),
             ];
             unset($signals['google_places_pending'], $signals['google_places_skipped']);
             $company->signals = $signals;
@@ -367,7 +406,7 @@ class WaterfallOrchestrator
             WaterfallSentry::capture($company, 'google-places', $e);
             Log::warning('google-places failed', [
                 'company_id' => $company->id,
-                'error'      => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
             $this->recordRun($company, 'google-places', 'failed');
         }
@@ -394,10 +433,11 @@ class WaterfallOrchestrator
         if (! empty($company->email_generic)) {
             return true;
         }
-        $hasContact = \Illuminate\Support\Facades\DB::table('contacts')
+        $hasContact = DB::table('contacts')
             ->where('company_id', $company->id)
-            ->whereIn('email_status', \App\Services\Triage\TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
+            ->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
             ->exists();
+
         return $hasContact;
     }
 
@@ -407,15 +447,15 @@ class WaterfallOrchestrator
             return;
         }
         $context = [
-            'siren'        => $company->siren,
+            'siren' => $company->siren,
             'denomination' => $company->denomination,
-            'naf'          => $company->naf,
+            'naf' => $company->naf,
         ];
         // Sprint H9 — google-maps retiré : remplacé par GooglePlaces API server-side (step3d).
         // Reste pour les workers Node : pages-jaunes (Webshare proxy requis si activé),
         // website scrape, google-search (fallback URL discovery).
         foreach (['pages-jaunes', 'website', 'google-search'] as $src) {
-            \App\Jobs\DispatchScrapeJob::dispatch($company->id, $src, $context, $company->website);
+            DispatchScrapeJob::dispatch($company->id, $src, $context, $company->website);
         }
     }
 
@@ -448,12 +488,12 @@ class WaterfallOrchestrator
                 }
                 $best = $results[0];
                 DB::table('contacts')->where('id', $c->id)->update([
-                    'email'        => $best->email,
+                    'email' => $best->email,
                     'email_status' => $best->status,
-                    'email_score'  => $best->score,
-                    'email_pattern'=> str_replace([$company->id . '@'], '@', $best->email),
+                    'email_score' => $best->score,
+                    'email_pattern' => str_replace([$company->id . '@'], '@', $best->email),
                     'last_verified_at' => now(),
-                    'updated_at'   => now(),
+                    'updated_at' => now(),
                 ]);
             } catch (\Throwable $e) {
                 WaterfallSentry::capture($company, 'email-finder', $e);
@@ -471,6 +511,7 @@ class WaterfallOrchestrator
         $result = $this->ban->geocode((string) $company->address, $company->postcode);
         if (! $result) {
             $this->step8_lambert_fallback($company);
+
             return;
         }
         $company->lat = $result->lat;
@@ -480,9 +521,9 @@ class WaterfallOrchestrator
         // Backfill BAN signals pour AutoClassifier (step10b)
         $signals = $company->signals ?: [];
         $signals['ban'] = [
-            'city'          => $result->city ?? null,
+            'city' => $result->city ?? null,
             'insee_commune' => $result->insee ?? null,
-            'postcode'      => $result->postcode ?? null,
+            'postcode' => $result->postcode ?? null,
         ];
         $company->signals = $signals;
 
@@ -521,7 +562,7 @@ class WaterfallOrchestrator
         } catch (\Throwable $e) {
             Log::warning('lambert-fallback failed', [
                 'company_id' => $company->id,
-                'error'      => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
         }
     }
@@ -537,10 +578,10 @@ class WaterfallOrchestrator
             $req = new LLMRequestData(
                 useCaseSlug: 'classify_company_axion',
                 variables: [
-                    'denomination'    => $company->denomination,
-                    'naf'             => $company->naf,
-                    'effectif_range'  => $company->effectif_range,
-                    'ext_website_text'=> '',
+                    'denomination' => $company->denomination,
+                    'naf' => $company->naf,
+                    'effectif_range' => $company->effectif_range,
+                    'ext_website_text' => '',
                 ],
             );
             $resp = $this->llm->complete($req);
@@ -613,7 +654,7 @@ class WaterfallOrchestrator
         } catch (\Throwable $e) {
             Log::warning('recompute quality score failed', [
                 'company_id' => $company->id,
-                'error'      => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
         }
     }
@@ -632,28 +673,28 @@ class WaterfallOrchestrator
                 // (ou company-only si aucun mais email_generic présent).
                 $contactIds = DB::table('contacts')
                     ->where('company_id', $company->id)
-                    ->whereIn('email_status', \App\Services\Triage\TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
+                    ->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
                     ->pluck('id')
                     ->all();
 
                 if (empty($contactIds)) {
                     AudienceMember::firstOrCreate([
                         'audience_id' => $audienceId,
-                        'company_id'  => $company->id,
-                        'contact_id'  => null,
+                        'company_id' => $company->id,
+                        'contact_id' => null,
                     ], [
                         'workspace_id' => $company->workspace_id,
-                        'added_at'     => now(),
+                        'added_at' => now(),
                     ]);
                 } else {
                     foreach ($contactIds as $contactId) {
                         AudienceMember::firstOrCreate([
                             'audience_id' => $audienceId,
-                            'company_id'  => $company->id,
-                            'contact_id'  => $contactId,
+                            'company_id' => $company->id,
+                            'contact_id' => $contactId,
                         ], [
                             'workspace_id' => $company->workspace_id,
-                            'added_at'     => now(),
+                            'added_at' => now(),
                         ]);
                     }
                 }
@@ -662,7 +703,7 @@ class WaterfallOrchestrator
                     ->where('id', $audienceId)
                     ->update([
                         'member_count' => DB::raw('(SELECT COUNT(*) FROM audience_members WHERE audience_id = email_audiences.id)'),
-                        'updated_at'   => now(),
+                        'updated_at' => now(),
                     ]);
             }
             $this->recordRun($company, 'auto-segment', 'success');
@@ -681,7 +722,7 @@ class WaterfallOrchestrator
         } catch (\Throwable $e) {
             Log::warning("{$step} failed (skipped)", [
                 'company_id' => $company->id,
-                'error'      => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
         }
     }
@@ -691,14 +732,14 @@ class WaterfallOrchestrator
         try {
             DB::table('scraper_runs')->insert([
                 'workspace_id' => $company->workspace_id,
-                'company_id'   => $company->id,
-                'source'       => $source,
-                'status'       => $status,
-                'started_at'   => now(),
-                'finished_at'  => now(),
-                'dedup_key'    => $this->dedup->buildDedupKey($source, ['siren' => $company->siren, 't' => time()]),
-                'created_at'   => now(),
-                'updated_at'   => now(),
+                'company_id' => $company->id,
+                'source' => $source,
+                'status' => $status,
+                'started_at' => now(),
+                'finished_at' => now(),
+                'dedup_key' => $this->dedup->buildDedupKey($source, ['siren' => $company->siren, 't' => time()]),
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
         } catch (\Throwable $e) {
             Log::warning('scraper_runs insert failed', ['source' => $source, 'error' => $e->getMessage()]);

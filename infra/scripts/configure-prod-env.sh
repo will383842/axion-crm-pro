@@ -33,6 +33,15 @@ echo "[axion-config] Application credentials production…"
 
 # --- Désactivation MOCK pour sources réelles ---
 set_env "MOCK_MODE"                  "false"
+# MAIL_MAILER n'etait pose NULLE PART : Laravel retombait sur son defaut `log`,
+# et aucun courriel ne partait. La decision de Will est bien « log » — on
+# l'ECRIT, pour qu'elle cesse d'etre un defaut implicite.
+set_env "MAIL_MAILER"                "log"
+# ... mais le lien magique et la reinitialisation de mot de passe ne sont pas du
+# courrier commercial : ce sont les deux portes de secours d'un compte, et `log`
+# les coupait aussi. C'est l'une des raisons pour lesquelles personne ne s'est
+# jamais connecte au CRM. Poser `smtp` ici les laisse sortir, et EUX SEULS.
+set_env "MAIL_MAILER_AUTH"           "log"
 set_env "MOCK_LLM"                   "false"
 set_env "MOCK_INSEE"                 "false"
 set_env "MOCK_ANNUAIRE_ENTREPRISES"  "false"
@@ -72,12 +81,46 @@ set_env "OWNER_INITIAL_NAME"         "Williams Jullin"
 # --- Contraintes CPX22 (4 GB RAM) ---
 set_env "WORKER_CONCURRENCY"         "1"
 
-echo "[axion-config] Restart services…"
+# 🔴 `up -d`, JAMAIS `restart`.
+#
+# Ce script vient d'ecrire des variables dans le `.env` — et
+# `docker compose restart` NE RELIT PAS `env_file` : il relance le processus
+# DANS le conteneur existant, dont l'environnement a ete fige a la creation.
+# Autrement dit, ce script annoncait « Restart services… » puis rendait la main
+# sans qu'AUCUNE des variables qu'il venait d'ecrire ne soit appliquee. Un
+# operateur repartait convaincu du contraire : pas une panne, une fausse
+# assurance. Mesure le 2026-08-19 (audit 360, meme famille que A07-003).
+echo "[axion-config] Recreation des services (up -d, pas restart)…"
 cd /opt/axion-crm-pro
-docker compose restart api horizon scheduler
+
+# 🔴 CONSTAT F38-007 (S0), et c'est le piege DANS le piege.
+#
+# Cette commande ne nommait que trois services, et on pouvait croire que
+# Postgres et Redis n'etaient pas concernes. Ils le sont : `api`, `horizon` et
+# `scheduler` portent tous `depends_on: [postgres, redis]`, et Compose monte les
+# dependances sauf si on lui dit `--no-deps`. Sans l'overlay de production, il
+# les recreait donc depuis `docker-compose.yml` -- qui PUBLIE 55432 et 56379.
+#
+# C'est la faille du 2026-08-19, rouverte par le script meme qui sert a
+# configurer la production.
+export COMPOSE_FILE="docker-compose.yml:docker-compose.prod.yml"
+echo "[axion-config] COMPOSE_FILE = $COMPOSE_FILE"
+docker compose up -d api horizon scheduler
 
 echo "[axion-config] Attente healthcheck (30s)…"
 sleep 30
+
+# On NE SUPPOSE PAS que les variables sont appliquees : on les LIT dans le
+# conteneur qui tourne. Sans ce controle, l'erreur ci-dessus etait indetectable.
+echo "[axion-config] Verification des variables REELLEMENT appliquees :"
+for cle in APP_ENV MAIL_MAILER MAIL_MAILER_AUTH MOCK_MODE; do
+  valeur="$(docker inspect axion-crm-api --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep "^${cle}=" || true)"
+  if [ -z "$valeur" ]; then
+    echo "  ⚠️  ${cle} : ABSENTE du conteneur — la variable n'a PAS ete appliquee." >&2
+  else
+    echo "  ✓ ${valeur}"
+  fi
+done
 
 echo "[axion-config] Vérification finale :"
 if curl -fsS http://localhost/up >/dev/null 2>&1; then

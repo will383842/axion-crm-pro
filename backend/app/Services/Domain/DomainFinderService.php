@@ -5,8 +5,11 @@ namespace App\Services\Domain;
 use App\Models\Company;
 use App\Models\Media;
 use App\Services\Http\ProxiedHttpClient;
+use App\Services\Http\SsrfGuard;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Sentry\State\Hub;
 
 /**
  * Trouve le site web officiel d'une entreprise en cascade (3 stratégies).
@@ -35,6 +38,7 @@ class DomainFinderService
 
     // Vérification de domaine deviné : court + fail-fast (des millions d'entreprises).
     private const GUESS_TIMEOUT = 4;
+
     private const GUESS_CONNECT_TIMEOUT = 2;
 
     private const BRAVE_SEARCH_URL = 'https://api.search.brave.com/res/v1/web/search';
@@ -51,10 +55,27 @@ class DomainFinderService
         $signals = $company->signals ?? [];
         $existing = $signals['legal']['siteweb'] ?? null;
         if ($existing && is_string($existing) && filter_var($existing, FILTER_VALIDATE_URL)) {
+            // C19-001 — `signals.legal.siteweb` est de la DONNÉE : il est rempli
+            // par l'import AnnuaireEntreprises, donc par un tiers. `find()`
+            // n'émet aucune requête ici, mais ce qu'il rend est écrit dans
+            // `companies.website`, puis re-scrapé par MentionsLegales et par la
+            // passe 3. Laisser passer `http://169.254.169.254/` ici, c'est
+            // empoisonner toute la chaîne depuis un seul champ.
+            // `filter_var(…, FILTER_VALIDATE_URL)` ne protège de rien : il
+            // accepte `http://127.0.0.1/` sans broncher.
+            if (! SsrfGuard::check($existing)['ok']) {
+                Log::warning('DomainFinder: signals.legal.siteweb refuse par la garde SSRF', [
+                    'company_id' => $company->id,
+                    'siteweb' => $existing,
+                ]);
+
+                return null;
+            }
+
             return $this->canonicalize($existing);
         }
 
-        if (!$company->denomination) {
+        if (! $company->denomination) {
             return null;
         }
         $ville = $company->city_name ?? $company->city ?? '';
@@ -156,6 +177,7 @@ class DomainFinderService
                 return $this->canonicalize("https://{$domain}/");
             }
         }
+
         return null;
     }
 
@@ -167,7 +189,7 @@ class DomainFinderService
      *
      * @param  iterable<Company>  $companies
      * @param  bool  $extended  2e passage (pass 2) : teste les variantes secondaires.
-     * @return array<int, string|null>  id entreprise => url trouvée (ou null)
+     * @return array<int, string|null> id entreprise => url trouvée (ou null)
      */
     public function guessDomainsBatch(iterable $companies, bool $extended = false): array
     {
@@ -184,7 +206,7 @@ class DomainFinderService
                 // dominent. Le pool HTTP gère mieux : les NXDOMAIN échouent vite au
                 // resolve (bien avant le connectTimeout) sans sérialiser.
                 $reqs['k' . ($n++)] = [
-                    'c'      => $c,
+                    'c' => $c,
                     'domain' => $domain,
                     'tokens' => $tokens,
                 ];
@@ -201,9 +223,22 @@ class DomainFinderService
                     $out[] = $pool->as($key)
                         ->timeout(self::GUESS_TIMEOUT)
                         ->connectTimeout(self::GUESS_CONNECT_TIMEOUT)
+                        // C19-003 — pas de contrôle SSRF à l'ENTRÉE ici, et c'est
+                        // un choix mesuré, pas un oubli : `candidateDomains()` ne
+                        // fabrique que des `slug.fr` / `slug.com` construits à
+                        // partir de la dénomination, jamais une IP ni un nom
+                        // interdit — un contrôle d'entrée y serait provablement
+                        // sans effet, et il coûterait ce que le commentaire
+                        // ci-dessus a déjà mesuré : le pré-filtre DNS séquentiel
+                        // DIVISAIT le débit par ~2,5. La redirection, elle, est
+                        // hors de notre contrôle : le domaine deviné peut
+                        // appartenir à n'importe qui et répondre
+                        // `302 → 169.254.169.254`. Elle, on la vérifie.
+                        ->withOptions(SsrfGuard::redirectOptions())
                         ->withHeaders(['User-Agent' => self::USER_AGENT])
                         ->get("https://{$it['domain']}/");
                 }
+
                 return $out;
             });
 
@@ -225,6 +260,7 @@ class DomainFinderService
                 }
             }
         }
+
         return $result;
     }
 
@@ -242,7 +278,7 @@ class DomainFinderService
      * On préfère un faux « vivant » à un faux « mort » (on ne jette pas un lead).
      *
      * @param  iterable<Company>  $companies
-     * @return array<int, bool>  id entreprise => vivant (true) / mort (false)
+     * @return array<int, bool> id entreprise => vivant (true) / mort (false)
      */
     public function revalidateBatch(iterable $companies): array
     {
@@ -254,6 +290,26 @@ class DomainFinderService
             if ($url === '') {
                 continue; // pas de site à re-valider → on ne se prononce pas
             }
+
+            // ── C19-001 — LA GARDE SSRF, ENFIN BRANCHÉE ─────────────────────
+            // C'est ICI la surface la plus directe des trois : `companies.website`
+            // lu tel quel et appelé, sans aucun contrôle. La passe 3 tourne sur
+            // des millions de lignes, 400 requêtes par salve : une seule ligne
+            // empoisonnée en base suffisait à faire frapper la boucle locale ou
+            // le réseau privé de l'hôte. On refuse ET on marque « mort » — un
+            // site interne n'est pas un lead.
+            $verdict = SsrfGuard::check($url);
+            if (! $verdict['ok']) {
+                Log::warning('DomainFinder passe 3: website refuse par la garde SSRF', [
+                    'company_id' => $c->id,
+                    'website' => $url,
+                    'motif' => $verdict['reason'],
+                ]);
+                $result[$c->id] = false;
+
+                continue;
+            }
+
             $result[$c->id] = false;
             $reqs['k' . ($n++)] = ['id' => $c->id, 'url' => $url];
         }
@@ -268,9 +324,13 @@ class DomainFinderService
                     $out[] = $pool->as($key)
                         ->timeout(self::GUESS_TIMEOUT)
                         ->connectTimeout(self::GUESS_CONNECT_TIMEOUT)
+                        // C19-003 — l'URL de départ a été contrôlée plus haut ;
+                        // chaque saut de redirection l'est ici.
+                        ->withOptions(SsrfGuard::redirectOptions())
                         ->withHeaders(['User-Agent' => self::USER_AGENT])
                         ->get($it['url']);
                 }
+
                 return $out;
             });
 
@@ -297,11 +357,15 @@ class DomainFinderService
         try {
             $resp = Http::timeout(self::GUESS_TIMEOUT)
                 ->connectTimeout(self::GUESS_CONNECT_TIMEOUT)
+                // C19-003 — site jumeau séquentiel de `guessDomainsBatch()` :
+                // même domaine deviné, même redirection possible, même garde.
+                ->withOptions(SsrfGuard::redirectOptions())
                 ->withHeaders(['User-Agent' => self::USER_AGENT])
                 ->get("https://{$domain}/");
         } catch (\Throwable $e) {
             return false;
         }
+
         return $resp->successful() && $this->verifyBody((string) $resp->body(), $company, $tokens);
     }
 
@@ -350,6 +414,7 @@ class DomainFinderService
             explode(' ', (string) $s),
             fn ($w) => $w !== '' && mb_strlen($w) >= 2 && ! in_array($w, $stop, true),
         );
+
         return array_values(array_slice($words, 0, 4));
     }
 
@@ -357,6 +422,7 @@ class DomainFinderService
     {
         $from = ['à', 'â', 'ä', 'á', 'ã', 'å', 'é', 'è', 'ê', 'ë', 'î', 'ï', 'í', 'ì', 'ô', 'ö', 'ò', 'ó', 'õ', 'ù', 'û', 'ü', 'ú', 'ç', 'ñ'];
         $to = ['a', 'a', 'a', 'a', 'a', 'a', 'e', 'e', 'e', 'e', 'i', 'i', 'i', 'i', 'o', 'o', 'o', 'o', 'o', 'u', 'u', 'u', 'u', 'c', 'n'];
+
         return str_replace($from, $to, $s);
     }
 
@@ -367,9 +433,10 @@ class DomainFinderService
     private function searchBrave(string $denomination, string $ville): ?string
     {
         $apiKey = config('services.brave.api_key');
-        if (!$apiKey) {
+        if (! $apiKey) {
             // Graceful degradation : pas de clé → skip silently
             Log::debug('DomainFinder Brave skipped (no API key)');
+
             return null;
         }
 
@@ -379,41 +446,54 @@ class DomainFinderService
             $response = Http::timeout(self::HTTP_TIMEOUT_SECONDS)
                 ->withHeaders([
                     'X-Subscription-Token' => $apiKey,
-                    'Accept'               => 'application/json',
+                    'Accept' => 'application/json',
                 ])
+                ->withOptions(SsrfGuard::redirectOptions())
                 ->retry(2, 500, function (\Throwable $e) {
-                    return $e instanceof \Illuminate\Http\Client\ConnectionException;
+                    return $e instanceof ConnectionException;
                 })
                 ->get(self::BRAVE_SEARCH_URL, [
-                    'q'          => $query,
-                    'count'      => 5,
-                    'country'    => 'fr',
+                    'q' => $query,
+                    'count' => 5,
+                    'country' => 'fr',
                     'safesearch' => 'moderate',
                 ]);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 Log::debug('DomainFinder Brave HTTP error', ['status' => $response->status()]);
+
                 return null;
             }
 
             $results = $response->json('web.results', []);
-            if (!is_array($results)) {
+            if (! is_array($results)) {
                 return null;
             }
 
             foreach ($results as $r) {
                 $url = $r['url'] ?? null;
-                if (!is_string($url)) {
+                if (! is_string($url)) {
                     continue;
                 }
                 $host = parse_url($url, PHP_URL_HOST);
-                if (!$host || $this->isBlacklisted($host)) {
+                if (! $host || $this->isBlacklisted($host)) {
                     continue;
                 }
+                // C19-001 — cette URL vient d'une API TIERCE (Brave). Elle est
+                // aussi « issue de la donnée » qu'un champ de la base : la
+                // liste noire ci-dessus filtre LinkedIn et les annuaires, elle
+                // ne dit rien de 169.254.169.254. La valeur rendue devient
+                // `companies.website`.
+                if (! SsrfGuard::check($url)['ok']) {
+                    Log::warning('DomainFinder Brave: resultat refuse par la garde SSRF', ['url' => $url]);
+
+                    continue;
+                }
+
                 return $this->canonicalize($url);
             }
         } catch (\Throwable $e) {
-            if (class_exists(\Sentry\State\Hub::class)) {
+            if (class_exists(Hub::class)) {
                 \Sentry\captureException($e);
             }
             Log::warning('DomainFinder Brave exception', ['error' => $e->getMessage()]);
@@ -430,7 +510,7 @@ class DomainFinderService
     {
         $denomSlug = $this->slugify($denomination);
         $villeSlug = $this->slugify($ville);
-        if (!$denomSlug || !$villeSlug) {
+        if (! $denomSlug || ! $villeSlug) {
             return null;
         }
 
@@ -441,23 +521,27 @@ class DomainFinderService
             $response = app(ProxiedHttpClient::class)->request(self::HTTP_TIMEOUT_SECONDS)
                 ->withHeaders([
                     'User-Agent' => self::USER_AGENT,
-                    'Accept'     => 'text/html,application/xhtml+xml',
+                    'Accept' => 'text/html,application/xhtml+xml',
                 ])
                 ->get($url);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 return null;
             }
 
             if (preg_match('/<a[^>]+class="[^"]*company-website[^"]*"[^>]+href="([^"]+)"/i', $response->body(), $m)) {
                 $href = $m[1];
                 $host = parse_url($href, PHP_URL_HOST);
-                if ($host && !$this->isBlacklisted($host)) {
+                // C19-001 — `$href` est extrait du HTML d'un TIERS (Pages Jaunes,
+                // ou de ce que renvoie le proxy Webshare). C'est la définition
+                // même d'une URL issue de la donnée, et elle devient
+                // `companies.website`.
+                if ($host && ! $this->isBlacklisted($host) && SsrfGuard::check($href)['ok']) {
                     return $this->canonicalize($href);
                 }
             }
         } catch (\Throwable $e) {
-            if (class_exists(\Sentry\State\Hub::class)) {
+            if (class_exists(Hub::class)) {
                 \Sentry\captureException($e);
             }
             Log::debug('DomainFinder PagesJaunes failed', ['error' => $e->getMessage()]);
@@ -474,17 +558,19 @@ class DomainFinderService
                 return true;
             }
         }
+
         return false;
     }
 
     private function canonicalize(string $url): string
     {
         $parts = parse_url($url);
-        if (!$parts || empty($parts['host'])) {
+        if (! $parts || empty($parts['host'])) {
             return $url;
         }
         $scheme = $parts['scheme'] ?? 'https';
         $host = preg_replace('/^www\./i', '', strtolower($parts['host']));
+
         return sprintf('%s://%s/', $scheme, $host);
     }
 
@@ -492,6 +578,7 @@ class DomainFinderService
     {
         $s = strtolower(trim($s));
         $s = preg_replace('/[^a-z0-9]+/i', '-', $s);
+
         return trim((string) $s, '-');
     }
 }

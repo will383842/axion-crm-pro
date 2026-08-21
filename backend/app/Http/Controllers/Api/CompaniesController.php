@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Jobs\EnrichCompanyJob;
 use App\Models\Company;
 use App\Services\Email\EmailConfidenceService;
@@ -9,6 +10,8 @@ use App\Services\Waterfall\WaterfallOrchestrator;
 use App\Support\CompanyQueryFilters;
 use App\Support\EligibiliteCampagne;
 use App\Support\MasquageCoordonnees;
+use App\Support\PlafondExport;
+use App\Support\TotalListe;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
@@ -17,11 +20,17 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use RuntimeException;
 use Spatie\QueryBuilder\QueryBuilder;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CompaniesController extends ApiController
 {
+    // 🔴 G43-005 (S0) — verrouillage optimiste OPTIONNEL sur `update()`. Le trait
+    // ne s'active que si le client annonce l'etat qu'il modifiait ; sans jeton,
+    // rien ne change. Cf. `App\Http\Controllers\Concerns\VerrouOptimiste`.
+    use VerrouOptimiste;
+
     public function __construct(private readonly WaterfallOrchestrator $waterfall) {}
 
     /**
@@ -78,7 +87,47 @@ class CompaniesController extends ApiController
                 ->defaultSort('-quality_score')
                 ->where('workspace_id', $workspaceId);
 
-            $page = $query->paginate($perPage);
+            // 🔴 G41-006 (S1) — LE TOTAL COUTAIT 148 FOIS LA PAGE.
+            //
+            // `paginate($perPage)` emet TOUJOURS un `select count(*)` complet
+            // avant d'aller chercher la page. Mesure du 2026-08-20 sur
+            // `axion_crm_perf4m` (2 800 000 fiches), les deux requetes du meme
+            // affichage au MEME instant :
+            //
+            //     count(*) ... Index Only Scan, Heap Fetches: 0
+            //                  1 818,064 ms froid / 490,431 ms chaud
+            //     la page  ... Index Scan, 4 tampons
+            //                      3,310 ms
+            //
+            // Le comptage est DEJA servi par le meilleur index possible
+            // (`idx_companies_ws_counts`) : aucun index ne le reparera, car
+            // compter 2,8 M de lignes exige d'en visiter 2,8 M. Le seul remede
+            // est de ne pas recompter a chaque affichage.
+            //
+            // Le 5e parametre de `paginate()` est le point d'accroche prevu par
+            // le cadre lui-meme (`Eloquent\Builder::paginate()`, l. 1120 :
+            // `$total = value($total) ?? $this->toBase()->getCountForPagination()`).
+            // En le fournissant, on saute le comptage -- et RIEN D'AUTRE ne
+            // change : le paginateur reste un `LengthAwarePaginator`, donc
+            // `total`, `per_page`, `current_page` et `last_page` gardent leur
+            // sens et leurs valeurs. C'est ce qui distingue ce correctif de
+            // `simplePaginate()`, qui aurait supprime deux de ces quatre champs
+            // et casse `CompaniesListPage.tsx:751`.
+            //
+            // Le total reste un comptage EXACT, simplement pas a la seconde
+            // pres (60 s de fraicheur). Cf. `App\Support\TotalListe`.
+            $page = $query->paginate(
+                $perPage,
+                ['*'],
+                'page',
+                null,
+                // `toBase()` et non `getEloquentBuilder()` : un comptage
+                // n'hydrate aucun modele, et `toBase()` est compris a la fois
+                // par l'enveloppe `Spatie\QueryBuilder` (reforwarde par
+                // `__call`) et par l'analyse statique, qui perd le type Spatie
+                // des le premier `->where()`.
+                TotalListe::pour($query->toBase(), $workspaceId),
+            );
 
             // Masquage des coordonnées pour les comptes en lecture seule
             // (§2.10). On ne transforme la sortie QUE dans ce cas : pour les
@@ -126,6 +175,15 @@ class CompaniesController extends ApiController
      * Query filtrée partagée entre la liste (index) et l'export.
      * Applique les MÊMES filtres → l'export = exactement la liste affichée.
      * (Les 4 derniers filtres étaient envoyés par le front mais absents ici → ignorés.)
+     *
+     * ⚠️ `@return QueryBuilder<Company>` est OBLIGATOIRE, pas decoratif.
+     * `Spatie\QueryBuilder\QueryBuilder` est `@template TModel of Model` : sans
+     * le parametre, `TModel` reste non resolu et tout ce qui recoit ensuite le
+     * Builder — ici `EligibiliteCampagne::exclureOpposes()`, elle aussi
+     * templatee — devient inanalysable. Mesure du 2026-08-21 : c'est la cause
+     * de 5 des 38 erreurs PHPStan de la branche.
+     *
+     * @return QueryBuilder<Company>
      */
     private function buildFilteredQuery(): QueryBuilder
     {
@@ -157,6 +215,14 @@ class CompaniesController extends ApiController
         if (! Schema::hasTable('companies') || $workspaceId === null) {
             return response()->streamDownload(function () use ($header) {
                 $out = fopen('php://output', 'w');
+                if ($out === false) {
+                    // `php://output` ne s'ouvre pas : il n'y a aucun flux ou ecrire. On LEVE
+                    // plutot que de poursuivre — `fputcsv(false, ...)` est une TypeError en
+                    // PHP 8, et le telechargement rendrait un fichier vide ou tronque sans
+                    // que l'operateur puisse savoir que son export est incomplet. C'est le
+                    // defaut meme que le plafond partage (G41-007) sert a rendre VISIBLE.
+                    throw new RuntimeException("Export CSV : impossible d'ouvrir php://output.");
+                }
                 fwrite($out, "\xEF\xBB\xBF");
                 fputcsv($out, $header);
                 fclose($out);
@@ -185,11 +251,30 @@ class CompaniesController extends ApiController
             EligibiliteCampagne::exclureOpposes($relation->getQuery(), 'contacts.email');
         };
 
-        $query = $this->buildFilteredQuery()
-            ->where('workspace_id', $workspaceId)
-            ->with($hasSante
-                ? ['contacts' => $chargeContacts, 'healthPractitioners']
-                : ['contacts' => $chargeContacts]);
+        // `getEloquentBuilder()` : `buildFilteredQuery()` rend un
+        // `Spatie\QueryBuilder\QueryBuilder`, enveloppe qui n'étend PLUS
+        // `Eloquent\Builder` depuis la v6. Ici le code tournait — `chunkById`
+        // est reforwardé par `__call` — mais le même geste, en `MediaController`
+        // et `JournalistsController`, levait un TypeError et rendait 500
+        // (constat F36-008). On déballe donc explicitement, pour que le plafond
+        // partagé reçoive un vrai Builder et que les trois exports parlent le
+        // même langage.
+        // ⚠️ ON NE CHAINE PAS `->where(...)->getEloquentBuilder()`, ET CE N'EST
+        // PAS UN GOUT. `Spatie\QueryBuilder\QueryBuilder` porte
+        // `@mixin EloquentBuilder<TModel>` : pour l'analyse statique, `->where()`
+        // rend un `Eloquent\Builder`, qui n'a AUCUN `getEloquentBuilder()`.
+        // A l'execution le chainage marche — `__call` reforwarde puis rend
+        // l'enveloppe — mais PHPStan ne peut pas le savoir, et il avait raison
+        // de se plaindre : c'est le meme ecart enveloppe/Builder qui a produit
+        // le 500 du constat F36-008. On garde donc l'enveloppe dans une
+        // variable, on la mute, et on ne la deballe qu'une fois.
+        $filtree = $this->buildFilteredQuery();
+        $filtree->where('workspace_id', $workspaceId);
+        $filtree->with($hasSante
+            ? ['contacts' => $chargeContacts, 'healthPractitioners']
+            : ['contacts' => $chargeContacts]);
+
+        $query = $filtree->getEloquentBuilder();
 
         $confidenceScorer = new EmailConfidenceService;
 
@@ -200,56 +285,69 @@ class CompaniesController extends ApiController
         // et PHP lisait une variable indéfinie à chaque ligne.
         return response()->streamDownload(function () use ($query, $header, $confidenceScorer, $hasSante) {
             $out = fopen('php://output', 'w');
+            if ($out === false) {
+                // `php://output` ne s'ouvre pas : il n'y a aucun flux ou ecrire. On LEVE
+                // plutot que de poursuivre — `fputcsv(false, ...)` est une TypeError en
+                // PHP 8, et le telechargement rendrait un fichier vide ou tronque sans
+                // que l'operateur puisse savoir que son export est incomplet. C'est le
+                // defaut meme que le plafond partage (G41-007) sert a rendre VISIBLE.
+                throw new RuntimeException("Export CSV : impossible d'ouvrir php://output.");
+            }
             fwrite($out, "\xEF\xBB\xBF"); // BOM UTF-8 → Excel FR lit les accents
             fputcsv($out, $header);
-            // chunkById(id) = pagination stable en mémoire bornée (gros volumes OK).
-            $query->chunkById(1000, function ($companies) use ($out, $confidenceScorer, $hasSante) {
-                foreach ($companies as $c) {
-                    $contacts = $c->contacts
-                        ->map(function ($ct) {
-                            $name = trim(($ct->first_name ?? '') . ' ' . ($ct->last_name ?? ''));
-                            $bits = array_filter([
-                                $name,
-                                $ct->role ? "({$ct->role})" : '',
-                                $ct->email ?? '',
-                                $ct->phone ?? '',
-                            ]);
+            // 🔴 PLAFOND (constat G41-007, S1). `chunkById(1000)` était stable
+            // en mémoire, mais SANS BORNE : au volume mesuré — 4 295 349 fiches
+            // — cela fait 4 296 allers-retours SQL et gèle un worker PHP-FPM au
+            // moins deux minutes. Le plafond rend le pire cas FINI, et le
+            // fichier DIT qu'il est coupé. Cf. App\Support\PlafondExport.
+            $tronque = PlafondExport::parcourirBorne($query, function ($c) use ($out, $confidenceScorer, $hasSante) {
+                $contacts = $c->contacts
+                    ->map(function ($ct) {
+                        $name = trim(($ct->first_name ?? '') . ' ' . ($ct->last_name ?? ''));
+                        $bits = array_filter([
+                            $name,
+                            $ct->role ? "({$ct->role})" : '',
+                            $ct->email ?? '',
+                            $ct->phone ?? '',
+                        ]);
 
-                            return trim(implode(' ', $bits));
-                        })
-                        ->filter()
-                        ->implode(' | ');
-                    $specialites = $hasSante
-                        ? $c->healthPractitioners->pluck('specialite')->filter()->unique()->implode(', ')
-                        : '';
-                    // Lien Google Maps : coordonnées GPS si dispo (précis), sinon
-                    // requête textuelle sur l'adresse postale.
-                    if ($c->lat !== null && $c->lon !== null) {
-                        $mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' . $c->lat . ',' . $c->lon;
-                    } else {
-                        $mapsUrl = 'https://www.google.com/maps/search/?api=1&query='
-                            . rawurlencode(trim(($c->address ?? '') . ', ' . ($c->postcode ?? '') . ' ' . ($c->city_name ?? $c->city ?? '')));
-                    }
-                    fputcsv($out, [
-                        $c->siren,
-                        $c->denomination,
-                        $c->enseigne,
-                        $c->naf,
-                        $c->size_category,
-                        $c->department_code,
-                        $c->city_name,
-                        $c->email_generic,
-                        $this->resolveBestConfidence($c, $confidenceScorer),
-                        $c->phone,
-                        $c->website,
-                        $mapsUrl,
-                        $contacts,
-                        $specialites,
-                    ]);
+                        return trim(implode(' ', $bits));
+                    })
+                    ->filter()
+                    ->implode(' | ');
+                $specialites = $hasSante
+                    ? $c->healthPractitioners->pluck('specialite')->filter()->unique()->implode(', ')
+                    : '';
+                // Lien Google Maps : coordonnées GPS si dispo (précis), sinon
+                // requête textuelle sur l'adresse postale.
+                if ($c->lat !== null && $c->lon !== null) {
+                    $mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' . $c->lat . ',' . $c->lon;
+                } else {
+                    $mapsUrl = 'https://www.google.com/maps/search/?api=1&query='
+                        . rawurlencode(trim(($c->address ?? '') . ', ' . ($c->postcode ?? '') . ' ' . ($c->city_name ?? $c->city ?? '')));
                 }
+                fputcsv($out, [
+                    $c->siren,
+                    $c->denomination,
+                    $c->enseigne,
+                    $c->naf,
+                    $c->size_category,
+                    $c->department_code,
+                    $c->city_name,
+                    $c->email_generic,
+                    $this->resolveBestConfidence($c, $confidenceScorer),
+                    $c->phone,
+                    $c->website,
+                    $mapsUrl,
+                    $contacts,
+                    $specialites,
+                ]);
             });
+            if ($tronque) {
+                PlafondExport::ecrireAvertissement($out, count($header));
+            }
             fclose($out);
-        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8'] + PlafondExport::entetes());
     }
 
     /**
@@ -308,14 +406,29 @@ class CompaniesController extends ApiController
             'denomination' => ['nullable', 'string', 'max:255'],
             'discovery_source' => ['nullable', 'string', 'max:64'],
         ]);
+        $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
         $company = Company::create([
-            'workspace_id' => app()->bound('workspace.id') ? app('workspace.id') : null,
+            'workspace_id' => $workspaceId,
             'siren' => $validated['siren'],
             'denomination' => $validated['denomination'] ?? null,
             'discovery_source' => $validated['discovery_source'] ?? 'manual',
         ]);
 
-        return $this->ok($company, 201);
+        // G41-006 : le total de la liste est mis en cache 60 s. Sans cet oubli,
+        // l'operateur creerait une fiche, la verrait s'afficher, et le compteur
+        // juste au-dessus continuerait d'annoncer l'ancien nombre pendant une
+        // minute -- le produit contredirait le geste qu'il vient de faire.
+        // Le patron est celui de `CompteursHub::oublier`, appele au meme titre
+        // par `BulkController` apres une action de masse.
+        if (is_string($workspaceId) && $workspaceId !== '') {
+            TotalListe::oublier($workspaceId);
+        }
+
+        // Meme regle qu'a la fiche : ce qui sort porte `phone` et
+        // `email_generic`. Une creation par un role sans `contacts.view_pii`
+        // (role sur mesure : le referentiel seme n'en produit pas) ne doit pas
+        // devenir la porte que `show()` vient de fermer.
+        return $this->ok(MasquageCoordonnees::masquerSiRequis($company), 201);
     }
 
     /**
@@ -333,12 +446,29 @@ class CompaniesController extends ApiController
      */
     public function show(Company $company): JsonResponse
     {
+        // Meme raison que sur les contacts : la fiche d'un autre locataire etait
+        // lisible en devinant un identifiant (F36-005 / B12-001, S0).
+        $this->refuserHorsEspace($company);
+
         $relations = ['contacts', 'tags'];
         if (Schema::hasTable('health_practitioners')) {
             $relations[] = 'healthPractitioners';
         }
 
-        return $this->ok($company->load($relations));
+        // 🔴 B12-002 / F36-006 (S1). Le masquage couvrait TROIS listes et
+        // AUCUNE fiche. Ici la fiche charge `contacts` : elle livrait donc les
+        // coordonnees NOMINATIVES, pas seulement l'accueil de la societe. Et
+        // cette route ne porte aucune permission au-dela du groupe
+        // (routes/api.php:138) : un `viewer` -- qui n'a que `companies.view`,
+        // `llm.view_usage`, `rgpd.view` -- l'atteint. Les identifiants de
+        // `companies` etant des entiers consecutifs, il suffisait de lire la
+        // liste masquee, d'y relever les identifiants, puis de rappeler chaque
+        // fiche une par une. Le masquage des listes ne coutait rien.
+        //
+        // `masquerSiRequis` descend dans les relations DEJA chargees : la regle
+        // ne vit plus dans l'appelant, qui n'a plus a savoir quelles colonnes
+        // portent une coordonnee.
+        return $this->ok(MasquageCoordonnees::masquerSiRequis($company->load($relations)));
     }
 
     /**
@@ -349,6 +479,10 @@ class CompaniesController extends ApiController
      *     security={{"sanctumCookie":{}}},
      *
      *     @OA\Parameter(name="company", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Parameter(name="If-Match", in="header", required=false,
+     *         description="Jeton de version OPTIONNEL (G43-005) : celui de l'en-tête `ETag` d'une réponse 200. La mise à jour est refusée en 409 si la fiche a changé depuis. Sans cet en-tête, aucun contrôle de concurrence — comportement historique.",
+     *
+     *         @OA\Schema(type="string", example="3f1c9a0b2d4e6f8091a2b3c4d5e6f708")),
      *
      *     @OA\RequestBody(@OA\JsonContent(
      *
@@ -357,13 +491,42 @@ class CompaniesController extends ApiController
      *         @OA\Property(property="website", type="string", format="url"),
      *         @OA\Property(property="phone", type="string"),
      *         @OA\Property(property="linkedin_url", type="string", format="url"),
+     *         @OA\Property(property="updated_at", type="string", format="date-time",
+     *             description="Forme dégradée du jeton de version, alternative à `If-Match`. À prendre dans un GET, jamais dans le corps d'un PUT : celui-ci rend l'horodatage calculé par PHP, pas celui posé par le trigger Postgres."),
      *     )),
      *
-     *     @OA\Response(response=200, description="Updated"),
+     *     @OA\Response(response=200, description="Updated — l'en-tête `ETag` porte le jeton de l'état d'après"),
+     *     @OA\Response(response=409, description="version_conflict — la fiche a été modifiée depuis la lecture du client. Le corps porte `current_version`, avec lequel rejouer."),
      * )
      */
     public function update(Request $r, Company $company): JsonResponse
     {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($company);
+
+        // 🔴 G43-005 (S0) — DEUX SAISIES SIMULTANEES, UNE DISPARAISSAIT EN SILENCE.
+        //
+        // Cette methode ecrivait sur ce que la resolution de route avait charge,
+        // sans jamais comparer avec l'etat que le client croyait modifier. Deux
+        // commerciaux ouvrent la meme fiche, enregistrent chacun leur
+        // formulaire : les DEUX recoivent 200, la premiere saisie est effacee,
+        // personne n'est averti. Mesure le 2026-08-20 par
+        // `tests/Feature/EditionConcurrenteTest.php`.
+        //
+        // Le controle est OPTIONNEL, et c'est delibere. Le client qui veut etre
+        // protege envoie l'etat sur lequel il travaillait (`If-Match`, ou
+        // `updated_at` dans le corps) et recoit 409 s'il a ete double. Celui qui
+        // n'envoie rien garde EXACTEMENT le comportement d'avant : imposer le
+        // jeton reviendrait a rendre 409 a tout appelant existant, c'est-a-dire
+        // a changer le contrat de la route au lieu de corriger un defaut.
+        //
+        // Ce controle precede la validation : un conflit d'edition n'est pas une
+        // faute de saisie, et le signaler en premier evite d'annoncer un 422 sur
+        // un formulaire qui, de toute facon, ne devait pas etre ecrit.
+        $this->refuserSiVersionPerimee($r, $company);
+
         $validated = $r->validate([
             'priority' => ['nullable', Rule::in(['haute', 'moyenne', 'basse', 'gelee'])],
             'denomination' => ['nullable', 'string', 'max:255'],
@@ -373,7 +536,17 @@ class CompaniesController extends ApiController
         ]);
         $company->update($validated);
 
-        return $this->ok($company);
+        // L'ecriture est faite AVANT le masquage : ce qui part en reponse est
+        // masque, ce qui est en base ne l'est pas. Une garde relit la base
+        // apres coup pour l'interdire (MasquageFicheDetailleeTest).
+        //
+        // L'en-tete `ETag` porte le jeton de l'etat d'APRES : sans lui, aucun
+        // client ne pourrait obtenir de jeton, et le verrou serait du decor. Le
+        // CORPS de la reponse, lui, n'est pas modifie d'un octet.
+        return $this->avecJetonDeVersion(
+            $this->ok(MasquageCoordonnees::masquerSiRequis($company)),
+            $company,
+        );
     }
 
     /**
@@ -390,7 +563,21 @@ class CompaniesController extends ApiController
      */
     public function destroy(Company $company): JsonResponse
     {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($company);
+
         $company->delete();
+
+        // Meme raison qu'a la creation (G41-006) : la corbeille sort la fiche
+        // de la liste, donc du total. Un compteur qui ne redescend pas apres
+        // une suppression est le defaut le plus visible qu'un cache puisse
+        // produire.
+        $workspaceId = $company->getAttribute('workspace_id');
+        if (is_string($workspaceId) && $workspaceId !== '') {
+            TotalListe::oublier($workspaceId);
+        }
 
         return response()->json(null, 204);
     }
@@ -409,9 +596,16 @@ class CompaniesController extends ApiController
      */
     public function enrich(Company $company): JsonResponse
     {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($company);
+
         $this->waterfall->enrich($company);
 
-        return $this->ok($company->fresh()->load('contacts'));
+        // Quatrieme site qui rend une coordonnee : l'enrichissement RENVOIE
+        // les contacts qu'il vient de decouvrir -- c'est meme sa raison d'etre.
+        return $this->ok(MasquageCoordonnees::masquerSiRequis($company->fresh()->load('contacts')));
     }
 
     /**
@@ -433,8 +627,14 @@ class CompaniesController extends ApiController
     public function bulkEnrich(Request $r): JsonResponse
     {
         $ids = $r->validate(['ids' => 'required|array|max:500', 'ids.*' => 'integer'])['ids'];
+
+        // B11-002 : l'espace vient de la REQUETE, pas de la ligne. Sous RLS
+        // armee, un job ne peut pas relire lui-meme le `workspace_id` d'une
+        // entreprise : sa lecture d'amorcage serait filtree, elle aussi.
+        $workspaceId = app()->bound('workspace.id') ? (string) app('workspace.id') : null;
+
         foreach ($ids as $id) {
-            EnrichCompanyJob::dispatch((int) $id);
+            dispatch((new EnrichCompanyJob((int) $id))->pourEspace($workspaceId));
         }
 
         return $this->ok(['queued' => count($ids)]);
@@ -454,8 +654,13 @@ class CompaniesController extends ApiController
      */
     public function recomputeScore(Company $company): JsonResponse
     {
+        // Constat B12-001 / F36-005 : la resolution de route rendait
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
+        // « interdit » confirmerait son existence.
+        $this->refuserHorsEspace($company);
+
         DB::statement('SELECT recompute_company_quality_score(?)', [$company->id]);
 
-        return $this->ok($company->fresh());
+        return $this->ok(MasquageCoordonnees::masquerSiRequis($company->fresh()));
     }
 }

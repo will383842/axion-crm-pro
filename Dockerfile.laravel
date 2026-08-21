@@ -42,6 +42,7 @@ FROM php:${PHP_VERSION}-fpm-alpine AS php-base
 RUN apk add --no-cache \
         bash curl git icu-dev libpng-dev libjpeg-turbo-dev libwebp-dev \
         oniguruma-dev libzip-dev libxml2-dev postgresql-dev nodejs npm \
+        fcgi \
         autoconf g++ make linux-headers \
     && docker-php-ext-configure intl \
     && docker-php-ext-install -j$(nproc) \
@@ -61,9 +62,19 @@ WORKDIR /var/www/html
 FROM php-base AS dev
 ENV APP_ENV=local APP_DEBUG=true
 RUN echo "opcache.enable=0" > /usr/local/etc/php/conf.d/zz-opcache-dev.ini
-EXPOSE 80
-# La commande par défaut sera fournie par docker-compose (php-fpm ou artisan).
-CMD ["php", "-S", "0.0.0.0:80", "-t", "public"]
+COPY infra/php/fpm-axion.conf /usr/local/etc/php-fpm.d/zz-axion.conf
+# 🔴 9000, et php-fpm — comme la production. Constat A-010 (S0).
+#
+# Ce commentaire disait : « la commande par défaut sera fournie par
+# docker-compose (php-fpm ou artisan) ». Aucun fichier `docker-compose` n'en a
+# jamais fourni. La commande de repli — `php -S`, un seul processus — servait
+# donc TOUT, développement comme production, depuis le premier jour.
+#
+# L'atelier local doit ressembler à la production, sinon il ne prouve rien :
+# c'est déjà écrit noir sur blanc dans `infra/caddy/Caddyfile` à propos de
+# l'origine unique. La même règle vaut ici.
+EXPOSE 9000
+CMD ["php-fpm", "-F"]
 
 # -----------------------------------------------------------------------------
 # 4) builder : compose autoload + cache config + build front public assets
@@ -110,12 +121,38 @@ RUN echo "opcache.enable=1" > /usr/local/etc/php/conf.d/zz-opcache-prod.ini \
     && echo "opcache.validate_timestamps=0" >> /usr/local/etc/php/conf.d/zz-opcache-prod.ini
 COPY --from=builder /var/www/html /var/www/html
 COPY infra/docker/entrypoint-prod.sh /usr/local/bin/entrypoint-prod
+# Pool php-fpm — le fichier porte la mesure qui le justifie.
+COPY infra/php/fpm-axion.conf /usr/local/etc/php-fpm.d/zz-axion.conf
 RUN chmod +x /usr/local/bin/entrypoint-prod
 USER www-data
-EXPOSE 80
+# 🔴 9000 ET NON 80 — constat A-010 (S0) de l'audit 360.
+#
+# Ce service ne sert plus HTTP : il parle FastCGI, et c'est Caddy qui parle HTTP
+# au monde. Le port déclaré doit dire ce que le service fait réellement, sinon
+# le prochain qui lit ce fichier branchera un mandataire sur 80 et prendra 502.
+EXPOSE 9000
+# Le contrôle de santé interrogeait `http://localhost/up`. Il n'y a plus de
+# serveur HTTP ici : ce contrôle échouerait TOUJOURS, le conteneur serait
+# déclaré malsain en permanence, et le déploiement le redémarrerait en boucle.
+# Un correctif de performance aurait alors provoqué une panne totale.
+# On interroge donc php-fpm dans SA langue, sur le point de vie que déclare
+# `infra/php/fpm-axion.conf`.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 \
-    CMD curl -fsS http://localhost/up || exit 1
+    CMD SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET \
+        cgi-fcgi -bind -connect 127.0.0.1:9000 2>/dev/null | grep -q pong || exit 1
 # L'entrypoint construit config/route/view caches avec l'environnement RÉEL,
-# puis passe la main à la commande (serveur web, horizon, scheduler…).
+# puis passe la main à la commande (php-fpm, horizon, scheduler…).
 ENTRYPOINT ["/usr/local/bin/entrypoint-prod"]
-CMD ["php", "-S", "0.0.0.0:80", "-t", "public"]
+# 🔴 php-fpm, PAS `php -S` — constat A-010 (S0).
+#
+# `php -S` est le serveur de développement de PHP : UN processus, UNE requête à
+# la fois. Mesuré en PRODUCTION le 2026-08-19 — douze requêtes simultanées sur
+# `/up` rendaient un escalier de pas 15 ms, quand douze requêtes séquentielles
+# restaient plates au même instant sur le même point. Ce n'était pas une
+# lenteur du serveur : c'était une mise en file d'attente.
+#
+# La documentation de PHP dit de ce serveur qu'« il ne devrait pas être utilisé
+# sur un réseau public ». Il l'était, derrière Caddy et Cloudflare.
+#
+# `-F` : rester au premier plan. Docker surveille le processus, pas un démon.
+CMD ["php-fpm", "-F"]

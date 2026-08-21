@@ -64,9 +64,22 @@ final class ContactUpserter
             ->first();
 
         if ($existing === null && $email !== null) {
+            // C21-001 — CETTE RECHERCHE EST JOUÉE À CHAQUE FICHE ENTRANTE, et
+            // aussi par l'écran d'ARBITRAGE manuel, qui passe par ce service.
+            //
+            // ⚠️ NE PAS RÉÉCRIRE `->whereRaw('lower(email::text) = ?', [$email])`.
+            // `contacts.email` est de type `citext` : elle compare DÉJÀ sans
+            // égard à la casse, et `idx_contacts_email btree (email) WHERE
+            // email IS NOT NULL` porte sur la COLONNE, pas sur l'expression.
+            // Le transtypage suivi de `lower()` rendait l'index
+            // méconnaissable, et Postgres retombait sur le balayage complet.
+            // Mesuré sur le banc `a35r`, 20 000 lignes, le 2026-08-21 :
+            //     lower(email::text)  Seq Scan    coût 923,00  25,257 ms  573 tampons
+            //     email (citext)      Index Scan  coût   8,43   0,174 ms    4 tampons
+            // Garde : `tests/Feature/Crm/IndexEmailIngestionServentLesRequetesTest.php`.
             $existing = DB::table('contacts')
                 ->where('workspace_id', $workspaceId)
-                ->whereRaw('lower(email::text) = ?', [$email])
+                ->where('email', $email)
                 ->orderByRaw('CASE WHEN company_id = ? THEN 0 ELSE 1 END', [$companyId])
                 ->first();
         }

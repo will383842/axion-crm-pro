@@ -14,6 +14,7 @@ import {
   StatusPill,
   type StatusTone,
   cn,
+  TableScroll,
 } from '@/components/ui';
 import { api } from '@/lib/api';
 
@@ -125,6 +126,10 @@ export function AiActRegisterPage() {
         />
       ) : (
         <Card padding="none" className="overflow-hidden">
+          {/* D30-002 — conteneur a defilement horizontal. Sans lui, les 1002 px
+              de largeur minimale de ce tableau etaient coupes net par le
+              `overflow-hidden` de la Card, sans aucun moyen de les atteindre. */}
+          <TableScroll template={GRID}>
           <div
             role="row"
             className={cn(
@@ -189,6 +194,7 @@ export function AiActRegisterPage() {
               </button>
             ))}
           </div>
+          </TableScroll>
         </Card>
       )}
 

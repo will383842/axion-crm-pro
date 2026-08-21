@@ -12,6 +12,29 @@ export type CampaignStatus =
   | 'failed'
   | 'cancelled';
 
+/**
+ * Les etats dont le SERVEUR ne peut plus faire sortir une campagne.
+ *
+ * G42-007 — cette liste existait DEJA, recopiee a la main dans
+ * `CampaignDetailPage.tsx:104` (`isCompleted`). Elle sert desormais aussi a
+ * COUPER la scrutation : une campagne terminee ne bouge plus, la scruter
+ * toutes les 5 secondes est du bruit pur. Deux listes jumelles finissant
+ * toujours par diverger, il n'y en a plus qu'une.
+ *
+ * ⚠️ `paused` n'en fait PAS partie : une campagne en pause peut etre reprise,
+ * et l'ecran doit voir la reprise meme si elle vient d'ailleurs.
+ */
+export const ETATS_TERMINAUX: ReadonlySet<CampaignStatus> = new Set<CampaignStatus>([
+  'completed',
+  'failed',
+  'cancelled',
+]);
+
+/** Vrai si la campagne ne peut plus changer d'etat cote serveur. */
+export function estTerminee(statut: CampaignStatus | undefined): boolean {
+  return statut !== undefined && ETATS_TERMINAUX.has(statut);
+}
+
 export type CampaignSource =
   | 'insee'
   | 'google_maps'

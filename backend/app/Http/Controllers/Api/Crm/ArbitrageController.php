@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Crm;
 use App\Crm\Console\ConsoleAccess;
 use App\Crm\Ingest\ContactUpserter;
 use App\Crm\Ingest\SiteSyncClassifier;
+use App\Support\MasquageCoordonnees;
 use App\Support\WorkspaceContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -74,8 +75,15 @@ class ArbitrageController extends ConsoleController
                 ];
             }
 
+            // 🔴 SITE JUMEAU de B12-002 / F36-006, et le moins visible des sept :
+            // la coordonnee n'est pas dans une COLONNE, elle est dans le JSON
+            // `payload -> pending_match`, qui porte `email` et `phone` (cf.
+            // `attach()` plus bas, qui les en relit). Aucune enumeration de
+            // colonnes ne l'aurait trouvee — c'est le balayage par CLE de
+            // `masquerTableauSiRequis`, qui descend dans les sous-tableaux,
+            // qui la couvre.
             return $this->ok([
-                'data' => $data,
+                'data' => MasquageCoordonnees::masquerTableauSiRequis($data),
                 'meta' => ['total' => $total, 'per_page' => $perPage],
             ]);
         });

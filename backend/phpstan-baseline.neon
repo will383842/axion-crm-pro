@@ -1,7 +1,7 @@
 # =============================================================================
 # BASELINE PHPStan — dette figée le 2026-08-13, dégonflée le 2026-08-18
 # =============================================================================
-# ÉTAT COURANT (2026-08-18) : 211 entrées / 248 erreurs, niveau 8.
+# ÉTAT COURANT (2026-08-18) : 191 entrées / 209 erreurs, niveau 8.
 # Ces deux nombres sont FIGÉS dans un test Pest — cf.
 # tests/Unit/PhpstanBaselineNeGrossitPasTest.php. Ils ne peuvent que DÉCROÎTRE ;
 # quand tu les fais baisser, mets à jour le test dans le MÊME commit.
@@ -23,6 +23,15 @@
 #     À noter : un `@property` sur un modèle solde aussi les erreurs de ses
 #     Resources (Larastan résout `$this->resource`) — le bloc de Tag a soldé
 #     6 entrées de `TagResource` sans qu'on y touche.
+#   - 2026-08-21 : le job CI rougissait sur 38 erreurs et n'atteignait donc jamais
+#     Pint ni Pest. 11 entrées ORPHELINES, 3 mal comptées, 24 vraies erreurs.
+#     Corrigées : `getEloquentBuilder()` sur l'enveloppe Spatie (3 sites), les six
+#     `fopen('php://output')` non vérifiés, les relations non typées de Journalist,
+#     deux conditions mortes de RetentionPurge, les 15 `?->` d'OwnerUserSeeder
+#     centralisés dans un helper (7 → 1) → 211 → 191 entrées, 248 → 209 erreurs.
+#     ZÉRO entrée nouvelle. Une seule croissance : `SsrfGuard` 1 → 2, deux méthodes
+#     sœurs lisant `env()` hors `config/` — choix documenté dont le défaut est le
+#     comportement SÛR.
 #
 # Piège à connaître : déclarer une colonne JSONB castée `array` rend « toujours
 # vrai » les `is_array()` défensifs qui la lisent, et PHPStan le signale. Trois
@@ -199,18 +208,6 @@ parameters:
 			path: app/Console/Commands/ProspectionEnrich.php
 
 		-
-			message: '#^Parameter \#1 \$query of static method Illuminate\\Database\\Connection\:\:selectOne\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Console/Commands/RetentionPurge.php
-
-		-
-			message: '#^Parameter \#3 \$subject of function preg_replace expects array\<float\|int\|string\>\|string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Console/Commands/RetentionPurge.php
-
-		-
 			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
 			identifier: larastan.noEnvCallsOutsideOfConfig
 			count: 1
@@ -245,12 +242,6 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: app/Events/ScraperRunCancelled.php
-
-		-
-			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
-			identifier: larastan.noEnvCallsOutsideOfConfig
-			count: 1
-			path: app/Http/Controllers/Api/Auth/PasswordResetController.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$city_name\.$#'
@@ -349,24 +340,6 @@ parameters:
 			path: app/Http/Controllers/Api/CompaniesController.php
 
 		-
-			message: '#^Parameter \#1 \$stream of function fclose expects resource, resource\|false given\.$#'
-			identifier: argument.type
-			count: 2
-			path: app/Http/Controllers/Api/CompaniesController.php
-
-		-
-			message: '#^Parameter \#1 \$stream of function fputcsv expects resource, resource\|false given\.$#'
-			identifier: argument.type
-			count: 3
-			path: app/Http/Controllers/Api/CompaniesController.php
-
-		-
-			message: '#^Parameter \#1 \$stream of function fwrite expects resource, resource\|false given\.$#'
-			identifier: argument.type
-			count: 2
-			path: app/Http/Controllers/Api/CompaniesController.php
-
-		-
 			message: '#^Method App\\Http\\Controllers\\Api\\CoverageController\:\:queryCityCells\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -424,24 +397,6 @@ parameters:
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$source\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Http/Controllers/Api/JournalistsController.php
-
-		-
-			message: '#^Parameter \#1 \$stream of function fclose expects resource, resource\|false given\.$#'
-			identifier: argument.type
-			count: 2
-			path: app/Http/Controllers/Api/JournalistsController.php
-
-		-
-			message: '#^Parameter \#1 \$stream of function fputcsv expects resource, resource\|false given\.$#'
-			identifier: argument.type
-			count: 3
-			path: app/Http/Controllers/Api/JournalistsController.php
-
-		-
-			message: '#^Parameter \#1 \$stream of function fwrite expects resource, resource\|false given\.$#'
-			identifier: argument.type
-			count: 2
 			path: app/Http/Controllers/Api/JournalistsController.php
 
 		-
@@ -541,24 +496,6 @@ parameters:
 			path: app/Http/Controllers/Api/MediaController.php
 
 		-
-			message: '#^Parameter \#1 \$stream of function fclose expects resource, resource\|false given\.$#'
-			identifier: argument.type
-			count: 2
-			path: app/Http/Controllers/Api/MediaController.php
-
-		-
-			message: '#^Parameter \#1 \$stream of function fputcsv expects resource, resource\|false given\.$#'
-			identifier: argument.type
-			count: 3
-			path: app/Http/Controllers/Api/MediaController.php
-
-		-
-			message: '#^Parameter \#1 \$stream of function fwrite expects resource, resource\|false given\.$#'
-			identifier: argument.type
-			count: 2
-			path: app/Http/Controllers/Api/MediaController.php
-
-		-
 			message: '#^Method App\\Http\\Controllers\\Api\\ObservabilityController\:\:countHunterMonth\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -575,12 +512,6 @@ parameters:
 			identifier: notIdentical.alwaysTrue
 			count: 1
 			path: app/Http/Controllers/Api/ScrapingCampaignsController.php
-
-		-
-			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
-			identifier: larastan.noEnvCallsOutsideOfConfig
-			count: 1
-			path: app/Http/Controllers/Internal/ScraperResultController.php
 
 		-
 			message: '#^Access to an undefined property App\\Http\\Resources\\ScrapingCampaignResource\:\:\$created_at\.$#'
@@ -647,24 +578,6 @@ parameters:
 			identifier: missingType.return
 			count: 1
 			path: app/Models/HealthPractitioner.php
-
-		-
-			message: '#^Method App\\Models\\Journalist\:\:company\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Journalist.php
-
-		-
-			message: '#^Method App\\Models\\Journalist\:\:media\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Journalist.php
-
-		-
-			message: '#^Method App\\Models\\Journalist\:\:workspace\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Journalist.php
 
 		-
 			message: '#^Class App\\Models\\ScrapingCampaign has PHPDoc tag @property for property \$per_source_limits with no value type specified in iterable type array\.$#'
@@ -747,7 +660,7 @@ parameters:
 		-
 			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
 			identifier: larastan.noEnvCallsOutsideOfConfig
-			count: 2
+			count: 1
 			path: app/Providers/MockServicesProvider.php
 
 		-
@@ -755,12 +668,6 @@ parameters:
 			identifier: larastan.noEnvCallsOutsideOfConfig
 			count: 3
 			path: app/Providers/RouteServiceProvider.php
-
-		-
-			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
-			identifier: larastan.noEnvCallsOutsideOfConfig
-			count: 2
-			path: app/Providers/TelescopeServiceProvider.php
 
 		-
 			message: '#^Cannot call method getBreachCount\(\) on App\\Services\\Auth\\HibpChecker\|null\.$#'
@@ -829,28 +736,10 @@ parameters:
 			path: app/Services/Audiences/AudienceBuilderService.php
 
 		-
-			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
-			identifier: larastan.noEnvCallsOutsideOfConfig
-			count: 1
-			path: app/Services/Audit/AuditHashChain.php
-
-		-
 			message: '#^Method App\\Services\\Auth\\AuthService\:\:attemptLogin\(\) should return array\{user\: App\\Models\\User, requires_2fa\: bool\} but returns array\{user\: App\\Models\\User\|null, requires_2fa\: bool\}\.$#'
 			identifier: return.type
 			count: 1
 			path: app/Services/Auth/AuthService.php
-
-		-
-			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
-			identifier: larastan.noEnvCallsOutsideOfConfig
-			count: 1
-			path: app/Services/Auth/MagicLinkService.php
-
-		-
-			message: '#^Method App\\Services\\Auth\\TwoFactorService\:\:startEnrolment\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Services/Auth/TwoFactorService.php
 
 		-
 			message: '#^Parameter \#1 \$string of function sha1 expects string, string\|false given\.$#'
@@ -1011,7 +900,7 @@ parameters:
 		-
 			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
 			identifier: larastan.noEnvCallsOutsideOfConfig
-			count: 1
+			count: 2
 			path: app/Services/Http/SsrfGuard.php
 
 		-
@@ -1317,5 +1206,5 @@ parameters:
 		-
 			message: '#^Using nullsafe method call on non\-nullable type Illuminate\\Console\\Command\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
-			count: 7
+			count: 1
 			path: database/seeders/OwnerUserSeeder.php

@@ -13,9 +13,20 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { Card, EmptyState, KpiCard, PageHeader, SearchInput, Tabs, Toolbar, cn } from '@/components/ui';
+import {
+  Card,
+  EmptyState,
+  KpiCard,
+  PageHeader,
+  QueryErrorState,
+  SearchInput,
+  Tabs,
+  Toolbar,
+  cn,
+} from '@/components/ui';
 import type { TabItem } from '@/components/ui';
 import { api } from '@/lib/api';
+import { useAntiRebond } from '@/hooks/useAntiRebond';
 import { COUNTRY_OPTIONS, PROSPECTION_STATUS_OPTIONS } from '@/lib/prospection-referentiels';
 import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
 import {
@@ -53,6 +64,15 @@ function ContactsHubContent() {
   const [tab, setTab] = useState<TabId>('tous');
   const [temperature, setTemperature] = useState<Temperature>('actifs');
   const [search, setSearch] = useState('');
+  // G42-010 — anti-rebond de 300 ms AVANT la requete.
+  //
+  // Mesure du 2026-08-20 sur `/companies`, meme cablage (voir
+  // `tests/perf/recherche-anti-rebond.test.tsx`) : taper « boulangerie »
+  // (11 caracteres) lancait 11 requetes serveur. Apres : 1.
+  //
+  // ⚠️ Le champ garde `search` (valeur IMMEDIATE) pour son `value` : la
+  // lettre s'affiche sans attendre. Seule la requete patiente.
+  const rechercheDifferee = useAntiRebond(search);
   // Pays et statut de prospection : l'API les acceptait DÉJÀ
   // (`CompanyQueryFilters`), seul l'écran ne les proposait pas — donc les
   // fiches étrangères restaient introuvables depuis la console.
@@ -65,11 +85,11 @@ function ContactsHubContent() {
   });
 
   const list = useQuery<CursorResponse<HubCompany>>({
-    queryKey: ['crm', 'contacts-hub', tab, temperature, search, country, prospection],
+    queryKey: ['crm', 'contacts-hub', tab, temperature, rechercheDifferee, country, prospection],
     queryFn: async () => {
       const params = new URLSearchParams({ temperature, per_page: '50' });
       if (tab !== 'tous') params.set('relation_type', tab);
-      if (search.trim().length > 0) params.set('q', search.trim());
+      if (rechercheDifferee.trim().length > 0) params.set('q', rechercheDifferee.trim());
       if (country) params.set('filter[country_code]', country);
       if (prospection) params.set('filter[prospection_status]', prospection);
       return (await api.get<CursorResponse<HubCompany>>(`/crm/contacts-hub?${params.toString()}`)).data;
@@ -92,6 +112,26 @@ function ContactsHubContent() {
   const rows = list.data?.data ?? [];
   const temperatureLabel = TEMPERATURES.find((t) => t.id === temperature)?.label ?? '';
 
+  /**
+   * 🔴 D25-001 — l'échec de chargement n'est pas « il n'y a personne ».
+   *
+   * Sur une base de 4,29 M de fiches, cet écran affichait « Aucun contact dans
+   * cette vue » et quatre compteurs à zéro dès que l'API répondait 403 ou 500 —
+   * le MÊME texte que sur une vue légitimement vide. Le commentaire ci-dessous
+   * (`isPlaceholderData`) avait déjà réparé le mensonge de l'état TRANSITOIRE ;
+   * il restait le mensonge de l'état d'ÉCHEC, plus grave car durable.
+   *
+   * Compteurs et onglets partent avec le reste : leurs effectifs viennent de
+   * `counts`, et des filtres qui ne peuvent rien filtrer n'informent personne.
+   *
+   * ⚠️ `data === undefined` : React Query v5 conserve la dernière réponse
+   * réussie quand un rafraîchissement échoue — on n'efface jamais des lignes
+   * que l'opérateur avait déjà sous les yeux.
+   */
+  const echecListe = list.error !== null && list.data === undefined;
+  const echecCompteurs = counts.error !== null && counts.data === undefined;
+  const echec = echecListe || echecCompteurs;
+
   return (
     <div className="px-6 py-6">
       <PageHeader
@@ -99,6 +139,17 @@ function ContactsHubContent() {
         subtitle={`${tab === 'tous' ? 'Tous les types' : RELATION_TYPE_LABELS[tab]} — ${temperatureLabel}`}
       />
 
+      {echec ? (
+        <QueryErrorState
+          error={echecListe ? list.error : counts.error}
+          contexte="la liste des fiches"
+          onRetry={() => {
+            void list.refetch();
+            void counts.refetch();
+          }}
+        />
+      ) : (
+        <>
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard label="Clients" value={byType['client'] ?? 0} tone="emerald" />
         <KpiCard label="Prospects" value={byType['prospect'] ?? 0} tone="sky" />
@@ -245,6 +296,8 @@ function ContactsHubContent() {
           </Card>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }

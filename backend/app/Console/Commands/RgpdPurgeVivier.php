@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\RefuseUneSuppressionMassive;
 use App\Crm\Taxonomy;
 use App\Services\Audit\AuditHashChain;
 use App\Support\WorkspaceContext;
@@ -27,7 +28,9 @@ use Illuminate\Support\Facades\DB;
  */
 class RgpdPurgeVivier extends Command
 {
-    protected $signature = 'rgpd:purge-vivier {--dry-run : Compte sans supprimer}';
+    use RefuseUneSuppressionMassive;
+
+    protected $signature = 'rgpd:purge-vivier {--dry-run : Compte sans supprimer} {--force : Passe outre le plafond de proportion}';
 
     protected $description = 'Purge le vivier candidats : 2 ans après la dernière interaction, refusés à J+90 (CNIL CVthèque)';
 
@@ -67,6 +70,36 @@ class RgpdPurgeVivier extends Command
                     'refused_90d' => (clone $refused)->count(),
                     'activities' => 0,
                 ];
+            }
+
+            // ── PLAFOND DE PROPORTION (B15-008) ──────────────────────────────
+            //
+            // 🔑 POURQUOI ON BLOQUE, MEME QUAND L'EFFACEMENT EST UNE OBLIGATION.
+            //
+            // Refuser une purge de retention retarde une echeance ; laisser passer
+            // une purge ERRONEE detruit des donnees qui ne reviennent pas. Un jour
+            // de retard se rattrape en relancant la commande a la main ; un vivier
+            // efface par une condition trop large ne se rattrape pas.
+            // **L'irreversible l'emporte.** Et le refus n'est pas silencieux : il
+            // nomme la proportion, la table, et le geste qui debloque.
+            //
+            // B15-004 est la preuve que ce risque n'est pas theorique :
+            // `prospection:purge-non-commercial` supprimait sur
+            // `legal_form IS NULL OR ...` — c'est-a-dire presque tout — sans
+            // qu'aucune barriere ni aucun test ne le dise.
+            //
+            // Le vivier porte des CANDIDATURES : des personnes qui ont postule. Une
+            // condition trop large les efface toutes, et leurs activites avec.
+            $vises = (clone $expired)->count() + (clone $refused)->count();
+            // `candidates` porte `deleted_at` : une fiche deja en corbeille ne
+            // doit compter ni au numerateur ni au denominateur.
+            $totalVivier = DB::table('candidates')
+                ->whereNull('deleted_at')
+                ->where('workspace_id', $vivierId)
+                ->count();
+
+            if (! $this->ecritureAutoriseeSansOperateur('candidates', $vises, $totalVivier, 'purger')) {
+                return ['expired_2y' => 0, 'refused_90d' => 0, 'activities' => 0];
             }
 
             return DB::transaction(function () use ($vivierId, $expired, $refused): array {

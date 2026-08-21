@@ -98,7 +98,21 @@ test('OwnerUserSeeder crée workspace + owner avec password depuis env', functio
     });
 });
 
-test('OwnerUserSeeder génère password sécurisé si OWNER_INITIAL_PASSWORD vide', function () {
+/**
+ * 🔴 CE TEST GARDAIT UN DÉFAUT. Il exigeait que le seeder ÉCRIVE le mot de passe
+ * généré dans `storage/app/private/seeders/owner-initial-password.txt` — en clair,
+ * et sans le `chmod 0600` que le code annonçait (Flysystem n'en pose aucun sans
+ * option `visibility` : le fichier prenait le umask, soit 0644, lisible par tout
+ * utilisateur du serveur). Le même secret partait aussi sur la sortie standard du
+ * seed, donc dans les journaux de CI et de Docker.
+ * Mesuré le 2026-08-19 (audit 360, F35-008).
+ *
+ * Le seeder n'écrit plus AUCUN secret. Sans `OWNER_INITIAL_PASSWORD`, le compte
+ * est créé sans mot de passe, et l'opérateur en pose un avec
+ * `infra/scripts/definir-mot-de-passe-crm.sh` — un chemin où le secret ne touche
+ * ni le disque, ni `argv`, ni un journal.
+ */
+test('OwnerUserSeeder n écrit AUCUN secret quand OWNER_INITIAL_PASSWORD est vide', function () {
     Storage::fake('local');
 
     withOwnerEnv([
@@ -109,12 +123,31 @@ test('OwnerUserSeeder génère password sécurisé si OWNER_INITIAL_PASSWORD vid
 
         $user = DB::table('users')->where('email', 'owner2@test.local')->first();
         expect($user)->not->toBeNull();
-        expect($user->password_hash)->not->toBeNull();
-        // Hash bcrypt commence par $2y$
-        expect($user->password_hash)->toStartWith('$2y$');
 
-        // Fichier persisté
-        Storage::disk('local')->assertExists('seeders/owner-initial-password.txt');
+        // Le compte existe, mais SANS mot de passe : il n'y a rien à écrire
+        // quelque part « au cas où ».
+        expect($user->password_hash)->toBeNull();
+
+        // Et surtout : aucun fichier de secret, nulle part.
+        Storage::disk('local')->assertMissing('seeders/owner-initial-password.txt');
+    });
+});
+
+test('OwnerUserSeeder pose bien le mot de passe quand OWNER_INITIAL_PASSWORD est fourni', function () {
+    Storage::fake('local');
+
+    withOwnerEnv([
+        'OWNER_INITIAL_EMAIL' => 'owner2b@test.local',
+        'OWNER_INITIAL_PASSWORD' => 'UnMotDePasseFourni!2026',
+    ], function () {
+        $this->seed(OwnerUserSeeder::class);
+
+        $user = DB::table('users')->where('email', 'owner2b@test.local')->first();
+        expect($user->password_hash)->not->toBeNull();
+        expect(Hash::check('UnMotDePasseFourni!2026', $user->password_hash))->toBeTrue();
+
+        // Même dans ce cas, rien n'est écrit sur disque.
+        Storage::disk('local')->assertMissing('seeders/owner-initial-password.txt');
     });
 });
 

@@ -85,7 +85,44 @@ jobs:
           set -euo pipefail
           # `config` exige un `.env` présent (env_file du service api).
           cp .env.example .env
-          docker compose -f docker-compose.yml -f docker-compose.prod.yml config > /tmp/merged.yml
+
+          # ── P6-INFRA-003 : CE JOB NE RENDAIT QU'UNE SEULE COMBINAISON ──────
+          #
+          # Il fusionnait `base + prod`, et concluait « la production ne publie
+          # que 80 et 443 ». Mais la production ne se lance pas toujours avec ces
+          # deux fichiers-là : `docker-compose.observability.yml` prescrit
+          #
+          #   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+          #                  -f docker-compose.observability.yml up -d
+          #
+          # combinaison que ce job ne rendait JAMAIS. La passe à regard neuf l'a
+          # relevée comme douzième chemin vers la faille du 2026-08-19 (Postgres
+          # sur 55432 et Redis sur 56379, joignables depuis internet, Redis sans
+          # mot de passe).
+          #
+          # On mesure donc TOUTES les combinaisons qui peuvent servir en
+          # production. Une seule qui publierait autre chose que 80/443 fait
+          # rougir.
+          combinaisons="prod:docker-compose.prod.yml"
+          if [ -f docker-compose.observability.yml ]; then
+            combinaisons="$combinaisons prod+observabilite:docker-compose.prod.yml,docker-compose.observability.yml"
+          fi
+
+          for entree in $combinaisons; do
+            nom="${entree%%:*}"
+            fichiers="${entree#*:}"
+            args=""
+            IFS=','
+            for f in $fichiers; do args="$args -f $f"; done
+            unset IFS
+            echo "── combinaison « $nom » : docker-compose.yml$args"
+            # shellcheck disable=SC2086
+            docker compose -f docker-compose.yml $args config > "/tmp/merged-$nom.yml"
+          done
+
+          # Le reste du contrôle porte sur la combinaison de référence ; les
+          # autres sont vérifiées juste après, avec le même extracteur.
+          cp /tmp/merged-prod.yml /tmp/merged.yml
 
           echo "::group::configuration fusionnée — publications de ports"
           grep -n 'published:' /tmp/merged.yml || echo '(aucune)'
@@ -97,7 +134,35 @@ jobs:
           # VERT sans avoir rien mesuré. Un contrôle qui réussit quand il ne
           # peut pas mesurer ne contrôle rien. Constaté en le rejouant à la main
           # le 2026-08-19.
-          publies="$(awk -F'published: ' '/published: /{gsub(/"/,"",$2); print $2}' /tmp/merged.yml | sort -u)"
+          # ⚠️ `host_ip` FAIT PARTIE DE LA MESURE, et il y manquait.
+          #
+          # Cet extracteur lisait `published:` seul. Or `docker compose config`
+          # rend, pour un port lie a la boucle locale :
+          #
+          #     - mode: ingress
+          #       host_ip: 127.0.0.1     <- present
+          #       target: 9090
+          #       published: "9090"
+          #
+          # et, pour un port reellement EXPOSE, le meme bloc SANS `host_ip`.
+          # Un port sur 127.0.0.1 n'ecoute pas sur 0.0.0.0 : il n'expose rien.
+          #
+          # Mesure du 2026-08-21 sur `base + prod + observabilite` :
+          #   sans host_ip : 80 443 3000 3001 3100 3200 4317 4318 8080 9090 9093
+          #   avec host_ip : 80 443
+          # Les neuf ports d'observabilite sont tous sur la boucle locale. Sans
+          # cette distinction, etendre la garde a cette combinaison l'aurait
+          # fait rougir A TORT — et une garde qui crie faux finit desactivee.
+          extraire_ports() {
+            awk '
+              $1 == "-" && $2 == "mode:" { hostip = "" }
+              $1 == "host_ip:"           { hostip = $2 }
+              $1 == "published:"         { v = $2; gsub(/"/, "", v);
+                                           if (hostip !~ /^127\./ && hostip != "::1" && hostip != "localhost") print v }
+            ' "$1" | sort -u
+          }
+
+          publies="$(extraire_ports /tmp/merged.yml)"
           echo "Ports publiés : ${publies:-aucun}"
 
           # TÉMOIN POSITIF — l'extraction a-t-elle seulement fonctionné ?
@@ -134,6 +199,84 @@ jobs:
           fi
 
           echo "OK — seuls 80 et 443 sont publiés par la configuration de production."
+
+          # ── LES AUTRES COMBINAISONS, avec le MEME extracteur ───────────────
+          for fichier in /tmp/merged-*.yml; do
+            nom="$(basename "$fichier" .yml)"; nom="${nom#merged-}"
+            [ "$nom" = "prod" ] && continue
+
+            autres="$(extraire_ports "$fichier")"
+            echo "Combinaison « $nom » — ports publiés : ${autres:-aucun}"
+
+            # Même témoin positif : sans 80 ni 443, la mesure est cassée.
+            for attendu in 80 443; do
+              if ! echo "$autres" | grep -qx "$attendu"; then
+                echo "::error::Témoin positif en échec sur « $nom » : port $attendu introuvable."
+                exit 1
+              fi
+            done
+
+            mauvais=""
+            for port in $autres; do
+              case "$port" in 80|443) ;; *) mauvais="$mauvais $port" ;; esac
+            done
+            if [ -n "$mauvais" ]; then
+              echo "::error::La combinaison « $nom » publie des ports non autorisés :$mauvais"
+              echo "::error::Elle est pourtant prescrite pour la PRODUCTION. Fermer ces ports"
+              echo "::error::dans l'overlay concerné, avec « ports: !override [] »."
+              exit 1
+            fi
+            echo "OK — « $nom » ne publie que 80 et 443."
+          done
+
+      # ── TÉMOIN NÉGATIF : le contrôle ci-dessus sait-il seulement rougir ? ──
+      #
+      # Un « aucun port interdit » ne vaut que si l'on a prouvé que l'extracteur
+      # SAIT en trouver. On lui donne donc la combinaison FAUTIVE — celle qui
+      # oublie `docker-compose.prod.yml` — et on exige qu'elle publie bien
+      # 55432 et 56379. Deux choses en découlent :
+      #
+      #   - si ces ports apparaissent : l'extracteur fonctionne, ET le risque
+      #     P6-INFRA-003 est TOUJOURS RÉEL — la sécurité repose sur le fait de
+      #     ne jamais oublier un fichier ;
+      #   - s'ils n'apparaissent plus : quelqu'un a fermé les ports dans le
+      #     fichier de BASE. C'est une bonne nouvelle, et ce job le dit — il
+      #     faut alors retirer cet avertissement plutôt que le laisser mentir.
+      - name: TÉMOIN NÉGATIF — la combinaison sans overlay prod expose bien la base
+        run: |
+          set -euo pipefail
+          cp .env.example .env
+          docker compose -f docker-compose.yml config > /tmp/base-seule.yml
+
+          # Meme extracteur que l'etape precedente — une etape est un shell
+          # distinct, la fonction n'y survit pas. Recopiee A DESSEIN plutot que
+          # partagee : deux extracteurs qui divergeraient en silence seraient
+          # pires qu'une repetition visible.
+          publies="$(awk '
+              $1 == "-" && $2 == "mode:" { hostip = "" }
+              $1 == "host_ip:"           { hostip = $2 }
+              $1 == "published:"         { v = $2; gsub(/"/, "", v);
+                                           if (hostip !~ /^127\./ && hostip != "::1" && hostip != "localhost") print v }
+            ' /tmp/base-seule.yml | sort -u)"
+          echo "Ports publiés par docker-compose.yml SEUL : ${publies:-aucun}"
+
+          manquants=""
+          for port in 55432 56379; do
+            echo "$publies" | grep -qx "$port" || manquants="$manquants $port"
+          done
+
+          if [ -n "$manquants" ]; then
+            echo "::notice::Le fichier de base ne publie plus :$manquants"
+            echo "::notice::Si c'est délibéré, P6-INFRA-003 est CLOS à la source : retirer ce témoin,"
+            echo "::notice::et l'avertissement en tête de docker-compose.observability.yml."
+            echo "::error::Ce témoin ne prouve donc plus que l'extracteur sait rougir. Le mettre à jour."
+            exit 1
+          fi
+
+          echo "Témoin négatif OK : l'extracteur voit 55432 et 56379 quand ils sont là."
+          echo "::warning::P6-INFRA-003 reste OUVERT À LA SOURCE : docker-compose.yml publie"
+          echo "::warning::55432 et 56379 sur 0.0.0.0, et seul l'overlay prod les referme."
+          echo "::warning::Toute commande qui oublie -f docker-compose.prod.yml rouvre la faille du 19/08."
 
   caddyfile-valide:
     name: Le Caddyfile est-il valide ?

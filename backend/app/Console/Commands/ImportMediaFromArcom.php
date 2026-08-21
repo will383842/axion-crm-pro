@@ -61,12 +61,16 @@ use Illuminate\Support\Facades\Http;
  * la zone reste NULL (le fichier ne permet pas de trancher national/local).
  *
  * ── Idempotence ──────────────────────────────────────────────────────────────
- * Full-refresh transactionnel PAR source (`DELETE source='arcom'` puis
- * ré-insertion) — comme media:import-opendatasoft. Relançable sans doublon.
- * Déduplication intra-lot par (nom normalisé + type).
+ * FUSION transactionnelle par source (B17-008, 2026-08-20). Le full-refresh
+ * (`DELETE source='arcom'` puis ré-insertion) a été retiré : rejoué chaque
+ * dimanche, il recréait les stations avec un id neuf, ce qui détachait les
+ * journalistes et orphelinait les émissions (FK ON DELETE SET NULL).
+ * Voir {@see ImportMediaMerge}. Déduplication intra-lot par (nom normalisé + type).
  */
 class ImportMediaFromArcom extends Command
 {
+    use ImportMediaMerge;
+
     protected $signature = 'media:import-arcom
         {--limit=0 : Nombre max de stations à insérer (0 = toutes)}
         {--dry-run : Analyse et affiche les stats sans écrire en base}
@@ -152,7 +156,7 @@ class ImportMediaFromArcom extends Command
                     $r['media_type'],
                     $r['diffusion_zone'] ?? '-',
                     $r['department_code'] ?? '-',
-                    $r['city'] ?? ''
+                    $r['city'] ?? '',
                 ));
             }
 
@@ -165,20 +169,42 @@ class ImportMediaFromArcom extends Command
             $this->info("  Rattachement company : {$matched} médias associés à une entreprise.");
         }
 
-        // ── Full-refresh idempotent (transaction) ────────────────────────────
-        $inserted = 0;
-        DB::transaction(function () use ($workspaceId, $rows, &$inserted) {
-            DB::table('media')
-                ->where('source', 'arcom')
-                ->where('workspace_id', $workspaceId)
-                ->delete();
-            foreach (array_chunk($rows, 500) as $chunk) {
-                DB::table('media')->insert($chunk);
-                $inserted += count($chunk);
-            }
-        });
+        // ── B17-008 : FUSION, plus de full-refresh ───────────────────────────
+        // Avant (mesuré sur ce dépôt le 2026-08-20) : DELETE source='arcom' puis
+        // INSERT, rejoué chaque dimanche 03:30 (routes/console.php:157). L'id de la
+        // station changeait à chaque rejeu (5 → 7 dans la garde) → journalistes
+        // détachés, ÉMISSIONS orphelines (`parent_media_id` ON DELETE SET NULL —
+        // et le rattrapage `media:link-emissions-to-channels` ne tourne qu'à 04:30),
+        // enrichissement de la semaine effacé ; un XLSX vide ou illisible-mais-200
+        // faisait tomber la source de 1 station à 0.
+        if ($rows === []) {
+            $this->refuseLotVide('arcom');
 
-        $this->info("✓ {$inserted} stations ARCOM importées (source=arcom).");
+            return self::FAILURE;
+        }
+
+        $stats = $this->mergeMediaRows(
+            sourceTag: 'arcom',
+            workspaceId: (string) $workspaceId,
+            rows: $rows,
+            // Clé naturelle : l'`arcom_id` synthétique et déterministe
+            // (nom + type + catégorie normalisés, cf. self::arcomStableId()) — même
+            // service ⇒ même clé d'un run à l'autre. Limite assumée : si l'ARCOM
+            // renomme une station, la clé change → l'ancienne fiche est ARCHIVÉE
+            // (pas supprimée, journalistes conservés) et une neuve est créée.
+            keyOf: static fn (array $r): string => 'arcom:' . mb_strtolower(trim((string) ($r['arcom_id'] ?? $r['name'] ?? ''))),
+            // Le fichier de transparence possède l'identité du service et l'adresse
+            // du siège social déclaré ; aucun autre traitement n'écrit ces colonnes.
+            sourceOwned: ['name', 'media_type', 'media_family', 'diffusion_zone', 'publisher',
+                'department_code', 'region_code', 'city', 'postcode', 'arcom_id'],
+            // --match-companies pose un rattachement best-effort : il ne doit jamais
+            // écraser celui de media:link-to-companies (quotidien, 05:20).
+            backfillOnly: ['company_id', 'siren'],
+            // --limit=N tronque volontairement le lot (ligne 128) : sans ce
+            // garde-fou, un `--limit=10` archiverait les 1 234 autres stations.
+            archiveAbsents: $limit <= 0,
+        );
+        $this->afficheFusion('arcom', $stats);
 
         return self::SUCCESS;
     }
@@ -192,7 +218,7 @@ class ImportMediaFromArcom extends Command
      */
     public static function extractRows(string $xlsxPath): array
     {
-        $zip = new \ZipArchive();
+        $zip = new \ZipArchive;
         if ($zip->open($xlsxPath) !== true) {
             throw new \RuntimeException('Archive XLSX illisible.');
         }
@@ -321,22 +347,22 @@ class ImportMediaFromArcom extends Command
             $dept = $isFrance ? self::deptFromPostcode($postcode) : null;
 
             $rows[] = [
-                'workspace_id'    => $workspaceId,
-                'name'            => mb_substr($name, 0, 240),
-                'media_type'      => $type,
-                'media_family'    => 'editorial',
-                'diffusion_zone'  => self::zoneFromCategory($type, $category),
-                'publisher'       => $publisher !== '' ? mb_substr($publisher, 0, 240) : null,
+                'workspace_id' => $workspaceId,
+                'name' => mb_substr($name, 0, 240),
+                'media_type' => $type,
+                'media_family' => 'editorial',
+                'diffusion_zone' => self::zoneFromCategory($type, $category),
+                'publisher' => $publisher !== '' ? mb_substr($publisher, 0, 240) : null,
                 'department_code' => $dept,
-                'region_code'     => $dept ? self::regionFromDept($dept) : null,
-                'city'            => $city !== '' ? mb_substr($city, 0, 160) : null,
-                'postcode'        => $postcode !== '' ? mb_substr($postcode, 0, 10) : null,
-                'arcom_id'        => self::arcomStableId($name, $type, $category),
-                'website_status'  => 'pending',
-                'enrich_status'   => 'pending',
-                'source'          => 'arcom',
-                'created_at'      => $now,
-                'updated_at'      => $now,
+                'region_code' => $dept ? self::regionFromDept($dept) : null,
+                'city' => $city !== '' ? mb_substr($city, 0, 160) : null,
+                'postcode' => $postcode !== '' ? mb_substr($postcode, 0, 10) : null,
+                'arcom_id' => self::arcomStableId($name, $type, $category),
+                'website_status' => 'pending',
+                'enrich_status' => 'pending',
+                'source' => 'arcom',
+                'created_at' => $now,
+                'updated_at' => $now,
             ];
         }
 
@@ -425,9 +451,9 @@ class ImportMediaFromArcom extends Command
 
         return match (strtoupper(trim($category))) {
             'A', 'B' => 'local',
-            'C'      => 'régional',
+            'C' => 'régional',
             'D', 'E' => 'national',
-            default  => null,
+            default => null,
         };
     }
 

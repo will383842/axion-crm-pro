@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Events\ScraperRunCancelled;
+use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Http\Requests\StoreScrapingCampaignRequest;
 use App\Http\Requests\UpdateScrapingCampaignRequest;
 use App\Http\Resources\ScrapingCampaignResource;
+use App\Jobs\DispatchScrapeJob;
 use App\Jobs\LaunchCampaignJob;
+use App\Jobs\LaunchZoneScrapingJob;
 use App\Jobs\MonitorCampaignProgressJob;
 use App\Models\ScrapingCampaign;
 use Illuminate\Http\JsonResponse;
@@ -33,11 +36,15 @@ use Illuminate\Support\Facades\Schema;
  */
 class ScrapingCampaignsController extends ApiController
 {
+    use VerrouOptimiste;
+
     /**
      * @OA\Get(path="/campaigns", tags={"Campaigns"}, summary="Liste paginée des campagnes",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="status", in="query", @OA\Schema(type="string")),
      *     @OA\Parameter(name="search", in="query", @OA\Schema(type="string")),
+     *
      *     @OA\Response(response=200, description="OK"))
      */
     public function index(Request $r): JsonResponse
@@ -71,7 +78,7 @@ class ScrapingCampaignsController extends ApiController
             if ($search = $r->query('search')) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'ILIKE', "%{$search}%")
-                      ->orWhere('description', 'ILIKE', "%{$search}%");
+                        ->orWhere('description', 'ILIKE', "%{$search}%");
                 });
             }
 
@@ -80,15 +87,16 @@ class ScrapingCampaignsController extends ApiController
             return $this->ok([
                 'data' => ScrapingCampaignResource::collection($page->items()),
                 'meta' => [
-                    'total'        => $page->total(),
-                    'per_page'     => $page->perPage(),
+                    'total' => $page->total(),
+                    'per_page' => $page->perPage(),
                     'current_page' => $page->currentPage(),
-                    'last_page'    => $page->lastPage(),
+                    'last_page' => $page->lastPage(),
                 ],
             ]);
         } catch (\Throwable $e) {
             Log::error('campaigns.index failed', ['exception' => $e->getMessage()]);
             report($e);
+
             return $this->ok(['data' => [], 'meta' => ['total' => 0], 'degraded' => true]);
         }
     }
@@ -96,6 +104,7 @@ class ScrapingCampaignsController extends ApiController
     /**
      * @OA\Post(path="/campaigns", tags={"Campaigns"}, summary="Crée une campagne (status=draft ou scheduled)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Response(response=201, description="Created"))
      */
     public function store(StoreScrapingCampaignRequest $r): JsonResponse
@@ -113,19 +122,19 @@ class ScrapingCampaignsController extends ApiController
             : 'draft';
 
         $campaign = ScrapingCampaign::create([
-            'workspace_id'            => $workspaceId,
-            'created_by'              => $user->id,
-            'name'                    => $validated['name'],
-            'description'             => $validated['description'] ?? null,
-            'status'                  => $status,
-            'sources'                 => $validated['sources'],
-            'zones'                   => $validated['zones'],
-            'max_companies'           => $validated['max_companies'] ?? 1000,
-            'max_duration_minutes'    => $validated['max_duration_minutes'] ?? 180,
+            'workspace_id' => $workspaceId,
+            'created_by' => $user->id,
+            'name' => $validated['name'],
+            'description' => $validated['description'] ?? null,
+            'status' => $status,
+            'sources' => $validated['sources'],
+            'zones' => $validated['zones'],
+            'max_companies' => $validated['max_companies'] ?? 1000,
+            'max_duration_minutes' => $validated['max_duration_minutes'] ?? 180,
             'max_requests_per_minute' => $validated['max_requests_per_minute'] ?? 30,
-            'per_source_limits'       => $validated['per_source_limits'] ?? null,
-            'scheduled_at'            => $validated['scheduled_at'] ?? null,
-            'expires_at'              => $validated['expires_at'] ?? null,
+            'per_source_limits' => $validated['per_source_limits'] ?? null,
+            'scheduled_at' => $validated['scheduled_at'] ?? null,
+            'expires_at' => $validated['expires_at'] ?? null,
         ]);
 
         return response()->json(new ScrapingCampaignResource($campaign), 201);
@@ -143,6 +152,7 @@ class ScrapingCampaignsController extends ApiController
         $campaign->load(['runs' => function ($q) {
             $q->latest('id')->limit(20);
         }]);
+
         return $this->ok(new ScrapingCampaignResource($campaign));
     }
 
@@ -157,14 +167,44 @@ class ScrapingCampaignsController extends ApiController
         }
         if ($campaign->status !== 'draft') {
             return response()->json([
-                'error'   => 'invalid_state',
+                'error' => 'invalid_state',
                 'message' => "Modification autorisée uniquement en status=draft (actuel : {$campaign->status}).",
-                'status'  => $campaign->status,
+                'status' => $campaign->status,
             ], 422);
         }
 
+        // ── VERROU OPTIMISTE (G43-005) ───────────────────────────────────
+        //
+        // Deux personnes ouvrent la meme fiche, la modifient, enregistrent :
+        // la seconde ecrasait la premiere, et les DEUX recevaient « succes ».
+        // Rien ne le disait a personne. La saisie perdue ne laisse aucune trace.
+        //
+        // Le mecanisme n'est pas invente ici : `CompaniesController` le porte
+        // depuis le lot G43-005, par le trait partage. Il reste OPTIONNEL —
+        // sans en-tete `If-Match`, le comportement historique ne change pas, ce
+        // qui evite de casser les clients existants. Mais le client qui l'envoie
+        // est desormais protege ICI AUSSI.
+        $this->refuserSiVersionPerimee($r, $campaign);
+
         $campaign->update($r->validated());
-        return $this->ok(new ScrapingCampaignResource($campaign->fresh()));
+
+        // ⚠️ L'EN-TETE `ETag` PORTE LE JETON DE L'ETAT D'APRES.
+        //
+        // Sans lui, aucun client ne peut obtenir de jeton, et le verrou pose
+        // au-dessus serait du DECOR : `refuserSiVersionPerimee()` ne se
+        // declenche que si le client annonce un etat, et il ne peut l'annoncer
+        // que s'il l'a recu. Le CORPS de la reponse n'est pas modifie.
+        // `refresh()` et non `fresh()` : `fresh()` peut rendre `null` (PHPStan le
+        // signale a juste titre — la ligne peut avoir disparu entre l'ecriture et
+        // la relecture), et il partait ici DEUX fois en base, une pour le corps
+        // et une pour le jeton. `refresh()` recharge l'instance en place et rend
+        // `$this` : un seul aller-retour, et un modele non nul.
+        $campaign->refresh();
+
+        return $this->avecJetonDeVersion(
+            $this->ok(new ScrapingCampaignResource($campaign)),
+            $campaign,
+        );
     }
 
     /**
@@ -177,6 +217,7 @@ class ScrapingCampaignsController extends ApiController
             abort(404);
         }
         $campaign->delete();
+
         return $this->ok(['deleted' => true]);
     }
 
@@ -191,20 +232,21 @@ class ScrapingCampaignsController extends ApiController
         }
         if (! $campaign->canStart()) {
             return response()->json([
-                'error'   => 'invalid_state',
+                'error' => 'invalid_state',
                 'message' => "Impossible de démarrer une campagne au statut '{$campaign->status}'.",
-                'status'  => $campaign->status,
+                'status' => $campaign->status,
             ], 422);
         }
 
         $campaign->update([
-            'status'        => 'running',
-            'started_at'    => $campaign->started_at ?? now(),
+            'status' => 'running',
+            'started_at' => $campaign->started_at ?? now(),
             'paused_reason' => null,
-            'paused_at'     => null,
+            'paused_at' => null,
         ]);
 
-        LaunchCampaignJob::dispatch($campaign->id);
+        dispatch((new LaunchCampaignJob($campaign->id))
+            ->pourEspace((string) $campaign->workspace_id));
 
         return $this->ok(new ScrapingCampaignResource($campaign->fresh()));
     }
@@ -220,15 +262,15 @@ class ScrapingCampaignsController extends ApiController
         }
         if (! $campaign->canPause()) {
             return response()->json([
-                'error'   => 'invalid_state',
+                'error' => 'invalid_state',
                 'message' => "Impossible de mettre en pause une campagne au statut '{$campaign->status}'.",
-                'status'  => $campaign->status,
+                'status' => $campaign->status,
             ], 422);
         }
 
         $campaign->update([
-            'status'        => 'paused',
-            'paused_at'     => now(),
+            'status' => 'paused',
+            'paused_at' => now(),
             'paused_reason' => 'manual',
         ]);
 
@@ -254,21 +296,22 @@ class ScrapingCampaignsController extends ApiController
         }
         if (! $campaign->canResume()) {
             return response()->json([
-                'error'   => 'invalid_state',
+                'error' => 'invalid_state',
                 'message' => "Impossible de reprendre une campagne au statut '{$campaign->status}'.",
-                'status'  => $campaign->status,
+                'status' => $campaign->status,
             ], 422);
         }
 
         $campaign->update([
-            'status'        => 'running',
-            'paused_at'     => null,
+            'status' => 'running',
+            'paused_at' => null,
             'paused_reason' => null,
         ]);
 
         // Si auto-pause sur quota_companies/duration, refuser le resume implicite
         // serait plus prudent, mais pour le MVP on autorise (l'user reprend en connaissance de cause).
-        MonitorCampaignProgressJob::dispatch($campaign->id);
+        dispatch((new MonitorCampaignProgressJob($campaign->id))
+            ->pourEspace((string) $campaign->workspace_id));
 
         return $this->ok(new ScrapingCampaignResource($campaign->fresh()));
     }
@@ -284,14 +327,14 @@ class ScrapingCampaignsController extends ApiController
         }
         if (! $campaign->canCancel()) {
             return response()->json([
-                'error'   => 'invalid_state',
+                'error' => 'invalid_state',
                 'message' => "Impossible d'annuler une campagne au statut '{$campaign->status}'.",
-                'status'  => $campaign->status,
+                'status' => $campaign->status,
             ], 422);
         }
 
         $campaign->update([
-            'status'      => 'cancelled',
+            'status' => 'cancelled',
             'finished_at' => now(),
         ]);
 
@@ -305,17 +348,49 @@ class ScrapingCampaignsController extends ApiController
             DB::table('scraper_runs')
                 ->whereIn('id', $runsToCancel)
                 ->update([
-                    'status'      => 'cancelled',
+                    'status' => 'cancelled',
                     'finished_at' => now(),
-                    'error'       => 'Campagne annulée',
+                    'error' => 'Campagne annulée',
                 ]);
 
+            // 🔴 CONSTAT C18-008. Annuler une campagne ne purge PAS la file :
+            // `LaunchCampaignJob` y a pousse un `LaunchZoneScrapingJob` par
+            // (zone x source), decale de `ceil(60 / max_requests_per_minute)` s
+            // chacun, et Laravel ne sait pas retirer un job precis d'une file.
+            // Le statut `cancelled` ecrit ci-dessus ne suffisait donc pas : les
+            // jobs restants s'executaient quand meme et creaient des entreprises
+            // apres l'arret. Ce qui arrete vraiment, c'est la LECTURE de l'arret
+            // a l'execution — `LaunchZoneScrapingJob::motifArretCampagne()` pour
+            // les jobs pas encore demarres, `::motifArretDistant()` pour celui
+            // qui tourne. Les deux relisent ce statut et la cle ci-dessous.
             foreach ($runsToCancel as $runId) {
                 try {
-                    Redis::setex('cancelled:scraper-run:' . $runId, 3600, '1');
+                    // 🔴 SITE JUMEAU DE C18-011, PORTE LE 2026-08-21 — ET IL CASSAIT DEUX FOIS.
+                    //
+                    // Cette clef traverse la frontiere PHP <-> Node : `workers/src/scrapers/base.ts`
+                    // (`PREFIXE_ANNULATION`, l. 56) la relit avant chaque scrape. Elle etait
+                    // ecrite par la facade `Redis` NUE, donc sur la connexion `default` :
+                    //
+                    //     PHP  ecrivait  axion_crm_pro_database_cancelled:scraper-run:42  (base 0)
+                    //     Node lisait    cancelled:scraper-run:42                          (base 1)
+                    //
+                    // Deux divergences INDEPENDANTES — le prefixe et le numero de base —,
+                    // chacune suffisante a elle seule pour que l'arret d'urgence n'arrete
+                    // rien cote Node. C'est exactement la panne de C18-011, a un autre
+                    // endroit : le meme defaut, non porte. Vingt-sixieme fois (motif A-011).
+                    //
+                    // ⚠️ LES TROIS SITES BOUGENT ENSEMBLE, ET C'EST OBLIGATOIRE. Deplacer
+                    // les deux ecritures sans la lecture casserait l'annulation cote PHP,
+                    // qui elle FONCTIONNE aujourd'hui — precisement parce que les trois
+                    // partagent la meme connexion fautive. C'est tout ou rien :
+                    //     ecriture  Api/ScraperRunsController::destroy()
+                    //     ecriture  Api/ScrapingCampaignsController::cancel()
+                    //     lecture   Jobs/LaunchZoneScrapingJob::motifArretDistant()
+                    Redis::connection(DispatchScrapeJob::CONNEXION_REDIS)
+                        ->setex(LaunchZoneScrapingJob::CLE_ANNULATION . $runId, 3600, '1');
                 } catch (\Throwable $e) {
                     Log::warning('campaigns.cancel: Redis flag failed', [
-                        'run_id'    => $runId,
+                        'run_id' => $runId,
                         'exception' => $e->getMessage(),
                     ]);
                 }
@@ -367,7 +442,7 @@ class ScrapingCampaignsController extends ApiController
         } catch (\Throwable $e) {
             Log::warning('campaigns.stats failed', [
                 'campaign_id' => $campaign->id,
-                'exception'   => $e->getMessage(),
+                'exception' => $e->getMessage(),
             ]);
         }
 
@@ -385,10 +460,10 @@ class ScrapingCampaignsController extends ApiController
         }
 
         return $this->ok([
-            'campaign'             => new ScrapingCampaignResource($campaign->fresh()),
-            'per_source'           => $perSource,
-            'per_zone'             => $perZone,
-            'last_events'          => $lastEvents,
+            'campaign' => new ScrapingCampaignResource($campaign->fresh()),
+            'per_source' => $perSource,
+            'per_zone' => $perZone,
+            'last_events' => $lastEvents,
             'companies_per_minute' => $companiesLastMinute,
         ]);
     }
@@ -397,25 +472,34 @@ class ScrapingCampaignsController extends ApiController
     // Helpers
     // ------------------------------------------------------------------
 
+    /**
+     * 🔴 CONSTAT B12-001 / F36-005. Cette methode etait FAIL-OPEN : elle rendait
+     * `true` des que le contexte d'espace manquait (« tolerant en test/dev »).
+     * Rien ne distingue un test d'une production, et la tolerance devenait la
+     * regle des qu'un appel arrivait avant le middleware.
+     *
+     * Elle delegue desormais a `ApiController::estDeMonEspace()`, qui repond
+     * « non » quand elle ne sait pas. Le repli sur le compte authentifie, qui
+     * etait la seule vraie valeur de cette version locale, a ete remonte dans
+     * `espaceCourantOuNull()` : plus aucune copie ici.
+     */
     private function belongsToCurrentWorkspace(ScrapingCampaign $campaign): bool
     {
-        $workspaceId = $this->workspaceIdOrNull();
-        if ($workspaceId === null) {
-            return true;
-        }
-        return (string) $campaign->workspace_id === (string) $workspaceId;
+        return $this->estDeMonEspace($campaign);
     }
 
     private function workspaceIdOrNull(): ?string
     {
         if (app()->bound('workspace.id')) {
             $id = app('workspace.id');
+
             return $id !== null && $id !== '' ? (string) $id : null;
         }
         $user = request()->user();
         if ($user && $user->current_workspace_id) {
             return (string) $user->current_workspace_id;
         }
+
         return null;
     }
 }

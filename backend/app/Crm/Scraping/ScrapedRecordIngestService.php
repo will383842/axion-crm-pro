@@ -2,6 +2,7 @@
 
 namespace App\Crm\Scraping;
 
+use App\Crm\Identite\CleDePersonne;
 use App\Models\Company;
 use App\Services\Tags\AutoTaggerService;
 use App\Support\WorkspaceContext;
@@ -389,9 +390,24 @@ final class ScrapedRecordIngestService
 
     /**
      * Dédup + écriture backfill-only d'une personne. Ordre de dédup : email
-     * normalisé, puis `normalized_hash` (nom + entreprise). Pas de `person_key`
-     * ici : il est SALÉ côté site, la collecte ne peut pas le calculer — c'est
-     * l'événement entrant (lot L2) qui le posera s'il croise la fiche.
+     * normalisé, puis `normalized_hash` (nom + entreprise).
+     *
+     * 🔴 A05-001 (S1) — CE COMMENTAIRE DISAIT LE CONTRAIRE, ET C'ÉTAIT FAUX.
+     *
+     * Il affirmait : « Pas de `person_key` ici : il est SALÉ côté site, la
+     * collecte ne peut pas le calculer ». C'est ce raisonnement qui a produit
+     * la mesure du 2026-08-18 : **1 319 567 contacts, 410 481 avec e-mail, 0
+     * avec `person_key`** — donc une fiche 360° inatteignable pour 100 % du
+     * stock, puisque le hub n'offre le lien que `si person_key !== null`.
+     *
+     * Lu dans le dépôt du site (`src/lib/security/email-hash.ts` l. 81), la clé
+     * est un HMAC-SHA256 de formule publique dont seul le SECRET est côté site.
+     * La collecte PEUT donc la calculer, dès lors que le secret lui est donné
+     * (`CRM_PERSON_KEY_SECRET`). Sans secret, `CleDePersonne::pour()` rend
+     * `null` et on ne pose rien — jamais de clé inventée (cf. `CleDePersonne`).
+     *
+     * Poser la clé ICI n'est pas un confort : sans elle, le remplissage du
+     * stock re-divergerait dès la première collecte suivante.
      *
      * @param  array<string, string>  $person
      * @return 'created'|'updated'|'opted_out'|'bad_mx'|'skipped'
@@ -430,9 +446,26 @@ final class ScrapedRecordIngestService
 
         $existing = null;
         if ($email !== null) {
+            // C21-001 — CETTE RECHERCHE EST JOUÉE À CHAQUE FICHE INGÉRÉE.
+            //
+            // Elle s'écrivait `->whereRaw('lower(email::text) = ?', [$email])`.
+            // `contacts.email` est de type `citext` : la comparaison y est DÉJÀ
+            // insensible à la casse (et `$email` est mis en minuscules quelques
+            // lignes plus haut). Le `lower()` ne changeait donc rien au
+            // résultat — il transformait seulement la colonne en EXPRESSION, ce
+            // qui rendait `idx_contacts_email` inutilisable.
+            //
+            // Mesuré le 2026-08-20 sur 20 000 contacts, par `EXPLAIN` du SQL
+            // réellement émis (garde
+            // `tests/Feature/Infra/IndexEmailRgpdServentLesRequetesTest.php`) :
+            //     AVANT ... Seq Scan on contacts ....... 11,216 ms · 589 tampons
+            //     APRÈS ... Index Scan idx_contacts_email  0,046 ms ·   4 tampons
+            // Soit 244 fois moins de temps, sur 20 000 lignes seulement.
+            // Sur la base de volume, cette dédup est le chemin le plus chaud de
+            // l'ingestion : elle est jouée une fois PAR PERSONNE collectée.
             $existing = DB::table('contacts')
                 ->where('workspace_id', $workspaceId)
-                ->whereRaw('lower(email::text) = ?', [$email])
+                ->where('email', $email)
                 ->orderByRaw('CASE WHEN company_id = ? THEN 0 ELSE 1 END', [$companyId])
                 ->first();
         }
@@ -460,12 +493,38 @@ final class ScrapedRecordIngestService
                 'sources' => json_encode([$record->source], JSON_THROW_ON_ERROR),
                 'metadata' => '{}',
                 'legal_basis' => 'legitimate_interest_b2b',
+                // A05-001 : la clé de rapprochement, posée DÈS LA CRÉATION.
+                // `null` si l'adresse est absente ou le secret non configuré —
+                // jamais de valeur inventée.
+                'person_key' => CleDePersonne::pour($email),
                 'field_origins' => json_encode($this->collectedOrigins($person, $email), JSON_THROW_ON_ERROR),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
             return $id > 0 ? 'created' : 'skipped';
+        }
+
+        // A05-001 — RATTRAPAGE DE LA CLÉ sur une fiche déjà là qui n'en portait
+        // pas. Écrit À PART du bloc backfill-only ci-dessous, et volontairement :
+        // l'outcome (`created` / `updated` / `skipped`) décrit ce que la COLLECTE
+        // apporte à la fiche. Poser une clé de rapprochement absente est une
+        // réparation d'index interne, pas un apport de donnée collectée — la
+        // compter comme `updated` fausserait les compteurs d'ingestion sans rien
+        // dire de vrai.
+        //
+        // La clé se dérive de l'adresse DE LA FICHE quand elle en a une : la
+        // dédup a pu retrouver cette fiche par `normalized_hash` (nom +
+        // entreprise), auquel cas l'adresse entrante n'est pas forcément la
+        // sienne.
+        if (($existing->person_key ?? null) === null) {
+            $cle = CleDePersonne::pour(
+                is_string($existing->email ?? null) && $existing->email !== '' ? $existing->email : $email,
+            );
+
+            if ($cle !== null) {
+                DB::table('contacts')->where('id', $existing->id)->update(['person_key' => $cle]);
+            }
         }
 
         // Backfill-only, comme pour l'entreprise : rien d'existant n'est

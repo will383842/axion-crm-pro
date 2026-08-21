@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\RefuseUneSuppressionMassive;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -23,7 +24,9 @@ use Illuminate\Support\Facades\DB;
  */
 class MediaCleanEmails extends Command
 {
-    protected $signature = 'media:clean-emails {--threshold=10 : Au-delà de N médias partageant le même email → plateforme} {--dry-run}';
+    use RefuseUneSuppressionMassive;
+
+    protected $signature = 'media:clean-emails {--threshold=10 : Au-delà de N médias partageant le même email → plateforme} {--dry-run} {--force : Passe outre le plafond de proportion}';
 
     protected $description = 'Purge les emails médias parasites ou sur-partagés (plateformes/parking).';
 
@@ -78,7 +81,7 @@ class MediaCleanEmails extends Command
             count($toNull),
             count($shared),
             count($parasites),
-            $dry ? ' [dry-run]' : ''
+            $dry ? ' [dry-run]' : '',
         ));
 
         if ($dry) {
@@ -89,15 +92,36 @@ class MediaCleanEmails extends Command
             return self::SUCCESS;
         }
 
+        // ── PLAFOND (B15-008) ────────────────────────────────────────────
+        //
+        // Cette commande tourne SEULE, toutes les nuits a 05:05
+        // (`routes/console.php:275`), et met `media.email` a NULL. Elle n'avait
+        // AUCUNE barriere : le jour ou son detecteur se trompe — un domaine
+        // grand public mal classe, un `--threshold` trop bas — elle effacerait
+        // les adresses de tout le registre presse en une nuit.
+        //
+        // On compte les lignes REELLEMENT visees, pas les adresses distinctes :
+        // un meme email sur-partage porte, par definition, sur plusieurs medias.
+        // ⚠️ `whereNull('deleted_at')` : `media` porte une corbeille VIVANTE —
+        // c'est `ImportMediaMerge` qui l'archive. Compter les lignes deja
+        // archivees gonflerait les deux termes du rapport, et le plafond
+        // mesurerait autre chose que ce qu'il croit.
+        $visees = DB::table('media')->whereNull('deleted_at')->whereIn('email', $toNull)->count();
+        $totalAvecEmail = DB::table('media')->whereNull('deleted_at')->whereNotNull('email')->count();
+
+        if (! $this->ecritureAutoriseeSansOperateur('media', $visees, $totalAvecEmail, 'nuller')) {
+            return self::FAILURE;
+        }
+
         $nulled = 0;
         foreach (array_chunk($toNull, 500) as $chunk) {
             // media.email → NULL (+ enrich_status pending si plus aucun signal).
             $nulled += DB::table('media')
                 ->whereIn('email', $chunk)
                 ->update([
-                    'email'         => null,
+                    'email' => null,
                     'enrich_status' => DB::raw("CASE WHEN phone IS NULL THEN 'pending' ELSE enrich_status END"),
-                    'updated_at'    => now(),
+                    'updated_at' => now(),
                 ]);
         }
 
@@ -117,7 +141,7 @@ class MediaCleanEmails extends Command
                     $before = $socials['contact_channels']['emails'];
                     $after = array_values(array_filter(
                         $before,
-                        fn ($e) => ! in_array(strtolower((string) $e), $toNullLower, true)
+                        fn ($e) => ! in_array(strtolower((string) $e), $toNullLower, true),
                     ));
                     if (count($after) !== count($before)) {
                         $socials['contact_channels']['emails'] = $after;

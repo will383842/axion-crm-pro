@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Http\Resources\TagResource;
 use App\Models\Tag;
 use Illuminate\Http\JsonResponse;
@@ -13,6 +14,8 @@ use Illuminate\Support\Str;
 
 class TagsController extends ApiController
 {
+    use VerrouOptimiste;
+
     /**
      * @OA\Get(path="/tags", tags={"Tags"}, summary="Liste des tags du workspace",
      *     security={{"sanctumCookie":{}}},
@@ -119,14 +122,29 @@ class TagsController extends ApiController
      */
     public function update(Request $r, Tag $tag): JsonResponse
     {
-        $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
-        if ($workspaceId && $tag->workspace_id !== $workspaceId) {
-            return $this->ok(['error' => 'not found'], 404);
-        }
+        // Constat B12-001 : `if ($workspaceId && ...)` ne refusait rien quand le
+        // contexte d'espace manquait, et rendait un 404 dans une enveloppe 200
+        // (`$this->ok(..., 404)` positionne bien le code HTTP, mais le corps
+        // annonce une reussite). La garde durcie de `ApiController` refuse
+        // franchement -- et refuse aussi quand elle ne sait pas.
+        $this->refuserHorsEspace($tag);
         // Garde-fou : on ne modifie pas les tags auto/llm (générés par le système)
         if ($tag->kind !== 'manual') {
             return $this->ok(['error' => 'cannot update auto/llm tag'], 403);
         }
+
+        // ── VERROU OPTIMISTE (G43-005) ───────────────────────────────────
+        //
+        // Deux personnes ouvrent la meme fiche, la modifient, enregistrent :
+        // la seconde ecrasait la premiere, et les DEUX recevaient « succes ».
+        // Rien ne le disait a personne. La saisie perdue ne laisse aucune trace.
+        //
+        // Le mecanisme n'est pas invente ici : `CompaniesController` le porte
+        // depuis le lot G43-005, par le trait partage. Il reste OPTIONNEL —
+        // sans en-tete `If-Match`, le comportement historique ne change pas, ce
+        // qui evite de casser les clients existants. Mais le client qui l'envoie
+        // est desormais protege ICI AUSSI.
+        $this->refuserSiVersionPerimee($r, $tag);
 
         $data = $r->validate([
             'name' => ['sometimes', 'required', 'string', 'max:120'],
@@ -137,7 +155,26 @@ class TagsController extends ApiController
 
         $tag->update($data);
 
-        return $this->ok(['data' => new TagResource($tag->fresh())]);
+        // ⚠️ L'EN-TETE `ETag` PORTE LE JETON DE L'ETAT D'APRES.
+        //
+        // Sans lui, aucun client ne peut obtenir de jeton, et le verrou pose
+        // au-dessus serait du DECOR : `refuserSiVersionPerimee()` ne se declenche
+        // que si le client annonce un etat, et il ne peut l'annoncer que s'il l'a
+        // recu. Le CORPS de la reponse n'est pas modifie d'un octet.
+        //
+        // Ce controleur n'expose pas de `show()` : la reponse du PUT est le SEUL
+        // endroit ou le jeton peut etre remis.
+        // `refresh()` et non `fresh()` : `fresh()` peut rendre `null` (PHPStan le
+        // signale a juste titre — la ligne peut avoir disparu entre l'ecriture et
+        // la relecture), et il partait ici DEUX fois en base, une pour le corps
+        // et une pour le jeton. `refresh()` recharge l'instance en place et rend
+        // `$this` : un seul aller-retour, et un modele non nul.
+        $tag->refresh();
+
+        return $this->avecJetonDeVersion(
+            $this->ok(['data' => new TagResource($tag)]),
+            $tag,
+        );
     }
 
     /**
@@ -148,10 +185,12 @@ class TagsController extends ApiController
      */
     public function destroy(Tag $tag): JsonResponse
     {
-        $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
-        if ($workspaceId && $tag->workspace_id !== $workspaceId) {
-            return $this->ok(['error' => 'not found'], 404);
-        }
+        // Constat B12-001 : `if ($workspaceId && ...)` ne refusait rien quand le
+        // contexte d'espace manquait, et rendait un 404 dans une enveloppe 200
+        // (`$this->ok(..., 404)` positionne bien le code HTTP, mais le corps
+        // annonce une reussite). La garde durcie de `ApiController` refuse
+        // franchement -- et refuse aussi quand elle ne sait pas.
+        $this->refuserHorsEspace($tag);
         if ($tag->kind !== 'manual') {
             return $this->ok(['error' => 'cannot delete auto/llm tag (will be re-created by AutoTagger)'], 403);
         }

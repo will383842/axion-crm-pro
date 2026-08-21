@@ -120,35 +120,26 @@ final class EtancheiteWorkspace
      * avec pour seule façon de le calmer : retirer la table d'ici. Une
      * dérogation qui ne se périme pas toute seule finit par devenir la règle.
      *
+     * ── HISTORIQUE : la dérogation s'est bien périmée ───────────────────────
+     *
+     * Cette liste a contenu `email_verification_logs` du 2026-08-18 au
+     * 2026-08-20 (constat A07-002). Sans contexte workspace, la table rendait
+     * TOUTES les lignes de TOUS les espaces : sa policy d'origine
+     * `email_verif_workspace_isolation` (migration 2026_05_19_000001) portait
+     * un repli permissif écrit en `COALESCE(NULLIF(current_setting(...), ''),
+     * workspace_id::text)` — toujours vrai sans contexte —, et son nom
+     * RACCOURCI l'avait fait échapper au `DROP POLICY IF EXISTS
+     * <table>_workspace_isolation` du durcissement L0.
+     *
+     * Elle a été supprimée le 2026-08-20 par
+     * `2026_08_20_100000_supprimer_policy_permissive_survivante_email_verification_logs.php`.
+     * La table est depuis dans le contrôle GÉNÉRAL, comme toutes les autres.
+     * Le mécanisme a fonctionné exactement comme prévu : c'est le test
+     * « DÉFAUT CONNU » qui a rougi le jour de la correction.
+     *
      * @var array<string, string>
      */
-    public const DEFAUTS_CONNUS = [
-        'email_verification_logs' => <<<'MOTIF'
-            FUITE INTER-WORKSPACE MESURÉE le 2026-08-18 (base jetable, rôle axion_app) :
-            sans contexte workspace, la table rend TOUTES les lignes de TOUS les workspaces.
-
-            Cause : la table porte DEUX policies permissives, que Postgres combine par OU.
-              · `email_verif_workspace_isolation` (migration 2026_05_19_000001) :
-                    workspace_id::text = COALESCE(NULLIF(current_setting(...), ''), workspace_id::text)
-                → sans contexte, COALESCE retombe sur `workspace_id::text`, le prédicat est
-                  toujours VRAI : c'est le repli permissif « pas de contexte ⇒ je vois tout ».
-              · `email_verification_logs_workspace_isolation` (durcissement L0) : stricte.
-
-            La migration de durcissement fait bien `DROP POLICY IF EXISTS
-            <table>_workspace_isolation`, mais l'ancienne policy s'appelle
-            `email_verif_workspace_isolation` (nom RACCOURCI) : le DROP l'a manquée, et la
-            policy permissive a survécu au durcissement.
-
-            Le test structurel existant ne la voyait pas non plus : il cherche
-            `qual LIKE '%IS NULL%'`, or ce prédicat-ci n'écrit pas « IS NULL », il écrit
-            COALESCE. Un détecteur écrit sur la FORME d'un repli en rate les autres formes.
-
-            CORRECTIF (hors du périmètre d'écriture des tests) : une migration
-            `DROP POLICY IF EXISTS email_verif_workspace_isolation ON email_verification_logs;`
-            La table contient des adresses e-mail et des réponses de prestataire de
-            vérification : la fuite est réelle, pas théorique.
-            MOTIF,
-    ];
+    public const DEFAUTS_CONNUS = [];
 
     /**
      * Inventaire BRUT : toute relation du schéma courant portant `workspace_id`,

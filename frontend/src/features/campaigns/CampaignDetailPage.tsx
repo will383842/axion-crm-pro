@@ -7,7 +7,7 @@
  *  - Progress bars (entreprises + temps)
  *  - 4 KpiCards : companies / runs / req per min / ETA
  *  - 5 tabs : Suivi temps réel | Sources | Zones | Runs | Configuration
- *  - Refresh 5s via refetchInterval
+ *  - Refresh 5s via refetchInterval, COUPÉ sur un état terminal (G42-007)
  */
 import { useState } from 'react';
 import { Link, useParams, useNavigate } from '@tanstack/react-router';
@@ -23,9 +23,12 @@ import {
   Button,
   Card,
   cn,
+  EmptyState,
   KpiCard,
   LiveBadge,
   PageHeader,
+  QueryErrorState,
+  ReponseVideState,
   Spinner,
   StatusPill,
   Tabs,
@@ -35,6 +38,7 @@ import {
   ALL_SOURCES,
   PAUSED_REASON_LABEL,
   STATUS_LABEL,
+  estTerminee,
   statusToTone,
   type Campaign,
   type CampaignStatsResponse,
@@ -58,18 +62,49 @@ export function CampaignDetailPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<DetailTab>('live');
 
-  const { data: campaign, isLoading } = useQuery({
+  // ═══ G42-007 — la scrutation s'ARRÊTE sur un état terminal ═══════════════
+  //
+  // Mesure du 2026-08-20 : cet écran portait DEUX `refetchInterval: 5_000`,
+  // soit **24 requêtes par minute**, indéfiniment — y compris sur une
+  // campagne `completed` que le serveur ne peut plus faire bouger. Un onglet
+  // laissé ouvert sur une collecte finie de la veille interrogeait
+  // `/campaigns/{id}` et `/campaigns/{id}/stats` 1 440 fois par heure pour
+  // recevoir exactement la même réponse.
+  //
+  // La cadence devient une EXPRESSION : `false` sur un état terminal, 5 s
+  // sinon. Rien ne change pendant qu'une campagne tourne — c'est voulu, c'est
+  // là que le direct sert.
+  //
+  // ⚠️ Ce n'est pas une mise en sommeil définitive : `startMutation` invalide
+  // `['campaign', id]`, la donnée revient, le statut redevient `running` et
+  // la cadence reprend au rendu suivant. React Query relit ses options à
+  // chaque rendu.
+  //
+  // ⚠️ CE QUI N'EST PAS RÉPARÉ, et qui est le cœur de G42-007 : pendant qu'une
+  // campagne TOURNE, l'écran fait toujours 24 req/min pour deux ressources qui
+  // décrivent le même objet. Les fondre demande au serveur d'exposer les
+  // statistiques DANS la ressource campagne — un changement de contrat d'API,
+  // hors périmètre d'un lot frontend. Voir le rapport du lot.
+  const idLisible = Number.isFinite(id) && id > 0;
+
+  const { data: campaign, isLoading, error, refetch } = useQuery({
     queryKey: ['campaign', id],
     queryFn: async () => (await api.get<Campaign>(`/campaigns/${id}`)).data,
-    refetchInterval: 5_000,
-    enabled: Number.isFinite(id) && id > 0,
+    // Forme FONCTION : cette requête est la seule à connaître son propre
+    // statut, et elle ne peut pas se lire elle-même depuis `campaign` (zone
+    // morte temporelle — la variable est en cours de déclaration).
+    refetchInterval: (requete) =>
+      estTerminee(requete.state.data?.status) ? false : 5_000,
+    enabled: idLisible,
   });
 
   const { data: stats } = useQuery({
     queryKey: ['campaign-stats', id],
     queryFn: async () => (await api.get<CampaignStatsResponse>(`/campaigns/${id}/stats`)).data,
-    refetchInterval: 5_000,
-    enabled: Number.isFinite(id) && id > 0,
+    // Les statistiques ne portent pas le statut : on lit celui de la requête
+    // précédente, déjà résolue à ce point du rendu.
+    refetchInterval: estTerminee(campaign?.status) ? false : 5_000,
+    enabled: idLisible,
   });
 
   const pauseMutation = useMutation({
@@ -93,15 +128,70 @@ export function CampaignDetailPage() {
     onError: (e) => toast.error(extractApiMessage(e) ?? 'Démarrage impossible'),
   });
 
-  if (isLoading || !campaign) {
+  // ═══ D25-004 — LE SABLIER QUI NE S'ARRÊTAIT JAMAIS ══════════════════════
+  //
+  // Cet écran écrivait `if (isLoading || !campaign) return <Spinner/>`. React
+  // Query v5 : sur un échec, `isLoading` retombe à `false` mais `campaign`
+  // reste `undefined` — le second terme restait donc VRAI indéfiniment, et le
+  // sablier ne pouvait plus disparaître. Rien ne disait à l'utilisateur
+  // d'arrêter d'attendre, et les quatre actions de cet écran (pause, reprise,
+  // annulation, démarrage) restaient derrière ce sablier.
+  //
+  // La sortie de chargement teste désormais L'ÉTAT DE LA REQUÊTE, et les trois
+  // façons de n'avoir pas de donnée sont distinguées — parce qu'elles appellent
+  // trois gestes différents :
+  //
+  //   identifiant illisible  -> le lien est faux, aucune requête n'est partie
+  //   erreur                 -> le serveur a refusé (403) ou échoué (500)
+  //   200 au corps vide      -> le serveur a répondu, sans rien
+  //
+  // ⚠️ Le dernier cas est celui qu'un correctif « `error !== null` » NE FERME
+  // PAS : il n'y a alors aucune erreur, et pourtant aucune donnée. C'est le
+  // trou qui a survécu au premier passage sur `/settings` (cf. le lot).
+  //
+  // ⚠️ `campaign === undefined` fait partie de la condition d'échec : React
+  // Query conserve la dernière réponse réussie quand un rafraîchissement
+  // échoue, et cet écran se rafraîchit toutes les 5 s. Effacer une campagne
+  // affichée sur un hoquet de réseau serait une régression, pas un correctif.
+  const echecLecture = error !== null && campaign === undefined;
+
+  if (!idLisible) {
+    return (
+      <div className="px-6 py-6">
+        <EmptyState
+          title="Adresse de campagne invalide"
+          description={`L’adresse ne contient pas d’identifiant de campagne lisible (« ${String(campaignId ?? '')} »). Le lien est probablement tronqué.`}
+          action={<Link to="/campaigns"><Button variant="secondary" size="sm">Retour aux campagnes</Button></Link>}
+        />
+      </div>
+    );
+  }
+  if (echecLecture) {
+    return (
+      <div className="px-6 py-6">
+        <QueryErrorState error={error} contexte="cette campagne" onRetry={() => void refetch()} />
+      </div>
+    );
+  }
+  if (isLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center"><Spinner /></div>
+    );
+  }
+  if (!campaign) {
+    return (
+      <div className="px-6 py-6">
+        <ReponseVideState contexte="cette campagne" onRetry={() => void refetch()} />
+      </div>
     );
   }
 
   const isLive = campaign.status === 'running';
   const isPaused = campaign.status === 'paused';
-  const isCompleted = campaign.status === 'completed' || campaign.status === 'cancelled' || campaign.status === 'failed';
+  // G42-007 — la liste des états terminaux vivait ici EN DOUBLE. Elle est
+  // désormais partagée avec la coupure de scrutation (`./types`), pour que
+  // les deux ne puissent plus diverger.
+  const isCompleted = estTerminee(campaign.status);
 
   const companiesPercent = Math.min(100, Math.round((campaign.companies_created / Math.max(1, campaign.max_companies)) * 100));
   const durationPercent = Math.min(100, Math.round((campaign.elapsed_minutes / Math.max(1, campaign.max_duration_minutes)) * 100));

@@ -39,9 +39,9 @@ declare(strict_types=1);
  * remontent jamais.
  */
 
-/** Plafonds figés le 2026-08-18. Ne peuvent que DÉCROÎTRE. */
-const BASELINE_MAX_ENTREES = 211;
-const BASELINE_MAX_ERREURS = 248;
+/** Plafonds figés le 2026-08-18, abaissés le 2026-08-21 (211/248 → 191/209). Ne peuvent que DÉCROÎTRE. */
+const BASELINE_MAX_ENTREES = 191;
+const BASELINE_MAX_ERREURS = 209;
 
 /**
  * Chemins sur lesquels aucune entrée de baseline n'est tolérée.

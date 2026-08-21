@@ -8,6 +8,7 @@ use App\Models\EmailAudience;
 use App\Models\Tag;
 use App\Models\Workspace;
 use App\Services\Audiences\AudienceBuilderService;
+use App\Services\Audiences\CritereAudienceInvalide;
 use Illuminate\Bus\PendingBatch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -21,12 +22,37 @@ beforeEach(function () {
     $this->service = new AudienceBuilderService;
 });
 
+/**
+ * ⚠️ `quality_score` est une colonne DERIVEE depuis le correctif C21-004
+ * (migration `2026_08_20_000001_quality_score_declencheur_complet`) : le
+ * declencheur `companies_recompute_score` est passe en `BEFORE INSERT OR
+ * UPDATE OF …` et ecrase donc, a l'insertion, toute valeur choisie par
+ * l'appelant. C'etait deja l'intention — aucun chemin applicatif n'y ecrit de
+ * valeur arbitraire — mais ce n'etait pas ce que la base FAISAIT, d'ou 82,58 %
+ * de scores faux mesures en production le 2026-08-19.
+ *
+ * Ces tests ne portent pas sur la PROVENANCE du score : ils portent sur le
+ * filtre `quality_score` d'`AudienceBuilderService`. On pose donc la valeur par
+ * un `UPDATE` de la seule colonne `quality_score`, qui n'est PAS dans la liste
+ * ecoutee par le declencheur et ne doit jamais y entrer (recursion). Les fiches
+ * portent exactement les memes scores qu'avant : rien n'est affaibli ici.
+ */
 function mkCompany(string $wsId, array $attrs = []): Company
 {
-    return Company::create(array_merge([
+    $scoreImpose = $attrs['quality_score'] ?? null;
+    unset($attrs['quality_score']);
+
+    $company = Company::create(array_merge([
         'workspace_id' => $wsId,
         'siren' => str_pad((string) random_int(1, 999999999), 9, '0', STR_PAD_LEFT),
     ], $attrs));
+
+    if ($scoreImpose !== null) {
+        DB::table('companies')->where('id', $company->id)->update(['quality_score' => $scoreImpose]);
+        $company->refresh();
+    }
+
+    return $company;
 }
 
 /**
@@ -210,15 +236,27 @@ it('evaluateForCompany returns matching audience IDs', function () {
     expect($matches)->toContain($a1->id)->not->toContain($a2->id);
 });
 
-it('skips invalid fields/ops silently', function () {
+// 🔴 CE TEST GARDAIT LE DÉFAUT (constat D26-001, S1).
+//
+// Il s'appelait « skips invalid fields/ops silently » et assertait
+// `toBe(1)` : une base d'UNE fiche, un critère demandant tout autre chose, et
+// le résultat était la fiche. Autrement dit il assertait que le critère avait
+// été EFFACÉ et que l'audience était devenue le workspace entier. Le mode de
+// panne le plus grave d'un ciblage était donc protégé par un vert.
+//
+// Le comportement attendu est le refus. Le détail des formes refusées
+// (opérateur, valeur, bloc inconnu, `not`, non-destruction au refresh) vit
+// dans `tests/Unit/Audiences/CriteresInvalidesRefusesTest.php`.
+it('refuse un champ ou un operateur hors liste blanche, au lieu de l effacer', function () {
     mkCompany($this->ws->id);
-    $preview = $this->service->preview($this->ws->id, [
-        'all' => [
-            ['field' => 'DROP TABLE users', 'op' => 'eq', 'value' => 'x'],
-            ['field' => 'department_code', 'op' => 'INVALID', 'value' => '75'],
-        ],
-    ]);
-    expect($preview['companies'])->toBe(1);
+
+    expect(fn () => $this->service->preview($this->ws->id, [
+        'all' => [['field' => 'DROP TABLE users', 'op' => 'eq', 'value' => 'x']],
+    ]))->toThrow(CritereAudienceInvalide::class);
+
+    expect(fn () => $this->service->preview($this->ws->id, [
+        'all' => [['field' => 'department_code', 'op' => 'INVALID', 'value' => '75']],
+    ]))->toThrow(CritereAudienceInvalide::class);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

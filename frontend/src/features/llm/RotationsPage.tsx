@@ -9,6 +9,7 @@ import {
   PageHeader,
   StatusPill,
   cn,
+  TableScroll,
 } from '@/components/ui';
 import { api } from '@/lib/api';
 
@@ -80,7 +81,12 @@ export function RotationsPage() {
                     Aucune rotation configurée pour cette dimension.
                   </div>
                 ) : (
-                  <>
+                  /* D30-002 — conteneur a defilement horizontal. Ce tableau
+                     exige 738 px (650 px de colonnes fixes + 4 gouttieres de
+                     12 + 2x20 de rembourrage `px-5`) ; l'ecran de reference en
+                     fait 343. Le fragment `<>` qui etait ici ne defilait pas
+                     et la Card, en `overflow-hidden`, coupait le reste. */
+                  <TableScroll template={ROW_GRID} rembourrageX={20}>
                     <div
                       role="row"
                       className={cn(
@@ -121,7 +127,7 @@ export function RotationsPage() {
                         </div>
                       ))}
                     </div>
-                  </>
+                  </TableScroll>
                 )}
               </Card>
             );

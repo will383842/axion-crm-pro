@@ -2,12 +2,15 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\RunsInWorkspace;
+use App\Models\ScraperRun;
 use App\Models\ScrapingCampaign;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -29,9 +32,10 @@ use Illuminate\Support\Facades\Log;
  */
 class LaunchCampaignJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, RunsInWorkspace, SerializesModels;
 
     public int $tries = 1;
+
     public int $timeout = 600;
 
     /** Sources de découverte traitées par LaunchZoneScrapingJob (Laravel queue). */
@@ -45,19 +49,43 @@ class LaunchCampaignJob implements ShouldQueue
 
     public function __construct(public readonly int $campaignId) {}
 
+    /**
+     * 🔴 CONSTAT B11-002 / B17-010. `Queue::looping` efface le contexte entre
+     * deux jobs ; celui-ci ne le reposait pas. Il crée pourtant des
+     * `scraper_runs` porteurs d'un `workspace_id` et met à jour
+     * `scraping_campaigns` — deux tables sous policy STRICTE. Le corps du job
+     * s'exécute désormais sous l'espace de sa campagne.
+     */
     public function handle(): void
+    {
+        $espace = $this->espaceDuJob() ?? $this->espaceDepuisLaLigne('scraping_campaigns', $this->campaignId);
+
+        if ($espace === null) {
+            Log::warning('LaunchCampaignJob: aucun espace de travail — campagne non lancee (constat B11-002)', [
+                'campaign_id' => $this->campaignId,
+            ]);
+
+            return;
+        }
+
+        $this->inWorkspace($espace, fn () => $this->lancer());
+    }
+
+    private function lancer(): void
     {
         /** @var ScrapingCampaign|null $campaign */
         $campaign = ScrapingCampaign::find($this->campaignId);
         if (! $campaign) {
             Log::warning('LaunchCampaignJob: campaign not found', ['campaign_id' => $this->campaignId]);
+
             return;
         }
         if ($campaign->status !== 'running') {
             Log::info('LaunchCampaignJob: campaign no longer running, skip', [
                 'campaign_id' => $campaign->id,
-                'status'      => $campaign->status,
+                'status' => $campaign->status,
             ]);
+
             return;
         }
 
@@ -66,9 +94,10 @@ class LaunchCampaignJob implements ShouldQueue
         $rpm = max(1, (int) $campaign->max_requests_per_minute);
         $delayPerRequestSec = (int) ceil(60.0 / $rpm);
 
-        $discoverySources = array_values(array_filter($sources, fn ($s) =>
-            in_array($s, self::DISCOVERY_SOURCES_BACKEND, true)
-            || in_array($s, self::DISCOVERY_SOURCES_NODE, true)
+        $discoverySources = array_values(array_filter(
+            $sources,
+            fn ($s) => in_array($s, self::DISCOVERY_SOURCES_BACKEND, true)
+            || in_array($s, self::DISCOVERY_SOURCES_NODE, true),
         ));
 
         $denominator = max(1, count($zones) * max(1, count($discoverySources)));
@@ -92,6 +121,7 @@ class LaunchCampaignJob implements ShouldQueue
                     Log::info('LaunchCampaignJob: enrichment-only source skipped (waterfall handles it)', [
                         'campaign_id' => $campaign->id, 'source' => $source,
                     ]);
+
                     continue;
                 }
 
@@ -100,13 +130,14 @@ class LaunchCampaignJob implements ShouldQueue
                     Log::info('LaunchCampaignJob: zone type unsupported, skip', [
                         'campaign_id' => $campaign->id, 'zone_type' => $zoneType,
                     ]);
+
                     continue;
                 }
                 $department = (string) $zoneCode;
 
                 if (in_array($source, self::DISCOVERY_SOURCES_BACKEND, true)) {
                     // Dispatch direct via LaunchZoneScrapingJob (queue Laravel)
-                    LaunchZoneScrapingJob::dispatch(
+                    dispatch((new LaunchZoneScrapingJob(
                         (string) $campaign->workspace_id,
                         $department,
                         null,
@@ -114,45 +145,46 @@ class LaunchCampaignJob implements ShouldQueue
                         $perCampaignLimit,
                         $campaign->id,
                         $source,
-                    )->delay(now()->addSeconds($offsetSeconds));
+                    ))->pourEspace((string) $campaign->workspace_id))
+                        ->delay(now()->addSeconds($offsetSeconds));
                     $runsTotal++;
                 } elseif (in_array($source, self::DISCOVERY_SOURCES_NODE, true)) {
                     // Sources Phase B (Node BullMQ via DispatchScrapeJob)
                     if ($mockScrapers) {
                         // Mode mock : crée un run skipped pour traçabilité UI
                         try {
-                            \App\Models\ScraperRun::create([
-                                'workspace_id'    => $campaign->workspace_id,
-                                'campaign_id'     => $campaign->id,
-                                'source'          => $source,
-                                'status'          => 'cancelled',
-                                'started_at'      => now(),
-                                'finished_at'     => now(),
-                                'error'           => 'MOCK_SCRAPERS=true: Phase B Webshare non activée',
+                            ScraperRun::create([
+                                'workspace_id' => $campaign->workspace_id,
+                                'campaign_id' => $campaign->id,
+                                'source' => $source,
+                                'status' => 'cancelled',
+                                'started_at' => now(),
+                                'finished_at' => now(),
+                                'error' => 'MOCK_SCRAPERS=true: Phase B Webshare non activée',
                                 'request_payload' => [
-                                    'type'        => 'campaign',
+                                    'type' => 'campaign',
                                     'campaign_id' => $campaign->id,
-                                    'zone'        => $zone,
-                                    'limit'       => $perCampaignLimit,
+                                    'zone' => $zone,
+                                    'limit' => $perCampaignLimit,
                                 ],
                             ]);
                             // Compte aussi comme run_completed pour ne pas bloquer le monitor
-                            \Illuminate\Support\Facades\DB::table('scraping_campaigns')
+                            DB::table('scraping_campaigns')
                                 ->where('id', $campaign->id)
                                 ->update([
-                                    'runs_completed' => \Illuminate\Support\Facades\DB::raw('runs_completed + 1'),
-                                    'updated_at'     => now(),
+                                    'runs_completed' => DB::raw('runs_completed + 1'),
+                                    'updated_at' => now(),
                                 ]);
                             $runsTotal++;
                         } catch (\Throwable $e) {
                             Log::warning('LaunchCampaignJob: mock run create failed', [
                                 'campaign_id' => $campaign->id, 'source' => $source,
-                                'exception'   => $e->getMessage(),
+                                'exception' => $e->getMessage(),
                             ]);
                         }
                     } else {
                         // Prod : dispatch via LaunchZoneScrapingJob qui appellera dispatchNodeWorker()
-                        LaunchZoneScrapingJob::dispatch(
+                        dispatch((new LaunchZoneScrapingJob(
                             (string) $campaign->workspace_id,
                             $department,
                             null,
@@ -160,13 +192,15 @@ class LaunchCampaignJob implements ShouldQueue
                             $perCampaignLimit,
                             $campaign->id,
                             $source,
-                        )->delay(now()->addSeconds($offsetSeconds));
+                        ))->pourEspace((string) $campaign->workspace_id))
+                            ->delay(now()->addSeconds($offsetSeconds));
                         $runsTotal++;
                     }
                 } else {
                     Log::info('LaunchCampaignJob: unknown source, skip', [
                         'campaign_id' => $campaign->id, 'source' => $source,
                     ]);
+
                     continue;
                 }
 
@@ -177,6 +211,8 @@ class LaunchCampaignJob implements ShouldQueue
         $campaign->update(['runs_total' => $runsTotal]);
 
         // Démarre le moniteur de progression (re-self-dispatch toutes les 60s).
-        MonitorCampaignProgressJob::dispatch($campaign->id)->delay(now()->addSeconds(30));
+        dispatch((new MonitorCampaignProgressJob($campaign->id))
+            ->pourEspace((string) $campaign->workspace_id))
+            ->delay(now()->addSeconds(30));
     }
 }

@@ -17,6 +17,7 @@ class StartScheduledCampaignsCommand extends Command
     {
         if (! Schema::hasTable('scraping_campaigns')) {
             $this->warn('Table scraping_campaigns absente, skip.');
+
             return self::SUCCESS;
         }
 
@@ -27,15 +28,17 @@ class StartScheduledCampaignsCommand extends Command
             ->chunkById(50, function ($campaigns) use (&$count) {
                 foreach ($campaigns as $campaign) {
                     $campaign->update([
-                        'status'     => 'running',
+                        'status' => 'running',
                         'started_at' => now(),
                     ]);
-                    LaunchCampaignJob::dispatch($campaign->id);
+                    dispatch((new LaunchCampaignJob($campaign->id))
+                        ->pourEspace((string) $campaign->workspace_id));
                     $count++;
                 }
             });
 
         $this->info("Démarré {$count} campagne(s) scheduled.");
+
         return self::SUCCESS;
     }
 }

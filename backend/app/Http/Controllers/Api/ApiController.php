@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 
@@ -46,6 +47,141 @@ use Illuminate\Routing\Controller;
  */
 abstract class ApiController extends Controller
 {
+    /**
+     * 🔴 CONSTAT F36-002 (S0) — `$this->authorize()` ETAIT UN APPEL FATAL DANS LES
+     * 37 CONTROLEURS D'API, ET C'EST POURQUOI F36-001 EXISTE.
+     *
+     * Cette classe etend `Illuminate\Routing\Controller`, celle du framework, qui ne porte PAS
+     * `AuthorizesRequests` depuis Laravel 11. La classe de base du depot
+     * (`App\Http\Controllers\Controller`) la porte, elle — mais aucun controleur d'API ne
+     * l'etend. Consequence mesuree : `$this->authorize()` levait
+     * « Call to undefined method », et le depot n'en contenait **AUCUNE occurrence**.
+     *
+     * C'est la cause mecanique de `F36-001` : « aucune des policies n'est jamais invoquee, la
+     * couche d'autorisation du produit est du code mort ». Dix policies sont enregistrees dans
+     * `AuthServiceProvider`, ecrites, testables — et structurellement inatteignables depuis les
+     * routes. *Une porte fermee a clef dont la serrure n'est reliee a rien.*
+     *
+     * ⚠️ CE QUE CE TRAIT NE FAIT PAS, ET IL FAUT LE DIRE.
+     *
+     * Il rend `authorize()` APPELABLE. Il n'appelle rien. Les 37 controleurs restent sans
+     * verification de policy, et `F36-001` reste OUVERT — le cabler route par route est un
+     * choix de conception qui change le comportement de ~110 points d'API, et cela ne se prend
+     * pas au detour d'un correctif (regle 7 du mandat).
+     *
+     * Ce qui change : la piece cesse d'etre inatteignable. Le jour ou on cablera, on n'aura pas
+     * a decouvrir en meme temps que la methode n'existe pas.
+     *
+     * Garde : `backend/tests/Feature/Rgpd/CoucheAutorisationAtteignableTest.php`.
+     */
+    use AuthorizesRequests;
+
+    /**
+     * Refuse un enregistrement qui appartient a un AUTRE espace de travail.
+     *
+     * 🔴 POURQUOI CETTE METHODE EXISTE (audit 360, F36-005 / B12-001, S0).
+     *
+     * `GET /contacts/{id}` et `GET /companies/{id}` rendaient `$this->ok($modele)`
+     * sur ce que la resolution de route avait trouve, SANS AUCUN filtre d'espace.
+     * Un compte de l'espace BETA lisait donc la fiche d'une personne de l'espace
+     * ALPHA en devinant un identifiant - et les identifiants sont des entiers
+     * consecutifs. Mesure le 2026-08-19.
+     *
+     * La ceinture applicative existait pourtant : `WorkspaceScope`, pose par le
+     * trait `BelongsToWorkspace`. Elle est INERTE tant que
+     * `CRM_STRICT_WORKSPACE_SCOPE` est a false, et c'est le defaut. On ne bascule
+     * PAS ce drapeau ici : il ferait echouer les 26 taches planifiees qui
+     * s'executent sans contexte d'espace (B11-001). On ferme donc la fuite la ou
+     * elle est, au point d'entree, sans toucher a ce qui tourne en arriere-plan.
+     *
+     * 404 et non 403 : repondre « interdit » confirmerait l'existence de la fiche,
+     * donc renseignerait un curieux qui balaie les identifiants. « Introuvable »
+     * ne renseigne personne.
+     */
+    protected function refuserHorsEspace(mixed $modele, string $colonne = 'workspace_id'): void
+    {
+        if ($modele === null) {
+            return;
+        }
+
+        $espaceDuModele = $modele->{$colonne} ?? null;
+
+        // Un enregistrement sans espace n'appartient a personne en particulier
+        // (referentiels globaux) : ce n'est pas a cette garde de trancher.
+        if ($espaceDuModele === null || $espaceDuModele === '') {
+            return;
+        }
+
+        $espaceCourant = $this->espaceCourantOuNull();
+
+        if ($espaceCourant === null || (string) $espaceDuModele !== (string) $espaceCourant) {
+            abort(404);
+        }
+    }
+
+    /**
+     * L'espace de travail courant, ou `null`.
+     *
+     * 🔑 DEUX SOURCES, ET C'EST DELIBERE. Le conteneur d'abord : c'est
+     * `SetCurrentWorkspace` qui l'y pose, et c'est la meme frontiere que la RLS
+     * Postgres. Le compte authentifie ensuite, en repli, pour le cas ou le
+     * middleware n'aurait pas tourne.
+     *
+     * Ce repli existait deja -- ecrit deux fois, a l'identique, dans
+     * `ScraperRunsController` et `ScrapingCampaignsController`. Il manquait a la
+     * garde durcie. Dix-neuvieme fois que ce depot porte le meme code a deux
+     * endroits et le correctif a un seul : on le remonte ici, une fois.
+     */
+    protected function espaceCourantOuNull(): ?string
+    {
+        if (app()->bound('workspace.id')) {
+            $id = app('workspace.id');
+            if ($id !== null && $id !== '') {
+                return (string) $id;
+            }
+        }
+
+        $user = request()->user();
+        if ($user && ($user->current_workspace_id ?? null)) {
+            return (string) $user->current_workspace_id;
+        }
+
+        return null;
+    }
+
+    /**
+     * L'enregistrement appartient-il a l'espace courant ?
+     *
+     * 🔴 CONSTAT B12-001 / F36-005, DEUXIEME TOUR. Trois controleurs portaient
+     * chacun leur propre version de ce controle, toutes ecrites ainsi :
+     *
+     *     if ($workspaceId === null) { return true; }   // « tolerant en test/dev »
+     *
+     * C'est un contournement FAIL-OPEN : quand le contexte d'espace manque, la
+     * garde laisse tout passer. Le commentaire d'origine l'assumait -- « Tolerant
+     * si workspace.id n'est pas bound (tests/dev) : ne bloque pas » -- mais rien
+     * dans le code ne distingue un test d'une production : une commande, un job,
+     * un appel arrive avant le middleware, et la tolerance devient la regle.
+     *
+     * C'est le meme motif que `F37-001`, un etage plus haut : un controle qui,
+     * faute de savoir, repond « oui ». Ici la reponse est « non ».
+     */
+    protected function estDeMonEspace(mixed $modele, string $colonne = 'workspace_id'): bool
+    {
+        if ($modele === null) {
+            return true;
+        }
+
+        $espaceDuModele = $modele->{$colonne} ?? null;
+        if ($espaceDuModele === null || $espaceDuModele === '') {
+            return true;
+        }
+
+        $espaceCourant = $this->espaceCourantOuNull();
+
+        return $espaceCourant !== null && (string) $espaceDuModele === (string) $espaceCourant;
+    }
+
     protected function ok(mixed $data = null, int $status = 200): JsonResponse
     {
         return response()->json($data ?? ['ok' => true], $status);

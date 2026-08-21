@@ -32,23 +32,25 @@ class RetryGooglePlacesCommand extends Command
 
     public function handle(GooglePlacesClient $places): int
     {
-        $limit     = (int) $this->option('limit');
+        $limit = (int) $this->option('limit');
         $workspace = $this->option('workspace');
-        $dryRun    = (bool) $this->option('dry-run');
+        $dryRun = (bool) $this->option('dry-run');
 
         if ($limit <= 0 || $limit > 5000) {
             $this->error('limit doit être entre 1 et 5000');
+
             return self::INVALID;
         }
 
         // Avant de relancer, on vérifie qu'il reste du quota — sinon ça sert à rien
-        $used  = $places->currentMonthUsage();
+        $used = $places->currentMonthUsage();
         $total = $places->monthlyQuotaLimit();
         $remaining = max(0, $total - $used);
         $this->info("Google Places quota ce mois : {$used} / {$total} utilisé ({$remaining} restant)");
 
         if ($remaining <= 0) {
             $this->warn('Aucun quota restant ce mois-ci. Re-lance la commande après le 1er du mois prochain.');
+
             return self::SUCCESS;
         }
 
@@ -80,18 +82,20 @@ class RetryGooglePlacesCommand extends Command
             foreach ($companies as $c) {
                 $this->line(sprintf('  - #%d siren=%s %s', $c->id, $c->siren, $c->denomination));
             }
+
             return self::SUCCESS;
         }
 
         if ($count === 0) {
             $this->info('Aucune company en attente. Bye.');
+
             return self::SUCCESS;
         }
 
         // Throttle 2s entre dispatches pour étaler la charge Google Places
         $offsetSeconds = 0;
         foreach ($companies as $company) {
-            EnrichCompanyJob::dispatch($company->id)
+            dispatch((new EnrichCompanyJob($company->id))->pourEspace((string) $company->workspace_id))
                 ->delay(now()->addSeconds($offsetSeconds))
                 ->onQueue('default');
             $offsetSeconds += 2;

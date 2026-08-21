@@ -1,3 +1,73 @@
+# Axion CRM Pro — Loki (mode monolithique, stockage fichier)
+#
+# ── 🔴 LA BORNE ETAIT ECRITE ET PERSONNE NE LA LISAIT — constat F39-011 (S1) ──
+#
+# Ce fichier portait `limits_config.retention_period: 720h  # 30 jours` et RIEN
+# d'autre. Cette valeur est SANS EFFET tant que le compacteur ne porte pas
+# `retention_enabled: true` : Loki ne supprime alors AUCUN morceau, et le volume
+# `loki-data` grossit sans fin.
+#
+# Ce n'est pas une deduction, c'est une mesure. On a demande a Loki LUI-MEME ce
+# qu'il avait compris du fichier — `-print-config-stderr` rend la configuration
+# RESOLUE, defauts compris — le 2026-08-20 :
+#
+#   $ docker run --rm \
+#         -v .../local-config.yaml:/etc/loki/local-config.yaml:ro \
+#         grafana/loki:3.2.0 -config.file=/etc/loki/local-config.yaml \
+#         -print-config-stderr -verify-config
+#   compactor:
+#     working_directory: /loki/compactor
+#     retention_enabled: false        <-- LA BORNE N'ETAIT PAS APPLIQUEE
+#     delete_request_store: ""
+#   limits_config:
+#     retention_period: 30d           <-- LA BORNE ECRITE, JAMAIS LUE
+#
+# ⚠️ `-verify-config` sortait **0** : la configuration etait VALIDE, et elle ne
+# bornait rien. Une garde qui se serait contentee de lire `retention_period:
+# 720h` dans ce fichier aurait conclu « borne posee ». C'est exactement le faux
+# vert que le lot F39-011 cherchait.
+#
+# ── CE QUE LE CORRECTIF AJOUTE, ET POURQUOI CHAQUE LIGNE EST NECESSAIRE ──────
+#
+#   · `compactor.retention_enabled: true` — arme reellement la suppression ;
+#   · `compactor.delete_request_store: filesystem` — Loki 3.x **REFUSE DE
+#     DEMARRER** avec la retention armee et sans magasin de demandes de
+#     suppression. Une borne qui empeche le service de demarrer n'est pas une
+#     borne, c'est une panne : verifie par `-verify-config` apres correctif ;
+#   · `compactor.working_directory` sous `/loki`, c'est-a-dire dans le volume
+#     `loki-data` — sinon le travail du compacteur partirait a chaque recreation
+#     de conteneur. Le magasin `filesystem` est celui deja declare par
+#     `common.storage.filesystem` ci-dessous.
+#
+# ⚠️ UNE PREMIERE VERSION DE CE CORRECTIF AJOUTAIT UN BLOC `storage_config` AVEC
+# `delete_request_store_path`. Loki l'a REFUSEE, et c'est la mesure qui l'a dit,
+# pas la relecture :
+#
+#   failed parsing config: line 92: field delete_request_store_path not found
+#   in type storage.Config
+#
+# Un correctif ecrit de memoire aurait empeche Loki de demarrer — c'est-a-dire
+# aurait remplace « le disque se remplit » par « il n'y a plus de journaux du
+# tout ». D'ou le `-verify-config` avant et apres.
+#
+# ⚠️ `schema_config.index.period` DOIT valoir 24h pour que la retention
+# fonctionne : c'est deja le cas ci-dessous, et il ne faut pas y toucher.
+#
+# ── CE QUE J'AI TROUVE SANS LE REPARER (constat annexe) ─────────────────────
+#
+# `infra/monitoring/promtail/promtail.yml` collecte
+# `/var/lib/docker/containers/*/*-json.log`, mais `docker-compose.observability.yml`
+# ne monte que `/var/log:ro` dans le conteneur promtail. **Ce chemin n'existe
+# donc pas pour lui** : la collecte des journaux Docker ne ramene RIEN
+# aujourd'hui. Le second poste, `/var/log/axion-crm/api/*.log`, ne correspond a
+# aucun chemin ecrit par la pile.
+#
+# Je ne le repare PAS ici, et c'est delibere : brancher la collecte AVANT que la
+# borne ne soit prouvee reviendrait a deverser tout le flot des journaux Docker
+# dans un magasin qui ne purge pas. Le correctif de ce fichier est le prealable
+# a celui-la.
+#
+# Garde : `backend/tests/Feature/Infra/BorneDeCroissanceDuDisqueTest.php`.
 auth_enabled: false
 server: { http_listen_port: 3100 }
 common:
@@ -14,7 +84,16 @@ schema_config:
       store: tsdb
       object_store: filesystem
       schema: v13
+      # ⚠️ 24h EXACTEMENT : la retention de Loki ne s'applique qu'a cette periode
+      # d'index. La changer desarmerait silencieusement le compacteur ci-dessous.
       index: { prefix: axion_index_, period: 24h }
+compactor:
+  working_directory: /loki/compactor
+  # Sans cette ligne, `retention_period` ci-dessous est un commentaire.
+  retention_enabled: true
+  # Loki 3.x refuse de demarrer si la retention est armee sans ce magasin.
+  delete_request_store: filesystem
+  delete_request_store_key_prefix: index/
 limits_config:
-  retention_period: 720h  # 30 jours
+  retention_period: 720h  # 30 jours — desormais REELLEMENT applique
   max_query_lookback: 720h

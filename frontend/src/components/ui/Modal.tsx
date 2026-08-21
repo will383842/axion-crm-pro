@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { cn } from './cn';
 import { IconButton } from './IconButton';
+import { usePiegeFocus } from './useFocusTrap';
 
 export interface ModalProps {
   open: boolean;
@@ -22,7 +23,9 @@ const SIZES = {
 };
 
 export function Modal({ open, onClose, title, description, size = 'md', children, footer, closeOnOverlay = true }: ModalProps) {
-  const ref = useRef<HTMLDivElement | null>(null);
+  // D28-003 — la ref part sur l'élément qui porte `role="dialog"`, pas sur le
+  // panneau : « dans le dialogue » doit désigner ce que l'ARIA désigne.
+  const refDialogue = usePiegeFocus<HTMLDivElement>(open);
 
   useEffect(() => {
     if (!open) return;
@@ -40,14 +43,18 @@ export function Modal({ open, onClose, title, description, size = 'md', children
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 axion-fade-in" role="dialog" aria-modal="true">
+    <div
+      ref={refDialogue}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 axion-fade-in"
+      role="dialog"
+      aria-modal="true"
+    >
       <div
         className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
         onClick={() => closeOnOverlay && onClose()}
         aria-hidden
       />
       <div
-        ref={ref}
         className={cn(
           'relative w-full rounded-2xl bg-white p-6 shadow-[var(--shadow-popover)] ring-1 ring-slate-200',
           'dark:bg-slate-900 dark:ring-slate-800',
@@ -87,6 +94,9 @@ export function Drawer({
   children?: ReactNode;
   footer?: ReactNode;
 }) {
+  // D28-003 — même piège que `Modal` : l'agent 28 relevait 10 sorties sur 10 Tab.
+  const refDialogue = usePiegeFocus<HTMLDivElement>(open);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -103,7 +113,12 @@ export function Drawer({
   const w = width === 'sm' ? 'max-w-sm' : width === 'lg' ? 'max-w-2xl' : 'max-w-lg';
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end axion-fade-in" role="dialog" aria-modal="true">
+    <div
+      ref={refDialogue}
+      className="fixed inset-0 z-50 flex justify-end axion-fade-in"
+      role="dialog"
+      aria-modal="true"
+    >
       <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={onClose} aria-hidden />
       <div
         className={cn(

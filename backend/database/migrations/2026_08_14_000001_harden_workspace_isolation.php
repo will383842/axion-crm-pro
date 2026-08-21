@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -226,6 +227,97 @@ return new class extends Migration
      * rôle est créé SANS droit de connexion : les privilèges sont en place,
      * l'activation ne demandera plus qu'un `ALTER ROLE ... LOGIN PASSWORD`.
      */
+    /**
+     * Rejoue une écriture sur un objet GLOBAL AU CLUSTER tant que Postgres la
+     * refuse pour cause de concurrence.
+     *
+     * 🔴 POURQUOI CETTE MÉTHODE EXISTE — MESURÉ LE 2026-08-21.
+     *
+     * Cinq `migrate:fresh` lancés ensemble sur cinq bases DISTINCTES
+     * (`axion_crm_test_lot1..lot5`) ont fait échouer trois d'entre eux, dans
+     * trois fichiers de test sans rapport les uns avec les autres :
+     *
+     *     SQLSTATE[XX000]: Internal error: 7 ERROR:  tuple concurrently updated
+     *     (Database: axion_crm_test_lot4,
+     *      SQL: ALTER ROLE axion_app NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE)
+     *
+     * `CREATE ROLE` et `ALTER ROLE` écrivent dans `pg_authid`, table **partagée
+     * par toutes les bases de l'instance**. Deux migrations concurrentes
+     * réécrivent la même ligne, et Postgres refuse la seconde.
+     *
+     * ⚠️ CE N'EST PAS QU'UN CONFORT DE BANC. La même collision attend le premier
+     * déploiement où deux `php artisan migrate` se recouvrent — un déploiement
+     * rejoué avant la fin du précédent, deux conteneurs qui démarrent ensemble,
+     * un bleu-vert. L'entrypoint de production les joue en série aujourd'hui :
+     * c'est la seule raison pour laquelle personne ne l'a vu.
+     *
+     * ⚠️ UN VERROU D'AVIS NE PEUT PAS RÉSOUDRE CECI, ET JE L'AI CRU AVANT DE LE
+     * MESURER. `pg_advisory_lock` est scopé à la **base**, pas au cluster.
+     * Vérifié à la main, deux sessions, même clé, deux bases :
+     *
+     *     lot12  VERROU PRIS a 1787265666,16   (tenu 4 s)
+     *     lot13  VERROU PRIS a 1787265667,51   ← n'a pas attendu
+     *
+     * Il n'existe donc aucun verrou pris DEPUIS une base qui protège un objet du
+     * cluster. Le rejeu borné est le seul remède disponible ici — et il est
+     * légitime, parce que ces écritures sont idempotentes : les rejouer donne le
+     * même état.
+     */
+    private function rejouerSiConcurrence(callable $ecriture, string $quoi): void
+    {
+        $essais = 0;
+
+        while (true) {
+            try {
+                $ecriture();
+
+                return;
+            } catch (QueryException $e) {
+                $concurrence = str_contains($e->getMessage(), 'tuple concurrently updated');
+
+                if (! $concurrence || ++$essais >= 5) {
+                    throw $e;
+                }
+
+                // Attente croissante et DÉSYNCHRONISÉE : sans la part aléatoire,
+                // deux migrations qui se sont heurtées se re-heurteraient au même
+                // instant à chaque tour.
+                usleep(($essais * 120_000) + random_int(0, 80_000));
+            }
+        }
+    }
+
+    /**
+     * Le rôle peut-il DÉJÀ ouvrir une session avec ce mot de passe ?
+     *
+     * Une tentative de connexion, et rien d'autre. `false` dès que quoi que ce
+     * soit cloche (rôle absent, mot de passe différent, extension pdo_pgsql
+     * indisponible) : en cas de doute on réécrit, ce qui est le comportement
+     * d'avant et reste correct.
+     */
+    private function motDePasseOuvreDeja(string $role, string $password): bool
+    {
+        $config = config('database.connections.pgsql');
+
+        try {
+            new PDO(
+                sprintf(
+                    'pgsql:host=%s;port=%s;dbname=%s',
+                    (string) ($config['host'] ?? '127.0.0.1'),
+                    (string) ($config['port'] ?? 5432),
+                    (string) ($config['database'] ?? 'postgres'),
+                ),
+                $role,
+                $password,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5],
+            );
+
+            return true;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
     private function createApplicationRole(): void
     {
         // Lu depuis la CONFIG et non env() : `config:cache` est actif en prod,
@@ -237,24 +329,68 @@ return new class extends Migration
             throw new RuntimeException("Nom de rôle applicatif invalide : « {$role} ».");
         }
 
-        DB::statement(
-            <<<SQL
-            DO \$\$
-            BEGIN
-                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{$role}') THEN
-                    EXECUTE 'CREATE ROLE {$role} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS';
-                END IF;
-            END
-            \$\$;
-            SQL
+        $this->rejouerSiConcurrence(
+            static fn () => DB::statement(
+                <<<SQL
+                DO \$\$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{$role}') THEN
+                        EXECUTE 'CREATE ROLE {$role} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS';
+                    END IF;
+                END
+                \$\$;
+                SQL
+            ),
+            "CREATE ROLE {$role}",
         );
 
         // Jamais de superuser / bypassrls sur ce rôle, même si quelqu'un l'a
         // créé à la main auparavant.
-        DB::statement("ALTER ROLE {$role} NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE");
+        //
+        // ⚠️ ON NE RÉÉCRIT QUE SI QUELQUE CHOSE A BOUGÉ. C'est la moitié la plus
+        // utile du correctif de concurrence : dans le cas courant — le rôle est
+        // déjà conforme — il n'y a plus AUCUNE écriture dans `pg_authid`, donc
+        // plus rien à faire entrer en collision. Le rejeu ci-dessous ne sert
+        // qu'au cas restant, celui où l'état doit réellement changer.
+        $attributs = DB::selectOne(
+            'SELECT rolsuper, rolbypassrls, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname = ?',
+            [$role],
+        );
 
-        if ($password !== '') {
-            DB::statement("ALTER ROLE {$role} LOGIN PASSWORD " . DB::getPdo()->quote($password));
+        $aCorriger = $attributs === null
+            || $attributs->rolsuper
+            || $attributs->rolbypassrls
+            || $attributs->rolcreatedb
+            || $attributs->rolcreaterole;
+
+        if ($aCorriger) {
+            $this->rejouerSiConcurrence(
+                static fn () => DB::statement("ALTER ROLE {$role} NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE"),
+                "ALTER ROLE {$role} (attributs)",
+            );
+        }
+
+        if ($password !== '' && ! $this->motDePasseOuvreDeja($role, $password)) {
+            // ⚠️ ON N'ÉCRIT QUE SI LE MOT DE PASSE NE MARCHE PAS DÉJÀ, et il a
+            // fallu une mesure pour comprendre que c'était la seule issue.
+            //
+            // `pg_authid.rolpassword` ne porte qu'un condensat SCRAM : on ne peut
+            // pas COMPARER depuis ici. On ne compare donc pas, on ESSAIE — une
+            // connexion, avec ce rôle et ce mot de passe. Si elle s'ouvre, il n'y
+            // a rien à écrire.
+            //
+            // Pourquoi pas simplement un rejeu, comme pour les attributs : parce
+            // qu'un rejeu ne peut pas marcher ici. Cette migration tourne dans une
+            // TRANSACTION ; dès que `ALTER ROLE` échoue, la transaction est
+            // avortée, et le tour suivant ne rend plus « tuple concurrently
+            // updated » mais « 25P02 current transaction is aborted ». Mesuré :
+            // le rejeu seul a fait passer la sonde à trois migrations
+            // concurrentes de 3 échecs à 1, jamais à 0. *Le seul geste qui ne peut
+            // pas entrer en collision est celui qu'on n'émet pas.*
+            $this->rejouerSiConcurrence(
+                static fn () => DB::statement("ALTER ROLE {$role} LOGIN PASSWORD " . DB::getPdo()->quote($password)),
+                "ALTER ROLE {$role} (mot de passe)",
+            );
         }
 
         $schema = 'public';

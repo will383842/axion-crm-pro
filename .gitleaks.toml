@@ -1,0 +1,57 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# GITLEAKS — configuration du scan de secrets
+#
+# Le job « Secrets scan (Gitleaks) » (.github/workflows/security.yml) tournait
+# sans configuration : regles par defaut, aucune exception. Il rendait SIX
+# alertes sur la branche `fix/a35-authentification`, toutes de la regle
+# `generic-api-key`, et toutes FAUSSES — ce sont les secrets factices avec
+# lesquels les gardes du canal machine-a-machine signent leurs requetes :
+#
+#   backend/tests/Feature/Internal/PatronHmacDeReferenceTest.php     (a890fe6)
+#   backend/tests/Feature/Crm/ScrapedIngestTest.php                  (a6aceb0)
+#   backend/tests/Feature/Internal/SignatureCanalInterneTest.php x3  (a6aceb0)
+#   backend/tests/Feature/Auth/GardesAuthentificationAgent35Test.php (da994be)
+#
+# Ces valeurs DOIVENT rester en clair dans le depot : les tests de F37-001
+# prouvent qu'un secret vide ouvrait le canal, et ils ne peuvent le prouver
+# qu'en signant avec un vrai secret — non vide, et donc litteral.
+#
+# ⚠️ L'EXEMPTION PORTE SUR LES VALEURS, JAMAIS SUR LES CHEMINS.
+#
+# Exempter `backend/tests/**` aurait ete plus court et beaucoup plus dangereux :
+# un secret de PRODUCTION colle demain dans un fichier de test — c'est arrive a
+# ce depot avec `seeders/owner-initial-password.txt` — passerait alors sans un
+# mot. Ici, seules les quatre chaines ci-dessous sont connues du scanner ; toute
+# autre valeur, dans ces memes fichiers, fera rougir le job.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[extend]
+useDefault = true
+
+# ⚠️ `[allowlist]` AU SINGULIER, ET CE N'EST PAS UN DETAIL DE STYLE.
+#
+# La premiere version employait `[[allowlists]]` (pluriel, tableau de tables),
+# la forme que documente gitleaks aujourd'hui. Mesure du 2026-08-21 :
+#
+#   gitleaks v8.30.1 (image `:latest`) ..... config lue, no leaks found
+#   gitleaks v8.24.3 (celle de la CI) ...... config IGNOREE, leaks found: 6
+#
+# `gitleaks-action@v2` epingle 8.24.3, ou le pluriel n'existe pas encore : la
+# config etait lue sans erreur ET sans effet. Le singulier fonctionne sur les
+# DEUX versions — verifie sur les deux.
+#
+# 🔑 Troisieme fois dans ce chantier qu'une mesure est faite sur une version
+# autre que celle qui tourne en CI (apres `react-router` lie au depot principal
+# et le `vendor` de `predis` monte dans le banc). La regle qui s'en degage :
+# **mesurer avec la version que la CI epingle, jamais avec `:latest`.**
+
+[allowlist]
+description = "Secrets factices des gardes HMAC et HIBP — valeurs exactes, pas de chemin exempte"
+regexTarget = "line"
+regexes = [
+  '''un-secret-de-garde-suffisamment-long-2026''',
+  '''un-secret-de-test-suffisamment-long-2026''',
+  '''secret-de-test-du-canal-interne-2026''',
+  '''un-mot-de-passe-vraiment-unique-a35-2026''',
+  '''le-mauvais-secret''',
+]

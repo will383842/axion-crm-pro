@@ -1,0 +1,103 @@
+name: E2E
+
+# P6-UI-008 (S1) — CE QUE CE WORKFLOW REPARE.
+#
+# Constat mesure le 2026-08-20 : le depot portait 17 suites
+# `frontend/tests/e2e/*.spec.ts`, et 3 seulement etaient jouees par un workflow
+# (`a11y.yml` : a11y, dark-contraste, navigation). Les 14 autres n'etaient
+# executees NULLE PART. Elles donnaient l'apparence d'une couverture sans en
+# tenir aucune — le pire des etats.
+#
+# Preuve que ce n'etait pas anodin : jouees a la main sur le build
+# (`vite preview`, chromium 1234, 2026-08-20), 4 des 14 etaient ROUGES —
+#   auth.spec.ts       3 echecs sur 4    coverage.spec.ts   2 echecs sur 2
+#   companies.spec.ts  2 echecs sur 3    onboarding.spec.ts 1 echec  sur 4
+# et personne ne pouvait le savoir.
+#
+# Ce job cable les 11 suites qui tournent VERTES sur un simple build statique
+# (36 cas, deux passages consecutifs verts avec les reglages CI : 2 workers,
+# 2 reprises). Les 3 restantes sont exclues par ecrit dans
+# `frontend/tests/e2e/couverture-e2e.json`, et la garde
+# `frontend/tests/couverture-e2e.test.ts` refuse desormais qu'une suite existe
+# sans etre ni jouee ni motivee.
+#
+# ⚠️ Ce job est BLOQUANT, et il doit le rester. Le poser en
+# `continue-on-error: true` recreerait exactement le defaut qu'il repare : une
+# porte qui alerte et n'empeche rien.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  suites-cablees:
+    name: Suites e2e sur le build (BLOQUANT)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v7
+        with: { node-version: '22', cache: 'pnpm', cache-dependency-path: frontend/pnpm-lock.yaml }
+      - name: Install deps (BLOQUANT — lockfile fige)
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      # `--project=chromium` uniquement : c'est le seul navigateur installe ici.
+      # Elargir a firefox/webkit suppose de les installer a cette etape d'abord,
+      # sans quoi on recolte des « Executable doesn't exist » qui noient les
+      # vrais defauts — la lecon deja apprise dans `a11y.yml`.
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+      # La cible doit EXISTER sur le runner. `playwright.config.ts` neutralise
+      # son `webServer` quand `CI=true`, SAUF si `E2E_PREVIEW=true` : dans ce
+      # cas il demarre et arrete lui-meme `vite preview` sur 127.0.0.1:4173.
+      # C'est pour cela qu'on construit d'abord.
+      - name: Build frontend (la cible que les suites doivent visiter)
+        working-directory: frontend
+        run: pnpm build
+      # Les 11 suites en une seule invocation : un seul demarrage de
+      # `vite preview`, un seul rapport. Mesure locale du 2026-08-20 sur le
+      # meme build : 36 cas, 56 s a 1 min 0 s.
+      #
+      # Les 3 suites absentes de cette liste le sont a dessein, avec un motif
+      # ecrit dans `frontend/tests/e2e/couverture-e2e.json` :
+      #   console-locale.spec.ts  exige la pile docker locale + un compte 2FA
+      #   auth.spec.ts            i18n non epingle, mode strict, /2fa sans session
+      #   coverage.spec.ts        libelles renommes, assertion sur une classe morte
+      # Les cabler ici, ce serait les cabler POUR QU'ELLES ECHOUENT.
+      - name: Suites e2e cablees (BLOQUANT)
+        working-directory: frontend
+        env:
+          E2E_PREVIEW: 'true'
+          E2E_BASE_URL: http://127.0.0.1:4173
+        run: >-
+          pnpm exec playwright test
+          tests/e2e/audiences-builder.spec.ts
+          tests/e2e/campaigns-wizard.spec.ts
+          tests/e2e/companies.spec.ts
+          tests/e2e/dark-mode.spec.ts
+          tests/e2e/dashboard.spec.ts
+          tests/e2e/global-search.spec.ts
+          tests/e2e/llm.spec.ts
+          tests/e2e/onboarding.spec.ts
+          tests/e2e/rgpd.spec.ts
+          tests/e2e/settings.spec.ts
+          tests/e2e/tags-manager.spec.ts
+          --project=chromium --reporter=line,html
+      # `--reporter` en ligne de commande ECRASE la liste de
+      # `playwright.config.ts` : avec `line` seul, aucun `playwright-report/`
+      # n'est ecrit et l'artefact ci-dessous serait vide. On demande donc les
+      # deux — `line` pour lire le journal du job, `html` pour ramener traces,
+      # captures et videos quand un cas rougit.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-e2e-report
+          path: frontend/playwright-report/
+          if-no-files-found: warn

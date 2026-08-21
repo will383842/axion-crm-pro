@@ -7,7 +7,11 @@ use App\Services\Email\EmailConfidenceService;
 use App\Services\Email\HunterEmailVerifier;
 use App\Services\Email\MxEmailValidator;
 use App\Services\Scraping\GooglePlacesClient;
+use App\Support\RelocalisationPartman;
 use App\Support\WorkspaceContext;
+use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
@@ -76,6 +80,63 @@ class AppServiceProvider extends ServiceProvider
     {
         if ($this->app->environment('production')) {
             URL::forceScheme('https');
+        }
+
+        // ── B10-001 (S1) : LE CORRECTIF DE RECONSTRUCTION ETAIT INATTEIGNABLE ──
+        //
+        // `migrate:fresh` fait, dans cet ordre : (1) `db:wipe`, qui emet UN SEUL
+        // `DROP TABLE … CASCADE` sur tout le `search_path` ; (2) les migrations.
+        // Sur une base ou pg_partman vit dans `public`, l'etape 1 echoue
+        // (SQLSTATE 2BP01, « cannot drop table part_config ») et l'etape 2 n'a
+        // JAMAIS lieu : la migration `2026_08_18_100001` qui relocalise
+        // l'extension ne peut pas s'executer, precisement sur les bases qui en
+        // ont besoin. Une migration ne repare pas ce qui empeche les migrations
+        // de tourner.
+        //
+        // `CommandStarting` est le seul crochet qui tombe AVANT `db:wipe`. Il
+        // couvre les deux chemins : `php artisan migrate:fresh` (Makefile,
+        // deploiement) ET `RefreshDatabase`, qui appelle `migrate:fresh` et
+        // n'ouvre jamais le Makefile — donc toute la suite Pest.
+        //
+        // Le geste est idempotent, ne leve jamais, et s'abstient des que
+        // pg_partman gere reellement des partitions (cf. RelocalisationPartman).
+        Event::listen(CommandStarting::class, function (CommandStarting $evenement): void {
+            if ($evenement->command !== 'migrate:fresh') {
+                return;
+            }
+
+            $connexion = $evenement->input->hasParameterOption('--database')
+                ? (string) $evenement->input->getParameterOption('--database')
+                : '';
+
+            RelocalisationPartman::jouer($connexion === '' ? null : $connexion);
+        });
+
+        // ── LE REFUS DE DEBOGAGE NE DOIT PAS ETRE SILENCIEUX — F37-003 (S1) ──
+        //
+        // `config/app.php` neutralise `APP_DEBUG=true` hors `local`/`testing`.
+        // Sans ce signal, un opérateur qui pose `APP_DEBUG=true` sur la
+        // préproduction pour voir une trace ne verrait RIEN et ne comprendrait
+        // pas pourquoi : il chercherait la panne ailleurs, ou il « réparerait »
+        // la garde. Un refus muet est la moitié d'un défaut.
+        //
+        // Le drapeau est lu dans la CONFIGURATION et non par `env()` : en
+        // production `config:cache` est actif et `env()` hors configuration rend
+        // `null`, donc un signal bâti sur `env('APP_DEBUG')` ne se déclencherait
+        // jamais là où il sert.
+        if (config('app.debug_refuse') === true) {
+            Log::critical(
+                'Debogage REFUSE hors poste de developpement : APP_DEBUG est a vrai en '
+                . 'environnement « ' . $this->app->environment() . ' ». Constat F37-003 (S1) : '
+                . "une page de debogage Laravel affiche chaque variable d'environnement du "
+                . 'processus (DB_PASSWORD, APP_KEY, jetons tiers), la configuration resolue et '
+                . "le code source du chemin d'appel — et la preproduction est servie "
+                . "PUBLIQUEMENT par le Caddy de production, sans aucun filtre d'acces. "
+                . 'Le debogage reste desactive. Corrigez la configuration du conteneur '
+                . '(docker inspect), pas le .env : `docker compose restart` ne relit pas '
+                . 'env_file.',
+                ['environnement' => $this->app->environment()],
+            );
         }
 
         // Sanctum : tokenable_id UUID (migration 000002) → custom PAT model

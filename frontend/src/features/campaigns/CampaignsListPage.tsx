@@ -13,6 +13,7 @@ import {
   Building2, Clock, Map as MapIcon, MoreVertical,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { useAntiRebond } from '@/hooks/useAntiRebond';
 import {
   Button,
   Card,
@@ -55,12 +56,21 @@ export function CampaignsListPage() {
   const qc = useQueryClient();
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
+  // G42-010 — anti-rebond de 300 ms AVANT la requete.
+  //
+  // Mesure du 2026-08-20 sur `/companies`, meme cablage (voir
+  // `tests/perf/recherche-anti-rebond.test.tsx`) : taper « boulangerie »
+  // (11 caracteres) lancait 11 requetes serveur. Apres : 1.
+  //
+  // ⚠️ Le champ garde `search` (valeur IMMEDIATE) pour son `value` : la
+  // lettre s'affiche sans attendre. Seule la requete patiente.
+  const rechercheDifferee = useAntiRebond(search);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['campaigns', { search }],
+    queryKey: ['campaigns', { search: rechercheDifferee }],
     queryFn: async () =>
       (await api.get<CampaignsListResponse>('/campaigns', {
-        params: { per_page: 50, search: search || undefined },
+        params: { per_page: 50, search: rechercheDifferee || undefined },
       })).data,
     refetchInterval: 10_000,
   });

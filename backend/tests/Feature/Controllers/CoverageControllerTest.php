@@ -2,12 +2,18 @@
 
 use App\Models\User;
 use App\Models\Workspace;
+use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
+
+beforeEach(function () {
+    // Les roles doivent exister AVANT toute attribution.
+    $this->seed(PermissionsAndRolesSeeder::class);
+});
 
 function makeCoverageUser(): array
 {
@@ -24,6 +30,18 @@ function makeCoverageUser(): array
         'current_workspace_id' => $workspace->id,
         'first_login_completed_at' => now(),
     ]);
+
+    // ⚠️ LE ROLE EST OBLIGATOIRE DEPUIS QUE F36-001 EST BRANCHE.
+    //
+    // Cette suite mesure le METIER, pas les droits, et son utilisateur n'en
+    // avait aucun. Tant qu'aucune route ne portait `permission:`, cela ne se
+    // voyait pas ; depuis, elle recevait 403. On lui donne `admin` : le geste
+    // teste ICI est celui d'un administrateur, et le lui refuser reviendrait a
+    // mesurer la garde au lieu du produit. Les droits sont mesures a leur
+    // place : `tests/Feature/Rgpd/CoucheAutorisationBrancheeTest.php`.
+    setPermissionsTeamId($user->current_workspace_id);
+    $user->assignRole('admin');
+
     return [$user, $workspace];
 }
 
@@ -73,7 +91,7 @@ test('POST /coverage/launch accepte body valide', function () {
     $this->actingAs($u)
         ->postJson('/api/v1/coverage/launch', [
             'department' => '75',
-            'limit'      => 50,
+            'limit' => 50,
         ])
         ->assertOk()
         ->assertJsonStructure(['queued']);
@@ -84,7 +102,7 @@ test('POST /coverage/launch refuse limit > 1000', function () {
     $this->actingAs($u)
         ->postJson('/api/v1/coverage/launch', [
             'department' => '75',
-            'limit'      => 5000,
+            'limit' => 5000,
         ])
         ->assertStatus(422);
 });

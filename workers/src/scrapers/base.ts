@@ -28,6 +28,58 @@ export interface ScraperImplementation {
 export interface RedisLike {
   brpop(queue: string, timeoutSeconds: number): Promise<[string, string] | null>;
   lpush(queue: string, value: string): Promise<unknown>;
+  /**
+   * Lecture du drapeau d'annulation. REQUISE, pas optionnelle : une méthode
+   * facultative aurait laissé un consommateur sans `get` continuer à scraper
+   * après l'arrêt, en silence et sans que rien ne rougisse.
+   */
+  get(key: string): Promise<string | null>;
+}
+
+/**
+ * 🔴 C18-008, SITE JUMEAU CÔTÉ NODE.
+ *
+ * Préfixe de la clef d'annulation, écrite par `ScraperRunsController::cancel()`
+ * et `ScrapingCampaignsController::cancel()` (constante PHP
+ * `LaunchZoneScrapingJob::CLE_ANNULATION`, TTL 3600 s).
+ *
+ * Mesure du 2026-08-21, avant ce correctif :
+ *     grep -rni "cancel" workers/src --include=*.ts   ->  AUCUN fichier
+ * Les onze files `axion:scrape:*` étaient donc totalement insensibles au
+ * bouton « arrêter » : un job déjà déposé partait au scrape quoi qu'il arrive.
+ * Le commentaire de `app/Events/ScraperRunCancelled.php` affirmait pourtant
+ * depuis le Sprint 19.6 que « les workers vérifient également le flag Redis ».
+ *
+ * ⚠️ Ce préfixe est partagé avec le PHP. Si tu le changes ici, change-le dans
+ * `backend/app/Jobs/LaunchZoneScrapingJob.php::CLE_ANNULATION`.
+ */
+export const PREFIXE_ANNULATION = 'cancelled:scraper-run:';
+
+/**
+ * Le job porte-t-il un ordre d'arrêt ?
+ *
+ * `false` quand le job ne nomme aucune ligne `scraper_runs` — c'est le cas du
+ * chemin `WaterfallOrchestrator`, où la ligne n'est créée qu'à l'INGESTION du
+ * résultat : il n'y a alors rien à annuler, et ce résidu est compté côté PHP
+ * par `tests/Feature/ArretCollecteCoteNodeTest.php`.
+ *
+ * Une panne de lecture ne vaut PAS un ordre d'arrêt : Redis indisponible
+ * jetterait sinon tous les jobs en cours. On journalise et on laisse passer —
+ * la base, elle, porte déjà le statut `cancelled` et le résultat sera trié à
+ * l'ingestion.
+ */
+async function estAnnule(redis: RedisLike, job: ScrapeRequestJob): Promise<boolean> {
+  const brut = job.context?.['scraper_run_id'];
+  const runId = typeof brut === 'number' ? brut : typeof brut === 'string' ? Number(brut) : NaN;
+  if (!Number.isInteger(runId) || runId <= 0) return false;
+
+  try {
+    const drapeau = await redis.get(`${PREFIXE_ANNULATION}${runId}`);
+    return drapeau !== null && drapeau !== undefined && drapeau !== '';
+  } catch (err) {
+    log.warn({ err, scraper_run_id: runId }, "Lecture du drapeau d'annulation impossible — le job continue");
+    return false;
+  }
 }
 
 export interface StartWorkerDeps {
@@ -170,6 +222,21 @@ async function consumeLoop(
 
       const job = JSON.parse(raw) as ScrapeRequestJob;
       tickJob();
+
+      // 🔴 C18-008. L'arrêt d'urgence, enfin lu de ce côté-ci du pont.
+      // Le job est ABANDONNÉ sans résultat : la ligne `scraper_runs` porte
+      // déjà `status='cancelled'` et `finished_at`, écrits par le contrôleur.
+      // Renvoyer un résultat la ferait repasser derrière l'annulation — c'est
+      // exactement la maladie que le correctif PHP a soignée dans
+      // `LaunchZoneScrapingJob` (« le bouton arrêter s'effaçait de
+      // l'historique »). On ne la réintroduit pas par le pont Node.
+      if (await estAnnule(redis, job)) {
+        log.info(
+          { run_id: job.run_id, scraper_run_id: job.context?.['scraper_run_id'], consumerId },
+          'Job abandonné : arrêt demandé par l’exploitant',
+        );
+        continue;
+      }
 
       etat.enCours += 1;
       const start = Date.now();

@@ -157,5 +157,59 @@ return [
             'port' => env('REDIS_PORT', '6379'),
             'database' => env('REDIS_QUEUE_DB', '2'),
         ],
+
+        // ═══════════════════════════════════════════════════════════════════
+        // C18-011 — LE PONT LARAVEL → NODE, ET POURQUOI IL LUI FAUT SA PROPRE
+        // CONNEXION SANS PRÉFIXE.
+        // ═══════════════════════════════════════════════════════════════════
+        //
+        // `options.prefix` ci-dessus (`axion_crm_pro_database_`) est collé
+        // devant CHAQUE clef par le client Redis de Laravel. C'est voulu : il
+        // isole le cache, les sessions et les files Laravel d'un autre
+        // locataire du même serveur Redis.
+        //
+        // Mais `DispatchScrapeJob` n'écrit pas pour Laravel : il écrit pour un
+        // consommateur écrit en TypeScript, `workers/src/scrapers/base.ts`,
+        // qui fait `BRPOP` sur la constante NUE de
+        // `workers/src/bridge/queues.ts` avec un `ioredis` sans `keyPrefix`.
+        // Mesure du 2026-08-21, sur le fil :
+        //     émis   : axion_crm_pro_database_axion:scrape:google-maps
+        //     écouté : axion:scrape:google-maps
+        // Les deux ne se rencontraient jamais. Aucun des deux côtés n'émettait
+        // d'erreur : Laravel écrivait sans se plaindre, le worker attendait
+        // sans se plaindre. Le pont n'avait, mesure faite, jamais pu marcher.
+        //
+        // ⚠️ POURQUOI PAS VIDER `options.prefix`, NI CELUI DE `queue`.
+        // Le préfixe vide au niveau global déplacerait d'un coup TOUTES les
+        // clefs de cache, de session et de file Laravel : ce qui est déjà en
+        // vol au moment du déploiement devient orphelin (jobs jamais repris,
+        // sessions perdues, verrous `Cache::lock()` dédoublés le temps de leur
+        // TTL). La connexion `queue` porte en outre les files de Laravel
+        // lui-même (`QUEUE_CONNECTION=redis` → `queue.connections.redis`) :
+        // lui retirer son préfixe aurait exactement le même effet. On isole
+        // donc le pont, et rien d'autre ne bouge.
+        //
+        // ⚠️ LA BASE DOIT ÊTRE CELLE DE `WORKER_REDIS_URL`.
+        // Côté Node, `workers/src/bridge/redis.ts` lit `WORKER_REDIS_URL`
+        // (défaut `redis://localhost:6379/1`). `.env` et `.env.example`
+        // posent tous deux `REDIS_QUEUE_DB=1` et
+        // `WORKER_REDIS_URL=redis://redis:6379/1` : le défaut retenu ici est
+        // donc `1`, celui qui est réellement déployé, et NON le `2` que la
+        // connexion `queue` ci-dessus prend par défaut (défaut jamais employé
+        // en pratique — cf. la note de `.env.example`). `REDIS_SCRAPE_DB`
+        // permet de les découpler si un jour ils divergent.
+        'scrape_bridge' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_PORT', '6379'),
+            'database' => env('REDIS_SCRAPE_DB', env('REDIS_QUEUE_DB', '1')),
+
+            // Clef NUE. `PredisConnector` comme `PhpRedisConnector` font
+            // gagner un `prefix` posé au niveau de la connexion sur celui des
+            // options globales — vérifié dans les deux connecteurs.
+            'prefix' => '',
+        ],
     ],
 ];

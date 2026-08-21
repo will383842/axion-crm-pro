@@ -3,6 +3,7 @@
 namespace App\Services\Audit;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Audit append-only avec chaîne cryptographique vérifiable.
@@ -26,16 +27,87 @@ class AuditHashChain
      */
     public const GENESIS_PREV_HASH = '0000000000000000000000000000000000000000000000000000000000000000';
 
+    /**
+     * Valeur historiquement livree PAR DEFAUT DANS LE CODE SOURCE.
+     *
+     * Un secret ecrit dans un depot n'est pas un secret : quiconque lit le code
+     * peut recalculer toute la chaine. On la garde nommee pour la RECONNAITRE et
+     * la refuser, pas pour s'en servir.
+     */
+    public const SECRET_DE_DEVELOPPEMENT = 'dev-only-secret-change-me';
+
     private string $secret;
+
+    /** N'alerte qu'une fois par processus : sinon le journal noie son propre signal. */
+    private static bool $alerteEmise = false;
 
     public function __construct()
     {
-        $this->secret = (string) env('AUDIT_HASH_CHAIN_SECRET', 'dev-only-secret-change-me');
+        // Constat P5-HMAC-002, deuxieme cas. Ce secret etait lu par `env()`
+        // brut, sans entree `config/` -- voir `config/services.php`.
+        $this->secret = (string) config('services.audit.hash_chain_secret', '');
+    }
+
+    /**
+     * Le secret est-il utilisable ? Sinon la chaine ne prouve RIEN.
+     *
+     * 🔴 Mesure le 2026-08-19 (audit 360, B16-001, S0) : le code livrait par
+     * defaut une valeur PUBLIQUE, ecrite en clair dans un depot public. Quiconque
+     * peut lire cette ligne peut forger n'importe quel maillon : la chaine cesse
+     * d'etre une preuve et devient une decoration.
+     *
+     * ⚠️ RECTIFICATION du 2026-08-20. Ce commentaire affirmait que le secret
+     * « est la CHAINE VIDE en production ». C'est FAUX, et c'etait invérifiable
+     * par celui qui l'a ecrit : il n'a aucun acces au serveur. L'agent 40, qui
+     * l'avait, a mesure DEUX FOIS sur l'application de production en marche,
+     * sans jamais afficher la valeur : longueur 64 caracteres, differente de la
+     * chaine vide ET de la valeur de developpement. Le constat B16-001 est donc
+     * REFUTE POUR LA PRODUCTION au registre.
+     *
+     * Le defaut que ce code corrige subsiste entierement : il ne porte pas sur
+     * la valeur du secret, mais sur CE QUE LA VERIFICATION REPOND quand le
+     * secret manque. Elle repondait `valid: true`. Un controle d'integrite qui
+     * affirme « tout va bien » sans pouvoir le savoir est pire qu'un controle
+     * absent : il endort celui qui le lit.
+     */
+    public function secretEstUtilisable(): bool
+    {
+        return $this->secret !== '' && $this->secret !== self::SECRET_DE_DEVELOPPEMENT;
+    }
+
+    /** Pourquoi le secret est refuse, en clair, pour l'exploitant. */
+    public function raisonSecretInutilisable(): ?string
+    {
+        if ($this->secret === '') {
+            return "AUDIT_HASH_CHAIN_SECRET n'est pas defini : la chaine d'audit ne prouve rien.";
+        }
+
+        if ($this->secret === self::SECRET_DE_DEVELOPPEMENT) {
+            return 'AUDIT_HASH_CHAIN_SECRET porte encore la valeur de developpement, publiee dans le code source.';
+        }
+
+        return null;
+    }
+
+    private function signalerSecretAbsent(): void
+    {
+        if (self::$alerteEmise || $this->secretEstUtilisable()) {
+            return;
+        }
+
+        self::$alerteEmise = true;
+        Log::error("Chaine d'audit : " . $this->raisonSecretInutilisable());
     }
 
     /** @param  array<string,mixed>  $row */
     public function record(array $row): int
     {
+        // On CONTINUE d'ecrire meme sans secret : perdre la trace serait pire que
+        // de la garder faible, et ce service tourne sur chaque requete - le faire
+        // echouer rendrait l'API entierement indisponible. Mais on le DIT, une
+        // fois par processus, au niveau erreur.
+        $this->signalerSecretAbsent();
+
         return (int) DB::transaction(function () use ($row) {
             // Sérialise les écritures de la chaîne : deux inserts concurrents
             // liraient le même maillon de tête et produiraient deux lignes
@@ -71,6 +143,19 @@ class AuditHashChain
 
     public function verifyChain(?int $maxRows = null): bool
     {
+        // 🔴 SANS SECRET UTILISABLE, ON NE REPOND JAMAIS « VALIDE ».
+        //
+        // C'etait la vraie tromperie : la chaine se verifiait parfaitement
+        // elle-meme avec un secret vide, et l'API repondait `valid: true` sur un
+        // journal que n'importe qui pouvait reecrire de bout en bout. Un controle
+        // d'integrite qui dit « tout va bien » sans pouvoir le savoir est pire
+        // qu'un controle absent : il endort celui qui le lit.
+        if (! $this->secretEstUtilisable()) {
+            $this->signalerSecretAbsent();
+
+            return false;
+        }
+
         $query = DB::table('audit_logs')->orderBy('id');
         if ($maxRows !== null) {
             $query->limit($maxRows);

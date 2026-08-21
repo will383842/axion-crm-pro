@@ -1,15 +1,26 @@
 import { StrictMode, Fragment } from 'react';
 import { createRoot } from 'react-dom/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { RouterProvider, createRouter } from '@tanstack/react-router';
-import { Toaster } from 'sonner';
+import { QueryClient } from '@tanstack/react-query';
+import { createRouter } from '@tanstack/react-router';
 import { routeTree } from './app/routeTree';
+// P6-UI-005 — la COMPOSITION de l'arbre (fournisseurs + frontiere d'erreur de
+// dernier recours) vit desormais dans `AppRoot`, pour qu'elle soit MONTABLE
+// dans un test. Ce fichier ne garde que l'AMORCAGE, qui ne l'est pas :
+// `document.getElementById('root')` est nul sous vitest.
+import { AppRoot } from './app/AppRoot';
 import { initSentry } from './lib/sentry';
+// D26-003 — la densite d'affichage etait un `useState` local a /settings, sans
+// effet et sans persistance. Elle est relue ici, a l'amorcage, comme le theme :
+// un reglage d'apparence qui n'existe que dans l'ecran qui le regle n'en est
+// pas un.
+import { appliquerDensite, lireDensite } from './lib/densite';
 import './styles/index.css';
 import './lib/i18n';
 
 // Sprint 18.8 — Sentry init (compatible GlitchTip self-hosted, no-op si pas de DSN)
 initSentry();
+
+appliquerDensite(lireDensite());
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,9 +63,6 @@ console.log('[Boot] MODE=', import.meta.env.MODE, 'PROD=', import.meta.env.PROD,
 
 createRoot(rootEl).render(
   <Wrapper>
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-      <Toaster richColors closeButton position="top-right" />
-    </QueryClientProvider>
+    <AppRoot router={router} queryClient={queryClient} />
   </Wrapper>,
 );

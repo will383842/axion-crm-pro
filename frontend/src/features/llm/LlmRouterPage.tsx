@@ -14,6 +14,7 @@ import {
   Tabs,
   type TabItem,
   cn,
+  TableScroll,
 } from '@/components/ui';
 import { api } from '@/lib/api';
 
@@ -99,6 +100,10 @@ export function LlmRouterPage() {
           />
         ) : (
           <Card padding="none" className="overflow-hidden">
+            {/* D30-002 — conteneur a defilement horizontal. Sans lui, les 952 px
+                de largeur minimale de ce tableau etaient coupes net par le
+                `overflow-hidden` de la Card, sans aucun moyen de les atteindre. */}
+            <TableScroll template={USE_CASES_GRID}>
             <div
               role="row"
               className={cn(
@@ -141,6 +146,7 @@ export function LlmRouterPage() {
                 </div>
               ))}
             </div>
+            </TableScroll>
           </Card>
         )
       )}

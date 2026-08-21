@@ -55,6 +55,40 @@ function b15008Media(string $espace, string $nom, ?string $email): int
     ]);
 }
 
+/**
+ * Sème N médias partageant la même adresse, en un seul INSERT.
+ *
+ * ⚠️ L'ECHELLE N'EST PAS DECORATIVE. Le plafond ne s'applique qu'au-delà de
+ * `$plancherLignes` (1000) : en deçà, une proportion élevée ne signale AUCUN
+ * accident de masse — purger 2 candidats sur 4, c'est 50 %, et c'est le ménage
+ * attendu. Un témoin à douze lignes ne mesurerait donc plus rien depuis que ce
+ * plancher existe. Il faut passer la barre pour que la garde ait un objet.
+ */
+function b15008Semer(string $espace, string $prefixe, ?string $email, int $combien): void
+{
+    $lot = [];
+    for ($i = 1; $i <= $combien; $i++) {
+        $lot[] = [
+            'workspace_id' => $espace,
+            'name' => $prefixe . ' ' . $i,
+            'media_type' => 'presse_quotidien',
+            'media_family' => 'presse_ecrite',
+            'source' => 'test',
+            'enrich_status' => 'done',
+            'email' => $email === null ? "unique{$i}@journal{$i}.test" : $email,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+        if (count($lot) === 500) {
+            DB::table('media')->insert($lot);
+            $lot = [];
+        }
+    }
+    if ($lot !== []) {
+        DB::table('media')->insert($lot);
+    }
+}
+
 function b15008Espace(): string
 {
     $id = (string) Str::uuid();
@@ -72,30 +106,28 @@ function b15008Espace(): string
 test('B15-008 — TEMOIN : sans plafond, le detecteur viserait bien la quasi-totalite du registre', function () {
     $espace = b15008Espace();
 
-    // Douze médias partagent la MÊME adresse grand public : c'est exactement ce
-    // que le détecteur appelle « sur-partagé » au-delà de --threshold=10.
-    for ($i = 1; $i <= 12; $i++) {
-        b15008Media($espace, "Media {$i}", 'jean.dupont@gmail.com');
-    }
-    // Un seul média porte une adresse professionnelle légitime.
-    b15008Media($espace, 'Le Vrai Journal', 'redaction@levraijournal.fr');
+    // 1200 médias partagent la MÊME adresse grand public : c'est ce que le
+    // détecteur appelle « sur-partagé » au-delà de --threshold=10, et c'est
+    // au-dessus du plancher de 1000 — donc dans le domaine du plafond.
+    b15008Semer($espace, 'Partage', 'jean.dupont@gmail.com', 1200);
+    // Cent médias portent une adresse professionnelle légitime.
+    b15008Semer($espace, 'Presse', null, 100);
 
     $vises = DB::table('media')->where('email', 'jean.dupont@gmail.com')->count();
     $totalAvecEmail = DB::table('media')->whereNotNull('email')->count();
 
-    // 12 sur 13 : 92 %. Très au-delà du plafond de 30 %.
-    expect($vises)->toBe(12);
-    expect($totalAvecEmail)->toBe(13);
+    // 1200 sur 1300 : 92 %. Très au-delà du plafond de 30 %, et au-dessus du
+    // plancher de 1000 : les deux conditions du refus sont réunies.
+    expect($vises)->toBe(1200);
+    expect($totalAvecEmail)->toBe(1300);
     expect($vises / $totalAvecEmail)->toBeGreaterThan(0.30);
 });
 
 test('B15-008 — le plafond ARRETE une purge de masse, et l automatisme n ecrit RIEN', function () {
     $espace = b15008Espace();
 
-    for ($i = 1; $i <= 12; $i++) {
-        b15008Media($espace, "Media {$i}", 'jean.dupont@gmail.com');
-    }
-    b15008Media($espace, 'Le Vrai Journal', 'redaction@levraijournal.fr');
+    b15008Semer($espace, 'Partage', 'jean.dupont@gmail.com', 1200);
+    b15008Semer($espace, 'Presse', null, 100);
 
     // Exactement la ligne du planificateur : ni --force, ni --dry-run, aucun
     // opérateur devant l'écran.
@@ -107,7 +139,7 @@ test('B15-008 — le plafond ARRETE une purge de masse, et l automatisme n ecrit
 
     // 🔑 L'ASSERTION QUI COMPTE : rien n'a ete detruit.
     expect((int) DB::table('media')->whereNotNull('email')->count())->toBe(
-        13,
+        1300,
         'Le plafond a laisse passer la purge : les adresses ont ete nullifiees.',
     );
 });
@@ -115,24 +147,21 @@ test('B15-008 — le plafond ARRETE une purge de masse, et l automatisme n ecrit
 test('B15-008 — TEMOIN NEGATIF : sous le plafond, l automatisme fait bien son travail', function () {
     $espace = b15008Espace();
 
-    // Douze médias sur-partagent une adresse grand public...
-    for ($i = 1; $i <= 12; $i++) {
-        b15008Media($espace, "Partage {$i}", 'demo@gmail.com');
-    }
-    // ... mais le registre en compte cent autres, parfaitement legitimes.
-    for ($i = 1; $i <= 100; $i++) {
-        b15008Media($espace, "Presse {$i}", "redaction{$i}@journal{$i}.fr");
-    }
+    // 1100 médias sur-partagent une adresse grand public — AU-DESSUS du
+    // plancher, donc le plafond a bien son mot à dire...
+    b15008Semer($espace, 'Partage', 'demo@gmail.com', 1100);
+    // ... mais le registre en compte 9000 autres, parfaitement légitimes.
+    b15008Semer($espace, 'Presse', null, 9000);
 
-    // 12 sur 112 : 10,7 %, sous le plafond de 30 %.
+    // 1100 sur 10 100 : 10,9 %, sous le plafond de 30 %.
     $code = $this->artisan('media:clean-emails', ['--threshold' => 10])->run();
 
     expect($code)->toBe(0, 'Sous le plafond, la commande doit agir normalement.');
 
-    // Les douze sur-partagees sont nullifiees...
+    // Les 1100 sur-partagees sont nullifiees...
     expect((int) DB::table('media')->where('email', 'demo@gmail.com')->count())->toBe(0);
-    // ... et les cent legitimes sont INTACTES.
-    expect((int) DB::table('media')->whereNotNull('email')->count())->toBe(100);
+    // ... et les 9000 legitimes sont INTACTES.
+    expect((int) DB::table('media')->whereNotNull('email')->count())->toBe(9000);
 });
 
 test('B15-008 — RECENSEMENT : toute commande destructive porte une garde, ou est nommee ici', function () {

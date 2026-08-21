@@ -31,6 +31,27 @@ trait RefuseUneSuppressionMassive
     protected float $proportionMaximale = 0.30;
 
     /**
+     * Nombre de lignes en deçà duquel la PROPORTION ne veut rien dire.
+     *
+     * 🔑 POURQUOI UN PLANCHER, ET PAS SEULEMENT UN POURCENTAGE.
+     *
+     * Ce plafond protège d'un accident de MASSE — le cas `B15-004`, où une
+     * condition trop large effaçait presque toute une table de plusieurs
+     * millions de lignes. Sur un petit volume, la proportion s'affole sans que
+     * le danger existe : purger 2 candidats sur 4, c'est 50 %, et c'est
+     * exactement le ménage qu'on attend.
+     *
+     * Or bloquer là serait pire qu'inutile. Une purge de rétention RGPD qui ne
+     * s'exécute pas est un MANQUEMENT : le CRM garde des données au-delà de
+     * l'échéance qu'il s'est donnée. On refuserait donc, chaque mois, au nom
+     * d'un risque qui n'existe pas à cette échelle.
+     *
+     * En deçà de ce plancher, seule la proportion est TUE ; tout le reste — le
+     * compte, la table, le journal — est dit comme d'habitude.
+     */
+    protected int $plancherLignes = 1000;
+
+    /**
      * Décide si la suppression peut avoir lieu, et l'explique à l'opérateur.
      *
      * @param  string  $table  table visée, pour le message
@@ -132,6 +153,11 @@ trait RefuseUneSuppressionMassive
         $pourcentage = number_format($proportion * 100, 1, ',', ' ');
 
         $this->line("Table « {$table} » : {$aEcrire} ligne(s) sur {$total} — {$pourcentage} %.");
+
+        if ($aEcrire < $this->plancherLignes) {
+            // Sous le plancher : la proportion ne mesure pas un risque de masse.
+            return true;
+        }
 
         if ($proportion > $this->proportionMaximale && ! (bool) $this->option('force')) {
             $seuil = number_format($this->proportionMaximale * 100, 0, ',', ' ');

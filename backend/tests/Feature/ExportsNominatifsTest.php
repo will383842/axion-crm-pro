@@ -176,7 +176,7 @@ test('F36-008 : reparer le 500 ne rouvre PAS la porte aux opposes', function () 
 
     $csv = corpsCsvNominatif($this->get('/api/v1/media/export')->assertOk());
 
-    $this->assertStringContainsString('GAZETTE LIBRE', $csv, "La fiche non opposee doit sortir : sans elle le test passerait au vert sur un CSV vide.");
+    $this->assertStringContainsString('GAZETTE LIBRE', $csv, 'La fiche non opposee doit sortir : sans elle le test passerait au vert sur un CSV vide.');
     expect($csv)->not->toContain('GAZETTE OPPOSEE');
     expect($csv)->not->toContain('contact@gazette-opposee.example');
     expect($media->exists)->toBeTrue();

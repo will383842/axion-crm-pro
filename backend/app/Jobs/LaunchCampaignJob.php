@@ -3,12 +3,14 @@
 namespace App\Jobs;
 
 use App\Jobs\Concerns\RunsInWorkspace;
+use App\Models\ScraperRun;
 use App\Models\ScrapingCampaign;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -33,6 +35,7 @@ class LaunchCampaignJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, RunsInWorkspace, SerializesModels;
 
     public int $tries = 1;
+
     public int $timeout = 600;
 
     /** Sources de découverte traitées par LaunchZoneScrapingJob (Laravel queue). */
@@ -74,13 +77,15 @@ class LaunchCampaignJob implements ShouldQueue
         $campaign = ScrapingCampaign::find($this->campaignId);
         if (! $campaign) {
             Log::warning('LaunchCampaignJob: campaign not found', ['campaign_id' => $this->campaignId]);
+
             return;
         }
         if ($campaign->status !== 'running') {
             Log::info('LaunchCampaignJob: campaign no longer running, skip', [
                 'campaign_id' => $campaign->id,
-                'status'      => $campaign->status,
+                'status' => $campaign->status,
             ]);
+
             return;
         }
 
@@ -89,9 +94,10 @@ class LaunchCampaignJob implements ShouldQueue
         $rpm = max(1, (int) $campaign->max_requests_per_minute);
         $delayPerRequestSec = (int) ceil(60.0 / $rpm);
 
-        $discoverySources = array_values(array_filter($sources, fn ($s) =>
-            in_array($s, self::DISCOVERY_SOURCES_BACKEND, true)
-            || in_array($s, self::DISCOVERY_SOURCES_NODE, true)
+        $discoverySources = array_values(array_filter(
+            $sources,
+            fn ($s) => in_array($s, self::DISCOVERY_SOURCES_BACKEND, true)
+            || in_array($s, self::DISCOVERY_SOURCES_NODE, true),
         ));
 
         $denominator = max(1, count($zones) * max(1, count($discoverySources)));
@@ -115,6 +121,7 @@ class LaunchCampaignJob implements ShouldQueue
                     Log::info('LaunchCampaignJob: enrichment-only source skipped (waterfall handles it)', [
                         'campaign_id' => $campaign->id, 'source' => $source,
                     ]);
+
                     continue;
                 }
 
@@ -123,6 +130,7 @@ class LaunchCampaignJob implements ShouldQueue
                     Log::info('LaunchCampaignJob: zone type unsupported, skip', [
                         'campaign_id' => $campaign->id, 'zone_type' => $zoneType,
                     ]);
+
                     continue;
                 }
                 $department = (string) $zoneCode;
@@ -145,33 +153,33 @@ class LaunchCampaignJob implements ShouldQueue
                     if ($mockScrapers) {
                         // Mode mock : crée un run skipped pour traçabilité UI
                         try {
-                            \App\Models\ScraperRun::create([
-                                'workspace_id'    => $campaign->workspace_id,
-                                'campaign_id'     => $campaign->id,
-                                'source'          => $source,
-                                'status'          => 'cancelled',
-                                'started_at'      => now(),
-                                'finished_at'     => now(),
-                                'error'           => 'MOCK_SCRAPERS=true: Phase B Webshare non activée',
+                            ScraperRun::create([
+                                'workspace_id' => $campaign->workspace_id,
+                                'campaign_id' => $campaign->id,
+                                'source' => $source,
+                                'status' => 'cancelled',
+                                'started_at' => now(),
+                                'finished_at' => now(),
+                                'error' => 'MOCK_SCRAPERS=true: Phase B Webshare non activée',
                                 'request_payload' => [
-                                    'type'        => 'campaign',
+                                    'type' => 'campaign',
                                     'campaign_id' => $campaign->id,
-                                    'zone'        => $zone,
-                                    'limit'       => $perCampaignLimit,
+                                    'zone' => $zone,
+                                    'limit' => $perCampaignLimit,
                                 ],
                             ]);
                             // Compte aussi comme run_completed pour ne pas bloquer le monitor
-                            \Illuminate\Support\Facades\DB::table('scraping_campaigns')
+                            DB::table('scraping_campaigns')
                                 ->where('id', $campaign->id)
                                 ->update([
-                                    'runs_completed' => \Illuminate\Support\Facades\DB::raw('runs_completed + 1'),
-                                    'updated_at'     => now(),
+                                    'runs_completed' => DB::raw('runs_completed + 1'),
+                                    'updated_at' => now(),
                                 ]);
                             $runsTotal++;
                         } catch (\Throwable $e) {
                             Log::warning('LaunchCampaignJob: mock run create failed', [
                                 'campaign_id' => $campaign->id, 'source' => $source,
-                                'exception'   => $e->getMessage(),
+                                'exception' => $e->getMessage(),
                             ]);
                         }
                     } else {
@@ -192,6 +200,7 @@ class LaunchCampaignJob implements ShouldQueue
                     Log::info('LaunchCampaignJob: unknown source, skip', [
                         'campaign_id' => $campaign->id, 'source' => $source,
                     ]);
+
                     continue;
                 }
 

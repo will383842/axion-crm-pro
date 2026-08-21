@@ -38,6 +38,7 @@
  * corps. C'est la seule mesure qu'aucune indirection ne trompe.
  */
 
+use App\Models\ProxyProvider;
 use App\Models\User;
 use App\Models\Workspace;
 use Database\Seeders\PermissionsAndRolesSeeder;
@@ -114,7 +115,7 @@ function listeNeFuitPas(string $route, string $marqueurDeA, string $marqueurDeB,
     // et un 200 doit être inspecté.
     expect($reponse->status())->not->toBe(
         500,
-        "{$route} rend 500 : on ne peut RIEN conclure du cloisonnement sur une route cassee."
+        "{$route} rend 500 : on ne peut RIEN conclure du cloisonnement sur une route cassee.",
     );
 
     if ($reponse->status() !== 200) {
@@ -140,7 +141,7 @@ function listeNeFuitPas(string $route, string $marqueurDeA, string $marqueurDeB,
         $marqueurDeB,
         $valeurs,
         "{$route} ne rend pas la ligne de B : ce vert ne prouverait pas le cloisonnement, "
-        . 'seulement que la route est muette ou cassee.'
+        . 'seulement que la route est muette ou cassee.',
     );
 
     test()->assertNotContains(
@@ -149,10 +150,10 @@ function listeNeFuitPas(string $route, string $marqueurDeA, string $marqueurDeB,
         "🔴 {$route} rend une ligne d'un AUTRE espace de travail.\n\n"
         . "Une fuite par la LISTE est pire qu'une fuite par la fiche : la fiche demande de "
         . "deviner un identifiant, la liste les donne tous.\n\n"
-        . "Le correctif de cloisonnement du 2026-08-20 a ete porte sur 36 methodes unitaires "
-        . "(show/update/destroy) et sur AUCUNE liste : le controle de completude enumerait les "
+        . 'Le correctif de cloisonnement du 2026-08-20 a ete porte sur 36 methodes unitaires '
+        . '(show/update/destroy) et sur AUCUNE liste : le controle de completude enumerait les '
         . "methodes qui recoivent un modele par resolution de route, et un `index()` n'en "
-        . 'recoit aucun.'
+        . 'recoit aucun.',
     );
 }
 
@@ -215,9 +216,9 @@ test('P6-API — GET /proxy-providers ne rend PAS les fournisseurs d un autre es
     // interrogeait le mauvais nom, se declarait IGNOREE, et ne prouvait donc
     // RIEN -- un test ignore est un vert deguise. Le nom est lu dans le modele
     // plutot que recopie.
-    $table = (new \App\Models\ProxyProvider)->getTable();
+    $table = (new ProxyProvider)->getTable();
     expect(Schema::hasTable($table))->toBeTrue(
-        "La table {$table} est absente du banc : cette garde ne mesurerait rien."
+        "La table {$table} est absente du banc : cette garde ne mesurerait rien.",
     );
 
     [, $espaceA] = compteListe('ALPHA');

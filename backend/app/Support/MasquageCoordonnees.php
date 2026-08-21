@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use Illuminate\Database\Eloquent\Model;
+
 /**
  * Masquage des coordonnées pour les comptes en LECTURE SEULE (plan §2.10).
  *
@@ -276,7 +278,7 @@ final class MasquageCoordonnees
             return;
         }
 
-        if (! $noeud instanceof \Illuminate\Database\Eloquent\Model) {
+        if (! $noeud instanceof Model) {
             return;
         }
 

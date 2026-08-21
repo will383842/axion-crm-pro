@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -78,7 +79,7 @@ class EnsureTwoFactorPassed
         }
 
         try {
-            $quand = \Illuminate\Support\Carbon::parse($passeA);
+            $quand = Carbon::parse($passeA);
         } catch (\Throwable) {
             return false;
         }

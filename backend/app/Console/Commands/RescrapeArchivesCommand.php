@@ -32,20 +32,22 @@ class RescrapeArchivesCommand extends Command
 
     public function handle(): int
     {
-        $limit     = (int) $this->option('limit');
+        $limit = (int) $this->option('limit');
         $workspace = $this->option('workspace');
-        $reason    = (string) $this->option('reason');
-        $ageDays   = (int) $this->option('age-days');
-        $dryRun    = (bool) $this->option('dry-run');
+        $reason = (string) $this->option('reason');
+        $ageDays = (int) $this->option('age-days');
+        $dryRun = (bool) $this->option('dry-run');
 
         if ($limit <= 0 || $limit > 5000) {
             $this->error('limit doit être entre 1 et 5000');
+
             return self::INVALID;
         }
 
         $allowedReasons = ['no_email', 'low_quality_score', 'entreprise_radiee', 'duplicate', 'manual'];
         if (! in_array($reason, $allowedReasons, true)) {
             $this->error('reason doit être l\'un de : ' . implode(', ', $allowedReasons));
+
             return self::INVALID;
         }
 
@@ -71,11 +73,13 @@ class RescrapeArchivesCommand extends Command
             foreach ($companies as $c) {
                 $this->line(sprintf('  - #%d siren=%s %s', $c->id, $c->siren, $c->denomination));
             }
+
             return self::SUCCESS;
         }
 
         if ($count === 0) {
             $this->info('Rien à re-scraper. Bye.');
+
             return self::SUCCESS;
         }
 

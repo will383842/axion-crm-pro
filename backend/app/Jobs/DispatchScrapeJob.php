@@ -107,14 +107,14 @@ class DispatchScrapeJob implements ShouldQueue
         }
 
         $payload = [
-            'run_id'     => bin2hex(random_bytes(8)),
-            'source'     => $this->source,
+            'run_id' => bin2hex(random_bytes(8)),
+            'source' => $this->source,
             'company_id' => $this->companyId,
             'target_url' => $this->targetUrl,
-            'context'    => $this->context,
-            'enqueued_at'=> now()->toIso8601String(),
-            'attempts'   => 0,
-            'max_attempts'=> 3,
+            'context' => $this->context,
+            'enqueued_at' => now()->toIso8601String(),
+            'attempts' => 0,
+            'max_attempts' => 3,
         ];
 
         Redis::connection(self::CONNEXION_REDIS)->lpush(

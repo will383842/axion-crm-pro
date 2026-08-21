@@ -107,7 +107,7 @@ function ssrfCorpsAvecEmail(string $email): string
 {
     $remplissage = str_repeat(
         'Mentions legales de la societe. Siege social, capital, RCS, directeur de la publication. ',
-        10
+        10,
     );
 
     return "<html><body><p>{$remplissage}</p><p>Contact : {$email}</p></body></html>";
@@ -121,14 +121,14 @@ test('TEMOIN DU BANC — SsrfGuard dit oui a l IP publique et non aux quatre int
     $public = SsrfGuard::check('http://' . SSRF_IP_PUBLIQUE . '/');
     expect($public['ok'])->toBeTrue(
         "L'IP temoin est refusee par la garde elle-meme : tous les temoins de ce fichier "
-        . 'deviendraient impossibles a distinguer d\'un refus legitime.'
+        . 'deviendraient impossibles a distinguer d\'un refus legitime.',
     );
 
     foreach (ssrfAdressesInternes() as $libelle => $ip) {
         $verdict = SsrfGuard::check("http://{$ip}/");
         expect($verdict['ok'])->toBeFalse(
             "SsrfGuard::check() accepte {$ip} ({$libelle}). La garde elle-meme est cassee ; "
-            . 'inutile de verifier qui l\'appelle.'
+            . 'inutile de verifier qui l\'appelle.',
         );
     }
 });
@@ -145,14 +145,14 @@ test('TEMOIN — en production, un hote qui ne resout pas est REFUSE (fail-close
 
     try {
         expect(SsrfGuard::requireDnsResolution())->toBeTrue(
-            'La variable ne reprend pas la main : le reste de ce test ne mesurerait rien.'
+            'La variable ne reprend pas la main : le reste de ce test ne mesurerait rien.',
         );
 
         $verdict = SsrfGuard::check('http://hote-qui-ne-resout-pas.invalid/');
 
         expect($verdict['ok'])->toBeFalse(
             'Avec la resolution exigee — le comportement EXPEDIE en production — un hote sans '
-            . 'enregistrement DNS doit etre refuse. La detente du banc a fuite dans le produit.'
+            . 'enregistrement DNS doit etre refuse. La detente du banc a fuite dans le produit.',
         );
         expect($verdict['reason'])->toBe('dns_no_records');
     } finally {
@@ -163,7 +163,7 @@ test('TEMOIN — en production, un hote qui ne resout pas est REFUSE (fail-close
     // et elle est bien LA, visible, pas cachee dans un coin.
     expect(SsrfGuard::check('http://hote-qui-ne-resout-pas.invalid/')['ok'])->toBeTrue(
         "Le banc n'accorde plus la detente DNS : une douzaine de tests du depot qui utilisent "
-        . 'des domaines fictifs (alive.test, gone.test...) vont rougir sans parler de SSRF.'
+        . 'des domaines fictifs (alive.test, gone.test...) vont rougir sans parler de SSRF.',
     );
 });
 
@@ -177,9 +177,9 @@ test('TEMOIN DU BANC — le banc SUIT reellement une 302, avec le middleware de 
 
     expect($reponse->body())->toBe(
         'ARRIVEE',
-        "Http::fake() ne suit plus les redirections sur ce banc. Tous les tests C19-003 "
+        'Http::fake() ne suit plus les redirections sur ce banc. Tous les tests C19-003 '
         . 'ci-dessous passeraient alors au vert SANS RIEN PROUVER : « la cible interne n\'a pas '
-        . 'ete atteinte » serait vrai parce que AUCUNE redirection n\'est suivie, correctif ou pas.'
+        . 'ete atteinte » serait vrai parce que AUCUNE redirection n\'est suivie, correctif ou pas.',
     );
 });
 
@@ -199,7 +199,7 @@ test('C19-001 — MentionsLegales refuse une URL interne et n emet AUCUNE requet
             [],
             "MentionsLegalesScraperService a scrape {$ip} ({$libelle}) et en a rapporte des emails. "
             . 'La garde SSRF n\'est pas branchee sur cette entree : `$company->website` vient de la '
-            . 'base, il suffit d\'y ecrire une adresse interne pour faire lire l\'infrastructure.'
+            . 'base, il suffit d\'y ecrire une adresse interne pour faire lire l\'infrastructure.',
         );
     }
 });
@@ -215,7 +215,7 @@ test('TEMOIN C19-001 — MentionsLegales scrape toujours un site public', functi
         'contact@site-public.fr',
         $recolte['emails'],
         'Le scraper ne rapporte plus rien sur une adresse PUBLIQUE : la garde a ete branchee trop '
-        . 'large et le service est mort. Un refus generalise n\'est pas un correctif.'
+        . 'large et le service est mort. Un refus generalise n\'est pas un correctif.',
     );
 });
 
@@ -239,7 +239,7 @@ test('C19-001 — DomainFinder::revalidateBatch n appelle jamais une adresse int
         expect($resultat)->toBe(
             [1 => false],
             "La passe 3 a rendu VIVANT pour {$ip} ({$libelle}) : une adresse interne serait "
-            . 'conservee comme lead, et re-scrapee a chaque passage.'
+            . 'conservee comme lead, et re-scrapee a chaque passage.',
         );
     }
 });
@@ -254,7 +254,7 @@ test('TEMOIN C19-001 — revalidateBatch interroge toujours un site public et le
 
     expect($resultat)->toBe(
         [7 => true],
-        'La re-validation ne marche plus sur une adresse PUBLIQUE : la garde a ete branchee trop large.'
+        'La re-validation ne marche plus sur une adresse PUBLIQUE : la garde a ete branchee trop large.',
     );
     Http::assertSentCount(1);
 });
@@ -271,7 +271,7 @@ test('C19-001 — DomainFinder::find refuse un signals.legal.siteweb interne', f
         expect($trouve)->toBeNull(
             "DomainFinder::find() a rendu l'adresse interne {$ip} ({$libelle}) comme site officiel. "
             . 'Cette valeur est ensuite ecrite dans `companies.website` et re-scrapee par tout le '
-            . 'reste de la chaine : un seul champ empoisonne se propage a trois services.'
+            . 'reste de la chaine : un seul champ empoisonne se propage a trois services.',
         );
     }
 });
@@ -284,7 +284,7 @@ test('TEMOIN C19-001 — find() rend toujours un siteweb public canonicalise', f
 
     expect((new DomainFinderService)->find($entreprise))->toBe(
         'https://acme.fr/',
-        'La strategie 1 ne rend plus rien sur une URL publique : la garde a ete branchee trop large.'
+        'La strategie 1 ne rend plus rien sur une URL publique : la garde a ete branchee trop large.',
     );
 });
 
@@ -299,20 +299,20 @@ test('C19-001 — ProxiedHttpClient refuse une adresse interne', function () {
         $leve = false;
         try {
             app(ProxiedHttpClient::class)->request()->get("http://{$ip}/latest/meta-data/");
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $leve = true;
             $this->assertStringContainsString(
                 'SSRF',
                 $e->getMessage(),
                 "ProxiedHttpClient a bien leve sur {$ip}, mais pas pour un motif SSRF : "
-                . 'le refus vient d\'ailleurs, la garde n\'est pas prouvee.'
+                . 'le refus vient d\'ailleurs, la garde n\'est pas prouvee.',
             );
         }
 
         expect($leve)->toBeTrue(
             "ProxiedHttpClient a laisse passer {$ip} ({$libelle}). C'est le client HTTP partage des "
             . 'scrapes « risques » (Pages Jaunes via proxy Webshare) : il herite d\'une URL de '
-            . 'l\'appelant et ne verifiait rien.'
+            . 'l\'appelant et ne verifiait rien.',
         );
         Http::assertNothingSent();
     }
@@ -325,7 +325,7 @@ test('TEMOIN C19-001 — ProxiedHttpClient laisse passer une adresse publique', 
 
     expect($reponse->body())->toBe(
         'PAGE',
-        'Le client proxifie refuse desormais une adresse PUBLIQUE : le scrape Pages Jaunes est mort.'
+        'Le client proxifie refuse desormais une adresse PUBLIQUE : le scrape Pages Jaunes est mort.',
     );
 });
 
@@ -352,7 +352,7 @@ test('C19-003 — MentionsLegales ne suit pas une 302 vers 169.254.169.254', fun
         $recolte['emails'],
         'Le scraper a suivi la redirection jusqu\'au service de metadonnees et en a PARSE le corps. '
         . 'La garde ne regarde que l\'URL de depart (C19-003) : un site public suffit a rediriger '
-        . 'le backend vers l\'infrastructure.'
+        . 'le backend vers l\'infrastructure.',
     );
 });
 
@@ -378,7 +378,7 @@ test('C19-003 — ProxiedHttpClient ne suit pas une 302 vers la boucle locale', 
 
     try {
         app(ProxiedHttpClient::class)->request()->get('http://' . SSRF_IP_PUBLIQUE . '/recherche');
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         // Un refus par exception est le comportement attendu : on le laisse passer,
         // c'est `assertNotSent` ci-dessous qui juge.
     }
@@ -398,6 +398,6 @@ test('TEMOIN C19-003 — une 302 vers un autre hote PUBLIC est toujours suivie',
         'ARRIVEE',
         'Le correctif C19-003 bloque desormais TOUTE redirection, y compris vers un hote public. '
         . 'Ce n\'est pas une garde SSRF, c\'est une panne : la moitie des sites francais redirigent '
-        . 'http -> https ou apex -> www.'
+        . 'http -> https ou apex -> www.',
     );
 });

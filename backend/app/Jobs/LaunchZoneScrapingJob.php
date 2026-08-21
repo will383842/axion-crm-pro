@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Contracts\InseeClient;
+use App\Data\Sources\InseeCompanyData;
 use App\Jobs\Concerns\RunsInWorkspace;
 use App\Models\Company;
 use App\Models\ScraperRun;
@@ -39,6 +40,7 @@ class LaunchZoneScrapingJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, RunsInWorkspace, SerializesModels;
 
     public int $tries = 2;
+
     public int $timeout = 1800;
 
     /**
@@ -122,9 +124,9 @@ class LaunchZoneScrapingJob implements ShouldQueue
             if ($motif !== null) {
                 Log::info('LaunchZoneScrapingJob: arret lu avant demarrage, aucun run cree', [
                     'campaign_id' => $this->campaignId,
-                    'department'  => $this->department,
-                    'source'      => $this->source,
-                    'motif'       => $motif,
+                    'department' => $this->department,
+                    'source' => $this->source,
+                    'motif' => $motif,
                 ]);
 
                 return;
@@ -132,18 +134,18 @@ class LaunchZoneScrapingJob implements ShouldQueue
         }
 
         $run = ScraperRun::create([
-            'workspace_id'    => $this->workspaceId,
-            'campaign_id'     => $this->campaignId,
-            'source'          => $this->source,
-            'status'          => 'running',
-            'started_at'      => now(),
+            'workspace_id' => $this->workspaceId,
+            'campaign_id' => $this->campaignId,
+            'source' => $this->source,
+            'status' => 'running',
+            'started_at' => now(),
             'request_payload' => [
-                'type'        => $this->campaignId ? 'campaign' : 'coverage_launch',
+                'type' => $this->campaignId ? 'campaign' : 'coverage_launch',
                 'campaign_id' => $this->campaignId,
-                'department'  => $this->department,
-                'naf'         => $this->naf,
-                'limit'       => $this->limit,
-                'source'      => $this->source,
+                'department' => $this->department,
+                'naf' => $this->naf,
+                'limit' => $this->limit,
+                'source' => $this->source,
             ],
         ]);
 
@@ -192,12 +194,12 @@ class LaunchZoneScrapingJob implements ShouldQueue
                 $company = Company::query()->updateOrCreate(
                     ['workspace_id' => $this->workspaceId, 'siren' => $data->siren],
                     [
-                        'denomination'    => $data->denomination,
-                        'naf'             => $data->naf ?? $this->naf,
-                        'legal_form'      => $data->legalForm,
-                        'effectif_range'  => $data->effectifRange,
-                        'size_category'   => $this->sizeCategory,
-                        'discovery_source'=> $this->source,
+                        'denomination' => $data->denomination,
+                        'naf' => $data->naf ?? $this->naf,
+                        'legal_form' => $data->legalForm,
+                        'effectif_range' => $data->effectifRange,
+                        'size_category' => $this->sizeCategory,
+                        'discovery_source' => $this->source,
                         // Tampon du département dès la découverte (la zone est connue)
                         // → permet « Enrichir par département » sans attendre la
                         // classification. La classification confirmera la même valeur.
@@ -224,20 +226,20 @@ class LaunchZoneScrapingJob implements ShouldQueue
             // arret par plafond (le job a fait une partie de son travail),
             // `cancelled` sur un arret demande.
             $run->update([
-                'status'           => $motifArret === null
+                'status' => $motifArret === null
                     ? 'success'
                     : ($motifArret === 'quota_companies' ? 'partial' : 'cancelled'),
-                'finished_at'      => now(),
-                'error'            => $motifArret === null
+                'finished_at' => now(),
+                'error' => $motifArret === null
                     ? $run->error
                     : 'Collecte interrompue : ' . $motifArret,
                 'response_payload' => [
-                    'companies_found'     => $companiesFound,
+                    'companies_found' => $companiesFound,
                     'companies_processed' => $companiesCreated,
-                    'companies_new'       => $companiesNew,
+                    'companies_new' => $companiesNew,
                     'companies_refreshed' => $companiesRefreshed,
-                    'source'              => $this->source,
-                    'motif_arret'         => $motifArret,
+                    'source' => $this->source,
+                    'motif_arret' => $motifArret,
                 ],
             ]);
 
@@ -246,36 +248,36 @@ class LaunchZoneScrapingJob implements ShouldQueue
                     ->where('id', $this->campaignId)
                     ->update([
                         'companies_created' => DB::raw("companies_created + {$companiesCreated}"),
-                        'runs_completed'    => DB::raw('runs_completed + 1'),
-                        'updated_at'        => now(),
+                        'runs_completed' => DB::raw('runs_completed + 1'),
+                        'updated_at' => now(),
                     ]);
             } elseif ($this->campaignId !== null) {
                 DB::table('scraping_campaigns')
                     ->where('id', $this->campaignId)
                     ->update([
                         'runs_completed' => DB::raw('runs_completed + 1'),
-                        'updated_at'     => now(),
+                        'updated_at' => now(),
                     ]);
             }
         } catch (\Throwable $e) {
             Log::error('LaunchZoneScrapingJob failed', [
                 'workspace_id' => $this->workspaceId,
-                'campaign_id'  => $this->campaignId,
-                'department'   => $this->department,
-                'source'       => $this->source,
-                'error'        => $e->getMessage(),
+                'campaign_id' => $this->campaignId,
+                'department' => $this->department,
+                'source' => $this->source,
+                'error' => $e->getMessage(),
             ]);
             $run->update([
-                'status'      => 'failed',
+                'status' => 'failed',
                 'finished_at' => now(),
-                'error'       => mb_substr($e->getMessage(), 0, 500),
+                'error' => mb_substr($e->getMessage(), 0, 500),
             ]);
             if ($this->campaignId !== null) {
                 DB::table('scraping_campaigns')
                     ->where('id', $this->campaignId)
                     ->update([
                         'runs_completed' => DB::raw('runs_completed + 1'),
-                        'updated_at'     => now(),
+                        'updated_at' => now(),
                     ]);
             }
             throw $e;
@@ -372,7 +374,7 @@ class LaunchZoneScrapingJob implements ShouldQueue
             // Redis indisponible n'est PAS une autorisation de continuer : on
             // se rabat sur la base ci-dessous, qui porte la meme information.
             Log::warning('LaunchZoneScrapingJob: lecture du drapeau Redis impossible', [
-                'run_id'    => $run->id,
+                'run_id' => $run->id,
                 'exception' => $e->getMessage(),
             ]);
         }
@@ -392,15 +394,15 @@ class LaunchZoneScrapingJob implements ShouldQueue
     /**
      * Dispatch vers le bon client selon $this->source.
      *
-     * @return array<int, \App\Data\Sources\InseeCompanyData>
+     * @return array<int, InseeCompanyData>
      */
     private function discoverEntreprises(InseeClient $insee, FranceTravailDiscoveryClient $ftDiscovery, ScraperRun $run): array
     {
         return match ($this->source) {
             'insee' => $insee->searchByCriteria([
                 'department' => $this->department,
-                'naf'        => $this->naf,
-                'limit'      => $this->limit,
+                'naf' => $this->naf,
+                'limit' => $this->limit,
             ]),
             'france_travail' => $ftDiscovery->searchEntreprisesByDept($this->department, $this->limit),
             'google_maps', 'pages_jaunes' => $this->dispatchNodeWorker($run),
@@ -414,7 +416,7 @@ class LaunchZoneScrapingJob implements ShouldQueue
      * dans tous les cas LaunchZoneScrapingJob ne reçoit pas les résultats Node
      * (asynchrone via /internal/scraper-result).
      *
-     * @return array<int, \App\Data\Sources\InseeCompanyData>
+     * @return array<int, InseeCompanyData>
      */
     private function dispatchNodeWorker(ScraperRun $run): array
     {
@@ -422,6 +424,7 @@ class LaunchZoneScrapingJob implements ShouldQueue
             Log::info('LaunchZoneScrapingJob: MOCK_SCRAPERS=true, skipping Node worker', [
                 'source' => $this->source, 'department' => $this->department,
             ]);
+
             return [];
         }
         // Phase B (production) : enqueue via DispatchScrapeJob — résultats arriveront
@@ -443,14 +446,15 @@ class LaunchZoneScrapingJob implements ShouldQueue
             companyId: 0,  // synthétique : pas de company source pour une zone discovery
             source: str_replace('_', '-', $this->source),
             context: [
-                'discovery_zone'  => $this->department,
-                'limit'           => $this->limit,
-                'campaign_id'     => $this->campaignId,
-                'workspace_id'    => $this->workspaceId,
-                'scraper_run_id'  => (int) $run->id,
+                'discovery_zone' => $this->department,
+                'limit' => $this->limit,
+                'campaign_id' => $this->campaignId,
+                'workspace_id' => $this->workspaceId,
+                'scraper_run_id' => (int) $run->id,
             ],
             targetUrl: null,
         );
+
         return [];
     }
 }

@@ -98,7 +98,7 @@ function lireFichierHmac(string $relatif): string
 
     expect(file_exists($chemin))->toBeTrue(
         "Le banc ne voit pas {$relatif} (cherche en {$chemin}). Une garde qui n'a rien a "
-        . 'inspecter passe au vert sans rien prouver : monte la racine du depot avant de la croire.'
+        . 'inspecter passe au vert sans rien prouver : monte la racine du depot avant de la croire.',
     );
 
     return (string) file_get_contents($chemin);
@@ -132,8 +132,8 @@ test('P5-HMAC-001 — aucun commentaire ne designe scraper-result comme le patro
                 $contenu,
                 "{$relatif} designe encore `/internal/scraper-result` comme le patron de reference. "
                 . "C'est le canal qui portait le defaut F37-001 (secret vide = porte ouverte, aucun "
-                . "horodatage). Le patron reel est `HmacSignature` + `/internal/site-sync`. "
-                . 'Le prochain canal machine-a-machine sera ecrit en copiant ce que cette ligne designe.'
+                . 'horodatage). Le patron reel est `HmacSignature` + `/internal/site-sync`. '
+                . 'Le prochain canal machine-a-machine sera ecrit en copiant ce que cette ligne designe.',
             );
         }
     }
@@ -149,8 +149,8 @@ test('P5-HMAC-001 — TEMOIN NEGATIF : la garde SAIT reperer une designation fau
     $faux = "// Nouveau canal signe, meme patron que scraper-result.\n";
 
     expect(str_contains($faux, 'patron que scraper-result'))->toBeTrue(
-        "Le motif de recherche ne reconnait meme pas un cas fabrique : la garde ci-dessus "
-        . 'passerait au vert sur n\'importe quoi.'
+        'Le motif de recherche ne reconnait meme pas un cas fabrique : la garde ci-dessus '
+        . 'passerait au vert sur n\'importe quoi.',
     );
 });
 
@@ -159,8 +159,8 @@ test('P5-HMAC-002 — le secret du canal interne a une entree config, comme tous
         "`services.worker_internal.hmac_secret` n'existe pas. WORKER_INTERNAL_HMAC_SECRET etait le "
         . "SEUL secret du depot sans entree `config/` : il fonctionnait par la grace d'un detail de "
         . '`docker-compose` (env_file injecte la variable dans l\'environnement du processus, si bien '
-        . "que `env()` la lit encore sous `config:cache`). Le jour ou la production passe en "
-        . '`environment:` explicite ou en secrets Docker, il tombe a vide.'
+        . 'que `env()` la lit encore sous `config:cache`). Le jour ou la production passe en '
+        . '`environment:` explicite ou en secrets Docker, il tombe a vide.',
     );
 });
 
@@ -170,10 +170,10 @@ test('P5-HMAC-002 — le controleur lit son secret par config(), pas par env() b
     $this->assertStringNotContainsString(
         "env('WORKER_INTERNAL_HMAC_SECRET'",
         $controleur,
-        "Le controleur lit encore le secret par `env()` brut. `env()` hors de `config/` est "
-        . "explicitement deconseille par Laravel : sous `config:cache`, il ne rend la vraie valeur "
+        'Le controleur lit encore le secret par `env()` brut. `env()` hors de `config/` est '
+        . 'explicitement deconseille par Laravel : sous `config:cache`, il ne rend la vraie valeur '
         . "que si la variable est dans l'environnement du PROCESSUS. C'est vrai aujourd'hui par "
-        . '`env_file:`, et cela cesse de l\'etre au premier changement de mode d\'injection.'
+        . '`env_file:`, et cela cesse de l\'etre au premier changement de mode d\'injection.',
     );
 
     // La parenthese fermante n'est PAS dans le motif : le controleur ecrit
@@ -184,7 +184,7 @@ test('P5-HMAC-002 — le controleur lit son secret par config(), pas par env() b
     $this->assertStringContainsString(
         "config('services.worker_internal.hmac_secret'",
         $controleur,
-        'Le controleur doit lire son secret par la configuration.'
+        'Le controleur doit lire son secret par la configuration.',
     );
 });
 
@@ -204,7 +204,7 @@ test('P5-HMAC-002 — TEMOIN : deplacer la lecture du secret ne rouvre pas la po
     expect($reponse->status())->toBe(
         503,
         'Secret absent : le canal doit se fermer (503), jamais repondre 200. '
-        . "C'est la garde de F37-001, et elle doit survivre au passage a config()."
+        . "C'est la garde de F37-001, et elle doit survivre au passage a config().",
     );
 });
 
@@ -227,7 +227,7 @@ test('P5-HMAC-002 — TEMOIN : avec un secret pose, une signature juste passe et
             'CONTENT_TYPE' => 'application/json',
             'HTTP_ACCEPT' => 'application/json',
         ],
-        $corps
+        $corps,
     )->assertOk();
 
     // Signature fausse -> 401. Sans ce second cas, un controleur qui accepterait
@@ -243,7 +243,7 @@ test('P5-HMAC-002 — TEMOIN : avec un secret pose, une signature juste passe et
             'CONTENT_TYPE' => 'application/json',
             'HTTP_ACCEPT' => 'application/json',
         ],
-        $corps
+        $corps,
     )->assertStatus(401);
 });
 
@@ -283,7 +283,7 @@ test('P5-HMAC-003 — le rejeu tardif reste ouvert sur scraper-result, et le cod
             'rejeu tardif reste donc ouvert',
             $controleur,
             "Le controleur emploie desormais l'horodatage signe : le commentaire qui declare le "
-            . 'rejeu ouvert est devenu faux. Un commentaire perime est un piege a la relecture.'
+            . 'rejeu ouvert est devenu faux. Un commentaire perime est un piege a la relecture.',
         );
 
         return;
@@ -292,9 +292,9 @@ test('P5-HMAC-003 — le rejeu tardif reste ouvert sur scraper-result, et le cod
     $this->assertStringContainsString(
         'rejeu',
         $controleur,
-        "Le canal /internal/scraper-result signe le corps BRUT, sans horodatage : une requete "
-        . "interceptee reste rejouable indefiniment, alors que /internal/site-sync est protege. "
+        'Le canal /internal/scraper-result signe le corps BRUT, sans horodatage : une requete '
+        . 'interceptee reste rejouable indefiniment, alors que /internal/site-sync est protege. '
         . "C'est un ecart REEL entre les deux canaux, et il doit etre ecrit la ou on le lira. "
-        . 'Constat P5-HMAC-003, ouvert au registre.'
+        . 'Constat P5-HMAC-003, ouvert au registre.',
     );
 });

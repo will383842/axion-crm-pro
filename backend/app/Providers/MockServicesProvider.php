@@ -2,50 +2,50 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\ServiceProvider;
-use App\Contracts\LLMClient;
-use App\Contracts\ProxyProvider;
-use App\Contracts\CaptchaSolver;
-use App\Contracts\SmtpProber;
-use App\Contracts\InseeClient;
 use App\Contracts\AnnuaireEntreprisesClient;
-use App\Contracts\BodaccClient;
 use App\Contracts\BanGeocoder;
+use App\Contracts\BodaccClient;
+use App\Contracts\CaptchaSolver;
+use App\Contracts\DirectionFinder;
 use App\Contracts\FranceTravailClient;
 use App\Contracts\GoogleMapsScraper;
+use App\Contracts\InseeClient;
+use App\Contracts\LLMClient;
 use App\Contracts\PagesJaunesScraper;
-use App\Contracts\WebsiteScraper;
+use App\Contracts\ProxyProvider;
 use App\Contracts\SearchEngine;
-use App\Contracts\DirectionFinder;
+use App\Contracts\SmtpProber;
+use App\Contracts\WebsiteScraper;
+use App\Services\AnnuaireEntreprises\HttpAnnuaireEntreprisesClient;
+use App\Services\AnnuaireEntreprises\Mocks\MockAnnuaireEntreprisesClient;
+use App\Services\Ban\HttpBanGeocoder;
+use App\Services\Ban\Mocks\MockBanGeocoder;
+use App\Services\Bodacc\HttpBodaccClient;
+use App\Services\Bodacc\Mocks\MockBodaccClient;
+use App\Services\Captcha\Mocks\MockCaptchaSolver;
+use App\Services\Captcha\TwoCaptchaSolver;
+use App\Services\FranceTravail\HttpFranceTravailClient;
+use App\Services\FranceTravail\Mocks\MockFranceTravailClient;
+use App\Services\Insee\HttpInseeClient;
+use App\Services\Insee\Mocks\MockInseeClient;
 use App\Services\LLM\LLMRouterService;
 use App\Services\LLM\Mocks\MockLLMClient;
 use App\Services\Proxies\Mocks\MockProxyProvider;
 use App\Services\Proxies\WebshareProvider;
-use App\Services\Captcha\TwoCaptchaSolver;
-use App\Services\Captcha\Mocks\MockCaptchaSolver;
-use App\Services\Smtp\HunterSmtpProber;
-use App\Services\Smtp\Mocks\MockSmtpProber;
-use App\Services\Insee\HttpInseeClient;
-use App\Services\Insee\Mocks\MockInseeClient;
-use App\Services\AnnuaireEntreprises\HttpAnnuaireEntreprisesClient;
-use App\Services\AnnuaireEntreprises\Mocks\MockAnnuaireEntreprisesClient;
-use App\Services\Bodacc\HttpBodaccClient;
-use App\Services\Bodacc\Mocks\MockBodaccClient;
-use App\Services\Ban\HttpBanGeocoder;
-use App\Services\Ban\Mocks\MockBanGeocoder;
-use App\Services\FranceTravail\HttpFranceTravailClient;
-use App\Services\FranceTravail\Mocks\MockFranceTravailClient;
+use App\Services\Scraping\Mocks\MockDirectionFinder;
 use App\Services\Scraping\Mocks\MockGoogleMapsScraper;
 use App\Services\Scraping\Mocks\MockPagesJaunesScraper;
-use App\Services\Scraping\Mocks\MockWebsiteScraper;
 use App\Services\Scraping\Mocks\MockSearchEngine;
-use App\Services\Scraping\Mocks\MockDirectionFinder;
+use App\Services\Scraping\Mocks\MockWebsiteScraper;
+use App\Services\Scraping\PlaywrightDirectionFinder;
 use App\Services\Scraping\PlaywrightGoogleMapsScraper;
 use App\Services\Scraping\PlaywrightPagesJaunesScraper;
-use App\Services\Scraping\PlaywrightWebsiteScraper;
 use App\Services\Scraping\PlaywrightSearchEngine;
-use App\Services\Scraping\PlaywrightDirectionFinder;
+use App\Services\Scraping\PlaywrightWebsiteScraper;
+use App\Services\Smtp\HunterSmtpProber;
+use App\Services\Smtp\Mocks\MockSmtpProber;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\ServiceProvider;
 
 /**
  * Branche les implémentations RÉELLES ou SIMULÉES des services externes.
@@ -100,25 +100,25 @@ class MockServicesProvider extends ServiceProvider
         // configurée par use case dans llm_use_cases.fallback_chain.
         // Si MOCK_LLM=true (default suit MOCK_MODE), on retombe sur MockLLMClient
         // pour les tests Pest / dev local.
-        $bind(LLMClient::class,                LLMRouterService::class, MockLLMClient::class, 'MOCK_LLM');
+        $bind(LLMClient::class, LLMRouterService::class, MockLLMClient::class, 'MOCK_LLM');
         $this->app->bind(LLMRouterService::class, LLMRouterService::class);
 
-        $bind(ProxyProvider::class,            WebshareProvider::class,           MockProxyProvider::class,           'MOCK_PROXIES');
-        $bind(CaptchaSolver::class,            TwoCaptchaSolver::class,           MockCaptchaSolver::class,           'MOCK_CAPTCHA');
+        $bind(ProxyProvider::class, WebshareProvider::class, MockProxyProvider::class, 'MOCK_PROXIES');
+        $bind(CaptchaSolver::class, TwoCaptchaSolver::class, MockCaptchaSolver::class, 'MOCK_CAPTCHA');
         // Sprint H2 — HunterSmtpProber remplace RealSmtpProber (probe direct → ban Spamhaus IP Hetzner).
         // RealSmtpProber gardé en classe pour fallback manuel mais plus wired par défaut.
-        $bind(SmtpProber::class,               HunterSmtpProber::class,           MockSmtpProber::class,              'MOCK_SMTP');
-        $bind(InseeClient::class,              HttpInseeClient::class,            MockInseeClient::class,             'MOCK_INSEE');
-        $bind(AnnuaireEntreprisesClient::class,HttpAnnuaireEntreprisesClient::class,MockAnnuaireEntreprisesClient::class,'MOCK_ANNUAIRE_ENTREPRISES');
-        $bind(BodaccClient::class,             HttpBodaccClient::class,           MockBodaccClient::class,            'MOCK_BODACC');
-        $bind(BanGeocoder::class,              HttpBanGeocoder::class,            MockBanGeocoder::class,             'MOCK_BAN');
-        $bind(FranceTravailClient::class,      HttpFranceTravailClient::class,    MockFranceTravailClient::class,     'MOCK_FRANCE_TRAVAIL');
+        $bind(SmtpProber::class, HunterSmtpProber::class, MockSmtpProber::class, 'MOCK_SMTP');
+        $bind(InseeClient::class, HttpInseeClient::class, MockInseeClient::class, 'MOCK_INSEE');
+        $bind(AnnuaireEntreprisesClient::class, HttpAnnuaireEntreprisesClient::class, MockAnnuaireEntreprisesClient::class, 'MOCK_ANNUAIRE_ENTREPRISES');
+        $bind(BodaccClient::class, HttpBodaccClient::class, MockBodaccClient::class, 'MOCK_BODACC');
+        $bind(BanGeocoder::class, HttpBanGeocoder::class, MockBanGeocoder::class, 'MOCK_BAN');
+        $bind(FranceTravailClient::class, HttpFranceTravailClient::class, MockFranceTravailClient::class, 'MOCK_FRANCE_TRAVAIL');
 
-        $bind(GoogleMapsScraper::class,        PlaywrightGoogleMapsScraper::class,MockGoogleMapsScraper::class,       'MOCK_SCRAPERS');
-        $bind(PagesJaunesScraper::class,       PlaywrightPagesJaunesScraper::class,MockPagesJaunesScraper::class,     'MOCK_SCRAPERS');
-        $bind(WebsiteScraper::class,           PlaywrightWebsiteScraper::class,   MockWebsiteScraper::class,          'MOCK_SCRAPERS');
-        $bind(SearchEngine::class,             PlaywrightSearchEngine::class,     MockSearchEngine::class,            'MOCK_SCRAPERS');
-        $bind(DirectionFinder::class,          PlaywrightDirectionFinder::class,  MockDirectionFinder::class,         'MOCK_SCRAPERS');
+        $bind(GoogleMapsScraper::class, PlaywrightGoogleMapsScraper::class, MockGoogleMapsScraper::class, 'MOCK_SCRAPERS');
+        $bind(PagesJaunesScraper::class, PlaywrightPagesJaunesScraper::class, MockPagesJaunesScraper::class, 'MOCK_SCRAPERS');
+        $bind(WebsiteScraper::class, PlaywrightWebsiteScraper::class, MockWebsiteScraper::class, 'MOCK_SCRAPERS');
+        $bind(SearchEngine::class, PlaywrightSearchEngine::class, MockSearchEngine::class, 'MOCK_SCRAPERS');
+        $bind(DirectionFinder::class, PlaywrightDirectionFinder::class, MockDirectionFinder::class, 'MOCK_SCRAPERS');
     }
 
     /** N'alerte qu'une fois par processus : sinon le journal noie son propre signal. */

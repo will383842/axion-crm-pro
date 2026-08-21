@@ -385,7 +385,7 @@ test('F38-003 — TEMOIN DE MONTAGE : le banc voit les workflows et le script me
         . "Une garde qui n'a rien a inspecter passe au vert sans rien prouver -- c'est le "
         . "defaut exact trouve le 19/08 sur les gardes de ce dossier.\n"
         . '⚠️ Le conteneur de mesure ne MONTE pas `.github/`, il en porte une COPIE : '
-        . '`docker cp .github a35r:/var/www/.github`.'
+        . '`docker cp .github a35r:/var/www/.github`.',
     );
 
     expect($vides)->toBe([], 'Fichiers vus mais VIDES : ' . implode(', ', $vides));
@@ -400,7 +400,7 @@ test('F38-003 — TEMOIN D ENUMERATION : aucun workflow qui recree une pile n ec
     expect(count($fichiers))->toBeGreaterThanOrEqual(
         10,
         'Seulement ' . count($fichiers) . " fichiers de workflow balayes dans {$dossier} : "
-        . 'le balayage ne voit pas ce qu il croit voir.'
+        . 'le balayage ne voit pas ce qu il croit voir.',
     );
 
     $balayes = [];
@@ -417,14 +417,14 @@ test('F38-003 — TEMOIN D ENUMERATION : aucun workflow qui recree une pile n ec
 
     expect($balayes)->toBe(
         $enumeres,
-        "La liste ecrite a la main dans `pilesPiloteesParLesWorkflows()` ne correspond plus a ce "
+        'La liste ecrite a la main dans `pilesPiloteesParLesWorkflows()` ne correspond plus a ce '
         . "que le balayage trouve.\n\n"
-        . "Trouve par balayage : " . implode(', ', $balayes) . "\n"
-        . "Enumere a la main   : " . implode(', ', $enumeres) . "\n\n"
+        . 'Trouve par balayage : ' . implode(', ', $balayes) . "\n"
+        . 'Enumere a la main   : ' . implode(', ', $enumeres) . "\n\n"
         . "Un workflow qui recree une pile Docker sans figurer dans la liste n'est mesure par "
-        . "AUCUN des controles ci-dessous. La lecon a ete payee trois fois sur "
+        . 'AUCUN des controles ci-dessous. La lecon a ete payee trois fois sur '
         . "`PileDeProductionSansOverlayTest` : ce n'est pas la garde qu'il faut croire, c'est "
-        . "l'ENUMERATION qu'il faut challenger."
+        . "l'ENUMERATION qu'il faut challenger.",
     );
 });
 
@@ -438,9 +438,9 @@ test('F38-003 — TEMOIN NEGATIF : le balayage sait reperer un appel avale, abse
     expect($trouves)->toHaveCount(1);
     expect($trouves[0]['projet'])->toBe('axion-crm-staging');
     expect($trouves[0]['avalee'])->toBeTrue(
-        "Le balayage ne recolle pas la continuation `\\` : il verrait un appel parfaitement sain "
+        'Le balayage ne recolle pas la continuation `\\` : il verrait un appel parfaitement sain '
         . 'la ou le `|| echo` de la ligne suivante annule tout. Sans ce recollage, la garde '
-        . 'ci-dessous passerait au vert sur le defaut F38-003 lui-meme.'
+        . 'ci-dessous passerait au vert sur le defaut F38-003 lui-meme.',
     );
 
     // 2. Les formes SAINES doivent etre reconnues saines, ET rendre le bon nom
@@ -476,7 +476,7 @@ test('F40-005 — TEMOIN NEGATIF : le balayage sait reperer un deploiement qui o
     $fautif = "docker compose up -d --build --force-recreate --no-deps api app horizon scheduler\n";
     expect(laBaseEtLeCacheSontHorsDePorteeDuDeploiement($fautif))->toBeTrue(
         'Le balayage ne voit pas le piege 18 sur la ligne qui le porte : la garde ci-dessous '
-        . 'passerait au vert sur le defaut lui-meme.'
+        . 'passerait au vert sur le defaut lui-meme.',
     );
 
     // La forme corrigee, celle de `deploy-staging.yml:140-143`.
@@ -488,9 +488,9 @@ test('F40-005 — TEMOIN NEGATIF : le balayage sait reperer un deploiement qui o
     expect(laBaseEtLeCacheSontHorsDePorteeDuDeploiement($toutePile))->toBeFalse();
     expect(invocationsUpAvecServices($toutePile)[0]['services'])->toBe(
         [],
-        "`up -d 2>&1 | tail -30` ne nomme AUCUN service : si le balayage y lit « 2 » ou « tail », "
+        '`up -d 2>&1 | tail -30` ne nomme AUCUN service : si le balayage y lit « 2 » ou « tail », '
         . "il croira que la commande cible un service precis et manquera le fait qu'elle recree "
-        . 'TOUTE la pile de production.'
+        . 'TOUTE la pile de production.',
     );
 });
 
@@ -525,23 +525,23 @@ test('F38-003 / F40-004 — toute pile recreee par un workflow est mesuree sur s
 
     expect($sansMesure)->toBe(
         [],
-        "Ces workflows RECREENT une pile Docker sur un serveur et ne mesurent JAMAIS les ports "
+        'Ces workflows RECREENT une pile Docker sur un serveur et ne mesurent JAMAIS les ports '
         . "qu'elle publie reellement :\n  - " . implode("\n  - ", $sansMesure) . "\n\n"
         . "`config-prod` prouve que le FICHIER fusionne est juste. Il l'etait deja le 19/08, "
-        . "pendant que Postgres repondait sur 0.0.0.0:55432 devant 4 295 349 fiches et que Redis, "
-        . "SANS mot de passe, acceptait FLUSHALL. Entre le fichier et le reel il y a un "
+        . 'pendant que Postgres repondait sur 0.0.0.0:55432 devant 4 295 349 fiches et que Redis, '
+        . 'SANS mot de passe, acceptait FLUSHALL. Entre le fichier et le reel il y a un '
         . "deploiement qui, pour postgres et redis, ne fait rien.\n\n"
         . "Correctif : apres le bloc de sante des conteneurs,\n"
         . "    if ! bash \"\$PROJECT_PATH/infra/scripts/verifier-ports-publies.sh\" axion-crm-pro; then\n"
         . "      echo \"::error::…\" ; exit 1\n"
-        . "    fi\n"
+        . "    fi\n",
     );
 
     expect($mauvaisProjet)->toBe(
         [],
-        "Un appel mesure la mauvaise pile. Le script rend `exit 2` sur un projet inexistant "
+        'Un appel mesure la mauvaise pile. Le script rend `exit 2` sur un projet inexistant '
         . "(« la mesure n'a rien vu ») -- mais un projet qui EXISTE et n'est pas celui qu'on croit "
-        . "rendrait un vert parfaitement trompeur.\n  - " . implode("\n  - ", $mauvaisProjet)
+        . "rendrait un vert parfaitement trompeur.\n  - " . implode("\n  - ", $mauvaisProjet),
     );
 });
 
@@ -566,10 +566,10 @@ test('F38-003 / F40-004 — aucun appel de la garde des ports n a son code de re
         "Ces appels neutralisent le code de retour de la garde des ports.\n\n"
         . "Le `||` retombe sur une commande qui reussit toujours : l'echec disparait, et avec lui "
         . "le `exit 2` « aucun conteneur trouve, la mesure n'a rien vu » -- qui est le temoin "
-        . "INTERNE du script, celui qui refuse de rassurer sur du vide. Un `|| echo` ne degrade "
+        . 'INTERNE du script, celui qui refuse de rassurer sur du vide. Un `|| echo` ne degrade '
         . "pas cette garde : il l'annule.\n\n"
         . "Ecrire `|| ok=0` (variable evaluee ensuite) ou laisser l'appel nu sous `set -e`.\n\n"
-        . "Appels avales :\n  - " . implode("\n  - ", $avales)
+        . "Appels avales :\n  - " . implode("\n  - ", $avales),
     );
 });
 
@@ -592,7 +592,7 @@ test('F38-003 — la preproduction evalue bien la variable que son appel aliment
             $contenu,
             "L'appel de la garde des ports alimente `ok=0`, mais `deploy-staging.yml` n'evalue "
             . "plus `ok`. La variable ne sert alors a rien : l'echec est avale par un autre "
-            . 'chemin, et le job reste vert.'
+            . 'chemin, et le job reste vert.',
         );
     }
 
@@ -606,7 +606,7 @@ test('F38-003 — la preproduction evalue bien la variable que son appel aliment
         'La preproduction doit etre mesuree avec une liste de ports publics autorises VIDE. '
         . '⚠️ Le script lit `${2-80 443}` SANS les deux-points : un second argument vide vaut '
         . '« rien n est autorise », alors qu avec les deux-points il serait retombe sur '
-        . '« 80 443 » et aurait annonce « ports attendus absents : 80 443 » sur une pile saine.'
+        . '« 80 443 » et aurait annonce « ports attendus absents : 80 443 » sur une pile saine.',
     );
 });
 
@@ -626,21 +626,21 @@ test('F40-005 — le deploiement de production peut appliquer un changement sur 
 
     expect($horsDePortee)->toBe(
         [],
-        "PIEGE 18 -- dans ces fichiers, tous les `docker compose up` nomment leurs services avec "
+        'PIEGE 18 -- dans ces fichiers, tous les `docker compose up` nomment leurs services avec '
         . "`--no-deps`, et aucun ne couvre `postgres` ni `redis` :\n  - "
         . implode("\n  - ", $horsDePortee) . "\n\n"
-        . "Consequence jamais tiree : une modification de `docker-compose*.yml` portant sur "
-        . "`postgres`, `redis` ou `reverb` est INAPPLICABLE par ce deploiement. Ces conteneurs "
+        . 'Consequence jamais tiree : une modification de `docker-compose*.yml` portant sur '
+        . '`postgres`, `redis` ou `reverb` est INAPPLICABLE par ce deploiement. Ces conteneurs '
         . "gardent la configuration de leur creation, indefiniment. C'est dans cet ecart qu'une "
         . "base de 4 295 349 fiches est restee ouverte sur internet du 17/05 au 19/08.\n\n"
-        . "Le correctif existe deja, ecrit pour la PREPRODUCTION le 19/08 et jamais retroporte "
+        . 'Le correctif existe deja, ecrit pour la PREPRODUCTION le 19/08 et jamais retroporte '
         . "(`deploy-staging.yml:143`). Ajouter, apres le `up` des services applicatifs :\n"
         . "    docker compose up -d --no-deps postgres redis\n\n"
-        . "`up -d` SANS `--force-recreate` ne recree que si la configuration fusionnee a "
+        . '`up -d` SANS `--force-recreate` ne recree que si la configuration fusionnee a '
         . "reellement change : aucune interruption dans le cas courant.\n"
-        . "⚠️ `reverb` reste VOLONTAIREMENT absent : il est arrete depuis 5 semaines, Echo est "
+        . '⚠️ `reverb` reste VOLONTAIREMENT absent : il est arrete depuis 5 semaines, Echo est '
         . "desactive cote frontend et le Caddyfile n'a aucune route WebSocket vers lui. "
-        . "L'ajouter le DEMARRERAIT."
+        . "L'ajouter le DEMARRERAIT.",
     );
 });
 
@@ -650,14 +650,14 @@ test('F38-002 — le mode d emploi de la protection de branche existe et ne pres
     expect(is_file($chemin))->toBeTrue(
         cheminModeEmploiProtection() . " est absent.\n\n"
         . "La protection de la branche `main` n'exige que 4 contextes sur 36 jobs : "
-        . "`config-prod`, `caddyfile-valide`, `scripts-executables` et `axe-core Playwright` "
+        . '`config-prod`, `caddyfile-valide`, `scripts-executables` et `axe-core Playwright` '
         . "n'en font pas partie. Les gardes nees des deux incidents les plus graves du produit "
-        . "peuvent donc rougir SANS empecher la fusion -- mesure : la PR #186 a fusionne le "
+        . 'peuvent donc rougir SANS empecher la fusion -- mesure : la PR #186 a fusionne le '
         . "2026-08-19 a 09:15:13, alors que son `Container scan (Trivy)` n'a rendu son verdict "
         . "qu'a 09:17.\n\n"
         . "Cela se regle par l'API GitHub, PAS dans le depot : ce depot ne peut pas le corriger. "
         . "Il peut en revanche porter l'instruction que l'exploitant doit suivre. Sans ce "
-        . 'fichier, le constat F38-002 ne laisse aucune trace actionnable.'
+        . 'fichier, le constat F38-002 ne laisse aucune trace actionnable.',
     );
 
     $contenu = (string) file_get_contents($chemin);
@@ -668,7 +668,7 @@ test('F38-002 — le mode d emploi de la protection de branche existe et ne pres
         4,
         'Le mode d emploi ne prescrit que ' . count($prescrits) . ' contexte(s) entre les balises '
         . '`CONTEXTES-REQUIS:DEBUT` / `CONTEXTES-REQUIS:FIN`. Soit les balises ont disparu, soit '
-        . "la liste est vide : dans les deux cas il n'y a plus rien a suivre."
+        . "la liste est vide : dans les deux cas il n'y a plus rien a suivre.",
     );
 
     $nomsDeJobs = array_map('repliSansAccent', nomsDesJobsDeTousLesWorkflows());
@@ -680,7 +680,7 @@ test('F38-002 — le mode d emploi de la protection de branche existe et ne pres
         20,
         'Seulement ' . count($nomsDeJobs) . ' noms de job extraits des workflows : le motif '
         . 'd extraction ne voit pas ce qu il croit voir, et la verification des contextes ne '
-        . 'prouve rien.'
+        . 'prouve rien.',
     );
 
     // TEMOIN NEGATIF : un nom fantome doit etre reconnu comme fantome.
@@ -700,9 +700,9 @@ test('F38-002 — le mode d emploi de la protection de branche existe et ne pres
         "Le mode d emploi prescrit des contextes qu'AUCUN job ne declare :\n  - "
         . implode("\n  - ", $fantomes) . "\n\n"
         . "GitHub attend INDEFINIMENT un contexte requis qui n'arrive jamais : poser l'un de "
-        . "ces noms dans `required_status_checks.contexts` figerait `main` pour de bon, et le "
+        . 'ces noms dans `required_status_checks.contexts` figerait `main` pour de bon, et le '
         . "seul moyen d'en sortir serait de desactiver la protection -- c'est-a-dire de faire "
         . "l'inverse de ce que ce constat demande.\n\n"
-        . "Le nom d'un contexte est le `name:` du job, pas son identifiant."
+        . "Le nom d'un contexte est le `name:` du job, pas son identifiant.",
     );
 });

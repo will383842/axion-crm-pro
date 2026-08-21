@@ -106,8 +106,8 @@ test('P6-UI-001 — /dashboard/stats compte les entreprises REELLES, pas zero', 
     expect($reponse->json('companies_total'))->toBe(
         3,
         "L'ecran d'accueil affichera « Lance ton premier scrape — aucune entreprise "
-        . "collectee » alors que la base en porte trois. En production, elle en porte "
-        . '4 295 349.'
+        . 'collectee » alors que la base en porte trois. En production, elle en porte '
+        . '4 295 349.',
     );
 
     // La repartition par taille doit refleter les donnees, pas un gabarit fige.
@@ -144,7 +144,7 @@ test('P6-UI-001 — /dashboard/stats ne compte PAS les entreprises d un autre es
     expect($reponse->json('companies_total'))->toBe(
         1,
         "Le compteur d'accueil revele le volume d'activite d'un AUTRE client. "
-        . "Un compteur ne montre aucune fiche, mais il en dit le nombre."
+        . 'Un compteur ne montre aucune fiche, mais il en dit le nombre.',
     );
 });
 
@@ -185,7 +185,7 @@ test('P6-UI-002 — /search retrouve une entreprise par sa denomination', functi
         'Boulangerie Martin',
         $noms,
         'La palette ⌘K est presente sur TOUS les ecrans et vantee par la visite guidee. '
-        . "Tant que cette route rend un tableau vide, elle ne peut RIEN trouver."
+        . 'Tant que cette route rend un tableau vide, elle ne peut RIEN trouver.',
     );
     $this->assertNotContains('Garage Dupont', $noms, 'La recherche ne filtre pas : elle rend tout.');
 });
@@ -229,7 +229,7 @@ test('P6-UI-002 — /search ne rend RIEN d un autre espace de travail', function
         'Secret Alpha SARL',
         $noms,
         "La recherche globale rend une fiche d'un AUTRE espace. Une palette de recherche "
-        . 'est le pire endroit ou fuir : elle balaie tout, sur une saisie libre.'
+        . 'est le pire endroit ou fuir : elle balaie tout, sur une saisie libre.',
     );
 });
 

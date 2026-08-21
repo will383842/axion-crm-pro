@@ -144,7 +144,7 @@ function laRouteRegardeVraimentLaBase(
     test()->assertTrue(
         Schema::hasTable($table),
         "La table {$table} est absente du banc : cette garde ne mesurerait RIEN. "
-        . 'Un test ignore est un vert deguise.'
+        . 'Un test ignore est un vert deguise.',
     );
 
     $reponse = test()->actingAs($moi)->getJson($route);
@@ -152,7 +152,7 @@ function laRouteRegardeVraimentLaBase(
     test()->assertSame(
         200,
         $reponse->status(),
-        "{$route} rend {$reponse->status()} : on n'inspecte pas le corps d'une route cassee."
+        "{$route} rend {$reponse->status()} : on n'inspecte pas le corps d'une route cassee.",
     );
 
     $valeurs = aplatirB12($reponse->json());
@@ -167,7 +167,7 @@ function laRouteRegardeVraimentLaBase(
         . "qui la rend indiscernable d'une fonctionnalite qui marche. L'ecran lit « rien a "
         . "montrer » la ou la base porte une ligne.\n\n"
         . 'Soit la route interroge la base, soit elle rend 501 via `notImplemented()` — un 200 '
-        . "invente n'est pas une troisieme option."
+        . "invente n'est pas une troisieme option.",
     );
 
     // Garde solidaire : brancher une liste sur la base SANS filtre d'espace
@@ -177,7 +177,7 @@ function laRouteRegardeVraimentLaBase(
         $valeurs,
         "🔴 {$route} rend une ligne d'un AUTRE espace de travail ({$marqueurDuVoisin}).\n\n"
         . 'Une fuite par la LISTE est pire qu\'une fuite par la fiche : la fiche demande de '
-        . 'deviner un identifiant, la liste les donne tous.'
+        . 'deviner un identifiant, la liste les donne tous.',
     );
 }
 
@@ -231,7 +231,11 @@ test('B12-007 — GET /llm/usage rend les appels LLM reellement enregistres', fu
     }
 
     laRouteRegardeVraimentLaBase(
-        '/api/v1/llm/usage', 'llm_usage', 'usage-a-moi-b12', 'usage-du-voisin-b12', $moi
+        '/api/v1/llm/usage',
+        'llm_usage',
+        'usage-a-moi-b12',
+        'usage-du-voisin-b12',
+        $moi,
     );
 });
 
@@ -264,9 +268,9 @@ test('B12-007 — GET /llm/usage/summary chiffre le cout REEL, pas zero', functi
     $this->assertSame(
         3.75,
         round((float) ($resume['total_eur'] ?? 0), 2),
-        "🔴 GET /llm/usage/summary ne chiffre RIEN : 3,75 EUR sont enregistres en base "
-        . "et la route en annonce " . round((float) ($resume['total_eur'] ?? 0), 2) . ". "
-        . 'Un « 0 EUR depense » ecrit dans le code est une affirmation, pas une mesure.'
+        '🔴 GET /llm/usage/summary ne chiffre RIEN : 3,75 EUR sont enregistres en base '
+        . 'et la route en annonce ' . round((float) ($resume['total_eur'] ?? 0), 2) . '. '
+        . 'Un « 0 EUR depense » ecrit dans le code est une affirmation, pas une mesure.',
     );
 
     // Le cloisonnement se lit dans le chiffre lui-meme : 99 EUR du voisin
@@ -275,14 +279,14 @@ test('B12-007 — GET /llm/usage/summary chiffre le cout REEL, pas zero', functi
     $this->assertArrayNotHasKey(
         'secret-du-voisin-b12',
         (array) ($resume['by_use_case'] ?? []),
-        'GET /llm/usage/summary agrege les appels d un AUTRE espace de travail.'
+        'GET /llm/usage/summary agrege les appels d un AUTRE espace de travail.',
     );
 
     $this->assertArrayHasKey(
         'resume-b12',
         (array) ($resume['by_use_case'] ?? []),
         'GET /llm/usage/summary ne ventile pas par cas d usage : le contrat attendu par '
-        . 'LlmRouterPage.tsx (`by_use_case`) n est pas rendu.'
+        . 'LlmRouterPage.tsx (`by_use_case`) n est pas rendu.',
     );
 });
 
@@ -304,7 +308,11 @@ test('B12-007 — GET /rotations rend les rotations reellement configurees', fun
     }
 
     laRouteRegardeVraimentLaBase(
-        '/api/v1/rotations', 'rotations', 'rotation-a-moi-b12', 'rotation-du-voisin-b12', $moi
+        '/api/v1/rotations',
+        'rotations',
+        'rotation-a-moi-b12',
+        'rotation-du-voisin-b12',
+        $moi,
     );
 });
 
@@ -323,8 +331,11 @@ test('B12-007 — GET /notifications rend les notifications reellement deposees'
     }
 
     laRouteRegardeVraimentLaBase(
-        '/api/v1/notifications', 'notifications',
-        'notification-a-moi-b12', 'notification-du-voisin-b12', $moi
+        '/api/v1/notifications',
+        'notifications',
+        'notification-a-moi-b12',
+        'notification-du-voisin-b12',
+        $moi,
     );
 });
 
@@ -345,7 +356,11 @@ test('B12-007 — GET /saved-views rend les vues reellement enregistrees', funct
     }
 
     laRouteRegardeVraimentLaBase(
-        '/api/v1/saved-views', 'saved_views', 'vue-a-moi-b12', 'vue-du-voisin-b12', $moi
+        '/api/v1/saved-views',
+        'saved_views',
+        'vue-a-moi-b12',
+        'vue-du-voisin-b12',
+        $moi,
     );
 });
 
@@ -385,8 +400,11 @@ test('B12-007 — GET /llm/use-cases/{u}/prompts rend les versions reellement ve
     $duVoisin = $poser($voisin, 'prompts-du-voisin-b12', 'contenu-du-voisin-b12');
 
     laRouteRegardeVraimentLaBase(
-        "/api/v1/llm/use-cases/{$aMoi}/prompts", 'prompt_template_versions',
-        'contenu-a-moi-b12', 'contenu-du-voisin-b12', $moi
+        "/api/v1/llm/use-cases/{$aMoi}/prompts",
+        'prompt_template_versions',
+        'contenu-a-moi-b12',
+        'contenu-du-voisin-b12',
+        $moi,
     );
 
     // Et le cas d'usage du voisin n'est meme pas atteignable : 404, pas 200 vide
@@ -403,7 +421,7 @@ test('C19-008 — POST /proxy-providers/{p}/test ne repond plus « healthy » en
 
     $this->assertTrue(
         Schema::hasTable($table),
-        "La table {$table} est absente du banc : cette garde ne mesurerait rien."
+        "La table {$table} est absente du banc : cette garde ne mesurerait rien.",
     );
 
     [$moi, $mien] = compteB12('ALPHA');
@@ -434,14 +452,14 @@ test('C19-008 — POST /proxy-providers/{p}/test ne repond plus « healthy » en
         $reponse->status(),
         "🔴 POST /proxy-providers/{p}/test rend {$reponse->status()} au lieu de 501.\n\n"
         . "C'est le constat C19-008 : le SEUL bouton de diagnostic du sous-systeme mandataire "
-        . "repond « en bonne sante » sans rien contacter, et ne rougira jamais — y compris le "
-        . 'jour ou le mandataire EST la cause de la panne.'
+        . 'repond « en bonne sante » sans rien contacter, et ne rougira jamais — y compris le '
+        . 'jour ou le mandataire EST la cause de la panne.',
     );
 
     $this->assertNotSame(
         true,
         $reponse->json('healthy'),
-        'La reponse porte encore `healthy: true` : le mensonge subsiste sous un autre code.'
+        'La reponse porte encore `healthy: true` : le mensonge subsiste sous un autre code.',
     );
 });
 
@@ -495,7 +513,7 @@ test('B12-007 NON-REGRESSION — {0} rend 200 et sa cle sur une base NUE', funct
     $this->assertArrayHasKey(
         $cle,
         (array) $reponse->json(),
-        "{$url} ne porte plus la cle `{$cle}` : le contrat lu par le frontend est rompu."
+        "{$url} ne porte plus la cle `{$cle}` : le contrat lu par le frontend est rompu.",
     );
 })->with('routes_b12_rebranchees');
 

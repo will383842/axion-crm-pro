@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 /**
  * LE PLAFOND DES EXPORTS CSV, écrit UNE SEULE FOIS.
@@ -74,8 +75,8 @@ final class PlafondExport
      * réécrivant à chaque lot par `forPageAfterId()`.
      *
      * @param  Builder<covariant \Illuminate\Database\Eloquent\Model>  $query
-     * @param  callable(\Illuminate\Database\Eloquent\Model):void  $ecrireLigne
-     * @return bool  vrai si l'export a été coupé
+     * @param  callable(Model):void  $ecrireLigne
+     * @return bool vrai si l'export a été coupé
      */
     public static function parcourirBorne(Builder $query, callable $ecrireLigne): bool
     {

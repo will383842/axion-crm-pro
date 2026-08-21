@@ -49,7 +49,7 @@ test('F36-002 — `authorize()` EXISTE sur les controleurs d API', function () {
     expect(method_exists(ApiController::class, 'authorize'))->toBeTrue(
         "`\$this->authorize()` n'existe pas sur ApiController. Les 37 controleurs d'API en "
         . "heritent : tout appel a la couche d'autorisation y est un appel FATAL, et c'est la "
-        . "cause mecanique de F36-001 (« la couche d'autorisation est du code mort »)."
+        . "cause mecanique de F36-001 (« la couche d'autorisation est du code mort »).",
     );
 
     expect(in_array(AuthorizesRequests::class, class_uses_recursive(ApiController::class), true))
@@ -93,7 +93,8 @@ test('F36-002 — une policy appelee a travers la couche est REELLEMENT executee
     // consultee : si Gate ne l'invoquait pas, la valeur sentinelle ne remonterait
     // jamais. C'est le seul moyen de distinguer « la policy dit oui » de
     // « personne n'a demande a la policy ».
-    $temoin = new class {
+    $temoin = new class
+    {
         public bool $appelee = false;
 
         public function view($user, $modele): bool
@@ -112,7 +113,7 @@ test('F36-002 — une policy appelee a travers la couche est REELLEMENT executee
         "La policy n'a pas ete consultee : Gate ne la resout pas. Une couche d'autorisation "
         . "qu'on peut appeler mais qui n'interroge personne ne vaut pas mieux qu'une couche "
         . 'absente — elle est pire, parce qu'
-        . "elle rassure."
+        . 'elle rassure.',
     );
     expect($verdict)->toBeFalse();
 });
@@ -166,18 +167,18 @@ test('F36-001 — combien de controleurs invoquent REELLEMENT la couche : le com
     // compte « zero appel » serait vrai pour la mauvaise raison. Le pire des verts.
     expect($inspectes)->toBeGreaterThan(
         30,
-        "Seulement {$inspectes} controleurs inspectes : le balayage ne voit pas ce qu'il croit voir."
+        "Seulement {$inspectes} controleurs inspectes : le balayage ne voit pas ce qu'il croit voir.",
     );
 
     expect($avecAppel)->toBe(
         [],
-        "🟢 BONNE NOUVELLE, ET IL FAUT AGIR EN CONSEQUENCE : des controleurs invoquent desormais "
+        '🟢 BONNE NOUVELLE, ET IL FAUT AGIR EN CONSEQUENCE : des controleurs invoquent desormais '
         . "la couche d'autorisation, alors que le compte fige ici est ZERO.\n\n"
         . "Ce test n'est pas une interdiction : c'est un COMPTEUR. Le constat F36-001 (« aucune "
         . "policy n'est jamais invoquee ») etait vrai au 2026-08-20 ; il ne l'est plus.\n\n"
-        . "Mets a jour ce test avec le nouveau compte, et surtout : verifie que chaque appel "
+        . 'Mets a jour ce test avec le nouveau compte, et surtout : verifie que chaque appel '
         . "ajoute est accompagne de sa garde. Cabler une policy sans mesurer ce qu'elle refuse, "
         . "c'est refaire B16-004 — une permission posee, une fuite qui reste.\n\n"
-        . "Controleurs concernes :\n  - " . implode("\n  - ", $avecAppel)
+        . "Controleurs concernes :\n  - " . implode("\n  - ", $avecAppel),
     );
 });

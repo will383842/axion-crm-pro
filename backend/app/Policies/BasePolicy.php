@@ -11,11 +11,30 @@ use App\Models\User;
  */
 abstract class BasePolicy
 {
-    public function viewAny(User $user): bool { return $user->hasAnyRole(['owner', 'admin', 'operator', 'viewer']); }
-    public function view(User $user, $model): bool { return $this->sameWorkspace($user, $model); }
-    public function create(User $user): bool { return $user->hasAnyRole(['owner', 'admin', 'operator']); }
-    public function update(User $user, $model): bool { return $this->sameWorkspace($user, $model) && $user->hasAnyRole(['owner', 'admin', 'operator']); }
-    public function delete(User $user, $model): bool { return $this->sameWorkspace($user, $model) && $user->hasAnyRole(['owner', 'admin']); }
+    public function viewAny(User $user): bool
+    {
+        return $user->hasAnyRole(['owner', 'admin', 'operator', 'viewer']);
+    }
+
+    public function view(User $user, $model): bool
+    {
+        return $this->sameWorkspace($user, $model);
+    }
+
+    public function create(User $user): bool
+    {
+        return $user->hasAnyRole(['owner', 'admin', 'operator']);
+    }
+
+    public function update(User $user, $model): bool
+    {
+        return $this->sameWorkspace($user, $model) && $user->hasAnyRole(['owner', 'admin', 'operator']);
+    }
+
+    public function delete(User $user, $model): bool
+    {
+        return $this->sameWorkspace($user, $model) && $user->hasAnyRole(['owner', 'admin']);
+    }
 
     /**
      * Le modèle appartient-il à l'espace de travail courant de l'utilisateur ?

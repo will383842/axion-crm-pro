@@ -42,7 +42,7 @@ class TwoFactorService
 
     public function __construct()
     {
-        $this->g2fa = new Google2FA();
+        $this->g2fa = new Google2FA;
     }
 
     /**
@@ -91,8 +91,8 @@ class TwoFactorService
         }
 
         $user->forceFill([
-            'totp_enabled_at'          => now(),
-            'totp_recovery_codes'      => $hashed,
+            'totp_enabled_at' => now(),
+            'totp_recovery_codes' => $hashed,
             'first_login_completed_at' => now(),
         ])->save();
 

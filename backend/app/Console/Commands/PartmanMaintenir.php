@@ -149,7 +149,6 @@ class PartmanMaintenir extends Command
             return self::FAILURE;
         }
 
-
         try {
             return $this->entretenir($table, $horizonMin);
         } catch (QueryException $e) {
@@ -237,7 +236,7 @@ class PartmanMaintenir extends Command
         }
 
         $horizonAvant = $this->horizon($table);
-        $this->line("Horizon avant maintenance : " . ($horizonAvant ?? 'AUCUNE partition datee'));
+        $this->line('Horizon avant maintenance : ' . ($horizonAvant ?? 'AUCUNE partition datee'));
 
         // ── Le verrou silencieux. On le cherche AVANT d'appeler la maintenance,
         // parce que `run_maintenance` echouerait dessus de facon beaucoup moins

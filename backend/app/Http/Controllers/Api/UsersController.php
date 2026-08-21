@@ -13,6 +13,7 @@ class UsersController extends ApiController
     /**
      * @OA\Get(path="/users", tags={"Users"}, summary="Liste des users du workspace",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Response(response=200, description="OK"))
      */
     public function index(Request $r): JsonResponse
@@ -52,6 +53,7 @@ class UsersController extends ApiController
         } catch (\Throwable $e) {
             Log::error('users.index failed', ['exception' => $e->getMessage()]);
             report($e);
+
             return $this->ok(['data' => [], 'degraded' => true]);
         }
     }
@@ -59,33 +61,47 @@ class UsersController extends ApiController
     /**
      * @OA\Post(path="/users", tags={"Users"}, summary="Invite un user (Sprint 3)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Response(response=501, description="Not implemented"))
      */
-    public function store(Request $r): JsonResponse { return $this->notImplemented('3'); }
+    public function store(Request $r): JsonResponse
+    {
+        return $this->notImplemented('3');
+    }
 
     /**
      * @OA\Put(path="/users/{user}", tags={"Users"}, summary="Update user (rôle, locale) (Sprint 3)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="user", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
      *     @OA\Response(response=501, description="Not implemented"))
      */
-    public function update(Request $r, User $user): JsonResponse {
+    public function update(Request $r, User $user): JsonResponse
+    {
         // Constat B12-001 / F36-005 : la resolution de route rendait
         // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
         // « interdit » confirmerait son existence.
         $this->refuserHorsEspace($user, 'current_workspace_id');
- return $this->notImplemented('3'); }
+
+        return $this->notImplemented('3');
+    }
 
     /**
      * @OA\Delete(path="/users/{user}", tags={"Users"}, summary="Supprime user (Sprint 3)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="user", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
      *     @OA\Response(response=501, description="Not implemented"))
      */
-    public function destroy(User $user): JsonResponse {
+    public function destroy(User $user): JsonResponse
+    {
         // Constat B12-001 / F36-005 : la resolution de route rendait
         // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
         // « interdit » confirmerait son existence.
         $this->refuserHorsEspace($user, 'current_workspace_id');
- return $this->notImplemented('3'); }
+
+        return $this->notImplemented('3');
+    }
 }

@@ -51,7 +51,7 @@ test('B16-001 — TEMOIN : sans secret utilisable, la chaine refuse de se declar
 
     expect($chaine->verifyChain())->toBeFalse(
         "Sans secret, la chaine se declare valide : c'est exactement le defaut B16-001. "
-        . "Elle est coherente avec elle-meme, et ne prouve rien."
+        . 'Elle est coherente avec elle-meme, et ne prouve rien.',
     );
 
     // Et la valeur de developpement publiee dans le code source ne vaut pas
@@ -59,7 +59,7 @@ test('B16-001 — TEMOIN : sans secret utilisable, la chaine refuse de se declar
     config(['services.audit.hash_chain_secret' => AuditHashChain::SECRET_DE_DEVELOPPEMENT]);
     expect((new AuditHashChain)->verifyChain())->toBeFalse(
         'La valeur de developpement est ecrite en clair dans un depot public : '
-        . "l'accepter reviendrait a n'avoir aucun secret."
+        . "l'accepter reviendrait a n'avoir aucun secret.",
     );
 });
 

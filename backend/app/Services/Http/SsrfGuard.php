@@ -2,6 +2,8 @@
 
 namespace App\Services\Http;
 
+use PHPUnit\Framework\TestCase;
+
 /**
  * SSRF guard — refuse les URLs qui pointent vers des IPs privées, link-local,
  * AWS/GCP metadata, loopback. À appeler avant tout fetch HTTP externe.
@@ -151,7 +153,7 @@ class SsrfGuard
             // Pas de conteneur applicatif → on se comporte comme en production.
         }
 
-        return class_exists(\PHPUnit\Framework\TestCase::class, false);
+        return class_exists(TestCase::class, false);
     }
 
     /**
@@ -223,11 +225,15 @@ class SsrfGuard
         } else {
             $a = @dns_get_record($host, DNS_A);
             foreach ($a ?: [] as $r) {
-                if (! empty($r['ip'])) $ips[] = $r['ip'];
+                if (! empty($r['ip'])) {
+                    $ips[] = $r['ip'];
+                }
             }
             $aaaa = @dns_get_record($host, DNS_AAAA);
             foreach ($aaaa ?: [] as $r) {
-                if (! empty($r['ipv6'])) $ips[] = $r['ipv6'];
+                if (! empty($r['ipv6'])) {
+                    $ips[] = $r['ipv6'];
+                }
             }
         }
 
@@ -277,11 +283,12 @@ class SsrfGuard
             if ($remainingBits === 0) {
                 return true;
             }
-            $maskByte = chr(0xff << (8 - $remainingBits) & 0xff);
+            $maskByte = chr(0xFF << (8 - $remainingBits) & 0xFF);
             if ((ord($packedIp[$bytes]) & ord($maskByte)) === (ord($packedRange[$bytes]) & ord($maskByte))) {
                 return true;
             }
         }
+
         return false;
     }
 }

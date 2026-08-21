@@ -96,7 +96,7 @@ test('B16-007 — la route REND ce que le registre contient', function () {
     $this->assertSame(
         1,
         DB::table('ai_act_register')->where('workspace_id', $espace->id)->count(),
-        'Le semis a echoue : la garde ne mesure rien.'
+        'Le semis a echoue : la garde ne mesure rien.',
     );
 
     $reponse = $this->actingAs(compteRegistreIa($espace))->getJson('/api/v1/ai-act/register');
@@ -105,7 +105,7 @@ test('B16-007 — la route REND ce que le registre contient', function () {
     $this->assertCount(
         1,
         (array) $reponse->json('data'),
-        'La route rend le vide alors que le registre contient une entree (constat B16-007).'
+        'La route rend le vide alors que le registre contient une entree (constat B16-007).',
     );
     $this->assertSame('Routeur LLM — classification', $reponse->json('data.0.system_name'));
     // Le champ est un JSONB : il doit sortir en objet, pas en chaine echappee,
@@ -138,7 +138,7 @@ test('B16-007 — TEMOIN : le registre d un AUTRE espace reste invisible', funct
     $this->assertSame(
         [],
         (array) $reponse->json('data'),
-        "Le registre AI Act d'un autre espace de travail est rendu."
+        "Le registre AI Act d'un autre espace de travail est rendu.",
     );
 });
 
@@ -197,7 +197,7 @@ test('B16-007 — l espace de l entree est IMPOSE, jamais choisi par l appelant'
     $this->assertSame(
         0,
         DB::table('ai_act_register')->where('workspace_id', $autre->id)->count(),
-        "Une entree a ete ecrite dans le registre d'un autre espace."
+        "Une entree a ete ecrite dans le registre d'un autre espace.",
     );
     $this->assertSame(1, DB::table('ai_act_register')->where('workspace_id', $mien->id)->count());
 });

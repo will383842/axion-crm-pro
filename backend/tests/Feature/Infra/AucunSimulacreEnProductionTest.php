@@ -234,7 +234,7 @@ test('C18-016 — la carte de la garde couvre TOUTES les liaisons du provider', 
             $couvertes,
             "Le contrat {$abstrait} est branche par MockServicesProvider mais ne figure pas dans "
             . 'carteDesServices() : aucun cas de cette garde ne le mesure. Un service non mesure '
-            . 'est un service qui peut repartir en simulacre en production. Ajoutez-le a la carte.'
+            . 'est un service qui peut repartir en simulacre en production. Ajoutez-le a la carte.',
         );
     }
 
@@ -266,7 +266,7 @@ test('C18-016 — TEMOIN : en TEST, les simulacres se branchent bien (les 14)', 
             "En environnement de TEST, {$contrat} devrait resoudre le simulacre {$simulacre}, "
             . "mais le conteneur rend {$classe}. Un correctif qui interdit les simulacres "
             . 'partout est PIRE que le defaut : il fait tomber toute la suite du depot et '
-            . 'pousse les developpeurs a le contourner.'
+            . 'pousse les developpeurs a le contourner.',
         );
     }
 });
@@ -285,7 +285,7 @@ test('C18-016 — en PRODUCTION, un simulacre explicitement demande est REFUSE (
             . "(drapeau {$drapeau} pose a true). `MockLLMClient` et ses pairs ecrivent des "
             . 'donnees FABRIQUEES en base, sur des fiches de personnes reelles, indiscernables '
             . "des vraies. Il n'existe aucune raison legitime de servir des donnees inventees a "
-            . 'des utilisateurs reels : le refus ne doit pas etre contournable par une variable.'
+            . 'des utilisateurs reels : le refus ne doit pas etre contournable par une variable.',
         );
     }
 });
@@ -304,7 +304,7 @@ test('C18-016 — en PRODUCTION sans AUCUNE variable, le defaut est le service R
             "Sans aucune variable, le conteneur resout {$classe} au lieu de {$reel} pour "
             . "{$contrat}. L'ancien code faisait `env('MOCK_MODE', true)` : le DEFAUT etait le "
             . 'simulacre. Une variable absente suffisait a mettre la production sur des donnees '
-            . 'fabriquees.'
+            . 'fabriquees.',
         );
     }
 });
@@ -319,7 +319,7 @@ test('C18-016 — en PREPRODUCTION aussi, le defaut est le service REEL (les 14)
 
         expect($classe)->toBe(
             $reel,
-            "En preproduction sans variable, {$contrat} resout {$classe} au lieu de {$reel}."
+            "En preproduction sans variable, {$contrat} resout {$classe} au lieu de {$reel}.",
         );
     }
 });
@@ -333,7 +333,7 @@ test('C18-016 — une valeur AMBIGUE ne rebranche pas un simulacre', function ()
             ->toBe(
                 LLMRouterService::class,
                 "MOCK_LLM=« {$valeur} » devrait DESACTIVER le simulacre. Avec un cast `(bool)`, "
-                . 'cette valeur l activait.'
+                . 'cette valeur l activait.',
             );
     }
 });
@@ -360,7 +360,7 @@ test('C18-016 — TEMOIN NEGATIF : la mesure sait reperer un service laisse en s
         MockSmtpProber::class,
         'Le temoin negatif ne fonctionne plus : on a cable un simulacre en dur, en production, '
         . "et la mesure ne l'a pas vu. Si elle ne voit pas CE simulacre-la, les cas verts "
-        . 'ci-dessus ne prouvent rien. Verifiez classeResolue().'
+        . 'ci-dessus ne prouvent rien. Verifiez classeResolue().',
     );
 
     // Et le meme contrat, sans sabotage, rend bien le service reel : la difference est donc

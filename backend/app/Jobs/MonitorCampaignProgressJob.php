@@ -83,8 +83,8 @@ class MonitorCampaignProgressJob implements ShouldQueue
         // les 60 s. On part donc de l'etat courant : a defaut de savoir
         // recompter, le moniteur ne DEFAIT rien.
         $aggregates = [
-            'runs_completed'        => (int) $campaign->runs_completed,
-            'companies_created'     => (int) $campaign->companies_created,
+            'runs_completed' => (int) $campaign->runs_completed,
+            'companies_created' => (int) $campaign->companies_created,
             'duration_seconds_used' => (int) $campaign->duration_seconds_used,
         ];
 

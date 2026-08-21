@@ -13,17 +13,18 @@ uses(TestCase::class, RefreshDatabase::class);
 function makeNotifUser(): User
 {
     $workspace = Workspace::create([
-        'id'    => (string) Str::uuid(),
-        'slug'  => 'notif-ws-' . Str::random(6),
-        'name'  => 'Notif WS',
+        'id' => (string) Str::uuid(),
+        'slug' => 'notif-ws-' . Str::random(6),
+        'name' => 'Notif WS',
     ]);
+
     return User::create([
-        'id'                            => (string) Str::uuid(),
-        'email'                         => 'notif' . Str::random(4) . '@test.local',
-        'name'                          => 'Notif User',
-        'password_hash'                 => Hash::make('SomePass!1234'),
-        'current_workspace_id'          => $workspace->id,
-        'first_login_completed_at'      => now(),
+        'id' => (string) Str::uuid(),
+        'email' => 'notif' . Str::random(4) . '@test.local',
+        'name' => 'Notif User',
+        'password_hash' => Hash::make('SomePass!1234'),
+        'current_workspace_id' => $workspace->id,
+        'first_login_completed_at' => now(),
     ]);
 }
 

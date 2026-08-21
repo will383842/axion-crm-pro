@@ -43,22 +43,22 @@ class ImportMediaFromOpendatasoft extends Command
     /** @var array<string,array<string,mixed>> */
     private const SOURCES = [
         'cppap' => [
-            'dataset'    => 'liste-des-publications-de-presse',
+            'dataset' => 'liste-des-publications-de-presse',
             'source_tag' => 'cppap',
             'media_type' => 'presse_autre',
-            'map'        => ['name' => 'titre', 'publisher' => 'editeur', 'department' => 'departement', 'cppap' => 'ndeg_cppap'],
+            'map' => ['name' => 'titre', 'publisher' => 'editeur', 'department' => 'departement', 'cppap' => 'ndeg_cppap'],
         ],
         'spel' => [
-            'dataset'    => 'liste-des-services-de-presse-en-ligne-reconnus',
+            'dataset' => 'liste-des-services-de-presse-en-ligne-reconnus',
             'source_tag' => 'spel',
             'media_type' => 'portail_web',
-            'map'        => ['name' => 'service', 'publisher' => 'editeur', 'department' => 'departement', 'cppap' => 'numero_cppap', 'website' => 'url'],
+            'map' => ['name' => 'service', 'publisher' => 'editeur', 'department' => 'departement', 'cppap' => 'numero_cppap', 'website' => 'url'],
         ],
         'agences' => [
-            'dataset'    => 'liste-des-agences-de-presse-agreees',
+            'dataset' => 'liste-des-agences-de-presse-agreees',
             'source_tag' => 'agence',
             'media_type' => 'agence_presse',
-            'map'        => ['name' => 'identification_denomination_sociale'],
+            'map' => ['name' => 'identification_denomination_sociale'],
         ],
     ];
 
@@ -112,20 +112,20 @@ class ImportMediaFromOpendatasoft extends Command
             $website = isset($cfg['map']['website']) ? $this->normalizeUrl($rec[$cfg['map']['website']] ?? null) : null;
             $cppap = isset($cfg['map']['cppap']) ? mb_substr(trim((string) ($rec[$cfg['map']['cppap']] ?? '')), 0, 40) ?: null : null;
             $rows[] = [
-                'workspace_id'    => $workspaceId,
-                'name'            => mb_substr($name, 0, 240),
-                'media_type'      => $cfg['media_type'],
-                'media_family'    => 'editorial',
-                'periodicity'     => self::derivePeriodicity($cppap, $rec),
-                'publisher'       => isset($cfg['map']['publisher']) ? mb_substr(trim((string) ($rec[$cfg['map']['publisher']] ?? '')), 0, 240) ?: null : null,
+                'workspace_id' => $workspaceId,
+                'name' => mb_substr($name, 0, 240),
+                'media_type' => $cfg['media_type'],
+                'media_family' => 'editorial',
+                'periodicity' => self::derivePeriodicity($cppap, $rec),
+                'publisher' => isset($cfg['map']['publisher']) ? mb_substr(trim((string) ($rec[$cfg['map']['publisher']] ?? '')), 0, 240) ?: null : null,
                 'department_code' => isset($cfg['map']['department']) ? mb_substr(trim((string) ($rec[$cfg['map']['department']] ?? '')), 0, 5) ?: null : null,
-                'cppap_number'    => $cppap,
-                'website'         => $website,
-                'website_status'  => $website ? 'found' : 'pending',
-                'enrich_status'   => 'pending',
-                'source'          => $cfg['source_tag'],
-                'created_at'      => $now,
-                'updated_at'      => $now,
+                'cppap_number' => $cppap,
+                'website' => $website,
+                'website_status' => $website ? 'found' : 'pending',
+                'enrich_status' => 'pending',
+                'source' => $cfg['source_tag'],
+                'created_at' => $now,
+                'updated_at' => $now,
             ];
         }
 
@@ -224,15 +224,15 @@ class ImportMediaFromOpendatasoft extends Command
         }
 
         return match (true) {
-            str_contains($s, 'quotidien') || str_contains($s, 'journalier')        => 'quotidien',
-            str_contains($s, 'hebdomadaire') || str_contains($s, 'hebdo')          => 'hebdomadaire',
-            str_contains($s, 'bimensuel')                                          => 'bimensuel',
-            str_contains($s, 'bimestriel')                                         => 'bimestriel',
-            str_contains($s, 'trimestriel')                                        => 'trimestriel',
-            str_contains($s, 'semestriel')                                         => 'semestriel',
-            str_contains($s, 'mensuel')                                            => 'mensuel',
-            str_contains($s, 'annuel') || str_contains($s, 'annuelle')             => 'annuel',
-            default                                                                => 'autre',
+            str_contains($s, 'quotidien') || str_contains($s, 'journalier') => 'quotidien',
+            str_contains($s, 'hebdomadaire') || str_contains($s, 'hebdo') => 'hebdomadaire',
+            str_contains($s, 'bimensuel') => 'bimensuel',
+            str_contains($s, 'bimestriel') => 'bimestriel',
+            str_contains($s, 'trimestriel') => 'trimestriel',
+            str_contains($s, 'semestriel') => 'semestriel',
+            str_contains($s, 'mensuel') => 'mensuel',
+            str_contains($s, 'annuel') || str_contains($s, 'annuelle') => 'annuel',
+            default => 'autre',
         };
     }
 

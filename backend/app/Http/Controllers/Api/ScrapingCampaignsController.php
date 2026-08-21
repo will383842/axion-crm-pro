@@ -6,8 +6,8 @@ use App\Events\ScraperRunCancelled;
 use App\Http\Requests\StoreScrapingCampaignRequest;
 use App\Http\Requests\UpdateScrapingCampaignRequest;
 use App\Http\Resources\ScrapingCampaignResource;
-use App\Jobs\LaunchCampaignJob;
 use App\Jobs\DispatchScrapeJob;
+use App\Jobs\LaunchCampaignJob;
 use App\Jobs\LaunchZoneScrapingJob;
 use App\Jobs\MonitorCampaignProgressJob;
 use App\Models\ScrapingCampaign;
@@ -38,8 +38,10 @@ class ScrapingCampaignsController extends ApiController
     /**
      * @OA\Get(path="/campaigns", tags={"Campaigns"}, summary="Liste paginée des campagnes",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="status", in="query", @OA\Schema(type="string")),
      *     @OA\Parameter(name="search", in="query", @OA\Schema(type="string")),
+     *
      *     @OA\Response(response=200, description="OK"))
      */
     public function index(Request $r): JsonResponse
@@ -73,7 +75,7 @@ class ScrapingCampaignsController extends ApiController
             if ($search = $r->query('search')) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'ILIKE', "%{$search}%")
-                      ->orWhere('description', 'ILIKE', "%{$search}%");
+                        ->orWhere('description', 'ILIKE', "%{$search}%");
                 });
             }
 
@@ -82,15 +84,16 @@ class ScrapingCampaignsController extends ApiController
             return $this->ok([
                 'data' => ScrapingCampaignResource::collection($page->items()),
                 'meta' => [
-                    'total'        => $page->total(),
-                    'per_page'     => $page->perPage(),
+                    'total' => $page->total(),
+                    'per_page' => $page->perPage(),
                     'current_page' => $page->currentPage(),
-                    'last_page'    => $page->lastPage(),
+                    'last_page' => $page->lastPage(),
                 ],
             ]);
         } catch (\Throwable $e) {
             Log::error('campaigns.index failed', ['exception' => $e->getMessage()]);
             report($e);
+
             return $this->ok(['data' => [], 'meta' => ['total' => 0], 'degraded' => true]);
         }
     }
@@ -98,6 +101,7 @@ class ScrapingCampaignsController extends ApiController
     /**
      * @OA\Post(path="/campaigns", tags={"Campaigns"}, summary="Crée une campagne (status=draft ou scheduled)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Response(response=201, description="Created"))
      */
     public function store(StoreScrapingCampaignRequest $r): JsonResponse
@@ -115,19 +119,19 @@ class ScrapingCampaignsController extends ApiController
             : 'draft';
 
         $campaign = ScrapingCampaign::create([
-            'workspace_id'            => $workspaceId,
-            'created_by'              => $user->id,
-            'name'                    => $validated['name'],
-            'description'             => $validated['description'] ?? null,
-            'status'                  => $status,
-            'sources'                 => $validated['sources'],
-            'zones'                   => $validated['zones'],
-            'max_companies'           => $validated['max_companies'] ?? 1000,
-            'max_duration_minutes'    => $validated['max_duration_minutes'] ?? 180,
+            'workspace_id' => $workspaceId,
+            'created_by' => $user->id,
+            'name' => $validated['name'],
+            'description' => $validated['description'] ?? null,
+            'status' => $status,
+            'sources' => $validated['sources'],
+            'zones' => $validated['zones'],
+            'max_companies' => $validated['max_companies'] ?? 1000,
+            'max_duration_minutes' => $validated['max_duration_minutes'] ?? 180,
             'max_requests_per_minute' => $validated['max_requests_per_minute'] ?? 30,
-            'per_source_limits'       => $validated['per_source_limits'] ?? null,
-            'scheduled_at'            => $validated['scheduled_at'] ?? null,
-            'expires_at'              => $validated['expires_at'] ?? null,
+            'per_source_limits' => $validated['per_source_limits'] ?? null,
+            'scheduled_at' => $validated['scheduled_at'] ?? null,
+            'expires_at' => $validated['expires_at'] ?? null,
         ]);
 
         return response()->json(new ScrapingCampaignResource($campaign), 201);
@@ -145,6 +149,7 @@ class ScrapingCampaignsController extends ApiController
         $campaign->load(['runs' => function ($q) {
             $q->latest('id')->limit(20);
         }]);
+
         return $this->ok(new ScrapingCampaignResource($campaign));
     }
 
@@ -159,13 +164,14 @@ class ScrapingCampaignsController extends ApiController
         }
         if ($campaign->status !== 'draft') {
             return response()->json([
-                'error'   => 'invalid_state',
+                'error' => 'invalid_state',
                 'message' => "Modification autorisée uniquement en status=draft (actuel : {$campaign->status}).",
-                'status'  => $campaign->status,
+                'status' => $campaign->status,
             ], 422);
         }
 
         $campaign->update($r->validated());
+
         return $this->ok(new ScrapingCampaignResource($campaign->fresh()));
     }
 
@@ -179,6 +185,7 @@ class ScrapingCampaignsController extends ApiController
             abort(404);
         }
         $campaign->delete();
+
         return $this->ok(['deleted' => true]);
     }
 
@@ -193,17 +200,17 @@ class ScrapingCampaignsController extends ApiController
         }
         if (! $campaign->canStart()) {
             return response()->json([
-                'error'   => 'invalid_state',
+                'error' => 'invalid_state',
                 'message' => "Impossible de démarrer une campagne au statut '{$campaign->status}'.",
-                'status'  => $campaign->status,
+                'status' => $campaign->status,
             ], 422);
         }
 
         $campaign->update([
-            'status'        => 'running',
-            'started_at'    => $campaign->started_at ?? now(),
+            'status' => 'running',
+            'started_at' => $campaign->started_at ?? now(),
             'paused_reason' => null,
-            'paused_at'     => null,
+            'paused_at' => null,
         ]);
 
         dispatch((new LaunchCampaignJob($campaign->id))
@@ -223,15 +230,15 @@ class ScrapingCampaignsController extends ApiController
         }
         if (! $campaign->canPause()) {
             return response()->json([
-                'error'   => 'invalid_state',
+                'error' => 'invalid_state',
                 'message' => "Impossible de mettre en pause une campagne au statut '{$campaign->status}'.",
-                'status'  => $campaign->status,
+                'status' => $campaign->status,
             ], 422);
         }
 
         $campaign->update([
-            'status'        => 'paused',
-            'paused_at'     => now(),
+            'status' => 'paused',
+            'paused_at' => now(),
             'paused_reason' => 'manual',
         ]);
 
@@ -257,15 +264,15 @@ class ScrapingCampaignsController extends ApiController
         }
         if (! $campaign->canResume()) {
             return response()->json([
-                'error'   => 'invalid_state',
+                'error' => 'invalid_state',
                 'message' => "Impossible de reprendre une campagne au statut '{$campaign->status}'.",
-                'status'  => $campaign->status,
+                'status' => $campaign->status,
             ], 422);
         }
 
         $campaign->update([
-            'status'        => 'running',
-            'paused_at'     => null,
+            'status' => 'running',
+            'paused_at' => null,
             'paused_reason' => null,
         ]);
 
@@ -288,14 +295,14 @@ class ScrapingCampaignsController extends ApiController
         }
         if (! $campaign->canCancel()) {
             return response()->json([
-                'error'   => 'invalid_state',
+                'error' => 'invalid_state',
                 'message' => "Impossible d'annuler une campagne au statut '{$campaign->status}'.",
-                'status'  => $campaign->status,
+                'status' => $campaign->status,
             ], 422);
         }
 
         $campaign->update([
-            'status'      => 'cancelled',
+            'status' => 'cancelled',
             'finished_at' => now(),
         ]);
 
@@ -309,9 +316,9 @@ class ScrapingCampaignsController extends ApiController
             DB::table('scraper_runs')
                 ->whereIn('id', $runsToCancel)
                 ->update([
-                    'status'      => 'cancelled',
+                    'status' => 'cancelled',
                     'finished_at' => now(),
-                    'error'       => 'Campagne annulée',
+                    'error' => 'Campagne annulée',
                 ]);
 
             // 🔴 CONSTAT C18-008. Annuler une campagne ne purge PAS la file :
@@ -326,32 +333,32 @@ class ScrapingCampaignsController extends ApiController
             // qui tourne. Les deux relisent ce statut et la cle ci-dessous.
             foreach ($runsToCancel as $runId) {
                 try {
-        // 🔴 SITE JUMEAU DE C18-011, PORTE LE 2026-08-21 — ET IL CASSAIT DEUX FOIS.
-        //
-        // Cette clef traverse la frontiere PHP <-> Node : `workers/src/scrapers/base.ts`
-        // (`PREFIXE_ANNULATION`, l. 56) la relit avant chaque scrape. Elle etait
-        // ecrite par la facade `Redis` NUE, donc sur la connexion `default` :
-        //
-        //     PHP  ecrivait  axion_crm_pro_database_cancelled:scraper-run:42  (base 0)
-        //     Node lisait    cancelled:scraper-run:42                          (base 1)
-        //
-        // Deux divergences INDEPENDANTES — le prefixe et le numero de base —,
-        // chacune suffisante a elle seule pour que l'arret d'urgence n'arrete
-        // rien cote Node. C'est exactement la panne de C18-011, a un autre
-        // endroit : le meme defaut, non porte. Vingt-sixieme fois (motif A-011).
-        //
-        // ⚠️ LES TROIS SITES BOUGENT ENSEMBLE, ET C'EST OBLIGATOIRE. Deplacer
-        // les deux ecritures sans la lecture casserait l'annulation cote PHP,
-        // qui elle FONCTIONNE aujourd'hui — precisement parce que les trois
-        // partagent la meme connexion fautive. C'est tout ou rien :
-        //     ecriture  Api/ScraperRunsController::destroy()
-        //     ecriture  Api/ScrapingCampaignsController::cancel()
-        //     lecture   Jobs/LaunchZoneScrapingJob::motifArretDistant()
+                    // 🔴 SITE JUMEAU DE C18-011, PORTE LE 2026-08-21 — ET IL CASSAIT DEUX FOIS.
+                    //
+                    // Cette clef traverse la frontiere PHP <-> Node : `workers/src/scrapers/base.ts`
+                    // (`PREFIXE_ANNULATION`, l. 56) la relit avant chaque scrape. Elle etait
+                    // ecrite par la facade `Redis` NUE, donc sur la connexion `default` :
+                    //
+                    //     PHP  ecrivait  axion_crm_pro_database_cancelled:scraper-run:42  (base 0)
+                    //     Node lisait    cancelled:scraper-run:42                          (base 1)
+                    //
+                    // Deux divergences INDEPENDANTES — le prefixe et le numero de base —,
+                    // chacune suffisante a elle seule pour que l'arret d'urgence n'arrete
+                    // rien cote Node. C'est exactement la panne de C18-011, a un autre
+                    // endroit : le meme defaut, non porte. Vingt-sixieme fois (motif A-011).
+                    //
+                    // ⚠️ LES TROIS SITES BOUGENT ENSEMBLE, ET C'EST OBLIGATOIRE. Deplacer
+                    // les deux ecritures sans la lecture casserait l'annulation cote PHP,
+                    // qui elle FONCTIONNE aujourd'hui — precisement parce que les trois
+                    // partagent la meme connexion fautive. C'est tout ou rien :
+                    //     ecriture  Api/ScraperRunsController::destroy()
+                    //     ecriture  Api/ScrapingCampaignsController::cancel()
+                    //     lecture   Jobs/LaunchZoneScrapingJob::motifArretDistant()
                     Redis::connection(DispatchScrapeJob::CONNEXION_REDIS)
                         ->setex(LaunchZoneScrapingJob::CLE_ANNULATION . $runId, 3600, '1');
                 } catch (\Throwable $e) {
                     Log::warning('campaigns.cancel: Redis flag failed', [
-                        'run_id'    => $runId,
+                        'run_id' => $runId,
                         'exception' => $e->getMessage(),
                     ]);
                 }
@@ -403,7 +410,7 @@ class ScrapingCampaignsController extends ApiController
         } catch (\Throwable $e) {
             Log::warning('campaigns.stats failed', [
                 'campaign_id' => $campaign->id,
-                'exception'   => $e->getMessage(),
+                'exception' => $e->getMessage(),
             ]);
         }
 
@@ -421,10 +428,10 @@ class ScrapingCampaignsController extends ApiController
         }
 
         return $this->ok([
-            'campaign'             => new ScrapingCampaignResource($campaign->fresh()),
-            'per_source'           => $perSource,
-            'per_zone'             => $perZone,
-            'last_events'          => $lastEvents,
+            'campaign' => new ScrapingCampaignResource($campaign->fresh()),
+            'per_source' => $perSource,
+            'per_zone' => $perZone,
+            'last_events' => $lastEvents,
             'companies_per_minute' => $companiesLastMinute,
         ]);
     }
@@ -453,12 +460,14 @@ class ScrapingCampaignsController extends ApiController
     {
         if (app()->bound('workspace.id')) {
             $id = app('workspace.id');
+
             return $id !== null && $id !== '' ? (string) $id : null;
         }
         $user = request()->user();
         if ($user && $user->current_workspace_id) {
             return (string) $user->current_workspace_id;
         }
+
         return null;
     }
 }

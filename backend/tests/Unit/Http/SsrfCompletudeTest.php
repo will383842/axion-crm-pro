@@ -95,7 +95,7 @@ const SSRF_SIGNATURES_EMETTEUR = '/Http::|GuzzleHttp|curl_init|ProxiedHttpClient
  * exactement ainsi que les deux emissions de MentionsLegales et celles d'INSEE
  * ont d'abord echappe a la methode A.
  *
- * @return list<array{int, string}>  [ligne de debut, texte de l'instruction]
+ * @return list<array{int, string}> [ligne de debut, texte de l'instruction]
  */
 function ssrfCompletudeInstructions(string $source): array
 {
@@ -172,7 +172,7 @@ function ssrfCompletudeEstChaineHttp(string $instruction): bool
  * Extrait, dans une instruction, les emissions dont le 1er argument porte une
  * VARIABLE — c'est-a-dire dont l'URL vient (au moins en partie) de la donnee.
  *
- * @return list<string>  expressions normalisees, ex. `get($base . $path)`
+ * @return list<string> expressions normalisees, ex. `get($base . $path)`
  */
 function ssrfCompletudeEmissionsVariables(string $instruction): array
 {
@@ -217,7 +217,7 @@ function ssrfCompletudeEmissionsVariables(string $instruction): array
  * Elle rate ce qui est ecrit sur plusieurs lignes ; elle attrape ce que la
  * decoupe en instructions rate. Les deux servent a se contredire.
  *
- * @return list<int>  numeros de ligne
+ * @return list<int> numeros de ligne
  */
 function ssrfCompletudeLignesSuspectes(string $source): array
 {
@@ -225,7 +225,7 @@ function ssrfCompletudeLignesSuspectes(string $source): array
     foreach (explode("\n", $source) as $i => $texte) {
         if (preg_match(
             '/->(get|post|put|patch|delete|head|send)\(\s*(\$|"[^"]*\{\$|[A-Za-z_:\\\\]+\s*\.\s*\$)/',
-            $texte
+            $texte,
         )) {
             $lignes[] = $i + 1;
         }
@@ -242,7 +242,7 @@ function ssrfCompletudeLignesSuspectes(string $source): array
  * seul caractere. L'imprecision est d'au plus une ligne, et elle ne peut que
  * RETRECIR la plage — donc jamais faire passer une emission pour gardee.
  *
- * @return list<array{int, int, string}>  [debut, fin, texte]
+ * @return list<array{int, int, string}> [debut, fin, texte]
  */
 function ssrfCompletudePlagesFonctions(string $source): array
 {
@@ -405,16 +405,14 @@ function ssrfCompletudeExemptions(): array
         // ni `/`, ni `:`, ni `@`, ni `?` : rien qui puisse deplacer l'hote hors
         // de `api.pwnedpasswords.com`. Un `SsrfGuard::check()` y rendrait
         // toujours le meme verdict, sur la meme constante.
-        'app/Services/Auth/HibpChecker.php::get(self::API_BASE_URL . $prefix)' =>
-            'hote constant (API_BASE_URL) + 5 caracteres hexadecimaux issus de sha1() ; '
+        'app/Services/Auth/HibpChecker.php::get(self::API_BASE_URL . $prefix)' => 'hote constant (API_BASE_URL) + 5 caracteres hexadecimaux issus de sha1() ; '
             . 'aucune donnee ne peut deplacer l\'hote.',
 
         // `HttpInseeClient::searchPaginated()` — mesure faite dans le fichier :
         //     $endpoint = $hasGeo ? '/siret' : '/siren';
         // Deux litteraux, choisis par un booleen. La donnee (`$criteria`) decide
         // LEQUEL des deux, jamais leur contenu.
-        'app/Services/Insee/HttpInseeClient.php::get(self::BASE_URL . $endpoint)' =>
-            'hote constant (BASE_URL) + $endpoint choisi entre deux litteraux \'/siret\' et '
+        'app/Services/Insee/HttpInseeClient.php::get(self::BASE_URL . $endpoint)' => 'hote constant (BASE_URL) + $endpoint choisi entre deux litteraux \'/siret\' et '
             . '\'/siren\' ; la donnee choisit la branche, pas la chaine.',
     ];
 }
@@ -435,12 +433,12 @@ test('TEMOIN — l enumerateur trouve quelque chose (il ne juge pas zero fichier
     expect(count($fichiers))->toBeGreaterThan(
         40,
         'L\'enumerateur ne voit presque plus de fichiers dans app/Services + app/Jobs (mesure du '
-        . '2026-08-20 : 73). Tout le reste de ce fichier passerait au vert SANS RIEN LIRE.'
+        . '2026-08-20 : 73). Tout le reste de ce fichier passerait au vert SANS RIEN LIRE.',
     );
     expect(count($emetteurs))->toBeGreaterThan(
         10,
         'L\'enumerateur ne reconnait presque plus d\'emetteur HTTP (mesure du 2026-08-20 : 20). '
-        . 'La signature de detection ne correspond plus au code : la completude n\'est plus mesuree.'
+        . 'La signature de detection ne correspond plus au code : la completude n\'est plus mesuree.',
     );
 });
 
@@ -467,11 +465,11 @@ test('TEMOIN — l enumerateur VOIT un appel non garde qu on lui presente', func
     expect($sites)->toHaveCount(
         1,
         "L'enumerateur ne voit pas `Http::…->get(\$website . '/…')`. C'est LE cas que le constat "
-        . 'C19-001 decrit ; s\'il passe inapercu, la garde de completude ne mesure rien du tout.'
+        . 'C19-001 decrit ; s\'il passe inapercu, la garde de completude ne mesure rien du tout.',
     );
     expect($sites[0]['gardee'])->toBeFalse(
         'L\'enumerateur declare gardee une methode qui ne mentionne meme pas SsrfGuard : le '
-        . 'critere « garde presente » est casse, et tous les verdicts de ce fichier sont faux.'
+        . 'critere « garde presente » est casse, et tous les verdicts de ce fichier sont faux.',
     );
 });
 
@@ -500,7 +498,7 @@ test('TEMOIN — l enumerateur ne crie PAS sur un appel correctement garde', fun
     expect($sites[0]['gardee'])->toBeTrue(
         'Une methode qui appelle pourtant SsrfGuard est declaree NON gardee : la garde de '
         . 'completude rougirait eternellement, ce qui la rend inutilisable — donc desactivee, '
-        . 'donc absente. Un faux positif tue une garde aussi surement qu\'un faux negatif.'
+        . 'donc absente. Un faux positif tue une garde aussi surement qu\'un faux negatif.',
     );
 });
 
@@ -517,7 +515,7 @@ test('TEMOIN — sur le VRAI service, garde retiree, l enumerateur rougit aux 4 
         4,
         'DomainFinderService ne presente plus 4 emissions a URL variable (mesure du 2026-08-20 : '
         . 'lignes 235, 325, 357, 513). Le service a change de forme : cette garde doit etre relue, '
-        . 'pas simplement remise au vert.'
+        . 'pas simplement remise au vert.',
     );
 
     $mutant = str_replace('SsrfGuard', 'AucuneGarde', $reel);
@@ -528,7 +526,7 @@ test('TEMOIN — sur le VRAI service, garde retiree, l enumerateur rougit aux 4 
         4,
         'Garde retiree, l\'enumerateur ne signale pas les 4 emissions de DomainFinderService. '
         . 'Il aurait donc laisse passer l\'etat d\'AVANT la reparation : cette garde de completude '
-        . 'ne prouve rien.'
+        . 'ne prouve rien.',
     );
 });
 
@@ -561,10 +559,10 @@ test('TEMOIN — les deux methodes d enumeration ne se contredisent pas', functi
 
     expect($manquants)->toBe(
         [],
-        "La methode B (regex) voit des emissions que la methode A (tokenisation) ne voit pas : "
+        'La methode B (regex) voit des emissions que la methode A (tokenisation) ne voit pas : '
         . implode(', ', $manquants)
         . '. L\'enumeration principale a un angle mort — ces sites ne sont donc PAS verifies, '
-        . 'et le vert de la garde de completude ci-dessous ne couvre pas ce qu\'il pretend couvrir.'
+        . 'et le vert de la garde de completude ci-dessous ne couvre pas ce qu\'il pretend couvrir.',
     );
 });
 
@@ -597,15 +595,15 @@ test('C19-001 — toute emission HTTP a URL non constante passe par SsrfGuard', 
     expect($total)->toBeGreaterThan(
         4,
         'L\'enumerateur ne trouve presque plus d\'emission a URL variable (mesure du 2026-08-20 : '
-        . '9). Le verdict « tout est garde » serait vrai par vacuite.'
+        . '9). Le verdict « tout est garde » serait vrai par vacuite.',
     );
 
     expect($nus)->toBe(
         [],
-        "Des emissions HTTP consomment une URL issue de la DONNEE sans que leur methode ne "
+        'Des emissions HTTP consomment une URL issue de la DONNEE sans que leur methode ne '
         . "connaisse SsrfGuard :\n  " . implode("\n  ", $nus)
         . "\n\nC'est le constat C19-001, non ferme. Soit la garde y est branchee, soit l'hote y est "
-        . 'prouve constant et le site rejoint la table des exemptions AVEC SON MOTIF ECRIT.'
+        . 'prouve constant et le site rejoint la table des exemptions AVEC SON MOTIF ECRIT.',
     );
 
     // Une exemption qui ne correspond plus a rien est un mensonge qui dort :
@@ -616,7 +614,7 @@ test('C19-001 — toute emission HTTP a URL non constante passe par SsrfGuard', 
         'Ces exemptions ne correspondent plus a aucun site du code : '
         . implode(', ', $orphelines)
         . '. Une exemption perimee est une dispense accordee a personne — elle finit par couvrir '
-        . 'un site voisin qu\'on n\'a jamais examine.'
+        . 'un site voisin qu\'on n\'a jamais examine.',
     );
 });
 
@@ -656,12 +654,12 @@ test('C19-001 — l inventaire des emetteurs HTTP est a jour', function () {
         'Nouveaux emetteurs HTTP dans le perimetre, jamais examines pour SSRF : '
         . implode(', ', $nouveaux)
         . '. Le patron A-011 de ce depot est precisement celui-la : un service de plus, et le '
-        . 'correctif qui n\'est pas porte. Lire le fichier, puis l\'ajouter a cette liste.'
+        . 'correctif qui n\'est pas porte. Lire le fichier, puis l\'ajouter a cette liste.',
     );
     expect($disparus)->toBe(
         [],
         'Ces emetteurs ont disparu de l\'inventaire : ' . implode(', ', $disparus)
         . '. Soit ils ont ete supprimes (retirer la ligne), soit la detection ne les reconnait '
-        . 'plus — et dans ce second cas ils ne sont PLUS verifies du tout.'
+        . 'plus — et dans ce second cas ils ne sont PLUS verifies du tout.',
     );
 });

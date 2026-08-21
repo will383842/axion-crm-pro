@@ -73,6 +73,6 @@ return Application::configure(basePath: dirname(__DIR__))
         // Un 401 est un contrat. Un 500 dit « le serveur est casse » a un client
         // qui a simplement oublie de se connecter.
         $exceptions->shouldRenderJsonWhen(
-            fn ($request, $e) => $request->is('api/*') || $request->expectsJson()
+            fn ($request, $e) => $request->is('api/*') || $request->expectsJson(),
         );
     })->create();

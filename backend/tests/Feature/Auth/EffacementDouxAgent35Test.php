@@ -62,6 +62,7 @@ use App\Models\Company;
 use App\Models\Contact;
 use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -129,7 +130,7 @@ test('B10-016 TEMOIN — les quatre tables du lot portent reellement une colonne
     $attendues = ['companies', 'contacts', 'users', 'workspaces'];
     $portantes = array_values(array_filter(
         $attendues,
-        fn (string $t): bool => Schema::hasTable($t) && Schema::hasColumn($t, 'deleted_at')
+        fn (string $t): bool => Schema::hasTable($t) && Schema::hasColumn($t, 'deleted_at'),
     ));
 
     // Egalite stricte, pas `toContain` : si une table disparait du schema, la
@@ -377,11 +378,11 @@ test('B10-016 — tout modele assis sur une table a deleted_at declare SoftDelet
 
     foreach (glob(app_path('Models') . '/*.php') ?: [] as $fichier) {
         $classe = 'App\\Models\\' . basename($fichier, '.php');
-        if (! class_exists($classe) || ! is_subclass_of($classe, \Illuminate\Database\Eloquent\Model::class)) {
+        if (! class_exists($classe) || ! is_subclass_of($classe, Model::class)) {
             continue;
         }
 
-        $table = (new $classe())->getTable();
+        $table = (new $classe)->getTable();
         if (! Schema::hasTable($table) || ! Schema::hasColumn($table, 'deleted_at')) {
             continue;
         }

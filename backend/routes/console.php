@@ -108,9 +108,9 @@ Schedule::command('audit:verify-chain')
     ->dailyAt('03:00')
     ->onFailure(function (): void {
         Log::critical(
-            AuditVerifyChain::PREFIXE_ALERTE . " : la tache planifiee de 03:00 "
+            AuditVerifyChain::PREFIXE_ALERTE . ' : la tache planifiee de 03:00 '
             . "s'est terminee en echec. La chaine d'audit est rompue ou "
-            . 'inverifiable — voir les lignes precedentes du journal.'
+            . 'inverifiable — voir les lignes precedentes du journal.',
         );
     });
 // 🔴 B11-003 (S1) — la portee de `retention:purge` est desormais OBLIGATOIRE :
@@ -143,7 +143,7 @@ Schedule::command(PartmanMaintenir::SIGNATURE_PLANIFIEE)
         Log::critical(
             PartmanMaintenir::PREFIXE_ALERTE . " : la tache planifiee de 01:30 s'est terminee en "
             . "echec. Les partitions a venir d'audit_logs ne sont peut-etre plus creees, et la "
-            . "retention de 24 mois n'est plus appliquee — voir les lignes precedentes du journal."
+            . "retention de 24 mois n'est plus appliquee — voir les lignes precedentes du journal.",
         );
     });
 Schedule::command('rgpd:anonymize-ips')->dailyAt('04:30');
@@ -305,7 +305,7 @@ $purgeRgpdRetenue = function (string $commande): bool {
         Log::warning(
             "[RGPD] Purge « {$commande} » SAUTEE : CRM_PURGE_ENABLED n'est pas a true. "
             . "L'echeance CNIL correspondante n'est tenue par aucun automatisme tant que "
-            . 'ce drapeau reste ferme (config crm.purges_enabled).'
+            . 'ce drapeau reste ferme (config crm.purges_enabled).',
         );
     }
 

@@ -16,6 +16,7 @@ class AuditLogsController extends ApiController
     /**
      * @OA\Get(path="/audit-logs", tags={"AuditLogs"}, summary="Audit logs paginés (hash-chained)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Response(response=200, description="OK"))
      */
     public function index(Request $r): JsonResponse
@@ -55,15 +56,16 @@ class AuditLogsController extends ApiController
             return $this->ok([
                 'data' => $page->items(),
                 'meta' => [
-                    'total'        => $page->total(),
-                    'per_page'     => $page->perPage(),
+                    'total' => $page->total(),
+                    'per_page' => $page->perPage(),
                     'current_page' => $page->currentPage(),
-                    'last_page'    => $page->lastPage(),
+                    'last_page' => $page->lastPage(),
                 ],
             ]);
         } catch (\Throwable $e) {
             Log::error('audit-logs.index failed', ['exception' => $e->getMessage()]);
             report($e);
+
             return $this->ok(['data' => [], 'degraded' => true]);
         }
     }
@@ -71,6 +73,7 @@ class AuditLogsController extends ApiController
     /**
      * @OA\Get(path="/audit-logs/verify-chain", tags={"AuditLogs"}, summary="Vérifie l'intégrité de la chaîne de hashs SHA-256",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Response(response=200, description="Booléen valid"))
      */
     public function verifyChain(): JsonResponse
@@ -90,6 +93,7 @@ class AuditLogsController extends ApiController
         } catch (\Throwable $e) {
             Log::error('audit-logs.verify-chain failed', ['exception' => $e->getMessage()]);
             report($e);
+
             return $this->ok(['valid' => false, 'degraded' => true]);
         }
     }

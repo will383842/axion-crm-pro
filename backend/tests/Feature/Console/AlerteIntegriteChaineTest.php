@@ -25,6 +25,7 @@
  */
 
 use App\Services\Audit\AuditHashChain;
+use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -53,7 +54,7 @@ function poserSecretDeChaine(string $valeur): void
 }
 
 /** L'evenement planifie qui porte `audit:verify-chain`, ou null. */
-function evenementPlanifieDeVerification(): ?\Illuminate\Console\Scheduling\Event
+function evenementPlanifieDeVerification(): ?Event
 {
     // Le fichier `routes/console.php` n'est charge qu'a l'amorcage du noyau
     // console : sans cette ligne, un test HTTP lirait un planning VIDE et la
@@ -75,7 +76,7 @@ function evenementPlanifieDeVerification(): ?\Illuminate\Console\Scheduling\Even
 
 test('B16-006 — une chaine ROMPUE fait sortir la commande en echec ET emet une alerte critique', function () {
     poserSecretDeChaine('un-secret-de-chaine-reellement-secret-2026');
-    $chaine = new AuditHashChain();
+    $chaine = new AuditHashChain;
     $chaine->record(['method' => 'POST', 'path' => '/origine', 'status' => 201]);
 
     // TEMOIN 1 — avant falsification, la chaine est bien valide : ce que la
@@ -102,12 +103,12 @@ test('B16-006 — une chaine ROMPUE fait sortir la commande en echec ET emet une
     $this->assertStringContainsString(
         MARQUEUR_ALERTE_INTEGRITE,
         (string) $capture,
-        "La rupture de chaine n'a produit aucune alerte de niveau critique."
+        "La rupture de chaine n'a produit aucune alerte de niveau critique.",
     );
     $this->assertStringContainsString(
         'rompue',
         (string) $capture,
-        "L'alerte ne dit pas que la chaine est ROMPUE."
+        "L'alerte ne dit pas que la chaine est ROMPUE.",
     );
 });
 
@@ -116,7 +117,7 @@ test('B16-006 — TEMOIN : une chaine INTACTE ne reveille personne', function ()
     // une reussite — et une alerte qui se declenche toutes les nuits est une
     // alerte que plus personne ne lit.
     poserSecretDeChaine('un-secret-de-chaine-reellement-secret-2026');
-    $chaine = new AuditHashChain();
+    $chaine = new AuditHashChain;
     $chaine->record(['method' => 'POST', 'path' => '/a', 'status' => 201]);
     $chaine->record(['method' => 'PUT', 'path' => '/b', 'status' => 200]);
 
@@ -149,12 +150,12 @@ test('B16-006 — un secret inutilisable est annonce comme tel, pas comme une fa
     $this->assertStringContainsString(
         'AUDIT_HASH_CHAIN_SECRET',
         (string) $capture,
-        "L'alerte ne nomme pas la vraie cause : le secret de chaine."
+        "L'alerte ne nomme pas la vraie cause : le secret de chaine.",
     );
     $this->assertStringNotContainsString(
         'falsification',
         (string) $capture,
-        'Un secret absent est annonce comme une falsification : le diagnostic envoie au mauvais endroit.'
+        'Un secret absent est annonce comme une falsification : le diagnostic envoie au mauvais endroit.',
     );
 });
 
@@ -167,11 +168,11 @@ test('B16-006 — la tache de 03:00 existe bien et porte cet horaire', function 
 
     // TEMOIN — si la recherche ne trouvait rien, la garde suivante passerait au
     // vert sur un planning vide.
-    $this->assertNotNull($evenement, "Aucune tache planifiee ne lance `audit:verify-chain`.");
+    $this->assertNotNull($evenement, 'Aucune tache planifiee ne lance `audit:verify-chain`.');
     $this->assertSame(
         '0 3 * * *',
         $evenement->expression,
-        "La verification d'integrite n'est plus planifiee a 03:00."
+        "La verification d'integrite n'est plus planifiee a 03:00.",
     );
 });
 
@@ -198,7 +199,7 @@ test('B16-006 — quand la tache de 03:00 ECHOUE, une alerte critique part', fun
     $this->assertStringContainsString(
         MARQUEUR_ALERTE_INTEGRITE,
         (string) $capture,
-        "L'echec de la tache planifiee de 03:00 n'avertit personne (constat B16-006)."
+        "L'echec de la tache planifiee de 03:00 n'avertit personne (constat B16-006).",
     );
 });
 

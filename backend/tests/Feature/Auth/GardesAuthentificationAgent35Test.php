@@ -22,11 +22,13 @@ use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Request as PsrRequest;
+use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use PragmaRX\Google2FA\Google2FA;
 use Tests\TestCase;
 
@@ -81,7 +83,7 @@ beforeEach(function () {
  * `SessionGuard` garde l utilisateur en memoire dans le conteneur : on mesurerait
  * le banc, pas la session. Sans le rejeu du cookie, on ne mesurerait rien du tout.
  */
-function connexionA35(string $email, string $mdp = 'CorrectPassword12345!'): \Illuminate\Testing\TestResponse
+function connexionA35(string $email, string $mdp = 'CorrectPassword12345!'): TestResponse
 {
     $t = test();
     $reponse = $t->postJson('/api/v1/auth/login', ['email' => $email, 'password' => $mdp]);
@@ -111,7 +113,7 @@ function resynchroniserCsrfA35(): void
 {
     try {
         test()->withHeader('X-CSRF-TOKEN', app('session.store')->token());
-    } catch (\Throwable) {
+    } catch (Throwable) {
         // Pas de session : rien a resynchroniser.
     }
 }
@@ -120,7 +122,7 @@ function resynchroniserCsrfA35(): void
 test('F35-002 — l enrolement 2FA ecrit des colonnes qui existent vraiment', function () {
     $colonnes = array_map(
         fn ($c) => $c->column_name,
-        DB::select("SELECT column_name FROM information_schema.columns WHERE table_name = 'users'")
+        DB::select("SELECT column_name FROM information_schema.columns WHERE table_name = 'users'"),
     );
 
     $utilisateur = utilisateurA35('enrolement@a35.test');
@@ -134,7 +136,7 @@ test('F35-002 — l enrolement 2FA ecrit des colonnes qui existent vraiment', fu
 });
 
 test('F35-002 — confirmer l enrolement pose first_login_completed_at et rend 10 codes de secours', function () {
-    $g = new Google2FA();
+    $g = new Google2FA;
     $utilisateur = utilisateurA35('confirme@a35.test', premierLoginFait: false);
     $secret = app(TwoFactorService::class)->startEnrolment($utilisateur)['secret'];
 
@@ -148,7 +150,7 @@ test('F35-002 — confirmer l enrolement pose first_login_completed_at et rend 1
 });
 
 test('F35-002 — un code de secours ne sert qu une fois', function () {
-    $g = new Google2FA();
+    $g = new Google2FA;
     $utilisateur = utilisateurA35('secours@a35.test', premierLoginFait: false);
     $secret = app(TwoFactorService::class)->startEnrolment($utilisateur)['secret'];
     $codes = app(TwoFactorService::class)->confirmEnrolment($utilisateur->fresh(), $g->getCurrentOtp($secret));
@@ -170,7 +172,7 @@ test('F35-002 — GET /users ne selectionne aucune colonne inexistante', functio
 
 // ─────────────────────────────────────────────────────────────── F35-003
 test('F35-003 — un compte a 2FA active ne franchit rien tant que le code n a pas ete verifie', function () {
-    $g = new Google2FA();
+    $g = new Google2FA;
     $secret = $g->generateSecretKey();
     $utilisateur = utilisateurA35('gate2fa@a35.test', totp: $secret);
 
@@ -188,7 +190,7 @@ test('F35-003 — un compte a 2FA active ne franchit rien tant que le code n a p
 });
 
 test('F35-003 — les routes de la liste blanche restent joignables avant la 2FA', function () {
-    $g = new Google2FA();
+    $g = new Google2FA;
     $utilisateur = utilisateurA35('gate2fab@a35.test', totp: $g->generateSecretKey());
     connexionA35($utilisateur->email);
 
@@ -203,7 +205,7 @@ test('F35-004 — HIBP injoignable : le mot de passe est REFUSE, jamais accepte 
     ]));
     app()->instance(HibpChecker::class, new HibpChecker(new Client(['handler' => $pile])));
 
-    $validation = Validator::make(['password' => 'password'], ['password' => [new NotPwnedPassword()]]);
+    $validation = Validator::make(['password' => 'password'], ['password' => [new NotPwnedPassword]]);
 
     expect($validation->fails())->toBeTrue();
     expect($validation->errors()->first('password'))->toContain('indisponible');
@@ -212,12 +214,12 @@ test('F35-004 — HIBP injoignable : le mot de passe est REFUSE, jamais accepte 
 test('F35-004 — TEMOIN : HIBP joignable et mot de passe sain, la regle laisse passer', function () {
     $sha = strtoupper(sha1('un-mot-de-passe-vraiment-unique-a35-2026'));
     $corps = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA:0' . "\r\n";
-    $pile = HandlerStack::create(new MockHandler([new \GuzzleHttp\Psr7\Response(200, [], $corps)]));
+    $pile = HandlerStack::create(new MockHandler([new Response(200, [], $corps)]));
     app()->instance(HibpChecker::class, new HibpChecker(new Client(['handler' => $pile])));
 
     $validation = Validator::make(
         ['password' => 'un-mot-de-passe-vraiment-unique-a35-2026'],
-        ['password' => [new NotPwnedPassword()]]
+        ['password' => [new NotPwnedPassword]],
     );
 
     expect($validation->fails())->toBeFalse();
@@ -227,10 +229,10 @@ test('F35-004 — TEMOIN : HIBP joignable et mot de passe sain, la regle laisse 
 test('F35-004 — TEMOIN : HIBP joignable et mot de passe compromis, la regle refuse', function () {
     $sha = strtoupper(sha1('password'));
     $corps = substr($sha, 5) . ':9999999' . "\r\n";
-    $pile = HandlerStack::create(new MockHandler([new \GuzzleHttp\Psr7\Response(200, [], $corps)]));
+    $pile = HandlerStack::create(new MockHandler([new Response(200, [], $corps)]));
     app()->instance(HibpChecker::class, new HibpChecker(new Client(['handler' => $pile])));
 
-    expect(Validator::make(['password' => 'password'], ['password' => [new NotPwnedPassword()]])->fails())->toBeTrue();
+    expect(Validator::make(['password' => 'password'], ['password' => [new NotPwnedPassword]])->fails())->toBeTrue();
 });
 
 // ─────────────────────────────────────────────────────────────── F35-005
@@ -389,7 +391,9 @@ test('F35-009 — un compte inconnu coute le meme travail cryptographique qu un 
     $rapport = max($connu, $inconnu) / max(min($connu, $inconnu), 1e-6);
     expect($rapport)->toBeLessThan(3.0, sprintf(
         'medianes : compte connu %.1f ms, compte inconnu %.1f ms, rapport %.2f',
-        $connu * 1000, $inconnu * 1000, $rapport
+        $connu * 1000,
+        $inconnu * 1000,
+        $rapport,
     ));
 });
 

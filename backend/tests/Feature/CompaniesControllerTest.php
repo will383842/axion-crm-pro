@@ -1,11 +1,13 @@
 <?php
 
+use App\Jobs\EnrichCompanyJob;
+use App\Models\Company;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Models\Company;
 use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -134,9 +136,9 @@ test('bulkEnrich queues jobs', function () {
         'workspace_id' => $this->workspace->id, 'siren' => '555555555',
         'denomination' => 'X', 'signals' => [], 'metadata' => [],
     ]);
-    \Illuminate\Support\Facades\Queue::fake();
+    Queue::fake();
     $this->postJson('/api/v1/companies/bulk-enrich', ['ids' => [$c->id]])->assertOk();
-    \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\EnrichCompanyJob::class);
+    Queue::assertPushed(EnrichCompanyJob::class);
 });
 
 /**

@@ -104,7 +104,7 @@ const JUMEAUX_URL_PUBLIQUE = 'https://93.184.216.34/';
  * ENREGISTRE, et le temoin ci-dessous verifie qu'il enregistre bien quelque
  * chose dans le cas nominal.
  *
- * @return array<int, array{0: string, 1: string}>  recueil, par reference
+ * @return array<int, array{0: string, 1: string}> recueil, par reference
  */
 function jumeauxEspionRedis(array &$recueil): void
 {
@@ -135,7 +135,7 @@ test('C19-001 — DispatchScrapeJob ne met JAMAIS une adresse interne en file', 
             "DispatchScrapeJob a depose {$url} ({$libelle}) sur `axion:scrape:website`. Cette "
             . 'valeur vient de `companies.website` (cf. WaterfallOrchestrator ligne 418) : une '
             . 'ligne empoisonnee en base suffit a faire ouvrir cette adresse par le navigateur '
-            . 'Playwright du worker Node, hors de portee de toute garde PHP.'
+            . 'Playwright du worker Node, hors de portee de toute garde PHP.',
         );
 
         Mockery::close();
@@ -158,7 +158,7 @@ test('TEMOIN — DispatchScrapeJob met TOUJOURS en file une adresse publique', f
         'Aucun scrape n\'est plus mis en file pour une adresse PUBLIQUE : la garde a ete branchee '
         . 'trop large et la chaine de scrape est morte. Un refus generalise n\'est pas un correctif. '
         . '(Et sans ce temoin, le test ci-dessus serait vert meme si `handle()` ne poussait plus '
-        . 'jamais rien.)'
+        . 'jamais rien.)',
     );
     expect($pousse[0][0])->toBe('axion:scrape:website');
 
@@ -181,7 +181,7 @@ test('TEMOIN — DispatchScrapeJob sans target_url fonctionne toujours', functio
     expect($pousse)->toHaveCount(
         1,
         'Un dispatch SANS target_url (le cas de LaunchZoneScrapingJob) est desormais refuse : la '
-        . 'garde traite l\'absence d\'URL comme une URL invalide et casse le scrape de zone.'
+        . 'garde traite l\'absence d\'URL comme une URL invalide et casse le scrape de zone.',
     );
 });
 
@@ -252,7 +252,7 @@ test('C19-001 — un websiteUri interne rendu par Google Places n est PAS ecrit 
             . '`companies.website`. C\'est le site JUMEAU des deux entrees deja gardees dans '
             . 'DomainFinderService (resultat Brave ligne 475, href Pages Jaunes ligne 526) : une '
             . 'URL fournie par un tiers, persistee sans controle, puis affichee, exportee, et '
-            . 'transmise comme `target_url` au worker Playwright.'
+            . 'transmise comme `target_url` au worker Playwright.',
         );
     }
 });
@@ -276,11 +276,11 @@ test('TEMOIN — un websiteUri PUBLIC rendu par Google Places est toujours ecrit
         JUMEAUX_URL_PUBLIQUE,
         'L\'enrichissement Google Places n\'ecrit plus le site meme pour une adresse PUBLIQUE : '
         . 'la garde a ete branchee trop large et l\'etape 3d est morte. Sans ce temoin, le test '
-        . 'ci-dessus serait vert pour la simple raison que plus rien ne s\'ecrit.'
+        . 'ci-dessus serait vert pour la simple raison que plus rien ne s\'ecrit.',
     );
     expect($entreprise->phone)->toBe(
         '+33 1 23 45 67 89',
         'Le reste de l\'enrichissement (telephone) ne passe plus : le refus SSRF a fait sauter '
-        . 'toute l\'etape au lieu du seul champ concerne.'
+        . 'toute l\'etape au lieu du seul champ concerne.',
     );
 });

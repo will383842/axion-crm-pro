@@ -61,6 +61,7 @@
  */
 
 use App\Console\Commands\PartmanMaintenir;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -132,7 +133,7 @@ test('B10-003 : la maintenance des partitions est PLANIFIEE, elle ne depend pas 
     // REELLEMENT enregistre la tache — elle tient donc meme si la ligne passe
     // par une constante, si elle demenage dans un autre fichier, ou si un
     // `Schedule::command()` est ecrit dans un bloc jamais atteint.
-    $planificateur = app(Illuminate\Console\Scheduling\Schedule::class);
+    $planificateur = app(Schedule::class);
     $evenements = $planificateur->events();
 
     // TEMOIN. Sans lui, un registre VIDE — bootstrap different, routes console

@@ -57,8 +57,8 @@ class ScraperRunCancelled implements ShouldBroadcast
     {
         return [
             'scraper_run_id' => $this->scraperRunId,
-            'reason'         => $this->reason,
-            'occurred_at'    => now()->toIso8601String(),
+            'reason' => $this->reason,
+            'occurred_at' => now()->toIso8601String(),
         ];
     }
 }

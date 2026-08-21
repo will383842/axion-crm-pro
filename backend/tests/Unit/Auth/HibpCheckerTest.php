@@ -2,8 +2,10 @@
 
 use App\Services\Auth\HibpChecker;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Support\Facades\Cache;
 
@@ -60,9 +62,9 @@ test('HibpChecker isBreached respecte le threshold', function () {
  */
 test('HibpChecker rend null - et surtout pas 0 - quand le reseau echoue', function () {
     $mock = new MockHandler([
-        new \GuzzleHttp\Exception\ConnectException(
+        new ConnectException(
             'connect timeout',
-            new \GuzzleHttp\Psr7\Request('GET', 'https://api.pwnedpasswords.com/range/12345')
+            new Request('GET', 'https://api.pwnedpasswords.com/range/12345'),
         ),
     ]);
     $client = new Client(['handler' => HandlerStack::create($mock)]);
@@ -114,9 +116,9 @@ test('HibpChecker parse correctement les newlines mixtes', function () {
 
 test('HibpChecker isBreached rend null quand le service est injoignable', function () {
     $mock = new MockHandler([
-        new \GuzzleHttp\Exception\ConnectException(
+        new ConnectException(
             'connect timeout',
-            new \GuzzleHttp\Psr7\Request('GET', 'https://api.pwnedpasswords.com/range/12345')
+            new Request('GET', 'https://api.pwnedpasswords.com/range/12345'),
         ),
     ]);
     $checker = new HibpChecker(new Client(['handler' => HandlerStack::create($mock)]));

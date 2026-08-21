@@ -116,7 +116,7 @@ test('P5-35-007 — l administrateur d un espace ne lit QUE le journal de son es
         '/api/v1/chez-moi',
         $chemins,
         'La route ne rend rien du tout : ce vert ne prouverait pas le cloisonnement, '
-        . 'seulement que la route est muette.'
+        . 'seulement que la route est muette.',
     );
 
     $this->assertNotContains(
@@ -124,7 +124,7 @@ test('P5-35-007 — l administrateur d un espace ne lit QUE le journal de son es
         $chemins,
         'Le journal d\'un AUTRE espace de travail est rendu. La permission `audit.view` '
         . 'a bien ete posee, mais elle ne dit rien de l\'espace : elle separe les roles, '
-        . 'pas les clients.'
+        . 'pas les clients.',
     );
 });
 

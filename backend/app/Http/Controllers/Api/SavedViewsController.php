@@ -43,7 +43,9 @@ class SavedViewsController extends ApiController
     /**
      * @OA\Get(path="/saved-views", tags={"SavedViews"}, summary="Liste vues sauvegardées (filtres companies/contacts)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="entity", in="query", @OA\Schema(type="string")),
+     *
      *     @OA\Response(response=200, description="OK"))
      */
     public function index(Request $r): JsonResponse
@@ -104,31 +106,50 @@ class SavedViewsController extends ApiController
     /**
      * @OA\Post(path="/saved-views", tags={"SavedViews"}, summary="Crée vue (Sprint 10)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Response(response=501, description="Not implemented"))
      */
-    public function store(Request $r): JsonResponse { return $this->notImplemented('10'); }
+    public function store(Request $r): JsonResponse
+    {
+        return $this->notImplemented('10');
+    }
 
     /**
      * @OA\Get(path="/saved-views/{savedView}", tags={"SavedViews"}, summary="Show vue (Sprint 10)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="savedView", in="path", required=true, @OA\Schema(type="integer")),
+     *
      *     @OA\Response(response=501, description="Not implemented"))
      */
-    public function show(int $savedView): JsonResponse { return $this->notImplemented('10'); }
+    public function show(int $savedView): JsonResponse
+    {
+        return $this->notImplemented('10');
+    }
 
     /**
      * @OA\Put(path="/saved-views/{savedView}", tags={"SavedViews"}, summary="Update vue (Sprint 10)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="savedView", in="path", required=true, @OA\Schema(type="integer")),
+     *
      *     @OA\Response(response=501, description="Not implemented"))
      */
-    public function update(Request $r, int $savedView): JsonResponse { return $this->notImplemented('10'); }
+    public function update(Request $r, int $savedView): JsonResponse
+    {
+        return $this->notImplemented('10');
+    }
 
     /**
      * @OA\Delete(path="/saved-views/{savedView}", tags={"SavedViews"}, summary="Delete vue (Sprint 10)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="savedView", in="path", required=true, @OA\Schema(type="integer")),
+     *
      *     @OA\Response(response=501, description="Not implemented"))
      */
-    public function destroy(int $savedView): JsonResponse { return $this->notImplemented('10'); }
+    public function destroy(int $savedView): JsonResponse
+    {
+        return $this->notImplemented('10');
+    }
 }

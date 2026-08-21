@@ -4,8 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\StoreEmailAudienceRequest;
 use App\Http\Resources\EmailAudienceResource;
-use App\Models\AudienceMember;
-use App\Models\Contact;
 use App\Models\EmailAudience;
 use App\Services\Audiences\AudienceBuilderService;
 use App\Support\MasquageCoordonnees;
@@ -22,6 +20,7 @@ class AudiencesController extends ApiController
     /**
      * @OA\Get(path="/audiences", tags={"Audiences"}, summary="Liste audiences",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Response(response=200, description="OK"))
      */
     public function index(Request $r): JsonResponse
@@ -35,9 +34,11 @@ class AudiencesController extends ApiController
             if ($workspaceId) {
                 $q->where('workspace_id', $workspaceId);
             }
+
             return $this->ok(['data' => EmailAudienceResource::collection($q->limit(200)->get())]);
         } catch (\Throwable $e) {
             Log::error('audiences.index failed', ['error' => $e->getMessage()]);
+
             return $this->ok(['data' => [], 'degraded' => true]);
         }
     }
@@ -52,12 +53,12 @@ class AudiencesController extends ApiController
 
         $audience = EmailAudience::create([
             'workspace_id' => $workspaceId,
-            'name'         => $data['name'],
-            'description'  => $data['description'] ?? null,
-            'criteria'     => $data['criteria'],
-            'is_active'    => $data['is_active'] ?? true,
+            'name' => $data['name'],
+            'description' => $data['description'] ?? null,
+            'criteria' => $data['criteria'],
+            'is_active' => $data['is_active'] ?? true,
             'auto_refresh' => $data['auto_refresh'] ?? true,
-            'created_by'   => optional($request->user())->id,
+            'created_by' => optional($request->user())->id,
         ]);
 
         // First refresh inline (rapide pour audience nouvelle)
@@ -73,6 +74,7 @@ class AudiencesController extends ApiController
     public function show(EmailAudience $audience): JsonResponse
     {
         $this->assertWorkspace($audience);
+
         return $this->ok(['data' => new EmailAudienceResource($audience)]);
     }
 
@@ -80,13 +82,14 @@ class AudiencesController extends ApiController
     {
         $this->assertWorkspace($audience);
         $data = $request->validate([
-            'name'         => ['sometimes', 'required', 'string', 'max:160'],
-            'description'  => ['sometimes', 'nullable', 'string', 'max:1000'],
-            'criteria'     => ['sometimes', 'required', 'array'],
-            'is_active'    => ['sometimes', 'boolean'],
+            'name' => ['sometimes', 'required', 'string', 'max:160'],
+            'description' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'criteria' => ['sometimes', 'required', 'array'],
+            'is_active' => ['sometimes', 'boolean'],
             'auto_refresh' => ['sometimes', 'boolean'],
         ]);
         $audience->update($data);
+
         return $this->ok(['data' => new EmailAudienceResource($audience->fresh())]);
     }
 
@@ -94,6 +97,7 @@ class AudiencesController extends ApiController
     {
         $this->assertWorkspace($audience);
         $audience->delete();
+
         return $this->ok(['ok' => true]);
     }
 
@@ -111,8 +115,10 @@ class AudiencesController extends ApiController
             $result = $this->builder->preview($workspaceId, $request->input('criteria', []));
         } catch (\Throwable $e) {
             Log::warning('audiences.preview failed', ['error' => $e->getMessage()]);
+
             return $this->ok(['companies' => 0, 'contacts' => 0, 'error' => 'preview_failed']);
         }
+
         return $this->ok($result);
     }
 
@@ -123,8 +129,10 @@ class AudiencesController extends ApiController
             $this->builder->refresh($audience);
         } catch (\Throwable $e) {
             Log::error('audiences.refresh failed', ['id' => $audience->id, 'error' => $e->getMessage()]);
+
             return $this->ok(['error' => 'refresh failed'], 500);
         }
+
         return $this->ok(['data' => new EmailAudienceResource($audience->fresh())]);
     }
 
@@ -138,9 +146,17 @@ class AudiencesController extends ApiController
             ->leftJoin('contacts as ct', 'ct.id', '=', 'am.contact_id')
             ->where('am.audience_id', $audience->id)
             ->select(
-                'am.id', 'am.added_at',
-                'c.id as company_id', 'c.denomination', 'c.department_code', 'c.size_category', 'c.sector_main',
-                'ct.id as contact_id', 'ct.first_name', 'ct.last_name', 'ct.email',
+                'am.id',
+                'am.added_at',
+                'c.id as company_id',
+                'c.denomination',
+                'c.department_code',
+                'c.size_category',
+                'c.sector_main',
+                'ct.id as contact_id',
+                'ct.first_name',
+                'ct.last_name',
+                'ct.email',
             )
             ->orderByDesc('am.added_at')
             ->limit($limit)

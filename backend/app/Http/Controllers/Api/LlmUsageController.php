@@ -59,7 +59,9 @@ class LlmUsageController extends ApiController
     /**
      * @OA\Get(path="/llm/usage", tags={"LLM"}, summary="Historique d'usage LLM (tokens + coût €)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="limit", in="query", @OA\Schema(type="integer", maximum=100)),
+     *
      *     @OA\Response(response=200, description="Liste paginée"))
      */
     public function index(Request $r): JsonResponse
@@ -114,7 +116,9 @@ class LlmUsageController extends ApiController
     /**
      * @OA\Get(path="/llm/usage/summary", tags={"LLM"}, summary="Résumé coûts LLM (par use-case, par provider, par jour)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="days", in="query", @OA\Schema(type="integer", maximum=365)),
+     *
      *     @OA\Response(response=200, description="Agrégations"))
      */
     public function summary(Request $r): JsonResponse

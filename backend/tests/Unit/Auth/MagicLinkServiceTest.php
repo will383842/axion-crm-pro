@@ -3,13 +3,14 @@
 use App\Services\Auth\MagicLinkService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
 /** Cree un compte minimal et rend son identifiant. */
 function makeMagicUser(string $email): object
 {
-    $id = (string) \Illuminate\Support\Str::uuid();
+    $id = (string) Str::uuid();
     DB::table('users')->insert([
         'id' => $id,
         'email' => $email,

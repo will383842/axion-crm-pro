@@ -2,10 +2,11 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\Audit\AuditHashChain;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Route;
 use Symfony\Component\HttpFoundation\Response;
-use App\Services\Audit\AuditHashChain;
 
 /**
  * Post-handle middleware : journalise dans la table `audit_logs` (chaîne
@@ -75,7 +76,7 @@ class AuditHashChainLogger
 
         try {
             $userId = optional($request->user())->id;
-            $wsId   = app()->bound('workspace.id') ? app('workspace.id') : null;
+            $wsId = app()->bound('workspace.id') ? app('workspace.id') : null;
 
             $this->chain->record([
                 // audit_logs.workspace_id et user_id sont typés UUID en Postgres.
@@ -83,14 +84,14 @@ class AuditHashChainLogger
                 // workspace mocké en INT, etc.), on stocke null pour ne pas planter
                 // l'insert. La requête principale reste auditée par path/method/ip.
                 'workspace_id' => self::asUuidOrNull($wsId),
-                'user_id'      => self::asUuidOrNull($userId),
-                'method'       => $request->method(),
+                'user_id' => self::asUuidOrNull($userId),
+                'method' => $request->method(),
                 // 🔴 Le chemin, PRIVÉ DE SES SECRETS. Cf. `cheminSansSecret()` :
                 // `/api/v1/rgpd/export/{token}` porte le jeton DANS l'URL.
-                'path'         => self::cheminSansSecret($request),
-                'status'       => $response->getStatusCode(),
-                'ip'           => $request->ip(),
-                'user_agent'   => substr((string) $request->userAgent(), 0, 255),
+                'path' => self::cheminSansSecret($request),
+                'status' => $response->getStatusCode(),
+                'ip' => $request->ip(),
+                'user_agent' => substr((string) $request->userAgent(), 0, 255),
                 // 🔴 B16-005 (S1) — voir `empreinteDuCorps()` juste dessous.
                 // Cette ligne calculait `hash('sha256', json_encode($request->all()))`
                 // SANS MASQUER QUOI QUE CE SOIT. Sur `POST api/v1/auth/login`,
@@ -101,7 +102,10 @@ class AuditHashChainLogger
         } catch (\Throwable $e) {
             // Ne pas casser la requête sur erreur d'audit ; logger sentry/glitchtip.
             // report() peut lui-même lever si Sentry mal configuré : on swallow tout.
-            try { report($e); } catch (\Throwable) { /* swallow */ }
+            try {
+                report($e);
+            } catch (\Throwable) { /* swallow */
+            }
         }
 
         return $response;
@@ -154,7 +158,7 @@ class AuditHashChainLogger
         $chemin = $request->path();
         $route = $request->route();
 
-        if (! $route instanceof \Illuminate\Routing\Route) {
+        if (! $route instanceof Route) {
             return $chemin;
         }
 
@@ -290,7 +294,9 @@ class AuditHashChainLogger
      */
     private static function asUuidOrNull(mixed $v): ?string
     {
-        if ($v === null || $v === '') return null;
+        if ($v === null || $v === '') {
+            return null;
+        }
         $s = (string) $v;
         // UUID classique : 8-4-4-4-12 hex
         if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $s)) {
@@ -300,6 +306,7 @@ class AuditHashChainLogger
         if (preg_match('/^[0-9A-HJKMNP-TV-Z]{26}$/i', $s)) {
             return $s;
         }
+
         return null;
     }
 }

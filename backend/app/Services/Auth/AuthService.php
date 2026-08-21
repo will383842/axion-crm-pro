@@ -109,11 +109,11 @@ class AuthService
         // ── 3. Succès. ───────────────────────────────────────────────────────
         RateLimiter::clear($throttleKey);
         $user->forceFill([
-            'failed_login_count'    => 0,
-            'last_failed_login_at'  => null,
-            'locked_until'          => null,
-            'last_login_at'         => now(),
-            'last_login_ip'         => $request->ip(),
+            'failed_login_count' => 0,
+            'last_failed_login_at' => null,
+            'locked_until' => null,
+            'last_login_at' => now(),
+            'last_login_ip' => $request->ip(),
             'last_login_user_agent' => substr((string) $request->userAgent(), 0, 255),
         ])->save();
 
@@ -121,7 +121,7 @@ class AuthService
         $request->session()->regenerate();
 
         return [
-            'user'         => $user->fresh(),
+            'user' => $user->fresh(),
             'requires_2fa' => $user->totp_enabled_at !== null,
         ];
     }

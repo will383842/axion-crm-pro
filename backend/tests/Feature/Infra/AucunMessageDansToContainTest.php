@@ -90,6 +90,7 @@ function appelsToContainAvecMessage(string $source, string $fichier): array
             if ($dansChaine !== null) {
                 if ($c === '\\') {
                     $j += 2;
+
                     continue;
                 }
                 if ($c === $dansChaine) {
@@ -120,11 +121,13 @@ function appelsToContainAvecMessage(string $source, string $fichier): array
                 if ($c === '\\') {
                     $courant .= $arguments[$k + 1] ?? '';
                     $k++;
+
                     continue;
                 }
                 if ($c === $dansChaine) {
                     $dansChaine = null;
                 }
+
                 continue;
             }
             if ($c === "'" || $c === '"') {
@@ -136,6 +139,7 @@ function appelsToContainAvecMessage(string $source, string $fichier): array
             } elseif ($c === ',' && $niveau === 0) {
                 $morceaux[] = $courant;
                 $courant = '';
+
                 continue;
             }
             $courant .= $c;
@@ -172,7 +176,7 @@ test('toContain — aucun test du depot ne passe un MESSAGE a toContain', functi
     $racine = base_path('tests');
 
     expect(is_dir($racine))->toBeTrue(
-        "Le banc ne voit pas {$racine} : cette garde passerait au vert sur zero fichier."
+        "Le banc ne voit pas {$racine} : cette garde passerait au vert sur zero fichier.",
     );
 
     $fichiers = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($racine));
@@ -196,13 +200,13 @@ test('toContain — aucun test du depot ne passe un MESSAGE a toContain', functi
     // la garde passerait au vert sans rien inspecter. Le pire des verts.
     expect($inspectes)->toBeGreaterThan(
         50,
-        "Seulement {$inspectes} fichiers de test inspectes : le balayage ne voit pas ce qu'il croit voir."
+        "Seulement {$inspectes} fichiers de test inspectes : le balayage ne voit pas ce qu'il croit voir.",
     );
 
     expect($fautifs)->toBe(
         [],
-        "`expect()->toContain()` de Pest est VARIADIQUE : tous ses arguments sont des VALEURS a "
-        . "chercher. Un message passe en second argument devient une deuxieme valeur, et la "
+        '`expect()->toContain()` de Pest est VARIADIQUE : tous ses arguments sont des VALEURS a '
+        . 'chercher. Un message passe en second argument devient une deuxieme valeur, et la '
         . "garde cherche sa propre phrase d'explication dans la donnee qu'elle inspecte. Elle "
         . "rougit alors ETERNELLEMENT, en affichant exactement le message qu'on a ecrit -- si "
         . "bien qu'on croit avoir trouve le defaut qu'on decrivait.\n\n"
@@ -211,6 +215,6 @@ test('toContain — aucun test du depot ne passe un MESSAGE a toContain', functi
         . "Ecrire plutot :\n"
         . "  \$this->assertStringContainsString(\$aiguille, \$meule, \$message);\n"
         . "  \$this->assertContains(\$aiguille, \$tableau, \$message);\n\n"
-        . "Occurrences :\n  - " . implode("\n  - ", $fautifs)
+        . "Occurrences :\n  - " . implode("\n  - ", $fautifs),
     );
 });

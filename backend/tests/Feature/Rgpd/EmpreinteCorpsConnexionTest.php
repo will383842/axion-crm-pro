@@ -25,8 +25,12 @@
  */
 
 use App\Http\Middleware\AuditHashChainLogger as Journalisateur;
+use App\Models\User;
+use App\Models\Workspace;
+use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -71,7 +75,7 @@ test('B16-005 — deux mots de passe differents laissent la MEME empreinte', fun
     $this->assertCount(
         2,
         $empreintes,
-        'Aucune ligne de journal pour la connexion : la garde ne mesure rien.'
+        'Aucune ligne de journal pour la connexion : la garde ne mesure rien.',
     );
 
     // TEMOIN 2 — l'empreinte est bien un condense, pas une colonne vide ou une
@@ -86,7 +90,7 @@ test('B16-005 — deux mots de passe differents laissent la MEME empreinte', fun
         $empreintes[0],
         $empreintes[1],
         "L'empreinte du corps de connexion depend du mot de passe : elle permet "
-        . 'de verifier une hypothese hors ligne (constat B16-005).'
+        . 'de verifier une hypothese hors ligne (constat B16-005).',
     );
 });
 
@@ -109,7 +113,7 @@ test('B16-005 — TEMOIN : l empreinte distingue toujours DEUX COMPTES different
     $this->assertNotSame(
         $empreintes[0],
         $empreintes[1],
-        "L'empreinte ne distingue plus deux comptes : le journal ne journalise plus rien."
+        "L'empreinte ne distingue plus deux comptes : le journal ne journalise plus rien.",
     );
 });
 
@@ -173,17 +177,17 @@ test('B16-005 — MESURE : la ligne de connexion n est PAS servie par la route d
     // TEMOIN — la ligne existe bien, et son espace est nul : c'est CE fait qui
     // la soustrait a la route, et non l'absence de journalisation.
     $this->assertNotNull($ligne, 'La connexion n a pas ete journalisee : la garde ne mesure rien.');
-    $this->assertNull($ligne->workspace_id, "La ligne de connexion porte un espace : la mesure ci-dessous ne vaut plus.");
+    $this->assertNull($ligne->workspace_id, 'La ligne de connexion porte un espace : la mesure ci-dessous ne vaut plus.');
 
-    $espace = \App\Models\Workspace::create([
-        'id' => (string) \Illuminate\Support\Str::uuid(),
-        'slug' => 'expo-' . \Illuminate\Support\Str::random(6),
+    $espace = Workspace::create([
+        'id' => (string) Str::uuid(),
+        'slug' => 'expo-' . Str::random(6),
         'name' => 'Espace observateur',
     ]);
-    $this->seed(\Database\Seeders\PermissionsAndRolesSeeder::class);
-    $observateur = \App\Models\User::create([
-        'id' => (string) \Illuminate\Support\Str::uuid(),
-        'email' => 'obs-' . \Illuminate\Support\Str::random(6) . '@audit.test',
+    $this->seed(PermissionsAndRolesSeeder::class);
+    $observateur = User::create([
+        'id' => (string) Str::uuid(),
+        'email' => 'obs-' . Str::random(6) . '@audit.test',
         'name' => 'Observateur',
         'password_hash' => password_hash('MotDePasseDeTest2026!', PASSWORD_BCRYPT, ['cost' => 4]),
         'current_workspace_id' => $espace->id,
@@ -199,7 +203,7 @@ test('B16-005 — MESURE : la ligne de connexion n est PAS servie par la route d
     $this->assertNotContains(
         'api/v1/auth/login',
         $cheminsServis,
-        "La ligne de connexion — donc son empreinte de corps — est servie par la route du journal."
+        'La ligne de connexion — donc son empreinte de corps — est servie par la route du journal.',
     );
 });
 
@@ -225,6 +229,6 @@ test('B16-005 — la reinitialisation de mot de passe est couverte, comme la con
     $this->assertSame(
         $empreintes[0],
         $empreintes[1],
-        "L'empreinte du corps de reinitialisation depend du mot de passe choisi."
+        "L'empreinte du corps de reinitialisation depend du mot de passe choisi.",
     );
 });

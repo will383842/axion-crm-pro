@@ -96,7 +96,7 @@ SH);
         // Le script refuse un mot de passe de moins de douze caractères, et
         // refuse aussi un terminal : on lui parle par l'entrée standard.
         'un-mot-de-passe-assez-long',
-        60
+        60,
     );
     $processus->run();
 
@@ -114,7 +114,7 @@ test('P5-35-005 — TEMOIN : le banc voit bien le script', function () {
     $chemin = cheminScriptMotDePasse();
     expect(file_exists($chemin))->toBeTrue(
         "Le banc ne voit pas {$chemin}. Une garde qui n'a aucun fichier à exercer passe au vert " .
-        'sans rien prouver : monte `infra/` avant de la croire.'
+        'sans rien prouver : monte `infra/` avant de la croire.',
     );
     expect(filesize($chemin))->toBeGreaterThan(1000);
 });
@@ -125,7 +125,7 @@ test('P5-35-004 — un compte inexistant le DIT a l operateur', function () {
     expect($r['sortie'])->not->toBe(
         '',
         "Le script est mort en silence. C'est le geste par lequel l'exploitant reprend l'accès " .
-        "à son produit : une faute de frappe sur l'adresse doit produire un message, pas un code 1 muet."
+        "à son produit : une faute de frappe sur l'adresse doit produire un message, pas un code 1 muet.",
     );
     expect(strtolower($r['sortie']))->toContain('aucun compte');
 });

@@ -33,9 +33,9 @@ trait RefuseUneSuppressionMassive
     /**
      * Décide si la suppression peut avoir lieu, et l'explique à l'opérateur.
      *
-     * @param  string  $table      table visée, pour le message
-     * @param  int     $aSupprimer nombre de lignes que la condition sélectionne
-     * @param  int     $total      nombre total de lignes de la table
+     * @param  string  $table  table visée, pour le message
+     * @param  int  $aSupprimer  nombre de lignes que la condition sélectionne
+     * @param  int  $total  nombre total de lignes de la table
      */
     protected function suppressionAutorisee(string $table, int $aSupprimer, int $total): bool
     {
@@ -61,7 +61,7 @@ trait RefuseUneSuppressionMassive
         if ($proportion > $this->proportionMaximale && ! $force) {
             $seuil = number_format($this->proportionMaximale * 100, 0, ',', ' ');
             $this->error(
-                "REFUS : cette commande supprimerait {$pourcentage} % de « {$table} », au-delà du plafond de {$seuil} %."
+                "REFUS : cette commande supprimerait {$pourcentage} % de « {$table} », au-delà du plafond de {$seuil} %.",
             );
             $this->line('Si cette proportion est VOULUE, relancez avec --force. Vérifiez d\'abord avec --dry-run.');
 

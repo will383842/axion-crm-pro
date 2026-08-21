@@ -46,7 +46,9 @@ class RotationsController extends ApiController
     /**
      * @OA\Get(path="/rotations", tags={"Rotations"}, summary="Liste les rotations LLM (round-robin / cost-based)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="dimension", in="query", @OA\Schema(type="string")),
+     *
      *     @OA\Response(response=200, description="OK"))
      */
     public function index(Request $r): JsonResponse
@@ -99,8 +101,13 @@ class RotationsController extends ApiController
     /**
      * @OA\Put(path="/rotations/{rotation}", tags={"Rotations"}, summary="Update rotation (Sprint 4)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="rotation", in="path", required=true, @OA\Schema(type="integer")),
+     *
      *     @OA\Response(response=501, description="Not implemented"))
      */
-    public function update(Request $r, int $rotation): JsonResponse { return $this->notImplemented('4'); }
+    public function update(Request $r, int $rotation): JsonResponse
+    {
+        return $this->notImplemented('4');
+    }
 }

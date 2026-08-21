@@ -34,7 +34,7 @@ return [
      | Désactivé par défaut. À activer quand Will valide Phase A.
      | --------------------------------------------------------------------- */
     'webshare' => [
-        'enabled'  => env('WEBSHARE_ENABLED', false),
+        'enabled' => env('WEBSHARE_ENABLED', false),
         'username' => env('WEBSHARE_USERNAME'),
         'password' => env('WEBSHARE_PASSWORD'),
         'endpoint' => env('WEBSHARE_ENDPOINT', 'p.webshare.io:80'),
@@ -44,7 +44,7 @@ return [
      | France Travail (déjà utilisé par FranceTravailDiscoveryClient)
      | --------------------------------------------------------------------- */
     'france_travail' => [
-        'client_id'     => env('FRANCE_TRAVAIL_CLIENT_ID'),
+        'client_id' => env('FRANCE_TRAVAIL_CLIENT_ID'),
         'client_secret' => env('FRANCE_TRAVAIL_CLIENT_SECRET'),
     ],
 
@@ -52,9 +52,9 @@ return [
      | INSEE Sirene
      | --------------------------------------------------------------------- */
     'insee' => [
-        'base_url'      => env('INSEE_API_BASE_URL', 'https://api.insee.fr'),
-        'api_key'       => env('INSEE_API_KEY'),
-        'client_id'     => env('INSEE_CLIENT_ID'),
+        'base_url' => env('INSEE_API_BASE_URL', 'https://api.insee.fr'),
+        'api_key' => env('INSEE_API_KEY'),
+        'client_id' => env('INSEE_CLIENT_ID'),
         'client_secret' => env('INSEE_CLIENT_SECRET'),
     ],
 
@@ -73,17 +73,17 @@ return [
      | --------------------------------------------------------------------- */
     'google' => [
         'places' => [
-            'api_key'              => env('GOOGLE_PLACES_API_KEY'),
-            'cache_ttl_days'       => (int) env('GOOGLE_PLACES_CACHE_TTL_DAYS', 30),
+            'api_key' => env('GOOGLE_PLACES_API_KEY'),
+            'cache_ttl_days' => (int) env('GOOGLE_PLACES_CACHE_TTL_DAYS', 30),
             // Sprint H12 — Quota mensuel max d'appels (free tier ~$200 crédit/mois
             // ≈ 11500 Text Search Pro). Au-delà, GooglePlacesClient skip + marque
             // signals.google_places_pending=true pour retraitement le mois suivant.
-            'monthly_quota_limit'  => (int) env('GOOGLE_PLACES_MONTHLY_QUOTA_LIMIT', 11500),
+            'monthly_quota_limit' => (int) env('GOOGLE_PLACES_MONTHLY_QUOTA_LIMIT', 11500),
             // Sprint H14 — Smart skip : ne pas appeler Google Places si l'entreprise
             // a DÉJÀ email exploitable + phone + website. Économise quota sans
             // perdre de leads exploitables (la note Google + photos sont "nice to
             // have" mais pas critiques). Default true.
-            'smart_skip'           => filter_var(env('GOOGLE_PLACES_SMART_SKIP', true), FILTER_VALIDATE_BOOL),
+            'smart_skip' => filter_var(env('GOOGLE_PLACES_SMART_SKIP', true), FILTER_VALIDATE_BOOL),
             // Sprint H14 — Seuil au-delà duquel on alerte Will sur le backlog pending
             // (KpiCard rouge dans /admin/observability). Default 5000.
             'pending_alert_threshold' => (int) env('GOOGLE_PLACES_PENDING_ALERT_THRESHOLD', 5000),

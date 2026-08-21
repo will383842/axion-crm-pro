@@ -156,7 +156,7 @@ class ImportMediaFromArcom extends Command
                     $r['media_type'],
                     $r['diffusion_zone'] ?? '-',
                     $r['department_code'] ?? '-',
-                    $r['city'] ?? ''
+                    $r['city'] ?? '',
                 ));
             }
 
@@ -218,7 +218,7 @@ class ImportMediaFromArcom extends Command
      */
     public static function extractRows(string $xlsxPath): array
     {
-        $zip = new \ZipArchive();
+        $zip = new \ZipArchive;
         if ($zip->open($xlsxPath) !== true) {
             throw new \RuntimeException('Archive XLSX illisible.');
         }
@@ -347,22 +347,22 @@ class ImportMediaFromArcom extends Command
             $dept = $isFrance ? self::deptFromPostcode($postcode) : null;
 
             $rows[] = [
-                'workspace_id'    => $workspaceId,
-                'name'            => mb_substr($name, 0, 240),
-                'media_type'      => $type,
-                'media_family'    => 'editorial',
-                'diffusion_zone'  => self::zoneFromCategory($type, $category),
-                'publisher'       => $publisher !== '' ? mb_substr($publisher, 0, 240) : null,
+                'workspace_id' => $workspaceId,
+                'name' => mb_substr($name, 0, 240),
+                'media_type' => $type,
+                'media_family' => 'editorial',
+                'diffusion_zone' => self::zoneFromCategory($type, $category),
+                'publisher' => $publisher !== '' ? mb_substr($publisher, 0, 240) : null,
                 'department_code' => $dept,
-                'region_code'     => $dept ? self::regionFromDept($dept) : null,
-                'city'            => $city !== '' ? mb_substr($city, 0, 160) : null,
-                'postcode'        => $postcode !== '' ? mb_substr($postcode, 0, 10) : null,
-                'arcom_id'        => self::arcomStableId($name, $type, $category),
-                'website_status'  => 'pending',
-                'enrich_status'   => 'pending',
-                'source'          => 'arcom',
-                'created_at'      => $now,
-                'updated_at'      => $now,
+                'region_code' => $dept ? self::regionFromDept($dept) : null,
+                'city' => $city !== '' ? mb_substr($city, 0, 160) : null,
+                'postcode' => $postcode !== '' ? mb_substr($postcode, 0, 10) : null,
+                'arcom_id' => self::arcomStableId($name, $type, $category),
+                'website_status' => 'pending',
+                'enrich_status' => 'pending',
+                'source' => 'arcom',
+                'created_at' => $now,
+                'updated_at' => $now,
             ];
         }
 
@@ -451,9 +451,9 @@ class ImportMediaFromArcom extends Command
 
         return match (strtoupper(trim($category))) {
             'A', 'B' => 'local',
-            'C'      => 'régional',
+            'C' => 'régional',
             'D', 'E' => 'national',
-            default  => null,
+            default => null,
         };
     }
 

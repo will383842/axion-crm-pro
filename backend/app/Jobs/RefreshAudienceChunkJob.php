@@ -3,7 +3,6 @@
 namespace App\Jobs;
 
 use App\Jobs\Concerns\RunsInWorkspace;
-use App\Models\AudienceMember;
 use App\Models\Company;
 use App\Models\EmailAudience;
 use App\Services\Audiences\AudienceBuilderService;
@@ -31,6 +30,7 @@ class RefreshAudienceChunkJob implements ShouldQueue
     use Batchable, Dispatchable, InteractsWithQueue, Queueable, RunsInWorkspace, SerializesModels;
 
     public int $tries = 2;
+
     public int $timeout = 600;
 
     public function __construct(
@@ -73,6 +73,7 @@ class RefreshAudienceChunkJob implements ShouldQueue
         $audience = EmailAudience::find($this->audienceId);
         if (! $audience) {
             Log::warning('RefreshAudienceChunkJob: audience missing', ['id' => $this->audienceId]);
+
             return;
         }
 
@@ -108,20 +109,20 @@ class RefreshAudienceChunkJob implements ShouldQueue
                 $contacts = $contactsByCompany->get($companyId, collect());
                 if ($contacts->isEmpty()) {
                     $rows[] = [
-                        'audience_id'  => $audience->id,
-                        'company_id'   => $companyId,
-                        'contact_id'   => null,
+                        'audience_id' => $audience->id,
+                        'company_id' => $companyId,
+                        'contact_id' => null,
                         'workspace_id' => $audience->workspace_id,
-                        'added_at'     => now(),
+                        'added_at' => now(),
                     ];
                 } else {
                     foreach ($contacts as $c) {
                         $rows[] = [
-                            'audience_id'  => $audience->id,
-                            'company_id'   => $companyId,
-                            'contact_id'   => $c->id,
+                            'audience_id' => $audience->id,
+                            'company_id' => $companyId,
+                            'contact_id' => $c->id,
                             'workspace_id' => $audience->workspace_id,
-                            'added_at'     => now(),
+                            'added_at' => now(),
                         ];
                     }
                 }

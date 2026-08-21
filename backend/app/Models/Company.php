@@ -60,6 +60,7 @@ class Company extends Model
 {
     use BelongsToWorkspace;
     use HasFactory;
+
     /**
      * 🔴 B10-016 — la table porte `deleted_at` depuis l'origine (migration
      * 2026_05_16_000003, ligne 57) et TOUT le code de lecture s'appuie dessus :

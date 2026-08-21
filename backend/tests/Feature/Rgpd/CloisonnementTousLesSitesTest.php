@@ -215,7 +215,7 @@ test('B12-001 — SANS contexte d espace, on ne rend RIEN : la garde est fail-cl
         200,
         'Sans contexte d\'espace, la fiche d\'ALPHA est rendue. C\'est exactement ce que '
         . 'la garde artisanale autorisait : « tolérant si workspace.id n\'est pas bound ». '
-        . 'Rien ne distingue un test d\'une production.'
+        . 'Rien ne distingue un test d\'une production.',
     );
 });
 
@@ -246,7 +246,7 @@ function modelesCloisonnes(): array
  * Toutes les méthodes de contrôleur recevant un modèle cloisonné par résolution
  * de route, avec l'état de leur garde.
  *
- * @return array<string, bool>  « Fichier::methode » => la garde est-elle posée
+ * @return array<string, bool> « Fichier::methode » => la garde est-elle posée
  */
 function sitesDeLiaison(): array
 {
@@ -308,7 +308,7 @@ test('B12-001 — TEMOIN : le banc voit bien des sites de liaison a inspecter', 
     expect(count($sites))->toBeGreaterThan(
         20,
         'Moins de vingt sites de liaison trouvés : le balayage ne voit pas ce qu\'il croit voir. '
-        . 'Trente-huit ont été comptés le 2026-08-20.'
+        . 'Trente-huit ont été comptés le 2026-08-20.',
     );
 
     expect(count(modelesCloisonnes()))->toBeGreaterThan(5);
@@ -331,12 +331,12 @@ test('B12-001 — AUCUNE methode liant un modele cloisonne n est depourvue de ga
 
     expect($nus)->toBe(
         [],
-        "Ces methodes recoivent un enregistrement cloisonne par resolution de route et ne "
-        . "verifient pas a quel espace il appartient. La resolution de route ne filtre RIEN : "
+        'Ces methodes recoivent un enregistrement cloisonne par resolution de route et ne '
+        . 'verifient pas a quel espace il appartient. La resolution de route ne filtre RIEN : '
         . "elle rend l'enregistrement qui porte cet identifiant, quel que soit son proprietaire, "
         . "et les identifiants sont des entiers consecutifs.\n\n"
-        . "Pose `\$this->refuserHorsEspace(\$modele)` en tete de methode. La piece existe deja "
+        . 'Pose `$this->refuserHorsEspace($modele)` en tete de methode. La piece existe deja '
         . "dans `ApiController` : c'est le patron A-011 qui recommence si on la reecrit.\n\n"
-        . "Sites nus :\n  - " . implode("\n  - ", $nus)
+        . "Sites nus :\n  - " . implode("\n  - ", $nus),
     );
 });

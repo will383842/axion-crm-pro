@@ -7,9 +7,11 @@ use App\Models\Company;
 use App\Services\Email\EmailConfidenceService;
 use App\Services\Email\MxEmailValidator;
 use App\Services\Http\SsrfGuard;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Sentry\State\Hub;
 
 /**
  * Scrape la page « Mentions Légales » (ou variantes) d'un site web pour extraire,
@@ -95,15 +97,15 @@ class MentionsLegalesScraperService
      * @var array<string, array<int, string>>
      */
     private const SERVICE_ROLE_MAP = [
-        'Commercial'             => ['commercial', 'commerciale', 'sales', 'vente', 'ventes', 'devis'],
-        'Comptabilité'           => ['compta', 'comptabilite', 'facturation', 'facture', 'billing', 'finance', 'finances'],
-        'Ressources humaines'    => ['rh', 'recrut', 'recrutement', 'emploi', 'job', 'jobs', 'career', 'careers', 'candidature'],
-        'Direction'              => ['direction', 'ceo', 'gerance', 'gerant', 'pdg', 'dg', 'president', 'presidente'],
-        'Support / SAV'          => ['sav', 'support', 'aide', 'help', 'assistance', 'serviceclient', 'service-client'],
+        'Commercial' => ['commercial', 'commerciale', 'sales', 'vente', 'ventes', 'devis'],
+        'Comptabilité' => ['compta', 'comptabilite', 'facturation', 'facture', 'billing', 'finance', 'finances'],
+        'Ressources humaines' => ['rh', 'recrut', 'recrutement', 'emploi', 'job', 'jobs', 'career', 'careers', 'candidature'],
+        'Direction' => ['direction', 'ceo', 'gerance', 'gerant', 'pdg', 'dg', 'president', 'presidente'],
+        'Support / SAV' => ['sav', 'support', 'aide', 'help', 'assistance', 'serviceclient', 'service-client'],
         'Communication / Presse' => ['presse', 'press', 'media', 'medias', 'communication', 'comm'],
-        'Marketing'              => ['marketing', 'mkt', 'digital'],
-        'Achats'                 => ['achat', 'achats', 'purchasing', 'procurement', 'fournisseur', 'fournisseurs'],
-        'Contact général'        => ['contact', 'info', 'infos', 'information', 'accueil', 'hello', 'bonjour', 'welcome', 'mail', 'societe'],
+        'Marketing' => ['marketing', 'mkt', 'digital'],
+        'Achats' => ['achat', 'achats', 'purchasing', 'procurement', 'fournisseur', 'fournisseurs'],
+        'Contact général' => ['contact', 'info', 'infos', 'information', 'accueil', 'hello', 'bonjour', 'welcome', 'mail', 'societe'],
     ];
 
     public function __construct(
@@ -289,13 +291,15 @@ class MentionsLegalesScraperService
                         ])
                         ->get($base . $path);
                 }
+
                 return $out;
             });
         } catch (\Throwable $e) {
-            if (class_exists(\Sentry\State\Hub::class)) {
+            if (class_exists(Hub::class)) {
                 \Sentry\captureException($e);
             }
             Log::debug('MentionsLegales pool failed', ['website' => $website, 'error' => $e->getMessage()]);
+
             return null;
         }
 
@@ -360,7 +364,7 @@ class MentionsLegalesScraperService
                     'Accept' => 'text/html,application/xhtml+xml',
                 ])
                 ->retry(1, 500, function (\Throwable $e) {
-                    return $e instanceof \Illuminate\Http\Client\ConnectionException;
+                    return $e instanceof ConnectionException;
                 })
                 ->get($url);
 
@@ -376,10 +380,11 @@ class MentionsLegalesScraperService
 
             return $response->body();
         } catch (\Throwable $e) {
-            if (class_exists(\Sentry\State\Hub::class)) {
+            if (class_exists(Hub::class)) {
                 \Sentry\captureException($e);
             }
             Log::debug('MentionsLegales fetch failed', ['url' => $url, 'error' => $e->getMessage()]);
+
             return null;
         }
     }
@@ -418,6 +423,7 @@ class MentionsLegalesScraperService
                 $out[$email] = true;
             }
         }
+
         return array_keys($out);
     }
 
@@ -436,6 +442,7 @@ class MentionsLegalesScraperService
         }
         $domain = (string) substr(strrchr($email, '@') ?: '@', 1);
         $tld = str_contains($domain, '.') ? substr((string) strrchr($domain, '.'), 1) : '';
+
         return ! in_array($tld, self::EMAIL_FALSE_TLDS, true);
     }
 
@@ -462,6 +469,7 @@ class MentionsLegalesScraperService
                 $out[$digits] = true;
             }
         }
+
         return array_keys($out);
     }
 
@@ -483,9 +491,9 @@ class MentionsLegalesScraperService
                 || ($first !== '' && strlen($first) >= 3 && str_contains($local, $first))) {
                 return [
                     'first_name' => $rep['first_name'] ?? null,
-                    'last_name'  => (string) ($rep['last_name'] ?? 'Dirigeant'),
-                    'role'       => $rep['role'] ?? 'dirigeant',
-                    'kind'       => 'dirigeant',
+                    'last_name' => (string) ($rep['last_name'] ?? 'Dirigeant'),
+                    'role' => $rep['role'] ?? 'dirigeant',
+                    'kind' => 'dirigeant',
                 ];
             }
         }
@@ -495,9 +503,9 @@ class MentionsLegalesScraperService
         if ($roleLabel !== null) {
             return [
                 'first_name' => null,
-                'last_name'  => ucfirst($local),
-                'role'       => $roleLabel,
-                'kind'       => 'service',
+                'last_name' => ucfirst($local),
+                'role' => $roleLabel,
+                'kind' => 'service',
             ];
         }
 
@@ -506,18 +514,18 @@ class MentionsLegalesScraperService
         if ($person !== null) {
             return [
                 'first_name' => $person['first_name'],
-                'last_name'  => $person['last_name'],
-                'role'       => 'à qualifier',
-                'kind'       => 'person',
+                'last_name' => $person['last_name'],
+                'role' => 'à qualifier',
+                'kind' => 'person',
             ];
         }
 
         // 4. Fallback : boîte générique non catégorisée.
         return [
             'first_name' => null,
-            'last_name'  => ucfirst($local),
-            'role'       => 'Service',
-            'kind'       => 'service',
+            'last_name' => ucfirst($local),
+            'role' => 'Service',
+            'kind' => 'service',
         ];
     }
 
@@ -534,6 +542,7 @@ class MentionsLegalesScraperService
                 }
             }
         }
+
         return null;
     }
 
@@ -547,6 +556,7 @@ class MentionsLegalesScraperService
         if (preg_match('/^([a-zà-ÿ]+)[._\-]([a-zà-ÿ]{2,})$/u', $local, $m)) {
             return ['first_name' => ucfirst($m[1]), 'last_name' => ucfirst($m[2])];
         }
+
         return null;
     }
 
@@ -555,9 +565,9 @@ class MentionsLegalesScraperService
     {
         return match ($status) {
             'verified' => 'valid',
-            'risky'    => 'catchall',
-            'role'     => 'role',
-            default    => 'unknown',
+            'risky' => 'catchall',
+            'role' => 'role',
+            default => 'unknown',
         };
     }
 
@@ -570,31 +580,31 @@ class MentionsLegalesScraperService
     {
         try {
             DB::table('contacts')->insertOrIgnore([[
-                'workspace_id'     => $company->workspace_id,
-                'company_id'       => $company->id,
-                'first_name'       => $class['first_name'],
-                'last_name'        => $class['last_name'],
-                'role'             => $class['role'],
-                'email'            => $email,
-                'email_status'     => $emailStatus,
+                'workspace_id' => $company->workspace_id,
+                'company_id' => $company->id,
+                'first_name' => $class['first_name'],
+                'last_name' => $class['last_name'],
+                'role' => $class['role'],
+                'email' => $email,
+                'email_status' => $emailStatus,
                 // A05-001 (S1) : SITE JUMEAU de `ScrapedRecordIngestService`.
                 // Ce chemin-ci fabrique lui aussi des fiches personne PORTEUSES
                 // D'UNE ADRESSE, et n'a jamais posé la clé de rapprochement —
                 // il compte donc parmi les 1 319 567 contacts sans `person_key`
                 // mesurés le 2026-08-18. `null` si le secret n'est pas
                 // configuré : on ne fabrique jamais de clé de complaisance.
-                'person_key'       => CleDePersonne::pour($email),
+                'person_key' => CleDePersonne::pour($email),
                 // Score de confiance A/B/C (déterministe, sans SMTP) posé dès la
                 // capture — priorise l'envoi via ESP. Additif : n'altère rien.
-                'email_confidence' => (new EmailConfidenceService())->score($email, $company->website),
+                'email_confidence' => (new EmailConfidenceService)->score($email, $company->website),
                 'discovery_source' => 'mentions-legales',
-                'sources'          => json_encode(['mentions-legales']),
-                'metadata'         => json_encode([
-                    'kind'          => $class['kind'],
+                'sources' => json_encode(['mentions-legales']),
+                'metadata' => json_encode([
+                    'kind' => $class['kind'],
                     'mx_validation' => $validation,
                 ]),
-                'created_at'       => now(),
-                'updated_at'       => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
             ]]);
         } catch (\Throwable $e) {
             Log::warning('contact insert (all-channels) failed', [

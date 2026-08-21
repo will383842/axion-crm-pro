@@ -8,7 +8,6 @@ use App\Http\Controllers\Api\Auth\MagicLinkController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
 use App\Http\Controllers\Api\Auth\TwoFactorController;
 use App\Http\Controllers\Api\CompaniesController;
-use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\CompanyTagsBulkController;
 use App\Http\Controllers\Api\ContactsController;
 use App\Http\Controllers\Api\CoverageController;
@@ -17,6 +16,7 @@ use App\Http\Controllers\Api\Crm\BulkController;
 use App\Http\Controllers\Api\Crm\CandidatesController;
 use App\Http\Controllers\Api\Crm\ContactsHubController;
 use App\Http\Controllers\Api\Crm\PersonTimelineController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\FeaturesController;
 use App\Http\Controllers\Api\GlobalSearchController;
 use App\Http\Controllers\Api\JournalistsController;
@@ -41,7 +41,6 @@ use App\Http\Controllers\Internal\ScraperResultController;
 use App\Http\Controllers\Internal\SiteGdprController;
 use App\Http\Controllers\Internal\SiteSyncController;
 use App\Http\Controllers\Internal\ZeptoMailWebhookController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /*

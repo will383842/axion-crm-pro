@@ -45,7 +45,7 @@ uses(TestCase::class, RefreshDatabase::class);
 function b17WorkspaceRejeu(): Workspace
 {
     return Workspace::create([
-        'id'   => (string) Str::uuid(),
+        'id' => (string) Str::uuid(),
         'slug' => 'b17-' . Str::random(6),
         'name' => 'WS Rejeu Import',
     ]);
@@ -59,15 +59,15 @@ function b17WorkspaceRejeu(): Workspace
 function b17PoseEnrichissement(int $mediaId, int $companyId): void
 {
     DB::table('media')->where('id', $mediaId)->update([
-        'email'            => 'redaction@alpha.example',
+        'email' => 'redaction@alpha.example',
         'email_confidence' => 'A',
-        'phone'            => '0102030405',
-        'socials'          => json_encode(['twitter' => '@alpha']),
-        'enrich_status'    => 'enriched',
-        'enriched_at'      => now(),
-        'editorial_theme'  => 'sport',
-        'company_id'       => $companyId,
-        'updated_at'       => now(),
+        'phone' => '0102030405',
+        'socials' => json_encode(['twitter' => '@alpha']),
+        'enrich_status' => 'enriched',
+        'enriched_at' => now(),
+        'editorial_theme' => 'sport',
+        'company_id' => $companyId,
+        'updated_at' => now(),
     ]);
 }
 
@@ -75,10 +75,10 @@ function b17InsereCompany(string $ws, string $siren): int
 {
     return DB::table('companies')->insertGetId([
         'workspace_id' => $ws,
-        'siren'        => $siren,
+        'siren' => $siren,
         'denomination' => 'Editions Alpha',
-        'created_at'   => now(),
-        'updated_at'   => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
     ]);
 }
 
@@ -87,14 +87,14 @@ function b17InsereJournaliste(string $ws, int $mediaId): int
 {
     return DB::table('journalists')->insertGetId([
         'workspace_id' => $ws,
-        'media_id'     => $mediaId,
-        'first_name'   => 'Jean',
-        'last_name'    => 'Dupont',
-        'role'         => 'redacteur en chef',
-        'email'        => 'jean.dupont@alpha.example',
-        'source'       => 'ours',
-        'created_at'   => now(),
-        'updated_at'   => now(),
+        'media_id' => $mediaId,
+        'first_name' => 'Jean',
+        'last_name' => 'Dupont',
+        'role' => 'redacteur en chef',
+        'email' => 'jean.dupont@alpha.example',
+        'source' => 'ours',
+        'created_at' => now(),
+        'updated_at' => now(),
     ]);
 }
 
@@ -102,11 +102,11 @@ function b17InsereJournaliste(string $ws, int $mediaId): int
 function b17PayloadSpel(string $editeur): array
 {
     return [[
-        'service'      => 'Journal Test Alpha',
-        'editeur'      => $editeur,
-        'departement'  => '38',
+        'service' => 'Journal Test Alpha',
+        'editeur' => $editeur,
+        'departement' => '38',
         'numero_cppap' => '1234 W 56789',
-        'url'          => 'alpha.example',
+        'url' => 'alpha.example',
     ]];
 }
 
@@ -144,12 +144,14 @@ function b17XlsxArcom(array $dataRows): string
         . '<sheetData>' . $rowsXml . '</sheetData></worksheet>';
 
     $path = tempnam(sys_get_temp_dir(), 'b17_arcom_') . '.xlsx';
-    $zip = new ZipArchive();
+    $zip = new ZipArchive;
     $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
-    $zip->addFromString('[Content_Types].xml',
+    $zip->addFromString(
+        '[Content_Types].xml',
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         . '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
-        . '<Default Extension="xml" ContentType="application/xml"/></Types>');
+        . '<Default Extension="xml" ContentType="application/xml"/></Types>',
+    );
     $zip->addFromString('xl/worksheets/sheet1.xml', $sheet);
     $zip->close();
     $bytes = (string) file_get_contents($path);
@@ -270,15 +272,15 @@ it('media:import-arcom rejoue la meme source sans detruire enrichissement ni rat
 
     // Une emission Wikidata rattachee a cette chaine (parent_media_id ON DELETE SET NULL).
     $emissionId = DB::table('media')->insertGetId([
-        'workspace_id'    => $ws->id,
+        'workspace_id' => $ws->id,
         'parent_media_id' => $idAvant,
-        'name'            => 'Emission Alpha',
-        'media_type'      => 'tv_emission',
-        'media_family'    => 'editorial',
-        'enrich_status'   => 'pending',
-        'source'          => 'wikidata',
-        'created_at'      => now(),
-        'updated_at'      => now(),
+        'name' => 'Emission Alpha',
+        'media_type' => 'tv_emission',
+        'media_family' => 'editorial',
+        'enrich_status' => 'pending',
+        'source' => 'wikidata',
+        'created_at' => now(),
+        'updated_at' => now(),
     ]);
 
     // Rejeu : la source a corrige la denomination de l'editeur (TEMOIN).

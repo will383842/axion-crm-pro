@@ -50,7 +50,7 @@ function cheminRunbookDisquePlein(): string
 
 test('B16-009 — retirer les PREMIERS maillons casse la chaine DEFINITIVEMENT', function () {
     config(['services.audit.hash_chain_secret' => 'un-secret-de-chaine-reellement-secret-2026']);
-    $chaine = new AuditHashChain();
+    $chaine = new AuditHashChain;
 
     $chaine->record(['method' => 'POST', 'path' => '/le-plus-ancien', 'status' => 201]);
     $chaine->record(['method' => 'POST', 'path' => '/milieu', 'status' => 201]);
@@ -69,7 +69,7 @@ test('B16-009 — retirer les PREMIERS maillons casse la chaine DEFINITIVEMENT',
     $this->assertFalse(
         $chaine->verifyChain(),
         "Retirer le premier maillon devrait casser la verification : si ce n'est "
-        . 'pas le cas, la garde documentaire ci-dessous ne repose sur rien.'
+        . 'pas le cas, la garde documentaire ci-dessous ne repose sur rien.',
     );
 
     // « DEFINITIVEMENT » : rien ne se repare tout seul au passage suivant, et
@@ -77,7 +77,7 @@ test('B16-009 — retirer les PREMIERS maillons casse la chaine DEFINITIVEMENT',
     $chaine->record(['method' => 'POST', 'path' => '/apres-incident', 'status' => 201]);
     $this->assertFalse(
         $chaine->verifyChain(),
-        'La chaine redevient valide apres coup : la mesure ci-dessus etait fausse.'
+        'La chaine redevient valide apres coup : la mesure ci-dessus etait fausse.',
     );
 });
 
@@ -96,7 +96,7 @@ test('B16-009 — le runbook AVERTIT avant de detacher des partitions audit_logs
     $this->assertStringContainsString(
         'run_maintenance',
         $contenu,
-        "Le runbook ne parle plus de partitionnement : cette garde ne mesure plus rien."
+        'Le runbook ne parle plus de partitionnement : cette garde ne mesure plus rien.',
     );
     $this->assertStringContainsString('df -h', $contenu, "Ce n'est pas le runbook « disque plein ».");
 
@@ -106,13 +106,13 @@ test('B16-009 — le runbook AVERTIT avant de detacher des partitions audit_logs
         'audit:verify-chain',
         $contenu,
         "Le runbook ne nomme pas le controle qu'il casse : celui qui l'applique en "
-        . 'incident ne peut pas savoir ce qu il vient de perdre.'
+        . 'incident ne peut pas savoir ce qu il vient de perdre.',
     );
     $this->assertStringContainsString(
         'NE PAS DETACHER',
         $contenu,
         "Le runbook n'interdit pas le detachement des partitions `audit_logs` : "
-        . "l'appliquer rend la verification d'integrite definitivement rouge (B16-009)."
+        . "l'appliquer rend la verification d'integrite definitivement rouge (B16-009).",
     );
 });
 
@@ -129,6 +129,6 @@ test('B16-009 — l avertissement est AVANT la commande dangereuse, pas apres', 
     $this->assertLessThan(
         $positionCommande,
         $positionAvertissement,
-        "L'avertissement est ecrit APRES la commande qu'il concerne : il sera lu trop tard."
+        "L'avertissement est ecrit APRES la commande qu'il concerne : il sera lu trop tard.",
     );
 });

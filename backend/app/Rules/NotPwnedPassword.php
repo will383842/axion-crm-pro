@@ -41,8 +41,8 @@ class NotPwnedPassword implements ValidationRule
 
         if ($count === null) {
             $fail(
-                "La vérification des mots de passe compromis est momentanément indisponible. "
-                . "Par précaution, le mot de passe n'a pas été changé — réessayez dans quelques minutes."
+                'La vérification des mots de passe compromis est momentanément indisponible. '
+                . "Par précaution, le mot de passe n'a pas été changé — réessayez dans quelques minutes.",
             );
 
             return;

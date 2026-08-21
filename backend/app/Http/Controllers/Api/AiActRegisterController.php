@@ -52,6 +52,7 @@ class AiActRegisterController extends ApiController
     /**
      * @OA\Get(path="/ai-act/register", tags={"RGPD"}, summary="Registre AI Act (art. 9-15) — systèmes IA déployés",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Response(response=200, description="Liste des entrées"))
      */
     public function index(Request $r): JsonResponse
@@ -84,7 +85,7 @@ class AiActRegisterController extends ApiController
                     // illisible est une analyse d'impact non consultee.
                     $tableau['impact_assessment'] = json_decode(
                         (string) ($tableau['impact_assessment'] ?? '{}'),
-                        true
+                        true,
                     ) ?: [];
 
                     return $tableau;
@@ -106,6 +107,7 @@ class AiActRegisterController extends ApiController
     /**
      * @OA\Post(path="/ai-act/register", tags={"RGPD"}, summary="Inscrit un système IA au registre AI Act",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Response(response=201, description="Entrée créée"),
      *     @OA\Response(response=403, description="Droit rgpd.handle requis"),
      *     @OA\Response(response=422, description="Classe de risque hors AI Act"))

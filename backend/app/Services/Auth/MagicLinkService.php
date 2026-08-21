@@ -43,11 +43,11 @@ class MagicLinkService
         $tokenHash = hash('sha256', $token);
 
         DB::table('magic_links')->insert([
-            'id'         => (string) Str::uuid(),
-            'user_id'    => $user->id,
-            'email'      => $email,
+            'id' => (string) Str::uuid(),
+            'user_id' => $user->id,
+            'email' => $email,
             'token_hash' => $tokenHash,
-            'ip'         => $ip,
+            'ip' => $ip,
             'expires_at' => now()->addMinutes(self::TTL_MINUTES),
             'created_at' => now(),
         ]);
@@ -60,6 +60,7 @@ class MagicLinkService
         // n'etait donc jamais envoye, meme avec un SMTP configure (F40-002).
         if (config('crm.mock_mode', true)) {
             \Log::info('Mock magic link (would be emailed)', ['email' => $email, 'link' => $link]);
+
             return;
         }
 

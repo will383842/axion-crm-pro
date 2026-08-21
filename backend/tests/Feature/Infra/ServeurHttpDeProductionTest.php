@@ -62,7 +62,7 @@ function lireFichierDepot(string $relatif): string
     $chemin = racineDepotHttp() . '/' . ltrim($relatif, '/');
     expect(file_exists($chemin))->toBeTrue(
         "Le banc ne voit pas {$relatif}. Une garde qui n'a rien à inspecter passe au vert " .
-        'sans rien prouver : monte la racine du dépôt avant de la croire.'
+        'sans rien prouver : monte la racine du dépôt avant de la croire.',
     );
 
     return file_get_contents($chemin) ?: '';
@@ -90,13 +90,13 @@ test('A-010 — aucune image ne sert HTTP par le serveur integre de PHP', functi
     // souhaitable, et ne doit pas faire rougir la garde.
     $directives = array_values(array_filter(
         preg_split('/\R/', $dockerfile) ?: [],
-        fn (string $ligne) => ! str_starts_with(ltrim($ligne), '#') && trim($ligne) !== ''
+        fn (string $ligne) => ! str_starts_with(ltrim($ligne), '#') && trim($ligne) !== '',
     ));
 
     foreach ($directives as $ligne) {
         expect($ligne)->not->toMatch(
             '/\b(CMD|ENTRYPOINT)\b.*php.*["\']?-S["\']?/i',
-            "Cette ligne du Dockerfile sert HTTP par `php -S`, qui traite une requête à la fois :\n    {$ligne}"
+            "Cette ligne du Dockerfile sert HTTP par `php -S`, qui traite une requête à la fois :\n    {$ligne}",
         );
     }
 });
@@ -113,12 +113,12 @@ test('A-010 — le service api demarre php-fpm, et le declare', function () {
     $this->assertStringContainsString(
         'CMD ["php-fpm", "-F"]',
         $dockerfile,
-        'L\'étape `prod` doit démarrer php-fpm au premier plan.'
+        'L\'étape `prod` doit démarrer php-fpm au premier plan.',
     );
     $this->assertStringContainsString(
         'EXPOSE 9000',
         $dockerfile,
-        'php-fpm parle FastCGI sur 9000, pas HTTP sur 80 : le port déclaré doit le dire.'
+        'php-fpm parle FastCGI sur 9000, pas HTTP sur 80 : le port déclaré doit le dire.',
     );
 });
 
@@ -136,13 +136,13 @@ test('A-010 — le pool php-fpm tient au moins les dix utilisateurs du cahier de
         10,
         'Le principe directeur 8 du cahier des charges demande dix utilisateurs simultanés dès ' .
         'le premier jour. Un pool en dessous de dix les met en file d\'attente. ' .
-        'Réglage d\'usine de l\'image Docker officielle : 5.'
+        'Réglage d\'usine de l\'image Docker officielle : 5.',
     );
 
     $this->assertStringContainsString(
         'ping.path',
         $pool,
-        'Sans point de vie, le contrôle de santé du conteneur ne peut rien mesurer.'
+        'Sans point de vie, le contrôle de santé du conteneur ne peut rien mesurer.',
     );
 });
 
@@ -152,17 +152,17 @@ test('A-010 — Caddy parle FastCGI a l api, plus HTTP', function () {
     $this->assertStringNotContainsString(
         'reverse_proxy api:80',
         $caddy,
-        'L\'API n\'écoute plus en HTTP : un mandataire vers `api:80` renverrait 502.'
+        'L\'API n\'écoute plus en HTTP : un mandataire vers `api:80` renverrait 502.',
     );
     $this->assertStringContainsString(
         'api:9000',
         $caddy,
-        'Le mandataire doit joindre php-fpm sur son port FastCGI.'
+        'Le mandataire doit joindre php-fpm sur son port FastCGI.',
     );
     $this->assertStringContainsString(
         'transport fastcgi',
         $caddy,
-        'Le transport doit être déclaré FastCGI.'
+        'Le transport doit être déclaré FastCGI.',
     );
 
     // Laravel n'a qu'un point d'entrée : toute requête doit y aboutir, sinon
@@ -176,7 +176,7 @@ test('A-010 — le controle de sante n interroge plus un port HTTP disparu', fun
 
         $lignes = array_values(array_filter(
             preg_split('/\R/', $contenu) ?: [],
-            fn (string $l) => ! str_starts_with(ltrim($l), '#') && trim($l) !== ''
+            fn (string $l) => ! str_starts_with(ltrim($l), '#') && trim($l) !== '',
         ));
 
         foreach ($lignes as $ligne) {
@@ -188,7 +188,7 @@ test('A-010 — le controle de sante n interroge plus un port HTTP disparu', fun
             // le déploiement le redémarre en boucle.
             expect($ligne)->not->toMatch(
                 '/healthcheck|test:|HEALTHCHECK|CMD-SHELL/i',
-                "Contrôle de santé en HTTP sur un service qui ne sert plus HTTP, dans {$f} :\n    {$ligne}"
+                "Contrôle de santé en HTTP sur un service qui ne sert plus HTTP, dans {$f} :\n    {$ligne}",
             );
         }
     }

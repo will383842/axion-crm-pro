@@ -45,6 +45,7 @@ class Contact extends Model
 {
     use BelongsToWorkspace;
     use HasFactory;
+
     /**
      * 🔴 B10-016 — meme ecart que sur `Company`. La colonne existe (migration
      * 2026_05_16_000003, ligne 95) et six sites de lecture la filtrent :

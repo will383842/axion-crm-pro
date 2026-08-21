@@ -145,7 +145,7 @@ test('F37-003 — TEMOIN : la sonde demarre et sait rendre une valeur', function
     expect($resultat['code'])->toBe(
         0,
         "La sonde n'a pas pu s'executer. Tout ce qui suit serait un vert sans mesure.\n"
-        . "Sortie :\n" . $resultat['sortie']
+        . "Sortie :\n" . $resultat['sortie'],
     );
 
     // TEMOIN POSITIF. Sans lui, une sonde cassee qui repondrait toujours
@@ -153,9 +153,9 @@ test('F37-003 — TEMOIN : la sonde demarre et sait rendre une valeur', function
     // Sur un poste de developpement le debogage reste legitime : la sonde DOIT
     // y rendre `true`.
     expect($resultat['debug'])->toBeTrue(
-        "La sonde ne rend plus `true` meme en local, avec APP_DEBUG=true. Elle ne mesure "
+        'La sonde ne rend plus `true` meme en local, avec APP_DEBUG=true. Elle ne mesure '
         . "donc plus rien, et les gardes qui suivent seraient vertes sur une panne.\n"
-        . "Sortie :\n" . $resultat['sortie']
+        . "Sortie :\n" . $resultat['sortie'],
     );
 });
 
@@ -165,11 +165,11 @@ test('F37-003 — APP_DEBUG=true ne prend PAS effet en production', function () 
     expect($resultat['debug'])->toBeFalse(
         "`config('app.debug')` vaut TRUE avec APP_ENV=production.\n\n"
         . "Une page de debogage Laravel affiche la valeur de CHAQUE variable d'environnement "
-        . "du processus (DB_PASSWORD, APP_KEY, jetons tiers), la configuration resolue, la "
+        . 'du processus (DB_PASSWORD, APP_KEY, jetons tiers), la configuration resolue, la '
         . "requete SQL fautive avec ses parametres, et le code source du chemin d'appel. Une "
         . "seule 500 provoquee suffit a tout lire.\n\n"
         . "Correctif : `config/app.php` ne doit accorder le debogage qu'aux environnements "
-        . "`local` et `testing`.\n\nSortie de la sonde :\n" . $resultat['sortie']
+        . "`local` et `testing`.\n\nSortie de la sonde :\n" . $resultat['sortie'],
     );
 });
 
@@ -179,13 +179,13 @@ test('F37-003 — APP_DEBUG=true ne prend PAS effet en preproduction', function 
     expect($resultat['debug'])->toBeFalse(
         "`config('app.debug')` vaut TRUE avec APP_ENV=staging.\n\n"
         . "La preproduction N'EST PAS privee : `infra/caddy/Caddyfile` sert "
-        . "`staging.axion-crm-pro.com` et `staging-api.axion-crm-pro.com` depuis le Caddy de "
+        . '`staging.axion-crm-pro.com` et `staging-api.axion-crm-pro.com` depuis le Caddy de '
         . "PRODUCTION, sur des noms publics, SANS basic_auth ni liste d'adresses autorisees. "
-        . "Le seul en-tete de restriction est un `X-Robots-Tag: noindex`, qui parle aux "
+        . 'Le seul en-tete de restriction est un `X-Robots-Tag: noindex`, qui parle aux '
         . "moteurs et a personne d'autre.\n\n"
-        . "De plus la preproduction porte les memes secrets de forme que la production et une "
+        . 'De plus la preproduction porte les memes secrets de forme que la production et une '
         . "copie de 300 000 fiches : ses pages de debogage sont exploitables telles quelles.\n\n"
-        . "Sortie de la sonde :\n" . $resultat['sortie']
+        . "Sortie de la sonde :\n" . $resultat['sortie'],
     );
 });
 
@@ -235,7 +235,7 @@ test('F37-003 — TEMOIN : le banc voit les fichiers qui posent APP_DEBUG', func
         [],
         'Le banc ne voit pas ces fichiers : ' . implode(', ', $manquants)
         . ". Une garde qui n'a rien a inspecter passe au vert sans rien prouver. "
-        . "Racine vue : " . racineDepotDebogage()
+        . 'Racine vue : ' . racineDepotDebogage(),
     );
 });
 
@@ -245,7 +245,7 @@ test('F37-003 — TEMOIN NEGATIF : le balayage SAIT reperer un APP_DEBUG vrai', 
     foreach (["      APP_DEBUG: 'true'", '      APP_DEBUG: true', '  regler APP_DEBUG true', 'APP_DEBUG=true'] as $fabrique) {
         expect(poseAppDebugVrai($fabrique))->toBeTrue(
             "Le balayage ne reconnait pas « {$fabrique} » comme une pose a vrai : la garde "
-            . 'ci-dessous passerait au vert sur le defaut lui-meme.'
+            . 'ci-dessous passerait au vert sur le defaut lui-meme.',
         );
     }
 
@@ -253,7 +253,7 @@ test('F37-003 — TEMOIN NEGATIF : le balayage SAIT reperer un APP_DEBUG vrai', 
     // le correctif et la pente serait de l'assouplir.
     foreach (["      APP_DEBUG: 'false'", '  regler APP_DEBUG false', 'APP_DEBUG=false', '# APP_DEBUG=true dans le passe'] as $correcte) {
         expect(poseAppDebugVrai($correcte))->toBeFalse(
-            "Le balayage crie sur « {$correcte} », qui est pourtant correcte."
+            "Le balayage crie sur « {$correcte} », qui est pourtant correcte.",
         );
     }
 });
@@ -288,10 +288,10 @@ test('F37-003 — aucun fichier de deploiement ne pose APP_DEBUG a vrai', functi
     expect($fautifs)->toBe(
         [],
         "Ces fichiers posent APP_DEBUG a vrai pour un environnement DEPLOYE.\n\n"
-        . "`config/app.php` neutralise desormais la valeur hors `local`/`testing`, donc la "
-        . "porte est fermee — mais un reglage faux qui dort reste un reglage faux : le "
-        . "prochain lecteur croira que la preproduction affiche ses traces, et il « reparera » "
+        . '`config/app.php` neutralise desormais la valeur hors `local`/`testing`, donc la '
+        . 'porte est fermee — mais un reglage faux qui dort reste un reglage faux : le '
+        . 'prochain lecteur croira que la preproduction affiche ses traces, et il « reparera » '
         . "`config/app.php` pour que ce soit vrai.\n\n"
-        . "Poses fautives :\n  - " . implode("\n  - ", $fautifs)
+        . "Poses fautives :\n  - " . implode("\n  - ", $fautifs),
     );
 });

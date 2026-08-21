@@ -405,7 +405,7 @@ test('P6-DR — TEMOIN : le banc voit le runbook, et c est bien celui de la repr
 
     $this->assertFileExists(
         $chemin,
-        "Le runbook de reprise est introuvable. Racine vue : " . racineDepotRunbookDr()
+        'Le runbook de reprise est introuvable. Racine vue : ' . racineDepotRunbookDr(),
     );
 
     $contenu = contenuRunbookDr();
@@ -415,7 +415,7 @@ test('P6-DR — TEMOIN : le banc voit le runbook, et c est bien celui de la repr
     expect(strlen($contenu))->toBeGreaterThan(
         800,
         'Le runbook fait moins de 800 octets : tronque ou vide, les balayages qui suivent '
-        . 'seraient verts sans rien avoir regarde.'
+        . 'seraient verts sans rien avoir regarde.',
     );
 
     // Sous-chaines SANS LETTRE ACCENTUEE : le document est en francais, la
@@ -423,17 +423,17 @@ test('P6-DR — TEMOIN : le banc voit le runbook, et c est bien celui de la repr
     $this->assertStringContainsString(
         'RPO',
         $contenu,
-        "Ce n'est pas le runbook de reprise apres sinistre."
+        "Ce n'est pas le runbook de reprise apres sinistre.",
     );
     $this->assertStringContainsString(
         'RTO',
         $contenu,
-        "Ce n'est pas le runbook de reprise apres sinistre."
+        "Ce n'est pas le runbook de reprise apres sinistre.",
     );
 
     expect(blocsDeCommandesDr($contenu))->not->toBeEmpty(
         'Le runbook ne contient AUCUN bloc de commandes. Le balayage des outils et celui '
-        . 'des roles porteraient sur zero bloc : verts par vacuite.'
+        . 'des roles porteraient sur zero bloc : verts par vacuite.',
     );
 });
 
@@ -446,7 +446,7 @@ test('P6-DR — TEMOIN : le corpus du depot est bien peuple', function () {
     expect(count($corpus))->toBeGreaterThan(
         20,
         'Le corpus de reference compte moins de 20 fichiers : le balayage des outils '
-        . 'declarerait absent a peu pres n importe quoi. Racine vue : ' . racineDepotRunbookDr()
+        . 'declarerait absent a peu pres n importe quoi. Racine vue : ' . racineDepotRunbookDr(),
     );
 
     // Et il contient bien la chaine de sauvegarde reelle, celle sur laquelle le
@@ -454,7 +454,7 @@ test('P6-DR — TEMOIN : le corpus du depot est bien peuple', function () {
     foreach (['backup-postgres.sh', 'restore-postgres.sh', 'dr-drill.sh', 'setup-backup.sh'] as $script) {
         expect(is_file(racineDepotRunbookDr() . '/infra/scripts/' . $script))->toBeTrue(
             "`infra/scripts/{$script}` est introuvable : le runbook ne peut pas etre "
-            . 'verifie contre une chaine de sauvegarde absente.'
+            . 'verifie contre une chaine de sauvegarde absente.',
         );
     }
 });
@@ -476,12 +476,12 @@ test('P6-DR — MESURE : le role `axion` contourne la RLS, son COUNT ne peut PAS
     expect($roleApp)->not->toBe(
         $proprietaire,
         "Le role applicatif et le role proprietaire sont le MEME (« {$roleApp} ») sur ce banc : "
-        . 'la mesure ci-dessous comparerait un role avec lui-meme.'
+        . 'la mesure ci-dessous comparerait un role avec lui-meme.',
     );
     expect($mdpApp)->not->toBe(
         '',
         '`DB_APP_PASSWORD` est vide : impossible d ouvrir une session avec le role applicatif, '
-        . 'la mesure ne porterait sur rien.'
+        . 'la mesure ne porterait sur rien.',
     );
 
     $hote = (string) config('database.connections.pgsql_owner.host');
@@ -498,7 +498,7 @@ test('P6-DR — MESURE : le role `axion` contourne la RLS, son COUNT ne peut PAS
     // TEMOIN — c'est bien la propriete `rolbypassrls` qu'on met en cause, et
     // elle est bien portee par le role que le runbook nommait.
     $ligne = $admin->query(
-        'SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = ' . $admin->quote($proprietaire)
+        'SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = ' . $admin->quote($proprietaire),
     )->fetch(PDO::FETCH_ASSOC);
 
     expect($ligne)->not->toBeFalse("Le role « {$proprietaire} » n'existe pas dans ce cluster.");
@@ -506,7 +506,7 @@ test('P6-DR — MESURE : le role `axion` contourne la RLS, son COUNT ne peut PAS
         "Le role « {$proprietaire} » ne contourne PAS la RLS sur ce banc (rolsuper="
         . var_export($ligne['rolsuper'], true) . ', rolbypassrls=' . var_export($ligne['rolbypassrls'], true)
         . '). La mesure qui suit ne demontrerait alors rien du defaut de production, ou '
-        . 'l on a mesure le 2026-08-20 : axion | t | t.'
+        . 'l on a mesure le 2026-08-20 : axion | t | t.',
     );
 
     $base = 'axion_crm_test_lot14_a35_runbook_rls';
@@ -521,14 +521,14 @@ test('P6-DR — MESURE : le role `axion` contourne la RLS, son COUNT ne peut PAS
         // LEVEL SECURITY, et une policy STRICTE (aucun repli permissif).
         $proprio->exec('CREATE TABLE public.fiches_isolees (id integer PRIMARY KEY, workspace_id uuid, nom text)');
         $proprio->exec(
-            "INSERT INTO public.fiches_isolees VALUES "
-            . "(1, '11111111-1111-1111-1111-111111111111', 'une fiche du workspace reel')"
+            'INSERT INTO public.fiches_isolees VALUES '
+            . "(1, '11111111-1111-1111-1111-111111111111', 'une fiche du workspace reel')",
         );
         $proprio->exec('ALTER TABLE public.fiches_isolees ENABLE ROW LEVEL SECURITY');
         $proprio->exec('ALTER TABLE public.fiches_isolees FORCE ROW LEVEL SECURITY');
         $proprio->exec(
-            "CREATE POLICY fiches_isolees_workspace_isolation ON public.fiches_isolees FOR ALL "
-            . "USING (workspace_id::TEXT = NULLIF(current_setting('app.current_workspace_id', true), ''))"
+            'CREATE POLICY fiches_isolees_workspace_isolation ON public.fiches_isolees FOR ALL '
+            . "USING (workspace_id::TEXT = NULLIF(current_setting('app.current_workspace_id', true), ''))",
         );
         $proprio->exec('GRANT USAGE ON SCHEMA public TO ' . $roleApp);
         $proprio->exec('GRANT SELECT ON public.fiches_isolees TO ' . $roleApp);
@@ -545,7 +545,7 @@ test('P6-DR — MESURE : le role `axion` contourne la RLS, son COUNT ne peut PAS
             1,
             "Le role « {$proprietaire} » ne voit pas la ligne alors qu'il contourne la RLS : "
             . 'la mesure est cassee (table vide ? policy mal posee ?), et le constat ci-dessous '
-            . 'ne reposerait sur rien.'
+            . 'ne reposerait sur rien.',
         );
 
         // ── ET AVEC LE ROLE APPLICATIF, LE MEME GESTE REND BIEN 0 ───────────
@@ -562,7 +562,7 @@ test('P6-DR — MESURE : le role `axion` contourne la RLS, son COUNT ne peut PAS
             0,
             "Le role applicatif « {$roleApp} » voit {$vuParLeRoleApplicatif} ligne(s) alors que "
             . 'le contexte workspace pointe sur un identifiant inexistant : la policy ne mord '
-            . 'pas, et la mesure ne separe donc pas les deux roles.'
+            . 'pas, et la mesure ne separe donc pas les deux roles.',
         );
 
         // Le constat, dit en une ligne : MEME base, MEME requete, MEME contexte,
@@ -570,7 +570,7 @@ test('P6-DR — MESURE : le role `axion` contourne la RLS, son COUNT ne peut PAS
         expect($vuParLeSuperutilisateur)->not->toBe(
             $vuParLeRoleApplicatif,
             'Les deux roles rendent le meme chiffre : le §5 du runbook serait alors correct, '
-            . 'et cette garde n aurait pas lieu d etre.'
+            . 'et cette garde n aurait pas lieu d etre.',
         );
 
         unset($app, $proprio);
@@ -604,7 +604,7 @@ test('P6-DR — TEMOIN NEGATIF : le balayage des outils voit les fantomes du §2
         'pg_basebackup',
         $outils,
         'Le balayage rate `pg_basebackup` : il ne regarde donc pas le jeton qui suit '
-        . '`docker exec <conteneur>`, et tout fantome cache derriere `docker exec` passerait.'
+        . '`docker exec <conteneur>`, et tout fantome cache derriere `docker exec` passerait.',
     );
 
     // Et il ne prend pas le SQL pour des commandes — le §5 en contient trois
@@ -625,10 +625,10 @@ test('P6-DR — TEMOIN NEGATIF : le balayage des outils voit les fantomes du §2
 
     // Ni la PROSE pour des commandes : `dr-drill.sh` a le droit d ecrire, en
     // toutes lettres, que `s3cmd` n existe pas.
-    $prose = "Elle lisait `s3cmd ls s3://axion-crm-backups/`, alors que la sauvegarde est en SFTP.";
+    $prose = 'Elle lisait `s3cmd ls s3://axion-crm-backups/`, alors que la sauvegarde est en SFTP.';
     expect(outilsInvoquesParLeRunbookDr($prose))->toBe(
         [],
-        'Le balayage lit la prose : il interdirait de NOMMER un outil pour dire qu il est absent.'
+        'Le balayage lit la prose : il interdirait de NOMMER un outil pour dire qu il est absent.',
     );
 });
 
@@ -649,10 +649,10 @@ test('P6-DR — TEMOIN NEGATIF : « present dans le depot » ignore les commenta
         expect(outilInvoqueDansLeDepot('s3cmd', [$fabrique]))->toBeFalse(
             'Le balayage compte une MENTION en commentaire comme une invocation. Il aurait '
             . 'blanchi `s3cmd`, l outil qui a motive cette garde, sur la foi du commentaire '
-            . 'de `dr-drill.sh` qui dit precisement qu il n est PAS installe.'
+            . 'de `dr-drill.sh` qui dit precisement qu il n est PAS installe.',
         );
         expect(outilInvoqueDansLeDepot('sshpass', [$fabrique]))->toBeTrue(
-            'Le balayage ne reconnait pas une invocation reelle : il rougirait sur tout.'
+            'Le balayage ne reconnait pas une invocation reelle : il rougirait sur tout.',
         );
     } finally {
         @unlink($fabrique);
@@ -666,37 +666,37 @@ test('P6-DR — TEMOIN NEGATIF : « present dans le depot » ignore les commenta
     expect(outilInvoqueDansLeDepot('s3cmd', $corpus))->toBeFalse(
         '`s3cmd` est declare present dans le depot. Or il n y figure que dans les commentaires '
         . 'de `dr-drill.sh`, qui disent le contraire : « s3cmd n est pas installe sur le '
-        . 'serveur ». Le balayage lit donc les commentaires, et il aurait blanchi le §2.'
+        . 'serveur ». Le balayage lit donc les commentaires, et il aurait blanchi le §2.',
     );
 
     // Temoin inverse : il sait dire oui. `sshpass` est le coeur de la
     // sauvegarde reelle, sur des lignes executables.
     expect(outilInvoqueDansLeDepot('sshpass', $corpus))->toBeTrue(
         '`sshpass` est declare absent alors que `backup-postgres.sh` l invoque : le balayage '
-        . 'ne sait pas reconnaitre une invocation, et rougirait sur tout.'
+        . 'ne sait pas reconnaitre une invocation, et rougirait sur tout.',
     );
     expect(outilInvoqueDansLeDepot('docker', $corpus))->toBeTrue(
-        '`docker` est declare absent : le balayage est casse.'
+        '`docker` est declare absent : le balayage est casse.',
     );
 
     // Et il ne confond pas un outil inexistant avec un outil reel.
     expect(outilInvoqueDansLeDepot('cf-cli', $corpus))->toBeFalse(
-        '`cf-cli` est declare present : il ne figure nulle part dans le depot.'
+        '`cf-cli` est declare present : il ne figure nulle part dans le depot.',
     );
 });
 
 test('P6-DR — TEMOIN NEGATIF : les balayages de chemins et de roles voient le defaut', function () {
     // Chemins : le vrai et un mort.
     $chemins = cheminsDeDepotDuRunbookDr(
-        "Cf. `infra/scripts/restore-postgres.sh` et /opt/axion-crm-pro/infra/scripts/dr-drill.sh, "
-        . "ainsi que `infra/scripts/replication-wal.sh` qui n existe pas."
+        'Cf. `infra/scripts/restore-postgres.sh` et /opt/axion-crm-pro/infra/scripts/dr-drill.sh, '
+        . 'ainsi que `infra/scripts/replication-wal.sh` qui n existe pas.',
     );
     $this->assertContains('infra/scripts/restore-postgres.sh', $chemins);
     $this->assertContains(
         'infra/scripts/dr-drill.sh',
         $chemins,
         'Le prefixe /opt/axion-crm-pro/ n est pas normalise : un chemin absolu de serveur '
-        . 'ne serait jamais verifie.'
+        . 'ne serait jamais verifie.',
     );
     $this->assertContains('infra/scripts/replication-wal.sh', $chemins);
 
@@ -704,13 +704,13 @@ test('P6-DR — TEMOIN NEGATIF : les balayages de chemins et de roles voient le 
     $this->assertContains(
         'infra/scripts/backup-postgres.sh',
         cheminsDeDepotDuRunbookDr('Tout part de infra/scripts/backup-postgres.sh.'),
-        'Le point final de la phrase est colle au chemin : la garde rougirait sur un chemin valide.'
+        'Le point final de la phrase est colle au chemin : la garde rougirait sur un chemin valide.',
     );
 
     // Roles : `-U axion` est le superutilisateur, `-U axion_app` ne l est pas.
     expect(blocJoueAvecLeRoleQuiContourneLaRls('docker exec pg psql -U axion -d axion_crm -c "…"'))->toBeTrue();
     expect(blocJoueAvecLeRoleQuiContourneLaRls('docker exec pg psql -U axion_app -d axion_crm -c "…"'))->toBeFalse(
-        'Le balayage crie sur `-U axion_app` : il rougirait sur le correctif lui-meme.'
+        'Le balayage crie sur `-U axion_app` : il rougirait sur le correctif lui-meme.',
     );
 
     // Affirmation d un comptage nul, sous ses formes courantes.
@@ -722,11 +722,11 @@ test('P6-DR — TEMOIN NEGATIF : les balayages de chemins et de roles voient le 
     // `backend/`. CE FICHIER-CI est la preuve vivante que la resolution marche.
     expect(cheminDeDepotExiste('backend/tests/Feature/Infra/RunbookRestaurationDrTest.php'))->toBeTrue(
         'Le balayage ne resout pas un chemin `backend/…` : il declarerait morts tous les '
-        . 'renvois vers le code de l application, y compris vers cette garde.'
+        . 'renvois vers le code de l application, y compris vers cette garde.',
     );
     expect(cheminDeDepotExiste('infra/scripts/backup-postgres.sh'))->toBeTrue();
     expect(cheminDeDepotExiste('infra/scripts/replication-wal.sh'))->toBeFalse(
-        'Le balayage declare present un fichier inexistant : il ne verifierait plus rien.'
+        'Le balayage declare present un fichier inexistant : il ne verifierait plus rien.',
     );
 });
 
@@ -738,7 +738,7 @@ test('P6-DR — TEMOIN NEGATIF : un bloc non etiquete hors citation est repere',
     expect(fencesNonEtiqueteesHorsCitation($smuggle))->toBe(
         [2],
         'Le verrou ne voit pas un bloc non etiquete pose au fil du document : le balayage '
-        . 'des outils serait contournable en retirant un seul mot.'
+        . 'des outils serait contournable en retirant un seul mot.',
     );
 
     // Et il ne crie ni sur un bloc etiquete, ni sur une SORTIE citee — c'est la
@@ -747,14 +747,14 @@ test('P6-DR — TEMOIN NEGATIF : un bloc non etiquete hors citation est repere',
     expect(fencesNonEtiqueteesHorsCitation("> ```\n>  axion | t | t\n> ```\n"))->toBe(
         [],
         'Le verrou crie sur une sortie citee : il interdirait de MONTRER la mesure qui '
-        . 'justifie le correctif.'
+        . 'justifie le correctif.',
     );
 
     // Le corollaire, sur le vrai balayage : « t » (la colonne rolbypassrls) ne
     // doit pas etre pris pour un binaire.
     expect(outilsInvoquesParLeRunbookDr("> ```\n>  axion      | t | t\n> ```\n"))->toBe(
         [],
-        'Le balayage des outils lit un tableau de sortie Postgres comme des commandes.'
+        'Le balayage des outils lit un tableau de sortie Postgres comme des commandes.',
     );
 });
 
@@ -773,11 +773,11 @@ test('P6-DR — le runbook ne nomme QUE des outils invoques ailleurs dans le dep
         [],
         "Le runbook porte un bloc de code NON ETIQUETE hors citation (lignes ci-dessus).\n\n"
         . "Le balayage des outils ne lit que les blocs `bash` / `sh` / `shell` — parce qu'un "
-        . "runbook contient aussi des blocs de SORTIE. Un bloc non etiquete au fil du texte "
+        . 'runbook contient aussi des blocs de SORTIE. Un bloc non etiquete au fil du texte '
         . "se lit comme une commande a taper mais n'est verifie par personne : c'est la porte "
         . "de service par laquelle un outil fantome reviendrait.\n\n"
         . 'Correctif : etiqueter le bloc `bash`, ou le mettre en citation si ce sont des '
-        . 'lignes de resultat.'
+        . 'lignes de resultat.',
     );
 
     $outils = outilsInvoquesParLeRunbookDr($contenu);
@@ -787,7 +787,7 @@ test('P6-DR — le runbook ne nomme QUE des outils invoques ailleurs dans le dep
     expect(count($outils))->toBeGreaterThan(
         3,
         'Le runbook n invoque que ' . count($outils) . ' outil(s) : trop peu pour un runbook de '
-        . 'reprise, et ce balayage serait vert par vacuite. Trouves : ' . implode(', ', $outils)
+        . 'reprise, et ce balayage serait vert par vacuite. Trouves : ' . implode(', ', $outils),
     );
 
     $corpus = corpusOutilsDuDepot();
@@ -800,18 +800,18 @@ test('P6-DR — le runbook ne nomme QUE des outils invoques ailleurs dans le dep
 
     expect($fantomes)->toBe(
         [],
-        "Le runbook de reprise prescrit des outils qui ne sont invoques NULLE PART dans le "
-        . "depot : " . implode(', ', $fantomes) . ".\n\n"
+        'Le runbook de reprise prescrit des outils qui ne sont invoques NULLE PART dans le '
+        . 'depot : ' . implode(', ', $fantomes) . ".\n\n"
         . "C'est un document qu'on suit a 3 heures du matin, apres un sinistre, sans le temps "
         . "de verifier. `s3cmd` par exemple n'est meme pas installe sur le serveur — c'est "
-        . "ecrit en tete de `infra/scripts/dr-drill.sh`, ou le meme defaut a ete repare le "
+        . 'ecrit en tete de `infra/scripts/dr-drill.sh`, ou le meme defaut a ete repare le '
         . "2026-08-16 sans etre porte ici.\n\n"
-        . "La sauvegarde qui EXISTE est un `pg_dump` quotidien televerse en SFTP par "
-        . "`infra/scripts/backup-postgres.sh` ; elle se restaure par "
+        . 'La sauvegarde qui EXISTE est un `pg_dump` quotidien televerse en SFTP par '
+        . '`infra/scripts/backup-postgres.sh` ; elle se restaure par '
         . "`infra/scripts/restore-postgres.sh`. Il n'y a ni stockage objet, ni archivage WAL, "
         . "ni reprise a un point dans le temps.\n\n"
-        . "Correctif : reecrire le geste sur ce qui existe. Si un outil est reellement requis, "
-        . "il doit d'abord etre installe ET invoque par un script du depot."
+        . 'Correctif : reecrire le geste sur ce qui existe. Si un outil est reellement requis, '
+        . "il doit d'abord etre installe ET invoque par un script du depot.",
     );
 });
 
@@ -824,7 +824,7 @@ test('P6-DR — tous les chemins de depot nommes par le runbook EXISTENT', funct
     expect(count($chemins))->toBeGreaterThan(
         2,
         'Le runbook ne nomme que ' . count($chemins) . ' chemin(s) du depot. Un operateur en '
-        . 'sinistre a besoin de savoir QUEL fichier jouer. Trouves : ' . implode(', ', $chemins)
+        . 'sinistre a besoin de savoir QUEL fichier jouer. Trouves : ' . implode(', ', $chemins),
     );
 
     $morts = [];
@@ -837,7 +837,7 @@ test('P6-DR — tous les chemins de depot nommes par le runbook EXISTENT', funct
     expect($morts)->toBe(
         [],
         "Le runbook renvoie vers des chemins qui n'existent pas : " . implode(', ', $morts) . ".\n\n"
-        . 'Racine vue : ' . racineDepotRunbookDr() . ' (application : ' . base_path() . ')'
+        . 'Racine vue : ' . racineDepotRunbookDr() . ' (application : ' . base_path() . ')',
     );
 });
 
@@ -862,7 +862,7 @@ test('P6-DR — le runbook nomme le VRAI chemin de restauration', function () {
         $this->assertStringContainsString(
             $chemin,
             $contenu,
-            "Le runbook de reprise ne nomme pas `{$chemin}` : {$pourquoi}"
+            "Le runbook de reprise ne nomme pas `{$chemin}` : {$pourquoi}",
         );
     }
 });
@@ -884,17 +884,17 @@ test('P6-DR — aucun controle du runbook ne s appuie sur un role qui contourne 
         . "    SELECT rolname, rolsuper, rolbypassrls FROM pg_roles WHERE rolcanlogin;\n"
         . "    axion      | t | t\n"
         . "    axion_app  | f | f\n\n"
-        . "`axion` est SUPERUTILISATEUR et porte BYPASSRLS : il ignore la Row Level Security, "
-        . "y compris `FORCE ROW LEVEL SECURITY`. Le `SELECT COUNT(*)` annonce « doit retourner "
-        . "0 » retourne TOUTE la table. La mesure directe est plus haut dans ce fichier : "
-        . "meme base, meme requete, meme contexte workspace inexistant — 1 ligne vue par "
+        . '`axion` est SUPERUTILISATEUR et porte BYPASSRLS : il ignore la Row Level Security, '
+        . 'y compris `FORCE ROW LEVEL SECURITY`. Le `SELECT COUNT(*)` annonce « doit retourner '
+        . '0 » retourne TOUTE la table. La mesure directe est plus haut dans ce fichier : '
+        . 'meme base, meme requete, meme contexte workspace inexistant — 1 ligne vue par '
         . "`axion`, 0 par `axion_app`.\n\n"
         . "Consequence : l'operateur, apres un sinistre, lit un chiffre non nul et conclut que "
         . "l'isolation multi-tenant est cassee. Il part en chasse au fantome la nuit ou il a "
         . "le moins de temps.\n\n"
-        . "Correctif : jouer ce controle avec le role applicatif (`-U axion_app`), le seul qui "
+        . 'Correctif : jouer ce controle avec le role applicatif (`-U axion_app`), le seul qui '
         . "soit soumis a la RLS. C'est le meme correctif que celui pose le 2026-08-20 dans "
-        . "`dr-drill.sh` (constat A08-008)."
+        . '`dr-drill.sh` (constat A08-008).',
     );
 });
 
@@ -922,9 +922,9 @@ test('P6-DR — le runbook ne promet plus une sauvegarde horaire ni un stockage 
             $fantome,
             $minuscules,
             "Le runbook promet encore « {$fantome} » : {$pourquoi}\n\n"
-            . "Un operateur qui lit cette promesse croit pouvoir revenir a T-5 min. La realite "
-            . "mesurable est un `pg_dump` par jour a 03:00 UTC : la perte maximale est de "
-            . "24 heures, et il faut le DIRE."
+            . 'Un operateur qui lit cette promesse croit pouvoir revenir a T-5 min. La realite '
+            . 'mesurable est un `pg_dump` par jour a 03:00 UTC : la perte maximale est de '
+            . '24 heures, et il faut le DIRE.',
         );
     }
 });

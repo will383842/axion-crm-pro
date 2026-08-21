@@ -19,8 +19,9 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Audit\AuditHashChain;
 use Database\Seeders\PermissionsAndRolesSeeder;
-use Illuminate\Support\Str;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -82,7 +83,7 @@ afterEach(function () {
 
 test('B16-001 — sans secret, la chaine ne se declare JAMAIS valide', function () {
     imposerSecretChaine('');
-    $chaine = new AuditHashChain();
+    $chaine = new AuditHashChain;
 
     $chaine->record(['method' => 'GET', 'path' => '/test', 'status' => 200]);
 
@@ -93,7 +94,7 @@ test('B16-001 — sans secret, la chaine ne se declare JAMAIS valide', function 
 
 test('B16-001 — le secret de developpement publie dans le code est REFUSE', function () {
     imposerSecretChaine(AuditHashChain::SECRET_DE_DEVELOPPEMENT);
-    $chaine = new AuditHashChain();
+    $chaine = new AuditHashChain;
 
     expect($chaine->secretEstUtilisable())->toBeFalse();
     expect($chaine->verifyChain())->toBeFalse();
@@ -102,7 +103,7 @@ test('B16-001 — le secret de developpement publie dans le code est REFUSE', fu
 
 test('B16-001 — TEMOIN : avec un vrai secret, une chaine intacte est valide', function () {
     imposerSecretChaine('un-secret-de-chaine-reellement-secret-2026');
-    $chaine = new AuditHashChain();
+    $chaine = new AuditHashChain;
 
     $chaine->record(['method' => 'GET', 'path' => '/a', 'status' => 200]);
     $chaine->record(['method' => 'POST', 'path' => '/b', 'status' => 201]);
@@ -115,13 +116,13 @@ test('B16-001 — TEMOIN : avec un vrai secret, une chaine intacte est valide', 
 
 test('B16-001 — TEMOIN : avec un vrai secret, une ligne falsifiee est detectee', function () {
     imposerSecretChaine('un-secret-de-chaine-reellement-secret-2026');
-    $chaine = new AuditHashChain();
+    $chaine = new AuditHashChain;
 
     $chaine->record(['method' => 'GET', 'path' => '/origine', 'status' => 200]);
 
     // On réécrit le chemin sans toucher aux condensés : c'est la falsification
     // que la chaîne est censée voir.
-    \Illuminate\Support\Facades\DB::table('audit_logs')->update(['path' => '/falsifie']);
+    DB::table('audit_logs')->update(['path' => '/falsifie']);
 
     expect($chaine->verifyChain())->toBeFalse();
 });

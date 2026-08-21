@@ -33,6 +33,7 @@
  * vert n'importe quelle assertion « aucune occurrence ».
  */
 
+use App\Contracts\InseeClient;
 use App\Jobs\LaunchZoneScrapingJob;
 use App\Models\ScraperRun;
 use App\Models\ScrapingCampaign;
@@ -80,16 +81,16 @@ function nodeFichiersSources(string $racine): array
 function nodeMakeUser(): array
 {
     $workspace = Workspace::create([
-        'id'   => (string) Str::uuid(),
+        'id' => (string) Str::uuid(),
         'slug' => 'node-' . Str::random(6),
         'name' => 'WS node',
     ]);
     $user = User::create([
-        'id'                       => (string) Str::uuid(),
-        'email'                    => 'node' . Str::random(4) . '@test.local',
-        'name'                     => 'User node',
-        'password_hash'            => Hash::make('SomePass!1234'),
-        'current_workspace_id'     => $workspace->id,
+        'id' => (string) Str::uuid(),
+        'email' => 'node' . Str::random(4) . '@test.local',
+        'name' => 'User node',
+        'password_hash' => Hash::make('SomePass!1234'),
+        'current_workspace_id' => $workspace->id,
         'first_login_completed_at' => now(),
     ]);
 
@@ -146,7 +147,7 @@ function nodeDepotsDeLaFile(Workspace $w, ?int $campaignId, string $source = 'go
             enrich: false,
         );
         $job->handle(
-            app(\App\Contracts\InseeClient::class),
+            app(InseeClient::class),
             Mockery::mock(FranceTravailDiscoveryClient::class),
         );
     } finally {
@@ -171,25 +172,25 @@ function nodeDepotsDeLaFile(Workspace $w, ?int $campaignId, string $source = 'go
 // 1) Le job depose sur la file doit NOMMER la ligne scraper_runs
 // ===========================================================================
 
-test("C18-008 jumeau — le job Node depose sur la file porte le numero du scraper_run", function () {
+test('C18-008 jumeau — le job Node depose sur la file porte le numero du scraper_run', function () {
     // PAS de Queue::fake() ici : `DispatchScrapeJob` DOIT s executer (file
     // `sync`) pour que son payload arrive jusqu a la faussette Redis. Avec
     // `Queue::fake()` le dispatch est intercepte, rien n est depose, et la
     // garde mesurait un tableau vide en croyant mesurer la file.
     [$u, $w] = nodeMakeUser();
     $c = ScrapingCampaign::create([
-        'workspace_id'         => $w->id,
-        'created_by'           => $u->id,
-        'name'                 => 'Campagne node',
-        'status'               => 'running',
-        'sources'              => ['google_maps'],
-        'zones'                => [['type' => 'department', 'code' => '75']],
-        'max_companies'        => 1000,
-        'companies_created'    => 0,
+        'workspace_id' => $w->id,
+        'created_by' => $u->id,
+        'name' => 'Campagne node',
+        'status' => 'running',
+        'sources' => ['google_maps'],
+        'zones' => [['type' => 'department', 'code' => '75']],
+        'max_companies' => 1000,
+        'companies_created' => 0,
         'max_duration_minutes' => 180,
-        'runs_total'           => 1,
-        'runs_completed'       => 0,
-        'started_at'           => now(),
+        'runs_total' => 1,
+        'runs_completed' => 0,
+        'started_at' => now(),
     ]);
 
     $depots = nodeDepotsDeLaFile($w, $c->id);
@@ -215,7 +216,7 @@ test("C18-008 jumeau — le job Node depose sur la file porte le numero du scrap
     $this->assertSame((int) $run->id, (int) $depots[0]['payload']['context']['scraper_run_id']);
 });
 
-test("C18-008 jumeau TEMOIN — `run_id` reste le jeton synthetique, il ne designe AUCUN run", function () {
+test('C18-008 jumeau TEMOIN — `run_id` reste le jeton synthetique, il ne designe AUCUN run', function () {
     [$u, $w] = nodeMakeUser();
 
     $depots = nodeDepotsDeLaFile($w, null, 'pages_jaunes');
@@ -237,7 +238,7 @@ test("C18-008 jumeau TEMOIN — `run_id` reste le jeton synthetique, il ne desig
 // 2) Le moteur des workers doit LIRE ce drapeau
 // ===========================================================================
 
-test("C18-008 jumeau — le moteur des workers Node lit le drapeau d annulation", function () {
+test('C18-008 jumeau — le moteur des workers Node lit le drapeau d annulation', function () {
     $racine = nodeRacineWorkers();
     $fichiers = nodeFichiersSources($racine);
 
@@ -272,7 +273,7 @@ test("C18-008 jumeau — le moteur des workers Node lit le drapeau d annulation"
 // 3) Le RESIDU : ce qui reste inarretable, compte et fige
 // ===========================================================================
 
-test("C18-008 residu — les dispatches Node SANS numero de run sont comptes et figes a 1", function () {
+test('C18-008 residu — les dispatches Node SANS numero de run sont comptes et figes a 1', function () {
     $appels = [];
     foreach (['app/Jobs/LaunchZoneScrapingJob.php', 'app/Services/Waterfall/WaterfallOrchestrator.php'] as $rel) {
         $chemin = base_path($rel);
@@ -320,7 +321,7 @@ test("C18-008 residu — les dispatches Node SANS numero de run sont comptes et 
     $this->assertStringContainsString('WaterfallOrchestrator.php', $sansNumero[0][0]);
 });
 
-test("C18-007 residu — un run ingere depuis Node ne porte AUCUN campaign_id, le quota ne le voit pas", function () {
+test('C18-007 residu — un run ingere depuis Node ne porte AUCUN campaign_id, le quota ne le voit pas', function () {
     // Deuxieme moitie du meme defaut structurel, cote C18-007 cette fois.
     //
     // `LaunchZoneScrapingJob` incremente `scraping_campaigns.companies_created`

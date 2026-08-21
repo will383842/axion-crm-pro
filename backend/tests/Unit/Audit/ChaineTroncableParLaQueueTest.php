@@ -163,7 +163,7 @@ test('B16-002 — retirer les dernieres lignes ne rompt PAS la chaine (le journa
     // troncature DOIT etre detectee — et note le numero du correctif ici.
     expect($chaine->verifyChain())->toBeTrue(
         'B16-002 est ferme : la troncature par la queue est desormais detectee. '
-        . 'Inverse ce cas au lieu de le supprimer.'
+        . 'Inverse ce cas au lieu de le supprimer.',
     );
 });
 
@@ -190,7 +190,7 @@ test('B16-002 (forme extreme) — un journal integralement efface se declare val
     // ecrites, zero ligne restante, verdict « valide ».
     expect($chaine->verifyChain())->toBeTrue(
         'B16-002 est ferme : un journal vide ne se declare plus valide. '
-        . 'Inverse ce cas au lieu de le supprimer.'
+        . 'Inverse ce cas au lieu de le supprimer.',
     );
 });
 
@@ -237,7 +237,7 @@ test('B16-003 — modifier created_at ne rompt PAS la chaine (l horodatage n est
     // indiscutable meme si le pilote Postgres rend l'horodatage a la seconde.
     DB::statement(
         "UPDATE audit_logs SET created_at = created_at - INTERVAL '10 years' WHERE id = ?",
-        [$cible]
+        [$cible],
     );
 
     // TEMOIN : l'ecriture a REELLEMENT pris. `audit_logs` est partitionnee par
@@ -256,7 +256,7 @@ test('B16-003 — modifier created_at ne rompt PAS la chaine (l horodatage n est
     // cela s'est-il passe ? » alors que la reponse a change de dix ans.
     expect($chaine->verifyChain())->toBeTrue(
         'B16-003 est ferme : created_at entre desormais dans le hachage. '
-        . 'Inverse ce cas au lieu de le supprimer, et verifie la migration de format.'
+        . 'Inverse ce cas au lieu de le supprimer, et verifie la migration de format.',
     );
 });
 
@@ -290,6 +290,6 @@ test('DECOUVERTE (hors lot) — user_agent est ecrit mais pas hache : le modifie
     // 🔴 LE CONSTAT, hors lot, non repare.
     expect($chaine->verifyChain())->toBeTrue(
         'user_agent entre desormais dans le hachage : bonne nouvelle. '
-        . 'Inverse ce cas au lieu de le supprimer.'
+        . 'Inverse ce cas au lieu de le supprimer.',
     );
 });

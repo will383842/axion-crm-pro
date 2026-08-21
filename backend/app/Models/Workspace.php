@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * @property string $id    UUID
+ * @property string $id UUID
  * @property string $name
  * @property string $slug
  * @property array $settings
@@ -39,6 +39,7 @@ class Workspace extends Model
     use SoftDeletes;
 
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $fillable = ['id', 'name', 'slug', 'settings', 'cost_cap_eur', 'is_active'];
@@ -46,8 +47,8 @@ class Workspace extends Model
     protected function casts(): array
     {
         return [
-            'settings'     => 'array',
-            'is_active'    => 'boolean',
+            'settings' => 'array',
+            'is_active' => 'boolean',
             'cost_cap_eur' => 'decimal:2',
         ];
     }

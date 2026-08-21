@@ -83,7 +83,7 @@ class AuditHashChain
         }
 
         if ($this->secret === self::SECRET_DE_DEVELOPPEMENT) {
-            return "AUDIT_HASH_CHAIN_SECRET porte encore la valeur de developpement, publiee dans le code source.";
+            return 'AUDIT_HASH_CHAIN_SECRET porte encore la valeur de developpement, publiee dans le code source.';
         }
 
         return null;

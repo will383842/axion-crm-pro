@@ -40,10 +40,12 @@
  *     donc tenue par aucun automatisme, et rien ne le dit jamais a personne.
  */
 
+use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -82,7 +84,7 @@ function utilisateurAutomatisme(): string
 }
 
 /** Une ligne d'audit avec une IP et une date choisies. Renvoie son id. */
-function ligneAudit(string $ip, \DateTimeInterface $quand): int
+function ligneAudit(string $ip, DateTimeInterface $quand): int
 {
     return (int) DB::table('audit_logs')->insertGetId([
         'event_type' => 'test.automatisme',
@@ -336,7 +338,7 @@ test('B11-003 — la ligne PLANIFIEE de retention:purge porte sa portee, et elle
 // ═════════════════════════════════════════════════════════════════════════════
 
 /** Retrouve un evenement planifie par le fragment de commande qu'il porte. */
-function evenementPlanifie(string $fragment): ?\Illuminate\Console\Scheduling\Event
+function evenementPlanifie(string $fragment): ?Event
 {
     // Force le chargement de routes/console.php (charge paresseusement par le
     // noyau console) avant d'interroger l'ordonnanceur.
@@ -365,7 +367,7 @@ test('B17-009 — drapeau ferme : la purge est sautee, mais elle le DIT', functi
 
     $evenement = evenementPlanifie('rgpd:purge-vivier');
     $journal = [];
-    \Illuminate\Support\Facades\Log::listen(function ($message) use (&$journal) {
+    Log::listen(function ($message) use (&$journal) {
         $journal[] = $message->message;
     });
 

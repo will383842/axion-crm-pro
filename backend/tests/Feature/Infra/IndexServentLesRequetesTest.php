@@ -100,7 +100,7 @@ test('G41-003 — TEMOIN : EXPLAIN distingue une colonne indexee d une colonne n
         'idx_companies_denomination_trgm',
         $planNu,
         "Le plan d'une colonne NUE cite l'index d'une AUTRE colonne. La lecture du plan est "
-        . "donc fausse, et tout ce fichier avec elle.\n\n" . $planNu
+        . "donc fausse, et tout ce fichier avec elle.\n\n" . $planNu,
     );
 
     $this->assertStringContainsString(
@@ -108,7 +108,7 @@ test('G41-003 — TEMOIN : EXPLAIN distingue une colonne indexee d une colonne n
         $planNu,
         "Sur une colonne sans index trigrammes, le plan doit etre un balayage. S'il ne l'est "
         . "pas, EXPLAIN ne discrimine plus rien et la garde ci-dessous ne prouve RIEN.\n\n"
-        . $planNu
+        . $planNu,
     );
 });
 
@@ -130,7 +130,7 @@ test('G41-003 — la recherche par denomination EMPLOIE bien son index trigramme
     $nombre = (int) DB::table('companies')->count();
     expect($nombre)->toBeGreaterThanOrEqual(
         VOLUME_MINIMAL,
-        'Le volume attendu n\'est pas atteint : cette mesure ne prouverait rien.'
+        'Le volume attendu n\'est pas atteint : cette mesure ne prouverait rien.',
     );
 
     // LA requete que `GlobalSearchController::chercherEntreprises()` emet.
@@ -155,9 +155,9 @@ test('G41-003 — la recherche par denomination EMPLOIE bien son index trigramme
         "La palette ⌘K se declenche a CHAQUE FRAPPE. Son plan n'emploie pas l'index "
         . "trigrammes :\n\n{$plan}\n\n"
         . "C'est le constat G41-003 : l'index existe, il pese, `\\d` le montre -- et il ne "
-        . "sert pas la requete ecrite. Verifier que la COLONNE interrogee est bien celle que "
+        . 'sert pas la requete ecrite. Verifier que la COLONNE interrogee est bien celle que '
         . "l'index couvre. `denomination` et `denomination_normalized` sont deux colonnes "
-        . 'differentes, et un seul des deux est indexe.'
+        . 'differentes, et un seul des deux est indexe.',
     );
 });
 
@@ -196,6 +196,6 @@ test('G41-003 — aucun nom d index n est reutilise pour une autre colonne', fun
         "Un meme nom d'index designe deux colonnes differentes. `CREATE INDEX IF NOT EXISTS` "
         . "devient alors un SILENCE : la migration se declare passee, l'index attendu n'existe "
         . "pas, et la requete reste en Seq Scan.\n\nCollisions :\n  - "
-        . implode("\n  - ", $collisions)
+        . implode("\n  - ", $collisions),
     );
 });

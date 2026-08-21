@@ -8,7 +8,7 @@ return [
     'default' => env('LOG_CHANNEL', 'stack'),
     'deprecations' => [
         'channel' => env('LOG_DEPRECATIONS_CHANNEL', 'null'),
-        'trace'   => env('LOG_DEPRECATIONS_TRACE', false),
+        'trace' => env('LOG_DEPRECATIONS_TRACE', false),
     ],
     'channels' => [
         // ── LA PILE PAR DEFAUT — constat F39-011 (S1), corrige le 2026-08-20 ──
@@ -54,7 +54,7 @@ return [
         // borne ecrite et jamais jouee ne borne rien (cf. `retention_period` de
         // Loki, mesuree inoperante le meme jour).
         'stack' => [
-            'driver'   => 'stack',
+            'driver' => 'stack',
             'channels' => explode(',', (string) env('LOG_STACK', 'daily,stderr')),
             'ignore_exceptions' => false,
         ],
@@ -64,8 +64,8 @@ return [
         // fait la PRODUCTION quand personne n'a rien decide.
         'single' => [
             'driver' => 'single',
-            'path'   => storage_path('logs/laravel.log'),
-            'level'  => env('LOG_LEVEL', 'debug'),
+            'path' => storage_path('logs/laravel.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
         ],
         // `days` est la borne. Monolog\Handler\RotatingFileHandler la joue au
@@ -75,28 +75,28 @@ return [
         // rejoue, plutot que de relire ce tableau.
         'daily' => [
             'driver' => 'daily',
-            'path'   => storage_path('logs/laravel.log'),
-            'level'  => env('LOG_LEVEL', 'debug'),
-            'days'   => env('LOG_DAILY_DAYS', 14),
+            'path' => storage_path('logs/laravel.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => env('LOG_DAILY_DAYS', 14),
             'replace_placeholders' => true,
         ],
         'stderr' => [
-            'driver'    => 'monolog',
-            'level'     => env('LOG_LEVEL', 'debug'),
-            'handler'   => StreamHandler::class,
+            'driver' => 'monolog',
+            'level' => env('LOG_LEVEL', 'debug'),
+            'handler' => StreamHandler::class,
             'formatter' => env('LOG_STDERR_FORMATTER'),
-            'with'      => ['stream' => 'php://stderr'],
+            'with' => ['stream' => 'php://stderr'],
             'processors' => [PsrLogMessageProcessor::class],
         ],
         'syslog' => [
             'driver' => 'syslog',
-            'level'  => env('LOG_LEVEL', 'debug'),
+            'level' => env('LOG_LEVEL', 'debug'),
             'facility' => env('LOG_SYSLOG_FACILITY', LOG_USER),
             'replace_placeholders' => true,
         ],
         'errorlog' => [
             'driver' => 'errorlog',
-            'level'  => env('LOG_LEVEL', 'debug'),
+            'level' => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
         ],
         'null' => ['driver' => 'monolog', 'handler' => NullHandler::class],

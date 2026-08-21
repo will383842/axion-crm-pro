@@ -117,7 +117,7 @@ test('TEMOIN : le cast en entier rend EGAUX deux UUID etrangers', function () {
 // ─────────────────────────────────────────────────────────────────────────────
 
 test('un modele d un AUTRE espace n est pas vu — paire qui se caste en 1', function () {
-    $policy = new PolicySondeCloisonnement();
+    $policy = new PolicySondeCloisonnement;
     $utilisateur = new UtilisateurToujoursHabilite(['current_workspace_id' => SONDE_ESPACE_SIEN]);
     $intrus = sondeModeleDeLEspace(SONDE_ESPACE_AUTRE_MEME_CHIFFRE);
 
@@ -126,7 +126,7 @@ test('un modele d un AUTRE espace n est pas vu — paire qui se caste en 1', fun
 });
 
 test('un modele d un AUTRE espace n est pas vu — paire qui se caste en 0', function () {
-    $policy = new PolicySondeCloisonnement();
+    $policy = new PolicySondeCloisonnement;
     $utilisateur = new UtilisateurToujoursHabilite(['current_workspace_id' => SONDE_ESPACE_LETTRE_A]);
     $intrus = sondeModeleDeLEspace(SONDE_ESPACE_LETTRE_F);
 
@@ -137,7 +137,7 @@ test('un modele d un AUTRE espace n est pas vu — paire qui se caste en 0', fun
 test('update et delete d un modele etranger sont refuses meme avec tous les roles', function () {
     // `hasAnyRole` est forcé à VRAI (cf. UtilisateurToujoursHabilite) : si ces
     // deux appels rendent `false`, c'est `sameWorkspace()` qui a tranché.
-    $policy = new PolicySondeCloisonnement();
+    $policy = new PolicySondeCloisonnement;
     $utilisateur = new UtilisateurToujoursHabilite(['current_workspace_id' => SONDE_ESPACE_LETTRE_A]);
     $intrus = sondeModeleDeLEspace(SONDE_ESPACE_LETTRE_F);
 
@@ -153,7 +153,7 @@ test('update et delete d un modele etranger sont refuses meme avec tous les role
 // ─────────────────────────────────────────────────────────────────────────────
 
 test('TEMOIN INVERSE : un modele de SON espace reste accessible', function () {
-    $policy = new PolicySondeCloisonnement();
+    $policy = new PolicySondeCloisonnement;
     $utilisateur = new UtilisateurToujoursHabilite(['current_workspace_id' => SONDE_ESPACE_SIEN]);
     $sien = sondeModeleDeLEspace(SONDE_ESPACE_SIEN);
 
@@ -167,7 +167,7 @@ test('un utilisateur SANS espace courant ne voit aucun modele scope', function (
     // Cas réel : compte fraîchement créé, ou dont l'espace a été supprimé
     // (`ON DELETE SET NULL` sur `users.current_workspace_id`). Le cast rendait
     // ici `0 === 0` dès que le modèle commençait par une lettre : accès ouvert.
-    $policy = new PolicySondeCloisonnement();
+    $policy = new PolicySondeCloisonnement;
     $orphelin = new UtilisateurToujoursHabilite(['current_workspace_id' => null]);
 
     expect($policy->memeEspace($orphelin, sondeModeleDeLEspace(SONDE_ESPACE_LETTRE_A)))->toBeFalse();

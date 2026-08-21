@@ -175,7 +175,7 @@ test('F38-007 — TEMOIN : le banc voit bien les fichiers de pilotage de la prod
         [],
         'Le banc ne voit pas ces fichiers : ' . implode(', ', $manquants)
         . '. Une garde qui n\'a rien a inspecter passe au vert sans rien prouver. '
-        . '⚠️ Le conteneur de mesure ne monte pas `.github/` : `docker cp .github a35r:/var/www/.github`.'
+        . '⚠️ Le conteneur de mesure ne monte pas `.github/` : `docker cp .github a35r:/var/www/.github`.',
     );
 });
 
@@ -186,7 +186,7 @@ test('F38-007 — TEMOIN NEGATIF : le balayage SAIT reperer une invocation nue',
     expect($trouvees)->toHaveCount(1);
     expect($trouvees[0]['couvert'])->toBeFalse(
         'Le balayage ne reconnait pas une invocation nue fabriquee : la garde ci-dessous '
-        . 'passerait au vert sur n\'importe quoi.'
+        . 'passerait au vert sur n\'importe quoi.',
     );
 
     // Et il doit reconnaître la forme CORRECTE comme correcte, sinon il rougirait
@@ -214,13 +214,13 @@ test('F38-007 — aucune commande visant la production ne recree la pile SANS l 
     expect($nues)->toBe(
         [],
         "Ces commandes recreent la pile de PRODUCTION sans `docker-compose.prod.yml`.\n\n"
-        . "Compose repart alors du seul `docker-compose.yml`, qui PUBLIE Postgres sur 55432 et "
-        . "Redis sur 56379. Il voit une configuration differente de celle des conteneurs en "
+        . 'Compose repart alors du seul `docker-compose.yml`, qui PUBLIE Postgres sur 55432 et '
+        . 'Redis sur 56379. Il voit une configuration differente de celle des conteneurs en '
         . "place et il les RECREE, ports compris. C'est la faille du 2026-08-19, reouverte.\n\n"
         . "Redis n'a aucun mot de passe : FLUSHALL, lecture des jetons, CONFIG SET.\n\n"
-        . "Correctif : `export COMPOSE_FILE=\"docker-compose.yml:docker-compose.prod.yml\"` avant "
+        . 'Correctif : `export COMPOSE_FILE="docker-compose.yml:docker-compose.prod.yml"` avant '
         . "la commande, comme le fait deja `deploy-direct-ssh.yml`.\n\n"
-        . "Commandes nues :\n  - " . implode("\n  - ", $nues)
+        . "Commandes nues :\n  - " . implode("\n  - ", $nues),
     );
 });
 
@@ -242,7 +242,7 @@ test('F38-007 — les services applicatifs dependent bien de postgres et redis',
         4,
         'Le fichier de base ne declare plus les dependances attendues : la raison pour laquelle '
         . '`docker compose up -d api` monte aussi postgres et redis a disparu, et il faut '
-        . 'reverifier ce que ce test protege.'
+        . 'reverifier ce que ce test protege.',
     );
 
     expect($compose)->toContain('55432:5432');
@@ -255,7 +255,7 @@ test('F38-007 — les services applicatifs dependent bien de postgres et redis',
     expect(substr_count($prod, 'ports: !override []'))->toBeGreaterThanOrEqual(
         2,
         "L'overlay ne retire plus les publications de ports avec `!override`. Sans ce tag, "
-        . 'Compose FUSIONNE les listes et la publication du fichier de base survit.'
+        . 'Compose FUSIONNE les listes et la publication du fichier de base survit.',
     );
 });
 
@@ -284,7 +284,7 @@ test('P6-INFRA-003 — les consoles d administration ne se publient pas sur tout
     $chemin = racineDepotOverlay() . '/docker-compose.observability.yml';
 
     expect(is_file($chemin))->toBeTrue(
-        "Le banc ne voit pas docker-compose.observability.yml : cette garde ne mesurerait rien."
+        'Le banc ne voit pas docker-compose.observability.yml : cette garde ne mesurerait rien.',
     );
 
     $lignes = explode("\n", (string) file_get_contents($chemin));
@@ -309,11 +309,11 @@ test('P6-INFRA-003 — les consoles d administration ne se publient pas sur tout
         [],
         "Ces consoles d'administration se publient sur TOUTES les interfaces.\n\n"
         . "Docker insere ses regles iptables AVANT celles d'ufw : `ufw status` annoncera "
-        . "« 22/80/443 seulement » pendant que la chaine DOCKER acceptera 0.0.0.0/0 vers "
+        . '« 22/80/443 seulement » pendant que la chaine DOCKER acceptera 0.0.0.0/0 vers '
         . "chacune d'elles. C'est le mecanisme exact de la faille du 2026-08-19, et la raison "
         . "pour laquelle le rapport pare-feu de l'etape 0 concluait a tort que tout allait "
         . "bien.\n\n"
-        . "Correctif : lier a la boucle locale (`127.0.0.1:3000:3000`) et atteindre ces "
-        . "consoles par un tunnel SSH.\n\nPorts nus :\n  - " . implode("\n  - ", $nues)
+        . 'Correctif : lier a la boucle locale (`127.0.0.1:3000:3000`) et atteindre ces '
+        . "consoles par un tunnel SSH.\n\nPorts nus :\n  - " . implode("\n  - ", $nues),
     );
 });

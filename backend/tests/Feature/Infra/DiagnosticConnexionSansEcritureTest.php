@@ -68,7 +68,7 @@ test('diagnostic — TEMOIN : le banc voit bien le script', function () {
 
     expect(file_exists($chemin))->toBeTrue(
         "Le banc ne voit pas {$chemin}. Une garde qui n'a rien a inspecter passe au vert "
-        . 'sans rien prouver : monte la racine du depot avant de la croire.'
+        . 'sans rien prouver : monte la racine du depot avant de la croire.',
     );
     expect(filesize($chemin))->toBeGreaterThan(2000);
 });
@@ -111,7 +111,7 @@ test('le diagnostic de connexion n EXECUTE aucune ecriture', function () {
         . "produit, et son en-tete promet qu'il ne change rien. Ces lignes l'executeraient :\n  - "
         . implode("\n  - ", $fautives)
         . "\n\nUne promesse ecrite en commentaire n'est pas une garantie. Si le geste est "
-        . 'necessaire, il doit etre CONSEILLE (via `dit`) et joue a la main, jamais execute ici.'
+        . 'necessaire, il doit etre CONSEILLE (via `dit`) et joue a la main, jamais execute ici.',
     );
 });
 
@@ -125,9 +125,9 @@ test('le diagnostic reste lisible meme quand tout echoue', function () {
     $this->assertStringContainsString(
         'set -uo pipefail',
         $source,
-        "Le script doit tourner SANS `-e` : sur un serveur ou tout va mal, chacune de ses "
-        . "sondes peut echouer, et il doit continuer pour dire POURQUOI. Un diagnostic qui "
-        . 'meurt au premier obstacle ne diagnostique rien.'
+        'Le script doit tourner SANS `-e` : sur un serveur ou tout va mal, chacune de ses '
+        . 'sondes peut echouer, et il doit continuer pour dire POURQUOI. Un diagnostic qui '
+        . 'meurt au premier obstacle ne diagnostique rien.',
     );
 
     // Et il doit dire, noir sur blanc, ce que sa derniere ligne promet.
@@ -141,6 +141,6 @@ test('le diagnostic reste lisible meme quand tout echoue', function () {
     $this->assertStringContainsString(
         "Ce script n'a rien ",
         $source,
-        'La derniere ligne doit reaffirmer la promesse a celui qui vient de la lire tourner.'
+        'La derniere ligne doit reaffirmer la promesse a celui qui vient de la lire tourner.',
     );
 });

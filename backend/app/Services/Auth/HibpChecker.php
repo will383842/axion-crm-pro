@@ -42,11 +42,11 @@ class HibpChecker
     public function __construct(?Client $http = null)
     {
         $this->http = $http ?? new Client([
-            'timeout'         => 5,
+            'timeout' => 5,
             'connect_timeout' => 3,
-            'headers'         => [
+            'headers' => [
                 'User-Agent' => 'Axion-CRM-Pro/1.0 (security@axion-crm-pro.com)',
-                'Accept'     => 'text/plain',
+                'Accept' => 'text/plain',
                 // HIBP recommande le remplissage de la réponse (anonymat renforcé).
                 'Add-Padding' => 'true',
             ],

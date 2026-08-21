@@ -18,6 +18,7 @@ class ScraperRunsController extends ApiController
     /**
      * @OA\Get(path="/scraper-runs", tags={"Scraping"}, summary="Historique scraper runs",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Response(response=200, description="OK"))
      */
     public function index(Request $r): JsonResponse
@@ -38,15 +39,16 @@ class ScraperRunsController extends ApiController
             return $this->ok([
                 'data' => $page->items(),
                 'meta' => [
-                    'total'        => $page->total(),
-                    'per_page'     => $page->perPage(),
+                    'total' => $page->total(),
+                    'per_page' => $page->perPage(),
                     'current_page' => $page->currentPage(),
-                    'last_page'    => $page->lastPage(),
+                    'last_page' => $page->lastPage(),
                 ],
             ]);
         } catch (\Throwable $e) {
             Log::error('scraper-runs.index failed', ['exception' => $e->getMessage()]);
             report($e);
+
             return $this->ok(['data' => [], 'meta' => ['total' => 0], 'degraded' => true]);
         }
     }
@@ -54,7 +56,9 @@ class ScraperRunsController extends ApiController
     /**
      * @OA\Get(path="/scraper-runs/{run}", tags={"Scraping"}, summary="Détail d'un run",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="run", in="path", required=true, @OA\Schema(type="integer")),
+     *
      *     @OA\Response(response=200, description="OK"))
      */
     public function show(ScraperRun $run): JsonResponse
@@ -63,13 +67,16 @@ class ScraperRunsController extends ApiController
             // 404 plutôt que 403 : ne pas leak l'existence du run d'un autre workspace.
             abort(404);
         }
+
         return $this->ok($run);
     }
 
     /**
      * @OA\Post(path="/scraper-runs/{run}/cancel", tags={"Scraping"}, summary="Annule un run en cours",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="run", in="path", required=true, @OA\Schema(type="integer")),
+     *
      *     @OA\Response(response=200, description="Cancelled"),
      *     @OA\Response(response=404, description="Not found / cross-workspace"),
      *     @OA\Response(response=422, description="Run dans un état non annulable"))
@@ -82,16 +89,16 @@ class ScraperRunsController extends ApiController
 
         if (! in_array($run->status, ['pending', 'running'], true)) {
             return response()->json([
-                'error'   => 'invalid_state',
+                'error' => 'invalid_state',
                 'message' => "Impossible d'annuler un run au statut '{$run->status}'.",
-                'status'  => $run->status,
+                'status' => $run->status,
             ], 422);
         }
 
         $run->update([
-            'status'      => 'cancelled',
+            'status' => 'cancelled',
             'finished_at' => now(),
-            'error'       => $run->error ?: 'Annulé par utilisateur.',
+            'error' => $run->error ?: 'Annulé par utilisateur.',
         ]);
 
         // 🔴 CONSTAT C18-008. Ce commentaire annoncait « flag Redis lu par les
@@ -108,32 +115,32 @@ class ScraperRunsController extends ApiController
         // ⚠️ Si tu changes ce prefixe, change-le LA-BAS AUSSI.
         // TTL 1h : suffisant pour qu'un job en cours détecte l'annulation.
         try {
-        // 🔴 SITE JUMEAU DE C18-011, PORTE LE 2026-08-21 — ET IL CASSAIT DEUX FOIS.
-        //
-        // Cette clef traverse la frontiere PHP <-> Node : `workers/src/scrapers/base.ts`
-        // (`PREFIXE_ANNULATION`, l. 56) la relit avant chaque scrape. Elle etait
-        // ecrite par la facade `Redis` NUE, donc sur la connexion `default` :
-        //
-        //     PHP  ecrivait  axion_crm_pro_database_cancelled:scraper-run:42  (base 0)
-        //     Node lisait    cancelled:scraper-run:42                          (base 1)
-        //
-        // Deux divergences INDEPENDANTES — le prefixe et le numero de base —,
-        // chacune suffisante a elle seule pour que l'arret d'urgence n'arrete
-        // rien cote Node. C'est exactement la panne de C18-011, a un autre
-        // endroit : le meme defaut, non porte. Vingt-sixieme fois (motif A-011).
-        //
-        // ⚠️ LES TROIS SITES BOUGENT ENSEMBLE, ET C'EST OBLIGATOIRE. Deplacer
-        // les deux ecritures sans la lecture casserait l'annulation cote PHP,
-        // qui elle FONCTIONNE aujourd'hui — precisement parce que les trois
-        // partagent la meme connexion fautive. C'est tout ou rien :
-        //     ecriture  Api/ScraperRunsController::destroy()
-        //     ecriture  Api/ScrapingCampaignsController::cancel()
-        //     lecture   Jobs/LaunchZoneScrapingJob::motifArretDistant()
+            // 🔴 SITE JUMEAU DE C18-011, PORTE LE 2026-08-21 — ET IL CASSAIT DEUX FOIS.
+            //
+            // Cette clef traverse la frontiere PHP <-> Node : `workers/src/scrapers/base.ts`
+            // (`PREFIXE_ANNULATION`, l. 56) la relit avant chaque scrape. Elle etait
+            // ecrite par la facade `Redis` NUE, donc sur la connexion `default` :
+            //
+            //     PHP  ecrivait  axion_crm_pro_database_cancelled:scraper-run:42  (base 0)
+            //     Node lisait    cancelled:scraper-run:42                          (base 1)
+            //
+            // Deux divergences INDEPENDANTES — le prefixe et le numero de base —,
+            // chacune suffisante a elle seule pour que l'arret d'urgence n'arrete
+            // rien cote Node. C'est exactement la panne de C18-011, a un autre
+            // endroit : le meme defaut, non porte. Vingt-sixieme fois (motif A-011).
+            //
+            // ⚠️ LES TROIS SITES BOUGENT ENSEMBLE, ET C'EST OBLIGATOIRE. Deplacer
+            // les deux ecritures sans la lecture casserait l'annulation cote PHP,
+            // qui elle FONCTIONNE aujourd'hui — precisement parce que les trois
+            // partagent la meme connexion fautive. C'est tout ou rien :
+            //     ecriture  Api/ScraperRunsController::destroy()
+            //     ecriture  Api/ScrapingCampaignsController::cancel()
+            //     lecture   Jobs/LaunchZoneScrapingJob::motifArretDistant()
             Redis::connection(DispatchScrapeJob::CONNEXION_REDIS)
                 ->setex(LaunchZoneScrapingJob::CLE_ANNULATION . $run->id, 3600, '1');
         } catch (\Throwable $e) {
             Log::warning('scraper-runs.cancel: Redis flag failed', [
-                'run_id'    => $run->id,
+                'run_id' => $run->id,
                 'exception' => $e->getMessage(),
             ]);
         }
@@ -151,7 +158,9 @@ class ScraperRunsController extends ApiController
     /**
      * @OA\Post(path="/scraper-runs/{run}/retry", tags={"Scraping"}, summary="Relance un run échoué/annulé",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Parameter(name="run", in="path", required=true, @OA\Schema(type="integer")),
+     *
      *     @OA\Response(response=201, description="Nouveau run créé"),
      *     @OA\Response(response=404, description="Not found / cross-workspace"),
      *     @OA\Response(response=422, description="Run dans un état non relançable"))
@@ -164,20 +173,20 @@ class ScraperRunsController extends ApiController
 
         if (! in_array($run->status, ['failed', 'cancelled'], true)) {
             return response()->json([
-                'error'   => 'invalid_state',
+                'error' => 'invalid_state',
                 'message' => "Impossible de relancer un run au statut '{$run->status}'.",
-                'status'  => $run->status,
+                'status' => $run->status,
             ], 422);
         }
 
         // Crée un nouveau run pending avec les mêmes paramètres de requête.
         $newRun = DB::transaction(function () use ($run) {
             return ScraperRun::create([
-                'workspace_id'    => $run->workspace_id,
-                'company_id'      => $run->company_id,
-                'source'          => $run->source,
-                'status'          => 'pending',
-                'started_at'      => now(),
+                'workspace_id' => $run->workspace_id,
+                'company_id' => $run->company_id,
+                'source' => $run->source,
+                'status' => 'pending',
+                'started_at' => now(),
                 'request_payload' => $run->request_payload,
             ]);
         });
@@ -222,6 +231,7 @@ class ScraperRunsController extends ApiController
     {
         if (app()->bound('workspace.id')) {
             $id = app('workspace.id');
+
             return $id !== null && $id !== '' ? (string) $id : null;
         }
         // Fallback via user authentifié si le middleware workspace n'a pas tourné.
@@ -229,6 +239,7 @@ class ScraperRunsController extends ApiController
         if ($user && $user->current_workspace_id) {
             return (string) $user->current_workspace_id;
         }
+
         return null;
     }
 }

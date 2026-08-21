@@ -3,7 +3,9 @@
 > **Mise à jour après chaque correctif.** Si Claude Code se ferme, tout est ici : ce qui est
 > fait, ce qui est en cours, et comment reprendre exactement au même point.
 >
-> **Dernière mise à jour : 2026-08-21.**
+> **Dernière mise à jour : 2026-08-21, 07 h 30** — après la **vague 14**, qui a été
+> coupée en plein vol à 05 h 27. Les versions précédentes de cette fiche s'arrêtaient à
+> 01 h 25 et ignoraient donc six lots. **Voir le §13.**
 
 ---
 
@@ -136,14 +138,19 @@ contre une heure perdue.
 ### 7 bis. RECTIFICATIF — il RESTE des S0 mécaniquement réparables ici
 
 J'ai écrit le 20/08, et répété le 21/08, qu'« aucun S0 mécaniquement réparable ne reste dans ce
-dépôt ». **C'est faux.** En relisant les emplacements ligne par ligne, il en reste **trois** dont
-tout ou partie vit dans le dépôt CRM :
+dépôt ». **C'est faux.** En relisant les emplacements ligne par ligne, il en restait **trois** dont
+tout ou partie vit dans le dépôt CRM.
+
+> ✅ **Les trois sont fermés depuis la vague 14 du 21/08 au matin** (§13). Le tableau ci-dessous
+> garde l'énoncé d'origine et lui ajoute ce que la mesure a trouvé — parce que deux des trois
+> étaient **mal énoncés**, et que corriger un constat sans montrer ce qu'il disait d'abord
+> revient à effacer l'erreur au lieu de la rectifier (§6).
 
 | Constat | Ce qui est réparable ICI |
 |---|---|
-| `B11-002 / B17-010` (S0, conception) | 5 des 6 jobs de file s'exécutent sans contexte d'espace, alors que `Queue::looping` l'efface. Entièrement CRM : `app/Jobs/*`. |
-| `B14-002 / E31-001` (S0, correctif) | La moitié CRM : `Api/RgpdRequestsController.php`. L'autre moitié (`inbound.ts`) est dans le dépôt du site. |
-| `B10-004` (S0, PARTIEL) | Le reste : `users`, `invitations`, `password_reset_tokens` ne sont couverts par AUCUNE procédure d'effacement. `app/Services/Rgpd/*`. |
+| `B11-002 / B17-010` (S0, conception) | ~~5 des 6 jobs~~ → **SIX sur six** : mesuré le 21/08, `EnrichCompanyJob` portait bien le trait, mais ses **quatre** points de dispatch l'appelaient à **un seul argument** — son `?string $workspaceId = null` valait `null` à tous les coups. ✅ **fermé** (`4a6d574`, §13). |
+| `B14-002 / E31-001` (S0, correctif) | ✅ **fermé côté CRM** (`8db4417`, §13) — et le constat était **SOUS-ESTIMÉ** : sur l'`erasure` qu'il visait, le CRM est innocent (la garde le reprouve) ; le défaut était intact sur **trois autres types sur cinq** — `access`, `rectification`, `opposition` répondaient « traitée » contre `{"noop":true}`. |
+| `B10-004` (S0, PARTIEL) | ✅ **fermé** (`8db4417`, §13). `users` est **anonymisé** et non supprimé : mesure sur `pg_constraint`, 33 contraintes le visent, **7 bloquent** un DELETE et les 21 `SET NULL` incluent `audit_logs.user_id` sur la table mère **et ses douze partitions**. |
 
 `E33-006` et `C19-007`, eux, ne le sont pas : le premier vit entièrement dans le dépôt du site
 (`chatbot/tools/escalader-question.ts`), le second est un acte juridique qui appartient à Will.
@@ -287,3 +294,158 @@ il se recrute.* La première vague, lancée le 20/08, l'a démontré en trouvant
 quelques heures — dont deux dans le travail de réparation du jour même.
 
 La définition de fini du §12 reste à **3 points sur 16**.
+
+---
+
+## 13. VAGUE 14 — coupée à 05 h 27, reprise et close le 21/08 au matin
+
+### 13.1 Ce que la coupure a laissé, et comment l'état a été reconstruit
+
+Six lots tournaient. **Quatre** avaient rendu leur verdict ; **deux** — dont un S0 — ont été
+relancés à 05 h 14 et **tués à 05 h 27**. Rien n'était commité : 22 fichiers modifiés et 3
+nouveaux, **1 664 insertions**, vivant uniquement dans l'arbre de travail.
+
+L'état n'a pas été relu dans cette fiche — qui datait de 01 h 25 et ignorait tout — mais
+**reconstruit depuis git et depuis les mtimes**. La coupure est nette :
+
+| horodatage | contenu |
+|---|---|
+| 04 h 35 → 05 h 10 | les quatre lots achevés |
+| 05 h 25 → 05 h 26 | les quatre fichiers des deux lots tués |
+
+🔴 **Et ce découpage par mtime était trop naïf.** `PortabiliteCompleteTest.php` (05 h 10,
+lot *achevé*) teste `comptes_crm`, `sessions_ouvertes`, `invitations_recues` — c'est-à-dire
+exactement ce que `GdprPortabilityService.php` (05 h 25, lot *partiel*) ajoute. **Un même
+fichier portait deux lots.** Exclure les « partiels » du commit aurait rendu rouge un lot
+prouvé. *L'heure de dernière écriture dit quand un fichier a bougé, pas à quel travail il
+appartient.*
+
+### 13.2 Les quatre fichiers suspects : joués, et ils avaient quatre défauts
+
+Consigne : les jouer, prouver chaque assertion rouge, ou les jeter. **Joués : 33 verts,
+4 rouges** — et les quatre rouges étaient dans les *gardes*, jamais dans le code produit.
+
+| défaut | ce que c'était |
+|---|---|
+| `assertStringContainsString()` sans `$this->` (×3) | PHP levait « undefined function » : ces trois assertions **n'avaient jamais rien prouvé** |
+| `PORTES MORTES` attendait 2 routes, il y en a 3 | **la garde a contredit son auteur** — voir 13.3 |
+
+### 13.3 🔑 Le résultat que la vague n'attendait pas : une garde plus juste que son auteur
+
+La garde « portes mortes » annonçait *« sept routes DELETE, deux mortes »* — **une liste écrite
+à la main, jamais mesurée**. Première exécution : le routeur rend **NEUF** routes `DELETE`
+câblées sur un contrôleur, et **TROIS** ne suppriment rien.
+
+La troisième, `api/v1/saved-views/{saved_view}`, avait échappé au constat — et ce n'est pas un
+hasard : `saved_views` est l'une des **six tables mortes** de
+`_REPORTS/2026-08-19_INVENTAIRE-ETAPE-1A.md`. La porte est déclarée, elle répond, il n'y a rien
+derrière. Les trois ne se ressemblent pas :
+
+```
+contacts/{contact}         vérifie l'espace (refuserHorsEspace) PUIS 501
+users/{user}               vérifie l'espace (refuserHorsEspace) PUIS 501
+saved-views/{saved_view}   501 sec, aucun contrôle
+```
+
+*C'est le balayage du **routeur** — et non la liste à la main — qui a permis à la garde de
+rendre un résultat que personne n'avait vu.* Même leçon qu'au §7 sur les comptes tenus à la
+main : **une énumération recopiée ne garde que ce que son auteur savait déjà.**
+
+### 13.4 Le S0 `B14-002` était sous-estimé, et sur son propre terrain il était faux
+
+Le constat visait l'**effacement**. Sur l'effacement, **le CRM est innocent** et la garde le
+reprouve : une demande `erasure` supprime réellement la fiche, inscrit l'opposition dans les
+deux univers, met le signal en file. Sa moitié vraie vit dans le dépôt du site
+(`crm-sync/inbound.ts:243-261`).
+
+**Mais le défaut était intact sur trois des cinq types que le point d'entrée accepte :**
+
+```
+access          200 done  RIEN ({"noop":true})   art. 15
+rectification   200 done  RIEN ({"noop":true})   art. 16
+opposition      200 done  RIEN ({"noop":true})   art. 21
+```
+
+`opposition` porte exactement la conséquence annoncée : la personne est inscrite « traitée » au
+**registre** — la pièce que le CRM opposerait à un contrôle — et reste parfaitement joignable.
+
+Le mécanisme était le `default => ['noop' => true]`, qui accueillait en silence tout type non
+câblé. Il a disparu : le `match` est exhaustif sur le **catalogue** (`CHECK` relu dans
+`pg_constraint`, jamais recopié), et un type inconnu **lève** au lieu de mentir.
+
+L'article 16 n'a aucun traitement automatique possible ; il rend **422** tant que l'opérateur
+n'a pas déclaré son geste — la note que la console POSTait déjà était jetée sans être lue.
+
+### 13.5 Les gardes du S0, vues rouges — trois mutations, trois rouges
+
+| mutation | garde qui rougit |
+|---|---|
+| `opposition` renvoyée au `noop` | *« une opposition traitée FERME réellement les portes »* **+** la garde de couverture du catalogue — **deux gardes indépendantes** |
+| jeton d'export re-filtré sur `portability` seul | *« un droit d'accès traité produit une archive réellement téléchargeable »* |
+| garde-fou de l'art. 16 neutralisé | *« une rectification n'est PAS inscrite traitée sans acte déclaré »* |
+
+### 13.6 PR #191 : les sept contrôles rouges se ramenaient à QUATRE causes
+
+| cause | contrôles bloqués | état |
+|---|---:|---|
+| `RouteErrorBoundary` lit `state.loadedAt`, **disparu de la librairie** | **4** — Frontend, Trivy (app), E2E, axe-core | ✅ `c95e673` |
+| PHPStan : 38 erreurs | 1 — Backend Laravel | ✅ **38 → 0** |
+| Gitleaks : 6 fausses fuites, aucune config | 1 | ✅ `f1c3344` |
+| deux scripts d'infra en `100644` | 1 | ✅ `f115af2` |
+
+🔴 **Le piège de banc qui explique pourquoi `loadedAt` n'avait pas été vu**, et il vaut pour
+tout ce dépôt : `crmpro-wt-a35-auth/frontend/node_modules/@tanstack/react-router` est un **lien
+symbolique** vers le `node_modules` du dépôt principal, figé à `1.170.4`.
+`pnpm install --frozen-lockfile` s'exécute **sans rien changer**. Un `pnpm typecheck` lancé dans
+ce worktree est donc **vert sur une version que la CI n'installera jamais** :
+
+```
+router-core 1.171.2  (lié en local)          RouterState.loadedAt EXISTE
+router-core 1.171.22 (résolu par le lock)    loadedAt n'existe NULLE PART
+```
+
+*La seule référence est `pnpm-lock.yaml`.* Vérifié en dépaquetant `router-core@1.171.22` hors du
+dépôt. **Troisième piège de banc de ce dossier, après `.github/` non monté et `backend/` monté
+sur `/var/www/html`** (§8) — et le même en substance : *le banc n'est pas le lieu où le code
+tournera.*
+
+### 13.7 Ce que la remise à zéro de PHPStan a trouvé en chemin
+
+La baseline passe de **248 à 209 erreurs figées (−39), zéro entrée nouvelle** — le contrat du
+fichier (« elle ne peut que décroître ») est tenu, avec **une** croissance justifiée
+(`SsrfGuard` 1 → 2 : deux méthodes sœurs lisent `env()` hors `config/`, choix documenté dont le
+défaut est le comportement **sûr**).
+
+Quatre trouvailles méritent d'être notées :
+
+- **`getEloquentBuilder()` n'existe ni dans Laravel ni dans l'application** — il vient de Spatie.
+  Le code est juste ; c'est le chaînage `->where(...)->getEloquentBuilder()` qui trompe
+  l'analyse, `@mixin EloquentBuilder` faisant croire que `->where()` rend un Builder Eloquent.
+  **Même écart enveloppe/Builder que celui qui a produit le 500 de `F36-008`.**
+- **`Journalist` n'avait aucun type de retour sur ses trois relations** : Larastan refusait
+  `->with('media')` alors que la relation existe. *Un modèle dont les relations ne sont pas
+  typées est un modèle sur lequel l'analyse ne peut rien affirmer — c'est le silence, pas la
+  garantie.*
+- **`RetentionPurge` portait deux conditions qui ne pouvaient pas être fausses.** La garde
+  au-dessus corrèle les deux variables : passé ce point, « portée non nulle » **implique**
+  « colonne d'espace non nulle ». PHPStan l'avait vu ; le code re-testait quand même.
+- **`Seeder::$command` a pour valeur par défaut `null`** (mesuré par réflexion) : les quinze
+  `?->` d'`OwnerUserSeeder` sont **nécessaires**, et c'est le docblock du framework qui ment.
+  Centralisés dans un helper — baseline **7 → 1**, et la raison écrite à côté du geste.
+
+### 13.8 Commits de la vague
+
+| commit | contenu |
+|---|---|
+| `4a6d574` | `B11-002` — six jobs sur six, pas cinq |
+| `bb2fbb6` | `A-007` — Telescope **refuse** la production au lieu d'y défauter à faux |
+| `f115af2` | deux scripts d'infra sans bit d'exécution |
+| `8db4417` | `B14-002` + `B10-004` — trois droits RGPD sur cinq |
+| `26ea176` | `B10-016` — la garde qui a contredit son auteur |
+| `c95e673` | `state.loadedAt` disparu — quatre contrôles débloqués |
+| `f1c3344` | Gitleaks — six fausses fuites, témoin négatif à l'appui |
+
+⚠️ **Un défaut de dispositif, encore de moi.** Le premier découpage a fait passer le `chmod`
+des scripts d'infra dans le commit RGPD, dont le message n'en disait rien. Redécoupé en trois
+commits ; l'identité du contenu a été **prouvée** (`git diff filet HEAD` vide) avant de retirer
+le filet.

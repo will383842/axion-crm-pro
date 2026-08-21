@@ -457,11 +457,26 @@ test('le verrou ne parle JAMAIS avant le cloisonnement : une fiche d un autre es
 // NON-CONTAMINATION — le correctif porte sur UNE route. On le PROUVE.
 // ═══════════════════════════════════════════════════════════════════════════
 
-test('TEMOIN de non-contamination : PUT /tags reste inchange avec un If-Match perime', function () {
-    // `TagsController::update` est l'une des trois AUTRES routes PUT qui ecrivent
-    // vraiment. Elle ne connait pas le verrou : un jeton perime n'y change rien.
-    // Le jour ou on l'etendra, CE test devra etre modifie en connaissance de
-    // cause — c'est le but.
+test('PUT /tags REFUSE desormais un If-Match perime — le verrou a ete etendu', function () {
+    // ══════════════════════════════════════════════════════════════════════
+    // CE TEST ETAIT UN TEMOIN DE NON-CONTAMINATION. IL A CHANGE DE SENS, ET
+    // C'ETAIT PREVU.
+    // ══════════════════════════════════════════════════════════════════════
+    //
+    // Il verifiait que `PUT /tags` restait INCHANGE : le lot G43-005 n'avait
+    // cable le verrou que sur `companies`, et ce temoin prouvait qu'il n'avait
+    // rien contamine au passage. Sa propre note disait : « Le jour ou on
+    // l'etendra, CE test devra etre modifie en connaissance de cause — c'est le
+    // but. »
+    //
+    // Ce jour est le 2026-08-21. Trois `update()` vivants ecrasaient encore en
+    // silence — `tags`, `audiences`, `campaigns` — et portent desormais le meme
+    // trait. Le temoin devient donc son contraire : un jeton perime doit etre
+    // REFUSE ici aussi.
+    //
+    // La non-contamination reste mesuree, mais ailleurs : le temoin de
+    // compatibilite de `VerrouOptimisteEtenduTest` verifie que SANS `If-Match`,
+    // rien ne change.
     $etiquette = Tag::create([
         'workspace_id' => $this->espace->id,
         'slug' => 'concurrence',
@@ -470,11 +485,15 @@ test('TEMOIN de non-contamination : PUT /tags reste inchange avec un If-Match pe
         'rules' => [],
     ]);
 
-    $reponse = $this->withHeaders(['If-Match' => '"jeton-totalement-perime"'])
-        ->putJson("/api/v1/tags/{$etiquette->id}", ['name' => 'Apres']);
+    $this->withHeaders(['If-Match' => '"jeton-totalement-perime"'])
+        ->putJson("/api/v1/tags/{$etiquette->id}", ['name' => 'Apres'])
+        ->assertStatus(409);
 
-    $reponse->assertOk();
-    expect($etiquette->fresh()->name)->toBe('Apres');
+    // 🔑 Le refus doit MORDRE : la valeur d'avant survit.
+    expect($etiquette->fresh()->name)->toBe(
+        'Avant',
+        'Le 409 est rendu mais l ecriture a eu lieu : le refus arrive trop tard.',
+    );
 });
 
 /**

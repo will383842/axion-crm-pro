@@ -72,7 +72,16 @@ test('POST /notifications/read-all retourne 501', function () {
 });
 
 test('GET /saved-views authentifié → OK liste vide', function () {
-    $u = makeNotifUser();
+    // `GET /saved-views` exige `companies.view` depuis F36-001 : les vues
+    // sauvegardees sont des filtres SUR les entreprises. Meme raison qu'au
+    // commentaire de `makeNotifUserAvecRole()` ci-dessus — on donne le role,
+    // on ne relache pas la route.
+    //
+    // Le semis est LOCAL au test, comme dans les deux tests voisins : les roles
+    // doivent exister avant l'attribution, et ce fichier ne seme pas en
+    // `beforeEach`.
+    $this->seed(PermissionsAndRolesSeeder::class);
+    $u = makeNotifUserAvecRole();
     $this->actingAs($u)->getJson('/api/v1/saved-views')->assertOk();
 });
 

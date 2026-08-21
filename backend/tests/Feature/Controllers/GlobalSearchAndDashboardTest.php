@@ -16,6 +16,7 @@ function makeSearchUser(): User
         'slug' => 'srch-' . Str::random(6),
         'name' => 'Search WS',
     ]);
+
     return User::create([
         'id' => (string) Str::uuid(),
         'email' => 'srch' . Str::random(4) . '@test.local',

@@ -5,6 +5,7 @@ use App\Crm\Outbound\OutboundRejection;
 use App\Crm\Rgpd\SiteGdprService;
 use App\Models\User;
 use App\Models\Workspace;
+use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +15,11 @@ use Illuminate\Support\Str;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
+
+beforeEach(function () {
+    // Les roles doivent exister AVANT toute attribution.
+    $this->seed(PermissionsAndRolesSeeder::class);
+});
 
 /**
  * MINI-OUTBOX CRM → SITE (lot L5) — convergence BIDIRECTIONNELLE des
@@ -339,6 +345,17 @@ test('une opposition décidée dans la console met un événement en file', func
         'current_workspace_id' => $workspace->id,
         'first_login_completed_at' => now(),
     ]);
+
+    // ⚠️ LE ROLE EST OBLIGATOIRE DEPUIS QUE F36-001 EST BRANCHE.
+    //
+    // Cette suite mesure le METIER, pas les droits, et son utilisateur n'en
+    // avait aucun. Tant qu'aucune route ne portait `permission:`, cela ne se
+    // voyait pas ; depuis, elle recevait 403. On lui donne `admin` : le geste
+    // teste ICI est celui d'un administrateur, et le lui refuser reviendrait a
+    // mesurer la garde au lieu du produit. Les droits sont mesures a leur
+    // place : `tests/Feature/Rgpd/CoucheAutorisationBrancheeTest.php`.
+    setPermissionsTeamId($user->current_workspace_id);
+    $user->assignRole('admin');
     $this->actingAs($user);
 
     $journalistId = DB::table('journalists')->insertGetId([
@@ -372,6 +389,17 @@ test('le résumé d\'observabilité expose les réceptions et le backlog', funct
         'current_workspace_id' => $workspace->id,
         'first_login_completed_at' => now(),
     ]);
+
+    // ⚠️ LE ROLE EST OBLIGATOIRE DEPUIS QUE F36-001 EST BRANCHE.
+    //
+    // Cette suite mesure le METIER, pas les droits, et son utilisateur n'en
+    // avait aucun. Tant qu'aucune route ne portait `permission:`, cela ne se
+    // voyait pas ; depuis, elle recevait 403. On lui donne `admin` : le geste
+    // teste ICI est celui d'un administrateur, et le lui refuser reviendrait a
+    // mesurer la garde au lieu du produit. Les droits sont mesures a leur
+    // place : `tests/Feature/Rgpd/CoucheAutorisationBrancheeTest.php`.
+    setPermissionsTeamId($user->current_workspace_id);
+    $user->assignRole('admin');
     $this->actingAs($user);
 
     foreach (['aujourdhui-1', 'aujourdhui-2'] as $ref) {

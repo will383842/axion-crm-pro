@@ -72,6 +72,17 @@ beforeEach(function () {
         'first_login_completed_at' => now(),
     ]);
 
+    // ⚠️ LE ROLE MONTE DANS LE `beforeEach` DEPUIS QUE F36-001 EST BRANCHE.
+    //
+    // Il n'etait pose que dans UN des tests de ce fichier. Tant qu'aucune route
+    // n'exigeait de permission, les autres s'en passaient ; depuis,
+    // `POST /journalists/{id}/opt-out` exige `rgpd.handle` et
+    // `DELETE /journalists/{id}` exige `companies.delete`. Le compte de cette
+    // suite EST celui de la console qui traite les demandes RGPD : `owner`.
+    $this->seed(PermissionsAndRolesSeeder::class);
+    app(PermissionRegistrar::class)->setPermissionsTeamId($this->workspace->id);
+    $this->utilisateur->assignRole('owner');
+
     $this->actingAs($this->utilisateur);
 });
 
@@ -138,10 +149,7 @@ test('l\'effacement d\'un CONTACT ne peut pas emettre : il n\'efface pas encore'
     // Le jour ou quelqu'un l'implemente, ce test rougit et rappelle que
     // l'effacement d'une personne doit partir au site comme celui d'un
     // journaliste — sinon le patron A-011 se rejoue une fois de plus.
-    $this->seed(PermissionsAndRolesSeeder::class);
-    app(PermissionRegistrar::class)->setPermissionsTeamId($this->workspace->id);
-    $this->utilisateur->assignRole('owner');
-
+    // (le role est desormais pose dans le `beforeEach`)
     $companyId = DB::table('companies')->insertGetId([
         'workspace_id' => $this->workspace->id,
         'siren' => str_pad((string) random_int(100000000, 999999999), 9, '0'),

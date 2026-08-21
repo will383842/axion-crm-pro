@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Http\Requests\StoreEmailAudienceRequest;
 use App\Http\Resources\EmailAudienceResource;
 use App\Models\EmailAudience;
@@ -15,6 +16,8 @@ use Illuminate\Support\Facades\Schema;
 
 class AudiencesController extends ApiController
 {
+    use VerrouOptimiste;
+
     public function __construct(private readonly AudienceBuilderService $builder) {}
 
     /**
@@ -81,6 +84,19 @@ class AudiencesController extends ApiController
     public function update(Request $request, EmailAudience $audience): JsonResponse
     {
         $this->assertWorkspace($audience);
+        // ── VERROU OPTIMISTE (G43-005) ───────────────────────────────────
+        //
+        // Deux personnes ouvrent la meme fiche, la modifient, enregistrent :
+        // la seconde ecrasait la premiere, et les DEUX recevaient « succes ».
+        // Rien ne le disait a personne. La saisie perdue ne laisse aucune trace.
+        //
+        // Le mecanisme n'est pas invente ici : `CompaniesController` le porte
+        // depuis le lot G43-005, par le trait partage. Il reste OPTIONNEL —
+        // sans en-tete `If-Match`, le comportement historique ne change pas, ce
+        // qui evite de casser les clients existants. Mais le client qui l'envoie
+        // est desormais protege ICI AUSSI.
+        $this->refuserSiVersionPerimee($request, $audience);
+
         $data = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:160'],
             'description' => ['sometimes', 'nullable', 'string', 'max:1000'],
@@ -90,7 +106,23 @@ class AudiencesController extends ApiController
         ]);
         $audience->update($data);
 
-        return $this->ok(['data' => new EmailAudienceResource($audience->fresh())]);
+        // ⚠️ L'EN-TETE `ETag` PORTE LE JETON DE L'ETAT D'APRES.
+        //
+        // Sans lui, aucun client ne peut obtenir de jeton, et le verrou pose
+        // au-dessus serait du DECOR : `refuserSiVersionPerimee()` ne se declenche
+        // que si le client annonce un etat, et il ne peut l'annoncer que s'il l'a
+        // recu. Le CORPS de la reponse n'est pas modifie d'un octet.
+        // `refresh()` et non `fresh()` : `fresh()` peut rendre `null` (PHPStan le
+        // signale a juste titre — la ligne peut avoir disparu entre l'ecriture et
+        // la relecture), et il partait ici DEUX fois en base, une pour le corps
+        // et une pour le jeton. `refresh()` recharge l'instance en place et rend
+        // `$this` : un seul aller-retour, et un modele non nul.
+        $audience->refresh();
+
+        return $this->avecJetonDeVersion(
+            $this->ok(['data' => new EmailAudienceResource($audience)]),
+            $audience,
+        );
     }
 
     public function destroy(EmailAudience $audience): JsonResponse

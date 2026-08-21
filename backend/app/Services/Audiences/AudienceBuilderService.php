@@ -171,11 +171,13 @@ class AudienceBuilderService
         $chunks = (int) ceil($total / self::BATCH_CHUNK_SIZE);
         $jobs = [];
         for ($i = 0; $i < $chunks; $i++) {
-            $jobs[] = new RefreshAudienceChunkJob(
+            // B11-002 : `Bus::batch` ne passe pas par `dispatch()`, on pose
+            // donc l'espace sur l'instance avant de l'empiler.
+            $jobs[] = (new RefreshAudienceChunkJob(
                 audienceId: $audience->id,
                 offset: $i * self::BATCH_CHUNK_SIZE,
                 limit: self::BATCH_CHUNK_SIZE,
-            );
+            ))->pourEspace((string) $audience->workspace_id);
         }
 
         Bus::batch($jobs)

@@ -206,7 +206,8 @@ class ScrapingCampaignsController extends ApiController
             'paused_at'     => null,
         ]);
 
-        LaunchCampaignJob::dispatch($campaign->id);
+        dispatch((new LaunchCampaignJob($campaign->id))
+            ->pourEspace((string) $campaign->workspace_id));
 
         return $this->ok(new ScrapingCampaignResource($campaign->fresh()));
     }
@@ -270,7 +271,8 @@ class ScrapingCampaignsController extends ApiController
 
         // Si auto-pause sur quota_companies/duration, refuser le resume implicite
         // serait plus prudent, mais pour le MVP on autorise (l'user reprend en connaissance de cause).
-        MonitorCampaignProgressJob::dispatch($campaign->id);
+        dispatch((new MonitorCampaignProgressJob($campaign->id))
+            ->pourEspace((string) $campaign->workspace_id));
 
         return $this->ok(new ScrapingCampaignResource($campaign->fresh()));
     }

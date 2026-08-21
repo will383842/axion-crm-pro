@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Contracts\InseeClient;
+use App\Jobs\Concerns\RunsInWorkspace;
 use App\Models\Company;
 use App\Models\ScraperRun;
 use App\Services\FranceTravail\FranceTravailDiscoveryClient;
@@ -35,7 +36,7 @@ use Illuminate\Support\Facades\Redis;
  */
 class LaunchZoneScrapingJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, RunsInWorkspace, SerializesModels;
 
     public int $tries = 2;
     public int $timeout = 1800;
@@ -73,7 +74,40 @@ class LaunchZoneScrapingJob implements ShouldQueue
         public readonly bool $enrich = true,
     ) {}
 
+    /**
+     * L'espace de CE job-ci est deja dans son constructeur : il n'a jamais eu
+     * besoin de l'amorcage. Ce qui lui manquait, c'est de le POSER.
+     */
+    protected function espaceDuJob(): ?string
+    {
+        return $this->espaceCible ?? $this->workspaceId;
+    }
+
+    /**
+     * CONSTAT B11-002 / B17-010.
+     *
+     * Ce job portait `$this->workspaceId` depuis toujours et s'en servait comme
+     * d'une VALEUR (`'workspace_id' => $this->workspaceId` a chaque ecriture) —
+     * jamais comme d'un CONTEXTE. La difference se paie sous policy stricte :
+     * le `ScraperRun::create()` plus bas porte le bon `workspace_id`, mais le
+     * `WITH CHECK` le compare a `current_setting('app.current_workspace_id')`,
+     * que `Queue::looping` vient d'effacer. L'INSERT est refuse
+     * (SQLSTATE 42501), le job meurt, et le `companies_created` de la campagne
+     * ne bouge plus.
+     *
+     * Le corps entier passe donc sous `inWorkspace()` : la boucle de
+     * decouverte, les `updateOrCreate` sur `companies`, les increments de
+     * `scraping_campaigns` et les `DispatchScrapeJob` enfants.
+     */
     public function handle(InseeClient $insee, FranceTravailDiscoveryClient $ftDiscovery): void
+    {
+        $this->inWorkspace(
+            $this->espaceDuJob(),
+            fn () => $this->collecter($insee, $ftDiscovery),
+        );
+    }
+
+    private function collecter(InseeClient $insee, FranceTravailDiscoveryClient $ftDiscovery): void
     {
         // 🔴 C18-008. PREMIER point de lecture de l'arret : avant meme de creer
         // un run. `LaunchCampaignJob` pousse un job par (zone x source) avec un
@@ -178,7 +212,7 @@ class LaunchZoneScrapingJob implements ShouldQueue
                 // Enrichissement chaîné seulement si demandé (bouton « Récupérer »
                 // seul → enrich=false ; « Enrichir » séparé via /coverage/enrich).
                 if ($this->enrich) {
-                    EnrichCompanyJob::dispatch($company->id);
+                    dispatch((new EnrichCompanyJob($company->id))->pourEspace($this->workspaceId));
                 }
             }
             $companiesCreated = $companiesNew + $companiesRefreshed;

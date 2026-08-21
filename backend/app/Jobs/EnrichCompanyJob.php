@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 class EnrichCompanyJob implements ShouldQueue
 {
@@ -20,15 +21,20 @@ class EnrichCompanyJob implements ShouldQueue
     public int $timeout = 600;
 
     /**
-     * $workspaceId est OPTIONNEL pour rester compatible avec les cinq points de
-     * dispatch existants (lot L0 : strictement additif). Quand il est fourni,
-     * le job pose le contexte workspace pour toute sa durée — c'est la seule
-     * façon correcte de toucher des données scopées hors requête HTTP, le
-     * middleware SetCurrentWorkspace ne couvrant que le HTTP.
+     * 🔴 CONSTAT B11-002 / B17-010. Ce constructeur portait, depuis le lot L0,
+     * un second paramètre PROMU `?string $workspaceId = null`. Mesure du
+     * 2026-08-21 :
+     *
+     *   grep -rn "EnrichCompanyJob::dispatch" app/  ->  4 sites, tous à UN argument
+     *
+     * Il valait donc `null` à tous les coups, et `handle()` partait par la
+     * branche « pas de contexte ». Un paramètre promu est en outre le mauvais
+     * porteur : `unserialize()` d'une charge écrite avant le lot le laisse NON
+     * INITIALISÉ (mesuré, cf. `RunsInWorkspace`). L'espace passe désormais par
+     * `->pourEspace()`, propriété déclarée du trait.
      */
     public function __construct(
         public readonly int $companyId,
-        public readonly ?string $workspaceId = null,
     ) {}
 
     /** @return list<int> Exponential backoff (60s, 5min, 30min) entre retries. */
@@ -39,13 +45,20 @@ class EnrichCompanyJob implements ShouldQueue
 
     public function handle(WaterfallOrchestrator $waterfall): void
     {
-        if ($this->workspaceId === null) {
-            $this->enrich($waterfall);
+        $espace = $this->espaceDuJob() ?? $this->espaceDepuisLaLigne('companies', $this->companyId);
+
+        if ($espace === null) {
+            // Ni la charge ni la ligne pivot ne nomment d'espace : sous RLS
+            // armée, la lecture d'amorçage rend `null` elle aussi. On ne
+            // travaille PAS à l'aveugle, et on ne se tait pas.
+            Log::warning('EnrichCompanyJob: aucun espace de travail — enrichissement abandonne (constat B11-002)', [
+                'company_id' => $this->companyId,
+            ]);
 
             return;
         }
 
-        $this->inWorkspace($this->workspaceId, fn () => $this->enrich($waterfall));
+        $this->inWorkspace($espace, fn () => $this->enrich($waterfall));
     }
 
     private function enrich(WaterfallOrchestrator $waterfall): void

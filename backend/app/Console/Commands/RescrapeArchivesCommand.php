@@ -82,7 +82,7 @@ class RescrapeArchivesCommand extends Command
         // Throttle 2s entre dispatches pour ne pas marteler INSEE / Brave
         $offsetSeconds = 0;
         foreach ($companies as $company) {
-            EnrichCompanyJob::dispatch($company->id)
+            dispatch((new EnrichCompanyJob($company->id))->pourEspace((string) $company->workspace_id))
                 ->delay(now()->addSeconds($offsetSeconds))
                 ->onQueue('default');
             $offsetSeconds += 2;

@@ -30,7 +30,8 @@ class StartScheduledCampaignsCommand extends Command
                         'status'     => 'running',
                         'started_at' => now(),
                     ]);
-                    LaunchCampaignJob::dispatch($campaign->id);
+                    dispatch((new LaunchCampaignJob($campaign->id))
+                        ->pourEspace((string) $campaign->workspace_id));
                     $count++;
                 }
             });

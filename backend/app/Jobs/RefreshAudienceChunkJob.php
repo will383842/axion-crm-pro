@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\RunsInWorkspace;
 use App\Models\AudienceMember;
 use App\Models\Company;
 use App\Models\EmailAudience;
@@ -27,7 +28,7 @@ use Illuminate\Support\Facades\Log;
  */
 class RefreshAudienceChunkJob implements ShouldQueue
 {
-    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Dispatchable, InteractsWithQueue, Queueable, RunsInWorkspace, SerializesModels;
 
     public int $tries = 2;
     public int $timeout = 600;
@@ -40,12 +41,35 @@ class RefreshAudienceChunkJob implements ShouldQueue
         $this->onQueue('audiences-refresh');
     }
 
+    /**
+     * 🔴 CONSTAT B11-002 / B17-010. Ce job INSERE dans `audience_members`,
+     * table scopee, et lit `contacts` par une requete brute qui ne porte
+     * AUCUN filtre `workspace_id` (ligne « DB::table('contacts') » plus bas) :
+     * seule l'appartenance des `company_id` la retient. `Queue::looping`
+     * efface le contexte entre deux jobs, et celui-ci ne le reposait pas.
+     * Le corps s'execute desormais sous l'espace de son audience.
+     */
     public function handle(AudienceBuilderService $builder): void
     {
         if ($this->batch()?->cancelled()) {
             return;
         }
 
+        $espace = $this->espaceDuJob() ?? $this->espaceDepuisLaLigne('email_audiences', $this->audienceId);
+
+        if ($espace === null) {
+            Log::warning('RefreshAudienceChunkJob: aucun espace de travail — chunk abandonne (constat B11-002)', [
+                'audience_id' => $this->audienceId,
+            ]);
+
+            return;
+        }
+
+        $this->inWorkspace($espace, fn () => $this->rafraichir($builder));
+    }
+
+    private function rafraichir(AudienceBuilderService $builder): void
+    {
         $audience = EmailAudience::find($this->audienceId);
         if (! $audience) {
             Log::warning('RefreshAudienceChunkJob: audience missing', ['id' => $this->audienceId]);

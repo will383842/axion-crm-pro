@@ -591,8 +591,14 @@ class CompaniesController extends ApiController
     public function bulkEnrich(Request $r): JsonResponse
     {
         $ids = $r->validate(['ids' => 'required|array|max:500', 'ids.*' => 'integer'])['ids'];
+
+        // B11-002 : l'espace vient de la REQUETE, pas de la ligne. Sous RLS
+        // armee, un job ne peut pas relire lui-meme le `workspace_id` d'une
+        // entreprise : sa lecture d'amorcage serait filtree, elle aussi.
+        $workspaceId = app()->bound('workspace.id') ? (string) app('workspace.id') : null;
+
         foreach ($ids as $id) {
-            EnrichCompanyJob::dispatch((int) $id);
+            dispatch((new EnrichCompanyJob((int) $id))->pourEspace($workspaceId));
         }
 
         return $this->ok(['queued' => count($ids)]);

@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\RunsInWorkspace;
 use App\Models\ScrapingCampaign;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -28,7 +29,7 @@ use Illuminate\Support\Facades\Schema;
  */
 class MonitorCampaignProgressJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, RunsInWorkspace, SerializesModels;
 
     public int $tries = 1;
 
@@ -36,7 +37,32 @@ class MonitorCampaignProgressJob implements ShouldQueue
 
     public function __construct(public readonly int $campaignId) {}
 
+    /**
+     * 🔴 CONSTAT B11-002 / B17-010. Ce moniteur tourne toutes les 60 s en se
+     * re-dispatchant lui-meme, et il ECRIT dans `scraping_campaigns`
+     * (compteurs de quota, auto-pause). `Queue::looping` efface le contexte
+     * entre deux jobs : il n'en avait aucun. Sous policy stricte, son
+     * `ScrapingCampaign::find()` rend `null` et le `return` de la ligne
+     * suivante est SILENCIEUX — une campagne ne se mettrait plus jamais en
+     * pause sur quota. Le corps s'execute desormais sous l'espace de sa
+     * campagne.
+     */
     public function handle(): void
+    {
+        $espace = $this->espaceDuJob() ?? $this->espaceDepuisLaLigne('scraping_campaigns', $this->campaignId);
+
+        if ($espace === null) {
+            Log::warning('MonitorCampaignProgressJob: aucun espace de travail — suivi abandonne (constat B11-002)', [
+                'campaign_id' => $this->campaignId,
+            ]);
+
+            return;
+        }
+
+        $this->inWorkspace($espace, fn () => $this->suivre());
+    }
+
+    private function suivre(): void
     {
         /** @var ScrapingCampaign|null $campaign */
         $campaign = ScrapingCampaign::find($this->campaignId);
@@ -155,6 +181,8 @@ class MonitorCampaignProgressJob implements ShouldQueue
         }
 
         // 6) Sinon, re-self-dispatch
-        self::dispatch($campaign->id)->delay(now()->addSeconds(60));
+        dispatch((new self($campaign->id))
+            ->pourEspace((string) $campaign->workspace_id))
+            ->delay(now()->addSeconds(60));
     }
 }

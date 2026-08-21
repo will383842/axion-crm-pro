@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\RunsInWorkspace;
 use App\Models\ScrapingCampaign;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -29,7 +30,7 @@ use Illuminate\Support\Facades\Log;
  */
 class LaunchCampaignJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, RunsInWorkspace, SerializesModels;
 
     public int $tries = 1;
     public int $timeout = 600;
@@ -45,7 +46,29 @@ class LaunchCampaignJob implements ShouldQueue
 
     public function __construct(public readonly int $campaignId) {}
 
+    /**
+     * 🔴 CONSTAT B11-002 / B17-010. `Queue::looping` efface le contexte entre
+     * deux jobs ; celui-ci ne le reposait pas. Il crée pourtant des
+     * `scraper_runs` porteurs d'un `workspace_id` et met à jour
+     * `scraping_campaigns` — deux tables sous policy STRICTE. Le corps du job
+     * s'exécute désormais sous l'espace de sa campagne.
+     */
     public function handle(): void
+    {
+        $espace = $this->espaceDuJob() ?? $this->espaceDepuisLaLigne('scraping_campaigns', $this->campaignId);
+
+        if ($espace === null) {
+            Log::warning('LaunchCampaignJob: aucun espace de travail — campagne non lancee (constat B11-002)', [
+                'campaign_id' => $this->campaignId,
+            ]);
+
+            return;
+        }
+
+        $this->inWorkspace($espace, fn () => $this->lancer());
+    }
+
+    private function lancer(): void
     {
         /** @var ScrapingCampaign|null $campaign */
         $campaign = ScrapingCampaign::find($this->campaignId);
@@ -106,7 +129,7 @@ class LaunchCampaignJob implements ShouldQueue
 
                 if (in_array($source, self::DISCOVERY_SOURCES_BACKEND, true)) {
                     // Dispatch direct via LaunchZoneScrapingJob (queue Laravel)
-                    LaunchZoneScrapingJob::dispatch(
+                    dispatch((new LaunchZoneScrapingJob(
                         (string) $campaign->workspace_id,
                         $department,
                         null,
@@ -114,7 +137,8 @@ class LaunchCampaignJob implements ShouldQueue
                         $perCampaignLimit,
                         $campaign->id,
                         $source,
-                    )->delay(now()->addSeconds($offsetSeconds));
+                    ))->pourEspace((string) $campaign->workspace_id))
+                        ->delay(now()->addSeconds($offsetSeconds));
                     $runsTotal++;
                 } elseif (in_array($source, self::DISCOVERY_SOURCES_NODE, true)) {
                     // Sources Phase B (Node BullMQ via DispatchScrapeJob)
@@ -152,7 +176,7 @@ class LaunchCampaignJob implements ShouldQueue
                         }
                     } else {
                         // Prod : dispatch via LaunchZoneScrapingJob qui appellera dispatchNodeWorker()
-                        LaunchZoneScrapingJob::dispatch(
+                        dispatch((new LaunchZoneScrapingJob(
                             (string) $campaign->workspace_id,
                             $department,
                             null,
@@ -160,7 +184,8 @@ class LaunchCampaignJob implements ShouldQueue
                             $perCampaignLimit,
                             $campaign->id,
                             $source,
-                        )->delay(now()->addSeconds($offsetSeconds));
+                        ))->pourEspace((string) $campaign->workspace_id))
+                            ->delay(now()->addSeconds($offsetSeconds));
                         $runsTotal++;
                     }
                 } else {
@@ -177,6 +202,8 @@ class LaunchCampaignJob implements ShouldQueue
         $campaign->update(['runs_total' => $runsTotal]);
 
         // Démarre le moniteur de progression (re-self-dispatch toutes les 60s).
-        MonitorCampaignProgressJob::dispatch($campaign->id)->delay(now()->addSeconds(30));
+        dispatch((new MonitorCampaignProgressJob($campaign->id))
+            ->pourEspace((string) $campaign->workspace_id))
+            ->delay(now()->addSeconds(30));
     }
 }

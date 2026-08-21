@@ -128,6 +128,24 @@ test('les compteurs sont servis par un index couvrant, jamais par un balayage', 
     // c'est exactement la rougeur attendue.
     DB::statement('SET enable_seqscan = off');
 
+    // ⚠️ `ANALYZE` AVANT DE LIRE LE PLAN — ce test etait INTERMITTENT sans lui.
+    //
+    // Mesure du 2026-08-21 : ce test a rougi en CI en attendant
+    // `Index Only Scan using idx_companies_ws_counts` et en recevant
+    // `Index Scan using idx_companies_workspace_relation_type` — sur un commit
+    // qui ne touchait NI `companies`, NI ses index, NI ce fichier.
+    //
+    // La cause est la meme que celle mesuree le matin meme sur `C21-001` :
+    // `RefreshDatabase` annule les DONNEES entre deux tests, il n'annule pas les
+    // STATISTIQUES. Un test voisin qui insere dans `companies` laisse donc au
+    // planificateur une idee fausse de la table, et le planificateur change
+    // d'index — legitimement, sur des chiffres qui ne correspondent plus a rien.
+    //
+    // `ANALYZE` remet les statistiques en accord avec les deux lignes que ce
+    // test vient d'ecrire. Le plan redevient une fonction de ce que le test
+    // MONTRE, et non de l'ordre dans lequel Pest l'a tire.
+    DB::statement('ANALYZE companies');
+
     $plan = collect(DB::select(
         'EXPLAIN SELECT relation_type, lifecycle_stage, count(*) AS total
            FROM companies

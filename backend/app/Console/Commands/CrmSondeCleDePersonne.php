@@ -92,7 +92,14 @@ class CrmSondeCleDePersonne extends Command
         // celui documente dans `RunsInWorkspace::espaceDepuisLaLigne()`.
         $restants = WorkspaceContext::runWithoutScope(
             'sonde A05-001 : compter les fiches sans cle de rapprochement, tous espaces confondus',
+            // ⚠️ `whereNull('deleted_at')` : une fiche EN CORBEILLE n'a pas besoin
+            // de cle de rapprochement — sa fiche 360 n'a pas a etre atteignable.
+            // La compter ferait crier la sonde sur un stock que personne ne doit
+            // rattacher, et une alarme qu'on ne peut pas eteindre finit ignoree.
+            // (La garde `B10-016-PORTEE PLAFOND` l'a d'ailleurs releve en CI :
+            // sans ce filtre, cette ligne devenait une lecture AVEUGLE de plus.)
             static fn (): int => (int) DB::table('contacts')
+                ->whereNull('deleted_at')
                 ->whereNull('person_key')
                 ->whereNotNull('email')
                 ->whereRaw("btrim(email::text) <> ''")

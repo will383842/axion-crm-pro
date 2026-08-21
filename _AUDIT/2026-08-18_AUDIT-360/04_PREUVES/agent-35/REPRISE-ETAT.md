@@ -919,3 +919,81 @@ qu'elles annonçaient, et toutes trois avaient été écrites **pendant cette
 campagne**. Le défaut n'est pas dans le produit : il est dans ma façon de
 mesurer. *Une garde qu'on n'a jamais vue rougir dans les conditions réelles de la
 CI n'est pas une garde, c'est une conjecture verte.*
+
+---
+
+## §16 — La suite jouée en entier, enfin ; et une opposition RGPD qui survivait
+
+### 16.1 Le verdict complet, par tranches
+
+| tranche | contenu | verdict |
+|---|---|---|
+| 1 | `Crm` `Infra` `Database` `Console` `Commands` | 520 passés, 1 incomplete |
+| 2 | `Rgpd` `Auth` `Controllers` `Api` `Audiences` … | 423 passés, 2 incomplete |
+| 3 | `Unit` + les 25 fichiers racine de `Feature` | 539 passés, 1 skipped |
+
+**1 482 tests, zéro échec.** C'est le premier verdict complet de la campagne — le
+banc n'avait jamais pu aller au bout d'un seul tenant.
+
+### 16.2 Deux échecs que j'ai fabriqués moi-même
+
+La tranche 3 a d'abord annoncé deux échecs, `relation "audit_logs" does not
+exist`. Ils ne se reproduisaient ni fichier par fichier, ni à deux, ni **en
+rejouant la graine exacte** (`1787341146` → 539 verts).
+
+La cause était dans mon fichier de sortie : il contenait **deux résumés**. J'avais
+lancé la tranche 3 deux fois — une première avec un `&` que j'avais cru mort, une
+seconde correctement. Les deux processus jouaient `migrate:fresh` sur la **même
+base**, en même temps : l'un détruisait les tables pendant que l'autre lisait.
+
+*C'est la règle que j'ai moi-même consignée au §13 de cette campagne, et que je
+viens d'enfreindre.* Une suite jouée pendant qu'un autre processus refait la base
+ne prouve rien — pas plus qu'une suite jouée pendant que des agents éditent
+l'arbre.
+
+### 16.3 Les trois `incomplete`, enfin nommés
+
+Ils traînaient sans identité depuis plusieurs vagues. Ce ne sont pas des oublis :
+
+| fichier | ce qu'il déclare |
+|---|---|
+| `Infra/VolumeDeProductionHubConsoleTest:422` | `G41-002` — le OU multi-champs de `applySearch` empêche l'index trigrammes ; arbitrage à Will |
+| `Rgpd/OppositionVoieJumelleAnnuaireTest:169` | `C19-010` — la voie jumelle laisse entrer l'identité d'un dirigeant opposé |
+| `Rgpd/PurgeNonDiffusibleVariantesTest:160` | `C19-010` — le rattrapage ne voit qu'une forme de marquage |
+
+Le troisième est **fermé** par cette vague ; les deux autres restent, et disent
+pourquoi.
+
+### 16.4 `C19-010` — une opposition qui survivait à sa propre purge
+
+Une personne physique ayant demandé à l'INSEE de **ne pas être publiée** entrait
+sous « [ND] [ND] » et survivait à `prospection:purge-non-diffusible`, dont la
+condition était une égalité stricte sur `'[ND]'`.
+
+La vague précédente avait **mesuré** le correctif et l'avait laissé en attente :
+le fichier était hors de son périmètre écrit. Il est dans celui-ci.
+
+**Un second défaut trouvé en chemin, et il est plus grave que le premier** : la
+condition était écrite **deux fois** — une pour compter, une pour supprimer. Qui
+n'en corrigeait qu'une faisait mentir le plafond de `RefuseUneSuppressionMassive`
+— la garde aurait autorisé une suppression sur la foi d'un décompte plus étroit
+qu'elle. Il n'y a plus qu'une définition.
+
+⚠️ **Ce que je n'ai pas fermé, et pourquoi.** La FORME 3 est une fiche *sans
+dénomination*. Elle est indiscernable d'un entrepreneur individuel parfaitement
+légitime, qui arrive sans dénomination par la même voie. La purger serait
+exactement le piège `B15-004` — « `legal_form IS NULL` » — qui a failli effacer la
+base entière. *Une purge trop large n'est pas une purge prudente : c'est une
+perte de données irréversible.* Son rattrapage demande de rejouer l'INSEE :
+travail de commande, **arbitrage à Will**.
+
+### 16.5 Ce qui reste ouvert et n'appartient qu'à Will
+
+Trois arbitrages, tous documentés dans le registre et dans les gardes :
+
+1. **`C19-010` / FORME 3** — rejouer l'INSEE sur les fiches sans dénomination.
+2. **`C19-010` / voie jumelle** — `recherche-entreprises.api.gouv.fr` laisse
+   entrer l'identité d'un dirigeant opposé, date de naissance comprise ;
+   `statut_diffusion` n'apparaît **nulle part** dans le dépôt.
+3. **`G41-002`** — le OU multi-champs de `applySearch` empêche l'index
+   trigrammes ; le corriger change une sémantique de recherche.

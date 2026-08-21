@@ -1,3 +1,66 @@
+# =============================================================================
+# BASELINE PHPStan — dette figée le 2026-08-13, dégonflée le 2026-08-18
+# =============================================================================
+# ÉTAT COURANT (2026-08-18) : 191 entrées / 209 erreurs, niveau 8.
+# Ces deux nombres sont FIGÉS dans un test Pest — cf.
+# tests/Unit/PhpstanBaselineNeGrossitPasTest.php. Ils ne peuvent que DÉCROÎTRE ;
+# quand tu les fais baisser, mets à jour le test dans le MÊME commit.
+#
+# Historique :
+#   - 2026-08-13 : 339 entrées / 443 erreurs constatées au durcissement de la CI
+#     (PR « fix/ci-reelle », Gate 0 de l'autopilot CRM).
+#   - (entre les deux) : deux entrées ont disparu sans que rien ne le signale —
+#     cet en-tête annonçait encore 339/443 alors que le fichier en contenait
+#     337/441. Personne ne pouvait le voir : `reportUnmatchedIgnoredErrors`
+#     valait `false`, donc une entrée obsolète ne faisait RIEN rougir.
+#   - 2026-08-18 : `reportUnmatchedIgnoredErrors` passé à `true` (Étape 0,
+#     ligne 6 des préalables). 38 entrées ORPHELINES révélées d'un coup
+#     (erreurs corrigées depuis le 13/08, entrées jamais retirées) → 337 → 299.
+#     Puis une vague de déclaration de types, sans aucun changement de
+#     comportement : blocs `@property` et types de retour de relations sur
+#     Company, Tag (qui n'en avait AUCUN), User, EmailAudience, ScraperRun,
+#     LlmUseCase et Media → 299 → 211 entrées, 441 → 248 erreurs.
+#     À noter : un `@property` sur un modèle solde aussi les erreurs de ses
+#     Resources (Larastan résout `$this->resource`) — le bloc de Tag a soldé
+#     6 entrées de `TagResource` sans qu'on y touche.
+#   - 2026-08-21 : le job CI rougissait sur 38 erreurs et n'atteignait donc jamais
+#     Pint ni Pest. 11 entrées ORPHELINES, 3 mal comptées, 24 vraies erreurs.
+#     Corrigées : `getEloquentBuilder()` sur l'enveloppe Spatie (3 sites), les six
+#     `fopen('php://output')` non vérifiés, les relations non typées de Journalist,
+#     deux conditions mortes de RetentionPurge, les 15 `?->` d'OwnerUserSeeder
+#     centralisés dans un helper (7 → 1) → 211 → 191 entrées, 248 → 209 erreurs.
+#     ZÉRO entrée nouvelle. Une seule croissance : `SsrfGuard` 1 → 2, deux méthodes
+#     sœurs lisant `env()` hors `config/` — choix documenté dont le défaut est le
+#     comportement SÛR.
+#
+# Piège à connaître : déclarer une colonne JSONB castée `array` rend « toujours
+# vrai » les `is_array()` défensifs qui la lisent, et PHPStan le signale. Trois
+# colonnes sont donc VOLONTAIREMENT laissées hors des blocs `@property` :
+# `Tag::$rules`, `EmailAudience::$criteria`, `Media::$socials` — retirer leur
+# garde-fou changerait le comportement (un JSONB scalaire se décode en scalaire).
+# La note est écrite dans chacun des trois modèles.
+#
+# Pourquoi ce fichier existe : jusqu'à cette date PHPStan n'avait JAMAIS analysé
+# le dépôt. `phpstan.neon` contenait deux clés supprimées en PHPStan 2
+# (`checkMissingIterableValueType`, `checkGenericClassInNonGenericObjectType`) :
+# l'outil s'arrêtait sur « Invalid configuration » à chaque exécution, et la CI
+# masquait l'échec avec un `|| true`.
+#
+# Règles d'usage :
+#   - le NIVEAU N'EST PAS BAISSÉ (toujours 8) et l'outil n'est pas neutralisé ;
+#   - le NOUVEAU code doit être propre : toute erreur absente de cette baseline
+#     fait rougir la CI ;
+#   - ce fichier ne doit que DÉCROÎTRE. Ne jamais le régénérer pour faire taire
+#     de nouvelles erreurs : corriger le code. Après une vague de corrections,
+#     régénérer proprement :
+#       php vendor/bin/phpstan analyse --generate-baseline=phpstan-baseline.neon
+#   - CHEMINS INTERDITS : aucune entrée ne peut viser `app/Crm/**`,
+#     `app/Http/Controllers/Api/Crm/**` ni les modèles Contact / Candidate /
+#     Company / Activity / Tag. Ce socle a été écrit APRÈS le gel et est propre
+#     au niveau 8 — le code neuf n'entre pas dans la baseline. Garde :
+#     tests/Unit/PhpstanBaselineNeGrossitPasTest.php.
+# =============================================================================
+
 parameters:
 	ignoreErrors:
 		-

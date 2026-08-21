@@ -28,7 +28,24 @@
 [extend]
 useDefault = true
 
-[[allowlists]]
+# ⚠️ `[allowlist]` AU SINGULIER, ET CE N'EST PAS UN DETAIL DE STYLE.
+#
+# La premiere version employait `[[allowlists]]` (pluriel, tableau de tables),
+# la forme que documente gitleaks aujourd'hui. Mesure du 2026-08-21 :
+#
+#   gitleaks v8.30.1 (image `:latest`) ..... config lue, no leaks found
+#   gitleaks v8.24.3 (celle de la CI) ...... config IGNOREE, leaks found: 6
+#
+# `gitleaks-action@v2` epingle 8.24.3, ou le pluriel n'existe pas encore : la
+# config etait lue sans erreur ET sans effet. Le singulier fonctionne sur les
+# DEUX versions — verifie sur les deux.
+#
+# 🔑 Troisieme fois dans ce chantier qu'une mesure est faite sur une version
+# autre que celle qui tourne en CI (apres `react-router` lie au depot principal
+# et le `vendor` de `predis` monte dans le banc). La regle qui s'en degage :
+# **mesurer avec la version que la CI epingle, jamais avec `:latest`.**
+
+[allowlist]
 description = "Secrets factices des gardes HMAC et HIBP — valeurs exactes, pas de chemin exempte"
 regexTarget = "line"
 regexes = [

@@ -150,6 +150,50 @@ final class PontRedisEnregistreur implements NodeConnectionInterface
         return null;
     }
 
+    /**
+     * ── LES TROIS METHODES QUE `predis/predis` v3 A AJOUTEES A SON INTERFACE ──
+     *
+     * Sans elles, PHP leve un FATAL au chargement de cette classe :
+     *
+     *   Class Tests\Support\PontRedisEnregistreur contains 3 abstract methods
+     *   (NodeConnectionInterface::getClientId, ::write, ::hasDataToRead)
+     *
+     * et le fatal emporte la suite Pest ENTIERE, pas seulement les tests de ce
+     * pont.
+     *
+     * 🔴 POURQUOI PERSONNE NE L'AVAIT VU SUR LE BANC. Le conteneur `a35r` monte
+     * `Axion-CRM-Pro/backend/vendor` — le vendor du depot PRINCIPAL — par-dessus
+     * `/var/www/html/vendor`. Le worktree a pourtant le sien. Mesure du
+     * 2026-08-21 :
+     *
+     *   vendor monte dans a35r ....... NodeConnectionInterface : 5 methodes
+     *   composer.lock (ce que la CI installe) : predis/predis v3.5.1, 8 methodes
+     *
+     * Le banc jouait donc contre un vendor que la CI n'installe pas. C'est le
+     * meme piege que celui du `node_modules` du frontend, lie au depot principal
+     * et fige a `react-router@1.170.4` (cf. `RouteErrorBoundary`). **Le vendor
+     * et le node_modules du banc ne font pas foi : `composer.lock` et
+     * `pnpm-lock.yaml`, oui.**
+     *
+     * Les corps sont inertes A DESSEIN : cette classe se substitue au socket, et
+     * `executeCommand()` seul sert au relevé. Rien dans la suite n'appelle ces
+     * trois-la ; si quelque chose s'y mettait, le silence serait pire qu'une
+     * erreur — d'ou `hasDataToRead()` qui rend `false` (il n'y a AUCUN fil) et
+     * `getClientId()` qui rend `null` (aucune connexion, donc aucun identifiant
+     * a inventer).
+     */
+    public function getClientId(): ?int
+    {
+        return null;
+    }
+
+    public function write(string $buffer): void {}
+
+    public function hasDataToRead(): bool
+    {
+        return false;
+    }
+
     private function enregistrer(CommandInterface $command): void
     {
         self::$emises[] = [

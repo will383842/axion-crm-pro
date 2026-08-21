@@ -239,14 +239,30 @@ jobs:
           #
           # Resultat mesure :
           #
-          #   les cinq conteneurs .............. running (healthy)
+          #   les cinq conteneurs .............. running (healthy)   <- trompeur
           #   les migrations ................... « Aucune migration en attente »
-          #   https://app.axion-crm-pro.com .... 200
+          #   https://app.axion-crm-pro.com .... 200                 <- trompeur
           #   https://api.axion-crm-pro.com/up . 502, pendant 13 minutes
+          #   le job `Smoke test prod` ......... ROUGE des la 21e seconde
           #
-          # Autrement dit : le deploiement REUSSIT, le serveur se declare en
-          # bonne sante, et l'API est injoignable. Le `docker restart
-          # axion-crm-caddy` joue a la main l'a ramenee en 200 immediatement.
+          # ⚠️ CORRECTION : une premiere version de ce commentaire disait « le
+          # deploiement REUSSIT ». C'est faux. L'etape `Smoke test prod`
+          # ci-dessous A DETECTE le 502 et a fait echouer le job :
+          #
+          #     curl: (22) The requested URL returned error: 502
+          #     ##[error]Health check failed
+          #
+          # Ce qui a manque n'est donc pas la detection, c'est la LECTURE : un
+          # deploiement en echec n'envoie aucune notification, et treize minutes
+          # ont passe avec un job rouge que personne ne regardait.
+          #
+          # Ce qui a egare le diagnostic sur le moment, ce sont les conteneurs :
+          # tous `healthy`, Caddy compris, pendant que Caddy parlait a une
+          # adresse morte. Un healthcheck qui interroge le conteneur lui-meme ne
+          # dit rien de ce qu'il ATTEINT.
+          #
+          # Le `docker restart axion-crm-caddy` joue a la main a ramene l'API en
+          # 200 immediatement.
           #
           # ⚠️ POURQUOI `restart` ET NON `up -d --no-deps caddy`. `up -d` ne
           # recree un conteneur que si sa CONFIGURATION FUSIONNEE a change. Ici

@@ -7,15 +7,40 @@
  * UNE PANNE DE PRODUCTION MESURÉE, LE 2026-08-21
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Le déploiement `377febf` a **réussi** de bout en bout :
+ * ⚠️ CORRECTION DU 2026-08-21 (après vérification du journal GitHub Actions).
+ * Une première version de cette garde affirmait que le déploiement avait
+ * « réussi de bout en bout ». **C'est faux, et l'erreur était de moi.**
  *
- *   les cinq conteneurs .............. running (healthy)
+ * L'étape `Smoke test prod` du déploiement `377febf` A DÉTECTÉ la panne, et a
+ * fait échouer le job :
+ *
+ *     GET https://api.axion-crm-pro.com/up
+ *     curl: (22) The requested URL returned error: 502
+ *     ##[error]Health check failed
+ *
+ * Voici l'état réel, et il est plus intéressant que celui que j'avais écrit :
+ *
+ *   les cinq conteneurs .............. running (healthy)      ← trompeur
  *   les onze migrations .............. « Aucune migration en attente »
- *   https://app.axion-crm-pro.com .... 200
+ *   https://app.axion-crm-pro.com .... 200                    ← trompeur
  *   https://api.axion-crm-pro.com/up . 502, pendant treize minutes
+ *   le job GitHub Actions ............ ROUGE, dès la 21ᵉ seconde
  *
- * Le serveur se déclarait donc en parfaite santé pendant que l'API était
- * injoignable — l'application s'affichait, et rien ne se chargeait.
+ * ── CE QUE CELA CHANGE, ET CE QUE CELA NE CHANGE PAS ──────────────────────
+ *
+ * Le correctif reste exactement le même : Caddy doit redémarrer après la
+ * recréation d'`api`, et cette garde le défend.
+ *
+ * Mais le défaut d'alerte n'est pas celui que je décrivais. La détection
+ * EXISTE et elle a fonctionné en vingt et une secondes. Ce qui a manqué, c'est
+ * que **personne n'a lu le rouge** : un déploiement en échec n'envoie aucune
+ * notification, et treize minutes ont passé avec un job rouge que nul ne
+ * regardait. *Une alarme que personne ne reçoit n'est pas une alarme.*
+ *
+ * Ce qui a égaré le diagnostic sur le moment, ce sont les conteneurs : tous
+ * `healthy`, y compris Caddy, pendant que Caddy parlait à une adresse morte.
+ * Un `healthcheck` qui interroge le conteneur lui-même ne dit rien de ce qu'il
+ * atteint.
  *
  * ── LE MÉCANISME ───────────────────────────────────────────────────────────
  *

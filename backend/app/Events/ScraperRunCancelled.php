@@ -12,8 +12,26 @@ use Illuminate\Queue\SerializesModels;
  * Sprint 19.6 — broadcast event lorsqu'un scraper run est annulé via API.
  * Émis par App\Http\Controllers\Api\ScraperRunsController::cancel.
  *
- * Les workers vérifient également le flag Redis `cancelled:scraper-run:{id}`
- * (TTL 1h) pour interrompre les tâches déjà en cours.
+ * ⚠️ CE COMMENTAIRE A ÉTÉ FAUX DU SPRINT 19.6 AU 2026-08-21. Il affirmait
+ * « les workers vérifient également le flag Redis `cancelled:scraper-run:{id}`
+ * (TTL 1h) pour interrompre les tâches déjà en cours ». Mesure du 2026-08-20 :
+ *     grep -rn "cancelled:scraper-run" backend/ frontend/ workers/
+ * → 2 ÉCRITURES (les deux contrôleurs `cancel()`), ce commentaire-ci, et
+ *   ZÉRO lecture. Le lecteur décrit ici n'existait nulle part, et l'arrêt
+ *   d'urgence n'arrêtait donc rien (constat C18-008).
+ *
+ * Ce qui lit réellement ce drapeau, aujourd'hui, et rien d'autre :
+ *  - `App\Jobs\LaunchZoneScrapingJob::motifArretDistant()` — sources PHP
+ *    (`insee`, `france_travail`), relu toutes les 10 entreprises ;
+ *  - `workers/src/scrapers/base.ts` (`PREFIXE_ANNULATION`) — files
+ *    `axion:scrape:*`, lu avant chaque scrape, et SEULEMENT si le job porte
+ *    un `context.scraper_run_id`.
+ *
+ * Reste inarrêtable : les scrapes poussés par `WaterfallOrchestrator`, qui ne
+ * nomment aucune ligne `scraper_runs` — elle n'est créée qu'à l'ingestion du
+ * résultat. Résidu compté par `tests/Feature/ArretCollecteCoteNodeTest.php`.
+ *
+ * Ce broadcast, lui, ne sert QU'À rafraîchir l'écran : il ne porte aucun arrêt.
  */
 class ScraperRunCancelled implements ShouldBroadcast
 {

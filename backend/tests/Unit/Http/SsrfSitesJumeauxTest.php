@@ -115,7 +115,12 @@ function jumeauxEspionRedis(array &$recueil): void
         return 1;
     });
 
-    Redis::shouldReceive('connection')->with('queue')->andReturn($lien);
+    // C18-011 : le pont passe desormais par une connexion Redis SANS prefixe
+    // (`scrape_bridge`). Cet espion-ci reste pose au niveau de la FACADE : il
+    // voit l'argument PHP, jamais le prefixe que le client Redis colle ensuite.
+    // C'est `tests/Unit/Scraping/PontRedisPrefixeTest.php` qui mesure la clef
+    // reellement emise sur le fil — cet espion en est structurellement aveugle.
+    Redis::shouldReceive('connection')->with(DispatchScrapeJob::CONNEXION_REDIS)->andReturn($lien);
 }
 
 test('C19-001 — DispatchScrapeJob ne met JAMAIS une adresse interne en file', function () {

@@ -129,7 +129,7 @@ class LaunchZoneScrapingJob implements ShouldQueue
         $motifArret = null;
 
         try {
-            $results = $this->discoverEntreprises($insee, $ftDiscovery);
+            $results = $this->discoverEntreprises($insee, $ftDiscovery, $run);
             $companiesFound = count($results);
 
             foreach ($results as $rang => $data) {
@@ -327,7 +327,8 @@ class LaunchZoneScrapingJob implements ShouldQueue
     {
         // a) Le drapeau que personne ne lisait.
         try {
-            $drapeau = Redis::get(self::CLE_ANNULATION . $run->id);
+            $drapeau = Redis::connection(DispatchScrapeJob::CONNEXION_REDIS)
+                ->get(self::CLE_ANNULATION . $run->id);
             // Selon le client (predis rend null, phpredis rend false), l'absence
             // ne se teste pas de la meme facon : on n'accepte que du contenu.
             if ($drapeau !== null && $drapeau !== false && (string) $drapeau !== '') {
@@ -359,7 +360,7 @@ class LaunchZoneScrapingJob implements ShouldQueue
      *
      * @return array<int, \App\Data\Sources\InseeCompanyData>
      */
-    private function discoverEntreprises(InseeClient $insee, FranceTravailDiscoveryClient $ftDiscovery): array
+    private function discoverEntreprises(InseeClient $insee, FranceTravailDiscoveryClient $ftDiscovery, ScraperRun $run): array
     {
         return match ($this->source) {
             'insee' => $insee->searchByCriteria([
@@ -368,7 +369,7 @@ class LaunchZoneScrapingJob implements ShouldQueue
                 'limit'      => $this->limit,
             ]),
             'france_travail' => $ftDiscovery->searchEntreprisesByDept($this->department, $this->limit),
-            'google_maps', 'pages_jaunes' => $this->dispatchNodeWorker(),
+            'google_maps', 'pages_jaunes' => $this->dispatchNodeWorker($run),
             default => throw new \RuntimeException("Unknown discovery source: {$this->source}"),
         };
     }
@@ -381,7 +382,7 @@ class LaunchZoneScrapingJob implements ShouldQueue
      *
      * @return array<int, \App\Data\Sources\InseeCompanyData>
      */
-    private function dispatchNodeWorker(): array
+    private function dispatchNodeWorker(ScraperRun $run): array
     {
         if ((bool) env('MOCK_SCRAPERS', true)) {
             Log::info('LaunchZoneScrapingJob: MOCK_SCRAPERS=true, skipping Node worker', [
@@ -392,14 +393,27 @@ class LaunchZoneScrapingJob implements ShouldQueue
         // Phase B (production) : enqueue via DispatchScrapeJob — résultats arriveront
         // de manière asynchrone côté /internal/scraper-result et créeront leurs propres
         // Company + ScraperRun. On ne bloque pas ici.
+        //
+        // 🔴 C18-008, SITE JUMEAU. `scraper_run_id` n'est pas decoratif : c'est
+        // le SEUL numero qui permette au worker Node de composer la cle
+        // `cancelled:scraper-run:{id}` posee par les deux controleurs au clic
+        // « arreter ». Le `run_id` que `DispatchScrapeJob` fabrique par
+        // `bin2hex(random_bytes(8))` ne designe aucune ligne `scraper_runs` :
+        // sans cette entree, le worker n'avait rien a mettre derriere le
+        // prefixe, et les onze files `axion:scrape:*` etaient integralement
+        // insensibles a l'arret d'urgence (mesure du 2026-08-21 :
+        // `grep -rni "cancel" workers/src` -> aucun fichier).
+        // Le lecteur est `workers/src/scrapers/base.ts` (`PREFIXE_ANNULATION`).
+        // ⚠️ Si tu renommes cette entree, renomme-la LA-BAS AUSSI.
         DispatchScrapeJob::dispatch(
             companyId: 0,  // synthétique : pas de company source pour une zone discovery
             source: str_replace('_', '-', $this->source),
             context: [
-                'discovery_zone' => $this->department,
-                'limit'          => $this->limit,
-                'campaign_id'    => $this->campaignId,
-                'workspace_id'   => $this->workspaceId,
+                'discovery_zone'  => $this->department,
+                'limit'           => $this->limit,
+                'campaign_id'     => $this->campaignId,
+                'workspace_id'    => $this->workspaceId,
+                'scraper_run_id'  => (int) $run->id,
             ],
             targetUrl: null,
         );

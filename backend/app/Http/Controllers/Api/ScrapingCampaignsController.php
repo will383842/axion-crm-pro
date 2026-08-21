@@ -7,6 +7,7 @@ use App\Http\Requests\StoreScrapingCampaignRequest;
 use App\Http\Requests\UpdateScrapingCampaignRequest;
 use App\Http\Resources\ScrapingCampaignResource;
 use App\Jobs\LaunchCampaignJob;
+use App\Jobs\DispatchScrapeJob;
 use App\Jobs\LaunchZoneScrapingJob;
 use App\Jobs\MonitorCampaignProgressJob;
 use App\Models\ScrapingCampaign;
@@ -323,7 +324,29 @@ class ScrapingCampaignsController extends ApiController
             // qui tourne. Les deux relisent ce statut et la cle ci-dessous.
             foreach ($runsToCancel as $runId) {
                 try {
-                    Redis::setex(LaunchZoneScrapingJob::CLE_ANNULATION . $runId, 3600, '1');
+        // 🔴 SITE JUMEAU DE C18-011, PORTE LE 2026-08-21 — ET IL CASSAIT DEUX FOIS.
+        //
+        // Cette clef traverse la frontiere PHP <-> Node : `workers/src/scrapers/base.ts`
+        // (`PREFIXE_ANNULATION`, l. 56) la relit avant chaque scrape. Elle etait
+        // ecrite par la facade `Redis` NUE, donc sur la connexion `default` :
+        //
+        //     PHP  ecrivait  axion_crm_pro_database_cancelled:scraper-run:42  (base 0)
+        //     Node lisait    cancelled:scraper-run:42                          (base 1)
+        //
+        // Deux divergences INDEPENDANTES — le prefixe et le numero de base —,
+        // chacune suffisante a elle seule pour que l'arret d'urgence n'arrete
+        // rien cote Node. C'est exactement la panne de C18-011, a un autre
+        // endroit : le meme defaut, non porte. Vingt-sixieme fois (motif A-011).
+        //
+        // ⚠️ LES TROIS SITES BOUGENT ENSEMBLE, ET C'EST OBLIGATOIRE. Deplacer
+        // les deux ecritures sans la lecture casserait l'annulation cote PHP,
+        // qui elle FONCTIONNE aujourd'hui — precisement parce que les trois
+        // partagent la meme connexion fautive. C'est tout ou rien :
+        //     ecriture  Api/ScraperRunsController::destroy()
+        //     ecriture  Api/ScrapingCampaignsController::cancel()
+        //     lecture   Jobs/LaunchZoneScrapingJob::motifArretDistant()
+                    Redis::connection(DispatchScrapeJob::CONNEXION_REDIS)
+                        ->setex(LaunchZoneScrapingJob::CLE_ANNULATION . $runId, 3600, '1');
                 } catch (\Throwable $e) {
                     Log::warning('campaigns.cancel: Redis flag failed', [
                         'run_id'    => $runId,

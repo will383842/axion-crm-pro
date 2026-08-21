@@ -20,12 +20,38 @@ use Illuminate\Support\Facades\Redis;
  * NOTE : on n'utilise pas le format binaire BullMQ natif (hashes + sets) car la
  * passerelle PHP→Node serait fragile. Schéma simple JSON + listes Redis = robuste,
  * inspectable via `redis-cli`, supporte n'importe quel langage côté consumer.
+ *
+ * ⚠️ C18-011 — CE COMMENTAIRE DÉCRIVAIT UN PONT QUI N'AVAIT JAMAIS MARCHÉ.
+ * Jusqu'au 2026-08-21, ce job poussait par `Redis::connection('queue')`, une
+ * connexion qui hérite de `database.redis.options.prefix`. La clef réellement
+ * écrite sur le fil était `axion_crm_pro_database_axion:scrape:<source>`, alors
+ * que le `BRPOP` du worker porte la clef NUE. Personne ne lisait, et rien ne
+ * rougissait. On passe désormais par `scrape_bridge`, connexion déclarée SANS
+ * préfixe dans `config/database.php` — et rien d'autre du cache, des sessions
+ * ou des files Laravel ne bouge.
+ * La garde qui le prouve SUR LE FIL (pas dans la configuration) :
+ * `tests/Unit/Scraping/PontRedisPrefixeTest.php`.
  */
 class DispatchScrapeJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    /**
+     * Connexion Redis du pont vers les workers Node. Elle DOIT rester sans
+     * préfixe : c'est tout ce qui la distingue de `queue`.
+     */
+    public const CONNEXION_REDIS = 'scrape_bridge';
+
+    /** Préfixe des noms de file, partagé avec `workers/src/bridge/queues.ts`. */
+    public const PREFIXE_FILE = 'axion:scrape:';
+
     public int $tries = 1; // ce job ne fait que push ; le worker Node gère ses propres retries
+
+    /** Nom de la file Redis écoutée par le worker Node de cette source. */
+    public static function file(string $source): string
+    {
+        return self::PREFIXE_FILE . $source;
+    }
 
     /** @param array<string,mixed> $context */
     public function __construct(
@@ -91,8 +117,8 @@ class DispatchScrapeJob implements ShouldQueue
             'max_attempts'=> 3,
         ];
 
-        Redis::connection('queue')->lpush(
-            "axion:scrape:{$this->source}",
+        Redis::connection(self::CONNEXION_REDIS)->lpush(
+            self::file($this->source),
             json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
         );
     }

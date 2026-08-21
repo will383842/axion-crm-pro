@@ -41,6 +41,7 @@
 
 use App\Contracts\InseeClient;
 use App\Data\Sources\InseeCompanyData;
+use App\Jobs\DispatchScrapeJob;
 use App\Jobs\LaunchZoneScrapingJob;
 use App\Jobs\MonitorCampaignProgressJob;
 use App\Models\Company;
@@ -65,16 +66,16 @@ uses(TestCase::class, RefreshDatabase::class);
 function arretMakeUser(string $slug = 'arr'): array
 {
     $workspace = Workspace::create([
-        'id'   => (string) Str::uuid(),
+        'id' => (string) Str::uuid(),
         'slug' => $slug . '-' . Str::random(6),
         'name' => 'WS ' . $slug,
     ]);
     $user = User::create([
-        'id'                       => (string) Str::uuid(),
-        'email'                    => $slug . Str::random(4) . '@test.local',
-        'name'                     => 'User ' . $slug,
-        'password_hash'            => Hash::make('SomePass!1234'),
-        'current_workspace_id'     => $workspace->id,
+        'id' => (string) Str::uuid(),
+        'email' => $slug . Str::random(4) . '@test.local',
+        'name' => 'User ' . $slug,
+        'password_hash' => Hash::make('SomePass!1234'),
+        'current_workspace_id' => $workspace->id,
         'first_login_completed_at' => now(),
     ]);
 
@@ -87,18 +88,18 @@ function arretMakeCampagne(User $u, Workspace $w, array $extra = []): ScrapingCa
     // `ScrapingCampaign::create()` ne renvoie que les attributs fournis, et
     // `0 >= null` vaut `true` en PHP (piege deja documente dans CampaignsTest).
     return ScrapingCampaign::create(array_merge([
-        'workspace_id'          => $w->id,
-        'created_by'            => $u->id,
-        'name'                  => 'Campagne arret',
-        'status'                => 'running',
-        'sources'               => ['insee'],
-        'zones'                 => [['type' => 'department', 'code' => '75']],
-        'max_companies'         => 1000,
-        'companies_created'     => 0,
-        'max_duration_minutes'  => 180,
-        'runs_total'            => 4,
-        'runs_completed'        => 0,
-        'started_at'            => now(),
+        'workspace_id' => $w->id,
+        'created_by' => $u->id,
+        'name' => 'Campagne arret',
+        'status' => 'running',
+        'sources' => ['insee'],
+        'zones' => [['type' => 'department', 'code' => '75']],
+        'max_companies' => 1000,
+        'companies_created' => 0,
+        'max_duration_minutes' => 180,
+        'runs_total' => 4,
+        'runs_completed' => 0,
+        'started_at' => now(),
     ], $extra));
 }
 
@@ -144,7 +145,7 @@ function arretFauxInsee(int $nb, ?callable $avantRendu = null): InseeClient
             return $out;
         }
 
-        public function iterateByCriteria(array $criteria): \Generator
+        public function iterateByCriteria(array $criteria): Generator
         {
             yield from $this->searchByCriteria($criteria);
         }
@@ -173,7 +174,7 @@ function arretJoueZone(Workspace $w, ?int $campaignId, InseeClient $insee, int $
 // C18-007 — le compteur de quota ne doit JAMAIS redescendre
 // ===========================================================================
 
-test("C18-007 — le moniteur ne remet PAS companies_created a zero", function () {
+test('C18-007 — le moniteur ne remet PAS companies_created a zero', function () {
     Queue::fake(); // le moniteur se re-dispatche : en driver `sync` ce serait infini.
     [$u, $w] = arretMakeUser();
 
@@ -183,12 +184,12 @@ test("C18-007 — le moniteur ne remet PAS companies_created a zero", function (
     $c = arretMakeCampagne($u, $w, ['max_companies' => 100, 'companies_created' => 42]);
     ScraperRun::create([
         'workspace_id' => $w->id,
-        'campaign_id'  => $c->id,
-        'company_id'   => null,
-        'source'       => 'insee',
-        'status'       => 'success',
-        'started_at'   => now()->subMinute(),
-        'finished_at'  => now(),
+        'campaign_id' => $c->id,
+        'company_id' => null,
+        'source' => 'insee',
+        'status' => 'success',
+        'started_at' => now()->subMinute(),
+        'finished_at' => now(),
     ]);
 
     (new MonitorCampaignProgressJob($c->id))->handle();
@@ -197,7 +198,7 @@ test("C18-007 — le moniteur ne remet PAS companies_created a zero", function (
     expect($c->fresh()->companies_created)->toBe(42);
 });
 
-test("C18-007 TEMOIN — le moniteur remonte bien le compteur quand les runs portent des company_id", function () {
+test('C18-007 TEMOIN — le moniteur remonte bien le compteur quand les runs portent des company_id', function () {
     Queue::fake();
     [$u, $w] = arretMakeUser();
     $c = arretMakeCampagne($u, $w, ['max_companies' => 100, 'companies_created' => 0]);
@@ -209,17 +210,17 @@ test("C18-007 TEMOIN — le moniteur remonte bien le compteur quand les runs por
     foreach ([1, 2, 3] as $i) {
         $company = Company::create([
             'workspace_id' => $w->id,
-            'siren'        => str_pad((string) (200000000 + $i), 9, '0', STR_PAD_LEFT),
+            'siren' => str_pad((string) (200000000 + $i), 9, '0', STR_PAD_LEFT),
             'denomination' => 'Temoin ' . $i,
         ]);
         ScraperRun::create([
             'workspace_id' => $w->id,
-            'campaign_id'  => $c->id,
-            'company_id'   => $company->id,
-            'source'       => 'insee',
-            'status'       => 'success',
-            'started_at'   => now()->subMinute(),
-            'finished_at'  => now(),
+            'campaign_id' => $c->id,
+            'company_id' => $company->id,
+            'source' => 'insee',
+            'status' => 'success',
+            'started_at' => now()->subMinute(),
+            'finished_at' => now(),
         ]);
     }
 
@@ -241,7 +242,7 @@ test("C18-007 — une campagne plafonnee a 3 s'arrete a 3 entreprises", function
     expect($c->fresh()->companies_created)->toBe(3);
 });
 
-test("C18-007 TEMOIN — sans plafond atteint, les 10 entreprises sont bien creees", function () {
+test('C18-007 TEMOIN — sans plafond atteint, les 10 entreprises sont bien creees', function () {
     Queue::fake();
     [$u, $w] = arretMakeUser();
     $c = arretMakeCampagne($u, $w, ['max_companies' => 1000, 'companies_created' => 0]);
@@ -258,7 +259,7 @@ test("C18-007 TEMOIN — sans plafond atteint, les 10 entreprises sont bien cree
 // C18-008 — l'arret doit etre LU par le consommateur
 // ===========================================================================
 
-test("C18-008 — apres annulation de la campagne, un job deja en file ne collecte plus", function () {
+test('C18-008 — apres annulation de la campagne, un job deja en file ne collecte plus', function () {
     Queue::fake();
     [$u, $w] = arretMakeUser();
     $c = arretMakeCampagne($u, $w);
@@ -282,7 +283,7 @@ test("C18-008 — apres annulation de la campagne, un job deja en file ne collec
     expect(ScraperRun::where('campaign_id', $c->id)->where('status', 'running')->count())->toBe(0);
 });
 
-test("C18-008 TEMOIN — sans annulation, le meme job collecte bien les 10", function () {
+test('C18-008 TEMOIN — sans annulation, le meme job collecte bien les 10', function () {
     Queue::fake();
     [$u, $w] = arretMakeUser();
     $c = arretMakeCampagne($u, $w);
@@ -292,7 +293,7 @@ test("C18-008 TEMOIN — sans annulation, le meme job collecte bien les 10", fun
     expect(Company::where('workspace_id', $w->id)->count())->toBe(10);
 });
 
-test("C18-008 — un arret en VOL interrompt la boucle du run en cours", function () {
+test('C18-008 — un arret en VOL interrompt la boucle du run en cours', function () {
     Queue::fake();
     [$u, $w] = arretMakeUser();
     $c = arretMakeCampagne($u, $w);
@@ -316,7 +317,7 @@ test("C18-008 — un arret en VOL interrompt la boucle du run en cours", functio
     $this->assertSame('cancelled', $run->status);
 });
 
-test("C18-008 — le drapeau Redis `cancelled:scraper-run:{id}` est LU par le consommateur", function () {
+test('C18-008 — le drapeau Redis `cancelled:scraper-run:{id}` est LU par le consommateur', function () {
     Queue::fake();
     [$u, $w] = arretMakeUser();
     $c = arretMakeCampagne($u, $w);
@@ -326,13 +327,40 @@ test("C18-008 — le drapeau Redis `cancelled:scraper-run:{id}` est LU par le co
     // pendant que la transaction du run n'est pas encore visible.
     // On observe la cle EXACTE demandee — elle doit etre celle qu'ecrivent
     // ScraperRunsController:99 et ScrapingCampaignsController:315.
+    //
+    // ⚠️ MISE A JOUR DU 2026-08-21, ET LA RAISON COMPTE PLUS QUE LE GESTE.
+    //
+    // Ce test simulait la facade NUE (`Redis::shouldReceive('get')`). Le drapeau
+    // d'annulation passe desormais par `DispatchScrapeJob::CONNEXION_REDIS` —
+    // connexion `scrape_bridge`, SANS prefixe — parce que la clef ecrite par PHP
+    // ne pouvait pas etre lue par le worker Node : elle portait
+    // `axion_crm_pro_database_` en tete, et vivait dans une autre base Redis.
+    // C'est le site jumeau de C18-011.
+    //
+    // Ce test ROUGISSAIT donc, et il avait raison de rougir : sa mise en scene ne
+    // couvrait plus le chemin reel du produit. La simulation suit le produit —
+    // c'est le produit qui a bouge, pas l'exigence.
     $clesLues = [];
-    Redis::shouldReceive('get')
-        ->andReturnUsing(function (string $cle) use (&$clesLues) {
-            $clesLues[] = $cle;
+    $pont = Mockery::mock();
+    $pont->shouldReceive('get')->andReturnUsing(function (string $cle) use (&$clesLues) {
+        $clesLues[] = $cle;
 
-            return '1';
-        });
+        return '1';
+    });
+    $pont->shouldReceive('setex')->andReturnTrue();
+    Redis::shouldReceive('connection')
+        ->with(DispatchScrapeJob::CONNEXION_REDIS)
+        ->andReturn($pont);
+    // Meme remarque qu'au test precedent : c'est la connexion `scrape_bridge` que
+    // le produit interroge desormais. Le temoin doit donc rendre `null` LA, sans
+    // quoi il serait vert parce que personne n'a rien demande — le pire des verts.
+    $pont = Mockery::mock();
+    $pont->shouldReceive('get')->andReturnNull();
+    $pont->shouldReceive('setex')->andReturnTrue();
+    Redis::shouldReceive('connection')
+        ->with(DispatchScrapeJob::CONNEXION_REDIS)
+        ->andReturn($pont);
+    Redis::shouldReceive('get')->andReturnNull();
     Redis::shouldReceive('setex')->andReturnTrue();
 
     arretJoueZone($w, $c->id, arretFauxInsee(10));
@@ -346,7 +374,7 @@ test("C18-008 — le drapeau Redis `cancelled:scraper-run:{id}` est LU par le co
     );
 });
 
-test("C18-008 TEMOIN — drapeau Redis absent : la collecte se fait normalement", function () {
+test('C18-008 TEMOIN — drapeau Redis absent : la collecte se fait normalement', function () {
     Queue::fake();
     [$u, $w] = arretMakeUser();
     $c = arretMakeCampagne($u, $w);

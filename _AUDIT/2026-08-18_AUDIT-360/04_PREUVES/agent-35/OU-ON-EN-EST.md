@@ -6,7 +6,7 @@
 > `REPRISE-ETAT.md` (§14 à §16) ; le registre des constats dans
 > `FILE-DE-TRAVAIL.md`.
 
-**Dernière mise à jour : 2026-08-21, vague 15.**
+**Dernière mise à jour : 2026-08-22, vague 15.**
 
 ---
 
@@ -36,6 +36,7 @@
 | `1506b47` | `C18-016` — trois jobs échappent à la garde anti-simulacre (inventaire figé) |
 | `9c1b30e` | `A05-001` — la sonde dit désormais sa COUVERTURE |
 | `c6d615a` | **canal Telegram** — service, `AnomalyDetect`, étape CI, 18 gardes |
+| `cb4bb44` | `C19-010` — un **guetteur** au lieu d'un rattrapage : 0 fiche concernée en production |
 
 Chaque garde a été **vue rouge avant d'être verte**, par une mutation réelle.
 
@@ -69,17 +70,16 @@ cd C:/Users/willi/Documents/Projets/crmpro-wt-a35-auth && gh pr merge 193 --merg
 |---|---|---|
 | 1 | **le scraping doit-il être vivant en production ?** | les 4,29 M d'entreprises viennent de l'**import INSEE**, pas du scraping. Les trois scrapers Node (`pages-jaunes`, `website`, `google-search`) ont **0 run depuis toujours**. Rien n'est cassé : c'est un allumage, pas une réparation. Et `TwoCaptchaSolver::solve()` **lève une exception** — il n'est pas écrit. |
 | 2 | où doit partir l'alerte d'un déploiement rouge ? | **tranché : Telegram.** En cours d'implémentation. |
-| 3 | `C19-010` / fiches sans dénomination | **sans objet aujourd'hui : 0 fiche concernée** en production. Un guetteur est posé à la place. |
+| 3 | ~~`C19-010` / fiches sans dénomination~~ | **CLOS SANS TRAVAIL DE DONNÉES : 0 fiche concernée** en production (compté le 21/08). Un guetteur `crm:sonde-non-diffusibles` est posé à 06:20 : il criera si la condition réapparaît, ce qui signifierait que l'ENTRÉE s'est rouverte. |
 | 4 | `G41-002` — recherche multi-champs | corriger changerait ce que la recherche trouve (157 ms → 2 ms). Décision produit. |
 
 ---
 
 ## 3. Ce qui est EN VOL au moment de l'écriture
 
-- **CI de #193** en cours.
-- **`CrmSondeNonDiffusibles`** — guetteur `C19-010` écrit, **pas encore testé ni
-  committé**. Reste : les gardes, la planification dans `routes/console.php`,
-  Pint/PHPStan, commit.
+- **CI de #193** relancée après le dernier envoi (9 commits).
+- Rien d'autre en cours : le guetteur `C19-010` est écrit, planifié à 06:20,
+  8 gardes vertes, Pint et PHPStan propres, committé et poussé.
 
 ---
 
@@ -126,7 +126,8 @@ Elles sont ici parce qu'elles se répéteront si personne ne les lit.
 
 ## 6. Par quoi reprendre, si la session se ferme maintenant
 
-1. Finir `CrmSondeNonDiffusibles` : gardes, planification, Pint/PHPStan, commit.
-2. Vérifier la CI de #193 et la faire fusionner par Will.
-3. Quand Will aura posé les jetons Telegram : **essai réel** d'envoi.
-4. Reprendre l'audit là où il s'est arrêté : **6 S0 ouverts**, puis les 70 S1.
+1. Vérifier la CI de #193 et la faire fusionner par Will.
+2. Quand Will aura posé les jetons Telegram : **essai réel** d'envoi, des deux
+   côtés (serveur et GitHub Actions).
+3. Reprendre l'audit là où il s'est arrêté : **6 S0 ouverts**, puis les 70 S1.
+4. Les 344 constats S2/S3 n'ont jamais été ouverts — c'est le gros du reste.

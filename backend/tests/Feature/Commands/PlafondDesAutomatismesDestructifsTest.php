@@ -157,15 +157,22 @@ test('B15-008 — RECENSEMENT : toute commande destructive porte une garde, ou e
     );
 
     /**
-     * Commandes destructives SANS garde, avec la raison — chacune est un reste
-     * ouvert de `B15-008`, pas un oubli. Retirer un nom d'ici sans poser la
-     * garde fera rougir ce test.
+     * Commandes destructives SANS garde.
+     *
+     * 🔑 CETTE LISTE EST VIDE DEPUIS LE 2026-08-21, ET C'EST LA FERMETURE DE
+     *    `B15-008`. Les six commandes qui detruisent portent toutes une
+     *    barriere : `suppressionAutorisee()` pour celles qu'un humain lance,
+     *    `ecritureAutoriseeSansOperateur()` pour les quatre qui tournent
+     *    SEULES sous le planificateur.
+     *
+     * Une liste vide ne prouve rien sans le temoin de couverture ci-dessus :
+     * c'est lui qui garantit que le balayage a bien vu les 56 commandes.
+     *
+     * Si une commande neuve detruit sans garde, POSEZ-LA. Ce tableau n'est pas
+     * une derogation : c'est le registre de ce qui reste a faire, et il doit
+     * rester vide.
      */
-    $connuesSansGarde = [
-        'PruneScraperRuns.php',
-        'RgpdPurgeBusinessProspects.php',
-        'RgpdPurgeVivier.php',
-    ];
+    $connuesSansGarde = [];
 
     $sansGarde = [];
     foreach ($fichiers as $chemin) {

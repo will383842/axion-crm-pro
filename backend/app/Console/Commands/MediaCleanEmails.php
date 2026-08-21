@@ -102,8 +102,12 @@ class MediaCleanEmails extends Command
         //
         // On compte les lignes REELLEMENT visees, pas les adresses distinctes :
         // un meme email sur-partage porte, par definition, sur plusieurs medias.
-        $visees = DB::table('media')->whereIn('email', $toNull)->count();
-        $totalAvecEmail = DB::table('media')->whereNotNull('email')->count();
+        // ⚠️ `whereNull('deleted_at')` : `media` porte une corbeille VIVANTE —
+        // c'est `ImportMediaMerge` qui l'archive. Compter les lignes deja
+        // archivees gonflerait les deux termes du rapport, et le plafond
+        // mesurerait autre chose que ce qu'il croit.
+        $visees = DB::table('media')->whereNull('deleted_at')->whereIn('email', $toNull)->count();
+        $totalAvecEmail = DB::table('media')->whereNull('deleted_at')->whereNotNull('email')->count();
 
         if (! $this->ecritureAutoriseeSansOperateur('media', $visees, $totalAvecEmail, 'nuller')) {
             return self::FAILURE;

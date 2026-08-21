@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\RefuseUneSuppressionMassive;
 use App\Crm\Taxonomy;
 use App\Services\Audit\AuditHashChain;
 use App\Support\WorkspaceContext;
@@ -28,7 +29,9 @@ use Illuminate\Support\Facades\DB;
  */
 class RgpdPurgeBusinessProspects extends Command
 {
-    protected $signature = 'rgpd:purge-business-prospects {--dry-run : Compte sans supprimer}';
+    use RefuseUneSuppressionMassive;
+
+    protected $signature = 'rgpd:purge-business-prospects {--dry-run : Compte sans supprimer} {--force : Passe outre le plafond de proportion}';
 
     protected $description = 'Purge les fiches personnes froides (intérêt légitime, sans interaction) au-delà de 3 ans (CNIL prospection)';
 
@@ -69,7 +72,42 @@ class RgpdPurgeBusinessProspects extends Command
                             ->whereNotNull('contacts.person_key');
                     });
 
-                return $dryRun ? $stale->count() : $stale->delete();
+                // ── PLAFOND DE PROPORTION (B15-008) ──────────────────────────────
+                //
+                // 🔑 POURQUOI ON BLOQUE, MEME QUAND L'EFFACEMENT EST UNE OBLIGATION.
+                //
+                // Refuser une purge de retention retarde une echeance ; laisser passer
+                // une purge ERRONEE detruit des donnees qui ne reviennent pas. Un jour
+                // de retard se rattrape en relancant la commande a la main ; un vivier
+                // efface par une condition trop large ne se rattrape pas.
+                // **L'irreversible l'emporte.** Et le refus n'est pas silencieux : il
+                // nomme la proportion, la table, et le geste qui debloque.
+                //
+                // B15-004 est la preuve que ce risque n'est pas theorique :
+                // `prospection:purge-non-commercial` supprimait sur
+                // `legal_form IS NULL OR ...` — c'est-a-dire presque tout — sans
+                // qu'aucune barriere ni aucun test ne le dise.
+                //
+                // `contacts` porte le stock commercial : 4,29 M de fiches au
+                // 2026-08-19. Une purge qui en viserait le tiers n'est pas une
+                // echeance de retention, c'est un defaut de condition.
+                if ($dryRun) {
+                    return $stale->count();
+                }
+
+                $vises = (clone $stale)->count();
+                // `contacts` porte `deleted_at` : une fiche deja en corbeille
+                // fausserait le rapport dans les deux sens.
+                $totalEspace = DB::table('contacts')
+                    ->whereNull('deleted_at')
+                    ->where('workspace_id', $workspaceId)
+                    ->count();
+
+                if (! $this->ecritureAutoriseeSansOperateur('contacts', $vises, $totalEspace, 'purger')) {
+                    return 0;
+                }
+
+                return $stale->delete();
             });
 
             $this->line(($dryRun ? '[DRY-RUN] ' : '') . "workspace {$workspaceId} : {$count} fiches personnes purgées");

@@ -124,24 +124,56 @@ function b10pTablesAEffacementDoux(): array
  *
  * @return array{aveugles: array<int, array{table: string, site: string}>, conscientes: array<int, array{table: string, site: string}>, ecritures: array<int, array{table: string, site: string, pose_deleted_at: bool}>}
  */
+/**
+ * Tous les `.php` d'un dossier, en profondeur — par `scandir`, jamais par
+ * `RecursiveDirectoryIterator`.
+ *
+ * @return list<string> chemins absolus, ordre stable
+ */
+function b10pFichiersPhp(string $dossier): array
+{
+    $trouves = [];
+
+    foreach (scandir($dossier) ?: [] as $entree) {
+        if ($entree === '.' || $entree === '..') {
+            continue;
+        }
+
+        $chemin = $dossier . DIRECTORY_SEPARATOR . $entree;
+
+        if (is_dir($chemin)) {
+            $trouves = array_merge($trouves, b10pFichiersPhp($chemin));
+        } elseif (str_ends_with($entree, '.php')) {
+            $trouves[] = $chemin;
+        }
+    }
+
+    sort($trouves);
+
+    return $trouves;
+}
+
 function b10pBalayerAppelsConstructeur(array $tables): array
 {
     $seaux = ['aveugles' => [], 'conscientes' => [], 'ecritures' => []];
 
-    $iterateur = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator(app_path(), FilesystemIterator::SKIP_DOTS),
-    );
-
-    foreach ($iterateur as $fichier) {
-        if (! $fichier->isFile() || $fichier->getExtension() !== 'php') {
-            continue;
-        }
-
-        $relatif = 'app' . str_replace('\\', '/', substr($fichier->getPathname(), strlen(app_path())));
+    // ⚠️ `scandir` RECURSIF ET NON `RecursiveDirectoryIterator`. Ce n'est pas
+    // un gout : sur le montage de Docker Desktop pour Windows, l'iterateur ne
+    // rend pas tout le repertoire. Mesure du 2026-08-21 dans le conteneur
+    // `a35r`, sur `app/Console/Commands` :
+    //
+    //   scandir() / glob() / find ......... 56 fichiers
+    //   RecursiveDirectoryIterator ........ 14   <- stable sur trois passages
+    //
+    // Le balayage voyait 251 fichiers sur 293. Une garde qui enumere sur un
+    // quart d'un repertoire rend un « rien trouve » sans valeur — et c'est
+    // exactement ce qui a fige des plafonds faux (cf. la note plus bas).
+    foreach (b10pFichiersPhp(app_path()) as $chemin) {
+        $relatif = 'app' . str_replace('\\', '/', substr($chemin, strlen(app_path())));
 
         // Source SANS commentaires, numeros de ligne preserves.
         $plat = '';
-        foreach (token_get_all(file_get_contents($fichier->getPathname())) as $jeton) {
+        foreach (token_get_all(file_get_contents($chemin)) as $jeton) {
             if (is_array($jeton) && ($jeton[0] === T_COMMENT || $jeton[0] === T_DOC_COMMENT)) {
                 $plat .= str_repeat("\n", substr_count($jeton[1], "\n"));
 
@@ -313,18 +345,39 @@ test('B10-016-PORTEE TROU DE COUVERTURE — les tables a deleted_at sans aucun m
  * clair a cote de chaque table pour que la derive se lise au diff.
  */
 test('B10-016-PORTEE PLAFOND — les lectures DB::table aveugles a deleted_at n augmentent pas', function () {
+    // 🔴 CES ONZE NOMBRES ONT ETE FAUX, ET LE COUPABLE EST LE BANC.
+    //
+    // Ils valaient 16 / 23 / 1 / 10 pour companies / contacts / media /
+    // workspaces, total 67. La CI en a rendu 22 / 26 / 5 / 17, total 87 — sur
+    // EXACTEMENT le meme commit. Mesure du 2026-08-21, dans le conteneur
+    // `a35r`, sur `app/Console/Commands` :
+    //
+    //   scandir() ......................... 56 fichiers
+    //   glob() ............................ 56
+    //   find (shell) ...................... 56
+    //   RecursiveDirectoryIterator ........ 14   <- stable sur trois passages
+    //
+    // Le montage de Docker Desktop pour Windows ne rend pas tout le repertoire
+    // a `RecursiveDirectoryIterator`. Le balayage voyait 251 fichiers `.php` sur
+    // 293, et 14 commandes sur 56 : les plafonds ci-dessous ont donc ete ecrits
+    // d'apres UN QUART du repertoire le plus concerne, puis vus verts.
+    //
+    // ⚠️ TREIZE gardes de cette suite balaient un repertoire de cette facon.
+    // Toutes rendent, sur ce banc, un verdict portant sur un sous-ensemble
+    // arbitraire — et un « rien trouve » y est sans valeur. La reference est la
+    // CI, ou l'arbre est complet. Voir REPRISE-ETAT.md §13.
     $plafonds = [
         'campaigns' => 0,
         'candidates' => 11,
-        'companies' => 16,
-        'contacts' => 23,
+        'companies' => 22,
+        'contacts' => 26,
         'email_audiences' => 0,
         'health_practitioners' => 2,
         'journalists' => 1,
-        'media' => 1,
+        'media' => 5,
         'scraping_campaigns' => 1,
         'users' => 2,
-        'workspaces' => 10,
+        'workspaces' => 17,
     ];
 
     $tables = b10pTablesAEffacementDoux();
@@ -351,22 +404,34 @@ test('B10-016-PORTEE PLAFOND — les lectures DB::table aveugles a deleted_at n 
     expect($depassements)->toBe([]);
 
     // Et le total, pour que l'ordre de grandeur reste visible d'un coup d'oeil.
-    expect(count($aveugles))->toBeLessThanOrEqual(67);
+    // 87 et non 67 : cf. la note des plafonds ci-dessus.
+    expect(count($aveugles))->toBeLessThanOrEqual(87);
 });
 
 /**
- * LES NEUF COLONNES MORTES.
+ * LES COLONNES MORTES — ET ELLES SONT HUIT, PAS NEUF.
  *
- * Cote constructeur de requetes, un seul site de tout `app/` pose `deleted_at` :
- * `GdprErasureService.php:216`, sur `users`. Rien d'autre. Les dix autres
- * colonnes ne sont jamais ecrites par cette voie.
+ * 🔴 CETTE GARDE AFFIRMAIT : « un seul site de tout `app/` pose `deleted_at` :
+ * `GdprErasureService.php:216`, sur `users`. Rien d'autre. » C'ETAIT FAUX, et
+ * pour la meme raison que les plafonds ci-dessus : le balayage du banc ne voyait
+ * que 14 des 56 fichiers de `app/Console/Commands`.
+ *
+ * Le site manquant, rendu par la CI le 2026-08-21 :
+ *
+ *   app/Console/Commands/ImportMediaMerge.php:197
+ *     DB::table('media')->whereIn('id', $paquet)->update(['deleted_at' => now(), ...])
+ *
+ * Ce n'est pas un detail : c'est l'ARCHIVAGE des medias sortis du registre, et
+ * il tourne en automatisme. `media` porte donc bien une corbeille VIVANTE — la
+ * seule avec `users` — et les cinq lectures aveugles de `media` recensees
+ * au-dessus lisent, elles, des lignes archivees comme si elles ne l'etaient pas.
  *
  * On fige l'ENSEMBLE des tables concernees, pas un compte : le jour ou un
  * `DB::table('contacts')->update(['deleted_at' => ...])` apparait, la garde
- * nomme la table et impose de verifier d'abord les 23 lectures aveugles de
+ * nomme la table et impose de verifier d'abord les 26 lectures aveugles de
  * `contacts`.
  */
-test('B10-016-PORTEE COLONNES MORTES — une seule table recoit un deleted_at par DB::table', function () {
+test('B10-016-PORTEE COLONNES MORTES — deux tables recoivent un deleted_at par DB::table', function () {
     $ecritures = b10pBalayerAppelsConstructeur(b10pTablesAEffacementDoux())['ecritures'];
 
     // TEMOIN : sans ecritures vues, `$posantes` serait vide et l'assertion
@@ -385,8 +450,11 @@ test('B10-016-PORTEE COLONNES MORTES — une seule table recoit un deleted_at pa
     sort($posantes);
     sort($sites);
 
-    expect($posantes)->toBe(['users']);
-    expect($sites)->toBe(['app/Services/Rgpd/GdprErasureService.php:216']);
+    expect($posantes)->toBe(['media', 'users']);
+    expect($sites)->toBe([
+        'app/Console/Commands/ImportMediaMerge.php:197',
+        'app/Services/Rgpd/GdprErasureService.php:216',
+    ]);
 });
 
 /**

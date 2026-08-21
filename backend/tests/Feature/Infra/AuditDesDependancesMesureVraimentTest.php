@@ -236,11 +236,45 @@ test('la forme d avant — composer audit sans --locked — n audite AUCUN paque
     // rend 0 SANS MEME ESSAYER de sortir, et c'est tout le defaut.
     [$sortie, $code] = execH47('COMPOSER_DISABLE_NETWORK=1 composer audit --no-dev', $dir);
 
-    $this->assertStringContainsString(
-        'No packages - skipping audit',
-        $sortie,
-        'La forme d avant devrait annoncer qu elle n a aucun paquet a auditer. '
-        . 'Sortie obtenue : ' . $sortie,
+    // ⚠️ ON NE FIGE PAS LE LIBELLE EXACT DE COMPOSER, ET C'EST UNE MESURE QUI
+    //    L'A IMPOSE.
+    //
+    // Ce test attendait mot pour mot « No packages - skipping audit ». Mesure du
+    // 2026-08-21 :
+    //
+    //   banc `a35r`, composer 2.7.9 ...... « No packages - skipping audit. »
+    //   CI, `tools: composer:v2` (v2 la
+    //   plus recente) .................... « No installed packages found.
+    //                                        Please run "composer install"
+    //                                        before running "audit" or pass
+    //                                        "--locked" ... »
+    //
+    // Le COMPORTEMENT est identique — aucun paquet audite, code 0 — et le
+    // nouveau libelle est meme plus explicite. Seule la phrase a change. Une
+    // garde qui epingle la prose d'un outil que la CI met a jour toute seule
+    // rougit un jour sans qu'aucun code du depot n'ait bouge : c'est le cas ici,
+    // et ce test-la aurait fini par etre retire au lieu d'etre lu.
+    //
+    // Ce qui est verifie ci-dessous, et qui EST le constat H47-001 : la commande
+    // annonce qu'elle n'a rien a auditer, elle rend SUCCES, et elle n'a consulte
+    // aucun bulletin.
+    $formulations = [
+        'No packages - skipping audit',   // composer <= 2.7
+        'No installed packages found',    // composer >= 2.8
+    ];
+    $reconnue = false;
+    foreach ($formulations as $forme) {
+        if (str_contains($sortie, $forme)) {
+            $reconnue = true;
+            break;
+        }
+    }
+    $this->assertTrue(
+        $reconnue,
+        'La forme d avant devrait annoncer qu elle n a aucun paquet a auditer, sous l une '
+        . 'des formulations connues de composer (' . implode(' | ', $formulations) . '). '
+        . 'Si le libelle a encore change, AJOUTER la nouvelle forme ici plutot que de '
+        . 'retirer la garde. Sortie obtenue : ' . $sortie,
     );
 
     $this->assertSame(

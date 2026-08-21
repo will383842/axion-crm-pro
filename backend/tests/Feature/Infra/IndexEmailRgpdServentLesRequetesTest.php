@@ -285,20 +285,57 @@ test('C21-001 — TEMOIN : sans volume, la mesure ne mesure rien', function () {
     // Ce test ne verifie pas le produit : il verifie que les gardes ci-dessous
     // savent ce qu'elles font. Sur une ligne, Postgres balaie -- et c'est le bon
     // choix. Une garde de performance qui l'ignore rend un verdict faux.
-    $espace = Workspace::create([
-        'id' => (string) Str::uuid(), 'slug' => 'vide-' . Str::random(6), 'name' => 'Vide',
-    ]);
-    // `health_practitioners` : la seule des trois tables sans contrainte
-    // d'espace ni colonne generee -- une ligne suffit a poser le temoin.
-    DB::table('health_practitioners')->insert([
-        'workspace_id' => $espace->id, 'nom' => 'Seule', 'prenom' => 'Une',
-        'specialite' => 'generaliste', 'email' => 'seule@exemple.fr',
-        'created_at' => now(), 'updated_at' => now(),
-    ]);
-    DB::statement('ANALYZE health_practitioners');
+    //
+    // ═══════════════════════════════════════════════════════════════════════
+    // 🔴 CE TEMOIN A ETE INTERMITTENT, ET LA CAUSE N'ETAIT PAS DANS LE TEST
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // Il s'appuyait sur `health_practitioners`, qu'un AUTRE test de ce meme
+    // fichier peuple a `VOLUME_EMAIL` lignes. `RefreshDatabase` annule bien les
+    // DONNEES entre deux tests. Il n'annule pas les STATISTIQUES.
+    //
+    // Mesure du 2026-08-21, sur une table jetable :
+    //
+    //   BEGIN; INSERT 5000; ANALYZE;
+    //     -> pg_class.reltuples = 5000
+    //   ROLLBACK;
+    //     -> pg_class.reltuples = 5000   <- ELLES SURVIVENT
+    //     -> count(*)           = 0
+    //
+    // `ANALYZE` ecrit `pg_class` HORS TRANSACTION (mise a jour en place). Et
+    // meme un `ANALYZE` refait ici ne suffisait pas : il corrige `reltuples`,
+    // mais `relpages` reste gonfle par les lignes MORTES, que seul un `VACUUM`
+    // recupererait -- et `VACUUM` ne tourne pas dans une transaction, donc pas
+    // sous `RefreshDatabase`. Le planificateur voit alors une densite absurde
+    // et prefere l'index :
+    //
+    //   BEGIN; INSERT 1; ANALYZE; EXPLAIN ...
+    //     -> Index Scan   (au lieu du Seq Scan attendu)
+    //
+    // Le verdict dependait donc de l'ORDRE ALEATOIRE des tests : vert si ce
+    // temoin passait avant celui qui peuple, rouge s'il passait apres. Une
+    // garde intermittente est pire qu'une garde absente : elle apprend a
+    // rejouer la CI au lieu de lire ce qu'elle dit.
+    //
+    // La parade : une table qui n'appartient qu'a lui. Meme forme utile -- une
+    // colonne interrogee, un index btree dessus -- et aucun autre test ne
+    // l'ecrit, donc aucune statistique heritee. Ce que ce temoin doit prouver,
+    // « sur une table minuscule le planificateur balaie », ne demande rien de
+    // plus que cela.
+    DB::statement('DROP TABLE IF EXISTS temoin_volume_c21001');
+    DB::statement('CREATE TABLE temoin_volume_c21001 (id serial primary key, email text)');
+    DB::statement('CREATE INDEX idx_temoin_volume_c21001_email ON temoin_volume_c21001 (email)');
+    DB::table('temoin_volume_c21001')->insert(['email' => 'seule@exemple.fr']);
+    DB::statement('ANALYZE temoin_volume_c21001');
+
+    // TEMOIN DU TEMOIN : la table doit vraiment porter sa ligne au moment de la
+    // mesure. Un `Seq Scan` obtenu sur une table VIDE ne prouverait rien non
+    // plus -- c'est le meme piege que celui du test « la ligne cherchee EXISTE »
+    // trente lignes plus bas.
+    expect((int) DB::table('temoin_volume_c21001')->count())->toBe(1);
 
     $plan = planDe([
-        'sql' => 'select id from "health_practitioners" where email = ?',
+        'sql' => 'select id from "temoin_volume_c21001" where email = ?',
         'bindings' => ['seule@exemple.fr'],
     ]);
 
@@ -308,6 +345,8 @@ test('C21-001 — TEMOIN : sans volume, la mesure ne mesure rien', function () {
         'Sur une table minuscule, le planificateur DOIT balayer. Si ce test rougit, le seuil '
         . "a change et les gardes ci-dessous mesurent autre chose.\n\n{$plan}",
     );
+
+    DB::statement('DROP TABLE IF EXISTS temoin_volume_c21001');
 });
 
 test('C21-001 — TEMOIN : le volume est en place et la ligne cherchee EXISTE', function () {

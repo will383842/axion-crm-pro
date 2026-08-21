@@ -88,6 +88,25 @@ function cheminSondeTelescope(): string
     // Sonde des constats A-007 / F40-003.
     require __CHEMIN_AUTOLOAD__;
     $app = require __CHEMIN_BOOTSTRAP__;
+
+    // 🔴 LE `.env` DU DEPOT EST NEUTRALISE, ET C'EST TOUTE LA VALIDITE DE LA
+    //    MESURE QUI EN DEPEND.
+    //
+    // Cette sonde passe CHACUNE de ses variables par l'environnement du
+    // processus (`env VAR=... php sonde.php`). Elle n'a donc jamais besoin d'un
+    // fichier `.env` — mais Laravel en lit un s'il existe, et ce qu'il y trouve
+    // ECRASE le scenario joue.
+    //
+    // Mesure du 2026-08-21 : la CI fait `cp .env.example backend/.env`
+    // (`ci.yml:272`), et `.env.example:69` porte `TELESCOPE_ENABLED=false`. Le
+    // scenario « la variable est ABSENTE » — celui de la production — mesurait
+    // donc `false` en CI et `NULL` sur le banc, qui n'a pas de `.env`. Deux
+    // verdicts opposes pour le meme code.
+    //
+    // `useEnvironmentPath()` doit etre appele AVANT `bootstrap()` :
+    // `LoadEnvironmentVariables` lit le chemin au moment ou il s'execute.
+    $app->useEnvironmentPath(__DOSSIER_SANS_ENV__);
+
     $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
     echo 'app_env=' . var_export($app->environment(), true) . "\n";
@@ -123,11 +142,19 @@ function cheminSondeTelescope(): string
     echo 'refus=' . var_export((bool) config('telescope.enabled_refuse'), true) . "\n";
     PHP;
 
+    // Un dossier qui ne contient AUCUN `.env`. On ne supprime evidemment pas
+    // celui du depot : on regarde ailleurs.
+    $dossierSansEnv = sys_get_temp_dir() . '/a35-env-vide';
+    if (! is_dir($dossierSansEnv)) {
+        mkdir($dossierSansEnv, 0o777, true);
+    }
+
     $source = str_replace(
-        ['__CHEMIN_AUTOLOAD__', '__CHEMIN_BOOTSTRAP__'],
+        ['__CHEMIN_AUTOLOAD__', '__CHEMIN_BOOTSTRAP__', '__DOSSIER_SANS_ENV__'],
         [
             var_export(base_path('vendor/autoload.php'), true),
             var_export(base_path('bootstrap/app.php'), true),
+            var_export($dossierSansEnv, true),
         ],
         $source,
     );

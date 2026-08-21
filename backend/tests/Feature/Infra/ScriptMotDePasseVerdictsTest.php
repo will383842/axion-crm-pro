@@ -85,6 +85,35 @@ esac
 SH);
     chmod($atelier . '/bin/docker', 0o755);
 
+    // ⚠️ ET UN FAUX `id`, POUR LA MEME RAISON QUE LE FAUX `docker`.
+    //
+    // `definir-mot-de-passe-crm.sh:50` sort immediatement si `id -u` ne rend
+    // pas 0 :
+    //
+    //     if [ "$(id -u)" -ne 0 ]; then
+    //       echo "ERREUR : a lancer en root." >&2
+    //
+    // Le banc `a35r` tourne en root dans son conteneur ; le runner GitHub, non.
+    // Mesure du 2026-08-21 : en CI, les trois gardes ci-dessous recevaient
+    // « erreur : a lancer en root. » et n'atteignaient JAMAIS le code qu'elles
+    // pretendent mesurer. Elles etaient vertes sur le banc et rouges en CI, pour
+    // une raison qui n'a rien a voir avec le produit.
+    //
+    // On ne touche pas au script — sa garde root est correcte et doit le rester.
+    // On lui donne un `id` qui repond 0, comme on lui donne deja un `docker` qui
+    // repond ce qu'on veut mesurer.
+    file_put_contents($atelier . '/bin/id', <<<'SH'
+#!/bin/sh
+# Le script n'appelle `id` que sous la forme `id -u`. Tout autre usage est
+# delegue au vrai binaire : une garde ne doit pas mentir plus que necessaire.
+if [ "$1" = "-u" ]; then
+  echo 0
+  exit 0
+fi
+exec /usr/bin/id "$@"
+SH);
+    chmod($atelier . '/bin/id', 0o755);
+
     $processus = new Process(
         ['bash', cheminScriptMotDePasse(), 'compte-de-garde@example.test'],
         null,
@@ -104,6 +133,7 @@ SH);
 
     // Ménage : le script factice n'a servi qu'à cette mesure.
     @unlink($atelier . '/bin/docker');
+    @unlink($atelier . '/bin/id');
     @rmdir($atelier . '/bin');
     @rmdir($atelier);
 

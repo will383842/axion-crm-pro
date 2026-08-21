@@ -107,11 +107,15 @@ Route::prefix('v1')->group(function () {
 
         // Workspace + users
         Route::get('/workspace', [WorkspaceController::class, 'show']);
-        Route::put('/workspace', [WorkspaceController::class, 'update']);
+        Route::put('/workspace', [WorkspaceController::class, 'update'])
+            ->middleware('permission:workspaces.manage');
         Route::get('/users', [UsersController::class, 'index']);
-        Route::post('/users', [UsersController::class, 'store']);
-        Route::put('/users/{user}', [UsersController::class, 'update']);
-        Route::delete('/users/{user}', [UsersController::class, 'destroy']);
+        Route::post('/users', [UsersController::class, 'store'])
+            ->middleware('permission:users.manage');
+        Route::put('/users/{user}', [UsersController::class, 'update'])
+            ->middleware('permission:users.manage');
+        Route::delete('/users/{user}', [UsersController::class, 'destroy'])
+            ->middleware('permission:users.manage');
 
         // Companies
         Route::get('/companies', [CompaniesController::class, 'index']);
@@ -170,16 +174,18 @@ Route::prefix('v1')->group(function () {
         Route::get('/journalists/export', [JournalistsController::class, 'export'])
             ->middleware(['throttle:scraper-list', 'permission:data.export']);
         Route::get('/journalists/{journalist}', [JournalistsController::class, 'show']);
-        Route::post('/journalists/{journalist}/opt-out', [JournalistsController::class, 'optOut']);
-        Route::delete('/journalists/{journalist}', [JournalistsController::class, 'destroy']);
+        Route::post('/journalists/{journalist}/opt-out', [JournalistsController::class, 'optOut'])
+            ->middleware('permission:rgpd.handle');
+        Route::delete('/journalists/{journalist}', [JournalistsController::class, 'destroy'])
+            ->middleware('permission:companies.delete');
 
         // Coverage
         Route::get('/coverage', [CoverageController::class, 'index']);
         Route::get('/coverage/next-zone', [CoverageController::class, 'nextZone']);
         Route::post('/coverage/launch', [CoverageController::class, 'launch'])
-            ->middleware('throttle:scraper-launch');
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
         Route::post('/coverage/enrich', [CoverageController::class, 'enrich'])
-            ->middleware('throttle:scraper-launch');
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
         Route::get('/coverage/cells/{cell}', [CoverageController::class, 'showCell']);
 
         // Scraper runs (Sprint 19.6 : rate limiting per-user)
@@ -188,24 +194,29 @@ Route::prefix('v1')->group(function () {
         Route::get('/scraper-runs/{run}', [ScraperRunsController::class, 'show'])
             ->middleware('throttle:scraper-list');
         Route::post('/scraper-runs/{run}/cancel', [ScraperRunsController::class, 'cancel'])
-            ->middleware('throttle:scraper-launch');
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
         Route::post('/scraper-runs/{run}/retry', [ScraperRunsController::class, 'retry'])
-            ->middleware('throttle:scraper-launch');
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
 
         // LLM
         Route::get('/llm/use-cases', [LlmUseCasesController::class, 'index']);
-        Route::put('/llm/use-cases/{useCase}', [LlmUseCasesController::class, 'update']);
+        Route::put('/llm/use-cases/{useCase}', [LlmUseCasesController::class, 'update'])
+            ->middleware('permission:llm.config');
         Route::get('/llm/use-cases/{useCase}/prompts', [LlmUseCasesController::class, 'prompts']);
-        Route::put('/llm/use-cases/{useCase}/prompts/{v}', [LlmUseCasesController::class, 'updatePrompt']);
+        Route::put('/llm/use-cases/{useCase}/prompts/{v}', [LlmUseCasesController::class, 'updatePrompt'])
+            ->middleware('permission:llm.config');
         Route::get('/llm/usage', [LlmUsageController::class, 'index']);
         Route::get('/llm/usage/summary', [LlmUsageController::class, 'summary']);
 
         // Proxies + rotations
         Route::get('/proxy-providers', [ProxyProvidersController::class, 'index']);
-        Route::put('/proxy-providers/{p}', [ProxyProvidersController::class, 'update']);
-        Route::post('/proxy-providers/{p}/test', [ProxyProvidersController::class, 'test']);
+        Route::put('/proxy-providers/{p}', [ProxyProvidersController::class, 'update'])
+            ->middleware('permission:proxies.config');
+        Route::post('/proxy-providers/{p}/test', [ProxyProvidersController::class, 'test'])
+            ->middleware('permission:proxies.config');
         Route::get('/rotations', [RotationsController::class, 'index']);
-        Route::put('/rotations/{rotation}', [RotationsController::class, 'update']);
+        Route::put('/rotations/{rotation}', [RotationsController::class, 'update'])
+            ->middleware('permission:llm.config');
 
         // Tags + saved views + global search + notifications
         Route::get('/tags', [TagsController::class, 'index']);
@@ -223,16 +234,33 @@ Route::prefix('v1')->group(function () {
         // rien, et le throttle limite la cadence, pas le droit.
         Route::post('/companies/tags/bulk', CompanyTagsBulkController::class)
             ->middleware('permission:companies.update');
-        Route::apiResource('saved-views', SavedViewsController::class);
+        // Les vues sauvegardees sont des filtres SUR les entreprises : elles
+        // suivent donc les droits de `companies`. La destruction reste reservee
+        // a l'administration, comme partout ailleurs (« operator = CRUD sans
+        // destruction »).
+        Route::apiResource('saved-views', SavedViewsController::class)
+            ->only(['index', 'show'])
+            ->middleware('permission:companies.view');
+        Route::apiResource('saved-views', SavedViewsController::class)
+            ->only(['store', 'update'])
+            ->middleware('permission:companies.update');
+        Route::apiResource('saved-views', SavedViewsController::class)
+            ->only(['destroy'])
+            ->middleware('permission:companies.delete');
 
         // Audiences (Sprint Pipeline 360°)
         Route::get('/audiences', [AudiencesController::class, 'index']);
-        Route::post('/audiences', [AudiencesController::class, 'store']);
-        Route::post('/audiences/preview', [AudiencesController::class, 'preview']);
+        Route::post('/audiences', [AudiencesController::class, 'store'])
+            ->middleware('permission:companies.update');
+        Route::post('/audiences/preview', [AudiencesController::class, 'preview'])
+            ->middleware('permission:companies.update');
         Route::get('/audiences/{audience}', [AudiencesController::class, 'show']);
-        Route::put('/audiences/{audience}', [AudiencesController::class, 'update']);
-        Route::delete('/audiences/{audience}', [AudiencesController::class, 'destroy']);
-        Route::post('/audiences/{audience}/refresh', [AudiencesController::class, 'refresh']);
+        Route::put('/audiences/{audience}', [AudiencesController::class, 'update'])
+            ->middleware('permission:companies.update');
+        Route::delete('/audiences/{audience}', [AudiencesController::class, 'destroy'])
+            ->middleware('permission:companies.delete');
+        Route::post('/audiences/{audience}/refresh', [AudiencesController::class, 'refresh'])
+            ->middleware('permission:companies.update');
         Route::get('/audiences/{audience}/members', [AudiencesController::class, 'members']);
 
         Route::get('/search', [GlobalSearchController::class, 'index']);
@@ -263,7 +291,8 @@ Route::prefix('v1')->group(function () {
             ->whereNumber('req')
             ->middleware('permission:rgpd.handle');
         Route::get('/ai-act/register', [AiActRegisterController::class, 'index']);
-        Route::post('/ai-act/register', [AiActRegisterController::class, 'store']);
+        Route::post('/ai-act/register', [AiActRegisterController::class, 'store'])
+            ->middleware('permission:rgpd.handle');
         // Le journal d'audit est un element de preuve : il se consulte avec
         // `audit.view`, que ni `viewer` ni `operator` ne portent (B16-004).
         Route::get('/audit-logs', [AuditLogsController::class, 'index'])
@@ -280,21 +309,21 @@ Route::prefix('v1')->group(function () {
         Route::get('/campaigns', [ScrapingCampaignsController::class, 'index'])
             ->middleware('throttle:scraper-list');
         Route::post('/campaigns', [ScrapingCampaignsController::class, 'store'])
-            ->middleware('throttle:scraper-launch');
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
         Route::get('/campaigns/{campaign}', [ScrapingCampaignsController::class, 'show'])
             ->middleware('throttle:scraper-list');
         Route::put('/campaigns/{campaign}', [ScrapingCampaignsController::class, 'update'])
-            ->middleware('throttle:scraper-launch');
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
         Route::delete('/campaigns/{campaign}', [ScrapingCampaignsController::class, 'destroy'])
-            ->middleware('throttle:scraper-launch');
+            ->middleware(['throttle:scraper-launch', 'permission:companies.delete']);
         Route::post('/campaigns/{campaign}/start', [ScrapingCampaignsController::class, 'start'])
-            ->middleware('throttle:scraper-launch');
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
         Route::post('/campaigns/{campaign}/pause', [ScrapingCampaignsController::class, 'pause'])
-            ->middleware('throttle:scraper-launch');
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
         Route::post('/campaigns/{campaign}/resume', [ScrapingCampaignsController::class, 'resume'])
-            ->middleware('throttle:scraper-launch');
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
         Route::post('/campaigns/{campaign}/cancel', [ScrapingCampaignsController::class, 'cancel'])
-            ->middleware('throttle:scraper-launch');
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
         Route::get('/campaigns/{campaign}/stats', [ScrapingCampaignsController::class, 'stats'])
             ->middleware('throttle:scraper-list');
 
@@ -329,9 +358,11 @@ Route::prefix('v1')->group(function () {
             // conflit possible avec un identifiant numérique.
             Route::get('/arbitrage', [ArbitrageController::class, 'index']);
             Route::post('/arbitrage/{activityId}/attach', [ArbitrageController::class, 'attach'])
-                ->whereNumber('activityId');
+                ->whereNumber('activityId')
+                ->middleware('permission:companies.update');
             Route::post('/arbitrage/{activityId}/dismiss', [ArbitrageController::class, 'dismiss'])
-                ->whereNumber('activityId');
+                ->whereNumber('activityId')
+                ->middleware('permission:companies.update');
 
             Route::post('/bulk', BulkController::class);
         });

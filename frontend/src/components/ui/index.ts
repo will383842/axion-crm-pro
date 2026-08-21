@@ -44,6 +44,11 @@ export { EmptyState } from './EmptyState';
 // a rien » ; `QueryErrorState` dit « on n'a pas pu savoir, et voici pourquoi ».
 // Les confondre, c'était le défaut mesuré sur 31 écrans sur 35.
 export { QueryErrorState, type QueryErrorStateProps } from './QueryErrorState';
+// D25-004 — le troisième cas, que `QueryErrorState` ne peut PAS décrire faute
+// d'objet `error` : le serveur répond 200 avec un corps vide. React Query tient
+// la requête pour RÉUSSIE et `data` reste absente — sans cette branche, l'écran
+// reste bloqué sur son sablier pour toujours.
+export { ReponseVideState, type ReponseVideStateProps } from './ReponseVideState';
 export { ErrorBoundary } from './ErrorBoundary';
 export { Skeleton, CompaniesTableSkeleton } from './Skeleton';
 export { FormField } from './FormField';

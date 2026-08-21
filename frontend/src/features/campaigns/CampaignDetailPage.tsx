@@ -23,9 +23,12 @@ import {
   Button,
   Card,
   cn,
+  EmptyState,
   KpiCard,
   LiveBadge,
   PageHeader,
+  QueryErrorState,
+  ReponseVideState,
   Spinner,
   StatusPill,
   Tabs,
@@ -82,7 +85,9 @@ export function CampaignDetailPage() {
   // décrivent le même objet. Les fondre demande au serveur d'exposer les
   // statistiques DANS la ressource campagne — un changement de contrat d'API,
   // hors périmètre d'un lot frontend. Voir le rapport du lot.
-  const { data: campaign, isLoading } = useQuery({
+  const idLisible = Number.isFinite(id) && id > 0;
+
+  const { data: campaign, isLoading, error, refetch } = useQuery({
     queryKey: ['campaign', id],
     queryFn: async () => (await api.get<Campaign>(`/campaigns/${id}`)).data,
     // Forme FONCTION : cette requête est la seule à connaître son propre
@@ -90,7 +95,7 @@ export function CampaignDetailPage() {
     // morte temporelle — la variable est en cours de déclaration).
     refetchInterval: (requete) =>
       estTerminee(requete.state.data?.status) ? false : 5_000,
-    enabled: Number.isFinite(id) && id > 0,
+    enabled: idLisible,
   });
 
   const { data: stats } = useQuery({
@@ -99,7 +104,7 @@ export function CampaignDetailPage() {
     // Les statistiques ne portent pas le statut : on lit celui de la requête
     // précédente, déjà résolue à ce point du rendu.
     refetchInterval: estTerminee(campaign?.status) ? false : 5_000,
-    enabled: Number.isFinite(id) && id > 0,
+    enabled: idLisible,
   });
 
   const pauseMutation = useMutation({
@@ -123,9 +128,61 @@ export function CampaignDetailPage() {
     onError: (e) => toast.error(extractApiMessage(e) ?? 'Démarrage impossible'),
   });
 
-  if (isLoading || !campaign) {
+  // ═══ D25-004 — LE SABLIER QUI NE S'ARRÊTAIT JAMAIS ══════════════════════
+  //
+  // Cet écran écrivait `if (isLoading || !campaign) return <Spinner/>`. React
+  // Query v5 : sur un échec, `isLoading` retombe à `false` mais `campaign`
+  // reste `undefined` — le second terme restait donc VRAI indéfiniment, et le
+  // sablier ne pouvait plus disparaître. Rien ne disait à l'utilisateur
+  // d'arrêter d'attendre, et les quatre actions de cet écran (pause, reprise,
+  // annulation, démarrage) restaient derrière ce sablier.
+  //
+  // La sortie de chargement teste désormais L'ÉTAT DE LA REQUÊTE, et les trois
+  // façons de n'avoir pas de donnée sont distinguées — parce qu'elles appellent
+  // trois gestes différents :
+  //
+  //   identifiant illisible  -> le lien est faux, aucune requête n'est partie
+  //   erreur                 -> le serveur a refusé (403) ou échoué (500)
+  //   200 au corps vide      -> le serveur a répondu, sans rien
+  //
+  // ⚠️ Le dernier cas est celui qu'un correctif « `error !== null` » NE FERME
+  // PAS : il n'y a alors aucune erreur, et pourtant aucune donnée. C'est le
+  // trou qui a survécu au premier passage sur `/settings` (cf. le lot).
+  //
+  // ⚠️ `campaign === undefined` fait partie de la condition d'échec : React
+  // Query conserve la dernière réponse réussie quand un rafraîchissement
+  // échoue, et cet écran se rafraîchit toutes les 5 s. Effacer une campagne
+  // affichée sur un hoquet de réseau serait une régression, pas un correctif.
+  const echecLecture = error !== null && campaign === undefined;
+
+  if (!idLisible) {
+    return (
+      <div className="px-6 py-6">
+        <EmptyState
+          title="Adresse de campagne invalide"
+          description={`L’adresse ne contient pas d’identifiant de campagne lisible (« ${String(campaignId ?? '')} »). Le lien est probablement tronqué.`}
+          action={<Link to="/campaigns"><Button variant="secondary" size="sm">Retour aux campagnes</Button></Link>}
+        />
+      </div>
+    );
+  }
+  if (echecLecture) {
+    return (
+      <div className="px-6 py-6">
+        <QueryErrorState error={error} contexte="cette campagne" onRetry={() => void refetch()} />
+      </div>
+    );
+  }
+  if (isLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center"><Spinner /></div>
+    );
+  }
+  if (!campaign) {
+    return (
+      <div className="px-6 py-6">
+        <ReponseVideState contexte="cette campagne" onRetry={() => void refetch()} />
+      </div>
     );
   }
 

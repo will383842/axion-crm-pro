@@ -5,7 +5,7 @@
  * Refresh, Edit (toast), Delete.
  */
 import { useState } from 'react';
-import { useParams, useNavigate } from '@tanstack/react-router';
+import { Link, useParams, useNavigate } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -15,8 +15,11 @@ import { api } from '@/lib/api';
 import {
   Button,
   Card,
+  EmptyState,
   KpiCard,
   PageHeader,
+  QueryErrorState,
+  ReponseVideState,
   Spinner,
   StatusPill,
   Tabs,
@@ -53,6 +56,22 @@ const TABS: Array<TabItem<DetailTab>> = [
   { id: 'campaign', label: 'Préparation campagne',  icon: <Send className="h-3.5 w-3.5" /> },
 ];
 
+/**
+ * Ouvre l'enveloppe `{ data: … }` de l'API SANS SUPPOSER qu'elle est là.
+ *
+ * D25-004 — un corps de réponse vide (200 sans contenu, cache intermédiaire,
+ * ressource filtrée par une portée) laisse `response.data` à `null`. Le code
+ * écrivait `.data.data` : cela lève, et l'écran se met alors à raconter une
+ * panne réseau qui n'a pas eu lieu.
+ *
+ * Rend `null` — jamais `undefined`, que React Query v5 refuse.
+ */
+function enveloppe<T>(corps: unknown): T | null {
+  if (corps === null || corps === undefined || typeof corps !== 'object') return null;
+  const contenu = (corps as { data?: unknown }).data;
+  return contenu === undefined || contenu === null ? null : (contenu as T);
+}
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -64,17 +83,37 @@ export function AudienceDetailPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<DetailTab>('members');
 
-  const { data: audience, isLoading } = useQuery({
+  const idLisible = Number.isFinite(id) && id > 0;
+
+  const { data: audience, isLoading, error, refetch } = useQuery({
     queryKey: ['audience', id],
-    queryFn: async () => (await api.get<{ data: EmailAudience }>(`/audiences/${id}`)).data.data,
-    enabled: Number.isFinite(id) && id > 0,
+    // ⚠️ `.data.data` NU EST UN PIÈGE, et il était posé ici. Sur une réponse
+    // 200 au corps vide, axios laisse `response.data` à `null` : lire `.data`
+    // dessus LÈVE un `TypeError`, React Query le range en erreur, et l'écran
+    // affichait « Erreur inattendue — aucune réponse du serveur ». C'est FAUX
+    // deux fois : le serveur a répondu, et il a répondu 200. Mesuré le
+    // 2026-08-21 (`tests/screens/sablier-eternel.test.tsx`).
+    //
+    // On rend `null` — et surtout PAS `undefined` : React Query v5 lève
+    // « data is undefined » sur un `queryFn` qui rend `undefined`, ce qui
+    // ramènerait exactement le faux message d'erreur qu'on vient d'ôter.
+    queryFn: async () => enveloppe<EmailAudience>((await api.get(`/audiences/${id}`)).data),
+    enabled: idLisible,
   });
 
-  const { data: members, isLoading: membersLoading } = useQuery({
+  const {
+    data: members,
+    isLoading: membersLoading,
+    error: membersError,
+    refetch: membersRefetch,
+  } = useQuery({
     queryKey: ['audience-members', id],
+    // Même piège, même parade que ci-dessus.
     queryFn: async () =>
-      (await api.get<MembersResponse>(`/audiences/${id}/members`, { params: { limit: 100 } })).data.data,
-    enabled: Number.isFinite(id) && id > 0,
+      enveloppe<AudienceMember[]>(
+        (await api.get<MembersResponse>(`/audiences/${id}/members`, { params: { limit: 100 } })).data,
+      ),
+    enabled: idLisible,
   });
 
   const refreshMutation = useMutation({
@@ -97,8 +136,50 @@ export function AudienceDetailPage() {
     onError: (e) => toast.error(extractApiMessage(e) ?? 'Suppression impossible'),
   });
 
-  if (isLoading || !audience) {
+  // ═══ D25-004 — LE SABLIER QUI NE S'ARRÊTAIT JAMAIS ══════════════════════
+  //
+  // Cet écran écrivait `if (isLoading || !audience) return <Spinner/>`, la même
+  // faute que `CampaignDetailPage`. React Query v5 : sur un échec, `isLoading`
+  // retombe à `false` et `audience` reste `undefined` — le second terme restait
+  // vrai indéfiniment, le sablier ne pouvait plus disparaître.
+  //
+  // Les trois façons de n'avoir pas de donnée sont désormais distinguées, parce
+  // qu'elles appellent trois gestes différents : lien faux, panne/refus du
+  // serveur, ou réponse 200 au corps vide (ce dernier cas n'a AUCUNE erreur à
+  // montrer — c'est celui qu'un correctif « `error !== null` » laisse ouvert).
+  //
+  // ⚠️ `audience === undefined` fait partie de la condition d'échec : React
+  // Query conserve la dernière réponse réussie quand un rafraîchissement
+  // échoue, et l'effacer ferait perdre à l'écran ce qu'il affichait déjà.
+  const echecLecture = error !== null && audience === undefined;
+
+  if (!idLisible) {
+    return (
+      <div className="px-6 py-6">
+        <EmptyState
+          title="Adresse d’audience invalide"
+          description={`L’adresse ne contient pas d’identifiant d’audience lisible (« ${String(audienceId ?? '')} »). Le lien est probablement tronqué.`}
+          action={<Link to="/audiences"><Button variant="secondary" size="sm">Retour aux audiences</Button></Link>}
+        />
+      </div>
+    );
+  }
+  if (echecLecture) {
+    return (
+      <div className="px-6 py-6">
+        <QueryErrorState error={error} contexte="cette audience" onRetry={() => void refetch()} />
+      </div>
+    );
+  }
+  if (isLoading) {
     return <div className="flex h-[60vh] items-center justify-center"><Spinner /></div>;
+  }
+  if (!audience) {
+    return (
+      <div className="px-6 py-6">
+        <ReponseVideState contexte="cette audience" onRetry={() => void refetch()} />
+      </div>
+    );
   }
 
   return (
@@ -188,7 +269,16 @@ export function AudienceDetailPage() {
       </div>
 
       {tab === 'members' ? (
-        <MembersTab members={members ?? []} loading={membersLoading} />
+        <MembersTab
+          members={members ?? []}
+          loading={membersLoading}
+          // Mesure du 2026-08-21 : la fiche pouvait arriver et les MEMBRES
+          // échouer. L'onglet affichait alors « Aucun membre pour l'instant.
+          // Lance un refresh » — une affirmation sur un segment qu'il n'avait
+          // pas pu lire, et une invitation à un geste qui ne sert à rien.
+          error={membersError}
+          onRetry={() => void membersRefetch()}
+        />
       ) : null}
       {tab === 'criteria' ? (
         <CriteriaTab audience={audience} />
@@ -203,7 +293,26 @@ export function AudienceDetailPage() {
 // ---------------------------------------------------------------------------
 // Tab — Membres
 // ---------------------------------------------------------------------------
-function MembersTab({ members, loading }: { members: AudienceMember[]; loading: boolean }) {
+function MembersTab({
+  members,
+  loading,
+  error,
+  onRetry,
+}: {
+  members: AudienceMember[];
+  loading: boolean;
+  error: unknown;
+  onRetry: () => void;
+}) {
+  // D25-001 appliqué à un ONGLET : « la liste est vide » et « je n'ai pas pu
+  // lire la liste » ne se disent plus pareil. L'échec passe AVANT le
+  // chargement — sur un échec, `loading` est déjà `false`, mais l'ordre rend
+  // l'intention lisible et protège d'une inversion future.
+  if (error !== null && error !== undefined && members.length === 0) {
+    return (
+      <QueryErrorState error={error} contexte="les membres de cette audience" onRetry={onRetry} />
+    );
+  }
   if (loading) {
     return <div className="flex h-40 items-center justify-center"><Spinner /></div>;
   }

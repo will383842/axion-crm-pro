@@ -60,6 +60,7 @@ import {
   Input,
   PageHeader,
   QueryErrorState,
+  ReponseVideState,
   StatusPill,
   Tabs,
   type TabItem,
@@ -216,6 +217,25 @@ export function SettingsPage() {
    */
   const echecLecture = ws.error !== null && ws.data === undefined;
 
+  /**
+   * ═══ D25-004, LE RESTE DU DÉFAUT ═══
+   *
+   * Mesure du 2026-08-21 : la branche `echecLecture` ci-dessus NE SUFFISAIT
+   * PAS. Sous une réponse **200 au corps vide**, React Query tient la requête
+   * pour réussie — `ws.error === null` — et `ws.data` est malgré tout absente.
+   * L'écran retombait donc sur son `<p>Chargement…</p>` final, et y restait
+   * pour toujours : le plafond de dépenses LLM et les clés d'intégration
+   * derrière un « Chargement… » perpétuel, exactement comme avant le correctif.
+   *
+   * Le sablier n'est désormais légitime QUE tant que la requête charge
+   * vraiment. `ws.isLoading` est la seule chose qui a le droit de le montrer.
+   *
+   * ⚠️ `ws.data` peut être une CHAÎNE VIDE et non `undefined` : axios laisse
+   * `response.data` à `''` quand le corps est vide, `JSON.parse` ayant échoué
+   * en mode tolérant. Le test est donc une falsité, pas un `=== undefined`.
+   */
+  const reponseVide = !ws.isLoading && ws.error === null && !ws.data;
+
   return (
     <div className="px-6 py-6">
       <PageHeader
@@ -296,6 +316,11 @@ export function SettingsPage() {
                 </Button>
               </div>
             </form>
+          ) : reponseVide ? (
+            <ReponseVideState
+              contexte="les réglages de l’espace de travail"
+              onRetry={() => void ws.refetch()}
+            />
           ) : (
             <p className="text-sm text-slate-500">Chargement…</p>
           )}

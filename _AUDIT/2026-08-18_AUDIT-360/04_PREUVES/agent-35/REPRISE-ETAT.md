@@ -23,6 +23,11 @@
 
 ## 2. 🟢 CE QUI A CHANGÉ LE 2026-08-20 — la PR #191 est redevenue fusionnable
 
+> ⚠️ **Ce titre était prématuré, et il l'est resté vingt-quatre heures.** Le 20/08, les trois
+> blocages du §10 étaient levés, mais **sept contrôles CI étaient rouges** et le job backend
+> n'atteignait même pas Pest. #191 n'est `CLEAN` que depuis le **2026-08-21, 09 h 15** —
+> voir §13.9. *« Fusionnable » se mesure sur la PR, pas sur la liste des constats fermés.*
+
 **Les trois blocages de `08_PASSE-2-ADVERSARIALE.md` §10 sont fermés, chacun vu rouge puis
 vert.** Et la suite complète, **jouée pour la première fois en entier sur cette branche**, en
 a révélé bien davantage.
@@ -513,7 +518,44 @@ celui de la CI compte.
 > moins une fois, un vert qui ne valait rien. La référence est `composer.lock`,
 > `pnpm-lock.yaml`, et la CI.
 
-### 13.9 Les onze commits de la vague
+
+### 13.9 ✅ VERDICT — la PR #191 est **CLEAN**, mesurée le 2026-08-21 à 09 h 15
+
+```
+PR #191   mergeable = MERGEABLE   mergeStateStatus = CLEAN
+Backend Laravel (install + PHPStan + Pint + Pest) .... SUCCESS
+Suites e2e sur le build (BLOQUANT) ................... SUCCESS
+axe-core Playwright / Lighthouse CI .................. SUCCESS
+Frontend React/Vite .................................. SUCCESS
+Secrets scan (Gitleaks) .............................. SUCCESS
+Container scan (Trivy) x3 ............................ SUCCESS
+Les scripts d'infra sont-ils exécutables ? ........... SUCCESS
+… 20 SUCCESS, 2 SKIPPED, 1 NEUTRAL — AUCUN ROUGE
+
+Pest :  1464 passed, 0 failed, 3 incomplete (9177 assertions)
+```
+
+**Point de départ : 7 contrôles rouges et une suite qui n'atteignait jamais
+Pest.** Le job « Backend Laravel » sortait sur les 38 erreurs PHPStan — Pint et
+Pest, tous deux BLOQUANTS, n'étaient donc **jamais joués**. Les débloquer a
+révélé 10 rouges de plus, tous dus aux écarts banc/CI du §13.8.
+
+⚠️ **Trois tests restent `incomplete`** (auto-ignorés par `markTestSkipped`, pas
+des échecs). Ils ne bloquent pas, mais **personne ne les a identifiés** : à
+nommer avant de déclarer la suite pleinement couverte.
+
+⚠️ **Ce qui n'est PAS fait, et qui doit être dit** : sur les treize gardes qui
+balaient un répertoire avec `RecursiveDirectoryIterator`, **trois** ont été
+fiabilisées (`EffacementDouxPortee`, `ContexteEspaceDesJobs`, et le témoin
+`C21-001`). Une tentative de conversion automatique des deux suivantes
+(`IndexEmailIngestionServentLesRequetes`, `OppositionCouvreTousLesUnivers`) a
+cassé leurs boucles — **annulée, les deux fichiers sont revenus à l'état poussé
+et rejoués verts (16 tests)**. Les dix restantes visent des dossiers NON tronqués
+(`tests/`, `app/Http/Controllers`, `infra/scripts` : mesurés complets) ; elles ne
+sont donc pas fausses aujourd'hui, mais elles le deviendraient le jour où l'un de
+ces dossiers dépasserait le seuil. **À convertir à la main, une par une.**
+
+### 13.10 Les treize commits de la vague
 
 | commit | contenu |
 |---|---|
@@ -528,6 +570,7 @@ celui de la CI compte.
 | `32f6f46` | Pint — 110 écarts sur les 227 fichiers de la PR |
 | `f10c77d` | les trois défauts que Pest a montrés une fois atteint |
 | `b732d75` | les cinq gardes vertes au banc et rouges en CI |
+| `46e41ff` | composer a REPARE H47-001 en amont ; une enumeration avait raison par chance |
 
 ⚠️ **Un défaut de dispositif, et il est de moi.** Le premier découpage a fait
 passer le `chmod` des scripts d'infra dans le commit RGPD, dont le message n'en

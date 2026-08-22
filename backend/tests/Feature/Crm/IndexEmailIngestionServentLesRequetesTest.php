@@ -340,10 +340,39 @@ function c21iBalayage(): array
 
 // ── TEMOINS DE L'INSTRUMENT ──────────────────────────────────────────────────
 
-test('C21-001/twins — TEMOIN : sans volume, Postgres balaie, et il a raison', function () {
-    // Ce test ne verifie pas le produit : il verifie que les mesures ci-dessous
-    // savent ce qu'elles font. Une garde de performance qui rendrait « index »
-    // sur une table d'une ligne ne discriminerait rien.
+test('C21-001/twins — TEMOIN : l instrument SAIT rendre autre chose qu un index', function () {
+    // ── CE TEMOIN A CHANGE DE FORME, ET LA RAISON COMPTE ────────────────────
+    //
+    // Il affirmait : « sur UNE ligne, Postgres balaie, et il a raison ». Cette
+    // premisse est FAUSSE des qu'un test voisin a brasse `candidates`, et il a
+    // rougi pour cela dans la suite complete du 2026-08-21.
+    //
+    // Mesure, MEME ligne unique, MEME requete :
+    //
+    //   table propre ...... Seq Scan                        (cost=0.00..1.01)
+    //   table ballonnee ... Index Scan using idx_candidates_email (cost=0.25..8.27)
+    //
+    // `RefreshDatabase` annule les DONNEES entre deux tests, pas l'ETAT
+    // PHYSIQUE : les tuples morts et les pages restent. Un balayage qui doit
+    // lire 200 pages perd alors contre un index qui en lit deux — et le
+    // planificateur a raison. Le temoin ne mesurait donc pas l'instrument, il
+    // mesurait ce que ses voisins avaient laisse dans la table.
+    //
+    // ── CE QU'IL MESURE MAINTENANT ─────────────────────────────────────────
+    //
+    // La question utile est : « cet instrument sait-il rendre autre chose que
+    // "index" ? ». Une colonne qui ne porte AUCUN index y repond, et sa reponse
+    // ne depend d'aucun etat : aucun index ne peut la servir, donc le balayage
+    // est le seul plan possible.
+    //
+    // `candidates.last_name` n'est indexee nulle part (catalogue verifie le
+    // 2026-08-21 : sept index, aucun sur `last_name`). Mesure : `Seq Scan` sur
+    // table propre ET sur table ballonnee, et jusque `enable_seqscan` decourage.
+    //
+    // Le vrai pouvoir discriminant du fichier est ailleurs, et il est intact :
+    // le temoin suivant montre qu'AU MEME VOLUME, la forme `lower(email::text)`
+    // reste un balayage la ou la forme correcte prend l'index. Deux plans
+    // opposes dans les memes conditions — c'est cela qui prouve la mesure.
     $vivier = Workspace::firstOrCreate(
         ['slug' => Taxonomy::VIVIER_WORKSPACE_SLUG],
         ['id' => (string) Str::uuid(), 'name' => 'Vivier'],
@@ -358,19 +387,26 @@ test('C21-001/twins — TEMOIN : sans volume, Postgres balaie, et il a raison', 
         'created_at' => now(),
         'updated_at' => now(),
     ]);
-    DB::statement('ANALYZE candidates');
 
+    // Pas d'`ANALYZE` ici, et c'est delibere : le verdict de ce temoin ne doit
+    // dependre d'AUCUNE statistique. S'il en dependait, il retomberait dans le
+    // defaut qu'on vient de lui retirer.
     $plan = c21iPlanDe([
-        'sql' => 'select * from "candidates" where "workspace_id" = ? and "email" = ? limit 1',
-        'bindings' => [(string) $vivier->id, c21iAdresseCible()],
+        'sql' => 'select * from "candidates" where "last_name" = ? limit 1',
+        'bindings' => ['Seule'],
     ]);
 
     $this->assertStringContainsString(
         'Seq Scan',
         $plan,
-        "Sur UNE ligne, Postgres devrait balayer. S'il indexe deja ici, les mesures "
-        . "ci-dessous ne distinguent plus rien et leur vert ne prouve rien.\n" . $plan,
+        "`candidates.last_name` ne porte aucun index : le plan DOIT etre un balayage.\n"
+        . "S'il n'en est plus un, c'est qu'un index a ete ajoute sur cette colonne — et\n"
+        . "ce temoin ne discrimine plus rien. Choisir alors une autre colonne nue.\n" . $plan,
     );
+
+    // Et la ligne est bien la : un temoin qui balaie une table VIDE ne prouve
+    // rien non plus.
+    expect(DB::table('candidates')->where('last_name', 'Seule')->count())->toBe(1);
 });
 
 test('C21-001/twins — TEMOIN : la forme fautive reste un balayage AU VOLUME', function () {

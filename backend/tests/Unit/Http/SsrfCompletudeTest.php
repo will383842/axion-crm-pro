@@ -414,6 +414,17 @@ function ssrfCompletudeExemptions(): array
         // LEQUEL des deux, jamais leur contenu.
         'app/Services/Insee/HttpInseeClient.php::get(self::BASE_URL . $endpoint)' => 'hote constant (BASE_URL) + $endpoint choisi entre deux litteraux \'/siret\' et '
             . '\'/siren\' ; la donnee choisit la branche, pas la chaine.',
+
+        // `AlerteTelegram::envoyer()` — mesure faite dans le fichier :
+        //     post("https://api.telegram.org/bot{$token}/sendMessage")
+        // L'HOTE est ecrit en dur : `api.telegram.org`. Ce qui varie, `$token`,
+        // vient de `config('alertes.telegram.token')`, donc de l'ENVIRONNEMENT du
+        // conteneur — jamais d'une donnee utilisateur, jamais de la base. Et il
+        // vit dans le CHEMIN, apres le troisieme `/` : meme un jeton fantaisiste
+        // ne peut pas deplacer l'hote. `SsrfGuard` ne juge que l'hote ; l'exiger
+        // ici reviendrait a decorer du code pour faire taire un banc.
+        'app/Services/Alertes/AlerteTelegram.php::post("https://api.telegram.org/bot{$token}/sendMessage")' => 'hote ecrit en dur (api.telegram.org) ; le jeton vient de la configuration du '
+            . 'conteneur, pas de la donnee, et vit dans le CHEMIN : il ne peut pas deplacer l hote.',
     ];
 }
 
@@ -622,6 +633,11 @@ test('C19-001 — l inventaire des emetteurs HTTP est a jour', function () {
     // Mesure du 2026-08-20. Toute ARRIVEE dans cette liste est un fichier neuf
     // capable d'emettre du HTTP : il doit etre lu, pas ajoute machinalement.
     $attendus = [
+        // Ajoute le 2026-08-22 avec le canal d'alerte. LU AVANT D'ETRE AJOUTE :
+        // son unique emission vise `api.telegram.org`, hote ecrit en dur, et le
+        // seul element variable est le jeton du bot — issu de la configuration
+        // du conteneur, place dans le CHEMIN. Exemption motivee plus haut.
+        'app/Services/Alertes/AlerteTelegram.php',
         'app/Services/AnnuaireEntreprises/HttpAnnuaireEntreprisesClient.php',
         'app/Services/Auth/HibpChecker.php',
         'app/Services/Ban/HttpBanGeocoder.php',

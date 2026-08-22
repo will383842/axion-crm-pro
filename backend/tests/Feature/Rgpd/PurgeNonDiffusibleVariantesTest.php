@@ -33,7 +33,8 @@
  *       masques, donc la chaine « [ND] [ND] » (avec l'espace du milieu).
  *       C'est la sortie litterale du ROUGE :
  *           'denomination' => '[ND] [ND]'
- *       ❌ NON RECONNUE : l'egalite stricte ne la voit pas.
+ *       ✅ RECONNUE DEPUIS LE 2026-08-21 : l'egalite stricte est remplacee
+ *          par `position('[ND]' in denomination) > 0`.
  *
  *   FORME 3 · `denomination IS NULL`
  *       Personne PHYSIQUE opposee, voie `/siren` : cette branche ne lit QUE
@@ -51,27 +52,34 @@
  * ne les invente pas. Le chiffre honnete est : 1 reconnue sur 3 mesurees.
  *
  * ═══════════════════════════════════════════════════════════════════════════
- * POURQUOI CE TEST EST « INCOMPLET » ET NON REPARE
+ * CE QUI A ETE FERME LE 2026-08-21, ET CE QUI RESTE
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Le correctif tient en une ligne, dans
- * `app/Console/Commands/ProspectionPurgeNonDiffusible.php` — un fichier HORS
- * du perimetre ecrit de ce lot, et trois agents partagent ce depot. La forme
- * mesuree comme correcte, a soumettre a Will :
+ * La FORME 2 est FERMEE. `ProspectionPurgeNonDiffusible` emploie desormais
+ * `position('[ND]' in denomination) > 0`, qui couvre les FORMES 1 et 2 sans
+ * dependre d'un echappement `LIKE` — en SQL, `[` n'est pas un metacaractere,
+ * mais l'oublier est le genre de detail qui se paie six mois plus tard.
  *
- *     ->where(function ($q) {
- *         $q->where('denomination', '[ND]')
- *           ->orWhere('denomination', 'like', '%[[]ND]%');   // `[` echappe en LIKE
- *     })
+ * La vague precedente avait MESURE ce correctif et l'avait laisse en attente :
+ * le fichier etait hors de son perimetre ecrit, et trois agents partagent ce
+ * depot. Il est dans le perimetre de la vague 15.
  *
- * (`LIKE '%[[]ND]%'` — en SQL standard `[` n'est pas un metacaractere, mais
- * l'ecrire ainsi reste lisible ; `position('[ND]' in denomination) > 0` est
- * equivalent et plus sur. Les deux couvrent FORME 1 et FORME 2.)
+ * ⚠️ ET LA CONDITION ETAIT ECRITE DEUX FOIS — une pour compter, une pour
+ * supprimer. Qui n'en corrigeait qu'une faisait mentir le plafond de
+ * `RefuseUneSuppressionMassive` : la garde aurait autorise une suppression sur
+ * la foi d'un decompte plus etroit qu'elle. Il n'y a plus qu'une definition.
  *
- * La FORME 3 ne se repare PAS par la purge : elle demande de rejouer l'INSEE
- * sur les fiches sans denomination issues de `discovery_source = 'insee'`, et
- * d'archiver celles que l'API rend desormais `null` (le nouveau filtre). C'est
- * un travail de commande, pas d'une ligne — arbitrage a Will.
+ * ── CE QUI RESTE : LA FORME 3, ET ELLE NE DOIT PAS ETRE FERMEE ICI ─────────
+ *
+ * Une fiche SANS DENOMINATION n'est pas une preuve d'opposition : un
+ * entrepreneur individuel LEGITIME et diffusible arrive lui aussi sans
+ * denomination par la voie `/siren`. Purger sur `denomination IS NULL` serait
+ * exactement le piege `B15-004` qui a failli effacer la base entiere.
+ *
+ * Son rattrapage demande de rejouer l'INSEE sur les fiches sans denomination
+ * issues de `discovery_source = 'insee'`, et d'archiver celles que l'API rend
+ * desormais `null`. C'est un travail de commande, pas d'une condition —
+ * arbitrage a Will.
  */
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -118,52 +126,59 @@ test('C19-010 — TEMOIN : la purge SAIT effacer la forme qu elle reconnait', fu
     expect(DB::table('companies')->count())->toBe(8);
 });
 
-test('C19-010 — RESTE OUVERT : la purge ne voit ni « [ND] [ND] » ni la fiche sans nom', function () {
-    // ⚠️ TEST DELIBEREMENT « INCOMPLET » : ni vert, ni rouge.
+test('C19-010 — la purge efface DESORMAIS « [ND] [ND] », et la fiche sans nom reste dehors', function () {
+    // ⚠️ TEST ENCORE « INCOMPLET », mais pour UNE forme au lieu de deux.
     //
-    // Le declarer vert serait un mensonge -- des fiches nees d'une opposition
-    // restent en base. Le laisser rouge ferait de la suite un feu permanent
-    // que quelqu'un finirait par eteindre, et le defaut deviendrait invisible.
-    // C'est la convention deja employee par `G41-002` dans ce depot.
+    // Le 2026-08-21, la FORME 2 a ete fermee : `position('[ND]' in denomination)`
+    // remplace l'egalite stricte, et « [ND] [ND] » est desormais effacee. La
+    // vague precedente avait mesure ce correctif et l'avait laisse en attente
+    // parce que `ProspectionPurgeNonDiffusible.php` etait hors de son perimetre
+    // ecrit ; il est dans le mien.
+    //
+    // La FORME 3 reste dehors, et il ne faut PAS la fermer ici : une fiche sans
+    // denomination n'est pas une preuve d'opposition. Un entrepreneur individuel
+    // legitime arrive lui aussi sans denomination par la meme voie. La purger
+    // serait le piege `B15-004`. Son rattrapage demande de rejouer l'INSEE —
+    // travail de commande, arbitrage a Will.
     $espace = espaceNonDiffusible();
-    fichesND($espace, '[ND]', 1);          // FORME 1 — reconnue
-    fichesND($espace, '[ND] [ND]', 1);     // FORME 2 — non reconnue
-    fichesND($espace, null, 1);            // FORME 3 — non reconnaissable
+    fichesND($espace, '[ND]', 1);          // FORME 1 — reconnue depuis toujours
+    fichesND($espace, '[ND] [ND]', 1);     // FORME 2 — reconnue depuis ce lot
+    fichesND($espace, null, 1);            // FORME 3 — deliberement hors d'atteinte
     fichesND($espace, 'Fabrique Lumiere SAS', 7);
 
     Artisan::call('prospection:purge-non-diffusible', ['--force' => true]);
 
-    $restantes = DB::table('companies')
-        ->where(function ($q) {
-            $q->where('denomination', 'like', '%ND%')->orWhereNull('denomination');
-        })
-        ->count();
+    // 1. LES DEUX FORMES MARQUEES SONT PARTIES — c'est la fermeture, et elle est
+    //    affirmative : plus aucune fiche ne porte le marqueur d'opposition.
+    $marquees = DB::table('companies')->whereRaw("position('[ND]' in denomination) > 0")->count();
 
-    $this->assertGreaterThan(
+    expect($marquees)->toBe(
         0,
-        $restantes,
-        'BONNE NOUVELLE, et il faut la traiter : la purge efface DESORMAIS toutes les '
-        . 'formes de marquage. Le defaut documente ici est referme -- retirer le '
-        . '`markTestIncomplete` ci-dessous et transformer cette garde en assertion '
-        . 'positive (`expect($restantes)->toBe(0)`).',
+        'Une fiche portant le marqueur INSEE « [ND] » a SURVECU a la purge de rattrapage. '
+        . 'C est une donnee que la personne a explicitement demande de ne pas publier.',
     );
 
-    // La mesure exacte, pour que le rapport ne soit pas une impression.
-    $this->assertSame(
-        2,
-        $restantes,
-        'Le nombre de fiches issues d\'une opposition qui SURVIVENT a la purge a change. '
-        . 'Mesure du 2026-08-20 : 2 sur 3 (« [ND] [ND] » et la fiche sans denomination). '
-        . 'Si ce nombre bouge, c\'est que la purge OU la collecte a change : refaire la mesure.',
+    // 2. LA FICHE SANS NOM EST TOUJOURS LA, et ce n'est pas un oubli.
+    $sansNom = DB::table('companies')->whereNull('denomination')->count();
+
+    expect($sansNom)->toBe(
+        1,
+        'La fiche SANS DENOMINATION a ete effacee. Si c est voulu, il faut le prouver : '
+        . 'un entrepreneur individuel legitime arrive lui aussi sans denomination par la '
+        . 'voie `/siren`, et le piege `B15-004` est exactement celui-la.',
     );
+
+    // 3. Et la purge n'a pas deborde sur les fiches legitimes.
+    expect(DB::table('companies')->count())->toBe(8);
 
     $this->markTestIncomplete(
-        'C19-010 n\'est ferme qu\'a moitie. L\'ENTREE est fermee (les trois voies de '
-        . 'HttpInseeClient ecartent les unites opposees, 9 gardes vertes), mais le '
-        . 'RATTRAPAGE ne reconnait qu\'une forme de marquage sur les 3 mesurees : '
-        . '« [ND] [ND] » et la fiche sans denomination survivent a '
-        . '`prospection:purge-non-diffusible`. Le correctif tient en une ligne mais '
-        . 'porte sur `ProspectionPurgeNonDiffusible.php`, hors du perimetre ecrit de '
-        . 'ce lot. Forme proposee dans l\'en-tete de ce fichier.',
+        'C19-010, ce qui RESTE : la FORME 3 (fiche sans denomination, personne physique '
+        . 'opposee arrivee par la voie `/siren`) n est pas rattrapable par cette purge, et '
+        . 'ne doit pas l etre — elle est indiscernable d une fiche legitime. Son rattrapage '
+        . 'demande de rejouer l INSEE sur les fiches sans denomination issues de '
+        . '`discovery_source = insee` et d archiver celles que l API rend desormais null. '
+        . 'Travail de commande, arbitrage a Will. Le troisieme volet (la voie jumelle '
+        . '`recherche-entreprises.api.gouv.fr`) est suivi dans '
+        . '`OppositionVoieJumelleAnnuaireTest`.',
     );
 });

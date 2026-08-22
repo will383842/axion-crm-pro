@@ -239,14 +239,30 @@ jobs:
           #
           # Resultat mesure :
           #
-          #   les cinq conteneurs .............. running (healthy)
+          #   les cinq conteneurs .............. running (healthy)   <- trompeur
           #   les migrations ................... « Aucune migration en attente »
-          #   https://app.axion-crm-pro.com .... 200
+          #   https://app.axion-crm-pro.com .... 200                 <- trompeur
           #   https://api.axion-crm-pro.com/up . 502, pendant 13 minutes
+          #   le job `Smoke test prod` ......... ROUGE des la 21e seconde
           #
-          # Autrement dit : le deploiement REUSSIT, le serveur se declare en
-          # bonne sante, et l'API est injoignable. Le `docker restart
-          # axion-crm-caddy` joue a la main l'a ramenee en 200 immediatement.
+          # ⚠️ CORRECTION : une premiere version de ce commentaire disait « le
+          # deploiement REUSSIT ». C'est faux. L'etape `Smoke test prod`
+          # ci-dessous A DETECTE le 502 et a fait echouer le job :
+          #
+          #     curl: (22) The requested URL returned error: 502
+          #     ##[error]Health check failed
+          #
+          # Ce qui a manque n'est donc pas la detection, c'est la LECTURE : un
+          # deploiement en echec n'envoie aucune notification, et treize minutes
+          # ont passe avec un job rouge que personne ne regardait.
+          #
+          # Ce qui a egare le diagnostic sur le moment, ce sont les conteneurs :
+          # tous `healthy`, Caddy compris, pendant que Caddy parlait a une
+          # adresse morte. Un healthcheck qui interroge le conteneur lui-meme ne
+          # dit rien de ce qu'il ATTEINT.
+          #
+          # Le `docker restart axion-crm-caddy` joue a la main a ramene l'API en
+          # 200 immediatement.
           #
           # ⚠️ POURQUOI `restart` ET NON `up -d --no-deps caddy`. `up -d` ne
           # recree un conteneur que si sa CONFIGURATION FUSIONNEE a change. Ici
@@ -397,3 +413,78 @@ jobs:
           curl -fsS --max-time 10 -o /dev/null "$APP_URL" || (echo "::error::App URL failed" && exit 1)
 
           echo "::notice::Deploy OK"
+
+      # ══════════════════════════════════════════════════════════════════════
+      # 🔴 L'ALERTE — le seul chainon qui manquait le 2026-08-21
+      # ══════════════════════════════════════════════════════════════════════
+      #
+      # Ce jour-la, l'etape `Smoke test prod` ci-dessus a DETECTE le 502 des la
+      # 21e seconde et fait echouer ce job :
+      #
+      #     curl: (22) The requested URL returned error: 502
+      #     ##[error]Health check failed
+      #
+      # La detection marchait donc parfaitement. Ce qui manquait, c'est que
+      # quelqu'un l'APPRENNE : un deploiement en echec n'envoyait aucune
+      # notification, et le rouge a attendu treize minutes sur GitHub que
+      # quelqu'un vienne le regarder. Une alarme que personne ne recoit n'est
+      # pas une alarme.
+      #
+      # ⚠️ `if: failure()` — ne tourne QUE si une etape precedente a echoue.
+      # Pas sur une annulation, qui n'est pas un incident.
+      #
+      # ⚠️ `continue-on-error: true` — l'alerte ne doit JAMAIS masquer la panne
+      # qu'elle annonce. Si Telegram est injoignable, le job reste rouge pour la
+      # bonne raison, pas pour un echec d'envoi.
+      #
+      # ⚠️ LE JETON NE DOIT PAS FUIR. Il passe par l'ENVIRONNEMENT, jamais par la
+      # ligne de commande (`ps` et les journaux montrent les arguments, pas
+      # l'environnement), et la sortie de `curl` part dans /dev/null : son
+      # message d'erreur citerait l'URL, qui contient le jeton.
+      - name: Alerte Telegram si le deploiement a echoue
+        if: failure()
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "::warning::Deploiement en ECHEC et canal Telegram NON CONFIGURE : personne ne sera prevenu."
+            echo "Poser les secrets de depot TELEGRAM_BOT_TOKEN et TELEGRAM_CHAT_ID"
+            echo "(Settings > Secrets and variables > Actions > New repository secret)."
+            exit 0
+          fi
+
+          # Ecrit pour etre lu sur un telephone, par quelqu'un qui n'a pas le
+          # contexte : ce qui est casse, sur quel commit, et le lien direct.
+          SUJET=$(echo "$COMMIT_MSG" | head -1)
+          NL=$(printf '%b' '\n')
+          TEXTE="DEPLOIEMENT EN ECHEC - axion-crm-pro${NL}${NL}"
+          TEXTE="${TEXTE}L API ou l application peut etre injoignable EN CE MOMENT.${NL}${NL}"
+          TEXTE="${TEXTE}Commit : ${SUJET}${NL}Journal : ${RUN_URL}${NL}${NL}"
+          TEXTE="${TEXTE}Geste de secours si l API rend 502 :${NL}"
+          TEXTE="${TEXTE}  ssh root@46.62.248.239${NL}"
+          # ⚠️ `docker restart`, PAS `docker compose restart`. Deux raisons, et
+          # la seconde n'est pas cosmetique :
+          #  - c'est la commande REELLEMENT jouee a la main le 2026-08-21, qui a
+          #    ramene l'API en 200 immediatement ;
+          #  - la garde `A09` extrait toute ligne contenant `docker compose ` et
+          #    exige qu'elle soit citee dans `_AUDIT/DEPLOY-PIPELINE.md`. Cette
+          #    ligne-ci est un MESSAGE, pas une commande, et le detecteur ne peut
+          #    pas faire la difference : il extrayait `docker compose restart
+          #    caddy"` — avec le guillemet — introuvable au document. Le
+          #    detecteur a raison d'etre bete ; c'est au message de ne pas mentir.
+          TEXTE="${TEXTE}  docker restart axion-crm-caddy"
+
+          # `--fail` : sans lui, `curl` rend 0 meme sur un 401 ou un 404, et cette
+          # etape annoncerait « alerte envoyee » alors que Telegram a refuse.
+          # Mesure a blanc du 2026-08-21 : avec un jeton bidon, elle se declarait
+          # satisfaite. Une alerte qui ment sur son propre succes est pire que pas
+          # d alerte : elle rassure.
+          if curl -sS --fail --max-time 15 -o /dev/null -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" -d "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=${TEXTE}" -d "disable_web_page_preview=true" 2>/dev/null; then
+            echo "alerte Telegram envoyee"
+          else
+            echo "::warning::l envoi de l alerte Telegram a echoue"
+          fi

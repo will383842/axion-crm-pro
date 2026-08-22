@@ -106,6 +106,97 @@ function ficheIndex(string $workspaceId, string $siren, array $extra = []): void
     ], $extra));
 }
 
+/**
+ * LE JEU D'ESSAI DES MESURES DE PLAN — et son absence a fait rougir ce fichier.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Mesure du 2026-08-21 : `G41-008 — la reprise des fiches archivees EMPLOIE son
+ * index` a rougi dans la suite complete, sur un commit qui ne touchait ni
+ * `companies`, ni ses index, ni ce fichier. Jouee seule, elle restait verte.
+ *
+ * ── LA CAUSE ───────────────────────────────────────────────────────────────
+ *
+ * Le `beforeEach` n'ecrivait qu'UNE fiche, et sans aucun des attributs que ces
+ * gardes interrogent. Or presque tous les index vises sont PARTIELS :
+ *
+ *   idx_companies_archive_reason ....... WHERE archive_reason IS NOT NULL
+ *   idx_companies_workspace_country_... WHERE country_code <> 'FR'
+ *   idx_companies_best_email_confidence  WHERE best_email_confidence IS NOT NULL
+ *   idx_companies_revalidate ........... WHERE website_status = 'found'
+ *                                          AND website_revalidated_at IS NULL
+ *
+ * Sur une fiche qui ne remplit AUCUN de ces predicats, ces index sont VIDES.
+ * Aucun n'est meilleur qu'un autre, le planificateur departage a egalite de
+ * cout — c'est-a-dire arbitrairement — et le nom attendu apparait ou n'apparait
+ * pas selon l'etat physique que les tests voisins ont laisse dans la table.
+ *
+ * Mesure : table propre, la garde `archive` obtenait
+ * `Index Scan using idx_companies_workspace_lifecycle_stage` + un `Filter`.
+ * Le nom attendu n'etait nulle part. *Cette garde ne prouvait pas ce qu'elle
+ * annoncait ; elle etait verte par chance.*
+ *
+ * ── CE QUE CE JEU D'ESSAI RETABLIT ─────────────────────────────────────────
+ *
+ * 200 fiches, reparties pour que chaque index partiel soit REELLEMENT le plus
+ * selectif pour sa requete :
+ *
+ *   3 portent un motif d'archivage ....... l'index partiel a 3 entrees sur 200
+ *   3 sont etrangeres (RO / association) .. idem
+ *   3 portent une confiance e-mail ........ idem
+ *   3 portent le signal `google_places_pending` (l'index GIN)
+ *   100 sont en `website_status = 'found'`, dont 3 SEULEMENT jamais revalidees
+ *
+ * ⚠️ Ce dernier desequilibre est le plus delicat, et il a demande trois
+ * mesures. `idx_companies_revalidate` (partiel) concurrence
+ * `companies_website_status_index` (plein) : tant que les deux portaient le meme
+ * nombre de lignes, le plein gagnait avec un `Filter`, et la garde tombait. Il
+ * faut des fiches DEJA revalidees — celles que la production accumule — pour que
+ * le partiel soit franchement plus petit et gagne pour une VRAIE raison.
+ *
+ * ⚠️ Et `ANALYZE` est indispensable : sans lui, la meme garde rend le BON index
+ * sur une table ballonnee et le MAUVAIS sur une table neuve. Les statistiques
+ * ne sont pas annulees entre deux tests ; une garde qui n'etablit pas les
+ * siennes herite de celles de sa voisine.
+ *
+ * Verifie table neuve ET table ballonnee (8 000 tuples morts), deux passages,
+ * plans identiques : les six gardes nomment leur index dans les deux cas.
+ */
+function fixtureIndexes(string $workspaceId): void
+{
+    $lot = [];
+
+    for ($i = 1; $i <= 200; $i++) {
+        $lot[] = [
+            'workspace_id' => $workspaceId,
+            'siren' => str_pad((string) (932000000 + $i), 9, '0'),
+            'denomination' => 'ZZ FIXTURE ' . $i,
+            'signals' => $i >= 22 && $i <= 24 ? '{"google_places_pending":true}' : '{}',
+            'metadata' => '{}',
+            'field_origins' => '{}',
+            'archive_reason' => $i <= 3 ? 'no_email' : null,
+            'country_code' => $i >= 4 && $i <= 6 ? 'RO' : 'FR',
+            'entity_nature' => $i >= 4 && $i <= 6 ? 'association' : 'entreprise',
+            'best_email_confidence' => $i >= 7 && $i <= 9 ? 'A' : null,
+            'website_status' => $i >= 10 && $i <= 109 ? 'found' : 'unknown',
+            // NULL pour 10..12 seulement : trois fiches `found` jamais
+            // revalidees, contre 97 qui le sont. C'est ce rapport qui rend
+            // l'index partiel meilleur que l'index plein.
+            'website_revalidated_at' => ($i <= 9 || $i >= 13) ? now() : null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+    }
+
+    foreach (array_chunk($lot, 100) as $paquet) {
+        DB::table('companies')->insert($paquet);
+    }
+
+    // Sans cette ligne, le verdict depend des statistiques laissees par le test
+    // precedent. Avec elle, il ne depend que de ce que ce test vient d'ecrire.
+    DB::statement('ANALYZE companies');
+}
+
 beforeEach(function () {
     $this->workspace = Workspace::create([
         'id' => (string) Str::uuid(), 'slug' => 'ws-idx-' . Str::random(5), 'name' => 'Index', 'settings' => [],
@@ -116,6 +207,8 @@ beforeEach(function () {
 // ── TEMOIN — l'instrument discrimine ────────────────────────────────────────
 
 test('G41-008 — TEMOIN : une colonne NUE ne fait citer aucun de ces index', function () {
+    fixtureIndexes($this->workspace->id);
+
     // `legal_form` ne porte aucun index. Meme avec `enable_seqscan = off`, le
     // plan ne peut nommer aucun des index de la liste ci-dessous. Sans ce
     // temoin, les gardes suivantes pourraient etre vertes sur n'importe quoi --
@@ -209,6 +302,8 @@ test('G41-008 — TEMOIN : la lecture de definition d index ne rend pas n import
 });
 
 test('G41-008 — la prospection internationale EMPLOIE son index', function () {
+    fixtureIndexes($this->workspace->id);
+
     // `filter[country_code]` + `filter[entity_nature]` (CompanyQueryFilters:116-117),
     // servis par l'index PARTIEL `WHERE country_code <> 'FR'`. C'est exactement
     // le cas d'usage que le commentaire du filtre decrit : « cibler les
@@ -223,6 +318,8 @@ test('G41-008 — la prospection internationale EMPLOIE son index', function () 
 });
 
 test('G41-008 — la reprise des fiches archivees EMPLOIE son index', function () {
+    fixtureIndexes($this->workspace->id);
+
     // `RescrapeArchivesCommand:54` (`->where('archive_reason', $reason)`) et
     // `ObservabilityController:174-177` (le decompte par motif d'archivage).
     $plan = planForce(
@@ -234,6 +331,8 @@ test('G41-008 — la reprise des fiches archivees EMPLOIE son index', function (
 });
 
 test('G41-008 — le filtre par confiance email EMPLOIE son index', function () {
+    fixtureIndexes($this->workspace->id);
+
     // `AllowedFilter::exact('best_email_confidence')`, CompanyQueryFilters:38 --
     // un filtre expose par l'API de liste ET par l'export.
     $plan = planForce("SELECT id FROM companies WHERE best_email_confidence = 'A' LIMIT 50");
@@ -242,6 +341,8 @@ test('G41-008 — le filtre par confiance email EMPLOIE son index', function () 
 });
 
 test('G41-008 — la revalidation des sites EMPLOIE son index', function () {
+    fixtureIndexes($this->workspace->id);
+
     // `ProspectionFindWebsites:127` : `website_status = 'found'` +
     // `whereNull('website_revalidated_at')` -- exactement le predicat de
     // l'index partiel. C'est ce qui rend la commande REPRENABLE sans balayage.
@@ -251,6 +352,8 @@ test('G41-008 — la revalidation des sites EMPLOIE son index', function () {
 });
 
 test('G41-008 — l index GIN sur signals EST utilisable, par la forme OPERATEUR', function () {
+    fixtureIndexes($this->workspace->id);
+
     // 🔴 CONSTAT NEUF, TROUVE EN VERIFIANT CELUI-CI, ET NON REPARE ICI.
     //
     // L'index `gin (signals)` sert `signals ? 'cle'` et `signals @> '{…}'` :

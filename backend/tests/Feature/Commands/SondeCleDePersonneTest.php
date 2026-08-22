@@ -34,6 +34,7 @@
 use App\Console\Commands\CrmSondeCleDePersonne;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -189,6 +190,50 @@ test('A05-001 — TEMOIN : secret pose et stock rattache, la sonde se TAIT', fun
 
     Log::shouldNotHaveReceived('critical');
     Log::shouldNotHaveReceived('warning');
+});
+
+test('A05-001 — le silence est MERITE, mais pas muet : la sonde dit sa COUVERTURE', function () {
+    config(['crm.person_key.secret' => 'un-secret-de-mesure-2026']);
+
+    $espace = a05Espace();
+    a05Contact($espace, 'rattachee-1@sonde.test', 'cle-1');
+    a05Contact($espace, 'rattachee-2@sonde.test', 'cle-2');
+    a05Contact($espace, null);        // sans adresse : hors de portee
+    a05Contact($espace, '   ');       // adresse vide : idem
+
+    // 🔑 POURQUOI CE TEST EXISTE. « Aucune fiche en attente » est VRAI et
+    // pourtant trompeur : la sonde ne compte que les fiches qui portent une
+    // adresse, puisque la cle se calcule sur elle. Mesure du 2026-08-21 en
+    // production : 410 481 fiches rattachees sur 1 319 567 — les 909 086 autres
+    // n'ont AUCUNE adresse et n'auront jamais de fiche 360.
+    //
+    // Un operateur qui lit « rien a faire » en conclurait que toute personne est
+    // atteignable. C'est faux, et ce n'est pas un defaut a reparer : c'est une
+    // couverture a connaitre. *Une sonde qui se tait sur ce qu'elle ne mesure
+    // pas laisse croire qu'elle mesure tout.*
+    // ⚠️ `Artisan::call()` + `Artisan::output()`, et NON
+    // `$this->artisan(...)->expectsOutputToContain(...)`.
+    //
+    // `expectsOutputToContain` compare LIGNE PAR LIGNE, et le formateur de
+    // console COUPE un message long au milieu : « 2 sans adresse » se retrouvait
+    // a cheval sur deux lignes, et l'assertion echouait sur une sortie pourtant
+    // exacte. Mesure du 2026-08-21 : la sortie contenait bien la phrase entiere.
+    // Une assertion qui rougit sur un retour a la ligne mesure la largeur du
+    // terminal, pas le produit.
+    $code = Artisan::call(CrmSondeCleDePersonne::SIGNATURE_PLANIFIEE);
+    $sortie = Artisan::output();
+
+    expect($code)->toBe(0);
+    expect(str_contains($sortie, '2 fiche(s) rattachee(s)'))->toBeTrue(
+        'La sonde ne dit pas combien de fiches sont rattachees.
+Sortie : ' . $sortie,
+    );
+    expect(str_contains($sortie, '2 sans adresse'))->toBeTrue(
+        'La sonde ne dit pas combien de fiches sont HORS DE PORTEE. Son silence laisse alors
+'
+        . 'croire que toute personne a une fiche 360, ce qui est faux.
+Sortie : ' . $sortie,
+    );
 });
 
 // ---------------------------------------------------------------------------

@@ -74,30 +74,49 @@ class CrmSondeNonDiffusibles extends Command
         // ⚠️ `runWithoutScope()` : cette sonde compte à travers TOUS les espaces,
         // et elle n'en a aucun — c'est une tâche planifiée. La ceinture
         // applicative est levée explicitement, et la raison part au journal.
-        [$marquees, $sansNom, $total] = WorkspaceContext::runWithoutScope(
+        // ⚠️ CHAQUE LECTURE NOMME `deleted_at`, ET CE N'EST PAS DECORATIF.
+        //
+        // La garde `B10-016-PORTEE` compte les lectures qui ignorent `deleted_at`
+        // — une lecture muette sur la corbeille inclut ou exclut des lignes sans
+        // le dire. Mes trois premieres lectures etaient de celles-la, et le
+        // plafond de `companies` a deborde. Le relever aurait ete relacher une
+        // garde pour accommoder mon propre code.
+        //
+        // La bonne reponse etait de distinguer, et elle vaut mieux que l'ancienne
+        // version : une fiche non diffusible EN CORBEILLE reste de la donnee
+        // personnelle STOCKEE — mais elle ne se traite pas du meme geste qu'une
+        // fiche vivante. Les compter ensemble melangeait deux situations.
+        [$marquees, $marqueesCorbeille, $sansNom, $total] = WorkspaceContext::runWithoutScope(
             'sonde C19-010 : compter les fiches non diffusibles, tous espaces confondus',
             static fn (): array => [
                 (int) DB::table('companies')
+                    ->whereNull('deleted_at')
                     ->whereRaw("position('[ND]' in denomination) > 0")
                     ->count(),
-                // ⚠️ On restreint à `discovery_source = 'insee'` : une fiche sans
-                // dénomination venue d'ailleurs (import manuel, campagne) n'a rien
-                // à voir avec l'opposition INSEE, et la compter ferait crier la
-                // sonde sur un stock qu'aucun geste ne peut réduire. Une alarme
-                // qu'on ne peut pas éteindre finit ignorée.
                 (int) DB::table('companies')
+                    ->whereNotNull('deleted_at')
+                    ->whereRaw("position('[ND]' in denomination) > 0")
+                    ->count(),
+                // ⚠️ On restreint a `discovery_source = 'insee'` : une fiche sans
+                // denomination venue d'ailleurs (import manuel, campagne) n'a rien
+                // a voir avec l'opposition INSEE, et la compter ferait crier la
+                // sonde sur un stock qu'aucun geste ne peut reduire. Une alarme
+                // qu'on ne peut pas eteindre finit ignoree.
+                (int) DB::table('companies')
+                    ->whereNull('deleted_at')
                     ->whereNull('denomination')
                     ->where('discovery_source', 'insee')
                     ->count(),
-                (int) DB::table('companies')->count(),
+                (int) DB::table('companies')->whereNull('deleted_at')->count(),
             ],
         );
 
-        if ($marquees === 0 && $sansNom === 0) {
+        if ($marquees === 0 && $marqueesCorbeille === 0 && $sansNom === 0) {
             // Le silence est mérité — et il dit sur quoi il a été mesuré, sans
             // quoi personne ne peut juger si la sonde a vraiment regardé.
             $this->info(sprintf(
-                'Aucune fiche non diffusible : 0 marquee `[ND]`, 0 sans denomination, sur %s fiches.',
+                'Aucune fiche non diffusible : 0 marquee `[ND]` (ni vivante ni en corbeille), '
+                . '0 sans denomination, sur %s fiches vivantes.',
                 number_format($total, 0, ',', ' '),
             ));
 
@@ -105,9 +124,10 @@ class CrmSondeNonDiffusibles extends Command
         }
 
         $message = self::PREFIXE_ALERTE . ' : '
-            . $marquees . ' fiche(s) portent le marqueur `[ND]`, et '
-            . $sansNom . ' fiche(s) INSEE sont SANS DENOMINATION (sur '
-            . number_format($total, 0, ',', ' ') . ').'
+            . $marquees . ' fiche(s) VIVANTES portent le marqueur `[ND]`, '
+            . $marqueesCorbeille . ' autre(s) le portent EN CORBEILLE, et '
+            . $sansNom . ' fiche(s) INSEE vivantes sont SANS DENOMINATION (sur '
+            . number_format($total, 0, ',', ' ') . ' fiches vivantes).'
             . ' Ces personnes ont demande a l INSEE de NE PAS etre publiees.'
             . ' GESTE : (1) jouer `prospection:purge-non-diffusible --dry-run` pour voir ce que'
             . ' le rattrapage effacerait ; (2) pour les fiches SANS denomination, NE PAS purger'
@@ -116,13 +136,22 @@ class CrmSondeNonDiffusibles extends Command
             . ' Et surtout : leur presence signifie que l ENTREE s est rouverte —'
             . ' verifier `HttpInseeClient` avant tout le reste.';
 
-        Log::critical($message, ['marquees' => $marquees, 'sans_denomination' => $sansNom]);
+        Log::critical($message, [
+            'marquees_vivantes' => $marquees,
+            'marquees_corbeille' => $marqueesCorbeille,
+            'sans_denomination' => $sansNom,
+        ]);
         $this->error($message);
 
         app(AlerteTelegram::class)->envoyer(
             '🔴 CRM — donnee personnelle qui ne devrait pas etre la',
             $message,
-            ['constat' => 'C19-010', 'marquees' => $marquees, 'sans_denomination' => $sansNom],
+            [
+                'constat' => 'C19-010',
+                'marquees_vivantes' => $marquees,
+                'marquees_corbeille' => $marqueesCorbeille,
+                'sans_denomination' => $sansNom,
+            ],
         );
 
         return self::FAILURE;

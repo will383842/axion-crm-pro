@@ -45,6 +45,37 @@ function alerteDeploiementSource(): string
     return (string) file_get_contents($chemin);
 }
 
+/**
+ * Le TEXTE ENTIER de l'étape d'alerte, découpé par ses bornes réelles.
+ *
+ * ⚠️ POURQUOI PAS UNE FENÊTRE DE N CARACTÈRES. La première version de ce fichier
+ * lisait `substr($source, $pos, 2500)`. Le 2026-08-22, l'ajout d'un commentaire
+ * de dix lignes dans le workflow a repoussé la ligne `curl` au-delà de la
+ * fenêtre, et trois contrôles ont rougi sur un workflow parfaitement correct.
+ *
+ * *Une garde qui dépend d'un décompte de caractères mesure la longueur des
+ * commentaires, pas le produit.* On découpe donc du `- name:` de l'alerte
+ * jusqu'au `- name:` suivant — les bornes que YAML donne lui-même.
+ */
+function alerteDeploiementEtape(): string
+{
+    $source = alerteDeploiementSource();
+
+    $debut = strpos($source, '- name: Alerte Telegram si le deploiement a echoue');
+
+    expect($debut)->not->toBeFalse(
+        "L etape d alerte a disparu du workflow. Mesure du 2026-08-21 : sans elle, un\n"
+        . 'deploiement en echec ne previent personne, et treize minutes passent.',
+    );
+
+    // La borne de fin : l'étape suivante, ou la fin du fichier s'il n'y en a pas.
+    $suivante = strpos($source, "\n      - name:", (int) $debut + 10);
+
+    return $suivante === false
+        ? substr($source, (int) $debut)
+        : substr($source, (int) $debut, $suivante - (int) $debut);
+}
+
 test('ALERTE-DEPLOIEMENT — le dispositif EXISTE dans le workflow de production', function () {
     $source = alerteDeploiementSource();
 
@@ -62,8 +93,7 @@ test('ALERTE-DEPLOIEMENT — elle ne se declenche QUE sur un echec', function ()
     // Sans `if: failure()`, l'alerte partirait a CHAQUE deploiement reussi. Un
     // canal qui crie tout le temps finit coupe, et le jour ou il a quelque chose
     // a dire, plus personne ne le lit.
-    $posAlerte = strpos($source, 'Alerte Telegram si le deploiement a echoue');
-    $extrait = substr($source, (int) $posAlerte, 400);
+    $extrait = alerteDeploiementEtape();
 
     expect(str_contains($extrait, 'if: failure()'))->toBeTrue(
         "L etape d alerte n est plus conditionnee a un ECHEC : elle partira a chaque\n"
@@ -73,9 +103,7 @@ test('ALERTE-DEPLOIEMENT — elle ne se declenche QUE sur un echec', function ()
 });
 
 test('ALERTE-DEPLOIEMENT — elle ne peut pas MASQUER la panne qu elle annonce', function () {
-    $source = alerteDeploiementSource();
-    $posAlerte = strpos($source, 'Alerte Telegram si le deploiement a echoue');
-    $extrait = substr($source, (int) $posAlerte, 400);
+    $extrait = alerteDeploiementEtape();
 
     // 🔑 `continue-on-error: true`. Sans lui, un Telegram injoignable ferait
     // echouer l etape d alerte — et le job resterait rouge pour la MAUVAISE
@@ -100,8 +128,7 @@ test('ALERTE-DEPLOIEMENT — le JETON passe par l environnement, jamais par la l
 
     // Et la sortie de `curl` part dans /dev/null : son message d'erreur cite
     // l'URL, qui CONTIENT le jeton.
-    $posAlerte = strpos($source, 'Alerte Telegram si le deploiement a echoue');
-    $extrait = substr($source, (int) $posAlerte, 2500);
+    $extrait = alerteDeploiementEtape();
 
     expect(str_contains($extrait, '2>/dev/null'))->toBeTrue(
         'La sortie d erreur de `curl` n est plus jetee : elle cite l URL de l API, qui '
@@ -110,9 +137,7 @@ test('ALERTE-DEPLOIEMENT — le JETON passe par l environnement, jamais par la l
 });
 
 test('ALERTE-DEPLOIEMENT — elle ne MENT pas sur son propre succes', function () {
-    $source = alerteDeploiementSource();
-    $posAlerte = strpos($source, 'Alerte Telegram si le deploiement a echoue');
-    $extrait = substr($source, (int) $posAlerte, 2500);
+    $extrait = alerteDeploiementEtape();
 
     // 🔴 DEFAUT MESURE LE 2026-08-21, PENDANT L'ECRITURE DE CETTE ETAPE.
     // Sans `--fail`, `curl` rend 0 meme sur un 401 ou un 404 : l'essai a blanc

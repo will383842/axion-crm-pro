@@ -466,7 +466,17 @@ jobs:
           TEXTE="${TEXTE}Commit : ${SUJET}${NL}Journal : ${RUN_URL}${NL}${NL}"
           TEXTE="${TEXTE}Geste de secours si l API rend 502 :${NL}"
           TEXTE="${TEXTE}  ssh root@46.62.248.239${NL}"
-          TEXTE="${TEXTE}  cd /opt/axion-crm-pro && docker compose restart caddy"
+          # ⚠️ `docker restart`, PAS `docker compose restart`. Deux raisons, et
+          # la seconde n'est pas cosmetique :
+          #  - c'est la commande REELLEMENT jouee a la main le 2026-08-21, qui a
+          #    ramene l'API en 200 immediatement ;
+          #  - la garde `A09` extrait toute ligne contenant `docker compose ` et
+          #    exige qu'elle soit citee dans `_AUDIT/DEPLOY-PIPELINE.md`. Cette
+          #    ligne-ci est un MESSAGE, pas une commande, et le detecteur ne peut
+          #    pas faire la difference : il extrayait `docker compose restart
+          #    caddy"` — avec le guillemet — introuvable au document. Le
+          #    detecteur a raison d'etre bete ; c'est au message de ne pas mentir.
+          TEXTE="${TEXTE}  docker restart axion-crm-caddy"
 
           # `--fail` : sans lui, `curl` rend 0 meme sur un 401 ou un 404, et cette
           # etape annoncerait « alerte envoyee » alors que Telegram a refuse.

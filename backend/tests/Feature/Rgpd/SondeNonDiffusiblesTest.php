@@ -60,9 +60,10 @@ function ndEspace(): string
     return $id;
 }
 
-function ndFiche(string $espace, ?string $denomination, string $source = 'insee'): void
+function ndFiche(string $espace, ?string $denomination, string $source = 'insee', bool $corbeille = false): void
 {
     DB::table('companies')->insert([
+        'deleted_at' => $corbeille ? now() : null,
         'workspace_id' => $espace,
         'siren' => str_pad((string) random_int(100000000, 999999999), 9, '0'),
         'denomination' => $denomination,
@@ -92,7 +93,7 @@ test('C19-010/sonde — base saine : elle se tait, et DIT sur quoi elle a compte
     expect(str_contains($sortie, 'Aucune fiche non diffusible'))->toBeTrue(
         "La sonde se tait sans rien dire.\nSortie : " . $sortie,
     );
-    expect(str_contains($sortie, 'sur 2 fiches'))->toBeTrue(
+    expect(str_contains($sortie, 'sur 2 fiches vivantes'))->toBeTrue(
         "La sonde ne dit pas sur combien de fiches elle a compte : son silence ne prouve\n"
         . "alors rien.\nSortie : " . $sortie,
     );
@@ -154,6 +155,47 @@ test('C19-010/sonde — TEMOIN : une denomination qui contient « ND » sans cro
     ndFiche($espace, 'Andre et Fils');
 
     $this->artisan(CrmSondeNonDiffusibles::SIGNATURE_PLANIFIEE)->assertSuccessful();
+});
+
+// ── 3 bis. LA CORBEILLE — de la donnee STOCKEE, pas de la donnee disparue ───
+
+test('C19-010/sonde — une fiche marquee EN CORBEILLE la fait crier aussi', function () {
+    // 🔑 Une fiche non diffusible mise a la corbeille reste de la donnee
+    // PERSONNELLE STOCKEE : la suppression douce ne l'efface pas, elle la cache.
+    // La sonde doit la voir — mais separement, parce qu'elle ne se traite pas du
+    // meme geste qu'une fiche vivante.
+    $espace = ndEspace();
+    ndFiche($espace, '[ND]', 'insee', corbeille: true);
+    ndFiche($espace, 'Fabrique Lumiere SAS');
+
+    $this->artisan(CrmSondeNonDiffusibles::SIGNATURE_PLANIFIEE)->assertFailed();
+});
+
+test('C19-010/sonde — le cri DISTINGUE les vivantes des fiches en corbeille', function () {
+    // Les compter ensemble melangerait deux situations qui appellent deux
+    // gestes differents. Celui qui lit l'alerte a 3 h du matin doit savoir
+    // laquelle il a devant lui.
+    $espace = ndEspace();
+    ndFiche($espace, '[ND]');
+    ndFiche($espace, '[ND] [ND]', 'insee', corbeille: true);
+
+    $vus = [];
+    Log::spy();
+    Log::shouldReceive('critical')->andReturnUsing(function (string $m) use (&$vus): void {
+        $vus[] = $m;
+    });
+
+    $this->artisan(CrmSondeNonDiffusibles::SIGNATURE_PLANIFIEE)->assertFailed();
+
+    $vu = implode(' | ', $vus);
+
+    expect(str_contains($vu, '1 fiche(s) VIVANTES'))->toBeTrue(
+        'Le cri ne compte pas les fiches vivantes a part : ' . $vu,
+    );
+    expect(str_contains($vu, '1 autre(s) le portent EN CORBEILLE'))->toBeTrue(
+        'Le cri ne distingue pas la corbeille : celui qui le lit ne saura pas quel geste faire. '
+        . $vu,
+    );
 });
 
 // ── 4. LE CRI DIT-IL LE GESTE ? ─────────────────────────────────────────────

@@ -21,8 +21,9 @@ class ProxyEndpointData extends Data
     public function toProxyUrl(): string
     {
         $auth = $this->username
-            ? rawurlencode($this->username).':'.rawurlencode((string) $this->password).'@'
+            ? rawurlencode($this->username) . ':' . rawurlencode((string) $this->password) . '@'
             : '';
+
         return "http://{$auth}{$this->host}:{$this->port}";
     }
 }

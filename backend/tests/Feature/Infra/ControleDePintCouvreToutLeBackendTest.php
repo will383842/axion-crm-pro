@@ -157,7 +157,7 @@ test('H46-007 — le pathspec du pas Pint porte la magie :(glob)', function () {
     // Et la forme fautive ne doit pas reapparaitre ailleurs dans le meme script
     // (par exemple sur un second `git diff` ajoute plus tard).
     $this->assertFalse(
-        (bool) preg_match("/(?<!\\(glob\\))backend\\/\\*\\*\\/\\*\\.php/", str_replace(':(glob)backend/**/*.php', '', $script)),
+        (bool) preg_match('/(?<!\\(glob\\))backend\\/\\*\\*\\/\\*\\.php/', str_replace(':(glob)backend/**/*.php', '', $script)),
         'Le pathspec sans magie `backend/**/*.php` est revenu dans le pas Pint. '
         . 'Il rate les fichiers poses a la racine de backend/ (H46-007) : le prefixer de `:(glob)`.',
     );

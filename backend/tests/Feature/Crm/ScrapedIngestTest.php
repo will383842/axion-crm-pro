@@ -843,7 +843,7 @@ test('C18-002 — une personne sans nom de famille est COMPTÉE comme écartée,
 
     expect($outcome->personsSkipped)->toBe(
         ['skipped_no_last_name' => 1],
-        "La personne collectée a été écartée SANS être comptée : elle disparaît en silence du rapport "
+        'La personne collectée a été écartée SANS être comptée : elle disparaît en silence du rapport '
         . "d'ingestion (constat C18-002). Geste : compter la branche `skipped_*` dans le `match` de "
         . '`ScrapedRecordIngestService::apply()` (le `default` est un fourre-tout volontaire) et la '
         . 'passer à `ScrapeIngestOutcome::$personsSkipped`.',

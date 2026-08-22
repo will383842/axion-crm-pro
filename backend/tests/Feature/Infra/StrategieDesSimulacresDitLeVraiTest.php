@@ -159,7 +159,7 @@ test('H44-009 — TEMOIN : le banc voit le tableau et le corpus de classes', fun
 
     expect(count(classesDeLApplication()))->toBeGreaterThan(
         100,
-        'Le banc ne voit que ' . count(classesDeLApplication()) . " classes sous `backend/app/`. "
+        'Le banc ne voit que ' . count(classesDeLApplication()) . ' classes sous `backend/app/`. '
         . 'Le parcours est tronque, et la garde va crier au loup sur des classes qui existent. '
         . 'Repare `classesDeLApplication()` avant de la croire.',
     );
@@ -178,7 +178,7 @@ test('H44-009 — TEMOIN NEGATIF : le balayage voit bien les deux lignes fantome
 
     expect(array_key_exists('DnsManager', classesDeLApplication()))->toBeFalse(
         '`DnsManager` existe desormais sous `backend/app/` : le constat H44-009 disait le '
-        . "contraire, et ce temoin negatif ne prouve plus rien. Remplace-le par un nom qui "
+        . 'contraire, et ce temoin negatif ne prouve plus rien. Remplace-le par un nom qui '
         . "n'existe pas, sinon la garde principale ne mesure plus l'absence.",
     );
 
@@ -246,15 +246,15 @@ test('H44-009 — l implementation de production annoncee est bien celle que le 
 
     expect($ecarts)->toBe(
         [],
-        "`MOCKS-STRATEGY.md` nomme une implementation de production que "
+        '`MOCKS-STRATEGY.md` nomme une implementation de production que '
         . "`MockServicesProvider::register()` ne branche PAS.\n\n"
         . "C'est l'erreur la plus couteuse du constat H44-009 : elle envoie deboguer la mauvaise "
-        . "classe le jour ou le service se comporte mal. Le cas mesure le 2026-08-22 : le "
-        . "tableau annoncait `RealSmtpProber` pour le sondage SMTP, alors que le sprint H2 avait "
+        . 'classe le jour ou le service se comporte mal. Le cas mesure le 2026-08-22 : le '
+        . 'tableau annoncait `RealSmtpProber` pour le sondage SMTP, alors que le sprint H2 avait '
         . "bascule sur `HunterSmtpProber` (le sondage direct sur le port 25 faisait bannir l'IP "
-        . "Hetzner par Spamhaus). `RealSmtpProber` existe toujours en classe, pour un repli "
+        . 'Hetzner par Spamhaus). `RealSmtpProber` existe toujours en classe, pour un repli '
         . "manuel, mais n'est plus wire — cf. `MockServicesProvider.php:108-109`.\n\n"
-        . "GESTE : aligne la colonne « Implementation prod » sur le `\$bind` du provider, et dis "
+        . 'GESTE : aligne la colonne « Implementation prod » sur le `$bind` du provider, et dis '
         . "en une ligne ce que devient l'ancienne classe si elle survit.\n\n"
         . "Ecarts :\n  - " . implode("\n  - ", $ecarts),
     );

@@ -47,7 +47,20 @@ use Tests\TestCase;
 
 uses(TestCase::class);
 
-function racineDepotH47(): string
+/**
+ * ⚠️ Le nom porte celui de CE fichier, et pas un identifiant de constat.
+ *
+ * Pest charge TOUS les fichiers de test dans le meme espace global : deux
+ * assistants qui portent le meme nom se percutent en `Cannot redeclare`, et la
+ * suite ENTIERE refuse de demarrer. C'est arrive le 2026-08-23 avec
+ * `racineDepotH47()`, declare ici et dans `AuditDesDependancesMesureVraimentTest`
+ * — deux fichiers ecrits par deux agents differents, chacun isole des FICHIERS
+ * de l'autre mais pas de ses NOMS.
+ *
+ * Un assistant de test se nomme donc d'apres son fichier, jamais d'apres le
+ * constat : deux constats peuvent se rencontrer, deux fichiers non.
+ */
+function racineDepotImagesDeployees(): string
 {
     return realpath(base_path('..')) ?: base_path('..');
 }
@@ -113,7 +126,7 @@ function dockerfilesExecutesH47(array $fichiersCompose): array
     $trouves = [];
 
     foreach ($fichiersCompose as $relatif) {
-        $chemin = racineDepotH47().'/'.$relatif;
+        $chemin = racineDepotImagesDeployees() . '/' . $relatif;
         if (! is_file($chemin)) {
             continue;
         }
@@ -126,14 +139,14 @@ function dockerfilesExecutesH47(array $fichiersCompose): array
         try {
             /** @var array<string, mixed> $pile */
             $pile = (array) Yaml::parse($texte);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Une exception de parsing sortirait en ERREUR, sans dire quoi faire.
             // On la transforme en echec qui porte le geste.
             expect(false)->toBeTrue(
-                "H47-005 : {$relatif} n'a pas pu etre lu en YAML (".$e->getMessage().'). '.
-                "La garde ne mesure RIEN dans cet etat. GESTE : si le fichier a gagne une balise ".
-                'Compose non standard (comme `!override`), la neutraliser dans '.
-                'dockerfilesExecutesH47() avant le parsing.'
+                "H47-005 : {$relatif} n'a pas pu etre lu en YAML (" . $e->getMessage() . '). ' .
+                'La garde ne mesure RIEN dans cet etat. GESTE : si le fichier a gagne une balise ' .
+                'Compose non standard (comme `!override`), la neutraliser dans ' .
+                'dockerfilesExecutesH47() avant le parsing.',
             );
 
             continue;
@@ -158,10 +171,10 @@ function dockerfilesExecutesH47(array $fichiersCompose): array
 // ─────────────────────────────────────────────────────────────────────────────
 
 test('H47-005 — TEMOIN : l analyse lit les matrices et les services, et sait les confronter', function () {
-    $repertoire = sys_get_temp_dir().'/h47-'.bin2hex(random_bytes(6));
+    $repertoire = sys_get_temp_dir() . '/h47-' . bin2hex(random_bytes(6));
     mkdir($repertoire);
 
-    $workflow = $repertoire.'/w.yml';
+    $workflow = $repertoire . '/w.yml';
     file_put_contents($workflow, <<<'YAML'
     jobs:
       build-and-push:
@@ -185,12 +198,12 @@ test('H47-005 — TEMOIN : l analyse lit les matrices et les services, et sait l
 
 test('H47-005 — toute image construite par un deploiement est executee par sa pile', function () {
     foreach (pilesDeDeploiementH47() as $relatifWorkflow => $fichiersCompose) {
-        $cheminWorkflow = racineDepotH47().'/'.$relatifWorkflow;
+        $cheminWorkflow = racineDepotImagesDeployees() . '/' . $relatifWorkflow;
 
         expect(is_file($cheminWorkflow))->toBeTrue(
-            "H47-005 : {$relatifWorkflow} est introuvable depuis le banc. La garde ne mesure ".
-            'RIEN dans cet etat. GESTE : verifier que le depot complet est monte (voir le '.
-            "piege de banc en tete de ce fichier), ou corriger le chemin dans pilesDeDeploiementH47()."
+            "H47-005 : {$relatifWorkflow} est introuvable depuis le banc. La garde ne mesure " .
+            'RIEN dans cet etat. GESTE : verifier que le depot complet est monte (voir le ' .
+            'piege de banc en tete de ce fichier), ou corriger le chemin dans pilesDeDeploiementH47().',
         );
 
         $construits = dockerfilesConstruitsH47($cheminWorkflow);
@@ -199,25 +212,25 @@ test('H47-005 — toute image construite par un deploiement est executee par sa 
         // Sans ce garde-fou, un parsing casse rendrait deux tableaux vides et
         // le test serait vert en n'ayant rien inspecte.
         expect($construits)->not->toBeEmpty(
-            "H47-005 : aucune entree de matrice lue dans {$relatifWorkflow} — l'analyse n'a rien ".
-            'inspecte, elle ne prouve donc rien. GESTE : verifier la forme '.
-            '`strategy.matrix.include` du job de construction.'
+            "H47-005 : aucune entree de matrice lue dans {$relatifWorkflow} — l'analyse n'a rien " .
+            'inspecte, elle ne prouve donc rien. GESTE : verifier la forme ' .
+            '`strategy.matrix.include` du job de construction.',
         );
         expect($executes)->not->toBeEmpty(
-            'H47-005 : aucun `build.dockerfile` lu dans la pile compose du deploiement — '.
-            "l'analyse n'a rien inspecte. GESTE : verifier les chemins listes dans ".
-            'pilesDeDeploiementH47() et le parsing des `!override`.'
+            'H47-005 : aucun `build.dockerfile` lu dans la pile compose du deploiement — ' .
+            "l'analyse n'a rien inspecte. GESTE : verifier les chemins listes dans " .
+            'pilesDeDeploiementH47() et le parsing des `!override`.',
         );
 
         $orphelins = array_values(array_diff($construits, $executes));
 
         expect($orphelins)->toBe([], sprintf(
-            'H47-005 : %s construit %s, mais AUCUN service des fichiers %s ne le fait tourner. '.
-            'Une image poussee a chaque deploiement et jamais tiree coute du temps de runner, '.
-            "occupe le registre et fait remonter des alertes d'analyse sur du code qui ne s'execute ".
-            'nulle part — c est exactement le cas mesure le 2026-08-22 avec `Dockerfile.worker` '.
-            '(32 des 57 alertes, dont les 2 critiques). GESTE : soit declarer le service dans la '.
-            'pile, soit retirer la ligne de la matrice `build-and-push` — les deux vont ENSEMBLE, '.
+            'H47-005 : %s construit %s, mais AUCUN service des fichiers %s ne le fait tourner. ' .
+            'Une image poussee a chaque deploiement et jamais tiree coute du temps de runner, ' .
+            "occupe le registre et fait remonter des alertes d'analyse sur du code qui ne s'execute " .
+            'nulle part — c est exactement le cas mesure le 2026-08-22 avec `Dockerfile.worker` ' .
+            '(32 des 57 alertes, dont les 2 critiques). GESTE : soit declarer le service dans la ' .
+            'pile, soit retirer la ligne de la matrice `build-and-push` — les deux vont ENSEMBLE, ' .
             'et le commentaire de docker-compose.yml (juste avant le service `caddy`) le dit.',
             $relatifWorkflow,
             implode(', ', $orphelins),

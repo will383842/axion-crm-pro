@@ -38,6 +38,7 @@ class LLMRouterService implements LLMClient
         $requestHash = $this->computeRequestHash($useCase, $variables, $request->promptTemplateVersion);
         if ($cached = Cache::get("llm:hash:{$requestHash}")) {
             $cached['cacheHit'] = true;
+
             return LLMResponseData::from($cached);
         }
 
@@ -95,7 +96,7 @@ class LLMRouterService implements LLMClient
                 Log::warning('LLM provider failed, trying next', [
                     'use_case' => $useCase->slug,
                     'provider' => $providerSlug,
-                    'error'    => $e->getMessage(),
+                    'error' => $e->getMessage(),
                 ]);
                 $lastError = $e;
             }
@@ -128,6 +129,7 @@ class LLMRouterService implements LLMClient
             }
             $variables[$key] = $sanitized;
         }
+
         return $variables;
     }
 
@@ -135,11 +137,12 @@ class LLMRouterService implements LLMClient
     private function computeRequestHash(LlmUseCase $useCase, array $variables, ?int $version): string
     {
         $payload = [
-            'slug'    => $useCase->slug,
-            'model'   => $useCase->model,
+            'slug' => $useCase->slug,
+            'model' => $useCase->model,
             'version' => $version ?? $useCase->prompt_version,
-            'vars'    => $this->sortRecursively($variables),
+            'vars' => $this->sortRecursively($variables),
         ];
+
         return hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR));
     }
 
@@ -153,6 +156,7 @@ class LLMRouterService implements LLMClient
         foreach ($data as $k => $v) {
             $data[$k] = $this->sortRecursively($v);
         }
+
         return $data;
     }
 
@@ -160,6 +164,7 @@ class LLMRouterService implements LLMClient
     {
         $version = $version ?? (int) $useCase->prompt_version;
         $cacheKey = "llm:prompt:{$useCase->slug}:{$version}";
+
         return Cache::remember($cacheKey, 600, function () use ($useCase, $version) {
             $tpl = DB::table('prompt_templates')
                 ->where('use_case_id', $useCase->id)
@@ -171,6 +176,7 @@ class LLMRouterService implements LLMClient
                 ->where('prompt_template_id', $tpl->id)
                 ->where('version', $version)
                 ->first();
+
             return $v?->content ?? $this->defaultTemplate($useCase->slug);
         });
     }
@@ -178,9 +184,9 @@ class LLMRouterService implements LLMClient
     private function defaultTemplate(string $slug): string
     {
         return match ($slug) {
-            'classify_company_axion'  => 'Tu es expert en classification d\'entreprises B2B. Analyse cette entreprise et retourne un JSON {"ia_maturity":{...},"axion_offer_match":{...},"priority":"haute|moyenne|basse|gelee"}. Entreprise : {{denomination}} (NAF {{naf}}, {{effectif_range}}). Site : {{ext_website_text}}',
-            'sector_classification'   => 'Classifie le secteur métier de cette entreprise selon notre taxonomie. Retourne JSON {"secteur_metier_axion":"...","maturite_ia_visible":"absente|emergente|en_cours|avancee|leader"}. Données : {{ext_company_data}}',
-            'extract_team_from_page'  => 'Extrais les membres de l\'équipe dirigeante. Retourne JSON array [{name,title,linkedin_url?,confidence}]. Page : {{ext_page_text}}',
+            'classify_company_axion' => 'Tu es expert en classification d\'entreprises B2B. Analyse cette entreprise et retourne un JSON {"ia_maturity":{...},"axion_offer_match":{...},"priority":"haute|moyenne|basse|gelee"}. Entreprise : {{denomination}} (NAF {{naf}}, {{effectif_range}}). Site : {{ext_website_text}}',
+            'sector_classification' => 'Classifie le secteur métier de cette entreprise selon notre taxonomie. Retourne JSON {"secteur_metier_axion":"...","maturite_ia_visible":"absente|emergente|en_cours|avancee|leader"}. Données : {{ext_company_data}}',
+            'extract_team_from_page' => 'Extrais les membres de l\'équipe dirigeante. Retourne JSON array [{name,title,linkedin_url?,confidence}]. Page : {{ext_page_text}}',
             'extract_journalists_from_page' => 'Tu extrais les contacts de la RÉDACTION d\'un média français à partir du texte brut de ses pages « ours » / mentions légales / équipe. '
                 . 'Retourne UNIQUEMENT un objet JSON strict de la forme {"journalists":[{"first_name":"","last_name":"","role":"","beat":""}]}. '
                 . 'Règles STRICTES : n\'invente RIEN ; ne liste QUE des personnes physiques explicitement nommées (prénom + nom) associées à une fonction média '
@@ -188,9 +194,9 @@ class LLMRouterService implements LLMClient
                 . '"role" = la fonction exacte mentionnée. "beat" = la rubrique si visible (politique, sport, économie, tech, culture, faits divers, …), sinon "". '
                 . 'IGNORE les raisons sociales, sociétés éditrices, hébergeurs, prestataires techniques, agences web, numéros SIREN/RCS/CPPAP et les fonctions non éditoriales (directeur technique/commercial). '
                 . 'Si aucune personne nommée avec une fonction média n\'apparaît, retourne {"journalists":[]}. TEXTE : {{ext_page_text}}',
-            'detect_email_pattern'    => 'Détecte le pattern email de l\'entreprise depuis ces exemples : {{ext_known_emails}}. Retourne JSON {"pattern":"{first}.{last}@{domain}","confidence":80}',
-            'auto_tag'                => 'Suggère 3-5 tags pertinents. Retourne JSON {"tags":["..."]}. Entreprise : {{denomination}} {{ext_summary}}',
-            default                   => 'Retourne JSON valide. Input : {{ext_input}}',
+            'detect_email_pattern' => 'Détecte le pattern email de l\'entreprise depuis ces exemples : {{ext_known_emails}}. Retourne JSON {"pattern":"{first}.{last}@{domain}","confidence":80}',
+            'auto_tag' => 'Suggère 3-5 tags pertinents. Retourne JSON {"tags":["..."]}. Entreprise : {{denomination}} {{ext_summary}}',
+            default => 'Retourne JSON valide. Input : {{ext_input}}',
         };
     }
 
@@ -204,6 +210,7 @@ class LLMRouterService implements LLMClient
                 return '';
             }
             $v = $variables[$key];
+
             return is_scalar($v) ? (string) $v : json_encode($v, JSON_UNESCAPED_UNICODE);
         }, $template) ?? $template;
     }
@@ -224,28 +231,29 @@ class LLMRouterService implements LLMClient
             Log::debug('LLM usage tracking skipped (no workspace_id on use case)', [
                 'use_case' => $useCase->slug,
                 'provider' => $resp->providerUsed,
-                'cost'     => $resp->costEur,
+                'cost' => $resp->costEur,
             ]);
+
             return;
         }
         try {
             DB::table('llm_usage')->insert([
-                'workspace_id'  => $useCase->workspace_id,
+                'workspace_id' => $useCase->workspace_id,
                 'use_case_slug' => $useCase->slug,
-                'provider'      => $resp->providerUsed,
-                'model'         => $resp->modelUsed,
-                'tokens_input'  => $resp->tokensInput,
+                'provider' => $resp->providerUsed,
+                'model' => $resp->modelUsed,
+                'tokens_input' => $resp->tokensInput,
                 'tokens_output' => $resp->tokensOutput,
-                'cost_eur'      => $resp->costEur,
-                'latency_ms'    => $resp->latencyMs,
-                'cache_hit'     => $resp->cacheHit,
-                'request_hash'  => $resp->requestHash,
-                'created_at'    => now(),
+                'cost_eur' => $resp->costEur,
+                'latency_ms' => $resp->latencyMs,
+                'cache_hit' => $resp->cacheHit,
+                'request_hash' => $resp->requestHash,
+                'created_at' => now(),
             ]);
         } catch (\Throwable $e) {
             Log::warning('LLM usage tracking insert failed (non-fatal)', [
                 'use_case' => $useCase->slug,
-                'error'    => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
         }
     }

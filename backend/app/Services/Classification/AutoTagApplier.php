@@ -58,6 +58,7 @@ class AutoTagApplier
                     return false;
                 }
             }
+
             return true;
         }
         if (isset($rules['any']) && is_array($rules['any'])) {
@@ -66,8 +67,10 @@ class AutoTagApplier
                     return true;
                 }
             }
+
             return false;
         }
+
         // Single condition implicite
         return $this->evaluate($company, $rules);
     }
@@ -76,24 +79,24 @@ class AutoTagApplier
     private function evaluate(Company $company, array $cond): bool
     {
         $field = (string) ($cond['field'] ?? '');
-        $op    = (string) ($cond['op']    ?? '=');
+        $op = (string) ($cond['op'] ?? '=');
         $value = $cond['value'] ?? null;
 
         $actual = $this->resolveField($company, $field);
 
         return match ($op) {
-            '='           => $actual == $value,
-            '!='          => $actual != $value,
-            '>'           => is_numeric($actual) && (float) $actual > (float) $value,
-            '>='          => is_numeric($actual) && (float) $actual >= (float) $value,
-            '<'           => is_numeric($actual) && (float) $actual <  (float) $value,
-            '<='          => is_numeric($actual) && (float) $actual <= (float) $value,
-            'in'          => is_array($value) && in_array($actual, $value, true),
+            '=' => $actual == $value,
+            '!=' => $actual != $value,
+            '>' => is_numeric($actual) && (float) $actual > (float) $value,
+            '>=' => is_numeric($actual) && (float) $actual >= (float) $value,
+            '<' => is_numeric($actual) && (float) $actual < (float) $value,
+            '<=' => is_numeric($actual) && (float) $actual <= (float) $value,
+            'in' => is_array($value) && in_array($actual, $value, true),
             'starts_with' => is_string($actual) && str_starts_with($actual, (string) $value),
-            'ends_with'   => is_string($actual) && str_ends_with($actual, (string) $value),
-            'contains'    => is_string($actual) && str_contains($actual, (string) $value),
-            'regex'       => is_string($actual) && preg_match((string) $value, $actual) === 1,
-            default       => false,
+            'ends_with' => is_string($actual) && str_ends_with($actual, (string) $value),
+            'contains' => is_string($actual) && str_contains($actual, (string) $value),
+            'regex' => is_string($actual) && preg_match((string) $value, $actual) === 1,
+            default => false,
         };
     }
 
@@ -102,7 +105,9 @@ class AutoTagApplier
         $parts = preg_split('/[.\[\]]+/', trim($path, '.[]'));
         $current = $company->toArray();
         foreach ($parts as $p) {
-            if ($p === '' || $p === null) continue;
+            if ($p === '' || $p === null) {
+                continue;
+            }
             if (is_array($current) && array_key_exists($p, $current)) {
                 $current = $current[$p];
             } elseif (is_array($current) && is_numeric($p) && isset($current[(int) $p])) {
@@ -111,6 +116,7 @@ class AutoTagApplier
                 return null;
             }
         }
+
         return $current;
     }
 }

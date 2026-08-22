@@ -114,7 +114,7 @@ function sourcesBackendI48006(): array
  */
 function ligneNotificationsSection1I48006(string $inventaire): string
 {
-    $debut = strpos($inventaire, "## 1. Ce qui EXISTE");
+    $debut = strpos($inventaire, '## 1. Ce qui EXISTE');
     $fin = strpos($inventaire, "## 2. Ce qui N'EXISTE PAS");
 
     Assert::assertNotFalse($debut, 'le titre du §1 a change : cette garde n\'inspecte plus la bonne section.');
@@ -197,8 +197,8 @@ test('I48-006 — la table notifications n a toujours AUCUN ecrivain, et l inven
         // et cette garde doit devenir son symetrique.
         expect(str_contains($inventaire, '3 bis'))->toBeFalse(
             "Un ecrivain de `notifications` existe desormais :\n" . implode("\n", $ecrivains)
-            . "\nGESTE : dans " . INVENTAIRE_1A_I48006 . ", supprimer le §3 bis et remonter la ligne "
-            . "`notifications` en §1 avec le nom du producteur ; puis retourner cette garde (I48-006) "
+            . "\nGESTE : dans " . INVENTAIRE_1A_I48006 . ', supprimer le §3 bis et remonter la ligne '
+            . '`notifications` en §1 avec le nom du producteur ; puis retourner cette garde (I48-006) '
             . 'pour qu\'elle exige la presence d\'un ecrivain plutot que son absence.',
         );
 

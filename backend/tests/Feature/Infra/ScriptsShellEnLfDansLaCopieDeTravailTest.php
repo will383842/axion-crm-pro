@@ -172,10 +172,10 @@ test('A-003 — aucun script shell du depot n est en CRLF dans la copie de trava
 
     expect($fautifs)->toBe(
         [],
-        "Ces scripts shell sont en CRLF dans la COPIE DE TRAVAIL. Envoyes tels quels sur un "
+        'Ces scripts shell sont en CRLF dans la COPIE DE TRAVAIL. Envoyes tels quels sur un '
         . "serveur Linux (scp, docker cp, copier-coller), ils echouent des la premiere ligne :\n"
         . "    line 39: \$'\\r': command not found\n\n"
-        . "Le defaut est invisible cote depot — `git diff` ne montre rien, la CI est verte — car "
+        . 'Le defaut est invisible cote depot — `git diff` ne montre rien, la CI est verte — car '
         . "l index, lui, est bien en LF. Seule la copie de travail ment.\n\n"
         . "GESTE : `git add --renormalize -- '*.sh'` puis commit ; ou reecrire ces fichiers en "
         . "remplacant \\r\\n par \\n, ce qui ne produit aucun diff.\n\n"

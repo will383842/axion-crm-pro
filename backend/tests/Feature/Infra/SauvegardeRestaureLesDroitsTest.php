@@ -583,10 +583,10 @@ test('F39-010 — la base cible n a AUCUN defaut, et viser la production se decl
     );
 
     expect(str_contains($restore, 'JE_RESTAURE_LA_PRODUCTION'))->toBeTrue(
-        "F39-010, second verrou disparu : `restore-postgres.sh` n exige plus de declaration "
+        'F39-010, second verrou disparu : `restore-postgres.sh` n exige plus de declaration '
         . "explicite pour ecraser la base de production.\n\n"
-        . "Retirer le defaut protege de la distraction ; ca ne protege pas du copier-coller "
-        . "d une ligne de runbook. Ecraser la production est legitime (reprise apres "
+        . 'Retirer le defaut protege de la distraction ; ca ne protege pas du copier-coller '
+        . 'd une ligne de runbook. Ecraser la production est legitime (reprise apres '
         . "sinistre) mais jamais ordinaire : ca doit s ENONCER.\n\n"
         . 'Geste : refuser quand `$TARGET_DB` vaut la base de production et que '
         . '`JE_RESTAURE_LA_PRODUCTION` ne vaut pas `oui`.',
@@ -595,8 +595,8 @@ test('F39-010 — la base cible n a AUCUN defaut, et viser la production se decl
     // L'usage ne doit plus presenter la cible comme facultative : c'est cette
     // ligne-la que l'operateur copie.
     expect(str_contains($restore, '[target_db]'))->toBeFalse(
-        "L usage de `restore-postgres.sh` annonce toujours la base cible entre crochets, "
-        . "donc facultative, alors qu elle est desormais obligatoire. C est la ligne que "
+        'L usage de `restore-postgres.sh` annonce toujours la base cible entre crochets, '
+        . 'donc facultative, alors qu elle est desormais obligatoire. C est la ligne que '
         . "l operateur copie : elle doit dire vrai.\n\n"
         . 'Geste : ecrire `<target_db>` a la place de `[target_db]` en tete du script.',
     );
@@ -609,14 +609,14 @@ test('F39-010 — le runbook de reprise appelle le script avec la declaration ex
     $runbook = (string) file_get_contents(racineDepotSauvegarde() . '/infra/runbooks/04-restore-dr.md');
 
     expect(str_contains($runbook, 'restore-postgres.sh'))->toBeTrue(
-        "Le runbook 04 n appelle plus `restore-postgres.sh` : cette garde n inspecte plus rien.",
+        'Le runbook 04 n appelle plus `restore-postgres.sh` : cette garde n inspecte plus rien.',
     );
 
     expect(str_contains($runbook, 'JE_RESTAURE_LA_PRODUCTION=oui'))->toBeTrue(
-        "F39-010 : le runbook `infra/runbooks/04-restore-dr.md` appelle `restore-postgres.sh` "
-        . "sur la base de production SANS la declaration que le script exige depuis le "
+        'F39-010 : le runbook `infra/runbooks/04-restore-dr.md` appelle `restore-postgres.sh` '
+        . 'sur la base de production SANS la declaration que le script exige depuis le '
         . "2026-08-22.\n\n"
-        . "La commande du §4 sortira donc en code 1, en pleine reprise apres sinistre, avec "
+        . 'La commande du §4 sortira donc en code 1, en pleine reprise apres sinistre, avec '
         . "un message que personne n attend a ce moment-la.\n\n"
         . 'Geste : prefixer la commande du §4 par `JE_RESTAURE_LA_PRODUCTION=oui`, et dire '
         . 'pourquoi elle est la.',

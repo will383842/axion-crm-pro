@@ -12,18 +12,18 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->workspace = Workspace::create([
-        'id'   => Str::uuid()->toString(),
+        'id' => Str::uuid()->toString(),
         'name' => 'Test WS',
         'slug' => 'test-ws-' . uniqid(),
     ]);
-    $this->service = new AutoClassifierService();
+    $this->service = new AutoClassifierService;
 });
 
 function makeCompany(array $attrs): Company
 {
     return Company::create(array_merge([
         'workspace_id' => test()->workspace->id,
-        'siren'        => (string) random_int(100000000, 999999999),
+        'siren' => (string) random_int(100000000, 999999999),
     ], $attrs));
 }
 
@@ -96,7 +96,7 @@ it('falls back to "autre" for unknown NAF prefix', function () {
 it('extracts commune code and city name from signals.ban', function () {
     $c = makeCompany([
         'postcode' => '69003',
-        'signals'  => ['ban' => ['insee_commune' => '69383', 'city' => 'Lyon 3e Arrondissement']],
+        'signals' => ['ban' => ['insee_commune' => '69383', 'city' => 'Lyon 3e Arrondissement']],
     ]);
     $this->service->classify($c);
     $c->refresh();

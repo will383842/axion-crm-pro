@@ -11,9 +11,9 @@ use Illuminate\Support\Facades\Http;
 class AnthropicProvider
 {
     private const PRICING_EUR_PER_MTOKEN = [
-        'claude-opus-4-7'            => ['input' => 15.0, 'output' => 75.0],
-        'claude-sonnet-4-6'          => ['input' => 3.0,  'output' => 15.0],
-        'claude-haiku-4-5-20251001'  => ['input' => 0.80, 'output' => 4.0],
+        'claude-opus-4-7' => ['input' => 15.0, 'output' => 75.0],
+        'claude-sonnet-4-6' => ['input' => 3.0,  'output' => 15.0],
+        'claude-haiku-4-5-20251001' => ['input' => 0.80, 'output' => 4.0],
     ];
 
     /** @var array{tokens_input:int,tokens_output:int,cost_eur:float} */
@@ -32,20 +32,20 @@ class AnthropicProvider
             throw new \LogicException('ANTHROPIC_API_KEY not set');
         }
 
-        $maxTokens   = (int) ($options['max_tokens'] ?? 2048);
+        $maxTokens = (int) ($options['max_tokens'] ?? 2048);
         $temperature = (float) ($options['temperature'] ?? 0.2);
 
         $resp = Http::withHeaders([
-            'x-api-key'         => $apiKey,
+            'x-api-key' => $apiKey,
             'anthropic-version' => '2023-06-01',
-            'content-type'      => 'application/json',
+            'content-type' => 'application/json',
         ])->timeout((int) ($options['timeout_s'] ?? 60))->post(
             'https://api.anthropic.com/v1/messages',
             [
-                'model'       => $this->model,
-                'max_tokens'  => $maxTokens,
+                'model' => $this->model,
+                'max_tokens' => $maxTokens,
                 'temperature' => $temperature,
-                'messages'    => [
+                'messages' => [
                     ['role' => 'user', 'content' => $promptTemplate],
                 ],
             ],
@@ -64,7 +64,7 @@ class AnthropicProvider
         }
 
         $usage = $data['usage'] ?? [];
-        $tokensIn  = (int) ($usage['input_tokens'] ?? 0);
+        $tokensIn = (int) ($usage['input_tokens'] ?? 0);
         $tokensOut = (int) ($usage['output_tokens'] ?? 0);
 
         $pricing = self::PRICING_EUR_PER_MTOKEN[$this->model] ?? ['input' => 0, 'output' => 0];
@@ -72,9 +72,9 @@ class AnthropicProvider
         $costEur = ($tokensIn / 1_000_000) * $pricing['input'] + ($tokensOut / 1_000_000) * $pricing['output'];
 
         $this->lastUsage = [
-            'tokens_input'  => $tokensIn,
+            'tokens_input' => $tokensIn,
             'tokens_output' => $tokensOut,
-            'cost_eur'      => $costEur,
+            'cost_eur' => $costEur,
         ];
 
         return $text;

@@ -269,7 +269,7 @@ test('reportUnmatchedIgnoredErrors reste activé (H45-004)', function () {
         . 'correspond plus à aucune erreur reste invisible : la baseline devient une '
         . 'garde qui ne garde rien. Geste : rétablis la ligne `reportUnmatchedIgnoredErrors: true` '
         . 'sous `parameters:` dans backend/phpstan.neon, puis retire les entrées de '
-        . 'baseline devenues orphelines que PHPStan signalera.'
+        . 'baseline devenues orphelines que PHPStan signalera.',
     );
 });
 
@@ -303,7 +303,7 @@ test('la détection des erreurs PHPStan NEUVES vit dans ci.yml, et son étape es
         . 'Les gardes de ce fichier ne lisent QUE des fichiers NEON : sans cette étape, '
         . 'plus rien ne détecte une erreur PHPStan neuve dans `app/`. Geste : rétablis '
         . 'l\'étape « PHPStan niveau 8 (BLOQUANT — baseline figée) » (`composer analyse`) '
-        . 'dans le job `backend`, ou corrige l\'en-tête de ce fichier qui la cite.'
+        . 'dans le job `backend`, ou corrige l\'en-tête de ce fichier qui la cite.',
     );
 
     $corps = $m['corps'] ?? '';
@@ -311,13 +311,13 @@ test('la détection des erreurs PHPStan NEUVES vit dans ci.yml, et son étape es
     expect(str_contains($corps, 'composer analyse'))->toBeTrue(
         'H46-010 : l\'étape PHPStan de ci.yml ne lance plus `composer analyse`. '
         . 'Geste : remets la commande, ou mets à jour l\'en-tête de ce fichier si '
-        . 'l\'analyse a déménagé — l\'en-tête promet qu\'elle est jouée là.'
+        . 'l\'analyse a déménagé — l\'en-tête promet qu\'elle est jouée là.',
     );
 
     expect(str_contains($corps, 'continue-on-error'))->toBeFalse(
         'H46-010 : l\'étape PHPStan de ci.yml porte `continue-on-error`. Elle rapporte '
         . 'alors sans rien bloquer : une erreur de niveau 8 dans du code neuf passerait '
         . 'en CI VERTE, et les gardes de ce fichier (qui ne lisent que des fichiers) ne '
-        . 'la verraient pas non plus. Geste : retire `continue-on-error` de l\'étape.'
+        . 'la verraient pas non plus. Geste : retire `continue-on-error` de l\'étape.',
     );
 });

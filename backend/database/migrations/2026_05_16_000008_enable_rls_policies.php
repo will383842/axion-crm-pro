@@ -34,14 +34,14 @@ return new class extends Migration
             // Sprint 19.1 : skip si table absente ou pas de workspace_id
             $tableExists = DB::selectOne(
                 'SELECT 1 AS ok FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = ?',
-                [$table]
+                [$table],
             );
             if (! $tableExists) {
                 continue;
             }
             $columnExists = DB::selectOne(
                 'SELECT 1 AS ok FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?',
-                [$table, 'workspace_id']
+                [$table, 'workspace_id'],
             );
             if (! $columnExists) {
                 continue;
@@ -87,7 +87,7 @@ return new class extends Migration
         foreach ($tables as $table) {
             $tableExists = DB::selectOne(
                 'SELECT 1 AS ok FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = ?',
-                [$table]
+                [$table],
             );
             if (! $tableExists) {
                 continue;

@@ -55,7 +55,7 @@ test('A07-009 — le runbook de la console locale ne renvoie a AUCUN worktree', 
     // `crmpro-wt-etape0` pour raconter l'historique de la mesure, et c'est
     // legitime. Ce qui ne l'est pas, c'est un chemin de fichier a suivre.
     expect(str_contains($contenu, 'Projets/crmpro-wt-'))->toBeFalse(
-        "A07-009 : le runbook de la console locale porte a nouveau un chemin absolu vers un worktree "
+        'A07-009 : le runbook de la console locale porte a nouveau un chemin absolu vers un worktree '
         . "(`Projets/crmpro-wt-...`). Un worktree est supprime avec l'etape qu'il sert et n'existe que sur "
         . 'un seul poste : remplacer ce chemin par le fichier versionne du depot principal.',
     );
@@ -77,7 +77,7 @@ test('A07-009 — ce que le runbook nomme a la place existe vraiment dans le dep
     foreach (['docker-compose.yml', 'docker-compose.local.yml', 'frontend/tests/e2e/console-locale.spec.ts'] as $atteste) {
         expect(is_file($racine . '/' . $atteste))->toBeTrue(
             "A07-009 : le runbook fait jouer `{$atteste}` depuis la racine du depot, et ce fichier n'y est "
-            . "pas. Soit le fichier a bouge et le runbook ment a nouveau, soit il a ete supprime : mettre "
+            . 'pas. Soit le fichier a bouge et le runbook ment a nouveau, soit il a ete supprime : mettre '
             . 'le runbook a jour AVANT de toucher a cette garde.',
         );
     }

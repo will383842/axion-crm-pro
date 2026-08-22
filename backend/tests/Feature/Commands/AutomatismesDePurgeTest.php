@@ -587,12 +587,12 @@ test('B15-007 — l en-tete de retention:purge n annonce QUE les purges que hand
         'B15-007 : aucun appel a purger() reconnu dans ' . $chemin . '. Soit la commande '
         . 'ne purge plus rien, soit la signature de purger() a change et cette garde ne '
         . 'lit plus rien. GESTE : verifier handle() puis, si la signature a bouge, '
-        . 'adapter la regexp de ce test — ne PAS le supprimer.'
+        . 'adapter la regexp de ce test — ne PAS le supprimer.',
     );
     expect(count($annoncees) > 0)->toBeTrue(
         'B15-007 : aucune ligne `[purge] <table>` trouvee dans l en-tete de ' . $chemin
         . '. GESTE : remettre dans le docblock une ligne `[purge] <table> -> <effet>` par '
-        . 'tache reellement jouee par handle().'
+        . 'tache reellement jouee par handle().',
     );
 
     expect($annoncees === $jouees)->toBeTrue(
@@ -601,7 +601,7 @@ test('B15-007 — l en-tete de retention:purge n annonce QUE les purges que hand
         . 'C est exactement le defaut mesure le 2026-08-22 (cinq politiques annoncees, trois '
         . 'jouees). GESTE : si tu viens d ajouter une purge, ajoute sa ligne `[purge] <table>` '
         . 'dans le docblock ; si tu viens d en retirer une, retire sa ligne. Ne laisse jamais '
-        . 'l en-tete promettre une purge que personne n execute : une relecture RGPD s y fie.'
+        . 'l en-tete promettre une purge que personne n execute : une relecture RGPD s y fie.',
     );
 });
 
@@ -623,7 +623,7 @@ test('B15-007 — audit_logs et llm_usage ne sont purges par personne, et le fic
             . 'de lignes dans un journal scelle par chaine de hachage — elle en rompt le '
             . 'chainage ; pour llm_usage aucune destination d archivage n a jamais ete '
             . 'decidee. GESTE : STOP & ASK Will et un ADR avant d activer l une des deux ; '
-            . 'ensuite seulement, retirer la table de cette liste.'
+            . 'ensuite seulement, retirer la table de cette liste.',
         );
     }
 
@@ -634,7 +634,7 @@ test('B15-007 — audit_logs et llm_usage ne sont purges par personne, et le fic
             'B15-007 : `' . $table . '` a disparu de RetentionPurge.php. La note qui explique '
             . 'pourquoi cette table n est PAS purgee ici a ete effacee — le prochain lecteur '
             . 'croira a un oubli et l implementera. GESTE : restaurer la rubrique B15-007 de '
-            . 'l en-tete.'
+            . 'l en-tete.',
         );
     }
 });

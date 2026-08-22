@@ -105,7 +105,7 @@ test('B13-008 — le parcours du canal produit vraiment des types (témoin)', fu
         . 'les trois gardes suivantes seraient donc vertes SANS RIEN MESURER. Geste : '
         . 'vérifie `evenementDuCanal()` ci-dessus, le contrat `SiteSyncEvent::fromArray()` '
         . 'a probablement changé et rejette les événements fabriqués ici. Types lus : « '
-        . implode(' · ', $atteints) . ' ».'
+        . implode(' · ', $atteints) . ' ».',
     );
 });
 
@@ -119,7 +119,7 @@ test('B13-008 — les types déclarés « saisie manuelle » sont bien hors de p
             . 'le rend désormais pour un événement du site. La note du docbloc est devenue '
             . "fausse. Geste : retire « {$type} » de BUSINESS_RELATION_TYPES_SAISIE_MANUELLE "
             . 'et mets à jour son docbloc — ou supprime la branche du classifieur si elle '
-            . 'a été ajoutée par accident.'
+            . 'a été ajoutée par accident.',
         );
     }
 });

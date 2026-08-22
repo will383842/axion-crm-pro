@@ -195,12 +195,14 @@ class MxEmailValidator
     private function extractDomain(string $email): string
     {
         $parts = explode('@', $email);
+
         return count($parts) >= 2 ? strtolower(end($parts)) : '';
     }
 
     private function extractLocalPart(string $email): string
     {
         $parts = explode('@', $email);
+
         return strtolower($parts[0] ?? '');
     }
 
@@ -228,14 +230,14 @@ class MxEmailValidator
         bool $hasMx = false,
     ): array {
         return [
-            'status'           => $status,
-            'email'            => $email,
-            'reason'           => $reason,
-            'mx_records'       => $mxRecords,
-            'is_disposable'    => $isDisposable,
-            'is_role'          => $isRole,
+            'status' => $status,
+            'email' => $email,
+            'reason' => $reason,
+            'mx_records' => $mxRecords,
+            'is_disposable' => $isDisposable,
+            'is_role' => $isRole,
             'is_free_provider' => $isFreeProvider,
-            'has_mx_records'   => $hasMx,
+            'has_mx_records' => $hasMx,
         ];
     }
 }

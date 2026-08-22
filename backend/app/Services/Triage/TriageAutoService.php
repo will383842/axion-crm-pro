@@ -55,6 +55,7 @@ class TriageAutoService
         if ($hasContactableContact || $hasGenericEmail) {
             $newStatus = 'ready_for_outreach';
             $this->applyStatus($company, $newStatus, null);
+
             return ['status' => $newStatus, 'archive_reason' => null];
         }
 
@@ -62,6 +63,7 @@ class TriageAutoService
         $newStatus = 'archived_no_email';
         $reason = 'no_email';
         $this->applyStatus($company, $newStatus, $reason);
+
         return ['status' => $newStatus, 'archive_reason' => $reason];
     }
 
@@ -79,12 +81,12 @@ class TriageAutoService
         // Sprint H4 — Audit transition uniquement vers archived (info la plus exploitable)
         if ($status === 'archived_no_email' && $oldStatus !== 'archived_no_email') {
             AuditLogger::log('company.archived', [
-                'workspace_id'   => (string) $company->workspace_id,
-                'resource_type'  => 'company',
-                'resource_id'    => (string) $company->id,
-                'siren'          => $company->siren,
+                'workspace_id' => (string) $company->workspace_id,
+                'resource_type' => 'company',
+                'resource_id' => (string) $company->id,
+                'siren' => $company->siren,
                 'archive_reason' => $reason,
-                'previous_status'=> $oldStatus,
+                'previous_status' => $oldStatus,
             ]);
         }
     }

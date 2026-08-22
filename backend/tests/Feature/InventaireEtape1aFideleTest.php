@@ -25,7 +25,6 @@ uses(TestCase::class);
  * ne relit pas la prose ligne à ligne et ne vérifie aucune autre affirmation du
  * rapport.
  */
-
 test('A09-004 — l’inventaire nomme SavedViewsController tant que le contrôleur et ses routes existent', function () {
     $controleur = app_path('Http/Controllers/Api/SavedViewsController.php');
     $routes = base_path('routes/api.php');
@@ -54,8 +53,8 @@ test('A09-004 — l’inventaire nomme SavedViewsController tant que le contrôl
     $texte = (string) file_get_contents($inventaire);
 
     expect(str_contains($texte, 'SavedViewsController'))->toBeTrue(
-        "A09-004 : `_REPORTS/2026-08-19_INVENTAIRE-ETAPE-1A.md` ne nomme plus "
-        . "`SavedViewsController`, alors que le contrôleur existe et que "
+        'A09-004 : `_REPORTS/2026-08-19_INVENTAIRE-ETAPE-1A.md` ne nomme plus '
+        . '`SavedViewsController`, alors que le contrôleur existe et que '
         . "`routes/api.php` déclare `Route::apiResource('saved-views', …)`.\n"
         . "Le document range alors `saved_views` dans l'échafaudage mort — et il "
         . "sert d'entrée au §28.5 : on le lit pour décider quoi construire. On "

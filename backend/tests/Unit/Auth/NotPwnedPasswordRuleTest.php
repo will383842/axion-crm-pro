@@ -3,10 +3,14 @@
 use App\Rules\NotPwnedPassword;
 use App\Services\Auth\HibpChecker;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 
 beforeEach(fn () => Cache::flush());
 
@@ -14,6 +18,7 @@ function makeHibpChecker(string $bodyResponse): HibpChecker
 {
     $mock = new MockHandler([new Response(200, [], $bodyResponse)]);
     $client = new Client(['handler' => HandlerStack::create($mock)]);
+
     return new HibpChecker($client);
 }
 
@@ -64,7 +69,7 @@ test('NotPwnedPassword threshold custom respecté', function () {
 });
 
 test('NotPwnedPassword ignore les types non-string', function () {
-    $rule = new NotPwnedPassword();
+    $rule = new NotPwnedPassword;
     $failed = false;
     $rule->validate('password', 12345, function () use (&$failed) {
         $failed = true;
@@ -73,7 +78,7 @@ test('NotPwnedPassword ignore les types non-string', function () {
 });
 
 test('NotPwnedPassword ignore les strings vides', function () {
-    $rule = new NotPwnedPassword();
+    $rule = new NotPwnedPassword;
     $failed = false;
     $rule->validate('password', '', function () use (&$failed) {
         $failed = true;
@@ -107,10 +112,10 @@ test('NotPwnedPassword ignore les strings vides', function () {
 /** Un HibpChecker dont l'API est injoignable (le cas qui declenche le repli). */
 function makeHibpCheckerInjoignable(): HibpChecker
 {
-    $requete = new GuzzleHttp\Psr7\Request('GET', HibpChecker::API_BASE_URL);
+    $requete = new Request('GET', HibpChecker::API_BASE_URL);
     $mock = new MockHandler([
-        new GuzzleHttp\Exception\ConnectException('cURL error 6', $requete),
-        new GuzzleHttp\Exception\ConnectException('cURL error 6', $requete),
+        new ConnectException('cURL error 6', $requete),
+        new ConnectException('cURL error 6', $requete),
     ]);
 
     return new HibpChecker(new Client(['handler' => HandlerStack::create($mock)]));
@@ -128,9 +133,9 @@ function makeHibpCheckerInjoignable(): HibpChecker
 function journalPendant(Closure $geste): array
 {
     $lignes = [];
-    Illuminate\Support\Facades\Event::listen(
-        Illuminate\Log\Events\MessageLogged::class,
-        function (Illuminate\Log\Events\MessageLogged $e) use (&$lignes) {
+    Event::listen(
+        MessageLogged::class,
+        function (MessageLogged $e) use (&$lignes) {
             $lignes[] = ['niveau' => $e->level, 'message' => $e->message, 'contexte' => $e->context];
         },
     );
@@ -154,8 +159,8 @@ test('P5-35-010 — sans drapeau, HIBP injoignable REFUSE toujours (defaut incha
 
     expect($message !== null)->toBeTrue(
         'P5-35-010 : HIBP injoignable et le mot de passe passe alors que le mode '
-        ."n'est pas configure. Geste : verifier que `NotPwnedPassword::failMode()` "
-        .'retombe sur `closed` quand `auth.hibp.fail_mode` est absent.',
+        . "n'est pas configure. Geste : verifier que `NotPwnedPassword::failMode()` "
+        . 'retombe sur `closed` quand `auth.hibp.fail_mode` est absent.',
     );
 });
 
@@ -172,8 +177,8 @@ test('P5-35-010 — mode `open-audited` : le mot de passe passe ET la ligne d al
 
     expect($echoue)->toBeFalse(
         'P5-35-010 : le mode `open-audited` refuse quand meme — la porte de sortie '
-        ."ne s'ouvre pas. Geste : dans `NotPwnedPassword::validate`, court-circuiter "
-        .'le `$fail` quand `failMode() === FAIL_MODE_OPEN_AUDITED`.',
+        . "ne s'ouvre pas. Geste : dans `NotPwnedPassword::validate`, court-circuiter "
+        . 'le `$fail` quand `failMode() === FAIL_MODE_OPEN_AUDITED`.',
     );
 
     $alertes = array_values(array_filter(
@@ -184,15 +189,15 @@ test('P5-35-010 — mode `open-audited` : le mot de passe passe ET la ligne d al
     expect(count($alertes))->toBe(
         1,
         'P5-35-010 : le contournement du controle HIBP est passe SANS ligne de '
-        ."journal — c'est exactement le fail-open silencieux de F35-004, remis en "
-        ."place par la porte de sortie. Geste : `Log::alert('auth.hibp.fail_open', "
-        .'[...])` avant le `return` du mode degrade.',
+        . "journal — c'est exactement le fail-open silencieux de F35-004, remis en "
+        . "place par la porte de sortie. Geste : `Log::alert('auth.hibp.fail_open', "
+        . '[...])` avant le `return` du mode degrade.',
     );
     expect($alertes[0]['niveau'])->toBe(
         'alert',
         'P5-35-010 : la ligne existe mais pas au niveau `alert`. Un contournement '
-        ."de controle de securite doit sortir au-dessus du bruit d'exploitation. "
-        .'Geste : `Log::alert`, pas `Log::warning` ni `Log::info`.',
+        . "de controle de securite doit sortir au-dessus du bruit d'exploitation. "
+        . 'Geste : `Log::alert`, pas `Log::warning` ni `Log::info`.',
     );
 });
 
@@ -209,12 +214,12 @@ test('P5-35-010 — la ligne d alerte ne fuite ni le mot de passe ni son emprein
 
     expect(str_contains($tout, $secret))->toBeFalse(
         'P5-35-010 : le mot de passe EN CLAIR est parti dans les journaux. Geste : '
-        ."ne journaliser que l'attribut et la raison, jamais la valeur.",
+        . "ne journaliser que l'attribut et la raison, jamais la valeur.",
     );
     expect(str_contains($tout, strtoupper(sha1($secret))))->toBeFalse(
         'P5-35-010 : le SHA-1 du mot de passe est parti dans les journaux — un '
-        .'journal devient alors une liste de condensats a casser hors ligne. '
-        ."Geste : retirer l'empreinte du contexte.",
+        . 'journal devient alors une liste de condensats a casser hors ligne. '
+        . "Geste : retirer l'empreinte du contexte.",
     );
 });
 
@@ -234,9 +239,9 @@ test('P5-35-010 — une valeur de drapeau inconnue retombe sur le REFUS', functi
 
         expect($message !== null)->toBeTrue(
             "P5-35-010 : la valeur de drapeau « {$valeur} » a OUVERT le controle. "
-            ."Un drapeau mal orthographie qui echoue vers l'ouverture reproduit "
-            .'F35-004. Geste : garder la liste blanche de '
-            .'`NotPwnedPassword::failMode()` (comparaison stricte a `open-audited`).',
+            . "Un drapeau mal orthographie qui echoue vers l'ouverture reproduit "
+            . 'F35-004. Geste : garder la liste blanche de '
+            . '`NotPwnedPassword::failMode()` (comparaison stricte a `open-audited`).',
         );
     }
 });
@@ -247,7 +252,7 @@ test('P5-35-010 — meme en `open-audited`, un mot de passe COMPROMIS reste refu
     // ce ne serait plus un mode degrade, ce serait la desactivation du controle.
     config(['auth.hibp.fail_mode' => NotPwnedPassword::FAIL_MODE_OPEN_AUDITED]);
 
-    $corps = substr(strtoupper(sha1('password')), 5).':9999999'."\r\n";
+    $corps = substr(strtoupper(sha1('password')), 5) . ':9999999' . "\r\n";
     $message = null;
     (new NotPwnedPassword(5, makeHibpChecker($corps)))
         ->validate('password', 'password', function (string $m) use (&$message) {
@@ -256,7 +261,7 @@ test('P5-35-010 — meme en `open-audited`, un mot de passe COMPROMIS reste refu
 
     expect($message !== null)->toBeTrue(
         'P5-35-010 : `open-audited` laisse passer un mot de passe dont HIBP a '
-        .'REPONDU qu il est compromis. Geste : le court-circuit ne doit vivre que '
-        .'dans la branche `$count === null`, jamais apres.',
+        . 'REPONDU qu il est compromis. Geste : le court-circuit ne doit vivre que '
+        . 'dans la branche `$count === null`, jamais apres.',
     );
 });

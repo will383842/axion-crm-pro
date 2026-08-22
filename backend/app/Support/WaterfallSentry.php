@@ -3,6 +3,9 @@
 namespace App\Support;
 
 use App\Models\Company;
+use Illuminate\Support\Facades\Log;
+use Sentry\State\Hub;
+use Sentry\State\Scope;
 
 /**
  * Sprint H4 — Helper centralisé pour capturer les exceptions waterfall
@@ -31,7 +34,7 @@ class WaterfallSentry
 
     public static function capture(?Company $company, string $service, \Throwable $throwable): void
     {
-        if (! class_exists(\Sentry\State\Hub::class)) {
+        if (! class_exists(Hub::class)) {
             return;
         }
 
@@ -60,7 +63,7 @@ class WaterfallSentry
         if (! is_string($dsn) || trim($dsn) === '') {
             if (! self::$absenceDeDsnDejaSignalee) {
                 self::$absenceDeDsnDejaSignalee = true;
-                \Illuminate\Support\Facades\Log::warning(
+                Log::warning(
                     'Capture des exceptions INACTIVE : SENTRY_LARAVEL_DSN est vide. '
                     . 'Les exceptions de la waterfall ne partent nulle part. '
                     . 'Geste : renseigner SENTRY_LARAVEL_DSN dans le .env du serveur '
@@ -73,13 +76,13 @@ class WaterfallSentry
         }
 
         try {
-            \Sentry\configureScope(function (\Sentry\State\Scope $scope) use ($company, $service) {
+            \Sentry\configureScope(function (Scope $scope) use ($company, $service) {
                 $scope->setTag('service', $service);
                 $scope->setTag('layer', 'waterfall');
                 if ($company !== null) {
                     $scope->setContext('company', [
-                        'id'           => $company->id ?? null,
-                        'siren'        => $company->siren ?? null,
+                        'id' => $company->id ?? null,
+                        'siren' => $company->siren ?? null,
                         'workspace_id' => $company->workspace_id ?? null,
                         'denomination' => $company->denomination ?? null,
                     ]);
@@ -88,9 +91,9 @@ class WaterfallSentry
             \Sentry\captureException($throwable);
         } catch (\Throwable $sentryFailure) {
             // Sentry lui-même casse → on ne propage pas, on log discrètement
-            \Illuminate\Support\Facades\Log::debug('Sentry capture failed', [
+            Log::debug('Sentry capture failed', [
                 'sentry_error' => $sentryFailure->getMessage(),
-                'original'     => $throwable->getMessage(),
+                'original' => $throwable->getMessage(),
             ]);
         }
     }

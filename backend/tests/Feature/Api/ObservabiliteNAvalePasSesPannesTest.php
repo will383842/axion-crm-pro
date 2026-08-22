@@ -134,7 +134,7 @@ test('F39-007 — aucune rubrique d observabilite ne rend une valeur neutre sans
         . "ObservabilityController.\n\n"
         . 'Mesure du 2026-08-22 : le fichier ne l importait pas, et c est ce qui rendait les '
         . "six avalements totalement muets.\n\n"
-        . 'GESTE : remettre `use Illuminate\Support\Facades\Log;` en tete du fichier.'
+        . 'GESTE : remettre `use Illuminate\Support\Facades\Log;` en tete du fichier.',
     );
 
     // 2. Chaque bloc d'interception journalise.
@@ -146,7 +146,7 @@ test('F39-007 — aucune rubrique d observabilite ne rend une valeur neutre sans
         'F39-007 : aucun bloc `catch (\Throwable …)` reconnu dans ObservabilityController. '
         . 'Soit le controleur ne rattrape plus rien (bonne nouvelle : verifier, puis retirer '
         . 'cette garde), soit la forme des interceptions a change et ce test ne lit plus rien. '
-        . 'GESTE : verifier le fichier avant de toucher a ce test.'
+        . 'GESTE : verifier le fichier avant de toucher a ce test.',
     );
 
     $muets = [];
@@ -165,6 +165,6 @@ test('F39-007 — aucune rubrique d observabilite ne rend une valeur neutre sans
         . 'GESTE : ajouter dans ce bloc `Log::warning(\'observability.<rubrique> indisponible\', '
         . '[\'exception\' => $e->getMessage()]);` AVANT de rendre la valeur neutre. Si la '
         . 'rubrique n a pas besoin de filet, retirer l interception plutot que de la laisser '
-        . 'muette : une panne bruyante vaut mieux qu un zero qui ment.'
+        . 'muette : une panne bruyante vaut mieux qu un zero qui ment.',
     );
 });

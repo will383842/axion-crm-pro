@@ -11,6 +11,7 @@ class LinkedInController extends ApiController
     /**
      * @OA\Get(path="/linkedin", tags={"Phase 2"}, summary="LinkedIn outreach (Phase 2 — stub 501)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Response(response=501, description="Not implemented"))
      */
     public function __invoke(Request $r): JsonResponse

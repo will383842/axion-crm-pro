@@ -4,10 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use ZipArchive;
 
 /**
  * Import IGN AdminExpress COG (édition 2026).
@@ -36,15 +33,16 @@ class ImportIgnAdminExpress extends Command
 
     public function handle(): int
     {
-        $year   = (int) $this->option('year');
-        $layer  = (string) $this->option('layer');
+        $year = (int) $this->option('year');
+        $layer = (string) $this->option('layer');
         $minPop = (int) $this->option('since-population');
-        $mock   = (bool) $this->option('mock') || env('MOCK_IGN', env('MOCK_MODE', true));
+        $mock = (bool) $this->option('mock') || env('MOCK_IGN', env('MOCK_MODE', true));
 
         $this->info("IGN AdminExpress COG {$year} — layer={$layer} mock=" . ($mock ? 'true' : 'false'));
 
         if ($mock) {
             $this->warn('Mode mock — pas de téléchargement réseau, lecture fixtures local.');
+
             return $this->importFromFixtures($layer, $minPop);
         }
 
@@ -58,6 +56,7 @@ class ImportIgnAdminExpress extends Command
         $fixturesDir = base_path('tests/fixtures/ign');
         if (! is_dir($fixturesDir)) {
             $this->warn("Fixtures dir absent : {$fixturesDir} — création d'entrées de test minimales.");
+
             return $this->seedTestSet();
         }
 
@@ -68,6 +67,7 @@ class ImportIgnAdminExpress extends Command
             $path = "{$fixturesDir}/{$kind}.geojson";
             if (! file_exists($path)) {
                 $this->warn("Fixture absente {$path}");
+
                 continue;
             }
             $this->importGeoJson($kind, $path, $minPop);
@@ -111,30 +111,31 @@ class ImportIgnAdminExpress extends Command
             }
 
             $cities = [
-                ['75056', '75', 'Paris',         'paris',         ['75001','75002','75003'], 2161000],
+                ['75056', '75', 'Paris',         'paris',         ['75001', '75002', '75003'], 2161000],
                 ['92012', '92', 'Boulogne-Billancourt', 'boulogne-billancourt', ['92100'],   121334],
                 ['92050', '92', 'Nanterre',      'nanterre',      ['92000'],                 96807],
-                ['69123', '69', 'Lyon',          'lyon',          ['69001','69002','69003','69004','69005','69006','69007','69008','69009'], 522969],
+                ['69123', '69', 'Lyon',          'lyon',          ['69001', '69002', '69003', '69004', '69005', '69006', '69007', '69008', '69009'], 522969],
                 ['69266', '69', 'Villeurbanne',  'villeurbanne',  ['69100'],                153934],
-                ['38185', '38', 'Grenoble',      'grenoble',      ['38000','38100'],        158346],
+                ['38185', '38', 'Grenoble',      'grenoble',      ['38000', '38100'],        158346],
                 ['38421', '38', 'Saint-Martin-d\'Hères', 'saint-martin-d-heres', ['38400'],  39800],
             ];
             foreach ($cities as [$insee, $dept, $name, $slug, $cps, $pop]) {
                 DB::table('cities')->updateOrInsert(
                     ['code_insee' => $insee],
                     [
-                        'department'   => $dept,
-                        'name'         => $name,
-                        'slug'         => $slug,
+                        'department' => $dept,
+                        'name' => $name,
+                        'slug' => $slug,
                         'postal_codes' => '{' . implode(',', $cps) . '}',
-                        'population'   => $pop,
-                        'created_at'   => now(),
+                        'population' => $pop,
+                        'created_at' => now(),
                     ],
                 );
             }
         });
 
         $this->info('Mini-jeu de test seedé (2 régions, 4 départements, 7 villes).');
+
         return self::SUCCESS;
     }
 
@@ -144,6 +145,7 @@ class ImportIgnAdminExpress extends Command
         $geojson = json_decode(file_get_contents($path), true);
         if (! is_array($geojson) || ! isset($geojson['features'])) {
             $this->error("GeoJSON invalide : {$path}");
+
             return;
         }
 
@@ -151,17 +153,17 @@ class ImportIgnAdminExpress extends Command
         DB::transaction(function () use ($geojson, $kind, $minPop, &$count) {
             foreach ($geojson['features'] as $feature) {
                 $props = $feature['properties'] ?? [];
-                $geom  = json_encode($feature['geometry'] ?? null);
+                $geom = json_encode($feature['geometry'] ?? null);
 
                 if ($kind === 'regions') {
-                    DB::statement(<<<SQL
+                    DB::statement(<<<'SQL'
                         INSERT INTO regions (code, country_code, name, population, geometry, created_at)
                         VALUES (?, 'FR', ?, ?, ST_GeomFromGeoJSON(?), now())
                         ON CONFLICT (code) DO UPDATE
                             SET name = EXCLUDED.name, population = EXCLUDED.population, geometry = EXCLUDED.geometry
                     SQL, [$props['code'] ?? null, $props['name'] ?? '', $props['population'] ?? 0, $geom]);
                 } elseif ($kind === 'departments') {
-                    DB::statement(<<<SQL
+                    DB::statement(<<<'SQL'
                         INSERT INTO departments (code, region_code, name, population, geometry, created_at)
                         VALUES (?, ?, ?, ?, ST_GeomFromGeoJSON(?), now())
                         ON CONFLICT (code) DO UPDATE
@@ -173,7 +175,7 @@ class ImportIgnAdminExpress extends Command
                     if ($pop < $minPop) {
                         continue;
                     }
-                    DB::statement(<<<SQL
+                    DB::statement(<<<'SQL'
                         INSERT INTO cities (code_insee, department, name, slug, postal_codes, population, geometry, centroid, created_at)
                         VALUES (?, ?, ?, ?, ?, ?, ST_GeomFromGeoJSON(?), ST_Centroid(ST_GeomFromGeoJSON(?)), now())
                         ON CONFLICT (code_insee) DO UPDATE

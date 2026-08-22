@@ -228,13 +228,13 @@ test('F38-013 — un echec de l OUTIL fait rougir, une analyse propre verdit', f
     $this->assertContains(
         $code,
         [0, 1],
-        "Sur une decouverte, le job doit rendre 0 (non arme, documente) ou 1 (arme). Il rend "
+        'Sur une decouverte, le job doit rendre 0 (non arme, documente) ou 1 (arme). Il rend '
         . $code . ", ce qui est le code reserve a l echec d outil.\nSortie : " . $sortie,
     );
     $this->assertTrue(
         str_contains($sortie, 'decouverte') || str_contains($sortie, 'Semgrep'),
         "Une decouverte ne doit JAMAIS passer en silence : le journal doit la nommer et dire\n"
-        . "quoi en faire. Sortie : " . $sortie,
+        . 'quoi en faire. Sortie : ' . $sortie,
     );
 });
 
@@ -254,7 +254,7 @@ test('F38-013 — l envoi du SARIF est conditionne a l existence du fichier', fu
         $condition = (string) ($etape['if'] ?? '');
         $this->assertTrue(
             str_contains($condition, 'hashFiles'),
-            "L envoi du SARIF n est pas conditionne a l existence du fichier (`if: " . $condition . "`).\n"
+            'L envoi du SARIF n est pas conditionne a l existence du fichier (`if: ' . $condition . "`).\n"
             . "GESTE : `if: always() && hashFiles('semgrep.sarif') != ''`, comme les trois etapes\n"
             . 'equivalentes des jobs `trivy` et `trivy-images-tirees`.',
         );

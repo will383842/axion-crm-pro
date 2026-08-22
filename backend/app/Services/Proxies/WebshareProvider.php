@@ -31,7 +31,7 @@ class WebshareProvider implements ProxyProvider
             $resp = Http::withHeaders(['Authorization' => "Token {$apiKey}"])
                 ->timeout(15)
                 ->get(self::API_BASE . '/proxy/list/', [
-                    'mode'      => 'direct',
+                    'mode' => 'direct',
                     'page_size' => 100,
                     'country_code__in' => $this->zoneToCountries($zone),
                 ]);
@@ -44,16 +44,17 @@ class WebshareProvider implements ProxyProvider
             foreach ($resp->json('results', []) as $row) {
                 $endpoints[] = new ProxyEndpointData(
                     provider: 'webshare',
-                    type:     'datacenter',
-                    zone:     $zone,
-                    host:     (string) ($row['proxy_address'] ?? ''),
-                    port:     (int) ($row['port'] ?? 0),
+                    type: 'datacenter',
+                    zone: $zone,
+                    host: (string) ($row['proxy_address'] ?? ''),
+                    port: (int) ($row['port'] ?? 0),
                     username: (string) ($row['username'] ?? '') ?: null,
                     password: (string) ($row['password'] ?? '') ?: null,
-                    weight:   1,
-                    isHealthy:(bool) ($row['valid'] ?? true),
+                    weight: 1,
+                    isHealthy: (bool) ($row['valid'] ?? true),
                 );
             }
+
             return $endpoints;
         });
     }
@@ -65,6 +66,7 @@ class WebshareProvider implements ProxyProvider
         if (empty($list)) {
             throw new \RuntimeException('No healthy Webshare endpoint for zone ' . $zone);
         }
+
         return $list[array_rand($list)];
     }
 
@@ -80,6 +82,7 @@ class WebshareProvider implements ProxyProvider
             ])
                 ->timeout(10)
                 ->get('https://api.ipify.org?format=json');
+
             return $resp->ok() && filter_var($resp->json('ip'), FILTER_VALIDATE_IP) !== false;
         } catch (\Throwable) {
             return false;
@@ -89,8 +92,8 @@ class WebshareProvider implements ProxyProvider
     private function zoneToCountries(string $zone): string
     {
         return match ($zone) {
-            'fr'    => 'FR',
-            'eu'    => 'FR,DE,NL,BE,IT,ES,PL,SE,FI,DK,IE',
+            'fr' => 'FR',
+            'eu' => 'FR,DE,NL,BE,IT,ES,PL,SE,FI,DK,IE',
             default => '',
         };
     }

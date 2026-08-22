@@ -12,18 +12,19 @@ uses(TestCase::class, RefreshDatabase::class);
 function tourUser(): User
 {
     $workspace = Workspace::create([
-        'id'    => (string) Str::uuid(),
-        'slug'  => 'tour-ws-' . Str::random(6),
-        'name'  => 'Tour WS',
+        'id' => (string) Str::uuid(),
+        'slug' => 'tour-ws-' . Str::random(6),
+        'name' => 'Tour WS',
     ]);
+
     return User::create([
-        'id'                            => (string) Str::uuid(),
-        'email'                         => 'tour' . Str::random(4) . '@test.local',
-        'name'                          => 'Tour User',
-        'password_hash'                 => Hash::make('SomePassword123!'),
-        'current_workspace_id'          => $workspace->id,
-        'first_login_completed_at'      => now(),  // bypass 2FA enforcement
-        'onboarding_tour_completed_at'  => null,
+        'id' => (string) Str::uuid(),
+        'email' => 'tour' . Str::random(4) . '@test.local',
+        'name' => 'Tour User',
+        'password_hash' => Hash::make('SomePassword123!'),
+        'current_workspace_id' => $workspace->id,
+        'first_login_completed_at' => now(),  // bypass 2FA enforcement
+        'onboarding_tour_completed_at' => null,
     ]);
 }
 

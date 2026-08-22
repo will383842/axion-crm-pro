@@ -110,8 +110,8 @@ test('C19-012 — solve() ne fait toujours RIEN d autre que jeter une exception'
         . "C'est le constat C19-012. Resoudre les captchas d'un tiers par un service payant "
         . "engage le depot juridiquement (conditions d'utilisation des sites visites) et sur le "
         . "RGPD de la collecte qui en decoule. Ce n'est PAS un arbitrage technique.\n\n"
-        . "GESTE : si la mise en service est voulue, fais-la trancher par Will et ecris la "
-        . "decision datee dans `_AUDIT/05_DECISIONS.md`, PUIS remplace cette garde par celle qui "
+        . 'GESTE : si la mise en service est voulue, fais-la trancher par Will et ecris la '
+        . 'decision datee dans `_AUDIT/05_DECISIONS.md`, PUIS remplace cette garde par celle qui '
         . "encadre l'usage (quota, journalisation, domaines autorises). Ne la supprime pas "
         . 'seulement pour faire passer la campagne au vert.',
     );
@@ -130,8 +130,8 @@ test('C19-012 — le contrat CaptchaSolver est toujours cable sur la classe iner
     // ci-dessus resterait verte, et le contournement serait pourtant en service.
     expect(str_contains($provider, '$bind(CaptchaSolver::class, TwoCaptchaSolver::class,'))->toBeTrue(
         'La liaison de `' . CaptchaSolver::class . '` ne designe plus `TwoCaptchaSolver` comme '
-        . "implementation reelle. Une autre classe a donc pris sa place, et la garde qui verifie "
-        . "que `solve()` jette une exception ne mesure plus le service reellement branche "
+        . 'implementation reelle. Une autre classe a donc pris sa place, et la garde qui verifie '
+        . 'que `solve()` jette une exception ne mesure plus le service reellement branche '
         . "(constat C19-012).\n\n"
         . 'GESTE : fais trancher la mise en service par Will et ecris la decision datee dans '
         . '`_AUDIT/05_DECISIONS.md` avant de rebrancher ce contrat.',

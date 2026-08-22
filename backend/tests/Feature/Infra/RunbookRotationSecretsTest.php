@@ -62,11 +62,12 @@ test('B16-014 — toute commande `artisan ...` du runbook de rotation existe ree
     $enregistrees = array_keys(Artisan::all());
     $fantomes = array_values(array_diff($citees, $enregistrees));
 
-    expect($fantomes)->toBe([],
+    expect($fantomes)->toBe(
+        [],
         'B16-014 rouvert : le runbook infra/runbooks/05-rotate-secrets.md prescrit '
         . 'des commandes artisan qui n existent pas — ' . implode(', ', $fantomes) . '. '
-        . "Un operateur les atteint APRES avoir change le secret, donc sans retour "
-        . "possible, et tombe sur `Command is not defined`. Geste : soit ecrire la "
+        . 'Un operateur les atteint APRES avoir change le secret, donc sans retour '
+        . 'possible, et tombe sur `Command is not defined`. Geste : soit ecrire la '
         . 'commande dans backend/app/Console/Commands/, soit reecrire le pas du '
         . 'runbook en disant explicitement qu il N EST PAS OUTILLE et ce qu il faut '
         . 'faire a la place.',

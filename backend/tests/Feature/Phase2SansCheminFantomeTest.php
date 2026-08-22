@@ -109,6 +109,7 @@ test('B12-017 — aucun contrôleur Phase 2 ne documente un chemin qu’aucune r
 
             if (! in_array($cible, $servies, true)) {
                 $fantomes[] = basename($fichier) . ' publie ' . $chemin . ' — aucune route ne le sert';
+
                 continue;
             }
 
@@ -137,7 +138,7 @@ test('B12-017 — aucun contrôleur Phase 2 ne documente un chemin qu’aucune r
         "B12-017 : un contrôleur Phase 2 publie dans l'OpenAPI un chemin qu'il ne "
         . "sert pas :\n  - " . implode("\n  - ", $fantomes)
         . "\nCe chemin apparaît dans la documentation Swagger — en « 501 Not "
-        . "implemented » — à côté de la vraie route qui, elle, répond. Le lecteur "
+        . 'implemented » — à côté de la vraie route qui, elle, répond. Le lecteur '
         . "de la documentation lit l'inverse de la vérité.\n"
         . 'GESTE : retirer l’annotation @OA\\* du contrôleur bouchon (et, s’il '
         . 'n’est désigné par aucune route, supprimer le fichier).',

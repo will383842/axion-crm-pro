@@ -504,7 +504,7 @@ test('B14-008 — chaque type du vocabulaire sortant est réellement émettable,
     $typesDuSite = ['consent_optout', 'consent_optin', 'erasure'];
     $scopesDuSite = ['business', 'vivier'];
 
-    expect(ConsentOutboundRecorder::EVENT_TYPES === $typesDuSite)->toBeTrue(
+    expect($typesDuSite === ConsentOutboundRecorder::EVENT_TYPES)->toBeTrue(
         'Le vocabulaire émis (ConsentOutboundRecorder::EVENT_TYPES = '
         . implode(', ', ConsentOutboundRecorder::EVENT_TYPES) . ') ne correspond plus à celui que le site '
         . 'accepte (' . implode(', ', $typesDuSite) . '). Geste : ajouter le type des DEUX côtés — ici, dans '
@@ -512,7 +512,7 @@ test('B14-008 — chaque type du vocabulaire sortant est réellement émettable,
         . 'src/server/crm-sync/inbound.ts — sinon le site répond 422 et la ligne passe en `gave_up` : '
         . 'l\'opposition RGPD n\'arrive jamais.',
     );
-    expect(ConsentOutboundRecorder::SCOPES === $scopesDuSite)->toBeTrue(
+    expect($scopesDuSite === ConsentOutboundRecorder::SCOPES)->toBeTrue(
         'Les portées émises (' . implode(', ', ConsentOutboundRecorder::SCOPES) . ') ne correspondent plus '
         . 'à celles que le site accepte (' . implode(', ', $scopesDuSite) . '). Même geste : les deux côtés '
         . 'ensemble, ou le message est refusé 422.',

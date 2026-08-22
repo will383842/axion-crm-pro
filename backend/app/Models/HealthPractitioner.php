@@ -11,9 +11,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * ⚠️ Donnée nominative de SANTÉ (RGPD art. 9). Ingestion gatée par
  * SANTE_INGESTION_ENABLED. Rattaché à une {@see Company} par SIREN.
  *
- * @property int     $id
- * @property string  $workspace_id
- * @property ?int    $company_id
+ * @property int $id
+ * @property string $workspace_id
+ * @property ?int $company_id
  * @property ?string $siren
  * @property ?string $rpps
  * @property ?string $specialite

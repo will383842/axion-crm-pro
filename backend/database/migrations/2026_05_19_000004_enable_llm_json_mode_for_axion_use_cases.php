@@ -41,7 +41,7 @@ return new class extends Migration
             DB::table('llm_use_cases')
                 ->where('slug', $slug)
                 ->update([
-                    'options'    => json_encode(['json' => true]),
+                    'options' => json_encode(['json' => true]),
                     'updated_at' => now(),
                 ]);
         }
@@ -60,7 +60,7 @@ return new class extends Migration
                 'normalize_address',
             ])
             ->update([
-                'options'    => '{}',
+                'options' => '{}',
                 'updated_at' => now(),
             ]);
     }

@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Contracts\InseeClient;
-use App\Models\Company;
 use App\Services\Prospection\SectorClassifier;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -32,6 +31,7 @@ class ProspectionCollect extends Command
         $dept = trim((string) $this->argument('department'));
         if ($dept === '') {
             $this->error('Département requis (ex : 38).');
+
             return self::FAILURE;
         }
         // Un code commune à 5 chiffres (ex. arrondissement de Paris 75101) déclenche une
@@ -48,6 +48,7 @@ class ProspectionCollect extends Command
             ?: DB::table('workspaces')->orderBy('created_at')->value('id');
         if (! $workspaceId) {
             $this->error('Aucun workspace cible (--workspace=UUID).');
+
             return self::FAILURE;
         }
 
@@ -89,29 +90,29 @@ class ProspectionCollect extends Command
             }
             $extra = $this->extraInseeFields($data->raw);
             $buffer[] = [
-                'workspace_id'     => $workspaceId,
-                'siren'            => $data->siren,
-                'denomination'     => $data->denomination,
-                'naf'              => $data->naf,
-                'legal_form'       => $data->legalForm,
-                'effectif_range'   => $data->effectifRange,
-                'size_category'    => $this->sizeFrom(
+                'workspace_id' => $workspaceId,
+                'siren' => $data->siren,
+                'denomination' => $data->denomination,
+                'naf' => $data->naf,
+                'legal_form' => $data->legalForm,
+                'effectif_range' => $data->effectifRange,
+                'size_category' => $this->sizeFrom(
                     $data->effectifRange,
                     is_array($data->raw['uniteLegale'] ?? null) ? ($data->raw['uniteLegale']['categorieEntreprise'] ?? null) : null,
                 ),
-                'sector_main'      => SectorClassifier::fromNaf($data->naf),
-                'address'          => $data->address,
-                'postcode'         => $data->postcode,
-                'city'             => $data->city,
-                'city_name'        => $data->city,
-                'insee'            => $data->insee,
-                'siret'            => is_string($data->raw['siret'] ?? null) ? $data->raw['siret'] : null,
-                'enseigne'         => $extra['enseigne'] ?? null,
-                'metadata'         => json_encode($extra, JSON_UNESCAPED_UNICODE),
+                'sector_main' => SectorClassifier::fromNaf($data->naf),
+                'address' => $data->address,
+                'postcode' => $data->postcode,
+                'city' => $data->city,
+                'city_name' => $data->city,
+                'insee' => $data->insee,
+                'siret' => is_string($data->raw['siret'] ?? null) ? $data->raw['siret'] : null,
+                'enseigne' => $extra['enseigne'] ?? null,
+                'metadata' => json_encode($extra, JSON_UNESCAPED_UNICODE),
                 'discovery_source' => 'insee',
-                'department_code'  => $deptCode,
-                'created_at'       => now(),
-                'updated_at'       => now(),
+                'department_code' => $deptCode,
+                'created_at' => now(),
+                'updated_at' => now(),
             ];
             $count++;
 
@@ -130,7 +131,8 @@ class ProspectionCollect extends Command
 
         $elapsed = round(microtime(true) - $start);
         $this->info("✅ Terminé : {$count} entreprises pour le dépt {$dept} en {$elapsed}s.");
-        $this->line("Enrichissement (emails/tél/dirigeants) à lancer séparément.");
+        $this->line('Enrichissement (emails/tél/dirigeants) à lancer séparément.');
+
         return self::SUCCESS;
     }
 
@@ -154,16 +156,16 @@ class ProspectionCollect extends Command
         $adr = is_array($raw['adresseEtablissement'] ?? null) ? $raw['adresseEtablissement'] : [];
 
         return array_filter([
-            'siret'                => $raw['siret'] ?? null,
-            'sigle'                => $u['sigleUniteLegale'] ?? null,
-            'enseigne'             => $periode['enseigne1Etablissement'] ?? null,
+            'siret' => $raw['siret'] ?? null,
+            'sigle' => $u['sigleUniteLegale'] ?? null,
+            'enseigne' => $periode['enseigne1Etablissement'] ?? null,
             'categorie_entreprise' => $u['categorieEntreprise'] ?? null,      // TPE/PME/ETI/GE officiel INSEE
-            'date_creation'        => $u['dateCreationUniteLegale'] ?? null,
-            'forme_juridique'      => $u['categorieJuridiqueUniteLegale'] ?? null,
-            'employeur'            => $u['caractereEmployeurUniteLegale'] ?? null,   // O = a des salariés
-            'ess'                  => $u['economieSocialeSolidaireUniteLegale'] ?? null,
-            'gps_lambert_x'        => $adr['coordonneeLambertAbscisseEtablissement'] ?? null,
-            'gps_lambert_y'        => $adr['coordonneeLambertOrdonneeEtablissement'] ?? null,
+            'date_creation' => $u['dateCreationUniteLegale'] ?? null,
+            'forme_juridique' => $u['categorieJuridiqueUniteLegale'] ?? null,
+            'employeur' => $u['caractereEmployeurUniteLegale'] ?? null,   // O = a des salariés
+            'ess' => $u['economieSocialeSolidaireUniteLegale'] ?? null,
+            'gps_lambert_x' => $adr['coordonneeLambertAbscisseEtablissement'] ?? null,
+            'gps_lambert_y' => $adr['coordonneeLambertOrdonneeEtablissement'] ?? null,
         ], static fn ($v) => $v !== null && $v !== '');
     }
 
@@ -185,11 +187,12 @@ class ProspectionCollect extends Command
         if ($cat === 'PME') {
             return $hasStaff ? 'pme' : 'tpe';
         }
+
         return match (true) {
-            $hasStaff                                    => 'pme',               // 10–249
+            $hasStaff => 'pme',               // 10–249
             in_array($t, ['32', '41', '42', '51'], true) => 'eti',               // 250–4999
-            in_array($t, ['52', '53'], true)             => 'grande_entreprise',  // 5000+
-            default                                      => 'tpe',               // 00–03, NN, null
+            in_array($t, ['52', '53'], true) => 'grande_entreprise',  // 5000+
+            default => 'tpe',               // 00–03, NN, null
         };
     }
 }

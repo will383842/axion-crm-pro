@@ -14,9 +14,9 @@ class MockAnnuaireEntreprisesClient implements AnnuaireEntreprisesClient
             denomination: 'Mock Annuaire ' . $siren,
             representatives: [
                 [
-                    'role'       => 'gerant',
+                    'role' => 'gerant',
                     'first_name' => 'Mock',
-                    'last_name'  => 'Dirigeant',
+                    'last_name' => 'Dirigeant',
                     'birth_date' => null,
                 ],
             ],

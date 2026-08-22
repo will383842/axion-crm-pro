@@ -882,8 +882,8 @@ test('B13-005 — un tag de provenance hors référentiel est RENDU au site, et 
 
     expect($resultat['tags_ignores'] ?? null)->toBe(
         ['src:' . $slug],
-        "Le tag de provenance a été abandonné en SILENCE, avec une réponse 200 : le site ne peut ni "
-        . "compter ses pertes ni les deviner (constat B13-005). Geste : collecter le slug écarté dans "
+        'Le tag de provenance a été abandonné en SILENCE, avec une réponse 200 : le site ne peut ni '
+        . 'compter ses pertes ni les deviner (constat B13-005). Geste : collecter le slug écarté dans '
         . '`SiteSyncIngestService::attachTags()` au lieu du `continue` nu, et l exposer sous '
         . '`tags_ignores` dans `IngestOutcome::toArray()`.',
     );

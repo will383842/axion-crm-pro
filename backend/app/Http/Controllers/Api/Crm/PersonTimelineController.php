@@ -119,7 +119,7 @@ class PersonTimelineController extends ConsoleController
      * l'ordre des événements d'une même seconde. Un horodatage vide ou
      * illisible descend en fin de liste — comme le faisait la chaîne vide.
      *
-     * @param array<string, mixed> $activite
+     * @param  array<string, mixed>  $activite
      */
     private static function instantDe(array $activite): float
     {

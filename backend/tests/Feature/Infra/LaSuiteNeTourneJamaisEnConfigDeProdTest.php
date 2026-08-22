@@ -415,11 +415,11 @@ test('A06-009 — aucun fichier de test n affirme la valeur du drapeau cote serv
         [],
         "Un fichier de test AFFIRME la valeur de `CRM_DB_APP_ROLE_ENABLED` sur le serveur :\n  - "
         . implode("\n  - ", $fautifs) . "\n\n"
-        . "Ce dépôt n a pas les moyens de le savoir — la production n y est pas observable, et il se "
-        . "contredit lui-même (`CoverageRefreshMatrix.php` dit `=true`, `PartmanMaintenir.php` dit "
+        . 'Ce dépôt n a pas les moyens de le savoir — la production n y est pas observable, et il se '
+        . 'contredit lui-même (`CoverageRefreshMatrix.php` dit `=true`, `PartmanMaintenir.php` dit '
         . "false, le même jour). Constat A06-009.\n"
-        . "Geste : dire ce qui EST mesurable — « sa valeur par défaut, et celle sous laquelle CETTE "
-        . "SUITE tourne » — et renvoyer à ce fichier pour la divergence. Le conditionnel (« tant que "
+        . 'Geste : dire ce qui EST mesurable — « sa valeur par défaut, et celle sous laquelle CETTE '
+        . 'SUITE tourne » — et renvoyer à ce fichier pour la divergence. Le conditionnel (« tant que '
         . '… vaut false ») reste permis : il décrit une hypothèse, pas un état du monde.',
     );
 });

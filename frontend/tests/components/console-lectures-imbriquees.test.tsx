@@ -45,17 +45,20 @@ let erreurLevee: Error | null = null;
 
 /** Capte l'exception de rendu pour la nommer, au lieu de la laisser filer brute. */
 class Filet extends Component<{ children: ReactNode }, { emporte: boolean }> {
-  state: { emporte: boolean } = { emporte: false };
+  // `override` : le projet compile avec `noImplicitOverride`. Sans lui,
+  // `tsc --noEmit` rend TS4114 et la porte CI du frontend rougit — le membre
+  // redefinit bien celui de `Component`, et le compilateur exige qu'on le dise.
+  override state: { emporte: boolean } = { emporte: false };
 
   static getDerivedStateFromError(): { emporte: boolean } {
     return { emporte: true };
   }
 
-  componentDidCatch(erreur: Error): void {
+  override componentDidCatch(erreur: Error): void {
     erreurLevee = erreur;
   }
 
-  render(): ReactNode {
+  override render(): ReactNode {
     return this.state.emporte ? <span>ECRAN-EMPORTE</span> : this.props.children;
   }
 }

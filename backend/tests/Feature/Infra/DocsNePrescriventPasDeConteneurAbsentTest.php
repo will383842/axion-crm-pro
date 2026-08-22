@@ -135,11 +135,11 @@ test('A09-010 — chaque `docker exec` du README et du CONTRIBUTING vise un cont
         expect($fantomes)->toBe(
             [],
             "{$document} prescrit `docker exec` vers un ou des conteneurs que docker-compose.yml "
-            . "ne declare pas : " . implode(', ', $fantomes) . ". C'est le constat A09-010 : "
-            . "celui qui suit la procedure lit « No such container », croit son poste mal monte, "
-            . "et finit par pousser sans avoir joue ces tests. GESTE : soit declarer le service "
-            . "dans docker-compose.yml, soit ecrire la forme HORS conteneur — pour les workers "
-            . "Node, `(cd workers && pnpm test)` depuis la racine. Conteneurs declares : "
+            . 'ne declare pas : ' . implode(', ', $fantomes) . ". C'est le constat A09-010 : "
+            . 'celui qui suit la procedure lit « No such container », croit son poste mal monte, '
+            . 'et finit par pousser sans avoir joue ces tests. GESTE : soit declarer le service '
+            . 'dans docker-compose.yml, soit ecrire la forme HORS conteneur — pour les workers '
+            . 'Node, `(cd workers && pnpm test)` depuis la racine. Conteneurs declares : '
             . implode(', ', $declares),
         );
     }

@@ -697,7 +697,7 @@ test('H47-004 — chaque lot de la matrice pnpm-audit a un bloc `directory:` che
             (string) $lot,
             $declares,
             "Le lot « {$lot} » est audite par `pnpm-audit` mais n a aucun bloc `directory:` dans "
-            . ".github/dependabot.yml : son avis rougira sans qu aucune PR de correction ne soit "
+            . '.github/dependabot.yml : son avis rougira sans qu aucune PR de correction ne soit '
             . "jamais proposee.\n"
             . 'GESTE : ajouter un bloc `- package-ecosystem: npm / directory: /' . $lot . '` '
             . 'avec le meme `ignore` de gel que ses voisins.',

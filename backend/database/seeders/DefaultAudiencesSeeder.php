@@ -60,9 +60,9 @@ class DefaultAudiencesSeeder extends Seeder
                 EmailAudience::query()->updateOrCreate(
                     ['workspace_id' => $workspaceId, 'name' => $def['name']],
                     [
-                        'description'  => $def['description'],
-                        'criteria'     => $def['criteria'],
-                        'is_active'    => true,
+                        'description' => $def['description'],
+                        'criteria' => $def['criteria'],
+                        'is_active' => true,
                         'auto_refresh' => true,
                     ],
                 );

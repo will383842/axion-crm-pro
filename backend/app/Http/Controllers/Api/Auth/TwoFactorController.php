@@ -16,6 +16,7 @@ class TwoFactorController extends ApiController
     /**
      * @OA\Post(path="/auth/2fa/setup", tags={"Auth"}, summary="Initie l'enrolment TOTP (QR code + secret)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Response(response=200, description="QR + secret retournés"),
      *     @OA\Response(response=401, description="Unauthenticated"))
      */
@@ -25,14 +26,18 @@ class TwoFactorController extends ApiController
         if (! $user) {
             return response()->json(['error' => 'unauthenticated'], 401);
         }
+
         return $this->ok($this->service->startEnrolment($user));
     }
 
     /**
      * @OA\Post(path="/auth/2fa/confirm", tags={"Auth"}, summary="Confirme l'enrolment TOTP (active 2FA + génère recovery codes)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\RequestBody(required=true, @OA\JsonContent(required={"code"},
+     *
      *         @OA\Property(property="code", type="string", maxLength=6))),
+     *
      *     @OA\Response(response=200, description="2FA activé + recovery_codes"))
      */
     public function confirm(Request $request): JsonResponse
@@ -43,13 +48,17 @@ class TwoFactorController extends ApiController
             return response()->json(['error' => 'unauthenticated'], 401);
         }
         $recoveryCodes = $this->service->confirmEnrolment($user, (string) $request->input('code'));
+
         return $this->ok(['recovery_codes' => $recoveryCodes]);
     }
 
     /**
      * @OA\Post(path="/auth/2fa/verify", tags={"Auth"}, summary="Vérifie un code TOTP au login",
+     *
      *     @OA\RequestBody(required=true, @OA\JsonContent(required={"code"},
+     *
      *         @OA\Property(property="code", type="string"))),
+     *
      *     @OA\Response(response=200, description="Vérifié"),
      *     @OA\Response(response=422, description="Code invalide"))
      */
@@ -66,6 +75,7 @@ class TwoFactorController extends ApiController
         }
 
         $request->session()->put('2fa_passed_at', now()->toIso8601String());
+
         return $this->ok(['verified' => true]);
     }
 }

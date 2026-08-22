@@ -92,11 +92,12 @@ test('B16-013 — audit_logs.prev_hash ne porte aucun defaut SQL, ni sur le pare
         $defauts,
     ));
 
-    expect($defauts)->toBe([], // Pest : le message ne doit PAS être un 2e argument de toContain/toHaveKey.
+    expect($defauts)->toBe(
+        [], // Pest : le message ne doit PAS être un 2e argument de toContain/toHaveKey.
         "B16-013 rouvert : un DEFAULT est revenu sur audit_logs.prev_hash ({$lisible}). "
         . "Un INSERT omettant prev_hash s'insererait alors en silence avec le maillon zero, "
-        . "et verifyChain() crierait a la falsification des la ligne suivante. "
-        . "Geste : ajouter une migration `ALTER TABLE <table> ALTER COLUMN prev_hash DROP DEFAULT` "
+        . 'et verifyChain() crierait a la falsification des la ligne suivante. '
+        . 'Geste : ajouter une migration `ALTER TABLE <table> ALTER COLUMN prev_hash DROP DEFAULT` '
         . '(modele : backend/database/migrations/2026_08_22_150000_audit_logs_prev_hash_sans_defaut.php), '
         . "et verifier qu'aucun CREATE TABLE de migration ne repose un DEFAULT sur cette colonne.",
     );

@@ -30,7 +30,7 @@ final class ScrapeIngestOutcome
     /**
      * @param  list<string>  $tags
      * @param  list<string>  $companyFieldsWritten
-     * @param  array<string, int>  $personsSkipped motif => nombre de personnes écartées
+     * @param  array<string, int>  $personsSkipped  motif => nombre de personnes écartées
      */
     public function __construct(
         public readonly string $status,

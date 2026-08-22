@@ -11,6 +11,7 @@ class ColdEmailController extends ApiController
     /**
      * @OA\Get(path="/cold-email", tags={"Phase 2"}, summary="Cold email (Phase 2 — stub 501)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Response(response=501, description="Not implemented"))
      */
     public function __invoke(Request $r): JsonResponse

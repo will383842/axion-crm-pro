@@ -25,6 +25,7 @@ class ImportNaf extends Command
 
         if ($mock) {
             $this->warn('Mode mock — seed avec sous-ensemble NAF minimal (12 codes représentatifs).');
+
             return $this->seedMockSet();
         }
 
@@ -32,6 +33,7 @@ class ImportNaf extends Command
         if (! file_exists($path)) {
             $this->error("Fichier NAF absent : {$path}");
             $this->line('Télécharger : https://www.insee.fr/fr/information/2406147 (CSV)');
+
             return self::FAILURE;
         }
 
@@ -96,6 +98,7 @@ class ImportNaf extends Command
         });
 
         $this->info('NAF mock set seedé (6 divisions / 6 groupes / 6 classes / 7 sub-classes).');
+
         return self::SUCCESS;
     }
 
@@ -109,7 +112,7 @@ class ImportNaf extends Command
 
         DB::transaction(function () use ($csv, &$counts) {
             foreach ($csv->getRecords() as $row) {
-                $code  = trim((string) ($row['code'] ?? ''));
+                $code = trim((string) ($row['code'] ?? ''));
                 $label = trim((string) ($row['libelle'] ?? ''));
                 $level = (int) ($row['niveau'] ?? 0);
 
@@ -135,7 +138,10 @@ class ImportNaf extends Command
 
         $this->info(sprintf(
             'NAF importé : %d divisions / %d groupes / %d classes / %d sub-classes.',
-            $counts['divisions'], $counts['groups'], $counts['classes'], $counts['subclasses'],
+            $counts['divisions'],
+            $counts['groups'],
+            $counts['classes'],
+            $counts['subclasses'],
         ));
 
         return self::SUCCESS;

@@ -443,11 +443,11 @@ test('ACQUIS 3 — le réglage qui rend le verrou capable de rougir est toujours
 
     expect(str_contains($database, "env('DB_TIMEZONE')"))->toBeTrue(
         'config/database.php ne lit plus DB_TIMEZONE : la session Postgres retombe sur le défaut serveur '
-        . "(UTC), le décalage de 2 h revient et HorodatagesFuseauTest ne peut plus rougir. Rétablir la "
+        . '(UTC), le décalage de 2 h revient et HorodatagesFuseauTest ne peut plus rougir. Rétablir la '
         . 'lecture de la variable.',
     );
     expect(str_contains($database, "'timezone' => \$dbTimezone,"))->toBeTrue(
-        "config/database.php ne pose plus la clé `timezone` du connecteur depuis \$dbTimezone : la valeur "
+        'config/database.php ne pose plus la clé `timezone` du connecteur depuis $dbTimezone : la valeur '
         . "lue n'arrive plus jusqu'à `SET TIME ZONE`. Rétablir `'timezone' => \$dbTimezone,` dans "
         . '`$pgsqlBase`.',
     );

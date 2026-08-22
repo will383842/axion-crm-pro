@@ -1082,16 +1082,16 @@ test('F39-009 — aucun document du depot ne promet plus un RPO d une heure', fu
     expect($fautifs)->toBe(
         [],
         "Un document annonce encore un RPO d'une heure, ou une sauvegarde qui n'existe pas.\n\n"
-        . "La seule sauvegarde qui existe est QUOTIDIENNE : `pg_dump` a 03:00 UTC, cron pose par "
-        . "`infra/scripts/setup-backup.sh`, televerse en SFTP sur une Storage Box Hetzner. La "
-        . "perte maximale reelle est donc de 24 heures — facteur 24 sur ce qui etait annonce. Le "
+        . 'La seule sauvegarde qui existe est QUOTIDIENNE : `pg_dump` a 03:00 UTC, cron pose par '
+        . '`infra/scripts/setup-backup.sh`, televerse en SFTP sur une Storage Box Hetzner. La '
+        . 'perte maximale reelle est donc de 24 heures — facteur 24 sur ce qui etait annonce. Le '
         . "depot l'etablit lui-meme a trois endroits : `infra/scripts/dr-drill.sh:15`, "
-        . "`.github/workflows/surveillance-sauvegarde.yml:28-30` et "
+        . '`.github/workflows/surveillance-sauvegarde.yml:28-30` et '
         . "`infra/runbooks/04-restore-dr.md:26-38`.\n\n"
         . "ARCHITECTURE.md est le document qu'on MONTRE : un RPO d'une heure promis a un client "
         . "est un engagement que l'infrastructure ne tient pas.\n\n"
         . 'GESTE : aligne la ligne sur `infra/runbooks/04-restore-dr.md:24-38`. Fermer le vrai '
-        . "ecart demande un archivage continu des journaux de transaction — un chantier, pas une "
+        . 'ecart demande un archivage continu des journaux de transaction — un chantier, pas une '
         . "ligne de documentation ; tant qu'il n'est pas fait, on annonce 24 h. Constat F39-009.\n\n"
         . "Lignes :\n  - " . implode("\n  - ", $fautifs),
     );

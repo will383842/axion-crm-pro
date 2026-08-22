@@ -98,14 +98,14 @@ final class ConsentOutboundRecorder
      * Met en file un événement de consentement à destination du site.
      *
      * @param  ?string  $personKey  ⚠️ B14-012, NON TRANCHÉ — mesure du
-     *   2026-08-22 : aucun des trois sites d'appel du dépôt
-     *   (`JournalistsController::optOut`, `::destroy`,
-     *   `RgpdRequestsController::queueOutbound`) ne le renseigne ; la colonne
-     *   part donc TOUJOURS à null, et `crm:flush-outbound` l'émet telle quelle.
-     *   Ce n'est pas un oubli à combler à la légère : `person_key` est dérivée
-     *   de l'adresse, donc pseudonymisante — la renseigner ferait SORTIR du
-     *   serveur une corrélation qui n'en sortait pas. C'est une décision de
-     *   conformité, pas un patch : ne pas la remplir sans qu'elle soit prise.
+     *                              2026-08-22 : aucun des trois sites d'appel du dépôt
+     *                              (`JournalistsController::optOut`, `::destroy`,
+     *                              `RgpdRequestsController::queueOutbound`) ne le renseigne ; la colonne
+     *                              part donc TOUJOURS à null, et `crm:flush-outbound` l'émet telle quelle.
+     *                              Ce n'est pas un oubli à combler à la légère : `person_key` est dérivée
+     *                              de l'adresse, donc pseudonymisante — la renseigner ferait SORTIR du
+     *                              serveur une corrélation qui n'en sortait pas. C'est une décision de
+     *                              conformité, pas un patch : ne pas la remplir sans qu'elle soit prise.
      * @param  array<string, mixed>  $payload  Contexte non identifiant (motif, surface console…).
      * @return string L'`event_id` (UUID) mis en file, ou celui d'un doublon déjà en attente.
      *

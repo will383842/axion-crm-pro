@@ -93,7 +93,7 @@ test('F37-005 — TEMOIN : le banc lit bien une liste d origines non vide', func
     $configuration = configurationCorsSansVariable();
 
     expect($configuration['allowed_origins'] ?? [])->not->toBeEmpty(
-        "config/cors.php ne rend AUCUNE origine par defaut. Les deux assertions qui suivent "
+        'config/cors.php ne rend AUCUNE origine par defaut. Les deux assertions qui suivent '
         . "ne prouveraient alors rien du tout. Verifie que `require config_path('cors.php')` "
         . 'lit bien le fichier avant de croire ce vert.',
     );
@@ -114,11 +114,11 @@ test('F37-005 — le defaut de production n autorise aucune origine locale', fun
 
     expect($locales)->toBe(
         [],
-        "Le DEFAUT de `config/cors.php` autorise une origine locale : " . implode(', ', $locales) . ".\n\n"
-        . "Ce defaut est ce que la PRODUCTION applique : mesure du 2026-08-22, rien dans le depot "
-        . "ne pose `CORS_ALLOWED_ORIGINS` cote production (ni .env.example, ni "
-        . "docker-compose.prod.yml, ni infra/scripts/configure-prod-env.sh, ni le workflow de "
-        . "deploiement). Avec `supports_credentials => true`, une origine `.localhost` — que "
+        'Le DEFAUT de `config/cors.php` autorise une origine locale : ' . implode(', ', $locales) . ".\n\n"
+        . 'Ce defaut est ce que la PRODUCTION applique : mesure du 2026-08-22, rien dans le depot '
+        . 'ne pose `CORS_ALLOWED_ORIGINS` cote production (ni .env.example, ni '
+        . 'docker-compose.prod.yml, ni infra/scripts/configure-prod-env.sh, ni le workflow de '
+        . 'deploiement). Avec `supports_credentials => true`, une origine `.localhost` — que '
         . "n'importe qui peut faire resoudre vers sa propre machine — devient une origine de "
         . "confiance de l'API de production, cookies compris.\n\n"
         . 'GESTE : retire cette origine du DEFAUT et pose-la dans `docker-compose.local.yml` '
@@ -137,7 +137,7 @@ test('F37-005 — les identifiants ne sont jamais servis a une origine joker', f
     $joker = in_array('*', $origines, true) || $configuration['allowed_origins_patterns'] !== [];
 
     expect($joker)->toBeFalse(
-        "`config/cors.php` combine `supports_credentials => true` avec une origine joker "
+        '`config/cors.php` combine `supports_credentials => true` avec une origine joker '
         . "(`*` ou un motif dans `allowed_origins_patterns`). Le paquet reflete alors l'origine "
         . "de l'appelant : TOUTE page du web devient une origine de confiance de l'API, avec le "
         . "cookie de session de l'utilisateur connecte.\n\n"
@@ -161,8 +161,8 @@ test('F37-005 — la surcouche locale declare bien son origine, sinon le correct
     // console de developpement sans API, et quelqu'un remettra l'origine dans
     // le defaut — ce qui rejouerait F37-005 a l'identique.
     expect(str_contains($contenu, 'CORS_ALLOWED_ORIGINS: https://app.localhost'))->toBeTrue(
-        "`docker-compose.local.yml` ne pose plus `CORS_ALLOWED_ORIGINS: https://app.localhost`. "
-        . "Le defaut de `config/cors.php` etant desormais la seule origine de PRODUCTION, la "
+        '`docker-compose.local.yml` ne pose plus `CORS_ALLOWED_ORIGINS: https://app.localhost`. '
+        . 'Le defaut de `config/cors.php` etant desormais la seule origine de PRODUCTION, la '
         . "console locale n'a plus d'origine autorisee : chaque appel du SPA sera refuse par le "
         . "navigateur.\n\n"
         . 'GESTE : remets la ligne dans le bloc `x-socle-local` — et surtout PAS dans le defaut '

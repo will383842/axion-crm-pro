@@ -104,7 +104,7 @@ test('C19-011 — par defaut, les DEUX sondes verifient le certificat TLS', func
     );
     expect($iproyal['verify'] ?? null)->toBeTrue(
         'IPRoyalProvider::healthCheck() sonde sans verifier le certificat (meme defaut que '
-        . "Webshare, patron A-011 : le correctif n a pas ete porte au site jumeau). Remettre "
+        . 'Webshare, patron A-011 : le correctif n a pas ete porte au site jumeau). Remettre '
         . "'verify' => \$this->verifierTlsDeLaSonde('iproyal', \$endpoint).",
     );
 
@@ -233,7 +233,8 @@ test('C19-011 — plus aucun `verify => false` EN DUR sous app/Services', functi
         }
     }
 
-    expect($fautifs)->toBe([],
+    expect($fautifs)->toBe(
+        [],
         'Verification TLS desactivee EN DUR dans : ' . implode(', ', $fautifs)
         . '. Passer par un drapeau de configuration par fournisseur (cf. trait VerificationTlsSonde) '
         . 'plutot que par un `false` que personne ne peut voir ni journaliser.',

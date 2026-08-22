@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Vérifie hourly que nos IPs sortantes ne sont pas blacklistées (Spamhaus, Barracuda, etc.).
@@ -19,10 +18,12 @@ class BlacklistsCheck extends Command
     {
         if (env('MOCK_MODE', true)) {
             $this->info('MOCK_MODE — blacklists check skipped, all IPs assumed clean.');
+
             return self::SUCCESS;
         }
 
         $this->warn('Implémentation réelle prévue Sprint 8 — DNSBL queries Spamhaus + Barracuda + SORBS.');
+
         return self::SUCCESS;
     }
 }

@@ -11,18 +11,18 @@ it('exposes siège address from geo_adresse', function () {
     Http::fake([
         'recherche-entreprises.api.gouv.fr/*' => Http::response([
             'results' => [[
-                'nom_complet'         => 'Acme SAS',
+                'nom_complet' => 'Acme SAS',
                 'activite_principale' => '6201Z',
-                'siege'               => [
-                    'geo_adresse'     => '10 Rue de la Paix 75002 Paris',
-                    'code_postal'     => '75002',
+                'siege' => [
+                    'geo_adresse' => '10 Rue de la Paix 75002 Paris',
+                    'code_postal' => '75002',
                     'libelle_commune' => 'Paris',
                 ],
             ]],
         ], 200),
     ]);
 
-    $data = (new HttpAnnuaireEntreprisesClient())->fetchBySiren('123456789');
+    $data = (new HttpAnnuaireEntreprisesClient)->fetchBySiren('123456789');
 
     expect($data)->not->toBeNull();
     expect($data->address)->toBe('10 Rue de la Paix 75002 Paris');
@@ -35,18 +35,18 @@ it('reconstructs siège address from voie components when geo_adresse missing', 
         'recherche-entreprises.api.gouv.fr/*' => Http::response([
             'results' => [[
                 'nom_complet' => 'Foo SARL',
-                'siege'       => [
-                    'numero_voie'     => '5',
-                    'type_voie'       => 'AVENUE',
-                    'libelle_voie'    => 'DES CHAMPS',
-                    'code_postal'     => '69001',
+                'siege' => [
+                    'numero_voie' => '5',
+                    'type_voie' => 'AVENUE',
+                    'libelle_voie' => 'DES CHAMPS',
+                    'code_postal' => '69001',
                     'libelle_commune' => 'Lyon',
                 ],
             ]],
         ], 200),
     ]);
 
-    $data = (new HttpAnnuaireEntreprisesClient())->fetchBySiren('987654321');
+    $data = (new HttpAnnuaireEntreprisesClient)->fetchBySiren('987654321');
 
     expect($data->address)->toBe('5 AVENUE DES CHAMPS');
     expect($data->postcode)->toBe('69001');
@@ -60,7 +60,7 @@ it('returns null address when siège absent', function () {
         ], 200),
     ]);
 
-    $data = (new HttpAnnuaireEntreprisesClient())->fetchBySiren('111222333');
+    $data = (new HttpAnnuaireEntreprisesClient)->fetchBySiren('111222333');
 
     expect($data->address)->toBeNull();
     expect($data->postcode)->toBeNull();

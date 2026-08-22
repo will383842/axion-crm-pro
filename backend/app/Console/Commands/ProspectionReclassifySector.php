@@ -44,6 +44,7 @@ class ProspectionReclassifySector extends Command
         ) {
             $this->line("   secteur {$r->s} : {$r->c}");
         }
+
         return self::SUCCESS;
     }
 }

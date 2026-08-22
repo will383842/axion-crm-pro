@@ -33,6 +33,7 @@ class NotificationCreated implements ShouldBroadcast
         if ($this->userId !== null) {
             return [new PrivateChannel('user.' . $this->userId)];
         }
+
         return [new PrivateChannel('workspace.' . $this->workspaceId)];
     }
 
@@ -45,12 +46,12 @@ class NotificationCreated implements ShouldBroadcast
     {
         return [
             'notification_id' => $this->notificationId,
-            'type'            => $this->type,
-            'title'           => $this->title,
-            'body'            => $this->body,
-            'severity'        => $this->severity,
-            'action_url'      => $this->actionUrl,
-            'occurred_at'     => now()->toIso8601String(),
+            'type' => $this->type,
+            'title' => $this->title,
+            'body' => $this->body,
+            'severity' => $this->severity,
+            'action_url' => $this->actionUrl,
+            'occurred_at' => now()->toIso8601String(),
         ];
     }
 }

@@ -2,6 +2,7 @@
 
 use App\Support\WaterfallSentry;
 use Illuminate\Support\Facades\Log;
+use Sentry\State\Hub;
 
 /**
  * Remet le drapeau « je l'ai deja dit » a zero.
@@ -26,14 +27,14 @@ it('captures without throwing when Sentry class missing', function () {
     // Ce que ce cas mesure reellement, c'est qu'aucun chemin de sortie du
     // helper — classe absente, DSN vide, ou capture reelle — ne propage
     // d'exception dans la waterfall qui l'appelle.
-    $e = new \RuntimeException('test');
-    expect(fn () => WaterfallSentry::capture(null, 'service', $e))->not->toThrow(\Throwable::class);
+    $e = new RuntimeException('test');
+    expect(fn () => WaterfallSentry::capture(null, 'service', $e))->not->toThrow(Throwable::class);
 });
 
 it('handles null company without crashing', function () {
-    $e = new \RuntimeException('test');
+    $e = new RuntimeException('test');
     expect(fn () => WaterfallSentry::capture(null, 'auto-classify', $e))
-        ->not->toThrow(\Throwable::class);
+        ->not->toThrow(Throwable::class);
 });
 
 /**
@@ -55,7 +56,7 @@ test('C18-014 — TEMOIN : la premiere porte est bien OUVERTE en test', function
     // Sans ce temoin, la garde suivante pourrait verdir alors que le flot
     // s'arrete a `class_exists(\Sentry\State\Hub::class)` — elle prouverait
     // alors l'absence du paquet, pas le comportement du helper.
-    expect(class_exists(\Sentry\State\Hub::class))->toBeTrue(
+    expect(class_exists(Hub::class))->toBeTrue(
         'Le SDK Sentry est absent du vendor de ce banc. `WaterfallSentry::capture` sort ' .
         'alors a sa toute premiere ligne et la garde C18-014 ci-dessous ne mesure RIEN. ' .
         'Geste : `composer install` dans le conteneur api (sentry/sentry-laravel est en ' .
@@ -68,7 +69,7 @@ test('C18-014 — un DSN vide est DIT a voix haute, pas avale en silence', funct
     config()->set('sentry.dsn', null);
 
     $journal = Log::spy();
-    WaterfallSentry::capture(null, 'auto-classify', new \RuntimeException('panne de waterfall'));
+    WaterfallSentry::capture(null, 'auto-classify', new RuntimeException('panne de waterfall'));
 
     $journal->shouldHaveReceived('warning')->withArgs(
         fn ($message) => str_contains((string) $message, 'SENTRY_LARAVEL_DSN'),
@@ -80,7 +81,7 @@ test('C18-014 — le nom de la variable a renseigner figure dans l avertissement
     config()->set('sentry.dsn', '');
 
     $journal = Log::spy();
-    WaterfallSentry::capture(null, 'enrichissement', new \RuntimeException('panne'));
+    WaterfallSentry::capture(null, 'enrichissement', new RuntimeException('panne'));
 
     // Un avertissement qui dit « supervision inactive » sans nommer la variable
     // envoie l'exploitant chercher dans quatre fichiers de configuration.
@@ -100,9 +101,9 @@ test('C18-014 — TEMOIN : l avertissement ne se repete pas a chaque exception',
     config()->set('sentry.dsn', null);
 
     $journal = Log::spy();
-    WaterfallSentry::capture(null, 'auto-classify', new \RuntimeException('une'));
-    WaterfallSentry::capture(null, 'auto-classify', new \RuntimeException('deux'));
-    WaterfallSentry::capture(null, 'auto-classify', new \RuntimeException('trois'));
+    WaterfallSentry::capture(null, 'auto-classify', new RuntimeException('une'));
+    WaterfallSentry::capture(null, 'auto-classify', new RuntimeException('deux'));
+    WaterfallSentry::capture(null, 'auto-classify', new RuntimeException('trois'));
 
     $journal->shouldHaveReceived('warning')->once();
 });

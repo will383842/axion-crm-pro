@@ -462,6 +462,6 @@ test('la commande de backfill pose bien son contexte workspace (correctif du 202
         . 'contexte, le backfill écrit hors `app.current_workspace_id` et RLS '
         . 'rejette ses requêtes dès que `CRM_DB_APP_ROLE_ENABLED` est actif. '
         . 'Geste : réenrobe la boucle de traitement dans `WorkspaceContext::run($workspaceId, …)` '
-        . '(cf. correctif du 2026-08-15, ScrapingBackfillSrcTags.php:98).'
+        . '(cf. correctif du 2026-08-15, ScrapingBackfillSrcTags.php:98).',
     );
 });

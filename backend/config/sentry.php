@@ -1,5 +1,11 @@
 <?php
 
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+
 /**
  * Sprint 18.8 — Sentry SDK config (compatible GlitchTip self-hosted).
  *
@@ -17,13 +23,13 @@ return [
     'environment' => env('SENTRY_ENVIRONMENT', env('APP_ENV', 'production')),
 
     'breadcrumbs' => [
-        'logs'        => true,
-        'cache'       => false,
-        'livewire'    => false,
+        'logs' => true,
+        'cache' => false,
+        'livewire' => false,
         'sql_queries' => false,
-        'sql_bindings'=> false,
-        'queue_info'  => true,
-        'command_info'=> true,
+        'sql_bindings' => false,
+        'queue_info' => true,
+        'command_info' => true,
         'http_client_requests' => true,
     ],
 
@@ -40,10 +46,10 @@ return [
 
     // Filter known noise
     'ignore_exceptions' => [
-        \Illuminate\Auth\AuthenticationException::class,
-        \Illuminate\Validation\ValidationException::class,
-        \Illuminate\Http\Exceptions\HttpResponseException::class,
-        \Symfony\Component\HttpKernel\Exception\NotFoundHttpException::class,
-        \Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException::class,
+        AuthenticationException::class,
+        ValidationException::class,
+        HttpResponseException::class,
+        NotFoundHttpException::class,
+        MethodNotAllowedHttpException::class,
     ],
 ];

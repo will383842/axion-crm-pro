@@ -31,7 +31,7 @@ final class IngestOutcome
 
     /**
      * @param  list<string>  $tags
-     * @param  list<string>  $tagsIgnores slugs demandés que le référentiel ne connaît pas
+     * @param  list<string>  $tagsIgnores  slugs demandés que le référentiel ne connaît pas
      */
     public function __construct(
         public readonly string $status,

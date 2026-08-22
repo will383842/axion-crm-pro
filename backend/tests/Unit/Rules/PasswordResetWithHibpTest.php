@@ -148,7 +148,7 @@ test('H45-003 : HIBP annonce son User-Agent, et cet en-tete part reellement sur 
     // Aucun appel réseau ici : on n'inspecte que la configuration du client que
     // `HibpChecker` se donne quand on ne lui en injecte aucun.
     $clientInterne = (new ReflectionProperty(HibpChecker::class, 'http'))
-        ->getValue(new HibpChecker());
+        ->getValue(new HibpChecker);
 
     expect(property_exists($clientInterne, 'config'))->toBeTrue(
         "Guzzle n'expose plus sa configuration sous la propriété `config`. Geste : adapter cette "

@@ -42,18 +42,18 @@ class LlmUseCasesSeeder extends Seeder
             DB::table('llm_use_cases')->updateOrInsert(
                 ['workspace_id' => null, 'slug' => $slug],
                 [
-                    'description'      => $desc,
+                    'description' => $desc,
                     'primary_provider' => $provider,
-                    'model'            => $model,
-                    'fallback_chain'   => $fallbackJson,
-                    'prompt_version'   => 1,
-                    'options'          => in_array($slug, $jsonUseCases, true)
+                    'model' => $model,
+                    'fallback_chain' => $fallbackJson,
+                    'prompt_version' => 1,
+                    'options' => in_array($slug, $jsonUseCases, true)
                         ? json_encode(['json' => true])
                         : '{}',
-                    'cost_cap_eur'     => 50,
-                    'enabled'          => true,
-                    'created_at'       => now(),
-                    'updated_at'       => now(),
+                    'cost_cap_eur' => 50,
+                    'enabled' => true,
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ],
             );
         }

@@ -24,7 +24,7 @@ class HttpFranceTravailClient implements FranceTravailClient
             ->timeout(15)
             ->get(self::BASE_URL . '/offres/search', [
                 'entreprise.siren' => $siren,
-                'range'            => '0-99',
+                'range' => '0-99',
             ]);
 
         if ($resp->status() === 204 || $resp->failed()) {
@@ -42,6 +42,7 @@ class HttpFranceTravailClient implements FranceTravailClient
                 sourceUrl: $offer['origineOffre']['urlOrigine'] ?? null,
             );
         }
+
         return $out;
     }
 
@@ -56,15 +57,16 @@ class HttpFranceTravailClient implements FranceTravailClient
             $resp = Http::asForm()->post(
                 'https://entreprise.francetravail.fr/connexion/oauth2/access_token?realm=%2Fpartenaire',
                 [
-                    'grant_type'    => 'client_credentials',
-                    'client_id'     => $id,
+                    'grant_type' => 'client_credentials',
+                    'client_id' => $id,
                     'client_secret' => $secret,
-                    'scope'         => 'api_offresdemploiv2 o2dsoffre',
+                    'scope' => 'api_offresdemploiv2 o2dsoffre',
                 ],
             );
             if ($resp->failed()) {
                 throw new \RuntimeException('FranceTravail auth error');
             }
+
             return (string) $resp->json('access_token');
         });
     }

@@ -132,16 +132,16 @@ test('H47-003 — les deux documents du gel portent la rectification datee du 20
             rectificationComplete2026H47003($contenu),
             "🔴 {$relatif} enonce une premisse d etat du depot qui n est plus vraie, sans sa "
             . "rectification.\n\n"
-            . "Mesure du 2026-08-18, ecrite dans ce fichier : alertes Dependabot DESACTIVEES "
-            . "(404, \"disabled\"), « AUCUN canal de mise a jour de securite a preserver », "
+            . 'Mesure du 2026-08-18, ecrite dans ce fichier : alertes Dependabot DESACTIVEES '
+            . '(404, "disabled"), « AUCUN canal de mise a jour de securite a preserver », '
             . "precaution « INERTE ».\n"
-            . "Mesure du 2026-08-19 : vulnerability-alerts -> 204 No Content, "
-            . "dependabot_security_updates -> \"enabled\", automated-security-fixes -> "
+            . 'Mesure du 2026-08-19 : vulnerability-alerts -> 204 No Content, '
+            . 'dependabot_security_updates -> "enabled", automated-security-fixes -> '
             . "{\"enabled\":true,\"paused\":false}.\n\n"
-            . "Ce fichier enonce les criteres d entree du DEGEL. Qui le lit croit devoir "
+            . 'Ce fichier enonce les criteres d entree du DEGEL. Qui le lit croit devoir '
             . "attendre un geste qui a deja eu lieu.\n\n"
-            . "GESTE : ajouter un encart « RECTIFICATION 2026-08-19 » qui CITE le releve "
-            . "(204 No Content, \"enabled\", automated-security-fixes) et dit ce que cela change "
+            . 'GESTE : ajouter un encart « RECTIFICATION 2026-08-19 » qui CITE le releve '
+            . '(204 No Content, "enabled", automated-security-fixes) et dit ce que cela change '
             . 'pour la procedure de degel. Ne PAS effacer la mesure du 2026-08-18.',
         );
     }
@@ -159,7 +159,7 @@ test('H47-003 — la rectification n a pas efface la mesure d origine', function
         $this->assertTrue(
             str_contains($contenu, '2026-08-18'),
             "🔴 {$relatif} ne porte plus la mesure d origine du 2026-08-18.\n\n"
-            . "Rectifier n est pas reecrire : on empile une mesure datee sur une autre, on n en "
+            . 'Rectifier n est pas reecrire : on empile une mesure datee sur une autre, on n en '
             . "remplace jamais une.\n"
             . 'GESTE : restaurer le bloc de mesure du 2026-08-18 au-dessus de la rectification.',
         );
@@ -176,9 +176,9 @@ test('H47-003 — le critere d entree du degel est marque REMPLI dans dependabot
     // procedure inchangee corrigerait le constat sans corriger la decision.
     $this->assertTrue(
         str_contains($contenu, 'REMPLI depuis le 2026-08-19'),
-        "🔴 La procedure de degel de .github/dependabot.yml presente encore « les alertes "
+        '🔴 La procedure de degel de .github/dependabot.yml presente encore « les alertes '
         . "Dependabot sont ACTIVES » comme un critere a satisfaire.\n\n"
-        . "Il est satisfait depuis le 2026-08-19 (204 No Content / \"enabled\" / "
+        . 'Il est satisfait depuis le 2026-08-19 (204 No Content / "enabled" / '
         . "automated-security-fixes non pause).\n"
         . 'GESTE : marquer ce critere « REMPLI depuis le 2026-08-19 » en renvoyant a la '
         . 'rectification, sans toucher aux deux autres criteres, qui eux ne sont pas mesures ici.',

@@ -77,22 +77,22 @@ class ImportMediaBlogs extends Command
             }
 
             DB::table('media')->insert([
-                'workspace_id'       => $workspaceId,
-                'name'               => mb_substr($name, 0, 240),
-                'media_type'         => 'blog',
-                'media_family'       => 'editorial',
-                'editorial_theme'    => $r['editorial_theme'] ?? null,
-                'department_code'    => $r['department_code'] ?? null,
-                'region_code'        => $r['region_code'] ?? null,
-                'city'               => $r['city'] ?? null,
-                'website'            => $website,
-                'website_status'     => 'found',
-                'website_method'     => 'curated',
+                'workspace_id' => $workspaceId,
+                'name' => mb_substr($name, 0, 240),
+                'media_type' => 'blog',
+                'media_family' => 'editorial',
+                'editorial_theme' => $r['editorial_theme'] ?? null,
+                'department_code' => $r['department_code'] ?? null,
+                'region_code' => $r['region_code'] ?? null,
+                'city' => $r['city'] ?? null,
+                'website' => $website,
+                'website_status' => 'found',
+                'website_method' => 'curated',
                 'website_checked_at' => now(),
-                'source'             => 'blog-curated',
-                'enrich_status'      => 'pending',
-                'created_at'         => now(),
-                'updated_at'         => now(),
+                'source' => 'blog-curated',
+                'enrich_status' => 'pending',
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
             $inserted++;
         }

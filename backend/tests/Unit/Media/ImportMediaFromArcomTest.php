@@ -42,12 +42,14 @@ function makeArcomXlsx(array $dataRows): string
         . '<sheetData>' . $rowsXml . '</sheetData></worksheet>';
 
     $path = tempnam(sys_get_temp_dir(), 'arcom_test_') . '.xlsx';
-    $zip = new ZipArchive();
+    $zip = new ZipArchive;
     $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
-    $zip->addFromString('[Content_Types].xml',
+    $zip->addFromString(
+        '[Content_Types].xml',
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         . '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
-        . '<Default Extension="xml" ContentType="application/xml"/></Types>');
+        . '<Default Extension="xml" ContentType="application/xml"/></Types>',
+    );
     $zip->addFromString('xl/worksheets/sheet1.xml', $sheet);
     $zip->close();
 

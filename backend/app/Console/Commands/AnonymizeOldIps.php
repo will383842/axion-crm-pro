@@ -134,7 +134,7 @@ class AnonymizeOldIps extends Command
                  WHERE created_at < ?
                    AND ip IS NOT NULL
                    AND ip <> {$tronqueIp}",
-                [$cutoff]
+                [$cutoff],
             );
 
             // B15-011. `last_login_at IS NULL` est traité comme « ancien » : une
@@ -146,7 +146,7 @@ class AnonymizeOldIps extends Command
                  WHERE (last_login_at IS NULL OR last_login_at < ?)
                    AND last_login_ip IS NOT NULL
                    AND last_login_ip <> {$tronqueDerniereIp}",
-                [$cutoff]
+                [$cutoff],
             );
         }
 

@@ -90,10 +90,10 @@ class ImportMediaEmissionsFromWikidata extends Command
         }
 
         $stats = [
-            'emissions'    => 0,
+            'emissions' => 0,
             'emissions_new' => 0,
             'channels_new' => 0,
-            'journalists'  => 0,
+            'journalists' => 0,
             'journalists_new' => 0,
         ];
 
@@ -103,7 +103,7 @@ class ImportMediaEmissionsFromWikidata extends Command
 
             while (true) {
                 if ($limit > 0 && $stats['emissions'] >= $limit) {
-                    break 1;
+                    break;
                 }
                 $pageSize = self::PAGE_SIZE;
                 if ($limit > 0) {
@@ -152,7 +152,7 @@ class ImportMediaEmissionsFromWikidata extends Command
     /**
      * Exécute une requête SPARQL paginée (LIMIT/OFFSET sur les émissions DISTINCT).
      *
-     * @return array<int,array<string,mixed>>|null  bindings, ou null en cas d'échec HTTP
+     * @return array<int,array<string,mixed>>|null bindings, ou null en cas d'échec HTTP
      */
     private function querySparql(string $classQid, int $limit, int $offset): ?array
     {
@@ -161,9 +161,9 @@ class ImportMediaEmissionsFromWikidata extends Command
         try {
             $resp = Http::withHeaders([
                 'User-Agent' => self::USER_AGENT,
-                'Accept'     => 'application/sparql-results+json',
+                'Accept' => 'application/sparql-results+json',
             ])->timeout(90)->retry(3, 3000, throw: false)->get(self::SPARQL_ENDPOINT, [
-                'query'  => $query,
+                'query' => $query,
                 'format' => 'json',
             ]);
         } catch (\Throwable $e) {
@@ -216,7 +216,7 @@ class ImportMediaEmissionsFromWikidata extends Command
      * lignes à cause des OPTIONAL multi-valués genre/diffuseur/personne).
      *
      * @param  array<int,array<string,mixed>>  $rows
-     * @return array<string,array<string,mixed>>  indexé par QID d'émission
+     * @return array<string,array<string,mixed>> indexé par QID d'émission
      */
     private function groupRows(array $rows): array
     {
@@ -235,12 +235,12 @@ class ImportMediaEmissionsFromWikidata extends Command
 
             if (! isset($out[$qid])) {
                 $out[$qid] = [
-                    'qid'         => $qid,
-                    'uri'         => $progUri,
-                    'name'        => $label,
-                    'genre'       => null,
+                    'qid' => $qid,
+                    'uri' => $progUri,
+                    'name' => $label,
+                    'genre' => null,
                     'broadcaster' => null,
-                    'people'      => [], // clé "role|personUri" → [role, name, uri]
+                    'people' => [], // clé "role|personUri" → [role, name, uri]
                 ];
             }
 
@@ -265,7 +265,7 @@ class ImportMediaEmissionsFromWikidata extends Command
                 $out[$qid]['people'][$key] = [
                     'role' => $role,
                     'name' => $personName,
-                    'uri'  => $personUri,
+                    'uri' => $personUri,
                 ];
             }
         }
@@ -353,16 +353,16 @@ class ImportMediaEmissionsFromWikidata extends Command
 
         $now = now();
         $id = DB::table('media')->insertGetId([
-            'workspace_id'  => $workspaceId,
-            'name'          => mb_substr($broadcaster, 0, 240),
-            'media_type'    => $channelType,
-            'media_family'  => 'editorial',
+            'workspace_id' => $workspaceId,
+            'name' => mb_substr($broadcaster, 0, 240),
+            'media_type' => $channelType,
+            'media_family' => 'editorial',
             'diffusion_zone' => 'national',
             'website_status' => 'pending',
             'enrich_status' => 'pending',
-            'source'        => 'wikidata',
-            'created_at'    => $now,
-            'updated_at'    => $now,
+            'source' => 'wikidata',
+            'created_at' => $now,
+            'updated_at' => $now,
         ]);
         $stats['channels_new']++;
         $this->channelCache[$cacheKey] = (int) $id;
@@ -497,24 +497,24 @@ class ImportMediaEmissionsFromWikidata extends Command
 
         $now = now();
         $id = DB::table('media')->insertGetId([
-            'workspace_id'    => $workspaceId,
+            'workspace_id' => $workspaceId,
             'parent_media_id' => $channelId,
-            'name'            => mb_substr($emission['name'], 0, 240),
-            'media_type'      => 'tv_emission',
-            'media_family'    => 'editorial',
+            'name' => mb_substr($emission['name'], 0, 240),
+            'media_type' => 'tv_emission',
+            'media_family' => 'editorial',
             'editorial_theme' => $emission['genre'],
-            'diffusion_zone'  => 'national',
+            'diffusion_zone' => 'national',
             // On conserve le label diffuseur brut : il permet à
             // media:link-emissions-to-channels de rattacher a posteriori une
             // émission restée orpheline (chaîne pas encore en base au 1er import).
-            'socials'         => json_encode(array_filter([
+            'socials' => json_encode(array_filter([
                 'wikidata_id' => $emission['qid'],
                 'broadcaster' => $emission['broadcaster'] ?? null,
             ], static fn ($v) => $v !== null && $v !== ''), JSON_UNESCAPED_UNICODE),
-            'enrich_status'   => 'pending',
-            'source'          => 'wikidata',
-            'created_at'      => $now,
-            'updated_at'      => $now,
+            'enrich_status' => 'pending',
+            'source' => 'wikidata',
+            'created_at' => $now,
+            'updated_at' => $now,
         ]);
         $stats['emissions_new']++;
 
@@ -548,14 +548,14 @@ class ImportMediaEmissionsFromWikidata extends Command
         $now = now();
         DB::table('journalists')->insert([
             'workspace_id' => $workspaceId,
-            'media_id'     => $emissionId,
-            'first_name'   => $first !== null ? mb_substr($first, 0, 120) : null,
-            'last_name'    => mb_substr($last, 0, 120),
-            'role'         => mb_substr($person['role'], 0, 160),
-            'source'       => 'wikidata',
-            'source_url'   => mb_substr($person['uri'], 0, 500),
-            'created_at'   => $now,
-            'updated_at'   => $now,
+            'media_id' => $emissionId,
+            'first_name' => $first !== null ? mb_substr($first, 0, 120) : null,
+            'last_name' => mb_substr($last, 0, 120),
+            'role' => mb_substr($person['role'], 0, 160),
+            'source' => 'wikidata',
+            'source_url' => mb_substr($person['uri'], 0, 500),
+            'created_at' => $now,
+            'updated_at' => $now,
         ]);
         $stats['journalists_new']++;
     }

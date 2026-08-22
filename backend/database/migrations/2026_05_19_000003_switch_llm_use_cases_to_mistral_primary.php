@@ -30,9 +30,9 @@ return new class extends Migration
                 ->where('primary_provider', 'anthropic')
                 ->update([
                     'primary_provider' => 'mistral',
-                    'model'            => 'mistral-small-latest',
-                    'fallback_chain'   => $r['fallback'],
-                    'updated_at'       => now(),
+                    'model' => 'mistral-small-latest',
+                    'fallback_chain' => $r['fallback'],
+                    'updated_at' => now(),
                 ]);
         }
     }
@@ -52,9 +52,9 @@ return new class extends Migration
                 ->where('primary_provider', 'mistral')
                 ->update([
                     'primary_provider' => 'anthropic',
-                    'model'            => $r['model'],
-                    'fallback_chain'   => $r['fallback'],
-                    'updated_at'       => now(),
+                    'model' => $r['model'],
+                    'fallback_chain' => $r['fallback'],
+                    'updated_at' => now(),
                 ]);
         }
     }

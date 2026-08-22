@@ -91,7 +91,18 @@ function ecrivainNotificationsI48006(string $contenu): bool
     }
 
     // Canal Laravel : le trait `Notifiable` n'ecrit que si on l'appelle.
-    return preg_match('/->\s*notifyNow?\s*\(|Notification::\s*sendNow?\s*\(/', $contenu) === 1;
+    //
+    // ⚠️ `notify(Now)?` et NON `notifyNow?`. Le `?` ne porte que sur le
+    // caractere qui le precede : `notifyNow?` exige `notifyNo` au MINIMUM, et
+    // ne reconnait donc pas `notify()` — le cas le plus courant. Le temoin de
+    // ce fichier l'a attrape le 2026-08-23 : il exigeait que
+    // `$user->notify(new RappelEntretien());` soit vu comme une ecriture, et le
+    // detecteur repondait non.
+    //
+    // C'est exactement le defaut que ce temoin existe pour trouver : un
+    // detecteur casse aurait rendu « aucun ecrivain » sur tout le depot, et la
+    // garde principale serait passee au vert sans rien avoir inspecte.
+    return preg_match('/->\s*notify(Now)?\s*\(|Notification::\s*send(Now)?\s*\(/', $contenu) === 1;
 }
 
 function sourcesBackendI48006(): array

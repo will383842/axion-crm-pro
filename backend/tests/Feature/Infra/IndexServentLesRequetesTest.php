@@ -56,6 +56,45 @@ function plan(string $sql): string
         ->implode("\n");
 }
 
+/**
+ * Le plan, en RETIRANT au planificateur le choix du balayage.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 🔴 POURQUOI CE SECOND INSTRUMENT EXISTE (mesure du 2026-08-23)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `G41-003` a rougi sur un index qui EXISTE et que `pg_trgm` sert
+ * parfaitement — catalogue verifie : `idx_companies_denomination_trgm`,
+ * `gin (denomination_normalized gin_trgm_ops)`, extension installee. Le plan
+ * obtenu etait pourtant `Seq Scan on companies (cost=0.00..2006.00)`.
+ *
+ * La cause est la meme famille que `CompteursHubTest` la veille : un index GIN
+ * alimente DANS UNE TRANSACTION garde ses entrees dans une liste EN ATTENTE
+ * (`fastupdate`), et le planificateur chiffre alors sa lecture bien au-dessus
+ * de sa valeur reelle. `ANALYZE` ne vide pas cette liste : seul `VACUUM` (ou
+ * `gin_clean_pending_list`) le fait, et `VACUUM` ne tourne pas dans une
+ * transaction. Sous `RefreshDatabase`, la situation est donc INEVITABLE.
+ *
+ * *Le verdict ne mesurait pas le schema, il mesurait l'instant.*
+ *
+ * ── CE QUE CE SECOND INSTRUMENT DEMANDE, ET CE QU'IL NE DEMANDE PAS ───────
+ *
+ * Il ne demande plus « l'index est-il le choix le moins cher a cette seconde ».
+ * Il demande « EXISTE-T-IL un index qui sert cette requete » — la seule
+ * question qui vaudra a 4,29 M de lignes, ou la liste en attente aura ete
+ * videe mille fois.
+ *
+ * ⚠️ `SET LOCAL`, et pas `SET` : la connexion est PARTAGEE entre les tests d'un
+ * meme processus. Un `SET` laisse par une assertion rouge fausserait les plans
+ * de TOUS les tests suivants.
+ */
+function planSansBalayage(string $sql): string
+{
+    DB::statement('SET LOCAL enable_seqscan = off');
+
+    return plan($sql);
+}
+
 test('G41-003 — TEMOIN : EXPLAIN distingue une colonne indexee d une colonne nue', function () {
     // Ce test ne verifie pas le produit : il verifie que L'INSTRUMENT discrimine.
     // Sans lui, la garde ci-dessous pourrait rendre « index employe » sur
@@ -147,7 +186,11 @@ test('G41-003 — la recherche par denomination EMPLOIE bien son index trigramme
     // qui sont precisement ceux ou un balayage couterait cher.
     //
     // On mesure donc le cas qui compte : une saisie distinctive.
-    $plan = plan("SELECT id FROM companies WHERE denomination_normalized ILIKE '%c3a4%' LIMIT 10");
+    // ⚠️ `planSansBalayage` et non `plan` : voir l'en-tete de cette fonction.
+    // L'index GIN vient d'etre alimente dans cette transaction, sa liste en
+    // attente n'a pas ete videe, et le planificateur le surevalue. On lui pose
+    // donc la question qui compte : « existe-t-il un index qui sert ceci ? »
+    $plan = planSansBalayage("SELECT id FROM companies WHERE denomination_normalized ILIKE '%c3a4%' LIMIT 10");
 
     $this->assertStringContainsString(
         'idx_companies_denomination_trgm',

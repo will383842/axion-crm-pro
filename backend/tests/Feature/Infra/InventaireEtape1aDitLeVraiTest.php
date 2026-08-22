@@ -60,11 +60,27 @@ function racineDepotA09003(): string
 }
 
 const INVENTAIRE_A09003 = '_REPORTS/2026-08-19_INVENTAIRE-ETAPE-1A.md';
-const MIGRATION_A09003 = 'backend/database/migrations/2026_08_19_000002_crm_activites_et_motifs.php';
+/**
+ * ⚠️ CHEMIN RELATIF A `base_path()`, PAS A LA RACINE DU DEPOT.
+ *
+ * Ecrit d'abord `backend/database/migrations/...` depuis la racine. Sur le banc
+ * local, `backend/` est MONTE a `/var/www/html` : `racine/backend` n'existe pas,
+ * et la garde rougissait sur un fichier pourtant present. En CI l'arbre est
+ * complet et les deux formes marchent — le defaut ne se voyait donc QUE sur le
+ * banc, c'est-a-dire la ou on le regarde le plus souvent.
+ *
+ * `base_path()` designe le meme repertoire dans les deux mondes.
+ */
+const MIGRATION_A09003 = 'database/migrations/2026_08_19_000002_crm_activites_et_motifs.php';
 
 function lireFichierA09003(string $relatif): string
 {
-    $chemin = racineDepotA09003() . '/' . $relatif;
+    // Les documents (`_REPORTS/...`) vivent a la racine du depot ; le code
+    // (`database/...`) vit sous `base_path()`. Sur le banc, les deux ne sont
+    // PAS dans le meme arbre : `backend/` y est monte a part.
+    $chemin = str_starts_with($relatif, 'database/') || str_starts_with($relatif, 'app/')
+        ? base_path($relatif)
+        : racineDepotA09003() . '/' . $relatif;
 
     Assert::assertFileExists(
         $chemin,

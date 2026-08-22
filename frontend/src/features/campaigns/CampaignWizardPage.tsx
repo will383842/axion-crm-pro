@@ -24,6 +24,7 @@ import {
   Button,
   Card,
   cn,
+  CompteurDeSaisie,
   Input,
   PageHeader,
   SegmentedControl,
@@ -179,8 +180,23 @@ export function CampaignWizardPage() {
       max_duration_minutes: maxDuration,
       max_requests_per_minute: maxRpm,
     };
-    if (Object.keys(perSourceLimits).length > 0) {
-      payload.per_source_limits = perSourceLimits;
+    // D26-008 — on n'envoie QUE les limites des sources retenues.
+    //
+    // Le défaut, mesuré le 2026-08-22 : `toggleSource` ne touche que `sources`
+    // et ne purge jamais `perSourceLimits`. Le panneau, lui, n'affiche que les
+    // sources retenues. Une limite saisie pour une source ensuite désélectionnée
+    // n'avait donc PLUS AUCUN affichage — et partait quand même au serveur, où
+    // elle était persistée. Une valeur transmise que personne ne peut voir est
+    // le pire des deux mondes.
+    //
+    // Filtrer à l'envoi plutôt que purger au désélectionnement : purger ferait
+    // perdre la saisie à qui déselectionne une source par erreur, et la
+    // resélectionner ramène ici la valeur qu'il avait tapée.
+    const limitesEnvoyees = Object.fromEntries(
+      Object.entries(perSourceLimits).filter(([source]) => sources.includes(source as CampaignSource)),
+    );
+    if (Object.keys(limitesEnvoyees).length > 0) {
+      payload.per_source_limits = limitesEnvoyees;
     }
     if (scheduleMode === 'later' && scheduledAt) {
       payload.scheduled_at = new Date(scheduledAt).toISOString();
@@ -399,13 +415,18 @@ function StepIdentity({
   return (
     <div className="space-y-5">
       <SectionHeading title="Identité" hint="Nom et description visibles dans la liste des campagnes." />
+      {/* D26-010 — `maxLength` tronque un collage sans rien dire. Le compteur
+          n'apparaît qu'aux abords de la borne (cf. `CompteurDeSaisie`) et
+          bascule au rouge quand la limite est atteinte : la coupure se VOIT. */}
       <Field label="Nom de la campagne" required>
         <Input
           placeholder="Ex : Prospection PME Paris IT — semaine 21"
           value={name}
           onChange={(e) => setName(e.target.value)}
           maxLength={120}
+          aria-describedby="compteur-nom-campagne"
         />
+        <CompteurDeSaisie id="compteur-nom-campagne" valeur={name} max={120} />
       </Field>
       <Field label="Description (optionnel)">
         <textarea
@@ -414,7 +435,9 @@ function StepIdentity({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           maxLength={500}
+          aria-describedby="compteur-description-campagne"
         />
+        <CompteurDeSaisie id="compteur-description-campagne" valeur={description} max={500} />
       </Field>
 
       <Field label="Planification">
@@ -768,6 +791,11 @@ function StepBudget({
                   <label className="text-[10px] uppercase tracking-wider text-slate-500">RPM</label>
                   <Input
                     type="number"
+                    // Le `<label>` ci-dessus n'est rattaché à rien (ni `htmlFor`
+                    // ni englobement) et dit « RPM » pour toutes les sources :
+                    // sans nom accessible propre, ces champs sont
+                    // indiscernables.
+                    aria-label={`RPM — ${meta?.label ?? s}`}
                     min={1}
                     max={100}
                     value={lim.rpm ?? ''}
@@ -784,6 +812,7 @@ function StepBudget({
                   <label className="text-[10px] uppercase tracking-wider text-slate-500">Daily quota</label>
                   <Input
                     type="number"
+                    aria-label={`Quota quotidien — ${meta?.label ?? s}`}
                     min={1}
                     max={50000}
                     value={lim.daily ?? ''}
@@ -838,6 +867,32 @@ function NumberField({
   value: number;
   onChange: (v: number) => void;
 }) {
+  /**
+   * D26-005 — LE BORNAGE NE S'APPLIQUE PLUS À CHAQUE FRAPPE.
+   *
+   * Le défaut, mesuré le 2026-08-22 sur « Durée max (minutes) » (`min={5}`) :
+   * `onChange` bornait la valeur à chaque touche. Taper « 12 » produisait
+   * d'abord « 1 », aussitôt remonté à 5 — et la frappe suivante donnait « 52 ».
+   * Le champ corrigeait l'utilisateur pendant qu'il écrivait. Même mécanique sur
+   * « Entreprises max » dès qu'on efface pour ressaisir : `Number('')` vaut 0,
+   * borné à 1.
+   *
+   * La frappe vit donc ici, en CHAÎNE, et n'est bornée qu'à la sortie du champ.
+   *
+   * ⚠️ Le piège de ce déplacement, et comment il est évité : borner sur `onBlur`
+   * laisse normalement transiter une valeur hors bornes dans l'état du parent
+   * entre la frappe et la sortie — on troquerait une gêne d'ergonomie contre un
+   * envoi invalide. Ici, `onChange` ne remonte au parent QUE des valeurs déjà
+   * dans les bornes ; hors bornes ou vide, le parent conserve sa dernière valeur
+   * valide. `canContinue[4]` et `buildPayload()` ne voient donc jamais
+   * d'invalide, à aucun instant.
+   */
+  const [saisie, setSaisie] = useState<string>(String(value));
+  const [enEdition, setEnEdition] = useState(false);
+  // Hors édition, c'est la valeur du parent qui fait foi : elle peut changer
+  // sans nous (retour à l'étape 4, réinitialisation…).
+  const affichee = enEdition ? saisie : String(value);
+
   return (
     <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200 dark:bg-slate-800/40 dark:ring-slate-700">
       <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
@@ -846,13 +901,33 @@ function NumberField({
       </div>
       <Input
         type="number"
+        // Le libellé vit dans un `<div>` au-dessus, pas dans un `<label>` : sans
+        // cet `aria-label`, le champ n'a AUCUN nom accessible — et aucune garde
+        // ne pourrait le désigner autrement que par son rang.
+        aria-label={label}
         min={min}
         max={max}
         step={step}
-        value={value}
+        value={affichee}
+        onFocus={() => {
+          setSaisie(String(value));
+          setEnEdition(true);
+        }}
         onChange={(e) => {
-          const v = Number(e.target.value);
-          if (!Number.isNaN(v)) onChange(Math.max(min, Math.min(max, v)));
+          const brut = e.target.value;
+          setSaisie(brut);
+          setEnEdition(true);
+          const v = Number(brut);
+          if (brut !== '' && !Number.isNaN(v) && v >= min && v <= max) onChange(v);
+        }}
+        onBlur={() => {
+          setEnEdition(false);
+          const v = Number(saisie);
+          // Champ vidé ou illisible : on ne devine pas ce que l'utilisateur
+          // voulait, le parent garde sa dernière valeur valide et le champ la
+          // réaffiche.
+          if (saisie.trim() === '' || Number.isNaN(v)) return;
+          onChange(Math.max(min, Math.min(max, v)));
         }}
       />
       {hint ? <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{hint}</p> : null}

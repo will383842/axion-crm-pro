@@ -67,8 +67,23 @@ export function UsersPage() {
   });
 
   const inviteMut = useMutation({
+    // H46-008 — le generique ferme le `any` que rendait `api.post` sans
+    // parametre : `.data` traversait le `mutationFn` et echappait a `tsc`. La
+    // suppression `no-unsafe-return` qui gelait ce defaut a ete retiree de
+    // `frontend/eslint-suppressions.json` dans le meme geste.
+    //
+    // ⚠️ `unknown`, et PAS une forme inventee. Mesure du 2026-08-22 :
+    // `grep -rn invite backend/routes` ne rend RIEN — la route
+    // `POST /users/invite` n'existe pas cote serveur (`routes/api.php` ne
+    // declare que `/users` en index/store/update/destroy). Declarer ici la
+    // forme d'une reponse qui n'arrive jamais serait une affirmation sans
+    // mesure. `unknown` dit la verite : on ne sait pas ce qui revient, et le
+    // code ne peut rien en lire sans le qualifier.
+    //
+    // Le point d'entree manquant est un defaut DISTINCT, hors de ce constat :
+    // il n'est pas referme ici.
     mutationFn: async () =>
-      (await api.post('/users/invite', { email: inviteEmail, role: inviteRole })).data,
+      (await api.post<unknown>('/users/invite', { email: inviteEmail, role: inviteRole })).data,
     onSuccess: () => {
       toast.success('Invitation envoyée');
       setOpen(false);

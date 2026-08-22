@@ -165,6 +165,7 @@ function ContactsHubContent() {
         left={
           <>
             <SearchInput
+              label="Rechercher une entreprise, un SIREN ou une personne"
               value={search}
               onChange={setSearch}
               placeholder="Nom d'entreprise, SIREN, personne…"
@@ -253,7 +254,13 @@ function ContactsHubContent() {
                     )}
                   </div>
 
-                  {company.contacts.length > 0 && (
+                  {/* D25-011 — `?.` sur une donnee d'API, pas sur un type.
+                      `types.ts` declare `contacts` et `tags` obligatoires, mais
+                      c'est une promesse de COMPILATION sur une reponse HTTP que
+                      personne ne valide a l'execution : une clef absente jette,
+                      et emporte l'ecran entier. Mesure du 2026-08-22 : cinq
+                      lectures imbriquees sans garde sur la console. */}
+                  {(company.contacts?.length ?? 0) > 0 && (
                     <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-slate-600 dark:text-slate-300">
                       {company.contacts.slice(0, 3).map((contact) => (
                         <span key={contact.id}>
@@ -275,7 +282,8 @@ function ContactsHubContent() {
                     </div>
                   )}
 
-                  {company.tags.length > 0 && (
+                  {/* D25-011 — meme raison qu'au-dessus. */}
+                  {(company.tags?.length ?? 0) > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {company.tags.slice(0, 3).map((slug) => (
                         <span
@@ -285,8 +293,8 @@ function ContactsHubContent() {
                           {tagLabel(slug)}
                         </span>
                       ))}
-                      {company.tags.length > 3 && (
-                        <span className="text-[11px] text-slate-400">+{company.tags.length - 3}</span>
+                      {(company.tags?.length ?? 0) > 3 && (
+                        <span className="text-[11px] text-slate-400">+{(company.tags?.length ?? 0) - 3}</span>
                       )}
                     </div>
                   )}

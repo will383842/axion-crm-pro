@@ -17,6 +17,9 @@ import {
   TableScroll,
 } from '@/components/ui';
 import { api } from '@/lib/api';
+// D29-005 — les montants passent par le formateur partagé : `toFixed()` rendait
+// un point décimal anglais et une espace sécable avant le symbole.
+import { formaterEuros } from '@/lib/monnaie';
 
 interface UseCase {
   id: number;
@@ -225,7 +228,7 @@ export function LlmRouterPage() {
               <KpiCard
                 tone="violet"
                 label="Coût total 30j"
-                value={`${(usage.data?.total_eur ?? 0).toFixed(2)} €`}
+                value={formaterEuros(usage.data?.total_eur ?? 0)}
                 icon={<Activity className="h-4 w-4" />}
               />
               <KpiCard
@@ -267,7 +270,7 @@ export function LlmRouterPage() {
                         <div className="mb-1 flex justify-between text-sm">
                           <span className="capitalize text-slate-700 dark:text-slate-200">{p}</span>
                           <span className="tabular-nums">
-                            {eur.toFixed(2)} € · {pct}%
+                            {formaterEuros(eur)} · {pct}%
                           </span>
                         </div>
                         <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">

@@ -18,9 +18,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # 🔴 F38-008 — plafonds anti-gel, poses le 2026-08-22. Aucun job de la
+  # chaine qualite n'avait de borne : sans elle un job herite du plafond
+  # GitHub de 6 h, et SIX executions etaient figees entre 1 h 28 et 2 h 25
+  # au moment de la mesure. Ce ne sont pas des budgets : ce sont des
+  # plafonds, poses tres au-dessus de la duree utile. Si un job legitime
+  # est tue, relever la borne EN CITANT la duree du run tue — jamais la
+  # retirer. Explication complete : .github/workflows/ci.yml, en-tete.
+  # Garde : backend/tests/Feature/Infra/WorkflowsBornesDeDureeTest.php
   gitleaks:
     name: Secrets scan (Gitleaks)
     runs-on: ubuntu-24.04
+    timeout-minutes: 20  # F38-008 (scan de tout l'historique)
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
@@ -31,16 +40,82 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
+  # ⚠️ 2026-08-22 — constat F38-013 (S2). Ce job portait `continue-on-error: true`
+  # SANS UN MOT, dans le fichier même dont le bloc `trivy`, treize lignes plus
+  # bas, explique pourquoi cette directive a été retirée de son voisin : « une
+  # vulnérabilité CRITICAL ou HIGH n'a JAMAIS pu faire rougir une PR ». Le SAST
+  # était donc le dernier des trois à rendre un vert inconditionnel — et le seul
+  # à le faire sans justification écrite, dans un fichier qui en exige une de
+  # tous les autres.
+  #
+  # CE QUE CE CORRECTIF FAIT — ET CE QU'IL NE FAIT PAS. Les deux comptent.
+  #
+  # ✅ La directive est retirée et le verdict de `semgrep ci` est enfin LU. Son
+  #    code de sortie discrimine : 0 = rien de bloquant, 1 = découvertes,
+  #    ≥ 2 = l'OUTIL a échoué (registre semgrep.dev injoignable, configuration
+  #    illisible, SARIF non écrit). Ce dernier cas sort en ROUGE, comme le job
+  #    `composer-audit` plus bas : ne pas savoir n'est pas un feu vert, et c'est
+  #    précisément la confusion que `continue-on-error` installait.
+  #
+  # ✅ Le défaut n° 3 du bloc `trivy` — l'envoi du SARIF non conditionné à
+  #    l'existence du fichier — était resté ouvert ICI. Sans le `hashFiles`
+  #    ci-dessous, un semgrep qui échoue avant d'écrire le fichier fait rougir
+  #    le job sur « Path does not exist », donc pour une raison qui n'a rien à
+  #    voir avec la sécurité. Le rouge revient maintenant à l'étape qui a
+  #    réellement échoué, avec le message qui dit quoi faire.
+  #
+  # ⛔ LE BLOCAGE SUR LES DÉCOUVERTES N'EST PAS ARMÉ, ET C'EST DÉLIBÉRÉ. Chaque
+  #    garde de ce fichier a été armée APRÈS une mesure, jamais avant : trivy
+  #    « alors que le dépôt comptait ZÉRO alerte ouverte », composer « alors que
+  #    le lock est MESURÉ PROPRE », pnpm par un cliquet posé sur 29 avis comptés
+  #    un par un. Le nombre de découvertes de `semgrep ci` sur `main` n'a JAMAIS
+  #    été mesuré. Armer à l'aveugle rendrait l'un des deux pires résultats : un
+  #    rouge permanent, qui se contourne puis s'ignore — l'état d'où l'on sort —
+  #    ou un vert qu'on croirait mérité.
+  #
+  #    LE GESTE QUI ARME, dans cet ordre :
+  #      1. jouer sur `main` la MÊME invocation que ci-dessous et compter les
+  #         découvertes bloquantes ;
+  #      2. si zéro : remplacer le `exit 0` final par un `exit 1` quand
+  #         `code = 1`, et écrire ici la mesure ET sa date, comme l'ont fait ses
+  #         voisins ;
+  #      3. sinon : poser `.github/sast-cliquet.json` sur le modèle exact de
+  #         `.github/audit-node-cliquet.json` et rougir sur l'AUGMENTATION.
+  #
+  # Garde : backend/tests/Feature/Infra/SastNEtouffePasSonVerdictTest.php
   semgrep:
     name: SAST (Semgrep)
     runs-on: ubuntu-24.04
+    timeout-minutes: 30  # F38-008
     container: returntocorp/semgrep
     steps:
       - uses: actions/checkout@v4
-      - run: semgrep ci --config=p/owasp-top-ten --config=p/security-audit --config=p/laravel --config=p/typescript --sarif --output semgrep.sarif
-        continue-on-error: true
+      - name: SAST — inventaire SARIF, et ROUGE si l outil echoue
+        # `shell: sh` et non bash : l'image `returntocorp/semgrep` est bâtie sur
+        # Alpine, où `bash` peut manquer. Tout ce qui suit est du POSIX strict.
+        shell: sh {0}
+        run: |
+          set +e
+          semgrep ci --config=p/owasp-top-ten --config=p/security-audit --config=p/laravel --config=p/typescript --sarif --output semgrep.sarif
+          code=$?
+          set -e
+          if [ "$code" -ge 2 ]; then
+            echo "ECHEC DE MESURE : semgrep ci a rendu $code — c est l OUTIL qui a echoue, pas une decouverte."
+            echo "Ne pas savoir n est pas un feu vert : ce job sort en 2."
+            echo "Geste : relire le journal ci-dessus. Registre semgrep.dev injoignable => rejouer le job ;"
+            echo "        configuration refusee => corriger les --config de cette etape."
+            exit 2
+          fi
+          if [ "$code" -eq 1 ]; then
+            echo "Semgrep rapporte des decouvertes bloquantes. NON BLOQUANT tant que le cliquet SAST n est pas pose."
+            echo "Geste : cf. le commentaire de ce job — mesurer le compte sur main, PUIS armer"
+            echo "        (exit 1 sec si zero, sinon .github/sast-cliquet.json sur le modele du cliquet Node)."
+          fi
+          exit 0
       - uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        # `always()` seul faisait rougir le job quand le fichier manquait — le
+        # defaut n° 3 du bloc `trivy`, ici encore ouvert avant F38-013.
+        if: always() && hashFiles('semgrep.sarif') != ''
         with: { sarif_file: semgrep.sarif }
 
   # ⚠️ 2026-08-16 — ce job avait TROIS défauts, tous du même genre : il avait
@@ -62,6 +137,7 @@ jobs:
   trivy:
     name: Container scan (Trivy)
     runs-on: ubuntu-24.04
+    timeout-minutes: 45  # F38-008 (construction des images avant scan)
     strategy:
       fail-fast: false # une image vulnérable ne doit pas masquer l'état des deux autres
       matrix:
@@ -135,6 +211,7 @@ jobs:
   trivy-images-tirees:
     name: Scan images tirées (inventaire)
     runs-on: ubuntu-24.04
+    timeout-minutes: 45  # F38-008 (une image tiree puis scannee par entree d'inventaire)
     strategy:
       fail-fast: false
       matrix:
@@ -217,6 +294,7 @@ jobs:
   composer-audit:
     name: PHP deps audit
     runs-on: ubuntu-24.04
+    timeout-minutes: 20  # F38-008
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
@@ -278,10 +356,28 @@ jobs:
   pnpm-audit:
     name: Node deps audit
     runs-on: ubuntu-24.04
+    timeout-minutes: 20  # F38-008
     strategy:
       fail-fast: false
       matrix:
-        path: [frontend, workers]
+        # 🔴 `poc/05_dedup_performance` ajouté le 2026-08-22 — constat H47-004.
+        # Ce répertoire porte un `pnpm-lock.yaml` vivant que RIEN ne regardait :
+        # ni cette matrice, ni aucun bloc `directory:` de `.github/dependabot.yml`
+        # (qui n'en déclare que cinq : /backend, /frontend, /workers, / ×2). La
+        # mesure du 2026-08-19 y trouve l'alerte Dependabot #33 (`esbuild`,
+        # GHSA-g7r4-m6w7-qqqr) : une alerte pour laquelle aucune PR ne serait
+        # jamais proposée et sur laquelle aucune garde ne tournerait.
+        #
+        # ⚠️ La gravité de CETTE alerte est faible (dépendance de développement,
+        # 1 low), mais le mécanisme est général : tout lockfile ajouté hors des
+        # trois répertoires déclarés héritait du même angle mort, en silence.
+        # C'est le trou qu'on ferme, pas l'avis.
+        #
+        # Armé sans risque de rouge immédiat : mesure du 2026-08-19,
+        # `cd poc/05_dedup_performance && pnpm audit` → 1 low, 0 high,
+        # 0 critical, et le relevé de `.github/audit-node-cliquet.json` est posé
+        # sur ces comptes exacts.
+        path: [frontend, workers, poc/05_dedup_performance]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -360,6 +456,7 @@ jobs:
   zap-baseline:
     name: OWASP ZAP baseline
     runs-on: ubuntu-24.04
+    timeout-minutes: 45  # F38-008 (scan actif d'une cible distante)
     if: github.event_name == 'schedule' && vars.ZAP_TARGET_URL != ''
     steps:
       - uses: actions/checkout@v4
@@ -393,6 +490,7 @@ jobs:
   alerte:
     name: Alerte si une analyse de sécurité échoue
     runs-on: ubuntu-24.04
+    timeout-minutes: 10  # F38-008 (ouverture d'une issue)
     needs: [gitleaks, semgrep, trivy, trivy-images-tirees, composer-audit, pnpm-audit]
     if: failure() && github.event_name != 'pull_request'
     steps:

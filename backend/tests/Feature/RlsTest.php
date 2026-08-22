@@ -437,10 +437,31 @@ test('sans contexte, un tag EXISTANT est invisible et son insertion est REFUSÉE
     }
 });
 
-test('la commande de backfill pose bien son contexte workspace (correctif du 2026-08-15)', function () {
+test('la commande de backfill pose bien son contexte workspace (correctif du 2026-08-15, H45-004)', function () {
     // Garde structurelle : sans `WorkspaceContext::run`, la commande retombe
     // dans la panne ci-dessus dès que le rôle applicatif est actif.
-    $source = file_get_contents(app_path('Console/Commands/ScrapingBackfillSrcTags.php'));
+    //
+    // H45-004 — cette garde cherchait la chaîne dans le TEXTE BRUT du fichier,
+    // commentaires compris. Elle serait donc restée VERTE le jour où l'appel
+    // disparaît mais qu'un commentaire le mentionne (« // WorkspaceContext::run(
+    // retiré le … ») : elle trouvait sa propre justification, pas le code.
+    // Mesure du 2026-08-22 : l'appel réel est unique, à
+    // ScrapingBackfillSrcTags.php:98. On dépouille donc les commentaires avant
+    // de chercher.
+    //
+    // Le dépouillement est volontairement simple (`//`, `/* */`, `#` hors
+    // attribut `#[…]`) : il tronque aussi ce qui suivrait un `//` à l'intérieur
+    // d'une chaîne, par exemple une URL. Ce biais ne peut que rendre la garde
+    // plus stricte, jamais plus laxiste — c'est le sens acceptable de l'erreur.
+    $source = (string) file_get_contents(app_path('Console/Commands/ScrapingBackfillSrcTags.php'));
+    $codeSeul = preg_replace('~/\*.*?\*/|//[^\n]*|#(?!\[)[^\n]*~s', '', $source) ?? $source;
 
-    expect($source)->toContain('WorkspaceContext::run(');
+    expect(str_contains($codeSeul, 'WorkspaceContext::run('))->toBeTrue(
+        'H45-004 : `ScrapingBackfillSrcTags` n\'appelle plus `WorkspaceContext::run(` '
+        . 'dans son CODE (une mention en commentaire ne compte plus). Sans ce '
+        . 'contexte, le backfill écrit hors `app.current_workspace_id` et RLS '
+        . 'rejette ses requêtes dès que `CRM_DB_APP_ROLE_ENABLED` est actif. '
+        . 'Geste : réenrobe la boucle de traitement dans `WorkspaceContext::run($workspaceId, …)` '
+        . '(cf. correctif du 2026-08-15, ScrapingBackfillSrcTags.php:98).'
+    );
 });

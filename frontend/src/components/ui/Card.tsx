@@ -47,6 +47,15 @@ export function CardEyebrow({ className, children }: { className?: string; child
   );
 }
 
-export function CardFooter({ className, children }: { className?: string; children?: ReactNode }) {
-  return <div className={cn('mt-4 flex items-center justify-between gap-2', className)}>{children}</div>;
-}
+// D27-001 — `CardFooter` a ete RETIRE d'ici le 2026-08-22.
+//
+// Mesure du 2026-08-22 : `grep -rn CardFooter frontend/src frontend/tests` ne
+// rendait que sa declaration et sa reexportation par `index.ts` — zero
+// appelant, depuis sa naissance. Un composant de systeme sans appelant n'est
+// pas neutre : il se lit comme une promesse (« le pied de carte est deja
+// resolu »), il se met a jour a chaque revue du systeme, et le premier ecran
+// qui en aura besoin heritera d'un composant que rien n'a jamais rendu.
+//
+// S'il faut un pied de carte, on l'ecrit DANS l'ecran qui le demande, et on le
+// remonte ici quand un DEUXIEME ecran le reclame : c'est ce deuxieme appelant
+// qui justifie un composant partage, pas l'intention du premier.

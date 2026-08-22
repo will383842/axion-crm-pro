@@ -10,10 +10,13 @@
  * `DashboardPage.tsx`, et un mock de module ne les aurait pas fait remonter.
  * Ici, en oublier une fait rougir le test.
  *
- * ⚠️ `placeholderData` est un OBJET, pas une fonction : `isLoading` reste donc
- * toujours FAUX et `DashboardSkeleton` n'est jamais rendu. Le premier écran est
- * une grille de zéros. Ce n'est pas un défaut à corriger ici, mais un test qui
- * attendrait un squelette au démarrage attendrait pour rien.
+ * ⚠️ NOTE PÉRIMÉE, CORRIGÉE LE 2026-08-22 (D25-008). Ce fichier disait jusqu'ici
+ * que `placeholderData` — un OBJET de zéros — empêchait `DashboardSkeleton`
+ * d'être rendu, et qu'« un test qui attendrait un squelette au démarrage
+ * attendrait pour rien ». C'était exact, et c'était le défaut : le premier écran
+ * du CRM était une grille de zéros. Le `placeholderData` a été retiré ; la garde
+ * « D25-008 » ci-dessous attend désormais ce squelette, et rougit si quelqu'un
+ * remet un objet de repli dans la requête.
  */
 import { describe, it, expect } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -21,7 +24,7 @@ import userEvent from '@testing-library/user-event';
 
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { renderScreen } from '../helpers/renderScreen';
-import { dynamicGet, getJson, getStatus, recordGet } from '../msw/handlers';
+import { dynamicGet, getJson, getPending, getStatus, recordGet } from '../msw/handlers';
 
 const PATH = '/';
 
@@ -118,6 +121,64 @@ describe('DashboardPage — rendu', () => {
     // L'action est humanisée et collée à l'auteur (« Will · Company Enriched ») :
     // on interroge donc un fragment, pas un nœud entier.
     expect(await screen.findByText(/Company Enriched/)).toBeVisible();
+  });
+
+  /**
+   * D25-008 — « ATTENDRE » ET « RIEN » NE DOIVENT PAS SE RESSEMBLER.
+   *
+   * Le défaut ne vivait QUE dans l'état transitoire : un test d'état stable ne
+   * pouvait pas le voir. `getPending` fige donc `/dashboard/stats` en vol, et on
+   * regarde ce que l'écran montre à cet instant précis — c'est le premier écran
+   * réel de l'application, celui qu'un opérateur voit chaque matin.
+   *
+   * Cette garde rougit si quelqu'un remet un `placeholderData` (ou tout autre
+   * repli qui met `isPending` à faux) : le squelette disparaîtrait, et les
+   * libellés de vignettes apparaîtraient au-dessus de zéros inventés.
+   */
+  it('D25-008 — tant que /dashboard/stats n’a pas répondu, l’écran montre le SQUELETTE, pas des zéros', async () => {
+    const { handler, release } = getPending('/dashboard/stats', STATS);
+    const vue = await renderScreen(<DashboardPage />, {
+      path: PATH,
+      handlers: [handler, ...socle()],
+    });
+
+    await waitFor(() => {
+      expect(
+        vue.container.querySelectorAll('.animate-pulse').length,
+        'D25-008 : aucun `.animate-pulse` pendant que `/dashboard/stats` est en vol — ' +
+          'donc `DashboardSkeleton` n’est pas rendu. Cause connue : un ' +
+          '`placeholderData` dans le `useQuery` de DashboardPage.tsx met `isPending` ' +
+          'à faux, et `isLoading` (= isPending && isFetching) ne vaut plus jamais vrai. ' +
+          'GESTE : retirer `placeholderData` du `useQuery` ; le repli ' +
+          '`const stats = data ?? {…}` suffit déjà à protéger le rendu.',
+      ).toBeGreaterThan(0);
+    });
+
+    // Aucune des deux conclusions ne doit être affichée tant qu'on n'a rien reçu :
+    // ni les chiffres (ils seraient faux), ni l'état vide (il serait mensonger).
+    expect(
+      screen.queryByText('Total entreprises'),
+      'D25-008 : une vignette KPI est affichée avant la réponse du serveur — ' +
+        'la valeur qu’elle porte ne vient d’aucune mesure. GESTE : retirer le repli ' +
+        'qui court-circuite `isLoading` dans DashboardPage.tsx.',
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Lance ton premier scrape'),
+      'D25-008 : l’état vide (« aucune entreprise ») s’affiche alors que le serveur ' +
+        'n’a pas répondu. GESTE : `isEmpty` ne doit se calculer qu’une fois `isLoading` ' +
+        'retombé, donc `isLoading` doit exister.',
+    ).not.toBeInTheDocument();
+
+    // Témoin : la réponse arrivée, le squelette cède la place aux vrais chiffres.
+    // Sans ce témoin, un écran bloqué en squelette passerait la garde ci-dessus.
+    // ⚠️ On ne compte PAS les `.animate-pulse` restants ici : les cartes filles
+    // (ActivityFeed, TopDeptsCard) montent leur propre squelette au même instant,
+    // et la garde deviendrait une course. La présence de la vignette suffit :
+    // elle n'existe QUE dans la branche « chargé » du rendu.
+    release();
+    await waitFor(() => {
+      expect(vignette('Total entreprises')).toHaveTextContent(/4.294.898/);
+    });
   });
 
   it('base vide : invite à lancer un premier scrape, sans afficher d’indicateurs faux', async () => {

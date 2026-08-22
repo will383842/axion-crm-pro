@@ -200,3 +200,84 @@ test('F35-014 — TEMOIN : une banniere contenant OK ne passe pas pour un succes
     expect($r['sortie'])->not->toContain('OK : mot de passe défini');
     expect(strtolower($r['sortie']))->toContain('aucun compte');
 });
+
+/**
+ * F35-007 — LE SECRET NE PASSE QUE PAR L'ENTREE STANDARD.
+ *
+ * CE QUI MANQUAIT, ET QUI EST LE CONSTAT P5-35-005.
+ *
+ * Le correctif F35-007 a ete pose le 2026-08-19 : le script transmettait le mot
+ * de passe par `docker exec -e CRM_MDP="$MDP"`, c'est-a-dire comme ARGUMENT de
+ * la commande `docker`. Il apparaissait donc en clair dans la ligne de commande
+ * du processus, lisible par TOUT utilisateur du serveur via `ps -ef` ou
+ * `/proc/<pid>/cmdline`, pendant toute la duree du `docker exec`.
+ *
+ * Mesure du 2026-08-22 : le correctif est bien en place (`definir-mot-de-passe-crm.sh:147`
+ * fait `printf '%s' "$MDP" | docker exec -i …`), mais il n'avait AUCUNE GARDE.
+ * La seule mention de F35-007 dans `backend/tests/` etait un commentaire —
+ * `DiagnosticConnexionSansEcritureTest.php:15` — qui parle du defaut sans
+ * l'inspecter. Un commentaire n'a jamais rougi.
+ *
+ * POURQUOI UNE LECTURE STATIQUE, ET PAS UNE EXECUTION.
+ *
+ * Les gardes ci-dessus jouent le script contre un faux `docker` : elles
+ * mesurent ce qu'il DIT. Ici on mesure ce qu'il TRANSMET, et un faux `docker`
+ * ne peut pas en temoigner — il verrait les arguments qu'on lui donne, pas
+ * l'exposition dans la table des processus. La forme de la commande est donc
+ * ce qu'il faut lire, et elle se lit dans le fichier.
+ *
+ * ⚠️ Les COMMENTAIRES sont ecartes a dessein. L'en-tete du script et le code PHP
+ * qu'il ecrit citent tous deux `docker exec -e CRM_MDP=...` pour expliquer le
+ * defaut corrige (l.31 et l.85). Une garde qui les compterait rougirait sur la
+ * documentation de son propre correctif.
+ */
+test('F35-007 — le mot de passe ne figure dans AUCUN argument de docker exec', function () {
+    $source = (string) file_get_contents(cheminScriptMotDePasse());
+
+    $fautives = [];
+    foreach (explode("\n", $source) as $index => $ligne) {
+        $nu = ltrim($ligne);
+        // Commentaires shell (`#`) et commentaires du PHP embarque (`//`).
+        if ($nu === '' || str_starts_with($nu, '#') || str_starts_with($nu, '//')) {
+            continue;
+        }
+        $position = strpos($ligne, 'docker exec');
+        if ($position === false) {
+            continue;
+        }
+
+        // On ne regarde qu'APRES `docker exec` : le tube qui alimente son
+        // entree standard (`printf '%s' "$MDP" | docker exec …`) est ecrit
+        // AVANT, et il est precisement la bonne forme.
+        $arguments = substr($ligne, $position);
+        if (preg_match('/\bMDP\b|MOT_DE_PASSE|PASSWORD/i', $arguments) === 1) {
+            $fautives[] = 'l.' . ($index + 1) . ' : ' . trim($ligne);
+        }
+    }
+
+    expect($fautives === [])->toBeTrue(
+        "Le mot de passe repasse par la ligne de commande de `docker exec` :\n" .
+        implode("\n", $fautives) . "\n" .
+        'Tout utilisateur du serveur le lit alors dans `ps -ef` ou /proc/<pid>/cmdline ' .
+        'pendant la duree de la commande (constat F35-007). Geste : le remettre sur ' .
+        'l\'ENTREE STANDARD — `printf \'%s\' "$MDP" | docker exec -i … ` — et laisser le ' .
+        'code PHP le lire par `stream_get_contents(STDIN)`.',
+    );
+});
+
+/**
+ * TEMOIN POSITIF — sans lui, un script qui aurait CESSE de transmettre le mot
+ * de passe satisferait aussi la garde ci-dessus. « Aucun secret en argument »
+ * est trivialement vrai d'un script qui n'envoie plus rien.
+ */
+test('F35-007 — TEMOIN : le mot de passe arrive bien au conteneur, par un tube', function () {
+    $source = (string) file_get_contents(cheminScriptMotDePasse());
+
+    expect(preg_match('/\$MDP"?\s*\|.*docker exec\s+(-\w+\s+)*-i\b/', $source) === 1)->toBeTrue(
+        'Aucun tube n\'amene `$MDP` a l\'entree standard d\'un `docker exec -i`. Soit le ' .
+        'script ne transmet plus le mot de passe du tout — et il ne rend plus l\'acces au ' .
+        'CRM — soit il le transmet autrement, et la garde F35-007 ci-dessus ne mesure plus ' .
+        'rien. `-i` est indispensable : sans lui, `docker exec` ne relaie pas stdin. ' .
+        'Geste : verifier la ligne `SORTIE="$(printf \'%s\' "$MDP" | docker exec -i …)"`.',
+    );
+});

@@ -51,6 +51,13 @@ x-socle-local: &socle-local
     SESSION_SECURE_COOKIE: "false"
     SANCTUM_STATEFUL_DOMAINS: app.localhost,localhost,127.0.0.1
     FRONTEND_URL: https://app.localhost
+    # Constat F37-005 (S3). `backend/config/cors.php` acceptait `https://app.localhost`
+    # PAR DÉFAUT — donc en production aussi, puisque mesure du 2026-08-22 : rien dans
+    # le dépôt ne posait `CORS_ALLOWED_ORIGINS`. Le défaut est désormais la seule
+    # origine de production ; l'origine locale se déclare ICI, dans la surcouche que
+    # la production ne charge jamais (cf. l'en-tête de ce fichier). Sans cette ligne,
+    # la console locale perd son API.
+    CORS_ALLOWED_ORIGINS: https://app.localhost
     # Le lot L6 est livré et gaté. Sans ce drapeau, `/api/v1/crm/*` répond 404
     # et `GET /config/features` annonce `console_v2:false` : les quatre écrans
     # de la console v2 ne s'affichent tout simplement pas. Le défaut `false` de

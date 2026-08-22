@@ -281,4 +281,35 @@ return [
     */
     'console_v2' => env('CRM_CONSOLE_V2_ENABLED', false),
 
+    /*
+    | 🔴 C19-011 (S3) — LA SONDE DE SANTE DES MANDATAIRES NE VERIFIAIT AUCUN
+    | CERTIFICAT.
+    |
+    | Mesure du 2026-08-22 : `WebshareProvider.php:70` et `IPRoyalProvider.php:56`
+    | ecrivaient tous deux `Http::withOptions(['proxy' => …, 'verify' => false])`
+    | avant d'appeler `https://api.ipify.org?format=json`. Un mandataire pouvait
+    | donc rendre N'IMPORTE QUELLE reponse pour ce domaine : il suffisait qu'elle
+    | contienne une IP bien formee pour que `healthCheck()` declare le point de
+    | sortie sain. La seule sonde du sous-systeme etait aveugle a la substitution
+    | qu'elle est censee detecter.
+    |
+    | POURQUOI UNE CLE PAR FOURNISSEUR, ET PAS UN SEUL INTERRUPTEUR. Certains
+    | mandataires HTTPS presentent un certificat d'interception ; remettre la
+    | verification partout d'un coup ferait passer des points de sortie SAINS pour
+    | morts, et `pickEndpoint()` leve une RuntimeException des qu'il n'en reste
+    | aucun — c'est-a-dire l'arret de la collecte. On ferme donc l'oeil
+    | fournisseur par fournisseur, apres mesure, et jamais globalement.
+    |
+    | Le defaut est `true` (on verifie). Quand une cle est mise a `false`, la
+    | sonde le JOURNALISE a chaque appel : une verification desactivee doit rester
+    | visible dans les journaux, sinon elle redevient l'etat par defaut invisible
+    | qu'on repare ici.
+    */
+    'proxies' => [
+        'verify_tls' => [
+            'webshare' => env('WEBSHARE_PROXY_VERIFY_TLS', true),
+            'iproyal' => env('IPROYAL_PROXY_VERIFY_TLS', true),
+        ],
+    ],
+
 ];

@@ -157,7 +157,14 @@ audit: ## audit:verify-chain
 pentest: ## OWASP self-check
 	docker exec axion-crm-api php artisan app:pentest-self-check
 
-dr-drill: ## DR drill (RPO ≤ 1h, RTO ≤ 4h)
+# Constat F39-009 (S2). Cette ligne annonçait un RPO d'une heure — faux d'un
+# facteur 24. La seule sauvegarde qui existe est QUOTIDIENNE (cron 03:00 UTC posé par
+# `infra/scripts/setup-backup.sh`) : la perte maximale réelle est de 24 h. Le
+# script lui-même a été réaligné le 2026-08-16 (`RPO_CIBLE_S=129600`, soit 36 h
+# pour absorber un décalage d'exécution) ; l'aide du Makefile, non. Fermer l'écart
+# demande un archivage continu des journaux de transaction — un chantier, pas une
+# ligne d'aide. Tant qu'il n'est pas fait, cette ligne annonce 24 h.
+dr-drill: ## DR drill (RPO réel ≤ 24 h — sauvegarde quotidienne —, RTO ≤ 4 h)
 	bash infra/scripts/dr-drill.sh
 
 # --- Imports + maintenance -------------------------------------------------

@@ -416,6 +416,59 @@ test('timeline : une cle malformee repond 404 sans interroger la base', function
     $this->getJson('/api/v1/crm/persons/pas-un-sha256/timeline')->assertNotFound();
 });
 
+test('timeline : D29-008 — l heure rejouee du 25 octobre ne renverse pas l ordre', function () {
+    // POURQUOI CETTE GARDE EXISTE : le tri de la fiche 360° comparait les
+    // horodatages en tant que CHAÎNES. `activities.occurred_at` est un
+    // TIMESTAMPTZ que Postgres rend avec le décalage de la session ; le
+    // 25 octobre 2026, l'heure locale 02:30 existe deux fois, et les deux
+    // chaînes ne diffèrent QUE par le suffixe (`+02` / `+01`). Un tri
+    // décroissant par `strcmp` classait alors « +02 » — l'instant ANTÉRIEUR —
+    // en tête. Une heure par an, la timeline mentait sur l'ordre des faits.
+    $personKey = consolePersonKey('bascule-dst@example.invalid');
+    $companyId = consoleCompany($this->workspace->id, '900000211');
+
+    // Les deux instants sont posés AVEC leur décalage explicite : c'est la
+    // seule écriture qui ne dépende pas de la façon dont Postgres tranche
+    // l'ambiguïté d'une heure locale rejouée.
+    foreach ([
+        ['2026-10-25 00:30:00+00', 'ZZ ANCIEN (00:30 Z)'],
+        ['2026-10-25 01:30:00+00', 'ZZ RECENT (01:30 Z)'],
+    ] as [$quand, $titre]) {
+        DB::table('activities')->insert([
+            'workspace_id' => $this->workspace->id,
+            'type' => 'form_submission', 'kind' => 'form_submission',
+            'occurred_at' => $quand, 'person_key' => $personKey,
+            'external_ref' => 'site:event:' . Str::uuid(),
+            'subject_type' => 'company', 'subject_id' => $companyId,
+            'title' => $titre, 'payload' => '{}', 'created_at' => now(),
+        ]);
+    }
+
+    $data = $this->getJson('/api/v1/crm/persons/' . $personKey . '/timeline')
+        ->assertOk()
+        ->json('data');
+
+    // PRÉMISSE INSPECTÉE, PAS SUPPOSÉE : sans une session Postgres alignée sur
+    // Paris, les deux horodatages ne se ressemblent pas et cette garde ne
+    // mesurerait plus rien tout en restant verte.
+    foreach ($data as $activite) {
+        $rendu = (string) $activite['occurred_at'];
+        expect(str_starts_with($rendu, '2026-10-25 02:30:00'))->toBeTrue(
+            "D29-008 : « {$rendu} » n'est pas rendu dans l'heure rejouée de Paris — la session Postgres "
+            . "n'est plus alignée sur Europe/Paris. Vérifier `DB_TIMEZONE` dans backend/phpunit.xml : "
+            . "sans lui, cette garde ne mesure plus le défaut qu'elle est censée garder.",
+        );
+    }
+
+    // `toBe` n'accepte pas de message ici sans risque : on assertionne le
+    // booléen, ce qui laisse la place au geste à faire.
+    expect(($data[0]['title'] ?? null) === 'ZZ RECENT (01:30 Z)')->toBeTrue(
+        "D29-008 : la timeline 360° remonte l'événement le plus ANCIEN en tête pendant l'heure rejouée du "
+        . '25 octobre 2026. Le tri de `PersonTimelineController::show()` compare des chaînes au lieu '
+        . "d'instants : rétablir la comparaison par `self::instantDe()`.",
+    );
+});
+
 // ── 5. ARBITRAGE — bout en bout ─────────────────────────────────────────────
 
 test('arbitrage : la file liste les evenements orphelins, les plus anciens d abord', function () {

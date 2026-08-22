@@ -18,6 +18,7 @@ import {
   Button,
   Card,
   cn,
+  CompteurDeSaisie,
   Input,
   PageHeader,
   Spinner,
@@ -198,6 +199,9 @@ export function AudienceBuilderPage() {
   });
 
   const watchedName = watch('name');
+  // D26-010 — le compteur a besoin de la valeur COURANTE, pas seulement de
+  // celle qui sera soumise : la troncature se produit pendant la frappe.
+  const watchedDescription = watch('description');
   const canCreate = watchedName.trim().length > 0 && (criteria.all?.length ?? 0) > 0;
 
   return (
@@ -217,21 +221,41 @@ export function AudienceBuilderPage() {
           {/* Identité */}
           <Card padding="md" className="space-y-4">
             <SectionHeading icon={<Sparkles className="h-4 w-4" />} title="Informations" />
+            {/*
+              D26-012 — UN SEUL MÉCANISME DE BORNE PAR CHAMP.
+              Ces deux champs en portaient DEUX qui s'annulaient : l'attribut
+              HTML `maxLength` tronque à 120 (resp. 500), et une règle
+              react-hook-form `maxLength` prétendait rougir à 121 (resp. 501) —
+              une longueur que la valeur ne pouvait jamais atteindre. Le message
+              « Max 120 caractères » était donc INATTEIGNABLE par construction.
+              On garde l'attribut HTML — le retirer laisserait partir vers l'API
+              une valeur plus longue que la colonne — et on retire les règles
+              mortes. La borne cesse d'être silencieuse par le compteur
+              (D26-010), pas par un message qui ne s'affiche jamais.
+
+              `required` RESTE : contrairement aux règles de longueur, ce n'est
+              pas un doublon d'un attribut HTML, et il tient si `canCreate`
+              (plus bas) change un jour de forme.
+            */}
             <Field label="Nom" required error={errors.name?.message}>
               <Input
                 placeholder="Ex : PME Île-de-France IT — prêtes outreach"
-                {...register('name', { required: 'Nom requis', maxLength: { value: 120, message: 'Max 120 caractères' } })}
+                {...register('name', { required: 'Nom requis' })}
                 invalid={!!errors.name}
                 maxLength={120}
+                aria-describedby="compteur-nom-audience"
               />
+              <CompteurDeSaisie id="compteur-nom-audience" valeur={watchedName ?? ''} max={120} />
             </Field>
             <Field label="Description (optionnel)">
               <textarea
                 className="min-h-[70px] w-full rounded-lg bg-white px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-200 transition placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700"
                 placeholder="Pour quelle campagne ? Quel objectif ?"
                 maxLength={500}
-                {...register('description', { maxLength: 500 })}
+                aria-describedby="compteur-description-audience"
+                {...register('description')}
               />
+              <CompteurDeSaisie id="compteur-description-audience" valeur={watchedDescription ?? ''} max={500} />
             </Field>
           </Card>
 

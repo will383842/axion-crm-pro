@@ -61,6 +61,17 @@ jobs:
   # l'intérieur d'un même workflow, ci.yml est appelé ici comme workflow
   # réutilisable (`workflow_call`).
   # ---------------------------------------------------------------------------
+  # 🔴 F38-008 — plafonds anti-gel, poses le 2026-08-22. Aucun job de la
+  # chaine qualite n'avait de borne : sans elle un job herite du plafond
+  # GitHub de 6 h, et SIX executions etaient figees entre 1 h 28 et 2 h 25
+  # au moment de la mesure. Ce ne sont pas des budgets : ce sont des
+  # plafonds, poses tres au-dessus de la duree utile. Si un job legitime
+  # est tue, relever la borne EN CITANT la duree du run tue — jamais la
+  # retirer. Explication complete : .github/workflows/ci.yml, en-tete.
+  # Garde : backend/tests/Feature/Infra/WorkflowsBornesDeDureeTest.php
+  # ⚠️ Ce job-ci N'A PAS de `timeout-minutes` et NE PEUT PAS en avoir : GitHub
+  # refuse la cle sur un job qui appelle un workflow reutilisable (`uses:`).
+  # Les bornes des six jobs de `ci.yml` s'appliquent a sa place.
   ci:
     name: CI (gate bloquant)
     uses: ./.github/workflows/ci.yml
@@ -71,6 +82,7 @@ jobs:
 
   deploy:
     name: SSH Hetzner + pull + migrate + restart
+    timeout-minutes: 60  # F38-008 (SSH + pull + migrate + redemarrage + sante)
     needs: [ci]
     if: ${{ needs.ci.result == 'success' }}
     runs-on: ubuntu-24.04

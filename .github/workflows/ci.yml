@@ -17,9 +17,28 @@ name: CI
 #   - PHPStan niveau 8 : baseline `backend/phpstan-baseline.neon` (datée, note
 #     en tête du fichier) — le NOUVEAU code doit être propre, la baseline ne
 #     doit que décroître.
-#   - Pint : le dépôt compte 276 fichiers non formatés ; reformater tout serait
-#     un diff massif hors périmètre. Le contrôle porte donc sur les fichiers PHP
-#     MODIFIÉS (équivalent `--dirty`), qui doivent être impeccables.
+#   - Pint : le dépôt compte encore des fichiers non formatés ; les reformater
+#     tous serait un diff massif hors périmètre. Le contrôle porte donc sur les
+#     fichiers PHP MODIFIÉS (équivalent `--dirty`), qui doivent être impeccables.
+#     🔴 H46-006 — ce paragraphe annonçait un décompte FIGÉ (« 276 »), faux
+#     d'au moins deux générations : la mesure d'audit du 2026-08-19 en donnait
+#     174, et le commit 32f6f46 du 2026-08-21 en a reformaté 95 de plus. Un
+#     chiffre écrit dans un commentaire périme sans que rien ne rougisse : on
+#     donne désormais LE GESTE qui le mesure, pas le résultat. Pour connaître
+#     la dette à l'instant t :
+#         cd backend && ./vendor/bin/pint --test | tail -1
+#     La garde qui refuse qu'un nombre y soit réinscrit :
+#     backend/tests/Feature/Infra/ControleDePintCouvreToutLeBackendTest.php
+#
+# 🔴 F38-008 — CHAQUE job porte désormais `timeout-minutes`. Sans borne, un job
+# hérite du plafond GitHub de 6 h : au moment de la mesure (2026-08-19), SIX
+# exécutions de cette chaîne étaient figées entre 1 h 28 et 2 h 25, à consommer
+# des minutes de runner sans que personne ne soit prévenu. Ces bornes ne sont
+# PAS des budgets de performance : ce sont des plafonds anti-gel, posés très
+# au-dessus de la durée utile. Si un job légitime est tué par sa borne, on la
+# relève EN CITANT la durée mesurée du run tué — jamais au jugement, et jamais
+# en la retirant. La garde qui refuse un job sans borne :
+# backend/tests/Feature/Infra/WorkflowsBornesDeDureeTest.php
 #
 # Les audits de dépendances (pnpm audit / composer audit) et le scan de secrets
 # vivent dans `security.yml` (déjà déclenché sur push + pull_request + cron) :
@@ -78,6 +97,7 @@ jobs:
   config-prod:
     name: La config de production ne publie que 80 et 443
     runs-on: ubuntu-24.04
+    timeout-minutes: 20  # F38-008 — plafond anti-gel (lecture de fichiers + docker compose config)
     steps:
       - uses: actions/checkout@v4
       - name: Inventaire des ports publiés par la configuration FUSIONNÉE
@@ -281,6 +301,7 @@ jobs:
   caddyfile-valide:
     name: Le Caddyfile est-il valide ?
     runs-on: ubuntu-24.04
+    timeout-minutes: 20  # F38-008 — plafond anti-gel (une image Caddy tirée, une validation)
     steps:
       - uses: actions/checkout@v4
 
@@ -355,6 +376,7 @@ jobs:
   scripts-executables:
     name: Les scripts d'infra sont-ils exécutables ?
     runs-on: ubuntu-24.04
+    timeout-minutes: 15  # F38-008 — plafond anti-gel (un `git ls-files` et des bits de mode)
     steps:
       - uses: actions/checkout@v4
       - run: |
@@ -374,6 +396,7 @@ jobs:
   backend:
     name: Backend Laravel (install + PHPStan + Pint + Pest)
     runs-on: ubuntu-24.04
+    timeout-minutes: 60  # F38-008 — le job le plus long de la chaîne (Postgres + suite Pest entière)
     steps:
       - uses: actions/checkout@v4
         with:
@@ -437,7 +460,19 @@ jobs:
             exit 0
           fi
           echo "Base de comparaison : $base"
-          mapfile -t files < <(git diff --name-only --diff-filter=ACMR "$base"...HEAD -- 'backend/**/*.php' | sed 's|^backend/||')
+          # 🔴 H46-007 — le pathspec etait 'backend/**/*.php' SANS la magie
+          # `:(glob)`. Sans elle, git applique fnmatch et `**` n'est qu'un `*`
+          # ordinaire : il exige au moins un segment de repertoire. Mesure du
+          # 2026-08-22, en lecture seule sur ce depot :
+          #   git ls-files -- 'backend/tests/**/*.php'  → 194 fichiers
+          #   backend/tests en contient                  → 197
+          # les 3 absents etant exactement ceux poses DIRECTEMENT sous le
+          # dossier (Pest.php, TestCase.php, bootstrap.php). Le meme angle mort
+          # existait donc pour tout .php pose a la racine de backend/ : aucun
+          # aujourd'hui, mais le premier ajoute aurait echappe au controle sans
+          # que rien ne le dise. `:(glob)` rend `**` reellement recursif, y
+          # compris sur zero segment.
+          mapfile -t files < <(git diff --name-only --diff-filter=ACMR "$base"...HEAD -- ':(glob)backend/**/*.php' | sed 's|^backend/||')
           if [ "${#files[@]}" -eq 0 ]; then
             echo "Aucun fichier PHP modifié — contrôle Pint sans objet."
             exit 0
@@ -567,6 +602,66 @@ jobs:
         # aléatoire reste actif en local pour débusquer le couplage.
         run: php vendor/bin/pest --colors --configuration phpunit-ci.xml
 
+      # 🔴 A06-005 — LE GESTE, PAS SEULEMENT LA CAUSE.
+      #
+      # `ReconstructionBaseTest` interroge `pg_depend` et `ReconstructionAtteignableTest`
+      # EMULE le `DROP` de `db:wipe` sur une base temoin : deux mesures de la
+      # CAUSE. Personne ne jouait le geste lui-meme. Mesure du 2026-08-22 :
+      # `grep -rn 'migrate:fresh' .github/workflows/` ne rendait RIEN — aucune
+      # CI ne reconstruisait la base, et `make db-rebuild-check` (le seul
+      # endroit qui joue les deux passes) n'est appele par aucun workflow.
+      #
+      # Le vrai critere de B10-001 est « DEUX FOIS DE SUITE » : la premiere
+      # passe peut reussir sur une base neuve et la SECONDE mourir en 2BP01
+      # (`cannot drop table part_config because extension pg_partman requires
+      # it`), puisque c'est la premiere qui installe l'extension.
+      #
+      # ⚠️ Ce pas ne peut vivre QU'ICI, apres Pest : il detruit la base. Il vise
+      # `axion-ci-postgres`, conteneur cree par ce job et detruit avec lui —
+      # jamais une base partagee. Le deplacer avant Pest ferait tourner la suite
+      # sur une base a moitie reconstruite.
+      - name: Reconstruction de la base — migrate:fresh DEUX FOIS (BLOQUANT, A06-005)
+        working-directory: backend
+        env:
+          APP_ENV: testing
+          # Meme clef que phpunit.xml : sans APP_KEY, un boot Laravel qui
+          # touche au chiffrement meurt avant la premiere migration.
+          APP_KEY: 'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: '5432'
+          DB_DATABASE: axion_crm_test
+          DB_USERNAME: axion
+          DB_PASSWORD: axion_dev_only
+          # Memes valeurs que `phpunit.xml` : la migration L0 cree le role
+          # applicatif non-proprietaire a partir de la CONFIG. Sans elles, la
+          # reconstruction ne serait pas celle que la suite mesure.
+          DB_APP_USERNAME: axion_app
+          DB_APP_PASSWORD: axion_app_test_only
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: '6379'
+          CACHE_STORE: array
+          SESSION_DRIVER: array
+          QUEUE_CONNECTION: sync
+          MAIL_MAILER: array
+          TELESCOPE_ENABLED: 'false'
+          PULSE_ENABLED: 'false'
+          MOCK_MODE: 'true'
+        run: |
+          set -euo pipefail
+          echo "== reconstruction n°1 =="
+          php artisan migrate:fresh --force
+          echo "== reconstruction n°2 (c'est celle-la qui mourait) =="
+          php artisan migrate:fresh --force
+          echo "== pg_partman doit avoir ete relocalise HORS de public =="
+          sql="select n.nspname from pg_extension e join pg_namespace n on n.oid = e.extnamespace where e.extname = 'pg_partman'"
+          schema=$(docker exec -e PGPASSWORD=axion_dev_only axion-ci-postgres psql -h 127.0.0.1 -U axion -d axion_crm_test -tAc "$sql")
+          echo "pg_partman vit dans « ${schema:-<absente>} »"
+          if [ "$schema" = "public" ]; then
+            echo "::error::pg_partman est reste dans public : le prochain migrate:fresh mourra en SQLSTATE 2BP01. Rejouer « php artisan db:partman-relocaliser » et verifier le crochet CommandStarting d'AppServiceProvider."
+            exit 1
+          fi
+
       - name: Journaux Postgres (diagnostic si la suite échoue)
         if: failure()
         run: |
@@ -578,6 +673,7 @@ jobs:
   frontend:
     name: Frontend React/Vite
     runs-on: ubuntu-24.04
+    timeout-minutes: 30  # F38-008 — plafond anti-gel (install + typecheck + lint + Vitest + build)
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -609,6 +705,7 @@ jobs:
   workers:
     name: Workers Node + Playwright
     runs-on: ubuntu-24.04
+    timeout-minutes: 45  # F38-008 — plafond anti-gel (téléchargement des navigateurs Playwright compris)
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

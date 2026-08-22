@@ -121,8 +121,17 @@ export function Drawer({
     >
       <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={onClose} aria-hidden />
       <div
+        data-tiroir-panneau
         className={cn(
-          'relative h-full w-full overflow-y-auto bg-white shadow-[var(--shadow-popover)] ring-1 ring-slate-200',
+          // D30-005 — le panneau valait `w-full` plafonné à `max-w-sm` (384 px) :
+          // sur un téléphone de 375 px il couvrait l'écran ENTIER et le voile
+          // porteur du `onClick={onClose}` (ligne au-dessus) n'était atteignable
+          // NULLE PART. Fermer supposait de viser la croix, en haut à droite.
+          // `w-[calc(100%-3rem)]` laisse 48 px de voile tapotable quelle que soit
+          // la largeur, et ne change rien au-delà de 432 px : au-delà, le
+          // `max-w-*` reste le plus petit des deux, donc les tiroirs de bureau
+          // sont inchangés. Une bande à tapoter plutôt qu'une croix à viser.
+          'relative h-full w-[calc(100%-3rem)] overflow-y-auto bg-white shadow-[var(--shadow-popover)] ring-1 ring-slate-200',
           'dark:bg-slate-900 dark:ring-slate-800',
           'axion-slide-in-right',
           w,

@@ -38,6 +38,7 @@ import {
   STATUS_LABEL,
   PAUSED_REASON_LABEL,
   statusToTone,
+  uneCampagneEnMouvement,
 } from './types';
 
 type Filter = 'all' | CampaignStatus;
@@ -72,7 +73,26 @@ export function CampaignsListPage() {
       (await api.get<CampaignsListResponse>('/campaigns', {
         params: { per_page: 50, search: rechercheDifferee || undefined },
       })).data,
-    refetchInterval: 10_000,
+    /**
+     * G41-012 — la scrutation SUSPEND, elle ne disparaît pas.
+     *
+     * L'écran se rappelait toutes les dix secondes SANS AUCUNE condition :
+     * ouvert la nuit sur une liste où plus rien ne bouge, il interrogeait le
+     * serveur 8 640 fois par jour pour la même réponse. Le patron de la
+     * réparation existait déjà à côté (`CampaignDetailPage`, constat G42-007) :
+     * `refetchInterval` en EXPRESSION, lue à chaque tour.
+     *
+     * ⚠️ Ce qu'il ne faut SURTOUT pas faire : supprimer la scrutation. Une liste
+     * qui ne se rafraîchit plus pendant qu'une collecte tourne serait une
+     * régression fonctionnelle, pas une économie. On suspend sur les états, on
+     * ne coupe jamais pendant qu'un état peut changer.
+     */
+    refetchInterval: (requete) =>
+      uneCampagneEnMouvement(requete.state.data?.data ?? []) ? 10_000 : false,
+    // Onglet en arrière-plan : personne ne regarde. C'est déjà le défaut de
+    // React Query ; on l'écrit pour que le jour où un défaut global change,
+    // l'intention de cet écran reste lisible.
+    refetchIntervalInBackground: false,
   });
 
   const campaigns = useMemo<Campaign[]>(() => data?.data ?? [], [data]);

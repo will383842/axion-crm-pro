@@ -36,6 +36,24 @@ $appUsername = env('DB_APP_USERNAME', 'axion_app');
 $appPassword = env('DB_APP_PASSWORD', '');
 $useAppRole = filter_var(env('CRM_DB_APP_ROLE_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
 
+/*
+ * D29-010 — « POSÉE À VIDE » N'EST PAS « ABSENTE », ET C'EST POURTANT LE GESTE
+ * NATUREL POUR DÉSACTIVER LE RÉGLAGE.
+ *
+ * Le commentaire de la clé `timezone` (plus bas) ne raisonnait que sur le cas
+ * « clé jamais renseignée » : `env()` rend `null`, `configureTimezone()` teste
+ * `isset()`, rien n'est émis. Mais quelqu'un qui veut revenir en arrière écrit
+ * `DB_TIMEZONE=` dans le `.env` — et `env()` rend alors la chaîne VIDE, pour
+ * laquelle `isset()` est VRAI. Le connecteur émet `SET TIME ZONE ''` à CHAQUE
+ * ouverture de connexion, que Postgres refuse : ce n'est pas un horodatage qui
+ * dérape, c'est toute l'API qui tombe, y compris `/up`.
+ *
+ * On ramène donc le vide à l'absence. Le seul moyen de désactiver le réglage
+ * redevient sûr, quelle que soit la main qui l'écrit.
+ */
+$dbTimezone = env('DB_TIMEZONE');
+$dbTimezone = (is_string($dbTimezone) && trim($dbTimezone) === '') ? null : $dbTimezone;
+
 $pgsqlBase = [
     'driver' => 'pgsql',
     'url' => env('DB_URL'),
@@ -99,7 +117,9 @@ $pgsqlBase = [
     //
     // Les tests, eux, tournent AVEC (cf. `phpunit.xml`) : c'est ce qui rend
     // `HorodatagesFuseauTest` capable de rougir.
-    'timezone' => env('DB_TIMEZONE'),
+    // La valeur passe par `$dbTimezone` (cf. D29-010, en tête de fichier) :
+    // une chaîne vide y est ramenée à `null`, donc à « pas de `SET TIME ZONE` ».
+    'timezone' => $dbTimezone,
 ];
 
 return [

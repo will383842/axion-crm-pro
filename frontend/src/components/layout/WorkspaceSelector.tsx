@@ -58,12 +58,18 @@ export function WorkspaceSelector() {
       items={items}
       // Ce sélecteur vit DANS la barre latérale : il suit ses jetons, pas ceux
       // du contenu — sinon il ressort comme une tache claire sur le fond coloré.
+      // D28-004 — `<span>` avant le 2026-08-22 : la focalisation clavier venait
+      // du `<button>` que `DropdownMenu` posait autour, wrapper depuis retiré
+      // (il fabriquait un bouton-dans-un-bouton chez cinq autres appelants).
       trigger={
-        <span className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-white/10">
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-white/10"
+        >
           <Avatar name={workspaceName} size="xs" />
           <span className="flex-1 truncate text-xs font-medium text-sidebar-fg">{workspaceName}</span>
           <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-sidebar-fg-muted" />
-        </span>
+        </button>
       }
     />
   );

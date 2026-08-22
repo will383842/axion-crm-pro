@@ -164,9 +164,19 @@ function sectionContacts(features: ConsoleFeatures): NavSection {
 export interface SidebarProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
+  /**
+   * D30-005 — la barre prend la largeur de son conteneur au lieu de ses 260 px.
+   *
+   * Rendue DANS le tiroir mobile, la largeur fixe laissait une bande morte :
+   * mesure du 2026-08-22, 375 px de téléphone moins 260 px de barre = 115 px de
+   * vide qui n'était ni la barre ni le voile — on y tapotait sans effet. Le
+   * drapeau reste optionnel : la colonne de bureau garde ses 260 px, qui sont
+   * une largeur de gabarit et non un accident.
+   */
+  pleineLargeur?: boolean;
 }
 
-export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
+export function Sidebar({ collapsed, onToggleCollapse, pleineLargeur = false }: SidebarProps) {
   const router = useRouterState({ select: (s) => s.location.pathname });
   const features = useConsoleFeatures();
   const sections = [SECTION_AUJOURDHUI, sectionContacts(features), ...SECTIONS_APRES_CONTACTS];
@@ -199,7 +209,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
       data-tour="sidebar"
       className={cn(
         'flex h-screen shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-out',
-        collapsed ? 'w-16' : 'w-[260px]',
+        collapsed ? 'w-16' : pleineLargeur ? 'w-full' : 'w-[260px]',
       )}
       aria-label="Navigation latérale"
     >
@@ -284,8 +294,22 @@ function NavSectionBlock({
 
   return (
     <div className="mb-3 last:mb-0">
+      {/*
+        D28-012 — ce titre de groupe était un `<h3>`. Six groupes, donc six
+        `<h3>` émis AVANT le `<h1>` de la page (`PageHeader.tsx`) : le plan de
+        titres du produit commençait par un niveau 3 et la navigation par titres
+        rendait la hiérarchie inintelligible.
+        On ne se contente pas de retirer les `<h3>` — cela supprimerait six
+        points d'ancrage à qui s'en servait. Chaque liste devient un REPÈRE DE
+        RÉGION nommé (`<nav aria-label>`) : l'ancrage change de nature, il ne
+        disparaît pas.
+        `aria-label` plutôt que `aria-labelledby` : barre réduite, le bouton
+        porteur du titre n'est pas rendu du tout (`!collapsed` ci-dessous) et un
+        `aria-labelledby` pointerait alors vers un identifiant inexistant — une
+        région sans nom.
+      */}
       {!collapsed && (
-        <h3 className="mb-1">
+        <div className="mb-1">
           <button
             type="button"
             onClick={onBasculer}
@@ -302,15 +326,17 @@ function NavSectionBlock({
             />
             <span className="flex-1 truncate text-left">{section.title}</span>
           </button>
-        </h3>
+        </div>
       )}
-      <ul id={idListe} className={cn('flex flex-col gap-0.5', !deplie && 'hidden')}>
-        {section.items.map((item) => (
-          <li key={item.to}>
-            <SidebarNavLink item={item} collapsed={collapsed} currentPath={currentPath} />
-          </li>
-        ))}
-      </ul>
+      <nav aria-label={section.title}>
+        <ul id={idListe} className={cn('flex flex-col gap-0.5', !deplie && 'hidden')}>
+          {section.items.map((item) => (
+            <li key={item.to}>
+              <SidebarNavLink item={item} collapsed={collapsed} currentPath={currentPath} />
+            </li>
+          ))}
+        </ul>
+      </nav>
     </div>
   );
 }

@@ -3,8 +3,13 @@
 > **Spec :** Axion CRM Pro v6 — plateforme B2B de prospection automatisée pour Axion-IA.
 > **Date :** 2026-05-16
 > **Auteur de la spec :** Williams Jullin (Axion-IA OÜ)
-> **Format :** 24 fichiers Markdown denses dans `./spec/`, ordonnés.
-> **Statut :** Spec exhaustive — implémentation à venir.
+> **Format :** 25 fichiers Markdown denses dans `./spec/`, ordonnés.
+> **Statut :** Spec exhaustive — **implémentée**. L'état RÉEL du produit se lit
+> dans `ARCHITECTURE.md`, pas ici : ce dossier est la spécification d'origine,
+> figée au 2026-05-16, et il ne suit pas le code.
+> ⚠️ Ce champ a annoncé « implémentation à venir » jusqu'au 2026-08-22 (constat
+> A09-011) alors que `backend/` et `frontend/` étaient en production depuis le
+> 2026-05-17. Un lecteur pressé en concluait qu'il n'y avait rien à casser.
 
 ---
 
@@ -17,69 +22,79 @@
 5. **Liens internes** — utiliser `./XX_nom.md#ancre` pour pointer une section précise.
 6. **Conventions d'écriture** — voir `Conventions` plus bas.
 
-## Sommaire des 24 fichiers
+## Sommaire des 25 fichiers
+
+> La colonne « Lignes » a été RETIRÉE le 2026-08-22 (constat A09-011). Elle
+> annonçait des tailles fausses jusqu'à un facteur 2,44 — `13_ui_admin_phase1.md`
+> était donné pour ~1500 lignes et en comptait 614 — parce qu'une colonne de
+> tailles se périme à chaque commit et que personne ne la remesure. Le compte
+> exact se prend d'un `wc -l spec/*.md` ; il n'a pas à être recopié à la main.
+> Le sommaire annonçait par ailleurs « 24 fichiers » pour un tableau qui en
+> énumérait 25.
 
 ### Bloc 1 — Fondations (5 fichiers)
 
-| # | Fichier | Rôle | Lignes |
-|---|---------|------|--------|
-| 01 | `00_INDEX.md` | Sommaire + glossaire + conventions (ce fichier) | ~400 |
-| 02 | `01_thinking_executive_naming.md` | Chain-of-thought architecte (8 risques + 8 décisions) + executive summary + flux ASCII + 3 propositions nom domaine | ~600 |
-| 03 | `02_architecture_infra.md` | Diagramme infra ASCII + modules + stack précise + dimensionnement Hetzner + isolation totale d'axion-ia.com | ~700 |
-| 04 | `03_db_schema_phase1.md` | ~32 tables PostgreSQL 16 exécutables (FK, indexes, RLS, partitionnement pg_partman) | ~1500 |
-| 05 | `04_db_schema_phase2_scaffold.md` | ~30 tables Phase 2 scaffoldées (campagnes, cold email, LinkedIn outreach, CRM, analytics) | ~1000 |
+| # | Fichier | Rôle |
+|---|---------|------|
+| 01 | `00_INDEX.md` | Sommaire + glossaire + conventions (ce fichier) |
+| 02 | `01_thinking_executive_naming.md` | Chain-of-thought architecte (8 risques + 8 décisions) + executive summary + flux ASCII + 3 propositions nom domaine |
+| 03 | `02_architecture_infra.md` | Diagramme infra ASCII + modules + stack précise + dimensionnement Hetzner + isolation totale d'axion-ia.com |
+| 04 | `03_db_schema_phase1.md` | ~32 tables PostgreSQL 16 exécutables (FK, indexes, RLS, partitionnement pg_partman) |
+| 05 | `04_db_schema_phase2_scaffold.md` | ~30 tables Phase 2 scaffoldées (campagnes, cold email, LinkedIn outreach, CRM, analytics) |
 
 ### Bloc 2 — Couche scraping (3 fichiers)
 
-| # | Fichier | Rôle | Lignes |
-|---|---------|------|--------|
-| 06 | `05_scrapers_14_sources.md` | 14 sources détaillées + spec Google Search Wrapper + spec Direction Finder (ETI/Grandes) | ~1800 |
-| 07 | `06_email_finder_validation.md` | Patterns 15+ variantes + extraction exhaustive + détection pattern entreprise + cascade SMTP N1→N5 + scoring 0-100 | ~900 |
-| 08 | `07_llm_router.md` | Interface `LLMClient` PHP + 5 providers + fallback chain + prompt templates versionnés + A/B testing + cost tracking | ~900 |
+| # | Fichier | Rôle |
+|---|---------|------|
+| 06 | `05_scrapers_14_sources.md` | 14 sources détaillées + spec Google Search Wrapper + spec Direction Finder (ETI/Grandes) |
+| 07 | `06_email_finder_validation.md` | Patterns 15+ variantes + extraction exhaustive + détection pattern entreprise + cascade SMTP N1→N5 + scoring 0-100 |
+| 08 | `07_llm_router.md` | Interface `LLMClient` PHP + 5 providers + fallback chain + prompt templates versionnés + A/B testing + cost tracking |
 
 ### Bloc 3 — Orchestration (3 fichiers)
 
-| # | Fichier | Rôle | Lignes |
-|---|---------|------|--------|
-| 09 | `08_waterfall_enrichissement_classification.md` | State machine 10 étapes Spatie + parallélisation + classification LLM + tags | ~800 |
-| 10 | `09_proxy_pluggable_system.md` | Interface `ProxyProvider` + 4 implémentations (Webshare, IPRoyal, Smartproxy, BrightData) + routeur intelligent | ~700 |
-| 11 | `10_rotations_universelles.md` | 5 dimensions de rotation (proxies, UA, cibles, moteurs recherche, LLM) + weighted round-robin + health checks | ~700 |
+| # | Fichier | Rôle |
+|---|---------|------|
+| 09 | `08_waterfall_enrichissement_classification.md` | State machine 10 étapes Spatie + parallélisation + classification LLM + tags |
+| 10 | `09_proxy_pluggable_system.md` | Interface `ProxyProvider` + 4 implémentations (Webshare, IPRoyal, Smartproxy, BrightData) + routeur intelligent |
+| 11 | `10_rotations_universelles.md` | 5 dimensions de rotation (proxies, UA, cibles, moteurs recherche, LLM) + weighted round-robin + health checks |
 
 ### Bloc 4 — Interface (3 fichiers)
 
-| # | Fichier | Rôle | Lignes |
-|---|---------|------|--------|
-| 12 | `11_carte_france_interactive.md` | MapLibre + OpenFreeMap + IGN AdminExpress + BAN + composant React 3 modes (visu/recherche/action) | ~700 |
-| 13 | `12_coverage_matrix_deduplication.md` | Materialized view rollup + anti-doublon 6 niveaux + fuzzy matching pg_trgm + algo « prochaine zone » | ~800 |
-| 14 | `13_ui_admin_phase1.md` | 17 pages Phase 1 + 5 pages Phase 2 scaffold + wireframes textuels détaillés | ~1500 |
+| # | Fichier | Rôle |
+|---|---------|------|
+| 12 | `11_carte_france_interactive.md` | MapLibre + OpenFreeMap + IGN AdminExpress + BAN + composant React 3 modes (visu/recherche/action) |
+| 13 | `12_coverage_matrix_deduplication.md` | Materialized view rollup + anti-doublon 6 niveaux + fuzzy matching pg_trgm + algo « prochaine zone » |
+| 14 | `13_ui_admin_phase1.md` | 17 pages Phase 1 + 5 pages Phase 2 scaffold + wireframes textuels détaillés |
 
 ### Bloc 5 — Production-ready (4 fichiers)
 
-| # | Fichier | Rôle | Lignes |
-|---|---------|------|--------|
-| 15 | `14_api_routes_laravel.md` | 60-80 endpoints REST + DTOs Spatie Data + rate limiting + Phase 2 stubs 501 | ~1100 |
-| 16 | `15_auth_multitenant_rbac.md` | Sanctum SPA cookie + 2FA TOTP + magic link + RLS policies + Spatie Permission + audit hash chain | ~800 |
-| 17 | `16_monitoring_observabilite.md` | 40+ métriques Prometheus + 10 dashboards Grafana + Alertmanager rules + logs structurés Loki | ~800 |
-| 18 | `17_rgpd_aiact_owasp.md` | Registre RGPD + droit accès/suppression SQL transaction + audit hash chain PHP + AI Act register + checklist OWASP top 10 | ~700 |
+| # | Fichier | Rôle |
+|---|---------|------|
+| 15 | `14_api_routes_laravel.md` | 60-80 endpoints REST + DTOs Spatie Data + rate limiting + Phase 2 stubs 501 |
+| 16 | `15_auth_multitenant_rbac.md` | Sanctum SPA cookie + 2FA TOTP + magic link + RLS policies + Spatie Permission + audit hash chain |
+| 17 | `16_monitoring_observabilite.md` | 40+ métriques Prometheus + 10 dashboards Grafana + Alertmanager rules + logs structurés Loki |
+| 18 | `17_rgpd_aiact_owasp.md` | Registre RGPD + droit accès/suppression SQL transaction + audit hash chain PHP + AI Act register + checklist OWASP top 10 |
 
 ### Bloc 6 — Infrastructure + déploiement (3 fichiers)
 
-| # | Fichier | Rôle | Lignes |
-|---|---------|------|--------|
-| 19 | `18_deploiement_hetzner.md` | Schéma IPs + vSwitch + docker-compose maître + Dockerfiles multi-stage + GH Actions + backups + DR RPO 1h/RTO 4h | ~1100 |
-| 20 | `19_queues_workers_playwright.md` | Queues Horizon exhaustives + workers Laravel/PHP + workers Node/Playwright + bridge Redis | ~900 |
-| 21 | `20_detection_nouveaux_prospects_signaux.md` | Jobs nightly INSEE/BODACC/France Travail + scraping news FR hebdo + notifications Slack/Telegram | ~600 |
+| # | Fichier | Rôle |
+|---|---------|------|
+| 19 | `18_deploiement_hetzner.md` | Schéma IPs + vSwitch + docker-compose maître + Dockerfiles multi-stage + GH Actions + backups + DR RPO 1h/RTO 4h |
+| 20 | `19_queues_workers_playwright.md` | Queues Horizon exhaustives + workers Laravel/PHP + workers Node/Playwright + bridge Redis |
+| 21 | `20_detection_nouveaux_prospects_signaux.md` | Jobs nightly INSEE/BODACC/France Travail + scraping news FR hebdo + notifications Slack/Telegram |
 
 ### Bloc 7 — Exécution (3 fichiers finaux)
 
-| # | Fichier | Rôle | Lignes |
-|---|---------|------|--------|
-| 22 | `21_couts_roadmap.md` | Tableau coûts mensuels détaillé + roadmap 12 semaines avec critères « done » | ~600 |
-| 23 | `22_risques_mitigations.md` | Top 15 risques techniques + légaux + opérationnels avec mitigation chacun | ~700 |
-| 24 | `23_interfaces_phase2_execution_pack.md` | Interfaces Phase 2 + Code Gen Roadmap 12 étapes + Tests AC + Seeders + 12 prompts Claude Code prêts à l'emploi | ~2000 |
-| 25 | `24_frontend_design_system.md` (**v1.2**) | Design tokens + empty/loading states + error boundaries + toast + form patterns + responsive mobile/tablette/desktop + onboarding + saved views + notifications + ⌘K + print PDF | ~1500 |
+| # | Fichier | Rôle |
+|---|---------|------|
+| 22 | `21_couts_roadmap.md` | Tableau coûts mensuels détaillé + roadmap 12 semaines avec critères « done » |
+| 23 | `22_risques_mitigations.md` | Top 15 risques techniques + légaux + opérationnels avec mitigation chacun |
+| 24 | `23_interfaces_phase2_execution_pack.md` | Interfaces Phase 2 + Code Gen Roadmap 12 étapes + Tests AC + Seeders + 12 prompts Claude Code prêts à l'emploi |
+| 25 | `24_frontend_design_system.md` (**v1.2**) | Design tokens + empty/loading states + error boundaries + toast + form patterns + responsive mobile/tablette/desktop + onboarding + saved views + notifications + ⌘K + print PDF |
 
-**Volume total estimé v1.2 :** ~22 000 lignes / ~67 000 mots de spec dense.
+**Volume total, mesuré le 2026-08-22 :** 16 319 lignes sur les 25 fichiers du
+tableau (`AUDIT_v1.md`, hors sommaire, en ajoute 709). La version précédente
+annonçait « ~22 000 lignes estimé » — une estimation, jamais remesurée.
 
 ---
 

@@ -155,7 +155,13 @@ const SCREENS: readonly Screen[] = [
   { url: '/', name: 'Tableau de bord', shot: '01-dashboard.png' },
   { url: '/companies', name: 'Entreprises', shot: '02-companies.png' },
   { url: `/companies/${ABSENT_UUID}`, name: 'Entreprise — fiche', shot: '03-company-detail.png', detailOnAbsentRecord: true },
-  { url: '/contacts', name: 'Contacts', shot: '04-contacts.png' },
+  // ⚠️ D22-005 — quand `CRM_CONSOLE_V2_ENABLED` est à true (le cas ici), cette
+  // URL REDIRIGE vers `/console/contacts` : dans ce mode la barre latérale
+  // n'offre plus l'ancienne liste, et un signet ne doit pas ramener sur un écran
+  // orphelin. La capture `04-contacts.png` montre donc le hub. Aucune assertion
+  // du bloc de test ne porte sur l'URL finale — ce qui est vérifié reste que
+  // l'écran s'ouvre sous la coquille, ce qui est toujours le cas.
+  { url: '/contacts', name: 'Contacts (redirigé vers le hub si console v2)', shot: '04-contacts.png' },
   { url: '/international/roumanie', name: 'International — Roumanie', shot: '05-international-roumanie.png' },
   { url: '/media', name: 'Médias', shot: '06-media.png' },
   { url: `/media/${ABSENT_UUID}`, name: 'Média — fiche', shot: '07-media-detail.png', detailOnAbsentRecord: true },

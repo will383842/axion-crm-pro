@@ -97,8 +97,32 @@ export default defineConfig({
     cssCodeSplit: true,
     rollupOptions: {
       output: {
+        /**
+         * G42-005 — CE DÉCOUPAGE NE COUVRE PAS REACT, ET IL FAUT LE DIRE.
+         *
+         * L'entrée `react: ['react', 'react-dom']` a été RETIRÉE le 2026-08-22.
+         * Elle n'a jamais rien découpé : mesure sur le dernier build présent
+         * (`dist/assets/`), le morceau annoncé `react-l0sNRNKZ.js` faisait
+         * 44 octets — son contenu intégral était la ligne
+         * `//# sourceMappingURL=…`. React et react-dom sont restés dans
+         * `index-Bi4ad1jA.js` (1 046 694 o).
+         *
+         * POURQUOI : la forme OBJET de `manualChunks` ne retient que le module
+         * exactement nommé. `react` et `react-dom` sont des paquets CommonJS
+         * dont le point d'entrée n'est qu'une façade ; le code réel vit dans
+         * `react/cjs/…`, qui n'est nommé nulle part ici. Les trois autres
+         * entrées, elles, tiennent parce que leurs paquets sont en ESM —
+         * `router` (88 127 o), `query` (87 325 o) et `maplibre` (802 715 o)
+         * sortent bien.
+         *
+         * SI ON VEUT VRAIMENT SORTIR REACT : passer à la forme FONCTION
+         * (`manualChunks(id)` testant `id.includes('/node_modules/react-dom/')`
+         * puis `/node_modules/react/`) — et MESURER le build avant/après. Un
+         * découpage mal posé duplique le runtime React 19 et casse les hooks à
+         * l'exécution ; aucune gate de bundle ne le rattraperait.
+         * Garde : `tests/perf/decoupage-manuel.test.ts`.
+         */
         manualChunks: {
-          react: ['react', 'react-dom'],
           router: ['@tanstack/react-router'],
           query: ['@tanstack/react-query', 'axios'],
           maplibre: ['maplibre-gl'],

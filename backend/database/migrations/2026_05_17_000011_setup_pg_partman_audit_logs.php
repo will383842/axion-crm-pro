@@ -91,7 +91,11 @@ return new class extends Migration
                     ip              INET,
                     user_agent      TEXT,
                     payload_hash    TEXT,
-                    prev_hash       TEXT NOT NULL DEFAULT 'GENESIS',
+                    -- B16-013 : plus AUCUN défaut ici. Ce gabarit est celui dont
+                    -- héritent toutes les partitions créées par pg_partman ; le
+                    -- laisser porter un défaut réarmerait, sur chaque base
+                    -- reconstruite, le piège que 2026_08_22_150000 désarme.
+                    prev_hash       TEXT NOT NULL,
                     current_hash    TEXT NOT NULL,
                     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
                     PRIMARY KEY (id, created_at)

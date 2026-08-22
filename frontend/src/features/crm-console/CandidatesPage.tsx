@@ -152,7 +152,7 @@ function CandidatesContent() {
 
       <Toolbar
         left={
-          <SearchInput value={search} onChange={setSearch} placeholder="Nom, prénom, e-mail…" className="w-72" />
+          <SearchInput label="Rechercher un candidat" value={search} onChange={setSearch} placeholder="Nom, prénom, e-mail…" className="w-72" />
         }
       />
 
@@ -207,7 +207,11 @@ function CandidatesContent() {
                     {candidate.cv_ref !== null && <> · CV stocké sur le site</>}
                   </div>
 
-                  {candidate.tags.length > 0 && (
+                  {/* D25-011 — `tags` est declare obligatoire dans `types.ts`,
+                      mais c'est une promesse de COMPILATION sur une reponse
+                      d'API non validee a l'execution : une clef absente jette et
+                      emporte l'ecran entier. Mesure du 2026-08-22. */}
+                  {(candidate.tags?.length ?? 0) > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {candidate.tags.slice(0, 4).map((slug) => (
                         <span

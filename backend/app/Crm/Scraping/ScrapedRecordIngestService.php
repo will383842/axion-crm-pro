@@ -130,6 +130,8 @@ final class ScrapedRecordIngestService
         $updated = 0;
         $optedOut = 0;
         $badMx = 0;
+        /** @var array<string, int> $skipped motif => nombre de personnes écartées */
+        $skipped = [];
 
         foreach ($record->persons as $person) {
             if (($person['kind'] ?? 'person') === 'service_mailbox') {
@@ -148,7 +150,18 @@ final class ScrapedRecordIngestService
                 'updated' => $updated++,
                 'opted_out' => $optedOut++,
                 'bad_mx' => $badMx++,
-                default => null,
+                // C18-002 — LE `default => null` D'AVANT PERDAIT DES PERSONNES.
+                // `upsertContact()` annonce `skipped` dans son propre @return et
+                // le rend dans trois cas ; aucun n'était compté nulle part. Une
+                // personne collectée pouvait donc disparaître entre le message
+                // et le rapport sans qu'un seul chiffre ne bouge.
+                //
+                // La branche est un FOURRE-TOUT VOLONTAIRE, et pas une
+                // énumération : si `upsertContact()` gagne demain un cinquième
+                // retour, il sera compté sous son propre nom au lieu de
+                // retomber dans le silence. C'est la seule forme qui ne peut pas
+                // re-perdre une personne par omission.
+                default => $skipped[$result] = ($skipped[$result] ?? 0) + 1,
             };
         }
 
@@ -181,6 +194,7 @@ final class ScrapedRecordIngestService
             companyFieldsWritten: $fieldsWritten,
             tags: $tags,
             activityId: $activityId,
+            personsSkipped: $skipped,
         );
 
         $this->recordRun($record, $workspaceId, $companyId, $record->status, $outcome, $dedupKey);
@@ -410,7 +424,15 @@ final class ScrapedRecordIngestService
      * stock re-divergerait dès la première collecte suivante.
      *
      * @param  array<string, string>  $person
-     * @return 'created'|'updated'|'opted_out'|'bad_mx'|'skipped'
+     * @return 'created'|'updated'|'opted_out'|'bad_mx'|'skipped_no_last_name'|'skipped_insert_failed'|'skipped_no_change'
+     *
+     * C18-002 — LE `skipped` UNIQUE A ÉTÉ ÉCLATÉ EN TROIS MOTIFS. Il ne s'agit
+     * pas de raffinement : agrégés, ces trois cas ne se distinguaient plus, et
+     * ils appellent des gestes OPPOSÉS. `skipped_no_change` est la marche
+     * normale d'un re-scrape (rien de neuf, tant mieux) ; `skipped_no_last_name`
+     * accuse le collecteur, qui ramène des personnes sans nom ; et
+     * `skipped_insert_failed` est une anomalie de base à instruire. Les compter
+     * ensemble aurait produit un nombre que personne ne saurait lire.
      */
     private function upsertContact(ScrapedRecord $record, string $workspaceId, int $companyId, array $person): string
     {
@@ -422,7 +444,7 @@ final class ScrapedRecordIngestService
         // NOT NULL, et fabriquer un nom depuis l'email est exactement la
         // faiblesse que l'audit demande de NE PAS reproduire.
         if ($lastName === null) {
-            return 'skipped';
+            return 'skipped_no_last_name';
         }
 
         if ($email !== null) {
@@ -502,7 +524,7 @@ final class ScrapedRecordIngestService
                 'updated_at' => now(),
             ]);
 
-            return $id > 0 ? 'created' : 'skipped';
+            return $id > 0 ? 'created' : 'skipped_insert_failed';
         }
 
         // A05-001 — RATTRAPAGE DE LA CLÉ sur une fiche déjà là qui n'en portait
@@ -554,7 +576,7 @@ final class ScrapedRecordIngestService
         }
 
         if ($update === []) {
-            return 'skipped';
+            return 'skipped_no_change';
         }
 
         $update['field_origins'] = $this->encodeObject($origins);

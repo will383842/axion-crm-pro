@@ -5,11 +5,18 @@
 # Usage local (dev MOCK_MODE) :
 #   API_TOKEN=<bearer-token> npx artillery run load-tests/audience-refresh.yml
 #
-# Usage prod (PRUDENCE — affecte vrai serveur) :
-#   API_TOKEN=<token> npx artillery run --target https://app.axion-crm-pro.com \
-#     load-tests/audience-refresh.yml
+# Usage sur environnement de charge DEDIE :
+#   LOAD_TEST_TARGET=https://<env-de-charge> API_TOKEN=<token> \
+#     npx artillery run load-tests/audience-refresh.yml
 #
-# Doc + baselines : load-tests/LOAD-TEST-RUNBOOK.md
+# G43-007 — ce bloc prescrivait ici un « usage prod » avec `--target` sur le
+# domaine de production. Ce n'est pas une precaution a prendre, c'est un geste a
+# ne pas faire : la phase « sustained » envoie 6 000 requetes en 6 minutes, et
+# les lignes creees par le scenario resteraient dans les donnees des clients.
+# La cible par defaut ci-dessous est donc `http://localhost`, et le runbook
+# porte le refus explicite du domaine de production.
+#
+# Doc + baselines + refus de la prod : load-tests/LOAD-TEST-RUNBOOK.md
 # =============================================================================
 
 config:

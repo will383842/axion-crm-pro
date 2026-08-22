@@ -10,7 +10,11 @@ git clone https://github.com/will383842/axion-crm-pro.git
 cd axion-crm-pro
 cp .env.example .env
 
-# 2. Démarrer la stack (Postgres + Redis + Caddy + api + horizon + scheduler + app + workers)
+# 2. Démarrer la stack — les 8 services RÉELS de docker-compose.yml
+#    (postgres, redis, api, horizon, reverb, scheduler, app, caddy).
+#    Cette ligne annonçait « + workers » jusqu'au 2026-08-22 : aucun service
+#    worker n'a jamais été déclaré ici (constat A09-010). Les workers Node se
+#    lancent hors conteneur, depuis `workers/` — voir « Tests » plus bas.
 docker compose up -d
 
 # 3. Migrations + seeders (mode mocks + démo)
@@ -81,8 +85,10 @@ docker exec axion-crm-api composer test
 # Frontend Vitest
 docker exec axion-crm-app pnpm test
 
-# Workers Vitest
-docker exec axion-crm-worker-google-maps pnpm test
+# Workers Vitest (depuis host) — il n'existe AUCUN conteneur `axion-crm-worker-*` :
+# docker-compose.yml n'en déclare pas (mesure du 2026-08-22, constat A09-010).
+# Sous-shell : la ligne suivante repart de la racine du dépôt.
+(cd workers && pnpm test)
 
 # E2E Playwright (depuis host)
 cd frontend && pnpm e2e

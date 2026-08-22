@@ -34,14 +34,38 @@ declare(strict_types=1);
  * `app`, `config`, `database`, `routes` — `tests/` est hors périmètre, une
  * règle PHPStan personnalisée ne serait donc jamais exécutée sur elle-même.
  *
+ * ── CE QUE CETTE GARDE NE FAIT PAS (H46-010) ─────────────────────────────────
+ *
+ * Elle n'invoque JAMAIS PHPStan. Sa seule source de vérité est du TEXTE lu au
+ * disque : `phpstan-baseline.neon` et `phpstan.neon`. C'est un contrôle de
+ * FICHIER, pas une analyse de code.
+ *
+ * Conséquence à connaître, et qui a été prise pour une couverture qu'elle
+ * n'offre pas : **une erreur PHPStan neuve dans `app/` ne fait bouger aucune
+ * assertion de ce fichier**. Le nom « la baseline ne grossit pas » dit vrai —
+ * le fichier ne grossit pas — mais il ne dit rien du code.
+ *
+ * La détection des erreurs NEUVES appartient à l'étape « PHPStan niveau 8
+ * (BLOQUANT — baseline figée) » du job `backend` de `.github/workflows/ci.yml`
+ * (`composer analyse`, ci.yml:444-446 au 2026-08-22). C'est elle, et elle
+ * seule, qui fait rougir du code neuf non conforme au niveau 8. Le dernier test
+ * de ce fichier vérifie que cette étape existe encore et n'a pas été
+ * neutralisée — sans quoi la phrase ci-dessus deviendrait fausse en silence.
+ *
  * QUAND TU FAIS BAISSER LA DETTE : mets à jour les deux plafonds ci-dessous ET
  * l'en-tête de `phpstan-baseline.neon` dans le MÊME commit. Ces nombres ne
  * remontent jamais.
  */
 
-/** Plafonds figés le 2026-08-18, abaissés le 2026-08-21 (211/248 → 191/209). Ne peuvent que DÉCROÎTRE. */
-const BASELINE_MAX_ENTREES = 191;
-const BASELINE_MAX_ERREURS = 209;
+/**
+ * Plafonds figés le 2026-08-18, abaissés le 2026-08-21 (211/248 → 191/209) puis
+ * le 2026-08-22 (191/209 → 190/208 — constat H46-003 : `PentestSelfCheck`
+ * appelle `SsrfGuard::enabled()` au lieu de recopier sa lecture d'`env()`, et
+ * l'entrée `larastan.noEnvCallsOutsideOfConfig` qui gelait cette recopie
+ * disparaît avec elle). Ne peuvent que DÉCROÎTRE.
+ */
+const BASELINE_MAX_ENTREES = 190;
+const BASELINE_MAX_ERREURS = 208;
 
 /**
  * Chemins sur lesquels aucune entrée de baseline n'est tolérée.
@@ -148,7 +172,10 @@ test('le parseur de baseline lit vraiment des entrées', function () {
     expect($entrees[0]['path'])->toStartWith('app/');
 });
 
-test('la baseline PHPStan ne grossit pas', function () {
+// H46-010 — le nom disait « la baseline ne grossit pas » sans dire de QUOI il
+// s'agit. C'est un contrôle de FICHIER : il compte des lignes de
+// `phpstan-baseline.neon`, il ne joue pas PHPStan. Le nom le dit désormais.
+test('le FICHIER de baseline PHPStan ne grossit pas (contrôle de fichier, PHPStan n\'est pas joué — H46-010)', function () {
     ['entrees' => $entrees] = lireBaselinePhpstan();
 
     $nbEntrees = count($entrees);
@@ -218,18 +245,79 @@ test('aucune entrée de baseline ne vise le socle CRM', function () {
     ));
 });
 
-test('reportUnmatchedIgnoredErrors reste activé', function () {
+test('reportUnmatchedIgnoredErrors reste activé (H45-004)', function () {
     $chemin = dirname(__DIR__, 2) . '/phpstan.neon';
     $conf = str_replace(["\r\n", "\r"], "\n", (string) file_get_contents($chemin));
 
     // Sans ce drapeau, une entrée obsolète ne fait rien rougir : la baseline
     // peut alors mentir sans conséquence, et le compteur ci-dessus ne protège
     // plus de rien (on pourrait laisser s'accumuler des lignes mortes).
-    $this->assertStringContainsString(
-        'reportUnmatchedIgnoredErrors: true',
-        $conf,
-        'phpstan.neon doit garder `reportUnmatchedIgnoredErrors: true`. À `false`, ' .
-        'une entrée de baseline qui ne correspond plus à aucune erreur reste ' .
-        'invisible — la baseline devient une garde qui ne garde rien.',
+    //
+    // H45-004 — l'assertion cherchait la chaîne dans le texte BRUT. Mesure du
+    // 2026-08-22 : `phpstan.neon:19-26` est un pavé de commentaires qui cite
+    // `reportUnmatchedIgnoredErrors` mot pour mot ; commenter la déclaration
+    // active (`phpstan.neon:27`) en `# reportUnmatchedIgnoredErrors: true`
+    // aurait donc laissé la garde VERTE alors que le drapeau était éteint. On
+    // dépouille les commentaires NEON (`#` en tête de ligne) puis on lit la
+    // CLÉ — sa déclaration entière — et non plus une sous-chaîne.
+    $sansCommentaires = preg_replace('~^[ \t]*#[^\n]*$~m', '', $conf) ?? $conf;
+    $active = preg_match('~^[ \t]*reportUnmatchedIgnoredErrors:[ \t]*true[ \t]*$~m', $sansCommentaires) === 1;
+
+    expect($active)->toBeTrue(
+        'H45-004 : `phpstan.neon` ne déclare plus `reportUnmatchedIgnoredErrors: true` '
+        . 'hors commentaire. À `false` — ou commentée — une entrée de baseline qui ne '
+        . 'correspond plus à aucune erreur reste invisible : la baseline devient une '
+        . 'garde qui ne garde rien. Geste : rétablis la ligne `reportUnmatchedIgnoredErrors: true` '
+        . 'sous `parameters:` dans backend/phpstan.neon, puis retire les entrées de '
+        . 'baseline devenues orphelines que PHPStan signalera.'
+    );
+});
+
+test('la détection des erreurs PHPStan NEUVES vit dans ci.yml, et son étape est bloquante (H46-010)', function () {
+    // H46-010 — les quatre gardes ci-dessus ne lisent que deux fichiers NEON :
+    // aucune ne ferait rougir une erreur PHPStan neuve dans `app/`. Ce n'est pas
+    // un défaut à réparer ici (faire jouer PHPStan depuis Pest doublerait la CI
+    // et allongerait la suite de plusieurs minutes) — mais l'en-tête de ce
+    // fichier RENVOIE à l'étape CI qui, elle, fait ce travail. Cette garde
+    // vérifie que le renvoi reste vrai : le jour où l'étape disparaît ou passe
+    // en `continue-on-error`, la promesse de l'en-tête devient un mensonge, et
+    // plus rien du tout ne garde le code neuf.
+    $chemin = dirname(__DIR__, 3) . '/.github/workflows/ci.yml';
+    $brut = str_replace(["\r\n", "\r"], "\n", (string) file_get_contents($chemin));
+
+    // Les commentaires du workflow parlent longuement de PHPStan (ci.yml:6-19) :
+    // les chercher reviendrait à trouver la justification au lieu de l'étape.
+    // Même piège que H45-004, on le désamorce de la même façon.
+    $sansCommentaires = preg_replace('~^[ \t]*#[^\n]*$~m', '', $brut) ?? $brut;
+
+    // Le bloc de l'étape : de son `- name:` jusqu'au `- name:` suivant (ou la
+    // fin du fichier). On ne juge que ce bloc, pas le workflow entier.
+    $trouve = preg_match(
+        '~^(?<indent>[ \t]*)- name:[^\n]*PHPStan[^\n]*\n(?<corps>(?:(?!^\g{indent}- name:).*\n)*)~m',
+        $sansCommentaires,
+        $m,
+    ) === 1;
+
+    expect($trouve)->toBeTrue(
+        'H46-010 : `.github/workflows/ci.yml` n\'a plus d\'étape nommée « PHPStan ». '
+        . 'Les gardes de ce fichier ne lisent QUE des fichiers NEON : sans cette étape, '
+        . 'plus rien ne détecte une erreur PHPStan neuve dans `app/`. Geste : rétablis '
+        . 'l\'étape « PHPStan niveau 8 (BLOQUANT — baseline figée) » (`composer analyse`) '
+        . 'dans le job `backend`, ou corrige l\'en-tête de ce fichier qui la cite.'
+    );
+
+    $corps = $m['corps'] ?? '';
+
+    expect(str_contains($corps, 'composer analyse'))->toBeTrue(
+        'H46-010 : l\'étape PHPStan de ci.yml ne lance plus `composer analyse`. '
+        . 'Geste : remets la commande, ou mets à jour l\'en-tête de ce fichier si '
+        . 'l\'analyse a déménagé — l\'en-tête promet qu\'elle est jouée là.'
+    );
+
+    expect(str_contains($corps, 'continue-on-error'))->toBeFalse(
+        'H46-010 : l\'étape PHPStan de ci.yml porte `continue-on-error`. Elle rapporte '
+        . 'alors sans rien bloquer : une erreur de niveau 8 dans du code neuf passerait '
+        . 'en CI VERTE, et les gardes de ce fichier (qui ne lisent que des fichiers) ne '
+        . 'la verraient pas non plus. Geste : retire `continue-on-error` de l\'étape.'
     );
 });

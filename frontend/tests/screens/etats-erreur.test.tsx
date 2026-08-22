@@ -38,12 +38,20 @@
  *
  * ═══ PÉRIMÈTRE ═══
  *
- * 5 écrans représentatifs des 3 familles où le défaut coûte le plus cher :
+ * 6 vues représentatives des familles où le défaut coûte le plus cher :
  *   - console v2 (3 écrans) : la file d'arbitrage, le vivier, le hub contacts ;
  *   - administration (2 écrans) : utilisateurs et journaux d'audit — là où un
  *     403 est le cas NOMINAL pour un opérateur non-admin, donc là où
  *     « Aucun utilisateur » se lit tous les jours.
- * Les 30 autres écrans restent à porter ; le composant partagé est écrit pour ça.
+ *   - accueil (1 bloc) : `ActivityFeed`, constat **P5-35-012** (S3). Mesure du
+ *     2026-08-22 : la branche d'erreur et la branche « base vide » y étaient la
+ *     MÊME (`isError || items.length === 0`), si bien qu'un 403 sur
+ *     `GET /audit-logs` affichait « Activité bientôt disponible » — la promesse
+ *     que le CRM commence à travailler, sur l'écran même qu'on ouvre pour
+ *     savoir s'il travaille. Ce n'est pas un écran de route : c'est un bloc de
+ *     l'accueil, et il est monté seul ici — la garde porte sur SES branches de
+ *     rendu, pas sur la composition du tableau de bord.
+ * Les écrans restants sont à porter ; le composant partagé est écrit pour ça.
  */
 import { describe, it, expect } from 'vitest';
 import type { ReactElement } from 'react';
@@ -58,6 +66,8 @@ import { CandidatesPage } from '@/features/crm-console/CandidatesPage';
 import { ContactsHubPage } from '@/features/crm-console/ContactsHubPage';
 import { UsersPage } from '@/features/users/UsersPage';
 import { AuditLogsPage } from '@/features/rgpd/AuditLogsPage';
+// P5-35-012 — le fil d'activité de l'accueil. Un bloc, pas un écran de route.
+import { ActivityFeed } from '@/features/dashboard/components/ActivityFeed';
 
 import { renderScreen } from '../helpers/renderScreen';
 import { apiUrl, getJson, http, HttpResponse, type HttpHandler } from '../msw/handlers';
@@ -179,6 +189,18 @@ const ECRANS: CasEcran[] = [
     // « Aucun journal d'audit ». Sans accent, et absent du reste de l'écran
     // (le titre est « Journaux d'audit »).
     texteVide: 'Aucun journal',
+  },
+  {
+    // P5-35-012 — le fil d'activité de l'accueil.
+    nom: 'ActivityFeed',
+    rendre: () => <ActivityFeed />,
+    path: '/',
+    vide: { '/audit-logs': { data: [] } },
+    // « Activité bientôt disponible ». On ne cherche NI « Activit » (le titre de
+    // la carte, « Activité récente », le contient et reste affiché en erreur),
+    // NI un mot accentué. « disponible » n'apparaît nulle part ailleurs, ni dans
+    // la carte, ni dans aucun message de `QueryErrorState`.
+    texteVide: 'disponible',
   },
 ];
 

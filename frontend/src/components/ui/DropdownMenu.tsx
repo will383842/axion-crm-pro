@@ -1,6 +1,35 @@
-import type { ReactNode } from 'react';
-import { useEffect, useRef, useState } from 'react';
+// `MouseEvent` est ALIASÉ : sans cela il masquerait le `MouseEvent` du DOM, dont
+// dépend le `document.addEventListener('mousedown', …)` de fermeture ci-dessous.
+import type { MouseEvent as EvenementSouris, ReactElement, ReactNode } from 'react';
+import { cloneElement, useEffect, useRef, useState } from 'react';
 import { cn } from './cn';
+
+/**
+ * D28-004 — CE QUE `DropdownMenu` ATTEND DE SON DÉCLENCHEUR.
+ *
+ * Le composant enveloppait son `trigger` dans SON PROPRE `<button>`. Mesure du
+ * 2026-08-22 : cinq des sept appelants lui passaient déjà un `<button>` —
+ * `AudiencesListPage`, `CampaignsListPage`, `CompanyDetailPage`, `CompanyRow`
+ * et `ScraperRunsPage` (ces trois derniers via `IconButton`). Un bouton dans un
+ * bouton est du HTML invalide : le déclencheur extérieur perd son nom
+ * accessible (celui de l'`aria-label` intérieur ne remonte pas) et axe relève
+ * `nested-interactive`.
+ *
+ * Le composant CLONE désormais son déclencheur au lieu de l'envelopper : les
+ * cinq sites se ferment d'un seul geste, et le nom accessible reste là où il a
+ * toujours été, sur l'élément que l'appelant écrit.
+ *
+ * ⚠️ CONTRAT QUI EN DÉCOULE : le `trigger` doit être un élément FOCALISABLE au
+ * clavier (`<button>`, `<a href>`). Le wrapper disparu ne fournit plus la
+ * focalisation, donc un `<span>` produirait un menu inatteignable au clavier —
+ * c'est pourquoi `UserMenu` et `WorkspaceSelector`, qui passaient un `<span>`,
+ * ont été passés en `<button>`. Garde : `tests/components/declencheur-menu.test.tsx`.
+ */
+interface ProprietesDeclencheur {
+  onClick?: (event: EvenementSouris<HTMLElement>) => void;
+  'aria-haspopup'?: 'menu';
+  'aria-expanded'?: boolean;
+}
 
 export interface MenuItem {
   id: string;
@@ -42,17 +71,22 @@ export function DropdownMenu({
     };
   }, [open]);
 
+  const declencheur = trigger as ReactElement<ProprietesDeclencheur>;
+  const declencheurCable = cloneElement(declencheur, {
+    // Le `onClick` de l'appelant est COMPOSÉ, jamais écrasé : `CompanyRow` y
+    // pose un `stopPropagation()` sans lequel ouvrir le menu déclencherait
+    // aussi la navigation de la ligne.
+    onClick: (event: EvenementSouris<HTMLElement>) => {
+      declencheur.props.onClick?.(event);
+      setOpen((v) => !v);
+    },
+    'aria-haspopup': 'menu',
+    'aria-expanded': open,
+  });
+
   return (
     <div ref={wrapRef} className={cn('relative inline-block', className)}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        className="inline-flex"
-      >
-        {trigger}
-      </button>
+      {declencheurCable}
       {open ? (
         <div
           role="menu"

@@ -12,6 +12,10 @@ use Illuminate\Support\Facades\Http;
  */
 class IPRoyalProvider implements ProxyProvider
 {
+    // C19-011 : la decision « verifie-t-on le certificat de la sonde ? » vit dans
+    // le trait, pas ici — sinon les deux fournisseurs divergent.
+    use VerificationTlsSonde;
+
     public function listEndpoints(string $zone = 'eu'): array
     {
         $user = (string) env('IPROYAL_USERNAME', '');
@@ -53,7 +57,13 @@ class IPRoyalProvider implements ProxyProvider
     public function healthCheck(ProxyEndpointData $endpoint): bool
     {
         try {
-            $resp = Http::withOptions(['proxy' => $endpoint->toProxyUrl(), 'verify' => false])
+            // C19-011 : `'verify' => false` en dur rendait cette sonde incapable
+            // de distinguer `api.ipify.org` d'un mandataire qui se fait passer
+            // pour lui. Voir `VerificationTlsSonde` pour le pourquoi complet.
+            $resp = Http::withOptions([
+                'proxy' => $endpoint->toProxyUrl(),
+                'verify' => $this->verifierTlsDeLaSonde('iproyal', $endpoint),
+            ])
                 ->timeout(15)
                 ->get('https://api.ipify.org?format=json');
             return $resp->ok();

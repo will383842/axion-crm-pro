@@ -501,6 +501,7 @@ export function CompaniesListPage() {
         left={
           <>
             <SearchInput
+              label="Rechercher une entreprise"
               value={filter.search}
               onChange={(v) => setFilterAndReset({ search: v })}
               placeholder="Rechercher une entreprise…"

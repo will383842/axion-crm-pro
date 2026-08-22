@@ -276,3 +276,150 @@ test('A08-003 — la suite ne tourne JAMAIS dans l environnement de la productio
     // disait, pendant que deux autres se lisaient comme des phrases sur la
     // production.
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A06-009 — AUCUN FICHIER DE TEST N'AFFIRME L'ÉTAT DU DRAPEAU SUR LE SERVEUR
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// 🔴 CE QUI ÉTAIT ÉCRIT, ET POURQUOI C'EST GRAVE.
+//
+// `tests/Feature/EtancheiteParTableTest.php` portait, mot pour mot :
+// « `CRM_DB_APP_ROLE_ENABLED` reste à false — sa valeur par défaut, et sa
+// valeur en production ». Or CE DÉPÔT NE PEUT PAS LE SAVOIR : la production n'y
+// est pas observable, et il se contredit lui-même sur ce point exact
+// (`CoverageRefreshMatrix.php` dit `=true`, `PartmanMaintenir.php` dit false, le
+// même jour). Une phrase de test qui tranche à leur place fabrique une
+// certitude sur le SEUL fait qui décide si les policies mordent pour de vrai —
+// et le lecteur suivant s'y fiera pour ne pas re-mesurer.
+//
+// Ce contrôle ne juge pas quelle valeur est la bonne. Il interdit seulement
+// qu'un fichier de test AFFIRME la valeur du drapeau côté serveur. Le
+// conditionnel reste permis, et c'est voulu : `NeDoitPasRegresserTest.php` écrit
+// « tant que … vaut false, … » et n'affirme rien — cette formulation-là décrit
+// une hypothèse de lecture, pas un état du monde.
+
+/**
+ * Les fichiers de test qui parlent du drapeau. ÉNUMÉRÉS À LA MAIN, jamais
+ * ramassés au `glob` : un fichier qui apparaîtrait demain doit être ajouté ici
+ * par quelqu'un qui l'a relu. Un `glob` l'avalerait en silence — et une garde
+ * qui grossit toute seule finit par certifier ce qu'elle n'a jamais inspecté.
+ *
+ * @return list<string>
+ */
+function a06FichiersQuiParlentDuDrapeau(): array
+{
+    return [
+        'tests/Feature/RlsTest.php',
+        'tests/Feature/EtancheiteParTableTest.php',
+        'tests/Feature/NeDoitPasRegresserTest.php',
+        'tests/Feature/Rgpd/RolePorteurDeLaRlsTest.php',
+    ];
+}
+
+/**
+ * Les tournures qui AFFIRMENT une valeur côté serveur. Volontairement étroites :
+ * « 71 fois sur 71 en production » (RlsTest) et « un trou en production »
+ * (EtancheiteParTableTest) sont des faits rapportés d'ailleurs, pas des
+ * affirmations sur le drapeau — les rendre rouges ferait de cette garde un
+ * censeur de prose au lieu d'un contrôle.
+ *
+ * @return list<string>
+ */
+function a06TournuresQuiAffirment(): array
+{
+    return [
+        'valeur en production',
+        'vaut false en production',
+        'est a false en production',
+        'reste a false en production',
+    ];
+}
+
+/**
+ * Aplatit un fichier PHP en une phrase continue et sans accents.
+ *
+ * Deux raisons, toutes deux payées ici : les commentaires de ce dépôt coupent
+ * les phrases sur plusieurs lignes derrière des « * », de sorte qu'une simple
+ * recherche de sous-chaîne ne verrait JAMAIS « sa valeur en production » ; et
+ * l'accentuation varie (« à false » / « a false ») d'un fichier à l'autre.
+ */
+function a06Aplatir(string $contenu): string
+{
+    $sansCommentaire = preg_replace('/\s*\n\s*(\*|\/\/)\s*/u', ' ', $contenu) ?? $contenu;
+    $uneLigne = preg_replace('/\s+/u', ' ', $sansCommentaire) ?? $sansCommentaire;
+
+    $sansAccent = strtr(mb_strtolower($uneLigne), [
+        'à' => 'a', 'â' => 'a', 'ä' => 'a', 'é' => 'e', 'è' => 'e', 'ê' => 'e',
+        'ë' => 'e', 'î' => 'i', 'ï' => 'i', 'ô' => 'o', 'ö' => 'o', 'ù' => 'u',
+        'û' => 'u', 'ü' => 'u', 'ç' => 'c',
+    ]);
+
+    return $sansAccent;
+}
+
+test('A06-009 — TEMOIN : le lecteur voit la phrase MEME coupee sur deux lignes et accentuee', function () {
+    // La forme exacte qui a échappé pendant des semaines : coupée par un « * »
+    // de bloc de commentaire, et accentuée.
+    $fabrique = " * `CRM_DB_APP_ROLE_ENABLED` reste à false — sa valeur par défaut, et sa valeur\n"
+        . " * en production —, l'application se connecte avec le rôle `axion`.\n";
+
+    expect(str_contains(a06Aplatir($fabrique), 'valeur en production'))->toBeTrue(
+        'Le lecteur ne recolle pas une phrase coupée par un bloc de commentaire : le contrôle '
+        . 'ci-dessous serait vert sur le défaut même qu il est censé voir (piège documenté : '
+        . '`RecursiveDirectoryIterator` et les recherches naïves ont déjà produit des verts creux ici).',
+    );
+
+    // Et il ne doit PAS rougir sur un fait rapporté qui contient les mêmes mots.
+    $rapporte = " * « coverage:refresh-matrix échoue 71 fois sur 71 en production depuis l'armement ».\n";
+    $touches = array_filter(
+        a06TournuresQuiAffirment(),
+        static fn (string $t): bool => str_contains(a06Aplatir($rapporte), $t),
+    );
+    expect($touches)->toBe(
+        [],
+        'Le contrôle rougit sur un fait rapporté (« 71 fois sur 71 en production ») : il censure la '
+        . 'prose au lieu de traquer une affirmation sur le drapeau.',
+    );
+});
+
+test('A06-009 — aucun fichier de test n affirme la valeur du drapeau cote serveur', function () {
+    $fautifs = [];
+
+    foreach (a06FichiersQuiParlentDuDrapeau() as $relatif) {
+        $chemin = base_path($relatif);
+
+        // TEMOIN DE MONTAGE : un fichier absent rendrait « il n'affirme rien »
+        // vrai par vacuité — exactement le vert creux que cette campagne traque.
+        expect(is_file($chemin))->toBeTrue(
+            "Le fichier `{$relatif}` n existe plus (déplacé ? renommé ?). Tant qu il figure dans "
+            . '`a06FichiersQuiParlentDuDrapeau()` sans être lisible, cette garde ne mesure RIEN. '
+            . 'Geste : corriger le chemin dans la liste, ou l en retirer en connaissance de cause.',
+        );
+
+        $aplati = a06Aplatir((string) file_get_contents($chemin));
+
+        // On ne relève que les fichiers qui NOMMENT le drapeau : ailleurs, ces
+        // tournures parlent d'autre chose.
+        if (! str_contains($aplati, 'crm_db_app_role_enabled')) {
+            continue;
+        }
+
+        foreach (a06TournuresQuiAffirment() as $tournure) {
+            if (str_contains($aplati, $tournure)) {
+                $fautifs[] = $relatif . ' → « ' . $tournure . ' »';
+            }
+        }
+    }
+
+    expect($fautifs)->toBe(
+        [],
+        "Un fichier de test AFFIRME la valeur de `CRM_DB_APP_ROLE_ENABLED` sur le serveur :\n  - "
+        . implode("\n  - ", $fautifs) . "\n\n"
+        . "Ce dépôt n a pas les moyens de le savoir — la production n y est pas observable, et il se "
+        . "contredit lui-même (`CoverageRefreshMatrix.php` dit `=true`, `PartmanMaintenir.php` dit "
+        . "false, le même jour). Constat A06-009.\n"
+        . "Geste : dire ce qui EST mesurable — « sa valeur par défaut, et celle sous laquelle CETTE "
+        . "SUITE tourne » — et renvoyer à ce fichier pour la divergence. Le conditionnel (« tant que "
+        . '… vaut false ») reste permis : il décrit une hypothèse, pas un état du monde.',
+    );
+});

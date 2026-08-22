@@ -105,7 +105,13 @@ function PersonTimelineContent() {
 
         <Card>
           <CardTitle>Timeline</CardTitle>
-          {data.data.length === 0 ? (
+          {/* D25-011 — `data.data` vient d'une reponse d'API que rien ne valide
+              a l'execution : sans `?.`, une clef absente jette et emporte tout
+              l'ecran (timeline ET l'encart « univers » au-dessus). On accepte
+              ici de confondre « absent » et « vide » : l'ecran ne sait de toute
+              facon pas distinguer les deux, et un ecran blanc est pire.
+              Mesure du 2026-08-22. */}
+          {(data.data?.length ?? 0) === 0 ? (
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Aucun touchpoint enregistré.</p>
           ) : (
             <ol className="mt-3 flex flex-col gap-3">

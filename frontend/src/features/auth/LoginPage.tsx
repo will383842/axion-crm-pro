@@ -17,7 +17,15 @@ export function AuthShell({
   children: ReactNode;
 }) {
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-white to-sky-50/30 px-4 py-12 dark:from-slate-950 dark:via-slate-900 dark:to-sky-950/30">
+    // D28-012 — `<main>` et non `<div>`. Les quatre écrans d'authentification
+    // (`/login`, `/2fa`, `/magic-link`, `/password-reset`) vivent HORS de la
+    // coquille : ils sont enfants de `rootRoute` et jamais de `layoutRoute`, le
+    // `<main id="main">` de `RootLayout` ne les couvre donc pas. Mesure du
+    // 2026-08-22 : `grep -c '<main|role="banner"|<nav'` rendait 0 sur les
+    // quatre — aucun repère de région, sur les seuls écrans que TOUT
+    // utilisateur traverse. Un seul geste les couvre tous, puisqu'ils partagent
+    // cette coquille.
+    <main className="relative flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-white to-sky-50/30 px-4 py-12 dark:from-slate-950 dark:via-slate-900 dark:to-sky-950/30">
       {/* Subtle decorative orbs */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-32 top-1/3 h-72 w-72 rounded-full bg-sky-200/30 blur-3xl dark:bg-sky-900/20" />
@@ -44,7 +52,7 @@ export function AuthShell({
           {children}
         </Card>
       </div>
-    </div>
+    </main>
   );
 }
 

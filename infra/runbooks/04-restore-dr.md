@@ -230,8 +230,20 @@ docker exec axion-crm-postgres sh -c 'df -h /var/lib/postgresql/data'
 **C'est ici que passe tout le travail, et il tient en une commande.**
 
 ```bash
-bash /opt/axion-crm-pro/infra/scripts/restore-postgres.sh /tmp/restore/axion_crm_20260820T030000Z.sql.gz axion_crm
+JE_RESTAURE_LA_PRODUCTION=oui \
+  bash /opt/axion-crm-pro/infra/scripts/restore-postgres.sh /tmp/restore/axion_crm_20260820T030000Z.sql.gz axion_crm
 ```
+
+> ⚠️ **Le préfixe `JE_RESTAURE_LA_PRODUCTION=oui` n'est pas décoratif** (constat
+> F39-010, 2026-08-22). Jusqu'à cette date, la base cible avait pour DÉFAUT
+> `axion_crm` : un `restore-postgres.sh dump.sql.gz` sans second argument — la
+> forme même que le script donnait en exemple — écrasait la production sans
+> poser de question. Le second argument est désormais **obligatoire**, et viser
+> la production demande **en plus** cette variable.
+>
+> **Ici, dans ce runbook, c'est bien ce qu'on veut** : la machine est neuve, la
+> base est vide, on remonte la production. Ailleurs, restaure dans une base
+> nommée autrement (`axion_crm_restore`) — le script la crée.
 
 Le script fait six étapes, et **chacune est là parce qu'elle a manqué un jour** :
 

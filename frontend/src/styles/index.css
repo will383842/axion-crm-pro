@@ -168,10 +168,27 @@ body {
   position: absolute;
   left: -9999px;
 }
+/* D28-005 — le lien d'évitement n'avait NI fond NI couleur : il héritait de
+   celle du corps (quasi noir en mode clair, cf. `body` ligne 80) et se posait
+   en `1rem/1rem`, c'est-à-dire PAR-DESSUS la barre latérale. Mesure du
+   2026-08-22 : 1,19:1 en mode clair — le seul dispositif de saut de navigation
+   du produit était illisible pour qui l'atteint au clavier.
+   Les jetons `--color-sidebar-*` sont choisis À DESSEIN : ils valent en clair
+   COMME en sombre (cf. le commentaire du bloc `@theme`, ligne 19), donc une
+   seule déclaration couvre les deux thèmes — poser une couleur en dur aurait
+   rouvert le défaut dans l'autre. Rembourrage et contour sont là pour que la
+   zone focalisée se VOIE, pas seulement qu'elle contraste. */
 .skip-link:focus {
   left: 1rem;
   top: 1rem;
   z-index: 9999;
+  background: var(--color-sidebar-active);
+  color: #fff;
+  padding: 0.5rem 0.875rem;
+  border-radius: var(--radius-button);
+  outline: 2px solid var(--color-brand-300);
+  outline-offset: 2px;
+  box-shadow: var(--shadow-popover);
 }
 
 /* Print-PDF utilitaire (cf. spec/24) */
@@ -196,4 +213,34 @@ body {
   padding-top: 0.25rem;
   padding-bottom: 0.25rem;
   line-height: 1.25rem;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   MOUVEMENT RÉDUIT — D28-016.
+
+   Mesure du 2026-08-22 : quatre `@keyframes` déclarées plus haut (lignes 55-70),
+   dont `.axion-pulse-dot` en `infinite`, montée sur `StatusPill`, `PageHeader`
+   et `CampaignDetailPage` — et AUCUNE occurrence de `prefers-reduced-motion`
+   dans tout le frontend, ni en CSS ni en JS. Pour qui a demandé la réduction du
+   mouvement au niveau du système (trouble vestibulaire, migraine, épilepsie
+   photosensible), le produit ne tenait aucun compte de la demande.
+
+   La règle est GLOBALE et non classe par classe : elle couvre du même geste les
+   quatre animations maison ET les `transition-*` de Tailwind, et surtout elle
+   couvrira celles qu'on ajoutera demain — un traitement au cas par cas se serait
+   désynchronisé à la première animation suivante.
+
+   `animation-iteration-count: 1` plutôt que `animation: none` : un composant qui
+   se démonterait sur `animationend` continue de recevoir l'événement, presque
+   immédiatement. Supprimer l'animation le laisserait monté pour toujours.
+   ────────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

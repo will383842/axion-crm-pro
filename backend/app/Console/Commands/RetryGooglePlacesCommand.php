@@ -16,8 +16,10 @@ use Illuminate\Console\Command;
  *     dès que le quota mensuel free ($200 crédit ≈ 11500 calls) est atteint.
  *  2. Le 1er de chaque mois suivant, cette commande retraite les pending.
  *
- * Schedule recommandé : Schedule::command('companies:retry-google-places --limit=500')
- *                         ->monthlyOn(1, '03:00')->withoutOverlapping();
+ * Réellement planifiée (routes/console.php) : `--limit=500`, `monthlyOn(1, '03:00')`,
+ * `withoutOverlapping(120)`, `onOneServer()`. Le `skip()` d'existence qui l'y
+ * accompagnait a été retiré le 2026-08-22 (constat A09-012 / B17-007) : il rendait
+ * toujours false, cette commande étant déclarée juste en dessous.
  */
 class RetryGooglePlacesCommand extends Command
 {

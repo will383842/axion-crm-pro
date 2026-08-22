@@ -34,6 +34,25 @@
     "Sans cette seconde mesure, le premier passage en CI aurait pu rougir pour une",
     "raison n ayant rien a voir avec la securite."
   ],
+  "_ajout_poc_05_dedup_performance": [
+    "Ajoute le 2026-08-22 — constat H47-004, en meme temps que l entree",
+    "correspondante dans la matrice `pnpm-audit` de .github/workflows/security.yml.",
+    "",
+    "Ce lockfile existait et RIEN ne le regardait : ni cette matrice, ni aucun",
+    "bloc `directory:` de .github/dependabot.yml. L alerte Dependabot #33",
+    "(esbuild, GHSA-g7r4-m6w7-qqqr) porte sur lui.",
+    "",
+    "RELEVE MESURE LE 2026-08-19, pas suppose : `cd poc/05_dedup_performance &&",
+    "pnpm audit` rend « 1 vulnerabilities found / Severity: 1 low » et sort en 1.",
+    "Donc high=0, critical=0 : armer ce lot ne fait rougir aucune PR aujourd hui,",
+    "et toute AUGMENTATION la fera rougir demain. Le seul avis present est `low`,",
+    "que le cliquet ne compte pas — il reste visible dans l etape « Inventaire",
+    "lisible » du job.",
+    "",
+    "⚠️ Si poc/ est un jour declare mort, le geste est de SORTIR le lockfile du",
+    "depot ET de retirer les deux entrees (matrice + ce releve) dans le MEME",
+    "changement : un lot releve sans lockfile ferait rougir le job pour rien."
+  ],
   "lots": {
     "frontend": {
       "high": 18,
@@ -42,6 +61,10 @@
     "workers": {
       "high": 10,
       "critical": 1
+    },
+    "poc/05_dedup_performance": {
+      "high": 0,
+      "critical": 0
     }
   }
 }

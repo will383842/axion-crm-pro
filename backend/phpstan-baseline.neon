@@ -1,7 +1,7 @@
 # =============================================================================
 # BASELINE PHPStan — dette figée le 2026-08-13, dégonflée le 2026-08-18
 # =============================================================================
-# ÉTAT COURANT (2026-08-18) : 191 entrées / 209 erreurs, niveau 8.
+# ÉTAT COURANT (2026-08-18) : 190 entrées / 208 erreurs, niveau 8.
 # Ces deux nombres sont FIGÉS dans un test Pest — cf.
 # tests/Unit/PhpstanBaselineNeGrossitPasTest.php. Ils ne peuvent que DÉCROÎTRE ;
 # quand tu les fais baisser, mets à jour le test dans le MÊME commit.
@@ -32,6 +32,11 @@
 #     ZÉRO entrée nouvelle. Une seule croissance : `SsrfGuard` 1 → 2, deux méthodes
 #     sœurs lisant `env()` hors `config/` — choix documenté dont le défaut est le
 #     comportement SÛR.
+#   - 2026-08-22 (H46-003) : `PentestSelfCheck::checkSsrfGuard()` relisait
+#     `env('SSRF_GUARD_DENY_PRIVATE', false)` — soit le défaut INVERSE de
+#     `SsrfGuard::enabled()`, qui lit la même variable avec `true`. Il appelle
+#     désormais la garde au lieu de recopier sa lecture : l'appel `env()` hors
+#     `config/` disparaît avec la recopie → 191 → 190 entrées, 209 → 208 erreurs.
 #
 # Piège à connaître : déclarer une colonne JSONB castée `array` rend « toujours
 # vrai » les `is_array()` défensifs qui la lisent, et PHPStan le signale. Trois
@@ -182,12 +187,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: app/Console/Commands/MediaFindWebsites.php
-
-		-
-			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
-			identifier: larastan.noEnvCallsOutsideOfConfig
-			count: 1
-			path: app/Console/Commands/PentestSelfCheck.php
 
 		-
 			message: '#^Strict comparison using \=\=\= between array\{\} and array\{\} will always evaluate to true\.$#'

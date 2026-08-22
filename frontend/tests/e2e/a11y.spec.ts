@@ -62,9 +62,13 @@ const SOCLE: ReadonlyArray<{ regle: string; url: string; noeudsMax: number; pour
     url: '*',
     noeudsMax: 1,
     pourquoi:
-      '2 fautifs mesures : le bouton de theme de `DarkModeToggle.tsx:44` (`px-2 py-1` -> '
-      + "22,9 x 24 px) et le bouton « Afficher le mot de passe » de `LoginPage.tsx` (`p-0.5` "
-      + '-> 20 x 20 px). Minimum WCAG 2.2 AA : 24 x 24 px.',
+      '2 fautifs mesures au 2026-08-20 : le bouton de theme de `DarkModeToggle.tsx:44` '
+      + "(`px-2 py-1` -> 22,9 x 24 px) et le bouton « Afficher le mot de passe » de "
+      + '`LoginPage.tsx` (`p-0.5` -> 20 x 20 px). Minimum WCAG 2.2 AA : 24 x 24 px. '
+      + '⚠️ D28-015 ferme le PREMIER des deux le 2026-08-22 (`min-h-6 min-w-6` pose sur '
+      + 'le bouton de theme) : il ne reste que `LoginPage.tsx`, hors du perimetre de ce '
+      + "lot. Le plafond n'est pas abaisse ici — le socle ne se retracte pas tout seul "
+      + '(cf. avertissement ci-dessus : `target-size` depend de la fonte du runner).',
   },
   // ── Le tableau virtualise des entreprises ────────────────────────────────
   // Ces quatre lignes n'etaient PAS visibles de l'ancienne porte : elle

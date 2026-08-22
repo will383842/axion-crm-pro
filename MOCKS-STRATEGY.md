@@ -1,6 +1,11 @@
 # Stratégie mocks Axion CRM Pro (Sprint 1 → S12)
 
-> **But :** coder l'intégralité de la plateforme Phase 1 SANS dépendre de services externes payants (LLM, proxies, captcha, SMTP). Tests verts en local + CI. Basculement vers vrais services en 1 ligne (`MOCK_MODE=false`).
+> **But :** coder l'intégralité de la plateforme Phase 1 SANS dépendre de services externes payants (LLM, proxies, captcha, SMTP). Tests verts en local + CI.
+>
+> **Basculement vers les vrais scrapers — DEUX variables, pas une** (rectifié le 2026-08-22, constat C18-017 ; cette ligne promettait « 1 ligne (`MOCK_MODE=false`) », ce qui est faux). Les workers Node lisent `MOCK_SCRAPERS` **puis**, à défaut seulement, `MOCK_MODE` : la première **masque** la seconde. La règle vit à un seul endroit, `workers/src/config/mocks.ts`.
+>
+> - défaut, si aucune des deux n'est posée : **simulacres** (un oubli de configuration ne peut pas facturer d'appels réels) ;
+> - la seule écriture qui bascule est la chaîne **exacte** `false` — `0`, `off`, `FALSE` laissent les simulacres actifs, et le worker l'écrit désormais en `warn` au démarrage au lieu de se taire.
 
 ---
 
@@ -13,7 +18,7 @@ Toute interface qui appelle un service externe doit avoir **2 implémentations**
 | LLM (Anthropic/Mistral/OpenAI) | `LLMClient` | `LLMRouterService` (HTTP appels Anthropic, etc.) | `MockLLMClient` retournant fixtures JSON |
 | Proxies (Webshare/IPRoyal) | `ProxyProvider` | `WebshareProvider`, `IPRoyalProvider` | `MockProxyProvider` retournant `http://localhost:0` no-op |
 | Captcha solver | `CaptchaSolver` | `TwoCaptchaSolver` | `MockCaptchaSolver` retournant token bidon |
-| SMTP probe | `SmtpProber` | `RealSmtpProber` (port 25 sortant) | `MockSmtpProber` retournant 250 OK ou 550 selon liste hardcodée |
+| SMTP probe | `SmtpProber` | `HunterSmtpProber` (API Hunter.io) | `MockSmtpProber` retournant 250 OK ou 550 selon liste hardcodée |
 | Google Maps scraper | `GoogleMapsScraper` | Playwright + proxy résidentiel | `MockGoogleMapsScraper` retournant HTML fixtures local |
 | Google Search Wrapper | `SearchEngine` | Playwright + IPRoyal + 2captcha | `MockSearchEngine` retournant SERP JSON fixtures |
 | Sites web scraper | `WebsiteScraper` | Playwright + datacenter | `MockWebsiteScraper` retournant HTML fixtures (10 sites pré-enregistrés) |
@@ -23,8 +28,25 @@ Toute interface qui appelle un service externe doit avoir **2 implémentations**
 | BODACC API | `BodaccClient` | HTTP bodacc-datafluide | `MockBodaccClient` retournant fixtures |
 | BAN API | `BanGeocoder` | HTTP api-adresse.data.gouv.fr | `MockBanGeocoder` retournant lat/lon hardcodés |
 | France Travail API | `FranceTravailClient` | HTTP api.francetravail.io | `MockFranceTravailClient` retournant fixtures |
-| Cloudflare/Hetzner DNS | `DnsManager` | API Cloudflare/Hetzner | `MockDnsManager` no-op (logs only) |
-| Email envoi (Phase 2) | `EmailSender` | AWS SES / Mailgun / Postmark | `MockEmailSender` log only |
+
+> ⚠️ **Constat H44-009 (S3) — ce tableau décrivait du code qui n'existe pas.**
+>
+> Il annonçait deux contrats de plus, `DnsManager` (double `MockDnsManager`) et
+> `EmailSender` (double `MockEmailSender`). Mesure du 2026-08-22 :
+> `backend/app/Contracts/` contient **14** fichiers et ni l'un ni l'autre n'y
+> figure ; `find backend/app -name "Mock*.php"` rend **15** doubles, aucun des
+> deux non plus. Les deux lignes ont été retirées : un tableau d'architecture est
+> lu comme un inventaire, et un inventaire qui invente est pire qu'un inventaire
+> absent — on cherche pendant une heure une classe que personne n'a écrite.
+>
+> Il nommait aussi `RealSmtpProber` comme implémentation de production du sondage
+> SMTP. C'est faux depuis le sprint H2 : `MockServicesProvider.php:110` câble
+> `HunterSmtpProber` (le sondage direct sur le port 25 faisait bannir l'IP Hetzner
+> par Spamhaus). `RealSmtpProber` reste **en classe**, pour un repli manuel, mais
+> n'est plus branché par défaut — cf. le commentaire de
+> `MockServicesProvider.php:108-109`.
+>
+> Garde : `backend/tests/Feature/Infra/StrategieDesSimulacresDitLeVraiTest.php`.
 
 ---
 

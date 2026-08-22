@@ -9,15 +9,43 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * Politique de rétention RGPD :
- * - audit_logs > 24 mois         → archivage S3 + suppression (pg_partman gère le detach)
- * - email_validations expirées   → suppression
- * - scraper_runs > 90 jours      → suppression payload_path + response_payload (garde meta)
- * - llm_usage > 12 mois          → archivage + suppression
- * - notifications > 90 jours     → suppression
+ * Politique de rétention RGPD — CE QUE CETTE COMMANDE PURGE, ET RIEN D'AUTRE.
+ *
+ * ⚠️ Les lignes `[purge]` ci-dessous sont LUES par une garde
+ * (`tests/Feature/Commands/AutomatismesDePurgeTest.php`, B15-007) et comparées
+ * aux appels à `purger()` de `handle()`. Ajouter une ligne sans la tâche — ou
+ * l'inverse — fait rougir la suite. C'est délibéré : l'écart ci-dessous a vécu
+ * deux ans en silence.
+ *
+ * [purge] email_validations → suppression des entrées expirées depuis > 7 jours
+ * [purge] notifications     → suppression au-delà de 90 jours
+ * [purge] scraper_runs      → effacement de `response_payload` + `payload_path`
+ *                             au-delà de 90 jours (la ligne de run survit)
  *
  * ══════════════════════════════════════════════════════════════════════════════
- * 🔴 DEUX DÉFAUTS MESURÉS DANS CE FICHIER (audit 360).
+ * B15-007 — CE QUE CET EN-TÊTE ANNONÇAIT ET QUE PERSONNE N'EXÉCUTAIT.
+ *
+ * Jusqu'au 2026-08-22, cet en-tête annonçait CINQ politiques. Deux n'existaient
+ * nulle part dans le corps du fichier :
+ *
+ *  - `audit_logs > 24 mois → archivage S3 + suppression`. Aucune ligne de ce
+ *    fichier ne nomme `audit_logs`. Ce que le dépôt fait réellement de cette
+ *    table : `AnonymizeOldIps` en ANONYMISE les IP (elle ne supprime rien) et
+ *    `PartmanMaintenir` entretient les partitions. Le détachement des vieilles
+ *    partitions relève de pg_partman, PAS d'un `DELETE` applicatif — et c'est
+ *    tant mieux : `audit_logs` est un journal scellé par chaîne de hachage
+ *    (cf. `CorrigerHorodatages.php:72-80`, qui l'écarte pour cette raison), une
+ *    suppression ligne à ligne lancée tous les jours à 04:00 en romprait le
+ *    chaînage. On ne l'implémente donc pas ici : on cesse de l'annoncer.
+ *
+ *  - `llm_usage > 12 mois → archivage + suppression`. AUCUNE commande du dépôt
+ *    n'archive ni ne supprime cette table (`AnomalyDetect` ne fait que la LIRE).
+ *    L'archivage suppose une destination et une durée qui n'ont jamais été
+ *    décidées : c'est un arbitrage, pas un oubli de code. Il reste à trancher —
+ *    mais un en-tête qui le déclare fait est pire que son absence, parce qu'il
+ *    fait passer la relecture RGPD sans que personne n'aille voir.
+ * ══════════════════════════════════════════════════════════════════════════════
+ * 🔴 DEUX AUTRES DÉFAUTS MESURÉS DANS CE FICHIER (audit 360).
  *
  * B17-001 / H45-002 (S1) — « L'ESSAI À BLANC ÉCRIVAIT ».
  *

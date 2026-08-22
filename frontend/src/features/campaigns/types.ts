@@ -35,6 +35,30 @@ export function estTerminee(statut: CampaignStatus | undefined): boolean {
   return statut !== undefined && ETATS_TERMINAUX.has(statut);
 }
 
+/**
+ * Les etats qui peuvent changer SANS geste dans cet onglet — G41-012.
+ *
+ * `draft` n'en fait PAS partie : un brouillon ne bouge que si quelqu'un le
+ * lance, et le lancement se fait depuis la fiche, d'ou l'on revient a la liste
+ * (qui se recharge alors au montage). Un brouillon oublie dans un espace de
+ * travail ne doit pas condamner l'ecran a interroger le serveur toutes les dix
+ * secondes jusqu'a la fin des temps.
+ *
+ * `paused` EN FAIT partie, comme dans la fiche (`CampaignDetailPage`) : la
+ * reprise peut venir d'un autre onglet ou d'un collegue, et l'ecran doit la
+ * voir.
+ */
+export const ETATS_EN_MOUVEMENT: ReadonlySet<CampaignStatus> = new Set<CampaignStatus>([
+  'scheduled',
+  'running',
+  'paused',
+]);
+
+/** Vrai si AU MOINS une campagne de la liste peut encore bouger toute seule. */
+export function uneCampagneEnMouvement(campagnes: ReadonlyArray<{ status: CampaignStatus }>): boolean {
+  return campagnes.some((c) => ETATS_EN_MOUVEMENT.has(c.status));
+}
+
 export type CampaignSource =
   | 'insee'
   | 'google_maps'

@@ -91,8 +91,12 @@ changement de code requis.
 - **Cloud** : Hetzner Frankfurt fsn1 (UE/RGPD) via Terraform module
 - **Orchestration** : docker-compose maître + Coolify v4 PaaS
 - **DNS** : Cloudflare proxied (root + api + staging)
-- **Backups** : Hetzner Object Storage hourly + Backblaze B2 réplication off-site (3-2-1)
-- **DR** : RPO 1h / RTO 4h drillé via `infra/scripts/dr-drill.sh`
+- **Backups** : `pg_dump` **quotidien** (cron 03:00 UTC, posé par `infra/scripts/setup-backup.sh`),
+  téléversé en SFTP sur une Storage Box Hetzner — rétention 7 j en local, 30 j hors-site
+  (`infra/scripts/backup-postgres.sh`)
+- **DR** : **RPO réel ≤ 24 h** — la sauvegarde étant quotidienne, il n'y a pas de reprise à un
+  instant arbitraire — / RTO ≤ 4 h, mesuré à 21 min pour 16 Go le 2026-08-16. Drillé par
+  `infra/scripts/dr-drill.sh` (tolérance 36 h). Gestes : `infra/runbooks/04-restore-dr.md`
 
 ## Stack figée
 

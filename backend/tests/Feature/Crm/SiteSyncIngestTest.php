@@ -5,6 +5,7 @@ use App\Crm\Taxonomy;
 use Database\Seeders\GovernedTagsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -833,4 +834,81 @@ test('un opt_out ne peut pas se DÉCLARER vivier sans viser une candidature', fu
     ]))->assertOk();
 
     expect(DB::table('opt_out')->first()->scope)->toBe('business');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// B13-005 — UN TAG DE PROVENANCE ÉCARTÉ EST DIT, PAS PERDU
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('B13-005 — un tag de provenance hors référentiel est RENDU au site, et journalisé', function () {
+    // 🔴 CE QUI SE PASSAIT, ET POURQUOI ÇA NE SE VOYAIT NULLE PART.
+    //
+    // `source_slug` est LIBRE côté site (aucune validation ne le ferme, cf.
+    // `SiteSyncEvent::optionalString`), et le classifieur en fait
+    // `src:<valeur>`. Si cette valeur n'est pas au référentiel gouverné,
+    // `resolveTagId()` rend `null` et `attachTags()` faisait un `continue` nu :
+    // l'événement repartait en **200**, `result.tags` amputé du tag de
+    // provenance, sans un mot ni dans la réponse ni dans le journal.
+    //
+    // Les deux tests « les slugs de provenance envoyés par le site sont tous
+    // gouvernés » (ci-dessus) gardent une LISTE PINNÉE : ils rougissent si l'on
+    // oublie d'ajouter un slug connu. Ils ne peuvent RIEN voir d'une campagne
+    // que le site inventera demain sans toucher à ce dépôt — et c'est
+    // exactement le cas mesuré ici.
+    Log::spy();
+
+    $slug = 'zz-campagne-hors-referentiel';
+    $reponse = siteSyncPost(siteSyncEvent(['source_slug' => $slug]));
+
+    $reponse->assertOk()->assertJsonPath('result.status', 'created');
+
+    $resultat = $reponse->json('result');
+
+    // TÉMOIN — le tag n'est TOUJOURS PAS créé à la volée. Le correctif nomme la
+    // perte, il n'ouvre pas le référentiel à l'ingestion : sans ce témoin, on
+    // pourrait fermer le constat en fabriquant le tag, ce qui serait pire.
+    expect(DB::table('tags')->where('slug', 'src:' . $slug)->exists())->toBeFalse(
+        'Le tag inconnu a été CRÉÉ à la volée : une ingestion peut désormais polluer le référentiel '
+        . 'gouverné. Ce n est pas le correctif attendu pour B13-005 — le tag reste écarté, il doit '
+        . 'seulement être DIT.',
+    );
+
+    // ⚠️ `toContain()` est VARIADIQUE en Pest : y passer un message en second
+    // argument en ferait une seconde AIGUILLE, et l'assertion mesurerait autre
+    // chose que ce qu'elle annonce (piège déjà payé dans ce dépôt).
+    expect(in_array('src:' . $slug, $resultat['tags'] ?? [], true))->toBeFalse(
+        'Le tag écarté figure quand même dans `tags` : la réponse annonce un classement qui n existe pas.',
+    );
+
+    expect($resultat['tags_ignores'] ?? null)->toBe(
+        ['src:' . $slug],
+        "Le tag de provenance a été abandonné en SILENCE, avec une réponse 200 : le site ne peut ni "
+        . "compter ses pertes ni les deviner (constat B13-005). Geste : collecter le slug écarté dans "
+        . '`SiteSyncIngestService::attachTags()` au lieu du `continue` nu, et l exposer sous '
+        . '`tags_ignores` dans `IngestOutcome::toArray()`.',
+    );
+
+    // L'autre moitié : l'exploitant qui cherche pourquoi un segment est vide
+    // doit le trouver dans le journal, sans avoir à rejouer l'événement.
+    Log::shouldHaveReceived('notice')
+        ->withArgs(fn (string $message, array $contexte = []): bool => $message === 'crm.ingest.tag_ignore'
+            && ($contexte['slug'] ?? null) === 'src:' . $slug)
+        ->once();
+});
+
+test('B13-005 — quand rien n est écarté, `tags_ignores` est présent et VIDE', function () {
+    // Un champ qui n'apparaît que les mauvais jours ne se surveille pas : le
+    // site ne saurait pas distinguer « aucune perte » de « ancienne version du
+    // CRM qui ne dit rien ». La clé est donc toujours là.
+    $resultat = siteSyncPost(siteSyncEvent())->assertOk()->json('result');
+
+    expect(array_key_exists('tags_ignores', $resultat))->toBeTrue(
+        'La clé `tags_ignores` disparaît quand il n y a rien à signaler : le site ne peut plus '
+        . 'distinguer « aucune perte » de « le CRM ne le dit pas » (constat B13-005).',
+    );
+    expect($resultat['tags_ignores'])->toBe(
+        [],
+        'Un événement nominal déclare des tags écartés : soit le référentiel a perdu une entrée, '
+        . 'soit le collecteur d écartés compte à tort.',
+    );
 });

@@ -7,7 +7,7 @@
  * qu'elles lisent le MÊME drapeau (`/config/features`).
  */
 import type { ReactNode } from 'react';
-import { EmptyState, Skeleton } from '@/components/ui';
+import { EmptyState, QueryErrorState, Skeleton } from '@/components/ui';
 import { CONSOLE_FEATURES_CLOSED, useConsoleFeaturesQuery } from './useConsoleFeatures';
 
 export function ConsoleGate({
@@ -17,7 +17,7 @@ export function ConsoleGate({
   children: ReactNode;
   requiresVivier?: boolean;
 }) {
-  const { data, isPending } = useConsoleFeaturesQuery();
+  const { data, isPending, error, refetch } = useConsoleFeaturesQuery();
   const features = data ?? CONSOLE_FEATURES_CLOSED;
 
   // Tant que la réponse n'est pas revenue, la console reste fermée — mais on ne
@@ -28,6 +28,36 @@ export function ConsoleGate({
     return (
       <div className="px-6 py-6">
         <ConsoleListSkeleton rows={4} />
+      </div>
+    );
+  }
+
+  // « La console n'est pas ouverte sur ce serveur » est une affirmation sur la
+  // CONFIGURATION. Quand `/config/features` échoue, on n'en sait rien : on sait
+  // seulement qu'on n'a pas pu demander. Présenter une panne réseau comme une
+  // décision d'exploitant envoie l'opérateur réclamer un drapeau à son
+  // administrateur — qui le trouvera déjà levé (constat D22-004).
+  //
+  // Le défaut était masqué par le correctif du chargement : `isPending` retombe
+  // à false sur ÉCHEC aussi, `data` reste `undefined`, et le flot atteignait la
+  // branche « non activée ». `useConsoleFeatures.ts` pose `retry: false` : un
+  // seul hoquet réseau suffisait à produire le faux message.
+  //
+  // La décision, elle, ne change PAS : `features` vaut toujours
+  // CONSOLE_FEATURES_CLOSED, la console reste FERMÉE. Seul le texte change.
+  //
+  // `data === undefined` fait partie de la condition : React Query v5 conserve
+  // la dernière réponse réussie quand un rafraîchissement échoue. Fermer une
+  // console qui vient de s'ouvrir, sur un rafraîchissement raté, remplacerait
+  // un mensonge par une régression.
+  if (error !== null && data === undefined) {
+    return (
+      <div className="px-6 py-6">
+        <QueryErrorState
+          error={error}
+          contexte="l’état de la console CRM v2"
+          onRetry={() => void refetch()}
+        />
       </div>
     );
   }

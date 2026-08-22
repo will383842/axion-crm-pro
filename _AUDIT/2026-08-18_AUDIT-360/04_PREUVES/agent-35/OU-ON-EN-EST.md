@@ -77,6 +77,39 @@ cd C:/Users/willi/Documents/Projets/crmpro-wt-a35-auth && gh pr merge 193 --merg
 
 ## 3. Ce qui est EN VOL au moment de l'écriture
 
+### L'équipe de 30 verificateurs (workflow `verite-du-registre-360`)
+
+Lancee le 2026-08-22 pour etablir la VERITE des 420 constats declares ouverts :
+6 agents sur les S0 (un chacun), 10 sur les S1, 10 sur les S2, 4 sur les S3, puis
+une synthese. **Lecture seule stricte** : aucun agent ne modifie de fichier ni ne
+joue de test — les tests partagent une base unique, et un `migrate:fresh`
+concurrent detruirait le travail des autres (mesure du 2026-08-21).
+
+Resultats partiels, 16 agents sur 30 :
+
+| verdict | nombre | part |
+|---|---|---|
+| ouvert, confirme | 49 | 64 % |
+| **deja ferme** — le registre mentait | 23 | 30 % |
+| indecidable sans mesure | 4 | 5 % |
+
+### La CI de #193 etait ROUGE — quatre gardes figees ont attrape mon lot
+
+Et elles avaient raison les quatre fois :
+
+| garde | exigence | reponse |
+|---|---|---|
+| `SsrfCompletude` x2 | tout emetteur HTTP neuf doit etre LU puis declare | `AlerteTelegram` declare + exemption motivee (hote en dur, jeton dans le chemin) |
+| `B10-016-PORTEE` | les lectures aveugles a `deleted_at` n'augmentent pas | lectures rendues CONSCIENTES, plafond NON releve |
+| `A09` | toute commande du workflow doit etre citee au document | le message contenait `docker compose restart caddy"` — pris pour une commande |
+
+⚠️ Le deuxieme cas vaut d'etre retenu : relever le plafond pour accommoder son
+propre code est l'anti-patron que cette campagne denonce. En rendant les lectures
+conscientes, la sonde `C19-010` distingue desormais les fiches non diffusibles
+VIVANTES de celles EN CORBEILLE — deux situations, deux gestes.
+
+
+
 - **CI de #193** relancée après le dernier envoi (9 commits).
 - Rien d'autre en cours : le guetteur `C19-010` est écrit, planifié à 06:20,
   8 gardes vertes, Pint et PHPStan propres, committé et poussé.

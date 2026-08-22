@@ -185,3 +185,47 @@ Le correctif marcherait, mais le produit ne ferait plus la même chose. C'est un
    Corriger la ferait passer de 157 ms à 2 ms, mais elle ne trouverait plus les
    mêmes résultats (elle cesserait de chercher dans certaines colonnes).
    C'est un choix produit.
+
+---
+
+## Hors du dépôt CRM — et pour certains, hors de tout dépôt
+
+Trois constats de la vague de correction ont été **reportés pour une raison que
+je n'avais pas anticipée en découpant les lots** : leur correctif ne vit pas dans
+le CRM.
+
+### a. Le dépôt du SITE (`Axion-IA/axionia`)
+
+`I49-002`, `E32-006`, `E32-008` et d'autres portent sur le code du site. Les
+agents n'avaient que le worktree CRM : c'est mon découpage qui était fautif, pas
+leur refus. Ils demandent une vague dédiée, pointée sur `Axion-IA/axionia` — qui
+est bien versionné.
+
+### b. 🔴 Des journaux qui ne sont VERSIONNÉS NULLE PART
+
+`A-013 / A06-001`, `A05-007` et `A06-008` portent sur
+`Axion-IA/_SESSIONS/` et `Axion-IA/_PLANS/`. **Ces dossiers n'ont pas de `.git`.**
+Mesure du 2026-08-22 : `Axion-IA/.git` n'existe pas ; seul `Axion-IA/axionia/`
+est un dépôt.
+
+*Corriger un compte rendu sans historique, c'est pouvoir le casser sans retour.*
+Je ne l'ai donc pas fait — et le fait que ces documents ne soient pas versionnés
+est **le vrai constat**, celui qui commande les trois autres. Il rejoint
+`A07-004`, qui disait déjà : « le plan qui fait foi vit dans un dossier sans
+`.git` : il ne survit pas à une perte de poste ».
+
+⚠️ **Ce que `A-013` dit, et qui mérite votre attention.** À la ligne 93 du journal
+`2026-08-18_PREALABLES-CRM-ETAPE-0.md` :
+
+```
+| 14 | F11 AIPD + F12 pare-feu | ✅ commit 9e81b8a — … ; ⛔ AIPD à valider par Will |
+```
+
+Une case verte est posée sur une ligne qui dit elle-même, dans la même cellule,
+que la chose reste à valider. *Une case cochée par-dessus un blocage écrit, c'est
+une mesure qui se contredit dans la même phrase.* La règle qui manquait — une
+ligne n'est cochée que si son livrable se déclare lui-même complet — reste à
+écrire.
+
+**Décision attendue :** versionner `Axion-IA/_SESSIONS/` et `_PLANS/`, puis
+corriger ces trois journaux. Tant que ce n'est pas fait, je n'y touche pas.

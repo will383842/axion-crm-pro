@@ -1,0 +1,1082 @@
+[
+ {
+  "lot": 0,
+  "nb": 26,
+  "fiches": [
+   {
+    "id": "A-005",
+    "sev": "S3",
+    "titre": "Deux écrans factices restent joignables par URL, sans que rien ne les annonce",
+    "preuve": "frontend/src/app/routeTree.tsx:121-122 — `path: '/cold-email', component: ColdEmailStub` et `path: '/linkedin', component: LinkedInStub` (imports l.51-52) ; backend/routes/api.php:383-387 — le commentaire « `/cold-email` et `/linkedin` sont CONSERVES a dessein » puis `Route::any('/cold-email{any?}', ColdEmailController::class)` et son jumeau LinkedIn. Les deux composants existent toujours (frontend/src/features/phase2-scaffold/{ColdEmailStub,LinkedInStub}.tsx). Aucun repertoire d'ADR dans le depot : l'arbitrage ecrit exige par le correctif n'existe nulle part, seulement le commentaire de routes/api.php que le constat refusait deja comme preuve.",
+    "piste": "Soit retirer les deux routes SPA + les deux controleurs et rediriger `/cold-email` et `/linkedin` vers `/`, soit inscrire l'arbitrage dans un ADR date plutot que dans un commentaire de `routes/api.php`.",
+    "risque": "Retirer les routes sans redirection transformerait un signet en 404, ce que le §6.3-9 du mandat interdit ; cote API, passer de 501 a 404 changerait la reponse vue par un eventuel appelant (aucun connu dans le depot)."
+   },
+   {
+    "id": "A09-004",
+    "sev": "S2",
+    "titre": "L'inventaire de l'étape 1a déclare saved_views sans contrôleur ni route ; les deux existent",
+    "preuve": "_REPORTS/2026-08-19_INVENTAIRE-ETAPE-1A.md:54 affirme des six tables listees « **Aucune n'a de modèle Eloquent, de contrôleur, de route ni d'écran.** », et :62 range `saved_views` dans ce tableau avec « Qui la cite dans le code applicatif : — ». C'est faux pour les deux moities : le controleur existe — backend/app/Http/Controllers/Api/SavedViewsController.php (en-tete :12-30, il decrit explicitement le remplacement du stub `return $this->ok(['data' => []])` au titre des constats A-002 et B12-007) — et les routes existent : backend/routes/api.php:34 `use App\\Http\\Controllers\\Api\\SavedViewsController;` puis :241-249, trois `Route::apiResource('saved-views', SavedViewsController::class)` (index/show sous `permission:companies.view`, store/update sous `companies.update`, destroy sous `companies.delete`). Le document n'a recu aucune correction depuis (dernier commit a832d88, 2026-08-19 ; aucune occurrence de `SavedViewsController` dans le fichier).",
+    "piste": "Sortir `saved_views` du tableau de l'echafaudage mort (ou l'y garder avec la mention exacte : controleur + routes existent, `index`/`show` implementes, `store`/`update`/`destroy` encore en 501 selon SavedViewsController.php:27-30), et corriger la phrase absolue de la ligne 54 qui generalise a « aucune » des six tables.",
+    "risque": "Aucun : correction documentaire pure."
+   },
+   {
+    "id": "B12-017",
+    "sev": "S3",
+    "titre": "Api/Phase2/CampaignsController est un contrôleur mort : aucune route ne le désigne",
+    "preuve": "backend/app/Http/Controllers/Api/Phase2/CampaignsController.php existe toujours (20 lignes, classe declaree :9, `__invoke()` :16 rendant `$this->notImplemented('Phase 2')`). backend/routes/api.php n'importe que ses deux voisins : :28 `use App\\Http\\Controllers\\Api\\Phase2\\ColdEmailController;` et :29 `...\\LinkedInController;` — pas de troisieme ligne. Une recherche de `Phase2\\CampaignsController` / `Phase2/CampaignsController` sur tout backend/ ne remonte AUCUNE occurrence ; le seul autre endroit qui nomme le namespace est la garde de routage backend/tests/Feature/PasDeStub501SousCrmEtAnalyticsTest.php:114, qui filtre par prefixe et ne cite donc pas cette classe. Aggravant lu au passage : l'annotation :11-14 `@OA\\Get(path=\"/campaigns\", ...)` publie encore ce chemin dans l'OpenAPI alors qu'aucune route ne l'expose. Aucune garde ne cite B12-017.",
+    "piste": "Supprimer backend/app/Http/Controllers/Api/Phase2/CampaignsController.php et regenerer la spec OpenAPI ; verifier au passage que la note de routes/api.php (« /campaigns retire — implemente en Sprint 19.7 ci-dessus ») pointe bien vers le controleur reel.",
+    "risque": "Quasi nul : rien ne reference la classe. Seule precaution, regenerer la specification OpenAPI apres suppression, sans quoi le chemin fantome `/campaigns` reste publie dans la doc servie par Swagger."
+   },
+   {
+    "id": "D22-005",
+    "sev": "S2",
+    "titre": "/contacts devient un écran orphelin dès que la console v2 est ouverte, tout en restant vivant",
+    "preuve": "Les deux moities de l'orphelinat sont lisibles. La barre laterale RETIRE l'entree : frontend/src/components/layout/Sidebar.tsx:144-153, `sectionContacts(features)` rend, si `features.console_v2` est vrai, les trois entrees /console/contacts, /console/vivier, /console/arbitrage — et l'entree `{ to: '/contacts', label: 'Contacts' }` n'existe que dans la branche ELSE (:153), c'est-a-dire console fermee. La route, elle, reste vivante quoi qu'il arrive : frontend/src/app/routeTree.tsx:88 `const contactsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/contacts', component: ContactsListPage });`, enregistree inconditionnellement a :137 dans les enfants de layoutRoute. Aucune redirection de /contacts vers /console/contacts nulle part. Un signet, un lien profond ou l'historique du navigateur ramenent donc l'utilisateur sur un ecran que la navigation ne montre plus — et qui n'a aucun moyen de dire qu'il est perime.",
+    "piste": "Dans le composant de contactsRoute, lire useConsoleFeatures() et, si console_v2 est ouvert, rediriger vers /console/contacts (avec l'etat de chargement qui ne prejuge de rien, comme ConsoleGate). L'ecran reste alors joignable quand le drapeau est ferme, et cesse d'exister quand il est ouvert — un seul drapeau decide, comme pour le reste de la console.",
+    "risque": "Faible mais non nul : rediriger /contacts vers /console/contacts casse les signets existants dans l'autre sens si le drapeau se referme (retour arriere prevu « en une minute », cf. useConsoleFeatures.ts:1-9). La redirection doit donc etre CONDITIONNEE au drapeau, jamais ecrite en dur."
+   },
+   {
+    "id": "D22-007",
+    "sev": "S2",
+    "titre": "L'écran « Page introuvable » existe, est livré dans le bundle, et ne s'affiche jamais",
+    "preuve": "frontend/src/app/routeTree.tsx:126 : `const notFoundRoute = createRoute({ getParentRoute: () => rootRoute, path: '/*', component: NotFoundPage });`, ajoutee aux enfants de rootRoute a :167. `path: '/*'` n'est pas la syntaxe de capture de TanStack Router v1 (frontend/package.json:25, `\"@tanstack/react-router\": \"^1.170.27\"`) : le fourre-tout s'y ecrit `$` — tel quel, le chemin ne matche que le segment litteral. Et rien ne prend le relais : frontend/src/main.tsx:39-43 `createRouter({ routeTree, defaultPreload: 'intent', context: { queryClient } })` ne passe AUCUN `defaultNotFoundComponent`, et `grep -rn \"notFoundComponent|defaultNotFound\" frontend/src` ne rend que la mention d'une ligne voisine dans RouteErrorBoundary.tsx:41. Le composant existe pourtant et est bien importe donc embarque dans le bundle : routeTree.tsx:26 `import { NotFoundPage } from '@/features/misc/NotFoundPage';`, fichier frontend/src/features/misc/NotFoundPage.tsx lu en entier. Aucun test ne cite NotFoundPage (`grep -rln \"NotFoundPage|notFound\" frontend/tests` ne rend que tests/README.md).",
+    "piste": "Remplacer la route `path: '/*'` par un `notFoundComponent` sur rootRoute (ou un `defaultNotFoundComponent` dans createRouter, main.tsx:39), et rattacher l'ecran a layoutRoute pour qu'il conserve la barre laterale ; ajouter un test de rendu sur une URL inconnue, seule facon d'empecher que le fourre-tout redevienne decoratif.",
+    "risque": "Faible. Un point d'attention : brancher enfin l'ecran 404 le rendra VISIBLE pour la premiere fois, et il ne l'a jamais ete — NotFoundPage.tsx rend un `min-h-screen` centre hors de la coquille, ce qui donnera un 404 sans barre laterale (c'est exactement D23-009, a traiter dans le meme geste)."
+   },
+   {
+    "id": "D23-006",
+    "sev": "S3",
+    "titre": "Le fil d'Ariane parle anglais sur dix routes et porte encore les libellés retirés de la barre",
+    "preuve": "frontend/src/components/layout/AutoBreadcrumbs.tsx:11-31 : la table LABELS ne couvre que 18 chemins. Les routes déclarées dans frontend/src/app/routeTree.tsx et absentes de LABELS retombent sur `humanize()` (:33-39), qui rend le segment d'URL brut capitalisé : `/media` (routeTree.tsx:90), `/journalists` (:92), `/tags` (:109), `/audiences` (:110-112), `/admin/observability` (:114), `/international/roumanie` (:89), `/console/contacts` (:116), `/console/vivier` (:117), `/console/arbitrage` (:118), `/console/personnes/$personKey` (:119) — dix routes rendues « Media / Journalists / Tags / Audiences / Admin › Observability / Console › … ». Et LABELS garde `/cold-email` (:28) et `/linkedin` (:29) alors que Sidebar.tsx:76 acte que « les routes `/cold-email` et `/linkedin` restent joignables par URL » seulement, retirées de la barre.",
+    "piste": "Compléter LABELS pour les dix chemins et retirer les deux entrées mortes ; puis dériver la table du même objet que Sidebar (une seule source de libellés par route), ou poser un test qui échoue si une route de routeTree n'a pas d'entrée dans LABELS.",
+    "risque": "Aucun risque fonctionnel : la table est purement cosmétique. Le vrai risque est qu'elle se re-désynchronise — c'est déjà ce qui s'est produit."
+   },
+   {
+    "id": "D23-010",
+    "sev": "S2",
+    "titre": "La visite guidée n'affiche que 5 de ses 7 étapes et se marque « faite » quand même",
+    "preuve": "La visite compte 7 etapes (frontend/src/components/OnboardingTour.tsx:15-73). Deux d'entre elles visent des entrees de la barre : :47 `target: '[data-tour=\"nav-companies\"]'` et :62 `target: '[data-tour=\"nav-settings\"]'`. Or la barre n'ouvre QU'UNE section a la fois — frontend/src/components/layout/Sidebar.tsx:174 « UNE seule section ouverte a la fois » et :184 `useState<string | null>(sectionDeLaPage?.id ?? sections[0]?.id ?? null)` — et la liste d'une section fermee est retiree de l'affichage : :307 `<ul id={idListe} className={cn('flex flex-col gap-0.5', !deplie && 'hidden')}>`. Au premier demarrage l'utilisateur est sur `/` : seule la section « Aujourd'hui » est ouverte, donc `nav-dashboard` (:52) est visible, mais `nav-companies` (section « Contacts ») et `nav-settings` (section « Reglages ») sont `hidden` — 5 etapes sur 7 s'affichent. Et la visite se marque faite quand meme : :109-116, `handleCallback` appelle `completeMutation.mutate()` sur STATUS.FINISHED ou SKIPPED, sans jamais verifier que les 7 cibles ont ete atteintes.",
+    "piste": "Deplacer `sectionOuverte` dans un petit magasin partage (ou exposer un `openSection(id)` via contexte), puis, dans le `callback` Joyride, ouvrir la section porteuse avant chaque etape `nav-*` ; et refuser de marquer la visite faite si Joyride a emis `EVENTS.TARGET_NOT_FOUND` — une visite tronquee ne doit pas se declarer accomplie.",
+    "risque": "Ouvrir la section depuis la visite guidee ecrit dans l'etat de la barre depuis un autre composant : mal fait, cela referme la section que l'utilisateur venait d'ouvrir, ou laisse la barre dans un etat different de celui d'avant la visite."
+   },
+   {
+    "id": "D23-011",
+    "sev": "S2",
+    "titre": "Le lien permanent CRM → console axionia n'existe pas, et celui de l'autre sens s'appelle « Prospection »",
+    "preuve": "Sens CRM→site : aucun `https://` dans `frontend/src/components/layout/` ni `frontend/src/app/RootLayout.tsx` (grep vide), et aucune occurrence de « axionia » dans tout `frontend/src`. Le pied de `Sidebar.tsx` (fichier lu jusqu'à la fin, l. 201-260) ne porte aucun lien externe. Sens site→CRM : `Axion-IA/axionia/src/components/admin/ui/AdminSidebarNav.tsx:772-789` porte bien `<a href=\"https://app.axion-crm-pro.com\" target=\"_blank\">` mais l'étiquette est `<span>Prospection</span>` (l. 788), pas « CRM ».",
+    "piste": "Ajouter dans le pied de `Sidebar.tsx` un lien permanent vers la console axionia (URL par variable Vite, pas en dur), avec `target=\"_blank\" rel=\"noopener noreferrer\"` et un rendu icône seule quand `collapsed` ; côté axionia, renommer l'étiquette « Prospection » en un nom qui désigne l'outil (« Axion CRM Pro »).",
+    "risque": "Aucun risque fonctionnel : ajout d'un `<a>` externe dans le pied de barre CRM et changement d'un libellé côté site ; le seul effet de bord est visuel (encombrement du pied de barre repliée, `collapsed`)."
+   },
+   {
+    "id": "D26-005",
+    "sev": "S2",
+    "titre": "Les champs numériques de l'assistant se corrigent à chaque frappe : taper « 12 » donne « 52 »",
+    "preuve": "frontend/src/features/campaigns/CampaignWizardPage.tsx:851-854 — `onChange={(e) => { const v = Number(e.target.value); if (!Number.isNaN(v)) onChange(Math.max(min, Math.min(max, v))); }}` : le bornage est applique a CHAQUE frappe, pas a la sortie du champ. Le champ « Duree max (minutes) » emploie `min={5}` (:708) : taper « 12 » donne « 1 » → borne a 5 → le champ affiche 5, la frappe suivante produit « 52 » — exactement le symptome decrit. Le champ « Entreprises max » (:694-703, `min={1}`) subit la meme mecanique des que l'on efface pour ressaisir (chaine vide → `Number('')` = 0 → borne a 1).",
+    "piste": "Garder l'etat en chaine pendant la saisie (`useState<string>`) et n'appliquer `Math.max(min, Math.min(max, v))` que sur `onBlur` (ou a la validation de l'etape), en affichant le bornage comme un message plutot qu'en reecrivant la frappe.",
+    "risque": "Deplacer le bornage vers `onBlur` laisse transiter dans l'etat une valeur hors bornes entre la frappe et la sortie du champ : il faut garantir que la validation d'etape et `buildPayload()` (:172-188) refusent une valeur hors bornes, sinon on troque une gene d'ergonomie contre un envoi invalide."
+   },
+   {
+    "id": "D26-008",
+    "sev": "S2",
+    "titre": "Une limite saisie pour une source ensuite désélectionnée reste envoyée et persistée, sans être visible nulle part",
+    "preuve": "frontend/src/features/campaigns/CampaignWizardPage.tsx:236-240 — `toggleSource` ne touche QUE `sources` (`setSources((cur) => cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s])`) et ne purge jamais `perSourceLimits`. Le panneau n'affiche que les sources retenues : :761 `{sources.map((s) => { ... })}` — une limite saisie pour une source ensuite deselectionnee n'a donc plus AUCUN affichage. Et elle part quand meme : :182-184 `if (Object.keys(perSourceLimits).length > 0) { payload.per_source_limits = perSourceLimits; }` envoie l'objet entier, sans filtrer sur `sources`. Le panneau est de surcroit replie par defaut (:160 `useState(false)`), donc invisible meme pour les sources retenues.",
+    "piste": "Filtrer a l'envoi — dans `buildPayload()`, ne retenir que `Object.fromEntries(Object.entries(perSourceLimits).filter(([s]) => sources.includes(s as CampaignSource)))` — et, en complement, afficher au recapitulatif d'etape 4 les limites reellement envoyees, pour qu'aucune valeur transmise ne soit invisible.",
+    "risque": "Purger la limite au deselectionnement fait perdre la saisie si l'utilisateur reselectionne la source par erreur ; filtrer seulement a l'envoi conserve la saisie mais laisse un etat fantome en memoire. Le choix se tranche, il n'est pas neutre."
+   },
+   {
+    "id": "D26-009",
+    "sev": "S2",
+    "titre": "Le bouton Précédent du navigateur ne recule pas d'une étape : il quitte l'assistant et jette la saisie",
+    "preuve": "frontend/src/features/campaigns/CampaignWizardPage.tsx:102 — `const [step, setStep] = useState<Step>(1);` : l'etape est un etat local, jamais dans l'adresse. L'assistant entier vit sur une SEULE route sans parametre de recherche : frontend/src/app/routeTree.tsx:106 `createRoute({ ..., path: '/campaigns/new', component: CampaignWizardPage })`, et `grep -rn \"validateSearch\\|useSearch(\" frontend/src` ne rend aucune occurrence dans tout le produit. Le bouton « Precedent » du produit recule bien d'une etape (:294-296 `if (step > 1) setStep((step - 1) as Step); else void navigate({ to: '/campaigns' })`), mais celui du NAVIGATEUR n'a qu'une entree d'historique a defaire : celle de l'entree dans l'assistant. Toute la saisie (nom, description, zones, sources, budget — les `useState` de :103 a :161) est perdue.",
+    "piste": "Declarer `validateSearch: (s) => ({ step: Number(s.step ?? 1) })` sur `campaignsNewRoute`, lire l'etape par `useSearch` et la changer par `navigate({ search: { step } })` (le composant restant monte, les `useState` de saisie survivent) ; garder un garde-fou qui ramene a l'etape 1 si les etapes precedentes ne sont pas valides.",
+    "risque": "Poser l'etape dans l'URL cree une entree d'historique par etape : si l'assistant se demonte a la navigation, reculer restituera la bonne etape mais un formulaire VIDE — l'etat de saisie doit survivre au changement de parametre, sinon le correctif aggrave la perte au lieu de la reparer."
+   },
+   {
+    "id": "D26-010",
+    "sev": "S2",
+    "titre": "Sept champs tronquent la saisie collée sans compteur ni message",
+    "preuve": "Les troncatures silencieuses sont toujours la, et aucun compteur ne les accompagne. frontend/src/features/campaigns/CampaignWizardPage.tsx:407 `maxLength={120}` (champ « Nom de la campagne ») et :416 `maxLength={500}` (textarea « Description ») — j'ai lu les deux blocs :402-417, il n'y a ni compteur, ni texte d'aide, ni message. frontend/src/features/audiences/AudienceBuilderPage.tsx:225 `maxLength={120}` et :232 `maxLength={500}` ; frontend/src/features/auth/TwoFactorPage.tsx:124 `maxLength={6}`. Recherche exhaustive : `grep -rn \"maxLength\" frontend/src --include=*.tsx` rend 7 lignes, dont aucune n'est accompagnee d'un compteur — `grep -rn \"caracteres\\|/120\\|/500\"` ne rend qu'un message de validation react-hook-form (AudienceBuilderPage.tsx:223 « Max 120 caracteres »), qui ne se declenche jamais puisque l'attribut HTML tronque AVANT que la valeur n'atteigne 121.",
+    "piste": "Porter le compteur dans le composant `Input`/`FormField` (« 87 / 120 »), affiche des que la saisie depasse ~80 % de la borne, et signaler visuellement la troncature d'un coller ; ne pas toucher a `TwoFactorPage` ou `maxLength={6}` sur un code a 6 chiffres est le comportement attendu.",
+    "risque": "Ajouter un compteur est inoffensif ; retirer `maxLength` pour laisser la validation parler ne l'est pas — le champ pourrait alors envoyer plus que ce que la colonne accepte et faire echouer la creation cote API. Garder la borne, ajouter la lisibilite."
+   },
+   {
+    "id": "D26-012",
+    "sev": "S3",
+    "titre": "Les deux seuls messages de validation d'AudienceBuilderPage ne peuvent jamais s'afficher",
+    "preuve": "frontend/src/features/audiences/AudienceBuilderPage.tsx:223 `{...register('name', { required: 'Nom requis', maxLength: { value: 120, message: 'Max 120 caracteres' } })}` immediatement suivi de :225 `maxLength={120}` (attribut HTML : la regle ne peut pas rougir), et :201 `const canCreate = watchedName.trim().length > 0 && (criteria.all?.length ?? 0) > 0;` qui desactive la soumission avant que `required` ne puisse parler. :228-235 : le `<Field label=\"Description (optionnel)\">` ne recoit AUCUNE prop `error`, et :233 `{...register('description', { maxLength: 500 })}` est une regle sans message, doublee par :232 `maxLength={500}` en HTML.",
+    "piste": "Choisir un seul mecanisme par champ : soit garder les attributs HTML et retirer les regles react-hook-form mortes, soit l'inverse ; et passer `error={errors.description?.message}` au `Field` de la description, avec un message sur la regle `maxLength`.",
+    "risque": "Retirer l'attribut `maxLength` HTML rend possible la saisie au-dela de la limite : le message doit alors s'afficher vraiment, sinon on remplace une regle morte par une soumission bloquee sans cause visible — exactement le defaut decrit."
+   },
+   {
+    "id": "D28-005",
+    "sev": "S2",
+    "titre": "Le lien d'évitement, seul dispositif de saut de navigation du produit, est illisible en mode clair : 1,19:1 mesuré au pixel",
+    "preuve": "frontend/src/styles/index.css:167-175 est la definition COMPLETE du lien d'evitement : `.skip-link { position: absolute; left: -9999px; }` puis `.skip-link:focus { left: 1rem; top: 1rem; z-index: 9999; }`. Aucune couleur, aucun fond, aucun rembourrage. Le lien herite donc la couleur du corps — :80-83 `body { background: oklch(0.98 0.005 250); color: oklch(0.15 0 0); }`, soit un texte quasi noir — et il se pose en `1rem/1rem`, c'est-a-dire PAR-DESSUS la barre laterale, dont le jeton de fond vaut `--color-sidebar: oklch(0.24 0.06 250)` (:26) : frontend/src/app/RootLayout.tsx:75 place `<a href=\"#main\" className=\"skip-link\">Aller au contenu</a>` juste avant la barre (:78-80) dans le meme conteneur. Quasi-noir sur bleu profond : le 1,19:1 mesure est coherent. En mode sombre le corps passe a `color: oklch(0.95 0 0)` (:85-87), ce qui explique que seul le mode clair soit touche. Les gardes existantes ne couvrent PAS le contraste de ce lien : frontend/tests/e2e/navigation.spec.ts:158-161 verifie seulement qu'il est `toBeAttached()`, et frontend/tests/e2e/dark-contraste.spec.ts:168-170 l'EXCLUT explicitement de la mesure (« `.skip-link` est parquee a `left: -9999px` ... La mesurer serait un faux rouge »).",
+    "piste": "Completer `.skip-link:focus` avec un fond et une couleur explicites plus un rembourrage et un contour de focus (par ex. fond `--color-sidebar-active` et texte `--color-sidebar-fg`, ou simplement blanc sur `oklch(0.24 0.06 250)`), et cesser d'exclure le lien de frontend/tests/e2e/dark-contraste.spec.ts en le mesurant sous focus force.",
+    "risque": "Aucun, hors apparence : la regle ne s'applique qu'au focus d'un element deja hors flux. Seul piege a eviter, poser une couleur en dur qui deviendra illisible en mode sombre — donner les deux etats du meme coup."
+   },
+   {
+    "id": "D28-012",
+    "sev": "S3",
+    "titre": "La barre latérale émet six <h3> avant le <h1> de la page, et cinq écrans n'ont aucun repère de région",
+    "preuve": "frontend/src/components/layout/Sidebar.tsx:288-305 — chaque titre de groupe est rendu dans un `<h3 className=\"mb-1\">` qui enveloppe le bouton d'accordeon ; il y a bien six groupes (`title:` aux lignes 88 « Collecte », 98 « Pilotage », 106 « Conformite », 115 « Reglages », 129 « Aujourd'hui », 161 « Contacts »), tous emis avant le `<h1>` de la page (frontend/src/components/ui/PageHeader.tsx:25). Et les cinq ecrans hors coquille ne portent aucun repere : `grep -c '<main\\|role=\"banner\"\\|<nav'` rend 0 sur features/auth/LoginPage.tsx, MagicLinkPage.tsx, PasswordResetPage.tsx, TwoFactorPage.tsx et features/misc/NotFoundPage.tsx.",
+    "piste": "Dans `Sidebar`, remplacer les `<h3>` de groupe par un `<div>` porteur de l'`id` et rattacher chaque `<ul>` a un `<nav aria-labelledby=…>` ; envelopper le contenu des 4 ecrans d'authentification et du 404 dans un `<main>`.",
+    "risque": "Passer les `<h3>` en `role=\"presentation\"` retire six points d'ancrage de la navigation par titres pour ceux qui s'en servaient : mieux vaut rattacher la liste a un `<nav aria-labelledby>` que de supprimer l'information. Aucun effet visuel si l'on garde les classes."
+   },
+   {
+    "id": "D28-013",
+    "sev": "S2",
+    "titre": "Le 404 n'a aucun élément atteignable au clavier",
+    "preuve": "ATTENTION, PIÈGE : `frontend/src/features/misc/NotFoundPage.tsx:8` porte bien un `<Link to=\"/\">` focalisable, et aucune règle CSS du dépôt ne retire l'anneau de focus (grep `outline` sur `src/styles/*.css` → vide). MAIS cette page ne s'affiche jamais. `frontend/src/app/routeTree.tsx:126` déclare `path: '/*'`, or dans TanStack Router v1 le jeton de route fourre-tout est `$`, PAS `*` : `node_modules/@tanstack/router-core/dist/esm/new-process-route-tree.js:53` teste `part.charCodeAt(0) === 36` ('$') et le fichier ne teste jamais 42 ('*') ; `path.js:110` sort tôt si le chemin ne contient pas `$`. `'/*'` est donc un segment STATIQUE nommé « * ». Une URL inconnue tombe alors sur le composant par défaut de la librairie — `node_modules/@tanstack/react-router/dist/esm/not-found.js:41` : `jsx(\"p\", { children: \"Not Found\" })` — et `frontend/src/main.tsx:39-43` ne pose aucun `defaultNotFoundComponent`. Un `<p>` : zéro élément atteignable au clavier. Le constat est juste, et sa cause est à `routeTree.tsx:126`, pas dans `NotFoundPage.tsx`.",
+    "piste": "Le plus sûr : poser `defaultNotFoundComponent: NotFoundPage` dans `createRouter` (`main.tsx:39-43`) et supprimer `notFoundRoute`. Sinon, corriger `path: '/*'` → `path: '$'` à `routeTree.tsx:126` et vérifier qu'aucune route existante n'est captée.",
+    "risque": "Changer `path: '/*'` en `path: '$'` fait enfin correspondre cette route à TOUTES les URL non reconnues — y compris, si l'arbre est mal ordonné, à des URL qui tombaient jusque-là ailleurs. La voie `defaultNotFoundComponent` est plus sûre car elle ne touche pas l'appariement des routes."
+   },
+   {
+    "id": "D28-014",
+    "sev": "S3",
+    "titre": "Trois régions d'annonce dans tout le produit, aucun ErrorBoundary monté : ni les chargements, ni les changements d'écran, ni les erreurs de rendu ne sont annoncés",
+    "preuve": "ATTENTION : l'intitule est aujourd'hui FAUX sur son point principal. `ErrorBoundary` EST monte — frontend/src/app/AppRoot.tsx:51 `<ErrorBoundary level=\"root\">` (import l.23) et frontend/src/app/RootLayout.tsx:113 `<RouteErrorBoundary level=\"page\">` a l'interieur de `<main id=\"main\">` (l.101), avec frontend/src/app/RouteErrorBoundary.tsx et une garde de montage (frontend/tests/components/ErrorBoundary.montage.test.tsx). Les regions d'annonce ne sont plus trois mais au moins neuf fichiers : NotificationsBell.tsx:194, QueryErrorState.tsx:188, ReponseVideState.tsx:52, ErrorBoundary.tsx:90, FormField.tsx:42, CompaniesListPage.tsx:700, CoveragePage.tsx:174, SettingsPage.tsx:158, TagsManagerPage.tsx:311. CE QUI RESTE OUVERT, et que j'ai lu : frontend/src/components/ui/Skeleton.tsx:5-13 — `CompaniesTableSkeleton` porte toujours `aria-busy=\"true\"` sans `aria-live` ni `role=\"status\"` ; frontend/src/components/ui/Spinner.tsx:6 — `aria-label=\"Chargement\"` sur un `<svg>` sans `role=\"img\"` ; et `grep -rn aria-live src --include=*.tsx` ne rend AUCUNE ligne : il n'existe aucune region d'annonce au changement d'ecran dans RootLayout.",
+    "piste": "`role=\"status\" aria-live=\"polite\"` sur `CompaniesTableSkeleton`, `role=\"img\"` sur le `<svg>` de `Spinner`, et une seule region `aria-live=\"polite\"` dans `RootLayout` mise a jour au changement de route avec le titre de l'ecran. Et reecrire l'intitule du constat : la partie ErrorBoundary est fermee.",
+    "risque": "Une region `aria-live` alimentee a chaque changement de route bavarde vite : mal calibree (`assertive`, ou reecrite a chaque rendu), elle interrompt la lecture en cours. `role=\"img\"` sur le Spinner est sans risque."
+   },
+   {
+    "id": "D28-016",
+    "sev": "S3",
+    "titre": "Aucune prise en compte de prefers-reduced-motion : quatre animations, dont une infinie",
+    "preuve": "frontend/src/styles/index.css:55-69 declare quatre `@keyframes` (axion-fade-in :55, axion-slide-up :59, axion-slide-in-right :63, axion-pulse-dot :67) et :71-74 leurs quatre classes, dont :74 `.axion-pulse-dot { animation: axion-pulse-dot 2s ease-in-out infinite; }` — infinie. Une recherche de `prefers-reduced-motion` sur TOUT frontend (--include=*.css --include=*.tsx --include=*.ts) ne remonte AUCUNE occurrence : ni bloc media, ni garde JS. L'animation infinie est bien montee a l'ecran : frontend/src/components/ui/StatusPill.tsx:27, frontend/src/components/ui/PageHeader.tsx:46, frontend/src/features/campaigns/CampaignDetailPage.tsx:390. Aucune garde ne cite D28-016.",
+    "piste": "Ajouter en fin de frontend/src/styles/index.css un bloc `@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }` — une regle globale couvre les quatre animations et les transitions Tailwind d'un coup, plutot qu'un traitement classe par classe.",
+    "risque": "Aucun risque fonctionnel : le bloc media n'agit que sur les navigateurs dont l'utilisateur a demande la reduction du mouvement. Verifier seulement qu'aucun composant ne depend de l'evenement `animationend` pour se demonter."
+   },
+   {
+    "id": "D29-003",
+    "sev": "S3",
+    "titre": "Quinze des vingt-sept clés du dictionnaire sont mortes, dont les sept libellés de navigation",
+    "preuve": "Chiffre reproduit exactement. J'ai aplati frontend/src/locales/fr.json (27 cles) et cherche chacune dans tout frontend/src hors locales : 12 vivantes, 15 mortes. Les mortes sont precisement celles du constat : `app.name`, `app.tagline`, les SEPT libelles de navigation `nav.dashboard`, `nav.companies`, `nav.contacts`, `nav.coverage`, `nav.scraperRuns`, `nav.users`, `nav.settings`, puis `common.empty`, `common.retry`, `common.save`, `common.cancel`, `common.delete`, `common.search`. Les 12 vivantes (auth.login.*, auth.twoFactor.*, phase2.stub.*, common.loading, common.error) sont bien trouvees dans features/auth/LoginPage.tsx, features/auth/TwoFactorPage.tsx et features/phase2-scaffold/ColdEmailStub.tsx — la methode n'est pas aveugle. En face, la barre laterale ecrit ses libelles en dur : frontend/src/components/layout/Sidebar.tsx:160 `return { id: 'contacts', title: 'Contacts', items };`. Aucune garde ne cite D29-003.",
+    "piste": "Trancher UNE direction et l'ecrire. Le moins couteux et le plus honnete aujourd'hui : supprimer les 15 cles mortes de fr.json et en.json, pour que le dictionnaire cesse de faire croire que la navigation est traduite. Si l'internationalisation de la console est au programme, faire l'inverse — router les 29 libelles de Sidebar.tsx par `t('nav.*')` et completer les deux dictionnaires — mais pas la moitie des deux.",
+    "risque": "Faible dans les deux sens. Si l'on branche la barre sur `t()`, il faut ajouter les cles manquantes (la barre porte 29 libelles, le dictionnaire n'en couvre que 7) et tenir la parite avec en.json, sinon des libelles se rendront comme des cles brutes."
+   },
+   {
+    "id": "D30-001",
+    "sev": "S1",
+    "titre": "Le conteneur principal rogne au lieu de laisser défiler : ce qui dépasse 375 px est perdu, sans barre ni geste pour y accéder",
+    "preuve": "frontend/src/app/RootLayout.tsx:101 — `<main id=\"main\" className=\"flex-1 overflow-x-hidden px-4 py-5 md:px-6 md:py-6 lg:px-10\">`. `overflow-x-hidden` coupe le debordement horizontal sans offrir ni barre ni geste : ce qui depasse la largeur visible est perdu. Le constat citait la ligne 100 ; le bloc de commentaire P6-UI-005 insere depuis a decale d'une ligne, la propriete est inchangee. Le remede partiel D30-002 existe (components/ui/TableScroll.tsx, `overflow-x-auto` + largeur minimale calculee) mais il ne couvre que les tableaux en grille qui l'utilisent ; tout autre contenu large rendu dans `#main` reste rogne par cette ligne.",
+    "piste": "Remplacer `overflow-x-hidden` par `overflow-x-auto` a la ligne 101, puis verifier a 375 px les ecrans qui n'utilisent PAS TableScroll (detail entreprise, campagnes, parametres). Poser une garde jsdom qui monte RootLayout avec un enfant de 1200 px de large et exige que le conteneur soit defilable — le marqueur `data-tableau-defilable` de TableScroll montre que le depot sait deja contourner l'aveuglement de jsdom sur les classes Tailwind.",
+    "risque": "Passer `overflow-x-hidden` a `overflow-x-auto` sur le conteneur principal peut faire apparaitre une barre de defilement horizontale sur des ecrans ou un debordement d'un pixel existe deja et passait inapercu — c'est un revelateur, pas une regression, mais il faut s'attendre a devoir corriger deux ou trois debordements parasites. Attention aussi au `sticky` des en-tetes : changer le conteneur de defilement de reference peut deplacer leur ancrage (le commentaire de TableScroll.tsx:34-38 documente exactement ce piege)."
+   },
+   {
+    "id": "D30-005",
+    "sev": "S2",
+    "titre": "Le tiroir de navigation ne se referme pas après une navigation, couvre tout l'écran sans voile atteignable, et laisse 115 px de bande morte : chaque parcours coûte 4 appuis au lieu de 2 clics",
+    "preuve": "Les trois griefs tiennent, tous les trois lus. (1) FERMETURE : `frontend/src/app/RootLayout.tsx:70` déclare `const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)` ; les deux seuls `setMobileSidebarOpen(false)` sont l. 85 (`onClose` du `Drawer`) et l. 90 (le bouton de repli passé à `Sidebar`) — aucun `useEffect` sur le chemin courant, donc une navigation depuis le tiroir le laisse ouvert. (2) VOILE INATTEIGNABLE : `frontend/src/components/ui/Modal.tsx:113` pose le voile en `absolute inset-0` avec `onClick={onClose}`, mais le panneau l. 114-118 vaut `w-full` plafonné à `max-w-sm` (l. 104 : `width === 'sm' ? 'max-w-sm' …`, soit 384 px) — sur un téléphone de 375 px, le panneau couvre l'écran entier et le voile n'est atteignable nulle part. (3) BANDE MORTE : `frontend/src/components/layout/Sidebar.tsx:202` fixe `w-[260px]` ; 375 − 260 = 115 px, exactement la bande annoncée.",
+    "piste": "Trois gestes indépendants : ajouter dans `RootLayout` un `useEffect` sur le chemin courant (`useRouterState`) qui appelle `setMobileSidebarOpen(false)` ; passer le panneau de `Drawer` en `w-[85%] max-w-sm` pour qu'une bande de voile reste tapotable ; et faire que la `Sidebar` rendue DANS le tiroir prenne `w-full` au lieu de `w-[260px]`, ce qui supprime les 115 px morts.",
+    "risque": "Refermer le tiroir sur changement de route est un changement de comportement attendu, sans effet ailleurs. Réduire la largeur du panneau touche en revanche `Drawer` pour TOUS ses usages, pas seulement la navigation."
+   },
+   {
+    "id": "D30-008",
+    "sev": "S2",
+    "titre": "PageHeader pose shrink-0 sur son bloc d'actions, ce qui annule le flex-wrap qu'il porte lui-même : le repli est écrit et ne peut pas se produire, sur 27 écrans",
+    "preuve": "frontend/src/components/ui/PageHeader.tsx:18 — `<header className={cn('mb-6 flex flex-wrap items-end justify-between gap-4', className)}>` ; :37 — `<div className=\"flex shrink-0 flex-wrap items-center gap-2\">{actions}</div>`. Le bloc d'actions porte à la fois `shrink-0` et `flex-wrap` : `shrink-0` fige sa largeur à max-content, ses enfants n'ont donc jamais de contrainte de largeur et le `flex-wrap` du même élément ne peut structurellement jamais s'exercer. Aucune garde : grep « D30-008 » sur tout le dépôt worktree → 0 occurrence.",
+    "piste": "Remplacer `shrink-0` par `min-w-0` (ou rien) sur le div des actions, en gardant `flex-wrap`, pour que le repli écrit puisse réellement se produire ; vérifier sur le plus chargé des 27 écrans.",
+    "risque": "Retirer `shrink-0` change la mise en page de tous les écrans qui utilisent PageHeader (le bloc d'actions pourra se comprimer avant de replier) ; c'est visuel, non fonctionnel, mais cela touche 27 écrans d'un coup et mérite une capture avant/après."
+   },
+   {
+    "id": "E32-010",
+    "sev": "S2",
+    "titre": "L'état du drapeau CRM_CONSOLE_V2_ENABLED en production n'est pas mesurable de l'extérieur : la route qui l'annonce répond 500",
+    "preuve": "Partiellement fermé, mais pas fermé. FERMÉ : le symptôme 500 vient du défaut A-001, corrigé — backend/bootstrap/app.php:34 `$middleware->redirectGuestsTo(fn () => null);` avec le commentaire :22-33 qui cite explicitement « RouteNotFoundException: Route [login] not defined -> HTTP 500 … (audit 360, A-001 / F35-001) ». OUVERT : le correctif prescrit par la grille agent-32 (« sortir /config/features du groupe auth:sanctum » + poser le drapeau dans les composes de prod/préprod) n'est pas fait. backend/routes/api.php:341 `Route::get('/config/features', [FeaturesController::class, 'index']);` est toujours DANS le groupe ouvert à :83 (`Route::middleware(['auth:sanctum','workspace','first-login'])->group(...)`), qui ne se referme qu'à :388. Et grep CRM_CONSOLE_V2_ENABLED sur docker-compose*.yml + .env.example + backend/config/crm.php ne trouve que docker-compose.local.yml:59 (\"true\"), .env.example:328 (false) et backend/config/crm.php:282 (défaut false) : aucun compose de production ni de préproduction ne pose le drapeau. L'état réel en production reste donc inobservable sans jeton.",
+    "piste": "Déplacer `Route::get('/config/features', …)` hors du groupe auth:sanctum (une route anonyme ne rendant que `console_v2`), et poser explicitement CRM_CONSOLE_V2_ENABLED dans docker-compose.prod.yml et docker-compose.staging.yml plutôt que de dépendre du défaut.",
+    "risque": "Sortir la route de auth:sanctum expose publiquement l'état d'un drapeau de fonctionnalité (fuite d'information mineure) ; le contrôleur gère déjà l'absence d'utilisateur (FeaturesController.php:39 `if ($user instanceof User)`), donc pas de 500, mais `universes` deviendrait toujours {false,false} pour un anonyme — il faut décider si c'est acceptable ou n'exposer que `console_v2`."
+   },
+   {
+    "id": "G41-012",
+    "sev": "S2",
+    "titre": "Deux écrans se rappellent toutes les dix secondes, sur un serveur qui ne sert qu'une requête à la fois",
+    "preuve": "Depot CRM. Les deux ecrans se rappellent toujours toutes les dix secondes, sans condition : `frontend/src/features/campaigns/CampaignsListPage.tsx:75` — `refetchInterval: 10_000,` — et `frontend/src/features/scraping/ScraperRunsPage.tsx:237` — `refetchInterval: 10_000,`. Ni l'un ni l'autre ne s'arrete sur un etat terminal ni sur un onglet cache, alors que le patron de la reparation existe deja a cote : `frontend/src/features/campaigns/CampaignDetailPage.tsx:96-97` et `:106` posent `refetchInterval` en EXPRESSION (`estTerminee(...) ? false : 5_000`) pour le constat G42-007. Nuance a ne pas enterrer : la moitie « sur un serveur qui ne sert qu'une requete a la fois » n'est plus vraie — `infra/php/fpm-axion.conf:47` pose `pm.max_children = ${PHP_FPM_MAX_CHILDREN:-16}` (le reglage d'usine a 5 est explicitement decrit comme repare, :17). Aucune garde ne cite G41-012.",
+    "piste": "Sur `ScraperRunsPage.tsx:237` et `CampaignsListPage.tsx:75`, remplacer la constante par une expression sur le modele de `CampaignDetailPage.tsx:96-97` (pas de course en cours ⇒ `false`), et ajouter `refetchIntervalInBackground: false` pour que l'onglet laisse ouvert la nuit n'interroge plus rien.",
+    "risque": "Changer la cadence change ce que l'exploitant voit en direct : une liste de campagnes qui ne se rafraichit plus pendant qu'une collecte tourne serait une regression fonctionnelle. Le correctif doit suspendre la scrutation sur les etats OU l'onglet est inactif, jamais la supprimer."
+   },
+   {
+    "id": "G42-009",
+    "sev": "S3",
+    "titre": "Six dépendances déclarées ne sont importées nulle part",
+    "preuve": "frontend/package.json:24 \"@tanstack/react-query-devtools\", :26 \"@tanstack/react-table\", :31 \"class-variance-authority\", :34 \"date-fns\", :49 \"zustand\" — grep de chacun sur frontend/src, frontend/tests, vite.config.ts, vitest.config.ts, eslint.config.js : 0 occurrence, le seul fichier qui les nomme est package.json lui-meme. Cinq des six sont donc confirmes non importes ; je n'identifie pas le sixieme (les autres deps ont toutes >=1 import). Cote devDependencies : @sentry/cli, @testing-library/dom, eslint-plugin-react, prettier n'ont non plus aucun import mais sont des outils appeles par binaire/config, ce qui est legitime. Aucune garde ne nomme G42-009 dans le depot.",
+    "piste": "Retirer les cinq entrees confirmees de frontend/package.json, regenerer pnpm-lock.yaml, et poser une garde qui relit package.json et exige que chaque dependance de la section `dependencies` soit importee au moins une fois sous frontend/src (enumeration mecanique, pas une liste ecrite a la main).",
+    "risque": "Retirer une dependance apparemment morte peut casser un chargement implicite (plugin eslint, preset tailwind) ou un import indirect via un fichier genere ; le risque reel est faible ici puisque les cinq sont des bibliotheques applicatives, mais le lockfile change et le build doit etre rejoue."
+   },
+   {
+    "id": "P5-35-008",
+    "sev": "S2",
+    "titre": "Le même bloc de routes laisse /audit-logs/verify-chain et /ai-act/register sans aucune permission",
+    "preuve": "PARTIELLEMENT ferme, et il faut le dire precisement : deux des trois routes sont desormais protegees, la troisieme non. backend/routes/api.php:302-303 `Route::get('/audit-logs/verify-chain', …)->middleware('permission:audit.view')` — FERME. :294-295 `Route::post('/ai-act/register', …)->middleware('permission:rgpd.handle')` — FERME. Mais :293 `Route::get('/ai-act/register', [AiActRegisterController::class, 'index']);` — AUCUNE permission, sur la ligne juste au-dessus des deux autres. Le registre reglementaire AI Act reste donc lisible par tout compte authentifie, y compris un `viewer`.",
+    "piste": "Ajouter `->middleware('permission:rgpd.view')` ou `'permission:rgpd.handle'` sur api.php:293 — la decision entre les deux revient a Will, puisque c'est elle qui determine si le registre AI Act est consultable par un operateur. Et ajouter la garde correspondante a cote de celle qui existe pour `/audit-logs`.",
+    "risque": "Poser une permission sur une lecture qui repondait 200 a tout le monde fera passer en 403 les comptes qui la consultaient. Il faut donc choisir la permission en connaissance : `rgpd.view` (que portent viewer et operator) ne change presque rien ; `rgpd.handle` (owner/admin seuls) ferme reellement."
+   }
+  ]
+ },
+ {
+  "lot": 1,
+  "nb": 6,
+  "fiches": [
+   {
+    "id": "A06-005",
+    "sev": "S3",
+    "titre": "La garde de la base reconstructible mesure la cause, jamais le geste ; et le cas qui cassait n'est joué par aucune CI",
+    "preuve": "Recherche de `fresh` dans .github/ : les trois seules occurrences sont des `coverage:refresh-matrix` (prospection-collect-paris.yml:83, prospection-reclassify.yml:42, prospection-collect-region.yml:106) — AUCUN workflow ne joue `migrate:fresh`, ni `make db-rebuild` (grep sur les .yml : zero). backend/tests/Feature/Database/ReconstructionBaseTest.php:36-38 appelle toujours `Artisan::call('migrate', ['--force' => true])` puis interroge `pg_depend` : elle mesure la cause. NUANCE : une garde neuve couvre desormais une large part du geste — backend/tests/Feature/Database/ReconstructionAtteignableTest.php:91-186 fabrique une base temoin, y installe pg_partman dans `public`, REPRODUIT l'echec `cannot drop table part_config` (l.113-115), applique la relocalisation et verifie que le meme DROP passe, puis verifie que le crochet `migrate:fresh` est arme (l.161-175). Elle emule le DROP, elle ne joue pas `migrate:fresh` deux fois, et rien en CI ne le joue.",
+    "piste": "Ajouter dans le job `backend` de .github/workflows/ci.yml, apres la suite Pest et sur le conteneur Postgres du job, un pas qui joue `php artisan migrate:fresh --force` deux fois de suite et exige deux codes 0.",
+    "risque": "Un pas de CI qui joue `migrate:fresh` doit viser une base dediee au job : sur une base partagee il detruirait le travail d'autres suites — c'est exactement le geste interdit dans cet atelier."
+   },
+   {
+    "id": "A09-006",
+    "sev": "S2",
+    "titre": "CONTRIBUTING.md présente comme « quality gates » deux seuils de couverture que la CI ne mesure jamais",
+    "preuve": "Le document ment toujours, et une autre piece du depot le dit noir sur blanc. C:/Users/willi/Documents/Projets/crmpro-wt-a35-auth/CONTRIBUTING.md, sous le titre « ## Quality gates » (l.11), l.16 « Pest backend >= 75 % couverture sur services metier » et l.17 « Vitest frontend >= 60 % couverture (config dans vitest.config.ts) ». Or la CI ne mesure jamais la couverture : .github/workflows/ci.yml:388 `coverage: none` sur le setup PHP, :568 `php vendor/bin/pest --colors --configuration phpunit-ci.xml` sans option de couverture, :602 et :674 `run: pnpm test` — jamais `pnpm test:coverage`. Et la configuration frontend l'admet elle-meme : frontend/vitest.config.ts:39-45 « SEUILS DECORATIFS EN L'ETAT. La CI lance `pnpm test`, jamais `pnpm test:coverage` : ces nombres ne bloquent rien et n'ont jamais rien bloque », juste au-dessus de :46 `thresholds: { lines: 60, ... }`.",
+    "piste": "Deplacer les deux lignes de « Quality gates » vers une section « Objectifs non gardes », en citant vitest.config.ts:39-45 et ci.yml:388 comme preuve — c'est le meme geste que le paragraphe « Verite des gates » deja pratique ailleurs dans ce projet. Puis, si l'on veut la porte : mesurer d'abord la couverture reelle, poser le seuil a cette valeur, et le faire decroitre-vers-le-haut comme la baseline PHPStan.",
+    "risque": "Nul si l'on corrige le document. Rendre les seuils mordants est autre chose : la couverture reelle n'a jamais ete mesuree, elle est probablement sous les seuils annonces, et armer la porte rougirait toutes les PR du jour au lendemain."
+   },
+   {
+    "id": "F38-008",
+    "sev": "S2",
+    "titre": "Aucun timeout-minutes dans les 8 workflows de la chaîne qualité — six exécutions figées entre 1 h 28 et 2 h 25 au moment de la mesure",
+    "preuve": "Depot CRM. Aucun `timeout-minutes` dans les huit workflows nommes : `grep -c timeout-minutes` rend 0 pour `ci.yml`, `a11y.yml`, `security.yml`, `deploy-staging.yml`, `deploy-direct-ssh.yml`, `build-postgres-image.yml`, `surveillance-sauvegarde.yml`, `release-tracking.yml`. Preuve positive de la lecture : `.github/workflows/ci.yml` declare six jobs (`runs-on: ubuntu-24.04` aux lignes 80, 283, 357, 376, 580, 611 sur 677 lignes) et aucun ne porte de borne. Le reglage EXISTE ailleurs dans le meme dossier, ce qui exclut l'ignorance de la directive : `.github/workflows/diag-website-status.yml:20` (`timeout-minutes: 15`), `prospection-collect.yml:33` (180), `prospection-find-websites.yml:46` (340), etc. Aucune garde ne cite F38-008.",
+    "piste": "Ajouter `timeout-minutes:` sous chaque `runs-on:` des huit workflows, calibre sur la duree p95 reelle de chaque job majoree d'une marge (par ex. 30 pour les jobs de test, 60 pour les builds d'image). Une garde d'enumeration cote `backend/tests/Feature/Infra/` peut ensuite refuser tout job sans borne, sur le modele de `GardeDesPortsBrancheeSurLaProductionTest.php`.",
+    "risque": "Une borne trop basse tuerait un job long legitime (le build d'image Postgres, la suite e2e) : chaque valeur doit etre posee au-dessus de la duree observee la plus longue, pas au jugement."
+   },
+   {
+    "id": "H45-005",
+    "sev": "S2",
+    "titre": "Les drapeaux MOCK_* ne sont épinglés dans aucun des deux fichiers PHPUnit : la suite locale n'est pas hermétique et rougit là où la CI est verte",
+    "preuve": "Reduit d'un cran, pas ferme. backend/phpunit.xml:29 declare `<env name=\"MOCK_MODE\" value=\"true\"/>` — toujours SANS `force=\"true\"`, alors que le meme fichier sait s'en servir quatre lignes plus bas (:44 `CACHE_STORE ... force=\"true\"`, :56-57 `DB_CONNECTION` et `DB_DATABASE` idem). Un seul drapeau a ete rapatrie depuis la CI : :42 `MOCK_INSEE`, avec un commentaire :30-41 qui raconte exactement le defaut du constat (« un vert qui depend d'une variable absente du fichier de configuration est un vert de CI, pas un vert de la suite »). Meme etat dans backend/phpunit-ci.xml:50 et :63. Or .github/workflows/ci.yml:553-562 pose DIX drapeaux : MOCK_MODE, MOCK_LLM, MOCK_PROXIES, MOCK_SCRAPERS, MOCK_SMTP, MOCK_INSEE, MOCK_ANNUAIRE_ENTREPRISES, MOCK_BODACC, MOCK_BAN, MOCK_FRANCE_TRAVAIL — HUIT ne sont declares dans aucun des deux fichiers PHPUnit. La suite locale et la CI ne mesurent donc toujours pas la meme chose.",
+    "piste": "Recopier les huit `<env name=\"MOCK_*\" value=\"true\"/>` manquants dans phpunit.xml et phpunit-ci.xml, poser `force=\"true\"` sur MOCK_MODE, puis ajouter une garde qui compare mecaniquement la liste des `MOCK_*` de ci.yml a celle des deux fichiers PHPUnit — sans quoi le prochain drapeau ajoute a la CI recreera l'ecart.",
+    "risque": "Poser les huit drapeaux manquants peut FAIRE ROUGIR la suite locale la ou elle etait verte : un test qui touchait un vrai client HTTP passerait en simulacre, ou l'inverse. C'est le resultat cherche (rendre l'ecart visible), mais il faut s'attendre a des rouges au premier passage, et il existe une garde S0 anti-simulacre a consulter avant (backend/tests/.../C18-016)."
+   },
+   {
+    "id": "H46-006",
+    "sev": "S3",
+    "titre": "Le commentaire de ci.yml annonce 276 fichiers non formatés ; la mesure d'aujourd'hui en donne 174",
+    "preuve": ".github/workflows/ci.yml:20-22, verbatim : « Pint : le dépôt compte 276 fichiers non formatés ; reformater tout serait un diff massif hors périmètre. » Le commentaire est inchangé. La mesure de l'audit (2026-08-19) en donnait 174 (04_PREUVES/agent-46/pint-test-checkout-LF-large.txt, 174 chemins), et depuis le commit 32f6f46 du 2026-08-21 a reformaté 95 fichiers de plus : le nombre affiché dans ci.yml est faux d'au moins deux générations.",
+    "piste": "Remplacer le nombre figé par la façon de l'obtenir (« compter avec `pint --test` ; à la date X : N ») et le dater, ou mieux : supprimer le chiffre en même temps qu'on solde H46-005, puisque le commentaire n'existe que pour justifier l'exception.",
+    "risque": "Nul — c'est un commentaire. Le seul risque est d'y réinscrire un nombre qui périmera à son tour."
+   },
+   {
+    "id": "H46-007",
+    "sev": "S3",
+    "titre": "Le pathspec 'backend//*.php' du contrôle Pint de la CI ne couvre pas les fichiers PHP situés directement sous backend/",
+    "preuve": ".github/workflows/ci.yml:440 : `mapfile -t files < <(git diff --name-only --diff-filter=ACMR \"$base\"...HEAD -- 'backend/**/*.php' | sed 's|^backend/||')`. Le pathspec n'a pas la magie `:(glob)` — vérifié empiriquement en lecture seule sur ce dépôt : `git ls-files -- 'backend/tests/**/*.php'` rend 194 fichiers alors que `backend/tests` en contient 197, et les 3 manquants sont exactement ceux posés DIRECTEMENT sous le dossier (backend/tests/Pest.php, TestCase.php, bootstrap.php). Le même trou existe donc sur `backend/**/*.php` pour les .php à la racine de backend/. Atténuation : `git ls-files 'backend/*.php' | grep -v /` est vide aujourd'hui — aucun fichier n'est actuellement dans l'angle mort, le défaut est latent.",
+    "piste": "Remplacer `'backend/**/*.php'` par `':(glob)backend/**/*.php'` (qui rend `**` réellement récursif y compris zéro segment) ou plus simplement par `'backend/' '*.php'` → `-- 'backend/*.php'` avec la sémantique git par défaut où `*` traverse les `/`.",
+    "risque": "Élargir le pathspec fera entrer dans le contrôle des fichiers jusqu'ici jamais vérifiés ; une PR qui touche un futur backend/x.php pourrait rougir sur du format, ce qui est le comportement voulu."
+   }
+  ]
+ },
+ {
+  "lot": 2,
+  "nb": 5,
+  "fiches": [
+   {
+    "id": "A-003 / A09-005",
+    "sev": "S2",
+    "titre": ".gitattributes a été posé mais la copie de travail n'a jamais été renormalisée : 8 scripts .sh sur 16 sont encore en CRLF",
+    "preuve": "Mesure faite dans la copie de travail du DEPOT PRINCIPAL, C:/Users/willi/Documents/Projets/Axion-CRM-Pro : `git ls-files --eol -- '*.sh' | grep -c 'w/crlf'` rend exactement 8. Les huit fichiers sont backend/database/perf/mesure_reference.sh, infra/docker/entrypoint-prod.sh, infra/scripts/backup-postgres.sh, infra/scripts/configure-prod-env.sh, infra/scripts/dr-drill.sh, infra/scripts/setup-backup.sh, infra/scripts/setup-hetzner-cpx22.sh, infra/scripts/verifier-sauvegarde.sh — tous en `i/lf w/crlf`, c'est-a-dire LF dans l'index et CRLF sur disque. Le .gitattributes est bien pose (C:/Users/willi/Documents/Projets/crmpro-wt-a35-auth/.gitattributes:21 `* text=auto eol=lf`, :24 `*.sh text eol=lf`) et il MORD sur les copies creees apres : dans le worktree crmpro-wt-a35-auth les 18 .sh sont tous en `w/lf`. C'est bien la renormalisation de la copie principale qui n'a jamais eu lieu.",
+    "piste": "Sur l'arbre principal et arbre propre : `git add --renormalize -- '*.sh'` puis commit ; ou, plus chirurgical, `rm` des huit fichiers suivi de `git checkout -- <les huit>`, ce qui les fait re-materialiser sous .gitattributes. Puis une garde qui refuse un `.sh` en CRLF, sur le modele de ServeurHttpDeProductionTest.",
+    "risque": "`git add --renormalize .` reecrit des fichiers dans une copie de travail que sept worktrees et plusieurs agents partagent (git worktree list en denombre 7 sur ce depot) : joue pendant qu'un autre agent edite, il produit un diff surprise. A jouer sur un arbre propre, et sur les seuls chemins concernes."
+   },
+   {
+    "id": "C19-012",
+    "sev": "S3",
+    "titre": "Le contournement de captcha n'est pas actif — mais rien ne l'interdit par construction, et aucune décision ne l'a arbitré",
+    "preuve": "backend/app/Services/Captcha/TwoCaptchaSolver.php:9-12 : la classe existe toujours et `solve()` ne fait que `throw new \\LogicException('TwoCaptchaSolver requires MOCK_CAPTCHA=false + Sprint 7 implementation.')`. Elle reste CÂBLÉE comme implémentation réelle : backend/app/Providers/MockServicesProvider.php:107 `$bind(CaptchaSolver::class, TwoCaptchaSolver::class, MockCaptchaSolver::class, 'MOCK_CAPTCHA');`. Rien ne l'interdit par construction : il suffit de poser `MOCK_CAPTCHA=false` et d'écrire le corps de `solve()`. Le seul verrou est une valeur d'exploitation — infra/scripts/configure-prod-env.sh:55 `set_env \"MOCK_CAPTCHA\" \"true\"` et .env.example:12 — et la clé d'API est déjà prévue (.env.example:181 `TWOCAPTCHA_API_KEY=`). Aucun fichier de décision (`_AUDIT/`, `spec/`) ne tranche le sujet ; aucun commit ne cite C19-012.",
+    "piste": "Écrire une décision datée (contournement de captcha refusé, ou autorisé sous conditions) dans _AUDIT/05_DECISIONS.md, puis la rendre mécanique : une garde Pest qui échoue si `solve()` cesse d'être un `throw`, ou si `MOCK_CAPTCHA` peut valoir `false` en production.",
+    "risque": "Nul côté produit tant qu'on n'ajoute qu'une décision écrite et une garde. Supprimer la classe, en revanche, casserait le `$bind` de MockServicesProvider.php:107 — il faut retirer les deux ensemble."
+   },
+   {
+    "id": "F37-005",
+    "sev": "S3",
+    "titre": "La production accepte l'origine CORS https://app.localhost avec credentials",
+    "preuve": "backend/config/cors.php:6-9 : `'allowed_origins' => array_filter(array_map('trim', explode(',', (string) env('CORS_ALLOWED_ORIGINS', 'https://app.localhost,https://app.axion-crm-pro.com'))))` avec :14 `'supports_credentials' => true`. La seconde moitié du constat est vérifiable dans l'arbre : une recherche de `CORS_ALLOWED_ORIGINS` sur TOUT le dépôt ne rend qu'une seule occurrence, celle de cors.php:7 — la variable n'est posée ni dans .env.example, ni dans docker-compose.prod.yml, ni dans infra/scripts/configure-prod-env.sh, ni dans .github/workflows/deploy-direct-ssh.yml. Rien ne la fournit au conteneur : c'est donc le défaut qui s'applique, et la production accepte `https://app.localhost` avec cookies.",
+    "piste": "Faire du défaut la seule origine de production (`https://app.axion-crm-pro.com`), et poser `CORS_ALLOWED_ORIGINS=https://app.localhost,https://app.axion-crm-pro.com` dans docker-compose.local.yml et .env.example. Ajouter une garde Pest qui échoue si `config('cors.allowed_origins')` contient un hôte `.localhost` quand `app()->environment('production')`.",
+    "risque": "Retirer `https://app.localhost` du DÉFAUT casse la pile locale de développement, qui repose justement dessus (cf. la surcouche docker-compose.local.yml). Il faut poser la variable côté local en même temps, sinon la console locale perd son API."
+   },
+   {
+    "id": "F39-009",
+    "sev": "S2",
+    "titre": "Le RPO annoncé est faux d'un facteur 24, et la profondeur réelle des sauvegardes est de trois jours, pas trente",
+    "preuve": "Depot CRM. Le RPO annonce est toujours faux a deux endroits : `Makefile:160` — `dr-drill: ## DR drill (RPO ≤ 1h, RTO ≤ 4h)` — et `ARCHITECTURE.md:94-95` — « Backups : Hetzner Object Storage hourly + Backblaze B2 replication off-site (3-2-1) » / « DR : RPO 1h / RTO 4h ». Or la sauvegarde est QUOTIDIENNE, ce que le depot etablit lui-meme trois fois : `infra/scripts/dr-drill.sh:15` (« elle exigeait un RPO ≤ 1 h alors que la sauvegarde est QUOTIDIENNE »), `.github/workflows/surveillance-sauvegarde.yml:28-30` (cron 05:00 UTC, « deux heures apres la sauvegarde de 03:00 UTC ») et `infra/runbooks/04-restore-dr.md:26-28` (« La cible RPO n'est PAS tenue … La perte maximale reelle est donc de 24 heures »). Facteur 24, confirme. Le runbook cite dans le constat a DEJA ete corrige (`04-restore-dr.md:38` : « ce document annonce 24 h ») — le mensonge survit ailleurs. INDECIDABLE en revanche sur « la profondeur reelle est de trois jours, pas trente » : la configuration dit 30 (`infra/scripts/backup-postgres.sh:55`, `RETENTION_REMOTE_DAYS=30`, rotation :364-413), et verifier le contenu reel de la Storage Box exigerait de s'y connecter, ce que le mandat interdit.",
+    "piste": "Corriger `Makefile:160` en « DR drill (RPO reel ≤ 24 h, RTO ≤ 4 h) » et reecrire les deux puces de `ARCHITECTURE.md:94-95` sur le modele deja pose dans `infra/runbooks/04-restore-dr.md:24-38` (sauvegarde quotidienne 03:00 UTC vers Storage Box Hetzner, retention 30 j, pas de reprise a un instant arbitraire). Etendre ensuite `backend/tests/Feature/Infra/RunbookRestaurationDrTest.php` a ces deux fichiers pour que le mensonge ne repousse pas.",
+    "risque": "Aucun risque technique — ce sont deux lignes de documentation. Le risque est inverse : les laisser telles quelles fait promettre a un client un RPO d'une heure que l'infrastructure ne tient pas."
+   },
+   {
+    "id": "H44-009",
+    "sev": "S3",
+    "titre": "MOCKS-STRATEGY.md décrit deux contrats et deux doubles qui n'existent pas, et nomme la mauvaise implémentation de production pour le sondage SMTP",
+    "preuve": "MOCKS-STRATEGY.md:26 annonce le contrat `DnsManager` / le double `MockDnsManager`, et :27 le contrat `EmailSender` / `MockEmailSender`. Or `ls backend/app/Contracts/` rend 14 fichiers et ni DnsManager.php ni EmailSender.php n'y figurent ; `find backend/app -name \"Mock*.php\"` rend 15 doubles, aucun MockDnsManager ni MockEmailSender. Sondage SMTP : MOCKS-STRATEGY.md:16 nomme `RealSmtpProber` comme implémentation de production, alors que backend/app/Providers/MockServicesProvider.php:110 câble `$bind(SmtpProber::class, HunterSmtpProber::class, MockSmtpProber::class, 'MOCK_SMTP');` — le commentaire :108-109 le dit explicitement : « HunterSmtpProber remplace RealSmtpProber … RealSmtpProber gardé en classe pour fallback manuel mais plus wired par défaut ».",
+    "piste": "Retirer les deux lignes 26-27 de MOCKS-STRATEGY.md (ou les marquer explicitement « Phase 2 — non implémenté »), et remplacer `RealSmtpProber` par `HunterSmtpProber` en ligne 16 avec la note de MockServicesProvider.php:108-109 sur le repli manuel.",
+    "risque": "Nul : le correctif ne touche qu'un document. Le seul risque est de corriger le document dans le mauvais sens (écrire que DnsManager existe « bientôt » plutôt que de retirer la ligne)."
+   }
+  ]
+ },
+ {
+  "lot": 3,
+  "nb": 5,
+  "fiches": [
+   {
+    "id": "F38-006",
+    "sev": "S2",
+    "titre": "Le job Lighthouse rend success depuis toujours en n'ayant produit aucun score : lhci sort en 1 sous continue-on-error",
+    "preuve": "Depot CRM (`crmpro-wt-a35-auth`). `.github/workflows/a11y.yml:83-93`, job `lighthouse` : `if: github.event_name == 'pull_request'` (:86), `npm install -g @lhci/cli@0.13` (:91), `lhci autorun --upload.target=temporary-public-storage --collect.url=https://staging.axion-crm-pro.com` (:92) et — la ligne qui fait le constat — `continue-on-error: true` (:93). Le job ne peut donc JAMAIS faire rougir une PR, quel que soit le code de sortie de `lhci`. Aucun fichier de configuration Lighthouse n'existe dans le depot (`find . -iname \"*lighthouse*\" -o -iname \".lighthouserc*\"` : aucun resultat), donc aucune assertion n'est declaree. Aucune garde ne cite F38-006 (`git grep F38-006` : zero resultat). INDECIDABLE en revanche sur la moitie « lhci sort en 1 » : reproduire l'echec demanderait de joindre `staging.axion-crm-pro.com`, ce que le mandat interdit.",
+    "piste": "D'abord verifier a la main que l'URL rend 200 et que `lhci autorun` produit un score ; ensuite poser un `.lighthouserc.json` avec des assertions chiffrees et retirer `continue-on-error: true` de `a11y.yml:93`. En attendant, faire echouer explicitement le job si aucun rapport n'a ete produit, plutot que de le laisser vert sur zero mesure.",
+    "risque": "Retirer `continue-on-error` fera rougir toutes les PR tant que la cible `https://staging.axion-crm-pro.com` n'est pas reellement servie — il faut donc reparer la cible AVANT de retirer le filet, sinon on remplace une porte muette par une porte bloquee."
+   },
+   {
+    "id": "F38-014",
+    "sev": "S3",
+    "titre": "pnpm install --frozen-lockfile // pnpm install : la seule porte E2E teste un arbre de dépendances que rien d'autre ne valide",
+    "preuve": ".github/workflows/a11y.yml:24 : `run: pnpm install --frozen-lockfile || pnpm install`. Le repli avale exactement l'échec que `--frozen-lockfile` sert à produire : dès que frontend/pnpm-lock.yaml diverge de package.json, la porte réinstalle un arbre de dépendances résolu à la volée et vert, et c'est cet arbre-là — que rien d'autre ne valide — qui est mesuré par axe-core et Playwright (:26-27, `playwright install` puis build/preview).",
+    "piste": "Remplacer la ligne 24 par `pnpm install --frozen-lockfile` seul, et vérifier au préalable que le lock est à jour ; si l'on tient à un repli, le rendre bruyant (échec du job avec un message explicite) plutôt que silencieux.",
+    "risque": "Retirer le `|| pnpm install` fera rougir le job a11y dès le prochain lock désynchronisé — c'est l'effet recherché, mais cela peut bloquer une PR sans rapport le jour où on le pose. À faire en même temps qu'un `pnpm install --lockfile-only` de remise à niveau du lock."
+   },
+   {
+    "id": "H44-008",
+    "sev": "S3",
+    "titre": "Le job Playwright rattrape en silence un lockfile désynchronisé et mesure alors d'autres dépendances que la CI",
+    "preuve": ".github/workflows/a11y.yml:22-24 : étape `Install deps` → `run: pnpm install --frozen-lockfile || pnpm install`. Le `|| pnpm install` rattrape silencieusement un lockfile désynchronisé et réinstalle un arbre de dépendances résolu à la volée — donc potentiellement différent de celui que mesure ci.yml. Le numéro de ligne a glissé de 25-26 à 22-24, le mécanisme est intact ; aucun commit ne cite H44-008.",
+    "piste": "Remplacer par `pnpm install --frozen-lockfile` seul (comme les autres jobs), et laisser l'échec parler ; si un filet est jugé nécessaire, garder l'échec mais afficher `pnpm install --frozen-lockfile` en clair dans le message d'erreur du job.",
+    "risque": "Retirer le repli fera rougir a11y.yml le jour où frontend/pnpm-lock.yaml est réellement désynchronisé — ce qui est le but, mais peut bloquer une PR en cours qui n'a rien à voir avec l'accessibilité."
+   },
+   {
+    "id": "H45-003",
+    "sev": "S2",
+    "titre": "Deux des quatre tests HIBP n'affirment rien de ce que leur nom promet : la suite entière reste verte quand on casse ce qu'ils prétendent garder",
+    "preuve": "backend/tests/Unit/Rules/PasswordResetWithHibpTest.php, lu en entier (62 lignes). Ligne 45 : le test « HIBP cache prefix unique par 5 chars du sha1 » se termine sur `expect(true)->toBeTrue();`, precede de son propre aveu ligne 43-44 (« Vu qu'on n'a plus de mock, on ne peut tester ca directement. On valide juste qu'on n'a pas crashe. ») — il n'assure RIEN sur le prefixe de cache que son nom promet. Ligne 62 : le test « HIBP user-agent inclus dans la requete » se termine sur `expect($captured)->not->toBeNull();` — il assure que la requete a ete capturee, jamais qu'elle porte un en-tete User-Agent, alors que le handler la capture bien ligne 51 (`$captured = $request;`). Les deux resteraient verts si le prefixe de cache et l'en-tete disparaissaient.",
+    "piste": "Ligne 62 : `expect($captured->getHeaderLine('User-Agent'))->toContain('Axion')` (ou la valeur exacte posee par HibpChecker). Ligne 45 : compter les entrees de cache reellement ecrites — deux `Cache::has(...)` sur les cles derivees des deux prefixes sha1 — au lieu de `expect(true)`.",
+    "risque": "Aucun risque produit : on modifie deux assertions de test. Attention seulement a ce que la nouvelle assertion sur l'User-Agent nomme la valeur reellement emise par HibpChecker, sinon on remplace un test creux par un test rouge."
+   },
+   {
+    "id": "A05-007",
+    "sev": "S3",
+    "titre": "Deux numérotations de lots coexistent dans les documents de référence, sans table de correspondance",
+    "preuve": "Les deux numerotations coexistent toujours, et la table de correspondance demandee n'a ete ajoutee nulle part. Cote plan : Axion-IA/_PLANS/2026-08-13_ORDRE-MISSION-AUTOPILOT-CRM.md:131-137, « RÈGLES D'EXÉCUTION AUTOPILOT — 1. Ordre des lots strict (numerotation CORRIGEE …) : **L0 = SITE, prerequis** … → **L1 = CRM, durcissement RLS/role** ». Cote execution : Axion-IA/_SESSIONS/2026-08-13_AUTOPILOT-CRM-journal.md:339-344, « ⚠️ Numerotation : l'ordre de mission de cette session renomme les lots. **L0 ici = « durcissement RLS » (le L1 du plan maitre)** ; **L1 ici = « socle de donnees » (le L2 du plan maitre)** ». L'ecart n'est donc documente qu'UNE fois, au milieu du journal, exactement comme le constat le decrit. L'en-tete du journal (l. 1-17) ne porte aucune table de correspondance. A noter : ces deux fichiers vivent dans le depot Axion-IA, pas dans le depot CRM — _PLANS/ n'existe ni dans le worktree ni dans `git ls-tree main` du CRM.",
+    "piste": "Ajouter une table de six lignes (« lot du plan » ↔ « lot de session » ↔ « PR ») en TETE du journal 2026-08-13 ET en tete du rapport de cloture, pas au fil de l'eau ; et y nommer explicitement le L0 du plan (prerequis site), qui a ete livre sans jamais porter ce nom nulle part.",
+    "risque": "Aucun : deux documents de reference, aucun code. Le seul piege est d'ecrire la table de correspondance dans un seul des deux documents — c'est precisement la moitie de geste qui a cree le probleme."
+   }
+  ]
+ },
+ {
+  "lot": 4,
+  "nb": 5,
+  "fiches": [
+   {
+    "id": "B14-008",
+    "sev": "S2",
+    "titre": "Le contrat est versionné à l'entrée et pas à la sortie, et aucun test ne compare les deux vocabulaires",
+    "preuve": "L'asymetrie est lisible dans les deux fichiers. ENTREE, version exigee et refus dur : backend/app/Crm/Ingest/SiteSyncEvent.php:118-122 — `$version = $raw['schema_version'] ?? null; if ($version !== self::SCHEMA_VERSION) { throw SiteSyncRejection::invalid('unsupported_schema_version', ...); }`. SORTIE, aucune version : backend/app/Console/Commands/CrmFlushOutbound.php:203-211, le corps emis est `json_encode(['event_id', 'event_type', 'person_key', 'email_hash', 'scope', 'origin', 'occurred_at'])` — il n'y a pas de cle `schema_version`, et `grep -n \"schema_version|SCHEMA_VERSION\" app/Console/Commands/CrmFlushOutbound.php` ne rend aucune ligne. Aucun test ne confronte les deux vocabulaires : `grep -rln \"EVENT_TYPES|SCHEMA_VERSION\" backend/tests/` ne rend aucun fichier.",
+    "piste": "Ajouter `'schema_version' => self::SCHEMA_VERSION` au tableau de CrmFlushOutbound::dispatchOne(), en le tirant d'une constante partagee ; puis un test qui assert que le vocabulaire emis (EVENT_TYPES de ConsentOutboundRecorder) et le vocabulaire accepte a l'entree sont derives de la MEME source, de sorte qu'ajouter un type d'un seul cote fasse rougir.",
+    "risque": "Reel mais maitrisable : ajouter `schema_version` au corps sortant modifie le contrat lu par le site (depot Axion-IA, que je n'ai pas ouvert). Si le recepteur cote site valide les cles de facon stricte, une cle nouvelle peut le faire refuser — la coordination des deux depots est necessaire, ce n'est pas un patch unilateral."
+   },
+   {
+    "id": "I49-002",
+    "sev": "S2",
+    "titre": "§22.3 : deux interdits sur cinq sont une décision appliquée, deux sont sans objet, et le cinquième n'est appliqué que dans un sens",
+    "preuve": "L'asymetrie du cinquieme interdit est intacte, et je l'ai lue des deux cotes. Sens site -> CRM, strict : backend/app/Crm/Ingest/SiteSyncEvent.php:117 `self::assertOnlyKeys($raw, self::TOP_LEVEL_KEYS, 'racine')`, avec TOP_LEVEL_KEYS :72-75 et les listes PERSON/COMPANY/CONSENT/CANDIDATE :78-85. Sens CRM -> site, indifferent : Axion-IA/axionia/src/server/crm-sync/inbound.ts:143-176 `parseInboundPayload` lit sept cles et rend l'objet reconstruit — recherche de `assertOnlyKeys|Object.keys|unknown_field|strict` sur ce fichier : ZERO resultat, alors que le meme fichier sait refuser (neuf `return null` explicites). Et le contrat ecrit, Axion-IA/axionia/src/server/crm-sync/types.ts:5 (« Le schema y est STRICT : toute cle inconnue fait rejeter le message (422) ») est toujours affirme des deux cotes. Le CDC n'a pas bouge non plus : C:/Users/willi/Downloads/axion-ia-crm-cahier-des-charges-fonctionnel-v2.md, §22.3, presente les cinq interdits comme des garanties acquises, sans distinguer l'applique du prevu.",
+    "piste": "Ecrire dans inbound.ts l'equivalent d'`assertOnlyKeys` (refus 422 de toute cle hors des sept attendues, avec le meme code d'erreur `unknown_field` que le CRM) ; et degraisser le §22.3 du CDC en separant ce qui est interdit-et-applique de ce qui est prevu — les items 3 et 4 ne protegent rien tant que le CRM ne porte ni enregistrement ni transcription.",
+    "risque": "Le correctif se fait dans le depot SITE, pas dans le CRM. Refuser les cles inconnues cote site fera echouer tout emetteur qui envoie aujourd'hui un champ superflu et passe en silence — a verifier sur `emit.ts` avant, sinon on ferme le canal RGPD sortant."
+   },
+   {
+    "id": "I49-009",
+    "sev": "S2",
+    "titre": "Le §22.2 annonce en gras comme « existants » trois éléments qui n'existent pas",
+    "preuve": "Le CDC n'a pas ete degraisse — je l'ai ouvert : C:/Users/willi/Downloads/axion-ia-crm-cahier-des-charges-fonctionnel-v2.md (horodatage 2026-08-18 12:35, inchange depuis l'audit), §22.2, met toujours en gras `**numero client attribue**` a la ligne Facturation du premier tableau, `**desinscription, reinscription, effacement**` a la ligne Consentement du second, et `**fiche creee ou rapprochee**` a la ligne Identite — sous un en-tete qui dit « existants en gras, a ajouter en clair ». Cote code, l'inexistence tient : backend/app/Crm/Ingest/SiteSyncEvent.php:38-49, `EVENT_TYPES` compte dix valeurs (form_submission, calendly_*, newsletter_optin/optout, review_posted, application_submitted, opt_out) — rien qui corresponde a l'attribution d'un numero client.",
+    "piste": "Retirer le gras des trois mentions dans le §22.2 du CDC (« numero client attribue », « reinscription », « fiche creee ou rapprochee »). Quinze minutes, et a faire AVANT tout chiffrage du lot canal — « fiche creee ou rapprochee » est le prerequis annonce du §22.4.",
+    "risque": "Le correctif porte sur un document, pas sur le produit : aucun risque d'execution. Le risque est inverse — laisser le gras en l'etat gonfle l'existant de trois evenements et fausse tout chiffrage du chantier canal."
+   },
+   {
+    "id": "E32-006",
+    "sev": "S2",
+    "titre": "L'unique lien de la console vers le CRM le présente comme un outil de « Prospection », pointe la racine, et vit hors du SSOT de navigation",
+    "preuve": "Depot du site. `src/components/admin/ui/AdminSidebarNav.tsx:772-794` : un `<a href=\"https://app.axion-crm-pro.com\" target=\"_blank\">` ecrit en dur DANS le composant, avec `title=\"Ouvrir Axion CRM Pro (outil de prospection)\"` (:776) et le libelle `<span ...>Prospection</span>` (:788). Les trois reproches sont verifies mot pour mot : (a) libelle « Prospection », (b) URL = racine `https://app.axion-crm-pro.com` sans chemin, (c) hors du SSOT — `git grep -n \"app.axion-crm-pro\" -- src` ne rend que cette ligne, et `src/lib/admin-nav.ts` ne la connait pas.",
+    "piste": "Ajouter un champ `external?: true` (ou `hrefAbsolu`) au type d'item de `admin-nav.ts`, y declarer l'entree avec un libelle qui dit ce qu'elle est (« Axion CRM Pro »), une URL qui pointe l'ecran utile plutot que la racine, et faire sauter ces items dans le balayage de `check-admin-nav-routes.ts`.",
+    "risque": "Deplacer l'entree dans `admin-nav.ts` la fait passer sous `scripts/check-admin-nav-routes.ts`, qui cherche un `page.tsx` sur le disque (`check-admin-nav-routes.ts:33`) : sans un cas « lien externe » dans le modele de nav, la garde rougira sur une entree parfaitement valide."
+   },
+   {
+    "id": "E32-008",
+    "sev": "S3",
+    "titre": "Le libellé « Recrutement » désigne une route /contacts/commercial dont la page s'intitule « Commercial »",
+    "preuve": "Constat situé hors du worktree CRM : les chemins `src/lib/admin-nav.ts` et `.../contacts/commercial/page.tsx` n'existent pas dans crmpro-wt-a35-auth ; ils sont dans C:/Users/willi/Documents/Projets/Axion-IA/axionia. Lu : axionia/src/lib/admin-nav.ts:492-497 → `href: `${base}/contacts/commercial``, `label: \"Recrutement\"` (ligne 494). Lu : axionia/src/app/[locale]/(admin)/[adminPrefix]/contacts/commercial/page.tsx:1 → `// Contacts admin — onglet « Commercial »`. NUANCE MESURÉE, la formulation du constat est imprécise : la page ne « s'intitule » pas « Commercial » à l'écran — elle délègue à SubmissionsV2, dont le titre rendu est `title=\"Soumissions\"` (submissions/_v2/SubmissionsV2.tsx:220). Il y a donc TROIS noms pour un seul écran (nav « Recrutement », URL/commentaire « Commercial », titre affiché « Soumissions »), pas deux. Aucun commit ne cite E32-008 (git log --all --grep : vide).",
+    "piste": "Choisir UN nom (« Recrutement » ou « Commercial »), l'appliquer au label de admin-nav.ts:494 ET au titre rendu par SubmissionsV2 pour ce basePath (aujourd'hui « Soumissions » pour tous les onglets), sans toucher à l'URL.",
+    "risque": "Renommer le libellé de nav est sans risque technique ; changer l'URL /contacts/commercial casserait les liens existants et le `basePath` codé en dur dans SubmissionsV2.tsx:70,145-146 — donc ne pas toucher à la route."
+   }
+  ]
+ },
+ {
+  "lot": 5,
+  "nb": 5,
+  "fiches": [
+   {
+    "id": "B14-001 / I49-001",
+    "sev": "S1",
+    "titre": "Le canal sortant déclare trois événements, en produit deux, et un seul est atteignable par un humain",
+    "preuve": "Le vocabulaire declare trois evenements : backend/app/Crm/Outbound/ConsentOutboundRecorder.php:33 `public const EVENT_TYPES = ['consent_optout', 'consent_optin', 'erasure'];`, double par le CHECK de backend/database/migrations/2026_08_14_000007_crm_outbound_events.php:59. Le depot n'en produit que DEUX : `erasure` (RgpdRequestsController.php:224) et `consent_optout` (RgpdRequestsController.php:285 via executerOpposition, et JournalistsController.php:255). Un grep de `consent_optin` sur tout le depot ne rend QUE ces deux declarations — aucun producteur, nulle part. En revanche, la seconde moitie du constat (« un seul est atteignable par un humain ») est FERMEE : POST /rgpd/requests/{id}/process est appele par frontend/src/features/rgpd/RgpdRequestsPage.tsx:96, ecran reference dans la barre laterale (Sidebar.tsx:108), et cet unique chemin produit desormais les DEUX evenements ; le commentaire RgpdRequestsController.php:303-305 date lui-meme ce correctif (B14-002).",
+    "piste": "Trancher entre les deux etats et l'ecrire : soit `consent_optin` est une reserve assumee (alors un commentaire au-dessus de la ligne 33 dit qui l'emettra et quand), soit il n'existe pas (alors on le retire du const, et la migration du CHECK attend qu'un comptage prouve qu'aucune ligne ne le porte). Poser une garde qui exige que chaque valeur de EVENT_TYPES ait au moins un site d'appel dans app/.",
+    "risque": "Retirer `consent_optin` du const PHP est sans risque ; le retirer du CHECK SQL exige une migration, et une migration qui restreint un CHECK echoue si une ligne historique porte la valeur. Inversement, le documenter comme reserve ne coute rien mais laisse un vocabulaire plus large que le produit."
+   },
+   {
+    "id": "B14-012",
+    "sev": "S2",
+    "titre": "person_key est prévu, jamais renseigné, et de toute façon jeté par le site",
+    "preuve": "Le parametre existe et n'est jamais renseigne. backend/app/Crm/Outbound/ConsentOutboundRecorder.php:52 `?string $personKey = null,` dans record(), :96 `'person_key' => $personKey,` a l'insertion, et :124 le meme parametre optionnel dans recordForEmail(), transmis tel quel a :128. Or les TROIS sites d'appel du depot passent par recordForEmail() en arguments nommes SANS jamais fournir personKey : JournalistsController.php:255-260 (eventType, email, scope, payload:), :307-312 (idem), RgpdRequestsController.php:307-317 (idem). La colonne part donc toujours a null, et CrmFlushOutbound.php:206 l'emet telle quelle : `'person_key' => $row->person_key === null ? null : (string) $row->person_key`. LIMITE DE MA VERIFICATION : le troisieme membre du titre (« jete par le site ») porte sur le depot Axion-IA, que ma tranche ne couvre pas et que je n'ai pas ouvert — je ne l'atteste pas.",
+    "piste": "Aux trois sites d'appel, resoudre la person_key du sujet (elle existe deja sur contacts/candidates, cf. ContactUpserter.php:61-63) et la passer en argument nomme a recordForEmail(). Si la reponse est au contraire qu'elle ne doit pas sortir, alors retirer le parametre et la colonne — mais ne pas laisser un champ prevu, cable de bout en bout et toujours vide.",
+    "risque": "Faible cote CRM. Attention toutefois a ce que person_key est : une cle derivee de l'adresse, donc une donnee pseudonymisante. La renseigner fait sortir du serveur une correlation qui n'en sortait pas ; c'est une decision de conformite autant que technique, a poser avant le patch."
+   },
+   {
+    "id": "B14-014",
+    "sev": "S3",
+    "titre": "L'anti-doublon du producteur peut écraser une décision plus récente",
+    "preuve": "backend/app/Crm/Outbound/ConsentOutboundRecorder.php:80-89 — la recherche `->where('event_type', …)->where('email_hash', …)->where('scope', …)->whereIn('status', ['pending','failed'])->value('event_id')` puis `if ($pending !== null) { return (string) $pending; }` : retour anticipe, aucune ecriture, ni comparaison ni fusion du `payload` (qui n'est ecrit qu'a l'insertion, l.100). Aucune garde ne cite B14-014.",
+    "piste": "Dans la branche de retour anticipe, fusionner le nouveau `payload` dans la ligne en attente (`array_merge` du JSON existant) et rafraichir `updated_at`, ou horodater la derniere decision ; a traiter en meme temps que l'emission du payload.",
+    "risque": "Fusionner les payload change ce qui partira au site le jour ou `CRM_OUTBOUND_ENABLED` sera actif (aujourd'hui le payload n'est pas emis) ; une mise a jour ajoute aussi une ecriture la ou il n'y en avait pas — a faire dans la meme transaction que la lecture pour ne pas creer de course."
+   },
+   {
+    "id": "E33-004",
+    "sev": "S2",
+    "titre": "La réconciliation compare 5 familles alors que le site en émet 6 : les demandes podcast ne sont jamais vérifiées",
+    "preuve": "Depot du site. `src/server/crm-sync/reconcile.ts:73-74` : `export type CrmSyncFamily = \"submission\" | \"job_application\" | \"calendly_event\" | \"newsletter_subscriber\" | \"customer_review\";` — cinq familles, et `FAMILY_LABELS` (`reconcile.ts:101-107`) les reprend a l'identique. Or `src/features/podcast-request/actions.ts:110-118` emet bien vers le CRM : `syncFormSubmissionToCrm({ subjectRef: `site:podcast_request:${created.id}`, formType: \"podcast\", ... })` — une SIXIEME famille, `podcast_request`, qu'aucun appel a `compareFamily` ne couvre (`reconcile.ts:157-259`). Les demandes podcast ne sont donc jamais verifiees par le filet.",
+    "piste": "Ajouter `\"podcast_request\"` a `CrmSyncFamily` + `FAMILY_LABELS`, puis un sixieme `compareFamily({ family: \"podcast_request\", universe: \"business\", loadIds: (from,to) => prisma.podcastRequest.findMany({ where: { <colonne d horodatage reelle>: { gte: from, lt: to } }, select: { id: true }, take: MAX_SOURCES_PER_FAMILY }) })`.",
+    "risque": "Faible : la reconciliation ne fait qu'observer et journaliser. Le seul piege est de se tromper de colonne d'horodatage sur `PodcastRequest` — `reconcile.ts:271-276` avertit deja que chaque modele nomme la sienne comme il l'entend."
+   },
+   {
+    "id": "F40-012",
+    "sev": "S3",
+    "titre": "Deux artefacts de construction morts : Dockerfile.worker et la cible prod-nginx",
+    "preuve": "Dockerfile.worker existe (108 lignes) mais AUCUN service de compose ne le lance : docker-compose.yml:310-315 porte le commentaire « Workers Playwright (google-maps / pages-jaunes / google-search) RETIRÉS le 2026-08-14 … conteneurs fantômes », et `grep -n worker docker-compose*.yml` ne rend plus que docker-compose.test.yml:37-42 — trois overrides `profiles: [\"disabled-in-tests\"]` sur des services `worker-google-maps`/`worker-pages-jaunes`/`worker-google-search` qui n'existent plus dans le fichier de base, donc morts eux aussi. L'image continue pourtant d'être construite et poussée (deploy-staging.yml:74 `- { image: worker, dockerfile: Dockerfile.worker, target: prod }`) et scannée (security.yml:74). Cible prod-nginx : Dockerfile.frontend:68-77 (`FROM nginx:1.31-alpine AS prod-nginx`, `COPY infra/nginx/frontend.conf`), alors que le service `app` construit `target: ${TARGET_FRONTEND:-prod}` (docker-compose.yml:292) et `target: prod` en production (docker-compose.prod.yml:105) — jamais `prod-nginx`. `infra/nginx/frontend.conf` n'est référencé QUE par Dockerfile.frontend:71.",
+    "piste": "Soit rétablir les services workers dans docker-compose.yml (ce que le commentaire ligne 315 prévoit), soit retirer d'un même geste Dockerfile.worker + son entrée dans deploy-staging.yml + security.yml + la garde ci.yml et les trois overrides morts de docker-compose.test.yml ; et supprimer la cible prod-nginx avec infra/nginx/frontend.conf (le rollback qu'elle promet n'a plus de chemin d'appel).",
+    "risque": "Supprimer Dockerfile.worker retirerait aussi la garde CI de version Playwright (ci.yml:639-648 lit `ARG PLAYWRIGHT_VERSION` dans ce fichier) et casserait la matrice deploy-staging.yml:74 et security.yml:74 : il faut retirer les quatre références dans le même commit, sinon la CI rougit."
+   }
+  ]
+ },
+ {
+  "lot": 6,
+  "nb": 5,
+  "fiches": [
+   {
+    "id": "F38-013",
+    "sev": "S2",
+    "titre": "Le SAST Semgrep porte un continue-on-error: true non commenté, dans le fichier même qui explique pourquoi on les a retirés",
+    "preuve": ".github/workflows/security.yml:40-41 — étape du job semgrep : `- run: semgrep ci --config=p/owasp-top-ten --config=p/security-audit --config=p/laravel --config=p/typescript --sarif --output semgrep.sarif` suivie de `continue-on-error: true`, sans le moindre commentaire. Il subsiste dans le fichier même dont le bloc :47-60 explique pourquoi on a retiré cette directive du job trivy (« 1. `continue-on-error: true` annulait `exit-code: '1'` : une vulnérabilité CRITICAL ou HIGH n'a JAMAIS pu faire rougir une PR. Le résultat partait dans l'onglet Security, que personne ne consulte. »), et où trivy porte désormais :119 `exit-code: '1' # BLOQUANT — plus de continue-on-error`. Le SAST est donc le dernier des trois à rendre un vert inconditionnel.",
+    "piste": "Jouer une fois `semgrep ci` sur main pour compter les découvertes bloquantes ; si zéro, retirer `continue-on-error: true` (comme cela a été fait pour trivy, et l'écrire dans le commentaire) ; sinon, poser un relevé sur le modèle de .github/audit-node-cliquet.json et faire rougir sur l'augmentation. Dans tous les cas, la ligne ne doit pas rester sans justification écrite dans un fichier qui en exige une pour ses voisins.",
+    "risque": "Retirer la ligne sèchement peut rendre le job rouge en permanence sur des découvertes préexistantes — exactement le piège que le dépôt a évité pour pnpm-audit avec un cliquet. Il faut mesurer avant d'armer."
+   },
+   {
+    "id": "H47-003",
+    "sev": "S3",
+    "titre": "La prémisse écrite du gel Dependabot — « les alertes sont DÉSACTIVÉES » — est fausse depuis le 2026-08-19",
+    "preuve": ".github/dependabot.yml:62 « ⚠️ PRÉREQUIS NON REMPLI, mesuré le 2026-08-18 : » et :65 « Les alertes Dependabot sont DÉSACTIVÉES sur ce dépôt : il n'y a donc, à ce jour, AUCUN canal de mise à jour de sécurité à préserver. » — texte inchange, aucune note de rectification datee du 2026-08-19 ou apres. Le meme enonce subsiste dans _REPORTS/2026-08-18_POLITIQUE-DEPENDANCES-ETAPE-0.md:297 (« 🔴 Prérequis NON REMPLI — les alertes Dependabot sont DÉSACTIVÉES ») et :429 (tableau, colonne « désactivées »). Aucune garde ne nomme H47-003. Reserve : je ne peux pas verifier l'etat reel des alertes cote GitHub (interdiction de me connecter) ; ce que je mesure, c'est que le depot n'a pas corrige sa premisse.",
+    "piste": "Ajouter dans .github/dependabot.yml apres la ligne 70, et dans le rapport de politique, un encart date « RECTIFICATION 2026-08-xx » qui dit ce qui a change et ce que cela implique pour la procedure de degel (le critere d'entree « les alertes sont ACTIVES » devient rempli), sans effacer la mesure d'origine.",
+    "risque": "Aucun risque technique : c'est du commentaire. Le risque est de reecrire une seconde premisse non mesuree — la correction doit citer la mesure et sa date, pas affirmer un etat."
+   },
+   {
+    "id": "H47-004",
+    "sev": "S3",
+    "titre": "poc/05_dedup_performance/pnpm-lock.yaml porte une alerte, hors de la configuration Dependabot et hors de la matrice pnpm-audit",
+    "preuve": "poc/05_dedup_performance/pnpm-lock.yaml existe (ls du repertoire). .github/dependabot.yml declare exactement cinq blocs `directory:` — :130 /backend (composer), :142 /frontend (npm), :154 /workers (npm), :166 / (github-actions), :177 / (docker) : aucun ne couvre poc/. .github/workflows/security.yml:284 `path: [frontend, workers]` : la matrice pnpm-audit ne visite pas non plus poc/. Le lockfile du poc n'est donc dans aucun des deux dispositifs. Aucune garde ne nomme H47-004. Reserve : que ce lockfile « porte une alerte » n'est pas verifiable sans executer pnpm audit, ce que je m'interdis ; la partie structurelle du constat, elle, est confirmee.",
+    "piste": "Deux gestes independants : (1) ajouter `- { nom: poc, path: poc/05_dedup_performance }` a la matrice de security.yml:284 ; (2) soit ajouter un bloc `directory: /poc/05_dedup_performance` a dependabot.yml, soit — si le poc est mort — supprimer son lockfile et le dire dans poc/README.md. Ne pas laisser un troisieme etat : un lockfile vivant qu'aucun dispositif ne regarde.",
+    "risque": "Ajouter poc/ a la matrice pnpm-audit peut faire rougir immediatement le job `pnpm-audit` (donc bloquer les PR) si le lockfile porte reellement du high/critical — c'est l'effet recherche, mais il faut l'anticiper, ou relever le cliquet .github/audit-node-cliquet.json au compte mesure le jour de l'armement."
+   },
+   {
+    "id": "G41-010",
+    "sev": "S2",
+    "titre": "Quatre écrans de liste n'ont aucun prédicat workspace_id dans leur requête : aucun index composite ne peut les servir",
+    "preuve": "Depot CRM — DEUX des quatre ecrans sont reparees, deux ne le sont pas. REPAREES : `AuditLogsController.php:47-52` porte desormais `->when($espaceCourant !== null && $espaceCourant !== '', fn($q) => $q->where('workspace_id', $espaceCourant), fn($q) => $q->whereRaw('1 = 0'))` (correctif documente :28-44, constats B16-004 / P5-35-007) ; `RgpdRequestsController.php:64-71` porte le meme montage (correctif documente :52-60, constat P6-API-002). OUVERTES : `MediaController.php:80-105`, `buildFilteredQuery()` = `QueryBuilder::for(Media::query()->whereNull('deleted_at'))->allowedFilters(...)` — aucun `workspace_id` ; idem pour `JournalistsController` (`:37` appelle le meme patron). Et aucun filtre implicite ne les rattrape : ni `App\\Models\\Media` ni `App\\Models\\Journalist` n'emploient de trait de portee par espace (seul `SoftDeletes`, cf. `backend/app/Models/Journalist.php:28-29`), et les tables `media` / `journalists` sont ABSENTES de la liste RLS de `backend/database/migrations/2026_05_18_000001_apply_rls_dynamic.php:26-44`. Aucune garde ne cite G41-010.",
+    "piste": "Poser le predicat dans `buildFilteredQuery()` des deux controleurs sur le modele exact de `RgpdRequestsController.php:64-71` (y compris le `whereRaw('1 = 0')` en l'absence de contexte d'espace), inscrire `media` et `journalists` dans `$workspaceScopedTables` de la migration RLS, et verifier ensuite par EXPLAIN qu'un index compose `(workspace_id, ...)` sert bien la liste.",
+    "risque": "Reel, et il depasse la performance : ajouter le predicat CHANGE ce que la liste rend (aujourd'hui elle rend les medias de tous les espaces). Si des donnees ont ete creees sans `workspace_id`, elles disparaitront de l'ecran — a verifier avant, et a corriger par une migration de donnees, pas en assouplissant le filtre."
+   },
+   {
+    "id": "H44-010",
+    "sev": "S3",
+    "titre": "La collecte Vitest des workers est bornée à tests/ : tout test posé ailleurs serait ignoré sans un mot",
+    "preuve": "workers/vitest.config.ts:25 : `include: ['tests/**/*.test.ts']` (le constat citait :26, la ligne a glissé d'un cran). La collecte est bornée à `tests/` ; un `*.test.ts` posé sous `workers/src/` ne serait jamais collecté. Atténuation mesurée : `find workers/src -name \"*.test.ts\"` ne rend aujourd'hui AUCUN fichier — le défaut est latent, pas actif. À noter, la config pose `passWithNoTests: false` (:27), donc une suite VIDE rougirait ; mais une suite partielle (les tests de tests/ passent, ceux de src/ sont ignorés) reste verte en silence.",
+    "piste": "Passer à `include: ['**/*.test.ts']` avec l'`exclude` existant (node_modules, dist), ou — moins intrusif — ajouter une garde qui échoue si un `*.test.ts` existe hors de `tests/`, ce qui rend l'oubli bruyant sans changer la collecte.",
+    "risque": "Élargir le glob peut faire entrer dans la collecte des fichiers de fixtures ou d'aide nommés *.test.ts, et donc rougir pour une raison sans rapport."
+   }
+  ]
+ },
+ {
+  "lot": 7,
+  "nb": 5,
+  "fiches": [
+   {
+    "id": "A09-012",
+    "sev": "S3",
+    "titre": "Deux commentaires de routes/console.php déclarent inexistantes des commandes artisan qui existent",
+    "preuve": "backend/routes/console.php:219-221 — « La commande `companies:rescrape-archives` est codee dans le Sprint Hardening (H6). En attendant, le schedule est pose mais s'auto-skip si la commande n'existe pas (pas d'erreur dans schedule:list) », renforce a :227 par « Skip si la commande artisan n'existe pas encore ». Or backend/app/Console/Commands/RescrapeArchivesCommand.php:23 declare `protected $signature = 'companies:rescrape-archives'`. Le `skip()` de :226-228 rend donc toujours false et la tache s'execute reellement le 1er du mois a 02:00. Meme patron pour la seconde : le `skip()` de :238-240 teste `companies:retry-google-places`, que backend/app/Console/Commands/RetryGooglePlacesCommand.php:25 declare — ce second bloc n'a plus de commentaire mensonger, seulement une fermeture morte. Nuance : le constat annonce « deux commentaires », le fichier n'en porte plus qu'un (:219-221 + :227) ; le second cas subsiste sous forme de code mort. Aucune garde ne cite A09-012.",
+    "piste": "Supprimer le commentaire :219-221 et :227, remplacer par une ligne disant ce qui se passe reellement (« la commande existe depuis <commit> ; cette tache tourne le 1er du mois et declenche ~700 EnrichCompanyJob »), et retirer les deux fermetures `skip()` devenues mortes (:226-228 et :238-240).",
+    "risque": "Retirer les deux `skip()` change le comportement en apparence seulement (ils rendent deja false), mais si l'une des deux commandes disparaissait un jour, la tache echouerait au lieu de se sauter en silence — c'est precisement l'effet voulu, a assumer par ecrit."
+   },
+   {
+    "id": "B17-007",
+    "sev": "S3",
+    "titre": "Le commentaire de console.php affirme que companies:rescrape-archives s'auto-saute ; la commande existe et la tâche s'exécute",
+    "preuve": "Meme defaut que A09-012, vu du cote de la tache. backend/routes/console.php:219-221 affirme « La commande `companies:rescrape-archives` est codee dans le Sprint Hardening (H6). En attendant, le schedule est pose mais s'auto-skip si la commande n'existe pas ». La commande existe : backend/app/Console/Commands/RescrapeArchivesCommand.php:23 `protected $signature = 'companies:rescrape-archives'`. Le `skip()` de console.php:226-228 (`return ! array_key_exists('companies:rescrape-archives', Artisan::all());`) rend donc false a chaque passage, et la tache `monthlyOn(1, '02:00')` de :222-225 s'execute pour de bon. Idem pour `companies:retry-google-places` (console.php:234-241 face a RetryGooglePlacesCommand.php:25). Aucune garde ne cite B17-007.",
+    "piste": "Fusionner avec A09-012 : un seul lot corrige le commentaire :219-221/:227 et retire les deux fermetures `skip()` mortes. Ecrire dans le commentaire ce que la tache fait vraiment, avec sa charge (le re-scrape mensuel part sur le stock archive le 1er a 02:00, le retry Google Places a 03:00).",
+    "risque": "Le meme que A09-012 : le correctif est textuel. Retirer les deux `skip()` supprime un filet qui, s'il servait un jour, transformerait un saut silencieux en echec visible — souhaitable, mais a ecrire."
+   },
+   {
+    "id": "B17-011",
+    "sev": "S2",
+    "titre": "MonitorCampaignProgressJob a tries=1 : une seule exception fige la campagne en running pour toujours",
+    "preuve": "backend/app/Jobs/MonitorCampaignProgressJob.php:34 `public int $tries = 1;`. Le re-dispatch qui entretient le suivi est la DERNIERE instruction du corps (:184-186) ; tout ce qui le precede peut lever hors du seul try/catch present (:91-152, qui ne couvre que les agregats) — notamment `$campaign->update($aggregates)` (:154), `$campaign->shouldAutoPause()` (:158) et les deux `update()` de :160 et :175. Aucune methode `failed()` n'existe dans le fichier (ni dans aucun job : `grep -rn 'public function failed' backend/app/Jobs/*.php` ne rend RIEN), et backend/routes/console.php ne planifie aucun guetteur de campagnes bloquees (seul `campaigns:start-scheduled` y touche, :210). Une exception unique tue donc la chaine de suivi : la campagne reste `running` sans plus jamais etre auto-pausee ni terminee.",
+    "piste": "Ajouter `public function failed(\\Throwable $e): void` qui re-dispatche `new self($this->campaignId)` avec `->delay(60s)` et un compteur d'echecs consecutifs porte par la campagne, OU envelopper le corps de `suivre()` dans un `try { ... } finally { re-dispatch }` de sorte que le battement survive a toute exception.",
+    "risque": "Re-dispatcher depuis un `failed()` sans compteur de garde peut fabriquer une boucle infinie de jobs sur une erreur permanente (colonne manquante, espace introuvable) — la relance doit etre bornee et journalisee."
+   },
+   {
+    "id": "G41-011",
+    "sev": "S2",
+    "titre": "La liste des tags recompte tous les rattachements à chaque affichage, par balayage séquentiel",
+    "preuve": "Depot CRM — la moitie « balayage sequentiel » est fermee, la moitie « recompte a chaque affichage » ne l'est pas. TOUJOURS LA : `backend/app/Http/Controllers/Api/TagsController.php:45-53` — a chaque appel de `GET /tags`, `$tags = $q->limit(500)->get();` puis `DB::table('company_tag')->whereIn('tag_id', $tagIds)->select('tag_id', DB::raw('COUNT(*) as c'))->groupBy('tag_id')->pluck('c','tag_id')` : aucun cache, aucun compteur denormalise, aucun `withCount` memoise — le comptage integral est refait a chaque affichage. FERMEE en revanche : le balayage sequentiel a ete supprime par `backend/database/migrations/2026_08_20_110000_index_par_etiquette_sur_company_tag.php:94-95` — `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_company_tag_tag ON company_tag (tag_id, company_id)` — pose pour le constat voisin G41-001, dont l'en-tete :31 decrit exactement le defaut (« Postgres BALAIE `company_tag` en entier pour y repondre »). Nuance a ne pas enterrer : la garde qui prouve l'emploi de cet index (`backend/tests/Feature/Infra/VolumeDeProductionHubConsoleTest.php:308`) mesure l'ECRAN D'ACCUEIL, pas `GET /tags` — aucun test ne lit le plan de cette requete-ci (`git grep TagsController -- backend/tests` : rien sur `index`).",
+    "piste": "Verifier d'abord par EXPLAIN que `idx_company_tag_tag` sert bien le `GROUP BY` de `TagsController:49-53` (et l'inscrire dans `IndexServentLesRequetesTest.php`, qui lit le plan). Si le cout reste sensible au volume, mettre les comptages en cache court (60 s) par espace de travail, invalide par les mutations d'etiquettes.",
+    "risque": "Faible. Un cache court sur les comptages rend des chiffres legerement en retard apres un etiquetage de masse ; il faut donc l'invalider depuis les actions de masse sur les etiquettes, sinon l'ecran ment a l'utilisateur qui vient d'agir."
+   },
+   {
+    "id": "H46-012",
+    "sev": "S3",
+    "titre": "Le paquet workers est linté sans les règles typées : les no-unsafe-* n'y existent pas, alors qu'il manipule les données scrapées",
+    "preuve": "workers/eslint.config.mjs:24 : `...tseslint.configs.recommended` — jeu NON typé, donc aucune règle `@typescript-eslint/no-unsafe-*`. frontend/eslint.config.mjs:10 : `...tseslint.configs.recommendedTypeChecked`, avec `parserOptions: { project: ['./tsconfig.json'] }` (:17). L'écart est délibéré et documenté (workers/eslint.config.mjs:16-20 : « Choix : règles NON typées … les règles typées exigent que chaque fichier linté appartienne au projet TypeScript ; eslint.config.mjs et vitest.config.ts n'y sont pas »), mais le fait tenu par le constat est exact : le paquet qui manipule des données scrapées — donc des `any` venus de l'extérieur — est le seul des deux à ne pas être surveillé par les no-unsafe-*.",
+    "piste": "Appliquer `recommendedTypeChecked` dans un bloc `files: ['src/**/*.ts', 'tests/**/*.ts']` avec `parserOptions.projectService` (ou un tsconfig.eslint.json qui inclut aussi les fichiers de config), en laissant `*.mjs`/`*.config.ts` sur le jeu non typé — la structure du fichier prévoit déjà ce découpage (workers/eslint.config.mjs:43-45).",
+    "risque": "Activer recommendedTypeChecked sur workers fera très probablement rougir immédiatement le lint sur le code de scraping (accès non typés aux payloads) ; et si le bloc typé n'est pas restreint aux fichiers du projet TS, ESLint échoue en entier — c'est exactement le piège que le commentaire :16-20 décrit."
+   }
+  ]
+ },
+ {
+  "lot": 8,
+  "nb": 5,
+  "fiches": [
+   {
+    "id": "C18-002",
+    "sev": "S2",
+    "titre": "Une personne collectée disparaît sans compteur : 'skipped' n'existe pas dans le rapport d'ingestion",
+    "preuve": "backend/app/Crm/Scraping/ScrapedRecordIngestService.php:145-152 : `match ($result) { 'created' => …, 'updated' => …, 'opted_out' => …, 'bad_mx' => …, default => null }`. Or upsertContact() rend explicitement 'skipped' (:425, :505, :557 — son propre @return :413 annonce `'created'|'updated'|'opted_out'|'bad_mx'|'skipped'`). Le cas 'skipped' tombe donc dans `default => null` et n'est compté nulle part. ScrapeIngestOutcome (backend/app/Crm/Scraping/ScrapeIngestOutcome.php:34-43) ne porte que contactsCreated, contactsUpdated, personsSkippedOptOut, emailsRejectedMx, et son toArray() (:47-58) — journalisé dans scraper_runs.response_payload (:655) — n'expose aucun compteur de personnes écartées pour un autre motif.",
+    "piste": "Ajouter `public readonly int $personsSkipped = 0` au constructeur, compter la branche `'skipped' => $skipped++` dans le match :145-152, et l'exposer dans toArray() sous `persons_skipped`. Idéalement, faire remonter aussi le MOTIF du skip (upsertContact a trois retours 'skipped' distincts) plutôt qu'un seul compteur agrégé.",
+    "risque": "Ajouter un champ à ScrapeIngestOutcome change la forme JSON de `scraper_runs.response_payload`, lue par le worker Node et par les tests d'ingestion ; il faut vérifier qu'aucun consommateur ne fait de comparaison stricte de structure."
+   },
+   {
+    "id": "G43-004",
+    "sev": "S1",
+    "titre": "POST /companies/tags/bulk insère sans workspace_id : refusé par la RLS de production, accepté en local avec une ligne invisible",
+    "preuve": "backend/app/Http/Controllers/Api/CompanyTagsBulkController.php:121-128 : `poser()` construit les lignes avec `'company_id'`, `'tag_id'`, `'assigned_by' => 'user'` — et rien d'autre ; :133 `return DB::table('company_tag')->insertOrIgnore($lignes);`. La colonne existe (backend/database/migrations/2026_05_18_000007_extend_tags_system.php:58-59 « ALTER TABLE company_tag ADD COLUMN IF NOT EXISTS workspace_id UUID ») et la policy de production l'exige à l'égalité stricte, sans échappatoire NULL : 2026_08_14_000001_harden_workspace_isolation.php:211 pose `workspace_id::TEXT = NULLIF(current_setting(...),'')` comme USING **et** WITH CHECK (:100-107), `company_tag` n'étant ni dans EXCLUDED_TABLES (:62-67) ni dans GLOBAL_ROW_TABLES (:81-83). Les deux autres sites d'écriture du même pivot posent bien la colonne : backend/app/Crm/Scraping/ScrapedRecordIngestService.php:610 et backend/app/Services/Tags/AutoTaggerService.php:133 — celui-ci seul l'omet. Aucune garde ne le couvre : backend/tests/Feature/ActionsDeMasseTagsTest.php inspecte `company_tag` sept fois (:76, :77, :94, :111, :127, :160, :204) et ne lit JAMAIS `workspace_id` — :204 vérifie `assigned_by`, pas l'espace.",
+    "piste": "Passer `$workspaceId` à `poser()` depuis `__invoke()` (il est déjà en main, ligne 42) et l'inclure dans chaque ligne du tableau, comme le font ScrapedRecordIngestService:610 et AutoTaggerService:133 ; puis étendre ActionsDeMasseTagsTest pour asserter `DB::table('company_tag')->value('workspace_id')`, sans quoi la garde restera aveugle à la récidive.",
+    "risque": "Ajouter `'workspace_id' => $workspaceId` (et `assigned_at`) au tableau de `poser()` est local et sans effet de bord sur la lecture ; le seul piège est que `insertOrIgnore` sur la clé primaire (company_id, tag_id) IGNORE les lignes déjà posées — les lignes à workspace_id NULL déjà écrites en local ne seront pas réparées par le correctif et demandent un UPDATE de rattrapage distinct."
+   },
+   {
+    "id": "A06-009",
+    "sev": "S3",
+    "titre": "Deux fichiers de test affirment que CRM_DB_APP_ROLE_ENABLED vaut false en production ; B11-010 le mesure à true",
+    "preuve": "backend/tests/Feature/EtancheiteParTableTest.php:34 porte toujours, mot pour mot : « `CRM_DB_APP_ROLE_ENABLED` reste à false — sa valeur par défaut, et sa valeur en production ». Le même arbre la contredit : backend/app/Console/Commands/CoverageRefreshMatrix.php:25 « Depuis `CRM_DB_APP_ROLE_ENABLED=true`, la connexion par défaut porte… ». Nuance : le second fichier cité par le constat (backend/tests/Feature/NeDoitPasRegresserTest.php:35) est formulé au CONDITIONNEL (« tant que … vaut false ») et n'affirme rien sur la production — la moitié du constat est donc imprécise. Aucun commit ne cite A06-009.",
+    "piste": "Remplacer « et sa valeur en production » par « (l'état du serveur n'est pas observable depuis ce dépôt — cf. RlsTest.php:341-346) », et renvoyer explicitement à la divergence figée par LaSuiteNeTourneJamaisEnConfigDeProdTest. La garde citée existe mais garde autre chose : que la suite ne POSE pas le drapeau, pas la véracité de la phrase sur la production.",
+    "risque": "Nul sur le produit : seuls des blocs de commentaires changent, aucune assertion ni SQL touché."
+   },
+   {
+    "id": "B13-005",
+    "sev": "S2",
+    "titre": "Un tag de provenance hors référentiel est perdu en silence, avec une réponse 200",
+    "preuve": "Le silence est intact, ligne pour ligne. backend/app/Crm/Ingest/SiteSyncIngestService.php:385-388 : `$tagId = $this->resolveTagId($workspaceId, $slug); if ($tagId === null) { continue; }` — aucun Log, aucune collecte du slug ecarte. Et :433-438, dans resolveTagId(), la branche « namespace gouverne, valeur inconnue » se termine par un `return null;` nu, sous un commentaire (:410-415) qui ASSUME l'abandon (« Sinon on l'ignore »). Les deux correctifs demandes sont absents : `grep -n \"tags_ignores|tagsIgnores|ignored\" app/Crm/Ingest/IngestOutcome.php app/Crm/Ingest/SiteSyncIngestService.php` ne rend rien, et aucun Log::notice n'entoure le continue. L'evenement est donc toujours accepte en 200 avec le tag de provenance disparu sans un mot.",
+    "piste": "Dans attachTags(), remplacer le `continue` nu par la collecte du slug dans un tableau `$ignores` + un `Log::notice('crm.ingest.tag_ignore', ['slug' => $slug, 'event_id' => ...])`, puis exposer `tags_ignores` dans IngestOutcome pour que le site puisse compter ses propres pertes au lieu de les deviner.",
+    "risque": "Tres faible : on n'ajoute qu'un journal et un champ supplementaire dans la reponse. Le seul point d'attention est le contrat de sortie — ajouter une cle a IngestOutcome touche le corps JSON que lit le site ; un champ additionnel est retro-compatible, mais il faut le declarer, pas le glisser."
+   },
+   {
+    "id": "A-013 / A06-001",
+    "sev": "S1",
+    "titre": "La faille du 19 août était écrite, en toutes lettres, la veille — et une case a été posée par-dessus",
+    "preuve": "La case est toujours posée, et le document qu'elle recouvre dit toujours le contraire. Journal (dans Axion-IA, pas dans le worktree CRM) : C:/Users/willi/Documents/Projets/Axion-IA/_SESSIONS/2026-08-18_PREALABLES-CRM-ETAPE-0.md:93 → « | 14 | F11 AIPD + F12 pare-feu | ✅ commit `9e81b8a` … ⛔ AIPD à valider par Will | » — le ✅ couvre F12, et la seule réserve porte sur l'AIPD. Rapport visé : _REPORTS/2026-08-18_ETAT-PARE-FEU.md:147-176 (§2.1) énonce en toutes lettres, la VEILLE de la faille, que docker-compose.yml publie 55432 et 56379 sur 0.0.0.0 et que l'overlay de production ne pose aucun `!override` ; :204-228 (§2.3) ajoute le mot de passe littéral `axion_dev_only` et Redis sans requirepass ; :458 titre encore « ## 5. CONSTAT MESURÉ — *(VIDE : aucune mesure n'a été faite)* » ; :501-503 (§7.1) « Tant que ce n'est pas fait, F12 n'est **pas** soldé ». Le rapport n'a reçu qu'un seul commit (9e81b8a) et le journal n'a pas été touché depuis le 2026-08-19 03:53. Le défaut TECHNIQUE, lui, a été corrigé depuis : docker-compose.prod.yml:157 et :166 posent `ports: !override []` sur postgres et redis, avec au-dessus (:130-147) la preuve rejouée du 2026-08-19 (`psql -h <ip-prod> -p 55432 -U axion` → 4 295 349 lignes). C'est le RÉCIT qui reste faux, pas le port.",
+    "piste": "Coller au §5 du rapport la mesure réellement faite le 2026-08-19 (celle qui est recopiée dans docker-compose.prod.yml:143-147), retirer ou requalifier le ✅ de la ligne 93 du journal en 🟡 avec le renvoi au §7.1, et inscrire la règle qui manquait : une ligne n'est cochée que si le document qu'elle produit se déclare lui-même soldé.",
+    "risque": "Aucun risque technique : le correctif est documentaire. Le risque est inverse — laisser le journal en l'état, c'est garder une preuve écrite qu'une case cochée peut recouvrir une faille énoncée."
+   }
+  ]
+ },
+ {
+  "lot": 9,
+  "nb": 5,
+  "fiches": [
+   {
+    "id": "D29-008",
+    "sev": "S2",
+    "titre": "La timeline 360° trie ses événements en comparant des chaînes : l'ordre s'inverse dans l'heure rejouée du 25 octobre",
+    "preuve": "backend/app/Http/Controllers/Api/Crm/PersonTimelineController.php:71 — `return strcmp((string) ($b['occurred_at'] ?? ''), (string) ($a['occurred_at'] ?? ''));`. La valeur vient brute du query builder (ligne 122 `'occurred_at' => $row->occurred_at ?? $row->created_at`) sur une colonne TIMESTAMPTZ (backend/database/migrations/2026_08_14_000004_crm_socle_tags_optout_timeline.php:109). Postgres rend alors la chaine avec le decalage de la session : backend/config/database.php:102 `'timezone' => env('DB_TIMEZONE')` et backend/phpunit.xml:65 `<env name=\"DB_TIMEZONE\" value=\"Europe/Paris\"/>`. Le 25 octobre, `2026-10-25 02:30:00+02` (00:30 Z) et `2026-10-25 02:30:00+01` (01:30 Z) ne different que par le suffixe, et strcmp classe `+02` avant `+01` en decroissant — soit l'instant ANTERIEUR en premier. Aucune garde ne cite D29-008 dans le depot.",
+    "piste": "Trier sur l'instant et non sur la chaine : `usort(..., fn($a,$b) => strtotime((string) $b['occurred_at']) <=> strtotime((string) $a['occurred_at']))`, ou mieux normaliser `occurred_at` en UTC/ISO-8601 des la construction du tableau dans `activitiesFor()` — ce qui referme aussi le meme defaut partout ou la valeur est consommee.",
+    "risque": "Faible : le correctif ne touche que l'ordre de rendu d'un endpoint de lecture ; il peut changer l'ordre des ex aequo (deux evenements a la meme seconde), ce que le tri actuel decidait deja arbitrairement."
+   },
+   {
+    "id": "D29-010",
+    "sev": "S2",
+    "titre": "DB_TIMEZONE posée à vide met toute l'API à terre, et c'est la façon naturelle de la « désactiver »",
+    "preuve": "`backend/config/database.php:102` : `'timezone' => env('DB_TIMEZONE'),` — aucune normalisation, aucun défaut, aucun filtre sur la chaîne vide. Le commentaire qui précède (l. 78-84) ne raisonne QUE sur le cas « non renseignée » : « Non renseignée, la clé vaut `null` : `configureTimezone()` teste `isset()`, donc n'émet rien ». Le cas « renseignée à vide » (`DB_TIMEZONE=` dans le `.env`) n'est pas envisagé — or il produit `''`, pour lequel `isset()` est VRAI : le connecteur émet alors un `SET TIME ZONE ''` que Postgres refuse, sur CHAQUE connexion. C'est bien la façon naturelle de « désactiver » le réglage, et la seule qui ne soit pas prévue. NOTE D'HONNÊTETÉ : le `vendor/` n'est pas présent dans le worktree, je n'ai donc pas pu relire `PostgresConnector::configureTimezone()` — ce qui est LU ici, c'est l'absence totale de garde à la l. 102 et un commentaire qui ne couvre que l'autre cas.",
+    "piste": "Remplacer la l. 102 par une lecture qui traite le vide comme l'absence — par ex. `'timezone' => (($tz = env('DB_TIMEZONE')) === '' ? null : $tz)` — puis mettre à jour l'assertion de `NeDoitPasRegresserTest.php:438` pour qu'elle épingle la NOUVELLE forme (et non plus l'ancienne), sans quoi la garde se retourne contre le correctif.",
+    "risque": "ATTENTION, une garde s'y oppose : `backend/tests/Feature/NeDoitPasRegresserTest.php:438` épingle la chaîne LITTÉRALE `\"'timezone' => env('DB_TIMEZONE')\"` dans `config/database.php`. Tout correctif qui normalise la valeur fera rougir ce test tant qu'on ne l'aura pas ajusté — et ce test défend un autre acquis (que `HorodatagesFuseauTest` puisse rougir), qu'il ne faut pas désarmer au passage."
+   },
+   {
+    "id": "A07-009",
+    "sev": "S3",
+    "titre": "Le runbook de la console locale renvoie à un fichier du worktree crmpro-wt-etape0 alors qu'il est versionné dans main",
+    "preuve": "_REPORTS/RUNBOOK-CONSOLE-LOCALE.md:41 : `-f C:/Users/willi/Documents/Projets/crmpro-wt-etape0/docker-compose.local.yml` (idem :331, :344, :575). Or `git ls-files docker-compose.local.yml` → le fichier est SUIVI, et il existe à la racine du dépôt principal (/c/Users/willi/Documents/Projets/Axion-CRM-Pro/docker-compose.local.yml). Le runbook envoie donc l'opérateur vers un worktree tiers pour un fichier versionné.",
+    "piste": "Remplacer les quatre occurrences de `C:/Users/willi/Documents/Projets/crmpro-wt-etape0/` par un chemin relatif au dépôt principal (`-f docker-compose.local.yml`), et supprimer la phrase « la surcouche de développement vit dans le worktree ».",
+    "risque": "Aucun risque code ; le seul piège est de corriger :41 en oubliant :331, :344 et :575, qui portent le même chemin."
+   },
+   {
+    "id": "C18-017",
+    "sev": "S2",
+    "titre": "Côté Node, le mock ne peut pas fuir — mais la bascule vers le réel est plus fragile que ce que promet MOCKS-STRATEGY.md, et _stub.ts est du code mort",
+    "preuve": "Les trois membres du titre tiennent, verifies un par un. (1) La bascule : les ONZE workers portent la meme ligne 7, par exemple workers/src/scrapers/crunchbase.worker.ts:7 `const useMock = (process.env['MOCK_SCRAPERS'] ?? process.env['MOCK_MODE'] ?? 'true') !== 'false';` — `grep -l \"MOCK_SCRAPERS\" workers/src/scrapers/*.ts` rend 11 fichiers. Le mock ne peut effectivement pas fuir (defaut a 'true'), mais la bascule exige la chaine EXACTE 'false' : MOCK_MODE=0, =off, =FALSE laissent le mock en place, en silence, et la regle est recopiee onze fois au lieu d'etre partagee. (2) La promesse : MOCKS-STRATEGY.md:3 annonce « Basculement vers vrais services en 1 ligne (`MOCK_MODE=false`) », ce que la double lecture MOCK_SCRAPERS ?? MOCK_MODE dement — il y a deux poignees, et la premiere masque la seconde. (3) Le code mort : workers/src/scrapers/_stub.ts existe (fonction `stubWorker`) et `grep -rn \"_stub\" workers/src workers/tests` ne rend AUCUNE reference — plus personne ne l'importe.",
+    "piste": "Extraire la ligne 7 dans un unique helper (`workers/src/config/mocks.ts`) qui interprete le drapeau une seule fois et de facon tolerante, et faire appeler cet helper par les onze workers ; supprimer _stub.ts ; corriger MOCKS-STRATEGY.md:3 pour qu'il decrive les deux variables reellement lues.",
+    "risque": "Faible. Le seul point a ne pas rater : centraliser la lecture du drapeau change le comportement des valeurs aujourd'hui ignorees ('0', 'off'). Si un environnement pose deja MOCK_MODE=0 en croyant desactiver les mocks, le correctif basculera ce dernier vers les VRAIS scrapers — c'est le but, mais c'est une bascule reelle, a annoncer."
+   },
+   {
+    "id": "A06-008",
+    "sev": "S2",
+    "titre": "Le journal §4 annonce 15 lignes closes sur 16 ; sept le sont au sens de leur propre critère",
+    "preuve": "Document hors worktree CRM : C:/Users/willi/Documents/Projets/Axion-IA/_SESSIONS/2026-08-18_PREALABLES-CRM-ETAPE-0.md, §4 « État des 16 lignes du §3 » (:74-93). Le décompte du constat est exact : 16 lignes (1, 2, 3, 3 bis, 3 ter, 4 à 14), quinze ✅ et une seule 🟡 (ligne 12, F9). Le fichier est INCHANGÉ depuis le 2026-08-19 03:53 et ne porte aucune annotation d'audit (grep « rectificatif|A06-008|audit 360 » : rien). Je n'ai pas re-instruit les 16 critères un par un — le chiffre « sept » reste donc non revérifié — mais deux lignes suffisent à confirmer la substance : ligne 3 ter (:82) est ✅ tout en disant « **rien n'envoie**. ⛔ reste Will : Mail Agent + jeton dans les secrets + URL du webhook » ; ligne 14 (:93) est ✅ alors que le rapport qu'elle produit se déclare lui-même non soldé (_REPORTS/2026-08-18_ETAT-PARE-FEU.md:501-503 « Tant que ce n'est pas fait, F12 n'est **pas** soldé »).",
+    "piste": "Reprendre les 16 lignes une à une, et n'y laisser ✅ que si le livrable de la ligne se déclare lui-même complet ; passer en 🟡 toute ligne qui porte un ⛔ résiduel dans sa propre cellule (au minimum 3 ter et 14), et inscrire en tête du §4 la règle qui manquait : un commit n'est pas une clôture.",
+    "risque": "Aucun risque technique. Le seul écueil est de requalifier à la louche : chaque ✅ retiré doit l'être en citant le critère de SA propre ligne, sinon on remplace un faux vert par un faux rouge."
+   }
+  ]
+ },
+ {
+  "lot": 10,
+  "nb": 5,
+  "fiches": [
+   {
+    "id": "A09-013",
+    "sev": "S3",
+    "titre": "Le journal d'étape 1a porte un SHA de main périmé et deux sections « n'existe pas » que le même document dément plus bas",
+    "preuve": "_SESSIONS/2026-08-19_CRM-ETAPE-1A.md:1001 « `main` = `d4910c8`. **Aucune PR ouverte.** » ; or `git log -1 main` → e8924b8 et `git rev-list --count d4910c8..main` → 28. Les deux sections « n'existe pas » sont bien là (:418 « La préproduction N'EXISTE PAS », :771 « RIEN n'a été écrit pour la préproduction ») et le même document les dément plus bas : :1293 « `https://staging.axion-crm-pro.com` → **200** », :1301 « Overlay de préproduction | `docker-compose.staging.yml` », :1305 « `infra/scripts/bootstrap-preprod.sh` », :1317-1318 mesures sur la préprod vivante.",
+    "piste": "Poser en tête des §3.1 et §6.5 un encart « ⚠️ DÉPASSÉ le 2026-08-19 en fin de journée — cf. §11 », et remplacer la ligne 1001 par le SHA courant ou par une phrase sans SHA (« main au moment de la clôture de cette étape »).",
+    "risque": "Aucun — journal de session. Attention seulement à ne pas réécrire l'histoire : un journal se rectifie par un encart daté, pas par une réécriture silencieuse."
+   },
+   {
+    "id": "C18-014",
+    "sev": "S2",
+    "titre": "WaterfallSentry couvre 11 pannes silencieuses et ne peut rien émettre",
+    "preuve": "Le premier membre est verifie : `grep -rn \"WaterfallSentry::capture\" backend/app` rend exactement ONZE sites d'appel, et backend/app/Support/WaterfallSentry.php:23 les fait tous passer par `if (! class_exists(\\Sentry\\State\\Hub::class)) { return; }`. Cette porte-la est ouverte — sentry/sentry-laravel est en `require` (pas require-dev) : backend/composer.json:37. La panne est donc ailleurs, exactement ou le constat la place : backend/config/sentry.php:12 `'dsn' => env('SENTRY_LARAVEL_DSN'),`, et cette variable n'est declaree NULLE PART dans le depot — .env.example:269 ne porte que `VITE_SENTRY_DSN=` (le frontend), aucun docker-compose*.yml ne la pose (les services chargent `env_file: .env`, docker-compose.yml:147,194,219,271), et le seul autre endroit qui la nomme est une liste de secrets de preprod, infra/scripts/bootstrap-preprod.sh:122. Sans DSN le SDK est inerte : les onze captures partent dans le vide. LIMITE : l'etat reel du fichier .env du serveur de production n'est pas lisible depuis le depot et je ne m'y connecte pas — ce que j'atteste, c'est que RIEN dans le depot ne fournit ce DSN ni ne signale son absence.",
+    "piste": "Declarer `SENTRY_LARAVEL_DSN=` dans .env.example a cote de VITE_SENTRY_DSN, et ajouter une sonde de demarrage (ou une ligne dans la sonde de configuration existante) qui dit a voix haute « capture d'exceptions INACTIVE : SENTRY_LARAVEL_DSN vide » — le defaut n'est pas tant que le DSN manque, c'est que rien ne le dit.",
+    "risque": "Aucun risque de casse. Le seul effet de bord a anticiper est le volume : brancher reellement le DSN reveille onze points de capture d'un coup, et les traces d'exception de la waterfall peuvent porter des donnees d'entreprise (WaterfallSentry.php:32-37 pousse siren et denomination dans le contexte) — a verifier au regard de ce qu'on accepte d'envoyer a un service tiers."
+   },
+   {
+    "id": "A09-011",
+    "sev": "S3",
+    "titre": "spec/00_INDEX.md se déclare « implémentation à venir » et annonce des tailles de fichiers fausses jusqu'à un facteur 2,4",
+    "preuve": "spec/00_INDEX.md:7 « **Statut :** Spec exhaustive — implémentation à venir. » alors que backend/ et frontend/ sont en production. spec/00_INDEX.md:6 annonce « 24 fichiers » quand le tableau en énumère 25 (lignes 25-80). Tailles mesurées par `wc -l` contre les annonces : 13_ui_admin_phase1.md ~1500 annoncé / 614 réel (facteur 2,44) ; 22_risques_mitigations.md ~700 / 194 ; 08_waterfall… ~800 / 337 ; 12_coverage_matrix… ~800 / 328.",
+    "piste": "Remplacer le statut par « implémentée, cf. ARCHITECTURE.md » et régénérer la colonne « Lignes » par un `wc -l` scripté (ou la supprimer : une colonne de tailles se périme à chaque commit).",
+    "risque": "Aucun — document de spécification, hors chemin d'exécution."
+   },
+   {
+    "id": "D22-004",
+    "sev": "S2",
+    "titre": "La console v2 annonce « non activée sur ce serveur » alors qu'elle est activée : une panne réseau est présentée comme une décision de configuration",
+    "preuve": "Un correctif partiel a ete pose et il ferme l'AUTRE cas, pas celui-ci. frontend/src/features/crm-console/ConsoleGate.tsx:20 lit `const { data, isPending } = useConsoleFeaturesQuery();` — `isError` n'est jamais consulte — puis :21 `const features = data ?? CONSOLE_FEATURES_CLOSED;`. La branche :28-34 traite le chargement (squelette muet, correctif reel). Mais sur ECHEC de la requete, isPending retombe a false et data reste undefined : le flot atteint :36-44 et affiche `title=\"Console non activee\" description=\"La console CRM v2 n'est pas ouverte sur ce serveur.\"` — une panne reseau presentee comme une decision de configuration, mot pour mot le constat. Le defaut est aggrave par frontend/src/features/crm-console/useConsoleFeatures.ts:42 `retry: false` (un seul essai, donc un hoquet suffit) et :52 `return data ?? CONSOLE_FEATURES_CLOSED;`. LA GARDE EXISTE ET N'INSPECTE PAS CE CAS : frontend/tests/components/ConsoleGate.test.tsx:83-99 ne couvre que « tant que le drapeau n'a pas repondu » (isPending) ; aucun test ne joue une reponse en erreur.",
+    "piste": "Recuperer `isError`/`error` de useConsoleFeaturesQuery() et inserer, avant la branche `!features.console_v2`, un etat distinct : « Impossible de verifier l'etat de la console — le serveur n'a pas repondu », avec un bouton de reessai. Puis etendre ConsoleGate.test.tsx d'un cas ou la requete echoue, pour que la garde inspecte enfin les trois etats et non deux.",
+    "risque": "Aucun risque de securite : la console doit rester FERMEE en cas d'erreur, et le correctif ne change que le TEXTE affiche, pas la decision. Seule precaution — ne pas transformer l'erreur en ouverture."
+   },
+   {
+    "id": "P5-35-005",
+    "sev": "S2",
+    "titre": "Deux constats sur quatorze sont déclarés « gardés par un test vu rougir » alors qu'aucune garde n'existe",
+    "preuve": "_AUDIT/2026-08-18_AUDIT-360/11_GRILLES/agent-35_authentification.md:32 porte toujours « | Gardes | **25 tests neufs**, chacun **vu rougir avant** son correctif | », et les lignes 410 (F35-007, « le mot de passe passe par un tube jusqu'a stdin ») et 497 (F35-014) portent toujours « Garde vue rougir puis verte » ; `grep -c \"Garde vue rougir puis verte\"` = 14, inchange. Cote code, F35-007 n'a toujours AUCUNE garde : la seule mention est un commentaire, backend/tests/Feature/Infra/DiagnosticConnexionSansEcritureTest.php:15, qui parle du defaut sans l'inspecter. NUANCE IMPORTANTE : une garde du script existe desormais, backend/tests/Feature/Infra/ScriptMotDePasseVerdictsTest.php (en-tete l.3-11 « constats P5-35-004 et P5-35-005 », cas l.143-186, dont un temoin F35-014 l.180-186) — elle a ete ecrite APRES le constat et ferme la moitie F35-014, pas la moitie F35-007 ni les trois mentions du rapport.",
+    "piste": "Ajouter a ScriptMotDePasseVerdictsTest un cas F35-007 qui lit `infra/scripts/definir-mot-de-passe-crm.sh` et exige qu'aucun `docker exec` ne porte le mot de passe en argument (le secret ne doit passer que par stdin) ; puis reecrire l.32, l.410 et l.497 de la grille pour dire quelles gardes existaient AVANT le correctif et lesquelles ont ete ajoutees apres.",
+    "risque": "Nul cote produit : il s'agit de corriger trois phrases d'un rapport et d'ajouter une lecture statique du script. Le seul piege est celui deja paye dans ScriptMotDePasseVerdictsTest (faux `docker`/faux `id`) : une garde de shell mal bouchonnee mesure sa propre panne."
+   }
+  ]
+ },
+ {
+  "lot": 11,
+  "nb": 5,
+  "fiches": [
+   {
+    "id": "B15-011",
+    "sev": "S3",
+    "titre": "users.last_login_ip n'est jamais anonymisée",
+    "preuve": "backend/app/Console/Commands/AnonymizeOldIps.php:46-86 : `handle()` ne touche que `audit_logs` (:68-72) et `sessions` (:75-80). La table `users` n'y apparaît nulle part, et le docbloc :9 le confirme (« anonymisation des IPs dans audit_logs + sessions »). Or backend/app/Services/Auth/AuthService.php:116 écrit `'last_login_ip' => $request->ip()` (colonne INET déclarée en 2026_05_16_000002_create_auth_tenant_audit_schema.php:57). Le seul endroit qui la remet à null est backend/app/Services/Rgpd/GdprErasureService.php:230, c'est-à-dire un effacement RGPD explicite : sans demande, l'IP de dernière connexion est conservée sans limite de durée.",
+    "piste": "Ajouter dans `handle()` un troisième `DB::affectingStatement` sur `users` conditionné à `last_login_at < ?`, avec le même `host(network(set_masklen(...)))::inet` que :70, puis étendre AutomatismesDePurgeTest au chemin réel de cette troisième requête.",
+    "risque": "Faible, mais réel : `users.last_login_ip` est exposée en portabilité (GdprPortabilityService.php:171) et testée telle quelle (PortabiliteCompleteTest.php:607-614) — tronquer la valeur change ce qui sort d'un export. Choisir entre troncature /24-/48 (cohérent avec audit_logs) et mise à NULL, et le dire dans la politique de conservation."
+   },
+   {
+    "id": "B17-005",
+    "sev": "S2",
+    "titre": "rgpd:anonymize-ips réécrit chaque nuit l'intégralité de l'historique audit_logs",
+    "preuve": "backend/app/Console/Commands/AnonymizeOldIps.php:69-75 : `UPDATE audit_logs SET ip = host(network(set_masklen(ip::cidr, …)))::inet WHERE created_at < ? AND ip IS NOT NULL`, avec `$cutoff = now()->subDays(30)` (:50). Le prédicat ne distingue PAS une IP déjà tronquée d'une IP brute : chaque nuit, la totalité de l'historique de plus de 30 jours est réécrite, y compris les millions de lignes anonymisées les nuits précédentes (l'opération est idempotente en valeur, pas en écriture). La commande est planifiée quotidiennement (docbloc :11 « Schedule daily à 04:30 »).",
+    "piste": "Ajouter au WHERE une condition qui exclut le déjà-fait, p. ex. `AND ip <> host(network(set_masklen(ip::cidr, CASE WHEN family(ip)=4 THEN 24 ELSE 48 END)))::inet`, ou restreindre à une fenêtre glissante (`created_at >= ? - interval '2 days' AND created_at < ?`) après un backfill unique. Un index partiel sur created_at aiderait.",
+    "risque": "Deux effets à surveiller : le prédicat de restriction doit rester juste, sinon une IP passe au travers et n'est jamais anonymisée (le contraire de l'objectif RGPD) ; et surtout, ce même UPDATE réécrit la colonne `ip` qui ENTRE dans canonical() (AuditHashChain.php:198) — chaque nuit il casse déjà la chaîne d'intégrité sur tout l'historique, un défaut connexe qu'un correctif de volume ne doit pas masquer."
+   },
+   {
+    "id": "C19-011",
+    "sev": "S3",
+    "titre": "Les deux fournisseurs de proxy désactivent la vérification du certificat TLS de leur propre sonde de santé",
+    "preuve": "backend/app/Services/Proxies/WebshareProvider.php:70 `Http::withOptions(['proxy' => $endpoint->toProxyUrl(), 'verify' => false])->timeout(10)->get('https://api.ipify.org?format=json')` et backend/app/Services/Proxies/IPRoyalProvider.php:56, identique avec `->timeout(15)`. Les deux sondes de santé désactivent donc la vérification du certificat TLS de leur propre appel : le proxy peut rendre n'importe quelle réponse pour `api.ipify.org`, et `healthCheck()` la validera dès qu'elle contient une IP bien formée (:72).",
+    "piste": "Remplacer `'verify' => false` par `'verify' => (bool) config('crm.proxies.verify_tls', true)`, poser la variable à `false` seulement pour le fournisseur qui l'exige, et journaliser à chaque sonde le fait qu'elle tourne sans vérification.",
+    "risque": "Réel : certains fournisseurs de proxy HTTPS présentent un certificat d'interception ; retirer `verify => false` peut faire passer des points de sortie sains pour morts, et `pickEndpoint()` (:57-65) lève une RuntimeException quand plus aucun n'est sain — donc arrêt de la collecte. À basculer derrière une variable, fournisseur par fournisseur, et à mesurer avant/après."
+   },
+   {
+    "id": "P5-35-012",
+    "sev": "S3",
+    "titre": "Sur un refus de permission, le fil d'activité annonce des données à venir",
+    "preuve": "frontend/src/features/dashboard/components/ActivityFeed.tsx:93-98 — `) : isError || items.length === 0 ? (` puis `<EmptyState title=\"Activité bientôt disponible\" description=\"Les actions de ton équipe (scrapes, enrichissements, exports) apparaîtront ici.\" />`. La branche d'erreur et la branche « base vide » sont la MEME : un 403 sur GET /audit-logs (droits insuffisants) rend un texte qui annonce des donnees a venir. Le composant `QueryErrorState` existe pourtant dans le depot (frontend/src/components/ui/QueryErrorState.tsx, utilise par 8 ecrans) mais n'est pas branche ici. Aucune garde ne nomme P5-35-012.",
+    "piste": "Separer les deux branches : `isError ? <QueryErrorState error={error} /> : items.length === 0 ? <EmptyState .../> : ...`, en recuperant `error` du `useQuery` (ligne 59). Etendre la garde frontend/tests/screens/etats-erreur.test.tsx (qui couvre deja ce patron pour D25-001) au fil d'activite.",
+    "risque": "Aucun effet de bord : le changement est confine a une branche de rendu d'un seul composant. Attention a ne pas casser le cas legitime « 200 + liste vide », qui doit continuer a montrer l'EmptyState."
+   },
+   {
+    "id": "A06-013",
+    "sev": "S3",
+    "titre": "Le journal d'étape 0 consigne un diagnostic Calendly faux, que le code de main contredit explicitement",
+    "preuve": "Le journal Axion-IA/_SESSIONS/2026-08-18_PREALABLES-CRM-ETAPE-0.md:55 ecrit toujours : « `completed`/`no_show` sont **hors de portee de l'API Calendly par construction** (`enrich.ts:20-21`) ». Le code de main dit l'inverse : axionia/src/server/calendly/api.ts:290 `noShow: Boolean(invitee[\"no_show\"]),` et axionia/src/server/calendly/enrich.ts:34-35 « `no_show` — l'hote a coche « Mark as no-show ». Contrairement a ce qu'on a longtemps ecrit ici, l'API le sait : l'invitee porte `no_show`. » (le meme bloc precise que seul `completed` reste manuel, et pourquoi).",
+    "piste": "Reecrire la ligne F16 du §2 : `no_show` remonte automatiquement, seul `completed` est manuel et pourquoi ; y consigner la fenetre de rattrapage de 48 h de `refresh.ts` (a re-mesurer avant d'ecrire le chiffre) et le fait que le webhook `invitee_no_show.created` est inerte faute de plan Calendly payant.",
+    "risque": "Nul : c'est une ligne de journal archive. Le seul risque est de la corriger a moitie — le journal doit aussi consigner la limite reelle (fenetre de rattrapage) faute de quoi le prochain lecteur reconstruira un chemin qui existe deja."
+   }
+  ]
+ },
+ {
+  "lot": 12,
+  "nb": 5,
+  "fiches": [
+   {
+    "id": "B15-012",
+    "sev": "S2",
+    "titre": "Le jeton d'export n'est pas à usage unique, contrairement à ce que le service annonce",
+    "preuve": "backend/app/Services/Rgpd/GdprPortabilityService.php:13 annonce « fournit un token téléchargement one-shot ». retrieve() (:238-254) ne consomme rien : il lit la ligne par `where('export_token', $hash)->where('export_expires_at','>',now())`, renvoie le déchiffré, et n'écrit AUCUNE mise à jour (pas de nullage d'export_token, pas de consumed_at, pas de suppression du fichier `gdpr-exports/{token}.enc`). Le jeton est donc rejouable autant de fois qu'on veut pendant 7 jours (expiresAt = now()->addDays(7), :212).",
+    "piste": "Dans retrieve(), après lecture réussie, invalider dans une transaction : `update(['export_token' => null, 'export_expires_at' => now()])` puis `Storage::delete($path)` — ou, si l'on veut tolérer les rejeux courts, ajouter une colonne `export_consumed_at` et refuser au-delà d'une fenêtre de quelques minutes. Corriger aussi le docbloc :13 si la décision est de garder 7 jours multi-usage.",
+    "risque": "Rendre le jeton réellement à usage unique casse le re-téléchargement légitime (double clic, prefetch navigateur, reprise de téléchargement) et rendrait 404 une archive que la personne n'a pas fini de récupérer."
+   },
+   {
+    "id": "I48-006",
+    "sev": "S2",
+    "titre": "notifications : zéro écrivain, zéro lecteur, trois suppresseurs — et l'inventaire qui fixe l'ordre des pièces la déclare « vivante »",
+    "preuve": "Une moitie du constat est fermee, l'autre est intacte. FERMEE : le corps `{\"data\": []}` ecrit en dur a disparu — backend/app/Http/Controllers/Api/NotificationsController.php:73 interroge desormais `DB::table('notifications')`, et l'en-tete :12-42 documente la fermeture de B12-007. Un second lecteur existe (backend/app/Services/Rgpd/GdprPortabilityService.php:108). OUVERTE : il n'y a toujours AUCUN ecrivain — un grep de `'notifications'` sur backend/app, backend/routes, backend/config, backend/database/seeders ne remonte que des lectures et des suppressions (RetentionPurge.php:107-108, GdprErasureService.php:58, PentestSelfCheck.php:80), aucun `insert`, aucun modele Eloquent `Notification`, aucun `->notify()` (le trait `Notifiable` est declare a Models/User.php:39 et jamais appele). Et l'inventaire qui fixe l'ordre des pieces continue de mentir : _REPORTS/2026-08-19_INVENTAIRE-ETAPE-1A.md:27 — « **`notifications`** ... | base, 10 fichiers applicatifs | Vivante. Sert les rappels et les notifications de 1a. » Aucune garde ne cite I48-006.",
+    "piste": "Corriger _REPORTS/2026-08-19_INVENTAIRE-ETAPE-1A.md:27 en disant la mesure : « table sans ecrivain — lue par la cloche (NotificationsController) et l'export RGPD, purgee par la retention et l'effacement, jamais alimentee ; le producteur reste a ecrire ». Le classer en §3 (echafaudage) plutot qu'en §1 (a etendre), et noter que `markRead()`/`markAllRead()` sont encore en 501.",
+    "risque": "Nul si l'on corrige la ligne d'inventaire (document). Le vrai risque est inverse : laisser « Vivante » conduit l'auteur du lot 1a a « etendre » une table que rien n'alimente, et a decouvrir l'absence d'ecrivain en cours de route."
+   },
+   {
+    "id": "D27-012",
+    "sev": "S3",
+    "titre": "spec/00_INDEX.md annonce des tailles fausses pour les deux specs de mon périmètre",
+    "preuve": "spec/00_INDEX.md:54 annonce `~1500` lignes pour `13_ui_admin_phase1.md` — `wc -l` → 614 (facteur 2,44). spec/00_INDEX.md:80 annonce `~1500` pour `24_frontend_design_system.md` — `wc -l` → 776 (facteur 1,93). Les deux annonces sont donc fausses, dans le sens qui surestime la matière disponible.",
+    "piste": "Même correctif qu'A09-011 : régénérer la colonne « Lignes » par `wc -l`, ou la supprimer plutôt que d'entretenir un chiffre qui se périme à chaque édition.",
+    "risque": "Aucun — index de spécification."
+   },
+   {
+    "id": "E31-010",
+    "sev": "S2",
+    "titre": "Une opposition dont l'adresse ne se déchiffre pas est perdue en silence, et la route répond quand même « ok »",
+    "preuve": "C:/Users/willi/Documents/Projets/Axion-IA/axionia/src/server/vivier/opposition.ts:38 `const email = safeDecrypt(application.email);` ; :55 `if (email) {` enveloppe À LA FOIS recordConsentEvent() (:56-64) et syncVivierOppositionToCrm() (:66-71) ; :74 `return { ok: true, alreadyOpposed: false, applications: siblings.length };` est hors de ce bloc. safeDecrypt (:98-105) rend null sur toute exception. Donc, adresse non déchiffrable : ni ligne au registre de preuve, ni propagation au CRM, et la route répond quand même ok:true. Nuance mesurée : le drapeau vivierOpposedAt est tout de même posé (:44 `siblings = email ? … : [application.id]`, :46-49) — la perte porte sur la preuve et sur le CRM, pas sur le drapeau local.",
+    "piste": "Après la pose du drapeau, si `email === null`, journaliser en erreur avec l'applicationId et rendre un résultat distinct (`{ ok: false, reason: 'pii_undecryptable' }` ou `{ ok: true, degraded: true }`) que la route publique traduit en « enregistré, propagation en attente » — plus un compteur pour que le silence cesse d'être silencieux.",
+    "risque": "Faire échouer la route quand le déchiffrement rate change la réponse rendue au visiteur qui a cliqué son lien d'opposition ; il faut absolument garder le drapeau posé avant de signaler l'échec, sinon on transforme une opposition partielle en opposition refusée."
+   },
+   {
+    "id": "A09-010",
+    "sev": "S3",
+    "titre": "README.md et CONTRIBUTING.md prescrivent trois commandes de test qui ne peuvent pas s'exécuter",
+    "preuve": "README.md:13 annonce toujours « # 2. Demarrer la stack (Postgres + Redis + Caddy + api + horizon + scheduler + app + workers) » ; README.md:85 `docker exec axion-crm-worker-google-maps pnpm test` ; CONTRIBUTING.md:77-78 `docker exec axion-crm-worker-google-maps pnpm typecheck` puis `… pnpm test`. Or `grep -nE '^  [a-zA-Z0-9_-]+:' docker-compose.yml` ne rend que 8 services : postgres(86), redis(114), api(138), horizon(184), reverb(209), scheduler(236), app(285), caddy(314) — aucun worker.",
+    "piste": "Remplacer les trois lignes par la forme hors conteneur (`cd workers && pnpm typecheck` / `pnpm test`) et retirer « + workers » de README.md:13.",
+    "risque": "Nul cote produit. Verifier seulement que la commande de remplacement fonctionne depuis la racine (`cd workers && pnpm test`) avant de la prescrire, sinon on remplace une commande impossible par une autre."
+   }
+  ]
+ },
+ {
+  "lot": 13,
+  "nb": 5,
+  "fiches": [
+   {
+    "id": "H45-004",
+    "sev": "S2",
+    "titre": "Deux gardes statiques trouvent leurs propres commentaires : elles restent vertes quand le code qu'elles nomment disparaît",
+    "preuve": "Les deux gardes cherchent une sous-chaine dans le TEXTE BRUT d'un fichier, commentaires compris. (1) backend/tests/Feature/RlsTest.php:440-445, test « la commande de backfill pose bien son contexte workspace » : `$source = file_get_contents(app_path('Console/Commands/ScrapingBackfillSrcTags.php')); expect($source)->toContain('WorkspaceContext::run(');`. L'appel reel est unique, a ScrapingBackfillSrcTags.php:98 ; le jour ou il disparait mais qu'un commentaire le mentionne (« // WorkspaceContext::run( retire le ... »), la garde reste verte. (2) backend/tests/Unit/PhpstanBaselineNeGrossitPasTest.php:222-233, test « reportUnmatchedIgnoredErrors reste active » : `$conf = ...file_get_contents($chemin)` sur backend/phpstan.neon puis `assertStringContainsString('reportUnmatchedIgnoredErrors: true', $conf)`. La declaration active est a phpstan.neon:27 ; la commenter en `# reportUnmatchedIgnoredErrors: true` laisserait l'assertion passer. Le constat pointait ces gardes a RlsTest.php:380-386 et PhpstanBaselineNeGrossitPasTest.php:221-235 — la seconde plage est exacte, la premiere a glisse (RlsTest.php fait aujourd'hui 446 lignes et cette garde est sa derniere).",
+    "piste": "Retirer les commentaires avant l'assertion (`preg_replace('~//[^\\n]*|/\\*.*?\\*/~s', '', $source)` cote PHP, `^\\s*#` cote NEON — le meme depouillement existe deja dans frontend/tests/couverture-e2e.test.ts:60 pour les workflows YAML), ou mieux : pour phpstan.neon, parser la cle plutot que chercher la ligne.",
+    "risque": "Depouiller les commentaires avant d'assertionner peut rendre une garde rouge sur un fichier ou la chaine ne vivait QUE dans un commentaire — c'est justement le resultat souhaite, mais il faut le verifier avant de fusionner pour ne pas bloquer une PR sans rapport."
+   },
+   {
+    "id": "H46-010",
+    "sev": "S3",
+    "titre": "La garde « la baseline ne grossit pas » garde le fichier, jamais le code : une erreur PHPStan neuve la laisse verte",
+    "preuve": "backend/tests/Unit/PhpstanBaselineNeGrossitPasTest.php n'invoque JAMAIS PHPStan : sa seule source de vérité est du texte lu au disque — `lireBaselinePhpstan()` fait `file_get_contents(dirname(__DIR__, 2) . '/phpstan-baseline.neon')` (:77-78) et analyse le fichier à la main (:84-137). Les quatre tests qui s'ensuivent ne lisent que ce fichier et phpstan.neon : « le parseur lit vraiment des entrées » (:142), « la baseline ne grossit pas » (:151, plafonds constants BASELINE_MAX_ENTREES=191 / BASELINE_MAX_ERREURS=209 aux lignes 43-44), « l'en-tête annonce les nombres réellement présents » (:177) et « reportUnmatchedIgnoredErrors reste activé » (:221, lecture de phpstan.neon). Une erreur PHPStan neuve dans app/ ne fait donc bouger aucune de ces quatre assertions. Le garde-fou réel est ailleurs (l'étape PHPStan bloquante de ci.yml) — mais le nom du test promet une garde du code qu'il n'exerce pas.",
+    "piste": "Ne pas faire jouer PHPStan dans Pest : renommer la garde et son en-tête pour dire ce qu'elle garde réellement (« la baseline ne grossit pas ET le socle CRM n'y entre pas » — un contrôle de FICHIER), et y inscrire noir sur blanc que la détection des erreurs neuves appartient à l'étape PHPStan de ci.yml.",
+    "risque": "Faire jouer PHPStan depuis un test Pest doublerait un contrôle déjà tenu par la CI et allongerait la suite de plusieurs minutes ; le vrai correctif est probablement documentaire, pas fonctionnel."
+   },
+   {
+    "id": "D28-015",
+    "sev": "S3",
+    "titre": "Deux cibles tactiles sous 24 × 24 px, présentes sur tous les écrans : 33 nœuds en clair, 32 en sombre",
+    "preuve": "frontend/src/components/ui/DarkModeToggle.tsx:40-52 : trois `<button>` dont la seule mise en boîte est `className={`rounded px-2 py-1 transition …`}` (:45), sur un conteneur `text-xs` (:38). Aucune classe de taille minimale (`min-h-*`, `min-w-*`, `size-*`, `h-*`, `w-*`) nulle part dans le composant : la cible vaut le glyphe (☀/☾/⚙) plus 8 px de part et d'autre en largeur et 4 px en hauteur, soit les ~22,9 × 24 px mesurés — sous le seuil 24 × 24 px du WCAG 2.2 (2.5.8). Le composant est dans l'en-tête de la coquille, donc présent sur tous les écrans, ce qui multiplie le défaut par le nombre de vues.",
+    "piste": "Ajouter `min-h-6 min-w-6` (24 px) — ou `inline-flex items-center justify-center size-6` — sur le `<button>` de :45, et couvrir la règle par un test axe-core sur la cible tactile plutôt que par une vérification à l'œil.",
+    "risque": "Élargir les boutons change la hauteur de l'en-tête de quelques pixels sur tous les écrans — à vérifier sur les captures de référence s'il en existe, et à mesurer côté CLS si une garde Web Vitals surveille cette page."
+   },
+   {
+    "id": "E33-007",
+    "sev": "S2",
+    "titre": "Le lead chatbot part en clair vers Telegram, y compris ce que le chiffrement vient de protéger",
+    "preuve": "C:/Users/willi/Documents/Projets/Axion-IA/axionia/src/server/chatbot/tools/capturer-lead.ts:24-41 — notifyNewLead() compose un corps Telegram contenant `Nom : ${input.nom}`, `Email : ${input.email}`, `Tél : ${input.telephone}`, `Structure : ${input.structure}` et `Besoin : ${input.besoin_resume}`, envoyé par sendTelegram() (:37). Appel à :182, sous la garde `if (!result.idempotent)` (:181). Le même fichier chiffre ces trois champs au repos douze lignes plus haut : :127-130 `contactName: encryptPii(input.nom)`, `contactEmail: encryptPii(input.email)`, `contactPhone: encryptPii(input.telephone)`, avec le commentaire :107-121 « PII CHIFFRÉ AU REPOS (2026-08-18) ». Ce que le chiffrement protège en base part en clair sur Telegram.",
+    "piste": "Réduire le corps Telegram à des éléments non identifiants plus un lien profond vers la fiche : `🟢 Nouveau lead chatbot — Submission #<id>` + structure/besoin tronqué, et le lien vers /admin/submissions/<id>. Au minimum masquer l'adresse (`j***@domaine.fr`) et retirer le téléphone.",
+    "risque": "L'équipe perd la possibilité d'agir directement depuis la notification (rappeler la personne sans ouvrir la console) : c'est un changement d'usage, pas un risque technique. Aucun impact sur la capture du lead (l'appel est déjà fail-soft)."
+   },
+   {
+    "id": "B13-008",
+    "sev": "S3",
+    "titre": "relation_type = 'fournisseur' est inatteignable par le canal, alors que le site détient les fiches correspondantes",
+    "preuve": "backend/app/Crm/Taxonomy.php:44 (`'fournisseur'` dans `BUSINESS_RELATION_TYPES`) et :60 (dans `BUSINESS_RELATION_PRIORITY`), sans aucune note du docbloc (l.20-34) disant que la valeur serait reservee a la saisie manuelle. En face, backend/app/Crm/Ingest/SiteSyncClassifier.php:53-70 : `relationType()` ne rend que `newsletter`, `client`, `partenaire`, `presse_media`, `investisseur`, `conference` et `prospect` (deux `default => 'prospect'`) — aucune branche `fournisseur`. Aucune garde ne cite B13-008.",
+    "piste": "Le moins cher et le plus honnete : ecrire dans le docbloc de `Taxonomy::BUSINESS_RELATION_TYPES` que `fournisseur` est reserve a la saisie manuelle en console et n'est atteignable par aucun evenement du canal. Sinon, emetteur `SousTraitant` cote site avec un `form_type`/`source_slug` dedie et la branche correspondante dans `relationType()`.",
+    "risque": "L'option chere (ajouter un emetteur SousTraitant cote site) fait naitre un type de fiche qui n'existait pas dans la console et suppose une valeur gouvernee des deux cotes ; l'option courte (documenter) ne risque rien."
+   }
+  ]
+ },
+ {
+  "lot": 14,
+  "nb": 5,
+  "fiches": [
+   {
+    "id": "H45-006",
+    "sev": "S2",
+    "titre": "app:pentest-self-check n'a aucun test, annonce deux contrôles qu'il ne fait pas, et mesure la mauvaise colonne pour la RLS",
+    "preuve": "Les trois moities du constat tiennent. (1) Aucun test : recherche de `PentestSelfCheck` et `pentest-self-check` sur backend/tests, backend/routes et .github → zero occurrence. (2) Le docbloc backend/app/Console/Commands/PentestSelfCheck.php:12-17 annonce « CORS strict (pas de * wildcard) » et « Rate limiting actif sur login/magic-link », alors que `handle()` :29-32 n'appelle que quatre controles — headers, ssrf, rls, chaine d'audit. Il annonce aussi « RLS Postgres effective sur 30 tables » quand `checkRls()` :78-81 en enumere HUIT. (3) La mauvaise colonne : :84 `SELECT relrowsecurity FROM pg_class` — or le durcissement du depot repose sur FORCE RLS (`ALTER TABLE … FORCE ROW LEVEL SECURITY`, migration 2026_08_14_000001:95), et `relrowsecurity` seul est contourne par le proprietaire de la table.",
+    "piste": "Lire `relforcerowsecurity` en plus de `relrowsecurity` ; alimenter la liste des tables depuis la meme source que la migration de durcissement plutot qu'a la main (l'enumeration en dur est exactement le patron qui a deja produit une garde verte sur ce qu'elle n'inspectait pas) ; et retirer du docbloc les deux controles inexistants, ou les ecrire.",
+    "risque": "La commande n'est jouee par aucune CI ni aucun entrypoint (aucune reference hors du fichier) : la corriger ne peut casser aucun chemin vivant. Elle deviendra en revanche ROUGE la ou elle passait, puisqu'elle mesurera enfin la bonne colonne."
+   },
+   {
+    "id": "H46-003",
+    "sev": "S2",
+    "titre": "SSRF_GUARD_DENY_PRIVATE a deux défauts contradictoires : true dans la garde, false dans l'auto-contrôle censé la vérifier",
+    "preuve": "Les deux defauts contradictoires sont toujours la, a deux fichiers d'ecart : backend/app/Services/Http/SsrfGuard.php:77 `return (bool) env('SSRF_GUARD_DENY_PRIVATE', true);` contre backend/app/Console/Commands/PentestSelfCheck.php:71 `$denyPrivate = (bool) env('SSRF_GUARD_DENY_PRIVATE', false);` — suivi ligne 72 de `return $denyPrivate ? [] : ['SSRF_GUARD_DENY_PRIVATE not enabled in .env']`. Le docbloc de SsrfGuard.php:110-113 raisonne meme explicitement sur ce point (« sous config:cache … le defaut est le comportement SUR ») sans voir que l'auto-controle cense le verifier porte le defaut INVERSE. Le constat citait SsrfGuard.php:41 ; la methode a bouge en :75-78, la valeur est inchangee.",
+    "piste": "Aligner PentestSelfCheck.php:71 sur `SsrfGuard::enabled()` : appeler la methode plutot que de relire `env()` (`$denyPrivate = SsrfGuard::enabled();`). Une seule source, plus de defaut a synchroniser — et cela retire au passage une entree de la baseline H46-002.",
+    "risque": "Nul sur le produit : seul le defaut de la COMMANDE d'auto-controle change. Consequence attendue et souhaitable — l'auto-controle cessera de crier au loup sous `config:cache`."
+   },
+   {
+    "id": "D29-005",
+    "sev": "S3",
+    "titre": "Les montants en euros sont rendus avec un point décimal anglais et une espace ordinaire",
+    "preuve": "frontend/src/features/llm/LlmRouterPage.tsx:228 : ``value={`${(usage.data?.total_eur ?? 0).toFixed(2)} €`}`` et :270 : `{eur.toFixed(2)} € · {pct}%`. `toFixed()` rend toujours un point décimal anglais (`12.34`), et l'espace avant `€` est une espace ordinaire, pas l'espace insécable exigée en typographie française. Le contraste est net dans le même fichier : :233 et :239 emploient bien `toLocaleString('fr-FR')` pour les jetons — donc l'outil est là, il n'est simplement pas employé pour les montants.",
+    "piste": "Remplacer les deux occurrences par un formateur partagé, p. ex. `new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(x)`, posé une fois dans frontend/src/lib/ et réutilisé partout où un montant s'affiche.",
+    "risque": "L'espace insécable introduite par `Intl.NumberFormat` (U+00A0) peut casser une assertion de test qui compare une chaîne exacte, et modifie la largeur rendue des KpiCard — à regarder si un instantané existe."
+   },
+   {
+    "id": "E34-006",
+    "sev": "S2",
+    "titre": "Le verrou LF du 2026-08-18 n'a pas été appliqué à la copie de travail : 4 877 fichiers portent encore des CR, et le test que ce verrou devait sauver rougit toujours",
+    "preuve": "Mesuré sur le disque : C:/Users/willi/Documents/Projets/Axion-IA/axionia/src/components/admin/ui/useConfirmation.tsx contient 114 séquences CRLF pour 114 LF au total — le fichier est intégralement en CRLF (`file` : « with CRLF line terminators »). Le test statique C:/Users/willi/Documents/Projets/Axion-IA/axionia/src/features/admin-qualiopi/confirmations.spec.ts:124 fait `crochet.indexOf(\"setDemande(null);\\n          await geste\")` puis `expect(fermeture).toBeGreaterThan(-1)` (:125). Le motif existe bien dans la source (useConfirmation.tsx:107 `setDemande(null);` puis :108 `await geste?.();`) mais séparé par un \\r\\n : indexOf rend -1, le test rougit. Le .gitattributes (actif, `* text=auto eol=lf`) le dit lui-même dans son en-tête : « L'activation n'a renormalisé AUCUN fichier ». Le verrou existe dans l'index, pas dans la copie de travail.",
+    "piste": "Soit renormaliser la copie de travail (`git rm --cached -r . && git reset --hard`, arbre propre), soit — plus robuste — rendre le test indifférent aux fins de ligne : normaliser la source lue (`code(...).replace(/\\r\\n/g, \"\\n\")`) dans l'assistant `code()` de confirmations.spec.ts. La seconde ferme la classe entière de tests statiques aveugles sous Windows.",
+    "risque": "Une renormalisation (`git add --renormalize .`) touche potentiellement des milliers de fichiers de la copie de travail : le diff est énorme même s'il est vide côté index, et tout worktree/branche en cours de rebase peut en souffrir. À faire arbre propre, en une passe, sans autre changement."
+   },
+   {
+    "id": "B15-009",
+    "sev": "S3",
+    "titre": "La liste de suppression n'a qu'un seul lecteur, et aucun moteur d'envoi ne la consulte",
+    "preuve": "backend/app/Support/ListeSuppression.php:145-162 (`estSupprimee()`) n'a qu'un seul appelant applicatif : backend/app/Support/EligibiliteCampagne.php:166 `return ! ListeSuppression::estSupprimee($normalise, $scope);`. Les autres references a `ListeSuppression::` dans app/ sont des ecritures (ZeptoMailWebhookController.php:82,85,88) ou l'empreinte partagee (DeduplicationService.php:227,319). Aucun moteur d'envoi de campagne n'existe encore, et aucune garde architecturale n'existe (grep `peutRecevoir|email_sends` sur backend/tests : uniquement des tests RGPD et un semeur). L'etat decrit par le constat est donc inchange — le constat est prospectif et son correctif etait explicitement differe a L7.",
+    "piste": "Inscrire dans la definition de fini de L7 : une facade unique d'envoi, plus un test architectural qui rougit si un fichier de `app/` ecrit dans `email_sends` sans passer par `EligibiliteCampagne::peutRecevoir()`.",
+    "risque": "Aucun aujourd'hui : rien n'ecrit dans `email_sends`. Le risque est inverse — laisser L7 se construire sans que la garde soit dans sa definition de fini."
+   }
+  ]
+ },
+ {
+  "lot": 15,
+  "nb": 5,
+  "fiches": [
+   {
+    "id": "B16-013",
+    "sev": "S3",
+    "titre": "Une ligne insérée sans prev_hash fait crier « falsification » sans qu'il y en ait eu",
+    "preuve": "Le correctif demande etait un `DROP DEFAULT` ; c'est un `SET DEFAULT` qui a ete fait, et le defaut est toujours arme. backend/database/migrations/2026_08_16_000001_audit_logs_prev_hash_default.php:30 — `ALTER TABLE audit_logs ALTER COLUMN prev_hash SET DEFAULT repeat('0', 64)`. Aucune migration posterieure ne touche a prev_hash (grep sur backend/database/migrations : seules 2026_05_16_000002:204 et 2026_05_17_000011:94, toutes deux `DEFAULT 'GENESIS'`, plus cette migration-ci). La consequence tient toujours : une ligne inseree sans prev_hash herite du maillon ZERO, et backend/app/Services/Audit/AuditHashChain.php:167 — `if (! hash_equals($prevHash, (string) $row->prev_hash)) { return false; }` — la rejette des la deuxieme ligne, en criant a la falsification. Aucune garde ne cite B16-013.",
+    "piste": "Migration `ALTER TABLE audit_logs ALTER COLUMN prev_hash DROP DEFAULT`, avec un `down()` qui remet `repeat('0',64)` (pas 'GENESIS'). Aligner au passage le gabarit de partition de 2026_05_17_000011_setup_pg_partman_audit_logs.php:94, qui recreerait la table avec `DEFAULT 'GENESIS'` si elle etait rejouee.",
+    "risque": "Apres DROP DEFAULT, la colonne reste NOT NULL : tout INSERT omettant prev_hash echouera franchement — c'est l'effet voulu, mais un import ou un script de secours qui comptait sur le defaut cassera d'un coup. Le service, lui, fournit toujours prev_hash explicitement (AuditHashChain.php:119), donc le produit ne risque rien."
+   },
+   {
+    "id": "B16-014",
+    "sev": "S3",
+    "titre": "Deux commentaires du produit décrivent un état qui n'existe plus, et un runbook renvoie à une commande absente",
+    "preuve": "Les deux textes sont intacts. (a) backend/app/Services/Audit/AuditHashChain.php:24-26 — « NB : la colonne `audit_logs.prev_hash` porte encore un DEFAULT SQL 'GENESIS' herite du schema initial ; il est inatteignable » : faux depuis la migration 2026_08_16_000001, qui a pose `repeat('0', 64)` (voir sa ligne 30). (b) infra/runbooks/05-rotate-secrets.md:87 — « 4. Marquer le breakpoint via `audit:checkpoint` artisan command » : une recherche de `audit:checkpoint` sur tout backend/ ne remonte AUCUN resultat. Deux voisines du meme runbook sont dans le meme cas : :78 `php artisan model:rotate-keys --tables=users` et :93 `php artisan llm:smoke-test` — absentes elles aussi de backend/app/Console/Commands/. Aucune garde ne cite B16-014.",
+    "piste": "Corriger AuditHashChain.php:24-26 (le defaut vaut desormais `repeat('0',64)`, et il sera retire par le correctif de B16-013). Dans infra/runbooks/05-rotate-secrets.md, remplacer les trois commandes inexistantes par ce qui existe reellement (`audit:verify-chain` est presente) ou marquer explicitement le pas comme non outille — un operateur qui a deja change le secret ne doit pas se retrouver bloque au pas 4.",
+    "risque": "Nul pour les textes. Ecrire la commande `audit:checkpoint` plutot que corriger le runbook serait, lui, un vrai developpement (il touche la chaine d'audit) et depasse les 20 minutes annoncees."
+   },
+   {
+    "id": "D25-011",
+    "sev": "S2",
+    "titre": "Cinq écrans lisent un champ imbriqué de la réponse d'API sans garde : une seule clef absente emporte l'écran entier",
+    "preuve": "Lectures imbriquées sans garde, mesurées sur frontend/src : ContactsHubPage.tsx:256 `{company.contacts.length > 0 && (`, :278 `{company.tags.length > 0 && (`, :288 et :289 `+{company.tags.length - 3}` ; CandidatesPage.tsx:210 `{candidate.tags.length > 0 && (` ; PersonTimelinePage.tsx:108 `{data.data.length === 0 ? (`. Aucune de ces cinq lignes n'emploie `?.` ni de repli. Les types les déclarent obligatoires (frontend/src/features/crm-console/types.ts:87 `tags: string[]`, :88 `contacts: HubContact[]`, :136 `tags: string[]`) — mais c'est une affirmation de compilation sur une réponse d'API non validée à l'exécution : une clef absente jette et emporte l'écran. À décharge : GlobalSearch.tsx:151 et :167 montrent la forme correcte (`data?.contacts && data.contacts.length > 0`), et depuis la fermeture de D24-008 le dégât est borné à l'écran au lieu de l'application entière.",
+    "piste": "Deux gestes : `company.contacts?.length ?? 0` sur les cinq sites, et — plus durable — valider la réponse d'API à la frontière (un schéma zod par vue de la console) pour que le type cesse d'être une promesse non tenue.",
+    "risque": "Presque nul : `?? []` et `?.length` ne changent le rendu que dans le cas qui plante aujourd'hui. Attention seulement à ne pas transformer « donnée manquante » en « liste vide » silencieuse sur un écran où la distinction compte."
+   },
+   {
+    "id": "F39-010",
+    "sev": "S2",
+    "titre": "Le script de restauration a pour cible par défaut la base de production",
+    "preuve": "infra/scripts/restore-postgres.sh:56 `TARGET_DB=\"${2:-axion_crm}\"` et :57 `DB_CONTAINER=\"${DB_CONTAINER:-axion-crm-postgres}\"` — les deux défauts désignent la production (docker-compose.yml:97 `POSTGRES_DB: axion_crm`, :92 `container_name: axion-crm-postgres`). Le script écrase ensuite la base ainsi désignée : :132 `| docker exec -i \"$DB_CONTAINER\" psql -U \"$DB_USER\" -d \"$TARGET_DB\" --single-transaction -v ON_ERROR_STOP=1`, après avoir au besoin créé la base (:88). Aucune confirmation, aucun contrôle d'environnement : `grep -n \"read -|confirm|CONFIRM|APP_ENV|production\" infra/scripts/restore-postgres.sh` ne rend aucune garde. Un `bash restore-postgres.sh dump.sql.gz` sans second argument — la forme même écrite dans l'usage à :5 — vise donc la base de production.",
+    "piste": "Retirer le défaut (`TARGET_DB=\"${2:?base cible requise — jamais de defaut}\"`) et, si la cible vaut `axion_crm` ou si DB_CONTAINER vaut axion-crm-postgres, exiger une confirmation explicite (variable `JE_RESTAURE_LA_PRODUCTION=oui` ou drapeau `--production`). Mettre l'usage :5 à jour dans le même geste.",
+    "risque": "Rendre le second argument obligatoire casse tout runbook ou automatisation qui appelle le script avec un seul argument ; il faut relire infra/runbooks/04-restore-dr.md et les scripts de sauvegarde avant de changer la signature."
+   },
+   {
+    "id": "E32-001",
+    "sev": "S3",
+    "titre": "La liste des « 12 écrans Contacts » se trompe sur 2 items sur 12 ; la console compte 153 entrées de navigation, pas ~150",
+    "preuve": "Le document fautif n'a pas ete corrige : _PROMPTS/PROMPT_AUDIT_360_CRM_PRO_2026-08-18.md:302 enumere toujours « les **12 ecrans « Contacts »** de la console axionia (Appels reserves, Messages, Clients, Presse, Partenariats, Investisseurs, Conferences, Recrutement, Podcast, Autres, Candidatures, Rendez-vous + calendrier) ». Le code dit autre chose : axionia/src/lib/admin-nav.ts porte exactement 12 entrees `group: \"contacts\"` (l.435, 441, 451, 461, 468, 475, 482, 489, 496, 507, 514, 522), dont `{ href: `${base}/contacts`, label: \"Tout\" }` (l.432-435) que le mandat ignore, et AUCUNE entree « Rendez-vous + calendrier » (`grep -i \"calendrier|rendez-vous\"` ne rend que des commentaires, l.334, 360, 406, 415, 422). Reserve : le decompte « 153 items, pas ~150 » suppose d'executer `buildAdminNav`, ce que je n'ai pas fait (lecture seule) — cette moitie du constat reste non verifiee par moi.",
+    "piste": "Corriger la liste du §4.11 / §A du mandat : retirer « Rendez-vous + calendrier », ajouter « Tout » ; et rejouer `buildAdminNav` une fois pour figer le decompte exact dans le document plutot qu'un « ~150 ».",
+    "risque": "Nul : correction d'une liste dans le mandat. Le risque est de ne corriger que la moitie lisible et de laisser le decompte errone, qui sert d'assiette a des decisions de retrait d'ecran."
+   }
+  ]
+ },
+ {
+  "lot": 16,
+  "nb": 5,
+  "fiches": [
+   {
+    "id": "B15-007",
+    "sev": "S2",
+    "titre": "RetentionPurge annonce deux purges qu'il n'exécute pas",
+    "preuve": "C:/Users/willi/Documents/Projets/crmpro-wt-a35-auth/backend/app/Console/Commands/RetentionPurge.php:11-17 annonce CINQ politiques, dont deux que `handle()` n'execute pas : ligne 13 « audit_logs > 24 mois -> archivage S3 + suppression (pg_partman gere le detach) » et ligne 16 « llm_usage > 12 mois -> archivage + suppression ». `handle()` (:78-131) ne contient que TROIS appels a `purger()` : :95 `email_validations expirees`, :105 `notifications anciennes (>90j)`, :119 `scraper_runs payload (>90j)`. Ni `audit_logs` ni `llm_usage` n'apparaissent une seule fois dans le corps du fichier. Le releve est propre : `grep -rn 'audit_logs|llm_usage' app/Console/` ne montre ces tables que dans d'AUTRES commandes qui font autre chose — AnonymizeOldIps.php:52-82 anonymise les IP d'`audit_logs` (elle ne purge rien), PartmanMaintenir.php entretient les partitions, AnomalyDetect.php:65 ne fait que LIRE `llm_usage`. Aucune commande n'archive ni ne supprime `llm_usage`, et aucune ne purge `audit_logs` a 24 mois. Aucune garde : `grep -rn 'B15-007' backend/` ne rend rien, et tests/Feature/Commands/AutomatismesDePurgeTest.php (qui couvre pourtant B17-001 :183 et B11-003 :253-329 sur cette meme commande) ne verifie a aucun endroit que la liste annoncee corresponde aux taches jouees.",
+    "piste": "Corriger l'en-tete :11-17 pour qu'il n'annonce que les trois taches reellement jouees, et deplacer `audit_logs` et `llm_usage` dans une rubrique explicite « non implemente / porte par pg_partman » avec le renvoi vers PartmanMaintenir ; puis ajouter au test AutomatismesDePurgeTest une garde mecanique qui lit le docblock et le compare aux libelles passes a `purger()`, pour que l'ecart ne puisse pas se reformer en silence.",
+    "risque": "Nul si on corrige la documentation (le constat est type `doc`) : on ne touche a aucun comportement. Le risque n'apparaitrait qu'en choisissant l'autre branche — implementer les deux purges — ce qui ferait supprimer, par une commande PLANIFIEE tous les jours a 04:00, des lignes d'un journal scelle par chaine de hachage (`audit_logs`, cf. CorrigerHorodatages.php:72-80 qui l'ecarte deja pour cette raison)."
+   },
+   {
+    "id": "D25-008",
+    "sev": "S2",
+    "titre": "Le tableau de bord n'affiche jamais son squelette : placeholderData est un objet de zéros, donc le premier écran du CRM est une grille de zéros avant toute réponse",
+    "preuve": "`frontend/src/features/dashboard/DashboardPage.tsx:82-91` : `placeholderData: { companies_total: 0, companies_enriched_24h: 0, contacts_qualified: 0, scraper_runs_24h: 0, llm_cost_eur_month: 0, quality_distribution: { complete: 0, partielle: 0, basique: 0 }, size_distribution: {} }`. Avec un `placeholderData`, TanStack Query v5 met `isPending` à faux, donc `isLoading` (= `isPending && isFetching`) ne vaut jamais vrai — et la ligne 135 `{isLoading ? <DashboardSkeleton /> : isEmpty ? … }` ne rend jamais le squelette. Le premier écran est donc la grille de zéros de la l. 82-91. (Défaut voisin non couvert par ce constat : `queryKey: ['dashboard-stats']` l. 79 n'inclut pas `period`, l. 80.)",
+    "piste": "Supprimer `placeholderData` (le garde-fou `const stats = data ?? {…}` de la l. 93 suffit déjà à protéger le rendu), et ajouter `period` à la `queryKey` au passage.",
+    "risque": "Retirer `placeholderData` fait apparaître le squelette au premier rendu et à chaque remontage : c'est un changement visuel voulu, mais visible. Vérifier que `stats` (l. 93-101, garde-fou `data ?? {…}`) couvre bien le cas `data === undefined`, sinon on casse le rendu."
+   },
+   {
+    "id": "D27-007",
+    "sev": "S2",
+    "titre": "Le jeton d'ombre est dupliqué en valeur littérale et a déjà divergé",
+    "preuve": "Le jeton est défini une fois : frontend/src/styles/index.css:46 `--shadow-card: 0 4px 24px -8px rgb(0 0 0 / 0.06), 0 1px 2px 0 rgb(0 0 0 / 0.04);` et :47 `--shadow-card-hover: 0 8px 32px -8px rgb(0 0 0 / 0.10), 0 2px 4px 0 rgb(0 0 0 / 0.06);`. Les copies littérales, et la divergence DÉJÀ survenue : CoveragePage.tsx:280 `shadow-[0_4px_24px_-8px_rgb(0_0_0/0.06)]` ne reprend que la PREMIÈRE des deux couches de --shadow-card (la seconde, `0 1px 2px 0 rgb(0 0 0 / 0.04)`, a disparu) ; idem :313 et :400. Pire, :280 `hover:shadow-[0_8px_32px_-8px_rgb(0_0_0/0.10)]` a aussi perdu la seconde couche de --shadow-card-hover ; :166 porte `0_8px_32px_-12px_rgb(0_0_0/0.12)` et features/coverage/FranceCoverageMap.tsx:323 porte `0_8px_32px_-8px_rgb(0_0_0/0.12)` — deux valeurs qui ne correspondent à AUCUN des deux jetons. Le reste du dépôt fait bien référence au jeton (Card.tsx:11-12,:25, KpiCard.tsx:68-69, Modal.tsx:59,:125, DropdownMenu.tsx:60, NotificationsBell.tsx:166, DashboardPage.tsx:251,:263,:271), ce qui rend l'écart d'autant plus visible.",
+    "piste": "Remplacer les six littéraux de features/coverage/ par `shadow-[var(--shadow-card)]` / `hover:shadow-[var(--shadow-card-hover)]` / `shadow-[var(--shadow-popover)]` selon l'intention, et — puisque le défaut est de la duplication — ajouter une règle de lint (ou une garde de test qui grep) interdisant `shadow-[0_` en dur dans src/features.",
+    "risque": "Changement visuel léger et localisé à /coverage (les ombres y deviendront celles du reste de l'application, avec la couche courte qui manquait)."
+   },
+   {
+    "id": "G43-007",
+    "sev": "S2",
+    "titre": "load-tests/ n'a jamais tourné, et son mode d'emploi prescrit de charger la production avec le mot de passe du dirigeant",
+    "preuve": "load-tests/LOAD-TEST-RUNBOOK.md:40-43 prescrit `curl -X POST https://app.axion-crm-pro.com/api/v1/auth/login -d '{\"email\":\"williamsjullin@gmail.com\",\"password\":\"...changeme...\"}'` puis :49 `export LOAD_TEST_TARGET='https://app.axion-crm-pro.com'` — la PRODUCTION, avec l'adresse du dirigeant. Jamais joue : `ls -la load-tests/` ne contient que 2 fichiers (audience-refresh.yml, LOAD-TEST-RUNBOOK.md), aucun dossier `results/` ; `artillery` n'apparait dans aucun package.json ni aucun workflow (les 5 seules occurrences du depot sont les 2 fichiers load-tests/ et 3 documents _AUDIT/).",
+    "piste": "Reecrire le runbook pour viser un environnement dedie (variable `LOAD_TEST_TARGET` obligatoire, refus explicite du domaine de production) et un compte de service jetable au lieu de l'adresse du dirigeant ; ou supprimer load-tests/ et le dire, plutot que de garder un mode d'emploi dont l'execution litterale charge la prod.",
+    "risque": "Aucun risque produit : ces deux fichiers ne sont references par aucun build ni aucune CI. Le seul risque est de laisser croire qu'un banc de charge existe alors qu'on vient de le retirer."
+   },
+   {
+    "id": "F39-007",
+    "sev": "S2",
+    "titre": "Sept des huit rubriques du résumé d'observabilité renvoient zéro en avalant l'exception : « rien à signaler » et « je n'ai pas pu regarder » y ont la même apparence",
+    "preuve": "backend/app/Http/Controllers/Api/ObservabilityController.php — six blocs `catch (\\Throwable $e)` rendent une valeur neutre sans journaliser : :70-72 (`return ['ingested_today' => 0, 'ingested_7d' => 0, 'last_ingested_at' => null]`), :101-103 (`['pending' => 0, 'gave_up' => 0]`), :122-126 (`$used = 0; $limit = 11500; $pending = 0;`), :158-160 (`$count = 0`), :191-193 (`return 0`), :214-216 (`return []`). Le fichier n'importe PAS `Log` (les `use` s'arretent a :10 `Illuminate\\Support\\Facades\\DB`) : aucun de ces six avalements ne laisse de trace. Nuance de decompte : le rapport annonce « sept sur huit », le code en porte six explicites ; les deux rubriques sans filet sont `countWaterfallErrors24h` (:136) et `countArchiveReasons` (:170), que le rapport comptait « implicitement ». La substance — « rien a signaler » et « je n'ai pas pu regarder » indiscernables — est entiere. Aucune garde ne cite F39-007.",
+    "piste": "Dans chaque catch : `Log::warning('observability.<rubrique> indisponible', ['exception' => $e->getMessage()])`, puis rendre la rubrique sous la forme `['status' => 'indisponible', ...valeurs neutres]` et faire afficher au tableau de bord un etat « non mesure » distinct de zero. Envelopper au passage `countWaterfallErrors24h` et `countArchiveReasons`, qui aujourd'hui remontent l'exception en 500.",
+    "risque": "Ajouter un `Log::warning` dans chaque catch est sans risque. En revanche ajouter un marqueur d'etat (`degraded: true`) au JSON change le contrat de l'endpoint consomme par le tableau de bord frontend : verifier le typage cote React avant."
+   }
+  ]
+ },
+ {
+  "lot": 17,
+  "nb": 5,
+  "fiches": [
+   {
+    "id": "A09-003",
+    "sev": "S2",
+    "titre": "L'inventaire de l'étape 1a déclare absentes des activités et des motifs qui existent en base depuis le même jour",
+    "preuve": "Le document n'a pas ete corrige : _REPORTS/2026-08-19_INVENTAIRE-ETAPE-1A.md:38 « **Activités (§2.3)** — les cinq activités d'AXION IA | ❌ aucune table, aucune colonne, aucune constante » et :39 « **Motifs d'échange (§2.3)** — les 11 motifs non commerciaux | ❌ idem ». Or les deux existent : backend/database/migrations/2026_08_19_000002_crm_activites_et_motifs.php:61 `CREATE TABLE IF NOT EXISTS crm_activites (...)` et :75 `CREATE TABLE IF NOT EXISTS crm_motifs (...)`, avec semis fait PAR LA MIGRATION (en-tete :41-45) ; et la constante existe aussi : backend/app/Crm/ActivitesEtMotifs.php:42 `final class ActivitesEtMotifs`, :56 `public const ACTIVITES`, :99 `public const MOTIFS`, :164 `public const ESPACES`. Meme jour : `git log` donne 504737f, 2026-08-19, « feat(etape1a-p2): les cinq activités et les onze motifs d'échange (§2.3) » pour la migration, et a832d88, 2026-08-19, pour le dernier commit touchant l'inventaire. Aucun addendum correctif dans le document (161 lignes, aucune occurrence de `crm_activites`/`crm_motifs`).",
+    "piste": "Remplacer les deux lignes 38-39 par l'etat mesure (tables `crm_activites` / `crm_motifs`, constantes `App\\Crm\\ActivitesEtMotifs`, migration 2026_08_19_000002) et dater la correction, ou porter un addendum en fin de document plutot que reecrire l'inventaire d'origine.",
+    "risque": "Aucun : correction documentaire pure, aucun code ni aucune base touches."
+   },
+   {
+    "id": "D27-001",
+    "sev": "S2",
+    "titre": "Trois composants du design system ne sont employés nulle part, et Stat a été recopié à la main dans les deux écrans qui en avaient besoin",
+    "preuve": "PARTIELLEMENT fermé : `ErrorBoundary` est désormais monté (`src/app/AppRoot.tsx:51`), ce tiers-là est clos. Les deux autres tiennent : `src/components/ui/Stat.tsx` est exporté (`src/components/ui/index.ts:35`) mais grep `import .*Stat` sur tout `src` → ZÉRO importateur ; et `src/features/coverage/CoveragePage.tsx:380` redéfinit localement `function Stat({ label, value })` — une copie à la main, employée l. 332-333. `CardFooter` est défini `src/components/ui/Card.tsx:50` et grep `CardFooter` sur tout `src` ne retourne que cette définition, aucun appelant. NUANCE : une seule copie de `Stat` trouvée, pas deux.",
+    "piste": "Dans `CoveragePage.tsx`, supprimer la fonction locale l. 380-387 et importer `Stat` depuis `@/components/ui` ; décider ensuite pour `CardFooter` — soit l'employer dans les cartes à actions, soit le retirer de `Card.tsx` et de l'index plutôt que le laisser en promesse morte.",
+    "risque": "La copie locale de `CoveragePage` n'a pas les classes `dark:` de `Stat.tsx` : la remplacer change l'apparence de l'écran en mode sombre — c'est une amélioration, mais c'est un changement visible."
+   },
+   {
+    "id": "D28-007",
+    "sev": "S2",
+    "titre": "Quinze emplacements de champ sans libellé associé, sur dix écrans — dont SearchInput, composant du système employé par huit écrans, qui n'expose aucun moyen d'en poser un",
+    "preuve": "frontend/src/components/ui/Toolbar.tsx:13-37, SearchInput : ses propriétés sont exactement `{ value, onChange, placeholder = 'Rechercher…', className }` (:14-23) et son `<input>` (:29-34) ne porte ni `id`, ni `aria-label`, ni `aria-labelledby`, et aucun `<label>` ne l'accompagne — seul un `placeholder` tient lieu de nom, ce qui disparaît à la saisie et n'est pas un libellé. Le composant n'expose AUCUN moyen d'en poser un : aucune propriété ne permettrait à un appelant de corriger cela sans modifier Toolbar.tsx. Et il est employé par huit écrans, exactement comme l'annonce le constat : CompaniesListPage.tsx, ContactsListPage.tsx, CandidatesPage.tsx, ContactsHubPage.tsx, JournalistsListPage.tsx, MediaListPage.tsx, AuditLogsPage.tsx, ScraperRunsPage.tsx (8 occurrences de `<SearchInput`). Par ailleurs 18 balises `<input` du dépôt ne portent sur leur ligne ni aria-label ni id.",
+    "piste": "Ajouter à SearchInput une propriété `label: string` (obligatoire, pour que l'oubli devienne impossible) rendue soit en `<label class=\"sr-only\" htmlFor={id}>`, soit en `aria-label`, avec un `id` engendré par useId() ; puis renseigner les huit appelants avec ce qu'ils cherchent réellement (« Rechercher une entreprise », « Rechercher un journal d'audit »…). Traiter ensuite les autres champs sans libellé un écran à la fois.",
+    "risque": "Quasi nul si le libellé est visuellement masqué (classe sr-only) ou passé en aria-label : aucun changement d'apparence, aucun changement de comportement."
+   },
+   {
+    "id": "H46-008",
+    "sev": "S2",
+    "titre": "Les écrans RGPD, Utilisateurs, Réglages et Société reçoivent des réponses d'API entièrement non typées — 5 no-unsafe-return gelés dans les suppressions ESLint",
+    "preuve": "frontend/eslint-suppressions.json gele exactement CINQ `@typescript-eslint/no-unsafe-return`, et ce sont les quatre ecrans nommes par le constat : src/features/rgpd/RgpdRequestsPage.tsx (2), src/features/users/UsersPage.tsx (1), src/features/settings/SettingsPage.tsx (1), src/features/companies/CompanyDetailPage.tsx (1). La cause est lisible : RgpdRequestsPage.tsx:81-82 `mutationFn: async () => (await api.post('/rgpd/requests', {...})).data` — `api.post` sans parametre generique, donc `.data` vaut `any` ; idem UsersPage.tsx:70-71. Nuance a porter au registre : les requetes de LECTURE sont typees (RgpdRequestsPage.tsx:77 `api.get<{ data: RgpdRequest[] }>`, UsersPage.tsx:66) — « entierement non typees » est trop fort, ce sont les MUTATIONS qui le sont.",
+    "piste": "Poser le generique sur les cinq appels `api.post`/`api.put` concernes (`api.post<{ data: RgpdRequest }>(...)`) et supprimer les cinq entrees de frontend/eslint-suppressions.json dans le meme commit ; `pnpm lint` est bloquante en CI (ci.yml), donc la garde est deja branchee.",
+    "risque": "Aucun risque d'execution : ajouter le generique et retirer la suppression ne change aucun comportement au runtime. Le seul risque est de decouvrir que la forme reelle de la reponse ne correspond pas au type qu'on declare — auquel cas c'est un defaut de plus, pas une regression."
+   },
+   {
+    "id": "A06-011",
+    "sev": "S3",
+    "titre": "Trois numérotations de fragilités coexistent, et la collision CDC ↔ plan n'est pas monotone",
+    "preuve": "Les trois numerotations coexistent toujours, et aucune table de correspondance n'a ete ajoutee. (1) CDC C:/Users/willi/Downloads/axion-ia-crm-cahier-des-charges-fonctionnel-v2.md §A.1 (l. 40-58, fichier date du 18/08, inchange) : 15 fragilites numerotees 1-15, la n°5 = « Dette de dependances : 20 mises a jour automatiques », la n°6 = « Performance jamais mesuree au volume ». (2) C:/Users/willi/Documents/Projets/Axion-IA/_PLANS/2026-08-18_PREALABLES-AVANT-CHANTIER-CRM-CIBLE.md:83-115 : 19 fragilites F1-F19, F5 = « Perf jamais mesuree au volume », F13 = « 20 PR Dependabot ouvertes ». La collision est donc bien NON MONOTONE : CDC n°5 -> F13 tandis que CDC n°6 -> F5. (3) Le meme plan §3 (l. 117-142) tire une TROISIEME numerotation, ordinale et non monotone elle aussi : 1, 2, 3, 4, « 3 bis », « 3 ter », 5, 6... 14. Les messages de commit du CRM suivent ce dernier plus l'etiquette F : `da97826 chore(etape0-l3bis): ranger la barre laterale ... (F17)`, `3feb733 chore(etape0-l7): retirer les stubs 501 ... (F7)`. Le seul texte de reconciliation present est plan:80, qui explique l'ecart d'origine (« le point drapeaux figes au build ... est retire ») sans donner la table. Aucune garde ne cite A06-011.",
+    "piste": "Ajouter au §A.1 du CDC une colonne « ref. plan » portant le F correspondant pour chacune des 15 lignes (la correspondance est deja construite au §1 ter de agent-06_etape-0.md), et y verser F18 (mailer) et F19 (MailWizz) qui n'ont aujourd'hui aucune exigence de sortie opposable cote CDC.",
+    "risque": "Nul (documents seuls). Seul piege : le CDC vit hors depot (C:/Users/willi/Downloads), donc la correction n'est ni versionnee ni protegee d'un ecrasement par une v2.8 telechargee ensuite."
+   }
+  ]
+ },
+ {
+  "lot": 18,
+  "nb": 4,
+  "fiches": [
+   {
+    "id": "E31-003",
+    "sev": "S1",
+    "titre": "L'opposition au vivier n'est pas transmise au CRM quand le flux candidats est fermé, et cet échec ne laisse aucune trace",
+    "preuve": "⚠️ Ce constat ne vit PAS dans le worktree qui m'a ete indique (crmpro-wt-a35-auth n'a aucun repertoire src/server) : il vit dans le depot du site, C:/Users/willi/Documents/Projets/Axion-IA/axionia. Chaine verifiee de bout en bout. src/server/vivier/opposition.ts:66-71 : `await syncVivierOppositionToCrm({...})` — la valeur de retour n'est ni lue ni testee, et la fonction rend `{ ok: true, alreadyOpposed: false, ... }` ligne 74 quoi qu'il arrive. src/server/crm-sync/index.ts:176-183 : `syncVivierOppositionToCrm` force le quatrieme argument `\"vivier\"`, donc l'univers est TOUJOURS vivier pour une opposition. src/server/crm-sync/enqueue.ts:81 : `if (universe === \"vivier\" && !isCrmSyncCandidatesEnabled()) return null;` — retour sec, AUCUN `console.warn`, aucune ligne d'outbox, aucun compteur ; a comparer aux deux seuls autres chemins d'echec du fichier, qui eux journalisent (:101 « mise en file best-effort echouee », :108 « ecriture outbox echouee (evenement perdu) »). src/server/crm-sync/config.ts:27-29 : `isCrmSyncCandidatesEnabled()` exige `CRM_SYNC_CANDIDATES_ENABLED === \"true\"` EN PLUS du drapeau maitre, et le commentaire :21-25 dit que ce second verrou reste ferme tant que les textes de consentement v2 ne sont pas en production. Consequence : drapeau maitre ON + flux candidats OFF est un etat NOMINAL et durable dans lequel toute opposition au vivier est perdue en silence, la personne voyant une page de confirmation. Aucune garde : grep `E31-003` sans resultat dans src/, et aucun fichier de tests/ ne mentionne `vivier-opposition`, `VivierOpposition` ni `vivierOpposedAt`.",
+    "piste": "Dans enqueue.ts:81, sortir `event_type === \"opt_out\"` du second verrou : une opposition est un droit qui s'exerce, jamais une capture de lead, et le CRM ne peut pas la refuser pour absence de consentement v2. A defaut d'accord sur ce point, remplacer a minima le `return null` muet par un `console.error(\"[crm-sync] opposition vivier NON transmise (drapeau candidats OFF)\", { subject_ref, event_id })` et faire remonter le null jusqu'a `recordVivierOpposition`, qui doit alors consigner l'echec dans le registre de preuve plutot que de rendre `{ ok: true }`.",
+    "risque": "Faible sur le comportement (on n'ajoute qu'une trace et une exception au verrou), mais il touche le VERROU D'INERTIE du lot L2 : laisser passer les `opt_out` quand le flux candidats est OFF signifie que le CRM recevra des evenements vivier alors que la sequence de deploiement prevoyait qu'il n'en recoive aucun — a valider avec le contrat d'ingestion cote CRM avant de basculer."
+   },
+   {
+    "id": "D28-004",
+    "sev": "S2",
+    "titre": "Cinq emplacements imbriquent un <button> dans le <button> de DropdownMenu : le déclencheur perd son nom accessible et axe relève nested-interactive",
+    "preuve": "`frontend/src/components/ui/DropdownMenu.tsx:47-55` enveloppe son `trigger` dans son PROPRE `<button type=\"button\" aria-haspopup=\"menu\">`. Cinq appelants y passent un élément qui est lui-même un `<button>` : `features/audiences/AudiencesListPage.tsx:202` (`<button type=\"button\" aria-label=\"Actions\">`), `features/campaigns/CampaignsListPage.tsx:271` (idem), `features/companies/CompanyDetailPage.tsx:153`, `features/companies/components/CompanyRow.tsx:121` et `features/scraping/ScraperRunsPage.tsx:674` (les trois via `IconButton`, qui rend bien un `<button>` — `components/ui/IconButton.tsx:24`). Les deux seuls appelants sains passent un `<span>` : `components/layout/UserMenu.tsx:81` et `components/layout/WorkspaceSelector.tsx:62` — la forme du correctif existe donc déjà dans le dépôt.",
+    "piste": "Deux voies : soit remplacer les cinq déclencheurs par des `<span>` sur le modèle de `UserMenu.tsx:81` en remontant le nom accessible ; soit — plus propre — faire que `DropdownMenu` CLONE son `trigger` (`cloneElement` avec `onClick`, `aria-haspopup`, `aria-expanded`) au lieu de l'envelopper, ce qui ferme les cinq sites d'un seul geste.",
+    "risque": "Passer les déclencheurs en `<span>` leur retire la focalisation clavier native : il faut que l'`aria-label` migre sur le `<button>` de `DropdownMenu` (aujourd'hui il n'en porte aucun), sinon on remplace un `nested-interactive` par un bouton sans nom accessible."
+   },
+   {
+    "id": "G42-005",
+    "sev": "S2",
+    "titre": "Le découpage manuel déclaré dans vite.config.ts ne fait pas ce qu'il annonce : le chunk react sort vide",
+    "preuve": "frontend/vite.config.ts:100-101 declare toujours `manualChunks: { react: ['react', 'react-dom'], ... }`, et le morceau produit `frontend/dist/assets/react-l0sNRNKZ.js` fait 44 octets : son contenu integral est la seule ligne `//# sourceMappingURL=react-l0sNRNKZ.js.map`. Le morceau annonce sort donc vide, exactement comme le dit le constat ; react et react-dom restent dans `index-Bi4ad1jA.js` (1 046 694 o).",
+    "piste": "Remplacer la forme objet par une fonction `manualChunks(id)` qui teste `id.includes('node_modules/react-dom')` / `node_modules/react/`, ou retirer purement l'entree `react` et documenter que le decoupage manuel ne la tient pas — le constat est type `doc`, dire la verite coute moins cher que de la forcer.",
+    "risque": "Repartir react/react-dom dans un vrai morceau change l'ordre de chargement des modules ; sur React 19 un decoupage mal pose peut dupliquer le runtime et casser les hooks a l'execution — a verifier sur le build, pas seulement sur la config."
+   },
+   {
+    "id": "H47-005",
+    "sev": "S2",
+    "titre": "Le paquet workers/ — 32 des 57 alertes, dont 2 critiques — n'est déployé par aucun fichier compose hors tests, mais son image est construite à chaque déploiement de préproduction",
+    "preuve": "L'asymetrie est intacte. Cote deploiement : .github/workflows/deploy-staging.yml:74 `- { image: worker, dockerfile: Dockerfile.worker, target: prod }` dans la matrice `build-and-push`, qui pousse `ghcr.io/…/worker:staging` et `:${{ github.sha }}` a chaque deploiement de preproduction (:89-93). Cote execution : recherche de `worker`/`Dockerfile.worker` sur docker-compose.yml, .prod.yml, .staging.yml, .local.yml, .test.yml → la SEULE occurrence est un commentaire, docker-compose.yml:308-313 : « Workers Playwright … RETIRES le 2026-08-14 … Le CODE est conserve (workers/) ». Aucun service `worker` n'est declare nulle part.",
+    "piste": "Retirer `{ image: worker, … }` de la matrice de deploy-staging.yml et le dire en commentaire au meme endroit que docker-compose.yml:308-313, de sorte que la reactivation remette les deux ensemble ; ou, si l'on veut garder la construction, la sortir du chemin de deploiement vers un job dedie non bloquant.",
+    "risque": "Retirer la ligne de la matrice ne casse aucun deploiement (rien ne tire cette image). Le seul effet de bord serait de rendre impossible une reactivation rapide des workers — que le commentaire de docker-compose.yml:313 envisage explicitement (« Reactivation = redeclarer les services ici »)."
+   }
+  ]
+ },
+ {
+  "lot": 19,
+  "nb": 4,
+  "fiches": [
+   {
+    "id": "E33-002",
+    "sev": "S1",
+    "titre": "Le chatbot exige un consentement RGPD explicite et ne le transmet pas au CRM",
+    "preuve": "C:/Users/willi/Documents/Projets/Axion-IA/axionia/src/server/chatbot/tools/capturer-lead.ts:51 — `consentement_rgpd: z.literal(true)` : le tool REFUSE la capture sans consentement explicite. capturer-lead.ts:131 — le consentement est bien persiste cote site : `details: { besoin: ..., canal: \"chatbot\", consentementRgpd: true }`. Mais capturer-lead.ts:156-164, l'appel `syncFormSubmissionToCrm({ tx, subjectRef, formType, sourceSlug, person, ...company, payload })` ne passe AUCUNE cle `consent` — alors que src/server/crm-sync/index.ts:84 declare `consent?: ConsentInput | null` et index.ts:211 `...(input.consent ? { consent: consentSection(input.consent) } : {})`. Contre-exemple lu dans le meme depot : src/features/unified-contact/actions.ts:265-269 passe bien `consent: { version, at, textRef }`, et actions.ts:281-289 appelle en plus `recordConsentEvent()` — deux gestes que le chemin chatbot ne fait ni l'un ni l'autre (grep `recordConsentEvent` sur capturer-lead.ts : zero occurrence). Aucune garde ne nomme E33-002.",
+    "piste": "Dans capturer-lead.ts:156, ajouter `consent: { version: CONSENT_VERSION, at: <horodatage de la capture>, textRef: \"chatbot\" }` en reprenant exactement la forme de unified-contact/actions.ts:265-269, et poser en parallele le `recordConsentEvent({ ..., formRef: CONSENT_FORM_REFS.<chatbot>, action: \"optin\" })` que ce chemin n'appelle pas — le registre indexe par personne est ce qui permet de repondre « prouvez le consentement ».",
+    "risque": "Faible : ajouter une section `consent` a un evenement sortant est additif et le CRM accepte deja `consent` (types.ts:97-103). Le seul point d'attention est qu'il faut une `version` et un `text_ref` REELS — inventer une version de texte de consentement qui n'existe pas cote site produirait une preuve fausse, pire que l'absence."
+   },
+   {
+    "id": "E31-005",
+    "sev": "S2",
+    "titre": "La réconciliation ignore la 6ᵉ famille source : les demandes podcast ne sont jamais comparées",
+    "preuve": "Lu dans `Axion-IA/axionia` (le CRM ne contient pas `src/server/crm-sync/`). `src/server/crm-sync/reconcile.ts:72-73` : `export type CrmSyncFamily = \"submission\" | \"job_application\" | \"calendly_event\" | \"newsletter_subscriber\" | \"customer_review\";` — cinq valeurs, et le commentaire qui la précède (l. 63-70) parle explicitement des « cinq familles de capture ». `FAMILY_LABELS` (l. 104-110) en énumère les mêmes cinq, et `collectReconciliation` (l. 118-275) ne pousse que ces cinq comparaisons. Or `src/features/podcast-request/actions.ts:110-117` émet bel et bien vers l'outbox avec `subjectRef: \\`site:podcast_request:${created.id}\\`` — un préfixe qu'aucune famille ne reconstruit (`compareFamily` fabrique ses références l. 293 : `\\`site:${input.family}:${s.id}\\``). Grep « podcast » sur tout `src/server/crm-sync/` : seulement des mentions du TYPE de formulaire (`index.ts:91`, `types.ts:37,59`), jamais une famille de réconciliation. Aucune garde ne cite E31-005.",
+    "piste": "Ajouter `\"podcast_request\"` à `CrmSyncFamily` (l. 72-73), son libellé dans `FAMILY_LABELS`, et un sixième `compareFamily({ family: \"podcast_request\", universe: \"business\", loadIds: … })` sur le modèle des trois familles ajoutées le 2026-08-18 (l. 226-265) ; mettre à jour au passage le commentaire « cinq familles » l. 63-70, qui deviendrait faux.",
+    "risque": "Ajouter la 6ᵉ famille va faire APPARAÎTRE des manquants jusque-là invisibles : le premier passage après correctif peut déclencher une alerte massive et être pris pour une régression. Vérifier au préalable que le modèle Prisma des demandes podcast porte bien une colonne d'horodatage exploitable pour la fenêtre."
+   },
+   {
+    "id": "G42-011",
+    "sev": "S2",
+    "titre": "FranceCoverageMap : 32 journalisations en production, un rendu React par mouvement de souris, et jusqu'à 500 balayages de source qui ne colorent rien",
+    "preuve": "Les trois volets tiennent toujours dans frontend/src/features/coverage/FranceCoverageMap.tsx. (1) Journalisation en production : ligne 40 `const LOG = (...args: unknown[]) => console.log('[FranceMap]', ...args);` — aucune garde `import.meta.env.DEV` — et 26 appels `LOG(` dans le fichier. (2) Un rendu React par mouvement de souris : lignes 254-273, `map.on('mousemove', 'dept-fill', (e) => { ... setHover({ code, name, total, x: e.point.x, y: e.point.y }); })` — `setHover` est appele a CHAQUE evenement, pas seulement au changement de departement (le garde `f.id !== hoveredId` ne protege que le `setFeatureState`, pas le `setState`). (3) Balayages de source steriles : lignes 298-309, `for (const cell of cells) { map.querySourceFeatures('departements', { filter: ... }).forEach(...) }` — un balayage complet de la source par cellule, et `querySourceFeatures` ne rend que les entites du viewport courant, donc les cellules hors ecran ne colorent rien. Seul le `fetch` de diagnostic a ete retire (commentaire lignes 165-179, correctif G42-003).",
+    "piste": "Trois gestes independants : (a) `const LOG = import.meta.env.DEV ? (...a) => console.log('[FranceMap]', ...a) : () => {}` ; (b) dans le mousemove, ne rappeler `setHover` que si `f.id !== hoveredId` ou si le deplacement depasse quelques pixels ; (c) remplacer la boucle par un `Map<code, total>` et une seule passe sur `querySourceFeatures('departements')` (ou mieux, un `promoteId: 'code'` sur la source pour adresser directement l'entite).",
+    "risque": "Le passage de `console.log` derriere `import.meta.env.DEV` prive le diagnostic terrain de la carte ; et remplacer la boucle par une seule passe `setFeatureState` indexee change le moment ou les couleurs apparaissent (au `sourcedata`, pas au rendu) — a verifier sur coverage.spec.ts, qui est justement une des 3 suites e2e non jouees."
+   },
+   {
+    "id": "P5-35-010",
+    "sev": "S2",
+    "titre": "Le durcissement de HIBP fait dépendre le seul chemin de changement de mot de passe d'un service externe",
+    "preuve": "Le fail-closed sans porte de sortie est intact. backend/app/Rules/NotPwnedPassword.php:40-48 : `$count = $this->checker->getBreachCount($value); if ($count === null) { $fail('La verification des mots de passe compromis est momentanement indisponible. Par precaution, le mot de passe n\\'a pas ete change …'); return; }`. Aucun drapeau d'echappement : recherche de `HIBP_FAIL_MODE|fail_mode` sur backend/ → zero occurrence. Et la regle n'est branchee qu'a UN endroit, qui est aussi le seul point de choix d'un mot de passe : `NotPwnedPassword` n'apparait dans backend/app et backend/routes que via backend/app/Http/Controllers/Api/Auth/PasswordResetController.php:7 et :92 (`'password' => ['required','string','confirmed', Password::min(12), new NotPwnedPassword]`). Les delais restent courts : backend/app/Services/Auth/HibpChecker.php:44-45 `'timeout' => 5, 'connect_timeout' => 3`.",
+    "piste": "Ajouter `HIBP_FAIL_MODE=closed|open-audited` (defaut `closed`) lu par `config/`, et en mode `open-audited` accepter le mot de passe EN ECRIVANT une ligne au journal d'audit ; ou n'appliquer le fail-closed qu'apres N echecs consecutifs, le cache 24 h de HibpChecker couvrant deja les coupures breves. Et corriger le statut de F35-004, dont la moitie (b) — brancher la regle sur tous les points d'entree d'un mot de passe — n'est pas faite.",
+    "risque": "Toute porte de sortie REOUVRE, par construction, le defaut F35-004 qu'on vient de fermer : mal cadree (drapeau oublie a `open`, absence de trace d'audit), elle ramene le fail-open silencieux. Le mode degrade doit donc etre explicite, journalise, et jamais le defaut."
+   }
+  ]
+ }
+]

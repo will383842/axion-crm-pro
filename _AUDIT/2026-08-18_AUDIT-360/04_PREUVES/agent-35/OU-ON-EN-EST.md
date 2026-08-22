@@ -44,36 +44,25 @@ Chaque garde a été **vue rouge avant d'être verte**, par une mutation réelle
 
 ## 2. Ce qui ATTEND WILL
 
-### a. Telegram — deux valeurs à fournir (ne les envoyer dans aucun message)
+### Tranche le 2026-08-22
 
-1. **@BotFather** → `/newbot` → jeton `123456789:AAF…`
-2. Créer un canal, y ajouter le bot comme **admin**, y écrire un message, puis
-   `https://api.telegram.org/bot<TOKEN>/getUpdates` → `chat.id` en `-100…`
-3. Sur le serveur :
-   ```
-   ssh root@46.62.248.239 "cd /opt/axion-crm-pro && cp .env .env.avant-telegram && sed -i '/^TELEGRAM_/d' .env && printf 'TELEGRAM_BOT_TOKEN=…\nTELEGRAM_CHAT_ID=…\n' >> .env && grep -c '^TELEGRAM_' .env"
-   ```
-   → doit afficher **2**, puis **recréer** les conteneurs (un `restart` ne relit
-   pas `env_file` — constat `A07-003`).
-4. Les **mêmes valeurs** en secrets de dépôt GitHub (*Settings → Secrets and
-   variables → Actions*), pour l'alerte de déploiement.
+| question | decision |
+|---|---|
+| le scraping doit-il etre vivant ? | **REPORTE** — « ne fait rien pour le moment, on verra une prochaine fois ». Aucun geste de ma part. |
+| ou part l'alerte d'un deploiement rouge ? | **TELEGRAM**, et c'est FAIT — voir ci-dessous. |
+| `C19-010` / fiches sans denomination | **sans objet** : 0 fiche en production. Guetteur pose a 06h20. |
+| `G41-002` recherche multi-champs | toujours ouvert — corriger changerait ce que la recherche trouve. |
 
-### b. Fusionner #193 quand la CI est verte
+### Ce qui reste a decider
 
-```
-cd C:/Users/willi/Documents/Projets/crmpro-wt-a35-auth && gh pr merge 193 --merge
-```
+Le document **`ARBITRAGES.md`** liste les 116 constats dont le correctif ne
+m'appartient pas, groupes par nature de decision :
 
-### c. Quatre arbitrages qui n'appartiennent qu'à lui
-
-| # | question | ce que la mesure dit |
-|---|---|---|
-| 1 | **le scraping doit-il être vivant en production ?** | les 4,29 M d'entreprises viennent de l'**import INSEE**, pas du scraping. Les trois scrapers Node (`pages-jaunes`, `website`, `google-search`) ont **0 run depuis toujours**. Rien n'est cassé : c'est un allumage, pas une réparation. Et `TwoCaptchaSolver::solve()` **lève une exception** — il n'est pas écrit. |
-| 2 | où doit partir l'alerte d'un déploiement rouge ? | **tranché : Telegram.** En cours d'implémentation. |
-| 3 | ~~`C19-010` / fiches sans dénomination~~ | **CLOS SANS TRAVAIL DE DONNÉES : 0 fiche concernée** en production (compté le 21/08). Un guetteur `crm:sonde-non-diffusibles` est posé à 06:20 : il criera si la condition réapparaît, ce qui signifierait que l'ENTRÉE s'est rouverte. |
-| 4 | `G41-002` — recherche multi-champs | corriger changerait ce que la recherche trouve (157 ms → 2 ms). Décision produit. |
-
----
+| famille | nombre |
+|---|---:|
+| touchent la **production** | 89 |
+| changent une **semantique** | 18 |
+| **juridiques** | 9 |
 
 ## 3. Ce qui est EN VOL au moment de l'écriture
 

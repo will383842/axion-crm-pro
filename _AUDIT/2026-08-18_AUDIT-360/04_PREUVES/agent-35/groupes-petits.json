@@ -1,0 +1,645 @@
+[
+ {
+  "constats": [
+   "A-005",
+   "A09-004",
+   "B12-017",
+   "D22-005",
+   "D22-007",
+   "D23-006",
+   "D23-010",
+   "D23-011",
+   "D26-005",
+   "D26-008",
+   "D26-009",
+   "D26-010",
+   "D26-012",
+   "D28-005",
+   "D28-012",
+   "D28-013",
+   "D28-014",
+   "D28-016",
+   "D29-003",
+   "D30-001",
+   "D30-005",
+   "D30-008",
+   "E32-010",
+   "G41-012",
+   "G42-009",
+   "P5-35-008"
+  ],
+  "fichiers": [
+   "backend/app/Http/Controllers/Api/Phase2/CampaignsController.php",
+   "backend/app/Http/Controllers/Api/SavedViewsController.php",
+   "backend/bootstrap/app.php",
+   "backend/config/crm.php",
+   "backend/routes/api.php",
+   "backend/tests/Feature/PasDeStub501SousCrmEtAnalyticsTest.php",
+   "frontend/package.json",
+   "frontend/src/app/AppRoot.ts",
+   "frontend/src/app/RootLayout.ts",
+   "frontend/src/app/RouteErrorBoundary.ts",
+   "frontend/src/app/routeTree.ts",
+   "frontend/src/components/OnboardingTour.ts",
+   "frontend/src/components/layout/AutoBreadcrumbs.ts",
+   "frontend/src/components/layout/Sidebar.ts",
+   "frontend/src/components/ui/Modal.ts",
+   "frontend/src/components/ui/PageHeader.ts",
+   "frontend/src/components/ui/Skeleton.ts",
+   "frontend/src/components/ui/Spinner.ts",
+   "frontend/src/components/ui/StatusPill.ts",
+   "frontend/src/features/audiences/AudienceBuilderPage.ts",
+   "frontend/src/features/auth/TwoFactorPage.ts",
+   "frontend/src/features/campaigns/CampaignDetailPage.ts",
+   "frontend/src/features/campaigns/CampaignWizardPage.ts",
+   "frontend/src/features/campaigns/CampaignsListPage.ts",
+   "frontend/src/features/misc/NotFoundPage.ts",
+   "frontend/src/features/scraping/ScraperRunsPage.ts",
+   "frontend/src/locales/fr.json",
+   "frontend/src/main.ts",
+   "frontend/tests/components/ErrorBoundary.montage.test.ts",
+   "frontend/tests/e2e/dark-contraste.spec.ts",
+   "frontend/tests/e2e/navigation.spec.ts"
+  ]
+ },
+ {
+  "constats": [
+   "A06-005",
+   "A09-006",
+   "F38-008",
+   "H45-005",
+   "H46-006",
+   "H46-007"
+  ],
+  "fichiers": [
+   ".github/workflows/ci.yml",
+   ".github/workflows/diag-website-status.yml",
+   "backend/tests/Feature/Database/ReconstructionAtteignableTest.php",
+   "backend/tests/Feature/Database/ReconstructionBaseTest.php",
+   "backend/tests/Pest.php",
+   "frontend/vitest.config.ts"
+  ]
+ },
+ {
+  "constats": [
+   "A-003 / A09-005",
+   "C19-012",
+   "F37-005",
+   "F39-009",
+   "H44-009"
+  ],
+  "fichiers": [
+   ".github/workflows/deploy-direct-ssh.yml",
+   ".github/workflows/surveillance-sauvegarde.yml",
+   "backend/app/Providers/MockServicesProvider.php",
+   "backend/app/Services/Captcha/TwoCaptchaSolver.php",
+   "backend/config/cors.php",
+   "backend/database/perf/mesure_reference.sh",
+   "backend/tests/Feature/Infra/RunbookRestaurationDrTest.php",
+   "infra/docker/entrypoint-prod.sh",
+   "infra/runbooks/04-restore-dr.md",
+   "infra/scripts/backup-postgres.sh",
+   "infra/scripts/configure-prod-env.sh",
+   "infra/scripts/dr-drill.sh",
+   "infra/scripts/setup-backup.sh",
+   "infra/scripts/setup-hetzner-cpx22.sh",
+   "infra/scripts/verifier-sauvegarde.sh"
+  ]
+ },
+ {
+  "constats": [
+   "F38-006",
+   "F38-014",
+   "H44-008"
+  ],
+  "fichiers": [
+   ".github/workflows/a11y.yml",
+   "frontend/pnpm-lock.yaml"
+  ]
+ },
+ {
+  "constats": [
+   "B14-008",
+   "I49-002",
+   "I49-009"
+  ],
+  "fichiers": [
+   "backend/app/Console/Commands/CrmFlushOutbound.php",
+   "backend/app/Crm/Ingest/SiteSyncEvent.php"
+  ]
+ },
+ {
+  "constats": [
+   "B14-001 / I49-001",
+   "B14-012",
+   "B14-014"
+  ],
+  "fichiers": [
+   "backend/app/Crm/Outbound/ConsentOutboundRecorder.php",
+   "backend/database/migrations/2026_08_14_000007_crm_outbound_events.php",
+   "frontend/src/features/rgpd/RgpdRequestsPage.ts"
+  ]
+ },
+ {
+  "constats": [
+   "F38-013",
+   "H47-003",
+   "H47-004"
+  ],
+  "fichiers": [
+   ".github/audit-node-cliquet.json",
+   ".github/dependabot.yml",
+   ".github/workflows/security.yml"
+  ]
+ },
+ {
+  "constats": [
+   "A09-012",
+   "B17-007",
+   "B17-011"
+  ],
+  "fichiers": [
+   "backend/app/Console/Commands/RescrapeArchivesCommand.php",
+   "backend/app/Console/Commands/RetryGooglePlacesCommand.php",
+   "backend/app/Jobs/MonitorCampaignProgressJob.php",
+   "backend/routes/console.php"
+  ]
+ },
+ {
+  "constats": [
+   "C18-002",
+   "G43-004"
+  ],
+  "fichiers": [
+   "backend/app/Crm/Scraping/ScrapeIngestOutcome.php",
+   "backend/app/Crm/Scraping/ScrapedRecordIngestService.php",
+   "backend/app/Http/Controllers/Api/CompanyTagsBulkController.php",
+   "backend/app/Services/Tags/AutoTaggerService.php",
+   "backend/database/migrations/2026_05_18_000007_extend_tags_system.php",
+   "backend/tests/Feature/ActionsDeMasseTagsTest.php"
+  ]
+ },
+ {
+  "constats": [
+   "D29-008",
+   "D29-010"
+  ],
+  "fichiers": [
+   "backend/app/Http/Controllers/Api/Crm/PersonTimelineController.php",
+   "backend/config/database.php",
+   "backend/database/migrations/2026_08_14_000004_crm_socle_tags_optout_timeline.php"
+  ]
+ },
+ {
+  "constats": [
+   "A09-013",
+   "C18-014"
+  ],
+  "fichiers": [
+   "backend/app/Support/WaterfallSentry.php",
+   "backend/composer.json",
+   "backend/config/sentry.php",
+   "infra/scripts/bootstrap-preprod.sh"
+  ]
+ },
+ {
+  "constats": [
+   "B15-011",
+   "B17-005"
+  ],
+  "fichiers": [
+   "backend/app/Console/Commands/AnonymizeOldIps.php",
+   "backend/app/Services/Auth/AuthService.php",
+   "backend/app/Services/Rgpd/GdprErasureService.php"
+  ]
+ },
+ {
+  "constats": [
+   "B15-012",
+   "I48-006"
+  ],
+  "fichiers": [
+   "backend/app/Http/Controllers/Api/NotificationsController.php",
+   "backend/app/Services/Rgpd/GdprPortabilityService.php"
+  ]
+ },
+ {
+  "constats": [
+   "H45-004",
+   "H46-010"
+  ],
+  "fichiers": [
+   "backend/tests/Feature/RlsTest.php",
+   "backend/tests/Unit/PhpstanBaselineNeGrossitPasTest.php",
+   "frontend/tests/couverture-e2e.test.ts"
+  ]
+ },
+ {
+  "constats": [
+   "H45-006",
+   "H46-003"
+  ],
+  "fichiers": [
+   "backend/app/Console/Commands/PentestSelfCheck.php",
+   "backend/app/Services/Http/SsrfGuard.php"
+  ]
+ },
+ {
+  "constats": [
+   "B16-013",
+   "B16-014"
+  ],
+  "fichiers": [
+   "backend/app/Services/Audit/AuditHashChain.php",
+   "backend/database/migrations/2026_08_16_000001_audit_logs_prev_hash_default.php",
+   "infra/runbooks/05-rotate-secrets.md"
+  ]
+ },
+ {
+  "constats": [
+   "B15-007"
+  ],
+  "fichiers": [
+   "backend/app/Console/Commands/RetentionPurge.php"
+  ]
+ },
+ {
+  "constats": [
+   "A09-003"
+  ],
+  "fichiers": [
+   "backend/app/Crm/ActivitesEtMotifs.php",
+   "backend/database/migrations/2026_08_19_000002_crm_activites_et_motifs.php"
+  ]
+ },
+ {
+  "constats": [
+   "E31-003"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "E33-002"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "D25-008"
+  ],
+  "fichiers": [
+   "frontend/src/features/dashboard/DashboardPage.ts"
+  ]
+ },
+ {
+  "constats": [
+   "D27-001"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "D28-004"
+  ],
+  "fichiers": [
+   "frontend/src/components/ui/DropdownMenu.ts"
+  ]
+ },
+ {
+  "constats": [
+   "E31-005"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "A06-009"
+  ],
+  "fichiers": [
+   "backend/app/Console/Commands/CoverageRefreshMatrix.php",
+   "backend/tests/Feature/EtancheiteParTableTest.php",
+   "backend/tests/Feature/NeDoitPasRegresserTest.php"
+  ]
+ },
+ {
+  "constats": [
+   "A07-009"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "A09-011"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "C19-011"
+  ],
+  "fichiers": [
+   "backend/app/Services/Proxies/IPRoyalProvider.php",
+   "backend/app/Services/Proxies/WebshareProvider.php"
+  ]
+ },
+ {
+  "constats": [
+   "D27-012"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "D28-015"
+  ],
+  "fichiers": [
+   "frontend/src/components/ui/DarkModeToggle.ts"
+  ]
+ },
+ {
+  "constats": [
+   "D29-005"
+  ],
+  "fichiers": [
+   "frontend/src/features/llm/LlmRouterPage.ts"
+  ]
+ },
+ {
+  "constats": [
+   "D25-011"
+  ],
+  "fichiers": [
+   "frontend/src/features/crm-console/types.ts"
+  ]
+ },
+ {
+  "constats": [
+   "D27-007"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "D28-007"
+  ],
+  "fichiers": [
+   "frontend/src/components/ui/Toolbar.ts"
+  ]
+ },
+ {
+  "constats": [
+   "G42-005"
+  ],
+  "fichiers": [
+   "frontend/vite.config.ts"
+  ]
+ },
+ {
+  "constats": [
+   "G42-011"
+  ],
+  "fichiers": [
+   "frontend/src/features/coverage/FranceCoverageMap.ts"
+  ]
+ },
+ {
+  "constats": [
+   "H45-003"
+  ],
+  "fichiers": [
+   "backend/tests/Unit/Rules/PasswordResetWithHibpTest.php"
+  ]
+ },
+ {
+  "constats": [
+   "E32-006"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "E33-004"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "G41-010"
+  ],
+  "fichiers": [
+   "backend/app/Models/Journalist.php",
+   "backend/database/migrations/2026_05_18_000001_apply_rls_dynamic.php"
+  ]
+ },
+ {
+  "constats": [
+   "G41-011"
+  ],
+  "fichiers": [
+   "backend/app/Http/Controllers/Api/TagsController.php",
+   "backend/database/migrations/2026_08_20_110000_index_par_etiquette_sur_company_tag.php",
+   "backend/tests/Feature/Infra/VolumeDeProductionHubConsoleTest.php"
+  ]
+ },
+ {
+  "constats": [
+   "B13-005"
+  ],
+  "fichiers": [
+   "backend/app/Crm/Ingest/SiteSyncIngestService.php"
+  ]
+ },
+ {
+  "constats": [
+   "C18-017"
+  ],
+  "fichiers": [
+   "workers/src/config/mocks.ts",
+   "workers/src/scrapers/_stub.ts",
+   "workers/src/scrapers/crunchbase.worker.ts"
+  ]
+ },
+ {
+  "constats": [
+   "D22-004"
+  ],
+  "fichiers": [
+   "frontend/src/features/crm-console/ConsoleGate.ts",
+   "frontend/src/features/crm-console/useConsoleFeatures.ts",
+   "frontend/tests/components/ConsoleGate.test.ts"
+  ]
+ },
+ {
+  "constats": [
+   "P5-35-012"
+  ],
+  "fichiers": [
+   "frontend/src/components/ui/QueryErrorState.ts",
+   "frontend/src/features/dashboard/components/ActivityFeed.ts",
+   "frontend/tests/screens/etats-erreur.test.ts"
+  ]
+ },
+ {
+  "constats": [
+   "E31-010"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "E33-007"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "E34-006"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "F39-010"
+  ],
+  "fichiers": [
+   "infra/scripts/restore-postgres.sh"
+  ]
+ },
+ {
+  "constats": [
+   "G43-007"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "H46-008"
+  ],
+  "fichiers": [
+   "frontend/eslint-suppressions.json"
+  ]
+ },
+ {
+  "constats": [
+   "H47-005"
+  ],
+  "fichiers": [
+   ".github/workflows/deploy-staging.yml"
+  ]
+ },
+ {
+  "constats": [
+   "P5-35-010"
+  ],
+  "fichiers": [
+   "backend/app/Http/Controllers/Api/Auth/PasswordResetController.php",
+   "backend/app/Rules/NotPwnedPassword.php",
+   "backend/app/Services/Auth/HibpChecker.php"
+  ]
+ },
+ {
+  "constats": [
+   "A05-007"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "E32-008"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "F40-012"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "H44-010"
+  ],
+  "fichiers": [
+   "workers/vitest.config.ts"
+  ]
+ },
+ {
+  "constats": [
+   "H46-012"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "A-013 / A06-001"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "A06-008"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "P5-35-005"
+  ],
+  "fichiers": [
+   "backend/tests/Feature/Infra/DiagnosticConnexionSansEcritureTest.php",
+   "backend/tests/Feature/Infra/ScriptMotDePasseVerdictsTest.php",
+   "infra/scripts/definir-mot-de-passe-crm.sh"
+  ]
+ },
+ {
+  "constats": [
+   "A06-013"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "A09-010"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "B13-008"
+  ],
+  "fichiers": [
+   "backend/app/Crm/Ingest/SiteSyncClassifier.php",
+   "backend/app/Crm/Taxonomy.php"
+  ]
+ },
+ {
+  "constats": [
+   "B15-009"
+  ],
+  "fichiers": [
+   "backend/app/Support/EligibiliteCampagne.php",
+   "backend/app/Support/ListeSuppression.php"
+  ]
+ },
+ {
+  "constats": [
+   "E32-001"
+  ],
+  "fichiers": []
+ },
+ {
+  "constats": [
+   "F39-007"
+  ],
+  "fichiers": [
+   "backend/app/Http/Controllers/Api/ObservabilityController.php"
+  ]
+ },
+ {
+  "constats": [
+   "A06-011"
+  ],
+  "fichiers": []
+ }
+]

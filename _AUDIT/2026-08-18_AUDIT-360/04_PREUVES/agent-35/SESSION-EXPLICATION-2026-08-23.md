@@ -458,3 +458,110 @@ d'état séparé, empêcherait qu'une coupure de tuyau laisse la machine dans un
 état que personne ne mesure. **C'est un correctif à écrire — il n'est pas
 écrit.** Je le consigne plutôt que de le taire, parce que la prochaine fusion
 rejouera exactement le même risque.
+
+---
+
+## 2.6 CHANTIER 1 — AVANCEMENT MESURÉ
+
+> Réécrit à chaque lot. Chaque ligne fermée l'a été **rouge puis vert**, avec
+> Pint appliqué et PHPStan niveau 8 sans erreur.
+
+### 🔴 D'ABORD, UNE CORRECTION DE MA PROPRE MESURE
+
+J'ai annoncé **20 routes**. C'est **19**, et le dossier avait raison.
+
+Mon `grep notImplemented(` comptait un appel cité **dans un commentaire** de
+`AiActRegisterController` — dont le `store()` est en réalité implémenté depuis
+la vague 2. C'est le **piège n° 9 du dossier**, mot pour mot : *« trois gardes
+lisaient leurs propres commentaires comme du code »*. Je viens de le repayer.
+
+Le recensement juste exclut les lignes de commentaire :
+
+```bash
+grep -rn "notImplemented(" backend/app/Http/Controllers/ \
+  | grep -v ApiController.php \
+  | grep -vE ":[0-9]+:\s*(\*|//|/\*)"
+```
+
+### État des 19
+
+| # | route | état |
+|---:|---|---|
+| 1 | `POST /notifications/{n}/read` | ✅ **fermée** |
+| 2 | `POST /notifications/read-all` | ✅ **fermée** |
+| 3 | `POST /saved-views` | ✅ **fermée** |
+| 4 | `GET /saved-views/{id}` | ✅ **fermée** |
+| 5 | `PUT /saved-views/{id}` | ✅ **fermée** |
+| 6 | `DELETE /saved-views/{id}` | ✅ **fermée** |
+| 7 | `PUT /workspace` | ✅ **fermée** |
+| 8 | `POST /users` | ✅ **fermée** |
+| 9 | `PUT /users/{user}` | ✅ **fermée** |
+| 10 | `DELETE /users/{user}` | ✅ **fermée** |
+| 11 | `PUT /llm/use-cases/{u}` | ⏳ |
+| 12 | `PUT /llm/use-cases/{u}/prompts/{v}` | ⏳ |
+| 13 | `PUT /proxy-providers/{p}` | ⏳ |
+| 14 | `POST /proxy-providers/{p}/test` | ⏳ |
+| 15 | `PUT /rotations/{rotation}` | ⏳ |
+| 16 | `PUT /contacts/{contact}` | 🔴 **bloquée — arbitrage `I48-001` / `I48-003`** |
+| 17 | `DELETE /contacts/{contact}` | 🔴 **bloquée — même arbitrage** |
+| 18 | `ANY /cold-email{any?}` | 🔴 **hors périmètre — décision à prendre** |
+| 19 | `ANY /linkedin{any?}` | 🔴 **hors périmètre — décision à prendre** |
+
+**10 fermées · 5 restant à écrire · 4 qui ne m'appartiennent pas.**
+
+### Ce que les gardes ont trouvé, et que le constat ne disait pas
+
+**1. `markRead` ne rendait pas 501. Elle rendait 500.** Signature
+`markRead(int $n)` alors que `notifications.id` est un **UUID**. Tout appel réel
+levait une `TypeError` : le `501` écrit juste en dessous **n'a jamais été
+atteint une seule fois**. *Un « pas encore implémenté » qui plante avant d'être
+lu est pire qu'un 501 : le 501 dit la vérité, la 500 annonce une panne.*
+
+**2. `admin` ne peut pas régler son espace.** Écrits avec un compte `admin`, les
+cinq cas de `PUT /workspace` rendaient 403 : dans `PermissionsAndRolesSeeder`,
+`admin` porte `users.manage` mais **pas** `workspaces.manage`, que seul `owner`
+détient. Le libellé « Administrateur workspace » le laisse mal deviner. Ce
+n'était pas la route qui avait tort, c'était mon compte de test.
+
+**3. Le piège n° 8 a tenu sa promesse.** La garde `B10-016-PORTEE` a rougi sur
+un plafond (`workspaces : 18 > 17`). Le dossier interdit de relever un plafond
+pour accommoder son propre code. En refusant, j'ai trouvé le vrai défaut : mon
+`PUT /workspace` lisait la table **sans voir `deleted_at`**, donc un espace
+**archivé restait réglable** — nom et plafond de dépense compris. Plafond
+inchangé, code corrigé.
+
+**4. Et cette garde-là avait elle-même un défaut.** `pose_deleted_at` valait
+`str_contains($chaine, 'deleted_at')` : elle ne distinguait pas **filtrer** sur
+la colonne d'y **écrire**. Mon premier `whereNull` a suffi à faire apparaître
+`workspaces` parmi les tables « à corbeille vivante » — l'exact contraire de la
+vérité. La classification exige désormais la colonne **en position de clé
+écrite**. Plus stricte, jamais plus laxiste : l'assertion qui nomme les deux
+sites d'archivage réels passe toujours, ce qui **prouve** que rien n'a été perdu.
+
+### 🔴 CE QUI EST BLOQUÉ ET REVIENT À WILL
+
+**Routes 16 et 17 — `PUT` / `DELETE /contacts/{contact}`.** La fiche `I48-001`
+dit que le correctif **ne peut pas être écrit** avant que `I48-003` et
+l'arbitrage « où vit le type » ne soient tranchés :
+
+> *« écrire une création contre `company_id NOT NULL` reviendrait à exiger une
+> entreprise pour enregistrer un candidat »*
+
+`contacts.company_id` **et** `contacts.last_name` sont tous deux `NOT NULL`, et
+cinq tables de personnes coexistent (`contacts`, `candidates`, `journalists`,
+`health_practitioners`). C'est une **décision de conception**, pas un correctif.
+
+**Routes 18 et 19 — `/cold-email` et `/linkedin`.** Le constat `I48-008` dit que
+c'est *« le seul endroit où le produit DÉPASSE son périmètre »* : lot L7,
+explicitement exclu. Deux réponses possibles, et **le choix est à Will** :
+les **retirer** (le mandat exige zéro route 501, et une route hors périmètre
+n'a pas à exister), ou les **assumer par écrit** comme périmètre futur.
+*Les implémenter serait la seule mauvaise réponse.*
+
+### Journaux de commit — le détail complet y est
+
+| commit | contenu |
+|---|---|
+| `441a1d7` | lots 1 et 2 — la cloche et les vues sauvegardées (6 routes) |
+| `8d4a49f` | lot 3 — `PUT /workspace`, et la correction du compte 20 → 19 |
+| `752f92a` | lot 4 — les trois portes des comptes, et les deux gardes remises d'aplomb |

@@ -1,0 +1,90 @@
+{
+  "introuvable": {
+    "route": "/companies/999999",
+    "appels": [
+      "404 /companies/999999"
+    ],
+    "releves": [
+      {
+        "t": 2,
+        "h1": "Chargement…",
+        "corps": "Chargement… Chargement de la fiche entreprise…",
+        "vivant": true
+      },
+      {
+        "t": 5,
+        "h1": "Entreprise introuvable",
+        "corps": "Entreprise introuvable 404 Cette entreprise n'existe pas ou a été supprimée.",
+        "vivant": true
+      },
+      {
+        "t": 10,
+        "h1": "Entreprise introuvable",
+        "corps": "Entreprise introuvable 404 Cette entreprise n'existe pas ou a été supprimée.",
+        "vivant": true
+      },
+      {
+        "t": 20,
+        "h1": "Entreprise introuvable",
+        "corps": "Entreprise introuvable 404 Cette entreprise n'existe pas ou a été supprimée.",
+        "vivant": true
+      },
+      {
+        "t": 30,
+        "h1": "Entreprise introuvable",
+        "corps": "Entreprise introuvable 404 Cette entreprise n'existe pas ou a été supprimée.",
+        "vivant": true
+      },
+      {
+        "t": 40,
+        "h1": "Entreprise introuvable",
+        "corps": "Entreprise introuvable 404 Cette entreprise n'existe pas ou a été supprimée.",
+        "vivant": true
+      }
+    ]
+  },
+  "temoin-existe": {
+    "route": "/companies/1",
+    "appels": [
+      "200 /companies/1"
+    ],
+    "releves": [
+      {
+        "t": 2,
+        "h1": "Verif Audit 360 SAS",
+        "corps": "Entreprises / Verif Audit 360 SAS VA Verif Audit 360 SAS SIREN 552100554 · Dept — · Inconnue · 🔴 Basique 0 Enrichir maintenant Exporter IDENTITÉ LÉGALE Informa",
+        "vivant": true
+      },
+      {
+        "t": 5,
+        "h1": "Verif Audit 360 SAS",
+        "corps": "Entreprises / Verif Audit 360 SAS VA Verif Audit 360 SAS SIREN 552100554 · Dept — · Inconnue · 🔴 Basique 0 Enrichir maintenant Exporter IDENTITÉ LÉGALE Informa",
+        "vivant": true
+      },
+      {
+        "t": 10,
+        "h1": "Verif Audit 360 SAS",
+        "corps": "Entreprises / Verif Audit 360 SAS VA Verif Audit 360 SAS SIREN 552100554 · Dept — · Inconnue · 🔴 Basique 0 Enrichir maintenant Exporter IDENTITÉ LÉGALE Informa",
+        "vivant": true
+      },
+      {
+        "t": 20,
+        "h1": "Verif Audit 360 SAS",
+        "corps": "Entreprises / Verif Audit 360 SAS VA Verif Audit 360 SAS SIREN 552100554 · Dept — · Inconnue · 🔴 Basique 0 Enrichir maintenant Exporter IDENTITÉ LÉGALE Informa",
+        "vivant": true
+      },
+      {
+        "t": 30,
+        "h1": "Verif Audit 360 SAS",
+        "corps": "Entreprises / Verif Audit 360 SAS VA Verif Audit 360 SAS SIREN 552100554 · Dept — · Inconnue · 🔴 Basique 0 Enrichir maintenant Exporter IDENTITÉ LÉGALE Informa",
+        "vivant": true
+      },
+      {
+        "t": 40,
+        "h1": "Verif Audit 360 SAS",
+        "corps": "Entreprises / Verif Audit 360 SAS VA Verif Audit 360 SAS SIREN 552100554 · Dept — · Inconnue · 🔴 Basique 0 Enrichir maintenant Exporter IDENTITÉ LÉGALE Informa",
+        "vivant": true
+      }
+    ]
+  }
+}

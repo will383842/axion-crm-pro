@@ -1,0 +1,187 @@
+[
+  {
+    "route": "/companies/1",
+    "statut": 200,
+    "ms": 1764,
+    "erreurNav": null,
+    "titre": "Axion CRM Pro",
+    "url": "/companies/1",
+    "h1": [
+      "Verif Audit 360 SAS"
+    ],
+    "h2": [],
+    "ariane": "Accueil/Entreprises/#1",
+    "lang": "fr",
+    "corps": "Entreprises / Verif Audit 360 SAS VA Verif Audit 360 SAS SIREN 552100554 · Dept — · Inconnue · 🔴 Basique 0 Enrichir maintenant Exporter IDENTITÉ LÉGALE Informations entreprise SIREN 552100554 FORME JURIDIQUE — NAF — EFFECTIF INSEE — ADRESSE — SITE WEB — TÉLÉPHONE — LINKEDIN — DATE CRÉATION 23/08/2026 ENRICHI LE Jamais Pipeline d'enrichissement Aucune trace d'enrichissement disponible pour le moment. DEBUG Données brutes (signals) Contacts (0) Aucun contact identifié. SCORE DE QUALITÉ Qualité de la donnée 0 🔴 Basique 0 Détail par dimension indisponible pour cette entreprise. ACTIONS RAPIDES Workflow Enrichir maintenant Exporter (vCard / VCF) Marquer obsolète",
+    "nbBoutons": 23,
+    "nbLiens": 26,
+    "nbTables": 0,
+    "champsSansNom": 0,
+    "nbChamps": 0,
+    "imagesSansAlt": 0,
+    "visible": "visible",
+    "consoleErr": [],
+    "reseauKo": [],
+    "capture": "C:\\Users\\willi\\AppData\\Local\\Temp\\claude\\C--Users-willi-Documents-Projets-Axion-CRM-Pro\\d00b375e-e631-40fa-9e49-56e9c2467d5a\\scratchpad\\passe2\\captures\\_companies_1.png"
+  },
+  {
+    "route": "/media/2",
+    "statut": 200,
+    "ms": 1596,
+    "erreurNav": null,
+    "titre": "Axion CRM Pro",
+    "url": "/media/2",
+    "h1": [
+      "Gazette de verification"
+    ],
+    "h2": [
+      "Informations",
+      "Contact rédaction",
+      "Journalistes"
+    ],
+    "ariane": "Accueil/Médias (presse)/#2",
+    "lang": "fr",
+    "corps": "Médias / Gazette de verification Gazette de verification presse_hebdo enrichissement : pending Informations Type presse_hebdo Famille Rédactionnel Périodicité hebdomadaire Thème éditorial — Zone de diffusion — Éditeur — Département — Région — Ville Paris Code postal — SIREN — N° CPPAP — N° ARCOM — Source naf-extract Contact rédaction Site web https://exemple.test Email rédaction redaction@exemple.test Téléphone 0100000000 Journalistes Aucun journaliste rattaché. Le contact presse fiable reste l'email rédaction ci-dessus (+ le directeur de publication en mentions légales).",
+    "nbBoutons": 16,
+    "nbLiens": 27,
+    "nbTables": 0,
+    "champsSansNom": 0,
+    "nbChamps": 0,
+    "imagesSansAlt": 0,
+    "visible": "visible",
+    "consoleErr": [],
+    "reseauKo": [],
+    "capture": "C:\\Users\\willi\\AppData\\Local\\Temp\\claude\\C--Users-willi-Documents-Projets-Axion-CRM-Pro\\d00b375e-e631-40fa-9e49-56e9c2467d5a\\scratchpad\\passe2\\captures\\_media_2.png"
+  },
+  {
+    "route": "/campaigns/1",
+    "statut": 200,
+    "ms": 1230,
+    "erreurNav": null,
+    "titre": "Axion CRM Pro",
+    "url": "/campaigns/1",
+    "h1": [
+      "Collecte de verification"
+    ],
+    "h2": [],
+    "ariane": "Accueil/Collectes/#1",
+    "lang": "fr",
+    "corps": "Collectes / Collecte de verification Brouillon Collecte de verification pour ouvrir l ecran de detail Lancer Annuler Entreprises créées 0 / 1000(0%) Temps écoulé 0 / 180 min(0%) ENTREPRISES CRÉÉES 0 1000 restantes RUNS 0/0 0% terminés DÉBIT MAX 30/min anti-blacklist ETA FIN 3h 0m estimation Suivi temps réel Sources Zones Runs Configuration Aucun événement pour l’instant. La campagne va générer des runs dans quelques secondes.",
+    "nbBoutons": 23,
+    "nbLiens": 26,
+    "nbTables": 0,
+    "champsSansNom": 0,
+    "nbChamps": 0,
+    "imagesSansAlt": 0,
+    "visible": "visible",
+    "consoleErr": [],
+    "reseauKo": [],
+    "capture": "C:\\Users\\willi\\AppData\\Local\\Temp\\claude\\C--Users-willi-Documents-Projets-Axion-CRM-Pro\\d00b375e-e631-40fa-9e49-56e9c2467d5a\\scratchpad\\passe2\\captures\\_campaigns_1.png"
+  },
+  {
+    "route": "/audiences/1",
+    "statut": 200,
+    "ms": 1313,
+    "erreurNav": null,
+    "titre": "Axion CRM Pro",
+    "url": "/audiences/1",
+    "h1": [
+      "Audience de vérification"
+    ],
+    "h2": [],
+    "ariane": "Accueil/Audiences (segments)/#1",
+    "lang": "fr",
+    "corps": "Audiences / Audience de vérification Active Audience de vérification Refresh Edit Supprimer MEMBRES 0 entreprises + contacts DERNIÈRE REFRESH jamais — STATUT Active incluse dans refresh batch AUTO-REFRESH OFF manuel uniquement Membres Critères Préparation campagne Aucun membre pour l'instant. Lance un refresh pour matérialiser le segment.",
+    "nbBoutons": 22,
+    "nbLiens": 26,
+    "nbTables": 0,
+    "champsSansNom": 0,
+    "nbChamps": 0,
+    "imagesSansAlt": 0,
+    "visible": "visible",
+    "consoleErr": [],
+    "reseauKo": [],
+    "capture": "C:\\Users\\willi\\AppData\\Local\\Temp\\claude\\C--Users-willi-Documents-Projets-Axion-CRM-Pro\\d00b375e-e631-40fa-9e49-56e9c2467d5a\\scratchpad\\passe2\\captures\\_audiences_1.png"
+  },
+  {
+    "route": "/console/personnes/39735351c5f71ba78f6937412ffe7700ea182d998e36e7fcf74b8d0810041051",
+    "statut": 200,
+    "ms": 1557,
+    "erreurNav": null,
+    "titre": "Axion CRM Pro",
+    "url": "/console/personnes/39735351c5f71ba78f6937412ffe7700ea182d998e36e7fcf74b8d0810041051",
+    "h1": [
+      "Personne"
+    ],
+    "h2": [],
+    "ariane": "Accueil/Console CRM/Personnes/39735351c5f71ba78f6937412ffe7700ea182d998e36e7fcf74b8d0810041051",
+    "lang": "fr",
+    "corps": "Personne Fiche 360° — tous les touchpoints connus de cette personne. Identité Aucune fiche dans les univers auxquels vous avez accès. Univers Business Aucune fiche Vivier candidats Aucune fiche Timeline Aucun touchpoint enregistré.",
+    "nbBoutons": 16,
+    "nbLiens": 26,
+    "nbTables": 0,
+    "champsSansNom": 0,
+    "nbChamps": 0,
+    "imagesSansAlt": 0,
+    "visible": "visible",
+    "consoleErr": [],
+    "reseauKo": [],
+    "capture": "C:\\Users\\willi\\AppData\\Local\\Temp\\claude\\C--Users-willi-Documents-Projets-Axion-CRM-Pro\\d00b375e-e631-40fa-9e49-56e9c2467d5a\\scratchpad\\passe2\\captures\\_console_personnes_39735351c5f71ba78f6937412ffe7700ea182d998e36e7fcf74b8d0810041051.png"
+  },
+  {
+    "route": "/console/personnes/pas-une-cle",
+    "statut": 200,
+    "ms": 1500,
+    "erreurNav": null,
+    "titre": "Axion CRM Pro",
+    "url": "/console/personnes/pas-une-cle",
+    "h1": [],
+    "h2": [],
+    "ariane": "Accueil/Console CRM/Personnes/Pas une cle",
+    "lang": "fr",
+    "corps": "",
+    "nbBoutons": 16,
+    "nbLiens": 26,
+    "nbTables": 0,
+    "champsSansNom": 0,
+    "nbChamps": 0,
+    "imagesSansAlt": 0,
+    "visible": "visible",
+    "consoleErr": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "reseauKo": [
+      "404 http://verif.localhost:8080/api/v1/crm/persons/pas-une-cle/timeline"
+    ],
+    "capture": "C:\\Users\\willi\\AppData\\Local\\Temp\\claude\\C--Users-willi-Documents-Projets-Axion-CRM-Pro\\d00b375e-e631-40fa-9e49-56e9c2467d5a\\scratchpad\\passe2\\captures\\_console_personnes_pas_une_cle.png"
+  },
+  {
+    "route": "/companies/999999",
+    "statut": 200,
+    "ms": 1363,
+    "erreurNav": null,
+    "titre": "Axion CRM Pro",
+    "url": "/companies/999999",
+    "h1": [
+      "Chargement…"
+    ],
+    "h2": [],
+    "ariane": "Accueil/Entreprises/#999999",
+    "lang": "fr",
+    "corps": "Chargement… Chargement de la fiche entreprise…",
+    "nbBoutons": 16,
+    "nbLiens": 25,
+    "nbTables": 0,
+    "champsSansNom": 0,
+    "nbChamps": 0,
+    "imagesSansAlt": 0,
+    "visible": "visible",
+    "consoleErr": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "reseauKo": [
+      "404 http://verif.localhost:8080/api/v1/companies/999999"
+    ],
+    "capture": "C:\\Users\\willi\\AppData\\Local\\Temp\\claude\\C--Users-willi-Documents-Projets-Axion-CRM-Pro\\d00b375e-e631-40fa-9e49-56e9c2467d5a\\scratchpad\\passe2\\captures\\_companies_999999.png"
+  }
+]

@@ -1,0 +1,52 @@
+[
+  {
+    "route": "/login",
+    "statut": 200,
+    "ms": 1633,
+    "erreurNav": null,
+    "titre": "Axion CRM Pro",
+    "url": "/login",
+    "h1": [
+      "Connexion"
+    ],
+    "h2": [],
+    "ariane": null,
+    "lang": "fr",
+    "corps": "Axion CRM Pro Connexion Connecte-toi à ton workspace Axion CRM Pro. Adresse e-mail Mot de passe Se souvenir de moi Se connecter Recevoir un lien magique Mot de passe oublié ?",
+    "nbBoutons": 2,
+    "nbLiens": 2,
+    "nbTables": 0,
+    "champsSansNom": 0,
+    "nbChamps": 3,
+    "imagesSansAlt": 0,
+    "visible": "visible",
+    "consoleErr": [],
+    "reseauKo": [],
+    "capture": "C:\\Users\\willi\\AppData\\Local\\Temp\\claude\\C--Users-willi-Documents-Projets-Axion-CRM-Pro\\d00b375e-e631-40fa-9e49-56e9c2467d5a\\scratchpad\\auth-connecte\\captures\\_login.png"
+  },
+  {
+    "route": "/2fa",
+    "statut": 200,
+    "ms": 1772,
+    "erreurNav": null,
+    "titre": "Axion CRM Pro",
+    "url": "/2fa",
+    "h1": [
+      "Code à 6 chiffres"
+    ],
+    "h2": [],
+    "ariane": null,
+    "lang": "fr",
+    "corps": "Axion CRM Pro Code à 6 chiffres Saisis le code à 6 chiffres généré par ton authenticator. Vérifier Retour à la connexion",
+    "nbBoutons": 1,
+    "nbLiens": 1,
+    "nbTables": 0,
+    "champsSansNom": 0,
+    "nbChamps": 1,
+    "imagesSansAlt": 0,
+    "visible": "visible",
+    "consoleErr": [],
+    "reseauKo": [],
+    "capture": "C:\\Users\\willi\\AppData\\Local\\Temp\\claude\\C--Users-willi-Documents-Projets-Axion-CRM-Pro\\d00b375e-e631-40fa-9e49-56e9c2467d5a\\scratchpad\\auth-connecte\\captures\\_2fa.png"
+  }
+]

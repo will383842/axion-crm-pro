@@ -1,0 +1,325 @@
+[
+  {
+    "route": "/scraper-runs",
+    "statut": 200,
+    "ms": 1441,
+    "erreurNav": null,
+    "titre": "Axion CRM Pro",
+    "url": "/scraper-runs",
+    "h1": [
+      "Journaux de collecte"
+    ],
+    "h2": [
+      "Aucun run pour l’instant"
+    ],
+    "ariane": "Accueil/Journaux de collecte",
+    "lang": "fr",
+    "corps": "En direct · actualisé toutes les 10s Journaux de collecte Monitoring des jobs de scraping en temps réel. Exporter en CSV TOTAL 0 runs sur la fenêtre EN COURS 0 en cours TAUX DE SUCCÈS 0% 0 OK / 0 clos ÉCHECS 0 aucun échec Tous 0 En cours 0 En attente 0 Terminés 0 Échec 0 Annulés 0 Rechercher une collecte par source, département ou identifiant 0 run Aucun run pour l’instant Lance ton premier scrape depuis la page Couverture France. Lancer un scrape",
+    "nbBoutons": 24,
+    "nbLiens": 25,
+    "nbTables": 0,
+    "champsSansNom": 0,
+    "nbChamps": 1,
+    "imagesSansAlt": 0,
+    "visible": "visible",
+    "consoleErr": [],
+    "reseauKo": [],
+    "capture": "C:\\Users\\willi\\AppData\\Local\\Temp\\claude\\C--Users-willi-Documents-Projets-Axion-CRM-Pro\\d00b375e-e631-40fa-9e49-56e9c2467d5a\\scratchpad\\passe1\\captures\\_scraper_runs.png"
+  },
+  {
+    "route": "/magic-link",
+    "statut": 200,
+    "ms": 1162,
+    "erreurNav": null,
+    "titre": "Axion CRM Pro",
+    "url": "/magic-link",
+    "h1": [
+      "Recevoir un lien magique"
+    ],
+    "h2": [],
+    "ariane": null,
+    "lang": "fr",
+    "corps": "Axion CRM Pro Recevoir un lien magique Reçois un lien de connexion par email — pas besoin de mot de passe. Adresse e-mail Envoyer le lien Retour à la connexion",
+    "nbBoutons": 1,
+    "nbLiens": 1,
+    "nbTables": 0,
+    "champsSansNom": 0,
+    "nbChamps": 1,
+    "imagesSansAlt": 0,
+    "visible": "visible",
+    "consoleErr": [],
+    "reseauKo": [],
+    "capture": "C:\\Users\\willi\\AppData\\Local\\Temp\\claude\\C--Users-willi-Documents-Projets-Axion-CRM-Pro\\d00b375e-e631-40fa-9e49-56e9c2467d5a\\scratchpad\\passe1\\captures\\_magic_link.png"
+  },
+  {
+    "route": "/password-reset",
+    "statut": 200,
+    "ms": 1211,
+    "erreurNav": null,
+    "titre": "Axion CRM Pro",
+    "url": "/password-reset",
+    "h1": [
+      "Réinitialiser le mot de passe"
+    ],
+    "h2": [],
+    "ariane": null,
+    "lang": "fr",
+    "corps": "Axion CRM Pro Réinitialiser le mot de passe Saisis l'email associé à ton compte, on t'envoie un lien sécurisé. Email Envoyer le lien Retour à la connexion",
+    "nbBoutons": 1,
+    "nbLiens": 1,
+    "nbTables": 0,
+    "champsSansNom": 0,
+    "nbChamps": 1,
+    "imagesSansAlt": 0,
+    "visible": "visible",
+    "consoleErr": [],
+    "reseauKo": [],
+    "capture": "C:\\Users\\willi\\AppData\\Local\\Temp\\claude\\C--Users-willi-Documents-Projets-Axion-CRM-Pro\\d00b375e-e631-40fa-9e49-56e9c2467d5a\\scratchpad\\passe1\\captures\\_password_reset.png"
+  },
+  {
+    "route": "/international/roumanie",
+    "statut": 200,
+    "ms": 1404,
+    "erreurNav": null,
+    "titre": "Axion CRM Pro",
+    "url": "/international/roumanie",
+    "h1": [
+      "Présence française — Roumanie"
+    ],
+    "h2": [],
+    "ariane": "Accueil/International/Roumanie",
+    "lang": "fr",
+    "corps": "Présence française — Roumanie Entreprises françaises implantées, entités locales et organismes francophones. Collecte : annuaire public CCIFER + DG Trésor. Tout Entreprises Associations Cabinets Enseignement Institutions Chambres de commerce Médias Tous Prospectables Partiels Pending Archivés 0 fiche DÉNOMINATION NATURE VILLE E-MAIL TÉLÉPHONE SITE STATUT Aucune fiche pour cette nature. Précédent Page 1 Suivant",
+    "nbBoutons": 31,
+    "nbLiens": 25,
+    "nbTables": 1,
+    "champsSansNom": 0,
+    "nbChamps": 0,
+    "imagesSansAlt": 0,
+    "visible": "visible",
+    "consoleErr": [],
+    "reseauKo": [],
+    "capture": "C:\\Users\\willi\\AppData\\Local\\Temp\\claude\\C--Users-willi-Documents-Projets-Axion-CRM-Pro\\d00b375e-e631-40fa-9e49-56e9c2467d5a\\scratchpad\\passe1\\captures\\_international_roumanie.png"
+  },
+  {
+    "route": "/media",
+    "statut": 200,
+    "ms": 1532,
+    "erreurNav": null,
+    "titre": "Axion CRM Pro",
+    "url": "/media",
+    "h1": [
+      "Médias"
+    ],
+    "h2": [
+      "Aucun média"
+    ],
+    "ariane": "Accueil/Médias (presse)",
+    "lang": "fr",
+    "corps": "Médias Base médias & presse · 0 médias Exporter CSV TOTAL 0 Page 1 · 0 affichés AVEC SITE WEB 0% de la page AVEC EMAIL 0% email rédaction TOP TYPE — de la page Rechercher un média Toutes familles 📝 Rédactionnel 🎥 Production audiovisuelle Tous types 📰 Journal 📓 Revue / périodique 🗞️ Autre presse 📻 Radio 📺 Télévision 🎬 Émission TV 🛰️ Agence de presse 🌐 Portail / site info ✍️ Blog 🎥 Production audiovisuelle Toute périodicité Quotidien Hebdomadaire Mensuel Bimensuel Trimestriel Site : tous Avec site web Sans site web Email : tous Avec email Sans email Confiance : toutes A · email = domaine du site B · domaine pro C · boîte grand public 📰 Aucun média Lance l'extraction des médias (media:extract-from-companies) pour peupler la base. Page 1 / 1 · 0 médias ← Précédent Suivant →",
+    "nbBoutons": 19,
+    "nbLiens": 24,
+    "nbTables": 0,
+    "champsSansNom": 0,
+    "nbChamps": 8,
+    "imagesSansAlt": 0,
+    "visible": "visible",
+    "consoleErr": [],
+    "reseauKo": [],
+    "capture": "C:\\Users\\willi\\AppData\\Local\\Temp\\claude\\C--Users-willi-Documents-Projets-Axion-CRM-Pro\\d00b375e-e631-40fa-9e49-56e9c2467d5a\\scratchpad\\passe1\\captures\\_media.png"
+  },
+  {
+    "route": "/journalists",
+    "statut": 200,
+    "ms": 1433,
+    "erreurNav": null,
+    "titre": "Axion CRM Pro",
+    "url": "/journalists",
+    "h1": [
+      "Journalistes"
+    ],
+    "h2": [
+      "Aucun journaliste"
+    ],
+    "ariane": "Accueil/Journalistes",
+    "lang": "fr",
+    "corps": "Journalistes Contacts rédaction · 0 journalistes Exporter CSV TOTAL 0 Page 1 AVEC EMAIL 0 sur la page OPT-OUT 0 opposition RGPD Rechercher un journaliste par nom 🎙️ Aucun journaliste La base des journalistes se remplira quand l'extraction des rédactions (Phase 3, RGPD-encadrée) sera lancée. Page 1 / 1 ← Précédent Suivant →",
+    "nbBoutons": 19,
+    "nbLiens": 24,
+    "nbTables": 0,
+    "champsSansNom": 0,
+    "nbChamps": 1,
+    "imagesSansAlt": 0,
+    "visible": "visible",
+    "consoleErr": [],
+    "reseauKo": [],
+    "capture": "C:\\Users\\willi\\AppData\\Local\\Temp\\claude\\C--Users-willi-Documents-Projets-Axion-CRM-Pro\\d00b375e-e631-40fa-9e49-56e9c2467d5a\\scratchpad\\passe1\\captures\\_journalists.png"
+  },
+  {
+    "route": "/llm/proxy-providers",
+    "statut": 200,
+    "ms": 1317,
+    "erreurNav": null,
+    "titre": "Axion CRM Pro",
+    "url": "/llm/proxy-providers",
+    "h1": [
+      "Fournisseurs de proxies"
+    ],
+    "h2": [
+      "Aucun fournisseur configuré"
+    ],
+    "ariane": "Accueil/LLM/Proxies",
+    "lang": "fr",
+    "corps": "Fournisseurs de proxies Webshare datacenter + IPRoyal résidentiel + Mock — bascule automatique selon zone. Aucun fournisseur configuré Configure WEBSHARE_API_KEY ou IPROYAL_USERNAME dans .env serveur pour activer les proxies. Voir la documentation",
+    "nbBoutons": 17,
+    "nbLiens": 25,
+    "nbTables": 0,
+    "champsSansNom": 0,
+    "nbChamps": 0,
+    "imagesSansAlt": 0,
+    "visible": "visible",
+    "consoleErr": [],
+    "reseauKo": [],
+    "capture": "C:\\Users\\willi\\AppData\\Local\\Temp\\claude\\C--Users-willi-Documents-Projets-Axion-CRM-Pro\\d00b375e-e631-40fa-9e49-56e9c2467d5a\\scratchpad\\passe1\\captures\\_llm_proxy_providers.png"
+  },
+  {
+    "route": "/rgpd/requests",
+    "statut": 200,
+    "ms": 1545,
+    "erreurNav": null,
+    "titre": "Axion CRM Pro",
+    "url": "/rgpd/requests",
+    "h1": [
+      "Requêtes RGPD"
+    ],
+    "h2": [
+      "Aucune requête RGPD"
+    ],
+    "ariane": "Accueil/RGPD/Requêtes",
+    "lang": "fr",
+    "corps": "Requêtes RGPD Articles 15-22 : accès / portabilité / suppression / rectification / opposition. Nouvelle requête Toutes Accès · art. 15 Portabilité · art. 20 Suppression · art. 17 Rectification · art. 16 Opposition · art. 21 Aucune requête RGPD Les requêtes apparaitront ici après création par les sujets concernés. Créer une requête",
+    "nbBoutons": 24,
+    "nbLiens": 25,
+    "nbTables": 0,
+    "champsSansNom": 0,
+    "nbChamps": 0,
+    "imagesSansAlt": 0,
+    "visible": "visible",
+    "consoleErr": [],
+    "reseauKo": [],
+    "capture": "C:\\Users\\willi\\AppData\\Local\\Temp\\claude\\C--Users-willi-Documents-Projets-Axion-CRM-Pro\\d00b375e-e631-40fa-9e49-56e9c2467d5a\\scratchpad\\passe1\\captures\\_rgpd_requests.png"
+  },
+  {
+    "route": "/rgpd/ai-act",
+    "statut": 200,
+    "ms": 1408,
+    "erreurNav": null,
+    "titre": "Axion CRM Pro",
+    "url": "/rgpd/ai-act",
+    "h1": [
+      "Registre AI Act"
+    ],
+    "h2": [
+      "Aucun système IA enregistré"
+    ],
+    "ariane": "Accueil/RGPD/Registre AI Act",
+    "lang": "fr",
+    "corps": "Registre AI Act Conformité UE 2024/1689 — systèmes IA + classification risque + supervision humaine documentés. Article 9 AI Act — tout système classé high doit être documenté ici avec DPIA, mesures de mitigation, supervision humaine et révision annuelle. TOTAL REGISTRES 0 RISQUE ÉLEVÉ 0 dont prohibés EN PRODUCTION 0 — DERNIÈRE REVUE — Annuelle obligatoire Aucun système IA enregistré Le LLM Router devrait apparaître ici après seed initial (AiActRegisterSeeder).",
+    "nbBoutons": 16,
+    "nbLiens": 25,
+    "nbTables": 0,
+    "champsSansNom": 0,
+    "nbChamps": 0,
+    "imagesSansAlt": 0,
+    "visible": "visible",
+    "consoleErr": [],
+    "reseauKo": [],
+    "capture": "C:\\Users\\willi\\AppData\\Local\\Temp\\claude\\C--Users-willi-Documents-Projets-Axion-CRM-Pro\\d00b375e-e631-40fa-9e49-56e9c2467d5a\\scratchpad\\passe1\\captures\\_rgpd_ai_act.png"
+  },
+  {
+    "route": "/campaigns/new",
+    "statut": 200,
+    "ms": 1402,
+    "erreurNav": null,
+    "titre": "Axion CRM Pro",
+    "url": "/campaigns/new",
+    "h1": [
+      "Nouvelle campagne"
+    ],
+    "h2": [
+      "Identité"
+    ],
+    "ariane": "Accueil/Collectes/Nouvelle collecte",
+    "lang": "fr",
+    "corps": "Collectes / Nouvelle Nouvelle campagne Configure ta campagne en 4 étapes : identité, zones, sources, budget. 1 Identité 2 Zones 3 Sources 4 Budget & sécurité Identité Nom et description visibles dans la liste des campagnes. NOM DE LA CAMPAGNE * DESCRIPTION (OPTIONNEL) PLANIFICATION Lancer maintenant Planifier plus tard Annuler Continuer",
+    "nbBoutons": 20,
+    "nbLiens": 26,
+    "nbTables": 0,
+    "champsSansNom": 0,
+    "nbChamps": 2,
+    "imagesSansAlt": 0,
+    "visible": "visible",
+    "consoleErr": [],
+    "reseauKo": [],
+    "capture": "C:\\Users\\willi\\AppData\\Local\\Temp\\claude\\C--Users-willi-Documents-Projets-Axion-CRM-Pro\\d00b375e-e631-40fa-9e49-56e9c2467d5a\\scratchpad\\passe1\\captures\\_campaigns_new.png"
+  },
+  {
+    "route": "/audiences/new",
+    "statut": 200,
+    "ms": 2672,
+    "erreurNav": null,
+    "titre": "Axion CRM Pro",
+    "url": "/audiences/new",
+    "h1": [
+      "Nouvelle audience"
+    ],
+    "h2": [
+      "Informations",
+      "Géographie",
+      "Taille et secteur",
+      "Qualité et statut",
+      "Tags personnalisés",
+      "Preview live"
+    ],
+    "ariane": "Accueil/Audiences (segments)/Nouvelle audience",
+    "lang": "fr",
+    "corps": "Audiences / Nouvelle Nouvelle audience Compose un segment dynamique. La preview se met à jour à chaque modification. Informations NOM * DESCRIPTION (OPTIONNEL) Géographie DÉPARTEMENTS Aucun département 75 Paris 92 Hauts-de-Seine 93 Seine-Saint-Denis 69 Rhône 13 Bouches-du-Rhône 33 Gironde 31 Haute-Garonne 59 Nord 67 Bas-Rhin 44 Loire-Atlantique RÉGIONS Aucune région 11 Île-de-France 24 Centre-Val de Loire 27 Bourgogne-Franche-Comté 28 Normandie 32 Hauts-de-France 44 Grand Est 52 Pays de la Loire 53 Bretagne 75 Nouvelle-Aquitaine 76 Occitanie 84 Auvergne-Rhône-Alpes 93 Provence-Alpes-Côte d'Azur 94 Corse Taille et secteur TAILLES D'ENTREPRISE Toutes tailles micro Micro (1-9) tpe TPE (10-49) pme PME (50-249) eti ETI (250-4999) grande Grande (5000+) SECTEURS Tous secteurs it_saas IT / SaaS btp BTP sante Santé commerce Commerce services_pro Services pro finance_assurance Finance / Assurance industrie Industrie hotellerie_restauration Hôtellerie / Resto transport Transport agro_alimentaire Agro-alimentaire Qualité et statut STATUTS PROSPECTION pending Pending ready_for_outreach Prêt outreach partial_email Email partiel archived_no_email Archivé sans email SCORE QUALITÉ MINIMUM : 0 0 25 50 75 100 A au moins un contact avec email Tags personnalisés SLUGS SÉPARÉS PAR VIRGULE OU ESPACE (CONTAINS_ANY) Preview live ENTREPRISES 0 CONTACTS 0 CRITÈRES (1) prospection_status in [1] Créer l'audience Annuler Renseigne un nom et au moins un critère pour activer la création.",
+    "nbBoutons": 60,
+    "nbLiens": 26,
+    "nbTables": 0,
+    "champsSansNom": 0,
+    "nbChamps": 5,
+    "imagesSansAlt": 0,
+    "visible": "visible",
+    "consoleErr": [],
+    "reseauKo": [],
+    "capture": "C:\\Users\\willi\\AppData\\Local\\Temp\\claude\\C--Users-willi-Documents-Projets-Axion-CRM-Pro\\d00b375e-e631-40fa-9e49-56e9c2467d5a\\scratchpad\\passe1\\captures\\_audiences_new.png"
+  },
+  {
+    "route": "/console/arbitrage",
+    "statut": 200,
+    "ms": 1742,
+    "erreurNav": null,
+    "titre": "Axion CRM Pro",
+    "url": "/console/arbitrage",
+    "h1": [
+      "Rapprochements à arbitrer"
+    ],
+    "h2": [
+      "Rien à arbitrer"
+    ],
+    "ariane": "Accueil/Console CRM/À arbitrer",
+    "lang": "fr",
+    "corps": "Rapprochements à arbitrer 0 événement(s) reçus sans SIREN — à rattacher ou à écarter. Rien à arbitrer Aucun événement n’attend d’arbitrage dans cette file. Cet écran ne voit que ce que l’ingestion y dépose : il ne dit rien des événements qui ne sont jamais arrivés jusqu’ici.",
+    "nbBoutons": 16,
+    "nbLiens": 25,
+    "nbTables": 0,
+    "champsSansNom": 0,
+    "nbChamps": 0,
+    "imagesSansAlt": 0,
+    "visible": "visible",
+    "consoleErr": [],
+    "reseauKo": [],
+    "capture": "C:\\Users\\willi\\AppData\\Local\\Temp\\claude\\C--Users-willi-Documents-Projets-Axion-CRM-Pro\\d00b375e-e631-40fa-9e49-56e9c2467d5a\\scratchpad\\passe1\\captures\\_console_arbitrage.png"
+  }
+]

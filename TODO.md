@@ -121,7 +121,8 @@ fichier exige que tout chemin cité existe.)
 Produits, datés, et à jour :
 
 ⚠️ **Ces deux pièces ont quitté ce dépôt le 2026-08-23**, quand il est repassé
-en **public**. Elles vivent dans **`will383842/axion-crm-pro-audit`** (privé) —
+en **public**. Elles vivent dans **will383842/axion-crm-pro-audit** (privé — sans accents graves : ce n'est pas
+un chemin de ce dépôt, et la garde A09 exige que tout chemin cité en existe un) —
 voir `_REPORTS/LISEZ-MOI-PIECES-DEPLACEES.md`. *Les chemins ne sont donc plus
 cités ici : la garde `A09` exige que tout chemin cité existe, et elle a raison.*
 

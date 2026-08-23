@@ -1030,3 +1030,25 @@ comme référence n'aurait aucun sens.*
    les deux reportés en « Sprint 3 » par le produit lui-même — et `X39-029`
    (« Lecteur » lit tout le CRM).
 3. Le §8 reprend à l'**étape 5** : la vague du dépôt du site.
+
+---
+
+## ✅ LES CINQ PR SONT VERTES — verdict final du 2026-08-23
+
+| PR | état | contenu |
+|---|---|---|
+| **#195** | **CLEAN** | mesure 7 du registre — journalisation des connexions |
+| **#196** | **CLEAN** | `X39-024` **(S0)** — la valeur des critères d'audience |
+| **#197** | **CLEAN** | mode sombre gardé sur 6 routes au lieu de 3 |
+| **#199** | **CLEAN** | `X39-028` — `GET /users` n'avait aucune garde |
+| **#200** | **CLEAN** | `X39-035` — une chaîne d'audit vide se déclarait valide |
+
+**21 contrôles verts chacune**, `Pest` et `a11y` compris. **Aucune fusion.**
+
+⚠️ **La #200 a rougi une fois, et c'est instructif** : un SECOND test épinglait
+le défaut, dans `AuditHashChainExtendedTest`, un fichier que je n'avais pas
+regardé — j'avais cherché la garde dans celui qui traite de `B16-002`. *Deux fois
+dans la journée, c'est la forge qui a trouvé ce que ma lecture avait manqué.*
+
+La surcharge du banc est archivée :
+`greement-navigateur/docker-compose.verif.banc.yml`.

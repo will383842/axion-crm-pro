@@ -1,0 +1,11 @@
+# Surcharge du BANC de verification uniquement — jamais deployee.
+# Arme le canal site->CRM pour que le parcours 12 du §11 puisse etre joue :
+# sans secret, l'endpoint refuse (401) et la propagation reste non mesurable.
+services:
+  api:
+    environment:
+      SITE_SYNC_HMAC_SECRET: banc-de-verification-2026
+      CRM_INGEST_ENABLED: "true"
+      # Sans ce secret, la chaine d audit ne prouve rien : verify-chain rend
+      # {"verifiable":false}. Le parcours 13 du §11 exige de la VERIFIER.
+      AUDIT_HASH_CHAIN_SECRET: banc-verif-chaine-audit-2026-0123456789abcdef

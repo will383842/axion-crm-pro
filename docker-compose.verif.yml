@@ -80,10 +80,29 @@ services:
     # 9000. L'image est donc perimee exactement comme l'etait le Caddy vivant :
     # la reprendre aurait mesure le produit d'avant l'audit, en croyant mesurer
     # celui d'apres.
+    # Cible `prod` et NON `dev`. Mesure du 2026-08-23, et elle est brutale.
+    #
+    # La cible `dev` ne cuit pas le code : elle l'attend d'un montage lie, et
+    # elle DESACTIVE opcache (`opcache.enable=0`). Chaque requete re-parcourt
+    # donc l'arbre entier a travers le montage Docker Desktop Windows. Mesure :
+    # 13 944 fichiers dans `vendor`, 2 min 15 s pour les parcourir (~10 ms par
+    # fichier), et UN SEUL appel a `/up` a travers Caddy a mis 428 SECONDES.
+    # Ouvrir les 39 ecrans a la main dans ces conditions est hors de portee.
+    #
+    # `prod` cuit `backend/` dans l'image (`COPY backend/`), installe vendor
+    # avec `--no-dev`, active opcache avec `validate_timestamps=0`, et passe par
+    # `entrypoint-prod` qui construit les caches config/route/view avec
+    # l'environnement REEL au demarrage.
+    #
+    # Ce n'est pas qu'un gain de vitesse, c'est un gain de FIDELITE : le
+    # Caddyfile de cette pile le dit deja de l'origine unique — « le local doit
+    # RESSEMBLER a la production, sinon il ne prouve rien ». La meme regle vaut
+    # ici. Et le code cuit garantit que le conteneur sert EXACTEMENT l'arbre du
+    # worktree, sans montage qui pourrait deriver.
     build:
       context: .
       dockerfile: Dockerfile.laravel
-      target: dev
+      target: prod
     image: crmverif-api:latest
     container_name: crmverif-api
     logging: *journal
@@ -92,10 +111,30 @@ services:
       APP_URL: https://verif.localhost:8443
       APP_ENV: local
       APP_DEBUG: "true"
-      # Le `.env` du worktree porte `APP_KEY=` VIDE — le banc, lui, la recoit
-      # de `phpunit.xml`. Une application qui tourne en a besoin : sans elle,
-      # aucune session, aucun cookie chiffre, donc aucune connexion possible.
-      APP_KEY: base64:V2VyaWZpY2F0aW9uTG9jYWxlQXVkaXQzNjBLZXkxMjM0NTY3OD0=
+      # 🔴 CINQUIEME VERROU DE CONNEXION — vu ROUGE le 2026-08-23.
+      #
+      # `APP_KEY` est VIDE dans les QUATRE fichiers : `.env:22` et
+      # `backend/.env:22`, dans ce worktree COMME dans la copie principale. Ce
+      # n'est pas une bizarrerie locale, c'est l'etat de toute installation.
+      # `backend/config/app.php:77` lit `env('APP_KEY')` ; sans clef, aucune
+      # session, aucun cookie chiffre, donc aucune connexion possible.
+      #
+      # LE BANC NE PEUT PAS LE VOIR : `backend/phpunit.xml:28` fournit la clef.
+      # Le verrou est donc invisible a toute la suite de tests, et c'est
+      # precisement pourquoi il a survecu a quatre autres verrous documentes.
+      #
+      # LA LONGUEUR N'EST PAS UN DETAIL. La clef posee ici le 2026-08-23 au
+      # matin faisait 38 octets une fois decodee ; aes-256-cbc en exige 32.
+      # Resultat mesure : `/up` rendait 500, et le journal disait
+      # « Unsupported cipher or incorrect key length » — 24 fois. Une clef
+      # presente mais mal dimensionnee echoue exactement comme une clef absente.
+      # Celle-ci fait 32 octets, verifies.
+      #
+      # Ce n'est pas un secret : pile locale, liee a 127.0.0.1, base jetable.
+      # Elle est ecrite en clair A DESSEIN, pour que la pile remonte a
+      # l'identique — une clef tiree au hasard invaliderait les sessions a
+      # chaque redemarrage.
+      APP_KEY: base64:ihRdBoEJDTugXzpD3SODaam/DjEgHLm8zr26MENxm8k=
       DB_HOST: postgres
       REDIS_HOST: redis
       # Le port fait partie de l'origine : le domaine « apatride » de Sanctum
@@ -105,14 +144,13 @@ services:
       # V7 leve : sans ce drapeau, `EnsureCrmConsoleV2` rend 404 sur tout
       # `/v1/crm/*` et quatre des 39 ecrans sont inatteignables meme connecte.
       CRM_CONSOLE_V2_ENABLED: "true"
-    volumes:
-      - ./backend:/var/www/html:cached
-      # `backend/vendor` est VIDE dans ce worktree ; le banc `a35r` monte deja
-      # celui de la copie principale. Mesure du 2026-08-23 avant de faire de
-      # meme : les deux `composer.lock` portent le MEME `content-hash`
-      # (19d5daef…) et les MEMES 186 paquets aux memes versions — seule la fin
-      # de ligne differe. Ce n'est donc pas une autre dependance, c'est la meme.
-      - ../Axion-CRM-Pro/backend/vendor:/var/www/html/vendor
+    # AUCUN MONTAGE LIE — a dessein, et c'est ce qui rend cette pile utilisable.
+    #
+    # Le code est cuit dans l'image (voir `target: prod` ci-dessus). Deux
+    # consequences voulues : les requetes ne traversent plus le montage Windows
+    # (428 s -> voir la mesure), et l'interdiction du mandat de toucher a
+    # `Axion-CRM-Pro/backend` devient sans objet, puisque plus rien n'y est
+    # monte. Pour reprendre un correctif du worktree : rebatir l'image.
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }

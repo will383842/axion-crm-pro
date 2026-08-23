@@ -13,12 +13,6 @@
       "submit": "Vérifier"
     }
   },
-  "phase2": {
-    "stub": {
-      "title": "Phase 2 — bientôt disponible",
-      "description": "Ce module est scaffoldé : DB + UI prêtes, logique métier reportée à la Phase 2."
-    }
-  },
   "common": {
     "loading": "Chargement…",
     "error": "Une erreur est survenue."

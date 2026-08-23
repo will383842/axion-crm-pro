@@ -13,12 +13,6 @@
       "submit": "Verify"
     }
   },
-  "phase2": {
-    "stub": {
-      "title": "Phase 2 — coming soon",
-      "description": "Module scaffolded: DB + UI ready, business logic deferred to Phase 2."
-    }
-  },
   "common": {
     "loading": "Loading…",
     "error": "An error occurred."

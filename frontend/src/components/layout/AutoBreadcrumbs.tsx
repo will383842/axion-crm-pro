@@ -49,8 +49,16 @@ const LABELS: Record<string, string> = {
   '/settings': 'Paramètres',
   '/campaigns': 'Collectes',
   '/campaigns/new': 'Nouvelle collecte',
+  // 2026-08-23 — §8.2 de `10_NAVIGATION-CIBLE.md` : ces deux adresses ne
+  // montent plus d'écran, elles redirigent vers `/pas-encore-livre?lot=L7`.
+  // Leur libellé RESTE : le fil d'Ariane peut être rendu pendant le temps très
+  // court où la route est résolue mais la redirection pas encore appliquée, et
+  // un libellé absent y ferait apparaître « cold-email » en anglais brut.
   '/cold-email': 'E-mails à froid',
   '/linkedin': 'Prospection LinkedIn',
+  '/pas-encore-livre': 'Pas encore livré',
+  '/crm': 'Contacts',
+  '/analytics': 'Tableau de bord',
   // D23-006 — les dix routes qui parlaient anglais, plus les segments
   // intermédiaires (`/admin`, `/international`, `/console`) : ils n'ont pas
   // d'écran à eux mais apparaissent quand même dans le fil.

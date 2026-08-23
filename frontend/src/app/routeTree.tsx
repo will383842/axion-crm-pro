@@ -1,4 +1,4 @@
-import { createRootRoute, createRoute, Outlet } from '@tanstack/react-router';
+import { createRootRoute, createRoute, Outlet, redirect } from '@tanstack/react-router';
 import { RootLayout } from './RootLayout';
 import { RouteErrorBoundary } from './RouteErrorBoundary';
 import { LoginPage } from '@/features/auth/LoginPage';
@@ -28,6 +28,7 @@ import { AuditLogsPage } from '@/features/rgpd/AuditLogsPage';
 import { UsersPage } from '@/features/users/UsersPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { NotFoundPage } from '@/features/misc/NotFoundPage';
+import { PasEncoreLivrePage } from '@/features/misc/PasEncoreLivrePage';
 // Sprint 19.7 — Scraping Campaigns (live)
 import { CampaignsListPage } from '@/features/campaigns/CampaignsListPage';
 import { CampaignWizardPage } from '@/features/campaigns/CampaignWizardPage';
@@ -52,8 +53,6 @@ import { CandidatesPage } from '@/features/crm-console/CandidatesPage';
 import { ArbitragePage } from '@/features/crm-console/ArbitragePage';
 import { PersonTimelinePage } from '@/features/crm-console/PersonTimelinePage';
 // Phase 2 scaffold stubs
-import { ColdEmailStub } from '@/features/phase2-scaffold/ColdEmailStub';
-import { LinkedInStub } from '@/features/phase2-scaffold/LinkedInStub';
 
 // P6-UI-005 — SITE DE MONTAGE 1/3 de la frontiere d'erreur (cf.
 // `RouteErrorBoundary.tsx` pour la mesure et la justification des trois sites).
@@ -137,8 +136,126 @@ const consoleVivierRoute = createRoute({ getParentRoute: () => layoutRoute, path
 const consoleArbitrageRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/arbitrage', component: ArbitragePage });
 const consolePersonRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/personnes/$personKey', component: PersonTimelinePage });
 // Phase 2 stubs
-const coldEmailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/cold-email', component: ColdEmailStub });
-const linkedInRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/linkedin', component: LinkedInStub });
+// ════════════════════════════════════════════════════════════════════════════
+// LES REDIRECTIONS DU §8.2 DE `10_NAVIGATION-CIBLE.md` — 4 sur 8, et il faut
+// dire lesquelles manquent et pourquoi.
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Le document prescrit HUIT redirections. Quatre sont ecrites ici. Les quatre
+// autres NE LE SONT PAS, et ce n'est pas un oubli :
+//
+//   `/console/contacts` -> `/companies` ......... fusion d'un ecran QUI MARCHE
+//   `/journalists` -> `/contacts?vue=presse` .... la vue epinglee n'existe pas
+//   `/media` -> `/companies?vue=presse` ......... idem
+//   `/international/roumanie` -> `/coverage?pays=RO` .. le filtre pays n'existe pas
+//
+// Les trois dernieres pointent vers des VUES EPINGLEES et un FILTRE PAYS que le
+// §8.2 range lui-meme parmi les elements « crees » — donc absents aujourd'hui.
+// Ecrire ces 301 maintenant remplacerait trois ecrans qui fonctionnent par une
+// liste non filtree : ce serait une regression deguisee en avancement. La
+// premiere retire un ecran de la console v2, ce qui est une decision produit.
+//
+// 🔑 CELLES QUI SONT ECRITES SONT TOUTES UN GAIN NET : leurs quatre adresses
+// sont aujourd'hui soit un 404 hors gabarit (D23-009), soit un ecran de
+// demonstration qui donne le change (I48-008).
+
+/**
+ * §8.2 n. 24 et 25 — `/cold-email` et `/linkedin` sont SUPPRIMEES.
+ *
+ * `I48-008` : « le seul endroit ou le produit DEPASSE son perimetre ». Le lot
+ * L7 est explicitement exclu, et ces deux ecrans en portaient l'apparence.
+ * `beforeLoad` jette la redirection AVANT tout rendu : le bouchon ne s'affiche
+ * plus une fraction de seconde.
+ */
+const coldEmailRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: '/cold-email',
+  beforeLoad: () => {
+    // `redirect()` de TanStack ne rend PAS une Error : c'est un objet de
+    // controle que le routeur intercepte, et `throw` est la facon PRESCRITE
+    // par la librairie de rediriger depuis `beforeLoad`. La regle a raison en
+    // general et tort ici ; on la desarme sur CETTE ligne, jamais sur le
+    // fichier — un fichier entier desarme finit par cacher un vrai defaut.
+    // eslint-disable-next-line @typescript-eslint/only-throw-error
+    throw redirect({ to: '/pas-encore-livre', search: { lot: 'L7' }, replace: true });
+  },
+});
+const linkedInRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: '/linkedin',
+  beforeLoad: () => {
+    // `redirect()` de TanStack ne rend PAS une Error : c'est un objet de
+    // controle que le routeur intercepte, et `throw` est la facon PRESCRITE
+    // par la librairie de rediriger depuis `beforeLoad`. La regle a raison en
+    // general et tort ici ; on la desarme sur CETTE ligne, jamais sur le
+    // fichier — un fichier entier desarme finit par cacher un vrai defaut.
+    // eslint-disable-next-line @typescript-eslint/only-throw-error
+    throw redirect({ to: '/pas-encore-livre', search: { lot: 'L7' }, replace: true });
+  },
+});
+
+/** La cible des deux precedentes. Hors menu : on n'y arrive que par un signet. */
+const pasEncoreLivreRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: '/pas-encore-livre',
+  component: PasEncoreLivrePage,
+  // D25-007 dit qu'AUCUNE route du depot ne declare `validateSearch`, si bien
+  // qu'aucun etat d'ecran ne survit a un rechargement. Celle-ci le declare :
+  // c'est une route neuve, autant ne pas naitre avec le defaut.
+  //  `exactOptionalPropertyTypes` est a `true` dans ce depot : ecrire
+  //  `{ lot: undefined }` n'est PAS la meme chose que ne pas ecrire la cle, et
+  //  le compilateur refuse la confusion. On omet donc la cle absente.
+  validateSearch: (recherche: Record<string, unknown>): { lot?: string } =>
+    typeof recherche.lot === 'string' ? { lot: recherche.lot } : {},
+});
+
+/**
+ * §8.2 n. 26 — `/crm` -> `/contacts`.
+ *
+ * `D23-009` : retiree a l'etape 0 SANS redirection, elle tombait sur l'ecran
+ * « Page introuvable », lequel a pour parent `rootRoute` et non `layoutRoute` —
+ * donc rendu HORS gabarit, sans barre laterale, avec un seul lien. La cible
+ * `/contacts` existe et fonctionne.
+ */
+const crmRedirectRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: '/crm',
+  beforeLoad: () => {
+    // `redirect()` de TanStack ne rend PAS une Error : c'est un objet de
+    // controle que le routeur intercepte, et `throw` est la facon PRESCRITE
+    // par la librairie de rediriger depuis `beforeLoad`. La regle a raison en
+    // general et tort ici ; on la desarme sur CETTE ligne, jamais sur le
+    // fichier — un fichier entier desarme finit par cacher un vrai defaut.
+    // eslint-disable-next-line @typescript-eslint/only-throw-error
+    throw redirect({ to: '/contacts', replace: true });
+  },
+});
+
+/**
+ * §8.2 n. 27 — `/analytics` -> le tableau de bord.
+ *
+ * ⚠️ ECART ASSUME, ET IL FAUT L'ECRIRE. Le document prescrit `301 -> /pilotage`.
+ * Le groupe PILOTAGE fait partie des elements « crees » du §8.2 : il N'EXISTE
+ * PAS. Rediriger un 404 vers un autre 404 serait pire que de ne rien faire.
+ *
+ * La cible retenue est `/`, et ce n'est pas un pis-aller arbitraire : le meme
+ * §8.2 dit que les quatre indicateurs de collecte de l'accueil DESCENDENT vers
+ * PILOTAGE › Tableaux de bord. L'accueil d'aujourd'hui porte donc exactement ce
+ * que la cible portera. Le jour ou `/pilotage` existe, cette ligne le vise.
+ */
+const analyticsRedirectRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: '/analytics',
+  beforeLoad: () => {
+    // `redirect()` de TanStack ne rend PAS une Error : c'est un objet de
+    // controle que le routeur intercepte, et `throw` est la facon PRESCRITE
+    // par la librairie de rediriger depuis `beforeLoad`. La regle a raison en
+    // general et tort ici ; on la desarme sur CETTE ligne, jamais sur le
+    // fichier — un fichier entier desarme finit par cacher un vrai defaut.
+    // eslint-disable-next-line @typescript-eslint/only-throw-error
+    throw redirect({ to: '/', replace: true });
+  },
+});
 // F7 — `/crm` et `/analytics` retirés : les écrans bouchons portaient le
 // vocabulaire du chantier CRM cible. Ils tombent désormais sur l'écran
 // « Page introuvable » — ce qui n'est vrai que depuis D22-007 : jusque-là ils
@@ -186,5 +303,8 @@ export const routeTree = rootRoute.addChildren([
     consolePersonRoute,
     coldEmailRoute,
     linkedInRoute,
+    pasEncoreLivreRoute,
+    crmRedirectRoute,
+    analyticsRedirectRoute,
   ]),
 ]);

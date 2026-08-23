@@ -897,3 +897,58 @@ pas publier tant que la question n'est pas tranchée.
 
 *Aucune n'a été prise. Les 27 commits vivent sur la machine de Will, committés :
 rien n'est perdu, rien n'est publié.*
+
+---
+
+## 3.5 ✅ PR #198 FUSIONNÉE ET DÉPLOYÉE — et le correctif a tenu
+
+| | |
+|---|---|
+| fusion | `0d7ce93`, 2026-08-23 16:25:28Z |
+| déploiement | ✅ **`success` DU PREMIER COUP** — les 7 jobs au vert |
+| `SSH Hetzner + pull + migrate + restart` | ✅ **allé jusqu'au bout**, migration comprise |
+| production | ✅ `api` 200 · `app` 200 |
+
+🔑 **C'est la mesure qui compte : ce matin le même job mourait à mi-chemin.**
+Le signal de vie posé sur la connexion (`ServerAliveInterval=30`,
+`ServerAliveCountMax=10`) a laissé passer les ~4 minutes de silence du build.
+
+### La preuve que le travail est ARRIVÉ, pas seulement que le job est vert
+
+Un déploiement vert ne prouve pas qu'une fonctionnalité fonctionne — c'est tout
+le motif de cet audit. Mesuré **de l'extérieur**, sur la production :
+
+```
+/crm         -> 301  https://app.axion-crm-pro.com/contacts
+/analytics   -> 301  https://app.axion-crm-pro.com/
+/cold-email  -> 301  https://app.axion-crm-pro.com/pas-encore-livre?lot=L7
+/linkedin    -> 301  https://app.axion-crm-pro.com/pas-encore-livre?lot=L7
+```
+
+Ce sont de **vraies 301 HTTP**, pas des redirections de routeur : elles
+répondent avant même que le navigateur charge l'application. Les quatre
+adresses qui tombaient dans le vide sont réparées **en production**.
+
+### Ce qui est désormais en production
+
+- **14 routes** qui répondaient « pas implémenté » fonctionnent
+- **4 redirections** réelles, aux deux couches (Caddy + routeur)
+- **le verrou optimiste** sur six écritures — deux saisies concurrentes ne
+  s'écrasent plus en silence
+- **`whereNull('deleted_at')`** sur le réglage d'espace — un espace archivé
+  n'est plus modifiable
+- **le signal de vie SSH**, qui vient de faire ses preuves
+- **le gate CI étendu** au `Caddyfile` du conteneur `app`
+
+### ⚠️ Ce qui n'est toujours PAS fait
+
+Le déploiement **n'est pas reprenable**. Le signal de vie empêche la connexion
+de mourir *de silence* ; il ne protège pas d'un réseau coupé ou d'un serveur
+redémarré. La vraie robustesse — lancer le script détaché côté serveur puis
+interroger son état par une seconde connexion — **reste à écrire**.
+
+Et les **cinq routes 501** + **quatre redirections** restantes attendent
+toujours des décisions, pas du code (§2.9).
+
+🔴 **Le §3.4 reste entier** : le dossier d'audit est sur un dépôt public, et
+les commits de journal ne sont toujours pas poussés.

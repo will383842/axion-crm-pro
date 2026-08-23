@@ -8,7 +8,13 @@
 > `FILE-DE-TRAVAIL.md`. Verdicts bruts de la vague de vérification :
 > `verdicts-420.json`. Ce qui revient à Will : `ARBITRAGES.md`.
 >
-> 🔴 **2026-08-23, SOIR — LA PR #194 EST FUSIONNÉE ET DÉPLOYÉE.** Le
+> ✅ **2026-08-23, SOIR — LA PR #198 EST FUSIONNÉE ET DÉPLOYÉE** (`0d7ce93`),
+> **du premier coup**, migration comprise, production à 200. Les quatre 301 du
+> §8.2 répondent depuis l'extérieur (`/crm`, `/analytics`, `/cold-email`,
+> `/linkedin`). Le signal de vie pose sur le SSH a tenu les ~4 min de silence du
+> build qui avaient fait tomber la production le matin même.
+>
+> 🔴 **2026-08-23, MATIN — LA PR #194 EST FUSIONNÉE ET DÉPLOYÉE.** Le
 > déploiement automatique a été **coupé en plein milieu** (rupture SSH) et la
 > production a rendu **502 pendant ~7 minutes** ; la relance du job l'a
 > rétablie. Le pipeline n'a **aucune protection contre la mort du transport** —

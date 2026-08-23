@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Models\ProxyProvider;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 
 class ProxyProvidersController extends ApiController
 {
@@ -66,6 +68,21 @@ class ProxyProvidersController extends ApiController
      *
      *     @OA\Response(response=501, description="Not implemented"))
      */
+    /**
+     * 🔑 `slug` N'EST PAS MODIFIABLE : c'est par lui que le code resout un
+     * fournisseur, et le docblock de `test()` juste en dessous explique
+     * precisement pourquoi cette resolution est deja fragile. Le renommer
+     * depuis un ecran acheverait de la casser.
+     *
+     * @OA\Put(path="/proxy-providers/{p}", tags={"LLM"}, summary="Règle un mandataire de l'espace courant",
+     *     security={{"sanctumCookie":{}}},
+     *
+     *     @OA\Parameter(name="p", in="path", required=true, @OA\Schema(type="integer")),
+     *
+     *     @OA\Response(response=200, description="OK"),
+     *     @OA\Response(response=404, description="Inconnu, ou hors de mon espace"),
+     *     @OA\Response(response=422, description="Type ou zone invalide"))
+     */
     public function update(Request $r, ProxyProvider $p): JsonResponse
     {
         // Constat B12-001 / F36-005 : la resolution de route rendait
@@ -73,7 +90,36 @@ class ProxyProvidersController extends ApiController
         // « interdit » confirmerait son existence.
         $this->refuserHorsEspace($p);
 
-        return $this->notImplemented('4');
+        $valide = $r->validate([
+            // La colonne porte CHECK (residential, datacenter, mobile) : une
+            // valeur inventee doit tomber ICI, pas dans Postgres — sinon
+            // l'appelant apprend qu'il a casse le serveur au lieu qu'il s'est
+            // trompe de mot.
+            'type' => ['sometimes', Rule::in(['residential', 'datacenter', 'mobile'])],
+            'zone' => ['sometimes', 'string', 'max:32'],
+            'enabled' => ['sometimes', 'boolean'],
+            // Un poids negatif n'a pas de sens dans un tirage pondere, et un
+            // poids demesure revient a desactiver tous les autres.
+            'weight' => ['sometimes', 'integer', 'min:0', 'max:1000'],
+            'metadata' => ['sometimes', 'array'],
+        ]);
+
+        $champs = [];
+        foreach (['type', 'zone', 'enabled', 'weight'] as $clef) {
+            if (array_key_exists($clef, $valide)) {
+                $champs[$clef] = $valide[$clef];
+            }
+        }
+        if (array_key_exists('metadata', $valide)) {
+            $champs['metadata'] = json_encode($valide['metadata'], JSON_UNESCAPED_UNICODE);
+        }
+
+        if ($champs !== []) {
+            $champs['updated_at'] = now();
+            DB::table('proxy_providers_config')->where('id', $p->getKey())->update($champs);
+        }
+
+        return $this->ok(['data' => ProxyProvider::query()->findOrFail($p->getKey())]);
     }
 
     /**

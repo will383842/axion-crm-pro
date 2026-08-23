@@ -99,15 +99,85 @@ class RotationsController extends ApiController
     }
 
     /**
-     * @OA\Put(path="/rotations/{rotation}", tags={"Rotations"}, summary="Update rotation (Sprint 4)",
+     * ⚠️ CETTE METHODE NE RECOIT PAS DE MODELE, ET C'EST CE QUI LA REND
+     * DIFFERENTE DE SES VOISINES.
+     *
+     * `LlmUseCasesController` et `ProxyProvidersController` recoivent un modele
+     * par resolution de route et posent `refuserHorsEspace()`. Ici la signature
+     * est `int $rotation` : il n'y a aucun modele a refuser, donc le
+     * cloisonnement doit etre ecrit A LA MAIN dans la requete — et s'il
+     * manquait, RIEN ne rougirait, puisque le controle de completude du
+     * correctif de cloisonnement n'enumere que les methodes qui recoivent un
+     * modele.
+     *
+     * C'est exactement l'angle mort qui avait laisse passer `P6-API-001` sur
+     * les listes. On l'ecrit donc explicitement, et la garde le mesure sur le
+     * CONTENU de la base, pas sur la presence d'un appel de methode.
+     *
+     * `dimension` et `slug` ne sont pas modifiables : ensemble ils IDENTIFIENT
+     * la rotation pour le tirage. Ce qui se regle ici, c'est son comportement.
+     *
+     * @OA\Put(path="/rotations/{rotation}", tags={"Rotations"}, summary="Règle une rotation de l'espace courant",
      *     security={{"sanctumCookie":{}}},
      *
      *     @OA\Parameter(name="rotation", in="path", required=true, @OA\Schema(type="integer")),
      *
-     *     @OA\Response(response=501, description="Not implemented"))
+     *     @OA\Response(response=200, description="OK"),
+     *     @OA\Response(response=404, description="Inconnue, ou hors de mon espace"),
+     *     @OA\Response(response=422, description="Champs invalides"))
      */
     public function update(Request $r, int $rotation): JsonResponse
     {
-        return $this->notImplemented('4');
+        $espace = $this->espaceCourantOuNull();
+        if ($espace === null) {
+            abort(404);
+        }
+
+        $ligne = DB::table('rotations')
+            ->where('id', $rotation)
+            ->where('workspace_id', $espace)
+            ->first(['id']);
+
+        // 404 et non 403 : « interdit » confirmerait l'existence de la ligne a
+        // qui n'a pas le droit de la voir.
+        if ($ligne === null) {
+            abort(404);
+        }
+
+        $valide = $r->validate([
+            // Un poids negatif n'a aucun sens dans un tirage pondere ; un poids
+            // demesure revient a desactiver silencieusement tous les autres.
+            'weight' => ['sometimes', 'integer', 'min:0', 'max:1000'],
+            // Un delai de repos negatif placerait la prochaine eligibilite dans
+            // le passe : la rotation ne se reposerait jamais.
+            'cooldown_seconds' => ['sometimes', 'integer', 'min:0', 'max:86400'],
+            'enabled' => ['sometimes', 'boolean'],
+            'metadata' => ['sometimes', 'array'],
+        ]);
+
+        $champs = [];
+        foreach (['weight', 'cooldown_seconds', 'enabled'] as $clef) {
+            if (array_key_exists($clef, $valide)) {
+                $champs[$clef] = $valide[$clef];
+            }
+        }
+        if (array_key_exists('metadata', $valide)) {
+            $champs['metadata'] = json_encode($valide['metadata'], JSON_UNESCAPED_UNICODE);
+        }
+
+        if ($champs !== []) {
+            $champs['updated_at'] = now();
+            DB::table('rotations')
+                ->where('id', $rotation)
+                ->where('workspace_id', $espace)
+                ->update($champs);
+        }
+
+        $apres = DB::table('rotations')
+            ->where('id', $rotation)
+            ->where('workspace_id', $espace)
+            ->first(['id', 'dimension', 'slug', 'weight', 'cooldown_seconds', 'enabled', 'last_used_at']);
+
+        return $this->ok(['data' => $apres === null ? null : (array) $apres]);
     }
 }

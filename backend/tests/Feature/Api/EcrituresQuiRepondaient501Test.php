@@ -618,3 +618,208 @@ it('ne ferme pas un compte d un autre espace', function () {
     $this->actingAs($moi)->deleteJson("/api/v1/users/{$lointain->id}")->assertNotFound();
     expect(DB::table('users')->where('id', $lointain->id)->value('deleted_at'))->toBeNull();
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LOT 5 — LE ROUTEUR LLM, LES MANDATAIRES, LES ROTATIONS
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Quatre routes, et une CINQUIEME volontairement laissee en 501 :
+// `POST /proxy-providers/{p}/test`. Son docblock argumente, mesures a l'appui,
+// que le 501 y est l'etat HONNETE — le conteneur ne lie qu'UN fournisseur, et
+// `MOCK_PROXIES=true` par defaut fait rendre `true` en dur au simulacre.
+// L'implementer deplacerait le mensonge d'un cran. C'est une decision, pas un
+// correctif ; elle est consignee au journal pour Will.
+
+/** Seme un cas d'usage LLM et rend son identifiant. */
+function casUsageE501(string $espace, string $slug): int
+{
+    return (int) DB::table('llm_use_cases')->insertGetId([
+        'workspace_id' => $espace,
+        'slug' => $slug,
+        'description' => 'avant',
+        'primary_provider' => 'mistral',
+        'model' => 'mistral-small',
+        'fallback_chain' => json_encode(['openai']),
+        'prompt_version' => 1,
+        'options' => json_encode([]),
+        'enabled' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+}
+
+it('modifie un cas d usage LLM de mon espace, et jamais celui d un autre', function () {
+    [$moi, $espace] = compteE501('Routeur', 'owner');
+    [, $autreEspace] = compteE501('RouteurAilleurs', 'owner');
+
+    $mien = casUsageE501($espace, 'extraction-mienne');
+    $sien = casUsageE501($autreEspace, 'extraction-sienne');
+
+    $this->actingAs($moi)
+        ->putJson("/api/v1/llm/use-cases/{$mien}", [
+            'description' => 'apres', 'model' => 'mistral-large', 'enabled' => false,
+        ])
+        ->assertOk();
+
+    $ligne = DB::table('llm_use_cases')->where('id', $mien)->first();
+    expect($ligne->description)->toBe('apres');
+    expect($ligne->model)->toBe('mistral-large');
+    expect((bool) $ligne->enabled)->toBeFalse();
+
+    $this->actingAs($moi)
+        ->putJson("/api/v1/llm/use-cases/{$sien}", ['description' => 'detourne'])
+        ->assertNotFound();
+    expect(DB::table('llm_use_cases')->where('id', $sien)->value('description'))->toBe('avant');
+});
+
+it('ne laisse pas renommer le slug d un cas d usage : le code l appelle par ce nom', function () {
+    [$moi, $espace] = compteE501('Renommeur', 'owner');
+    $mien = casUsageE501($espace, 'slug-stable');
+
+    $this->actingAs($moi)
+        ->putJson("/api/v1/llm/use-cases/{$mien}", ['slug' => 'slug-vole', 'description' => 'ok'])
+        ->assertOk();
+
+    expect(DB::table('llm_use_cases')->where('id', $mien)->value('slug'))->toBe('slug-stable');
+    expect(DB::table('llm_use_cases')->where('id', $mien)->value('description'))->toBe('ok');
+});
+
+it('active une version de prompt qui existe, et refuse une version inconnue', function () {
+    [$moi, $espace] = compteE501('Versionneur', 'owner');
+    $mien = casUsageE501($espace, 'prompts-mien');
+
+    // `prompt_templates` ne porte PAS de `updated_at` : elle n'a que
+    // `created_at` (migration 2026_05_16_000004, l. 35-40). Une version de
+    // prompt ne se modifie pas, elle se remplace — le schema le dit en ne
+    // prevoyant pas la colonne.
+    $modele = (int) DB::table('prompt_templates')->insertGetId([
+        'use_case_id' => $mien,
+        'slug' => 'principal',
+        'created_at' => now(),
+    ]);
+    DB::table('prompt_template_versions')->insert([
+        'prompt_template_id' => $modele,
+        'version' => 2,
+        'content' => 'le contenu de la version 2',
+        'created_at' => now(),
+    ]);
+
+    $this->actingAs($moi)
+        ->putJson("/api/v1/llm/use-cases/{$mien}/prompts/2")
+        ->assertOk();
+    expect((int) DB::table('llm_use_cases')->where('id', $mien)->value('prompt_version'))->toBe(2);
+
+    // Activer une version qui n'existe pas ferait tourner le routeur sur un
+    // prompt introuvable : la panne serait silencieuse et a l'execution.
+    $this->actingAs($moi)
+        ->putJson("/api/v1/llm/use-cases/{$mien}/prompts/99")
+        ->assertNotFound();
+    expect((int) DB::table('llm_use_cases')->where('id', $mien)->value('prompt_version'))->toBe(2);
+});
+
+it('modifie un mandataire de mon espace, et jamais celui d un autre', function () {
+    [$moi, $espace] = compteE501('Mandant', 'owner');
+    [, $autreEspace] = compteE501('MandantAilleurs', 'owner');
+
+    $mien = (int) DB::table('proxy_providers_config')->insertGetId([
+        'workspace_id' => $espace, 'slug' => 'mien', 'type' => 'datacenter',
+        'zone' => 'eu', 'enabled' => true, 'weight' => 1, 'endpoints_count' => 0,
+        'metadata' => json_encode([]), 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $sien = (int) DB::table('proxy_providers_config')->insertGetId([
+        'workspace_id' => $autreEspace, 'slug' => 'sien', 'type' => 'datacenter',
+        'zone' => 'eu', 'enabled' => true, 'weight' => 1, 'endpoints_count' => 0,
+        'metadata' => json_encode([]), 'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    $this->actingAs($moi)
+        ->putJson("/api/v1/proxy-providers/{$mien}", ['enabled' => false, 'weight' => 7, 'zone' => 'us'])
+        ->assertOk();
+
+    $ligne = DB::table('proxy_providers_config')->where('id', $mien)->first();
+    expect((bool) $ligne->enabled)->toBeFalse();
+    expect((int) $ligne->weight)->toBe(7);
+    expect($ligne->zone)->toBe('us');
+
+    $this->actingAs($moi)
+        ->putJson("/api/v1/proxy-providers/{$sien}", ['enabled' => false])
+        ->assertNotFound();
+    expect((bool) DB::table('proxy_providers_config')->where('id', $sien)->value('enabled'))->toBeTrue();
+});
+
+it('refuse un type de mandataire inconnu, en 422 et non en 500', function () {
+    [$moi, $espace] = compteE501('Typeur', 'owner');
+    $mien = (int) DB::table('proxy_providers_config')->insertGetId([
+        'workspace_id' => $espace, 'slug' => 'typeur', 'type' => 'datacenter',
+        'zone' => 'eu', 'enabled' => true, 'weight' => 1, 'endpoints_count' => 0,
+        'metadata' => json_encode([]), 'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    // La colonne porte CHECK (residential, datacenter, mobile).
+    $this->actingAs($moi)
+        ->putJson("/api/v1/proxy-providers/{$mien}", ['type' => 'satellite'])
+        ->assertStatus(422);
+});
+
+it('modifie une rotation de mon espace, et jamais celle d un autre', function () {
+    [$moi, $espace] = compteE501('Tourneur', 'owner');
+    [, $autreEspace] = compteE501('TourneurAilleurs', 'owner');
+
+    $semer = fn (string $e, string $slug) => (int) DB::table('rotations')->insertGetId([
+        'workspace_id' => $e, 'dimension' => 'proxy', 'slug' => $slug,
+        'weight' => 1, 'cooldown_seconds' => 0, 'enabled' => true,
+        'metadata' => json_encode([]), 'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    $mienne = $semer($espace, 'a-moi');
+    $sienne = $semer($autreEspace, 'a-lui');
+
+    $this->actingAs($moi)
+        ->putJson("/api/v1/rotations/{$mienne}", ['weight' => 5, 'cooldown_seconds' => 30, 'enabled' => false])
+        ->assertOk();
+
+    $ligne = DB::table('rotations')->where('id', $mienne)->first();
+    expect((int) $ligne->weight)->toBe(5);
+    expect((int) $ligne->cooldown_seconds)->toBe(30);
+    expect((bool) $ligne->enabled)->toBeFalse();
+
+    $this->actingAs($moi)
+        ->putJson("/api/v1/rotations/{$sienne}", ['enabled' => false])
+        ->assertNotFound();
+    expect((bool) DB::table('rotations')->where('id', $sienne)->value('enabled'))->toBeTrue();
+});
+
+it('refuse un poids negatif sur une rotation : un tirage pondere n en veut pas', function () {
+    [$moi, $espace] = compteE501('Poids', 'owner');
+    $mienne = (int) DB::table('rotations')->insertGetId([
+        'workspace_id' => $espace, 'dimension' => 'proxy', 'slug' => 'poids',
+        'weight' => 1, 'cooldown_seconds' => 0, 'enabled' => true,
+        'metadata' => json_encode([]), 'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    $this->actingAs($moi)
+        ->putJson("/api/v1/rotations/{$mienne}", ['weight' => -3])
+        ->assertStatus(422);
+});
+
+it('POST /proxy-providers/{p}/test reste en 501, et c est une DECISION', function () {
+    [$moi, $espace] = compteE501('Sondeur', 'owner');
+    $mien = (int) DB::table('proxy_providers_config')->insertGetId([
+        'workspace_id' => $espace, 'slug' => 'sondeur', 'type' => 'datacenter',
+        'zone' => 'eu', 'enabled' => true, 'weight' => 1, 'endpoints_count' => 0,
+        'metadata' => json_encode([]), 'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    // 🔴 CE CAS FIGE UN CHOIX, PAS UN DEFAUT. Le docblock de `test()` argumente,
+    // mesures a l'appui, que le 501 y est l'etat honnete : le conteneur ne lie
+    // qu'UN fournisseur, `MOCK_PROXIES=true` est le defaut du depot, et
+    // `MockProxyProvider::healthCheck()` s'ecrit `return true;`. Implementer
+    // maintenant remplacerait un `true` en dur par un autre, mieux cache.
+    //
+    // Le mandat exige « aucune route 501 ». Cette ligne-ci est donc un ECART
+    // ASSUME, porte au journal pour arbitrage. Si un jour la route est ecrite
+    // pour de vrai, ce test rougira — et ce sera le bon moment pour le retirer.
+    $this->actingAs($moi)
+        ->postJson("/api/v1/proxy-providers/{$mien}/test")
+        ->assertStatus(501);
+});

@@ -1280,3 +1280,57 @@ joignable — et il ne l'est pas :
 
 *Le mot de passe reste à tourner — c'est de l'hygiène, pas une urgence. Le
 contrôle qui protège est le pare-feu, et il tient.*
+
+---
+
+# ✅ LE DÉPÔT EST PUBLIC — 2026-08-23, et voici à quelles conditions
+
+`will383842/axion-crm-pro` : **`visibility = public`**.
+`will383842/axion-crm-pro-audit` : **`private`**.
+
+## Les six conditions, vérifiées AVANT la bascule
+
+| # | condition | mesure |
+|---|---|---|
+| 1 | IP d'origine, port 80 en direct | **injoignable** *(répondait 308)* |
+| 2 | IP d'origine, port 443 en direct | **injoignable** |
+| 3 | le site par Cloudflare | **200** |
+| 4 | ports 5432 / 6379 depuis l'extérieur | **fermés** |
+| 5 | pièces sensibles sur `main` | **retirées** |
+| 6 | copies dans le dépôt privé | **1 197 fichiers**, vérifiés à l'octet |
+
+**Et revérifié APRÈS la bascule** : le CRM répond 200 sur ses deux domaines, l'IP
+d'origine reste injoignable, le registre et l'AIPD sont **absents du dépôt
+public** et **présents dans le privé** (12 710 et 63 293 octets).
+
+## Ce qui a rendu la bascule acceptable
+
+*La confidentialité du dépôt n'était qu'un **cache** posé sur des faiblesses
+réelles. Un cache n'est pas un correctif.*
+
+Le passage en public a **forcé à poser les vrais contrôles** :
+
+- l'IP d'origine ne protège plus rien parce qu'elle n'a plus rien à protéger —
+  le filtre Cloudflare fait le travail, et il tient même quand l'historique parle ;
+- les quatre pièces qui engagent le responsable de traitement sont sorties.
+
+## ⚠️ CE QUI RESTE, ET QUI N'EST PAS FAIT
+
+**La rotation du mot de passe Postgres `axion_dev_only`** — présent dans
+**12 fichiers** du dépôt, désormais public, et dans son historique.
+
+*Ce n'est PAS une urgence, et c'est mesuré* : le mot de passe n'ouvre une porte
+que si le port est joignable, et 5432 comme 6379 sont en `DROP` persistant.
+**Le contrôle qui protège est le pare-feu.** Mais c'est de l'hygiène qui reste
+à faire, et elle est d'autant plus due que le dépôt est maintenant public.
+
+⚠️ **Elle ne doit PAS être jouée à la légère** — voir les deux pannes de la
+soirée, plus haut. La marche à suivre est écrite : script avec revert
+automatique, joué d'abord sur le staging qui existe, puis en production à un
+moment choisi.
+
+**L'historique git conserve les quatre pièces et le mot de passe.** Les en purger
+demanderait une réécriture qui invaliderait 50 branches, 8 tags et les
+références d'autres sessions. *Une sauvegarde miroir complète du dépôt a été
+prise avant toute opération : `Projets/_SAUVEGARDE-AVANT-REECRITURE/depot-complet.git`
+— 50 branches, 8 tags, 33 Mo.*

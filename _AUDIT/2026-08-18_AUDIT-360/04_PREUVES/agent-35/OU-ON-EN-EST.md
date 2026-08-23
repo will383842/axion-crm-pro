@@ -931,3 +931,44 @@ l'ai payée deux fois dans la même heure.
 | `fix/x39-024-criteres-audience` | `32640482286` | ✅ **les 6 jobs**, `Pest` compris |
 
 *Cette fois les gardes ont réellement tourné.*
+
+---
+
+# 📌 L'ÉTAT DES PR À LA FIN DU 2026-08-23
+
+| PR | contenu | état |
+|---|---|---|
+| **#195** | mesure 7 du registre — journalisation des connexions | ✅ **CLEAN**, 21 contrôles verts |
+| **#196** | `X39-024` (S0) — la valeur des critères d'audience | ✅ **CLEAN**, 21 contrôles verts |
+| **#197** | mode sombre gardé sur 6 routes au lieu de 3 | ✅ **CLEAN**, `a11y` compris |
+| **#198** | *(autre session)* 14 routes 501 fermées sur 19 | en cours |
+| **#199** | `X39-028` — `GET /users` sans garde | en cours |
+
+⚠️ **Aucune n'est fusionnée.** Les fusions sont des gestes de Will.
+
+## 🟢 La branche publiée par erreur n'expose plus rien
+
+`fix/x39-024-valeur-des-criteres-audience` portait deux commits de l'autre
+session, non poussés au moment où je l'ai créée. **Ils sont désormais sur leur
+propre branche**, `fix/501-redirections-grilles-2026-08-23`, ouverte en PR #198
+par cette session. *L'incident est donc clos de lui-même : il ne reste qu'un
+résidu à supprimer, sans urgence.*
+
+La leçon, elle, reste entière — voir l'incident du jour, plus haut.
+
+## ⚠️ CE QUE JE N'AI PAS PU JOUER, ET QUI EST DONC NON PROUVÉ
+
+**Les gardes Pest de `X39-028` n'ont jamais tourné sur mon poste.**
+`composer install` sur un montage Windows n'aboutit pas dans le worktree
+`crmpro-wt-correctifs` — lancé trois fois, tué par dépassement de durée la
+troisième. Syntaxe et Pint vérifiés, rien de plus.
+
+*C'est la CI de la PR #199 qui les joue.* **Tant qu'elle n'a pas parlé, ces
+gardes ne sont pas prouvées** — et l'expérience du jour dit que ce n'est pas une
+formalité : deux gardes écrites ce matin étaient fausses, et seule la forge l'a
+dit.
+
+**Pour la prochaine session** : si un banc PHP est nécessaire, ne pas repayer
+`composer install` sur un montage lié. Deux voies mesurées plus rapides —
+`infra/scripts/rafraichir-le-banc.sh a35r` (le banc du dépôt), ou ouvrir une PR
+et laisser la CI jouer.

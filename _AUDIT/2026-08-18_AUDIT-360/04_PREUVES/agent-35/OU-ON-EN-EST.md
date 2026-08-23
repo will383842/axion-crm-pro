@@ -373,11 +373,22 @@ est versionné) pour les 11 premiers.
 3. **Demander à Will l'ouverture de la PR** de `fix/gardes-de-plan-et-c19-010`.
    ⚠️ Le dépôt est **public** et le §A00 de `06_RESTE-WILL.md` garde la trace
    d'un agent qui a poussé malgré trois refus : **ne pas l'ouvrir sans réponse.**
-4. 🔴 **LE CHANTIER EN COURS — ouvrir les 39 écrans à la main.** Les verrous
-   sont **tous levés** (V5, V6, V3′, V7, plus `APP_KEY` et le montage lié
-   découverts le 23/08 — voir §0 bis). La pile de vérification répond en 0,17 s
-   et la connexion est prouvée. C'est l'exigence n° 3 du §12 du mandat, la seule
-   jamais entamée, et plus rien ne l'empêche.
+4. ✅ **FAIT le 2026-08-23** — **les 36 écrans sont ouverts à la main**, un par
+   un, dans un vrai navigateur. L'exigence n° 3 du §12 du mandat, la seule jamais
+   entamée, est **atteinte**. Journal complet, constats et reprise :
+   `ECRANS-OUVERTS-A-LA-MAIN-2026-08-23.md` (quatre passes).
+   - **36, pas 39 ni 37** : `/crm` et `/analytics` n'existent pas, et le 37ᵉ
+     `createRoute` est `layoutRoute`, la coquille de mise en page (`id: 'layout'`,
+     aucun `path`). `01_INVENTAIRE.md:41` est à corriger d'une unité.
+   - **23 constats `X39-*`** relevés, tous recoupés dans le code ou en base.
+   - 🟢 **L'hypothèse du sondage accumulé est RÉFUTÉE** : même débit d'appels
+     (1,5/min) sur le même écran, avant et après 20 changements de route sans un
+     seul rechargement ; 25 minuteurs posés, 24 coupés, 1 vivant.
+   - **Cinq faux constats évités** — le gel, `/contacts`, le gréement, le
+     « chargement infini » de la fiche introuvable, et un message d'erreur que
+     j'avais déduit d'une seule ligne de code avant de le mesurer.
+   - Gréement : **Playwright**, une page neuve chargée à froid par écran.
+     *L'extension Chrome de Claude ne répond pas sur ce poste.*
 5. **Lancer la vague du dépôt du site** pour les 11 constats reportés.
 6. Attaquer les **47 S1 ouverts**, puis les 168 S2.
 7. Poser à Will les arbitrages de `ARBITRAGES.md`, famille par famille.

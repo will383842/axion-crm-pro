@@ -1,0 +1,214 @@
+{
+  "etapes": [
+    {
+      "etiquette": "AVANT — tableau de bord a froid",
+      "secondes": 40,
+      "appels": 1,
+      "debitParMinute": 1.5,
+      "parRoute": {
+        "/dashboard/stats": 1
+      },
+      "intervallesVivants": 1,
+      "poses": 5,
+      "coupes": 4,
+      "observateursReactQuery": null
+    },
+    {
+      "etiquette": "APRES — meme ecran, 20 routes plus tard, sans un seul rechargement",
+      "secondes": 40,
+      "appels": 1,
+      "debitParMinute": 1.5,
+      "parRoute": {
+        "/dashboard/stats": 1
+      },
+      "intervallesVivants": 1,
+      "poses": 25,
+      "coupes": 24,
+      "observateursReactQuery": null
+    }
+  ],
+  "parcours": [
+    {
+      "cible": "/companies",
+      "mode": "routeur",
+      "url": "/companies",
+      "intervallesVivants": 0,
+      "poses": 7,
+      "coupes": 7,
+      "observateursReactQuery": null
+    },
+    {
+      "cible": "/contacts",
+      "mode": "routeur",
+      "url": "/console/contacts",
+      "intervallesVivants": 0,
+      "poses": 7,
+      "coupes": 7,
+      "observateursReactQuery": null
+    },
+    {
+      "cible": "/media",
+      "mode": "clic",
+      "url": "/media",
+      "intervallesVivants": 0,
+      "poses": 7,
+      "coupes": 7,
+      "observateursReactQuery": null
+    },
+    {
+      "cible": "/journalists",
+      "mode": "clic",
+      "url": "/journalists",
+      "intervallesVivants": 0,
+      "poses": 7,
+      "coupes": 7,
+      "observateursReactQuery": null
+    },
+    {
+      "cible": "/coverage",
+      "mode": "routeur",
+      "url": "/coverage",
+      "intervallesVivants": 1,
+      "poses": 10,
+      "coupes": 9,
+      "observateursReactQuery": null
+    },
+    {
+      "cible": "/scraper-runs",
+      "mode": "clic",
+      "url": "/scraper-runs",
+      "intervallesVivants": 0,
+      "poses": 10,
+      "coupes": 10,
+      "observateursReactQuery": null
+    },
+    {
+      "cible": "/campaigns",
+      "mode": "clic",
+      "url": "/campaigns",
+      "intervallesVivants": 0,
+      "poses": 10,
+      "coupes": 10,
+      "observateursReactQuery": null
+    },
+    {
+      "cible": "/audiences",
+      "mode": "routeur",
+      "url": "/audiences",
+      "intervallesVivants": 1,
+      "poses": 13,
+      "coupes": 12,
+      "observateursReactQuery": null
+    },
+    {
+      "cible": "/tags",
+      "mode": "routeur",
+      "url": "/tags",
+      "intervallesVivants": 0,
+      "poses": 15,
+      "coupes": 15,
+      "observateursReactQuery": null
+    },
+    {
+      "cible": "/users",
+      "mode": "clic",
+      "url": "/users",
+      "intervallesVivants": 0,
+      "poses": 15,
+      "coupes": 15,
+      "observateursReactQuery": null
+    },
+    {
+      "cible": "/audit-logs",
+      "mode": "routeur",
+      "url": "/audit-logs",
+      "intervallesVivants": 0,
+      "poses": 15,
+      "coupes": 15,
+      "observateursReactQuery": null
+    },
+    {
+      "cible": "/settings",
+      "mode": "routeur",
+      "url": "/settings",
+      "intervallesVivants": 0,
+      "poses": 15,
+      "coupes": 15,
+      "observateursReactQuery": null
+    },
+    {
+      "cible": "/admin/observability",
+      "mode": "routeur",
+      "url": "/admin/observability",
+      "intervallesVivants": 1,
+      "poses": 18,
+      "coupes": 17,
+      "observateursReactQuery": null
+    },
+    {
+      "cible": "/llm/router",
+      "mode": "routeur",
+      "url": "/llm/router",
+      "intervallesVivants": 0,
+      "poses": 20,
+      "coupes": 20,
+      "observateursReactQuery": null
+    },
+    {
+      "cible": "/llm/rotations",
+      "mode": "clic",
+      "url": "/llm/rotations",
+      "intervallesVivants": 0,
+      "poses": 20,
+      "coupes": 20,
+      "observateursReactQuery": null
+    },
+    {
+      "cible": "/rgpd/requests",
+      "mode": "routeur",
+      "url": "/rgpd/requests",
+      "intervallesVivants": 0,
+      "poses": 20,
+      "coupes": 20,
+      "observateursReactQuery": null
+    },
+    {
+      "cible": "/rgpd/ai-act",
+      "mode": "clic",
+      "url": "/rgpd/ai-act",
+      "intervallesVivants": 0,
+      "poses": 20,
+      "coupes": 20,
+      "observateursReactQuery": null
+    },
+    {
+      "cible": "/console/contacts",
+      "mode": "routeur",
+      "url": "/console/contacts",
+      "intervallesVivants": 0,
+      "poses": 20,
+      "coupes": 20,
+      "observateursReactQuery": null
+    },
+    {
+      "cible": "/console/arbitrage",
+      "mode": "clic",
+      "url": "/console/arbitrage",
+      "intervallesVivants": 0,
+      "poses": 20,
+      "coupes": 20,
+      "observateursReactQuery": null
+    },
+    {
+      "cible": "/international/roumanie",
+      "mode": "routeur",
+      "url": "/international/roumanie",
+      "intervallesVivants": 0,
+      "poses": 20,
+      "coupes": 20,
+      "observateursReactQuery": null
+    }
+  ],
+  "rendererRepondEn_ms": 1760,
+  "renderer": "vivant"
+}

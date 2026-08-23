@@ -677,3 +677,218 @@ production_audiovisuelle`.
    comptant les minuteurs vivants. C'est la seule façon honnête de trancher —
    et le gel a déjà été disculpé deux fois.
 3. Reprendre le §8 de `OU-ON-EN-EST.md` à l'étape 5 (vague du dépôt du site).
+
+---
+
+# QUATRIÈME PASSE — l'hypothèse du matin, tranchée. Et deux constats de plus.
+
+## 🟢 L'HYPOTHÈSE DU SONDAGE ACCUMULÉ EST **RÉFUTÉE**
+
+*C'était la question laissée ouverte à la coupure de 10:47 :*
+« chaque écran installe un sondage périodique, les changements de route les
+**accumulent** sans les arrêter, et le moteur finit par se figer. »
+
+**Elle est fausse.** Et elle n'a pas été jugée sur l'apparence du gel — ce chemin
+a déjà produit deux faux constats — mais sur le seul témoin qui ne triche pas :
+**le débit d'appels à l'API**, mesuré sur la même fenêtre, sur le **même écran**,
+avant et après une longue navigation.
+
+Protocole (`greement-navigateur/sondages-accumules.mjs`) :
+
+1. tableau de bord chargé à froid → **fenêtre de 40 s**, on compte les appels
+2. **20 changements de route d'affilée, sans UN SEUL rechargement**
+3. retour sur le **même** tableau de bord, toujours sans rechargement →
+   **fenêtre de 40 s** identique
+
+| | appels en 40 s | débit | intervalles vivants | posés | coupés |
+|---|---|---|---|---|---|
+| **avant** (écran à froid) | 1 | 1,5/min | **1** | 5 | 4 |
+| **après** (20 routes plus tard) | 1 | **1,5/min** | **1** | 25 | 24 |
+
+**Le débit est identique. Les compteurs se referment exactement : 25 posés,
+24 coupés, 1 vivant — le même unique minuteur qu'au départ.** Si les sondages
+s'accumulaient, on attendrait un débit d'un ordre de grandeur supérieur et une
+vingtaine de minuteurs vivants. Il n'y en a **qu'un**.
+
+Recoupé dans le code : le sondage passe par `refetchInterval` de react-query
+(`DashboardPage.tsx:81`, `CoveragePage.tsx:71`, `ObservabilityPage.tsx:34`,
+`AudiencesListPage.tsx:68`, `CampaignDetailPage.tsx:106`…), qui est **lié à
+l'observateur de la requête** : il est démonté avec l'écran. Et deux écrans vont
+plus loin — `CampaignsListPage.tsx:95` et `ScraperRunsPage.tsx:270` posent
+`refetchIntervalInBackground: false`.
+
+Le moteur de rendu **répondait encore** à la fin du parcours.
+
+⚠️ **La limite de cette mesure, écrite pour qu'on ne la surestime pas** :
+l'instrumentation n'enveloppe que `setInterval`. Si react-query planifie par
+`setTimeout`, ces minuteurs-là échappent au compteur — et c'est bien pourquoi
+**le débit d'appels est le témoin qui porte**, pas le compte d'intervalles.
+Sur 20 écrans enchaînés, un sondage non coupé aurait produit des appels. Il n'y
+en a pas eu.
+
+*Le gel du matin était donc bien le gréement, comme le commit `d7ae9ad` l'avait
+déjà établi — et non un sondage qui s'empile. **Deuxième disculpation du même
+soupçon, cette fois par un chemin indépendant.***
+
+*Note recueillie au passage : `/contacts` **redirige** vers `/console/contacts`
+au changement de route — ce qui reconfirme, au geste, la correction déjà écrite
+en 2ᵉ passe (ce n'est pas un doublon, c'est une redirection).*
+
+---
+
+## 🔴 `X39-023` — le réglage qui évite un décalage de 2 h n'est dans AUCUN `.env` du dépôt (S2)
+
+**Mesuré d'abord, expliqué ensuite.** Sur la pile de vérification — bâtie *depuis
+ce dépôt*, avec sa configuration — une étiquette créée par le produit s'inscrit
+en base **deux heures dans le futur**, et c'est **Postgres lui-même** qui le dit :
+
+```
+heure hôte (UTC)   : 09:46:11
+postgres now()     : 09:46:17          ← l'horloge de la base est juste
+created_at (UTC)   : 11:46:14          ← ce que le produit vient d'écrire
+                     écart = 01:59:56
+```
+
+Et la même fiche est rendue **différemment selon la route qui la sert** :
+
+| | `created_at` |
+|---|---|
+| réponse `201` de la création | `2026-08-23T11:44:35**+02:00**` |
+| réponse `409` du doublon, secondes plus tard | `2026-08-23T11:44:35**+00:00**` |
+| `GET /api/v1/tags` | `2026-08-23T11:44:35**+00:00**` |
+
+*Le premier rend l'instant juste (la valeur Carbon encore en mémoire), les deux
+autres relisent la base et rendent un instant faux de deux heures.*
+
+### Ce n'est PAS un constat neuf — c'est `A05-008`, reproduit
+
+L'audit connaît ce défaut et **le déclare corrigé** : `11_GRILLES/agent-08_non-régressions.md`,
+point 2 du §A.1, **✅ TENU**, mesuré sur données de production. Le correctif retenu
+n'est pas « passer à UTC » mais **aligner la session Postgres sur le fuseau
+applicatif** : `DB_TIMEZONE = APP_TIMEZONE = Europe/Paris`.
+
+**Le neuf est ailleurs : où ce réglage vit, et où il ne vit pas.**
+
+| endroit | `DB_TIMEZONE` |
+|---|---|
+| `backend/phpunit.xml:100` | ✅ `Europe/Paris` |
+| `backend/phpunit-ci.xml:108` | ✅ `Europe/Paris` |
+| l'environnement de **production** | ✅ `Europe/Paris` (`04_PREUVES/agent-08/04_prod-env-isolation-tz.txt:8`) |
+| **`.env.example`** | ❌ **absent** (`grep -c` → **0**) |
+| **`.env`** et **`backend/.env`** du dépôt | ❌ **absents** (seul `APP_TIMEZONE` y figure) |
+| `docker-compose.verif.yml` | ❌ absent |
+
+`backend/config/database.php:54,122` **lit** bien `env('DB_TIMEZONE')` — le code du
+correctif est là. **La variable, elle, n'est posée nulle part dans le dépôt.**
+
+*Conséquence, et elle est mesurée, pas déduite : **toute nouvelle installation
+montée à partir de ce dépôt reproduit `A05-008` en silence.** Ma pile de
+vérification en est la démonstration — elle a été bâtie en suivant la
+configuration du dépôt, et elle horodate deux heures dans le futur.*
+
+Et la garde ne peut pas prévenir : `HorodatagesFuseauTest` s'exécute sous
+`phpunit.xml`, **qui fournit lui-même `DB_TIMEZONE`**. Elle vérifie que le
+comportement est bon **quand le réglage est là** ; rien ne vérifie qu'un
+déploiement réel l'ait. *La correction ne tient qu'à la mémoire d'un serveur.*
+
+**Correctif proposé (une ligne, aucun risque)** : ajouter
+`DB_TIMEZONE=Europe/Paris` à `.env.example`, à `.env`, à `backend/.env` et à
+`docker-compose.verif.yml`.
+
+⚠️ **Ce que je n'ai PAS vérifié, et que je n'affirme donc pas** : l'état actuel de
+la production. Le relevé dont je dispose est celui de l'agent 8, daté du 19/08.
+*Je n'ai pas touché à la production, et le mandat ne me le demande pas.*
+
+---
+
+## `X39-017` : la moitié qui manquait est mesurée — et elle **disculpe** les écrans
+
+Le constat de la 3ᵉ passe disait : l'API rend `validation.required` en clair, et
+dix écrans lisent `response.data.message` pour l'afficher. Il restait à voir si
+un utilisateur lit vraiment cette chaîne. **Deux gestes réels, sur `/tags` :**
+
+**Geste 1 — un nom de 200 signes** (la règle serveur est `max:120`,
+`TagsController.php:91`). **Aucune requête n'est partie.** Cause lue :
+`TagsManagerPage.tsx:78` duplique la règle côté client — `z.string().max(120,
+'120 caractères max')` — **et le message est en français**. *L'écran ne laisse
+jamais le serveur répondre. C'est le bon comportement, et il faut le dire.*
+
+**Geste 2 — créer deux fois la même étiquette** (règle serveur **sans miroir
+client**) :
+
+| | |
+|---|---|
+| ce que l'API rend | `409 {"error":"**slug already exists**"}` — en anglais |
+| ce que l'écran affiche | **« Slug déjà utilisé »** — en français |
+
+Cause lue : `TagsManagerPage.tsx:131-135` branche explicitement le cas 409 sur un
+message français **avant** d'atteindre `extractApiMessage`.
+
+### 🔴 CINQUIÈME FAUX CONSTAT ÉVITÉ
+
+*J'avais lu `TagsManagerPage.tsx:137` — `toast.error(extractApiMessage(err) ?? …)` —
+et j'en avais déduit que l'écran afficherait « slug already exists ». **La mesure
+dit le contraire.** La lecture d'une seule ligne de code ne vaut pas le geste :
+la branche qui compte était quatre lignes plus haut.*
+
+**`X39-017` est donc ramené à sa taille exacte** :
+
+- ✅ **Vrai, et prouvé** : le backend n'a **aucun** répertoire `lang/`, donc toute
+  réponse 422 sort en clé brute (`validation.required`), avec le fragment anglais
+  « (and 1 more error) ». **C'est un défaut de l'API.**
+- ⚠️ **NON prouvé à l'écran** : sur les deux chemins réellement empruntés, aucun
+  utilisateur n'a lu cette clé. Les écrans testés protègent, soit en dupliquant la
+  règle en français, soit en branchant le code de statut.
+- ❓ **Ce qui reste ouvert** : `extractApiMessage` est bien la **voie de repli** de
+  dix écrans. Un 422 sur une règle serveur **sans miroir client ni branche de
+  statut** afficherait la clé brute. *Ce chemin existe dans le code ; je ne l'ai
+  pas atteint. Tant qu'il n'est pas atteint, on n'écrit pas qu'il est emprunté.*
+
+**Sévérité ramenée de S2 à S3** tant que le relais n'est pas vu.
+
+---
+
+## ✅ Deux témoins négatifs de plus
+
+7. **`/tags` duplique ses règles serveur côté client, en français.** Longueur du
+   nom, longueur du slug, forme du slug, longueur de la description : les quatre
+   règles de `TagsController.php:89-95` ont leur miroir dans `tagSchema`
+   (`TagsManagerPage.tsx:77-88`). *C'est exactement ce qu'il faut faire.*
+8. **Le conflit de doublon est traité, et en français** (« Slug déjà utilisé »),
+   alors que l'API répond en anglais.
+
+---
+
+# 🏁 OÙ ON EN EST, À LA FIN DE CETTE SESSION
+
+**Le chantier des écrans est TERMINÉ.** Les 36 écrans sont ouverts, les deux
+questions laissées ouvertes en 3ᵉ passe sont traitées :
+
+| ce qui restait à la 3ᵉ passe | état |
+|---|---|
+| finir `X39-017` — voir le 422 à l'écran | ✅ **fait** — et il **disculpe** les écrans testés ; le constat est ramené à l'API, sévérité S2 → S3 |
+| tester l'hypothèse du sondage accumulé | ✅ **fait** — **réfutée**, par le débit d'appels |
+
+## Bilan chiffré de la journée
+
+- **36 écrans** ouverts à la main (20 aux passes 1-2, 16 à la passe 3)
+- **23 constats** `X39-001` à `X39-023`
+- **5 faux constats évités** — c'est le chiffre dont je suis le plus sûr
+- **8 témoins négatifs** inscrits, dont le verrou 2FA du serveur vérifié au geste
+- **1 hypothèse réfutée** par une mesure indépendante
+
+## Ce qui reste, et qui n'est PAS des écrans
+
+1. **Un chemin non atteint**, honnêtement laissé ouvert : un 422 sur une règle
+   serveur **sans miroir client ni branche de statut** afficherait la clé brute
+   `validation.required`. Le code de ce chemin existe (`extractApiMessage`, repli
+   de dix écrans). *Je ne l'ai pas atteint, donc je n'écris pas qu'il est emprunté.*
+2. **`X39-023` appelle un correctif d'une ligne** : `DB_TIMEZONE=Europe/Paris`
+   dans `.env.example`, `.env`, `backend/.env`, `docker-compose.verif.yml`.
+   ⚠️ **Non appliqué** — le mandat n'a pas demandé de correctif dans cette passe.
+3. Reprendre `OU-ON-EN-EST.md` §8 à l'**étape 5** (vague du dépôt du site).
+
+## ⚠️ En attente de Will, inchangé
+
+**La PR de `fix/gardes-de-plan-et-c19-010` n'est PAS ouverte**, conformément à la
+consigne. Rien n'a été poussé sur un dépôt public.

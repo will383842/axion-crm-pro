@@ -1,0 +1,30 @@
+{
+  "tours": [
+    {
+      "tour": 1,
+      "alertes": [
+        "Tag créé",
+        "Tag créé"
+      ],
+      "extraitFin": "cueil / Tags 🔍 Rechercher ⌘K ☀ ⚙ ☾ A3 Audit 360 Tags Classification multi-axes des entreprises (géographie, secteur, taille, intent, custom). Nouveau tag TOTAL TAGS 0 tous axes confondus AUTO 0 géo, secteur, taille MANUEL 0 créés par l'équipe LLM 0 intent classification IA Aucun tag Crée ton premier tag manuel ou attends que le pipeline d'enrichissement génère les tags auto. Créer un tag Tag créé"
+    },
+    {
+      "tour": 2,
+      "alertes": [
+        "Slug déjà utilisé",
+        "Slug déjà utilisé"
+      ],
+      "extraitFin": "dus AUTO 0 géo, secteur, taille MANUEL 1 créés par l'équipe LLM 0 intent classification IA Custom Tags manuels 1 tag Etiquette de verification 0 Nouveau tag Nom* Slug (optionnel) Auto-généré depuis le nom si vide. a-z, 0-9, - uniquement. Catégorie Géographie Secteur Taille Intent (LLM) Custom Couleur slate sky violet emerald amber rose indigo Description (optionnel) Annuler Créer Slug déjà utilisé"
+    }
+  ],
+  "reponsesApi": [
+    {
+      "statut": 201,
+      "corps": "{\"data\":{\"id\":1,\"slug\":\"etiquette-de-verification\",\"name\":\"Etiquette de verification\",\"color\":\"slate\",\"category\":\"custom\",\"kind\":\"manual\",\"description\":null,\"companies_count\":0,\"created_at\":\"2026-08-23T11:44:35+02:00\",\"updated_at\":\"2026-08-23T11:44:35+02:00\"}}"
+    },
+    {
+      "statut": 409,
+      "corps": "{\"error\":\"slug already exists\",\"tag\":{\"id\":1,\"slug\":\"etiquette-de-verification\",\"name\":\"Etiquette de verification\",\"color\":\"slate\",\"category\":\"custom\",\"kind\":\"manual\",\"description\":null,\"companies_count\":0,\"created_at\":\"2026-08-23T11:44:35+00:00\",\"updated_at\":\"2026-08-23T11:44:35+00:00\"}}"
+    }
+  ]
+}

@@ -93,6 +93,50 @@ services:
     # Plafond du journal Docker — constat F39-011. Voir l ancre `x-journal`
     # en tete de fichier : 10 Mio x 5 = 50 Mio par conteneur, jamais plus.
     logging: *journal
+    # 🔴 JOURNALISATION DES CONNEXIONS — mesure n° 7 du registre des
+    # violations de données (`_REPORTS/REGISTRE-DES-VIOLATIONS-DE-DONNEES.md`),
+    # identifiée le 2026-08-19 et restée non réalisée.
+    #
+    # POURQUOI CETTE LIGNE EXISTE. La base a été joignable depuis internet
+    # pendant 94 jours, avec un mot de passe publié en clair dans un dépôt
+    # public. Au moment de décider s'il fallait notifier la CNIL, la seule
+    # phrase qu'on a pu écrire est celle-ci, et elle est dans le registre :
+    #
+    #   « Il n'est pas possible de démontrer qu'aucun accès non autorisé n'a
+    #     eu lieu : les journaux de connexion de PostgreSQL n'étaient pas
+    #     conservés. L'absence d'effet constaté n'est donc pas une preuve
+    #     d'absence d'accès. »
+    #
+    # Sans ces trois réglages, le prochain incident se soldera par la MÊME
+    # phrase. Ce n'est pas de l'observabilité de confort : c'est ce qui rend
+    # une violation ANALYSABLE, donc ce qui rend l'article 33 tenable.
+    #
+    # ⚠️ DANS LE FICHIER DE BASE, PAS DANS L'OVERLAY DE PRODUCTION, et c'est
+    # délibéré. Le constat F38-007 a dénombré DOUZE chemins qui lancent
+    # `docker compose up` sans `docker-compose.prod.yml`. Un réglage posé dans
+    # le seul overlay laisserait chacun de ces douze chemins recréer un Postgres
+    # muet — exactement le piège déjà payé sur la publication des ports.
+    #
+    # `%h` est le champ qui compte : l'ADRESSE D'OU VIENT LA CONNEXION. Sans
+    # lui, on saurait qu'il y a eu des connexions sans pouvoir dire d'ou.
+    #
+    # Le coût est borné : une ligne par ouverture et une par fermeture, sous le
+    # plafond de journal ci-dessus (50 Mio par conteneur). L'application passe
+    # par un pool : ce n'est pas une ligne par requête.
+    #
+    # VÉRIFIER LE CONTENEUR QUI TOURNE, JAMAIS LE FICHIER :
+    #   bash infra/scripts/verifier-journalisation-connexions-db.sh
+    # Le registre garde la trace de pourquoi cette distinction n'est pas
+    # théorique — un correctif fusionné ET déployé avec succès n'avait rien
+    # fermé, parce qu'un déploiement ne recrée pas les conteneurs de base.
+    command:
+      - postgres
+      - -c
+      - log_connections=on
+      - -c
+      - log_disconnections=on
+      - -c
+      - "log_line_prefix=%m [%p] %q%u@%d de %h "
     environment:
       POSTGRES_DB: axion_crm
       POSTGRES_USER: axion

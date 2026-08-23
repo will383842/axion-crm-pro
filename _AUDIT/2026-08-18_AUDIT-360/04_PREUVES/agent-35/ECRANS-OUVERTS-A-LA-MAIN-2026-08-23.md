@@ -1489,3 +1489,66 @@ demande une pile où le canal est armé.*
 > **Règle à tenir** : avant de conclure qu'une route ne répond pas, demander ses
 > routes au produit (`route:list`). Et ne jamais tester une garde applicative
 > par un geste qui court-circuite l'application.
+
+---
+
+### ✅ Parcours 12, le point qui manquait : LA PROPAGATION VERS LE SITE EST MESURÉE
+
+Le canal a été **armé sur le banc** (`docker-compose.verif.banc.yml`, surcharge
+qui n'est jamais déployée) : `SITE_SYNC_HMAC_SECRET` + `CRM_INGEST_ENABLED=true`.
+
+⚠️ **Les variables du CONTENEUR priment sur le `.env`.** Éditer `.env` dans le
+conteneur ne suffit pas — Laravel ne remplace pas une variable d'environnement
+déjà posée. Il faut **recréer** le service avec la surcharge.
+
+**Le geste complet, signature HMAC valide** :
+
+```
+POST /api/internal/site-sync/gdpr
+X-Site-Timestamp: <horodatage>   X-Site-Signature: hmac_sha256(secret, "<ts>.<corps>")
+{"action":"erase","person_key":"<sha256 du courriel>","email":"…","scope":"both"}
+
+→ 200 {"ok":true,"action":"erase","result":{
+     "deleted":{"business":{"contacts":1,…},"vivier":{…}},
+     "opt_out_scopes":["business","vivier"]}}
+```
+
+| vérification | résultat |
+|---|---|
+| la personne disparaît du CRM | **0 contact restant** ✅ |
+| l'opposition est posée | **2 lignes**, `business` **et** `vivier`, adresse en **hash seul** ✅ |
+| signature falsifiée d'un octet | **401** `bad_signature` ✅ |
+| horodatage vieux de 4 000 s | **401** ✅ *(fenêtre de 300 s)* |
+| action inconnue (`erasure` au lieu de `erase`) | **422**, message explicite ✅ |
+| `person_key` absente ou malformée | **422**, message explicite ✅ |
+
+**Le parcours 12 est donc COMPLET.** Toute la chaîne RGPD tient, des deux côtés.
+
+#### `X39-030` (S3) — l'effacement venu du site n'inscrit pas sa base légale
+
+Les deux chemins n'écrivent pas la même chose dans `opt_out` :
+
+| origine | `source` | `reason` |
+|---|---|---|
+| demande traitée **dans le CRM** | `gdpr_erasure` | **`gdpr_art17`** |
+| demande venue **du site** | `gdpr_erasure_bisystem` | **`NULL`** |
+
+*La colonne existe pour dire POURQUOI l'opposition a été posée. Sur le chemin
+qui compte le plus — la personne qui exerce son droit depuis le site public —
+elle reste vide.* Sans gravité immédiate (le blocage fonctionne), mais c'est la
+traçabilité de la base légale qui manque.
+
+### ⚠️ DOUZIÈME PIÈGE DE MESURE — une concaténation SQL qui avale ses lignes
+
+J'ai failli inscrire un **S1** : « l'effacement venu du site ne pose aucune
+opposition, la personne revient au prochain balayage ». **Faux.**
+
+Ma requête faisait `'... motif='||reason`. Sur ces lignes, `reason` est **NULL**
+— et en SQL, une concaténation avec NULL vaut **NULL** : les deux lignes se sont
+affichées **vides**, et j'ai lu « elles n'existent pas ».
+
+`select ... from opt_out` sans concaténation les montre toutes les quatre.
+
+> **Règle** : ne jamais conclure à l'absence d'une ligne à partir d'une requête
+> qui **concatène** des colonnes possiblement nulles. Lister d'abord, formater
+> ensuite — ou `coalesce()` partout.

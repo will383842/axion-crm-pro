@@ -239,8 +239,30 @@ jobs:
           #
           # ⚠️ SI CE BLOC DISPARAIT, LE DEPLOIEMENT S'ARRETE — il ne degrade pas
           # en silence : `git fetch` echoue franchement et le job rougit.
+          # ⚠️ DEUXIEME ESSAI, et il faut dire pourquoi le premier a echoue.
+          # La version d'avant passait par un `credential.helper` pose en ligne
+          # de commande (`!f() { echo username=...; }; f`). Le jeton ARRIVAIT
+          # bien sur le serveur — la trace le montre — mais GitHub repondait
+          # « Invalid username or token » : la fonction, avec ses accolades et
+          # ses points-virgules, ne survit pas au double passage guillemets +
+          # tunnel SSH. Trop de pieces mobiles pour un chemin qui doit juste
+          # marcher.
+          #
+          # Forme explicite, une seule piece : l'URL porte l'identifiant, le
+          # temps d'UNE commande.
+          #   - `git fetch <URL>` ne TOUCHE PAS la configuration du clone : le
+          #     `remote origin` garde son URL propre. Rien n'est ecrit sur le
+          #     disque du serveur, ce qui etait la seule exigence ;
+          #   - le refspec est explicite, sinon `fetch <URL>` ne met a jour
+          #     AUCUNE reference `refs/remotes/origin/*` et le `reset --hard`
+          #     suivant travaillerait sur des references perimees ;
+          #   - `credential.helper=` neutralise un assistant eventuellement
+          #     configure sur le serveur, qui presenterait de vieux identifiants
+          #     a la place des notres ;
+          #   - si le jeton fuyait dans un message d'erreur, GitHub Actions le
+          #     masque : c'est un secret declare, il ressort en `***`.
           if [ -n "$GH_TOKEN_LECTURE" ] && [ -n "$GH_DEPOT" ]; then
-            git -c credential.helper=                 -c "credential.https://github.com.helper=!f() { echo username=x-access-token; echo password=$GH_TOKEN_LECTURE; }; f"                 fetch --all --prune
+            git -c credential.helper= fetch --prune               "https://x-access-token:${GH_TOKEN_LECTURE}@github.com/${GH_DEPOT}.git"               "+refs/heads/*:refs/remotes/origin/*"
           else
             echo "::warning::aucun jeton de lecture fourni — fetch anonyme (ne marche que si le depot est public)"
             git fetch --all --prune

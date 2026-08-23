@@ -1334,3 +1334,55 @@ demanderait une réécriture qui invaliderait 50 branches, 8 tags et les
 références d'autres sessions. *Une sauvegarde miroir complète du dépôt a été
 prise avant toute opération : `Projets/_SAUVEGARDE-AVANT-REECRITURE/depot-complet.git`
 — 50 branches, 8 tags, 33 Mo.*
+
+---
+
+## 📌 DÉCISION DE WILL, 2026-08-23 : PAS DE ROTATION DU MOT DE PASSE
+
+Réaffirmée **après** le passage du dépôt en public et **après** que les faits
+nouveaux lui ont été présentés. *Ne pas la reproposer — elle a été soulevée
+deux fois, chiffrée à chaque fois.*
+
+**Ce que ça expose** : `axion_dev_only` est dans **12 fichiers** d'un dépôt
+public et dans son historique. Et **GitHub ne le signalera jamais** :
+`secret_scanning_non_provider_patterns` **refuse de s'activer** sur un compte
+personnel — mesuré, la requête est acceptée mais le réglage reste `disabled`.
+
+### ✅ Les quatre contrôles qui la rendent tenable — tous vérifiés
+
+| # | contrôle | état mesuré |
+|---|---|---|
+| 1 | ports **5432, 6379, 55432, 56379** depuis l'extérieur | **fermés**, `DROP` persisté |
+| 2 | **80 / 443** restreints aux plages Cloudflare | IP d'origine **injoignable** |
+| 3 | `PileDeProductionSansOverlayTest` sur `main` | présente, jouée à **chaque PR** |
+| 4 | `verifier-ports-publies.sh` dans `deploy-direct-ssh.yml` | **bloquant post-déploiement** |
+
+Le 4 est le plus important : il mesure les ports **réellement publiés par les
+conteneurs en fonctionnement**, pas la configuration. Son propre commentaire le
+dit — *« la seule garde qui mesure le réel n'était branchée nulle part ici »*,
+et jusqu'au 20/08 son unique appel vivait dans le workflow de **préproduction**,
+code de retour avalé par un `|| echo`.
+
+> **Règle** : si l'un de ces quatre contrôles tombe, la décision ne tient plus
+> et il faut le dire. **Ne jamais désarmer `verifier-ports-publies.sh`.**
+
+### ⚠️ Ce qui reste à Will, et que je ne peux pas faire
+
+**Basculer la double authentification du SMS vers une application.** GitHub
+déconseille le SMS (interceptable par portage de numéro). Cela demande son
+téléphone : `Settings → Password and authentication → Two-factor methods →
+Add → Authenticator app`.
+
+### 📊 Les dépendances — mesuré le 2026-08-23
+
+**57 alertes ouvertes** (et non 67) : **4 critiques**, 18 hautes, 31 moyennes,
+4 basses.
+
+*Les 4 critiques sont toutes `vitest`, en dépendance de **développement*** —
+elles ne tournent pas en production. Le vrai sujet est ailleurs : les **hautes
+en production**, `undici` (validation de certificat TLS contournable, fuite
+d'informations entre utilisateurs), `axios` (proxy hérité), `form-data`
+(injection CRLF).
+
+C'est le **point 9 du §12**, toujours ouvert. ⚠️ **Jamais en lot** : le dépôt
+garde la trace d'une montée groupée qui a cassé `main`.

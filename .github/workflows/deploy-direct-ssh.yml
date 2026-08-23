@@ -314,6 +314,47 @@ jobs:
           # défaut corrigé le 2026-08-16. Rallumer le temps réel est une
           # décision produit : elle passe par l'overlay de prod, pas par cette
           # ligne.
+          # ══════════════════════════════════════════════════════════════════
+          # 🔴 DEBLOCAGE PREALABLE — INCIDENT DU 2026-08-23, 18h11
+          # ══════════════════════════════════════════════════════════════════
+          #
+          # Ce qui s'est passe : `compose up --force-recreate` a recree api, app
+          # et horizon, puis a bute sur le scheduler :
+          #
+          #   Error response from daemon: cannot remove container "5f9bef93...":
+          #   container is running: stop the container before removing
+          #
+          # Compose retire les conteneurs SANS `--force`. Quand l'un d'eux ne
+          # repond plus a l'arret (tache bloquee, montage occupe), le retrait
+          # echoue, `up` s'ARRETE LA — et api comme app, deja retires, ne sont
+          # JAMAIS redemarres. La production est tombee entierement a 502 alors
+          # que le defaut ne concernait qu'un cron secondaire.
+          #
+          # La relance a empire : compose a cree un doublon prefixe d'un hash
+          # (`11768d02a99c_axion-crm-scheduler`), qui entrait alors en conflit de
+          # NOM avec le zombie. Deux conteneurs pour un nom, aucun ne demarre.
+          #
+          # 🔑 CE BLOC RETIRE DE FORCE CE QUI TIENT UN NOM EN OTAGE, et rien
+          # d'autre :
+          #   - les doublons prefixes d'un hash (`<hash>_axion-crm-*`), qui ne
+          #     sont JAMAIS legitimes : compose les fabrique en dernier recours ;
+          #   - le scheduler lui-meme, parce que `up --force-recreate` s'apprete
+          #     de toute facon a le remplacer. Le retirer d'avance n'enleve rien
+          #     de plus, et evite que son retrait echoue AU MILIEU du cycle.
+          #
+          # ⚠️ ON NE TOUCHE PAS a `postgres`, `redis` ni `caddy` : ils portent
+          # l'etat et ne sont pas dans la liste de `--force-recreate`.
+          echo "::group::deblocage des conteneurs coinces"
+          for fantome in $(docker ps -a --format '{{.Names}}' | grep -E '^[0-9a-f]+_axion-crm-' || true); do
+            echo "doublon prefixe d'un hash : $fantome — retrait force"
+            docker rm -f "$fantome" || true
+          done
+          if docker ps -a --format '{{.Names}}' | grep -qx 'axion-crm-scheduler'; then
+            echo "scheduler present — retrait force avant recreation"
+            docker rm -f axion-crm-scheduler || true
+          fi
+          echo "::endgroup::"
+
           docker compose up -d --build --force-recreate --no-deps api app horizon scheduler
 
           # 🔴 F40-005 (2026-08-20) — LE PIÈGE 18, RÉPARÉ POUR LA PRÉPRODUCTION

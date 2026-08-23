@@ -1361,3 +1361,131 @@ rôle ni permission »*. Mesuré, connecté **en tant que lecteur** :
 ✅ *Et deux écrans ne lui offrent RIEN* : `/` et `/console/contacts`. Le constat
 n'est donc pas uniforme — c'est une raison de plus de le mesurer écran par écran
 plutôt que de le déclarer en bloc.
+
+---
+
+## Parcours 12 — RGPD de bout en bout · ✅ **le produit tient**
+
+> *Énoncé : « déposer une demande, la traiter, exporter par jeton, effacer,
+> vérifier la propagation vers le site et l'anti-réinsertion ».*
+
+**Ce parcours rejoue AU GESTE trois fermetures que le registre ne validait que
+par lecture de diff** — `B15-003` (l'export ne couvrait que 4 tables sur 31),
+`B15-006` (l'effacement laissait adresse et téléphone dans six tables),
+`B15-010` (les routes RGPD n'exigeaient aucune permission).
+
+### ✅ La chaîne complète, jouée sur une personne réelle de la base
+
+| étape | geste | résultat |
+|---|---|---|
+| 1 | `POST /rgpd/requests` type `access` | **201**, `status: pending` |
+| 2 | `POST /rgpd/requests/{id}/process` | **200**, `status: done`, jeton émis, `export_expires_at` à **J+7** |
+| 3 | `GET /rgpd/export/{jeton}` **sans aucune session** | **200** ✅ |
+| 4 | `POST /rgpd/requests` type `erasure` puis `process` | **200**, `deleted: {contacts: 1, …}` |
+| 5 | la personne en base | **0 ligne** ✅ |
+
+### 🔑 `B15-003` est VÉRIFIÉ AU GESTE — et il vaut mieux que sa fermeture
+
+L'export livré à la personne concernée porte **21 collections**, pas 4 :
+
+```
+contacts · candidates · email_validations · rgpd_requests · magic_links_history
+activities · journalists · media_contacts · health_practitioners
+email_messages · email_verification_logs · notifications · oppositions
+suppressions_techniques · desabonnements · listes_ne_pas_appeler
+comptes_crm · invitations_recues · reinitialisations_mot_de_passe
+sessions_ouvertes · signaux_envoyes_au_site
+```
+
+*Et les noms sont en français, pour une pièce que lit une personne concernée.*
+
+### ✅ Le jeton d'export est bien conçu — vérifié, pas supposé
+
+| | mesure |
+|---|---|
+| jeton brut remis | **48 signes**, rendu dans `result.token` |
+| ce qui est stocké | `sha256(jeton)` — **le brut n'est jamais en base** |
+| expiration | **7 jours**, portée par `export_expires_at` |
+| l'archive elle-même | chiffrée sur disque (`Crypt::encryptString`) |
+| jeton inventé par un tiers | **404** `invalid_or_expired_token` |
+| session requise | **aucune** — c'est le point : la personne concernée n'a pas de compte |
+
+### 🔑 L'ANTI-RÉINSERTION EXISTE, ET ELLE COUVRE LES DEUX UNIVERS
+
+L'effacement écrit **deux** lignes d'opposition — une par univers :
+
+```
+source=gdpr_erasure  reason=gdpr_art17  scope=business  email_hash=95289698b544…
+source=gdpr_erasure  reason=gdpr_art17  scope=vivier    email_hash=95289698b544…
+```
+
+**L'adresse n'y figure PAS en clair** — seul le hash. *C'est exactement la bonne
+conception : on bloque quelqu'un sans conserver son adresse.*
+
+Et le hash correspond, vérifié à l'octet :
+
+```
+sha256('jean.dupont@exemple.test') = 95289698b544db25f9a4a74483189186589ea40df3be3a9e6ab2af18ee8facca
+stocké dans opt_out                = 95289698b544db25f9a4a74483189186589ea40df3be3a9e6ab2af18ee8facca
+```
+
+Les deux univers sont gardés, chacun par son service :
+
+| univers | garde | scope consulté |
+|---|---|---|
+| business | `ScrapedRecordIngestService.php:452-460` → `return 'opted_out'` | `'business'` |
+| vivier | `SiteSyncIngestService::hasOpposed($event, $scope)` | `'vivier'` |
+
+### ✅ La preuve de conformité SURVIT à l'effacement
+
+L'effacement supprime la ligne `rgpd_requests` de la personne — ce qui est
+cohérent (elle porte son adresse). **Mais la trace reste dans le journal
+d'audit**, chaînée :
+
+```
+POST api/v1/rgpd/requests            201
+POST api/v1/rgpd/requests/5/process  200
+GET  api/v1/rgpd/export/{token}      200   ← même le TÉLÉCHARGEMENT est tracé
+```
+
+*On peut donc démontrer qu'on a honoré la demande, sans conserver la personne.*
+
+### ⚠️ La propagation vers le site n'est PAS testable sur cette pile
+
+`POST /api/internal/site-sync/gdpr` — **et non `/api/v1/…`**, la route vit sous
+le préfixe `internal`, sans version.
+
+| geste | réponse |
+|---|---|
+| sans signature | **401** `bad_signature` |
+| avec une signature inventée | **401** `bad_signature` |
+
+`SITE_SYNC_HMAC_SECRET` est **vide** et `CRM_INGEST_ENABLED=false` : la porte est
+fermée par configuration, et **elle refuse correctement** — 401, pas 500, pas
+une acceptation silencieuse.
+
+*Je n'ai donc pas mesuré la propagation elle-même, et je ne fabrique pas un
+secret pour faire semblant. **Ce point du parcours 12 reste ouvert**, et il
+demande une pile où le canal est armé.*
+
+---
+
+### ⚠️ TROIS PIÈGES DE MESURE PAYÉS SUR CE SEUL PARCOURS — tous de ma main
+
+*Aucun n'était un défaut du produit. Tous auraient pu être écrits comme tels.*
+
+1. **« L'export par jeton rend 404 »** — je lisais le jeton dans la **colonne**
+   `export_token`, qui contient le **hash**. Le jeton brut est dans
+   `result.token` de la réponse. *Le produit hache au repos, ce qui est juste ;
+   c'est moi qui présentais le hash comme s'il était le jeton.*
+2. **« La propagation rend 404 »** — je tapais `/api/v1/site-sync/gdpr`. La
+   route vit sous `internal`, **sans `/v1`**. `php artisan route:list` l'a dit
+   en une commande, après que j'aie conclu deux fois.
+3. **« L'anti-réinsertion ne marche pas »** — j'avais réinséré la personne par
+   un `INSERT` SQL direct. **Un INSERT contourne par construction toute garde
+   applicative** : la mesure ne valait rien. La vraie garde vit dans le service
+   d'ingestion, et elle tient.
+
+> **Règle à tenir** : avant de conclure qu'une route ne répond pas, demander ses
+> routes au produit (`route:list`). Et ne jamais tester une garde applicative
+> par un geste qui court-circuite l'application.

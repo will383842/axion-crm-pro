@@ -109,7 +109,25 @@ Route::prefix('v1')->group(function () {
         Route::get('/workspace', [WorkspaceController::class, 'show']);
         Route::put('/workspace', [WorkspaceController::class, 'update'])
             ->middleware('permission:workspaces.manage');
-        Route::get('/users', [UsersController::class, 'index']);
+        // 🔴 X39-028 — cette route etait la SEULE des quatre sans garde, et
+        // c'est celle qui rend le plus : nom, ADRESSE E-MAIL, roles, etat de la
+        // 2FA et derniere connexion de CHAQUE compte de l'espace de travail.
+        //
+        // Mesure du 2026-08-23 : un compte de role `viewer` — trois permissions,
+        // `companies.view` / `llm.view_usage` / `rgpd.view` — obtenait 200 et
+        // lisait la liste complete.
+        //
+        // ⚠️ L'INTERFACE ETAIT DEJA ECRITE POUR LE 403 QUI NE VENAIT JAMAIS.
+        // `UsersPage.tsx` le dit dans son propre commentaire : « `/users` est
+        // une route ADMIN : un operateur sans le role recoit 403, et c'est le
+        // cas NOMINAL, pas l'exception. » Le code defensif ecrit pour ce refus
+        // ne s'executait pas une seule fois. Poser la garde ne casse donc rien :
+        // elle fait enfin arriver le cas que l'ecran attendait deja.
+        //
+        // `owner` et `admin` portent `users.manage` ; `operator` et `viewer`
+        // non — c'est le partage voulu par `PermissionsAndRolesSeeder`.
+        Route::get('/users', [UsersController::class, 'index'])
+            ->middleware('permission:users.manage');
         Route::post('/users', [UsersController::class, 'store'])
             ->middleware('permission:users.manage');
         Route::put('/users/{user}', [UsersController::class, 'update'])

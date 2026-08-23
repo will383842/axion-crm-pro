@@ -310,3 +310,72 @@ describe('QueryErrorState — les autres natures', () => {
     expect(texteEcran()).not.toContain(TEXTE_REFUS);
   });
 });
+
+// ---------------------------------------------------------------------------
+// X39-028 — quand le serveur REFUSE la vue, l'ecran ne doit plus proposer
+// l'action qui en decoule.
+//
+// ═══ LE DEFAUT MESURE, le 2026-08-23 ═══
+//
+// `GET /users` etait la SEULE des quatre routes utilisateur sans garde de
+// permission. Un compte de role `viewer` obtenait 200 et lisait nom, ADRESSE
+// E-MAIL, roles, etat de la 2FA et derniere connexion de chaque compte.
+//
+// La garde serveur posee (`permission:users.manage`), le refus arrive enfin —
+// et l'ecran a montre son second defaut : il affichait
+//
+//     « Vous n'avez pas les droits sur cette vue »
+//
+// et, JUSTE AU-DESSUS, le bouton « Inviter un utilisateur ». Un compte qui ne
+// peut meme pas consulter la liste des membres etait invite a en recruter. Le
+// POST qui aurait suivi serait reparti en 403, sans plus d'explication —
+// exactement le scenario que le commentaire de `UsersPage.tsx` decrit.
+//
+// ⚠️ CE QUE CETTE GARDE N'EST PAS. Elle ne verifie AUCUNE permission cote
+// interface : le constat D22-006 (« 33 ecrans sur 37 n'interrogent jamais role
+// ni permission ») reste ouvert. Elle verifie seulement que l'ecran cesse de
+// proposer une action APRES que le serveur a refuse la lecture. La vraie
+// protection est cote serveur, et c'est elle qui compte.
+// ---------------------------------------------------------------------------
+
+const BOUTON_INVITER = 'Inviter un utilisateur';
+
+describe("X39-028 — l'action disparait quand le serveur refuse la vue", () => {
+  it('TEMOIN — sous 200, le bouton « Inviter un utilisateur » EST propose', async () => {
+    // Sans ce temoin, la garde passerait au vert sur un ecran qui n'afficherait
+    // JAMAIS le bouton — un autre defaut, et elle ne saurait pas le voir.
+    await renderScreen(<UsersPage />, {
+      path: '/admin/users',
+      handlers: [getJson('/users', { data: [] })],
+    });
+
+    await waitFor(() => {
+      expect(texteEcran()).toContain('Aucun utilisateur');
+    });
+    expect(texteEcran()).toContain(BOUTON_INVITER);
+  });
+
+  it('sous 403, le bouton disparait — on ne propose pas de recruter a qui ne peut pas lire', async () => {
+    await renderScreen(<UsersPage />, {
+      path: '/admin/users',
+      handlers: [erreurGet('/users', 403)],
+    });
+
+    await waitFor(() => {
+      expect(texteEcran()).toContain(TEXTE_REFUS);
+    });
+    expect(texteEcran()).not.toContain(BOUTON_INVITER);
+  });
+
+  it('sous 500 aussi : une panne n est pas le moment de proposer une invitation', async () => {
+    await renderScreen(<UsersPage />, {
+      path: '/admin/users',
+      handlers: [erreurGet('/users', 500)],
+    });
+
+    await waitFor(() => {
+      expect(texteEcran()).toContain(TEXTE_PANNE);
+    });
+    expect(texteEcran()).not.toContain(BOUTON_INVITER);
+  });
+});

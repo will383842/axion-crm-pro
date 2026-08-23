@@ -268,3 +268,52 @@ test('F36-001 — RECENSEMENT : toute ecriture authentifiee porte une permission
         . 'ajoutez-la ci-dessus AVEC SA RAISON — jamais sans.',
     );
 });
+
+// ---------------------------------------------------------------------------
+// X39-028 — LA LECTURE AUSSI. `GET /users` etait la seule des quatre routes
+// utilisateur sans garde, et c'est celle qui rend le plus.
+//
+// ═══ CE QUI ETAIT MESURE, LE 2026-08-23 ═══
+//
+//   GET /api/v1/users   par un compte de role `viewer`   ->  200
+//
+// Les trois autres routes utilisateur portent `permission:users.manage`
+// (`routes/api.php:113,115,117`). L'index, lui, n'en portait aucune — et il rend
+// nom, ADRESSE E-MAIL, roles, etat de la 2FA et derniere connexion de CHAQUE
+// compte de l'espace de travail.
+//
+// Le `viewer` a trois permissions : companies.view, llm.view_usage, rgpd.view.
+// Aucune ne dit « lire la liste des membres ».
+//
+// ⚠️ ET L'INTERFACE ETAIT DEJA ECRITE POUR LE REFUS. `UsersPage.tsx` porte, dans
+// son propre commentaire : « `/users` est une route ADMIN : un operateur sans le
+// role recoit 403, et c'est le cas NOMINAL, pas l'exception. » Le code defensif
+// ecrit pour ce 403 ne s'executait pas une seule fois. La garde ne casse donc
+// rien : elle fait arriver le cas que l'ecran attendait deja.
+// ---------------------------------------------------------------------------
+
+test('X39-028 — un compte LECTURE SEULE ne lit PAS la liste des membres', function () {
+    $viewer = f36bCompte('viewer');
+
+    $this->actingAs($viewer)->getJson('/api/v1/users')->assertForbidden();
+});
+
+test('X39-028 — un OPERATEUR non plus : « CRUD sans destruction » n est pas « gestion d equipe »', function () {
+    $operator = f36bCompte('operator');
+
+    $this->actingAs($operator)->getJson('/api/v1/users')->assertForbidden();
+});
+
+test('X39-028 — TEMOIN : un ADMIN lit bien la liste, lui', function () {
+    // Sans ce temoin, la garde passerait au vert sur une route CASSEE pour tout
+    // le monde — un autre defaut, et elle ne saurait pas le voir.
+    $admin = f36bCompte('admin');
+
+    $this->actingAs($admin)->getJson('/api/v1/users')->assertOk();
+});
+
+test('X39-028 — TEMOIN : le PROPRIETAIRE aussi', function () {
+    $owner = f36bCompte('owner');
+
+    $this->actingAs($owner)->getJson('/api/v1/users')->assertOk();
+});

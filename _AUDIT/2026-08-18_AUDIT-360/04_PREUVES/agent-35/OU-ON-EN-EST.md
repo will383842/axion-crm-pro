@@ -540,3 +540,68 @@ rendre les règles de pare-feu **persistantes** (elles sautent au redémarrage),
 faire tourner les secrets, trancher l'article 33 du RGPD.
 *Je n'ai pas touché à la production — ces trois points reposent sur le relevé du
 19/08, pas sur une mesure d'aujourd'hui.*
+
+---
+
+# 🔴 CORRECTION D'ÉTAT — les « trois gestes de Will » étaient DÉJÀ FAITS
+
+> Écrit le 2026-08-23 après vérification. **Ce dossier, sa mémoire de reprise et
+> moi-même avons répété pendant quatre jours que trois choses attendaient Will.
+> Les trois étaient réglées depuis le 19 août, et écrites.**
+
+Ce que je répétais, et ce qui est vrai :
+
+| ce qui était annoncé « en attente » | ce qui est mesuré |
+|---|---|
+| « rendre les règles de pare-feu persistantes » | ✅ **FAIT le 19/08** — `iptables-persistent`, puis re-sauvegarde sur l'état propre (registre, mesure n° 2) |
+| « faire tourner les secrets » | ✅ **TRANCHÉ le 19/08** — examinée et **écartée par le dirigeant**, motif écrit, **risque résiduel assumé** (registre, mesure n° 6) |
+| « trancher l'article 33 » | ✅ **TRANCHÉ le 19/08** — *« Décision du responsable de traitement : NE PAS NOTIFIER »*, prise par Williams Jullin, avec sa motivation (registre, §7) |
+
+**Où c'est écrit, et c'est sur `main`** :
+`_REPORTS/REGISTRE-DES-VIOLATIONS-DE-DONNEES.md` et
+`_REPORTS/2026-08-19_BROUILLON-NOTIFICATION-CNIL-ART33.md`.
+La branche `docs/registre-violations` est **entièrement fusionnée** (0 commit
+d'avance sur `main`).
+
+*L'obligation de documentation de l'article 33 §5 — qui vaut **même quand on ne
+notifie pas** — est donc remplie.*
+
+## Pourquoi je ne l'avais pas vu
+
+Je lisais la mémoire de reprise, qui datait du 20/08 et disait « restent ouverts :
+persistance, secrets, article 33 ». Elle était juste **ce jour-là**. Le registre a
+été écrit le 19, la fusion a eu lieu ensuite, et personne n'est revenu fermer la
+note. *C'est le défaut que ce dépôt paie sans cesse : une note d'état qui survit à
+la réalité qu'elle décrit.* Mémoire corrigée le 23/08.
+
+## ⚠️ CE QUI RESTE VRAIMENT OUVERT — un seul point, et il est dans le registre
+
+**Mesure n° 7, identifiée le 19/08, non réalisée : la journalisation des
+connexions à la base.**
+
+Ce n'est pas une ligne de plus sur une liste. C'est **exactement ce qui a empêché
+de conclure** sur l'incident, et le registre le dit lui-même :
+
+> ⚠️ *Il n'est pas possible de démontrer qu'aucun accès non autorisé n'a eu lieu :
+> les journaux de connexion de PostgreSQL n'étaient pas conservés. L'absence
+> d'effet constaté n'est donc pas une preuve d'absence d'accès.*
+
+C'est cette phrase qui a rendu la décision de non-notification plus lourde à
+porter qu'elle n'aurait dû l'être. **Tant que `log_connections` et
+`log_disconnections` restent inactifs, un incident futur se soldera par la même
+phrase.**
+
+*Deux réglages dans la configuration Postgres. Le correctif se prépare ici ;
+l'appliquer à la production reste un geste de Will.*
+
+## 📌 Rappel du risque résiduel accepté
+
+Le mot de passe `axion_dev_only` figure dans **huit fichiers** d'`origin/main`,
+dépôt **public**, et il n'est pas tourné — décision assumée et consignée. Le seul
+garde-fou est donc `infra/scripts/verifier-ports-publies.sh`, qui mesure **les
+conteneurs en fonctionnement** et non la configuration.
+
+⚠️ **Cette distinction n'est pas théorique, et le registre en garde la trace** :
+le correctif de fond, *une fois fusionné et déployé avec succès*, **n'avait rien
+fermé** — un déploiement ne recrée pas les conteneurs de base de données. Sans ce
+contrôle, l'illusion aurait tenu. *Ne jamais désarmer ce script.*

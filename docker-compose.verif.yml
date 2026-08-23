@@ -114,6 +114,22 @@ services:
       APP_URL: http://verif.localhost:8080
       APP_ENV: local
       APP_DEBUG: "true"
+      # 🔴 SEPTIEME VERROU DE MESURE, decouvert le 2026-08-23 (constat X39-023).
+      #
+      # Sans cette ligne, la session Postgres reste sur son defaut UTC pendant
+      # que Carbon vit a Paris (`APP_TIMEZONE`). Eloquent ecrit alors l'heure
+      # murale parisienne dans une colonne `timestamptz`, qui la relit comme de
+      # l'UTC : chaque horodatage part DEUX HEURES DANS LE FUTUR.
+      #
+      # Vu ROUGE sur cette pile meme, l'ecart etant rendu par Postgres :
+      #   postgres now()  : 09:46:17
+      #   created_at (UTC): 11:46:14      ecart = 01:59:56
+      #
+      # Le banc ne peut pas le voir : `phpunit.xml:100` et `phpunit-ci.xml:108`
+      # fournissent la variable, donc `HorodatagesFuseauTest` reste vert meme
+      # quand un deploiement, lui, ne l'a pas. Meme motif que l'APP_KEY
+      # ci-dessous : le verrou est invisible a toute la suite de tests.
+      DB_TIMEZONE: Europe/Paris
       # 🔴 CINQUIEME VERROU DE CONNEXION — vu ROUGE le 2026-08-23.
       #
       # `APP_KEY` est VIDE dans les QUATRE fichiers : `.env:22` et

@@ -15,9 +15,12 @@
 
 ## 0. REPRENDRE CETTE SESSION EN UNE PHRASE
 
-**Les 15 thèmes S2 ont tous été expliqués une première fois, en survol.
-La suite attend le choix de Will : quel thème ouvrir constat par constat,
-avec les citations `fichier:ligne`.**
+> ⚠️ **CE §0 EST PÉRIMÉ DEPUIS LE PASSAGE EN AUTOPILOTE.** La session a changé
+> de nature en cours de route : elle a cessé d'expliquer pour exécuter.
+> **Aller directement à la PARTIE 2**, plus bas — et à son §2.9, qui dit ce qui
+> attend Will. Ce qui suit ne vaut que pour la première moitié de la session.
+
+**Les 15 thèmes S2 ont tous été expliqués une première fois, en survol.**
 
 Pour reprendre sans rien relire d'autre :
 
@@ -565,3 +568,170 @@ n'a pas à exister), ou les **assumer par écrit** comme périmètre futur.
 | `441a1d7` | lots 1 et 2 — la cloche et les vues sauvegardées (6 routes) |
 | `8d4a49f` | lot 3 — `PUT /workspace`, et la correction du compte 20 → 19 |
 | `752f92a` | lot 4 — les trois portes des comptes, et les deux gardes remises d'aplomb |
+
+---
+
+## 2.7 CHANTIER 2 — LA REFONTE DE NAVIGATION
+
+**4 des 8 redirections écrites. Les 4 autres ne le sont pas, et ce n'est pas un
+oubli.**
+
+| # | redirection | état |
+|---:|---|---|
+| 24 | `/cold-email` → `/pas-encore-livre?lot=L7` | ✅ **écrite** |
+| 25 | `/linkedin` → `/pas-encore-livre?lot=L7` | ✅ **écrite** |
+| 26 | `/crm` → `/contacts` | ✅ **écrite** |
+| 27 | `/analytics` → `/` | ✅ **écrite** — ⚠️ écart assumé |
+| 2 | `/console/contacts` → `/companies` | 🔴 **décision produit** |
+| 5 | `/journalists` → `/contacts?vue=presse` | 🔴 **la vue épinglée n'existe pas** |
+| 6 | `/media` → `/companies?vue=presse` | 🔴 **idem** |
+| 12 | `/international/roumanie` → `/coverage?pays=RO` | 🔴 **le filtre pays n'existe pas** |
+
+### Pourquoi les quatre écrites sont un gain net
+
+Leurs adresses sont aujourd'hui soit un **404 hors gabarit** (`D23-009` : l'écran
+« Page introuvable » a pour parent `rootRoute`, pas `layoutRoute` — il se rend
+donc **sans barre latérale**, avec un seul lien), soit un **écran de
+démonstration** qui donne le change (`I48-008` : « le seul endroit où le produit
+DÉPASSE son périmètre »).
+
+### Pourquoi les quatre autres ne le seraient pas
+
+Les vues épinglées `?vue=presse` et le filtre `?pays=RO` figurent **eux-mêmes
+parmi les éléments « créés »** du §8.2 — donc absents aujourd'hui. Écrire ces
+301 maintenant remplacerait **trois écrans qui fonctionnent** par une liste non
+filtrée : *une régression déguisée en avancement.* Un test les fige avec leur
+raison ; le jour où les vues existent, il rougira.
+
+### Deux couches, et ce n'est pas un doublon
+
+Le §8.2 écrit « **301** ». Une redirection de routeur n'en est **pas** une : le
+serveur rend `index.html` en **200**, le navigateur charge tout le JavaScript, et
+l'adresse change ensuite. Les quatre `redir … permanent` sont donc **aussi**
+posées dans `frontend/Caddyfile.app`. La 301 sert ce qui **arrive de
+l'extérieur** (signets, liens, sondes, moteurs) ; celle du routeur sert la
+navigation **interne**, où aucune requête HTTP n'est émise.
+
+### 🔴 Un trou de garde trouvé en chemin
+
+Le job CI **« Le Caddyfile est-il valide ? »** existe parce que *« Caddy refuse
+de démarrer sur un fichier invalide, et plus rien ne répond »*. Il ne validait
+que `infra/caddy/Caddyfile`.
+
+**`frontend/Caddyfile.app` n'était couvert par rien** — alors qu'il est cuit
+dans l'image du conteneur `app` et sert le SPA. Une faute de frappe dedans
+produit exactement le symptôme que le job veut prévenir. Une étape est ajoutée,
+et elle **mord** : mesuré, `exit 1` sur un fichier fautif, `exit 0` sur le vrai.
+
+### Trois gardes existantes ont rougi sur mon travail, et toutes avaient raison
+
+- **`D29-003`** — supprimer les deux écrans laissait `phase2.stub.*` en clés
+  mortes dans `fr.json` **et** `en.json`. Retirées des deux, comme elle l'exige.
+- **`D23-006`** — mes trois routes neuves n'avaient aucun libellé de fil
+  d'Ariane : il serait retombé sur l'URL brute, en anglais.
+- **`only-throw-error`** — `redirect()` n'est pas une `Error`. Désarmée **ligne
+  par ligne** avec sa justification, jamais sur le fichier.
+
+*Mesure : `tsc --noEmit` propre, `eslint --max-warnings 0` à zéro, **423 tests
+verts** sur 60 fichiers, `Caddyfile.app` valide.*
+
+---
+
+## 2.8 CHANTIER 3 — LES GRILLES VIDES
+
+**Deux fichiers, et ils ne disent volontairement pas la même chose.**
+
+### `11_GRILLES/inventaire-code.md` — généré
+
+158 lignes, **aucune vide** : 11 policies, 45 contrôleurs, 68 services,
+34 workers. Pour chacun : taille, méthodes publiques, tables touchées par
+`DB::table()`, nombre de fichiers appelants, et si un test le **nomme**.
+
+**Généré, pas écrit à la main** — le dossier a payé la leçon deux fois : la
+colonne d'état de `FILE-DE-TRAVAIL` qui « ment » (§1.1 bis), et la liste manuelle
+de `rafraichir-le-banc.sh` à qui il manquait cinq chemins. Une grille de
+158 lignes tenue à la main est fausse en une semaine. `--verifier` sort en 1 si
+elle ne correspond plus au code.
+
+⚠️ **Elle dit aussi ce qu'elle n'est pas.** La colonne « nommé par un test » dit
+qu'un fichier prononce le nom, rien de plus. `F36-009` prouve qu'on peut
+réécrire les 11 policies **en refus total** sans qu'aucune suite rougisse.
+
+**Les écarts de compte sont écrits, pas maquillés** : l'audit annonce 84 services
+et 44 contrôleurs, les dossiers en portent **68** et **45**. On inventorie ce qui
+existe ; on ne fabrique pas de lignes pour atteindre un chiffre.
+
+### `11_GRILLES/policies-lues-a-la-main.md` — lu
+
+Ce qu'une machine ne mesure pas. Trois trouvailles :
+
+1. **9 des 11 policies sont des coquilles vides** — `class XPolicy extends
+   BasePolicy {}`, cinq lignes. `B12-003` disait « aucune policy n'est jamais
+   appelée » ; on ajoute que, **même appelées, neuf n'auraient rien dit de
+   particulier**. La seule surcharge du dépôt est `AuditLogPolicy::viewAny →
+   owner seul`, et elle est juste.
+
+2. **0 appel à `$this->authorize()`** dans les 45 contrôleurs. Un seul `->can(`,
+   et c'est une permission Spatie. L'autorisation passe **entièrement** par les
+   53 middlewares `permission:` des routes. Les policies sont un second
+   dispositif, complet sur le papier, enregistré, **jamais branché**.
+
+3. 🔴 **Le plus lourd, et il est mesuré, pas déduit.** `sameWorkspace()` rend
+   `true` quand le modèle n'a pas de `workspace_id`. J'ai mesuré les **dix**
+   modèles protégés par `Schema::getColumnListing()` :
+
+   > **Deux n'ont pas cette colonne — `workspaces` (qui porte `id`) et `users`
+   > (qui porte `current_workspace_id`).** Ce sont les deux plus sensibles.
+
+   Pour eux, `sameWorkspace()` est **toujours vraie**, et `view`/`update`/
+   `delete` ne vérifient plus que le rôle. Le jour où l'on branche
+   `authorize()`, **n'importe quel `admin` passerait la policy sur l'espace ET
+   sur les comptes de n'importe quel client.**
+
+   *Ce n'est pas une faute de `BasePolicy`, c'est une faute d'hypothèse : elle
+   suppose que la colonne d'appartenance s'appelle partout `workspace_id`, et
+   lit son absence comme « ce modèle n'appartient à personne » au lieu de « je
+   ne sais pas ». Même raisonnement que `F37-001`.*
+
+**Ordre imposé, écrit dans le document** : corriger `BasePolicy`, écrire les
+gardes, **puis** brancher `authorize()`. Jamais l'inverse — brancher d'abord
+armerait les deux fail-open d'un coup, silencieusement.
+
+---
+
+## 2.9 CE QUI ATTEND WILL À LA SORTIE DE CETTE SESSION
+
+Rien de ce qui suit n'est un correctif oublié : ce sont des **décisions**.
+
+| # | Décision | Contexte |
+|---:|---|---|
+| 1 | **Ouvrir une PR** pour les 6 commits de code | Le dépôt est **public**, et le §A00 garde la trace d'un agent qui a poussé malgré trois refus. **Rien n'est poussé.** |
+| 2 | `PUT` / `DELETE /contacts/{contact}` | Bloquées par `I48-001` / `I48-003` : `company_id` et `last_name` sont `NOT NULL`, cinq tables de personnes coexistent. Arbitrage « où vit le type ». |
+| 3 | `/cold-email` et `/linkedin` côté **API** | Le frontend est traité ; les deux routes d'API restent en 501. Les retirer, ou les assumer par écrit. |
+| 4 | `POST /proxy-providers/{p}/test` | Écart assumé, argumenté dans le code. L'écrire vraiment demande une fabrique de fournisseurs — un choix de conception. |
+| 5 | Les 4 redirections restantes | Dépendent des vues épinglées et du filtre pays, qui restent à créer. |
+| 6 | Les 9 coquilles de policies | À remplir, ou à supprimer. Neuf fichiers qui n'ajoutent rien sont soit un socle, soit du décor. |
+| 7 | Le pipeline de déploiement | Aucune protection contre la mort du transport SSH (§2.2). Le correctif n'est **pas** écrit. |
+
+---
+
+## 2.10 LES SEPT COMMITS DE CETTE SESSION
+
+**Dépôt `crmpro-wt-a35-auth`, branche `fix/gardes-de-plan-et-c19-010` — tous
+LOCAUX, aucun poussé :**
+
+| commit | contenu |
+|---|---|
+| `441a1d7` | 501 — la cloche et les vues sauvegardées (6 routes) |
+| `8d4a49f` | 501 — `PUT /workspace`, et la correction de mon compte 20 → 19 |
+| `752f92a` | 501 — les trois portes des comptes, et deux gardes remises d'aplomb |
+| `3f745b1` | 501 — routeur LLM, mandataires, rotations (14 sur 19) |
+| `51501ad` | nav — 4 des 8 redirections, les 301 Caddy, et le gate étendu |
+
+**Dépôt `Axion-CRM-Pro`, branche `audit/360-p1-p2` :**
+
+| commit | contenu |
+|---|---|
+| `496c464` | journal — la fusion de la PR #194 et les 7 minutes de 502 |
+| `46bb769` | journal — chantier 1 à mi-parcours |
+| `90d9810` | grilles — l'inventaire des quatre familles et la lecture des policies |

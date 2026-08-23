@@ -732,3 +732,69 @@ bash infra/scripts/verifier-journalisation-connexions-db.sh
 Une fois fait et vérifié, la **mesure 7** du registre des violations peut passer
 de « identifiée, non réalisée » à réalisée. *Je n'ai pas modifié le registre :
 c'est un document qui engage le responsable de traitement.*
+
+---
+
+# 🟢 X39-024 EST CORRIGÉ — 2026-08-23
+
+| | |
+|---|---|
+| branche | `fix/x39-024-valeur-des-criteres-audience`, **empilée sur** `fix/gardes-de-plan-et-c19-010` |
+| état | **poussée** |
+| pourquoi empilée | la **PR #194 modifie ce même fichier** et elle est déjà en revue — son contenu n'est pas touché. Cette branche s'ouvre **après** sa fusion. |
+
+Trois lignes dans `StoreEmailAudienceRequest` :
+
+```php
+'criteria.all.*.value' => ['sometimes'],
+'criteria.any.*.value' => ['sometimes'],
+'criteria.not.*.value' => ['sometimes'],
+```
+
+`sometimes` **sans contrainte de type** est voulu : `value` est un scalaire pour
+`eq`/`neq`/`gte`, un tableau pour `in`/`not_in`/`contains_any`, et absente pour
+`is_null`. La forme est déjà tranchée en aval par `validerCriteres()`
+(`D26-001`) ; ces trois lignes servent à faire **survivre la clé** à
+`validated()`, pas à re-valider ce qui l'est déjà.
+
+## Vu rouge puis vert TROIS FOIS, de plus en plus près du produit
+
+| étage | avant | après |
+|---|---|---|
+| le validateur seul | **0/2** valeurs conservées | **2/2**, scalaire **et** tableau |
+| les vraies règles, blocs `all` + `any` + `not` | valeurs perdues | toutes conservées |
+| **bout en bout par l'API** | audience **vide** | **2 membres** — exactement le chiffre de l'aperçu |
+
+Témoin négatif conservé dans la garde : rejouées **sans** la règle `value`, les
+mêmes données rendent toujours **0/2**. *La garde sait donc voir le défaut ; elle
+ne passe pas verte en ne mesurant rien.*
+
+Garde : `backend/tests/Feature/Audiences/ValeurDesCriteresSurvitALaValidationTest.php`
+— elle ne lit **aucun fichier** et ne compte **aucune ligne** : elle mesure ce que
+le validateur **restitue**.
+
+## ⚠️ À SAVOIR POUR LA PROCHAINE SESSION
+
+**Le conteneur `crmverif-api` porte le fichier corrigé**, posé par `docker cp`
+puis redémarrage, pour la preuve bout en bout. Il ne correspond donc plus
+exactement à l'image bâtie depuis `fix/gardes-de-plan-et-c19-010`.
+*Sans conséquence — le correctif est celui qui vient d'être poussé — mais à
+savoir avant de conclure quoi que ce soit sur cette pile.*
+
+Données semées dans la base jetable pour ces mesures : 5 entreprises (dont une
+à `sector_main` **NULL** et une nommée « **Société Générale de Vérification** »
+pour l'essai des accents), 1 contact (**Jean Dupont**, courriel et téléphone),
+1 média, 1 collecte, et plusieurs audiences d'essai.
+
+---
+
+# 📌 L'ÉTAT DES BRANCHES À LA FIN DU 2026-08-23
+
+| branche | état | ce qu'elle porte |
+|---|---|---|
+| `fix/gardes-de-plan-et-c19-010` | **poussée** — **PR #194 ouverte, VERTE, non fusionnée** | les 91 correctifs de la vague 2 |
+| `fix/journalisation-connexions-db` | **poussée**, pas de PR | mesure 7 du registre des violations |
+| `fix/x39-024-valeur-des-criteres-audience` | **poussée**, pas de PR | le correctif `X39-024`, **à ouvrir APRÈS #194** |
+| `Axion-CRM-Pro` · `audit/360-p1-p2` | commitée localement | les journaux d'audit |
+
+⚠️ **Aucune fusion n'a été faite.** Les trois fusions sont des gestes de Will.

@@ -260,3 +260,201 @@ plan qui « fait foi » **n'est versionné dans aucun dépôt**.
 | ″ | Survol des 15 thèmes donné à Will + synthèse en 3 familles + recommandation d'ordre |
 | ″ | Will : *« Sauvegarde au fur et à mesure… »* → création de ce journal, commité |
 | ⏳ | **en attente** : quel thème Will veut ouvrir constat par constat |
+
+---
+
+# PARTIE 2 — PASSAGE EN AUTOPILOTE (2026-08-23, soir)
+
+> **La session change de nature ici.** Elle n'explique plus : elle exécute.
+> Consigne de Will, mot pour mot : *« Occupe-toi de la PR en faisant attention
+> puis fais tout dans l'ordre en autopilot sans t'arrêter »*, suivie des trois
+> chantiers repris ci-dessous.
+>
+> Le journal reste **un seul fichier**, dans l'ordre chronologique.
+
+## 2.0 L'ORDRE DE MARCHE
+
+| # | chantier | état |
+|---:|---|---|
+| 0 | **PR #194** — la fusionner, avec précaution | ✅ **fusionnée** `392a7377` — mais **incident de production**, voir §2.2 |
+| 1 | **19 routes 501 + 9 écrans à corps figé** (exigence n° 10 du §12) | 🔄 en cours — recensement fait, voir §2.3 |
+| 2 | **La refonte de navigation jamais appliquée** — 8 redirections, 0 écrite | ⏳ pas commencé |
+| 3 | **Les grilles vides** — 11 policies, 84 services, 44 contrôleurs | ⏳ pas commencé |
+
+---
+
+## 2.1 LA PR #194 — ce qui a été vérifié AVANT de fusionner
+
+Je ne me suis pas contenté du vert de la forge. Ce qui a été lu, dans cet ordre :
+
+| vérification | résultat |
+|---|---|
+| état de la PR | `MERGEABLE` · `CLEAN` · 321 fichiers, +17 069 / −1 383 |
+| les 24 contrôles | **tous `pass`** (3 `skipping` non bloquants) |
+| local == distant | ✅ `b94ee76` des deux côtés — la note « 5 commits locaux » du dossier était **périmée** |
+| **fichiers de production touchés** | ✅ **aucun** — ni `docker-compose.prod.yml`, ni `Dockerfile.laravel`, ni le `Caddyfile` de prod |
+| `docker-compose.yml` (+7 lignes) | ✅ **des commentaires seulement**, lus ligne à ligne |
+| **migrations neuves** | **une seule** : `2026_08_22_150000_audit_logs_prev_hash_sans_defaut` |
+| cette migration, lue en entier | ✅ **sans danger** — `ALTER … DROP DEFAULT` est une opération de **catalogue** : aucune ligne réécrite, instantané même sur une table énorme ; tolère table simple **ou** partitionnée (boucle vide si pas de partition) ; `prev_hash` est créée par `2026_05_16_000002`, donc présente en production |
+| l'exception ajoutée au scanner de secrets | ✅ **vérifiée moi-même**, pas crue sur parole |
+
+🔑 **Sur l'exception de `gitleaks`.** Une liste blanche est exactement le geste qui
+peut enterrer une vraie fuite. Le commit `b94ee76` affirmait un faux positif ;
+j'ai cherché la valeur `un-mot-de-passe-de-reprise-2026` **dans tout le dépôt** :
+elle n'apparaît qu'à deux endroits, la ligne du test unitaire et le commentaire
+de l'exception elle-même. L'exception est posée par **empreinte** (commit + fichier
++ règle + ligne), pas par fichier — elle ne couvre donc rien d'autre. ✅ Faux
+positif confirmé.
+
+---
+
+## 2.2 🔴 INCIDENT DE PRODUCTION — 502 pendant ~7 minutes, causé par cette fusion
+
+**Il faut l'écrire, parce que c'est moi qui l'ai déclenché.**
+
+| heure (UTC) | événement |
+|---|---|
+| 11:20:33 | PR #194 fusionnée → `392a7377` sur `main` |
+| 11:20:36 | le workflow **Deploy direct SSH Hetzner** part tout seul (déclencheur : `push` sur `main`) |
+| ~11:25 | les 6 contrôles de CI passent au vert ; le déploiement démarre |
+| 11:26:01 | images construites **sur le VPS**, 4 conteneurs recréés |
+| 11:26:11 | `Container axion-crm-horizon Recreated` — **puis plus rien** |
+| **11:30:29** | 🔴 `client_loop: send disconnect: Broken pipe` → **exit 255** |
+| 11:34 | mesure de l'extérieur : **`api` 502, `app` 502** |
+| 11:35 | trois sondes à 10 s d'intervalle : **502, 502, 502** — ce n'était pas le 502 transitoire connu |
+| 11:36 | relance du job de déploiement (`gh run rerun --failed`) |
+| **11:37:21** | ✅ **`api` 200, `app` 200** — production rétablie |
+
+### Ce que la panne a vraiment été
+
+**Le déploiement n'a pas échoué : il a été COUPÉ EN PLEIN MILIEU.** La construction
+a réussi, les conteneurs ont été recréés — puis **quatre minutes de silence**,
+puis la rupture du tuyau SSH. Le script n'a donc jamais atteint ses trois
+dernières étapes : `migrate --force`, la vérification des conteneurs, et la
+sonde HTTP finale.
+
+⚠️ **Le pipeline se croyait durci contre exactement ça.** Son en-tête annonce
+que « `migrate --force` est BLOQUANT » et qu'une vérification post-déploiement
+refuse tout conteneur `unhealthy`. C'est vrai — **quand le script va au bout**.
+Il n'a aucune protection contre le cas où **le transport meurt en cours de
+route** : la commande distante continue de tourner côté serveur, le job échoue
+côté forge, et personne ne sait dans quel état la machine se trouve. *Un
+déploiement « bloquant » qui perd sa connexion n'est pas bloquant : il est
+aveugle.*
+
+### Ce qui n'a PAS été touché
+
+- La **migration ne s'est probablement pas jouée** au premier passage. Sans
+  conséquence : elle ne fait que retirer un défaut SQL, et le service qui écrit
+  le journal fournit toujours `prev_hash` explicitement. La relance la joue.
+- **Aucune donnée** n'était en jeu : pas de réécriture de lignes, pas de
+  suppression de colonne.
+
+### Ce que j'en retiens, et que je n'invente pas après coup
+
+J'avais vérifié **ce que la fusion emportait** — les fichiers, les migrations,
+les compose. Je n'avais pas vérifié **ce que la fusion déclenchait** : que
+`push` sur `main` lance un déploiement qui **construit les images sur le VPS
+lui-même**. C'est là que ça a cassé. Une vérification de contenu ne remplace pas
+une vérification de conséquence.
+
+---
+
+## 2.3 CHANTIER 1 — les routes qui répondent « pas implémenté »
+
+### Le recensement, refait à la main plutôt que repris
+
+Je n'ai pas repris le chiffre « 19 » du dossier : je l'ai remesuré.
+
+```bash
+grep -rn "notImplemented(" backend/app/Http/Controllers/ | grep -v ApiController.php
+```
+
+**20 sites d'appel**, dans 11 contrôleurs, qui donnent **20 routes** :
+
+| # | route | contrôleur :: méthode | table derrière |
+|---:|---|---|---|
+| 1 | `PUT /workspace` | `WorkspaceController::update` | `workspaces` |
+| 2 | `POST /users` | `UsersController::store` | `users` |
+| 3 | `PUT /users/{user}` | `UsersController::update` | `users` |
+| 4 | `DELETE /users/{user}` | `UsersController::destroy` | `users` |
+| 5 | `PUT /contacts/{contact}` | `ContactsController::update` | `contacts` |
+| 6 | `DELETE /contacts/{contact}` | `ContactsController::destroy` | `contacts` |
+| 7 | `PUT /llm/use-cases/{u}` | `LlmUseCasesController::update` | `llm_use_cases` |
+| 8 | `PUT /llm/use-cases/{u}/prompts/{v}` | `LlmUseCasesController::updatePrompt` | prompts |
+| 9 | `PUT /proxy-providers/{p}` | `ProxyProvidersController::update` | `proxy_providers` |
+| 10 | `POST /proxy-providers/{p}/test` | `ProxyProvidersController::test` | — (action) |
+| 11 | `PUT /rotations/{rotation}` | `RotationsController::update` | `rotations` |
+| 12 | `POST /saved-views` | `SavedViewsController::store` | `saved_views` |
+| 13 | `GET /saved-views/{id}` | `SavedViewsController::show` | `saved_views` |
+| 14 | `PUT /saved-views/{id}` | `SavedViewsController::update` | `saved_views` |
+| 15 | `DELETE /saved-views/{id}` | `SavedViewsController::destroy` | `saved_views` |
+| 16 | `POST /notifications/{n}/read` | `NotificationsController::markRead` | `notifications` |
+| 17 | `POST /notifications/read-all` | `NotificationsController::markAllRead` | `notifications` |
+| 18 | `POST /ai-act/register` | `AiActRegisterController::store` | registre AI Act |
+| 19 | `ANY /cold-email{any?}` | `Phase2\ColdEmailController` | — **hors périmètre** |
+| 20 | `ANY /linkedin{any?}` | `Phase2\LinkedInController` | — **hors périmètre** |
+
+**Ma mesure (20) recoupe celle du dossier (19 + les deux conservés).**
+
+### 🟢 La bonne nouvelle, et elle change le chantier
+
+**Les tables existent déjà, et la vague 2 a réparé toutes les LECTURES.**
+`notifications` et `saved_views` interrogent désormais vraiment leur table, avec
+double cloisonnement espace + personne. Ce qui reste en 501 est **le côté
+écriture**. Le chantier n'est donc pas « construire une fonctionnalité » mais
+« finir un demi-travail assumé » — les contrôleurs disent eux-mêmes, en
+commentaire, ce qu'ils ne font pas encore.
+
+### 🔴 Ce qui est BLOQUÉ, et qui ne m'appartient pas
+
+Les routes 5 et 6 (`PUT`/`DELETE /contacts`) touchent au constat **`I48-001`**,
+dont la fiche d'audit dit explicitement que le correctif **ne peut pas être écrit**
+avant que `I48-003` et l'arbitrage « où vit le type » ne soient tranchés :
+
+> *« écrire une création contre `company_id NOT NULL` reviendrait à exiger une
+> entreprise pour enregistrer un candidat »*
+
+`contacts.company_id` et `contacts.last_name` sont tous deux `NOT NULL`. C'est
+une **décision de conception**, pas un correctif mécanique. **Elle revient à Will.**
+
+---
+
+## 2.4 UN DÉFAUT TROUVÉ EN CHEMIN — le script de banc ne tourne pas sous Git Bash
+
+`infra/scripts/rafraichir-le-banc.sh` — **celui que la mémoire de reprise
+prescrit de lancer avant toute suite de tests** — échoue immédiatement :
+
+```
+GetFileAttributesEx C:\c\Users\willi\Documents\Projets\crmpro-wt-a35-auth:
+The system cannot find the file specified.
+```
+
+Cause : `RACINE="$(… && pwd)"` rend `/c/Users/…` sous Git Bash, et `docker cp`
+sous Windows lit ce chemin comme `C:\c\Users\…`. Le correctif tient en un mot —
+`pwd -W` — mais il faut le poser proprement. **Contourné pour l'instant** (boucle
+équivalente jouée à la main, 29 chemins rafraîchis) ; à corriger dans le dépôt.
+
+*Ironie utile, et c'est la deuxième fois pour ce fichier : ce script a déjà fait
+rougir la PR #194 parce qu'il n'était pas exécutable. Le script censé rendre le
+banc honnête est le fichier le plus fragile du lot.*
+
+---
+
+## 2.5 ✅ CLÔTURE DE L'INCIDENT — la relance a tout remis d'aplomb
+
+| | |
+|---|---|
+| relance du job | `gh run rerun 32636270302 --failed` |
+| verdict | ✅ **`SSH Hetzner + pull + migrate + restart` → success** |
+| `migrate --force` | ✅ joué **cette fois**, et `migrate:status` sans aucune `Pending` |
+| production | ✅ **`api` 200 · `app` 200**, trois sondes espacées |
+| durée totale de l'indisponibilité | **~7 minutes** (11:30 → 11:37) |
+
+**Ce qu'il reste à faire de cet incident**, et qui n'est pas fait :
+le pipeline n'a **aucune protection contre la mort du transport SSH**. Un
+`ServerAliveInterval`, ou mieux un `nohup`/`setsid` côté serveur avec relevé
+d'état séparé, empêcherait qu'une coupure de tuyau laisse la machine dans un
+état que personne ne mesure. **C'est un correctif à écrire — il n'est pas
+écrit.** Je le consigne plutôt que de le taire, parce que la prochaine fusion
+rejouera exactement le même risque.

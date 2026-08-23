@@ -8,11 +8,25 @@
 > `FILE-DE-TRAVAIL.md`. Verdicts bruts de la vague de vérification :
 > `verdicts-420.json`. Ce qui revient à Will : `ARBITRAGES.md`.
 >
-> 📖 **Une session d'explication est ouverte en parallèle** — elle n'écrit aucun
-> correctif, elle explique les constats à Will thème par thème. Son journal est
-> `SESSION-EXPLICATION-2026-08-23.md`, tenu au fur et à mesure ; les 168 S2
-> ouverts y sont rangés en 15 thèmes par `S2-PAR-THEME.md` (rejouable :
-> `python extraire-s2-par-theme.py`). **Ce rangement ne referme rien.**
+> 🔴 **2026-08-23, SOIR — LA PR #194 EST FUSIONNÉE ET DÉPLOYÉE.** Le
+> déploiement automatique a été **coupé en plein milieu** (rupture SSH) et la
+> production a rendu **502 pendant ~7 minutes** ; la relance du job l'a
+> rétablie. Le pipeline n'a **aucune protection contre la mort du transport** —
+> correctif non écrit. Récit complet : `SESSION-EXPLICATION-2026-08-23.md` §2.2.
+>
+> 📖 **Journal de la session du 23/08 au soir** :
+> `SESSION-EXPLICATION-2026-08-23.md`. Il commence par expliquer les 168 S2
+> (rangés en 15 thèmes par `S2-PAR-THEME.md`, rejouable :
+> `python extraire-s2-par-theme.py`), puis passe en autopilote sur les trois
+> chantiers. **Son §2.9 liste les SEPT décisions qui attendent Will** — la
+> première étant l'ouverture d'une PR : le dépôt est public, et **rien n'est
+> poussé**.
+>
+> | chantier | avant | après |
+> |---|---|---|
+> | routes 501 | 19 ouvertes | ✅ **14 fermées** · 5 = décisions |
+> | redirections §8.2 | 0 sur 8 | ✅ **4 écrites** · 4 bloquées par des vues qui n'existent pas |
+> | grilles du §4 | 0/11 · 0/84 · 0/34 · 0/44 | ✅ **158 lignes, aucune vide** (`11_GRILLES/inventaire-code.md`) + les 11 policies lues à la main |
 
 **Dernière mise à jour : 2026-08-23, après-midi — LA PILE DE VÉRIFICATION EST DEBOUT,
 LES SIX VERROUS SONT LEVÉS, LA CONNEXION EST PROUVÉE.**
@@ -263,7 +277,7 @@ Plus, du mandat lui-même (§12, « définition de fini ») :
 | 3 | **chaque écran ouvert à la main**, captures archivées | 🟡 **écrans faits le 23/08** (36/36) ; **« chaque bouton essayé » et les 21 parcours du §11 restent** |
 | 5 | chaque S0/S1 corrigé | 🟡 **6 S0 et 47 S1 ouverts** |
 | 9 | les **57 alertes de vulnérabilité** arbitrées ou gelées | ❌ toujours 57 |
-| 10 | aucune route 501 | ❌ `I48-001` ouvert |
+| 10 | aucune route 501 | 🟡 **14 des 19 fermées le 23/08** ; les 5 restantes sont des décisions, pas du code (§2.9 du journal). `I48-001` toujours ouvert |
 | 13 | **une sauvegarde restaurée pour de vrai** | ✅ **TENU** — *cette ligne disait « aucune trace » à tort* : `agent-08`, archive de 724 926 343 octets, **20 726 338 lignes, écart nul**. Réserve écrite : copie locale, pas hors-site |
 | 14 | plus rien de sévérité ≥ S2 | ❌ 168 S2, 48 S3 *(étaient 220 et 82)* |
 

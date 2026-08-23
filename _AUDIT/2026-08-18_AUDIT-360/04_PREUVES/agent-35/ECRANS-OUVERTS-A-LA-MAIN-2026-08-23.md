@@ -1552,3 +1552,210 @@ affichées **vides**, et j'ai lu « elles n'existent pas ».
 > **Règle** : ne jamais conclure à l'absence d'une ligne à partir d'une requête
 > qui **concatène** des colonnes possiblement nulles. Lister d'abord, formater
 > ensuite — ou `coalesce()` partout.
+
+---
+
+# LES PARCOURS RESTANTS DU §11 — passe du 2026-08-23, soirée
+
+> Parcours **2, 3, 4, 5, 6, 7, 8, 9, 11, 13, 15, 16, 20**, joués à l'API et à
+> l'écran. Le canal site→CRM a été **armé sur le banc** pour rendre mesurable ce
+> qui ne l'était pas (`docker-compose.verif.banc.yml`, jamais déployé).
+
+## 🔴 `X39-034` (S1) — les réglages ne peuvent PAS être enregistrés
+
+> *Parcours 15 : « chaque onglet, chaque champ, sauvegarde, **effet réel**, annulation ».*
+
+Geste réel : `/settings`, changer le nom de l'espace de travail, cliquer
+**« Enregistrer »**. Ce que l'utilisateur lit :
+
+> **Modifications non enregistrées — Endpoint à implémenter en Sprint 3. — code HTTP 501**
+
+`PUT /api/v1/workspace` → **501** `{"error":"not_implemented"}`. Le nom en base
+ne bouge pas.
+
+**Deux défauts dans une seule phrase :**
+
+1. **La sauvegarde n'existe pas.** L'écran de réglages porte quatre onglets
+   (Workspace, Intégrations, Observabilité, Apparence) et un bouton
+   « Enregistrer » qui ne peut rien enregistrer.
+2. **Le message montré est celui du développeur.** « Endpoint à implémenter en
+   Sprint 3 » s'adresse à quelqu'un qui lit un plan de sprints, pas au dirigeant
+   qui renomme son entreprise. Famille `X39-007`.
+
+✅ **À porter au crédit de l'écran** : il **ne ment pas**. Il dit « Modifications
+non enregistrées » et donne le code HTTP — de quoi appeler le support. C'est le
+message relayé qui est brut, pas la conduite de l'écran.
+
+## 🔴 `X39-035` (S2) — une chaîne d'audit VIDE se déclare VALIDE
+
+> *Parcours 13 : « journaux d'audit + **vérification de la chaîne** ».*
+
+Mesuré sur une chaîne neuve, secret armé, en trois temps :
+
+| état de la chaîne | `verify-chain` rend |
+|---|---|
+| **intacte**, 5 lignes | `{"valid":true,"verifiable":true}` ✅ |
+| **une ligne du milieu altérée** (`update … set path='/falsifie'`) | `{"valid":false}` ✅ **la falsification est vue** |
+| **VIDÉE** (`delete from audit_logs`) | **`{"valid":true,"verifiable":true}`** 🔴 |
+
+**Effacer le journal ENTIER rend un verdict VERT.** Or c'est exactement ce
+qu'une chaîne cryptographique existe pour rendre impossible : celui qui efface
+tout obtient le même « chaîne valide » que celui qui n'a rien touché.
+
+*Ce constat ÉTEND `B16-002`* (S0, ouvert — « supprimer la dernière ligne du
+journal ne rompt pas la chaîne »). Le registre parle d'**une** ligne ; la mesure
+montre que **la totalité** passe aussi.
+
+⚠️ Second point, plus discret : quand `valid` vaut `false`, **`raison` vaut
+`null`**. La vérification dit « c'est cassé » sans dire **où**. Pour une pièce
+qu'on produit à un contrôle, c'est peu.
+
+## 🔴 `X39-031` (S2) — aucun compteur du tableau de bord n'est cliquable
+
+> *Parcours 2 : « chaque compteur **cliqué**, chaque graphe, chaque lien ».*
+
+Cinq compteurs mesurés, **cinq non cliquables** :
+
+```
+Total entreprises 5 · Enrichies 24h 5 · Nouvelles 7j 35
+Qualité moyenne 0/100 · Couverture Top 5 départements
+```
+
+**Un seul lien interne dans tout l'écran** : « 🏢 Explore tes entreprises → »
+vers `/companies`.
+
+*Un tableau de bord annonce « 35 nouvelles fiches sur 7 jours » et il n'existe
+aucun moyen de les voir.* Le chiffre est un cul-de-sac.
+
+## 🔴 `X39-032` (S2) — le hub contacts n'a ni sélection multiple, ni actions de masse, ni export
+
+> *Parcours 3 : « recherche, filtres, tri, pagination, **sélection multiple**,
+> **actions de masse** (`POST /bulk`), **export** ».*
+
+| ce que le §11 demande | mesuré à l'écran |
+|---|---|
+| recherche | ✅ « Nom d'entreprise, SIREN, personne… » |
+| filtres | ✅ pays, statut de prospection, **9 onglets par type** |
+| tri par colonne | ❌ aucun en-tête triable |
+| pagination | ❌ absente |
+| **sélection multiple** | ❌ **0 case à cocher** |
+| **actions de masse** | ❌ aucune |
+| **export** | ❌ aucun bouton |
+
+Recoupé dans le code : `ContactsHubPage.tsx` ne contient **aucune** occurrence
+de `checkbox`, `bulk` ou `Exporter`.
+
+*L'écran où un commercial passe sa journée sait chercher et filtrer, mais ne sait
+rien faire de ce qu'il a trouvé.*
+
+## 🔴 `X39-033` (S2) — la fiche 360° est strictement EN LECTURE SEULE
+
+> *Parcours 4 : « timeline, pagination, liens croisés, **modification, note,
+> tâche, tag** — comparée à l'anatomie exigée au §1.5 du CDC ».*
+
+Mesuré sur une personne **créée par le produit** (voir le témoin ci-dessous) :
+
+| anatomie §1.5 / parcours 4 | présent ? |
+|---|---|
+| bandeau d'identité | ✅ nom, courriel, entreprise |
+| timeline | ✅ horodatée, typée, sourcée |
+| les deux univers | ✅ « Business : Fiche présente » / « Vivier : Aucune fiche » |
+| **précédent / suivant** | ❌ **absent** |
+| **ajouter une note** | ❌ |
+| **créer une tâche** | ❌ |
+| **poser un tag** | ❌ |
+| **modifier** | ❌ |
+
+Recoupé dans le code : `PersonTimelinePage.tsx` contient **0 `<Button>` et
+0 `onClick`**. La pièce centrale du CDC ne permet aucun geste.
+
+---
+
+## ✅ CE QUI TIENT — et il y en a beaucoup
+
+### La machine à états des campagnes (parcours 9)
+
+Une campagne **annulée** refuse les gestes suivants, en 422, avec un message
+français explicite et **sans changer de statut** :
+
+```
+POST /campaigns/1/start  → 422 « Impossible de démarrer une campagne au statut 'cancelled'. »
+POST /campaigns/1/resume → 422 « Impossible de reprendre une campagne au statut 'cancelled'. »
+```
+
+Le cycle complet `start → pause → resume → cancel` répond 200 à chaque étape
+légitime. *C'est une vraie machine à états, pas une suite de boutons.*
+
+### La chaîne d'audit DÉTECTE la falsification (parcours 13)
+
+Une ligne du milieu modifiée par `UPDATE` direct en base → **`valid:false`**.
+*C'est la propriété essentielle, et elle est là.*
+
+### Le cycle de vie des tags (parcours 11)
+
+`créer` (201) → `renommer` (200) → `lister` (200) → `supprimer` (200 `{"ok":true}`).
+Le doublon est refusé en 409 avec un message français (déjà mesuré).
+
+### Les exports CSV (parcours 6 et 7)
+
+`/companies/export`, `/media/export`, `/journalists/export` rendent tous **200**
+avec un CSV **en-têtes françaises accentuées** :
+
+```
+SIREN,Dénomination,Enseigne,NAF,Taille,Département,Ville,Email,"Confiance email",Tél…
+Prénom,Nom,Rôle,Rubrique,Email,Téléphone,Média,Opt-out,Source
+```
+
+### L'étanchéité du vivier (parcours 5)
+
+« Univers vivier candidats non accessible — **L'accès au vivier suppose d'être
+membre de cet univers. Demandez à un administrateur de vous y rattacher.** »
+*Un refus qui dit quoi faire ensuite.*
+
+### L'observabilité (parcours 16)
+
+`GET /observability/summary` → 200, avec des mesures réelles : erreurs de
+cascade 24 h, quota Hunter (utilisé / plafond souple / pourcentage), Google Places.
+
+### La couverture France (parcours 8)
+
+`POST /coverage/launch` → **200 `{"queued":true}`**, `POST /coverage/enrich` →
+200. *(Le champ s'appelle `department`, pas `department_code`.)*
+
+### 🔑 L'ingestion du site remplit `person_key`, et la fiche 360° la retrouve
+
+Un `form_submission` signé HMAC, envoyé sur `/api/internal/site-sync` :
+
+```
+→ 200 {"ok":true,"result":{"status":"created","subject_type":"company",
+       "subject_id":1,"activity_id":1,"tags":["svc:audit"]}}
+```
+
+La personne apparaît en base **avec sa `person_key`**, et
+`/console/personnes/{clé}` affiche son nom, son identité, son univers et sa
+timeline. *La chaîne site → CRM → fiche 360° fonctionne de bout en bout.*
+
+---
+
+## ⚠️ DEUX PIÈGES DE MESURE PAYÉS SUR CE LOT — encore de ma main
+
+### Le hub contacts « n'a pas de recherche »
+
+Faux. Mon sélecteur cherchait `placeholder*="echerch"` ; le champ dit
+**« Nom d'entreprise, SIREN, personne… »**. *Un sélecteur qui suppose le libellé
+mesure le libellé, pas la fonction.*
+
+### « La fiche 360° ne retrouve pas une personne qui existe »
+
+**J'allais l'inscrire en S1.** Les contacts que j'avais semés par `INSERT` SQL
+n'avaient **pas de `person_key`** — la colonne est ordinaire, remplie par
+`ContactUpserter` et `SiteSyncIngestService`, et une commande de rattrapage
+existe (`CrmRemplirClePersonne`) pour l'existant.
+
+*Un `INSERT` direct court-circuite l'application : c'est le TROISIÈME constat que
+ce geste a failli me faire écrire aujourd'hui.* Créée par le vrai canal, la
+personne est retrouvée immédiatement.
+
+> **Règle, désormais tenue** : on ne sème une donnée d'essai par SQL que pour
+> mesurer une LECTURE. Dès qu'on veut éprouver une garde, une clé dérivée ou une
+> propagation, la donnée doit entrer **par le chemin du produit**.

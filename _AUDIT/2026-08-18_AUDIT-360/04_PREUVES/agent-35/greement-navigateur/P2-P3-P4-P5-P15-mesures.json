@@ -1,0 +1,206 @@
+{
+  "p2_dashboard": {
+    "h1": "Tableau de bord",
+    "boutons": [
+      "WEWorkspace e43437",
+      "Aujourd'hui",
+      "Contacts",
+      "Collecte",
+      "Pilotage",
+      "Conformité",
+      "Réglages",
+      "Réduire",
+      "🔍Rechercher⌘K",
+      "☀",
+      "⚙",
+      "☾",
+      "A3Audit 360",
+      "7j",
+      "30j",
+      "90j",
+      "⟳Actualiser"
+    ],
+    "corps": "BONJOUR AUDIT 👋 Tableau de bord Vue d'ensemble · 30 derniers jours En direct · actualisé toutes les 30s 7j 30j 90j ⟳ Actualiser TOTAL ENTREPRISES 5 Toutes périodes confondues ENRICHIES 24H 5 Fiches enrichies sur 24h NOUVELLES 7J 35 Découvertes sur 7 jours QUALITÉ MOYENNE 0/100 Score pondéré qualité QUALITÉ Distribution qualité des fiches SCORE MOYEN 0/100 Complète 0 0.0% Partielle 0 0.0% Basique 0 0.0% TAILLE D'ENTREPRISE (INSEE) Distribution par catégorie TOTAL CLASSÉ 0 0 0 0 0 0 Artisan TPE PME ETI Grande COUVERTURE Top 5 départements 🗺️ Aucun département couvert Lance un scrape pour commencer à couvrir la France. TEMPS RÉEL Activité récente 📋 Activité bientôt disponible Les actions de ",
+    "liens": [
+      {
+        "texte": "🏢Explore tes entreprises→5 fiches colle",
+        "href": "/companies"
+      }
+    ],
+    "compteurs": [
+      {
+        "extrait": "Total entreprises5Toutes périodes confondues",
+        "cliquable": false
+      },
+      {
+        "extrait": "Enrichies 24h5Fiches enrichies sur 24h",
+        "cliquable": false
+      },
+      {
+        "extrait": "Nouvelles 7j35Découvertes sur 7 jours",
+        "cliquable": false
+      },
+      {
+        "extrait": "Qualité moyenne0/100Score pondéré qualité",
+        "cliquable": false
+      },
+      {
+        "extrait": "CouvertureTop 5 départements🗺️Aucun départeme",
+        "cliquable": false
+      },
+      {
+        "extrait": "🏢Explore tes entreprises→5 fiches collectées ",
+        "cliquable": true
+      }
+    ],
+    "ko": []
+  },
+  "p3_hub": {
+    "h1": "Contacts",
+    "boutons": [
+      "WEWorkspace e43437",
+      "Aujourd'hui",
+      "Contacts",
+      "Collecte",
+      "Pilotage",
+      "Conformité",
+      "Réglages",
+      "Réduire",
+      "🔍Rechercher⌘K",
+      "☀",
+      "⚙",
+      "☾",
+      "A3Audit 360",
+      "Tous5",
+      "Prospects5",
+      "Clients0",
+      "Presse & médias0",
+      "Partenaires0",
+      "Investisseurs0",
+      "Conférences0",
+      "Newsletter0",
+      "Fournisseurs0",
+      "Contacts actifs",
+      "Prospection (base froide)",
+      "Tout"
+    ],
+    "corps": "Contacts Tous les types — Contacts actifs CLIENTS 0 PROSPECTS 5 OPPORTUNITÉS 0 DORMANTS 0 Tous 5 Prospects 5 Clients 0 Presse & médias 0 Partenaires 0 Investisseurs 0 Conférences 0 Newsletter 0 Fournisseurs 0 Rechercher une entreprise, un SIREN ou une personne Tous pays France Roumanie Tous statuts Contactables (e-mail exploitable) Partiels (e-mail incertain) Collectés, pas encore enrichis Sans e-mail (archivés) Contacts actifs Prospection (base froide) Tout Aucun contact dans cette vue Les fiches arrivent automatiquement depuis le site (formulaires, RDV, avis) — rien à créer ici.",
+    "outils": {
+      "champsRecherche": 0,
+      "cases": 0,
+      "entetesTriables": 0,
+      "pagination": false
+    },
+    "ko": []
+  },
+  "p4_fiche360": {
+    "h1": "Personne",
+    "boutons": [
+      "WEWorkspace e43437",
+      "Aujourd'hui",
+      "Contacts",
+      "Collecte",
+      "Pilotage",
+      "Conformité",
+      "Réglages",
+      "Réduire",
+      "🔍Rechercher⌘K",
+      "☀",
+      "⚙",
+      "☾",
+      "A3Audit 360"
+    ],
+    "corps": "Personne Fiche 360° — tous les touchpoints connus de cette personne. Identité Aucune fiche dans les univers auxquels vous avez accès. Univers Business Aucune fiche Vivier candidats Aucune fiche Timeline Aucun touchpoint enregistré.",
+    "anatomie": {
+      "bandeau": true,
+      "timeline": true,
+      "universBusiness": true,
+      "universVivier": true,
+      "precedentSuivant": false,
+      "note": false,
+      "tache": false,
+      "tag": true
+    },
+    "ko": []
+  },
+  "p5_vivier": {
+    "h1": null,
+    "boutons": [
+      "WEWorkspace e43437",
+      "Aujourd'hui",
+      "Contacts",
+      "Collecte",
+      "Pilotage",
+      "Conformité",
+      "Réglages",
+      "Réduire",
+      "🔍Rechercher⌘K",
+      "☀",
+      "⚙",
+      "☾",
+      "A3Audit 360"
+    ],
+    "corps": "Univers vivier candidats non accessible L'accès au vivier suppose d'être membre de cet univers. Demandez à un administrateur de vous y rattacher.",
+    "ko": []
+  },
+  "p5_arbitrage": {
+    "h1": "Rapprochements à arbitrer",
+    "boutons": [
+      "WEWorkspace e43437",
+      "Aujourd'hui",
+      "Contacts",
+      "Collecte",
+      "Pilotage",
+      "Conformité",
+      "Réglages",
+      "Réduire",
+      "🔍Rechercher⌘K",
+      "☀",
+      "⚙",
+      "☾",
+      "A3Audit 360"
+    ],
+    "corps": "Rapprochements à arbitrer 0 événement(s) reçus sans SIREN — à rattacher ou à écarter. Rien à arbitrer Aucun événement n’attend d’arbitrage dans cette file. Cet écran ne voit que ce que l’ingestion y dépose : il ne dit rien des événements qui ne sont jamais arrivés jusqu’ici.",
+    "ko": []
+  },
+  "p15_reglages": {
+    "h1": "Paramètres",
+    "boutons": [
+      "WEWorkspace e43437",
+      "Aujourd'hui",
+      "Contacts",
+      "Collecte",
+      "Pilotage",
+      "Conformité",
+      "Réglages",
+      "Réduire",
+      "🔍Rechercher⌘K",
+      "☀",
+      "⚙",
+      "☾",
+      "A3Audit 360",
+      "Workspace",
+      "Intégrations",
+      "Observabilité",
+      "Apparence",
+      "Enregistrer"
+    ],
+    "corps": "Paramètres Workspace, intégrations, observabilité, apparence. Workspace : Axion-IA Workspace Intégrations Observabilité Apparence WORKSPACE Identité et limites Nom Slug (URL) Non modifiable Plafond LLM mensuel (€) Kill-switch automatique LLM quand atteint Enregistrer",
+    "onglets": [
+      "WEWorkspace e43437",
+      "Workspace",
+      "Intégrations",
+      "Observabilité",
+      "Apparence"
+    ],
+    "apresEnregistrement": {
+      "alertes": [
+        "Modifications non enregistréesEndpoint à implémenter en Sprint 3.code HTTP 501",
+        "Endpoint à implémenter en Sprint 3."
+      ]
+    },
+    "ko": [
+      "501 /workspace"
+    ]
+  }
+}

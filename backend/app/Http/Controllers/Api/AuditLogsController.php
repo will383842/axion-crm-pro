@@ -85,10 +85,28 @@ class AuditLogsController extends ApiController
             // secret utilisable serait un mensonge (B16-001).
             $secretUtilisable = $this->chain->secretEstUtilisable();
 
+            // 🔴 X39-035 — un journal VIDE doit dire pourquoi il ne prouve rien.
+            //
+            // `verifyChain()` rend desormais `false` sur une chaine sans maillon
+            // (mesure du 2026-08-23 : `delete from audit_logs` rendait auparavant
+            // `valid: true`). Sans la raison ci-dessous, l'ecran enverrait
+            // chercher une falsification la ou le journal a simplement ete
+            // efface — ou n'a jamais rien enregistre. C'est le meme soin que
+            // celui deja pris pour le secret absent, juste au-dessus.
+            $chaineVide = $secretUtilisable && $this->chain->chaineEstVide();
+
+            $raison = null;
+            if (! $secretUtilisable) {
+                $raison = $this->chain->raisonSecretInutilisable();
+            } elseif ($chaineVide) {
+                $raison = $this->chain->raisonChaineVide();
+            }
+
             return $this->ok([
                 'valid' => $this->chain->verifyChain(),
                 'verifiable' => $secretUtilisable,
-                'raison' => $secretUtilisable ? null : $this->chain->raisonSecretInutilisable(),
+                'vide' => $chaineVide,
+                'raison' => $raison,
             ]);
         } catch (\Throwable $e) {
             Log::error('audit-logs.verify-chain failed', ['exception' => $e->getMessage()]);

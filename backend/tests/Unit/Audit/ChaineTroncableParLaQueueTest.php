@@ -177,21 +177,51 @@ test('B16-002 — retirer les dernieres lignes ne rompt PAS la chaine (le journa
  * détectée » sur une table vide. C'est le cas limite de la troncature par la
  * queue : on a tronque jusqu'a la tete.
  */
-test('B16-002 (forme extreme) — un journal integralement efface se declare valide', function () {
+test('X39-035 — un journal integralement efface ne se declare PLUS valide', function () {
+    // ── CE CAS A ETE INVERSE le 2026-08-23, comme son ancienne version le
+    //    demandait explicitement : « B16-002 est ferme : un journal vide ne se
+    //    declare plus valide. Inverse ce cas au lieu de le supprimer. »
+    //
+    // Il epinglait le defaut : quatre lignes ecrites, zero ligne restante,
+    // verdict « valide ». Autrement dit, celui qui effacait le journal ENTIER
+    // obtenait le meme vert que celui qui n'y avait pas touche — ce qu'une
+    // chaine cryptographique existe precisement pour rendre impossible.
+    //
+    // Le correctif tient en un compteur de maillons dans `verifyChain()`, et
+    // suit le raisonnement deja ecrit pour le secret absent : « un controle
+    // d'integrite qui dit "tout va bien" sans pouvoir le savoir est pire qu'un
+    // controle absent : il endort celui qui le lit. »
     $chaine = new AuditHashChain;
     ecrireMaillons($chaine, 4);
     expect(DB::table('audit_logs')->count())->toBe(4);
-    expect($chaine->verifyChain())->toBeTrue();
+    expect($chaine->verifyChain())->toBeTrue('temoin : la chaine intacte doit rester valide');
 
     DB::table('audit_logs')->delete();
     expect(DB::table('audit_logs')->count())->toBe(0);
 
-    // 🔴 LE CONSTAT, dans sa forme la plus courte a citer : quatre lignes
-    // ecrites, zero ligne restante, verdict « valide ».
-    expect($chaine->verifyChain())->toBeTrue(
-        'B16-002 est ferme : un journal vide ne se declare plus valide. '
-        . 'Inverse ce cas au lieu de le supprimer.',
+    expect($chaine->verifyChain())->toBeFalse(
+        'Un journal vide se declare valide : celui qui efface tout obtient le meme '
+        . 'verdict que celui qui n a rien touche (X39-035).',
     );
+    expect($chaine->chaineEstVide())->toBeTrue();
+    expect($chaine->raisonChaineVide())->toContain('VIDE');
+});
+
+test('X39-035 — TEMOIN : le correctif ne casse ni la chaine intacte, ni la detection d une alteration', function () {
+    // Sans ce temoin, on pourrait « fermer » X39-035 en faisant rendre `false`
+    // a `verifyChain()` en toute circonstance — un journal qui crie au loup en
+    // permanence est aussi inutile qu'un journal qui dort.
+    $chaine = new AuditHashChain;
+    $ids = ecrireMaillons($chaine, 4);
+
+    expect($chaine->verifyChain())->toBeTrue('la chaine intacte doit rester VALIDE');
+    expect($chaine->chaineEstVide())->toBeFalse();
+
+    // Une ligne du milieu alteree doit toujours etre VUE.
+    DB::table('audit_logs')->where('id', $ids[1])->update(['path' => '/falsifie-par-la-garde']);
+
+    expect($chaine->verifyChain())->toBeFalse('une ligne alteree doit toujours rompre la chaine');
+    expect($chaine->chaineEstVide())->toBeFalse('une chaine alteree n est pas une chaine vide');
 });
 
 /**

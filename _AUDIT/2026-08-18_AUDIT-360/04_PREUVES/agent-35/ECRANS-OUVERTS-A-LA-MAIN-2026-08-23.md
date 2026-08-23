@@ -1759,3 +1759,83 @@ personne est retrouvée immédiatement.
 > **Règle, désormais tenue** : on ne sème une donnée d'essai par SQL que pour
 > mesurer une LECTURE. Dès qu'on veut éprouver une garde, une clé dérivée ou une
 > propagation, la donnée doit entrer **par le chemin du produit**.
+
+---
+
+## Parcours 1 — la chaîne d'authentification · ✅ **elle tient**
+
+> *« Connexion → 2FA → première configuration → déconnexion → **session expirée**
+> → lien magique → mot de passe oublié ».*
+
+| écran | `h1` | champs nommés | validation à vide | adresse malformée |
+|---|---|---|---|---|
+| `/login` | Connexion | **3/3** ✅ | « Veuillez renseigner ce champ. » | « Veuillez inclure "@" dans l'adresse e-mail… » |
+| `/magic-link` | Recevoir un lien magique | **1/1** ✅ | idem | idem |
+| `/password-reset` | Réinitialiser le mot de passe | **1/1** ✅ | idem | idem |
+
+*Messages en français, pris en charge nativement par le navigateur.*
+
+### 🔑 La session expirée est traitée proprement
+
+Cookie de session **fabriqué et mort**, puis `/companies` :
+
+```
+→ url = /login   ·   h1 = « Connexion »
+```
+
+**Pas d'écran blanc, pas de 500, pas de boucle.** L'utilisateur est ramené là où
+il peut agir. *C'est exactement ce que le parcours demande de vérifier, et c'est
+tenu.*
+
+---
+
+## Parcours 19 — la visite guidée · 🔴 **`X39-036` (S2)**
+
+> *« La visite guidée du début à la fin. »*
+
+**Elle annonce SEPT étapes et en montre QUATRE.**
+
+Rejouée du début (`onboarding_tour_completed_at` remis à `null`), ce que
+l'utilisateur voit défiler :
+
+```
+1. « Bienvenue dans Axion CRM Pro 👋 »            Next (Step 1 of 7)
+2. « La barre latérale suit votre journée… »      Next (Step 2 of 7)
+3. « Recherche globale ultra-rapide… ⌘K »         Next (Step 3 of 7)
+4. « Mode clair/sombre… »                         Next (Step 6 of 7)   ← 4 et 5 SAUTÉES
+```
+
+**La numérotation saute de 3 à 6, sous les yeux de l'utilisateur.** Le premier
+contact d'un nouvel arrivant avec le produit est incomplet, et il le voit.
+
+### La cause, mesurée
+
+Les sept cibles `data-tour` **existent** dans le DOM. Mais deux d'entre elles ont
+une **taille nulle** — donc elles sont invisibles, et `react-joyride` passe :
+
+| cible | présente | visible | taille |
+|---|---|---|---|
+| `sidebar` | ✅ | ✅ | 260 × 950 |
+| `global-search` | ✅ | ✅ | 438 × 34 |
+| **`nav-companies`** | ✅ | ❌ | **0 × 0** |
+| `nav-dashboard` | ✅ | ✅ | 243 × 32 |
+| `dark-mode` | ✅ | ✅ | 82 × 30 |
+| **`nav-settings`** | ✅ | ❌ | **0 × 0** |
+
+Les deux invisibles vivent dans des **groupes repliés** de la barre latérale
+(« Contacts », « Réglages »). Le composant porte pourtant un dépliage exprès pour
+ce cas — `OnboardingTour.tsx`, constat `D23-010` : *« AVANT d'afficher l'étape,
+on déplie la section qui porte sa cible »* — **et il ne couvre pas ces deux-là.**
+
+⚠️ *Ce que je n'affirme pas* : mon parcours a montré 4 étapes, or seules 2 cibles
+sont invisibles. Il devrait donc en rester 5. L'écart d'une étape n'est pas
+expliqué — il peut venir de mon enchaînement de clics. **Le fait mesuré et
+reproductible est la numérotation qui saute de 3 à 6, et les deux cibles à
+taille nulle.**
+
+### `X39-005` confirmé du début à la fin
+
+**« Next (Step 1 of 7) »**, **« Next (Step 2 of 7) »**, **« Next (Step 3 of 7) »**…
+Trois mots anglais — `Next`, `Step`, `of` — répétés à **chaque** étape, à côté de
+« Passer », « Précédent » et « Fermer » qui sont, eux, en français. Sur le tout
+premier écran que voit un nouvel utilisateur.

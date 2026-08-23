@@ -360,6 +360,33 @@ const ECRANS_SOMBRES = [
   // Titre sans lettre accentuee volontairement : « Requetes RGPD » porte un
   // accent, on n'assure donc que sur la sous-chaine « RGPD ».
   { cas: '/rgpd/requests', url: '/rgpd/requests', titre: 'RGPD', charge: LISTE_VIDE, repere: 'RGPD' },
+
+  // ── Ajoutes le 2026-08-23 ────────────────────────────────────────────────
+  //
+  // La liste ci-dessus couvrait 4 cas sur 3 routes. La coquille applicative
+  // etant commune, une regression sur la barre laterale ou l'en-tete y serait
+  // vue ; le CONTENU de chaque ecran, lui, ne l'etait pas : tableaux, badges
+  // de statut, filtres, et surtout les etats vides, qui sont ce qu'un nouvel
+  // utilisateur voit en premier.
+  //
+  // Titres et reperes RELEVES A L'ECRAN le 2026-08-23, pas devines : voir
+  // `_AUDIT/…/agent-35/greement-navigateur/mesures-passe1-ecrans-liste.json`.
+  // Tous choisis SANS ACCENT, comme le reste de ce fichier.
+  // ⚠️ `/` (tableau de bord) est ABSENT DE CETTE LISTE, et ce n'est pas un
+  // oubli. `simulerApi()` rend la meme charge a toutes les routes ; sur
+  // `/dashboard/stats`, cette forme ne correspond a rien d'attendu, et
+  // l'ecran ne rend alors AUCUN `h1` — pas meme son titre. L'y inscrire
+  // demanderait une charge taillee a la main pour ce seul ecran, donc
+  // devinee : une garde batie sur une forme inventee mesure la forme
+  // inventee, pas le produit. Mesure le 2026-08-23.
+  //
+  // A REGARDER PAR AILLEURS : que `DashboardPage` ne rende meme pas son
+  // titre quand la charge est inattendue est une fragilite en soi. Elle
+  // n'est PAS rapportee comme un defaut du produit — l'API rend la bonne
+  // forme en vrai — mais elle merite un coup d'oeil.
+  { cas: '/scraper-runs', url: '/scraper-runs', titre: 'Journaux de collecte', charge: LISTE_VIDE, repere: 'Aucun run' },
+  { cas: '/journalists', url: '/journalists', titre: 'Journalistes', charge: LISTE_VIDE, repere: 'Aucun journaliste' },
+  { cas: '/tags', url: '/tags', titre: 'Tags', charge: LISTE_VIDE, repere: 'Aucun tag' },
 ] as const;
 
 for (const { cas, url, titre, charge, repere } of ECRANS_SOMBRES) {

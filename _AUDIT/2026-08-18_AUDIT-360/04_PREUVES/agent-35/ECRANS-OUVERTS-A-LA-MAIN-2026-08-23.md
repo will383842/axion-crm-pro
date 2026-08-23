@@ -278,3 +278,47 @@ serveur, elle, n'est pas bridée :
 
 *Le produit n'a rien à se reprocher ici. C'est l'instrument qui mentait.*
 Pour mesurer un rendu pour de vrai : onglet au premier plan, ou Lighthouse.
+
+---
+
+## ⚠️ DEUXIÈME PIÈGE DE MESURE PAYÉ — le gréement de balayage abîme ce qu'il mesure
+
+Après une vingtaine d'écrans enchaînés par `history.pushState()` **sans jamais
+recharger**, le moteur de rendu de Chrome s'est **figé** : plus de capture, plus
+d'exécution de script, expiration à 30 et 45 s.
+
+L'onglet était alors sur `/scraper-runs`. La conclusion tentante — *« cet écran
+gèle le navigateur »* — aurait été un constat S0 spectaculaire. Trois
+vérifications l'ont démontée, dans cet ordre :
+
+1. **Les conteneurs sont au repos** : `docker stats` rend 0,00 % à 0,32 % de
+   processeur sur les cinq. Le produit ne calcule rien.
+2. **Une autre route, `/companies`, refuse aussi de s'afficher** — alors qu'elle
+   fonctionnait quinze minutes plus tôt. Ce n'est donc pas propre à la route.
+3. **Onglet fermé, onglet neuf, chargement à froid de `/scraper-runs` :
+   l'écran s'affiche parfaitement**, en entier, avec ses compteurs.
+
+*C'est le gréement qui s'était dégradé, pas le produit.*
+
+**Règle à tenir pour la suite** : recharger l'onglet toutes les quelques pages, et
+**ne jamais conclure au gel d'un écran sans l'avoir rechargé à froid dans un
+onglet neuf**.
+
+⚠️ Corollaire déjà rencontré : pendant que le moteur était figé, les mesures
+`curl` elles-mêmes sont devenues bruitées (`/api/v1/scraper-runs` a rendu 4,21 s
+une fois, puis 0,32 à 1,90 s ; **mais le témoin `/api/v1/campaigns` variait de
+0,18 à 1,04 s dans le même temps**). **Aucun constat de performance n'a été
+inscrit sur cette base** — le témoin bougeait autant que le sujet.
+
+---
+
+## Écran — `/scraper-runs` · `ScraperRunsPage` (relu à froid)
+
+Rendu correct et complet. Fil d'Ariane et titre **concordent** (« Journaux de
+collecte »), contrairement à `/cold-email`. Bandeau « **En direct** · actualisé
+toutes les 10s » — **en français**, ce qui confirme que `/coverage` (« Live ·
+refresh 60s ») est l'exception, pas la règle (`X39-009`).
+
+Nouvelles occurrences de `X39-007` : « **Monitoring** des **jobs** de
+**scraping** en temps réel », « Lance ton premier **scrape** », « **Lancer un
+scrape** ».

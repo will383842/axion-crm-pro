@@ -460,3 +460,112 @@ que Will lit en premier.
 antérieur à l'audit, il n'est pas de moi) traîne **non suivi et non ignoré** à la racine du dépôt.
 Pas un secret ; mais un `git add .` distrait le committerait. **Je n'y touche pas** — ce n'est pas
 mon fichier. Signalé, c'est tout.
+
+---
+
+## 2026-08-23 — LA VÉRIFICATION DE LA VAGUE 2 EST ALLÉE AU BOUT
+
+**Banc rafraîchi d'abord** (`infra/scripts/rafraichir-le-banc.sh a35r`, 28 chemins). Sans ce
+geste, douze gardes rougissent sur un arbre périmé et l'on répare du vide.
+
+### Ce qui a été joué, et ce que ça a rendu
+
+| suite | tests | verdict |
+|---|---:|---|
+| `Feature/Crm` + `Feature/Database` | 266 | ✅ |
+| `Feature/Console` + `Feature/Commands` | 100 | ✅ |
+| `Feature/Rgpd` + `Auth` + `Controllers` | 368 | ✅ |
+| 8 sous-dossiers restants de `Feature` | 84 | ✅ |
+| `Feature` racine (28 fichiers, 2 tranches) | 224 | ✅ |
+| `Unit` (48 fichiers) | 342 | ✅ |
+| `Feature/Infra` | 261 | ✅ |
+| Workers (`vitest`, 9 fichiers) | 94 | ✅ |
+| Frontend (`vitest`, 59 fichiers) | 412 | ✅ |
+
+Trois tests portent un `markTestIncomplete` **délibéré** (`C19-010` voie jumelle, 2 dans
+`Infra`) : ils disent qu'un constat reste ouvert, ils ne le cachent pas.
+
+### Les six rouges — aucun n'était une régression du produit
+
+1. **Trois gardes de partitionnement** (`MaintenancePartitionsAuditTest`,
+   `AuditLogsPartitionnementTest`) inséraient dans `audit_logs` sans `prev_hash`. Le correctif
+   `B16-013` de la vague 2 avait **délibérément** retiré le défaut SQL de cette colonne, pour
+   qu'un INSERT qui l'omet échoue franchement plutôt que d'hériter en silence d'un maillon zéro.
+   Vérifié avant de toucher aux gardes : `AuditHashChain::record()` (l. 140) est le **seul** site
+   d'écriture du produit et il fournit toujours `prev_hash`. Commit `d9205b5`.
+
+2. **Le plafond `B10-016`** des lectures aveugles au `deleted_at` passait de 2 à 3 sur `users`.
+   Le troisième lecteur est l'essai à blanc d'`AnonymizeOldIps`, ajouté par `B15-011`, et il
+   **doit** rester aveugle : le chemin réel est un UPDATE brut qui ne filtre pas non plus, et
+   filtrer serait le vrai défaut — l'IP d'un compte en corbeille ne serait alors **jamais**
+   anonymisée, ce que la commande existe pour empêcher. Plafond relevé après examen, raison
+   écrite à côté du chiffre ; total 87 → 88.
+
+3. 🔴 **Trois gardes lisaient leurs propres commentaires comme du code.** Le même défaut
+   d'instrument, trouvé trois fois en une matinée, sur trois fichiers de mains différentes —
+   le patron `A-011` de ce dépôt, mais **entre gardes**. Commit `e41a034`.
+
+   - `ContexteEspaceDesJobsTest` (`B11-002`) désignait `MonitorCampaignProgressJob.php:60`, une
+     ligne de **commentaire** expliquant que le re-dispatch « construit un `new self(...)` neuf ».
+     Elle gonflait en outre `$sitesVus`, son propre témoin de couverture. Elle désignait aussi la
+     l. 114 à tort : le chemin d'échec ajouté par `B17-011` pose `->pourEspace($espace)` trois
+     instructions plus loin, après être allé chercher l'espace.
+   - `SsrfCompletudeTest` (`C19-001`) faisait entrer à l'inventaire des « émetteurs HTTP à
+     examiner pour SSRF » le fichier `VerificationTlsSonde.php`, **qui est un trait n'émettant
+     rien** : ce qui déclenchait la signature, c'était son commentaire d'en-tête, qui **cite**
+     l'appel fautif qu'il répare. Plus grave qu'un faux rouge — l'inventaire y perdait son sens.
+     Une fois les commentaires écartés, la garde a signalé d'elle-même que `SsrfGuard.php`
+     disparaissait de l'inventaire, et elle avait raison : ses quatre occurrences de signature
+     (l. 25, 90, 164, 187) sont des explications. Mesure faite en amputant le fichier de ses
+     commentaires : **aucune émission HTTP**, seulement deux `dns_get_record`, qui sont la
+     résolution dont ce garde-fou a besoin pour juger un hôte. Il n'est pas un émetteur à
+     examiner : il est ce qui examine. L'y garder revenait à faire comparaître le juge.
+   - `Phase2SansCheminFantomeTest` (`B12-017`) rougissait **sur le compte rendu de sa propre
+     réparation** : l'en-tête de `Phase2\CampaignsController` expliquait quelle annotation
+     `@OA\Get(path="/campaigns")` il avait fallu retirer, et la garde lisait l'explication comme
+     le défaut décrit. Ici les commentaires ne peuvent pas être écartés — une annotation OpenAPI
+     **est** un commentaire — donc le motif exige désormais l'ouverture d'une ligne de bloc de
+     documentation, forme que prennent les 40+ annotations réelles du dépôt et qu'une citation en
+     cours de phrase ne prend jamais. Et le geste restant de `B12-017` est fait : la classe morte
+     `Api/Phase2/CampaignsController` est **supprimée**.
+
+**Témoins rouges joués** avant de conclure, produit cassé exprès puis restauré : `->pourEspace()`
+retiré du re-dispatch → `B11-002` rouge, et sur la l. 114 **seule** ; vraie annotation
+`@OA\Get(path="/campaigns")` posée sur `ColdEmailController` → `B12-017` rouge.
+
+### Les 91 correctifs sont inscrits au registre
+
+**+87 lignes fermées** dans `FILE-DE-TRAVAIL.md` : 86 sur une garde jouée verte le jour même,
+2 sur un correctif documentaire (`E32-001`, `I49-009`). Le décompte passe de 119 à **206 fermées**
+sur 485 lignes.
+
+⚠️ **`I49-009` porte une réserve** : le correctif est réel (les deux mises en gras fautives ont
+disparu du §22.2, l. 683 et 694), mais le CDC vit dans `C:/Users/willi/Downloads/`, **hors de tout
+dépôt**. Ce correctif n'a ni historique, ni revue, et rien ne le rattrapera s'il est perdu.
+
+🔴 **Trois correctifs restent OUVERTS à dessein.** `E31-010`, `E33-002` et `E33-004` sont écrits
+mais **non committés** : ils vivent en modification non suivie dans `Axion-IA/axionia`, sur la
+branche `docs/plan-console-editoriale` — qui n'est pas la leur — au milieu du travail d'autres
+sessions. Patch archivé dans `04_PREUVES/agent-35/site-non-committe/`. *Un correctif qu'aucun
+dépôt ne porte n'est pas un correctif : c'est une note qui disparaîtra au premier `git checkout`
+de quelqu'un d'autre.* Je n'ai touché à aucune branche de ce dépôt : d'autres sessions y vivent.
+
+### Les quatre verrous de connexion : le rapport final est périmé
+
+Mesure du jour, en lecture seule. Les **quatre** verrous nommés au `07_RAPPORT-FINAL.md:28` —
+mot de passe initial, `MAIL_MAILER`, enrôlement 2FA sur trois colonnes inexistantes, écran blanc
+dès une ligne d'`audit_logs` — **sont levés dans le code**, chacun avec sa citation
+`fichier:ligne`. Le quatrième (`ActivityFeed.tsx:152`) n'est encore que sur la branche non
+fusionnée.
+
+Ce qui empêche de se connecter **aujourd'hui** est autre chose, et c'est de l'infrastructure :
+
+| | ce qui bloque | preuve |
+|---|---|---|
+| **V5** | `axion-crm-api` et `axion-crm-redis` sont **arrêtés** (`Exited 255`) — tout `/api/*` rend 502 | `docker logs axion-crm-caddy` : `dial tcp: lookup api: i/o timeout` |
+| **V6** | Le Caddy **vivant** est celui d'avant le passage à FastCGI : il parle `api:80`, la branche attend `api:9000` en fastcgi | API d'admin 2019 : `4 × "dial":"api:80"`, aucun `fastcgi` |
+| **V3′** | La migration `2026_08_19_120000_reparer_socle_authentification` **n'est pas appliquée** : `totp_recovery_codes` est `ARRAY` en base, face à un cast `encrypted:array` | dernière migration en base : `2026_08_19_000002` |
+| **V7** | `CRM_CONSOLE_V2_ENABLED=false` → 404 sur `/v1/crm/*` | `EnsureCrmConsoleV2.php:29-30` |
+
+**C'est le chantier suivant, et il est plus court qu'on ne le croyait** : l'ordre de levée est
+V5 → V6 → V3′ → V7, et il rendrait mesurables les 39 écrans du mandat, jamais ouverts à ce jour.

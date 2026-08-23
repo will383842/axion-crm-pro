@@ -1,0 +1,832 @@
+diff --git a/src/app/api/vivier-opposition/route.ts b/src/app/api/vivier-opposition/route.ts
+index b6632539..40c5880b 100644
+--- a/src/app/api/vivier-opposition/route.ts
++++ b/src/app/api/vivier-opposition/route.ts
+@@ -53,5 +53,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
+     return redirectTo(`status=fail&reason=${encodeURIComponent(result.reason)}`);
+   }
+ 
+-  return redirectTo(`status=ok&already=${result.alreadyOpposed ? "1" : "0"}`);
++  // E31-010 — `degraded` marque le cas où le drapeau a bien été posé mais où
++  // l'adresse ne s'est pas déchiffrée : ni ligne au registre de preuve, ni
++  // propagation au CRM. On le porte jusqu'à l'URL pour qu'il cesse d'être noyé
++  // dans un `status=ok` indistinct. La page de confirmation ne le rend pas
++  // encore : formuler ce que le visiteur doit lire dans ce cas est un arbitrage
++  // de rédaction, il revient à Will.
++  const degrade = result.degraded === true ? "&degraded=1" : "";
++
++  return redirectTo(`status=ok&already=${result.alreadyOpposed ? "1" : "0"}${degrade}`);
+ }
+diff --git a/src/lib/consents/index.ts b/src/lib/consents/index.ts
+index bcb34e8e..ec7440d5 100644
+--- a/src/lib/consents/index.ts
++++ b/src/lib/consents/index.ts
+@@ -45,6 +45,15 @@ export const CONSENT_FORM_REFS = {
+   commercialApplicationVivier: "commercial-tunnel-vivier",
+   newsletter: "newsletter-double-optin",
+   unifiedContact: "unified-contact-form",
++  /**
++   * E33-002 — case à cocher du mini-formulaire de la fenêtre de discussion
++   * (`src/components/chatbot/LeadForm.tsx`, libellé i18n `chatbot.leadConsent`).
++   * Elle est REQUISE depuis toujours (`consentement_rgpd: z.literal(true)`),
++   * mais jusqu'au 2026-08-22 le geste n'entrait dans AUCUN registre : son seul
++   * témoin était un `details.consentementRgpd: true` au fond d'un JSON, et le
++   * CRM ne recevait même pas ça.
++   */
++  chatbot: "chatbot-lead-form",
+   /** Opposition à la conservation en vivier (un clic, sans login). */
+   vivierOpposition: "vivier-opposition",
+ } as const;
+diff --git a/src/server/chatbot/tools/capturer-lead.test.ts b/src/server/chatbot/tools/capturer-lead.test.ts
+index 96dde8a7..11ff66d2 100644
+--- a/src/server/chatbot/tools/capturer-lead.test.ts
++++ b/src/server/chatbot/tools/capturer-lead.test.ts
+@@ -47,7 +47,32 @@ vi.mock("@/lib/telegram", () => ({
+   sendTelegram: (...a: unknown[]) => sendTelegramMock(...a),
+ }));
+ 
+-import { capturerLead, CapturerLeadInputSchema } from "@/server/chatbot/tools/capturer-lead";
++// E33-002 — on intercepte les deux sorties de PREUVE du consentement :
++// l'événement CRM (section `consent`) et le registre indexé par personne.
++// Sans ces deux mocks, le tool appelait les vraies fonctions, qui ne font rien
++// hors configuration : le défaut restait indétectable depuis un test.
++const syncFormSubmissionToCrmMock = vi.fn((..._a: unknown[]) => Promise.resolve());
++vi.mock("@/server/crm-sync", () => ({
++  syncFormSubmissionToCrm: (...a: unknown[]) => syncFormSubmissionToCrmMock(...a),
++}));
++
++const recordConsentEventMock = vi.fn((..._a: unknown[]) => Promise.resolve(true));
++vi.mock("@/lib/consents", async (importOriginal) => {
++  // `CONSENT_FORM_REFS` reste le VRAI : une garde qui compare la référence
++  // écrite à une constante qu'elle a elle-même inventée ne prouve rien.
++  const reel = await importOriginal<typeof import("@/lib/consents")>();
++  return {
++    ...reel,
++    recordConsentEvent: (...a: unknown[]) => recordConsentEventMock(...a),
++  };
++});
++
++import {
++  capturerLead,
++  CapturerLeadInputSchema,
++  CHATBOT_CONSENT_VERSION,
++} from "@/server/chatbot/tools/capturer-lead";
++import { CONSENT_FORM_REFS } from "@/lib/consents";
+ import { decryptPii, isEncryptedPii } from "@/lib/pii-crypto";
+ 
+ const ctx = { tenantId: "t1", conversationId: "conv-1" };
+@@ -66,6 +91,8 @@ beforeEach(() => {
+   transaction.mockClear();
+   enqueueEmailMock.mockClear();
+   sendTelegramMock.mockClear();
++  syncFormSubmissionToCrmMock.mockClear();
++  recordConsentEventMock.mockClear();
+ });
+ 
+ describe("T-17 capturer_lead", () => {
+@@ -245,3 +272,123 @@ describe("capturer_lead — PII chiffré au repos (AES-256-GCM)", () => {
+     expect(data.contactEmail).toBe("jean@acme.fr");
+   }, 20_000);
+ });
++
++// ─────────────────────────────────────────────────────────────────────────────
++// E33-002 — le consentement exigé doit AUSSI être transmis et enregistré
++// ─────────────────────────────────────────────────────────────────────────────
++//
++// Le défaut, mesuré le 2026-08-22 : `capturer_lead` REFUSE la capture sans
++// consentement explicite (`consentement_rgpd: z.literal(true)`, l. 51) — c'est
++// le point de capture le plus strict du site — et c'était le seul dont la
++// preuve ne sortait jamais. L'appel `syncFormSubmissionToCrm` ne portait
++// aucune clé `consent`, alors que `crm-sync/index.ts` en déclare une et que
++// `unified-contact/actions.ts` la remplit ; et `recordConsentEvent` n'était
++// appelé nulle part dans ce fichier. Résultat : un lead arrivait dans une base
++// de prospection sans qu'on puisse dire à quel texte, ni quand, la personne
++// avait dit oui.
++//
++// ⚠️ CE QUE CES GARDES NE COUVRENT PAS : elles vérifient ce que le tool ÉMET,
++// pas ce que le CRM en fait, ni que le libellé `chatbot.leadConsent` affiché à
++// la personne correspond bien à la version déclarée. Ce dernier lien est humain
++// et reste à la charge de qui modifie le texte.
++
++describe("capturer_lead — preuve du consentement (E33-002)", () => {
++  beforeEach(() => {
++    findUnique.mockResolvedValue(null);
++    submissionCreate.mockResolvedValue({
++      id: "sub-consent",
++      submittedAt: new Date("2026-08-22T10:11:12.000Z"),
++    });
++    idemCreate.mockResolvedValue({});
++  });
++
++  it("transmet la section `consent` au CRM (version + horodatage + texte)", async () => {
++    await capturerLead(validInput, ctx);
++
++    expect(syncFormSubmissionToCrmMock).toHaveBeenCalledOnce();
++    const envoi = syncFormSubmissionToCrmMock.mock.calls[0]![0] as {
++      consent?: { version?: string; at?: Date; textRef?: string };
++    };
++    expect(
++      envoi.consent,
++      "E33-002 : l'événement CRM du chatbot repart sans section `consent`. " +
++        "Geste : dans capturer-lead.ts, ajouter `consent: { version: " +
++        "CHATBOT_CONSENT_VERSION, at: submission.submittedAt, textRef: " +
++        "CONSENT_FORM_REFS.chatbot }` à l'appel `syncFormSubmissionToCrm`.",
++    ).toBeDefined();
++    expect(envoi.consent!.version).toBe(CHATBOT_CONSENT_VERSION);
++    expect(envoi.consent!.textRef).toBe(CONSENT_FORM_REFS.chatbot);
++    // L'horodatage est celui que la BASE a retenu, pas un `new Date()`
++    // d'application : c'est lui qui fera foi si l'accord est contesté.
++    expect(envoi.consent!.at).toEqual(new Date("2026-08-22T10:11:12.000Z"));
++  }, 20_000);
++
++  it("inscrit l'opt-in au registre indexé par personne", async () => {
++    await capturerLead(validInput, ctx);
++
++    expect(
++      recordConsentEventMock.mock.calls.length,
++      "E33-002 : aucun `recordConsentEvent` sur le chemin chatbot. Sans lui, " +
++        "« prouvez le consentement de cette personne » n'a pas de réponse — " +
++        "l'événement CRM est indexé par lead, pas par personne. Geste : " +
++        "appeler `recordConsentEvent({ email, formRef: CONSENT_FORM_REFS." +
++        "chatbot, consentVersion: CHATBOT_CONSENT_VERSION, action: 'optin' })` " +
++        "après le commit, sous la garde `!result.idempotent`.",
++    ).toBe(1);
++
++    const ligne = recordConsentEventMock.mock.calls[0]![0] as {
++      email: string;
++      formRef: string;
++      consentVersion: string;
++      action: string;
++      occurredAt?: Date;
++    };
++    expect(ligne.email).toBe("jean@acme.fr");
++    expect(ligne.formRef).toBe(CONSENT_FORM_REFS.chatbot);
++    expect(ligne.consentVersion).toBe(CHATBOT_CONSENT_VERSION);
++    expect(ligne.action).toBe("optin");
++    expect(ligne.occurredAt).toEqual(new Date("2026-08-22T10:11:12.000Z"));
++  }, 20_000);
++
++  it("n'inscrit RIEN au registre sur un rejeu idempotent", async () => {
++    // Le registre est APPEND-ONLY : un rejeu du chatbot y écrirait un second
++    // opt-in pour un seul geste de la personne, et le décompte des accords
++    // deviendrait faux dans le sens qui arrange — exactement ce qu'un registre
++    // de preuve ne doit jamais faire.
++    findUnique.mockResolvedValue({ resultat: { submissionId: "sub-existant" } });
++
++    await capturerLead(validInput, ctx);
++
++    expect(
++      recordConsentEventMock.mock.calls.length,
++      "E33-002 : un rejeu idempotent a écrit une ligne de consentement de plus. " +
++        "Geste : garder l'appel `recordConsentEvent` sous `if (!result.idempotent)`.",
++    ).toBe(0);
++  }, 20_000);
++
++  it("ne passe pas un condensat d'IP là où une IP en clair est attendue", async () => {
++    // `recordConsentEvent` hache lui-même ce qu'on lui donne. Le chemin chatbot
++    // ne dispose que de `ctx.ipHash`, DÉJÀ haché : le lui passer produirait un
++    // hachage de hachage, incomparable au reste du registre. Un contexte absent
++    // vaut mieux qu'un contexte faux.
++    await capturerLead(validInput, { ...ctx, ipHash: "abcdef" });
++
++    const ligne = recordConsentEventMock.mock.calls[0]![0] as { ip?: unknown };
++    expect(
++      ligne.ip ?? null,
++      "E33-002 : `ip` transmis au registre alors que seul un condensat est " +
++        "disponible ici. Geste : ne pas passer `ip` tant que le tool ne reçoit " +
++        "pas l'adresse en clair.",
++    ).toBeNull();
++  }, 20_000);
++
++  it("la version déclarée n'est ni vide ni recyclée d'un autre formulaire", () => {
++    // Verrou anti-« vert sans mesure » : les deux tests ci-dessus comparent la
++    // valeur écrite à `CHATBOT_CONSENT_VERSION`. Si cette constante devenait
++    // vide, ou reprenait la version d'un AUTRE point de capture, ils
++    // resteraient verts en certifiant une preuve fausse.
++    expect(CHATBOT_CONSENT_VERSION).toMatch(/^chatbot-v\d+-\d{4}-\d{2}-\d{2}$/);
++    expect(CONSENT_FORM_REFS.chatbot).toBe("chatbot-lead-form");
++    expect(CONSENT_FORM_REFS.chatbot).not.toBe(CONSENT_FORM_REFS.unifiedContact);
++  });
++});
+diff --git a/src/server/chatbot/tools/capturer-lead.ts b/src/server/chatbot/tools/capturer-lead.ts
+index 3665a179..80a993fb 100644
+--- a/src/server/chatbot/tools/capturer-lead.ts
++++ b/src/server/chatbot/tools/capturer-lead.ts
+@@ -15,6 +15,25 @@ import { Prisma } from "../../../../prisma/generated/client";
+ import type { ToolContext } from "@/server/chatbot/tools/rechercher-offres";
+ import { hashEmailForLookup } from "@/lib/security/email-hash";
+ import { encryptPii } from "@/lib/pii-crypto";
++import { CONSENT_FORM_REFS, recordConsentEvent } from "@/lib/consents";
++
++/**
++ * Version du texte de consentement affiché dans la fenêtre de discussion
++ * (`chatbot.leadConsent`, cf. `src/components/chatbot/LeadForm.tsx`).
++ *
++ * 🔴 E33-002, mesuré le 2026-08-22 : le texte, lui, existe depuis l'origine —
++ * c'est son IDENTIFIANT DE VERSION qui manquait. Les cinq autres points de
++ * capture en déclarent un (`podcast-v1-2026-07-21`, `newsletter-v1-2026-08-13`,
++ * `reviews-v1-2026-07-06`…), le chatbot était le seul à n'en avoir aucun.
++ *
++ * Ce `v1` s'ouvre donc AUJOURD'HUI et ne vaut que pour l'avenir : les leads
++ * chatbot capturés avant cette date portent un consentement réel mais sans
++ * version. Antidater cette chaîne fabriquerait une preuve fausse, ce qui est
++ * pire que l'absence de preuve. Toute retouche du libellé `chatbot.leadConsent`
++ * DOIT incrémenter cette constante — sinon deux textes différents deviennent
++ * indiscernables dans le registre.
++ */
++export const CHATBOT_CONSENT_VERSION = "chatbot-v1-2026-08-22";
+ 
+ /**
+  * Notifie l'équipe d'un NOUVEAU lead chatbot (best-effort, fail-soft — ne fait
+@@ -102,6 +121,10 @@ export async function capturerLead(
+   //  - course concurrente → le perdant rollback (Submission incluse) → 0 doublon,
+   //    puis relit le résultat du gagnant ci-dessous.
+   let result: CapturerLeadResult;
++  // E33-002 — l'horodatage du consentement, remonté hors de la transaction :
++  // le registre de preuve s'écrit APRÈS le commit (cf. `@/lib/consents`, parti
++  // pris 3 : best-effort, jamais dans la transaction métier).
++  let consentementDonneA: Date | undefined;
+   try {
+     result = await prisma.$transaction(async (tx) => {
+       // 🔴 PII CHIFFRÉ AU REPOS (2026-08-18). Ces trois champs partaient EN
+@@ -132,8 +155,12 @@ export async function capturerLead(
+           source: "chatbot",
+           ...(ctx.ipHash ? { ipHash: ctx.ipHash } : {}),
+         },
+-        select: { id: true },
++        // E33-002 — `submittedAt` est relu pour horodater le consentement avec
++        // l'instant que la base a retenu, et non un `new Date()` d'application
++        // qui en différerait de quelques millisecondes.
++        select: { id: true, submittedAt: true },
+       });
++      consentementDonneA = submission.submittedAt;
+ 
+       await tx.chatActionIdempotency.create({
+         data: { cle: key, resultat: { submissionId: submission.id } },
+@@ -160,6 +187,18 @@ export async function capturerLead(
+         sourceSlug: "chatbot",
+         person: { email: input.email, fullName: input.nom, phone: input.telephone ?? null },
+         ...(input.structure ? { company: { name: input.structure } } : {}),
++        // 🔴 E33-002, mesuré le 2026-08-22 : cet appel ne portait AUCUNE
++        // section `consent`. Le chatbot est pourtant le point de capture le
++        // plus exigeant du site — il REFUSE la saisie sans case cochée
++        // (`consentement_rgpd: z.literal(true)`) — et c'était le seul dont le
++        // CRM recevait un lead sans savoir à quel texte, ni quand, la personne
++        // avait dit oui. Une base de prospection qui ne peut pas produire cette
++        // preuve n'est pas prospectable.
++        consent: {
++          version: CHATBOT_CONSENT_VERSION,
++          at: submission.submittedAt,
++          textRef: CONSENT_FORM_REFS.chatbot,
++        },
+         payload: { canal: "chatbot" },
+       });
+ 
+@@ -179,6 +218,30 @@ export async function capturerLead(
+   // Notification équipe sur NOUVEAU lead uniquement (jamais sur un retry
+   // idempotent → pas de double-ping). Fail-soft : n'impacte pas le résultat.
+   if (!result.idempotent) {
++    // 🔴 E33-002 — REGISTRE DE PREUVE. Le CRM reçoit désormais la section
++    // `consent` ci-dessus, mais un événement d'outbox répond « ce lead-ci
++    // portait un consentement » ; il ne répond pas « prouvez le consentement de
++    // CETTE personne », qui suppose un registre indexé par personne. Les cinq
++    // autres points de capture posent ce geste depuis le lot L4 ; le chemin
++    // chatbot ne le posait ni ne l'avait jamais posé (grep `recordConsentEvent`
++    // sur ce fichier le 2026-08-22 : zéro occurrence).
++    //
++    // Sous la garde `!result.idempotent`, comme la notification : le registre
++    // est APPEND-ONLY, un rejeu y écrirait un second opt-in pour un seul geste.
++    //
++    // `ip` n'est pas transmis : le chemin chatbot ne reçoit que `ctx.ipHash`,
++    // déjà haché, et `recordConsentEvent` hache lui-même ce qu'on lui donne —
++    // lui passer le condensat produirait un hachage de hachage, illisible et
++    // incomparable au reste du registre. Mieux vaut un contexte absent qu'un
++    // contexte faux.
++    await recordConsentEvent({
++      email: input.email,
++      formRef: CONSENT_FORM_REFS.chatbot,
++      consentVersion: CHATBOT_CONSENT_VERSION,
++      action: "optin",
++      ...(consentementDonneA ? { occurredAt: consentementDonneA } : {}),
++    });
++
+     await notifyNewLead(input, result.submissionId);
+ 
+     // Confirmation au visiteur (2026-08-13). Il laissait son adresse dans une
+diff --git a/src/server/crm-sync/__tests__/crm-sync-l5.test.ts b/src/server/crm-sync/__tests__/crm-sync-l5.test.ts
+index 35d52d9a..069367ba 100644
+--- a/src/server/crm-sync/__tests__/crm-sync-l5.test.ts
++++ b/src/server/crm-sync/__tests__/crm-sync-l5.test.ts
+@@ -26,6 +26,7 @@ const {
+   jobApplication,
+   calendlyEvent,
+   customerReview,
++  podcastRequest,
+   queueAdd,
+   enqueueSpy,
+   siteSettingUpsert,
+@@ -50,6 +51,8 @@ const {
+   jobApplication: { findMany: vi.fn() },
+   calendlyEvent: { findMany: vi.fn() },
+   customerReview: { findMany: vi.fn() },
++  // E33-004 : sixieme famille de capture, absente du filet jusqu'au 2026-08-22.
++  podcastRequest: { findMany: vi.fn() },
+   queueAdd: vi.fn(),
+   enqueueSpy: vi.fn(),
+   siteSettingUpsert: vi.fn(),
+@@ -64,6 +67,7 @@ vi.mock("@/lib/prisma", () => ({
+     jobApplication,
+     calendlyEvent,
+     customerReview,
++    podcastRequest,
+     siteSetting: {
+       upsert: (...args: unknown[]) => siteSettingUpsert(...args),
+     },
+@@ -146,6 +150,7 @@ beforeEach(() => {
+   jobApplication.findMany.mockResolvedValue([]);
+   calendlyEvent.findMany.mockResolvedValue([]);
+   customerReview.findMany.mockResolvedValue([]);
++  podcastRequest.findMany.mockResolvedValue([]);
+ });
+ 
+ afterEach(() => {
+@@ -578,8 +583,10 @@ describe("alerte de file d'attente", () => {
+   });
+ });
+ 
+-// ── Étape 0, ligne 12 (2026-08-18) — les cinq familles sont comparées ────────
+-describe("réconciliation — parité sur les CINQ familles de capture", () => {
++// ── Étape 0, ligne 12 (2026-08-18) — les familles comparées ─────────────────
++// E33-004 (2026-08-22) : passées à SIX. `podcast_request` émettait sans être
++// jamais vérifiée — voir le test dédié plus bas.
++describe("réconciliation — parité sur les SIX familles de capture", () => {
+   beforeEach(() => {
+     process.env.CRM_SYNC_ENABLED = "true";
+     process.env.CRM_SYNC_URL = "https://crm.test/api/internal/site-sync";
+@@ -587,13 +594,18 @@ describe("réconciliation — parité sur les CINQ familles de capture", () => {
+     outbox.findFirst.mockResolvedValue({ createdAt: new Date(Date.now() - 6 * 24 * 3600 * 1000) });
+   });
+ 
+-  it("le rapport porte les cinq familles, jamais moins", async () => {
++  it("le rapport porte les six familles, jamais moins", async () => {
+     const rapport = await collectReconciliation();
++    // 🔴 La liste est écrite EN DUR, jamais dérivée de `CrmSyncFamily` : un
++    // test qui lirait le type mesurerait le type, pas le comportement — et
++    // c'est exactement le défaut E33-004 (une famille déclarée nulle part
++    // comparée) qui serait passé au vert.
+     expect(rapport.families.map((f) => f.family).sort()).toEqual([
+       "calendly_event",
+       "customer_review",
+       "job_application",
+       "newsletter_subscriber",
++      "podcast_request",
+       "submission",
+     ]);
+   });
+@@ -631,4 +643,34 @@ describe("réconciliation — parité sur les CINQ familles de capture", () => {
+     expect(famille?.missingIds).toEqual(["site:customer_review:av-1"]);
+     expect(rapport.totalMissing).toBe(1);
+   });
++
++  // 🔴 E33-004 — mesure du 2026-08-22 : la réconciliation comparait CINQ
++  // familles alors que le site en émet six. Une demande podcast perdue entre
++  // l'écriture métier et l'outbox n'était signalée par personne, et le rapport
++  // affichait « 0 manquant » — un filet qui rassure sans rien voir.
++  it("podcast : une demande sans ligne d'outbox est un manquant (référence site:podcast_request:…)", async () => {
++    podcastRequest.findMany.mockResolvedValue([{ id: "pod-1" }, { id: "pod-2" }]);
++    outbox.findMany.mockResolvedValue([{ subjectRef: "site:podcast_request:pod-1" }]);
++
++    const rapport = await collectReconciliation();
++    const famille = rapport.families.find((f) => f.family === "podcast_request");
++
++    expect(famille).toBeDefined();
++    expect(famille?.sources).toBe(2);
++    expect(famille?.emitted).toBe(1);
++    // La référence attendue est EXACTEMENT celle qu'émet
++    // `src/features/podcast-request/actions.ts` : `site:podcast_request:<id>`.
++    // Un préfixe divergent rendrait 100 % de manquants — bruit permanent qui
++    // finirait par faire ignorer l'alerte.
++    expect(famille?.missingIds).toEqual(["site:podcast_request:pod-2"]);
++    expect(famille?.universe).toBe("business");
++
++    // La fenêtre porte sur `createdAt` : `PodcastRequest` n'a pas de colonne de
++    // soumission distincte, et `handledAt` (traitement interne) exclurait les
++    // demandes encore `new` — celles-là mêmes qu'un défaut de synchro perdrait.
++    const appel = podcastRequest.findMany.mock.calls.at(-1)?.[0] as {
++      where: Record<string, unknown>;
++    };
++    expect(Object.keys(appel.where)).toEqual(["createdAt"]);
++  });
+ });
+diff --git a/src/server/crm-sync/__tests__/crm-sync.test.ts b/src/server/crm-sync/__tests__/crm-sync.test.ts
+index 40c62396..c981ee6b 100644
+--- a/src/server/crm-sync/__tests__/crm-sync.test.ts
++++ b/src/server/crm-sync/__tests__/crm-sync.test.ts
+@@ -41,7 +41,12 @@ vi.mock("@/lib/security/email-hash", () => ({
+ }));
+ 
+ import { emitOutboxRow, signBody } from "../emit";
+-import { syncCandidateToCrm, syncFormSubmissionToCrm, normalizeSiren } from "../index";
++import {
++  syncCandidateToCrm,
++  syncFormSubmissionToCrm,
++  syncVivierOppositionToCrm,
++  normalizeSiren,
++} from "../index";
+ import { CRM_FORM_TYPES } from "../types";
+ import { UNIFIED_CONTACT_TYPES } from "@/lib/schemas/unified-contact-schema";
+ import { sweepCrmSyncOutbox } from "@/server/queue/workers/crm-sync-worker";
+@@ -61,6 +66,18 @@ afterEach(() => {
+   vi.unstubAllGlobals();
+ });
+ 
++/**
++ * Aplati un espion de `console.error` en UNE chaîne inspectable.
++ * Les traces de ce module passent leurs identifiants en objet (dernier
++ * argument) : sans `JSON.stringify`, `subject_ref` se lirait `[object Object]`
++ * et une garde qui le cherche serait rouge pour une mauvaise raison.
++ */
++function lignesDeJournal(espion: { mock: { calls: unknown[][] } }): string {
++  return espion.mock.calls
++    .map((args) => args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" "))
++    .join("\n");
++}
++
+ function enableSync(): void {
+   process.env.CRM_SYNC_ENABLED = "true";
+   process.env.CRM_SYNC_URL = "https://api.crm.invalid/api/internal/site-sync";
+@@ -124,6 +141,75 @@ describe("inertie (drapeaux à OFF)", () => {
+     expect(createMock.mock.calls[0]?.[0]?.data?.universe).toBe("vivier");
+   });
+ 
++  /**
++   * E31-003 — l'abandon d'une OPPOSITION n'a pas le droit d'être muet.
++   *
++   * Mesuré le 2026-08-22 : `syncVivierOppositionToCrm()` force l'univers à
++   * `vivier`, et le verrou candidats rendait alors `null` SANS un mot. Drapeau
++   * maître ON + flux candidats OFF est un état nominal et durable : dans cet
++   * état, une opposition — un droit qui s'exerce — disparaissait sans laisser
++   * de quoi la rejouer, la personne voyant une page de confirmation.
++   *
++   * Cette garde ne dit RIEN sur la transmission elle-même (arbitrage ouvert,
++   * il appartient au contrat d'ingestion du CRM) : elle inspecte uniquement le
++   * fait que l'abandon est journalisé, avec de quoi retrouver l'événement.
++   */
++  it("E31-003 — journalise l'opposition vivier abandonnée par le verrou candidats", async () => {
++    enableSync();
++    delete process.env.CRM_SYNC_CANDIDATES_ENABLED;
++
++    const journal = vi.spyOn(console, "error").mockImplementation(() => {});
++    try {
++      await syncVivierOppositionToCrm({
++        subjectRef: "site:job_application:E31-003",
++        person: { email: "oppose@example.invalid" },
++        consent: { version: "careers-v2-2026-08-13" },
++      });
++
++      const trace = lignesDeJournal(journal);
++
++      expect(
++        trace.includes("opposition vivier NON transmise"),
++        "E31-003 : le verrou `CRM_SYNC_CANDIDATES_ENABLED` abandonne à nouveau " +
++          "une opposition au vivier SANS rien journaliser — elle est perdue et " +
++          "personne ne peut la rejouer après la bascule. GESTE : rétablir le " +
++          "`console.error` du chemin `event_type === \"opt_out\"` dans " +
++          "`src/server/crm-sync/enqueue.ts` (verrou d'inertie).",
++      ).toBe(true);
++
++      expect(
++        trace.includes("site:job_application:E31-003"),
++        "E31-003 : l'abandon est journalisé mais SANS `subject_ref` — une trace " +
++          "qui ne nomme pas la personne concernée ne permet pas de rejouer " +
++          "l'opposition. GESTE : joindre `{ event_id, subject_ref }` au " +
++          "`console.error` de `src/server/crm-sync/enqueue.ts`.",
++      ).toBe(true);
++
++      // …et le silence revient quand le verrou s'ouvre, sinon la garde ci-dessus
++      // serait verte pour une mauvaise raison (« ça journalise toujours »).
++      journal.mockClear();
++      createMock.mockClear();
++      process.env.CRM_SYNC_CANDIDATES_ENABLED = "true";
++
++      await syncVivierOppositionToCrm({
++        subjectRef: "site:job_application:E31-003",
++        person: { email: "oppose@example.invalid" },
++        consent: { version: "careers-v2-2026-08-13" },
++      });
++
++      expect(createMock).toHaveBeenCalledTimes(1);
++      expect(
++        lignesDeJournal(journal).includes("opposition vivier NON transmise"),
++        "E31-003 : le flux candidats est OUVERT et l'opposition part bien au CRM, " +
++          "mais la trace d'abandon est quand même émise — elle devient du bruit " +
++          "et ne veut plus rien dire. GESTE : garder le `console.error` DANS la " +
++          "branche du verrou, dans `src/server/crm-sync/enqueue.ts`.",
++      ).toBe(false);
++    } finally {
++      journal.mockRestore();
++    }
++  });
++
+   it("le balayage ne touche pas la base quand le drapeau est à OFF", async () => {
+     delete process.env.CRM_SYNC_ENABLED;
+ 
+diff --git a/src/server/crm-sync/enqueue.ts b/src/server/crm-sync/enqueue.ts
+index 0f4e330b..ab05b313 100644
+--- a/src/server/crm-sync/enqueue.ts
++++ b/src/server/crm-sync/enqueue.ts
+@@ -78,7 +78,36 @@ export async function enqueueCrmSyncEvent(
+   // Aucune écriture, aucun job, aucun appel réseau tant que le drapeau est à
+   // OFF : le comportement est identique à celui d'avant le lot.
+   if (!isCrmSyncEnabled()) return null;
+-  if (universe === "vivier" && !isCrmSyncCandidatesEnabled()) return null;
++  if (universe === "vivier" && !isCrmSyncCandidatesEnabled()) {
++    // ── E31-003 ────────────────────────────────────────────────────────────
++    // C'était le SEUL chemin d'abandon de ce fichier qui ne disait rien, alors
++    // que les deux autres journalisent (« mise en file best-effort échouée »,
++    // « écriture outbox échouée (événement perdu) »).
++    //
++    // Mesure du 2026-08-22 : drapeau maître ON + `CRM_SYNC_CANDIDATES_ENABLED`
++    // absent est un état NOMINAL et DURABLE — `config.ts` dit que ce second
++    // verrou ne s'ouvre qu'après la mise en production des textes de
++    // consentement v2. Or `syncVivierOppositionToCrm()` force l'univers à
++    // `vivier` : dans cet état, toute OPPOSITION à la conservation en vivier
++    // était perdue en silence, sans ligne d'outbox et sans journal, pendant que
++    // la personne voyait une page de confirmation.
++    //
++    // Ce qu'on NE fait PAS ici, volontairement : laisser passer les `opt_out`
++    // malgré le verrou. Ce serait envoyer au CRM des événements `vivier` que la
++    // séquence de déploiement dit qu'il ne doit pas encore recevoir —
++    // l'arbitrage appartient au contrat d'ingestion du CRM, pas à ce fichier.
++    // On rend donc l'abandon AUDIBLE, rien de plus : la source de vérité de
++    // l'opposition reste `vivierOpposedAt` côté site, et cette trace est ce qui
++    // permettra de rejouer les oppositions au moment de la bascule.
++    if (event.event_type === "opt_out") {
++      console.error(
++        "[crm-sync] opposition vivier NON transmise (CRM_SYNC_CANDIDATES_ENABLED à OFF) — " +
++          "à rejouer après la bascule du flux candidats :",
++        { event_id: event.event_id, subject_ref: event.subject_ref },
++      );
++    }
++    return null;
++  }
+ 
+   try {
+     const writer = (options.tx ?? prisma) as unknown as CrmOutboxWriter;
+diff --git a/src/server/crm-sync/reconcile.ts b/src/server/crm-sync/reconcile.ts
+index 57d2997d..a624b1f5 100644
+--- a/src/server/crm-sync/reconcile.ts
++++ b/src/server/crm-sync/reconcile.ts
+@@ -60,7 +60,7 @@ const MAX_SOURCES_PER_FAMILY = 2000;
+ const MAX_REPORTED_IDS = 20;
+ 
+ /**
+- * Les cinq familles de capture du site qui émettent vers le CRM.
++ * Les SIX familles de capture du site qui émettent vers le CRM.
+  *
+  * Étape 0, ligne 12 (2026-08-18) : la réconciliation ne comparait que les
+  * formulaires et les candidatures — le critère de PARITÉ du cahier des charges
+@@ -68,9 +68,25 @@ const MAX_REPORTED_IDS = 20;
+  * familles ») était mesuré sur deux familles sur cinq. Calendly, newsletter et
+  * avis rejoignent la comparaison ; chacune avec SA condition d'émission (un
+  * enregistrement qui, par construction, n'émet pas n'est pas un manquant).
++ *
++ * 🔴 E33-004, mesuré le 2026-08-22 : il en manquait une SIXIÈME. Les demandes
++ * podcast émettent bel et bien (`src/features/podcast-request/actions.ts`,
++ * `syncFormSubmissionToCrm({ subjectRef: "site:podcast_request:…" })`) mais
++ * aucun `compareFamily` ne les couvrait : le filet ne voyait pas passer les
++ * leads venus des QR des flyers papier. Un filet muet sur une famille est pire
++ * qu'un filet absent — il donne le rapport « 0 manquant » qui rassure.
++ *
++ * Toute famille ajoutée ici DOIT recevoir son `compareFamily` ci-dessous ; la
++ * garde `réconciliation — parité sur les SIX familles` compare la liste rendue
++ * par le rapport à cette union et rougit si l'un des deux avance seul.
+  */
+ export type CrmSyncFamily =
+-  "submission" | "job_application" | "calendly_event" | "newsletter_subscriber" | "customer_review";
++  | "submission"
++  | "job_application"
++  | "calendly_event"
++  | "newsletter_subscriber"
++  | "customer_review"
++  | "podcast_request";
+ 
+ export interface ReconcileFamilyReport {
+   family: CrmSyncFamily;
+@@ -107,6 +123,7 @@ const FAMILY_LABELS: Record<CrmSyncFamily, string> = {
+   calendly_event: "Rendez-vous Calendly (invité identifié)",
+   newsletter_subscriber: "Newsletter (inscriptions confirmées)",
+   customer_review: "Avis clients",
++  podcast_request: "Demandes de podcast (page /podcast + QR flyers)",
+ };
+ 
+ /**
+@@ -262,6 +279,28 @@ export async function collectReconciliation(): Promise<ReconcileReport> {
+           take: MAX_SOURCES_PER_FAMILY,
+         }),
+     }),
++    // 🔴 E33-004 — la sixième famille, ajoutée le 2026-08-22.
++    // `createdAt` et non `handledAt` : `PodcastRequest` n'a pas de colonne de
++    // soumission distincte (cf. `prisma/schema.prisma`, modèle PodcastRequest),
++    // et `handledAt` est l'horodatage du TRAITEMENT interne — le prendre pour
++    // borne exclurait de la fenêtre toute demande encore `new`, c'est-à-dire
++    // précisément celles qu'un défaut de synchro laisserait tomber.
++    // L'émission est INCONDITIONNELLE dans l'action (aucun garde-fou métier
++    // avant `syncFormSubmissionToCrm`) : toute demande créée dans la fenêtre
++    // doit avoir sa ligne d'outbox, sans exception à retrancher.
++    await compareFamily({
++      family: "podcast_request",
++      universe: "business",
++      since,
++      until,
++      loadIds: (from, to) =>
++        prisma.podcastRequest.findMany({
++          where: { createdAt: { gte: from, lt: to } },
++          select: { id: true },
++          orderBy: { createdAt: "asc" },
++          take: MAX_SOURCES_PER_FAMILY,
++        }),
++    }),
+   );
+ 
+   return {
+diff --git a/src/server/vivier/__tests__/vivier.test.ts b/src/server/vivier/__tests__/vivier.test.ts
+index 9b58d86d..e4fa0d5c 100644
+--- a/src/server/vivier/__tests__/vivier.test.ts
++++ b/src/server/vivier/__tests__/vivier.test.ts
+@@ -44,8 +44,15 @@ vi.mock("@/server/queue/queues", () => ({
+ 
+ // Les PII sont chiffrées at-rest : dans les tests, l'identité est la plus
+ // simple des transformations réversibles.
++//
++// E31-010 — `decryptPii` doit pouvoir ÉCHOUER ici : c'est exactement le cas que
++// le constat décrit (clé tournée, chiffré corrompu), et une fonction figée ne
++// permettrait pas de l'atteindre. D'où un `vi.fn` qui porte l'implémentation
++// par défaut — `vi.clearAllMocks()` n'efface que les appels, pas elle.
++const decryptPiiMock = vi.fn((value: string | null) => value);
++
+ vi.mock("@/lib/pii-crypto", () => ({
+-  decryptPii: (value: string | null) => value,
++  decryptPii: (value: string | null) => decryptPiiMock(value),
+   encryptPii: (value: string | null) => value,
+ }));
+ 
+@@ -420,6 +427,64 @@ describe("enregistrement de l'opposition", () => {
+       reason: "internal",
+     });
+   });
++
++  // E31-010 (S2) — jusqu'au 2026-08-22, une adresse que `decryptPii` refusait
++  // de rendre faisait sauter À LA FOIS le registre de preuve et la propagation
++  // au CRM, et la fonction répondait quand même `ok: true`. La perte était
++  // totale et muette : aucune trace, aucun compteur, aucun signal au visiteur.
++  it("E31-010 — une adresse illisible pose le drapeau, le DIT, et ne se perd plus en silence", async () => {
++    const erreurs = vi.spyOn(console, "error").mockImplementation(() => {});
++    decryptPiiMock.mockImplementation(() => {
++      throw new Error("clé de chiffrement tournée");
++    });
++
++    try {
++      const result = await recordVivierOpposition("app-1");
++
++      // 1. LE DROIT EST EXERCÉ QUAND MÊME. Le drapeau se pose AVANT tout
++      //    signalement : refuser l'opposition parce qu'on n'a pas su lire
++      //    l'adresse punirait la personne d'un défaut qui est le nôtre.
++      expect(updateManyMock).toHaveBeenCalledTimes(1);
++      expect(updateManyMock.mock.calls[0]?.[0]?.data).toEqual({
++        vivierOpposedAt: expect.any(Date),
++      });
++
++      // 2. LE RÉSULTAT DIT LA DÉGRADATION. C'est ce champ, et lui seul, qui
++      //    distingue une opposition complète d'une opposition à moitié faite.
++      expect(result).toEqual({
++        ok: true,
++        alreadyOpposed: false,
++        applications: 1,
++        degraded: true,
++      });
++
++      // 3. LE SILENCE A CESSÉ, et le journal nomme la candidature — sans quoi
++      //    on saurait qu'il manque quelque chose sans savoir chez qui.
++      expect(erreurs).toHaveBeenCalledTimes(1);
++      expect(String(erreurs.mock.calls[0]?.[0])).toContain("DÉGRADÉE");
++      expect(erreurs.mock.calls[0]?.[1]).toMatchObject({ applicationId: "app-1" });
++
++      // 4. TÉMOIN DU MANQUE : c'est bien la preuve et le CRM qui sautent. Sans
++      //    ces deux lignes, la garde certifierait une dégradation qu'elle
++      //    n'aurait pas constatée.
++      expect(consentCreateMock).not.toHaveBeenCalled();
++      expect(outboxCreateMock).not.toHaveBeenCalled();
++    } finally {
++      decryptPiiMock.mockImplementation((value: string | null) => value);
++      erreurs.mockRestore();
++    }
++  });
++
++  // TÉMOIN INVERSE : le cas nominal ne porte PAS `degraded`. Sans lui, un
++  // correctif qui marquerait TOUTES les oppositions comme dégradées passerait
++  // pour vert, et le drapeau ne distinguerait plus rien.
++  it("E31-010 — TÉMOIN : une adresse lisible ne rend aucun `degraded`", async () => {
++    const result = await recordVivierOpposition("app-1");
++
++    expect(result).toEqual({ ok: true, alreadyOpposed: false, applications: 2 });
++    expect(consentCreateMock).toHaveBeenCalled();
++    expect(outboxCreateMock).toHaveBeenCalled();
++  });
+ });
+ 
+ // ─────────────────────────────────────────────────────────────────────────────
+diff --git a/src/server/vivier/opposition.ts b/src/server/vivier/opposition.ts
+index 1e1fea53..e22f2dd1 100644
+--- a/src/server/vivier/opposition.ts
++++ b/src/server/vivier/opposition.ts
+@@ -10,6 +10,11 @@
+  *   3. l'opposition est propagée au CRM (univers vivier).
+  *
+  * IDEMPOTENTE : re-cliquer le même lien ne casse rien et ne ré-émet rien.
++ *
++ * DÉGRADÉE plutôt que muette (E31-010) : si l'adresse ne se déchiffre pas, le
++ * drapeau (1) est posé quand même, mais (2) et (3) sautent — le résultat porte
++ * alors `degraded: true` et le fait est journalisé en erreur. Une opposition à
++ * moitié faite doit se voir ; elle ne doit pas se refuser.
+  */
+ 
+ import { prisma } from "@/lib/prisma";
+@@ -19,7 +24,10 @@ import { CONSENT_FORM_REFS, recordConsentEvent } from "@/lib/consents";
+ import { syncVivierOppositionToCrm } from "@/server/crm-sync";
+ 
+ export type VivierOppositionResult =
+-  | { ok: true; alreadyOpposed: boolean; applications: number }
++  // `degraded` n'est présent QUE lorsqu'il vaut `true` (E31-010) : l'ajouter
++  // systématiquement casserait les égalités strictes des appelants et des
++  // gardes, pour un champ qui ne dit rien dans le cas nominal.
++  | { ok: true; alreadyOpposed: boolean; applications: number; degraded?: true }
+   | { ok: false; reason: "unknown_application" | "internal" };
+ 
+ export async function recordVivierOpposition(
+@@ -52,25 +60,50 @@ export async function recordVivierOpposition(
+       return { ok: true, alreadyOpposed: true, applications: siblings.length };
+     }
+ 
+-    if (email) {
+-      await recordConsentEvent({
+-        email,
+-        formRef: CONSENT_FORM_REFS.vivierOpposition,
+-        consentVersion: application.consentVersion,
+-        action: "optout",
+-        occurredAt: now,
+-        ip: options.ip ?? null,
+-        userAgent: options.userAgent ?? null,
++    // 🔴 E31-010 — UNE ADRESSE ILLISIBLE FAISAIT DISPARAÎTRE LA MOITIÉ DE
++    // L'OPPOSITION, EN SILENCE.
++    //
++    // Mesure du 2026-08-22 : `safeDecrypt()` rend `null` sur TOUTE exception
++    // (clé tournée, chiffré corrompu). Le `if (email)` qui enveloppait ici À LA
++    // FOIS le registre de preuve et la propagation au CRM était alors sauté —
++    // et la fonction rendait quand même `ok: true`. La personne lisait « c'est
++    // enregistré » ; il ne restait qu'un drapeau local, sans preuve consignée
++    // et sans que le CRM apprenne jamais l'opposition.
++    //
++    // On NE fait PAS échouer la route pour autant : le drapeau vient d'être
++    // posé au-dessus, et rendre `ok: false` transformerait une opposition
++    // partielle en opposition REFUSÉE aux yeux du visiteur — un droit exercé
++    // qu'on lui présenterait comme un échec. On rend donc un résultat DISTINCT
++    // et on journalise en erreur : c'est ce qui fait cesser le silence, sans
++    // rien retirer à la personne.
++    if (!email) {
++      console.error("[vivier] opposition DÉGRADÉE — adresse non déchiffrable", {
++        applicationId: application.id,
++        applications: siblings.length,
++        manquant: "registre de preuve (optout) + propagation CRM",
++        geste: "réparer le chiffré ou la clé, puis rejouer la propagation à la main",
+       });
+ 
+-      await syncVivierOppositionToCrm({
+-        subjectRef: `site:job_application:${application.id}`,
+-        occurredAt: now,
+-        person: { email },
+-        consent: { version: application.consentVersion, at: now },
+-      });
++      return { ok: true, alreadyOpposed: false, applications: siblings.length, degraded: true };
+     }
+ 
++    await recordConsentEvent({
++      email,
++      formRef: CONSENT_FORM_REFS.vivierOpposition,
++      consentVersion: application.consentVersion,
++      action: "optout",
++      occurredAt: now,
++      ip: options.ip ?? null,
++      userAgent: options.userAgent ?? null,
++    });
++
++    await syncVivierOppositionToCrm({
++      subjectRef: `site:job_application:${application.id}`,
++      occurredAt: now,
++      person: { email },
++      consent: { version: application.consentVersion, at: now },
++    });
++
+     return { ok: true, alreadyOpposed: false, applications: siblings.length };
+   } catch (error) {
+     console.error("[vivier] opposition non enregistrée:", error);

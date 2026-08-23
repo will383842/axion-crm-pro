@@ -8,7 +8,7 @@
 > `FILE-DE-TRAVAIL.md`. Verdicts bruts de la vague de vérification :
 > `verdicts-420.json`. Ce qui revient à Will : `ARBITRAGES.md`.
 
-**Dernière mise à jour : 2026-08-23.**
+**Dernière mise à jour : 2026-08-23 (fin de la vérification de la vague 2).**
 
 ---
 
@@ -21,7 +21,7 @@ cd C:/Users/willi/Documents/Projets/crmpro-wt-a35-auth && git log --oneline -8
 # 2. Rendre le banc honnête AVANT toute suite (sans quoi douze gardes mentent)
 bash infra/scripts/rafraichir-le-banc.sh a35r
 
-# 3. Reprendre la vérification là où elle s'est arrêtée
+# 3. La vérification est FINIE (23/08). Pour la rejouer, par tranches courtes :
 docker exec a35r sh -lc 'cd /var/www/html && php artisan test --without-tty tests/Feature/Crm tests/Feature/Database'
 ```
 
@@ -37,11 +37,17 @@ copie **périmée** existe. Rafraîchir d'abord, croire ensuite.
 | | |
 |---|---|
 | worktree de travail | `C:/Users/willi/Documents/Projets/crmpro-wt-a35-auth` |
-| branche | `fix/gardes-de-plan-et-c19-010` @ `44cb33e` — **poussée** |
-| copie principale (journaux) | `Axion-CRM-Pro`, branche `audit/360-p1-p2` @ `a21361b` |
+| branche | `fix/gardes-de-plan-et-c19-010` @ `e41a034` — ⚠️ **2 commits du 23/08 NON POUSSÉS** |
+| copie principale (journaux) | `Axion-CRM-Pro`, branche `audit/360-p1-p2` |
 | conteneur du banc | `a35r` · base de test `axion_crm_test` (forcée par `phpunit.xml`) |
 
-**Aucun fichier non committé nulle part.** Les deux dépôts sont propres.
+⚠️ **Le dépôt du SITE, lui, n'est pas propre** — et personne ne l'avait compté.
+`Axion-IA/axionia` porte **586 lignes de correctifs d'audit non committées**
+(`E31-010`, `E33-002`, `E33-004`, plus `crm-sync`), sur la branche
+`docs/plan-console-editoriale` qui n'est pas la leur, au milieu du travail
+d'autres sessions. Je n'y ai touché à **aucune** branche ; le patch est archivé
+dans `04_PREUVES/agent-35/site-non-committe/`. *C'est la première chose à
+sécuriser en reprenant.*
 
 ### Fusionné et déployé en production
 
@@ -53,8 +59,10 @@ copie **périmée** existe. Rafraîchir d'abord, croire ensuite.
 ### En cours, non fusionné
 
 La branche `fix/gardes-de-plan-et-c19-010` porte **la vague 2** : 91 correctifs
-écrits par 20 agents, plus les six défauts trouvés en les vérifiant. **Pas encore
-de PR ouverte** — elle attend la fin de la vérification backend.
+écrits par 20 agents, plus les six défauts trouvés en les vérifiant. La vérification est **finie et verte** (23/08).
+**Pas encore de PR ouverte** — le dépôt est PUBLIC et `06_RESTE-WILL.md` §A00
+garde la trace d'un agent qui a poussé malgré trois refus : **la PR se demande à
+Will avant de s'ouvrir.**
 
 ---
 
@@ -78,19 +86,25 @@ de portée **par construction**, pas par défaut. La sonde le dit désormais.
 ```
           fermés  partiels  ouverts   total
 S0            16         3        6      25
-S1            61         7       48     116
-S2            36         0      220     256
-S3             6         0       82      88
+S1            62         7       47     116
+S2            88         0      168     256
+S3            40         0       48      88
 ────────────────────────────────────────────
-TOTAL        119        10      356     485
+TOTAL        206        10      269     485
 ```
 
-⚠️ **Ce tableau SOUS-ESTIME le travail fait.** Les **91 correctifs de la vague 2**
-n'y sont pas inscrits : je ne compte un constat fermé qu'une fois sa garde jouée
-verte. C'est le premier geste à faire en reprenant.
+✅ **Les 91 correctifs de la vague 2 sont inscrits** (2026-08-23) : **+87 lignes
+fermées**, dont 86 sur une garde **jouée verte le jour même** et 2 sur un
+correctif documentaire. Aucun S0 dans le lot — ceux qui restent sont des
+`conception` et des arbitrages, pas des correctifs mécaniques.
 
-### D'où viennent les 119 fermés
+🔴 **Trois correctifs restent ouverts à dessein** : `E31-010`, `E33-002`,
+`E33-004` sont **écrits mais non committés**, en modification non suivie dans le
+dépôt du site. Un correctif qu'aucun dépôt ne porte n'est pas un correctif.
 
+### D'où viennent les 206 fermés
+
+- **87** fermés le 2026-08-23 par la vague 2, garde jouée verte le jour même.
 - **55** fermés par des correctifs, vagues 1 à 14.
 - **64** fermés par **lecture**, le 2026-08-22 : trente vérificateurs ont établi
   que le registre les déclarait ouverts **à tort**. Chacun porte une citation
@@ -99,20 +113,27 @@ verte. C'est le premier geste à faire en reprenant.
 
 ---
 
-## 4. LA VÉRIFICATION DE LA VAGUE 2 — où elle en est
+## 4. LA VÉRIFICATION DE LA VAGUE 2 — ✅ TERMINÉE LE 2026-08-23
 
-| contrôle | verdict |
-|---|---|
-| Syntaxe PHP, 73 fichiers | ✅ |
-| **PHPStan niveau 8**, tout le dépôt | ✅ **aucune erreur** |
-| Pint | ✅ |
-| `tsc --noEmit` | ✅ |
-| **Frontend : 59 fichiers, 412 tests** | ✅ **tous verts** |
-| Backend `tests/Feature/Infra` (147 tests) | ✅ verts |
-| Backend `Crm`, `Database`, `Console`, `Commands` | ⏳ **à jouer** |
-| Backend `Rgpd`, `Auth`, `Controllers`, … | ⏳ **à jouer** |
-| Backend `Unit` + racine de `Feature` | ⏳ **à jouer** |
-| Workers (`workers/`) | ⏳ **à jouer** |
+| contrôle | tests | verdict |
+|---|---:|---|
+| Syntaxe PHP · PHPStan niveau 8 · Pint · `tsc --noEmit` | — | ✅ |
+| `Feature/Crm` + `Feature/Database` | 266 | ✅ |
+| `Feature/Console` + `Feature/Commands` | 100 | ✅ |
+| `Feature/Rgpd` + `Auth` + `Controllers` | 368 | ✅ |
+| 8 sous-dossiers restants de `Feature` | 84 | ✅ |
+| `Feature` racine (28 fichiers) | 224 | ✅ |
+| `Unit` (48 fichiers) | 342 | ✅ |
+| `Feature/Infra` | 261 | ✅ |
+| Workers (`vitest`) | 94 | ✅ |
+| Frontend (`vitest`, 59 fichiers) | 412 | ✅ |
+
+**Six rouges rencontrés, tous examinés, aucun n'était une régression du produit.**
+Le récit complet est au `00_JOURNAL.md`, entrée du 2026-08-23. En trois mots :
+trois gardes comptaient sur un défaut SQL que la vague 2 avait délibérément
+retiré ; un plafond n'avait pas été rouvert après un correctif légitime ; et
+**trois gardes lisaient leurs propres commentaires comme du code** — dont une qui
+rougissait sur le compte rendu de sa propre réparation.
 
 ⚠️ **Jouer par tranches courtes.** La suite entière meurt en sortie 255 vers
 816 tests, et les tâches d'arrière-plan longues se font arrêter. Une tranche =
@@ -145,17 +166,31 @@ Plus, du mandat lui-même (§12, « définition de fini ») :
 | # | exigence | état |
 |---|---|---|
 | 3 | **chaque écran ouvert à la main**, captures archivées | ❌ **jamais fait** |
-| 5 | chaque S0/S1 corrigé | 🟡 **6 S0 et 48 S1 ouverts** |
+| 5 | chaque S0/S1 corrigé | 🟡 **6 S0 et 47 S1 ouverts** |
 | 9 | les **57 alertes de vulnérabilité** arbitrées ou gelées | ❌ toujours 57 |
 | 10 | aucune route 501 | ❌ `I48-001` ouvert |
 | 13 | **une sauvegarde restaurée pour de vrai** | ❌ aucune trace |
-| 14 | plus rien de sévérité ≥ S2 | ❌ 220 S2, 82 S3 |
+| 14 | plus rien de sévérité ≥ S2 | ❌ 168 S2, 48 S3 *(étaient 220 et 82)* |
 
-🔴 **Le plus gros manque est structurel.** Les 39 écrans n'ont jamais été
-ouverts dans un navigateur — et ils ne peuvent pas l'être : le rapport final
-établit que **personne ne s'est jamais connecté au CRM**, quatre verrous se
-refermant l'un sur l'autre. Tant qu'ils tiennent, tout est mesuré au `curl`.
-*C'est probablement le prochain vrai chantier.*
+🔴 **Le plus gros manque est structurel — mais il a rétréci le 2026-08-23.**
+Les 39 écrans n'ont toujours jamais été ouverts dans un navigateur. En revanche,
+la raison invoquée par le rapport final est **périmée** : les **quatre verrous**
+du `07_RAPPORT-FINAL.md:28` (mot de passe initial · `MAIL_MAILER` · enrôlement
+2FA sur trois colonnes inexistantes · écran blanc dès une ligne d'`audit_logs`)
+**sont levés dans le code**, chacun avec sa citation `fichier:ligne`. Le
+quatrième (`ActivityFeed.tsx:152`) n'est encore que sur la branche non fusionnée.
+
+Ce qui bloque **aujourd'hui** est de l'infrastructure, et c'est plus court :
+
+| | ce qui bloque | preuve | qui |
+|---|---|---|---|
+| **V5** | `axion-crm-api` et `axion-crm-redis` **arrêtés** (`Exited 255`) — tout `/api/*` rend 502 | `docker logs axion-crm-caddy` : `dial tcp: lookup api: i/o timeout` | moi |
+| **V6** | Le Caddy **vivant** date d'avant le passage à FastCGI : il parle `api:80`, la branche attend `api:9000` en fastcgi | API d'admin 2019 : `4 × "dial":"api:80"`, aucun `fastcgi` | moi |
+| **V3′** | La migration `2026_08_19_120000_reparer_socle_authentification` **n'est pas appliquée** : `totp_recovery_codes` est `ARRAY`, face à un cast `encrypted:array` | dernière migration en base : `2026_08_19_000002` | moi |
+| **V7** | `CRM_CONSOLE_V2_ENABLED=false` → 404 sur `/v1/crm/*` | `EnsureCrmConsoleV2.php:29-30` | drapeau produit → Will |
+
+**Ordre de levée : V5 → V6 → V3′ → V7.** C'est le prochain vrai chantier, et
+c'est lui qui rendrait les 39 écrans mesurables autrement qu'au `curl`.
 
 ---
 
@@ -209,12 +244,23 @@ est versionné) pour les 11 premiers.
 
 ## 8. PAR QUOI REPRENDRE, DANS L'ORDRE
 
-1. **Rafraîchir le banc** (`infra/scripts/rafraichir-le-banc.sh a35r`).
-2. **Finir la vérification backend** par tranches courtes — `Crm`, `Database`,
-   `Console`, `Commands`, puis `Rgpd`, `Auth`, `Controllers`, puis `Unit` et la
-   racine de `Feature`, puis les workers.
-3. **Inscrire les 91 correctifs au registre** une fois leurs gardes vertes.
-4. **Ouvrir la PR** de `fix/gardes-de-plan-et-c19-010` et la faire fusionner.
+> Mis à jour le 2026-08-23. Les étapes 1 à 3 de la version précédente sont
+> **faites** : banc rafraîchi, vérification backend terminée et verte, 91
+> correctifs inscrits au registre.
+
+1. **Sécuriser les correctifs du dépôt du site.** `E31-010`, `E33-002`,
+   `E33-004` sont écrits et **non committés** dans `Axion-IA/axionia`, sur une
+   branche qui n'est pas la leur. Patch de secours :
+   `04_PREUVES/agent-35/site-non-committe/`. Vérifier d'abord qu'aucune autre
+   session ne travaille dans cette copie.
+2. **Pousser les 2 commits du 23/08** (`d9205b5`, `e41a034`) — la branche locale
+   est en avance sur son distant.
+3. **Demander à Will l'ouverture de la PR** de `fix/gardes-de-plan-et-c19-010`.
+   ⚠️ Le dépôt est **public** et le §A00 de `06_RESTE-WILL.md` garde la trace
+   d'un agent qui a poussé malgré trois refus : **ne pas l'ouvrir sans réponse.**
+4. **Lever les quatre verrous d'infrastructure** (§5, V5 → V6 → V3′ → V7) et
+   **ouvrir enfin les 39 écrans à la main** — c'est l'exigence n° 3 du §12 du
+   mandat, la seule jamais entamée.
 5. **Lancer la vague du dépôt du site** pour les 11 constats reportés.
-6. Attaquer les **48 S1 ouverts**, puis les S2.
+6. Attaquer les **47 S1 ouverts**, puis les 168 S2.
 7. Poser à Will les arbitrages de `ARBITRAGES.md`, famille par famille.

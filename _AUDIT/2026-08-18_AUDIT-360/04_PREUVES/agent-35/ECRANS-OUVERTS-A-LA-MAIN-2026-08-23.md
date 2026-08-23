@@ -135,3 +135,146 @@ Le vocabulaire suit le même désordre : « application d'authentification » pu
 - **Palette de recherche annoncée** avec son raccourci (`⌘K`).
 - **Bascule de thème** présente (clair / système / sombre).
 - `lang="fr"` sur `<html>`.
+
+---
+
+# DEUXIÈME PASSE — le balayage des écrans de la console
+
+> 22 écrans supplémentaires ouverts. Ce qui suit ne contient que ce qui a été
+> **vu à l'écran**, puis **recoupé dans le code ou en base**.
+
+## 🔴 `X39-004` (suite) — la preuve est maintenant accablante
+
+Le constat ne dit plus « le nom n'est pas affiché ». Il dit : **le même écran
+affiche l'espace de travail de TROIS façons à la fois.**
+
+Capture : `captures/X39-004_settings_workspace_trois_affichages.jpg`, écran
+`/settings`, un seul instant :
+
+| où | ce qui s'affiche |
+|---|---|
+| barre latérale, en haut à gauche | **« Workspace e43437 »** |
+| bandeau, en haut à droite | « Workspace : **Axion-IA** » |
+| champ « Nom » | **Axion-IA** |
+
+*Deux composants de la même page savent aller chercher le nom. Le troisième —
+celui qui est visible sur les 39 écrans, dans une barre latérale que le CDC §23.3
+veut figée — lit six caractères d'UUID.* `WorkspaceSelector.tsx:28`.
+
+## 🔴 `X39-007` — la console est écrite pour ses développeurs, pas pour ses utilisateurs (S2)
+
+Ce n'est pas une maladresse isolée : c'est le **registre par défaut** des textes
+d'en-tête. Relevé écran par écran, tel qu'affiché :
+
+| écran | ce que lit l'utilisateur |
+|---|---|
+| `/users` | « 4 rôles RBAC : owner / admin / operator / viewer **(Spatie Permission teams)** » |
+| `/llm/router` | titre **« LLM Router »**, puis « 9 **use cases** × 5 **providers** + **fallback chain** + **cost tracking** + **idempotency cache** 24h. » |
+| `/llm/rotations` | « 5 dimensions de rotation : proxies + **user-agents** + **targets** + moteurs de recherche + **LLM providers**. » |
+| `/cold-email`, `/linkedin` | « Ce module est **scaffoldé** : **DB** + **UI** prêtes, logique métier reportée à la Phase 2. » |
+| `/settings` | « **Kill-switch** automatique LLM quand atteint », « **Slug** (URL) » |
+| `/tags` | « géographie, secteur, taille, **intent**, **custom** » |
+| `/audit-logs` | « Journal **append-only** avec chaîne cryptographique SHA-256 » |
+| `/` (état vide) | « Démarrer sur **`/coverage`** → » — *un chemin de route brut* |
+| `/` (état vide) | « Lance ton premier **scrape** » |
+
+*« Spatie Permission teams » est le nom d'une bibliothèque PHP. Il est affiché à
+un commercial qui cherche à inviter un collègue.* Le mandat demande une console
+« simple à prendre en main » ; **toute complication est un constat** (§11).
+
+## 🔴 `X39-008` — le fil d'Ariane et le titre de la page se contredisent, en deux langues (S2)
+
+Capture : `captures/X39-008_cold-email_fil_ariane_vs_titre.jpg`.
+
+| | `/cold-email` | `/linkedin` |
+|---|---|---|
+| fil d'Ariane | **E-mails à froid** | **Prospection LinkedIn** |
+| titre `h1`, juste dessous | **Cold email** | **LinkedIn outreach** |
+
+Citation du bon libellé : `frontend/src/components/layout/AutoBreadcrumbs.tsx:52-53`.
+*La traduction existe et elle est bonne — elle n'est simplement pas employée par
+l'écran lui-même. Deux noms pour la même chose, à trois centimètres l'un de
+l'autre.*
+
+## 🔴 `X39-009` — le bandeau « temps réel » est en anglais sur un écran, en français sur l'autre (S3)
+
+Même composant, même fonction, deux langues :
+
+| écran | bandeau |
+|---|---|
+| `/coverage` | **« Live · refresh 60s »** |
+| `/campaigns` | « **En direct** · **actualisé toutes les** 10s » |
+| `/audiences` | « exécutées au **refresh** auto » |
+| `/admin/observability` | « échecs audience **refresh** » |
+
+## `X39-010` — aucun écran n'a de titre de page propre (S3)
+
+`document.title` vaut **« Axion CRM Pro »** sur les 22 écrans balayés, sans
+exception. Conséquences concrètes : les onglets d'un navigateur sont
+indiscernables, l'historique ne dit rien, et un lecteur d'écran annonce la même
+chose à chaque navigation. `/settings`, `/users`, `/audit-logs` : même titre.
+
+## `X39-011` — `/console/vivier` n'a AUCUN `h1` (S3)
+
+L'écran de refus d'accès (« Univers vivier candidats non accessible ») ne porte
+pas de `h1`. C'est le seul des 22 écrans balayés dans ce cas.
+
+✅ *Le refus lui-même est CORRECT et c'est une bonne nouvelle* : mon compte est
+membre de `axion-ia`, pas de `vivier-candidats`, et l'accès est refusé avec un
+message qui explique quoi faire. **C'est l'étanchéité que le parcours 5 du §11
+demande de vérifier — elle tient.**
+
+---
+
+## 📌 CORRECTION À L'INVENTAIRE DU MANDAT LUI-MÊME (§4.7)
+
+Le mandat annonce **« 4 écrans factices »** : `/cold-email`, `/linkedin`, `/crm`,
+`/analytics`. **Deux des quatre n'existent pas.**
+
+| route | ce que dit le mandat | ce qui est mesuré |
+|---|---|---|
+| `/cold-email` | `ColdEmailStub` | ✅ écran « Phase 2 » |
+| `/linkedin` | `LinkedInStub` | ✅ écran « Phase 2 » |
+| `/crm` | `CrmStub` | ❌ **404 « Page introuvable »** |
+| `/analytics` | `AnalyticsStub` | ❌ **404 « Page introuvable »** |
+
+Recoupé dans le code, pas seulement à l'écran : `frontend/src/app/routeTree.tsx`
+ne déclare que les lignes **140** (`/cold-email`) et **141** (`/linkedin`).
+Aucune route `/crm` ni `/analytics` n'y figure.
+
+*Doctrine règle 1 : le code fait foi, les documents sont des hypothèses — y
+compris le mandat, y compris quand il énumère.* L'exigence n° 10 du §12
+(« aucun écran factice sous un nom que le CDC emploie ») porte donc sur **deux**
+écrans, pas quatre.
+
+Autre correction, moindre : le mandat marque `/contacts` « ⚠️ doublon de
+`/console/contacts` ». Mesuré : `/contacts` **redirige** vers
+`/console/contacts`. Ce n'est pas un doublon, c'est une redirection.
+
+---
+
+## ⚠️ PIÈGE DE MESURE PAYÉ — à ne pas repayer
+
+**Aucune mesure de TEMPS prise depuis ce gréement n'est exploitable.**
+
+`/contacts` a semblé mettre **24 553 ms** à s'afficher. J'allais l'inscrire comme
+un défaut de performance majeur sur une base vide. Vérification avant écriture :
+
+```
+document.visibilityState === "hidden"   ·   hasFocus() === false
+un setTimeout de 1000 ms en a duré 1451
+```
+
+Chrome **bride les minuteurs des onglets non visibles**. Et la mesure côté
+serveur, elle, n'est pas bridée :
+
+| endpoint | code | temps |
+|---|---|---|
+| `/api/v1/crm/contacts-hub/counts` | 200 | **0,060 s** |
+| `/api/v1/crm/contacts-hub` | 200 | **0,051 s** |
+| `/api/v1/contacts` | 200 | **0,084 s** |
+| `/api/v1/companies` | 200 | **0,043 s** |
+| `/api/v1/audiences` | 200 | **0,045 s** |
+
+*Le produit n'a rien à se reprocher ici. C'est l'instrument qui mentait.*
+Pour mesurer un rendu pour de vrai : onglet au premier plan, ou Lighthouse.

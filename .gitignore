@@ -97,3 +97,7 @@ lerna-debug.log*
 tmp/
 temp/
 *.tmp
+
+# Surcharge du BANC de verification uniquement — porte des secrets de test,
+# ne doit JAMAIS etre versionnee (le depot est public).
+docker-compose.verif.banc.yml

@@ -120,9 +120,15 @@ fichier exige que tout chemin cité existe.)
 
 Produits, datés, et à jour :
 
-- AIPD : `_REPORTS/AIPD_2026-08-18.md` (remplace la DPIA de mai, qui décrivait
-  des mesures « en place » qui ne l'étaient pas).
-- Registre des violations : `_REPORTS/REGISTRE-DES-VIOLATIONS-DE-DONNEES.md`.
+⚠️ **Ces deux pièces ont quitté ce dépôt le 2026-08-23**, quand il est repassé
+en **public**. Elles vivent dans **will383842/axion-crm-pro-audit** (privé — sans accents graves : ce n'est pas
+un chemin de ce dépôt, et la garde A09 exige que tout chemin cité en existe un) —
+voir `_REPORTS/LISEZ-MOI-PIECES-DEPLACEES.md`. *Les chemins ne sont donc plus
+cités ici : la garde `A09` exige que tout chemin cité existe, et elle a raison.*
+
+- **AIPD** — remplace la DPIA de mai, qui décrivait des mesures « en place »
+  qui ne l'étaient pas.
+- **Registre des violations** — au sens de l'article 33 §5 du RGPD.
 
 Restent ouverts :
 

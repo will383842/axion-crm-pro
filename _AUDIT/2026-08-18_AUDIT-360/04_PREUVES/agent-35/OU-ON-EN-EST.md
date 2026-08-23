@@ -1052,3 +1052,95 @@ dans la journée, c'est la forge qui a trouvé ce que ma lecture avait manqué.*
 
 La surcharge du banc est archivée :
 `greement-navigateur/docker-compose.verif.banc.yml`.
+
+---
+
+# 🔴 SOIRÉE DU 2026-08-23 — DEUX INCIDENTS DE PRODUCTION, ET CE QUI A ÉTÉ FAIT
+
+## ✅ Les cinq PR sont FUSIONÉES
+
+#195, #196, #197, #199, #200 — toutes squashées sur `main`. Vérifié **par le
+contenu** et non par le compte de commits : `chaineEstVide` est sur `origin/main`,
+et `permission:users.manage` y apparaît **4 fois** au lieu de 3.
+
+Les deux branches résiduelles ont été supprimées — après avoir prouvé, **par le
+diff et non par le compte**, qu'elles ne portaient rien que `main` n'ait déjà.
+
+## 🔐 L'IP D'ORIGINE EST FERMÉE — constat `F37-007` traité à la source
+
+**Mesuré avant** : `http://46.62.248.239/` répondait **308**. Cloudflare était
+donc contournable par quiconque connaît l'IP — et elle est dans **8 fichiers de
+`main` et 59 branches**.
+
+**Geste** : filtre `DOCKER-USER` n'acceptant sur 80/443 que les **14 plages IPv4
+officielles de Cloudflare**, plus la boucle locale et le réseau Docker. Tout le
+reste est refusé.
+
+⚠️ **Posé avec un FILET** : avant d'appliquer, un `iptables-restore` différé de
+6 minutes était armé en tâche de fond, à partir d'une sauvegarde horodatée. Il
+n'a été annulé **qu'après** vérification. *Un pare-feu qu'on pose sans porte de
+sortie est un pare-feu qu'on pose une fois.*
+
+**Vérifié, dans cet ordre** :
+
+| | avant | après |
+|---|---|---|
+| `https://app.axion-crm-pro.com/` | 200 | **200** ✅ |
+| `https://api.axion-crm-pro.com/` | 200 | **200** ✅ |
+| `http://46.62.248.239/` en direct | **308** | **injoignable** ✅ |
+| `https://46.62.248.239/` + bon `Host` | — | **injoignable** ✅ |
+| SSH | ok | **ok** ✅ |
+
+**Persisté** : 17 règles dans `/etc/iptables/rules.v4`, `netfilter-persistent`
+**enabled**. Aucun revert déclenché, sauvegarde conservée dans
+`/root/pare-feu-sauvegardes/`.
+
+*Cela remplace un secret — l'adresse, connue de 59 branches — par un contrôle.*
+
+## 🔴 LA PRODUCTION NE SE DÉPLOYAIT PLUS — depuis le passage en privé
+
+`Deploy direct SSH Hetzner` échouait à **chaque** exécution :
+
+```
+remote: Not Found
+fatal: repository 'https://github.com/***/' not found
+```
+
+**Cause trouvée et reproduite** : la ligne qui passe les arguments au script
+distant porte un **`
+` LITTÉRAL** au lieu d'une continuation de ligne. Dans un
+bloc YAML ce n'est pas un saut de ligne, **c'est un argument de plus** — et tout
+décale d'un cran :
+
+```
+AVANT   $5 (GH_TOKEN_LECTURE) = [n]
+        $6 (GH_DEPOT)         = [LE_JETON]
+        URL = https://x-access-token:n@github.com/LE_JETON.git
+APRES   $5 = [LE_JETON]   $6 = [will383842/axion-crm-pro]
+```
+
+*Le `github.com/***` du journal, c'était **le jeton pris pour le nom du dépôt**,
+et le masquage de GitHub le rendait indéchiffrable à l'œil.*
+
+**Conséquence mesurée** : le serveur est resté au code de la PR #198. **Les cinq
+correctifs de ce soir ne sont PAS en production** — dont la journalisation des
+connexions, mesure 7 du registre.
+
+Correctif en **PR #203**.
+
+## ⏳ CE QUI RESTE EN ATTENTE DE CE DÉPLOIEMENT
+
+**La mesure 7 du registre n'est toujours pas appliquée en production.** Mesuré
+ce soir sur le serveur : `log_connections = off`, préfixe `%m [%p]` sans `%h`,
+et `axion-crm-postgres` tourne depuis **6 heures** — le déploiement recrée l'API,
+l'horizon et le scheduler, **jamais la base**.
+
+*C'est exactement le piège que le registre documente, reproduit sous les yeux.*
+Une fois la #203 fusionnée et le code arrivé, il faudra le geste explicite :
+
+```bash
+cd /opt/axion-crm-pro
+export COMPOSE_FILE="docker-compose.yml:docker-compose.prod.yml"
+docker compose up -d --no-deps postgres
+bash infra/scripts/verifier-journalisation-connexions-db.sh
+```

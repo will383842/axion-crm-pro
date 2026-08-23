@@ -401,9 +401,9 @@ function ssrfCompletudeSansCommentaires(string $source): string
         if (is_array($jeton) && ($jeton[0] === T_COMMENT || $jeton[0] === T_DOC_COMMENT)) {
             // Seuls les sauts de ligne sont conserves : les numeros de ligne
             // restent ceux du fichier reel.
-            $plat .= str_repeat("
-", substr_count($jeton[1], "
-"));
+            $plat .= str_repeat('
+', substr_count($jeton[1], '
+'));
 
             continue;
         }

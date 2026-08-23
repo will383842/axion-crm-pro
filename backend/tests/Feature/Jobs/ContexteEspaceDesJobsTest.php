@@ -395,9 +395,9 @@ function cejSansCommentaires(string $source): string
         if (is_array($jeton) && ($jeton[0] === T_COMMENT || $jeton[0] === T_DOC_COMMENT)) {
             // On remplace le commentaire par ses seuls sauts de ligne : les
             // numeros de ligne restent ceux du fichier reel.
-            $plat .= str_repeat("
-", substr_count($jeton[1], "
-"));
+            $plat .= str_repeat('
+', substr_count($jeton[1], '
+'));
 
             continue;
         }

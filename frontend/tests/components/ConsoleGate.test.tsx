@@ -10,6 +10,12 @@
  * dans le cache évite d'avoir à simuler le réseau pour vérifier une décision
  * d'affichage.
  */
+
+// `import type` plutot qu'une annotation `typeof import(...)` en ligne :
+// `@typescript-eslint/consistent-type-imports` refuse la seconde, et la CI le
+// tient pour BLOQUANT. La forme retenue est effacee a la compilation, donc elle
+// ne deplace pas le hissage de `vi.mock` ci-dessous.
+import type * as ModuleApi from '@/lib/api';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -36,7 +42,7 @@ const { reponseFeatures } = vi.hoisted(() => ({
   ),
 }));
 vi.mock('@/lib/api', async () => {
-  const reel = await vi.importActual<typeof import('@/lib/api')>('@/lib/api');
+  const reel = await vi.importActual<typeof ModuleApi>('@/lib/api');
   return { ...reel, api: { get: () => reponseFeatures() } };
 });
 import { ConsoleGate } from '@/features/crm-console/ConsoleGate';

@@ -963,8 +963,14 @@ La leçon, elle, reste entière — voir l'incident du jour, plus haut.
 `crmpro-wt-correctifs` — lancé trois fois, tué par dépassement de durée la
 troisième. Syntaxe et Pint vérifiés, rien de plus.
 
-*C'est la CI de la PR #199 qui les joue.* **Tant qu'elle n'a pas parlé, ces
-gardes ne sont pas prouvées** — et l'expérience du jour dit que ce n'est pas une
+✅ **LA CI A PARLÉ : les gardes PASSENT.** PR #199 → **21 contrôles verts**,
+`MERGEABLE / CLEAN`, dont *Backend Laravel (install + PHPStan + Pint + Pest)* en
+3 min 45. Les quatre tests de `X39-028` — `viewer` refusé, `operator` refusé,
+`admin` admis, propriétaire admis — ont donc réellement tourné.
+
+*Ce paragraphe est conservé tel qu'il a été écrit AVANT le verdict, parce que
+c'est là qu'était la discipline :* « tant qu'elle n'a pas parlé, ces gardes ne
+sont pas prouvées » — et l'expérience du jour dit que ce n'est pas une
 formalité : deux gardes écrites ce matin étaient fausses, et seule la forge l'a
 dit.
 

@@ -644,3 +644,91 @@ la garde née de la faille des ports — elle tient sur cette branche.
 | `crmpro-wt-a35-auth` · `fix/gardes-de-plan-et-c19-010` | **poussée**, 0 commit local en attente |
 | `Axion-CRM-Pro` · `audit/360-p1-p2` | commitée localement (journaux d'audit) |
 | PR #194 | **ouverte, verte, non fusionnée** |
+
+---
+
+# 🟢 LA MESURE 7 DU REGISTRE EST PRÊTE — 2026-08-23
+
+**C'était le seul point vraiment ouvert du registre des violations de données.**
+Il est écrit, vu rouge puis vert. **Il n'est pas déployé.**
+
+| | |
+|---|---|
+| branche | `fix/journalisation-connexions-db`, tirée de `main` (`5087f1e`) |
+| commit | `57f7737` — **local, non poussé** |
+| pourquoi une branche à part | ne pas rouvrir la CI de la **PR #194**, verte et en attente de fusion |
+
+## Ce qui est posé
+
+Trois arguments sur le service `postgres` de **`docker-compose.yml`** — le
+fichier de base, **pas** l'overlay de production :
+
+```yaml
+command:
+  - postgres
+  - -c
+  - log_connections=on
+  - -c
+  - log_disconnections=on
+  - -c
+  - "log_line_prefix=%m [%p] %q%u@%d de %h "
+```
+
+*Dans le fichier de base à dessein* : le constat `F38-007` a dénombré **douze**
+chemins qui lancent `docker compose up` sans l'overlay. Un réglage posé dans le
+seul overlay laisserait chacun de ces douze chemins recréer un Postgres muet —
+exactement le piège déjà payé sur la publication des ports.
+
+**`%h` est le champ qui compte.** Sans lui, on saurait qu'il y a eu des
+connexions sans pouvoir dire d'où — donc sans pouvoir distinguer un accès
+interne d'un accès depuis internet. C'est la question exacte à laquelle il a
+fallu répondre « on ne peut pas savoir » le 19 août.
+
+## Vu rouge, puis vert — sur des serveurs qui TOURNENT
+
+| serveur | mesure | sortie |
+|---|---|---|
+| `crmverif-postgres`, **sans** le réglage | `log_connections=off`, `log_disconnections=off`, préfixe **sans `%h`** | **1 — rouge** |
+| un Postgres lancé avec **ces mêmes arguments** | les trois ✅ | **0 — vert** |
+
+Et le journal produit porte bien l'origine :
+
+```
+connection received: host=127.0.0.1 port=47738
+connection authorized: user=axion database=axion_crm application_name=psql
+disconnection: session time: 0:00:00.105 user=axion database=axion_crm host=127.0.0.1
+```
+
+## Deux contrôles, et ils ne prouvent PAS la même chose
+
+1. **`infra/scripts/verifier-journalisation-connexions-db.sh`** interroge
+   PostgreSQL par `SHOW` : il mesure **le serveur qui tourne**. C'est le seul
+   qui prouve quelque chose sur la réalité. *Leçon du registre : le correctif
+   des ports a été fusionné, déployé avec succès, et n'avait **rien fermé**.*
+2. **`JournalisationConnexionsBaseTest`** ne garde que le **fichier**, et son
+   en-tête le déclare au lieu de le laisser croire.
+
+### ⚠️ SEPTIÈME PIÈGE DE MESURE — la garde a failli être déclarée bonne à vide
+
+Elle **ne trouvait même pas le bloc `postgres`** : `docker-compose.yml` est en
+**CRLF**, et `^  postgres:
+` ne rencontrait rien. Elle aurait rougi en annonçant
+« service introuvable » — *rougir pour la mauvaise raison est une autre façon de
+ne rien garder.* Corrigée, puis la logique rejouée **hors Pest** sur le fichier
+réel (**vert**) et sur un compose muet (**rouge**).
+
+## ⚠️ CE QUI RESTE À WILL
+
+**Poser le réglage ne suffit pas.** Un déploiement ne recrée pas les conteneurs
+de base de données. Il faut le geste explicite, **une fois** :
+
+```bash
+cd /opt/axion-crm-pro
+export COMPOSE_FILE="docker-compose.yml:docker-compose.prod.yml"
+docker compose up -d --no-deps postgres
+bash infra/scripts/verifier-journalisation-connexions-db.sh
+```
+
+Une fois fait et vérifié, la **mesure 7** du registre des violations peut passer
+de « identifiée, non réalisée » à réalisée. *Je n'ai pas modifié le registre :
+c'est un document qui engage le responsable de traitement.*

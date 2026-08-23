@@ -1,0 +1,64 @@
+# Axion CRM Pro — Caddy de la PILE DE VERIFICATION (2026-08-23)
+#
+# Pourquoi ce fichier existe. La pile locale historique est cablee sur
+# `Axion-CRM-Pro/backend`, la copie que le mandat de l'audit interdit de
+# toucher, et qui ne porte AUCUN des 91 correctifs de la vague 2. Ouvrir les
+# 39 ecrans dessus reviendrait a auditer un produit d'avant le travail.
+#
+# On ne rebranche pas la pile historique : ses `container_name` sont fixes, si
+# bien qu'un `up` depuis le worktree reprendrait les MEMES conteneurs — dont
+# `axion-crm-postgres`, qui heberge `axion_crm_test`, la base du banc, et
+# `axion-crm-caddy`, qui sert le frontend a d'autres sessions.
+#
+# Cette pile-ci est donc ENTIEREMENT separee : ses propres conteneurs, son
+# propre reseau, ses propres volumes, ses propres ports. Rien de ce qui tourne
+# n'est touche.
+{
+    admin off
+    servers {
+        trusted_proxies static private_ranges
+    }
+}
+
+# ORIGINE UNIQUE, comme la production et comme `app.localhost`.
+#
+# Ce n'est pas un detail de confort : deux impasses mesurees le 2026-08-17
+# l'imposent. `SESSION_DOMAIN=.localhost` fait REFUSER le cookie de session par
+# les navigateurs (`localhost` est un domaine de premier niveau) -> 401 ; et un
+# cookie host-only sur une origine d'API distincte empeche le SPA de LIRE
+# `XSRF-TOKEN` (lecture JS inter-hotes impossible) -> 419. Le local doit
+# RESSEMBLER a la production, sinon il ne prouve rien.
+verif.localhost {
+    tls internal
+    encode zstd gzip
+
+    @api {
+        path /api/* /sanctum/* /docs /docs/* /up /broadcasting/*
+    }
+    handle @api {
+        # FastCGI et non HTTP — constat A-010 (S0). `root` designe un chemin
+        # DANS LE CONTENEUR DE L'API : il ne sert qu'a composer SCRIPT_FILENAME.
+        root * /var/www/html/public
+        rewrite * /index.php
+        reverse_proxy api:9000 {
+            transport fastcgi {
+                split .php
+            }
+            header_up X-Real-IP {remote_host}
+        }
+    }
+
+    handle {
+        reverse_proxy app:5173 {
+            header_up Connection {>Connection}
+            header_up Upgrade {>Upgrade}
+        }
+    }
+
+    header {
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; connect-src 'self' https://*.openfreemap.org; font-src 'self' data:; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    }
+}

@@ -984,3 +984,49 @@ dit.
 `composer install` sur un montage lié. Deux voies mesurées plus rapides —
 `infra/scripts/rafraichir-le-banc.sh a35r` (le banc du dépôt), ou ouvrir une PR
 et laisser la CI jouer.
+
+---
+
+# 🏁 LES 21 PARCOURS DU §11 SONT JOUÉS — 2026-08-23
+
+L'exigence n° 3 du §12 est **entièrement** couverte : les **36 écrans** ouverts
+à la main, **et les 21 parcours** du §11 joués. Le détail est dans
+`ECRANS-OUVERTS-A-LA-MAIN-2026-08-23.md`.
+
+**36 constats** `X39-001` → `X39-036`. **Cinq correctifs**, tous vus rouges puis
+verts, en cinq PR : **#195, #196, #197, #199, #200**.
+
+**Quatorze pièges de mesure** payés dans la journée, presque tous de ma main, et
+**aucun n'était un défaut du produit**. La règle qui les résume :
+*une mesure qui accuse le produit doit d'abord se prouver elle-même.*
+
+## ⚠️ LE BANC A ÉTÉ ARMÉ — à savoir avant de le réutiliser
+
+`docker-compose.verif.banc.yml` (dans `crmpro-wt-correctifs`, **non commité**,
+jamais déployé) pose trois variables que la pile n'avait pas :
+
+```yaml
+SITE_SYNC_HMAC_SECRET: banc-de-verification-2026
+CRM_INGEST_ENABLED: "true"
+AUDIT_HASH_CHAIN_SECRET: banc-verif-chaine-audit-2026-0123456789abcdef
+```
+
+Sans elles, le canal site→CRM refuse (401) et la chaîne d'audit n'est pas
+vérifiable — **deux parcours du §11 étaient donc inatteignables**.
+
+⚠️ **Les variables du CONTENEUR priment sur le `.env`** : éditer le fichier ne
+suffit pas, il faut **recréer** le service avec la surcharge.
+
+⚠️ **La base jetable a été largement remuée** — contacts créés puis effacés par
+l'article 17, journal d'audit vidé et reconstitué plusieurs fois, campagne
+annulée, tags créés et supprimés. *Elle ne représente plus rien : la reprendre
+comme référence n'aurait aucun sens.*
+
+## Par quoi reprendre
+
+1. **Fusionner les cinq PR** (gestes de Will).
+2. **Trois arbitrages** qui ne m'appartiennent pas : `X39-027` (aucun moyen
+   d'ajouter un utilisateur), `X39-034` (les réglages ne s'enregistrent pas) —
+   les deux reportés en « Sprint 3 » par le produit lui-même — et `X39-029`
+   (« Lecteur » lit tout le CRM).
+3. Le §8 reprend à l'**étape 5** : la vague du dépôt du site.

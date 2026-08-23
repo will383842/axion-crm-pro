@@ -1839,3 +1839,70 @@ taille nulle.**
 Trois mots anglais — `Next`, `Step`, `of` — répétés à **chaque** étape, à côté de
 « Passer », « Précédent » et « Fermer » qui sont, eux, en français. Sur le tout
 premier écran que voit un nouvel utilisateur.
+
+---
+
+# 🏁 LES 21 PARCOURS DU §11 — BILAN, 2026-08-23
+
+| # | parcours | état | ce qu'il a donné |
+|---|---|---|---|
+| 1 | authentification, session expirée | ✅ **joué** | tient — session morte → `/login`, validation en français |
+| 2 | tableau de bord, chaque compteur | ✅ **joué** | 🔴 `X39-031` — **aucun compteur cliquable**, 1 seul lien |
+| 3 | hub contacts | ✅ **joué** | 🔴 `X39-032` — ni sélection multiple, ni masse, ni export |
+| 4 | fiche 360° vs CDC §1.5 | ✅ **joué** | 🔴 `X39-033` — **lecture seule**, 0 bouton, 0 `onClick` |
+| 5 | vivier et arbitrage | ✅ **joué** | ✅ étanchéité tenue, refus qui dit quoi faire |
+| 6 | entreprises | ✅ **joué** | ✅ fiche, enrichir, recalculer, export CSV |
+| 7 | médias, journalistes, exports | ✅ **joué** | ✅ trois exports CSV en-têtes françaises |
+| 8 | couverture France | ✅ **joué** | ✅ `launch` et `enrich` acceptés |
+| 9 | assistant de campagne | ✅ **joué** | ✅ **machine à états réelle** (refus 422 motivés) |
+| 10 | audiences | ✅ **joué** | 🔴 `X39-024` **(S0)** — corrigé, PR #196 |
+| 11 | tags, cycle complet | ✅ **joué** | ✅ créer / renommer / supprimer / doublon refusé |
+| 12 | RGPD de bout en bout | ✅ **joué** | ✅ export 21 collections, anti-réinsertion 2 univers, propagation site mesurée · 🔴 `X39-030` (S3) |
+| 13 | AI Act + chaîne d'audit | ✅ **joué** | 🔴 `X39-035` — chaîne **vide** = valide, corrigé, PR #200 |
+| 14 | rôle limité, atteindre l'interdit | ✅ **joué** | 🔴 `X39-027` (S1) · `X39-028` corrigé, PR #199 · masquage PII ✅ |
+| 15 | réglages | ✅ **joué** | 🔴 `X39-034` (S1) — **rien ne s'enregistre**, 501 |
+| 16 | observabilité | ✅ **joué** | ✅ mesures réelles |
+| 17 | recherche globale | ✅ **joué** | 🔴 `X39-025` — accents ignorés, téléphone jamais cherché |
+| 18 | sélecteur d'espace | ✅ **joué** | 🔴 `X39-026` — **décoratif**, deux actions inertes |
+| 19 | visite guidée | ✅ **joué** | 🔴 `X39-036` — annonce 7 étapes, en montre 4 |
+| 20 | routes 501 et entrées verrouillées | ✅ **joué** | recensées ; 14 sur 19 fermées par la PR #198 |
+| 21 | 375 px · clavier · mode sombre | ✅ **joué** | ✅ aucun défilement horizontal, focus visible 22/22, garde sombre étendue à 6 routes (PR #197) |
+
+**21 sur 21.**
+
+## Les cinq correctifs, tous vus rouges puis verts
+
+| PR | constat | preuve |
+|---|---|---|
+| **#195** | mesure 7 du registre — journalisation des connexions | rouge/vert sur des serveurs qui tournent |
+| **#196** | `X39-024` (S0) — valeur des critères d'audience | rouge/vert **trois fois**, jusqu'au bout par l'API |
+| **#197** | mode sombre : 3 → 6 routes gardées | 11 tests verts, commande de la CI |
+| **#199** | `X39-028` — `GET /users` sans garde | viewer 200 → **403**, propriétaire intact |
+| **#200** | `X39-035` — chaîne vide déclarée valide | trois états distingués, deux tests inversés |
+
+## Ce qui n'est PAS corrigé, et pourquoi
+
+| constat | pourquoi je ne l'ai pas fermé |
+|---|---|
+| `X39-027` (S1) — aucun moyen d'ajouter un utilisateur | écrire une invitation complète (jeton, courriel, acceptation) est une **fonctionnalité**, reportée en « Sprint 3 » par le produit lui-même |
+| `X39-034` (S1) — les réglages ne s'enregistrent pas | idem : `PUT /workspace` rend 501, « Sprint 3 » |
+| `X39-029` — « Lecteur » lit tout le CRM | **arbitrage**, pas correctif : soit les permissions de lecture sont décoratives, soit `/users` ne devait pas être ouvert |
+| `X39-031/032/033` | fonctionnalités absentes (compteurs cliquables, actions de masse, actions sur la fiche 360°), pas des défauts à rapiécer |
+| `X39-036` — la visite saute des étapes | la cause est nommée (deux cibles à 0 × 0 dans des groupes repliés) ; le correctif touche au dépliage `D23-010`, à faire avec l'auteur |
+
+## Le compte des pièges de mesure
+
+**Quatorze**, sur la journée. Presque tous de ma main, et **aucun n'était un
+défaut du produit** :
+
+le gel du navigateur · les minuteurs bridés d'un onglet d'arrière-plan · le
+chargement « infini » d'une fiche introuvable · un message d'erreur déduit d'une
+ligne de code · `toContain()` variadique · un test sans `uses(TestCase::class)` ·
+un contraste calculé sans savoir lire `oklch()` · un cookie `#HttpOnly_` écarté ·
+un hash pris pour un jeton · une route cherchée sous `/api/v1` au lieu de
+`internal` · une garde applicative testée par un `INSERT` SQL · une concaténation
+SQL qui avale ses lignes nulles · un sélecteur qui suppose un libellé · une
+`person_key` absente parce que la donnée n'était pas entrée par le produit.
+
+> *La règle qui les résume tous : **une mesure qui accuse le produit doit
+> d'abord se prouver elle-même.***

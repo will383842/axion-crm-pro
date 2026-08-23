@@ -38,7 +38,7 @@ v2.0 » est en réalité une copie de la v2.1 : **la v2.0 n'existe plus nulle pa
 | §4.5 tâches planifiées | **10** | **35 `Schedule::command`** dans `routes/console.php` (**170 l.**) | 🔴 **+25 tâches jamais nommées par le document** |
 | §4.5 jobs | 7 | **6 jobs + 1 trait** (`Concerns/RunsInWorkspace`) | composition à corriger |
 | §4.5 commandes Artisan | 49 | **49** | ✅ exact |
-| §4.7 écrans | 39 (dont 4 stubs) | **37 routes** dans `routeTree.tsx`, **37 pages** | **−2** : `/crm` (`CrmStub`) et `/analytics` (`AnalyticsStub`) **n'existent pas** ; la fiche 360° est `/console/personnes/$personKey`, **pas** `/persons/{key}` |
+| §4.7 écrans | 39 (dont 4 stubs) | **36 écrans** dans `routeTree.tsx` | **−3** : `/crm` (`CrmStub`) et `/analytics` (`AnalyticsStub`) **n'existent pas** ; et le 37ᵉ `createRoute` est **`layoutRoute`**, la coquille de mise en page — `id: 'layout'`, **aucun `path`**, donc pas un écran (corrigé le 2026-08-23, `grep -oP "^const \K\w+(?= = createRoute)"` → 37 déclarations dont `layoutRoute`). La fiche 360° est `/console/personnes/$personKey`, **pas** `/persons/{key}` |
 | §4.7 composants | 33 | **34 fichiers** (`layout` 5 + `OnboardingTour` + `ui` 28, dont `cn.ts` et `index.ts`) | +1 |
 | §4.9 migrations | 54 | **58** | **+4** |
 | §4.10 workflows | 17 | **17** | ✅ exact |

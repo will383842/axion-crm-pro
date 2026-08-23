@@ -260,14 +260,19 @@ Plus, du mandat lui-même (§12, « définition de fini ») :
 
 | # | exigence | état |
 |---|---|---|
-| 3 | **chaque écran ouvert à la main**, captures archivées | ❌ **jamais fait** |
+| 3 | **chaque écran ouvert à la main**, captures archivées | 🟡 **écrans faits le 23/08** (36/36) ; **« chaque bouton essayé » et les 21 parcours du §11 restent** |
 | 5 | chaque S0/S1 corrigé | 🟡 **6 S0 et 47 S1 ouverts** |
 | 9 | les **57 alertes de vulnérabilité** arbitrées ou gelées | ❌ toujours 57 |
 | 10 | aucune route 501 | ❌ `I48-001` ouvert |
-| 13 | **une sauvegarde restaurée pour de vrai** | ❌ aucune trace |
+| 13 | **une sauvegarde restaurée pour de vrai** | ✅ **TENU** — *cette ligne disait « aucune trace » à tort* : `agent-08`, archive de 724 926 343 octets, **20 726 338 lignes, écart nul**. Réserve écrite : copie locale, pas hors-site |
 | 14 | plus rien de sévérité ≥ S2 | ❌ 168 S2, 48 S3 *(étaient 220 et 82)* |
 
-🔴 **Le plus gros manque est structurel — mais il a rétréci le 2026-08-23.**
+✅ **CE PARAGRAPHE EST PÉRIMÉ — les écrans ONT été ouverts le 2026-08-23**, tous les
+36, dans un vrai navigateur, connectés, sur le bon code. Les six verrous V5 à V9
+décrits plus bas sont **tous levés** (§0 bis). Ce qui suit est conservé pour la
+traçabilité de la décision, **pas comme un reste à faire**.
+
+🔴 *État d'avant le 23/08 — conservé pour mémoire.*
 Les 39 écrans n'ont toujours jamais été ouverts dans un navigateur. En revanche,
 la raison invoquée par le rapport final est **périmée** : les **quatre verrous**
 du `07_RAPPORT-FINAL.md:28` (mot de passe initial · `MAIL_MAILER` · enrôlement

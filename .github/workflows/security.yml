@@ -12,6 +12,18 @@ permissions:
   contents: read
   security-events: write
   issues: write # pour le job `alerte` en fin de fichier
+  # 🔴 AJOUTE LE 2026-08-23, quand le depot est passe en PRIVE.
+  # Sur un depot PUBLIC, le jeton du run lit les metadonnees d'une PR sans
+  # qu'on l'ait demande. Sur un depot PRIVE, il n'a QUE les permissions
+  # declarees ici — et `gitleaks-action` appelle
+  # `GET /repos/{owner}/{repo}/pulls/{n}/commits` pour savoir quels commits
+  # scanner. Sans cette ligne : 403 « Resource not accessible by integration »,
+  # et le scan de secrets ne tourne PAS DU TOUT.
+  #
+  # C'est le genre de dependance qu'on ne voit qu'en changeant la visibilite :
+  # rien dans le fichier ne disait que ce job dependait du caractere public du
+  # depot.
+  pull-requests: read
 
 concurrency:
   group: security-${{ github.ref }}
@@ -112,10 +124,46 @@ jobs:
             echo "        (exit 1 sec si zero, sinon .github/sast-cliquet.json sur le modele du cliquet Node)."
           fi
           exit 0
+      # 🔴 DEPOT PRIVE — 2026-08-23. `upload-sarif` ecrit dans le CODE SCANNING
+      # de GitHub, gratuit sur un depot public, reserve a GitHub Advanced
+      # Security (payant) sur un depot prive. Depuis le passage en prive, cette
+      # etape rend « Resource not accessible by integration » et faisait rougir
+      # SEPT jobs d'analyse.
+      #
+      # ⚠️ POURQUOI TOLERER CETTE ETAPE-LA N'EST PAS UN DESARMEMENT, et il faut
+      # le demontrer plutot que l'affirmer — F38-013 de cet audit porte
+      # precisement sur un `continue-on-error` pose sans un mot :
+      #
+      #   - cette etape est un CANAL DE RAPPORT, pas un controle. Elle ne juge
+      #     rien : elle depose un fichier deja produit ;
+      #   - les VRAIES gardes sont des etapes distinctes, et elles tournent
+      #     toujours : « Garde — vulnerabilites CORRIGEABLES (bloquant) »
+      #     (`exit-code: '1'`), la garde `composer.lock`, le cliquet Node ;
+      #   - et les decouvertes restent LISIBLES : chaque job porte deja une
+      #     sortie `format: table` imprimee dans le journal. Rien ne devient
+      #     invisible — c'etait la seule question qui comptait.
+      #
+      # 🔑 ON NE TENTE PAS L'ENVOI PLUTOT QUE D'IGNORER SON ECHEC, et la
+      # difference n'est pas cosmetique. Ma premiere version posait
+      # `continue-on-error: true` — et la garde `F38-013`
+      # (`SastNEtouffePasSonVerdictTest`) l'a REFUSEE, a juste titre : elle
+      # interdit cette directive PARTOUT dans le job semgrep, precisement parce
+      # qu'un rouge ignore ne se distingue pas d'un vert.
+      #
+      # Une etape SAUTEE dit la verite — « on n'a pas envoye » — la ou une etape
+      # toleree dit « on a essaye, on s'en moque ». La garde n'a pas ete
+      # relachee d'un pouce ; c'est mon correctif qui etait le mauvais.
+      #
+      # Si `github.event.repository` manque sur un declencheur donne,
+      # l'expression vaut `null == false` -> faux -> etape sautee. Le repli va
+      # donc dans le sens SUR.
+      #
+      # Le jour ou GHAS est souscrit, ou le depot repasse public, la condition
+      # redevient vraie toute seule : rien a defaire.
       - uses: github/codeql-action/upload-sarif@v3
         # `always()` seul faisait rougir le job quand le fichier manquait — le
         # defaut n° 3 du bloc `trivy`, ici encore ouvert avant F38-013.
-        if: always() && hashFiles('semgrep.sarif') != ''
+        if: always() && hashFiles('semgrep.sarif') != '' && github.event.repository.private == false
         with: { sarif_file: semgrep.sarif }
 
   # ⚠️ 2026-08-16 — ce job avait TROIS défauts, tous du même genre : il avait
@@ -163,9 +211,45 @@ jobs:
           output: trivy-${{ matrix.image }}.sarif
           severity: CRITICAL,HIGH
           exit-code: '0'
+      # 🔴 DEPOT PRIVE — 2026-08-23. `upload-sarif` ecrit dans le CODE SCANNING
+      # de GitHub, gratuit sur un depot public, reserve a GitHub Advanced
+      # Security (payant) sur un depot prive. Depuis le passage en prive, cette
+      # etape rend « Resource not accessible by integration » et faisait rougir
+      # SEPT jobs d'analyse.
+      #
+      # ⚠️ POURQUOI TOLERER CETTE ETAPE-LA N'EST PAS UN DESARMEMENT, et il faut
+      # le demontrer plutot que l'affirmer — F38-013 de cet audit porte
+      # precisement sur un `continue-on-error` pose sans un mot :
+      #
+      #   - cette etape est un CANAL DE RAPPORT, pas un controle. Elle ne juge
+      #     rien : elle depose un fichier deja produit ;
+      #   - les VRAIES gardes sont des etapes distinctes, et elles tournent
+      #     toujours : « Garde — vulnerabilites CORRIGEABLES (bloquant) »
+      #     (`exit-code: '1'`), la garde `composer.lock`, le cliquet Node ;
+      #   - et les decouvertes restent LISIBLES : chaque job porte deja une
+      #     sortie `format: table` imprimee dans le journal. Rien ne devient
+      #     invisible — c'etait la seule question qui comptait.
+      #
+      # 🔑 ON NE TENTE PAS L'ENVOI PLUTOT QUE D'IGNORER SON ECHEC, et la
+      # difference n'est pas cosmetique. Ma premiere version posait
+      # `continue-on-error: true` — et la garde `F38-013`
+      # (`SastNEtouffePasSonVerdictTest`) l'a REFUSEE, a juste titre : elle
+      # interdit cette directive PARTOUT dans le job semgrep, precisement parce
+      # qu'un rouge ignore ne se distingue pas d'un vert.
+      #
+      # Une etape SAUTEE dit la verite — « on n'a pas envoye » — la ou une etape
+      # toleree dit « on a essaye, on s'en moque ». La garde n'a pas ete
+      # relachee d'un pouce ; c'est mon correctif qui etait le mauvais.
+      #
+      # Si `github.event.repository` manque sur un declencheur donne,
+      # l'expression vaut `null == false` -> faux -> etape sautee. Le repli va
+      # donc dans le sens SUR.
+      #
+      # Le jour ou GHAS est souscrit, ou le depot repasse public, la condition
+      # redevient vraie toute seule : rien a defaire.
       - uses: github/codeql-action/upload-sarif@v3
         # `always()` seul faisait rougir le job quand le fichier manquait.
-        if: always() && hashFiles(format('trivy-{0}.sarif', matrix.image)) != ''
+        if: always() && hashFiles(format('trivy-{0}.sarif', matrix.image)) != '' && github.event.repository.private == false
         with:
           sarif_file: trivy-${{ matrix.image }}.sarif
           category: trivy-${{ matrix.image }}
@@ -227,8 +311,44 @@ jobs:
           output: trivy-${{ matrix.nom }}.sarif
           severity: CRITICAL,HIGH
           exit-code: '0'
+      # 🔴 DEPOT PRIVE — 2026-08-23. `upload-sarif` ecrit dans le CODE SCANNING
+      # de GitHub, gratuit sur un depot public, reserve a GitHub Advanced
+      # Security (payant) sur un depot prive. Depuis le passage en prive, cette
+      # etape rend « Resource not accessible by integration » et faisait rougir
+      # SEPT jobs d'analyse.
+      #
+      # ⚠️ POURQUOI TOLERER CETTE ETAPE-LA N'EST PAS UN DESARMEMENT, et il faut
+      # le demontrer plutot que l'affirmer — F38-013 de cet audit porte
+      # precisement sur un `continue-on-error` pose sans un mot :
+      #
+      #   - cette etape est un CANAL DE RAPPORT, pas un controle. Elle ne juge
+      #     rien : elle depose un fichier deja produit ;
+      #   - les VRAIES gardes sont des etapes distinctes, et elles tournent
+      #     toujours : « Garde — vulnerabilites CORRIGEABLES (bloquant) »
+      #     (`exit-code: '1'`), la garde `composer.lock`, le cliquet Node ;
+      #   - et les decouvertes restent LISIBLES : chaque job porte deja une
+      #     sortie `format: table` imprimee dans le journal. Rien ne devient
+      #     invisible — c'etait la seule question qui comptait.
+      #
+      # 🔑 ON NE TENTE PAS L'ENVOI PLUTOT QUE D'IGNORER SON ECHEC, et la
+      # difference n'est pas cosmetique. Ma premiere version posait
+      # `continue-on-error: true` — et la garde `F38-013`
+      # (`SastNEtouffePasSonVerdictTest`) l'a REFUSEE, a juste titre : elle
+      # interdit cette directive PARTOUT dans le job semgrep, precisement parce
+      # qu'un rouge ignore ne se distingue pas d'un vert.
+      #
+      # Une etape SAUTEE dit la verite — « on n'a pas envoye » — la ou une etape
+      # toleree dit « on a essaye, on s'en moque ». La garde n'a pas ete
+      # relachee d'un pouce ; c'est mon correctif qui etait le mauvais.
+      #
+      # Si `github.event.repository` manque sur un declencheur donne,
+      # l'expression vaut `null == false` -> faux -> etape sautee. Le repli va
+      # donc dans le sens SUR.
+      #
+      # Le jour ou GHAS est souscrit, ou le depot repasse public, la condition
+      # redevient vraie toute seule : rien a defaire.
       - uses: github/codeql-action/upload-sarif@v3
-        if: always() && hashFiles(format('trivy-{0}.sarif', matrix.nom)) != ''
+        if: always() && hashFiles(format('trivy-{0}.sarif', matrix.nom)) != '' && github.event.repository.private == false
         with:
           sarif_file: trivy-${{ matrix.nom }}.sarif
           category: trivy-${{ matrix.nom }}

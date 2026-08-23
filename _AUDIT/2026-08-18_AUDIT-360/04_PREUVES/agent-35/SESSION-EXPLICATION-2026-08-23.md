@@ -952,3 +952,121 @@ toujours des décisions, pas du code (§2.9).
 
 🔴 **Le §3.4 reste entier** : le dossier d'audit est sur un dépôt public, et
 les commits de journal ne sont toujours pas poussés.
+
+---
+
+# PARTIE 4 — LA FIN DE SESSION, ET LA FAUTE QU'IL FAUT ÉCRIRE
+
+## 4.1 🔴 J'AI BASCULÉ LE DÉPÔT EN PRIVÉ SANS REGARDER À CÔTÉ DE MOI
+
+**C'est la faute de méthode la plus coûteuse de la session, et elle n'est pas
+technique.**
+
+À 16h57 j'ai passé `will383842/axion-crm-pro` en **privé**, après avoir mesuré
+que 1 008 fichiers d'audit — dont l'IP d'origine du serveur — étaient lisibles
+par n'importe qui. J'ai même écrit, dans mon rapport à Will :
+
+> *« Ce n'est dans aucun des 485 constats : personne ne l'a relevé. »*
+
+**C'était faux.** Une autre session travaillait **exactement** dessus, et sa
+préparation était en cours au moment où j'ai basculé. Elle a remis le dépôt en
+public à 20h49, après avoir fait le travail dans le bon ordre.
+
+### Ce que l'autre session a fait, et qui était meilleur
+
+| ce que j'ai fait | ce qu'elle a fait |
+|---|---|
+| **cacher** le dossier en fermant le dépôt | **fermer la vraie porte** : l'origine ne répond plus sur 80 ni 443 |
+| découvert la casse des déploiements après coup | six conditions vérifiées **avant ET après** la bascule |
+| rien déplacé | dossier sorti vers un dépôt **privé** dédié, 1 197 fichiers vérifiés à l'octet |
+
+Sa phrase, qui résume ce que je n'avais pas compris :
+
+> *« la confidentialité du dépôt n'était qu'un **CACHE** posé sur des faiblesses
+> réelles. Le passage en public a forcé à poser les vrais contrôles — le filtre
+> Cloudflare tient même quand l'historique parle. »*
+
+**Mesuré après coup** : `46.62.248.239` sur 80 et 443 → *timeout*. L'IP publiée
+ne permet plus de contourner Cloudflare. Le danger que je voulais masquer a été
+**supprimé**, pas caché.
+
+### Ce que ma bascule a coûté
+
+- **1 h 30 de déploiements impossibles** — le serveur lit le code par une URL
+  HTTPS sans identifiants ; privé, plus rien.
+- **Sept scans de sécurité cassés**, dont Gitleaks qui ne tournait plus du tout.
+- Une part de la **seconde panne de production** de la soirée.
+
+### La leçon, écrite pour la prochaine fois
+
+**Avant toute action sur un réglage qui engage tout le dépôt — visibilité,
+protection de branche, secrets — vérifier qu'aucune autre session n'y travaille.**
+`ListAgents` prend trois secondes. Quatre sessions tournaient en parallèle ce
+soir-là, dont une sur ce dépôt.
+
+*Le fond de mon constat n'était pas faux : l'exposition était réelle à cet
+instant. C'est la méthode qui l'était — j'ai agi seul sur une décision qui
+appartenait à un chantier déjà en cours.*
+
+---
+
+## 4.2 ⚠️ UN TROU QUI RESTE, MESURÉ ET NON TRAITÉ
+
+Le dossier d'audit a été retiré de `main`. **Pas de la branche
+`audit/360-p1-p2`**, qui est poussée sur le dépôt public :
+
+```
+raw.githubusercontent.com/.../audit/360-p1-p2/.../02_CONSTATS.md  →  200
+```
+
+**1 008 fichiers lisibles anonymement**, alors qu'un dépôt privé
+`axion-crm-pro-audit` a été créé exprès pour les accueillir. Ce n'est
+probablement pas voulu — c'est la branche qu'on oublie quand on nettoie `main`.
+
+S'y ajoute le reste consigné par l'autre session : le mot de passe
+`axion_dev_only`, présent dans **12 fichiers** du dépôt public, à faire tourner.
+
+🔑 **Je n'y ai pas touché, et c'est délibéré.** J'ai déjà agi seul une fois sur
+cette question aujourd'hui. La décision revient à Will, ou à la session qui
+mène ce chantier.
+
+---
+
+## 4.3 ÉTAT À LA FERMETURE DE CETTE SESSION
+
+| | |
+|---|---|
+| Production | ✅ `api` 200 · `app` 200 |
+| Déploiement | ✅ réparé et **éprouvé** — un déploiement `success` de bout en bout |
+| PR de cette session | ✅ **toutes fusionnées** (#194, #198, #201, #202, #205, #208) · #204 fermée comme redondante |
+| Worktree | ✅ propre, rien de non commité |
+| Journal | ⚠️ **41 commits locaux, non poussés** |
+
+### Les six PR fusionnées
+
+| PR | ce qu'elle a apporté |
+|---|---|
+| #194 | les 91 correctifs de la vague 2 |
+| #198 | 14 routes 501 fermées, 4 redirections, les grilles du §4 |
+| #201 | le jeton de lecture + les 7 scans réparés |
+| #202 | la forme explicite du `fetch` |
+| #205 | la garde des arguments du déploiement |
+| #208 | le déblocage des conteneurs coincés |
+
+### Ce que la soirée a coûté
+
+**Deux pannes de production**, ~7 minutes puis ~25 minutes. Les deux causées par
+des gestes que j'ai déclenchés. Les deux réparées, et chacune a laissé une
+garde derrière elle.
+
+**Quatre tentatives pour réparer le déploiement**, dont **deux sur un mauvais
+diagnostic** d'un défaut — un `\n` littéral — que j'avais moi-même introduit.
+
+### Ce qui reste, et qui n'est toujours pas fait
+
+- le déploiement **n'est pas reprenable** : un `up` qui échoue au milieu laisse
+  la pile dans un état pire qu'avant. Deux trous bouchés, celui-là reste ;
+- **6 S0 · 47 S1 · 168 S2** ouverts au registre ;
+- les **sept décisions** du §2.9, dont le fail-open de `sameWorkspace()` — à
+  corriger **avant** que quiconque branche `authorize()` ;
+- la branche d'audit publique du §4.2 ci-dessus.

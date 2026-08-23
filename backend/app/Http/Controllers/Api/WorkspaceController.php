@@ -100,13 +100,28 @@ class WorkspaceController extends ApiController
             $champs['cost_cap_eur'] = $valide['cost_cap_eur'];
         }
 
+        // 🔑 `whereNull('deleted_at')` SUR LES DEUX REQUETES, ET CE N'EST PAS
+        // COSMETIQUE. `workspaces` porte `deleted_at` : un espace archive doit
+        // etre INTROUVABLE, pas seulement invisible. Sans ce filtre, un compte
+        // dont le contexte pointe encore un espace ferme continuerait a en
+        // regler le nom et le plafond de depense.
+        //
+        // C'est la garde `B10-016-PORTEE` qui l'a trouve — elle recense les
+        // appels « aveugles au deleted_at » et son plafond `workspaces` est
+        // passe de 17 a 18. Le piege n. 8 du dossier dit de ne JAMAIS relever
+        // un plafond pour accommoder son propre code ; en refusant, on trouve
+        // la vraie reponse. C'etait le cas ici.
         if ($champs !== []) {
             $champs['updated_at'] = now();
-            DB::table('workspaces')->where('id', $espace)->update($champs);
+            DB::table('workspaces')
+                ->where('id', $espace)
+                ->whereNull('deleted_at')
+                ->update($champs);
         }
 
         $ligne = DB::table('workspaces')
             ->where('id', $espace)
+            ->whereNull('deleted_at')
             ->first(['id', 'slug', 'name', 'settings', 'cost_cap_eur', 'is_active', 'updated_at']);
 
         if ($ligne === null) {

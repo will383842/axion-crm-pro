@@ -448,3 +448,173 @@ it('ne laisse changer ni l adresse ni l etat actif de l espace depuis l interieu
     // sans quoi la garde passerait au vert sur une route qui refuse TOUT.
     expect(DB::table('workspaces')->where('id', $espace)->value('name'))->toBe('ok');
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LOT 4 — LES COMPTES : `POST`, `PUT`, `DELETE /users/{user}`
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// 🔑 CE QUE LE SCHEMA DIT DU GESTE, ET QU'IL FALLAIT LIRE AVANT D'INVENTER.
+// `user_workspaces` porte `role_slug`, `invited_at`, `joined_at`, `revoked_at`
+// (migration 2026_05_16_000002). Ce n'est pas une simple table de liaison :
+// c'est une table d'INVITATION. Le produit avait deja pense le geste ; la route
+// ne le posait simplement pas.
+//
+// 🔴 ET ON N'INSCRIT AUCUN MOT DE PASSE. `users.password_hash` est NULLABLE, et
+// le constat f35-008 de ce meme audit s'appelle « mot de passe proprietaire en
+// clair ». Un ecran d'administration qui choisit le mot de passe d'autrui le
+// connait — donc le compte n'est plus a personne. On cree un compte SANS secret
+// et la personne s'en donne un par le parcours existant.
+//
+// ⚠️ CE QUE CE LOT NE FAIT PAS, et il faut le dire : AUCUN COURRIEL N'EST
+// ENVOYE. `MAIL_MAILER` etait l'un des quatre verrous du rapport final, et une
+// route qui pretend inviter alors que rien ne part serait une facade de plus.
+// La ligne d'invitation est ECRITE et datee ; sa remise est un autre chantier.
+
+/** Le role porte par un compte dans `user_workspaces`. */
+function roleE501(string $utilisateur, string $espace): ?string
+{
+    return DB::table('user_workspaces')
+        ->where('user_id', $utilisateur)
+        ->where('workspace_id', $espace)
+        ->value('role_slug');
+}
+
+it('cree un compte invite, sans mot de passe, avec sa ligne d invitation datee', function () {
+    [$moi, $espace] = compteE501('Inviteur');
+
+    $reponse = $this->actingAs($moi)->postJson('/api/v1/users', [
+        'email' => 'nouvelle-recrue@ecritures-501.test',
+        'name' => 'Nouvelle Recrue',
+        'role' => 'operator',
+    ])->assertCreated();
+
+    $id = (string) $reponse->json('data.id');
+    $ligne = DB::table('users')->where('id', $id)->first();
+
+    expect($ligne)->not->toBeNull();
+    expect((string) $ligne->current_workspace_id)->toBe($espace);
+
+    // 🔴 Le coeur de ce cas : aucun secret n'a ete choisi par l'administrateur.
+    expect($ligne->password_hash)->toBeNull();
+
+    // Et l'invitation existe, datee, pas encore acceptee.
+    $invitation = DB::table('user_workspaces')
+        ->where('user_id', $id)->where('workspace_id', $espace)->first();
+    expect($invitation)->not->toBeNull();
+    expect($invitation->role_slug)->toBe('operator');
+    expect($invitation->invited_at)->not->toBeNull();
+    expect($invitation->joined_at)->toBeNull();
+});
+
+it('refuse une adresse deja prise, en 422 et non en 500', function () {
+    [$moi] = compteE501('Redondant');
+
+    $this->actingAs($moi)->postJson('/api/v1/users', [
+        'email' => 'doublon@ecritures-501.test', 'name' => 'Un', 'role' => 'viewer',
+    ])->assertCreated();
+
+    // `users.email` est CITEXT NOT NULL UNIQUE : sans controle prealable,
+    // Postgres leve et la reponse serait un 500. CITEXT, donc la casse ne
+    // sauve pas non plus.
+    $this->actingAs($moi)->postJson('/api/v1/users', [
+        'email' => 'DOUBLON@ecritures-501.test', 'name' => 'Deux', 'role' => 'viewer',
+    ])->assertStatus(422);
+});
+
+it('refuse un role qui n existe pas, en 422', function () {
+    [$moi] = compteE501('Inventeur');
+
+    // La colonne porte un CHECK (owner, admin, operator, viewer) : une valeur
+    // inventee doit tomber ICI, pas dans Postgres.
+    $this->actingAs($moi)->postJson('/api/v1/users', [
+        'email' => 'chimere@ecritures-501.test', 'name' => 'Chimere', 'role' => 'sorcier',
+    ])->assertStatus(422);
+});
+
+it('modifie un compte de mon espace, et jamais un compte d un autre espace', function () {
+    [$moi, $espace] = compteE501('Modifieur2');
+    $collegue = collegueE501($espace, 'Modifiable');
+    [$lointain] = compteE501('Lointain2');
+
+    $this->actingAs($moi)
+        ->putJson("/api/v1/users/{$collegue->id}", ['name' => 'Renomme'])
+        ->assertOk();
+    expect(DB::table('users')->where('id', $collegue->id)->value('name'))->toBe('Renomme');
+
+    $avant = DB::table('users')->where('id', $lointain->id)->value('name');
+    $this->actingAs($moi)
+        ->putJson("/api/v1/users/{$lointain->id}", ['name' => 'Detourne'])
+        ->assertNotFound();
+    expect(DB::table('users')->where('id', $lointain->id)->value('name'))->toBe($avant);
+});
+
+it('change le role d un compte, et l ecrit dans la table d invitation', function () {
+    [$moi, $espace] = compteE501('Promoteur');
+    $collegue = collegueE501($espace, 'Promu');
+
+    DB::table('user_workspaces')->insert([
+        'user_id' => $collegue->id, 'workspace_id' => $espace,
+        'role_slug' => 'viewer', 'invited_at' => now(), 'joined_at' => now(),
+    ]);
+
+    $this->actingAs($moi)
+        ->putJson("/api/v1/users/{$collegue->id}", ['role' => 'admin'])
+        ->assertOk();
+
+    expect(roleE501((string) $collegue->id, $espace))->toBe('admin');
+});
+
+it('ne laisse pas modifier l adresse d un compte : c est son identite', function () {
+    [$moi, $espace] = compteE501('Usurpateur');
+    $collegue = collegueE501($espace, 'Cible');
+    $avant = DB::table('users')->where('id', $collegue->id)->value('email');
+
+    $this->actingAs($moi)
+        ->putJson("/api/v1/users/{$collegue->id}", [
+            'email' => 'vole@ecritures-501.test', 'name' => 'ok',
+        ])
+        ->assertOk();
+
+    // L'adresse est l'identifiant de connexion : la changer par un ecran
+    // d'administration, sans verification, revient a prendre le compte.
+    expect(DB::table('users')->where('id', $collegue->id)->value('email'))->toBe($avant);
+    expect(DB::table('users')->where('id', $collegue->id)->value('name'))->toBe('ok');
+});
+
+it('ferme un compte en douceur et revoque son invitation, sans effacer la ligne', function () {
+    [$moi, $espace] = compteE501('Fermeur');
+    $collegue = collegueE501($espace, 'Ferme');
+
+    DB::table('user_workspaces')->insert([
+        'user_id' => $collegue->id, 'workspace_id' => $espace,
+        'role_slug' => 'viewer', 'invited_at' => now(), 'joined_at' => now(),
+    ]);
+
+    $this->actingAs($moi)->deleteJson("/api/v1/users/{$collegue->id}")->assertOk();
+
+    // `users.deleted_at` existe et le modele porte `SoftDeletes` : un compte se
+    // ferme, il ne s'efface pas. Le journal d'audit reference son auteur.
+    $ligne = DB::table('users')->where('id', $collegue->id)->first();
+    expect($ligne)->not->toBeNull();
+    expect($ligne->deleted_at)->not->toBeNull();
+
+    expect(DB::table('user_workspaces')->where('user_id', $collegue->id)->value('revoked_at'))
+        ->not->toBeNull();
+});
+
+it('refuse de me fermer moi-meme', function () {
+    [$moi] = compteE501('Suicidaire');
+
+    // Sans ce refus, le dernier administrateur connecte peut se verrouiller
+    // dehors, et plus personne ne peut rouvrir la porte par le produit.
+    $this->actingAs($moi)->deleteJson("/api/v1/users/{$moi->id}")->assertStatus(422);
+    expect(DB::table('users')->where('id', $moi->id)->value('deleted_at'))->toBeNull();
+});
+
+it('ne ferme pas un compte d un autre espace', function () {
+    [$moi] = compteE501('Interne2');
+    [$lointain] = compteE501('Externe2');
+
+    $this->actingAs($moi)->deleteJson("/api/v1/users/{$lointain->id}")->assertNotFound();
+    expect(DB::table('users')->where('id', $lointain->id)->value('deleted_at'))->toBeNull();
+});

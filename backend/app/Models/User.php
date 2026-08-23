@@ -19,6 +19,9 @@ use Spatie\Permission\Traits\HasRoles;
  * @property string $name
  * @property ?string $password_hash Hachage du mot de passe — la colonne ne s'appelle PAS `password`
  * @property ?string $current_workspace_id UUID
+ * @property string $locale NOT NULL, défaut 'fr' — colonne réelle depuis 2026_05_16_000002, jamais annotée
+ * @property string $timezone NOT NULL, défaut 'Europe/Paris' — idem
+ * @property ?CarbonInterface $deleted_at SoftDeletes — la colonne existe depuis l'origine
  * @property ?CarbonInterface $first_login_completed_at
  * @property ?CarbonInterface $onboarding_tour_completed_at
  * @property ?CarbonInterface $email_verified_at
@@ -86,6 +89,7 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'id', 'name', 'email', 'password_hash', 'current_workspace_id',
+        'locale', 'timezone',
         'first_login_completed_at', 'onboarding_tour_completed_at',
         'totp_enabled_at', 'totp_secret', 'totp_recovery_codes',
         'last_login_at', 'last_login_ip', 'last_login_user_agent',

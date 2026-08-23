@@ -12,7 +12,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement("ALTER TABLE media ADD COLUMN IF NOT EXISTS email_confidence CHAR(1)");
+        DB::statement('ALTER TABLE media ADD COLUMN IF NOT EXISTS email_confidence CHAR(1)');
         DB::statement('ALTER TABLE media DROP CONSTRAINT IF EXISTS media_email_confidence_check');
         DB::statement("ALTER TABLE media ADD CONSTRAINT media_email_confidence_check CHECK (email_confidence IN ('A','B','C'))");
         DB::statement('CREATE INDEX IF NOT EXISTS idx_media_email_confidence ON media (email_confidence) WHERE email_confidence IS NOT NULL');

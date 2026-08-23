@@ -20,8 +20,8 @@ class ProxyProvider extends Model
     protected function casts(): array
     {
         return [
-            'enabled'              => 'boolean',
-            'metadata'             => 'array',
+            'enabled' => 'boolean',
+            'metadata' => 'array',
             'last_health_check_at' => 'datetime',
         ];
     }

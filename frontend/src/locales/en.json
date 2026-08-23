@@ -1,8 +1,4 @@
 {
-  "app": {
-    "name": "Axion CRM Pro",
-    "tagline": "Internal B2B prospection console"
-  },
   "auth": {
     "login": {
       "title": "Sign in",
@@ -17,15 +13,6 @@
       "submit": "Verify"
     }
   },
-  "nav": {
-    "dashboard": "Dashboard",
-    "companies": "Companies",
-    "contacts": "Contacts",
-    "coverage": "France coverage",
-    "scraperRuns": "Scraper runs",
-    "users": "Users",
-    "settings": "Settings"
-  },
   "phase2": {
     "stub": {
       "title": "Phase 2 — coming soon",
@@ -34,12 +21,6 @@
   },
   "common": {
     "loading": "Loading…",
-    "empty": "No results",
-    "error": "An error occurred.",
-    "retry": "Retry",
-    "save": "Save",
-    "cancel": "Cancel",
-    "delete": "Delete",
-    "search": "Search"
+    "error": "An error occurred."
   }
 }

@@ -928,3 +928,171 @@ test('P6-DR — le runbook ne promet plus une sauvegarde horaire ni un stockage 
         );
     }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// F39-009 (S2) — LE MENSONGE SURVIT AILLEURS QUE DANS LE RUNBOOK
+//
+// Le runbook a ete corrige : il annonce 24 h depuis le 2026-08-16
+// (`infra/runbooks/04-restore-dr.md:38`). C'est exactement le patron de ce depot
+// — « le correctif existe mais n'a pas ete porte au site jumeau » — et il s'est
+// referme une fois de plus ici. Mesure du 2026-08-22, DEUX autres documents
+// promettaient encore un RPO d'une heure :
+//
+//     Makefile:160        dr-drill: ## DR drill (RPO <= 1h, RTO <= 4h)
+//     ARCHITECTURE.md:94  Backups : Hetzner Object Storage hourly + Backblaze B2 (3-2-1)
+//     ARCHITECTURE.md:95  DR : RPO 1h / RTO 4h
+//
+// Facteur 24. Le depot etablit lui-meme la sauvegarde QUOTIDIENNE a trois
+// endroits : `infra/scripts/dr-drill.sh:15`, `.github/workflows/surveillance-
+// sauvegarde.yml:28-30` (cron 05:00 UTC, « deux heures apres la sauvegarde de
+// 03:00 UTC ») et le runbook lui-meme.
+//
+// Le risque n'est pas technique : ARCHITECTURE.md est le document qu'on montre.
+// Un RPO d'une heure promis a un client est un engagement que l'infrastructure
+// ne tient pas.
+//
+// ⚠️ CE QUE CETTE GARDE NE PEUT PAS DIRE. Le constat affirmait aussi « la
+// profondeur reelle des sauvegardes est de trois jours, pas trente ». C'est
+// INDECIDABLE depuis le depot : la configuration dit bien 30
+// (`infra/scripts/backup-postgres.sh:55`, `RETENTION_REMOTE_DAYS=30`), et lire
+// le contenu reel de la Storage Box exige de s'y connecter. Cette garde ne
+// certifie donc RIEN sur la profondeur — elle ne mesure que le RPO annonce.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Les documents qui annoncent un RPO au lecteur, hors runbook.
+ *
+ * @return array<string, string> chemin relatif => contenu
+ */
+function documentsQuiAnnoncentLeRpo(): array
+{
+    $racine = racineDepotRunbookDr();
+    $documents = [];
+
+    foreach (['Makefile', 'ARCHITECTURE.md'] as $relatif) {
+        $chemin = $racine . '/' . $relatif;
+        $documents[$relatif] = file_exists($chemin) ? (string) file_get_contents($chemin) : '';
+    }
+
+    return $documents;
+}
+
+/**
+ * Les lignes qui promettent un RPO d'une heure.
+ *
+ * ⚠️ `\brpo\b` et non `rpo` : `ARCHITECTURE.md:32` contient `BRPOP`, la commande
+ * Redis. Sans la frontiere de mot, le balayage inspecterait le schema
+ * d'architecture des workers et rendrait un faux positif que personne ne saurait
+ * lire.
+ *
+ * @return list<string>
+ */
+function promessesDeRpoDUneHeure(string $texte): array
+{
+    $fautives = [];
+
+    foreach (preg_split('/\R/u', $texte) ?: [] as $ligne) {
+        if (preg_match('/\brpo\b.{0,14}?\b1\s*h/iu', $ligne) === 1) {
+            $fautives[] = trim($ligne);
+        }
+    }
+
+    return $fautives;
+}
+
+/**
+ * Les promesses de sauvegarde qui n'existent nulle part dans l'infrastructure.
+ *
+ * @return list<string>
+ */
+function fantomesDeSauvegardeDansLaDoc(string $texte): array
+{
+    $minuscules = mb_strtolower($texte);
+    $trouves = [];
+
+    foreach (['hourly', 'backblaze', 'object storage', 'wal streaming', 'sauvegarde horaire'] as $fantome) {
+        if (str_contains($minuscules, $fantome)) {
+            $trouves[] = $fantome;
+        }
+    }
+
+    return $trouves;
+}
+
+test('F39-009 — TEMOIN : le banc voit bien le Makefile et ARCHITECTURE.md', function () {
+    foreach (documentsQuiAnnoncentLeRpo() as $relatif => $contenu) {
+        expect(mb_strlen($contenu))->toBeGreaterThan(
+            200,
+            "Le banc lit {$relatif} comme un fichier vide ou minuscule. Les assertions qui "
+            . "suivent n'y trouveraient aucun mensonge et passeraient au vert sans rien "
+            . 'inspecter. Monte la racine du depot avant de les croire.',
+        );
+    }
+
+    // L'ancre doit etre la : sans elle, quelqu'un pourrait renommer la recette et
+    // la garde inspecterait un fichier qui ne parle plus de reprise.
+    expect(str_contains(documentsQuiAnnoncentLeRpo()['Makefile'], 'dr-drill:'))->toBeTrue(
+        "La recette `dr-drill` a disparu du Makefile : la garde F39-009 n'a plus rien a "
+        . 'inspecter la-bas. Verifie ou l exercice de reprise est declare desormais.',
+    );
+});
+
+test('F39-009 — TEMOIN NEGATIF : les deux balayages voient bien le mensonge d origine', function () {
+    // Les trois lignes exactes mesurees le 2026-08-22, avant correction.
+    $avant = "dr-drill: ## DR drill (RPO ≤ 1h, RTO ≤ 4h)\n"
+        . "- **Backups** : Hetzner Object Storage hourly + Backblaze B2 réplication off-site\n"
+        . "- **DR** : RPO 1h / RTO 4h drillé via `infra/scripts/dr-drill.sh`\n";
+
+    expect(promessesDeRpoDUneHeure($avant))->toHaveCount(
+        2,
+        'Le balayage ne reconnait plus le mensonge qu il a ete ecrit pour voir. Une garde '
+        . "qu'on n'a jamais vue rouge ne garde rien : repare `promessesDeRpoDUneHeure()`.",
+    );
+
+    expect(fantomesDeSauvegardeDansLaDoc($avant))->not->toBeEmpty(
+        'Le balayage des sauvegardes fantomes ne voit plus « hourly » ni « Backblaze ». '
+        . 'Repare `fantomesDeSauvegardeDansLaDoc()`.',
+    );
+
+    // Et il doit se TAIRE sur la forme corrigee, sinon il rougira eternellement.
+    $apres = "dr-drill: ## DR drill (RPO réel ≤ 24 h — sauvegarde quotidienne —, RTO ≤ 4 h)\n"
+        . "- **DR** : **RPO réel ≤ 24 h** — la sauvegarde étant quotidienne, il n'y a pas de\n"
+        . "                         │ Node Workers ×N  │ (Playwright stealth + BRPOP)\n";
+
+    expect(promessesDeRpoDUneHeure($apres))->toBe(
+        [],
+        'Le balayage crie au loup sur la formulation CORRIGEE (ou sur `BRPOP`, la commande '
+        . 'Redis du schema des workers). Une garde qui rougit sur le correctif finit '
+        . 'desactivee : resserre `promessesDeRpoDUneHeure()`.',
+    );
+});
+
+test('F39-009 — aucun document du depot ne promet plus un RPO d une heure', function () {
+    $fautifs = [];
+
+    foreach (documentsQuiAnnoncentLeRpo() as $relatif => $contenu) {
+        foreach (promessesDeRpoDUneHeure($contenu) as $ligne) {
+            $fautifs[] = "{$relatif}  →  {$ligne}";
+        }
+        foreach (fantomesDeSauvegardeDansLaDoc($contenu) as $fantome) {
+            $fautifs[] = "{$relatif}  →  promesse fantome « {$fantome} »";
+        }
+    }
+
+    expect($fautifs)->toBe(
+        [],
+        "Un document annonce encore un RPO d'une heure, ou une sauvegarde qui n'existe pas.\n\n"
+        . 'La seule sauvegarde qui existe est QUOTIDIENNE : `pg_dump` a 03:00 UTC, cron pose par '
+        . '`infra/scripts/setup-backup.sh`, televerse en SFTP sur une Storage Box Hetzner. La '
+        . 'perte maximale reelle est donc de 24 heures — facteur 24 sur ce qui etait annonce. Le '
+        . "depot l'etablit lui-meme a trois endroits : `infra/scripts/dr-drill.sh:15`, "
+        . '`.github/workflows/surveillance-sauvegarde.yml:28-30` et '
+        . "`infra/runbooks/04-restore-dr.md:26-38`.\n\n"
+        . "ARCHITECTURE.md est le document qu'on MONTRE : un RPO d'une heure promis a un client "
+        . "est un engagement que l'infrastructure ne tient pas.\n\n"
+        . 'GESTE : aligne la ligne sur `infra/runbooks/04-restore-dr.md:24-38`. Fermer le vrai '
+        . 'ecart demande un archivage continu des journaux de transaction — un chantier, pas une '
+        . "ligne de documentation ; tant qu'il n'est pas fait, on annonce 24 h. Constat F39-009.\n\n"
+        . "Lignes :\n  - " . implode("\n  - ", $fautifs),
+    );
+});

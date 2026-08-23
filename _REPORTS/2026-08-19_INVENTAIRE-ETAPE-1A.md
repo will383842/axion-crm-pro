@@ -24,7 +24,7 @@
 | **`ContactsHubPage.tsx`** + `/crm/contacts-hub` + `/counts` | frontend + API | Le hub et ses compteurs — pièce 1 déjà livrée et optimisée. |
 | **`tags`** gouvernés (`slug`, `category`, `kind`, `is_locked`, `namespace` généré) + `company_tag` / `candidate_tag` + `TagsManagerPage.tsx` | base + frontend | **Les tags libres du §27 existent déjà**, avec leur gouvernance (`Taxonomy::TAG_NAMESPACES`). Rien à créer. |
 | **`saved_views`** (`entity`, `filters jsonb`, `is_default`) | base | La table des **vues épinglées** est là, à la colonne près. ⚠️ voir §3 : personne ne l'utilise. |
-| **`notifications`** (`type`, `title`, `body`, `action_url`, `read_at`) | base, 10 fichiers applicatifs | Vivante. Sert les rappels et les notifications de 1a. |
+| **`notifications`** (`type`, `title`, `body`, `action_url`, `read_at`) | base + cloche in-app | Table **sans écrivain** : lue par `NotificationsController` et l'export RGPD, purgée par la rétention et l'effacement, **jamais alimentée**. ⚠️ voir §3 bis — ce n'est pas une pièce à étendre, c'est un producteur à écrire. |
 | **`Taxonomy`** — source de vérité unique, listes fermées, comparées aux `CHECK` réels par `Feature\Crm\SocleCrmTest` | `app/Crm/Taxonomy.php` | **Le patron à suivre** pour toute nouvelle taxonomie de 1a (activités, motifs) : ajouter une valeur sans migration fait ROUGIR la CI. |
 | **`crm-console`** middleware + drapeau `crm.console_v2` | `routes/api.php` | Tout `/v1/crm/*` est déjà derrière un drapeau. `CRM_CONSOLE_V2_ENABLED=true` **vérifié sur la production le 19/08**. |
 | **`ArbitragePage`** + `/crm/arbitrage/*` | frontend + API | Rapprochement / arbitrage des doublons — servira le §1.2 et l'étape 1c. |
@@ -33,10 +33,14 @@
 
 ## 2. Ce qui N'EXISTE PAS DU TOUT — à construire
 
+> ⚠️ **Deux lignes de ce tableau ont été rectifiées le 2026-08-22** (A09-003) :
+> elles déclaraient absent ce qui existait déjà le jour même. Le tableau porte
+> l'état mesuré, l'encart qui le suit porte ce qui était écrit.
+
 | Exigence | État |
 |---|---|
-| **Activités (§2.3)** — les cinq activités d'AXION IA | ❌ aucune table, aucune colonne, aucune constante |
-| **Motifs d'échange (§2.3)** — les 11 motifs non commerciaux | ❌ idem |
+| **Activités (§2.3)** — les cinq activités d'AXION IA | ✅ **construit** — table `crm_activites`, constante `ActivitesEtMotifs::ACTIVITES`. Voir la RECTIFICATION 2026-08-22 sous ce tableau |
+| **Motifs d'échange (§2.3)** — les 11 motifs non commerciaux | ✅ **construit** — table `crm_motifs`, constante `ActivitesEtMotifs::MOTIFS`. Voir la RECTIFICATION 2026-08-22 sous ce tableau |
 | **Dossiers (§3.1 bis)** — le regroupement des échanges | ❌ aucune table `dossiers`, aucun `dossier_id` |
 | **Multi-types sur une fiche (§2.2)** | ❌ voir §4 — le modèle actuel dit le contraire |
 | **Interaction consignée à la main (§3.2)** — appel, e-mail, réunion, note | ❌ `activities.kind` ne porte **aucun** de ces mots (voir §4) |
@@ -46,12 +50,52 @@
 | **Compte rendu envoyé au contact (§6.4)** | ❌ rien |
 | **Notifications Telegram** | ❌ rien côté CRM |
 
+> ### RECTIFICATION 2026-08-22 — deux lignes de ce tableau étaient fausses le jour même
+>
+> **Pourquoi elle est ici et pourquoi les deux lignes d'origine restent lisibles.**
+> Ce document sert d'entrée au §28.5 : on le lit pour décider quoi construire.
+> Deux lignes y déclaraient absent ce qui existait déjà — les relire, c'est
+> refaire une taxonomie qui a sa migration, son semis et sa garde. Un document
+> qui ment est pire qu'un document absent, parce qu'on le suit. Les deux
+> affirmations du 19/08 ne sont donc pas effacées : elles sont datées, et
+> corrigées ici (constat **A09-003** de l'audit 360).
+>
+> **Ce qui était écrit ici le 2026-08-19**, mot pour mot, et qui était déjà faux
+> ce jour-là :
+>
+> | Exigence | État écrit le 19/08 |
+> |---|---|
+> | **Activités (§2.3)** — les cinq activités d'AXION IA | ❌ aucune table, aucune colonne, aucune constante |
+> | **Motifs d'échange (§2.3)** — les 11 motifs non commerciaux | ❌ idem |
+>
+> **Ce qui a été mesuré le 2026-08-22**, par lecture du dépôt — pas par lecture
+> d'un rapport antérieur :
+>
+> | Ce que le 19/08 déclarait absent | Ce qui existe, et où |
+> |---|---|
+> | table des activités | `crm_activites` — `backend/database/migrations/2026_08_19_000002_crm_activites_et_motifs.php` (`CREATE TABLE IF NOT EXISTS crm_activites`) |
+> | table des motifs | `crm_motifs` — même migration, contrainte `crm_motifs_espace_check` sur `ESPACES` |
+> | constante des cinq activités | `App\Crm\ActivitesEtMotifs::ACTIVITES` (5 entrées, drapeau `qualiopi` sur `formation`) |
+> | constante des onze motifs | `App\Crm\ActivitesEtMotifs::MOTIFS` (11 entrées, de `presse` à `autre`) |
+>
+> **Même jour que ce document** : la migration est arrivée par le commit
+> `504737f` du 2026-08-19 (« feat(etape1a-p2) : les cinq activités et les onze
+> motifs d'échange (§2.3) ») ; le dernier commit touchant cet inventaire est
+> `a832d88`, du 2026-08-19 également. L'inventaire n'a jamais été relu après le
+> travail qu'il devait annoncer — c'est le mécanisme du défaut, pas un oubli
+> isolé : **un inventaire se réouvre à la fin du lot qu'il ouvre.**
+>
+> ⚠️ Le semis est fait **par la migration**, pas par un seeder : l'entrypoint de
+> production ne joue que `migrate deploy`. C'est une raison de plus de ne pas
+> reconstruire ces tables « puisqu'elles n'existent pas ».
+
 ---
 
 ## 3. 🟠 Ce qui existe en BASE mais que RIEN n'exécute — l'échafaudage mort
 
 Six tables de la phase 2 (mai 2026) couvrent, sur le papier, des besoins de
-l'étape 1a. **Aucune n'a de modèle Eloquent, de contrôleur, de route ni d'écran.**
+l'étape 1a. **Cinq d'entre elles n'ont ni modèle Eloquent, ni contrôleur, ni
+route, ni écran** — pour la sixième, voir la RECTIFICATION sous le tableau.
 
 | Table | Ce qu'elle promet | Qui la cite dans le code applicatif |
 |---|---|---|
@@ -59,12 +103,41 @@ l'étape 1a. **Aucune n'a de modèle Eloquent, de contrôleur, de route ni d'éc
 | `crm_notes` | notes de fiche (§3.1) | — |
 | `crm_pipelines`, `pipeline_stages` | parcours (§2.5) | — |
 | `deals`, `deal_history` | opportunités (§2.4) | — |
-| `saved_views` | vues épinglées (§18) | — |
+| `saved_views` | vues épinglées (§18) | ⚠️ **contrôleur + trois routes** — voir la RECTIFICATION 2026-08-22 sous ce tableau |
 
-Les **seuls** fichiers qui les nomment sont `PentestSelfCheck.php` (inventaire
-de sécurité), `SemeurTablesScopees.php` (aide de test d'isolation) et
-`PasDeStub501SousCrmEtAnalyticsTest.php` (garde de routage). Autrement dit :
-elles sont **surveillées et cloisonnées par la RLS, mais vides et inertes**.
+Pour les **cinq premières**, les seuls fichiers qui les nomment sont
+`PentestSelfCheck.php` (inventaire de sécurité), `SemeurTablesScopees.php` (aide
+de test d'isolation) et `PasDeStub501SousCrmEtAnalyticsTest.php` (garde de
+routage). Autrement dit : elles sont **surveillées et cloisonnées par la RLS,
+mais vides et inertes**.
+
+> ### RECTIFICATION 2026-08-22 — `saved_views` n'est pas de l'échafaudage mort
+>
+> **Pourquoi cette rectification est ici, et pourquoi la phrase d'origine reste
+> lisible.** Ce document sert d'entrée au §28.5 : on le lit pour décider quoi
+> construire. Ranger `saved_views` dans l'échafaudage mort revient à faire
+> réécrire un contrôleur qui existe et re-trancher un cloisonnement déjà tranché.
+> Un document qui ment est pire qu'un document absent, parce qu'on le suit — même
+> raison que la RECTIFICATION du §2. Constat **A09-004** de l'audit 360.
+>
+> **Ce qui était écrit ici le 2026-08-19**, mot pour mot : « **Aucune n'a de
+> modèle Eloquent, de contrôleur, de route ni d'écran.** », et `saved_views`
+> rangée dans le tableau avec « Qui la cite dans le code applicatif : — ».
+>
+> **Ce qui a été mesuré le 2026-08-22**, par lecture du dépôt — pas par lecture
+> d'un rapport antérieur :
+>
+> | Ce que le 19/08 déclarait absent | Ce qui existe, et où |
+> |---|---|
+> | contrôleur | `backend/app/Http/Controllers/Api/SavedViewsController.php` — son en-tête décrit explicitement le remplacement du bouchon `return $this->ok(['data' => []])`, au titre des constats A-002 et B12-007 |
+> | routes | `backend/routes/api.php` — `use App\Http\Controllers\Api\SavedViewsController;` puis **trois** `Route::apiResource('saved-views', …)` : `index`/`show` sous `permission:companies.view`, `store`/`update` sous `companies.update`, `destroy` sous `companies.delete` |
+>
+> **Ce qui reste vrai, et qu'il ne faut pas sur-corriger** : `store`, `update` et
+> `destroy` répondent encore `501` — le contrôleur le dit lui-même. Seules `index`
+> et `show` sont implémentées, et aucun écran ne consomme la ressource. La table
+> reste donc sans écriture ; elle n'est pas pour autant inerte, elle est LUE, par
+> du code qui a déjà tranché son cloisonnement (une vue appartient à une
+> personne, pas à un espace).
 
 ⚠️ **Le piège à ne pas manquer.** Un inventaire superficiel lit « il y a déjà une
 table `crm_tasks` » et conclut « les tâches existent, on étend ». C'est faux :
@@ -76,6 +149,37 @@ pas de rattachement à une **activité**, que le §2.4 rend obligatoire.
 les **noms** et les colonnes qui conviennent, et les étendre par migration
 additive ; ne pas créer `tasks` à côté de `crm_tasks`, ce qui donnerait deux
 tables pour une notion — la faute exacte que le §28.5 cherche à éviter.
+
+### 3 bis. 🟠 `notifications` — lue, exportée, purgée… et jamais alimentée
+
+Ce document affirmait, jusqu'au 2026-08-22, que `notifications` était
+**« Vivante. Sert les rappels et les notifications de 1a. »** C'est faux, et
+c'est la sorte de phrase qui coûte cher : elle range la table au §1 (« à
+étendre »), et l'auteur de la pièce découvre l'absence de producteur au milieu
+du travail.
+
+**Mesure du 2026-08-22** (constat I48-006), `grep` de `'notifications'` sur
+`backend/app`, `backend/routes`, `backend/config`, `backend/database/seeders` :
+
+| Rôle | Qui | Où |
+|---|---|---|
+| Lecture | cloche in-app | `NotificationsController::index` (`DB::table('notifications')`) |
+| Lecture | export RGPD art. 15/20 | `GdprPortabilityService` |
+| Suppression | rétention > 90 j | `RetentionPurge` |
+| Suppression | droit à l'effacement | `GdprErasureService` |
+| Surveillance | inventaire de sécurité | `PentestSelfCheck` |
+| **Écriture** | **personne** | **aucun `insert`, aucun modèle Eloquent `Notification`, aucun `->notify()`** |
+
+Le trait `Notifiable` est bien déclaré sur `App\Models\User`, et n'est appelé
+nulle part. Et `POST /notifications/{n}/read` comme `POST /notifications/read-all`
+répondent encore **501**.
+
+Autrement dit : la cloche est câblée de bout en bout **sauf** au bout qui
+compte. La table n'est pas à étendre — **le producteur est à écrire**, et les
+deux `501` avec lui. La garde
+`Feature\Infra\InventaireEtape1aNeMentPasSurNotificationsTest` tient les deux
+bouts : le jour où un écrivain apparaît, elle rougit et renvoie ici pour
+reclasser la ligne en §1.
 
 ---
 

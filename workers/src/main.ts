@@ -10,6 +10,7 @@ import { startCrunchbaseWorker } from './scrapers/crunchbase.worker';
 import { startInfogreffeWorker } from './scrapers/infogreffe.worker';
 import { startSocieteComWorker } from './scrapers/societe-com.worker';
 import { startSocialLightWorker } from './scrapers/social-light.worker';
+import { useMockScrapers } from './config/mocks';
 
 const log = pino({ name: 'workers', level: process.env['LOG_LEVEL'] ?? 'info' });
 
@@ -43,7 +44,18 @@ async function main(): Promise<void> {
   const { startHealthcheckServer } = await import('./healthcheck-server');
   startHealthcheckServer();
 
-  log.info({ type, mockMode: process.env['MOCK_MODE'] }, 'Worker booting');
+  // C18-017 — cette ligne n'imprimait que `MOCK_MODE`, alors que `MOCK_SCRAPERS`
+  // le MASQUE. L'opérateur lisait donc `mockMode=false` sur un worker qui
+  // servait des fixtures. On imprime la DÉCISION, pas une des deux poignées.
+  log.info(
+    {
+      type,
+      mockScrapers: process.env['MOCK_SCRAPERS'] ?? null,
+      mockMode: process.env['MOCK_MODE'] ?? null,
+      simulacres: useMockScrapers(),
+    },
+    'Worker booting',
+  );
   await factory();
 }
 

@@ -21,16 +21,16 @@ return new class extends Migration
         DB::table('llm_use_cases')->updateOrInsert(
             ['workspace_id' => null, 'slug' => 'extract_journalists_from_page'],
             [
-                'description'      => 'Extraction journalistes (dir. publication / rédac chef / journalistes) depuis pages ours/mentions-légales',
+                'description' => 'Extraction journalistes (dir. publication / rédac chef / journalistes) depuis pages ours/mentions-légales',
                 'primary_provider' => 'mistral',
-                'model'            => 'mistral-small-latest',
-                'fallback_chain'   => '["mistral"]',
-                'prompt_version'   => 1,
-                'options'          => json_encode(['json' => true]),
-                'cost_cap_eur'     => 50,
-                'enabled'          => true,
-                'created_at'       => now(),
-                'updated_at'       => now(),
+                'model' => 'mistral-small-latest',
+                'fallback_chain' => '["mistral"]',
+                'prompt_version' => 1,
+                'options' => json_encode(['json' => true]),
+                'cost_cap_eur' => 50,
+                'enabled' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
         );
     }

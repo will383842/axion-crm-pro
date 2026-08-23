@@ -14,8 +14,17 @@ on:
       - '.github/workflows/build-postgres-image.yml'
 
 jobs:
+  # 🔴 F38-008 — plafonds anti-gel, poses le 2026-08-22. Aucun job de la
+  # chaine qualite n'avait de borne : sans elle un job herite du plafond
+  # GitHub de 6 h, et SIX executions etaient figees entre 1 h 28 et 2 h 25
+  # au moment de la mesure. Ce ne sont pas des budgets : ce sont des
+  # plafonds, poses tres au-dessus de la duree utile. Si un job legitime
+  # est tue, relever la borne EN CITANT la duree du run tue — jamais la
+  # retirer. Explication complete : .github/workflows/ci.yml, en-tete.
+  # Garde : backend/tests/Feature/Infra/WorkflowsBornesDeDureeTest.php
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 90  # F38-008 (compilation de PostGIS + pgvector + pg_partman)
     permissions:
       contents: read
       packages: write

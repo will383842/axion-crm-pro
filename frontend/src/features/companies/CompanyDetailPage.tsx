@@ -66,7 +66,16 @@ export function CompanyDetailPage() {
   });
 
   const enrichMut = useMutation({
-    mutationFn: async () => (await api.post(`/companies/${companyId}/enrich`)).data,
+    // H46-008 — le generique ferme le `any` que rendait `api.post` sans
+    // parametre ; la suppression `no-unsafe-return` correspondante a ete
+    // retiree de `frontend/eslint-suppressions.json` dans le meme geste.
+    //
+    // Mesure du 2026-08-22, `CompaniesController::enrich()` : la fiche est
+    // rendue A LA RACINE, `->fresh()->load('contacts')` et masquee — donc la
+    // MEME forme que la lecture ci-dessus. On reemploie `CompanyDetail` plutot
+    // que d'ecrire un second type parallele, qui divergerait a la premiere
+    // colonne ajoutee.
+    mutationFn: async () => (await api.post<CompanyDetail>(`/companies/${companyId}/enrich`)).data,
     onSuccess: () => {
       toast.success('Enrichissement lancé');
       qc.invalidateQueries({ queryKey: ['company', companyId] });

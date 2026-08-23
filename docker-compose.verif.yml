@@ -1,0 +1,214 @@
+# PILE DE VERIFICATION — montee le 2026-08-23, ENTIEREMENT separee de la pile
+# locale historique.
+#
+# POURQUOI. `docker inspect axion-crm-api` rend
+# `project.config_files = Axion-CRM-Pro/docker-compose.yml`, dont le service
+# `api` monte `./backend` : la pile locale sert donc la copie que le mandat de
+# l'audit 360 INTERDIT de toucher, figee sur `audit/360-p1-p2`, qui ne porte
+# AUCUN des 91 correctifs de la vague 2. Ouvrir les 39 ecrans dessus
+# reviendrait a auditer un produit d'avant le travail.
+#
+# ON NE REBRANCHE PAS LA PILE HISTORIQUE. Ses `container_name` sont FIXES : un
+# `up -f docker-compose.yml` depuis ce worktree reprendrait les MEMES
+# conteneurs, dont `axion-crm-postgres` — qui heberge `axion_crm_test`, la base
+# du banc de tests — et `axion-crm-caddy`, qui sert en ce moment le frontend a
+# d'autres sessions. Ce serait casser le travail des autres pour faire le sien.
+#
+# CE FICHIER NE PARTAGE RIEN AVEC ELLE : conteneurs `crmverif-*`, reseau
+# `axion-crm-verif`, volumes prefixes par le projet `crmverif`, ports
+# 8080/8443/55433/56380. Aucun conteneur en marche n'est touche.
+#
+# USAGE :
+#   docker compose -p crmverif -f docker-compose.verif.yml up -d
+#   docker compose -p crmverif -f docker-compose.verif.yml down     (sans -v : les donnees restent)
+
+x-journal: &journal
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '5'
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-ghcr.io/will383842/axion-crm-pro-postgres:16-3.5-vector-partman}
+    container_name: crmverif-postgres
+    logging: *journal
+    environment:
+      POSTGRES_DB: axion_crm
+      POSTGRES_USER: axion
+      POSTGRES_PASSWORD: axion_dev_only
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      # 127.0.0.1 EXPLICITE. Le constat du 19/08 est ne d'un `55432:5432` nu,
+      # qui publie sur 0.0.0.0 et passe DEVANT les regles ufw.
+      - "127.0.0.1:55433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U axion -d axion_crm"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [axion-crm-verif]
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: crmverif-redis
+    logging: *journal
+    command: >
+      redis-server --appendonly yes --save 60 1000
+      --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    ports:
+      - "127.0.0.1:56380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [axion-crm-verif]
+
+  api:
+    # 🔴 CONSTRUITE DEPUIS CE WORKTREE, et surtout PAS reprise telle quelle.
+    #
+    # Mesure du 2026-08-23 : l'image `axion-crm-pro-api:latest` deja presente
+    # sur cette machine demarre `php -S 0.0.0.0:80` — le serveur de
+    # DEVELOPPEMENT de PHP, un processus, une requete a la fois. C'est l'etat
+    # d'AVANT le correctif A-010 (S0), qui a fait passer l'API a php-fpm sur
+    # 9000. L'image est donc perimee exactement comme l'etait le Caddy vivant :
+    # la reprendre aurait mesure le produit d'avant l'audit, en croyant mesurer
+    # celui d'apres.
+    # Cible `prod` et NON `dev`. Mesure du 2026-08-23, et elle est brutale.
+    #
+    # La cible `dev` ne cuit pas le code : elle l'attend d'un montage lie, et
+    # elle DESACTIVE opcache (`opcache.enable=0`). Chaque requete re-parcourt
+    # donc l'arbre entier a travers le montage Docker Desktop Windows. Mesure :
+    # 13 944 fichiers dans `vendor`, 2 min 15 s pour les parcourir (~10 ms par
+    # fichier), et UN SEUL appel a `/up` a travers Caddy a mis 428 SECONDES.
+    # Ouvrir les 39 ecrans a la main dans ces conditions est hors de portee.
+    #
+    # `prod` cuit `backend/` dans l'image (`COPY backend/`), installe vendor
+    # avec `--no-dev`, active opcache avec `validate_timestamps=0`, et passe par
+    # `entrypoint-prod` qui construit les caches config/route/view avec
+    # l'environnement REEL au demarrage.
+    #
+    # Ce n'est pas qu'un gain de vitesse, c'est un gain de FIDELITE : le
+    # Caddyfile de cette pile le dit deja de l'origine unique — « le local doit
+    # RESSEMBLER a la production, sinon il ne prouve rien ». La meme regle vaut
+    # ici. Et le code cuit garantit que le conteneur sert EXACTEMENT l'arbre du
+    # worktree, sans montage qui pourrait deriver.
+    build:
+      context: .
+      dockerfile: Dockerfile.laravel
+      target: prod
+    image: crmverif-api:latest
+    container_name: crmverif-api
+    logging: *journal
+    env_file: .env
+    environment:
+      # 8080 et non 8443 : voir le long commentaire de `Caddyfile.verif`.
+      # Chrome refuse l'autorite interne de Caddy, et ni le magasin de
+      # certificats de Windows ni `thisisunsafe` ne se touchent sans arbitrage.
+      APP_URL: http://verif.localhost:8080
+      APP_ENV: local
+      APP_DEBUG: "true"
+      # 🔴 SEPTIEME VERROU DE MESURE, decouvert le 2026-08-23 (constat X39-023).
+      #
+      # Sans cette ligne, la session Postgres reste sur son defaut UTC pendant
+      # que Carbon vit a Paris (`APP_TIMEZONE`). Eloquent ecrit alors l'heure
+      # murale parisienne dans une colonne `timestamptz`, qui la relit comme de
+      # l'UTC : chaque horodatage part DEUX HEURES DANS LE FUTUR.
+      #
+      # Vu ROUGE sur cette pile meme, l'ecart etant rendu par Postgres :
+      #   postgres now()  : 09:46:17
+      #   created_at (UTC): 11:46:14      ecart = 01:59:56
+      #
+      # Le banc ne peut pas le voir : `phpunit.xml:100` et `phpunit-ci.xml:108`
+      # fournissent la variable, donc `HorodatagesFuseauTest` reste vert meme
+      # quand un deploiement, lui, ne l'a pas. Meme motif que l'APP_KEY
+      # ci-dessous : le verrou est invisible a toute la suite de tests.
+      DB_TIMEZONE: Europe/Paris
+      # 🔴 CINQUIEME VERROU DE CONNEXION — vu ROUGE le 2026-08-23.
+      #
+      # `APP_KEY` est VIDE dans les QUATRE fichiers : `.env:22` et
+      # `backend/.env:22`, dans ce worktree COMME dans la copie principale. Ce
+      # n'est pas une bizarrerie locale, c'est l'etat de toute installation.
+      # `backend/config/app.php:77` lit `env('APP_KEY')` ; sans clef, aucune
+      # session, aucun cookie chiffre, donc aucune connexion possible.
+      #
+      # LE BANC NE PEUT PAS LE VOIR : `backend/phpunit.xml:28` fournit la clef.
+      # Le verrou est donc invisible a toute la suite de tests, et c'est
+      # precisement pourquoi il a survecu a quatre autres verrous documentes.
+      #
+      # LA LONGUEUR N'EST PAS UN DETAIL. La clef posee ici le 2026-08-23 au
+      # matin faisait 38 octets une fois decodee ; aes-256-cbc en exige 32.
+      # Resultat mesure : `/up` rendait 500, et le journal disait
+      # « Unsupported cipher or incorrect key length » — 24 fois. Une clef
+      # presente mais mal dimensionnee echoue exactement comme une clef absente.
+      # Celle-ci fait 32 octets, verifies.
+      #
+      # Ce n'est pas un secret : pile locale, liee a 127.0.0.1, base jetable.
+      # Elle est ecrite en clair A DESSEIN, pour que la pile remonte a
+      # l'identique — une clef tiree au hasard invaliderait les sessions a
+      # chaque redemarrage.
+      APP_KEY: base64:ihRdBoEJDTugXzpD3SODaam/DjEgHLm8zr26MENxm8k=
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      # Le port fait partie de l'origine : le domaine « apatride » de Sanctum
+      # doit le porter, sinon la session n'est jamais reconnue.
+      SANCTUM_STATEFUL_DOMAINS: verif.localhost:8080,verif.localhost:8443,verif.localhost
+      SESSION_DOMAIN: ""
+      # V7 leve : sans ce drapeau, `EnsureCrmConsoleV2` rend 404 sur tout
+      # `/v1/crm/*` et quatre des 39 ecrans sont inatteignables meme connecte.
+      CRM_CONSOLE_V2_ENABLED: "true"
+    # AUCUN MONTAGE LIE — a dessein, et c'est ce qui rend cette pile utilisable.
+    #
+    # Le code est cuit dans l'image (voir `target: prod` ci-dessus). Deux
+    # consequences voulues : les requetes ne traversent plus le montage Windows
+    # (428 s -> voir la mesure), et l'interdiction du mandat de toucher a
+    # `Axion-CRM-Pro/backend` devient sans objet, puisque plus rien n'y est
+    # monte. Pour reprendre un correctif du worktree : rebatir l'image.
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    networks: [axion-crm-verif]
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      target: prod
+      args:
+        # ORIGINE NUE, sans `/api` : le client SPA ajoute lui-meme `/api/v1`.
+        VITE_API_BASE_URL: http://verif.localhost:8080
+    image: crmverif-app:latest
+    container_name: crmverif-app
+    logging: *journal
+    networks: [axion-crm-verif]
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: crmverif-caddy
+    logging: *journal
+    ports:
+      - "127.0.0.1:8080:80"
+      - "127.0.0.1:8443:443"
+    volumes:
+      - ./infra/caddy/Caddyfile.verif:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [api, app]
+    networks: [axion-crm-verif]
+
+networks:
+  axion-crm-verif:
+    name: axion-crm-verif
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  caddy-data:
+  caddy-config:

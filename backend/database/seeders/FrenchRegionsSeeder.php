@@ -41,9 +41,9 @@ class FrenchRegionsSeeder extends Seeder
                 ['code' => $code],
                 [
                     'country_code' => 'FR',
-                    'name'         => $name,
-                    'population'   => $population,
-                    'created_at'   => now(),
+                    'name' => $name,
+                    'population' => $population,
+                    'created_at' => now(),
                 ],
             );
         }
@@ -159,9 +159,9 @@ class FrenchRegionsSeeder extends Seeder
                 ['code' => $code],
                 [
                     'region_code' => $regionCode,
-                    'name'        => $name,
-                    'population'  => $population,
-                    'created_at'  => now(),
+                    'name' => $name,
+                    'population' => $population,
+                    'created_at' => now(),
                 ],
             );
         }

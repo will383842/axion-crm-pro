@@ -9,7 +9,11 @@ import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { CompaniesListPage } from '@/features/companies/CompaniesListPage';
 import { CompanyDetailPage } from '@/features/companies/CompanyDetailPage';
 import { RoumaniePage } from '@/features/international/RoumaniePage';
-import { ContactsListPage } from '@/features/contacts/ContactsListPage';
+// D22-005 — la route `/contacts` ne monte plus l'écran directement : elle passe
+// par `ContactsRoute`, qui redirige vers `/console/contacts` quand le drapeau
+// `console_v2` est ouvert. Sans cela, l'écran restait joignable par signet alors
+// que la barre latérale ne le montrait plus.
+import { ContactsRoute } from '@/features/contacts/ContactsRoute';
 import { MediaListPage } from '@/features/media/MediaListPage';
 import { MediaDetailPage } from '@/features/media/MediaDetailPage';
 import { JournalistsListPage } from '@/features/media/JournalistsListPage';
@@ -69,6 +73,21 @@ export const rootRoute = createRootRoute({
       <Outlet />
     </RouteErrorBoundary>
   ),
+  // D22-007 / D28-013 — l'écran « Page introuvable » existait, était importé,
+  // était livré dans le bundle… et ne s'est JAMAIS affiché. Il était branché sur
+  // une route `path: '/*'`, or le jeton fourre-tout de TanStack Router v1 est
+  // `$` et non `*` (`router-core/dist/esm/new-process-route-tree.js:53` ne teste
+  // que le code 36, `'$'`) : `'/*'` n'était qu'un segment STATIQUE nommé « * ».
+  // Une URL inconnue tombait donc sur l'écran par défaut de la librairie —
+  // `react-router/dist/esm/not-found.js:41`, un `<p>Not Found</p>` en anglais,
+  // sans un seul élément atteignable au clavier (mesure du 2026-08-22).
+  //
+  // `notFoundComponent` sur la racine plutôt que `path: '$'` : `Match.js:73`
+  // consulte cette option pour la route racine, et cette voie ne touche PAS
+  // l'appariement des routes — corriger le chemin en `'$'` aurait fait
+  // correspondre une vraie route fourre-tout, avec le risque de capter des URL
+  // qui tombaient jusque-là ailleurs.
+  notFoundComponent: NotFoundPage,
 });
 
 const layoutRoute = createRoute({
@@ -85,7 +104,7 @@ const passwordResetRoute = createRoute({ getParentRoute: () => rootRoute, path: 
 const dashboardRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/', component: DashboardPage });
 const companiesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/companies', component: CompaniesListPage });
 const companyDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/companies/$companyId', component: CompanyDetailPage });
-const contactsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/contacts', component: ContactsListPage });
+const contactsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/contacts', component: ContactsRoute });
 const roumanieRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/international/roumanie', component: RoumaniePage });
 const mediaRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/media', component: MediaListPage });
 const mediaDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/media/$mediaId', component: MediaDetailPage });
@@ -121,9 +140,13 @@ const consolePersonRoute = createRoute({ getParentRoute: () => layoutRoute, path
 const coldEmailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/cold-email', component: ColdEmailStub });
 const linkedInRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/linkedin', component: LinkedInStub });
 // F7 — `/crm` et `/analytics` retirés : les écrans bouchons portaient le
-// vocabulaire du chantier CRM cible. Ils tombent désormais sur `notFoundRoute`.
+// vocabulaire du chantier CRM cible. Ils tombent désormais sur l'écran
+// « Page introuvable » — ce qui n'est vrai que depuis D22-007 : jusque-là ils
+// tombaient sur le `<p>Not Found</p>` anglais de la librairie.
 
-const notFoundRoute = createRoute({ getParentRoute: () => rootRoute, path: '/*', component: NotFoundPage });
+// D22-007 / D28-013 — `notFoundRoute` (`path: '/*'`) est SUPPRIMÉE : elle
+// n'attrapait rien (voir `notFoundComponent` sur `rootRoute` ci-dessus) et sa
+// seule présence laissait croire le contraire à la lecture.
 
 export const routeTree = rootRoute.addChildren([
   loginRoute,
@@ -164,5 +187,4 @@ export const routeTree = rootRoute.addChildren([
     coldEmailRoute,
     linkedInRoute,
   ]),
-  notFoundRoute,
 ]);

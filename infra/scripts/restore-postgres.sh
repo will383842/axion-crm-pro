@@ -2,7 +2,10 @@
 # ============================================================================
 # Axion CRM Pro — Restore Postgres depuis dump produit par backup-postgres.sh
 # ============================================================================
-# Usage : bash restore-postgres.sh /path/to/axion_crm_YYYYMMDD.sql.gz [target_db]
+# Usage : bash restore-postgres.sh /path/to/axion_crm_YYYYMMDD.sql.gz <target_db>
+#         (la base cible est OBLIGATOIRE — cf. F39-010 plus bas)
+# Pour écraser la base de PRODUCTION, il faut EN PLUS :
+#         JE_RESTAURE_LA_PRODUCTION=oui bash restore-postgres.sh <archive> axion_crm
 #
 # L'archive contient, dans cet ordre :
 #   1) un préambule d'extensions DÉRIVÉ de `pg_extension` au moment du dump —
@@ -53,7 +56,26 @@
 set -euo pipefail
 
 DUMP_FILE="${1:-}"
-TARGET_DB="${2:-axion_crm}"
+
+# ── 🔴 F39-010 (S2) : PLUS AUCUN DÉFAUT SUR LA BASE CIBLE ───────────────────
+#
+# Mesure du 2026-08-22 : cette ligne donnait à la cible le DÉFAUT `axion_crm`,
+# et `axion_crm` EST la base de production (`docker-compose.yml:97`
+# `POSTGRES_DB: axion_crm`). La forme même écrite dans l'usage —
+# `bash restore-postgres.sh dump.sql.gz` — écrasait donc la production, sans
+# une question, sans un contrôle d'environnement. Un défaut commode vaut une
+# décision prise à la place de l'opérateur ; ici, la décision était
+# irréversible.
+#
+# On exige maintenant la cible EXPLICITEMENT. Le geste de trop est le geste qui
+# protège : personne n'écrase par distraction une base qu'il a dû nommer.
+TARGET_DB="${2:-}"
+
+# Le nom de la base à protéger. Variable, parce qu'un jour la production
+# pourrait ne plus s'appeler ainsi — mais alors le garde-fou doit SUIVRE, pas
+# disparaître.
+BASE_DE_PRODUCTION="${BASE_DE_PRODUCTION:-axion_crm}"
+
 DB_CONTAINER="${DB_CONTAINER:-axion-crm-postgres}"
 DB_USER="${DB_USER:-axion}"
 
@@ -71,9 +93,28 @@ DB_APP_USER="${DB_APP_USER:-axion_app}"
 MARQUEUR_GLOBALS_DEBUT="-- >>> AXION-GLOBALS-DEBUT"
 MARQUEUR_GLOBALS_FIN="-- >>> AXION-GLOBALS-FIN"
 
-if [ -z "$DUMP_FILE" ] || [ ! -f "$DUMP_FILE" ]; then
-    echo "Usage: $0 <dump_file.sql.gz> [target_db]" >&2
-    echo "Exemple : $0 /var/backups/axion-crm/axion_crm_20260517T020000Z.sql.gz" >&2
+if [ -z "$DUMP_FILE" ] || [ ! -f "$DUMP_FILE" ] || [ -z "$TARGET_DB" ]; then
+    echo "Usage: $0 <dump_file.sql.gz> <target_db>" >&2
+    echo "Exemple : $0 /var/backups/axion-crm/axion_crm_20260517T020000Z.sql.gz axion_crm_restore" >&2
+    echo "La base cible n'a PAS de valeur par defaut (F39-010) : elle valait" >&2
+    echo "'${BASE_DE_PRODUCTION}', la production, et ce script ECRASE ce qu'il vise." >&2
+    exit 1
+fi
+
+# ── 🔴 F39-010, second verrou : viser la PRODUCTION se déclare ──────────────
+#
+# Retirer le défaut empêche l'accident de distraction ; il n'empêche pas le
+# copier-coller d'une ligne de runbook. Écraser la base de production est un
+# geste légitime — c'est exactement ce que fait la reprise après sinistre
+# (`infra/runbooks/04-restore-dr.md` §4) — mais ce n'est jamais un geste
+# ordinaire. On demande donc qu'il soit ÉNONCÉ, pas coché.
+if [ "$TARGET_DB" = "$BASE_DE_PRODUCTION" ] && [ "${JE_RESTAURE_LA_PRODUCTION:-}" != "oui" ]; then
+    echo "❌ Cible = « ${TARGET_DB} », c'est-a-dire LA BASE DE PRODUCTION." >&2
+    echo "   Ce script l'ECRASE : les donnees actuelles seront perdues, sans retour." >&2
+    echo "   Si c'est bien ce que tu veux (reprise apres sinistre, cf." >&2
+    echo "   infra/runbooks/04-restore-dr.md §4), rejoue la commande ainsi :" >&2
+    echo "     JE_RESTAURE_LA_PRODUCTION=oui $0 $DUMP_FILE $TARGET_DB" >&2
+    echo "   Sinon, nomme une AUTRE base (ex: ${TARGET_DB}_restore) : elle sera creee." >&2
     exit 1
 fi
 

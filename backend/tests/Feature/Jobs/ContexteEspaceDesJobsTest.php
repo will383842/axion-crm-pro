@@ -374,6 +374,86 @@ function cejBalayerPhp(string $dossier): array
  * entier — une garde qui balaie le fichier entier trouve son motif dans un
  * COMMENTAIRE et se croit verte.
  */
+/**
+ * La source AMPUTEE DE SES COMMENTAIRES, numeros de ligne preserves.
+ *
+ * 🔴 Pourquoi. Le 2026-08-23, cette garde a designe comme fautif
+ * `MonitorCampaignProgressJob.php:60` — qui est une ligne de COMMENTAIRE
+ * expliquant que le re-dispatch « construit un `new self(...)` neuf ». Le
+ * balayage lisait la source brute : il comptait une phrase de francais comme
+ * un point de mise en file, et l'aurait comptee dans `$sitesVus` aussi, ce qui
+ * gonflait son propre temoin de couverture.
+ *
+ * Un commentaire ne met rien en file. Le meme geste est deja employe par la
+ * garde B10-016 (EffacementDouxPorteeAgent35Test) pour la meme raison.
+ */
+function cejSansCommentaires(string $source): string
+{
+    $plat = '';
+
+    foreach (token_get_all($source) as $jeton) {
+        if (is_array($jeton) && ($jeton[0] === T_COMMENT || $jeton[0] === T_DOC_COMMENT)) {
+            // On remplace le commentaire par ses seuls sauts de ligne : les
+            // numeros de ligne restent ceux du fichier reel.
+            $plat .= str_repeat('
+', substr_count($jeton[1], '
+'));
+
+            continue;
+        }
+
+        $plat .= is_array($jeton) ? $jeton[1] : $jeton;
+    }
+
+    return $plat;
+}
+
+/**
+ * Le job est-il construit dans une VARIABLE a qui l'espace est donne plus loin ?
+ *
+ * 🔴 Pourquoi. La garde ne regardait que la phrase du `new` — une seule
+ * instruction, jusqu'au premier `;`. Or le chemin d'echec de
+ * `MonitorCampaignProgressJob` (constat B17-011) s'ecrit en quatre temps :
+ *
+ *     $suivant = new self($this->campaignId);      // <- la phrase examinee
+ *     $suivant->echecsConsecutifs = $relance;
+ *     $espace = $this->espaceDuJob() ?? ...;       // l'espace se CHERCHE
+ *     dispatch($suivant->pourEspace($espace));     // <- et il est POSE ici
+ *
+ * L'espace est bel et bien nomme ; il l'est trois instructions plus loin,
+ * parce qu'il faut d'abord aller le chercher. Refuser cette forme obligerait a
+ * ecrire le code d'une facon qui plait a la garde plutot qu'a l'exploitant —
+ * exactement l'inverse de ce qu'une garde doit produire.
+ *
+ * On reste STRICT sur l'essentiel : c'est bien `->pourEspace(` sur CETTE
+ * variable-la qui est exige, et rien d'autre. Un `new self()` range dans une
+ * variable qu'on ne dote jamais d'un espace reste fautif.
+ */
+function cejEspacePoseSurLaVariable(string $source, int $posApresMotif): bool
+{
+    // Le debut de l'instruction : on remonte au `;`, `{` ou `}` precedent.
+    $debut = 0;
+    foreach ([';', '{', '}'] as $borne) {
+        $trouve = strrpos(substr($source, 0, $posApresMotif), $borne);
+        if ($trouve !== false && $trouve + 1 > $debut) {
+            $debut = $trouve + 1;
+        }
+    }
+
+    $avant = substr($source, $debut, $posApresMotif - $debut);
+
+    if (preg_match('/(\$[A-Za-z_][A-Za-z0-9_]*)\s*=\s*$/', preg_replace('/(new\s+\w+|\w+::dispatch)\s*\($/', '', trim($avant)) ?? '', $m) !== 1) {
+        return false;
+    }
+
+    // La variable doit recevoir son espace APRES sa construction, dans ce meme
+    // fichier. On borne a 2 000 caracteres : au-dela on n'est plus dans la
+    // meme methode, et un homonyme d'une autre methode ne prouverait rien.
+    $apres = substr($source, $posApresMotif, 2000);
+
+    return str_contains($apres, $m[1] . '->pourEspace(');
+}
+
 function cejPhrase(string $source, int $debut): string
 {
     $fin = strpos($source, ';', $debut);
@@ -509,7 +589,7 @@ test('ENUMERATION — tout point de mise en file nomme un espace', function () {
     $fautifs = [];
 
     foreach (cejFichiersApplicatifs() as $fichier) {
-        $source = (string) file_get_contents($fichier);
+        $source = cejSansCommentaires((string) file_get_contents($fichier));
         $relatif = str_replace(base_path() . DIRECTORY_SEPARATOR, '', $fichier);
 
         foreach ($catalogue as $classe => $_) {
@@ -537,7 +617,8 @@ test('ENUMERATION — tout point de mise en file nomme un espace', function () {
                     $sitesVus++;
 
                     $nommeUnEspace = str_contains($phrase, '->pourEspace(')
-                        || ($porteurDeSonEspace[$classe] && stripos($phrase, 'workspace') !== false);
+                        || ($porteurDeSonEspace[$classe] && stripos($phrase, 'workspace') !== false)
+                        || cejEspacePoseSurLaVariable($source, $pos);
 
                     if (! $nommeUnEspace) {
                         $ligne = substr_count(substr($source, 0, $pos), "\n") + 1;

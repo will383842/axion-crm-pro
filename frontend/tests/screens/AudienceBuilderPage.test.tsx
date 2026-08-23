@@ -231,3 +231,70 @@ describe('AudienceBuilderPage — parcours', () => {
     });
   });
 });
+
+/**
+ * D26-010 et D26-012 — LES BORNES DE SAISIE DE CET ÉCRAN.
+ *
+ * Mesures du 2026-08-22 :
+ *  - D26-012 : `register('name', { maxLength: { value: 120, message: 'Max 120
+ *    caractères' } })` était posé JUSTE À CÔTÉ de `maxLength={120}` en HTML.
+ *    L'attribut tronque à 120 : la règle ne pouvait pas rougir, et son message
+ *    était inatteignable par construction. Idem pour la description, dont la
+ *    règle n'avait même pas de message et dont le `Field` ne recevait aucune
+ *    prop `error`.
+ *  - D26-010 : ni compteur, ni texte d'aide, ni message devant ces deux bornes —
+ *    un collage de 700 caractères en laissait 500, sans que rien ne le dise.
+ *
+ * Le mécanisme retenu est l'attribut HTML (le retirer laisserait partir vers
+ * l'API une valeur plus longue que la colonne) ; la lisibilité vient du
+ * compteur, pas d'un message qui ne s'affiche jamais.
+ */
+describe('AudienceBuilderPage — bornes de saisie (D26-010 / D26-012)', () => {
+  it('affiche un compteur quand le nom approche sa borne', async () => {
+    const user = userEvent.setup();
+    await renderScreen(<AudienceBuilderPage />, { path: PATH, landingRoutes: LANDING });
+
+    const champ = screen.getByPlaceholderText(/PME Île-de-France IT/);
+    await user.type(champ, 'court');
+    expect(document.querySelector('[data-compteur-de-saisie]')).toBeNull();
+
+    await user.clear(champ);
+    await user.paste('x'.repeat(140));
+
+    const compteur = document.querySelector('[data-compteur-de-saisie]');
+    expect(
+      compteur !== null,
+      'D26-010 : aucun compteur devant `maxLength={120}` sur le nom de ' +
+        'l’audience. L’attribut HTML tronque un collage sans rien dire. ' +
+        'GESTE : rétablir le `<CompteurDeSaisie>` dans ' +
+        '`src/features/audiences/AudienceBuilderPage.tsx`.',
+    ).toBe(true);
+    expect(compteur?.textContent).toContain('/ 120');
+  });
+
+  it('ne double plus l’attribut HTML d’une règle react-hook-form morte', async () => {
+    // ⚠️ CETTE GARDE LIT LE SOURCE, et le dit. Une règle qui ne peut jamais se
+    // déclencher ne produit AUCUN effet observable à l'écran : il n'y a rien à
+    // mesurer au rendu, seulement une règle à ne pas réécrire.
+    const { readFileSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
+    const nodePath = await import('node:path');
+    const ici = nodePath.dirname(fileURLToPath(import.meta.url));
+    const source = readFileSync(
+      nodePath.resolve(ici, '../../src/features/audiences/AudienceBuilderPage.tsx'),
+      'utf8',
+    );
+
+    const reglesMortes = source.match(/register\([^)]*maxLength/g) ?? [];
+    expect(
+      reglesMortes.length,
+      `D26-012 : ${reglesMortes.length} règle(s) react-hook-form \`maxLength\` ` +
+        'sont revenues doubler l’attribut HTML du même champ. L’attribut tronque ' +
+        'AVANT la longueur qui déclencherait la règle : le message est ' +
+        'inatteignable par construction, et il donne l’illusion d’une validation. ' +
+        'GESTE : un seul mécanisme par champ — garder `maxLength={…}` en HTML et ' +
+        'retirer la règle de `register(...)` dans ' +
+        '`src/features/audiences/AudienceBuilderPage.tsx`.',
+    ).toBe(0);
+  });
+});

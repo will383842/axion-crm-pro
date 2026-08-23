@@ -49,6 +49,7 @@ class AudiencesFullRefreshCommand extends Command
         }
 
         $this->info("Done: {$ok} OK, {$failed} failed");
+
         return $failed === 0 ? self::SUCCESS : self::FAILURE;
     }
 }

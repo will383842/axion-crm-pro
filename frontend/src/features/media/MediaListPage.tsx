@@ -248,6 +248,7 @@ export function MediaListPage() {
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <SearchInput
+          label="Rechercher un média"
           value={filter.search}
           onChange={(v) => setFilterAndReset({ search: v })}
           placeholder="Rechercher un média…"

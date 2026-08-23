@@ -811,3 +811,78 @@ test('les fiches FRANÇAISES existantes gardent country_code FR et aucun tag pay
     // `pays-fr` serait un tag universel sur 4,29 M de fiches : sans pouvoir de tri.
     expect($slugs)->not->toContain('pays-fr');
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// C18-002 — UNE PERSONNE ÉCARTÉE EST COMPTÉE, ET SON MOTIF EST DIT
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('C18-002 — une personne sans nom de famille est COMPTÉE comme écartée, avec son motif', function () {
+    // 🔴 CE QUI SE PASSAIT AVANT, ET POURQUOI PERSONNE NE LE VOYAIT.
+    //
+    // `upsertContact()` rend `skipped` quand la personne n'a pas de nom de
+    // famille — et le `match` de l'ingestion faisait tomber ce cas dans un
+    // `default => null`. La personne disparaissait donc entre le message et le
+    // rapport SANS QU'UN SEUL CHIFFRE NE BOUGE : contacts_created = 0,
+    // contacts_updated = 0, persons_skipped_opt_out = 0, emails_rejected_mx = 0.
+    // Un run « created » avec zéro contact était indiscernable d'un run qui
+    // n'apportait aucune personne.
+    //
+    // Une garde qui ne compterait que les contacts POSÉS resterait aveugle à la
+    // récidive : elle serait verte dans les deux cas. C'est le COMPTEUR
+    // D'ÉCARTÉS qu'il faut lire, et son MOTIF.
+    $outcome = ingestScrape(scrapedRecord([
+        'persons' => [[
+            'first_name' => 'Sans',
+            'last_name' => null,
+            'email' => 'sans-nom@zz-scrape.example.invalid',
+            'kind' => 'person',
+        ]],
+    ]));
+
+    expect($outcome->contactsCreated)->toBe(0, 'Le banc ne mesure rien : la personne a été créée, elle ne devait pas l être.');
+
+    expect($outcome->personsSkipped)->toBe(
+        ['skipped_no_last_name' => 1],
+        'La personne collectée a été écartée SANS être comptée : elle disparaît en silence du rapport '
+        . "d'ingestion (constat C18-002). Geste : compter la branche `skipped_*` dans le `match` de "
+        . '`ScrapedRecordIngestService::apply()` (le `default` est un fourre-tout volontaire) et la '
+        . 'passer à `ScrapeIngestOutcome::$personsSkipped`.',
+    );
+
+    // Le rapport JOURNALISÉ (scraper_runs.response_payload, lu par le worker et
+    // par la page des runs) doit porter le chiffre, pas seulement l'objet PHP :
+    // c'est là que l'exploitant le lit.
+    $paye = $outcome->toArray();
+    expect($paye['persons_skipped'] ?? null)->toBe(
+        1,
+        'Le compteur existe en mémoire mais pas dans `toArray()` : `scraper_runs.response_payload` '
+        . "reste muet, et l'exploitant n'a toujours aucun moyen de voir la perte. Geste : exposer "
+        . '`persons_skipped` + `persons_skipped_reasons` dans `ScrapeIngestOutcome::toArray()`.',
+    );
+    expect($paye['persons_skipped_reasons'] ?? null)->toBe(
+        ['skipped_no_last_name' => 1],
+        'Le total est là mais pas le motif. Agrégé, « 1 personne écartée » ne dit pas s il faut '
+        . 'corriger le collecteur ou se réjouir : les deux gestes sont opposés (constat C18-002).',
+    );
+});
+
+test('C18-002 — un re-scrape qui n apporte RIEN est compté sous son propre motif, pas confondu avec une perte', function () {
+    // Le même message rejoué (run_id neuf, contenu identique) : la fiche existe,
+    // rien de nouveau à écrire. C'est la marche NORMALE d'une re-collecte — et
+    // c'est précisément pour cela que le compteur est ventilé par motif :
+    // confondre ce cas avec « le collecteur ramène des personnes sans nom »
+    // ferait tirer la mauvaise sonnette.
+    ingestScrape(scrapedRecord());
+    $second = ingestScrape(scrapedRecord());
+
+    expect($second->personsSkipped)->toBe(
+        ['skipped_no_change' => 1],
+        "Le re-scrape sans apport n'est pas compté sous `skipped_no_change` : soit la branche a "
+        . 'disparu du `match`, soit les motifs ont été ré-agrégés en un seul compteur. Geste : garder '
+        . 'les trois retours distincts de `upsertContact()` (constat C18-002).',
+    );
+    expect($second->contactsCreated + $second->contactsUpdated)->toBe(
+        0,
+        'Le re-scrape a écrit : la mesure ci-dessus ne porte plus sur le cas « rien à apporter ».',
+    );
+});

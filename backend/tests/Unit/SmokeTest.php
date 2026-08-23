@@ -5,7 +5,7 @@ use App\Data\LLM\LLMResponseData;
 use App\Services\LLM\Mocks\MockLLMClient;
 
 test('mock LLM client returns a generic response for known use case', function () {
-    $client = new MockLLMClient();
+    $client = new MockLLMClient;
     $resp = $client->complete(new LLMRequestData(useCaseSlug: 'classify_company_axion'));
 
     expect($resp)->toBeInstanceOf(LLMResponseData::class);

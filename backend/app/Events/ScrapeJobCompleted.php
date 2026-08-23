@@ -38,12 +38,12 @@ class ScrapeJobCompleted implements ShouldBroadcast
     public function broadcastWith(): array
     {
         return [
-            'scraper_run_id'    => $this->scraperRunId,
-            'status'            => $this->status,
+            'scraper_run_id' => $this->scraperRunId,
+            'status' => $this->status,
             'companies_created' => $this->companiesCreated,
             'companies_updated' => $this->companiesUpdated,
-            'error_message'     => $this->errorMessage,
-            'occurred_at'       => now()->toIso8601String(),
+            'error_message' => $this->errorMessage,
+            'occurred_at' => now()->toIso8601String(),
         ];
     }
 }

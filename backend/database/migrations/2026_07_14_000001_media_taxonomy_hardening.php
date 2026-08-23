@@ -70,7 +70,7 @@ return new class extends Migration
         DB::statement("ALTER TABLE media ADD CONSTRAINT media_media_type_check CHECK (media_type IN ({$allowed})) NOT VALID");
         try {
             DB::statement('ALTER TABLE media VALIDATE CONSTRAINT media_media_type_check');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Une valeur media_type hors taxonomie traîne en base : on garde la
             // contrainte NOT VALID (elle protège les futures écritures) sans faire
             // échouer la migration. À nettoyer via un correctif de données dédié.

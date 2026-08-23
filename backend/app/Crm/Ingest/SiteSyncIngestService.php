@@ -6,6 +6,7 @@ use App\Crm\Taxonomy;
 use App\Support\WorkspaceContext;
 use Database\Seeders\GovernedTagsSeeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * FUNNEL D'INGESTION UNIQUE des événements du site (lot L2).
@@ -119,8 +120,9 @@ final class SiteSyncIngestService
             : $this->upsertBusiness($event, $workspaceId);
 
         $tags = [];
+        $tagsIgnores = [];
         if ($subjectId !== null && $subjectType !== null) {
-            $tags = $this->attachTags($event, $workspaceId, $subjectType, $subjectId);
+            [$tags, $tagsIgnores] = $this->attachTags($event, $workspaceId, $subjectType, $subjectId);
         }
 
         if ($this->isOppositionEvent($event)) {
@@ -135,6 +137,7 @@ final class SiteSyncIngestService
             subjectId: $subjectId,
             activityId: $activityId,
             tags: $tags,
+            tagsIgnores: $tagsIgnores,
         );
     }
 
@@ -375,15 +378,39 @@ final class SiteSyncIngestService
     // ── Tags, opposition, timeline ──────────────────────────────────────────
 
     /**
-     * @return list<string>
+     * @return array{0: list<string>, 1: list<string>} [tags posés, slugs écartés]
      */
     private function attachTags(SiteSyncEvent $event, string $workspaceId, string $subjectType, int $subjectId): array
     {
         $attached = [];
+        $ignores = [];
 
         foreach ($this->classifier->tags($event) as $slug) {
             $tagId = $this->resolveTagId($workspaceId, $slug);
             if ($tagId === null) {
+                // B13-005 — CE `continue` ÉTAIT NU, ET C'EST TOUT LE DÉFAUT.
+                //
+                // Le slug écarté n'était ni journalisé ni rendu : l'événement
+                // repartait en 200 avec un tag de provenance en moins, et le
+                // site n'avait AUCUN moyen de compter ses pertes. Le cas est
+                // atteignable en vrai — `source_slug` est libre côté site, et le
+                // classifieur en fait `src:<valeur>`, un namespace gouverné dont
+                // la valeur n'est pas forcément au référentiel.
+                //
+                // On ne crée toujours rien à la volée (une ingestion ne doit pas
+                // pouvoir polluer le référentiel gouverné). On le DIT, et à deux
+                // endroits : le journal, pour l'exploitant qui cherche pourquoi
+                // un segment est vide, et la réponse, pour le site qui peut
+                // alors corriger sa source au lieu de la deviner.
+                $ignores[] = $slug;
+                Log::notice('crm.ingest.tag_ignore', [
+                    'slug' => $slug,
+                    'event_id' => $event->eventId,
+                    'workspace_id' => $workspaceId,
+                    'subject_type' => $subjectType,
+                    'subject_id' => $subjectId,
+                ]);
+
                 continue;
             }
 
@@ -401,7 +428,7 @@ final class SiteSyncIngestService
             $attached[] = $slug;
         }
 
-        return $attached;
+        return [$attached, $ignores];
     }
 
     /**

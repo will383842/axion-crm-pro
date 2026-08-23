@@ -106,6 +106,12 @@ function ssrfCompletudeInstructions(string $source): array
 
     foreach (token_get_all($source) as $jeton) {
         if (is_array($jeton)) {
+            // Un commentaire n'emet aucune requete : il ne doit ni former une
+            // instruction, ni en teinter une. Meme raison que
+            // `ssrfCompletudeSansCommentaires()`, sur le jumeau de ce balayage.
+            if ($jeton[0] === T_COMMENT || $jeton[0] === T_DOC_COMMENT) {
+                continue;
+            }
             if (trim($courant) === '') {
                 $ligne = $jeton[2];
             }
@@ -367,11 +373,52 @@ function ssrfCompletudeFichiers(): array
 }
 
 /** @return list<string> ceux d'entre eux qui savent emettre du HTTP */
+/**
+ * La source AMPUTEE DE SES COMMENTAIRES.
+ *
+ * 🔴 Pourquoi, mesure du 2026-08-23. `ssrfCompletudeEmetteurs()` faisait un
+ * `preg_match` sur la source BRUTE. Elle a donc designe comme « nouvel emetteur
+ * HTTP jamais examine pour SSRF » le fichier
+ * `app/Services/Proxies/VerificationTlsSonde.php` — qui est un TRAIT n'emettant
+ * rien du tout : il rend un booleen et journalise. Ce qui a declenche la
+ * signature, c'est son commentaire d'en-tete, qui CITE l'appel fautif qu'il
+ * repare (`Http::withOptions([... 'verify' => false])`).
+ *
+ * Un commentaire n'emet aucune requete. Le laisser compter, c'est fabriquer un
+ * rouge sur du texte et, pire, faire entrer dans l'inventaire des « emetteurs a
+ * verifier » un fichier qui n'en est pas un — l'inventaire perdrait son sens.
+ *
+ * C'est le SECOND site du meme defaut trouve ce jour-la ; l'autre est
+ * `ContexteEspaceDesJobsTest`, qui lisait « construit un `new self(...)` neuf »
+ * dans un commentaire comme un point de mise en file. Le patron A-011 de ce
+ * depot joue aussi entre gardes : on porte donc le correctif sur les deux.
+ */
+function ssrfCompletudeSansCommentaires(string $source): string
+{
+    $plat = '';
+
+    foreach (token_get_all($source) as $jeton) {
+        if (is_array($jeton) && ($jeton[0] === T_COMMENT || $jeton[0] === T_DOC_COMMENT)) {
+            // Seuls les sauts de ligne sont conserves : les numeros de ligne
+            // restent ceux du fichier reel.
+            $plat .= str_repeat('
+', substr_count($jeton[1], '
+'));
+
+            continue;
+        }
+
+        $plat .= is_array($jeton) ? $jeton[1] : $jeton;
+    }
+
+    return $plat;
+}
+
 function ssrfCompletudeEmetteurs(): array
 {
     $emetteurs = [];
     foreach (ssrfCompletudeFichiers() as $relatif) {
-        $source = (string) file_get_contents(base_path($relatif));
+        $source = ssrfCompletudeSansCommentaires((string) file_get_contents(base_path($relatif)));
         if (preg_match(SSRF_SIGNATURES_EMETTEUR, $source)) {
             $emetteurs[] = $relatif;
         }
@@ -647,7 +694,18 @@ test('C19-001 — l inventaire des emetteurs HTTP est a jour', function () {
         'app/Services/FranceTravail/FranceTravailDiscoveryClient.php',
         'app/Services/FranceTravail/HttpFranceTravailClient.php',
         'app/Services/Http/ProxiedHttpClient.php',
-        'app/Services/Http/SsrfGuard.php',
+        // RETIRE le 2026-08-23, apres mesure, et surtout pas machinalement.
+        // Ce fichier n'y figurait QUE par ses commentaires : les quatre
+        // occurrences de la signature (`Http::`, `GuzzleHttp`, `ProxiedHttpClient`)
+        // sont, aux lignes 25, 90, 164 et 187, des explications — jamais du code.
+        // Mesure faite en amputant le fichier de ses commentaires : il ne reste
+        // AUCUNE emission HTTP, seulement deux `dns_get_record`, qui sont la
+        // resolution meme dont ce garde-fou a besoin pour juger un hote.
+        //
+        // Et c'est coherent : `SsrfGuard` n'est pas un emetteur a examiner, c'est
+        // ce qui EXAMINE les emetteurs. L'y garder revenait a demander au juge de
+        // comparaitre. Sa propre couverture est ailleurs : `tests/Unit/Http/`
+        // et, cote collecte, `workers/tests/ssrf-guard{,-dns}.test.ts`.
         'app/Services/Insee/HttpInseeClient.php',
         'app/Services/LLM/Providers/AnthropicProvider.php',
         'app/Services/LLM/Providers/GroqProvider.php',

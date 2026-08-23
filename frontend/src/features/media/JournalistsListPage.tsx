@@ -103,7 +103,7 @@ export function JournalistsListPage() {
       </div>
 
       <div className="mb-4 flex items-center gap-2">
-        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Rechercher par nom…" className="w-72" />
+        <SearchInput label="Rechercher un journaliste par nom" value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Rechercher par nom…" className="w-72" />
       </div>
 
       {isLoading ? (

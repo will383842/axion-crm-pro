@@ -1,7 +1,46 @@
 import { useEffect, useState, type ReactElement } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import Joyride, { STATUS, type CallBackProps, type Step } from 'react-joyride';
+import Joyride, { EVENTS, STATUS, type CallBackProps, type Step } from 'react-joyride';
 import { api } from '@/lib/api';
+
+/**
+ * D23-010 — DÉPLIE LA SECTION QUI PORTE LA CIBLE D'UNE ÉTAPE.
+ *
+ * Le défaut, mesuré le 2026-08-22 : la visite compte SEPT étapes, dont deux
+ * visent des entrées de la barre latérale (`nav-companies`, `nav-settings`).
+ * Or la barre n'ouvre QU'UNE section à la fois et masque les listes des autres
+ * (`Sidebar.tsx` : `<ul className={… !deplie && 'hidden'}>`). Au premier
+ * démarrage l'utilisateur est sur `/`, donc seule « Aujourd'hui » est ouverte :
+ * les deux étapes visaient des éléments masqués — CINQ étapes sur sept
+ * s'affichaient réellement.
+ *
+ * POURQUOI PAR LE DOM, et non par un magasin partagé : la section ouverte est un
+ * état local de `Sidebar`. L'exposer pour qu'un autre composant l'ÉCRIVE, c'est
+ * risquer de refermer la section que l'utilisateur venait d'ouvrir et de laisser
+ * la barre dans un état différent d'avant la visite. Ici on n'écrit rien : on
+ * actionne l'accordéon par son propre bouton, exactement comme l'utilisateur le
+ * ferait — `Sidebar` reste seul maître de son état.
+ *
+ * ⚠️ AUCUNE TABLE DE CORRESPONDANCE cible → section n'est écrite ici : elle
+ * ferait doublon avec `Sidebar.tsx` et divergerait à la première section
+ * ajoutée. Le lien est LU dans le DOM — de la cible à sa liste, de la liste au
+ * bouton qui la commande (`aria-controls`).
+ */
+export function ouvrirSectionDeLaCible(selecteurDeCible: string): void {
+  if (typeof document === 'undefined') return;
+
+  const cible = document.querySelector(selecteurDeCible);
+  // Une liste repliée reste dans le DOM (`hidden` = `display:none`) : on la
+  // trouve donc, et c'est précisément ce qui permet de la déplier avant l'étape.
+  const liste = cible?.closest('ul[id^="nav-section-"]');
+  if (liste === null || liste === undefined) return;
+
+  const bouton = document.querySelector<HTMLButtonElement>(`button[aria-controls="${liste.id}"]`);
+  // Déjà ouverte : ne surtout pas cliquer, cela la REFERMERAIT.
+  if (bouton === null || bouton.getAttribute('aria-expanded') === 'true') return;
+
+  bouton.click();
+}
 
 interface AuthMeResponse {
   user: {
@@ -107,10 +146,29 @@ export function OnboardingTour(): ReactElement | null {
   }, [isSuccess, data]);
 
   const handleCallback = (props: CallBackProps): void => {
-    const { status } = props;
+    const { status, type, step } = props;
+
+    // D23-010 — AVANT d'afficher l'étape, on déplie la section qui porte sa
+    // cible. `EVENTS.TARGET_NOT_FOUND` est traité aussi : si Joyride a déjà
+    // conclu à l'absence, déplier maintenant remet l'élément à l'écran pour le
+    // retour arrière et pour la relecture de la visite.
+    const typeDEvenement: string = type;
+    if (
+      (typeDEvenement === EVENTS.STEP_BEFORE || typeDEvenement === EVENTS.TARGET_NOT_FOUND) &&
+      typeof step?.target === 'string'
+    ) {
+      ouvrirSectionDeLaCible(step.target);
+    }
+
     const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED];
     if (finishedStatuses.includes(status)) {
       setRun(false);
+      // ⚠️ RESTE OUVERT, et c'est une décision qui n'est pas technique : le
+      // constat D23-010 demandait aussi de REFUSER de marquer la visite faite
+      // quand une cible a manqué. Tel quel, ce refus rejouerait la visite à
+      // chaque connexion, sans jamais rien réparer — on remplacerait une visite
+      // tronquée par une visite inévitable. Le sort d'une visite tronquée
+      // (rejouer ? proposer ? renoncer ?) revient à Will.
       completeMutation.mutate();
     }
   };

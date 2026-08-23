@@ -9,7 +9,9 @@ export { cn } from './cn';
 // Foundation primitives
 export { Button, type ButtonProps, type ButtonVariant, type ButtonSize } from './Button';
 export { IconButton, type IconButtonProps } from './IconButton';
-export { Card, CardHeader, CardTitle, CardEyebrow, CardFooter, type CardProps } from './Card';
+// D27-001 — `CardFooter` ne figure plus ici : il n'a jamais eu d'appelant
+// (mesure du 2026-08-22). La raison du retrait est ecrite dans `Card.tsx`.
+export { Card, CardHeader, CardTitle, CardEyebrow, type CardProps } from './Card';
 export { KpiCard, type KpiCardProps, type KpiTone } from './KpiCard';
 export { SegmentedControl, type SegOption } from './SegmentedControl';
 export { StatusPill, mapStatusToTone, type StatusPillProps, type StatusTone } from './StatusPill';
@@ -34,6 +36,8 @@ export { Toolbar, SearchInput } from './Toolbar';
 export { Avatar } from './Avatar';
 export { Stat } from './Stat';
 export { Input, type InputProps } from './Input';
+// D26-010 — le compteur qui rend visible une troncature jusque-là silencieuse.
+export { CompteurDeSaisie, type CompteurDeSaisieProps } from './CompteurDeSaisie';
 
 // Legacy / existing (backwards compat)
 export { PageShell, type PageShellProps } from './PageShell';

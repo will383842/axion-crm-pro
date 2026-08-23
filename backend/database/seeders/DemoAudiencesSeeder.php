@@ -17,14 +17,15 @@ class DemoAudiencesSeeder extends Seeder
         $workspaces = Workspace::query()->get();
         if ($workspaces->isEmpty()) {
             $this->command->warn('No workspaces found, skipping demo audiences.');
+
             return;
         }
 
         $demos = [
             [
-                'name'        => 'PME IT Île-de-France',
+                'name' => 'PME IT Île-de-France',
                 'description' => 'PME et ETI tech qualifiées dans la région IDF, status ready_for_outreach.',
-                'criteria'    => [
+                'criteria' => [
                     'all' => [
                         ['field' => 'prospection_status', 'op' => 'in', 'value' => ['ready_for_outreach']],
                         ['field' => 'size_category', 'op' => 'in', 'value' => ['pme', 'eti']],
@@ -34,9 +35,9 @@ class DemoAudiencesSeeder extends Seeder
                 ],
             ],
             [
-                'name'        => 'TPE Sud-Ouest tous secteurs',
+                'name' => 'TPE Sud-Ouest tous secteurs',
                 'description' => 'TPE de Nouvelle-Aquitaine, status prêts ou partiels.',
-                'criteria'    => [
+                'criteria' => [
                     'all' => [
                         ['field' => 'prospection_status', 'op' => 'in', 'value' => ['ready_for_outreach', 'partial_email']],
                         ['field' => 'size_category', 'op' => 'eq', 'value' => 'tpe'],
@@ -45,9 +46,9 @@ class DemoAudiencesSeeder extends Seeder
                 ],
             ],
             [
-                'name'        => 'Grandes entreprises France entière',
+                'name' => 'Grandes entreprises France entière',
                 'description' => 'ETI et grandes entreprises prospectables, toutes régions.',
-                'criteria'    => [
+                'criteria' => [
                     'all' => [
                         ['field' => 'size_category', 'op' => 'in', 'value' => ['eti', 'grande']],
                         ['field' => 'prospection_status', 'op' => 'eq', 'value' => 'ready_for_outreach'],
@@ -55,9 +56,9 @@ class DemoAudiencesSeeder extends Seeder
                 ],
             ],
             [
-                'name'        => 'À tester (qualité moyenne)',
+                'name' => 'À tester (qualité moyenne)',
                 'description' => 'Entreprises de qualité moyenne pour validation manuelle.',
-                'criteria'    => [
+                'criteria' => [
                     'all' => [
                         ['field' => 'quality_score', 'op' => 'gte', 'value' => 40],
                         ['field' => 'quality_score', 'op' => 'lt', 'value' => 70],
@@ -73,12 +74,12 @@ class DemoAudiencesSeeder extends Seeder
                 $audience = EmailAudience::firstOrCreate(
                     [
                         'workspace_id' => $workspace->id,
-                        'name'         => $demo['name'],
+                        'name' => $demo['name'],
                     ],
                     [
-                        'description'  => $demo['description'],
-                        'criteria'     => $demo['criteria'],
-                        'is_active'    => true,
+                        'description' => $demo['description'],
+                        'criteria' => $demo['criteria'],
+                        'is_active' => true,
                         'auto_refresh' => true,
                         'member_count' => 0,
                     ],

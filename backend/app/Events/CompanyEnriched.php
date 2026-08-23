@@ -36,11 +36,11 @@ class CompanyEnriched implements ShouldBroadcast
     public function broadcastWith(): array
     {
         return [
-            'company_id'        => $this->companyId,
-            'company_name'      => $this->companyName,
+            'company_id' => $this->companyId,
+            'company_name' => $this->companyName,
             'new_quality_score' => $this->newQualityScore,
-            'fields_enriched'   => $this->fieldsEnriched,
-            'occurred_at'       => now()->toIso8601String(),
+            'fields_enriched' => $this->fieldsEnriched,
+            'occurred_at' => now()->toIso8601String(),
         ];
     }
 }

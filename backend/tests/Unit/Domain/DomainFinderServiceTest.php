@@ -10,7 +10,7 @@ it('returns signals.legal.siteweb when present', function () {
     $company = new Company(['denomination' => 'Acme SA', 'city_name' => 'Paris']);
     $company->signals = ['legal' => ['siteweb' => 'https://www.acme.fr/about']];
 
-    $service = new DomainFinderService();
+    $service = new DomainFinderService;
     $url = $service->find($company);
 
     expect($url)->toBe('https://acme.fr/');
@@ -30,7 +30,7 @@ it('returns first non-blacklist URL from Brave Search', function () {
     ]);
     $company = new Company(['denomination' => 'Target SA', 'city_name' => 'Lyon']);
 
-    $service = new DomainFinderService();
+    $service = new DomainFinderService;
     expect($service->find($company))->toBe('https://target.fr/');
 });
 
@@ -40,12 +40,12 @@ it('falls back to Pages Jaunes when MOCK_SCRAPERS=false and Brave empty', functi
     Http::fake([
         'www.pagesjaunes.fr/recherche/*' => Http::response(
             '<a class="company-website" href="https://www.realsite.fr/">site</a>',
-            200
+            200,
         ),
     ]);
     $company = new Company(['denomination' => 'RealCo', 'city_name' => 'Marseille']);
 
-    $service = new DomainFinderService();
+    $service = new DomainFinderService;
     expect($service->find($company))->toBe('https://realsite.fr/');
 });
 
@@ -55,7 +55,7 @@ it('skips Pages Jaunes when MOCK_SCRAPERS=true', function () {
     Http::preventStrayRequests();
     $company = new Company(['denomination' => 'GhostCo', 'city_name' => 'Lille']);
 
-    $service = new DomainFinderService();
+    $service = new DomainFinderService;
     expect($service->find($company))->toBeNull();
 });
 
@@ -65,13 +65,13 @@ it('returns null when Brave key absent and PJ scrapers disabled', function () {
     Http::preventStrayRequests();
     $company = new Company(['denomination' => 'GhostCo', 'city_name' => 'Lille']);
 
-    $service = new DomainFinderService();
+    $service = new DomainFinderService;
     expect($service->find($company))->toBeNull();
 });
 
 it('returns null when denomination missing', function () {
     $company = new Company([]);
-    $service = new DomainFinderService();
+    $service = new DomainFinderService;
     expect($service->find($company))->toBeNull();
 });
 
@@ -86,7 +86,7 @@ function candidateDomains(array $tokens, bool $extended): array
     $ref = new ReflectionMethod(DomainFinderService::class, 'candidateDomains');
     $ref->setAccessible(true);
 
-    return $ref->invoke(new DomainFinderService(), $tokens, $extended);
+    return $ref->invoke(new DomainFinderService, $tokens, $extended);
 }
 
 it('pass 1 candidates = 4 variantes prioritaires', function () {

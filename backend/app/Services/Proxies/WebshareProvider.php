@@ -13,6 +13,10 @@ use Illuminate\Support\Facades\Http;
  */
 class WebshareProvider implements ProxyProvider
 {
+    // C19-011 : la decision « verifie-t-on le certificat de la sonde ? » vit dans
+    // le trait, pas ici — sinon les deux fournisseurs divergent.
+    use VerificationTlsSonde;
+
     private const API_BASE = 'https://proxy.webshare.io/api/v2';
 
     /** @return list<ProxyEndpointData> */
@@ -27,7 +31,7 @@ class WebshareProvider implements ProxyProvider
             $resp = Http::withHeaders(['Authorization' => "Token {$apiKey}"])
                 ->timeout(15)
                 ->get(self::API_BASE . '/proxy/list/', [
-                    'mode'      => 'direct',
+                    'mode' => 'direct',
                     'page_size' => 100,
                     'country_code__in' => $this->zoneToCountries($zone),
                 ]);
@@ -40,16 +44,17 @@ class WebshareProvider implements ProxyProvider
             foreach ($resp->json('results', []) as $row) {
                 $endpoints[] = new ProxyEndpointData(
                     provider: 'webshare',
-                    type:     'datacenter',
-                    zone:     $zone,
-                    host:     (string) ($row['proxy_address'] ?? ''),
-                    port:     (int) ($row['port'] ?? 0),
+                    type: 'datacenter',
+                    zone: $zone,
+                    host: (string) ($row['proxy_address'] ?? ''),
+                    port: (int) ($row['port'] ?? 0),
                     username: (string) ($row['username'] ?? '') ?: null,
                     password: (string) ($row['password'] ?? '') ?: null,
-                    weight:   1,
-                    isHealthy:(bool) ($row['valid'] ?? true),
+                    weight: 1,
+                    isHealthy: (bool) ($row['valid'] ?? true),
                 );
             }
+
             return $endpoints;
         });
     }
@@ -61,15 +66,23 @@ class WebshareProvider implements ProxyProvider
         if (empty($list)) {
             throw new \RuntimeException('No healthy Webshare endpoint for zone ' . $zone);
         }
+
         return $list[array_rand($list)];
     }
 
     public function healthCheck(ProxyEndpointData $endpoint): bool
     {
         try {
-            $resp = Http::withOptions(['proxy' => $endpoint->toProxyUrl(), 'verify' => false])
+            // C19-011 : `'verify' => false` en dur rendait cette sonde incapable
+            // de distinguer `api.ipify.org` d'un mandataire qui se fait passer
+            // pour lui. Voir `VerificationTlsSonde` pour le pourquoi complet.
+            $resp = Http::withOptions([
+                'proxy' => $endpoint->toProxyUrl(),
+                'verify' => $this->verifierTlsDeLaSonde('webshare', $endpoint),
+            ])
                 ->timeout(10)
                 ->get('https://api.ipify.org?format=json');
+
             return $resp->ok() && filter_var($resp->json('ip'), FILTER_VALIDATE_IP) !== false;
         } catch (\Throwable) {
             return false;
@@ -79,8 +92,8 @@ class WebshareProvider implements ProxyProvider
     private function zoneToCountries(string $zone): string
     {
         return match ($zone) {
-            'fr'    => 'FR',
-            'eu'    => 'FR,DE,NL,BE,IT,ES,PL,SE,FI,DK,IE',
+            'fr' => 'FR',
+            'eu' => 'FR,DE,NL,BE,IT,ES,PL,SE,FI,DK,IE',
             default => '',
         };
     }

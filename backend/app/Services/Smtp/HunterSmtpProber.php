@@ -34,14 +34,14 @@ class HunterSmtpProber implements SmtpProber
         $result = $this->verifier->verify($email);
 
         $status = (string) ($result['status'] ?? 'unknown');
-        $score  = (int) ($result['score'] ?? 0);
+        $score = (int) ($result['score'] ?? 0);
 
         $mapped = match ($status) {
-            'deliverable'             => 'valid',
-            'undeliverable', 'invalid'=> 'invalid',
-            'risky', 'accept_all'     => 'catchall',
-            'disposable'              => 'disposable',
-            default                   => 'unknown',
+            'deliverable' => 'valid',
+            'undeliverable', 'invalid' => 'invalid',
+            'risky', 'accept_all' => 'catchall',
+            'disposable' => 'disposable',
+            default => 'unknown',
         };
 
         return new SmtpProbeResult(

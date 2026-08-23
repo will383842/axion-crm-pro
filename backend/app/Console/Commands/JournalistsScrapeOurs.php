@@ -89,8 +89,8 @@ class JournalistsScrapeOurs extends Command
                 // Un échec (HTTP, LLM, parse) sur un média ne casse jamais le lot.
                 Log::warning('journalists:scrape-ours media failed', [
                     'media_id' => $media->id,
-                    'website'  => $media->website,
-                    'error'    => $e->getMessage(),
+                    'website' => $media->website,
+                    'error' => $e->getMessage(),
                 ]);
             }
 
@@ -185,9 +185,9 @@ class JournalistsScrapeOurs extends Command
             }
             $out[] = [
                 'first_name' => $first,
-                'last_name'  => $last,
-                'role'       => $this->cleanField($row['role'] ?? null),
-                'beat'       => $this->cleanField($row['beat'] ?? null),
+                'last_name' => $last,
+                'role' => $this->cleanField($row['role'] ?? null),
+                'beat' => $this->cleanField($row['beat'] ?? null),
             ];
         }
 
@@ -251,15 +251,15 @@ class JournalistsScrapeOurs extends Command
 
         Journalist::create([
             'workspace_id' => $media->workspace_id,
-            'media_id'     => $media->id,
-            'company_id'   => $media->company_id,
-            'first_name'   => $first,
-            'last_name'    => $last,
-            'role'         => $p['role'],
-            'beat'         => $p['beat'],
-            'source'       => 'ours-llm',
-            'source_url'   => mb_substr($sourceUrl, 0, 500),
-            'opt_out'      => false,
+            'media_id' => $media->id,
+            'company_id' => $media->company_id,
+            'first_name' => $first,
+            'last_name' => $last,
+            'role' => $p['role'],
+            'beat' => $p['beat'],
+            'source' => 'ours-llm',
+            'source_url' => mb_substr($sourceUrl, 0, 500),
+            'opt_out' => false,
         ]);
 
         return 1;

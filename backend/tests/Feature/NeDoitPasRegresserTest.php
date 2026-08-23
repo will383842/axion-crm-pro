@@ -434,8 +434,98 @@ test('ACQUIS 3 — le réglage qui rend le verrou capable de rougir est toujours
         );
     }
 
+    // La forme LITTÉRALE `'timezone' => env('DB_TIMEZONE')` était épinglée ici
+    // jusqu'au 2026-08-22 ; D29-010 l'a remplacée par une lecture qui ramène la
+    // chaîne vide à `null`. Épingler une écriture, c'est interdire de la
+    // corriger : on épingle désormais le CHAÎNAGE — la variable est lue, et sa
+    // valeur atterrit dans la clé `timezone` du connecteur.
     $database = (string) file_get_contents($backend . '/config/database.php');
-    expect($database)->toContain("'timezone' => env('DB_TIMEZONE')");
+
+    expect(str_contains($database, "env('DB_TIMEZONE')"))->toBeTrue(
+        'config/database.php ne lit plus DB_TIMEZONE : la session Postgres retombe sur le défaut serveur '
+        . '(UTC), le décalage de 2 h revient et HorodatagesFuseauTest ne peut plus rougir. Rétablir la '
+        . 'lecture de la variable.',
+    );
+    expect(str_contains($database, "'timezone' => \$dbTimezone,"))->toBeTrue(
+        'config/database.php ne pose plus la clé `timezone` du connecteur depuis $dbTimezone : la valeur '
+        . "lue n'arrive plus jusqu'à `SET TIME ZONE`. Rétablir `'timezone' => \$dbTimezone,` dans "
+        . '`$pgsqlBase`.',
+    );
+});
+
+test('ACQUIS 3 bis — D29-010 : DB_TIMEZONE posée à VIDE est traitée comme absente', function () {
+    // POURQUOI : `DB_TIMEZONE=` (sans valeur) est LA façon naturelle de
+    // désactiver le réglage. `env()` rend alors la chaîne vide, pour laquelle
+    // `isset()` est VRAI : `PostgresConnector::configureTimezone()` émettait
+    // `SET TIME ZONE ''` à chaque ouverture de connexion, que Postgres refuse.
+    // Ce n'est pas un horodatage qui dérape, c'est toute l'API qui tombe.
+    //
+    // On mesure le COMPORTEMENT, pas l'écriture : `config/database.php` est un
+    // `return [...]` pur, on peut le réévaluer sous l'environnement de notre
+    // choix sans toucher la connexion en cours.
+    $lireTimezone = function (?string $valeur): mixed {
+        $anciennes = [$_ENV['DB_TIMEZONE'] ?? null, $_SERVER['DB_TIMEZONE'] ?? null, getenv('DB_TIMEZONE')];
+
+        try {
+            if ($valeur === null) {
+                unset($_ENV['DB_TIMEZONE'], $_SERVER['DB_TIMEZONE']);
+                putenv('DB_TIMEZONE');
+            } else {
+                $_ENV['DB_TIMEZONE'] = $valeur;
+                $_SERVER['DB_TIMEZONE'] = $valeur;
+                putenv('DB_TIMEZONE=' . $valeur);
+            }
+
+            /** @var array<string, mixed> $config */
+            $config = require base_path('config/database.php');
+
+            return $config['connections']['pgsql']['timezone'] ?? null;
+        } finally {
+            // On REMET l'environnement du processus : les tests suivants de ce
+            // fichier dépendent de `DB_TIMEZONE=Europe/Paris` (phpunit.xml).
+            [$env, $server, $put] = $anciennes;
+
+            if ($env === null) {
+                unset($_ENV['DB_TIMEZONE']);
+            } else {
+                $_ENV['DB_TIMEZONE'] = $env;
+            }
+
+            if ($server === null) {
+                unset($_SERVER['DB_TIMEZONE']);
+            } else {
+                $_SERVER['DB_TIMEZONE'] = $server;
+            }
+
+            if ($put === false) {
+                putenv('DB_TIMEZONE');
+            } else {
+                putenv('DB_TIMEZONE=' . $put);
+            }
+        }
+    };
+
+    // `toBeNull()` n'accepte pas de message dans toutes les versions de Pest :
+    // on assertionne le booléen, ce qui garantit que le geste à faire est lisible.
+    expect($lireTimezone('') === null)->toBeTrue(
+        'D29-010 : `DB_TIMEZONE=` posée à VIDE laisse une chaîne vide dans la config. Le connecteur émettra '
+        . "`SET TIME ZONE ''` à chaque connexion et Postgres le refusera — l'API entière tombe. Rétablir la "
+        . 'normalisation `$dbTimezone` en tête de config/database.php.',
+    );
+    expect($lireTimezone('   ') === null)->toBeTrue(
+        "D29-010 : une valeur composée uniquement d'espaces passe encore jusqu'à `SET TIME ZONE`. "
+        . 'Rétablir le `trim()` de la normalisation `$dbTimezone`.',
+    );
+
+    // Et la normalisation ne doit RIEN avaler d'autre : une valeur réelle passe,
+    // sinon on aurait fermé D29-010 en désarmant HorodatagesFuseauTest.
+    expect($lireTimezone('Europe/Paris') === 'Europe/Paris')->toBeTrue(
+        "D29-010 : la normalisation avale une valeur LÉGITIME — `SET TIME ZONE` n'est plus émis et le "
+        . 'décalage de 2 h revient. Ne neutraliser que la chaîne vide.',
+    );
+    expect($lireTimezone(null) === null)->toBeTrue(
+        'D29-010 : DB_TIMEZONE absente doit rester `null` (réglage inerte par défaut).',
+    );
 });
 
 // ═════════════════════════════════════════════════════════════════════════════

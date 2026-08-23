@@ -63,7 +63,7 @@ class EmailConfidenceService
     /**
      * Score de confiance A/B/C d'un email, relatif au site de l'entreprise.
      *
-     * @param  string       $email    email du contact (ou email_generic société)
+     * @param  string  $email  email du contact (ou email_generic société)
      * @param  string|null  $website  site web connu de l'entreprise (peut être null)
      * @return 'A'|'B'|'C'|null
      */
@@ -105,6 +105,7 @@ class EmailConfidenceService
         if ($domain === '' || ! str_contains($domain, '.')) {
             return null;
         }
+
         return $domain;
     }
 

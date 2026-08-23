@@ -14,12 +14,12 @@ class ZoneRotator
     {
         // Advisory lock 32 bits sur workspace_id hash + 'zones'
         $lockKey = crc32($workspaceId . ':zones');
-        $locked = (bool) DB::selectOne("SELECT pg_try_advisory_xact_lock(?)", [$lockKey])->pg_try_advisory_xact_lock;
+        $locked = (bool) DB::selectOne('SELECT pg_try_advisory_xact_lock(?)', [$lockKey])->pg_try_advisory_xact_lock;
         if (! $locked) {
             return null;
         }
 
-        $row = DB::selectOne(<<<SQL
+        $row = DB::selectOne(<<<'SQL'
             SELECT
                 cm.dept_code AS department,
                 cm.naf,

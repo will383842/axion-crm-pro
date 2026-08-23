@@ -13,9 +13,35 @@
 - PHPStan level 8 (`composer analyse`)
 - TypeScript strict (`pnpm typecheck`)
 - ESLint flat config (`pnpm lint --max-warnings 0`)
-- Pest backend ≥ 75 % couverture sur services métier
-- Vitest frontend ≥ 60 % couverture (config dans vitest.config.ts)
 - Axe-core 0 violation critical sur 4 pages clés
+
+## Objectifs NON gardés — personne ne les mesure
+
+⚠️ Ce qui suit ressemble à une porte et n'en est pas une. Ces deux lignes
+figuraient jusqu'au 2026-08-22 sous « Quality gates », où elles annonçaient un
+seuil bloquant :
+
+- ~~Pest backend ≥ 75 % couverture sur services métier~~
+- ~~Vitest frontend ≥ 60 % couverture~~
+
+**La CI ne mesure la couverture nulle part** (constat A09-006). Mesure du
+2026-08-22, dans `.github/workflows/ci.yml` : le setup PHP porte
+`coverage: none`, le pas Pest lance `php vendor/bin/pest --colors
+--configuration phpunit-ci.xml` sans option de couverture, et les deux pas
+frontend lancent `pnpm test`, jamais `pnpm test:coverage`. La configuration
+frontend le dit elle-même, juste au-dessus des seuils qu'elle déclare
+(`frontend/vitest.config.ts`, bloc `coverage`) : « SEUILS DÉCORATIFS EN
+L'ÉTAT […] ces nombres ne bloquent rien et n'ont jamais rien bloqué ».
+
+Annoncer une porte qui n'existe pas est pire que n'annoncer aucune porte : une
+revue qui lit « ≥ 75 % de couverture » en conclut que le risque est couvert et
+cesse de le regarder. Tant que la couverture n'est pas mesurée en CI, ces
+nombres restent des OBJECTIFS.
+
+**Pour en faire une vraie porte** — et c'est une décision de Will, pas un
+correctif : mesurer d'abord la couverture réelle, poser le seuil À CETTE
+VALEUR, puis le faire décroître-vers-le-haut comme la baseline PHPStan. Armer
+directement 75 % / 60 % ferait rougir toutes les PR du jour au lendemain.
 
 ## Dépendances — 🧊 GELÉES jusqu'à la fin de l'étape 0 (2026-08-18)
 
@@ -73,9 +99,13 @@ docker exec axion-crm-app pnpm typecheck
 docker exec axion-crm-app pnpm lint
 docker exec axion-crm-app pnpm test
 
-# Workers
-docker exec axion-crm-worker-google-maps pnpm typecheck
-docker exec axion-crm-worker-google-maps pnpm test
+# Workers (depuis host) — il n'existe AUCUN conteneur `axion-crm-worker-*` :
+# docker-compose.yml déclare 8 services (postgres, redis, api, horizon, reverb,
+# scheduler, app, caddy) et pas un seul worker. Mesure du 2026-08-22, constat
+# A09-010 : ces deux lignes prescrivaient donc une commande impossible.
+# Sous-shell : la ligne suivante repart de la racine du dépôt.
+(cd workers && pnpm typecheck)
+(cd workers && pnpm test)
 ```
 
 ## Bug critique en prod

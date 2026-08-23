@@ -22,26 +22,26 @@ class UpdateScrapingCampaignRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name'                    => ['sometimes', 'required', 'string', 'max:120'],
-            'description'             => ['sometimes', 'nullable', 'string', 'max:500'],
+            'name' => ['sometimes', 'required', 'string', 'max:120'],
+            'description' => ['sometimes', 'nullable', 'string', 'max:500'],
 
-            'sources'                 => ['sometimes', 'required', 'array', 'min:1'],
-            'sources.*'               => ['required', 'string', Rule::in(ScrapingCampaign::ALLOWED_SOURCES)],
+            'sources' => ['sometimes', 'required', 'array', 'min:1'],
+            'sources.*' => ['required', 'string', Rule::in(ScrapingCampaign::ALLOWED_SOURCES)],
 
-            'zones'                   => ['sometimes', 'required', 'array', 'min:1', 'max:100'],
-            'zones.*.type'            => ['required', 'string', Rule::in(ScrapingCampaign::ALLOWED_ZONE_TYPES)],
-            'zones.*.code'            => ['required', 'string', 'max:10'],
+            'zones' => ['sometimes', 'required', 'array', 'min:1', 'max:100'],
+            'zones.*.type' => ['required', 'string', Rule::in(ScrapingCampaign::ALLOWED_ZONE_TYPES)],
+            'zones.*.code' => ['required', 'string', 'max:10'],
 
-            'max_companies'           => ['sometimes', 'integer', 'min:1', 'max:50000'],
-            'max_duration_minutes'    => ['sometimes', 'integer', 'min:5', 'max:1440'],
+            'max_companies' => ['sometimes', 'integer', 'min:1', 'max:50000'],
+            'max_duration_minutes' => ['sometimes', 'integer', 'min:5', 'max:1440'],
             'max_requests_per_minute' => ['sometimes', 'integer', 'min:1', 'max:100'],
 
-            'per_source_limits'       => ['sometimes', 'nullable', 'array'],
-            'per_source_limits.*.rpm'   => ['nullable', 'integer', 'min:1', 'max:100'],
+            'per_source_limits' => ['sometimes', 'nullable', 'array'],
+            'per_source_limits.*.rpm' => ['nullable', 'integer', 'min:1', 'max:100'],
             'per_source_limits.*.daily' => ['nullable', 'integer', 'min:1', 'max:50000'],
 
-            'scheduled_at'            => ['sometimes', 'nullable', 'date', 'after:now'],
-            'expires_at'              => ['sometimes', 'nullable', 'date'],
+            'scheduled_at' => ['sometimes', 'nullable', 'date', 'after:now'],
+            'expires_at' => ['sometimes', 'nullable', 'date'],
         ];
     }
 }

@@ -311,6 +311,13 @@ services:
   # récepteur /internal/scraper-result ne faisait que logger). Le CODE est
   # conservé (workers/) et le job CI `workers` continue de le tester sur
   # runner GitHub. Réactivation = redéclarer les services ici + compose up.
+  #
+  # H47-005 (2026-08-22) — la CONSTRUCTION de l'image, elle, avait survécu au
+  # retrait : `deploy-staging.yml` poussait encore `worker:staging` à chaque
+  # déploiement de préproduction pour une image que personne ne tire. Sa ligne
+  # de matrice est retirée là-bas aussi. La réactivation se fait donc DES DEUX
+  # CÔTÉS : redéclarer les services ici ET remettre la ligne dans la matrice
+  # `build-and-push` de `.github/workflows/deploy-staging.yml`.
   caddy:
     image: caddy:2-alpine
     container_name: axion-crm-caddy

@@ -10,9 +10,11 @@ use Illuminate\Console\Command;
  * Sprint H6 (2026-05-17) — Re-dispatch EnrichCompanyJob pour companies archivées
  * sans email depuis 30+ jours.
  *
- * Schedule monthlyOn(1, '02:00') déjà posé dans routes/console.php par Pipeline
- * 360° initial avec un skip() temporaire. Cette commande implémente le code
- * manquant — le schedule s'active automatiquement après deploy de ce commit.
+ * Planifiée `monthlyOn(1, '02:00')` dans routes/console.php. Le `skip()`
+ * temporaire qui y accompagnait ce schedule a été retiré le 2026-08-22
+ * (constat A09-012 / B17-007) : il testait l'existence de CETTE commande, donc
+ * il rendait toujours false depuis ce commit-ci, et il aurait masqué en silence
+ * la disparition de la commande au lieu de la signaler.
  *
  * Throttle interne : 2 secondes de delay entre chaque dispatch (évite de
  * marteler INSEE / Brave en re-traitement mass).

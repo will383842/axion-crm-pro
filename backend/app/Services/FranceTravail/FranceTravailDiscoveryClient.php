@@ -7,6 +7,7 @@ use App\Data\Sources\InseeCompanyData;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Sentry\State\Hub;
 
 /**
  * Client de DECOUVERTE via France Travail : recherche d'entreprises qui recrutent
@@ -54,7 +55,7 @@ class FranceTravailDiscoveryClient
                 ->withToken($token)
                 ->get(self::SEARCH_URL, [
                     'departement' => $department,
-                    'range'       => $range,
+                    'range' => $range,
                 ]);
 
             // 204 No Content = pas d'offres
@@ -63,7 +64,7 @@ class FranceTravailDiscoveryClient
             }
             if (! $response->successful()) {
                 Log::warning('FranceTravailDiscovery search failed', [
-                    'status'     => $response->status(),
+                    'status' => $response->status(),
                     'department' => $department,
                 ]);
 
@@ -78,7 +79,7 @@ class FranceTravailDiscoveryClient
             // Entreprises radiées ne doivent pas être enrichies (waterfall économisé).
             return $this->filterActiveByInsee($candidates);
         } catch (\Throwable $e) {
-            if (class_exists(\Sentry\State\Hub::class)) {
+            if (class_exists(Hub::class)) {
                 \Sentry\captureException($e);
             }
             Log::warning('FranceTravailDiscovery exception', ['error' => $e->getMessage()]);
@@ -107,6 +108,7 @@ class FranceTravailDiscoveryClient
             $insee = app(InseeClient::class);
         } catch (\Throwable $e) {
             Log::debug('FranceTravailDiscovery: InseeClient unavailable, skip filter', ['error' => $e->getMessage()]);
+
             return $candidates;
         }
 
@@ -177,8 +179,8 @@ class FranceTravailDiscoveryClient
                 createdAt: null,
                 raw: [
                     'discovery_source' => 'france_travail',
-                    'first_offre_id'   => $offre['id'] ?? null,
-                    'siret'            => $siretClean,
+                    'first_offre_id' => $offre['id'] ?? null,
+                    'siret' => $siretClean,
                 ],
             );
         }
@@ -200,10 +202,10 @@ class FranceTravailDiscoveryClient
                 $response = Http::timeout(self::HTTP_TIMEOUT_SECONDS)
                     ->asForm()
                     ->post(self::OAUTH_TOKEN_URL . '?realm=' . urlencode('/' . self::OAUTH_REALM), [
-                        'grant_type'    => 'client_credentials',
-                        'client_id'     => $clientId,
+                        'grant_type' => 'client_credentials',
+                        'client_id' => $clientId,
                         'client_secret' => $clientSecret,
-                        'scope'         => 'api_offresdemploiv2 o2dsoffre',
+                        'scope' => 'api_offresdemploiv2 o2dsoffre',
                     ]);
                 if (! $response->successful()) {
                     return null;

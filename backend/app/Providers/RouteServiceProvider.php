@@ -18,8 +18,9 @@ class RouteServiceProvider extends ServiceProvider
     {
         RateLimiter::for('api', function (Request $request) {
             $limit = (int) env('RATE_LIMIT_PER_MINUTE', 60);
+
             return Limit::perMinute($limit)->by(
-                optional($request->user())->id ?: $request->ip()
+                optional($request->user())->id ?: $request->ip(),
             );
         });
 
@@ -33,12 +34,12 @@ class RouteServiceProvider extends ServiceProvider
         RateLimiter::for(
             'scraper-launch',
             fn (Request $r) => Limit::perMinute((int) env('SCRAPER_LAUNCH_PER_MINUTE', 10))
-                ->by(optional($r->user())->id ?: $r->ip())
+                ->by(optional($r->user())->id ?: $r->ip()),
         );
         RateLimiter::for(
             'scraper-list',
             fn (Request $r) => Limit::perMinute((int) env('SCRAPER_LIST_PER_MINUTE', 60))
-                ->by(optional($r->user())->id ?: $r->ip())
+                ->by(optional($r->user())->id ?: $r->ip()),
         );
     }
 }

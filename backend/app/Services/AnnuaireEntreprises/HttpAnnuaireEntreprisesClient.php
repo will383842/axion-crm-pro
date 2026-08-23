@@ -34,9 +34,9 @@ class HttpAnnuaireEntreprisesClient implements AnnuaireEntreprisesClient
         $representatives = [];
         foreach ($entry['dirigeants'] ?? [] as $dir) {
             $representatives[] = [
-                'role'       => (string) ($dir['qualite'] ?? 'dirigeant'),
+                'role' => (string) ($dir['qualite'] ?? 'dirigeant'),
                 'first_name' => $dir['prenoms'] ?? null,
-                'last_name'  => (string) ($dir['nom'] ?? ''),
+                'last_name' => (string) ($dir['nom'] ?? ''),
                 'birth_date' => $dir['date_naissance'] ?? null,
             ];
         }

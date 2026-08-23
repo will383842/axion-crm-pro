@@ -17,9 +17,9 @@ class HttpBodaccClient implements BodaccClient
         $resp = Http::timeout(15)
             ->get(self::BASE_URL . '/search/', [
                 'dataset' => 'annonces-commerciales',
-                'q'       => "registre:\"{$siren}\"",
-                'rows'    => 50,
-                'sort'    => '-dateparution',
+                'q' => "registre:\"{$siren}\"",
+                'rows' => 50,
+                'sort' => '-dateparution',
             ]);
 
         if ($resp->failed()) {
@@ -38,17 +38,18 @@ class HttpBodaccClient implements BodaccClient
                 rawText: $f['contenu'] ?? null,
             );
         }
+
         return $out;
     }
 
     private function mapType(string $famille): string
     {
         return match (true) {
-            str_contains($famille, 'création')      => 'creation',
-            str_contains($famille, 'modification')  => 'modification',
-            str_contains($famille, 'radiation')     => 'radiation',
-            str_contains($famille, 'procédure')     => 'procedure',
-            default                                  => 'modification',
+            str_contains($famille, 'création') => 'creation',
+            str_contains($famille, 'modification') => 'modification',
+            str_contains($famille, 'radiation') => 'radiation',
+            str_contains($famille, 'procédure') => 'procedure',
+            default => 'modification',
         };
     }
 }

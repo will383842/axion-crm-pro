@@ -12,6 +12,10 @@ use Illuminate\Support\Facades\Http;
  */
 class IPRoyalProvider implements ProxyProvider
 {
+    // C19-011 : la decision « verifie-t-on le certificat de la sonde ? » vit dans
+    // le trait, pas ici — sinon les deux fournisseurs divergent.
+    use VerificationTlsSonde;
+
     public function listEndpoints(string $zone = 'eu'): array
     {
         $user = (string) env('IPROYAL_USERNAME', '');
@@ -26,36 +30,45 @@ class IPRoyalProvider implements ProxyProvider
             $session = substr(bin2hex(random_bytes(4)), 0, 8);
             $country = match ($zone) {
                 'fr' => 'fr',
-                'eu' => ['fr','de','nl','be','it','es'][$i % 6],
+                'eu' => ['fr', 'de', 'nl', 'be', 'it', 'es'][$i % 6],
                 default => 'fr',
             };
             $endpoints[] = new ProxyEndpointData(
                 provider: 'iproyal',
-                type:     'residential',
-                zone:     $zone,
-                host:     'geo.iproyal.com',
-                port:     12321,
+                type: 'residential',
+                zone: $zone,
+                host: 'geo.iproyal.com',
+                port: 12321,
                 username: "{$user}_country-{$country}_session-{$session}",
                 password: $pass,
-                weight:   2, // residential pèse 2× datacenter
-                isHealthy:true,
+                weight: 2, // residential pèse 2× datacenter
+                isHealthy: true,
             );
         }
+
         return $endpoints;
     }
 
     public function pickEndpoint(string $zone = 'eu'): ProxyEndpointData
     {
         $list = $this->listEndpoints($zone);
+
         return $list[array_rand($list)];
     }
 
     public function healthCheck(ProxyEndpointData $endpoint): bool
     {
         try {
-            $resp = Http::withOptions(['proxy' => $endpoint->toProxyUrl(), 'verify' => false])
+            // C19-011 : `'verify' => false` en dur rendait cette sonde incapable
+            // de distinguer `api.ipify.org` d'un mandataire qui se fait passer
+            // pour lui. Voir `VerificationTlsSonde` pour le pourquoi complet.
+            $resp = Http::withOptions([
+                'proxy' => $endpoint->toProxyUrl(),
+                'verify' => $this->verifierTlsDeLaSonde('iproyal', $endpoint),
+            ])
                 ->timeout(15)
                 ->get('https://api.ipify.org?format=json');
+
             return $resp->ok();
         } catch (\Throwable) {
             return false;

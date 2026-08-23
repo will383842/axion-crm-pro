@@ -100,7 +100,7 @@ class CompanyTagsBulkController extends ApiController
         }
 
         $modifiees = $valide['action'] === 'add'
-            ? $this->poser($idsAutorises, $tagId)
+            ? $this->poser($idsAutorises, $tagId, (string) $workspaceId)
             : $this->retirer($idsAutorises, $tagId);
 
         return $this->ok([
@@ -116,11 +116,35 @@ class CompanyTagsBulkController extends ApiController
     /**
      * @param  list<int>  $ids
      */
-    private function poser(array $ids, int $tagId): int
+    private function poser(array $ids, int $tagId, string $workspaceId): int
     {
         $lignes = array_map(static fn (int $id): array => [
             'company_id' => $id,
             'tag_id' => $tagId,
+            // 🔴 `workspace_id` — CONSTAT `G43-004`, ET IL EST INVISIBLE EN LOCAL.
+            //
+            // Cette colonne manquait. En local, sans RLS, l'insertion PASSAIT :
+            // la ligne existait, non cloisonnée, et rien ne le disait. Sous la
+            // RLS de production, la même insertion est REFUSEE —
+            // `SQLSTATE[42501] new row violates row-level security policy`.
+            // L'action de masse aurait donc echoue le jour ou `CRM_DB_APP_ROLE_ENABLED`
+            // serait arme, sans que le moindre test local ne l'annonce.
+            //
+            // Les deux autres sites d'ecriture de ce pivot posent deja la
+            // colonne (`ScrapingBackfillSrcTags:167-168`) : c'etait une
+            // omission, pas un choix.
+            //
+            // ⚠️ La valeur est SURE, et pas seulement plausible : `$idsAutorises`
+            // a ete filtre plus haut par `where('workspace_id', $workspaceId)`.
+            // Chaque fiche taggee appartient donc bien a cet univers. Ecrire ici
+            // l'espace de la REQUETE sur une fiche d'ailleurs serait pire que de
+            // ne rien ecrire — cela fabriquerait une fuite entre univers.
+            'workspace_id' => $workspaceId,
+            // `assigned_at` n'est pas ecrit : la colonne porte `DEFAULT now()`
+            // (migration `2026_05_18_000007`), qui est exactement la bonne
+            // valeur. L'ecrire a la main n'ajouterait qu'une occasion de se
+            // tromper d'horloge.
+            //
             // `user` : le vocabulaire fermé de `assigned_by` distingue ce qu'un
             // humain a posé de ce qu'une règle a déduit. Les confondre ferait
             // passer une décision pour une observation.

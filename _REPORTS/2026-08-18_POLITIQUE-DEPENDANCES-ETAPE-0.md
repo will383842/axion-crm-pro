@@ -318,6 +318,48 @@ pas un soulagement. Le dépôt est **public** ; `secret_scanning` et
 
 → Action Will au §8.
 
+#### 🔴 RECTIFICATION 2026-08-19 — le §5.3 ci-dessus est périmé (constat H47-003)
+
+La mesure du 2026-08-18 n'est pas retirée : elle était juste ce jour-là, et c'est
+elle qui explique la rédaction du gel. Elle ne décrit simplement plus le dépôt.
+
+Nouvelle mesure, le **2026-08-19** — trois relevés concordants, conservés dans
+`04_PREUVES/agent-47/etat-dependabot-depot.txt` de l'audit 360 :
+
+```
+$ gh api repos/will383842/axion-crm-pro/vulnerability-alerts -i
+HTTP/2.0 204 No Content                      # 204 = alertes ACTIVES (était 404)
+
+$ gh api repos/will383842/axion-crm-pro -q '.security_and_analysis'
+{"dependabot_security_updates":{"status":"enabled"}, ...}   # était "disabled"
+
+$ gh api repos/will383842/axion-crm-pro/automated-security-fixes
+{"enabled":true,"paused":false}
+```
+
+**Témoin négatif** : la même réponse rend `"disabled"` pour
+`secret_scanning_non_provider_patterns` et `secret_scanning_validity_checks`.
+L'API ne répond donc pas `enabled` par défaut — le vert ci-dessus a une valeur.
+**Corroboration indépendante** : les 57 alertes du dépôt portent toutes
+`created_at` au 2026-08-19.
+
+**Ce que cela change** :
+
+- la précaution des §5.1/5.2 n'est **plus inerte** — il existe désormais un canal
+  de mise à jour de sécurité, et le gel doit le préserver pour de bon ;
+- le gel étant total sur les montées de version, ce canal est désormais la
+  **seule voie de correction restante** ;
+- le critère d'entrée du dégel « les alertes Dependabot sont ACTIVES » est
+  **déjà rempli** ; il n'y a plus rien à demander à Will sur ce point.
+
+⚠️ **Ce qui reste non mesuré, et n'est donc pas affirmé** : que ce canal
+*produise* des PR. Au 2026-08-20, ~24 h après la création des 57 alertes,
+`gh pr list --search "author:app/dependabot"` en rendait **zéro**, plafonds non
+saturés. Un jour d'observation ne suffit pas à déclarer le canal rompu — à
+**re-mesurer** après l'exécution planifiée du lundi 06:00 UTC. Si le compte est
+toujours nul alors qu'une correction existe dans un intervalle déjà déclaré,
+c'est un constat **S1** : le gel aurait coupé le canal de sécurité en silence.
+
 ---
 
 ## 6. Ce que Dependabot fera de lui-même — et ce qu'il ne fera pas
@@ -426,7 +468,7 @@ Dans l'ordre inverse, Dependabot les rouvrirait au prochain passage (lundi
 | Zéro `groups:` restant | inspection programmatique de l'arbre YAML | **aucun** écosystème n'en porte |
 | Zéro condition `ignore` par plage `versions:` | inspection programmatique | **aucune** sur les 5 écosystèmes |
 | Sécurité préservée par `ignore`/`update-types` | doc GitHub + changelog 2021-05-21, cités verbatim au §5.2 | établi |
-| État des alertes Dependabot du dépôt | `gh api .../vulnerability-alerts` (404) + `.security_and_analysis` (`disabled`) | **désactivées** — §5.3 |
+| État des alertes Dependabot du dépôt | `gh api .../vulnerability-alerts` (404) + `.security_and_analysis` (`disabled`) | **désactivées** au 2026-08-18 — §5.3. 🔴 **PÉRIMÉ** : re-mesuré **actives** le 2026-08-19, cf. la RECTIFICATION du §5.3 (constat H47-003) |
 
 **Ce qui n'a PAS été vérifié**, et n'est donc pas affirmé :
 

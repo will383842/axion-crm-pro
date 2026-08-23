@@ -203,3 +203,33 @@ test('l’action est posée comme décision HUMAINE, pas comme observation', fun
     // et fausserait tout audit de provenance.
     expect(DB::table('company_tag')->where('company_id', $a->id)->value('assigned_by'))->toBe('user');
 });
+
+test('G43-004 — la ligne du pivot porte son workspace_id, sans quoi la RLS de production la refuse', function () {
+    // 🔴 CE DEFAUT ETAIT INVISIBLE EN LOCAL, ET C'EST TOUT LE PROBLEME.
+    //
+    // `company_tag.workspace_id` n'etait pas ecrit. Sans RLS — la configuration
+    // du banc — l'insertion passe : la ligne existe, non cloisonnee, et aucun
+    // test ne s'en plaint. Sous la RLS de production, la MEME insertion rend
+    // `SQLSTATE[42501] new row violates row-level security policy for table
+    // "company_tag"`, et l'action de masse echoue pour tout le monde.
+    //
+    // Une garde qui ne compte que les lignes POSEES resterait aveugle a la
+    // recidive : elle serait verte dans les deux cas. C'est la COLONNE qu'il
+    // faut lire.
+    creerTag($this->workspace->id, 'a-rappeler');
+    $fiche = creerFiche($this->workspace->id, 'Fabrique Lumiere');
+
+    $this->postJson('/api/v1/companies/tags/bulk', [
+        'ids' => [$fiche->id], 'tag' => 'a-rappeler', 'action' => 'add',
+    ])->assertOk();
+
+    $pose = DB::table('company_tag')->where('company_id', $fiche->id)->first();
+
+    expect($pose)->not->toBeNull('Le tag n a pas ete pose du tout : la garde ne mesure rien.');
+    expect($pose->workspace_id)->toBe(
+        $this->workspace->id,
+        'La ligne de `company_tag` est ecrite SANS `workspace_id` (ou avec le mauvais). '
+        . 'En local elle passe ; sous la RLS de production elle est REFUSEE, et l action de '
+        . 'masse echoue pour tout le monde. Constat G43-004.',
+    );
+});

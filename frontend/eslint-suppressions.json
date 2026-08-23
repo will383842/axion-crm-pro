@@ -43,9 +43,6 @@
     },
     "@typescript-eslint/no-unnecessary-type-assertion": {
       "count": 1
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
     }
   },
   "src/features/companies/components/EnrichmentTimeline.tsx": {
@@ -81,9 +78,6 @@
   "src/features/rgpd/RgpdRequestsPage.tsx": {
     "@typescript-eslint/no-floating-promises": {
       "count": 2
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 2
     }
   },
   "src/features/scraping/ScraperRunsPage.tsx": {
@@ -97,9 +91,6 @@
     },
     "@typescript-eslint/no-floating-promises": {
       "count": 1
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
     }
   },
   "src/features/tags/TagsManagerPage.tsx": {
@@ -109,9 +100,6 @@
   },
   "src/features/users/UsersPage.tsx": {
     "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-return": {
       "count": 1
     }
   },

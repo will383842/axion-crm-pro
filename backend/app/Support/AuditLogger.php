@@ -39,12 +39,13 @@ class AuditLogger
         if (! $workspaceId) {
             // Sans workspace impossible de respecter la RLS — on skip silencieux.
             Log::debug('AuditLogger skipped: no workspace_id', ['action' => $action]);
+
             return;
         }
 
         $resourceType = $context['resource_type'] ?? null;
-        $resourceId   = isset($context['resource_id']) ? (string) $context['resource_id'] : null;
-        $actorUserId  = $context['actor_user_id'] ?? self::resolveActor();
+        $resourceId = isset($context['resource_id']) ? (string) $context['resource_id'] : null;
+        $actorUserId = $context['actor_user_id'] ?? self::resolveActor();
 
         // Le payload context = tout le reste (on retire les colonnes dédiées)
         $payload = $context;
@@ -57,18 +58,18 @@ class AuditLogger
 
         try {
             DB::table('business_events')->insert([
-                'workspace_id'  => $workspaceId,
+                'workspace_id' => $workspaceId,
                 'actor_user_id' => $actorUserId,
-                'action'        => $action,
+                'action' => $action,
                 'resource_type' => $resourceType,
-                'resource_id'   => $resourceId,
-                'context'       => empty($payload) ? null : json_encode($payload, JSON_UNESCAPED_UNICODE),
-                'created_at'    => now(),
+                'resource_id' => $resourceId,
+                'context' => empty($payload) ? null : json_encode($payload, JSON_UNESCAPED_UNICODE),
+                'created_at' => now(),
             ]);
         } catch (\Throwable $e) {
             Log::warning('AuditLogger insert failed', [
                 'action' => $action,
-                'error'  => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
         }
     }
@@ -77,6 +78,7 @@ class AuditLogger
     {
         try {
             $user = Auth::user();
+
             return $user?->id !== null ? (string) $user->id : null;
         } catch (\Throwable) {
             return null;

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Crm\Outbound\ConsentOutboundRecorder;
 use Illuminate\Console\Command;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
@@ -201,7 +202,15 @@ class CrmFlushOutbound extends Command
      */
     private function dispatchOne(stdClass $row, string $url, string $secret): string
     {
+        // 🔴 B14-008 : `schema_version` en tête, comme à l'entrée. Le contrat
+        // était versionné dans un seul sens ; l'ajout mesuré du 2026-08-22 est
+        // sans risque pour le récepteur actuel, dont le parseur
+        // (`parseInboundPayload`, site : src/server/crm-sync/inbound.ts) lit les
+        // sept clés attendues et IGNORE les autres — il n'y a aucun refus de
+        // clé inconnue de ce côté-là. La signature HMAC porte sur le corps réel,
+        // elle suit donc l'ajout sans coordination.
         $body = json_encode([
+            'schema_version' => ConsentOutboundRecorder::SCHEMA_VERSION,
             'event_id' => (string) $row->event_id,
             'event_type' => (string) $row->event_type,
             'person_key' => $row->person_key === null ? null : (string) $row->person_key,

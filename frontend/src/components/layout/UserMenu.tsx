@@ -77,14 +77,20 @@ export function UserMenu() {
     <DropdownMenu
       align="right"
       items={items}
+      // D28-004 — `<span>` avant le 2026-08-22 : la focalisation clavier venait
+      // du `<button>` que `DropdownMenu` posait autour. Ce wrapper a disparu (il
+      // fabriquait un bouton-dans-un-bouton chez cinq autres appelants), donc le
+      // déclencheur porte lui-même son rôle, sans quoi le menu utilisateur
+      // devenait inatteignable au clavier.
       trigger={
-        <span
+        <button
+          type="button"
           className="flex items-center gap-2 rounded-lg px-1.5 py-1 transition hover:bg-slate-100 dark:hover:bg-slate-800"
           aria-label={`Menu utilisateur — ${name}`}
         >
           <Avatar name={name} size="sm" />
           <span className="hidden text-sm font-medium text-sidebar-fg lg:inline">{name}</span>
-        </span>
+        </button>
       }
     />
   );

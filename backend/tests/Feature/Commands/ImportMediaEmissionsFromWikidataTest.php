@@ -12,7 +12,7 @@ uses(TestCase::class, RefreshDatabase::class);
 function makeWikidataWorkspace(): Workspace
 {
     return Workspace::create([
-        'id'   => (string) Str::uuid(),
+        'id' => (string) Str::uuid(),
         'slug' => 'wd-' . Str::random(6),
         'name' => 'WS Wikidata',
     ]);
@@ -28,33 +28,33 @@ function fakeSparqlEmissions(): array
     $uri = fn (string $q) => ['type' => 'uri', 'value' => 'http://www.wikidata.org/entity/' . $q];
 
     return [
-        'head'    => ['vars' => ['prog', 'progLabel', 'genreLabel', 'broadcasterLabel', 'person', 'personLabel', 'role']],
+        'head' => ['vars' => ['prog', 'progLabel', 'genreLabel', 'broadcasterLabel', 'person', 'personLabel', 'role']],
         'results' => [
             'bindings' => [
                 // Émission 1 — présentateur
                 [
-                    'prog'             => $uri('Q1001'),
-                    'progLabel'        => $lit('Le Grand Journal'),
-                    'genreLabel'       => $lit('talk-show'),
+                    'prog' => $uri('Q1001'),
+                    'progLabel' => $lit('Le Grand Journal'),
+                    'genreLabel' => $lit('talk-show'),
                     'broadcasterLabel' => $lit('Canal+'),
-                    'person'           => $uri('Q2001'),
-                    'personLabel'      => $lit('Michel Denisot'),
-                    'role'             => $lit('présentateur'),
+                    'person' => $uri('Q2001'),
+                    'personLabel' => $lit('Michel Denisot'),
+                    'role' => $lit('présentateur'),
                 ],
                 // Émission 1 — producteur (2e ligne, même émission)
                 [
-                    'prog'             => $uri('Q1001'),
-                    'progLabel'        => $lit('Le Grand Journal'),
-                    'genreLabel'       => $lit('talk-show'),
+                    'prog' => $uri('Q1001'),
+                    'progLabel' => $lit('Le Grand Journal'),
+                    'genreLabel' => $lit('talk-show'),
                     'broadcasterLabel' => $lit('Canal+'),
-                    'person'           => $uri('Q2002'),
-                    'personLabel'      => $lit('Renaud Le Van Kim'),
-                    'role'             => $lit('producteur'),
+                    'person' => $uri('Q2002'),
+                    'personLabel' => $lit('Renaud Le Van Kim'),
+                    'role' => $lit('producteur'),
                 ],
                 // Émission 2 — même chaîne, sans personne
                 [
-                    'prog'             => $uri('Q1002'),
-                    'progLabel'        => $lit('Les Guignols de l\'info'),
+                    'prog' => $uri('Q1002'),
+                    'progLabel' => $lit('Les Guignols de l\'info'),
                     'broadcasterLabel' => $lit('Canal+'),
                 ],
             ],

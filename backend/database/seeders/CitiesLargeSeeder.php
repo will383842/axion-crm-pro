@@ -3,8 +3,8 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Seed des grandes villes françaises (>30 000 hab) — sous-ensemble du référentiel IGN.
@@ -67,12 +67,12 @@ class CitiesLargeSeeder extends Seeder
             DB::table('cities')->updateOrInsert(
                 ['code_insee' => $insee],
                 [
-                    'department'   => $dept,
-                    'name'         => $name,
-                    'slug'         => $slug,
+                    'department' => $dept,
+                    'name' => $name,
+                    'slug' => $slug,
                     'postal_codes' => '{}',  // populé par IGN import
-                    'population'   => $pop,
-                    'created_at'   => now(),
+                    'population' => $pop,
+                    'created_at' => now(),
                 ],
             );
         }

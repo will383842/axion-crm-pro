@@ -1,5 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardHeader, CardTitle, CardEyebrow, Avatar, EmptyState } from '@/components/ui';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardEyebrow,
+  Avatar,
+  EmptyState,
+  QueryErrorState,
+} from '@/components/ui';
 import { api } from '@/lib/api';
 
 /**
@@ -55,8 +63,22 @@ function timeAgo(iso: string): string {
   return `il y a ${Math.floor(diff / 86400)} j`;
 }
 
+/**
+ * 🔴 P5-35-012 (S3) — UN REFUS DE DROITS ANNONCAIT DES DONNEES A VENIR.
+ *
+ * Mesure du 2026-08-22 : la branche d'erreur et la branche « base vide »
+ * etaient la MEME (`isError || items.length === 0`). Un 403 sur
+ * `GET /audit-logs` — le cas NOMINAL d'un operateur sans le role qui lit les
+ * journaux — affichait donc « Activite bientot disponible », c'est-a-dire la
+ * promesse que le CRM commence tout juste a travailler. Rien ne distinguait
+ * cela d'un espace reellement neuf, et l'ecran d'accueil est precisement celui
+ * qu'on regarde pour savoir si le produit tourne.
+ *
+ * C'est le patron D25-001, et le composant qui le ferme (`QueryErrorState`)
+ * existait deja dans le depot, branche sur 8 ecrans — pas sur celui-ci.
+ */
 export function ActivityFeed() {
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['dashboard-activity'],
     queryFn: async () => {
       const r = await api.get<AuditLogsResponse | AuditLog[]>('/audit-logs', { params: { limit: 5 } });
@@ -68,6 +90,11 @@ export function ActivityFeed() {
   });
 
   const items = data ?? [];
+  // ⚠️ `data === undefined` fait partie de la condition : React Query v5 CONSERVE
+  // la derniere page reussie quand un rafraichissement echoue. Effacer le fil
+  // dans ce cas ferait PERDRE a l'operateur ce qu'il avait sous les yeux — on
+  // remplacerait un mensonge par une regression.
+  const echec = isError && data === undefined;
 
   return (
     <Card>
@@ -90,7 +117,15 @@ export function ActivityFeed() {
             </li>
           ))}
         </ul>
-      ) : isError || items.length === 0 ? (
+      ) : echec ? (
+        // P5-35-012 : l'echec a sa PROPRE branche. Le cas legitime « 200 + liste
+        // vide » continue, lui, de rendre l'etat vide juste en dessous.
+        <QueryErrorState
+          error={error}
+          contexte="le fil d’activité"
+          onRetry={() => void refetch()}
+        />
+      ) : items.length === 0 ? (
         <EmptyState
           title="Activité bientôt disponible"
           description="Les actions de ton équipe (scrapes, enrichissements, exports) apparaîtront ici."

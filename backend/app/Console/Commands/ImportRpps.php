@@ -40,12 +40,14 @@ class ImportRpps extends Command
             ?: DB::table('workspaces')->orderBy('created_at')->value('id');
         if (! $workspaceId) {
             $this->error('Aucun workspace cible (--workspace=UUID).');
+
             return self::FAILURE;
         }
 
         $mock = (bool) $this->option('mock') || (bool) env('MOCK_RPPS', env('MOCK_MODE', true));
         if ($mock) {
             $this->warn('Mode mock — seed de professionnels de santé fictifs (données non réelles).');
+
             return $this->seedMock((string) $workspaceId);
         }
 
@@ -53,6 +55,7 @@ class ImportRpps extends Command
         if (! config('services.sante.ingestion_enabled')) {
             $this->error('Ingestion santé RÉELLE désactivée : données nominatives de santé (RGPD art. 9).');
             $this->line('Valider l\'AIPD dédiée puis positionner SANTE_INGESTION_ENABLED=true.');
+
             return self::FAILURE;
         }
 
@@ -60,6 +63,7 @@ class ImportRpps extends Command
         if (! file_exists($path)) {
             $this->error("Fichier RPPS absent : {$path}");
             $this->line('Télécharger « PS LibreAccès » : https://annuaire.sante.fr/web/site-pro/extractions-publiques');
+
             return self::FAILURE;
         }
 
@@ -75,6 +79,7 @@ class ImportRpps extends Command
         $map = $this->mapColumns($csv->getHeader());
         if (! isset($map['rpps'])) {
             $this->error('Colonne identifiant RPPS introuvable (en-têtes : ' . implode(', ', $csv->getHeader()) . ').');
+
             return self::FAILURE;
         }
 
@@ -107,15 +112,15 @@ class ImportRpps extends Command
                 ['workspace_id' => $workspaceId, 'rpps' => $rpps],
                 [
                     'company_id' => $companyId,
-                    'siren'      => $siren,
-                    'nom'        => $this->val($row, $map, 'nom'),
-                    'prenom'     => $this->val($row, $map, 'prenom'),
+                    'siren' => $siren,
+                    'nom' => $this->val($row, $map, 'nom'),
+                    'prenom' => $this->val($row, $map, 'prenom'),
                     'specialite' => $this->val($row, $map, 'specialite'),
-                    'phone'      => $this->val($row, $map, 'phone'),
-                    'address'    => $this->val($row, $map, 'address'),
-                    'postcode'   => $this->val($row, $map, 'postcode'),
-                    'city'       => $this->val($row, $map, 'city'),
-                    'source'     => 'rpps-libreacces',
+                    'phone' => $this->val($row, $map, 'phone'),
+                    'address' => $this->val($row, $map, 'address'),
+                    'postcode' => $this->val($row, $map, 'postcode'),
+                    'city' => $this->val($row, $map, 'city'),
+                    'source' => 'rpps-libreacces',
                     'updated_at' => now(),
                 ],
             );
@@ -123,6 +128,7 @@ class ImportRpps extends Command
         }
 
         $this->info("RPPS importé : {$imported} praticiens ({$linked} rattachés à une entreprise).");
+
         return self::SUCCESS;
     }
 
@@ -130,7 +136,7 @@ class ImportRpps extends Command
      * Mapping défensif en-tête → champ, par mots-clés (insensible à la casse).
      * `nom` exclut explicitement `prénom` (« prénom » contient « nom »).
      *
-     * @param array<int, string> $header
+     * @param  array<int, string>  $header
      * @return array<string, string>
      */
     private function mapColumns(array $header): array
@@ -173,12 +179,13 @@ class ImportRpps extends Command
                 $map['city'] = $col;
             }
         }
+
         return $map;
     }
 
     /**
-     * @param array<string, string> $row
-     * @param array<string, string> $map
+     * @param  array<string, string>  $row
+     * @param  array<string, string>  $map
      */
     private function resolveSiren(array $row, array $map): ?string
     {
@@ -189,12 +196,13 @@ class ImportRpps extends Command
                 $siren = substr($siret, 0, 9);
             }
         }
+
         return ($siren !== '' && strlen($siren) === 9) ? $siren : null;
     }
 
     /**
-     * @param array<string, string> $row
-     * @param array<string, string> $map
+     * @param  array<string, string>  $row
+     * @param  array<string, string>  $map
      */
     private function val(array $row, array $map, string $key): ?string
     {
@@ -202,6 +210,7 @@ class ImportRpps extends Command
             return null;
         }
         $v = trim((string) ($row[$map[$key]] ?? ''));
+
         return $v === '' ? null : $v;
     }
 
@@ -219,6 +228,7 @@ class ImportRpps extends Command
             );
         }
         $this->info('RPPS mock seedé : ' . count($samples) . ' praticiens fictifs.');
+
         return self::SUCCESS;
     }
 }

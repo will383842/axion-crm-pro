@@ -12,9 +12,9 @@ use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
 class PersonalAccessToken extends SanctumPersonalAccessToken
 {
     protected $casts = [
-        'abilities'    => 'json',
+        'abilities' => 'json',
         'last_used_at' => 'datetime',
-        'expires_at'   => 'datetime',
+        'expires_at' => 'datetime',
         // tokenable_id reste string (UUID) — pas de cast int.
     ];
 }

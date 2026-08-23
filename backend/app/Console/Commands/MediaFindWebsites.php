@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Media;
 use App\Services\Domain\DomainFinderService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -66,7 +67,7 @@ class MediaFindWebsites extends Command
     /**
      * Écrit tout le lot en UNE requête (bulk UPDATE ... FROM VALUES).
      *
-     * @param  \Illuminate\Support\Collection<int, Media>  $medias
+     * @param  Collection<int, Media>  $medias
      * @param  array<int, string|null>  $urls
      * @return array{0:int,1:int}
      */

@@ -47,8 +47,41 @@
     <php>
         <env name="APP_ENV" value="testing" force="true"/>
         <env name="APP_KEY" value="base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="/>
-        <env name="MOCK_MODE" value="true"/>
-        <!-- 🔴 MOCK_INSEE vivait UNIQUEMENT dans .github/workflows/ci.yml:415.
+        <!-- 🔴 H45-005 — LES DIX DRAPEAUX DE SIMULACRE, EPINGLES ICI, AVEC `force`.
+             ETAT MESURE LE 2026-08-22 : `.github/workflows/ci.yml` pose DIX
+             `MOCK_*` sur le pas Pest (et `docker-compose.test.yml` les memes
+             dix) ; ce fichier n'en declarait que DEUX (MOCK_MODE, MOCK_INSEE).
+             HUIT manquaient. La suite locale et la CI ne mesuraient donc pas la
+             meme chose, et le sens du decalage n'est pas anodin :
+             `.env.example` pose MOCK_INSEE, MOCK_ANNUAIRE_ENTREPRISES,
+             MOCK_BODACC, MOCK_BAN et MOCK_FRANCE_TRAVAIL a **false**. En local
+             ces cinq services partaient donc en HTTP REEL pendant la suite, la
+             ou la CI les simulait — un vert de CI qui ne dit rien du vert local,
+             et des appels reseau reels depuis un banc de tests.
+
+             POURQUOI `force="true"` SUR CHACUN, et pas seulement la valeur.
+             Sans `force`, un `<env>` de PHPUnit n'ecrase PAS une variable deja
+             presente dans l'environnement du PROCESSUS — et `docker-compose.yml`
+             en pose une par drapeau via `env_file: .env` (l.147). C'est
+             exactement le piege deja paye sur `DB_DATABASE` quinze lignes plus
+             bas : `composer test` lance DANS le conteneur `api` (ce que
+             documente `make test-backend`) lisait la valeur du `.env`, pas
+             celle-ci. Un drapeau pose sans `force` y serait reste decoratif.
+
+             CE QUE CE BLOC NE DECIDE PAS. Il ne rend rien simule en production :
+             `MockServicesProvider` REFUSE tout simulacre en `production`,
+             drapeau ou pas (C18-016/F37-002, garde
+             tests/Feature/Infra/AucunSimulacreEnProductionTest.php).
+
+             Garde d'alignement, qui rougit si la CI gagne un onzieme drapeau
+             sans qu'il arrive ici :
+             tests/Feature/Infra/DrapeauxMockAlignesTest.php -->
+        <env name="MOCK_MODE" value="true" force="true"/>
+        <env name="MOCK_LLM" value="true" force="true"/>
+        <env name="MOCK_PROXIES" value="true" force="true"/>
+        <env name="MOCK_SCRAPERS" value="true" force="true"/>
+        <env name="MOCK_SMTP" value="true" force="true"/>
+        <!-- MOCK_INSEE vivait UNIQUEMENT dans .github/workflows/ci.yml.
 
              Consequence mesuree le 2026-08-20 : `POST /api/v1/coverage/launch`
              rougit en 500 pour quiconque lance la suite en local avec ce
@@ -57,10 +90,12 @@
              « INSEE auth requires either INSEE_API_KEY ... ».
 
              Un vert qui depend d'une variable absente du fichier de
-             configuration est un vert de CI, pas un vert de la suite. On le
-             ramene ici pour que local et CI mesurent la MEME chose : c'est la
-             regle 6 du mandat, verifier sur la bonne reference. -->
-        <env name="MOCK_INSEE" value="true"/>
+             configuration est un vert de CI, pas un vert de la suite. -->
+        <env name="MOCK_INSEE" value="true" force="true"/>
+        <env name="MOCK_ANNUAIRE_ENTREPRISES" value="true" force="true"/>
+        <env name="MOCK_BODACC" value="true" force="true"/>
+        <env name="MOCK_BAN" value="true" force="true"/>
+        <env name="MOCK_FRANCE_TRAVAIL" value="true" force="true"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array" force="true"/>
         <!-- `force="true"` : cf. la note detaillee dans phpunit.xml. Necessaire mais

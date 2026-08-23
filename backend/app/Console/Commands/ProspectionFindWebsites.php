@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Company;
 use App\Services\Domain\DomainFinderService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -162,9 +163,9 @@ class ProspectionFindWebsites extends Command
      *   - MORT   → website_status = 'dead' + website_revalidated_at = now()
      *              (website conservé pour audit)
      *
-     * @param  \Illuminate\Support\Collection<int, Company>  $companies
+     * @param  Collection<int, Company>  $companies
      * @param  array<int, bool>  $aliveById
-     * @return array{0:int,1:int,2:int}  [traités, vivants, morts]
+     * @return array{0:int,1:int,2:int} [traités, vivants, morts]
      */
     private function flushRevalidate($companies, array $aliveById): array
     {
@@ -216,9 +217,9 @@ class ProspectionFindWebsites extends Command
      * de 100 UPDATE séparés. Crucial en exécution distribuée où la DB est jointe via
      * un tunnel SSH : 100 round-trips/lot (~30-50 ms chacun) plomberaient le débit.
      *
-     * @param  \Illuminate\Support\Collection<int, Company>  $companies
+     * @param  Collection<int, Company>  $companies
      * @param  array<int, string|null>  $urls
-     * @return array{0:int,1:int}  [traités, trouvés]
+     * @return array{0:int,1:int} [traités, trouvés]
      */
     private function flushBatch($companies, array $urls, string $missStatus, string $missMethod): array
     {

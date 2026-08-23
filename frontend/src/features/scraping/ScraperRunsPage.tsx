@@ -50,7 +50,9 @@ const RUNS_GRID = '80px minmax(120px,1fr) 80px 140px 140px minmax(140px,1.2fr) 7
 // ---------------------------------------------------------------------------
 // Types — alignés sur ScraperRunsController@index (response: { data: Run[] })
 // ---------------------------------------------------------------------------
-type RunStatus = 'pending' | 'running' | 'success' | 'completed' | 'failed' | 'cancelled' | string;
+// Exporté depuis G41-012 : `uneCourseEnMouvement` (plus bas) le porte dans sa
+// signature publique, et sa garde le nomme.
+export type RunStatus = 'pending' | 'running' | 'success' | 'completed' | 'failed' | 'cancelled' | string;
 
 interface RequestPayload {
   type?: string;
@@ -89,6 +91,21 @@ type Filter = 'all' | 'running' | 'pending' | 'success' | 'failed' | 'cancelled'
 // Helpers
 // ---------------------------------------------------------------------------
 const PAGE_SIZE = 15;
+
+/**
+ * G41-012 — les états qu'un journal de collecte peut encore quitter TOUT SEUL.
+ *
+ * Une course terminée (`success`/`completed`/`failed`/`cancelled`) ne changera
+ * plus : la scruter est du bruit pur. Seules `pending` et `running` bougent sans
+ * geste dans cet onglet. La liste est nommée ici plutôt qu'écrite dans la
+ * requête : elle est ainsi visible, et testable.
+ */
+export const ETATS_DE_COURSE_EN_MOUVEMENT: ReadonlySet<string> = new Set(['pending', 'running']);
+
+/** Vrai si AU MOINS une course de la liste peut encore changer d'état. */
+export function uneCourseEnMouvement(runs: ReadonlyArray<{ status: RunStatus }>): boolean {
+  return runs.some((r) => ETATS_DE_COURSE_EN_MOUVEMENT.has(r.status));
+}
 
 function getZone(run: Run): string {
   const payload = run.request_payload ?? {};
@@ -234,7 +251,23 @@ export function ScraperRunsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['scraper-runs'],
     queryFn: async () => (await api.get<ApiList>('/scraper-runs?per_page=50')).data,
-    refetchInterval: 10_000,
+    /**
+     * G41-012 — la scrutation SUSPEND, elle ne disparaît pas.
+     *
+     * L'écran se rappelait toutes les dix secondes SANS AUCUNE condition :
+     * ouvert la nuit sur des journaux où plus rien ne bouge, il interrogeait le
+     * serveur 8 640 fois par jour pour la même réponse. Le patron existait déjà
+     * dans `CampaignDetailPage` (constat G42-007) : `refetchInterval` en
+     * EXPRESSION, relue à chaque tour.
+     *
+     * ⚠️ Ne jamais supprimer la scrutation : une liste figée pendant qu'une
+     * collecte tourne serait une régression, pas une économie.
+     */
+    refetchInterval: (requete) =>
+      uneCourseEnMouvement(requete.state.data?.data ?? []) ? 10_000 : false,
+    // Onglet en arrière-plan : personne ne regarde. C'est déjà le défaut de
+    // React Query ; on l'écrit pour que l'intention reste lisible.
+    refetchIntervalInBackground: false,
   });
 
   const runs = useMemo<Run[]>(() => data?.data ?? [], [data]);
@@ -404,6 +437,7 @@ export function ScraperRunsPage() {
       <Toolbar
         left={
           <SearchInput
+            label="Rechercher une collecte par source, département ou identifiant"
             value={search}
             onChange={handleSearch}
             placeholder="Rechercher source, dept, id…"

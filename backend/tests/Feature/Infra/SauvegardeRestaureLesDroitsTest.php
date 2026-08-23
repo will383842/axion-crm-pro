@@ -542,3 +542,83 @@ test('A08-008 — l exercice de restauration ne se contente plus de compter en s
         . "`has_table_privilege('<role applicatif>', …, 'SELECT')` sur la base restauree.",
     );
 });
+
+/**
+ * 🔴 F39-010 (S2) — « le script de restauration a pour cible par defaut la base
+ * de production ».
+ *
+ * Mesure du 2026-08-22, avant correctif :
+ *   `infra/scripts/restore-postgres.sh:56` `TARGET_DB="${2:-axion_crm}"`
+ *   `docker-compose.yml:97`                `POSTGRES_DB: axion_crm`
+ * Les deux nomment la MEME base. Et le script l'ecrase :
+ *   `:132` `| psql … -d "$TARGET_DB" --single-transaction -v ON_ERROR_STOP=1`,
+ * apres l'avoir creee au besoin (`:88`). Aucune confirmation, aucun controle
+ * d'environnement : la forme meme donnee dans l'usage (`:5`),
+ * `bash restore-postgres.sh dump.sql.gz`, visait la production.
+ *
+ * CE QUE CETTE GARDE INSPECTE, et rien d'autre : le TEXTE du script (l'absence
+ * de defaut, la presence du second verrou) et la ligne du runbook qui l'appelle.
+ * Elle ne joue pas la restauration — ce banc n'a ni archive ni conteneur.
+ */
+test('F39-010 — la base cible n a AUCUN defaut, et viser la production se declare', function () {
+    $restore = contenuScriptSauvegarde('infra/scripts/restore-postgres.sh');
+
+    // TEMOIN — c'est bien le script qui ecrase une base : sans lui, un fichier
+    // vide ou renomme passerait la garde au vert.
+    expect(str_contains($restore, 'TARGET_DB'))->toBeTrue(
+        "`restore-postgres.sh` ne porte plus de variable TARGET_DB : cette garde n'inspecte "
+        . 'plus rien. Verifier ce qu est devenu le script avant de conclure quoi que ce soit.',
+    );
+
+    // `${2:-}` (defaut VIDE) est la forme voulue ; `${2:-quoi-que-ce-soit}` ne
+    // l'est pas, quelle que soit la base nommee.
+    $defautArme = (bool) preg_match('/TARGET_DB="?\$\{2:-\s*[^}\s"]/', $restore);
+    expect($defautArme)->toBeFalse(
+        "F39-010 rouvert : `restore-postgres.sh` redonne un DEFAUT a la base cible.\n\n"
+        . "Le script ECRASE la base qu'il vise, apres l'avoir creee au besoin. Un defaut "
+        . "signifie qu'un appel a un seul argument — la forme la plus naturelle, et celle "
+        . "que l'usage montrait — choisit la cible a la place de l'operateur. Le 2026-08-22 "
+        . "cette cible etait `axion_crm`, la production (docker-compose.yml:97).\n\n"
+        . 'Geste : `TARGET_DB="${2:-}"` et refuser l execution si le second argument manque.',
+    );
+
+    expect(str_contains($restore, 'JE_RESTAURE_LA_PRODUCTION'))->toBeTrue(
+        'F39-010, second verrou disparu : `restore-postgres.sh` n exige plus de declaration '
+        . "explicite pour ecraser la base de production.\n\n"
+        . 'Retirer le defaut protege de la distraction ; ca ne protege pas du copier-coller '
+        . 'd une ligne de runbook. Ecraser la production est legitime (reprise apres '
+        . "sinistre) mais jamais ordinaire : ca doit s ENONCER.\n\n"
+        . 'Geste : refuser quand `$TARGET_DB` vaut la base de production et que '
+        . '`JE_RESTAURE_LA_PRODUCTION` ne vaut pas `oui`.',
+    );
+
+    // L'usage ne doit plus presenter la cible comme facultative : c'est cette
+    // ligne-la que l'operateur copie.
+    expect(str_contains($restore, '[target_db]'))->toBeFalse(
+        'L usage de `restore-postgres.sh` annonce toujours la base cible entre crochets, '
+        . 'donc facultative, alors qu elle est desormais obligatoire. C est la ligne que '
+        . "l operateur copie : elle doit dire vrai.\n\n"
+        . 'Geste : ecrire `<target_db>` a la place de `[target_db]` en tete du script.',
+    );
+});
+
+test('F39-010 — le runbook de reprise appelle le script avec la declaration exigee', function () {
+    // Un verrou pose dans le script sans mettre a jour le runbook qui l'appelle
+    // ne protege rien : il transforme la reprise apres sinistre en enigme, a
+    // l'heure ou personne n'a le temps d'en resoudre une.
+    $runbook = (string) file_get_contents(racineDepotSauvegarde() . '/infra/runbooks/04-restore-dr.md');
+
+    expect(str_contains($runbook, 'restore-postgres.sh'))->toBeTrue(
+        'Le runbook 04 n appelle plus `restore-postgres.sh` : cette garde n inspecte plus rien.',
+    );
+
+    expect(str_contains($runbook, 'JE_RESTAURE_LA_PRODUCTION=oui'))->toBeTrue(
+        'F39-010 : le runbook `infra/runbooks/04-restore-dr.md` appelle `restore-postgres.sh` '
+        . 'sur la base de production SANS la declaration que le script exige depuis le '
+        . "2026-08-22.\n\n"
+        . 'La commande du §4 sortira donc en code 1, en pleine reprise apres sinistre, avec '
+        . "un message que personne n attend a ce moment-la.\n\n"
+        . 'Geste : prefixer la commande du §4 par `JE_RESTAURE_LA_PRODUCTION=oui`, et dire '
+        . 'pourquoi elle est la.',
+    );
+});

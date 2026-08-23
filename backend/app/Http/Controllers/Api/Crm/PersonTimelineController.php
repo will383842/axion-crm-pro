@@ -68,7 +68,7 @@ class PersonTimelineController extends ConsoleController
         // affiche un univers puis l'autre n'est pas une timeline, c'est deux
         // listes accolées.
         usort($activities, static function (array $a, array $b): int {
-            return strcmp((string) ($b['occurred_at'] ?? ''), (string) ($a['occurred_at'] ?? ''));
+            return self::instantDe($b) <=> self::instantDe($a);
         });
 
         return $this->ok([
@@ -96,6 +96,46 @@ class PersonTimelineController extends ConsoleController
                 array_slice($activities, 0, self::MAX_ACTIVITIES),
             ),
         ]);
+    }
+
+    /**
+     * D29-008 — L'INSTANT, PAS LA CHAÎNE.
+     *
+     * `activities.occurred_at` est un TIMESTAMPTZ (migration
+     * `2026_08_14_000004_crm_socle_tags_optout_timeline.php`, l. 109) et arrive
+     * ici en CHAÎNE, rendue par Postgres avec le décalage de la session — que
+     * `config/database.php` aligne sur `DB_TIMEZONE` (Europe/Paris en test,
+     * cf. `phpunit.xml`). Comparer ces chaînes, c'est comparer des suffixes.
+     *
+     * Le 25 octobre 2026, l'heure locale 02:30 existe DEUX fois :
+     *   · `2026-10-25 02:30:00+02` = 00:30 Z (l'ANTÉRIEUR)
+     *   · `2026-10-25 02:30:00+01` = 01:30 Z (le plus récent)
+     * Les deux chaînes ne diffèrent que par le suffixe, et un tri décroissant
+     * par `strcmp` place « +02 » devant « +01 » : la timeline « 360° » remonte
+     * l'événement le plus ANCIEN en tête, une fois par an, pendant une heure.
+     * Mesure du 2026-08-22 : aucune garde ne couvrait ce cas.
+     *
+     * On compare donc l'instant, en microsecondes (`U.u`) pour ne pas perdre
+     * l'ordre des événements d'une même seconde. Un horodatage vide ou
+     * illisible descend en fin de liste — comme le faisait la chaîne vide.
+     *
+     * @param  array<string, mixed>  $activite
+     */
+    private static function instantDe(array $activite): float
+    {
+        $brut = trim((string) ($activite['occurred_at'] ?? ''));
+
+        if ($brut === '') {
+            return -INF;
+        }
+
+        try {
+            return (float) (new \DateTimeImmutable($brut))->format('U.u');
+        } catch (\Exception) {
+            // Une valeur qu'on ne sait pas lire ne doit pas décider de l'ordre
+            // du reste : elle sort en queue, elle ne fait pas planter la fiche.
+            return -INF;
+        }
     }
 
     /**

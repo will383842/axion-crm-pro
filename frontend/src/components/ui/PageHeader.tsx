@@ -34,7 +34,16 @@ export function PageHeader({ title, subtitle, eyebrow, badge, actions, breadcrum
         </h1>
         {subtitle ? <p className="mt-1 max-w-3xl text-sm text-slate-500 dark:text-slate-400">{subtitle}</p> : null}
       </div>
-      {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+      {/*
+        D30-008 — ce bloc portait `shrink-0` ET `flex-wrap`. Les deux ne peuvent
+        pas coexister : `shrink-0` fige la largeur du bloc à `max-content`, ses
+        enfants n'y rencontrent donc JAMAIS de contrainte de largeur, et le
+        `flex-wrap` du même élément ne peut structurellement jamais s'exercer.
+        Le repli était écrit et ne pouvait pas se produire — sur les 27 écrans
+        qui montent `PageHeader`. `min-w-0` remplace `shrink-0` : le bloc peut
+        se comprimer, et c'est cette compression qui déclenche le repli.
+      */}
+      {actions ? <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div> : null}
     </header>
   );
 }

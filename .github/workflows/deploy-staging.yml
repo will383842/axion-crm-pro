@@ -46,6 +46,17 @@ jobs:
   # y vaut `false` (il n'est vrai que sur `pull_request`). Aucun des deux ne
   # peut affamer l'autre.
   # ══════════════════════════════════════════════════════════════════════════
+  # 🔴 F38-008 — plafonds anti-gel, poses le 2026-08-22. Aucun job de la
+  # chaine qualite n'avait de borne : sans elle un job herite du plafond
+  # GitHub de 6 h, et SIX executions etaient figees entre 1 h 28 et 2 h 25
+  # au moment de la mesure. Ce ne sont pas des budgets : ce sont des
+  # plafonds, poses tres au-dessus de la duree utile. Si un job legitime
+  # est tue, relever la borne EN CITANT la duree du run tue — jamais la
+  # retirer. Explication complete : .github/workflows/ci.yml, en-tete.
+  # Garde : backend/tests/Feature/Infra/WorkflowsBornesDeDureeTest.php
+  # ⚠️ Ce job-ci N'A PAS de `timeout-minutes` et NE PEUT PAS en avoir : GitHub
+  # refuse la cle sur un job qui appelle un workflow reutilisable (`uses:`).
+  # Les bornes des six jobs de `ci.yml` s'appliquent a sa place.
   ci:
     name: CI (gate bloquant)
     uses: ./.github/workflows/ci.yml
@@ -61,6 +72,7 @@ jobs:
   build-and-push:
     name: Build + push GHCR
     runs-on: ubuntu-24.04
+    timeout-minutes: 60  # F38-008 (le commentaire ci-dessous chiffre ce build a ~25 min)
     # Rien ne part vers GHCR tant que la CI n'est pas verte. Construire puis
     # jeter coûterait ~25 min de runner pour rien, et surtout une image
     # `:staging` publiée est immédiatement tirable par le serveur.
@@ -71,7 +83,24 @@ jobs:
         include:
           - { image: api,    dockerfile: Dockerfile.laravel,  target: prod }
           - { image: app,    dockerfile: Dockerfile.frontend, target: prod }
-          - { image: worker, dockerfile: Dockerfile.worker,   target: prod }
+          # ── H47-005 ───────────────────────────────────────────────────────
+          # `{ image: worker, dockerfile: Dockerfile.worker, target: prod }`
+          # RETIRE le 2026-08-22. Il construisait et poussait
+          # `.../worker:staging` a CHAQUE deploiement de preproduction, pour une
+          # image que PERSONNE ne tire : les workers Playwright ont ete retires
+          # de la pile le 2026-08-14 (docker-compose.yml, en tete du service
+          # `caddy`), aucun fichier compose ne declare de service `worker`, et
+          # l'etape de deploiement ci-dessous nomme ses services un par un
+          # (`api app horizon scheduler`). Mesure du 2026-08-22 : 32 des 57
+          # alertes de l'analyse d'image, dont les 2 critiques, venaient de
+          # cette image jamais executee.
+          #
+          # ⚠️ REACTIVATION : elle se fait DES DEUX COTES, ensemble. Redeclarer
+          # les services dans `docker-compose.yml` (comme le dit son commentaire)
+          # ET remettre cette ligne. Le code vit toujours dans `workers/`, et le
+          # job `workers` de `ci.yml` continue de le tester a chaque PR : rien
+          # n'est perdu, seule la construction sur le chemin de deploiement
+          # disparait. Garde : `backend/tests/Feature/Infra/ImagesConstruitesSontDeployeesTest.php`.
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -121,6 +150,7 @@ jobs:
   deploy-staging:
     name: SSH Hetzner — préproduction
     runs-on: ubuntu-24.04
+    timeout-minutes: 45  # F38-008 (SSH + pull + migrate + redemarrage)
     needs: build-and-push
     environment:
       name: staging-direct-ssh

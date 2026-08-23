@@ -3,14 +3,14 @@
 return [
     'default' => env('QUEUE_CONNECTION', 'redis'),
     'connections' => [
-        'sync'  => ['driver' => 'sync'],
+        'sync' => ['driver' => 'sync'],
         'redis' => [
-            'driver'      => 'redis',
-            'connection'  => env('REDIS_QUEUE_CONNECTION', 'queue'),
-            'queue'       => env('REDIS_QUEUE', 'default'),
+            'driver' => 'redis',
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'queue'),
+            'queue' => env('REDIS_QUEUE', 'default'),
             'retry_after' => 600,
-            'block_for'   => null,
-            'after_commit'=> true,
+            'block_for' => null,
+            'after_commit' => true,
         ],
         'database' => [
             'driver' => 'database', 'connection' => env('DB_QUEUE_CONNECTION'), 'table' => env('DB_QUEUE_TABLE', 'jobs'),

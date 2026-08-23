@@ -41,6 +41,7 @@ class ProspectionReclassifySize extends Command
         SQL);
 
         $this->info("✅ {$affected} entreprises classées par taille (TPE/PME/ETI/GE).");
+
         return self::SUCCESS;
     }
 }

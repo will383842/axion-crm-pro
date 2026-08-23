@@ -31,6 +31,9 @@ final class Taxonomy
      * Aucune valeur `candidat_*` : la frontière entre les deux univers est
      * portée par le CHECK SQL, pas par une convention.
      *
+     * ⚠️ Toutes ces valeurs ne sont pas atteignables par le canal site → CRM :
+     * voir `BUSINESS_RELATION_TYPES_SAISIE_MANUELLE` juste en dessous (B13-008).
+     *
      * @var list<string>
      */
     public const BUSINESS_RELATION_TYPES = [
@@ -41,6 +44,33 @@ final class Taxonomy
         'investisseur',
         'conference',
         'newsletter',
+        'fournisseur',
+    ];
+
+    /**
+     * Valeurs de `BUSINESS_RELATION_TYPES` qu'AUCUN événement du canal
+     * site → CRM ne peut produire : elles n'existent que par la saisie manuelle
+     * en console.
+     *
+     * B13-008 — mesure du 2026-08-22 : `fournisseur` figure dans la liste
+     * canonique et dans l'ordre de priorité, mais `SiteSyncClassifier::relationType()`
+     * (SiteSyncClassifier.php:53-70) n'a aucune branche qui le rende — ses deux
+     * `default` retombent sur `prospect`. Rien ne le disait, et la liste laissait
+     * donc croire que le canal savait poser ce type.
+     *
+     * Ce n'est PAS un oubli à réparer côté canal : le site ne détient aucun
+     * formulaire « sous-traitant », et lui en fabriquer un ferait naître un type
+     * de fiche que la console ne gouverne pas encore. On l'écrit noir sur blanc
+     * plutôt que de le laisser deviner.
+     *
+     * Le jour où un émetteur `SousTraitant` existe côté site : retirer la valeur
+     * d'ici ET ajouter la branche dans `relationType()`. La garde
+     * `tests/Unit/Crm/TaxonomieAtteignableParLeCanalTest.php` rougit tant que
+     * les deux ne bougent pas ensemble.
+     *
+     * @var list<string>
+     */
+    public const BUSINESS_RELATION_TYPES_SAISIE_MANUELLE = [
         'fournisseur',
     ];
 

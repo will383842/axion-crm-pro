@@ -132,6 +132,7 @@ export function ContactsListPage() {
         left={
           <>
             <SearchInput
+              label="Rechercher un contact par nom de famille"
               value={search}
               onChange={setSearch}
               placeholder="Nom de famille…"

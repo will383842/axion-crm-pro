@@ -4,6 +4,14 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 
 export type CoverageMode = 'visu' | 'search' | 'action';
 
+/**
+ * G42-011 — en deçà de ce déplacement (pixels écran), l'infobulle de survol
+ * n'est pas repositionnée : l'œil ne verrait pas la différence, et chaque
+ * repositionnement coûte un rendu React complet. Six pixels ≈ la moitié de
+ * l'écart entre le curseur et l'infobulle (`hover.x + 14`).
+ */
+const SEUIL_DEPLACEMENT_PX = 6;
+
 interface Cell {
   code: string;
   name: string;
@@ -37,7 +45,21 @@ const MINIMAL_STYLE: StyleSpecification = {
   ],
 };
 
-const LOG = (...args: unknown[]) => console.log('[FranceMap]', ...args);
+// G42-011 — mesure du 2026-08-22 : 26 appels `LOG(` dans ce fichier, tous
+// actifs EN PRODUCTION. Le diagnostic du Sprint 18.9c (dimensions du canvas,
+// bornes du viewport, `innerHTML.slice(0, 200)` du conteneur, propriétés du
+// premier département…) partait dans la console de l'utilisateur à chaque
+// ouverture de `/coverage`. Deux coûts, pas un seul : le temps passé à
+// sérialiser des objets MapLibre que personne ne lit, et ce que ces lignes
+// racontent de l'intérieur de l'application à qui ouvre la console.
+//
+// Le diagnostic n'est pas perdu : il reste ENTIER en développement, où il a
+// été écrit pour servir. En production, `LOG` est un no-op — on garde la
+// fonction plutôt que de retirer les 26 appels, pour que le prochain qui
+// ouvre ce fichier en `pnpm dev` retrouve exactement la trace de Sprint 18.9c.
+const LOG: (...args: unknown[]) => void = import.meta.env.DEV
+  ? (...args) => console.log('[FranceMap]', ...args)
+  : () => {};
 
 export function FranceCoverageMap({
   cells,
@@ -239,6 +261,9 @@ export function FranceCoverageMap({
         if (code && cb) cb(code);
       });
       let hoveredId: string | number | null = null;
+      // G42-011 — dernier état RÉELLEMENT poussé dans React, pour ne pas le
+      // repousser à l'identique (cf. le `mousemove` plus bas).
+      let dernierSurvol: { code: string; x: number; y: number } | null = null;
       const clearHoverState = () => {
         if (hoveredId !== null) {
           map.setFeatureState({ source: 'departements', id: hoveredId }, { hover: false });
@@ -249,6 +274,7 @@ export function FranceCoverageMap({
       map.on('mouseleave', 'dept-fill', () => {
         map.getCanvas().style.cursor = '';
         clearHoverState();
+        dernierSurvol = null;
         setHover(null);
       });
       map.on('mousemove', 'dept-fill', (e) => {
@@ -261,6 +287,29 @@ export function FranceCoverageMap({
         }
         const props = f.properties ?? {};
         const code = (props['code'] as string | undefined) ?? '?';
+
+        // 🔴 G42-011, mesuré le 2026-08-22 : `setHover` était appelé à CHAQUE
+        // événement de souris. Le garde `f.id !== hoveredId` juste au-dessus ne
+        // protège que le `setFeatureState` de MapLibre (peint hors React) ; le
+        // `setState`, lui, passait toujours. Un déplacement lent sur un seul
+        // département suffisait donc à déclencher des dizaines de rendus React
+        // par seconde, chacun re-parcourant `cellsRef.current` pour retrouver
+        // la même cellule et réafficher la même infobulle.
+        //
+        // On ne pousse plus que ce qui CHANGE quelque chose à l'écran : un
+        // autre département, ou un déplacement visible. Le seuil est en pixels
+        // écran et non en temps (pas de throttle) : l'infobulle suit le curseur
+        // sans saccade perceptible, et s'arrête net quand le curseur s'arrête.
+        if (
+          dernierSurvol !== null &&
+          dernierSurvol.code === code &&
+          Math.abs(e.point.x - dernierSurvol.x) < SEUIL_DEPLACEMENT_PX &&
+          Math.abs(e.point.y - dernierSurvol.y) < SEUIL_DEPLACEMENT_PX
+        ) {
+          return;
+        }
+        dernierSurvol = { code, x: e.point.x, y: e.point.y };
+
         const name = (props['nom'] as string | undefined) ?? (props['name'] as string | undefined) ?? code;
         const cell = cellsRef.current.find((c) => c.code === code);
         setHover({
@@ -300,14 +349,32 @@ export function FranceCoverageMap({
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
-    for (const cell of cells) {
-      // L'id feature-state doit correspondre à promoteId ou generateId — on cherche par code.
-      map.querySourceFeatures('departements', { filter: ['==', ['get', 'code'], cell.code] })
-        .forEach((f) => {
-          if (f.id !== undefined) {
-            map.setFeatureState({ source: 'departements', id: f.id }, { total: cell.total });
-          }
-        });
+    // 🔴 G42-011, mesuré le 2026-08-22 : cette boucle appelait
+    // `querySourceFeatures` UNE FOIS PAR CELLULE — soit jusqu'à 101 balayages
+    // complets de la source des départements (et davantage si la maille
+    // descend sous le département), chacun rendant au plus une entité utile.
+    // Une seule passe suffit : on indexe les totaux par code, puis on parcourt
+    // les entités une fois. Même ensemble de `setFeatureState`, même résultat
+    // à l'écran — seul le coût change.
+    //
+    // ⚠️ CE QUE CE CORRECTIF NE RÉPARE PAS : `querySourceFeatures` ne rend que
+    // les entités du VIEWPORT courant. Les départements hors écran ne sont pas
+    // colorés, avant comme après — et le seront au prochain passage de cet
+    // effet, pas au déplacement de la carte. Corriger cela demande un
+    // `promoteId: 'code'` sur la source (adressage direct de l'entité, sans
+    // balayage) et une réapplication sur `sourcedata`, ce qui déplace le moment
+    // où les couleurs apparaissent : c'est un autre geste, à mesurer sur
+    // `tests/e2e/coverage.spec.ts`.
+    const totauxParCode = new Map<string, number>(cells.map((c) => [c.code, c.total]));
+
+    for (const f of map.querySourceFeatures('departements')) {
+      // L'id feature-state vient de `generateId` — on retrouve la cellule par code.
+      if (f.id === undefined) continue;
+      const code = (f.properties ?? {})['code'] as string | undefined;
+      if (code === undefined) continue;
+      const total = totauxParCode.get(code);
+      if (total === undefined) continue;
+      map.setFeatureState({ source: 'departements', id: f.id }, { total });
     }
   }, [cells]);
 
@@ -320,7 +387,13 @@ export function FranceCoverageMap({
       <div ref={containerRef} className="absolute inset-0" style={{ width: '100%', height: '100%' }} aria-label="Carte de couverture France" role="region" />
 
       {/* Légende flottante glassmorphism */}
-      <div className="pointer-events-none absolute bottom-4 left-4 rounded-2xl bg-white/85 px-4 py-3 text-[11px] shadow-[0_8px_32px_-8px_rgb(0_0_0/0.12)] ring-1 ring-slate-200/60 backdrop-blur-md">
+      {/* D27-007 — `--shadow-popover` et non une valeur litterale : cette legende
+          FLOTTE au-dessus de la carte, c'est l'intention que porte ce jeton.
+          Mesure du 2026-08-22 : elle portait `0_8px_32px_-8px_rgb(0_0_0/0.12)`,
+          une valeur qui ne correspondait a AUCUN des trois jetons d'ombre —
+          personne ne l'avait decidee, elle avait simplement ete recopiee de
+          travers. */}
+      <div className="pointer-events-none absolute bottom-4 left-4 rounded-2xl bg-white/85 px-4 py-3 text-[11px] shadow-[var(--shadow-popover)] ring-1 ring-slate-200/60 backdrop-blur-md">
         <div className="mb-2 flex items-center gap-2">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Entreprises</span>
         </div>

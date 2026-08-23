@@ -31,13 +31,26 @@ uses(TestCase::class, RefreshDatabase::class);
  * seule connexion sur laquelle la RLS mord.
  *
  * 🔴 Ce que ce fichier NE mesure PAS : la ceinture applicative. Tant que
- * `CRM_DB_APP_ROLE_ENABLED` reste à false — sa valeur par défaut, et sa valeur
- * en production —, l'application se connecte avec le rôle `axion`, qui est
- * SUPERUSER et BYPASSRLS : les policies, même strictes et même en FORCE, sont
- * intégralement contournées. Ces tests prouvent donc que la barrière EST prête,
- * pas qu'elle est ARMÉE. L'armer est un changement de variable d'environnement,
- * et c'est `RlsTest` (section « INERTIE ») qui garde le fait qu'elle ne l'est
- * pas encore.
+ * `CRM_DB_APP_ROLE_ENABLED` reste à false — sa valeur par défaut, et celle sous
+ * laquelle CETTE SUITE tourne —, l'application se connecte avec le rôle
+ * `axion`, qui est SUPERUSER et BYPASSRLS : les policies, même strictes et même
+ * en FORCE, sont intégralement contournées. Ces tests prouvent donc que la
+ * barrière EST prête, pas qu'elle est ARMÉE. L'armer est un changement de
+ * variable d'environnement, et c'est `RlsTest` (section « INERTIE ») qui garde
+ * le fait que la suite, elle, ne l'arme pas.
+ *
+ * ⚠️ A06-009 — CETTE PHRASE AFFIRMAIT AUSSI L'ÉTAT DU DRAPEAU SUR LE SERVEUR,
+ * ET C'EST UNE AFFIRMATION QUE CE DÉPÔT N'A PAS LES MOYENS DE FAIRE. L'état du
+ * serveur n'est pas observable depuis ici (cf. `RlsTest.php:341-346`), et le
+ * dépôt se contredit lui-même : `app/Console/Commands/CoverageRefreshMatrix.php`
+ * écrit « Depuis `CRM_DB_APP_ROLE_ENABLED=true`, la connexion par défaut
+ * porte… » quand `app/Console/Commands/PartmanMaintenir.php`, le même jour,
+ * écrit l'inverse. Un commentaire de test qui tranche à leur place fabrique une
+ * fausse certitude sur le seul point qui décide si les policies mordent en vrai.
+ * La divergence, elle, est figée par
+ * `tests/Feature/Infra/LaSuiteNeTourneJamaisEnConfigDeProdTest.php` — qui garde
+ * ce qui EST mesurable : que la suite ne pose pas le drapeau, et non la
+ * véracité d'une phrase sur la production.
  */
 function etancheiteOwner(): Connection
 {

@@ -28,17 +28,17 @@ class EffectifRangesSeeder extends Seeder
             ['42', '1 000 à 1 999 salariés',       'eti',               1000, 1999],
             ['51', '2 000 à 4 999 salariés',       'eti',               2000, 4999],
             ['52', '5 000 à 9 999 salariés',       'grande_entreprise', 5000, 9999],
-            ['53', '10 000 salariés et plus',      'grande_entreprise',10000, null],
+            ['53', '10 000 salariés et plus',      'grande_entreprise', 10000, null],
         ];
 
         foreach ($rows as [$code, $label, $size, $min, $max]) {
             DB::table('effectif_ranges')->updateOrInsert(
                 ['code' => $code],
                 [
-                    'label'         => $label,
+                    'label' => $label,
                     'size_category' => $size,
-                    'min_value'     => $min,
-                    'max_value'     => $max,
+                    'min_value' => $min,
+                    'max_value' => $max,
                 ],
             );
         }

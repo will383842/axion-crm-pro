@@ -21,9 +21,13 @@ class AuditHashChain
     /**
      * Sentinelle du maillon zéro. 64 zéros hex = même largeur qu'un SHA-256,
      * ce qui préserve l'invariant « prev_hash est toujours un digest 64-hex ».
-     * NB : la colonne `audit_logs.prev_hash` porte encore un DEFAULT SQL
-     * 'GENESIS' hérité du schéma initial ; il est inatteignable, ce service
-     * fournit toujours prev_hash explicitement.
+     * NB (rectifié le 2026-08-22, B16-014) : ce commentaire annonçait un DEFAULT
+     * SQL `'GENESIS'` sur `audit_logs.prev_hash`. C'était faux depuis la
+     * migration 2026_08_16_000001, qui l'avait remplacé par `repeat('0', 64)`.
+     * La colonne n'a plus AUCUN défaut depuis 2026_08_22_150000 (B16-013) : un
+     * INSERT qui omet `prev_hash` échoue franchement, au lieu de créer en
+     * silence une ligne que `verifyChain()` dénoncerait plus tard comme
+     * falsifiée. Ce service, lui, fournit toujours `prev_hash` explicitement.
      */
     public const GENESIS_PREV_HASH = '0000000000000000000000000000000000000000000000000000000000000000';
 

@@ -35,7 +35,100 @@ class MonitorCampaignProgressJob implements ShouldQueue
 
     public int $timeout = 60;
 
+    /**
+     * 🔴 CONSTAT B17-011. Combien de relances consecutives le battement s'autorise
+     * apres un echec, avant de se taire pour de bon.
+     *
+     * Il en faut une borne : sur une panne PERMANENTE (colonne disparue, espace
+     * introuvable) un `failed()` qui re-dispatche sans compter fabrique une file
+     * infinie de jobs qui echouent — on remplacerait un suivi mort par une boucle
+     * qui inonde Horizon. Cinq relances = cinq minutes de tolerance a une panne
+     * passagere (bascule Postgres, redemarrage Redis), puis un `critical` qui
+     * nomme la campagne restee `running`.
+     */
+    private const RELANCES_MAX_APRES_ECHEC = 5;
+
+    /**
+     * Echecs CONSECUTIFS deja encaisses par ce battement.
+     *
+     * ⚠️ Propriete DECLAREE et non parametre promu : une charge serialisee AVANT
+     * ce lot et encore en file au deploiement n'a pas cette cle, et un parametre
+     * promu type leverait « must not be accessed before initialization » a la
+     * deserialisation (mesure du 2026-08-21 consignee dans RunsInWorkspace).
+     *
+     * Le compteur se remet a zero tout seul : le re-dispatch de fin de `suivre()`
+     * construit un `new self(...)` neuf, donc a zero. Seul le chemin d'echec le
+     * fait monter.
+     */
+    public int $echecsConsecutifs = 0;
+
     public function __construct(public readonly int $campaignId) {}
+
+    /**
+     * 🔴 CONSTAT B17-011 (S2) — « une seule exception fige la campagne en running
+     * pour toujours ».
+     *
+     * MESURE DU 2026-08-22, AVANT CORRECTIF : `tries = 1`, le re-dispatch qui
+     * entretient le suivi est la DERNIERE instruction de `suivre()`, et le seul
+     * `try/catch` du corps ne couvre que le recompte des agregats. Tout ce qui
+     * suit — `$campaign->update($aggregates)`, `shouldAutoPause()`, les deux
+     * `update()` de pause et de fin — peut lever hors de ce filet. Aucune methode
+     * `failed()` n'existait dans aucun job (`grep -rn 'public function failed'
+     * app/Jobs/*.php` ne rendait rien), et `routes/console.php` ne planifie aucun
+     * guetteur de campagnes bloquees. Une exception unique tuait donc la chaine :
+     * la campagne restait `running`, sans plus jamais etre auto-pausee sur quota
+     * ni marquee terminee.
+     *
+     * Ce que ce `failed()` retablit : le BATTEMENT, pas le travail. Il ne rejoue
+     * pas le tour perdu, il reprogramme le suivant. Si la campagne n'est plus
+     * `running`, ce tour suivant sort par les `return` du haut de `suivre()` sans
+     * rien re-dispatcher : la chaine s'eteint d'elle-meme, comme avant.
+     */
+    public function failed(\Throwable $e): void
+    {
+        $relance = $this->echecsConsecutifs + 1;
+
+        if ($relance > self::RELANCES_MAX_APRES_ECHEC) {
+            Log::critical(
+                'MonitorCampaignProgressJob : suivi ABANDONNE apres '
+                . self::RELANCES_MAX_APRES_ECHEC . ' echecs consecutifs (constat B17-011). '
+                . 'La campagne peut rester bloquee en « running » sans auto-pause ni fin — '
+                . 'geste : corriger la cause ci-dessous, puis re-dispatcher le suivi '
+                . '(MonitorCampaignProgressJob) sur cette campagne.',
+                [
+                    'campaign_id' => $this->campaignId,
+                    'exception' => $e->getMessage(),
+                ],
+            );
+
+            return;
+        }
+
+        Log::warning('MonitorCampaignProgressJob : battement relance apres echec (constat B17-011)', [
+            'campaign_id' => $this->campaignId,
+            'relance' => $relance,
+            'plafond' => self::RELANCES_MAX_APRES_ECHEC,
+            'exception' => $e->getMessage(),
+        ]);
+
+        $suivant = new self($this->campaignId);
+        $suivant->echecsConsecutifs = $relance;
+
+        // L'espace de la charge peut manquer (job mis en file avant B11-002) ;
+        // l'amorcage par la ligne peut lui-meme lever sous RLS stricte, et une
+        // exception ici ferait perdre le battement qu'on est justement en train
+        // de sauver.
+        $espace = $this->espaceDuJob();
+        if ($espace === null) {
+            try {
+                $espace = $this->espaceDepuisLaLigne('scraping_campaigns', $this->campaignId);
+            } catch (\Throwable) {
+                $espace = null;
+            }
+        }
+
+        dispatch($suivant->pourEspace($espace))->delay(now()->addSeconds(60));
+    }
 
     /**
      * 🔴 CONSTAT B11-002 / B17-010. Ce moniteur tourne toutes les 60 s en se

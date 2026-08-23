@@ -17,7 +17,7 @@ return new class extends Migration
     {
         $exists = DB::selectOne(
             "SELECT 1 AS ok FROM information_schema.columns
-             WHERE table_schema = current_schema() AND table_name = 'users' AND column_name = 'onboarding_tour_completed_at'"
+             WHERE table_schema = current_schema() AND table_name = 'users' AND column_name = 'onboarding_tour_completed_at'",
         );
         if (! $exists) {
             DB::statement('ALTER TABLE users ADD COLUMN onboarding_tour_completed_at TIMESTAMPTZ');

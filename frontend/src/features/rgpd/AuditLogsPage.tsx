@@ -109,6 +109,7 @@ export function AuditLogsPage() {
         left={
           <>
             <SearchInput
+              label="Rechercher dans le journal d'audit"
               value={search}
               onChange={setSearch}
               placeholder="Événement, chemin, IP, acteur…"

@@ -11,13 +11,14 @@
  *
  * Sous-composants dans `@/components/layout/`.
  */
-import { useEffect, useState } from 'react';
-import { Outlet } from '@tanstack/react-router';
+import { useEffect, useRef, useState } from 'react';
+import { Outlet, useRouterState } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Drawer, GlobalSearch, Modal } from '@/components/ui';
 import { OnboardingTour } from '@/components/OnboardingTour';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { libelleDeChemin } from '@/components/layout/AutoBreadcrumbs';
 import { RouteErrorBoundary } from './RouteErrorBoundary';
 import { api } from '@/lib/api';
 import { subscribeWorkspaceNotifications } from '@/lib/echo';
@@ -70,9 +71,49 @@ export function RootLayout() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
+  // D30-005 — le tiroir ne se refermait APRÈS AUCUNE navigation : les deux
+  // seuls `setMobileSidebarOpen(false)` étaient la croix du tiroir et le bouton
+  // de repli. Toucher une entrée de menu changeait donc d'écran… sous un tiroir
+  // resté ouvert, qu'il fallait ensuite refermer à la main : quatre appuis là où
+  // le bureau demande deux clics. On referme sur le chemin, et non dans le
+  // gestionnaire de clic des entrées : la navigation vient aussi de la
+  // recherche globale, d'un lien interne ou du retour arrière.
+  const cheminCourant = useRouterState({ select: (s) => s.location.pathname });
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [cheminCourant]);
+
+  // D28-014 — le changement d'écran ne s'ANNONÇAIT nulle part : mesure du
+  // 2026-08-22, `grep -rn aria-live src --include=*.tsx` ne rendait aucune
+  // ligne. Dans une application d'une seule page, changer d'écran ne recharge
+  // rien : qui ne voit pas la page n'apprend jamais qu'il a changé d'endroit.
+  //
+  // Trois précautions contre le bavardage, qui est le risque réel d'une telle
+  // région :
+  //  - `polite` et jamais `assertive` : l'annonce attend la fin de la lecture
+  //    en cours au lieu de la couper ;
+  //  - le message n'est écrit que quand le CHEMIN change, pas à chaque rendu ;
+  //  - le premier rendu ne dit rien — l'arrivée sur la page est déjà annoncée
+  //    par le navigateur, la redire ferait doublon.
+  const [annonceDeRoute, setAnnonceDeRoute] = useState('');
+  const premierRendu = useRef(true);
+  useEffect(() => {
+    if (premierRendu.current) {
+      premierRendu.current = false;
+      return;
+    }
+    setAnnonceDeRoute(`${libelleDeChemin(cheminCourant)}, page chargée`);
+  }, [cheminCourant]);
+
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
       <a href="#main" className="skip-link">Aller au contenu</a>
+
+      {/* D28-014 — la seule région d'annonce du changement d'écran. Invisible à
+          l'œil (`sr-only`), elle n'existe que pour les lecteurs d'écran. */}
+      <div role="status" aria-live="polite" className="sr-only" data-annonce-de-route>
+        {annonceDeRoute}
+      </div>
 
       {/* Desktop sidebar */}
       <div className="sticky top-0 hidden h-screen lg:flex">
@@ -87,7 +128,10 @@ export function RootLayout() {
         width="sm"
       >
         <div className="-mx-6 -my-4">
-          <Sidebar collapsed={false} onToggleCollapse={() => setMobileSidebarOpen(false)} />
+          {/* D30-005 — `pleineLargeur` : dans le tiroir, la barre suit la
+              largeur du panneau. Ses 260 px fixes laissaient 115 px de bande
+              morte sur un téléphone de 375 px. */}
+          <Sidebar collapsed={false} onToggleCollapse={() => setMobileSidebarOpen(false)} pleineLargeur />
         </div>
       </Drawer>
 
@@ -98,7 +142,21 @@ export function RootLayout() {
           onOpenMobileSearch={() => setMobileSearchOpen(true)}
         />
 
-        <main id="main" className="flex-1 overflow-x-hidden px-4 py-5 md:px-6 md:py-6 lg:px-10">
+        {/*
+          D30-001 — `overflow-x-hidden` ici COUPAIT le débordement horizontal
+          sans offrir ni barre ni geste : à 375 px, tout ce qui dépassait la
+          largeur visible était simplement perdu, sans aucun moyen d'y accéder.
+          `overflow-x-auto` ne montre une barre que s'il y a réellement quelque
+          chose à atteindre — c'est la seule différence, et elle rend le contenu
+          joignable au lieu de le supprimer.
+
+          ⚠️ Ce changement est un RÉVÉLATEUR : un débordement d'un pixel qui
+          passait inaperçu fera désormais apparaître une barre. Ce n'est pas une
+          régression, c'est le débordement qui était déjà là. `TableScroll`
+          (`components/ui/TableScroll.tsx`) reste le remède ciblé des tableaux
+          en grille ; cette ligne couvre tout le reste.
+        */}
+        <main id="main" className="flex-1 overflow-x-auto px-4 py-5 md:px-6 md:py-6 lg:px-10">
           {/*
             P6-UI-005 — SITE DE MONTAGE 2/3. La frontiere est posee A
             L'INTERIEUR de `#main`, et non autour de toute la coquille : c'est

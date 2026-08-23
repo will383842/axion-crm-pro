@@ -19,10 +19,12 @@ class SignalsNightlyScan extends Command
     {
         if (env('MOCK_MODE', true)) {
             $this->info('MOCK_MODE — signals scan no-op.');
+
             return self::SUCCESS;
         }
 
         $this->warn('Implémentation réelle prévue Sprint 7 — fan-out queues scrape:france-travail + scrape:bodacc.');
+
         return self::SUCCESS;
     }
 }

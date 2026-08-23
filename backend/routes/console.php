@@ -216,27 +216,41 @@ Schedule::command('audiences:full-refresh')
     ->onOneServer();
 
 // Sprint Pipeline 360° — Re-scrape mensuel companies archivées sans email
-// La commande `companies:rescrape-archives` est codée dans le Sprint Hardening (H6).
-// En attendant, le schedule est posé mais s'auto-skip si la commande n'existe pas
-// (pas d'erreur dans schedule:list).
+//
+// A09-012 / B17-007 (audit 360) : le commentaire qui tenait ici renvoyait la
+// commande à un Sprint Hardening (H6) futur et présentait la tâche comme
+// inoffensive tant que ce sprint n'aurait pas eu lieu. Mesure du 2026-08-22 : la
+// commande est bel et bien déclarée
+// (app/Console/Commands/RescrapeArchivesCommand.php:23), donc le `skip()` rendait
+// false à chaque passage et la tâche tournait pour de bon. Le commentaire mentait
+// sur ce que la prod fait une fois par mois — c'est la raison pour laquelle il a
+// été remplacé par la description du travail réel, ci-dessous.
+//
+// Ce que cette ligne déclenche vraiment : le 1er du mois à 02:00, jusqu'à 200
+// companies `archived_no_email` inertes depuis 30+ jours repartent en
+// EnrichCompanyJob, espacés de 2 s chacun (~400 s d'étalement) pour ne pas
+// marteler INSEE / Brave.
+//
+// Le `skip()` est retiré avec le commentaire, et c'est délibéré : si la commande
+// venait à disparaître, on VEUT que la tâche échoue visiblement plutôt qu'elle se
+// saute en silence pendant des mois — c'est ce silence qui a produit ce constat.
 Schedule::command('companies:rescrape-archives --limit=200')
     ->monthlyOn(1, '02:00')
     ->withoutOverlapping(120)
-    ->onOneServer()
-    ->skip(function (): bool {
-        // True = skip ce run. Skip si la commande artisan n'existe pas encore.
-        return ! array_key_exists('companies:rescrape-archives', Artisan::all());
-    });
+    ->onOneServer();
 
 // Sprint H12 — Retry Google Places pour les companies pending (quota mensuel atteint)
-// Tourne le 1er de chaque mois à 03:00 (1h après rescrape-archives).
+// Tourne le 1er de chaque mois à 03:00 (1h après rescrape-archives) : jusqu'à 500
+// companies portant `signals.google_places_pending` repartent en EnrichCompanyJob.
+//
+// A09-012 / B17-007 : la même fermeture `skip()` morte a été retirée ici. La
+// commande existe (app/Console/Commands/RetryGooglePlacesCommand.php:25) ; le test
+// d'existence rendait donc toujours false, et il masquait la disparition éventuelle
+// de la commande au lieu de la signaler.
 Schedule::command('companies:retry-google-places --limit=500')
     ->monthlyOn(1, '03:00')
     ->withoutOverlapping(120)
-    ->onOneServer()
-    ->skip(function (): bool {
-        return ! array_key_exists('companies:retry-google-places', Artisan::all());
-    });
+    ->onOneServer();
 
 // --- Chantier base médias : rafraîchissement automatique (« set & forget ») ---
 // Extraction des nouveaux médias (par NAF) depuis companies — idempotent, quotidien.

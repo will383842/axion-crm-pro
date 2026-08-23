@@ -10,7 +10,9 @@ use Illuminate\Support\Str;
 /**
  * Portabilité RGPD art. 20 — export JSON structuré + chiffré.
  * Exporte toutes les données détenues sur un sujet (par email), produit un ZIP chiffré
- * AES-256 stocké dans s3/local 7 jours, fournit un token téléchargement one-shot.
+ * AES-256 stocké dans s3/local 7 jours, remis contre un jeton de POSSESSION
+ * valable jusqu'à son expiration — voir le commentaire de `retrieve()` (B15-012)
+ * pour ce que ce jeton fait, et ne fait pas.
  */
 class GdprPortabilityService
 {
@@ -235,6 +237,32 @@ class GdprPortabilityService
         return ['token' => $token, 'expires_at' => $expiresAt->toIso8601String(), 'size' => strlen($encrypted)];
     }
 
+    /**
+     * 🔴 B15-012 — L'EN-TETE DE CETTE CLASSE ANNONÇAIT UN JETON « one-shot ».
+     * IL NE L'A JAMAIS ÉTÉ.
+     *
+     * Mesure du 2026-08-22 : cette méthode retrouve la ligne par
+     * `export_token` haché, rend le déchiffré, et n'écrit RIEN — pas de nullage
+     * du jeton, pas de date de consommation, pas de suppression de
+     * `gdpr-exports/{token}.enc`. Le lien est donc rejouable pendant les
+     * 7 jours de `export_expires_at` (posés à `export()`).
+     *
+     * Ce n'est pas un oubli, c'est le modèle assumé ailleurs : `routes/api.php`
+     * (bloc « PORTABILITÉ RGPD ») écrit noir sur blanc que la sécurité repose
+     * sur la POSSESSION du secret — 48 caractères (~285 bits), stocké haché,
+     * 404 sur jeton inconnu, throttle posé — et sur son expiration. Et la
+     * relecture est NÉCESSAIRE à la personne : double-clic, prefetch du
+     * navigateur, reprise d'un téléchargement interrompu. Consommer au premier
+     * appel transformerait ces trois gestes ordinaires en 404 sur l'archive
+     * qu'elle n'a pas fini de récupérer.
+     *
+     * On a donc aligné l'ANNONCE sur la MESURE, et pas l'inverse. Passer
+     * réellement en usage unique — ou en fenêtre de rejeu courte, via une
+     * colonne `export_consumed_at` — est un arbitrage produit : il change ce
+     * que reçoit la personne concernée, et il n'appartient pas à ce fichier.
+     * La garde `JetonExportNonPersisteTest` vérifie que l'annonce et le geste
+     * ne peuvent plus diverger en silence.
+     */
     public function retrieve(string $token): ?string
     {
         $hash = hash('sha256', $token);

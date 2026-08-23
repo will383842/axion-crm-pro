@@ -210,6 +210,44 @@ test('P6-API-001 — GET /journalists ne rend PAS les journalistes d un autre es
     listeNeFuitPas('/api/v1/journalists', 'alpha-secret@presse.test', 'beta-a-moi@presse.test', $b);
 });
 
+test('G41-010 — GET /media ne rend PAS les medias d un autre espace', function () {
+    // 🔴 CONSTAT G41-010 (S2). Le meme defaut que P6-API-001 ci-dessus, sur le
+    // controleur d'a cote, est reste ouvert deux jours de plus :
+    // `JournalistsController` a ete repare le 2026-08-20, `MediaController` ne
+    // l'a ete que le 2026-08-22. Deux `buildFilteredQuery()` jumelles, un seul
+    // correctif — le motif A-011, et la raison pour laquelle cette garde MESURE
+    // la seconde au lieu de se fier a la ressemblance des deux fichiers.
+    //
+    // La liste rendait `media.email` et `media.phone` — les coordonnees de
+    // redaction de TOUS les espaces — a tout compte habilite.
+    if (! Schema::hasTable('media')) {
+        test()->markTestSkipped('table media absente de ce banc');
+    }
+
+    [, $espaceA] = compteListe('ALPHA');
+    [$b, $espaceB] = compteListe('BETA');
+
+    foreach ([[$espaceA, 'Alpha Media Secret'], [$espaceB, 'Beta Media A Moi']] as [$ws, $nom]) {
+        DB::table('media')->insert([
+            'workspace_id' => $ws,
+            // `name` est le marqueur, et ce choix n'est pas un gout :
+            // `MasquageCoordonnees::masquerSiRequis()` peut caviarder `email`
+            // selon le role. Chercher un marqueur caviarde ferait verdir la
+            // garde pour la mauvaise raison — on aurait mesure un masquage en
+            // croyant mesurer un cloisonnement.
+            'name' => $nom,
+            'media_type' => 'presse_quotidien',
+            // Posee quand meme : le jour ou le masquage saute, la fuite portera
+            // sur cette colonne-la, et l'aplatissement la verra.
+            'email' => strtolower(str_replace(' ', '-', $nom)) . '@redaction.test',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    listeNeFuitPas('/api/v1/media', 'Alpha Media Secret', 'Beta Media A Moi', $b);
+});
+
 test('P6-API — GET /proxy-providers ne rend PAS les fournisseurs d un autre espace', function () {
     // ⚠️ La table s'appelle `proxy_providers_config`, pas `proxy_providers` :
     // c'est `ProxyProvider::$table` qui le dit. Une premiere version de ce test

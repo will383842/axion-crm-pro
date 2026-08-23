@@ -11,6 +11,7 @@ class WorkspaceController extends ApiController
     /**
      * @OA\Get(path="/workspace", tags={"Workspace"}, summary="Workspace courant (settings + cost_cap)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Response(response=200, description="OK"))
      */
     public function show(Request $r): JsonResponse
@@ -22,13 +23,15 @@ class WorkspaceController extends ApiController
             if (! $user) {
                 return $this->ok(null);
             }
+
             return $this->ok($user->currentWorkspace);
         } catch (\Throwable $e) {
             Log::error('workspace.show failed', [
-                'user_id'   => optional($r->user())->id,
+                'user_id' => optional($r->user())->id,
                 'exception' => $e->getMessage(),
             ]);
             report($e);
+
             return $this->ok(null);
         }
     }
@@ -36,7 +39,11 @@ class WorkspaceController extends ApiController
     /**
      * @OA\Put(path="/workspace", tags={"Workspace"}, summary="Update settings workspace (Sprint 3)",
      *     security={{"sanctumCookie":{}}},
+     *
      *     @OA\Response(response=501, description="Not implemented"))
      */
-    public function update(Request $r): JsonResponse { return $this->notImplemented('3'); }
+    public function update(Request $r): JsonResponse
+    {
+        return $this->notImplemented('3');
+    }
 }

@@ -30,8 +30,8 @@ class ClassifierService
             useCaseSlug: 'sector_classification',
             variables: [
                 'ext_company_data' => json_encode([
-                    'denomination'   => $company->denomination,
-                    'naf'            => $company->naf,
+                    'denomination' => $company->denomination,
+                    'naf' => $company->naf,
                     'effectif_range' => $company->effectif_range,
                 ], JSON_UNESCAPED_UNICODE),
             ],
@@ -41,10 +41,10 @@ class ClassifierService
         $offerResp = $this->llm->complete(new LLMRequestData(
             useCaseSlug: 'classify_company_axion',
             variables: [
-                'denomination'    => $company->denomination,
-                'naf'             => $company->naf,
-                'effectif_range'  => $company->effectif_range,
-                'ext_website_text'=> '',
+                'denomination' => $company->denomination,
+                'naf' => $company->naf,
+                'effectif_range' => $company->effectif_range,
+                'ext_website_text' => '',
             ],
         ));
         $offerJson = $offerResp->asJson() ?? [];
@@ -74,10 +74,10 @@ class ClassifierService
             useCaseSlug: 'auto_tag',
             variables: [
                 'denomination' => $company->denomination,
-                'ext_summary'  => json_encode([
-                    'naf'      => $company->naf,
-                    'size'     => $company->size_category,
-                    'signals'  => $company->signals,
+                'ext_summary' => json_encode([
+                    'naf' => $company->naf,
+                    'size' => $company->size_category,
+                    'signals' => $company->signals,
                 ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_IGNORE),
             ],
         ));
@@ -93,6 +93,6 @@ class ClassifierService
         $company->tags()->sync($tagIds);
 
         // Apply DSL rules pour tags additionnels avec match programmatique
-        (new AutoTagApplier())->apply($company);
+        (new AutoTagApplier)->apply($company);
     }
 }

@@ -52,20 +52,22 @@ return new class extends Migration
             // Vérifie existence de la table
             $tableExists = DB::selectOne(
                 'SELECT 1 AS ok FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = ?',
-                [$table]
+                [$table],
             );
             if (! $tableExists) {
                 $skippedNoTable[] = $table;
+
                 continue;
             }
 
             // Vérifie présence de workspace_id
             $columnExists = DB::selectOne(
                 'SELECT 1 AS ok FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?',
-                [$table, 'workspace_id']
+                [$table, 'workspace_id'],
             );
             if (! $columnExists) {
                 $skippedNoColumn[] = $table;
+
                 continue;
             }
 
@@ -109,7 +111,7 @@ return new class extends Migration
         foreach ($this->workspaceScopedTables as $table) {
             $tableExists = DB::selectOne(
                 'SELECT 1 AS ok FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = ?',
-                [$table]
+                [$table],
             );
             if (! $tableExists) {
                 continue;

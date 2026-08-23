@@ -7,10 +7,10 @@ use Illuminate\Support\Facades\Http;
 class MistralProvider
 {
     private const PRICING_EUR_PER_MTOKEN = [
-        'mistral-large-latest'  => ['input' => 2.0,  'output' => 6.0],
-        'mistral-small-latest'  => ['input' => 0.20, 'output' => 0.60],
-        'open-mistral-7b'       => ['input' => 0.25, 'output' => 0.25],
-        'open-mixtral-8x22b'    => ['input' => 2.0,  'output' => 6.0],
+        'mistral-large-latest' => ['input' => 2.0,  'output' => 6.0],
+        'mistral-small-latest' => ['input' => 0.20, 'output' => 0.60],
+        'open-mistral-7b' => ['input' => 0.25, 'output' => 0.25],
+        'open-mixtral-8x22b' => ['input' => 2.0,  'output' => 6.0],
     ];
 
     private array $lastUsage = ['tokens_input' => 0, 'tokens_output' => 0, 'cost_eur' => 0.0];
@@ -29,10 +29,10 @@ class MistralProvider
         // avec un 422 ("Input should be a valid dictionary or object"). On
         // n'inclut le paramètre QUE quand JSON mode est demandé.
         $payload = [
-            'model'       => $this->model,
-            'messages'    => [['role' => 'user', 'content' => $promptTemplate]],
+            'model' => $this->model,
+            'messages' => [['role' => 'user', 'content' => $promptTemplate]],
             'temperature' => (float) ($options['temperature'] ?? 0.2),
-            'max_tokens'  => (int) ($options['max_tokens'] ?? 2048),
+            'max_tokens' => (int) ($options['max_tokens'] ?? 2048),
         ];
         if (! empty($options['json'])) {
             $payload['response_format'] = ['type' => 'json_object'];
@@ -48,17 +48,21 @@ class MistralProvider
         $data = $resp->json();
         $text = (string) ($data['choices'][0]['message']['content'] ?? '');
         $usage = $data['usage'] ?? [];
-        $tokensIn  = (int) ($usage['prompt_tokens'] ?? 0);
+        $tokensIn = (int) ($usage['prompt_tokens'] ?? 0);
         $tokensOut = (int) ($usage['completion_tokens'] ?? 0);
         $pricing = self::PRICING_EUR_PER_MTOKEN[$this->model] ?? ['input' => 0, 'output' => 0];
 
         $this->lastUsage = [
-            'tokens_input'  => $tokensIn,
+            'tokens_input' => $tokensIn,
             'tokens_output' => $tokensOut,
-            'cost_eur'      => ($tokensIn / 1_000_000) * $pricing['input'] + ($tokensOut / 1_000_000) * $pricing['output'],
+            'cost_eur' => ($tokensIn / 1_000_000) * $pricing['input'] + ($tokensOut / 1_000_000) * $pricing['output'],
         ];
+
         return $text;
     }
 
-    public function lastUsage(): array { return $this->lastUsage; }
+    public function lastUsage(): array
+    {
+        return $this->lastUsage;
+    }
 }

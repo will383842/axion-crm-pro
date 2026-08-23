@@ -1,10 +1,17 @@
 <?php
 
+use App\Providers\AppServiceProvider;
+use App\Providers\AuthServiceProvider;
+use App\Providers\HorizonServiceProvider;
+use App\Providers\MockServicesProvider;
+use App\Providers\RouteServiceProvider;
+use App\Providers\TelescopeServiceProvider;
+
 return [
-    App\Providers\AppServiceProvider::class,
-    App\Providers\AuthServiceProvider::class,
-    App\Providers\HorizonServiceProvider::class,
-    App\Providers\MockServicesProvider::class,
-    App\Providers\TelescopeServiceProvider::class,
-    App\Providers\RouteServiceProvider::class,
+    AppServiceProvider::class,
+    AuthServiceProvider::class,
+    HorizonServiceProvider::class,
+    MockServicesProvider::class,
+    TelescopeServiceProvider::class,
+    RouteServiceProvider::class,
 ];

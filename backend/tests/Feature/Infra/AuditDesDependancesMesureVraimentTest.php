@@ -572,6 +572,139 @@ test('le cliquet couvre EXACTEMENT la matrice pnpm, et il est date', function ()
     }
 });
 
+/**
+ * Les repertoires du depot qui portent un `pnpm-lock.yaml`, DEDUITS de l'arbre.
+ *
+ * ⚠️ SCANDIR RECURSIF, ET PAS `RecursiveDirectoryIterator`. Mesure du depot :
+ * l'iterateur TRONQUE le parcours sur ce montage Docker (14 fichiers vus sur 56
+ * reellement presents). Une garde de completude batie dessus certifierait
+ * l'absence de ce qu'elle n'a pas parcouru — exactement le genre de vert que ce
+ * fichier existe pour interdire.
+ *
+ * @return list<string> chemins relatifs a la racine du depot, sans le lockfile
+ */
+function lockfilesPnpmDuDepotH47(?string $racine = null, string $prefixe = ''): array
+{
+    $racine ??= racineDepotH47();
+    $trouves = [];
+
+    $entrees = @scandir($racine);
+    if ($entrees === false) {
+        return $trouves;
+    }
+
+    foreach ($entrees as $entree) {
+        if ($entree === '.' || $entree === '..') {
+            continue;
+        }
+
+        $chemin = $racine . '/' . $entree;
+        $relatif = $prefixe === '' ? $entree : $prefixe . '/' . $entree;
+
+        if (is_dir($chemin)) {
+            // Repertoires OUTILLAGE : ils portent des lockfiles qui ne sont pas
+            // ceux du depot. Les auditer n'aurait aucun sens, et `.git` a lui
+            // seul rend le parcours interminable.
+            if (in_array($entree, ['.git', 'node_modules', 'vendor', 'dist', 'coverage', '.pnpm-store'], true)) {
+                continue;
+            }
+            $trouves = array_merge($trouves, lockfilesPnpmDuDepotH47($chemin, $relatif));
+
+            continue;
+        }
+
+        if ($entree === 'pnpm-lock.yaml') {
+            $trouves[] = $prefixe;
+        }
+    }
+
+    return $trouves;
+}
+
+test('H47-004 — la matrice pnpm-audit visite TOUS les lockfiles pnpm du depot', function (): void {
+    // 🔴 CONSTAT H47-004. `poc/05_dedup_performance/pnpm-lock.yaml` vivait hors
+    // des DEUX dispositifs a la fois : aucun bloc `directory:` de
+    // `.github/dependabot.yml` ne le couvrait, et la matrice de `pnpm-audit` ne
+    // visitait que `frontend` et `workers`. L'alerte Dependabot #33 (`esbuild`,
+    // GHSA-g7r4-m6w7-qqqr) porte sur lui : une alerte pour laquelle aucune PR
+    // n'aurait jamais ete proposee, et sur laquelle aucune garde ne tournait.
+    //
+    // La gravite de CET avis est faible (1 low, dependance de developpement).
+    // Le mecanisme, lui, est general : tout lockfile ajoute demain hors des
+    // repertoires declares heritait du meme angle mort, en silence. C'est le
+    // MECANISME que cette garde ferme, pas l'avis.
+    //
+    // La liste attendue est DEDUITE de l'arbre, jamais ecrite a la main. Une
+    // garde de completude a liste manuelle ne voit jamais le site qu'on a
+    // oublie — et ce depot a deja paye cette lecon.
+    $surDisque = lockfilesPnpmDuDepotH47();
+
+    // TEMOIN DE COUVERTURE : si le balayage ne trouve plus rien, il rend vert
+    // sans avoir rien mesure. On exige d'en voir au moins autant que la matrice
+    // en declare.
+    $matrice = jobsDAuditH47()['pnpm-audit']['strategy']['matrix']['path'] ?? [];
+    $this->assertNotEmpty($matrice, 'La matrice pnpm-audit est vide ou a change de forme.');
+    $this->assertGreaterThanOrEqual(
+        count($matrice),
+        count($surDisque),
+        'Le balayage voit moins de lockfiles que la matrice n en declare : il est tronque, '
+        . 'et son verdict ne vaut rien. Trouves : ' . implode(', ', $surDisque),
+    );
+
+    sort($surDisque);
+    $matriceTriee = $matrice;
+    sort($matriceTriee);
+
+    $this->assertSame(
+        $surDisque,
+        $matriceTriee,
+        "La matrice `pnpm-audit` ne visite pas exactement les lockfiles du depot.\n\n"
+        . 'Sur disque : ' . implode(', ', $surDisque) . "\n"
+        . 'Dans la matrice : ' . implode(', ', $matriceTriee) . "\n\n"
+        . "GESTE, pour un lockfile EN TROP dans la matrice : le retirer de la matrice ET de\n"
+        . ".github/audit-node-cliquet.json, dans le meme changement.\n"
+        . "GESTE, pour un lockfile MANQUANT : (1) l ajouter a `matrix.path`, (2) mesurer\n"
+        . '`cd <lot> && pnpm audit` et poser le releve dans .github/audit-node-cliquet.json, '
+        . "(3) ajouter le bloc `directory:` correspondant dans .github/dependabot.yml.\n"
+        . 'Ne PAS laisser un troisieme etat : un lockfile vivant qu aucun dispositif ne regarde.',
+    );
+});
+
+test('H47-004 — chaque lot de la matrice pnpm-audit a un bloc `directory:` chez Dependabot', function (): void {
+    // Les deux dispositifs sont independants et se ratent l'un l'autre : la
+    // matrice AUDITE (elle rougit), Dependabot PROPOSE LE CORRECTIF. Couvrir
+    // l'un sans l'autre laisse soit une alerte sans PR, soit une PR que rien ne
+    // verifie. C'est le couple qui manquait a poc/05_dedup_performance.
+    $chemin = racineDepotH47() . '/.github/dependabot.yml';
+    $this->assertFileExists($chemin, 'dependabot.yml est introuvable.');
+
+    $declares = [];
+    foreach (Yaml::parseFile($chemin)['updates'] ?? [] as $bloc) {
+        $declares[] = ltrim((string) ($bloc['directory'] ?? ''), '/');
+    }
+
+    // TEMOIN DE COUVERTURE : une lecture qui ne rend rien ferait passer la
+    // boucle ci-dessous sans rien verifier.
+    $this->assertGreaterThanOrEqual(
+        5,
+        count($declares),
+        'dependabot.yml declare moins de blocs `directory:` que les cinq mesures du 2026-08-18 : '
+        . 'la lecture est cassee, pas le fichier. Lus : ' . implode(', ', $declares),
+    );
+
+    foreach (jobsDAuditH47()['pnpm-audit']['strategy']['matrix']['path'] ?? [] as $lot) {
+        $this->assertContains(
+            (string) $lot,
+            $declares,
+            "Le lot « {$lot} » est audite par `pnpm-audit` mais n a aucun bloc `directory:` dans "
+            . '.github/dependabot.yml : son avis rougira sans qu aucune PR de correction ne soit '
+            . "jamais proposee.\n"
+            . 'GESTE : ajouter un bloc `- package-ecosystem: npm / directory: /' . $lot . '` '
+            . 'avec le meme `ignore` de gel que ses voisins.',
+        );
+    }
+});
+
 test('un audit rouge sur main reveille encore un humain', function (): void {
     $alerte = workflowSecuriteH47()['jobs']['alerte'] ?? null;
     $this->assertIsArray($alerte, "Le job d'alerte a disparu : un rouge sur le cron ne previendrait plus personne.");

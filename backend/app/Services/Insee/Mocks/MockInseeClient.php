@@ -14,17 +14,18 @@ class MockInseeClient implements InseeClient
             return new InseeCompanyData($siren, denomination: 'Mock Company ' . $siren, naf: '6201Z', legalForm: 'SAS', effectifRange: '11');
         }
         $raw = json_decode(file_get_contents($path), true) ?: [];
+
         return new InseeCompanyData(
             siren: $siren,
-            denomination: $raw['denomination']  ?? null,
-            naf: $raw['naf']                    ?? null,
-            legalForm: $raw['legal_form']       ?? null,
-            effectifRange: $raw['effectif']     ?? null,
-            address: $raw['address']            ?? null,
-            postcode: $raw['postcode']          ?? null,
-            city: $raw['city']                  ?? null,
-            insee: $raw['insee']                ?? null,
-            createdAt: $raw['created_at']       ?? null,
+            denomination: $raw['denomination'] ?? null,
+            naf: $raw['naf'] ?? null,
+            legalForm: $raw['legal_form'] ?? null,
+            effectifRange: $raw['effectif'] ?? null,
+            address: $raw['address'] ?? null,
+            postcode: $raw['postcode'] ?? null,
+            city: $raw['city'] ?? null,
+            insee: $raw['insee'] ?? null,
+            createdAt: $raw['created_at'] ?? null,
             raw: $raw,
         );
     }

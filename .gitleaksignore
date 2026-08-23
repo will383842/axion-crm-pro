@@ -5,3 +5,22 @@
 # on l'ignore par empreinte, on ne réécrit pas l'histoire d'une branche partagée.
 4030dda29a98161baa79f2723f2b72db73a0e281:_REPORTS/RUNBOOK-CONSOLE-LOCALE.md:generic-api-key:249
 4030dda29a98161baa79f2723f2b72db73a0e281:_REPORTS/RUNBOOK-CONSOLE-LOCALE.md:generic-api-key:330
+
+# 2026-08-23 — FAUX POSITIF, et il faut dire pourquoi plutôt que de le taire.
+# La valeur signalée est `un-mot-de-passe-de-reprise-2026` : une donnée de TEST,
+# posée dans un test unitaire qui porte précisément sur la règle
+# `NotPwnedPassword`. Elle est passée à `->validate('password', ...)` face à un
+# vérificateur HIBP SIMULÉ (`makeHibpCheckerInjoignable()`) : elle n'ouvre aucun
+# compte, ne déchiffre rien, et n'a jamais quitté la suite de tests.
+# Vu à la lecture avant d'être ignorée — lignes 173 et 206 du fichier.
+# La règle `generic-api-key` a mordu sur l'ENTROPIE (3,667), pas sur un usage.
+#
+# ⚠️ Différence avec l'entrée de 2026-08-18 ci-dessus, qui compte : celle-là
+# était un VRAI secret, tourné le soir même puis ignoré par empreinte parce que
+# l'historique le portait encore. Ici il n'y a rien à tourner.
+#
+# Ignoré par EMPREINTE et non par fichier : renommer la donnée de test ne
+# retirerait rien, puisque gitleaks balaie les COMMITS de la branche et non
+# l'état final — et on ne réécrit pas l'histoire d'une branche partagée.
+14d69e8e98aa2b2e7e243140aa7874acfd7d9c2f:backend/tests/Unit/Auth/NotPwnedPasswordRuleTest.php:generic-api-key:168
+14d69e8e98aa2b2e7e243140aa7874acfd7d9c2f:backend/tests/Unit/Auth/NotPwnedPasswordRuleTest.php:generic-api-key:201

@@ -5,34 +5,35 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 /**
  * Sprint 19.7 — Campagnes de scraping.
  *
  * Orchestre N scraper_runs avec budgets + planning + auto-pause anti-blacklist.
  *
- * @property int    $id
- * @property string $workspace_id  UUID
- * @property string $created_by    UUID
+ * @property int $id
+ * @property string $workspace_id UUID
+ * @property string $created_by UUID
  * @property string $name
  * @property ?string $description
- * @property string $status        draft|scheduled|running|paused|completed|failed|cancelled
- * @property array  $sources       liste des sources whitelistées
- * @property array  $zones         [{ type:'department'|'region'|'city', code:'75' }, ...]
- * @property int    $max_companies
- * @property int    $max_duration_minutes
- * @property int    $max_requests_per_minute
+ * @property string $status draft|scheduled|running|paused|completed|failed|cancelled
+ * @property array $sources liste des sources whitelistées
+ * @property array $zones [{ type:'department'|'region'|'city', code:'75' }, ...]
+ * @property int $max_companies
+ * @property int $max_duration_minutes
+ * @property int $max_requests_per_minute
  * @property ?array $per_source_limits
- * @property ?\Illuminate\Support\Carbon $scheduled_at
- * @property ?\Illuminate\Support\Carbon $expires_at
- * @property int    $companies_created
- * @property int    $requests_made
- * @property int    $runs_completed
- * @property int    $runs_total
- * @property int    $duration_seconds_used
- * @property ?\Illuminate\Support\Carbon $started_at
- * @property ?\Illuminate\Support\Carbon $paused_at
- * @property ?\Illuminate\Support\Carbon $finished_at
+ * @property ?Carbon $scheduled_at
+ * @property ?Carbon $expires_at
+ * @property int $companies_created
+ * @property int $requests_made
+ * @property int $runs_completed
+ * @property int $runs_total
+ * @property int $duration_seconds_used
+ * @property ?Carbon $started_at
+ * @property ?Carbon $paused_at
+ * @property ?Carbon $finished_at
  * @property ?string $paused_reason
  */
 class ScrapingCampaign extends Model
@@ -55,22 +56,22 @@ class ScrapingCampaign extends Model
     protected function casts(): array
     {
         return [
-            'sources'                 => 'array',
-            'zones'                   => 'array',
-            'per_source_limits'       => 'array',
-            'scheduled_at'            => 'datetime',
-            'expires_at'              => 'datetime',
-            'started_at'              => 'datetime',
-            'paused_at'               => 'datetime',
-            'finished_at'             => 'datetime',
-            'max_companies'           => 'int',
-            'max_duration_minutes'    => 'int',
+            'sources' => 'array',
+            'zones' => 'array',
+            'per_source_limits' => 'array',
+            'scheduled_at' => 'datetime',
+            'expires_at' => 'datetime',
+            'started_at' => 'datetime',
+            'paused_at' => 'datetime',
+            'finished_at' => 'datetime',
+            'max_companies' => 'int',
+            'max_duration_minutes' => 'int',
             'max_requests_per_minute' => 'int',
-            'companies_created'       => 'int',
-            'requests_made'           => 'int',
-            'runs_completed'          => 'int',
-            'runs_total'              => 'int',
-            'duration_seconds_used'   => 'int',
+            'companies_created' => 'int',
+            'requests_made' => 'int',
+            'runs_completed' => 'int',
+            'runs_total' => 'int',
+            'duration_seconds_used' => 'int',
         ];
     }
 
@@ -122,6 +123,7 @@ class ScrapingCampaign extends Model
         $durationRatio = $this->max_duration_minutes > 0
             ? min(1.0, $this->elapsed_minutes / $this->max_duration_minutes)
             : 0.0;
+
         return (int) round(max($companiesRatio, $durationRatio) * 100);
     }
 
@@ -134,6 +136,7 @@ class ScrapingCampaign extends Model
             return 0;
         }
         $end = $this->finished_at ?? now();
+
         return max(0, (int) $this->started_at->diffInMinutes($end, false));
     }
 
@@ -186,6 +189,7 @@ class ScrapingCampaign extends Model
         if ($this->elapsed_minutes >= $this->max_duration_minutes) {
             return 'quota_duration';
         }
+
         return null;
     }
 }

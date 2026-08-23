@@ -78,9 +78,25 @@ export function RgpdRequestsPage() {
     queryFn: async () => (await api.get<{ data: RgpdRequest[] }>('/rgpd/requests')).data,
   });
 
+  // H46-008 — la forme des reponses de MUTATION est declaree, comme elle l'est
+  // deja en lecture ligne 78.
+  //
+  // Sans parametre generique, `axios` rend `any` : le `.data` traversait le
+  // `mutationFn`, `useMutation` en heritait, et tout ce qu'on en aurait fait
+  // ensuite echappait a `tsc`. Cinq mutations du produit etaient dans ce cas,
+  // et les cinq `no-unsafe-return` correspondants etaient GELES dans
+  // `eslint-suppressions.json` — un defaut qui ne rougissait plus.
+  //
+  // ⚠️ Mesure du 2026-08-22, lue dans le controleur et non supposee :
+  // `RgpdRequestsController::store()` fait `return $this->ok($req, 201)` et
+  // `ApiController::ok()` fait `response()->json($data)` — la demande est
+  // rendue A LA RACINE, sans clef `data`. C'est `index()` qui passe par un
+  // paginateur, d'ou le `{ data: … }` de la lecture. Les deux formes different
+  // pour de vrai : les confondre etait le piege de ce correctif.
   const createMut = useMutation({
     mutationFn: async () =>
-      (await api.post('/rgpd/requests', { type: newType, subject_email: newEmail })).data,
+      (await api.post<RgpdRequest>('/rgpd/requests', { type: newType, subject_email: newEmail }))
+        .data,
     onSuccess: () => {
       toast.success('Requête RGPD créée');
       setNewOpen(false);
@@ -92,8 +108,19 @@ export function RgpdRequestsPage() {
   });
 
   const processMut = useMutation({
+    // H46-008 — mesure du 2026-08-22, `RgpdRequestsController::process()` :
+    // `return $this->ok(['request' => $req->fresh(), 'result' => $result])`.
+    // `result` est volontairement `unknown` : sa forme depend du TYPE de la
+    // demande (effacement, portabilite, opposition…) et lui inventer ici une
+    // structure commune serait affirmer sans mesure. `unknown` oblige a
+    // qualifier avant de lire — c'est exactement ce qu'on veut de ce champ.
     mutationFn: async (id: number) =>
-      (await api.post(`/rgpd/requests/${id}/process`, { note: processNote })).data,
+      (
+        await api.post<{ request: RgpdRequest; result: unknown }>(
+          `/rgpd/requests/${id}/process`,
+          { note: processNote },
+        )
+      ).data,
     onSuccess: () => {
       toast.success('Requête traitée');
       setProcessOpen(null);

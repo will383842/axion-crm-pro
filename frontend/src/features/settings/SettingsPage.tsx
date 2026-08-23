@@ -190,7 +190,19 @@ export function SettingsPage() {
   const [echecEnregistrement, setEchecEnregistrement] = useState<unknown>(null);
 
   const updateMut = useMutation({
-    mutationFn: async (patch: Partial<Workspace>) => (await api.put('/workspace', patch)).data,
+    // H46-008 — le generique ferme le `any` que rendait `api.put` sans
+    // parametre ; la suppression `no-unsafe-return` correspondante a ete
+    // retiree de `frontend/eslint-suppressions.json` dans le meme geste.
+    //
+    // ⚠️ `unknown`, et PAS `Workspace`. Mesure du 2026-08-22 :
+    // `WorkspaceController::update()` tient en une ligne —
+    // `return $this->notImplemented('3')` — c'est-a-dire un 501 portant
+    // `{ error, message, sprint }`. Ecrire `api.put<Workspace>` ici
+    // declarerait une forme que ce point d'entree ne rend JAMAIS ; `unknown`
+    // dit ce qu'on sait. Le succes de cette mutation n'existe pas encore : ce
+    // defaut-la est distinct, et il n'est pas referme ici.
+    mutationFn: async (patch: Partial<Workspace>) =>
+      (await api.put<unknown>('/workspace', patch)).data,
     onMutate: () => setEchecEnregistrement(null),
     onSuccess: () => {
       setEchecEnregistrement(null);

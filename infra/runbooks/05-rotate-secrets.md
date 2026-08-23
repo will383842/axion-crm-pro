@@ -73,10 +73,31 @@ docker compose up -d api horizon scheduler
 # 3 bis. VÉRIFIER que la nouvelle valeur est réellement dans le conteneur
 docker inspect axion-crm-api --format '{{range .Config.Env}}{{println .}}{{end}}' | grep '^APP_KEY='
 
-# 4. Re-chiffrer les colonnes chiffrées — elles s'appellent `totp_secret` et
-#    `totp_recovery_codes` ; `two_factor_recovery_codes` n'a jamais existé (A07-001)
-docker exec -it axion-crm-api php artisan model:rotate-keys --tables=users
+# 4. Les colonnes chiffrées s'appellent `totp_secret` et `totp_recovery_codes` ;
+#    `two_factor_recovery_codes` n'a jamais existé (A07-001).
+#
+#    🔴 PAS DE COMMANDE — voir l'encadré ci-dessous. Ne cherche pas
+#    `model:rotate-keys` : elle n'existe pas sur ce dépôt.
 ```
+
+> ### ⚠️ Pas 4 : le ré-chiffrement N'EST PAS OUTILLÉ
+>
+> **Mesure du 2026-08-22 (audit 360, B16-014).** Ce runbook prescrivait une
+> commande `model:rotate-keys --tables=users`. **Elle n'existe pas** :
+> aucune classe de `backend/app/Console/Commands/` ne la déclare, et ce n'est pas
+> non plus une commande du framework. Un opérateur qui a déjà changé `APP_KEY`
+> — donc qui ne peut plus revenir en arrière — se retrouvait bloqué sur un
+> `Command "model:rotate-keys" is not defined`, au pire moment.
+>
+> **Ce qui tient lieu de filet en attendant :** `backend/config/app.php:78` lit
+> `APP_PREVIOUS_KEYS`. Tant que l'ancienne clé y figure, les colonnes chiffrées
+> avec elle restent déchiffrables — le pas 2 ci-dessus n'est donc pas un confort,
+> c'est **ce qui empêche la perte**. Ne retire jamais l'ancienne clé de
+> `APP_PREVIOUS_KEYS` avant qu'un ré-chiffrement ait réellement eu lieu.
+>
+> **Ce qui reste à faire, et que ce runbook ne décide pas :** écrire la commande
+> de ré-chiffrement (elle touche des secrets TOTP, ça se conçoit, ça ne
+> s'improvise pas à 3 heures du matin).
 
 ## Procédure rotation AUDIT_HASH_CHAIN_SECRET
 ATTENTION : casse la vérifiabilité historique. À utiliser uniquement en cas de fuite suspectée.
@@ -84,10 +105,23 @@ ATTENTION : casse la vérifiabilité historique. À utiliser uniquement en cas d
 1. Snapshot Postgres : `pg_dump audit_logs > backup-pre-rotation.sql`
 2. Décrire le justificatif d'incident dans `audit_logs` final hash
 3. `AUDIT_HASH_CHAIN_SECRET=<nouveau>` puis **`docker compose up -d api`** (jamais `restart`), et vérifier par `docker inspect` que la valeur est bien celle attendue
-4. Marquer le breakpoint via `audit:checkpoint` artisan command
+4. **Marquer la rupture — PAS OUTILLÉ.** `audit:checkpoint` n'existe pas
+   (mesure du 2026-08-22, B16-014 : aucune classe de
+   `backend/app/Console/Commands/` ne la déclare). Ne la cherche pas, tu perdrais
+   du temps après avoir déjà changé le secret. La seule commande d'audit réelle
+   est `docker exec -it axion-crm-api php artisan audit:verify-chain` : joue-la
+   juste après la rotation. **Elle rendra rouge, et c'est normal** — les maillons
+   d'avant la rotation ont été hachés avec l'ancien secret et ne peuvent plus
+   être revérifiés. Note l'`id` de la dernière ligne d'avant rotation dans le
+   ticket d'incident : c'est lui, la borne, tant qu'aucune commande ne la pose.
 
 ## Procédure révocation clé provider compromise
 1. Révoquer côté console provider (Anthropic console / Webshare dashboard)
 2. Mettre à jour `.env` ou Doppler
 3. **`docker compose up -d api horizon`** (jamais `restart` : il ne relit pas `env_file`), puis vérifier par `docker inspect`
-4. Vérifier 5 min après : `php artisan llm:smoke-test` doit passer
+4. **Vérifier 5 min après — PAS OUTILLÉ.** `llm:smoke-test` n'existe pas non plus
+   (même mesure, B16-014). À défaut : déclencher un vrai appel provider depuis le
+   produit et regarder les logs du conteneur
+   (`docker compose logs --tail=100 api horizon`). Un `401`/`403` du provider
+   signifie que la nouvelle clé n'est pas celle qui est utilisée — retour au
+   pas 3, `docker inspect` à l'appui.

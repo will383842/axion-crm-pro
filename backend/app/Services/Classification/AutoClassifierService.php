@@ -204,6 +204,7 @@ class AutoClassifierService
         // Corse : 20 → 2A/2B (insee distinct), distinction via postcode 3e char
         if ($first2 === '20') {
             $third = (int) ($postcode[2] ?? '0');
+
             // 200xx, 201xx = 2A (Corse-du-Sud), 202xx = 2B (Haute-Corse)
             return $third <= 1 ? '2A' : '2B';
         }
@@ -212,8 +213,10 @@ class AutoClassifierService
             if (strlen($postcode) < 3) {
                 return null;
             }
+
             return substr($postcode, 0, 3);
         }
+
         return $first2;
     }
 
@@ -227,6 +230,7 @@ class AutoClassifierService
         if (is_string($banCommune) && strlen($banCommune) === 5) {
             return $banCommune;
         }
+
         return null;
     }
 
@@ -240,6 +244,7 @@ class AutoClassifierService
         if ($company->city) {
             return mb_substr($company->city, 0, 120);
         }
+
         return null;
     }
 }

@@ -30,6 +30,7 @@ final class ScrapeIngestOutcome
     /**
      * @param  list<string>  $tags
      * @param  list<string>  $companyFieldsWritten
+     * @param  array<string, int>  $personsSkipped  motif => nombre de personnes écartées
      */
     public function __construct(
         public readonly string $status,
@@ -41,6 +42,19 @@ final class ScrapeIngestOutcome
         public readonly array $companyFieldsWritten = [],
         public readonly array $tags = [],
         public readonly ?int $activityId = null,
+        // C18-002 — CE COMPTEUR N'EXISTAIT PAS, ET C'EST POUR ÇA QU'ON NE VOYAIT
+        // RIEN. `upsertContact()` rend `skipped` dans trois cas (personne sans
+        // nom de famille, insertion refusée, aucune donnée nouvelle à apporter),
+        // et le `match` de l'ingestion faisait tomber ces trois cas dans un
+        // `default => null`. Une personne collectée pouvait donc disparaître de
+        // bout en bout sans qu'AUCUN chiffre du rapport ne bouge : le run
+        // s'affichait « created » avec 0 contact, et rien ne disait pourquoi.
+        //
+        // Le compteur est ventilé PAR MOTIF, pas agrégé : « 12 personnes
+        // écartées » ne dit pas s'il faut corriger le collecteur (noms absents)
+        // ou se réjouir (rien de neuf à écrire). Les deux exigent des gestes
+        // opposés.
+        public readonly array $personsSkipped = [],
     ) {}
 
     /** @return array<string, mixed> */
@@ -53,6 +67,13 @@ final class ScrapeIngestOutcome
             'contacts_updated' => $this->contactsUpdated,
             'persons_skipped_opt_out' => $this->personsSkippedOptOut,
             'emails_rejected_mx' => $this->emailsRejectedMx,
+            // C18-002 — deux clés AJOUTÉES au contrat de sortie (jamais de clé
+            // retirée ni renommée : le worker Node et la vue `ScraperRunsPage`
+            // lisent ce payload par clé, un ajout leur est transparent).
+            // `persons_skipped` est le total, pour qu'un lecteur pressé voie
+            // qu'il manque du monde sans avoir à additionner lui-même.
+            'persons_skipped' => array_sum($this->personsSkipped),
+            'persons_skipped_reasons' => $this->personsSkipped,
             'company_fields_written' => $this->companyFieldsWritten,
             'tags' => $this->tags,
             'activity_id' => $this->activityId,

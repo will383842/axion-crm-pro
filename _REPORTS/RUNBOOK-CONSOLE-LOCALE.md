@@ -29,16 +29,19 @@ remplace pas l'origine unique pour la vérification du navigateur.
 
 ## 1. Démarrer la pile
 
-Le fichier de projet Compose vit dans le **dépôt principal**, la surcouche de
-développement vit dans le **worktree**. Les deux `-f` sont obligatoires, dans
-cet ordre, et la commande se lance depuis le dépôt principal :
+Le fichier de projet Compose **et** la surcouche de développement sont tous
+deux **versionnés à la racine du dépôt principal** (`git ls-files
+docker-compose.local.yml` — corrigé le 2026-08-22, constat A07-009 : ce runbook
+envoyait chercher `docker-compose.local.yml` dans le worktree `crmpro-wt-etape0`
+alors qu'il est suivi ici). Les deux `-f` restent obligatoires, dans cet ordre,
+et la commande se lance depuis le dépôt principal :
 
 ```bash
 cd C:/Users/willi/Documents/Projets/Axion-CRM-Pro
 
 docker compose \
   -f docker-compose.yml \
-  -f C:/Users/willi/Documents/Projets/crmpro-wt-etape0/docker-compose.local.yml \
+  -f docker-compose.local.yml \
   up -d
 ```
 
@@ -326,9 +329,14 @@ docker exec axion-crm-postgres psql -U axion -d axion_crm -c \
 
 ## 6. Lancer le spec de vérification
 
+Comme au §1, **depuis le dépôt principal** (`cd
+C:/Users/willi/Documents/Projets/Axion-CRM-Pro`) : le spec est versionné dans
+`frontend/tests/e2e/`, et c'est le code de ce dépôt que la pile Docker sert
+(§9.1).
+
 ```bash
 CI=1 E2E_TOTP_SECRET=<affiché par la commande — NE PAS le recopier ici : la valeur du 18/08 a été publiée par erreur, puis TOURNÉE le soir même> \
-  pnpm --dir C:/Users/willi/Documents/Projets/crmpro-wt-etape0/frontend \
+  pnpm --dir frontend \
   exec playwright test tests/e2e/console-locale.spec.ts \
   --project=chromium --reporter=list --retries=0 --workers=1
 ```
@@ -341,7 +349,7 @@ compte ; il change à chaque exécution de celle-ci.
 Si le navigateur manque :
 
 ```bash
-pnpm --dir C:/Users/willi/Documents/Projets/crmpro-wt-etape0/frontend \
+pnpm --dir frontend \
   exec playwright install chromium
 ```
 
@@ -571,9 +579,11 @@ docker inspect axion-crm-api --format '{{range .Mounts}}{{.Source}} -> {{.Destin
 
 Compose résout les chemins relatifs (`./backend`, `context: .`) contre le
 **répertoire de projet**, c'est-à-dire le dossier du **premier** `-f` — donc
-`Axion-CRM-Pro`, jamais le worktree. La surcouche a beau vivre dans
-`crmpro-wt-etape0`, elle monte le backend du dépôt principal et construit le
-frontend depuis ses sources.
+`Axion-CRM-Pro`, jamais un worktree. La mesure du 2026-08-18 avait été prise
+avec une surcouche pointée sur `crmpro-wt-etape0` : cela n'y changeait rien, et
+depuis le 2026-08-22 le §1 prend la surcouche **versionnée du dépôt principal**
+(A07-009). Dans les deux cas, la pile monte le backend du dépôt principal et
+construit le frontend depuis ses sources.
 
 Preuves croisées :
 

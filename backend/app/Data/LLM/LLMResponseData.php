@@ -24,6 +24,7 @@ class LLMResponseData extends Data
     public function asJson(): ?array
     {
         $decoded = json_decode($this->text, true);
+
         return is_array($decoded) ? $decoded : null;
     }
 }

@@ -68,6 +68,48 @@
 #    Settings → Advanced Security → Dependabot alerts + Dependabot security
 #    updates. Voir la politique écrite, section « reste Will ».
 #
+# ── 🔴 RECTIFICATION 2026-08-19 — LE BLOC CI-DESSUS EST PÉRIMÉ (H47-003) ──────
+#
+# La mesure du 2026-08-18 n'est pas effacée : elle était juste ce jour-là, et
+# c'est elle qui explique la rédaction du gel. Mais elle ne décrit plus le
+# dépôt. Nouvelle mesure, le 2026-08-19 (`04_PREUVES/agent-47/etat-dependabot-depot.txt`
+# de l'audit 360, trois relevés concordants) :
+#
+#    GET /repos/will383842/axion-crm-pro/vulnerability-alerts
+#        → HTTP/2.0 204 No Content        (et non plus 404 : ALERTES ACTIVES)
+#    .security_and_analysis.dependabot_security_updates
+#        → {"status":"enabled"}           (et non plus "disabled")
+#    GET .../automated-security-fixes
+#        → {"enabled":true,"paused":false}
+#
+# Témoin négatif de cette mesure : la MÊME réponse rend `"disabled"` pour
+# `secret_scanning_non_provider_patterns` et `secret_scanning_validity_checks`.
+# L'API ne répond donc pas « enabled » par défaut — le vert ci-dessus a une
+# valeur. Corroboration indépendante : les 57 alertes du dépôt portent toutes
+# `created_at` au 2026-08-19.
+#
+# CE QUE CELA CHANGE, ET C'EST LE POINT :
+#   · la précaution des §5.1/5.2 n'est PLUS inerte. Il existe désormais un canal
+#     de mise à jour de sécurité, et le gel doit le préserver pour de bon — ce
+#     que la forme `ignore` + `update-types` fait, contrairement à `versions:`
+#     (cf. le bloc ci-dessus, à ne toujours pas convertir) ;
+#   · le gel étant total sur les montées de version, ce canal est désormais la
+#     SEULE voie de correction restante ;
+#   · le deuxième critère d'entrée du dégel, plus bas — « les alertes Dependabot
+#     sont ACTIVES sur le dépôt » — est DÉJÀ REMPLI depuis le 2026-08-19. Il n'y
+#     a plus rien à demander à Will sur ce point précis.
+#
+# ⚠️ CE QUI RESTE NON MESURÉ, et n'est donc pas affirmé ici : que ce canal
+# PRODUISE effectivement des PR. Au 2026-08-20, ~24 h après la création des 57
+# alertes, `gh pr list --search "author:app/dependabot"` en rendait ZÉRO, avec
+# des plafonds `open-pull-requests-limit` non saturés. Un jour d'observation ne
+# suffit pas à déclarer le canal rompu. À RE-MESURER après l'exécution planifiée
+# du lundi 06:00 UTC ; si le compte est toujours nul alors qu'une correction
+# existe dans un intervalle déjà déclaré, alors le gel aura coupé le canal de
+# sécurité en silence — et ce sera un constat S1, pas une finition.
+#
+# Garde : backend/tests/Feature/Infra/PremissesMesureesSeRectifientTest.php
+#
 # ── AUCUN `groups:`, JAMAIS ──────────────────────────────────────────────────
 #
 # Tous les `groups:` ont été RETIRÉS le 2026-08-18. Regrouper des montées entre
@@ -82,7 +124,9 @@
 # Critère d'entrée du dégel — les trois, cumulativement :
 #   · l'étape 0 est déclarée terminée (harnais de tests posé et VERT sur `main`
 #     deux exécutions consécutives, hors PR de dépendances) ;
-#   · les alertes Dependabot sont ACTIVES sur le dépôt (cf. prérequis ci-dessus) ;
+#   · ✅ REMPLI depuis le 2026-08-19 — les alertes Dependabot sont ACTIVES sur
+#     le dépôt (cf. la RECTIFICATION 2026-08-19 ci-dessus, qui remplace le bloc
+#     « PRÉREQUIS NON REMPLI » du 2026-08-18) ;
 #   · un `pnpm install --frozen-lockfile` (frontend + workers) et un
 #     `composer validate --strict` (backend) passent sur `main`.
 #
@@ -154,6 +198,34 @@ updates:
     directory: /workers
     schedule: { interval: weekly, day: monday, time: '06:00' }
     open-pull-requests-limit: 5
+    # 🧊 GEL 2026-08-18 — montées de version suspendues, sécurité préservée.
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - 'version-update:semver-major'
+          - 'version-update:semver-minor'
+          - 'version-update:semver-patch'
+
+  # 🔴 AJOUT 2026-08-22 — constat H47-004. `poc/05_dedup_performance` porte un
+  # `pnpm-lock.yaml` vivant qui n'était couvert par RIEN : ni par un bloc
+  # `directory:` de ce fichier, ni par la matrice du job `pnpm-audit` de
+  # `.github/workflows/security.yml`. L'alerte Dependabot #33 (`esbuild`,
+  # GHSA-g7r4-m6w7-qqqr, mesurée le 2026-08-19) porte sur lui : une alerte pour
+  # laquelle aucune PR n'aurait jamais été proposée, et sur laquelle aucune garde
+  # ne tournait.
+  #
+  # Ce qui est tranché ici : la COUVERTURE, pas le sort du répertoire. Déclarer
+  # `poc/` mort et le sortir du dépôt est une décision qui appartient à Will ;
+  # laisser un lockfile que personne ne regarde n'en est pas une, c'est un
+  # oubli. Le troisième état — un lockfile vivant hors de tout dispositif — est
+  # celui qu'on refuse.
+  #
+  # ⚠️ Le gel s'y applique comme ailleurs : c'est la couverture SÉCURITÉ qu'on
+  # ouvre, pas un canal de montées de version dans un répertoire de démonstration.
+  - package-ecosystem: npm
+    directory: /poc/05_dedup_performance
+    schedule: { interval: weekly, day: monday, time: '06:00' }
+    open-pull-requests-limit: 3
     # 🧊 GEL 2026-08-18 — montées de version suspendues, sécurité préservée.
     ignore:
       - dependency-name: '*'

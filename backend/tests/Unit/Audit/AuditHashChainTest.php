@@ -60,12 +60,56 @@ test('B16-001 — TEMOIN (bis) : sans secret utilisable, la chaine refuse de se 
     );
 });
 
+/**
+ * B16-013 — la colonne `prev_hash` ne doit porter AUCUN défaut SQL.
+ *
+ * Ce que cette garde inspecte réellement, et rien d'autre : le catalogue
+ * (`pg_attrdef`) pour `audit_logs` ET pour chacune de ses partitions. Elle ne
+ * dit rien de la valeur écrite par le code — c'est l'affaire du test suivant.
+ *
+ * Mesure du 2026-08-22 : le défaut valait `repeat('0', 64)`, posé par la
+ * migration 2026_08_16_000001 qui devait justement le RETIRER. Un défaut, quelle
+ * que soit sa valeur, laisse un INSERT qui omet `prev_hash` s'insérer sans
+ * bruit ; `verifyChain()` rejette alors la ligne suivante en criant à la
+ * falsification, sans qu'il y en ait eu. Une alerte d'intégrité qui crie au loup
+ * finit par n'être plus lue.
+ */
+test('B16-013 — audit_logs.prev_hash ne porte aucun defaut SQL, ni sur le parent ni sur ses partitions', function () {
+    $defauts = DB::select(<<<'SQL'
+        SELECT c.relname                          AS table_concernee,
+               pg_get_expr(d.adbin, d.adrelid)    AS defaut
+        FROM   pg_attrdef  d
+        JOIN   pg_class    c ON c.oid = d.adrelid
+        JOIN   pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum
+        WHERE  a.attname = 'prev_hash'
+          AND (c.oid = 'audit_logs'::regclass
+               OR c.oid IN (SELECT inhrelid FROM pg_inherits WHERE inhparent = 'audit_logs'::regclass))
+        ORDER  BY c.relname
+    SQL);
+
+    $lisible = implode(', ', array_map(
+        fn ($d) => "{$d->table_concernee} => {$d->defaut}",
+        $defauts,
+    ));
+
+    expect($defauts)->toBe(
+        [], // Pest : le message ne doit PAS être un 2e argument de toContain/toHaveKey.
+        "B16-013 rouvert : un DEFAULT est revenu sur audit_logs.prev_hash ({$lisible}). "
+        . "Un INSERT omettant prev_hash s'insererait alors en silence avec le maillon zero, "
+        . 'et verifyChain() crierait a la falsification des la ligne suivante. '
+        . 'Geste : ajouter une migration `ALTER TABLE <table> ALTER COLUMN prev_hash DROP DEFAULT` '
+        . '(modele : backend/database/migrations/2026_08_22_150000_audit_logs_prev_hash_sans_defaut.php), '
+        . "et verifier qu'aucun CREATE TABLE de migration ne repose un DEFAULT sur cette colonne.",
+    );
+});
+
 // Sentinelle du maillon zéro : 64 zéros hex, PAS la chaîne 'GENESIS'.
 // Ce test attendait 'GENESIS' (le DEFAULT SQL de la colonne `prev_hash`), mais
 // ce DEFAULT est inatteignable : `AuditHashChain::record()` fournit toujours
 // `prev_hash` explicitement, et `verifyChain()` amorce la chaîne sur 64 zéros.
 // Les deux sites du service sont d'accord entre eux depuis le premier commit ;
-// c'était l'attente du test qui était fausse (et le DEFAULT SQL qui est mort).
+// c'était l'attente du test qui était fausse (et le DEFAULT SQL, retiré depuis
+// par B16-013, n'existe plus du tout).
 // On garde 64 zéros : même largeur qu'un SHA-256, donc « prev_hash est toujours
 // un digest 64-hex » reste vrai — et les hashs déjà en base restent vérifiables.
 test('first record uses the 64-zero genesis prev hash', function () {

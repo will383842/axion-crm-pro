@@ -79,15 +79,16 @@ export function DashboardPage() {
     queryKey: ['dashboard-stats'],
     queryFn: async () => (await api.get<DashboardStats>('/dashboard/stats', { params: { period } })).data,
     refetchInterval: 30_000,
-    placeholderData: {
-      companies_total: 0,
-      companies_enriched_24h: 0,
-      contacts_qualified: 0,
-      scraper_runs_24h: 0,
-      llm_cost_eur_month: 0,
-      quality_distribution: { complete: 0, partielle: 0, basique: 0 },
-      size_distribution: {},
-    },
+    // D25-008 — PAS de `placeholderData` ici, et c'est délibéré. Un
+    // `placeholderData` met `isPending` à faux dès le premier rendu ; `isLoading`
+    // (= isPending && isFetching) ne vaut alors JAMAIS vrai, et le
+    // `{isLoading ? <DashboardSkeleton /> : …}` plus bas ne s'ouvre jamais.
+    // Mesure du 2026-08-22 : le premier écran du CRM était la grille de zéros de
+    // cet objet de repli — « aucune entreprise collectée » et « le serveur n'a
+    // pas encore répondu » avaient exactement la même apparence, sur l'écran
+    // d'accueil. Le garde-fou `const stats = data ?? {…}` juste dessous suffit à
+    // protéger le rendu quand `data` est indéfini ; le squelette, lui, DIT
+    // l'attente au lieu de l'habiller en résultat.
   });
 
   const stats = data ?? {

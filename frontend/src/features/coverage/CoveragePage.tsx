@@ -3,6 +3,20 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
+// D27-001 — `Stat` vient du systeme, il n'est plus recopie ici.
+//
+// Mesure du 2026-08-22 : `src/components/ui/Stat.tsx` etait exporte par
+// `src/components/ui/index.ts:35` et n'avait AUCUN importateur ; cet ecran en
+// portait une copie manuscrite, plus courte de toutes ses classes `dark:`. Le
+// mode sombre y rendait donc deux cartouches blancs au milieu d'un panneau
+// sombre — une divergence qu'aucune revue du systeme ne pouvait voir, puisque
+// la copie ne s'appelait pas depuis le systeme.
+//
+// Deux consequences a garder en tete si l'apparence surprend : la version du
+// systeme ajoute les classes `dark:` (c'est le correctif) et `tabular-nums`
+// sur la valeur (les chiffres ne dansent plus quand le compteur change).
+import { Stat } from '@/components/ui';
+
 // G42-003 — la carte est chargee A LA DEMANDE, sur ce seul ecran.
 //
 // Mesure du 2026-08-20 (`pnpm build`, vite 6.4.2) : `maplibre-gl` et sa
@@ -162,8 +176,21 @@ export function CoveragePage() {
       </div>
 
       {/* Map + Sidebar */}
+      {/* D27-007 — les ombres de cet ecran passent par les JETONS
+          (`--shadow-card`, `--shadow-card-hover`, `--shadow-popover` de
+          `src/styles/index.css`) et non par des valeurs litterales. Pourquoi :
+          les copies a la main avaient DEJA diverge. Mesure du 2026-08-22, avant
+          correctif : les quatre panneaux de /coverage portaient
+          `0_4px_24px_-8px_rgb(0_0_0/0.06)`, soit la PREMIERE couche du jeton
+          seulement — la seconde (`0 1px 2px 0 rgb(0 0 0 / 0.04)`), celle qui
+          pose le contact au sol, avait disparu ; et deux valeurs de plus
+          (`-12px/0.12` ici, `-8px/0.12` dans la legende de la carte) ne
+          correspondaient a AUCUN jeton. La garde
+          `frontend/tests/styles/jetons-d-ombre.test.ts` refuse desormais toute
+          ombre ecrite en valeur brute sous `src/` : seul `var(--shadow-*)` y
+          est admis. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
-        <div className="rounded-2xl bg-white/80 p-1 shadow-[0_8px_32px_-12px_rgb(0_0_0/0.12)] ring-1 ring-slate-200/60 backdrop-blur-sm">
+        <div className="rounded-2xl bg-white/80 p-1 shadow-[var(--shadow-card)] ring-1 ring-slate-200/60 backdrop-blur-sm">
           {/* La reserve d'espace fait EXACTEMENT la hauteur de la carte
               (h-[640px], cf. FranceCoverageMap) : le chargement differe ne
               doit pas produire de decalage de mise en page a l'arrivee. */}
@@ -277,7 +304,7 @@ function KpiCard({
 }) {
   const t = TONE_MAP[tone];
   return (
-    <div className={`group relative overflow-hidden rounded-2xl bg-white/80 p-4 ring-1 ${t.ring} shadow-[0_4px_24px_-8px_rgb(0_0_0/0.06)] backdrop-blur-sm transition hover:-translate-y-0.5 hover:shadow-[0_8px_32px_-8px_rgb(0_0_0/0.10)] ${t.glow}`}>
+    <div className={`group relative overflow-hidden rounded-2xl bg-white/80 p-4 ring-1 ${t.ring} shadow-[var(--shadow-card)] backdrop-blur-sm transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-card-hover)] ${t.glow}`}>
       <div className={`mb-2 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${t.chip}`}>
         {label}
       </div>
@@ -310,7 +337,7 @@ function SelectionCard({
 }) {
   const isCovered = (cell.total ?? 0) > 0;
   return (
-    <div className="rounded-2xl bg-white/80 p-5 ring-1 ring-slate-200/60 shadow-[0_4px_24px_-8px_rgb(0_0_0/0.06)] backdrop-blur-sm">
+    <div className="rounded-2xl bg-white/80 p-5 ring-1 ring-slate-200/60 shadow-[var(--shadow-card)] backdrop-blur-sm">
       <div className="mb-3 flex items-start justify-between gap-2">
         <div>
           <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Sélection</div>
@@ -377,15 +404,6 @@ function HintCard({ mode }: { mode: CoverageMode }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-100">
-      <div className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{label}</div>
-      <div className="mt-0.5 text-lg font-semibold tracking-tight text-slate-900">{value}</div>
-    </div>
-  );
-}
-
 function TopList({
   top,
   selected,
@@ -397,7 +415,7 @@ function TopList({
 }) {
   const hasData = top.some((c) => (c.total ?? 0) > 0);
   return (
-    <div className="rounded-2xl bg-white/80 p-4 ring-1 ring-slate-200/60 shadow-[0_4px_24px_-8px_rgb(0_0_0/0.06)] backdrop-blur-sm">
+    <div className="rounded-2xl bg-white/80 p-4 ring-1 ring-slate-200/60 shadow-[var(--shadow-card)] backdrop-blur-sm">
       <div className="mb-3 flex items-center justify-between">
         <div className="text-sm font-semibold text-slate-900">Top zones</div>
         <div className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Triées · entreprises</div>

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\VerrouOptimiste;
+use App\Models\Rotation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -36,6 +38,8 @@ use Illuminate\Support\Facades\Schema;
  */
 class RotationsController extends ApiController
 {
+    use VerrouOptimiste;
+
     /**
      * Cinq dimensions, quelques dizaines de lignes par espace au plus : le
      * plafond n'est pas ici une contrainte de volume, c'est le refus de principe
@@ -133,16 +137,27 @@ class RotationsController extends ApiController
             abort(404);
         }
 
-        $ligne = DB::table('rotations')
-            ->where('id', $rotation)
+        $courant = Rotation::query()
+            ->whereKey($rotation)
             ->where('workspace_id', $espace)
-            ->first(['id']);
+            ->first();
 
         // 404 et non 403 : « interdit » confirmerait l'existence de la ligne a
         // qui n'a pas le droit de la voir.
-        if ($ligne === null) {
+        if ($courant === null) {
             abort(404);
         }
+
+        // 🔑 G43-005 — VERROU OPTIMISTE. La garde `VerrouOptimisteEtenduTest`
+        // avait ANTICIPE ce moment : « un update() qui rend 501 n'ecrit rien :
+        // il n'y a pas de saisie a perdre. Le jour ou il est cable, il
+        // apparaitra ici. » Il l'a fait, le 2026-08-23, et sa liste de
+        // derogations est vide A DESSEIN — « ce n'est pas une derogation, c'est
+        // le registre de ce qui reste a faire ».
+        //
+        // Sans ce controle, deux saisies concurrentes perdent du travail EN
+        // SILENCE : la seconde ecrase la premiere sans que personne l'apprenne.
+        $this->refuserSiVersionPerimee($r, $courant);
 
         $valide = $r->validate([
             // Un poids negatif n'a aucun sens dans un tirage pondere ; un poids

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,6 +15,8 @@ use Illuminate\Validation\ValidationException;
 
 class UsersController extends ApiController
 {
+    use VerrouOptimiste;
+
     /**
      * @OA\Get(path="/users", tags={"Users"}, summary="Liste des users du workspace",
      *     security={{"sanctumCookie":{}}},
@@ -120,9 +123,17 @@ class UsersController extends ApiController
         // pas deux adresses. On compare donc sans casse, et AVANT d'ecrire,
         // pour rendre un 422 qui nomme le champ au lieu d'une `QueryException`
         // que le gestionnaire transforme en 500.
-        $dejaPrise = User::withTrashed()
-            ->whereRaw('lower(email::text) = ?', [mb_strtolower($valide['email'])])
-            ->exists();
+        // 🔴 C21-001/twins — ICI, `lower()` SERAIT REDONDANT ET LA GARDE L'A DIT.
+        // Ma premiere version ecrivait `whereRaw('lower(email::text) = ?')`.
+        // L'inventaire fige de `lower(<colonne>::text)` a rougi, avec le bon
+        // conseil dans son message : « la colonne visee est-elle citext ? Si
+        // oui, lower() est redondant ». `users.email` EST `CITEXT NOT NULL
+        // UNIQUE` — la comparaison ignore deja la casse, cote base.
+        //
+        // Le `lower()` ne servait a rien et coutait cher : il rend l'index
+        // unique inutilisable, donc un balayage sequentiel de la table des
+        // comptes a chaque invitation.
+        $dejaPrise = User::withTrashed()->where('email', $valide['email'])->exists();
 
         if ($dejaPrise) {
             throw ValidationException::withMessages([
@@ -189,6 +200,17 @@ class UsersController extends ApiController
         // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
         // « interdit » confirmerait son existence.
         $this->refuserHorsEspace($user, 'current_workspace_id');
+
+        // 🔑 G43-005 — VERROU OPTIMISTE. La garde `VerrouOptimisteEtenduTest`
+        // avait ANTICIPE ce moment : « un update() qui rend 501 n'ecrit rien :
+        // il n'y a pas de saisie a perdre. Le jour ou il est cable, il
+        // apparaitra ici. » Il l'a fait, le 2026-08-23, et sa liste de
+        // derogations est vide A DESSEIN — « ce n'est pas une derogation, c'est
+        // le registre de ce qui reste a faire ».
+        //
+        // Sans ce controle, deux saisies concurrentes perdent du travail EN
+        // SILENCE : la seconde ecrase la premiere sans que personne l'apprenne.
+        $this->refuserSiVersionPerimee($r, $user);
 
         $valide = $r->validate([
             'name' => ['sometimes', 'string', 'max:255'],

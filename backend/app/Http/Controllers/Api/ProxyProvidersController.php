@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Models\ProxyProvider;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,6 +13,8 @@ use Illuminate\Validation\Rule;
 
 class ProxyProvidersController extends ApiController
 {
+    use VerrouOptimiste;
+
     /**
      * @OA\Get(path="/proxy-providers", tags={"LLM"}, summary="Liste des providers proxy actifs",
      *     security={{"sanctumCookie":{}}},
@@ -89,6 +92,17 @@ class ProxyProvidersController extends ApiController
         // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
         // « interdit » confirmerait son existence.
         $this->refuserHorsEspace($p);
+
+        // 🔑 G43-005 — VERROU OPTIMISTE. La garde `VerrouOptimisteEtenduTest`
+        // avait ANTICIPE ce moment : « un update() qui rend 501 n'ecrit rien :
+        // il n'y a pas de saisie a perdre. Le jour ou il est cable, il
+        // apparaitra ici. » Il l'a fait, le 2026-08-23, et sa liste de
+        // derogations est vide A DESSEIN — « ce n'est pas une derogation, c'est
+        // le registre de ce qui reste a faire ».
+        //
+        // Sans ce controle, deux saisies concurrentes perdent du travail EN
+        // SILENCE : la seconde ecrase la premiere sans que personne l'apprenne.
+        $this->refuserSiVersionPerimee($r, $p);
 
         $valide = $r->validate([
             // La colonne porte CHECK (residential, datacenter, mobile) : une

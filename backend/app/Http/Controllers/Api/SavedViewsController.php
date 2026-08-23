@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\VerrouOptimiste;
+use App\Models\SavedView;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -38,6 +40,8 @@ use Illuminate\Validation\ValidationException;
  */
 class SavedViewsController extends ApiController
 {
+    use VerrouOptimiste;
+
     /** Des filtres sauvegardes : quelques dizaines par personne, jamais mille. */
     private const PLAFOND = 100;
 
@@ -189,6 +193,19 @@ class SavedViewsController extends ApiController
         // doit rendre 404, pas 422. Sinon le message de validation confirme
         // l'existence de la ligne a qui n'a pas le droit de la voir.
         $actuelle = $this->mienneOu404($espace, $utilisateur, $savedView);
+
+        $modele = SavedView::query()->whereKey($savedView)->firstOrFail();
+
+        // 🔑 G43-005 — VERROU OPTIMISTE. La garde `VerrouOptimisteEtenduTest`
+        // avait ANTICIPE ce moment : « un update() qui rend 501 n'ecrit rien :
+        // il n'y a pas de saisie a perdre. Le jour ou il est cable, il
+        // apparaitra ici. » Il l'a fait, le 2026-08-23, et sa liste de
+        // derogations est vide A DESSEIN — « ce n'est pas une derogation, c'est
+        // le registre de ce qui reste a faire ».
+        //
+        // Sans ce controle, deux saisies concurrentes perdent du travail EN
+        // SILENCE : la seconde ecrase la premiere sans que personne l'apprenne.
+        $this->refuserSiVersionPerimee($r, $modele);
 
         $valide = $r->validate([
             'entity' => ['sometimes', 'string', 'max:64'],

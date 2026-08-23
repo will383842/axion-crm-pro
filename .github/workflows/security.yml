@@ -143,13 +143,27 @@ jobs:
       #     sortie `format: table` imprimee dans le journal. Rien ne devient
       #     invisible — c'etait la seule question qui comptait.
       #
-      # Le jour ou GHAS est souscrit, ou le depot repasse public, retirer cette
-      # ligne : l'etape refonctionnera sans autre changement.
+      # 🔑 ON NE TENTE PAS L'ENVOI PLUTOT QUE D'IGNORER SON ECHEC, et la
+      # difference n'est pas cosmetique. Ma premiere version posait
+      # `continue-on-error: true` — et la garde `F38-013`
+      # (`SastNEtouffePasSonVerdictTest`) l'a REFUSEE, a juste titre : elle
+      # interdit cette directive PARTOUT dans le job semgrep, precisement parce
+      # qu'un rouge ignore ne se distingue pas d'un vert.
+      #
+      # Une etape SAUTEE dit la verite — « on n'a pas envoye » — la ou une etape
+      # toleree dit « on a essaye, on s'en moque ». La garde n'a pas ete
+      # relachee d'un pouce ; c'est mon correctif qui etait le mauvais.
+      #
+      # Si `github.event.repository` manque sur un declencheur donne,
+      # l'expression vaut `null == false` -> faux -> etape sautee. Le repli va
+      # donc dans le sens SUR.
+      #
+      # Le jour ou GHAS est souscrit, ou le depot repasse public, la condition
+      # redevient vraie toute seule : rien a defaire.
       - uses: github/codeql-action/upload-sarif@v3
-        continue-on-error: true
         # `always()` seul faisait rougir le job quand le fichier manquait — le
         # defaut n° 3 du bloc `trivy`, ici encore ouvert avant F38-013.
-        if: always() && hashFiles('semgrep.sarif') != ''
+        if: always() && hashFiles('semgrep.sarif') != '' && github.event.repository.private == false
         with: { sarif_file: semgrep.sarif }
 
   # ⚠️ 2026-08-16 — ce job avait TROIS défauts, tous du même genre : il avait
@@ -216,12 +230,26 @@ jobs:
       #     sortie `format: table` imprimee dans le journal. Rien ne devient
       #     invisible — c'etait la seule question qui comptait.
       #
-      # Le jour ou GHAS est souscrit, ou le depot repasse public, retirer cette
-      # ligne : l'etape refonctionnera sans autre changement.
+      # 🔑 ON NE TENTE PAS L'ENVOI PLUTOT QUE D'IGNORER SON ECHEC, et la
+      # difference n'est pas cosmetique. Ma premiere version posait
+      # `continue-on-error: true` — et la garde `F38-013`
+      # (`SastNEtouffePasSonVerdictTest`) l'a REFUSEE, a juste titre : elle
+      # interdit cette directive PARTOUT dans le job semgrep, precisement parce
+      # qu'un rouge ignore ne se distingue pas d'un vert.
+      #
+      # Une etape SAUTEE dit la verite — « on n'a pas envoye » — la ou une etape
+      # toleree dit « on a essaye, on s'en moque ». La garde n'a pas ete
+      # relachee d'un pouce ; c'est mon correctif qui etait le mauvais.
+      #
+      # Si `github.event.repository` manque sur un declencheur donne,
+      # l'expression vaut `null == false` -> faux -> etape sautee. Le repli va
+      # donc dans le sens SUR.
+      #
+      # Le jour ou GHAS est souscrit, ou le depot repasse public, la condition
+      # redevient vraie toute seule : rien a defaire.
       - uses: github/codeql-action/upload-sarif@v3
-        continue-on-error: true
         # `always()` seul faisait rougir le job quand le fichier manquait.
-        if: always() && hashFiles(format('trivy-{0}.sarif', matrix.image)) != ''
+        if: always() && hashFiles(format('trivy-{0}.sarif', matrix.image)) != '' && github.event.repository.private == false
         with:
           sarif_file: trivy-${{ matrix.image }}.sarif
           category: trivy-${{ matrix.image }}
@@ -302,11 +330,25 @@ jobs:
       #     sortie `format: table` imprimee dans le journal. Rien ne devient
       #     invisible — c'etait la seule question qui comptait.
       #
-      # Le jour ou GHAS est souscrit, ou le depot repasse public, retirer cette
-      # ligne : l'etape refonctionnera sans autre changement.
+      # 🔑 ON NE TENTE PAS L'ENVOI PLUTOT QUE D'IGNORER SON ECHEC, et la
+      # difference n'est pas cosmetique. Ma premiere version posait
+      # `continue-on-error: true` — et la garde `F38-013`
+      # (`SastNEtouffePasSonVerdictTest`) l'a REFUSEE, a juste titre : elle
+      # interdit cette directive PARTOUT dans le job semgrep, precisement parce
+      # qu'un rouge ignore ne se distingue pas d'un vert.
+      #
+      # Une etape SAUTEE dit la verite — « on n'a pas envoye » — la ou une etape
+      # toleree dit « on a essaye, on s'en moque ». La garde n'a pas ete
+      # relachee d'un pouce ; c'est mon correctif qui etait le mauvais.
+      #
+      # Si `github.event.repository` manque sur un declencheur donne,
+      # l'expression vaut `null == false` -> faux -> etape sautee. Le repli va
+      # donc dans le sens SUR.
+      #
+      # Le jour ou GHAS est souscrit, ou le depot repasse public, la condition
+      # redevient vraie toute seule : rien a defaire.
       - uses: github/codeql-action/upload-sarif@v3
-        continue-on-error: true
-        if: always() && hashFiles(format('trivy-{0}.sarif', matrix.nom)) != ''
+        if: always() && hashFiles(format('trivy-{0}.sarif', matrix.nom)) != '' && github.event.repository.private == false
         with:
           sarif_file: trivy-${{ matrix.nom }}.sarif
           category: trivy-${{ matrix.nom }}

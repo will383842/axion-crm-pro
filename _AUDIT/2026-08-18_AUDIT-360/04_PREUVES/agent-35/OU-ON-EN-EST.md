@@ -605,3 +605,42 @@ conteneurs en fonctionnement** et non la configuration.
 le correctif de fond, *une fois fusionné et déployé avec succès*, **n'avait rien
 fermé** — un déploiement ne recrée pas les conteneurs de base de données. Sans ce
 contrôle, l'illusion aurait tenu. *Ne jamais désarmer ce script.*
+
+---
+
+# ✅ LA PR #194 EST VERTE ET FUSIONNABLE — 2026-08-23
+
+**Elle était déjà OUVERTE**, créée le 23/08 à 06:53. Le §8 étape 3 demandait
+« demander à Will l'ouverture de la PR » : il n'y avait rien à ouvrir, seulement
+à débloquer. *Encore une note d'état en retard sur la réalité.*
+
+| | |
+|---|---|
+| PR | **#194** — `fix/gardes-de-plan-et-c19-010` → `main` |
+| contenu | **320 fichiers**, +17 050 / −1 383, **12 commits** |
+| état avant | `BLOCKED` — CI rouge + Gitleaks rouge |
+| **état après** | **`MERGEABLE` / `CLEAN`** — **21 contrôles verts**, 3 ignorés délibérément |
+| url | https://github.com/will383842/axion-crm-pro/pull/194 |
+
+Dont, parmi les 21 verts : **« La config de production ne publie que 80 et 443 »**,
+la garde née de la faille des ports — elle tient sur cette branche.
+
+## Ce qu'il a fallu pour la débloquer
+
+1. **Trois rouges de CI, tous mécaniques** (commit `8a8bf41`) — une annotation de
+   type `import()`, un script d'infra en 100644, deux fichiers Pint sur 192.
+   Aucun ne touchait un test.
+2. **Deux faux positifs Gitleaks** (commit `b94ee76`) — `un-mot-de-passe-de-reprise-2026`,
+   donnée de test d'un test unitaire **sur la règle `NotPwnedPassword`**, face à un
+   vérificateur HIBP simulé. **Lus avant d'être ignorés**, par empreinte, avec le
+   pourquoi écrit dans `.gitleaksignore`.
+
+⚠️ **La FUSION reste un geste de Will.** Rien n'est fusionné.
+
+## État des dépôts à cet instant
+
+| | |
+|---|---|
+| `crmpro-wt-a35-auth` · `fix/gardes-de-plan-et-c19-010` | **poussée**, 0 commit local en attente |
+| `Axion-CRM-Pro` · `audit/360-p1-p2` | commitée localement (journaux d'audit) |
+| PR #194 | **ouverte, verte, non fusionnée** |

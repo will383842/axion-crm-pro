@@ -299,7 +299,18 @@ Pour chacun : **qu'exécute-t-il réellement ? est-il bloquant ou décoratif (`c
 
 ### 4.11 Côté site (Axion-IA) — ce qui touche au CRM
 
-`src/server/crm-sync/**` (+ ses 2 suites de test) · `src/server/actions/crm-sync/**` · `src/server/queue/workers/crm-sync-worker.ts` · `src/app/api/internal/crm-webhook/**` · `src/app/[locale]/(admin)/[adminPrefix]/synchro-crm/**` · `src/server/qualiopi/crm/**` · les **14 points de capture** · `capturer-lead.ts` (PII en clair) · `admin-submissions/actions.ts` (plafond d'export) · `admin-calendly/actions.ts` (statuts) · les **12 écrans « Contacts »** de la console axionia (Appels réservés, Messages, Clients, Presse, Partenariats, Investisseurs, Conférences, Recrutement, Podcast, Autres, Candidatures, Rendez-vous + calendrier) et le module `calendrier` mort.
+`src/server/crm-sync/**` (+ ses 2 suites de test) · `src/server/actions/crm-sync/**` · `src/server/queue/workers/crm-sync-worker.ts` · `src/app/api/internal/crm-webhook/**` · `src/app/[locale]/(admin)/[adminPrefix]/synchro-crm/**` · `src/server/qualiopi/crm/**` · les **14 points de capture** · `capturer-lead.ts` (PII en clair) · `admin-submissions/actions.ts` (plafond d'export) · `admin-calendly/actions.ts` (statuts) · les **12 écrans « Contacts »** de la console axionia (Tout, Appels réservés, Messages, Clients, Presse, Partenariats, Investisseurs, Conférences, Recrutement, Podcast, Autres, Candidatures) et le module `calendrier` mort.
+
+> **Rectification du 2026-08-22 — constat E32-001.** Cette liste se trompait sur
+> 2 items sur 12 : elle citait « Rendez-vous + calendrier », qui n'est **aucune**
+> entrée de navigation, et omettait « Tout ». Mesure, sur
+> `axionia/src/lib/admin-nav.ts` : `grep -c 'group: "contacts"'` rend **12**
+> (lignes 435, 441, 451, 461, 468, 475, 482, 489, 496, 507, 514, 522), dont
+> l'entrée `label: "Tout"` vers `${base}/contacts` (l. 432-435) ; et
+> `grep -in "calendrier\|rendez-vous"` ne rend que des **commentaires**
+> (l. 32, 334, 360, 406, 415, 422). Le total reste 12 : un item retiré, un
+> ajouté. Une liste d'écrans sert d'assiette à des décisions de retrait — s'y
+> tromper, c'est auditer un écran qui n'existe pas et en oublier un qui existe.
 
 ---
 

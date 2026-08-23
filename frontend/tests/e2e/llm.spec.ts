@@ -69,14 +69,31 @@ test.describe('Phase 2 pages (stubs)', () => {
     await expect(page).toHaveURL(/campaigns/);
   });
 
-  test('cold-email page loads', async ({ page }) => {
+  // 2026-08-23 — §8.2 de `10_NAVIGATION-CIBLE.md`, et MEME RAISONNEMENT QUE
+  // POUR `/crm` ET `/analytics` CI-DESSOUS, quatre lignes plus bas : ces deux
+  // ecrans bouchons sont SUPPRIMES. `I48-008` les nomme « le seul endroit ou le
+  // produit DEPASSE son perimetre » — le lot L7 est explicitement exclu, et un
+  // ecran de demonstration donnait le change.
+  //
+  // Les deux cas qui verifiaient qu'ils « chargeaient » figeaient donc un
+  // comportement retire volontairement. On verifie desormais la redirection —
+  // et on la verifie sur l'URL D'ARRIVEE, pas sur l'absence d'un texte : un
+  // `toHaveCount(0)` passerait aussi bien sur une page blanche ou une erreur.
+  test('/cold-email mene a l ecran « pas encore livre », lot L7', async ({ page }) => {
     await page.goto('/cold-email');
-    await expect(page).toHaveURL(/cold-email/);
+    await expect(page).toHaveURL(/pas-encore-livre/);
+    await expect(page).toHaveURL(/lot=L7/);
   });
 
-  test('linkedin page loads', async ({ page }) => {
+  test('/linkedin mene a l ecran « pas encore livre », lot L7', async ({ page }) => {
     await page.goto('/linkedin');
-    await expect(page).toHaveURL(/linkedin/);
+    await expect(page).toHaveURL(/pas-encore-livre/);
+    await expect(page).toHaveURL(/lot=L7/);
+  });
+
+  test('/crm mene desormais a /contacts, et non plus au 404 hors gabarit', async ({ page }) => {
+    await page.goto('/crm');
+    await expect(page).toHaveURL(/\/contacts/);
   });
 
   // F7 (étape 0) — les écrans bouchons `/crm` et `/analytics` ont été

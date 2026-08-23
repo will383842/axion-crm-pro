@@ -4,6 +4,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -61,11 +62,20 @@ test('GET /workspace authentifié retourne le workspace courant', function () {
         ->assertOk();
 });
 
-test('PUT /workspace retourne 501 (Sprint 3 stub)', function () {
-    [$user] = makeAuthUser();
+// 2026-08-23 — CE TEST FIGEAIT LE STUB, il fige maintenant le comportement.
+// `PUT /workspace` est ecrit (exigence n. 10 du §12). On ne se contente pas
+// d'echanger 501 contre 200 : on RELIT LA BASE, sans quoi la garde passerait au
+// vert sur une route qui repond « ok » sans rien ecrire — le motif B12-007
+// exactement.
+test('PUT /workspace ecrit vraiment le nom en base', function () {
+    [$user, $workspace] = makeAuthUser();
+
     $this->actingAs($user)
         ->putJson('/api/v1/workspace', ['name' => 'New'])
-        ->assertStatus(501);
+        ->assertOk();
+
+    expect(DB::table('workspaces')
+        ->where('id', $workspace->id)->value('name'))->toBe('New');
 });
 
 test('GET /users sans auth → 401', function () {
@@ -80,9 +90,13 @@ test('GET /users authentifié retourne liste vide stub', function () {
         ->assertJsonStructure(['data']);
 });
 
-test('POST /users retourne 501', function () {
+// 2026-08-23 — idem : `POST /users` invite pour de vrai. Le corps d'origine
+// n'envoyait qu'un `email` ; `name` et `role` sont desormais exiges, donc cet
+// appel-la rend 422. C'est le bon comportement, et on le fige tel quel — un
+// test qui ne verifierait que « ce n'est plus 501 » ne dirait rien.
+test('POST /users refuse une invitation sans nom ni role', function () {
     [$user] = makeAuthUser();
     $this->actingAs($user)
         ->postJson('/api/v1/users', ['email' => 'a@b.com'])
-        ->assertStatus(501);
+        ->assertStatus(422);
 });

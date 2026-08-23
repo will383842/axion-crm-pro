@@ -61,14 +61,22 @@ test('GET /notifications authentifié → OK', function () {
     $this->actingAs($u)->getJson('/api/v1/notifications')->assertOk()->assertJsonStructure(['data']);
 });
 
-test('POST /notifications/1/read retourne 501', function () {
+// 2026-08-23 — 🔴 CE TEST NE MESURAIT PAS CE QU'IL CROYAIT. Il attendait 501
+// sur l'identifiant `1`, mais `notifications.id` est un UUID : la methode
+// s'appelait `markRead(int $n)` et levait une TypeError. La route rendait donc
+// **500**, et le 501 n'a jamais ete atteint. Le test passait parce que... il ne
+// passait pas : il figeait un comportement qui n'existait pas.
+// Elle est ecrite desormais, et `1` n'est pas un UUID -> 404.
+test('POST /notifications/1/read : un identifiant non-UUID rend 404, pas une erreur serveur', function () {
     $u = makeNotifUser();
-    $this->actingAs($u)->postJson('/api/v1/notifications/1/read')->assertStatus(501);
+    $this->actingAs($u)->postJson('/api/v1/notifications/1/read')->assertNotFound();
 });
 
-test('POST /notifications/read-all retourne 501', function () {
+test('POST /notifications/read-all marque les notifications et rend un compte', function () {
     $u = makeNotifUser();
-    $this->actingAs($u)->postJson('/api/v1/notifications/read-all')->assertStatus(501);
+    $this->actingAs($u)->postJson('/api/v1/notifications/read-all')
+        ->assertOk()
+        ->assertJsonStructure(['marked']);
 });
 
 test('GET /saved-views authentifié → OK liste vide', function () {

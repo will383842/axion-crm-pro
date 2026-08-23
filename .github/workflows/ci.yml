@@ -373,6 +373,33 @@ jobs:
             caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
           echo "OK — le Caddyfile est valide, Caddy démarrera dessus."
 
+      # ── 🔴 CE FICHIER N'ÉTAIT COUVERT PAR RIEN (mesuré le 2026-08-23) ──────
+      # Ce job existe parce que « Caddy refuse de démarrer sur un fichier
+      # invalide, et plus rien ne répond ». C'était vrai — et le job ne
+      # regardait QU'UN des deux Caddyfile du dépôt.
+      #
+      # `frontend/Caddyfile.app` est CUIT DANS L'IMAGE du conteneur `app`
+      # (`Dockerfile.frontend:52`) et sert le SPA sur :5173. Une faute de
+      # frappe dedans produit exactement le symptôme que ce job veut prévenir
+      # — l'application ne démarre plus — et rien ne l'aurait attrapée avant
+      # le redémarrage en production.
+      #
+      # Découvert en y ajoutant les quatre redirections 301 du §8.2 de
+      # `10_NAVIGATION-CIBLE.md` : il a fallu constater que le gate ne les
+      # aurait pas protégées.
+      #
+      # ⚠️ Le fichier ne s'appelle pas `Caddyfile` : on le monte donc
+      # explicitement SOUS ce nom, sinon Caddy ne le trouve pas et l'étape
+      # passerait au vert sans avoir rien lu.
+      - name: Le Caddyfile du conteneur `app` est-il valide ?
+        run: |
+          set -euo pipefail
+          test -f frontend/Caddyfile.app  # un fichier absent rendrait l'étape muette
+          docker run --rm \
+            -v "$PWD/frontend/Caddyfile.app:/etc/caddy/Caddyfile:ro" caddy:2-alpine \
+            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          echo "OK — le SPA démarrera : son Caddy interne est valide."
+
   scripts-executables:
     name: Les scripts d'infra sont-ils exécutables ?
     runs-on: ubuntu-24.04

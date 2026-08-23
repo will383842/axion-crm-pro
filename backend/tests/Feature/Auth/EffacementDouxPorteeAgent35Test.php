@@ -196,11 +196,32 @@ function b10pBalayerAppelsConstructeur(array $tables): array
                     $site = $relatif . ':' . $ligne;
                     $nommeColonne = str_contains($chaine, 'deleted_at');
 
+                    // 🔴 CORRIGE LE 2026-08-23 — la garde confondait deux gestes
+                    // opposes. `pose_deleted_at` valait `str_contains(deleted_at)`,
+                    // donc un `whereNull('deleted_at')` — qui LIT la corbeille pour
+                    // l'eviter — etait compte comme un code qui ARCHIVE des lignes.
+                    // Le premier `whereNull` pose sur une chaine d'ecriture a suffi
+                    // a faire apparaitre `workspaces` dans la liste des tables « a
+                    // corbeille vivante », ce qui est l'exact contraire de la
+                    // verite.
+                    //
+                    // On exige desormais la colonne EN POSITION DE CLE ECRITE
+                    // (`'deleted_at' =>`). Le controle devient plus STRICT, jamais
+                    // plus laxiste : les deux sites historiques (ImportMediaMerge
+                    // et GdprErasureService) ecrivent bien `['deleted_at' => now()]`
+                    // et restent nommes par l'assertion ci-dessous.
+                    // Espaces retires d'abord : `'deleted_at' => now()` et
+                    // `'deleted_at'=>now()` sont le meme geste, et une garde qui
+                    // depend de la mise en page finit par mentir apres un Pint.
+                    $compacte = preg_replace('/\s+/', '', $chaine) ?? '';
+                    $poseColonne = str_contains($compacte, "'deleted_at'=>")
+                        || str_contains($compacte, '"deleted_at"=>');
+
                     if (preg_match('/->\s*(insertGetId|insertOrIgnore|insert|upsert|updateOrInsert|update|delete|truncate)\s*\(/', $chaine) === 1) {
                         $seaux['ecritures'][] = [
                             'table' => $table,
                             'site' => $site,
-                            'pose_deleted_at' => $nommeColonne,
+                            'pose_deleted_at' => $poseColonne,
                         ];
 
                         continue;
@@ -502,7 +523,7 @@ test('B10-016-PORTEE COLONNES MORTES — deux tables recoivent un deleted_at par
  * une dixieme porte ajoutee demain sera balayee sans qu'on y pense. C'est
  * precisement ce qui a permis a cette garde de contredire son auteur.
  */
-test('B10-016-PORTEE PORTES MORTES — trois des neuf portes DELETE de l API ne suppriment rien', function () {
+test('B10-016-PORTEE PORTES MORTES — UNE des neuf portes DELETE de l API ne supprime rien', function () {
     $portes = [];
     $mortes = [];
 
@@ -543,10 +564,20 @@ test('B10-016-PORTEE PORTES MORTES — trois des neuf portes DELETE de l API ne 
     expect(count($portes))->toBeGreaterThanOrEqual(7);
 
     sort($mortes);
+
+    // 2026-08-23 — DE TROIS A UNE, et la liste RETRECIT au lieu de s'allonger.
+    // `saved-views` et `users` repondaient `notImplemented` ; leurs `destroy()`
+    // sont ecrits (exigence n. 10 du §12, garde
+    // `tests/Feature/Api/EcrituresQuiRepondaient501Test.php`). On ne relache
+    // donc RIEN : on retire deux entrees d'une liste de defauts.
+    //
+    // 🔴 `contacts/{contact}` RESTE, et ce n'est pas un oubli. Sa reparation
+    // depend de `I48-001`, dont la fiche d'audit dit que le correctif ne peut
+    // pas etre ecrit avant l'arbitrage « ou vit le type » et `I48-003`
+    // (`contacts.company_id` et `contacts.last_name` sont tous deux NOT NULL).
+    // C'est une decision de conception, elle revient a Will.
     expect($mortes)->toBe([
         'api/v1/contacts/{contact}',
-        'api/v1/saved-views/{saved_view}',
-        'api/v1/users/{user}',
     ]);
 });
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Models\LlmUseCase;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -11,6 +12,8 @@ use Illuminate\Support\Facades\Schema;
 
 class LlmUseCasesController extends ApiController
 {
+    use VerrouOptimiste;
+
     /**
      * Plafond de versions de prompt rendues.
      *
@@ -78,11 +81,57 @@ class LlmUseCasesController extends ApiController
     public function update(Request $r, LlmUseCase $useCase): JsonResponse
     {
         // Constat B12-001 / F36-005 : la resolution de route rendait
-        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
-        // « interdit » confirmerait son existence.
+        // l'enregistrement sans aucun filtre d'espace. 404, jamais 403.
         $this->refuserHorsEspace($useCase);
 
-        return $this->notImplemented('4');
+        // 🔑 G43-005 — VERROU OPTIMISTE. La garde `VerrouOptimisteEtenduTest`
+        // avait ANTICIPE ce moment : « un update() qui rend 501 n'ecrit rien :
+        // il n'y a pas de saisie a perdre. Le jour ou il est cable, il
+        // apparaitra ici. » Il l'a fait, le 2026-08-23, et sa liste de
+        // derogations est vide A DESSEIN — « ce n'est pas une derogation, c'est
+        // le registre de ce qui reste a faire ».
+        //
+        // Sans ce controle, deux saisies concurrentes perdent du travail EN
+        // SILENCE : la seconde ecrase la premiere sans que personne l'apprenne.
+        $this->refuserSiVersionPerimee($r, $useCase);
+
+        // 🔑 `slug` N'EST PAS MODIFIABLE, et c'est le point de ce reglage.
+        // Le code appelle un cas d'usage PAR SON SLUG : le renommer depuis un
+        // ecran ferait tomber, en silence et a l'execution, tout appelant qui
+        // le nomme. Le nom d'appel n'est pas une etiquette d'affichage.
+        //
+        // `prompt_version` n'y est pas non plus : elle a sa propre route
+        // (`updatePrompt`), qui verifie d'abord que la version existe.
+        $valide = $r->validate([
+            'description' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'primary_provider' => ['sometimes', 'string', 'max:64'],
+            'model' => ['sometimes', 'string', 'max:128'],
+            'fallback_chain' => ['sometimes', 'array'],
+            'options' => ['sometimes', 'array'],
+            // NUMERIC(10,4) : borne ici pour rendre 422 plutot que laisser
+            // Postgres lever « numeric field overflow » en 500.
+            'cost_cap_eur' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:999999.9999'],
+            'enabled' => ['sometimes', 'boolean'],
+        ]);
+
+        $champs = [];
+        foreach (['description', 'primary_provider', 'model', 'cost_cap_eur', 'enabled'] as $clef) {
+            if (array_key_exists($clef, $valide)) {
+                $champs[$clef] = $valide[$clef];
+            }
+        }
+        foreach (['fallback_chain', 'options'] as $clef) {
+            if (array_key_exists($clef, $valide)) {
+                $champs[$clef] = json_encode($valide[$clef], JSON_UNESCAPED_UNICODE);
+            }
+        }
+
+        if ($champs !== []) {
+            $champs['updated_at'] = now();
+            DB::table('llm_use_cases')->where('id', $useCase->getKey())->update($champs);
+        }
+
+        return $this->ok(['data' => LlmUseCase::query()->findOrFail($useCase->getKey())]);
     }
 
     /**
@@ -173,6 +222,33 @@ class LlmUseCasesController extends ApiController
      *
      *     @OA\Response(response=501, description="Not implemented"))
      */
+    /**
+     * ACTIVER la version `{v}` du prompt de ce cas d'usage.
+     *
+     * 🔑 CETTE ROUTE ACTIVE, ELLE NE REECRIT PAS. Une version de prompt est
+     * IMMUABLE : c'est tout l'interet de les versionner. `prompts()` rend deja
+     * `active_version` depuis `llm_use_cases.prompt_version` — c'est donc cette
+     * colonne, et elle seule, que le geste deplace.
+     *
+     * 🔴 ET ON VERIFIE QUE LA VERSION EXISTE AVANT DE L'ACTIVER. Poser un
+     * numero qui ne correspond a aucune ligne ferait tourner le routeur sur un
+     * prompt introuvable : la panne serait silencieuse, et a l'execution — donc
+     * en production, sur un appel client, et pas ici.
+     *
+     * Le cloisonnement passe par le CAS D'USAGE : ni `prompt_templates` ni
+     * `prompt_template_versions` ne portent de `workspace_id`. C'est
+     * `refuserHorsEspace($useCase)` qui tient la frontiere, comme dans
+     * `prompts()` — meme ceinture, et toujours pas de bretelles.
+     *
+     * @OA\Put(path="/llm/use-cases/{useCase}/prompts/{v}", tags={"LLM"}, summary="Active une version de prompt",
+     *     security={{"sanctumCookie":{}}},
+     *
+     *     @OA\Parameter(name="useCase", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Parameter(name="v", in="path", required=true, @OA\Schema(type="integer")),
+     *
+     *     @OA\Response(response=200, description="OK"),
+     *     @OA\Response(response=404, description="Cas d'usage hors de mon espace, ou version inexistante"))
+     */
     public function updatePrompt(Request $r, LlmUseCase $useCase, int $v): JsonResponse
     {
         // Constat B12-001 / F36-005 : la resolution de route rendait
@@ -180,6 +256,20 @@ class LlmUseCasesController extends ApiController
         // « interdit » confirmerait son existence.
         $this->refuserHorsEspace($useCase);
 
-        return $this->notImplemented('4');
+        $existe = DB::table('prompt_template_versions AS pv')
+            ->join('prompt_templates AS t', 't.id', '=', 'pv.prompt_template_id')
+            ->where('t.use_case_id', $useCase->getKey())
+            ->where('pv.version', $v)
+            ->exists();
+
+        if (! $existe) {
+            abort(404);
+        }
+
+        DB::table('llm_use_cases')
+            ->where('id', $useCase->getKey())
+            ->update(['prompt_version' => $v, 'updated_at' => now()]);
+
+        return $this->ok(['data' => LlmUseCase::query()->findOrFail($useCase->getKey())]);
     }
 }

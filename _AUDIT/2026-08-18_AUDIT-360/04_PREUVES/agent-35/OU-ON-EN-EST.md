@@ -430,3 +430,113 @@ est versionné) pour les 11 premiers.
 5. **Lancer la vague du dépôt du site** pour les 11 constats reportés.
 6. Attaquer les **47 S1 ouverts**, puis les 168 S2.
 7. Poser à Will les arbitrages de `ARBITRAGES.md`, famille par famille.
+
+---
+
+# 🟢 LA BRANCHE ÉTAIT ROUGE EN CI, ET LES TROIS ROUGES ÉTAIENT MÉCANIQUES
+
+> Découvert le 2026-08-23 en cherchant à répondre à « est-ce que tout est
+> terminé ? ». **Personne ne l'avait regardé.**
+
+`fix/gardes-de-plan-et-c19-010` portait les 91 correctifs de la vague 2 et sa CI
+rougissait depuis le **23/08 06:53**, alors que la vérification locale était
+verte — 1 645 tests backend, 412 frontend, 94 workers. *Un dossier peut déclarer
+une vague « vérifiée en entier » pendant que la forge la refuse.*
+
+| workflow | verdict |
+|---|---|
+| CI | ❌ **failure** |
+| Security | ❌ **failure** |
+| E2E | ✅ success |
+| Accessibility | ✅ success |
+
+**Aucun des trois rouges de `CI` ne touchait un test.**
+
+| # | job rouge | cause réelle | portée |
+|---|---|---|---|
+| 1 | Frontend React/Vite → *Lint (BLOQUANT)* | `vi.importActual<typeof import('@/lib/api')>` — une annotation de type `import()` en ligne, refusée par `@typescript-eslint/consistent-type-imports` | **1 ligne** |
+| 2 | *Les scripts d'infra sont-ils exécutables ?* | `infra/scripts/rafraichir-le-banc.sh` enregistré en **100644** | **1 fichier** |
+| 3 | Backend → *Pint (BLOQUANT)* | règle `single_quote` | **2 fichiers sur 192 modifiés** |
+
+## Le détail, et ce qui a été vérifié avant d'accepter
+
+**① Le lint.** Remplacé par `import type * as ModuleApi from '@/lib/api'`.
+Ce n'est pas un détail de style dans ce fichier : sa mise en page inhabituelle
+(les `import` **après** le `vi.mock`) existe pour le hissage de `vi.mock`.
+`import type` est **effacé à la compilation**, donc il ne déplace rien.
+*Vérifié : eslint vert, et le fichier passe toujours **11 tests sur 11**.*
+
+**② Le bit d'exécution.** Ironie utile : le fichier fautif est **exactement le
+script que la mémoire de reprise prescrit de lancer avant toute suite de tests**
+(`rafraichir-le-banc.sh a35r`). Non exécutable, il aurait échoué **en silence
+sous cron** — ce que la garde dit vouloir empêcher, mot pour mot.
+*La garde ne couvre que `infra/scripts/*.sh`.* Deux autres `.sh` du dépôt sont en
+100644 (`backend/database/perf/mesure_reference.sh`, `infra/docker/entrypoint-prod.sh`) :
+**hors de sa portée, délibérément pas touchés.**
+
+**③ Pint.** ⚠️ **Vérifié avant d'accepter, parce que Pint touchait à des CHAÎNES
+et non à de l'indentation.** Le diff transformait `"…"` en `'…'` autour d'une
+**vraie nouvelle ligne** (pas une séquence `\n`) :
+
+```php
+$plat .= str_repeat("\n", …)   →   $plat .= str_repeat('\n', …)
+                 ↑ une VRAIE nouvelle ligne dans la source, pas un antislash-n
+```
+
+Mesuré plutôt que supposé :
+
+```
+"<0a>" === '<0a>'   →  bool(true)
+strlen             →  1  et  1
+bin2hex            →  "0a"  et  "0a"
+```
+
+Plus `php -l` sur les deux fichiers. **Le changement est neutre à l'octet près.**
+
+## Les trois contrôles rejoués en local
+
+| contrôle | résultat |
+|---|---|
+| `pint --test` sur les **192** fichiers PHP modifiés face à `main` | ✅ **PASS** |
+| `eslint . --max-warnings 0` | ✅ **vert** |
+| `git ls-files -s infra/scripts/*.sh` | ✅ tous en **100755** |
+
+⚠️ **`Security` reste rouge et n'est PAS traité ici.** Il vit dans
+`security.yml` (audits de dépendances + scan de secrets) et relève des
+**57 alertes de vulnérabilité** du point 9 du §12 — un autre chantier.
+
+## ⛔ NON POUSSÉ
+
+Le dépôt est **public**. Les commits restent locaux, conformément au §A00 de
+`06_RESTE-WILL.md`.
+
+| état | nombre |
+|---|---|
+| commits **locaux, jamais poussés** | **5** |
+| commits **poussés**, non fusionnés dans `main` | **6** (les 91 correctifs) |
+
+Les cinq locaux : la pile de vérification (`0c06153`), le montage lié et la clef
+(`29bf113`), l'écoute HTTP (`106cdbf`), `DB_TIMEZONE` (`8f23e9b`), et les trois
+rouges de CI (`8a8bf41`).
+
+---
+
+# ✅ CE QUI EST DÉJÀ EN PRODUCTION — la mémoire du dossier était PÉRIMÉE
+
+En cherchant quoi conseiller, j'ai vérifié la faille de production (Postgres et
+Redis joignables depuis internet, mesurée le 19/08). **Elle est fermée.**
+
+| | mesure |
+|---|---|
+| `23a0e5f` et `b6fa07f` — les **onze chemins** qui rouvraient les ports | ✅ **sur `origin/main`** |
+| PR **#193** | ✅ **fusionnée le 2026-08-22 à 20:57** |
+| workflow « Deploy direct SSH Hetzner » | ✅ **success** |
+
+*Le dossier et la mémoire disaient encore « poussés sur la branche, non fusionnés ;
+le produit qui tourne porte encore le défaut ». C'est faux depuis le 22/08 au soir.*
+
+⚠️ **Ce qui reste à Will sur ce sujet, inchangé et non vérifiable d'ici** :
+rendre les règles de pare-feu **persistantes** (elles sautent au redémarrage),
+faire tourner les secrets, trancher l'article 33 du RGPD.
+*Je n'ai pas touché à la production — ces trois points reposent sur le relevé du
+19/08, pas sur une mesure d'aujourd'hui.*

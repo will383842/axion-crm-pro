@@ -1218,3 +1218,146 @@ moi-même en écrivant l'outil.* **Ce qu'il faudrait** : un calcul qui convertit
 `oklch`/`oklab` en sRGB et qui échantillonne la couleur **rendue** (capture
 d'écran) plutôt que la couleur déclarée. À reprendre — le mode sombre reste
 **non mesuré**, et il ne faut pas le compter comme vérifié.
+
+---
+
+## Parcours 14 — Utilisateurs et rôles · 🔴 **`X39-027` (S1)**, `X39-028`, `X39-029`
+
+> *Énoncé : « créer un compte de rôle limité, **se connecter avec**, tenter
+> d'atteindre ce qui est interdit ».*
+
+### 🔴 `X39-027` — le produit n'a AUCUN moyen d'ajouter un utilisateur (S1)
+
+**Le parcours s'arrête à son premier geste.** Et ce n'est pas un détail
+d'ergonomie : c'est un CRM multi-utilisateurs qui ne peut compter qu'un compte.
+
+Le geste, joué à l'écran : `/users` → **« Inviter un utilisateur »**. Le dialogue
+qui s'ouvre est **complet et soigné** :
+
+> Inviter un utilisateur — *Un email d'invitation sera envoyé pour rejoindre le
+> workspace.* · **Email** · **Rôle** : Lecteur (lecture seule) / Opérateur
+> (édition) / Admin (gestion équipe) / Propriétaire (owner) · **Envoyer
+> l'invitation**
+
+Rempli, envoyé. Ce que le serveur répond, capté sur le réseau :
+
+```
+POST /api/v1/users/invite → 405
+« The POST method is not supported for route api/v1/users/invite.
+  Supported methods: PUT, DELETE. »
+```
+
+*Le 405 vient de ce que `invite` est avalé comme un identifiant par
+`/users/{user}`.* Ce que l'utilisateur lit, lui : **« Impossible d'envoyer
+l'invitation »**, le dialogue reste ouvert, aucune explication.
+
+**Il n'existe aucun autre chemin.** Mesuré, un par un :
+
+| chemin | résultat |
+|---|---|
+| `POST /api/v1/users/invite` | ❌ **la route n'existe pas** (`grep` sur `routes/api.php` : rien) |
+| `POST /api/v1/users` | ❌ **501** — `{"error":"not_implemented","message":"Endpoint à implémenter en Sprint 3."}` |
+| une route d'invitation | ❌ aucune (`invitations` est une table **morte** : seuls les services RGPD la citent, pour l'effacer) |
+| une commande Artisan | ❌ aucune |
+| un seeder | ❌ seul `OwnerUserSeeder`, qui crée **le** propriétaire |
+
+**Conséquence :** les **4 rôles** et **16 permissions** du modèle RBAC — dont
+l'écran se vante en titre (« 4 rôles RBAC : owner / admin / operator / viewer »)
+— **ne peuvent jamais être attribués à personne.** Le système de droits est
+complet, testé, et inatteignable.
+
+⚠️ **Ce défaut est connu du code mais n'a JAMAIS été inscrit au registre.**
+`UsersPage.tsx:76-84` le documente noir sur blanc — *« `grep -rn invite
+backend/routes` ne rend RIEN […] Le point d'entrée manquant est un défaut
+DISTINCT, hors de ce constat : il n'est pas refermé ici »*. Et
+`11_GRILLES/ecrans.md:204` **liste `POST /users/invite`** dans les routes de
+l'écran, comme si elle existait. *Un auditeur l'a vu, l'a écrit dans le code, et
+personne ne l'a porté au registre.*
+
+*À ne pas confondre avec `I48-001`, qui porte sur les fiches **personnes**.*
+
+---
+
+### Le parcours a quand même été joué — le compte créé EN BASE
+
+Puisque le produit n'offre aucun chemin, le compte `viewer@verif.localhost` a
+été inséré **directement dans la base jetable**, avec le rôle `viewer` sur
+l'espace de travail. *C'est écrit ici pour qu'on ne croie pas le contraire.*
+
+Ses **trois** permissions, par le seeder : `companies.view`, `llm.view_usage`,
+`rgpd.view`. Tout le reste doit être refusé.
+
+### ✅ CE QUI TIENT — et c'est la meilleure nouvelle de la journée
+
+**① Aucune écriture ne passe. Cinq sur cinq.**
+
+| geste tenté par le lecteur | réponse |
+|---|---|
+| `POST /companies` — créer une fiche | **403** |
+| `POST /tags` — créer un tag | **403** |
+| `POST /audiences` — créer une audience | **403** |
+| `DELETE /companies/2` — supprimer une fiche | **403** |
+| `POST /users` — créer un utilisateur | **403** |
+
+**② `audit.view` est exigé, et l'écran gère le refus proprement.**
+`GET /audit-logs` → **403**, et l'écran affiche **« Vous n'avez pas… »** au lieu
+de planter ou de mentir. *C'est exactement ce qu'on veut voir.*
+
+**③ 🔑 LE MASQUAGE DES COORDONNÉES FONCTIONNE.** Le lecteur n'a pas
+`contacts.view_pii`, et il ne voit rien en clair :
+
+```
+GET /contacts    →  Jean Dupont | 'j***@exemple.test' | '0102****05'
+GET /companies/5 →  email_generic = null | phone = null
+```
+
+*Sur un CRM qui porte 1 319 567 personnes physiques, c'est le contrôle qui
+compte le plus. Il tient.*
+
+### 🔴 `X39-028` — `GET /users` n'a AUCUNE garde : un lecteur liste tous les comptes (S2)
+
+Les trois autres routes utilisateur portent `->middleware('permission:users.manage')`
+(`routes/api.php:114,116,118`). **`GET /users` (ligne 112) n'en porte aucune.**
+
+Mesuré : le lecteur obtient **200** et lit l'écran complet — nom, **adresse
+e-mail**, rôles, état de la 2FA, dernière connexion de chaque compte.
+
+⚠️ **Et l'interface est écrite pour un 403 qui ne vient jamais.** Le commentaire
+de `UsersPage.tsx` dit : *« `/users` est une route ADMIN : un opérateur sans le
+rôle reçoit 403, et c'est le cas NOMINAL, pas l'exception. »* **C'est faux, et
+c'est mesurable.** Le code défensif écrit pour ce 403 ne s'exécute jamais.
+
+### `X39-029` — « Lecteur (lecture seule) » lit l'INTÉGRALITÉ du CRM (S2)
+
+Sur ~117 routes, **quatre** exigent une permission de lecture :
+`companies.view` (×1), `rgpd.view` (×1), `audit.view` (×2). Tout le reste est
+ouvert à n'importe quel compte authentifié.
+
+Le lecteur obtient **200** sur : `/users`, `/contacts`, `/audiences`,
+`/campaigns`, `/scraper-runs`, `/tags`, `/media`, `/workspace`,
+`/dashboard/stats`, `/crm/contacts-hub`.
+
+*Les trois permissions de lecture déclarées pour ce rôle ne veulent donc rien
+dire : il lirait tout sans elles.* Le tableau de bord lui annonce
+**« 5 entreprises »**, le hub contacts **« 5 prospects »**.
+
+**Ce n'est peut-être pas un défaut** — « lecture seule » peut vouloir dire « lit
+tout, n'écrit rien », et le masquage des coordonnées protège l'essentiel.
+*Mais alors les permissions `companies.view` / `llm.view_usage` / `rgpd.view`
+sont décoratives, et l'écran `/users` ne devrait pas être ouvert.*
+**Arbitrage à Will**, pas correctif mécanique.
+
+### `D22-006` — confirmé à l'écran, avec des exemples
+
+Le constat existant (S2, ouvert) dit : *« 33 écrans sur 37 n'interrogent jamais
+rôle ni permission »*. Mesuré, connecté **en tant que lecteur** :
+
+| écran | ce qu'on lui offre alors qu'il n'en a pas le droit |
+|---|---|
+| `/users` | **« Inviter un utilisateur »** |
+| `/companies` | **« Importer »**, **« Exporter »**, **« Lancer scraping → »** — il n'a ni `data.export` ni `scraping.run` |
+| `/settings` | **« Enregistrer »** |
+
+✅ *Et deux écrans ne lui offrent RIEN* : `/` et `/console/contacts`. Le constat
+n'est donc pas uniforme — c'est une raison de plus de le mesurer écran par écran
+plutôt que de le déclarer en bloc.

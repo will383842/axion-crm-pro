@@ -1,0 +1,21 @@
+{
+  "ecran": "Utilisateurs 4 rôles RBAC : owner / admin / operator / viewer (Spatie Permission teams). Inviter un utilisateur UTILISATEUR EMAIL RÔLES 2FA DERNIÈRE CONNEXION A3 Audit 360 audit360@verif.localhost — Non activé 23/08/2026 16:02:24",
+  "dialogue": {
+    "texte": "Inviter un utilisateur Un email d'invitation sera envoyé pour rejoindre le workspace. Email Rôle Lecteur (lecture seule) Opérateur (édition) Admin (gestion équipe) Propriétaire (owner) Annuler Envoyer l'invitation",
+    "champs": 2
+  },
+  "apresEnvoi": {
+    "dialogueEncoreLa": true,
+    "alertes": [
+      "Impossible d'envoyer l'invitation"
+    ],
+    "corps": "Utilisateurs 4 rôles RBAC : owner / admin / operator / viewer (Spatie Permission teams). Inviter un utilisateur UTILISATEUR EMAIL RÔLES 2FA DERNIÈRE CONNEXION A3 Audit 360 audit360@verif.localhost — Non activé 23/08/2026 16:02:24 Inviter un utilisateur Un email d'invitation sera envoyé pour rejoindr"
+  },
+  "reseau": [
+    {
+      "methode": "POST",
+      "statut": 405,
+      "corps": "{\n    \"message\": \"The POST method is not supported for route api/v1/users/invite. Supported methods: PUT, DELETE.\",\n    \"exception\": \"Symfony\\\\Component\\\\HttpKernel\\\\Exception\\\\MethodNotAllowedHttpExc"
+    }
+  ]
+}

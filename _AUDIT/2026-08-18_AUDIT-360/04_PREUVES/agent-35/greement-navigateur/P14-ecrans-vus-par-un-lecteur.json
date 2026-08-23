@@ -1,0 +1,54 @@
+{
+  "/": {
+    "url": "/",
+    "h1": "Tableau de bord",
+    "actionsOffertes": [],
+    "corps": "BONJOUR VIEWER 👋 Tableau de bord Vue d'ensemble · 30 derniers jours En direct · actualisé toutes les 30s 7j 30j 90j ⟳ Actualiser TOTAL ENTREPRISES 5 Toutes périodes confondues ENRICHIES 24H 5 Fiches enrichies sur 24h NOUVELLES 7J 35 Découvertes sur 7 jours QUALITÉ MOYENNE 0/100 Score pondéré qualité QUALITÉ Distributi",
+    "reseauKo": [
+      "403 /audit-logs"
+    ]
+  },
+  "/users": {
+    "url": "/users",
+    "h1": "Utilisateurs",
+    "actionsOffertes": [
+      "Inviter un utilisateur"
+    ],
+    "corps": "Utilisateurs 4 rôles RBAC : owner / admin / operator / viewer (Spatie Permission teams). Inviter un utilisateur UTILISATEUR EMAIL RÔLES 2FA DERNIÈRE CONNEXION A3 Audit 360 audit360@verif.localhost — Non activé 23/08/2026 16:02:24 VT Viewer Test viewer@verif.localhost — Non activé 23/08/2026 16:05:47",
+    "reseauKo": []
+  },
+  "/companies": {
+    "url": "/companies",
+    "h1": "Entreprises",
+    "actionsOffertes": [
+      "Exporter"
+    ],
+    "corps": "Entreprises Pipeline de prospection · 5 entreprises actives Importer Exporter Lancer scraping → TOTAL 5 Page 1 · 5 affichées ENRICHIES 0% dont email + téléphone vérifiés TOP TAILLE INCONNUE 100% de l'échantillon TOP NAF — — Tous Prospectables Partiels Pending Archivés Rechercher une entreprise Toutes tailles Artisan TP",
+    "reseauKo": []
+  },
+  "/settings": {
+    "url": "/settings",
+    "h1": "Paramètres",
+    "actionsOffertes": [
+      "Enregistrer"
+    ],
+    "corps": "Paramètres Workspace, intégrations, observabilité, apparence. Workspace : Axion-IA Workspace Intégrations Observabilité Apparence WORKSPACE Identité et limites Nom Slug (URL) Non modifiable Plafond LLM mensuel (€) Kill-switch automatique LLM quand atteint Enregistrer",
+    "reseauKo": []
+  },
+  "/audit-logs": {
+    "url": "/audit-logs",
+    "h1": "Journaux d’audit",
+    "actionsOffertes": [],
+    "corps": "Journaux d’audit Journal append-only avec chaîne cryptographique SHA-256 vérifiable. Vérifier la chaîne Rechercher dans le journal d'audit Toutes sévérités Info Attention Erreur Critique Vous n’avez pas les droits sur cette vue Le serveur a bien répondu, et il a refusé : votre compte n’est pas autorisé à consulter les ",
+    "reseauKo": [
+      "403 /audit-logs"
+    ]
+  },
+  "/console/contacts": {
+    "url": "/console/contacts",
+    "h1": "Contacts",
+    "actionsOffertes": [],
+    "corps": "Contacts Tous les types — Contacts actifs CLIENTS 0 PROSPECTS 5 OPPORTUNITÉS 0 DORMANTS 0 Tous 5 Prospects 5 Clients 0 Presse & médias 0 Partenaires 0 Investisseurs 0 Conférences 0 Newsletter 0 Fournisseurs 0 Rechercher une entreprise, un SIREN ou une personne Tous pays France Roumanie Tous statuts Contactables (e-mail",
+    "reseauKo": []
+  }
+}

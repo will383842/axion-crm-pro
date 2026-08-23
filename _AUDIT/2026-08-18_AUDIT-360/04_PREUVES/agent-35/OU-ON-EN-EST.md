@@ -798,3 +798,35 @@ pour l'essai des accents), 1 contact (**Jean Dupont**, courriel et téléphone),
 | `Axion-CRM-Pro` · `audit/360-p1-p2` | commitée localement | les journaux d'audit |
 
 ⚠️ **Aucune fusion n'a été faite.** Les trois fusions sont des gestes de Will.
+
+---
+
+## ⚠️ PIÈGE À CONNAÎTRE — pousser une branche ne déclenche AUCUNE vérification
+
+`.github/workflows/ci.yml` ne se déclenche que sur :
+
+```yaml
+on:
+  pull_request:
+    branches: [main]     # ← une PR, pas une poussee
+  workflow_dispatch:     # ← un lancement a la main
+  workflow_call:         # ← appele comme gate par le deploiement
+```
+
+**Il n'y a pas de `push:`.** Une branche poussée sur ce dépôt n'est donc
+vérifiée par **rien** tant qu'une PR n'est pas ouverte — pas de tests, pas de
+Pint, pas de scan de secrets.
+
+*J'ai annoncé « je vérifie que la CI les valide » après avoir poussé deux
+branches. C'était faux : rien ne tournait.* Le contournement, quand on ne veut
+pas ouvrir de PR :
+
+```bash
+gh workflow run ci.yml --ref <branche>
+gh run list --workflow ci.yml --limit 4
+```
+
+*Corollaire pour la suite de l'audit : « la branche est poussée » ne veut pas
+dire « elle est verte ». Les deux seules branches dont la CI a réellement parlé
+ce jour sont `fix/gardes-de-plan-et-c19-010` — parce qu'une PR est ouverte
+dessus — et celles lancées à la main.*

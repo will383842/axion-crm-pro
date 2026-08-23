@@ -246,6 +246,11 @@ test('B10-003 : la commande repousse REELLEMENT l horizon des partitions', funct
     DB::table('audit_logs')->insert([
         'event_type' => 'garde.b10003',
         'current_hash' => 'table.vivante',
+        // `prev_hash` est fourni EXPLICITEMENT : B16-013 a retire le defaut SQL
+        // de cette colonne le 2026-08-22, pour qu'un INSERT qui l'omet echoue
+        // franchement au lieu d'heriter d'un maillon zero. Cette garde-ci ne
+        // porte pas sur la chaine de hachage : elle a juste besoin d'une ligne.
+        'prev_hash' => str_repeat('0', 64),
         'created_at' => now(),
     ]);
 
@@ -337,6 +342,11 @@ test('B10-003 : la commande REFUSE de rendre 0 quand des lignes futures sont dej
     DB::table('audit_logs')->insert([
         'event_type' => 'garde.b10003',
         'current_hash' => 'ligne.tombee.dans.default',
+        // `prev_hash` est fourni EXPLICITEMENT : B16-013 a retire le defaut SQL
+        // de cette colonne le 2026-08-22, pour qu'un INSERT qui l'omet echoue
+        // franchement au lieu d'heriter d'un maillon zero. Cette garde-ci ne
+        // porte pas sur la chaine de hachage : elle a juste besoin d'une ligne.
+        'prev_hash' => str_repeat('0', 64),
         'created_at' => $apresHorizon,
     ]);
 

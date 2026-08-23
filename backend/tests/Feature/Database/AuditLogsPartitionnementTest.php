@@ -50,9 +50,13 @@ it('convertit audit_logs en table partitionnée sans perdre les lignes déjà pr
     SQL);
 
     DB::table('audit_logs')->insert([
-        ['event_type' => 'garde.reconstruction', 'current_hash' => 'maintenant', 'created_at' => now()],
-        ['event_type' => 'garde.reconstruction', 'current_hash' => 'tres.vieux', 'created_at' => '2019-01-15 08:00:00+00'],
-        ['event_type' => 'garde.reconstruction', 'current_hash' => 'tres.futur', 'created_at' => '2031-06-01 08:00:00+00'],
+        // `prev_hash` explicite : B16-013 a retire le defaut SQL de la colonne le
+        // 2026-08-22, pour qu'un INSERT qui l'omet echoue franchement plutot que
+        // d'heriter d'un maillon zero. Cette garde porte sur le partitionnement,
+        // pas sur la chaine de hachage : elle a seulement besoin de lignes valides.
+        ['event_type' => 'garde.reconstruction', 'prev_hash' => str_repeat('0', 64), 'current_hash' => 'maintenant', 'created_at' => now()],
+        ['event_type' => 'garde.reconstruction', 'prev_hash' => str_repeat('0', 64), 'current_hash' => 'tres.vieux', 'created_at' => '2019-01-15 08:00:00+00'],
+        ['event_type' => 'garde.reconstruction', 'prev_hash' => str_repeat('0', 64), 'current_hash' => 'tres.futur', 'created_at' => '2031-06-01 08:00:00+00'],
     ]);
 
     // Rejoue la vraie migration, exactement comme sur une base neuve.
@@ -78,7 +82,7 @@ it('convertit audit_logs en table partitionnée sans perdre les lignes déjà pr
     // ou partition pg_partman) — sans quoi l'application se mettrait à refuser
     // des écritures d'audit en production.
     DB::table('audit_logs')->insert([
-        'event_type' => 'garde.apres', 'current_hash' => 'apres', 'created_at' => '2040-02-03 00:00:00+00',
+        'event_type' => 'garde.apres', 'prev_hash' => str_repeat('0', 64), 'current_hash' => 'apres', 'created_at' => '2040-02-03 00:00:00+00',
     ]);
 
     expect(DB::table('audit_logs')->where('event_type', 'garde.apres')->count())->toBe(1);

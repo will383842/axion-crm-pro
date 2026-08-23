@@ -102,7 +102,20 @@ test('B12-017 — aucun contrôleur Phase 2 ne documente un chemin qu’aucune r
     foreach ($fichiers as $fichier) {
         $source = (string) file_get_contents($fichier);
         // Toutes les annotations `@OA\Get|Post|Put|Patch|Delete(path="…")`.
-        preg_match_all('/@OA\\\\(?:Get|Post|Put|Patch|Delete)\s*\(\s*path\s*=\s*"([^"]+)"/', $source, $trouvees);
+        //
+        // 🔴 L'ancre de debut de ligne n'est pas cosmetique — mesure du
+        // 2026-08-23. Sans elle, la garde comptait comme PUBLIEE une annotation
+        // seulement CITEE dans une phrase : l'en-tete de Phase2\CampaignsController
+        // expliquait quelle annotation il avait fallu retirer, et la garde lisait
+        // cette explication comme le defaut qu'elle decrivait. Elle rougissait sur
+        // le compte rendu de sa propre reparation.
+        //
+        // Toute annotation REELLE de ce depot ouvre une ligne de bloc de
+        // documentation (mesure : grep -rn "OA.Get(path" backend/app/ — les 40+
+        // occurrences s'ecrivent «      * @OA\Get(path="…" »). Une citation en
+        // cours de phrase ne le fait jamais : on ne perd aucune annotation vraie,
+        // et on cesse de lire du francais comme du code.
+        preg_match_all('/^\s*\*\s*@OA\\\\(?:Get|Post|Put|Patch|Delete)\s*\(\s*path\s*=\s*"([^"]+)"/m', $source, $trouvees);
 
         foreach ($trouvees[1] ?? [] as $chemin) {
             $cible = b12017Normaliser($chemin);

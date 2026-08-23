@@ -376,7 +376,17 @@ test('B10-016-PORTEE PLAFOND — les lectures DB::table aveugles a deleted_at n 
         'journalists' => 1,
         'media' => 5,
         'scraping_campaigns' => 1,
-        'users' => 2,
+        // 2 -> 3 le 2026-08-23, APRES examen, jamais pour accommoder un rouge.
+        // Le troisieme lecteur est l'essai a blanc de `AnonymizeOldIps` (l. 120),
+        // ajoute par le correctif B15-011. Il DOIT rester aveugle au `deleted_at` :
+        //   - le chemin reel est un UPDATE brut (l. 143-150) qui ne filtre pas non
+        //     plus ; un essai a blanc qui filtrerait MENTIRAIT sur ce qui va bouger ;
+        //   - et surtout, filtrer serait le defaut : l'IP d'un compte en corbeille
+        //     ne serait alors JAMAIS anonymisee, ce que la commande existe pour
+        //     empecher. Les deux autres sont GdprErasureService:213 et
+        //     GdprPortabilityService:196 ; GdprPortabilityService:168 est
+        //     'consciente' (elle nomme `deleted_at` dans son select).
+        'users' => 3,
         'workspaces' => 17,
     ];
 
@@ -405,7 +415,12 @@ test('B10-016-PORTEE PLAFOND — les lectures DB::table aveugles a deleted_at n 
 
     // Et le total, pour que l'ordre de grandeur reste visible d'un coup d'oeil.
     // 87 et non 67 : cf. la note des plafonds ci-dessus.
-    expect(count($aveugles))->toBeLessThanOrEqual(87);
+    // 87 -> 88 le 2026-08-23 : la SEULE lecture ajoutee est l'essai a blanc de
+    // `AnonymizeOldIps` (correctif B15-011), dont le plafond `users` ci-dessus
+    // porte la justification complete. Le total suit le detail, il ne le
+    // devance pas : si un jour ce nombre montait sans qu'aucun plafond de
+    // table ne bouge, ce serait le balayage qui derive, pas le code.
+    expect(count($aveugles))->toBeLessThanOrEqual(88);
 });
 
 /**

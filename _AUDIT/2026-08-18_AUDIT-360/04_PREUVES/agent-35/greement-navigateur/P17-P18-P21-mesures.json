@@ -1,0 +1,351 @@
+{
+  "p21_375px": [
+    {
+      "ecran": "/",
+      "largeurFenetre": 375,
+      "largeurDocument": 375,
+      "defileHorizontal": false,
+      "debordants": [],
+      "nbDebordants": 0,
+      "h1": "Tableau de bord"
+    },
+    {
+      "ecran": "/companies",
+      "largeurFenetre": 375,
+      "largeurDocument": 375,
+      "defileHorizontal": false,
+      "debordants": [
+        "div [786px]",
+        "div.sticky.top-0 [786px]",
+        "div [390px]",
+        "div [512px]",
+        "div [664px]"
+      ],
+      "nbDebordants": 73,
+      "h1": "Entreprises"
+    },
+    {
+      "ecran": "/console/contacts",
+      "largeurFenetre": 375,
+      "largeurDocument": 375,
+      "defileHorizontal": false,
+      "debordants": [],
+      "nbDebordants": 0,
+      "h1": "Contacts"
+    },
+    {
+      "ecran": "/audiences",
+      "largeurFenetre": 375,
+      "largeurDocument": 375,
+      "defileHorizontal": false,
+      "debordants": [],
+      "nbDebordants": 0,
+      "h1": "Audiences"
+    },
+    {
+      "ecran": "/settings",
+      "largeurFenetre": 375,
+      "largeurDocument": 375,
+      "defileHorizontal": false,
+      "debordants": [],
+      "nbDebordants": 0,
+      "h1": "Paramètres"
+    },
+    {
+      "ecran": "/users",
+      "largeurFenetre": 375,
+      "largeurDocument": 375,
+      "defileHorizontal": false,
+      "debordants": [
+        "div [1060px]",
+        "div.sticky.top-0 [1060px]",
+        "div [508px]",
+        "div [680px]",
+        "div [832px]"
+      ],
+      "nbDebordants": 19,
+      "h1": "Utilisateurs"
+    },
+    {
+      "ecran": "/audit-logs",
+      "largeurFenetre": 375,
+      "largeurDocument": 375,
+      "defileHorizontal": false,
+      "debordants": [
+        "div [1144px]",
+        "div.sticky.top-0 [1144px]",
+        "div [408px]",
+        "div [580px]",
+        "div [752px]"
+      ],
+      "nbDebordants": 342,
+      "h1": "Journaux d’audit"
+    },
+    {
+      "ecran": "/coverage",
+      "largeurFenetre": 375,
+      "largeurDocument": 375,
+      "defileHorizontal": false,
+      "debordants": [],
+      "nbDebordants": 0,
+      "h1": "Couverture France"
+    }
+  ],
+  "p21_clavier": {
+    "premierElement": {
+      "balise": "a",
+      "texte": "Aller au contenu",
+      "contourVisible": true,
+      "contour": "oklch(0.75 0.15 250) solid 2px"
+    },
+    "sansFocusVisible": 0,
+    "total": 22,
+    "chaine": [
+      "a:Aller au contenu",
+      "a:AAxion CRM Pro",
+      "button:WEWorkspace e43437",
+      "button:Aujourd'hui",
+      "a:Tableau de bord",
+      "button:Contacts",
+      "button:Collecte",
+      "button:Pilotage",
+      "button:Conformité",
+      "button:Réglages",
+      "button:Réduire la barre latérale",
+      "button:Recherche globale",
+      "button:Notifications",
+      "button:Theme light",
+      "button:Theme system",
+      "button:Theme dark",
+      "button:Menu utilisateur — Audit 360",
+      "button:7j",
+      "button:30j",
+      "button:90j",
+      "button:⟳Actualiser",
+      "a:🔄Reprends ton dernier zone→Aucun scrape lanc"
+    ]
+  },
+  "p17_recherche": {
+    "paletteOuverte": true,
+    "essais": [
+      {
+        "terme": "Verif",
+        "vu": "🔍 Esc ENTREPRISES VERIF AUDIT 360 SAS 552100554 TAGS ETIQUETTE DE VERIFICATION #ETIQUETTE-DE-VERIFICATION ⌘K pour ouvrir / fermer ↑↓ naviguer · ↵ ouvrir"
+      },
+      {
+        "terme": "verif",
+        "vu": "🔍 Esc ENTREPRISES VERIF AUDIT 360 SAS 552100554 TAGS ETIQUETTE DE VERIFICATION #ETIQUETTE-DE-VERIFICATION ⌘K pour ouvrir / fermer ↑↓ naviguer · ↵ ouvrir"
+      },
+      {
+        "terme": "VÉRIF",
+        "vu": "🔍 Esc Aucun résultat pour « VÉRIF ». ⌘K pour ouvrir / fermer ↑↓ naviguer · ↵ ouvrir"
+      },
+      {
+        "terme": "vérif",
+        "vu": "🔍 Esc Aucun résultat pour « vérif ». ⌘K pour ouvrir / fermer ↑↓ naviguer · ↵ ouvrir"
+      },
+      {
+        "terme": "Audit 360",
+        "vu": "🔍 Esc ENTREPRISES VERIF AUDIT 360 SAS 552100554 ⌘K pour ouvrir / fermer ↑↓ naviguer · ↵ ouvrir"
+      },
+      {
+        "terme": "verif audit",
+        "vu": "🔍 Esc ENTREPRISES VERIF AUDIT 360 SAS 552100554 ⌘K pour ouvrir / fermer ↑↓ naviguer · ↵ ouvrir"
+      },
+      {
+        "terme": "vrif",
+        "vu": "🔍 Esc Aucun résultat pour « vrif ». ⌘K pour ouvrir / fermer ↑↓ naviguer · ↵ ouvrir"
+      },
+      {
+        "terme": "552100554",
+        "vu": "🔍 Esc ENTREPRISES VERIF AUDIT 360 SAS 552100554 ⌘K pour ouvrir / fermer ↑↓ naviguer · ↵ ouvrir"
+      },
+      {
+        "terme": "redaction@exemple.test",
+        "vu": "🔍 Esc Aucun résultat pour « redaction@exemple.test ». ⌘K pour ouvrir / fermer ↑↓ naviguer · ↵ ouvrir"
+      }
+    ]
+  },
+  "p18_selecteur": {
+    "selecteur": {
+      "texte": "WEWorkspace e43437",
+      "cliquable": true
+    },
+    "apresClic": {
+      "menuOuvert": true,
+      "texteVisible": "Aller au contenu A Axion CRM Pro WE Workspace e43437 WE Workspace e43437 Créer un workspace Gérer les workspaces AUJOURD'HUI Tableau de bord CONTACTS COLLECTE PILOTAGE CONFORMITÉ RÉGLAGES Réduire Accueil 🔍 Rechercher ⌘K ☀ ⚙ ☾ A3 Audit 360 BONJOUR AUDIT 👋 Tableau de bord Vue d'ensemble · 30 dernier"
+    }
+  },
+  "p21_sombre": [
+    {
+      "ecran": "/",
+      "fondPage": "rgb(12, 16, 20)",
+      "theme": "dark",
+      "nbSousContraste": 20,
+      "pires": [
+        {
+          "texte": "Tableau de bord",
+          "ratio": 1.1,
+          "couleur": "rgba(0, 0, 0, 0)",
+          "fond": "rgb(12, 16, 20)"
+        },
+        {
+          "texte": "⟳",
+          "ratio": 1.13,
+          "couleur": "rgb(255, 255, 255)",
+          "fond": "oklch(0.279 0.041 260.031)"
+        },
+        {
+          "texte": "30j",
+          "ratio": 1.67,
+          "couleur": "rgb(255, 255, 255)",
+          "fond": "oklch(0.372 0.044 257.287)"
+        },
+        {
+          "texte": "4",
+          "ratio": 2.1,
+          "couleur": "rgb(255, 255, 255)",
+          "fond": "oklab(0.208 -0.00310889 -0.0418848 / 0.6)"
+        },
+        {
+          "texte": "4",
+          "ratio": 2.1,
+          "couleur": "rgb(255, 255, 255)",
+          "fond": "oklab(0.208 -0.00310889 -0.0418848 / 0.6)"
+        },
+        {
+          "texte": "28",
+          "ratio": 2.1,
+          "couleur": "rgb(255, 255, 255)",
+          "fond": "oklab(0.208 -0.00310889 -0.0418848 / 0.6)"
+        }
+      ]
+    },
+    {
+      "ecran": "/companies",
+      "fondPage": "rgb(12, 16, 20)",
+      "theme": "dark",
+      "nbSousContraste": 78,
+      "pires": [
+        {
+          "texte": "Entreprises",
+          "ratio": 1.1,
+          "couleur": "rgba(0, 0, 0, 0)",
+          "fond": "rgb(12, 16, 20)"
+        },
+        {
+          "texte": "Rechercher une entreprise",
+          "ratio": 1.81,
+          "couleur": "rgb(238, 238, 238)",
+          "fond": "oklab(0.208 -0.00310889 -0.0418848 / 0.6)"
+        },
+        {
+          "texte": "4",
+          "ratio": 2.1,
+          "couleur": "rgb(255, 255, 255)",
+          "fond": "oklab(0.208 -0.00310889 -0.0418848 / 0.6)"
+        },
+        {
+          "texte": "0%",
+          "ratio": 2.1,
+          "couleur": "rgb(255, 255, 255)",
+          "fond": "oklab(0.208 -0.00310889 -0.0418848 / 0.6)"
+        },
+        {
+          "texte": "INCONNUE",
+          "ratio": 2.1,
+          "couleur": "rgb(255, 255, 255)",
+          "fond": "oklab(0.208 -0.00310889 -0.0418848 / 0.6)"
+        },
+        {
+          "texte": "—",
+          "ratio": 2.1,
+          "couleur": "rgb(255, 255, 255)",
+          "fond": "oklab(0.208 -0.00310889 -0.0418848 / 0.6)"
+        }
+      ]
+    },
+    {
+      "ecran": "/settings",
+      "fondPage": "rgb(12, 16, 20)",
+      "theme": "dark",
+      "nbSousContraste": 5,
+      "pires": [
+        {
+          "texte": "Enregistrer",
+          "ratio": 1,
+          "couleur": "oklch(0.208 0.042 265.755)",
+          "fond": "oklch(0.208 0.042 265.755)"
+        },
+        {
+          "texte": "Paramètres",
+          "ratio": 1.1,
+          "couleur": "rgba(0, 0, 0, 0)",
+          "fond": "rgb(12, 16, 20)"
+        },
+        {
+          "texte": "Non modifiable",
+          "ratio": 1.12,
+          "couleur": "rgb(178, 191, 206)",
+          "fond": "oklch(0.208 0.042 265.755)"
+        },
+        {
+          "texte": "Kill-switch automatique LLM quand attein",
+          "ratio": 1.12,
+          "couleur": "rgb(178, 191, 206)",
+          "fond": "oklch(0.208 0.042 265.755)"
+        },
+        {
+          "texte": "Identité et limites",
+          "ratio": 2.1,
+          "couleur": "rgb(255, 255, 255)",
+          "fond": "oklch(0.208 0.042 265.755)"
+        }
+      ]
+    },
+    {
+      "ecran": "/audiences",
+      "fondPage": "rgb(12, 16, 20)",
+      "theme": "dark",
+      "nbSousContraste": 14,
+      "pires": [
+        {
+          "texte": "Audiences",
+          "ratio": 1.1,
+          "couleur": "rgba(0, 0, 0, 0)",
+          "fond": "rgb(12, 16, 20)"
+        },
+        {
+          "texte": "0",
+          "ratio": 1.13,
+          "couleur": "rgb(255, 255, 255)",
+          "fond": "oklab(0.279 -0.00709772 -0.040381 / 0.6)"
+        },
+        {
+          "texte": "0",
+          "ratio": 1.13,
+          "couleur": "rgb(255, 255, 255)",
+          "fond": "oklab(0.279 -0.00709772 -0.040381 / 0.6)"
+        },
+        {
+          "texte": "0",
+          "ratio": 1.13,
+          "couleur": "rgb(255, 255, 255)",
+          "fond": "oklab(0.279 -0.00709772 -0.040381 / 0.6)"
+        },
+        {
+          "texte": "1",
+          "ratio": 1.13,
+          "couleur": "rgb(255, 255, 255)",
+          "fond": "oklab(0.279 -0.00709772 -0.040381 / 0.6)"
+        },
+        {
+          "texte": "4",
+          "ratio": 1.13,
+          "couleur": "rgb(255, 255, 255)",
+          "fond": "oklab(0.279 -0.00709772 -0.040381 / 0.6)"
+        }
+      ]
+    }
+  ]
+}

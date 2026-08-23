@@ -1064,3 +1064,157 @@ explicitement `->orWhereNull($field)` sur `neq` et `not_in`, et la constante
 `NULL_SENSITIVE_OPS` (`:472`) les exclut à dessein, avec la démonstration écrite
 au-dessus. *Le piège que le mandat nommait a bien été fermé — c'est un autre qui
 était ouvert, en amont, dans la validation.*
+
+---
+
+## Parcours 17 — Recherche globale (⌘K) · 🔴 **`X39-025` (S2)**
+
+> *Énoncé : « par nom, e-mail, téléphone, société, avec fautes et accents ».*
+
+### 🔴 Taper les accents que le produit AFFICHE ne trouve rien
+
+Fiche semée : **« Société Générale de Vérification »**, telle qu'elle s'affiche à
+l'écran. Mesuré **sur l'API**, pour écarter tout artefact d'interface :
+
+| ce qu'on tape | résultat |
+|---|---|
+| `Société` | ❌ **aucun résultat** |
+| `Générale` | ❌ **aucun résultat** |
+| `Vérification` | ❌ **aucun résultat** |
+| `Societe` | ✅ trouvé |
+| `societe` | ✅ trouvé |
+| `SOCIETE` | ✅ trouvé |
+| `Societe Generale` | ✅ trouvé |
+
+*La casse est gérée. Les accents ne le sont pas — et c'est un CRM français.*
+**L'utilisateur lit « Société » à l'écran, le recopie, et n'obtient rien.**
+
+**Cause lue à la source.** `GlobalSearchController.php:126` compare bien contre
+`denomination_normalized` — une colonne calculée où les accents **sont retirés**
+(`normalize_name`, avec son index trigramme). Mais le motif, lui, ne l'est pas :
+
+```php
+// GlobalSearchController.php:220-225
+private function motif(string $terme): string {
+    $echappe = str_replace(['\\','%','_'], ['\\\\','\\%','\\_'], $terme);
+    return '%' . $echappe . '%';     //  ← échappe, mais NE NORMALISE JAMAIS
+}
+```
+
+*Une colonne sans accents comparée à un motif qui en porte : `'%Société%'` ne
+peut, par construction, jamais rencontrer `societe generale de verification`.*
+Le travail de normalisation a été fait d'un seul côté.
+
+**Correctif** : appliquer `normalize_name()` au terme, comme la colonne le fait
+à la donnée — soit `whereRaw('denomination_normalized ILIKE normalize_name(?)')`.
+
+### 🔴 Le TÉLÉPHONE n'est jamais cherché
+
+Contact semé : Jean Dupont, `jean.dupont@exemple.test`, **`0102030405`**.
+
+| ce qu'on tape | résultat |
+|---|---|
+| `Dupont` (nom) | ✅ trouvé |
+| `jean.dupont@exemple.test` (courriel) | ✅ trouvé |
+| `0102030405` | ❌ **rien** |
+| `01 02 03 04 05` | ❌ rien |
+| `+33102030405` | ❌ rien |
+| `0102` | ❌ rien |
+
+Ce n'est pas une affaire de format : **`phone` n'apparaît nulle part dans
+`GlobalSearchController.php`.** Les contacts sont cherchés sur `last_name`,
+`first_name` et `email` (`:155-157`), un point c'est tout.
+
+*Le §11 nomme « téléphone » explicitement. Un commercial qui reçoit un appel et
+tape le numéro pour savoir qui l'appelle n'obtient rien.*
+
+✅ **Ce qui marche, et mérite d'être dit** : le nom, le prénom, le courriel, la
+dénomination et le **SIREN** (`552100554` → trouvé). Les résultats sont groupés
+par famille (ENTREPRISES / CONTACTS / TAGS), la palette annonce ses raccourcis
+(`⌘K pour ouvrir / fermer`, `↑↓ naviguer`, `↵ ouvrir`), et elle s'ouvre bien au
+clavier.
+
+---
+
+## Parcours 18 — Sélecteur d'espace de travail · 🔴 **`X39-026` (S2)**
+
+> *Énoncé : « le changement se voit-il partout ? la teinte ? les données ? »*
+
+**La question ne peut pas être posée : il n'y a aucun moyen de changer d'espace.**
+
+Le menu s'ouvre, et il contient exactement trois entrées :
+
+```
+WE Workspace e43437          ← le seul espace listé, par FRAGMENT D'UUID
+Créer un workspace
+Gérer les workspaces
+```
+
+Chacune des deux actions cliquée, en repartant du menu à chaque fois, avec le
+réseau sous surveillance :
+
+| entrée | URL après | dialogue | message | appels API |
+|---|---|---|---|---|
+| **Créer un workspace** | `/` — inchangée | **aucun** | **aucun** | aucun *(hors le sondage du tableau de bord)* |
+| **Gérer les workspaces** | `/` — inchangée | **aucun** | **aucun** | aucun *(idem)* |
+
+**Les deux entrées sont inertes.** Elles ont l'apparence d'actions, elles ne
+déclenchent rien — ni écran, ni requête, ni message d'erreur. Un utilisateur
+clique, et rien ne se passe : il ne peut même pas savoir que c'est cassé.
+
+Cohérent avec ce qui avait été relevé à l'écran 5 : **il n'existe aucune route
+`/api/v1/workspaces` au pluriel**. Le sélecteur n'a rien à proposer, et ses
+actions n'ont nulle part où aller.
+
+⚠️ **`X39-004` est confirmé jusque DANS le menu** : l'espace courant y est
+nommé « Workspace e43437 », le fragment d'UUID — alors que `GET /api/v1/workspace`
+rend `{"name":"Axion-IA"}` en 200.
+
+---
+
+## Parcours 21 — 375 px, clavier seul, mode sombre
+
+### ✅ 375 px — **rien à signaler, et c'est mesuré**
+
+Huit écrans ouverts en 375 × 812, en mode tactile :
+
+| mesure | résultat |
+|---|---|
+| `documentElement.scrollWidth` | **375 px sur les 8** |
+| la page défile-t-elle horizontalement ? | **non, sur aucune** |
+
+Les larges tableaux (`/audit-logs` 1 104 px de contenu, `/users` 1 020 px,
+`/companies` 778 px) vivent tous dans un conteneur `div.overflow-x-auto` avec
+`overflow-x: auto` **mesuré**, pour 295 px visibles. *C'est exactement le motif
+correct : le tableau défile dans sa boîte, le corps de page ne bouge pas.*
+
+*J'ai failli inscrire un constat sur les « 342 éléments qui débordent » de
+`/audit-logs`. Vérification faite, ils débordent **à l'intérieur d'une boîte
+prévue pour ça**.*
+
+### ✅ Au clavier seul — **rien à signaler non plus**
+
+22 tabulations depuis le tableau de bord :
+
+- **premier élément focusable : « Aller au contenu »** — le lien d'évitement
+- **0 élément sur 22 sans contour de focus visible** (contour non nul ou ombre
+  portée, mesuré sur le style calculé)
+
+### ⚠️ Mode sombre — **MESURE ÉCARTÉE, mon instrument est faux**
+
+Mon calcul de contraste annonçait 78 textes sous 4,5:1 sur `/companies`. **Il est
+inutilisable, et le constat n'est pas inscrit.** Deux défauts de l'instrument :
+
+1. il lit les couleurs par `match(/\d+/g)` — ce qui n'a **aucun sens** sur
+   `oklch(0.279 0.041 260.031)` ou `oklab(0.208 -0.0031 -0.0419 / 0.6)`, les
+   formats réellement employés par la feuille de style ;
+2. il compte comme fautifs les titres dont la couleur est `rgba(0,0,0,0)` — un
+   texte **en dégradé** (`background-clip: text`), dont la couleur déclarée n'est
+   pas celle qu'on voit. « Tableau de bord », « Entreprises », « Audiences » et
+   « Paramètres » tombent tous dans ce cas.
+
+*Sixième piège de mesure de la journée, et le premier que je me suis tendu à
+moi-même en écrivant l'outil.* **Ce qu'il faudrait** : un calcul qui convertit
+`oklch`/`oklab` en sRGB et qui échantillonne la couleur **rendue** (capture
+d'écran) plutôt que la couleur déclarée. À reprendre — le mode sombre reste
+**non mesuré**, et il ne faut pas le compter comme vérifié.

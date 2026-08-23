@@ -1,0 +1,32 @@
+{
+  "menu": {
+    "texte": "WE Workspace e43437 Créer un workspace Gérer les workspaces",
+    "entrees": [
+      "WEWorkspace e43437",
+      "Créer un workspace",
+      "Gérer les workspaces"
+    ]
+  },
+  "actions": {
+    "Créer un workspace": {
+      "urlAvant": "/",
+      "url": "/",
+      "dialogue": false,
+      "texteDialogue": null,
+      "alertes": [],
+      "appelsApi": [
+        "GET /dashboard/stats"
+      ]
+    },
+    "Gérer les workspaces": {
+      "urlAvant": "/",
+      "url": "/",
+      "dialogue": false,
+      "texteDialogue": null,
+      "alertes": [],
+      "appelsApi": [
+        "GET /dashboard/stats"
+      ]
+    }
+  }
+}

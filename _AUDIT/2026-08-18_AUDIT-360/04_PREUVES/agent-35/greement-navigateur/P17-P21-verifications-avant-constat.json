@@ -1,0 +1,142 @@
+{
+  "conteneurs375": [
+    {
+      "ecran": "/audit-logs",
+      "conteneursDefilables": [
+        {
+          "balise": "div",
+          "classe": "overflow-x-auto",
+          "overflowX": "auto",
+          "visible": 295,
+          "contenu": 1104
+        },
+        {
+          "balise": "div",
+          "classe": "truncate font-mono text-[11px] text-slate-500",
+          "overflowX": "hidden",
+          "visible": 160,
+          "contenu": 187
+        },
+        {
+          "balise": "div",
+          "classe": "truncate font-mono text-[11px] text-slate-500",
+          "overflowX": "hidden",
+          "visible": 160,
+          "contenu": 187
+        }
+      ],
+      "pageDefileHorizontalement": false
+    },
+    {
+      "ecran": "/companies",
+      "conteneursDefilables": [
+        {
+          "balise": "div",
+          "classe": "px-6 py-6",
+          "overflowX": "visible",
+          "visible": 343,
+          "contenu": 345
+        },
+        {
+          "balise": "header",
+          "classe": "mb-6 flex flex-wrap items-end justify-between gap-4",
+          "overflowX": "visible",
+          "visible": 295,
+          "contenu": 321
+        },
+        {
+          "balise": "div",
+          "classe": "flex min-w-0 flex-wrap items-center gap-2",
+          "overflowX": "visible",
+          "visible": 295,
+          "contenu": 321
+        },
+        {
+          "balise": "div",
+          "classe": "overflow-x-auto",
+          "overflowX": "auto",
+          "visible": 295,
+          "contenu": 778
+        }
+      ],
+      "pageDefileHorizontalement": false
+    },
+    {
+      "ecran": "/users",
+      "conteneursDefilables": [
+        {
+          "balise": "div",
+          "classe": "overflow-x-auto",
+          "overflowX": "auto",
+          "visible": 295,
+          "contenu": 1020
+        }
+      ],
+      "pageDefileHorizontalement": false
+    }
+  ],
+  "selecteurEspace": {
+    "entrees": {
+      "Gérer les workspaces": {
+        "absent": true
+      },
+      "Créer un workspace": {
+        "url": "/",
+        "vu": "BONJOUR AUDIT 👋 Tableau de bord Vue d'ensemble · 30 derniers jours En direct · actualisé toutes les 30s 7j 30j 90j ⟳ Actualiser TOTAL ENTREPRISES 5 Toutes périodes confondues ENRICHIES 24H 5 Fiches enrichies sur 24h NOUVELLES 7J 35 Découve"
+      }
+    },
+    "reseauKo": []
+  },
+  "recherche": [
+    {
+      "terme": "Société",
+      "trouve": false,
+      "vu": "🔍 Esc Aucun résultat pour « Société ». ⌘K pour ouvrir / fermer ↑↓ naviguer · ↵ ouvrir"
+    },
+    {
+      "terme": "Societe",
+      "trouve": false,
+      "vu": "🔍 Esc Aucun résultat pour « Societe ». ⌘K pour ouvrir / fermer ↑↓ naviguer · ↵ ouvrir"
+    },
+    {
+      "terme": "societe generale",
+      "trouve": true,
+      "vu": "🔍 Esc ENTREPRISES SOCIÉTÉ GÉNÉRALE DE VÉRIFICATION 444444444 ⌘K pour ouvrir / fermer ↑↓ naviguer · ↵ ouvrir"
+    },
+    {
+      "terme": "Générale",
+      "trouve": false,
+      "vu": "🔍 Esc Aucun résultat pour « Générale ». ⌘K pour ouvrir / fermer ↑↓ naviguer · ↵ ouvrir"
+    },
+    {
+      "terme": "Generale",
+      "trouve": true,
+      "vu": "🔍 Esc ENTREPRISES SOCIÉTÉ GÉNÉRALE DE VÉRIFICATION 444444444 ⌘K pour ouvrir / fermer ↑↓ naviguer · ↵ ouvrir"
+    },
+    {
+      "terme": "Vérification",
+      "trouve": false,
+      "vu": "🔍 Esc Aucun résultat pour « Vérification ». ⌘K pour ouvrir / fermer ↑↓ naviguer · ↵ ouvrir"
+    },
+    {
+      "terme": "Verification",
+      "trouve": true,
+      "vu": "🔍 Esc ENTREPRISES SOCIÉTÉ GÉNÉRALE DE VÉRIFICATION 444444444 TAGS ETIQUETTE DE VERIFICATION #ETIQUETTE-DE-VERIFICATION ⌘K pour ouvrir / fermer ↑↓ naviguer · ↵ ouvrir"
+    },
+    {
+      "terme": "jean.dupont@exemple.test",
+      "trouve": true,
+      "vu": "🔍 Esc CONTACTS JEAN DUPONT JEAN.DUPONT@EXEMPLE.TEST ⌘K pour ouvrir / fermer ↑↓ naviguer · ↵ ouvrir"
+    },
+    {
+      "terme": "Dupont",
+      "trouve": true,
+      "vu": "🔍 Esc CONTACTS JEAN DUPONT JEAN.DUPONT@EXEMPLE.TEST ⌘K pour ouvrir / fermer ↑↓ naviguer · ↵ ouvrir"
+    },
+    {
+      "terme": "0102030405",
+      "trouve": false,
+      "vu": "🔍 Esc Aucun résultat pour « 0102030405 ». ⌘K pour ouvrir / fermer ↑↓ naviguer · ↵ ouvrir"
+    }
+  ]
+}

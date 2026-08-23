@@ -108,7 +108,10 @@ services:
     logging: *journal
     env_file: .env
     environment:
-      APP_URL: https://verif.localhost:8443
+      # 8080 et non 8443 : voir le long commentaire de `Caddyfile.verif`.
+      # Chrome refuse l'autorite interne de Caddy, et ni le magasin de
+      # certificats de Windows ni `thisisunsafe` ne se touchent sans arbitrage.
+      APP_URL: http://verif.localhost:8080
       APP_ENV: local
       APP_DEBUG: "true"
       # 🔴 CINQUIEME VERROU DE CONNEXION — vu ROUGE le 2026-08-23.
@@ -139,7 +142,7 @@ services:
       REDIS_HOST: redis
       # Le port fait partie de l'origine : le domaine « apatride » de Sanctum
       # doit le porter, sinon la session n'est jamais reconnue.
-      SANCTUM_STATEFUL_DOMAINS: verif.localhost:8443,verif.localhost
+      SANCTUM_STATEFUL_DOMAINS: verif.localhost:8080,verif.localhost:8443,verif.localhost
       SESSION_DOMAIN: ""
       # V7 leve : sans ce drapeau, `EnsureCrmConsoleV2` rend 404 sur tout
       # `/v1/crm/*` et quatre des 39 ecrans sont inatteignables meme connecte.
@@ -163,7 +166,7 @@ services:
       target: prod
       args:
         # ORIGINE NUE, sans `/api` : le client SPA ajoute lui-meme `/api/v1`.
-        VITE_API_BASE_URL: https://verif.localhost:8443
+        VITE_API_BASE_URL: http://verif.localhost:8080
     image: crmverif-app:latest
     container_name: crmverif-app
     logging: *journal

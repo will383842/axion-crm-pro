@@ -28,7 +28,44 @@
 # cookie host-only sur une origine d'API distincte empeche le SPA de LIRE
 # `XSRF-TOKEN` (lecture JS inter-hotes impossible) -> 419. Le local doit
 # RESSEMBLER a la production, sinon il ne prouve rien.
-verif.localhost {
+# DEUX ADRESSES, UN SEUL BLOC — et donc une seule origine logique.
+#
+# POURQUOI LE HTTP EST LA. Caddy signe `verif.localhost` avec sa PROPRE autorite
+# interne, que Chrome ne connait pas : le navigateur affiche un avertissement de
+# certificat et REFUSE d'aller plus loin. Les deux contournements habituels sont
+# hors de portee d'un audit : installer l'autorite de Caddy dans le magasin de
+# certificats de Windows est une modification des reglages de SECURITE de la
+# machine, et taper `thisisunsafe` est un contournement delibere d'un controle
+# du navigateur. Ni l'un ni l'autre ne se fait sans le mot de Will.
+#
+# Declarer `http://` EXPLICITEMENT desarme la redirection automatique de Caddy
+# vers HTTPS (mesuree : 308 vers `https://verif.localhost/`, sans meme le port,
+# donc vers le vide). La passe NAVIGATEUR passe par 8080 ; les mesures en ligne
+# de commande peuvent continuer sur 8443.
+#
+# ⚠️ CE QUE CELA COUTE, ET IL FAUT LE DIRE : le bundle du frontend fige son
+# origine d'API AU BUILD (`vite.config.ts` refuse meme un build sans elle). Il
+# est donc bati sur `http://verif.localhost:8080`. Charge en HTTPS, il appellerait
+# du HTTP depuis une page HTTPS — contenu mixte, bloque par le navigateur. Sur
+# cette pile, HTTPS reste bon pour `curl`, pas pour Chrome.
+# LES DEUX SCHEMAS, SANS PORT — et c'est la forme exacte qui compte.
+#
+# Trois formes ont ete essayees le 2026-08-23 ; deux echouent :
+#
+#  - `verif.localhost` seul : Caddy ajoute sa redirection automatique
+#    HTTP -> HTTPS, et tout le 8080 rend 308.
+#  - `http://verif.localhost:8080, https://verif.localhost:8443` : les ports
+#    publies sont `8080:80` et `8443:443`, donc ecrire 8080 dans l'adresse fait
+#    ecouter Caddy sur le 8080 DU CONTENEUR, ou rien n'arrive — pendant que le
+#    308 automatique continue de repondre sur le 80. Symptome : 308 partout.
+#  - `auto_https disable_redirects` : Caddy cesse alors d'ecouter en HTTP tout
+#    court. Symptome : connexion refusee (code 000).
+#
+# La forme ci-dessous declare les deux schemas SANS port : Caddy ecoute donc 80
+# et 443 dans le conteneur (les ports vers lesquels pointent les mappages), le
+# scheme `http://` explicite desarme la redirection pour cet hote, et l'appariement
+# se fait sur le NOM d'hote — si bien que `verif.localhost:8080` correspond.
+http://verif.localhost, https://verif.localhost {
     tls internal
     encode zstd gzip
 

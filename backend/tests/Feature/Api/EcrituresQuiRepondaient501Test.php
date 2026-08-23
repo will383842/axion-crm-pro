@@ -64,7 +64,7 @@ beforeEach(function () {
  *
  * @return array{0: User, 1: string}
  */
-function compteE501(string $nom): array
+function compteE501(string $nom, string $role = 'admin'): array
 {
     $espace = Workspace::create([
         'id' => (string) Str::uuid(),
@@ -82,7 +82,7 @@ function compteE501(string $nom): array
     ]);
 
     setPermissionsTeamId($espace->id);
-    $compte->assignRole('admin');
+    $compte->assignRole($role);
 
     return [$compte, (string) $espace->id];
 }
@@ -361,4 +361,90 @@ it('une seule vue par defaut et par entite : poser la nouvelle retire l ancienne
     // ouvrir UNE sans choisir.
     expect((bool) DB::table('saved_views')->where('id', $seconde)->value('is_default'))->toBeTrue();
     expect((bool) DB::table('saved_views')->where('id', $premiere)->value('is_default'))->toBeFalse();
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LOT 3 — LE REGLAGE DE L'ESPACE : `PUT /workspace`
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// La route porte deja `permission:workspaces.manage` : l'autorisation n'est pas
+// l'objet de ce lot. Ce qui est en jeu ici, c'est QUELS CHAMPS une console a le
+// droit de changer sur son propre espace — et deux d'entre eux ne doivent PAS
+// l'etre depuis l'interieur :
+//
+//   `slug`      — il est UNIQUE et sert d'adresse ; le changer depuis un ecran
+//                 casserait silencieusement toute reference exterieure.
+//   `is_active` — un espace se desactive depuis l'ADMINISTRATION, pas depuis
+//                 lui-meme : se couper le courant de l'interieur enferme tous
+//                 ses membres dehors, sans recours par le produit.
+//
+// Une route qui accepte tout ce qu'on lui envoie n'est pas « souple », elle est
+// non specifiee. On mesure donc aussi ce qu'elle REFUSE de faire.
+//
+// ⚠️ CES CAS EXIGENT `owner`, ET C'EST LA GARDE QUI ME L'A APPRIS. Ecrits avec
+// un compte `admin`, ils rendaient 403 : dans `PermissionsAndRolesSeeder`, le
+// role `admin` porte `users.manage` mais PAS `workspaces.manage`, que seul
+// `owner` detient. Le libelle « Administrateur workspace » le laisse mal
+// deviner. Ce n'etait donc pas la route qui avait tort, c'etait mon compte de
+// test — et on le note ici pour que le prochain ne repaie pas la surprise.
+
+it('modifie le nom et le plafond de mon espace, et l ecrit vraiment en base', function () {
+    [$moi, $espace] = compteE501('Reglant', 'owner');
+
+    $this->actingAs($moi)
+        ->putJson('/api/v1/workspace', ['name' => 'Nouveau nom', 'cost_cap_eur' => 1234.50])
+        ->assertOk();
+
+    $ligne = DB::table('workspaces')->where('id', $espace)->first();
+    expect($ligne->name)->toBe('Nouveau nom');
+    expect((float) $ligne->cost_cap_eur)->toBe(1234.50);
+});
+
+it('remplace les reglages libres de mon espace', function () {
+    [$moi, $espace] = compteE501('Reglages', 'owner');
+
+    $this->actingAs($moi)
+        ->putJson('/api/v1/workspace', ['settings' => ['fuseau' => 'Europe/Paris']])
+        ->assertOk();
+
+    expect(json_decode((string) DB::table('workspaces')->where('id', $espace)->value('settings'), true))
+        ->toBe(['fuseau' => 'Europe/Paris']);
+});
+
+it('ne touche JAMAIS l espace d un autre, meme si le corps le nomme', function () {
+    [$moi, $espace] = compteE501('Chezmoi', 'owner');
+    [, $autreEspace] = compteE501('Chezlautre', 'owner');
+
+    $avant = DB::table('workspaces')->where('id', $autreEspace)->value('name');
+
+    $this->actingAs($moi)
+        ->putJson('/api/v1/workspace', ['name' => 'Detourne', 'id' => $autreEspace, 'workspace_id' => $autreEspace])
+        ->assertOk();
+
+    // L'espace vise est TOUJOURS le mien : il vient du contexte, jamais du corps.
+    expect(DB::table('workspaces')->where('id', $autreEspace)->value('name'))->toBe($avant);
+    expect(DB::table('workspaces')->where('id', $espace)->value('name'))->toBe('Detourne');
+});
+
+it('refuse un plafond negatif, en 422 et non en 500', function () {
+    [$moi] = compteE501('Negatif', 'owner');
+
+    $this->actingAs($moi)
+        ->putJson('/api/v1/workspace', ['cost_cap_eur' => -1])
+        ->assertStatus(422);
+});
+
+it('ne laisse changer ni l adresse ni l etat actif de l espace depuis l interieur', function () {
+    [$moi, $espace] = compteE501('Immuable', 'owner');
+    $slugAvant = DB::table('workspaces')->where('id', $espace)->value('slug');
+
+    $this->actingAs($moi)
+        ->putJson('/api/v1/workspace', ['slug' => 'vole', 'is_active' => false, 'name' => 'ok'])
+        ->assertOk();
+
+    expect(DB::table('workspaces')->where('id', $espace)->value('slug'))->toBe($slugAvant);
+    expect((bool) DB::table('workspaces')->where('id', $espace)->value('is_active'))->toBeTrue();
+    // Le champ legitime du meme appel doit, lui, avoir ete pris en compte :
+    // sans quoi la garde passerait au vert sur une route qui refuse TOUT.
+    expect(DB::table('workspaces')->where('id', $espace)->value('name'))->toBe('ok');
 });

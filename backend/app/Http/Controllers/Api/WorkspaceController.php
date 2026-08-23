@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class WorkspaceController extends ApiController
@@ -37,13 +38,89 @@ class WorkspaceController extends ApiController
     }
 
     /**
-     * @OA\Put(path="/workspace", tags={"Workspace"}, summary="Update settings workspace (Sprint 3)",
+     * 🔑 TROIS CHAMPS MODIFIABLES, ET DEUX REFUS ECRITS.
+     *
+     * `name`, `settings` et `cost_cap_eur` se reglent depuis la console. Deux
+     * colonnes de la table sont volontairement HORS de portee de cette route,
+     * et il faut dire pourquoi plutot que de les omettre en silence :
+     *
+     *   `slug`      il est `CITEXT NOT NULL UNIQUE` et sert d'adresse. Le
+     *               changer depuis un ecran casserait, sans bruit, toute
+     *               reference exterieure qui le porte.
+     *   `is_active` un espace se desactive depuis l'ADMINISTRATION, jamais
+     *               depuis lui-meme. Se couper le courant de l'interieur
+     *               enferme tous ses membres dehors, sans recours par le
+     *               produit.
+     *
+     * Ces deux-la ne sont pas « oublies » : `$r->validate()` ne rend que les
+     * cles qu'il a validees, donc une requete qui les envoie les voit tomber.
+     * La garde `EcrituresQuiRepondaient501Test` le mesure explicitement — et
+     * verifie AUSSI, dans le meme appel, qu'un champ legitime passe : sans quoi
+     * elle serait verte sur une route qui refuse tout.
+     *
+     * 🔑 L'ESPACE VISE VIENT DU CONTEXTE, JAMAIS DU CORPS. Meme raisonnement que
+     * `AiActRegisterController::store` : accepter un `workspace_id` depuis la
+     * requete permettrait de regler l'espace du voisin — y compris son plafond
+     * de depense.
+     *
+     * @OA\Put(path="/workspace", tags={"Workspace"}, summary="Règle l'espace courant (nom, réglages, plafond)",
      *     security={{"sanctumCookie":{}}},
      *
-     *     @OA\Response(response=501, description="Not implemented"))
+     *     @OA\Response(response=200, description="OK"),
+     *     @OA\Response(response=404, description="Aucun espace courant"),
+     *     @OA\Response(response=422, description="Champs invalides"))
      */
     public function update(Request $r): JsonResponse
     {
-        return $this->notImplemented('3');
+        $espace = $this->espaceCourantOuNull();
+        if ($espace === null) {
+            abort(404);
+        }
+
+        $valide = $r->validate([
+            'name' => ['sometimes', 'string', 'max:255'],
+            'settings' => ['sometimes', 'array'],
+            // Le plafond est un `NUMERIC(10,2)` : au-dela de 99 999 999,99 la
+            // base leve « numeric field overflow », donc un 500 sur une saisie.
+            // On borne ici pour que la reponse soit un 422 qui nomme le champ.
+            'cost_cap_eur' => ['sometimes', 'numeric', 'min:0', 'max:99999999.99'],
+        ]);
+
+        $champs = [];
+        if (array_key_exists('name', $valide)) {
+            $champs['name'] = $valide['name'];
+        }
+        if (array_key_exists('settings', $valide)) {
+            // Remplacement, pas fusion — et c'est delibere. Une fusion rendrait
+            // impossible le retrait d'un reglage : il n'y aurait aucun moyen
+            // d'exprimer « enleve cette cle ». Un PUT remplace.
+            $champs['settings'] = json_encode($valide['settings'], JSON_UNESCAPED_UNICODE);
+        }
+        if (array_key_exists('cost_cap_eur', $valide)) {
+            $champs['cost_cap_eur'] = $valide['cost_cap_eur'];
+        }
+
+        if ($champs !== []) {
+            $champs['updated_at'] = now();
+            DB::table('workspaces')->where('id', $espace)->update($champs);
+        }
+
+        $ligne = DB::table('workspaces')
+            ->where('id', $espace)
+            ->first(['id', 'slug', 'name', 'settings', 'cost_cap_eur', 'is_active', 'updated_at']);
+
+        if ($ligne === null) {
+            abort(404);
+        }
+
+        $sortie = (array) $ligne;
+        // `settings` est un JSONB que le pilote restitue en CHAINE — meme
+        // traitement que `filters` dans `SavedViewsController` et
+        // `impact_assessment` dans `AiActRegisterController`. Les trois doivent
+        // s'accorder, sinon l'ecran decode a un endroit sur trois.
+        $sortie['settings'] = json_decode((string) ($sortie['settings'] ?? '{}'), true) ?: [];
+        $sortie['is_active'] = (bool) $sortie['is_active'];
+
+        return $this->ok(['data' => $sortie]);
     }
 }

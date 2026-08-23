@@ -7,6 +7,12 @@
 > Récit détaillé : `REPRISE-ETAT.md` (§14 à §16). Registre des constats :
 > `FILE-DE-TRAVAIL.md`. Verdicts bruts de la vague de vérification :
 > `verdicts-420.json`. Ce qui revient à Will : `ARBITRAGES.md`.
+>
+> 📖 **Une session d'explication est ouverte en parallèle** — elle n'écrit aucun
+> correctif, elle explique les constats à Will thème par thème. Son journal est
+> `SESSION-EXPLICATION-2026-08-23.md`, tenu au fur et à mesure ; les 168 S2
+> ouverts y sont rangés en 15 thèmes par `S2-PAR-THEME.md` (rejouable :
+> `python extraire-s2-par-theme.py`). **Ce rangement ne referme rien.**
 
 **Dernière mise à jour : 2026-08-23, après-midi — LA PILE DE VÉRIFICATION EST DEBOUT,
 LES SIX VERROUS SONT LEVÉS, LA CONNEXION EST PROUVÉE.**

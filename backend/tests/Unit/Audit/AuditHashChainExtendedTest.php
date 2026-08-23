@@ -75,9 +75,27 @@ test('AuditHashChain record retourne un id positif', function () {
     expect($id)->toBeGreaterThan(0);
 });
 
-test('AuditHashChain verifyChain retourne true sur chaîne vide', function () {
+test('X39-035 — verifyChain retourne FALSE sur chaine vide : un journal sans maillon ne prouve rien', function () {
+    // ── CAS INVERSÉ le 2026-08-23 (constat X39-035).
+    //
+    // Il assurait `toBeTrue()` : une chaine SANS AUCUN MAILLON se declarait
+    // valide. Autrement dit, celui qui effacait le journal entier obtenait le
+    // meme verdict vert que celui qui n'y avait pas touche — ce qu'une chaine
+    // cryptographique existe precisement pour rendre impossible.
+    //
+    // C'est le meme raisonnement que celui deja tenu dans `AuditHashChain` pour
+    // le secret absent : « un controle d'integrite qui dit "tout va bien" sans
+    // pouvoir le savoir est pire qu'un controle absent : il endort celui qui le
+    // lit. » Un journal vide est exactement ce cas.
+    //
+    // ⚠️ Sur une installation neuve, c'est vrai aussi, et ce n'est PAS une
+    // fausse alerte : tant qu'aucune ligne n'a ete ecrite, la chaine n'a rien a
+    // demontrer. `raisonChaineVide()` le dit en toutes lettres pour que l'ecran
+    // distingue « journal vide » de « journal falsifie ».
     $chain = new AuditHashChain;
-    expect($chain->verifyChain())->toBeTrue();
+
+    expect($chain->verifyChain())->toBeFalse();
+    expect($chain->chaineEstVide())->toBeTrue();
 });
 
 test('AuditHashChain verifyChain retourne true sur 1 record', function () {

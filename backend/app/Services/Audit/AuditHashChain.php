@@ -166,6 +166,7 @@ class AuditHashChain
         }
 
         $prevHash = self::GENESIS_PREV_HASH;
+        $maillons = 0;
         foreach ($query->cursor() as $row) {
             // Le maillon déclaré par la ligne doit correspondre au maillon réel.
             if (! hash_equals($prevHash, (string) $row->prev_hash)) {
@@ -178,9 +179,53 @@ class AuditHashChain
                 return false;
             }
             $prevHash = (string) $row->current_hash;
+            $maillons++;
+        }
+
+        // 🔴 X39-035 — UNE CHAINE VIDE NE SE DECLARE PAS VALIDE.
+        //
+        // Sans ce garde-fou, la boucle ci-dessus n'entre JAMAIS quand le journal
+        // est vide, et la methode rend `true`. Mesure du 2026-08-23, en trois
+        // temps, sur une chaine neuve et un secret arme :
+        //
+        //   chaine intacte (5 lignes)  -> valid: true    (correct)
+        //   une ligne du milieu alteree -> valid: false   (correct, la falsification est VUE)
+        //   `delete from audit_logs`    -> valid: TRUE    (le defaut)
+        //
+        // Autrement dit : celui qui efface le journal ENTIER obtenait le meme
+        // verdict vert que celui qui n'y avait pas touche. C'est precisement ce
+        // qu'une chaine cryptographique existe pour rendre impossible, et c'est
+        // la meme famille que `B16-002` (supprimer la DERNIERE ligne ne rompt
+        // rien) — ici la totalite passait aussi.
+        //
+        // Le raisonnement est deja ecrit vingt lignes plus haut, pour le secret
+        // absent : « un controle d'integrite qui dit "tout va bien" sans pouvoir
+        // le savoir est pire qu'un controle absent : il endort celui qui le
+        // lit. » Un journal vide est exactement ce cas — il ne prouve RIEN.
+        //
+        // ⚠️ Sur une installation neuve, c'est vrai aussi, et ce n'est pas une
+        // fausse alerte : tant qu'aucune ligne n'a ete ecrite, la chaine n'a
+        // rien a demontrer. `raisonChaineVide()` le dit en toutes lettres, pour
+        // que l'ecran distingue « journal vide » de « journal falsifie ».
+        if ($maillons === 0) {
+            return false;
         }
 
         return true;
+    }
+
+    /** Le journal porte-t-il au moins un maillon ? */
+    public function chaineEstVide(): bool
+    {
+        return ! DB::table('audit_logs')->exists();
+    }
+
+    /** Pourquoi un journal vide ne vaut pas un journal valide. */
+    public function raisonChaineVide(): string
+    {
+        return "Le journal d'audit est VIDE : la chaine ne porte aucun maillon, "
+            . "elle ne prouve donc rien. Sur une installation neuve c'est normal ; "
+            . 'sur un systeme en service, cela signifie que le journal a ete efface.';
     }
 
     /**

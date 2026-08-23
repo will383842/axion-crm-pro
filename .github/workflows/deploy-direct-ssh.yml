@@ -131,7 +131,43 @@ jobs:
           # ce qui suit est silencieusement AVALÉ. C'est ce qui s'est passé au
           # déploiement b84100f : ni config:clear ni les vérifications
           # post-déploiement ne se sont exécutés, et le job est resté vert.
-          ssh -o StrictHostKeyChecking=no "$USER@$HOST" 'bash -s' -- \
+          # ══════════════════════════════════════════════════════════════════
+          # 🔴 SIGNAL DE VIE — INCIDENT DU 2026-08-23, 7 MINUTES DE 502
+          # ══════════════════════════════════════════════════════════════════
+          #
+          # Ce qui s'est passé : la fusion de la PR #194 a lancé ce déploiement.
+          # Build fait, quatre conteneurs recréés à 11:26:11 — puis QUATRE
+          # MINUTES DE SILENCE (la construction ne dit rien), puis
+          # `client_loop: send disconnect: Broken pipe`, exit 255 à 11:30:29.
+          #
+          # Le script n'a jamais atteint ses trois dernières étapes :
+          # `migrate --force`, la vérification des conteneurs, et la sonde HTTP.
+          # Mesuré de l'extérieur à 11:34 : api 502, app 502. La relance du job
+          # a tout rétabli — mais entre les deux, personne ne savait dans quel
+          # état était la machine.
+          #
+          # ⚠️ CE PIPELINE SE CROYAIT DURCI, et son en-tête le dit : « migrate
+          # --force est BLOQUANT », « vérification post-déploiement ». C'est
+          # vrai QUAND LE SCRIPT VA AU BOUT. Il n'avait AUCUNE protection contre
+          # la mort du TRANSPORT : la commande continue côté serveur, le job
+          # échoue côté forge, et l'état réel n'est mesuré par personne.
+          # *Un déploiement « bloquant » qui perd sa connexion n'est pas
+          # bloquant : il est aveugle.*
+          #
+          # Ce que ces deux options font : un paquet de vie toutes les 30 s, et
+          # jusqu'à 10 sans réponse avant d'abandonner — soit 5 minutes de
+          # silence tolérées, contre ~4 minutes observées pendant le build.
+          #
+          # ⚠️ CE QU'ELLES NE FONT PAS, et il faut le dire : elles empêchent la
+          # connexion de mourir DE SILENCE. Elles ne rendent pas le déploiement
+          # REPRENABLE. Si le tuyau tombe pour une autre raison (réseau coupé,
+          # serveur redémarré), on retombe dans le même angle mort. La vraie
+          # robustesse — lancer le script détaché côté serveur puis interroger
+          # son état séparément — reste À FAIRE.
+          ssh -o StrictHostKeyChecking=no \
+              -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=10 \
+              "$USER@$HOST" 'bash -s' -- \
             "$PROJECT_PATH" "$SKIP_MIGRATE" "$EXPECTED_SHA" "$INSEE_API_KEY" <<'REMOTE' | tee /tmp/deploy-remote.log
           set -euo pipefail
           PROJECT_PATH="$1"

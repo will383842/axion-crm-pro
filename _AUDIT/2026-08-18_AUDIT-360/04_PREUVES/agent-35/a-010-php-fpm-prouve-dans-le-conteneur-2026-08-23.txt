@@ -1,0 +1,31 @@
+A-010 (S0) — php-fpm PROUVE DANS LE CONTENEUR, AVEC TEMOIN NEGATIF
+Mesure du 2026-08-23, pile de verification `crmverif`.
+
+Doctrine regle 3 : un « rien trouve » ne vaut que si la sonde est prouvee
+capable de rendre 1. Les deux conteneurs ci-dessous montent EXACTEMENT le
+meme code (--volumes-from) ; seule l'IMAGE differe.
+
+SONDE : ps -o args= | grep -v "grep\|ps -o" | grep -c "php -S"
+
+--- A) crmverif-api, image BATIE depuis le worktree : attendu 0 ---
+sonde = 0
+processus :
+PID   PPID  COMMAND
+    1     0 php-fpm: master process (/usr/local/etc/php-fpm.conf)
+    7     1 php-fpm: pool www
+    8     1 php-fpm: pool www
+    9     1 php-fpm: pool www
+   10     1 php-fpm: pool www
+   42     0 ps -o pid,ppid,args
+
+ecoute :
+tcp        0      0 :::9000                 :::*                    LISTEN      
+
+--- B) TEMOIN NEGATIF, image axion-crm-pro-api:latest (4 juillet) : attendu 1 ---
+sonde = 1
+processus : PID 1 = php -S 0.0.0.0:80 -t public
+
+CONCLUSION. La sonde sait rendre 1. Son 0 sur crmverif-api est donc un vrai
+0 : l'API de la pile de verification tourne bien en php-fpm, l'etat d'APRES
+le correctif A-010. Toute mesure prise sur cette pile porte sur le produit
+d'apres l'audit, et non sur celui d'avant.

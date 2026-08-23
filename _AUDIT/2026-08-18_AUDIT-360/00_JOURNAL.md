@@ -569,3 +569,79 @@ Ce qui empêche de se connecter **aujourd'hui** est autre chose, et c'est de l'i
 
 **C'est le chantier suivant, et il est plus court qu'on ne le croyait** : l'ordre de levée est
 V5 → V6 → V3′ → V7, et il rendrait mesurables les 39 écrans du mandat, jamais ouverts à ce jour.
+
+---
+
+## 2026-08-23 (après-midi) — la pile de vérification est debout, et le montage lié la rendait inutilisable
+
+> Session reprise après une coupure à 09:11, en pleine construction de l'image de l'API.
+> Rien n'a été repris d'une conversation : tout ce qui suit est remesuré.
+
+### Ce qui a été sécurisé en premier
+
+**Les deux fichiers de la pile de vérification étaient non suivis** (`docker-compose.verif.yml`,
+`infra/caddy/Caddyfile.verif`). Ils portent le raisonnement qui justifie une pile *séparée* — une
+heure de mesure. Commités en `0c06153`.
+
+**Les 586 lignes du dépôt du site sont enfin dans un dépôt** (§8 étape 1). Elles vivaient en
+modification non suivie sur `docs/plan-console-editoriale`, une branche qui n'est pas la leur.
+Elles sont désormais sur `fix/correctifs-audit-360-depot-du-site` (`2b3612a0`), créée **par un
+index temporaire** : `HEAD`, l'index et la copie de travail n'ont pas bougé d'un octet, au cas où
+une autre session y travaillerait.
+
+🔴 **Et l'archive de secours était PÉRIMÉE** — 40 709 octets contre 44 386 aujourd'hui. Il lui
+manquait `src/features/admin-qualiopi/confirmations.spec.ts` **en entier**, c'est-à-dire tout le
+constat `E34-006`. *C'est exactement la démonstration qu'une archive ne remplace pas un commit :
+elle avait été prise une fois, puis le travail avait continué sans elle.* Archive rafraîchie.
+
+### Deux corrections au document d'état
+
+1. **Le §8 étape 2 était déjà fait.** `origin` porte `fix/gardes-de-plan-et-c19-010` à `e41a034` :
+   les deux commits du 23/08 sont poussés. Le document les donnait encore en attente.
+2. **`APP_KEY` est un cinquième verrou, et il est plus large qu'annoncé.** Il n'est pas vide
+   « dans le `.env` du worktree » : il est vide dans les **quatre** fichiers — `.env:22` et
+   `backend/.env:22`, dans le worktree **comme** dans la copie principale. Ce n'est pas une
+   bizarrerie locale, c'est l'état de toute installation. `backend/config/app.php:77` lit
+   `env('APP_KEY')` ; sans clé, aucune session, aucun cookie chiffré, donc aucune connexion.
+   **Le banc ne peut pas le voir** : `backend/phpunit.xml:28` fournit `base64:AAAA…`.
+
+### A-010 : l'image locale était périmée, prouvé avec témoin négatif
+
+L'image `axion-crm-pro-api:latest` présente sur la machine **date du 4 juillet** et lance
+`php -S 0.0.0.0:80 -t public` — le serveur de développement de PHP, l'état d'AVANT le correctif
+A-010 (S0). L'image bâtie depuis le worktree lance `php-fpm -F` sur 9000.
+
+Sonde : `ps -o args= | grep -v "grep\|ps -o" | grep -c "php -S"`. Les deux conteneurs montent
+**exactement le même code** (`--volumes-from`) ; seule l'image diffère.
+
+| conteneur | image | sonde | PID 1 |
+|---|---|---:|---|
+| `crmverif-api` | bâtie du worktree | **0** | `php-fpm: master process` + 4 ouvriers, `:::9000 LISTEN` |
+| témoin | `axion-crm-pro-api` (4 juillet) | **1** | `php -S 0.0.0.0:80 -t public` |
+
+La sonde sait donc rendre 1 : son 0 est un vrai 0 (doctrine règle 3). Preuves :
+`04_PREUVES/agent-35/a-010-image-perimee-vs-batie-2026-08-23.txt` et
+`a-010-php-fpm-prouve-dans-le-conteneur-2026-08-23.txt`.
+
+### V6 levé sur cette pile — et une mesure qui change le plan
+
+Premier appel de bout en bout, `https://verif.localhost:8443/up` : **`500` en 428 secondes**.
+
+Le code de retour est la bonne nouvelle : **500 et non 502**. Caddy a joint php-fpm en FastCGI et
+a reçu une réponse PHP. La plomberie `api:9000` marche ; c'est le Caddy **vivant** qui parlait
+`api:80`.
+
+🔴 **Les 428 secondes, elles, condamnent le montage lié.** Cause mesurée, pas supposée :
+`find /var/www/html/vendor -type f | wc -l` rend **13 944 fichiers en 2 min 15 s** — près de
+10 ms par fichier à travers le montage Docker Desktop Windows. Et la cible `dev` **désactive
+opcache** (`opcache.enable=0`), si bien que *chaque* requête repaie ce parcours.
+
+**Ouvrir 39 écrans à la main dans ces conditions est hors de portée.** La pile est donc passée à
+la cible **`prod`** : code cuit dans l'image (`COPY backend/`), vendor en `--no-dev`, opcache actif
+avec `validate_timestamps=0`, caches config/route/view construits au démarrage par
+`entrypoint-prod` avec l'environnement réel.
+
+Ce n'est pas seulement un gain de vitesse, c'est un gain de **fidélité** — et le Caddyfile de cette
+pile l'écrivait déjà à propos de l'origine unique : *le local doit ressembler à la production,
+sinon il ne prouve rien.* Effet de bord heureux : plus aucun montage lié, donc l'interdiction du
+mandat de toucher à `Axion-CRM-Pro/backend` devient **sans objet** au lieu d'être une promesse.

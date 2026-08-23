@@ -1,0 +1,19 @@
+A-010 (S0) — PREUVE QUE L'IMAGE LOCALE ETAIT PERIMEE
+Mesure du 2026-08-23, docker image inspect.
+
+Le correctif A-010 fait passer l'API de `php -S` (serveur de DEVELOPPEMENT
+de PHP : un processus, une requete a la fois) a php-fpm sur 9000. L'image
+deja presente sur la machine porte encore l'etat d'AVANT. La reprendre aurait
+mesure le produit d'avant l'audit en croyant mesurer celui d'apres.
+
+--- image PERIMEE, deja presente sur la machine ---
+Cmd=["php","-S","0.0.0.0:80","-t","public"]
+Entrypoint=["docker-php-entrypoint"]
+ExposedPorts={"80/tcp":{},"9000/tcp":{}}
+Created=2026-07-04T13:31:50.837511661Z
+
+--- image BATIE depuis crmpro-wt-a35-auth (Dockerfile.laravel, cible dev) ---
+Cmd=["php-fpm","-F"]
+Entrypoint=["docker-php-entrypoint"]
+ExposedPorts={"9000/tcp":{}}
+Created=2026-08-23T07:41:55.464668526Z

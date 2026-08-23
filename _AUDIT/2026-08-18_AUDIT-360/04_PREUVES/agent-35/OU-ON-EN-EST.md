@@ -1366,12 +1366,17 @@ code de retour avalé par un `|| echo`.
 > **Règle** : si l'un de ces quatre contrôles tombe, la décision ne tient plus
 > et il faut le dire. **Ne jamais désarmer `verifier-ports-publies.sh`.**
 
-### ⚠️ Ce qui reste à Will, et que je ne peux pas faire
+### 📌 DÉCISION DE WILL : la double authentification reste par **SMS**
 
-**Basculer la double authentification du SMS vers une application.** GitHub
-déconseille le SMS (interceptable par portage de numéro). Cela demande son
-téléphone : `Settings → Password and authentication → Two-factor methods →
-Add → Authenticator app`.
+La bascule vers une application d'authentification lui a été recommandée, avec
+sa raison (un numéro peut être porté chez un autre opérateur à l'insu du
+titulaire). **Il a refusé le 2026-08-23.** *Ne pas le reproposer.*
+
+Les deux parades qui fonctionnent **dans** ce choix, et qui lui appartiennent :
+① télécharger les **codes de secours** GitHub et les ranger hors ligne
+(`Settings → Password and authentication → Recovery codes`) ;
+② demander à l'opérateur un **verrou de portabilité** — c'est là que se joue
+l'attaque, pas chez GitHub.
 
 ### 📊 Les dépendances — mesuré le 2026-08-23
 

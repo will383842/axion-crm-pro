@@ -173,7 +173,8 @@ jobs:
               -o ServerAliveInterval=30 \
               -o ServerAliveCountMax=10 \
               "$USER@$HOST" 'bash -s' -- \
-            "$PROJECT_PATH" "$SKIP_MIGRATE" "$EXPECTED_SHA" "$INSEE_API_KEY" \n            "$GH_TOKEN_LECTURE" "$GH_DEPOT" <<'REMOTE' | tee /tmp/deploy-remote.log
+            "$PROJECT_PATH" "$SKIP_MIGRATE" "$EXPECTED_SHA" "$INSEE_API_KEY" \
+            "$GH_TOKEN_LECTURE" "$GH_DEPOT" <<'REMOTE' | tee /tmp/deploy-remote.log
           set -euo pipefail
           PROJECT_PATH="$1"
           SKIP_MIGRATE="$2"

@@ -735,3 +735,165 @@ LOCAUX, aucun poussé :**
 | `496c464` | journal — la fusion de la PR #194 et les 7 minutes de 502 |
 | `46bb769` | journal — chantier 1 à mi-parcours |
 | `90d9810` | grilles — l'inventaire des quatre familles et la lecture des policies |
+
+---
+
+# PARTIE 3 — LA PR #198, ET CE QUE LA CI M'A APPRIS
+
+> https://github.com/will383842/axion-crm-pro/pull/198 — ouverte le 2026-08-23
+> après le « OUI OK » de Will. **Ouverte seulement, pas fusionnée** : la fusion
+> redéclencherait le déploiement, et le pipeline n'a toujours aucune protection
+> contre la coupure SSH du §2.2.
+
+## 3.1 🔴 LA PR EST PARTIE AVEC SIX ROUGES
+
+Et c'est le passage le plus instructif de la session, parce que **ma
+vérification locale était verte**.
+
+**Pourquoi elle l'était à tort :** je n'avais joué que les tranches **voisines
+de mon changement** — `Feature/Auth`, `Feature/Api`, et ma propre garde. Les
+tranches qui **épinglent le comportement ailleurs** (`Feature/Controllers`,
+`Feature/Crm`, la racine de `Feature`) n'ont pas été jouées.
+
+*C'est la règle « jouer par tranches courtes » du §7 retournée contre moi :
+courtes, oui — mais pas seulement celles qu'on vient de toucher.*
+
+### Deux étaient de VRAIS défauts. Code corrigé, garde intouchée.
+
+**① `G43-005` — six de mes `update()` écrivaient sans verrou optimiste.**
+Deux saisies concurrentes y perdaient du travail **en silence** : la seconde
+écrasait la première sans que personne l'apprenne.
+
+🔑 **La garde avait écrit d'avance ce qui allait arriver**, mot pour mot dans
+son code :
+
+> *« Un `update()` qui rend 501 n'écrit rien : il n'y a pas de saisie à perdre.
+> **Le jour où il est câblé, il apparaîtra ici.** »*
+
+Il l'a fait. Et sa liste de dérogations est vide **à dessein** — *« ce n'est pas
+une dérogation, c'est le registre de ce qui reste à faire »*. **Je n'y ai rien
+ajouté.** Le trait `VerrouOptimiste` et `refuserSiVersionPerimee()` sont posés
+sur les six.
+
+Deux modèles manquaient pour cela — `SavedView` et `Rotation` — parce que le
+trait calcule son jeton depuis les attributs d'un `Model`, et que ces deux
+contrôleurs passaient par `DB::table()`. Écrits, minces, et ils disent en
+commentaire pourquoi ils sont nés.
+
+**② `C21-001/twins` — mon `lower(email::text)` était redondant ET coûteux.**
+La garde a rougi avec **le bon conseil dans son message** : *« la colonne visée
+est-elle `citext` ? Si oui, `lower()` est redondant »*. `users.email` **est**
+`CITEXT NOT NULL UNIQUE` : la base ignore déjà la casse.
+
+Le `lower()` ne servait à rien et **rendait l'index unique inutilisable** — donc
+un balayage séquentiel de la table des comptes à chaque invitation.
+
+⚠️ **Et le dépôt le savait déjà.** `ContactUpserter.php:70` porte un
+avertissement « NE PAS RÉÉCRIRE `lower(email::text)` », avec la mesure du Seq
+Scan à l'appui (coût 923,00 · 25,257 ms · 573 tampons). **J'ai repayé une leçon
+déjà écrite dans le code.**
+
+### Quatre étaient des tests qui figeaient l'ancien état
+
+Mis à jour, **jamais désarmés** — et pas en échangeant « 501 » contre « 200 » :
+
+- `PUT /workspace` → vérifie que le nom est **écrit en base**. Une route peut
+  rendre « ok » sans rien écrire : ce serait le motif `B12-007` qu'on vient de
+  fermer à côté.
+- `POST /users` → fige le **422** exact (le corps d'origine n'envoyait qu'un
+  `email` ; `name` et `role` sont exigés).
+- 🔴 `POST /notifications/1/read retourne 501` **ne mesurait rien.** Il attendait
+  un 501 que la route **n'a jamais rendu** — elle rendait **500** sur la
+  `TypeError` du `int $n` face à un UUID. *Il figeait un comportement
+  inexistant.* Il vérifie désormais qu'un identifiant non-UUID rend 404.
+- Les deux e2e `cold-email/linkedin page loads` → vérifient la redirection
+  **sur l'URL d'arrivée**, pas sur l'absence d'un texte : un `toHaveCount(0)`
+  passerait aussi bien sur une page blanche.
+
+---
+
+## 3.2 🔴 DEUX FAUX ÉCHECS QUE J'AI FABRIQUÉS MOI-MÊME
+
+**J'ai lancé deux suites PHP en parallèle sur la même base.** Le §7 du dossier
+l'interdit explicitement — *« elles partagent une base et chacune commence par
+`migrate:fresh` : deux processus concurrents ont déjà produit deux faux échecs
+dans cette campagne »*.
+
+Résultat : **8 `QueryException`**. Rejouées seules : **247 verts, 0 rouge**.
+
+Même faute côté frontend, où j'avais lancé `vitest` pendant que le backend
+tournait : **3 « échecs »** sur des écrans que je n'avais pas touchés, qui
+étaient des **délais dépassés** (10 440 ms pour un test qui en prend 1 500).
+Rejoués seuls : **13/13 verts**.
+
+*Le piège n° 6 de la liste du dossier, repayé le jour même où j'en citais un
+autre.*
+
+### Mesures propres, chacune jouée SEULE
+
+| suite | résultat |
+|---|---|
+| `Feature/Controllers` + `Feature/Api` + `VerrouOptimisteEtendu` | ✅ **182** |
+| `Feature/Crm` | ✅ **247** |
+| `Feature/Auth` | ✅ **61** |
+| `AudienceBuilderPage` + `CampaignWizardPage.saisie` | ✅ **13** |
+| Pint · PHPStan niveau 8 | ✅ sans erreur |
+
+---
+
+## 3.3 UN GESTE MALADROIT, CORRIGÉ
+
+Le commit de correction est d'abord parti sur `fix/gardes-de-plan-et-c19-010` —
+la branche courante du worktree, **dont la PR #194 est déjà fusionnée** — au
+lieu de la branche de la PR #198. `git push` sans argument suit la branche
+courante, pas celle qu'on a en tête.
+
+Corrigé : `fix/501-redirections-grilles-2026-08-23` avancée sur `574b793` et
+repoussée. Sans conséquence, mais **`fix/gardes-de-plan-et-c19-010` porte
+désormais un commit de trop côté distant** — à nettoyer un jour, ou à laisser
+mourir avec la branche.
+
+*C'est le piège n° 5 du dossier, dans sa variante moderne : « `git branch` crée
+sans basculer » devient « `git push` pousse ce qui est sorti, pas ce qu'on
+vise ».*
+
+---
+
+## 3.4 🔴 CE QUI RESTE EN ATTENTE DE WILL — LE POINT LE PLUS LOURD
+
+**Le dossier d'audit est sur un dépôt PUBLIC. 1 008 fichiers.**
+
+`will383842/axion-crm-pro` est public, et la branche `audit/360-p1-p2` y est
+poussée. Elle porte l'audit complet : **la liste détaillée des faiblesses de la
+production**, avec chemins, lignes et mesures.
+
+Sans citer les contenus, ce qui est lisible par n'importe qui :
+
+| renseignement | fichiers |
+|---|---:|
+| l'IP du serveur de production | **21** |
+| les droits `1777` du webroot du conteneur | **12** |
+| l'état du mot de passe Redis de production | **6** |
+| les cartes de source téléchargeables | **14** |
+| le `laravel.log` en `rwxrwxrwx` | **10** |
+| les gates de sécurité désarmées par `continue-on-error` | **21** |
+
+⚠️ **Ce n'est pas cette session qui l'a créé** — c'était déjà là. Et ce n'est
+**dans aucun des 485 constats** de l'audit : personne ne l'a relevé, alors que
+l'audit recense par ailleurs des défauts bien moins exploitables.
+
+🔴 **LES 27 COMMITS DE JOURNAL NE SONT PAS POUSSÉS**, et ne le seront pas sans
+le mot de Will. Ils ajouteraient la mesure des **deux policies fail-open** et la
+carte précise de ce qui reste ouvert — c'est-à-dire exactement ce qu'il ne faut
+pas publier tant que la question n'est pas tranchée.
+
+**Trois options posées à Will :**
+
+1. **Passer le dépôt en privé** — le plus simple, immédiat, réversible.
+2. **Retirer la branche `audit/360-p1-p2`** du dépôt public — plus chirurgical,
+   mais l'historique GitHub garde des traces et des miroirs ont pu passer.
+3. **Assumer**, si c'est délibéré — auquel cas le journal se pousse et on n'en
+   parle plus.
+
+*Aucune n'a été prise. Les 27 commits vivent sur la machine de Will, committés :
+rien n'est perdu, rien n'est publié.*

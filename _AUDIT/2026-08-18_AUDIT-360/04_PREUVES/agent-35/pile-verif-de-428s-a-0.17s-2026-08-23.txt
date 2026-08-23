@@ -1,0 +1,58 @@
+PILE DE VERIFICATION — DE 428 SECONDES A 0,17 SECONDE, ET POURQUOI
+Mesures du 2026-08-23. Meme Caddy, meme hote, meme worktree.
+
+Trois etats successifs de `GET https://verif.localhost:8443/up` :
+
+| etat                                            | code | temps   |
+|-------------------------------------------------|------|---------|
+| montage lie + cible `dev` (opcache desactive)    | 500  | 428 s   |
+| code cuit dans l'image + APP_KEY de 38 octets    | 500  | 8,5 s   |
+| code cuit dans l'image + APP_KEY de 32 octets    | 200  | 0,17 s  |
+
+--- 1. LE SIXIEME VERROU : LE MONTAGE LIE ---
+
+Cause mesuree, pas supposee :
+
+    docker exec crmverif-api sh -lc 'time find /var/www/html/vendor -type f | wc -l'
+    real 2m 14.96s   ->   13 944 fichiers
+
+Soit ~9,7 ms par fichier a travers le montage Docker Desktop Windows. La cible
+`dev` du Dockerfile pose `opcache.enable=0` : CHAQUE requete repaie ce parcours.
+
+TEMOIN DE CONTROLE, sur la meme pile au meme instant : le frontend, lui, est
+CUIT dans son image et ne traverse aucun montage.
+
+    GET https://verif.localhost:8443/    ->  200 en 0,32 s
+
+La seule variable qui differe entre les deux chemins est le montage lie. Ce
+n'est donc pas Caddy, ni l'hote, ni le reseau.
+
+Consequence pour le mandat : les 39 ecrans etaient inatteignables pour une raison
+que personne n'avait nommee — non pas un verrou d'authentification, mais un
+montage de fichiers. C'est un SIXIEME verrou, a ajouter aux cinq connus.
+
+Correctif : cible `prod` (COPY backend/, vendor --no-dev, opcache actif avec
+validate_timestamps=0, caches config/route/view construits au demarrage par
+`entrypoint-prod` avec l'environnement reel). Effet de bord heureux : plus aucun
+montage lie, donc l'interdiction du mandat de toucher a `Axion-CRM-Pro/backend`
+devient SANS OBJET au lieu d'etre une promesse.
+
+--- 2. LE CINQUIEME VERROU, VU ROUGE : APP_KEY ---
+
+`APP_KEY` est VIDE dans les QUATRE fichiers : `.env:22` et `backend/.env:22`,
+dans le worktree COMME dans la copie principale. `backend/config/app.php:77` lit
+`env('APP_KEY')`.
+
+LE BANC NE PEUT PAS LE VOIR : `backend/phpunit.xml:28` fournit
+`base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=`. Le verrou est invisible a
+toute la suite de tests — c'est pourquoi il a survecu aux quatre autres.
+
+Et il a ete vu ROUGE, par accident et donc sans complaisance : la clef posee au
+matin faisait 38 octets une fois decodee, la ou aes-256-cbc en exige 32.
+
+    grep -c "Unsupported cipher or incorrect key length" laravel-2026-08-23.log
+    -> 24
+
+Une clef PRESENTE mais mal dimensionnee echoue exactement comme une clef
+ABSENTE : 500 sur toutes les routes. Avec une clef de 32 octets verifies, la
+meme route rend 200.

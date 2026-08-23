@@ -8,7 +8,8 @@
 > `FILE-DE-TRAVAIL.md`. Verdicts bruts de la vague de vérification :
 > `verdicts-420.json`. Ce qui revient à Will : `ARBITRAGES.md`.
 
-**Dernière mise à jour : 2026-08-23 (fin de la vérification de la vague 2).**
+**Dernière mise à jour : 2026-08-23, après-midi — LA PILE DE VÉRIFICATION EST DEBOUT,
+LES SIX VERROUS SONT LEVÉS, LA CONNEXION EST PROUVÉE.**
 
 ---
 
@@ -32,12 +33,95 @@ copie **périmée** existe. Rafraîchir d'abord, croire ensuite.
 
 ---
 
+## 0 bis. 🟢 CE QUI A CHANGÉ CET APRÈS-MIDI — à lire avant le reste
+
+**La console est enfin joignable, connectée, sur le BON code.** C'est ce qui bloquait
+l'exigence n° 3 du §12 du mandat depuis le début.
+
+### La pile de vérification, en trois commandes
+
+```bash
+cd C:/Users/willi/Documents/Projets/crmpro-wt-a35-auth
+docker compose -p crmverif -f docker-compose.verif.yml up -d
+curl -sk --resolve verif.localhost:8443:127.0.0.1 https://verif.localhost:8443/up   # 200, ~0,2 s
+```
+
+| | |
+|---|---|
+| adresse | `https://verif.localhost:8443` (TLS interne Caddy ; `-k` en ligne de commande) |
+| compte | `audit360@verif.localhost` / `Audit360-Verif!2026` — rôle `owner`, sans 2FA |
+| base | `crmverif-postgres`, **jetable**, séparée de `axion_crm_test` du banc |
+| conteneurs | `crmverif-{postgres,redis,api,app,caddy}` — **rien de commun** avec les `axion-crm-*` |
+
+⚠️ **Sanctum : toujours envoyer `Origin` et `Referer`.** Sans eux, la requête est traitée comme
+apatride et rend 401 **malgré** un cookie de session valide. Mesuré : avec → 200, sans → 401.
+Un navigateur les envoie toujours ; `curl`, non. *Ne pas rapporter ce 401 comme un défaut.*
+
+### Les six verrous, et leur état
+
+| | verrou | état |
+|---|---|---|
+| **V5** | pile câblée sur la copie interdite | ✅ **levé** — pile `crmverif` séparée, bâtie du worktree |
+| **V6** | Caddy vivant en `api:80` au lieu de `api:9000` fastcgi | ✅ **levé sur cette pile** — `Caddyfile.verif` |
+| **V3′** | `totp_recovery_codes` en `ARRAY` face à un cast `encrypted:array` | ✅ **levé** — migration passée, colonne en `text` |
+| **V7** | `CRM_CONSOLE_V2_ENABLED=false` → 404 sur `/v1/crm/*` | ✅ **levé** — `/crm/persons/{clé}/timeline` rend 401, plus 404 |
+| **V8** | `APP_KEY` **vide** — *cinquième verrou, découvert le 23/08* | ✅ **levé** — et **vu rouge** |
+| **V9** | **le montage lié** — *sixième verrou, découvert le 23/08* | ✅ **levé** — code cuit dans l'image |
+
+🔴 **Le sixième verrou est celui que personne n'avait nommé, et c'est le plus lourd.**
+Un seul `GET /up` mettait **428 secondes**. Cause mesurée : 13 944 fichiers dans `vendor`,
+2 min 15 s pour les parcourir à ~10 ms pièce à travers le montage Docker Desktop Windows — et la
+cible `dev` du Dockerfile pose `opcache.enable=0`, si bien que **chaque** requête repaie le
+parcours. Témoin de contrôle au même instant, même Caddy, même hôte : le frontend, **cuit dans son
+image**, rend 200 en **0,32 s**. La seule variable qui diffère est le montage.
+
+Correctif : cible **`prod`** (code cuit, vendor `--no-dev`, opcache actif, caches construits au
+démarrage par `entrypoint-prod`). **428 s → 0,17 s.** Effet de bord heureux : plus aucun montage
+lié, donc l'interdiction du mandat de toucher à `Axion-CRM-Pro/backend` devient **sans objet** au
+lieu d'être une promesse.
+
+🔴 **Le cinquième verrou a été vu ROUGE, et par accident — donc sans complaisance.**
+`APP_KEY` est vide dans les **quatre** fichiers (`.env:22` et `backend/.env:22`, worktree **et**
+copie principale). Le banc ne peut pas le voir : `backend/phpunit.xml:28` la fournit. Et la clef
+posée le matin même faisait **38 octets** décodés là où aes-256-cbc en exige **32** : le journal
+disait « Unsupported cipher or incorrect key length » **24 fois**, et toute route rendait 500.
+*Une clef présente mais mal dimensionnée échoue exactement comme une clef absente.*
+
+### Deux corrections au présent document
+
+1. **Le §8 étape 2 était déjà faite.** `origin` porte `fix/gardes-de-plan-et-c19-010` à `e41a034`.
+2. **Le §8 étape 1 est faite** — voir ci-dessous.
+
+### Ce qui est commité, et ce qui ne l'est pas
+
+| dépôt / branche | commit | poussé ? |
+|---|---|---|
+| `crmpro-wt-a35-auth` · `fix/gardes-de-plan-et-c19-010` | `0c06153` pile de vérif · `29bf113` montage + clef | ❌ **local** |
+| `Axion-IA/axionia` · `fix/correctifs-audit-360-depot-du-site` | `2b3612a0` — les 586 lignes | ❌ **local** |
+| `Axion-CRM-Pro` · `audit/360-p1-p2` | `1c9b6b8` journal + preuves | — |
+
+⚠️ **Rien n'est poussé sur les dépôts publics sans le mot de Will** (§A00 de `06_RESTE-WILL.md`).
+
+🔴 **L'archive de secours du dépôt du site était PÉRIMÉE** — 40 709 octets contre 44 386, et il
+lui manquait `confirmations.spec.ts` **en entier**, donc tout le constat `E34-006`. C'est la
+démonstration qu'une archive ne remplace pas un commit : prise une fois, le travail a continué
+sans elle. La branche `fix/correctifs-audit-360-depot-du-site` a été créée **par un index
+temporaire** — `HEAD`, l'index et la copie de travail de `docs/plan-console-editoriale` n'ont pas
+bougé d'un octet, au cas où une autre session y travaillerait.
+
+### Par quoi reprendre MAINTENANT
+
+**Ouvrir les 39 écrans du §4.7 du mandat, un par un, dans un vrai navigateur**, grille §5.1 et une
+capture par état. C'est l'exigence n° 3 du §12, la seule jamais entamée — et plus rien ne l'empêche.
+
+---
+
 ## 1. L'ÉTAT DU CODE
 
 | | |
 |---|---|
 | worktree de travail | `C:/Users/willi/Documents/Projets/crmpro-wt-a35-auth` |
-| branche | `fix/gardes-de-plan-et-c19-010` @ `e41a034` — ⚠️ **2 commits du 23/08 NON POUSSÉS** |
+| branche | `fix/gardes-de-plan-et-c19-010` @ `29bf113` — `e41a034` est **poussé** ; les 2 commits de l'après-midi ne le sont pas |
 | copie principale (journaux) | `Axion-CRM-Pro`, branche `audit/360-p1-p2` |
 | conteneur du banc | `a35r` · base de test `axion_crm_test` (forcée par `phpunit.xml`) |
 
@@ -46,8 +130,13 @@ copie **périmée** existe. Rafraîchir d'abord, croire ensuite.
 (`E31-010`, `E33-002`, `E33-004`, plus `crm-sync`), sur la branche
 `docs/plan-console-editoriale` qui n'est pas la leur, au milieu du travail
 d'autres sessions. Je n'y ai touché à **aucune** branche ; le patch est archivé
-dans `04_PREUVES/agent-35/site-non-committe/`. *C'est la première chose à
-sécuriser en reprenant.*
+dans `04_PREUVES/agent-35/site-non-committe/`.
+
+✅ **RÉGLÉ le 2026-08-23 après-midi.** Les 586 lignes (11 fichiers, `E31-010`,
+`E33-002`, `E33-004` **et `E34-006`** que l'archive avait manqué) sont sur
+`fix/correctifs-audit-360-depot-du-site` (`2b3612a0`), branche **locale**, créée
+par un index temporaire : `HEAD`, l'index et la copie de travail de
+`docs/plan-console-editoriale` n'ont pas bougé d'un octet.
 
 ### Fusionné et déployé en production
 
@@ -271,19 +360,18 @@ est versionné) pour les 11 premiers.
 > **faites** : banc rafraîchi, vérification backend terminée et verte, 91
 > correctifs inscrits au registre.
 
-1. **Sécuriser les correctifs du dépôt du site.** `E31-010`, `E33-002`,
-   `E33-004` sont écrits et **non committés** dans `Axion-IA/axionia`, sur une
-   branche qui n'est pas la leur. Patch de secours :
-   `04_PREUVES/agent-35/site-non-committe/`. Vérifier d'abord qu'aucune autre
-   session ne travaille dans cette copie.
-2. **Pousser les 2 commits du 23/08** (`d9205b5`, `e41a034`) — la branche locale
-   est en avance sur son distant.
+1. ✅ **FAIT** — les correctifs du dépôt du site sont sécurisés sur
+   `fix/correctifs-audit-360-depot-du-site` (`2b3612a0`), branche locale.
+2. ✅ **DÉJÀ FAIT AVANT** — `d9205b5` et `e41a034` étaient poussés ; ce document
+   se trompait. *Ne pas repayer cette vérification : `git ls-remote --heads origin`.*
 3. **Demander à Will l'ouverture de la PR** de `fix/gardes-de-plan-et-c19-010`.
    ⚠️ Le dépôt est **public** et le §A00 de `06_RESTE-WILL.md` garde la trace
    d'un agent qui a poussé malgré trois refus : **ne pas l'ouvrir sans réponse.**
-4. **Lever les quatre verrous d'infrastructure** (§5, V5 → V6 → V3′ → V7) et
-   **ouvrir enfin les 39 écrans à la main** — c'est l'exigence n° 3 du §12 du
-   mandat, la seule jamais entamée.
+4. 🔴 **LE CHANTIER EN COURS — ouvrir les 39 écrans à la main.** Les verrous
+   sont **tous levés** (V5, V6, V3′, V7, plus `APP_KEY` et le montage lié
+   découverts le 23/08 — voir §0 bis). La pile de vérification répond en 0,17 s
+   et la connexion est prouvée. C'est l'exigence n° 3 du §12 du mandat, la seule
+   jamais entamée, et plus rien ne l'empêche.
 5. **Lancer la vague du dépôt du site** pour les 11 constats reportés.
 6. Attaquer les **47 S1 ouverts**, puis les 168 S2.
 7. Poser à Will les arbitrages de `ARBITRAGES.md`, famille par famille.

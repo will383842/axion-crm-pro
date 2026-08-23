@@ -267,6 +267,39 @@ Plus, du mandat lui-même (§12, « définition de fini ») :
 | 13 | **une sauvegarde restaurée pour de vrai** | ✅ **TENU** — *cette ligne disait « aucune trace » à tort* : `agent-08`, archive de 724 926 343 octets, **20 726 338 lignes, écart nul**. Réserve écrite : copie locale, pas hors-site |
 | 14 | plus rien de sévérité ≥ S2 | ❌ 168 S2, 48 S3 *(étaient 220 et 82)* |
 
+### 📊 LA DÉFINITION DE FINI (§12), REPRISE POINT PAR POINT LE 2026-08-23
+
+> Le tableau de référence est `12_CRITIQUE-COMPLETUDE.md` §8, mais il **date du
+> 2026-08-19 12:06Z** — donc **d'avant** les deux vagues d'agents, d'avant P5,
+> d'avant P6, d'avant le rapport final, et d'avant l'ouverture des écrans. Voici
+> le même tableau, **remesuré**. Ce qui a bougé est signalé.
+
+| # | exigence | état au 2026-08-23 | bougé ? |
+|---|---|---|---|
+| 1 | chaque élément du §4 dans un tableau, aucune ligne vide | ❌ **0/11 policies · 0/84 services · 0/34 workers · 0/44 contrôleurs** en grille | — |
+| 2 | chaque grille du §5 remplie | ❌ grille ÉCRAN à **8 points sur 25** ; `fonctionnalites.md`, `raccordement.md`, `parcours.md` **absents** | — |
+| 3 | chaque écran ouvert à la main, **chaque bouton essayé**, captures | 🟡 **les 36 écrans sont ouverts** (23/08, connectés, bon code, captures) — mais **« chaque bouton essayé » non**, et **0 des 21 parcours du §11** joué | 🟢 **oui** |
+| 4 | §6 : refonte de navigation **appliquée** | ⚠️ document produit (73 Ko) ; **refonte non appliquée**, 8 redirections à écrire, **0 écrite** | — |
+| 5 | chaque S0/S1 corrigé, test vu rouge puis vert | ❌ **6 S0 et 47 S1 ouverts** *(étaient 22 S0)* | 🟢 en partie |
+| 6 | les 16 lignes de l'étape 0 closes | ❌ **7 clos · 7 partiels · 2 ouverts** | — |
+| 7 | F1 → F15 levées ou arbitrées sur `main` fusionné | ❌ **5 levées · 7 partielles · 3 encore vraies** | — |
+| 8 | PR #174 et #735 fusionnées, `main` vert | ✅ **tenu**, re-vérifié | — |
+| 9 | les 57 alertes arbitrées, corrigées ou gelées | ⚠️ 57/57 mesurées, **0 atteignable en production**, politique de gel écrite ; la montée `axios 1.16.1 → 1.18.0` **non faite**, `H47-005` non tranché | — |
+| 10 | aucune route 501, aucun écran factice | ❌ **19 routes 501 + 9 « 200 à corps figé » + 3 inertes** ; `/cold-email` et `/linkedin` conservés | — |
+| 11 | matrice exigence → test → preuve complète | ❌ section C (13 parcours) **vide** | — |
+| 12 | critères du §29 du CDC mesurés | ❌ **1 tenu · 4 non tenus · 8 hors périmètre motivé · 12 en blanc** | — |
+| 13 | **une sauvegarde restaurée pour de vrai** | ✅ **tenu** — 724 926 343 octets, **20 726 338 lignes, écart nul**, témoin négatif joué. Réserve : copie locale, pas hors-site ; et `A08-008`, les **droits** ne sont pas restaurés | — |
+| 14 | P5 **puis** P6 menées en entier, la dernière sans rien ≥ S2 | 🟡 **les deux ONT été menées** (`08_…md` 805 l., `09_…/` 6 fichiers) — mais la condition de sortie **n'est pas remplie** : **168 S2 et 48 S3 ouverts** | 🟢 **oui** |
+| 15 | rapport final, verdict net par domaine | 🟡 **`07_RAPPORT-FINAL.md` existe** (234 l.), avec un verdict par domaine — mais son §28 s'appuie sur **quatre verrous levés depuis** : il est à réécrire | 🟢 **oui** |
+| 16 | `06_RESTE-WILL.md` en une page, chaque ligne avec recommandation | ✅ **tenu**, format respecté | — |
+
+**Score : 3 tenus sur 16** (8, 13, 16) · **3 nettement avancés** (3, 14, 15) ·
+**2 partiels** (4, 9) · **8 non tenus**.
+
+*Le chantier des écrans, qui était le plus gros manque structurel, est clos. Ce
+qui reste n'est pas de la mesure d'écran : c'est du remplissage de grilles, de la
+correction de S0/S1, et des arbitrages qui reviennent à Will.*
+
 ✅ **CE PARAGRAPHE EST PÉRIMÉ — les écrans ONT été ouverts le 2026-08-23**, tous les
 36, dans un vrai navigateur, connectés, sur le bon code. Les six verrous V5 à V9
 décrits plus bas sont **tous levés** (§0 bis). Ce qui suit est conservé pour la

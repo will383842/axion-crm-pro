@@ -1216,3 +1216,67 @@ décrivent, pour l'essentiel, des failles désormais corrigées.* La PR #206 est
 donc à reprendre **en chirurgical** : ne sortir que les quatre pièces vraiment
 sensibles — registre des violations, brouillon CNIL, AIPD, état du pare-feu —
 et adapter les gardes qui les lisent.
+
+---
+
+# 🔴 SECONDE PANNE, MÊME SOIRÉE — et la décision d'arrêter
+
+## Ce qui s'est passé la deuxième fois
+
+Après avoir rétabli le CRM une première fois, **il est retombé**. Cause mesurée :
+mes commandes répétées (`docker compose up`, `restart`, `up` de nouveau) ont
+laissé des **conteneurs en double**, aux noms préfixés d'un hash :
+
+```
+9b0e89267d0e_axion-crm-api        Created
+bb133926b36b_axion-crm-scheduler  Created
+3671506cb1e8_axion-crm-horizon    Created
+axion-crm-horizon                 Exited (137)
+```
+
+Compose crée un conteneur au **nom préfixé** quand le nom voulu est déjà pris par
+un conteneur de configuration différente. Ils se disputaient les noms, aucun ne
+servait, et le CRM rendait **502**.
+
+**Réparé** : suppression des doublons, puis `docker compose up -d api app horizon
+scheduler` avec l'overlay de production. État vérifié deux minutes après —
+`api` et `horizon` **healthy**, **0 doublon**, **4 295 349 fiches**,
+`log_connections = on`.
+
+## 🛑 LA DÉCISION : je ne touche plus à la production ce soir
+
+**Deux pannes en une heure, toutes deux de ma main.** Le motif est le même les
+deux fois : *j'ai enchaîné des gestes sur une pile que je ne remesurais pas
+entre chacun.*
+
+Ce qui restait à faire en production — **la rotation du mot de passe Postgres** —
+est le geste **le plus dangereux** de la liste : il touche l'authentification de
+tous les services à la base. Un décalage entre `ALTER ROLE` et le `.env`, et le
+CRM ne redemarre plus du tout.
+
+*Je viens de démontrer, deux fois, que mes gestes de production ont un taux
+d'échec non nul.* **Enchaîner sur le plus risqué serait de l'entêtement, pas de
+la méthode.**
+
+### Ce que je propose à la place
+
+La rotation se prépare **entièrement hors production** :
+
+1. un script qui fait `ALTER ROLE`, met à jour `.env`, redémarre les services et
+   **vérifie** — avec un **revert automatique** comme celui du pare-feu ;
+2. joué d'abord sur `axion-crm-staging-postgres`, qui existe et tourne ;
+3. puis en production, **à un moment choisi**, avec Will devant l'écran.
+
+### Ce que ça change pour le passage en public
+
+**Rien d'urgent.** Le mot de passe publié n'ouvre une porte que si le port est
+joignable — et il ne l'est pas :
+
+| contrôle | état |
+|---|---|
+| ports 5432 / 6379 depuis l'extérieur | **DROP** dans `DOCKER-USER`, persisté |
+| 80 / 443 | **plages Cloudflare uniquement**, vérifié |
+| IP d'origine en direct | **injoignable** |
+
+*Le mot de passe reste à tourner — c'est de l'hygiène, pas une urgence. Le
+contrôle qui protège est le pare-feu, et il tient.*

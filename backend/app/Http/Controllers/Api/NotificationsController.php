@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 /**
  * LA CLOCHE DE L'EN-TETE — constat B12-007 (S1).
@@ -104,26 +105,109 @@ class NotificationsController extends ApiController
     }
 
     /**
+     * 🔴 CE QUE LA MESURE DU 2026-08-23 A TROUVE, ET QUI N'ETAIT PAS DANS LE
+     * CONSTAT : cette route ne rendait PAS 501. Elle rendait **500**.
+     *
+     * La signature etait `markRead(int $n)` alors que `notifications.id` est un
+     * **UUID** (migration `2026_05_16_000006`, l. 108). Tout appel reel passait
+     * donc une chaine a un parametre entier : `TypeError`, 500, et le `501`
+     * ecrit juste en dessous n'a jamais ete atteint une seule fois.
+     *
+     * *Un « pas encore implemente » qui plante avant d'etre lu est pire qu'un
+     * 501 : le 501 dit la verite, la 500 annonce une panne.* La garde
+     * `EcrituresQuiRepondaient501Test` porte une ligne dediee a ce piege.
+     *
      * @OA\Post(path="/notifications/{n}/read", tags={"Notifications"}, summary="Marque comme lue",
      *     security={{"sanctumCookie":{}}},
      *
-     *     @OA\Parameter(name="n", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Parameter(name="n", in="path", required=true, @OA\Schema(type="string", format="uuid")),
      *
-     *     @OA\Response(response=501, description="Not implemented (Sprint 10)"))
+     *     @OA\Response(response=200, description="OK"),
+     *     @OA\Response(response=404, description="Inconnue, ou hors de mon espace / de mes notifications"))
      */
-    public function markRead(int $n): JsonResponse
+    public function markRead(Request $r, string $n): JsonResponse
     {
-        return $this->notImplemented('10');
+        [$espace, $utilisateur] = $this->qui($r);
+
+        // Fail-closed, comme la lecture : sans espace connu OU sans compte
+        // identifie, on n'ecrit rien. Une ecriture qui ne sait pas pour qui
+        // elle ecrit est pire qu'une lecture qui ne sait pas quoi montrer.
+        if ($espace === null || $utilisateur === null) {
+            abort(404);
+        }
+
+        // `where('id', 'pas-un-uuid')` sur une colonne UUID fait rendre a
+        // Postgres « invalid input syntax for type uuid » — donc un 500 sur une
+        // simple faute de frappe dans l'URL. On tranche AVANT la requete.
+        if (! Str::isUuid($n)) {
+            abort(404);
+        }
+
+        $ligne = DB::table('notifications')
+            ->where('id', $n)
+            ->where('workspace_id', $espace)
+            ->where('user_id', $utilisateur)
+            ->first(['id', 'read_at']);
+
+        // 404 et non 403 : repondre « interdit » sur la ligne d'un collegue ou
+        // d'un autre espace confirmerait son existence a qui n'a pas le droit
+        // de la voir. Le depot tranche deja ainsi dans `refuserHorsEspace`.
+        if ($ligne === null) {
+            abort(404);
+        }
+
+        // Idempotent A DESSEIN : « lu a 14h02 » est une mesure, pas un compteur
+        // de clics. Un second appel ne doit pas deplacer l'horodatage.
+        if ($ligne->read_at === null) {
+            DB::table('notifications')
+                ->where('id', $n)
+                ->whereNull('read_at')
+                ->update(['read_at' => now()]);
+        }
+
+        return $this->ok(['id' => $n, 'read' => true]);
     }
 
     /**
      * @OA\Post(path="/notifications/read-all", tags={"Notifications"}, summary="Marque toutes comme lues",
      *     security={{"sanctumCookie":{}}},
      *
-     *     @OA\Response(response=501, description="Not implemented (Sprint 10)"))
+     *     @OA\Response(response=200, description="OK — rend le nombre de lignes touchees"))
      */
-    public function markAllRead(): JsonResponse
+    public function markAllRead(Request $r): JsonResponse
     {
-        return $this->notImplemented('10');
+        [$espace, $utilisateur] = $this->qui($r);
+
+        if ($espace === null || $utilisateur === null) {
+            abort(404);
+        }
+
+        // 🔑 LES DEUX DIMENSIONS, ET C'EST TOUT L'ENJEU DE CETTE METHODE.
+        // Filtrer sur le seul espace ferait de « tout marquer comme lu » un
+        // geste qui eteint les notifications non lues de TOUS les collegues.
+        // La colonne `user_id NOT NULL` de la migration dit que la ligne
+        // appartient a une personne ; on ecrit donc sur les deux.
+        $touchees = DB::table('notifications')
+            ->where('workspace_id', $espace)
+            ->where('user_id', $utilisateur)
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+
+        return $this->ok(['marked' => (int) $touchees]);
+    }
+
+    /**
+     * L'espace courant et le compte courant, ou `null` pour l'un et l'autre.
+     *
+     * @return array{0: ?string, 1: ?string}
+     */
+    private function qui(Request $r): array
+    {
+        $utilisateur = $r->user();
+
+        return [
+            $this->espaceCourantOuNull(),
+            $utilisateur === null ? null : (string) $utilisateur->getKey(),
+        ];
     }
 }

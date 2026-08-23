@@ -102,8 +102,15 @@ test('Le service postgres journalise les connexions ET les deconnexions', functi
 test('Le prefixe de journal porte %h — sans quoi on ne sait pas D OU vient la connexion', function () {
     $bloc = blocPostgresDuCompose();
 
-    expect($bloc)->toContain(
-        '%h',
+    // 🔴 PAS `expect($bloc)->toContain('%h', "message")`.
+    //
+    // `toContain()` est VARIADIQUE : ses arguments sont tous des motifs à
+    // trouver. Le message d'explication était donc cherché DANS le fichier
+    // compose, et la garde rougissait sur un produit correct. Vu en CI le
+    // 2026-08-23 (run 32639647022) : les deux autres tests du fichier
+    // passaient, celui-ci seul tombait — l'accusation portait sur mon
+    // instrument, pas sur l'objet.
+    expect(str_contains($bloc, '%h'))->toBeTrue(
         "Le `log_line_prefix` du service `postgres` ne porte pas `%h`.\n\n"
         . "Sans ce champ, le journal dit qu'il y a eu des connexions mais pas d'OU elles "
         . "venaient : il ne permet donc pas de distinguer un acces interne d'un acces "

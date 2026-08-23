@@ -184,13 +184,36 @@ Ce qui bloque **aujourd'hui** est de l'infrastructure, et c'est plus court :
 
 | | ce qui bloque | preuve | qui |
 |---|---|---|---|
-| **V5** | `axion-crm-api` et `axion-crm-redis` **arrêtés** (`Exited 255`) — tout `/api/*` rend 502 | `docker logs axion-crm-caddy` : `dial tcp: lookup api: i/o timeout` | moi |
-| **V6** | Le Caddy **vivant** date d'avant le passage à FastCGI : il parle `api:80`, la branche attend `api:9000` en fastcgi | API d'admin 2019 : `4 × "dial":"api:80"`, aucun `fastcgi` | moi |
+| **V5** | `axion-crm-api` et `axion-crm-redis` **arrêtés** (`Exited 255`) — tout `/api/*` rend 502 | `docker logs axion-crm-caddy` : `dial tcp: lookup api: i/o timeout` | voir ci-dessous |
+| **V6** | Le Caddy **vivant** date d'avant le passage à FastCGI : il parle `api:80`, la branche attend `api:9000` en fastcgi | API d'admin 2019 : `4 × "dial":"api:80"`, aucun `fastcgi` | voir ci-dessous |
 | **V3′** | La migration `2026_08_19_120000_reparer_socle_authentification` **n'est pas appliquée** : `totp_recovery_codes` est `ARRAY`, face à un cast `encrypted:array` | dernière migration en base : `2026_08_19_000002` | moi |
 | **V7** | `CRM_CONSOLE_V2_ENABLED=false` → 404 sur `/v1/crm/*` | `EnsureCrmConsoleV2.php:29-30` | drapeau produit → Will |
 
 **Ordre de levée : V5 → V6 → V3′ → V7.** C'est le prochain vrai chantier, et
 c'est lui qui rendrait les 39 écrans mesurables autrement qu'au `curl`.
+
+🔴 **MAIS V5 N'EST PAS « rallumer deux conteneurs », et c'est la mesure la plus
+importante du 2026-08-23.** La pile locale n'est pas seulement arrêtée : elle est
+**câblée sur la mauvaise copie du code**.
+
+`docker inspect axion-crm-api` rend `com.docker.compose.project.config_files =
+Axion-CRM-Pro/docker-compose.yml`, dont le service `api` monte
+`./backend:/var/www/html` — c'est-à-dire **`Axion-CRM-Pro/backend`, la copie que
+le mandat interdit de toucher**, figée sur `audit/360-p1-p2` et qui **ne porte
+aucun des 91 correctifs**. Rallumer l'API telle quelle servirait donc un CRM
+d'avant la vague 2, et les 39 écrans seraient mesurés sur du code périmé —
+l'exact contraire de ce qu'on cherche.
+
+Et l'on ne peut pas simplement rebrancher la pile sur le worktree : les
+`container_name` sont **fixes** (`axion-crm-postgres`, `axion-crm-caddy`, …), si
+bien qu'un `up` depuis `crmpro-wt-a35-auth` **reprendrait les mêmes conteneurs** —
+dont `axion-crm-postgres`, qui héberge `axion_crm_test`, **la base du banc**, et
+`axion-crm-caddy`, qui sert en ce moment le frontend à d'autres sessions.
+
+**Ce n'est donc pas un geste d'exploitation, c'est une décision** : *quelle copie
+du code la pile locale doit-elle servir ?* Elle revient à Will, ou au minimum se
+pose avant d'être prise. Tant qu'elle n'est pas tranchée, aucune ouverture
+d'écran à la main n'a de sens.
 
 ---
 

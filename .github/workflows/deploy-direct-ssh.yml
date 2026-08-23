@@ -121,6 +121,11 @@ jobs:
           PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
           SKIP_MIGRATE: ${{ github.event.inputs.skip_migrate || 'false' }}
           INSEE_API_KEY: ${{ secrets.INSEE_API_KEY }}
+          # Jeton EPHEMERE du run, pour que le serveur puisse lire un depot
+          # PRIVE. Il expire a la fin du job ; rien n'est ecrit sur le disque
+          # du serveur (voir le bloc `git fetch` plus bas).
+          GH_TOKEN_LECTURE: ${{ secrets.GITHUB_TOKEN }}
+          GH_DEPOT: ${{ github.repository }}
           EXPECTED_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
@@ -168,12 +173,14 @@ jobs:
               -o ServerAliveInterval=30 \
               -o ServerAliveCountMax=10 \
               "$USER@$HOST" 'bash -s' -- \
-            "$PROJECT_PATH" "$SKIP_MIGRATE" "$EXPECTED_SHA" "$INSEE_API_KEY" <<'REMOTE' | tee /tmp/deploy-remote.log
+            "$PROJECT_PATH" "$SKIP_MIGRATE" "$EXPECTED_SHA" "$INSEE_API_KEY" \n            "$GH_TOKEN_LECTURE" "$GH_DEPOT" <<'REMOTE' | tee /tmp/deploy-remote.log
           set -euo pipefail
           PROJECT_PATH="$1"
           SKIP_MIGRATE="$2"
           EXPECTED_SHA="$3"
           INSEE_API_KEY="${4:-}"
+          GH_TOKEN_LECTURE="${5:-}"
+          GH_DEPOT="${6:-}"
 
           cd "$PROJECT_PATH"
 
@@ -198,7 +205,46 @@ jobs:
           echo "COMPOSE_FILE = $COMPOSE_FILE"
 
           echo "::group::git fetch + reset sur le SHA validé par la CI"
-          git fetch --all --prune
+
+          # ══════════════════════════════════════════════════════════════════
+          # 🔴 DEPOT PRIVE — mesure du 2026-08-23, faite EXPRES
+          # ══════════════════════════════════════════════════════════════════
+          #
+          # Le depot est passe en PRIVE ce jour-la : il portait, sur `main` et
+          # sur 49 autres branches, l'IP d'origine du serveur — celle qui permet
+          # de CONTOURNER Cloudflare (constat F37-007) — plus le detail des
+          # faiblesses de la production.
+          #
+          # Le premier deploiement d'apres a echoue, et c'etait le but de le
+          # declencher tout de suite plutot que de le decouvrir en urgence :
+          #
+          #     fatal: could not read Username for 'https://github.com'
+          #
+          # Le clone du serveur pointe une URL HTTPS sans identifiants. Public,
+          # ca marchait ; prive, plus rien.
+          #
+          # 🔑 CE QUE FAIT LE CORRECTIF, ET CE QU'IL EVITE.
+          # On fournit un identifiant de LECTURE, valable le temps du job, par
+          # un assistant `credential.helper` pose en LIGNE DE COMMANDE :
+          #   - rien n'est ecrit sur le disque du serveur — ni `.git-credentials`,
+          #     ni `remote set-url` avec le jeton dedans. Un jeton grave dans la
+          #     configuration d'un clone y reste des mois ;
+          #   - l'URL du depot n'est pas reecrite, donc le jeton n'apparait dans
+          #     AUCUN message d'erreur de git (une URL `https://x:TOKEN@...`
+          #     ressort telle quelle dans les erreurs reseau) ;
+          #   - le jeton expire a la fin du run. Rien a revoquer.
+          #
+          # `permissions: contents: read` en tete de ce fichier borne ce que ce
+          # jeton peut faire : lire. Il ne peut ni pousser, ni ouvrir une PR.
+          #
+          # ⚠️ SI CE BLOC DISPARAIT, LE DEPLOIEMENT S'ARRETE — il ne degrade pas
+          # en silence : `git fetch` echoue franchement et le job rougit.
+          if [ -n "$GH_TOKEN_LECTURE" ] && [ -n "$GH_DEPOT" ]; then
+            git -c credential.helper=                 -c "credential.https://github.com.helper=!f() { echo username=x-access-token; echo password=$GH_TOKEN_LECTURE; }; f"                 fetch --all --prune
+          else
+            echo "::warning::aucun jeton de lecture fourni — fetch anonyme (ne marche que si le depot est public)"
+            git fetch --all --prune
+          fi
           # On déploie EXACTEMENT le commit qui vient de passer la CI.
           git reset --hard "$EXPECTED_SHA"
           DEPLOYED_SHA="$(git rev-parse HEAD)"

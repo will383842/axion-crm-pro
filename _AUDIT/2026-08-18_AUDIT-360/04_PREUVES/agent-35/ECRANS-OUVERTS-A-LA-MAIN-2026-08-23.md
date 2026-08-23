@@ -892,3 +892,23 @@ questions laissées ouvertes en 3ᵉ passe sont traitées :
 
 **La PR de `fix/gardes-de-plan-et-c19-010` n'est PAS ouverte**, conformément à la
 consigne. Rien n'a été poussé sur un dépôt public.
+
+---
+
+## ⚠️ TROISIÈME PIÈGE DE MESURE PAYÉ — l'hôte se remplit pendant la session
+
+En fin de session, `/up` de la pile de vérification est passé de **0,051 s**
+(au début) à **0,58 – 1,27 s**. Un facteur 10 à 25. Le constat tentant était
+« la pile se dégrade à l'usage ».
+
+**C'est faux, et le témoin est immédiat** : `docker stats` rend **0,01 % de
+processeur** sur `crmverif-api`. *Il ne calcule rien.* Ce qui a changé, c'est
+l'hôte : Docker Desktop a relevé tout seul, au fil de la session, `axion-ia-postgres`
+(**20 %**), `axion-crm-caddy` (**6 %**), `bookforge-postgres`, `bookforge-redis`,
+`axion-ia-mailhog` — et 25 processus Chrome traînaient encore.
+
+**Règle à tenir** : avant d'inscrire la moindre mesure de temps, jouer
+`docker stats --no-stream`. Si le conteneur mesuré est au repos, le temps observé
+appartient à la machine, pas au produit. *Troisième fois que ce dépôt punit une
+mesure de durée prise sans témoin — après les minuteurs bridés de l'onglet
+d'arrière-plan et après le gréement dégradé.*

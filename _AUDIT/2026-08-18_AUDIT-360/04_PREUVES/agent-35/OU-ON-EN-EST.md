@@ -1144,3 +1144,75 @@ export COMPOSE_FILE="docker-compose.yml:docker-compose.prod.yml"
 docker compose up -d --no-deps postgres
 bash infra/scripts/verifier-journalisation-connexions-db.sh
 ```
+
+---
+
+# 🔴 INCIDENT DE PRODUCTION DU 2026-08-23 — J'AI CASSÉ LE CRM DIX MINUTES
+
+**Ma faute, et elle est nette.** Écrit ici parce qu'une panne qu'on ne consigne
+pas se reproduit.
+
+## Ce qui s'est passé
+
+| heure | fait |
+|---|---|
+| 17:55 | je mesure la production : `log_connections = off`, `axion-crm-postgres` **Up 6 heures** |
+| 18:09 | **le déploiement automatique passe** — il recrée postgres, le réglage s'applique **tout seul** |
+| 18:12 | je lance `docker compose up -d --no-deps postgres` **sur ma mesure de 17:55** |
+| 18:12 | l'API, l'app et horizon passent à l'état **`Created`** — recréés, jamais démarrés |
+| 18:13 | **le CRM rend 502** |
+| 18:22 | `docker compose up -d api app horizon` — **rétabli** |
+
+## La faute, nommée
+
+**J'ai agi sur une mesure périmée de dix-sept minutes.** Entre le moment où j'ai
+constaté `log_connections = off` et celui où j'ai agi, le déploiement avait tout
+fait. Mon geste était **inutile**, et il a cassé.
+
+*C'est exactement le piège que ce journal documente depuis le matin — le
+quinzième de la journée, et le premier qui coûte une panne au lieu d'un faux
+constat.*
+
+> **Règle** : avant tout geste sur la production, **remesurer l'état à l'instant
+> du geste**, jamais se fier à un relevé antérieur. Et vérifier `docker ps`
+> **avant** et **après**, pas seulement le réglage visé.
+
+## Ce qui n'a PAS été perdu
+
+| | |
+|---|---|
+| les données | **4 295 349 fiches**, intactes — vérifié avant et après |
+| le volume | jamais touché (`--no-deps` ne détruit rien) |
+| la journalisation | **on**, et elle a survécu à la panne |
+
+## ✅ Et la mesure 7 du registre EST CLOSE
+
+Vérifiée **en production**, par le script écrit pour ça :
+
+```
+✅ log_connections        = on
+✅ log_disconnections     = on
+✅ log_line_prefix        porte %h  →  « %m [%p] %q%u@%d de %h »
+```
+
+Et le journal enregistre réellement :
+`connection received: host=[local]` · `disconnection: session time: 0:00:00.001`.
+
+**Le prochain incident sera analysable.** C'est ce que le registre demandait
+depuis le 19 août.
+
+## ⚠️ DÉCOUVERTE : 19 gardes lisent les documents d'audit
+
+En préparant le retrait de `_AUDIT/` et `_REPORTS/`, la CI de la PR #206 a rougi :
+**19 fichiers de test lisent ces documents**, dont des protections produit
+réelles (contournement de captcha, Telescope désactivé par défaut).
+
+**14 chemins distincts** sont réellement lus, dont
+`_REPORTS/REGISTRE-DES-VIOLATIONS-DE-DONNEES.md` lui-même — gardé pour rester
+honnête.
+
+*Retirer les 104 fichiers casserait 19 gardes pour protéger des documents qui
+décrivent, pour l'essentiel, des failles désormais corrigées.* La PR #206 est
+donc à reprendre **en chirurgical** : ne sortir que les quatre pièces vraiment
+sensibles — registre des violations, brouillon CNIL, AIPD, état du pare-feu —
+et adapter les gardes qui les lisent.

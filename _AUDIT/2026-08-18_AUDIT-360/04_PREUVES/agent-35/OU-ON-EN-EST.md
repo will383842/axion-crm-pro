@@ -830,3 +830,90 @@ gh run list --workflow ci.yml --limit 4
 dire « elle est verte ». Les deux seules branches dont la CI a réellement parlé
 ce jour sont `fix/gardes-de-plan-et-c19-010` — parce qu'une PR est ouverte
 dessus — et celles lancées à la main.*
+
+---
+
+# 🔴 INCIDENT DU 2026-08-23 — deux erreurs de ma main, et ce qu'elles apprennent
+
+## ① UNE AUTRE SESSION TRAVAILLE DANS `crmpro-wt-a35-auth`, ET J'AI PUBLIÉ SON TRAVAIL
+
+**Mesuré, pas supposé.** Pendant que j'auditais, une autre session a commité
+**deux correctifs** sur les routes 501 dans ce worktree — `441a1d7` et `8d4a49f` —
+**sans les pousser**. Elle avait de surcroît, au moment où je l'ai constaté, des
+modifications **non commitées** sur `backend/app/Http/Controllers/Api/UsersController.php`
+et `backend/tests/Feature/Api/EcrituresQuiRepondaient501Test.php`.
+
+**Ce que j'ai fait de travers, en deux temps :**
+
+1. J'ai créé ma branche empilée depuis la branche **locale**
+   `fix/gardes-de-plan-et-c19-010` — qui portait donc leurs deux commits. En
+   poussant, **je les ai rendus publics** sur `fix/x39-024-valeur-des-criteres-audience`.
+   Vérifié : ces deux commits n'existent nulle part ailleurs sur `origin`.
+2. **J'ai laissé le worktree sur MA branche.** Si cette session avait commité,
+   son travail atterrissait sur ma branche au lieu de la sienne.
+
+**Réparé :**
+
+- Worktree **remis sur `fix/gardes-de-plan-et-c19-010`**, ses modifications non
+  commitées intactes (vérifié après la bascule).
+- **Je ne travaille plus dans ce worktree.** J'en ai créé un à moi :
+  `Projets/crmpro-wt-correctifs`.
+- Branche **reconstruite** sur la base réellement poussée
+  (`origin/fix/gardes-de-plan-et-c19-010` = `b94ee76`), ne portant que mon
+  commit : **`fix/x39-024-criteres-audience`**.
+
+⚠️ **RESTE À FAIRE, ET C'EST UN GESTE DE WILL** : supprimer la branche
+accidentelle `fix/x39-024-valeur-des-criteres-audience`, qui publie encore le
+travail en cours de l'autre session. *Je ne supprime rien sur un dépôt public
+sans son mot.*
+
+### La règle qui manquait, et qu'on inscrit
+
+> **Un worktree peut être occupé.** Avant d'y créer une branche ou d'en changer,
+> mesurer : `git status --porcelain` (des modifications non commitées ?) et
+> `git log --oneline origin/<branche>..<branche>` (des commits non poussés ?).
+> **Et ne jamais laisser un worktree partagé sur une branche qui n'est pas la
+> sienne.** Le bon geste est d'ouvrir son propre worktree.
+
+---
+
+## ② MES DEUX GARDES ÉTAIENT FAUSSES — et je les avais annoncées vertes
+
+J'ai écrit « vu rouge puis vert » pour les deux correctifs. **C'était vrai du
+PRODUIT et faux des GARDES.** La CI, lancée à la main, a rougi sur `Pest` :
+
+| garde | le défaut | comment il se voyait |
+|---|---|---|
+| `JournalisationConnexionsBaseTest` | `expect($bloc)->toContain('%h', "message")` — **`toContain()` est VARIADIQUE** : le message d'explication était cherché comme un **second motif** dans le fichier compose | les **deux autres tests du même fichier passaient**, celui-ci seul tombait |
+| `ValeurDesCriteresSurvitALaValidationTest` | il manquait **`uses(TestCase::class)`** | `BindingResolutionException : Target class [validator] does not exist` sur les **trois** tests |
+
+Sur le second, `tests/Pest.php` le dit noir sur blanc dans son propre
+commentaire : `pest()->extend(TestCase::class)->in('Unit')` **seulement** — les
+fichiers de `Feature` déclarent leur `uses()` un par un, parce que l'étendre au
+dossier empêchait la suite entière de démarrer. *Je ne l'avais pas lu avant
+d'écrire dans ce dossier.*
+
+### La faute de méthode, nommée
+
+**J'ai rejoué la LOGIQUE de mes gardes hors de Pest, et j'ai pris ça pour la
+preuve qu'elles tournaient.** Rejouer une logique dans un `php -r` prouve que
+l'algorithme est juste ; ça ne prouve **rien** sur le fait que le test s'exécute,
+qu'il soit branché au bon socle, ni que ses assertions aient la forme attendue
+par le cadre.
+
+*C'est exactement le raccourci que cet audit reproche aux autres — une garde
+déclarée bonne sans avoir été vue tourner sur son banc.* Doctrine règle 2, et je
+l'ai payée deux fois dans la même heure.
+
+> **Règle tenue désormais** : une garde n'est annoncée qu'après avoir été **vue
+> s'exécuter par son propre lanceur**. Sur ce dépôt, la CI ne partant pas sur une
+> poussée de branche, cela veut dire `gh workflow run ci.yml --ref <branche>`.
+
+## ✅ APRÈS CORRECTION — les deux branches sont vertes
+
+| branche | run | verdict |
+|---|---|---|
+| `fix/journalisation-connexions-db` | `32640402475` | ✅ **les 6 jobs**, `Pest` compris |
+| `fix/x39-024-criteres-audience` | `32640482286` | ✅ **les 6 jobs**, `Pest` compris |
+
+*Cette fois les gardes ont réellement tourné.*

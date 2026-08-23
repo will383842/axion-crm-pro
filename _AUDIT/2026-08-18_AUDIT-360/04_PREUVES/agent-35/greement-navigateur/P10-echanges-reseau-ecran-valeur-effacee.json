@@ -1,0 +1,32 @@
+[
+  {
+    "sens": "ENVOYÉ  ",
+    "url": "/audiences/preview",
+    "corps": "{\"criteria\":{\"all\":[{\"field\":\"prospection_status\",\"op\":\"in\",\"value\":[\"ready_for_outreach\"]}]}}"
+  },
+  {
+    "sens": "REÇU    ",
+    "url": "/audiences/preview",
+    "corps": "{\"companies\":0,\"contacts\":0}"
+  },
+  {
+    "sens": "ENVOYÉ  ",
+    "url": "/audiences/preview",
+    "corps": "{\"criteria\":{\"all\":[{\"field\":\"sector_main\",\"op\":\"in\",\"value\":[\"it_saas\"]},{\"field\":\"prospection_status\",\"op\":\"in\",\"value\":[\"ready_for_outreach\"]}]}}"
+  },
+  {
+    "sens": "REÇU    ",
+    "url": "/audiences/preview",
+    "corps": "{\"companies\":0,\"contacts\":0}"
+  },
+  {
+    "sens": "ENVOYÉ  ",
+    "url": "/audiences",
+    "corps": "{\"name\":\"P10 batie a l ecran\",\"criteria\":{\"all\":[{\"field\":\"sector_main\",\"op\":\"in\",\"value\":[\"it_saas\"]},{\"field\":\"prospection_status\",\"op\":\"in\",\"value\":[\"ready_for_outreach\"]}]},\"is_active\":true,\"auto_refresh\":false}"
+  },
+  {
+    "sens": "REÇU    ",
+    "url": "/audiences",
+    "corps": "{\"data\":{\"id\":4,\"workspace_id\":\"e43437b9-559f-4a35-afc9-4ef0cb2640f6\",\"name\":\"P10 batie a l ecran\",\"description\":null,\"criteria\":{\"all\":[{\"op\":\"in\",\"field\":\"sector_main\"},{\"op\":\"in\",\"field\":\"prospection_status\"}]},\"is_active\":true,\"auto_refresh\":false,\"member_count\":0,\"refreshed_at\":null,\"created_by\":\"89eb1cdb-18e2-4f72-81d0-c4fb04244fde\",\"created_at\":\"2026-08-23T13:20:15+02:00\",\"updated_at\":\"2026"
+  }
+]

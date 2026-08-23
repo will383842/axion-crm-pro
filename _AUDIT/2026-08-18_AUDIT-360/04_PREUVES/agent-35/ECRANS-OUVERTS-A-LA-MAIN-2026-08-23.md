@@ -912,3 +912,155 @@ l'hôte : Docker Desktop a relevé tout seul, au fil de la session, `axion-ia-po
 appartient à la machine, pas au produit. *Troisième fois que ce dépôt punit une
 mesure de durée prise sans témoin — après les minuteurs bridés de l'onglet
 d'arrière-plan et après le gréement dégradé.*
+
+---
+
+# LES PARCOURS DU §11 — passe du 2026-08-23
+
+> Exigence n° 3 du §12, seconde moitié : *« chaque écran ouvert à la main,
+> **chaque bouton essayé** »*, plus les 21 parcours nommés au §11.
+> Les écrans sont faits ; voici les parcours.
+
+## Parcours 10 — Audiences · 🔴 **`X39-024` (S0)**
+
+> *Énoncé du mandat : « construire avec `neq` **et** `not_in` sur un champ vide,
+> comparer l'aperçu au décompte réel, rafraîchir, lister les membres ».*
+
+### 🔴 `X39-024` — l'audience enregistrée n'est PAS celle que l'aperçu a montrée
+
+**La valeur de chaque critère est effacée à l'enregistrement.** Silencieusement,
+sans erreur, sans avertissement — et l'écran affiche pourtant le bon nombre juste
+avant.
+
+#### Le geste réel, joué sur l'écran
+
+`/audiences/new`, un nom, puis un clic sur la puce **« IT / SaaS »**. Ce que
+l'écran a envoyé, capté sur le réseau :
+
+```json
+POST /api/v1/audiences
+{"name":"P10 batie a l ecran","criteria":{"all":[
+   {"field":"sector_main","op":"in","value":["it_saas"]},
+   {"field":"prospection_status","op":"in","value":["ready_for_outreach"]}]}}
+```
+
+Ce que le serveur a **répondu**, dans la même seconde :
+
+```json
+{"criteria":{"all":[{"op":"in","field":"sector_main"},
+                    {"op":"in","field":"prospection_status"}]}}
+```
+
+**Les deux `value` ont disparu.** Ce n'est pas mon `curl` : c'est l'écran du
+produit, et c'est la réponse du serveur qui le montre.
+
+#### Aperçu contre réalité, mesuré trois fois
+
+| critère demandé | ce que l'**aperçu** annonce | ce que l'audience **contient** |
+|---|---|---|
+| `in` · secteur = IT/SaaS | **2 entreprises** | **0 — personne** |
+| `neq` · secteur ≠ BTP | **3 entreprises** | **4 — l'espace de travail ENTIER**, BTP compris |
+| `eq` · secteur = BTP | **1 entreprise** (la fiche BTP) | **1 — mais c'est la fiche SANS SECTEUR** |
+
+*Le troisième cas est le plus traître : **le compte est juste, la fiche est
+fausse**. Rien à l'écran ne peut alerter.*
+
+Membres réellement inscrits, relevés en base :
+
+```
+audience « neq btp »  -> 552100554 it_saas · 111111111 it_saas
+                         222222222 btp     · 333333333 (NULL)      = les 4
+audience « eq btp »   -> 333333333 (NULL)                          = la mauvaise
+```
+
+⚠️ **`in` est l'opérateur de CINQ des huit critères de l'écran** — départements,
+régions, tailles, secteurs, statuts (`AudienceBuilderPage.tsx:128-132`). *Le cas
+le plus courant est donc : l'utilisateur compose un segment, lit « 2 entreprises »,
+enregistre, et l'audience est **vide**.*
+
+#### La cause, lue à la source
+
+Deux chemins, deux lectures du même corps de requête :
+
+| | ce qu'il lit | résultat |
+|---|---|---|
+| `AudiencesController::preview()` **:145-147** | `$request->input('criteria')` — **l'entrée BRUTE** | ✅ correct |
+| `AudiencesController::store()` **:55** | `$request->validated()` | ❌ **mutilé** |
+
+`validated()` ne rend **que** les clés couvertes par une règle. Or
+`StoreEmailAudienceRequest.php:28-33` déclare `criteria.all.*.field` et
+`criteria.all.*.op` — pour les trois blocs — **et jamais `criteria.*.value`.**
+
+*L'aperçu est honnête. C'est l'enregistrement qui ment.*
+
+#### ✅ Le chemin de MODIFICATION, lui, est correct — et c'est le contournement
+
+`AudiencesController::update()` **:100-104** valide `criteria` **en bloc**
+(`['sometimes','required','array']`), sans règles imbriquées : `validate()` rend
+donc le tableau entier, valeurs comprises. Mesuré sur la même audience :
+
+| geste | critère enregistré | membre obtenu |
+|---|---|---|
+| création | `{op:"eq", field:"sector_main"}` | Fiche **SANS secteur** ❌ |
+| **modification**, même charge utile | `{op:"eq", field:"sector_main", value:"btp"}` | Fiche **secteur BTP** ✅ |
+
+*Deux gestes sur le même objet, deux comportements.* **Contournement immédiat
+pour l'utilisateur** : après avoir créé une audience, la rouvrir et l'enregistrer
+une seconde fois — la modification répare ce que la création a cassé.
+
+#### Ce constat ÉTEND `D26-001`, il ne le réinvente pas
+
+*Doctrine règle 8.* L'agent 26 avait nommé la cause :
+`11_GRILLES/agent-26_formulaires.md:43` — *« `StoreEmailAudienceRequest`
+(champ/op) — **`value` jamais validée** »* — et son correctif dit déjà
+« Ajouter `criteria.*.value` aux règles ». **Statut : ouvert.**
+
+Ce que la présente mesure ajoute, et qui change la sévérité :
+
+1. `D26-001` décrit un critère **mal formé** qui élargit l'audience. Ici l'entrée
+   est **parfaitement bien formée** — c'est le produit qui la mutile.
+2. `D26-001` dit que « l'aperçu affiche le compte du workspace entier ». La
+   mesure montre l'**inverse** : l'aperçu est **juste**, c'est l'audience
+   enregistrée qui est fausse. *Le chiffre sur lequel l'utilisateur décide
+   d'envoyer n'est pas celui qu'il obtiendra.*
+3. Le mode de défaillance **dépend de l'opérateur** — personne, tout le monde, ou
+   les mauvaises fiches. Aucun des trois n'est annoncé.
+
+**Ce service décide à qui part un courriel.** Une audience « BTP » qui contient
+tout l'espace de travail est un envoi de masse non voulu ; une audience vide est
+une campagne qui ne part pas.
+
+#### Correctif proposé — non appliqué
+
+Trois lignes dans `StoreEmailAudienceRequest`, une par bloc :
+`'criteria.all.*.value' => ['sometimes']`, idem `any` et `not`. Une règle
+`sometimes` sans contrainte suffit à faire **survivre** la clé à `validated()`.
+*Et faire valider `preview` par la même règle que `store`, pour que les deux
+chemins ne puissent plus diverger.*
+
+⚠️ **Non appliqué : `AudienceBuilderService` est au cœur des 91 correctifs de la
+PR #194, verte et en attente de fusion.** Y toucher maintenant rouvrirait sa CI.
+*À poser juste après la fusion.*
+
+---
+
+## ✅ CE QUI A ÉTÉ VÉRIFIÉ ET QUI N'EST **PAS** UN DÉFAUT
+
+Le mandat soupçonnait la sémantique du **champ vide**. Elle est **juste**.
+
+Sur 4 fiches — 2 en `it_saas`, 1 en `btp`, **1 à NULL** — les aperçus rendent :
+
+| critère | rendu | attendu si NULL est bien traité |
+|---|---|---|
+| `neq` secteur ≠ btp | **3** | 3 ✅ (les 2 IT **plus** la NULL) |
+| `not_in` secteur ∉ [btp] | **3** | 3 ✅ |
+| `not(neq)` — le complément | **1** | 1 ✅ |
+
+**3 + 1 = 4 = le total.** Le complément partitionne exactement : les deux
+évaluateurs s'accordent, et la fiche à NULL n'est perdue par aucun des deux.
+
+Recoupé dans le code : `AudienceBuilderService.php:591` et `:595` posent
+explicitement `->orWhereNull($field)` sur `neq` et `not_in`, et la constante
+`NULL_SENSITIVE_OPS` (`:472`) les exclut à dessein, avec la démonstration écrite
+au-dessus. *Le piège que le mandat nommait a bien été fermé — c'est un autre qui
+était ouvert, en amont, dans la validation.*

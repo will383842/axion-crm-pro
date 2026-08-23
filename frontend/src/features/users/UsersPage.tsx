@@ -117,14 +117,31 @@ export function UsersPage() {
       <PageHeader
         title="Utilisateurs"
         subtitle="4 rôles RBAC : owner / admin / operator / viewer (Spatie Permission teams)."
+        // 🔴 X39-028 — le bouton disparait quand le serveur a REFUSE la vue.
+        //
+        // Mesure du 2026-08-23 : un compte `viewer` lisait « Vous n'avez pas
+        // les droits sur cette vue » et se voyait offrir, juste au-dessus,
+        // « Inviter un utilisateur ». Un compte qui ne peut meme pas consulter
+        // la liste des membres etait invite a en recruter — et le POST qui
+        // aurait suivi serait reparti en 403.
+        //
+        // On se branche sur `echec`, deja calcule ligne 113 pour le corps de la
+        // page : le bandeau et l'action disent enfin la meme chose.
+        //
+        // ⚠️ Ce n'est PAS une garde de droits. L'interface ne consulte toujours
+        // aucune permission (constat D22-006, ouvert) : elle se contente de ne
+        // plus proposer une action apres que le serveur a refuse la lecture.
+        // La vraie garde est cote serveur, et c'est elle qui protege.
         actions={
-          <Button
-            variant="primary"
-            iconLeft={<UserPlus className="h-3.5 w-3.5" />}
-            onClick={() => setOpen(true)}
-          >
-            Inviter un utilisateur
-          </Button>
+          echec ? null : (
+            <Button
+              variant="primary"
+              iconLeft={<UserPlus className="h-3.5 w-3.5" />}
+              onClick={() => setOpen(true)}
+            >
+              Inviter un utilisateur
+            </Button>
+          )
         }
       />
 

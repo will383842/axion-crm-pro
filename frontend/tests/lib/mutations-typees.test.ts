@@ -204,7 +204,13 @@ describe('H46-008 — toute mutation dont on lit le corps declare sa forme', () 
       // existe, alors que `POST /users` (`UsersController::store`) est cable
       // depuis le 2026-08-23 et rend `201 { data: <compte> }` — forme lue dans
       // le controleur, pas supposee.
-      ['features/users/UsersPage.tsx', 'api.post<{ data: UserRow }>'],
+      //
+      // 2026-08-24, second passage : le generique porte desormais AUSSI
+      // `invitation_envoyee`. Ce n'est pas un ornement — c'est le seul moyen
+      // pour l'ecran de savoir si le courriel est parti, `MOCK_MODE` et
+      // `MAIL_MAILER` etant des reglages serveur qu'il ne voit pas. Le figer ici
+      // empeche qu'on le retire en croyant simplifier.
+      ['features/users/UsersPage.tsx', 'api.post<{ data: UserRow; invitation_envoyee: boolean }>'],
       // 🔴 X39-034, 2026-08-24 — le second `unknown` tombe, pour la meme raison
       // que le premier et par la meme consigne. `WorkspaceController::update()`
       // ne rend PLUS 501 depuis le 2026-08-23 : il ecrit reellement, et rend

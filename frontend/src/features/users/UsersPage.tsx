@@ -89,25 +89,35 @@ export function UsersPage() {
     // repondrait 422. D'ou le champ ajoute au formulaire.
     mutationFn: async () =>
       (
-        await api.post<{ data: UserRow }>('/users', {
+        await api.post<{ data: UserRow; invitation_envoyee: boolean }>('/users', {
           email: inviteEmail,
           name: inviteName,
           role: inviteRole,
         })
       ).data,
-    onSuccess: () => {
+    onSuccess: (reponse) => {
       // 🔴 D25-001, meme ecran — « l'ecran d'administration ou le mensonge
-      // coutait le plus cher ». Ce toast disait « Invitation envoyee ». AUCUN
-      // courriel ne part : `UsersController::store` l'ecrit noir sur blanc
-      // (« CE QUE CETTE ROUTE NE FAIT PAS [...] aucun courriel ne part »), et
-      // `MAIL_MAILER` reste `log` par decision du cahier des charges §9.0.
+      // coutait le plus cher ».
       //
-      // Annoncer un envoi qui n'a pas lieu laisse l'administrateur attendre, et
-      // la personne invitee ignorer qu'un compte l'attend. On dit donc ce qui
-      // s'est reellement passe : le compte existe, et il faut prevenir a la
-      // main. Le compte est cree SANS mot de passe — la personne s'en donne un
-      // par le parcours de reinitialisation.
-      toast.success('Compte créé — prévenez la personne : aucun e-mail n’est envoyé');
+      // Ce toast a dit successivement DEUX choses fausses, et pour la meme
+      // raison : il affirmait a la place du serveur. D'abord « Invitation
+      // envoyee », alors que rien ne partait. Puis, apres correction, « aucun
+      // e-mail n'est envoye » — vrai ce jour-la, faux des que le SMTP a ete
+      // branche.
+      //
+      // L'ecran NE PEUT PAS SAVOIR : `MOCK_MODE` et `MAIL_MAILER` sont des
+      // reglages serveur, invisibles d'ici. La seule sortie honnete est de
+      // RELAYER ce que le serveur rapporte, jamais de le deviner. D'ou
+      // `invitation_envoyee`, calcule par `UsersController::remettreInvitation()`
+      // d'apres ce qui s'est REELLEMENT passe — envoi reussi, mode maquette, ou
+      // transport en echec.
+      if (reponse.invitation_envoyee) {
+        toast.success('Compte créé — l’invitation vient de partir par e-mail');
+      } else {
+        toast.success(
+          'Compte créé — aucun e-mail n’est parti : prévenez la personne, elle se connectera via « mot de passe oublié »',
+        );
+      }
       setOpen(false);
       setInviteEmail('');
       setInviteName('');
@@ -260,12 +270,17 @@ export function UsersPage() {
         open={open}
         onClose={() => setOpen(false)}
         title="Inviter un utilisateur"
-        // 🔴 X39-027 / D25-001 — cette phrase annoncait « Un email d'invitation
-        // sera envoye ». Il ne part aucun courriel : `MAIL_MAILER` reste `log`
-        // par decision du cahier des charges §9.0, et `UsersController::store`
-        // le dit explicitement. L'ecran annoncait donc une remise qui n'a pas
-        // lieu — le motif exact que D25-001 a coute cher a apprendre ici meme.
-        description="Le compte est créé immédiatement, sans mot de passe. Aucun e-mail n’est envoyé : prévenez la personne, elle se connectera via « mot de passe oublié »."
+        // 🔴 X39-027 / D25-001 — cette phrase a annonce, tour a tour, un envoi
+        // qui n'avait pas lieu (« Un email d'invitation sera envoye ») puis une
+        // absence d'envoi qui a cesse d'etre vraie (« Aucun e-mail n'est
+        // envoye »). Les deux affirmaient AVANT d'agir, sur un reglage que
+        // l'ecran ne voit pas.
+        //
+        // Elle ne dit donc plus que ce qui est vrai dans TOUS les cas : le
+        // compte naît sans mot de passe. Ce qui est arrive au courriel est
+        // annonce APRES coup, par le message de succes, d'apres le drapeau
+        // `invitation_envoyee` que rend le serveur.
+        description="Le compte est créé immédiatement, sans mot de passe. La personne reçoit un lien pour en choisir un — et vous saurez, juste après, s’il est réellement parti."
         footer={
           <>
             <Button variant="secondary" onClick={() => setOpen(false)}>

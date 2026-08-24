@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ShieldCheck, ShieldOff, UserMinus, UserPlus, Users as UsersIcon } from 'lucide-react';
 import {
@@ -41,7 +41,61 @@ const ROLE_OPTIONS = [
 // appelait — meme motif que le lien de mot de passe (X39-037) et que le bouton
 // d'invitation (X39-027) : le serveur savait faire, la console ne demandait
 // jamais.
-const GRID = 'minmax(200px,1.2fr) minmax(200px,1.4fr) minmax(150px,1fr) 130px 170px 210px';
+//
+// 🔴 X39-039 — ET CETTE COLONNE A FAIT DEBORDER LE TABLEAU.
+//
+// Signale par Will : « il y a comme un curseur pour aller de gauche a droite,
+// ca depasse de l'ecran ». Mesure : les minima valaient
+// 200+200+150+130+170+210 = 1060 px, plus 5 gouttieres de 12 et 2 rembourrages
+// de 16, soit 1152 px imposes. Sur un portable de 1366 px, la barre laterale et
+// les marges laissent environ 1050 px : le tableau debordait de 100 px.
+//
+// `TableScroll` (D30-002) rendait ce debordement ATTEIGNABLE — sans lui les
+// colonnes de droite auraient ete coupees en silence. Mais rendre un
+// debordement navigable n'est pas la meme chose que ne pas deborder.
+//
+// DEUX GABARITS PLUTOT QU'UN. Au large, les six colonnes. A l'etroit, on retire
+// les deux qui informent sans servir a agir — « 2FA » et « Derniere connexion »
+// — et le tableau tient sans defilement. On ne retire JAMAIS la colonne
+// d'actions : c'est celle qui permet de faire quelque chose, et le constat
+// D30-002 raconte precisement ce que coute une colonne d'actions hors d'atteinte.
+export const GRID_COMPLET =
+  'minmax(140px,1.3fr) minmax(160px,1.5fr) minmax(100px,0.9fr) 100px 130px 175px';
+
+/** Sans « 2FA » ni « Derniere connexion » : 593 px imposes au lieu de 897. */
+export const GRID_COMPACT = 'minmax(120px,1.3fr) minmax(150px,1.5fr) minmax(90px,0.8fr) 165px';
+
+/** Au-dessus de cette largeur de FENETRE, les six colonnes tiennent. */
+const SEUIL_LARGE_PX = 1180;
+
+/**
+ * Vrai quand la fenetre est assez large pour les six colonnes.
+ *
+ * ⚠️ `matchMedia` et non `window.innerWidth` : la largeur seule obligerait a
+ * ecouter `resize` et a re-rendre a chaque pixel. Une media query ne notifie
+ * qu'au FRANCHISSEMENT du seuil.
+ *
+ * Dans le banc, `tests/setup.ts` fournit un `matchMedia` qui rend toujours
+ * `matches: false` — les tests voient donc le mode LARGE par defaut de ce hook
+ * (`useState(true)` avant montage, puis la valeur mesuree). Le premier rendu
+ * montre les six colonnes, ce que les gardes existantes attendent.
+ */
+function useFenetreLarge(): boolean {
+  const [large, setLarge] = useState(true);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+
+    const mq = window.matchMedia(`(min-width: ${SEUIL_LARGE_PX}px)`);
+    const appliquer = () => setLarge(mq.matches);
+    appliquer();
+    mq.addEventListener('change', appliquer);
+
+    return () => mq.removeEventListener('change', appliquer);
+  }, []);
+
+  return large;
+}
 
 function roleToneFor(role: string) {
   if (role === 'owner') return 'danger';
@@ -66,6 +120,8 @@ interface MoiReponse {
 
 export function UsersPage() {
   const qc = useQueryClient();
+  const large = useFenetreLarge();
+  const GRID = large ? GRID_COMPLET : GRID_COMPACT;
 
   // 🔑 QUI SUIS-JE — pour ne pas me proposer de fermer mon propre compte.
   // Le serveur refuse deja ce geste (`destroy()` : « On ne ferme pas son propre
@@ -268,8 +324,8 @@ export function UsersPage() {
             <div>Utilisateur</div>
             <div>Email</div>
             <div>Rôles</div>
-            <div>2FA</div>
-            <div>Dernière connexion</div>
+            {large ? <div>2FA</div> : null}
+            {large ? <div>Dernière connexion</div> : null}
             <div>Actions</div>
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -298,22 +354,26 @@ export function UsersPage() {
                     ))
                   )}
                 </div>
-                <div>
-                  {u.totp_enabled_at ? (
-                    <StatusPill tone="success">
-                      <ShieldCheck className="-ml-0.5 mr-0.5 h-3 w-3" /> Activé
-                    </StatusPill>
-                  ) : (
-                    <StatusPill tone="warning">
-                      <ShieldOff className="-ml-0.5 mr-0.5 h-3 w-3" /> Non activé
-                    </StatusPill>
-                  )}
-                </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">
-                  {u.last_login_at
-                    ? new Date(u.last_login_at).toLocaleString('fr-FR')
-                    : 'Jamais'}
-                </div>
+                {large ? (
+                  <div>
+                    {u.totp_enabled_at ? (
+                      <StatusPill tone="success">
+                        <ShieldCheck className="-ml-0.5 mr-0.5 h-3 w-3" /> Activé
+                      </StatusPill>
+                    ) : (
+                      <StatusPill tone="warning">
+                        <ShieldOff className="-ml-0.5 mr-0.5 h-3 w-3" /> Non activé
+                      </StatusPill>
+                    )}
+                  </div>
+                ) : null}
+                {large ? (
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                    {u.last_login_at
+                      ? new Date(u.last_login_at).toLocaleString('fr-FR')
+                      : 'Jamais'}
+                  </div>
+                ) : null}
                 {/* 🔑 SON PROPRE COMPTE N'EST PAS REGLABLE ICI, et c'est le
                     serveur qui a raison le premier : `destroy()` refuse de
                     fermer le compte de l'appelant, parce qu'un dernier

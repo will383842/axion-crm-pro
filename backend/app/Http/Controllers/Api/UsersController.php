@@ -273,7 +273,7 @@ class UsersController extends ApiController
                 . "« mot de passe oublié » depuis l'écran de connexion.\n",
                 function ($m) use ($compte) {
                     $m->to($compte->email)->subject('Votre accès à Axion CRM Pro');
-                }
+                },
             );
 
             return true;

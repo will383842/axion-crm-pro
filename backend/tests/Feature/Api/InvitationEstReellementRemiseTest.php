@@ -104,14 +104,14 @@ it('ecrit un jeton de definition de mot de passe, et n en garde que le CONDENSAT
 
     expect($ligne)->not->toBeNull(
         'Sans jeton, le compte cree est INACCESSIBLE : il naît sans mot de passe, '
-        . 'et rien ne permet a la personne de s en donner un.'
+        . 'et rien ne permet a la personne de s en donner un.',
     );
 
     // 64 caracteres aleatoires condenses en SHA-256 : 64 caracteres hexadecimaux.
     expect($ligne->token)->toMatch(
         '/^[0-9a-f]{64}$/',
         'Le jeton doit etre stocke CONDENSE. En clair, un administrateur qui lit '
-        . 'la table peut prendre le compte qu il vient de creer.'
+        . 'la table peut prendre le compte qu il vient de creer.',
     );
 });
 
@@ -167,6 +167,6 @@ it('un transport en ECHEC ne defait pas la creation — le compte reste, le drap
 
     expect(User::where('email', $email)->exists())->toBeTrue(
         'Le compte doit SURVIVRE a l echec d envoi. Sinon l adresse reste prise '
-        . 'par une creation invisible, et personne ne peut la recreer.'
+        . 'par une creation invisible, et personne ne peut la recreer.',
     );
 });

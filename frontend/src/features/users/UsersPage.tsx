@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ShieldCheck, ShieldOff, UserPlus, Users as UsersIcon } from 'lucide-react';
+import { ShieldCheck, ShieldOff, UserMinus, UserPlus, Users as UsersIcon } from 'lucide-react';
 import {
   Avatar,
   Button,
@@ -36,7 +36,12 @@ const ROLE_OPTIONS = [
   { value: 'owner', label: 'Propriétaire (owner)' },
 ];
 
-const GRID = 'minmax(220px,1.4fr) minmax(220px,1.6fr) minmax(160px,1fr) 140px 200px';
+// 🔴 X39-038 — SIXIEME COLONNE : les actions. Les routes `PUT /users/{user}` et
+// `DELETE /users/{user}` existaient depuis le 2026-08-23 et AUCUN ecran ne les
+// appelait — meme motif que le lien de mot de passe (X39-037) et que le bouton
+// d'invitation (X39-027) : le serveur savait faire, la console ne demandait
+// jamais.
+const GRID = 'minmax(200px,1.2fr) minmax(200px,1.4fr) minmax(150px,1fr) 130px 170px 210px';
 
 function roleToneFor(role: string) {
   if (role === 'owner') return 'danger';
@@ -55,12 +60,28 @@ function roleLabelFor(role: string): string {
   return map[role.toLowerCase()] ?? role;
 }
 
+interface MoiReponse {
+  user: { id: string; name: string; email: string };
+}
+
 export function UsersPage() {
   const qc = useQueryClient();
+
+  // 🔑 QUI SUIS-JE — pour ne pas me proposer de fermer mon propre compte.
+  // Le serveur refuse deja ce geste (`destroy()` : « On ne ferme pas son propre
+  // compte »), et c'est LUI qui protege. L'ecran ne fait que cesser d'offrir une
+  // action vouee au refus : proposer un bouton qui repond toujours non, c'est le
+  // motif D25-001 sur lequel cet ecran s'est deja blesse.
+  const { data: moi } = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: async () => (await api.get<MoiReponse>('/auth/me')).data,
+  });
   const [open, setOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
   const [inviteRole, setInviteRole] = useState('operator');
+  // La confirmation de fermeture : on ne ferme jamais un compte sur un seul clic.
+  const [aFermer, setAFermer] = useState<UserRow | null>(null);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['users'],
@@ -125,6 +146,39 @@ export function UsersPage() {
       qc.invalidateQueries({ queryKey: ['users'] });
     },
     onError: () => toast.error('Impossible de créer le compte'),
+  });
+
+  // 🔑 CHANGER LE ROLE. `PUT /users/{user}` accepte `name`, `locale`, `timezone`
+  // et `role` — jamais `email`, qui est l'identifiant de connexion (le
+  // controleur explique pourquoi : le changer sans confirmation des deux cotes
+  // revient a prendre le compte).
+  //
+  // ⚠️ Le verrou optimiste du serveur est OPTIONNEL : sans `If-Match`, il ne
+  // rend pas 409. On ne l'envoie donc pas ici — le jour ou deux responsables
+  // regleront les memes roles en meme temps, il faudra le poser, et le
+  // commentaire de `VerrouOptimiste` dit comment.
+  const roleMut = useMutation({
+    mutationFn: async (params: { id: string; role: string }) =>
+      (await api.put<{ data: UserRow }>(`/users/${params.id}`, { role: params.role })).data,
+    onSuccess: () => {
+      toast.success('Rôle mis à jour');
+      void qc.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: () => toast.error('Impossible de changer le rôle'),
+  });
+
+  // 🔑 FERMER UN COMPTE. Le serveur REVOQUE l'appartenance (`revoked_at`) et
+  // supprime en douceur : rien n'est efface, la trace de qui est passe reste.
+  // D'ou « Fermer » et non « Supprimer » — le mot doit dire ce qui se passe.
+  const fermerMut = useMutation({
+    mutationFn: async (id: string) =>
+      (await api.delete<{ closed: string }>(`/users/${id}`)).data,
+    onSuccess: () => {
+      toast.success('Compte fermé');
+      setAFermer(null);
+      void qc.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: () => toast.error('Impossible de fermer ce compte'),
   });
 
   const rows = data?.data ?? [];
@@ -216,6 +270,7 @@ export function UsersPage() {
             <div>Rôles</div>
             <div>2FA</div>
             <div>Dernière connexion</div>
+            <div>Actions</div>
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {rows.map((u) => (
@@ -258,6 +313,40 @@ export function UsersPage() {
                   {u.last_login_at
                     ? new Date(u.last_login_at).toLocaleString('fr-FR')
                     : 'Jamais'}
+                </div>
+                {/* 🔑 SON PROPRE COMPTE N'EST PAS REGLABLE ICI, et c'est le
+                    serveur qui a raison le premier : `destroy()` refuse de
+                    fermer le compte de l'appelant, parce qu'un dernier
+                    responsable qui se verrouille dehors ne peut plus etre
+                    rouvert PAR LE PRODUIT. L'ecran cesse simplement d'offrir
+                    une action vouee au refus. */}
+                <div className="flex items-center gap-2">
+                  {moi?.user.id === u.id ? (
+                    <span className="text-xs text-slate-400">Vous</span>
+                  ) : (
+                    <>
+                      <select
+                        aria-label={`Rôle de ${u.name}`}
+                        value={(u.roles ?? [])[0] ?? 'viewer'}
+                        onChange={(e) => roleMut.mutate({ id: u.id, role: e.target.value })}
+                        disabled={roleMut.isPending}
+                        className="h-8 rounded-lg bg-white px-2 text-xs text-slate-900 ring-1 ring-slate-200 transition focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700"
+                      >
+                        {ROLE_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        variant="secondary"
+                        onClick={() => setAFermer(u)}
+                        iconLeft={<UserMinus className="h-3.5 w-3.5" />}
+                      >
+                        Fermer
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
@@ -338,6 +427,43 @@ export function UsersPage() {
             </select>
           </label>
         </div>
+      </Modal>
+
+      {/* 🔑 UNE FERMETURE NE SE FAIT PAS SUR UN CLIC. Le geste est reversible
+          cote base (`revoked_at` + suppression douce), mais il coupe l'acces a
+          quelqu'un : il merite une phrase et un second geste. */}
+      <Modal
+        open={aFermer !== null}
+        onClose={() => setAFermer(null)}
+        title="Fermer ce compte ?"
+        description={
+          aFermer
+            ? `${aFermer.name} (${aFermer.email}) n'aura plus accès à cet espace de travail.`
+            : ''
+        }
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setAFermer(null)}>
+              Annuler
+            </Button>
+            <Button
+              variant="primary"
+              loading={fermerMut.isPending}
+              onClick={() => {
+                if (aFermer) fermerMut.mutate(aFermer.id);
+              }}
+              iconLeft={<UserMinus className="h-3.5 w-3.5" />}
+            >
+              Fermer le compte
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          Son appartenance est <strong>révoquée</strong>, pas effacée : la trace de son passage
+          reste dans l'historique de l'espace. Le compte peut être recréé plus tard avec la même
+          adresse.
+        </p>
       </Modal>
     </div>
   );

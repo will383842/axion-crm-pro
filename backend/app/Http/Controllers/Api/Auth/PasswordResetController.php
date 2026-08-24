@@ -64,10 +64,42 @@ class PasswordResetController extends ApiController
             ]);
         } else {
             $link = config('app.frontend_url') . '/password-reset?token=' . $token . '&email=' . urlencode($email);
-            // Transport DEDIE a l'authentification (cf. config/mail.php).
-            Mail::mailer(config('mail.auth_mailer'))->raw("Réinitialisez votre mot de passe :\n\n{$link}\n\nValide 60 minutes.", function ($m) use ($email) {
-                $m->to($email)->subject('Réinitialisation du mot de passe — Axion CRM Pro');
-            });
+
+            // 🔴 L'ENVOI NE DOIT PAS POUVOIR CHANGER LA REPONSE.
+            //
+            // Cette route est ANTI-ENUMERATION : elle rend `sent: true` que
+            // l'adresse existe ou non, et c'est tout son interet. Sans ce
+            // try/catch, un transport en echec — SMTP injoignable, jeton
+            // ZeptoMail refuse, domaine non verifie — la faisait repondre 500.
+            // La promesse « toujours la meme reponse » tombait donc au premier
+            // incident de messagerie, et l'ecran affichait une erreur serveur
+            // pour une demande parfaitement valide.
+            try {
+                // Transport DEDIE a l'authentification (cf. config/mail.php).
+                Mail::mailer(config('mail.auth_mailer'))->raw("Réinitialisez votre mot de passe :\n\n{$link}\n\nValide 60 minutes.", function ($m) use ($email) {
+                    $m->to($email)->subject('Réinitialisation du mot de passe — Axion CRM Pro');
+                });
+
+                // 🔑 TRACE D'ENVOI — meme raison que dans
+                // `UsersController::remettreInvitation()` : le 2026-08-24, on ne
+                // savait pas repondre a « ce courriel est-il parti ? ». Les
+                // journaux ne portaient RIEN, ni succes ni echec, et il a fallu
+                // lire la base pour deviner qu'une adresse avait ete mal saisie.
+                //
+                // ⚠️ LE LIEN N'EST PAS JOURNALISE : il vaut mot de passe pendant
+                // une heure, et les journaux sont lus par plus de monde qu'une
+                // boite aux lettres. On note QUI et QUAND, jamais QUOI.
+                \Log::info('password_reset.envoye', [
+                    'email' => $email,
+                    'mailer' => config('mail.auth_mailer'),
+                ]);
+            } catch (\Throwable $e) {
+                \Log::error('password_reset.envoi_echoue', [
+                    'email' => $email,
+                    'exception' => $e->getMessage(),
+                ]);
+                report($e);
+            }
         }
 
         return $this->ok(['sent' => true]);

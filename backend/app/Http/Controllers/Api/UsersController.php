@@ -280,6 +280,22 @@ class UsersController extends ApiController
                 },
             );
 
+            // 🔑 TRACE D'ENVOI — ajoutee le 2026-08-24, apres une question a
+            // laquelle on ne savait pas repondre : « ce courriel est-il parti ? ».
+            // Ce jour-la, une invitation avait ete emise vers une adresse mal
+            // saisie ; les journaux ne portaient AUCUNE trace du jour, ni pour
+            // l'echec ni pour la reussite. Impossible de distinguer « Laravel
+            // n'a rien envoye » de « le destinataire n'existe pas ».
+            //
+            // ⚠️ LE LIEN N'EST PAS JOURNALISE, et c'est deliberé : il vaut mot
+            // de passe pendant une heure, et les journaux sont lus par plus de
+            // monde qu'une boite aux lettres. On note QUI et QUAND, jamais QUOI.
+            Log::info('invitation.envoyee', [
+                'user_id' => $compte->id,
+                'email' => $compte->email,
+                'mailer' => config('mail.auth_mailer'),
+            ]);
+
             return true;
         } catch (\Throwable $e) {
             // On journalise SANS le lien : il vaut mot de passe pendant une

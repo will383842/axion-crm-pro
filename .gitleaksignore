@@ -1,26 +1,75 @@
-# 2026-08-18 — secret TOTP d'un utilisateur de TEST LOCAL (console-locale@axion-ia.test,
-# base Docker locale, jamais en production), écrit par erreur dans le runbook au commit 4030dda.
-# Traitement : la valeur a été TOURNÉE le soir même (tinker, nouveau secret) — celle du dépôt
-# est morte — et le fichier a été caviardé (commit suivant). L'historique la porte encore ;
-# on l'ignore par empreinte, on ne réécrit pas l'histoire d'une branche partagée.
-4030dda29a98161baa79f2723f2b72db73a0e281:_REPORTS/RUNBOOK-CONSOLE-LOCALE.md:generic-api-key:249
-4030dda29a98161baa79f2723f2b72db73a0e281:_REPORTS/RUNBOOK-CONSOLE-LOCALE.md:generic-api-key:330
+# ─────────────────────────────────────────────────────────────────────────────
+# GITLEAKS — les 24 detections du scan PROGRAMME, inspectees une par une
+# le 2026-08-24.
+#
+# POURQUOI CE FICHIER EXISTE. Le scan `schedule` de `security.yml` rougit chaque
+# nuit sur 24 detections, alors que les scans de PR restent verts : ceux-la ne
+# lisent que le diff, celui-la balaie les 40 Mo d'HISTORIQUE. Vingt-deux des
+# fichiers vises n'existent meme plus dans l'arbre — ils ont ete retires, mais
+# l'historique les garde, et sur un depot PUBLIC l'historique se lit.
+#
+# ⚠️ CE FICHIER N'EST PAS UN INTERRUPTEUR. Chaque ligne ci-dessous a ete OUVERTE
+# et lue dans l'historique avant d'etre inscrite. Une empreinte ajoutee sans
+# cette lecture transformerait la garde en decoration — exactement ce que ce
+# depot refuse ailleurs. Si vous en ajoutez une, ecrivez CE QUE VOUS AVEZ VU.
+#
+# ═══ CE QUI A ETE MESURE ═══════════════════════════════════════════════════
+#
+#  20 detections : « Mock magic link (would be emailed) » pour
+#     `test@example.com` sur `app.localhost`, datees du 2026-08-19. Le mot
+#     « Mock » est DANS le message : ce sont des liens de connexion produits en
+#     mode maquette, jamais des secrets de production. Ils vivent dans des
+#     journaux de banc captures comme preuves d'audit.
+#
+#   2 detections : constantes de test PHP, explicites —
+#     `SECRET_C18 = 'secret-c18...'` et `'un-secret-...'`. Des valeurs factices
+#     nommees comme telles.
+#
+#   1 detection : `f37-001-hmac.txt`, un condensat attendu. La ligne qui le
+#     precede dit `WORKER_..._SECRET len=0 isEmpty=true` : le secret d'ou il
+#     derive est VIDE. Il ne protege rien et n'ouvre rien.
+#
+#   1 detection : NON INSCRITE ICI, ET C'EST DELIBERE. Voir plus bas.
+#
+# ═══ LA 24e — POURQUOI ELLE N'EST PAS DANS CE FICHIER ══════════════════════
+#
+# `_AUDIT/.../agent-15/02_portabilite-jeton.txt` porte un jeton d'export RGPD
+# REEL, et il etait encore VALIDE au moment de cette inspection :
+# `expires=2026-08-26T12:54:09+02:00`. La route qui le consomme,
+# `GET /rgpd/export/{token}`, n'est PAS authentifiee — c'est sa raison d'etre.
+#
+# Le contenu de cet export est quasi vide (1568 octets ; `contacts(0)`,
+# `email*(0)`, `magic*(0)`, une seule `rgpd_requests`), donc le risque est
+# faible — mais l'identite du sujet y figure, et le depot est public.
+#
+# Taire cette detection-la pendant que le jeton vit reviendrait a eteindre
+# l'alarme sur le seul cas ou elle a raison. Elle rougira donc jusqu'a ce que le
+# jeton soit REVOQUE cote serveur (effacer `export_token` / avancer
+# `export_expires_at` sur la ligne `rgpd_requests` concernee, ou supprimer
+# `gdpr-exports/<jeton>.enc`). Une fois cela fait, ajouter son empreinte ici EN
+# DATANT la revocation.
+# ─────────────────────────────────────────────────────────────────────────────
 
-# 2026-08-23 — FAUX POSITIF, et il faut dire pourquoi plutôt que de le taire.
-# La valeur signalée est `un-mot-de-passe-de-reprise-2026` : une donnée de TEST,
-# posée dans un test unitaire qui porte précisément sur la règle
-# `NotPwnedPassword`. Elle est passée à `->validate('password', ...)` face à un
-# vérificateur HIBP SIMULÉ (`makeHibpCheckerInjoignable()`) : elle n'ouvre aucun
-# compte, ne déchiffre rien, et n'a jamais quitté la suite de tests.
-# Vu à la lecture avant d'être ignorée — lignes 173 et 206 du fichier.
-# La règle `generic-api-key` a mordu sur l'ENTROPIE (3,667), pas sur un usage.
-#
-# ⚠️ Différence avec l'entrée de 2026-08-18 ci-dessus, qui compte : celle-là
-# était un VRAI secret, tourné le soir même puis ignoré par empreinte parce que
-# l'historique le portait encore. Ici il n'y a rien à tourner.
-#
-# Ignoré par EMPREINTE et non par fichier : renommer la donnée de test ne
-# retirerait rien, puisque gitleaks balaie les COMMITS de la branche et non
-# l'état final — et on ne réécrit pas l'histoire d'une branche partagée.
-14d69e8e98aa2b2e7e243140aa7874acfd7d9c2f:backend/tests/Unit/Auth/NotPwnedPasswordRuleTest.php:generic-api-key:168
-14d69e8e98aa2b2e7e243140aa7874acfd7d9c2f:backend/tests/Unit/Auth/NotPwnedPasswordRuleTest.php:generic-api-key:201
+66a1300ee010f3d749db358a8888962fdc5bbdb6:backend/tests/Feature/Internal/ReponseVeridiqueIngestionTest.php:generic-api-key:64
+f4bc4330e1ab0a82ef95fd41ea2a48e2b01e0922:backend/tests/Feature/Infra/RunbookDisquePleinTest.php:generic-api-key:52
+7be3753f36ec8a03c42bd2737314cca0cc08288a:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-45/sabotages/S09-masquage-pour-tout-le-monde.txt:generic-api-key:177
+7be3753f36ec8a03c42bd2737314cca0cc08288a:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-45/integral/03_baseline_suite_complete-INTEGRAL.txt:generic-api-key:162
+a3c42d66398b94afdb31843f5427e840388c33aa:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-45/integral/S01-index-compteurs-INTEGRAL.txt:generic-api-key:5362
+6c90194a76f6f1f91d55662b7f636a75674a869a:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-37/f37-001-hmac.txt:generic-api-key:4
+6c90194a76f6f1f91d55662b7f636a75674a869a:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-45/sabotages/S02-cache-compteurs.txt:generic-api-key:381
+6c90194a76f6f1f91d55662b7f636a75674a869a:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-45/sabotages/S01-index-compteurs.txt:generic-api-key:5362
+6c90194a76f6f1f91d55662b7f636a75674a869a:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-45/sabotages/S03-cle-cache-sans-workspace.txt:generic-api-key:5496
+6c90194a76f6f1f91d55662b7f636a75674a869a:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-45/sabotages/S05-seeder-upsert.txt:generic-api-key:274
+6c90194a76f6f1f91d55662b7f636a75674a869a:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-45/sabotages/S09-masquage-pour-tout-le-monde.txt:generic-api-key:177
+6c90194a76f6f1f91d55662b7f636a75674a869a:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-45/sabotages/S04-oubli-cache-apres-bulk.txt:generic-api-key:5164
+6c90194a76f6f1f91d55662b7f636a75674a869a:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-45/sabotages/S08-masquage-ne-masque-plus.txt:generic-api-key:5442
+6c90194a76f6f1f91d55662b7f636a75674a869a:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-45/sabotages/S07-reportUnmatched-false.txt:generic-api-key:5503
+6c90194a76f6f1f91d55662b7f636a75674a869a:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-45/sabotages/S06-baseline-phpstan-grossit.txt:generic-api-key:172
+6c90194a76f6f1f91d55662b7f636a75674a869a:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-45/sabotages/S13-antirejeu-desarme-par-defaut.txt:generic-api-key:5363
+6c90194a76f6f1f91d55662b7f636a75674a869a:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-45/sabotages/S15-etancheite-vivier-ouverte.txt:generic-api-key:206
+6c90194a76f6f1f91d55662b7f636a75674a869a:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-45/sabotages/S14-hmac-accepte-tout.txt:generic-api-key:5478
+6c90194a76f6f1f91d55662b7f636a75674a869a:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-45/sabotages/S16-masque-telephone-inerte.txt:generic-api-key:380
+8db82299d22cbbacb7a56def81e40edbc3b32992:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-08/ci-logs/Backend Laravel (install + PHPStan + Pint + Pest)/10_Pest (BLOQUANT).txt:generic-api-key:122
+8db82299d22cbbacb7a56def81e40edbc3b32992:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-08/ci-logs/1_Backend Laravel (install + PHPStan + Pint + Pest).txt:generic-api-key:696
+8db82299d22cbbacb7a56def81e40edbc3b32992:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-44/pest-ci-config-full.txt:generic-api-key:89
+8db82299d22cbbacb7a56def81e40edbc3b32992:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-45/03_baseline_suite_complete.txt:generic-api-key:162

@@ -59,6 +59,7 @@ export function UsersPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteName, setInviteName] = useState('');
   const [inviteRole, setInviteRole] = useState('operator');
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -72,26 +73,48 @@ export function UsersPage() {
     // suppression `no-unsafe-return` qui gelait ce defaut a ete retiree de
     // `frontend/eslint-suppressions.json` dans le meme geste.
     //
-    // ⚠️ `unknown`, et PAS une forme inventee. Mesure du 2026-08-22 :
-    // `grep -rn invite backend/routes` ne rend RIEN — la route
-    // `POST /users/invite` n'existe pas cote serveur (`routes/api.php` ne
-    // declare que `/users` en index/store/update/destroy). Declarer ici la
-    // forme d'une reponse qui n'arrive jamais serait une affirmation sans
-    // mesure. `unknown` dit la verite : on ne sait pas ce qui revient, et le
-    // code ne peut rien en lire sans le qualifier.
+    // 🔴 X39-027 — LE BOUTON TAPAIT A COTE. Cet appel visait
+    // `POST /users/invite`, une route qui N'EXISTE PAS : le commentaire qui
+    // etait ici le disait lui-meme (« `grep -rn invite backend/routes` ne rend
+    // RIEN »), et concluait que le point d'entree manquant etait « un defaut
+    // DISTINCT, hors de ce constat ». Il l'etait — et il est referme ICI.
     //
-    // Le point d'entree manquant est un defaut DISTINCT, hors de ce constat :
-    // il n'est pas referme ici.
+    // Le serveur porte bien la creation, et depuis le 2026-08-23 :
+    // `POST /users` (`UsersController::store`), sous `permission:users.manage`.
+    // Elle rend `201 { data: <compte> }`, d'ou le type ci-dessous, qui n'est
+    // plus `unknown` : la forme est desormais MESUREE, pas supposee.
+    //
+    // ⚠️ `name` est `required` cote serveur. L'envoyer manquait a l'ancien
+    // corps `{ email, role }` : meme en corrigeant la seule URL, l'appel
+    // repondrait 422. D'ou le champ ajoute au formulaire.
     mutationFn: async () =>
-      (await api.post<unknown>('/users/invite', { email: inviteEmail, role: inviteRole })).data,
+      (
+        await api.post<{ data: UserRow }>('/users', {
+          email: inviteEmail,
+          name: inviteName,
+          role: inviteRole,
+        })
+      ).data,
     onSuccess: () => {
-      toast.success('Invitation envoyée');
+      // 🔴 D25-001, meme ecran — « l'ecran d'administration ou le mensonge
+      // coutait le plus cher ». Ce toast disait « Invitation envoyee ». AUCUN
+      // courriel ne part : `UsersController::store` l'ecrit noir sur blanc
+      // (« CE QUE CETTE ROUTE NE FAIT PAS [...] aucun courriel ne part »), et
+      // `MAIL_MAILER` reste `log` par decision du cahier des charges §9.0.
+      //
+      // Annoncer un envoi qui n'a pas lieu laisse l'administrateur attendre, et
+      // la personne invitee ignorer qu'un compte l'attend. On dit donc ce qui
+      // s'est reellement passe : le compte existe, et il faut prevenir a la
+      // main. Le compte est cree SANS mot de passe — la personne s'en donne un
+      // par le parcours de reinitialisation.
+      toast.success('Compte créé — prévenez la personne : aucun e-mail n’est envoyé');
       setOpen(false);
       setInviteEmail('');
+      setInviteName('');
       setInviteRole('operator');
       qc.invalidateQueries({ queryKey: ['users'] });
     },
-    onError: () => toast.error("Impossible d'envoyer l'invitation"),
+    onError: () => toast.error('Impossible de créer le compte'),
   });
 
   const rows = data?.data ?? [];
@@ -237,7 +260,12 @@ export function UsersPage() {
         open={open}
         onClose={() => setOpen(false)}
         title="Inviter un utilisateur"
-        description="Un email d'invitation sera envoyé pour rejoindre le workspace."
+        // 🔴 X39-027 / D25-001 — cette phrase annoncait « Un email d'invitation
+        // sera envoye ». Il ne part aucun courriel : `MAIL_MAILER` reste `log`
+        // par decision du cahier des charges §9.0, et `UsersController::store`
+        // le dit explicitement. L'ecran annoncait donc une remise qui n'a pas
+        // lieu — le motif exact que D25-001 a coute cher a apprendre ici meme.
+        description="Le compte est créé immédiatement, sans mot de passe. Aucun e-mail n’est envoyé : prévenez la personne, elle se connectera via « mot de passe oublié »."
         footer={
           <>
             <Button variant="secondary" onClick={() => setOpen(false)}>
@@ -247,9 +275,11 @@ export function UsersPage() {
               variant="primary"
               onClick={() => inviteMut.mutate()}
               loading={inviteMut.isPending}
-              disabled={!inviteEmail}
+              // `name` est `required` cote serveur au meme titre que `email` :
+              // les deux gardent le bouton, sinon l'appel part pour un 422.
+              disabled={!inviteEmail || !inviteName}
             >
-              Envoyer l'invitation
+              Créer le compte
             </Button>
           </>
         }
@@ -262,6 +292,19 @@ export function UsersPage() {
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
               placeholder="prenom.nom@exemple.com"
+              required
+            />
+          </label>
+          {/* 🔴 X39-027 — champ ABSENT du formulaire alors que le serveur
+              l'exige (`'name' => ['required', ...]`). Sans lui, l'appel part
+              pour un 422 que l'ecran ne sait pas expliquer. */}
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Nom</span>
+            <Input
+              type="text"
+              value={inviteName}
+              onChange={(e) => setInviteName(e.target.value)}
+              placeholder="Prénom Nom"
               required
             />
           </label>

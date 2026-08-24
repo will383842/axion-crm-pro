@@ -195,7 +195,21 @@ describe('H46-008 — toute mutation dont on lit le corps declare sa forme', () 
     const REGISTRE: Array<[string, string]> = [
       ['features/rgpd/RgpdRequestsPage.tsx', 'api.post<RgpdRequest>'],
       ['features/rgpd/RgpdRequestsPage.tsx', 'api.post<{ request: RgpdRequest; result: unknown }>'],
-      ['features/users/UsersPage.tsx', 'api.post<unknown>'],
+      // 🔴 X39-027, 2026-08-24 — ce site portait `api.post<unknown>`, et la
+      // consigne de cette garde disait deja quoi faire le jour ou le point
+      // d'entree existerait : « remplacer `unknown` par la forme LUE dans le
+      // controleur, et corriger ce registre ». C'est ce jour.
+      //
+      // L'appel ne visait pas la bonne route : `POST /users/invite` n'a JAMAIS
+      // existe, alors que `POST /users` (`UsersController::store`) est cable
+      // depuis le 2026-08-23 et rend `201 { data: <compte> }` — forme lue dans
+      // le controleur, pas supposee.
+      ['features/users/UsersPage.tsx', 'api.post<{ data: UserRow }>'],
+      // ⚠️ `SettingsPage.tsx` reste `unknown` A DESSEIN DANS CETTE PR, et ce
+      // n'est plus vrai pour longtemps : `WorkspaceController::update()` ne
+      // rend PLUS 501 depuis le 2026-08-23, il ecrit reellement. L'ecran, lui,
+      // n'a pas suivi — c'est le constat X39-034, traite dans sa PR propre.
+      // Le corriger ici melangerait deux ecrans dans un meme changement.
       ['features/settings/SettingsPage.tsx', 'api.put<unknown>'],
       ['features/companies/CompanyDetailPage.tsx', 'api.post<CompanyDetail>'],
     ];
@@ -213,5 +227,57 @@ describe('H46-008 — toute mutation dont on lit le corps declare sa forme', () 
           'dans le controleur, et corriger ce registre.',
       ).toBe(true);
     }
+  });
+
+  /**
+   * 🔴 X39-027 — LA GARDE QUI MANQUAIT, et qui aurait vu le defaut.
+   *
+   * Le bouton « Inviter un utilisateur » a poste vers `POST /users/invite`
+   * — une route qui n'a JAMAIS existe cote serveur — pendant tout le temps ou
+   * l'ecran passait pour fini. Rien ne rougissait : `tsc` ne connait pas les
+   * routes, le lint non plus, et la garde ci-dessus ne verifiait que le
+   * GENERIQUE de l'appel, pas sa CIBLE. Le commentaire du code nommait meme le
+   * defaut sans que rien ne le mesure.
+   *
+   * Cette garde ferme l'angle mort pour ce cas precis : la chaine `/users/
+   * invite` ne doit reapparaitre nulle part dans `src/`. Elle est volontairement
+   * ETROITE — une garde generale « toute route appelee existe cote serveur »
+   * demanderait de lire `routes/api.php` depuis le frontend, ce qui melangerait
+   * les deux paquets ; elle reste a ecrire, et elle vaudrait mieux que celle-ci.
+   */
+  it('X39-027 — aucun ecran ne poste vers `/users/invite`, qui n existe pas cote serveur', () => {
+    const fautifs: string[] = [];
+
+    const parcourir = (repertoire: string): void => {
+      for (const entree of readdirSync(repertoire)) {
+        const chemin = join(repertoire, entree);
+        if (statSync(chemin).isDirectory()) {
+          parcourir(chemin);
+
+          continue;
+        }
+        if (! /\.(ts|tsx)$/.test(entree)) {
+          continue;
+        }
+        const source = readFileSync(chemin, 'utf8');
+        // On cherche la chaine DANS UN APPEL, pas dans un commentaire : le
+        // commentaire de `UsersPage.tsx` cite la route pour expliquer le
+        // correctif, et le faire rougir pour cela serait absurde.
+        if (/['"`]\/users\/invite['"`]/.test(source)) {
+          fautifs.push(relative(RACINE_SRC, chemin));
+        }
+      }
+    };
+    parcourir(RACINE_SRC);
+
+    expect(
+      fautifs,
+      `X39-027 : « /users/invite » est appelee dans ${fautifs.join(', ')}.\n` +
+        "Cette route n existe pas dans `backend/routes/api.php`, qui ne declare `/users` qu en " +
+        'index / store / update / destroy. Un appel qui la vise rend 404, et le bouton ne cree ' +
+        'aucun compte.\n' +
+        'GESTE : viser `POST /users` (`UsersController::store`), et envoyer `name` — il y est ' +
+        '`required`, un corps `{ email, role }` seul rend 422.',
+    ).toEqual([]);
   });
 });

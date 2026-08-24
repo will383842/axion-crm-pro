@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -91,12 +92,23 @@ class UsersController extends ApiController
      * n'est alors plus a personne. On cree donc un compte SANS secret, et la
      * personne s'en donne un par le parcours de reinitialisation existant.
      *
-     * ⚠️ CE QUE CETTE ROUTE NE FAIT PAS, ecrit plutot que taise : **aucun
-     * courriel ne part**. `MAIL_MAILER` etait l'un des quatre verrous du
-     * rapport final ; une route qui pretendrait « inviter » alors que rien
-     * n'est remis serait une facade de plus — exactement le motif `B12-007`
-     * qu'on vient de fermer ailleurs. La ligne d'invitation est ECRITE et
-     * DATEE ; sa remise est un chantier distinct, et il reste ouvert.
+     * ✅ LA REMISE EXISTE DEPUIS LE 2026-08-24, et ce paragraphe disait le
+     * contraire. Il disait : « aucun courriel ne part [...] sa remise est un
+     * chantier distinct, et il reste ouvert ». Ce chantier est fait —
+     * `remettreInvitation()`, plus bas, envoie un lien de definition de mot de
+     * passe par le meme parcours que la reinitialisation.
+     *
+     * ⚠️ MAIS ELLE RESTE CONDITIONNELLE, et c'est la reponse qui le dit, pas ce
+     * commentaire : `invitation_envoyee` vaut `false` tant que `MOCK_MODE` est
+     * `true` ou que le transport echoue. DEUX verrous en serie, tous deux fermes
+     * par defaut (`MOCK_MODE=true`, `MAIL_MAILER=log`) — un `.env` de production
+     * doit lever les deux, sans quoi un compte cree ne peut pas se connecter DU
+     * TOUT : il naît sans mot de passe, et le lien pour s'en donner un n'est
+     * jamais remis.
+     *
+     * Une route qui pretendrait « inviter » sans rien remettre serait une facade
+     * de plus — le motif `B12-007`. D'ou le drapeau : la reponse dit ce qui
+     * s'est passe, l'ecran le relaie, personne n'affirme a la place du serveur.
      *
      * @OA\Post(path="/users", tags={"Users"}, summary="Invite un compte dans l'espace courant",
      *     security={{"sanctumCookie":{}}},
@@ -171,7 +183,111 @@ class UsersController extends ApiController
             return $compte;
         });
 
-        return $this->ok(['data' => $this->vue($compte)], 201);
+        // 🔴 L'INVITATION PART D'ICI — et elle ne partait pas.
+        //
+        // Le commentaire de cette methode disait, et c'etait vrai : « aucun
+        // courriel ne part [...] la remise est un chantier distinct, et il reste
+        // ouvert ». Ce chantier est celui-ci.
+        //
+        // ⚠️ HORS DE LA TRANSACTION, deliberement. Un envoi SMTP peut prendre
+        // plusieurs secondes, ou pendre jusqu'au delai d'attente ; le tenir dans
+        // la transaction garderait des verrous ouverts sur `users` et
+        // `user_workspaces` pendant tout ce temps.
+        //
+        // ⚠️ ET IL NE PEUT PAS FAIRE ECHOUER LA CREATION. Le compte EXISTE une
+        // fois la transaction close. Si le courriel ne part pas, la reponse doit
+        // le DIRE — pas defaire un compte valide, ni pretendre l'avoir remis.
+        $envoyee = $this->remettreInvitation($compte);
+
+        return $this->ok([
+            'data' => $this->vue($compte),
+            // 🔑 L'ECRAN NE PEUT PAS DEVINER, ET NE DOIT PAS SUPPOSER.
+            // `MOCK_MODE` et `MAIL_MAILER` sont des reglages SERVEUR : le
+            // frontend ne les voit pas. Sans ce drapeau il ne lui reste qu'a
+            // affirmer quelque chose au hasard — c'est exactement ce qu'il
+            // faisait en annoncant « Invitation envoyee » alors que rien ne
+            // partait (constat D25-001, meme ecran).
+            'invitation_envoyee' => $envoyee,
+        ], 201);
+    }
+
+    /**
+     * Remet a la personne invitee le lien qui lui permet de se donner un mot de
+     * passe. Rend `true` si un courriel est REELLEMENT parti.
+     *
+     * 🔑 ON REUTILISE LE PARCOURS DE REINITIALISATION, ON N'EN INVENTE PAS UN
+     * SECOND. Meme table `password_reset_tokens`, meme condensat SHA-256 du
+     * jeton, meme page `/password-reset`, meme duree de vie, meme transport
+     * `mail.auth_mailer`. C'est le §28.5 — « on etend, on ne reinvente pas » —
+     * et ici il porte une consequence de securite : un second mecanisme de
+     * remise de mot de passe, c'est une seconde surface a auditer, a expirer et
+     * a limiter en debit.
+     *
+     * ⚠️ LE JETON EN CLAIR NE VIT QUE DANS LE COURRIEL. La base ne garde que son
+     * condensat, exactement comme `PasswordResetController::forgot()`. Un
+     * administrateur qui lit la table ne peut donc pas prendre le compte qu'il
+     * vient de creer.
+     *
+     * ⚠️ `mock_mode` d'abord, par `config()` et JAMAIS `env()`. C'est le defaut
+     * F40-002, deja paye : avec `config:cache` — que l'entrypoint de production
+     * lance a chaque demarrage — le `.env` n'est plus lu, et `env('MOCK_MODE',
+     * true)` rendait TRUE en production. Le courriel n'etait alors jamais
+     * envoye, meme avec un SMTP correct.
+     */
+    private function remettreInvitation(User $compte): bool
+    {
+        $jeton = Str::random(64);
+
+        DB::table('password_reset_tokens')->updateOrInsert(
+            ['email' => $compte->email],
+            ['token' => hash('sha256', $jeton), 'created_at' => now()],
+        );
+
+        $lien = rtrim((string) config('app.frontend_url'), '/')
+            . '/password-reset?token=' . $jeton
+            . '&email=' . urlencode((string) $compte->email);
+
+        if (config('crm.mock_mode', true)) {
+            Log::info('Mock invitation link (would be emailed)', [
+                'email' => $compte->email,
+                'link' => $lien,
+            ]);
+
+            return false;
+        }
+
+        // ⚠️ LE COMPTE EST DEJA CREE. Un echec d'envoi — SMTP injoignable, jeton
+        // ZeptoMail refuse, domaine non verifie — ne doit pas remonter en 500 :
+        // il rendrait la creation invisible a l'ecran alors qu'elle a eu lieu,
+        // et la personne se retrouverait avec un compte fantome impossible a
+        // recreer (l'adresse serait « deja utilisee »).
+        try {
+            $ttl = \App\Http\Controllers\Api\Auth\PasswordResetController::TOKEN_TTL_MINUTES;
+
+            Mail::mailer(config('mail.auth_mailer'))->raw(
+                "Bonjour {$compte->name},\n\n"
+                . "Un compte vient d'être créé pour vous sur Axion CRM Pro.\n\n"
+                . "Choisissez votre mot de passe :\n\n{$lien}\n\n"
+                . "Ce lien est valable {$ttl} minutes. Passé ce délai, utilisez\n"
+                . "« mot de passe oublié » depuis l'écran de connexion.\n",
+                function ($m) use ($compte) {
+                    $m->to($compte->email)->subject('Votre accès à Axion CRM Pro');
+                }
+            );
+
+            return true;
+        } catch (\Throwable $e) {
+            // On journalise SANS le lien : il vaut mot de passe pendant une
+            // heure, et les journaux sont lus par plus de monde qu'une boite aux
+            // lettres.
+            Log::error('invitation.envoi_echoue', [
+                'user_id' => $compte->id,
+                'exception' => $e->getMessage(),
+            ]);
+            report($e);
+
+            return false;
+        }
     }
 
     /**

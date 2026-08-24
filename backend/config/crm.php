@@ -75,6 +75,43 @@ return [
     'mock_mode' => env('MOCK_MODE', true),
 
     /*
+    |--------------------------------------------------------------------------
+    | 🔑 `mock_mail` — LE COURRIEL SE DEVERROUILLE SEUL
+    |--------------------------------------------------------------------------
+    |
+    | POURQUOI CE DRAPEAU EXISTE. `MOCK_MODE` est un interrupteur GENERAL.
+    | Mesure du 2026-08-24 : il commande aussi `BlacklistsCheck` (qui declare
+    | toutes les IP saines tant qu'il est vrai), `SignalsNightlyScan` (no-op),
+    | et les imports `ImportIgnAdminExpress` / `ImportNaf` / `ImportRpps`, qui
+    | lisent des fixtures au lieu des sources reelles.
+    |
+    | Autrement dit : qui voulait seulement recevoir les invitations par
+    | courriel devait, du meme geste, reveiller un scan nocturne et trois
+    | imports sur des API externes. Un reglage de production ne doit pas forcer
+    | ce marche-la.
+    |
+    | Le repli sur `MOCK_MODE` garde le comportement existant : rien ne change
+    | pour qui ne pose pas `MOCK_MAIL`. C'est le patron DEJA employe dans ce
+    | depot par `MOCK_IGN`, `MOCK_RPPS` et `MOCK_INSEE` — on etend, on
+    | n'invente pas (§28.5).
+    |
+    | En production, `MOCK_MAIL=false` suffit a faire partir les liens de
+    | reinitialisation et d'invitation, sans toucher au reste.
+    |
+    | ⚠️ `env()` ICI ET NULLE PART AILLEURS — c'est la lecon F40-002 rappelee
+    | juste au-dessus : avec `config:cache`, un `env()` lu hors configuration
+    | rend sa valeur par defaut en production.
+    |
+    | ⚠️ NE PAS CONFONDRE AVEC `MOCK_SMTP`, qui existe deja et ne commande PAS
+    | l'envoi. Celui-la choisit l'implementation de `SmtpProber`
+    | (`MockServicesProvider`) : il sert a SONDER l'existence d'une adresse chez
+    | Hunter, pour la prospection. Deux sujets distincts sous des noms voisins —
+    | d'ou cette note, pour que personne ne pose l'un en croyant l'autre.
+    |
+    */
+    'mock_mail' => env('MOCK_MAIL', env('MOCK_MODE', true)),
+
+    /*
     | L2 — ingestion site → CRM (`POST /api/internal/site-sync`).
     |
     | `enabled` : drapeau MAÎTRE. À false (défaut), l'endpoint répond 503

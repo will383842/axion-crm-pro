@@ -100,12 +100,12 @@ class UsersController extends ApiController
      * passe par le meme parcours que la reinitialisation.
      *
      * ⚠️ MAIS ELLE RESTE CONDITIONNELLE, et c'est la reponse qui le dit, pas ce
-     * commentaire : `invitation_envoyee` vaut `false` tant que `MOCK_MODE` est
+     * commentaire : `invitation_envoyee` vaut `false` tant que `MOCK_MAIL` est
      * `true` ou que le transport echoue. DEUX verrous en serie, tous deux fermes
-     * par defaut (`MOCK_MODE=true`, `MAIL_MAILER=log`) — un `.env` de production
-     * doit lever les deux, sans quoi un compte cree ne peut pas se connecter DU
-     * TOUT : il naît sans mot de passe, et le lien pour s'en donner un n'est
-     * jamais remis.
+     * par defaut (`MOCK_MAIL=true` — qui retombe sur `MOCK_MODE` s'il n'est pas
+     * pose — et `MAIL_MAILER=log`). Un `.env` de production doit lever les deux,
+     * sans quoi un compte cree ne peut pas se connecter DU TOUT : il naît sans
+     * mot de passe, et le lien pour s'en donner un n'est jamais remis.
      *
      * Une route qui pretendrait « inviter » sans rien remettre serait une facade
      * de plus — le motif `B12-007`. D'ou le drapeau : la reponse dit ce qui
@@ -248,7 +248,11 @@ class UsersController extends ApiController
             . '/password-reset?token=' . $jeton
             . '&email=' . urlencode((string) $compte->email);
 
-        if (config('crm.mock_mode', true)) {
+        // `crm.mock_mail` et non `crm.mock_mode` : le courriel se deverrouille
+        // SEUL, sans reveiller le scan nocturne ni les trois imports que le
+        // drapeau general commande aussi. Il retombe sur `MOCK_MODE` quand
+        // `MOCK_MAIL` n'est pas pose — rien ne change pour qui n'y touche pas.
+        if (config('crm.mock_mail', true)) {
             Log::info('Mock invitation link (would be emailed)', [
                 'email' => $compte->email,
                 'link' => $lien,

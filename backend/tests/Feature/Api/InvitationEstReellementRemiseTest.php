@@ -93,7 +93,7 @@ function corpsInvitationX39027(string $email): array
 }
 
 it('ecrit un jeton de definition de mot de passe, et n en garde que le CONDENSAT', function () {
-    config()->set('crm.mock_mode', true);
+    config()->set('crm.mock_mail', true);
     [$admin] = invitantX39027();
     $email = 'recrue-' . Str::random(6) . '@invitation-x39027.test';
 
@@ -123,7 +123,7 @@ it('en mode maquette, ne remet RIEN et le dit — pas de courriel, drapeau a fal
     // menteur que ce depot traque. On observe l'evenement d'envoi, qui ne fait
     // pas cette distinction.
     Event::fake([MessageSent::class]);
-    config()->set('crm.mock_mode', true);
+    config()->set('crm.mock_mail', true);
     [$admin] = invitantX39027();
     $email = 'recrue-' . Str::random(6) . '@invitation-x39027.test';
 
@@ -144,7 +144,7 @@ it('hors mode maquette, remet REELLEMENT un courriel a la personne invitee', fun
     //
     // On observe l'evenement que TOUT envoi emet, brut ou non.
     Event::fake([MessageSent::class]);
-    config()->set('crm.mock_mode', false);
+    config()->set('crm.mock_mail', false);
     [$admin] = invitantX39027();
     $email = 'recrue-' . Str::random(6) . '@invitation-x39027.test';
 
@@ -165,7 +165,7 @@ it('hors mode maquette, remet REELLEMENT un courriel a la personne invitee', fun
 });
 
 it('un transport en ECHEC ne defait pas la creation — le compte reste, le drapeau tombe', function () {
-    config()->set('crm.mock_mode', false);
+    config()->set('crm.mock_mail', false);
     // ⚠️ UN TRANSPORT INEXISTANT, ET NON UN SMTP INJOIGNABLE. La premiere
     // version pointait `127.0.0.1:1` en esperant un refus de connexion : cela
     // depend du reseau du banc, du pare-feu et d'un delai d'attente — trois

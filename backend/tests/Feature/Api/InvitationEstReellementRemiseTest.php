@@ -31,8 +31,8 @@
  *      serait ensuite « deja utilisee » — un compte fantome, impossible a
  *      recreer.
  *
- * ⚠️ CE QU'ELLE NE MESURE PAS : que le courriel ARRIVE. `Mail::fake()` prouve
- * que Laravel l'a remis a son transport, rien de plus. La reception depend du
+ * ⚠️ CE QU'ELLE NE MESURE PAS : que le courriel ARRIVE. L'evenement `MessageSent`
+ * prouve que Laravel l'a remis a son transport, rien de plus. La reception depend du
  * jeton ZeptoMail, du domaine verifie sur l'agent et de la reputation d'envoi —
  * cela se constate dans « E-mails traites » de l'agent, pas dans un banc.
  */
@@ -41,8 +41,9 @@ use App\Models\User;
 use App\Models\Workspace;
 use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Mail\Events\MessageSent;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -116,7 +117,12 @@ it('ecrit un jeton de definition de mot de passe, et n en garde que le CONDENSAT
 });
 
 it('en mode maquette, ne remet RIEN et le dit — pas de courriel, drapeau a false', function () {
-    Mail::fake();
+    // ⚠️ PAS `Mail::assertNothingSent()`, ET C'EST LE PIEGE DE CETTE GARDE.
+    // Elle n'inspecte que les MAILABLES ; un `Mail::raw()` lui echappe. Elle
+    // serait donc VERTE meme si un courriel partait — precisement le vert
+    // menteur que ce depot traque. On observe l'evenement d'envoi, qui ne fait
+    // pas cette distinction.
+    Event::fake([MessageSent::class]);
     config()->set('crm.mock_mode', true);
     [$admin] = invitantX39027();
     $email = 'recrue-' . Str::random(6) . '@invitation-x39027.test';
@@ -126,11 +132,18 @@ it('en mode maquette, ne remet RIEN et le dit — pas de courriel, drapeau a fal
         ->assertCreated();
 
     $reponse->assertJsonPath('invitation_envoyee', false);
-    Mail::assertNothingSent();
+    Event::assertNotDispatched(MessageSent::class);
 });
 
 it('hors mode maquette, remet REELLEMENT un courriel a la personne invitee', function () {
-    Mail::fake();
+    // ⚠️ PAS `Mail::fake()` + `Mail::assertSent()` ICI, et la premiere version de
+    // ce test s'y est cassee (RuntimeException). Ces deux-la travaillent sur des
+    // MAILABLES ; `remettreInvitation()` envoie un message BRUT (`Mail::raw`),
+    // que le faux mailer ne range pas dans sa liste de mailables. L'assertion
+    // n'avait donc rien a inspecter.
+    //
+    // On observe l'evenement que TOUT envoi emet, brut ou non.
+    Event::fake([MessageSent::class]);
     config()->set('crm.mock_mode', false);
     [$admin] = invitantX39027();
     $email = 'recrue-' . Str::random(6) . '@invitation-x39027.test';
@@ -141,20 +154,26 @@ it('hors mode maquette, remet REELLEMENT un courriel a la personne invitee', fun
 
     $reponse->assertJsonPath('invitation_envoyee', true);
 
-    Mail::assertSent(function ($message) use ($email) {
-        return in_array($email, array_keys($message->to ?? []), true)
-            || collect($message->to ?? [])->contains(fn ($d) => ($d['address'] ?? $d) === $email);
+    Event::assertDispatched(MessageSent::class, function (MessageSent $e) use ($email) {
+        $destinataires = array_map(
+            static fn ($adresse) => $adresse->getAddress(),
+            $e->message->getTo(),
+        );
+
+        return in_array($email, $destinataires, true);
     });
 });
 
 it('un transport en ECHEC ne defait pas la creation — le compte reste, le drapeau tombe', function () {
     config()->set('crm.mock_mode', false);
-    // Un transport SMTP qui ne repondra pas : l'envoi leve, la creation ne doit
-    // pas partir avec lui.
-    config()->set('mail.auth_mailer', 'smtp');
-    config()->set('mail.mailers.smtp.host', '127.0.0.1');
-    config()->set('mail.mailers.smtp.port', 1);
-    config()->set('mail.mailers.smtp.timeout', 1);
+    // ⚠️ UN TRANSPORT INEXISTANT, ET NON UN SMTP INJOIGNABLE. La premiere
+    // version pointait `127.0.0.1:1` en esperant un refus de connexion : cela
+    // depend du reseau du banc, du pare-feu et d'un delai d'attente — trois
+    // facons de rendre ce test lent puis capricieux. Un nom de mailer non
+    // declare fait lever le gestionnaire immediatement, sans toucher au reseau,
+    // et c'est exactement le chemin qu'on veut mesurer : ce qui se passe quand
+    // l'envoi jette.
+    config()->set('mail.auth_mailer', 'transport-absent-x39027');
 
     [$admin] = invitantX39027();
     $email = 'recrue-' . Str::random(6) . '@invitation-x39027.test';

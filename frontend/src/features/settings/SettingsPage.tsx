@@ -4,11 +4,21 @@
  *
  * ═══ L'INVENTAIRE MESURÉ (agent 26, `07-settings-commandes-mortes.txt`) ═══
  *
- *  • WORKSPACE — le formulaire poste vers `PUT /workspace`, qui rend `501`
+ *  • WORKSPACE — le formulaire postait vers `PUT /workspace`, qui rendait `501`
  *    (`WorkspaceController::update` = `notImplemented('3')`). L'utilisateur
  *    n'obtenait que `toast.error('Erreur mise à jour')` : le message du serveur
  *    n'était jamais affiché. Le seul formulaire de l'écran ne pouvait pas
  *    réussir, et l'écran ne disait pas pourquoi.
+ *
+ *    ✅ RÉSOLU — et il faut le dater, parce que ce fichier a affirmé le 501
+ *    plus longtemps qu'il n'était vrai. `PUT /workspace` ÉCRIT depuis le
+ *    2026-08-23 (constat `X39-034`) : validation, verrou optimiste, refus
+ *    explicite de `slug` et `is_active`, filtrage `deleted_at`. Le second
+ *    défaut du constat — « le message montré est celui du développeur »,
+ *    *Endpoint à implémenter en Sprint 3* — tombe avec lui : cette phrase
+ *    venait du corps du 501, elle n'a plus d'émetteur. `EchecEnregistrement`
+ *    reste en place pour les VRAIS refus (422, 409, 403), et c'est sa raison
+ *    d'être : afficher la phrase du serveur au lieu de la jeter.
  *  • INTÉGRATIONS — « Renouveler » et « Configurer » sans `onClick` : **14
  *    boutons** (7 × 2) dont le clic ne produisait rien. `MaskedSecret
  *    value="sk-•••••"` était une CONSTANTE LITTÉRALE : « Afficher » révélait une
@@ -194,15 +204,24 @@ export function SettingsPage() {
     // parametre ; la suppression `no-unsafe-return` correspondante a ete
     // retiree de `frontend/eslint-suppressions.json` dans le meme geste.
     //
-    // ⚠️ `unknown`, et PAS `Workspace`. Mesure du 2026-08-22 :
-    // `WorkspaceController::update()` tient en une ligne —
-    // `return $this->notImplemented('3')` — c'est-a-dire un 501 portant
-    // `{ error, message, sprint }`. Ecrire `api.put<Workspace>` ici
-    // declarerait une forme que ce point d'entree ne rend JAMAIS ; `unknown`
-    // dit ce qu'on sait. Le succes de cette mutation n'existe pas encore : ce
-    // defaut-la est distinct, et il n'est pas referme ici.
+    // 🔴 X39-034, 2026-08-24 — CE COMMENTAIRE AFFIRMAIT UN 501 QUI N'EXISTE
+    // PLUS. Il disait, mesure du 2026-08-22 a l'appui, que
+    // `WorkspaceController::update()` « tient en une ligne —
+    // `return $this->notImplemented('3')` », et que « le succes de cette
+    // mutation n'existe pas encore ».
+    //
+    // Il existe depuis le 2026-08-23. La route ecrit reellement : validation de
+    // `name` / `settings` / `cost_cap_eur`, verrou optimiste, refus explicite de
+    // `slug` et `is_active`, filtrage `deleted_at`. Elle rend
+    // `200 { data: <espace> }` — forme LUE dans le controleur, pas supposee.
+    // Garde cote serveur : `EcrituresQuiRepondaient501Test`, lot 3.
+    //
+    // ⚠️ ASYMETRIE ASSUMEE, et il vaut mieux l'ecrire que la laisser decouvrir :
+    // `show()` rend l'espace NU (`$this->ok($user->currentWorkspace)`), d'ou le
+    // `api.get<Workspace>` quelques lignes plus haut, tandis que `update()`
+    // l'ENVELOPPE dans `data`. Les deux generiques different donc a dessein.
     mutationFn: async (patch: Partial<Workspace>) =>
-      (await api.put<unknown>('/workspace', patch)).data,
+      (await api.put<{ data: Workspace }>('/workspace', patch)).data,
     onMutate: () => setEchecEnregistrement(null),
     onSuccess: () => {
       setEchecEnregistrement(null);

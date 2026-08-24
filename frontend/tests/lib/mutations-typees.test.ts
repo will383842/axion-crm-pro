@@ -205,12 +205,16 @@ describe('H46-008 — toute mutation dont on lit le corps declare sa forme', () 
       // depuis le 2026-08-23 et rend `201 { data: <compte> }` — forme lue dans
       // le controleur, pas supposee.
       ['features/users/UsersPage.tsx', 'api.post<{ data: UserRow }>'],
-      // ⚠️ `SettingsPage.tsx` reste `unknown` A DESSEIN DANS CETTE PR, et ce
-      // n'est plus vrai pour longtemps : `WorkspaceController::update()` ne
-      // rend PLUS 501 depuis le 2026-08-23, il ecrit reellement. L'ecran, lui,
-      // n'a pas suivi — c'est le constat X39-034, traite dans sa PR propre.
-      // Le corriger ici melangerait deux ecrans dans un meme changement.
-      ['features/settings/SettingsPage.tsx', 'api.put<unknown>'],
+      // 🔴 X39-034, 2026-08-24 — le second `unknown` tombe, pour la meme raison
+      // que le premier et par la meme consigne. `WorkspaceController::update()`
+      // ne rend PLUS 501 depuis le 2026-08-23 : il ecrit reellement, et rend
+      // `200 { data: <espace> }`.
+      //
+      // ⚠️ `{ data: Workspace }` et non `Workspace` : `show()` rend l'espace NU,
+      // `update()` l'ENVELOPPE. Les deux points d'entree de la meme ressource ne
+      // s'accordent pas, et c'est le controleur qui fait foi — la forme est lue,
+      // pas deduite du voisin.
+      ['features/settings/SettingsPage.tsx', 'api.put<{ data: Workspace }>'],
       ['features/companies/CompanyDetailPage.tsx', 'api.post<CompanyDetail>'],
     ];
 
@@ -219,12 +223,13 @@ describe('H46-008 — toute mutation dont on lit le corps declare sa forme', () 
       expect(
         source.includes(fragment),
         `H46-008 : « ${fragment} » a disparu de ${relatif}.\n` +
-          'Les deux `unknown` ne sont PAS un oubli : mesure du 2026-08-22, `POST /users/invite` ' +
-          "n existe pas dans `backend/routes/api.php`, et `WorkspaceController::update()` rend " +
-          'un 501 (`notImplemented`). Declarer une forme de succes pour ces deux-la serait ' +
-          'affirmer sans mesure.\n' +
-          'GESTE : si le point d entree existe desormais, remplacer `unknown` par la forme LUE ' +
-          'dans le controleur, et corriger ce registre.',
+          'Les cinq sites portent desormais une forme REELLE : les deux `unknown` qui restaient ' +
+          "ont ete leves le 2026-08-24, apres que leurs deux points d entree ont ete cables " +
+          '(`POST /users` le 23/08, constat X39-027 ; `PUT /workspace` le 23/08 aussi, constat ' +
+          'X39-034). Chaque generique a ete LU dans son controleur, pas deduit du voisin — ' +
+          "`/workspace` ne s enveloppe pas de la meme facon en lecture et en ecriture.\n" +
+          'GESTE : si un point d entree change de forme, relire le controleur et corriger ce ' +
+          'registre. Si une forme redevient inconnue, `unknown` reste la reponse honnete.',
       ).toBe(true);
     }
   });

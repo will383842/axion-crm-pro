@@ -8,8 +8,21 @@ ARG NODE_VERSION=22-alpine
 FROM node:${NODE_VERSION} AS deps
 RUN corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /srv/app
-COPY frontend/package.json frontend/pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile || pnpm install
+# 🔴 Lock SANS joker, et install SANS repli — le meme defaut que
+# `Dockerfile.worker` et `Dockerfile.laravel`, corriges tous deux ; celui-ci
+# avait ete oublie. C'est pourtant le plus expose des trois : il construit
+# l'image `app` SERVIE EN PRODUCTION.
+#
+# Le joker rendait le verrou facultatif, et le repli `|| pnpm install`
+# resolvait alors « les dernieres versions » en silence. Les deux ensemble
+# vidaient de son sens tout durcissement de dependances : un verrou qui ne
+# colle plus a `package.json` n'arretait pas le build, il etait CONTOURNE, et
+# la production embarquait des versions que personne n'avait mesurees.
+#
+# Verrou absent ou perime = build en echec. C'est le seul comportement qui
+# rende le verrou vrai.
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
 # -----------------------------------------------------------------------------
 # 2) dev : vite dev server (HMR) — conservé pour devs locaux

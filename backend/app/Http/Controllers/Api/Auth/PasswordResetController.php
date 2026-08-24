@@ -54,7 +54,10 @@ class PasswordResetController extends ApiController
         // production tente a chaque demarrage - le `.env` n'est plus lu, et
         // `env('MOCK_MODE', true)` rendait alors TRUE en production. Le courriel
         // n'etait donc jamais envoye, meme avec un SMTP configure (F40-002).
-        if (config('crm.mock_mode', true)) {
+        // `crm.mock_mail` — meme raison que dans `UsersController::store()` :
+        // deverrouiller le courriel ne doit pas obliger a deverrouiller les
+        // imports et le scan nocturne. Repli sur `MOCK_MODE` si non pose.
+        if (config('crm.mock_mail', true)) {
             \Log::info('Mock password reset link (would be emailed)', [
                 'email' => $email,
                 'link' => config('app.frontend_url') . '/password-reset?token=' . $token . '&email=' . urlencode($email),

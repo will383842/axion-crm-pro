@@ -231,13 +231,86 @@ jobs:
           echo "::group::vérifications"
           ok=1
 
-          echo -n "API préprod (127.0.0.1:8082/up) : "
-          curl -fsS --max-time 15 http://127.0.0.1:8082/up > /dev/null 2>&1 \
-            && echo "répond" || { echo "MUETTE"; ok=0; }
+          # 🔴 F41-001 (2026-08-24) — ces deux contrôles NE POUVAIENT PAS passer.
+          #
+          # La préproduction était déclarée MUETTE à CHAQUE déploiement depuis le
+          # 2026-08-23 au moins (c026a44, 99f9bb6, a1a0f6b, 3ed04f0, 79524a7,
+          # c4c3770, f0b0c52, bc0fafd — huit de suite). Ce n'est pas la pile qui
+          # tombait : c'est la mesure qui visait à côté, sur DEUX points.
+          #
+          # 1. LA MAUVAISE ADRESSE. La pile ne publie rien sur `127.0.0.1` : elle
+          #    publie sur la passerelle du pont `docker0`
+          #    (`${STAGING_BIND_IP:-172.17.0.1}`), et c'est délibéré — voir la
+          #    contrainte 3 en tête de `docker-compose.staging.yml`, qui raconte
+          #    déjà ce piège dans l'autre sens (« Caddy tapait sur
+          #    172.17.0.1:8081, où rien n'écoutait »). D'où le refus INSTANTANÉ
+          #    qu'on lit dans les journaux : « Failed to connect to 127.0.0.1
+          #    port 8081 after 0 ms ». Zéro milliseconde : personne n'écoute là.
+          #
+          # 2. LA MAUVAISE LANGUE, pour l'API. Le constat A-010 (S0) a déjà établi
+          #    que ce service ne sert plus HTTP mais parle FastCGI, et le
+          #    healthcheck du compose a été refait pour l'interroger avec
+          #    `cgi-fcgi`. Ce correctif n'a jamais été propagé ICI : le workflow
+          #    est resté sur `curl http://…/up`, qui — le compose l'écrit noir sur
+          #    blanc — « échouerait TOUJOURS ».
+          #
+          # Une garde qui ne peut pas passer n'est pas une garde sévère, c'est une
+          # garde morte : elle rougit sur une pile saine, donc plus personne ne
+          # lit son rouge. C'est le symétrique du vert menteur, et il coûte aussi
+          # cher.
+          #
+          # 3. AUCUNE ATTENTE, enfin. Les contrôles partaient 0,8 s après le
+          #    démarrage des conteneurs (Started 20:02:19.34 → MUETTE
+          #    20:02:20.13). Le déploiement de PRODUCTION, lui, laisse 20 s. Les
+          #    boucles ci-dessous réessaient au lieu d'attendre à l'aveugle :
+          #    elles sortent dès que ça répond, et ne masquent rien puisqu'elles
+          #    finissent par poser `ok=0`.
 
-          echo -n "Frontend préprod (127.0.0.1:8081) : "
-          curl -fsS --max-time 15 -o /dev/null http://127.0.0.1:8081 2>&1 \
-            && echo "répond" || { echo "MUET"; ok=0; }
+          # L'adresse est DEMANDÉE À DOCKER, pas devinée : `docker compose port`
+          # rend ce qui est réellement publié. Si le binding change un jour, la
+          # mesure suit toute seule — c'est la règle de ce fichier, « mesuré sur
+          # les conteneurs, pas sur le fichier ».
+          ADDR_APP="$(docker compose port app 5173 2>/dev/null || true)"
+          if [ -z "$ADDR_APP" ]; then
+            echo "::error::impossible de lire l'adresse publiée du frontend — la mesure n'a rien vu."
+            ok=0
+          fi
+
+          # API : php-fpm parle FastCGI, on l'interroge donc par son healthcheck
+          # (celui du compose, qui utilise `cgi-fcgi`) et non par un curl HTTP.
+          # `start_period: 40s` + `interval: 30s` : 90 s de budget, pas moins.
+          echo -n "API préprod (php-fpm, healthcheck FastCGI) : "
+          etat_api="jamais-lu"
+          for _ in $(seq 1 30); do
+            etat_api="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}sans-healthcheck{{end}}' axion-crm-staging-api 2>/dev/null || echo absent)"
+            case "$etat_api" in
+              healthy) break ;;
+              # Un conteneur sans healthcheck ou introuvable ne deviendra jamais
+              # sain : inutile d'attendre 90 s pour l'apprendre.
+              sans-healthcheck|absent) break ;;
+            esac
+            sleep 3
+          done
+          [ "$etat_api" = "healthy" ] \
+            && echo "saine" || { echo "MUETTE (état : $etat_api)"; ok=0; }
+
+          # Frontend : là, un vrai appel HTTP sur l'adresse publiée — il teste EN
+          # PLUS que la publication réseau fonctionne, ce qu'un healthcheck
+          # interne au conteneur ne voit pas.
+          echo -n "Frontend préprod ($ADDR_APP) : "
+          if [ -n "$ADDR_APP" ]; then
+            repond=0
+            for _ in $(seq 1 30); do
+              if curl -fsS --max-time 15 -o /dev/null "http://$ADDR_APP" 2>/dev/null; then
+                repond=1
+                break
+              fi
+              sleep 3
+            done
+            [ "$repond" -eq 1 ] && echo "répond" || { echo "MUET"; ok=0; }
+          else
+            echo "NON MESURÉ"
+          fi
 
           # TÉMOIN POSITIF — la PRODUCTION n'a pas bougé. Sans lui, « la préprod
           # répond » ne dirait rien de ce qu'on aurait pu casser à côté.

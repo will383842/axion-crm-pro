@@ -192,7 +192,36 @@ jobs:
           # reste du script (qui arrive par l'entrée standard) et tout ce qui suit
           # est silencieusement AVALÉ — défaut mesuré sur le déploiement b84100f,
           # où le job est resté VERT sans avoir rien exécuté.
-          ssh -o StrictHostKeyChecking=no "$USER@$HOST" 'bash -s' -- \
+          # 🔴 F41-002 (2026-08-24) — la connexion mourait DE SILENCE.
+          #
+          # Mesure du déploiement 7188298 : `horizon Recreated` à 04:50:01, puis
+          # QUATRE MINUTES ET DIX-SEPT SECONDES sans un octet, puis
+          # `client_loop: send disconnect: Broken pipe` et `exit code 255`. Le
+          # script n'a jamais atteint ses vérifications : ce n'était pas la
+          # préproduction qui répondait mal, c'était le tuyau qui avait lâché.
+          #
+          # Pendant un `docker compose up -d --build`, la connexion ne porte
+          # aucun trafic tant que le build n'écrit rien. Sans sonde de vie, un
+          # pare-feu ou un NAT intermédiaire la coupe.
+          #
+          # Le remède est DÉJÀ dans le dépôt, à un fichier d'ici : la production
+          # porte ces deux mêmes options dans `deploy-direct-ssh.yml`, dont le
+          # commentaire décrit exactement ce qui vient d'arriver ici — « elles
+          # empêchent la connexion de mourir DE SILENCE ». Elles n'avaient jamais
+          # été propagées sur ce second site. C'est le défaut A-011, le même que
+          # A-010 (le contrôle FastCGI) et que le verrou facultatif du
+          # `Dockerfile.frontend` : trois oublis de propagation, même journée.
+          #
+          # ⚠️ CE QUE CECI NE FAIT PAS — et la production le dit déjà : ces
+          # options n'empêchent que la mort par silence. Elles ne rendent pas le
+          # déploiement REPRENABLE. Si le tuyau tombe pour une autre raison
+          # (réseau coupé, serveur redémarré), on retombe dans le même angle
+          # mort. Lancer le script détaché côté serveur et interroger son état
+          # séparément reste À FAIRE, des deux côtés.
+          ssh -o StrictHostKeyChecking=no \
+              -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=10 \
+              "$USER@$HOST" 'bash -s' -- \
             "$EXPECTED_SHA" <<'REMOTE'
           set -euo pipefail
           EXPECTED_SHA="$1"

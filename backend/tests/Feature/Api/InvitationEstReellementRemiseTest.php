@@ -108,7 +108,8 @@ it('ecrit un jeton de definition de mot de passe, et n en garde que le CONDENSAT
     );
 
     // 64 caracteres aleatoires condenses en SHA-256 : 64 caracteres hexadecimaux.
-    expect($ligne->token)->toMatch('/^[0-9a-f]{64}$/',
+    expect($ligne->token)->toMatch(
+        '/^[0-9a-f]{64}$/',
         'Le jeton doit etre stocke CONDENSE. En clair, un administrateur qui lit '
         . 'la table peut prendre le compte qu il vient de creer.'
     );

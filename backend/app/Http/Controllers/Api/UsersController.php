@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Auth\PasswordResetController;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -262,7 +263,7 @@ class UsersController extends ApiController
         // et la personne se retrouverait avec un compte fantome impossible a
         // recreer (l'adresse serait « deja utilisee »).
         try {
-            $ttl = \App\Http\Controllers\Api\Auth\PasswordResetController::TOKEN_TTL_MINUTES;
+            $ttl = PasswordResetController::TOKEN_TTL_MINUTES;
 
             Mail::mailer(config('mail.auth_mailer'))->raw(
                 "Bonjour {$compte->name},\n\n"

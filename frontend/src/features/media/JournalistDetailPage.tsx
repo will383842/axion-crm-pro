@@ -116,7 +116,11 @@ export function JournalistDetailPage() {
   const { journalistId } = useParams({ strict: false });
   const queryClient = useQueryClient();
 
-  const [kind, setKind] = useState(KINDS[0].value);
+  // Valeur littérale, pas `KINDS[0].value` : `noUncheckedIndexedAccess` rend
+  // l'indexation d'un tableau potentiellement `undefined`, et surtout le défaut
+  // d'un formulaire ne doit pas dépendre de l'ORDRE d'une liste d'affichage —
+  // réordonner le menu changerait silencieusement ce qui est pré-sélectionné.
+  const [kind, setKind] = useState<string>("press_release_sent");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
 

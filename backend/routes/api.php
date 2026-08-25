@@ -150,6 +150,11 @@ Route::prefix('v1')->group(function () {
         Route::post('/journalists', [JournalistsController::class, 'store']);
         Route::get('/journalists/{journalist}', [JournalistsController::class, 'show']);
         Route::patch('/journalists/{journalist}', [JournalistsController::class, 'update']);
+        // Consignation d'un échange (appel, message LinkedIn, communiqué
+        // envoyé, réponse, retombée). Rien ne reçoit d'email dans ce système :
+        // la saisie manuelle n'est pas un pis-aller, c'est la seule source qui
+        // ne se trompe pas sur ce qui s'est réellement dit.
+        Route::post('/journalists/{journalist}/activities', [JournalistsController::class, 'logActivity']);
         Route::post('/journalists/{journalist}/opt-out', [JournalistsController::class, 'optOut']);
         Route::delete('/journalists/{journalist}', [JournalistsController::class, 'destroy']);
 

@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -134,9 +135,144 @@ class JournalistsController extends ApiController
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
+    /**
+     * Fiche d'un contact presse, AVEC sa timeline.
+     *
+     * La timeline est jointe ici plutôt que servie par un second appel : la
+     * question à laquelle cette fiche répond — « qu'est-ce que je lui ai envoyé
+     * et qu'est-ce qu'on s'est dit ? » — n'a pas de sens en deux moitiés. Une
+     * fiche affichée sans ses échanges donnerait à croire qu'il n'y en a pas.
+     */
     public function show(Journalist $journalist): JsonResponse
     {
-        return $this->ok($journalist->load('media'));
+        return $this->ok([
+            'data' => $journalist->load('media'),
+            'timeline' => $this->timeline($journalist),
+        ]);
+    }
+
+    /**
+     * Consigne un échange avec un journaliste (appel, message LinkedIn,
+     * communiqué envoyé, réponse reçue, retombée).
+     *
+     * ── Pourquoi la saisie manuelle est ici la bonne réponse ──────────────
+     * Rien dans ce système ne reçoit d'email : le relais est sortant seul.
+     * Capturer les réponses automatiquement demanderait une infrastructure
+     * entrante complète. À l'échelle d'un fichier presse, consigner à la main
+     * prend dix secondes et ne ment jamais sur ce qui s'est réellement dit —
+     * alors qu'un parseur de réponses se trompe en silence.
+     *
+     * `external_ref` porte une empreinte du geste : deux clics sur le même
+     * bouton ne créent qu'une ligne (l'index unique
+     * `activities_workspace_external_ref_key` s'en charge). Sans elle, un
+     * double-clic dédoublerait l'historique — et un historique qu'on soupçonne
+     * de compter double ne sert plus à décider.
+     */
+    public function logActivity(Request $request, Journalist $journalist): JsonResponse
+    {
+        $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
+        if (! $workspaceId) {
+            return $this->ok(['error' => 'workspace required'], 422);
+        }
+
+        $data = $request->validate([
+            'kind' => ['required', Rule::in(self::KINDS_PRESSE)],
+            'title' => ['required', 'string', 'max:300'],
+            'content' => ['nullable', 'string', 'max:5000'],
+            // Un échange se consigne souvent après coup — hier, la semaine
+            // dernière. On accepte donc une date passée, jamais future : « on
+            // s'est parlé demain » n'est pas un fait, c'est une faute de saisie.
+            'occurred_at' => ['nullable', 'date', 'before_or_equal:now'],
+        ]);
+
+        $occurredAt = isset($data['occurred_at']) ? new \DateTimeImmutable($data['occurred_at']) : now();
+
+        // Empreinte du geste : même journaliste + même nature + même minute +
+        // même titre ⇒ même ligne. La minute (et non la seconde) est le grain
+        // qui neutralise un double-clic sans empêcher de consigner deux
+        // échanges distincts le même jour.
+        $ref = 'console:journalist:' . $journalist->id . ':' . $data['kind'] . ':'
+            . $occurredAt->format('Y-m-d\TH:i') . ':' . substr(sha1($data['title']), 0, 12);
+
+        $existant = DB::table('activities')
+            ->where('workspace_id', $workspaceId)
+            ->where('external_ref', $ref)
+            ->first();
+
+        if ($existant !== null) {
+            return $this->ok([
+                'data' => $existant,
+                'deja_consigne' => true,
+            ]);
+        }
+
+        DB::table('activities')->insert([
+            'workspace_id' => $workspaceId,
+            'user_id' => optional($request->user())->id,
+            // `type` (texte libre, historique) reçoit la même valeur que `kind`
+            // le temps de la phase « expand » — cf. SiteSyncIngestService.
+            'type' => $data['kind'],
+            'kind' => $data['kind'],
+            'occurred_at' => $occurredAt,
+            'external_ref' => $ref,
+            'subject_type' => 'journalist',
+            'subject_id' => $journalist->id,
+            'title' => $data['title'],
+            'content' => $data['content'] ?? null,
+            'payload' => json_encode([
+                'surface' => 'console:journalists',
+                'saisie' => 'manuelle',
+            ], JSON_THROW_ON_ERROR),
+            'created_at' => now(),
+        ]);
+
+        return $this->ok(['timeline' => $this->timeline($journalist)], 201);
+    }
+
+    /**
+     * Natures d'échange proposées sur une fiche presse.
+     *
+     * Sous-ensemble volontaire de `Taxonomy::ACTIVITY_KINDS` : la fiche ne doit
+     * pas offrir `gdpr_erasure` ou `calendly_no_show` dans une liste déroulante
+     * de saisie d'échange. Restreindre ici n'affaiblit pas le CHECK — il reste
+     * la garde en base ; c'est l'inverse qui serait faux (proposer plus que ce
+     * que la base accepte).
+     *
+     * @var list<string>
+     */
+    private const KINDS_PRESSE = [
+        'press_release_sent',
+        'press_followup',
+        'press_reply',
+        'press_coverage',
+        'linkedin_message',
+        'call',
+    ];
+
+    /**
+     * Les échanges d'un journaliste, du plus récent au plus ancien.
+     *
+     * `occurred_at` d'abord, `created_at` en second : un échange consigné
+     * aujourd'hui mais daté du mois dernier doit se ranger à SA place dans
+     * l'histoire, pas en tête parce qu'on vient de le taper.
+     *
+     * @return array<int, object>
+     */
+    private function timeline(Journalist $journalist): array
+    {
+        $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
+        if (! $workspaceId || ! Schema::hasTable('activities')) {
+            return [];
+        }
+
+        return DB::table('activities')
+            ->where('workspace_id', $workspaceId)
+            ->where('subject_type', 'journalist')
+            ->where('subject_id', $journalist->id)
+            ->orderByRaw('coalesce(occurred_at, created_at) DESC')
+            ->limit(200)
+            ->get(['id', 'kind', 'type', 'title', 'content', 'occurred_at', 'created_at'])
+            ->all();
     }
 
     /**

@@ -143,7 +143,13 @@ Route::prefix('v1')->group(function () {
         Route::get('/journalists', [JournalistsController::class, 'index']);
         Route::get('/journalists/export', [JournalistsController::class, 'export'])
             ->middleware(['throttle:scraper-list', 'permission:data.export']);
+        // Création / modification manuelles (2026-08-25). Jusqu'ici la table
+        // n'était alimentée QUE par le scraping : aucun contact presse ne
+        // pouvait être ajouté à la main, ce qui rendait la base inutilisable
+        // pour des relations presse.
+        Route::post('/journalists', [JournalistsController::class, 'store']);
         Route::get('/journalists/{journalist}', [JournalistsController::class, 'show']);
+        Route::patch('/journalists/{journalist}', [JournalistsController::class, 'update']);
         Route::post('/journalists/{journalist}/opt-out', [JournalistsController::class, 'optOut']);
         Route::delete('/journalists/{journalist}', [JournalistsController::class, 'destroy']);
 

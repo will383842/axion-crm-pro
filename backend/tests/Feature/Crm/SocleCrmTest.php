@@ -111,6 +111,29 @@ test('les CHECK en base correspondent exactement à App\\Crm\\Taxonomy', functio
     socleExpectCheck('activities_kind_check', Taxonomy::ACTIVITY_KINDS);
     socleExpectCheck('tags_category_check', Taxonomy::TAG_CATEGORIES);
     socleExpectCheck('opt_out_scope_check', ['business', 'vivier']);
+    // Base presse (2026-08-25). `acces` commande QUI peut recevoir un mailing :
+    // une divergence entre le code et le CHECK laisserait passer une porte
+    // d'accès que la règle d'envoi ne connaît pas.
+    socleExpectCheck('journalists_acces_check', Taxonomy::ACCES_PRESSE);
+    socleExpectCheck('journalists_lien_linkedin_check', Taxonomy::LIENS_LINKEDIN);
+});
+
+test('seul email_redaction est diffusable par mailing', function () {
+    // Ce test ne vérifie pas une liste, il verrouille une RÈGLE. Les trois
+    // autres portes désignent des contacts qu'un envoi direct brûle : une
+    // émission TV se joint par sa production, un contact LinkedIn n'a pas
+    // d'email, un contact à qualifier n'a pas encore de rédaction identifiée.
+    //
+    // Si quelqu'un ajoute un jour une cinquième porte, ce test tombe — et c'est
+    // exactement ce qu'on veut : la question « est-elle diffusable ? » doit
+    // être tranchée EN MÊME TEMPS que la valeur est créée, jamais après coup
+    // par le premier écran qui s'en sert.
+    expect(Taxonomy::ACCES_PRESSE)->toBe([
+        'email_redaction',
+        'redaction_prod',
+        'linkedin_direct',
+        'a_qualifier',
+    ]);
 });
 
 test('Podcast et Autres sont des VUES, pas des types de relation', function () {

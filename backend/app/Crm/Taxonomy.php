@@ -135,6 +135,67 @@ final class Taxonomy
         'opt_out',
         'gdpr_export',
         'gdpr_erasure',
+        // ── Relations presse (2026-08-25) ──────────────────────────────────
+        // La timeline ne connaissait aucun geste de relations presse : un
+        // communiqué envoyé à un journaliste n'avait AUCUNE valeur de `kind`
+        // dans laquelle se ranger, donc aucun moyen d'être consigné. Le besoin
+        // exprimé — « savoir ce que j'ai envoyé à chacun et ce qu'on s'est
+        // dit » — se réduisait en grande partie à ces six lignes manquantes.
+        //
+        // `linkedin_message` et `call` sont volontairement génériques : ils
+        // servent la presse comme le reste du CRM. Les dupliquer en
+        // `press_call` aurait fabriqué deux vocabulaires pour un même geste.
+        'press_release_sent',
+        'press_followup',
+        'press_reply',
+        'press_coverage',
+        'linkedin_message',
+        'call',
+    ];
+
+    /**
+     * Par quelle PORTE on atteint un contact presse. Liste FERMÉE, et c'est
+     * délibéré : contrairement aux motifs d'échange (`crm_activites`, table
+     * ouverte et modifiable depuis la console), ceci n'est pas un réglage mais
+     * une RÈGLE DE DIFFUSION. Elle décide qui peut recevoir un mailing.
+     *
+     * Un `redaction_prod` (émission TV, radio, podcast) qui reçoit un
+     * communiqué en direct est un contact brûlé : on passe par la production.
+     * Un `linkedin_direct` n'a pas d'email du tout. Un `a_qualifier` n'a pas
+     * encore de rédaction identifiée. **Seul `email_redaction` est diffusable.**
+     * Rendre cette liste modifiable, ce serait permettre d'inventer une
+     * cinquième porte sans écrire la règle d'envoi qui va avec.
+     *
+     * @var list<string>
+     */
+    public const ACCES_PRESSE = [
+        'email_redaction',
+        'redaction_prod',
+        'linkedin_direct',
+        'a_qualifier',
+    ];
+
+    /**
+     * État de la relation LinkedIn avec un contact.
+     *
+     * Cinq états utiles et non un booléen : « demande envoyée, sans réponse
+     * depuis treize jours » n'est ni « en relation » ni « pas connecté », et
+     * c'est pourtant l'état qui appelle un geste. Un `bool $ami` écrase
+     * précisément l'information qui sert à piloter.
+     *
+     * `inconnu` est le défaut et n'est PAS un synonyme de `non_connecte` : ne
+     * pas savoir n'est pas savoir que non. Les confondre ferait compter comme
+     * « à inviter » des gens qu'on n'a simplement jamais regardés.
+     *
+     * @var list<string>
+     */
+    public const LIENS_LINKEDIN = [
+        'inconnu',
+        'non_connecte',
+        'demande_envoyee',
+        'connecte',
+        'abonne',
+        'refuse',
     ];
 
     /**

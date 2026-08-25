@@ -34,6 +34,7 @@ import {
   Newspaper,
   Mic,
   Scale,
+  Send,
   GraduationCap,
 } from 'lucide-react';
 import { cn, Tooltip } from '@/components/ui';
@@ -156,6 +157,9 @@ function sectionContacts(features: ConsoleFeatures): NavSection {
     { to: '/companies', label: 'Entreprises', icon: <Building2 className="h-4 w-4" />, dataTour: 'nav-companies' },
     { to: '/journalists', label: 'Journalistes', icon: <Mic className="h-4 w-4" /> },
     { to: '/media', label: 'Médias (presse)', icon: <Newspaper className="h-4 w-4" /> },
+    // Après les deux fiches, et non avant : le registre se lit une fois qu'on
+    // sait de qui il parle. Il ne consigne rien — la saisie reste sur la fiche.
+    { to: '/presse/envois', label: 'Communiqués envoyés', icon: <Send className="h-4 w-4" /> },
   );
 
   return { id: 'contacts', title: 'Contacts', items };

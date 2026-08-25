@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\LlmUseCasesController;
 use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\NotificationsController;
 use App\Http\Controllers\Api\ObservabilityController;
+use App\Http\Controllers\Api\PresseEnvoisController;
 use App\Http\Controllers\Api\Phase2\ColdEmailController;
 use App\Http\Controllers\Api\Phase2\LinkedInController;
 use App\Http\Controllers\Api\ProxyProvidersController;
@@ -140,6 +141,15 @@ Route::prefix('v1')->group(function () {
         Route::get('/media/export', [MediaController::class, 'export'])
             ->middleware(['throttle:scraper-list', 'permission:data.export']);
         Route::get('/media/{media}', [MediaController::class, 'show']);
+        // Consignation d'un geste presse sur une RÉDACTION (et non sur une
+        // personne) : Le Mémorial de l'Isère se joint à `redaction@…`, sans
+        // journaliste nommé. Cf. MediaController::logActivity().
+        Route::post('/media/{media}/activities', [MediaController::class, 'logActivity']);
+
+        // Registre des envois : « à qui a-t-on envoyé quoi, et quand ».
+        // AVANT les routes paramétrées ci-dessus dans l'ordre de lecture ? Non —
+        // le préfixe `/presse/` ne collisionne avec aucune d'elles.
+        Route::get('/presse/envois', [PresseEnvoisController::class, 'index']);
 
         Route::get('/journalists', [JournalistsController::class, 'index']);
         Route::get('/journalists/export', [JournalistsController::class, 'export'])

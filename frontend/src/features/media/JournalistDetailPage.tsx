@@ -1,9 +1,10 @@
-import { useState } from "react";
 import { Link, useParams } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Card, EmptyState, Input, PageHeader, Spinner, StatusPill } from "@/components/ui";
+import { useQuery } from "@tanstack/react-query";
+import { Button, Card, EmptyState, PageHeader, Spinner, StatusPill } from "@/components/ui";
 import { api } from "@/lib/api";
-import { toast } from "sonner";
+// Saisie et historique viennent du panneau partagé : cette page n'en détient
+// plus de copie. Cf. l'en-tête de `JournalPresse.tsx`.
+import { ConsignerEchange, HistoriqueEchanges, dateFr, type TimelineItem } from "./JournalPresse";
 
 /**
  * Fiche d'un contact presse : qui il est, par quelle porte on l'atteint, et
@@ -50,15 +51,6 @@ interface JournalistDetail {
   source_url: string | null;
 }
 
-interface TimelineItem {
-  id: number;
-  kind: string | null;
-  title: string | null;
-  content: string | null;
-  occurred_at: string | null;
-  created_at: string | null;
-}
-
 interface ShowResponse {
   data: JournalistDetail;
   timeline: TimelineItem[];
@@ -97,32 +89,8 @@ const LIENS: Record<string, string> = {
   refuse: "Demande déclinée",
 };
 
-const KINDS: Array<{ value: string; label: string }> = [
-  { value: "press_release_sent", label: "Communiqué envoyé" },
-  { value: "press_followup", label: "Relance" },
-  { value: "press_reply", label: "Réponse reçue" },
-  { value: "press_coverage", label: "Retombée publiée" },
-  { value: "linkedin_message", label: "Message LinkedIn" },
-  { value: "call", label: "Appel" },
-];
-
-function dateFr(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
-}
-
 export function JournalistDetailPage() {
   const { journalistId } = useParams({ strict: false });
-  const queryClient = useQueryClient();
-
-  // Valeur littérale, pas `KINDS[0].value` : `noUncheckedIndexedAccess` rend
-  // l'indexation d'un tableau potentiellement `undefined`, et surtout le défaut
-  // d'un formulaire ne doit pas dépendre de l'ORDRE d'une liste d'affichage —
-  // réordonner le menu changerait silencieusement ce qui est pré-sélectionné.
-  const [kind, setKind] = useState<string>("press_release_sent");
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
 
   const { data, isLoading, isError } = useQuery<ShowResponse>({
     queryKey: ["journalist", journalistId],
@@ -131,19 +99,6 @@ export function JournalistDetailPage() {
       return r.data;
     },
     enabled: !!journalistId,
-  });
-
-  const consigner = useMutation({
-    mutationFn: async () => {
-      await api.post(`/journalists/${journalistId}/activities`, { kind, title, content: content || null });
-    },
-    onSuccess: () => {
-      setTitle("");
-      setContent("");
-      toast.success("Échange consigné");
-      void queryClient.invalidateQueries({ queryKey: ["journalist", journalistId] });
-    },
-    onError: () => toast.error("La consignation a échoué"),
   });
 
   if (isLoading) {
@@ -289,76 +244,15 @@ export function JournalistDetailPage() {
           </Card>
         </div>
 
-        {/* ── Échanges ──────────────────────────────────────────────────── */}
+        {/* ── Échanges ─────────────────────────────────────────────────
+            Panneau PARTAGÉ avec la fiche rédaction (JournalPresse.tsx) :
+            une seconde copie aurait divergé au premier motif ajouté. */}
         <div className="space-y-6">
-          <Card>
-            <h2 className="mb-4 text-sm font-semibold text-slate-900 dark:text-white">Consigner un échange</h2>
-            <div className="space-y-3">
-              <select
-                value={kind}
-                onChange={(e) => setKind(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-              >
-                {KINDS.map((k) => (
-                  <option key={k.value} value={k.value}>
-                    {k.label}
-                  </option>
-                ))}
-              </select>
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="En une ligne : ce qui s'est passé"
-              />
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                rows={3}
-                placeholder="Détail (facultatif)"
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-              />
-              <Button
-                variant="primary"
-                size="md"
-                disabled={!title.trim() || consigner.isPending}
-                onClick={() => consigner.mutate()}
-              >
-                {consigner.isPending ? "Enregistrement…" : "Consigner"}
-              </Button>
-            </div>
-          </Card>
-
-          <Card padding="none" className="overflow-hidden">
-            <h2 className="border-b border-slate-200 px-5 py-4 text-sm font-semibold text-slate-900 dark:border-slate-800 dark:text-white">
-              Historique · {data.timeline.length}
-            </h2>
-            {data.timeline.length === 0 ? (
-              <p className="px-5 py-8 text-center text-sm text-slate-500">
-                Aucun échange consigné. Le premier communiqué envoyé apparaîtra ici.
-              </p>
-            ) : (
-              <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-                {data.timeline.map((t) => (
-                  <li key={t.id} className="px-5 py-3">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="text-sm font-medium text-slate-900 dark:text-white">
-                        {t.title ?? KINDS.find((k) => k.value === t.kind)?.label ?? t.kind}
-                      </span>
-                      <span className="shrink-0 text-xs text-slate-500 tabular-nums">
-                        {dateFr(t.occurred_at ?? t.created_at)}
-                      </span>
-                    </div>
-                    <span className="text-xs text-slate-500">
-                      {KINDS.find((k) => k.value === t.kind)?.label ?? t.kind}
-                    </span>
-                    {t.content && (
-                      <p className="mt-1 text-sm whitespace-pre-line text-slate-600 dark:text-slate-300">{t.content}</p>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
+          <ConsignerEchange
+            endpoint={`/journalists/${journalistId}/activities`}
+            queryKey={["journalist", journalistId]}
+          />
+          <HistoriqueEchanges timeline={data.timeline} />
         </div>
       </div>
     </div>

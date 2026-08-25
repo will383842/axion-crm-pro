@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, EmptyState, Spinner, cn } from "@/components/ui";
 import { api } from "@/lib/api";
 import { MEDIA_TYPE_OPTIONS, type MediaItem } from "./MediaListPage";
+import { ConsignerEchange, HistoriqueEchanges, type TimelineItem } from "./JournalPresse";
 
 interface JournalistItem {
   id: number;
@@ -25,6 +26,17 @@ interface MediaDetail extends MediaItem {
   parent?: MediaItem | null;
 }
 
+/**
+ * ⚠️ `GET /media/{id}` ne renvoie plus le média à la racine : il renvoie
+ * `{ data, timeline }`. La fiche part avec ses échanges dans le MÊME appel,
+ * parce qu'une fiche rendue sans eux laisse croire qu'il n'y en a pas — cf.
+ * `MediaController::show()`.
+ */
+interface ShowResponse {
+  data: MediaDetail;
+  timeline: TimelineItem[];
+}
+
 function typeLabel(v: string | null): string {
   return MEDIA_TYPE_OPTIONS.find((o) => o.value === v)?.label ?? v ?? "—";
 }
@@ -32,10 +44,10 @@ function typeLabel(v: string | null): string {
 export function MediaDetailPage() {
   const { mediaId } = useParams({ strict: false });
 
-  const { data, isLoading, isError } = useQuery<MediaDetail>({
+  const { data: reponse, isLoading, isError } = useQuery<ShowResponse>({
     queryKey: ["media", mediaId],
     queryFn: async () => {
-      const r = await api.get<MediaDetail>(`/media/${mediaId}`);
+      const r = await api.get<ShowResponse>(`/media/${mediaId}`);
       return r.data;
     },
     enabled: !!mediaId,
@@ -48,13 +60,16 @@ export function MediaDetailPage() {
       </div>
     );
   }
-  if (isError || !data) {
+  if (isError || !reponse?.data) {
     return (
       <div className="px-6 py-6">
         <EmptyState icon="📰" title="Média introuvable" description="Ce média n'existe pas ou a été supprimé." />
       </div>
     );
   }
+
+  const data = reponse.data;
+  const timeline = reponse.timeline ?? [];
 
   const familyLabel =
     data.media_family === "audiovisual_production"
@@ -200,6 +215,19 @@ export function MediaDetailPage() {
           </p>
         )}
       </Card>
+
+      {/* ── Suivi presse ────────────────────────────────────────────────
+          « Qu'est-ce qu'on leur a envoyé, et quand ». L'historique agrège les
+          échanges de la rédaction ET ceux de ses journalistes : un communiqué
+          envoyé à un journaliste du Mémorial est un échange avec Le Mémorial.
+          Chaque ligne dit « via Untel » quand elle est passée par une personne. */}
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <ConsignerEchange endpoint={`/media/${mediaId}/activities`} queryKey={["media", mediaId]} />
+        <HistoriqueEchanges
+          timeline={timeline}
+          vide="Aucun échange consigné avec cette rédaction — ni avec ses journalistes. Le premier communiqué envoyé apparaîtra ici."
+        />
+      </div>
 
       {/* Émissions / médias enfants */}
       {data.children && data.children.length > 0 ? (

@@ -145,10 +145,33 @@ class JournalistsController extends ApiController
      */
     public function show(Journalist $journalist): JsonResponse
     {
+        if ($this->horsWorkspace($journalist)) {
+            abort(404);
+        }
+
         return $this->ok([
             'data' => $journalist->load('media'),
             'timeline' => $this->timeline($journalist),
         ]);
+    }
+
+    /**
+     * Refuse une fiche qui n'appartient pas au workspace courant.
+     *
+     * Jumeau de `MediaController::horsWorkspace()`, et pour la même raison : la
+     * RLS posée sur `journalists` ne s'applique pas (rôle de connexion `axion`,
+     * `rolsuper` et `rolbypassrls` à `t` ; la migration
+     * `harden_workspace_isolation` reste inerte tant que
+     * `CRM_DB_APP_ROLE_ENABLED` vaut false — voir son en-tête). Et le modèle
+     * `Journalist` n'utilise pas `BelongsToWorkspace`. Sans ce contrôle, une
+     * fiche presse d'un autre workspace se lisait et s'annotait.
+     */
+    private function horsWorkspace(Journalist $journalist): bool
+    {
+        $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
+
+        return $workspaceId === null
+            || (string) $journalist->workspace_id !== (string) $workspaceId;
     }
 
     /**
@@ -170,6 +193,11 @@ class JournalistsController extends ApiController
      */
     public function logActivity(Request $request, Journalist $journalist): JsonResponse
     {
+        // Avant toute validation : on n'annote pas la fiche d'un autre workspace.
+        if ($this->horsWorkspace($journalist)) {
+            abort(404);
+        }
+
         $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
         if (! $workspaceId) {
             return $this->ok(['error' => 'workspace required'], 422);

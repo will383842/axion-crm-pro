@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\Crm\ContactsHubController;
 use App\Http\Controllers\Api\Crm\PersonTimelineController;
 use App\Http\Controllers\Api\FeaturesController;
 use App\Http\Controllers\Api\GlobalSearchController;
+use App\Http\Controllers\Api\JournalistAttachmentController;
 use App\Http\Controllers\Api\JournalistsController;
 use App\Http\Controllers\Api\LlmUsageController;
 use App\Http\Controllers\Api\LlmUseCasesController;
@@ -148,6 +149,10 @@ Route::prefix('v1')->group(function () {
         // pouvait être ajouté à la main, ce qui rendait la base inutilisable
         // pour des relations presse.
         Route::post('/journalists', [JournalistsController::class, 'store']);
+        // Rattachement des contacts presse a un media. AVANT /journalists/{journalist},
+        // sinon 'rattachement' serait pris pour un identifiant.
+        Route::get('/journalists/rattachement', [JournalistAttachmentController::class, 'index']);
+        Route::post('/journalists/rattachement', [JournalistAttachmentController::class, 'store']);
         Route::get('/journalists/{journalist}', [JournalistsController::class, 'show']);
         Route::patch('/journalists/{journalist}', [JournalistsController::class, 'update']);
         // Consignation d'un échange (appel, message LinkedIn, communiqué

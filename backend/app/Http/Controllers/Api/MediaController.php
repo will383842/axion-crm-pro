@@ -437,7 +437,7 @@ class MediaController extends ApiController
      * `occurred_at` d'abord, `created_at` en second : un échange consigné
      * aujourd'hui mais daté du mois dernier se range à SA place.
      *
-     * @return array<int, object>
+     * @return array<int, \stdClass>
      */
     private function timeline(Media $media): array
     {

@@ -241,7 +241,7 @@ class JournalistAttachmentController extends ApiController
     /**
      * Candidats médias pour une chaîne brute — crible indexé, puis score exact.
      *
-     * @return list<object>
+     * @return array<int, \stdClass>
      */
     private function candidats(string $workspaceId, string $raw): array
     {
@@ -328,7 +328,7 @@ class JournalistAttachmentController extends ApiController
      * `normalize_name` en PHP créerait une seconde vérité, et le jour où les
      * deux divergent, ce contrôle laisse passer ce qu'il devait arrêter.
      *
-     * @return list<object>
+     * @return array<int, \stdClass>
      */
     private function collisions(string $workspaceId, string $raw, int $mediaId): array
     {
@@ -394,7 +394,7 @@ class JournalistAttachmentController extends ApiController
         }
     }
 
-    /** @return list<object> */
+    /** @return array<int, \stdClass> */
     private function contacts(string $workspaceId, string $raw): array
     {
         return DB::table('journalists')

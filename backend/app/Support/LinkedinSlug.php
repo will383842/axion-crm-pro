@@ -75,7 +75,12 @@ final class LinkedinSlug
         // `/in/<slug>` et rien d'autre. Le segment peut être suivi d'une locale
         // (`/in/x/en`) ou d'un onglet (`/in/x/details/experience`) : on ne garde
         // que le segment qui suit `/in/`.
-        if (! preg_match('#/in/([^/?#]+)#i', $path, $m)) {
+        // ⚠️ Délimiteur `~` et NON `#` : le motif contient lui-même un `#` (dans
+        // la classe `[^/?#]`), et PHP ne le protège pas d'être lu comme fin de
+        // motif — même à l'intérieur d'une classe de caractères. Avec `#`,
+        // `preg_match` rendait `false` et « Internal error » : cette fonction
+        // ne renvoyait JAMAIS de slug. Mesuré le 2026-08-26, au rejeu du lot.
+        if (! preg_match('~/in/([^/?#]+)~i', $path, $m)) {
             return null;
         }
 
@@ -105,7 +110,9 @@ final class LinkedinSlug
         // profils non latins). On rejette tout ce qui contient un caractère de
         // structure d'URL résiduel : c'est le signe qu'on a mal découpé, et il
         // vaut mieux ne rien stocker qu'une clé fausse.
-        if ($slug === '' || preg_match('#[/?#\s]#', $slug)) {
+        // Même piège de délimiteur qu'au-dessus : `preg_match` rendait `false`,
+        // donc cette garde de structure ne rejetait RIEN.
+        if ($slug === '' || preg_match('~[/?#\s]~', $slug)) {
             return null;
         }
 

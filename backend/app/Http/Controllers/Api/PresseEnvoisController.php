@@ -118,7 +118,7 @@ class PresseEnvoisController extends ApiController
      * alors « fiche supprimée » plutôt que de masquer la ligne : l'envoi a bien
      * eu lieu, et un registre qui efface son passé ne sert plus de registre.
      *
-     * @param  array<int, object>  $lignes
+     * @param  array<int, \stdClass>  $lignes
      */
     private function resoudreCibles(array $lignes): void
     {

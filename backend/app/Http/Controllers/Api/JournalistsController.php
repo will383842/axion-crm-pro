@@ -463,7 +463,11 @@ class JournalistsController extends ApiController
             'source' => 'console',
         ]);
 
-        return $this->ok(['data' => $journalist->fresh()->load('media')], 201);
+        // `refresh()` et non `fresh()` : `fresh()` rend `Journalist|null` (la
+        // ligne peut avoir disparu entre-temps) et l'enchaîner sur `->load()`
+        // était un appel sur null en puissance. `refresh()` recharge en place et
+        // rend `$this` — même effet, sans le trou.
+        return $this->ok(['data' => $journalist->refresh()->load('media')], 201);
     }
 
     /**
@@ -500,7 +504,8 @@ class JournalistsController extends ApiController
 
         $journalist->update($data);
 
-        return $this->ok(['data' => $journalist->fresh()->load('media')]);
+        // Même raison qu'en `store()` : `fresh()` peut rendre null.
+        return $this->ok(['data' => $journalist->refresh()->load('media')]);
     }
 
     /**
@@ -603,7 +608,9 @@ class JournalistsController extends ApiController
             'motif' => $motif,
             'first_name' => $j->first_name,
             'last_name' => $j->last_name,
-            'media' => $j->media?->name ?? $j->media_raw,
+            // `->name` et non `?->name` : `??` couvre déjà le cas où la relation
+            // est absente, et PHPStan refuse la double protection comme du bruit.
+            'media' => $j->media->name ?? $j->media_raw,
             'beat' => $j->beat,
             'source' => $j->source,
             'source_url' => $j->source_url,

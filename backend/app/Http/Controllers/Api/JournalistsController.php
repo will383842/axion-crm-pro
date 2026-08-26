@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Crm\Outbound\ConsentOutboundRecorder;
+use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Http\Requests\StoreJournalistRequest;
 use App\Http\Requests\UpdateJournalistRequest;
 use App\Models\Journalist;
@@ -28,6 +29,11 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class JournalistsController extends ApiController
 {
+    // G43-005 — toute écriture de ce contrôleur passe par le verrou optimiste :
+    // sans lui, deux saisies concurrentes sur la même fiche presse se perdent
+    // en silence. Cf. `App\Http\Controllers\Concerns\VerrouOptimiste`.
+    use VerrouOptimiste;
+
     public function index(Request $r): JsonResponse
     {
         $perPage = min(100, max(1, (int) $r->query('per_page', 25)));
@@ -255,25 +261,6 @@ class JournalistsController extends ApiController
     }
 
     /**
-     * Refuse une fiche qui n'appartient pas au workspace courant.
-     *
-     * Jumeau de `MediaController::horsWorkspace()`, et pour la même raison : la
-     * RLS posée sur `journalists` ne s'applique pas (rôle de connexion `axion`,
-     * `rolsuper` et `rolbypassrls` à `t` ; la migration
-     * `harden_workspace_isolation` reste inerte tant que
-     * `CRM_DB_APP_ROLE_ENABLED` vaut false — voir son en-tête). Et le modèle
-     * `Journalist` n'utilise pas `BelongsToWorkspace`. Sans ce contrôle, une
-     * fiche presse d'un autre workspace se lisait et s'annotait.
-     */
-    private function horsWorkspace(Journalist $journalist): bool
-    {
-        $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
-
-        return $workspaceId === null
-            || (string) $journalist->workspace_id !== (string) $workspaceId;
-    }
-
-    /**
      * Consigne un échange avec un journaliste (appel, message LinkedIn,
      * communiqué envoyé, réponse reçue, retombée).
      *
@@ -293,9 +280,9 @@ class JournalistsController extends ApiController
     public function logActivity(Request $request, Journalist $journalist): JsonResponse
     {
         // Avant toute validation : on n'annote pas la fiche d'un autre workspace.
-        if ($this->horsWorkspace($journalist)) {
-            abort(404);
-        }
+        // ⚠️ La pièce partagée d'`ApiController`, pas une garde locale : c'est
+        // celle que le recensement B12-001 reconnaît.
+        $this->refuserHorsEspace($journalist);
 
         $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
         if (! $workspaceId) {
@@ -478,6 +465,22 @@ class JournalistsController extends ApiController
      */
     public function update(UpdateJournalistRequest $request, Journalist $journalist): JsonResponse
     {
+        // Deux gardes que le lot presse ne portait pas, parce qu'il est
+        // antérieur aux recensements qui les exigent :
+        //
+        // B12-001 — la résolution de route rend la fiche qui porte cet
+        // identifiant, quel qu'en soit le propriétaire. Sans ce refus, on
+        // modifiait la fiche presse d'un autre client.
+        $this->refuserHorsEspace($journalist);
+
+        // G43-005 — sans verrou, deux saisies concurrentes se perdent EN
+        // SILENCE : le second enregistrement écrase le premier sans que
+        // personne ne l'apprenne. Le contrôle précède la validation, comme en
+        // `CompaniesController` : un conflit d'édition n'est pas une faute de
+        // saisie, et annoncer un 422 sur un formulaire qui ne devait de toute
+        // façon pas être écrit brouille le diagnostic.
+        $this->refuserSiVersionPerimee($request, $journalist);
+
         $data = $request->validated();
 
         if (array_key_exists('linkedin_url', $data)) {

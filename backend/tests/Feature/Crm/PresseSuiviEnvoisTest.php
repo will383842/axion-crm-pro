@@ -53,6 +53,12 @@ beforeEach(function () {
         'joined_at' => now(),
     ]);
 
+    // Voir PresseEnvoisCroisementsTest : `user_workspaces` est la table maison,
+    // le middleware `permission:` interroge Spatie. Il faut les DEUX, et le
+    // contexte d'équipe avant le rôle.
+    setPermissionsTeamId($this->workspace->id);
+    $this->user->assignRole('owner');
+
     $this->actingAs($this->user);
 
     $this->mediaId = (int) DB::table('media')->insertGetId([

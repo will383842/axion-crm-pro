@@ -374,9 +374,13 @@ class JournalistAttachmentController extends ApiController
      */
     private function promouvoirVersLeMedia(string $workspaceId, int $mediaId, string $raw): void
     {
+        // `whereNull('deleted_at')` (garde B10-016) : une fiche effacée ne doit
+        // pas servir de source pour déduire la portée d'une rédaction — sinon
+        // une donnée qu'on s'est engagé à oublier continue d'agir sur la base.
         $source = DB::table('journalists')
             ->where('workspace_id', $workspaceId)
             ->where('media_raw', $raw)
+            ->whereNull('deleted_at')
             ->whereNotNull('media_portee_raw')
             ->first(['media_portee_raw']);
 
@@ -389,6 +393,7 @@ class JournalistAttachmentController extends ApiController
         if ($zone !== null) {
             DB::table('media')
                 ->where('id', $mediaId)
+                ->whereNull('deleted_at')
                 ->whereNull('diffusion_zone')
                 ->update(['diffusion_zone' => $zone]);
         }

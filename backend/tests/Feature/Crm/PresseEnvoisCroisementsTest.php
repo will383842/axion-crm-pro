@@ -44,6 +44,14 @@ beforeEach(function () {
         'joined_at' => now(),
     ]);
 
+    // ⚠️ `user_workspaces.role_slug` est la table MAISON ; le middleware
+    // `permission:` interroge Spatie (`model_has_roles`, portée par équipe).
+    // Poser l'une sans l'autre donnait un compte « owner » à qui l'API
+    // répondait 403 sur toute écriture. Les deux, dans cet ordre : le contexte
+    // d'équipe D'ABORD, sinon le rôle est attribué à l'équipe `null`.
+    setPermissionsTeamId($this->workspace->id);
+    $this->user->assignRole('owner');
+
     $this->actingAs($this->user);
 
     $this->mediaId = (int) DB::table('media')->insertGetId([

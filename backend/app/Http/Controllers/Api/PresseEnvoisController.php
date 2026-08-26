@@ -134,7 +134,12 @@ class PresseEnvoisController extends ApiController
 
         $medias = [];
         if ($idsMedia !== [] && Schema::hasTable('media')) {
-            foreach (DB::table('media')->whereIn('id', $idsMedia)->get(['id', 'name']) as $m) {
+            // ⚠️ `whereNull('deleted_at')` : une fiche effacée au titre du RGPD
+            // ne doit pas voir son nom ressortir ici. La ligne d'envoi, elle,
+            // RESTE — l'envoi a bien eu lieu — et s'affiche « fiche supprimée »,
+            // ce qui est exactement le comportement voulu plus bas. Garde
+            // B10-016 : une lecture aveugle au `deleted_at` est un site de fuite.
+            foreach (DB::table('media')->whereIn('id', $idsMedia)->whereNull('deleted_at')->get(['id', 'name']) as $m) {
                 $medias[(string) $m->id] = $m->name;
             }
         }
@@ -144,7 +149,8 @@ class PresseEnvoisController extends ApiController
             // Pas de `full_name` : la colonne n'existe pas (mesuré en base le
             // 2026-08-25) et le modèle n'a pas d'accesseur. Le nom se compose.
             $colonnes = ['id', 'first_name', 'last_name', 'media_id'];
-            foreach (DB::table('journalists')->whereIn('id', $idsJournaliste)->get($colonnes) as $j) {
+            // Même raison : un journaliste effacé ne reparaît pas nommément.
+            foreach (DB::table('journalists')->whereIn('id', $idsJournaliste)->whereNull('deleted_at')->get($colonnes) as $j) {
                 $journalistes[(string) $j->id] = $j;
             }
 
@@ -154,7 +160,7 @@ class PresseEnvoisController extends ApiController
                 $journalistes,
             )));
             if ($idsRedaction !== [] && Schema::hasTable('media')) {
-                foreach (DB::table('media')->whereIn('id', $idsRedaction)->get(['id', 'name']) as $m) {
+                foreach (DB::table('media')->whereIn('id', $idsRedaction)->whereNull('deleted_at')->get(['id', 'name']) as $m) {
                     $medias[(string) $m->id] = $m->name;
                 }
             }

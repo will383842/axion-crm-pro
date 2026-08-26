@@ -259,35 +259,6 @@ class MediaController extends ApiController
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8'] + PlafondExport::entetes());
     }
 
-    /**
-     * Refuse une fiche qui n'appartient pas au workspace courant.
-     *
-     * ── Pourquoi ce garde-fou est APPLICATIF et non délégué à la base ───────
-     * Le dépôt pose une RLS stricte sur `media` (policy
-     * `media_workspace_isolation`, `FORCE ROW LEVEL SECURITY`). Elle ne
-     * s'applique PAS : le rôle de connexion est `axion`, `rolsuper = t` et
-     * `rolbypassrls = t`, et la migration `harden_workspace_isolation` est
-     * explicitement inerte tant que `CRM_DB_APP_ROLE_ENABLED` vaut false (voir
-     * son en-tête, § « Pourquoi c'est INERTE au déploiement »).
-     *
-     * Or `Media` n'utilise pas le trait `BelongsToWorkspace` : sans ce contrôle,
-     * `GET /media/{id}` rendait 200 sur la fiche d'un AUTRE workspace. Mesuré le
-     * 2026-08-25 par `PresseEnvoisCroisementsTest`, qui échouait en rendant 200
-     * là où il attendait 404.
-     *
-     * Le jour où le rôle durci sera activé, ce contrôle deviendra redondant —
-     * et c'est très bien : une isolation portée à deux endroits vaut mieux
-     * qu'une isolation portée par une garde qu'on croit active et qui ne l'est
-     * pas.
-     */
-    private function horsWorkspace(Media $media): bool
-    {
-        $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
-
-        return $workspaceId === null
-            || (string) $media->workspace_id !== (string) $workspaceId;
-    }
-
     public function show(Media $media): JsonResponse
     {
         // Constat B12-001 / F36-005 : la resolution de route rendait
@@ -340,9 +311,12 @@ class MediaController extends ApiController
         // autre workspace. Sans ce refus, l'écriture aurait été acceptée et
         // rangée dans le workspace de l'appelant, en pointant une fiche
         // étrangère — une ligne d'historique impossible à interpréter ensuite.
-        if ($this->horsWorkspace($media)) {
-            abort(404);
-        }
+        // ⚠️ `refuserHorsEspace()` et NON une garde locale : la garde B12-001
+        // recense les méthodes qui reçoivent un modèle cloisonné par résolution
+        // de route, et exige CETTE pièce-là — celle d'`ApiController`. Réécrire
+        // la sienne, c'est le patron A-011 qui recommence, et le recensement
+        // ne la reconnaît pas.
+        $this->refuserHorsEspace($media);
 
         $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
         if (! $workspaceId) {

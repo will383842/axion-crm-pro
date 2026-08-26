@@ -8,6 +8,7 @@ use App\Http\Middleware\SetCurrentWorkspace;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -37,12 +38,46 @@ return Application::configure(basePath: dirname(__DIR__))
         // Ne pas le réajouter manuellement sur web (double-bind = double-exec).
         $middleware->statefulApi();
 
-        $middleware->api(append: [
-            SetCurrentWorkspace::class,
-            EnforceFirstLoginSetup::class,
-            EnsureTwoFactorPassed::class,
-            AuditHashChainLogger::class,
-        ]);
+        // (C) L'ORDRE DE CES MIDDLEWARES N'EST PAS COSMETIQUE.
+        //
+        // Le groupe `api` de Laravel 12 vaut, par defaut :
+        //   EnsureFrontendRequestsAreStateful -> throttle -> SubstituteBindings
+        //
+        // En `append:` seul, `SetCurrentWorkspace` atterrissait APRES
+        // `SubstituteBindings`. La resolution implicite des modeles
+        // (`show(Media $media)` -> `findOrFail`) interrogeait donc Postgres
+        // AVANT que la session var `app.current_workspace_id` ne soit posee.
+        // Or la policy RLS echoue FERMEE :
+        //   workspace_id::text = NULLIF(current_setting('app.…', true), '')
+        // variable absente -> NULLIF rend NULL -> `colonne = NULL` rend NULL ->
+        // zero ligne -> `ModelNotFoundException` -> 404.
+        //
+        // Effet mesure en production le 2026-08-26 : TOUTES les fiches de
+        // detail repondaient 404 (medias, journalistes) ou 500 (entreprises),
+        // et ce depuis le 2026-08-14 — date a laquelle la migration
+        // `harden_workspace_isolation` a rendu la RLS reellement contraignante.
+        // Les listes survivaient parce que leur requete part du CORPS du
+        // controleur, donc apres toute la chaine. Invisible en local, ou la RLS
+        // est inerte : c'est la prod qui porte le drapeau.
+        //
+        // ❌ NE PAS « corriger » avec `prepend:` : cela placerait
+        // `SetCurrentWorkspace` avant `EnsureFrontendRequestsAreStateful`,
+        // `$request->user()` rendrait null, et le middleware sortirait en
+        // silence sur son propre garde-fou. Le defaut survivrait a l'identique
+        // — SANS que rien ne rougisse. Il faut la position EXACTE ci-dessous :
+        // apres l'authentification, avant le binding.
+        //
+        // Verrouille par tests/Unit/Http/ContexteWorkspaceAvantBindingTest.php.
+        $middleware->api(
+            remove: [SubstituteBindings::class],
+            append: [
+                SetCurrentWorkspace::class,
+                SubstituteBindings::class,
+                EnforceFirstLoginSetup::class,
+                EnsureTwoFactorPassed::class,
+                AuditHashChainLogger::class,
+            ],
+        );
 
         $middleware->alias([
             'workspace' => SetCurrentWorkspace::class,

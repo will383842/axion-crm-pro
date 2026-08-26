@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\Crm\PersonTimelineController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\FeaturesController;
 use App\Http\Controllers\Api\GlobalSearchController;
+use App\Http\Controllers\Api\JournalistAttachmentController;
 use App\Http\Controllers\Api\JournalistsController;
 use App\Http\Controllers\Api\LlmUsageController;
 use App\Http\Controllers\Api\LlmUseCasesController;
@@ -27,6 +28,7 @@ use App\Http\Controllers\Api\NotificationsController;
 use App\Http\Controllers\Api\ObservabilityController;
 use App\Http\Controllers\Api\Phase2\ColdEmailController;
 use App\Http\Controllers\Api\Phase2\LinkedInController;
+use App\Http\Controllers\Api\PresseEnvoisController;
 use App\Http\Controllers\Api\ProxyProvidersController;
 use App\Http\Controllers\Api\ReferentielsGeoController;
 use App\Http\Controllers\Api\RgpdRequestsController;
@@ -187,11 +189,46 @@ Route::prefix('v1')->group(function () {
         Route::get('/media/export', [MediaController::class, 'export'])
             ->middleware(['throttle:scraper-list', 'permission:data.export']);
         Route::get('/media/{media}', [MediaController::class, 'show']);
+        // Consignation d'un geste presse sur une RÉDACTION (et non sur une
+        // personne) : Le Mémorial de l'Isère se joint à `redaction@…`, sans
+        // journaliste nommé. Cf. MediaController::logActivity().
+        Route::post('/media/{media}/activities', [MediaController::class, 'logActivity'])
+            ->middleware('permission:companies.update');
+
+        // Registre des envois : « à qui a-t-on envoyé quoi, et quand ».
+        // AVANT les routes paramétrées ci-dessus dans l'ordre de lecture ? Non —
+        // le préfixe `/presse/` ne collisionne avec aucune d'elles.
+        Route::get('/presse/envois', [PresseEnvoisController::class, 'index']);
 
         Route::get('/journalists', [JournalistsController::class, 'index']);
         Route::get('/journalists/export', [JournalistsController::class, 'export'])
             ->middleware(['throttle:scraper-list', 'permission:data.export']);
+        // Création / modification manuelles (2026-08-25). Jusqu'ici la table
+        // n'était alimentée QUE par le scraping : aucun contact presse ne
+        // pouvait être ajouté à la main, ce qui rendait la base inutilisable
+        // pour des relations presse.
+        Route::post('/journalists', [JournalistsController::class, 'store'])
+            ->middleware('permission:companies.create');
+        // Rattachement des contacts presse a un media. AVANT /journalists/{journalist},
+        // sinon 'rattachement' serait pris pour un identifiant.
+        Route::get('/journalists/rattachement', [JournalistAttachmentController::class, 'index']);
+        Route::post('/journalists/rattachement', [JournalistAttachmentController::class, 'store'])
+            ->middleware('permission:companies.update');
         Route::get('/journalists/{journalist}', [JournalistsController::class, 'show']);
+        // ⚠️ Rejeu du 2026-08-26 : le lot presse venait d'une branche ANTÉRIEURE
+        // au durcissement des permissions de `main` (§2.10). Ses routes
+        // d'écriture arrivaient donc nues. Les reprendre telles quelles aurait
+        // ouvert des écritures sans garde — on étend au contraire la convention
+        // de `main` à toutes les nouvelles routes : une écriture porte toujours
+        // une permission.
+        Route::patch('/journalists/{journalist}', [JournalistsController::class, 'update'])
+            ->middleware('permission:companies.update');
+        // Consignation d'un échange (appel, message LinkedIn, communiqué
+        // envoyé, réponse, retombée). Rien ne reçoit d'email dans ce système :
+        // la saisie manuelle n'est pas un pis-aller, c'est la seule source qui
+        // ne se trompe pas sur ce qui s'est réellement dit.
+        Route::post('/journalists/{journalist}/activities', [JournalistsController::class, 'logActivity'])
+            ->middleware('permission:companies.update');
         Route::post('/journalists/{journalist}/opt-out', [JournalistsController::class, 'optOut'])
             ->middleware('permission:rgpd.handle');
         Route::delete('/journalists/{journalist}', [JournalistsController::class, 'destroy'])

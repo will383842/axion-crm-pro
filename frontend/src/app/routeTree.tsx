@@ -17,6 +17,8 @@ import { ContactsRoute } from '@/features/contacts/ContactsRoute';
 import { MediaListPage } from '@/features/media/MediaListPage';
 import { MediaDetailPage } from '@/features/media/MediaDetailPage';
 import { JournalistsListPage } from '@/features/media/JournalistsListPage';
+import { JournalistDetailPage } from '@/features/media/JournalistDetailPage';
+import { EnvoisPressePage } from '@/features/media/EnvoisPressePage';
 import { CoveragePage } from '@/features/coverage/CoveragePage';
 import { ScraperRunsPage } from '@/features/scraping/ScraperRunsPage';
 import { LlmRouterPage } from '@/features/llm/LlmRouterPage';
@@ -108,6 +110,8 @@ const roumanieRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/i
 const mediaRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/media', component: MediaListPage });
 const mediaDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/media/$mediaId', component: MediaDetailPage });
 const journalistsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/journalists', component: JournalistsListPage });
+const journalistDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/journalists/$journalistId', component: JournalistDetailPage });
+const envoisPresseRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/presse/envois', component: EnvoisPressePage });
 const coverageRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/coverage', component: CoveragePage });
 const scraperRunsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/scraper-runs', component: ScraperRunsPage });
 const llmRouterRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/llm/router', component: LlmRouterPage });
@@ -279,6 +283,8 @@ export const routeTree = rootRoute.addChildren([
     mediaRoute,
     mediaDetailRoute,
     journalistsRoute,
+    envoisPresseRoute,
+    journalistDetailRoute,
     coverageRoute,
     scraperRunsRoute,
     llmRouterRoute,

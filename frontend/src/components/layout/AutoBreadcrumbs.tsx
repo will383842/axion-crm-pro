@@ -76,6 +76,12 @@ const LABELS: Record<string, string> = {
   '/console/vivier': 'Vivier candidats',
   '/console/arbitrage': 'À arbitrer',
   '/console/personnes': 'Personnes',
+  // 2026-08-26 — registre des envois presse. `/presse` est un segment
+  // INTERMÉDIAIRE : aucun écran ne lui répond, mais il s'affiche dans le fil
+  // avant `/presse/envois`. Sans libellé, le fil montrait « presse » en brut.
+  // C'est la garde D23-006 qui l'a vu, et elle a nommé le geste à faire.
+  '/presse': 'Relations presse',
+  '/presse/envois': 'Envois de communiqués',
   // F7 — `/crm` et `/analytics` retirés du routeur : plus de libellé à mapper.
 };
 

@@ -2,10 +2,12 @@
 
 use App\Models\User;
 use App\Models\Workspace;
+use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -44,12 +46,18 @@ beforeEach(function () {
         'joined_at' => now(),
     ]);
 
-    // ⚠️ `user_workspaces.role_slug` est la table MAISON ; le middleware
-    // `permission:` interroge Spatie (`model_has_roles`, portée par équipe).
-    // Poser l'une sans l'autre donnait un compte « owner » à qui l'API
-    // répondait 403 sur toute écriture. Les deux, dans cet ordre : le contexte
-    // d'équipe D'ABORD, sinon le rôle est attribué à l'équipe `null`.
-    setPermissionsTeamId($this->workspace->id);
+    // ⚠️ TROIS gestes, pas un — c'est le motif des tests de `main` qui touchent
+    // une route protégée (cf. ActionsDeMasseTagsTest) :
+    //   1. SEMER les rôles : `RefreshDatabase` rend une base nue, et
+    //      `assignRole('owner')` y lève `RoleDoesNotExist`.
+    //   2. Poser le contexte d'ÉQUIPE : Spatie porte les rôles par workspace ;
+    //      sans lui, le rôle est attribué à l'équipe `null` et ne sert à rien.
+    //   3. Attribuer le rôle.
+    // `user_workspaces.role_slug` est la table MAISON et ne suffit pas : le
+    // middleware `permission:` interroge Spatie. Poser l'une sans l'autre
+    // donnait un compte « owner » à qui l'API répondait 403 sur toute écriture.
+    $this->seed(PermissionsAndRolesSeeder::class);
+    app(PermissionRegistrar::class)->setPermissionsTeamId($this->workspace->id);
     $this->user->assignRole('owner');
 
     $this->actingAs($this->user);

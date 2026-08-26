@@ -2,10 +2,12 @@
 
 use App\Models\User;
 use App\Models\Workspace;
+use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -53,10 +55,10 @@ beforeEach(function () {
         'joined_at' => now(),
     ]);
 
-    // Voir PresseEnvoisCroisementsTest : `user_workspaces` est la table maison,
-    // le middleware `permission:` interroge Spatie. Il faut les DEUX, et le
-    // contexte d'équipe avant le rôle.
-    setPermissionsTeamId($this->workspace->id);
+    // Voir PresseEnvoisCroisementsTest pour le détail : semer les rôles, poser
+    // le contexte d'équipe, puis attribuer. Dans cet ordre, et les trois.
+    $this->seed(PermissionsAndRolesSeeder::class);
+    app(PermissionRegistrar::class)->setPermissionsTeamId($this->workspace->id);
     $this->user->assignRole('owner');
 
     $this->actingAs($this->user);

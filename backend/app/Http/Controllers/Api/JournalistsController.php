@@ -3,14 +3,21 @@
 namespace App\Http\Controllers\Api;
 
 use App\Crm\Outbound\ConsentOutboundRecorder;
+use App\Http\Controllers\Concerns\VerrouOptimiste;
+use App\Http\Requests\StoreJournalistRequest;
+use App\Http\Requests\UpdateJournalistRequest;
 use App\Models\Journalist;
 use App\Support\EligibiliteCampagne;
+use App\Support\LinkedinSlug;
 use App\Support\MasquageCoordonnees;
 use App\Support\PlafondExport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use RuntimeException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -22,6 +29,11 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class JournalistsController extends ApiController
 {
+    // G43-005 — toute écriture de ce contrôleur passe par le verrou optimiste :
+    // sans lui, deux saisies concurrentes sur la même fiche presse se perdent
+    // en silence. Cf. `App\Http\Controllers\Concerns\VerrouOptimiste`.
+    use VerrouOptimiste;
+
     public function index(Request $r): JsonResponse
     {
         $perPage = min(100, max(1, (int) $r->query('per_page', 25)));
@@ -215,6 +227,14 @@ class JournalistsController extends ApiController
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8'] + PlafondExport::entetes());
     }
 
+    /**
+     * Fiche d'un contact presse, AVEC sa timeline.
+     *
+     * La timeline est jointe ici plutôt que servie par un second appel : la
+     * question à laquelle cette fiche répond — « qu'est-ce que je lui ai envoyé
+     * et qu'est-ce qu'on s'est dit ? » — n'a pas de sens en deux moitiés. Une
+     * fiche affichée sans ses échanges donnerait à croire qu'il n'y en a pas.
+     */
     public function show(Journalist $journalist): JsonResponse
     {
         // Constat B12-001 / F36-005 : la resolution de route rendait
@@ -227,7 +247,378 @@ class JournalistsController extends ApiController
         // exactement le defaut decrit sur `companies`, sur la famille de
         // donnees la plus sensible. `masquerSiRequis` descend aussi dans
         // `media`, deja chargee.
-        return $this->ok(MasquageCoordonnees::masquerSiRequis($journalist->load('media')));
+        //
+        // ⚠️ Rejeu du 2026-08-26 : le lot presse est antérieur à ce masquage et
+        // rendait la fiche en clair. Sur la table la plus sensible du CRM, le
+        // reprendre tel quel aurait rouvert la fuite en croyant n'ajouter
+        // qu'une timeline. Les deux apports se cumulent.
+        $fiche = MasquageCoordonnees::masquerSiRequis($journalist->load('media'));
+
+        return $this->ok([
+            'data' => $fiche,
+            'timeline' => $this->timeline($journalist),
+        ]);
+    }
+
+    /**
+     * Consigne un échange avec un journaliste (appel, message LinkedIn,
+     * communiqué envoyé, réponse reçue, retombée).
+     *
+     * ── Pourquoi la saisie manuelle est ici la bonne réponse ──────────────
+     * Rien dans ce système ne reçoit d'email : le relais est sortant seul.
+     * Capturer les réponses automatiquement demanderait une infrastructure
+     * entrante complète. À l'échelle d'un fichier presse, consigner à la main
+     * prend dix secondes et ne ment jamais sur ce qui s'est réellement dit —
+     * alors qu'un parseur de réponses se trompe en silence.
+     *
+     * `external_ref` porte une empreinte du geste : deux clics sur le même
+     * bouton ne créent qu'une ligne (l'index unique
+     * `activities_workspace_external_ref_key` s'en charge). Sans elle, un
+     * double-clic dédoublerait l'historique — et un historique qu'on soupçonne
+     * de compter double ne sert plus à décider.
+     */
+    public function logActivity(Request $request, Journalist $journalist): JsonResponse
+    {
+        // Avant toute validation : on n'annote pas la fiche d'un autre workspace.
+        // ⚠️ La pièce partagée d'`ApiController`, pas une garde locale : c'est
+        // celle que le recensement B12-001 reconnaît.
+        $this->refuserHorsEspace($journalist);
+
+        $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
+        if (! $workspaceId) {
+            return $this->ok(['error' => 'workspace required'], 422);
+        }
+
+        $data = $request->validate([
+            'kind' => ['required', Rule::in(self::KINDS_PRESSE)],
+            'title' => ['required', 'string', 'max:300'],
+            'content' => ['nullable', 'string', 'max:5000'],
+            // Un échange se consigne souvent après coup — hier, la semaine
+            // dernière. On accepte donc une date passée, jamais future : « on
+            // s'est parlé demain » n'est pas un fait, c'est une faute de saisie.
+            'occurred_at' => ['nullable', 'date', 'before_or_equal:now'],
+        ]);
+
+        $occurredAt = isset($data['occurred_at']) ? new \DateTimeImmutable($data['occurred_at']) : now();
+
+        // Empreinte du geste : même journaliste + même nature + même minute +
+        // même titre ⇒ même ligne. La minute (et non la seconde) est le grain
+        // qui neutralise un double-clic sans empêcher de consigner deux
+        // échanges distincts le même jour.
+        $ref = 'console:journalist:' . $journalist->id . ':' . $data['kind'] . ':'
+            . $occurredAt->format('Y-m-d\TH:i') . ':' . substr(sha1($data['title']), 0, 12);
+
+        $existant = DB::table('activities')
+            ->where('workspace_id', $workspaceId)
+            ->where('external_ref', $ref)
+            ->first();
+
+        if ($existant !== null) {
+            return $this->ok([
+                'data' => $existant,
+                'deja_consigne' => true,
+            ]);
+        }
+
+        DB::table('activities')->insert([
+            'workspace_id' => $workspaceId,
+            'user_id' => optional($request->user())->id,
+            // `type` (texte libre, historique) reçoit la même valeur que `kind`
+            // le temps de la phase « expand » — cf. SiteSyncIngestService.
+            'type' => $data['kind'],
+            'kind' => $data['kind'],
+            'occurred_at' => $occurredAt,
+            'external_ref' => $ref,
+            'subject_type' => 'journalist',
+            'subject_id' => $journalist->id,
+            'title' => $data['title'],
+            'content' => $data['content'] ?? null,
+            'payload' => json_encode([
+                'surface' => 'console:journalists',
+                'saisie' => 'manuelle',
+            ], JSON_THROW_ON_ERROR),
+            'created_at' => now(),
+        ]);
+
+        return $this->ok(['timeline' => $this->timeline($journalist)], 201);
+    }
+
+    /**
+     * Natures d'échange proposées sur une fiche presse.
+     *
+     * Sous-ensemble volontaire de `Taxonomy::ACTIVITY_KINDS` : la fiche ne doit
+     * pas offrir `gdpr_erasure` ou `calendly_no_show` dans une liste déroulante
+     * de saisie d'échange. Restreindre ici n'affaiblit pas le CHECK — il reste
+     * la garde en base ; c'est l'inverse qui serait faux (proposer plus que ce
+     * que la base accepte).
+     *
+     * @var list<string>
+     */
+    private const KINDS_PRESSE = [
+        'press_release_sent',
+        'press_followup',
+        'press_reply',
+        'press_coverage',
+        'linkedin_message',
+        'call',
+    ];
+
+    /**
+     * Les échanges d'un journaliste, du plus récent au plus ancien.
+     *
+     * `occurred_at` d'abord, `created_at` en second : un échange consigné
+     * aujourd'hui mais daté du mois dernier doit se ranger à SA place dans
+     * l'histoire, pas en tête parce qu'on vient de le taper.
+     *
+     * @return array<int, object>
+     */
+    private function timeline(Journalist $journalist): array
+    {
+        $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
+        if (! $workspaceId || ! Schema::hasTable('activities')) {
+            return [];
+        }
+
+        return DB::table('activities')
+            ->where('workspace_id', $workspaceId)
+            ->where('subject_type', 'journalist')
+            ->where('subject_id', $journalist->id)
+            ->orderByRaw('coalesce(occurred_at, created_at) DESC')
+            ->limit(200)
+            ->get(['id', 'kind', 'type', 'title', 'content', 'occurred_at', 'created_at'])
+            ->all();
+    }
+
+    /**
+     * Création d'un contact presse.
+     *
+     * ── Le point de cette méthode : elle REFUSE avant de créer ────────────
+     * Jusqu'ici la table n'était alimentée que par le scraping : aucun humain
+     * ne pouvait y ajouter une fiche, et donc aucun humain ne pouvait y créer
+     * de doublon. En ouvrant la porte, on ouvre le risque — d'où le contrôle
+     * préalable, qui répond **409** avec les fiches ressemblantes plutôt que de
+     * créer une seconde ligne.
+     *
+     * Elle ne fusionne pas d'autorité : sur des noms de personnes, une fusion
+     * automatique est irréversible et se trompe (deux homonymes réels existent).
+     * Elle présente, l'humain trancher. `?force=1` crée quand même, pour le cas
+     * légitime des homonymes.
+     */
+    public function store(StoreJournalistRequest $request): JsonResponse
+    {
+        $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
+        if (! $workspaceId) {
+            return $this->ok(['error' => 'workspace required'], 422);
+        }
+
+        $data = $request->validated();
+
+        $slug = $this->resolveSlug($data);
+        if ($slug instanceof JsonResponse) {
+            return $slug;
+        }
+        $data['linkedin_slug'] = $slug;
+        unset($data['linkedin_url']);
+
+        if (! $request->boolean('force')) {
+            $doublons = $this->doublonsProbables($workspaceId, $data);
+            if ($doublons->isNotEmpty()) {
+                return $this->ok([
+                    'error' => 'doublon_probable',
+                    'message' => 'Une ou plusieurs fiches ressemblent à celle-ci. Vérifiez avant de créer.',
+                    'candidats' => $doublons,
+                    // Le client renvoie la même requête avec ?force=1 s'il
+                    // s'agit bien d'une personne différente (homonyme).
+                    'force_param' => 'force=1',
+                ], 409);
+            }
+        }
+
+        // `source` est NOT NULL en base. Un client qui l'envoie explicitement à
+        // `null` passerait la validation (`nullable`) puis violerait la
+        // contrainte : on retire la clé pour laisser le défaut s'appliquer,
+        // plutôt que de rendre une 500 pour une saisie qui n'a rien de fautif.
+        if (! isset($data['source']) || trim((string) $data['source']) === '') {
+            unset($data['source']);
+        }
+
+        $journalist = Journalist::create($data + [
+            'workspace_id' => $workspaceId,
+            // Défaut de traçabilité : une fiche saisie à la main vient de la
+            // console, et le dire évite qu'elle soit prise plus tard pour un
+            // résultat de scraping non vérifié.
+            'source' => 'console',
+        ]);
+
+        // `refresh()` et non `fresh()` : `fresh()` rend `Journalist|null` (la
+        // ligne peut avoir disparu entre-temps) et l'enchaîner sur `->load()`
+        // était un appel sur null en puissance. `refresh()` recharge en place et
+        // rend `$this` — même effet, sans le trou.
+        return $this->ok(['data' => $journalist->refresh()->load('media')], 201);
+    }
+
+    /**
+     * Modification d'un contact presse.
+     *
+     * `opt_out` n'est pas modifiable ici — il a son point d'entrée dédié, qui
+     * émet aussi vers le site (cf. `optOut()`). Voir `StoreJournalistRequest`.
+     */
+    public function update(UpdateJournalistRequest $request, Journalist $journalist): JsonResponse
+    {
+        // Deux gardes que le lot presse ne portait pas, parce qu'il est
+        // antérieur aux recensements qui les exigent :
+        //
+        // B12-001 — la résolution de route rend la fiche qui porte cet
+        // identifiant, quel qu'en soit le propriétaire. Sans ce refus, on
+        // modifiait la fiche presse d'un autre client.
+        $this->refuserHorsEspace($journalist);
+
+        // G43-005 — sans verrou, deux saisies concurrentes se perdent EN
+        // SILENCE : le second enregistrement écrase le premier sans que
+        // personne ne l'apprenne. Le contrôle précède la validation, comme en
+        // `CompaniesController` : un conflit d'édition n'est pas une faute de
+        // saisie, et annoncer un 422 sur un formulaire qui ne devait de toute
+        // façon pas être écrit brouille le diagnostic.
+        $this->refuserSiVersionPerimee($request, $journalist);
+
+        $data = $request->validated();
+
+        if (array_key_exists('linkedin_url', $data)) {
+            $slug = $this->resolveSlug($data);
+            if ($slug instanceof JsonResponse) {
+                return $slug;
+            }
+            $data['linkedin_slug'] = $slug;
+            unset($data['linkedin_url']);
+        }
+
+        // L'invariant « au moins un nom » se vérifie sur l'état FUSIONNÉ, pas
+        // sur la requête : un PATCH qui ne porte que `first_name: null` est
+        // légitime tant qu'un `last_name` subsiste en base. La règle
+        // `required_without` du formulaire ne peut pas le savoir — elle ne voit
+        // que la requête — d'où ce contrôle ici, et non là-bas.
+        $apres = array_merge($journalist->only(['first_name', 'last_name']), $data);
+        if (trim((string) ($apres['first_name'] ?? '')) === '' && trim((string) ($apres['last_name'] ?? '')) === '') {
+            return $this->ok([
+                'error' => 'nom_requis',
+                'message' => 'Un contact doit conserver au moins un nom ou un prénom.',
+            ], 422);
+        }
+
+        $journalist->update($data);
+
+        // Même raison qu'en `store()` : `fresh()` peut rendre null.
+        return $this->ok(['data' => $journalist->refresh()->load('media')]);
+    }
+
+    /**
+     * Normalise `linkedin_url` en slug, ou rend une réponse 422 qui DIT
+     * pourquoi. Un `null` silencieux serait pire que l'erreur : l'utilisateur
+     * croirait avoir enregistré l'URL, et la fiche perdrait sa meilleure clé
+     * d'identité sans que rien ne l'indique.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function resolveSlug(array $data): string|null|JsonResponse
+    {
+        $url = $data['linkedin_url'] ?? null;
+        if (! is_string($url) || trim($url) === '') {
+            return null;
+        }
+
+        $slug = LinkedinSlug::normalize($url);
+        if ($slug === null) {
+            return $this->ok([
+                'error' => 'linkedin_url_illisible',
+                'message' => "Cette URL n'est pas un profil LinkedIn de personne (/in/…). "
+                    . "Une page d'entreprise ou d'école ne peut pas identifier un contact.",
+            ], 422);
+        }
+
+        return $slug;
+    }
+
+    /**
+     * Fiches ressemblant à celle qu'on s'apprête à créer, par ordre de force
+     * de preuve décroissante.
+     *
+     * Le calcul de la clé nom+média est délégué à Postgres (`normalize_name`,
+     * `digest`) plutôt que réimplémenté en PHP. Deux implémentations d'une même
+     * normalisation finissent toujours par diverger — et le jour où elles
+     * divergent, ce contrôle laisse passer exactement les doublons qu'il est
+     * censé arrêter.
+     *
+     * @param  array<string, mixed>  $data
+     * @return Collection<int, object>
+     */
+    private function doublonsProbables(string $workspaceId, array $data): Collection
+    {
+        $base = Journalist::query()
+            ->where('workspace_id', $workspaceId)
+            ->whereNull('deleted_at');
+
+        // 1. Le slug LinkedIn : preuve d'identité, pas ressemblance.
+        if (! empty($data['linkedin_slug'])) {
+            $parSlug = (clone $base)->where('linkedin_slug', $data['linkedin_slug'])->get();
+            if ($parSlug->isNotEmpty()) {
+                return $parSlug->map(fn ($j) => $this->candidat($j, 'meme_profil_linkedin'));
+            }
+        }
+
+        // 2. L'email : quasi aussi fort, et `email` est CITEXT (insensible à la
+        //    casse) — la comparaison est donc juste sans lower() de part et d'autre.
+        if (! empty($data['email'])) {
+            $parEmail = (clone $base)->where('email', $data['email'])->get();
+            if ($parEmail->isNotEmpty()) {
+                return $parEmail->map(fn ($j) => $this->candidat($j, 'meme_email'));
+            }
+        }
+
+        // 3. Nom + média, via la clé que la base calcule elle-même.
+        $cle = DB::selectOne(
+            "SELECT encode(digest(
+                 normalize_name(coalesce(?, '') || '_' || coalesce(?, ''))
+                 || '@' ||
+                 coalesce(?::TEXT, normalize_name(coalesce(?, '')), ''),
+                 'sha256'
+             ), 'hex') AS k",
+            [
+                $data['first_name'] ?? null,
+                $data['last_name'] ?? null,
+                $data['media_id'] ?? null,
+                $data['media_raw'] ?? null,
+            ],
+        );
+
+        if ($cle === null || ! isset($cle->k)) {
+            return collect();
+        }
+
+        return (clone $base)->where('dedup_key', $cle->k)->get()
+            ->map(fn ($j) => $this->candidat($j, 'meme_nom_et_media'));
+    }
+
+    /**
+     * Réduit une fiche candidate à ce qui permet de TRANCHER, et rien de plus.
+     * Un doublon se lève en regardant le média, la rubrique et la provenance —
+     * pas en relisant le téléphone, qui est une donnée personnelle de plus
+     * exposée sans nécessité.
+     */
+    private function candidat(Journalist $j, string $motif): object
+    {
+        return (object) [
+            'id' => $j->id,
+            'motif' => $motif,
+            'first_name' => $j->first_name,
+            'last_name' => $j->last_name,
+            // `->name` et non `?->name` : `??` couvre déjà le cas où la relation
+            // est absente, et PHPStan refuse la double protection comme du bruit.
+            'media' => $j->media->name ?? $j->media_raw,
+            'beat' => $j->beat,
+            'source' => $j->source,
+            'source_url' => $j->source_url,
+            'created_at' => $j->created_at,
+        ];
     }
 
     /**

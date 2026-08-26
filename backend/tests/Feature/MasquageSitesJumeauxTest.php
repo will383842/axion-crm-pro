@@ -289,9 +289,14 @@ test('TEMOIN a clair : le proprietaire lit les sept sites en entier', function (
 
     $vus = [];
 
+    // ⚠️ `data.email` et non `email` : depuis le 2026-08-26, `journalists.show`
+    // et `media.show` rendent `{ data, timeline }` — la fiche ne vit plus à la
+    // racine. SEUL LE CHEMIN CHANGE : les attentes sont identiques, et les
+    // `assertStringNotContainsString` sur le corps brut, plus bas, restent le
+    // vrai filet — ils ne dépendent d'aucun chemin.
     $j = $this->getJson("/api/v1/journalists/{$this->journalistId}")->assertOk();
-    expect($j->json('email'))->toBe(JUM_MAIL_JOURNALISTE);
-    expect($j->json('phone'))->toBe(JUM_TEL_JOURNALISTE);
+    expect($j->json('data.email'))->toBe(JUM_MAIL_JOURNALISTE);
+    expect($j->json('data.phone'))->toBe(JUM_TEL_JOURNALISTE);
     $vus[] = 'journalists.show';
 
     $liste = $this->getJson('/api/v1/journalists')->assertOk();
@@ -299,7 +304,7 @@ test('TEMOIN a clair : le proprietaire lit les sept sites en entier', function (
     $vus[] = 'journalists.index';
 
     $m = $this->getJson("/api/v1/media/{$this->mediaId}")->assertOk();
-    expect($m->json('email'))->toBe(JUM_MAIL_MEDIA);
+    expect($m->json('data.email'))->toBe(JUM_MAIL_MEDIA);
     // La fiche media charge `journalists` : elle porte donc AUSSI la
     // coordonnee nominative. C'est ce qui en fait le pire des sept.
     $this->assertStringContainsString(JUM_MAIL_JOURNALISTE, (string) $m->getContent());
@@ -348,8 +353,10 @@ test('un viewer ne lit PAS la fiche journaliste en clair', function () {
 
     $r = $this->getJson("/api/v1/journalists/{$this->journalistId}")->assertOk();
 
-    expect($r->json('email'))->toBe('j***@jumeaux-presse.test');
-    expect($r->json('phone'))->toBe('+336******33');
+    // Même remarque que plus haut : seul le chemin suit le nouveau contrat,
+    // les valeurs attendues et les deux garde-fous sur le corps brut ne bougent pas.
+    expect($r->json('data.email'))->toBe('j***@jumeaux-presse.test');
+    expect($r->json('data.phone'))->toBe('+336******33');
     $this->assertStringNotContainsString(JUM_MAIL_JOURNALISTE, (string) $r->getContent());
     $this->assertStringNotContainsString(JUM_TEL_JOURNALISTE, (string) $r->getContent());
 });

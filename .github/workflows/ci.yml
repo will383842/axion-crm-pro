@@ -420,6 +420,36 @@ jobs:
           fi
           echo "Tous les scripts d'infra sont en 100755."
 
+  donnees-personnelles:
+    name: Aucune donnée nominative dans ce dépôt public
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15  # F38-008 — plafond anti-gel (un grep sur les .json/.csv suivis)
+    steps:
+      - uses: actions/checkout@v4
+      - name: TÉMOIN — cette garde sait-elle seulement échouer ?
+        run: |
+          # GitHub impose `set -e` à tout bloc `run:`. On capture donc le code
+          # au lieu de mourir dessus, sinon le diagnostic ci-dessous est du code
+          # mort et le rouge n'apprend rien (piège vécu le 2026-08-26).
+          code=0
+          bash infra/scripts/garde-donnees-personnelles.sh --temoin || code=$?
+          if [ "$code" -ne 0 ]; then
+            echo "::error::Le témoin a échoué : la garde ne détecte plus rien."
+            echo "::error::Son vert ne prouverait donc RIEN. Réparer le motif d'abord."
+            exit 1
+          fi
+      - name: La garde (BLOQUANT)
+        run: |
+          code=0
+          bash infra/scripts/garde-donnees-personnelles.sh || code=$?
+          # 2 = le contrôle n'a rien pu énumérer : c'est un échec d'outillage,
+          # pas un dépôt propre. On le distingue explicitement d'un vrai vert.
+          if [ "$code" -eq 2 ]; then
+            echo "::error::La garde n'a examiné AUCUN fichier — résultat non concluant."
+            exit 1
+          fi
+          exit "$code"
+
   backend:
     name: Backend Laravel (install + PHPStan + Pint + Pest)
     runs-on: ubuntu-24.04

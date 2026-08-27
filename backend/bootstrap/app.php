@@ -8,6 +8,7 @@ use App\Http\Middleware\SetCurrentWorkspace;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 
@@ -33,6 +34,31 @@ return Application::configure(basePath: dirname(__DIR__))
         // (audit 360, A-001 / F35-001). Rendre `null` supprime la redirection ;
         // la redirection vers /login est portee par le SPA, pas par l'API.
         $middleware->redirectGuestsTo(fn () => null);
+
+        // (A bis) LA VRAIE IP DU VISITEUR — mesure du 2026-08-27.
+        //
+        // Sans cette declaration, Laravel retenait comme IP client celle du
+        // reseau Docker : `172.18.0.8`, `172.18.0.12`. Mesure dans `audit_logs`
+        // avant correctif : 84 entrees sur 92 portaient une adresse interne.
+        //
+        // Ce n'est pas cosmetique. `RouteServiceProvider` limite la connexion a
+        // cinq tentatives par minute PAR IP (`->by($r->ip())`). Toutes les
+        // requetes portant la meme adresse, le seau etait COMMUN : un attaquant
+        // epuisait le quota et verrouillait les utilisateurs legitimes, sans
+        // etre lui-meme limite. La garde comptait, mais pas ce qu'il fallait.
+        //
+        // On ne fait confiance qu'au reseau Docker : le conteneur n'est
+        // joignable QUE par Caddy, qui est desormais seul a fixer l'IP reelle a
+        // partir de `CF-Connecting-IP` (cf. `infra/caddy/Caddyfile`).
+        // ⚠️ Ne PAS elargir a `*` : cela laisserait n'importe qui declarer son
+        // adresse par un simple en-tete.
+        $middleware->trustProxies(
+            at: ['172.16.0.0/12', '192.168.0.0/16', '10.0.0.0/8'],
+            headers: Request::HEADER_X_FORWARDED_FOR
+                | Request::HEADER_X_FORWARDED_HOST
+                | Request::HEADER_X_FORWARDED_PORT
+                | Request::HEADER_X_FORWARDED_PROTO,
+        );
 
         // statefulApi() prepend EnsureFrontendRequestsAreStateful sur les routes api/* déjà.
         // Ne pas le réajouter manuellement sur web (double-bind = double-exec).

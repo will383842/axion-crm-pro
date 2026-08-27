@@ -1,6 +1,5 @@
 <?php
 
-use Illuminate\Http\Request;
 use App\Http\Middleware\AuditHashChainLogger;
 use App\Http\Middleware\EnforceFirstLoginSetup;
 use App\Http\Middleware\EnsureCrmConsoleV2;
@@ -9,6 +8,7 @@ use App\Http\Middleware\SetCurrentWorkspace;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 

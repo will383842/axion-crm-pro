@@ -140,7 +140,22 @@ services:
     environment:
       POSTGRES_DB: axion_crm
       POSTGRES_USER: axion
-      POSTGRES_PASSWORD: axion_dev_only
+      # 🔴 PLUS DE VALEUR EN DUR — 2026-08-27.
+      #
+      # Ce fichier est dans un depot PUBLIC. La valeur qui etait ecrite ici,
+      # `axion_dev_only`, etait AUSSI celle de la base de production : elle a
+      # ete lisible par n'importe qui pendant 94 jours, pendant lesquels le
+      # port 55432 etait joignable depuis internet (faille du 2026-08-19).
+      #
+      # La forme `:?` est deliberee : elle N'A PAS de valeur de repli. Si la
+      # variable manque, Compose REFUSE de demarrer au lieu de retomber en
+      # silence sur une valeur publique. C'est cette retombee silencieuse qui
+      # a fabrique la faille — pas l'oubli d'un reglage.
+      #
+      # ⚠️ Changer cette variable ne change PAS le mot de passe d'une base
+      # DEJA initialisee : Postgres ne la lit qu'au tout premier demarrage.
+      # Sur une base existante, il faut `ALTER USER <role> WITH PASSWORD ...`.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD absent du .env}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -161,12 +176,23 @@ services:
     # Plafond du journal Docker — constat F39-011. Voir l ancre `x-journal`
     # en tete de fichier : 10 Mio x 5 = 50 Mio par conteneur, jamais plus.
     logging: *journal
+    # 🔴 REDIS N'AVAIT AUCUN MOT DE PASSE — 2026-08-27.
+    # Avec le port 56379 publie (faille du 2026-08-19), c'etait une console
+    # d'administration ANONYME sur le cache, les sessions et les jetons :
+    # `FLUSHALL`, lecture des jetons, `CONFIG SET`, depuis internet.
     command: >
       redis-server
       --appendonly yes
       --save 60 1000
       --maxmemory 256mb
       --maxmemory-policy allkeys-lru
+      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD absent du .env}
+    environment:
+      # ⚠️ SANS CECI, LE CONTENEUR EST DECLARE MALADE EN BOUCLE : le
+      # healthcheck `redis-cli ping` recevrait `NOAUTH`. On passe par la
+      # variable plutot que par `-a` pour que le mot de passe n'apparaisse
+      # PAS dans la liste des processus.
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?REDIS_PASSWORD absent du .env}
     volumes:
       - redis-data:/data
     ports:

@@ -4,7 +4,8 @@
 # ============================================================================
 # Workflow :
 # 1) pg_dump compressé (gzip)
-# 2) scp vers Storage Box (sshpass auth)
+# 2) chiffrement AES-256 (passphrase Axion-IA, cf. bloc « Chiffrement » plus bas)
+# 3) scp vers Storage Box (sshpass auth)
 # 3) Rotation locale 7j (find côté serveur, OK)
 # 4) Rotation distante 30j (sftp - 'rm' commands, Storage Box n'a pas find)
 #
@@ -18,7 +19,10 @@ set -euo pipefail
 if [ -f /opt/axion-crm-pro/.env ]; then
     set -a
     # shellcheck disable=SC1091
-    source <(grep -E '^SB_' /opt/axion-crm-pro/.env)
+    # ⚠️ Le motif couvre SB_* ET la passphrase de chiffrement. Ne pas le
+    # restreindre : sans BACKUP_ENCRYPTION_PASSPHRASE, le script refuse
+    # d'envoyer (à dessein) et la sauvegarde hors-site s'arrête.
+    source <(grep -E '^(SB_|BACKUP_ENCRYPTION_PASSPHRASE)' /opt/axion-crm-pro/.env)
     set +a
 fi
 
@@ -332,6 +336,60 @@ fi
 # hors-site cette nuit-là, ce qui est strictement pire. Le script sortira en
 # erreur juste après, sans faire tourner la rétention — l'alerte part, et rien
 # n'est effacé tant que le problème n'est pas réglé.
+# --- Chiffrement AES-256 avant de quitter le serveur ------------------------
+#
+# ⚠️ AJOUTÉ LE 2026-09-03. Jusqu'ici l'archive partait EN CLAIR : 708 Mo de
+# données CRM — prospects, clients, données nominatives — déposés tels quels
+# sur un stockage tiers. La Storage Box est un service Hetzner distinct du
+# serveur ; ce qui y est écrit sort du périmètre que nous contrôlons.
+#
+# Le chiffrement intervient APRÈS les vérifications de contenu (droits,
+# extensions), qui ont besoin de lire le SQL, et AVANT l'envoi. L'archive en
+# clair est détruite dans la foulée : elle n'existe que le temps des contrôles.
+#
+# 🔑 La passphrase est celle d'Axion-IA (arbitrage Will du 2026-09-03) — elle
+# est déjà dans son coffre et vérifiée capable d'ouvrir des archives réelles.
+# Le choix évite d'introduire une clé de plus qu'il faudrait penser à sauver :
+# une clé qu'on oublie de mettre au coffre rend la sauvegarde ILLISIBLE, ce qui
+# est pire que pas de chiffrement du tout. Contrepartie assumée : une fuite de
+# cette phrase ouvre Axion-IA ET CRM Pro.
+#
+# Paramètres identiques à ceux d'Axion-IA (`scripts/backup-lib.sh`) pour qu'une
+# seule commande de déchiffrement vaille partout. ⚠️ `-iter 100000` n'est pas
+# décoratif : sans lui, openssl retombe sur 10 000 itérations et rend
+# « bad decrypt » AVEC la bonne phrase.
+if [ -z "${BACKUP_ENCRYPTION_PASSPHRASE:-}" ]; then
+    log "❌ BACKUP_ENCRYPTION_PASSPHRASE non définie — refus d'envoyer en clair."
+    log "   Renseigne-la dans /opt/axion-crm-pro/.env (cf. en-tête de ce script)."
+    exit 1
+fi
+
+log "Chiffrement AES-256 de l'archive…"
+if ! openssl enc -aes-256-cbc -salt -pbkdf2 -iter 100000 \
+    -pass "env:BACKUP_ENCRYPTION_PASSPHRASE" \
+    -in "$BACKUP_DIR/$BACKUP_FILE" -out "$BACKUP_DIR/$BACKUP_FILE.enc"; then
+    log "❌ Chiffrement échoué — l'archive en clair est conservée localement, rien n'est envoyé."
+    rm -f "$BACKUP_DIR/$BACKUP_FILE.enc"
+    exit 1
+fi
+
+# Relecture immédiate : une archive chiffrée qu'on ne sait pas rouvrir est un
+# fichier mort qui occupe la place d'une sauvegarde. On le vérifie ici, pas le
+# jour où on en a besoin.
+if ! openssl enc -d -aes-256-cbc -salt -pbkdf2 -iter 100000 \
+    -pass "env:BACKUP_ENCRYPTION_PASSPHRASE" \
+    -in "$BACKUP_DIR/$BACKUP_FILE.enc" 2>/dev/null | gzip -t 2>/dev/null; then
+    log "❌ L'archive chiffrée ne se relit pas — envoi annulé, clair conservé."
+    rm -f "$BACKUP_DIR/$BACKUP_FILE.enc"
+    exit 1
+fi
+
+rm -f "$BACKUP_DIR/$BACKUP_FILE"
+BACKUP_FILE="$BACKUP_FILE.enc"
+SIZE=$(stat -c%s "$BACKUP_DIR/$BACKUP_FILE")
+log "✅ Chiffrée et relue : $BACKUP_FILE ($SIZE bytes)"
+
+# --- Upload Storage Box ---
 log "Uploading to Storage Box ($SB_HOST:$SB_PATH)..."
 sb_scp "$BACKUP_DIR/$BACKUP_FILE" "$SB_USER@$SB_HOST:$SB_PATH/"
 log "✅ Upload OK"
@@ -359,7 +417,10 @@ fi
 
 # --- Rotation locale (find marche sur Ubuntu) ---
 log "Rotation locale (>$RETENTION_LOCAL_DAYS jours)..."
-find "$BACKUP_DIR" -name "axion_crm_*.sql.gz" -mtime "+$RETENTION_LOCAL_DAYS" -delete -print || true
+# ⚠️ Le glob couvre `.sql.gz` ET `.sql.gz.enc` : les archives d'avant le
+# chiffrement (2026-09-03) doivent continuer à tourner, sinon elles restent
+# indéfiniment et la rétention locale ne veut plus rien dire.
+find "$BACKUP_DIR" \( -name "axion_crm_*.sql.gz" -o -name "axion_crm_*.sql.gz.enc" \) -mtime "+$RETENTION_LOCAL_DAYS" -delete -print || true
 
 # --- Rotation distante (Storage Box n'a pas `find`, on liste via sftp et on rm les anciens) ---
 log "Rotation distante (>$RETENTION_REMOTE_DAYS jours)..."
@@ -380,7 +441,7 @@ log "  Cutoff: garder uniquement les fichiers > $CUTOFF_TIMESTAMP"
 # de #136 — une sauvegarde locale sans copie hors-site.
 #
 # `ls -1` force une entrée par ligne, sans remplissage.
-REMOTE_LIST=$(sshpass -p "$SB_PASSWORD" sftp -P "$SB_PORT" -o StrictHostKeyChecking=accept-new "$SB_USER@$SB_HOST" <<EOF 2>/dev/null | sed -nE 's/^(axion_crm_[0-9]+T[0-9]+Z\.sql\.gz)[[:space:]]*$/\1/p' || true
+REMOTE_LIST=$(sshpass -p "$SB_PASSWORD" sftp -P "$SB_PORT" -o StrictHostKeyChecking=accept-new "$SB_USER@$SB_HOST" <<EOF 2>/dev/null | sed -nE 's/^(axion_crm_[0-9]+T[0-9]+Z\.sql\.gz(\.enc)?)[[:space:]]*$/\1/p' || true
 cd $SB_PATH
 ls -1
 EOF

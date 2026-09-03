@@ -111,7 +111,10 @@ echo "  Place disponible sur le volume de restauration : ${LIBRE_GO} Go"
 echo "[1/6] Récupération de la dernière sauvegarde depuis la Storage Box…"
 mkdir -p "$SCRATCH"
 
-DERNIER=$(ssh "$SRV" "ls -1t ${SRV_BACKUPS}/*.sql.gz 2>/dev/null | head -1 | xargs -r basename")
+# ⚠️ Depuis le 2026-09-03 les archives sont chiffrées (`.sql.gz.enc`). Le glob
+# couvre les DEUX formes : une archive antérieure au chiffrement doit encore
+# pouvoir être exercée, sinon l'exercice devient aveugle pendant 7 jours.
+DERNIER=$(ssh "$SRV" "ls -1t ${SRV_BACKUPS}/*.sql.gz ${SRV_BACKUPS}/*.sql.gz.enc 2>/dev/null | head -1 | xargs -r basename")
 if [ -z "$DERNIER" ]; then
     echo "❌ Aucune sauvegarde locale sur le serveur — la sauvegarde ne tourne pas." >&2
     exit 1
@@ -193,7 +196,25 @@ docker exec "$PG_CONTENEUR" psql -U axion -d postgres -q \
 # cluster de départ, où les rôles sont déjà en place — c'est justement ce que
 # l'étape 5 vérifie.
 JOURNAL="$SCRATCH/restauration.log"
-zcat "$SCRATCH/${DERNIER}" \
+# Une archive chiffrée passe d'abord par openssl ; une archive en clair
+# (d'avant le 2026-09-03) est lue directement. On ne devine pas au contenu :
+# on se fie à l'extension, seul contrat stable entre les deux scripts.
+if [ "${DERNIER%.enc}" != "${DERNIER}" ]; then
+    if [ -z "${BACKUP_ENCRYPTION_PASSPHRASE:-}" ]; then
+        echo "❌ Archive chiffrée mais BACKUP_ENCRYPTION_PASSPHRASE absente." >&2
+        echo "   L'exercice ne peut rien prouver sans elle — c'est justement" >&2
+        echo "   ce qu'il est censé vérifier. Renseigne-la et relance." >&2
+        exit 1
+    fi
+    lire_archive() {
+        openssl enc -d -aes-256-cbc -salt -pbkdf2 -iter 100000 \
+            -pass "env:BACKUP_ENCRYPTION_PASSPHRASE" -in "$SCRATCH/${DERNIER}" | zcat
+    }
+else
+    lire_archive() { zcat "$SCRATCH/${DERNIER}"; }
+fi
+
+lire_archive \
     | sed "\|${MARQUEUR_GLOBALS_DEBUT}|,\|${MARQUEUR_GLOBALS_FIN}|d" \
     | docker exec -i "$PG_CONTENEUR" psql -U axion -d "$BASE_DRILL" -q \
     > "$JOURNAL" 2>&1 || true

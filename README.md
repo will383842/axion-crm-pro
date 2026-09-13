@@ -121,7 +121,7 @@ docker exec axion-crm-api php artisan audit:verify-chain
 
 ## Licence
 
-Propriétaire — Axion-IA OÜ.
+Propriétaire — AXION IA SAS.
 
 ## Documentation complète
 

@@ -1,11 +1,11 @@
 {
-  "denomination": "AXION-IA OÜ",
+  "denomination": "AXION IA SAS",
   "naf": "6202A",
   "legal_form": "5710",
   "effectif": "01",
-  "address": "Pärnu mnt 22",
-  "postcode": "10141",
-  "city": "Tallinn",
-  "insee": "TLN",
-  "created_at": "2023-09-01"
+  "address": "ELITE BUREAUX - boîte 53, 11 Avenue Paul Verlaine",
+  "postcode": "38100",
+  "city": "Grenoble",
+  "insee": "38185",
+  "created_at": "2026-07-01"
 }

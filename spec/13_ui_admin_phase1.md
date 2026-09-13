@@ -127,7 +127,7 @@ Couvert dans `11_carte_france_interactive.md`. Une seule page combinant :
 │ ├─────────────────────────────────────────────────────────────────┤  │
 │ │ ☐ │ Quali │ Taille (6 cat. v1.1)   │ Raison sociale     │ Décideur  │
 │ │ ──┼───────┼─────────────────────────┼─────────────────────┼──────────│
-│ │ ☐ │  🟢   │ 🏢 PME                  │ AXION-IA OÜ        │ W. Jullin│
+│ │ ☐ │  🟢   │ 🏢 PME                  │ AXION IA SAS       │ W. Jullin│
 │ │ ☐ │  🟢   │ 🏬 ETI                  │ EXEMPLE Industries │ M. Dupont│
 │ │ ☐ │  🟡   │ 👥 TPE                  │ SARL TEST          │ J. Martin│
 │ │ ☐ │  🔴   │ 🔨 Artisan              │ Plomberie Démo     │ —        │
@@ -158,7 +158,7 @@ Pour distinguer dirigeants légaux des C-level Direction Finder.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│ ◀ Retour    AXION-IA OÜ                  [⚡ Relancer enrichissement]│
+│ ◀ Retour    AXION IA SAS                 [⚡ Relancer enrichissement]│
 ├──────────────────────────────────────────────────────────────────────┤
 │ Identification                                                       │
 │   SIREN 00000000000 · SAS · NAF 6201Z · Créée 2024                  │
@@ -221,7 +221,7 @@ Filtres :
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │ ◀ Retour     Marie Dupont                                            │
-│              DRH chez AXION-IA OÜ                                    │
+│              DRH chez AXION IA SAS                                   │
 ├──────────────────────────────────────────────────────────────────────┤
 │ 🟢 Trouvé via : Direction Finder                                     │
 │   📍 Source URL : https://axion-ia.com/direction                     │

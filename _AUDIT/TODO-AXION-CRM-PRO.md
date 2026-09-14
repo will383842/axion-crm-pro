@@ -18,11 +18,11 @@ Légende sévérité :
 **Pourquoi** : actuellement le projet `axion-crm-pro` est rattaché au compte de facturation **"SOS-Expat.com global"**. Mélange business :
 - Comptabilité brouillée (impossible de séparer les coûts par projet propre)
 - Risque si désactivation/dispute du compte SOS-Expat → Axion CRM Pro tombe aussi
-- Mauvaise hygiène fiscale (Axion-IA OÜ Estonia ≠ SOS-Expat France)
+- Mauvaise hygiène fiscale (Axion IA SAS ≠ SOS-Expat France)
 
 **Comment** :
 1. https://console.cloud.google.com/billing → bouton **"Créer un compte de facturation"**
-2. Nom : "Axion CRM Pro Billing" (ou "Axion-IA OÜ" selon ta préf)
+2. Nom : "Axion CRM Pro Billing" (ou "Axion IA SAS" selon ta préf)
 3. Ajouter une **carte de crédit pro Axion** (séparée de SOS-Expat)
 4. Aller sur le projet `axion-crm-pro` → Settings → **"Lier ce projet à un autre compte de facturation"**
 5. Sélectionner le nouveau compte → confirmer

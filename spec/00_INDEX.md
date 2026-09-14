@@ -2,7 +2,7 @@
 
 > **Spec :** Axion CRM Pro v6 — plateforme B2B de prospection automatisée pour Axion-IA.
 > **Date :** 2026-05-16
-> **Auteur de la spec :** Williams Jullin (Axion-IA OÜ)
+> **Auteur de la spec :** Williams Jullin (AXION IA SAS)
 > **Format :** 25 fichiers Markdown denses dans `./spec/`, ordonnés.
 > **Statut :** Spec exhaustive — **implémentée**. L'état RÉEL du produit se lit
 > dans `ARCHITECTURE.md`, pas ici : ce dossier est la spécification d'origine,
@@ -102,7 +102,7 @@ annonçait « ~22 000 lignes estimé » — une estimation, jamais remesurée.
 
 ### Métier
 
-- **Axion-IA** — Cabinet IA opérationnel B2B (OÜ estonienne, fondateur Williams Jullin, site `axion-ia.com`). Client unique de Axion CRM Pro au démarrage.
+- **Axion-IA** — Cabinet IA opérationnel B2B (SAS française, fondateur Williams Jullin, site `axion-ia.com`). Client unique de Axion CRM Pro au démarrage.
 - **Axion CRM Pro** — Le projet courant. Plateforme INTERNE de prospection multi-canal. Distincte d'axion-ia.com (compte Hetzner, domaine, secrets séparés).
 - **Cabinet IA opérationnel** — Naming canonique d'Axion-IA (FR) / *operational AI consultancy* (EN). Jamais « agence/studio/atelier ».
 - **Offre Axion-IA** — Catalogue de prestations : *Audit Flash*, *Audit Ciblé* (Essentielle 490/790/1190 €, Approfondie 890/1390/1990 €), *Mission PME*, *Mission ETI*, *Grand programme*. Voir `pricing.ts` SSOT côté Axion-IA.

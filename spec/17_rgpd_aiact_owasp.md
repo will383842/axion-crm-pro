@@ -232,7 +232,7 @@ class GdprPortabilityService
                 'request_id' => $req->id,
                 'requester_email' => $email,
                 'generated_at' => now()->toIso8601String(),
-                'data_controller' => 'Axion-IA OÜ',
+                'data_controller' => 'AXION IA SAS',
                 'dpo_contact' => 'contact@axion-ia.com',
             ],
             'contacts' => Contact::where('primary_email', $email)->get()->toArray(),

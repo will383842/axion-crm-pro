@@ -107,7 +107,7 @@ Tous les mocks lisent depuis `tests/fixtures/<service>/*.json`. Exemple structur
 ```
 tests/fixtures/
 ├── insee/
-│   ├── siren_axion_ia.json          (réponse INSEE pour AXION-IA OÜ)
+│   ├── siren_axion_ia.json          (réponse INSEE pour AXION IA SAS)
 │   ├── siren_total_energies.json
 │   └── ...
 ├── annuaire-entreprises/

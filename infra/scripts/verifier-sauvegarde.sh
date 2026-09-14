@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+#
+# ⚠️ 2026-09-03 — LES MOTIFS ACCEPTENT `.sql.gz` ET `.sql.gz.enc`.
+# Les archives sont chiffrées depuis cette date. Un motif ancré sur
+# `.sql.gz$` ne reconnaîtrait plus rien et cette surveillance annoncerait
+# une sauvegarde disparue sur un système parfaitement sain — l'alerte
+# fausse est ce qui apprend à ignorer les alertes. Les deux formes restent
+# acceptées tant que des archives d'avant le chiffrement existent.
 # =============================================================================
 # Axion CRM Pro — la sauvegarde d'hier soir a-t-elle vraiment eu lieu ?
 # =============================================================================
@@ -81,7 +88,7 @@ echo "    seuils : âge ≤ ${SEUIL_AGE_H} h, taille ≥ ${SEUIL_TAILLE_MO} Mo"
 # déjà cassé la rotation en silence (cf. #139). Une entrée par ligne.
 INVENTAIRE=$(sshpass -p "$SB_PASSWORD" sftp -P "$SB_PORT" \
     -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
-    "$SB_USER@$SB_HOST" <<EOF 2>/dev/null | grep -E 'axion_crm_[0-9]+T[0-9]+Z\.sql\.gz$' || true
+    "$SB_USER@$SB_HOST" <<EOF 2>/dev/null | grep -E 'axion_crm_[0-9]+T[0-9]+Z\.sql\.gz(\.enc)?$' || true
 cd $SB_PATH
 ls -l
 EOF
@@ -101,7 +108,7 @@ TAILLE_O=$(printf '%s' "$DERNIERE_LIGNE" | awk '{print $5}')
 echo "    dernière archive hors-site : $NOM"
 
 # --- Âge ---------------------------------------------------------------------
-HORO=$(printf '%s' "$NOM" | sed -nE 's/^axion_crm_([0-9]{8})T([0-9]{6})Z\.sql\.gz$/\1 \2/p')
+HORO=$(printf '%s' "$NOM" | sed -nE 's/^axion_crm_([0-9]{8})T([0-9]{6})Z\.sql\.gz(\.enc)?$/\1 \2/p')
 if [ -z "$HORO" ]; then
     echoerr "❌ Nom d'archive inattendu, horodatage illisible : $NOM"
     exit 1
@@ -135,7 +142,7 @@ fi
 # --- Copie locale (secondaire, mais elle situe la panne) ---------------------
 # Si le local est frais et le hors-site vieux, c'est l'ENVOI qui casse ; si les
 # deux sont vieux, c'est le dump. Le diagnostic vaut d'être posé tout de suite.
-LOCALE=$(ls -1t "$BACKUP_DIR"/axion_crm_*.sql.gz 2>/dev/null | head -1 || true)
+LOCALE=$(ls -1t "$BACKUP_DIR"/axion_crm_*.sql.gz "$BACKUP_DIR"/axion_crm_*.sql.gz.enc 2>/dev/null | head -1 || true)
 if [ -z "$LOCALE" ]; then
     echo "    ⚠️  aucune copie locale dans $BACKUP_DIR (rotation à 7 j — anormal si le cron tourne)"
 else

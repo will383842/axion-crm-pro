@@ -106,3 +106,21 @@ vulnerabilities:
   - id: CVE-2026-33630
     statement: "c-ares 1.34.6-r0, corrige en 1.34.8-r0 — paquet Alpine, DONC a priori corrigeable... sauf que `RUN apk --no-cache upgrade` est DEJA present au stade `prod` de Dockerfile.frontend (l. 72) et ne l'atteint pas : le depot Alpine de la version embarquee par `caddy:2-alpine` ne publie pas encore 1.34.8-r0. Le remede est le meme que ci-dessus — un rebuild amont de l'image Caddy sur une Alpine plus recente. Ne PAS ajouter un second `apk upgrade` : il ne changerait rien et donnerait l'illusion d'un correctif."
     expired_at: 2026-10-01
+
+  # ---------------------------------------------------------------------------
+  # Complement du 2026-09-14 — les deux dernieres, trouvees par DIFFERENCE.
+  #
+  # 🔑 Methode, et c'est la lecon : mon premier passage avait releve les CVE a
+  # l'oeil dans le journal et n'en avait vu que deux sur quatre. La garde est
+  # restee rouge, et j'ai cru mon correctif inoperant. Le bon geste est de
+  # DIFFERENCIER deux ensembles — les CVE que la garde imprime, moins celles que
+  # ce fichier couvre — au lieu de lire une liste longue.
+  # ---------------------------------------------------------------------------
+  - id: CVE-2026-84304
+    paths: ["usr/bin/caddy"]
+    statement: "google.golang.org/grpc v1.81.0, corrige en 1.83.1 — COMPILE DANS le binaire Caddy. Meme remede que les 14 CVE precedentes : seul un Caddy reconstruit en amont corrige."
+    expired_at: 2026-10-01
+  - id: CVE-2026-84445
+    paths: ["usr/bin/caddy"]
+    statement: "google.golang.org/grpc — idem : corrigeable uniquement par un rebuild amont de Caddy."
+    expired_at: 2026-10-01

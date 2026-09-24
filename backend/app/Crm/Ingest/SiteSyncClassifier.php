@@ -97,6 +97,11 @@ final class SiteSyncClassifier
     {
         return match ($event->eventType) {
             'newsletter_optin', 'newsletter_optout' => 'consent',
+            // Demande du guide SANS la case lettre : intérêt légitime B2B, à
+            // la condition que le formulaire informe et offre l'opposition
+            // (texte validé par Will). Jamais de prospection sur une adresse
+            // personnelle (`personnes.email_nature = perso`).
+            'lead_magnet_requested' => 'legitimate_interest_b2b',
             default => 'precontractual',
         };
     }
@@ -143,6 +148,7 @@ final class SiteSyncClassifier
                 'form_submission' => 'src:site-formulaire-' . str_replace('_', '-', (string) $event->formType),
                 'calendly_booked', 'calendly_completed', 'calendly_canceled', 'calendly_no_show' => 'src:calendly',
                 'newsletter_optin', 'newsletter_optout' => 'src:newsletter',
+                'lead_magnet_requested' => 'src:guide-ia',
                 'review_posted' => 'src:avis-client',
                 default => 'src:site-formulaire-autre',
             };

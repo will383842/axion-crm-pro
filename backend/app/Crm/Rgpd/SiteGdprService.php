@@ -93,7 +93,7 @@ final class SiteGdprService
         $email = mb_strtolower(trim($email));
 
         $result = [
-            'business' => ['contacts' => [], 'activities' => []],
+            'business' => ['contacts' => [], 'personnes' => [], 'abonnements' => [], 'activities' => []],
             'vivier' => ['candidates' => [], 'activities' => []],
             'opt_out' => [],
         ];
@@ -113,8 +113,30 @@ final class SiteGdprService
                     ->map(fn (object $row): array => (array) $row)
                     ->all();
 
+                // Lot L4-C — la personne connue par la lettre ou le guide, et
+                // ses abonnements. Ce qu'on sait effacer, on doit savoir
+                // l'exporter.
+                $personnes = DB::table('personnes')
+                    ->where('workspace_id', $businessId)
+                    ->where(function ($q) use ($personKey, $email): void {
+                        $q->where('person_key', $personKey)
+                            ->orWhere('email', $email);
+                    })
+                    ->get(['id', 'email', 'first_name', 'last_name', 'email_nature', 'locale', 'premiere_source', 'premiere_source_at', 'derniere_interaction_at', 'legal_basis', 'rattachee_at', 'created_at'])
+                    ->map(fn (object $row): array => (array) $row)
+                    ->all();
+
+                $abonnements = DB::table('abonnements')
+                    ->where('workspace_id', $businessId)
+                    ->whereIn('personne_id', array_map(static fn (array $p): int => (int) $p['id'], $personnes))
+                    ->get(['personne_id', 'canal', 'statut', 'consent_version', 'consent_at', 'source_slug', 'abonne_at', 'desabonne_at', 'motif_desabonnement'])
+                    ->map(fn (object $row): array => (array) $row)
+                    ->all();
+
                 return [
                     'contacts' => $contacts,
+                    'personnes' => $personnes,
+                    'abonnements' => $abonnements,
                     'activities' => $this->activities($businessId, $personKey),
                 ];
             });
@@ -186,8 +208,32 @@ final class SiteGdprService
                             ->where('email', $email)
                             ->delete();
 
+                        // Lot L4-C — la personne et ses abonnements. Suppression
+                        // FERME : l'empreinte reste dans `opt_out` (portées
+                        // `business` posée ci-dessous et `lettre` si elle
+                        // existait), c'est l'anti-réinsertion.
+                        $personnesIds = DB::table('personnes')
+                            ->where('workspace_id', $businessId)
+                            ->where(function ($q) use ($personKey, $email): void {
+                                $q->where('person_key', $personKey)
+                                    ->orWhere('email', $email);
+                            })
+                            ->pluck('id')
+                            ->all();
+
+                        $abonnements = DB::table('abonnements')
+                            ->where('workspace_id', $businessId)
+                            ->whereIn('personne_id', $personnesIds)
+                            ->delete();
+                        $personnes = DB::table('personnes')
+                            ->where('workspace_id', $businessId)
+                            ->whereIn('id', $personnesIds)
+                            ->delete();
+
                         return [
                             'contacts' => $contacts,
+                            'personnes' => $personnes,
+                            'abonnements' => $abonnements,
                             'health_practitioners' => $praticiens,
                             'activities' => $this->deleteActivities($businessId, $personKey),
                         ];

@@ -40,6 +40,7 @@
  * distrait obtient).
  */
 
+use App\Crm\Taxonomy;
 use App\Services\Dedup\DeduplicationService;
 use App\Services\Rgpd\GdprErasureService;
 use App\Support\EligibiliteCampagne;
@@ -71,10 +72,42 @@ function universAutorisesParLeSchema(string $table): array
 
     preg_match_all("/'([a-z_]+)'(?:::text)?/", (string) $ligne->def, $trouves);
 
-    $univers = array_values(array_unique($trouves[1]));
+    // Lot L4-C — `lettre` est une portée de CANAL, pas un UNIVERS : se
+    // désabonner de la lettre ne ferme ni la base commerciale ni le vivier, et
+    // un effacement pose une opposition `business` qui bloque déjà tout. On la
+    // retire ICI et nulle part ailleurs, par la constante qui la déclare — une
+    // portée ajoutée au CHECK sans y être déclarée comme canal reste donc
+    // exigée partout, comme avant. Témoin : le test « les portées de canal
+    // sont bien dans le CHECK » plus bas.
+    $univers = array_values(array_diff(array_unique($trouves[1]), Taxonomy::OPT_OUT_SCOPES_CANAL));
     sort($univers);
 
     return $univers;
+}
+
+/**
+ * Les valeurs BRUTES du CHECK, canaux compris — pour le témoin qui prouve que
+ * la soustraction ci-dessus retire une valeur qui existe vraiment.
+ *
+ * @return list<string>
+ */
+function porteesBrutesDuSchema(string $table): array
+{
+    $ligne = DB::selectOne(
+        'select pg_get_constraintdef(oid) as def from pg_constraint where conname = ?',
+        [$table . '_scope_check'],
+    );
+
+    if ($ligne === null) {
+        return [];
+    }
+
+    preg_match_all("/'([a-z_]+)'(?:::text)?/", (string) $ligne->def, $trouves);
+
+    $portees = array_values(array_unique($trouves[1]));
+    sort($portees);
+
+    return $portees;
 }
 
 /**
@@ -191,6 +224,20 @@ test('B15-002 — les univers d’opposition sont LUS dans le schema, jamais rec
     expect($univers)->toBe(['business', 'vivier']);
 });
 
+test('L4-C — les portées de CANAL retirées de l’inventaire des univers sont bien dans le CHECK', function () {
+    // Sans ce témoin, une constante `OPT_OUT_SCOPES_CANAL` qui nommerait une
+    // valeur inexistante — ou qui en avalerait une vraie — passerait inaperçue.
+    $brutes = porteesBrutesDuSchema('opt_out');
+
+    foreach (Taxonomy::OPT_OUT_SCOPES_CANAL as $canal) {
+        $this->assertContains($canal, $brutes, "la portée de canal « {$canal} » n’est pas dans opt_out_scope_check");
+    }
+
+    // Et la soustraction ne retire QUE les canaux.
+    expect(array_values(array_diff($brutes, Taxonomy::OPT_OUT_SCOPES_CANAL)))
+        ->toBe(universAutorisesParLeSchema('opt_out'));
+});
+
 test('B15-002 — TEMOIN : le lecteur de schema rend VIDE sur une contrainte absente', function () {
     // Sans ce temoin, un lecteur qui renverrait une constante passerait le test
     // precedent en ne lisant jamais la base.
@@ -216,8 +263,15 @@ test('B15-002 — l’inventaire des points de lecture est BALAYE, jamais recopi
     // Les six points mesures le 2026-08-21. Un septieme qui apparait n'est pas
     // une faute : c'est un rappel qu'il faut verifier que l'effacement couvre
     // l'univers qu'il interroge, puis remonter le chiffre ici.
+    // Lot L4-C (2026-09-24) : +2. `PersonnesIngestService` lit `business`
+    // (opposition générale) et `lettre` (canal) ; `Personnes\Abonnements` lit
+    // `business` (éligibilité et export). Ni l'un ni l'autre ne lit le vivier,
+    // qui n'a aucune personne de la lettre — et l'effacement couvre bien la
+    // table `personnes` (SiteGdprService, GdprErasureService).
     expect($fichiers)->toBe([
+        'app/Crm/Ingest/PersonnesIngestService.php',
         'app/Crm/Ingest/SiteSyncIngestService.php',
+        'app/Crm/Personnes/Abonnements.php',
         'app/Crm/Rgpd/SiteGdprService.php',
         'app/Crm/Scraping/ScrapedRecordIngestService.php',
         'app/Services/Dedup/DeduplicationService.php',

@@ -58,6 +58,9 @@ class GovernedTagsSeeder extends Seeder
         'src:site-formulaire-simulateur-roi' => ['name' => 'Simulateur de gains', 'category' => 'intent'],
         'src:calendly' => ['name' => 'RDV Calendly', 'category' => 'intent'],
         'src:newsletter' => ['name' => 'Newsletter', 'category' => 'intent'],
+        // Lot L4-C : le guide IA entreprise, pour les entreprises qui
+        // recevraient un jour l'événement (une personne rattachée).
+        'src:guide-ia' => ['name' => 'Guide IA entreprise', 'category' => 'intent'],
         'src:chatbot' => ['name' => 'Chatbot', 'category' => 'intent'],
         'src:avis-client' => ['name' => 'Avis client', 'category' => 'intent'],
 

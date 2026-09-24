@@ -33,7 +33,15 @@ class GdprErasureService
             $clesPersonne = array_values(array_filter(array_unique(array_merge(
                 DB::table('contacts')->where('email', $email)->pluck('person_key')->all(),
                 DB::table('candidates')->where('email', $email)->pluck('person_key')->all(),
+                // Lot L4-C — la personne connue par la lettre ou le guide.
+                DB::table('personnes')->where('email', $email)->pluck('person_key')->all(),
             ))));
+
+            // Lot L4-C — `abonnements` part en cascade avec sa personne ; on
+            // le compte à part pour que le bilan dise ce qui a disparu.
+            $personnesIds = DB::table('personnes')->where('email', $email)->pluck('id')->all();
+            $deleted['abonnements'] = DB::table('abonnements')->whereIn('personne_id', $personnesIds)->delete();
+            $deleted['personnes'] = DB::table('personnes')->whereIn('id', $personnesIds)->delete();
 
             $deleted['contacts'] = DB::table('contacts')->where('email', $email)->delete();
             $deleted['email_validations'] = DB::table('email_validations')->where('email', $email)->delete();

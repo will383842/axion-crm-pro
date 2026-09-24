@@ -48,6 +48,7 @@ class GdprPortabilityService
         $clesPersonne = array_values(array_filter(array_unique(array_merge(
             DB::table('contacts')->where('email', $email)->pluck('person_key')->all(),
             DB::table('candidates')->where('email', $email)->pluck('person_key')->all(),
+            DB::table('personnes')->where('email', $email)->pluck('person_key')->all(),
         ))));
 
         $data = [
@@ -55,6 +56,14 @@ class GdprPortabilityService
             'exported' => now()->toIso8601String(),
             'contacts' => DB::table('contacts')->where('email', $email)->get()->toArray(),
             'candidates' => DB::table('candidates')->where('email', $email)->get()->toArray(),
+            // Lot L4-C — la personne connue par la lettre ou le guide, et ses
+            // abonnements (statut, version et date du consentement recopiés du
+            // site, qui garde la preuve).
+            'personnes' => DB::table('personnes')->where('email', $email)->get()->toArray(),
+            'abonnements' => DB::table('abonnements')
+                ->whereIn('personne_id', DB::table('personnes')->where('email', $email)->select('id'))
+                ->get()
+                ->toArray(),
             'email_validations' => DB::table('email_validations')->where('email', $email)->get()->toArray(),
             'rgpd_requests' => DB::table('rgpd_requests')->where('subject_email', $email)->get()->toArray(),
             'magic_links_history' => DB::table('magic_links')->where('email', $email)->get(['id', 'expires_at', 'consumed_at', 'created_at'])->toArray(),

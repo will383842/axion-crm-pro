@@ -122,6 +122,8 @@ final class ContactUpserter
                 'updated_at' => now(),
             ]);
 
+            $this->rattacherPersonne($workspaceId, $personKey, $id, $companyId);
+
             return [$id, IngestOutcome::CREATED];
         }
 
@@ -176,7 +178,33 @@ final class ContactUpserter
 
         DB::table('contacts')->where('id', $existing->id)->update($update);
 
+        $this->rattacherPersonne($workspaceId, $personKey, (int) $existing->id, (int) $existing->company_id);
+
         return [(int) $existing->id, IngestOutcome::UPDATED];
+    }
+
+    /**
+     * RATTACHEMENT AUTOMATIQUE d'une personne (lot L4-C) — la personne connue
+     * par la lettre ou le guide, qui entre ensuite avec une entreprise (un
+     * formulaire avec SIREN, un arbitrage manuel, l'action « Rattacher à une
+     * entreprise »), rejoint sa fiche contact par la clé du site.
+     *
+     * Ici et nulle part ailleurs : les trois chemins passent par ce service, le
+     * rattachement ne peut donc pas diverger entre eux. `contact_id IS NULL` :
+     * un rattachement déjà fait n'est jamais déplacé en silence.
+     */
+    private function rattacherPersonne(string $workspaceId, string $personKey, int $contactId, int $companyId): void
+    {
+        DB::table('personnes')
+            ->where('workspace_id', $workspaceId)
+            ->where('person_key', $personKey)
+            ->whereNull('contact_id')
+            ->update([
+                'contact_id' => $contactId,
+                'company_id' => $companyId,
+                'rattachee_at' => now(),
+                'updated_at' => now(),
+            ]);
     }
 
     /**

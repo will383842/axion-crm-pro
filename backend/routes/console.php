@@ -4,6 +4,7 @@ use App\Console\Commands\AuditVerifyChain;
 use App\Console\Commands\CoverageRefreshMatrix;
 use App\Console\Commands\CrmSondeCleDePersonne;
 use App\Console\Commands\CrmSondeNonDiffusibles;
+use App\Console\Commands\CrmSondePersonnes;
 use App\Console\Commands\PartmanMaintenir;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -393,6 +394,31 @@ Schedule::command('rgpd:purge-business-prospects')
     ->withoutOverlapping(240)
     ->onOneServer()
     ->skip(fn (): bool => $purgeRgpdRetenue('rgpd:purge-business-prospects'));
+
+// Lot L4-C (2026-09-24) — personnes de la lettre et du guide NON rattachées,
+// sans abonnement actif, inactives depuis 3 ans. Même gate que les deux purges
+// ci-dessus (`CRM_PURGE_ENABLED`), même saut JOURNALISÉ.
+Schedule::command('rgpd:purge-personnes')
+    ->monthlyOn(2, '04:45')
+    ->withoutOverlapping(120)
+    ->onOneServer()
+    ->skip(fn (): bool => $purgeRgpdRetenue('rgpd:purge-personnes'));
+
+// Lot L4-C — SENTINELLE du flux personnes : des inscriptions ou des demandes du
+// guide reçues en 24 h, et aucune rattachée à une personne, drapeau ouvert.
+// Le patron des sondes de 06:10 et 06:20 : `onFailure()` est le seul crochet
+// qui lise le code de sortie d'une tâche planifiée.
+Schedule::command(CrmSondePersonnes::SIGNATURE_PLANIFIEE)
+    ->dailyAt('06:30')
+    ->withoutOverlapping(30)
+    ->onOneServer()
+    ->onFailure(function (): void {
+        Log::critical(
+            CrmSondePersonnes::PREFIXE_ALERTE . ' : la sonde de 06:30 est sortie en echec. '
+            . 'Des evenements lettre/guide arrivent sans produire de personne — voir la ligne '
+            . 'precedente du journal, qui compte et dit le geste.',
+        );
+    });
 
 // Lot L5 (2026-08-14) — mini-outbox CRM → site : les oppositions nées dans la
 // console convergent vers le site (sinon les deux systèmes se réécrivent à des

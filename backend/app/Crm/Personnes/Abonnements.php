@@ -44,6 +44,40 @@ final class Abonnements
     }
 
     /**
+     * PROSPECTION INDIVIDUELLE AUTORISÉE ? La règle, écrite UNE fois (lot L4-C,
+     * relecture RGPD) : sans consentement, la CNIL n'admet la prospection que
+     * d'un PROFESSIONNEL (L.34-5 CPCE).
+     *
+     *   - adresse `pro` → oui (intérêt légitime B2B, objet lié à la profession) ;
+     *   - adresse `perso` → seulement si elle est ABONNÉE à la lettre (elle a
+     *     coché la case : consentement) ;
+     *   - adresse `inconnue` (aucune adresse connue, p. ex. une fiche née d'un
+     *     désabonnement) → non.
+     *
+     * Les oppositions et adresses mortes se retirent en plus, par
+     * `exclureOpposees()`. Jumelle SQL : `limiterAuxProspectables()`.
+     */
+    public static function prospectionAutorisee(?string $nature, ?string $statutLettre): bool
+    {
+        return $nature === 'pro' || ($nature === 'perso' && $statutLettre === 'abonne');
+    }
+
+    /**
+     * Jumelle SQL de `prospectionAutorisee()`. La requête doit joindre
+     * `abonnements` (canal `lettre`) sous son nom de table.
+     */
+    public static function limiterAuxProspectables(Builder $requete): Builder
+    {
+        return $requete->where(function (Builder $q): void {
+            $q->where('personnes.email_nature', 'pro')
+                ->orWhere(function (Builder $perso): void {
+                    $perso->where('personnes.email_nature', 'perso')
+                        ->where('abonnements.statut', 'abonne');
+                });
+        });
+    }
+
+    /**
      * Retire d'une requête sur `personnes` celles qui se sont opposées à toute
      * prospection ou dont l'adresse est techniquement morte. Sert à l'export de
      * la console comme à l'éligibilité : UNE seule écriture de la règle.

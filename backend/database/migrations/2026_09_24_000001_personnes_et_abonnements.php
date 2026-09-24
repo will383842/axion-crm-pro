@@ -115,6 +115,7 @@ return new class extends Migration
              CHECK (kind IS NULL OR kind IN (' . Taxonomy::sqlList(self::ACTIVITY_KINDS_AVANT) . '))',
         );
 
+        DB::statement('DROP INDEX IF EXISTS idx_activities_personnes_created');
         DB::statement('DROP TABLE IF EXISTS abonnements');
         DB::statement('DROP TABLE IF EXISTS personnes');
     }
@@ -206,6 +207,11 @@ return new class extends Migration
                 consent_version        TEXT,
                 consent_at             TIMESTAMPTZ,
                 consent_text_ref       TEXT,
+                -- Base légale de CET abonnement : `consent` (case cochée,
+                -- double opt-in) ou `legitimate_interest_b2b` (adresse pro
+                -- inscrite à la demande du guide). NULL tant que la personne
+                -- n'a jamais été abonnée (désabonnement reçu en premier).
+                legal_basis            TEXT,
 
                 -- Placement d'origine (`guide-ia-haut`, `article-…`).
                 source_slug            TEXT,
@@ -240,6 +246,12 @@ return new class extends Migration
              CHECK (statut IN (' . Taxonomy::sqlList(Taxonomy::ABONNEMENT_STATUTS) . '))',
         );
 
+        DB::statement('ALTER TABLE abonnements DROP CONSTRAINT IF EXISTS abonnements_legal_basis_check');
+        DB::statement(
+            'ALTER TABLE abonnements ADD CONSTRAINT abonnements_legal_basis_check
+             CHECK (legal_basis IS NULL OR legal_basis IN (' . Taxonomy::sqlList(Taxonomy::ABONNEMENT_LEGAL_BASES) . '))',
+        );
+
         DB::statement('CREATE UNIQUE INDEX IF NOT EXISTS abonnements_personne_canal_key ON abonnements (personne_id, canal)');
         DB::statement('CREATE INDEX IF NOT EXISTS idx_abonnements_workspace_canal_statut ON abonnements (workspace_id, canal, statut)');
 
@@ -263,6 +275,15 @@ return new class extends Migration
 
     private function extendVocabularies(): void
     {
+        // La sentinelle `crm:sonde-personnes` compte chaque jour les entrées
+        // lettre et guide des dernières 24 h par `created_at`, colonne sans
+        // index : sans celui-ci, un balayage complet de `activities` par jour.
+        // Partiel : il ne porte que les deux types comptés.
+        DB::statement(
+            "CREATE INDEX IF NOT EXISTS idx_activities_personnes_created ON activities (workspace_id, created_at)
+             WHERE kind IN ('newsletter_optin', 'lead_magnet_requested')",
+        );
+
         DB::statement('ALTER TABLE activities DROP CONSTRAINT IF EXISTS activities_kind_check');
         DB::statement(
             'ALTER TABLE activities ADD CONSTRAINT activities_kind_check

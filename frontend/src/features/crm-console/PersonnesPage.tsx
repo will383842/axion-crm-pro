@@ -38,7 +38,7 @@ import {
 } from './types';
 
 const SELECT_CLS =
-  'h-9 rounded-lg bg-white px-3 text-xs text-slate-900 ring-1 ring-slate-200 transition focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700';
+  'h-11 rounded-lg bg-white px-3 text-xs text-slate-900 ring-1 ring-slate-200 transition focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700';
 
 interface Filtres {
   statut_lettre: string;

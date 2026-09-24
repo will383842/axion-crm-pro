@@ -266,6 +266,16 @@ final class Taxonomy
     public const ABONNEMENT_STATUTS = ['abonne', 'desabonne'];
 
     /**
+     * Bases légales d'un ABONNEMENT (amendement de Will du 2026-09-24) :
+     * consentement (adresse personnelle, case cochée ; format actuel du site,
+     * double opt-in) ou intérêt légitime B2B (adresse professionnelle inscrite
+     * à la demande du guide). Sous-ensemble fermé de `LEGAL_BASES`.
+     *
+     * @var list<string>
+     */
+    public const ABONNEMENT_LEGAL_BASES = ['consent', 'legitimate_interest_b2b'];
+
+    /**
      * Par quelle PORTE on atteint un contact presse. Liste FERMÉE, et c'est
      * délibéré : contrairement aux motifs d'échange (`crm_activites`, table
      * ouverte et modifiable depuis la console), ceci n'est pas un réglage mais

@@ -34,6 +34,8 @@ function personne(overrides: Partial<PersonneRow> = {}): PersonneRow {
     derniere_interaction_at: '2026-09-24T10:00:00Z',
     legal_basis: 'legitimate_interest_b2b',
     statut_lettre: null,
+    base_lettre: null,
+    prospection_autorisee: true,
     placement: null,
     rattachee: false,
     contact_id: null,
@@ -123,5 +125,23 @@ describe('PersonneDetailPage — rattacher', () => {
 
     await waitFor(() => expect(post.bodies).toHaveLength(1));
     expect(post.bodies[0]).toEqual({ company_id: 1842, last_name: 'ZZ TEST' });
+  });
+
+  it('adresse personnelle sans consentement : bandeau « aucune prospection » et rattachement fermé', async () => {
+    const { handler } = recordGet(
+      '/crm/personnes/12',
+      fiche({ personne: personne({ email_nature: 'perso', prospection_autorisee: false }) }),
+    );
+
+    await renderScreen(<PersonneDetailPage />, {
+      path: '/console/lettre-et-guide/$personneId',
+      url: '/console/lettre-et-guide/12',
+      consoleFeatures: 'open',
+      handlers: [handler],
+    });
+
+    expect(await screen.findByText('Adresse personnelle sans consentement : aucune prospection.')).toBeVisible();
+    expect(screen.getByText('Intérêt légitime B2B', { exact: false })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Rattacher à cette entreprise' })).toBeNull();
   });
 });

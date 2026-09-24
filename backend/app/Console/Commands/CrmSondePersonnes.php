@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Crm\Ingest\PersonnesIngestService;
-use App\Crm\Taxonomy;
 use App\Services\Alertes\AlerteTelegram;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
@@ -32,6 +31,9 @@ class CrmSondePersonnes extends Command
 {
     public const SIGNATURE_PLANIFIEE = 'crm:sonde-personnes';
 
+    /** @var list<string> */
+    public const TYPES_COMPTES = ['newsletter_optin', 'lead_magnet_requested'];
+
     public const PREFIXE_ALERTE = '[L4-C] le flux personnes recoit sans rien ecrire';
 
     protected $signature = self::SIGNATURE_PLANIFIEE;
@@ -50,9 +52,12 @@ class CrmSondePersonnes extends Command
         $workspaceId = (string) $workspaceId;
         $depuis = now()->subDay();
 
-        // Les rebonds ne créent jamais de personne (décision D1) : ils ne
-        // comptent ni au numérateur ni au dénominateur.
-        $types = array_values(array_diff(Taxonomy::PERSONNES_EVENT_TYPES, ['email_hard_bounced']));
+        // Les ENTRÉES seulement. Les rebonds ne créent jamais de personne
+        // (décision D1), et un `newsletter_optout` peut légitimement garder le
+        // chemin historique (opposition générale émise par le site) : compter
+        // l'un ou l'autre ferait crier la sentinelle sur un flux sain.
+        // L'index partiel `idx_activities_personnes_created` porte ces deux types.
+        $types = self::TYPES_COMPTES;
 
         [$recus, $rattaches, $creees] = WorkspaceContext::run($workspaceId, static fn (): array => [
             (int) DB::table('activities')

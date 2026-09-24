@@ -3,6 +3,7 @@
 use App\Crm\Personnes\Abonnements;
 use App\Crm\Personnes\NatureEmail;
 use App\Crm\Rgpd\SiteGdprService;
+use App\Services\Rgpd\GdprErasureService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -462,4 +463,180 @@ test('L4-C — aucune adresse n’atteint le journal pendant l’ingestion', fun
     foreach ($lignes as $ligne) {
         expect(str_contains((string) $ligne, L4C_EMAIL))->toBeFalse();
     }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Relectures de la PR (2026-09-24)
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('L4-C relecture — une OPPOSITION GÉNÉRALE du site (site:email_opposition) reste une opposition business : 0 personne, et un formulaire suivant rend opted_out', function () {
+    // `email/opposition.ts` : lien « ne plus recevoir de sollicitations » de
+    // tous les e-mails, oppositions saisies en console. Même type d'événement
+    // que la désinscription de la lettre, autre `subject_ref`.
+    l4cPost(l4cEvent('newsletter_optout', '2026-09-02T12:00:00Z', [
+        'subject_ref' => 'site:email_opposition:l4c',
+        'payload' => ['reason' => 'lien-email'],
+    ]))->assertOk();
+
+    expect(DB::table('opt_out')->pluck('scope')->all())->toBe(['business'])
+        ->and(DB::table('personnes')->count())->toBe(0);
+
+    l4cPost(l4cEvent('form_submission', '2026-09-03T09:00:00Z', [
+        'form_type' => 'audit',
+        'subject_ref' => 'site:submission:' . Str::uuid(),
+        'person' => ['first_name' => 'Jean', 'last_name' => 'ZZ TEST'],
+        'company' => ['siren' => '900000404', 'name' => 'ZZ TEST SAS'],
+    ]))->assertOk()->assertJsonPath('result.status', 'opted_out');
+
+    expect(DB::table('contacts')->count())->toBe(0);
+});
+
+test('L4-C relecture — une opposition générale d’un ABONNÉ le désabonne de la lettre (chemin historique + désabonnement)', function () {
+    l4cPost(l4cOptinActuel(['occurred_at' => '2026-09-01T10:00:00Z']))->assertOk();
+
+    l4cPost(l4cEvent('newsletter_optout', '2026-09-02T12:00:00Z', [
+        'subject_ref' => 'site:email_opposition:l4c-2',
+        'payload' => ['reason' => 'console-admin'],
+    ]))->assertOk();
+
+    expect(l4cStatut())->toBe('desabonne')
+        ->and(DB::table('opt_out')->pluck('scope')->all())->toBe(['business']);
+});
+
+test('L4-C relecture — drapeau FERMÉ : un formulaire avec SIREN et une opposition business n’émettent AUCUNE requête sur personnes ni abonnements', function () {
+    // La fenêtre de déploiement : le nouveau code tourne AVANT `migrate`.
+    config(['crm.ingest.personnes_enabled' => false]);
+
+    $requetes = [];
+    DB::listen(function ($q) use (&$requetes): void {
+        $requetes[] = $q->sql;
+    });
+
+    l4cPost(l4cEvent('form_submission', '2026-09-03T09:00:00Z', [
+        'form_type' => 'audit',
+        'subject_ref' => 'site:submission:' . Str::uuid(),
+        'person' => ['first_name' => 'Jean', 'last_name' => 'ZZ TEST'],
+        'company' => ['siren' => '900000405', 'name' => 'ZZ TEST SAS'],
+    ]))->assertOk()->assertJsonPath('result.status', 'created');
+    l4cPost(l4cEvent('opt_out', '2026-09-04T10:00:00Z', ['subject_ref' => 'site:opt_out:l4c-ferme']))->assertOk();
+
+    $touchees = array_filter($requetes, static fn (string $sql): bool => str_contains($sql, 'personnes') || str_contains($sql, 'abonnements'));
+
+    expect($requetes)->not->toBeEmpty()
+        ->and(array_values($touchees))->toBe([]);
+});
+
+test('L4-C relecture — base légale : format actuel → consent ; adresse pro inscrite à la demande du guide → intérêt légitime B2B, sans date de consentement inventée', function () {
+    l4cPost(l4cOptinActuel())->assertOk();
+    expect(DB::table('abonnements')->value('legal_basis'))->toBe('consent');
+
+    l4cPost(l4cOptinActuel([
+        'consent' => ['at' => null, 'version' => 'guide-mention-v1', 'text_ref' => 'guide-mention'],
+        'payload' => ['base_legale' => 'legitimate_interest_b2b', 'email_nature' => 'pro'],
+    ], 'zz.pro@example.invalid'))->assertOk()->assertJsonPath('result.status', 'created');
+
+    $ab = DB::table('abonnements')
+        ->join('personnes', 'personnes.id', '=', 'abonnements.personne_id')
+        ->where('personnes.person_key', l4cKey('zz.pro@example.invalid'))
+        ->first(['abonnements.legal_basis', 'abonnements.statut', 'abonnements.consent_at', 'personnes.legal_basis AS base_personne']);
+
+    expect($ab->statut)->toBe('abonne')
+        ->and($ab->legal_basis)->toBe('legitimate_interest_b2b')
+        ->and($ab->consent_at)->toBeNull()
+        ->and($ab->base_personne)->toBe('legitimate_interest_b2b');
+});
+
+test('L4-C relecture — une base légale hors liste fermée retombe sur consent', function () {
+    l4cPost(l4cOptinActuel(['payload' => ['base_legale' => 'contract']]))->assertOk();
+
+    expect(DB::table('abonnements')->value('legal_basis'))->toBe('consent');
+});
+
+test('L4-C relecture — un abonné par intérêt légitime qui coche ensuite la case passe en consentement, et ne redescend jamais', function () {
+    $li = ['payload' => ['base_legale' => 'legitimate_interest_b2b']];
+    l4cPost(l4cOptinActuel(['occurred_at' => '2026-09-01T10:00:00Z'] + $li))->assertOk();
+    l4cPost(l4cOptinActuel(['occurred_at' => '2026-09-02T10:00:00Z', 'consent' => ['at' => '2026-09-02T10:00:00Z']]))->assertOk();
+    l4cPost(l4cOptinActuel(['occurred_at' => '2026-09-03T10:00:00Z'] + $li))->assertOk();
+
+    expect(DB::table('abonnements')->value('legal_basis'))->toBe('consent');
+});
+
+test('L4-C relecture — adresse PERSONNELLE en intérêt légitime : jamais inscrite (site ou CRM qui dit « perso » suffit)', function () {
+    // Le site la déclare perso.
+    l4cPost(l4cOptinActuel(['payload' => ['base_legale' => 'legitimate_interest_b2b', 'email_nature' => 'perso']]))
+        ->assertOk();
+
+    // Le site la déclare pro, mais la liste du CRM la reconnaît.
+    $adresse = 'zz.l4c@' . NatureEmail::DOMAINES_GRAND_PUBLIC[0];
+    l4cPost(l4cOptinActuel(['payload' => ['base_legale' => 'legitimate_interest_b2b', 'email_nature' => 'pro']], $adresse))
+        ->assertOk();
+
+    expect(DB::table('abonnements')->count())->toBe(0)
+        ->and(DB::table('personnes')->count())->toBe(2)
+        ->and(DB::table('personnes')->pluck('legal_basis')->unique()->values()->all())->toBe(['legitimate_interest_b2b'])
+        ->and(DB::table('activities')->where('title', 'like', 'Inscription à la lettre refusée%')->count())->toBe(2)
+        ->and(Abonnements::eligiblesALaDiffusion($this->ws)->count())->toBe(0);
+});
+
+test('L4-C relecture — l’intérêt légitime ne lève JAMAIS une désinscription de la lettre ; un consentement, si', function () {
+    l4cPost(l4cOptinActuel(['occurred_at' => '2026-09-01T10:00:00Z']))->assertOk();
+    l4cPost(l4cEvent('newsletter_optout', '2026-09-02T12:00:00Z'))->assertOk();
+
+    l4cPost(l4cOptinActuel([
+        'occurred_at' => '2026-09-10T08:00:00Z',
+        'consent' => ['at' => null],
+        'payload' => ['base_legale' => 'legitimate_interest_b2b'],
+    ]))->assertOk()->assertJsonPath('result.status', 'opted_out');
+    expect(l4cStatut())->toBe('desabonne');
+
+    l4cPost(l4cOptinActuel(['occurred_at' => '2026-09-11T08:00:00Z', 'consent' => ['at' => '2026-09-11T08:00:00Z']]))->assertOk();
+    expect(l4cStatut())->toBe('abonne');
+});
+
+test('L4-C relecture — un désabonnement reçu en premier crée la personne SANS adresse ni nom ; l’inscription plus ancienne ne l’y remet pas', function () {
+    l4cPost(l4cEvent('newsletter_optout', '2026-09-02T12:00:00Z', [
+        'person' => ['first_name' => 'Jean', 'last_name' => 'ZZ TEST'],
+    ]))->assertOk();
+
+    $p = DB::table('personnes')->first();
+    expect($p->email)->toBeNull()
+        ->and($p->first_name)->toBeNull()
+        ->and($p->last_name)->toBeNull()
+        ->and($p->email_nature)->toBe('inconnue')
+        ->and($p->email_hash)->toBe(hash('sha256', L4C_EMAIL));
+
+    // L'inscription de T1, rejouée par le backoff : consignée, rien d'autre.
+    l4cPost(l4cOptinActuel(['occurred_at' => '2026-09-01T10:00:00Z']))->assertOk();
+
+    expect(DB::table('personnes')->value('email'))->toBeNull()
+        ->and(l4cStatut())->toBe('desabonne');
+
+    // L'effacement la retrouve quand même, par l'empreinte.
+    $bilan = app(GdprErasureService::class)->erase(L4C_EMAIL);
+    expect($bilan['deleted']['personnes'])->toBe(1)
+        ->and(DB::table('personnes')->count())->toBe(0);
+});
+
+test('L4-C relecture — la timeline ne recopie que les clés FERMÉES de payload', function () {
+    l4cPost(l4cOptinActuel(['payload' => [
+        'source' => 'guide-ia',
+        'ip' => '192.0.2.10',
+        'contact_secondaire' => 'zz.autre@example.invalid',
+    ]]))->assertOk();
+
+    $payload = json_decode((string) DB::table('activities')->value('payload'), true);
+
+    expect($payload)->toHaveKey('source')
+        ->not->toHaveKey('ip')
+        ->not->toHaveKey('contact_secondaire');
+});
+
+test('L4-C relecture — NatureEmail couvre les FAMILLES de l’amendement sous toute extension nationale, sans avaler un vrai nom de domaine', function () {
+    foreach (['hotmail.co.uk', 'yahoo.co.uk', 'outlook.be', 'gmx.de', 'live.com.au', 'yahoo.com.br', 'protonmail.ch'] as $domaine) {
+        expect(NatureEmail::estGrandPublic($domaine))->toBeTrue("{$domaine} devrait être grand public");
+    }
+    foreach (['example.invalid', 'live.example.fr', 'outlookconseil.fr', 'yahoo.entreprise.example'] as $domaine) {
+        expect(NatureEmail::estGrandPublic($domaine))->toBeFalse("{$domaine} ne devrait pas être grand public");
+    }
+    expect(NatureEmail::de(null))->toBe('inconnue');
 });

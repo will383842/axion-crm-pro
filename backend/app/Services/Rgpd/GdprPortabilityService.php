@@ -45,10 +45,17 @@ class GdprPortabilityService
         // l'EXPORTER*. Les deux services se repondent desormais table pour table
         // (cf. GdprErasureService). Si l'un apprend une table, l'autre aussi -
         // sinon on effacerait une donnee qu'on aurait refuse de montrer.
+        // Lot L4-C : les personnes de cette adresse, par l'adresse OU par son
+        // empreinte (une fiche nee d'un desabonnement ne porte pas l'adresse en
+        // clair). Meme regle que `GdprErasureService::personnesDe()`.
+        $personnes = static fn () => DB::table('personnes')->where(function ($q) use ($email): void {
+            $q->where('email', $email)->orWhere('email_hash', hash('sha256', mb_strtolower(trim($email))));
+        });
+
         $clesPersonne = array_values(array_filter(array_unique(array_merge(
             DB::table('contacts')->where('email', $email)->pluck('person_key')->all(),
             DB::table('candidates')->where('email', $email)->pluck('person_key')->all(),
-            DB::table('personnes')->where('email', $email)->pluck('person_key')->all(),
+            $personnes()->pluck('person_key')->all(),
         ))));
 
         $data = [
@@ -59,9 +66,9 @@ class GdprPortabilityService
             // Lot L4-C — la personne connue par la lettre ou le guide, et ses
             // abonnements (statut, version et date du consentement recopiés du
             // site, qui garde la preuve).
-            'personnes' => DB::table('personnes')->where('email', $email)->get()->toArray(),
+            'personnes' => $personnes()->get()->toArray(),
             'abonnements' => DB::table('abonnements')
-                ->whereIn('personne_id', DB::table('personnes')->where('email', $email)->select('id'))
+                ->whereIn('personne_id', $personnes()->select('id'))
                 ->get()
                 ->toArray(),
             'email_validations' => DB::table('email_validations')->where('email', $email)->get()->toArray(),

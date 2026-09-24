@@ -16,6 +16,7 @@ import { Button, Card, CardTitle, EmptyState, Input, PageHeader, QueryErrorState
 import { api } from '@/lib/api';
 import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
 import {
+  BASE_LEGALE_LABELS,
   NATURE_EMAIL_LABELS,
   SOURCE_PERSONNE_LABELS,
   STATUT_LETTRE_LABELS,
@@ -95,7 +96,8 @@ function PersonneDetailContent() {
       toast.success(data.contact_created ? 'Rattachée — fiche contact créée.' : 'Rattachée à une fiche contact existante.');
       rafraichir();
     },
-    onError: () => toast.error('Rattachement impossible : identifiant d’entreprise et nom de famille requis.'),
+    onError: () =>
+      toast.error('Rattachement impossible : identifiant d’entreprise et nom de famille requis, et adresse prospectable.'),
   });
 
   if (fiche.isLoading) {
@@ -122,6 +124,7 @@ function PersonneDetailContent() {
   const nomAffiche = [personne.first_name, personne.last_name].filter(Boolean).join(' ') || personne.email || 'Personne';
   const parsedCompanyId = Number.parseInt(companyId, 10);
   const nomConnu = (personne.last_name ?? '') !== '';
+  const baseLegale = (code: string | null | undefined) => (code ? (BASE_LEGALE_LABELS[code] ?? code) : '—');
 
   return (
     <div className="px-6 py-6">
@@ -130,6 +133,17 @@ function PersonneDetailContent() {
         subtitle={`${SOURCE_PERSONNE_LABELS[personne.premiere_source] ?? personne.premiere_source} · arrivée le ${formatDate(personne.premiere_source_at)}`}
       />
 
+      {!personne.prospection_autorisee && (
+        <div
+          role="note"
+          className="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-950 dark:text-amber-100 dark:ring-amber-800"
+        >
+          {personne.email_nature === 'perso'
+            ? 'Adresse personnelle sans consentement : aucune prospection.'
+            : 'Aucune adresse connue : aucune prospection.'}
+        </div>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
         <div className="flex flex-col gap-4">
           <Card>
@@ -137,7 +151,7 @@ function PersonneDetailContent() {
             <dl className="mt-2 flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-300">
               <div>{personne.email ?? '—'}</div>
               <div className="text-slate-400">{NATURE_EMAIL_LABELS[personne.email_nature]}</div>
-              <div className="text-slate-400">Base légale : {personne.legal_basis}</div>
+              <div className="text-slate-400">Base légale : {baseLegale(personne.legal_basis)}</div>
               {personne.purge_prevue_le !== null && (
                 <div className="text-slate-400">Purge prévue le {formatDate(personne.purge_prevue_le)}</div>
               )}
@@ -159,6 +173,7 @@ function PersonneDetailContent() {
               </StatusPill>
               {abonnement !== null && (
                 <>
+                  <div>Base légale : {baseLegale(abonnement.legal_basis)}</div>
                   <div>Consentement : {abonnement.consent_version ?? '—'} · {formatDate(abonnement.consent_at)}</div>
                   <div>Placement : {abonnement.source_slug ?? '—'}</div>
                   {abonnement.desabonne_at !== null && <div>Désabonné le {formatDate(abonnement.desabonne_at)}</div>}
@@ -175,6 +190,11 @@ function PersonneDetailContent() {
             {entreprise !== null ? (
               <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
                 {entreprise.denomination ?? '—'} · SIREN {entreprise.siren ?? '—'}
+              </p>
+            ) : !personne.prospection_autorisee ? (
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                Non rattachée. Le rattachement est fermé : il ferait entrer la personne dans le hub et les audiences, qui
+                servent à la prospection.
               </p>
             ) : (
               <div className="mt-2 flex flex-col gap-2">
@@ -214,7 +234,7 @@ function PersonneDetailContent() {
               <Input
                 value={titre}
                 onChange={(e) => setTitre(e.target.value)}
-                placeholder="ex. Relancer après lecture du guide"
+                placeholder="ex. Retrouver l’entreprise (SIREN)"
                 aria-label="Titre de la tâche"
                 className="min-w-64 flex-1"
               />

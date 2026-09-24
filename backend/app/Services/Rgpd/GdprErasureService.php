@@ -4,6 +4,7 @@ namespace App\Services\Rgpd;
 
 use App\Services\Audit\AuditHashChain;
 use App\Services\Dedup\DeduplicationService;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -33,13 +34,12 @@ class GdprErasureService
             $clesPersonne = array_values(array_filter(array_unique(array_merge(
                 DB::table('contacts')->where('email', $email)->pluck('person_key')->all(),
                 DB::table('candidates')->where('email', $email)->pluck('person_key')->all(),
-                // Lot L4-C — la personne connue par la lettre ou le guide.
-                DB::table('personnes')->where('email', $email)->pluck('person_key')->all(),
+                self::personnesDe($email)->pluck('person_key')->all(), // lot L4-C
             ))));
 
             // Lot L4-C — `abonnements` part en cascade avec sa personne ; on
             // le compte à part pour que le bilan dise ce qui a disparu.
-            $personnesIds = DB::table('personnes')->where('email', $email)->pluck('id')->all();
+            $personnesIds = self::personnesDe($email)->pluck('id')->all();
             $deleted['abonnements'] = DB::table('abonnements')->whereIn('personne_id', $personnesIds)->delete();
             $deleted['personnes'] = DB::table('personnes')->whereIn('id', $personnesIds)->delete();
 
@@ -314,6 +314,21 @@ class GdprErasureService
             Log::info('GDPR erasure complete', ['email' => $email, 'deleted' => $deleted]);
 
             return ['deleted' => $deleted, 'opt_out_added' => true];
+        });
+    }
+
+    /**
+     * Lot L4-C — les personnes d'une adresse : par l'adresse, OU par son
+     * empreinte (`email_hash`, sha256 de l'adresse normalisée). Une personne
+     * créée par un désabonnement ne porte PAS l'adresse en clair : sans
+     * l'empreinte, l'effacement et la portabilité ne la trouveraient pas.
+     */
+    public static function personnesDe(string $email): Builder
+    {
+        $email = mb_strtolower(trim($email));
+
+        return DB::table('personnes')->where(function (Builder $q) use ($email): void {
+            $q->where('email', $email)->orWhere('email_hash', hash('sha256', $email));
         });
     }
 }

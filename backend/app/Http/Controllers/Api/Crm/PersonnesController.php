@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Crm;
 use App\Crm\Ingest\ContactUpserter;
 use App\Crm\Personnes\Abonnements;
 use App\Crm\Taxonomy;
+use App\Support\CelluleCsv;
 use App\Support\MasquageCoordonnees;
 use App\Support\PlafondExport;
 use App\Support\WorkspaceContext;
@@ -139,7 +140,7 @@ class PersonnesController extends ConsoleController
                 ->where('workspace_id', $workspaceId)
                 ->where('personne_id', $id)
                 ->where('canal', 'lettre')
-                ->first(['canal', 'statut', 'consent_version', 'consent_at', 'consent_text_ref', 'source_slug', 'abonne_at', 'desabonne_at', 'motif_desabonnement']);
+                ->first(['canal', 'statut', 'legal_basis', 'consent_version', 'consent_at', 'consent_text_ref', 'source_slug', 'abonne_at', 'desabonne_at', 'motif_desabonnement']);
 
             $timeline = DB::table('activities')
                 ->where('workspace_id', $workspaceId)
@@ -152,7 +153,10 @@ class PersonnesController extends ConsoleController
                     'id' => (int) $row->id,
                     'kind' => $row->kind,
                     'title' => $row->title,
-                    'content' => $row->content,
+                    // Le texte libre n'est rendu que pour une TÂCHE (saisie ici) :
+                    // les notes des autres activités peuvent porter des
+                    // coordonnées, et la fiche 360° ne les expose pas non plus.
+                    'content' => $row->kind === 'task' ? $row->content : null,
                     'occurred_at' => $row->occurred_at,
                     'due_at' => $row->due_at,
                     'done_at' => $row->done_at,
@@ -307,6 +311,21 @@ class PersonnesController extends ConsoleController
                     abort(404, 'Entreprise introuvable dans cet univers.');
                 }
 
+                // Rattacher fait entrer la personne au hub et dans les
+                // audiences, qui servent à la PROSPECTION : jamais une adresse
+                // personnelle sans consentement (L.34-5 CPCE), ni une fiche sans
+                // adresse connue.
+                $statutLettre = DB::table('abonnements')
+                    ->where('personne_id', $id)
+                    ->where('canal', 'lettre')
+                    ->value('statut');
+                if (! Abonnements::prospectionAutorisee(
+                    is_string($personne->email_nature ?? null) ? $personne->email_nature : null,
+                    is_string($statutLettre) ? $statutLettre : null,
+                )) {
+                    abort(422, 'Rattachement refusé : adresse personnelle sans consentement, ou adresse inconnue. Aucune prospection n’est possible pour cette personne.');
+                }
+
                 $firstName = $this->texte($data['first_name'] ?? null) ?? $this->texte($personne->first_name);
                 $lastName = $this->texte($data['last_name'] ?? null) ?? $this->texte($personne->last_name);
                 if ($lastName === null) {
@@ -338,6 +357,16 @@ class PersonnesController extends ConsoleController
                 if ($upserted === null) {
                     throw new RuntimeException('ContactUpserter a refusé une fiche munie d’un nom : état incohérent.');
                 }
+
+                // Le rattachement automatique de `ContactUpserter` suit le
+                // drapeau d'ingestion ; ce geste-ci est explicite, il lie
+                // toujours (à l'entreprise EFFECTIVE du contact retrouvé).
+                $this->contacts->lierPersonne(
+                    $workspaceId,
+                    (string) $personne->person_key,
+                    $upserted[0],
+                    (int) (DB::table('contacts')->where('id', $upserted[0])->whereNull('deleted_at')->value('company_id') ?? $company->id),
+                );
 
                 // Le nom saisi par l'opérateur devient la valeur déclarée de la
                 // personne : les deux fiches disent désormais la même chose.
@@ -391,13 +420,21 @@ class PersonnesController extends ConsoleController
         $workspaceId = $this->businessWorkspace($request);
         $filtres = $this->filtres($request);
         $masquer = MasquageCoordonnees::requis();
+        // Par défaut, l'export ne sort QUE les personnes qu'on peut prospecter
+        // (`Abonnements::prospectionAutorisee`) : c'est le fichier type qu'on
+        // réimporte un jour dans un outil d'envoi. Les autres ne sortent que
+        // sur demande explicite, et la colonne le dit ligne par ligne.
+        $choix = $request->validate([
+            'inclure_non_prospectables' => ['nullable', 'string', 'in:oui,non'],
+        ]);
+        $tous = ($choix['inclure_non_prospectables'] ?? null) === 'oui';
 
-        $entete = ['Adresse', 'Prénom', 'Nom', 'Nature', 'Source', 'Statut lettre', 'Consentement (version)', 'Consentement le', 'Rattachée', 'SIREN', 'Dernière interaction'];
+        $entete = ['Adresse', 'Prénom', 'Nom', 'Nature', 'Source', 'Statut lettre', 'Base légale (lettre)', 'Consentement (version)', 'Consentement le', 'Prospection autorisée', 'Rattachée', 'SIREN', 'Dernière interaction'];
 
         // La requête est construite ICI, sous le contexte d'espace, et lue dans
         // le flux ; le contexte est reposé autour de la lecture.
-        return response()->streamDownload(function () use ($workspaceId, $filtres, $masquer, $entete): void {
-            WorkspaceContext::run($workspaceId, function () use ($workspaceId, $filtres, $masquer, $entete): void {
+        return response()->streamDownload(function () use ($workspaceId, $filtres, $masquer, $entete, $tous): void {
+            WorkspaceContext::run($workspaceId, function () use ($workspaceId, $filtres, $masquer, $entete, $tous): void {
                 $out = fopen('php://output', 'w');
                 if ($out === false) {
                     throw new RuntimeException("Export CSV : impossible d'ouvrir php://output.");
@@ -406,6 +443,9 @@ class PersonnesController extends ConsoleController
                 fputcsv($out, $entete);
 
                 $requete = Abonnements::exclureOpposees($this->requete($workspaceId, $filtres));
+                if (! $tous) {
+                    $requete = Abonnements::limiterAuxProspectables($requete);
+                }
 
                 // Même plafond que tous les exports du dépôt (G41-007), même
                 // ligne témoin lue en plus pour distinguer « complet » de
@@ -416,19 +456,27 @@ class PersonnesController extends ConsoleController
                 $lues = 0;
                 $tronque = false;
                 $ecrire = function (\stdClass $p) use ($out, $masquer): void {
-                    fputcsv($out, [
+                    // Chaque cellule est NEUTRALISÉE : prénom, nom, source et
+                    // version viennent d'un formulaire public (injection de
+                    // formule à l'ouverture dans un tableur).
+                    fputcsv($out, CelluleCsv::ligne([
                         $masquer ? MasquageCoordonnees::email($p->email) : $p->email,
                         $p->first_name,
                         $p->last_name,
                         $p->email_nature,
                         $p->premiere_source,
                         $p->statut_lettre ?? 'aucun',
+                        $p->base_lettre,
                         $p->consent_version,
                         $p->consent_at,
+                        Abonnements::prospectionAutorisee(
+                            is_string($p->email_nature) ? $p->email_nature : null,
+                            is_string($p->statut_lettre) ? $p->statut_lettre : null,
+                        ) ? 'oui' : 'non',
                         $p->contact_id === null ? 'non' : 'oui',
                         $p->siren,
                         $p->derniere_interaction_at,
-                    ]);
+                    ]));
                 };
                 $requete->chunkById(min(1000, $plafond + 1), function ($lot) use (&$lues, &$tronque, $plafond, $ecrire): bool {
                     foreach ($lot as $ligne) {
@@ -503,6 +551,7 @@ class PersonnesController extends ConsoleController
                 'personnes.company_id',
                 'personnes.rattachee_at',
                 'abonnements.statut AS statut_lettre',
+                'abonnements.legal_basis AS base_lettre',
                 'abonnements.consent_version',
                 'abonnements.consent_at',
                 'abonnements.source_slug AS placement',
@@ -527,13 +576,18 @@ class PersonnesController extends ConsoleController
             $requete->whereNull('personnes.contact_id');
         }
         if ($f['q'] !== null) {
-            $terme = $f['q'];
-            $requete->where(function (Builder $q) use ($terme): void {
-                // Préfixe sur la colonne `citext` : l'index sur `email` reste
-                // utilisable, et « commence par » est ce qu'on tape.
-                $q->where('personnes.email', 'ilike', $terme . '%')
-                    ->orWhere('personnes.last_name', 'ilike', $terme . '%')
+            // Les jokers `%` et `_` sont NEUTRALISÉS : sans cela, un compte qui
+            // voit l'adresse masquée la reconstituerait lettre par lettre
+            // (`q=a%`, `q=ab%`…). Et sans `contacts.view_pii`, on ne cherche
+            // que dans les NOMS : chercher dans l'adresse serait le même oracle.
+            $terme = addcslashes($f['q'], '%_\\');
+            $dansAdresse = ! MasquageCoordonnees::requis();
+            $requete->where(function (Builder $q) use ($terme, $dansAdresse): void {
+                $q->where('personnes.last_name', 'ilike', $terme . '%')
                     ->orWhere('personnes.first_name', 'ilike', $terme . '%');
+                if ($dansAdresse) {
+                    $q->orWhere('personnes.email', 'ilike', $terme . '%');
+                }
             });
         }
 
@@ -556,6 +610,13 @@ class PersonnesController extends ConsoleController
             'derniere_interaction_at' => $p->derniere_interaction_at,
             'legal_basis' => $p->legal_basis,
             'statut_lettre' => $p->statut_lettre ?? null,
+            'base_lettre' => $p->base_lettre ?? null,
+            // LA règle (`Abonnements::prospectionAutorisee`), calculée ici pour
+            // que la console n'en écrive pas une seconde.
+            'prospection_autorisee' => Abonnements::prospectionAutorisee(
+                is_string($p->email_nature ?? null) ? $p->email_nature : null,
+                is_string($p->statut_lettre ?? null) ? $p->statut_lettre : null,
+            ),
             'placement' => $p->placement ?? null,
             'rattachee' => $p->contact_id !== null,
             'contact_id' => $p->contact_id === null ? null : (int) $p->contact_id,

@@ -152,8 +152,12 @@ final class SiteSyncIngestService
             // Une opposition GÉNÉRALE (art. 21) retire aussi la personne de
             // toute liste de diffusion : ses abonnements passent en
             // `desabonne`. Sans effet tant qu'aucune personne n'existe.
+            // Drapeau fermé : aucune requête (fenêtre de déploiement, voir
+            // `ContactUpserter::rattacherPersonne`) ; une personne restée
+            // `abonne` n'est de toute façon jamais éligible avec une opposition
+            // `business` (`Abonnements::exclureOpposees`).
             $hash = $event->emailHash();
-            if ($scope === 'business' && $hash !== null) {
+            if ($scope === 'business' && $hash !== null && PersonnesIngestService::drapeauOuvert()) {
                 $this->personnes->desabonnerSurOpposition($workspaceId, $hash, $event->occurredAt, 'opposition_generale');
             }
         }

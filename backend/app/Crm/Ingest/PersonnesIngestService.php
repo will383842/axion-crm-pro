@@ -15,8 +15,25 @@ use Illuminate\Support\Facades\DB;
  * et AVANT `upsertBusiness`, dans la même transaction et sous le même contexte
  * d'espace. Elle ne s'applique qu'aux quatre types de
  * `Taxonomy::PERSONNES_EVENT_TYPES`, et seulement drapeau ouvert
- * (`crm.ingest.personnes_enabled`). Drapeau fermé : comportement d'avant,
- * au bit près — c'est le retour arrière.
+ * (`crm.ingest.personnes_enabled`). Drapeau fermé : aucune lecture ni
+ * écriture de `personnes` ou `abonnements`, nulle part (ni ici, ni dans
+ * `ContactUpserter`, ni sur une opposition générale) — c'est le retour
+ * arrière, et c'est ce qui rend sûre la fenêtre de déploiement où le nouveau
+ * code tourne avant la migration.
+ *
+ * ── Quel `newsletter_optout` est un désabonnement de la LETTRE ──────────────
+ *
+ * Le site émet `newsletter_optout` depuis DEUX endroits :
+ *   - le lien de désinscription de la lettre (`newsletter/actions.ts`,
+ *     `subject_ref = site:newsletter_subscriber:<id>`) → retrait du CANAL ;
+ *   - l'opposition GÉNÉRALE à toute sollicitation (`email/opposition.ts`,
+ *     `subject_ref = site:email_opposition:<id>`) : lien présent dans tous les
+ *     e-mails, oppositions reçues au téléphone et saisies en console. C'est
+ *     l'art. 21, et la prospection humaine ne lit QUE l'opposition `business`.
+ * Seul le premier est pris ici ; tout autre `subject_ref` garde le chemin
+ * historique (opposition `business` + désabonnement de tous les canaux). Liste
+ * fermée : un nouveau chemin de désinscription du site retombe du côté
+ * PROTECTEUR tant qu'il n'est pas ajouté à `PREFIXES_DESABONNEMENT_LETTRE`.
  *
  * ── Ce qu'elle fait que le chemin historique ne faisait pas ─────────────────
  *
@@ -46,6 +63,37 @@ use Illuminate\Support\Facades\DB;
  */
 final class PersonnesIngestService
 {
+    /**
+     * `subject_ref` d'un désabonnement de la LETTRE seule. Tout autre
+     * `newsletter_optout` est une opposition générale (voir l'en-tête).
+     *
+     * @var list<string>
+     */
+    public const PREFIXES_DESABONNEMENT_LETTRE = ['site:newsletter_subscriber:'];
+
+    /**
+     * Bases légales qu'une INSCRIPTION à la lettre peut porter (amendement de
+     * Will du 2026-09-24) : consentement (adresse personnelle, case cochée) ou
+     * intérêt légitime B2B (adresse professionnelle, inscription à la demande
+     * du guide). Lue dans `payload.base_legale` ; absente → `consent`, qui est
+     * le format actuel du site (double opt-in).
+     *
+     * @var list<string>
+     */
+    public const BASES_LEGALES_INSCRIPTION = Taxonomy::ABONNEMENT_LEGAL_BASES;
+
+    /**
+     * Clés de `payload` recopiées dans la timeline. Liste FERMÉE : si le site
+     * ajoute un jour une adresse ou une IP dans `payload`, elle n'entre pas en
+     * clair dans `activities`.
+     *
+     * @var list<string>
+     */
+    public const CLES_PAYLOAD_CONSIGNEES = [
+        'source', 'placement', 'locale', 'reason', 'base_legale', 'email_nature',
+        'aimant', 'edition', 'verifie',
+    ];
+
     /** Rang de protection des bases légales : on ne redescend jamais. */
     private const RANG_BASE_LEGALE = [
         'legitimate_interest_b2b' => 0,
@@ -64,7 +112,24 @@ final class PersonnesIngestService
 
     public function prendEnCharge(SiteSyncEvent $event): bool
     {
-        return self::drapeauOuvert() && in_array($event->eventType, Taxonomy::PERSONNES_EVENT_TYPES, true);
+        if (! self::drapeauOuvert() || ! in_array($event->eventType, Taxonomy::PERSONNES_EVENT_TYPES, true)) {
+            return false;
+        }
+
+        // Une opposition GÉNÉRALE voyage aussi en `newsletter_optout` : elle
+        // n'est pas à nous (voir l'en-tête).
+        return $event->eventType !== 'newsletter_optout' || self::estDesabonnementLettre($event);
+    }
+
+    public static function estDesabonnementLettre(SiteSyncEvent $event): bool
+    {
+        foreach (self::PREFIXES_DESABONNEMENT_LETTRE as $prefixe) {
+            if (str_starts_with($event->subjectRef, $prefixe)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function ingerer(SiteSyncEvent $event, string $workspaceId, string $activityRef): IngestOutcome
@@ -121,10 +186,11 @@ final class PersonnesIngestService
         }
 
         $existante = $this->trouver($workspaceId, $event);
+        $inscription = $event->eventType === 'newsletter_optin';
+        $abonnement = $existante === null ? null : $this->abonnement((int) $existante->id);
+        $base = $this->baseLegaleInscription($event);
 
-        if ($event->eventType === 'newsletter_optin' && $hash !== null) {
-            $abonnement = $existante === null ? null : $this->abonnement((int) $existante->id);
-
+        if ($inscription && $hash !== null) {
             // Une opposition de CANAL ne compte que lorsqu'aucun abonnement ne
             // porte déjà l'histoire : s'il existe, c'est sa garde de désordre qui
             // tranche (un désabonnement plus récent l'emporte, une réinscription
@@ -134,15 +200,58 @@ final class PersonnesIngestService
             if ($abonnement === null && $this->opposeeAuCanalDepuis($hash, $event->consentAt() ?? $event->occurredAt)) {
                 return new IngestOutcome(status: IngestOutcome::OPTED_OUT);
             }
+
+            // L'intérêt légitime ne lève JAMAIS une opposition : quelqu'un qui
+            // s'est désabonné de la lettre n'y revient que par un
+            // CONSENTEMENT (art. 21 : l'opposition met fin au traitement fondé
+            // sur l'intérêt légitime).
+            if ($base === 'legitimate_interest_b2b' && $this->opposee($hash, 'lettre')) {
+                return new IngestOutcome(status: IngestOutcome::OPTED_OUT);
+            }
         }
 
-        [$personne, $creee] = $this->upsertPersonne($event, $workspaceId, $existante);
+        // Une inscription PLUS ANCIENNE qu'un désabonnement déjà appliqué ne
+        // réabonne pas (garde de désordre) — et ne remet pas non plus
+        // l'adresse en clair sur une fiche créée sans elle par ce
+        // désabonnement. Elle est consignée, c'est tout.
+        if ($inscription && $existante !== null && $abonnement !== null
+            && ($abonnement->statut ?? null) === 'desabonne'
+            && ! $this->plusRecent($event->occurredAt, $abonnement->dernier_evenement_at ?? null)) {
+            return new IngestOutcome(
+                status: IngestOutcome::UPDATED,
+                subjectType: 'personne',
+                subjectId: (int) $existante->id,
+                activityId: $this->consigner($event, $workspaceId, $existante, $activityRef),
+            );
+        }
 
-        if ($event->eventType === 'newsletter_optin') {
+        // Adresse PERSONNELLE sans consentement : jamais inscrite (amendement
+        // de Will, L.34-5 CPCE). Le site le décide ; le CRM le vérifie aussi,
+        // et une seule des deux listes qui dit « perso » suffit.
+        $refusee = $inscription && $base === 'legitimate_interest_b2b' && $this->estPerso($event);
+
+        [$personne, $creee] = $this->upsertPersonne(
+            $event,
+            $workspaceId,
+            $existante,
+            true,
+            // Refusée ou non, une inscription porte SA base (l'intérêt légitime
+            // quand elle est refusée) : jamais le `consent` par défaut du
+            // classificateur pour quelqu'un qui n'a rien coché.
+            $inscription ? $base : null,
+        );
+
+        if ($inscription && ! $refusee) {
             $this->appliquerAbonnement($event, $workspaceId, $personne, 'abonne');
         }
 
-        $activityId = $this->consigner($event, $workspaceId, $personne, $activityRef);
+        $activityId = $this->consigner(
+            $event,
+            $workspaceId,
+            $personne,
+            $activityRef,
+            $refusee ? 'Inscription à la lettre refusée : adresse personnelle sans consentement' : null,
+        );
 
         return new IngestOutcome(
             status: $creee ? IngestOutcome::CREATED : IngestOutcome::UPDATED,
@@ -157,8 +266,11 @@ final class PersonnesIngestService
         // Un désabonnement n'est jamais bloqué : c'est un retrait, il s'applique
         // toujours. Il CRÉE la personne si besoin — sans elle, l'inscription plus
         // ancienne qu'on retente ensuite (backoff du site) réabonnerait
-        // quelqu'un qui s'est désabonné.
-        [$personne, $creee] = $this->upsertPersonne($event, $workspaceId, $this->trouver($workspaceId, $event));
+        // quelqu'un qui s'est désabonné. Mais il la crée SANS ADRESSE NI NOM :
+        // la clé du site et l'empreinte suffisent à la garde de désordre, et on
+        // ne conserve pas en clair l'adresse de quelqu'un qui vient de dire
+        // stop (l'information du site ne parle que d'une liste d'opposition).
+        [$personne, $creee] = $this->upsertPersonne($event, $workspaceId, $this->trouver($workspaceId, $event), false);
 
         $this->appliquerAbonnement($event, $workspaceId, $personne, 'desabonne');
 
@@ -242,12 +354,20 @@ final class PersonnesIngestService
     /**
      * @return array{0: \stdClass, 1: bool} [la personne relue, créée ?]
      */
-    private function upsertPersonne(SiteSyncEvent $event, string $workspaceId, ?\stdClass $existante): array
-    {
-        $email = $event->email();
-        $firstName = $event->str('person', 'first_name');
-        $lastName = $event->str('person', 'last_name');
-        $legalBasis = $this->classifier->legalBasis($event);
+    private function upsertPersonne(
+        SiteSyncEvent $event,
+        string $workspaceId,
+        ?\stdClass $existante,
+        bool $avecIdentite = true,
+        ?string $baseInscription = null,
+    ): array {
+        // Sans identité (désabonnement) : ni adresse ni nom ne sont écrits.
+        $email = $avecIdentite ? $event->email() : null;
+        $firstName = $avecIdentite ? $event->str('person', 'first_name') : null;
+        $lastName = $avecIdentite ? $event->str('person', 'last_name') : null;
+        // Une inscription porte SA base (consentement ou intérêt légitime B2B) ;
+        // les autres événements, celle du classificateur.
+        $legalBasis = $baseInscription ?? $this->classifier->legalBasis($event);
         $locale = $this->locale($event);
 
         // RATTACHEMENT AUTOMATIQUE, dans l'autre sens : la personne arrive
@@ -272,7 +392,7 @@ final class PersonnesIngestService
                 'person_key' => $event->personKey(),
                 'email' => $email,
                 'email_hash' => $event->emailHash(),
-                'email_nature' => NatureEmail::de($email),
+                'email_nature' => $email === null ? 'inconnue' : $this->nature($event),
                 'first_name' => $firstName,
                 'last_name' => $lastName,
                 'locale' => $locale,
@@ -329,7 +449,7 @@ final class PersonnesIngestService
             if (! $prise) {
                 $update['email'] = $email;
                 $update['email_hash'] = $event->emailHash();
-                $update['email_nature'] = NatureEmail::de($email);
+                $update['email_nature'] = $this->nature($event);
                 $origins['email'] = 'declared';
             }
         }
@@ -397,11 +517,21 @@ final class PersonnesIngestService
         $existant = $this->abonnement((int) $personne->id);
         $at = $event->occurredAt;
 
+        $base = $this->baseLegaleInscription($event);
+
         $champs = $statut === 'abonne'
             ? [
                 'statut' => 'abonne',
+                // Déjà abonné : on ne redescend jamais (consentement > intérêt
+                // légitime). Réinscription après un désabonnement : la base de
+                // CETTE inscription, puisque l'ancienne a pris fin.
+                'legal_basis' => $existant !== null && ($existant->statut ?? null) === 'abonne'
+                    ? $this->fusionnerBaseLegale(is_string($existant->legal_basis ?? null) ? $existant->legal_basis : null, $base)
+                    : $base,
                 'consent_version' => $event->consentVersion(),
-                'consent_at' => $event->consentAt() ?? $at,
+                // Un consentement se date ; une inscription par intérêt légitime
+                // n'a pas de date de consentement à inventer.
+                'consent_at' => $event->consentAt() ?? ($base === 'consent' ? $at : null),
                 'consent_text_ref' => $event->str('consent', 'text_ref'),
                 'abonne_at' => $at,
                 'desabonne_at' => null,
@@ -428,12 +558,7 @@ final class PersonnesIngestService
             return;
         }
 
-        // À la SECONDE : l'horodatage est persisté à la seconde pleine (format
-        // d'écriture de Laravel), alors que le site émet des millisecondes.
-        // Comparer l'instant brut ferait passer pour « plus récent » un
-        // événement plus ancien de la même seconde.
-        $dernier = $this->date($existant->dernier_evenement_at ?? null);
-        if ($dernier !== null && (int) $at->format('U') <= (int) $dernier->format('U')) {
+        if (! $this->plusRecent($at, $existant->dernier_evenement_at ?? null)) {
             return;
         }
 
@@ -470,9 +595,9 @@ final class PersonnesIngestService
 
     // ── Timeline ────────────────────────────────────────────────────────────
 
-    private function consigner(SiteSyncEvent $event, string $workspaceId, ?\stdClass $personne, string $activityRef): int
+    private function consigner(SiteSyncEvent $event, string $workspaceId, ?\stdClass $personne, string $activityRef, ?string $titre = null): int
     {
-        $payload = $event->payload;
+        $payload = array_intersect_key($event->payload, array_flip(self::CLES_PAYLOAD_CONSIGNEES));
         $payload['source_slug'] = $event->sourceSlug;
         $payload['subject_ref'] = $event->subjectRef;
         // Jamais de `pending_match` ici : c'est lui qui faisait entrer
@@ -490,7 +615,7 @@ final class PersonnesIngestService
             'external_ref' => $activityRef,
             'subject_type' => $personne === null ? null : 'personne',
             'subject_id' => $personne === null ? null : (int) $personne->id,
-            'title' => match ($event->eventType) {
+            'title' => $titre ?? match ($event->eventType) {
                 'newsletter_optin' => 'Inscription à la lettre',
                 'newsletter_optout' => 'Désabonnement de la lettre',
                 'lead_magnet_requested' => 'Guide IA entreprise téléchargé',
@@ -520,6 +645,51 @@ final class PersonnesIngestService
     private function placement(SiteSyncEvent $event): ?string
     {
         return $event->str('payload', 'placement') ?? $event->str('payload', 'source') ?? $event->sourceSlug;
+    }
+
+    /**
+     * Base légale d'une inscription : `payload.base_legale` en liste fermée,
+     * `consent` par défaut (format actuel du site : double opt-in).
+     */
+    private function baseLegaleInscription(SiteSyncEvent $event): string
+    {
+        $declaree = $event->str('payload', 'base_legale');
+
+        return in_array($declaree, self::BASES_LEGALES_INSCRIPTION, true) ? (string) $declaree : 'consent';
+    }
+
+    /**
+     * Nature de l'adresse : celle que le SITE a décidée (`payload.email_nature`,
+     * amendement de Will : nature « décidée côté serveur » du site) si elle est
+     * valide, sinon celle de `NatureEmail`.
+     */
+    private function nature(SiteSyncEvent $event): string
+    {
+        $declaree = $event->str('payload', 'email_nature');
+        if (in_array($declaree, ['pro', 'perso'], true)) {
+            return (string) $declaree;
+        }
+
+        return NatureEmail::de($event->email());
+    }
+
+    /** Vrai si le site OU la liste du CRM dit « perso » : le doute protège. */
+    private function estPerso(SiteSyncEvent $event): bool
+    {
+        return $this->nature($event) === 'perso' || NatureEmail::de($event->email()) === 'perso';
+    }
+
+    /**
+     * À la SECONDE : l'horodatage est persisté à la seconde pleine (format
+     * d'écriture de Laravel), alors que le site émet des millisecondes.
+     * Comparer l'instant brut ferait passer pour « plus récent » un événement
+     * plus ancien de la même seconde.
+     */
+    private function plusRecent(DateTimeImmutable $at, mixed $dernier): bool
+    {
+        $dernier = $this->date($dernier);
+
+        return $dernier === null || (int) $at->format('U') > (int) $dernier->format('U');
     }
 
     private function locale(SiteSyncEvent $event): ?string

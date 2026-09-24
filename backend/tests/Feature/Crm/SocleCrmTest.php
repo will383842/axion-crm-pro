@@ -117,6 +117,7 @@ test('les CHECK en base correspondent exactement à App\\Crm\\Taxonomy', functio
     socleExpectCheck('personnes_legal_basis_check', Taxonomy::LEGAL_BASES);
     socleExpectCheck('abonnements_canal_check', Taxonomy::ABONNEMENT_CANAUX);
     socleExpectCheck('abonnements_statut_check', Taxonomy::ABONNEMENT_STATUTS);
+    socleExpectCheck('abonnements_legal_basis_check', Taxonomy::ABONNEMENT_LEGAL_BASES);
     // Base presse (2026-08-25). `acces` commande QUI peut recevoir un mailing :
     // une divergence entre le code et le CHECK laisserait passer une porte
     // d'accès que la règle d'envoi ne connaît pas.

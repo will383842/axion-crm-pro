@@ -415,7 +415,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/personnes', [PersonnesController::class, 'index']);
             Route::get('/personnes/counts', [PersonnesController::class, 'counts']);
             Route::get('/personnes/export', [PersonnesController::class, 'export'])
-                ->middleware('permission:data.export');
+                ->middleware(['throttle:scraper-list', 'permission:data.export']);
             Route::get('/personnes/{personneId}', [PersonnesController::class, 'show'])->whereNumber('personneId');
             Route::post('/personnes/{personneId}/taches', [PersonnesController::class, 'storeTache'])
                 ->whereNumber('personneId')

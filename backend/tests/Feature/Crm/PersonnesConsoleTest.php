@@ -382,3 +382,111 @@ test('L4-C commande — la purge est inerte tant que CRM_PURGE_ENABLED est ferm�
     expect(Artisan::call('rgpd:purge-personnes'))->toBe(1)
         ->and(DB::table('personnes')->count())->toBe(1);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Relectures de la PR (2026-09-24)
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('L4-C relecture — l’export ne sort par défaut QUE les personnes prospectables ; sur demande, toutes, avec la colonne qui le dit', function () {
+    l4cPersonne($this->workspace->id, 'zz.pro@example.invalid', [], null);
+    l4cPersonne($this->workspace->id, 'zz.perso-abonne@example.invalid', ['email_nature' => 'perso']);
+    l4cPersonne($this->workspace->id, 'zz.perso-guide@example.invalid', ['email_nature' => 'perso', 'legal_basis' => 'legitimate_interest_b2b'], null);
+    l4cPersonne($this->workspace->id, 'zz.perso-parti@example.invalid', ['email_nature' => 'perso'], 'desabonne');
+
+    $defaut = $this->get('/api/v1/crm/personnes/export')->assertOk()->streamedContent();
+
+    expect($defaut)->toContain('zz.pro@example.invalid')
+        ->toContain('zz.perso-abonne@example.invalid')
+        ->not->toContain('zz.perso-guide@example.invalid')
+        ->not->toContain('zz.perso-parti@example.invalid')
+        ->toContain('Prospection autorisée')
+        ->toContain('Base légale (lettre)');
+
+    $tous = $this->get('/api/v1/crm/personnes/export?inclure_non_prospectables=oui')->assertOk()->streamedContent();
+    $ligneGuide = collect(explode("\n", $tous))->first(fn (string $l): bool => str_contains($l, 'zz.perso-guide@example.invalid'));
+
+    expect($ligneGuide)->not->toBeNull()
+        ->and(str_getcsv((string) $ligneGuide)[9])->toBe('non');
+});
+
+test('L4-C relecture — l’export NEUTRALISE une formule venue du formulaire public', function () {
+    l4cPersonne($this->workspace->id, 'zz.formule@example.invalid', [
+        'first_name' => '=HYPERLINK("http://example.invalid","x")',
+        'last_name' => '+1+1',
+        'premiere_source' => '@SUM(A1)',
+    ]);
+
+    $csv = $this->get('/api/v1/crm/personnes/export')->assertOk()->streamedContent();
+    $ligne = collect(explode("\n", $csv))->first(fn (string $l): bool => str_contains($l, 'zz.formule@example.invalid'));
+    $cellules = str_getcsv((string) $ligne);
+
+    expect($cellules[1])->toBe('\'=HYPERLINK("http://example.invalid","x")')
+        ->and($cellules[2])->toBe("'+1+1")
+        ->and($cellules[4])->toBe("'@SUM(A1)");
+});
+
+test('L4-C relecture — rattacher une adresse PERSONNELLE sans consentement est refusé (422), abonnée elle passe', function () {
+    $sans = l4cPersonne($this->workspace->id, 'zz.perso-sans@example.invalid', ['email_nature' => 'perso'], null);
+    $avec = l4cPersonne($this->workspace->id, 'zz.perso-avec@example.invalid', ['email_nature' => 'perso']);
+    $company = l4cEntreprise($this->workspace->id, '900000503');
+
+    $this->postJson("/api/v1/crm/personnes/{$sans}/rattacher", ['company_id' => $company, 'last_name' => 'ZZ TEST'])
+        ->assertStatus(422);
+    expect(DB::table('contacts')->count())->toBe(0);
+
+    $this->getJson("/api/v1/crm/personnes/{$sans}")->assertOk()->assertJsonPath('personne.prospection_autorisee', false);
+
+    $this->postJson("/api/v1/crm/personnes/{$avec}/rattacher", ['company_id' => $company, 'last_name' => 'ZZ TEST'])
+        ->assertOk();
+    expect(DB::table('contacts')->count())->toBe(1);
+});
+
+test('L4-C relecture — la recherche neutralise les jokers, et sans contacts.view_pii ne cherche pas dans l’adresse', function () {
+    l4cPersonne($this->workspace->id, 'zz.joker@example.invalid', ['last_name' => 'ZZ NOM']);
+
+    // `%` et `_` sont des caractères, plus des jokers.
+    $this->getJson('/api/v1/crm/personnes?q=' . rawurlencode('%'))->assertOk()->assertJsonCount(0, 'data');
+    $this->getJson('/api/v1/crm/personnes?q=' . rawurlencode('z_'))->assertOk()->assertJsonCount(0, 'data');
+    // TÉMOIN : le préfixe réel trouve, par l'adresse comme par le nom.
+    $this->getJson('/api/v1/crm/personnes?q=zz.jok')->assertOk()->assertJsonCount(1, 'data');
+
+    $this->actingAs(l4cConsoleUser($this->workspace->id, 'viewer', 'l4c.joker@example.invalid'));
+    $this->getJson('/api/v1/crm/personnes?q=zz.jok')->assertOk()->assertJsonCount(0, 'data');
+    $this->getJson('/api/v1/crm/personnes?q=' . rawurlencode('ZZ N'))->assertOk()->assertJsonCount(1, 'data');
+});
+
+test('L4-C relecture — la fiche ne rend le texte libre que des TÂCHES', function () {
+    $id = l4cPersonne($this->workspace->id, 'zz.note@example.invalid');
+    DB::table('activities')->insert([
+        'workspace_id' => $this->workspace->id,
+        'type' => 'call',
+        'kind' => 'call',
+        'occurred_at' => now()->subDay(),
+        'person_key' => hash('sha256', 'l4c-console|zz.note@example.invalid'),
+        'title' => 'Appel',
+        'content' => 'Note libre avec coordonnées',
+        'payload' => '{}',
+        'created_at' => now(),
+    ]);
+
+    $this->getJson("/api/v1/crm/personnes/{$id}")->assertOk()
+        ->assertJsonPath('timeline.0.kind', 'call')
+        ->assertJsonPath('timeline.0.content', null);
+});
+
+test('L4-C relecture — la sentinelle ne compte pas un désabonnement parti par le chemin historique', function () {
+    DB::table('activities')->insert([
+        'workspace_id' => $this->workspace->id,
+        'type' => 'newsletter_optout',
+        'kind' => 'newsletter_optout',
+        'occurred_at' => now(),
+        'person_key' => hash('sha256', 'l4c-sentinelle-opposition'),
+        'external_ref' => 'site:event:' . Str::uuid(),
+        'title' => 'newsletter optout',
+        'payload' => '{}',
+        'created_at' => now(),
+    ]);
+
+    config(['crm.ingest.personnes_enabled' => true, 'alertes.telegram.token' => '']);
+    expect(Artisan::call('crm:sonde-personnes'))->toBe(0);
+});

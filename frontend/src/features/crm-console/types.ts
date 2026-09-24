@@ -211,6 +211,15 @@ export const NATURE_EMAIL_LABELS: Record<NatureEmail, string> = {
   inconnue: 'Nature inconnue',
 };
 
+/** Libellé humain d'une base légale (`Taxonomy::LEGAL_BASES`). */
+export const BASE_LEGALE_LABELS: Record<string, string> = {
+  consent: 'Consentement',
+  legitimate_interest_b2b: 'Intérêt légitime B2B',
+  precontractual: 'Mesures précontractuelles',
+  contract: 'Contrat',
+  legal_obligation: 'Obligation légale',
+};
+
 export const SOURCE_PERSONNE_LABELS: Record<string, string> = {
   newsletter: 'Lettre',
   'guide-ia': 'Guide IA entreprise',
@@ -229,6 +238,10 @@ export interface PersonneRow {
   derniere_interaction_at: string | null;
   legal_basis: string;
   statut_lettre: StatutLettre | null;
+  /** Base légale de l'abonnement à la lettre (consentement ou intérêt légitime B2B). */
+  base_lettre: string | null;
+  /** LA règle du CRM (`Abonnements::prospectionAutorisee`) : jamais recalculée ici. */
+  prospection_autorisee: boolean;
   placement: string | null;
   rattachee: boolean;
   contact_id: number | null;
@@ -262,6 +275,7 @@ export interface PersonneFiche {
   abonnement: {
     canal: string;
     statut: StatutLettre;
+    legal_basis: string | null;
     consent_version: string | null;
     consent_at: string | null;
     consent_text_ref: string | null;

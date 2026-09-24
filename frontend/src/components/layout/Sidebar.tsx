@@ -33,6 +33,7 @@ import {
   Users2,
   Newspaper,
   Mic,
+  Mail,
   Scale,
   Send,
   GraduationCap,
@@ -150,6 +151,8 @@ function sectionContacts(features: ConsoleFeatures): NavSection {
           ? [{ to: '/console/vivier', label: 'Vivier candidats', icon: <GraduationCap className="h-4 w-4" /> }]
           : []),
         { to: '/console/arbitrage', label: 'À arbitrer', icon: <Scale className="h-4 w-4" /> },
+        // Lot L4-C — les personnes de la lettre et du guide, sans entreprise.
+        { to: '/console/lettre-et-guide', label: 'Personnes (lettre et guide)', icon: <Mail className="h-4 w-4" /> },
       ]
     : [{ to: '/contacts', label: 'Contacts', icon: <UsersIcon className="h-4 w-4" /> }];
 

@@ -54,6 +54,8 @@ import { ContactsHubPage } from '@/features/crm-console/ContactsHubPage';
 import { CandidatesPage } from '@/features/crm-console/CandidatesPage';
 import { ArbitragePage } from '@/features/crm-console/ArbitragePage';
 import { PersonTimelinePage } from '@/features/crm-console/PersonTimelinePage';
+import { PersonnesPage } from '@/features/crm-console/PersonnesPage';
+import { PersonneDetailPage } from '@/features/crm-console/PersonneDetailPage';
 // Phase 2 scaffold stubs
 
 // P6-UI-005 — SITE DE MONTAGE 1/3 de la frontiere d'erreur (cf.
@@ -139,6 +141,10 @@ const consoleContactsRoute = createRoute({ getParentRoute: () => layoutRoute, pa
 const consoleVivierRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/vivier', component: CandidatesPage });
 const consoleArbitrageRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/arbitrage', component: ArbitragePage });
 const consolePersonRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/personnes/$personKey', component: PersonTimelinePage });
+// Lot L4-C — « Personnes (lettre et guide) » : liste et fiche. Chemin distinct
+// de `/console/personnes/$personKey` (fiche 360° tous univers).
+const consoleLettreGuideRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/lettre-et-guide', component: PersonnesPage });
+const consoleLettreGuideDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/lettre-et-guide/$personneId', component: PersonneDetailPage });
 // Phase 2 stubs
 // ════════════════════════════════════════════════════════════════════════════
 // LES REDIRECTIONS DU §8.2 DE `10_NAVIGATION-CIBLE.md` — 4 sur 8, et il faut
@@ -307,6 +313,8 @@ export const routeTree = rootRoute.addChildren([
     consoleVivierRoute,
     consoleArbitrageRoute,
     consolePersonRoute,
+    consoleLettreGuideRoute,
+    consoleLettreGuideDetailRoute,
     coldEmailRoute,
     linkedInRoute,
     pasEncoreLivreRoute,

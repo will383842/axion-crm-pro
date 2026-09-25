@@ -230,16 +230,21 @@ final class SiteGdprService
                             ->whereIn('id', $personnesIds)
                             ->delete();
 
+                        $activites = $this->deleteActivities($businessId, $personKey);
+
+                        // 🔴 Le journal DANS le contexte ET dans la transaction —
+                        // cf. `journal()`.
+                        $this->journal($businessId, $email);
+
                         return [
                             'contacts' => $contacts,
                             'personnes' => $personnes,
                             'abonnements' => $abonnements,
                             'health_practitioners' => $praticiens,
-                            'activities' => $this->deleteActivities($businessId, $personKey),
+                            'activities' => $activites,
                         ];
                     }),
                 );
-                $this->journal($businessId, $email);
             }
             $this->optOut($email, $emailHash, 'business');
         }
@@ -262,13 +267,16 @@ final class SiteGdprService
                             })
                             ->delete();
 
+                        $activites = $this->deleteActivities($vivierId, $personKey);
+
+                        $this->journal($vivierId, $email);
+
                         return [
                             'candidates' => $candidates,
-                            'activities' => $this->deleteActivities($vivierId, $personKey),
+                            'activities' => $activites,
                         ];
                     }),
                 );
-                $this->journal($vivierId, $email);
             }
             $this->optOut($email, $emailHash, 'vivier');
         }
@@ -331,6 +339,24 @@ final class SiteGdprService
         ]);
     }
 
+    /**
+     * 🔴 À appeler DANS `WorkspaceContext::run()` et DANS la transaction de
+     * l'effacement — jamais après (constaté en production le 2026-09-25).
+     *
+     * `rgpd_requests` porte une RLS FORCÉE : sans `app.current_workspace_id`,
+     * l'insertion est refusée (« new row violates row-level security policy »).
+     * L'appel vivait APRÈS `WorkspaceContext::run()`, donc hors contexte : sous
+     * le rôle de production `axion_app`, CHAQUE effacement venu du site levait
+     * ici. Et comme la suppression avait déjà été validée dans sa propre
+     * transaction, l'effacement restait PARTIEL : fiches business supprimées,
+     * mais ni journal, ni opposition anti-réinsertion, ni univers vivier, ni
+     * preuve d'audit — et le site recevait un 500. Mesuré en production :
+     * 0 journal `site-sync-gdpr`, 0 opposition `gdpr_erasure_bisystem`.
+     *
+     * La suite ne l'avait pas vu parce qu'elle tourne sous le rôle `axion`
+     * (SUPERUSER, BYPASSRLS). `SiteGdprSousRlsTest` rejoue l'effacement sous
+     * `axion_app`.
+     */
     private function journal(string $workspaceId, string $email): void
     {
         DB::table('rgpd_requests')->insert([

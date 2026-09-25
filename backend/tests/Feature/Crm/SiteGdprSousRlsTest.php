@@ -31,7 +31,7 @@ uses(TestCase::class, RefreshDatabase::class);
  * connexion `pgsql_app` — le rôle `axion_app`, celui de la production — avec
  * des données semées et nettoyées par le propriétaire.
  */
-function rlsOwner(): Connection
+function effacementRlsProprio(): Connection
 {
     return DB::connection('pgsql_owner');
 }
@@ -42,9 +42,9 @@ function rlsOwner(): Connection
  *
  * @return array{business: string, vivier: string, companies: list<int>, email: string, key: string}
  */
-function rlsSemer(): array
+function effacementRlsSemer(): array
 {
-    $owner = rlsOwner();
+    $owner = effacementRlsProprio();
     $email = 'zz.rls.' . Str::lower(Str::random(8)) . '@example.invalid';
     $key = hash('sha256', 'sel-site|' . $email);
 
@@ -116,9 +116,9 @@ function rlsSemer(): array
 }
 
 /** @param array{business: string, vivier: string, companies: list<int>, email: string, key: string} $s */
-function rlsNettoyer(array $s): void
+function effacementRlsNettoyer(array $s): void
 {
-    $owner = rlsOwner();
+    $owner = effacementRlsProprio();
     $owner->table('rgpd_requests')->where('subject_email', $s['email'])->delete();
     $owner->table('opt_out')->where('email_hash', hash('sha256', $s['email']))->delete();
     $owner->table('activities')->where('person_key', $s['key'])->delete();
@@ -129,9 +129,9 @@ function rlsNettoyer(array $s): void
 }
 
 /** Compte, par le propriétaire (qui voit tout), ce qui reste de la personne. */
-function rlsReste(array $s): array
+function effacementRlsReste(array $s): array
 {
-    $owner = rlsOwner();
+    $owner = effacementRlsProprio();
 
     return [
         'contacts' => $owner->table('contacts')->where('workspace_id', $s['business'])->count(),
@@ -143,9 +143,9 @@ function rlsReste(array $s): array
 }
 
 /** Exécute l'effacement sous `axion_app`, comme en production. */
-function rlsEffacer(array $s): array
+function effacementRlsEffacer(array $s): array
 {
-    config(['crm.ingest.business_workspace' => rlsOwner()->table('workspaces')->where('id', $s['business'])->value('slug')]);
+    config(['crm.ingest.business_workspace' => effacementRlsProprio()->table('workspaces')->where('id', $s['business'])->value('slug')]);
     $precedente = DB::getDefaultConnection();
     DB::setDefaultConnection('pgsql_app');
 
@@ -163,7 +163,7 @@ function rlsEffacer(array $s): array
 
 afterEach(function () {
     DB::connection('pgsql_app')->disconnect();
-    rlsOwner()->disconnect();
+    effacementRlsProprio()->disconnect();
 });
 
 test('TÉMOIN — la connexion de ce test est bien le rôle soumis à la RLS', function () {
@@ -179,16 +179,16 @@ test('TÉMOIN — la connexion de ce test est bien le rôle soumis à la RLS', f
 test('🔴 sous axion_app, l\'effacement aboutit : fiches, timeline, journal ET opposition, dans les deux univers', function () {
     // La preuve d'audit, jamais atteinte en production jusqu'ici.
     $this->mock(AuditHashChain::class)->shouldReceive('record')->once()->andReturn(1);
-    $s = rlsSemer();
+    $s = effacementRlsSemer();
 
     try {
-        expect(rlsReste($s))->toBe([
+        expect(effacementRlsReste($s))->toBe([
             'contacts' => 1, 'candidates' => 1, 'activities' => 2, 'journaux' => 0, 'oppositions' => 0,
         ]);
 
-        $resultat = rlsEffacer($s);
+        $resultat = effacementRlsEffacer($s);
 
-        expect(rlsReste($s))->toBe([
+        expect(effacementRlsReste($s))->toBe([
             'contacts' => 0,
             'candidates' => 0,
             'activities' => 0,
@@ -198,28 +198,28 @@ test('🔴 sous axion_app, l\'effacement aboutit : fiches, timeline, journal ET 
             'oppositions' => 2,
         ])->and($resultat['opt_out_scopes'])->toBe(['business', 'vivier']);
     } finally {
-        rlsNettoyer($s);
+        effacementRlsNettoyer($s);
     }
 });
 
 test('🔴 si le journal échoue, RIEN n\'est effacé — plus jamais d\'effacement partiel', function () {
     $this->mock(AuditHashChain::class)->shouldNotReceive('record');
-    $s = rlsSemer();
+    $s = effacementRlsSemer();
     // Le journal lève (contrainte violée à la volée) : la suppression de
     // l'univers business, qui partage désormais sa transaction, doit être
     // ANNULÉE avec lui.
-    rlsOwner()->statement(
+    effacementRlsProprio()->statement(
         "ALTER TABLE rgpd_requests ADD CONSTRAINT zz_rls_journal_refuse CHECK (subject_email <> '" . $s['email'] . "') NOT VALID",
     );
 
     try {
-        expect(fn () => rlsEffacer($s))->toThrow(Exception::class);
+        expect(fn () => effacementRlsEffacer($s))->toThrow(Exception::class);
 
-        expect(rlsReste($s))->toBe([
+        expect(effacementRlsReste($s))->toBe([
             'contacts' => 1, 'candidates' => 1, 'activities' => 2, 'journaux' => 0, 'oppositions' => 0,
         ]);
     } finally {
-        rlsOwner()->statement('ALTER TABLE rgpd_requests DROP CONSTRAINT IF EXISTS zz_rls_journal_refuse');
-        rlsNettoyer($s);
+        effacementRlsProprio()->statement('ALTER TABLE rgpd_requests DROP CONSTRAINT IF EXISTS zz_rls_journal_refuse');
+        effacementRlsNettoyer($s);
     }
 });

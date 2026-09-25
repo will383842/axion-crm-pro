@@ -226,9 +226,9 @@ test('🔴 si le journal échoue, RIEN n\'est effacé — plus jamais d\'effacem
 
 /**
  * Lot L4-C — sème, par le propriétaire, une personne de la lettre dans
- * l'univers business et son abonnement. Renvoie le nombre de lignes posées.
+ * l'univers business et son abonnement à la lettre.
  *
- * @param array{business: string, vivier: string, companies: list<int>, email: string, key: string} $s
+ * @param  array{business: string, vivier: string, companies: list<int>, email: string, key: string}  $s
  */
 function effacementRlsSemerLettre(array $s): void
 {

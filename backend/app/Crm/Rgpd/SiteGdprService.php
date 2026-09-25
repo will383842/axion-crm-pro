@@ -187,29 +187,29 @@ final class SiteGdprService
             if ($businessId !== null) {
                 // MUTATION B — suppression L4-C HORS de la transaction du journal.
                 [$personnes, $abonnements] = WorkspaceContext::run($businessId, function () use ($businessId, $personKey, $email): array {
-                        // Lot L4-C — la personne et ses abonnements. Suppression
-                        // FERME : l'empreinte reste dans `opt_out` (portées
-                        // `business` posée ci-dessous et `lettre` si elle
-                        // existait), c'est l'anti-réinsertion.
-                        $personnesIds = DB::table('personnes')
-                            ->where('workspace_id', $businessId)
-                            ->where(function ($q) use ($personKey, $email): void {
-                                $q->where('person_key', $personKey)
-                                    ->orWhere('email', $email);
-                            })
-                            ->pluck('id')
-                            ->all();
+                    // Lot L4-C — la personne et ses abonnements. Suppression
+                    // FERME : l'empreinte reste dans `opt_out` (portées
+                    // `business` posée ci-dessous et `lettre` si elle
+                    // existait), c'est l'anti-réinsertion.
+                    $personnesIds = DB::table('personnes')
+                        ->where('workspace_id', $businessId)
+                        ->where(function ($q) use ($personKey, $email): void {
+                            $q->where('person_key', $personKey)
+                                ->orWhere('email', $email);
+                        })
+                        ->pluck('id')
+                        ->all();
 
-                        $abonnements = DB::table('abonnements')
-                            ->where('workspace_id', $businessId)
-                            ->whereIn('personne_id', $personnesIds)
-                            ->delete();
-                        $personnes = DB::table('personnes')
-                            ->where('workspace_id', $businessId)
-                            ->whereIn('id', $personnesIds)
-                            ->delete();
+                    $abonnements = DB::table('abonnements')
+                        ->where('workspace_id', $businessId)
+                        ->whereIn('personne_id', $personnesIds)
+                        ->delete();
+                    $personnes = DB::table('personnes')
+                        ->where('workspace_id', $businessId)
+                        ->whereIn('id', $personnesIds)
+                        ->delete();
 
-                        return [$personnes, $abonnements];
+                    return [$personnes, $abonnements];
                 });
                 $deleted['business'] = WorkspaceContext::run(
                     $businessId,

@@ -185,35 +185,9 @@ final class SiteGdprService
         if (in_array($scope, ['both', 'business'], true)) {
             $businessId = $this->workspaceId((string) config('crm.ingest.business_workspace', 'axion-ia'));
             if ($businessId !== null) {
-                // MUTATION B — suppression L4-C HORS de la transaction du journal.
-                [$personnes, $abonnements] = WorkspaceContext::run($businessId, function () use ($businessId, $personKey, $email): array {
-                    // Lot L4-C — la personne et ses abonnements. Suppression
-                    // FERME : l'empreinte reste dans `opt_out` (portées
-                    // `business` posée ci-dessous et `lettre` si elle
-                    // existait), c'est l'anti-réinsertion.
-                    $personnesIds = DB::table('personnes')
-                        ->where('workspace_id', $businessId)
-                        ->where(function ($q) use ($personKey, $email): void {
-                            $q->where('person_key', $personKey)
-                                ->orWhere('email', $email);
-                        })
-                        ->pluck('id')
-                        ->all();
-
-                    $abonnements = DB::table('abonnements')
-                        ->where('workspace_id', $businessId)
-                        ->whereIn('personne_id', $personnesIds)
-                        ->delete();
-                    $personnes = DB::table('personnes')
-                        ->where('workspace_id', $businessId)
-                        ->whereIn('id', $personnesIds)
-                        ->delete();
-
-                    return [$personnes, $abonnements];
-                });
                 $deleted['business'] = WorkspaceContext::run(
                     $businessId,
-                    fn (): array => DB::transaction(function () use ($businessId, $personKey, $email, $personnes, $abonnements): array {
+                    fn (): array => DB::transaction(function () use ($businessId, $personKey, $email): array {
                         $contacts = DB::table('contacts')
                             ->where('workspace_id', $businessId)
                             ->where(function ($q) use ($personKey, $email): void {
@@ -234,11 +208,29 @@ final class SiteGdprService
                             ->where('email', $email)
                             ->delete();
 
-                        $activites = $this->deleteActivities($businessId, $personKey);
+                        // Lot L4-C — la personne et ses abonnements. Suppression
+                        // FERME : l'empreinte reste dans `opt_out` (portées
+                        // `business` posée ci-dessous et `lettre` si elle
+                        // existait), c'est l'anti-réinsertion.
+                        $personnesIds = DB::table('personnes')
+                            ->where('workspace_id', $businessId)
+                            ->where(function ($q) use ($personKey, $email): void {
+                                $q->where('person_key', $personKey)
+                                    ->orWhere('email', $email);
+                            })
+                            ->pluck('id')
+                            ->all();
 
-                        // 🔴 Le journal DANS le contexte ET dans la transaction —
-                        // cf. `journal()`.
-                        $this->journal($businessId, $email);
+                        $abonnements = DB::table('abonnements')
+                            ->where('workspace_id', $businessId)
+                            ->whereIn('personne_id', $personnesIds)
+                            ->delete();
+                        $personnes = DB::table('personnes')
+                            ->where('workspace_id', $businessId)
+                            ->whereIn('id', $personnesIds)
+                            ->delete();
+
+                        $activites = $this->deleteActivities($businessId, $personKey);
 
                         return [
                             'contacts' => $contacts,
@@ -249,6 +241,10 @@ final class SiteGdprService
                         ];
                     }),
                 );
+            }
+            // MUTATION A — journal business APRÈS le run (l'état d'avant #247).
+            if ($businessId !== null) {
+                $this->journal($businessId, $email);
             }
             $this->optOut($email, $emailHash, 'business');
         }

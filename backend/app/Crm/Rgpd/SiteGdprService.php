@@ -232,6 +232,10 @@ final class SiteGdprService
 
                         $activites = $this->deleteActivities($businessId, $personKey);
 
+                        // 🔴 Le journal DANS le contexte ET dans la transaction —
+                        // cf. `journal()`.
+                        $this->journal($businessId, $email);
+
                         return [
                             'contacts' => $contacts,
                             'personnes' => $personnes,
@@ -241,10 +245,6 @@ final class SiteGdprService
                         ];
                     }),
                 );
-            }
-            // MUTATION A — journal business APRÈS le run (l'état d'avant #247).
-            if ($businessId !== null) {
-                $this->journal($businessId, $email);
             }
             $this->optOut($email, $emailHash, 'business');
         }

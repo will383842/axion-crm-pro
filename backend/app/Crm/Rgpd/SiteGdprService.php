@@ -185,29 +185,8 @@ final class SiteGdprService
         if (in_array($scope, ['both', 'business'], true)) {
             $businessId = $this->workspaceId((string) config('crm.ingest.business_workspace', 'axion-ia'));
             if ($businessId !== null) {
-                $deleted['business'] = WorkspaceContext::run(
-                    $businessId,
-                    fn (): array => DB::transaction(function () use ($businessId, $personKey, $email): array {
-                        $contacts = DB::table('contacts')
-                            ->where('workspace_id', $businessId)
-                            ->where(function ($q) use ($personKey, $email): void {
-                                $q->where('person_key', $personKey)
-                                    ->orWhere('email', $email);
-                            })
-                            ->delete();
-
-                        // 🔴 PRATICIENS DE SANTÉ — ARTICLE 9.
-                        // Table visée par aucun effacement jusqu'au 2026-08-16.
-                        // Suppression ferme : `nom`, `prenom`, `specialite`,
-                        // `address` et `rpps` rendent la personne identifiable
-                        // même sans email ni téléphone — et c'est justement la
-                        // donnée de santé. Rattachée par `workspace_id`, donc
-                        // couverte par le contexte posé ci-dessus.
-                        $praticiens = DB::table('health_practitioners')
-                            ->where('workspace_id', $businessId)
-                            ->where('email', $email)
-                            ->delete();
-
+                // MUTATION B — suppression L4-C HORS de la transaction du journal.
+                [$personnes, $abonnements] = WorkspaceContext::run($businessId, function () use ($businessId, $personKey, $email): array {
                         // Lot L4-C — la personne et ses abonnements. Suppression
                         // FERME : l'empreinte reste dans `opt_out` (portées
                         // `business` posée ci-dessous et `lettre` si elle
@@ -228,6 +207,31 @@ final class SiteGdprService
                         $personnes = DB::table('personnes')
                             ->where('workspace_id', $businessId)
                             ->whereIn('id', $personnesIds)
+                            ->delete();
+
+                        return [$personnes, $abonnements];
+                });
+                $deleted['business'] = WorkspaceContext::run(
+                    $businessId,
+                    fn (): array => DB::transaction(function () use ($businessId, $personKey, $email, $personnes, $abonnements): array {
+                        $contacts = DB::table('contacts')
+                            ->where('workspace_id', $businessId)
+                            ->where(function ($q) use ($personKey, $email): void {
+                                $q->where('person_key', $personKey)
+                                    ->orWhere('email', $email);
+                            })
+                            ->delete();
+
+                        // 🔴 PRATICIENS DE SANTÉ — ARTICLE 9.
+                        // Table visée par aucun effacement jusqu'au 2026-08-16.
+                        // Suppression ferme : `nom`, `prenom`, `specialite`,
+                        // `address` et `rpps` rendent la personne identifiable
+                        // même sans email ni téléphone — et c'est justement la
+                        // donnée de santé. Rattachée par `workspace_id`, donc
+                        // couverte par le contexte posé ci-dessus.
+                        $praticiens = DB::table('health_practitioners')
+                            ->where('workspace_id', $businessId)
+                            ->where('email', $email)
                             ->delete();
 
                         $activites = $this->deleteActivities($businessId, $personKey);

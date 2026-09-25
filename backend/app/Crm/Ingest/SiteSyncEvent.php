@@ -46,6 +46,15 @@ final class SiteSyncEvent
         'review_posted',
         'application_submitted',
         'opt_out',
+        // Lot L4-C (2026-09-24). Émis par le site derrière son propre drapeau
+        // (`CRM_SYNC_GUIDE_ENABLED`), et REFUSÉS ici en 503 tant que
+        // `crm.ingest.personnes_enabled` est fermé : ils n'ont aucun chemin
+        // historique où atterrir (cf. `Taxonomy::PERSONNES_EVENT_TYPES`).
+        //   - `lead_magnet_requested` : clic humain (POST) sur le lien personnel
+        //     du guide — jamais la simple demande, qu'un tiers peut faire ;
+        //   - `email_hard_bounced` : rebond dur constaté par le site.
+        'lead_magnet_requested',
+        'email_hard_bounced',
     ];
 
     /**

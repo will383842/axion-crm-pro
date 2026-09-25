@@ -110,7 +110,14 @@ test('les CHECK en base correspondent exactement à App\\Crm\\Taxonomy', functio
     socleExpectCheck('contacts_legal_basis_check', Taxonomy::LEGAL_BASES);
     socleExpectCheck('activities_kind_check', Taxonomy::ACTIVITY_KINDS);
     socleExpectCheck('tags_category_check', Taxonomy::TAG_CATEGORIES);
-    socleExpectCheck('opt_out_scope_check', ['business', 'vivier']);
+    // Deux UNIVERS et une portée de CANAL (lot L4-C : se désabonner de la
+    // lettre ne ferme plus le CRM à la personne).
+    socleExpectCheck('opt_out_scope_check', array_merge(['business', 'vivier'], Taxonomy::OPT_OUT_SCOPES_CANAL));
+    socleExpectCheck('personnes_email_nature_check', Taxonomy::PERSONNE_EMAIL_NATURES);
+    socleExpectCheck('personnes_legal_basis_check', Taxonomy::LEGAL_BASES);
+    socleExpectCheck('abonnements_canal_check', Taxonomy::ABONNEMENT_CANAUX);
+    socleExpectCheck('abonnements_statut_check', Taxonomy::ABONNEMENT_STATUTS);
+    socleExpectCheck('abonnements_legal_basis_check', Taxonomy::ABONNEMENT_LEGAL_BASES);
     // Base presse (2026-08-25). `acces` commande QUI peut recevoir un mailing :
     // une divergence entre le code et le CHECK laisserait passer une porte
     // d'accès que la règle d'envoi ne connaît pas.

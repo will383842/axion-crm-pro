@@ -135,6 +135,10 @@ test('B15-003 — INVARIANT : tout ce que l effacement supprime, l export le con
         // supprimée — le catalogue interdit la suppression, cf. le test dédié
         // plus bas qui le mesure au lieu de le supposer.
         'users', 'invitations', 'password_reset_tokens', 'sessions',
+        // Lot L4-C (2026-09-24) : la personne de la lettre et du guide, et ses
+        // abonnements (sans colonne d'identification propre, mais qui disent
+        // à quoi elle a consenti).
+        'personnes', 'abonnements',
     ];
 
     foreach ($tablesSensibles as $table) {
@@ -197,6 +201,11 @@ const COLONNES_IDENTIFIANTES = [
  */
 const COUVERTES_HORS_INVENTAIRE = [
     'notifications',
+    // Lot L4-C (2026-09-24) : `abonnements` ne déclare aucune colonne
+    // d'identification — elle se rattache à la personne par `personne_id`. Elle
+    // dit pourtant à quoi la personne a consenti : exportée et effacée avec
+    // `personnes`.
+    'abonnements',
     // B10-004 (2026-08-21) : `sessions` ne déclare ni `email` ni `phone` — elle
     // se rattache à la personne par `user_id`. Elle garde pourtant son IP et son
     // navigateur, c'est-à-dire le résidu le plus direct de l'anonymisation d'un
@@ -232,6 +241,11 @@ function decisionsPortabilite(): array
         'email_suppressions' => true,
         'unsubscribes' => true,
         'crm_outbound_events' => true,
+        // Lot L4-C : exportée ET effacée (les deux services), avec ses
+        // abonnements — qui n'ont pas de colonne d'identification propre et
+        // n'entrent donc pas dans cet inventaire.
+        'personnes' => true,
+        'abonnements' => true, // cf. COUVERTES_HORS_INVENTAIRE
 
         // ── LES TITULAIRES DE COMPTE, FERMÉS LE 2026-08-21 ───────────────
         //
@@ -851,8 +865,12 @@ test('B10-004 — COMPTE FIGE : la PII en texte libre et en JSONB echappe a l in
     // services RGPD n'interroge — `scraper_runs.request_payload`,
     // `business_events.context`, `linkedin_profiles_cache.snapshot`,
     // `companies.metadata`… Aucune d'elles n'est balayée par adresse.
+    // 40 -> 42 le 2026-09-24 (lot L4-C) : `personnes.field_origins` et
+    // `abonnements.identifiants_externes`, toutes deux sur des tables
+    // COUVERTES par l'export et l'effacement — le compte « hors de portée »
+    // ci-dessous ne bouge donc pas.
     expect($colonnes->count())->toBe(
-        40,
+        42,
         'le nombre de colonnes JSON/JSONB a changé : ré-arbitrer, puis mettre ce chiffre à jour',
     );
     expect(count($horsPortee))->toBe(

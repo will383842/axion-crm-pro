@@ -223,3 +223,99 @@ test('🔴 si le journal échoue, RIEN n\'est effacé — plus jamais d\'effacem
         effacementRlsNettoyer($s);
     }
 });
+
+/**
+ * Lot L4-C — sème, par le propriétaire, une personne de la lettre dans
+ * l'univers business et son abonnement à la lettre.
+ *
+ * @param  array{business: string, vivier: string, companies: list<int>, email: string, key: string}  $s
+ */
+function effacementRlsSemerLettre(array $s): void
+{
+    $owner = effacementRlsProprio();
+    $personneId = (int) $owner->table('personnes')->insertGetId([
+        'workspace_id' => $s['business'],
+        'person_key' => $s['key'],
+        'email' => $s['email'],
+        'email_hash' => hash('sha256', $s['email']),
+        'premiere_source' => 'newsletter',
+        'premiere_source_at' => now(),
+        'legal_basis' => 'consent',
+    ]);
+    $owner->table('abonnements')->insert([
+        'workspace_id' => $s['business'],
+        'personne_id' => $personneId,
+        'canal' => 'lettre',
+        'statut' => 'abonne',
+        'dernier_evenement_at' => now(),
+    ]);
+}
+
+/** @param array{business: string, vivier: string, companies: list<int>, email: string, key: string} $s */
+function effacementRlsResteLettre(array $s): array
+{
+    $owner = effacementRlsProprio();
+
+    return [
+        'personnes' => $owner->table('personnes')->where('workspace_id', $s['business'])->where('email', $s['email'])->count(),
+        'abonnements' => $owner->table('abonnements')->where('workspace_id', $s['business'])->count(),
+        'journal_business' => $owner->table('rgpd_requests')
+            ->where('workspace_id', $s['business'])
+            ->where('subject_email', $s['email'])
+            ->count(),
+    ];
+}
+
+/** @param array{business: string, vivier: string, companies: list<int>, email: string, key: string} $s */
+function effacementRlsNettoyerLettre(array $s): void
+{
+    $owner = effacementRlsProprio();
+    $owner->table('abonnements')->where('workspace_id', $s['business'])->delete();
+    $owner->table('personnes')->where('workspace_id', $s['business'])->delete();
+    effacementRlsNettoyer($s);
+}
+
+test('🔴 L4-C — sous axion_app, une personne de la lettre est effacée (personnes + abonnements) ET le journal est écrit', function () {
+    $this->mock(AuditHashChain::class)->shouldReceive('record')->once()->andReturn(1);
+    $s = effacementRlsSemer();
+    effacementRlsSemerLettre($s);
+
+    try {
+        // TÉMOIN : les lignes existent bien avant l'effacement.
+        expect(effacementRlsResteLettre($s))->toBe([
+            'personnes' => 1, 'abonnements' => 1, 'journal_business' => 0,
+        ]);
+
+        $resultat = effacementRlsEffacer($s);
+
+        // Discriminant POSITIF : le service a bien compté ses suppressions —
+        // pas un « 0 restant » obtenu parce que rien n'a tourné.
+        expect($resultat['deleted']['business']['personnes'] ?? null)->toBe(1)
+            ->and($resultat['deleted']['business']['abonnements'] ?? null)->toBe(1)
+            ->and(effacementRlsResteLettre($s))->toBe([
+                'personnes' => 0, 'abonnements' => 0, 'journal_business' => 1,
+            ]);
+    } finally {
+        effacementRlsNettoyerLettre($s);
+    }
+});
+
+test('🔴 L4-C — si le journal échoue, la personne de la lettre et son abonnement RESTENT (même transaction)', function () {
+    $this->mock(AuditHashChain::class)->shouldNotReceive('record');
+    $s = effacementRlsSemer();
+    effacementRlsSemerLettre($s);
+    effacementRlsProprio()->statement(
+        "ALTER TABLE rgpd_requests ADD CONSTRAINT zz_rls_journal_refuse_lettre CHECK (subject_email <> '" . $s['email'] . "') NOT VALID",
+    );
+
+    try {
+        expect(fn () => effacementRlsEffacer($s))->toThrow(Exception::class);
+
+        expect(effacementRlsResteLettre($s))->toBe([
+            'personnes' => 1, 'abonnements' => 1, 'journal_business' => 0,
+        ]);
+    } finally {
+        effacementRlsProprio()->statement('ALTER TABLE rgpd_requests DROP CONSTRAINT IF EXISTS zz_rls_journal_refuse_lettre');
+        effacementRlsNettoyerLettre($s);
+    }
+});

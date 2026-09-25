@@ -175,7 +175,8 @@ export interface TimelineEntry {
 
 export interface TimelineSubject {
   universe: 'business' | 'vivier';
-  type: 'contact' | 'candidate';
+  /** `personne` : lot L4-C — la personne de la lettre et du guide, sans entreprise. */
+  type: 'contact' | 'candidate' | 'personne';
   id: number;
   first_name: string | null;
   last_name: string | null;
@@ -191,6 +192,101 @@ export interface TimelineResponse {
   };
   subjects: TimelineSubject[];
   data: TimelineEntry[];
+}
+
+// ── Lot L4-C — « Personnes (lettre et guide) » ──────────────────────────────
+
+export type StatutLettre = 'abonne' | 'desabonne';
+export type NatureEmail = 'pro' | 'perso' | 'inconnue';
+
+export const STATUT_LETTRE_LABELS: Record<StatutLettre | 'aucun', string> = {
+  abonne: 'Abonné à la lettre',
+  desabonne: 'Désabonné',
+  aucun: 'Sans abonnement',
+};
+
+export const NATURE_EMAIL_LABELS: Record<NatureEmail, string> = {
+  pro: 'Adresse professionnelle',
+  perso: 'Adresse personnelle',
+  inconnue: 'Nature inconnue',
+};
+
+/** Libellé humain d'une base légale (`Taxonomy::LEGAL_BASES`). */
+export const BASE_LEGALE_LABELS: Record<string, string> = {
+  consent: 'Consentement',
+  legitimate_interest_b2b: 'Intérêt légitime B2B',
+  precontractual: 'Mesures précontractuelles',
+  contract: 'Contrat',
+  legal_obligation: 'Obligation légale',
+};
+
+export const SOURCE_PERSONNE_LABELS: Record<string, string> = {
+  newsletter: 'Lettre',
+  'guide-ia': 'Guide IA entreprise',
+};
+
+export interface PersonneRow {
+  id: number;
+  person_key: string;
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  email_nature: NatureEmail;
+  locale: string | null;
+  premiere_source: string;
+  premiere_source_at: string | null;
+  derniere_interaction_at: string | null;
+  legal_basis: string;
+  statut_lettre: StatutLettre | null;
+  /** Base légale de l'abonnement à la lettre (consentement ou intérêt légitime B2B). */
+  base_lettre: string | null;
+  /** LA règle du CRM (`Abonnements::prospectionAutorisee`) : jamais recalculée ici. */
+  prospection_autorisee: boolean;
+  placement: string | null;
+  rattachee: boolean;
+  contact_id: number | null;
+  company_id: number | null;
+  entreprise: string | null;
+  purge_prevue_le: string | null;
+}
+
+export interface PersonnesCounts {
+  total: number;
+  by_statut_lettre: Record<StatutLettre | 'aucun', number>;
+  by_nature: Record<NatureEmail, number>;
+  by_source: Record<string, number>;
+  rattachees: number;
+  non_rattachees: number;
+}
+
+export interface PersonneTimelineEntry {
+  id: number;
+  kind: string | null;
+  title: string | null;
+  content: string | null;
+  occurred_at: string | null;
+  due_at: string | null;
+  done_at: string | null;
+  external_ref: string | null;
+}
+
+export interface PersonneFiche {
+  personne: PersonneRow;
+  abonnement: {
+    canal: string;
+    statut: StatutLettre;
+    legal_basis: string | null;
+    consent_version: string | null;
+    consent_at: string | null;
+    consent_text_ref: string | null;
+    source_slug: string | null;
+    abonne_at: string | null;
+    desabonne_at: string | null;
+    motif_desabonnement: string | null;
+  } | null;
+  entreprise: { id: number; denomination: string | null; siren: string | null } | null;
+  taches: PersonneTimelineEntry[];
+  timeline: PersonneTimelineEntry[];
 }
 
 /** Libellé humain d'un tag gouverné : `sect:btp` → « Secteur · btp ». */

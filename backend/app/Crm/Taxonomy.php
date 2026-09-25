@@ -181,7 +181,99 @@ final class Taxonomy
         'press_coverage',
         'linkedin_message',
         'call',
+        // ── Personnes : la lettre et le guide (lot L4-C, 2026-09-24) ───────
+        // `lead_magnet_requested` et `email_hard_bounced` sont des types
+        // d'événement du canal site → CRM : ils DOIVENT figurer ici, sinon
+        // `SiteSyncClassifier::activityKind()` les refuse (liste fermée).
+        // `task` est la tâche ou la relance posée par un opérateur sur une
+        // personne : `activities` porte déjà `due_at` et `done_at` depuis son
+        // premier schéma, il n'y avait pas de table à créer, seulement une
+        // valeur de vocabulaire.
+        'lead_magnet_requested',
+        'email_hard_bounced',
+        'task',
     ];
+
+    /**
+     * Portées d'opposition qui désignent un CANAL et non un UNIVERS (lot L4-C).
+     *
+     * `opt_out.scope` portait jusqu'ici deux univers, `business` et `vivier`.
+     * Se désabonner de la lettre inscrivait une opposition `business` : la
+     * personne ne pouvait plus JAMAIS entrer au CRM, pas même en réservant un
+     * appel (constat D1 de la revue du 2026-09-24). Retirer son consentement à
+     * un canal n'est pas s'opposer à toute prospection (art. 21).
+     *
+     * `lettre` est donc une portée de CANAL : elle retire la personne de la
+     * liste de diffusion (et servira de liste repoussoir à la réimportation
+     * d'un fichier d'envoi), mais elle ne bloque ni un formulaire ni un
+     * rendez-vous. Elle n'est PAS un univers : un effacement n'a pas à
+     * l'écrire — il pose une opposition `business`, qui bloque déjà tout —, et
+     * les énumérations d'univers du dépôt n'ont pas à la connaître. Les gardes
+     * qui lisent le CHECK de `opt_out` en retirent cette liste, et SEULEMENT
+     * elle.
+     *
+     * @var list<string>
+     */
+    public const OPT_OUT_SCOPES_CANAL = ['lettre'];
+
+    /**
+     * Événements du site orientés vers les PERSONNES (table `personnes`) quand
+     * `crm.ingest.personnes_enabled` est ouvert. La lettre et le guide
+     * seulement : c'est le périmètre de la décision de Will du 2026-09-24, et
+     * rien d'autre (les réservations et formulaires sans SIREN restent dans
+     * l'arbitrage, faute d'une décision distincte).
+     *
+     * @var list<string>
+     */
+    public const PERSONNES_EVENT_TYPES = [
+        'newsletter_optin',
+        'newsletter_optout',
+        'lead_magnet_requested',
+        'email_hard_bounced',
+    ];
+
+    /**
+     * Les deux types qui n'existaient pas avant le lot L4-C : ils n'ont AUCUN
+     * chemin historique. Drapeau fermé, on les refuse en 503 (la ligne reste en
+     * attente côté site) plutôt que de les laisser tomber dans l'arbitrage.
+     *
+     * @var list<string>
+     */
+    public const PERSONNES_EVENT_TYPES_SANS_CHEMIN_HISTORIQUE = [
+        'lead_magnet_requested',
+        'email_hard_bounced',
+    ];
+
+    /**
+     * Nature de l'adresse d'une personne. Elle conditionne toute prospection
+     * sans consentement : sans consentement, la CNIL n'admet la prospection
+     * que d'un professionnel et sur un objet lié à sa profession — jamais sur
+     * une adresse personnelle.
+     *
+     * @var list<string>
+     */
+    public const PERSONNE_EMAIL_NATURES = ['pro', 'perso', 'inconnue'];
+
+    /**
+     * Canaux d'abonnement — 1 canal = 1 future liste de diffusion. Liste
+     * FERMÉE, étendue par migration seulement.
+     *
+     * @var list<string>
+     */
+    public const ABONNEMENT_CANAUX = ['lettre'];
+
+    /** @var list<string> */
+    public const ABONNEMENT_STATUTS = ['abonne', 'desabonne'];
+
+    /**
+     * Bases légales d'un ABONNEMENT (amendement de Will du 2026-09-24) :
+     * consentement (adresse personnelle, case cochée ; format actuel du site,
+     * double opt-in) ou intérêt légitime B2B (adresse professionnelle inscrite
+     * à la demande du guide). Sous-ensemble fermé de `LEGAL_BASES`.
+     *
+     * @var list<string>
+     */
+    public const ABONNEMENT_LEGAL_BASES = ['consent', 'legitimate_interest_b2b'];
 
     /**
      * Par quelle PORTE on atteint un contact presse. Liste FERMÉE, et c'est

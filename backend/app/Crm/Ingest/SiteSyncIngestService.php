@@ -44,6 +44,7 @@ final class SiteSyncIngestService
     public function __construct(
         private readonly SiteSyncClassifier $classifier,
         private readonly ContactUpserter $contacts,
+        private readonly PersonnesIngestService $personnes,
     ) {}
 
     public function ingest(SiteSyncEvent $event): IngestOutcome
@@ -58,6 +59,18 @@ final class SiteSyncIngestService
                 );
             }
             $this->assertCandidateConsentV2($event);
+        }
+
+        // Lot L4-C — les deux types nés avec la table `personnes` n'ont AUCUN
+        // chemin historique : drapeau fermé, on les refuse TEMPORAIREMENT (503)
+        // pour que l'outbox du site les garde en attente, au lieu de les
+        // laisser tomber dans l'arbitrage avec l'adresse en clair.
+        if (in_array($event->eventType, Taxonomy::PERSONNES_EVENT_TYPES_SANS_CHEMIN_HISTORIQUE, true)
+            && ! PersonnesIngestService::drapeauOuvert()) {
+            throw SiteSyncRejection::unavailable(
+                'personnes_ingest_disabled',
+                'Le flux « personnes » (lettre et guide) est fermé (CRM_INGEST_PERSONNES_ENABLED). La ligne reste en attente côté site.',
+            );
         }
 
         $workspaceId = $this->resolveWorkspaceId($universe);
@@ -110,6 +123,14 @@ final class SiteSyncIngestService
             );
         }
 
+        // Lot L4-C — la lettre et le guide vers `personnes`, AVANT
+        // `upsertBusiness` : sans cela, un abonné sans SIREN retombait dans
+        // l'arbitrage. Drapeau fermé : cette branche est sautée et tout ce qui
+        // suit se comporte exactement comme avant (retour arrière).
+        if ($this->personnes->prendEnCharge($event)) {
+            return $this->personnes->ingerer($event, $workspaceId, $activityRef);
+        }
+
         $scope = $this->oppositionScope($event, $universe);
         if (! $this->isOppositionEvent($event) && $this->hasOpposed($event, $scope)) {
             return new IngestOutcome(status: IngestOutcome::OPTED_OUT);
@@ -127,6 +148,18 @@ final class SiteSyncIngestService
 
         if ($this->isOppositionEvent($event)) {
             $this->recordOpposition($event, $scope);
+
+            // Une opposition GÉNÉRALE (art. 21) retire aussi la personne de
+            // toute liste de diffusion : ses abonnements passent en
+            // `desabonne`. Sans effet tant qu'aucune personne n'existe.
+            // Drapeau fermé : aucune requête (fenêtre de déploiement, voir
+            // `ContactUpserter::rattacherPersonne`) ; une personne restée
+            // `abonne` n'est de toute façon jamais éligible avec une opposition
+            // `business` (`Abonnements::exclureOpposees`).
+            $hash = $event->emailHash();
+            if ($scope === 'business' && $hash !== null && PersonnesIngestService::drapeauOuvert()) {
+                $this->personnes->desabonnerSurOpposition($workspaceId, $hash, $event->occurredAt, 'opposition_generale');
+            }
         }
 
         $activityId = $this->recordActivity($event, $workspaceId, $subjectType, $subjectId, $contactId, $activityRef);

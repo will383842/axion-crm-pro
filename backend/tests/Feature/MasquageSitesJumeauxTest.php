@@ -76,6 +76,8 @@ const JUM_MAIL_CANDIDAT = 'alex.candidat@jumeaux-vivier.test';
 const JUM_TEL_CANDIDAT = '+33655555555';
 const JUM_MAIL_ORPHELIN = 'orphelin@jumeaux-arbitrage.test';
 const JUM_TEL_ORPHELIN = '+33666666666';
+// Lot L4-C — une personne de la lettre, SANS entreprise.
+const JUM_MAIL_PERSONNE = 'lettre.abonne@jumeaux-lettre.test';
 
 /** @return list<string> toutes les valeurs en clair, d'un bloc */
 function jumeauxValeursEnClair(): array
@@ -87,6 +89,7 @@ function jumeauxValeursEnClair(): array
         JUM_MAIL_MEDIA, JUM_TEL_MEDIA,
         JUM_MAIL_CANDIDAT, JUM_TEL_CANDIDAT,
         JUM_MAIL_ORPHELIN, JUM_TEL_ORPHELIN,
+        JUM_MAIL_PERSONNE,
     ];
 }
 
@@ -273,6 +276,21 @@ beforeEach(function () {
         'created_at' => now(),
     ]);
 
+    // Lot L4-C — la personne de la lettre et du guide, sans entreprise :
+    // l'écran « Personnes (lettre et guide) » la rend, liste et fiche.
+    $this->personneId = (int) DB::table('personnes')->insertGetId([
+        'workspace_id' => $this->workspace->id,
+        'person_key' => hash('sha256', 'jumeaux-l4c'),
+        'email' => JUM_MAIL_PERSONNE,
+        'email_hash' => hash('sha256', JUM_MAIL_PERSONNE),
+        'premiere_source' => 'newsletter',
+        'premiere_source_at' => now(),
+        'derniere_interaction_at' => now(),
+        'legal_basis' => 'consent',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
     $this->viewer = jumeauxUtilisateur($this->workspace->id, $this->vivierId, 'viewer');
     $this->owner = jumeauxUtilisateur($this->workspace->id, $this->vivierId, 'owner');
 });
@@ -453,6 +471,25 @@ test('le vivier ne rend PAS les coordonnees des candidats en clair a un viewer',
     $this->assertStringNotContainsString(JUM_MAIL_CANDIDAT, (string) $r->getContent());
 });
 
+test('L4-C — la liste et la fiche des personnes (lettre et guide) ne rendent PAS l adresse en clair a un viewer', function () {
+    $this->actingAs($this->owner);
+    $this->assertStringContainsString(
+        JUM_MAIL_PERSONNE,
+        (string) $this->getJson('/api/v1/crm/personnes')->assertOk()->getContent(),
+    );
+
+    $this->actingAs($this->viewer);
+
+    $liste = $this->getJson('/api/v1/crm/personnes')->assertOk();
+    $this->assertStringNotContainsString(JUM_MAIL_PERSONNE, (string) $liste->getContent());
+
+    $fiche = $this->getJson("/api/v1/crm/personnes/{$this->personneId}")->assertOk();
+    $this->assertStringNotContainsString(JUM_MAIL_PERSONNE, (string) $fiche->getContent());
+
+    // L'export ne se contourne pas : sans droit d'export, 403.
+    $this->getJson('/api/v1/crm/personnes/export')->assertForbidden();
+});
+
 test('ANGLE MORT DECLARE : les exports en flux echappent au balayage, la porte est fermee autrement', function () {
     // `StreamedResponse::getContent()` rend `false` : les deux exports CSV
     // (`/journalists/export`, `/media/export`) sont INVISIBLES au balayage,
@@ -490,6 +527,8 @@ test('BALAYAGE : aucune route GET de l API ne sert une coordonnee en clair a un 
         'media' => $this->mediaId,
         'audience' => $this->audienceId,
         'personKey' => $this->personKey,
+        // Lot L4-C : la fiche d'une personne de la lettre et du guide.
+        'personneId' => $this->personneId,
     ];
 
     $cibles = [];

@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\Crm\ArbitrageController;
 use App\Http\Controllers\Api\Crm\BulkController;
 use App\Http\Controllers\Api\Crm\CandidatesController;
 use App\Http\Controllers\Api\Crm\ContactsHubController;
+use App\Http\Controllers\Api\Crm\PersonnesController;
 use App\Http\Controllers\Api\Crm\PersonTimelineController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\FeaturesController;
@@ -408,6 +409,24 @@ Route::prefix('v1')->group(function () {
             Route::get('/candidates/counts', [CandidatesController::class, 'counts']);
 
             Route::get('/persons/{personKey}/timeline', [PersonTimelineController::class, 'show']);
+
+            // Lot L4-C — « Personnes (lettre et guide) ». Les segments fixes
+            // (`counts`, `export`) précèdent `{id}`, contraint aux chiffres.
+            Route::get('/personnes', [PersonnesController::class, 'index']);
+            Route::get('/personnes/counts', [PersonnesController::class, 'counts']);
+            Route::get('/personnes/export', [PersonnesController::class, 'export'])
+                ->middleware(['throttle:scraper-list', 'permission:data.export']);
+            Route::get('/personnes/{personneId}', [PersonnesController::class, 'show'])->whereNumber('personneId');
+            Route::post('/personnes/{personneId}/taches', [PersonnesController::class, 'storeTache'])
+                ->whereNumber('personneId')
+                ->middleware('permission:companies.update');
+            Route::post('/personnes/{personneId}/taches/{activityId}/terminer', [PersonnesController::class, 'terminerTache'])
+                ->whereNumber('personneId')
+                ->whereNumber('activityId')
+                ->middleware('permission:companies.update');
+            Route::post('/personnes/{personneId}/rattacher', [PersonnesController::class, 'rattacher'])
+                ->whereNumber('personneId')
+                ->middleware('permission:companies.update');
 
             // `/arbitrage/{activityId}/…` : les segments fixes précèdent, aucun
             // conflit possible avec un identifiant numérique.

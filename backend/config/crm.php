@@ -137,6 +137,14 @@ return [
     'ingest' => [
         'enabled' => env('CRM_INGEST_ENABLED', false),
         'candidates_enabled' => env('CRM_INGEST_CANDIDATES_ENABLED', false),
+        // Lot L4-C (2026-09-24) — la LETTRE et le GUIDE vers `personnes`.
+        // Fermé (défaut) : `newsletter_optin` / `newsletter_optout` gardent leur
+        // chemin historique (arbitrage sans SIREN), et les deux types nés avec
+        // ce lot (`lead_magnet_requested`, `email_hard_bounced`) sont refusés
+        // en 503 — la ligne reste en attente côté site, rien n'est perdu.
+        // Rollback = remettre à false, par un DÉPLOIEMENT (un `restart` ne
+        // relit pas l'environnement).
+        'personnes_enabled' => env('CRM_INGEST_PERSONNES_ENABLED', false),
         'hmac_secret' => env('SITE_SYNC_HMAC_SECRET', ''),
         'business_workspace' => env('CRM_INGEST_BUSINESS_WORKSPACE', 'axion-ia'),
         // Fenêtre de tolérance de l'horodatage signé (anti-rejeu). 0 = contrôle

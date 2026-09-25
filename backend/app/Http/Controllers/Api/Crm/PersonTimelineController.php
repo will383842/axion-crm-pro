@@ -57,6 +57,7 @@ class PersonTimelineController extends ConsoleController
         if ($business !== null) {
             $activities = array_merge($activities, $this->activitiesFor($business, $personKey, 'business'));
             $subjects = array_merge($subjects, $this->businessSubjects($business, $personKey));
+            $subjects = array_merge($subjects, $this->personneSubjects($business, $personKey));
         }
 
         if ($vivier !== null && $vivierAccessible) {
@@ -266,7 +267,82 @@ class PersonTimelineController extends ConsoleController
         return WorkspaceContext::run($workspaceId, static fn (): bool => DB::table('contacts')
             ->where('workspace_id', $workspaceId)
             ->where('person_key', $personKey)
-            ->exists());
+            ->exists()
+            // Lot L4-C : une personne connue par la lettre ou le guide existe
+            // dans l'univers business, même sans entreprise.
+            || DB::table('personnes')
+                ->where('workspace_id', $workspaceId)
+                ->where('person_key', $personKey)
+                ->exists());
+    }
+
+    /**
+     * Lot L4-C — la PERSONNE (lettre et guide), branchée par `person_key` : la
+     * même clé que la timeline, donc les mêmes activités. Elle porte son statut
+     * de lettre, sa provenance et, si elle est rattachée, son entreprise.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function personneSubjects(string $workspaceId, string $personKey): array
+    {
+        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $personKey): array {
+            $rows = DB::table('personnes')
+                ->leftJoin('abonnements', function ($join): void {
+                    $join->on('abonnements.personne_id', '=', 'personnes.id')
+                        ->where('abonnements.canal', '=', 'lettre');
+                })
+                ->leftJoin('companies', 'companies.id', '=', 'personnes.company_id')
+                ->where('personnes.workspace_id', $workspaceId)
+                ->where('personnes.person_key', $personKey)
+                ->select([
+                    'personnes.id',
+                    'personnes.first_name',
+                    'personnes.last_name',
+                    'personnes.email',
+                    'personnes.email_nature',
+                    'personnes.premiere_source',
+                    'personnes.legal_basis',
+                    'personnes.contact_id',
+                    'abonnements.statut AS statut_lettre',
+                    'abonnements.consent_version',
+                    'abonnements.consent_at',
+                    'companies.id AS company_id',
+                    'companies.denomination',
+                    'companies.siren',
+                    'companies.relation_type',
+                    'companies.lifecycle_stage',
+                ])
+                ->limit(5)
+                ->get();
+
+            $out = [];
+            foreach ($rows as $row) {
+                $out[] = [
+                    'universe' => 'business',
+                    'type' => 'personne',
+                    'id' => (int) $row->id,
+                    'first_name' => $row->first_name,
+                    'last_name' => $row->last_name,
+                    'email' => $row->email,
+                    'email_nature' => $row->email_nature,
+                    'premiere_source' => $row->premiere_source,
+                    'legal_basis' => $row->legal_basis,
+                    'statut_lettre' => $row->statut_lettre,
+                    'consent_version' => $row->consent_version,
+                    'consent_at' => $row->consent_at,
+                    'contact_id' => $row->contact_id === null ? null : (int) $row->contact_id,
+                    'company' => $row->company_id === null ? null : [
+                        'id' => (int) $row->company_id,
+                        'denomination' => $row->denomination,
+                        'siren' => $row->siren,
+                        'relation_type' => $row->relation_type,
+                        'lifecycle_stage' => $row->lifecycle_stage,
+                    ],
+                ];
+            }
+
+            return $out;
+        });
     }
 
     /**

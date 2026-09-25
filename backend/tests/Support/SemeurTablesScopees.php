@@ -64,7 +64,10 @@ final class SemeurTablesScopees
         'email_audiences',
         'linkedin_accounts',
         'media',
+        // Lot L4-C : la personne AVANT son abonnement (clé étrangère).
+        'personnes',
         // ── Feuilles ─────────────────────────────────────────────────────────
+        'abonnements',
         'activities',
         'ai_act_register',
         'analytics_attribution',
@@ -228,6 +231,20 @@ final class SemeurTablesScopees
         $id['candidates'] = $insererAvecId('candidates', [
             'last_name' => 'ZZ Candidat ' . $marque,
             'relation_type' => 'candidat_autre',
+        ]);
+
+        $id['personnes'] = $insererAvecId('personnes', [
+            'person_key' => hash('sha256', 'zz-personne-' . $marque),
+            'premiere_source' => 'newsletter',
+            'premiere_source_at' => now(),
+            'legal_basis' => 'consent',
+        ]);
+
+        $inserer('abonnements', [
+            'personne_id' => $id['personnes'],
+            'canal' => 'lettre',
+            'statut' => 'abonne',
+            'dernier_evenement_at' => now(),
         ]);
 
         $id['crm_pipelines'] = $insererAvecId('crm_pipelines', [

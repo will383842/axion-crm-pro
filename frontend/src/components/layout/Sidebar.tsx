@@ -152,7 +152,7 @@ function sectionContacts(features: ConsoleFeatures): NavSection {
           : []),
         { to: '/console/arbitrage', label: 'À arbitrer', icon: <Scale className="h-4 w-4" /> },
         // Lot L4-C — les personnes de la lettre et du guide, sans entreprise.
-        { to: '/console/lettre-et-guide', label: 'Personnes (lettre et guide)', icon: <Mail className="h-4 w-4" /> },
+        { to: '/console/lettre-et-guide', label: 'Contacts newsletter', icon: <Mail className="h-4 w-4" /> },
       ]
     : [{ to: '/contacts', label: 'Contacts', icon: <UsersIcon className="h-4 w-4" /> }];
 

@@ -127,8 +127,8 @@ function PersonnesContent() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="Personnes (lettre et guide)"
-        subtitle="Abonnés à la lettre et demandeurs du guide, sans entreprise. Ils rejoignent le hub de contacts une fois rattachés."
+        title="Contacts newsletter"
+        subtitle="Abonnés à la newsletter et demandeurs du guide, sans entreprise. Ils rejoignent le hub de contacts une fois rattachés."
       />
 
       {echec ? (
@@ -143,7 +143,7 @@ function PersonnesContent() {
       ) : (
         <>
           <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <KpiCard label="Abonnés à la lettre" value={c?.by_statut_lettre.abonne ?? 0} tone="sky" />
+            <KpiCard label="Abonnés à la newsletter" value={c?.by_statut_lettre.abonne ?? 0} tone="sky" />
             <KpiCard label="Demandeurs du guide sans abonnement" value={c?.by_statut_lettre.aucun ?? 0} tone="violet" />
             <KpiCard label="À rattacher" value={c?.non_rattachees ?? 0} tone="amber" />
             <KpiCard label="Désabonnés" value={c?.by_statut_lettre.desabonne ?? 0} tone="slate" />
@@ -159,7 +159,7 @@ function PersonnesContent() {
                   placeholder="Adresse, nom…"
                   className="w-64"
                 />
-                <select value={filtres.statut_lettre} onChange={changer('statut_lettre')} aria-label="Filtre statut de la lettre" className={SELECT_CLS}>
+                <select value={filtres.statut_lettre} onChange={changer('statut_lettre')} aria-label="Filtre statut de la newsletter" className={SELECT_CLS}>
                   <option value="">Tous les statuts</option>
                   <option value="abonne">{STATUT_LETTRE_LABELS.abonne}</option>
                   <option value="desabonne">{STATUT_LETTRE_LABELS.desabonne}</option>
@@ -199,7 +199,7 @@ function PersonnesContent() {
             ) : rows.length === 0 ? (
               <EmptyState
                 title="Aucune personne dans ce segment"
-                description="Les personnes arrivent depuis le site (lettre confirmée, guide téléchargé) une fois le flux ouvert : rien à créer ici."
+                description="Les personnes arrivent depuis le site (newsletter confirmée, guide téléchargé) une fois le flux ouvert : rien à créer ici."
               />
             ) : (
               <Card padding="none" className="overflow-hidden">

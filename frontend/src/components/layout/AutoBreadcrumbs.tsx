@@ -76,7 +76,7 @@ const LABELS: Record<string, string> = {
   '/console/vivier': 'Vivier candidats',
   '/console/arbitrage': 'À arbitrer',
   '/console/personnes': 'Personnes',
-  '/console/lettre-et-guide': 'Personnes (lettre et guide)',
+  '/console/lettre-et-guide': 'Contacts newsletter',
   // 2026-08-26 — registre des envois presse. `/presse` est un segment
   // INTERMÉDIAIRE : aucun écran ne lui répond, mais il s'affiche dans le fil
   // avant `/presse/envois`. Sans libellé, le fil montrait « presse » en brut.

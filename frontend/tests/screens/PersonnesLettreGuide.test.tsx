@@ -68,7 +68,7 @@ describe('PersonnesPage — segments', () => {
 
     expect(await screen.findByText('zz.lettre@example.invalid')).toBeVisible();
 
-    await userEvent.selectOptions(screen.getByLabelText('Filtre statut de la lettre'), 'abonne');
+    await userEvent.selectOptions(screen.getByLabelText('Filtre statut de la newsletter'), 'abonne');
 
     await waitFor(() => {
       const derniere = new URL(urls[urls.length - 1] as string);

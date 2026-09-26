@@ -200,7 +200,7 @@ export type StatutLettre = 'abonne' | 'desabonne';
 export type NatureEmail = 'pro' | 'perso' | 'inconnue';
 
 export const STATUT_LETTRE_LABELS: Record<StatutLettre | 'aucun', string> = {
-  abonne: 'Abonné à la lettre',
+  abonne: 'Abonné à la newsletter',
   desabonne: 'Désabonné',
   aucun: 'Sans abonnement',
 };
@@ -221,7 +221,7 @@ export const BASE_LEGALE_LABELS: Record<string, string> = {
 };
 
 export const SOURCE_PERSONNE_LABELS: Record<string, string> = {
-  newsletter: 'Lettre',
+  newsletter: 'Newsletter',
   'guide-ia': 'Guide IA entreprise',
 };
 

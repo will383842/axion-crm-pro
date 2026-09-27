@@ -2,6 +2,7 @@
 
 namespace App\Services\Audiences;
 
+use App\Crm\FichesProtegees;
 use App\Jobs\RefreshAudienceChunkJob;
 use App\Models\AudienceMember;
 use App\Models\Company;
@@ -376,6 +377,11 @@ class AudienceBuilderService
         self::validerCriteres($criteria);
 
         $query = Company::query()->where('workspace_id', $workspaceId);
+
+        // Les fiches protégées n'entrent dans AUCUNE audience : les écrire
+        // passera par un flux dédié, décidé par Will — jamais par une audience
+        // générale où le triage les aurait rangées (`ready_for_outreach`).
+        FichesProtegees::exclure($query);
 
         $all = $criteria['all'] ?? [];
         if (is_array($all)) {

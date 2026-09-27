@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -174,4 +175,53 @@ test('F36-003 — un compte en LECTURE SEULE ne cree, ne modifie ni ne supprime 
     // serait le pire des cas -- refuser en facade et agir en coulisse.
     expect(Company::find($entreprise->id))->not->toBeNull();
     expect(Company::find($entreprise->id)->denomination)->toBe('Cible');
+});
+
+/**
+ * FICHES PROTÉGÉES (organisateurs d'événements) : la corbeille de la console
+ * est un UPDATE de `deleted_at`, que le déclencheur de la base ne voit pas —
+ * la garde est donc dans le contrôleur. Témoin : une fiche ordinaire part.
+ */
+test('une fiche protegee ne part pas a la corbeille depuis la console, le temoin oui', function () {
+    $protegee = (int) DB::table('companies')->insertGetId([
+        'workspace_id' => $this->workspace->id,
+        'siren' => null,
+        'country_code' => 'FR',
+        'foreign_id' => 'evt:club-exemple',
+        'entity_nature' => 'association',
+        'denomination' => 'Club exemple',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $tagId = (int) DB::table('tags')->insertGetId([
+        'workspace_id' => $this->workspace->id,
+        'slug' => 'src:scraping-evenements-pro',
+        'name' => 'Collecte — organisateurs',
+        'category' => 'intent',
+        'kind' => 'auto',
+        'rules' => '{}',
+        'is_locked' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    DB::table('company_tag')->insert([
+        'company_id' => $protegee,
+        'tag_id' => $tagId,
+        'workspace_id' => $this->workspace->id,
+        'assigned_at' => now(),
+        'assigned_by' => 'auto-rule',
+    ]);
+    $temoin = Company::create([
+        'workspace_id' => $this->workspace->id,
+        'siren' => '987650001',
+        'denomination' => 'Temoin',
+    ]);
+
+    $this->deleteJson('/api/v1/companies/' . $protegee)
+        ->assertStatus(409)
+        ->assertJsonPath('error', 'fiche_protegee');
+    expect(DB::table('companies')->where('id', $protegee)->value('deleted_at'))->toBeNull();
+
+    $this->deleteJson('/api/v1/companies/' . $temoin->id)->assertNoContent();
+    expect(DB::table('companies')->where('id', $temoin->id)->value('deleted_at'))->not->toBeNull();
 });

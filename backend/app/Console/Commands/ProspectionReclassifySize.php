@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Crm\FichesProtegees;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -21,6 +22,9 @@ class ProspectionReclassifySize extends Command
         $where = $this->option('all')
             ? '1=1'
             : "(size_category IS NULL OR size_category = '')";
+        // Sans effectif INSEE, le CASE retombe sur `ELSE 'tpe'` : une CCI ou
+        // une association protégée serait classée « TPE ».
+        $where .= ' AND ' . FichesProtegees::conditionSql();
 
         $affected = DB::update(<<<SQL
             UPDATE companies SET size_category = CASE

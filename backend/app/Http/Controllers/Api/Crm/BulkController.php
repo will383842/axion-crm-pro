@@ -130,6 +130,14 @@ class BulkController extends ConsoleController
     private function removeTag(string $workspaceId, bool $isCandidate, array $ids, array $params): array
     {
         $tagId = $this->requireTagId($workspaceId, $params);
+
+        // Un `src:*` dit d'où vient la fiche : c'est un constat, pas une
+        // étiquette. Le retirer en masse ferait aussi sauter la protection
+        // des fiches qui en dépendent (FichesProtegees). Même règle que
+        // `CompanyTagsBulkController` pour les tags verrouillés.
+        if (str_starts_with(trim((string) $params['tag']), 'src:')) {
+            abort(422, 'Un tag de provenance (src:) ne se retire pas depuis une action de masse.');
+        }
         [$pivot, $key] = $this->pivotFor($isCandidate);
 
         $removed = DB::table($pivot)

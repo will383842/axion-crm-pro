@@ -230,7 +230,7 @@ class EvenementsController extends ApiController
     }
 
     /**
-     * @param  list<int>  $eventIds
+     * @param  array<int>  $eventIds
      * @return array<int, list<array{id: int, denomination: ?string, entity_nature: ?string}>>
      */
     private function organisateurs(string $workspaceId, array $eventIds): array

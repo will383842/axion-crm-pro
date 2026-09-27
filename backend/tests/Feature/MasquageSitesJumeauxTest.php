@@ -210,6 +210,9 @@ beforeEach(function () {
         'external_ref' => 'zz-jumeaux-evenement',
         'nom' => 'ZZ Salon des jumeaux',
         'type' => 'salon',
+        // Une coordonnée glissée dans la note libre : le balayage doit la
+        // trouver chez le propriétaire et JAMAIS chez le viewer.
+        'demarche_note' => 'Rappeler ' . JUM_MAIL_CONTACT,
         'created_at' => now(),
         'updated_at' => now(),
     ]);

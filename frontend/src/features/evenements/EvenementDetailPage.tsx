@@ -25,6 +25,8 @@ import {
   TYPES,
   libelle,
   quand,
+  jour,
+  lienSur,
   tonIntervention,
 } from "./libelles";
 
@@ -69,10 +71,11 @@ function Ligne({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function Lien({ href, children }: { href: string | null; children: ReactNode }) {
-  if (!href) return <>—</>;
+  const sur = lienSur(href);
+  if (!sur) return <>—</>;
   return (
     <a
-      href={href}
+      href={sur}
       target="_blank"
       rel="noreferrer noopener"
       className="text-sky-700 hover:underline"
@@ -114,9 +117,17 @@ export function EvenementDetailPage() {
     onSuccess: (fiche) => {
       qc.setQueryData(["evenement", eventId], fiche);
       void qc.invalidateQueries({ queryKey: ["evenements"] });
+      void qc.invalidateQueries({ queryKey: ["evenements-entreprise"] });
       toast.success("Démarche enregistrée");
     },
-    onError: () => toast.error("La démarche n'a pas été enregistrée."),
+    onError: (err: unknown) => {
+      const statut = (err as { response?: { status?: number } }).response?.status;
+      toast.error(
+        statut === 403
+          ? "Votre compte n'a pas le droit de modifier la démarche."
+          : "La démarche n'a pas été enregistrée.",
+      );
+    },
   });
 
   if (isLoading) return <p className="px-6 py-6 text-sm text-slate-500">Chargement…</p>;
@@ -290,9 +301,7 @@ export function EvenementDetailPage() {
                 {e.historique.map((h) => (
                   <li key={h.id} className="flex justify-between gap-2">
                     <span className="text-slate-800">{ETAPES[h.kind] ?? h.kind}</span>
-                    <span className="text-slate-500">
-                      {new Date(h.occurred_at).toLocaleDateString("fr-FR")}
-                    </span>
+                    <span className="text-slate-500">{jour(h.occurred_at)}</span>
                   </li>
                 ))}
               </ol>

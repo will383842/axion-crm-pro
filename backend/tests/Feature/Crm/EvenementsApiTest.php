@@ -129,8 +129,8 @@ test('faire avancer la demarche ecrit l etat ET une ligne d historique par etape
         ->and(collect($fiche['historique'])->pluck('kind')->sort()->values()->all())
         ->toBe(['evenement_inscrit', 'intervention_proposee']);
 
-    // Témoin : renvoyer la même étape n'ajoute AUCUNE ligne d'historique.
-    $this->patchJson('/api/v1/evenements/' . $id . '/demarche', ['intervention' => 'proposee'])->assertOk();
+    // Témoin : renvoyer les MÊMES étapes n'ajoute AUCUNE ligne d'historique.
+    $this->patchJson('/api/v1/evenements/' . $id . '/demarche', ['participation' => 'inscrit', 'intervention' => 'proposee'])->assertOk();
     expect(DB::table('activities')->where('subject_type', 'event')->where('subject_id', $id)->count())->toBe(2);
 });
 
@@ -148,6 +148,8 @@ test('une valeur hors vocabulaire est refusee', function () {
     $id = evtApiEvenement($this->workspace->id);
 
     $this->patchJson('/api/v1/evenements/' . $id . '/demarche', ['intervention' => 'peut-etre'])->assertStatus(422);
+    // Une date que Postgres refuserait donnerait une 500 : refusée avant.
+    $this->patchJson('/api/v1/evenements/' . $id . '/demarche', ['prochaine_relance_at' => 'next monday'])->assertStatus(422);
     $this->getJson('/api/v1/evenements?type=kermesse')->assertStatus(422);
 });
 
@@ -158,6 +160,27 @@ test('un compte en lecture seule lit mais ne fait pas avancer la demarche', func
     $this->getJson('/api/v1/evenements/' . $id)->assertOk();
     $this->patchJson('/api/v1/evenements/' . $id . '/demarche', ['intervention' => 'proposee'])->assertForbidden();
     expect(DB::table('events')->where('id', $id)->value('intervention'))->toBe('aucune');
+});
+
+test('le bloc d une entreprise d un autre espace est introuvable', function () {
+    $autre = (string) Str::uuid();
+    Workspace::create(['id' => $autre, 'slug' => 'ws-evt-autre-bloc', 'name' => 'Autre', 'settings' => []]);
+    $etrangere = (int) DB::table('companies')->insertGetId([
+        'workspace_id' => $autre, 'siren' => '900000931', 'denomination' => 'ZZ Etrangere',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    evtApiEvenement($autre, [], $etrangere);
+
+    $this->getJson('/api/v1/companies/' . $etrangere . '/evenements')->assertNotFound();
+});
+
+test('la note de demarche est masquee a un compte sans droit sur les coordonnees', function () {
+    $id = evtApiEvenement($this->workspace->id, ['demarche_note' => 'ZZ rappeler zz.note@example.invalid']);
+
+    expect($this->getJson('/api/v1/evenements/' . $id)->json('demarche_note'))->toContain('zz.note@example.invalid');
+
+    $this->actingAs(evtApiCompte($this->workspace->id, 'viewer'));
+    expect($this->getJson('/api/v1/evenements/' . $id)->json('demarche_note'))->toBeNull();
 });
 
 test('le bloc de la fiche entreprise liste les evenements de l organisateur', function () {

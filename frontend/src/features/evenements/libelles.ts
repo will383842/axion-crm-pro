@@ -100,3 +100,15 @@ export function tonIntervention(v: string): Ton {
   if (v === "refusee") return "rouge";
   return "gris";
 }
+
+/** Un lien issu de la base n'est cliquable que s'il est http(s). */
+export function lienSur(href: string | null | undefined): string | null {
+  return href && /^https?:\/\//i.test(href) ? href : null;
+}
+
+/** « 2026-10-20 00:00:00+02 » (PDO pgsql) -> « 20/10/2026 », sans dépendre du moteur JS. */
+export function jour(valeur: string | null | undefined): string {
+  if (!valeur) return "—";
+  const [a, m, j] = valeur.slice(0, 10).split("-");
+  return a && m && j ? `${j}/${m}/${a}` : "—";
+}

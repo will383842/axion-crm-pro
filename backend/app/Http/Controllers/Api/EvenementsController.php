@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Crm\Taxonomy;
 use App\Models\Company;
+use App\Support\MasquageCoordonnees;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -62,10 +63,10 @@ class EvenementsController extends ApiController
             ->forPage($page, $parPage)
             ->get();
 
-        $organisateurs = $this->organisateurs($workspaceId, $lignes->pluck('id')->map(fn ($id) => (int) $id)->all());
+        $organisateurs = $this->organisateurs($workspaceId, $lignes->pluck('id')->map(fn ($id) => (int) $id)->values()->all());
 
         return $this->ok([
-            'data' => $lignes->map(fn (object $e) => $this->resume($e, $organisateurs[(int) $e->id] ?? []))->values(),
+            'data' => $lignes->map(fn (\stdClass $e) => $this->resume($e, $organisateurs[(int) $e->id] ?? []))->values(),
             'meta' => ['total' => $total, 'page' => $page, 'per_page' => $parPage],
         ]);
     }
@@ -95,7 +96,7 @@ class EvenementsController extends ApiController
         $data = $request->validate([
             'participation' => ['sometimes', Rule::in(Taxonomy::EVENEMENT_PARTICIPATIONS)],
             'intervention' => ['sometimes', Rule::in(Taxonomy::EVENEMENT_INTERVENTIONS)],
-            'prochaine_relance_at' => ['sometimes', 'nullable', 'date'],
+            'prochaine_relance_at' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
             'demarche_note' => ['sometimes', 'nullable', 'string', 'max:5000'],
         ]);
 
@@ -119,7 +120,7 @@ class EvenementsController extends ApiController
                 return $this->fiche($workspaceId, $ligne);
             }
 
-            DB::table('events')->where('id', $event)->update($changements + ['updated_at' => now()]);
+            DB::table('events')->where('workspace_id', $workspaceId)->where('id', $event)->update($changements + ['updated_at' => now()]);
 
             // Une ligne d'historique par ÉTAPE franchie (pas pour la note ni la
             // date de relance, qui ne sont pas des étapes).
@@ -148,7 +149,7 @@ class EvenementsController extends ApiController
                 ]);
             }
 
-            $apresMaj = DB::table('events')->where('id', $event)->first();
+            $apresMaj = DB::table('events')->where('workspace_id', $workspaceId)->where('id', $event)->first();
 
             return $apresMaj === null ? null : $this->fiche($workspaceId, $apresMaj);
         });
@@ -175,7 +176,7 @@ class EvenementsController extends ApiController
             ->get();
 
         return $this->ok([
-            'data' => $lignes->map(fn (object $e) => $this->resume($e, []))->values(),
+            'data' => $lignes->map(fn (\stdClass $e) => $this->resume($e, []))->values(),
         ]);
     }
 
@@ -220,6 +221,8 @@ class EvenementsController extends ApiController
                             ->from('event_organizers')
                             ->join('companies', 'companies.id', '=', 'event_organizers.company_id')
                             ->whereColumn('event_organizers.event_id', 'events.id')
+                            ->whereColumn('companies.workspace_id', 'event_organizers.workspace_id')
+                            ->whereNull('companies.deleted_at')
                             ->where('companies.denomination', 'ILIKE', $motif);
                     });
             });
@@ -241,6 +244,7 @@ class EvenementsController extends ApiController
             ->join('companies', 'companies.id', '=', 'event_organizers.company_id')
             ->where('event_organizers.workspace_id', $workspaceId)
             ->whereIn('event_organizers.event_id', $eventIds)
+            ->where('companies.workspace_id', $workspaceId)
             ->whereNull('companies.deleted_at')
             ->get(['event_organizers.event_id', 'companies.id', 'companies.denomination', 'companies.entity_nature']);
 
@@ -259,7 +263,7 @@ class EvenementsController extends ApiController
      * @param  list<array{id: int, denomination: ?string, entity_nature: ?string}>  $organisateurs
      * @return array<string, mixed>
      */
-    private function resume(object $e, array $organisateurs): array
+    private function resume(\stdClass $e, array $organisateurs): array
     {
         return [
             'id' => (int) $e->id,
@@ -282,12 +286,13 @@ class EvenementsController extends ApiController
     }
 
     /** @return array<string, mixed> */
-    private function fiche(string $workspaceId, object $e): array
+    private function fiche(string $workspaceId, \stdClass $e): array
     {
         $organisateurs = DB::table('event_organizers')
             ->join('companies', 'companies.id', '=', 'event_organizers.company_id')
             ->where('event_organizers.workspace_id', $workspaceId)
             ->where('event_organizers.event_id', $e->id)
+            ->where('companies.workspace_id', $workspaceId)
             ->whereNull('companies.deleted_at')
             ->get(['companies.id', 'companies.denomination', 'companies.entity_nature', 'companies.city', 'companies.website', 'companies.signals'])
             ->map(function (object $c): array {
@@ -314,7 +319,7 @@ class EvenementsController extends ApiController
             ->orderByDesc('occurred_at')
             ->limit(100)
             ->get(['id', 'kind', 'occurred_at'])
-            ->map(fn (object $a): array => [
+            ->map(fn (\stdClass $a): array => [
                 'id' => (int) $a->id,
                 'kind' => $a->kind,
                 'occurred_at' => $a->occurred_at,
@@ -332,7 +337,10 @@ class EvenementsController extends ApiController
             'appel_intervenants_limite' => $e->appel_intervenants_limite,
             'source_url' => $e->source_url,
             'notes' => $e->notes,
-            'demarche_note' => $e->demarche_note,
+            // Texte libre de Will : il peut contenir un nom ou un numéro malgré
+            // la consigne. Masqué, comme une coordonnée, pour qui n'a pas le
+            // droit de voir les coordonnées.
+            'demarche_note' => MasquageCoordonnees::requis() ? null : $e->demarche_note,
             'organisateurs' => $organisateurs,
             'historique' => $historique,
         ];

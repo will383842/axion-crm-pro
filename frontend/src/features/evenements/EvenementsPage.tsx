@@ -26,6 +26,8 @@ import {
   TYPES,
   libelle,
   quand,
+  jour,
+  lienSur,
   tonIntervention,
   type Option,
 } from "./libelles";
@@ -175,9 +177,7 @@ function TableEvenements({ rows }: { rows: EvenementResume[] }) {
                 </Pastille>
               </td>
               <td className="px-3 py-2 whitespace-nowrap text-slate-600">
-                {e.prochaine_relance_at
-                  ? new Date(e.prochaine_relance_at).toLocaleDateString("fr-FR")
-                  : "—"}
+                {jour(e.prochaine_relance_at)}
               </td>
             </tr>
           ))}
@@ -430,9 +430,9 @@ function OngletOrganisateurs() {
                     <td className="px-3 py-2 text-slate-600">{r.city ?? "—"}</td>
                     <td className="px-3 py-2 text-slate-600">{r.email_generic ?? "—"}</td>
                     <td className="px-3 py-2">
-                      {r.website ? (
+                      {lienSur(r.website) ? (
                         <a
-                          href={r.website}
+                          href={lienSur(r.website) ?? undefined}
                           target="_blank"
                           rel="noreferrer noopener"
                           className="text-sky-700 hover:underline"

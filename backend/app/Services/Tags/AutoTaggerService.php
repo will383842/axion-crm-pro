@@ -52,6 +52,7 @@ class AutoTaggerService
         'cabinet' => 'Cabinet (conseil, avocats)',
         'institution' => 'Institution',
         'media' => 'Média',
+        'reseau' => 'Réseau ou club d\'affaires',
     ];
 
     /**

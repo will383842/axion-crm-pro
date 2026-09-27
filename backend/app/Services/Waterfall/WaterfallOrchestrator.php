@@ -7,6 +7,7 @@ use App\Contracts\BanGeocoder;
 use App\Contracts\BodaccClient;
 use App\Contracts\InseeClient;
 use App\Contracts\LLMClient;
+use App\Crm\FichesProtegees;
 use App\Data\LLM\LLMRequestData;
 use App\Jobs\DispatchScrapeJob;
 use App\Models\AudienceMember;
@@ -67,6 +68,16 @@ class WaterfallOrchestrator
 
     public function enrich(Company $company): void
     {
+        // Garde UNIQUE pour tous les chemins d'enrichissement (commande,
+        // EnrichCompanyJob, bulk-enrich, coverage, re-scrape, Google Places) :
+        // une fiche protégée n'est ni enrichie, ni retaguée, ni triée, ni
+        // rattachée à une audience. Cf. FichesProtegees.
+        if (FichesProtegees::estProtegee((int) $company->id)) {
+            Log::info('Waterfall ignore : fiche protegee', ['company_id' => $company->id]);
+
+            return;
+        }
+
         Log::info('Waterfall start', ['company_id' => $company->id, 'siren' => $company->siren]);
 
         // Sprint H3 — Si étape INSEE détecte entreprise radiée → archive + SKIP tout le waterfall.

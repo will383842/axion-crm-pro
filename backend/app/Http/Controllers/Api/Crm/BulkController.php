@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Crm;
 
 use App\Crm\Console\CompteursHub;
+use App\Crm\FichesProtegees;
 use App\Crm\Ingest\SiteSyncClassifier;
 use App\Crm\Taxonomy;
 use App\Support\WorkspaceContext;
@@ -130,6 +131,12 @@ class BulkController extends ConsoleController
     private function removeTag(string $workspaceId, bool $isCandidate, array $ids, array $params): array
     {
         $tagId = $this->requireTagId($workspaceId, $params);
+
+        // Retirer en masse un tag de FichesProtegees ferait sauter, d'un clic,
+        // la protection de toutes les fiches qui le portent.
+        if (in_array(trim((string) $params['tag']), FichesProtegees::TAGS, true)) {
+            abort(422, 'Ce tag protège ses fiches : il ne se retire pas depuis une action de masse.');
+        }
         [$pivot, $key] = $this->pivotFor($isCandidate);
 
         $removed = DB::table($pivot)

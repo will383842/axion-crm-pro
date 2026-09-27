@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Crm\FichesProtegees;
 use App\Models\Company;
 use App\Services\Waterfall\WaterfallOrchestrator;
 use App\Support\WorkspaceContext;
@@ -68,6 +69,9 @@ class ProspectionEnrich extends Command
         }
 
         $q = Company::query();
+        // Sans cette exclusion, une fiche protégée (que le waterfall refuse)
+        // resterait `enriched_at IS NULL` et serait re-choisie à chaque run.
+        FichesProtegees::exclure($q);
         if ($this->option('force')) {
             // AUCUN filtre sur enriched_at : on repasse sur les fiches déjà
             // enrichies. Réservé au cas où une DONNÉE D'ENTRÉE a changé — un

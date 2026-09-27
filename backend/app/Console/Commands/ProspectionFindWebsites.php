@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Crm\FichesProtegees;
 use App\Models\Company;
 use App\Services\Domain\DomainFinderService;
 use Illuminate\Console\Command;
@@ -66,6 +67,9 @@ class ProspectionFindWebsites extends Command
                 ->where('website_status', $sourceStatus)
                 ->whereNull('website')
                 ->whereNotNull('denomination');
+            // `pending` est la valeur par défaut de la colonne : sans cette
+            // exclusion, toute fiche protégée serait ramassée.
+            FichesProtegees::exclure($q);
             if ($dept) {
                 $q->where('department_code', $dept);
             }
@@ -126,6 +130,7 @@ class ProspectionFindWebsites extends Command
                 ->where('website_status', 'found')
                 ->whereNotNull('website')
                 ->whereNull('website_revalidated_at');
+            FichesProtegees::exclure($q);
             if ($dept) {
                 $q->where('department_code', $dept);
             }

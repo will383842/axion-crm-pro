@@ -760,3 +760,28 @@ test('bulk ignore silencieusement les identifiants d un autre workspace', functi
     expect(DB::table('companies')->where('id', $etrangere)->value('lifecycle_stage'))->toBe('nouveau');
     expect(DB::table('companies')->where('id', $mienne)->value('lifecycle_stage'))->toBe('qualifie');
 });
+
+test('bulk remove_tag refuse de retirer un tag protecteur, pas un tag ordinaire', function () {
+    $company = consoleCompany($this->workspace->id, '900000291');
+    $src = consoleTag($this->workspace->id, 'src:scraping-evenements-pro');
+    $ordinaire = consoleTag($this->workspace->id, 'svc:audit');
+    foreach ([$src, $ordinaire] as $tagId) {
+        DB::table('company_tag')->insert([
+            'company_id' => $company, 'tag_id' => $tagId, 'workspace_id' => $this->workspace->id,
+            'assigned_at' => now(), 'assigned_by' => 'user',
+        ]);
+    }
+
+    // Retirer ce tag ferait sauter la protection de la fiche (FichesProtegees).
+    $this->postJson('/api/v1/crm/bulk', [
+        'ids' => [$company], 'action' => 'remove_tag', 'params' => ['tag' => 'src:scraping-evenements-pro'],
+    ])->assertStatus(422)
+        ->assertJsonPath('message', 'Ce tag protège ses fiches : il ne se retire pas depuis une action de masse.');
+    expect(DB::table('company_tag')->where('company_id', $company)->where('tag_id', $src)->exists())->toBeTrue();
+
+    // Témoin : un tag ordinaire se retire toujours.
+    $this->postJson('/api/v1/crm/bulk', [
+        'ids' => [$company], 'action' => 'remove_tag', 'params' => ['tag' => 'svc:audit'],
+    ])->assertOk();
+    expect(DB::table('company_tag')->where('company_id', $company)->where('tag_id', $ordinaire)->exists())->toBeFalse();
+});

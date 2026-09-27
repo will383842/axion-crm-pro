@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Console\Concerns\RefuseUneSuppressionMassive;
+use App\Crm\FichesProtegees;
 use Illuminate\Console\Command;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
@@ -88,6 +89,9 @@ class ProspectionPurgeNonDiffusible extends Command
      */
     private function fichesNonDiffusibles(): Builder
     {
-        return DB::table('companies')->whereRaw("position('[ND]' in denomination) > 0");
+        $query = DB::table('companies')->whereRaw("position('[ND]' in denomination) > 0");
+        FichesProtegees::exclure($query);
+
+        return $query;
     }
 }

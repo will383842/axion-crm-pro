@@ -3,7 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Console\Concerns\RefuseUneSuppressionMassive;
+use App\Crm\FichesProtegees;
 use Illuminate\Console\Command;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -35,18 +37,30 @@ class ProspectionPurgeNonCommercial extends Command
 
     public function handle(): int
     {
-        $condition = "(legal_form IS NULL OR left(legal_form, 1) <> '5')";
-
-        $aSupprimer = DB::table('companies')->whereRaw($condition)->count();
+        $aSupprimer = $this->fichesNonCommerciales()->count();
         $total = DB::table('companies')->count();
 
         if (! $this->suppressionAutorisee('companies', $aSupprimer, $total)) {
             return self::SUCCESS;
         }
 
-        $supprimees = DB::table('companies')->whereRaw($condition)->delete();
+        $supprimees = $this->fichesNonCommerciales()->delete();
         $this->info("✅ {$supprimees} entités non-sociétés (auto-entrepreneurs, EI, SCI, associations…) supprimées.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Une SEULE définition pour le comptage et la suppression (cf. la jumelle
+     * `ProspectionPurgeNonDiffusible`). Les fiches protégées en sont exclues :
+     * les organisateurs d'événements (associations, CCI, clubs) n'ont jamais
+     * de forme `5xxx` et tombaient TOUS sous `legal_form IS NULL`.
+     */
+    private function fichesNonCommerciales(): Builder
+    {
+        $query = DB::table('companies')->whereRaw("(legal_form IS NULL OR left(legal_form, 1) <> '5')");
+        FichesProtegees::exclure($query);
+
+        return $query;
     }
 }

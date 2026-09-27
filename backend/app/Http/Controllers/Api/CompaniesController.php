@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Crm\FichesProtegees;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Jobs\EnrichCompanyJob;
 use App\Models\Company;
@@ -568,6 +569,15 @@ class CompaniesController extends ApiController
         // « interdit » confirmerait son existence.
         $this->refuserHorsEspace($company);
 
+        // Une fiche protégée (organisateurs d'événements) ne part pas à la
+        // corbeille d'un clic : 409 et le motif, jamais un 204 silencieux.
+        if (FichesProtegees::estProtegee((int) $company->id)) {
+            return response()->json([
+                'error' => 'fiche_protegee',
+                'message' => "Cette fiche est protégée (organisateurs d'événements) : elle ne se supprime pas depuis la console.",
+            ], 409);
+        }
+
         $company->delete();
 
         // Meme raison qu'a la creation (G41-006) : la corbeille sort la fiche
@@ -600,6 +610,14 @@ class CompaniesController extends ApiController
         // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
         // « interdit » confirmerait son existence.
         $this->refuserHorsEspace($company);
+
+        // Le waterfall refuserait en silence : l'API répondrait « enrichie ».
+        if (FichesProtegees::estProtegee((int) $company->id)) {
+            return response()->json([
+                'error' => 'fiche_protegee',
+                'message' => "Cette fiche est protégée (organisateurs d'événements) : elle n'est pas enrichie.",
+            ], 409);
+        }
 
         $this->waterfall->enrich($company);
 

@@ -23,6 +23,7 @@ import { api } from '@/lib/api';
 import { ContactsCard, type ContactItem } from './components/ContactsCard';
 import { QualityScoreCard } from './components/QualityScoreCard';
 import { EnrichmentTimeline, deriveTimelineFromSignals } from './components/EnrichmentTimeline';
+import { EvenementsCard } from './components/EvenementsCard';
 
 interface CompanyDetail {
   id: number;
@@ -260,6 +261,7 @@ export function CompanyDetailPage() {
         {/* RIGHT COLUMN (1/3) */}
         <aside className="space-y-6">
           <ContactsCard contacts={c.contacts ?? []} />
+          <EvenementsCard companyId={c.id} />
           <QualityScoreCard
             score={c.quality_score}
             breakdown={c.quality_breakdown ?? undefined}

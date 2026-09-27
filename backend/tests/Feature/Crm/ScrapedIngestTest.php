@@ -464,11 +464,31 @@ test('une boîte service ne devient JAMAIS une fiche personne', function () {
 test('un email au domaine non résolvable est rejeté : pas de fiche sur une adresse morte', function () {
     config(['crm.scrape_funnel.validate_mx' => true]);
     // Domaine .invalid : RFC 2606, ne résout jamais — le test reste hermétique.
+    // Sans téléphone, l'adresse morte était le seul canal : aucune fiche.
 
-    $outcome = ingestScrape(scrapedRecord());
+    $outcome = ingestScrape(scrapedRecord(['persons' => [[
+        'first_name' => 'Paul',
+        'last_name' => 'ZZ SCRAPE',
+        'email' => 'paul@zz-scrape.example.invalid',
+        'kind' => 'person',
+    ]]]));
 
     expect($outcome->emailsRejectedMx)->toBe(1)
         ->and(DB::table('contacts')->count())->toBe(0);
+});
+
+test('un email au domaine non résolvable, mais un téléphone : la personne est gardée, sans l adresse', function () {
+    // 2026-09-27 : la personne disparaissait en silence alors que son
+    // téléphone restait un canal valable.
+    config(['crm.scrape_funnel.validate_mx' => true]);
+
+    $outcome = ingestScrape(scrapedRecord());
+
+    $contact = DB::table('contacts')->first();
+    expect($outcome->emailsRejectedMx)->toBe(1)
+        ->and($outcome->contactsCreated)->toBe(1)
+        ->and($contact->email)->toBeNull()
+        ->and($contact->phone)->toBe('0612345678');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

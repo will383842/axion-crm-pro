@@ -3,8 +3,10 @@
 namespace App\Crm\Scraping;
 
 use App\Crm\Identite\CleDePersonne;
+use App\Crm\Personnes\NatureEmail;
 use App\Models\Company;
 use App\Services\Tags\AutoTaggerService;
+use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -43,6 +45,15 @@ use Throwable;
  */
 final class ScrapedRecordIngestService
 {
+    /**
+     * Sources dont une personne se rattache à l'organisation qui l'AFFICHE,
+     * même si son adresse existe déjà sur une autre fiche (2026-09-27 :
+     * l'organisateur d'un événement et son entreprise sont deux fiches).
+     *
+     * @var list<string>
+     */
+    private const SOURCES_DEDUP_PAR_ORGANISATION = ['evenements-pro'];
+
     public function __construct(private readonly EmailMxValidator $mx) {}
 
     /**
@@ -148,6 +159,10 @@ final class ScrapedRecordIngestService
             match ($result) {
                 'created' => $created++,
                 'updated' => $updated++,
+                // La personne est GARDÉE (elle a un téléphone), son adresse
+                // morte non : elle compte aux deux endroits.
+                'created_bad_mx' => [$created++, $badMx++],
+                'updated_bad_mx' => [$updated++, $badMx++],
                 'opted_out' => $optedOut++,
                 'bad_mx' => $badMx++,
                 // C18-002 — LE `default => null` D'AVANT PERDAIT DES PERSONNES.
@@ -309,13 +324,22 @@ final class ScrapedRecordIngestService
         $fields = $record->companyFields;
 
         $columns = [];
-        foreach (['denomination', 'website', 'phone', 'address', 'postcode', 'city', 'linkedin_url'] as $column) {
+        foreach (['denomination', 'website', 'address', 'postcode', 'city', 'linkedin_url', 'department_code'] as $column) {
             if (isset($fields[$column])) {
                 $columns[$column] = $fields[$column];
             }
         }
-        if (isset($fields['email_generic']) && $this->mx->isDeliverable(mb_strtolower($fields['email_generic']))) {
-            $columns['email_generic'] = mb_strtolower($fields['email_generic']);
+        // Une opposition vaut pour TOUTE coordonnée, pas seulement l'e-mail
+        // d'une personne nommée : l'adresse générique d'une petite association
+        // est souvent celle de son président.
+        if (isset($fields['phone']) && ! $this->estOppose(null, $fields['phone'])) {
+            $columns['phone'] = $fields['phone'];
+        }
+        if (isset($fields['email_generic'])) {
+            $generique = mb_strtolower($fields['email_generic']);
+            if (! $this->estOppose($generique, null) && $this->mx->isDeliverable($generique)) {
+                $columns['email_generic'] = $generique;
+            }
         }
 
         return $columns;
@@ -368,6 +392,12 @@ final class ScrapedRecordIngestService
      */
     private function channelSignals(ScrapedRecord $record, array $signals): array
     {
+        // Formulaire de contact : BACKFILL-ONLY, comme le reste.
+        $formulaire = $record->companyFields['contact_form_url'] ?? null;
+        if ($formulaire !== null && ($signals['contact_form_url'] ?? '') === '') {
+            $signals['contact_form_url'] = $formulaire;
+        }
+
         if ($record->channelEmails === [] && $record->channelPhones === []) {
             return $signals;
         }
@@ -376,8 +406,17 @@ final class ScrapedRecordIngestService
         $emails = is_array($channels['emails'] ?? null) ? $channels['emails'] : [];
         $phones = is_array($channels['phones'] ?? null) ? $channels['phones'] : [];
 
-        $channels['emails'] = array_values(array_unique(array_merge($emails, array_map('mb_strtolower', $record->channelEmails))));
-        $channels['phones'] = array_values(array_unique(array_merge($phones, $record->channelPhones)));
+        $nouveauxEmails = array_values(array_filter(
+            array_map('mb_strtolower', $record->channelEmails),
+            fn (string $email): bool => ! $this->estOppose($email, null),
+        ));
+        $nouveauxTelephones = array_values(array_filter(
+            $record->channelPhones,
+            fn (string $telephone): bool => ! $this->estOppose(null, $telephone),
+        ));
+
+        $channels['emails'] = array_values(array_unique(array_merge($emails, $nouveauxEmails)));
+        $channels['phones'] = array_values(array_unique(array_merge($phones, $nouveauxTelephones)));
         $signals['contact_channels'] = $channels;
 
         return $signals;
@@ -389,7 +428,7 @@ final class ScrapedRecordIngestService
             return;
         }
         $email = mb_strtolower(trim($email));
-        if ($email === '' || ! $this->mx->isDeliverable($email)) {
+        if ($email === '' || $this->estOppose($email, null) || ! $this->mx->isDeliverable($email)) {
             return;
         }
 
@@ -447,23 +486,24 @@ final class ScrapedRecordIngestService
             return 'skipped_no_last_name';
         }
 
-        if ($email !== null) {
-            // ANTI-RÉINSERTION : une personne opposée ne revient jamais par un
-            // re-scrape — le hash survit à l'effacement (règle B.6.10).
-            $emailHash = hash('sha256', $email);
-            $opposed = DB::table('opt_out')
-                ->where('scope', 'business')
-                ->where('email_hash', $emailHash)
-                ->exists();
-            if ($opposed) {
-                return 'opted_out';
-            }
+        // ANTI-RÉINSERTION : une personne opposée ne revient jamais par un
+        // re-scrape — le hash survit à l'effacement (règle B.6.10). Le
+        // téléphone compte aussi : une opposition donnée par téléphone ne se
+        // contourne pas parce que la collecte a trouvé le numéro.
+        if ($this->estOppose($email, $person['phone'] ?? null)) {
+            return 'opted_out';
+        }
 
-            if (! $this->mx->isDeliverable($email)) {
-                // Email invalide : la personne n'est pas créée sur la foi d'une
-                // adresse morte. Le nom seul, sans canal, n'a pas de valeur.
+        $emailRejete = false;
+        if ($email !== null && ! $this->mx->isDeliverable($email)) {
+            if (($person['phone'] ?? null) === null) {
+                // Email invalide et aucun autre canal : la personne n'est pas
+                // créée sur la foi d'une adresse morte.
                 return 'bad_mx';
             }
+            // Un téléphone reste un canal : on garde la personne, pas l'adresse.
+            $email = null;
+            $emailRejete = true;
         }
 
         $existing = null;
@@ -485,9 +525,17 @@ final class ScrapedRecordIngestService
             // Soit 244 fois moins de temps, sur 20 000 lignes seulement.
             // Sur la base de volume, cette dédup est le chemin le plus chaud de
             // l'ingestion : elle est jouée une fois PAR PERSONNE collectée.
-            $existing = DB::table('contacts')
+            $recherche = DB::table('contacts')
                 ->where('workspace_id', $workspaceId)
-                ->where('email', $email)
+                ->where('email', $email);
+            if (in_array($record->source, self::SOURCES_DEDUP_PAR_ORGANISATION, true)) {
+                // Le président d'un club est AUSSI le dirigeant de sa propre
+                // entreprise : pour cette source, la personne est rattachée à
+                // l'organisation qui l'affiche, pas à une autre fiche qui
+                // porterait la même adresse.
+                $recherche->where('company_id', $companyId);
+            }
+            $existing = $recherche
                 ->orderByRaw('CASE WHEN company_id = ? THEN 0 ELSE 1 END', [$companyId])
                 ->first();
         }
@@ -513,7 +561,12 @@ final class ScrapedRecordIngestService
                 'linkedin_url' => $person['linkedin_url'] ?? null,
                 'discovery_source' => $record->source,
                 'sources' => json_encode([$record->source], JSON_THROW_ON_ERROR),
-                'metadata' => '{}',
+                // Une adresse grand public (gmail, orange…) est celle d'une
+                // PERSONNE : marquée, pour qu'aucun envoi ne la traite comme
+                // une adresse professionnelle.
+                'metadata' => $email !== null && NatureEmail::de($email) === 'perso'
+                    ? json_encode(['email_nature' => 'perso'], JSON_THROW_ON_ERROR)
+                    : '{}',
                 'legal_basis' => 'legitimate_interest_b2b',
                 // A05-001 : la clé de rapprochement, posée DÈS LA CRÉATION.
                 // `null` si l'adresse est absente ou le secret non configuré —
@@ -524,7 +577,11 @@ final class ScrapedRecordIngestService
                 'updated_at' => now(),
             ]);
 
-            return $id > 0 ? 'created' : 'skipped_insert_failed';
+            if ($id <= 0) {
+                return 'skipped_insert_failed';
+            }
+
+            return $emailRejete ? 'created_bad_mx' : 'created';
         }
 
         // A05-001 — RATTRAPAGE DE LA CLÉ sur une fiche déjà là qui n'en portait
@@ -576,7 +633,7 @@ final class ScrapedRecordIngestService
         }
 
         if ($update === []) {
-            return 'skipped_no_change';
+            return $emailRejete ? 'skipped_no_change_bad_mx' : 'skipped_no_change';
         }
 
         $update['field_origins'] = $this->encodeObject($origins);
@@ -584,7 +641,7 @@ final class ScrapedRecordIngestService
 
         DB::table('contacts')->where('id', $existing->id)->update($update);
 
-        return 'updated';
+        return $emailRejete ? 'updated_bad_mx' : 'updated';
     }
 
     // ── Tags, run, timeline ─────────────────────────────────────────────────
@@ -699,7 +756,11 @@ final class ScrapedRecordIngestService
         }
 
         try {
-            return (int) DB::table('activities')->insertGetId([
+            // Point de sauvegarde : sans lui, une collision sur `external_ref`
+            // (ré-import après la purge des runs à 90 jours) AVORTE la
+            // transaction Postgres — le `catch` ci-dessous l'avalait, et la
+            // ligne entière échouait plus loin.
+            return (int) DB::transaction(fn () => DB::table('activities')->insertGetId([
                 'workspace_id' => $workspaceId,
                 'type' => 'scraped',
                 'kind' => 'scraped',
@@ -710,7 +771,7 @@ final class ScrapedRecordIngestService
                 'title' => 'Collecte — ' . $record->source,
                 'payload' => json_encode($payload, JSON_THROW_ON_ERROR),
                 'created_at' => now(),
-            ]);
+            ]));
         } catch (Throwable) {
             // L'external_ref est UNIQUE par workspace : une collision (rejeu
             // partiel) ne doit pas faire échouer l'ingestion entière.
@@ -719,6 +780,33 @@ final class ScrapedRecordIngestService
     }
 
     // ── Utilitaires ─────────────────────────────────────────────────────────
+
+    /**
+     * Opposition (univers business) sur une adresse OU un téléphone. Même
+     * empreinte que le reste du CRM (`ListeSuppression::empreinte`, calculée en
+     * PHP : la base est en locale C, `lower()` n'y abaisse pas les accents).
+     */
+    private function estOppose(?string $email, ?string $telephone): bool
+    {
+        $email = $email !== null && trim($email) !== '' ? $email : null;
+        $telephone = $telephone !== null ? (string) preg_replace('/[\s.\-]/', '', $telephone) : null;
+        $telephone = $telephone !== '' ? $telephone : null;
+        if ($email === null && $telephone === null) {
+            return false;
+        }
+
+        return DB::table('opt_out')
+            ->where('scope', 'business')
+            ->where(function ($q) use ($email, $telephone): void {
+                if ($email !== null) {
+                    $q->orWhere('email_hash', ListeSuppression::empreinte($email));
+                }
+                if ($telephone !== null) {
+                    $q->orWhere('phone', $telephone);
+                }
+            })
+            ->exists();
+    }
 
     private function resolveWorkspaceId(): string
     {

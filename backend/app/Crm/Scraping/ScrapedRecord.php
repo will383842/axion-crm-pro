@@ -64,6 +64,9 @@ final class ScrapedRecord
     private const COMPANY_FIELD_KEYS = [
         'denomination', 'website', 'phone', 'email_generic', 'address',
         'postcode', 'city', 'linkedin_url',
+        // 2026-09-27 (organisateurs d'événements) : beaucoup n'offrent qu'un
+        // formulaire de contact, et le département n'avait aucune porte.
+        'contact_form_url', 'department_code',
     ];
 
     /**
@@ -147,6 +150,16 @@ final class ScrapedRecord
 
         $matchHint = self::stringSection($company['match_hint'] ?? [], self::MATCH_HINT_KEYS, 'company.match_hint');
         $companyFields = self::stringSection($company['fields'] ?? [], self::COMPANY_FIELD_KEYS, 'company.fields');
+
+        if (isset($companyFields['contact_form_url']) && preg_match('#^https?://#i', $companyFields['contact_form_url']) !== 1) {
+            throw ScrapeIngestRejection::invalid('invalid_contact_form_url', 'company.fields.contact_form_url doit être une URL http(s).');
+        }
+        if (isset($companyFields['department_code'])) {
+            $companyFields['department_code'] = strtoupper($companyFields['department_code']);
+            if (preg_match('/^(\d{2,3}|2[AB])$/', $companyFields['department_code']) !== 1) {
+                throw ScrapeIngestRejection::invalid('invalid_department_code', 'company.fields.department_code doit être un code de département (ex. 69, 2A, 974).');
+            }
+        }
 
         // ── Entités SANS SIREN (prospection internationale) ─────────────────
         // Le SIREN n'est pas un besoin métier : c'est une CLÉ DE DÉDUP. Une

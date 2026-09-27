@@ -6,6 +6,7 @@ use App\Crm\Scraping\ScrapedRecord;
 use App\Crm\Scraping\ScrapedRecordIngestService;
 use App\Crm\Scraping\ScrapeIngestRejection;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 /**
@@ -50,6 +51,18 @@ class ScrapingIngestFile extends Command
         $line = 0;
         $counts = [];
         $errors = 0;
+        /** @var array<string, int> $personnes */
+        $personnes = [];
+
+        // ESSAI À BLANC FIDÈLE (2026-09-27). Le service annulait CHAQUE ligne
+        // dans sa propre transaction : un organisateur présent sur 26 lignes y
+        // était annoncé « créé » 26 fois, et aucune personne n'était comptée.
+        // Désormais : UNE transaction pour tout le fichier, le service écrit
+        // « pour de vrai » dedans, et tout est annulé à la fin — le bilan est
+        // exactement celui de l'import réel.
+        if ($dryRun) {
+            DB::beginTransaction();
+        }
 
         while (($raw = fgets($handle)) !== false) {
             $line++;
@@ -73,21 +86,43 @@ class ScrapingIngestFile extends Command
                     );
                 }
 
-                $outcome = $ingest->ingest(ScrapedRecord::fromArray($decoded), $dryRun);
+                $outcome = $ingest->ingest(ScrapedRecord::fromArray($decoded), false);
                 $counts[$outcome->status] = ($counts[$outcome->status] ?? 0) + 1;
+
+                $cumul = [
+                    'contacts_crees' => $outcome->contactsCreated,
+                    'contacts_completes' => $outcome->contactsUpdated,
+                    'personnes_opposees' => $outcome->personsSkippedOptOut,
+                    'emails_sans_serveur' => $outcome->emailsRejectedMx,
+                ];
+                foreach ($outcome->personsSkipped as $motif => $n) {
+                    $cumul['personnes_' . $motif] = $n;
+                }
+                foreach ($cumul as $cle => $n) {
+                    $personnes[$cle] = ($personnes[$cle] ?? 0) + $n;
+                }
             } catch (ScrapeIngestRejection $e) {
                 $errors++;
                 $this->warn("ligne {$line} : {$e->errorCode} — {$e->getMessage()}");
             } catch (Throwable $e) {
                 $errors++;
-                $this->warn("ligne {$line} : " . $e->getMessage());
+                // Le message d'une erreur SQL peut citer une valeur de la
+                // ligne (une adresse) : seule la classe est affichée.
+                $this->warn("ligne {$line} : erreur " . $e::class);
             }
         }
         fclose($handle);
 
+        if ($dryRun) {
+            DB::rollBack();
+        }
+
         $this->info(($dryRun ? '[DRY-RUN — rien n\'est écrit] ' : '') . 'Terminé.');
         foreach ($counts as $status => $count) {
             $this->line("  {$status} : {$count}");
+        }
+        foreach ($personnes as $cle => $n) {
+            $this->line("  {$cle} : {$n}");
         }
         if ($errors > 0) {
             $this->warn("  refusées : {$errors}");

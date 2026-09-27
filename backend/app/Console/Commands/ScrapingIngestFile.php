@@ -6,6 +6,7 @@ use App\Crm\Scraping\ScrapedRecord;
 use App\Crm\Scraping\ScrapedRecordIngestService;
 use App\Crm\Scraping\ScrapeIngestRejection;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 /**
@@ -50,44 +51,85 @@ class ScrapingIngestFile extends Command
         $line = 0;
         $counts = [];
         $errors = 0;
+        /** @var array<string, int> $personnes */
+        $personnes = [];
 
-        while (($raw = fgets($handle)) !== false) {
-            $line++;
-            $raw = trim($raw);
-            if ($raw === '') {
-                continue;
+        // ESSAI À BLANC FIDÈLE (2026-09-27). Le service annulait CHAQUE ligne
+        // dans sa propre transaction : un organisateur présent sur 26 lignes y
+        // était annoncé « créé » 26 fois, et aucune personne n'était comptée.
+        // Désormais : UNE transaction pour tout le fichier, le service écrit
+        // « pour de vrai » dedans, et tout est annulé à la fin — le bilan est
+        // exactement celui de l'import réel.
+        // ⚠️ Pendant un essai à blanc, les lignes touchées restent verrouillées
+        // jusqu'à la fin du fichier : à lancer hors des heures d'écriture. Une
+        // erreur de CONCURRENCE (interblocage) dans une ligne laisse la
+        // transaction globale avortée — les lignes suivantes sont alors
+        // comptées refusées : relancer l'essai.
+        if ($dryRun) {
+            DB::beginTransaction();
+        }
+
+        try {
+            while (($raw = fgets($handle)) !== false) {
+                $line++;
+                $raw = trim($raw);
+                if ($raw === '') {
+                    continue;
+                }
+
+                try {
+                    $decoded = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);
+                    if (! is_array($decoded)) {
+                        throw new \JsonException('la ligne n\'est pas un objet');
+                    }
+
+                    // La source de la ligne DOIT être celle annoncée : un fichier
+                    // ne peut pas mélanger les provenances en silence.
+                    if (($decoded['source'] ?? null) !== $source) {
+                        throw ScrapeIngestRejection::invalid(
+                            'source_mismatch',
+                            'source de la ligne (' . var_export($decoded['source'] ?? null, true) . ") ≠ source annoncée ({$source}).",
+                        );
+                    }
+
+                    $outcome = $ingest->ingest(ScrapedRecord::fromArray($decoded), false);
+                    $counts[$outcome->status] = ($counts[$outcome->status] ?? 0) + 1;
+
+                    $cumul = [
+                        'contacts_crees' => $outcome->contactsCreated,
+                        'contacts_completes' => $outcome->contactsUpdated,
+                        'personnes_opposees' => $outcome->personsSkippedOptOut,
+                        'emails_sans_serveur' => $outcome->emailsRejectedMx,
+                    ];
+                    foreach ($outcome->personsSkipped as $motif => $n) {
+                        $cumul['personnes_' . $motif] = $n;
+                    }
+                    foreach ($cumul as $cle => $n) {
+                        $personnes[$cle] = ($personnes[$cle] ?? 0) + $n;
+                    }
+                } catch (ScrapeIngestRejection $e) {
+                    $errors++;
+                    $this->warn("ligne {$line} : {$e->errorCode} — {$e->getMessage()}");
+                } catch (Throwable $e) {
+                    $errors++;
+                    // Le message d'une erreur SQL peut citer une valeur de la
+                    // ligne (une adresse) : seule la classe est affichée.
+                    $this->warn("ligne {$line} : erreur " . $e::class);
+                }
             }
-
-            try {
-                $decoded = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);
-                if (! is_array($decoded)) {
-                    throw new \JsonException('la ligne n\'est pas un objet');
-                }
-
-                // La source de la ligne DOIT être celle annoncée : un fichier
-                // ne peut pas mélanger les provenances en silence.
-                if (($decoded['source'] ?? null) !== $source) {
-                    throw ScrapeIngestRejection::invalid(
-                        'source_mismatch',
-                        'source de la ligne (' . var_export($decoded['source'] ?? null, true) . ") ≠ source annoncée ({$source}).",
-                    );
-                }
-
-                $outcome = $ingest->ingest(ScrapedRecord::fromArray($decoded), $dryRun);
-                $counts[$outcome->status] = ($counts[$outcome->status] ?? 0) + 1;
-            } catch (ScrapeIngestRejection $e) {
-                $errors++;
-                $this->warn("ligne {$line} : {$e->errorCode} — {$e->getMessage()}");
-            } catch (Throwable $e) {
-                $errors++;
-                $this->warn("ligne {$line} : " . $e->getMessage());
+        } finally {
+            fclose($handle);
+            if ($dryRun) {
+                DB::rollBack();
             }
         }
-        fclose($handle);
 
         $this->info(($dryRun ? '[DRY-RUN — rien n\'est écrit] ' : '') . 'Terminé.');
         foreach ($counts as $status => $count) {
             $this->line("  {$status} : {$count}");
+        }
+        foreach ($personnes as $cle => $n) {
+            $this->line("  {$cle} : {$n}");
         }
         if ($errors > 0) {
             $this->warn("  refusées : {$errors}");

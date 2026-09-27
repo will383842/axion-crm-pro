@@ -1,7 +1,7 @@
 # =============================================================================
 # BASELINE PHPStan — dette figée le 2026-08-13, dégonflée le 2026-08-18
 # =============================================================================
-# ÉTAT COURANT (2026-08-18) : 190 entrées / 208 erreurs, niveau 8.
+# ÉTAT COURANT (2026-08-18) : 190 entrées / 207 erreurs, niveau 8.
 # Ces deux nombres sont FIGÉS dans un test Pest — cf.
 # tests/Unit/PhpstanBaselineNeGrossitPasTest.php. Ils ne peuvent que DÉCROÎTRE ;
 # quand tu les fais baisser, mets à jour le test dans le MÊME commit.
@@ -803,7 +803,7 @@ parameters:
 		-
 			message: '#^Parameter \#3 \$subject of function preg_replace expects array\<float\|int\|string\>\|string, string\|null given\.$#'
 			identifier: argument.type
-			count: 2
+			count: 1
 			path: app/Services/Dedup/DeduplicationService.php
 
 		-

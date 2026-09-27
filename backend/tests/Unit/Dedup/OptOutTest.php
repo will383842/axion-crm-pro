@@ -26,7 +26,13 @@ test('isOptedOut normalizes email (trim + lowercase)', function () {
 test('isOptedOut normalizes phone (strip separators)', function () {
     $svc = new DeduplicationService;
     $svc->addOptOut(null, '+33 1 23 45 67 89', 'manual');
-    expect($svc->isOptedOut(null, '0123456789'))->toBeFalse(); // FR variant
+    // 2026-09-27 : l'écriture nationale du MÊME numéro est reconnue. Ce test
+    // figeait le contraire (« FR variant » → faux) : une opposition donnée en
+    // +33 se contournait en écrivant 01. C'était le défaut, pas la règle.
+    expect($svc->isOptedOut(null, '0123456789'))->toBeTrue();
+    expect($svc->isOptedOut(null, '0033 1 23 45 67 89'))->toBeTrue();
+    // Témoin : un autre numéro n'est pas opposé.
+    expect($svc->isOptedOut(null, '0123456780'))->toBeFalse();
     expect($svc->isOptedOut(null, '+33 1.23.45.67.89'))->toBeTrue();
 });
 

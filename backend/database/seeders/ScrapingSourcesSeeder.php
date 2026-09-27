@@ -140,7 +140,7 @@ class ScrapingSourcesSeeder extends Seeder
             'name' => 'Organisateurs d\'événements professionnels (pages publiques)',
             'kind' => 'import',
             'ttl_days' => 365,
-            'dedup_key_pattern' => 'foreign_id',
+            'dedup_key_pattern' => 'siren',
             'legal_note' => 'Pages publiques des événements professionnels et de leurs organisateurs (CCI, réseaux et clubs d\'affaires, associations d\'entrepreneurs, salons) : coordonnées publiées pour être contactées. Finalité : proposer une intervention gratuite de Will. Intérêt légitime B2B ; information art. 14 au premier message ; opposition respectée. Fiches protégées (FichesProtegees) : ni purge, ni enrichissement automatique, ni audience.',
         ],
         'gplaces' => [

@@ -9,7 +9,6 @@
 use App\Crm\Scraping\ScrapedRecord;
 use App\Crm\Taxonomy;
 use App\Models\Workspace;
-use Database\Seeders\ScrapingSourcesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -44,10 +43,18 @@ beforeEach(function () {
     ]);
 });
 
+afterEach(function () {
+    foreach ($GLOBALS['zz_evt_fichiers'] ?? [] as $chemin) {
+        @unlink($chemin);
+    }
+    $GLOBALS['zz_evt_fichiers'] = [];
+});
+
 /** @param  list<array<string, mixed>|string>  $lignes */
 function evtFichier(array $lignes): string
 {
     $chemin = tempnam(sys_get_temp_dir(), 'zz-evt-');
+    $GLOBALS['zz_evt_fichiers'][] = $chemin;
     file_put_contents($chemin, implode("\n", array_map(
         static fn (array|string $l): string => is_string($l) ? $l : json_encode($l, JSON_UNESCAPED_UNICODE),
         $lignes,
@@ -99,9 +106,9 @@ test('la nature reseau est acceptee par la base et par le format pivot', functio
         ->and(ScrapedRecord::ENTITY_NATURES)->toContain('reseau');
 });
 
-test('la source evenements-pro est au registre, active', function () {
-    $this->seed(ScrapingSourcesSeeder::class);
-
+test('la source evenements-pro est au registre, active, des la migration', function () {
+    // Pas de `seed()` ici : c'est la MIGRATION qui doit l'avoir posée, car les
+    // seeders ne tournent pas au déploiement.
     expect(DB::table('scraping_sources')->where('slug', 'evenements-pro')->value('enabled'))->toBeTrue();
 });
 
@@ -124,9 +131,10 @@ test('l import cree l evenement et le relie a ses organisateurs, par foreign_id 
 });
 
 test('l essai a blanc n ecrit rien et rend le MEME bilan que l import reel', function () {
-    // Deux événements, UN organisateur partagé : une transaction par ligne
-    // aurait compté l'organisateur « créé » deux fois.
-    $fichier = evtFichier([evtLigne('zz-a'), evtLigne('zz-b')]);
+    // Le MÊME événement deux fois : en réel, la 2e ligne le trouve (1 créé,
+    // 1 inchangé). Un essai à blanc qui annulerait ligne par ligne l'aurait
+    // compté « créé » deux fois.
+    $fichier = evtFichier([evtLigne('zz-a'), evtLigne('zz-a')]);
 
     Artisan::call('crm:import-evenements', ['file' => $fichier, '--dry-run' => true]);
     $aBlanc = Artisan::output();
@@ -137,12 +145,13 @@ test('l essai a blanc n ecrit rien et rend le MEME bilan que l import reel', fun
     Artisan::call('crm:import-evenements', ['file' => $fichier]);
     $reel = Artisan::output();
 
-    foreach (['crees', 'liens_crees', 'rejetes'] as $compteur) {
+    foreach (['crees', 'inchanges', 'liens_crees', 'rejetes'] as $compteur) {
         expect(evtBilan($aBlanc, $compteur))->toBe(evtBilan($reel, $compteur));
     }
-    expect(evtBilan($reel, 'crees'))->toBe(2)
-        ->and(evtBilan($reel, 'liens_crees'))->toBe(2)
-        ->and(DB::table('events')->count())->toBe(2);
+    expect(evtBilan($reel, 'crees'))->toBe(1)
+        ->and(evtBilan($reel, 'inchanges'))->toBe(1)
+        ->and(evtBilan($reel, 'liens_crees'))->toBe(1)
+        ->and(DB::table('events')->count())->toBe(1);
 });
 
 test('un re-import met a jour la description mais jamais la demarche de Will', function () {
@@ -190,6 +199,55 @@ test('une ligne fautive est rejetee seule, les autres passent', function () {
         ->and($sortie)->toContain('dates_inversees')
         ->and($sortie)->toContain('organisateur_sans_ancre')
         ->and($sortie)->toContain('json_invalide');
+});
+
+test('une erreur de la base annule SA ligne seule, et la commande le signale en echec', function () {
+    // Le lien vers la chambre est refusé par la base APRÈS l'insertion de
+    // l'événement : seul le point de sauvegarde de la ligne peut l'annuler.
+    DB::statement("ALTER TABLE event_organizers ADD CONSTRAINT zz_refuse_chambre CHECK (company_id <> {$this->chambre}) NOT VALID");
+
+    $code = Artisan::call('crm:import-evenements', ['file' => evtFichier([
+        evtLigne('zz-bon'),
+        evtLigne('zz-casse', ['organisateurs' => [['siren' => '900000901']]]),
+    ])]);
+    $sortie = Artisan::output();
+
+    expect(DB::table('events')->pluck('external_ref')->all())->toBe(['zz-bon'])
+        ->and($sortie)->toContain('erreur_base')
+        ->and($sortie)->toContain('ÉCHEC')
+        ->and($code)->toBe(1);
+});
+
+test('les compteurs d une ligne rejetee ne sont pas reportes', function () {
+    // Un organisateur introuvable, PUIS une ancre invalide : la ligne est
+    // rejetée, son « introuvable » ne doit pas rester dans le bilan.
+    Artisan::call('crm:import-evenements', ['file' => evtFichier([evtLigne('zz-mixte', ['organisateurs' => [
+        ['country' => 'FR', 'foreign_id' => 'evt:zz-inconnu'],
+        ['denomination' => 'ZZ'],
+    ]])])]);
+    $sortie = Artisan::output();
+
+    expect(evtBilan($sortie, 'rejetes'))->toBe(1)
+        ->and(evtBilan($sortie, 'organisateurs_introuvables'))->toBe(0);
+});
+
+test('verifie doit etre un vrai booleen', function () {
+    Artisan::call('crm:import-evenements', ['file' => evtFichier([evtLigne('zz-v', ['verifie' => 'true'])])]);
+
+    expect(DB::table('events')->count())->toBe(0)
+        ->and(Artisan::output())->toContain('type_de_valeur_invalide');
+});
+
+test('les coordonnees presentes dans les notes sont retirees a l import', function () {
+    Artisan::call('crm:import-evenements', ['file' => evtFichier([evtLigne('zz-n', [
+        'notes' => 'Contact : zz.personne@example.invalid ou 06 12 34 56 78, entree libre.',
+    ])])]);
+
+    $notes = (string) DB::table('events')->where('external_ref', 'zz-n')->value('notes');
+    expect($notes)->not->toContain('@')
+        ->and($notes)->not->toContain('06 12')
+        ->and($notes)->toContain('entree libre')
+        ->and(evtBilan(Artisan::output(), 'notes_expurgees'))->toBe(1);
 });
 
 test('un organisateur absent est compte, jamais invente', function () {

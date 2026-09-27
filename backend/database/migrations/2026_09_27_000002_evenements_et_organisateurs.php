@@ -61,6 +61,12 @@ return new class extends Migration
 
     public function up(): void
     {
+        // En TÊTE : les deux CHECK reconstruits plus bas verrouillent
+        // `activities` et `companies` (4,3 M de lignes). Sans délai, un ALTER
+        // qui attend derrière une requête longue fait la queue — et toutes
+        // les requêtes suivantes derrière lui.
+        DB::statement("SET LOCAL lock_timeout = '30s'");
+
         $this->createEvents();
         $this->createEventOrganizers();
         $this->applyRls();
@@ -71,13 +77,11 @@ return new class extends Migration
              CHECK (kind IS NULL OR kind IN (' . Taxonomy::sqlList(Taxonomy::ACTIVITY_KINDS) . '))',
         );
 
-        DB::statement("SET LOCAL lock_timeout = '30s'");
         DB::statement('ALTER TABLE companies DROP CONSTRAINT IF EXISTS companies_entity_nature_check');
         DB::statement(
             'ALTER TABLE companies ADD CONSTRAINT companies_entity_nature_check
-             CHECK (entity_nature IS NULL OR entity_nature IN (' . Taxonomy::sqlList(array_merge(self::NATURES_AVANT, ['reseau'])) . ')) NOT VALID',
+             CHECK (entity_nature IS NULL OR entity_nature IN (' . Taxonomy::sqlList(array_merge(self::NATURES_AVANT, ['reseau'])) . '))',
         );
-        DB::statement('ALTER TABLE companies VALIDATE CONSTRAINT companies_entity_nature_check');
 
         (new ScrapingSourcesSeeder)->run();
     }
@@ -183,6 +187,8 @@ return new class extends Migration
         DB::statement('CREATE INDEX IF NOT EXISTS idx_events_workspace_relance ON events (workspace_id, prochaine_relance_at) WHERE prochaine_relance_at IS NOT NULL');
 
         DB::statement("COMMENT ON TABLE events IS 'Evenements professionnels (salons, clubs, ateliers) et etat de la demarche de Will. Aucune donnee de personne.'");
+        DB::statement("COMMENT ON COLUMN events.notes IS 'Extrait public de la page. JAMAIS un nom ni une coordonnee : une personne va dans contacts. L''import retire e-mails et telephones.'");
+        DB::statement("COMMENT ON COLUMN events.demarche_note IS 'Note de Will sur la demarche. JAMAIS un nom ni une coordonnee : une personne va dans contacts.'");
         DB::statement("COMMENT ON COLUMN events.external_ref IS 'Identifiant stable du sourcing : cle de re-import.'");
         DB::statement("COMMENT ON COLUMN events.participation IS 'repere | inscrit | rencontre. Jamais ecrit par un import.'");
         DB::statement("COMMENT ON COLUMN events.intervention IS 'aucune | proposee | acceptee | refusee | realisee. Jamais ecrit par un import.'");

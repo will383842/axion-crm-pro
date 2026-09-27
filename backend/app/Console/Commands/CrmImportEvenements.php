@@ -85,6 +85,7 @@ class CrmImportEvenements extends Command
         $this->bilan = [
             'lignes' => 0, 'crees' => 0, 'mis_a_jour' => 0, 'inchanges' => 0, 'rejetes' => 0,
             'liens_crees' => 0, 'organisateurs_introuvables' => 0, 'sans_organisateur' => 0,
+            'notes_expurgees' => 0,
         ];
         $this->rejets = [];
 
@@ -119,7 +120,17 @@ class CrmImportEvenements extends Command
             ]);
         }
 
-        $this->info($dryRun ? '[À BLANC] rien n\'a été écrit.' : 'Import appliqué.');
+        // Une base qui refuse (RLS sans contexte, contrainte) ne doit JAMAIS
+        // ressembler à un import réussi : chaque ligne serait rangée en
+        // `erreur_base` et la sortie resterait au vert.
+        $echec = ($this->rejets['erreur_base'] ?? 0) > 0
+            || ($this->bilan['lignes'] > 0 && $this->bilan['rejetes'] === $this->bilan['lignes']);
+
+        if ($echec) {
+            $this->error('ÉCHEC : la base a refusé des lignes, ou toutes les lignes ont été rejetées.');
+        } else {
+            $this->info($dryRun ? '[À BLANC] rien n\'a été écrit.' : 'Import appliqué.');
+        }
         $this->table(['compteur', 'nombre'], array_map(
             static fn (string $cle, int $n): array => [$cle, $n],
             array_keys($this->bilan),
@@ -132,7 +143,7 @@ class CrmImportEvenements extends Command
             }
         }
 
-        return self::SUCCESS;
+        return $echec ? self::FAILURE : self::SUCCESS;
     }
 
     private function importer(string $chemin, string $workspaceId): void
@@ -153,8 +164,12 @@ class CrmImportEvenements extends Command
 
                 try {
                     // Un point de sauvegarde par ligne : une ligne fautive est
-                    // annulée seule, le reste de l'import continue.
-                    DB::transaction(fn () => $this->importerLigne($ligne, $workspaceId));
+                    // annulée seule, le reste de l'import continue. Ses
+                    // compteurs ne sont reportés QUE si elle aboutit.
+                    $delta = DB::transaction(fn (): array => $this->importerLigne($ligne, $workspaceId));
+                    foreach ($delta as $compteur => $n) {
+                        $this->bilan[$compteur] += $n;
+                    }
                 } catch (InvalidArgumentException $e) {
                     // Motif produit par ce fichier (jamais une valeur de la ligne).
                     $this->rejeter($e->getMessage(), $numero);
@@ -173,8 +188,10 @@ class CrmImportEvenements extends Command
         }
     }
 
-    private function importerLigne(string $ligne, string $workspaceId): void
+    /** @return array<string, int> compteurs de CETTE ligne */
+    private function importerLigne(string $ligne, string $workspaceId): array
     {
+        $delta = [];
         try {
             $brut = json_decode($ligne, true, 32, JSON_THROW_ON_ERROR);
         } catch (Throwable) {
@@ -203,9 +220,21 @@ class CrmImportEvenements extends Command
             throw new InvalidArgumentException('appel_intervenants_inconnu');
         }
 
-        $valeurs = ['type' => $type, 'appel_intervenants' => $appel, 'verifie' => ($brut['verifie'] ?? false) === true];
+        $verifie = $brut['verifie'] ?? false;
+        if (! is_bool($verifie)) {
+            // « "true" » ou « 1 » deviendraient `false` en silence, et un
+            // ré-import retirerait une vérification.
+            throw new InvalidArgumentException('type_de_valeur_invalide');
+        }
+
+        $valeurs = ['type' => $type, 'appel_intervenants' => $appel, 'verifie' => $verifie];
         foreach (self::CHAMPS_TEXTE as $champ) {
             $valeurs[$champ] = $this->texte($brut, $champ);
+        }
+        $notes = $this->expurger($valeurs['notes']);
+        if ($notes !== $valeurs['notes']) {
+            $delta['notes_expurgees'] = 1;
+            $valeurs['notes'] = $notes;
         }
         foreach (self::CHAMPS_DATE as $champ) {
             $valeurs[$champ] = $this->date($brut, $champ);
@@ -225,7 +254,7 @@ class CrmImportEvenements extends Command
             }
             $id = $this->organisateur($ancre, $workspaceId);
             if ($id === null) {
-                $this->bilan['organisateurs_introuvables']++;
+                $delta['organisateurs_introuvables'] = ($delta['organisateurs_introuvables'] ?? 0) + 1;
 
                 continue;
             }
@@ -244,7 +273,7 @@ class CrmImportEvenements extends Command
                 'created_at' => now(),
                 'updated_at' => now(),
             ] + $valeurs);
-            $this->bilan['crees']++;
+            $delta['crees'] = 1;
         } else {
             $eventId = (int) $existant->id;
             $change = false;
@@ -261,26 +290,29 @@ class CrmImportEvenements extends Command
             if ($change) {
                 // Seule la DESCRIPTION : la démarche de Will n'est jamais touchée.
                 DB::table('events')->where('id', $eventId)->update($valeurs + ['updated_at' => now()]);
-                $this->bilan['mis_a_jour']++;
+                $delta['mis_a_jour'] = 1;
             } else {
-                $this->bilan['inchanges']++;
+                $delta['inchanges'] = 1;
             }
         }
 
         if ($companyIds === []) {
-            $this->bilan['sans_organisateur']++;
+            $delta['sans_organisateur'] = 1;
 
-            return;
+            return $delta;
         }
 
+        $delta['liens_crees'] = 0;
         foreach (array_keys($companyIds) as $companyId) {
-            $this->bilan['liens_crees'] += DB::table('event_organizers')->insertOrIgnore([
+            $delta['liens_crees'] += DB::table('event_organizers')->insertOrIgnore([
                 'event_id' => $eventId,
                 'company_id' => $companyId,
                 'workspace_id' => $workspaceId,
                 'created_at' => now(),
             ]);
         }
+
+        return $delta;
     }
 
     /** @param  array<mixed>  $ancre */
@@ -335,6 +367,30 @@ class CrmImportEvenements extends Command
         }
 
         return $valeur;
+    }
+
+    /**
+     * `notes` est un extrait de page publique : « Contact : 06… / x@y » y est
+     * courant. Aucune coordonnée n'y reste — elle échapperait à l'effacement
+     * RGPD, qui cherche par personne. Les coordonnées vont dans `contacts`,
+     * par la porte d'ingestion.
+     */
+    private function expurger(?string $notes): ?string
+    {
+        if ($notes === null) {
+            return null;
+        }
+
+        $propre = (string) preg_replace(
+            [
+                '/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/iu',
+                '/(?:\+33\s?|0)[1-9](?:[\s.\-]?\d{2}){4}/u',
+            ],
+            '[coordonnée retirée]',
+            $notes,
+        );
+
+        return $propre;
     }
 
     private function rejeter(string $motif, int $numero): void

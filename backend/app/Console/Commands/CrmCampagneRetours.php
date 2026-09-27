@@ -6,28 +6,34 @@ use App\Services\Dedup\DeduplicationService;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 
 /**
  * Les RETOURS d'une campagne, quel que soit l'outil qui a envoyé.
  *
- * Une ligne JSON par événement : `type`, `email`, `crm_ref` (celui de
- * `crm:campagne:destinataires`), `campagne`, `date` (ISO), `evenement_id`
- * facultatif. Types :
+ * Une ligne JSON par événement : `type`, `email`, `campagne`, `date` (ISO),
+ * `evenement_id` facultatif (`crm_ref` est toléré, mais c'est l'ADRESSE qui
+ * fait foi : une boîte partagée porte plusieurs fiches). Types :
  *
- *  - `envoye` : le premier message est PARTI → `first_info_at` posé s'il était
- *    vide (information art. 14), sur la fiche et le contact ; l'événement cité
- *    passe « intervention proposée » s'il était encore « aucune » — jamais de
- *    recul d'une étape plus avancée ;
+ *  - `envoye` : le premier message est PARTI → `first_info_at` posé, s'il était
+ *    vide, sur TOUTES les fiches de l'espace qui portent cette adresse
+ *    (information art. 14 : chaque organisateur cité est informé) ; la date
+ *    ne peut pas être dans le futur. L'événement cité, s'il appartient à l'un
+ *    de ces organisateurs et en est encore à « aucune », passe « proposée » —
+ *    jamais de recul d'une étape plus avancée ;
  *  - `desinscription` / `plainte` : opposition DÉFINITIVE (portée business),
  *    plus la suppression « plainte » ;
- *  - `rebond_dur` : adresse supprimée et marquée `invalid` sur les fiches ;
- *  - `rebond_mou` : compté, supprimé au-delà du seuil (3).
+ *  - `rebond_dur` : adresse supprimée et marquée `invalid` sur ses fiches ;
+ *  - `rebond_mou` : compté, supprimé au-delà du seuil (3). ⚠️ Ce compteur vit
+ *    en cache, hors transaction : il n'est PAS appelé à blanc, et rejouer un
+ *    fichier réel le recompte — ne rejouer que des retours nouveaux.
  *
  * Un retour ne fait que RETIRER ou CONSTATER : il n'ajoute jamais un
- * destinataire, ne lève jamais une opposition. Rejouer le même fichier ne
- * change rien (idempotent).
+ * destinataire, ne crée jamais de fiche, ne lève jamais une opposition, ne
+ * touche jamais une fiche à la corbeille.
  */
 class CrmCampagneRetours extends Command
 {
@@ -41,6 +47,8 @@ class CrmCampagneRetours extends Command
 
     /** @var array<string, int> */
     private array $bilan = [];
+
+    private bool $aBlanc = false;
 
     public function handle(DeduplicationService $dedup): int
     {
@@ -59,22 +67,24 @@ class CrmCampagneRetours extends Command
             return self::FAILURE;
         }
         $workspaceId = (string) $workspaceId;
-        $dryRun = (bool) $this->option('dry-run');
+        $this->aBlanc = (bool) $this->option('dry-run');
 
         $this->bilan = array_fill_keys([
-            'lignes', 'rejetees', 'envoyes', 'premiers_messages_notes', 'interventions_proposees',
+            'lignes', 'rejetees', 'erreurs_base', 'envoyes', 'fiches_informees', 'interventions_proposees',
             'desinscriptions', 'plaintes', 'rebonds_durs', 'rebonds_mous',
         ], 0);
 
-        WorkspaceContext::run($workspaceId, function () use ($chemin, $workspaceId, $dryRun, $dedup): void {
+        WorkspaceContext::run($workspaceId, function () use ($chemin, $workspaceId, $dedup): void {
             DB::beginTransaction();
             try {
                 $flux = fopen($chemin, 'rb');
                 if ($flux === false) {
-                    throw new \RuntimeException("Ouverture impossible : {$chemin}");
+                    throw new \RuntimeException('Ouverture du fichier impossible.');
                 }
                 try {
+                    $numero = 0;
                     while (($ligne = fgets($flux)) !== false) {
+                        $numero++;
                         if (trim($ligne) === '') {
                             continue;
                         }
@@ -83,6 +93,10 @@ class CrmCampagneRetours extends Command
                             DB::transaction(fn () => $this->traiter($ligne, $workspaceId, $dedup));
                         } catch (InvalidArgumentException) {
                             $this->bilan['rejetees']++;
+                        } catch (QueryException $e) {
+                            // Le message SQL peut citer l'adresse : seul le code d'état sort.
+                            $this->bilan['erreurs_base']++;
+                            Log::warning('crm:campagne:retours : ligne refusee par la base', ['ligne' => $numero, 'sqlstate' => $e->getCode()]);
                         }
                     }
                 } finally {
@@ -93,21 +107,26 @@ class CrmCampagneRetours extends Command
 
                 throw $e;
             }
-            if ($dryRun) {
+            if ($this->aBlanc) {
                 DB::rollBack();
             } else {
                 DB::commit();
             }
         });
 
-        $this->info($dryRun ? '[À BLANC] rien n\'a été écrit.' : 'Retours enregistrés.');
+        $echec = $this->bilan['erreurs_base'] > 0;
+        if ($echec) {
+            $this->error('ÉCHEC : la base a refusé des lignes (voir le journal, sans adresse).');
+        } else {
+            $this->info($this->aBlanc ? '[À BLANC] rien n\'a été écrit.' : 'Retours enregistrés.');
+        }
         $this->table(['compteur', 'nombre'], array_map(
             static fn (string $cle, int $n): array => [$cle, $n],
             array_keys($this->bilan),
             array_values($this->bilan),
         ));
 
-        return self::SUCCESS;
+        return $echec ? self::FAILURE : self::SUCCESS;
     }
 
     private function traiter(string $ligne, string $workspaceId, DeduplicationService $dedup): void
@@ -119,7 +138,7 @@ class CrmCampagneRetours extends Command
         $type = $r['type'] ?? null;
         $email = is_string($r['email'] ?? null) ? mb_strtolower(trim($r['email'])) : '';
         $campagne = is_string($r['campagne'] ?? null) && trim($r['campagne']) !== '' ? trim($r['campagne']) : 'sans-nom';
-        if (! in_array($type, self::TYPES, true) || $email === '' || ! str_contains($email, '@')) {
+        if (! in_array($type, self::TYPES, true) || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
             throw new InvalidArgumentException('ligne_invalide');
         }
         $source = 'campagne:' . $campagne;
@@ -140,13 +159,17 @@ class CrmCampagneRetours extends Command
                 ListeSuppression::inscrire($email, ListeSuppression::REBOND_DUR, $source, 'business');
                 DB::table('contacts')
                     ->where('workspace_id', $workspaceId)
+                    ->whereNull('deleted_at')
                     ->where('email', $email)
                     ->update(['email_status' => 'invalid', 'updated_at' => now()]);
                 $this->bilan['rebonds_durs']++;
                 break;
 
             case 'rebond_mou':
-                ListeSuppression::rebondTemporaire($email, $source, 'business');
+                // Compteur en cache, hors transaction : jamais à blanc.
+                if (! $this->aBlanc) {
+                    ListeSuppression::rebondTemporaire($email, $source, 'business');
+                }
                 $this->bilan['rebonds_mous']++;
                 break;
 
@@ -159,42 +182,61 @@ class CrmCampagneRetours extends Command
     /** @param  array<mixed>  $r */
     private function envoye(array $r, string $email, string $campagne, string $workspaceId): void
     {
-        $date = is_string($r['date'] ?? null) && strtotime($r['date']) !== false
-            ? date('c', (int) strtotime($r['date']))
+        // Preuve art. 14 : la date du fichier, jamais dans le futur.
+        $horodatage = is_string($r['date'] ?? null) ? strtotime($r['date']) : false;
+        $date = $horodatage !== false && $horodatage <= time()
+            ? date('c', $horodatage)
             : now()->toIso8601String();
 
-        [$contactId, $companyId] = $this->fiches($r['crm_ref'] ?? null, $email, $workspaceId);
-        if ($companyId === null) {
+        // TOUTES les fiches de l'espace qui portent cette adresse.
+        $contacts = DB::table('contacts')
+            ->where('workspace_id', $workspaceId)
+            ->whereNull('deleted_at')
+            ->where('email', $email)
+            ->get(['id', 'company_id']);
+        $companyIds = DB::table('companies')
+            ->where('workspace_id', $workspaceId)
+            ->whereNull('deleted_at')
+            ->whereRaw('lower(email_generic) = ?', [$email])
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->merge($contacts->pluck('company_id')->map(fn ($id) => (int) $id))
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($companyIds === []) {
             // Un « envoyé » vers une adresse que le CRM ne connaît pas : rien à
             // noter. Jamais de fiche créée par un retour.
             throw new InvalidArgumentException('adresse_inconnue');
         }
         $this->bilan['envoyes']++;
 
-        // Information art. 14 : la date du PREMIER message, jamais écrasée.
-        $notes = DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $companyId)
-            ->whereNull('first_info_at')->update(['first_info_at' => $date]);
-        if ($contactId !== null) {
-            $notes += DB::table('contacts')->where('workspace_id', $workspaceId)->where('id', $contactId)
+        $informees = DB::table('companies')->where('workspace_id', $workspaceId)->whereIn('id', $companyIds)
+            ->whereNull('deleted_at')->whereNull('first_info_at')->update(['first_info_at' => $date]);
+        if ($contacts->isNotEmpty()) {
+            $informees += DB::table('contacts')->where('workspace_id', $workspaceId)
+                ->whereIn('id', $contacts->pluck('id')->all())
                 ->whereNull('first_info_at')->update(['first_info_at' => $date]);
         }
-        $this->bilan['premiers_messages_notes'] += $notes > 0 ? 1 : 0;
+        $this->bilan['fiches_informees'] += $informees;
 
-        $evenementId = is_int($r['evenement_id'] ?? null) ? $r['evenement_id'] : null;
+        $evenementId = $r['evenement_id'] ?? null;
+        $evenementId = is_int($evenementId) || (is_string($evenementId) && ctype_digit($evenementId)) ? (int) $evenementId : null;
         if ($evenementId === null) {
             return;
         }
 
-        // L'événement doit appartenir à CET organisateur : un retour ne touche
-        // jamais la démarche d'un événement qui ne le concerne pas.
+        // L'événement doit appartenir à l'un de CES organisateurs : un retour ne
+        // touche jamais la démarche d'un événement qui ne les concerne pas.
         $proposes = DB::table('events')
             ->where('workspace_id', $workspaceId)
             ->where('id', $evenementId)
             ->where('intervention', 'aucune')
-            ->whereExists(function ($q) use ($companyId): void {
+            ->whereExists(function ($q) use ($companyIds): void {
                 $q->selectRaw('1')->from('event_organizers')
                     ->whereColumn('event_organizers.event_id', 'events.id')
-                    ->where('event_organizers.company_id', $companyId);
+                    ->whereIn('event_organizers.company_id', $companyIds);
             })
             ->update(['intervention' => 'proposee', 'updated_at' => now()]);
 
@@ -213,37 +255,5 @@ class CrmCampagneRetours extends Command
             ]);
             $this->bilan['interventions_proposees']++;
         }
-    }
-
-    /**
-     * La fiche visée : par `crm_ref` (contact:ID / organisation:ID), sinon par
-     * l'adresse. L'adresse doit toujours correspondre à la fiche nommée.
-     *
-     * @return array{0: ?int, 1: ?int} [contact_id, company_id]
-     */
-    private function fiches(mixed $crmRef, string $email, string $workspaceId): array
-    {
-        if (is_string($crmRef) && preg_match('/^(contact|organisation):(\d+)$/', $crmRef, $m) === 1) {
-            if ($m[1] === 'contact') {
-                $c = DB::table('contacts')->where('workspace_id', $workspaceId)->where('id', (int) $m[2])
-                    ->where('email', $email)->first(['id', 'company_id']);
-
-                return $c === null ? [null, null] : [(int) $c->id, (int) $c->company_id];
-            }
-            $id = DB::table('companies')->where('workspace_id', $workspaceId)->where('id', (int) $m[2])
-                ->where('email_generic', $email)->value('id');
-
-            return [null, $id === null ? null : (int) $id];
-        }
-
-        $c = DB::table('contacts')->where('workspace_id', $workspaceId)->where('email', $email)
-            ->orderBy('id')->first(['id', 'company_id']);
-        if ($c !== null) {
-            return [(int) $c->id, (int) $c->company_id];
-        }
-        $id = DB::table('companies')->where('workspace_id', $workspaceId)
-            ->where('email_generic', $email)->orderBy('id')->value('id');
-
-        return [null, $id === null ? null : (int) $id];
     }
 }

@@ -13,28 +13,32 @@ use Illuminate\Support\Facades\DB;
  * La LISTE DES DESTINATAIRES d'une campagne, prête à donner à l'outil d'envoi.
  *
  * Le CRM ne fait QUE préparer : il n'envoie rien, ne contacte aucun service,
- * n'écrit rien en base. Il produit un fichier JSONL (hors dépôt) dont chaque
- * ligne est UNE adresse autorisée :
+ * n'écrit rien en base. Il produit un fichier JSONL (hors dépôt, lisible par
+ * son seul propriétaire) dont chaque ligne est UNE adresse autorisée.
  *
- *  - adresse valide : ni `email_status` invalid/disposable ;
- *  - aucune opposition ni suppression (`EligibiliteCampagne::peutRecevoir`,
- *    portée business — la porte imposée par la garde B15-009) ;
- *  - jamais une adresse grand public (gmail…) : on n'écrit à une personne sur
- *    son adresse privée qu'à la main, au sujet de son rôle — jamais dans une
- *    campagne (décision D3, plan d'envoi §10) ;
- *  - UNE ligne par adresse : une boîte partagée par plusieurs organisateurs
- *    (même CCI sous plusieurs noms) ne reçoit qu'un message, qui les cite ;
- *  - l'événement à venir le plus proche de l'organisateur, pour personnaliser.
+ * Tout se décide PAR ADRESSE, jamais par fiche : une même boîte peut être
+ * portée par plusieurs organisateurs (la même CCI sous plusieurs noms) et par
+ * plusieurs contacts. On regroupe d'abord toutes ses occurrences, puis l'adresse
+ * est écartée si UNE seule d'entre elles l'exige :
  *
- * Chaque ligne porte un `crm_ref` stable que l'outil renverra dans ses retours
- * (`crm:campagne:retours`).
+ *  - syntaxe invalide, ou `email_status` invalid/disposable ;
+ *  - adresse grand public (gmail…) ou marquée personnelle : on n'écrit à une
+ *    personne sur son adresse privée qu'à la main, au sujet de son rôle —
+ *    jamais dans une campagne (décision D3, plan d'envoi §10) ;
+ *  - avec `--non-informes` : l'une de ses fiches a déjà reçu un premier message ;
+ *  - opposition ou suppression (`EligibiliteCampagne::peutRecevoir`, portée
+ *    business — la porte imposée par la garde B15-009).
+ *
+ * Chaque ligne cite tous les organisateurs de l'adresse et l'événement à venir
+ * le plus proche, pour personnaliser. `crm:campagne:retours` retrouve ensuite
+ * TOUTES les fiches de l'adresse : aucune ne reste « non informée ».
  */
 class CrmCampagneDestinataires extends Command
 {
     protected $signature = 'crm:campagne:destinataires
                             {segment : Segment visé (liste fermée, cf. App\Crm\Campagnes\Segments)}
-                            {sortie : Fichier JSONL à écrire (hors dépôt)}
-                            {--non-informes : Seulement les adresses dont la fiche n\'a jamais reçu de premier message (first_info_at vide)}';
+                            {sortie : Fichier JSONL à écrire, HORS du dépôt}
+                            {--non-informes : Seulement les adresses dont aucune fiche n\'a reçu de premier message (first_info_at)}';
 
     protected $description = 'Prépare la liste des destinataires autorisés d\'une campagne (n\'envoie rien).';
 
@@ -43,6 +47,16 @@ class CrmCampagneDestinataires extends Command
         $segment = (string) $this->argument('segment');
         if (! in_array($segment, Segments::OUVERTS, true)) {
             $this->error("Segment fermé ou inconnu : « {$segment} ». Ouverts : " . implode(', ', Segments::OUVERTS) . '.');
+
+            return self::FAILURE;
+        }
+
+        $chemin = (string) $this->argument('sortie');
+        $dossier = realpath(dirname($chemin));
+        $depot = realpath(base_path('..'));
+        if ($dossier === false || ($depot !== false && str_starts_with($dossier . DIRECTORY_SEPARATOR, $depot . DIRECTORY_SEPARATOR))) {
+            // Des noms et des adresses ne s'écrivent jamais dans le dépôt (public).
+            $this->error('Chemin refusé : le fichier doit être écrit HORS du dépôt, dans un dossier existant.');
 
             return self::FAILURE;
         }
@@ -56,86 +70,97 @@ class CrmCampagneDestinataires extends Command
         }
         $workspaceId = (string) $workspaceId;
 
-        $chemin = (string) $this->argument('sortie');
+        $bilan = array_fill_keys([
+            'organisateurs', 'adresses_distinctes', 'destinataires', 'ecartees_invalides', 'ecartees_perso',
+            'ecartees_deja_informees', 'ecartees_opposition', 'adresses_partagees', 'sans_evenement_a_venir',
+        ], 0);
+
+        /** @var array<string, list<array<string, mixed>>> $parAdresse */
+        $parAdresse = [];
+        WorkspaceContext::run($workspaceId, function () use ($workspaceId, &$parAdresse, &$bilan): void {
+            foreach ($this->organisateurs($workspaceId) as $org) {
+                $bilan['organisateurs']++;
+                $evenement = $this->prochainEvenement($workspaceId, (int) $org->id);
+                foreach ($this->adresses($workspaceId, $org) as $a) {
+                    $a['organisation'] = (string) $org->denomination;
+                    $a['organisation_id'] = (int) $org->id;
+                    $a['evenement'] = $evenement;
+                    $parAdresse[mb_strtolower(trim($a['email']))][] = $a;
+                }
+            }
+
+        });
+
+        $lignes = [];
+        foreach ($parAdresse as $email => $occurrences) {
+            $bilan['adresses_distinctes']++;
+            $email = (string) $email;
+
+            if (filter_var($email, FILTER_VALIDATE_EMAIL) === false
+                || $this->une($occurrences, fn ($o) => in_array($o['status'], ['invalid', 'disposable'], true))) {
+                $bilan['ecartees_invalides']++;
+
+                continue;
+            }
+            if (NatureEmail::de($email) === 'perso' || $this->une($occurrences, fn ($o) => $o['perso'])) {
+                $bilan['ecartees_perso']++;
+
+                continue;
+            }
+            if ($this->option('non-informes') && $this->une($occurrences, fn ($o) => $o['deja_informe'])) {
+                $bilan['ecartees_deja_informees']++;
+
+                continue;
+            }
+            if (! EligibiliteCampagne::peutRecevoir($email, 'business')) {
+                $bilan['ecartees_opposition']++;
+
+                continue;
+            }
+
+            // La personne nommée d'abord (message plus personnel), sinon la boîte.
+            usort($occurrences, fn ($a, $b) => ($a['type'] === 'personne' ? 0 : 1) <=> ($b['type'] === 'personne' ? 0 : 1));
+            $premiere = $occurrences[0];
+            $evenement = null;
+            foreach ($occurrences as $o) {
+                if ($o['evenement'] !== null && ($evenement === null || $this->plusProche($o['evenement'], $evenement))) {
+                    $evenement = $o['evenement'];
+                }
+            }
+            $organisations = array_values(array_unique(array_map(fn ($o) => $o['organisation'], $occurrences)));
+            if (count($organisations) > 1) {
+                $bilan['adresses_partagees']++;
+            }
+            if ($evenement === null) {
+                $bilan['sans_evenement_a_venir']++;
+            }
+
+            $lignes[] = [
+                'crm_ref' => $premiere['crm_ref'],
+                'email' => $email,
+                'type' => $premiere['type'],
+                'prenom' => $premiere['prenom'],
+                'nom' => $premiere['nom'],
+                'fonction' => $premiere['fonction'],
+                'organisation' => $premiere['organisation'],
+                'organisation_id' => $premiere['organisation_id'],
+                'organisations' => $organisations,
+                'evenement' => $evenement,
+            ];
+        }
+
         $flux = @fopen($chemin, 'wb');
         if ($flux === false) {
             $this->error("Écriture impossible : {$chemin}");
 
             return self::FAILURE;
         }
-
-        $bilan = [
-            'organisateurs' => 0, 'adresses_vues' => 0, 'destinataires' => 0,
-            'ecartees_opposition' => 0, 'ecartees_invalides' => 0, 'ecartees_perso' => 0,
-            'ecartees_deja_informees' => 0, 'doublons_fusionnes' => 0, 'sans_evenement_a_venir' => 0,
-        ];
-
+        @chmod($chemin, 0600);
         try {
-            WorkspaceContext::run($workspaceId, function () use ($workspaceId, $flux, &$bilan): void {
-                /** @var array<string, array<string, mixed>> $parAdresse */
-                $parAdresse = [];
-
-                foreach ($this->organisateurs($workspaceId) as $org) {
-                    $bilan['organisateurs']++;
-                    $evenement = $this->prochainEvenement($workspaceId, (int) $org->id);
-
-                    foreach ($this->adresses($workspaceId, $org) as $a) {
-                        $bilan['adresses_vues']++;
-                        $email = mb_strtolower(trim($a['email']));
-
-                        if (in_array($a['status'], ['invalid', 'disposable'], true)) {
-                            $bilan['ecartees_invalides']++;
-
-                            continue;
-                        }
-                        if ($a['perso'] || NatureEmail::de($email) === 'perso') {
-                            $bilan['ecartees_perso']++;
-
-                            continue;
-                        }
-                        if ($this->option('non-informes') && $a['deja_informe']) {
-                            $bilan['ecartees_deja_informees']++;
-
-                            continue;
-                        }
-                        if (isset($parAdresse[$email])) {
-                            // Même adresse, autre organisateur : UN message, qui les cite.
-                            $parAdresse[$email]['organisations'][] = (string) $org->denomination;
-                            $bilan['doublons_fusionnes']++;
-
-                            continue;
-                        }
-                        if (! EligibiliteCampagne::peutRecevoir($email, 'business')) {
-                            $bilan['ecartees_opposition']++;
-
-                            continue;
-                        }
-
-                        if ($evenement === null) {
-                            $bilan['sans_evenement_a_venir']++;
-                        }
-
-                        $parAdresse[$email] = [
-                            'crm_ref' => $a['crm_ref'],
-                            'email' => $email,
-                            'type' => $a['type'],
-                            'prenom' => $a['prenom'],
-                            'nom' => $a['nom'],
-                            'fonction' => $a['fonction'],
-                            'organisation' => (string) $org->denomination,
-                            'organisation_id' => (int) $org->id,
-                            'organisations' => [(string) $org->denomination],
-                            'evenement' => $evenement,
-                        ];
-                    }
-                }
-
-                foreach ($parAdresse as $ligne) {
-                    $ligne['organisations'] = array_values(array_unique($ligne['organisations']));
-                    fwrite($flux, json_encode($ligne, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . "\n");
-                    $bilan['destinataires']++;
-                }
-            });
+            foreach ($lignes as $ligne) {
+                fwrite($flux, json_encode($ligne, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . "\n");
+                $bilan['destinataires']++;
+            }
         } finally {
             fclose($flux);
         }
@@ -148,6 +173,34 @@ class CrmCampagneDestinataires extends Command
         ));
 
         return self::SUCCESS;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $occurrences
+     * @param  callable(array<string, mixed>): bool  $test
+     */
+    private function une(array $occurrences, callable $test): bool
+    {
+        foreach ($occurrences as $o) {
+            if ($test($o)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $a
+     * @param  array<string, mixed>  $b
+     */
+    private function plusProche(array $a, array $b): bool
+    {
+        if ($a['date_debut'] === null) {
+            return false;
+        }
+
+        return $b['date_debut'] === null || $a['date_debut'] < $b['date_debut'];
     }
 
     /** @return iterable<\stdClass> */
@@ -175,7 +228,7 @@ class CrmCampagneDestinataires extends Command
     private function adresses(string $workspaceId, \stdClass $org): array
     {
         $adresses = [];
-        if (is_string($org->email_generic) && $org->email_generic !== '') {
+        if (is_string($org->email_generic) && trim($org->email_generic) !== '') {
             $adresses[] = [
                 'crm_ref' => 'organisation:' . $org->id,
                 'email' => $org->email_generic,

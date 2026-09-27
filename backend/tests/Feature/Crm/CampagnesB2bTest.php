@@ -226,3 +226,59 @@ test('les retours a blanc n ecrivent rien', function () {
 
     expect(EligibiliteCampagne::peutRecevoir('pro@zz-club.example.invalid', 'business'))->toBeTrue();
 });
+
+test('une boite partagee envoyee informe TOUS ses organisateurs, et ne ressort plus en non-informes', function () {
+    campRetours([['type' => 'envoye', 'email' => 'bureau@zz-club.example.invalid', 'crm_ref' => 'organisation:' . $this->club, 'campagne' => 'zz']]);
+
+    expect(DB::table('companies')->where('id', $this->club)->value('first_info_at'))->not->toBeNull()
+        ->and(DB::table('companies')->where('id', $this->jumeau)->value('first_info_at'))->not->toBeNull()
+        ->and(collect(campDestinataires(['--non-informes' => true]))->pluck('email')->all())
+        ->not->toContain('bureau@zz-club.example.invalid');
+});
+
+test('une adresse invalide sur UNE de ses fiches est ecartee partout', function () {
+    campContact($this, $this->jumeau, 'ZZ Meme boite', 'bureau@zz-club.example.invalid', ['email_status' => 'invalid']);
+
+    expect(collect(campDestinataires())->pluck('email')->all())->not->toContain('bureau@zz-club.example.invalid');
+});
+
+test('une adresse de domaine pro marquee personnelle est ecartee', function () {
+    campContact($this, $this->club, 'ZZ Marquee', 'marquee@zz-club.example.invalid', ['metadata' => json_encode(['email_nature' => 'perso'])]);
+
+    expect(collect(campDestinataires())->pluck('email')->all())->not->toContain('marquee@zz-club.example.invalid');
+});
+
+test('un rebond mou a blanc ne compte pas', function () {
+    $ligne = ['type' => 'rebond_mou', 'email' => 'pro@zz-club.example.invalid', 'campagne' => 'zz'];
+    campRetours([$ligne], true);
+    campRetours([$ligne], true);
+    campRetours([$ligne], true);
+    campRetours([$ligne]);
+
+    // Un seul rebond réel : sous le seuil de 3, l'adresse reste joignable.
+    expect(EligibiliteCampagne::peutRecevoir('pro@zz-club.example.invalid', 'business'))->toBeTrue();
+});
+
+test('envoye retrouve une boite generique saisie en majuscules', function () {
+    $maj = campOrga($this, 'evt:zz-maj', 'ZZ Majuscules', 'Accueil.Maj@zz-club.example.invalid');
+
+    campRetours([['type' => 'envoye', 'email' => 'accueil.maj@zz-club.example.invalid', 'campagne' => 'zz']]);
+
+    expect(DB::table('companies')->where('id', $maj)->value('first_info_at'))->not->toBeNull();
+});
+
+test('envoye ne touche jamais une fiche a la corbeille, ni ne date dans le futur', function () {
+    $supprime = campContact($this, $this->club, 'ZZ Corbeille', 'corbeille@zz-club.example.invalid', ['deleted_at' => now()]);
+
+    campRetours([['type' => 'envoye', 'email' => 'corbeille@zz-club.example.invalid', 'campagne' => 'zz']]);
+    campRetours([['type' => 'envoye', 'email' => 'pro@zz-club.example.invalid', 'campagne' => 'zz', 'date' => '2031-01-01T10:00:00+01:00']]);
+
+    expect(DB::table('contacts')->where('id', $supprime)->value('first_info_at'))->toBeNull()
+        ->and(strtotime((string) DB::table('contacts')->where('id', $this->pro)->value('first_info_at')))->toBeLessThanOrEqual(time());
+});
+
+test('la liste refuse un chemin dans le depot', function () {
+    $code = Artisan::call('crm:campagne:destinataires', ['segment' => 'organisateurs-evenements', 'sortie' => base_path('zz-liste.jsonl')]);
+
+    expect($code)->toBe(1)->and(file_exists(base_path('zz-liste.jsonl')))->toBeFalse();
+});

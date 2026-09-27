@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Crm;
 
 use App\Crm\Console\CompteursHub;
+use App\Crm\FichesProtegees;
 use App\Crm\Ingest\SiteSyncClassifier;
 use App\Crm\Taxonomy;
 use App\Support\WorkspaceContext;
@@ -131,12 +132,10 @@ class BulkController extends ConsoleController
     {
         $tagId = $this->requireTagId($workspaceId, $params);
 
-        // Un `src:*` dit d'où vient la fiche : c'est un constat, pas une
-        // étiquette. Le retirer en masse ferait aussi sauter la protection
-        // des fiches qui en dépendent (FichesProtegees). Même règle que
-        // `CompanyTagsBulkController` pour les tags verrouillés.
-        if (str_starts_with(trim((string) $params['tag']), 'src:')) {
-            abort(422, 'Un tag de provenance (src:) ne se retire pas depuis une action de masse.');
+        // Retirer en masse un tag de FichesProtegees ferait sauter, d'un clic,
+        // la protection de toutes les fiches qui le portent.
+        if (in_array(trim((string) $params['tag']), FichesProtegees::TAGS, true)) {
+            abort(422, 'Ce tag protège ses fiches : il ne se retire pas depuis une action de masse.');
         }
         [$pivot, $key] = $this->pivotFor($isCandidate);
 

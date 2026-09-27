@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Crm\FichesProtegees;
 use App\Jobs\EnrichCompanyJob;
 use App\Jobs\LaunchZoneScrapingJob;
 use App\Models\Company;
@@ -282,9 +281,6 @@ class CoverageController extends ApiController
         $query = Company::query()
             ->where('workspace_id', $workspaceId)
             ->where('department_code', $validated['department']);
-        // Le waterfall les refuserait de toute façon ; les exclure ici évite
-        // d'empiler des jobs inutiles et de les compter dans `queued`.
-        FichesProtegees::exclure($query);
 
         if (($validated['only_pending'] ?? true) === true) {
             $query->whereNull('enriched_at');

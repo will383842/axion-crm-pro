@@ -761,7 +761,7 @@ test('bulk ignore silencieusement les identifiants d un autre workspace', functi
     expect(DB::table('companies')->where('id', $mienne)->value('lifecycle_stage'))->toBe('qualifie');
 });
 
-test('bulk remove_tag refuse de retirer un tag de provenance src:, pas un tag ordinaire', function () {
+test('bulk remove_tag refuse de retirer un tag protecteur, pas un tag ordinaire', function () {
     $company = consoleCompany($this->workspace->id, '900000291');
     $src = consoleTag($this->workspace->id, 'src:scraping-evenements-pro');
     $ordinaire = consoleTag($this->workspace->id, 'svc:audit');
@@ -775,7 +775,7 @@ test('bulk remove_tag refuse de retirer un tag de provenance src:, pas un tag or
     // Retirer le `src:` ferait sauter la protection de la fiche (FichesProtegees).
     $this->postJson('/api/v1/crm/bulk', [
         'ids' => [$company], 'action' => 'remove_tag', 'params' => ['tag' => 'src:scraping-evenements-pro'],
-    ])->assertStatus(422);
+    ])->assertStatus(422)->assertSee('protège ses fiches');
     expect(DB::table('company_tag')->where('company_id', $company)->where('tag_id', $src)->exists())->toBeTrue();
 
     // Témoin : un tag ordinaire se retire toujours.

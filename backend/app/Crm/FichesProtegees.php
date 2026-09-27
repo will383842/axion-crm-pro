@@ -26,7 +26,22 @@ use Illuminate\Support\Facades\DB;
  * Une consigne « ne pas lancer telle commande » ne protège rien : ce prédicat
  * est posé DANS chacun de ces chemins. Une fiche est protégée dès qu'elle
  * porte l'un des tags ci-dessous — posé verrouillé par l'ingestion, et que les
- * actions de masse refusent de retirer (`src:*`).
+ * actions de masse refusent de retirer.
+ *
+ * Non couvert, sans gravité aujourd'hui : `prospection:reclassify-sector`
+ * (ne touche que les fiches à NAF, donnée factuelle) et
+ * `AudienceBuilderService::evaluateForCompany` (protégé via le waterfall).
+ * `/coverage/enrich` et `bulk-enrich` empilent des jobs que le waterfall
+ * refuse : la garde est au waterfall, pas en double dans chaque sélecteur.
+ *
+ * RGPD — la protection ne fait JAMAIS obstacle au droit d'une personne :
+ *  - ses fiches `contacts` s'effacent par les chemins habituels (non gardés) ;
+ *  - une coordonnée nominative portée par la fiche ELLE-MÊME (`email_generic`,
+ *    `phone` d'un président de club) s'efface par un UPDATE à NULL, que rien
+ *    ici ne bloque ;
+ *  - supprimer la fiche entière passe par la levée volontaire du déclencheur
+ *    (`SET LOCAL app.autoriser_suppression_protegee = 'on'`, cf. migration
+ *    `2026_09_27_000001`), plus une opposition dans `opt_out`.
  *
  * Lever la protection pour un traitement précis (enrichir ces fiches, les
  * cibler dans une campagne) est une DÉCISION de Will : elle se code alors

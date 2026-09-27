@@ -611,6 +611,14 @@ class CompaniesController extends ApiController
         // « interdit » confirmerait son existence.
         $this->refuserHorsEspace($company);
 
+        // Le waterfall refuserait en silence : l'API répondrait « enrichie ».
+        if (FichesProtegees::estProtegee((int) $company->id)) {
+            return response()->json([
+                'error' => 'fiche_protegee',
+                'message' => "Cette fiche est protégée (organisateurs d'événements) : elle n'est pas enrichie.",
+            ], 409);
+        }
+
         $this->waterfall->enrich($company);
 
         // Quatrieme site qui rend une coordonnee : l'enrichissement RENVOIE

@@ -1,6 +1,5 @@
 <?php
 
-use App\Crm\FichesProtegees;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
@@ -12,7 +11,7 @@ use Illuminate\Support\Facades\DB;
  * ne saurait rien de ce prédicat : c'est exactement ainsi que
  * `purge-non-commercial` s'est retrouvée à viser tous les organisateurs
  * d'événements (`legal_form IS NULL`). Ce déclencheur refuse la suppression
- * PHYSIQUE d'une fiche protégée, quel que soit le chemin.
+ * PHYSIQUE d'une fiche protégée, par quelque requête `DELETE` que ce soit.
  *
  * - `SECURITY DEFINER` : sans contexte d'espace, la RLS du rôle applicatif
  *   rendrait `company_tag` vide et le déclencheur laisserait tout passer.
@@ -23,26 +22,35 @@ use Illuminate\Support\Facades\DB;
  *   contrôleur, pas ici.
  * - Levée volontaire, pour l'annulation d'un import décidée par Will, dans la
  *   même transaction : `SET LOCAL app.autoriser_suppression_protegee = 'on'`.
+ *   Toujours `SET LOCAL`, jamais `SET` : sur une connexion réutilisée (worker
+ *   Horizon), la levée resterait active pour les jobs suivants. Aucun chemin
+ *   applicatif ne la pose ; ce verrou arrête les ACCIDENTS de code, pas une
+ *   personne qui exécute du SQL à la main.
+ * - Tables écrites avec `public.` : sans cela, une table temporaire du même
+ *   nom masquerait le contrôle (le `search_path` suit la convention du dépôt).
  *
- * La liste des tags est recopiée de `FichesProtegees::TAGS` à la migration ;
- * un test vérifie que chaque tag de la constante est bien refusé ici.
+ * La liste des tags est FIGÉE ici, volontairement : lue dans
+ * `FichesProtegees::TAGS` au moment de la migration, elle aurait suivi la
+ * constante en CI (qui rejoue `migrate:fresh`) mais jamais en production,
+ * où ce déclencheur n'est installé qu'une fois. Ajouter un tag à la constante
+ * exige donc une nouvelle migration — et `FichesProtegeesTest` rougit tant
+ * qu'elle manque (il lit le corps de la fonction installée).
+ *
+ * Ce que ce verrou ne voit pas : un `TRUNCATE` (pas de déclencheur ligne).
+ * Il bloquerait aussi la cascade d'une suppression PHYSIQUE d'espace
+ * (aujourd'hui les espaces ne vont qu'à la corbeille).
  */
 return new class extends Migration
 {
     public function up(): void
     {
-        $slugs = implode(', ', array_map(
-            static fn (string $slug): string => "'" . str_replace("'", "''", $slug) . "'",
-            FichesProtegees::TAGS,
-        ));
-
-        DB::unprepared(<<<SQL
+        DB::unprepared(<<<'SQL'
             CREATE OR REPLACE FUNCTION public.refuser_suppression_fiche_protegee()
             RETURNS trigger
             LANGUAGE plpgsql
             SECURITY DEFINER
             SET search_path = public, pg_catalog
-            AS \$fn\$
+            AS $fn$
             BEGIN
                 IF COALESCE(current_setting('app.autoriser_suppression_protegee', true), '') = 'on' THEN
                     RETURN OLD;
@@ -50,10 +58,10 @@ return new class extends Migration
 
                 IF EXISTS (
                     SELECT 1
-                    FROM   company_tag ct
-                    JOIN   tags t ON t.id = ct.tag_id
+                    FROM   public.company_tag ct
+                    JOIN   public.tags t ON t.id = ct.tag_id
                     WHERE  ct.company_id = OLD.id
-                    AND    t.slug IN ({$slugs})
+                    AND    t.slug IN ('src:scraping-evenements-pro')
                 ) THEN
                     RAISE EXCEPTION 'fiche_protegee : suppression refusee (company_id=%)', OLD.id
                         USING HINT = 'Organisateurs d''evenements. Levee volontaire : SET LOCAL app.autoriser_suppression_protegee = ''on''.';
@@ -61,7 +69,7 @@ return new class extends Migration
 
                 RETURN OLD;
             END
-            \$fn\$;
+            $fn$;
 
             DROP TRIGGER IF EXISTS companies_refuser_suppression_protegee ON public.companies;
 

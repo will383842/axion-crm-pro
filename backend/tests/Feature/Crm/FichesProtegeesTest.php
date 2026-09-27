@@ -152,6 +152,18 @@ test('la base refuse la suppression physique de chaque tag protege, et laisse pa
     expect(fpExiste($temoin))->toBeFalse();
 });
 
+test('le declencheur installe connait chaque tag de la constante', function () {
+    // La migration FIGE sa liste : ajouter un tag à FichesProtegees::TAGS sans
+    // nouvelle migration laisserait la production sans verrou pour ce tag.
+    $corps = (string) DB::selectOne(
+        "SELECT pg_get_functiondef('public.refuser_suppression_fiche_protegee()'::regprocedure) AS d",
+    )->d;
+
+    foreach (FichesProtegees::TAGS as $slug) {
+        expect($corps)->toContain("'" . $slug . "'");
+    }
+});
+
 test('la levee volontaire de la base permet l annulation d un import', function () {
     $espace = fpEspace();
     $protegee = fpProtegee($espace);
@@ -175,6 +187,20 @@ test('find-websites ne ramasse pas la fiche protegee, mais traite le temoin', fu
 
     expect(DB::table('companies')->where('id', $protegee)->value('website_status'))->toBe('pending')
         ->and(DB::table('companies')->where('id', $temoin)->value('website_status'))->not->toBe('pending');
+});
+
+test('find-websites --revalidate ne retouche pas la fiche protegee, mais revalide le temoin', function () {
+    Http::fake(['*' => Http::response('', 200)]);
+
+    $espace = fpEspace();
+    $site = ['website_status' => 'found', 'website' => 'https://club.example.invalid', 'website_revalidated_at' => null];
+    $protegee = fpProtegee($espace, $site);
+    $temoin = fpOrdinaire($espace, ['website' => 'https://temoin.example.invalid'] + $site);
+
+    Artisan::call('prospection:find-websites', ['--revalidate' => true, '--limit' => 10]);
+
+    expect(DB::table('companies')->where('id', $protegee)->value('website_revalidated_at'))->toBeNull()
+        ->and(DB::table('companies')->where('id', $temoin)->value('website_revalidated_at'))->not->toBeNull();
 });
 
 test('prospection:enrich ne selectionne pas la fiche protegee, mais selectionne le temoin', function () {
@@ -232,10 +258,12 @@ test('reclassify-size ne range pas la fiche protegee en TPE, mais classe le temo
 
 test('une audience n accueille pas la fiche protegee, mais accueille le temoin', function () {
     $espace = fpEspace();
-    fpProtegee($espace);
-    fpOrdinaire($espace);
+    $protegee = fpProtegee($espace);
+    $temoin = fpOrdinaire($espace);
 
-    $apercu = (new AudienceBuilderService)->preview($espace, []);
+    $service = new AudienceBuilderService;
+    $ids = $service->buildPublicQuery($espace, [])->pluck('id')->map(fn ($id) => (int) $id)->all();
 
-    expect($apercu['companies'])->toBe(1);
+    expect($ids)->toContain($temoin)->not->toContain($protegee)
+        ->and($service->preview($espace, [])['companies'])->toBe(1);
 });

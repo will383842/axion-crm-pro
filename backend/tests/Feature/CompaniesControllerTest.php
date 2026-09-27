@@ -222,6 +222,11 @@ test('une fiche protegee ne part pas a la corbeille depuis la console, le temoin
         ->assertJsonPath('error', 'fiche_protegee');
     expect(DB::table('companies')->where('id', $protegee)->value('deleted_at'))->toBeNull();
 
+    // L'enrichissement unitaire le dit aussi, au lieu d'un 200 « enrichie ».
+    $this->postJson('/api/v1/companies/' . $protegee . '/enrich')
+        ->assertStatus(409)
+        ->assertJsonPath('error', 'fiche_protegee');
+
     $this->deleteJson('/api/v1/companies/' . $temoin->id)->assertNoContent();
     expect(DB::table('companies')->where('id', $temoin->id)->value('deleted_at'))->not->toBeNull();
 });

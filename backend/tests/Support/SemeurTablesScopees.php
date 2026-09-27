@@ -66,6 +66,8 @@ final class SemeurTablesScopees
         'media',
         // Lot L4-C : la personne AVANT son abonnement (clé étrangère).
         'personnes',
+        // 2026-09-27 : l'événement AVANT son lien organisateur (clé étrangère).
+        'events',
         // ── Feuilles ─────────────────────────────────────────────────────────
         'abonnements',
         'activities',
@@ -89,6 +91,7 @@ final class SemeurTablesScopees
         'email_threads',
         'email_verification_logs',
         'email_warmup_pools',
+        'event_organizers',
         'health_practitioners',
         'invitations',
         'journalists',
@@ -245,6 +248,17 @@ final class SemeurTablesScopees
             'canal' => 'lettre',
             'statut' => 'abonne',
             'dernier_evenement_at' => now(),
+        ]);
+
+        $id['events'] = $insererAvecId('events', [
+            'external_ref' => 'zz-evenement-' . $marque,
+            'nom' => 'ZZ Événement ' . $marque,
+            'type' => 'salon',
+        ]);
+
+        $inserer('event_organizers', [
+            'event_id' => $id['events'],
+            'company_id' => $id['companies'],
         ]);
 
         $id['crm_pipelines'] = $insererAvecId('crm_pipelines', [

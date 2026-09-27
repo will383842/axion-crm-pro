@@ -54,6 +54,9 @@ final class ScrapedRecord
     public const ENTITY_NATURES = [
         'entreprise', 'association', 'cci', 'enseignement',
         'cabinet', 'institution', 'media',
+        // Réseaux et clubs d'affaires (BNI…), 2026-09-27 : ni association au
+        // sens où Will les cible, ni entreprise.
+        'reseau',
     ];
 
     private const MATCH_HINT_KEYS = ['denomination', 'postcode', 'city', 'address'];

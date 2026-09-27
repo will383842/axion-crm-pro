@@ -136,6 +136,13 @@ class ScrapingSourcesSeeder extends Seeder
             'dedup_key_pattern' => 'siren',
             'legal_note' => 'Annuaires publics d\'organismes officiels et para-publics (CCI françaises à l\'étranger — pages publiques, DG Trésor, CCEF, Team France Export) et communication institutionnelle des entreprises elles-mêmes. Données d\'identification d\'entreprises B2B, SIREN résolu via l\'API publique recherche-entreprises (data.gouv). Aucune PII au-delà des dirigeants publiés au registre.',
         ],
+        'evenements-pro' => [
+            'name' => 'Organisateurs d\'événements professionnels (pages publiques)',
+            'kind' => 'import',
+            'ttl_days' => 365,
+            'dedup_key_pattern' => 'siren',
+            'legal_note' => 'Pages publiques des événements professionnels et de leurs organisateurs (CCI, réseaux et clubs d\'affaires, associations d\'entrepreneurs, salons) : coordonnées publiées pour être contactées. Finalité : proposer une intervention gratuite de Will. Intérêt légitime B2B ; information art. 14 au premier message ; opposition respectée. Fiches protégées (FichesProtegees) : ni purge, ni enrichissement automatique, ni audience.',
+        ],
         'gplaces' => [
             'name' => 'Google Places API',
             'kind' => 'api',

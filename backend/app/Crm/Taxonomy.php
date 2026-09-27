@@ -192,7 +192,47 @@ final class Taxonomy
         'lead_magnet_requested',
         'email_hard_bounced',
         'task',
+        // ── Événements et interventions (2026-09-27) ───────────────────────
+        // L'HISTORIQUE de la démarche auprès d'un organisateur. L'état courant
+        // vit sur `events` (`participation`, `intervention`) pour être listable ;
+        // chaque changement laisse ici une ligne datée (payload.event_id).
+        'evenement_repere',
+        'evenement_inscrit',
+        'evenement_rencontre',
+        'intervention_proposee',
+        'intervention_acceptee',
+        'intervention_refusee',
+        'intervention_realisee',
     ];
+
+    /**
+     * Événements professionnels (table `events`, 2026-09-27) — le type tel que
+     * le sourcing le qualifie.
+     *
+     * @var list<string>
+     */
+    public const EVENEMENT_TYPES = [
+        'salon', 'conference', 'atelier', 'club-affaires', 'reseau-entrepreneurs',
+        'afterwork', 'petit-dejeuner', 'table-ronde', 'pitch', 'remise-prix',
+        'festival', 'cine-debat', 'autre',
+    ];
+
+    /**
+     * Où en est Will vis-à-vis de l'événement lui-même.
+     *
+     * @var list<string>
+     */
+    public const EVENEMENT_PARTICIPATIONS = ['repere', 'inscrit', 'rencontre'];
+
+    /**
+     * Où en est la proposition d'intervention faite à l'organisateur.
+     *
+     * @var list<string>
+     */
+    public const EVENEMENT_INTERVENTIONS = ['aucune', 'proposee', 'acceptee', 'refusee', 'realisee'];
+
+    /** @var list<string> */
+    public const EVENEMENT_APPELS_INTERVENANTS = ['oui', 'non', 'inconnu'];
 
     /**
      * Portées d'opposition qui désignent un CANAL et non un UNIVERS (lot L4-C).

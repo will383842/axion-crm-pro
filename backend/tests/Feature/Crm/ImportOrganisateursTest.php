@@ -113,6 +113,25 @@ test('un telephone en opposition n entre ni sur la fiche ni sur une personne', f
         ->and(DB::table('contacts')->count())->toBe(0);
 });
 
+test('un telephone oppose en 06 est reconnu ecrit en +33, 0033 ou +33 (0)', function () {
+    orgaOpposer(null, '0600000004');
+
+    foreach (['+33 6 00 00 00 04', '0033600000004', '+33 (0)6 00 00 00 04'] as $i => $ecriture) {
+        $outcome = orgaIngerer(orgaLigne([
+            'company' => ['foreign_id' => 'evt:zz-format-' . $i],
+            'persons' => [['last_name' => 'ZZ Format ' . $i, 'phone' => $ecriture]],
+        ]));
+        expect($outcome->personsSkippedOptOut)->toBe(1);
+    }
+
+    // Témoin : un autre numéro passe.
+    $temoin = orgaIngerer(orgaLigne([
+        'company' => ['foreign_id' => 'evt:zz-format-temoin'],
+        'persons' => [['last_name' => 'ZZ Format temoin', 'phone' => '+33 6 00 00 00 05']],
+    ]));
+    expect($temoin->contactsCreated)->toBe(1);
+});
+
 test('les adresses et telephones recoltes en opposition sont ecartes des canaux', function () {
     orgaOpposer('opposee@zz-club.example.invalid', '0600000002');
 

@@ -50,6 +50,43 @@ final class ListeSuppression
     }
 
     /**
+     * Les écritures d'un MÊME numéro, réduites à leurs chiffres (2026-09-27).
+     *
+     * `opt_out.phone` garde le numéro tel qu'il a été saisi (espaces, points
+     * et tirets seuls retirés). Une opposition donnée en « 06 12 34 56 78 »
+     * ne reconnaissait donc pas « +33 6 12 34 56 78 », « 0033 6… » ni
+     * « +33 (0)6… ». On compare les CHIFFRES de la colonne à toutes les formes
+     * françaises du numéro ; hors de France, les chiffres seuls.
+     *
+     * @return list<string>
+     */
+    public static function variantesTelephone(string $telephone): array
+    {
+        $chiffres = (string) preg_replace('/\D/', '', $telephone);
+        if ($chiffres === '') {
+            return [];
+        }
+
+        // Forme nationale française à dix chiffres, quelle que soit l'écriture.
+        $national = null;
+        if (preg_match('/^0[1-9]\d{8}$/', $chiffres) === 1) {
+            $national = $chiffres;
+        } elseif (preg_match('/^(?:0033|33)0?([1-9]\d{8})$/', $chiffres, $m) === 1) {
+            $national = '0' . $m[1];
+        }
+
+        if ($national === null) {
+            return [$chiffres];
+        }
+
+        $abonne = substr($national, 1);
+
+        return array_values(array_unique([
+            $national, '33' . $abonne, '0033' . $abonne, '330' . $abonne, '00330' . $abonne,
+        ]));
+    }
+
+    /**
      * Inscrit une adresse. Idempotent : un second signal incrémente le
      * compteur au lieu de créer une seconde ligne, et la raison la plus GRAVE
      * l'emporte — un rebond mou ne doit jamais « rétrograder » une plainte.

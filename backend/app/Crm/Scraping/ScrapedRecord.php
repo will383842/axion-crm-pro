@@ -156,7 +156,8 @@ final class ScrapedRecord
         }
         if (isset($companyFields['department_code'])) {
             $companyFields['department_code'] = strtoupper($companyFields['department_code']);
-            if (preg_match('/^(\d{2,3}|2[AB])$/', $companyFields['department_code']) !== 1) {
+            // 01-95 (sauf 20, scindé en 2A/2B) et outre-mer 971-976.
+            if (preg_match('/^(0[1-9]|1\d|2[1-9AB]|[3-8]\d|9[0-5]|97[1-6])$/', $companyFields['department_code']) !== 1) {
                 throw ScrapeIngestRejection::invalid('invalid_department_code', 'company.fields.department_code doit être un code de département (ex. 69, 2A, 974).');
             }
         }

@@ -163,6 +163,7 @@ final class ScrapedRecordIngestService
                 // morte non : elle compte aux deux endroits.
                 'created_bad_mx' => [$created++, $badMx++],
                 'updated_bad_mx' => [$updated++, $badMx++],
+                'skipped_no_change_bad_mx' => [$badMx++, $skipped['skipped_no_change'] = ($skipped['skipped_no_change'] ?? 0) + 1],
                 'opted_out' => $optedOut++,
                 'bad_mx' => $badMx++,
                 // C18-002 — LE `default => null` D'AVANT PERDAIT DES PERSONNES.
@@ -463,7 +464,7 @@ final class ScrapedRecordIngestService
      * stock re-divergerait dès la première collecte suivante.
      *
      * @param  array<string, string>  $person
-     * @return 'created'|'updated'|'opted_out'|'bad_mx'|'skipped_no_last_name'|'skipped_insert_failed'|'skipped_no_change'
+     * @return 'created'|'updated'|'opted_out'|'bad_mx'|'skipped_no_last_name'|'skipped_insert_failed'|'skipped_no_change'|'created_bad_mx'|'updated_bad_mx'|'skipped_no_change_bad_mx'
      *
      * C18-002 — LE `skipped` UNIQUE A ÉTÉ ÉCLATÉ EN TROIS MOTIFS. Il ne s'agit
      * pas de raffinement : agrégés, ces trois cas ne se distinguaient plus, et
@@ -501,8 +502,10 @@ final class ScrapedRecordIngestService
                 // créée sur la foi d'une adresse morte.
                 return 'bad_mx';
             }
-            // Un téléphone reste un canal : on garde la personne, pas l'adresse.
-            $email = null;
+            // Un téléphone reste un canal : on garde la personne. L'adresse
+            // morte reste sur la fiche, marquée `invalid` : aucune audience ne
+            // la retient, et une demande d'effacement faite avec CETTE adresse
+            // retrouve la fiche (l'effacement cherche par adresse).
             $emailRejete = true;
         }
 
@@ -553,6 +556,7 @@ final class ScrapedRecordIngestService
                 'last_name' => $lastName,
                 'role' => $person['role'] ?? null,
                 'email' => $email,
+                'email_status' => $emailRejete ? 'invalid' : null,
                 // Le téléphone est POSÉ sur la fiche personne : c'est la
                 // réparation de la perte constatée (audit A.4 : 0 % de
                 // téléphones sur les contacts alors que les collecteurs en
@@ -562,8 +566,9 @@ final class ScrapedRecordIngestService
                 'discovery_source' => $record->source,
                 'sources' => json_encode([$record->source], JSON_THROW_ON_ERROR),
                 // Une adresse grand public (gmail, orange…) est celle d'une
-                // PERSONNE : marquée, pour qu'aucun envoi ne la traite comme
-                // une adresse professionnelle.
+                // PERSONNE : marquée pour le futur flux d'envoi. ⚠️ Aucun code
+                // ne lit encore ce marquage : c'est une information, pas une
+                // garde — le futur envoi devra le lire.
                 'metadata' => $email !== null && NatureEmail::de($email) === 'perso'
                     ? json_encode(['email_nature' => 'perso'], JSON_THROW_ON_ERROR)
                     : '{}',
@@ -624,6 +629,18 @@ final class ScrapedRecordIngestService
             }
             $update[$column] = $value;
             $origins[$column] = 'collected';
+        }
+
+        if (isset($update['email'])) {
+            if ($emailRejete) {
+                $update['email_status'] = 'invalid';
+            }
+            if (NatureEmail::de((string) $update['email']) === 'perso') {
+                $metadata = json_decode(is_string($existing->metadata ?? null) ? $existing->metadata : '{}', true);
+                $metadata = is_array($metadata) ? $metadata : [];
+                $metadata['email_nature'] = 'perso';
+                $update['metadata'] = json_encode($metadata, JSON_THROW_ON_ERROR);
+            }
         }
 
         $sources = $this->decodeSources($existing->sources ?? null);
@@ -789,20 +806,24 @@ final class ScrapedRecordIngestService
     private function estOppose(?string $email, ?string $telephone): bool
     {
         $email = $email !== null && trim($email) !== '' ? $email : null;
-        $telephone = $telephone !== null ? (string) preg_replace('/[\s.\-]/', '', $telephone) : null;
-        $telephone = $telephone !== '' ? $telephone : null;
-        if ($email === null && $telephone === null) {
+        $variantes = $telephone !== null ? ListeSuppression::variantesTelephone($telephone) : [];
+        if ($email === null && $variantes === []) {
             return false;
         }
 
         return DB::table('opt_out')
             ->where('scope', 'business')
-            ->where(function ($q) use ($email, $telephone): void {
+            ->where(function ($q) use ($email, $variantes): void {
                 if ($email !== null) {
                     $q->orWhere('email_hash', ListeSuppression::empreinte($email));
                 }
-                if ($telephone !== null) {
-                    $q->orWhere('phone', $telephone);
+                if ($variantes !== []) {
+                    // Les chiffres de la colonne, contre toutes les formes du
+                    // numéro : « 06… », « +33 6… », « 0033 6… », « +33 (0)6… ».
+                    $q->orWhereRaw(
+                        "regexp_replace(phone, '[^0-9]', '', 'g') IN (" . implode(', ', array_fill(0, count($variantes), '?')) . ')',
+                        $variantes,
+                    );
                 }
             })
             ->exists();

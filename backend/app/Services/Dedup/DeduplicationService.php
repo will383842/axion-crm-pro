@@ -226,9 +226,16 @@ class DeduplicationService
         // `$email` est non-nul.
         $empreinte = $email !== null ? ListeSuppression::empreinte($email) : null;
 
+        // Même comparaison que l'ingestion : les CHIFFRES de la colonne contre
+        // toutes les écritures du numéro (« 06… » = « +33 6… »).
+        $variantes = $phone !== null ? ListeSuppression::variantesTelephone($phone) : [];
+
         return DB::table('opt_out')
             ->when($empreinte !== null, fn ($q) => $q->orWhere('email_hash', $empreinte))
-            ->when($phone !== null, fn ($q) => $q->orWhere('phone', preg_replace('/[\s.-]/', '', $phone)))
+            ->when($variantes !== [], fn ($q) => $q->orWhereRaw(
+                "regexp_replace(phone, '[^0-9]', '', 'g') IN (" . implode(', ', array_fill(0, count($variantes), '?')) . ')',
+                $variantes,
+            ))
             ->exists();
     }
 

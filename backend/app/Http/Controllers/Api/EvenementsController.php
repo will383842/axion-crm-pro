@@ -327,7 +327,9 @@ class EvenementsController extends ApiController
             ->values()
             ->all();
 
-        return $this->resume($e, []) + [
+        // array_merge et non `+` : l'union garde la clé de GAUCHE, et la
+        // liste vide de resume() masquait les organisateurs.
+        return array_merge($this->resume($e, []), [
             'lieu' => $e->lieu,
             'public_vise' => $e->public_vise,
             'taille' => $e->taille,
@@ -343,7 +345,7 @@ class EvenementsController extends ApiController
             'demarche_note' => MasquageCoordonnees::requis() ? null : $e->demarche_note,
             'organisateurs' => $organisateurs,
             'historique' => $historique,
-        ];
+        ]);
     }
 
     private function espace(): ?string

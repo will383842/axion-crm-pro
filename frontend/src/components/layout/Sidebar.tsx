@@ -37,6 +37,7 @@ import {
   Scale,
   Send,
   GraduationCap,
+  CalendarDays,
 } from 'lucide-react';
 import { cn, Tooltip } from '@/components/ui';
 import { WorkspaceSelector } from './WorkspaceSelector';
@@ -163,6 +164,8 @@ function sectionContacts(features: ConsoleFeatures): NavSection {
     // Après les deux fiches, et non avant : le registre se lit une fois qu'on
     // sait de qui il parle. Il ne consigne rien — la saisie reste sur la fiche.
     { to: '/presse/envois', label: 'Communiqués envoyés', icon: <Send className="h-4 w-4" /> },
+    // 2026-09-27 — événements professionnels, organisateurs et relances.
+    { to: '/evenements', label: 'Événements', icon: <CalendarDays className="h-4 w-4" /> },
   );
 
   return { id: 'contacts', title: 'Contacts', items };

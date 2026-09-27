@@ -202,6 +202,24 @@ beforeEach(function () {
     ]);
     $this->contactId = (int) $contact->id;
 
+    // 2026-09-27 : un événement ORGANISÉ par cette fiche, pour que le balayage
+    // visite aussi `/evenements/{event}` et `/companies/{company}/evenements`
+    // (ils ne doivent rendre aucune coordonnée, pas même au propriétaire).
+    $this->eventId = (int) DB::table('events')->insertGetId([
+        'workspace_id' => $this->workspace->id,
+        'external_ref' => 'zz-jumeaux-evenement',
+        'nom' => 'ZZ Salon des jumeaux',
+        'type' => 'salon',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    DB::table('event_organizers')->insert([
+        'event_id' => $this->eventId,
+        'company_id' => $this->companyId,
+        'workspace_id' => $this->workspace->id,
+        'created_at' => now(),
+    ]);
+
     // ⚠️ `person_key` N'EST PAS dans `$fillable` de `App\Models\Contact` : passé
     // à `create()`, il est silencieusement JETÉ. Mesuré le 2026-08-21 — la
     // colonne existe (migration 2026_08_14_000002) et toute la fiche 360° du
@@ -529,6 +547,7 @@ test('BALAYAGE : aucune route GET de l API ne sert une coordonnee en clair a un 
         'personKey' => $this->personKey,
         // Lot L4-C : la fiche d'une personne de la lettre et du guide.
         'personneId' => $this->personneId,
+        'event' => $this->eventId,
     ];
 
     $cibles = [];

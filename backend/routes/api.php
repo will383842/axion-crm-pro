@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\Crm\ContactsHubController;
 use App\Http\Controllers\Api\Crm\PersonnesController;
 use App\Http\Controllers\Api\Crm\PersonTimelineController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\EvenementsController;
 use App\Http\Controllers\Api\FeaturesController;
 use App\Http\Controllers\Api\GlobalSearchController;
 use App\Http\Controllers\Api\JournalistAttachmentController;
@@ -172,6 +173,16 @@ Route::prefix('v1')->group(function () {
             ->middleware('permission:companies.update');
         Route::post('/companies/{company}/recompute-score', [CompaniesController::class, 'recomputeScore'])
             ->middleware('permission:companies.update');
+
+        // Événements professionnels et démarche de Will (2026-09-27). Lire
+        // suit les droits de lecture des entreprises ; faire avancer la
+        // démarche est une modification.
+        Route::get('/evenements', [EvenementsController::class, 'index']);
+        Route::get('/evenements/{event}', [EvenementsController::class, 'show'])->whereNumber('event');
+        Route::patch('/evenements/{event}/demarche', [EvenementsController::class, 'updateDemarche'])
+            ->whereNumber('event')
+            ->middleware('permission:companies.update');
+        Route::get('/companies/{company}/evenements', [EvenementsController::class, 'pourEntreprise']);
 
         // Contacts
         // Il n'existe pas de permission `contacts.*` dediee (le referentiel n'en

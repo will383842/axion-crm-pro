@@ -772,10 +772,11 @@ test('bulk remove_tag refuse de retirer un tag protecteur, pas un tag ordinaire'
         ]);
     }
 
-    // Retirer le `src:` ferait sauter la protection de la fiche (FichesProtegees).
+    // Retirer ce tag ferait sauter la protection de la fiche (FichesProtegees).
     $this->postJson('/api/v1/crm/bulk', [
         'ids' => [$company], 'action' => 'remove_tag', 'params' => ['tag' => 'src:scraping-evenements-pro'],
-    ])->assertStatus(422)->assertSee('protège ses fiches');
+    ])->assertStatus(422)
+        ->assertJsonPath('message', 'Ce tag protège ses fiches : il ne se retire pas depuis une action de masse.');
     expect(DB::table('company_tag')->where('company_id', $company)->where('tag_id', $src)->exists())->toBeTrue();
 
     // Témoin : un tag ordinaire se retire toujours.

@@ -359,13 +359,15 @@ class CrmReferentielsReclasser extends Command
      */
     private function espaceSansFicheInsee(string $workspaceId): ?string
     {
+        // Hors corbeille (`deleted_at`) : une fiche supprimée ne fait pas un
+        // espace de prospection.
         $aDesFiches = DB::table('companies')->where('workspace_id', $workspaceId)
-            ->where('discovery_source', 'insee')->exists();
+            ->where('discovery_source', 'insee')->whereNull('deleted_at')->exists();
         if ($aDesFiches) {
             return null;
         }
         $ailleurs = DB::table('companies')->where('workspace_id', '<>', $workspaceId)
-            ->where('discovery_source', 'insee')->value('workspace_id');
+            ->where('discovery_source', 'insee')->whereNull('deleted_at')->value('workspace_id');
 
         return $ailleurs === null ? null
             : "REFUS : l'espace visé n'a aucune fiche INSEE, alors que l'espace {$ailleurs} en porte. "

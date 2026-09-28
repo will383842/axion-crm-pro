@@ -10,6 +10,7 @@
  */
 
 use App\Contracts\InseeClient;
+use App\Crm\EspaceProspection;
 use App\Crm\FichesProtegees;
 use App\Data\Sources\InseeCompanyData;
 use App\Models\Workspace;
@@ -473,4 +474,264 @@ test('sous axion_app (RLS), la commande reclasse et etiquette les fiches de son 
         DB::connection('pgsql_app')->disconnect();
         $proprio->disconnect();
     }
+});
+
+// ══ Relecture du 2026-09-28 — chaque correction, et le test qui la tient ══
+
+/**
+ * Simule une écriture CONCURRENTE : juste après la lecture d'un lot par la
+ * commande (la requête `SELECT c.id, c.naf_nomenclature … FROM companies c`),
+ * une autre écriture passe sur la fiche. Le rappel s'exécute avant l'`UPDATE`
+ * de la commande.
+ */
+function rcApresLecture(callable $ecriture): void
+{
+    $fait = false;
+    DB::listen(function ($requete) use (&$fait, $ecriture): void {
+        if ($fait || ! str_starts_with(ltrim($requete->sql), 'SELECT c.id, c.naf_nomenclature')) {
+            return;
+        }
+        $fait = true;
+        $ecriture();
+    });
+}
+
+test('B1 — une chaine vide est traitee comme absente, et reecrite', function () {
+    $id = rcFiche($this->espace, [
+        'naf' => '52.1D', 'size_category' => '', 'region_code' => '', 'department_code' => '', 'effectif_range' => '',
+    ]);
+    $sansCode = rcFiche($this->espace, ['naf' => '', 'sector_main' => '']);
+
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
+
+    $f = DB::table('companies')->where('id', $id)->first();
+    // Avant correction, `''` était lu comme NULL par la garde de concurrence :
+    // `size_category IS NOT DISTINCT FROM NULL` était faux, la fiche jamais écrite.
+    expect($f->sector_main)->toBe('commerce_detail')
+        ->and($f->size_category)->toBeNull()
+        ->and($f->region_code)->toBeNull()
+        ->and(DB::table('companies')->where('id', $sansCode)->value('sector_main'))->toBe('non_classe')
+        ->and(rcCompteur(Artisan::output(), 'fiches_modifiees_entre_temps'))->toBe(0);
+});
+
+dataset('ecritures concurrentes', [
+    'le secteur' => [['sector_main' => 'btp']],
+    'la categorie INSEE' => [['metadata' => '{"categorie_entreprise":"GE"}']],
+    'l effectif' => [['effectif_range' => '21']],
+]);
+
+test('B2 — une fiche modifiee entre-temps n est pas ecrasee, et ses etiquettes ne bougent pas', function (array $ecriture) {
+    $id = rcFiche($this->espace, ['naf' => '52.1D', 'sector_main' => 'transport', 'department_code' => '38']);
+    rcLier($this->espace, $id, rcTag($this->espace, 'sector-transport', ['category' => 'sector']));
+    rcApresLecture(fn () => DB::table('companies')->where('id', $id)->update($ecriture));
+
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
+    $sortie = Artisan::output();
+
+    expect(rcCompteur($sortie, 'fiches_modifiees'))->toBe(0)
+        ->and(rcCompteur($sortie, 'fiches_modifiees_entre_temps'))->toBe(1)
+        ->and(DB::table('companies')->where('id', $id)->value('sector_main'))->not->toBe('commerce_detail')
+        // Les étiquettes suivent la FICHE : ni ajout ni retrait pour elle.
+        ->and(rcSlugs($id))->toBe(['sector-transport']);
+})->with('ecritures concurrentes');
+
+test('B2 — TEMOIN : sans ecriture concurrente, la meme fiche est reecrite et reetiquetee', function () {
+    $id = rcFiche($this->espace, ['naf' => '52.1D', 'sector_main' => 'transport', 'department_code' => '38']);
+    rcLier($this->espace, $id, rcTag($this->espace, 'sector-transport', ['category' => 'sector']));
+
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
+
+    expect(DB::table('companies')->where('id', $id)->value('sector_main'))->toBe('commerce_detail')
+        ->and(rcSlugs($id))->toBe(['region-84', 'sector-commerce-detail']);
+});
+
+test('R4 — une fiche devenue protegee entre la lecture et l ecriture n est ni reecrite ni desetiquetee', function () {
+    $id = rcFiche($this->espace, ['naf' => '52.1D', 'sector_main' => 'transport']);
+    rcLier($this->espace, $id, rcTag($this->espace, 'sector-transport', ['category' => 'sector']));
+    $protection = rcTag($this->espace, FichesProtegees::TAGS[0], ['is_locked' => true, 'category' => 'intent']);
+    rcApresLecture(fn () => rcLier($this->espace, $id, $protection));
+
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
+
+    expect(DB::table('companies')->where('id', $id)->value('sector_main'))->toBe('transport')
+        ->and(rcSlugs($id))->toContain('sector-transport');
+});
+
+test('B3 — une audience d EXCLUSION obsolete bloque l execution reelle, pas l essai a blanc', function () {
+    $id = rcFiche($this->espace, ['naf' => '52.1D', 'sector_main' => 'transport']);
+    DB::table('email_audiences')->insert([
+        'workspace_id' => $this->espace,
+        'name' => 'ZZ sauf le commerce',
+        'criteria' => json_encode(['all' => [
+            ['field' => 'sector_main', 'op' => 'not_in', 'value' => ['commerce']],
+        ]], JSON_THROW_ON_ERROR),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    // L'essai à blanc la signale, et passe.
+    expect(Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--dry-run' => true]))->toBe(0);
+    expect(Artisan::output())->toContain('EXCLUSION')->toContain('ZZ sauf le commerce');
+
+    // L'exécution réelle refuse, et n'écrit rien.
+    expect(Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]))->toBe(1);
+    expect(Artisan::output())->toContain('REFUS')
+        ->and(DB::table('companies')->where('id', $id)->value('sector_main'))->toBe('transport');
+
+    // Sur décision explicite, elle part.
+    expect(Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--accepter-audiences' => true]))->toBe(0)
+        ->and(DB::table('companies')->where('id', $id)->value('sector_main'))->toBe('commerce_detail');
+});
+
+test('B3 — les etiquettes obsoletes dans un bloc not, dont nature-entreprise, sont des exclusions', function () {
+    DB::table('email_audiences')->insert([
+        'workspace_id' => $this->espace,
+        'name' => 'ZZ pas les entreprises',
+        'criteria' => json_encode(['not' => [
+            ['field' => 'tags', 'op' => 'contains_any', 'value' => ['nature-entreprise', 'size-micro']],
+        ]], JSON_THROW_ON_ERROR),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--dry-run' => true]);
+    $sortie = Artisan::output();
+
+    expect(rcCompteur($sortie, 'audiences_exclusion_obsoletes'))->toBe(1)
+        ->and($sortie)->toContain('tags=nature-entreprise')
+        ->and($sortie)->toContain('tags=size-micro');
+});
+
+test('R3 — compteurs-seulement : aucun nom d audience dans la sortie', function () {
+    DB::table('email_audiences')->insert([
+        'workspace_id' => $this->espace,
+        'name' => 'ZZ nom confidentiel',
+        'criteria' => json_encode(['all' => [['field' => 'sector_main', 'op' => 'in', 'value' => ['it_saas']]]], JSON_THROW_ON_ERROR),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--dry-run' => true, '--compteurs-seulement' => true]);
+    $discret = Artisan::output();
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--dry-run' => true]);
+    $complet = Artisan::output();
+
+    expect($discret)->not->toContain('ZZ nom confidentiel')
+        ->and(rcCompteur($discret, 'audiences_obsoletes'))->toBe(1)
+        // Témoin : en mode normal, Will voit bien le nom.
+        ->and($complet)->toContain('ZZ nom confidentiel');
+});
+
+test('B4 — un secteur valide pose autrement que par le NAF n est pas ecrase par non_classe', function () {
+    $federation = rcFiche($this->espace, ['naf' => '94.11Z', 'sector_main' => 'interprofessionnel']);
+    $represente = rcFiche($this->espace, ['naf' => '94.12Z', 'sector_main' => 'btp']);
+    $ancien = rcFiche($this->espace, ['naf' => '94.12Z', 'sector_main' => 'it_saas']);
+    $parNaf = rcFiche($this->espace, ['naf' => '62.01Z', 'sector_main' => 'interprofessionnel']);
+
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
+
+    $secteur = static fn (int $id): ?string => DB::table('companies')->where('id', $id)->value('sector_main');
+    expect($secteur($federation))->toBe('interprofessionnel')
+        ->and($secteur($represente))->toBe('btp')
+        // Hors référentiel : devient non classé.
+        ->and($secteur($ancien))->toBe('non_classe')
+        // Un code NAF qui PARLE décide toujours.
+        ->and($secteur($parNaf))->toBe('numerique_telecoms');
+});
+
+test('B6 — un espace sans fiche INSEE est refuse quand un autre en porte', function () {
+    rcFiche($this->espace, ['naf' => '52.1D']);
+    $autre = (string) Str::uuid();
+    Workspace::create(['id' => $autre, 'slug' => 'zz-vide-' . Str::random(6), 'name' => 'ZZ vide']);
+
+    $code = Artisan::call('crm:referentiels:reclasser', ['--workspace' => $autre]);
+
+    expect($code)->toBe(1)
+        ->and(Artisan::output())->toContain('aucune fiche INSEE');
+});
+
+test('B6 — la collecte et le reclassement ont le meme espace par defaut', function () {
+    $collecte = (string) DB::table('workspaces')->orderBy('created_at')->value('id');
+
+    expect(EspaceProspection::resoudre(null))->toBe($collecte);
+});
+
+test('B8 — l essai a blanc chiffre les etiquettes obsoletes, et l execution en supprime autant', function () {
+    $id = rcFiche($this->espace, ['naf' => '52.1D', 'sector_main' => 'commerce']);
+    rcLier($this->espace, $id, rcTag($this->espace, 'sector-commerce', ['category' => 'sector']));
+    rcLier($this->espace, $id, rcTag($this->espace, 'size-micro', ['category' => 'size']));
+    // Retenue par un lien posé par un utilisateur : ne sera PAS supprimée.
+    $autre = rcFiche($this->espace, ['naf' => '52.1D']);
+    rcLier($this->espace, $autre, rcTag($this->espace, 'sector-services-pro', ['category' => 'sector']), 'user');
+
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--dry-run' => true]);
+    $aBlanc = Artisan::output();
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
+    $reel = Artisan::output();
+
+    expect(rcCompteur($aBlanc, 'etiquettes_obsoletes_a_supprimer'))->toBe(2)
+        ->and(rcCompteur($aBlanc, 'garde_b15008_refuserait'))->toBe(0)
+        ->and(rcCompteur($reel, 'etiquettes_obsoletes_supprimees'))->toBe(2)
+        ->and(DB::table('tags')->where('workspace_id', $this->espace)->where('slug', 'sector-services-pro')->exists())->toBeTrue();
+});
+
+test('R2 — l audit est ecrit par lot, avec l intervalle d ids et l operateur, plus une entree de fin', function () {
+    for ($i = 0; $i < 3; $i++) {
+        rcFiche($this->espace, ['naf' => '52.1D']);
+    }
+
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--lot' => 1]);
+
+    $lignes = DB::table('audit_logs')->where('workspace_id', $this->espace)->orderBy('id')->get();
+    expect($lignes->where('event_type', 'RECLASSEMENT_REFERENTIELS_LOT')->count())->toBe(3)
+        ->and($lignes->where('event_type', 'RECLASSEMENT_REFERENTIELS_FIN')->count())->toBe(1)
+        ->and((string) $lignes->first()->path)->toContain('ids ')
+        ->and((string) $lignes->first()->user_agent)->toStartWith('cli ')
+        ->and((string) $lignes->first()->user_agent)->toContain('@');
+
+    // L'essai à blanc, lui, n'écrit rien — pas même un journal.
+    $avant = DB::table('audit_logs')->count();
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--dry-run' => true]);
+    expect(DB::table('audit_logs')->count())->toBe($avant);
+});
+
+test('R1 — la levee de updated_at est sans effet hors companies et tags', function () {
+    $ancienne = '2024-01-15 10:00:00';
+    $requete = (int) DB::table('rgpd_requests')->insertGetId([
+        'workspace_id' => $this->espace, 'type' => 'access', 'subject_email' => 'zz@example.invalid',
+        'updated_at' => $ancienne,
+    ]);
+    $fiche = rcFiche($this->espace, ['updated_at' => $ancienne]);
+
+    DB::transaction(function () use ($requete, $fiche): void {
+        DB::statement("SET LOCAL app.conserver_updated_at = 'on'");
+        DB::table('rgpd_requests')->where('id', $requete)->update(['status' => 'processing']);
+        // Même une valeur ÉCRITE par l'UPDATE n'est pas retenue : c'est
+        // l'ancienne qui est rétablie.
+        DB::table('companies')->where('id', $fiche)->update(['sector_main' => 'btp', 'updated_at' => '2030-01-01 00:00:00']);
+    });
+
+    expect(substr((string) DB::table('rgpd_requests')->where('id', $requete)->value('updated_at'), 0, 19))->not->toBe($ancienne)
+        ->and(substr((string) DB::table('companies')->where('id', $fiche)->value('updated_at'), 0, 19))->toBe($ancienne);
+});
+
+test('R5 — une etiquette manuelle ou verrouillee n est jamais renommee', function () {
+    rcFiche($this->espace, ['naf' => '41.20A', 'effectif_range' => '21', 'department_code' => '38']);
+    $manuelle = rcTag($this->espace, 'sector-btp', ['category' => 'sector', 'kind' => 'manual', 'name' => 'ZZ mon BTP']);
+    $verrouillee = rcTag($this->espace, 'size-pme', ['category' => 'size', 'is_locked' => true, 'name' => 'ZZ PME gouvernée']);
+    $auto = rcTag($this->espace, 'region-84', ['category' => 'geo', 'name' => 'Région 84']);
+
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
+
+    $nom = static fn (int $tag): string => (string) DB::table('tags')->where('id', $tag)->value('name');
+    expect($nom($manuelle))->toBe('ZZ mon BTP')
+        ->and($nom($verrouillee))->toBe('ZZ PME gouvernée')
+        // Témoin : l'étiquette automatique, elle, prend le libellé du référentiel.
+        ->and($nom($auto))->toBe('Région : Auvergne-Rhône-Alpes');
+});
+
+test('B7 — un index nature reste INVALIDE est detecte par la migration', function () {
+    $migration = require database_path('migrations/2026_09_28_000002_index_nature_et_validation_naf.php');
+    $index = $migration::INDEX;
+
+    expect($migration::indexInvalide($index))->toBeFalse();
+    DB::statement("UPDATE pg_index SET indisvalid = false WHERE indexrelid = '{$index}'::regclass");
+    expect($migration::indexInvalide($index))->toBeTrue();
 });

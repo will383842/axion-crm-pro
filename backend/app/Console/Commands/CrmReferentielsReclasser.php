@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Console\Concerns\RefuseUneSuppressionMassive;
+use App\Crm\EspaceProspection;
 use App\Crm\FichesProtegees;
 use App\Crm\Referentiels\Classement;
 use App\Crm\Referentiels\EtiquettesClassement;
@@ -15,6 +16,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use stdClass;
+use Throwable;
 
 /**
  * RECLASSEMENT DE MASSE — secteur, taille, nature, région, et leurs étiquettes.
@@ -25,19 +27,20 @@ use stdClass;
  *
  *   - `sector_main` depuis le code NAF, lu dans SA nomenclature (rév. 2,
  *     rév. 1, NAP 1973) — 472 785 fiches à code de 1993 étaient lues comme de
- *     la rév. 2 et rangées dans un mauvais secteur ;
+ *     la rév. 2 et rangées dans un mauvais secteur. Quand le code ne dit rien
+ *     (`non_classe`), un secteur VALIDE déjà posé est conservé
+ *     (`interprofessionnel`, secteur représenté) ;
  *   - `naf_nomenclature`, `naf_rev2` (le code d'origine `naf` n'est jamais
  *     réécrit) ;
  *   - `size_category` dans les quatre tailles (`micro` → `tpe`,
  *     `grande`/`grande_entreprise` → `grand_groupe`) ;
  *   - `entity_nature` = `entreprise` pour les fiches INSEE qui n'en ont pas ;
- *   - `region_code` depuis le département (les fiches collectées n'en avaient
- *     pas : la région n'était posée qu'à l'enrichissement) ;
+ *   - `region_code` depuis le département ;
+ *   - une chaîne vide (`''`) dans une colonne de classement devient NULL ;
  *   - les étiquettes automatiques `sector-…`, `size-…`, `region-…`
- *     RESYNCHRONISÉES avec la fiche (772 k fiches « commerce » pour 147 k
- *     étiquettes, avant). Jamais touchées : les étiquettes `src:`, les
- *     verrouillées (`is_locked`), les manuelles (`kind = manual` ou posées par
- *     un utilisateur).
+ *     RESYNCHRONISÉES avec la fiche. Jamais touchées : les étiquettes `src:`,
+ *     les verrouillées (`is_locked`), les manuelles (`kind = manual` ou posées
+ *     par un utilisateur).
  *
  * ── CE QUI REND LA COMMANDE SÛRE SUR 4,3 M DE FICHES ──────────────────────
  *
@@ -46,26 +49,35 @@ use stdClass;
  *    table, jamais une transaction de plusieurs minutes.
  *  - Curseur par identifiant : chaque lot annonce le dernier id traité ; une
  *    exécution interrompue se REPREND par `--depuis-id=<cet id>`.
- *  - IDEMPOTENTE : une fiche déjà juste n'est pas réécrite (on compare avant
- *    d'écrire) ; rejouer la commande du début ne fait que vérifier.
- *  - Une fiche MODIFIÉE entre la lecture et l'écriture de son lot (un
- *    enrichissement passait par là) n'est pas écrasée : l'`UPDATE` exige que
- *    les données d'entrée soient restées celles qu'on a lues. Elle est comptée
- *    « modifiée entre-temps » ; la rejouer suffit.
+ *  - IDEMPOTENTE : une fiche déjà juste n'est pas réécrite.
+ *  - Une fiche MODIFIÉE entre la lecture et l'écriture de son lot n'est pas
+ *    écrasée : l'`UPDATE` exige que TOUTES les données lues (code NAF,
+ *    effectif, catégorie INSEE, taille, nature, secteur, département, région,
+ *    pays, source) n'aient pas bougé. Elle est comptée « modifiée
+ *    entre-temps », et ses étiquettes ne sont PAS touchées ; la rejouer suffit.
  *  - `updated_at` n'est PAS touché (`app.conserver_updated_at`, cf. migration
  *    `2026_09_28_000001`) : reclasser n'est pas modifier la fiche.
- *  - Les fiches PROTÉGÉES (`FichesProtegees`) sont exclues : aucun automatisme
- *    ne les touche.
+ *  - Les fiches PROTÉGÉES (`FichesProtegees`) sont exclues — à la lecture ET
+ *    dans l'`UPDATE` et le `DELETE` eux-mêmes.
  *  - Sous RLS : tout se fait dans le contexte de l'espace (`WorkspaceContext`),
  *    et chaque requête filtre AUSSI `workspace_id`.
+ *  - Journalisée AU FIL DE L'EAU : une entrée de la chaîne d'audit par lot
+ *    écrit (intervalle d'identifiants, qui a lancé la commande), et une entrée
+ *    de fin même en cas d'échec.
+ *  - Les AUDIENCES qui citent une ancienne valeur sont signalées AVANT toute
+ *    écriture. Une audience d'EXCLUSION (bloc `not`, `neq`, `not_in`) qui en
+ *    cite une ne viserait plus « personne de moins » mais TOUT LE MONDE :
+ *    l'exécution réelle refuse alors de partir, sauf `--accepter-audiences`.
  *
  * ── L'ESSAI À BLANC NE MENT PAS ──────────────────────────────────────────
  *
  * `--dry-run` n'écrit RIEN — pas même dans une transaction annulée : il LIT
  * chaque lot et calcule, avec le même code que l'exécution réelle, ce qui
- * serait écrit. Le bilan AVANT/APRÈS par secteur, par taille, par nature et par
- * région est donc celui que produira l'exécution (à la concurrence près : ce
- * qui aura changé entre les deux passages).
+ * serait écrit, y compris les étiquettes obsolètes qui seraient supprimées et
+ * la décision de la garde B15-008.
+ *
+ * `--compteurs-seulement` : pour les journaux des workflows GitHub (dépôt
+ * PUBLIC) — aucun nom d'audience, seulement des nombres.
  */
 class CrmReferentielsReclasser extends Command
 {
@@ -73,18 +85,40 @@ class CrmReferentielsReclasser extends Command
 
     protected $signature = 'crm:referentiels:reclasser
                             {--dry-run : Tout lire et tout calculer, ne RIEN écrire, et afficher le bilan avant/après}
-                            {--workspace= : Slug de l\'espace (défaut : l\'espace business)}
-                            {--lot=2000 : Nombre de fiches par lot (1 à 4000)}
+                            {--workspace= : Identifiant ou slug de l\'espace (défaut : celui de prospection:collect)}
+                            {--lot=2000 : Nombre de fiches par lot (1 à 3500)}
                             {--depuis-id=0 : Reprendre APRÈS cette fiche (dernier id annoncé par une exécution interrompue)}
                             {--max-lots=0 : S\'arrêter après N lots (0 = jusqu\'au bout)}
                             {--pause-ms=0 : Pause entre deux lots, pour ménager la base}
                             {--sans-etiquettes : Ne pas resynchroniser les étiquettes sector-/size-/region-}
+                            {--accepter-audiences : Partir malgré des audiences d\'exclusion qui citent une valeur obsolète}
+                            {--compteurs-seulement : N\'afficher que des nombres (journaux publics des workflows)}
                             {--force : Lever le plafond de proportion de la suppression des étiquettes obsolètes}';
 
     protected $description = 'Reclasse toutes les fiches (secteur, taille, nature, région, étiquettes) selon le référentiel unique.';
 
     /** Colonnes que la commande écrit. */
     private const COLONNES = ['sector_main', 'naf_nomenclature', 'naf_rev2', 'size_category', 'entity_nature', 'region_code'];
+
+    /**
+     * Colonnes LUES et comparées dans l'`UPDATE` (garde de concurrence) :
+     * tout ce dont dépend le calcul, plus ce qu'il écrit.
+     */
+    private const GARDE = [
+        'naf' => 'c.naf',
+        'effectif_range' => 'c.effectif_range',
+        'categorie_entreprise' => "c.metadata->>'categorie_entreprise'",
+        'size_category' => 'c.size_category',
+        'entity_nature' => 'c.entity_nature',
+        'sector_main' => 'c.sector_main',
+        'department_code' => 'c.department_code',
+        'region_code' => 'c.region_code',
+        'country_code' => 'c.country_code',
+        'discovery_source' => 'c.discovery_source',
+    ];
+
+    /** 17 paramètres liés par fiche : 3 500 × 17 reste sous la limite de 65 535. */
+    private const LOT_MAX = 3500;
 
     private const COULEURS = ['sector' => 'violet', 'size' => 'amber', 'geo' => 'sky'];
 
@@ -105,119 +139,151 @@ class CrmReferentielsReclasser extends Command
 
     public function handle(AuditHashChain $audit): int
     {
-        $slug = (string) ($this->option('workspace') ?: config('crm.ingest.business_workspace', 'axion-ia'));
-        $workspaceId = DB::table('workspaces')->where('slug', $slug)->whereNull('deleted_at')->value('id');
+        $designation = is_string($this->option('workspace')) ? $this->option('workspace') : null;
+        $workspaceId = EspaceProspection::resoudre($designation);
         if ($workspaceId === null) {
-            $this->error("Espace introuvable : « {$slug} ».");
+            $this->error('Espace introuvable : « ' . ($designation ?? '(défaut)') . ' ».');
 
             return self::FAILURE;
         }
-        $workspaceId = (string) $workspaceId;
 
         $dryRun = (bool) $this->option('dry-run');
-        // 4 000 au plus : 13 paramètres liés par fiche, sous la limite de
-        // 65 535 de PostgreSQL.
-        $lot = max(1, min(4000, (int) $this->option('lot')));
+        $lot = max(1, min(self::LOT_MAX, (int) $this->option('lot')));
         $depuis = max(0, (int) $this->option('depuis-id'));
         $maxLots = max(0, (int) $this->option('max-lots'));
         $pauseMs = max(0, (int) $this->option('pause-ms'));
         $etiquettes = ! (bool) $this->option('sans-etiquettes');
+        $discret = (bool) $this->option('compteurs-seulement');
+        $operateur = self::operateur();
 
         $this->reinitialiser();
         $this->info(sprintf(
             '%s — espace %s, lots de %d, à partir de l\'id %d%s.',
             $dryRun ? '[À BLANC] rien ne sera écrit' : 'Reclassement',
-            $slug,
+            $workspaceId,
             $lot,
             $depuis,
             $etiquettes ? ', étiquettes comprises' : ', SANS les étiquettes',
         ));
 
-        $resultat = WorkspaceContext::run($workspaceId, function () use ($workspaceId, $dryRun, $lot, $depuis, $maxLots, $pauseMs, $etiquettes): array {
-            $this->compteurs['fiches_protegees_exclues'] = $this->compterProtegees($workspaceId);
-            if ($etiquettes) {
-                $this->chargerTags($workspaceId);
-            }
+        // ── Avant toute écriture : le bon espace, et les audiences ──────────
+        $refus = WorkspaceContext::run($workspaceId, fn (): ?string => $this->espaceSansFicheInsee($workspaceId));
+        if ($refus !== null) {
+            $this->error($refus);
 
-            $dernier = $depuis;
-            $lots = 0;
-            while (true) {
-                $fiches = $this->lireLot($workspaceId, $dernier, $lot);
-                if ($fiches === []) {
-                    return ['termine' => true, 'dernier' => $dernier, 'erreur' => null];
+            return self::FAILURE;
+        }
+
+        $audiences = WorkspaceContext::run($workspaceId, fn (): array => $this->audiencesObsoletes($workspaceId));
+        $this->afficherAudiences($audiences, $discret);
+        $exclusions = count(array_filter($audiences, static fn (array $a): bool => $a['exclusion']));
+        if ($exclusions > 0 && ! $dryRun && ! (bool) $this->option('accepter-audiences')) {
+            $this->error(
+                "REFUS : {$exclusions} audience(s) d'EXCLUSION citent une valeur obsolète. Après reclassement, "
+                . 'elles n\'excluraient plus personne et viseraient donc TOUTE la base. Réécrivez-les à l\'écran, '
+                . 'ou relancez avec --accepter-audiences. Rien n\'a été écrit.',
+            );
+
+            return self::FAILURE;
+        }
+
+        $dernier = $depuis;
+        $termine = false;
+        $erreur = null;
+        try {
+            WorkspaceContext::run($workspaceId, function () use ($workspaceId, $dryRun, $lot, $maxLots, $pauseMs, $etiquettes, $audit, $operateur, &$dernier, &$termine, &$erreur): void {
+                $this->compteurs['fiches_protegees_exclues'] = $this->compterProtegees($workspaceId);
+                if ($etiquettes) {
+                    $this->chargerTags($workspaceId);
                 }
-                $idsLot = array_map(static fn (stdClass $f): int => (int) $f->id, $fiches);
-                $haut = max($idsLot);
 
-                try {
-                    $this->traiterLot($workspaceId, $fiches, $dryRun, $etiquettes);
-                } catch (QueryException $e) {
-                    // Le lot est annulé en entier (sa transaction) ; tout ce
-                    // qui précède est acquis. Seul le code d'état part au
-                    // journal : le message SQL peut citer des valeurs.
-                    Log::error('crm:referentiels:reclasser : lot refusé par la base', [
-                        'apres_id' => $dernier, 'sqlstate' => $e->getCode(),
+                $lots = 0;
+                while (true) {
+                    $fiches = $this->lireLot($workspaceId, $dernier, $lot);
+                    if ($fiches === []) {
+                        $termine = true;
+
+                        return;
+                    }
+                    $ids = array_map(static fn (stdClass $f): int => (int) $f->id, $fiches);
+                    $bas = min($ids);
+                    $haut = max($ids);
+                    $avant = $this->compteurs;
+
+                    try {
+                        $this->traiterLot($workspaceId, $fiches, $dryRun, $etiquettes);
+                    } catch (QueryException $e) {
+                        // Le lot est annulé en entier (sa transaction) ; tout ce
+                        // qui précède est acquis. Seul le code d'état part au
+                        // journal : le message SQL peut citer des valeurs.
+                        Log::error('crm:referentiels:reclasser : lot refusé par la base', [
+                            'apres_id' => $dernier, 'sqlstate' => $e->getCode(),
+                        ]);
+                        $erreur = (string) $e->getCode();
+
+                        return;
+                    }
+
+                    $lots++;
+                    $dernier = $haut;
+                    $this->compteurs['lots']++;
+                    if (! $dryRun) {
+                        $this->auditer($audit, $workspaceId, $operateur, 'RECLASSEMENT_REFERENTIELS_LOT', 200, [
+                            'ids' => [$bas, $haut],
+                            'fiches_modifiees' => $this->compteurs['fiches_modifiees'] - $avant['fiches_modifiees'],
+                            'etiquettes_ajoutees' => $this->compteurs['etiquettes_ajoutees'] - $avant['etiquettes_ajoutees'],
+                            'etiquettes_retirees' => $this->compteurs['etiquettes_retirees'] - $avant['etiquettes_retirees'],
+                        ], "ids {$bas}-{$haut}");
+                    }
+                    $this->line(sprintf(
+                        '  lot %d : %d fiches, ids %d à %d — %d à modifier%s',
+                        $lots,
+                        count($fiches),
+                        $bas,
+                        $haut,
+                        $this->compteurs['fiches_a_modifier'],
+                        $dryRun ? '' : sprintf(' (%d modifiées)', $this->compteurs['fiches_modifiees']),
+                    ));
+                    Log::info('crm:referentiels:reclasser lot', [
+                        'a_blanc' => $dryRun, 'lot' => $lots, 'ids' => [$bas, $haut],
+                        'fiches_lues' => $this->compteurs['fiches_lues'],
+                        'fiches_a_modifier' => $this->compteurs['fiches_a_modifier'],
+                        'fiches_modifiees' => $this->compteurs['fiches_modifiees'],
                     ]);
 
-                    return ['termine' => false, 'dernier' => $dernier, 'erreur' => (string) $e->getCode()];
+                    if ($maxLots > 0 && $lots >= $maxLots) {
+                        return;
+                    }
+                    if ($pauseMs > 0) {
+                        usleep($pauseMs * 1000);
+                    }
                 }
+            });
 
-                $lots++;
-                $dernier = $haut;
-                $this->compteurs['lots']++;
-                $this->line(sprintf(
-                    '  lot %d : %d fiches, jusqu\'à l\'id %d — %d à modifier%s',
-                    $lots,
-                    count($fiches),
-                    $dernier,
-                    $this->compteurs['fiches_a_modifier'],
-                    $dryRun ? '' : sprintf(' (%d modifiées)', $this->compteurs['fiches_modifiees']),
-                ));
-                Log::info('crm:referentiels:reclasser lot', [
-                    'a_blanc' => $dryRun, 'lot' => $lots, 'jusqu_a_id' => $dernier,
-                    'fiches_lues' => $this->compteurs['fiches_lues'],
-                    'fiches_a_modifier' => $this->compteurs['fiches_a_modifier'],
-                    'fiches_modifiees' => $this->compteurs['fiches_modifiees'],
-                ]);
-
-                if ($maxLots > 0 && $lots >= $maxLots) {
-                    return ['termine' => false, 'dernier' => $dernier, 'erreur' => null];
-                }
-                if ($pauseMs > 0) {
-                    usleep($pauseMs * 1000);
-                }
+            if ($termine && $etiquettes) {
+                WorkspaceContext::run($workspaceId, function () use ($workspaceId, $dryRun): void {
+                    $this->etiquettesObsoletes($workspaceId, $dryRun);
+                });
             }
-        });
+        } catch (Throwable $e) {
+            $erreur ??= get_class($e);
 
-        $termine = (bool) $resultat['termine'];
-        $dernier = (int) $resultat['dernier'];
-        $erreur = $resultat['erreur'];
-
-        $orphelines = 0;
-        if ($termine && ! $dryRun && $etiquettes) {
-            $orphelines = WorkspaceContext::run($workspaceId, fn (): int => $this->retirerEtiquettesObsoletes($workspaceId));
+            throw $e;
+        } finally {
+            if (! $dryRun) {
+                // L'entrée de FIN, même quand la commande échoue ou est
+                // interrompue par une exception : la chaîne dit où l'on s'est
+                // arrêté, et qui avait lancé la commande.
+                $this->auditer($audit, $workspaceId, $operateur, 'RECLASSEMENT_REFERENTIELS_FIN', $erreur === null ? 200 : 500, [
+                    'termine' => $termine, 'dernier_id' => $dernier, 'erreur' => $erreur, 'compteurs' => $this->compteurs,
+                ], $termine ? 'terminé' : "arrêté après l'id {$dernier}");
+            }
         }
-        $this->compteurs['etiquettes_obsoletes_supprimees'] = $orphelines;
 
-        $audiences = WorkspaceContext::run($workspaceId, fn (): array => $this->audiencesAReecrire($workspaceId));
-
-        $this->afficherBilan($dryRun, $etiquettes, $audiences);
-
-        if (! $dryRun) {
-            $audit->record([
-                'workspace_id' => $workspaceId,
-                'user_id' => null,
-                'method' => 'RECLASSEMENT_REFERENTIELS',
-                'path' => 'artisan crm:referentiels:reclasser',
-                'status' => $erreur === null ? 200 : 500,
-                'ip' => null,
-                'user_agent' => null,
-                'payload_hash' => hash('sha256', json_encode([$this->compteurs, $dernier], JSON_THROW_ON_ERROR)),
-            ]);
-        }
+        $this->afficherBilan($dryRun, $etiquettes);
         Log::info('crm:referentiels:reclasser fin', [
             'a_blanc' => $dryRun, 'termine' => $termine, 'dernier_id' => $dernier,
-            'erreur' => $erreur, 'compteurs' => $this->compteurs,
+            'erreur' => $erreur, 'compteurs' => $this->compteurs, 'operateur' => $operateur,
         ]);
 
         if ($erreur !== null) {
@@ -252,8 +318,58 @@ class CrmReferentielsReclasser extends Command
             'etiquettes_a_retirer' => 0,
             'etiquettes_retirees' => 0,
             'fiches_protegees_exclues' => 0,
+            'etiquettes_obsoletes_a_supprimer' => 0,
             'etiquettes_obsoletes_supprimees' => 0,
+            'garde_b15008_refuserait' => 0,
+            'audiences_obsoletes' => 0,
+            'audiences_exclusion_obsoletes' => 0,
         ];
+    }
+
+    /** « utilisateur@hôte » du processus qui a lancé la commande. */
+    private static function operateur(): string
+    {
+        $utilisateur = get_current_user();
+        $hote = gethostname();
+
+        return ($utilisateur !== '' ? $utilisateur : '?') . '@' . ($hote !== false ? $hote : '?');
+    }
+
+    /** @param  array<string, mixed>  $details */
+    private function auditer(AuditHashChain $audit, string $workspaceId, string $operateur, string $evenement, int $statut, array $details, string $resume): void
+    {
+        $audit->record([
+            'workspace_id' => $workspaceId,
+            'user_id' => null,
+            'method' => $evenement,
+            'path' => 'artisan crm:referentiels:reclasser — ' . $resume,
+            'status' => $statut,
+            'ip' => null,
+            'user_agent' => 'cli ' . $operateur,
+            'payload_hash' => hash('sha256', json_encode($details, JSON_THROW_ON_ERROR)),
+        ]);
+    }
+
+    /**
+     * Refuse de tourner sur un espace qui n'a AUCUNE fiche INSEE quand un
+     * autre en porte : ce serait un reclassement à vide, qui annoncerait
+     * « 0 à modifier » pendant que les vraies fiches restent mal rangées.
+     * (Sous le rôle applicatif, la RLS masque les autres espaces : la garde n'y
+     * voit que celui-ci — elle ne peut alors que laisser passer.)
+     */
+    private function espaceSansFicheInsee(string $workspaceId): ?string
+    {
+        $aDesFiches = DB::table('companies')->where('workspace_id', $workspaceId)
+            ->where('discovery_source', 'insee')->exists();
+        if ($aDesFiches) {
+            return null;
+        }
+        $ailleurs = DB::table('companies')->where('workspace_id', '<>', $workspaceId)
+            ->where('discovery_source', 'insee')->value('workspace_id');
+
+        return $ailleurs === null ? null
+            : "REFUS : l'espace visé n'a aucune fiche INSEE, alors que l'espace {$ailleurs} en porte. "
+                . 'Préciser --workspace (la collecte écrit dans ' . (EspaceProspection::parDefaut() ?? '?') . ').';
     }
 
     private function compterProtegees(string $workspaceId): int
@@ -273,18 +389,27 @@ class CrmReferentielsReclasser extends Command
     /** @return list<stdClass> */
     private function lireLot(string $workspaceId, int $apresId, int $taille): array
     {
+        $colonnes = [];
+        foreach (self::GARDE as $alias => $expression) {
+            $colonnes[] = "{$expression} AS {$alias}";
+        }
         $lignes = DB::select(
-            "SELECT c.id, c.naf, c.effectif_range, c.metadata->>'categorie_entreprise' AS categorie_entreprise,
-                    c.size_category, c.entity_nature, c.discovery_source, c.department_code,
-                    c.region_code, c.country_code, c.sector_main, c.naf_nomenclature, c.naf_rev2
+            'SELECT c.id, c.naf_nomenclature, c.naf_rev2, ' . implode(', ', $colonnes) . '
              FROM companies c
-             WHERE c.workspace_id = ? AND c.id > ? AND " . FichesProtegees::conditionSql('c.id') . '
+             WHERE c.workspace_id = ? AND c.id > ? AND ' . FichesProtegees::conditionSql('c.id') . '
              ORDER BY c.id
              LIMIT ' . $taille,
             [$workspaceId, $apresId],
         );
 
-        return array_values(array_filter($lignes, static fn ($l): bool => $l instanceof stdClass));
+        $fiches = [];
+        foreach ($lignes as $ligne) {
+            if ($ligne instanceof stdClass) {
+                $fiches[] = $ligne;
+            }
+        }
+
+        return $fiches;
     }
 
     /**
@@ -303,36 +428,36 @@ class CrmReferentielsReclasser extends Command
         foreach ($fiches as $f) {
             $this->compteurs['fiches_lues']++;
             $calcul = Classement::pourFiche([
-                'naf' => self::texte($f->naf),
-                'effectif_range' => self::texte($f->effectif_range),
-                'categorie_entreprise' => self::texte($f->categorie_entreprise),
-                'size_category' => self::texte($f->size_category),
-                'entity_nature' => self::texte($f->entity_nature),
-                'discovery_source' => self::texte($f->discovery_source),
-                'department_code' => self::texte($f->department_code),
-                'region_code' => self::texte($f->region_code),
-                'country_code' => self::texte($f->country_code),
+                'naf' => self::brut($f->naf),
+                'effectif_range' => self::brut($f->effectif_range),
+                'categorie_entreprise' => self::brut($f->categorie_entreprise),
+                'size_category' => self::brut($f->size_category),
+                'entity_nature' => self::brut($f->entity_nature),
+                'sector_main' => self::brut($f->sector_main),
+                'department_code' => self::brut($f->department_code),
+                'region_code' => self::brut($f->region_code),
+                'country_code' => self::brut($f->country_code),
+                'discovery_source' => self::brut($f->discovery_source),
             ]);
             $this->methodes[$calcul['methode_secteur']] = ($this->methodes[$calcul['methode_secteur']] ?? 0) + 1;
 
             $nouveau = [];
             $change = false;
             foreach (self::COLONNES as $colonne) {
-                $actuel = self::texte($f->{$colonne});
-                // Ce que le calcul ne sait pas établir (null) n'efface JAMAIS
-                // une valeur posée — même règle que l'enrichissement.
-                $valeur = $calcul[$colonne] ?? $actuel;
-                $nouveau[$colonne] = $valeur;
-                if ($valeur !== $actuel) {
+                // La valeur BRUTE (une chaîne vide reste une chaîne vide) : c'est
+                // elle qu'on compare, et c'est ainsi qu'un `''` est bien réécrit.
+                $actuel = self::brut($f->{$colonne});
+                $nouveau[$colonne] = Classement::valeurAEcrire($calcul[$colonne], $actuel);
+                if ($nouveau[$colonne] !== $actuel) {
                     $change = true;
                 }
             }
 
-            $this->compter('secteur', self::texte($f->sector_main), $nouveau['sector_main']);
-            $this->compter('taille', self::texte($f->size_category), $nouveau['size_category']);
-            $this->compter('nature', self::texte($f->entity_nature), $nouveau['entity_nature']);
-            $this->compter('region', self::texte($f->region_code), $nouveau['region_code']);
-            $this->compter('nomenclature', self::texte($f->naf_nomenclature), $nouveau['naf_nomenclature']);
+            $this->compter('secteur', self::brut($f->sector_main), $nouveau['sector_main']);
+            $this->compter('taille', self::brut($f->size_category), $nouveau['size_category']);
+            $this->compter('nature', self::brut($f->entity_nature), $nouveau['entity_nature']);
+            $this->compter('region', self::brut($f->region_code), $nouveau['region_code']);
+            $this->compter('nomenclature', self::brut($f->naf_nomenclature), $nouveau['naf_nomenclature']);
 
             if ($change) {
                 $this->compteurs['fiches_a_modifier']++;
@@ -360,30 +485,44 @@ class CrmReferentielsReclasser extends Command
             DB::statement("SET LOCAL lock_timeout = '5s'");
             DB::statement("SET LOCAL app.conserver_updated_at = 'on'");
 
+            // Les étiquettes ne suivent QUE les fiches qui sont justes après ce
+            // lot : déjà justes, ou effectivement réécrites. Une fiche
+            // « modifiée entre-temps » garde ses étiquettes jusqu'au prochain
+            // passage — jamais une étiquette qui contredirait la fiche.
+            $ecartees = [];
             if ($aModifier !== []) {
-                $modifiees = $this->ecrireFiches($workspaceId, $aModifier);
-                $this->compteurs['fiches_modifiees'] += $modifiees;
-                $this->compteurs['fiches_modifiees_entre_temps'] += count($aModifier) - $modifiees;
+                $ecrites = $this->ecrireFiches($workspaceId, $aModifier);
+                $this->compteurs['fiches_modifiees'] += count($ecrites);
+                foreach ($aModifier as ['fiche' => $f]) {
+                    if (! isset($ecrites[(int) $f->id])) {
+                        $ecartees[(int) $f->id] = true;
+                        $this->compteurs['fiches_modifiees_entre_temps']++;
+                    }
+                }
             }
-            if ($plan['retraits'] !== []) {
-                $this->compteurs['etiquettes_retirees'] += $this->retirerEtiquettes($plan['retraits']);
+            $retraits = array_values(array_filter($plan['retraits'], static fn (array $r): bool => ! isset($ecartees[$r['company_id']])));
+            $ajouts = array_values(array_filter($plan['ajouts'], static fn (array $a): bool => ! isset($ecartees[$a['company_id']])));
+            if ($retraits !== []) {
+                $this->compteurs['etiquettes_retirees'] += $this->retirerEtiquettes($retraits);
             }
-            if ($plan['ajouts'] !== []) {
-                $this->compteurs['etiquettes_ajoutees'] += $this->ajouterEtiquettes($workspaceId, $plan['ajouts']);
+            if ($ajouts !== []) {
+                $this->compteurs['etiquettes_ajoutees'] += $this->ajouterEtiquettes($workspaceId, $ajouts);
             }
         });
     }
 
     /**
      * @param  list<array{fiche: stdClass, nouveau: array<string, ?string>}>  $aModifier
+     * @return array<int, true> identifiants effectivement réécrits
      */
-    private function ecrireFiches(string $workspaceId, array $aModifier): int
+    private function ecrireFiches(string $workspaceId, array $aModifier): array
     {
+        $gabarit = '(?::bigint, ?::text, ?::text, ?::varchar, ?::text, ?::text, ?::text'
+            . str_repeat(', ?::text', count(self::GARDE)) . ')';
         $valeurs = [];
         $liaisons = [];
         foreach ($aModifier as ['fiche' => $f, 'nouveau' => $n]) {
-            $valeurs[] = '(?::bigint, ?::text, ?::text, ?::varchar, ?::text, ?::text, ?::text,'
-                . ' ?::text, ?::text, ?::text, ?::text, ?::text, ?::text)';
+            $valeurs[] = $gabarit;
             array_push(
                 $liaisons,
                 (int) $f->id,
@@ -393,32 +532,43 @@ class CrmReferentielsReclasser extends Command
                 $n['size_category'],
                 $n['entity_nature'],
                 $n['region_code'],
-                // Ce qu'on a LU : l'écriture n'a lieu que si rien n'a bougé.
-                self::texte($f->naf),
-                self::texte($f->effectif_range),
-                self::texte($f->size_category),
-                self::texte($f->entity_nature),
-                self::texte($f->department_code),
-                self::texte($f->region_code),
             );
+            // Ce qu'on a LU, brut (`''` compris) : l'écriture n'a lieu que si
+            // rien n'a bougé depuis.
+            foreach (array_keys(self::GARDE) as $cle) {
+                $liaisons[] = self::brut($f->{$cle});
+            }
         }
         $liaisons[] = $workspaceId;
 
-        return DB::update(
+        $noms = ['id', 'sector_main', 'naf_nomenclature', 'naf_rev2', 'size_category', 'entity_nature', 'region_code'];
+        $gardes = [];
+        foreach (self::GARDE as $cle => $expression) {
+            $noms[] = 'lu_' . $cle;
+            $gardes[] = "{$expression} IS NOT DISTINCT FROM v.lu_{$cle}";
+        }
+
+        $lignes = DB::select(
             'UPDATE companies AS c
              SET sector_main = v.sector_main, naf_nomenclature = v.naf_nomenclature, naf_rev2 = v.naf_rev2,
                  size_category = v.size_category, entity_nature = v.entity_nature, region_code = v.region_code
-             FROM (VALUES ' . implode(', ', $valeurs) . ') AS v(id, sector_main, naf_nomenclature, naf_rev2,
-                   size_category, entity_nature, region_code, lu_naf, lu_effectif, lu_taille, lu_nature, lu_dept, lu_region)
+             FROM (VALUES ' . implode(', ', $valeurs) . ') AS v(' . implode(', ', $noms) . ')
              WHERE c.id = v.id AND c.workspace_id = ?
-               AND c.naf IS NOT DISTINCT FROM v.lu_naf
-               AND c.effectif_range IS NOT DISTINCT FROM v.lu_effectif
-               AND c.size_category IS NOT DISTINCT FROM v.lu_taille
-               AND c.entity_nature IS NOT DISTINCT FROM v.lu_nature
-               AND c.department_code IS NOT DISTINCT FROM v.lu_dept
-               AND c.region_code IS NOT DISTINCT FROM v.lu_region',
+               AND ' . implode("\n               AND ", $gardes) . '
+               AND ' . FichesProtegees::conditionSql('c.id') . '
+             RETURNING c.id',
             $liaisons,
+            false,
         );
+
+        $ecrites = [];
+        foreach ($lignes as $l) {
+            if ($l instanceof stdClass) {
+                $ecrites[(int) $l->id] = true;
+            }
+        }
+
+        return $ecrites;
     }
 
     /**
@@ -432,10 +582,9 @@ class CrmReferentielsReclasser extends Command
     {
         $attachees = [];
         if ($classements !== []) {
-            $ids = array_keys($classements);
             $lignes = DB::table('company_tag as ct')
                 ->join('tags as t', 't.id', '=', 'ct.tag_id')
-                ->whereIn('ct.company_id', $ids)
+                ->whereIn('ct.company_id', array_keys($classements))
                 ->where(function (QueryBuilder $q): void {
                     foreach (EtiquettesClassement::PREFIXES as $prefixe) {
                         $q->orWhere('t.slug', 'like', $prefixe . '%');
@@ -498,7 +647,8 @@ class CrmReferentielsReclasser extends Command
             }
             $n += DB::delete(
                 "DELETE FROM company_tag ct USING (VALUES {$valeurs}) AS v(company_id, tag_id)
-                 WHERE ct.company_id = v.company_id AND ct.tag_id = v.tag_id",
+                 WHERE ct.company_id = v.company_id AND ct.tag_id = v.tag_id
+                   AND " . FichesProtegees::conditionSql('ct.company_id'),
                 $liaisons,
             );
         }
@@ -546,7 +696,8 @@ class CrmReferentielsReclasser extends Command
     /**
      * L'identifiant de l'étiquette, créée si besoin — et son NOM aligné sur
      * le référentiel une fois par exécution (`Région 84` devient
-     * `Région : Auvergne-Rhône-Alpes`).
+     * `Région : Auvergne-Rhône-Alpes`), SEULEMENT si c'est une étiquette
+     * automatique non verrouillée : un nom choisi à la main ne se renomme pas.
      */
     private function tagId(string $workspaceId, string $slug): int
     {
@@ -556,21 +707,24 @@ class CrmReferentielsReclasser extends Command
 
         $spec = $this->specTag($slug);
         $maintenant = now();
-        DB::table('tags')->upsert(
-            [[
-                'workspace_id' => $workspaceId,
-                'slug' => $slug,
-                'name' => $spec['name'],
-                'color' => self::COULEURS[$spec['category']] ?? 'slate',
-                'category' => $spec['category'],
-                'kind' => 'auto',
-                'rules' => '[]',
-                'created_at' => $maintenant,
-                'updated_at' => $maintenant,
-            ]],
-            ['workspace_id', 'slug'],
-            ['name'],
-        );
+        DB::table('tags')->insertOrIgnore([
+            'workspace_id' => $workspaceId,
+            'slug' => $slug,
+            'name' => $spec['name'],
+            'color' => self::COULEURS[$spec['category']] ?? 'slate',
+            'category' => $spec['category'],
+            'kind' => 'auto',
+            'rules' => '[]',
+            'created_at' => $maintenant,
+            'updated_at' => $maintenant,
+        ]);
+        DB::table('tags')
+            ->where('workspace_id', $workspaceId)
+            ->where('slug', $slug)
+            ->where('kind', 'auto')
+            ->where('is_locked', false)
+            ->where('name', '<>', $spec['name'])
+            ->update(['name' => $spec['name']]);
         $id = (int) DB::table('tags')->where('workspace_id', $workspaceId)->where('slug', $slug)->value('id');
         $this->tagIds[$slug] = $id;
         $this->tagsAlignes[$slug] = true;
@@ -607,12 +761,8 @@ class CrmReferentielsReclasser extends Command
         return ['name' => $slug, 'category' => 'custom'];
     }
 
-    /**
-     * Les étiquettes `sector-`/`size-`/`region-` qui ne correspondent plus à
-     * AUCUNE valeur du référentiel (`sector-it-saas`, `size-micro`…) et que plus
-     * aucune fiche ne porte. Jamais une verrouillée ni une manuelle.
-     */
-    private function retirerEtiquettesObsoletes(string $workspaceId): int
+    /** @return list<string> slugs de famille qui correspondent au référentiel */
+    private static function slugsValides(): array
     {
         $valides = [];
         foreach (array_keys(Taxonomy::SECTEURS) as $cle) {
@@ -625,42 +775,82 @@ class CrmReferentielsReclasser extends Command
             $valides[] = EtiquettesClassement::slugRegion((string) $code);
         }
 
-        $obsoletes = DB::table('tags')
+        return $valides;
+    }
+
+    /**
+     * Les étiquettes `sector-`/`size-` qui ne correspondent plus à AUCUNE
+     * valeur du référentiel (`sector-it-saas`, `size-micro`…) : supprimées quand
+     * plus aucune fiche ne les porte. Jamais une verrouillée ni une manuelle.
+     *
+     * À blanc : on CHIFFRE celles que l'exécution supprimerait — celles
+     * qu'aucun lien intouchable (posé par un utilisateur, ou sur une fiche
+     * protégée) ne retiendra — et ce que dirait la garde B15-008.
+     */
+    private function etiquettesObsoletes(string $workspaceId, bool $dryRun): void
+    {
+        $candidates = DB::table('tags')
             ->where('workspace_id', $workspaceId)
             ->where('kind', 'auto')
             ->where('is_locked', false)
             ->where(function (QueryBuilder $q): void {
                 $q->where('slug', 'like', 'sector-%')->orWhere('slug', 'like', 'size-%');
             })
-            ->whereNotIn('slug', $valides)
-            ->whereNotExists(function (QueryBuilder $sub): void {
+            ->whereNotIn('slug', self::slugsValides());
+
+        if ($dryRun) {
+            $supprimables = (clone $candidates)->whereNotExists(function (QueryBuilder $sub): void {
+                $sub->selectRaw('1')->from('company_tag as ct')->whereColumn('ct.tag_id', 'tags.id')
+                    ->where(function (QueryBuilder $q): void {
+                        $q->where('ct.assigned_by', 'user')
+                            ->orWhereRaw('NOT (' . FichesProtegees::conditionSql('ct.company_id') . ')');
+                    });
+            });
+        } else {
+            $supprimables = (clone $candidates)->whereNotExists(function (QueryBuilder $sub): void {
                 $sub->selectRaw('1')->from('company_tag')->whereColumn('company_tag.tag_id', 'tags.id');
             });
+        }
+
+        $n = (clone $supprimables)->count();
+        $this->compteurs['etiquettes_obsoletes_a_supprimer'] = $n;
 
         // Garde commune des commandes qui suppriment (B15-008) : un plafond de
         // proportion, qui refuse si ce « ménage » visait une grande part des
         // étiquettes — ce serait un détecteur qui se trompe, pas un ménage.
         $total = (int) DB::table('tags')->where('workspace_id', $workspaceId)->count();
-        if (! $this->ecritureAutoriseeSansOperateur('tags', (clone $obsoletes)->count(), $total, 'supprimer')) {
-            return 0;
+        $autorise = $n === 0 || $this->ecritureAutoriseeSansOperateur('tags', $n, $total, 'supprimer');
+        if (! $autorise) {
+            $this->compteurs['garde_b15008_refuserait'] = 1;
+        }
+        if ($dryRun || ! $autorise || $n === 0) {
+            return;
         }
 
-        return $obsoletes->delete();
+        $this->compteurs['etiquettes_obsoletes_supprimees'] = $supprimables->delete();
     }
 
     /**
-     * Les audiences enregistrées qui citent une valeur de secteur ou de taille
-     * hors référentiel (ou une étiquette `sector-`/`size-` obsolète) : après le
-     * reclassement, elles ne viseraient plus personne. Elles ne sont PAS
-     * réécrites d'office — `commerce` se partage désormais en trois secteurs,
-     * c'est un choix de ciblage, pas une traduction.
+     * Les audiences enregistrées qui citent une valeur de secteur, de taille
+     * ou une étiquette que le reclassement rend obsolète (`it_saas`, `micro`,
+     * `sector-services-pro`, `nature-entreprise`…).
      *
-     * @return list<array{id: string, nom: string, valeurs: string}>
+     * Deux familles, et la seconde est la dangereuse :
+     *  - une audience d'INCLUSION (« secteur = it_saas ») ne vise plus
+     *    personne ;
+     *  - une audience d'EXCLUSION (bloc `not`, opérateurs `neq`, `not_in`)
+     *    n'exclut plus rien : elle s'ÉLARGIT à toute la base.
+     *
+     * Elles ne sont PAS réécrites d'office — `commerce` se partage désormais en
+     * trois secteurs, c'est un choix de ciblage, pas une traduction.
+     *
+     * @return list<array{id: string, nom: string, valeurs: string, exclusion: bool}>
      */
-    private function audiencesAReecrire(string $workspaceId): array
+    private function audiencesObsoletes(string $workspaceId): array
     {
         $secteurs = array_keys(Taxonomy::SECTEURS);
         $tailles = array_keys(Taxonomy::TAILLES);
+        $slugsValides = self::slugsValides();
         $sortie = [];
 
         $lignes = DB::table('email_audiences')
@@ -673,15 +863,14 @@ class CrmReferentielsReclasser extends Command
                 continue;
             }
             $fautives = [];
+            $exclusion = false;
             foreach (['all', 'any', 'not'] as $bloc) {
                 foreach (is_array($criteres[$bloc] ?? null) ? $criteres[$bloc] : [] as $cond) {
-                    if (! is_array($cond)) {
+                    if (! is_array($cond) || ! is_string($cond['field'] ?? null)) {
                         continue;
                     }
-                    $champ = $cond['field'] ?? null;
-                    if (! is_string($champ)) {
-                        continue;
-                    }
+                    $champ = $cond['field'];
+                    $op = is_string($cond['op'] ?? null) ? $cond['op'] : '';
                     $valeurs = is_array($cond['value'] ?? null) ? $cond['value'] : [$cond['value'] ?? null];
                     foreach ($valeurs as $v) {
                         if (! is_string($v)) {
@@ -690,25 +879,59 @@ class CrmReferentielsReclasser extends Command
                         $hors = match ($champ) {
                             'sector_main' => ! in_array($v, $secteurs, true),
                             'size_category' => ! in_array($v, $tailles, true),
-                            'tags' => (str_starts_with($v, 'sector-') || str_starts_with($v, 'size-'))
-                                && ! in_array($v, array_merge(
-                                    array_map([EtiquettesClassement::class, 'slugSecteur'], $secteurs),
-                                    array_map([EtiquettesClassement::class, 'slugTaille'], $tailles),
-                                ), true),
+                            'tags' => $v === 'nature-entreprise'
+                                || ((str_starts_with($v, 'sector-') || str_starts_with($v, 'size-'))
+                                    && ! in_array($v, $slugsValides, true)),
                             default => false,
                         };
                         if ($hors) {
                             $fautives[] = "{$champ}={$v}";
+                            if ($bloc === 'not' || in_array($op, ['neq', 'not_in'], true)) {
+                                $exclusion = true;
+                            }
                         }
                     }
                 }
             }
             if ($fautives !== []) {
-                $sortie[] = ['id' => (string) $a->id, 'nom' => (string) $a->name, 'valeurs' => implode(', ', array_unique($fautives))];
+                $sortie[] = [
+                    'id' => (string) $a->id,
+                    'nom' => (string) $a->name,
+                    'valeurs' => implode(', ', array_unique($fautives)),
+                    'exclusion' => $exclusion,
+                ];
             }
         }
 
+        $this->compteurs['audiences_obsoletes'] = count($sortie);
+        $this->compteurs['audiences_exclusion_obsoletes'] = count(array_filter($sortie, static fn (array $a): bool => $a['exclusion']));
+
         return $sortie;
+    }
+
+    /** @param  list<array{id: string, nom: string, valeurs: string, exclusion: bool}>  $audiences */
+    private function afficherAudiences(array $audiences, bool $discret): void
+    {
+        if ($audiences === []) {
+            $this->line('Audiences : aucune ne cite une valeur obsolète.');
+
+            return;
+        }
+        $exclusions = count(array_filter($audiences, static fn (array $a): bool => $a['exclusion']));
+        $this->warn(sprintf(
+            '%d audience(s) citent une valeur obsolète, dont %d d\'EXCLUSION (elles s\'élargiraient à toute la base).',
+            count($audiences),
+            $exclusions,
+        ));
+        if ($discret) {
+            // Journaux publics : aucun nom d'audience.
+            return;
+        }
+        $lignes = [];
+        foreach ($audiences as $a) {
+            $lignes[] = [$a['id'], $a['nom'], $a['exclusion'] ? 'EXCLUSION' : 'inclusion', $a['valeurs']];
+        }
+        $this->table(['id', 'audience', 'type', 'valeurs obsolètes'], $lignes);
     }
 
     private function compter(string $dimension, ?string $avant, ?string $apres): void
@@ -719,8 +942,7 @@ class CrmReferentielsReclasser extends Command
         $this->repartitions[$dimension]['apres'][$b] = ($this->repartitions[$dimension]['apres'][$b] ?? 0) + 1;
     }
 
-    /** @param  list<array{id: string, nom: string, valeurs: string}>  $audiences */
-    private function afficherBilan(bool $dryRun, bool $etiquettes, array $audiences): void
+    private function afficherBilan(bool $dryRun, bool $etiquettes): void
     {
         $this->newLine();
         $this->info($dryRun ? '═══ BILAN DE L\'ESSAI À BLANC (rien n\'a été écrit) ═══' : '═══ BILAN DU RECLASSEMENT ═══');
@@ -790,31 +1012,27 @@ class CrmReferentielsReclasser extends Command
         if (! $etiquettes) {
             unset($compteurs['etiquettes_a_ajouter'], $compteurs['etiquettes_a_retirer'],
                 $compteurs['etiquettes_ajoutees'], $compteurs['etiquettes_retirees'],
-                $compteurs['etiquettes_obsoletes_supprimees']);
+                $compteurs['etiquettes_obsoletes_a_supprimer'], $compteurs['etiquettes_obsoletes_supprimees'],
+                $compteurs['garde_b15008_refuserait']);
         }
         $this->table(['compteur', 'nombre'], array_map(
             static fn (string $cle, int $n): array => [$cle, $n],
             array_keys($compteurs),
             array_values($compteurs),
         ));
-
-        if ($audiences !== []) {
-            $this->newLine();
-            $this->warn(count($audiences) . ' audience(s) citent des valeurs hors référentiel — à réécrire à l\'écran :');
-            $this->table(['id', 'audience', 'valeurs obsolètes'], array_map(
-                static fn (array $a): array => [$a['id'], $a['nom'], $a['valeurs']],
-                $audiences,
-            ));
-        }
     }
 
-    private static function texte(mixed $valeur): ?string
+    /**
+     * La valeur telle que la base la rend : une chaîne vide RESTE une chaîne
+     * vide (ce n'est pas NULL, et la garde de concurrence doit la comparer
+     * telle quelle).
+     */
+    private static function brut(mixed $valeur): ?string
     {
         if ($valeur === null) {
             return null;
         }
-        $v = is_scalar($valeur) ? (string) $valeur : '';
 
-        return $v === '' ? null : $v;
+        return is_scalar($valeur) ? (string) $valeur : null;
     }
 }

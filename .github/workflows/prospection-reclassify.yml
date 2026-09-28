@@ -41,7 +41,9 @@ jobs:
             docker compose exec -u root -T api php artisan prospection:purge-non-commercial < /dev/null
             # Idempotent — une fiche déjà juste n'est pas réécrite. Le PREMIER
             # passage (4,3 M de fiches) se fait à la main, cf. la PR du chantier 1.
-            docker compose exec -u root -T api php artisan crm:referentiels:reclasser < /dev/null
+            # --compteurs-seulement : dépôt PUBLIC, journaux lisibles par tous —
+            # aucun nom d'audience, seulement des nombres.
+            docker compose exec -u root -T api php artisan crm:referentiels:reclasser --compteurs-seulement < /dev/null
             docker compose exec -u root -T api php artisan coverage:refresh-matrix < /dev/null || echo "coverage refresh KO (non bloquant)"
             docker compose exec -u root -T api php artisan prospection:stats < /dev/null
           EOF

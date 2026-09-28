@@ -17,9 +17,17 @@ use Illuminate\Support\Facades\Log;
 
 class AudienceBuilderService
 {
+    /**
+     * `entity_nature` (2026-09-28, chantier « référentiels ») : viser « les
+     * associations » ou « les CCI » passait jusqu'ici par l'étiquette
+     * `nature-*`, qui n'est posée qu'à l'enrichissement. La colonne est
+     * désormais renseignée sur toutes les fiches (les fiches INSEE portent
+     * `entreprise`), indexée, et ses valeurs sont celles de
+     * `Taxonomy::ENTITY_NATURES`.
+     */
     public const WHITELIST_FIELDS = [
         'prospection_status', 'department_code', 'region_code', 'commune_code',
-        'size_category', 'sector_main', 'priority', 'quality_score',
+        'size_category', 'sector_main', 'entity_nature', 'priority', 'quality_score',
         'tags', 'has_email', 'enriched_at', 'best_email_confidence',
     ];
 

@@ -1,0 +1,34 @@
+cle,libelle
+agriculture,"Agriculture, sylviculture, pêche"
+agroalimentaire,Agroalimentaire et boissons
+industrie,Industrie
+energie,Énergie
+eau_dechets,"Eau, déchets, dépollution"
+btp,Bâtiment et travaux publics
+automobile,Automobile (commerce et réparation)
+commerce_gros,Commerce de gros
+commerce_detail,Commerce de détail
+transport_logistique,Transport et logistique
+hebergement_tourisme,Hébergement et tourisme
+restauration,Restauration
+edition_medias,"Édition, audiovisuel, médias"
+numerique_telecoms,Numérique et télécoms
+banque_finance,Banque et finance
+assurance,Assurance
+immobilier,Immobilier
+droit,Droit
+comptabilite_audit,Comptabilité et audit
+conseil_management,Conseil et management
+architecture_ingenierie,"Architecture, ingénierie, contrôle technique"
+recherche_developpement,Recherche et développement
+marketing_publicite,"Marketing, publicité, études"
+services_specialises,"Design, photo, traduction et services spécialisés"
+services_entreprises,Services aux entreprises
+enseignement_formation,Enseignement et formation
+sante,Santé humaine et vétérinaire
+medico_social,Médico-social et action sociale
+culture_sport_loisirs,"Culture, sport et loisirs"
+services_personne,Services à la personne
+administration_publique,Administration publique
+interprofessionnel,Interprofessionnel
+non_classe,Non classé

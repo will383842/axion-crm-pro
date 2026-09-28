@@ -43,7 +43,7 @@ class CompaniesController extends ApiController
      *
      *     @OA\Parameter(name="per_page", in="query", @OA\Schema(type="integer", default=25, maximum=100)),
      *     @OA\Parameter(name="filter[naf]", in="query", @OA\Schema(type="string", example="6201Z")),
-     *     @OA\Parameter(name="filter[size_category]", in="query", @OA\Schema(type="string", enum={"tpe","pme","eti","ge"})),
+     *     @OA\Parameter(name="filter[size_category]", in="query", @OA\Schema(type="string", enum={"tpe","pme","eti","grand_groupe"})),
      *     @OA\Parameter(name="filter[priority]", in="query", @OA\Schema(type="string", enum={"haute","moyenne","basse","gelee"})),
      *     @OA\Parameter(name="filter[denomination]", in="query", @OA\Schema(type="string")),
      *     @OA\Parameter(name="sort", in="query", @OA\Schema(type="string", example="-quality_score")),

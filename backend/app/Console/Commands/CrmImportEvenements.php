@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Crm\Referentiels\Classement;
 use App\Crm\Taxonomy;
 use App\Services\Audit\AuditHashChain;
 use App\Support\WorkspaceContext;
@@ -230,6 +231,21 @@ class CrmImportEvenements extends Command
         $valeurs = ['type' => $type, 'appel_intervenants' => $appel, 'verifie' => $verifie];
         foreach (self::CHAMPS_TEXTE as $champ) {
             $valeurs[$champ] = $this->texte($brut, $champ);
+        }
+        // Région : UN seul codage, le code INSEE (`AURA` → `84`), comme
+        // `companies.region_code` — sinon on ne peut pas croiser « événements
+        // et organisations d'une même région ». Une région illisible est
+        // refusée (le CHECK `events_region_check` la refuserait de toute
+        // façon) ; une région absente se déduit du département.
+        $regionLue = $this->texte($brut, 'region');
+        if ($regionLue !== null) {
+            $region = Classement::region($regionLue);
+            if ($region === null) {
+                throw new InvalidArgumentException('region_inconnue');
+            }
+            $valeurs['region'] = $region;
+        } else {
+            $valeurs['region'] = Classement::regionDuDepartement($this->texte($brut, 'departement_code'));
         }
         $notes = $this->expurger($valeurs['notes']);
         if ($notes !== $valeurs['notes']) {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Crm\Taxonomy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -69,9 +70,9 @@ class DashboardController extends ApiController
             'quality_distribution' => $this->repartition('companies', $espace, 'quality_tier', [
                 'complete' => 0, 'partielle' => 0, 'basique' => 0,
             ]),
-            'size_distribution' => $this->repartition('companies', $espace, 'size_category', [
-                'artisan' => 0, 'tpe' => 0, 'pme' => 0, 'eti' => 0, 'grande_entreprise' => 0,
-            ]),
+            // Les tailles du référentiel unique (`Taxonomy::TAILLES`), plus
+            // aucune liste recopiée ici.
+            'size_distribution' => $this->repartition('companies', $espace, 'size_category', self::taillesAZero()),
             'period_label' => $this->libellePeriode($r->query('period')),
         ]));
     }
@@ -94,10 +95,14 @@ class DashboardController extends ApiController
             'scraper_runs_24h' => 0,
             'llm_cost_eur_month' => 0,
             'quality_distribution' => ['complete' => 0, 'partielle' => 0, 'basique' => 0],
-            'size_distribution' => [
-                'artisan' => 0, 'tpe' => 0, 'pme' => 0, 'eti' => 0, 'grande_entreprise' => 0,
-            ],
+            'size_distribution' => self::taillesAZero(),
         ];
+    }
+
+    /** @return array<string, int> */
+    private static function taillesAZero(): array
+    {
+        return array_fill_keys(array_keys(Taxonomy::TAILLES), 0);
     }
 
     /** Un compteur qui ne peut pas emporter l'écran avec lui. */

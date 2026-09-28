@@ -245,15 +245,25 @@ test('le waterfall refuse d enrichir une fiche protegee, et enrichit le temoin',
         ->and(DB::table('companies')->where('id', $temoin)->value('enriched_at'))->not->toBeNull();
 });
 
-test('reclassify-size ne range pas la fiche protegee en TPE, mais classe le temoin', function () {
+test('le reclassement de masse ne touche pas la fiche protegee, mais classe le temoin', function () {
+    // `prospection:reclassify-size` (qui rangeait les organisateurs en « TPE »)
+    // a été remplacée le 2026-09-28 par `crm:referentiels:reclasser`, qui
+    // écrit secteur, taille, nature, région ET étiquettes : la garde la suit.
+    // Les deux fiches portent la MÊME donnée INSEE : seule la protection
+    // explique que l'une soit classée et l'autre non.
     $espace = fpEspace();
-    $protegee = fpProtegee($espace);
-    $temoin = fpOrdinaire($espace);
+    $insee = ['naf' => '62.01Z', 'effectif_range' => '21'];
+    $protegee = fpProtegee($espace, $insee);
+    $temoin = fpOrdinaire($espace, $insee);
 
-    Artisan::call('prospection:reclassify-size', ['--all' => true]);
+    $slug = (string) DB::table('workspaces')->where('id', $espace)->value('slug');
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $slug]);
 
-    expect(DB::table('companies')->where('id', $protegee)->value('size_category'))->toBeNull()
-        ->and(DB::table('companies')->where('id', $temoin)->value('size_category'))->toBe('tpe');
+    $lire = static fn (int $id): object => DB::table('companies')->where('id', $id)->first(['size_category', 'sector_main']);
+    expect($lire($protegee)->size_category)->toBeNull()
+        ->and($lire($protegee)->sector_main)->toBeNull()
+        ->and($lire($temoin)->size_category)->toBe('pme')
+        ->and($lire($temoin)->sector_main)->toBe('numerique_telecoms');
 });
 
 test('une audience n accueille pas la fiche protegee, mais accueille le temoin', function () {

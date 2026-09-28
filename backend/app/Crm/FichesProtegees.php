@@ -28,8 +28,12 @@ use Illuminate\Support\Facades\DB;
  * porte l'un des tags ci-dessous — posé verrouillé par l'ingestion, et que les
  * actions de masse refusent de retirer.
  *
- * Non couvert, sans gravité aujourd'hui : `prospection:reclassify-sector`
- * (ne touche que les fiches à NAF, donnée factuelle) et
+ * Depuis le 2026-09-28, `prospection:reclassify-size` et
+ * `prospection:reclassify-sector` n'existent plus : le reclassement de masse
+ * est `crm:referentiels:reclasser`, qui EXCLUT ces fiches (secteur, taille,
+ * nature, région et étiquettes).
+ *
+ * Non couvert, sans gravité aujourd'hui :
  * `AudienceBuilderService::evaluateForCompany` (protégé via le waterfall).
  * `/coverage/enrich` et `bulk-enrich` empilent des jobs que le waterfall
  * refuse : la garde est au waterfall, pas en double dans chaque sélecteur.

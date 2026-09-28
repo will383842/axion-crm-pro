@@ -62,10 +62,12 @@ declare(strict_types=1);
  * le 2026-08-22 (191/209 → 190/208 — constat H46-003 : `PentestSelfCheck`
  * appelle `SsrfGuard::enabled()` au lieu de recopier sa lecture d'`env()`, et
  * l'entrée `larastan.noEnvCallsOutsideOfConfig` qui gelait cette recopie
- * disparaît avec elle). Ne peuvent que DÉCROÎTRE.
+ * disparaît avec elle), puis le 2026-09-28 (190/208 → 187/204 — chantier
+ * « référentiels » : les trois tables recopiées d'`AutoClassifierService`
+ * disparaissent avec leurs trois entrées). Ne peuvent que DÉCROÎTRE.
  */
-const BASELINE_MAX_ENTREES = 190;
-const BASELINE_MAX_ERREURS = 208;
+const BASELINE_MAX_ENTREES = 187;
+const BASELINE_MAX_ERREURS = 204;
 
 /**
  * Chemins sur lesquels aucune entrée de baseline n'est tolérée.

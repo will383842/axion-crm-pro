@@ -6,9 +6,9 @@
  * Fixtures FICTIVES uniquement (dépôt public) : `example.invalid`, noms « ZZ ».
  */
 
-use App\Crm\Scraping\ScrapedRecord;
 use App\Crm\Taxonomy;
 use App\Models\Workspace;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -103,7 +103,7 @@ test('les CHECK des evenements en base suivent la taxonomie', function () {
 
 test('la nature reseau est acceptee par la base et par le format pivot', function () {
     expect(DB::table('companies')->where('id', $this->club)->value('entity_nature'))->toBe('reseau')
-        ->and(ScrapedRecord::ENTITY_NATURES)->toContain('reseau');
+        ->and(array_keys(Taxonomy::ENTITY_NATURES))->toContain('reseau');
 });
 
 test('la source evenements-pro est au registre, active, des la migration', function () {
@@ -271,4 +271,40 @@ test('un evenement recurrent sans date est accepte', function () {
     $event = DB::table('events')->where('external_ref', 'zz-bni')->first();
     expect($event->date_debut)->toBeNull()
         ->and($event->recurrence)->toBe('chaque mardi 7h');
+});
+
+// ── Référentiels (2026-09-28) : la région est un code INSEE ────────────────
+
+test('la region du sourcing (AURA) est enregistree en code INSEE (84)', function () {
+    // `events.region` et `companies.region_code` parlent désormais la même
+    // langue : on peut croiser événements et organisations d'une région.
+    Artisan::call('crm:import-evenements', ['file' => evtFichier([
+        evtLigne('zz-reg-1'),
+        evtLigne('zz-reg-2', ['region' => 'Île-de-France']),
+        evtLigne('zz-reg-3', ['region' => null, 'departement_code' => '69']),
+    ])]);
+
+    expect(DB::table('events')->where('external_ref', 'zz-reg-1')->value('region'))->toBe('84')
+        ->and(DB::table('events')->where('external_ref', 'zz-reg-2')->value('region'))->toBe('11')
+        // Sans région, elle se déduit du département.
+        ->and(DB::table('events')->where('external_ref', 'zz-reg-3')->value('region'))->toBe('84');
+});
+
+test('une region illisible est refusee, et la base refuse aussi un sigle', function () {
+    Artisan::call('crm:import-evenements', ['file' => evtFichier([
+        evtLigne('zz-reg-x', ['region' => 'Atlantide']),
+    ])]);
+
+    expect(Artisan::output())->toContain('region_inconnue')
+        ->and(DB::table('events')->where('external_ref', 'zz-reg-x')->exists())->toBeFalse();
+
+    // Le CHECK `events_region_check` : un chemin qui oublierait la conversion
+    // ne pourrait pas écrire un sigle.
+    expect(fn () => DB::table('events')->insert([
+        'workspace_id' => $this->espace,
+        'external_ref' => 'zz-reg-sigle',
+        'nom' => 'ZZ sigle',
+        'type' => 'salon',
+        'region' => 'AURA',
+    ]))->toThrow(QueryException::class, 'events_region_check');
 });

@@ -3,7 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Contracts\InseeClient;
-use App\Services\Prospection\SectorClassifier;
+use App\Crm\Referentiels\Classement;
+use App\Crm\Referentiels\NomenclatureNaf;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -72,10 +73,12 @@ class ProspectionCollect extends Command
             DB::table('companies')->upsert(
                 $buffer,
                 ['workspace_id', 'siren'],
+                // `entity_nature` est posée à la CRÉATION seulement : une nature
+                // déjà décidée (à la main, par un import) n'est jamais réécrite.
                 [
                     'denomination', 'naf', 'legal_form', 'effectif_range', 'size_category',
-                    'sector_main', 'address', 'postcode', 'city', 'city_name', 'insee',
-                    'siret', 'enseigne', 'metadata', 'discovery_source', 'department_code', 'updated_at',
+                    'sector_main', 'naf_nomenclature', 'naf_rev2', 'address', 'postcode', 'city', 'city_name', 'insee',
+                    'siret', 'enseigne', 'metadata', 'discovery_source', 'department_code', 'region_code', 'updated_at',
                 ],
             );
             $buffer = [];
@@ -89,6 +92,11 @@ class ProspectionCollect extends Command
                 continue;
             }
             $extra = $this->extraInseeFields($data->raw);
+            // LE calcul unique (`App\Crm\Referentiels`) : la collecte,
+            // l'enrichissement et le reclassement de masse rangent une même
+            // entreprise dans le même secteur et la même taille.
+            $naf = NomenclatureNaf::classer($data->naf);
+            $categorie = is_array($data->raw['uniteLegale'] ?? null) ? ($data->raw['uniteLegale']['categorieEntreprise'] ?? null) : null;
             $buffer[] = [
                 'workspace_id' => $workspaceId,
                 'siren' => $data->siren,
@@ -96,11 +104,15 @@ class ProspectionCollect extends Command
                 'naf' => $data->naf,
                 'legal_form' => $data->legalForm,
                 'effectif_range' => $data->effectifRange,
-                'size_category' => $this->sizeFrom(
+                'size_category' => Classement::tailleDepuisInsee(
                     $data->effectifRange,
-                    is_array($data->raw['uniteLegale'] ?? null) ? ($data->raw['uniteLegale']['categorieEntreprise'] ?? null) : null,
+                    is_string($categorie) ? $categorie : null,
                 ),
-                'sector_main' => SectorClassifier::fromNaf($data->naf),
+                'sector_main' => $naf->secteur,
+                'naf_nomenclature' => $naf->nomenclature,
+                'naf_rev2' => $naf->codeRev2,
+                'entity_nature' => 'entreprise',
+                'region_code' => Classement::regionDuDepartement($deptCode),
                 'address' => $data->address,
                 'postcode' => $data->postcode,
                 'city' => $data->city,
@@ -137,11 +149,6 @@ class ProspectionCollect extends Command
     }
 
     /**
-     * Dérive la catégorie de taille (tpe/pme/eti/grande_entreprise) depuis la
-     * tranche d'effectif INSEE (`trancheEffectifsUniteLegale`). Les tranches
-     * non renseignées (NN/null) et 00–03 → TPE (micro, cas le plus fréquent).
-     */
-    /**
      * Champs INSEE supplémentaires utiles (stockés en metadata JSONB) : SIRET,
      * enseigne, catégorie officielle (TPE/PME/ETI/GE), date de création, forme
      * juridique, ESS, coordonnées GPS Lambert.
@@ -167,32 +174,5 @@ class ProspectionCollect extends Command
             'gps_lambert_x' => $adr['coordonneeLambertAbscisseEtablissement'] ?? null,
             'gps_lambert_y' => $adr['coordonneeLambertOrdonneeEtablissement'] ?? null,
         ], static fn ($v) => $v !== null && $v !== '');
-    }
-
-    /**
-     * Catégorie de taille : priorité à la catégorie OFFICIELLE INSEE
-     * (calculée sur tout le groupe), repli sur la tranche d'effectif du siège.
-     */
-    private function sizeFrom(?string $tranche, ?string $categorie): string
-    {
-        $cat = strtoupper(trim((string) $categorie));
-        if ($cat === 'GE') {
-            return 'grande_entreprise';
-        }
-        if ($cat === 'ETI') {
-            return 'eti';
-        }
-        $t = trim((string) $tranche);
-        $hasStaff = in_array($t, ['11', '12', '21', '22', '31'], true);
-        if ($cat === 'PME') {
-            return $hasStaff ? 'pme' : 'tpe';
-        }
-
-        return match (true) {
-            $hasStaff => 'pme',               // 10–249
-            in_array($t, ['32', '41', '42', '51'], true) => 'eti',               // 250–4999
-            in_array($t, ['52', '53'], true) => 'grande_entreprise',  // 5000+
-            default => 'tpe',               // 00–03, NN, null
-        };
     }
 }

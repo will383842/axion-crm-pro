@@ -31,7 +31,10 @@ use Illuminate\Support\Facades\DB;
  * Depuis le 2026-09-28, `prospection:reclassify-size` et
  * `prospection:reclassify-sector` n'existent plus : le reclassement de masse
  * est `crm:referentiels:reclasser`, qui EXCLUT ces fiches (secteur, taille,
- * nature, région et étiquettes).
+ * nature, région et étiquettes) — sauf `--inclure-protegees` (2026-09-29),
+ * levée EXPLICITE et limitée au classement : les six colonnes de classement
+ * et les étiquettes `sector-`/`size-`/`region-`, jamais un contact, une
+ * coordonnée ni une fiche.
  *
  * Non couvert, sans gravité aujourd'hui :
  * `AudienceBuilderService::evaluateForCompany` (protégé via le waterfall).

@@ -665,10 +665,14 @@ final class Taxonomy
      */
     public static function secteursRepresentables(): array
     {
-        return array_values(array_filter(
-            array_keys(self::SECTEURS),
-            static fn (string $cle): bool => $cle !== self::SECTEUR_NON_CLASSE,
-        ));
+        $cles = [];
+        foreach (array_keys(self::SECTEURS) as $cle) {
+            if ($cle !== self::SECTEUR_NON_CLASSE) {
+                $cles[] = $cle;
+            }
+        }
+
+        return $cles;
     }
 
     /**

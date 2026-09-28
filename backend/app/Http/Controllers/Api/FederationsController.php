@@ -77,7 +77,7 @@ class FederationsController extends ApiController
                 'f.parent_company_id', 't.denomination AS tete_denomination',
             ]);
 
-        $ids = $lignes->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+        $ids = array_values($lignes->pluck('id')->map(fn ($id): int => (int) $id)->all());
         $antennes = $this->compterAntennes($workspaceId, $ids);
         $avenir = $this->avecEvenementAVenir($workspaceId, $ids);
 
@@ -281,7 +281,7 @@ class FederationsController extends ApiController
 
     /**
      * @param  list<int>  $ids
-     * @return array<int, true>
+     * @return array<int, bool>
      */
     private function avecEvenementAVenir(string $workspaceId, array $ids): array
     {

@@ -1,14 +1,25 @@
 import { Card, CardHeader, CardTitle, CardEyebrow, cn } from '@/components/ui';
+import { TAILLES, type CleTaille } from '@/lib/referentiels.generated';
 
 export type SizeDistribution = Record<string, number>;
 
-const BUCKETS: Array<{ key: string; label: string; bar: string; ring: string }> = [
-  { key: 'artisan',           label: 'Artisan', bar: 'from-sky-400 to-sky-600',          ring: 'ring-sky-200/60 dark:ring-sky-900/40' },
-  { key: 'tpe',               label: 'TPE',     bar: 'from-violet-400 to-violet-600',    ring: 'ring-violet-200/60 dark:ring-violet-900/40' },
-  { key: 'pme',               label: 'PME',     bar: 'from-emerald-400 to-emerald-600',  ring: 'ring-emerald-200/60 dark:ring-emerald-900/40' },
-  { key: 'eti',               label: 'ETI',     bar: 'from-amber-400 to-amber-600',      ring: 'ring-amber-200/60 dark:ring-amber-900/40' },
-  { key: 'grande_entreprise', label: 'Grande',  bar: 'from-rose-400 to-rose-600',        ring: 'ring-rose-200/60 dark:ring-rose-900/40' },
-];
+/**
+ * Les tailles (clés ET libellés) viennent du référentiel unique généré depuis
+ * `Taxonomy::TAILLES` ; seules les couleurs sont propres à l'écran. Une
+ * taille ajoutée sans couleur fait échouer `pnpm typecheck`.
+ */
+const COULEURS: Record<CleTaille, { bar: string; ring: string }> = {
+  tpe: { bar: 'from-violet-400 to-violet-600', ring: 'ring-violet-200/60 dark:ring-violet-900/40' },
+  pme: { bar: 'from-emerald-400 to-emerald-600', ring: 'ring-emerald-200/60 dark:ring-emerald-900/40' },
+  eti: { bar: 'from-amber-400 to-amber-600', ring: 'ring-amber-200/60 dark:ring-amber-900/40' },
+  grand_groupe: { bar: 'from-rose-400 to-rose-600', ring: 'ring-rose-200/60 dark:ring-rose-900/40' },
+};
+
+const BUCKETS: Array<{ key: string; label: string; bar: string; ring: string }> = TAILLES.map((t) => ({
+  key: t.code,
+  label: t.libelle,
+  ...COULEURS[t.code],
+}));
 
 export function SizeDistributionChart({ data }: { data: SizeDistribution }) {
   const max = Math.max(1, ...BUCKETS.map((b) => data[b.key] ?? 0));

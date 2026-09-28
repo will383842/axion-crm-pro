@@ -15,6 +15,13 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import {
+  NATURES,
+  REGIONS,
+  SECTEURS,
+  TAILLES,
+  type EntreeReferentiel,
+} from '@/lib/referentiels.generated';
+import {
   Button,
   Card,
   cn,
@@ -46,42 +53,18 @@ const DEPT_PRESETS: Array<{ code: string; label: string }> = [
   { code: '44', label: 'Loire-Atlantique' },
 ];
 
-const REGION_PRESETS: Array<{ code: string; label: string }> = [
-  { code: '11', label: 'Île-de-France' },
-  { code: '24', label: 'Centre-Val de Loire' },
-  { code: '27', label: 'Bourgogne-Franche-Comté' },
-  { code: '28', label: 'Normandie' },
-  { code: '32', label: 'Hauts-de-France' },
-  { code: '44', label: 'Grand Est' },
-  { code: '52', label: 'Pays de la Loire' },
-  { code: '53', label: 'Bretagne' },
-  { code: '75', label: 'Nouvelle-Aquitaine' },
-  { code: '76', label: 'Occitanie' },
-  { code: '84', label: 'Auvergne-Rhône-Alpes' },
-  { code: '93', label: 'Provence-Alpes-Côte d\'Azur' },
-  { code: '94', label: 'Corse' },
-];
+// Régions, tailles, secteurs, natures : le référentiel unique, GÉNÉRÉ depuis
+// le serveur (`Taxonomy`). Les listes recopiées qui vivaient ici ne
+// connaissaient que 10 secteurs sur 15, et des tailles (`micro`, `grande`,
+// libellées « TPE (10-49) », faux au sens INSEE) que la collecte ne
+// produisait pas : une audience « Micro » ne trouvait aucune fiche collectée.
+const enPresets = (liste: readonly EntreeReferentiel[]): Array<{ code: string; label: string }> =>
+  liste.map((e) => ({ code: e.code, label: e.libelle }));
 
-const SIZE_PRESETS: Array<{ code: string; label: string }> = [
-  { code: 'micro',   label: 'Micro (1-9)' },
-  { code: 'tpe',     label: 'TPE (10-49)' },
-  { code: 'pme',     label: 'PME (50-249)' },
-  { code: 'eti',     label: 'ETI (250-4999)' },
-  { code: 'grande',  label: 'Grande (5000+)' },
-];
-
-const SECTOR_PRESETS: Array<{ code: string; label: string }> = [
-  { code: 'it_saas',                 label: 'IT / SaaS' },
-  { code: 'btp',                     label: 'BTP' },
-  { code: 'sante',                   label: 'Santé' },
-  { code: 'commerce',                label: 'Commerce' },
-  { code: 'services_pro',            label: 'Services pro' },
-  { code: 'finance_assurance',       label: 'Finance / Assurance' },
-  { code: 'industrie',               label: 'Industrie' },
-  { code: 'hotellerie_restauration', label: 'Hôtellerie / Resto' },
-  { code: 'transport',               label: 'Transport' },
-  { code: 'agro_alimentaire',        label: 'Agro-alimentaire' },
-];
+const REGION_PRESETS = enPresets(REGIONS);
+const SIZE_PRESETS = enPresets(TAILLES);
+const SECTOR_PRESETS = enPresets(SECTEURS);
+const NATURE_PRESETS = enPresets(NATURES);
 
 const STATUS_PRESETS: Array<{ code: string; label: string }> = [
   { code: 'pending',              label: 'Pending' },
@@ -117,6 +100,7 @@ export function AudienceBuilderPage() {
   const [regions, setRegions] = useState<string[]>([]);
   const [sizes, setSizes] = useState<string[]>([]);
   const [sectors, setSectors] = useState<string[]>([]);
+  const [natures, setNatures] = useState<string[]>([]);
   const [statuses, setStatuses] = useState<string[]>(['ready_for_outreach']);
   const [qualityMin, setQualityMin] = useState<number>(0);
   const [hasEmail, setHasEmail] = useState<boolean>(false);
@@ -129,6 +113,7 @@ export function AudienceBuilderPage() {
     if (regions.length > 0)     all.push({ field: 'region_code',     op: 'in', value: regions });
     if (sizes.length > 0)       all.push({ field: 'size_category',   op: 'in', value: sizes });
     if (sectors.length > 0)     all.push({ field: 'sector_main',     op: 'in', value: sectors });
+    if (natures.length > 0)     all.push({ field: 'entity_nature',   op: 'in', value: natures });
     if (statuses.length > 0)    all.push({ field: 'prospection_status', op: 'in', value: statuses });
     if (qualityMin > 0)         all.push({ field: 'quality_score',   op: 'gte', value: qualityMin });
     if (hasEmail)               all.push({ field: 'has_email',       op: 'eq',  value: true });
@@ -140,7 +125,7 @@ export function AudienceBuilderPage() {
     if (tagList.length > 0) all.push({ field: 'tags', op: 'contains_any', value: tagList });
 
     return { all };
-  }, [departments, regions, sizes, sectors, statuses, qualityMin, hasEmail, tagsInput]);
+  }, [departments, regions, sizes, sectors, natures, statuses, qualityMin, hasEmail, tagsInput]);
 
   // Preview live (debounced 500ms)
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
@@ -297,6 +282,14 @@ export function AudienceBuilderPage() {
                 selected={sectors}
                 onChange={setSectors}
                 placeholder="Tous secteurs"
+              />
+            </Field>
+            <Field label="Natures d'organisation">
+              <ChipsMultiSelect
+                options={NATURE_PRESETS}
+                selected={natures}
+                onChange={setNatures}
+                placeholder="Toutes natures"
               />
             </Field>
           </Card>

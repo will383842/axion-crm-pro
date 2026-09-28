@@ -3,6 +3,11 @@
  * serveur (`Taxonomy::EVENEMENT_*`). Une valeur inconnue s'affiche telle quelle
  * plutôt que de disparaître.
  */
+import {
+  NATURES as NATURES_REFERENTIEL,
+  REGIONS as REGIONS_REFERENTIEL,
+} from "@/lib/referentiels.generated";
+
 export type Option = { value: string; label: string };
 
 export const TYPES: Option[] = [
@@ -48,16 +53,19 @@ export const PERIODES: Option[] = [
   { value: "", label: "Tous" },
 ];
 
-/** Natures d'organisateur (companies.entity_nature). */
+/**
+ * Natures d'organisateur (companies.entity_nature) — le référentiel unique,
+ * GÉNÉRÉ depuis le serveur. La copie qui vivait ici oubliait `cabinet`.
+ */
 export const NATURES: Option[] = [
   { value: "", label: "Tous" },
-  { value: "cci", label: "Chambres de commerce" },
-  { value: "reseau", label: "Réseaux et clubs d'affaires" },
-  { value: "association", label: "Associations" },
-  { value: "entreprise", label: "Entreprises" },
-  { value: "institution", label: "Institutions" },
-  { value: "enseignement", label: "Enseignement" },
-  { value: "media", label: "Médias" },
+  ...NATURES_REFERENTIEL.map((n) => ({ value: n.code, label: n.libelle })),
+];
+
+/** Régions (code INSEE, comme `companies.region_code`) — référentiel unique. */
+export const REGIONS: Option[] = [
+  { value: "", label: "Toutes régions" },
+  ...REGIONS_REFERENTIEL.map((r) => ({ value: r.code, label: r.libelle })),
 ];
 
 /** Libellés des étapes d'historique (activities.kind). */

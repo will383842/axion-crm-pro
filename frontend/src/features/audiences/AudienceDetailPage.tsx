@@ -12,6 +12,8 @@ import {
   RefreshCw, Edit, Trash2, Users2, Zap, Mail, Building, Send,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { libelleReferentiel } from '@/lib/prospection-referentiels';
+import { SECTEURS, TAILLES } from '@/lib/referentiels.generated';
 import {
   Button,
   Card,
@@ -349,10 +351,10 @@ function MembersTab({
                   {m.department_code ?? '—'}
                 </td>
                 <td className="px-4 py-2.5 text-xs text-slate-600 dark:text-slate-400">
-                  {m.size_category ?? '—'}
+                  {libelleReferentiel(TAILLES, m.size_category) ?? '—'}
                 </td>
                 <td className="px-4 py-2.5 text-xs text-slate-600 dark:text-slate-400">
-                  {m.sector_main ?? '—'}
+                  {libelleReferentiel(SECTEURS, m.sector_main) ?? '—'}
                 </td>
                 <td className="px-4 py-2.5">
                   {m.email ? (

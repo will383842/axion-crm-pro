@@ -8,11 +8,6 @@ describe('SizeCategoryBadge (extended classes)', () => {
     expect(container.firstChild).toHaveClass('bg-sky-100');
   });
 
-  it('applies bg-orange-100 for artisan', () => {
-    const { container } = render(<SizeCategoryBadge size="artisan" />);
-    expect(container.firstChild).toHaveClass('bg-orange-100');
-  });
-
   it('applies bg-indigo-100 for pme', () => {
     const { container } = render(<SizeCategoryBadge size="pme" />);
     expect(container.firstChild).toHaveClass('bg-indigo-100');
@@ -23,8 +18,8 @@ describe('SizeCategoryBadge (extended classes)', () => {
     expect(container.firstChild).toHaveClass('bg-violet-100');
   });
 
-  it('applies bg-fuchsia-100 for grande_entreprise', () => {
-    const { container } = render(<SizeCategoryBadge size="grande_entreprise" />);
+  it('applies bg-fuchsia-100 for grand_groupe', () => {
+    const { container } = render(<SizeCategoryBadge size="grand_groupe" />);
     expect(container.firstChild).toHaveClass('bg-fuchsia-100');
   });
 

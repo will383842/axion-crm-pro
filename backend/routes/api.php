@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\Crm\PersonTimelineController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EvenementsController;
 use App\Http\Controllers\Api\FeaturesController;
+use App\Http\Controllers\Api\FederationsController;
 use App\Http\Controllers\Api\GlobalSearchController;
 use App\Http\Controllers\Api\JournalistAttachmentController;
 use App\Http\Controllers\Api\JournalistsController;
@@ -183,6 +184,16 @@ Route::prefix('v1')->group(function () {
             ->whereNumber('event')
             ->middleware('permission:companies.update');
         Route::get('/companies/{company}/evenements', [EvenementsController::class, 'pourEntreprise']);
+
+        // Fédérations et organisations professionnelles (chantier 3,
+        // 2026-09-29). Mêmes droits que les événements : lire suit la lecture
+        // des entreprises ; faire avancer le partenariat est une modification.
+        // `{federation}` = l'identifiant de la fiche `companies`.
+        Route::get('/federations', [FederationsController::class, 'index']);
+        Route::get('/federations/{federation}', [FederationsController::class, 'show'])->whereNumber('federation');
+        Route::patch('/federations/{federation}/demarche', [FederationsController::class, 'updateDemarche'])
+            ->whereNumber('federation')
+            ->middleware('permission:companies.update');
 
         // Contacts
         // Il n'existe pas de permission `contacts.*` dediee (le referentiel n'en

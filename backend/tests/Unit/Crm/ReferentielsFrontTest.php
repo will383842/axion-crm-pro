@@ -34,7 +34,11 @@ test('le fichier généré porte toutes les valeurs de chaque référentiel', fu
     // « identique » à un fichier vide, et la garde ci-dessus resterait verte.
     $contenu = ExportFront::contenu();
 
-    foreach ([Taxonomy::SECTEURS, Taxonomy::TAILLES, Taxonomy::ENTITY_NATURES, Taxonomy::REGIONS] as $liste) {
+    foreach ([
+        Taxonomy::SECTEURS, Taxonomy::TAILLES, Taxonomy::ENTITY_NATURES, Taxonomy::REGIONS,
+        Taxonomy::FEDERATION_FAMILLES, Taxonomy::FEDERATION_NIVEAUX, Taxonomy::FEDERATION_CONTACTABILITES,
+        Taxonomy::FEDERATION_CERTITUDES, Taxonomy::FEDERATION_PERTINENCES, Taxonomy::FEDERATION_PARTENARIATS,
+    ] as $liste) {
         foreach (array_keys($liste) as $code) {
             expect($contenu)->toContain('{ code: "' . $code . '"');
         }

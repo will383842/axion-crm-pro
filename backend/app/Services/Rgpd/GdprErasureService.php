@@ -2,6 +2,7 @@
 
 namespace App\Services\Rgpd;
 
+use App\Crm\Rgpd\EffacementCoordonneesFiches;
 use App\Services\Audit\AuditHashChain;
 use App\Services\Dedup\DeduplicationService;
 use Illuminate\Database\Query\Builder;
@@ -20,12 +21,31 @@ class GdprErasureService
         private readonly DeduplicationService $dedup,
     ) {}
 
-    /** @return array{deleted: array<string,int>, opt_out_added: bool} */
+    /**
+     * L'effacement est SYNCHRONE et n'emploie, sur `companies` et `contacts`,
+     * que des recherches servies par un index (relecture P1). Sa PREUVE — la
+     * recherche des résidus, et le balayage de la timeline par les numéros
+     * personnels — est DIFFÉRÉE : l'appelant met en file
+     * `App\Jobs\VerifierEffacementRgpd` avec `personnels`, qui ne doit
+     * jamais être archivé ni rendu (ce sont des numéros en clair).
+     *
+     * @return array{deleted: array<string,int>, opt_out_added: bool, verification: string, personnels: list<string>}
+     */
     public function erase(string $subjectEmail, ?string $phone = null, ?string $reason = 'gdpr_art17'): array
     {
         return DB::transaction(function () use ($subjectEmail, $phone, $reason) {
             $email = strtolower(trim($subjectEmail));
             $deleted = [];
+
+            // Les numéros de la personne : celui de la demande, et ceux que
+            // portent SES fiches personnes — relevés AVANT leur suppression.
+            // Une demande de la console ne cite que l'adresse ; le mobile de la
+            // personne n'en est pas moins une de ses coordonnées.
+            $telephones = array_values(array_unique(array_filter(array_merge(
+                [$phone ?? ''],
+                EffacementCoordonneesFiches::telephonesDesContacts($email),
+            ), static fn (string $t): bool => trim($t) !== '')));
+            $clesNom = EffacementCoordonneesFiches::clesNomDesContacts($email);
 
             // On releve les `person_key` AVANT de supprimer : c'est par elles que
             // la timeline (`activities`) est rattachee a la personne. Les
@@ -140,6 +160,20 @@ class GdprErasureService
                         ->orWhereRaw('to_addresses::text ILIKE ?', ['%' . $email . '%']);
                 })
                 ->delete();
+
+            // ── LES FICHES D'ORGANISATION (relecture de la PR #255, 2026-09-29)
+            // L'adresse et le mobile d'une personne vivent aussi sur la fiche de
+            // son organisation : e-mail générique, téléphone, canaux collectés,
+            // et fiches personnes qui portent son numéro sans son adresse. Mis à
+            // NULL — y compris sur une fiche PROTÉGÉE, qui survit. Espace par
+            // espace (RLS) ; seuls les numéros PERSONNELS sortent des fiches
+            // d'organisation (un standard partagé reste à l'organisation).
+            $fiches = EffacementCoordonneesFiches::effacerPartout($email, $telephones, $clesNom);
+            foreach ($fiches['bilan'] as $emplacement => $n) {
+                $deleted['fiches_' . $emplacement] = $n;
+            }
+            $personnels = $fiches['personnels'];
+            $opposables = $fiches['opposables'];
 
             // ── CE QU'ON NE SUPPRIME **PAS**, ET POURQUOI ────────────────────
             //
@@ -311,9 +345,30 @@ class GdprErasureService
                 scopes: DeduplicationService::UNIVERS_OPPOSITION,
             );
 
-            Log::info('GDPR erasure complete', ['email' => $email, 'deleted' => $deleted]);
+            // Chaque AUTRE numéro PERSONNEL est opposé lui aussi : sans cela, le
+            // prochain import le remettrait sur la fiche de l'organisation. Un
+            // standard partagé ne l'est PAS : `opt_out.phone` est global et
+            // fermerait l'organisation entière (la personne reste protégée par
+            // l'opposition sur son adresse et par `contacts_retires`). Et un
+            // numéro personnel ici mais standard dans un autre espace ne l'est
+            // pas non plus (relecture E2 : jamais par union).
+            foreach ($opposables as $telephone) {
+                if ($telephone !== $phone) {
+                    $this->dedup->addOptOut(
+                        null,
+                        $telephone,
+                        source: 'gdpr_erasure',
+                        reason: $reason,
+                        scopes: DeduplicationService::UNIVERS_OPPOSITION,
+                    );
+                }
+            }
 
-            return ['deleted' => $deleted, 'opt_out_added' => true];
+            // La preuve (« plus rien ne reste ») est DIFFÉRÉE : elle parcourt des
+            // tables entières. Le journal ne porte JAMAIS l'adresse en clair.
+            Log::info('GDPR erasure executed, verification deferred', ['email_hash' => hash('sha256', $email), 'deleted' => $deleted]);
+
+            return ['deleted' => $deleted, 'opt_out_added' => true, 'verification' => 'differee', 'personnels' => $personnels];
         });
     }
 

@@ -223,6 +223,20 @@ beforeEach(function () {
         'created_at' => now(),
     ]);
 
+    // 2026-09-29 (chantier 3) : la même fiche est AUSSI une organisation
+    // professionnelle, pour que le balayage visite `/federations` et
+    // `/federations/{federation}` — qui rendent ses coordonnées et celles de
+    // ses contacts (masquées pour le viewer), et la note de démarche.
+    DB::table('federations')->insert([
+        'company_id' => $this->companyId,
+        'workspace_id' => $this->workspace->id,
+        'famille' => 'federation_syndicat_pro',
+        'niveau' => 'national',
+        'pertinence' => 'haute',
+        'contactabilite' => 'email_verifie',
+        'partenariat_note' => 'Rappeler ' . JUM_TEL_CONTACT,
+    ]);
+
     // ⚠️ `person_key` N'EST PAS dans `$fillable` de `App\Models\Contact` : passé
     // à `create()`, il est silencieusement JETÉ. Mesuré le 2026-08-21 — la
     // colonne existe (migration 2026_08_14_000002) et toute la fiche 360° du
@@ -551,6 +565,10 @@ test('BALAYAGE : aucune route GET de l API ne sert une coordonnee en clair a un 
         // Lot L4-C : la fiche d'une personne de la lettre et du guide.
         'personneId' => $this->personneId,
         'event' => $this->eventId,
+        // 2026-09-29 (chantier 3) : la fiche « fédération » de la même
+        // entreprise — elle rend l'e-mail générique, le téléphone ET les
+        // contacts, donc le balayage doit la visiter.
+        'federation' => $this->companyId,
     ];
 
     $cibles = [];

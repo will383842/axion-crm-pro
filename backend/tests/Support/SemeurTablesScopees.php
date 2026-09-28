@@ -50,6 +50,10 @@ final class SemeurTablesScopees
      */
     public const ORDRE = [
         // ── Racines ──────────────────────────────────────────────────────────
+        // 2026-09-29 (chantier 3) : registre des personnes retirees, sans cle
+        // etrangere. EN TETE : le nettoyage (ordre inverse) le vide APRES
+        // `contacts`, dont chaque suppression peut y ecrire.
+        'contacts_retires',
         'companies',
         'contacts',
         'tags',
@@ -92,6 +96,9 @@ final class SemeurTablesScopees
         'email_verification_logs',
         'email_warmup_pools',
         'event_organizers',
+        // 2026-09-29 (chantier 3) : la ligne « organisation professionnelle »
+        // d'une fiche — feuille de `companies`.
+        'federations',
         'health_practitioners',
         'invitations',
         'journalists',
@@ -221,6 +228,10 @@ final class SemeurTablesScopees
             'denomination' => 'ZZ Étanchéité ' . $marque,
         ]);
 
+        $id['contacts_retires'] = $insererAvecId('contacts_retires', [
+            'cle_nom' => hash('sha256', 'zz-retire-' . $marque),
+        ]);
+
         $id['contacts'] = $insererAvecId('contacts', [
             'company_id' => $id['companies'],
             'last_name' => 'ZZ Contact ' . $marque,
@@ -259,6 +270,14 @@ final class SemeurTablesScopees
         $inserer('event_organizers', [
             'event_id' => $id['events'],
             'company_id' => $id['companies'],
+        ]);
+
+        $inserer('federations', [
+            'company_id' => $id['companies'],
+            'famille' => 'ordre',
+            'niveau' => 'national',
+            'pertinence' => 'haute',
+            'contactabilite' => 'aucun_contact',
         ]);
 
         $id['crm_pipelines'] = $insererAvecId('crm_pipelines', [

@@ -50,9 +50,13 @@ final class ScrapedRecordIngestService
      * même si son adresse existe déjà sur une autre fiche (2026-09-27 :
      * l'organisateur d'un événement et son entreprise sont deux fiches).
      *
+     * `federations-2026` (2026-09-29) : même raison — le président d'une
+     * fédération départementale siège souvent aussi à la nationale, et chaque
+     * organisme l'affiche comme SON contact.
+     *
      * @var list<string>
      */
-    private const SOURCES_DEDUP_PAR_ORGANISATION = ['evenements-pro'];
+    private const SOURCES_DEDUP_PAR_ORGANISATION = ['evenements-pro', 'federations-2026'];
 
     public function __construct(private readonly EmailMxValidator $mx) {}
 

@@ -38,6 +38,7 @@ import {
   Send,
   GraduationCap,
   CalendarDays,
+  Landmark,
 } from 'lucide-react';
 import { cn, Tooltip } from '@/components/ui';
 import { WorkspaceSelector } from './WorkspaceSelector';
@@ -166,6 +167,8 @@ function sectionContacts(features: ConsoleFeatures): NavSection {
     { to: '/presse/envois', label: 'Communiqués envoyés', icon: <Send className="h-4 w-4" /> },
     // 2026-09-27 — événements professionnels, organisateurs et relances.
     { to: '/evenements', label: 'Événements', icon: <CalendarDays className="h-4 w-4" /> },
+    // 2026-09-29 — fédérations, ordres, chambres, syndicats (chantier 3).
+    { to: '/federations', label: 'Fédérations', icon: <Landmark className="h-4 w-4" /> },
   );
 
   return { id: 'contacts', title: 'Contacts', items };

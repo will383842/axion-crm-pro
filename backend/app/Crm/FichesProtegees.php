@@ -38,6 +38,10 @@ use Illuminate\Support\Facades\DB;
  * `/coverage/enrich` et `bulk-enrich` empilent des jobs que le waterfall
  * refuse : la garde est au waterfall, pas en double dans chaque sélecteur.
  *
+ * Les CONTACTS de ces fiches sont aussi hors de la purge de rétention
+ * (`rgpd:purge-business-prospects`, 2026-09-29) : c'est l'ordre de Will du
+ * 27/09, et la purge les visait sans le savoir (constat de l'audit du 28/09).
+ *
  * RGPD — la protection ne fait JAMAIS obstacle au droit d'une personne :
  *  - ses fiches `contacts` s'effacent par les chemins habituels (non gardés) ;
  *  - une coordonnée nominative portée par la fiche ELLE-MÊME (`email_generic`,
@@ -53,9 +57,27 @@ use Illuminate\Support\Facades\DB;
  */
 final class FichesProtegees
 {
-    /** @var list<string> */
+    /** Organisateurs d'événements (source `evenements-pro`, 2026-09-27). */
+    public const TAG_ORGANISATEURS = 'src:scraping-evenements-pro';
+
+    /**
+     * Fédérations et organisations professionnelles (source `federations-2026`,
+     * chantier 3, 2026-09-29). Même règle que les organisateurs : Will a
+     * INTERDIT de supprimer leurs contacts (27/09) — ni purge, ni
+     * enrichissement automatique, ni reclassement, ni audience par défaut.
+     */
+    public const TAG_FEDERATIONS = 'src:scraping-federations-2026';
+
+    /**
+     * ⚠️ Chaque slug ajouté ici exige une NOUVELLE migration qui réinstalle le
+     * déclencheur de la base (sa liste est figée) — `FichesProtegeesTest` lit la
+     * fonction installée et rougit sinon.
+     *
+     * @var list<string>
+     */
     public const TAGS = [
-        'src:scraping-evenements-pro',
+        self::TAG_ORGANISATEURS,
+        self::TAG_FEDERATIONS,
     ];
 
     /**

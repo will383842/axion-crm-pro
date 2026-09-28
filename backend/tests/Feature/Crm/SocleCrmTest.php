@@ -131,6 +131,17 @@ test('les CHECK en base correspondent exactement à App\\Crm\\Taxonomy', functio
         static fn (int|string $code): string => (string) $code,
         array_keys(Taxonomy::REGIONS),
     ));
+    // Fédérations (chantier 3, 2026-09-29) : chaque liste fermée de la table
+    // `federations`, y compris les deux tableaux (secteurs représentés, sans
+    // `non_classe` ; tailles des adhérents).
+    socleExpectCheck('federations_famille_check', array_keys(Taxonomy::FEDERATION_FAMILLES));
+    socleExpectCheck('federations_niveau_check', array_keys(Taxonomy::FEDERATION_NIVEAUX));
+    socleExpectCheck('federations_certitude_check', array_keys(Taxonomy::FEDERATION_CERTITUDES));
+    socleExpectCheck('federations_pertinence_check', array_keys(Taxonomy::FEDERATION_PERTINENCES));
+    socleExpectCheck('federations_contactabilite_check', array_keys(Taxonomy::FEDERATION_CONTACTABILITES));
+    socleExpectCheck('federations_partenariat_check', array_keys(Taxonomy::FEDERATION_PARTENARIATS));
+    socleExpectCheck('federations_secteurs_check', Taxonomy::secteursRepresentables());
+    socleExpectCheck('federations_tailles_adherents_check', array_keys(Taxonomy::TAILLES));
 });
 
 test('seul email_redaction est diffusable par mailing', function () {

@@ -6,6 +6,7 @@ use App\Console\Commands\CrmSondeCleDePersonne;
 use App\Console\Commands\CrmSondeNonDiffusibles;
 use App\Console\Commands\CrmSondePersonnes;
 use App\Console\Commands\PartmanMaintenir;
+use App\Console\Commands\RgpdVerificationsEnAttente;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
@@ -204,6 +205,10 @@ Schedule::command(CrmSondeNonDiffusibles::SIGNATURE_PLANIFIEE)
     });
 
 Schedule::command('rgpd:anonymize-ips')->dailyAt('04:30');
+
+// Relecture R7 (PR #255) : un effacement dont la preuve différée n'a pas
+// conclu en 24 h est SIGNALÉ (journal `error`), pas seulement affiché.
+Schedule::command(RgpdVerificationsEnAttente::SIGNATURE_PLANIFIEE)->dailyAt('07:10')->withoutOverlapping(30)->onOneServer();
 Schedule::command('anomaly:detect')->everyFifteenMinutes();
 Schedule::command('signals:nightly-scan')->dailyAt('02:00');
 

@@ -190,13 +190,16 @@ final class SiteGdprService
                 // Les numéros de la personne, relevés AVANT la suppression de
                 // ses fiches (cf. EffacementCoordonneesFiches) — dans le
                 // contexte de l'espace, sans quoi la RLS ne montrerait rien.
-                $telephones = WorkspaceContext::run(
+                [$telephones, $clesNom] = WorkspaceContext::run(
                     $businessId,
-                    fn (): array => EffacementCoordonneesFiches::telephonesDesContacts($email, $businessId),
+                    fn (): array => [
+                        EffacementCoordonneesFiches::telephonesDesContacts($email, $businessId),
+                        EffacementCoordonneesFiches::clesNomDesContacts($email, $businessId),
+                    ],
                 );
                 $deleted['business'] = WorkspaceContext::run(
                     $businessId,
-                    fn (): array => DB::transaction(function () use ($businessId, $personKey, $email, $telephones): array {
+                    fn (): array => DB::transaction(function () use ($businessId, $personKey, $email, $telephones, $clesNom): array {
                         $contacts = DB::table('contacts')
                             ->where('workspace_id', $businessId)
                             ->where(function ($q) use ($personKey, $email): void {
@@ -244,7 +247,7 @@ final class SiteGdprService
                         // Les fiches d'ORGANISATION qui portent son adresse ou son
                         // mobile (e-mail générique, téléphone, canaux) — même
                         // définition que l'effacement console (PR #255).
-                        $fiches = EffacementCoordonneesFiches::effacer($email, $telephones, $businessId);
+                        $fiches = EffacementCoordonneesFiches::effacer($email, $telephones, $clesNom, $businessId);
 
                         // 🔴 Le journal DANS le contexte ET dans la transaction —
                         // cf. `journal()`.

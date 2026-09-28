@@ -593,7 +593,8 @@ class CrmImportFederations extends Command
             if ($p['email'] === null) {
                 continue;
             }
-            $contact = DB::table('contacts')->where('company_id', $companyId)->where('email', $p['email'])->first(['id', 'metadata']);
+            $contact = DB::table('contacts')->where('company_id', $companyId)->where('email', $p['email'])
+                ->whereNull('deleted_at')->first(['id', 'metadata']);
             if ($contact === null) {
                 continue;
             }

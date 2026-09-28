@@ -21,7 +21,10 @@ use Illuminate\Support\Facades\DB;
  *   - dans `companies.phone` : le standard d'un club, c'est un portable ;
  *   - dans `companies.signals.contact_channels` : les canaux collectés en vrac
  *     (e-mails, téléphones, et leur fiche de vérification `details`) ;
- *   - dans `contacts.phone`, sur une fiche personne SANS l'adresse demandée.
+ *   - dans `contacts.phone`, sur une fiche personne SANS l'adresse demandée :
+ *     un DOUBLON de la personne (même nom, aucune adresse) est supprimé ; sur
+ *     toute autre fiche (un collègue qui partage le standard), seul le numéro
+ *     est retiré — on n'efface jamais une AUTRE personne (garde B14-002).
  *
  * Ce trou existait déjà pour les organisateurs d'événements en production ; il
  * se referme pour eux du même geste.
@@ -76,10 +79,36 @@ final class EffacementCoordonneesFiches
     }
 
     /**
+     * Les empreintes de NOM (prénom + nom normalisés) des fiches personnes de
+     * cette adresse, relevées AVANT leur suppression : elles reconnaissent un
+     * doublon de la même personne qui porterait son numéro sans son adresse.
+     *
+     * @return list<string>
+     */
+    public static function clesNomDesContacts(string $email, ?string $workspaceId = null): array
+    {
+        $email = mb_strtolower(trim($email));
+        if ($email === '') {
+            return [];
+        }
+
+        $requete = DB::table('contacts')->where('email', $email);
+        if ($workspaceId !== null) {
+            $requete->where('workspace_id', $workspaceId);
+        }
+
+        return array_values(array_unique(array_map('strval', $requete
+            ->selectRaw(self::CLE_NOM . ' AS cle')
+            ->pluck('cle')
+            ->all())));
+    }
+
+    /**
      * @param  list<string>  $telephones
+     * @param  list<string>  $clesNom  empreintes de nom de la personne (`clesNomDesContacts`)
      * @return array<string, int> lignes touchées, par emplacement
      */
-    public static function effacer(string $email, array $telephones, ?string $workspaceId = null): array
+    public static function effacer(string $email, array $telephones, array $clesNom = [], ?string $workspaceId = null): array
     {
         $email = mb_strtolower(trim($email));
         $variantes = self::variantes($telephones);
@@ -87,7 +116,8 @@ final class EffacementCoordonneesFiches
             'companies_email_generic' => 0,
             'companies_phone' => 0,
             'companies_canaux' => 0,
-            'contacts_par_telephone' => 0,
+            'contacts_doublons_par_telephone' => 0,
+            'contacts_telephone_retire' => 0,
         ];
 
         if ($email !== '') {
@@ -107,13 +137,17 @@ final class EffacementCoordonneesFiches
                 ->whereRaw(self::chiffres('phone') . ' IN (' . self::marques($variantes) . ')', $variantes)
                 ->update(['phone' => null, 'updated_at' => now()]);
 
-            $contacts = DB::table('contacts')
-                ->whereNotNull('phone')
-                ->whereRaw(self::chiffres('phone') . ' IN (' . self::marques($variantes) . ')', $variantes);
-            if ($workspaceId !== null) {
-                $contacts->where('workspace_id', $workspaceId);
+            // Un DOUBLON de la personne (même nom, aucune adresse) : supprimé.
+            if ($clesNom !== []) {
+                $bilan['contacts_doublons_par_telephone'] = self::contactsAuNumero($variantes, $workspaceId)
+                    ->whereNull('email')
+                    ->whereRaw(self::CLE_NOM . ' IN (' . self::marques($clesNom) . ')', $clesNom)
+                    ->delete();
             }
-            $bilan['contacts_par_telephone'] = $contacts->delete();
+            // Toute AUTRE fiche qui porte ce numéro (un collègue, le standard
+            // partagé) : seul le numéro part, jamais la personne.
+            $bilan['contacts_telephone_retire'] = self::contactsAuNumero($variantes, $workspaceId)
+                ->update(['phone' => null, 'updated_at' => now()]);
         }
 
         foreach (self::fichesAvecCanaux($email, $variantes, $workspaceId) as $fiche) {
@@ -167,13 +201,7 @@ final class EffacementCoordonneesFiches
         }
 
         if ($variantes !== []) {
-            $contacts = DB::table('contacts')
-                ->whereNotNull('phone')
-                ->whereRaw(self::chiffres('phone') . ' IN (' . self::marques($variantes) . ')', $variantes);
-            if ($workspaceId !== null) {
-                $contacts->where('workspace_id', $workspaceId);
-            }
-            $residus['contacts.phone'] = $contacts->count();
+            $residus['contacts.phone'] = self::contactsAuNumero($variantes, $workspaceId)->count();
             $residus['companies.phone'] = self::fiches($workspaceId)
                 ->whereNotNull('phone')
                 ->whereRaw(self::chiffres('phone') . ' IN (' . self::marques($variantes) . ')', $variantes)
@@ -267,6 +295,28 @@ final class EffacementCoordonneesFiches
     }
 
     // ── Internes ────────────────────────────────────────────────────────────
+
+    /** Empreinte du nom d'une fiche personne — la même que `contacts_retires`. */
+    private const CLE_NOM = "encode(digest(normalize_name(coalesce(first_name, '') || '_' || last_name), 'sha256'), 'hex')";
+
+    /**
+     * Les fiches personnes qui portent l'un de ces numéros. Corbeille
+     * comprise, VOLONTAIREMENT (`deleted_at` n'est pas filtré) : une fiche mise
+     * à la corbeille garde la coordonnée, et l'effacement doit l'atteindre.
+     *
+     * @param  list<string>  $variantes
+     */
+    private static function contactsAuNumero(array $variantes, ?string $workspaceId): Builder
+    {
+        $requete = DB::table('contacts')
+            ->whereNotNull('phone')
+            ->whereRaw(self::chiffres('phone') . ' IN (' . self::marques($variantes) . ')', $variantes);
+        if ($workspaceId !== null) {
+            $requete->where('workspace_id', $workspaceId);
+        }
+
+        return $requete;
+    }
 
     private static function fiches(?string $workspaceId): Builder
     {

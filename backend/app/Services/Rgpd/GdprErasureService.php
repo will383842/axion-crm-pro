@@ -43,6 +43,7 @@ class GdprErasureService
                 [$phone ?? ''],
                 EffacementCoordonneesFiches::telephonesDesContacts($email),
             ), static fn (string $t): bool => trim($t) !== '')));
+            $clesNom = EffacementCoordonneesFiches::clesNomDesContacts($email);
 
             // On releve les `person_key` AVANT de supprimer : c'est par elles que
             // la timeline (`activities`) est rattachee a la personne. Les
@@ -163,7 +164,7 @@ class GdprErasureService
             // son organisation : e-mail générique, téléphone, canaux collectés,
             // et fiches personnes qui portent son numéro sans son adresse. Mis à
             // NULL — y compris sur une fiche PROTÉGÉE, qui survit.
-            foreach (EffacementCoordonneesFiches::effacer($email, $telephones) as $emplacement => $n) {
+            foreach (EffacementCoordonneesFiches::effacer($email, $telephones, $clesNom) as $emplacement => $n) {
                 $deleted[$emplacement] = $n;
             }
 

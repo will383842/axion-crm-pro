@@ -390,8 +390,17 @@ test('B10-016-PORTEE PLAFOND — les lectures DB::table aveugles a deleted_at n 
     $plafonds = [
         'campaigns' => 0,
         'candidates' => 11,
-        'companies' => 22,
-        'contacts' => 26,
+        // 22 -> 23 et 26 -> 30 le 2026-09-29, APRES examen (PR #255, veto RGPD) :
+        // les cinq lecteurs ajoutés sont ceux de l'EFFACEMENT art. 17
+        // (`App\Crm\Rgpd\EffacementCoordonneesFiches` : la fiche d'organisation
+        // qui porte l'adresse, les numéros et les empreintes de nom de la
+        // personne, les fiches qui portent son numéro, le contrôle des résidus).
+        // Ils DOIVENT rester aveugles au `deleted_at`, pour la raison même
+        // d'`AnonymizeOldIps` ci-dessous : une fiche à la corbeille garde la
+        // coordonnée, et un effacement qui la sauterait laisserait la donnée de
+        // la personne en base en se disant complet.
+        'companies' => 23,
+        'contacts' => 30,
         'email_audiences' => 0,
         'health_practitioners' => 2,
         'journalists' => 1,
@@ -441,7 +450,9 @@ test('B10-016-PORTEE PLAFOND — les lectures DB::table aveugles a deleted_at n 
     // porte la justification complete. Le total suit le detail, il ne le
     // devance pas : si un jour ce nombre montait sans qu'aucun plafond de
     // table ne bouge, ce serait le balayage qui derive, pas le code.
-    expect(count($aveugles))->toBeLessThanOrEqual(88);
+    // 88 -> 93 le 2026-09-29 : les cinq lecteurs de l'effacement art. 17
+    // (plafonds `companies` et `contacts` ci-dessus, même justification).
+    expect(count($aveugles))->toBeLessThanOrEqual(93);
 });
 
 /**
@@ -490,9 +501,12 @@ test('B10-016-PORTEE COLONNES MORTES — deux tables recoivent un deleted_at par
     // 216 -> 224 le 2026-09-24 : le lot L4-C a inséré huit lignes AU-DESSUS
     // (effacement de `personnes` et `abonnements`) dans GdprErasureService. Le
     // site est le même geste, sur `users` ; seule sa ligne a bougé.
+    // 224 -> 251 le 2026-09-29 : la PR #255 a inséré au-dessus le relevé des
+    // numéros et l'effacement des fiches d'organisation. Même geste, sur
+    // `users` ; seule sa ligne a bougé.
     expect($sites)->toBe([
         'app/Console/Commands/ImportMediaMerge.php:197',
-        'app/Services/Rgpd/GdprErasureService.php:224',
+        'app/Services/Rgpd/GdprErasureService.php:251',
     ]);
 });
 

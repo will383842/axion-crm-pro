@@ -77,10 +77,15 @@ beforeEach(function () {
         'workspace_id' => $this->espace, 'company_id' => $this->fede, 'first_name' => 'Zoe', 'last_name' => 'ZZPRESIDENTE',
         'email' => EFO_EMAIL, 'phone' => EFO_MOBILE_AUTRE_FORME, 'created_at' => now(), 'updated_at' => now(),
     ]);
-    // Une AUTRE fiche personne, sans l'adresse, avec le même mobile.
+    // Un DOUBLON de la même personne, sans l'adresse, avec le même mobile.
     $this->doublon = (int) DB::table('contacts')->insertGetId([
-        'workspace_id' => $this->espace, 'company_id' => $this->fede, 'last_name' => 'ZZPRESIDENTE BIS',
+        'workspace_id' => $this->espace, 'company_id' => $this->fede, 'first_name' => 'Zoe', 'last_name' => 'ZZPRESIDENTE',
         'phone' => '0033600000042', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    // Une AUTRE personne qui partage ce numéro (le standard) : elle reste, sans le numéro.
+    $this->collegue = (int) DB::table('contacts')->insertGetId([
+        'workspace_id' => $this->espace, 'company_id' => $this->fede, 'first_name' => 'Zed', 'last_name' => 'ZZSECRETAIRE',
+        'email' => 'secretaire@zz-fede.example.invalid', 'phone' => '06.00.00.00.42', 'created_at' => now(), 'updated_at' => now(),
     ]);
 
     // TÉMOIN : une autre organisation, d'autres coordonnées.
@@ -119,6 +124,9 @@ test('l effacement console atteint les trois emplacements d une fiche PROTEGEE, 
         ->and($canaux['phones'])->toBe(['01 00 00 00 10'])
         ->and(array_keys($canaux['details']))->toBe(['secretariat@zz-fede.example.invalid'])
         ->and(DB::table('contacts')->whereIn('id', [$this->presidente, $this->doublon])->count())->toBe(0)
+        // Le collègue n'est PAS effacé : seul le numéro partagé part.
+        ->and(DB::table('contacts')->where('id', $this->collegue)->value('email'))->toBe('secretaire@zz-fede.example.invalid')
+        ->and(DB::table('contacts')->where('id', $this->collegue)->value('phone'))->toBeNull()
         ->and($resultat['complete'])->toBeTrue()
         ->and($resultat['residus'])->toBe([])
         // Témoin intact.

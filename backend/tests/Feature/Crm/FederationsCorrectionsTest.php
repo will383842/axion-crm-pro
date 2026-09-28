@@ -396,11 +396,14 @@ test('S7 — une FUSION de doublons ne remplit pas le registre ; une suppression
         ['prenom' => 'Zia', 'nom' => 'ZZSUPPRIMEE', 'fonction' => 'Trésorière', 'email' => null, 'linkedin' => null],
     ]])]);
 
+    // Le témoin D'ABORD : sous `RefreshDatabase`, la transaction ci-dessous
+    // n'est qu'un point de sauvegarde, et un `SET LOCAL` y survit jusqu'à la
+    // fin du test (en production, il meurt avec la transaction de fusion).
+    DB::table('contacts')->where('last_name', 'ZZSUPPRIMEE')->delete();
     DB::transaction(function (): void {
         DB::statement("SET LOCAL app.fusion_contacts = 'on'");
         DB::table('contacts')->where('last_name', 'ZZFUSION')->delete();
     });
-    DB::table('contacts')->where('last_name', 'ZZSUPPRIMEE')->delete();
 
     expect(DB::table('contacts_retires')->count())->toBe(1)
         ->and(DB::table('contacts_retires')->value('cle_nom'))->toBe((string) DB::selectOne("SELECT contacts_retires_empreinte('Zia', 'ZZSUPPRIMEE') AS h")->h);

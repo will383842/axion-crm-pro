@@ -151,7 +151,7 @@ class CrmImportFederations extends Command
             'fiches_creees', 'fiches_rattachees', 'federations_mises_a_jour', 'federations_inchangees',
             'contacts_crees', 'contacts_completes', 'personnes_sans_changement', 'personnes_ecartees',
             'personnes_opposees', 'emails_refuses_mx',
-            'secteurs_poses', 'secteurs_conserves', 'departements_ignores',
+            'secteurs_poses', 'secteurs_conserves', 'departements_ignores', 'emails_generiques_non_poses',
             'tetes_liees', 'tetes_inchangees', 'tetes_introuvables', 'tetes_refusees_cycle',
         ], 0);
         $this->rejets = [];
@@ -310,6 +310,13 @@ class CrmImportFederations extends Command
         $companyId = (int) $fiche->id;
 
         $delta += $this->completerFiche($fiche, $l);
+
+        // L'e-mail générique du fichier n'est pas sur la fiche : opposition,
+        // domaine sans MX, ou autre adresse déjà présente (backfill-only).
+        // Compté, pour que l'essai à blanc dise ce qui ne sera PAS joignable.
+        if ($l['email_generique'] !== null && $fiche->email_generic !== $l['email_generique']) {
+            $delta['emails_generiques_non_poses'] = 1;
+        }
 
         if ($avant === null) {
             $delta['fiches_creees'] = 1;

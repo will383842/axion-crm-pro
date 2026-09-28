@@ -307,6 +307,8 @@ test('la liste d opposition s applique a l import : e-mail generique, telephone,
         ->and($opposee->phone)->toBeNull()
         ->and(DB::table('contacts')->where('company_id', $opposee->id)->count())->toBe(0)
         ->and(fedCompteur($r['sortie'], 'personnes_opposees'))->toBe(1)
+        // L'essai à blanc (et le bilan) disent qu'une adresse ne sera pas posée.
+        ->and(fedCompteur($r['sortie'], 'emails_generiques_non_poses'))->toBe(1)
         ->and($temoin->email_generic)->toBe('bureau@zz-temoin.example.invalid')
         ->and($temoin->phone)->toBe('06 00 00 00 08')
         ->and(DB::table('contacts')->where('company_id', $temoin->id)->count())->toBe(1);

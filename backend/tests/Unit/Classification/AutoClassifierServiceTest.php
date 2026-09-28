@@ -156,3 +156,23 @@ it('extracts commune code and city name from signals.ban', function () {
     expect($c->commune_code)->toBe('69383');
     expect($c->city_name)->toBe('Lyon 3e Arrondissement');
 });
+
+it('garde un secteur valide pose autrement (interprofessionnel) quand le code NAF ne dit rien', function () {
+    $federation = makeCompany(['naf' => '94.11Z', 'sector_main' => 'interprofessionnel']);
+    $ancien = makeCompany(['naf' => '94.11Z', 'sector_main' => 'associatif']);
+    $this->service->classify($federation);
+    $this->service->classify($ancien);
+
+    expect($federation->refresh()->sector_main)->toBe('interprofessionnel')
+        // Témoin : une valeur hors référentiel, elle, devient non classé.
+        ->and($ancien->refresh()->sector_main)->toBe('non_classe');
+});
+
+it('remplace une chaîne vide par NULL au lieu de la garder', function () {
+    $c = makeCompany(['size_category' => '', 'region_code' => '']);
+    $this->service->classify($c);
+    $c->refresh();
+
+    expect($c->size_category)->toBeNull()
+        ->and($c->region_code)->toBeNull();
+});

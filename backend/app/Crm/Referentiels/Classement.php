@@ -181,6 +181,22 @@ final class Classement
         return null;
     }
 
+    /**
+     * Les notes d'un événement, complétées de la région lue mais non reconnue
+     * (« England »). Idempotent : une note qui porte déjà la ligne n'en reçoit
+     * pas une seconde — la migration et chaque réimport peuvent la rejouer.
+     */
+    public static function noteRegionDOrigine(?string $notes, string $regionLue): string
+    {
+        $ligne = 'Région d\'origine : ' . trim($regionLue);
+        $notes = trim((string) $notes);
+        if ($notes === '') {
+            return $ligne;
+        }
+
+        return str_contains($notes, $ligne) ? $notes : $notes . "\n" . $ligne;
+    }
+
     public static function regionDuDepartement(?string $departement): ?string
     {
         $d = strtoupper(trim((string) $departement));
@@ -207,37 +223,99 @@ final class Classement
      * Le classement COMPLET d'une fiche, tel que le reclassement de masse et
      * l'enrichissement l'écrivent.
      *
+     * Une chaîne vide (`''`) vaut « absent » partout : elle n'est ni un code
+     * NAF, ni une taille, ni une région. Le calcul rend alors null, et c'est à
+     * l'appelant de décider s'il remplace `''` par NULL (le reclassement le
+     * fait : `''` n'est pas une valeur du référentiel).
+     *
      * @param  array{naf?: ?string, effectif_range?: ?string, categorie_entreprise?: ?string,
      *               size_category?: ?string, entity_nature?: ?string, discovery_source?: ?string,
-     *               department_code?: ?string, region_code?: ?string, country_code?: ?string}  $fiche
+     *               department_code?: ?string, region_code?: ?string, country_code?: ?string,
+     *               sector_main?: ?string}  $fiche
      * @return array{sector_main: string, naf_nomenclature: ?string, naf_rev2: ?string,
      *               size_category: ?string, entity_nature: ?string, region_code: ?string, methode_secteur: string}
      */
     public static function pourFiche(array $fiche): array
     {
-        $naf = NomenclatureNaf::classer($fiche['naf'] ?? null);
+        $lire = static function (string $cle) use ($fiche): ?string {
+            $v = trim((string) ($fiche[$cle] ?? ''));
 
-        $regionActuelle = $fiche['region_code'] ?? null;
-        $pays = strtoupper(trim((string) ($fiche['country_code'] ?? 'FR')));
+            return $v === '' ? null : $v;
+        };
+
+        $naf = NomenclatureNaf::classer($lire('naf'));
+
+        $regionActuelle = $lire('region_code');
+        $pays = strtoupper($lire('country_code') ?? 'FR');
         // Le département n'est un code INSEE que pour une fiche française : un
         // « 01 » roumain n'est pas l'Ain.
         $region = $pays === 'FR'
-            ? (self::regionDuDepartement($fiche['department_code'] ?? null) ?? self::region($regionActuelle) ?? $regionActuelle)
+            ? (self::regionDuDepartement($lire('department_code')) ?? self::region($regionActuelle) ?? $regionActuelle)
             : $regionActuelle;
 
         return [
-            'sector_main' => $naf->secteur,
+            'sector_main' => self::secteurRetenu($naf->secteur, $lire('sector_main')),
             'naf_nomenclature' => $naf->nomenclature,
             'naf_rev2' => $naf->codeRev2,
-            'size_category' => self::taille(
-                $fiche['effectif_range'] ?? null,
-                $fiche['categorie_entreprise'] ?? null,
-                $fiche['size_category'] ?? null,
-            ),
-            'entity_nature' => self::nature($fiche['entity_nature'] ?? null, $fiche['discovery_source'] ?? null),
+            'size_category' => self::taille($lire('effectif_range'), $lire('categorie_entreprise'), $lire('size_category')),
+            'entity_nature' => self::nature($lire('entity_nature'), $lire('discovery_source')),
             'region_code' => $region,
             'methode_secteur' => $naf->methode,
         ];
+    }
+
+    /**
+     * Le secteur à écrire, connaissant celui que porte déjà la fiche.
+     *
+     * Le code NAF décide TOUJOURS, sauf quand il ne dit rien (`non_classe` :
+     * pas de code, code d'attente, organisation professionnelle NAF 94). Dans
+     * ce cas seulement, un secteur déjà posé qui est une clé VALIDE du
+     * référentiel est conservé : c'est lui qui porte `interprofessionnel` (posé
+     * par le modèle fédérations) ou le secteur représenté d'un syndicat. Un
+     * secteur vide ou hors référentiel (`it_saas`, `autre`…) devient
+     * `non_classe`.
+     */
+    public static function secteurRetenu(string $depuisNaf, ?string $actuel): string
+    {
+        if ($depuisNaf !== Taxonomy::SECTEUR_NON_CLASSE) {
+            return $depuisNaf;
+        }
+        if ($actuel !== null && $actuel !== Taxonomy::SECTEUR_NON_CLASSE && array_key_exists($actuel, Taxonomy::SECTEURS)) {
+            return $actuel;
+        }
+
+        return Taxonomy::SECTEUR_NON_CLASSE;
+    }
+
+    /**
+     * La valeur à écrire dans une colonne de classement, connaissant le calcul
+     * et la valeur actuelle — règle COMMUNE à l'enrichissement et au
+     * reclassement de masse :
+     *
+     *  - le calcul a une valeur : elle est écrite. Pour le SECTEUR, qui n'est
+     *    jamais null, c'est `secteurRetenu()` qui protège un secteur valide
+     *    quand le code NAF ne dit rien ;
+     *  - le calcul ne sait pas (null) : la valeur actuelle est gardée — sauf
+     *    une chaîne vide, qui n'est pas une valeur du référentiel et devient
+     *    NULL.
+     */
+    public static function valeurAEcrire(?string $calcule, mixed $actuel): ?string
+    {
+        if ($calcule !== null) {
+            return $calcule;
+        }
+        if (! is_scalar($actuel)) {
+            return null;
+        }
+        $actuel = (string) $actuel;
+
+        return trim($actuel) === '' ? null : $actuel;
+    }
+
+    /** Les clés de secteur qu'un code NAF « muet » ne remplace pas, pour SQL. */
+    public static function secteursConservables(): string
+    {
+        return Taxonomy::sqlList(array_values(array_diff(array_keys(Taxonomy::SECTEURS), [Taxonomy::SECTEUR_NON_CLASSE])));
     }
 
     private static function renseigne(?string $valeur): bool

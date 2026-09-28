@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Contracts\InseeClient;
+use App\Crm\EspaceProspection;
 use App\Crm\Referentiels\Classement;
 use App\Crm\Referentiels\NomenclatureNaf;
 use Illuminate\Console\Command;
@@ -45,8 +46,9 @@ class ProspectionCollect extends Command
         $limit = (int) $this->option('limit');
         $delay = (int) $this->option('req-delay');
 
-        $workspaceId = $this->option('workspace')
-            ?: DB::table('workspaces')->orderBy('created_at')->value('id');
+        // Même résolution que `crm:referentiels:reclasser` (EspaceProspection) :
+        // la collecte et le reclassement visent le MÊME espace.
+        $workspaceId = $this->option('workspace') ?: EspaceProspection::parDefaut();
         if (! $workspaceId) {
             $this->error('Aucun workspace cible (--workspace=UUID).');
 
@@ -77,8 +79,15 @@ class ProspectionCollect extends Command
                 // déjà décidée (à la main, par un import) n'est jamais réécrite.
                 [
                     'denomination', 'naf', 'legal_form', 'effectif_range', 'size_category',
-                    'sector_main', 'naf_nomenclature', 'naf_rev2', 'address', 'postcode', 'city', 'city_name', 'insee',
+                    'naf_nomenclature', 'naf_rev2', 'address', 'postcode', 'city', 'city_name', 'insee',
                     'siret', 'enseigne', 'metadata', 'discovery_source', 'department_code', 'region_code', 'updated_at',
+                    // Même règle que `Classement::secteurRetenu()` : un code NAF
+                    // muet (`non_classe`) ne remplace pas un secteur valide déjà
+                    // posé (`interprofessionnel`, secteur représenté).
+                    'sector_main' => DB::raw(
+                        "CASE WHEN excluded.sector_main = 'non_classe' AND companies.sector_main IN ("
+                        . Classement::secteursConservables() . ') THEN companies.sector_main ELSE excluded.sector_main END',
+                    ),
                 ],
             );
             $buffer = [];

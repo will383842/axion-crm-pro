@@ -69,13 +69,12 @@ class AutoClassifierService
             'department_code' => $company->department_code,
             'region_code' => $company->region_code,
             'country_code' => $company->country_code,
+            'sector_main' => $company->sector_main,
         ]);
 
         foreach (['sector_main', 'naf_nomenclature', 'naf_rev2', 'size_category', 'entity_nature', 'region_code'] as $colonne) {
-            $valeur = $classement[$colonne];
-            // Une valeur que le calcul ne sait pas établir (null) n'efface
-            // jamais une valeur déjà posée.
-            if ($valeur !== null && $company->{$colonne} !== $valeur) {
+            $valeur = Classement::valeurAEcrire($classement[$colonne], $company->{$colonne});
+            if ($company->{$colonne} !== $valeur) {
                 $company->{$colonne} = $valeur;
                 $changed = true;
             }

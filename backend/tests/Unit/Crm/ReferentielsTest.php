@@ -267,3 +267,24 @@ test('étiquettes désirées : slugs et noms tirés du référentiel', function 
         'region-84' => ['name' => 'Région : Auvergne-Rhône-Alpes', 'category' => 'geo'],
     ]);
 });
+
+test('secteur retenu : le NAF décide, sauf quand il ne dit rien et qu un secteur valide est posé', function () {
+    expect(Classement::secteurRetenu('btp', 'interprofessionnel'))->toBe('btp')
+        ->and(Classement::secteurRetenu('non_classe', 'interprofessionnel'))->toBe('interprofessionnel')
+        ->and(Classement::secteurRetenu('non_classe', 'it_saas'))->toBe('non_classe')
+        ->and(Classement::secteurRetenu('non_classe', null))->toBe('non_classe');
+});
+
+test('valeur à écrire : null garde la valeur posée, sauf une chaîne vide', function () {
+    expect(Classement::valeurAEcrire(null, 'pme'))->toBe('pme')
+        ->and(Classement::valeurAEcrire(null, ''))->toBeNull()
+        ->and(Classement::valeurAEcrire('tpe', 'pme'))->toBe('tpe');
+});
+
+test('note de région d origine : ajoutée une seule fois', function () {
+    $une = Classement::noteRegionDOrigine('Salon', 'England');
+
+    expect($une)->toBe("Salon\nRégion d'origine : England")
+        ->and(Classement::noteRegionDOrigine($une, 'England'))->toBe($une)
+        ->and(Classement::noteRegionDOrigine(null, 'England'))->toBe("Région d'origine : England");
+});

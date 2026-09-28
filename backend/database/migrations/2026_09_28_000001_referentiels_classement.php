@@ -46,7 +46,10 @@ use Illuminate\Support\Facades\DB;
  *    dans `notes` avant d'être vidée. Puis un CHECK ferme la liste.
  *
  * 3. `trg_set_updated_at()` apprend à laisser `updated_at` intact quand la
- *    transaction le demande (`SET LOCAL app.conserver_updated_at = 'on'`).
+ *    transaction le demande (`SET LOCAL app.conserver_updated_at = 'on'`) —
+ *    sur `companies` et `tags` SEULEMENT (`TG_TABLE_NAME`), et en rétablissant
+ *    l'ANCIENNE valeur (`OLD.updated_at`), jamais celle que l'UPDATE écrirait.
+ *    Sur les 12 autres tables (`rgpd_requests`…), la levée est sans effet.
  *    Le reclassement de masse touche jusqu'à 4,3 M de fiches : sans cela, il
  *    les marquerait toutes « modifiées aujourd'hui » — l'accueil annoncerait
  *    4,3 M d'enrichissements en 24 h, le tri « récent » du hub serait brouillé,
@@ -152,14 +155,14 @@ return new class extends Migration
 
                 continue;
             }
-            // Inconnue : on la garde dans les notes, on ne la jette pas.
-            DB::statement(
-                "UPDATE events
-                 SET notes = CASE WHEN notes IS NULL OR notes = '' THEN ? ELSE notes || E'\\n' || ? END,
-                     region = NULL
-                 WHERE region = ?",
-                ['Région d\'origine : ' . $valeur, 'Région d\'origine : ' . $valeur, $valeur],
-            );
+            // Inconnue : on la garde dans les notes, on ne la jette pas — même
+            // format (et même idempotence) que l'import des événements.
+            foreach (DB::table('events')->where('region', $valeur)->get(['id', 'notes']) as $e) {
+                DB::table('events')->where('id', $e->id)->update([
+                    'notes' => Classement::noteRegionDOrigine(is_string($e->notes) ? $e->notes : null, $valeur),
+                    'region' => null,
+                ]);
+            }
         }
     }
 
@@ -175,7 +178,12 @@ return new class extends Migration
             SET search_path = public, pg_catalog
             AS $fn$
             BEGIN
-              IF COALESCE(current_setting('app.conserver_updated_at', true), '') = 'on' THEN
+              -- Levée LIMITÉE à `companies` et `tags` (les deux seules tables
+              -- que le reclassement écrit), et qui RÉTABLIT l'ancienne valeur :
+              -- jamais celle qu'aurait écrite l'UPDATE lui-même.
+              IF TG_TABLE_NAME IN ('companies', 'tags')
+                 AND COALESCE(current_setting('app.conserver_updated_at', true), '') = 'on' THEN
+                NEW.updated_at := OLD.updated_at;
                 RETURN NEW;
               END IF;
               NEW.updated_at = now();

@@ -86,7 +86,7 @@ class CrmImportEvenements extends Command
         $this->bilan = [
             'lignes' => 0, 'crees' => 0, 'mis_a_jour' => 0, 'inchanges' => 0, 'rejetes' => 0,
             'liens_crees' => 0, 'organisateurs_introuvables' => 0, 'sans_organisateur' => 0,
-            'notes_expurgees' => 0,
+            'notes_expurgees' => 0, 'regions_inconnues' => 0,
         ];
         $this->rejets = [];
 
@@ -234,24 +234,34 @@ class CrmImportEvenements extends Command
         }
         // Région : UN seul codage, le code INSEE (`AURA` → `84`), comme
         // `companies.region_code` — sinon on ne peut pas croiser « événements
-        // et organisations d'une même région ». Une région illisible est
-        // refusée (le CHECK `events_region_check` la refuserait de toute
-        // façon) ; une région absente se déduit du département.
+        // et organisations d'une même région ». Une région absente se déduit
+        // du département. Une région qui n'est pas française (« England »,
+        // « California ») ne fait PAS rejeter l'événement : la colonne reste
+        // vide (le CHECK `events_region_check` n'accepte que les codes) et la
+        // valeur lue est recopiée dans les notes — exactement comme la
+        // migration l'a fait pour les événements déjà en base.
         $regionLue = $this->texte($brut, 'region');
+        $regionInconnue = null;
         if ($regionLue !== null) {
-            $region = Classement::region($regionLue);
-            if ($region === null) {
-                throw new InvalidArgumentException('region_inconnue');
+            $valeurs['region'] = Classement::region($regionLue);
+            if ($valeurs['region'] === null) {
+                $regionInconnue = $regionLue;
             }
-            $valeurs['region'] = $region;
         } else {
             $valeurs['region'] = Classement::regionDuDepartement($this->texte($brut, 'departement_code'));
         }
-        $notes = $this->expurger($valeurs['notes']);
-        if ($notes !== $valeurs['notes']) {
+        $notesLues = $this->texte($brut, 'notes');
+        $notes = $this->expurger($notesLues);
+        if ($notes !== $notesLues) {
             $delta['notes_expurgees'] = 1;
-            $valeurs['notes'] = $notes;
         }
+        if ($regionInconnue !== null) {
+            // Recalculée depuis le FICHIER à chaque import : un réimport rend
+            // la même note, donc « inchangé » — jamais une ligne de plus.
+            $notes = Classement::noteRegionDOrigine($notes, (string) $this->expurger($regionInconnue));
+            $delta['regions_inconnues'] = 1;
+        }
+        $valeurs['notes'] = $notes;
         foreach (self::CHAMPS_DATE as $champ) {
             $valeurs[$champ] = $this->date($brut, $champ);
         }

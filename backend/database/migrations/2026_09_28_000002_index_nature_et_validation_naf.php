@@ -52,26 +52,55 @@ return new class extends Migration
      */
     public $withinTransaction = false;
 
+    public const INDEX = 'idx_companies_workspace_nature_hors_entreprise';
+
     public function up(): void
     {
         if (! Schema::hasTable('companies')) {
             return;
         }
 
-        DB::statement('ALTER TABLE companies VALIDATE CONSTRAINT companies_naf_nomenclature_check');
-        DB::statement('ALTER TABLE companies VALIDATE CONSTRAINT companies_naf_rev2_check');
+        // Hors transaction : `SET` (et non `SET LOCAL`) vaut pour la session,
+        // d'où le `RESET` final, quoi qu'il arrive. Un verrou qui ne vient pas
+        // fait ÉCHOUER la migration (donc le déploiement, qui le dit) au lieu
+        // de mettre en file toutes les requêtes de la console derrière elle.
+        DB::statement("SET lock_timeout = '30s'");
+        try {
+            DB::statement('ALTER TABLE companies VALIDATE CONSTRAINT companies_naf_nomenclature_check');
+            DB::statement('ALTER TABLE companies VALIDATE CONSTRAINT companies_naf_rev2_check');
 
-        // `IF NOT EXISTS` rend la migration rejouable — indispensable avec
-        // `CONCURRENTLY`, qui peut échouer à mi-course en laissant un index
-        // INVALIDE derrière lui (le supprimer à la main, puis rejouer).
-        DB::statement(
-            'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_companies_workspace_nature_hors_entreprise '
-            . "ON companies (workspace_id, entity_nature) WHERE entity_nature <> 'entreprise'",
-        );
+            // `CONCURRENTLY` attend la fin des transactions déjà ouvertes : on
+            // lui laisse plus de temps, mais pas l'éternité.
+            DB::statement("SET lock_timeout = '120s'");
+
+            // Un `CREATE INDEX CONCURRENTLY` interrompu laisse un index
+            // INVALIDE, que `IF NOT EXISTS` prendrait pour un succès : il
+            // existe, mais ne sert rien. On le détecte, on le supprime, on le
+            // reconstruit.
+            if (self::indexInvalide(self::INDEX)) {
+                DB::statement('DROP INDEX CONCURRENTLY IF EXISTS ' . self::INDEX);
+            }
+            DB::statement(
+                'CREATE INDEX CONCURRENTLY IF NOT EXISTS ' . self::INDEX . ' '
+                . "ON companies (workspace_id, entity_nature) WHERE entity_nature <> 'entreprise'",
+            );
+        } finally {
+            DB::statement('RESET lock_timeout');
+        }
     }
 
     public function down(): void
     {
-        DB::statement('DROP INDEX CONCURRENTLY IF EXISTS idx_companies_workspace_nature_hors_entreprise');
+        DB::statement('DROP INDEX CONCURRENTLY IF EXISTS ' . self::INDEX);
+    }
+
+    public static function indexInvalide(string $nom): bool
+    {
+        $ligne = DB::selectOne(
+            'SELECT NOT i.indisvalid AS invalide FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid WHERE c.relname = ?',
+            [$nom],
+        );
+
+        return $ligne !== null && (bool) $ligne->invalide;
     }
 };

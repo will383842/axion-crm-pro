@@ -452,7 +452,8 @@ test('sous axion_app (RLS), la commande reclasse et etiquette les fiches de son 
         expect($code)->toBe(0)
             ->and(rcCompteur($sortie, 'fiches_lues'))->toBe(1)
             ->and($proprio->table('companies')->where('id', $espaces['a']['fiche'])->value('sector_main'))->toBe('commerce_detail')
-            ->and($proprio->table('company_tag')->where('company_id', $espaces['a']['fiche'])->count())->toBe(3)
+            // Secteur et région (pas de taille : aucune donnée d'effectif).
+            ->and($proprio->table('company_tag')->where('company_id', $espaces['a']['fiche'])->count())->toBe(2)
             // L'autre espace : intact.
             ->and($proprio->table('companies')->where('id', $espaces['b']['fiche'])->value('sector_main'))->toBe('transport')
             ->and($proprio->table('company_tag')->where('company_id', $espaces['b']['fiche'])->count())->toBe(0);
@@ -461,9 +462,11 @@ test('sous axion_app (RLS), la commande reclasse et etiquette les fiches de son 
             $proprio->table('company_tag')->where('workspace_id', $e['id'])->delete();
             $proprio->table('companies')->where('workspace_id', $e['id'])->delete();
             $proprio->table('tags')->where('workspace_id', $e['id'])->delete();
-            // La ligne de journal (`audit_logs`, chaîne de hachage) reste : on
-            // ne retire jamais un maillon, et elle ne référence l'espace par
-            // aucune clé étrangère.
+            // Ce test COMMIT (connexions hors transaction de test) : la ligne
+            // de journal qu'il a écrite casserait la chaîne vérifiée par
+            // d'autres tests (`ChaineAuditSecretTest`, `RunbookDisquePleinTest`).
+            // On la retire : elle n'existe que pour ce test.
+            $proprio->table('audit_logs')->where('workspace_id', $e['id'])->delete();
             $proprio->table('workspaces')->where('id', $e['id'])->delete();
         }
         DB::connection('pgsql_app')->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);

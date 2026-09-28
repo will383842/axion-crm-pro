@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\RefuseUneSuppressionMassive;
 use App\Crm\FichesProtegees;
 use App\Crm\Referentiels\Classement;
 use App\Crm\Referentiels\EtiquettesClassement;
@@ -68,6 +69,8 @@ use stdClass;
  */
 class CrmReferentielsReclasser extends Command
 {
+    use RefuseUneSuppressionMassive;
+
     protected $signature = 'crm:referentiels:reclasser
                             {--dry-run : Tout lire et tout calculer, ne RIEN écrire, et afficher le bilan avant/après}
                             {--workspace= : Slug de l\'espace (défaut : l\'espace business)}
@@ -75,7 +78,8 @@ class CrmReferentielsReclasser extends Command
                             {--depuis-id=0 : Reprendre APRÈS cette fiche (dernier id annoncé par une exécution interrompue)}
                             {--max-lots=0 : S\'arrêter après N lots (0 = jusqu\'au bout)}
                             {--pause-ms=0 : Pause entre deux lots, pour ménager la base}
-                            {--sans-etiquettes : Ne pas resynchroniser les étiquettes sector-/size-/region-}';
+                            {--sans-etiquettes : Ne pas resynchroniser les étiquettes sector-/size-/region-}
+                            {--force : Lever le plafond de proportion de la suppression des étiquettes obsolètes}';
 
     protected $description = 'Reclasse toutes les fiches (secteur, taille, nature, région, étiquettes) selon le référentiel unique.';
 
@@ -621,7 +625,7 @@ class CrmReferentielsReclasser extends Command
             $valides[] = EtiquettesClassement::slugRegion((string) $code);
         }
 
-        return DB::table('tags')
+        $obsoletes = DB::table('tags')
             ->where('workspace_id', $workspaceId)
             ->where('kind', 'auto')
             ->where('is_locked', false)
@@ -631,8 +635,17 @@ class CrmReferentielsReclasser extends Command
             ->whereNotIn('slug', $valides)
             ->whereNotExists(function (QueryBuilder $sub): void {
                 $sub->selectRaw('1')->from('company_tag')->whereColumn('company_tag.tag_id', 'tags.id');
-            })
-            ->delete();
+            });
+
+        // Garde commune des commandes qui suppriment (B15-008) : un plafond de
+        // proportion, qui refuse si ce « ménage » visait une grande part des
+        // étiquettes — ce serait un détecteur qui se trompe, pas un ménage.
+        $total = (int) DB::table('tags')->where('workspace_id', $workspaceId)->count();
+        if (! $this->ecritureAutoriseeSansOperateur('tags', (clone $obsoletes)->count(), $total, 'supprimer')) {
+            return 0;
+        }
+
+        return $obsoletes->delete();
     }
 
     /**

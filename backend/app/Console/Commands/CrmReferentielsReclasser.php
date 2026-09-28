@@ -59,7 +59,8 @@ use Throwable;
  *  - `updated_at` n'est PAS touché (`app.conserver_updated_at`, cf. migration
  *    `2026_09_28_000001`) : reclasser n'est pas modifier la fiche.
  *  - Les fiches PROTÉGÉES (`FichesProtegees`) sont exclues — à la lecture ET
- *    dans l'`UPDATE` et le `DELETE` eux-mêmes.
+ *    dans l'`UPDATE` et le `DELETE` eux-mêmes — sauf `--inclure-protegees`
+ *    (voir plus bas).
  *  - Sous RLS : tout se fait dans le contexte de l'espace (`WorkspaceContext`),
  *    et chaque requête filtre AUSSI `workspace_id`.
  *  - Journalisée AU FIL DE L'EAU : une entrée de la chaîne d'audit par lot
@@ -79,6 +80,28 @@ use Throwable;
  *
  * `--compteurs-seulement` : pour les journaux des workflows GitHub (dépôt
  * PUBLIC) — aucun nom d'audience, seulement des nombres.
+ *
+ * ── `--inclure-protegees` (2026-09-29) ───────────────────────────────────
+ *
+ * Reclasse AUSSI les fiches protégées (organisateurs d'événements,
+ * fédérations), que la commande exclut par défaut. Ce que l'option touche,
+ * et RIEN d'autre : les six colonnes de classement (`COLONNES`) et les
+ * étiquettes automatiques `sector-`/`size-`/`region-` — par le même `UPDATE`,
+ * les mêmes plans d'étiquettes et les mêmes gardes que pour toute fiche.
+ * Aucune ligne `contacts`, aucune coordonnée, aucune fiche : la commande n'a
+ * aucune requête vers eux, avec ou sans l'option (Will, 27/09 : les contacts
+ * de ces fiches ne se suppriment pas).
+ *
+ * Pour les fiches protégées seulement, la NATURE n'est jamais DEVINÉE
+ * (`entreprise` pour une fiche INSEE qui n'en a pas) : un organisateur ou une
+ * fédération rattaché à une fiche INSEE n'est pas une société commerciale.
+ * Déjà renseignée, elle ne bouge jamais — c'est la règle commune.
+ *
+ * Pour TOUTES les fiches (seules les fédérations la déclenchent aujourd'hui) :
+ * B4 — un secteur VALIDE choisi par l'import des fédérations
+ * (`field_origins.sector_main` = `federations-2026`) n'est jamais écrasé, même
+ * par un code NAF qui parle : c'est le secteur REPRÉSENTÉ, que seul cet
+ * import a le droit de corriger.
  */
 class CrmReferentielsReclasser extends Command
 {
@@ -94,7 +117,8 @@ class CrmReferentielsReclasser extends Command
                             {--sans-etiquettes : Ne pas resynchroniser les étiquettes sector-/size-/region-}
                             {--accepter-audiences : Partir malgré des audiences d\'exclusion qui citent une valeur obsolète}
                             {--compteurs-seulement : N\'afficher que des nombres (journaux publics des workflows)}
-                            {--force : Lever le plafond de proportion de la suppression des étiquettes obsolètes}';
+                            {--force : Lever le plafond de proportion de la suppression des étiquettes obsolètes}
+                            {--inclure-protegees : Reclasser AUSSI les fiches protégées (classement et étiquettes sector-/size-/region- seulement)}';
 
     protected $description = 'Reclasse toutes les fiches (secteur, taille, nature, région, étiquettes) selon le référentiel unique.';
 
@@ -116,9 +140,11 @@ class CrmReferentielsReclasser extends Command
         'region_code' => 'c.region_code',
         'country_code' => 'c.country_code',
         'discovery_source' => 'c.discovery_source',
+        // B4 : le secteur choisi par l'import des fédérations ne s'écrase pas.
+        'origine_secteur' => "c.field_origins->>'sector_main'",
     ];
 
-    /** 17 paramètres liés par fiche : 3 500 × 17 reste sous la limite de 65 535. */
+    /** 18 paramètres liés par fiche : 3 500 × 18 reste sous la limite de 65 535. */
     private const LOT_MAX = 3500;
 
     private const COULEURS = ['sector' => 'violet', 'size' => 'amber', 'geo' => 'sky'];
@@ -137,6 +163,9 @@ class CrmReferentielsReclasser extends Command
 
     /** @var array<string, true> slugs dont le nom a déjà été aligné pendant cette exécution */
     private array $tagsAlignes = [];
+
+    /** `--inclure-protegees` : les fiches protégées sont reclassées aussi. */
+    private bool $inclureProtegees = false;
 
     public function handle(AuditHashChain $audit): int
     {
@@ -158,14 +187,16 @@ class CrmReferentielsReclasser extends Command
         $operateur = self::operateur();
 
         $this->reinitialiser();
+        $this->inclureProtegees = (bool) $this->option('inclure-protegees');
         $this->info(sprintf(
-            '%s — espace %s, lots de %d, à partir de l\'id %d%s.',
+            '%s — espace %s, lots de %d, à partir de l\'id %d%s%s.',
             $dryRun ? '[À BLANC] rien ne sera écrit' : 'Reclassement',
             // Journaux publics (`--compteurs-seulement`) : pas d'identifiant.
             $discret ? '(masqué)' : $workspaceId,
             $lot,
             $depuis,
             $etiquettes ? ', étiquettes comprises' : ', SANS les étiquettes',
+            $this->inclureProtegees ? ', fiches PROTÉGÉES comprises (classement seulement)' : '',
         ));
 
         // ── Avant toute écriture : le bon espace, et les audiences ──────────
@@ -195,7 +226,8 @@ class CrmReferentielsReclasser extends Command
         $auditFinEchoue = null;
         try {
             WorkspaceContext::run($workspaceId, function () use ($workspaceId, $dryRun, $lot, $maxLots, $pauseMs, $etiquettes, $audit, $operateur, &$dernier, &$termine, &$erreur): void {
-                $this->compteurs['fiches_protegees_exclues'] = $this->compterProtegees($workspaceId);
+                $protegees = $this->compterProtegees($workspaceId);
+                $this->compteurs[$this->inclureProtegees ? 'fiches_protegees_incluses' : 'fiches_protegees_exclues'] = $protegees;
                 if ($etiquettes) {
                     $this->chargerTags($workspaceId);
                 }
@@ -290,6 +322,7 @@ class CrmReferentielsReclasser extends Command
                 try {
                     $this->auditer($audit, $workspaceId, $operateur, 'RECLASSEMENT_REFERENTIELS_FIN', $erreur === null ? 200 : 500, [
                         'termine' => $termine, 'dernier_id' => $dernier, 'erreur' => $erreur, 'compteurs' => $this->compteurs,
+                        'inclure_protegees' => $this->inclureProtegees,
                     ], $termine ? 'terminé' : "arrêté après l'id {$dernier}");
                 } catch (Throwable $e) {
                     $auditFinEchoue = get_class($e);
@@ -343,6 +376,9 @@ class CrmReferentielsReclasser extends Command
             'etiquettes_a_retirer' => 0,
             'etiquettes_retirees' => 0,
             'fiches_protegees_exclues' => 0,
+            'fiches_protegees_incluses' => 0,
+            'natures_protegees_non_devinees' => 0,
+            'secteurs_import_conserves' => 0,
             'etiquettes_obsoletes_a_supprimer' => 0,
             'etiquettes_obsoletes_supprimees' => 0,
             'garde_b15008_refuserait' => 0,
@@ -419,6 +455,17 @@ class CrmReferentielsReclasser extends Command
             ->count();
     }
 
+    /**
+     * La condition « fiche non protégée » sur `$colonneId` — ou `TRUE` sous
+     * `--inclure-protegees`. UNE seule bascule, posée dans CHACUNE des
+     * requêtes qui lisent ou écrivent (lecture du lot, `UPDATE`, retrait et
+     * ajout d'étiquettes, estimation du ménage).
+     */
+    private function horsProtegees(string $colonneId): string
+    {
+        return $this->inclureProtegees ? 'TRUE' : FichesProtegees::conditionSql($colonneId);
+    }
+
     /** @return list<stdClass> */
     private function lireLot(string $workspaceId, int $apresId, int $taille): array
     {
@@ -427,9 +474,10 @@ class CrmReferentielsReclasser extends Command
             $colonnes[] = "{$expression} AS {$alias}";
         }
         $lignes = DB::select(
-            'SELECT c.id, c.naf_nomenclature, c.naf_rev2, ' . implode(', ', $colonnes) . '
+            'SELECT c.id, c.naf_nomenclature, c.naf_rev2, ' . implode(', ', $colonnes) . ',
+                    NOT ' . FichesProtegees::conditionSql('c.id') . ' AS protegee
              FROM companies c
-             WHERE c.workspace_id = ? AND c.id > ? AND ' . FichesProtegees::conditionSql('c.id') . '
+             WHERE c.workspace_id = ? AND c.id > ? AND ' . $this->horsProtegees('c.id') . '
              ORDER BY c.id
              LIMIT ' . $taille,
             [$workspaceId, $apresId],
@@ -473,6 +521,26 @@ class CrmReferentielsReclasser extends Command
                 'discovery_source' => self::brut($f->discovery_source),
             ]);
             $this->methodes[$calcul['methode_secteur']] = ($this->methodes[$calcul['methode_secteur']] ?? 0) + 1;
+
+            // B4 : un secteur valide choisi par l'import des fédérations reste.
+            $secteurActuel = self::brut($f->sector_main);
+            if (self::brut($f->origine_secteur) === CrmImportFederations::ORIGINE_SECTEUR
+                && $secteurActuel !== null
+                && $secteurActuel !== Taxonomy::SECTEUR_NON_CLASSE
+                && array_key_exists($secteurActuel, Taxonomy::SECTEURS)
+            ) {
+                if ($calcul['sector_main'] !== $secteurActuel) {
+                    $this->compteurs['secteurs_import_conserves']++;
+                }
+                $calcul['sector_main'] = $secteurActuel;
+            }
+            // Fiche protégée : la nature n'est jamais DEVINÉE — vide, elle
+            // reste vide ; renseignée, elle ne bouge de toute façon jamais
+            // (`Classement::nature`).
+            if ((bool) $f->protegee && self::brut($f->entity_nature) === null && $calcul['entity_nature'] !== null) {
+                $calcul['entity_nature'] = null;
+                $this->compteurs['natures_protegees_non_devinees']++;
+            }
 
             $nouveau = [];
             $change = false;
@@ -593,7 +661,7 @@ class CrmReferentielsReclasser extends Command
              FROM (VALUES ' . implode(', ', $valeurs) . ') AS v(' . implode(', ', $noms) . ')
              WHERE c.id = v.id AND c.workspace_id = ?
                AND ' . implode("\n               AND ", $gardes) . '
-               AND ' . FichesProtegees::conditionSql('c.id') . '
+               AND ' . $this->horsProtegees('c.id') . '
              RETURNING c.id',
             $liaisons,
             false,
@@ -686,7 +754,7 @@ class CrmReferentielsReclasser extends Command
             $n += DB::delete(
                 "DELETE FROM company_tag ct USING (VALUES {$valeurs}) AS v(company_id, tag_id)
                  WHERE ct.company_id = v.company_id AND ct.tag_id = v.tag_id
-                   AND " . FichesProtegees::conditionSql('ct.company_id'),
+                   AND " . $this->horsProtegees('ct.company_id'),
                 $liaisons,
             );
         }
@@ -715,7 +783,7 @@ class CrmReferentielsReclasser extends Command
                 "INSERT INTO company_tag (company_id, tag_id, workspace_id, assigned_at, assigned_by)
                  SELECT v.company_id, v.tag_id, ?::uuid, ?::timestamptz, 'auto-rule'
                  FROM (VALUES " . implode(', ', $valeurs) . ') AS v(company_id, tag_id)
-                 WHERE ' . FichesProtegees::conditionSql('v.company_id') . '
+                 WHERE ' . $this->horsProtegees('v.company_id') . '
                  ON CONFLICT DO NOTHING',
                 $liaisons,
             );
@@ -849,7 +917,7 @@ class CrmReferentielsReclasser extends Command
                 $sub->selectRaw('1')->from('company_tag as ct')->whereColumn('ct.tag_id', 'tags.id')
                     ->where(function (QueryBuilder $q): void {
                         $q->where('ct.assigned_by', 'user')
-                            ->orWhereRaw('NOT (' . FichesProtegees::conditionSql('ct.company_id') . ')');
+                            ->orWhereRaw('NOT (' . $this->horsProtegees('ct.company_id') . ')');
                     });
             });
         } else {

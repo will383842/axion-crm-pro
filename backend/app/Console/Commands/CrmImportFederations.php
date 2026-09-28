@@ -178,7 +178,11 @@ class CrmImportFederations extends Command
     /** @var array<string, int> ancre (SIREN ou identifiant) => company_id, lignes acceptées */
     private array $ancres = [];
 
-    /** Taille d'un paquet (lignes, puis têtes, par transaction). */
+    /**
+     * Taille d'un paquet (lignes, puis têtes, par transaction).
+     *
+     * @var positive-int
+     */
     private int $paquet = 500;
 
     /** Verrous tenus au plus par la session en fin de paquet, dont ceux d'identifiants de transaction. */
@@ -221,7 +225,7 @@ class CrmImportFederations extends Command
 
             return self::FAILURE;
         }
-        $this->paquet = (int) $paquet;
+        $this->paquet = max(1, (int) $paquet);
 
         $slug = (string) config('crm.ingest.business_workspace', 'axion-ia');
         $workspaceId = DB::table('workspaces')->where('slug', $slug)->whereNull('deleted_at')->value('id');

@@ -69,6 +69,28 @@ const ESI_INDEX = [
     ],
 ];
 
+/**
+ * Relecture R2 : un index COMPOSÉ ne sert la recherche que si sa condition
+ * porte sur la colonne cherchée. `idx_contacts_workspace_person_key` lu avec
+ * la seule condition `workspace_id` lit tout l'espace.
+ *
+ * @var array<string, string> index → colonne que sa condition doit porter
+ */
+const ESI_COLONNE_EXIGEE = [
+    'idx_contacts_workspace_person_key' => 'person_key',
+];
+
+/** @param  array<string, mixed>  $noeud */
+function esiConditionServie(array $noeud): bool
+{
+    if (! isset($noeud['Index Cond'])) {
+        return false;
+    }
+    $exigee = ESI_COLONNE_EXIGEE[(string) ($noeud['Index Name'] ?? '')] ?? null;
+
+    return $exigee === null || str_contains((string) $noeud['Index Cond'], $exigee);
+}
+
 function esiPeupler(): string
 {
     config(['crm.ingest.business_workspace' => 'axion-ia']);
@@ -169,7 +191,7 @@ function esiBitmapServi(array $noeud, array $admis, array &$vus): bool
         // condition (pour son seul prédicat) est un parcours de toutes les
         // fiches qu'il couvre.
         $index = (string) ($noeud['Index Name'] ?? '');
-        if (! isset($noeud['Index Cond']) || ! in_array($index, $admis, true)) {
+        if (! esiConditionServie($noeud) || ! in_array($index, $admis, true)) {
             return false;
         }
         $vus[$index] = true;
@@ -213,6 +235,8 @@ function esiVerifier(array $noeud, array &$vus, array &$defauts): void
             $index = (string) ($noeud['Index Name'] ?? '');
             if (! isset($noeud['Index Cond'])) {
                 $defauts[] = "index {$index} lu EN ENTIER sur {$table}";
+            } elseif (! esiConditionServie($noeud)) {
+                $defauts[] = "index {$index} lu sans condition sur sa colonne cherchee, sur {$table}";
             } elseif (! in_array($index, $admis, true)) {
                 $defauts[] = "index {$index} étranger à l'effacement sur {$table}";
             } else {
@@ -289,6 +313,44 @@ test('P1 — temoin : la sonde refuse une recherche non indexee (l ancienne rech
     $defauts = esiDefauts([[
         'sql' => "select \"id\", \"signals\" from \"companies\" where jsonb_exists(signals, 'contact_channels') and (signals->'contact_channels')::text ILIKE ?",
         'bindings' => ['%' . ESI_EMAIL . '%'],
+    ]], $vus);
+
+    expect($defauts)->toHaveCount(1);
+});
+
+test('R2 — temoin : un acces par l index (workspace_id, person_key) conditionne sur workspace_id SEUL est refuse', function () {
+    // Le nœud tel que Postgres le rend quand il lit l'index composé pour son
+    // premier champ seulement : tout l'espace.
+    $noeud = [
+        'Node Type' => 'Index Scan', 'Relation Name' => 'contacts', 'Index Name' => 'idx_contacts_workspace_person_key',
+        'Index Cond' => "(workspace_id = '00000000-0000-0000-0000-000000000001'::uuid)",
+    ];
+    $vus = [];
+    $defauts = [];
+    esiVerifier($noeud, $vus, $defauts);
+    expect($defauts)->toHaveCount(1);
+
+    // Et en bitmap.
+    $defauts = [];
+    esiVerifier(['Node Type' => 'Bitmap Heap Scan', 'Relation Name' => 'contacts', 'Plans' => [
+        ['Node Type' => 'Bitmap Index Scan', 'Index Name' => 'idx_contacts_workspace_person_key', 'Index Cond' => $noeud['Index Cond']],
+    ]], $vus, $defauts);
+    expect($defauts)->toHaveCount(1);
+
+    // TÉMOIN DU TÉMOIN : la même lecture, conditionnée AUSSI sur `person_key`, passe.
+    $defauts = [];
+    esiVerifier(['Index Cond' => "((workspace_id = '00000000-0000-0000-0000-000000000001'::uuid) AND (person_key = 'zz'::text))"] + $noeud, $vus, $defauts);
+    expect($defauts)->toBe([]);
+});
+
+test('P1 — temoin : la sonde refuse une recherche non indexee sur contacts', function () {
+    esiPeupler();
+    DB::statement('SET LOCAL enable_seqscan = off');
+
+    $vus = [];
+    $defauts = esiDefauts([[
+        'sql' => 'select "id" from "contacts" where "workspace_id" = ? and "person_key" is not null and "last_name" = ?',
+        'bindings' => [(string) DB::table('workspaces')->where('slug', 'axion-ia')->value('id'), 'ZZVOLUME7'],
     ]], $vus);
 
     expect($defauts)->toHaveCount(1);

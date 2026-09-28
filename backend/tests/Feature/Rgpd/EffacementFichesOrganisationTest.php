@@ -581,3 +581,86 @@ test('E4 — la preuve differee efface la timeline qui porte un numero PERSONNEL
     expect(DB::table('activities')->where('id', $activite)->exists())->toBeFalse()
         ->and(DB::table('activities')->where('id', $temoin)->exists())->toBeTrue();
 });
+
+// ── R6, R7 : l'échec de la preuve ──────────────────────────────────────────
+
+/** Une demande d'effacement « En traitement », en attente de sa preuve. */
+function efoDemandeEnAttente(string $espace, ?string $misAJour = null, string $verification = 'en_attente', string $statut = 'processing'): int
+{
+    // `updated_at` posé à l'INSERTION : le déclencheur de la table le remet à
+    // `now()` à chaque UPDATE.
+    return (int) DB::table('rgpd_requests')->insertGetId([
+        'workspace_id' => $espace, 'type' => 'erasure', 'status' => $statut, 'subject_email' => EFO_EMAIL,
+        'requested_at' => now(), 'processed_at' => now(), 'metadata' => json_encode(['verification' => $verification]),
+        'created_at' => now(), 'updated_at' => $misAJour ?? now(),
+    ]);
+}
+
+test('R6 — une requete en echec dans la preuve ne laisse ni adresse ni numero dans l exception', function () {
+    // Une colonne lue par la recherche des résidus disparaît : la requête qui
+    // porte l'adresse en paramètre échoue.
+    DB::statement('ALTER TABLE federations RENAME COLUMN partenariat_note TO partenariat_note_zz');
+
+    $erreur = null;
+    try {
+        (new VerifierEffacementRgpd(EFO_EMAIL, [EFO_MOBILE_AUTRE_FORME]))->handle();
+    } catch (Throwable $e) {
+        $erreur = $e;
+    }
+
+    expect($erreur)->toBeInstanceOf(RuntimeException::class)
+        ->and($erreur->getPrevious())->toBeNull()
+        ->and($erreur->getMessage())->toContain('SQLSTATE 42703')
+        ->and($erreur->getMessage())->toContain('EffacementCoordonneesFiches.php:')
+        ->and(mb_strtolower((string) $erreur))->not->toContain(EFO_EMAIL)
+        ->and((string) $erreur)->not->toContain('600000042')
+        ->and((string) $erreur)->not->toContain('00 00 00 42');
+});
+
+test('R7 — une preuve en echec marque la demande « echec », sans donnee personnelle, et la laisse En traitement', function () {
+    $id = efoDemandeEnAttente($this->espace);
+
+    (new VerifierEffacementRgpd(EFO_EMAIL, [EFO_MOBILE], $id))->pourEspace($this->espace)->failed(new RuntimeException('délai dépassé'));
+
+    $ligne = DB::table('rgpd_requests')->where('id', $id)->first();
+    $metadata = (array) json_decode((string) $ligne->metadata, true);
+    expect($ligne->status)->toBe('processing')
+        ->and($metadata['verification'])->toBe('echec')
+        ->and($metadata['motif'])->toBe(VerifierEffacementRgpd::MOTIF_ECHEC)
+        ->and(mb_strtolower((string) $ligne->metadata))->not->toContain(EFO_EMAIL);
+});
+
+test('R7 — une demande sans espace, ou introuvable, est refusee bruyamment (jamais un UPDATE a 0 ligne)', function () {
+    $id = efoDemandeEnAttente($this->espace);
+
+    // Sans espace porté par la charge.
+    expect(fn () => (new VerifierEffacementRgpd(EFO_EMAIL, [], $id))->handle())
+        ->toThrow(RuntimeException::class, "n'a pas d'espace");
+    // Une demande qui n'existe pas dans l'espace.
+    expect(fn () => (new VerifierEffacementRgpd(EFO_EMAIL, [], $id + 1000))->pourEspace($this->espace)->handle())
+        ->toThrow(RuntimeException::class, 'introuvable');
+    // TÉMOIN : la même demande, avec son espace, est bien inscrite.
+    (new VerifierEffacementRgpd(EFO_EMAIL, [], $id))->pourEspace($this->espace)->handle();
+    expect(json_decode((string) DB::table('rgpd_requests')->where('id', $id)->value('metadata'), true)['verification'])
+        ->not->toBe('en_attente');
+});
+
+test('R7 — la commande planifiee signale les verifications en attente ou en echec depuis plus de 24 h', function () {
+    $vieille = efoDemandeEnAttente($this->espace, now()->subHours(25)->toDateTimeString());
+    $echec = efoDemandeEnAttente($this->espace, now()->subHours(30)->toDateTimeString(), 'echec');
+    $recente = efoDemandeEnAttente($this->espace);
+    $soldee = efoDemandeEnAttente($this->espace, now()->subHours(40)->toDateTimeString(), 'complete', 'done');
+
+    $code = Artisan::call('rgpd:verifications-en-attente');
+    $sortie = Artisan::output();
+
+    expect($code)->toBe(1)
+        ->and($sortie)->toContain('#' . $vieille)
+        ->and($sortie)->toContain('#' . $echec)
+        ->and($sortie)->not->toContain('#' . $recente)
+        ->and($sortie)->not->toContain('#' . $soldee)
+        ->and(mb_strtolower($sortie))->not->toContain(EFO_EMAIL);
+
+    // TÉMOIN : au-delà de 48 h seulement, rien à signaler.
+    expect(Artisan::call('rgpd:verifications-en-attente', ['--heures' => 48]))->toBe(0);
+});

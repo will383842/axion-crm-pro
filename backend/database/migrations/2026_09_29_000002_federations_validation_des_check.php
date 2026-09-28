@@ -72,6 +72,14 @@ return new class extends Migration
                 }
                 DB::statement("CREATE INDEX CONCURRENTLY IF NOT EXISTS {$nom} ON {$definition}");
             }
+
+            // Relecture R3 : des statistiques fraîches, pour que le
+            // planificateur connaisse les index d'expression dès le premier
+            // effacement (sans elles, il ignore la sélectivité de
+            // `lower(email_generic)`, des chiffres et des canaux jusqu'au
+            // prochain autovacuum). Hors transaction, verrou de lecture seul.
+            DB::statement('ANALYZE companies');
+            DB::statement('ANALYZE contacts');
         } finally {
             DB::statement('RESET lock_timeout');
         }

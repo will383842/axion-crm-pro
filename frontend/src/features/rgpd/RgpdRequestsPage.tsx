@@ -54,7 +54,7 @@ interface RgpdRequest {
   /**
    * Verdict de la preuve DIFFÉRÉE d'un effacement (`VerifierEffacementRgpd`) :
    * `en_attente` tant qu'elle n'a pas tourné, `incomplete` si des coordonnées
-   * restent — la demande reste alors « En traitement », avec le motif.
+   * restent, `echec` si elle a échoué — la demande reste alors « En traitement », avec le motif.
    */
   metadata?: { verification?: string; motif?: string } | null;
 }
@@ -64,6 +64,9 @@ function verificationEffacement(r: RgpdRequest): string | null {
   const verification = r.metadata?.verification;
   if (verification === 'incomplete') {
     return r.metadata?.motif ?? 'Effacement incomplet : coordonnées encore présentes.';
+  }
+  if (verification === 'echec') {
+    return r.metadata?.motif ?? 'La vérification de l’effacement a échoué.';
   }
   if (verification === 'en_attente') return 'Vérification de l’effacement en attente.';
   return null;

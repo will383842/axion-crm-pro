@@ -8,11 +8,14 @@ use App\Support\WorkspaceContext;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
+use Throwable;
 
 /**
  * LA PREUVE D'UN EFFACEMENT (art. 17), EN DIFFÉRÉ (relecture P1, 2026-09-29).
@@ -45,9 +48,19 @@ class VerifierEffacementRgpd implements ShouldBeEncrypted, ShouldQueue
 
     public int $tries = 3;
 
-    public int $timeout = 1800;
+    /**
+     * SOUS le `retry_after` de la connexion `redis` (600 s,
+     * `config/queue.php`), relecture R1 : au-delà, la file croit la tâche
+     * perdue et en relance une seconde copie pendant que la première tourne —
+     * jusqu'à trois preuves simultanées sur 4,3 M de fiches. Garde :
+     * `TimeoutsDesJobsSousRetryAfterTest`. Une preuve plus longue échoue,
+     * et `failed()` le rend visible.
+     */
+    public int $timeout = 540;
 
     public const MOTIF_INCOMPLET = 'Coordonnees encore presentes apres effacement : a traiter a la main (voir residus).';
+
+    public const MOTIF_ECHEC = 'La verification de l effacement a echoue : la relancer, ou verifier a la main (voir journal).';
 
     /**
      * @param  list<string>  $personnels  numéros personnels de la personne
@@ -69,7 +82,11 @@ class VerifierEffacementRgpd implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
-        $residus = self::constater($this->email, $this->personnels, $this->seulEspace);
+        try {
+            $residus = self::constater($this->email, $this->personnels, $this->seulEspace);
+        } catch (QueryException $e) {
+            throw self::nettoyee($e);
+        }
         $complet = $residus === [];
 
         $contexte = ['email_hash' => hash('sha256', mb_strtolower(trim($this->email))), 'demande' => $this->demande, 'residus' => $residus];
@@ -79,39 +96,99 @@ class VerifierEffacementRgpd implements ShouldBeEncrypted, ShouldQueue
             Log::warning('GDPR erasure INCOMPLETE : coordonnees encore presentes', $contexte);
         }
 
+        if ($this->demande !== null) {
+            $this->inscrire(
+                $complet ? 'done' : 'processing',
+                $complet ? 'complete' : 'incomplete',
+                $complet ? null : self::MOTIF_INCOMPLET,
+                $residus,
+            );
+        }
+    }
+
+    /**
+     * Relecture R7 : une preuve qui échoue (délai, base, …) ne laisse PAS la
+     * demande « en attente » pour toujours. Elle reste « En traitement »,
+     * marquée `echec` avec un motif SANS donnée personnelle, visible dans la
+     * console ; `rgpd:verifications-en-attente` la signale aussi.
+     */
+    public function failed(?Throwable $erreur): void
+    {
+        $contexte = ['demande' => $this->demande, 'email_hash' => hash('sha256', mb_strtolower(trim($this->email))), 'erreur' => $erreur instanceof QueryException ? self::nettoyee($erreur)->getMessage() : ($erreur === null ? null : $erreur::class)];
+        Log::error('GDPR erasure verification FAILED', $contexte);
         if ($this->demande === null) {
             return;
         }
-        $inscrire = function () use ($complet, $residus): void {
+        try {
+            $this->inscrire('processing', 'echec', self::MOTIF_ECHEC, null);
+        } catch (Throwable $e) {
+            // Ne jamais relancer depuis `failed()` : le journal ci-dessus
+            // porte déjà l'échec, et la commande planifiée le signalera.
+            Log::error('GDPR erasure verification : la demande n a pas pu etre marquee en echec', ['demande' => $this->demande, 'erreur' => $e::class]);
+        }
+    }
+
+    /**
+     * Écrit le verdict sur la demande, dans SON espace (RLS forcée sur
+     * `rgpd_requests`). Refuse bruyamment une demande sans espace, ou une
+     * écriture qui ne touche aucune ligne (relecture R7) : un UPDATE à zéro
+     * ligne laisserait croire la demande soldée.
+     *
+     * @param  ?array<string, int>  $residus
+     */
+    private function inscrire(string $statut, string $verification, ?string $motif, ?array $residus): void
+    {
+        $espace = $this->espaceDuJob();
+        if ($espace === null) {
+            throw new RuntimeException("VerifierEffacementRgpd : la demande #{$this->demande} n'a pas d'espace ; verdict non inscrit.");
+        }
+
+        $this->inWorkspace($espace, function () use ($statut, $verification, $motif, $residus): void {
             $ligne = DB::table('rgpd_requests')->where('id', $this->demande)->first(['metadata']);
             if ($ligne === null) {
-                return;
+                throw new RuntimeException("VerifierEffacementRgpd : la demande #{$this->demande} est introuvable dans son espace ; verdict non inscrit.");
             }
             $metadata = (array) json_decode((string) $ligne->metadata, true);
-            $metadata['verification'] = $complet ? 'complete' : 'incomplete';
+            $metadata['verification'] = $verification;
             $metadata['verifie_le'] = now()->toIso8601String();
-            $metadata['residus'] = $residus;
-            if ($complet) {
+            if ($residus !== null) {
+                $metadata['residus'] = $residus;
+            }
+            if ($motif === null) {
                 unset($metadata['motif']);
             } else {
-                $metadata['motif'] = self::MOTIF_INCOMPLET;
+                $metadata['motif'] = $motif;
             }
-            DB::table('rgpd_requests')->where('id', $this->demande)->update([
-                'status' => $complet ? 'done' : 'processing',
+            $touchees = DB::table('rgpd_requests')->where('id', $this->demande)->update([
+                'status' => $statut,
                 'metadata' => json_encode($metadata, JSON_THROW_ON_ERROR),
                 'updated_at' => now(),
             ]);
-        };
+            if ($touchees !== 1) {
+                throw new RuntimeException("VerifierEffacementRgpd : la demande #{$this->demande} n'a pas ete mise a jour ; verdict non inscrit.");
+            }
+        });
+    }
 
-        // L'espace de la DEMANDE (RLS forcée sur `rgpd_requests`). Une
-        // demande sans espace n'est lisible que par le rôle propriétaire.
-        $espace = $this->espaceDuJob();
-        if ($espace === null) {
-            $inscrire();
-
-            return;
+    /**
+     * Relecture R6 : le message d'une `QueryException` porte la requête AVEC
+     * ses valeurs — l'adresse et les numéros de la personne. Il finirait dans
+     * `failed_jobs.exception` et le journal. On relance une exception neuve :
+     * le SQLSTATE et l'endroit du code, jamais les valeurs, et SANS
+     * l'exception d'origine (sa chaîne serait sérialisée avec).
+     */
+    public static function nettoyee(QueryException $e): RuntimeException
+    {
+        $endroit = 'inconnu';
+        foreach ($e->getTrace() as $cadre) {
+            $fichier = (string) ($cadre['file'] ?? '');
+            if (str_contains($fichier, DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR)) {
+                $endroit = basename($fichier) . ':' . (int) ($cadre['line'] ?? 0);
+                break;
+            }
         }
-        $this->inWorkspace($espace, $inscrire);
+
+        return new RuntimeException('VerifierEffacementRgpd : requete en echec (SQLSTATE ' . (string) $e->getCode() . ') a ' . $endroit . '.');
     }
 
     /**

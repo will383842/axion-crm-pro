@@ -17,6 +17,8 @@ import { getJson } from '../msw/handlers';
 
 const MOTIF = 'Coordonnees encore presentes apres effacement : a traiter a la main (voir residus).';
 
+const MOTIF_ECHEC = 'La verification de l effacement a echoue : la relancer, ou verifier a la main (voir journal).';
+
 const DEMANDES = {
   data: [
     {
@@ -27,6 +29,15 @@ const DEMANDES = {
       requested_at: '2026-09-29T08:00:00+02:00',
       processed_at: '2026-09-29T08:00:05+02:00',
       metadata: { origin: 'site-sync-gdpr', verification: 'incomplete', motif: MOTIF },
+    },
+    {
+      id: 3,
+      type: 'erasure',
+      status: 'processing',
+      subject_email: 'zz.echec@zz-rgpd.example.invalid',
+      requested_at: '2026-09-29T07:00:00+02:00',
+      processed_at: '2026-09-29T07:00:05+02:00',
+      metadata: { origin: 'site-sync-gdpr', verification: 'echec', motif: MOTIF_ECHEC },
     },
     {
       id: 2,
@@ -41,7 +52,7 @@ const DEMANDES = {
 };
 
 describe('RgpdRequestsPage — verdict de la preuve différée', () => {
-  it('un effacement incomplet affiche son motif ; un effacement soldé, rien', async () => {
+  it('un effacement incomplet ou en échec affiche son motif ; un effacement soldé, rien', async () => {
     await renderScreen(<RgpdRequestsPage />, {
       path: '/rgpd/requests',
       handlers: [getJson('/rgpd/requests', DEMANDES)],
@@ -49,6 +60,8 @@ describe('RgpdRequestsPage — verdict de la preuve différée', () => {
 
     await screen.findByText('zz.incomplet@zz-rgpd.example.invalid');
     expect(screen.getAllByText(MOTIF)).toHaveLength(1);
+    // Relecture R7 : une vérification en ÉCHEC se voit aussi.
+    expect(screen.getAllByText(MOTIF_ECHEC)).toHaveLength(1);
     expect(screen.getByText('zz.solde@zz-rgpd.example.invalid')).toBeInTheDocument();
     expect(screen.queryByText(/Vérification de l’effacement/)).toBeNull();
   });

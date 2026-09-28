@@ -128,9 +128,13 @@ return new class extends Migration
 
         $this->installerProtection(self::SLUGS_PROTEGES_AVANT);
 
+        DB::statement('DROP TRIGGER IF EXISTS companies_memoriser_retraits ON public.companies');
+        DB::statement('DROP FUNCTION IF EXISTS public.companies_memoriser_retraits()');
         DB::statement('DROP TRIGGER IF EXISTS contacts_memoriser_retrait ON public.contacts');
         DB::statement('DROP FUNCTION IF EXISTS public.contacts_memoriser_retrait()');
+        DB::statement('DROP FUNCTION IF EXISTS public.contacts_retires_empreinte(TEXT, TEXT)');
         DB::statement('DROP TABLE IF EXISTS contacts_retires');
+        DB::statement('DROP TABLE IF EXISTS contacts_retires_cle');
         DB::statement('DROP TRIGGER IF EXISTS companies_federation_meme_espace ON public.companies');
         DB::statement('DROP FUNCTION IF EXISTS public.companies_federation_meme_espace()');
         DB::statement('DROP TRIGGER IF EXISTS federations_meme_espace ON public.federations');
@@ -305,8 +309,15 @@ return new class extends Migration
      * fichier changeait (nouveau `run_id`).
      *
      * Ce registre garde, à chaque suppression d'une fiche personne venue de
-     * l'import des fédérations, l'EMPREINTE de son nom normalisé (jamais le nom)
-     * et le SIREN de son organisme. `crm:import-federations` écarte toute
+     * l'import des fédérations, l'EMPREINTE SALÉE (HMAC) de son nom normalisé
+     * (jamais le nom) et le SIREN de son organisme.
+     *
+     * Registre art. 30 — finalité : rendre effective une suppression ou un
+     * effacement face aux réimports de l'annuaire (art. 17 et 21) ; données :
+     * une empreinte HMAC non réversible sans la clé, et le SIREN d'une
+     * personne morale ; durée : celle des oppositions (`opt_out`), c'est-à-dire
+     * tant que la source `federations-2026` peut être réimportée — le registre
+     * se vide avec elle, jamais avant (le vider ferait revenir les personnes). `crm:import-federations` écarte toute
      * personne qui y figure. Même doctrine que `opt_out` : l'effacement laisse
      * une empreinte, pas la donnée — c'est ce qui l'empêche de revenir.
      *
@@ -340,22 +351,71 @@ return new class extends Migration
              WITH CHECK (workspace_id::TEXT = NULLIF(current_setting('app.current_workspace_id', true), ''))",
         );
 
+        // ── L'EMPREINTE EST SALÉE (relecture S7) ─────────────────────────────
+        // Une empreinte SHA-256 d'un nom se retrouve par dictionnaire (les noms
+        // sont peu nombreux) : sans sel, le registre redirait qui a été retiré.
+        // `opt_out` n'a pas de sel, et le seul secret HMAC existant
+        // (`CRM_PERSON_KEY_SECRET`) vit côté application — un déclencheur de la
+        // base ne peut pas le lire. La clé est donc tirée ICI, dans la base, au
+        // hasard (32 octets), et n'est lisible que par la fonction
+        // `contacts_retires_empreinte` (SECURITY DEFINER) : le rôle applicatif
+        // n'y a aucun droit. Elle ne change jamais (sinon le registre perdrait
+        // sa mémoire) et ne quitte pas la base.
         DB::unprepared(<<<'SQL'
+            CREATE TABLE IF NOT EXISTS public.contacts_retires_cle (
+                id   SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+                cle  BYTEA    NOT NULL
+            );
+            INSERT INTO public.contacts_retires_cle (id, cle) VALUES (1, gen_random_bytes(32)) ON CONFLICT (id) DO NOTHING;
+            REVOKE ALL ON public.contacts_retires_cle FROM PUBLIC;
+            COMMENT ON TABLE public.contacts_retires_cle IS 'Cle HMAC du registre contacts_retires. Lue par contacts_retires_empreinte() seulement. Ne jamais la changer ni l exporter.';
+
+            CREATE OR REPLACE FUNCTION public.contacts_retires_empreinte(p_prenom TEXT, p_nom TEXT)
+            RETURNS TEXT
+            LANGUAGE sql
+            STABLE
+            SECURITY DEFINER
+            SET search_path = public, pg_catalog
+            AS $fn$
+                SELECT encode(hmac(convert_to(public.normalize_name(coalesce(p_prenom, '') || '_' || p_nom), 'UTF8'), k.cle, 'sha256'), 'hex')
+                FROM   public.contacts_retires_cle k
+                WHERE  k.id = 1
+            $fn$;
+        SQL);
+        $roleApplicatif = (string) config('database.connections.pgsql_app.username', 'axion_app');
+        if ($roleApplicatif !== '' && DB::selectOne('SELECT 1 AS e FROM pg_roles WHERE rolname = ?', [$roleApplicatif]) !== null) {
+            DB::statement('REVOKE ALL ON public.contacts_retires_cle FROM "' . str_replace('"', '""', $roleApplicatif) . '"');
+        }
+
+        DB::unprepared(<<<'SQL'
+            -- Fusion de doublons : `SET LOCAL app.fusion_contacts = 'on'` dans
+            -- la transaction de fusion. La personne n'est pas RETIRÉE, elle est
+            -- regroupée : le registre ne doit pas l'empêcher de revenir.
             CREATE OR REPLACE FUNCTION public.contacts_memoriser_retrait()
             RETURNS trigger
             LANGUAGE plpgsql
             SECURITY DEFINER
             SET search_path = public, pg_catalog
             AS $fn$
+            DECLARE
+                v_siren CHAR(9);
             BEGIN
+                IF COALESCE(current_setting('app.fusion_contacts', true), '') = 'on' THEN
+                    RETURN OLD;
+                END IF;
+
                 IF COALESCE(OLD.sources, '[]'::jsonb) @> '["federations-2026"]'::jsonb THEN
+                    SELECT c.siren INTO v_siren FROM public.companies c WHERE c.id = OLD.company_id;
+                    IF NOT FOUND THEN
+                        -- Suppression EN CASCADE de la fiche d'organisation : elle
+                        -- n'est plus visible ici, son SIREN non plus. Le
+                        -- déclencheur de `companies` (BEFORE DELETE) a déjà
+                        -- inscrit ses personnes, avec le bon SIREN.
+                        RETURN OLD;
+                    END IF;
+
                     INSERT INTO public.contacts_retires (workspace_id, company_id, siren, cle_nom)
-                    VALUES (
-                        OLD.workspace_id,
-                        OLD.company_id,
-                        (SELECT c.siren FROM public.companies c WHERE c.id = OLD.company_id),
-                        encode(digest(public.normalize_name(coalesce(OLD.first_name, '') || '_' || OLD.last_name), 'sha256'), 'hex')
-                    )
+                    VALUES (OLD.workspace_id, OLD.company_id, v_siren, public.contacts_retires_empreinte(OLD.first_name, OLD.last_name))
                     ON CONFLICT DO NOTHING;
                 END IF;
 
@@ -367,6 +427,35 @@ return new class extends Migration
             CREATE TRIGGER contacts_memoriser_retrait
                 AFTER DELETE ON public.contacts
                 FOR EACH ROW EXECUTE FUNCTION public.contacts_memoriser_retrait();
+
+            -- La fiche d'organisation supprimée : ses personnes, AVANT la cascade,
+            -- pendant que le SIREN est encore lisible.
+            CREATE OR REPLACE FUNCTION public.companies_memoriser_retraits()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            SECURITY DEFINER
+            SET search_path = public, pg_catalog
+            AS $fn$
+            BEGIN
+                IF COALESCE(current_setting('app.fusion_contacts', true), '') = 'on' THEN
+                    RETURN OLD;
+                END IF;
+
+                INSERT INTO public.contacts_retires (workspace_id, company_id, siren, cle_nom)
+                SELECT ct.workspace_id, ct.company_id, OLD.siren, public.contacts_retires_empreinte(ct.first_name, ct.last_name)
+                FROM   public.contacts ct
+                WHERE  ct.company_id = OLD.id
+                AND    COALESCE(ct.sources, '[]'::jsonb) @> '["federations-2026"]'::jsonb
+                ON CONFLICT DO NOTHING;
+
+                RETURN OLD;
+            END
+            $fn$;
+
+            DROP TRIGGER IF EXISTS companies_memoriser_retraits ON public.companies;
+            CREATE TRIGGER companies_memoriser_retraits
+                BEFORE DELETE ON public.companies
+                FOR EACH ROW EXECUTE FUNCTION public.companies_memoriser_retraits();
         SQL);
     }
 

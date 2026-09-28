@@ -517,9 +517,52 @@ class FederationsController extends ApiController
                 }
             }
             $masquee['contacts'] = $contacts;
+            // Le LinkedIn de la fiche elle-même, s'il désigne une PERSONNE.
+            if (is_string($masquee['linkedin_url'] ?? null) && preg_match('#linkedin\.com/in/#i', $masquee['linkedin_url']) === 1) {
+                $masquee['linkedin_url'] = null;
+            }
+            $masquee['canaux'] = self::masquerCanaux(is_array($masquee['canaux'] ?? null) ? $masquee['canaux'] : []);
         }
 
         return $masquee;
+    }
+
+    /**
+     * Les canaux d'une fiche, pour un compte en lecture seule — masqués par
+     * TYPE de donnée, pas par nom de clé (relecture S2) : toute adresse
+     * (nominative ou générique) et tout téléphone sont masqués, un lien
+     * LinkedIn de PERSONNE (`/in/`) est retiré ; les sites et les pages
+     * d'organisation restent.
+     *
+     * @param  array<mixed>  $canaux
+     * @return array<string, list<mixed>>
+     */
+    private static function masquerCanaux(array $canaux): array
+    {
+        $emails = [];
+        foreach (is_array($canaux['emails'] ?? null) ? $canaux['emails'] : [] as $e) {
+            if (is_array($e)) {
+                $e['email'] = MasquageCoordonnees::email(is_string($e['email'] ?? null) ? $e['email'] : null);
+                $emails[] = $e;
+            }
+        }
+        $telephones = [];
+        foreach (is_array($canaux['telephones'] ?? null) ? $canaux['telephones'] : [] as $t) {
+            if (is_array($t)) {
+                $telephones[] = ['phone' => MasquageCoordonnees::telephone(is_string($t['phone'] ?? null) ? $t['phone'] : null)];
+            }
+        }
+        $linkedin = array_values(array_filter(
+            is_array($canaux['linkedin'] ?? null) ? $canaux['linkedin'] : [],
+            static fn (mixed $u): bool => is_string($u) && preg_match('#linkedin\.com/in/#i', $u) !== 1,
+        ));
+
+        return [
+            'emails' => $emails,
+            'telephones' => $telephones,
+            'sites' => array_values(is_array($canaux['sites'] ?? null) ? $canaux['sites'] : []),
+            'linkedin' => $linkedin,
+        ];
     }
 
     private function espace(): ?string

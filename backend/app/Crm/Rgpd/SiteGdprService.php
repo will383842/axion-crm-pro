@@ -93,7 +93,7 @@ final class SiteGdprService
         $email = mb_strtolower(trim($email));
 
         $result = [
-            'business' => ['contacts' => [], 'personnes' => [], 'abonnements' => [], 'activities' => []],
+            'business' => ['contacts' => [], 'personnes' => [], 'abonnements' => [], 'activities' => [], 'fiches_organisation' => []],
             'vivier' => ['candidates' => [], 'activities' => []],
             'opt_out' => [],
         ];
@@ -133,11 +133,20 @@ final class SiteGdprService
                     ->map(fn (object $row): array => (array) $row)
                     ->all();
 
+                // Les fiches d'ORGANISATION qui portent son adresse ou un de ses
+                // numéros PERSONNELS — ses valeurs et leur emplacement, jamais
+                // celles d'un tiers (relecture S1 et S6). Ce qu'on sait
+                // effacer, on sait l'exporter.
+                $telephones = EffacementCoordonneesFiches::telephonesDesContacts($email, $businessId, $personKey);
+                $clesNom = EffacementCoordonneesFiches::clesNomDesContacts($email, $businessId, $personKey);
+                $personnels = EffacementCoordonneesFiches::numerosPersonnels($telephones, $email, $clesNom, $businessId);
+
                 return [
                     'contacts' => $contacts,
                     'personnes' => $personnes,
                     'abonnements' => $abonnements,
                     'activities' => $this->activities($businessId, $personKey),
+                    'fiches_organisation' => EffacementCoordonneesFiches::fichesPortant($email, $personnels, $businessId),
                 ];
             });
         }
@@ -181,8 +190,6 @@ final class SiteGdprService
         $email = mb_strtolower(trim($email));
         $emailHash = hash('sha256', $email);
         $deleted = [];
-        /** @var list<string> $telephones */
-        $telephones = [];
 
         if (in_array($scope, ['both', 'business'], true)) {
             $businessId = $this->workspaceId((string) config('crm.ingest.business_workspace', 'axion-ia'));
@@ -193,8 +200,10 @@ final class SiteGdprService
                 [$telephones, $clesNom] = WorkspaceContext::run(
                     $businessId,
                     fn (): array => [
-                        EffacementCoordonneesFiches::telephonesDesContacts($email, $businessId),
-                        EffacementCoordonneesFiches::clesNomDesContacts($email, $businessId),
+                        // Par clé de personne OU par adresse, comme la
+                        // suppression juste après (relecture S5).
+                        EffacementCoordonneesFiches::telephonesDesContacts($email, $businessId, $personKey),
+                        EffacementCoordonneesFiches::clesNomDesContacts($email, $businessId, $personKey),
                     ],
                 );
                 $deleted['business'] = WorkspaceContext::run(
@@ -248,12 +257,20 @@ final class SiteGdprService
                         // mobile (e-mail générique, téléphone, canaux) — même
                         // définition que l'effacement console (PR #255).
                         $fiches = EffacementCoordonneesFiches::effacer($email, $telephones, $clesNom, $businessId);
+                        $personnels = $fiches['personnels'];
+
+                        // La même preuve que la console : ce qui reste, et où
+                        // (relecture S4). Sans elle, cette porte ne pouvait
+                        // jamais dire « incomplet ».
+                        $residus = EffacementCoordonneesFiches::residus($email, $personnels, $businessId);
 
                         // 🔴 Le journal DANS le contexte ET dans la transaction —
                         // cf. `journal()`.
                         $this->journal($businessId, $email);
 
-                        return $fiches + [
+                        return $fiches['bilan'] + [
+                            'personnels' => $personnels,
+                            'residus' => $residus,
                             'contacts' => $contacts,
                             'personnes' => $personnes,
                             'abonnements' => $abonnements,
@@ -264,9 +281,13 @@ final class SiteGdprService
                 );
             }
             $this->optOut($email, $emailHash, 'business');
-            foreach ($telephones as $telephone) {
-                $this->optOutTelephone($telephone, 'business');
+            // Les numéros PERSONNELS seulement : un standard partagé n'est pas
+            // opposé (cf. EffacementCoordonneesFiches, en-tête).
+            $personnels = is_array($deleted['business']['personnels'] ?? null) ? $deleted['business']['personnels'] : [];
+            foreach ($personnels as $telephone) {
+                $this->optOutTelephone((string) $telephone, 'business');
             }
+            unset($deleted['business']['personnels']);
         }
 
         if (in_array($scope, ['both', 'vivier'], true)) {
@@ -313,7 +334,18 @@ final class SiteGdprService
             'payload_hash' => hash('sha256', $personKey . '|' . $emailHash . '|' . $scope),
         ]);
 
-        return ['deleted' => $deleted, 'opt_out_scopes' => $scope === 'both' ? ['business', 'vivier'] : [$scope]];
+        // « Complet » seulement si la recherche de résidus revient vide (S4).
+        $residus = is_array($deleted['business']['residus'] ?? null) ? $deleted['business']['residus'] : [];
+        unset($deleted['business']['residus']);
+        $complet = $residus === [];
+
+        return [
+            'deleted' => $deleted,
+            'opt_out_scopes' => $scope === 'both' ? ['business', 'vivier'] : [$scope],
+            'complete' => $complet,
+            // Des emplacements et des nombres, jamais une valeur.
+            'residus' => $residus,
+        ];
     }
 
     // ── Internes ────────────────────────────────────────────────────────────

@@ -137,15 +137,15 @@ class GdprErasureService
             // parce qu'une activite nee de la COLLECTE peut porter l'adresse sans
             // porter la cle. Le balayage est couteux ; un effacement est rare, et
             // la justesse prime ici sur la vitesse.
-            $requeteActivites = DB::table('activities')->where(function ($q) use ($clesPersonne, $email, $telephones) {
+            $requeteActivites = DB::table('activities')->where(function ($q) use ($clesPersonne, $email, $phone) {
                 if ($clesPersonne !== []) {
                     $q->orWhereIn('person_key', $clesPersonne);
                 }
                 $q->orWhereRaw('payload::text ILIKE ?', ['%' . $email . '%'])
                     ->orWhereRaw("coalesce(content, '') ILIKE ?", ['%' . $email . '%'])
                     ->orWhereRaw("coalesce(title, '') ILIKE ?", ['%' . $email . '%']);
-                foreach ($telephones as $telephone) {
-                    $q->orWhereRaw('payload::text ILIKE ?', ['%' . $telephone . '%']);
+                if ($phone !== null && $phone !== '') {
+                    $q->orWhereRaw('payload::text ILIKE ?', ['%' . $phone . '%']);
                 }
             });
             $deleted['activities'] = $requeteActivites->delete();
@@ -163,10 +163,14 @@ class GdprErasureService
             // L'adresse et le mobile d'une personne vivent aussi sur la fiche de
             // son organisation : e-mail générique, téléphone, canaux collectés,
             // et fiches personnes qui portent son numéro sans son adresse. Mis à
-            // NULL — y compris sur une fiche PROTÉGÉE, qui survit.
-            foreach (EffacementCoordonneesFiches::effacer($email, $telephones, $clesNom) as $emplacement => $n) {
-                $deleted[$emplacement] = $n;
+            // NULL — y compris sur une fiche PROTÉGÉE, qui survit. Espace par
+            // espace (RLS) ; seuls les numéros PERSONNELS sortent des fiches
+            // d'organisation (un standard partagé reste à l'organisation).
+            $fiches = EffacementCoordonneesFiches::effacerPartout($email, $telephones, $clesNom);
+            foreach ($fiches['bilan'] as $emplacement => $n) {
+                $deleted['fiches_' . $emplacement] = $n;
             }
+            $personnels = $fiches['personnels'];
 
             // ── CE QU'ON NE SUPPRIME **PAS**, ET POURQUOI ────────────────────
             //
@@ -338,9 +342,12 @@ class GdprErasureService
                 scopes: DeduplicationService::UNIVERS_OPPOSITION,
             );
 
-            // Chaque AUTRE numéro de la personne est opposé lui aussi : sans cela,
-            // le prochain import le remettrait sur la fiche de l'organisation.
-            foreach ($telephones as $telephone) {
+            // Chaque AUTRE numéro PERSONNEL est opposé lui aussi : sans cela, le
+            // prochain import le remettrait sur la fiche de l'organisation. Un
+            // standard partagé ne l'est PAS : `opt_out.phone` est global et
+            // fermerait l'organisation entière (la personne reste protégée par
+            // l'opposition sur son adresse et par `contacts_retires`).
+            foreach ($personnels as $telephone) {
                 if ($telephone !== $phone) {
                     $this->dedup->addOptOut(
                         null,
@@ -355,7 +362,7 @@ class GdprErasureService
             // Un effacement ne se déclare complet que si l'on ne retrouve plus
             // rien. Le journal ne porte JAMAIS l'adresse en clair : il en porte
             // l'empreinte (il disait `email` jusqu'au 2026-09-29).
-            $residus = EffacementCoordonneesFiches::residus($email, $telephones);
+            $residus = EffacementCoordonneesFiches::residusPartout($email, $personnels);
             $complet = $residus === [];
             $contexte = ['email_hash' => hash('sha256', $email), 'deleted' => $deleted, 'residus' => $residus];
             if ($complet) {

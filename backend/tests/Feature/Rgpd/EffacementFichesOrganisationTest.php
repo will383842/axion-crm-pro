@@ -87,11 +87,6 @@ beforeEach(function () {
         'workspace_id' => $this->espace, 'company_id' => $this->antenne, 'first_name' => 'Zoe', 'last_name' => 'ZZPRESIDENTE',
         'phone' => '0033600000042', 'created_at' => now(), 'updated_at' => now(),
     ]);
-    // Une AUTRE personne qui partage ce numéro (le standard) : elle reste, sans le numéro.
-    $this->collegue = (int) DB::table('contacts')->insertGetId([
-        'workspace_id' => $this->espace, 'company_id' => $this->fede, 'first_name' => 'Zed', 'last_name' => 'ZZSECRETAIRE',
-        'email' => 'secretaire@zz-fede.example.invalid', 'phone' => '06.00.00.00.42', 'created_at' => now(), 'updated_at' => now(),
-    ]);
 
     // TÉMOIN : une autre organisation, d'autres coordonnées.
     $this->temoin = (int) DB::table('companies')->insertGetId([
@@ -129,9 +124,6 @@ test('l effacement console atteint les trois emplacements d une fiche PROTEGEE, 
         ->and($canaux['phones'])->toBe(['01 00 00 00 10'])
         ->and(array_keys($canaux['details']))->toBe(['secretariat@zz-fede.example.invalid'])
         ->and(DB::table('contacts')->whereIn('id', [$this->presidente, $this->doublon])->count())->toBe(0)
-        // Le collègue n'est PAS effacé : seul le numéro partagé part.
-        ->and(DB::table('contacts')->where('id', $this->collegue)->value('email'))->toBe('secretaire@zz-fede.example.invalid')
-        ->and(DB::table('contacts')->where('id', $this->collegue)->value('phone'))->toBeNull()
         ->and($resultat['complete'])->toBeTrue()
         ->and($resultat['residus'])->toBe([])
         // Témoin intact.
@@ -233,4 +225,133 @@ test('ce qu on sait effacer, on sait l exporter : les fiches d organisation qui 
     $fiches = EffacementCoordonneesFiches::fichesPortant(strtoupper(EFO_EMAIL));
 
     expect(array_column($fiches, 'id'))->toBe([$this->fede]);
+});
+
+// ── S3 : le standard n'est pas le numéro de la personne ────────────────────
+
+test('S3 — un standard d organisation ou un numero partage ne quittent que les fiches de la personne ; ils ne sont pas opposes', function () {
+    // Le standard d'une organisation, inscrit aussi sur la fiche de la personne.
+    $organisation = (int) DB::table('companies')->insertGetId([
+        'workspace_id' => $this->espace, 'siren' => '900000520', 'denomination' => 'ZZ Standard',
+        'phone' => '04 72 00 00 10', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    DB::table('contacts')->insert([
+        'workspace_id' => $this->espace, 'company_id' => $organisation, 'first_name' => 'Zia', 'last_name' => 'ZZDEMANDEUSE',
+        'email' => 'zia@zz-standard.example.invalid', 'phone' => '04.72.00.00.10', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    // Un portable PARTAGÉ avec un collègue (ligne de service).
+    $autre = (int) DB::table('companies')->insertGetId([
+        'workspace_id' => $this->espace, 'siren' => '900000521', 'denomination' => 'ZZ Service',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    DB::table('contacts')->insert([
+        'workspace_id' => $this->espace, 'company_id' => $autre, 'first_name' => 'Zia', 'last_name' => 'ZZDEMANDEUSE',
+        'email' => 'zia@zz-standard.example.invalid', 'phone' => '06 11 11 11 11', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $collegue = (int) DB::table('contacts')->insertGetId([
+        'workspace_id' => $this->espace, 'company_id' => $autre, 'first_name' => 'Zed', 'last_name' => 'ZZCOLLEGUE',
+        'email' => 'zed@zz-standard.example.invalid', 'phone' => '+33 6 11 11 11 11', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    $resultat = app(GdprErasureService::class)->erase('zia@zz-standard.example.invalid');
+
+    expect(DB::table('contacts')->where('email', 'zia@zz-standard.example.invalid')->count())->toBe(0)
+        // Le standard reste à l'organisation, le portable partagé au collègue.
+        ->and(efoFiche($organisation)->phone)->toBe('04 72 00 00 10')
+        ->and(DB::table('contacts')->where('id', $collegue)->value('phone'))->toBe('+33 6 11 11 11 11')
+        // Aucune opposition globale sur ces numéros.
+        ->and(DB::table('opt_out')->whereNotNull('phone')->whereRaw("regexp_replace(phone, '[^0-9]', '', 'g') LIKE ?", ['%472000010'])->exists())->toBeFalse()
+        ->and(DB::table('opt_out')->whereNotNull('phone')->whereRaw("regexp_replace(phone, '[^0-9]', '', 'g') LIKE ?", ['%611111111'])->exists())->toBeFalse()
+        ->and($resultat['complete'])->toBeTrue();
+});
+
+// ── S4 : la preuve lit plus large que l'effacement ─────────────────────────
+
+test('S4 — une adresse dans une note de Will ou dans metadata, un numero mal forme : l effacement est INCOMPLET', function (string $zone) {
+    match ($zone) {
+        'federations.partenariat_note' => DB::table('federations')->insert([
+            'company_id' => $this->temoin, 'workspace_id' => $this->espace, 'famille' => 'ordre', 'niveau' => 'national',
+            'pertinence' => 'haute', 'contactabilite' => 'aucun_contact', 'partenariat_note' => 'Rappeler ' . strtoupper(EFO_EMAIL),
+        ]),
+        'events.demarche_note' => DB::table('events')->insert([
+            'workspace_id' => $this->espace, 'external_ref' => 'zz-efo-note', 'nom' => 'ZZ salon', 'type' => 'salon',
+            'demarche_note' => 'Contact : ' . EFO_EMAIL, 'created_at' => now(), 'updated_at' => now(),
+        ]),
+        'companies.metadata' => DB::table('companies')->where('id', $this->temoin)->update([
+            // Numéro mal formé : la normalisation de l'effacement ne le lit pas,
+            // la recherche par chiffres, si.
+            'metadata' => json_encode(['standard' => '06.00.00.00.42 (poste 3)']),
+        ]),
+    };
+
+    $resultat = app(GdprErasureService::class)->erase(EFO_EMAIL);
+
+    expect($resultat['complete'])->toBeFalse()
+        ->and($resultat['residus'])->toHaveKey($zone);
+})->with(['federations.partenariat_note', 'events.demarche_note', 'companies.metadata']);
+
+test('S4 — la porte du site sait dire « incomplet »', function () {
+    DB::table('companies')->where('id', $this->temoin)->update([
+        'metadata' => json_encode(['contact' => EFO_EMAIL]),
+    ]);
+
+    $resultat = app(SiteGdprService::class)->erase(hash('sha256', 'zz-efo'), EFO_EMAIL, 'business');
+
+    expect($resultat['complete'])->toBeFalse()
+        ->and($resultat['residus'])->toHaveKey('companies.metadata');
+});
+
+// ── S5 : la porte du site relève par clé de personne ───────────────────────
+
+test('S5 — la porte du site releve les numeros par cle de personne, pas seulement par adresse', function () {
+    $fiche = (int) DB::table('companies')->insertGetId([
+        'workspace_id' => $this->espace, 'siren' => '900000530', 'denomination' => 'ZZ Club PK',
+        'phone' => '06 00 00 00 77', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    DB::table('contacts')->insert([
+        'workspace_id' => $this->espace, 'company_id' => $fiche, 'last_name' => 'ZZPK', 'email' => null,
+        'phone' => '06 00 00 00 77', 'person_key' => 'zz-pk-s5', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    app(SiteGdprService::class)->erase('zz-pk-s5', 'autre-adresse@zz-pk.example.invalid', 'business');
+
+    expect(efoFiche($fiche)->phone)->toBeNull()
+        ->and(DB::table('contacts')->where('person_key', 'zz-pk-s5')->exists())->toBeFalse();
+});
+
+// ── S1 et S6 : l'export ne rend que les valeurs de la personne ─────────────
+
+test('S1 — l export rend les valeurs de la personne et leur emplacement, jamais celles d un tiers', function () {
+    // Une fiche trouvée par ses CANAUX : son e-mail générique et son standard
+    // sont ceux d'un tiers.
+    $tiers = (int) DB::table('companies')->insertGetId([
+        'workspace_id' => $this->espace, 'siren' => '900000540', 'denomination' => 'ZZ Tiers',
+        'email_generic' => 'tiers@zz-tiers.example.invalid', 'phone' => '06 99 99 99 01',
+        'signals' => json_encode(['contact_channels' => ['emails' => [EFO_EMAIL], 'phones' => ['06 99 99 99 02']]]),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    $fiches = EffacementCoordonneesFiches::fichesPortant(EFO_EMAIL, [EFO_MOBILE]);
+    $parId = collect($fiches)->keyBy('id');
+    $texte = json_encode($fiches);
+
+    expect($parId)->toHaveKey($tiers)
+        ->and($parId[$tiers]['emplacements'])->toBe([['emplacement' => 'companies.signals.contact_channels.emails', 'valeur' => EFO_EMAIL]])
+        ->and($texte)->not->toContain('tiers@zz-tiers')
+        ->and($texte)->not->toContain('99 99 01')
+        ->and($texte)->not->toContain('99 99 02')
+        // La fiche de la personne elle-même : ses trois emplacements.
+        ->and(array_column($parId[$this->fede]['emplacements'], 'emplacement'))
+        ->toContain('companies.email_generic', 'companies.phone', 'companies.signals.contact_channels.emails', 'companies.signals.contact_channels.phones');
+});
+
+test('S6 — l export venu du site rend aussi les fiches d organisation, sans valeur d un tiers', function () {
+    DB::table('companies')->where('id', $this->fede)->update(['email_generic' => 'standard@zz-fede.example.invalid']);
+
+    $export = app(SiteGdprService::class)->export(hash('sha256', 'zz-efo'), EFO_EMAIL);
+    $fiches = collect($export['business']['fiches_organisation'])->keyBy('id');
+
+    expect($fiches)->toHaveKey($this->fede)
+        ->and(json_encode($export['business']['fiches_organisation']))->not->toContain('standard@zz-fede')
+        ->and(array_column($fiches[$this->fede]['emplacements'], 'valeur'))->toContain(EFO_EMAIL);
 });

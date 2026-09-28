@@ -619,11 +619,11 @@ class CrmImportFederations extends Command
             return false;
         }
         $ligne = DB::selectOne(
-            "SELECT EXISTS (
+            'SELECT EXISTS (
                 SELECT 1 FROM contacts_retires
                 WHERE workspace_id = ? AND siren = ?
-                AND cle_nom = encode(digest(normalize_name(coalesce(?, '') || '_' || ?), 'sha256'), 'hex')
-             ) AS e",
+                AND cle_nom = contacts_retires_empreinte(?, ?)
+             ) AS e',
             [$workspaceId, $siren, $prenom, $nom],
         );
 

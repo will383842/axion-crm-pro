@@ -198,7 +198,17 @@ test('un compte en lecture seule ne peut pas modifier la demarche, un autre espa
 });
 
 test('R5 — un compte en lecture seule ne recoit ni le LinkedIn des personnes ni l adresse postale ; l admin, si (temoin)', function () {
-    DB::table('companies')->where('id', $this->nationale)->update(['address' => '1 RUE ZZ FICTIVE', 'postcode' => '75001']);
+    DB::table('companies')->where('id', $this->nationale)->update([
+        'address' => '1 RUE ZZ FICTIVE', 'postcode' => '75001',
+        // S2 : des canaux remplis, de chaque TYPE de donnée.
+        'signals' => json_encode(['contact_channels' => [
+            'emails' => ['jean.zzcanal@zz-nationale.example.invalid'],
+            'details' => ['jean.zzcanal@zz-nationale.example.invalid' => ['type' => 'nominatif', 'verifie_le' => '2026-09-28']],
+            'phones' => ['06 00 00 00 55'],
+            'linkedin' => ['https://www.linkedin.com/in/zz-jean-canal', 'https://www.linkedin.com/company/zz-nationale'],
+            'sites' => ['https://zz-nationale-bis.example.invalid'],
+        ]]),
+    ]);
     DB::table('contacts')->where('company_id', $this->nationale)->update(['linkedin_url' => 'https://www.linkedin.com/in/zz-presidente']);
 
     $admin = $this->getJson('/api/v1/federations/' . $this->nationale)->assertOk();
@@ -213,7 +223,19 @@ test('R5 — un compte en lecture seule ne recoit ni le LinkedIn des personnes n
         ->and($r->json('postcode'))->toBeNull()
         ->and($r->json('contacts.0.linkedin_url'))->toBeNull()
         ->and($corps)->not->toContain('zz-presidente')
-        ->and($corps)->not->toContain('RUE ZZ FICTIVE');
+        ->and($corps)->not->toContain('RUE ZZ FICTIVE')
+        // S2 : les canaux, masqués par type.
+        ->and($corps)->not->toContain('jean.zzcanal@')
+        ->and($corps)->not->toContain('00 00 00 55')
+        ->and($corps)->not->toContain('zz-jean-canal')
+        ->and($r->json('canaux.emails.0.email'))->toBe('j***@zz-nationale.example.invalid')
+        ->and($r->json('canaux.linkedin'))->toBe(['https://www.linkedin.com/company/zz-nationale'])
+        ->and($r->json('canaux.sites'))->toBe(['https://zz-nationale-bis.example.invalid']);
+
+    // Témoin : l'admin lit les canaux en clair.
+    $this->actingAs($this->user);
+    $clair = (string) $this->getJson('/api/v1/federations/' . $this->nationale)->assertOk()->getContent();
+    expect($clair)->toContain('jean.zzcanal@')->toContain('zz-jean-canal');
 });
 
 test('D7 — un compte qui ne voit pas les coordonnees ne peut pas effacer la note en renvoyant la valeur masquee', function () {

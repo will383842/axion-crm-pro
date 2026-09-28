@@ -501,12 +501,12 @@ test('B10-016-PORTEE COLONNES MORTES — deux tables recoivent un deleted_at par
     // 216 -> 224 le 2026-09-24 : le lot L4-C a inséré huit lignes AU-DESSUS
     // (effacement de `personnes` et `abonnements`) dans GdprErasureService. Le
     // site est le même geste, sur `users` ; seule sa ligne a bougé.
-    // 224 -> 251 le 2026-09-29 : la PR #255 a inséré au-dessus le relevé des
+    // 224 -> 255 le 2026-09-29 : la PR #255 a inséré au-dessus le relevé des
     // numéros et l'effacement des fiches d'organisation. Même geste, sur
     // `users` ; seule sa ligne a bougé.
     expect($sites)->toBe([
         'app/Console/Commands/ImportMediaMerge.php:197',
-        'app/Services/Rgpd/GdprErasureService.php:251',
+        'app/Services/Rgpd/GdprErasureService.php:255',
     ]);
 });
 

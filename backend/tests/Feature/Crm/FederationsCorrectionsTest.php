@@ -360,3 +360,48 @@ test('D8 — l onglet et la campagne disent la MEME chose d un evenement recurre
         ->and($api[$sansDate]['evenement_a_venir'])->toBeFalse()
         ->and($campagne['contact@zz-sans-date.example.invalid']['evenement'])->toBeNull();
 });
+
+// ── S7 : le registre des retraits ──────────────────────────────────────────
+
+test('S7 — l empreinte du registre est SALEE : ce n est pas le SHA-256 du nom', function () {
+    fedcImporter([fedcLigne(['personnes' => [['prenom' => 'Zed', 'nom' => 'ZZSALE', 'fonction' => 'Président', 'email' => null, 'linkedin' => null]]])]);
+    DB::table('contacts')->where('last_name', 'ZZSALE')->delete();
+
+    $cle = (string) DB::table('contacts_retires')->value('cle_nom');
+    $sansSel = (string) DB::selectOne("SELECT encode(digest(normalize_name('Zed' || '_' || 'ZZSALE'), 'sha256'), 'hex') AS h")->h;
+
+    expect($cle)->not->toBe('')
+        ->and($cle)->not->toBe($sansSel)
+        // La même personne donne la même empreinte (le registre la reconnaît).
+        ->and($cle)->toBe((string) DB::selectOne("SELECT contacts_retires_empreinte('Zed', 'ZZSALE') AS h")->h);
+});
+
+test('S7 — une fiche supprimee EN CASCADE garde le SIREN de ses personnes au registre', function () {
+    fedcImporter([fedcLigne(['personnes' => [['prenom' => 'Zed', 'nom' => 'ZZCASCADE', 'fonction' => 'Président', 'email' => null, 'linkedin' => null]]])]);
+    $fiche = (int) fedcFiche('900000601')->id;
+
+    DB::transaction(function () use ($fiche): void {
+        // Levée volontaire documentée : la fiche est protégée.
+        DB::statement("SET LOCAL app.autoriser_suppression_protegee = 'on'");
+        DB::table('companies')->where('id', $fiche)->delete();
+    });
+
+    expect(DB::table('contacts')->where('last_name', 'ZZCASCADE')->exists())->toBeFalse()
+        ->and(DB::table('contacts_retires')->pluck('siren')->map(fn ($s) => trim((string) $s))->all())->toBe(['900000601']);
+});
+
+test('S7 — une FUSION de doublons ne remplit pas le registre ; une suppression, si (temoin)', function () {
+    fedcImporter([fedcLigne(['personnes' => [
+        ['prenom' => 'Zed', 'nom' => 'ZZFUSION', 'fonction' => 'Président', 'email' => null, 'linkedin' => null],
+        ['prenom' => 'Zia', 'nom' => 'ZZSUPPRIMEE', 'fonction' => 'Trésorière', 'email' => null, 'linkedin' => null],
+    ]])]);
+
+    DB::transaction(function (): void {
+        DB::statement("SET LOCAL app.fusion_contacts = 'on'");
+        DB::table('contacts')->where('last_name', 'ZZFUSION')->delete();
+    });
+    DB::table('contacts')->where('last_name', 'ZZSUPPRIMEE')->delete();
+
+    expect(DB::table('contacts_retires')->count())->toBe(1)
+        ->and(DB::table('contacts_retires')->value('cle_nom'))->toBe((string) DB::selectOne("SELECT contacts_retires_empreinte('Zia', 'ZZSUPPRIMEE') AS h")->h);
+});

@@ -67,7 +67,17 @@ class GdprPortabilityService
             // 2026-09-29 (PR #255) : l'effacement atteint désormais les fiches
             // d'ORGANISATION qui portent l'adresse (e-mail générique, canaux) ;
             // ce qu'on sait effacer, on sait l'exporter.
-            'fiches_organisation' => EffacementCoordonneesFiches::fichesPortant($email),
+            // Ses valeurs et leur emplacement SEULEMENT : l'e-mail générique ou
+            // le standard d'une fiche trouvée par ses canaux sont ceux d'un
+            // TIERS (art. 15 § 4, relecture S1).
+            'fiches_organisation' => EffacementCoordonneesFiches::fichesPortant(
+                $email,
+                EffacementCoordonneesFiches::numerosPersonnels(
+                    EffacementCoordonneesFiches::telephonesDesContacts($email),
+                    $email,
+                    EffacementCoordonneesFiches::clesNomDesContacts($email),
+                ),
+            ),
             // Lot L4-C — la personne connue par la lettre ou le guide, et ses
             // abonnements (statut, version et date du consentement recopiés du
             // site, qui garde la preuve).

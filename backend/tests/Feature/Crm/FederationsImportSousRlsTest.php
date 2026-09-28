@@ -92,3 +92,27 @@ test('sous axion_app, l import cree les fiches protegees, leurs lignes, leurs co
         });
     }
 });
+
+test('S-a — sous axion_app, ni la cle ni la fonction d empreinte ; seulement la question oui/non de son espace', function () {
+    $app = DB::connection('pgsql_app');
+    $espace = (string) Str::uuid();
+    $app->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $espace]);
+
+    $refus = static function (string $sql) use ($app): string {
+        try {
+            $app->select($sql);
+        } catch (Throwable $e) {
+            return $e->getMessage();
+        }
+
+        return '';
+    };
+
+    // Fabriquer des empreintes (et donc tester un dictionnaire) : refusé.
+    expect($refus("SELECT contacts_retires_empreinte('Zed', 'ZZDICO') AS h"))->toContain('permission denied')
+        ->and($refus('SELECT cle FROM contacts_retires_cle'))->toContain('permission denied');
+
+    // La question de l'import : permise, dans l'espace du contexte…
+    $oui = $app->selectOne('SELECT contacts_retires_contient(?::uuid, ?, ?, ?) AS e', [$espace, '900000001', 'Zed', 'ZZDICO']);
+    expect($oui->e)->toBeFalse();
+});

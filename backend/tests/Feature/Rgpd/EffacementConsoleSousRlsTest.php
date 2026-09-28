@@ -1,10 +1,14 @@
 <?php
 
+use App\Jobs\VerifierEffacementRgpd;
 use App\Services\Audit\AuditHashChain;
 use App\Services\Rgpd\GdprErasureService;
+use App\Services\Rgpd\GdprPortabilityService;
 use Illuminate\Database\Connection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -71,12 +75,13 @@ test('sous axion_app, l effacement console fait le travail par espace et ne se d
     try {
         DB::setDefaultConnection('pgsql_app');
         $resultat = app(GdprErasureService::class)->erase($email);
+        // La preuve différée, sous le même rôle.
+        $verdict = VerifierEffacementRgpd::constater($email, $resultat['personnels']);
         DB::setDefaultConnection($precedente);
 
         expect($owner->table('companies')->where('id', $fiche)->value('email_generic'))->toBeNull()
             ->and($owner->table('contacts')->where('id', $contact)->exists())->toBeFalse()
-            ->and($resultat['complete'])->toBeFalse()
-            ->and($resultat['residus'])->toHaveKey('perimetre_non_verifie_sous_rls');
+            ->and($verdict)->toHaveKey('perimetre_non_verifie_sous_rls');
     } finally {
         DB::setDefaultConnection($precedente);
         $owner->table('activities')->where('id', $activite)->delete();
@@ -84,6 +89,45 @@ test('sous axion_app, l effacement console fait le travail par espace et ne se d
         $owner->table('contacts_retires')->where('workspace_id', $espace)->delete();
         $owner->table('companies')->where('workspace_id', $espace)->delete();
         $owner->table('opt_out')->where('email_hash', hash('sha256', $email))->delete();
+        $owner->table('workspaces')->where('id', $espace)->delete();
+    }
+});
+
+test('E3 — sous axion_app, l export des articles 15 et 20 trouve les fiches d organisation, et avoue son perimetre', function () {
+    $owner = efrProprio();
+    $espace = (string) Str::uuid();
+    $marque = substr(str_replace('-', '', $espace), 0, 8);
+    $email = 'zz.export.' . $marque . '@zz-rls.example.invalid';
+    $owner->table('workspaces')->insert([
+        'id' => $espace, 'slug' => 'zz-efr-e3-' . $marque, 'name' => 'ZZ export RLS', 'settings' => '{}',
+        'cost_cap_eur' => 100, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $fiche = (int) $owner->table('companies')->insertGetId([
+        'workspace_id' => $espace, 'siren' => '98' . str_pad((string) random_int(0, 9999999), 7, '0', STR_PAD_LEFT),
+        'denomination' => 'ZZ fiche export RLS', 'email_generic' => $email, 'signals' => '{}', 'metadata' => '{}',
+        'quality_score' => 0, 'relation_type' => 'prospect', 'lifecycle_stage' => 'nouveau',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    $precedente = DB::getDefaultConnection();
+    $jeton = null;
+    try {
+        DB::setDefaultConnection('pgsql_app');
+        $jeton = app(GdprPortabilityService::class)->export($email)['token'];
+        DB::setDefaultConnection($precedente);
+
+        // Sous RLS, la demande n'est pas relue par `retrieve()` (hors
+        // contexte) : l'archive est lue là où l'export l'a posée.
+        $archive = (array) json_decode(Crypt::decryptString((string) Storage::disk('local')->get("gdpr-exports/{$jeton}.enc")), true);
+
+        expect(array_column($archive['fiches_organisation'], 'id'))->toContain($fiche)
+            ->and($archive['fiches_organisation_perimetre'])->toBe('non_verifie_sous_rls');
+    } finally {
+        DB::setDefaultConnection($precedente);
+        if ($jeton !== null) {
+            Storage::disk('local')->delete("gdpr-exports/{$jeton}.enc");
+        }
+        $owner->table('companies')->where('workspace_id', $espace)->delete();
         $owner->table('workspaces')->where('id', $espace)->delete();
     }
 });

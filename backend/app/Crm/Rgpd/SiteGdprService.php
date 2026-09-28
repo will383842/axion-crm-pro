@@ -3,6 +3,7 @@
 namespace App\Crm\Rgpd;
 
 use App\Crm\Taxonomy;
+use App\Jobs\VerifierEffacementRgpd;
 use App\Services\Audit\AuditHashChain;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\DB;
@@ -190,6 +191,7 @@ final class SiteGdprService
         $email = mb_strtolower(trim($email));
         $emailHash = hash('sha256', $email);
         $deleted = [];
+        $clesNom = [];
 
         if (in_array($scope, ['both', 'business'], true)) {
             $businessId = $this->workspaceId((string) config('crm.ingest.business_workspace', 'axion-ia'));
@@ -259,18 +261,15 @@ final class SiteGdprService
                         $fiches = EffacementCoordonneesFiches::effacer($email, $telephones, $clesNom, $businessId);
                         $personnels = $fiches['personnels'];
 
-                        // La même preuve que la console : ce qui reste, et où
-                        // (relecture S4). Sans elle, cette porte ne pouvait
-                        // jamais dire « incomplet ».
-                        $residus = EffacementCoordonneesFiches::residus($email, $personnels, $businessId);
-
                         // 🔴 Le journal DANS le contexte ET dans la transaction —
-                        // cf. `journal()`.
-                        $this->journal($businessId, $email);
+                        // cf. `journal()`. La demande reste « en cours » jusqu'au
+                        // verdict de la preuve DIFFÉRÉE (relectures P1, P2) :
+                        // un effacement incomplet reste VISIBLE dans la console.
+                        $demande = $this->journal($businessId, $email, verifier: true);
 
                         return $fiches['bilan'] + [
                             'personnels' => $personnels,
-                            'residus' => $residus,
+                            'demande' => $demande,
                             'contacts' => $contacts,
                             'personnes' => $personnes,
                             'abonnements' => $abonnements,
@@ -281,13 +280,24 @@ final class SiteGdprService
                 );
             }
             $this->optOut($email, $emailHash, 'business');
-            // Les numéros PERSONNELS seulement : un standard partagé n'est pas
-            // opposé (cf. EffacementCoordonneesFiches, en-tête).
-            $personnels = is_array($deleted['business']['personnels'] ?? null) ? $deleted['business']['personnels'] : [];
-            foreach ($personnels as $telephone) {
-                $this->optOutTelephone((string) $telephone, 'business');
+            $personnels = is_array($deleted['business']['personnels'] ?? null)
+                ? array_values(array_map('strval', $deleted['business']['personnels']))
+                : [];
+            $demande = is_int($deleted['business']['demande'] ?? null) ? $deleted['business']['demande'] : null;
+            unset($deleted['business']['personnels'], $deleted['business']['demande']);
+
+            if ($businessId !== null) {
+                // Les numéros PERSONNELS seulement, et personnels dans CHAQUE
+                // espace où on les trouve : `opt_out.phone` est global, un
+                // standard ailleurs n'est pas opposé (relectures S3, E2).
+                foreach (EffacementCoordonneesFiches::opposablesPartout($email, $personnels, $clesNom, $businessId) as $telephone) {
+                    $this->optOutTelephone($telephone, 'business');
+                }
+
+                // La preuve, APRÈS la transaction : elle parcourt des tables
+                // entières, le site n'attend pas (il coupe à 10 s).
+                dispatch((new VerifierEffacementRgpd($email, $personnels, $demande, $businessId))->pourEspace($businessId));
             }
-            unset($deleted['business']['personnels']);
         }
 
         if (in_array($scope, ['both', 'vivier'], true)) {
@@ -334,17 +344,12 @@ final class SiteGdprService
             'payload_hash' => hash('sha256', $personKey . '|' . $emailHash . '|' . $scope),
         ]);
 
-        // « Complet » seulement si la recherche de résidus revient vide (S4).
-        $residus = is_array($deleted['business']['residus'] ?? null) ? $deleted['business']['residus'] : [];
-        unset($deleted['business']['residus']);
-        $complet = $residus === [];
-
         return [
             'deleted' => $deleted,
             'opt_out_scopes' => $scope === 'both' ? ['business', 'vivier'] : [$scope],
-            'complete' => $complet,
-            // Des emplacements et des nombres, jamais une valeur.
-            'residus' => $residus,
+            // La preuve (« plus rien ne reste ») est différée : son verdict
+            // vit sur la demande `rgpd_requests`, visible dans la console.
+            'verification' => 'differee',
         ];
     }
 
@@ -431,16 +436,21 @@ final class SiteGdprService
      * (SUPERUSER, BYPASSRLS). `SiteGdprSousRlsTest` rejoue l'effacement sous
      * `axion_app`.
      */
-    private function journal(string $workspaceId, string $email): void
+    private function journal(string $workspaceId, string $email, bool $verifier = false): int
     {
-        DB::table('rgpd_requests')->insert([
+        $metadata = ['origin' => 'site-sync-gdpr'];
+        if ($verifier) {
+            $metadata['verification'] = 'en_attente';
+        }
+
+        return (int) DB::table('rgpd_requests')->insertGetId([
             'workspace_id' => $workspaceId,
             'type' => 'erasure',
-            'status' => 'done',
+            'status' => $verifier ? 'processing' : 'done',
             'subject_email' => $email,
             'requested_at' => now(),
             'processed_at' => now(),
-            'metadata' => json_encode(['origin' => 'site-sync-gdpr'], JSON_THROW_ON_ERROR),
+            'metadata' => json_encode($metadata, JSON_THROW_ON_ERROR),
             'created_at' => now(),
             'updated_at' => now(),
         ]);

@@ -22,12 +22,14 @@ class GdprErasureService
     ) {}
 
     /**
-     * `complete` n'est vrai que si, APRÈS l'effacement, l'adresse et les
-     * numéros de la personne ne se retrouvent plus nulle part où ce service
-     * sait chercher (`EffacementCoordonneesFiches::residus`). Sinon `residus`
-     * dit où ils restent, et l'appelant ne doit PAS déclarer la demande soldée.
+     * L'effacement est SYNCHRONE et n'emploie, sur `companies` et `contacts`,
+     * que des recherches servies par un index (relecture P1). Sa PREUVE — la
+     * recherche des résidus, et le balayage de la timeline par les numéros
+     * personnels — est DIFFÉRÉE : l'appelant met en file
+     * `App\Jobs\VerifierEffacementRgpd` avec `personnels`, qui ne doit
+     * jamais être archivé ni rendu (ce sont des numéros en clair).
      *
-     * @return array{deleted: array<string,int>, opt_out_added: bool, complete: bool, residus: array<string,int>}
+     * @return array{deleted: array<string,int>, opt_out_added: bool, verification: string, personnels: list<string>}
      */
     public function erase(string $subjectEmail, ?string $phone = null, ?string $reason = 'gdpr_art17'): array
     {
@@ -171,6 +173,7 @@ class GdprErasureService
                 $deleted['fiches_' . $emplacement] = $n;
             }
             $personnels = $fiches['personnels'];
+            $opposables = $fiches['opposables'];
 
             // ── CE QU'ON NE SUPPRIME **PAS**, ET POURQUOI ────────────────────
             //
@@ -346,8 +349,10 @@ class GdprErasureService
             // prochain import le remettrait sur la fiche de l'organisation. Un
             // standard partagé ne l'est PAS : `opt_out.phone` est global et
             // fermerait l'organisation entière (la personne reste protégée par
-            // l'opposition sur son adresse et par `contacts_retires`).
-            foreach ($personnels as $telephone) {
+            // l'opposition sur son adresse et par `contacts_retires`). Et un
+            // numéro personnel ici mais standard dans un autre espace ne l'est
+            // pas non plus (relecture E2 : jamais par union).
+            foreach ($opposables as $telephone) {
                 if ($telephone !== $phone) {
                     $this->dedup->addOptOut(
                         null,
@@ -359,19 +364,11 @@ class GdprErasureService
                 }
             }
 
-            // Un effacement ne se déclare complet que si l'on ne retrouve plus
-            // rien. Le journal ne porte JAMAIS l'adresse en clair : il en porte
-            // l'empreinte (il disait `email` jusqu'au 2026-09-29).
-            $residus = EffacementCoordonneesFiches::residusPartout($email, $personnels);
-            $complet = $residus === [];
-            $contexte = ['email_hash' => hash('sha256', $email), 'deleted' => $deleted, 'residus' => $residus];
-            if ($complet) {
-                Log::info('GDPR erasure complete', $contexte);
-            } else {
-                Log::warning('GDPR erasure INCOMPLETE : coordonnees encore presentes', $contexte);
-            }
+            // La preuve (« plus rien ne reste ») est DIFFÉRÉE : elle parcourt des
+            // tables entières. Le journal ne porte JAMAIS l'adresse en clair.
+            Log::info('GDPR erasure executed, verification deferred', ['email_hash' => hash('sha256', $email), 'deleted' => $deleted]);
 
-            return ['deleted' => $deleted, 'opt_out_added' => true, 'complete' => $complet, 'residus' => $residus];
+            return ['deleted' => $deleted, 'opt_out_added' => true, 'verification' => 'differee', 'personnels' => $personnels];
         });
     }
 

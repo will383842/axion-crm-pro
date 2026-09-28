@@ -618,12 +618,11 @@ class CrmImportFederations extends Command
         if ($nom === null) {
             return false;
         }
+        // `contacts_retires_contient` : la seule question que le rôle
+        // applicatif peut poser au registre (il n'exécute pas
+        // `contacts_retires_empreinte`, relecture S-a).
         $ligne = DB::selectOne(
-            'SELECT EXISTS (
-                SELECT 1 FROM contacts_retires
-                WHERE workspace_id = ? AND siren = ?
-                AND cle_nom = contacts_retires_empreinte(?, ?)
-             ) AS e',
+            'SELECT contacts_retires_contient(?::uuid, ?, ?, ?) AS e',
             [$workspaceId, $siren, $prenom, $nom],
         );
 

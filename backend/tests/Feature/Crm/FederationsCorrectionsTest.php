@@ -390,21 +390,45 @@ test('S7 — une fiche supprimee EN CASCADE garde le SIREN de ses personnes au r
         ->and(DB::table('contacts_retires')->pluck('siren')->map(fn ($s) => trim((string) $s))->all())->toBe(['900000601']);
 });
 
-test('S7 — une FUSION de doublons ne remplit pas le registre ; une suppression, si (temoin)', function () {
-    fedcImporter([fedcLigne(['personnes' => [
-        ['prenom' => 'Zed', 'nom' => 'ZZFUSION', 'fonction' => 'Président', 'email' => null, 'linkedin' => null],
-        ['prenom' => 'Zia', 'nom' => 'ZZSUPPRIMEE', 'fonction' => 'Trésorière', 'email' => null, 'linkedin' => null],
-    ]])]);
+test('B4 — supprimer un ESPACE en cascade n est pas bloque par le registre, et n y inscrit rien', function () {
+    $espace = (string) Str::uuid();
+    DB::table('workspaces')->insert([
+        'id' => $espace, 'slug' => 'zz-fedc-b4', 'name' => 'ZZ espace supprime', 'settings' => '{}',
+        'cost_cap_eur' => 100, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    // Une fiche NON protégée, et une personne venue de l'import des
+    // fédérations : exactement ce que les deux déclencheurs mémorisent.
+    $fiche = (int) DB::table('companies')->insertGetId([
+        'workspace_id' => $espace, 'siren' => '900000690', 'denomination' => 'ZZ fiche de l espace supprime',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    DB::table('contacts')->insert([
+        'workspace_id' => $espace, 'company_id' => $fiche, 'first_name' => 'Zed', 'last_name' => 'ZZESPACE',
+        'sources' => json_encode(['federations-2026']), 'created_at' => now(), 'updated_at' => now(),
+    ]);
 
-    // Le témoin D'ABORD : sous `RefreshDatabase`, la transaction ci-dessous
-    // n'est qu'un point de sauvegarde, et un `SET LOCAL` y survit jusqu'à la
-    // fin du test (en production, il meurt avec la transaction de fusion).
-    DB::table('contacts')->where('last_name', 'ZZSUPPRIMEE')->delete();
-    DB::transaction(function (): void {
-        DB::statement("SET LOCAL app.fusion_contacts = 'on'");
-        DB::table('contacts')->where('last_name', 'ZZFUSION')->delete();
-    });
+    DB::table('workspaces')->where('id', $espace)->delete();
+
+    expect(DB::table('workspaces')->where('id', $espace)->exists())->toBeFalse()
+        ->and(DB::table('companies')->where('id', $fiche)->exists())->toBeFalse()
+        ->and(DB::table('contacts_retires')->where('workspace_id', $espace)->count())->toBe(0);
+});
+
+// ── B1 : le registre survit au retour arrière ──────────────────────────────
+
+test('B1 — le retour arriere de la migration garde le registre des retraits ET sa cle', function () {
+    fedcImporter([fedcLigne(['personnes' => [['prenom' => 'Zed', 'nom' => 'ZZRETOUR', 'fonction' => 'Président', 'email' => null, 'linkedin' => null]]])]);
+    DB::table('contacts')->where('last_name', 'ZZRETOUR')->delete();
+    $cle = (string) DB::selectOne("SELECT encode(cle, 'hex') AS c FROM contacts_retires_cle")->c;
+    expect(DB::table('contacts_retires')->count())->toBe(1);
+
+    // Dans l'ordre inverse des migrations. Aucune fiche `federation` ici :
+    // `down()` refuserait sinon (cf. son garde-fou).
+    DB::table('companies')->where('entity_nature', 'federation')->update(['entity_nature' => null]);
+    (require database_path('migrations/2026_09_29_000002_federations_validation_des_check.php'))->down();
+    (require database_path('migrations/2026_09_29_000001_federations.php'))->down();
 
     expect(DB::table('contacts_retires')->count())->toBe(1)
-        ->and(DB::table('contacts_retires')->value('cle_nom'))->toBe((string) DB::selectOne("SELECT contacts_retires_empreinte('Zia', 'ZZSUPPRIMEE') AS h")->h);
+        ->and((string) DB::selectOne("SELECT encode(cle, 'hex') AS c FROM contacts_retires_cle")->c)->toBe($cle)
+        ->and(DB::selectOne("SELECT to_regprocedure('public.contacts_retires_empreinte(text,text)') IS NOT NULL AS e")->e)->toBeTrue();
 });

@@ -20,51 +20,54 @@ use Illuminate\Support\Facades\DB;
  * côté des organisations. Or l'adresse ou le mobile d'une personne vivent aussi
  * dans `companies.email_generic`, `companies.phone`,
  * `companies.signals.contact_channels` (e-mails, téléphones, `details`) et sur
- * des fiches personnes qui portent son numéro sans son adresse. Ce trou
- * existait déjà pour les organisateurs d'événements en production.
+ * des fiches personnes qui portent son numéro sans son adresse.
  *
- * ── Quel numéro est celui de la PERSONNE (relecture S3) ─────────────────────
+ * ── Deux temps (relecture P1) ───────────────────────────────────────────────
  *
- * Le numéro inscrit sur la fiche d'une personne n'est pas toujours le sien :
- * c'est souvent le STANDARD de son organisation. L'effacer partout couperait
- * l'organisation et ses collègues. Un numéro n'est traité comme PERSONNEL — et
- * alors effacé partout et opposé — que s'il n'est porté par AUCUNE autre
- * personne, et s'il est un portable (06/07) ou n'est le téléphone d'aucune
- * fiche d'organisation. Sinon, il ne quitte que les fiches de la personne
- * elle-même (supprimées), et il n'est PAS opposé : `opt_out.phone` est une
- * opposition GLOBALE, qui fermerait le standard à toute l'organisation. La
- * personne, elle, reste protégée du retour par l'opposition sur son adresse et
- * par le registre `contacts_retires` (empreinte de son nom).
+ * 1. Le temps SYNCHRONE — la demande attend, et le site coupe à 10 s
+ *    (`axionia/src/server/crm-sync/config.ts`). Relevé, effacement, export
+ *    n'y emploient QUE des recherches servies par un index (migration
+ *    `2026_09_29_000002`, garde `EffacementServiParDesIndexTest`) :
+ *      - `contacts.email` (égalité)            → `idx_contacts_email` ;
+ *      - `contacts (workspace_id, person_key)` → `idx_contacts_workspace_person_key` ;
+ *      - chiffres de `contacts.phone`          → `idx_contacts_telephone_chiffres` ;
+ *      - `lower(companies.email_generic)`      → `idx_companies_email_generic_minuscules` ;
+ *      - chiffres de `companies.phone`         → `idx_companies_telephone_chiffres` ;
+ *      - e-mails des canaux                    → `idx_companies_canaux_emails` (GIN) ;
+ *      - chiffres des téléphones des canaux    → `idx_companies_canaux_telephones` (GIN).
+ *    Chaque requête répète l'expression ET le prédicat partiel de son index
+ *    à l'identique : sinon le planificateur ne s'en sert pas.
+ * 2. Le temps DIFFÉRÉ — `App\Jobs\VerifierEffacementRgpd` : la preuve
+ *    (`residus()`, qui lit TOUT : texte de `signals` et `metadata`, notes
+ *    libres) et le balayage de la timeline par les numéros personnels
+ *    (`effacerTimeline()`). Il met la demande à jour et journalise.
+ *
+ * ── Quel numéro est celui de la PERSONNE (relectures S3, E2) ────────────────
+ *
+ * Le numéro inscrit sur la fiche d'une personne est souvent le STANDARD de son
+ * organisation. Un numéro n'est PERSONNEL — effacé partout — que s'il n'est
+ * porté par AUCUNE autre personne, et qu'il est un portable (06/07) ou n'est le
+ * standard d'aucune fiche d'organisation : ni `companies.phone`, ni un
+ * téléphone de ses canaux. Il n'est OPPOSÉ (`opt_out.phone`, opposition
+ * GLOBALE) que s'il est personnel dans CHAQUE espace où on le trouve
+ * (`opposables()`) : jamais par union.
  *
  * ── Fiches PROTÉGÉES ────────────────────────────────────────────────────────
  *
  * Mettre une coordonnée à NULL est un UPDATE : le verrou de la base ne vise que
  * la suppression de la fiche. C'est la promesse de `FichesProtegees` : « la
  * protection ne fait JAMAIS obstacle au droit d'une personne ».
- *
- * ── Espace par espace, et preuve indépendante ───────────────────────────────
- *
- * Sous le rôle de production (RLS forcée), une requête sans contexte d'espace
- * ne voit rien. `effacerPartout()` et `residusPartout()` travaillent donc espace
- * par espace, dans leur contexte (relecture S8). Et si le rôle courant est
- * soumis à la RLS, le reste de l'effacement (tables hors de ce fichier) n'a
- * pas pu tout voir : l'effacement ne se déclare alors PAS complet.
- *
- * `residus()` cherche plus large que `effacer()` n'efface (texte entier de
- * `signals` et `metadata`, notes libres de Will), et cherche les numéros par
- * leurs SEULS CHIFFRES, sans la normalisation de l'effacement (relecture S4) :
- * un numéro mal formé (« 01 23 45 67 89 poste 12 ») que l'effacement ne
- * reconnaît pas rend l'effacement « incomplet » au lieu de le laisser se dire
- * fait.
- *
- * Coût : ces recherches ne sont servies par aucun index — un balayage par
- * demande. Un effacement est rare et c'est un droit à délai légal : la justesse
- * prime (même arbitrage que `activities`).
  */
 final class EffacementCoordonneesFiches
 {
     /** Empreinte du nom d'une fiche personne, NON salée : comparée dans la même requête, jamais stockée. */
     private const CLE_NOM = "encode(digest(normalize_name(coalesce(first_name, '') || '_' || last_name), 'sha256'), 'hex')";
+
+    /**
+     * Prédicat des deux index partiels des canaux. `jsonb_exists` et non
+     * l'opérateur `?`, que PDO prendrait pour un paramètre.
+     */
+    private const AVEC_CANAUX = "jsonb_exists(signals, 'contact_channels')";
 
     // ── Relevé de la personne ───────────────────────────────────────────────
 
@@ -107,7 +110,8 @@ final class EffacementCoordonneesFiches
     }
 
     /**
-     * Parmi ces numéros, ceux qui sont ceux de la PERSONNE (cf. en-tête, S3).
+     * Parmi ces numéros, ceux qui sont ceux de la PERSONNE dans cet espace
+     * (cf. en-tête, S3 et E2).
      *
      * @param  list<string>  $telephones
      * @param  list<string>  $clesNom
@@ -141,10 +145,10 @@ final class EffacementCoordonneesFiches
                     $portable = true;
                 }
             }
-            $standard = self::fiches($workspaceId)
-                ->whereNotNull('phone')
-                ->whereRaw(self::chiffres('phone') . ' IN (' . self::marques($variantes) . ')', $variantes)
-                ->exists();
+            // Le STANDARD d'une organisation : son téléphone, ou un téléphone
+            // de ses canaux (E2) — les deux disent « joindre l'organisation ».
+            $standard = self::fichesAuNumero($variantes, $workspaceId)->exists()
+                || self::fichesAuxCanaux([], $variantes, $workspaceId)->exists();
 
             if ($portable || ! $standard) {
                 $personnels[] = $telephone;
@@ -154,20 +158,46 @@ final class EffacementCoordonneesFiches
         return $personnels;
     }
 
-    // ── Effacement ──────────────────────────────────────────────────────────
+    /**
+     * Ceux de ces numéros qu'on TROUVE dans cet espace : sur une fiche
+     * personne, une fiche d'organisation ou ses canaux.
+     *
+     * @param  list<string>  $telephones
+     * @return list<string>
+     */
+    public static function presents(array $telephones, ?string $workspaceId = null): array
+    {
+        $presents = [];
+        foreach (array_values(array_unique($telephones)) as $telephone) {
+            $variantes = self::variantes([$telephone]);
+            if ($variantes === []) {
+                continue;
+            }
+            if (self::contactsAuNumero($variantes, $workspaceId)->exists()
+                || self::fichesAuNumero($variantes, $workspaceId)->exists()
+                || self::fichesAuxCanaux([], $variantes, $workspaceId)->exists()) {
+                $presents[] = $telephone;
+            }
+        }
+
+        return $presents;
+    }
+
+    // ── Effacement (synchrone, indexé) ──────────────────────────────────────
 
     /**
      * Efface dans UN espace (ou partout si `$workspaceId` est null et que le
-     * rôle voit tout).
+     * rôle voit tout). `presents` est relevé AVANT l'effacement.
      *
      * @param  list<string>  $telephones  tous les numéros relevés pour la personne
      * @param  list<string>  $clesNom
-     * @return array{bilan: array<string, int>, personnels: list<string>}
+     * @return array{bilan: array<string, int>, personnels: list<string>, presents: list<string>}
      */
     public static function effacer(string $email, array $telephones, array $clesNom = [], ?string $workspaceId = null): array
     {
         $email = mb_strtolower(trim($email));
         $personnels = self::numerosPersonnels($telephones, $email, $clesNom, $workspaceId);
+        $presents = self::presents($telephones, $workspaceId);
         $tous = self::variantes($telephones);
         $variantes = self::variantes($personnels);
         $bilan = [
@@ -189,8 +219,7 @@ final class EffacementCoordonneesFiches
             $bilan['contacts_par_email'] = $contacts->delete();
 
             // La fiche de vérification de l'adresse part avec l'adresse.
-            $bilan['companies_email_generic'] = self::fiches($workspaceId)
-                ->whereRaw('lower(email_generic) = ?', [$email])
+            $bilan['companies_email_generic'] = self::fichesALAdresse($email, $workspaceId)
                 ->update([
                     'email_generic' => null,
                     'signals' => DB::raw("signals - 'email_generic_verification'"),
@@ -209,15 +238,14 @@ final class EffacementCoordonneesFiches
 
         // Un numéro PERSONNEL quitte tout : fiche d'organisation, autres fiches.
         if ($variantes !== []) {
-            $bilan['companies_phone'] = self::fiches($workspaceId)
-                ->whereNotNull('phone')
-                ->whereRaw(self::chiffres('phone') . ' IN (' . self::marques($variantes) . ')', $variantes)
+            $bilan['companies_phone'] = self::fichesAuNumero($variantes, $workspaceId)
                 ->update(['phone' => null, 'updated_at' => now()]);
             $bilan['contacts_telephone_retire'] = self::contactsAuNumero($variantes, $workspaceId)
                 ->update(['phone' => null, 'updated_at' => now()]);
         }
 
-        foreach (self::fichesAvecCanaux($email, $variantes, $workspaceId) as $fiche) {
+        $adresses = $email !== '' ? [$email] : [];
+        foreach (self::fichesAuxCanaux($adresses, $variantes, $workspaceId)->get(['id', 'signals']) as $fiche) {
             $signals = json_decode((string) $fiche->signals, true);
             if (! is_array($signals) || ! is_array($signals['contact_channels'] ?? null)) {
                 continue;
@@ -234,7 +262,7 @@ final class EffacementCoordonneesFiches
             $bilan['companies_canaux']++;
         }
 
-        return ['bilan' => $bilan, 'personnels' => $personnels];
+        return ['bilan' => $bilan, 'personnels' => $personnels, 'presents' => $presents];
     }
 
     /**
@@ -242,14 +270,18 @@ final class EffacementCoordonneesFiches
      * de la personne (numéros, empreintes de nom) est complété espace par
      * espace : sous RLS, le relevé fait hors contexte ne voyait rien.
      *
+     * `opposables` : les numéros personnels dans CHAQUE espace où on les
+     * trouve — les seuls qu'une opposition globale peut viser (E2).
+     *
      * @param  list<string>  $telephones
      * @param  list<string>  $clesNom
-     * @return array{bilan: array<string, int>, personnels: list<string>}
+     * @return array{bilan: array<string, int>, personnels: list<string>, opposables: list<string>}
      */
     public static function effacerPartout(string $email, array $telephones, array $clesNom): array
     {
         $bilan = [];
         $personnels = [];
+        $parEspace = [];
         foreach (self::espaces() as $espace) {
             $resultat = WorkspaceContext::run($espace, static function () use ($email, $telephones, $clesNom, $espace): array {
                 $tels = array_values(array_unique(array_merge($telephones, self::telephonesDesContacts($email, $espace))));
@@ -261,16 +293,169 @@ final class EffacementCoordonneesFiches
                 $bilan[$cle] = ($bilan[$cle] ?? 0) + $n;
             }
             $personnels = array_merge($personnels, $resultat['personnels']);
+            $parEspace[] = $resultat;
         }
+        $personnels = array_values(array_unique($personnels));
 
-        return ['bilan' => $bilan, 'personnels' => array_values(array_unique($personnels))];
+        return ['bilan' => $bilan, 'personnels' => $personnels, 'opposables' => self::opposables($personnels, $parEspace)];
     }
 
-    // ── Preuve ──────────────────────────────────────────────────────────────
+    /**
+     * Les numéros personnels dans TOUS les espaces où on les trouve, et
+     * aucun autre : pas d'union (E2). Un numéro personnel ici mais standard
+     * là-bas n'est pas opposé — l'opposition fermerait le standard.
+     *
+     * @param  list<string>  $personnels
+     * @param  list<array{personnels: list<string>, presents: list<string>}>  $parEspace
+     * @return list<string>
+     */
+    public static function opposables(array $personnels, array $parEspace): array
+    {
+        return array_values(array_filter($personnels, static function (string $numero) use ($parEspace): bool {
+            foreach ($parEspace as $espace) {
+                if (in_array($numero, $espace['presents'], true) && ! in_array($numero, $espace['personnels'], true)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }));
+    }
+
+    /**
+     * `opposables()` pour une porte qui n'a effacé que dans UN espace (le
+     * site) : les autres espaces sont relevés tels quels, chacun dans son
+     * contexte.
+     *
+     * @param  list<string>  $personnels  personnels dans l'espace effacé
+     * @param  list<string>  $clesNom
+     * @return list<string>
+     */
+    public static function opposablesPartout(string $email, array $personnels, array $clesNom, string $espaceEfface): array
+    {
+        $parEspace = [];
+        foreach (self::espaces() as $espace) {
+            if ($espace === $espaceEfface) {
+                continue;
+            }
+            $parEspace[] = WorkspaceContext::run($espace, static function () use ($email, $personnels, $clesNom, $espace): array {
+                $cles = array_values(array_unique(array_merge($clesNom, self::clesNomDesContacts($email, $espace))));
+
+                return [
+                    'presents' => self::presents($personnels, $espace),
+                    'personnels' => self::numerosPersonnels($personnels, $email, $cles, $espace),
+                ];
+            });
+        }
+
+        return self::opposables($personnels, $parEspace);
+    }
+
+    // ── Export (articles 15 et 20, synchrone, indexé) ───────────────────────
+
+    /**
+     * Les fiches d'organisation qui portent l'adresse ou un numéro PERSONNEL
+     * de la personne — et, pour chacune, SEULEMENT les valeurs de la personne
+     * et leur emplacement (relecture S1). L'e-mail générique ou le standard
+     * d'une fiche trouvée par ses canaux appartiennent à un TIERS : ils ne
+     * sortent pas (art. 15 § 4).
+     *
+     * @param  list<string>  $telephonesPersonnels
+     * @return list<array{id: int, denomination: ?string, emplacements: list<array{emplacement: string, valeur: string}>}>
+     */
+    public static function fichesPortant(string $email, array $telephonesPersonnels = [], ?string $workspaceId = null): array
+    {
+        $email = mb_strtolower(trim($email));
+        $variantes = self::variantes($telephonesPersonnels);
+        $adresses = $email !== '' ? [$email] : [];
+        if ($adresses === [] && $variantes === []) {
+            return [];
+        }
+
+        // Trois recherches indexées, réunies par identifiant (un OR entre
+        // elles empêcherait chacune de servir son index).
+        $ids = [];
+        if ($email !== '') {
+            $ids = array_merge($ids, self::fichesALAdresse($email, $workspaceId)->pluck('id')->all());
+        }
+        if ($variantes !== []) {
+            $ids = array_merge($ids, self::fichesAuNumero($variantes, $workspaceId)->pluck('id')->all());
+        }
+        $ids = array_merge($ids, self::fichesAuxCanaux($adresses, $variantes, $workspaceId)->pluck('id')->all());
+        $ids = array_values(array_unique(array_map('intval', $ids)));
+        if ($ids === []) {
+            return [];
+        }
+
+        $resultat = [];
+        foreach (DB::table('companies')->whereIn('id', $ids)->orderBy('id')->get(['id', 'denomination', 'email_generic', 'phone', 'signals']) as $f) {
+            $emplacements = [];
+            if ($email !== '' && is_string($f->email_generic) && mb_strtolower(trim($f->email_generic)) === $email) {
+                $emplacements[] = ['emplacement' => 'companies.email_generic', 'valeur' => $email];
+            }
+            if (is_string($f->phone) && self::telephoneVise($f->phone, $variantes)) {
+                $emplacements[] = ['emplacement' => 'companies.phone', 'valeur' => $f->phone];
+            }
+            $signals = json_decode((string) $f->signals, true);
+            $canaux = is_array($signals) && is_array($signals['contact_channels'] ?? null) ? $signals['contact_channels'] : [];
+            foreach (is_array($canaux['emails'] ?? null) ? $canaux['emails'] : [] as $e) {
+                if (is_string($e) && $email !== '' && mb_strtolower(trim($e)) === $email) {
+                    $emplacements[] = ['emplacement' => 'companies.signals.contact_channels.emails', 'valeur' => $email];
+                }
+            }
+            foreach (is_array($canaux['phones'] ?? null) ? $canaux['phones'] : [] as $t) {
+                if (is_string($t) && self::telephoneVise($t, $variantes)) {
+                    $emplacements[] = ['emplacement' => 'companies.signals.contact_channels.phones', 'valeur' => $t];
+                }
+            }
+            if ($emplacements !== []) {
+                $resultat[] = ['id' => (int) $f->id, 'denomination' => $f->denomination, 'emplacements' => $emplacements];
+            }
+        }
+
+        return $resultat;
+    }
+
+    /**
+     * `fichesPortant()` dans CHAQUE espace, dans son contexte (relecture E3),
+     * avec le relevé des numéros personnels de l'espace. `perimetre` avoue,
+     * si le rôle courant est soumis à la RLS, que le RESTE de l'export (tables
+     * lues sans contexte) n'a pas pu tout voir : l'export ne revient jamais
+     * vide sans le dire.
+     *
+     * @return array{fiches: list<array{id: int, denomination: ?string, emplacements: list<array{emplacement: string, valeur: string}>}>, perimetre: string}
+     */
+    public static function fichesPortantPartout(string $email): array
+    {
+        $fiches = [];
+        foreach (self::espaces() as $espace) {
+            $trouvees = WorkspaceContext::run($espace, static function () use ($email, $espace): array {
+                $personnels = self::numerosPersonnels(
+                    self::telephonesDesContacts($email, $espace),
+                    $email,
+                    self::clesNomDesContacts($email, $espace),
+                    $espace,
+                );
+
+                return self::fichesPortant($email, $personnels, $espace);
+            });
+            $fiches = array_merge($fiches, $trouvees);
+        }
+
+        return ['fiches' => $fiches, 'perimetre' => self::roleVoitTout() ? 'complet' : 'non_verifie_sous_rls'];
+    }
+
+    // ── Preuve (DIFFÉRÉE : `App\Jobs\VerifierEffacementRgpd`) ───────────────
 
     /**
      * Ce qui reste de l'adresse et des numéros PERSONNELS, par emplacement,
-     * dans un espace. Vide : rien.
+     * dans un espace. Vide : rien. Des parcours complets : JAMAIS sur le
+     * chemin synchrone (P1).
+     *
+     * Plus large que l'effacement (texte entier de `signals` et `metadata`,
+     * notes libres de Will), et indépendante de sa normalisation (S4) : les
+     * numéros sont cherchés par `motifsTelephones()`, qui exige leurs
+     * FRONTIÈRES (E1).
      *
      * @param  list<string>  $telephonesPersonnels
      * @return array<string, int>
@@ -278,6 +463,7 @@ final class EffacementCoordonneesFiches
     public static function residus(string $email, array $telephonesPersonnels, ?string $workspaceId = null): array
     {
         $email = mb_strtolower(trim($email));
+        $motifs = self::motifsTelephones($telephonesPersonnels);
         $residus = [];
 
         // Les zones où chercher, et la colonne (ou le texte) à lire.
@@ -307,11 +493,9 @@ final class EffacementCoordonneesFiches
                 }
             }
             if ($nom !== 'contacts.email' && $nom !== 'companies.email_generic') {
-                // Les numéros par leurs SEULS chiffres : aucune normalisation
-                // commune avec l'effacement (S4).
-                foreach (self::empreintesChiffres($telephonesPersonnels) as $chiffres) {
+                foreach ($motifs as $motif) {
                     $n += self::table($table, $workspaceId)
-                        ->whereRaw("regexp_replace(coalesce({$colonne}, ''), '[^0-9]', '', 'g') LIKE ?", ['%' . $chiffres . '%'])
+                        ->whereRaw("coalesce({$colonne}, '') ~ ?", [$motif])
                         ->count();
                 }
             }
@@ -341,12 +525,31 @@ final class EffacementCoordonneesFiches
         }
         if (! self::roleVoitTout()) {
             // Les tables que ce fichier ne parcourt pas espace par espace
-            // (timeline, candidats, courriels…) ont été effacées SANS contexte :
-            // sous RLS, elles n'ont rien vu. On ne dit pas « complet ».
+            // (candidats, courriels…) ont été effacées SANS contexte : sous
+            // RLS, elles n'ont rien vu. On ne dit pas « complet ».
             $residus['perimetre_non_verifie_sous_rls'] = 1;
         }
 
         return $residus;
+    }
+
+    /**
+     * La timeline (`activities.payload`), balayée par les numéros PERSONNELS
+     * (relecture E4) — pas seulement par le numéro de la demande. Un parcours
+     * complet de `activities` : temps différé seulement.
+     *
+     * @param  list<string>  $telephonesPersonnels
+     */
+    public static function effacerTimeline(array $telephonesPersonnels, ?string $workspaceId = null): int
+    {
+        $supprimees = 0;
+        foreach (self::motifsTelephones($telephonesPersonnels) as $motif) {
+            $supprimees += self::table('activities', $workspaceId)
+                ->whereRaw("coalesce(payload::text, '') ~ ?", [$motif])
+                ->delete();
+        }
+
+        return $supprimees;
     }
 
     /** Le rôle de la connexion voit-il toutes les lignes (propriétaire, BYPASSRLS) ? */
@@ -357,69 +560,18 @@ final class EffacementCoordonneesFiches
         return $role !== null && (bool) $role->voit;
     }
 
-    // ── Export (articles 15 et 20) ──────────────────────────────────────────
-
     /**
-     * Les fiches d'organisation qui portent l'adresse ou un numéro PERSONNEL
-     * de la personne — et, pour chacune, SEULEMENT les valeurs de la personne
-     * et leur emplacement (relecture S1). L'e-mail générique ou le standard
-     * d'une fiche trouvée par ses canaux appartiennent à un TIERS : ils ne
-     * sortent pas (art. 15 § 4).
+     * Les espaces business (le vivier ne porte pas de fiches d'organisation),
+     * corbeille comprise : leurs données sont toujours en base.
      *
-     * @param  list<string>  $telephonesPersonnels
-     * @return list<array{id: int, denomination: ?string, emplacements: list<array{emplacement: string, valeur: string}>}>
+     * @return list<string>
      */
-    public static function fichesPortant(string $email, array $telephonesPersonnels = [], ?string $workspaceId = null): array
+    public static function espaces(): array
     {
-        $email = mb_strtolower(trim($email));
-        $variantes = self::variantes($telephonesPersonnels);
-        if ($email === '' && $variantes === []) {
-            return [];
-        }
-
-        $requete = self::fiches($workspaceId)->where(function (Builder $q) use ($email, $variantes): void {
-            if ($email !== '') {
-                $q->orWhereRaw('lower(email_generic) = ?', [$email])
-                    ->orWhereRaw("coalesce(signals->'contact_channels', '{}'::jsonb)::text ILIKE ?", ['%' . self::echapperLike($email) . '%']);
-            }
-            if ($variantes !== []) {
-                $q->orWhereRaw(self::chiffres("coalesce(phone, '')") . ' IN (' . self::marques($variantes) . ')', $variantes);
-                foreach ($variantes as $v) {
-                    $q->orWhereRaw(
-                        "regexp_replace(coalesce(signals->'contact_channels'->>'phones', ''), '[^0-9]', '', 'g') LIKE ?",
-                        ['%' . $v . '%'],
-                    );
-                }
-            }
-        });
-
-        $resultat = [];
-        foreach ($requete->orderBy('id')->get(['id', 'denomination', 'email_generic', 'phone', 'signals']) as $f) {
-            $emplacements = [];
-            if ($email !== '' && is_string($f->email_generic) && mb_strtolower(trim($f->email_generic)) === $email) {
-                $emplacements[] = ['emplacement' => 'companies.email_generic', 'valeur' => $email];
-            }
-            if (is_string($f->phone) && self::telephoneVise($f->phone, $variantes)) {
-                $emplacements[] = ['emplacement' => 'companies.phone', 'valeur' => $f->phone];
-            }
-            $signals = json_decode((string) $f->signals, true);
-            $canaux = is_array($signals) && is_array($signals['contact_channels'] ?? null) ? $signals['contact_channels'] : [];
-            foreach (is_array($canaux['emails'] ?? null) ? $canaux['emails'] : [] as $e) {
-                if (is_string($e) && $email !== '' && mb_strtolower(trim($e)) === $email) {
-                    $emplacements[] = ['emplacement' => 'companies.signals.contact_channels.emails', 'valeur' => $email];
-                }
-            }
-            foreach (is_array($canaux['phones'] ?? null) ? $canaux['phones'] : [] as $t) {
-                if (is_string($t) && self::telephoneVise($t, $variantes)) {
-                    $emplacements[] = ['emplacement' => 'companies.signals.contact_channels.phones', 'valeur' => $t];
-                }
-            }
-            if ($emplacements !== []) {
-                $resultat[] = ['id' => (int) $f->id, 'denomination' => $f->denomination, 'emplacements' => $emplacements];
-            }
-        }
-
-        return $resultat;
+        return array_values(array_map('strval', DB::table('workspaces')
+            ->where('slug', '!=', Taxonomy::VIVIER_WORKSPACE_SLUG)
+            ->pluck('id')
+            ->all()));
     }
 
     /**
@@ -455,21 +607,39 @@ final class EffacementCoordonneesFiches
         return $canaux;
     }
 
-    // ── Internes ────────────────────────────────────────────────────────────
-
     /**
-     * Les espaces business (le vivier ne porte pas de fiches d'organisation),
-     * corbeille comprise : leurs données sont toujours en base.
+     * Les expressions régulières (POSIX, Postgres) qui reconnaissent un numéro
+     * dans un texte (relecture E1) : SES chiffres, un séparateur au plus entre
+     * deux (espace, point, tiret, parenthèse), et ses FRONTIÈRES — pas de
+     * chiffre juste avant ni juste après. Un SIREN suivi d'une date ne forme
+     * donc plus « le numéro » par hasard ; « 06.00.00.00.42 (poste 3) », si.
      *
+     * @param  list<string>  $telephones
      * @return list<string>
      */
-    private static function espaces(): array
+    public static function motifsTelephones(array $telephones): array
     {
-        return array_values(array_map('strval', DB::table('workspaces')
-            ->where('slug', '!=', Taxonomy::VIVIER_WORKSPACE_SLUG)
-            ->pluck('id')
-            ->all()));
+        $sep = '[ .()-]?';
+        $motifs = [];
+        foreach ($telephones as $t) {
+            $chiffres = (string) preg_replace('/\D/', '', $t);
+            if (strlen($chiffres) < 9) {
+                continue;
+            }
+            if (preg_match('/^(?:0033|33|0)0?([1-9]\d{8})$/', $chiffres, $m) === 1) {
+                // Français : 06…, +33 6…, 33 6…, 0033 6…, +33 (0)6…
+                $abonne = $m[1];
+                $prefixe = '(\+?33[ .]?(\(0\))?|0033[ .]?(\(0\))?|0)';
+                $motifs[] = '(^|[^0-9])' . $prefixe . $sep . implode($sep, str_split($abonne)) . '([^0-9]|$)';
+            } else {
+                $motifs[] = '(^|[^0-9])' . implode($sep, str_split($chiffres)) . '([^0-9]|$)';
+            }
+        }
+
+        return array_values(array_unique($motifs));
     }
+
+    // ── Internes : chaque recherche ci-dessous est servie par un index ──────
 
     private static function contactsDeLaPersonne(string $email, ?string $personKey, ?string $workspaceId): ?Builder
     {
@@ -480,6 +650,7 @@ final class EffacementCoordonneesFiches
         }
 
         // Par clé de personne OU par adresse — comme la suppression (S5).
+        // `idx_contacts_email`, `idx_contacts_workspace_person_key`.
         $requete = DB::table('contacts')->where(function (Builder $q) use ($email, $personKey): void {
             if ($email !== '') {
                 $q->orWhere('email', $email);
@@ -495,24 +666,30 @@ final class EffacementCoordonneesFiches
         return $requete;
     }
 
-    private static function fiches(?string $workspaceId): Builder
+    /** `idx_companies_email_generic_minuscules`. */
+    private static function fichesALAdresse(string $email, ?string $workspaceId): Builder
     {
-        return self::table('companies', $workspaceId);
+        return self::table('companies', $workspaceId)
+            ->whereNotNull('email_generic')
+            ->whereRaw('lower(email_generic) = ?', [$email]);
     }
 
-    private static function table(string $table, ?string $workspaceId): Builder
+    /**
+     * `idx_companies_telephone_chiffres`.
+     *
+     * @param  list<string>  $variantes
+     */
+    private static function fichesAuNumero(array $variantes, ?string $workspaceId): Builder
     {
-        $requete = DB::table($table);
-        if ($workspaceId !== null) {
-            $requete->where('workspace_id', $workspaceId);
-        }
-
-        return $requete;
+        return self::table('companies', $workspaceId)
+            ->whereNotNull('phone')
+            ->whereRaw(self::chiffres('phone') . ' IN (' . self::marques($variantes) . ')', $variantes);
     }
 
     /**
      * Les fiches personnes qui portent l'un de ces numéros. Corbeille
      * comprise, VOLONTAIREMENT : une fiche à la corbeille garde la coordonnée.
+     * `idx_contacts_telephone_chiffres`.
      *
      * @param  list<string>  $variantes
      */
@@ -524,33 +701,38 @@ final class EffacementCoordonneesFiches
     }
 
     /**
-     * Les fiches dont les canaux PEUVENT porter l'adresse ou un numéro : un
-     * préfiltre SQL large, puis la comparaison exacte en PHP.
+     * Les fiches dont les CANAUX portent l'une de ces adresses ou l'un de ces
+     * numéros — égalité exacte, par les fonctions des deux index GIN
+     * (`idx_companies_canaux_emails`, `idx_companies_canaux_telephones`).
      *
+     * @param  list<string>  $adresses  en minuscules
      * @param  list<string>  $variantes
-     * @return iterable<\stdClass>
      */
-    private static function fichesAvecCanaux(string $email, array $variantes, ?string $workspaceId): iterable
+    private static function fichesAuxCanaux(array $adresses, array $variantes, ?string $workspaceId): Builder
     {
-        if ($email === '' && $variantes === []) {
-            return [];
+        return self::table('companies', $workspaceId)
+            ->whereRaw(self::AVEC_CANAUX)
+            ->where(function (Builder $q) use ($adresses, $variantes): void {
+                if ($adresses !== []) {
+                    $q->orWhereRaw('canaux_emails(signals) && ARRAY[' . self::marques($adresses) . ']::text[]', $adresses);
+                }
+                if ($variantes !== []) {
+                    $q->orWhereRaw('canaux_telephones(signals) && ARRAY[' . self::marques($variantes) . ']::text[]', $variantes);
+                }
+                if ($adresses === [] && $variantes === []) {
+                    $q->whereRaw('false');
+                }
+            });
+    }
+
+    private static function table(string $table, ?string $workspaceId): Builder
+    {
+        $requete = DB::table($table);
+        if ($workspaceId !== null) {
+            $requete->where('workspace_id', $workspaceId);
         }
 
-        return self::fiches($workspaceId)
-            // `jsonb_exists` et non l'opérateur `?`, que PDO prendrait pour un paramètre.
-            ->whereRaw("jsonb_exists(signals, 'contact_channels')")
-            ->where(function (Builder $q) use ($email, $variantes): void {
-                if ($email !== '') {
-                    $q->orWhereRaw("(signals->'contact_channels')::text ILIKE ?", ['%' . self::echapperLike($email) . '%']);
-                }
-                foreach ($variantes as $v) {
-                    $q->orWhereRaw(
-                        "regexp_replace(coalesce(signals->'contact_channels'->>'phones', ''), '[^0-9]', '', 'g') LIKE ?",
-                        ['%' . $v . '%'],
-                    );
-                }
-            })
-            ->get(['id', 'signals']);
+        return $requete;
     }
 
     /**
@@ -573,28 +755,6 @@ final class EffacementCoordonneesFiches
         return array_map('strval', array_keys($variantes));
     }
 
-    /**
-     * Les chiffres qui identifient un numéro pour la recherche de résidus :
-     * les 9 chiffres d'abonné d'un numéro français où qu'ils soient dans la
-     * saisie (« 01 23 45 67 89 poste 12 »), sinon les 9 derniers chiffres.
-     *
-     * @param  list<string>  $telephones
-     * @return list<string>
-     */
-    private static function empreintesChiffres(array $telephones): array
-    {
-        $empreintes = [];
-        foreach ($telephones as $t) {
-            $chiffres = (string) preg_replace('/\D/', '', $t);
-            if (strlen($chiffres) < 9) {
-                continue;
-            }
-            $empreintes[] = preg_match('/(?:0033|33|0)([1-9]\d{8})/', $chiffres, $m) === 1 ? $m[1] : substr($chiffres, -9);
-        }
-
-        return array_values(array_unique($empreintes));
-    }
-
     /** @param  list<string>  $variantes */
     private static function telephoneVise(string $telephone, array $variantes): bool
     {
@@ -607,6 +767,7 @@ final class EffacementCoordonneesFiches
         return false;
     }
 
+    /** L'expression EXACTE des deux index de chiffres. */
     private static function chiffres(string $colonne): string
     {
         return "regexp_replace({$colonne}, '[^0-9]', '', 'g')";

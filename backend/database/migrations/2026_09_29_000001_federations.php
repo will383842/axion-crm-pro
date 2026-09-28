@@ -109,6 +109,7 @@ return new class extends Migration
         $this->installerGardeAntiCycle();
         $this->installerGardeMemeEspace();
         $this->createContactsRetires();
+        $this->createFonctionsCanaux();
         $this->installerProtection(self::SLUGS_PROTEGES);
 
         (new ScrapingSourcesSeeder)->run();
@@ -128,13 +129,21 @@ return new class extends Migration
 
         $this->installerProtection(self::SLUGS_PROTEGES_AVANT);
 
+        // Les index qui les emploient sont retirés par `2026_09_29_000002`.
+        DB::statement('DROP FUNCTION IF EXISTS public.canaux_emails(JSONB)');
+        DB::statement('DROP FUNCTION IF EXISTS public.canaux_telephones(JSONB)');
+
+        // 🔴 LE REGISTRE DES RETRAITS SURVIT AU RETOUR ARRIÈRE (relecture B1).
+        // `contacts_retires`, sa clé et ses deux fonctions RESTENT : les
+        // supprimer ferait revenir, au prochain import, chaque personne qui a
+        // été supprimée ou qui a exercé son droit à l'effacement — et une clé
+        // tirée à nouveau ne reconnaîtrait plus aucune empreinte. Seuls les
+        // déclencheurs partent ; le `up()` suivant les repose et retrouve la
+        // même clé (`ON CONFLICT DO NOTHING`).
         DB::statement('DROP TRIGGER IF EXISTS companies_memoriser_retraits ON public.companies');
         DB::statement('DROP FUNCTION IF EXISTS public.companies_memoriser_retraits()');
         DB::statement('DROP TRIGGER IF EXISTS contacts_memoriser_retrait ON public.contacts');
         DB::statement('DROP FUNCTION IF EXISTS public.contacts_memoriser_retrait()');
-        DB::statement('DROP FUNCTION IF EXISTS public.contacts_retires_empreinte(TEXT, TEXT)');
-        DB::statement('DROP TABLE IF EXISTS contacts_retires');
-        DB::statement('DROP TABLE IF EXISTS contacts_retires_cle');
         DB::statement('DROP TRIGGER IF EXISTS companies_federation_meme_espace ON public.companies');
         DB::statement('DROP FUNCTION IF EXISTS public.companies_federation_meme_espace()');
         DB::statement('DROP TRIGGER IF EXISTS federations_meme_espace ON public.federations');
@@ -351,16 +360,35 @@ return new class extends Migration
              WITH CHECK (workspace_id::TEXT = NULLIF(current_setting('app.current_workspace_id', true), ''))",
         );
 
-        // ── L'EMPREINTE EST SALÉE (relecture S7) ─────────────────────────────
+        // ── L'EMPREINTE EST SALÉE (relectures S7, S-a) ───────────────────────
         // Une empreinte SHA-256 d'un nom se retrouve par dictionnaire (les noms
         // sont peu nombreux) : sans sel, le registre redirait qui a été retiré.
         // `opt_out` n'a pas de sel, et le seul secret HMAC existant
         // (`CRM_PERSON_KEY_SECRET`) vit côté application — un déclencheur de la
         // base ne peut pas le lire. La clé est donc tirée ICI, dans la base, au
-        // hasard (32 octets), et n'est lisible que par la fonction
-        // `contacts_retires_empreinte` (SECURITY DEFINER) : le rôle applicatif
-        // n'y a aucun droit. Elle ne change jamais (sinon le registre perdrait
-        // sa mémoire) et ne quitte pas la base.
+        // hasard (32 octets). Elle ne change jamais (sinon le registre perdrait
+        // sa mémoire).
+        //
+        // CE QUE LE SEL PROTÈGE, ET CE QU'IL NE PROTÈGE PAS — honnêtement :
+        //  - il protège une FUITE DE LA TABLE `contacts_retires` seule (un
+        //    export, une copie, une requête de lecture) : sans la clé, les
+        //    empreintes ne se retrouvent pas par dictionnaire ;
+        //  - il ne protège PAS contre qui a la base entière : le propriétaire
+        //    (et tout super-utilisateur) lit `contacts_retires_cle`, et la clé
+        //    part dans CHAQUE sauvegarde (`pg_dump`) avec le registre ;
+        //  - le rôle applicatif ne lit pas la clé et n'exécute PAS
+        //    `contacts_retires_empreinte` (EXECUTE retiré à PUBLIC et à lui) :
+        //    il ne peut pas fabriquer d'empreintes pour tester un dictionnaire.
+        //    Il n'a que `contacts_retires_contient()`, une réponse oui/non pour
+        //    UNE personne d'UN organisme, dans l'espace de son contexte : c'est
+        //    ce dont l'import a besoin — et le rôle qui importe EST le rôle
+        //    applicatif, on ne peut donc pas la réserver à un autre.
+        //
+        // RESTAURATION « DONNÉES SEULES » (`pg_restore --data-only` sur un
+        // schéma neuf) : les migrations ont déjà tiré une clé NEUVE, et la
+        // ligne restaurée entre en conflit avec elle. Vider
+        // `contacts_retires_cle` AVANT de restaurer ses données — sinon la clé
+        // neuve reste, et le registre ne reconnaît plus personne, sans erreur.
         DB::unprepared(<<<'SQL'
             CREATE TABLE IF NOT EXISTS public.contacts_retires_cle (
                 id   SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
@@ -382,15 +410,42 @@ return new class extends Migration
                 WHERE  k.id = 1
             $fn$;
         SQL);
+        DB::unprepared(<<<'SQL'
+            REVOKE EXECUTE ON FUNCTION public.contacts_retires_empreinte(TEXT, TEXT) FROM PUBLIC;
+
+            -- La SEULE question que le rôle applicatif peut poser au registre :
+            -- « cette personne de cet organisme a-t-elle été retirée ? » — dans
+            -- l'espace de son contexte, jamais un autre.
+            CREATE OR REPLACE FUNCTION public.contacts_retires_contient(p_workspace UUID, p_siren TEXT, p_prenom TEXT, p_nom TEXT)
+            RETURNS BOOLEAN
+            LANGUAGE sql
+            STABLE
+            SECURITY DEFINER
+            SET search_path = public, pg_catalog
+            AS $fn$
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM   public.contacts_retires r
+                    WHERE  r.workspace_id = p_workspace
+                    AND    p_workspace::TEXT = NULLIF(current_setting('app.current_workspace_id', true), '')
+                    AND    r.siren = p_siren::CHAR(9)
+                    AND    r.cle_nom = public.contacts_retires_empreinte(p_prenom, p_nom)
+                )
+            $fn$;
+            REVOKE EXECUTE ON FUNCTION public.contacts_retires_contient(UUID, TEXT, TEXT, TEXT) FROM PUBLIC;
+        SQL);
         $roleApplicatif = (string) config('database.connections.pgsql_app.username', 'axion_app');
         if ($roleApplicatif !== '' && DB::selectOne('SELECT 1 AS e FROM pg_roles WHERE rolname = ?', [$roleApplicatif]) !== null) {
-            DB::statement('REVOKE ALL ON public.contacts_retires_cle FROM "' . str_replace('"', '""', $roleApplicatif) . '"');
+            $role = '"' . str_replace('"', '""', $roleApplicatif) . '"';
+            DB::statement('REVOKE ALL ON public.contacts_retires_cle FROM ' . $role);
+            DB::statement('REVOKE EXECUTE ON FUNCTION public.contacts_retires_empreinte(TEXT, TEXT) FROM ' . $role);
+            DB::statement('GRANT EXECUTE ON FUNCTION public.contacts_retires_contient(UUID, TEXT, TEXT, TEXT) TO ' . $role);
         }
 
         DB::unprepared(<<<'SQL'
-            -- Fusion de doublons : `SET LOCAL app.fusion_contacts = 'on'` dans
-            -- la transaction de fusion. La personne n'est pas RETIRÉE, elle est
-            -- regroupée : le registre ne doit pas l'empêcher de revenir.
+            -- Un espace SUPPRIMÉ (cascade) ne mémorise rien : son registre part
+            -- avec lui, et l'inscrire violerait la clé étrangère — la
+            -- suppression de l'espace échouerait (relecture B4).
             CREATE OR REPLACE FUNCTION public.contacts_memoriser_retrait()
             RETURNS trigger
             LANGUAGE plpgsql
@@ -400,7 +455,7 @@ return new class extends Migration
             DECLARE
                 v_siren CHAR(9);
             BEGIN
-                IF COALESCE(current_setting('app.fusion_contacts', true), '') = 'on' THEN
+                IF NOT EXISTS (SELECT 1 FROM public.workspaces w WHERE w.id = OLD.workspace_id) THEN
                     RETURN OLD;
                 END IF;
 
@@ -437,7 +492,7 @@ return new class extends Migration
             SET search_path = public, pg_catalog
             AS $fn$
             BEGIN
-                IF COALESCE(current_setting('app.fusion_contacts', true), '') = 'on' THEN
+                IF NOT EXISTS (SELECT 1 FROM public.workspaces w WHERE w.id = OLD.workspace_id) THEN
                     RETURN OLD;
                 END IF;
 
@@ -456,6 +511,63 @@ return new class extends Migration
             CREATE TRIGGER companies_memoriser_retraits
                 BEFORE DELETE ON public.companies
                 FOR EACH ROW EXECUTE FUNCTION public.companies_memoriser_retraits();
+        SQL);
+    }
+
+    /**
+     * LES CANAUX, INDEXABLES (relecture P1). L'effacement cherchait l'adresse
+     * et les numéros d'une personne dans `signals.contact_channels` par
+     * `ILIKE` et `regexp_replace … LIKE` : un parcours des 4,3 M de fiches,
+     * sur un chemin que le site coupe à 10 s. Ces deux fonctions rendent les
+     * valeurs NORMALISÉES des canaux (adresses en minuscules, clés de
+     * `details` comprises ; téléphones réduits à leurs chiffres) ; les index
+     * GIN de la migration `2026_09_29_000002` les servent, et l'égalité est
+     * exacte (`&&`). IMMUTABLE : elles ne lisent que leur argument.
+     */
+    private function createFonctionsCanaux(): void
+    {
+        DB::unprepared(<<<'SQL'
+            CREATE OR REPLACE FUNCTION public.canaux_emails(p_signals JSONB)
+            RETURNS TEXT[]
+            LANGUAGE sql
+            IMMUTABLE
+            PARALLEL SAFE
+            SET search_path = pg_catalog
+            AS $fn$
+                SELECT coalesce(array_agg(DISTINCT v), '{}'::TEXT[])
+                FROM (
+                    SELECT lower(btrim(e)) AS v
+                    FROM   jsonb_array_elements_text(CASE
+                               WHEN jsonb_typeof(p_signals -> 'contact_channels' -> 'emails') = 'array'
+                               THEN p_signals -> 'contact_channels' -> 'emails'
+                               ELSE '[]'::JSONB END) e
+                    UNION
+                    SELECT lower(btrim(k))
+                    FROM   jsonb_object_keys(CASE
+                               WHEN jsonb_typeof(p_signals -> 'contact_channels' -> 'details') = 'object'
+                               THEN p_signals -> 'contact_channels' -> 'details'
+                               ELSE '{}'::JSONB END) k
+                ) s
+                WHERE v <> ''
+            $fn$;
+
+            CREATE OR REPLACE FUNCTION public.canaux_telephones(p_signals JSONB)
+            RETURNS TEXT[]
+            LANGUAGE sql
+            IMMUTABLE
+            PARALLEL SAFE
+            SET search_path = pg_catalog
+            AS $fn$
+                SELECT coalesce(array_agg(DISTINCT d), '{}'::TEXT[])
+                FROM (
+                    SELECT regexp_replace(t, '[^0-9]', '', 'g') AS d
+                    FROM   jsonb_array_elements_text(CASE
+                               WHEN jsonb_typeof(p_signals -> 'contact_channels' -> 'phones') = 'array'
+                               THEN p_signals -> 'contact_channels' -> 'phones'
+                               ELSE '[]'::JSONB END) t
+                ) s
+                WHERE length(d) >= 9
+            $fn$;
         SQL);
     }
 

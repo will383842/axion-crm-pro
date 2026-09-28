@@ -51,6 +51,22 @@ interface RgpdRequest {
   requested_at: string;
   processed_at?: string | null;
   note?: string | null;
+  /**
+   * Verdict de la preuve DIFFÉRÉE d'un effacement (`VerifierEffacementRgpd`) :
+   * `en_attente` tant qu'elle n'a pas tourné, `incomplete` si des coordonnées
+   * restent — la demande reste alors « En traitement », avec le motif.
+   */
+  metadata?: { verification?: string; motif?: string } | null;
+}
+
+function verificationEffacement(r: RgpdRequest): string | null {
+  if (r.type !== 'erasure') return null;
+  const verification = r.metadata?.verification;
+  if (verification === 'incomplete') {
+    return r.metadata?.motif ?? 'Effacement incomplet : coordonnées encore présentes.';
+  }
+  if (verification === 'en_attente') return 'Vérification de l’effacement en attente.';
+  return null;
 }
 
 const TYPE_OPTIONS: Array<{ id: RgpdType | 'all'; label: string; article?: string }> = [
@@ -216,6 +232,11 @@ export function RgpdRequestsPage() {
                   <StatusPill tone={mapStatusToTone(r.status)} pulse={r.status === 'processing'}>
                     {translateRgpdStatus(r.status)}
                   </StatusPill>
+                  {verificationEffacement(r) !== null ? (
+                    <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                      {verificationEffacement(r)}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="text-xs text-slate-500">
                   {new Date(r.requested_at).toLocaleString('fr-FR')}

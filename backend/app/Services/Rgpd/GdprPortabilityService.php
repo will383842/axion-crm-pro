@@ -59,6 +59,8 @@ class GdprPortabilityService
             $personnes()->pluck('person_key')->all(),
         ))));
 
+        $portant = EffacementCoordonneesFiches::fichesPortantPartout($email);
+
         $data = [
             'subject' => $email,
             'exported' => now()->toIso8601String(),
@@ -70,14 +72,12 @@ class GdprPortabilityService
             // Ses valeurs et leur emplacement SEULEMENT : l'e-mail générique ou
             // le standard d'une fiche trouvée par ses canaux sont ceux d'un
             // TIERS (art. 15 § 4, relecture S1).
-            'fiches_organisation' => EffacementCoordonneesFiches::fichesPortant(
-                $email,
-                EffacementCoordonneesFiches::numerosPersonnels(
-                    EffacementCoordonneesFiches::telephonesDesContacts($email),
-                    $email,
-                    EffacementCoordonneesFiches::clesNomDesContacts($email),
-                ),
-            ),
+            // Espace par espace, dans son contexte (relecture E3) : sans
+            // contexte, sous le rôle de production, la RLS rendait une liste
+            // VIDE sans le dire. `fiches_organisation_perimetre` avoue ce que
+            // le reste de l'export n'a pas pu voir.
+            'fiches_organisation' => $portant['fiches'],
+            'fiches_organisation_perimetre' => $portant['perimetre'],
             // Lot L4-C — la personne connue par la lettre ou le guide, et ses
             // abonnements (statut, version et date du consentement recopiés du
             // site, qui garde la preuve).

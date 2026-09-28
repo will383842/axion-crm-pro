@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Crm\Outbound\ConsentOutboundRecorder;
+use App\Jobs\VerifierEffacementRgpd;
 use App\Models\RgpdRequest;
 use App\Services\Dedup\DeduplicationService;
 use App\Services\Rgpd\GdprErasureService;
@@ -236,6 +237,11 @@ class RgpdRequestsController extends ApiController
         //
         // Le jeton reste rendu a l'operateur qui declenche le traitement - il
         // doit bien le transmettre a la personne - mais il n'est plus ECRIT.
+        // Les numéros PERSONNELS d'un effacement ne servent qu'à sa preuve
+        // différée : ni archivés, ni rendus (ce sont des numéros en clair).
+        $personnels = is_array($result['personnels'] ?? null) ? array_values(array_map('strval', $result['personnels'])) : [];
+        unset($result['personnels']);
+
         $resultatArchive = $result;
         unset($resultatArchive['token']);
 
@@ -244,16 +250,26 @@ class RgpdRequestsController extends ApiController
             $archive['note'] = $note;
         }
 
-        // Un effacement qui retrouve encore des coordonnées n'est PAS soldé :
-        // la demande reste « en cours » et son archive dit où elles restent.
-        $solde = ! ($req->type === 'erasure' && ($result['complete'] ?? true) === false);
+        // Un effacement n'est soldé que par sa PREUVE, différée (relecture
+        // P1) : la demande reste « en cours » jusqu'à ce que
+        // `VerifierEffacementRgpd` ne retrouve plus rien — sinon elle y reste,
+        // avec le motif et les emplacements.
+        if ($req->type === 'erasure') {
+            $archive['verification'] = 'en_attente';
+        }
 
         $req->update([
-            'status' => $solde ? 'done' : 'processing',
+            'status' => $req->type === 'erasure' ? 'processing' : 'done',
             'processed_at' => now(),
             'processed_by' => $r->user()?->id,
             'metadata' => array_merge((array) $req->metadata, $archive),
         ]);
+
+        if ($req->type === 'erasure') {
+            // APRÈS la mise à jour : le verdict de la vérification l'écrase.
+            dispatch((new VerifierEffacementRgpd((string) $req->subject_email, $personnels, (int) $req->id))
+                ->pourEspace((string) $req->workspace_id));
+        }
 
         return $this->ok(['request' => $req->fresh(), 'result' => $result]);
     }

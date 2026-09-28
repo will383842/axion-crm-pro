@@ -71,6 +71,7 @@ export const NATURES = [
   { code: "institution", libelle: "Institution" },
   { code: "media", libelle: "Média" },
   { code: "reseau", libelle: "Réseau ou club d'affaires" },
+  { code: "federation", libelle: "Organisation professionnelle" },
 ] as const satisfies readonly EntreeReferentiel[];
 
 export type CleNature = (typeof NATURES)[number]['code'];
@@ -98,3 +99,74 @@ export const REGIONS = [
 ] as const satisfies readonly EntreeReferentiel[];
 
 export type CodeRegion = (typeof REGIONS)[number]['code'];
+
+/** Familles d'organisation professionnelle — `federations.famille`. */
+export const FAMILLES_FEDERATION = [
+  { code: "confederation", libelle: "Confédération interprofessionnelle" },
+  { code: "federation_syndicat_pro", libelle: "Fédération ou syndicat professionnel" },
+  { code: "ordre", libelle: "Ordre professionnel" },
+  { code: "profession_reglementee", libelle: "Chambre ou compagnie de profession réglementée" },
+  { code: "chambre_consulaire", libelle: "Chambre consulaire" },
+  { code: "syndicat_salaries", libelle: "Syndicat de salariés" },
+  { code: "association_metier", libelle: "Association de métier ou de fonction" },
+  { code: "association_entreprises", libelle: "Association d'entreprises ou de dirigeants" },
+  { code: "interprofession", libelle: "Interprofession ou organisme technique" },
+  { code: "pole_cluster", libelle: "Pôle de compétitivité ou cluster" },
+  { code: "financeur_formation", libelle: "Financeur de la formation (OPCO…)" },
+  { code: "developpement_economique", libelle: "Développement économique" },
+  { code: "association_elus", libelle: "Association d'élus" },
+  { code: "mutuelle_agricole", libelle: "Mutuelle ou caisse agricole" },
+  { code: "proprietaires_locataires", libelle: "Propriétaires et locataires" },
+] as const satisfies readonly EntreeReferentiel[];
+
+export type CleFamilleFederation = (typeof FAMILLES_FEDERATION)[number]['code'];
+
+/** Niveaux — `federations.niveau`. */
+export const NIVEAUX_FEDERATION = [
+  { code: "national", libelle: "National" },
+  { code: "regional", libelle: "Régional" },
+  { code: "departemental", libelle: "Départemental" },
+  { code: "local", libelle: "Local" },
+] as const satisfies readonly EntreeReferentiel[];
+
+export type CleNiveauFederation = (typeof NIVEAUX_FEDERATION)[number]['code'];
+
+/** Contactabilité — `federations.contactabilite`. */
+export const CONTACTABILITES = [
+  { code: "email_verifie", libelle: "E-mail vérifié" },
+  { code: "formulaire_seulement", libelle: "Formulaire seulement" },
+  { code: "telephone_seulement", libelle: "Téléphone seulement" },
+  { code: "site_ou_linkedin_seulement", libelle: "Site ou LinkedIn seulement" },
+  { code: "aucun_contact", libelle: "Aucun contact" },
+] as const satisfies readonly EntreeReferentiel[];
+
+export type CleContactabilite = (typeof CONTACTABILITES)[number]['code'];
+
+/** Certitude du classement — `federations.certitude`. */
+export const CERTITUDES = [
+  { code: "haute", libelle: "Haute" },
+  { code: "moyenne", libelle: "Moyenne" },
+  { code: "faible", libelle: "Faible" },
+] as const satisfies readonly EntreeReferentiel[];
+
+export type CleCertitude = (typeof CERTITUDES)[number]['code'];
+
+/** Pertinence — `federations.pertinence`. */
+export const PERTINENCES = [
+  { code: "haute", libelle: "Haute" },
+  { code: "moyenne", libelle: "Moyenne" },
+  { code: "faible", libelle: "Faible" },
+] as const satisfies readonly EntreeReferentiel[];
+
+export type ClePertinence = (typeof PERTINENCES)[number]['code'];
+
+/** Démarche « partenariat » — `federations.partenariat`. */
+export const PARTENARIATS = [
+  { code: "aucun", libelle: "Pas encore proposé" },
+  { code: "propose", libelle: "Proposé" },
+  { code: "en_discussion", libelle: "En discussion" },
+  { code: "accepte", libelle: "Accepté" },
+  { code: "refuse", libelle: "Refusé" },
+] as const satisfies readonly EntreeReferentiel[];
+
+export type ClePartenariat = (typeof PARTENARIATS)[number]['code'];

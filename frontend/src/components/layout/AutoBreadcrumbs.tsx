@@ -72,6 +72,7 @@ const LABELS: Record<string, string> = {
   '/international': 'International',
   '/international/roumanie': 'Roumanie',
   '/evenements': 'Événements',
+  '/federations': 'Fédérations',
   '/console': 'Console CRM',
   '/console/contacts': 'Contacts',
   '/console/vivier': 'Vivier candidats',

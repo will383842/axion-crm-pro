@@ -12,7 +12,7 @@
  *  1. les options sont EXACTEMENT le référentiel généré depuis le serveur
  *     (`referentiels.generated.ts`, lui-même gardé côté Pest contre
  *     `Taxonomy::ENTITY_NATURES`) ;
- *  2. indépendamment de ce fichier, les huit natures de la base y sont, et
+ *  2. indépendamment de ce fichier, les natures de la base y sont, et
  *     « autre » n'y est pas — sinon un fichier généré vidé passerait le 1 ;
  *  3. choisir une nature envoie bien `filter[entity_nature]=<valeur>` au
  *     serveur (le filtre sert à quelque chose, il ne fait pas que s'afficher).
@@ -35,7 +35,10 @@ const PAGE_VIDE = {
   meta: { current_page: 1, last_page: 1, per_page: 100, total: 0 },
 };
 
-/** Les huit natures du CHECK en base (migration 2026_09_27_000002). */
+/**
+ * Les natures du CHECK en base : huit (migration 2026_09_27_000002), plus
+ * `federation` (migration 2026_09_29_000001, chantier 3).
+ */
 const NATURES_EN_BASE = [
   'entreprise',
   'association',
@@ -45,6 +48,7 @@ const NATURES_EN_BASE = [
   'institution',
   'media',
   'reseau',
+  'federation',
 ];
 
 async function monter() {

@@ -749,35 +749,57 @@ test('B7 — un index nature reste INVALIDE est detecte par la migration', funct
 
 // ══ 2e relecture sécurité (2026-09-28) ══════════════════════════════════════
 
-test('S1 — avec une fiche protegee dans l espace, le retrait et le menage visent la fiche ordinaire et pas la protegee', function () {
-    // L'alias interne de `FichesProtegees::conditionSql()` valait `ct`. Appelée
-    // avec `'ct.company_id'`, la condition devenait `ct.company_id =
-    // ct.company_id` : dès qu'UNE fiche protégée existait dans l'espace, le
-    // DELETE ne retirait RIEN, nulle part.
-    $protegee = rcFiche($this->espace, ['naf' => '52.1D', 'sector_main' => 'transport']);
-    rcLier($this->espace, $protegee, rcTag($this->espace, FichesProtegees::TAGS[0], ['is_locked' => true, 'category' => 'intent']));
-    $microProtegee = rcTag($this->espace, 'size-micro', ['category' => 'size']);
-    rcLier($this->espace, $protegee, $microProtegee);
+/**
+ * Une fiche PROTÉGÉE (qui porte une étiquette obsolète `size-micro`) et une
+ * fiche ORDINAIRE (qui porte `sector-transport`, à retirer), dans le même
+ * espace.
+ *
+ * @return array{protegee: int, ordinaire: int, micro: int}
+ */
+function rcEspaceAvecProtegee(string $espace): array
+{
+    $protegee = rcFiche($espace, ['naf' => '52.1D', 'sector_main' => 'transport']);
+    rcLier($espace, $protegee, rcTag($espace, FichesProtegees::TAGS[0], ['is_locked' => true, 'category' => 'intent']));
+    $micro = rcTag($espace, 'size-micro', ['category' => 'size']);
+    rcLier($espace, $protegee, $micro);
 
-    $ordinaire = rcFiche($this->espace, ['naf' => '52.1D', 'sector_main' => 'transport', 'department_code' => '38']);
-    rcLier($this->espace, $ordinaire, rcTag($this->espace, 'sector-transport', ['category' => 'sector']));
+    $ordinaire = rcFiche($espace, ['naf' => '52.1D', 'sector_main' => 'transport', 'department_code' => '38']);
+    rcLier($espace, $ordinaire, rcTag($espace, 'sector-transport', ['category' => 'sector']));
 
-    // Le ménage à blanc : `sector-transport` (portée par la seule fiche
-    // ordinaire) partirait ; `size-micro` (portée par la protégée) resterait.
-    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--dry-run' => true]);
-    expect(rcCompteur(Artisan::output(), 'etiquettes_obsoletes_a_supprimer'))->toBe(1);
+    return ['protegee' => $protegee, 'ordinaire' => $ordinaire, 'micro' => $micro];
+}
+
+// L'alias interne de `FichesProtegees::conditionSql()` valait `ct`. Appelée
+// avec `'ct.company_id'`, la condition devenait `ct.company_id =
+// ct.company_id` : dès qu'UNE fiche protégée existait dans l'espace, le DELETE
+// des étiquettes ne retirait RIEN, et l'estimation du ménage comptait 0.
+
+test('S1 — avec une fiche protegee dans l espace, le retrait vise la fiche ordinaire et pas la protegee', function () {
+    $f = rcEspaceAvecProtegee($this->espace);
 
     Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
     $reel = Artisan::output();
 
-    expect(rcSlugs($ordinaire))->toBe(['region-84', 'sector-commerce-detail'])
+    $attendues = ['size-micro', FichesProtegees::TAGS[0]];
+    sort($attendues);
+    expect(rcSlugs($f['ordinaire']))->toBe(['region-84', 'sector-commerce-detail'])
         ->and(rcCompteur($reel, 'etiquettes_retirees'))->toBe(1)
         ->and(rcCompteur($reel, 'etiquettes_obsoletes_supprimees'))->toBe(1)
         ->and(DB::table('tags')->where('workspace_id', $this->espace)->where('slug', 'sector-transport')->exists())->toBeFalse()
         // La protégée : intacte, étiquettes comprises.
-        ->and(rcSlugs($protegee))->toBe([FichesProtegees::TAGS[0], 'size-micro'])
-        ->and(DB::table('tags')->where('id', $microProtegee)->exists())->toBeTrue()
-        ->and(DB::table('companies')->where('id', $protegee)->value('sector_main'))->toBe('transport');
+        ->and(rcSlugs($f['protegee']))->toBe($attendues)
+        ->and(DB::table('tags')->where('id', $f['micro'])->exists())->toBeTrue()
+        ->and(DB::table('companies')->where('id', $f['protegee'])->value('sector_main'))->toBe('transport');
+});
+
+test('S1 — avec une fiche protegee dans l espace, l essai a blanc compte juste les etiquettes obsoletes', function () {
+    rcEspaceAvecProtegee($this->espace);
+
+    // `sector-transport` (portée par la seule fiche ordinaire) partirait ;
+    // `size-micro` (portée par la protégée) resterait.
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--dry-run' => true]);
+
+    expect(rcCompteur(Artisan::output(), 'etiquettes_obsoletes_a_supprimer'))->toBe(1);
 });
 
 test('S2 — une fiche deja juste devenue protegee avant l ecriture ne recoit aucune etiquette', function () {

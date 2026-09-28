@@ -144,7 +144,8 @@ class FederationsController extends ApiController
                 $apres = $changements['partenariat'] ?? null;
                 if ($apres !== null && $apres !== $actuelle->partenariat && $apres !== 'aucun') {
                     $kind = 'partenariat_' . $apres;
-                    $nom = DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $company)->value('denomination');
+                    $nom = DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $company)
+                        ->whereNull('deleted_at')->value('denomination');
                     DB::table('activities')->insert([
                         'workspace_id' => $workspaceId,
                         'user_id' => optional($request->user())->id,

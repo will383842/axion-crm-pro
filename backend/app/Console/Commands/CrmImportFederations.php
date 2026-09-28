@@ -302,6 +302,7 @@ class CrmImportFederations extends Command
         $fiche = DB::table('companies')
             ->where('workspace_id', $workspaceId)
             ->where('siren', $l['siren'])
+            ->whereNull('deleted_at')
             ->first();
         if ($fiche === null) {
             throw new RuntimeException('fiche_introuvable_apres_ingestion');

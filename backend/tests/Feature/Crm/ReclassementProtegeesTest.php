@@ -172,7 +172,7 @@ const RP_CLASSEMENT = ['sector_main', 'size_category', 'entity_nature', 'region_
 
 test('sans l option, les fiches protegees sont exclues comme avant, le temoin est reclasse', function () {
     $organisateur = rpProtegeeAvecContacts($this->espace, FichesProtegees::TAG_ORGANISATEURS, [
-        'naf' => '82.30Z', 'size_category' => 'micro', 'department_code' => '69', 'region_code' => 'AURA',
+        'naf' => '82.30Z', 'size_category' => 'micro', 'department_code' => '69', 'region_code' => '82',
         'entity_nature' => 'reseau', 'discovery_source' => 'scraping',
     ]);
     rpLier($this->espace, $organisateur, rpTag($this->espace, 'sector-transport', ['category' => 'sector']));
@@ -204,7 +204,7 @@ test('sans l option, les fiches protegees sont exclues comme avant, le temoin es
 test('avec l option, la fiche protegee est classee ; contacts, coordonnees et fiches intacts', function () {
     $organisateur = rpProtegeeAvecContacts($this->espace, FichesProtegees::TAG_ORGANISATEURS, [
         'naf' => '82.30Z', 'effectif_range' => '12', 'size_category' => 'micro',
-        'department_code' => '69', 'region_code' => 'AURA',
+        'department_code' => '69', 'region_code' => '82',
         'entity_nature' => 'reseau', 'discovery_source' => 'scraping',
     ]);
     // Étiquette automatique obsolète : retirée. Les autres : intouchables.

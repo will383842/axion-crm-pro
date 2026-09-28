@@ -77,9 +77,14 @@ beforeEach(function () {
         'workspace_id' => $this->espace, 'company_id' => $this->fede, 'first_name' => 'Zoe', 'last_name' => 'ZZPRESIDENTE',
         'email' => EFO_EMAIL, 'phone' => EFO_MOBILE_AUTRE_FORME, 'created_at' => now(), 'updated_at' => now(),
     ]);
-    // Un DOUBLON de la même personne, sans l'adresse, avec le même mobile.
+    // Un DOUBLON de la même personne, sans l'adresse, avec le même mobile —
+    // sur la fiche de l'ANTENNE (une personne n'a qu'une fiche par organisme).
+    $this->antenne = (int) DB::table('companies')->insertGetId([
+        'workspace_id' => $this->espace, 'siren' => '900000503', 'denomination' => 'ZZ Antenne',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
     $this->doublon = (int) DB::table('contacts')->insertGetId([
-        'workspace_id' => $this->espace, 'company_id' => $this->fede, 'first_name' => 'Zoe', 'last_name' => 'ZZPRESIDENTE',
+        'workspace_id' => $this->espace, 'company_id' => $this->antenne, 'first_name' => 'Zoe', 'last_name' => 'ZZPRESIDENTE',
         'phone' => '0033600000042', 'created_at' => now(), 'updated_at' => now(),
     ]);
     // Une AUTRE personne qui partage ce numéro (le standard) : elle reste, sans le numéro.

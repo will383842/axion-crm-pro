@@ -124,6 +124,13 @@ const FICHE = {
   nb_etablissements: 1,
   origine_classement: 'examen',
   partenariat_note: null,
+  email_generic_verification: { type: 'generique', verifie_le: '2026-09-28' },
+  canaux: {
+    emails: [{ email: 'b***@zz-fede.example.invalid', type: 'nominatif', domaine_verifie: true, verifie_le: '2026-09-28' }],
+    telephones: [],
+    sites: ['https://zz-fede-bis.example.invalid'],
+    linkedin: [],
+  },
   ascendants: [
     { id: 5, denomination: 'ZZ Fédération régionale', niveau: 'regional' },
     { id: 3, denomination: 'ZZ Fédération nationale', niveau: 'national' },
@@ -194,6 +201,23 @@ describe('onglet Fédérations — fiche', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
 
     await waitFor(() => expect(corps).toHaveLength(1));
-    expect(corps[0]).toMatchObject({ partenariat: 'propose', partenariat_relance_at: null, partenariat_note: null });
+    expect(corps[0]).toMatchObject({ partenariat: 'propose', partenariat_relance_at: null });
+    // Note non modifiée : elle n'est PAS envoyée (elle arrive vide pour un
+    // compte qui ne voit pas les coordonnées, et l'effacerait).
+    expect(corps[0]).not.toHaveProperty('partenariat_note');
+  });
+
+  it('montre les autres coordonnées avec leur type et la date de vérification', async () => {
+    await renderScreen(<FederationDetailPage />, {
+      path: '/federations/$companyId',
+      url: '/federations/7',
+      handlers: [getJson('/federations/7', FICHE)],
+      landingRoutes: ['/federations', '/evenements/$eventId', '/companies/$companyId'],
+    });
+
+    const bloc = await screen.findByRole('region', { name: 'Autres coordonnées' });
+    expect(within(bloc).getByText('b***@zz-fede.example.invalid')).toBeInTheDocument();
+    expect(within(bloc).getByText(/nominative · domaine vérifié le 28\/09\/2026/)).toBeInTheDocument();
+    expect(within(bloc).getByRole('link', { name: 'https://zz-fede-bis.example.invalid' })).toBeInTheDocument();
   });
 });

@@ -50,6 +50,10 @@ final class SemeurTablesScopees
      */
     public const ORDRE = [
         // ── Racines ──────────────────────────────────────────────────────────
+        // 2026-09-29 (chantier 3) : registre des personnes retirees, sans cle
+        // etrangere. EN TETE : le nettoyage (ordre inverse) le vide APRES
+        // `contacts`, dont chaque suppression peut y ecrire.
+        'contacts_retires',
         'companies',
         'contacts',
         'tags',
@@ -222,6 +226,10 @@ final class SemeurTablesScopees
         $id['companies'] = $insererAvecId('companies', [
             'siren' => str_pad((string) random_int(100000000, 999999999), 9, '0'),
             'denomination' => 'ZZ Étanchéité ' . $marque,
+        ]);
+
+        $id['contacts_retires'] = $insererAvecId('contacts_retires', [
+            'cle_nom' => hash('sha256', 'zz-retire-' . $marque),
         ]);
 
         $id['contacts'] = $insererAvecId('contacts', [

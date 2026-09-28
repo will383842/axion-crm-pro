@@ -20,6 +20,12 @@ use InvalidArgumentException;
  *    FAIBLE en sont écartés par défaut (décision du 28/09 : « petits
  *    organismes sans salarié ni site… exclus des campagnes par défaut ») ;
  *    `--avec-pertinence-faible` les réintègre, en connaissance de cause.
+ *    Les SYNDICATS DE SALARIÉS en sont écartés aussi par défaut (décision de
+ *    Will du 28/09) : l'appartenance syndicale est une donnée de l'article 9
+ *    du RGPD. Base retenue pour les viser, sur option explicite
+ *    (`--avec-syndicats-salaries`) : art. 9.2.e — coordonnées rendues
+ *    manifestement publiques par les responsables syndicaux, message lié à
+ *    leur fonction. Une fiche sans classement connu n'est jamais visée.
  *  - prospects INSEE, journalistes/médias : FERMÉS tant que Will ne les ouvre
  *    pas (volume, chauffe d'IP, autre usage).
  *  - vivier candidats, personnes de la lettre : JAMAIS — les premiers ne sont

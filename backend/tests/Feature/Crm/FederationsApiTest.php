@@ -196,3 +196,46 @@ test('un compte en lecture seule ne peut pas modifier la demarche, un autre espa
     expect(DB::table('federations')->where('company_id', $this->nationale)->value('partenariat'))->toBe('aucun')
         ->and(DB::table('federations')->where('company_id', $etrangere)->value('partenariat'))->toBe('aucun');
 });
+
+test('R5 — un compte en lecture seule ne recoit ni le LinkedIn des personnes ni l adresse postale ; l admin, si (temoin)', function () {
+    DB::table('companies')->where('id', $this->nationale)->update(['address' => '1 RUE ZZ FICTIVE', 'postcode' => '75001']);
+    DB::table('contacts')->where('company_id', $this->nationale)->update(['linkedin_url' => 'https://www.linkedin.com/in/zz-presidente']);
+
+    $admin = $this->getJson('/api/v1/federations/' . $this->nationale)->assertOk();
+    expect($admin->json('address'))->toBe('1 RUE ZZ FICTIVE')
+        ->and($admin->json('contacts.0.linkedin_url'))->toBe('https://www.linkedin.com/in/zz-presidente');
+
+    $this->actingAs(fedApiCompte($this->workspace->id, 'viewer'));
+    $r = $this->getJson('/api/v1/federations/' . $this->nationale)->assertOk();
+    $corps = (string) $r->getContent();
+
+    expect($r->json('address'))->toBeNull()
+        ->and($r->json('postcode'))->toBeNull()
+        ->and($r->json('contacts.0.linkedin_url'))->toBeNull()
+        ->and($corps)->not->toContain('zz-presidente')
+        ->and($corps)->not->toContain('RUE ZZ FICTIVE');
+});
+
+test('D7 — un compte qui ne voit pas les coordonnees ne peut pas effacer la note en renvoyant la valeur masquee', function () {
+    DB::table('federations')->where('company_id', $this->nationale)->update(['partenariat_note' => 'ZZ note de Will']);
+
+    // Droit de modifier la démarche, SANS le droit de voir les coordonnées.
+    $compte = User::create([
+        'id' => (string) Str::uuid(), 'email' => 'modif-' . Str::random(6) . '@example.invalid', 'name' => 'ZZ modif',
+        'password_hash' => Hash::make('PasswordTest12345!'), 'current_workspace_id' => $this->workspace->id,
+        'first_login_completed_at' => now(),
+    ]);
+    setPermissionsTeamId($this->workspace->id);
+    $compte->assignRole('viewer');
+    $compte->givePermissionTo('companies.update');
+    $this->actingAs($compte);
+
+    // Il a lu la fiche : la note lui arrive vide. Son formulaire la renvoie vide.
+    expect($this->getJson('/api/v1/federations/' . $this->nationale)->assertOk()->json('partenariat_note'))->toBeNull();
+    $this->patchJson('/api/v1/federations/' . $this->nationale . '/demarche', [
+        'partenariat' => 'propose', 'partenariat_note' => null,
+    ])->assertOk();
+
+    expect(DB::table('federations')->where('company_id', $this->nationale)->value('partenariat_note'))->toBe('ZZ note de Will')
+        ->and(DB::table('federations')->where('company_id', $this->nationale)->value('partenariat'))->toBe('propose');
+});

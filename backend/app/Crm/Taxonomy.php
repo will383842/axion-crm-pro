@@ -636,8 +636,25 @@ final class Taxonomy
         'faible' => 'Faible',
     ];
 
-    /** Pertinence écartée des campagnes sauf option explicite (décision du 28/09). */
-    public const FEDERATION_PERTINENCE_HORS_CAMPAGNE = 'faible';
+    /**
+     * Pertinences RETENUES par le segment de campagne `federations`. Une
+     * liste de ce qu'on vise, et non de ce qu'on exclut : une fiche sans
+     * classement (pas de ligne `federations`) n'y est pas, donc n'est pas
+     * visée. `faible` s'ajoute par option explicite (décision du 28/09).
+     *
+     * @var list<string>
+     */
+    public const FEDERATION_PERTINENCES_EN_CAMPAGNE = ['haute', 'moyenne'];
+
+    /**
+     * Familles écartées du segment de campagne SAUF option explicite.
+     * `syndicat_salaries` : l'appartenance syndicale est une donnée de l'art. 9
+     * du RGPD (décision de Will du 28/09 ; base : art. 9.2.e, données rendues
+     * manifestement publiques par les responsables syndicaux).
+     *
+     * @var list<string>
+     */
+    public const FEDERATION_FAMILLES_HORS_CAMPAGNE = ['syndicat_salaries'];
 
     /**
      * Démarche « partenariat » auprès de l'organisme (en plus de

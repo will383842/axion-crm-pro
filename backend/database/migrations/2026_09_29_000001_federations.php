@@ -107,6 +107,8 @@ return new class extends Migration
         $this->createFederations();
         $this->applyRls();
         $this->installerGardeAntiCycle();
+        $this->installerGardeMemeEspace();
+        $this->createContactsRetires();
         $this->installerProtection(self::SLUGS_PROTEGES);
 
         (new ScrapingSourcesSeeder)->run();
@@ -126,6 +128,13 @@ return new class extends Migration
 
         $this->installerProtection(self::SLUGS_PROTEGES_AVANT);
 
+        DB::statement('DROP TRIGGER IF EXISTS contacts_memoriser_retrait ON public.contacts');
+        DB::statement('DROP FUNCTION IF EXISTS public.contacts_memoriser_retrait()');
+        DB::statement('DROP TABLE IF EXISTS contacts_retires');
+        DB::statement('DROP TRIGGER IF EXISTS companies_federation_meme_espace ON public.companies');
+        DB::statement('DROP FUNCTION IF EXISTS public.companies_federation_meme_espace()');
+        DB::statement('DROP TRIGGER IF EXISTS federations_meme_espace ON public.federations');
+        DB::statement('DROP FUNCTION IF EXISTS public.federations_meme_espace()');
         DB::statement('DROP TRIGGER IF EXISTS federations_refuser_cycle ON public.federations');
         DB::statement('DROP FUNCTION IF EXISTS public.federations_refuser_cycle()');
         DB::statement('DROP TABLE IF EXISTS federations');
@@ -225,6 +234,140 @@ return new class extends Migration
     private static function tableau(array $valeurs): string
     {
         return 'ARRAY[' . Taxonomy::sqlList($valeurs) . ']::TEXT[]';
+    }
+
+    /**
+     * `federations.workspace_id` est TOUJOURS l'espace de sa fiche `companies`
+     * (relecture sécurité R4) : sinon une ligne rangée dans l'espace B pour une
+     * fiche de l'espace A ferait voir, sous la RLS de B, le classement, la tête
+     * de réseau et la démarche d'une fiche de A. Gardé des deux côtés : à
+     * l'écriture de la ligne, et au déplacement (improbable) d'une fiche.
+     */
+    private function installerGardeMemeEspace(): void
+    {
+        DB::unprepared(<<<'SQL'
+            CREATE OR REPLACE FUNCTION public.federations_meme_espace()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            SECURITY DEFINER
+            SET search_path = public, pg_catalog
+            AS $fn$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM public.companies c
+                    WHERE  c.id = NEW.company_id
+                    AND    c.workspace_id = NEW.workspace_id
+                ) THEN
+                    RAISE EXCEPTION 'federation_espace_incoherent : la ligne et sa fiche ne sont pas dans le meme espace (company_id=%)', NEW.company_id;
+                END IF;
+
+                RETURN NEW;
+            END
+            $fn$;
+
+            DROP TRIGGER IF EXISTS federations_meme_espace ON public.federations;
+            CREATE TRIGGER federations_meme_espace
+                BEFORE INSERT OR UPDATE OF company_id, workspace_id ON public.federations
+                FOR EACH ROW EXECUTE FUNCTION public.federations_meme_espace();
+
+            CREATE OR REPLACE FUNCTION public.companies_federation_meme_espace()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            SECURITY DEFINER
+            SET search_path = public, pg_catalog
+            AS $fn$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM public.federations f
+                    WHERE  f.company_id = NEW.id
+                    AND    f.workspace_id <> NEW.workspace_id
+                ) THEN
+                    RAISE EXCEPTION 'federation_espace_incoherent : fiche deplacee sans sa ligne federations (company_id=%)', NEW.id;
+                END IF;
+
+                RETURN NEW;
+            END
+            $fn$;
+
+            DROP TRIGGER IF EXISTS companies_federation_meme_espace ON public.companies;
+            CREATE TRIGGER companies_federation_meme_espace
+                AFTER UPDATE OF workspace_id ON public.companies
+                FOR EACH ROW EXECUTE FUNCTION public.companies_federation_meme_espace();
+        SQL);
+    }
+
+    /**
+     * LES PERSONNES RETIRÉES NE REVIENNENT PAS (relecture sécurité R2).
+     *
+     * Une personne SANS e-mail n'a aucune opposition possible : `opt_out` se
+     * cherche par empreinte d'adresse ou par téléphone. Supprimée à la main,
+     * ou effacée, elle revenait donc au prochain import dès que la ligne du
+     * fichier changeait (nouveau `run_id`).
+     *
+     * Ce registre garde, à chaque suppression d'une fiche personne venue de
+     * l'import des fédérations, l'EMPREINTE de son nom normalisé (jamais le nom)
+     * et le SIREN de son organisme. `crm:import-federations` écarte toute
+     * personne qui y figure. Même doctrine que `opt_out` : l'effacement laisse
+     * une empreinte, pas la donnée — c'est ce qui l'empêche de revenir.
+     *
+     * Posé par un déclencheur, et non dans chaque chemin de suppression :
+     * console, effacement RGPD, purge — aucun ne peut l'oublier.
+     */
+    private function createContactsRetires(): void
+    {
+        DB::statement(
+            <<<'SQL'
+            CREATE TABLE IF NOT EXISTS contacts_retires (
+                id            BIGSERIAL   PRIMARY KEY,
+                workspace_id  UUID        NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+                company_id    BIGINT,
+                siren         CHAR(9),
+                cle_nom       TEXT        NOT NULL,
+                created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+            SQL
+        );
+        // Nom VÉRIFIÉ LIBRE le 2026-09-29.
+        DB::statement('CREATE UNIQUE INDEX IF NOT EXISTS contacts_retires_cle_key ON contacts_retires (workspace_id, siren, cle_nom)');
+        DB::statement("COMMENT ON TABLE contacts_retires IS 'Personnes retirees (suppression, effacement) : empreinte du nom normalise + SIREN. Jamais le nom en clair. Lue par crm:import-federations.'");
+
+        DB::statement('ALTER TABLE contacts_retires ENABLE ROW LEVEL SECURITY');
+        DB::statement('ALTER TABLE contacts_retires FORCE ROW LEVEL SECURITY');
+        DB::statement('DROP POLICY IF EXISTS contacts_retires_workspace_isolation ON contacts_retires');
+        DB::statement(
+            "CREATE POLICY contacts_retires_workspace_isolation ON contacts_retires FOR ALL
+             USING (workspace_id::TEXT = NULLIF(current_setting('app.current_workspace_id', true), ''))
+             WITH CHECK (workspace_id::TEXT = NULLIF(current_setting('app.current_workspace_id', true), ''))",
+        );
+
+        DB::unprepared(<<<'SQL'
+            CREATE OR REPLACE FUNCTION public.contacts_memoriser_retrait()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            SECURITY DEFINER
+            SET search_path = public, pg_catalog
+            AS $fn$
+            BEGIN
+                IF COALESCE(OLD.sources, '[]'::jsonb) @> '["federations-2026"]'::jsonb THEN
+                    INSERT INTO public.contacts_retires (workspace_id, company_id, siren, cle_nom)
+                    VALUES (
+                        OLD.workspace_id,
+                        OLD.company_id,
+                        (SELECT c.siren FROM public.companies c WHERE c.id = OLD.company_id),
+                        encode(digest(public.normalize_name(coalesce(OLD.first_name, '') || '_' || OLD.last_name), 'sha256'), 'hex')
+                    )
+                    ON CONFLICT DO NOTHING;
+                END IF;
+
+                RETURN OLD;
+            END
+            $fn$;
+
+            DROP TRIGGER IF EXISTS contacts_memoriser_retrait ON public.contacts;
+            CREATE TRIGGER contacts_memoriser_retrait
+                AFTER DELETE ON public.contacts
+                FOR EACH ROW EXECUTE FUNCTION public.contacts_memoriser_retrait();
+        SQL);
     }
 
     private function applyRls(): void

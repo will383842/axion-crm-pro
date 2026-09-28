@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Crm\Evenements\EvenementAVenir;
 use App\Crm\Federations\EtiquettesFederation;
 use App\Crm\Taxonomy;
 use App\Support\MasquageCoordonnees;
@@ -126,8 +127,16 @@ class FederationsController extends ApiController
                 return null;
             }
 
+            // La note est RETIRÉE à qui ne voit pas les coordonnées (elle peut
+            // en contenir) : ce compte-là reçoit `null`, et son formulaire
+            // renverrait `null` — il effacerait une note qu'il n'a jamais lue.
+            // Qui ne peut pas la lire ne peut donc pas l'écrire.
+            $champs = ['partenariat', 'partenariat_relance_at'];
+            if (! MasquageCoordonnees::requis()) {
+                $champs[] = 'partenariat_note';
+            }
             $changements = [];
-            foreach (['partenariat', 'partenariat_relance_at', 'partenariat_note'] as $champ) {
+            foreach ($champs as $champ) {
                 if (array_key_exists($champ, $data)) {
                     $changements[$champ] = $data[$champ];
                 }
@@ -239,7 +248,7 @@ class FederationsController extends ApiController
                     ->join('events as e', 'e.id', '=', 'eo.event_id')
                     ->whereColumn('eo.company_id', 'c.id')
                     ->whereColumn('e.workspace_id', 'c.workspace_id')
-                    ->whereRaw('COALESCE(e.date_fin, e.date_debut) >= CURRENT_DATE');
+                    ->whereRaw(EvenementAVenir::conditionSql('e'));
             };
             if ((bool) $filtres['evenement_a_venir']) {
                 $requete->whereExists($clause);
@@ -295,7 +304,7 @@ class FederationsController extends ApiController
             ->where('eo.workspace_id', $workspaceId)
             ->where('e.workspace_id', $workspaceId)
             ->whereIn('eo.company_id', $ids)
-            ->whereRaw('COALESCE(e.date_fin, e.date_debut) >= CURRENT_DATE')
+            ->whereRaw(EvenementAVenir::conditionSql('e'))
             ->distinct()
             ->pluck('eo.company_id')
             ->mapWithKeys(fn ($id): array => [(int) $id => true])
@@ -431,6 +440,29 @@ class FederationsController extends ApiController
             ->all();
 
         $signals = json_decode(is_string($l->signals) ? $l->signals : '{}', true);
+        $signals = is_array($signals) ? $signals : [];
+        $canaux = is_array($signals['contact_channels'] ?? null) ? $signals['contact_channels'] : [];
+        $details = is_array($canaux['details'] ?? null) ? $canaux['details'] : [];
+        // Les canaux en LISTE D'OBJETS sous les clés `email` et `phone` : c'est
+        // ce qui les fait passer par le masquage (qui masque par nom de clé).
+        $canauxEmails = [];
+        foreach (is_array($canaux['emails'] ?? null) ? $canaux['emails'] : [] as $e) {
+            if (! is_string($e)) {
+                continue;
+            }
+            $d = $details[mb_strtolower(trim($e))] ?? [];
+            $canauxEmails[] = [
+                'email' => $e,
+                'type' => is_array($d) ? ($d['type'] ?? null) : null,
+                'domaine_verifie' => is_array($d) ? ($d['domaine_verifie'] ?? null) : null,
+                'verifie_le' => is_array($d) ? ($d['verifie_le'] ?? null) : null,
+            ];
+        }
+        $canauxTelephones = array_map(
+            static fn (mixed $t): array => ['phone' => (string) $t],
+            is_array($canaux['phones'] ?? null) ? array_values($canaux['phones']) : [],
+        );
+        $verification = is_array($signals['email_generic_verification'] ?? null) ? $signals['email_generic_verification'] : null;
 
         $fiche = array_merge($this->resume($l, $nbAntennes, false), [
             'siren' => $l->siren,
@@ -444,7 +476,14 @@ class FederationsController extends ApiController
             'linkedin_url' => $l->linkedin_url,
             'phone' => $l->phone,
             'email_generic' => $l->email_generic,
-            'contact_form_url' => is_array($signals) && is_string($signals['contact_form_url'] ?? null) ? $signals['contact_form_url'] : null,
+            'contact_form_url' => is_string($signals['contact_form_url'] ?? null) ? $signals['contact_form_url'] : null,
+            'email_generic_verification' => $verification,
+            'canaux' => [
+                'emails' => $canauxEmails,
+                'telephones' => $canauxTelephones,
+                'sites' => array_values(array_filter(is_array($canaux['sites'] ?? null) ? $canaux['sites'] : [], 'is_string')),
+                'linkedin' => array_values(array_filter(is_array($canaux['linkedin'] ?? null) ? $canaux['linkedin'] : [], 'is_string')),
+            ],
             'nom_developpe' => $l->nom_developpe,
             'date_creation' => $l->date_creation,
             'nb_etablissements' => $l->nb_etablissements !== null ? (int) $l->nb_etablissements : null,
@@ -463,6 +502,22 @@ class FederationsController extends ApiController
 
         /** @var array<string, mixed> $masquee */
         $masquee = MasquageCoordonnees::masquerTableauSiRequis($fiche);
+
+        // Relecture sécurité R5 : au-delà des e-mails et téléphones, un compte
+        // en lecture seule ne reçoit ni le LinkedIn nominatif des personnes, ni
+        // l'adresse postale de la fiche (souvent le domicile du président d'une
+        // petite association). Le lien LinkedIn de l'ORGANISATION reste visible.
+        if (MasquageCoordonnees::requis()) {
+            $masquee['address'] = null;
+            $masquee['postcode'] = null;
+            $contacts = is_array($masquee['contacts'] ?? null) ? $masquee['contacts'] : [];
+            foreach (array_keys($contacts) as $i) {
+                if (is_array($contacts[$i])) {
+                    $contacts[$i]['linkedin_url'] = null;
+                }
+            }
+            $masquee['contacts'] = $contacts;
+        }
 
         return $masquee;
     }

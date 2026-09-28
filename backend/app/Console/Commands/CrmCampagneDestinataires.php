@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Crm\Campagnes\Segments;
+use App\Crm\Evenements\EvenementAVenir;
 use App\Crm\Federations\EtiquettesFederation;
 use App\Crm\Personnes\NatureEmail;
 use App\Crm\Taxonomy;
@@ -33,9 +34,26 @@ use Illuminate\Support\Facades\DB;
  *
  * Chaque ligne cite toutes les organisations de l'adresse et l'événement à venir
  * le plus proche, pour personnaliser. Pour le segment `federations`, elle porte
- * aussi la famille, le niveau et la tête de réseau de l'organisme ; les
- * organismes de pertinence FAIBLE en sont écartés sauf `--avec-pertinence-faible`
- * (décision du 28/09). `crm:campagne:retours` retrouve ensuite
+ * aussi la famille, le niveau et la tête de réseau de l'organisme. Chaque
+ * ligne dit enfin la NATURE de l'adresse (générique / nominative) et la date à
+ * laquelle son domaine a été vérifié, quand on les connaît.
+ *
+ * Segment `federations` — ce qui en est écarté par défaut, et pourquoi :
+ *  - la pertinence FAIBLE (décision du 28/09) : `--avec-pertinence-faible` ;
+ *  - les SYNDICATS DE SALARIÉS (décision de Will du 28/09) :
+ *    `--avec-syndicats-salaries`. L'appartenance syndicale est une donnée de
+ *    l'article 9 du RGPD ; écrire à un syndicat au sujet de son activité
+ *    s'appuie sur l'art. 9.2.e (données rendues MANIFESTEMENT PUBLIQUES par
+ *    les responsables syndicaux eux-mêmes : annuaires officiels des
+ *    confédérations, sites des syndicats). Cette base ne vaut que pour des
+ *    coordonnées publiées par la personne ou l'organisation, et pour un
+ *    message lié à leur fonction : on ne les vise donc que sur décision
+ *    explicite, jamais par défaut ;
+ *  - toute fiche dont le classement est INCONNU (pas de ligne `federations`,
+ *    pertinence absente) : le filtre REFUSE quand il ne sait pas — il retient
+ *    une liste de pertinences, il n'en exclut pas une.
+ *
+ * `crm:campagne:retours` retrouve ensuite
  * TOUTES les fiches de l'adresse : aucune ne reste « non informée ».
  */
 class CrmCampagneDestinataires extends Command
@@ -44,7 +62,8 @@ class CrmCampagneDestinataires extends Command
                             {segment : Segment visé (liste fermée, cf. App\Crm\Campagnes\Segments)}
                             {sortie : Fichier JSONL à écrire, HORS du dépôt}
                             {--non-informes : Seulement les adresses dont aucune fiche n\'a reçu de premier message (first_info_at)}
-                            {--avec-pertinence-faible : Segment federations : réintégrer les organismes de pertinence faible (écartés par défaut)}';
+                            {--avec-pertinence-faible : Segment federations : réintégrer les organismes de pertinence faible (écartés par défaut)}
+                            {--avec-syndicats-salaries : Segment federations : réintégrer les syndicats de salariés (art. 9 RGPD, écartés par défaut)}';
 
     protected $description = 'Prépare la liste des destinataires autorisés d\'une campagne (n\'envoie rien).';
 
@@ -77,26 +96,41 @@ class CrmCampagneDestinataires extends Command
         $workspaceId = (string) $workspaceId;
 
         $avecFaible = (bool) $this->option('avec-pertinence-faible');
-        if ($avecFaible && $segment !== Segments::FEDERATIONS) {
-            $this->error('--avec-pertinence-faible ne vaut que pour le segment « ' . Segments::FEDERATIONS . ' ».');
+        $avecSyndicats = (bool) $this->option('avec-syndicats-salaries');
+        if (($avecFaible || $avecSyndicats) && $segment !== Segments::FEDERATIONS) {
+            $this->error('--avec-pertinence-faible et --avec-syndicats-salaries ne valent que pour le segment « ' . Segments::FEDERATIONS . ' ».');
 
             return self::FAILURE;
         }
 
+        // Liste de pertinences RETENUES (et non une exclusion) : une valeur
+        // inconnue ou absente n'y est pas, donc la fiche n'est pas visée.
+        $pertinences = Taxonomy::FEDERATION_PERTINENCES_EN_CAMPAGNE;
+        if ($avecFaible) {
+            $pertinences[] = 'faible';
+        }
+        $famillesExclues = $avecSyndicats ? [] : Taxonomy::FEDERATION_FAMILLES_HORS_CAMPAGNE;
+
         $bilan = array_fill_keys([
-            'fiches', 'ecartees_pertinence_faible', 'adresses_distinctes', 'destinataires', 'ecartees_invalides', 'ecartees_perso',
+            'fiches', 'ecartees_pertinence_faible', 'ecartees_sans_classement', 'ecartees_syndicats_salaries', 'adresses_distinctes', 'destinataires', 'ecartees_invalides', 'ecartees_perso',
             'ecartees_deja_informees', 'ecartees_opposition', 'adresses_partagees', 'sans_evenement_a_venir',
         ], 0);
 
         /** @var array<string, list<array<string, mixed>>> $parAdresse */
         $parAdresse = [];
-        WorkspaceContext::run($workspaceId, function () use ($workspaceId, $segment, $avecFaible, &$parAdresse, &$bilan): void {
+        WorkspaceContext::run($workspaceId, function () use ($workspaceId, $segment, $pertinences, $famillesExclues, &$parAdresse, &$bilan): void {
             foreach ($this->fiches($workspaceId, $segment) as $org) {
-                if ($segment === Segments::FEDERATIONS && ! $avecFaible
-                    && $org->pertinence === Taxonomy::FEDERATION_PERTINENCE_HORS_CAMPAGNE) {
-                    $bilan['ecartees_pertinence_faible']++;
+                if ($segment === Segments::FEDERATIONS) {
+                    if (! in_array($org->pertinence, $pertinences, true)) {
+                        $bilan[$org->pertinence === null ? 'ecartees_sans_classement' : 'ecartees_pertinence_faible']++;
 
-                    continue;
+                        continue;
+                    }
+                    if (in_array($org->famille, $famillesExclues, true)) {
+                        $bilan['ecartees_syndicats_salaries']++;
+
+                        continue;
+                    }
                 }
                 $bilan['fiches']++;
                 $evenement = $this->prochainEvenement($workspaceId, (int) $org->id);
@@ -160,6 +194,8 @@ class CrmCampagneDestinataires extends Command
                 'crm_ref' => $premiere['crm_ref'],
                 'email' => $email,
                 'type' => $premiere['type'],
+                'nature_adresse' => $premiere['nature_adresse'],
+                'domaine_verifie_le' => $premiere['domaine_verifie_le'],
                 'prenom' => $premiere['prenom'],
                 'nom' => $premiere['nom'],
                 'fonction' => $premiere['fonction'],
@@ -251,7 +287,7 @@ class CrmCampagneDestinataires extends Command
             })
             ->orderBy('companies.id')
             ->get([
-                'companies.id', 'companies.denomination', 'companies.email_generic', 'companies.first_info_at',
+                'companies.id', 'companies.denomination', 'companies.email_generic', 'companies.first_info_at', 'companies.signals',
                 'federations.pertinence', 'federations.famille', 'federations.niveau', 'federations.secteurs',
                 'federations.parent_company_id',
             ]);
@@ -286,16 +322,26 @@ class CrmCampagneDestinataires extends Command
     /**
      * Les adresses d'un organisateur : sa boîte générique, puis ses contacts.
      *
-     * @return list<array{crm_ref: string, email: string, type: string, prenom: ?string, nom: ?string, fonction: ?string, status: ?string, perso: bool, deja_informe: bool}>
+     * `nature_adresse` et `domaine_verifie_le` : ce que l'import en a dit
+     * (`signals.email_generic_verification`, `contacts.metadata`), null si on
+     * ne le sait pas — jamais deviné.
+     *
+     * @return list<array{crm_ref: string, email: string, type: string, nature_adresse: ?string, domaine_verifie_le: ?string, prenom: ?string, nom: ?string, fonction: ?string, status: ?string, perso: bool, deja_informe: bool}>
      */
     private function adresses(string $workspaceId, \stdClass $org): array
     {
         $adresses = [];
         if (is_string($org->email_generic) && trim($org->email_generic) !== '') {
+            $signals = json_decode(is_string($org->signals ?? null) ? $org->signals : '{}', true);
+            $verification = is_array($signals) && is_array($signals['email_generic_verification'] ?? null)
+                ? $signals['email_generic_verification']
+                : [];
             $adresses[] = [
                 'crm_ref' => 'organisation:' . $org->id,
                 'email' => $org->email_generic,
                 'type' => 'generique',
+                'nature_adresse' => is_string($verification['type'] ?? null) ? $verification['type'] : null,
+                'domaine_verifie_le' => is_string($verification['verifie_le'] ?? null) ? $verification['verifie_le'] : null,
                 'prenom' => null, 'nom' => null, 'fonction' => null,
                 'status' => null,
                 'perso' => false,
@@ -317,6 +363,8 @@ class CrmCampagneDestinataires extends Command
                 'crm_ref' => 'contact:' . $c->id,
                 'email' => (string) $c->email,
                 'type' => 'personne',
+                'nature_adresse' => is_array($meta) && is_string($meta['email_type'] ?? null) ? $meta['email_type'] : null,
+                'domaine_verifie_le' => is_array($meta) && is_string($meta['domaine_verifie_le'] ?? null) ? $meta['domaine_verifie_le'] : null,
                 'prenom' => $c->first_name,
                 'nom' => $c->last_name,
                 'fonction' => $c->role,
@@ -336,11 +384,9 @@ class CrmCampagneDestinataires extends Command
             ->join('event_organizers', 'event_organizers.event_id', '=', 'events.id')
             ->where('events.workspace_id', $workspaceId)
             ->where('event_organizers.company_id', $companyId)
-            ->where(function ($q): void {
-                // À venir, ou récurrent sans date (un BNI se tient chaque semaine).
-                $q->whereRaw('COALESCE(events.date_fin, events.date_debut) >= CURRENT_DATE')
-                    ->orWhereNull('events.date_debut');
-            })
+            // À venir, ou récurrent sans date (un BNI se tient chaque semaine) :
+            // la définition UNIQUE, partagée avec l'onglet Fédérations.
+            ->whereRaw(EvenementAVenir::conditionSql('events'))
             ->orderByRaw('events.date_debut IS NULL, events.date_debut ASC, events.id ASC')
             ->first(['events.id', 'events.nom', 'events.date_debut', 'events.date_fin', 'events.recurrence', 'events.ville', 'events.lien_evenement']);
 

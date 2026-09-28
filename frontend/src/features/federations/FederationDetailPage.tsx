@@ -62,6 +62,13 @@ type Fiche = FederationResume & {
   nb_etablissements: number | null;
   origine_classement: string | null;
   partenariat_note: string | null;
+  email_generic_verification: { type: string | null; verifie_le: string | null } | null;
+  canaux: {
+    emails: { email: string; type: string | null; domaine_verifie: boolean | null; verifie_le: string | null }[];
+    telephones: { phone: string }[];
+    sites: string[];
+    linkedin: string[];
+  };
   ascendants: Noeud[];
   antennes: (Noeud & { city: string | null; department_code: string | null })[];
   contacts: {
@@ -147,7 +154,17 @@ export function FederationDetailPage() {
   }, [f]);
 
   const enregistrer = useMutation({
-    mutationFn: async (d: Demarche) => (await api.patch<Fiche>(`/federations/${companyId}/demarche`, d)).data,
+    mutationFn: async (d: Demarche) => {
+      // La note n'est envoyée QUE si elle a été modifiée : un compte qui ne voit
+      // pas les coordonnées la reçoit vide, et la renverrait vide — il
+      // effacerait une note qu'il n'a jamais lue (le serveur l'ignore aussi).
+      const corps: Partial<Demarche> = {
+        partenariat: d.partenariat,
+        partenariat_relance_at: d.partenariat_relance_at,
+      };
+      if (f && d.partenariat_note !== f.partenariat_note) corps.partenariat_note = d.partenariat_note;
+      return (await api.patch<Fiche>(`/federations/${companyId}/demarche`, corps)).data;
+    },
     onSuccess: (fiche) => {
       qc.setQueryData(["federation", companyId], fiche);
       void qc.invalidateQueries({ queryKey: ["federations"] });
@@ -215,7 +232,14 @@ export function FederationDetailPage() {
               <Ligne label="Formulaire">
                 <Lien href={f.contact_form_url}>Ouvrir</Lien>
               </Ligne>
-              <Ligne label="E-mail générique">{f.email_generic ?? "—"}</Ligne>
+              <Ligne label="E-mail générique">
+                {f.email_generic ?? "—"}
+                {f.email_generic && f.email_generic_verification?.verifie_le ? (
+                  <span className="ml-2 text-xs text-slate-500">
+                    domaine vérifié le {jour(f.email_generic_verification.verifie_le)}
+                  </span>
+                ) : null}
+              </Ligne>
               <Ligne label="Téléphone">{f.phone ?? "—"}</Ligne>
             </dl>
             <p className="mt-2 text-sm">
@@ -228,6 +252,38 @@ export function FederationDetailPage() {
               </Link>
             </p>
           </section>
+
+          {f.canaux.emails.length + f.canaux.telephones.length + f.canaux.sites.length + f.canaux.linkedin.length > 0 ? (
+            <section aria-labelledby="fed-canaux" className="rounded-lg border border-slate-200 p-4">
+              <h2 id="fed-canaux" className="mb-2 text-sm font-semibold text-slate-500 uppercase">
+                Autres coordonnées
+              </h2>
+              <ul className="space-y-1 text-sm">
+                {f.canaux.emails.map((e) => (
+                  <li key={`e-${e.email}`}>
+                    {e.email}
+                    <span className="ml-2 text-xs text-slate-500">
+                      {e.type === "nominatif" ? "nominative" : e.type === "generique" ? "générique" : "type inconnu"}
+                      {e.verifie_le ? ` · domaine vérifié le ${jour(e.verifie_le)}` : ""}
+                    </span>
+                  </li>
+                ))}
+                {f.canaux.telephones.map((t) => (
+                  <li key={`t-${t.phone}`}>{t.phone}</li>
+                ))}
+                {f.canaux.sites.map((u) => (
+                  <li key={`s-${u}`}>
+                    <Lien href={u}>{u}</Lien>
+                  </li>
+                ))}
+                {f.canaux.linkedin.map((u) => (
+                  <li key={`l-${u}`}>
+                    <Lien href={u}>{u}</Lien>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
 
           <section aria-labelledby="fed-arbre" className="rounded-lg border border-slate-200 p-4">
             <h2 id="fed-arbre" className="mb-2 text-sm font-semibold text-slate-500 uppercase">

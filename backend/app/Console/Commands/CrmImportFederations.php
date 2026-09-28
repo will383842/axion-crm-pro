@@ -88,11 +88,24 @@ class CrmImportFederations extends Command
         'adresse', 'code_postal', 'commune', 'departement', 'region',
         'famille', 'niveau', 'secteurs', 'tailles_adherents', 'certitude', 'pertinence',
         'contactabilite', 'origine_classement',
-        'email_generique', 'emails_autres', 'telephone', 'telephones_autres', 'site', 'linkedin',
+        'email_generique', 'email_generique_verifie_le', 'emails_autres', 'telephone', 'telephones_autres',
+        'site', 'sites_autres', 'linkedin', 'linkedin_autres',
         'personnes', 'tete_de_reseau',
     ];
 
-    private const CLES_PERSONNE = ['prenom', 'nom', 'fonction', 'email', 'linkedin'];
+    private const CLES_PERSONNE = ['prenom', 'nom', 'fonction', 'email', 'email_verifie_le', 'linkedin'];
+
+    /** Une adresse de `emails_autres` : son TYPE et sa vérification. */
+    private const CLES_EMAIL = ['email', 'type', 'domaine_verifie', 'verifie_le'];
+
+    /** Types d'adresse (CADRAGE §7 bis). */
+    private const TYPES_EMAIL = ['generique', 'nominatif'];
+
+    /**
+     * Origine posée dans `field_origins.sector_main` quand c'est CET import qui
+     * a choisi le secteur : lui seul a le droit de le corriger ensuite.
+     */
+    public const ORIGINE_SECTEUR = 'federations-2026';
 
     /** Département accepté par le schéma pivot (`ScrapedRecord`). */
     private const MOTIF_DEPARTEMENT = '/^(0[1-9]|1\d|2[1-9AB]|[3-8]\d|9[0-5]|97[1-6])$/';
@@ -150,8 +163,9 @@ class CrmImportFederations extends Command
             'lignes', 'rejetees',
             'fiches_creees', 'fiches_rattachees', 'federations_mises_a_jour', 'federations_inchangees',
             'contacts_crees', 'contacts_completes', 'personnes_sans_changement', 'personnes_ecartees',
-            'personnes_opposees', 'emails_refuses_mx',
-            'secteurs_poses', 'secteurs_conserves', 'departements_ignores', 'emails_generiques_non_poses',
+            'personnes_opposees', 'personnes_retirees_ignorees', 'emails_refuses_mx',
+            'natures_posees', 'secteurs_poses', 'secteurs_corriges', 'secteurs_conserves',
+            'departements_ignores', 'emails_generiques_non_poses', 'coordonnees_gardees_en_canaux',
             'tetes_liees', 'tetes_inchangees', 'tetes_introuvables', 'tetes_refusees_cycle',
         ], 0);
         $this->rejets = [];
@@ -277,7 +291,7 @@ class CrmImportFederations extends Command
         $avant = DB::table('companies')
             ->where('workspace_id', $workspaceId)
             ->where('siren', $l['siren'])
-            ->first(['id', 'deleted_at']);
+            ->first(['id', 'deleted_at', 'email_generic', 'phone', 'website', 'linkedin_url']);
         if ($avant !== null && $avant->deleted_at !== null) {
             // Mise à la corbeille par Will : un import ne la ressuscite pas.
             throw new InvalidArgumentException('fiche_a_la_corbeille');
@@ -288,7 +302,29 @@ class CrmImportFederations extends Command
             $delta['departements_ignores'] = 1;
         }
 
-        $outcome = $this->funnel->ingest(ScrapedRecord::fromArray($this->pivot($l)), false);
+        // Une personne RETIRÉE (supprimée, effacée) ne revient pas, même si la
+        // ligne du fichier a changé : son empreinte de nom est au registre
+        // `contacts_retires` (relecture sécurité R2).
+        $retenues = [];
+        foreach ($l['personnes'] as $p) {
+            if ($this->personneRetiree($workspaceId, $l['siren'], $p['first_name'], $p['last_name'])) {
+                $delta['personnes_retirees_ignorees'] = ($delta['personnes_retirees_ignorees'] ?? 0) + 1;
+
+                continue;
+            }
+            $retenues[] = $p;
+        }
+        $l['personnes'] = $retenues;
+
+        // Aucune donnée vérifiée jetée : une coordonnée du fichier qui diffère
+        // de celle que la fiche porte déjà part en CANAL supplémentaire au lieu
+        // d'être perdue (le funnel, « backfill-only », garde celle de la fiche).
+        [$canalEmails, $canalTelephones, $canalSites, $canalLinkedin, $gardees] = $this->canaux($l, $avant);
+        if ($gardees > 0) {
+            $delta['coordonnees_gardees_en_canaux'] = $gardees;
+        }
+
+        $outcome = $this->funnel->ingest(ScrapedRecord::fromArray($this->pivot($l, $canalEmails, $canalTelephones)), false);
         if (! in_array($outcome->status, [ScrapeIngestOutcome::CREATED, ScrapeIngestOutcome::UPDATED, ScrapeIngestOutcome::IDEMPOTENT], true)) {
             throw new InvalidArgumentException('pivot_statut_inattendu');
         }
@@ -310,11 +346,16 @@ class CrmImportFederations extends Command
         $companyId = (int) $fiche->id;
 
         $delta += $this->completerFiche($fiche, $l);
+        $this->ecrireCanauxTypes($fiche, $l, $canalSites, $canalLinkedin);
+        $this->typerContacts($companyId, $l);
 
         // L'e-mail générique du fichier n'est pas sur la fiche : opposition,
         // domaine sans MX, ou autre adresse déjà présente (backfill-only).
         // Compté, pour que l'essai à blanc dise ce qui ne sera PAS joignable.
-        if ($l['email_generique'] !== null && $fiche->email_generic !== $l['email_generique']) {
+        // Sans tenir compte de la casse : `Contact@X` et `contact@x` sont une
+        // seule adresse.
+        if ($l['email_generique'] !== null
+            && mb_strtolower(trim((string) $fiche->email_generic)) !== mb_strtolower($l['email_generique'])) {
             $delta['emails_generiques_non_poses'] = 1;
         }
 
@@ -375,15 +416,32 @@ class CrmImportFederations extends Command
             $origines[$colonne] = 'collected';
         }
 
+        // La NATURE : `entreprise` (valeur par défaut des fiches INSEE) devient
+        // celle du fichier ; toute autre nature (`reseau`, `association`,
+        // `cci`…) est une qualification déjà faite, jamais remplacée. Vide, le
+        // funnel l'a déjà posée. L'ordre « reclassement puis import » ou
+        // « import puis reclassement » donne donc le même résultat (la fiche,
+        // protégée, sort du reclassement).
+        if (($fiche->entity_nature ?? null) === 'entreprise' && $l['nature'] !== 'entreprise') {
+            $maj['entity_nature'] = $l['nature'];
+            $delta['natures_posees'] = 1;
+        }
+
         $principal = $l['secteurs'][0] ?? null;
         if ($principal !== null) {
             $actuel = $fiche->sector_main ?? null;
             $utile = is_string($actuel) && $actuel !== Taxonomy::SECTEUR_NON_CLASSE && array_key_exists($actuel, Taxonomy::SECTEURS);
+            $deCetImport = ($origines['sector_main'] ?? null) === self::ORIGINE_SECTEUR;
             if (! $utile) {
                 $maj['sector_main'] = $principal;
-                $origines['sector_main'] = 'collected';
+                $origines['sector_main'] = self::ORIGINE_SECTEUR;
                 $delta['secteurs_poses'] = 1;
+            } elseif ($actuel !== $principal && $deCetImport) {
+                // C'est CET import qui l'avait choisi : le fichier le corrige.
+                $maj['sector_main'] = $principal;
+                $delta['secteurs_corriges'] = 1;
             } elseif ($actuel !== $principal) {
+                // Posé autrement (code NAF, saisie) : on n'y touche pas.
                 $delta['secteurs_conserves'] = 1;
             }
         }
@@ -395,6 +453,180 @@ class CrmImportFederations extends Command
         }
 
         return $delta;
+    }
+
+    /**
+     * Les coordonnées qui partiront en CANAUX : celles que le fichier range
+     * « en plus », et celles qui diffèrent d'une valeur déjà sur la fiche.
+     *
+     * @param  array<string, mixed>  $l
+     * @return array{0: list<string>, 1: list<string>, 2: list<string>, 3: list<string>, 4: int}
+     */
+    private function canaux(array $l, ?\stdClass $avant): array
+    {
+        $gardees = 0;
+        $emails = array_map(static fn (array $e): string => $e['email'], $l['emails_autres']);
+        $telephones = $l['telephones_autres'];
+        $sites = $l['sites_autres'];
+        $linkedin = $l['linkedin_autres'];
+
+        $differe = static fn (mixed $actuel, ?string $nouveau, callable $forme): bool => $nouveau !== null
+            && is_string($actuel) && trim($actuel) !== ''
+            && $forme($actuel) !== $forme($nouveau);
+        $minuscule = static fn (string $v): string => mb_strtolower(trim($v));
+        $chiffres = static fn (string $v): string => (string) preg_replace('/\D/', '', $v);
+        $url = static fn (string $v): string => rtrim(mb_strtolower(trim($v)), '/');
+
+        if ($avant !== null) {
+            if ($differe($avant->email_generic, $l['email_generique'], $minuscule)) {
+                $emails[] = (string) $l['email_generique'];
+                $gardees++;
+            }
+            if ($differe($avant->phone, $l['telephone'], $chiffres)) {
+                $telephones[] = (string) $l['telephone'];
+                $gardees++;
+            }
+            if ($differe($avant->website, $l['site'], $url)) {
+                $sites[] = (string) $l['site'];
+                $gardees++;
+            }
+            if ($differe($avant->linkedin_url, $l['linkedin'], $url)) {
+                $linkedin[] = (string) $l['linkedin'];
+                $gardees++;
+            }
+        }
+
+        return [
+            array_values(array_unique($emails)),
+            array_values(array_unique($telephones)),
+            array_values(array_unique($sites)),
+            array_values(array_unique($linkedin)),
+            $gardees,
+        ];
+    }
+
+    /**
+     * Range dans `signals.contact_channels` ce que le funnel ne connaît pas :
+     * le TYPE et la vérification de chaque adresse en canal (`details`), les
+     * sites et les pages LinkedIn supplémentaires. Et, pour l'e-mail générique
+     * effectivement sur la fiche, sa fiche de vérification.
+     *
+     * Une adresse n'a de `details` que si le funnel l'a acceptée dans les
+     * canaux (opposition, MX) : on ne décrit jamais une adresse écartée.
+     * L'effacement (`EffacementCoordonneesFiches`) retire les deux ensemble.
+     *
+     * @param  array<string, mixed>  $l
+     * @param  list<string>  $sites
+     * @param  list<string>  $linkedin
+     */
+    private function ecrireCanauxTypes(\stdClass $fiche, array $l, array $sites, array $linkedin): void
+    {
+        $signals = json_decode(is_string($fiche->signals ?? null) ? $fiche->signals : '{}', true);
+        $signals = is_array($signals) ? $signals : [];
+        $avant = $signals;
+        $canaux = is_array($signals['contact_channels'] ?? null) ? $signals['contact_channels'] : [];
+
+        $presentes = array_map(
+            static fn (mixed $e): string => mb_strtolower(trim((string) $e)),
+            is_array($canaux['emails'] ?? null) ? $canaux['emails'] : [],
+        );
+        $details = is_array($canaux['details'] ?? null) ? $canaux['details'] : [];
+        $aDecrire = $l['emails_autres'];
+        if ($l['email_generique'] !== null) {
+            $aDecrire[] = [
+                'email' => $l['email_generique'], 'type' => 'generique',
+                'domaine_verifie' => $l['email_generique_verifie_le'] !== null, 'verifie_le' => $l['email_generique_verifie_le'],
+            ];
+        }
+        foreach ($aDecrire as $e) {
+            if (in_array(mb_strtolower($e['email']), $presentes, true)) {
+                $details[mb_strtolower($e['email'])] = [
+                    'type' => $e['type'],
+                    'domaine_verifie' => $e['domaine_verifie'],
+                    'verifie_le' => $e['verifie_le'],
+                    'source' => self::SOURCE,
+                ];
+            }
+        }
+        if ($details !== []) {
+            $canaux['details'] = $details;
+        }
+
+        foreach (['sites' => $sites, 'linkedin' => $linkedin] as $cle => $valeurs) {
+            if ($valeurs === []) {
+                continue;
+            }
+            $existants = is_array($canaux[$cle] ?? null) ? $canaux[$cle] : [];
+            $canaux[$cle] = array_values(array_unique(array_merge($existants, $valeurs)));
+        }
+        if ($canaux !== []) {
+            $signals['contact_channels'] = $canaux;
+        }
+
+        $generique = mb_strtolower(trim((string) ($fiche->email_generic ?? '')));
+        if ($l['email_generique'] !== null && $generique === mb_strtolower($l['email_generique'])) {
+            $signals['email_generic_verification'] = [
+                'type' => 'generique',
+                'domaine_verifie' => $l['email_generique_verifie_le'] !== null,
+                'verifie_le' => $l['email_generique_verifie_le'],
+                'source' => self::SOURCE,
+            ];
+        }
+
+        if ($signals !== $avant) {
+            DB::table('companies')->where('id', $fiche->id)->update([
+                'signals' => json_encode($signals, JSON_THROW_ON_ERROR),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    /**
+     * L'adresse d'une personne est NOMINATIVE : on le note sur sa fiche, avec
+     * la vérification du domaine, pour la liste de campagne.
+     *
+     * @param  array<string, mixed>  $l
+     */
+    private function typerContacts(int $companyId, array $l): void
+    {
+        foreach ($l['personnes'] as $p) {
+            if ($p['email'] === null) {
+                continue;
+            }
+            $contact = DB::table('contacts')->where('company_id', $companyId)->where('email', $p['email'])->first(['id', 'metadata']);
+            if ($contact === null) {
+                continue;
+            }
+            $meta = json_decode(is_string($contact->metadata) ? $contact->metadata : '{}', true);
+            $meta = is_array($meta) ? $meta : [];
+            $nouveau = array_merge($meta, [
+                'email_type' => 'nominatif',
+                'domaine_verifie' => $p['email_verifie_le'] !== null,
+                'domaine_verifie_le' => $p['email_verifie_le'],
+            ]);
+            if ($nouveau !== $meta) {
+                DB::table('contacts')->where('id', $contact->id)->update([
+                    'metadata' => json_encode($nouveau, JSON_THROW_ON_ERROR),
+                ]);
+            }
+        }
+    }
+
+    private function personneRetiree(string $workspaceId, string $siren, ?string $prenom, ?string $nom): bool
+    {
+        if ($nom === null) {
+            return false;
+        }
+        $ligne = DB::selectOne(
+            "SELECT EXISTS (
+                SELECT 1 FROM contacts_retires
+                WHERE workspace_id = ? AND siren = ?
+                AND cle_nom = encode(digest(normalize_name(coalesce(?, '') || '_' || ?), 'sha256'), 'hex')
+             ) AS e",
+            [$workspaceId, $siren, $prenom, $nom],
+        );
+
+        return (bool) ($ligne->e ?? false);
     }
 
     /**
@@ -591,7 +823,34 @@ class CrmImportFederations extends Command
                 'last_name' => $this->texte($p, 'nom'),
                 'role' => $this->texte($p, 'fonction'),
                 'email' => $this->email($this->texte($p, 'email')),
+                'email_verifie_le' => $this->date($p, 'email_verifie_le'),
                 'linkedin_url' => $this->lien($this->texte($p, 'linkedin')),
+            ];
+        }
+
+        $emailsAutres = $brut['emails_autres'] ?? [];
+        if (! is_array($emailsAutres) || ! array_is_list($emailsAutres)) {
+            throw new InvalidArgumentException('emails_invalides');
+        }
+        $adresses = [];
+        foreach ($emailsAutres as $e) {
+            if (! is_array($e) || array_diff(array_keys($e), self::CLES_EMAIL) !== []) {
+                throw new InvalidArgumentException('emails_invalides');
+            }
+            $type = $this->dans($e, 'type', self::TYPES_EMAIL, 'type_email_inconnu', obligatoire: true);
+            $verifie = $e['domaine_verifie'] ?? false;
+            if (! is_bool($verifie)) {
+                throw new InvalidArgumentException('type_de_valeur_invalide');
+            }
+            $adresse = $this->email($this->texte($e, 'email'));
+            if ($adresse === null) {
+                continue;
+            }
+            $adresses[$adresse] = [
+                'email' => $adresse,
+                'type' => (string) $type,
+                'domaine_verifie' => $verifie,
+                'verifie_le' => $this->date($e, 'verifie_le'),
             ];
         }
 
@@ -621,11 +880,14 @@ class CrmImportFederations extends Command
             'contactabilite' => $contactabilite,
             'origine_classement' => $this->texte($brut, 'origine_classement'),
             'email_generique' => $this->email($this->texte($brut, 'email_generique')),
-            'emails_autres' => array_values(array_filter(array_map(fn (string $e): ?string => $this->email($e), $this->chaines($brut, 'emails_autres')))),
+            'email_generique_verifie_le' => $this->date($brut, 'email_generique_verifie_le'),
+            'emails_autres' => array_values($adresses),
             'telephone' => $this->texte($brut, 'telephone'),
             'telephones_autres' => $this->chaines($brut, 'telephones_autres'),
             'site' => $this->lien($this->texte($brut, 'site')),
+            'sites_autres' => array_values(array_filter(array_map(fn (string $v): ?string => $this->lien($v), $this->chaines($brut, 'sites_autres')))),
             'linkedin' => $this->lien($this->texte($brut, 'linkedin')),
+            'linkedin_autres' => array_values(array_filter(array_map(fn (string $v): ?string => $this->lien($v), $this->chaines($brut, 'linkedin_autres')))),
             'personnes' => $propres,
             'tete_de_reseau' => $tete,
         ];
@@ -635,9 +897,11 @@ class CrmImportFederations extends Command
      * Le message du schéma pivot commun (`ScrapedRecord`) pour cette ligne.
      *
      * @param  array<string, mixed>  $l
+     * @param  list<string>  $canalEmails
+     * @param  list<string>  $canalTelephones
      * @return array<string, mixed>
      */
-    private function pivot(array $l): array
+    private function pivot(array $l, array $canalEmails, array $canalTelephones): array
     {
         $champs = array_filter([
             'denomination' => $l['nom'],
@@ -653,6 +917,7 @@ class CrmImportFederations extends Command
 
         $personnes = [];
         foreach ($l['personnes'] as $p) {
+            unset($p['email_verifie_le']);
             $personnes[] = array_filter($p + ['kind' => 'person'], static fn (mixed $v): bool => $v !== null);
         }
 
@@ -668,8 +933,8 @@ class CrmImportFederations extends Command
             ],
             'persons' => $personnes,
             'channels' => [
-                'emails' => $l['emails_autres'],
-                'phones' => $l['telephones_autres'],
+                'emails' => $canalEmails,
+                'phones' => $canalTelephones,
             ],
         ];
 

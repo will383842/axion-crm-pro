@@ -237,15 +237,36 @@ test('une fiche deja presente (organisateur d evenement) est RATTACHEE, jamais d
         'category' => 'intent', 'kind' => 'auto', 'rules' => '{}', 'is_locked' => true,
         'created_at' => now(), 'updated_at' => now(),
     ]);
+    // Une fiche d'organisateur COMPLÈTE : contacts, e-mail, téléphone, site,
+    // secteur utile et étiquettes automatiques — tout doit rester intact.
     $orga = (int) DB::table('companies')->insertGetId([
         'workspace_id' => $this->espace, 'siren' => '900000001', 'entity_nature' => 'reseau',
         'denomination' => 'ZZ NOM DEJA CONNU', 'relation_type' => 'partenaire', 'lifecycle_stage' => 'qualifie',
+        'email_generic' => 'bureau@zz-deja.example.invalid', 'phone' => '04 00 00 00 01',
+        'website' => 'https://zz-deja.example.invalid', 'sector_main' => 'restauration',
+        'department_code' => '69', 'region_code' => '84',
         'created_at' => now(), 'updated_at' => now(),
     ]);
     DB::table('company_tag')->insert([
         'company_id' => $orga, 'tag_id' => $tagOrga, 'workspace_id' => $this->espace,
         'assigned_at' => now(), 'assigned_by' => 'auto-rule',
     ]);
+    foreach (['sector-restauration' => 'sector', 'dept-69' => 'geo'] as $slugAuto => $categorie) {
+        $tagAuto = (int) DB::table('tags')->insertGetId([
+            'workspace_id' => $this->espace, 'slug' => $slugAuto, 'name' => $slugAuto, 'category' => $categorie,
+            'kind' => 'auto', 'rules' => '{}', 'is_locked' => false, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('company_tag')->insert([
+            'company_id' => $orga, 'tag_id' => $tagAuto, 'workspace_id' => $this->espace,
+            'assigned_at' => now(), 'assigned_by' => 'auto-rule',
+        ]);
+    }
+    $contactExistant = (int) DB::table('contacts')->insertGetId([
+        'workspace_id' => $this->espace, 'company_id' => $orga, 'first_name' => 'Zed', 'last_name' => 'ZZTRESORIER',
+        'role' => 'Trésorier', 'email' => 'tresorier@zz-deja.example.invalid', 'phone' => '06 00 00 00 77',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $contactAvant = DB::table('contacts')->where('id', $contactExistant)->first();
     $evenement = (int) DB::table('events')->insertGetId([
         'workspace_id' => $this->espace, 'external_ref' => 'zz-ag-fictive', 'nom' => 'ZZ Assemblée',
         'type' => 'conference', 'intervention' => 'acceptee', 'participation' => 'inscrit',
@@ -268,7 +289,16 @@ test('une fiche deja presente (organisateur d evenement) est RATTACHEE, jamais d
         ->and(DB::table('events')->where('id', $evenement)->value('intervention'))->toBe('acceptee')
         ->and(DB::table('events')->where('id', $evenement)->value('participation'))->toBe('inscrit')
         ->and(DB::table('federations')->where('company_id', $orga)->exists())->toBeTrue()
-        ->and(fedSlugs($orga))->toContain(FichesProtegees::TAG_ORGANISATEURS, FichesProtegees::TAG_FEDERATIONS);
+        ->and(fedSlugs($orga))->toContain(FichesProtegees::TAG_ORGANISATEURS, FichesProtegees::TAG_FEDERATIONS)
+        // Ce que la fiche portait déjà ne bouge pas.
+        ->and($fiche->email_generic)->toBe('bureau@zz-deja.example.invalid')
+        ->and($fiche->phone)->toBe('04 00 00 00 01')
+        ->and($fiche->website)->toBe('https://zz-deja.example.invalid')
+        ->and($fiche->sector_main)->toBe('restauration')
+        ->and(fedSlugs($orga))->toContain('sector-restauration', 'dept-69')
+        ->and((array) DB::table('contacts')->where('id', $contactExistant)->first())->toBe((array) $contactAvant)
+        // … et la personne du fichier s'AJOUTE à côté.
+        ->and(DB::table('contacts')->where('company_id', $orga)->count())->toBe(2);
 });
 
 test('une fiche a la corbeille n est pas ressuscitee, le temoin est importe', function () {

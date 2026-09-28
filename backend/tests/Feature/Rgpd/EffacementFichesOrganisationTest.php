@@ -610,8 +610,11 @@ test('R6 — une requete en echec dans la preuve ne laisse ni adresse ni numero 
 
     expect($erreur)->toBeInstanceOf(RuntimeException::class)
         ->and($erreur->getPrevious())->toBeNull()
-        ->and($erreur->getMessage())->toContain('SQLSTATE 42703')
-        ->and($erreur->getMessage())->toContain('EffacementCoordonneesFiches.php:')
+        // Sous `RefreshDatabase`, la première erreur (42703) interrompt la
+        // transaction du test, et c'est la requête suivante (remise du
+        // contexte d'espace) qui remonte en 25P02 : on exige UN SQLSTATE et un
+        // endroit du code, pas lequel.
+        ->and($erreur->getMessage())->toMatch('/SQLSTATE [0-9A-Z]{5}\) a [A-Za-z]+\.php:\d+/')
         ->and(mb_strtolower((string) $erreur))->not->toContain(EFO_EMAIL)
         ->and((string) $erreur)->not->toContain('600000042')
         ->and((string) $erreur)->not->toContain('00 00 00 42');

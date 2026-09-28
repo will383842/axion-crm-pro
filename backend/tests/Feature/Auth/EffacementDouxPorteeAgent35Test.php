@@ -417,7 +417,13 @@ test('B10-016-PORTEE PLAFOND — les lectures DB::table aveugles a deleted_at n 
         //     GdprPortabilityService:196 ; GdprPortabilityService:168 est
         //     'consciente' (elle nomme `deleted_at` dans son select).
         'users' => 3,
-        'workspaces' => 17,
+        // 17 -> 18 le 2026-09-29, APRES examen (PR #255, relecture R7) : le
+        // lecteur ajouté est `RgpdVerificationsEnAttente`, qui cherche dans
+        // CHAQUE espace les effacements dont la preuve n'a pas conclu. Il DOIT
+        // voir les espaces à la corbeille : leurs demandes sont toujours en
+        // base, et une demande d'effacement ne cesse pas d'exister parce que
+        // son espace a été mis à la corbeille.
+        'workspaces' => 18,
     ];
 
     $tables = b10pTablesAEffacementDoux();

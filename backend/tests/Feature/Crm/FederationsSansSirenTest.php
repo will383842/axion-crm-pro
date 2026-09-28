@@ -217,6 +217,22 @@ test('une fiche deja presente avec le MEME identifiant est rattachee ; celle d u
         ->and(DB::table('contacts')->where('company_id', $etrangere)->exists())->toBeFalse();
 });
 
+test('seul un homonyme d un AUTRE pays porte l identifiant : il n est pas rattache, une fiche francaise nait', function () {
+    $etrangere = (int) DB::table('companies')->insertGetId([
+        'workspace_id' => $this->espace, 'country_code' => 'BE', 'foreign_id' => FSS_ID,
+        'denomination' => 'ZZ HOMONYME BELGE', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    $r = fssImporter([fssLigne()]);
+
+    expect(fssCompteur($r['sortie'], 'fiches_creees'))->toBe(1)
+        ->and(fssCompteur($r['sortie'], 'fiches_rattachees'))->toBe(0)
+        ->and(fssFiche(FSS_ID))->not->toBeNull()
+        ->and(DB::table('federations')->where('company_id', fssFiche(FSS_ID)->id)->exists())->toBeTrue()
+        ->and(DB::table('federations')->where('company_id', $etrangere)->exists())->toBeFalse()
+        ->and(DB::table('companies')->where('id', $etrangere)->value('denomination'))->toBe('ZZ HOMONYME BELGE');
+});
+
 test('une fiche sans SIREN a la corbeille n est pas ressuscitee ; le temoin est importe', function () {
     DB::table('companies')->insert([
         'workspace_id' => $this->espace, 'country_code' => 'FR', 'foreign_id' => FSS_ID, 'denomination' => 'ZZ CORBEILLE',

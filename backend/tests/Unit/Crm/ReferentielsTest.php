@@ -67,13 +67,16 @@ test('NAF rév. 1 : les erreurs de lecture corrigées, une par une', function ()
         ->and(NomenclatureNaf::secteur('70.1A'))->toBe('btp');
 });
 
-test('NAF rév. 1 : le lien retenu est le lien PRINCIPAL (CC), jamais un lien annexe (CA)', function () {
+test('NAF rév. 1 : le lien retenu suit la règle de construire.py (CC, « tout sauf », intitulé le plus proche)', function () {
     // La table INSEE donne plusieurs liens par code rév. 1. La première
     // version du script prenait la PREMIÈRE ligne : 74.1G (conseil) partait en
-    // agriculture — 33 899 fiches de production au mauvais secteur, 66 089 au
-    // mauvais `naf_rev2`. Attendus vérifiés contre le XLS INSEE.
+    // agriculture. Règle actuelle (resources/referentiels/LISEZMOI.md) :
+    // candidats = liens CC, sinon liens sans précision, sinon tous ; parmi
+    // eux, le lien « CC : tout sauf … », puis l'intitulé rév. 2 le plus
+    // proche, puis le premier ; arbitrage manuel documenté pour 74.8K.
+    // Attendus vérifiés contre le XLS INSEE.
     $cas = [
-        '74.1G' => ['70.21Z', 'conseil_management'],
+        '74.1G' => ['70.22Z', 'conseil_management'],
         '74.6Z' => ['80.10Z', 'services_entreprises'],
         '22.1A' => ['58.11Z', 'edition_medias'],
         '51.3A' => ['46.31Z', 'commerce_gros'],
@@ -81,7 +84,12 @@ test('NAF rév. 1 : le lien retenu est le lien PRINCIPAL (CC), jamais un lien an
         '45.2U' => ['43.99D', 'btp'],
         '72.4Z' => ['63.12Z', 'numerique_telecoms'],
         '92.7C' => ['93.29Z', 'culture_sport_loisirs'],
-        '74.8K' => ['77.40Z', 'services_entreprises'],
+        // Arbitrage manuel documenté.
+        '74.8K' => ['82.99Z', 'services_entreprises'],
+        // Plusieurs CC : le « tout sauf » / l'intitulé le plus proche l'emporte.
+        '70.3E' => ['68.32B', 'immobilier'],
+        // Aucun CC ni lien sans précision : seulement des liens CA.
+        '15.9D' => ['11.01Z', 'agroalimentaire'],
     ];
     foreach ($cas as $code => [$rev2, $secteur]) {
         $c = NomenclatureNaf::classer($code);

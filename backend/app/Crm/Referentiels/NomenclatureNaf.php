@@ -176,7 +176,7 @@ final class NomenclatureNaf
         }
 
         // Codes de la révision 2003 absents de la table de passage (ex. 72.2Z,
-        // 51.6G) : secteur majoritaire des liens PRINCIPAUX (CC) du groupe, puis
+        // 51.6G) : secteur majoritaire des liens RETENUS du groupe, puis
         // de la division (cf. resources/referentiels/LISEZMOI.md). Aucun
         // code rév. 2 n'est inventé dans ce cas.
         $parGroupe = self::$rev1Groupes[substr($code, 0, 4)] ?? null;

@@ -41,15 +41,19 @@ Deux gardes empêchent une dérive silencieuse :
 ## Choix du lien rév. 1 → rév. 2
 
 La table de passage INSEE marque chaque lien : « CC » (lien principal), « CA » (lien
-annexe), « NC », ou rien (correspondance totale). `construire.py` retient :
+annexe), « NC », ou rien (correspondance totale). `construire.py` retient, pour chaque
+code rév. 1 :
 
-1. un lien **CC** ; s'il y en a plusieurs, celui du secteur majoritaire parmi les CC, puis le premier ;
-2. sans CC, le lien **sans marque** ;
-3. un lien **CA** ne sert jamais à choisir.
+1. les **candidats** : les liens CC ; à défaut, les liens sans précision ; à défaut, TOUS
+   les liens (8 codes n'ont que des liens CA ou NC, ex. 15.9D → 11.01Z) ;
+2. parmi eux, d'abord le lien « CC : tout sauf … » ; puis celui dont l'intitulé rév. 2 est
+   le plus proche de l'intitulé rév. 1 (mots communs) ; puis le premier ;
+3. un arbitrage manuel, documenté dans le script : 74.8K → 82.99Z.
 
-Les replis par groupe (`NN.N`) et par division (`NN`) ne comptent que les liens principaux.
-Prendre simplement la première ligne (première version du script) envoyait 74.1G (conseil)
-en agriculture : 33 899 fiches de production au mauvais secteur, 66 089 au mauvais `naf_rev2`.
+Les replis par groupe (`NN.N`) et par division (`NN`) ne comptent que les liens retenus.
+La toute première version du script prenait simplement la première ligne de la table :
+74.1G (conseil) partait en agriculture. Les écarts mesurés sur la production sont dans la
+description de la PR #254.
 
 ## Règle de lecture du champ `companies.naf`
 

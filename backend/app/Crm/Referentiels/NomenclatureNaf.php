@@ -270,7 +270,7 @@ final class NomenclatureNaf
                 if ($l === [null] || count($l) < 2) {
                     continue;
                 }
-                $lignes[] = array_values(array_map(static fn (?string $v): string => trim((string) $v), $l));
+                $lignes[] = array_map(static fn (?string $v): string => trim((string) $v), $l);
             }
         } finally {
             fclose($flux);

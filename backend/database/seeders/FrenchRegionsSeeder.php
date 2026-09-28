@@ -35,7 +35,9 @@ class FrenchRegionsSeeder extends Seeder
                 [
                     'country_code' => 'FR',
                     'name' => $name,
-                    'population' => $populations[$code] ?? null,
+                    // Une région ajoutée au référentiel sans sa population ici
+                    // fait rougir PHPStan (clé absente du tableau littéral).
+                    'population' => $populations[$code],
                     'created_at' => now(),
                 ],
             );

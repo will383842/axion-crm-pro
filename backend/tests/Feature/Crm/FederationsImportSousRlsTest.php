@@ -115,4 +115,78 @@ test('S-a — sous axion_app, ni la cle ni la fonction d empreinte ; seulement l
     // La question de l'import : permise, dans l'espace du contexte…
     $oui = $app->selectOne('SELECT contacts_retires_contient(?::uuid, ?, ?, ?) AS e', [$espace, '900000001', 'Zed', 'ZZDICO']);
     expect($oui->e)->toBeFalse();
+
+    // … et la même question pour un organisme SANS SIREN, par son ancre
+    // (2026-09-30) : permise aussi, sans rien ouvrir de plus.
+    $ancre = $app->selectOne('SELECT contacts_retires_contient_ancre(?::uuid, ?, ?, ?, ?) AS e', [$espace, 'FR', 'section:zz-dico:01', 'Zed', 'ZZDICO']);
+    expect($ancre->e)->toBeFalse();
+});
+
+test('sous axion_app, un organisme SANS SIREN est importe, relie a sa tete par identifiant, et son retrait est reconnu', function () {
+    $this->mock(AuditHashChain::class)->shouldReceive('record')->twice()->andReturn(1);
+    config(['crm.scrape_funnel.validate_mx' => false]);
+
+    $owner = fedRlsProprio();
+    $espace = (string) Str::uuid();
+    $marque = substr(str_replace('-', '', $espace), 0, 6);
+    $slug = 'zz-fed-rls-ss-' . $marque;
+    $owner->table('workspaces')->insert([
+        'id' => $espace, 'slug' => $slug, 'name' => 'ZZ fédérations sans SIREN RLS', 'settings' => '{}',
+        'cost_cap_eur' => 100, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    config(['crm.ingest.business_workspace' => $slug]);
+
+    // Identifiants propres à ce test : la table est partagée entre sessions.
+    $idTete = 'section:zz-rls-' . $marque . ':national';
+    $idAntenne = 'section:zz-rls-' . $marque . ':69';
+    $ligne = static fn (string $identifiant, ?string $tete, string $niveau, array $personnes): string => (string) json_encode([
+        'siren' => null, 'identifiant' => $identifiant, 'nom' => 'ZZ Section RLS ' . $niveau, 'famille' => 'confederation',
+        'niveau' => $niveau, 'secteurs' => ['interprofessionnel'], 'pertinence' => 'haute', 'contactabilite' => 'email_verifie',
+        'personnes' => $personnes, 'tete_de_reseau' => $tete,
+    ]);
+    $retire = ['prenom' => 'Zed', 'nom' => 'ZZRLSRETIRE' . $marque, 'fonction' => 'Secrétaire', 'email' => null, 'linkedin' => null];
+    $fichier = (string) tempnam(sys_get_temp_dir(), 'zz-fed-rls-ss-');
+
+    $precedente = DB::getDefaultConnection();
+    try {
+        file_put_contents($fichier, $ligne($idAntenne, $idTete, 'departemental', [$retire]) . "\n" . $ligne($idTete, null, 'national', []) . "\n");
+        DB::setDefaultConnection('pgsql_app');
+        $code = Artisan::call('crm:import-federations', ['file' => $fichier]);
+        DB::setDefaultConnection($precedente);
+
+        $tete = $owner->table('companies')->where('workspace_id', $espace)->where('foreign_id', $idTete)->first();
+        $antenne = $owner->table('companies')->where('workspace_id', $espace)->where('foreign_id', $idAntenne)->first();
+        expect($code)->toBe(0)
+            ->and($tete)->not->toBeNull()
+            ->and($antenne)->not->toBeNull()
+            ->and($antenne->siren)->toBeNull()
+            ->and($owner->table('federations')->where('company_id', $antenne->id)->value('parent_company_id'))->toBe((int) $tete->id)
+            ->and($owner->table('company_tag')->join('tags', 'tags.id', '=', 'company_tag.tag_id')
+                ->where('company_tag.company_id', $antenne->id)->where('tags.slug', FichesProtegees::TAG_FEDERATIONS)->exists())->toBeTrue();
+
+        // La personne retirée (par le propriétaire : console, effacement…)
+        // ne revient pas au ré-import SOUS axion_app — la ligne a changé.
+        $owner->table('contacts')->where('company_id', $antenne->id)->delete();
+        $nouveau = ['prenom' => 'Zia', 'nom' => 'ZZRLSNOUVEAU' . $marque, 'fonction' => 'Trésorière', 'email' => null, 'linkedin' => null];
+        file_put_contents($fichier, $ligne($idAntenne, $idTete, 'regional', [$retire, $nouveau]) . "\n");
+        DB::setDefaultConnection('pgsql_app');
+        Artisan::call('crm:import-federations', ['file' => $fichier]);
+        DB::setDefaultConnection($precedente);
+
+        expect($owner->table('contacts')->where('company_id', $antenne->id)->pluck('last_name')->all())->toBe(['ZZRLSNOUVEAU' . $marque])
+            ->and($owner->table('federations')->where('company_id', $antenne->id)->value('niveau'))->toBe('regional');
+    } finally {
+        DB::setDefaultConnection($precedente);
+        @unlink($fichier);
+        $owner->transaction(function () use ($owner, $espace): void {
+            $owner->statement("SET LOCAL app.autoriser_suppression_protegee = 'on'");
+            foreach (['federations', 'company_tag', 'contacts', 'activities', 'scraper_runs', 'business_events', 'contacts_retires'] as $table) {
+                $owner->table($table)->where('workspace_id', $espace)->delete();
+            }
+            $owner->table('companies')->where('workspace_id', $espace)->delete();
+            $owner->table('contacts_retires')->where('workspace_id', $espace)->delete();
+            $owner->table('tags')->where('workspace_id', $espace)->delete();
+            $owner->table('workspaces')->where('id', $espace)->delete();
+        });
+    }
 });

@@ -15,6 +15,7 @@ use App\Services\Tags\AutoTaggerService;
 use App\Support\WorkspaceContext;
 use DateTimeImmutable;
 use Illuminate\Console\Command;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -52,6 +53,19 @@ use Throwable;
  * `lifecycle_stage`) et ses étiquettes. Une fiche à la corbeille n'est pas
  * ressuscitée : la ligne est rejetée.
  *
+ * ── Les organismes SANS SIREN (2026-09-30) ────────────────────────────────
+ *
+ * Une union départementale, un conseil départemental d'ordre, une antenne
+ * de confédération n'ont pas de personnalité juridique propre : pas de
+ * SIREN, mais des coordonnées publiées. Leur ligne porte alors
+ * `"siren": null` et un `identifiant` STABLE fabriqué par le convertisseur
+ * (`section:fo:28`). La fiche s'ancre sur (`country_code` = FR,
+ * `foreign_id` = identifiant), exactement comme les organisateurs
+ * d'événements sans SIREN (#250/#251) : rattachement, dédoublonnage,
+ * `run_id`, registre des retraits et tête de réseau passent par cette ancre.
+ * Une ligne AVEC SIREN garde le comportement d'avant, à l'identique : son
+ * `identifiant` éventuel est ignoré (le SIREN reste la seule clé).
+ *
  * ── Idempotente ───────────────────────────────────────────────────────────
  *
  * Rejouer le même fichier ne crée rien : le funnel reconnaît le même contenu
@@ -83,7 +97,7 @@ class CrmImportFederations extends Command
     protected $description = 'Importe les fédérations et organisations professionnelles, et relie les têtes de réseau.';
 
     private const CLES_AUTORISEES = [
-        'siren', 'nom', 'nom_developpe', 'sigle', 'nature',
+        'siren', 'identifiant', 'nom', 'nom_developpe', 'sigle', 'nature',
         'naf', 'forme_juridique', 'effectif', 'date_creation', 'nb_etablissements',
         'adresse', 'code_postal', 'commune', 'departement', 'region',
         'famille', 'niveau', 'secteurs', 'tailles_adherents', 'certitude', 'pertinence',
@@ -107,6 +121,20 @@ class CrmImportFederations extends Command
      */
     public const ORIGINE_SECTEUR = 'federations-2026';
 
+    /**
+     * Identifiant d'un organisme SANS SIREN : un espace de noms en minuscules
+     * puis au moins un segment après « : » (`section:fo:28`,
+     * `section:cfe-cgc:2A`). Jamais neuf chiffres seuls : il ne peut pas se
+     * confondre avec un SIREN.
+     */
+    public const MOTIF_IDENTIFIANT = '/^[a-z0-9][a-z0-9-]*(:[A-Za-z0-9-]+)+$/';
+
+    /** Longueur maximale d'un identifiant (le plus long mesuré : 65). */
+    public const IDENTIFIANT_MAX = 120;
+
+    /** Pays de l'ancre `foreign_id` : ces organismes sont français. */
+    private const PAYS = 'FR';
+
     /** Département accepté par le schéma pivot (`ScrapedRecord`). */
     private const MOTIF_DEPARTEMENT = '/^(0[1-9]|1\d|2[1-9AB]|[3-8]\d|9[0-5]|97[1-6])$/';
 
@@ -116,7 +144,7 @@ class CrmImportFederations extends Command
     /** @var array<string, int> motif => nombre */
     private array $rejets = [];
 
-    /** @var array<int, string> company_id => SIREN de la tête de réseau */
+    /** @var array<int, string> company_id => SIREN ou identifiant de la tête de réseau */
     private array $tetes = [];
 
     private ScrapedRecordIngestService $funnel;
@@ -288,9 +316,7 @@ class CrmImportFederations extends Command
         $l = $this->lire($ligne);
         $delta = [];
 
-        $avant = DB::table('companies')
-            ->where('workspace_id', $workspaceId)
-            ->where('siren', $l['siren'])
+        $avant = $this->parAncre($workspaceId, $l['siren'], $l['identifiant'])
             ->first(['id', 'deleted_at', 'email_generic', 'phone', 'website', 'linkedin_url']);
         if ($avant !== null && $avant->deleted_at !== null) {
             // Mise à la corbeille par Will : un import ne la ressuscite pas.
@@ -307,7 +333,7 @@ class CrmImportFederations extends Command
         // `contacts_retires` (relecture sécurité R2).
         $retenues = [];
         foreach ($l['personnes'] as $p) {
-            if ($this->personneRetiree($workspaceId, $l['siren'], $p['first_name'], $p['last_name'])) {
+            if ($this->personneRetiree($workspaceId, $l['siren'], $l['identifiant'], $p['first_name'], $p['last_name'])) {
                 $delta['personnes_retirees_ignorees'] = ($delta['personnes_retirees_ignorees'] ?? 0) + 1;
 
                 continue;
@@ -335,9 +361,7 @@ class CrmImportFederations extends Command
         $delta['personnes_sans_changement'] = $outcome->personsSkipped['skipped_no_change'] ?? 0;
         $delta['personnes_ecartees'] = (int) array_sum($outcome->personsSkipped) - $delta['personnes_sans_changement'];
 
-        $fiche = DB::table('companies')
-            ->where('workspace_id', $workspaceId)
-            ->where('siren', $l['siren'])
+        $fiche = $this->parAncre($workspaceId, $l['siren'], $l['identifiant'])
             ->whereNull('deleted_at')
             ->first();
         if ($fiche === null) {
@@ -613,18 +637,44 @@ class CrmImportFederations extends Command
         }
     }
 
-    private function personneRetiree(string $workspaceId, string $siren, ?string $prenom, ?string $nom): bool
+    /**
+     * La fiche d'une ancre : le SIREN, ou (pays, `foreign_id`) pour un
+     * organisme sans SIREN — la même recherche que le funnel
+     * (`ScrapedRecordIngestService::upsertCompany`), servie par l'index unique
+     * `companies_workspace_foreign_id_unique`.
+     */
+    private function parAncre(string $workspaceId, ?string $siren, ?string $identifiant): Builder
+    {
+        $requete = DB::table('companies')->where('workspace_id', $workspaceId);
+        if ($siren !== null) {
+            return $requete->where('siren', $siren);
+        }
+        if ($identifiant === null) {
+            // `lire()` l'a déjà refusé : jamais une recherche sans ancre.
+            throw new InvalidArgumentException('siren_ou_identifiant_manquant');
+        }
+
+        return $requete->where('country_code', self::PAYS)->where('foreign_id', $identifiant);
+    }
+
+    private function personneRetiree(string $workspaceId, ?string $siren, ?string $identifiant, ?string $prenom, ?string $nom): bool
     {
         if ($nom === null) {
             return false;
         }
-        // `contacts_retires_contient` : la seule question que le rôle
+        // `contacts_retires_contient*` : les seules questions que le rôle
         // applicatif peut poser au registre (il n'exécute pas
-        // `contacts_retires_empreinte`, relecture S-a).
-        $ligne = DB::selectOne(
-            'SELECT contacts_retires_contient(?::uuid, ?, ?, ?) AS e',
-            [$workspaceId, $siren, $prenom, $nom],
-        );
+        // `contacts_retires_empreinte`, relecture S-a). Sans SIREN, le
+        // registre est lu par l'ancre (pays, `foreign_id`) de l'organisme.
+        $ligne = $siren !== null
+            ? DB::selectOne(
+                'SELECT contacts_retires_contient(?::uuid, ?, ?, ?) AS e',
+                [$workspaceId, $siren, $prenom, $nom],
+            )
+            : DB::selectOne(
+                'SELECT contacts_retires_contient_ancre(?::uuid, ?, ?, ?, ?) AS e',
+                [$workspaceId, self::PAYS, $identifiant, $prenom, $nom],
+            );
 
         return (bool) ($ligne->e ?? false);
     }
@@ -691,10 +741,11 @@ class CrmImportFederations extends Command
 
     private function deuxiemePasse(string $workspaceId): void
     {
-        foreach ($this->tetes as $companyId => $sirenTete) {
-            $teteId = DB::table('companies')
-                ->where('workspace_id', $workspaceId)
-                ->where('siren', $sirenTete)
+        foreach ($this->tetes as $companyId => $ancreTete) {
+            // La tête est un SIREN (neuf chiffres) ou l'identifiant d'un
+            // organisme sans SIREN : `lire()` n'a laissé passer que ces deux formes.
+            $estSiren = preg_match('/^\d{9}$/', $ancreTete) === 1;
+            $teteId = $this->parAncre($workspaceId, $estSiren ? $ancreTete : null, $estSiren ? null : $ancreTete)
                 ->whereNull('deleted_at')
                 ->value('id');
             if ($teteId === null) {
@@ -746,10 +797,21 @@ class CrmImportFederations extends Command
             throw new InvalidArgumentException('cle_inconnue');
         }
 
+        // L'ANCRE : le SIREN s'il est là (comportement d'avant, identifiant
+        // ignoré) ; sinon l'identifiant stable d'un organisme sans SIREN.
         $siren = $this->texte($brut, 'siren');
-        if ($siren === null || preg_match('/^\d{9}$/', $siren) !== 1) {
-            throw new InvalidArgumentException('siren_invalide');
+        $identifiant = $this->texte($brut, 'identifiant');
+        if ($siren !== null) {
+            if (preg_match('/^\d{9}$/', $siren) !== 1) {
+                throw new InvalidArgumentException('siren_invalide');
+            }
+            $identifiant = null;
+        } elseif ($identifiant === null) {
+            throw new InvalidArgumentException('siren_ou_identifiant_manquant');
+        } elseif (! self::identifiantValide($identifiant)) {
+            throw new InvalidArgumentException('identifiant_invalide');
         }
+        $ancre = $siren ?? $identifiant;
         $nom = $this->texte($brut, 'nom');
         if ($nom === null) {
             throw new InvalidArgumentException('champ_obligatoire_manquant');
@@ -773,7 +835,7 @@ class CrmImportFederations extends Command
         $tailles = $this->liste($brut, 'tailles_adherents', array_keys(Taxonomy::TAILLES), 'taille_inconnue');
 
         $tete = $this->texte($brut, 'tete_de_reseau');
-        if ($tete !== null && (preg_match('/^\d{9}$/', $tete) !== 1 || $tete === $siren)) {
+        if ($tete !== null && ((preg_match('/^\d{9}$/', $tete) !== 1 && ! self::identifiantValide($tete)) || $tete === $ancre)) {
             throw new InvalidArgumentException('tete_de_reseau_invalide');
         }
 
@@ -856,6 +918,7 @@ class CrmImportFederations extends Command
 
         return [
             'siren' => $siren,
+            'identifiant' => $identifiant,
             'nom' => $nom,
             'nom_developpe' => $this->texte($brut, 'nom_developpe'),
             'sigle' => $this->texte($brut, 'sigle'),
@@ -925,9 +988,12 @@ class CrmImportFederations extends Command
             'schema_version' => ScrapedRecord::SCHEMA_VERSION,
             'source' => self::SOURCE,
             'status' => 'success',
+            // Sans SIREN : l'ancre (pays, `foreign_id`) des organisateurs
+            // d'événements. Avec SIREN : le message d'avant, à l'identique (le
+            // `run_id` en dépend).
             'company' => [
-                'siren' => $l['siren'],
-                'country' => 'FR',
+                ...($l['siren'] !== null ? ['siren' => $l['siren']] : ['foreign_id' => $l['identifiant']]),
+                'country' => self::PAYS,
                 'nature' => $l['nature'],
                 'fields' => $champs,
             ],
@@ -941,7 +1007,7 @@ class CrmImportFederations extends Command
         // Le MÊME contenu rejoué = le même run : le funnel le reconnaît et
         // n'écrit rien (idempotence). Un contenu corrigé = un nouveau run, qui
         // complète la fiche (backfill-only).
-        $message['run_id'] = self::SOURCE . ':' . $l['siren'] . ':'
+        $message['run_id'] = self::SOURCE . ':' . ($l['siren'] ?? $l['identifiant']) . ':'
             . substr(hash('sha256', json_encode($message, JSON_THROW_ON_ERROR)), 0, 16);
 
         return $message;
@@ -1061,6 +1127,13 @@ class CrmImportFederations extends Command
     private function lien(?string $valeur): ?string
     {
         return $valeur !== null && preg_match('#^https?://#i', $valeur) === 1 ? $valeur : null;
+    }
+
+    /** Forme d'un identifiant d'organisme sans SIREN (ancre ou tête de réseau). */
+    public static function identifiantValide(string $identifiant): bool
+    {
+        return strlen($identifiant) <= self::IDENTIFIANT_MAX
+            && preg_match(self::MOTIF_IDENTIFIANT, $identifiant) === 1;
     }
 
     private function rejeter(string $motif, int $numero): void

@@ -10,6 +10,7 @@ use App\Crm\Referentiels\EtiquettesClassement;
 use App\Crm\Taxonomy;
 use App\Services\Audit\AuditHashChain;
 use App\Support\WorkspaceContext;
+use Closure;
 use Illuminate\Console\Command;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\QueryException;
@@ -160,14 +161,15 @@ class CrmReferentielsReclasser extends Command
         $this->info(sprintf(
             '%s — espace %s, lots de %d, à partir de l\'id %d%s.',
             $dryRun ? '[À BLANC] rien ne sera écrit' : 'Reclassement',
-            $workspaceId,
+            // Journaux publics (`--compteurs-seulement`) : pas d'identifiant.
+            $discret ? '(masqué)' : $workspaceId,
             $lot,
             $depuis,
             $etiquettes ? ', étiquettes comprises' : ', SANS les étiquettes',
         ));
 
         // ── Avant toute écriture : le bon espace, et les audiences ──────────
-        $refus = WorkspaceContext::run($workspaceId, fn (): ?string => $this->espaceSansFicheInsee($workspaceId));
+        $refus = WorkspaceContext::run($workspaceId, fn (): ?string => $this->espaceSansFicheInsee($workspaceId, $discret));
         if ($refus !== null) {
             $this->error($refus);
 
@@ -190,6 +192,7 @@ class CrmReferentielsReclasser extends Command
         $dernier = $depuis;
         $termine = false;
         $erreur = null;
+        $auditFinEchoue = null;
         try {
             WorkspaceContext::run($workspaceId, function () use ($workspaceId, $dryRun, $lot, $maxLots, $pauseMs, $etiquettes, $audit, $operateur, &$dernier, &$termine, &$erreur): void {
                 $this->compteurs['fiches_protegees_exclues'] = $this->compterProtegees($workspaceId);
@@ -210,16 +213,32 @@ class CrmReferentielsReclasser extends Command
                     $haut = max($ids);
                     $avant = $this->compteurs;
 
+                    // L'entrée d'audit du lot est écrite DANS la transaction du
+                    // lot, en dernier : un lot validé a toujours sa trace, et un
+                    // audit qui échoue annule le lot au lieu de le laisser
+                    // passer sans trace.
+                    $tracer = function () use ($audit, $workspaceId, $operateur, $avant, $bas, $haut): void {
+                        $this->auditer($audit, $workspaceId, $operateur, 'RECLASSEMENT_REFERENTIELS_LOT', 200, [
+                            'ids' => [$bas, $haut],
+                            'fiches_modifiees' => $this->compteurs['fiches_modifiees'] - $avant['fiches_modifiees'],
+                            'etiquettes_ajoutees' => $this->compteurs['etiquettes_ajoutees'] - $avant['etiquettes_ajoutees'],
+                            'etiquettes_retirees' => $this->compteurs['etiquettes_retirees'] - $avant['etiquettes_retirees'],
+                        ], "ids {$bas}-{$haut}");
+                    };
+
                     try {
-                        $this->traiterLot($workspaceId, $fiches, $dryRun, $etiquettes);
-                    } catch (QueryException $e) {
-                        // Le lot est annulé en entier (sa transaction) ; tout ce
-                        // qui précède est acquis. Seul le code d'état part au
-                        // journal : le message SQL peut citer des valeurs.
-                        Log::error('crm:referentiels:reclasser : lot refusé par la base', [
-                            'apres_id' => $dernier, 'sqlstate' => $e->getCode(),
+                        $this->traiterLot($workspaceId, $fiches, $dryRun, $etiquettes, $tracer);
+                    } catch (Throwable $e) {
+                        // Le lot est annulé en entier (sa transaction, audit
+                        // compris) ; tout ce qui précède est acquis. Seul le code
+                        // d'état (ou la classe) part au journal : le message SQL
+                        // peut citer des valeurs.
+                        $erreur = $e instanceof QueryException ? 'SQLSTATE ' . $e->getCode() : get_class($e);
+                        Log::error('crm:referentiels:reclasser : lot annulé', [
+                            'apres_id' => $dernier, 'erreur' => $erreur,
                         ]);
-                        $erreur = (string) $e->getCode();
+                        // Les compteurs du lot annulé ne comptent pas.
+                        $this->compteurs = $avant;
 
                         return;
                     }
@@ -227,14 +246,6 @@ class CrmReferentielsReclasser extends Command
                     $lots++;
                     $dernier = $haut;
                     $this->compteurs['lots']++;
-                    if (! $dryRun) {
-                        $this->auditer($audit, $workspaceId, $operateur, 'RECLASSEMENT_REFERENTIELS_LOT', 200, [
-                            'ids' => [$bas, $haut],
-                            'fiches_modifiees' => $this->compteurs['fiches_modifiees'] - $avant['fiches_modifiees'],
-                            'etiquettes_ajoutees' => $this->compteurs['etiquettes_ajoutees'] - $avant['etiquettes_ajoutees'],
-                            'etiquettes_retirees' => $this->compteurs['etiquettes_retirees'] - $avant['etiquettes_retirees'],
-                        ], "ids {$bas}-{$haut}");
-                    }
                     $this->line(sprintf(
                         '  lot %d : %d fiches, ids %d à %d — %d à modifier%s',
                         $lots,
@@ -273,22 +284,36 @@ class CrmReferentielsReclasser extends Command
             if (! $dryRun) {
                 // L'entrée de FIN, même quand la commande échoue ou est
                 // interrompue par une exception : la chaîne dit où l'on s'est
-                // arrêté, et qui avait lancé la commande.
-                $this->auditer($audit, $workspaceId, $operateur, 'RECLASSEMENT_REFERENTIELS_FIN', $erreur === null ? 200 : 500, [
-                    'termine' => $termine, 'dernier_id' => $dernier, 'erreur' => $erreur, 'compteurs' => $this->compteurs,
-                ], $termine ? 'terminé' : "arrêté après l'id {$dernier}");
+                // arrêté, et qui avait lancé la commande. Si ELLE échoue, on ne
+                // masque pas l'exception d'origine : on le dit, et la commande
+                // sort en échec.
+                try {
+                    $this->auditer($audit, $workspaceId, $operateur, 'RECLASSEMENT_REFERENTIELS_FIN', $erreur === null ? 200 : 500, [
+                        'termine' => $termine, 'dernier_id' => $dernier, 'erreur' => $erreur, 'compteurs' => $this->compteurs,
+                    ], $termine ? 'terminé' : "arrêté après l'id {$dernier}");
+                } catch (Throwable $e) {
+                    $auditFinEchoue = get_class($e);
+                    Log::error('crm:referentiels:reclasser : entrée d\'audit de fin NON écrite', [
+                        'dernier_id' => $dernier, 'erreur' => $auditFinEchoue,
+                    ]);
+                }
             }
         }
 
-        $this->afficherBilan($dryRun, $etiquettes);
+        $this->afficherBilan($dryRun, $etiquettes, $discret);
         Log::info('crm:referentiels:reclasser fin', [
             'a_blanc' => $dryRun, 'termine' => $termine, 'dernier_id' => $dernier,
             'erreur' => $erreur, 'compteurs' => $this->compteurs, 'operateur' => $operateur,
         ]);
 
         if ($erreur !== null) {
-            $this->error("ÉCHEC : la base a refusé un lot (SQLSTATE {$erreur}). Rien n'a été écrit pour ce lot ; tout ce qui précède est acquis.");
+            $this->error("ÉCHEC : un lot a été annulé ({$erreur}). Rien n'a été écrit pour ce lot ; tout ce qui précède est acquis et journalisé.");
             $this->error("Reprendre avec : --depuis-id={$dernier}");
+
+            return self::FAILURE;
+        }
+        if ($auditFinEchoue !== null) {
+            $this->error("ÉCHEC : l'entrée d'audit de fin n'a pas pu être écrite ({$auditFinEchoue}). Les lots, eux, sont écrits ET journalisés un par un.");
 
             return self::FAILURE;
         }
@@ -357,7 +382,7 @@ class CrmReferentielsReclasser extends Command
      * (Sous le rôle applicatif, la RLS masque les autres espaces : la garde n'y
      * voit que celui-ci — elle ne peut alors que laisser passer.)
      */
-    private function espaceSansFicheInsee(string $workspaceId): ?string
+    private function espaceSansFicheInsee(string $workspaceId, bool $discret = false): ?string
     {
         // Hors corbeille (`deleted_at`) : une fiche supprimée ne fait pas un
         // espace de prospection.
@@ -369,9 +394,15 @@ class CrmReferentielsReclasser extends Command
         $ailleurs = DB::table('companies')->where('workspace_id', '<>', $workspaceId)
             ->where('discovery_source', 'insee')->whereNull('deleted_at')->value('workspace_id');
 
-        return $ailleurs === null ? null
-            : "REFUS : l'espace visé n'a aucune fiche INSEE, alors que l'espace {$ailleurs} en porte. "
-                . 'Préciser --workspace (la collecte écrit dans ' . (EspaceProspection::parDefaut() ?? '?') . ').';
+        if ($ailleurs === null) {
+            return null;
+        }
+        if ($discret) {
+            return "REFUS : l'espace visé n'a aucune fiche INSEE, alors qu'un autre espace en porte. Préciser --workspace.";
+        }
+
+        return "REFUS : l'espace visé n'a aucune fiche INSEE, alors que l'espace {$ailleurs} en porte. "
+            . 'Préciser --workspace (la collecte écrit dans ' . (EspaceProspection::parDefaut() ?? '?') . ').';
     }
 
     private function compterProtegees(string $workspaceId): int
@@ -420,7 +451,7 @@ class CrmReferentielsReclasser extends Command
      *
      * @param  list<stdClass>  $fiches
      */
-    private function traiterLot(string $workspaceId, array $fiches, bool $dryRun, bool $etiquettes): void
+    private function traiterLot(string $workspaceId, array $fiches, bool $dryRun, bool $etiquettes, ?Closure $tracer = null): void
     {
         /** @var list<array{fiche: stdClass, nouveau: array<string, ?string>}> $aModifier */
         $aModifier = [];
@@ -480,7 +511,7 @@ class CrmReferentielsReclasser extends Command
             return;
         }
 
-        DB::transaction(function () use ($workspaceId, $aModifier, $plan): void {
+        DB::transaction(function () use ($workspaceId, $aModifier, $plan, $tracer): void {
             // Un verrou qui ne vient pas en 5 s fait échouer CE lot (et la
             // commande, qui dit où reprendre) plutôt que de faire la queue
             // devant tout le trafic de la console.
@@ -509,6 +540,11 @@ class CrmReferentielsReclasser extends Command
             }
             if ($ajouts !== []) {
                 $this->compteurs['etiquettes_ajoutees'] += $this->ajouterEtiquettes($workspaceId, $ajouts);
+            }
+            // En DERNIER : le verrou de la chaîne d'audit n'est tenu que le
+            // temps du COMMIT de ce lot.
+            if ($tracer !== null) {
+                $tracer();
             }
         });
     }
@@ -658,23 +694,31 @@ class CrmReferentielsReclasser extends Command
         return $n;
     }
 
-    /** @param  list<array{company_id: int, slug: string}>  $ajouts */
+    /**
+     * Les ajouts passent par un `INSERT … SELECT` gardé : une fiche devenue
+     * protégée entre la lecture du lot et cette écriture n'en reçoit aucun.
+     *
+     * @param  list<array{company_id: int, slug: string}>  $ajouts
+     */
     private function ajouterEtiquettes(string $workspaceId, array $ajouts): int
     {
         $n = 0;
         $maintenant = now();
         foreach (array_chunk($ajouts, 1000) as $paquet) {
-            $lignes = [];
+            $valeurs = [];
+            $liaisons = [$workspaceId, $maintenant];
             foreach ($paquet as $a) {
-                $lignes[] = [
-                    'company_id' => $a['company_id'],
-                    'tag_id' => $this->tagId($workspaceId, $a['slug']),
-                    'workspace_id' => $workspaceId,
-                    'assigned_at' => $maintenant,
-                    'assigned_by' => 'auto-rule',
-                ];
+                $valeurs[] = '(?::bigint, ?::bigint)';
+                array_push($liaisons, $a['company_id'], $this->tagId($workspaceId, $a['slug']));
             }
-            $n += DB::table('company_tag')->insertOrIgnore($lignes);
+            $n += DB::affectingStatement(
+                "INSERT INTO company_tag (company_id, tag_id, workspace_id, assigned_at, assigned_by)
+                 SELECT v.company_id, v.tag_id, ?::uuid, ?::timestamptz, 'auto-rule'
+                 FROM (VALUES " . implode(', ', $valeurs) . ') AS v(company_id, tag_id)
+                 WHERE ' . FichesProtegees::conditionSql('v.company_id') . '
+                 ON CONFLICT DO NOTHING',
+                $liaisons,
+            );
         }
 
         return $n;
@@ -944,7 +988,7 @@ class CrmReferentielsReclasser extends Command
         $this->repartitions[$dimension]['apres'][$b] = ($this->repartitions[$dimension]['apres'][$b] ?? 0) + 1;
     }
 
-    private function afficherBilan(bool $dryRun, bool $etiquettes): void
+    private function afficherBilan(bool $dryRun, bool $etiquettes, bool $discret = false): void
     {
         $this->newLine();
         $this->info($dryRun ? '═══ BILAN DE L\'ESSAI À BLANC (rien n\'a été écrit) ═══' : '═══ BILAN DU RECLASSEMENT ═══');
@@ -974,10 +1018,20 @@ class CrmReferentielsReclasser extends Command
             usort($valeurs, static fn (string $x, string $y): int => ($apres[$y] ?? 0) <=> ($apres[$x] ?? 0) ?: strcmp($x, $y));
             $lignes = [];
             $horsReferentiel = 0;
+            $masquees = ['avant' => 0, 'apres' => 0];
             foreach ($valeurs as $v) {
-                $connu = $v === '(vide)' || $libelles[$dimension] === [] || array_key_exists($v, $libelles[$dimension]);
+                $connu = $v === '(vide)' || array_key_exists($v, $libelles[$dimension])
+                    || ($dimension === 'nomenclature' && in_array($v, Taxonomy::NAF_NOMENCLATURES, true));
                 if (! $connu) {
                     $horsReferentiel += $apres[$v] ?? 0;
+                }
+                if (! $connu && $discret) {
+                    // Journaux publics : une valeur brute hors référentiel
+                    // n'est jamais affichée, seulement comptée.
+                    $masquees['avant'] += $avant[$v] ?? 0;
+                    $masquees['apres'] += $apres[$v] ?? 0;
+
+                    continue;
                 }
                 $lignes[] = [
                     $v,
@@ -987,12 +1041,19 @@ class CrmReferentielsReclasser extends Command
                     sprintf('%+d', ($apres[$v] ?? 0) - ($avant[$v] ?? 0)),
                 ];
             }
+            if ($masquees['avant'] + $masquees['apres'] > 0) {
+                $lignes[] = [
+                    '(hors référentiel)',
+                    '',
+                    $masquees['avant'],
+                    $masquees['apres'],
+                    sprintf('%+d', $masquees['apres'] - $masquees['avant']),
+                ];
+            }
             $this->newLine();
             $this->line("<comment>{$titre}</comment>");
             $this->table(['valeur', 'libellé', 'avant', 'après', 'écart'], $lignes);
-            if ($libelles[$dimension] !== []) {
-                $this->line("  valeurs hors référentiel restantes après : {$horsReferentiel}");
-            }
+            $this->line("  valeurs hors référentiel restantes après : {$horsReferentiel}");
         }
 
         $this->newLine();

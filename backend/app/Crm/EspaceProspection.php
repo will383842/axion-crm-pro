@@ -17,10 +17,14 @@ use Illuminate\Support\Facades\DB;
  */
 final class EspaceProspection
 {
-    /** L'espace par défaut : le premier créé (règle de `prospection:collect`). */
+    /**
+     * L'espace par défaut : le premier créé (règle de `prospection:collect`),
+     * hors corbeille — comme `resoudre()` : un espace supprimé ne reçoit ni
+     * collecte ni reclassement.
+     */
     public static function parDefaut(): ?string
     {
-        $id = DB::table('workspaces')->orderBy('created_at')->value('id');
+        $id = DB::table('workspaces')->whereNull('deleted_at')->orderBy('created_at')->value('id');
 
         return $id === null ? null : (string) $id;
     }

@@ -14,6 +14,7 @@ use App\Crm\EspaceProspection;
 use App\Crm\FichesProtegees;
 use App\Data\Sources\InseeCompanyData;
 use App\Models\Workspace;
+use App\Services\Audit\AuditHashChain;
 use Illuminate\Database\Connection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -380,6 +381,8 @@ test('la collecte INSEE range secteur, taille, nature et region par le meme calc
                     raw: ['uniteLegale' => ['categorieEntreprise' => 'GE']],
                 ),
                 new InseeCompanyData(siren: '931000003', denomination: 'ZZ Déjà association', naf: '94.99Z'),
+                new InseeCompanyData(siren: '931000004', denomination: 'ZZ Fédération', naf: '94.11Z'),
+                new InseeCompanyData(siren: '931000005', denomination: 'ZZ Ancien secteur', naf: '94.11Z'),
             ];
         }
 
@@ -391,6 +394,11 @@ test('la collecte INSEE range secteur, taille, nature et region par le meme calc
     // Une fiche déjà classée « association » à la main : la collecte ne
     // réécrit JAMAIS une nature décidée.
     rcFiche($this->espace, ['siren' => '931000003', 'entity_nature' => 'association', 'discovery_source' => 'site']);
+    // Branche « conserver » de l'upsert : un code NAF muet (94) ne remplace
+    // pas un secteur VALIDE déjà posé…
+    rcFiche($this->espace, ['siren' => '931000004', 'sector_main' => 'interprofessionnel']);
+    // … et son témoin : un secteur hors référentiel, lui, est remplacé.
+    rcFiche($this->espace, ['siren' => '931000005', 'sector_main' => 'associatif']);
 
     Artisan::call('prospection:collect', ['department' => '38', '--workspace' => $this->espace, '--req-delay' => 0]);
 
@@ -404,7 +412,10 @@ test('la collecte INSEE range secteur, taille, nature et region par le meme calc
         ->and($lire('931000002')->sector_main)->toBe('numerique_telecoms')
         ->and($lire('931000002')->size_category)->toBe('grand_groupe')
         ->and($lire('931000003')->entity_nature)->toBe('association')
-        ->and($lire('931000003')->sector_main)->toBe('non_classe');
+        ->and($lire('931000003')->sector_main)->toBe('non_classe')
+        ->and($lire('931000004')->sector_main)->toBe('interprofessionnel')
+        ->and($lire('931000004')->naf)->toBe('94.11Z')
+        ->and($lire('931000005')->sector_main)->toBe('non_classe');
 });
 
 // ── Sous le rôle de production (RLS) ──────────────────────────────────────
@@ -648,7 +659,7 @@ test('B6 — un espace sans fiche INSEE est refuse quand un autre en porte', fun
 });
 
 test('B6 — la collecte et le reclassement ont le meme espace par defaut', function () {
-    $collecte = (string) DB::table('workspaces')->orderBy('created_at')->value('id');
+    $collecte = (string) DB::table('workspaces')->whereNull('deleted_at')->orderBy('created_at')->value('id');
 
     expect(EspaceProspection::resoudre(null))->toBe($collecte);
 });
@@ -734,4 +745,141 @@ test('B7 — un index nature reste INVALIDE est detecte par la migration', funct
     expect($migration::indexInvalide($index))->toBeFalse();
     DB::statement("UPDATE pg_index SET indisvalid = false WHERE indexrelid = '{$index}'::regclass");
     expect($migration::indexInvalide($index))->toBeTrue();
+});
+
+// ══ 2e relecture sécurité (2026-09-28) ══════════════════════════════════════
+
+test('S1 — avec une fiche protegee dans l espace, le retrait et le menage visent la fiche ordinaire et pas la protegee', function () {
+    // L'alias interne de `FichesProtegees::conditionSql()` valait `ct`. Appelée
+    // avec `'ct.company_id'`, la condition devenait `ct.company_id =
+    // ct.company_id` : dès qu'UNE fiche protégée existait dans l'espace, le
+    // DELETE ne retirait RIEN, nulle part.
+    $protegee = rcFiche($this->espace, ['naf' => '52.1D', 'sector_main' => 'transport']);
+    rcLier($this->espace, $protegee, rcTag($this->espace, FichesProtegees::TAGS[0], ['is_locked' => true, 'category' => 'intent']));
+    $microProtegee = rcTag($this->espace, 'size-micro', ['category' => 'size']);
+    rcLier($this->espace, $protegee, $microProtegee);
+
+    $ordinaire = rcFiche($this->espace, ['naf' => '52.1D', 'sector_main' => 'transport', 'department_code' => '38']);
+    rcLier($this->espace, $ordinaire, rcTag($this->espace, 'sector-transport', ['category' => 'sector']));
+
+    // Le ménage à blanc : `sector-transport` (portée par la seule fiche
+    // ordinaire) partirait ; `size-micro` (portée par la protégée) resterait.
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--dry-run' => true]);
+    expect(rcCompteur(Artisan::output(), 'etiquettes_obsoletes_a_supprimer'))->toBe(1);
+
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
+    $reel = Artisan::output();
+
+    expect(rcSlugs($ordinaire))->toBe(['region-84', 'sector-commerce-detail'])
+        ->and(rcCompteur($reel, 'etiquettes_retirees'))->toBe(1)
+        ->and(rcCompteur($reel, 'etiquettes_obsoletes_supprimees'))->toBe(1)
+        ->and(DB::table('tags')->where('workspace_id', $this->espace)->where('slug', 'sector-transport')->exists())->toBeFalse()
+        // La protégée : intacte, étiquettes comprises.
+        ->and(rcSlugs($protegee))->toBe([FichesProtegees::TAGS[0], 'size-micro'])
+        ->and(DB::table('tags')->where('id', $microProtegee)->exists())->toBeTrue()
+        ->and(DB::table('companies')->where('id', $protegee)->value('sector_main'))->toBe('transport');
+});
+
+test('S2 — une fiche deja juste devenue protegee avant l ecriture ne recoit aucune etiquette', function () {
+    $id = rcFiche($this->espace, [
+        'naf' => '62.01Z', 'sector_main' => 'numerique_telecoms', 'entity_nature' => 'entreprise',
+        'naf_nomenclature' => 'naf_rev2', 'naf_rev2' => '62.01Z',
+    ]);
+    $protection = rcTag($this->espace, FichesProtegees::TAGS[0], ['is_locked' => true, 'category' => 'intent']);
+    rcApresLecture(fn () => rcLier($this->espace, $id, $protection));
+
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
+
+    expect(rcCompteur(Artisan::output(), 'fiches_a_modifier'))->toBe(0)
+        ->and(rcSlugs($id))->toBe([FichesProtegees::TAGS[0]]);
+});
+
+test('S2 — TEMOIN : la meme fiche, non protegee, recoit son etiquette', function () {
+    $id = rcFiche($this->espace, [
+        'naf' => '62.01Z', 'sector_main' => 'numerique_telecoms', 'entity_nature' => 'entreprise',
+        'naf_nomenclature' => 'naf_rev2', 'naf_rev2' => '62.01Z',
+    ]);
+
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
+
+    expect(rcSlugs($id))->toBe(['sector-numerique-telecoms']);
+});
+
+test('S3 — compteurs-seulement : ni valeur brute hors referentiel, ni identifiant d espace', function () {
+    rcFiche($this->espace, ['naf' => '94.12Z', 'sector_main' => 'zz_secteur_brut', 'size_category' => 'zz-taille-brute']);
+
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--dry-run' => true, '--compteurs-seulement' => true]);
+    $discret = Artisan::output();
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--dry-run' => true]);
+    $complet = Artisan::output();
+
+    expect($discret)->not->toContain('zz_secteur_brut')
+        ->and($discret)->not->toContain('zz-taille-brute')
+        ->and($discret)->not->toContain($this->espace)
+        ->and($discret)->toContain('(hors référentiel)')
+        // Témoin : en mode normal, Will voit tout.
+        ->and($complet)->toContain('zz_secteur_brut')
+        ->and($complet)->toContain('zz-taille-brute')
+        ->and($complet)->toContain($this->espace);
+});
+
+test('S4 — l espace par defaut ignore un espace en corbeille', function () {
+    $ancien = (string) Str::uuid();
+    Workspace::create(['id' => $ancien, 'slug' => 'zz-ancien-' . Str::random(6), 'name' => 'ZZ ancien']);
+    DB::table('workspaces')->where('id', $ancien)->update(['created_at' => '1990-01-01 00:00:00']);
+
+    // Témoin : le plus ancien espace, actif, EST l'espace par défaut.
+    expect(EspaceProspection::parDefaut())->toBe($ancien);
+
+    DB::table('workspaces')->where('id', $ancien)->update(['deleted_at' => now()]);
+
+    expect(EspaceProspection::parDefaut())->not->toBe($ancien)
+        ->and(EspaceProspection::parDefaut())->not->toBeNull();
+});
+
+/** Une chaîne d'audit qui refuse d'écrire un type d'entrée donné. */
+function rcAuditQuiEchoue(string $evenement): AuditHashChain
+{
+    return new class($evenement) extends AuditHashChain
+    {
+        public function __construct(private readonly string $refuse)
+        {
+            parent::__construct();
+        }
+
+        public function record(array $row): int
+        {
+            if (($row['method'] ?? null) === $this->refuse) {
+                throw new RuntimeException('zz audit indisponible');
+            }
+
+            return parent::record($row);
+        }
+    };
+}
+
+test('S5 — un lot dont l audit echoue est annule en entier : jamais un lot ecrit sans sa trace', function () {
+    $id = rcFiche($this->espace, ['naf' => '52.1D', 'sector_main' => 'transport', 'department_code' => '38']);
+    $this->app->instance(AuditHashChain::class, rcAuditQuiEchoue('RECLASSEMENT_REFERENTIELS_LOT'));
+
+    $code = Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
+
+    expect($code)->toBe(1)
+        ->and(Artisan::output())->toContain('un lot a été annulé')
+        ->and(DB::table('companies')->where('id', $id)->value('sector_main'))->toBe('transport')
+        ->and(rcSlugs($id))->toBe([])
+        // L'entrée de FIN, elle, dit où l'on s'est arrêté.
+        ->and(DB::table('audit_logs')->where('workspace_id', $this->espace)->where('event_type', 'RECLASSEMENT_REFERENTIELS_FIN')->count())->toBe(1);
+});
+
+test('S5 — si l audit de fin echoue, la commande sort en echec, et les lots restent ecrits et journalises', function () {
+    $id = rcFiche($this->espace, ['naf' => '52.1D', 'sector_main' => 'transport']);
+    $this->app->instance(AuditHashChain::class, rcAuditQuiEchoue('RECLASSEMENT_REFERENTIELS_FIN'));
+
+    $code = Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
+
+    expect($code)->toBe(1)
+        ->and(Artisan::output())->toContain('audit de fin')
+        ->and(DB::table('companies')->where('id', $id)->value('sector_main'))->toBe('commerce_detail')
+        ->and(DB::table('audit_logs')->where('workspace_id', $this->espace)->where('event_type', 'RECLASSEMENT_REFERENTIELS_LOT')->count())->toBe(1);
 });

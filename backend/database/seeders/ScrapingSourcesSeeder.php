@@ -143,6 +143,13 @@ class ScrapingSourcesSeeder extends Seeder
             'dedup_key_pattern' => 'siren',
             'legal_note' => 'Pages publiques des événements professionnels et de leurs organisateurs (CCI, réseaux et clubs d\'affaires, associations d\'entrepreneurs, salons) : coordonnées publiées pour être contactées. Finalité : proposer une intervention gratuite de Will. Intérêt légitime B2B ; information art. 14 au premier message ; opposition respectée. Fiches protégées (FichesProtegees) : ni purge, ni enrichissement automatique, ni audience.',
         ],
+        'federations-2026' => [
+            'name' => 'Fédérations et organisations professionnelles (annuaire 2026)',
+            'kind' => 'import',
+            'ttl_days' => 365,
+            'dedup_key_pattern' => 'siren',
+            'legal_note' => 'Registre Sirene (open data) pour l\'identité des organismes (codes 94.11Z, 94.12Z, 94.20Z, 94.99Z) ; coordonnées publiées pour être contactées sur leurs sites, l\'annuaire de l\'administration, le répertoire HATVP et les annuaires des ordres et confédérations. Finalité : proposer une intervention ou un partenariat, et les offres d\'Axion-IA. Intérêt légitime B2B ; information art. 14 au premier message ; opposition respectée. Fiches protégées (FichesProtegees) : ni purge, ni enrichissement automatique, ni audience par défaut.',
+        ],
         'gplaces' => [
             'name' => 'Google Places API',
             'kind' => 'api',

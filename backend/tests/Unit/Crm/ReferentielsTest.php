@@ -231,6 +231,8 @@ test('le référentiel des natures ne contient pas « autre »', function () {
         ->and(array_keys(Taxonomy::ENTITY_NATURES))->toBe([
             'entreprise', 'association', 'cci', 'enseignement',
             'cabinet', 'institution', 'media', 'reseau',
+            // Chantier 3 (2026-09-29) : organisations professionnelles.
+            'federation',
         ]);
 });
 

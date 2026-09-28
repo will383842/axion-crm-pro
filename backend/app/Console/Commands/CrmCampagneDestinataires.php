@@ -3,7 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Crm\Campagnes\Segments;
+use App\Crm\Federations\EtiquettesFederation;
 use App\Crm\Personnes\NatureEmail;
+use App\Crm\Taxonomy;
 use App\Support\EligibiliteCampagne;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
@@ -29,8 +31,11 @@ use Illuminate\Support\Facades\DB;
  *  - opposition ou suppression (`EligibiliteCampagne::peutRecevoir`, portée
  *    business — la porte imposée par la garde B15-009).
  *
- * Chaque ligne cite tous les organisateurs de l'adresse et l'événement à venir
- * le plus proche, pour personnaliser. `crm:campagne:retours` retrouve ensuite
+ * Chaque ligne cite toutes les organisations de l'adresse et l'événement à venir
+ * le plus proche, pour personnaliser. Pour le segment `federations`, elle porte
+ * aussi la famille, le niveau et la tête de réseau de l'organisme ; les
+ * organismes de pertinence FAIBLE en sont écartés sauf `--avec-pertinence-faible`
+ * (décision du 28/09). `crm:campagne:retours` retrouve ensuite
  * TOUTES les fiches de l'adresse : aucune ne reste « non informée ».
  */
 class CrmCampagneDestinataires extends Command
@@ -38,7 +43,8 @@ class CrmCampagneDestinataires extends Command
     protected $signature = 'crm:campagne:destinataires
                             {segment : Segment visé (liste fermée, cf. App\Crm\Campagnes\Segments)}
                             {sortie : Fichier JSONL à écrire, HORS du dépôt}
-                            {--non-informes : Seulement les adresses dont aucune fiche n\'a reçu de premier message (first_info_at)}';
+                            {--non-informes : Seulement les adresses dont aucune fiche n\'a reçu de premier message (first_info_at)}
+                            {--avec-pertinence-faible : Segment federations : réintégrer les organismes de pertinence faible (écartés par défaut)}';
 
     protected $description = 'Prépare la liste des destinataires autorisés d\'une campagne (n\'envoie rien).';
 
@@ -70,21 +76,36 @@ class CrmCampagneDestinataires extends Command
         }
         $workspaceId = (string) $workspaceId;
 
+        $avecFaible = (bool) $this->option('avec-pertinence-faible');
+        if ($avecFaible && $segment !== Segments::FEDERATIONS) {
+            $this->error('--avec-pertinence-faible ne vaut que pour le segment « ' . Segments::FEDERATIONS . ' ».');
+
+            return self::FAILURE;
+        }
+
         $bilan = array_fill_keys([
-            'organisateurs', 'adresses_distinctes', 'destinataires', 'ecartees_invalides', 'ecartees_perso',
+            'fiches', 'ecartees_pertinence_faible', 'adresses_distinctes', 'destinataires', 'ecartees_invalides', 'ecartees_perso',
             'ecartees_deja_informees', 'ecartees_opposition', 'adresses_partagees', 'sans_evenement_a_venir',
         ], 0);
 
         /** @var array<string, list<array<string, mixed>>> $parAdresse */
         $parAdresse = [];
-        WorkspaceContext::run($workspaceId, function () use ($workspaceId, &$parAdresse, &$bilan): void {
-            foreach ($this->organisateurs($workspaceId) as $org) {
-                $bilan['organisateurs']++;
+        WorkspaceContext::run($workspaceId, function () use ($workspaceId, $segment, $avecFaible, &$parAdresse, &$bilan): void {
+            foreach ($this->fiches($workspaceId, $segment) as $org) {
+                if ($segment === Segments::FEDERATIONS && ! $avecFaible
+                    && $org->pertinence === Taxonomy::FEDERATION_PERTINENCE_HORS_CAMPAGNE) {
+                    $bilan['ecartees_pertinence_faible']++;
+
+                    continue;
+                }
+                $bilan['fiches']++;
                 $evenement = $this->prochainEvenement($workspaceId, (int) $org->id);
+                $federation = $segment === Segments::FEDERATIONS ? $this->federation($workspaceId, $org) : null;
                 foreach ($this->adresses($workspaceId, $org) as $a) {
                     $a['organisation'] = (string) $org->denomination;
                     $a['organisation_id'] = (int) $org->id;
                     $a['evenement'] = $evenement;
+                    $a['federation'] = $federation;
                     $parAdresse[mb_strtolower(trim($a['email']))][] = $a;
                 }
             }
@@ -135,7 +156,7 @@ class CrmCampagneDestinataires extends Command
                 $bilan['sans_evenement_a_venir']++;
             }
 
-            $lignes[] = [
+            $ligne = [
                 'crm_ref' => $premiere['crm_ref'],
                 'email' => $email,
                 'type' => $premiere['type'],
@@ -147,6 +168,10 @@ class CrmCampagneDestinataires extends Command
                 'organisations' => $organisations,
                 'evenement' => $evenement,
             ];
+            if ($segment === Segments::FEDERATIONS) {
+                $ligne['federation'] = $premiere['federation'];
+            }
+            $lignes[] = $ligne;
         }
 
         $flux = @fopen($chemin, 'wb');
@@ -203,21 +228,59 @@ class CrmCampagneDestinataires extends Command
         return $b['date_debut'] === null || $a['date_debut'] < $b['date_debut'];
     }
 
-    /** @return iterable<\stdClass> */
-    private function organisateurs(string $workspaceId): iterable
+    /**
+     * Les fiches du segment : celles qui portent SON tag, désigné par son nom
+     * (`Segments::tag`), jamais par sa position dans une liste.
+     *
+     * @return iterable<\stdClass>
+     */
+    private function fiches(string $workspaceId, string $segment): iterable
     {
+        $tag = Segments::tag($segment);
+
         return DB::table('companies')
+            ->leftJoin('federations', 'federations.company_id', '=', 'companies.id')
             ->where('companies.workspace_id', $workspaceId)
             ->whereNull('companies.deleted_at')
-            ->whereExists(function ($q): void {
+            ->whereExists(function ($q) use ($tag): void {
                 $q->selectRaw('1')
                     ->from('company_tag')
                     ->join('tags', 'tags.id', '=', 'company_tag.tag_id')
                     ->whereColumn('company_tag.company_id', 'companies.id')
-                    ->where('tags.slug', Segments::tagOrganisateurs());
+                    ->where('tags.slug', $tag);
             })
             ->orderBy('companies.id')
-            ->get(['companies.id', 'companies.denomination', 'companies.email_generic', 'companies.first_info_at']);
+            ->get([
+                'companies.id', 'companies.denomination', 'companies.email_generic', 'companies.first_info_at',
+                'federations.pertinence', 'federations.famille', 'federations.niveau', 'federations.secteurs',
+                'federations.parent_company_id',
+            ]);
+    }
+
+    /**
+     * Ce qui personnalise un message à une fédération : sa famille, son
+     * niveau, ses secteurs représentés et le nom de sa tête de réseau.
+     *
+     * @return array{famille: ?string, niveau: ?string, secteurs: list<string>, tete_de_reseau: ?string}
+     */
+    private function federation(string $workspaceId, \stdClass $org): array
+    {
+        $tete = null;
+        if ($org->parent_company_id !== null) {
+            $nom = DB::table('companies')
+                ->where('workspace_id', $workspaceId)
+                ->where('id', $org->parent_company_id)
+                ->whereNull('deleted_at')
+                ->value('denomination');
+            $tete = is_string($nom) ? $nom : null;
+        }
+
+        return [
+            'famille' => $org->famille,
+            'niveau' => $org->niveau,
+            'secteurs' => EtiquettesFederation::tableau($org->secteurs),
+            'tete_de_reseau' => $tete,
+        ];
     }
 
     /**

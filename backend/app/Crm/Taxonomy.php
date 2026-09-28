@@ -203,6 +203,14 @@ final class Taxonomy
         'intervention_acceptee',
         'intervention_refusee',
         'intervention_realisee',
+        // ── Fédérations : la démarche « partenariat » (chantier 3, 2026-09-29)
+        // Même patron que l'intervention : l'état courant vit sur
+        // `federations.partenariat` (listable), chaque étape franchie laisse
+        // ici une ligne datée (subject_type = 'company').
+        'partenariat_propose',
+        'partenariat_en_discussion',
+        'partenariat_accepte',
+        'partenariat_refuse',
     ];
 
     /**
@@ -382,6 +390,16 @@ final class Taxonomy
         'cand-zone' => 'candidate',
         'cand-dispo' => 'candidate',
         'cand-mobilite' => 'candidate',
+        // Fédérations (chantier 3, 2026-09-29) : étiquettes DÉRIVÉES de la
+        // table `federations` (`App\Crm\Federations\EtiquettesFederation`),
+        // posées et retirées par la synchro automatique — comme `geo:`/`sect:`,
+        // leur gouvernance est le namespace, pas une liste de slugs.
+        'famille' => 'custom',
+        'niveau' => 'geo',
+        'secteur' => 'sector',
+        'taille-adherents' => 'size',
+        'pertinence' => 'custom',
+        'contactabilite' => 'custom',
     ];
 
     /** @var list<string> */
@@ -531,7 +549,127 @@ final class Taxonomy
         'institution' => 'Institution',
         'media' => 'Média',
         'reseau' => 'Réseau ou club d\'affaires',
+        // Chantier 3 (2026-09-29) : fédérations, confédérations, ordres,
+        // chambres de métiers et d'agriculture, syndicats patronaux et de
+        // salariés, associations de métiers… Les CCI restent `cci`. Le détail
+        // (famille, niveau, secteurs représentés) vit dans `federations`.
+        'federation' => 'Organisation professionnelle',
     ];
+
+    // ════════════════════════════════════════════════════════════════════════
+    // FÉDÉRATIONS ET ORGANISATIONS PROFESSIONNELLES (chantier 3, 2026-09-29)
+    // ════════════════════════════════════════════════════════════════════════
+    //
+    // Colonnes de la table `federations` (une ligne par fiche `companies`).
+    // Chaque liste est fermée par un CHECK (garde `SocleCrmTest`) et exportée à
+    // l'écran par `crm:referentiels:generer-front`. Décisions de Will :
+    // `_FEDERATIONS/CADRAGE.md` §1, §3, §5, §7, §7 bis (hors dépôt).
+
+    /**
+     * Famille d'organisation — CADRAGE §1 et décisions du 28/09 (catégories
+     * limites gardées, chacune dans sa famille, ciblables ou excluables).
+     *
+     * @var array<string, string>
+     */
+    public const FEDERATION_FAMILLES = [
+        'confederation' => 'Confédération interprofessionnelle',
+        'federation_syndicat_pro' => 'Fédération ou syndicat professionnel',
+        'ordre' => 'Ordre professionnel',
+        'profession_reglementee' => 'Chambre ou compagnie de profession réglementée',
+        'chambre_consulaire' => 'Chambre consulaire',
+        'syndicat_salaries' => 'Syndicat de salariés',
+        'association_metier' => 'Association de métier ou de fonction',
+        'association_entreprises' => 'Association d\'entreprises ou de dirigeants',
+        'interprofession' => 'Interprofession ou organisme technique',
+        'pole_cluster' => 'Pôle de compétitivité ou cluster',
+        'financeur_formation' => 'Financeur de la formation (OPCO…)',
+        'developpement_economique' => 'Développement économique',
+        'association_elus' => 'Association d\'élus',
+        'mutuelle_agricole' => 'Mutuelle ou caisse agricole',
+        'proprietaires_locataires' => 'Propriétaires et locataires',
+    ];
+
+    /** @var array<string, string> */
+    public const FEDERATION_NIVEAUX = [
+        'national' => 'National',
+        'regional' => 'Régional',
+        'departemental' => 'Départemental',
+        'local' => 'Local',
+    ];
+
+    /**
+     * Ce qu'on a trouvé pour joindre l'organisme, du meilleur au pire. Calculé
+     * par la recherche des contacts (hors CRM) ; la fiche n'est « finie » que
+     * si elle est joignable par e-mail (CADRAGE §7 bis).
+     *
+     * @var array<string, string>
+     */
+    public const FEDERATION_CONTACTABILITES = [
+        'email_verifie' => 'E-mail vérifié',
+        'formulaire_seulement' => 'Formulaire seulement',
+        'telephone_seulement' => 'Téléphone seulement',
+        'site_ou_linkedin_seulement' => 'Site ou LinkedIn seulement',
+        'aucun_contact' => 'Aucun contact',
+    ];
+
+    /**
+     * Certitude du classement (famille, niveau, secteurs) : `haute` = relu ou
+     * incontestable, `faible` = deviné. NULL = classé par règle, sans examen.
+     *
+     * @var array<string, string>
+     */
+    public const FEDERATION_CERTITUDES = [
+        'haute' => 'Haute',
+        'moyenne' => 'Moyenne',
+        'faible' => 'Faible',
+    ];
+
+    /**
+     * Pertinence pour Axion-IA — règle du CADRAGE §5, validée le 28/09.
+     * `faible` est exclue des campagnes PAR DÉFAUT (décision du 28/09).
+     *
+     * @var array<string, string>
+     */
+    public const FEDERATION_PERTINENCES = [
+        'haute' => 'Haute',
+        'moyenne' => 'Moyenne',
+        'faible' => 'Faible',
+    ];
+
+    /** Pertinence écartée des campagnes sauf option explicite (décision du 28/09). */
+    public const FEDERATION_PERTINENCE_HORS_CAMPAGNE = 'faible';
+
+    /**
+     * Démarche « partenariat » auprès de l'organisme (en plus de
+     * l'intervention, qui vit sur ses événements). Jamais écrite par un import.
+     *
+     * @var array<string, string>
+     */
+    public const FEDERATION_PARTENARIATS = [
+        'aucun' => 'Pas encore proposé',
+        'propose' => 'Proposé',
+        'en_discussion' => 'En discussion',
+        'accepte' => 'Accepté',
+        'refuse' => 'Refusé',
+    ];
+
+    /** Nombre maximal de secteurs représentés par un organisme. */
+    public const FEDERATION_SECTEURS_MAX = 3;
+
+    /**
+     * Secteurs qu'un organisme peut REPRÉSENTER : le référentiel des secteurs,
+     * sans `non_classe` (un secteur représenté est une information, pas un
+     * défaut). `interprofessionnel` en fait partie.
+     *
+     * @return list<string>
+     */
+    public static function secteursRepresentables(): array
+    {
+        return array_values(array_filter(
+            array_keys(self::SECTEURS),
+            static fn (string $cle): bool => $cle !== self::SECTEUR_NON_CLASSE,
+        ));
+    }
 
     /**
      * Régions — code INSEE de région (`companies.region_code`, `events.region`).

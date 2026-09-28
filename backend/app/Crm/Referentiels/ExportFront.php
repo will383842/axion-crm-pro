@@ -36,6 +36,13 @@ final class ExportFront
             self::liste('TAILLES', 'CleTaille', Taxonomy::TAILLES, 'Tailles — `companies.size_category`.'),
             self::liste('NATURES', 'CleNature', Taxonomy::ENTITY_NATURES, 'Natures d\'entité — `companies.entity_nature`.'),
             self::liste('REGIONS', 'CodeRegion', Taxonomy::REGIONS, 'Régions (code INSEE) — `companies.region_code`, `events.region`.'),
+            // Fédérations (chantier 3, 2026-09-29) — table `federations`.
+            self::liste('FAMILLES_FEDERATION', 'CleFamilleFederation', Taxonomy::FEDERATION_FAMILLES, 'Familles d\'organisation professionnelle — `federations.famille`.'),
+            self::liste('NIVEAUX_FEDERATION', 'CleNiveauFederation', Taxonomy::FEDERATION_NIVEAUX, 'Niveaux — `federations.niveau`.'),
+            self::liste('CONTACTABILITES', 'CleContactabilite', Taxonomy::FEDERATION_CONTACTABILITES, 'Contactabilité — `federations.contactabilite`.'),
+            self::liste('CERTITUDES', 'CleCertitude', Taxonomy::FEDERATION_CERTITUDES, 'Certitude du classement — `federations.certitude`.'),
+            self::liste('PERTINENCES', 'ClePertinence', Taxonomy::FEDERATION_PERTINENCES, 'Pertinence — `federations.pertinence`.'),
+            self::liste('PARTENARIATS', 'ClePartenariat', Taxonomy::FEDERATION_PARTENARIATS, 'Démarche « partenariat » — `federations.partenariat`.'),
         ];
 
         return <<<'TS'

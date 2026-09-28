@@ -2,6 +2,7 @@
 
 namespace App\Services\Tags;
 
+use App\Crm\Federations\EtiquettesFederation;
 use App\Crm\Referentiels\EtiquettesClassement;
 use App\Crm\Taxonomy;
 use App\Models\Company;
@@ -17,6 +18,8 @@ use Illuminate\Support\Str;
  *  - implantation-XX (category=geo, kind=auto)     — depuis signals.implantations (pays ISO2)
  *  - size-{cat}     (category=size, kind=auto)     — depuis size_category
  *  - sector-{cat}   (category=sector, kind=auto)   — depuis sector_main
+ *  - famille:, niveau:, secteur:, taille-adherents:, pertinence:,
+ *    contactabilite: (kind=auto) — depuis la ligne `federations` de la fiche
  *  - {tag}          (category=intent, kind=llm)    — depuis signals.llm_classification.tags
  *
  * Crée les tags absents à la volée. Sync :
@@ -164,6 +167,16 @@ class AutoTaggerService
         // reclassement de masse (`crm:referentiels:reclasser`) — mêmes slugs,
         // mêmes noms, quel que soit le chemin qui les pose.
         foreach (EtiquettesClassement::desirees($company->sector_main, $company->size_category, $company->region_code) as $slug => $spec) {
+            $tags[$slug] = $spec + ['kind' => 'auto', 'assigned_by' => 'auto-rule'];
+        }
+
+        // Organisation professionnelle (chantier 3, 2026-09-29) : famille,
+        // niveau, secteurs représentés, taille des adhérents, pertinence,
+        // contactabilité — DÉRIVÉS de sa ligne `federations`. Une seule
+        // définition (`EtiquettesFederation`) : sans elle ici, la première
+        // resynchro retirerait ces étiquettes automatiques. Une fiche sans
+        // ligne (toute entreprise ordinaire) n'en désire aucune.
+        foreach (EtiquettesFederation::desirees(EtiquettesFederation::ligne((int) $company->id)) as $slug => $spec) {
             $tags[$slug] = $spec + ['kind' => 'auto', 'assigned_by' => 'auto-rule'];
         }
 

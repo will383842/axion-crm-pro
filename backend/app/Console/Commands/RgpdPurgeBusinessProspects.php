@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Console\Concerns\RefuseUneSuppressionMassive;
+use App\Crm\FichesProtegees;
 use App\Crm\Taxonomy;
 use App\Services\Audit\AuditHashChain;
 use App\Support\WorkspaceContext;
@@ -20,6 +21,9 @@ use Illuminate\Support\Facades\DB;
  * personne, plus vieilles que 3 ans. Les `companies` restent : une personne
  * morale n'est pas une donnée personnelle (ses signaux non plus) ; seuls ses
  * humains le sont.
+ *
+ * Les contacts des fiches PROTÉGÉES (`FichesProtegees` : organisateurs
+ * d'événements, fédérations) ne sont jamais visés (2026-09-29).
  *
  * Un contact qui a interagi (person_key présent dans la timeline, ou base
  * légale devenue precontractual/consent via l'ingestion L2) N'EST PAS touché :
@@ -63,6 +67,12 @@ class RgpdPurgeBusinessProspects extends Command
                             ->orWhereNull('legal_basis');
                     })
                     ->where('created_at', '<', now()->subYears(3))
+                    // Jamais un contact d'une fiche PROTÉGÉE (organisateurs
+                    // d'événements, fédérations) : Will a interdit de supprimer
+                    // ces contacts (27/09) — constat de l'audit du 28/09, la
+                    // purge les visait sans le savoir. Alias interne de la
+                    // condition : `fp_ct`/`fp_t`, distincts de `contacts`.
+                    ->whereRaw(FichesProtegees::conditionSql('contacts.company_id'))
                     // Jamais une personne qui a interagi : sa timeline en fait foi.
                     ->whereNotExists(function ($q) use ($workspaceId): void {
                         $q->selectRaw('1')

@@ -92,6 +92,9 @@ final class SemeurTablesScopees
         'email_verification_logs',
         'email_warmup_pools',
         'event_organizers',
+        // 2026-09-29 (chantier 3) : la ligne « organisation professionnelle »
+        // d'une fiche — feuille de `companies`.
+        'federations',
         'health_practitioners',
         'invitations',
         'journalists',
@@ -259,6 +262,14 @@ final class SemeurTablesScopees
         $inserer('event_organizers', [
             'event_id' => $id['events'],
             'company_id' => $id['companies'],
+        ]);
+
+        $inserer('federations', [
+            'company_id' => $id['companies'],
+            'famille' => 'ordre',
+            'niveau' => 'national',
+            'pertinence' => 'haute',
+            'contactabilite' => 'aucun_contact',
         ]);
 
         $id['crm_pipelines'] = $insererAvecId('crm_pipelines', [

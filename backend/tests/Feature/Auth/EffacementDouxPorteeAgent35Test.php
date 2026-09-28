@@ -503,10 +503,11 @@ test('B10-016-PORTEE COLONNES MORTES — deux tables recoivent un deleted_at par
     // site est le même geste, sur `users` ; seule sa ligne a bougé.
     // 224 -> 255 le 2026-09-29 : la PR #255 a inséré au-dessus le relevé des
     // numéros et l'effacement des fiches d'organisation. Même geste, sur
-    // `users` ; seule sa ligne a bougé.
+    // `users` ; seule sa ligne a bougé. 255 -> 258 : le relevé des numéros
+    // opposables (4e relecture) ; même geste, seule la ligne a bougé.
     expect($sites)->toBe([
         'app/Console/Commands/ImportMediaMerge.php:197',
-        'app/Services/Rgpd/GdprErasureService.php:255',
+        'app/Services/Rgpd/GdprErasureService.php:258',
     ]);
 });
 

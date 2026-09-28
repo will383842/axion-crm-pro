@@ -135,7 +135,7 @@ final class EffacementCoordonneesFiches
             if ($clesNom !== []) {
                 $autres->whereRaw('NOT (' . self::CLE_NOM . ' IN (' . self::marques($clesNom) . '))', $clesNom);
             }
-            if ($autres->exists()) {
+            if (self::existe($autres)) {
                 continue;
             }
 
@@ -147,8 +147,8 @@ final class EffacementCoordonneesFiches
             }
             // Le STANDARD d'une organisation : son téléphone, ou un téléphone
             // de ses canaux (E2) — les deux disent « joindre l'organisation ».
-            $standard = self::fichesAuNumero($variantes, $workspaceId)->exists()
-                || self::fichesAuxCanaux([], $variantes, $workspaceId)->exists();
+            $standard = self::existe(self::fichesAuNumero($variantes, $workspaceId))
+                || self::existe(self::fichesAuxCanaux([], $variantes, $workspaceId));
 
             if ($portable || ! $standard) {
                 $personnels[] = $telephone;
@@ -173,9 +173,9 @@ final class EffacementCoordonneesFiches
             if ($variantes === []) {
                 continue;
             }
-            if (self::contactsAuNumero($variantes, $workspaceId)->exists()
-                || self::fichesAuNumero($variantes, $workspaceId)->exists()
-                || self::fichesAuxCanaux([], $variantes, $workspaceId)->exists()) {
+            if (self::existe(self::contactsAuNumero($variantes, $workspaceId))
+                || self::existe(self::fichesAuNumero($variantes, $workspaceId))
+                || self::existe(self::fichesAuxCanaux([], $variantes, $workspaceId))) {
                 $presents[] = $telephone;
             }
         }
@@ -723,6 +723,19 @@ final class EffacementCoordonneesFiches
                     $q->whereRaw('false');
                 }
             });
+    }
+
+    /**
+     * « Au moins une ligne ? » par un COMPTE, jamais par `exists()`. Un
+     * `EXISTS` porte un `LIMIT 1` : le planificateur peut alors préférer
+     * parcourir l'index de l'ESPACE en espérant tomber vite sur une ligne —
+     * c'est-à-dire lire tout l'espace quand le numéro n'y est pas (mesuré
+     * en CI, garde `EffacementServiParDesIndexTest`). Les lignes comptées
+     * sont une poignée : le compte passe par l'index de la recherche.
+     */
+    private static function existe(Builder $requete): bool
+    {
+        return $requete->count() > 0;
     }
 
     private static function table(string $table, ?string $workspaceId): Builder

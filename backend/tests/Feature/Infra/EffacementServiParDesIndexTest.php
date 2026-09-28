@@ -166,7 +166,9 @@ function esiBitmapServi(array $noeud, array $admis, array &$vus): bool
     $enfants = (array) ($noeud['Plans'] ?? []);
 
     return match ($noeud['Node Type'] ?? '') {
-        'Bitmap Index Scan' => in_array($noeud['Index Name'] ?? '', $admis, true) && ($vus[$noeud['Index Name']] = true),
+        // Une condition d'index est EXIGÉE : un index partiel lu sans condition
+        // (pour son seul prédicat) est un parcours de toutes les fiches qu'il couvre.
+        'Bitmap Index Scan' => isset($noeud['Index Cond']) && in_array($noeud['Index Name'] ?? '', $admis, true) && ($vus[$noeud['Index Name']] = true),
         'BitmapOr' => $enfants !== [] && array_reduce($enfants, fn (bool $ok, array $e): bool => esiBitmapServi($e, $admis, $vus) && $ok, true),
         'BitmapAnd' => array_reduce($enfants, fn (bool $ok, array $e): bool => esiBitmapServi($e, $admis, $vus) || $ok, false),
         default => false,

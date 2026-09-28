@@ -36,7 +36,7 @@ division_rev1,secteur
 50,automobile
 51,commerce_gros
 52,commerce_detail
-55,hebergement_tourisme
+55,restauration
 60,transport_logistique
 61,transport_logistique
 62,transport_logistique
@@ -52,7 +52,7 @@ division_rev1,secteur
 74,services_entreprises
 75,administration_publique
 80,enseignement_formation
-85,medico_social
+85,sante
 90,eau_dechets
 91,non_classe
 92,culture_sport_loisirs

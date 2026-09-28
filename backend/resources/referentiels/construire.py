@@ -75,33 +75,53 @@ with open(os.path.join(OUT, "naf_rev2_secteurs.csv"), "w", encoding="utf-8", new
     w = csv.writer(f, lineterminator="\n"); w.writerow(["naf_rev2", "secteur", "libelle"])
     for c in sorted(rev2): w.writerow([c, rev2[c][1], rev2[c][0]])
 
-# 2) NAF rév. 1 -> rév. 2 : lien principal = 1re ligne de la table officielle pour chaque code rév. 1
+# 2) NAF rév. 1 -> rév. 2 : la table INSEE qualifie chaque lien dans « Précisions sur la nature du lien » :
+#    « CC » = contenu central (lien principal), « CA » = contenu annexe, vide = correspondance totale.
+#    Lien retenu : un lien CC (s'il y en a plusieurs : celui du secteur majoritaire parmi les CC, puis le 1er) ;
+#    sans CC : le lien sans précision ; à défaut, le 1er lien. Les liens CA ne servent JAMAIS à choisir.
 s = xlrd.open_workbook(os.path.join(ICI, "table_NAF1-NAF2.xls")).sheet_by_index(0)
 liens = collections.OrderedDict()
 for i in range(1, s.nrows):
     r = s.row_values(i)
     a = str(r[1]).strip().rstrip("p"); b = str(r[3]).strip().rstrip("p")
+    prec = str(r[5]).strip()
+    genre = "CC" if prec.startswith("CC") else ("CA" if prec.startswith("CA") else ("NC" if prec.startswith("NC") else ("TOTAL" if prec == "" else "AUTRE")))
     if re.fullmatch(r"\d\d\.\d[A-Z]", a) and re.fullmatch(r"\d\d\.\d\d[A-Z]", b):
-        liens.setdefault(a, []).append(b)
+        liens.setdefault(a, []).append((b, genre))
+
+def principaux(bs):
+    cc = [b for b, g in bs if g == "CC"]
+    if cc: return cc
+    tot = [b for b, g in bs if g == "TOTAL"]
+    if tot: return tot
+    autres = [b for b, g in bs if g not in ("CA", "NC")]
+    return autres or [bs[0][0]]
+
+def choisir(bs):
+    p = principaux(bs)
+    maj = collections.Counter(secteur_rev2(b) for b in p).most_common(1)[0][0]
+    return next(b for b in p if secteur_rev2(b) == maj), p
+
 ambigus = 0
 with open(os.path.join(OUT, "naf_rev1_vers_rev2.csv"), "w", encoding="utf-8", newline="\n") as f:
     w = csv.writer(f, lineterminator="\n"); w.writerow(["naf_rev1", "naf_rev2", "secteur", "secteurs_possibles"])
     for a, bs in liens.items():
-        secs = sorted({secteur_rev2(b) for b in bs}); ambigus += len(secs) > 1
-        w.writerow([a, bs[0], secteur_rev2(bs[0]), "|".join(secs)])
+        b, p = choisir(bs)
+        secs = sorted({secteur_rev2(x) for x in p}); ambigus += len(secs) > 1
+        w.writerow([a, b, secteur_rev2(b), "|".join(secs)])
 
 # 2 bis) Repli par groupe rév. 1 (« NN.N ») pour les codes de la révision 2003 absents de la table (ex. 51.6G, 72.2Z) :
-# secteur majoritaire des liens officiels du groupe.
+# secteur majoritaire des liens PRINCIPAUX du groupe.
 grp = collections.defaultdict(collections.Counter)
 for a, bs in liens.items():
-    for b in bs: grp[a[:4]][secteur_rev2(b)] += 1
+    for b in principaux(bs): grp[a[:4]][secteur_rev2(b)] += 1
 with open(os.path.join(OUT, "naf_rev1_groupes.csv"), "w", encoding="utf-8", newline="\n") as f:
     w = csv.writer(f, lineterminator="\n"); w.writerow(["groupe_rev1", "secteur"])
     for g in sorted(grp): w.writerow([g, grp[g].most_common(1)[0][0]])
 # 2 ter) Dernier repli par division rév. 1 (« NN ») : ex. 51.6G / 51.7Z (révision 2003) -> commerce de gros.
 div = collections.defaultdict(collections.Counter)
 for a, bs in liens.items():
-    for b in bs: div[a[:2]][secteur_rev2(b)] += 1
+    for b in principaux(bs): div[a[:2]][secteur_rev2(b)] += 1
 with open(os.path.join(OUT, "naf_rev1_divisions.csv"), "w", encoding="utf-8", newline="\n") as f:
     w = csv.writer(f, lineterminator="\n"); w.writerow(["division_rev1", "secteur"])
     for d in sorted(div): w.writerow([d, div[d].most_common(1)[0][0]])

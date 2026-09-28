@@ -26,8 +26,14 @@ use Illuminate\Support\Facades\DB;
  *     - `naf_nomenclature` rend la reprise MESURABLE : combien de fiches
  *       restent sur une nomenclature ancienne, sans recalcul ;
  *     - le code d'origine (`naf`) n'est JAMAIS réécrit : c'est ce que l'INSEE a
- *       dit, et la conversion d'un code rév. 1 est parfois ambiguë (la table
- *       officielle donne plusieurs codes rév. 2 ; on retient le principal).
+ *       dit, et la conversion d'un code rév. 1 est parfois ambiguë : la table
+ *       officielle donne plusieurs codes rév. 2, marqués « CC » (lien
+ *       principal), « CA » (lien annexe), « NC » ou sans marque (correspondance
+ *       totale). On retient un lien CC — s'il y en a plusieurs, celui du
+ *       secteur majoritaire parmi les CC, puis le premier ; sans CC, le lien
+ *       sans marque. Un lien CA ne sert JAMAIS à choisir : prendre la première
+ *       ligne de la table envoyait 74.1G (conseil) en agriculture — 33 899
+ *       fiches de production au mauvais secteur, 66 089 au mauvais code.
  *
  *    Les deux CHECK sont posés `NOT VALID` : posé VALIDE, un CHECK relit les
  *    4,3 M de lignes sous verrou exclusif. `NOT VALID` le fait respecter par

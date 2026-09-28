@@ -8,7 +8,7 @@ reclassement de masse, écrans). Aucune autre liste de secteurs ne doit exister 
 |---|---|---|
 | `secteurs.csv` | les 33 clés de secteur (31 secteurs + `interprofessionnel` + `non_classe`) et leur libellé | 33 |
 | `naf_rev2_secteurs.csv` | les 732 sous-classes de la NAF rév. 2 (2008) → secteur | 732 |
-| `naf_rev1_vers_rev2.csv` | les 712 codes de la NAF rév. 1 (1993/2003) → code rév. 2 principal + secteur | 712 |
+| `naf_rev1_vers_rev2.csv` | les 712 codes de la NAF rév. 1 (1993/2003) → code rév. 2 retenu + secteur (règle ci-dessous) | 712 |
 | `naf_rev1_groupes.csv` | repli par groupe rév. 1 (`NN.N`) pour les codes absents de la table officielle | 224 |
 | `naf_rev1_divisions.csv` | dernier repli par division rév. 1 (`NN`) | 62 |
 | `nap600_secteurs.csv` | les 650 postes de la NAP 600 (1973, format `NN.NN` sans lettre) → secteur | 650 |
@@ -37,6 +37,19 @@ Deux gardes empêchent une dérive silencieuse :
   existe dans cette liste ;
 - `tests/Unit/Crm/ReferentielsFrontTest.php` vérifie que le fichier généré pour l'écran
   (`frontend/src/lib/referentiels.generated.ts`) est à jour.
+
+## Choix du lien rév. 1 → rév. 2
+
+La table de passage INSEE marque chaque lien : « CC » (lien principal), « CA » (lien
+annexe), « NC », ou rien (correspondance totale). `construire.py` retient :
+
+1. un lien **CC** ; s'il y en a plusieurs, celui du secteur majoritaire parmi les CC, puis le premier ;
+2. sans CC, le lien **sans marque** ;
+3. un lien **CA** ne sert jamais à choisir.
+
+Les replis par groupe (`NN.N`) et par division (`NN`) ne comptent que les liens principaux.
+Prendre simplement la première ligne (première version du script) envoyait 74.1G (conseil)
+en agriculture : 33 899 fiches de production au mauvais secteur, 66 089 au mauvais `naf_rev2`.
 
 ## Règle de lecture du champ `companies.naf`
 

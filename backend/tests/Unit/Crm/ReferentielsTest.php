@@ -67,6 +67,28 @@ test('NAF rév. 1 : les erreurs de lecture corrigées, une par une', function ()
         ->and(NomenclatureNaf::secteur('70.1A'))->toBe('btp');
 });
 
+test('NAF rév. 1 : le lien retenu est le lien PRINCIPAL (CC), jamais un lien annexe (CA)', function () {
+    // La table INSEE donne plusieurs liens par code rév. 1. La première
+    // version du script prenait la PREMIÈRE ligne : 74.1G (conseil) partait en
+    // agriculture — 33 899 fiches de production au mauvais secteur, 66 089 au
+    // mauvais `naf_rev2`. Attendus vérifiés contre le XLS INSEE.
+    $cas = [
+        '74.1G' => ['70.21Z', 'conseil_management'],
+        '74.6Z' => ['80.10Z', 'services_entreprises'],
+        '22.1A' => ['58.11Z', 'edition_medias'],
+        '51.3A' => ['46.31Z', 'commerce_gros'],
+        '93.0N' => ['96.09Z', 'services_personne'],
+        '45.2U' => ['43.99D', 'btp'],
+        '72.4Z' => ['63.12Z', 'numerique_telecoms'],
+        '92.7C' => ['93.29Z', 'culture_sport_loisirs'],
+        '74.8K' => ['77.40Z', 'services_entreprises'],
+    ];
+    foreach ($cas as $code => [$rev2, $secteur]) {
+        $c = NomenclatureNaf::classer($code);
+        expect([$code, $c->codeRev2, $c->secteur, $c->methode])->toBe([$code, $rev2, $secteur, 'rev1_table']);
+    }
+});
+
 test('NAF rév. 1 absent de la table : repli par GROUPE (72.2Z, 64.2B)', function () {
     $c = NomenclatureNaf::classer('72.2Z');
 

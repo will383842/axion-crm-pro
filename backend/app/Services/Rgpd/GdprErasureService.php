@@ -2,6 +2,7 @@
 
 namespace App\Services\Rgpd;
 
+use App\Crm\Rgpd\EffacementCoordonneesFiches;
 use App\Services\Audit\AuditHashChain;
 use App\Services\Dedup\DeduplicationService;
 use Illuminate\Database\Query\Builder;
@@ -20,12 +21,28 @@ class GdprErasureService
         private readonly DeduplicationService $dedup,
     ) {}
 
-    /** @return array{deleted: array<string,int>, opt_out_added: bool} */
+    /**
+     * `complete` n'est vrai que si, APRÈS l'effacement, l'adresse et les
+     * numéros de la personne ne se retrouvent plus nulle part où ce service
+     * sait chercher (`EffacementCoordonneesFiches::residus`). Sinon `residus`
+     * dit où ils restent, et l'appelant ne doit PAS déclarer la demande soldée.
+     *
+     * @return array{deleted: array<string,int>, opt_out_added: bool, complete: bool, residus: array<string,int>}
+     */
     public function erase(string $subjectEmail, ?string $phone = null, ?string $reason = 'gdpr_art17'): array
     {
         return DB::transaction(function () use ($subjectEmail, $phone, $reason) {
             $email = strtolower(trim($subjectEmail));
             $deleted = [];
+
+            // Les numéros de la personne : celui de la demande, et ceux que
+            // portent SES fiches personnes — relevés AVANT leur suppression.
+            // Une demande de la console ne cite que l'adresse ; le mobile de la
+            // personne n'en est pas moins une de ses coordonnées.
+            $telephones = array_values(array_unique(array_filter(array_merge(
+                [$phone ?? ''],
+                EffacementCoordonneesFiches::telephonesDesContacts($email),
+            ), static fn (string $t): bool => trim($t) !== '')));
 
             // On releve les `person_key` AVANT de supprimer : c'est par elles que
             // la timeline (`activities`) est rattachee a la personne. Les
@@ -119,15 +136,15 @@ class GdprErasureService
             // parce qu'une activite nee de la COLLECTE peut porter l'adresse sans
             // porter la cle. Le balayage est couteux ; un effacement est rare, et
             // la justesse prime ici sur la vitesse.
-            $requeteActivites = DB::table('activities')->where(function ($q) use ($clesPersonne, $email, $phone) {
+            $requeteActivites = DB::table('activities')->where(function ($q) use ($clesPersonne, $email, $telephones) {
                 if ($clesPersonne !== []) {
                     $q->orWhereIn('person_key', $clesPersonne);
                 }
                 $q->orWhereRaw('payload::text ILIKE ?', ['%' . $email . '%'])
                     ->orWhereRaw("coalesce(content, '') ILIKE ?", ['%' . $email . '%'])
                     ->orWhereRaw("coalesce(title, '') ILIKE ?", ['%' . $email . '%']);
-                if ($phone !== null && $phone !== '') {
-                    $q->orWhereRaw('payload::text ILIKE ?', ['%' . $phone . '%']);
+                foreach ($telephones as $telephone) {
+                    $q->orWhereRaw('payload::text ILIKE ?', ['%' . $telephone . '%']);
                 }
             });
             $deleted['activities'] = $requeteActivites->delete();
@@ -140,6 +157,15 @@ class GdprErasureService
                         ->orWhereRaw('to_addresses::text ILIKE ?', ['%' . $email . '%']);
                 })
                 ->delete();
+
+            // ── LES FICHES D'ORGANISATION (relecture de la PR #255, 2026-09-29)
+            // L'adresse et le mobile d'une personne vivent aussi sur la fiche de
+            // son organisation : e-mail générique, téléphone, canaux collectés,
+            // et fiches personnes qui portent son numéro sans son adresse. Mis à
+            // NULL — y compris sur une fiche PROTÉGÉE, qui survit.
+            foreach (EffacementCoordonneesFiches::effacer($email, $telephones) as $emplacement => $n) {
+                $deleted[$emplacement] = $n;
+            }
 
             // ── CE QU'ON NE SUPPRIME **PAS**, ET POURQUOI ────────────────────
             //
@@ -311,9 +337,33 @@ class GdprErasureService
                 scopes: DeduplicationService::UNIVERS_OPPOSITION,
             );
 
-            Log::info('GDPR erasure complete', ['email' => $email, 'deleted' => $deleted]);
+            // Chaque AUTRE numéro de la personne est opposé lui aussi : sans cela,
+            // le prochain import le remettrait sur la fiche de l'organisation.
+            foreach ($telephones as $telephone) {
+                if ($telephone !== $phone) {
+                    $this->dedup->addOptOut(
+                        null,
+                        $telephone,
+                        source: 'gdpr_erasure',
+                        reason: $reason,
+                        scopes: DeduplicationService::UNIVERS_OPPOSITION,
+                    );
+                }
+            }
 
-            return ['deleted' => $deleted, 'opt_out_added' => true];
+            // Un effacement ne se déclare complet que si l'on ne retrouve plus
+            // rien. Le journal ne porte JAMAIS l'adresse en clair : il en porte
+            // l'empreinte (il disait `email` jusqu'au 2026-09-29).
+            $residus = EffacementCoordonneesFiches::residus($email, $telephones);
+            $complet = $residus === [];
+            $contexte = ['email_hash' => hash('sha256', $email), 'deleted' => $deleted, 'residus' => $residus];
+            if ($complet) {
+                Log::info('GDPR erasure complete', $contexte);
+            } else {
+                Log::warning('GDPR erasure INCOMPLETE : coordonnees encore presentes', $contexte);
+            }
+
+            return ['deleted' => $deleted, 'opt_out_added' => true, 'complete' => $complet, 'residus' => $residus];
         });
     }
 

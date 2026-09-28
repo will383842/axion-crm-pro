@@ -2,6 +2,7 @@
 
 namespace App\Services\Rgpd;
 
+use App\Crm\Rgpd\EffacementCoordonneesFiches;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -63,6 +64,10 @@ class GdprPortabilityService
             'exported' => now()->toIso8601String(),
             'contacts' => DB::table('contacts')->where('email', $email)->get()->toArray(),
             'candidates' => DB::table('candidates')->where('email', $email)->get()->toArray(),
+            // 2026-09-29 (PR #255) : l'effacement atteint désormais les fiches
+            // d'ORGANISATION qui portent l'adresse (e-mail générique, canaux) ;
+            // ce qu'on sait effacer, on sait l'exporter.
+            'fiches_organisation' => EffacementCoordonneesFiches::fichesPortant($email),
             // Lot L4-C — la personne connue par la lettre ou le guide, et ses
             // abonnements (statut, version et date du consentement recopiés du
             // site, qui garde la preuve).

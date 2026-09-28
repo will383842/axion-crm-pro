@@ -244,8 +244,12 @@ class RgpdRequestsController extends ApiController
             $archive['note'] = $note;
         }
 
+        // Un effacement qui retrouve encore des coordonnées n'est PAS soldé :
+        // la demande reste « en cours » et son archive dit où elles restent.
+        $solde = ! ($req->type === 'erasure' && ($result['complete'] ?? true) === false);
+
         $req->update([
-            'status' => 'done',
+            'status' => $solde ? 'done' : 'processing',
             'processed_at' => now(),
             'processed_by' => $r->user()?->id,
             'metadata' => array_merge((array) $req->metadata, $archive),

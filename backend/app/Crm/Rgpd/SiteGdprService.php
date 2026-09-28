@@ -181,13 +181,22 @@ final class SiteGdprService
         $email = mb_strtolower(trim($email));
         $emailHash = hash('sha256', $email);
         $deleted = [];
+        /** @var list<string> $telephones */
+        $telephones = [];
 
         if (in_array($scope, ['both', 'business'], true)) {
             $businessId = $this->workspaceId((string) config('crm.ingest.business_workspace', 'axion-ia'));
             if ($businessId !== null) {
+                // Les numéros de la personne, relevés AVANT la suppression de
+                // ses fiches (cf. EffacementCoordonneesFiches) — dans le
+                // contexte de l'espace, sans quoi la RLS ne montrerait rien.
+                $telephones = WorkspaceContext::run(
+                    $businessId,
+                    fn (): array => EffacementCoordonneesFiches::telephonesDesContacts($email, $businessId),
+                );
                 $deleted['business'] = WorkspaceContext::run(
                     $businessId,
-                    fn (): array => DB::transaction(function () use ($businessId, $personKey, $email): array {
+                    fn (): array => DB::transaction(function () use ($businessId, $personKey, $email, $telephones): array {
                         $contacts = DB::table('contacts')
                             ->where('workspace_id', $businessId)
                             ->where(function ($q) use ($personKey, $email): void {
@@ -232,11 +241,16 @@ final class SiteGdprService
 
                         $activites = $this->deleteActivities($businessId, $personKey);
 
+                        // Les fiches d'ORGANISATION qui portent son adresse ou son
+                        // mobile (e-mail générique, téléphone, canaux) — même
+                        // définition que l'effacement console (PR #255).
+                        $fiches = EffacementCoordonneesFiches::effacer($email, $telephones, $businessId);
+
                         // 🔴 Le journal DANS le contexte ET dans la transaction —
                         // cf. `journal()`.
                         $this->journal($businessId, $email);
 
-                        return [
+                        return $fiches + [
                             'contacts' => $contacts,
                             'personnes' => $personnes,
                             'abonnements' => $abonnements,
@@ -247,6 +261,9 @@ final class SiteGdprService
                 );
             }
             $this->optOut($email, $emailHash, 'business');
+            foreach ($telephones as $telephone) {
+                $this->optOutTelephone($telephone, 'business');
+            }
         }
 
         if (in_array($scope, ['both', 'vivier'], true)) {
@@ -318,6 +335,28 @@ final class SiteGdprService
             ->where('workspace_id', $workspaceId)
             ->where('person_key', $personKey)
             ->delete();
+    }
+
+    /**
+     * Le mobile d'une personne effacée ne revient pas par la collecte suivante
+     * (même règle que `DeduplicationService::addOptOut`, qui ôte espaces,
+     * points et tirets).
+     */
+    private function optOutTelephone(string $telephone, string $scope): void
+    {
+        $telephone = (string) preg_replace('/[\s.-]/', '', $telephone);
+        if ($telephone === '' || DB::table('opt_out')->where('scope', $scope)->where('phone', $telephone)->exists()) {
+            return;
+        }
+
+        DB::table('opt_out')->insert([
+            'email' => null,
+            'email_hash' => null,
+            'phone' => $telephone,
+            'scope' => $scope,
+            'source' => 'gdpr_erasure_bisystem',
+            'created_at' => now(),
+        ]);
     }
 
     private function optOut(string $email, string $emailHash, string $scope): void

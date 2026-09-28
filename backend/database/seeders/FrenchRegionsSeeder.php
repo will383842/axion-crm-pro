@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Crm\Taxonomy;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -15,34 +16,28 @@ class FrenchRegionsSeeder extends Seeder
     public function run(): void
     {
         // --- 13 régions métropolitaines + 5 DROM (codes INSEE 2026) ---
-        $regions = [
-            ['11', 'Île-de-France',              12317279],
-            ['24', 'Centre-Val de Loire',         2557000],
-            ['27', 'Bourgogne-Franche-Comté',     2807000],
-            ['28', 'Normandie',                   3327000],
-            ['32', 'Hauts-de-France',             6004000],
-            ['44', 'Grand Est',                   5552000],
-            ['52', 'Pays de la Loire',            3801000],
-            ['53', 'Bretagne',                    3357000],
-            ['75', 'Nouvelle-Aquitaine',          6018000],
-            ['76', 'Occitanie',                   5982000],
-            ['84', 'Auvergne-Rhône-Alpes',        8076000],
-            ['93', "Provence-Alpes-Côte d'Azur",  5089000],
-            ['94', 'Corse',                        342000],
-            ['01', 'Guadeloupe',                   384000],
-            ['02', 'Martinique',                   358000],
-            ['03', 'Guyane',                       299000],
-            ['04', 'La Réunion',                   868000],
-            ['06', 'Mayotte',                      299000],
+        // Codes et libellés : le référentiel unique `Taxonomy::REGIONS`
+        // (chantier « référentiels », 2026-09-28) — plus une liste recopiée ici.
+        // Seules les populations sont propres à ce seeder.
+        $populations = [
+            '11' => 12317279, '24' => 2557000, '27' => 2807000, '28' => 3327000,
+            '32' => 6004000, '44' => 5552000, '52' => 3801000, '53' => 3357000,
+            '75' => 6018000, '76' => 5982000, '84' => 8076000, '93' => 5089000,
+            '94' => 342000, '01' => 384000, '02' => 358000, '03' => 299000,
+            '04' => 868000, '06' => 299000,
         ];
 
-        foreach ($regions as [$code, $name, $population]) {
+        foreach (Taxonomy::REGIONS as $code => $name) {
+            // Clé « 84 » devenue entier par PHP : le code en base est un texte.
+            $code = (string) $code;
             DB::table('regions')->updateOrInsert(
                 ['code' => $code],
                 [
                     'country_code' => 'FR',
                     'name' => $name,
-                    'population' => $population,
+                    // Une région ajoutée au référentiel sans sa population ici
+                    // fait rougir PHPStan (clé absente du tableau littéral).
+                    'population' => $populations[$code],
                     'created_at' => now(),
                 ],
             );

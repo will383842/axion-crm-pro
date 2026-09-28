@@ -50,7 +50,7 @@ class DemoAudiencesSeeder extends Seeder
                 'description' => 'ETI et grandes entreprises prospectables, toutes régions.',
                 'criteria' => [
                     'all' => [
-                        ['field' => 'size_category', 'op' => 'in', 'value' => ['eti', 'grande']],
+                        ['field' => 'size_category', 'op' => 'in', 'value' => ['eti', 'grand_groupe']],
                         ['field' => 'prospection_status', 'op' => 'eq', 'value' => 'ready_for_outreach'],
                     ],
                 ],

@@ -6,9 +6,9 @@
  * Fixtures FICTIVES uniquement (dépôt public) : `example.invalid`, noms « ZZ ».
  */
 
-use App\Crm\Scraping\ScrapedRecord;
 use App\Crm\Taxonomy;
 use App\Models\Workspace;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -103,7 +103,7 @@ test('les CHECK des evenements en base suivent la taxonomie', function () {
 
 test('la nature reseau est acceptee par la base et par le format pivot', function () {
     expect(DB::table('companies')->where('id', $this->club)->value('entity_nature'))->toBe('reseau')
-        ->and(ScrapedRecord::ENTITY_NATURES)->toContain('reseau');
+        ->and(array_keys(Taxonomy::ENTITY_NATURES))->toContain('reseau');
 });
 
 test('la source evenements-pro est au registre, active, des la migration', function () {
@@ -271,4 +271,78 @@ test('un evenement recurrent sans date est accepte', function () {
     $event = DB::table('events')->where('external_ref', 'zz-bni')->first();
     expect($event->date_debut)->toBeNull()
         ->and($event->recurrence)->toBe('chaque mardi 7h');
+});
+
+// ── Référentiels (2026-09-28) : la région est un code INSEE ────────────────
+
+test('la region du sourcing (AURA) est enregistree en code INSEE (84)', function () {
+    // `events.region` et `companies.region_code` parlent désormais la même
+    // langue : on peut croiser événements et organisations d'une région.
+    Artisan::call('crm:import-evenements', ['file' => evtFichier([
+        evtLigne('zz-reg-1'),
+        evtLigne('zz-reg-2', ['region' => 'Île-de-France']),
+        evtLigne('zz-reg-3', ['region' => null, 'departement_code' => '69']),
+    ])]);
+
+    expect(DB::table('events')->where('external_ref', 'zz-reg-1')->value('region'))->toBe('84')
+        ->and(DB::table('events')->where('external_ref', 'zz-reg-2')->value('region'))->toBe('11')
+        // Sans région, elle se déduit du département.
+        ->and(DB::table('events')->where('external_ref', 'zz-reg-3')->value('region'))->toBe('84');
+});
+
+test('une region etrangere ne fait pas rejeter l evenement : colonne vide, valeur dans les notes', function () {
+    // « England », « California » : ce ne sont pas des régions françaises,
+    // mais l'événement est bien réel.
+    $fichier = evtFichier([evtLigne('zz-reg-x', ['region' => 'England', 'notes' => 'Salon annuel'])]);
+
+    Artisan::call('crm:import-evenements', ['file' => $fichier]);
+    $premier = Artisan::output();
+    $event = DB::table('events')->where('external_ref', 'zz-reg-x')->first();
+
+    expect($event)->not->toBeNull()
+        ->and($event->region)->toBeNull()
+        ->and($event->notes)->toBe("Salon annuel\nRégion d'origine : England")
+        ->and(evtBilan($premier, 'regions_inconnues'))->toBe(1)
+        ->and(evtBilan($premier, 'rejetes'))->toBe(0);
+
+    // Réimport du MÊME fichier : rien ne change, la ligne n'est pas dupliquée.
+    Artisan::call('crm:import-evenements', ['file' => $fichier]);
+    expect(evtBilan(Artisan::output(), 'inchanges'))->toBe(1)
+        ->and(DB::table('events')->where('external_ref', 'zz-reg-x')->value('notes'))
+        ->toBe("Salon annuel\nRégion d'origine : England");
+});
+
+test('la migration convertit les regions des evenements deja en base : sigle vers code, inconnue vers les notes', function () {
+    // L'état d'avant la migration : pas de CHECK, des sigles.
+    DB::statement('ALTER TABLE events DROP CONSTRAINT events_region_check');
+    foreach ([['zz-m-1', 'AURA', null], ['zz-m-2', 'California', 'Salon'], ['zz-m-3', '84', null], ['zz-m-4', 'IDF', null]] as [$ref, $region, $notes]) {
+        DB::table('events')->insert([
+            'workspace_id' => $this->espace, 'external_ref' => $ref, 'nom' => 'ZZ ' . $ref,
+            'type' => 'salon', 'region' => $region, 'notes' => $notes,
+        ]);
+    }
+
+    $migration = require database_path('migrations/2026_09_28_000001_referentiels_classement.php');
+    $migration->up();
+    // Rejouée, elle ne change plus rien (et n'ajoute pas une seconde note).
+    $migration->up();
+
+    $lire = static fn (string $ref): object => DB::table('events')->where('external_ref', $ref)->first();
+    expect($lire('zz-m-1')->region)->toBe('84')
+        ->and($lire('zz-m-4')->region)->toBe('11')
+        ->and($lire('zz-m-3')->region)->toBe('84')
+        ->and($lire('zz-m-2')->region)->toBeNull()
+        ->and($lire('zz-m-2')->notes)->toBe("Salon\nRégion d'origine : California");
+});
+
+test('la base refuse un sigle de region', function () {
+    // Le CHECK `events_region_check` : un chemin qui oublierait la conversion
+    // ne pourrait pas écrire un sigle.
+    expect(fn () => DB::table('events')->insert([
+        'workspace_id' => $this->espace,
+        'external_ref' => 'zz-reg-sigle',
+        'nom' => 'ZZ sigle',
+        'type' => 'salon',
+        'region' => 'AURA',
+    ]))->toThrow(QueryException::class, 'events_region_check');
 });

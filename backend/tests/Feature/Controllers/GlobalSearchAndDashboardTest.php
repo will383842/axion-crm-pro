@@ -65,10 +65,14 @@ test('GET /dashboard/stats expose 5 quality buckets', function () {
     ]);
 });
 
-test('GET /dashboard/stats expose 5 size buckets', function () {
+test('GET /dashboard/stats expose les 4 tailles du référentiel', function () {
     $u = makeSearchUser();
     $resp = $this->actingAs($u)->getJson('/api/v1/dashboard/stats')->assertOk();
+    // Les quatre tailles de `Taxonomy::TAILLES` (chantier « référentiels ») :
+    // `artisan` et `grande_entreprise` n'existent plus.
     $resp->assertJsonStructure([
-        'size_distribution' => ['artisan', 'tpe', 'pme', 'eti', 'grande_entreprise'],
+        'size_distribution' => ['tpe', 'pme', 'eti', 'grand_groupe'],
     ]);
+    expect(array_keys($resp->json('size_distribution')))->not->toContain('grande_entreprise')
+        ->not->toContain('artisan');
 });

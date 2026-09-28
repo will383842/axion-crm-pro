@@ -22,6 +22,7 @@ import {
   INTERVENTIONS,
   NATURES,
   PARTICIPATIONS,
+  REGIONS,
   TYPES,
   libelle,
   quand,
@@ -156,7 +157,9 @@ export function EvenementDetailPage() {
                 {e.heure ? ` · ${e.heure}` : ""}
               </Ligne>
               <Ligne label="Où">
-                {[e.lieu, e.ville, e.departement_code, e.region].filter(Boolean).join(" · ") || "—"}
+                {[e.lieu, e.ville, e.departement_code, e.region ? libelle(REGIONS, e.region) : null]
+                  .filter(Boolean)
+                  .join(" · ") || "—"}
               </Ligne>
               <Ligne label="Public">{e.public_vise ?? "—"}</Ligne>
               <Ligne label="Taille">{e.taille ?? "—"}</Ligne>

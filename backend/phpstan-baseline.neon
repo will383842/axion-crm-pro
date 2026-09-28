@@ -1,7 +1,7 @@
 # =============================================================================
 # BASELINE PHPStan — dette figée le 2026-08-13, dégonflée le 2026-08-18
 # =============================================================================
-# ÉTAT COURANT (2026-08-18) : 190 entrées / 207 erreurs, niveau 8.
+# ÉTAT COURANT (2026-08-18) : 187 entrées / 204 erreurs, niveau 8.
 # Ces deux nombres sont FIGÉS dans un test Pest — cf.
 # tests/Unit/PhpstanBaselineNeGrossitPasTest.php. Ils ne peuvent que DÉCROÎTRE ;
 # quand tu les fais baisser, mets à jour le test dans le MÊME commit.
@@ -37,6 +37,11 @@
 #     `SsrfGuard::enabled()`, qui lit la même variable avec `true`. Il appelle
 #     désormais la garde au lieu de recopier sa lecture : l'appel `env()` hors
 #     `config/` disparaît avec la recopie → 191 → 190 entrées, 209 → 208 erreurs.
+#   - 2026-09-28 (chantier « référentiels ») : `AutoClassifierService` perd ses
+#     trois tables recopiées (département → région, effectif → taille, NAF →
+#     secteur) au profit du référentiel unique (`App\Crm\Referentiels`) : leurs
+#     trois entrées `classConstant.phpDocType` disparaissent → 190 → 187 entrées,
+#     207 → 204 erreurs.
 #
 # Piège à connaître : déclarer une colonne JSONB castée `array` rend « toujours
 # vrai » les `is_array()` défensifs qui la lisent, et PHPStan le signale. Trois
@@ -745,24 +750,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: app/Services/Captcha/Mocks/MockCaptchaSolver.php
-
-		-
-			message: '#^PHPDoc tag @var for constant App\\Services\\Classification\\AutoClassifierService\:\:DEPT_TO_REGION with type array\<string, string\> is not subtype of value array\{''01''\: ''84'', ''03''\: ''84'', ''07''\: ''84'', 15\: ''84'', 26\: ''84'', 38\: ''84'', 42\: ''84'', 43\: ''84'', \.\.\.\}\.$#'
-			identifier: classConstant.phpDocType
-			count: 1
-			path: app/Services/Classification/AutoClassifierService.php
-
-		-
-			message: '#^PHPDoc tag @var for constant App\\Services\\Classification\\AutoClassifierService\:\:EFFECTIF_TO_SIZE with type array\<string, string\> is not subtype of value array\{''00''\: ''micro'', ''01''\: ''micro'', ''02''\: ''micro'', ''03''\: ''tpe'', 11\: ''tpe'', 12\: ''tpe'', 21\: ''pme'', 22\: ''pme'', \.\.\.\}\.$#'
-			identifier: classConstant.phpDocType
-			count: 1
-			path: app/Services/Classification/AutoClassifierService.php
-
-		-
-			message: '#^PHPDoc tag @var for constant App\\Services\\Classification\\AutoClassifierService\:\:NAF_TO_SECTOR with type array\<string, string\> is not subtype of value array\{62\: ''it_saas'', 63\: ''it_saas'', 58\: ''media_edition'', 59\: ''media_edition'', 60\: ''media_edition'', 41\: ''btp'', 42\: ''btp'', 43\: ''btp'', \.\.\.\}\.$#'
-			identifier: classConstant.phpDocType
-			count: 1
-			path: app/Services/Classification/AutoClassifierService.php
 
 		-
 			message: '#^Access to an undefined property App\\Models\\Tag\:\:\$rules\.$#'

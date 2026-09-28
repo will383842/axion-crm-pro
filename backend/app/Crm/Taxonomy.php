@@ -411,6 +411,241 @@ final class Taxonomy
         'vivier-stock-2026-08-14',
     ];
 
+    // ════════════════════════════════════════════════════════════════════════
+    // RÉFÉRENTIELS DE CLASSEMENT DES ORGANISATIONS (chantier 1, 2026-09-28)
+    // ════════════════════════════════════════════════════════════════════════
+    //
+    // Avant ce chantier, chaque classement existait en plusieurs copies qui se
+    // contredisaient : deux classifieurs de secteur (collecte INSEE en 14
+    // secteurs, enrichissement en 20, qui écrasait le premier), quatre
+    // vocabulaires de taille (`micro`/`grande`, `grande_entreprise`, `artisan`,
+    // `taille:ge`), cinq listes de natures (dont un filtre d'écran proposant
+    // « Autres », valeur inexistante en base), deux codages de région (`AURA`
+    // côté événements, `84` côté organisations).
+    //
+    // Désormais ces listes vivent ICI, et nulle part ailleurs :
+    //   - le calcul (secteur depuis le code NAF, taille depuis l'INSEE, région
+    //     depuis le département) est dans `App\Crm\Referentiels\Classement` ;
+    //   - la table de passage NAF → secteur est dans `resources/referentiels/`
+    //     (sources INSEE, cf. LISEZMOI.md) ;
+    //   - l'écran lit `frontend/src/lib/referentiels.generated.ts`, GÉNÉRÉ depuis
+    //     ces constantes par `php artisan crm:referentiels:generer-front` — une
+    //     garde (`ReferentielsFrontTest`) rougit s'il n'est pas à jour.
+
+    /**
+     * Secteurs d'activité — `companies.sector_main`. Liste validée par Will le
+     * 2026-09-28 (31 secteurs adossés aux 88 divisions de la NAF rév. 2, plus
+     * deux clés réservées). L'ordre est celui de l'écran.
+     *
+     * `interprofessionnel` n'est produit par AUCUN code NAF : il est réservé aux
+     * organisations multi-secteurs (MEDEF, CPME, U2P…), posé par le modèle
+     * « fédérations » (chantier 3). `non_classe` = aucune activité connue (NAF
+     * vide ou `00…`) — et, provisoirement, la division 94 (organisations
+     * professionnelles), dont le secteur utile est celui qu'elles REPRÉSENTENT.
+     *
+     * Doit rester identique à `resources/referentiels/secteurs.csv` (garde
+     * `ReferentielsTest`).
+     *
+     * @var array<string, string> clé => libellé
+     */
+    public const SECTEURS = [
+        'agriculture' => 'Agriculture, sylviculture, pêche',
+        'agroalimentaire' => 'Agroalimentaire et boissons',
+        'industrie' => 'Industrie',
+        'energie' => 'Énergie',
+        'eau_dechets' => 'Eau, déchets, dépollution',
+        'btp' => 'Bâtiment et travaux publics',
+        'automobile' => 'Automobile (commerce et réparation)',
+        'commerce_gros' => 'Commerce de gros',
+        'commerce_detail' => 'Commerce de détail',
+        'transport_logistique' => 'Transport et logistique',
+        'hebergement_tourisme' => 'Hébergement et tourisme',
+        'restauration' => 'Restauration',
+        'edition_medias' => 'Édition, audiovisuel, médias',
+        'numerique_telecoms' => 'Numérique et télécoms',
+        'banque_finance' => 'Banque et finance',
+        'assurance' => 'Assurance',
+        'immobilier' => 'Immobilier',
+        'droit' => 'Droit',
+        'comptabilite_audit' => 'Comptabilité et audit',
+        'conseil_management' => 'Conseil et management',
+        'architecture_ingenierie' => 'Architecture, ingénierie, contrôle technique',
+        'recherche_developpement' => 'Recherche et développement',
+        'marketing_publicite' => 'Marketing, publicité, études',
+        'services_specialises' => 'Design, photo, traduction et services spécialisés',
+        'services_entreprises' => 'Services aux entreprises',
+        'enseignement_formation' => 'Enseignement et formation',
+        'sante' => 'Santé humaine et vétérinaire',
+        'medico_social' => 'Médico-social et action sociale',
+        'culture_sport_loisirs' => 'Culture, sport et loisirs',
+        'services_personne' => 'Services à la personne',
+        'administration_publique' => 'Administration publique',
+        'interprofessionnel' => 'Interprofessionnel',
+        'non_classe' => 'Non classé',
+    ];
+
+    public const SECTEUR_NON_CLASSE = 'non_classe';
+
+    /**
+     * Tailles — `companies.size_category`. Quatre valeurs, au sens INSEE
+     * (catégorie d'entreprise, décret 2008-1354) : TPE (< 10 salariés), PME
+     * (10-249), ETI (250-4 999), grand groupe (5 000 et plus).
+     *
+     * @var array<string, string> clé => libellé
+     */
+    public const TAILLES = [
+        'tpe' => 'TPE',
+        'pme' => 'PME',
+        'eti' => 'ETI',
+        'grand_groupe' => 'Grand groupe',
+    ];
+
+    /**
+     * Anciens vocabulaires de taille, et la valeur qui les remplace. Seules ces
+     * valeurs ont été vues en base (production, 2026-09-28) : `micro` 702 k
+     * (enrichissement), `grande_entreprise` 21,9 k (collecte), `grande` 62
+     * (enrichissement). `ge` est la forme du tag gouverné `taille:ge`.
+     *
+     * @var array<string, string>
+     */
+    public const TAILLES_ANCIENNES = [
+        'micro' => 'tpe',
+        'grande' => 'grand_groupe',
+        'grande_entreprise' => 'grand_groupe',
+        'ge' => 'grand_groupe',
+    ];
+
+    /**
+     * Natures d'entité — `companies.entity_nature`. C'est la liste du CHECK
+     * `companies_entity_nature_check` (garde `SocleCrmTest`). Les fiches venues
+     * de l'INSEE (sociétés commerciales) portent `entreprise`.
+     *
+     * @var array<string, string> clé => libellé
+     */
+    public const ENTITY_NATURES = [
+        'entreprise' => 'Entreprise',
+        'association' => 'Association',
+        'cci' => 'Chambre de commerce',
+        'enseignement' => 'Enseignement',
+        'cabinet' => 'Cabinet (conseil, avocats)',
+        'institution' => 'Institution',
+        'media' => 'Média',
+        'reseau' => 'Réseau ou club d\'affaires',
+    ];
+
+    /**
+     * Régions — code INSEE de région (`companies.region_code`, `events.region`).
+     * 13 régions métropolitaines + 5 DROM. `FrenchRegionsSeeder` en tire les
+     * libellés de la table `regions`.
+     *
+     * ⚠️ PHP convertit une clé « 84 » en ENTIER (seules « 01 »… « 06 »,
+     * zéro de tête, restent des chaînes). Toute lecture des CLÉS passe donc par
+     * `(string)` — c'est fait dans `Classement` et dans le générateur du front.
+     *
+     * @var array<int|string, string> code INSEE => libellé
+     */
+    public const REGIONS = [
+        '84' => 'Auvergne-Rhône-Alpes',
+        '27' => 'Bourgogne-Franche-Comté',
+        '53' => 'Bretagne',
+        '24' => 'Centre-Val de Loire',
+        '94' => 'Corse',
+        '44' => 'Grand Est',
+        '32' => 'Hauts-de-France',
+        '11' => 'Île-de-France',
+        '28' => 'Normandie',
+        '75' => 'Nouvelle-Aquitaine',
+        '76' => 'Occitanie',
+        '52' => 'Pays de la Loire',
+        '93' => 'Provence-Alpes-Côte d\'Azur',
+        '01' => 'Guadeloupe',
+        '02' => 'Martinique',
+        '03' => 'Guyane',
+        '04' => 'La Réunion',
+        '06' => 'Mayotte',
+    ];
+
+    /**
+     * Sigles usuels d'une région, tels que le sourcing des événements les
+     * écrit (`AURA`, `IDF`…). Ils ne sont JAMAIS stockés : on les convertit en
+     * code INSEE à l'entrée (`Classement::region()`).
+     *
+     * @var array<string, string> sigle => code INSEE
+     */
+    public const REGIONS_SIGLES = [
+        'AURA' => '84', 'ARA' => '84',
+        'BFC' => '27',
+        'BZH' => '53', 'BRE' => '53',
+        'CVL' => '24',
+        'COR' => '94',
+        'GE' => '44', 'GES' => '44',
+        'HDF' => '32',
+        'IDF' => '11',
+        'NOR' => '28',
+        'NA' => '75', 'NAQ' => '75',
+        'OCC' => '76',
+        'PDL' => '52',
+        'PACA' => '93', 'PAC' => '93', 'SUD' => '93',
+    ];
+
+    /**
+     * Département → région (codes INSEE). Source :
+     * https://www.insee.fr/fr/information/2114819
+     *
+     * Clés « 38 », « 971 » converties en entiers par PHP (cf. `REGIONS`) ;
+     * les VALEURS restent des chaînes.
+     *
+     * @var array<int|string, string>
+     */
+    public const REGION_PAR_DEPARTEMENT = [
+        // Auvergne-Rhône-Alpes (84)
+        '01' => '84', '03' => '84', '07' => '84', '15' => '84', '26' => '84',
+        '38' => '84', '42' => '84', '43' => '84', '63' => '84', '69' => '84',
+        '73' => '84', '74' => '84',
+        // Bourgogne-Franche-Comté (27)
+        '21' => '27', '25' => '27', '39' => '27', '58' => '27', '70' => '27',
+        '71' => '27', '89' => '27', '90' => '27',
+        // Bretagne (53)
+        '22' => '53', '29' => '53', '35' => '53', '56' => '53',
+        // Centre-Val de Loire (24)
+        '18' => '24', '28' => '24', '36' => '24', '37' => '24', '41' => '24', '45' => '24',
+        // Corse (94)
+        '2A' => '94', '2B' => '94',
+        // Grand Est (44)
+        '08' => '44', '10' => '44', '51' => '44', '52' => '44', '54' => '44',
+        '55' => '44', '57' => '44', '67' => '44', '68' => '44', '88' => '44',
+        // Hauts-de-France (32)
+        '02' => '32', '59' => '32', '60' => '32', '62' => '32', '80' => '32',
+        // Île-de-France (11)
+        '75' => '11', '77' => '11', '78' => '11', '91' => '11', '92' => '11',
+        '93' => '11', '94' => '11', '95' => '11',
+        // Normandie (28)
+        '14' => '28', '27' => '28', '50' => '28', '61' => '28', '76' => '28',
+        // Nouvelle-Aquitaine (75)
+        '16' => '75', '17' => '75', '19' => '75', '23' => '75', '24' => '75',
+        '33' => '75', '40' => '75', '47' => '75', '64' => '75', '79' => '75',
+        '86' => '75', '87' => '75',
+        // Occitanie (76)
+        '09' => '76', '11' => '76', '12' => '76', '30' => '76', '31' => '76',
+        '32' => '76', '34' => '76', '46' => '76', '48' => '76', '65' => '76',
+        '66' => '76', '81' => '76', '82' => '76',
+        // Pays de la Loire (52)
+        '44' => '52', '49' => '52', '53' => '52', '72' => '52', '85' => '52',
+        // Provence-Alpes-Côte d'Azur (93)
+        '04' => '93', '05' => '93', '06' => '93', '13' => '93', '83' => '93', '84' => '93',
+        // DROM
+        '971' => '01', '972' => '02', '973' => '03', '974' => '04', '976' => '06',
+    ];
+
+    /**
+     * Nomenclature détectée du code d'activité (`companies.naf_nomenclature`).
+     * `inconnue` : un code présent mais inexploitable (`00.00Z`, forme
+     * inconnue). NULL : aucun code.
+     *
+     * @var list<string>
+     */
+    public const NAF_NOMENCLATURES = ['naf_rev2', 'naf_rev1', 'nap_1973', 'inconnue'];
+
     /**
      * Rend une liste utilisable dans un CHECK SQL : 'a', 'b', 'c'.
      *

@@ -2,6 +2,7 @@
 
 namespace App\Crm\Scraping;
 
+use App\Crm\Taxonomy;
 use DateTimeImmutable;
 use DateTimeZone;
 use Exception;
@@ -44,20 +45,6 @@ final class ScrapedRecord
     ];
 
     private const COMPANY_KEYS = ['siren', 'foreign_id', 'country', 'nature', 'match_hint', 'fields', 'implantations'];
-
-    /**
-     * Natures d'entité — liste FERMÉE, alignée sur le CHECK SQL posé par la
-     * migration `2026_08_15_120001`. Une valeur inventée ici passerait la
-     * validation applicative pour mourir en base : les deux listes bougent
-     * ENSEMBLE.
-     */
-    public const ENTITY_NATURES = [
-        'entreprise', 'association', 'cci', 'enseignement',
-        'cabinet', 'institution', 'media',
-        // Réseaux et clubs d'affaires (BNI…), 2026-09-27 : ni association au
-        // sens où Will les cible, ni entreprise.
-        'reseau',
-    ];
 
     private const MATCH_HINT_KEYS = ['denomination', 'postcode', 'city', 'address'];
 
@@ -205,10 +192,13 @@ final class ScrapedRecord
         $entityNature = null;
         if (isset($company['nature'])) {
             $candidate = is_string($company['nature']) ? trim($company['nature']) : '';
-            if (! in_array($candidate, self::ENTITY_NATURES, true)) {
+            // Liste FERMÉE, lue dans le référentiel unique : la garde
+            // `SocleCrmTest` la compare au CHECK `companies_entity_nature_check`.
+            if (! array_key_exists($candidate, Taxonomy::ENTITY_NATURES)) {
                 throw ScrapeIngestRejection::invalid(
                     'invalid_entity_nature',
-                    'company.nature inconnue : « ' . $candidate . ' » (attendu : ' . implode(', ', self::ENTITY_NATURES) . ').',
+                    'company.nature inconnue : « ' . $candidate . ' » (attendu : '
+                        . implode(', ', array_keys(Taxonomy::ENTITY_NATURES)) . ').',
                 );
             }
             $entityNature = $candidate;

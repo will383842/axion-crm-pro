@@ -2,6 +2,8 @@
 
 namespace App\Services\Tags;
 
+use App\Crm\Referentiels\EtiquettesClassement;
+use App\Crm\Taxonomy;
 use App\Models\Company;
 use App\Models\Tag;
 use App\Support\AuditLogger;
@@ -41,18 +43,6 @@ class AutoTaggerService
      */
     private const IMPLANTATION_COUNTRY_LABELS = [
         'RO' => 'Roumanie',
-    ];
-
-    /** Libellés FR des natures d'entité (cf. companies.entity_nature). */
-    private const ENTITY_NATURE_LABELS = [
-        'entreprise' => 'Entreprise',
-        'association' => 'Association',
-        'cci' => 'Chambre de commerce',
-        'enseignement' => 'Enseignement',
-        'cabinet' => 'Cabinet (conseil, avocats)',
-        'institution' => 'Institution',
-        'media' => 'Média',
-        'reseau' => 'Réseau ou club d\'affaires',
     ];
 
     /**
@@ -170,14 +160,11 @@ class AutoTaggerService
                 'assigned_by' => 'auto-rule',
             ];
         }
-        if ($company->region_code) {
-            $slug = 'region-' . strtolower($company->region_code);
-            $tags[$slug] = [
-                'name' => 'Région ' . $company->region_code,
-                'category' => 'geo',
-                'kind' => 'auto',
-                'assigned_by' => 'auto-rule',
-            ];
+        // Secteur, taille, région : la définition est PARTAGÉE avec le
+        // reclassement de masse (`crm:referentiels:reclasser`) — mêmes slugs,
+        // mêmes noms, quel que soit le chemin qui les pose.
+        foreach (EtiquettesClassement::desirees($company->sector_main, $company->size_category, $company->region_code) as $slug => $spec) {
+            $tags[$slug] = $spec + ['kind' => 'auto', 'assigned_by' => 'auto-rule'];
         }
 
         // Pays d'immatriculation, pour les entités NON françaises : sans lui,
@@ -185,6 +172,7 @@ class AutoTaggerService
         // dans une campagne. (Les 4,29 M de fiches FR ne sont pas taguées :
         // ce serait un tag universel, donc sans pouvoir de tri.)
         $country = strtoupper((string) ($company->country_code ?? 'FR'));
+        $estFrancaise = $country === 'FR';
         if ($country !== 'FR' && preg_match('/^[A-Z]{2}$/', $country) === 1) {
             $slug = 'pays-' . strtolower($country);
             $tags[$slug] = [
@@ -198,10 +186,18 @@ class AutoTaggerService
         // Nature de l'entité — c'est ELLE qui permet de viser « les
         // associations » ou « les chambres de commerce » sans les mélanger
         // aux entreprises dans une campagne.
+        //
+        // Sauf `entreprise` pour une fiche française (2026-09-28) : depuis le
+        // chantier « référentiels », les 4,29 M de fiches INSEE portent cette
+        // nature. L'étiquette serait universelle — sans pouvoir de tri, même
+        // raisonnement que le pays ci-dessus — et elle n'apparaîtrait qu'au fil
+        // des enrichissements, recréant exactement l'écart fiche/étiquette que
+        // ce chantier supprime. On vise « les entreprises » par la colonne
+        // (`entity_nature`, filtrable, indexée, et champ d'audience).
         $nature = $company->entity_nature ?? null;
-        if (is_string($nature) && isset(self::ENTITY_NATURE_LABELS[$nature])) {
+        if (is_string($nature) && isset(Taxonomy::ENTITY_NATURES[$nature]) && ! ($estFrancaise && $nature === 'entreprise')) {
             $tags['nature-' . $nature] = [
-                'name' => self::ENTITY_NATURE_LABELS[$nature],
+                'name' => Taxonomy::ENTITY_NATURES[$nature],
                 'category' => 'custom',
                 'kind' => 'auto',
                 'assigned_by' => 'auto-rule',
@@ -225,24 +221,6 @@ class AutoTaggerService
                     'assigned_by' => 'auto-rule',
                 ];
             }
-        }
-        if ($company->size_category) {
-            $slug = 'size-' . strtolower($company->size_category);
-            $tags[$slug] = [
-                'name' => 'Taille : ' . ucfirst($company->size_category),
-                'category' => 'size',
-                'kind' => 'auto',
-                'assigned_by' => 'auto-rule',
-            ];
-        }
-        if ($company->sector_main) {
-            $slug = 'sector-' . strtolower(str_replace('_', '-', $company->sector_main));
-            $tags[$slug] = [
-                'name' => 'Secteur : ' . str_replace('_', ' ', $company->sector_main),
-                'category' => 'sector',
-                'kind' => 'auto',
-                'assigned_by' => 'auto-rule',
-            ];
         }
 
         // Tags LLM (intent)

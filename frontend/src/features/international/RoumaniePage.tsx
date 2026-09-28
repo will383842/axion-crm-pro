@@ -18,6 +18,8 @@ import { useState } from 'react';
 
 import { PageHeader } from '@/components/ui/PageHeader';
 import { api } from '@/lib/api';
+import { libelleReferentiel } from '@/lib/prospection-referentiels';
+import { NATURES } from '@/lib/referentiels.generated';
 
 type NatureTab = {
   value: string;
@@ -25,18 +27,13 @@ type NatureTab = {
 };
 
 /**
- * Sous-onglets. `''` = tout le pays. L'ordre suit le volume réel du vivier
- * (entreprises d'abord), pas l'ordre alphabétique.
+ * Sous-onglets. `''` = tout le pays. Les natures sont celles du référentiel
+ * unique (généré depuis `Taxonomy::ENTITY_NATURES`, entreprises d'abord) : la
+ * copie qui vivait ici oubliait les réseaux.
  */
 const NATURE_TABS: NatureTab[] = [
   { value: '', label: 'Tout' },
-  { value: 'entreprise', label: 'Entreprises' },
-  { value: 'association', label: 'Associations' },
-  { value: 'cabinet', label: 'Cabinets' },
-  { value: 'enseignement', label: 'Enseignement' },
-  { value: 'institution', label: 'Institutions' },
-  { value: 'cci', label: 'Chambres de commerce' },
-  { value: 'media', label: 'Médias' },
+  ...NATURES.map((n) => ({ value: n.code, label: n.libelle })),
 ];
 
 /**
@@ -196,7 +193,7 @@ export function RoumaniePage() {
                         {row.denomination ?? '—'}
                       </Link>
                     </td>
-                    <td className="px-3 py-2 text-slate-600">{row.entity_nature ?? '—'}</td>
+                    <td className="px-3 py-2 text-slate-600">{libelleReferentiel(NATURES, row.entity_nature) ?? '—'}</td>
                     <td className="px-3 py-2 text-slate-600">{row.city ?? '—'}</td>
                     <td className="px-3 py-2 text-slate-600">{row.email_generic ?? '—'}</td>
                     <td className="px-3 py-2 text-slate-600">{row.phone ?? '—'}</td>

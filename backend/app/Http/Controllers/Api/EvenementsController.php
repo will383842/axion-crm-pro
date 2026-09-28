@@ -36,7 +36,9 @@ class EvenementsController extends ApiController
         }
 
         $filtres = $request->validate([
-            'region' => ['nullable', 'string', 'max:10'],
+            // Code INSEE de région (`84`), comme `companies.region_code` — le
+            // référentiel unique ; un sigle (`AURA`) n'est plus stocké.
+            'region' => ['nullable', Rule::in(array_map(static fn (int|string $c): string => (string) $c, array_keys(Taxonomy::REGIONS)))],
             'type' => ['nullable', Rule::in(Taxonomy::EVENEMENT_TYPES)],
             'participation' => ['nullable', Rule::in(Taxonomy::EVENEMENT_PARTICIPATIONS)],
             'intervention' => ['nullable', Rule::in(Taxonomy::EVENEMENT_INTERVENTIONS)],

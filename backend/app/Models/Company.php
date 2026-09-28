@@ -33,7 +33,12 @@ use Illuminate\Support\Carbon;
  * @property ?string $department_code
  * @property ?string $region_code
  * @property ?string $commune_code
- * @property ?string $sector_main
+ * @property ?string $sector_main clé de `Taxonomy::SECTEURS`
+ * @property ?string $naf_nomenclature naf_rev2|naf_rev1|nap_1973|inconnue (CHECK en base)
+ * @property ?string $naf_rev2 code converti en NAF rév. 2, quand la table INSEE le donne
+ * @property ?string $entity_nature clé de `Taxonomy::ENTITY_NATURES`
+ * @property ?string $discovery_source
+ * @property ?string $country_code
  * @property ?string $archive_reason
  * @property string $prospection_status NOT NULL, défaut 'pending' (migration 2026_05_18_000006)
  * @property ?string $email_generic
@@ -109,6 +114,9 @@ class Company extends Model
         // Prospection internationale (2026-08-15) : une entité sans SIREN
         // s'ancre sur (country_code, foreign_id) — cf. migration 120001.
         'country_code', 'foreign_id', 'entity_nature',
+        // Référentiels (2026-09-28) : nomenclature détectée du code d'activité
+        // et code converti en NAF rév. 2 — `naf` garde le code d'origine.
+        'naf_nomenclature', 'naf_rev2',
     ];
 
     protected function casts(): array

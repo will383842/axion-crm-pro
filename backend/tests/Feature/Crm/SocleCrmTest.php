@@ -123,6 +123,14 @@ test('les CHECK en base correspondent exactement à App\\Crm\\Taxonomy', functio
     // d'accès que la règle d'envoi ne connaît pas.
     socleExpectCheck('journalists_acces_check', Taxonomy::ACCES_PRESSE);
     socleExpectCheck('journalists_lien_linkedin_check', Taxonomy::LIENS_LINKEDIN);
+    // Référentiels uniques (chantier 1, 2026-09-28). Les natures vivaient en
+    // cinq copies HORS de `Taxonomy` : ce test ne les couvrait donc pas.
+    socleExpectCheck('companies_entity_nature_check', array_keys(Taxonomy::ENTITY_NATURES));
+    socleExpectCheck('companies_naf_nomenclature_check', Taxonomy::NAF_NOMENCLATURES);
+    socleExpectCheck('events_region_check', array_map(
+        static fn (int|string $code): string => (string) $code,
+        array_keys(Taxonomy::REGIONS),
+    ));
 });
 
 test('seul email_redaction est diffusable par mailing', function () {

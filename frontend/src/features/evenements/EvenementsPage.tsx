@@ -22,6 +22,7 @@ import {
   NATURES,
   PARTICIPATIONS,
   PERIODES,
+  REGIONS,
   TAG_ORGANISATEURS,
   TYPES,
   libelle,
@@ -61,23 +62,6 @@ type ListeEvenements = {
 type Onglet = "evenements" | "organisateurs" | "relances";
 
 const PAR_PAGE = 50;
-
-const REGIONS: Option[] = [
-  { value: "", label: "Toutes régions" },
-  { value: "AURA", label: "Auvergne-Rhône-Alpes" },
-  { value: "IDF", label: "Île-de-France" },
-  { value: "OCC", label: "Occitanie" },
-  { value: "PAC", label: "Provence-Alpes-Côte d'Azur" },
-  { value: "NAQ", label: "Nouvelle-Aquitaine" },
-  { value: "HDF", label: "Hauts-de-France" },
-  { value: "BFC", label: "Bourgogne-Franche-Comté" },
-  { value: "BRE", label: "Bretagne" },
-  { value: "CVL", label: "Centre-Val de Loire" },
-  { value: "COR", label: "Corse" },
-  { value: "GES", label: "Grand Est" },
-  { value: "NOR", label: "Normandie" },
-  { value: "PDL", label: "Pays de la Loire" },
-];
 
 function Select(props: {
   label: string;
@@ -142,7 +126,7 @@ function TableEvenements({ rows }: { rows: EvenementResume[] }) {
               <td className="px-3 py-2 text-slate-600">{libelle(TYPES, e.type)}</td>
               <td className="px-3 py-2 text-slate-600">
                 {e.ville ?? "—"}
-                {e.region ? <div className="text-xs text-slate-500">{e.region}</div> : null}
+                {e.region ? <div className="text-xs text-slate-500">{libelle(REGIONS, e.region)}</div> : null}
               </td>
               <td className="px-3 py-2">
                 {e.organisateurs.length === 0 ? (

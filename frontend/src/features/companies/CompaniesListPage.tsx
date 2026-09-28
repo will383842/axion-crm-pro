@@ -23,7 +23,11 @@ import {
   COUNTRY_OPTIONS,
   ELIGIBILITE_OPTIONS,
   NATURE_OPTIONS,
+  SECTEUR_OPTIONS,
+  TAILLE_OPTIONS,
+  libelleReferentiel,
 } from "@/lib/prospection-referentiels";
+import { TAILLES } from "@/lib/referentiels.generated";
 import { toast } from "sonner";
 import { CompanyRow, COMPANY_ROW_GRID, type CompanyRowData } from "./components/CompanyRow";
 import { EFFECTIF_OPTIONS } from "./effectif";
@@ -46,14 +50,10 @@ interface CompaniesResponse {
 const ROW_HEIGHT = 56;
 const GRID = COMPANY_ROW_GRID;
 
-const SIZE_OPTIONS = [
-  { value: "", label: "Toutes tailles" },
-  { value: "artisan", label: "Artisan" },
-  { value: "tpe", label: "TPE" },
-  { value: "pme", label: "PME" },
-  { value: "eti", label: "ETI" },
-  { value: "grande_entreprise", label: "Grande entreprise" },
-];
+// Tailles, secteurs et natures : le référentiel unique, GÉNÉRÉ depuis le
+// serveur (`@/lib/referentiels.generated`). Les listes recopiées qui vivaient
+// ici (« artisan », « grande_entreprise », 15 secteurs d'une seule des deux
+// listes du serveur) ont disparu le 2026-09-28.
 
 const QUALITY_OPTIONS = [
   { value: "", label: "Toutes qualités" },
@@ -76,28 +76,6 @@ const PROSPECTION_TABS = [
   { value: "partial_email", label: "Partiels" },
   { value: "pending", label: "Pending" },
   { value: "archived_no_email", label: "Archivés" },
-];
-
-// Prospection internationale : sans ces deux filtres, les fiches étrangères
-// restent noyées dans les 4,29 M de fiches françaises et aucune campagne ne
-// peut les viser. « Tous pays » laisse le comportement historique inchangé.
-const SECTOR_OPTIONS = [
-  { value: "", label: "Tous secteurs" },
-  { value: "it_saas", label: "IT / SaaS" },
-  { value: "btp", label: "BTP" },
-  { value: "sante", label: "Santé" },
-  { value: "commerce", label: "Commerce" },
-  { value: "services_pro", label: "Services pro" },
-  { value: "finance_assurance", label: "Finance / Assurance" },
-  { value: "industrie", label: "Industrie" },
-  { value: "hotellerie_restauration", label: "Hôtellerie / Restauration" },
-  { value: "transport", label: "Transport" },
-  { value: "agro_alimentaire", label: "Agro-alimentaire" },
-  { value: "immobilier", label: "Immobilier" },
-  { value: "enseignement", label: "Enseignement / Formation" },
-  { value: "services_personnels", label: "Services aux particuliers" },
-  { value: "arts_loisirs", label: "Arts / Loisirs / Sport" },
-  { value: "autre", label: "Autre" },
 ];
 
 interface Filter {
@@ -343,7 +321,7 @@ export function CompaniesListPage() {
       return acc;
     }, {});
     const topSize = Object.entries(bySize).sort((a, b) => b[1] - a[1])[0];
-    const topSizeLabel = topSize ? topSize[0].toUpperCase() : "—";
+    const topSizeLabel = topSize ? (libelleReferentiel(TAILLES, topSize[0]) ?? topSize[0]) : "—";
     const topSizePct = topSize && count > 0 ? Math.round((topSize[1] / count) * 100) : 0;
 
     const byNaf = list.reduce<Record<string, number>>((acc, c) => {
@@ -510,7 +488,7 @@ export function CompaniesListPage() {
             <FilterSelect
               value={filter.size}
               onChange={(v) => setFilterAndReset({ size: v })}
-              options={SIZE_OPTIONS}
+              options={TAILLE_OPTIONS}
               ariaLabel="Filtre taille"
             />
             <FilterSelect
@@ -522,7 +500,7 @@ export function CompaniesListPage() {
             <FilterSelect
               value={filter.sector_main}
               onChange={(v) => setFilterAndReset({ sector_main: v })}
-              options={SECTOR_OPTIONS}
+              options={SECTEUR_OPTIONS}
               ariaLabel="Filtre secteur"
             />
             <FilterSelect

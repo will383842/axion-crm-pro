@@ -2,6 +2,7 @@
 
 namespace App\Crm\Ingest;
 
+use App\Crm\Referentiels\Classement;
 use App\Crm\Taxonomy;
 use App\Support\WorkspaceContext;
 use Database\Seeders\GovernedTagsSeeder;
@@ -220,7 +221,11 @@ final class SiteSyncIngestService
             'postcode' => $event->str('company', 'postcode'),
             'city' => $event->str('company', 'city'),
             'website' => $event->str('company', 'website'),
-            'size_category' => $event->str('company', 'size_category'),
+            // Traduite dans le référentiel unique des tailles
+            // (`grande_entreprise` → `grand_groupe`, tranche `21-50` → `pme`) ;
+            // une valeur hors référentiel n'est pas écrite plutôt que de
+            // réintroduire un cinquième vocabulaire.
+            'size_category' => Classement::tailleDeclaree($event->str('company', 'size_category')),
         ], static fn (?string $v): bool => $v !== null);
 
         if ($existing === null) {

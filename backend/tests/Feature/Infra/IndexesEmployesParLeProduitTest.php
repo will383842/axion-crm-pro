@@ -176,7 +176,14 @@ function fixtureIndexes(string $workspaceId): void
             'field_origins' => '{}',
             'archive_reason' => $i <= 3 ? 'no_email' : null,
             'country_code' => $i >= 4 && $i <= 6 ? 'RO' : 'FR',
-            'entity_nature' => $i >= 4 && $i <= 6 ? 'association' : 'entreprise',
+            // 110..119 : dix associations FRANÇAISES (2026-09-28). Sans elles,
+            // l'index partiel « hors entreprise » et l'index partiel des
+            // étrangers porteraient exactement les mêmes 3 lignes : deux index
+            // de même taille, départagés arbitrairement — la garde des
+            // étrangers deviendrait verte ou rouge au hasard. La production
+            // porte d'ailleurs ~4 000 fiches françaises d'une autre nature
+            // qu'« entreprise » (organisateurs d'événements, imports).
+            'entity_nature' => ($i >= 4 && $i <= 6) || ($i >= 110 && $i <= 119) ? 'association' : 'entreprise',
             'best_email_confidence' => $i >= 7 && $i <= 9 ? 'A' : null,
             'website_status' => $i >= 10 && $i <= 109 ? 'found' : 'unknown',
             // NULL pour 10..12 seulement : trois fiches `found` jamais
@@ -221,6 +228,8 @@ test('G41-008 — TEMOIN : une colonne NUE ne fait citer aucun de ces index', fu
         'idx_companies_best_email_confidence',
         'idx_companies_revalidate',
         'idx_companies_workspace_country_nature',
+        'idx_companies_workspace_nature_hors_entreprise',
+        'idx_companies_sector',
         'idx_companies_signals',
     ] as $index) {
         $this->assertStringNotContainsString(
@@ -315,6 +324,39 @@ test('G41-008 — la prospection internationale EMPLOIE son index', function () 
     );
 
     $this->assertStringContainsString('idx_companies_workspace_country_nature', $plan, messageDeRefus('idx_companies_workspace_country_nature', $plan));
+});
+
+test('referentiels — le filtre Nature des fiches FRANCAISES emploie son index', function () {
+    fixtureIndexes($this->workspace->id);
+
+    // `filter[entity_nature]` seul, sans pays : l'écran Entreprises, l'onglet
+    // Organisateurs, le champ d'audience. L'index partiel des étrangers ne
+    // peut pas servir (rien n'y dit `country_code <> 'FR'`) : avant le
+    // 2026-09-28, cette requête balayait les 4,29 M de fiches.
+    $plan = planForce(
+        "SELECT id FROM companies WHERE workspace_id = ? AND entity_nature = 'association' LIMIT 50",
+        [$this->workspace->id],
+    );
+
+    $this->assertStringContainsString(
+        'idx_companies_workspace_nature_hors_entreprise',
+        $plan,
+        messageDeRefus('idx_companies_workspace_nature_hors_entreprise', $plan),
+    );
+});
+
+test('referentiels — le filtre Secteur emploie son index', function () {
+    fixtureIndexes($this->workspace->id);
+
+    // `filter[sector_main]` (CompanyQueryFilters) et le champ d'audience
+    // `sector_main` : c'est l'index que le reclassement des 4,3 M de fiches
+    // rend enfin utile — les 33 clés du référentiel au lieu de deux listes.
+    $plan = planForce(
+        "SELECT id FROM companies WHERE workspace_id = ? AND sector_main = 'btp' LIMIT 50",
+        [$this->workspace->id],
+    );
+
+    $this->assertStringContainsString('idx_companies_sector', $plan, messageDeRefus('idx_companies_sector', $plan));
 });
 
 test('G41-008 — la reprise des fiches archivees EMPLOIE son index', function () {

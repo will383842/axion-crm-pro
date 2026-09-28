@@ -28,8 +28,12 @@ use Illuminate\Support\Facades\DB;
  * porte l'un des tags ci-dessous — posé verrouillé par l'ingestion, et que les
  * actions de masse refusent de retirer.
  *
- * Non couvert, sans gravité aujourd'hui : `prospection:reclassify-sector`
- * (ne touche que les fiches à NAF, donnée factuelle) et
+ * Depuis le 2026-09-28, `prospection:reclassify-size` et
+ * `prospection:reclassify-sector` n'existent plus : le reclassement de masse
+ * est `crm:referentiels:reclasser`, qui EXCLUT ces fiches (secteur, taille,
+ * nature, région et étiquettes).
+ *
+ * Non couvert, sans gravité aujourd'hui :
  * `AudienceBuilderService::evaluateForCompany` (protégé via le waterfall).
  * `/coverage/enrich` et `bulk-enrich` empilent des jobs que le waterfall
  * refuse : la garde est au waterfall, pas en double dans chaque sélecteur.
@@ -72,6 +76,14 @@ final class FichesProtegees
     /**
      * La même condition, en SQL brut, pour les `UPDATE … WHERE` écrits à la
      * main. `$colonneId` n'est jamais une donnée utilisateur.
+     *
+     * ⚠️ Les alias INTERNES (`fp_ct`, `fp_t`) sont réservés à cette condition.
+     * Ils valaient `ct` et `t` jusqu'au 2026-09-28 : appelée avec
+     * `'ct.company_id'` depuis une requête qui nomme elle aussi `company_tag`
+     * `ct`, la sous-requête lisait SON propre `ct` — la condition devenait
+     * `ct.company_id = ct.company_id`, c'est-à-dire « aucune fiche protégée
+     * dans l'espace », et elle écartait TOUTES les lignes dès qu'une seule
+     * fiche protégée existait (garde `ReclassementReferentielsTest`, S1).
      */
     public static function conditionSql(string $colonneId = 'companies.id'): string
     {
@@ -80,8 +92,8 @@ final class FichesProtegees
             self::TAGS,
         ));
 
-        return 'NOT EXISTS (SELECT 1 FROM company_tag ct JOIN tags t ON t.id = ct.tag_id'
-            . " WHERE ct.company_id = {$colonneId} AND t.slug IN ({$slugs}))";
+        return 'NOT EXISTS (SELECT 1 FROM company_tag fp_ct JOIN tags fp_t ON fp_t.id = fp_ct.tag_id'
+            . " WHERE fp_ct.company_id = {$colonneId} AND fp_t.slug IN ({$slugs}))";
     }
 
     public static function estProtegee(int $companyId): bool

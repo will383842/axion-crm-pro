@@ -16,7 +16,7 @@ test.describe('Dashboard', () => {
           scraper_runs_24h: 5,
           llm_cost_eur_month: 42.5,
           quality_distribution: { complete: 100, partielle: 200, basique: 100 },
-          size_distribution: { artisan: 10, tpe: 100, pme: 50, eti: 20, grande_entreprise: 5 },
+          size_distribution: { tpe: 100, pme: 50, eti: 20, grand_groupe: 5 },
         },
       }),
     );

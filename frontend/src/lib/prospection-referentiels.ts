@@ -9,10 +9,52 @@
  * apparaît donc partout, ou nulle part — jamais dans un écran sur deux.
  */
 
+import {
+  NATURES,
+  REGIONS,
+  SECTEURS,
+  TAILLES,
+  type EntreeReferentiel,
+} from './referentiels.generated';
+
 export interface OptionReferentiel {
   value: string;
   label: string;
 }
+
+/**
+ * Options de liste déroulante tirées d'un référentiel GÉNÉRÉ depuis le serveur
+ * (`referentiels.generated.ts`, lui-même produit depuis `Taxonomy`). Aucune
+ * valeur n'est recopiée à la main ici : c'est ce qui avait laissé le filtre
+ * Nature proposer « Autres » — valeur inexistante en base — et en oublier cinq.
+ */
+export function optionsReferentiel(
+  liste: readonly EntreeReferentiel[],
+  libelleVide: string,
+): OptionReferentiel[] {
+  return [{ value: '', label: libelleVide }, ...liste.map((e) => ({ value: e.code, label: e.libelle }))];
+}
+
+/**
+ * Libellé d'un code de référentiel ; le code brut s'il est inconnu (une
+ * valeur hors référentiel s'affiche plutôt que de disparaître), `null` si vide.
+ */
+export function libelleReferentiel(
+  liste: readonly EntreeReferentiel[],
+  code: string | null | undefined,
+): string | null {
+  if (!code) return null;
+  return liste.find((e) => e.code === code)?.libelle ?? code;
+}
+
+/** Secteurs d'activité (`sector_main`) — les 33 clés du référentiel unique. */
+export const SECTEUR_OPTIONS: OptionReferentiel[] = optionsReferentiel(SECTEURS, 'Tous secteurs');
+
+/** Tailles (`size_category`) — TPE, PME, ETI, grand groupe. */
+export const TAILLE_OPTIONS: OptionReferentiel[] = optionsReferentiel(TAILLES, 'Toutes tailles');
+
+/** Régions (code INSEE), pour les écrans qui ne lisent pas `/referentiels/geo`. */
+export const REGION_OPTIONS: OptionReferentiel[] = optionsReferentiel(REGIONS, 'Toutes régions');
 
 /**
  * Prospection internationale : sans ce filtre, les fiches étrangères restent
@@ -28,14 +70,13 @@ export const COUNTRY_OPTIONS: OptionReferentiel[] = [
 /**
  * Nature de l'entité — une association et une entreprise ne se prospectent pas
  * de la même façon, et le vocabulaire est celui de la base (`entity_nature`).
+ *
+ * 🔴 Jusqu'au 2026-09-28 cette liste était RECOPIÉE ici : elle proposait
+ * « Autres » (valeur qui n'existe pas en base : le filtre rendait une liste
+ * vide qui se lisait « aucun résultat ») et oubliait CCI, réseaux, médias,
+ * cabinets et enseignement. Elle vient désormais du référentiel généré.
  */
-export const NATURE_OPTIONS: OptionReferentiel[] = [
-  { value: '', label: 'Toutes natures' },
-  { value: 'entreprise', label: 'Entreprises' },
-  { value: 'association', label: 'Associations' },
-  { value: 'institution', label: 'Institutions' },
-  { value: 'autre', label: 'Autres' },
-];
+export const NATURE_OPTIONS: OptionReferentiel[] = optionsReferentiel(NATURES, 'Toutes natures');
 
 /**
  * Statut de prospection — LE vocabulaire qui répond à « qui puis-je contacter ».

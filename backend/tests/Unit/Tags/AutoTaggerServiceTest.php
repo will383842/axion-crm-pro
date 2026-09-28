@@ -182,6 +182,39 @@ it('never removes a locked governed tag on resync', function () {
     expect($c->fresh()->tags->pluck('slug')->all())->toContain('svc:audit');
 });
 
+it('nomme les étiquettes secteur, taille et région d après le référentiel unique', function () {
+    $c = makeTaggerCompany($this->workspace->id, [
+        'sector_main' => 'commerce_detail', 'size_category' => 'grand_groupe', 'region_code' => '84',
+    ]);
+
+    $this->service->syncTags($c);
+
+    $noms = Tag::where('workspace_id', $this->workspace->id)->pluck('name', 'slug')->all();
+    expect($noms['sector-commerce-detail'] ?? null)->toBe('Secteur : Commerce de détail')
+        ->and($noms['size-grand-groupe'] ?? null)->toBe('Taille : Grand groupe')
+        ->and($noms['region-84'] ?? null)->toBe('Région : Auvergne-Rhône-Alpes');
+});
+
+it('ne pose pas l étiquette universelle nature-entreprise sur une fiche française', function () {
+    // Depuis le chantier « référentiels », les 4,29 M de fiches INSEE portent
+    // la nature `entreprise` : l'étiquette ne trierait rien, et n'apparaîtrait
+    // qu'au fil des enrichissements (le désaccord fiche/étiquette qu'on retire).
+    $francaise = makeTaggerCompany($this->workspace->id, ['entity_nature' => 'entreprise']);
+    $association = makeTaggerCompany($this->workspace->id, ['entity_nature' => 'association']);
+    $roumaine = makeTaggerCompany($this->workspace->id, [
+        'siren' => null, 'country_code' => 'RO', 'foreign_id' => 'zz:ent-ro', 'entity_nature' => 'entreprise',
+    ]);
+
+    $this->service->syncTags($francaise);
+    $this->service->syncTags($association);
+    $this->service->syncTags($roumaine);
+
+    expect($francaise->fresh()->tags->pluck('slug')->all())->not->toContain('nature-entreprise')
+        // Témoins : les autres natures, et l'entreprise étrangère, gardent la leur.
+        ->and($association->fresh()->tags->pluck('slug')->all())->toContain('nature-association')
+        ->and($roumaine->fresh()->tags->pluck('slug')->all())->toContain('nature-entreprise');
+});
+
 it('idempotent on second call', function () {
     $c = makeTaggerCompany($this->workspace->id, [
         'department_code' => '75', 'size_category' => 'pme',

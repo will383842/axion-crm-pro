@@ -280,9 +280,7 @@ final class SiteGdprService
                 );
             }
             $this->optOut($email, $emailHash, 'business');
-            $personnels = is_array($deleted['business']['personnels'] ?? null)
-                ? array_values(array_map('strval', $deleted['business']['personnels']))
-                : [];
+            $personnels = is_array($deleted['business']['personnels'] ?? null) ? $deleted['business']['personnels'] : [];
             $demande = is_int($deleted['business']['demande'] ?? null) ? $deleted['business']['demande'] : null;
             unset($deleted['business']['personnels'], $deleted['business']['demande']);
 

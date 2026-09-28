@@ -46,6 +46,8 @@ type Noeud = { id: number; denomination: string | null; niveau: string | null };
 
 type Fiche = FederationResume & {
   siren: string | null;
+  /** Organisme sans SIREN (section, conseil départemental d'ordre) : sa clé d'import. */
+  identifiant: string | null;
   naf: string | null;
   legal_form: string | null;
   effectif_range: string | null;
@@ -221,7 +223,11 @@ export function FederationDetailPage() {
                   .filter(Boolean)
                   .join(" · ") || "—"}
               </Ligne>
-              <Ligne label="SIREN">{f.siren ?? "—"}</Ligne>
+              {f.siren === null && f.identifiant ? (
+                <Ligne label="Identifiant (sans SIREN)">{f.identifiant}</Ligne>
+              ) : (
+                <Ligne label="SIREN">{f.siren ?? "—"}</Ligne>
+              )}
               <Ligne label="Création">{jour(f.date_creation)}</Ligne>
               <Ligne label="Site">
                 <Lien href={f.website}>Ouvrir</Lien>

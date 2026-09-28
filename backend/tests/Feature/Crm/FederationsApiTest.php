@@ -261,3 +261,19 @@ test('D7 — un compte qui ne voit pas les coordonnees ne peut pas effacer la no
     expect(DB::table('federations')->where('company_id', $this->nationale)->value('partenariat_note'))->toBe('ZZ note de Will')
         ->and(DB::table('federations')->where('company_id', $this->nationale)->value('partenariat'))->toBe('propose');
 });
+
+test('un organisme SANS SIREN est dans la liste, et sa fiche rend son identifiant ; une fiche a SIREN n en rend pas', function () {
+    $section = fedApiFiche($this->workspace->id, 'ZZ Union departementale', [
+        'famille' => 'confederation', 'niveau' => 'departemental', 'secteurs' => '{interprofessionnel}',
+    ], ['siren' => null, 'country_code' => 'FR', 'foreign_id' => 'section:zz-api:69', 'department_code' => '69']);
+
+    expect(fedApiIds($this, '?famille=confederation'))->toBe([$section]);
+
+    $fiche = $this->getJson('/api/v1/federations/' . $section)->assertOk();
+    expect($fiche->json('siren'))->toBeNull()
+        ->and($fiche->json('identifiant'))->toBe('section:zz-api:69');
+
+    $temoin = $this->getJson('/api/v1/federations/' . $this->nationale)->assertOk();
+    expect($temoin->json('siren'))->not->toBeNull()
+        ->and($temoin->json('identifiant'))->toBeNull();
+});

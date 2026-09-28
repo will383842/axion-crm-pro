@@ -41,6 +41,11 @@ beforeEach(function () {
 });
 
 afterEach(function () {
+    // Une transaction laissée ouverte par la commande (ce que le test de
+    // reprise interdit) ne doit pas bloquer la suite : on la referme d'abord.
+    while (DB::transactionLevel() > 0) {
+        DB::rollBack();
+    }
     foreach ($GLOBALS['zz_fpq_fichiers'] ?? [] as $f) {
         @unlink($f);
     }
@@ -177,8 +182,10 @@ test('un import INTERROMPU garde ses paquets valides ; relance, il reprend sans 
     }
     $sortie = Artisan::output();
 
-    // Les deux premiers paquets sont en base, le troisième est annulé en entier.
+    // Les deux premiers paquets sont en base, le troisième est annulé en entier
+    // — et aucune transaction n'est restée ouverte derrière la commande.
     expect($interrompu)->toBe('fiche_introuvable_apres_ingestion')
+        ->and(DB::transactionLevel())->toBe(0)
         ->and($sortie)->toContain('INTERROMPU après 2 paquet(s)')
         ->and(fpqFiches($this->espace))->toBe(20)
         ->and(DB::table('federations')->where('workspace_id', $this->espace)->count())->toBe(20);

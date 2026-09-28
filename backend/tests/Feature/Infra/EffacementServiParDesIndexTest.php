@@ -163,16 +163,33 @@ function esiPlan(string $sql, array $bindings): array
  */
 function esiBitmapServi(array $noeud, array $admis, array &$vus): bool
 {
-    $enfants = (array) ($noeud['Plans'] ?? []);
+    $type = $noeud['Node Type'] ?? '';
+    if ($type === 'Bitmap Index Scan') {
+        // Une condition d'index est EXIGÉE : un index partiel lu sans
+        // condition (pour son seul prédicat) est un parcours de toutes les
+        // fiches qu'il couvre.
+        $index = (string) ($noeud['Index Name'] ?? '');
+        if (! isset($noeud['Index Cond']) || ! in_array($index, $admis, true)) {
+            return false;
+        }
+        $vus[$index] = true;
 
-    return match ($noeud['Node Type'] ?? '') {
-        // Une condition d'index est EXIGÉE : un index partiel lu sans condition
-        // (pour son seul prédicat) est un parcours de toutes les fiches qu'il couvre.
-        'Bitmap Index Scan' => isset($noeud['Index Cond']) && in_array($noeud['Index Name'] ?? '', $admis, true) && ($vus[$noeud['Index Name']] = true),
-        'BitmapOr' => $enfants !== [] && array_reduce($enfants, fn (bool $ok, array $e): bool => esiBitmapServi($e, $admis, $vus) && $ok, true),
-        'BitmapAnd' => array_reduce($enfants, fn (bool $ok, array $e): bool => esiBitmapServi($e, $admis, $vus) || $ok, false),
-        default => false,
-    };
+        return true;
+    }
+    if ($type !== 'BitmapOr' && $type !== 'BitmapAnd') {
+        return false;
+    }
+    // Une boucle, pas `array_reduce` : une fonction fléchée capture `$vus`
+    // PAR VALEUR, et les index vus sous un OR/AND se perdaient.
+    $servis = [];
+    foreach ((array) ($noeud['Plans'] ?? []) as $enfant) {
+        $servis[] = esiBitmapServi((array) $enfant, $admis, $vus);
+    }
+    if ($servis === []) {
+        return false;
+    }
+
+    return $type === 'BitmapOr' ? ! in_array(false, $servis, true) : in_array(true, $servis, true);
 }
 
 /**

@@ -462,10 +462,15 @@ test('S6 — l export venu du site rend aussi les fiches d organisation, sans va
 test('E1 — un SIREN suivi d une date ne forment pas le numero par hasard : l effacement est complet', function () {
     // Les chiffres collés de ce texte contiennent « 0600000042 »
     // (906000000|4200…) : une recherche de sous-suite de chiffres criait au
-    // résidu. Le numéro, lui, n'y est pas.
+    // résidu. Le numéro, lui, n'y est pas. ⚠️ `jsonb` range ses clés (les
+    // plus courtes d'abord) : « siren » passe bien AVANT « cree_le » dans le
+    // texte lu, sans quoi la suite de chiffres n'existerait pas (témoin
+    // ci-dessous).
     DB::table('companies')->where('id', $this->temoin)->update([
-        'metadata' => json_encode(['siren_ref' => '906000000', 'cree_le' => '4200-01-01']),
+        'metadata' => json_encode(['siren' => '906000000', 'cree_le' => '4200-01-01']),
     ]);
+    $texte = (string) DB::table('companies')->where('id', $this->temoin)->value('metadata');
+    expect((string) preg_replace('/\D/', '', $texte))->toContain('0600000042');
 
     $resultat = app(GdprErasureService::class)->erase(EFO_EMAIL);
 

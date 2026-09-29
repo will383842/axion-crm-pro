@@ -29,51 +29,62 @@ use Illuminate\Support\Facades\DB;
 final class AdressesPartagees
 {
     /**
-     * L'empreinte SALÉE de chaque adresse (`doublons_empreinte`, HMAC avec la
-     * clé de la base), sur l'adresse en minuscules et sans espaces autour —
-     * la même forme partout : détection, campagne, effacement.
+     * Inscrit (ou met à jour) les adresses partagées trouvées par la détection.
+     * L'empreinte SALÉE est calculée DANS la base (`doublons_inscrire_adresses`) :
+     * le rôle applicatif n'exécute pas la fonction d'empreinte (#255). À
+     * appeler dans le contexte de l'espace.
      *
-     * @param  list<string>  $emails
-     * @return array<string, string> adresse telle que donnée => empreinte
+     * @param  list<array{email: string, domaine: ?string, nb: int, nature: string}>  $lignes
      */
-    public static function empreintes(array $emails): array
+    public static function inscrire(string $workspaceId, array $lignes): int
     {
-        $empreintes = [];
-        foreach (array_chunk(array_values(array_unique($emails)), 5000) as $morceau) {
-            $lignes = DB::select(
-                'SELECT v, public.doublons_empreinte(lower(btrim(v))) AS h FROM json_array_elements_text(?::json) AS v',
-                [json_encode($morceau, JSON_THROW_ON_ERROR)],
-            );
-            foreach ($lignes as $l) {
-                $empreintes[(string) $l->v] = (string) $l->h;
-            }
+        $n = 0;
+        foreach (array_chunk($lignes, 2000) as $morceau) {
+            $r = DB::selectOne('SELECT public.doublons_inscrire_adresses(?::uuid, ?::jsonb) AS n', [$workspaceId, json_encode($morceau, JSON_THROW_ON_ERROR)]);
+            $n += (int) ($r->n ?? 0);
         }
 
-        return $empreintes;
+        return $n;
     }
 
     /**
-     * Les empreintes (`empreintes()`) des adresses à écarter
-     * des campagnes. À appeler dans le contexte de l'espace.
+     * Combien de lignes de la table n'ont PAS été revues par un parcours qui a
+     * vu ces adresses (le ménage, annoncé à blanc).
      *
-     * @return array<string, true>
+     * @param  list<string>  $emails
      */
-    public static function aExclure(string $workspaceId): array
+    public static function nonRevues(string $workspaceId, array $emails): int
+    {
+        $r = DB::selectOne('SELECT public.doublons_adresses_non_revues(?::uuid, ?::jsonb) AS n', [$workspaceId, json_encode(array_values($emails), JSON_THROW_ON_ERROR)]);
+
+        return (int) ($r->n ?? 0);
+    }
+
+    /**
+     * Parmi CES adresses (celles d'une campagne), celles à écarter : cabinet
+     * comptable ou domiciliation (réglable) portées par au moins N fiches. Une
+     * question oui/non bornée à l'espace du contexte.
+     *
+     * @param  list<string>  $emails
+     * @return array<string, true> adresse telle que donnée => écartée
+     */
+    public static function exclues(string $workspaceId, array $emails): array
     {
         $natures = config('crm.doublons.campagne.natures_exclues', []);
         $natures = is_array($natures) ? array_values(array_filter($natures, 'is_string')) : [];
         $seuil = max(2, (int) config('crm.doublons.campagne.seuil_fiches', 3));
-        if ($natures === []) {
+        if ($natures === [] || $emails === []) {
             return [];
         }
 
         $exclues = [];
-        foreach (DB::table('adresses_partagees')
-            ->where('workspace_id', $workspaceId)
-            ->whereIn('nature', $natures)
-            ->where('nb_fiches', '>=', $seuil)
-            ->pluck('email_empreinte') as $empreinte) {
-            $exclues[(string) $empreinte] = true;
+        foreach (array_chunk(array_values(array_unique($emails)), 5000) as $morceau) {
+            foreach (DB::select(
+                'SELECT e FROM public.doublons_adresses_exclues(?::uuid, ?::jsonb, ARRAY(SELECT jsonb_array_elements_text(?::jsonb)), ?::int) AS e',
+                [$workspaceId, json_encode($morceau, JSON_THROW_ON_ERROR), json_encode($natures, JSON_THROW_ON_ERROR), $seuil],
+            ) as $l) {
+                $exclues[(string) $l->e] = true;
+            }
         }
 
         return $exclues;

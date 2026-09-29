@@ -62,6 +62,14 @@ final class ScrapedRecordIngestService
     public function __construct(private readonly EmailMxValidator $mx) {}
 
     /**
+     * Les ancres à interroger au registre `contacts_retires` quand la fiche a
+     * été trouvée par le renvoi d'une fusion (chantier 5) ; null sinon.
+     *
+     * @var list<array{siren: ?string, pays: ?string, foreign_id: ?string}>|null
+     */
+    private ?array $ancresRenvoi = null;
+
+    /**
      * @throws ScrapeIngestRejection
      */
     public function ingest(ScrapedRecord $record, bool $dryRun = false): ScrapeIngestOutcome
@@ -139,6 +147,7 @@ final class ScrapedRecordIngestService
             return new ScrapeIngestOutcome(status: ScrapeIngestOutcome::PENDING_MATCH, activityId: $activityId);
         }
 
+        $this->ancresRenvoi = null;
         [$companyId, $status, $fieldsWritten] = $this->upsertCompany($record, $workspaceId);
 
         // ── Personnes ───────────────────────────────────────────────────────
@@ -156,6 +165,16 @@ final class ScrapedRecordIngestService
                 // personne (faiblesse relevée par l'audit : le scraping actuel
                 // fabrique des « contacts » depuis des boîtes génériques).
                 $this->backfillGenericEmail($companyId, $person['email'] ?? null, $workspaceId);
+
+                continue;
+            }
+
+            // Chantier 5 — la fiche a été trouvée par le RENVOI d'une fusion :
+            // une personne retirée (supprimée, effacée art. 17) sous l'ancre du
+            // message OU sous celle de la fiche gardée ne revient pas.
+            if ($this->ancresRenvoi !== null
+                && FusionFiches::personneRetiree($workspaceId, $this->ancresRenvoi, $person['first_name'] ?? null, $person['last_name'] ?? null)) {
+                $skipped['retiree_apres_fusion'] = ($skipped['retiree_apres_fusion'] ?? 0) + 1;
 
                 continue;
             }
@@ -251,6 +270,10 @@ final class ScrapedRecordIngestService
                 ->where('id', $renvoi['garde'])->whereNull('deleted_at')->first();
             if ($gardee !== null) {
                 $existing = $gardee;
+                $this->ancresRenvoi = [
+                    ['siren' => $record->siren, 'pays' => $record->countryCode, 'foreign_id' => $record->foreignId],
+                    FusionFiches::ancreDe($workspaceId, (int) $gardee->id),
+                ];
             }
         }
 

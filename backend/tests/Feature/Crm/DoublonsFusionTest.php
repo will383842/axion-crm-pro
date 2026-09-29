@@ -531,3 +531,21 @@ test('E1/E2 — la preuve désigne DEUX fiches INSEE : aucune fusion automatique
     // TÉMOIN : une fusion MANUELLE reste possible (un humain choisit).
     expect(dfFusionner($this->ws, $a, $x))->toBeGreaterThan(0);
 });
+
+test('E1 — plus de 50 homonymes à SIREN : l unicité ne se vérifie pas, la fusion automatique est refusée (preuve_ambigue)', function () {
+    // 51 homonymes qui ne satisfont PAS la preuve (autre code postal) : la
+    // recherche s'arrête avant d'avoir tout vu, elle ne conclut donc rien.
+    for ($i = 0; $i < 51; $i++) {
+        F::fiche($this->ws, 'ZZ Omega', ['postcode' => '69099']);
+    }
+
+    dfRefusSansEcriture($this->ws, 'preuve_ambigue', $this->garde, $this->absorbee, FusionFiches::MODE_AUTO, $this->paire);
+});
+
+test('TÉMOIN — à 50 homonymes non concluants, la fusion automatique passe', function () {
+    for ($i = 0; $i < 50; $i++) {
+        F::fiche($this->ws, 'ZZ Omega', ['postcode' => '69099']);
+    }
+
+    expect(dfFusionner($this->ws, $this->garde, $this->absorbee, FusionFiches::MODE_AUTO, $this->paire))->toBeGreaterThan(0);
+});

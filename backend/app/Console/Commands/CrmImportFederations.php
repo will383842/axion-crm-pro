@@ -460,9 +460,13 @@ class CrmImportFederations extends Command
         $l = $this->lire($ligne);
         $delta = [];
 
-        $avant = $this->parAncre($workspaceId, $l['siren'], $l['identifiant'], corbeilleComprise: true)
+        $trouvee = $this->parAncre($workspaceId, $l['siren'], $l['identifiant'], corbeilleComprise: true)
             ->first(['id', 'deleted_at', 'email_generic', 'phone', 'website', 'linkedin_url']);
-        $avant = $this->suivreFusion($workspaceId, $avant, ['id', 'deleted_at', 'email_generic', 'phone', 'website', 'linkedin_url']);
+        $avant = $this->suivreFusion($workspaceId, $trouvee, ['id', 'deleted_at', 'email_generic', 'phone', 'website', 'linkedin_url']);
+        // Un renvoi de fusion a été suivi : la ligne vise la fiche GARDÉE.
+        $ancreGardee = $trouvee !== null && $avant !== null && (int) $trouvee->id !== (int) $avant->id
+            ? FusionFiches::ancreDe($workspaceId, (int) $avant->id)
+            : null;
         if ($avant !== null && $avant->deleted_at !== null) {
             // Mise à la corbeille par Will : un import ne la ressuscite pas.
             throw new InvalidArgumentException('fiche_a_la_corbeille');
@@ -478,7 +482,12 @@ class CrmImportFederations extends Command
         // `contacts_retires` (relecture sécurité R2).
         $retenues = [];
         foreach ($l['personnes'] as $p) {
-            if ($this->personneRetiree($workspaceId, $l['siren'], $l['identifiant'], $p['first_name'], $p['last_name'])) {
+            // Après un renvoi de fusion, le registre est interrogé avec les
+            // DEUX ancres : celle du fichier (la fiche absorbée) ET celle de la
+            // fiche gardée — une personne effacée sur la gardée y est inscrite
+            // sous l'ancre de la gardée (veto RGPD, relecture #260).
+            if ($this->personneRetiree($workspaceId, $l['siren'], $l['identifiant'], $p['first_name'], $p['last_name'])
+                || ($ancreGardee !== null && FusionFiches::personneRetiree($workspaceId, [$ancreGardee], $p['first_name'], $p['last_name']))) {
                 $delta['personnes_retirees_ignorees'] = ($delta['personnes_retirees_ignorees'] ?? 0) + 1;
 
                 continue;

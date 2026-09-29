@@ -148,12 +148,17 @@ final class FusionFiches
      * les fusions en chaîne), ou null si elle n'est absorbée par aucune fusion
      * en cours. Servie par `idx_fusions_fiches_absorbee`.
      *
-     * @return array{garde: int, fusion: int}|null
+     * `fusions` : TOUTES les fusions de la chaîne (A→B puis B→C : les deux),
+     * dans l'ordre. Un lien posé sur la fiche d'arrivée est inscrit au journal
+     * de chacune : annulées dans l'ordre inverse, elles le ramènent pas à pas
+     * jusqu'à la fiche d'origine.
+     *
+     * @return array{garde: int, fusions: list<int>}|null
      */
     public static function gardeDe(string $ws, int $companyId): ?array
     {
         $courant = $companyId;
-        $fusion = null;
+        $fusions = [];
         for ($pas = 0; $pas < 16; $pas++) {
             $ligne = DB::selectOne(
                 'SELECT id, garde_id FROM fusions_fiches WHERE absorbee_id = ? AND annulee_at IS NULL AND workspace_id = ? ORDER BY id DESC LIMIT 1',
@@ -163,12 +168,57 @@ final class FusionFiches
                 break;
             }
             $courant = (int) $ligne->garde_id;
-            // La PREMIÈRE fusion de la chaîne est celle qui a absorbé la fiche
-            // cherchée : c'est elle que l'annulation doit défaire.
-            $fusion ??= (int) $ligne->id;
+            $fusions[] = (int) $ligne->id;
         }
 
-        return $fusion === null ? null : ['garde' => $courant, 'fusion' => $fusion];
+        return $fusions === [] ? null : ['garde' => $courant, 'fusions' => $fusions];
+    }
+
+    /**
+     * La personne a-t-elle été RETIRÉE (supprimée, effacée art. 17) sous l'UNE
+     * de ces ancres ? Après un renvoi de fusion, l'import doit interroger le
+     * registre `contacts_retires` avec l'ancre du fichier ET celle de la fiche
+     * gardée : la personne effacée sur la gardée y est inscrite sous l'ancre
+     * de la gardée (veto RGPD de la relecture #260).
+     *
+     * @param  list<array{siren: ?string, pays: ?string, foreign_id: ?string}>  $ancres
+     */
+    public static function personneRetiree(string $ws, array $ancres, ?string $prenom, ?string $nom): bool
+    {
+        if ($nom === null) {
+            return false;
+        }
+        foreach ($ancres as $a) {
+            if ($a['siren'] !== null) {
+                $ligne = DB::selectOne('SELECT contacts_retires_contient(?::uuid, ?, ?, ?) AS e', [$ws, $a['siren'], $prenom, $nom]);
+            } elseif ($a['foreign_id'] !== null && $a['pays'] !== null) {
+                $ligne = DB::selectOne('SELECT contacts_retires_contient_ancre(?::uuid, ?, ?, ?, ?) AS e', [$ws, $a['pays'], $a['foreign_id'], $prenom, $nom]);
+            } else {
+                continue;
+            }
+            if ((bool) ($ligne->e ?? false)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * L'ancre (SIREN, sinon pays + identifiant) d'une fiche, pour le registre.
+     *
+     * @return array{siren: ?string, pays: ?string, foreign_id: ?string}
+     */
+    public static function ancreDe(string $ws, int $companyId): array
+    {
+        $f = DB::table('companies')->where('workspace_id', $ws)->where('id', $companyId)
+            ->first(['siren', 'country_code', 'foreign_id', 'deleted_at']);
+
+        return [
+            'siren' => $f === null ? null : self::texte($f->siren),
+            'pays' => $f === null ? null : self::texte($f->country_code),
+            'foreign_id' => $f === null ? null : self::texte($f->foreign_id),
+        ];
     }
 
     /**
@@ -181,13 +231,19 @@ final class FusionFiches
         if (! in_array($table, ['event_organizers'], true)) {
             throw new InvalidArgumentException("Rattachement non journalisable : {$table}");
         }
-        DB::update(
+        $n = DB::update(
             "UPDATE fusions_fiches
                 SET journal = jsonb_set(journal, ARRAY['deplacements', ?::text],
                                         COALESCE(journal->'deplacements'->(?::text), '[]'::jsonb) || to_jsonb(?::bigint))
               WHERE workspace_id = ? AND id = ? AND annulee_at IS NULL",
             [$table, $table, $cle, $ws, $fusionId],
         );
+        // La fusion a été annulée entre le renvoi et l'écriture : le lien ne
+        // serait plus défait par personne. La ligne d'import est refusée (et
+        // son point de sauvegarde annulé), jamais écrite à moitié.
+        if ($n !== 1) {
+            throw new InvalidArgumentException('renvoi_de_fusion_perdu');
+        }
     }
 
     /**
@@ -386,8 +442,10 @@ final class FusionFiches
                 "UPDATE companies SET {$sets} WHERE workspace_id = ? AND id = ?",
                 array_merge(array_values($valeurs), [$ws, $gardeId]),
             );
-            foreach ($this->empreintesColonnes('companies', $ws, $gardeId, array_keys($valeurs)) as $col => $empreinte) {
-                $champs[$col] = ['avant' => $avants[$col] ?? null, 'empreinte' => $empreinte];
+            // L'empreinte est posée par la base après l'insertion du journal
+            // (`doublons_journaliser`) : le rôle applicatif n'en calcule pas.
+            foreach (array_keys($valeurs) as $col) {
+                $champs[$col] = ['avant' => $avants[$col] ?? null, 'empreinte' => null];
             }
         }
 
@@ -421,6 +479,8 @@ final class FusionFiches
             'operateur' => $operateur,
             'created_at' => now(),
         ]);
+
+        DB::select('SELECT public.doublons_journaliser(?::uuid, ?)', [$ws, $fusionId]);
 
         if ($flagId !== null) {
             DB::update(
@@ -598,9 +658,9 @@ final class FusionFiches
                     "UPDATE contacts SET {$sets} WHERE workspace_id = ? AND id = ?",
                     array_merge(array_values($j['champs']), [$ws, $j['garde_contact']]),
                 );
-                foreach ($this->empreintesColonnes('contacts', $ws, $j['garde_contact'], array_keys($j['champs'])) as $c => $empreinte) {
+                foreach (array_keys($j['champs']) as $c) {
                     $ancienne = $avant instanceof stdClass ? $avant->{$c} : null;
-                    $champs[$c] = ['avant' => $ancienne === null ? null : '', 'empreinte' => $empreinte];
+                    $champs[$c] = ['avant' => $ancienne === null ? null : '', 'empreinte' => null];
                 }
             }
             $journal[] = ['absorbee_contact' => $j['absorbee_contact'], 'garde_contact' => $j['garde_contact'], 'champs' => $champs];
@@ -697,31 +757,37 @@ final class FusionFiches
             ), count($evenementsMetier));
         }
 
-        // Une valeur recopiée n'est retirée que si son EMPREINTE n'a pas bougé
-        // (personne ne l'a changée depuis). `COALESCE` : la condition ne dit
-        // rien de « non nul », si bien qu'aucun index PARTIEL (`… IS NOT
-        // NULL`) ne peut la servir — la ligne se lit par sa clé primaire.
-        $remettre = function (string $table, string $col, int $id, mixed $v) use ($ws, &$bilan): void {
+        // Une valeur recopiée n'est retirée que si elle n'a pas bougé depuis :
+        // la BASE compare son empreinte à celle du journal
+        // (`doublons_valeur_inchangee`, oui/non). Une entrée retirée du journal
+        // par un effacement (art. 17) n'y est plus : rien à remettre.
+        $remettre = function (string $table, string $col, int $id, mixed $v, array $chemin) use ($ws, $fusionId, &$bilan): void {
             $v = is_array($v) ? $v : [];
-            $n = DB::update(
-                "UPDATE {$table} SET {$col} = ? WHERE workspace_id = ? AND id = ?
-                   AND public.doublons_empreinte(COALESCE(CAST({$col} AS TEXT), '')) = ?",
-                [($v['avant'] ?? null) === '' ? '' : null, $ws, $id, is_string($v['empreinte'] ?? null) ? $v['empreinte'] : ''],
+            $r = DB::selectOne(
+                'SELECT public.doublons_valeur_inchangee(?::uuid, ?, ?, ?, ?, ARRAY(SELECT jsonb_array_elements_text(?::jsonb))) AS ok',
+                [$ws, $fusionId, $table, $id, $col, json_encode($chemin, JSON_THROW_ON_ERROR)],
             );
+            $n = 0;
+            if ($r instanceof stdClass && (bool) $r->ok) {
+                $n = DB::update(
+                    "UPDATE {$table} SET {$col} = ? WHERE workspace_id = ? AND id = ?",
+                    [($v['avant'] ?? null) === '' ? '' : null, $ws, $id],
+                );
+            }
             $bilan[$n > 0 ? 'champs_remis' : 'champs_modifies_depuis']++;
         };
         foreach ((array) ($journal['champs'] ?? []) as $col => $v) {
             if (in_array($col, self::CHAMPS_FICHE, true)) {
-                $remettre('companies', (string) $col, $gardeId, $v);
+                $remettre('companies', (string) $col, $gardeId, $v, ['champs', (string) $col, 'empreinte']);
             }
         }
-        foreach ((array) ($journal['jumeaux'] ?? []) as $j) {
+        foreach (array_values((array) ($journal['jumeaux'] ?? [])) as $rang => $j) {
             if (! is_array($j)) {
                 continue;
             }
             foreach ((array) ($j['champs'] ?? []) as $col => $v) {
                 if (in_array($col, self::CHAMPS_PERSONNE, true)) {
-                    $remettre('contacts', (string) $col, (int) ($j['garde_contact'] ?? 0), $v);
+                    $remettre('contacts', (string) $col, (int) ($j['garde_contact'] ?? 0), $v, ['jumeaux', (string) $rang, 'champs', (string) $col, 'empreinte']);
                 }
             }
         }
@@ -858,29 +924,6 @@ final class FusionFiches
     }
 
     /**
-     * Les empreintes SALÉES des colonnes d'une ligne, calculées par la base
-     * sur la valeur écrite (`CAST(col AS TEXT)`) : exactement ce que
-     * l'annulation recalculera.
-     *
-     * @param  list<string>  $colonnes
-     * @return array<string, string>
-     */
-    private function empreintesColonnes(string $table, string $ws, int $id, array $colonnes): array
-    {
-        $select = implode(', ', array_map(
-            static fn (string $c): string => "public.doublons_empreinte(COALESCE(CAST({$c} AS TEXT), '')) AS {$c}",
-            $colonnes,
-        ));
-        $ligne = DB::selectOne("SELECT {$select} FROM {$table} WHERE workspace_id = ? AND id = ?", [$ws, $id]);
-        $empreintes = [];
-        foreach ($colonnes as $c) {
-            $empreintes[$c] = $ligne instanceof stdClass ? (string) $ligne->{$c} : '';
-        }
-
-        return $empreintes;
-    }
-
-    /**
      * E1 — la preuve « nom, code postal et site » ne vaut que si elle désigne
      * UNE seule fiche : une autre fiche à SIREN qui la satisferait aussi rend
      * la fusion ambiguë (lue par `idx_companies_denom_btree`).
@@ -899,6 +942,11 @@ final class FusionFiches
              LIMIT 51',
             [$ws, (string) $absorbee->denomination_normalized, $gardeId, (int) $absorbee->id],
         );
+        // Plus de 50 homonymes : l'unicité ne se vérifie pas — ambigu, jamais
+        // « pas d'autre candidat ».
+        if (count($autres) > 50) {
+            return true;
+        }
         $preuveAbsorbee = self::pourPreuve($absorbee);
         foreach ($autres as $autre) {
             if ($autre instanceof stdClass && Rapprochement::preuveCertaine($motif, self::pourPreuve($autre), $preuveAbsorbee, true)) {

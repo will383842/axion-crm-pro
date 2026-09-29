@@ -110,6 +110,16 @@ final class DoublonsFixtures
         return array_values($slugs);
     }
 
+    /**
+     * L'empreinte SALÉE d'une adresse, calculée par le PROPRIÉTAIRE de la base
+     * (les tests tournent sous lui) — le rôle applicatif, lui, n'exécute pas
+     * `doublons_empreinte`.
+     */
+    public static function empreinteAdresse(string $email): string
+    {
+        return (string) DB::selectOne('SELECT public.doublons_empreinte(lower(btrim(?))) AS h', [$email])->h;
+    }
+
     /** La valeur d'un compteur du bilan d'une commande. */
     public static function compteur(string $sortie, string $cle): ?int
     {

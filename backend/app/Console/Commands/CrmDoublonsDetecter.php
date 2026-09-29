@@ -87,8 +87,8 @@ class CrmDoublonsDetecter extends Command
 
     private int $verrousMax = 0;
 
-    /** @var array<string, true> empreintes des adresses revues par ce parcours */
-    private array $empreintesVues = [];
+    /** @var array<string, true> adresses revues par ce parcours */
+    private array $adressesVues = [];
 
     private FusionFiches $fusion;
 
@@ -211,13 +211,10 @@ class CrmDoublonsDetecter extends Command
                     }
                     // À blanc, rien n'a été recalculé en base : on compte les
                     // lignes dont l'adresse n'a PAS été revue par ce parcours.
-                    $obsoletes = 0;
-                    foreach (DB::table('adresses_partagees')->where('workspace_id', $ws)->pluck('email_empreinte') as $empreinte) {
-                        if (! isset($this->empreintesVues[(string) $empreinte])) {
-                            $obsoletes++;
-                        }
-                    }
-                    $this->compteurs['adresses_plus_partagees'] = $obsoletes;
+                    $this->compteurs['adresses_plus_partagees'] = AdressesPartagees::nonRevues(
+                        $ws,
+                        array_map(static fn (int|string $e): string => (string) $e, array_keys($this->adressesVues)),
+                    );
                 });
             }
         } finally {
@@ -251,7 +248,7 @@ class CrmDoublonsDetecter extends Command
     private function reinitialiser(): void
     {
         $this->verrousMax = 0;
-        $this->empreintesVues = [];
+        $this->adressesVues = [];
         $this->compteurs = [
             'lots' => 0,
             'fiches_lues' => 0,
@@ -355,7 +352,7 @@ class CrmDoublonsDetecter extends Command
      * dans le lot qui contient leur PREMIÈRE fiche (jamais deux fois).
      *
      * @param  list<stdClass>  $fiches
-     * @return list<array{empreinte: string, domaine: ?string, nb: int, nature: string}>
+     * @return list<array{email: string, domaine: ?string, nb: int, nature: string}>
      */
     private function adressesDuLot(string $ws, array $fiches, int $bas, int $haut): array
     {
@@ -413,14 +410,12 @@ class CrmDoublonsDetecter extends Command
         }
 
         $adresses = [];
-        $empreintes = AdressesPartagees::empreintes(array_map(static fn (int|string $e): string => (string) $e, array_keys($partagees)));
         foreach ($partagees as $email => $n) {
             $email = (string) $email;
             $nature = Rapprochement::natureAdresse($email, $parAdresse[$email] ?? []);
-            $empreinte = $empreintes[$email];
-            $this->empreintesVues[$empreinte] = true;
+            $this->adressesVues[$email] = true;
             $adresses[] = [
-                'empreinte' => $empreinte,
+                'email' => $email,
                 'domaine' => Rapprochement::domaineEmail($email),
                 'nb' => $n,
                 'nature' => $nature,
@@ -643,24 +638,15 @@ class CrmDoublonsDetecter extends Command
         }
     }
 
-    /** @param  list<array{empreinte: string, domaine: ?string, nb: int, nature: string}>  $adresses */
+    /**
+     * L'empreinte SALÉE est calculée par la base (`doublons_inscrire_adresses`) :
+     * le rôle applicatif n'exécute pas la fonction d'empreinte.
+     *
+     * @param  list<array{email: string, domaine: ?string, nb: int, nature: string}>  $adresses
+     */
     private function ecrireAdresses(string $ws, array $adresses): void
     {
-        foreach (array_chunk($adresses, self::PAR_INSTRUCTION) as $morceau) {
-            $valeurs = implode(', ', array_fill(0, count($morceau), '(?::uuid, ?, ?, ?::int, ?, clock_timestamp())'));
-            $params = [];
-            foreach ($morceau as $a) {
-                array_push($params, $ws, $a['empreinte'], $a['domaine'], $a['nb'], $a['nature']);
-            }
-            DB::insert(
-                "INSERT INTO adresses_partagees (workspace_id, email_empreinte, domaine, nb_fiches, nature, calculee_le)
-                 VALUES {$valeurs}
-                 ON CONFLICT (workspace_id, email_empreinte) DO UPDATE
-                    SET domaine = EXCLUDED.domaine, nb_fiches = EXCLUDED.nb_fiches,
-                        nature = EXCLUDED.nature, calculee_le = EXCLUDED.calculee_le",
-                $params,
-            );
-        }
+        AdressesPartagees::inscrire($ws, $adresses);
     }
 
     private function mesurerVerrous(): void

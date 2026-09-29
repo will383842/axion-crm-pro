@@ -18,7 +18,6 @@
  * Fixtures FICTIVES (dépôt public).
  */
 
-use App\Crm\Doublons\AdressesPartagees;
 use App\Crm\Doublons\Rapprochement;
 use App\Crm\FichesProtegees;
 use App\Services\Audit\AuditHashChain;
@@ -120,7 +119,7 @@ test('l adresse du cabinet comptable est inscrite par son EMPREINTE, avec sa nat
     $lignes = DB::table('adresses_partagees')->where('workspace_id', $this->ws)->get();
     expect($lignes)->toHaveCount(1);
     $ligne = $lignes->first();
-    expect($ligne->email_empreinte)->toBe(AdressesPartagees::empreintes([$this->email])[$this->email])
+    expect($ligne->email_empreinte)->toBe(F::empreinteAdresse($this->email))
         ->and($ligne->nb_fiches)->toBe(3)
         ->and($ligne->nature)->toBe(Rapprochement::CABINET_COMPTABLE)
         ->and($ligne->domaine)->toBe('zz-cabinet.example.invalid')

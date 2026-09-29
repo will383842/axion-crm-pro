@@ -146,17 +146,27 @@ test('sous axion_app : détecter, fusionner, annuler — dans l espace visé seu
             ->and($owner->table('companies')->where('id', $a['absorbee'])->exists())->toBeTrue()
             ->and($owner->table('companies')->where('id', $a['garde'])->exists())->toBeTrue();
 
-        // S1 — la clé des empreintes n'est lisible par personne d'autre que
-        // la fonction ; le rôle applicatif calcule l'empreinte, sans la clé.
-        $refusCle = null;
-        try {
-            DB::connection('pgsql_app')->select('SELECT cle FROM doublons_cle');
-        } catch (Throwable $e) {
-            $refusCle = $e->getMessage();
-        }
-        expect($refusCle)->toContain('permission denied')
-            ->and(strlen((string) DB::connection('pgsql_app')->selectOne("SELECT public.doublons_empreinte('zz') AS h")->h))->toBe(64);
+        // S1 — ni la clé des empreintes, ni la fonction d'empreinte ne sont à
+        // la portée du rôle applicatif (comme `contacts_retires_empreinte`,
+        // #255) : il ne peut pas fabriquer d'empreinte pour tester un
+        // dictionnaire. Il n'a que des gestes bornés à SON espace.
+        $refus = static function (string $sql, array $params = []): ?string {
+            try {
+                DB::connection('pgsql_app')->select($sql, $params);
+            } catch (Throwable $e) {
+                return $e->getMessage();
+            }
+
+            return null;
+        };
+        expect($refus('SELECT cle FROM doublons_cle'))->toContain('permission denied')
+            ->and($refus("SELECT public.doublons_empreinte('zz') AS h"))->toContain('permission denied');
         DB::connection('pgsql_app')->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $a['id']]);
+        // Hors de son contexte : refusé ; dans son contexte : répond.
+        expect($refus("SELECT public.doublons_adresses_exclues(?::uuid, '[\"zz@zz.example.invalid\"]'::jsonb, ARRAY['cabinet_comptable'], 2)", [$b['id']]))
+            ->toContain('doublons_hors_contexte')
+            ->and($refus("SELECT public.doublons_adresses_exclues(?::uuid, '[\"zz@zz.example.invalid\"]'::jsonb, ARRAY['cabinet_comptable'], 2)", [$a['id']]))
+            ->toBeNull();
 
         $annuler = Artisan::call('crm:doublons:fusionner', ['--workspace' => $a['slug'], '--annuler' => (string) $fusion]);
         DB::setDefaultConnection($precedente);

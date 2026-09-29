@@ -13,10 +13,12 @@
  * Fixtures FICTIVES (dépôt public).
  */
 
-use App\Crm\Doublons\AdressesPartagees;
+use App\Crm\Doublons\FusionFiches;
+use App\Crm\Doublons\Rapprochement;
 use App\Crm\Rgpd\SiteGdprService;
 use App\Services\Audit\AuditHashChain;
 use App\Services\Rgpd\GdprErasureService;
+use App\Support\WorkspaceContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -48,7 +50,7 @@ beforeEach(function () {
 
 function dePresente(string $ws, string $email): bool
 {
-    $empreinte = AdressesPartagees::empreintes([$email])[$email];
+    $empreinte = F::empreinteAdresse($email);
 
     return DB::table('adresses_partagees')->where('workspace_id', $ws)->where('email_empreinte', $empreinte)->exists();
 }
@@ -74,4 +76,35 @@ test('l effacement par le SITE retire la ligne de l adresse effacée, et d elle 
     expect(dePresente($this->ws, $this->adresses['site']))->toBeFalse()
         ->and(dePresente($this->ws, $this->adresses['console']))->toBeTrue()
         ->and(dePresente($this->ws, $this->adresses['temoin']))->toBeTrue();
+});
+
+test('l effacement retire AUSSI du journal des fusions les empreintes de l adresse et du mobile effacés', function () {
+    $email = 'zoe.journal@zz-efface.example.invalid';
+    $garde = F::fiche($this->ws, 'ZZ Journal Efface', ['postcode' => '69060']);
+    $absorbee = F::sansSiren($this->ws, 'ZZ Journal Efface', ['postcode' => '69060', 'email_generic' => $email, 'phone' => '06 12 34 56 78', 'website' => 'https://zz-journal.example.invalid']);
+    F::contact($this->ws, $garde, 'Zoe', 'ZZJOURNAL', ['email' => $email, 'phone' => '06 12 34 56 78']);
+    $fusion = WorkspaceContext::run($this->ws, fn (): int => app(FusionFiches::class)->fusionner(
+        $this->ws,
+        $garde,
+        $absorbee,
+        Rapprochement::NOM_CP,
+        FusionFiches::MODE_MANUEL,
+        null,
+        null,
+        'test',
+    ));
+    $champs = static function () use ($fusion): array {
+        $cles = array_keys((array) json_decode((string) DB::table('fusions_fiches')->where('id', $fusion)->value('journal'), true)['champs']);
+        sort($cles);
+
+        return $cles;
+    };
+    expect($champs())->toBe(['email_generic', 'phone', 'website']);
+
+    app(GdprErasureService::class)->erase($email);
+
+    $journal = (string) DB::table('fusions_fiches')->where('id', $fusion)->value('journal');
+    // TÉMOIN : le site, qui n'est pas une donnée de la personne, reste.
+    expect($champs())->toBe(['website'])
+        ->and($journal)->not->toContain(F::empreinteAdresse($email));
 });

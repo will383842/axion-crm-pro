@@ -122,10 +122,6 @@ class CrmCampagneDestinataires extends Command
             'ecartees_deja_informees', 'ecartees_opposition', 'ecartees_adresse_partagee', 'adresses_partagees', 'sans_evenement_a_venir',
         ], 0);
 
-        $partageesExclues = (bool) $this->option('avec-adresses-partagees')
-            ? []
-            : WorkspaceContext::run($workspaceId, fn (): array => AdressesPartagees::aExclure($workspaceId));
-
         /** @var array<string, list<array<string, mixed>>> $parAdresse */
         $parAdresse = [];
         WorkspaceContext::run($workspaceId, function () use ($workspaceId, $segment, $pertinences, $famillesExclues, &$parAdresse, &$bilan): void {
@@ -156,9 +152,11 @@ class CrmCampagneDestinataires extends Command
 
         });
 
-        $empreintes = $partageesExclues === [] ? [] : WorkspaceContext::run(
+        // Question oui/non posée à la base, pour les seules adresses de la
+        // campagne (le rôle applicatif ne calcule pas d'empreinte).
+        $partageesExclues = (bool) $this->option('avec-adresses-partagees') ? [] : WorkspaceContext::run(
             $workspaceId,
-            fn (): array => AdressesPartagees::empreintes(array_map(static fn (int|string $e): string => (string) $e, array_keys($parAdresse))),
+            fn (): array => AdressesPartagees::exclues($workspaceId, array_map(static fn (int|string $e): string => (string) $e, array_keys($parAdresse))),
         );
 
         $lignes = [];
@@ -187,7 +185,7 @@ class CrmCampagneDestinataires extends Command
 
                 continue;
             }
-            if (isset($partageesExclues[$empreintes[$email] ?? ''])) {
+            if (isset($partageesExclues[$email])) {
                 $bilan['ecartees_adresse_partagee']++;
 
                 continue;

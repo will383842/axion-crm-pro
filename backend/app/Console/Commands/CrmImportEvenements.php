@@ -274,7 +274,7 @@ class CrmImportEvenements extends Command
         if (! is_array($ancres)) {
             throw new InvalidArgumentException('organisateurs_invalides');
         }
-        /** @var array<int, ?int> $companyIds fiche => fusion suivie pour la trouver */
+        /** @var array<int, list<int>> $companyIds fiche => fusions suivies pour la trouver (chaîne) */
         $companyIds = [];
         foreach ($ancres as $ancre) {
             if (! is_array($ancre)) {
@@ -286,7 +286,7 @@ class CrmImportEvenements extends Command
 
                 continue;
             }
-            $companyIds[$trouve['id']] = $trouve['fusion'];
+            $companyIds[$trouve['id']] = $trouve['fusions'];
         }
 
         $existant = DB::table('events')
@@ -331,7 +331,7 @@ class CrmImportEvenements extends Command
         }
 
         $delta['liens_crees'] = 0;
-        foreach ($companyIds as $companyId => $fusion) {
+        foreach ($companyIds as $companyId => $fusions) {
             $cree = DB::table('event_organizers')->insertOrIgnore([
                 'event_id' => $eventId,
                 'company_id' => $companyId,
@@ -341,8 +341,13 @@ class CrmImportEvenements extends Command
             $delta['liens_crees'] += $cree;
             // Posé sur une fiche GARDÉE en suivant l'ancre d'une fiche absorbée :
             // inscrit au journal de la fusion, que l'annulation rend à l'absorbée.
-            if ($cree > 0 && $fusion !== null) {
-                FusionFiches::noterRattachement($workspaceId, $fusion, 'event_organizers', $eventId);
+            if ($cree > 0 && $fusions !== []) {
+                // Au journal de CHAQUE fusion de la chaîne (A→B puis B→C) :
+                // annulées dans l'ordre inverse, elles ramènent le lien jusqu'à
+                // la fiche d'origine.
+                foreach ($fusions as $fusion) {
+                    FusionFiches::noterRattachement($workspaceId, $fusion, 'event_organizers', $eventId);
+                }
                 $delta['liens_via_une_fusion'] = ($delta['liens_via_une_fusion'] ?? 0) + 1;
             }
         }
@@ -354,10 +359,10 @@ class CrmImportEvenements extends Command
      * L'organisateur par son ancre. Une fiche à la corbeille n'est jamais
      * reliée — sauf si une FUSION l'a absorbée (chantier 5) : l'événement se
      * relie alors à la fiche gardée, et le lien est inscrit au journal de la
-     * fusion (`fusion`), pour que l'annulation le défasse.
+     * fusion (`fusions`), pour que l'annulation le défasse.
      *
      * @param  array<mixed>  $ancre
-     * @return array{id: int, fusion: ?int}|null
+     * @return array{id: int, fusions: list<int>}|null
      */
     private function organisateur(array $ancre, string $workspaceId): ?array
     {
@@ -383,7 +388,7 @@ class CrmImportEvenements extends Command
             return null;
         }
         if ($fiche->deleted_at === null) {
-            return ['id' => (int) $fiche->id, 'fusion' => null];
+            return ['id' => (int) $fiche->id, 'fusions' => []];
         }
         $renvoi = FusionFiches::gardeDe($workspaceId, (int) $fiche->id);
         if ($renvoi === null) {
@@ -392,7 +397,7 @@ class CrmImportEvenements extends Command
         $vivante = DB::table('companies')->where('workspace_id', $workspaceId)
             ->where('id', $renvoi['garde'])->whereNull('deleted_at')->exists();
 
-        return $vivante ? ['id' => $renvoi['garde'], 'fusion' => $renvoi['fusion']] : null;
+        return $vivante ? ['id' => $renvoi['garde'], 'fusions' => $renvoi['fusions']] : null;
     }
 
     /** @param  array<mixed>  $brut */

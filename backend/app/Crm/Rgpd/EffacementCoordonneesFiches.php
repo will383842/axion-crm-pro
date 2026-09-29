@@ -227,15 +227,19 @@ final class EffacementCoordonneesFiches
                     'updated_at' => now(),
                 ]);
 
-            // Chantier 5 : l'empreinte salée de l'adresse, si elle était
-            // partagée par plusieurs fiches, part avec l'adresse (même forme
-            // que `AdressesPartagees::empreintes`).
-            $partagees = DB::table('adresses_partagees')
-                ->whereRaw('email_empreinte = public.doublons_empreinte(lower(btrim(?)))', [$email]);
-            if ($workspaceId !== null) {
-                $partagees->where('workspace_id', $workspaceId);
-            }
-            $bilan['adresses_partagees'] = $partagees->delete();
+        }
+
+        // Chantier 5 : l'empreinte salée de l'adresse (si elle était partagée)
+        // et celles de l'adresse et des numéros PERSONNELS dans le journal des
+        // fusions partent avec eux — `doublons_effacer`, bornée à l'espace du
+        // contexte (le rôle applicatif ne calcule pas d'empreinte).
+        $espace = $workspaceId ?? WorkspaceContext::current();
+        if ($espace !== null && ($email !== '' || $variantes !== [])) {
+            $r = DB::selectOne(
+                'SELECT public.doublons_effacer(?::uuid, ?, ?::jsonb) AS n',
+                [$espace, $email, json_encode(array_values($variantes), JSON_THROW_ON_ERROR)],
+            );
+            $bilan['adresses_partagees'] = (int) ($r->n ?? 0);
         }
 
         // Un DOUBLON de la personne (même nom, aucune adresse) qui porte l'un

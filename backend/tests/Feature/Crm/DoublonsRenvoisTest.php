@@ -14,6 +14,8 @@
 
 use App\Crm\Doublons\FusionFiches;
 use App\Crm\Doublons\Rapprochement;
+use App\Crm\Scraping\ScrapedRecord;
+use App\Crm\Scraping\ScrapedRecordIngestService;
 use App\Services\Audit\AuditHashChain;
 use App\Support\WorkspaceContext;
 use Database\Seeders\ScrapingSourcesSeeder;
@@ -139,4 +141,114 @@ test('un import de fédération qui vise une fiche absorbée met à jour la fich
         ->and(DB::table('contacts')->where('company_id', $garde)->where('last_name', 'ZZRENVOI')->exists())->toBeTrue()
         ->and(DB::table('contacts')->where('company_id', $absorbee)->count())->toBe(0)
         ->and(DB::table('companies')->where('id', $absorbee)->value('deleted_at'))->not->toBeNull();
+});
+
+/**
+ * Une ligne de fédération SANS SIREN, fictive.
+ *
+ * @param  list<array<string, mixed>>  $personnes
+ * @return array<string, mixed>
+ */
+function drvLigneFede(string $identifiant, array $personnes): array
+{
+    return [
+        'siren' => null, 'identifiant' => $identifiant, 'nom' => 'ZZ UNION VETO', 'famille' => 'confederation',
+        'niveau' => 'departemental', 'secteurs' => ['interprofessionnel'], 'tailles_adherents' => ['tpe'], 'pertinence' => 'haute',
+        'contactabilite' => 'email_verifie', 'departement' => '69', 'email_generique' => null,
+        'personnes' => $personnes, 'tete_de_reseau' => null,
+    ];
+}
+
+test('VETO RGPD — une personne retirée de la fiche GARDÉE ne revient pas par l ancre de la fiche absorbée (avec ou sans e-mail)', function () {
+    $garde = F::fiche($this->ws, 'ZZ Union Veto', ['postcode' => '69000']);
+    $absorbee = F::sansSiren($this->ws, 'ZZ Union Veto', ['postcode' => '69000', 'foreign_id' => 'section:zz-veto:69', 'discovery_source' => 'federations-2026']);
+    drvFusionner($this->ws, $garde, $absorbee);
+    // Zoé (avec e-mail) et Zed (SANS e-mail) sont sur la fiche gardée, puis
+    // retirées : le registre les inscrit sous l'ancre de la GARDÉE (son SIREN).
+    F::contact($this->ws, $garde, 'Zoe', 'ZZVETOUN', ['email' => 'zoe.veto@zz-veto.example.invalid']);
+    F::contact($this->ws, $garde, 'Zed', 'ZZVETODEUX');
+    DB::table('contacts')->where('company_id', $garde)->whereIn('last_name', ['ZZVETOUN', 'ZZVETODEUX'])->delete();
+    expect(DB::table('contacts_retires')->where('workspace_id', $this->ws)->count())->toBe(2);
+
+    Artisan::call('crm:import-federations', ['file' => drvFichier([drvLigneFede('section:zz-veto:69', [
+        ['prenom' => 'Zoe', 'nom' => 'ZZVETOUN', 'fonction' => 'Présidente', 'email' => 'zoe.veto@zz-veto.example.invalid', 'linkedin' => null],
+        ['prenom' => 'Zed', 'nom' => 'ZZVETODEUX', 'fonction' => 'Trésorier', 'email' => null, 'linkedin' => null],
+    ])])]);
+    $sortie = Artisan::output();
+
+    expect(DB::table('contacts')->where('workspace_id', $this->ws)->whereIn('last_name', ['ZZVETOUN', 'ZZVETODEUX'])->count())->toBe(0)
+        // Écartées PAR L'IMPORT (registre interrogé avec les deux ancres).
+        ->and(F::compteur($sortie, 'personnes_retirees_ignorees'))->toBe(2);
+});
+
+test('VETO RGPD — la collecte (funnel) qui suit un renvoi n ajoute pas une personne retirée de la fiche gardée', function () {
+    $garde = F::fiche($this->ws, 'ZZ Club Veto', ['postcode' => '69000']);
+    $absorbee = F::sansSiren($this->ws, 'ZZ Club Veto', ['postcode' => '69000', 'foreign_id' => 'evt:zz-club-veto']);
+    drvFusionner($this->ws, $garde, $absorbee);
+    F::contact($this->ws, $garde, 'Zed', 'ZZVETOTROIS');
+    DB::table('contacts')->where('company_id', $garde)->where('last_name', 'ZZVETOTROIS')->delete();
+
+    $message = [
+        'schema_version' => ScrapedRecord::SCHEMA_VERSION, 'source' => 'evenements-pro', 'status' => 'success',
+        'run_id' => 'zz-veto-funnel-1',
+        'company' => ['foreign_id' => 'evt:zz-club-veto', 'country' => 'FR', 'fields' => ['denomination' => 'ZZ Club Veto']],
+        'persons' => [
+            ['kind' => 'person', 'first_name' => 'Zed', 'last_name' => 'ZZVETOTROIS'],
+            // TÉMOIN : une personne jamais retirée est bien ajoutée.
+            ['kind' => 'person', 'first_name' => 'Zoe', 'last_name' => 'ZZVETOTEMOIN'],
+        ],
+    ];
+    $outcome = app(ScrapedRecordIngestService::class)->ingest(ScrapedRecord::fromArray($message));
+
+    expect($outcome->companyId)->toBe($garde)
+        ->and($outcome->personsSkipped['retiree_apres_fusion'] ?? 0)->toBe(1)
+        ->and(DB::table('contacts')->where('company_id', $garde)->where('last_name', 'ZZVETOTROIS')->exists())->toBeFalse()
+        ->and(DB::table('contacts')->where('company_id', $garde)->where('last_name', 'ZZVETOTEMOIN')->exists())->toBeTrue();
+});
+
+test('chaîne A→B puis B→C : le lien d événement est journalisé dans les DEUX fusions ; annulées, elles le rendent à A', function () {
+    $a = F::sansSiren($this->ws, 'ZZ Chaine', ['postcode' => '69040', 'foreign_id' => 'evt:zz-chaine-a']);
+    $b = F::sansSiren($this->ws, 'ZZ Chaine', ['postcode' => '69040', 'foreign_id' => 'evt:zz-chaine-b']);
+    $c = F::fiche($this->ws, 'ZZ Chaine', ['postcode' => '69040']);
+    $ab = drvFusionner($this->ws, $b, $a);
+    $bc = drvFusionner($this->ws, $c, $b);
+
+    Artisan::call('crm:import-evenements', ['file' => drvFichier([[
+        'external_ref' => 'zz-chaine-1', 'nom' => 'ZZ Événement chaîne', 'type' => 'club-affaires', 'date_debut' => '2026-11-15',
+        'ville' => 'Lyon', 'region' => 'AURA', 'verifie' => true,
+        'organisateurs' => [['country' => 'FR', 'foreign_id' => 'evt:zz-chaine-a']],
+    ]])]);
+    expect(drvOrganisateurs('zz-chaine-1'))->toBe([$c]);
+
+    drvAnnuler($this->ws, $bc);
+    expect(drvOrganisateurs('zz-chaine-1'))->toBe([$b]);
+    drvAnnuler($this->ws, $ab);
+    expect(drvOrganisateurs('zz-chaine-1'))->toBe([$a]);
+});
+
+test('une fusion annulée PENDANT l import : la ligne est refusée en entier, rien n est écrit à moitié', function () {
+    $garde = F::fiche($this->ws, 'ZZ Club Perdu', ['postcode' => '69050']);
+    $absorbee = F::sansSiren($this->ws, 'ZZ Club Perdu', ['postcode' => '69050', 'foreign_id' => 'evt:zz-club-perdu']);
+    $fusion = drvFusionner($this->ws, $garde, $absorbee);
+    // Juste après la lecture du renvoi, la fusion est annulée (course).
+    $fait = false;
+    DB::listen(function ($requete) use (&$fait, $fusion): void {
+        if ($fait || ! str_starts_with(ltrim($requete->sql), 'SELECT id, garde_id FROM fusions_fiches')) {
+            return;
+        }
+        $fait = true;
+        DB::table('fusions_fiches')->where('id', $fusion)->update(['annulee_at' => now()]);
+    });
+
+    Artisan::call('crm:import-evenements', ['file' => drvFichier([[
+        'external_ref' => 'zz-perdu-1', 'nom' => 'ZZ Événement perdu', 'type' => 'club-affaires', 'date_debut' => '2026-11-15',
+        'ville' => 'Lyon', 'region' => 'AURA', 'verifie' => true,
+        'organisateurs' => [['country' => 'FR', 'foreign_id' => 'evt:zz-club-perdu']],
+    ]])]);
+    $sortie = Artisan::output();
+
+    expect($fait)->toBeTrue()
+        ->and(F::compteur($sortie, 'rejetes'))->toBe(1)
+        ->and(DB::table('events')->where('external_ref', 'zz-perdu-1')->exists())->toBeFalse()
+        ->and(DB::table('event_organizers')->where('company_id', $garde)->exists())->toBeFalse();
 });

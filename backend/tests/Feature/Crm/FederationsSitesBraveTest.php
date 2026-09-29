@@ -348,10 +348,31 @@ test('seules website, website_status, website_method et website_checked_at chang
         ->and($apres['website_method'])->toBe('brave-federations')
         // `quality_score` (déclencheur) et `quality_badge` (colonne générée) : DÉRIVÉES.
         ->and(array_values(array_diff($changees, ['quality_score', 'quality_badge'])))->toBe(['website', 'website_checked_at', 'website_method', 'website_status'])
-        ->and($apres['updated_at'])->toBe($avant['updated_at'])
         ->and((array) DB::table('federations')->where('company_id', $id)->first())->toBe($federationAvant)
         ->and(DB::table('contacts')->where('company_id', $id)->get()->map(fn ($c) => (array) $c)->all())->toBe($contactsAvant)
         ->and(DB::table('company_tag')->where('company_id', $id)->get()->map(fn ($t) => (array) $t)->all())->toBe($etiquettesAvant);
+});
+
+test('updated_at n est pas touche — temoin : toute autre ecriture le remet a jour', function () {
+    // Test SÉPARÉ, sans contact : insérer un contact recalcule le score de la
+    // fiche, donc réécrit `updated_at` à `now()` — l'heure de DÉBUT de la
+    // transaction du test, la même que celle qu'un UPDATE fautif poserait.
+    // La comparaison ne mesurerait alors plus rien (mutation survivante).
+    $ancienne = '2024-01-15 10:00:00';
+    $espace = fsbEspace();
+    $id = fsbFederation($espace, ['city' => 'Paris', 'updated_at' => $ancienne], ['sigle' => 'UNSA', 'nom_developpe' => 'Union nationale ameublement']);
+    $temoin = fsbFederation($espace, ['updated_at' => $ancienne], ['contactabilite' => 'email_verifie']);
+    fsbSimuler(
+        fn (string $q): array => ['https://unsa-ameublement.test/'],
+        ['unsa-ameublement.test' => fsbPage('UNSA — Union nationale de l\'ameublement')],
+    );
+
+    fsbLancer();
+    DB::table('companies')->where('id', $temoin)->update(['website_status' => 'not_found']);
+
+    expect(DB::table('companies')->where('id', $id)->value('website'))->toBe('https://unsa-ameublement.test/')
+        ->and(substr((string) DB::table('companies')->where('id', $id)->value('updated_at'), 0, 19))->toBe($ancienne)
+        ->and(substr((string) DB::table('companies')->where('id', $temoin)->value('updated_at'), 0, 19))->not->toBe($ancienne);
 });
 
 // ═════════════════════════════════════════════════════════════════════════════

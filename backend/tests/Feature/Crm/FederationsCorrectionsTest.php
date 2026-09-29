@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Tests\Support\ResolveurDnsSimule;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -100,6 +101,9 @@ function fedcCanaux(string $siren): array
 /** @return list<array<string, mixed>> */
 function fedcDestinataires(array $options = [], string $segment = 'federations'): array
 {
+    // La liste ne retient que des adresses VÉRIFIÉES valides : on vérifie
+    // d'abord, avec un DNS simulé où tout domaine reçoit.
+    ResolveurDnsSimule::toutVerifier();
     $sortie = fedcFichier('');
     Artisan::call('crm:campagne:destinataires', ['segment' => $segment, 'sortie' => $sortie] + $options);
 

@@ -5,6 +5,7 @@
  * retours, sans aucun envoi. Fixtures FICTIVES (dépôt public).
  */
 
+use App\Crm\Emails\Dns\ResultatDns;
 use App\Crm\FichesProtegees;
 use App\Models\Workspace;
 use App\Support\EligibiliteCampagne;
@@ -12,6 +13,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Tests\Support\ResolveurDnsSimule;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -106,6 +108,9 @@ function campFichier(array $lignes = []): string
 /** @return list<array<string, mixed>> */
 function campDestinataires(array $options = []): array
 {
+    // La liste ne retient que des adresses VÉRIFIÉES valides : on vérifie
+    // d'abord, avec un DNS simulé où tout domaine reçoit.
+    ResolveurDnsSimule::toutVerifier();
     $sortie = campFichier();
     Artisan::call('crm:campagne:destinataires', ['segment' => 'organisateurs-evenements', 'sortie' => $sortie] + $options);
 
@@ -281,4 +286,39 @@ test('la liste refuse un chemin dans le depot', function () {
     $code = Artisan::call('crm:campagne:destinataires', ['segment' => 'organisateurs-evenements', 'sortie' => base_path('zz-liste.jsonl')]);
 
     expect($code)->toBe(1)->and(file_exists(base_path('zz-liste.jsonl')))->toBeFalse();
+});
+
+// ── La vérification des e-mails (crm:emails:verifier, 2026-09-30) ──────────
+
+test('une adresse JAMAIS verifiee n est pas retenue, et le bilan le dit', function () {
+    $sortie = campFichier();
+    Artisan::call('crm:campagne:destinataires', ['segment' => 'organisateurs-evenements', 'sortie' => $sortie]);
+
+    expect(file($sortie, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [])->toBe([])
+        // bureau@ (une adresse, deux organisateurs), pro@, la perso et l'opposée ;
+        // invalide@ l'est déjà par son `email_status`.
+        ->and(Artisan::output())->toMatch('/ecartees_non_verifiees\s*\|\s*4\s*\|/');
+});
+
+test('une adresse dont le domaine ne recoit rien est ecartee, meme verifiee', function () {
+    // Tout domaine répond « n'existe pas » : bureau@ et pro@ passent à
+    // `invalide` — ils restent sur leurs fiches, mais pas dans la liste.
+    ResolveurDnsSimule::toutVerifier(ResultatDns::INEXISTANT);
+    $sortie = campFichier();
+    Artisan::call('crm:campagne:destinataires', ['segment' => 'organisateurs-evenements', 'sortie' => $sortie]);
+
+    expect(file($sortie, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [])->toBe([])
+        ->and(Artisan::output())->toMatch('/ecartees_invalides\s*\|\s*[3-9]\s*\|/')
+        ->and(DB::table('companies')->where('id', $this->club)->value('email_generic'))->toBe('bureau@zz-club.example.invalid');
+});
+
+test('une verification ecrite pour une AUTRE adresse ne vaut pas pour celle-ci', function () {
+    ResolveurDnsSimule::toutVerifier();
+    // L'adresse de la fiche change APRÈS la vérification.
+    DB::table('contacts')->where('id', $this->pro)->update(['email' => 'nouvelle@zz-club.example.invalid']);
+    $sortie = campFichier();
+    Artisan::call('crm:campagne:destinataires', ['segment' => 'organisateurs-evenements', 'sortie' => $sortie]);
+    $emails = array_map(fn ($l) => json_decode($l, true)['email'], file($sortie, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: []);
+
+    expect($emails)->toBe(['bureau@zz-club.example.invalid']);
 });

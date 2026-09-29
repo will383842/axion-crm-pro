@@ -15,6 +15,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Tests\Support\ResolveurDnsSimule;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -189,6 +190,9 @@ function fedmSortie(): string
 /** @return list<array<string, mixed>> */
 function fedmDestinataires(string $segment, array $options = []): array
 {
+    // La liste ne retient que des adresses VÉRIFIÉES valides : on vérifie
+    // d'abord, avec un DNS simulé où tout domaine reçoit.
+    ResolveurDnsSimule::toutVerifier();
     $sortie = fedmSortie();
     Artisan::call('crm:campagne:destinataires', ['segment' => $segment, 'sortie' => $sortie] + $options);
 

@@ -60,6 +60,12 @@ function dabChaine(string $ws, int $garde, int $n): void
 
 function dabAttendAvertissement(int $fois): void
 {
+    if ($fois === 0) {
+        // Un espion Mockery ne sait pas vérifier « zéro fois » par `times(0)`.
+        Log::shouldNotHaveReceived('warning');
+
+        return;
+    }
     Log::shouldHaveReceived('warning')
         ->withArgs(static fn (string $message, array $contexte = []): bool => $message === 'crm.doublons.ancres_absorbees_tronquees'
             // Identifiants et bornes, RIEN d'autre (aucune donnée personnelle).

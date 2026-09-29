@@ -164,9 +164,10 @@ test('VETO RGPD — une personne retirée de la fiche GARDÉE ne revient pas par
     $absorbee = F::sansSiren($this->ws, 'ZZ Union Veto', ['postcode' => '69000', 'foreign_id' => 'section:zz-veto:69', 'discovery_source' => 'federations-2026']);
     drvFusionner($this->ws, $garde, $absorbee);
     // Zoé (avec e-mail) et Zed (SANS e-mail) sont sur la fiche gardée, puis
-    // retirées : le registre les inscrit sous l'ancre de la GARDÉE (son SIREN).
-    F::contact($this->ws, $garde, 'Zoe', 'ZZVETOUN', ['email' => 'zoe.veto@zz-veto.example.invalid']);
-    F::contact($this->ws, $garde, 'Zed', 'ZZVETODEUX');
+    // retirées : le registre (qui suit les personnes venues de l'import des
+    // fédérations) les inscrit sous l'ancre de la GARDÉE (son SIREN).
+    F::contact($this->ws, $garde, 'Zoe', 'ZZVETOUN', ['email' => 'zoe.veto@zz-veto.example.invalid', 'sources' => '["federations-2026"]']);
+    F::contact($this->ws, $garde, 'Zed', 'ZZVETODEUX', ['sources' => '["federations-2026"]']);
     DB::table('contacts')->where('company_id', $garde)->whereIn('last_name', ['ZZVETOUN', 'ZZVETODEUX'])->delete();
     expect(DB::table('contacts_retires')->where('workspace_id', $this->ws)->count())->toBe(2);
 
@@ -185,8 +186,9 @@ test('VETO RGPD — la collecte (funnel) qui suit un renvoi n ajoute pas une per
     $garde = F::fiche($this->ws, 'ZZ Club Veto', ['postcode' => '69000']);
     $absorbee = F::sansSiren($this->ws, 'ZZ Club Veto', ['postcode' => '69000', 'foreign_id' => 'evt:zz-club-veto']);
     drvFusionner($this->ws, $garde, $absorbee);
-    F::contact($this->ws, $garde, 'Zed', 'ZZVETOTROIS');
+    F::contact($this->ws, $garde, 'Zed', 'ZZVETOTROIS', ['sources' => '["federations-2026"]']);
     DB::table('contacts')->where('company_id', $garde)->where('last_name', 'ZZVETOTROIS')->delete();
+    expect(DB::table('contacts_retires')->where('workspace_id', $this->ws)->count())->toBe(1);
 
     $message = [
         'schema_version' => ScrapedRecord::SCHEMA_VERSION, 'source' => 'evenements-pro', 'status' => 'success',

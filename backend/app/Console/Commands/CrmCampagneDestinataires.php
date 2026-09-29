@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Crm\Campagnes\Segments;
+use App\Crm\Doublons\AdressesPartagees;
 use App\Crm\Emails\VerificationEmail;
 use App\Crm\Evenements\EvenementAVenir;
 use App\Crm\Federations\EtiquettesFederation;
@@ -36,7 +37,11 @@ use Illuminate\Support\Facades\DB;
  *    jamais dans une campagne (décision D3, plan d'envoi §10) ;
  *  - avec `--non-informes` : l'une de ses fiches a déjà reçu un premier message ;
  *  - opposition ou suppression (`EligibiliteCampagne::peutRecevoir`, portée
- *    business — la porte imposée par la garde B15-009).
+ *    business — la porte imposée par la garde B15-009) ;
+ *  - adresse de CABINET COMPTABLE ou de DOMICILIATION portée par plusieurs
+ *    fiches (`AdressesPartagees`, chantier 5, seuil réglable) : le message
+ *    n'atteindrait pas le dirigeant — `--avec-adresses-partagees` pour la
+ *    garder.
  *
  * Chaque ligne cite toutes les organisations de l'adresse et l'événement à venir
  * le plus proche, pour personnaliser. Pour le segment `federations`, elle porte
@@ -69,7 +74,8 @@ class CrmCampagneDestinataires extends Command
                             {sortie : Fichier JSONL à écrire, HORS du dépôt}
                             {--non-informes : Seulement les adresses dont aucune fiche n\'a reçu de premier message (first_info_at)}
                             {--avec-pertinence-faible : Segment federations : réintégrer les organismes de pertinence faible (écartés par défaut)}
-                            {--avec-syndicats-salaries : Segment federations : réintégrer les syndicats de salariés (art. 9 RGPD, écartés par défaut)}';
+                            {--avec-syndicats-salaries : Segment federations : réintégrer les syndicats de salariés (art. 9 RGPD, écartés par défaut)}
+                            {--avec-adresses-partagees : Garder les adresses de cabinet comptable / domiciliation portées par plusieurs fiches (écartées par défaut)}';
 
     protected $description = 'Prépare la liste des destinataires autorisés d\'une campagne (n\'envoie rien).';
 
@@ -119,7 +125,7 @@ class CrmCampagneDestinataires extends Command
 
         $bilan = array_fill_keys([
             'fiches', 'ecartees_pertinence_faible', 'ecartees_sans_classement', 'ecartees_syndicats_salaries', 'adresses_distinctes', 'destinataires', 'ecartees_invalides', 'ecartees_non_verifiees', 'ecartees_perso',
-            'ecartees_deja_informees', 'ecartees_opposition', 'adresses_partagees', 'sans_evenement_a_venir',
+            'ecartees_deja_informees', 'ecartees_opposition', 'ecartees_adresse_partagee', 'adresses_partagees', 'sans_evenement_a_venir',
         ], 0);
 
         /** @var array<string, list<array<string, mixed>>> $parAdresse */
@@ -152,6 +158,13 @@ class CrmCampagneDestinataires extends Command
 
         });
 
+        // Question oui/non posée à la base, pour les seules adresses de la
+        // campagne (le rôle applicatif ne calcule pas d'empreinte).
+        $partageesExclues = (bool) $this->option('avec-adresses-partagees') ? [] : WorkspaceContext::run(
+            $workspaceId,
+            fn (): array => AdressesPartagees::exclues($workspaceId, array_map(static fn (int|string $e): string => (string) $e, array_keys($parAdresse))),
+        );
+
         $lignes = [];
         foreach ($parAdresse as $email => $occurrences) {
             $bilan['adresses_distinctes']++;
@@ -183,6 +196,11 @@ class CrmCampagneDestinataires extends Command
             }
             if (! EligibiliteCampagne::peutRecevoir($email, 'business')) {
                 $bilan['ecartees_opposition']++;
+
+                continue;
+            }
+            if (isset($partageesExclues[$email])) {
+                $bilan['ecartees_adresse_partagee']++;
 
                 continue;
             }

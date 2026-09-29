@@ -1,0 +1,66 @@
+name: CRM — Doublons (prod, à la main)
+
+# Chantier 5 — `crm:doublons:detecter` et `crm:doublons:fusionner` sur le
+# serveur de production, par SSH, LANCÉS À LA MAIN seulement.
+#
+# Par défaut : ESSAI À BLANC de la détection — rien n'est écrit, le bilan donne
+# les chiffres (paires par motif, fusions certaines, file de vérification,
+# adresses partagées par nature). Les modes qui écrivent se choisissent
+# explicitement.
+#
+# `--compteurs-seulement` TOUJOURS : ce dépôt est PUBLIC, ses journaux aussi —
+# que des nombres, jamais un nom, une adresse ou un identifiant d'espace.
+#
+# Rien n'est jamais supprimé : une fusion met la fiche absorbée à la corbeille
+# et s'annule par `crm:doublons:fusionner --annuler=<numéro>` (sur le serveur).
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Ce que fait le workflow"
+        type: choice
+        default: detecter-a-blanc
+        options:
+          - detecter-a-blanc
+          - detecter
+          - fusionner-a-blanc
+          - fusionner-certaines
+
+permissions:
+  contents: read
+
+jobs:
+  doublons:
+    name: Doublons sur prod (${{ inputs.mode }})
+    runs-on: ubuntu-24.04
+    # Par lots sur 4,3 M de fiches.
+    timeout-minutes: 120
+    steps:
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Doublons via SSH
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          case "$MODE" in
+            detecter-a-blanc)     CMD="crm:doublons:detecter --dry-run" ;;
+            detecter)             CMD="crm:doublons:detecter" ;;
+            fusionner-a-blanc)    CMD="crm:doublons:fusionner --dry-run" ;;
+            fusionner-certaines)  CMD="crm:doublons:fusionner" ;;
+            *) echo "::error::mode inconnu : $MODE"; exit 1 ;;
+          esac
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$USER@$HOST" bash <<EOF
+            set -euo pipefail
+            cd "$PROJECT_PATH"
+            # « < /dev/null » OBLIGATOIRE : sinon docker compose exec -T lit le
+            # reste du heredoc comme stdin et avale les commandes suivantes.
+            docker compose exec -u root -T api php artisan $CMD --compteurs-seulement < /dev/null
+          EOF

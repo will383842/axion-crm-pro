@@ -352,29 +352,44 @@ aucune ligne à laisser passer, et `axion_app` y est soumis.
 Si un mot de passe est demandé, c'est celui de `DB_APP_PASSWORD` dans le `.env`.
 Si le rôle n'existe pas, l'archive est antérieure au correctif A08-008 : §7.3.
 
-### 7.3 — Le rôle applicatif peut-il lire ?
+### 7.3 — Le rôle applicatif peut-il lire ? Et seulement ce qu'il doit ?
 
-C'est la question que `restore-postgres.sh` pose à son étape 5. Pour la reposer
-seul, ou après un `GRANT` manuel :
+C'est la question que `restore-postgres.sh` pose à son étape 5, par la requête
+partagée `infra/scripts/droits-role-applicatif.sql`. Pour la reposer seul :
 
 ```bash
-docker exec axion-crm-postgres psql -U axion -d axion_crm -tAc "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind IN ('r','p') AND NOT has_table_privilege('axion_app', c.oid, 'SELECT')"
+docker exec -i axion-crm-postgres psql -U axion -d axion_crm -tA -F '|' -v role=axion_app < /opt/axion-crm-pro/infra/scripts/droits-role-applicatif.sql
 ```
 
-Attendu : **aucune table illisible**.
+Attendu : **aucune ligne**. Chaque ligne dit un défaut :
 
-> Ici `-U axion` est **légitime**, et la différence avec le §7.2 est tout le
-> sujet : on n'interroge pas des données, on interroge le catalogue avec
-> `has_table_privilege`, qui répond sur les droits **d'un autre rôle**. La
+- `illisible|<table>` — le rôle applicatif ne lit cette table ni en entier ni
+  par une seule colonne (`has_table_privilege` et `has_any_column_privilege`) :
+  l'application échouerait sur « permission denied ».
+- `fuite|<objet>` — une table de clés (`contacts_retires_cle`, `doublons_cle`)
+  ou une colonne d'empreintes (`adresses_partagees.email_empreinte`,
+  `fusions_empreintes.empreinte`), volontairement FERMÉE au rôle applicatif,
+  lui est lisible : il pourrait tester un dictionnaire d'adresses.
+- `fuite|fonction:<nom>` — une fonction d'empreinte (`doublons_empreinte`,
+  `contacts_retires_empreinte`) est EXÉCUTABLE par le rôle applicatif : il
+  calculerait l'empreinte de n'importe quelle valeur devinée.
+
+> Ici `-U axion` est **légitime** : on n'interroge pas des données, on
+> interroge le catalogue, qui répond sur les droits **d'un autre rôle**. La
 > réponse ne dépend ni de qui pose la question, ni de la RLS.
 
-**S'il reste des tables illisibles** — ou si `restore-postgres.sh` est sorti en
-code 6 —, l'archive a été produite avec `--no-acl`. Remède immédiat, en tant que
-propriétaire :
+**S'il reste des tables illisibles** — `restore-postgres.sh` sort en code 6 —,
+l'archive a très probablement été produite avec `--no-acl`. Remède : restaurer
+une archive produite AVEC ses droits (`backup-postgres.sh` actuel).
 
-```bash
-docker exec axion-crm-postgres psql -U axion -d axion_crm -c "GRANT USAGE ON SCHEMA public TO axion_app; GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO axion_app; GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO axion_app; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO axion_app;"
-```
+⛔ **N'accordez jamais de droits en masse sur toutes les tables du schéma.**
+Plusieurs tables et colonnes sont volontairement fermées au rôle applicatif
+(clés HMAC, empreintes) : un droit accordé en masse les rendrait lisibles, et
+la vérification sortirait en code 7. Si une archive sans droits est la seule
+disponible, les droits se rétablissent table par table, pour les seules tables
+listées `illisible|…`, et en respectant les privilèges de colonne posés par les
+migrations `2026_09_29_000001` (clé du registre des retraits) et
+`2026_10_01_000001` (doublons).
 
 Puis **rejoue 7.3**, et seulement ensuite ouvre le service.
 

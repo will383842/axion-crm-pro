@@ -75,6 +75,8 @@ final class SemeurTablesScopees
         // ── Feuilles ─────────────────────────────────────────────────────────
         'abonnements',
         'activities',
+        // 2026-09-30 (chantier 5) : adresses generiques partagees (empreintes).
+        'adresses_partagees',
         'ai_act_register',
         'analytics_attribution',
         'analytics_cohorts',
@@ -99,6 +101,11 @@ final class SemeurTablesScopees
         // 2026-09-29 (chantier 3) : la ligne « organisation professionnelle »
         // d'une fiche — feuille de `companies`.
         'federations',
+        // 2026-09-30 (chantier 5) : journal des fusions — APRES `duplicate_flags`
+        // (cle etrangere `flag_id`).
+        'fusions_fiches',
+        // 2026-09-30 (chantier 5) : empreintes d'une fusion — APRÈS elle.
+        'fusions_empreintes',
         'health_practitioners',
         'invitations',
         'journalists',
@@ -420,6 +427,27 @@ final class SemeurTablesScopees
             'entity_a_id' => $id['companies'],
             'entity_b_id' => $id['companies'] + 1,
             'similarity' => 0.900,
+        ]);
+
+        $id['fusions_fiches'] = $insererAvecId('fusions_fiches', [
+            'garde_id' => $id['companies'],
+            'absorbee_id' => $id['companies'] + 1,
+            'motif' => 'nom_cp',
+            'mode' => 'manuel',
+            'absorbee_supprimee_le' => now(),
+        ]);
+
+        $inserer('fusions_empreintes', [
+            'fusion_id' => $id['fusions_fiches'],
+            'chemin' => 'champs.website',
+            'empreinte' => hash('sha256', 'zz-fusion-' . $marque),
+        ]);
+
+        $inserer('adresses_partagees', [
+            'email_empreinte' => hash('sha256', 'zz-partagee-' . $marque),
+            'domaine' => 'zz-etancheite.invalid',
+            'nb_fiches' => 2,
+            'nature' => 'inconnue',
         ]);
 
         $inserer('email_events', [

@@ -13,6 +13,7 @@ import { EvenementsPage } from '@/features/evenements/EvenementsPage';
 import { EvenementDetailPage } from '@/features/evenements/EvenementDetailPage';
 import { FederationsPage } from '@/features/federations/FederationsPage';
 import { FederationDetailPage } from '@/features/federations/FederationDetailPage';
+import { DoublonsPage } from '@/features/doublons/DoublonsPage';
 // D22-005 — la route `/contacts` ne monte plus l'écran directement : elle passe
 // par `ContactsRoute`, qui redirige vers `/console/contacts` quand le drapeau
 // `console_v2` est ouvert. Sans cela, l'écran restait joignable par signet alors
@@ -117,6 +118,8 @@ const evenementsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '
 const evenementDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/evenements/$eventId', component: EvenementDetailPage });
 const federationsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/federations', component: FederationsPage });
 const federationDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/federations/$companyId', component: FederationDetailPage });
+// 2026-09-30 — chantier 5 : la file des doublons à vérifier.
+const doublonsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/doublons', component: DoublonsPage });
 const mediaRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/media', component: MediaListPage });
 const mediaDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/media/$mediaId', component: MediaDetailPage });
 const journalistsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/journalists', component: JournalistsListPage });
@@ -298,6 +301,7 @@ export const routeTree = rootRoute.addChildren([
     evenementDetailRoute,
     federationsRoute,
     federationDetailRoute,
+    doublonsRoute,
     mediaRoute,
     mediaDetailRoute,
     journalistsRoute,

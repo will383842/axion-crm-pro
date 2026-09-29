@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\Crm\ContactsHubController;
 use App\Http\Controllers\Api\Crm\PersonnesController;
 use App\Http\Controllers\Api\Crm\PersonTimelineController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\DoublonsController;
 use App\Http\Controllers\Api\EvenementsController;
 use App\Http\Controllers\Api\FeaturesController;
 use App\Http\Controllers\Api\FederationsController;
@@ -193,6 +194,18 @@ Route::prefix('v1')->group(function () {
         Route::get('/federations/{federation}', [FederationsController::class, 'show'])->whereNumber('federation');
         Route::patch('/federations/{federation}/demarche', [FederationsController::class, 'updateDemarche'])
             ->whereNumber('federation')
+            ->middleware('permission:companies.update');
+
+        // Doublons à vérifier (chantier 5). Lire suit la lecture des
+        // entreprises ; « ce ne sont pas des doublons » est une modification ;
+        // FUSIONNER met une fiche à la corbeille : le droit de supprimer.
+        // `{paire}` = l'identifiant de la ligne `duplicate_flags`.
+        Route::get('/doublons', [DoublonsController::class, 'index']);
+        Route::post('/doublons/{paire}/fusionner', [DoublonsController::class, 'fusionner'])
+            ->whereNumber('paire')
+            ->middleware('permission:companies.delete');
+        Route::post('/doublons/{paire}/ignorer', [DoublonsController::class, 'ignorer'])
+            ->whereNumber('paire')
             ->middleware('permission:companies.update');
 
         // Contacts

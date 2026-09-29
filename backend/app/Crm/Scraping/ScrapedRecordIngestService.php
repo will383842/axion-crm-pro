@@ -2,6 +2,7 @@
 
 namespace App\Crm\Scraping;
 
+use App\Crm\Doublons\FusionFiches;
 use App\Crm\Identite\CleDePersonne;
 use App\Crm\Personnes\NatureEmail;
 use App\Models\Company;
@@ -59,6 +60,14 @@ final class ScrapedRecordIngestService
     private const SOURCES_DEDUP_PAR_ORGANISATION = ['evenements-pro', 'federations-2026'];
 
     public function __construct(private readonly EmailMxValidator $mx) {}
+
+    /**
+     * Les ancres à interroger au registre `contacts_retires` quand la fiche a
+     * été trouvée par le renvoi d'une fusion (chantier 5) ; null sinon.
+     *
+     * @var list<array{siren: ?string, pays: ?string, foreign_id: ?string}>|null
+     */
+    private ?array $ancresRenvoi = null;
 
     /**
      * @throws ScrapeIngestRejection
@@ -138,7 +147,16 @@ final class ScrapedRecordIngestService
             return new ScrapeIngestOutcome(status: ScrapeIngestOutcome::PENDING_MATCH, activityId: $activityId);
         }
 
+        $this->ancresRenvoi = null;
         [$companyId, $status, $fieldsWritten] = $this->upsertCompany($record, $workspaceId);
+        // Chantier 5 — les fiches ABSORBÉES dans la fiche visée : une personne
+        // retirée de l'une d'elles avant la fusion ne revient pas par l'ancre
+        // de la fiche gardée (réserve C, #260).
+        $tronquee = false;
+        $absorbees = FusionFiches::ancresAbsorbees($workspaceId, $companyId, $tronquee);
+        if ($absorbees !== []) {
+            $this->ancresRenvoi = array_merge($this->ancresRenvoi ?? [], $absorbees);
+        }
 
         // ── Personnes ───────────────────────────────────────────────────────
         $created = 0;
@@ -155,6 +173,18 @@ final class ScrapedRecordIngestService
                 // personne (faiblesse relevée par l'audit : le scraping actuel
                 // fabrique des « contacts » depuis des boîtes génériques).
                 $this->backfillGenericEmail($companyId, $person['email'] ?? null, $workspaceId);
+
+                continue;
+            }
+
+            // Chantier 5 — la fiche a été trouvée par le RENVOI d'une fusion :
+            // une personne retirée (supprimée, effacée art. 17) sous l'ancre du
+            // message OU sous celle de la fiche gardée ne revient pas.
+            if ($this->ancresRenvoi !== null
+                && FusionFiches::personneRetiree($workspaceId, $this->ancresRenvoi, $person['first_name'] ?? null, $person['last_name'] ?? null)) {
+                // Retirée de la fiche gardée OU d'une fiche absorbée — avant
+                // comme après la fusion : le motif dit par où on l'a su.
+                $skipped['retiree_via_fiche_absorbee'] = ($skipped['retiree_via_fiche_absorbee'] ?? 0) + 1;
 
                 continue;
             }
@@ -215,6 +245,7 @@ final class ScrapedRecordIngestService
             tags: $tags,
             activityId: $activityId,
             personsSkipped: $skipped,
+            chainesFusionTronquees: $tronquee ? 1 : 0,
         );
 
         $this->recordRun($record, $workspaceId, $companyId, $record->status, $outcome, $dedupKey);
@@ -241,6 +272,21 @@ final class ScrapedRecordIngestService
                 ->where('foreign_id', $record->foreignId);
         }
         $existing = $lookup->first();
+
+        // Chantier 5 — une fiche ABSORBÉE par une fusion (corbeille) : ce que
+        // la source dit d'elle va à la fiche gardée, jamais à la corbeille.
+        if ($existing !== null && $existing->deleted_at !== null) {
+            $renvoi = FusionFiches::gardeDe($workspaceId, (int) $existing->id);
+            $gardee = $renvoi === null ? null : DB::table('companies')->where('workspace_id', $workspaceId)
+                ->where('id', $renvoi['garde'])->whereNull('deleted_at')->first();
+            if ($gardee !== null) {
+                $existing = $gardee;
+                $this->ancresRenvoi = [
+                    ['siren' => $record->siren, 'pays' => $record->countryCode, 'foreign_id' => $record->foreignId],
+                    FusionFiches::ancreDe($workspaceId, (int) $gardee->id),
+                ];
+            }
+        }
 
         if ($existing === null) {
             // Fiche née de la collecte : FROIDE par définition (règle B.2).

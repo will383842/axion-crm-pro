@@ -55,6 +55,10 @@ final class ScrapeIngestOutcome
         // ou se réjouir (rien de neuf à écrire). Les deux exigent des gestes
         // opposés.
         public readonly array $personsSkipped = [],
+        // Chantier 5 — 1 si la chaîne des fusions de la fiche a dépassé ses
+        // bornes (`FusionFiches::ancresAbsorbees`) : des ancres n'ont pas été
+        // interrogées au registre des personnes retirées. Compté au bilan.
+        public readonly int $chainesFusionTronquees = 0,
     ) {}
 
     /** @return array<string, mixed> */
@@ -77,6 +81,8 @@ final class ScrapeIngestOutcome
             'company_fields_written' => $this->companyFieldsWritten,
             'tags' => $this->tags,
             'activity_id' => $this->activityId,
+            // Chantier 5 — clé AJOUTÉE (transparente pour les lecteurs par clé).
+            'fusion_chains_truncated' => $this->chainesFusionTronquees,
         ];
     }
 }

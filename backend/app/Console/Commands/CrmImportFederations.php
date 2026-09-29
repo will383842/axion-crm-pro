@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Crm\Doublons\FusionFiches;
 use App\Crm\Federations\EtiquettesFederation;
 use App\Crm\Referentiels\Classement;
 use App\Crm\Scraping\ScrapedRecord;
@@ -259,6 +260,7 @@ class CrmImportFederations extends Command
             'natures_posees', 'secteurs_poses', 'secteurs_corriges', 'secteurs_conserves',
             'departements_ignores', 'emails_generiques_non_poses', 'coordonnees_gardees_en_canaux',
             'tetes_liees', 'tetes_inchangees', 'tetes_introuvables', 'tetes_refusees_cycle',
+            'chaines_de_fusion_tronquees',
         ], 0);
         $this->rejets = [];
         $this->tetes = [];
@@ -459,8 +461,21 @@ class CrmImportFederations extends Command
         $l = $this->lire($ligne);
         $delta = [];
 
-        $avant = $this->parAncre($workspaceId, $l['siren'], $l['identifiant'], corbeilleComprise: true)
+        $trouvee = $this->parAncre($workspaceId, $l['siren'], $l['identifiant'], corbeilleComprise: true)
             ->first(['id', 'deleted_at', 'email_generic', 'phone', 'website', 'linkedin_url']);
+        $avant = $this->suivreFusion($workspaceId, $trouvee, ['id', 'deleted_at', 'email_generic', 'phone', 'website', 'linkedin_url']);
+        // Un renvoi de fusion a été suivi : la ligne vise la fiche GARDÉE.
+        $ancreGardee = $trouvee !== null && $avant !== null && (int) $trouvee->id !== (int) $avant->id
+            ? FusionFiches::ancreDe($workspaceId, (int) $avant->id)
+            : null;
+        // Les ancres à interroger EN PLUS de celle du fichier : la fiche gardée
+        // (renvoi suivi), et les fiches ABSORBÉES dans la fiche visée (une
+        // personne retirée de A avant A→B ne revient pas par l'ancre de B).
+        $tronquee = false;
+        $ancresFusions = array_merge(
+            $ancreGardee === null ? [] : [$ancreGardee],
+            $avant === null ? [] : FusionFiches::ancresAbsorbees($workspaceId, (int) $avant->id, $tronquee),
+        );
         if ($avant !== null && $avant->deleted_at !== null) {
             // Mise à la corbeille par Will : un import ne la ressuscite pas.
             throw new InvalidArgumentException('fiche_a_la_corbeille');
@@ -476,7 +491,12 @@ class CrmImportFederations extends Command
         // `contacts_retires` (relecture sécurité R2).
         $retenues = [];
         foreach ($l['personnes'] as $p) {
-            if ($this->personneRetiree($workspaceId, $l['siren'], $l['identifiant'], $p['first_name'], $p['last_name'])) {
+            // Après un renvoi de fusion, le registre est interrogé avec les
+            // DEUX ancres : celle du fichier (la fiche absorbée) ET celle de la
+            // fiche gardée — une personne effacée sur la gardée y est inscrite
+            // sous l'ancre de la gardée (veto RGPD, relecture #260).
+            if ($this->personneRetiree($workspaceId, $l['siren'], $l['identifiant'], $p['first_name'], $p['last_name'])
+                || ($ancresFusions !== [] && FusionFiches::personneRetiree($workspaceId, $ancresFusions, $p['first_name'], $p['last_name']))) {
                 $delta['personnes_retirees_ignorees'] = ($delta['personnes_retirees_ignorees'] ?? 0) + 1;
 
                 continue;
@@ -501,11 +521,17 @@ class CrmImportFederations extends Command
         $delta['contacts_completes'] = $outcome->contactsUpdated;
         $delta['personnes_opposees'] = $outcome->personsSkippedOptOut;
         $delta['emails_refuses_mx'] = $outcome->emailsRejectedMx;
+        // Une ligne dont la chaîne des fusions a dépassé ses bornes, ici ou
+        // dans le funnel : comptée UNE fois (journal : `ancres_absorbees_tronquees`).
+        if ($tronquee || $outcome->chainesFusionTronquees > 0) {
+            $delta['chaines_de_fusion_tronquees'] = 1;
+        }
         $delta['personnes_sans_changement'] = $outcome->personsSkipped['skipped_no_change'] ?? 0;
         $delta['personnes_ecartees'] = (int) array_sum($outcome->personsSkipped) - $delta['personnes_sans_changement'];
 
-        $fiche = $this->parAncre($workspaceId, $l['siren'], $l['identifiant'])->first();
-        if ($fiche === null) {
+        $fiche = $this->parAncre($workspaceId, $l['siren'], $l['identifiant'])->first()
+            ?? $this->suivreFusion($workspaceId, $this->parAncre($workspaceId, $l['siren'], $l['identifiant'], corbeilleComprise: true)->first());
+        if ($fiche === null || $fiche->deleted_at !== null) {
             throw new RuntimeException('fiche_introuvable_apres_ingestion');
         }
         $companyId = (int) $fiche->id;
@@ -939,8 +965,43 @@ class CrmImportFederations extends Command
     {
         $estSiren = preg_match('/^\d{9}$/', $ancreTete) === 1;
         $id = $this->parAncre($workspaceId, $estSiren ? $ancreTete : null, $estSiren ? null : $ancreTete)->value('id');
+        if ($id === null) {
+            // Une tête absorbée par une fusion : sa fiche gardée.
+            $fiche = $this->suivreFusion($workspaceId, $this->parAncre(
+                $workspaceId,
+                $estSiren ? $ancreTete : null,
+                $estSiren ? null : $ancreTete,
+                corbeilleComprise: true,
+            )->first(['id', 'deleted_at']), ['id', 'deleted_at']);
 
-        return $id === null ? null : (int) $id;
+            return $fiche === null || $fiche->deleted_at !== null ? null : (int) $fiche->id;
+        }
+
+        return (int) $id;
+    }
+
+    /**
+     * Chantier 5 — une fiche à la corbeille ABSORBÉE par une fusion non
+     * annulée est remplacée par sa fiche gardée (vivante) : l'import met à
+     * jour celle-ci au lieu de refuser la ligne. Une fiche mise à la corbeille
+     * par Will (sans fusion) reste telle quelle — l'import refuse toujours de
+     * la ressusciter.
+     *
+     * @param  list<string>  $colonnes
+     */
+    private function suivreFusion(string $workspaceId, ?\stdClass $fiche, array $colonnes = ['*']): ?\stdClass
+    {
+        if ($fiche === null || $fiche->deleted_at === null) {
+            return $fiche;
+        }
+        $renvoi = FusionFiches::gardeDe($workspaceId, (int) $fiche->id);
+        if ($renvoi === null) {
+            return $fiche;
+        }
+        $gardee = DB::table('companies')->where('workspace_id', $workspaceId)
+            ->where('id', $renvoi['garde'])->whereNull('deleted_at')->first($colonnes);
+
+        return $gardee instanceof \stdClass ? $gardee : $fiche;
     }
 
     /**

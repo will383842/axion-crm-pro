@@ -50,7 +50,8 @@
 #
 # Codes de sortie : 1 = usage / restauration ; 6 = données restaurées mais
 # DROITS ou EXTENSIONS ABSENTS (l'application ne lira rien, ou échouera à la
-# première requête).
+# première requête) ; 7 = le rôle applicatif LIT une table de clés ou une
+# colonne d'empreintes qui doit lui rester fermée (droits accordés en masse).
 # ============================================================================
 
 set -euo pipefail
@@ -84,6 +85,8 @@ DB_USER="${DB_USER:-axion}"
 # rôle `axion` est superutilisateur (mesuré : `rolsuper=t`, `rolbypassrls=t`)
 # et lit tout, GRANT ou pas.
 DB_APP_USER="${DB_APP_USER:-axion_app}"
+# La requête des droits du rôle applicatif (étape 5), partagée avec dr-drill.sh.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ⚠️ CONTRAT PARTAGÉ AVEC `backup-postgres.sh` ET `dr-drill.sh`.
 # Les trois fichiers doivent porter ces marqueurs à l'identique. Les changer
@@ -189,32 +192,42 @@ fi
 # `dr-drill.sh`, et c'est exactement pourquoi il n'a jamais rien vu. On demande
 # à Postgres, table par table, si LE RÔLE APPLICATIF peut lire.
 #
-# `has_table_privilege` répond à cette question et à aucune autre : elle ne
-# dépend ni de la RLS (qui filtre des lignes, pas l'accès), ni du contenu. Une
-# base restaurée sans un seul GRANT rend ici le nombre total de tables.
+# `has_table_privilege` répond à cette question pour une table lue EN ENTIER ;
+# une table que le rôle ne lit que PAR COLONNES (`adresses_partagees`,
+# `fusions_empreintes`) exige `has_any_column_privilege`. Et certaines tables
+# ou colonnes doivent lui rester FERMÉES (clés HMAC, empreintes) : la même
+# requête le vérifie (`droits-role-applicatif.sql`, partagée avec dr-drill.sh,
+# exécutée telle quelle par `DroitsRoleApplicatifApresRestaurationTest`).
 log "Étape 5/6 : droits du rôle applicatif « ${DB_APP_USER} »"
-ILLISIBLES=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$TARGET_DB" -tAc "
-    SELECT count(*)
-    FROM pg_class c
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = 'public'
-      AND c.relkind IN ('r', 'p')
-      AND NOT has_table_privilege('${DB_APP_USER}', c.oid, 'SELECT')")
+DROITS=$(docker exec -i "$DB_CONTAINER" psql -U "$DB_USER" -d "$TARGET_DB" -tA -F '|' -v ON_ERROR_STOP=1 -v role="$DB_APP_USER" < "$SCRIPT_DIR/droits-role-applicatif.sql")
+ILLISIBLES=$(printf '%s\n' "$DROITS" | grep -c '^illisible|' || true)
+FUITES=$(printf '%s\n' "$DROITS" | grep -c '^fuite|' || true)
 
 if [ "$ILLISIBLES" -gt 0 ]; then
-    log "❌ CONSTAT A08-008 : ${ILLISIBLES} table(s) publique(s) illisibles par « ${DB_APP_USER} »."
+    log "❌ CONSTAT A08-008 : ${ILLISIBLES} table(s) publique(s) illisibles par « ${DB_APP_USER} » :"
+    printf '%s\n' "$DROITS" | grep '^illisible|' | sed 's/^illisible|/     - /'
     log "   Les données sont là, l'application ne les verra PAS : elle échouera sur"
     log "   « permission denied for table … » à la première requête."
     log "   Cause la plus probable : l'archive a été produite avec \`--no-acl\`, donc sans"
     log "   aucun GRANT (défaut corrigé le 2026-08-20 dans backup-postgres.sh)."
-    log "   Remède immédiat, à jouer en tant que propriétaire sur ${TARGET_DB} :"
-    log "     GRANT USAGE ON SCHEMA public TO ${DB_APP_USER};"
-    log "     GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${DB_APP_USER};"
-    log "     GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${DB_APP_USER};"
-    log "     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ${DB_APP_USER};"
+    log "   Remède : restaurer une archive produite AVEC ses droits (backup-postgres.sh"
+    log "   actuel). N'accordez JAMAIS de droits en masse sur toutes les tables : des"
+    log "   tables et des colonnes sont volontairement fermées au rôle applicatif (clés"
+    log "   HMAC, empreintes) et deviendraient lisibles. Voir infra/runbooks/04-restore-dr.md."
     exit 6
 fi
 log "  ✓ Aucune table illisible par le rôle applicatif."
+
+if [ "$FUITES" -gt 0 ]; then
+    log "❌ ${FUITES} objet(s) volontairement FERMÉ(S) au rôle « ${DB_APP_USER} » lui sont LISIBLES :"
+    printf '%s\n' "$DROITS" | grep '^fuite|' | sed 's/^fuite|/     - /'
+    log "   Clés HMAC ou colonnes d'empreintes : le rôle applicatif pourrait tester un"
+    log "   dictionnaire d'adresses. Retirez-lui ce droit (REVOKE, objet par objet) avant"
+    log "   de rendre la base à l'application — cf. les migrations 2026_09_29_000001 et"
+    log "   2026_10_01_000001, qui posent ces fermetures."
+    exit 7
+fi
+log "  ✓ Clés et empreintes fermées au rôle applicatif."
 
 # 6) 🔴 LES EXTENSIONS — constat F39-005 (S1)
 #

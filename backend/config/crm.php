@@ -340,6 +340,20 @@ return [
     ],
 
     /*
+    | Chantier 5 — doublons. Une adresse de CABINET COMPTABLE ou de
+    | DOMICILIATION portée par au moins `seuil_fiches` fiches n'atteint pas le
+    | dirigeant : `crm:campagne:destinataires` l'écarte par défaut (option
+    | `--avec-adresses-partagees` pour la garder). Lu dans `adresses_partagees`,
+    | que remplit `crm:doublons:detecter`.
+    */
+    'doublons' => [
+        'campagne' => [
+            'natures_exclues' => ['cabinet_comptable', 'domiciliation'],
+            'seuil_fiches' => (int) env('CRM_DOUBLONS_SEUIL_ADRESSE_PARTAGEE', 3),
+        ],
+    ],
+
+    /*
     | L6 — console CRM v2 (plan §2.11, conception UX v2 « 3 espaces »).
     |
     | À false (défaut), les routes `/v1/crm/*` de la console répondent **404**,

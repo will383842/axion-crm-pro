@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Console\Concerns\RefuseUneSuppressionMassive;
+use App\Crm\Doublons\FusionFiches;
 use App\Crm\FichesProtegees;
 use App\Crm\Taxonomy;
 use App\Services\Audit\AuditHashChain;
@@ -73,6 +74,10 @@ class RgpdPurgeBusinessProspects extends Command
                     // purge les visait sans le savoir. Alias interne de la
                     // condition : `fp_ct`/`fp_t`, distincts de `contacts`.
                     ->whereRaw(FichesProtegees::conditionSql('contacts.company_id'))
+                    // Chantier 5 — jamais un contact d'une fiche absorbée ou
+                    // gardée par une fusion en cours : l'annulation doit pouvoir
+                    // le rendre à sa fiche d'origine. Alias `fu_fa`/`fu_fg`.
+                    ->whereRaw(FusionFiches::conditionSql('contacts.company_id'))
                     // Jamais une personne qui a interagi : sa timeline en fait foi.
                     ->whereNotExists(function ($q) use ($workspaceId): void {
                         $q->selectRaw('1')

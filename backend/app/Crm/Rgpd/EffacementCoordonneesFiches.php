@@ -207,7 +207,26 @@ final class EffacementCoordonneesFiches
             'companies_canaux' => 0,
             'contacts_doublons_par_telephone' => 0,
             'contacts_telephone_retire' => 0,
+            'adresses_partagees' => 0,
         ];
+
+        // Chantier 5 : l'empreinte salée de l'adresse (si elle était partagée)
+        // et celles de l'adresse et des numéros PERSONNELS dans le journal des
+        // fusions partent avec eux — `doublons_effacer`, bornée à l'espace du
+        // contexte (le rôle applicatif ne calcule pas d'empreinte). AVANT la
+        // suppression des personnes : la fonction retrouve celles de l'espace
+        // à cette adresse et retire TOUTES leurs empreintes (LinkedIn, statut…),
+        // pas seulement l'adresse et les numéros. Appelée après, la cascade
+        // `fusions_empreintes.contact_id` fait le même travail.
+        $espace = $workspaceId ?? WorkspaceContext::current();
+        if ($espace !== null && ($email !== '' || $variantes !== [])) {
+            // Dans le contexte de CET espace : la fonction refuse tout autre.
+            $r = WorkspaceContext::run($espace, static fn (): mixed => DB::selectOne(
+                'SELECT public.doublons_effacer(?::uuid, ?, ?::jsonb) AS n',
+                [$espace, $email, json_encode($variantes, JSON_THROW_ON_ERROR)],
+            ));
+            $bilan['adresses_partagees'] = (int) ($r->n ?? 0);
+        }
 
         if ($email !== '') {
             // Déjà fait par les services quand le rôle voit tout ; ici pour le
@@ -225,6 +244,7 @@ final class EffacementCoordonneesFiches
                     'signals' => DB::raw("signals - 'email_generic_verification'"),
                     'updated_at' => now(),
                 ]);
+
         }
 
         // Un DOUBLON de la personne (même nom, aucune adresse) qui porte l'un

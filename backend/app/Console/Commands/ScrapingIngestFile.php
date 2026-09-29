@@ -100,6 +100,7 @@ class ScrapingIngestFile extends Command
                         'contacts_completes' => $outcome->contactsUpdated,
                         'personnes_opposees' => $outcome->personsSkippedOptOut,
                         'emails_sans_serveur' => $outcome->emailsRejectedMx,
+                        'chaines_de_fusion_tronquees' => $outcome->chainesFusionTronquees,
                     ];
                     foreach ($outcome->personsSkipped as $motif => $n) {
                         $cumul['personnes_' . $motif] = $n;

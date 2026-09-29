@@ -357,4 +357,43 @@ return [
         ],
     ],
 
+    /*
+    | Vérification des e-mails — `crm:emails:verifier` (2026-09-29).
+    |
+    | Syntaxe, jetables, webmails, type, partage, et « le domaine reçoit-il du
+    | courrier ? » (MX, sinon A/AAAA) — JAMAIS de sondage SMTP. Résultat DNS
+    | gardé par domaine dans `email_domaines`.
+    |
+    | `resolveur` : IP[:port] du résolveur DNS. Vide : le premier `nameserver`
+    | de /etc/resolv.conf (dans le conteneur, celui de Docker). On ne devine
+    | jamais un résolveur public : s'il n'y en a aucun, la commande refuse.
+    | `parallele`, `debit` (requêtes/s), `delai_ms`, `essais` : bornes des
+    | requêtes DNS. `revalider_apres_jours` : un domaine résolu il y a moins
+    | de N jours n'est pas redemandé.
+    |
+    | `planifiee` : à false (DÉFAUT), la tâche HEBDOMADAIRE de
+    | `routes/console.php` (dimanche 05:00) est SAUTÉE — et le saut se
+    | journalise. POUR L'ACTIVER : `CRM_EMAILS_VERIFICATION_PLANIFIEE=true`,
+    | APRÈS une première exécution manuelle réussie (procédure dans la PR).
+    | En test, le résolveur REFUSE tout réseau (`AppServiceProvider`).
+    */
+    'emails_verification' => [
+        'resolveur' => env('CRM_EMAILS_DNS_RESOLVEUR', ''),
+        'parallele' => (int) env('CRM_EMAILS_DNS_PARALLELE', 32),
+        'debit' => (int) env('CRM_EMAILS_DNS_DEBIT', 100),
+        'delai_ms' => (int) env('CRM_EMAILS_DNS_DELAI_MS', 3000),
+        'essais' => (int) env('CRM_EMAILS_DNS_ESSAIS', 2),
+        'revalider_apres_jours' => (int) env('CRM_EMAILS_REVALIDER_APRES_JOURS', 30),
+        'planifiee' => env('CRM_EMAILS_VERIFICATION_PLANIFIEE', false),
+        // Relecture E5 : domaines gardés en mémoire au plus pendant une exécution.
+        'memoire_domaines' => (int) env('CRM_EMAILS_MEMOIRE_DOMAINES', 20000),
+        // Relecture E6 : un domaine qui reçoit à coup sûr, pour juger le résolveur
+        // au démarrage, et à nouveau dans CHAQUE lot qui produit un verdict
+        // négatif (inexistant, sans courrier, MX nul), avant de l'enregistrer.
+        'domaine_temoin' => env('CRM_EMAILS_DOMAINE_TEMOIN', 'gmail.com'),
+        // Relecture S2 : `retention:purge` retire les domaines résolus il y a
+        // plus de N jours (ils seraient de toute façon redemandés).
+        'purger_domaines_apres_jours' => (int) env('CRM_EMAILS_PURGER_DOMAINES_APRES_JOURS', 180),
+    ],
+
 ];

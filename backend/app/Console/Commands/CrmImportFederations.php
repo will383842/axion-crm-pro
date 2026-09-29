@@ -467,6 +467,13 @@ class CrmImportFederations extends Command
         $ancreGardee = $trouvee !== null && $avant !== null && (int) $trouvee->id !== (int) $avant->id
             ? FusionFiches::ancreDe($workspaceId, (int) $avant->id)
             : null;
+        // Les ancres à interroger EN PLUS de celle du fichier : la fiche gardée
+        // (renvoi suivi), et les fiches ABSORBÉES dans la fiche visée (une
+        // personne retirée de A avant A→B ne revient pas par l'ancre de B).
+        $ancresFusions = array_merge(
+            $ancreGardee === null ? [] : [$ancreGardee],
+            $avant === null ? [] : FusionFiches::ancresAbsorbees($workspaceId, (int) $avant->id),
+        );
         if ($avant !== null && $avant->deleted_at !== null) {
             // Mise à la corbeille par Will : un import ne la ressuscite pas.
             throw new InvalidArgumentException('fiche_a_la_corbeille');
@@ -487,7 +494,7 @@ class CrmImportFederations extends Command
             // fiche gardée — une personne effacée sur la gardée y est inscrite
             // sous l'ancre de la gardée (veto RGPD, relecture #260).
             if ($this->personneRetiree($workspaceId, $l['siren'], $l['identifiant'], $p['first_name'], $p['last_name'])
-                || ($ancreGardee !== null && FusionFiches::personneRetiree($workspaceId, [$ancreGardee], $p['first_name'], $p['last_name']))) {
+                || ($ancresFusions !== [] && FusionFiches::personneRetiree($workspaceId, $ancresFusions, $p['first_name'], $p['last_name']))) {
                 $delta['personnes_retirees_ignorees'] = ($delta['personnes_retirees_ignorees'] ?? 0) + 1;
 
                 continue;

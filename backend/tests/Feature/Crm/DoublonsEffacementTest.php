@@ -93,18 +93,14 @@ test('l effacement retire AUSSI du journal des fusions les empreintes de l adres
         null,
         'test',
     ));
-    $champs = static function () use ($fusion): array {
-        $cles = array_keys((array) json_decode((string) DB::table('fusions_fiches')->where('id', $fusion)->value('journal'), true)['champs']);
-        sort($cles);
-
-        return $cles;
-    };
-    expect($champs())->toBe(['email_generic', 'phone', 'website']);
+    $chemins = static fn (): array => DB::table('fusions_empreintes')->where('fusion_id', $fusion)->orderBy('chemin')->pluck('chemin')->all();
+    $journalAvant = (string) DB::table('fusions_fiches')->where('id', $fusion)->value('journal');
+    expect($chemins())->toBe(['champs.email_generic', 'champs.phone', 'champs.website']);
 
     app(GdprErasureService::class)->erase($email);
 
-    $journal = (string) DB::table('fusions_fiches')->where('id', $fusion)->value('journal');
-    // TÉMOIN : le site, qui n'est pas une donnée de la personne, reste.
-    expect($champs())->toBe(['website'])
-        ->and($journal)->not->toContain(F::empreinteAdresse($email));
+    // TÉMOIN : le site, qui n'est pas une donnée de la personne, reste. Le
+    // journal lui-même n'est pas réécrit (réserve B).
+    expect($chemins())->toBe(['champs.website'])
+        ->and((string) DB::table('fusions_fiches')->where('id', $fusion)->value('journal'))->toBe($journalAvant);
 });

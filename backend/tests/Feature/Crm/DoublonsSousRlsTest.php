@@ -46,6 +46,7 @@ function drlsEspace(): array
     $garde = (int) $owner->table('companies')->insertGetId($commun + ['siren' => '94' . random_int(1000000, 9999999), 'discovery_source' => 'insee']);
     $absorbee = (int) $owner->table('companies')->insertGetId($commun + [
         'siren' => null, 'country_code' => 'FR', 'foreign_id' => 'evt:zz-rls-' . $marque, 'discovery_source' => 'evenements-pro',
+        'email_generic' => 'contact@zz-rls-' . $marque . '.example.invalid',
     ]);
     $tag = (int) $owner->table('tags')->insertGetId([
         'workspace_id' => $id, 'slug' => FichesProtegees::TAG_ORGANISATEURS, 'name' => 'Organisateurs', 'category' => 'intent',
@@ -167,6 +168,17 @@ test('sous axion_app : détecter, fusionner, annuler — dans l espace visé seu
             ->toContain('doublons_hors_contexte')
             ->and($refus("SELECT public.doublons_adresses_exclues(?::uuid, '[\"zz@zz.example.invalid\"]'::jsonb, ARRAY['cabinet_comptable'], 2)", [$a['id']]))
             ->toBeNull();
+        // Réserve A — il ne LIT aucune empreinte (privilèges de colonne), mais
+        // lit le reste (compteurs, natures, chemins) ; la comparaison n'accepte
+        // qu'un chemin de la liste fermée.
+        expect($refus('SELECT email_empreinte FROM adresses_partagees'))->toContain('permission denied')
+            ->and($refus('SELECT empreinte FROM fusions_empreintes'))->toContain('permission denied')
+            ->and($refus('SELECT count(*) AS n, max(nature) AS m FROM adresses_partagees'))->toBeNull()
+            ->and($refus('SELECT count(*) AS n, max(chemin) AS c FROM fusions_empreintes'))->toBeNull()
+            ->and(DB::connection('pgsql_app')->table('fusions_empreintes')->where('fusion_id', $fusion)->count())->toBeGreaterThan(0)
+            ->and($refus("SELECT public.doublons_valeur_inchangee(?::uuid, ?, 'champs.denomination')", [$a['id'], $fusion]))->toContain('doublons_chemin_refuse')
+            ->and($refus("SELECT public.doublons_valeur_inchangee(?::uuid, ?, 'jumeaux.0.last_name')", [$a['id'], $fusion]))->toContain('doublons_chemin_refuse')
+            ->and($refus("SELECT public.doublons_valeur_inchangee(?::uuid, ?, 'champs.phone')", [$a['id'], $fusion]))->toBeNull();
 
         $annuler = Artisan::call('crm:doublons:fusionner', ['--workspace' => $a['slug'], '--annuler' => (string) $fusion]);
         DB::setDefaultConnection($precedente);

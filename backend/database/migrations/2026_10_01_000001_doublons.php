@@ -31,12 +31,14 @@ use Illuminate\Support\Facades\DB;
  * homonymes restées sur la fiche absorbée, et ce qui a été recopié sur leur
  * homonyme). `crm:doublons:fusionner --annuler=<id>` le rejoue à l'envers.
  *
- * AUCUNE coordonnée en clair dans le journal : des identifiants, des noms de
- * colonnes, et l'EMPREINTE SALÉE (`doublons_empreinte`, ci-dessous) de chaque
- * valeur recopiée — assez pour ne la retirer que si personne ne l'a changée
- * depuis. Sans la clé, une empreinte ne se retrouve pas en essayant des
- * adresses connues ; avec la clé (qui vit dans la base), elle le peut : c'est
- * une donnée pseudonymisée, pas anonyme.
+ * AUCUNE coordonnée dans le journal : des identifiants et des noms de
+ * colonnes. L'EMPREINTE SALÉE de chaque valeur recopiée (assez pour ne la
+ * retirer que si personne ne l'a changée depuis) vit À PART, dans
+ * `fusions_empreintes` (une ligne par valeur, repérée par un chemin en liste
+ * fermée) : le rôle applicatif ne la lit pas, l'effacement la supprime par
+ * une seule requête indexée — le journal lui-même n'est jamais réécrit par un
+ * effacement (aucune relecture-réécriture qui perdrait un lien posé en même
+ * temps).
  *
  * Pas de clé étrangère vers `companies` : le journal doit survivre à tout.
  *
@@ -70,22 +72,27 @@ use Illuminate\Support\Facades\DB;
  * `doublons_cle` — même mécanisme que `contacts_retires_cle` (#255) : la clé
  * n'est lisible par personne (REVOKE, y compris au rôle applicatif), seule la
  * fonction la lit. Comme `contacts_retires_empreinte`, le rôle applicatif
- * N'EXÉCUTE PAS `doublons_empreinte` : il ne peut pas fabriquer d'empreinte
- * pour tester un dictionnaire. Il n'a que des gestes BORNÉS À L'ESPACE de son
- * contexte (`SECURITY DEFINER`, refus hors contexte) :
+ * N'EXÉCUTE PAS `doublons_empreinte`, et il ne LIT aucune empreinte : ni
+ * `adresses_partagees.email_empreinte`, ni `fusions_empreintes.empreinte`
+ * (privilèges de colonne ; il lit le reste — compteurs, natures, chemins).
+ * Les empreintes qu'il fait écrire lui restent donc illisibles. Il n'a que
+ * des gestes BORNÉS À L'ESPACE de son contexte (`SECURITY DEFINER`, refus
+ * hors contexte) :
  *  - `doublons_inscrire_adresses`   : inscrire les adresses qu'il a trouvées ;
  *  - `doublons_adresses_non_revues` : compter celles qu'un parcours n'a pas revues ;
  *  - `doublons_adresses_exclues`    : oui/non, pour SES adresses, écartée d'une campagne ;
- *  - `doublons_journaliser`         : poser les empreintes du journal d'UNE fusion ;
- *  - `doublons_valeur_inchangee`    : oui/non, la valeur recopiée n'a pas bougé ;
- *  - `doublons_effacer`             : retirer une adresse effacée (art. 17) des
- *    adresses partagées ET du journal des fusions, avec ses numéros.
+ *  - `doublons_journaliser`         : poser les empreintes d'UNE fusion (une fois) ;
+ *  - `doublons_valeur_inchangee`    : oui/non, la valeur recopiée n'a pas bougé —
+ *    le chemin est en LISTE FERMÉE, et la ligne comparée est celle que le
+ *    journal désigne (fiche gardée, homonyme), jamais une ligne au choix ;
+ *  - `doublons_effacer`             : retirer une adresse effacée (art. 17) et
+ *    ses numéros des adresses partagées ET des empreintes des fusions.
  * Une empreinte est une donnée PSEUDONYMISÉE, pas anonyme : avec la clé, on
  * retrouve une valeur connue — et la clé part dans les sauvegardes de la base
  * avec les tables. Ne jamais changer la clé : toutes les empreintes
  * deviendraient orphelines.
  *
- * RLS forcée sur les deux tables neuves, comme sur toute table d'espace.
+ * RLS forcée sur les trois tables neuves, comme sur toute table d'espace.
  */
 return new class extends Migration
 {
@@ -139,6 +146,26 @@ return new class extends Migration
         DB::statement('CREATE INDEX IF NOT EXISTS idx_fusions_fiches_flag ON fusions_fiches (workspace_id, flag_id) WHERE flag_id IS NOT NULL');
         DB::statement("COMMENT ON TABLE fusions_fiches IS 'Journal des fusions de fiches : ce qui a bouge, pour annuler (crm:doublons:fusionner --annuler). La fiche absorbee reste a la corbeille, jamais supprimee.'");
 
+        // ── fusions_empreintes ──────────────────────────────────────────────
+        DB::statement(<<<'SQL'
+            CREATE TABLE IF NOT EXISTS fusions_empreintes (
+                id            BIGSERIAL   PRIMARY KEY,
+                workspace_id  UUID        NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+                fusion_id     BIGINT      NOT NULL REFERENCES fusions_fiches(id) ON DELETE CASCADE,
+                chemin        TEXT        NOT NULL,
+                empreinte     TEXT        NOT NULL,
+                CONSTRAINT fusions_empreintes_empreinte_check CHECK (empreinte ~ '^[0-9a-f]{64}$'),
+                CONSTRAINT fusions_empreintes_chemin_check CHECK (
+                    chemin ~ '^champs\.(email_generic|phone|website|linkedin_url|first_info_at)$'
+                    OR chemin ~ '^jumeaux\.[0-9]{1,4}\.(email|email_status|phone|linkedin_url)$'
+                ),
+                CONSTRAINT fusions_empreintes_cle UNIQUE (fusion_id, chemin)
+            )
+        SQL);
+        // L'effacement : « les empreintes de CETTE valeur, dans CET espace ».
+        DB::statement('CREATE INDEX IF NOT EXISTS idx_fusions_empreintes_valeur ON fusions_empreintes (workspace_id, empreinte)');
+        DB::statement("COMMENT ON TABLE fusions_empreintes IS 'Empreintes salees des valeurs recopiees par une fusion (pour ne les retirer que si elles n ont pas bouge). Illisibles par le role applicatif ; supprimees par l effacement.'");
+
         // ── adresses_partagees ──────────────────────────────────────────────
         DB::statement(<<<'SQL'
             CREATE TABLE IF NOT EXISTS adresses_partagees (
@@ -159,7 +186,7 @@ return new class extends Migration
         DB::statement('CREATE INDEX IF NOT EXISTS idx_adresses_partagees_calcul ON adresses_partagees (workspace_id, calculee_le)');
         DB::statement("COMMENT ON TABLE adresses_partagees IS 'Adresses generiques portees par plusieurs fiches : empreinte sha256 (jamais l adresse), nombre de fiches, nature probable. Derivee, recalculee par crm:doublons:detecter.'");
 
-        foreach (['fusions_fiches', 'adresses_partagees'] as $table) {
+        foreach (['fusions_fiches', 'fusions_empreintes', 'adresses_partagees'] as $table) {
             DB::statement("ALTER TABLE {$table} ENABLE ROW LEVEL SECURITY");
             DB::statement("ALTER TABLE {$table} FORCE ROW LEVEL SECURITY");
             DB::statement("DROP POLICY IF EXISTS {$table}_workspace_isolation ON {$table}");
@@ -315,8 +342,8 @@ return new class extends Migration
             END
             $fn$;
 
-            -- Les empreintes du journal d'UNE fusion, calculées sur les valeurs
-            -- écrites (colonnes en liste fermée).
+            -- Les empreintes d'UNE fusion, calculées sur les valeurs écrites
+            -- (colonnes en liste fermée), une seule fois, dans `fusions_empreintes`.
             CREATE OR REPLACE FUNCTION public.doublons_journaliser(p_ws UUID, p_fusion BIGINT)
             RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_catalog AS $fn$
             DECLARE
@@ -332,12 +359,16 @@ return new class extends Migration
                 IF j IS NULL THEN
                     RAISE EXCEPTION 'doublons_fusion_introuvable';
                 END IF;
+                IF EXISTS (SELECT 1 FROM public.fusions_empreintes fe WHERE fe.fusion_id = p_fusion) THEN
+                    RAISE EXCEPTION 'doublons_deja_journalisee';
+                END IF;
                 FOR k IN SELECT jsonb_object_keys(public.doublons_objet(j->'champs')) LOOP
                     IF k NOT IN ('email_generic', 'phone', 'website', 'linkedin_url', 'first_info_at') THEN
                         RAISE EXCEPTION 'doublons_colonne_refusee';
                     END IF;
                     EXECUTE format('SELECT CAST(%I AS TEXT) FROM public.companies WHERE id = $1 AND workspace_id = $2', k) INTO v USING gid, p_ws;
-                    j := jsonb_set(j, ARRAY['champs', k, 'empreinte'], to_jsonb(public.doublons_empreinte(public.doublons_normaliser(k, v))));
+                    INSERT INTO public.fusions_empreintes (workspace_id, fusion_id, chemin, empreinte)
+                    VALUES (p_ws, p_fusion, 'champs.' || k, public.doublons_empreinte(public.doublons_normaliser(k, v)));
                 END LOOP;
                 FOR i IN 0 .. jsonb_array_length(public.doublons_liste(j->'jumeaux')) - 1 LOOP
                     FOR k IN SELECT jsonb_object_keys(public.doublons_objet(j->'jumeaux'->i->'champs')) LOOP
@@ -346,49 +377,60 @@ return new class extends Migration
                         END IF;
                         EXECUTE format('SELECT CAST(%I AS TEXT) FROM public.contacts WHERE id = $1 AND workspace_id = $2', k)
                             INTO v USING (j->'jumeaux'->i->>'garde_contact')::BIGINT, p_ws;
-                        j := jsonb_set(j, ARRAY['jumeaux', i::TEXT, 'champs', k, 'empreinte'], to_jsonb(public.doublons_empreinte(public.doublons_normaliser(k, v))));
+                        INSERT INTO public.fusions_empreintes (workspace_id, fusion_id, chemin, empreinte)
+                        VALUES (p_ws, p_fusion, 'jumeaux.' || i || '.' || k, public.doublons_empreinte(public.doublons_normaliser(k, v)));
                     END LOOP;
                 END LOOP;
-                UPDATE public.fusions_fiches SET journal = j WHERE id = p_fusion;
             END
             $fn$;
 
             -- Oui/non : la valeur actuelle est-elle encore celle que la fusion a
-            -- recopiée ? (lue au journal de CETTE fusion, dans CET espace)
-            CREATE OR REPLACE FUNCTION public.doublons_valeur_inchangee(p_ws UUID, p_fusion BIGINT, p_table TEXT, p_id BIGINT, p_colonne TEXT, p_chemin TEXT[])
+            -- recopiée ? Le CHEMIN est en liste fermée, et c'est le JOURNAL qui
+            -- désigne la ligne comparée (la fiche gardée pour `champs.*`,
+            -- l'homonyme de la fiche gardée pour `jumeaux.N.*`) : jamais une
+            -- table, une ligne ou une colonne au choix de l'appelant.
+            CREATE OR REPLACE FUNCTION public.doublons_valeur_inchangee(p_ws UUID, p_fusion BIGINT, p_chemin TEXT)
             RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_catalog AS $fn$
             DECLARE
                 attendue TEXT;
+                j        JSONB;
+                gid      BIGINT;
+                m        TEXT[];
                 v        TEXT;
             BEGIN
                 PERFORM public.doublons_verifier_espace(p_ws);
-                IF NOT ((p_table = 'companies' AND p_colonne IN ('email_generic', 'phone', 'website', 'linkedin_url', 'first_info_at'))
-                     OR (p_table = 'contacts' AND p_colonne IN ('email', 'email_status', 'phone', 'linkedin_url'))) THEN
-                    RAISE EXCEPTION 'doublons_colonne_refusee';
-                END IF;
-                SELECT ff.journal #>> p_chemin INTO attendue FROM public.fusions_fiches ff
+                SELECT ff.journal, ff.garde_id INTO j, gid FROM public.fusions_fiches ff
                 WHERE  ff.id = p_fusion AND ff.workspace_id = p_ws;
-                IF attendue IS NULL THEN
+                IF j IS NULL THEN
                     RETURN false;
                 END IF;
-                EXECUTE format('SELECT CAST(%I AS TEXT) FROM public.%I WHERE id = $1 AND workspace_id = $2', p_colonne, p_table) INTO v USING p_id, p_ws;
-                RETURN attendue = public.doublons_empreinte(public.doublons_normaliser(p_colonne, v));
+                SELECT fe.empreinte INTO attendue FROM public.fusions_empreintes fe
+                WHERE  fe.fusion_id = p_fusion AND fe.workspace_id = p_ws AND fe.chemin = p_chemin;
+                m := regexp_match(p_chemin, '^champs\.(email_generic|phone|website|linkedin_url|first_info_at)$');
+                IF m IS NOT NULL THEN
+                    EXECUTE format('SELECT CAST(%I AS TEXT) FROM public.companies WHERE id = $1 AND workspace_id = $2', m[1]) INTO v USING gid, p_ws;
+                    RETURN attendue IS NOT NULL AND attendue = public.doublons_empreinte(public.doublons_normaliser(m[1], v));
+                END IF;
+                m := regexp_match(p_chemin, '^jumeaux\.([0-9]{1,4})\.(email|email_status|phone|linkedin_url)$');
+                IF m IS NOT NULL THEN
+                    EXECUTE format('SELECT CAST(%I AS TEXT) FROM public.contacts WHERE id = $1 AND workspace_id = $2', m[2])
+                        INTO v USING (j->'jumeaux'->(m[1]::INT)->>'garde_contact')::BIGINT, p_ws;
+                    RETURN attendue IS NOT NULL AND attendue = public.doublons_empreinte(public.doublons_normaliser(m[2], v));
+                END IF;
+                RAISE EXCEPTION 'doublons_chemin_refuse';
             END
             $fn$;
 
             -- Art. 17 : l'adresse et les numéros effacés quittent les adresses
-            -- partagées ET le journal des fusions (les entrées qui les
-            -- recopiaient sont retirées : l'annulation n'y touchera plus).
+            -- partagées ET les empreintes des fusions — deux DELETE indexés,
+            -- aucune relecture-réécriture du journal (qui perdrait un lien posé
+            -- en même temps par un import).
             CREATE OR REPLACE FUNCTION public.doublons_effacer(p_ws UUID, p_email TEXT, p_telephones JSONB)
             RETURNS INTEGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_catalog AS $fn$
             DECLARE
                 h   TEXT[];
                 n   INTEGER := 0;
                 m   INTEGER;
-                r   RECORD;
-                j   JSONB;
-                c   JSONB;
-                jj  JSONB;
             BEGIN
                 PERFORM public.doublons_verifier_espace(p_ws);
                 SELECT array_agg(x) INTO h FROM (
@@ -405,24 +447,9 @@ return new class extends Migration
                 DELETE FROM public.adresses_partagees ap WHERE ap.workspace_id = p_ws AND ap.email_empreinte = ANY (h);
                 GET DIAGNOSTICS m = ROW_COUNT;
                 n := n + m;
-
-                FOR r IN SELECT ff.id, ff.journal FROM public.fusions_fiches ff WHERE ff.workspace_id = p_ws LOOP
-                    j := r.journal;
-                    SELECT COALESCE(jsonb_object_agg(ck, cv), '{}'::jsonb) INTO c
-                    FROM   jsonb_each(public.doublons_objet(j->'champs')) AS ce(ck, cv)
-                    WHERE  NOT (COALESCE(cv->>'empreinte', '') = ANY (h));
-                    SELECT COALESCE(jsonb_agg(
-                               jsonb_set(je.x, '{champs}', (
-                                   SELECT COALESCE(jsonb_object_agg(jk, jv), '{}'::jsonb)
-                                   FROM   jsonb_each(public.doublons_objet(je.x->'champs')) AS jc(jk, jv)
-                                   WHERE  NOT (COALESCE(jv->>'empreinte', '') = ANY (h))
-                               )) ORDER BY je.o), '[]'::jsonb) INTO jj
-                    FROM   jsonb_array_elements(public.doublons_liste(j->'jumeaux')) WITH ORDINALITY AS je(x, o);
-                    IF c IS DISTINCT FROM public.doublons_objet(j->'champs') OR jj IS DISTINCT FROM public.doublons_liste(j->'jumeaux') THEN
-                        UPDATE public.fusions_fiches SET journal = jsonb_set(jsonb_set(j, '{champs}', c), '{jumeaux}', jj) WHERE id = r.id;
-                        n := n + 1;
-                    END IF;
-                END LOOP;
+                DELETE FROM public.fusions_empreintes fe WHERE fe.workspace_id = p_ws AND fe.empreinte = ANY (h);
+                GET DIAGNOSTICS m = ROW_COUNT;
+                n := n + m;
                 RETURN n;
             END
             $fn$;
@@ -433,7 +460,7 @@ return new class extends Migration
             'doublons_adresses_non_revues(UUID, JSONB)',
             'doublons_adresses_exclues(UUID, JSONB, TEXT[], INTEGER)',
             'doublons_journaliser(UUID, BIGINT)',
-            'doublons_valeur_inchangee(UUID, BIGINT, TEXT, BIGINT, TEXT, TEXT[])',
+            'doublons_valeur_inchangee(UUID, BIGINT, TEXT)',
             'doublons_effacer(UUID, TEXT, JSONB)',
         ];
         foreach ($fonctions as $f) {
@@ -450,6 +477,13 @@ return new class extends Migration
             foreach ($fonctions as $f) {
                 DB::statement("GRANT EXECUTE ON FUNCTION public.{$f} TO " . $role);
             }
+            // Il ne LIT aucune empreinte : lecture colonne par colonne, sans
+            // `email_empreinte` ni `empreinte` (compteurs, natures, chemins).
+            // Il n'écrit pas les empreintes des fusions (fonctions seulement).
+            DB::statement('REVOKE ALL ON public.adresses_partagees FROM ' . $role);
+            DB::statement('GRANT SELECT (id, workspace_id, domaine, nb_fiches, nature, calculee_le), DELETE ON public.adresses_partagees TO ' . $role);
+            DB::statement('REVOKE ALL ON public.fusions_empreintes FROM ' . $role);
+            DB::statement('GRANT SELECT (id, workspace_id, fusion_id, chemin) ON public.fusions_empreintes TO ' . $role);
         }
     }
 
@@ -459,7 +493,7 @@ return new class extends Migration
             DROP TRIGGER IF EXISTS companies_refuser_suppression_absorbee ON public.companies;
             DROP FUNCTION IF EXISTS public.refuser_suppression_fiche_absorbee();
             DROP FUNCTION IF EXISTS public.doublons_effacer(UUID, TEXT, JSONB);
-            DROP FUNCTION IF EXISTS public.doublons_valeur_inchangee(UUID, BIGINT, TEXT, BIGINT, TEXT, TEXT[]);
+            DROP FUNCTION IF EXISTS public.doublons_valeur_inchangee(UUID, BIGINT, TEXT);
             DROP FUNCTION IF EXISTS public.doublons_journaliser(UUID, BIGINT);
             DROP FUNCTION IF EXISTS public.doublons_adresses_exclues(UUID, JSONB, TEXT[], INTEGER);
             DROP FUNCTION IF EXISTS public.doublons_adresses_non_revues(UUID, JSONB);
@@ -471,6 +505,7 @@ return new class extends Migration
             DROP FUNCTION IF EXISTS public.doublons_empreinte(TEXT);
             DROP TABLE IF EXISTS public.doublons_cle;
             DROP TABLE IF EXISTS adresses_partagees;
+            DROP TABLE IF EXISTS fusions_empreintes;
             DROP TABLE IF EXISTS fusions_fiches;
             DROP INDEX IF EXISTS idx_dup_flags_entite_b;
             DROP INDEX IF EXISTS idx_dup_flags_file_fusion_auto;

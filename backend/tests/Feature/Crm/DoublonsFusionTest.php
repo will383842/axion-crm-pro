@@ -204,7 +204,10 @@ test('le journal ne garde AUCUNE coordonnée : des identifiants et des empreinte
         // en essayant des adresses connues : l'empreinte est salée par la clé
         // de la base (`doublons_empreinte`).
         ->and($journal)->not->toContain(hash('sha256', 'contact@zz-omega.example.invalid'))
-        ->and($journal)->toContain((string) DB::selectOne("SELECT public.doublons_empreinte('contact@zz-omega.example.invalid') AS h")->h);
+        // Les empreintes vivent À PART, illisibles par le rôle applicatif.
+        ->and($journal)->not->toContain(F::empreinteAdresse('contact@zz-omega.example.invalid'))
+        ->and(DB::table('fusions_empreintes')->where('fusion_id', $fusion)->where('chemin', 'champs.email_generic')->value('empreinte'))
+        ->toBe(F::empreinteAdresse('contact@zz-omega.example.invalid'));
 });
 
 test('l annulation remet la base EXACTEMENT dans son état d avant', function () {

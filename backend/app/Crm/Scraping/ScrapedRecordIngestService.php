@@ -149,6 +149,13 @@ final class ScrapedRecordIngestService
 
         $this->ancresRenvoi = null;
         [$companyId, $status, $fieldsWritten] = $this->upsertCompany($record, $workspaceId);
+        // Chantier 5 — les fiches ABSORBÉES dans la fiche visée : une personne
+        // retirée de l'une d'elles avant la fusion ne revient pas par l'ancre
+        // de la fiche gardée (réserve C, #260).
+        $absorbees = FusionFiches::ancresAbsorbees($workspaceId, $companyId);
+        if ($absorbees !== []) {
+            $this->ancresRenvoi = array_merge($this->ancresRenvoi ?? [], $absorbees);
+        }
 
         // ── Personnes ───────────────────────────────────────────────────────
         $created = 0;

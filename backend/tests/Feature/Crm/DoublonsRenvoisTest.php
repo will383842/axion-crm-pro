@@ -254,3 +254,44 @@ test('une fusion annulée PENDANT l import : la ligne est refusée en entier, ri
         ->and(DB::table('events')->where('external_ref', 'zz-perdu-1')->exists())->toBeFalse()
         ->and(DB::table('event_organizers')->where('company_id', $garde)->exists())->toBeFalse();
 });
+
+test('RÉSERVE C — une personne retirée de A AVANT A→B ne revient pas par l ancre de B (import des fédérations)', function () {
+    $b = F::fiche($this->ws, 'ZZ Union Avant', ['postcode' => '69000']);
+    $a = F::sansSiren($this->ws, 'ZZ Union Avant', ['postcode' => '69000', 'foreign_id' => 'section:zz-avant:69', 'discovery_source' => 'federations-2026']);
+    // Zed, sans e-mail, est retiré de A : le registre l'inscrit sous l'ancre de A.
+    F::contact($this->ws, $a, 'Zed', 'ZZAVANT', ['sources' => '["federations-2026"]']);
+    DB::table('contacts')->where('company_id', $a)->where('last_name', 'ZZAVANT')->delete();
+    drvFusionner($this->ws, $b, $a);
+    $sirenB = (string) DB::table('companies')->where('id', $b)->value('siren');
+
+    Artisan::call('crm:import-federations', ['file' => drvFichier([array_replace(drvLigneFede('section:zz-inutile:69', [
+        ['prenom' => 'Zed', 'nom' => 'ZZAVANT', 'fonction' => 'Trésorier', 'email' => null, 'linkedin' => null],
+    ]), ['siren' => $sirenB, 'identifiant' => null])])]);
+    $sortie = Artisan::output();
+
+    expect(DB::table('contacts')->where('workspace_id', $this->ws)->where('last_name', 'ZZAVANT')->count())->toBe(0)
+        ->and(F::compteur($sortie, 'personnes_retirees_ignorees'))->toBe(1);
+});
+
+test('RÉSERVE C — la collecte par l ancre de la fiche gardée n ajoute pas une personne retirée d une fiche absorbée', function () {
+    $b = F::fiche($this->ws, 'ZZ Club Avant', ['postcode' => '69000']);
+    $a = F::sansSiren($this->ws, 'ZZ Club Avant', ['postcode' => '69000', 'foreign_id' => 'evt:zz-club-avant']);
+    F::contact($this->ws, $a, 'Zed', 'ZZAVANTDEUX', ['sources' => '["federations-2026"]']);
+    DB::table('contacts')->where('company_id', $a)->where('last_name', 'ZZAVANTDEUX')->delete();
+    drvFusionner($this->ws, $b, $a);
+
+    $outcome = app(ScrapedRecordIngestService::class)->ingest(ScrapedRecord::fromArray([
+        'schema_version' => ScrapedRecord::SCHEMA_VERSION, 'source' => 'evenements-pro', 'status' => 'success',
+        'run_id' => 'zz-avant-funnel-1',
+        'company' => ['siren' => (string) DB::table('companies')->where('id', $b)->value('siren'), 'country' => 'FR', 'fields' => ['denomination' => 'ZZ Club Avant']],
+        'persons' => [
+            ['kind' => 'person', 'first_name' => 'Zed', 'last_name' => 'ZZAVANTDEUX'],
+            ['kind' => 'person', 'first_name' => 'Zoe', 'last_name' => 'ZZAVANTTEMOIN'],
+        ],
+    ]));
+
+    expect($outcome->companyId)->toBe($b)
+        ->and($outcome->personsSkipped['retiree_apres_fusion'] ?? 0)->toBe(1)
+        ->and(DB::table('contacts')->where('company_id', $b)->where('last_name', 'ZZAVANTDEUX')->exists())->toBeFalse()
+        ->and(DB::table('contacts')->where('company_id', $b)->where('last_name', 'ZZAVANTTEMOIN')->exists())->toBeTrue();
+});

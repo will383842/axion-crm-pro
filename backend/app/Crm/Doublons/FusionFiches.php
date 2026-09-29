@@ -38,8 +38,10 @@ use stdClass;
  *     générique, téléphone, site, LinkedIn, date d'information art. 14) ;
  *  5. met la fiche absorbée à la CORBEILLE (jamais `DELETE`) ;
  *  6. écrit le journal (`fusions_fiches`) : chaque identifiant déplacé, chaque
- *     valeur recopiée par son EMPREINTE SALÉE (`doublons_empreinte`) — et une
- *     entrée de la chaîne d'audit. `annuler()` rejoue ce journal à l'envers.
+ *     colonne recopiée ; l'EMPREINTE SALÉE de chaque valeur recopiée est posée
+ *     par la base dans `fusions_empreintes`, illisible par le rôle applicatif
+ *     — et une entrée de la chaîne d'audit. `annuler()` rejoue ce journal à
+ *     l'envers.
  *
  * ── Après la fusion, les ancres de la fiche absorbée mènent à la gardée ─────
  *
@@ -202,6 +204,40 @@ final class FusionFiches
         }
 
         return false;
+    }
+
+    /**
+     * Les ancres des fiches ABSORBÉES dans cette fiche (fusions non annulées,
+     * en chaîne : A→B puis B→C donne A et B pour C). Une personne retirée de
+     * A avant la fusion est inscrite au registre sous l'ancre de A : un import
+     * par l'ancre de la fiche gardée doit la voir aussi (réserve C, #260).
+     * Servie par `idx_fusions_fiches_garde` ; bornée à 16 niveaux et 200 fiches.
+     *
+     * @return list<array{siren: ?string, pays: ?string, foreign_id: ?string}>
+     */
+    public static function ancresAbsorbees(string $ws, int $companyId): array
+    {
+        $vues = [$companyId => true];
+        $aVoir = [$companyId];
+        $ancres = [];
+        for ($pas = 0; $pas < 16 && $aVoir !== [] && count($vues) < 200; $pas++) {
+            $lignes = DB::select(
+                'SELECT absorbee_id FROM fusions_fiches WHERE garde_id = ANY(?::bigint[]) AND annulee_at IS NULL AND workspace_id = ?',
+                ['{' . implode(',', $aVoir) . '}', $ws],
+            );
+            $aVoir = [];
+            foreach ($lignes as $l) {
+                $id = (int) $l->absorbee_id;
+                if (isset($vues[$id])) {
+                    continue;
+                }
+                $vues[$id] = true;
+                $aVoir[] = $id;
+                $ancres[] = self::ancreDe($ws, $id);
+            }
+        }
+
+        return $ancres;
     }
 
     /**
@@ -442,10 +478,11 @@ final class FusionFiches
                 "UPDATE companies SET {$sets} WHERE workspace_id = ? AND id = ?",
                 array_merge(array_values($valeurs), [$ws, $gardeId]),
             );
-            // L'empreinte est posée par la base après l'insertion du journal
-            // (`doublons_journaliser`) : le rôle applicatif n'en calcule pas.
+            // Les empreintes sont posées par la base après l'insertion du journal
+            // (`doublons_journaliser`, dans `fusions_empreintes`) : le rôle
+            // applicatif n'en calcule ni n'en lit aucune.
             foreach (array_keys($valeurs) as $col) {
-                $champs[$col] = ['avant' => $avants[$col] ?? null, 'empreinte' => null];
+                $champs[$col] = ['avant' => $avants[$col] ?? null];
             }
         }
 
@@ -641,7 +678,7 @@ final class FusionFiches
      * Recopie sur l'homonyme de la fiche gardée les coordonnées qu'il n'a pas.
      *
      * @param  list<array{absorbee_contact: int, garde_contact: int, champs: array<string, mixed>}>  $jumeaux
-     * @return list<array{absorbee_contact: int, garde_contact: int, champs: array<string, array{avant: ?string, empreinte: ?string}>}>
+     * @return list<array{absorbee_contact: int, garde_contact: int, champs: array<string, array{avant: ?string}>}>
      */
     private function completerJumeaux(string $ws, array $jumeaux): array
     {
@@ -660,7 +697,7 @@ final class FusionFiches
                 );
                 foreach (array_keys($j['champs']) as $c) {
                     $ancienne = $avant instanceof stdClass ? $avant->{$c} : null;
-                    $champs[$c] = ['avant' => $ancienne === null ? null : '', 'empreinte' => null];
+                    $champs[$c] = ['avant' => $ancienne === null ? null : ''];
                 }
             }
             $journal[] = ['absorbee_contact' => $j['absorbee_contact'], 'garde_contact' => $j['garde_contact'], 'champs' => $champs];
@@ -758,14 +795,15 @@ final class FusionFiches
         }
 
         // Une valeur recopiée n'est retirée que si elle n'a pas bougé depuis :
-        // la BASE compare son empreinte à celle du journal
-        // (`doublons_valeur_inchangee`, oui/non). Une entrée retirée du journal
-        // par un effacement (art. 17) n'y est plus : rien à remettre.
-        $remettre = function (string $table, string $col, int $id, mixed $v, array $chemin) use ($ws, $fusionId, &$bilan): void {
+        // la BASE compare son empreinte à celle de `fusions_empreintes`
+        // (`doublons_valeur_inchangee`, oui/non, chemin en liste fermée). Une
+        // empreinte retirée par un effacement (art. 17) n'y est plus : rien à
+        // remettre, la valeur effacée reste effacée.
+        $remettre = function (string $table, string $col, int $id, mixed $v, string $chemin) use ($ws, $fusionId, &$bilan): void {
             $v = is_array($v) ? $v : [];
             $r = DB::selectOne(
-                'SELECT public.doublons_valeur_inchangee(?::uuid, ?, ?, ?, ?, ARRAY(SELECT jsonb_array_elements_text(?::jsonb))) AS ok',
-                [$ws, $fusionId, $table, $id, $col, json_encode($chemin, JSON_THROW_ON_ERROR)],
+                'SELECT public.doublons_valeur_inchangee(?::uuid, ?, ?) AS ok',
+                [$ws, $fusionId, $chemin],
             );
             $n = 0;
             if ($r instanceof stdClass && (bool) $r->ok) {
@@ -778,7 +816,7 @@ final class FusionFiches
         };
         foreach ((array) ($journal['champs'] ?? []) as $col => $v) {
             if (in_array($col, self::CHAMPS_FICHE, true)) {
-                $remettre('companies', (string) $col, $gardeId, $v, ['champs', (string) $col, 'empreinte']);
+                $remettre('companies', (string) $col, $gardeId, $v, 'champs.' . $col);
             }
         }
         foreach (array_values((array) ($journal['jumeaux'] ?? [])) as $rang => $j) {
@@ -787,7 +825,7 @@ final class FusionFiches
             }
             foreach ((array) ($j['champs'] ?? []) as $col => $v) {
                 if (in_array($col, self::CHAMPS_PERSONNE, true)) {
-                    $remettre('contacts', (string) $col, (int) ($j['garde_contact'] ?? 0), $v, ['jumeaux', (string) $rang, 'champs', (string) $col, 'empreinte']);
+                    $remettre('contacts', (string) $col, (int) ($j['garde_contact'] ?? 0), $v, 'jumeaux.' . $rang . '.' . $col);
                 }
             }
         }

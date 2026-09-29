@@ -370,6 +370,9 @@ Attendu : **aucune ligne**. Chaque ligne dit un défaut :
   ou une colonne d'empreintes (`adresses_partagees.email_empreinte`,
   `fusions_empreintes.empreinte`), volontairement FERMÉE au rôle applicatif,
   lui est lisible : il pourrait tester un dictionnaire d'adresses.
+- `fuite|fonction:<nom>` — une fonction d'empreinte (`doublons_empreinte`,
+  `contacts_retires_empreinte`) est EXÉCUTABLE par le rôle applicatif : il
+  calculerait l'empreinte de n'importe quelle valeur devinée.
 
 > Ici `-U axion` est **légitime** : on n'interroge pas des données, on
 > interroge le catalogue, qui répond sur les droits **d'un autre rôle**. La

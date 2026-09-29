@@ -20,11 +20,21 @@
 --                      `adresses_partagees.email_empreinte`,
 --                      `fusions_empreintes.empreinte`). Un droit accordé en
 --                      masse après une restauration produit exactement cela.
+--                      Aussi `fuite|fonction:<nom>` : une fonction d'empreinte
+--                      (`doublons_empreinte`, `contacts_retires_empreinte`)
+--                      EXÉCUTABLE par le rôle applicatif — il calculerait
+--                      l'empreinte de n'importe quelle valeur devinée.
 WITH fermees(nom) AS (
     VALUES ('contacts_retires_cle'), ('doublons_cle')
 ),
 colonnes_fermees(tab, col) AS (
     VALUES ('adresses_partagees', 'email_empreinte'), ('fusions_empreintes', 'empreinte')
+),
+-- `to_regprocedure` : une base plus ancienne, sans l'une des fonctions, ne
+-- fait pas échouer la vérification.
+fonctions_fermees(nom, sig) AS (
+    VALUES ('contacts_retires_empreinte', 'public.contacts_retires_empreinte(text, text)'),
+           ('doublons_empreinte', 'public.doublons_empreinte(text)')
 ),
 publiques AS (
     SELECT c.oid, c.relname
@@ -50,6 +60,11 @@ fuites AS (
     FROM   publiques p
     JOIN   colonnes_fermees cf ON cf.tab = p.relname
     WHERE  has_column_privilege(:'role', p.oid, cf.col, 'SELECT')
+    UNION ALL
+    SELECT 'fonction:' || ff.nom
+    FROM   fonctions_fermees ff
+    WHERE  to_regprocedure(ff.sig) IS NOT NULL
+    AND    has_function_privilege(:'role', to_regprocedure(ff.sig), 'EXECUTE')
 )
 SELECT 'illisible' AS genre, nom FROM illisibles
 UNION ALL

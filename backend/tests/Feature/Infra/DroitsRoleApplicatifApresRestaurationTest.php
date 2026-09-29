@@ -104,6 +104,13 @@ test('fuite : une colonne d empreintes accordée au rôle applicatif est signal�
     ['fusions_empreintes', 'empreinte'],
 ]);
 
+test('fuite : une fonction d empreinte exécutable par le rôle applicatif est signalée', function (string $nom, string $signature) {
+    expect(drapSous("GRANT EXECUTE ON FUNCTION public.{$signature} TO " . drapRole()))->toBe(["fuite|fonction:{$nom}"]);
+})->with([
+    ['doublons_empreinte', 'doublons_empreinte(TEXT)'],
+    ['contacts_retires_empreinte', 'contacts_retires_empreinte(TEXT, TEXT)'],
+]);
+
 test('fuite : un GRANT en masse, celui que l ancien message proposait, est signalé', function () {
     expect(drapSous('GRANT SELECT ON ALL TABLES IN SCHEMA public TO ' . drapRole()))->toBe([
         'fuite|adresses_partagees.email_empreinte',

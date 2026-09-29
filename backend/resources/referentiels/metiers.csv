@@ -10,7 +10,7 @@ autres-praticiens-sante,"Autres praticiens de santé (psychologues, ostéopathes
 laboratoires-analyses,Laboratoires d'analyses médicales
 ambulances,Ambulances
 hopitaux-cliniques,Hôpitaux et cliniques
-ehpad-hebergement-medicalise,EHPAD et hébergement des personnes âgées
+ehpad-hebergement-medicalise,"EHPAD et hébergement médicalisé (âge, handicap)"
 aide-a-domicile,Aide à domicile
 creches,Crèches et accueil de jeunes enfants
 veterinaires,Vétérinaires
@@ -25,11 +25,12 @@ location-immobiliere,Location et gestion de biens immobiliers (SCI…)
 holdings-sieges,Holdings et sièges sociaux
 banques-credit,Banques et établissements de crédit
 assurance,"Assurance (compagnies, agents et courtiers)"
-gestion-patrimoine,"Gestion de patrimoine, courtage financier et gestion de fonds"
+gestion-financiere,Courtage de valeurs et gestion de fonds
 garages-carrosseries,"Garages, mécanique et carrosserie"
 commerce-automobile,"Vente de véhicules, motos et pièces automobiles"
 location-vehicules,Location de véhicules
 taxis-vtc,Taxis et VTC
+autocars,Autocaristes et transport routier de voyageurs
 transport-routier,Transport routier de marchandises
 demenageurs,Déménageurs
 logistique-messagerie,"Logistique, entreposage, messagerie et livraison"
@@ -42,7 +43,6 @@ peintres,Peintres et vitriers
 platriers-isolation,"Plâtriers, plaquistes et isolation"
 carreleurs-revetements,Carreleurs et revêtements de sols et murs
 couvreurs-charpentiers,"Couvreurs, charpentiers et étancheurs"
-finitions-batiment,Autres travaux spécialisés du bâtiment
 paysagistes,Paysagistes
 nettoyage,Nettoyage et propreté
 securite-privee,Sécurité privée
@@ -60,7 +60,6 @@ evenementiel-salons,"Organisateurs de salons, foires et congrès"
 secretariat-domiciliation,"Secrétariat, domiciliation et centres d'appels"
 agents-commerciaux,Agents commerciaux et intermédiaires du commerce
 organismes-formation,Organismes de formation continue
-cours-soutien-scolaire,"Soutien scolaire, cours et autres enseignements"
 auto-ecoles,Auto-écoles
 coiffeurs,Coiffeurs
 esthetique,Instituts de beauté et soins du corps
@@ -79,6 +78,7 @@ habillement-chaussures,Magasins d'habillement et de chaussures
 bijouteries,Bijouteries et horlogeries
 equipement-maison,"Meubles, bricolage et équipement de la maison"
 vente-distance,Vente à distance et e-commerce
+vente-domicile,Vente à domicile
 pompes-funebres,Pompes funèbres
 salles-sport-clubs,Salles de sport et clubs sportifs
 arts-spectacle,Arts du spectacle et création artistique
@@ -88,4 +88,4 @@ imprimeries,Imprimeries
 agriculteurs-eleveurs,Agriculteurs et éleveurs
 viticulture,Viticulteurs et vinification
 mecanique-industrielle,"Mécanique industrielle, usinage et maintenance"
-metallerie-chaudronnerie,Métallerie et chaudronnerie
+metallerie-chaudronnerie,"Métallerie, chaudronnerie et charpente métallique"

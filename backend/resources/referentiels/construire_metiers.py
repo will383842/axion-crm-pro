@@ -6,8 +6,15 @@
 # `naf_rev2_secteurs.csv` (source INSEE, cf. LISEZMOI.md) : le script refuse un code qui n'y
 # figure pas, et une sous-classe rangée dans deux métiers.
 #
-# Une sous-classe absente de la table n'a PAS de métier : on n'invente rien. En particulier
-# les sous-classes « fourre-tout » (74.90B, 82.99Z, 96.09Z, 94.99Z…) n'en ont aucun.
+# Une sous-classe absente de la table n'a PAS de métier : on n'invente rien.
+#
+# Les sous-classes « autres … » / « n.c.a. » (non classées ailleurs) n'ont un métier QUE si leur
+# intitulé INSEE nomme réellement le métier (ex. 81.29B « Autres activités de NETTOYAGE n.c.a. »,
+# 62.09Z « Autres activités INFORMATIQUES », 93.19Z « Autres activités liées au SPORT »). Sinon,
+# aucun métier : 74.90B, 82.99Z, 96.09Z, 94.99Z, 88.99B, 43.29B, 43.39Z, 43.99D, 56.29B, 85.59B,
+# 85.60Z, 47.19B, 47.99B, 55.90Z, 33.19Z, 66.19B (revue du 2026-09-29). Le métier « Autres
+# praticiens de santé » (86.90F) est gardé : son intitulé dit « santé humaine », et le libellé du
+# métier annonce honnêtement que c'est un regroupement.
 #
 # Usage (Python 3, bibliothèque standard seulement) :
 #     python construire_metiers.py
@@ -32,7 +39,7 @@ METIERS = [
     ("laboratoires-analyses", "Laboratoires d'analyses médicales", ["86.90B"]),
     ("ambulances", "Ambulances", ["86.90A"]),
     ("hopitaux-cliniques", "Hôpitaux et cliniques", ["86.10Z"]),
-    ("ehpad-hebergement-medicalise", "EHPAD et hébergement des personnes âgées", ["87.10A", "87.10B", "87.10C", "87.30A"]),
+    ("ehpad-hebergement-medicalise", "EHPAD et hébergement médicalisé (âge, handicap)", ["87.10A", "87.10B", "87.10C", "87.30A"]),
     ("aide-a-domicile", "Aide à domicile", ["88.10A"]),
     ("creches", "Crèches et accueil de jeunes enfants", ["88.91A"]),
     ("veterinaires", "Vétérinaires", ["75.00Z"]),
@@ -43,24 +50,25 @@ METIERS = [
     ("bureaux-etudes", "Bureaux d'études, ingénierie et économistes de la construction", ["71.12B", "74.90A"]),
     ("controle-technique", "Contrôle technique, analyses et diagnostics", ["71.20A", "71.20B"]),
     ("agents-immobiliers", "Agents immobiliers et administrateurs de biens", ["68.31Z", "68.32A"]),
-    ("promoteurs-marchands-biens", "Promoteurs immobiliers et marchands de biens", ["41.10A", "41.10B", "41.10C", "68.10Z"]),
-    ("location-immobiliere", "Location et gestion de biens immobiliers (SCI…)", ["68.20A", "68.20B", "68.32B", "41.10D"]),
+    ("promoteurs-marchands-biens", "Promoteurs immobiliers et marchands de biens", ["41.10A", "41.10B", "41.10C", "41.10D", "68.10Z"]),
+    ("location-immobiliere", "Location et gestion de biens immobiliers (SCI…)", ["68.20A", "68.20B", "68.32B"]),
     ("holdings-sieges", "Holdings et sièges sociaux", ["64.20Z", "70.10Z"]),
     # ── Banque, assurance, patrimoine ────────────────────────────────────────
     ("banques-credit", "Banques et établissements de crédit", ["64.19Z", "64.91Z", "64.92Z"]),
     ("assurance", "Assurance (compagnies, agents et courtiers)", ["65.11Z", "65.12Z", "65.20Z", "66.22Z"]),
-    ("gestion-patrimoine", "Gestion de patrimoine, courtage financier et gestion de fonds", ["66.12Z", "66.19B", "66.30Z"]),
+    ("gestion-financiere", "Courtage de valeurs et gestion de fonds", ["66.12Z", "66.30Z"]),
     # ── Automobile et transport ──────────────────────────────────────────────
     ("garages-carrosseries", "Garages, mécanique et carrosserie", ["45.20A", "45.20B"]),
     ("commerce-automobile", "Vente de véhicules, motos et pièces automobiles", ["45.11Z", "45.19Z", "45.31Z", "45.32Z", "45.40Z"]),
     ("location-vehicules", "Location de véhicules", ["77.11A", "77.11B", "77.12Z"]),
-    ("taxis-vtc", "Taxis et VTC", ["49.32Z", "49.39B"]),
+    ("taxis-vtc", "Taxis et VTC", ["49.32Z"]),
+    ("autocars", "Autocaristes et transport routier de voyageurs", ["49.39A", "49.39B"]),
     ("transport-routier", "Transport routier de marchandises", ["49.41A", "49.41B", "49.41C"]),
     ("demenageurs", "Déménageurs", ["49.42Z"]),
     ("logistique-messagerie", "Logistique, entreposage, messagerie et livraison", ["52.10A", "52.10B", "52.24A", "52.24B", "52.29A", "52.29B", "53.20Z"]),
     # ── Bâtiment et travaux publics ──────────────────────────────────────────
     ("maconnerie-gros-oeuvre", "Maçonnerie, gros œuvre et construction de bâtiments", ["41.20A", "41.20B", "43.99C"]),
-    ("travaux-publics", "Travaux publics, terrassement et démolition", ["42.11Z", "42.12Z", "42.13A", "42.13B", "42.21Z", "42.22Z", "42.91Z", "42.99Z", "43.11Z", "43.12A", "43.12B", "43.13Z"]),
+    ("travaux-publics", "Travaux publics, terrassement et démolition", ["42.11Z", "42.12Z", "42.13A", "42.13B", "42.21Z", "42.22Z", "42.91Z", "42.99Z", "43.11Z", "43.12A", "43.12B", "43.13Z", "43.99E"]),
     ("electriciens", "Électriciens", ["43.21A", "43.21B"]),
     ("plombiers-chauffagistes", "Plombiers, chauffagistes et climatisation", ["43.22A", "43.22B"]),
     ("menuisiers", "Menuisiers, serruriers et agenceurs", ["16.23Z", "43.32A", "43.32B", "43.32C"]),
@@ -68,7 +76,6 @@ METIERS = [
     ("platriers-isolation", "Plâtriers, plaquistes et isolation", ["43.29A", "43.31Z"]),
     ("carreleurs-revetements", "Carreleurs et revêtements de sols et murs", ["43.33Z"]),
     ("couvreurs-charpentiers", "Couvreurs, charpentiers et étancheurs", ["43.91A", "43.91B", "43.99A"]),
-    ("finitions-batiment", "Autres travaux spécialisés du bâtiment", ["43.29B", "43.39Z", "43.99B", "43.99D", "43.99E"]),
     ("paysagistes", "Paysagistes", ["81.30Z"]),
     # ── Services aux entreprises ─────────────────────────────────────────────
     ("nettoyage", "Nettoyage et propreté", ["81.10Z", "81.21Z", "81.22Z", "81.29A", "81.29B"]),
@@ -88,7 +95,6 @@ METIERS = [
     ("agents-commerciaux", "Agents commerciaux et intermédiaires du commerce", ["46.11Z", "46.12A", "46.12B", "46.13Z", "46.14Z", "46.15Z", "46.16Z", "46.17A", "46.17B", "46.18Z", "46.19A", "46.19B"]),
     # ── Formation ────────────────────────────────────────────────────────────
     ("organismes-formation", "Organismes de formation continue", ["85.59A"]),
-    ("cours-soutien-scolaire", "Soutien scolaire, cours et autres enseignements", ["85.59B", "85.60Z"]),
     ("auto-ecoles", "Auto-écoles", ["85.53Z"]),
     # ── Commerce, restauration, services à la personne ───────────────────────
     ("coiffeurs", "Coiffeurs", ["96.02A"]),
@@ -96,18 +102,19 @@ METIERS = [
     ("boulangeries-patisseries", "Boulangeries et pâtisseries", ["10.71B", "10.71C", "10.71D", "47.24Z"]),
     ("boucheries-charcuteries", "Boucheries et charcuteries", ["10.13B", "47.22Z"]),
     ("commerces-alimentaires", "Épiceries, primeurs, cavistes et commerces alimentaires", ["47.11A", "47.11B", "47.11C", "47.21Z", "47.23Z", "47.25Z", "47.29Z"]),
-    ("grande-distribution", "Supermarchés, hypermarchés et grands magasins", ["47.11D", "47.11E", "47.11F", "47.19A", "47.19B"]),
+    ("grande-distribution", "Supermarchés, hypermarchés et grands magasins", ["47.11D", "47.11E", "47.11F", "47.19A"]),
     ("tabac-presse", "Tabac et presse", ["47.26Z", "47.62Z"]),
     ("restaurants", "Restaurants (y compris restauration rapide)", ["56.10A", "56.10B", "56.10C"]),
-    ("traiteurs-restauration-collective", "Traiteurs et restauration collective", ["56.21Z", "56.29A", "56.29B"]),
+    ("traiteurs-restauration-collective", "Traiteurs et restauration collective", ["56.21Z", "56.29A"]),
     ("cafes-bars", "Cafés et bars", ["56.30Z"]),
-    ("hotels-hebergement", "Hôtels, campings et hébergement touristique", ["55.10Z", "55.20Z", "55.30Z", "55.90Z"]),
+    ("hotels-hebergement", "Hôtels, campings et hébergement touristique", ["55.10Z", "55.20Z", "55.30Z"]),
     ("agences-voyage", "Agences de voyage et voyagistes", ["79.11Z", "79.12Z", "79.90Z"]),
     ("fleuristes", "Fleuristes, jardineries et animaleries", ["47.76Z"]),
     ("habillement-chaussures", "Magasins d'habillement et de chaussures", ["47.51Z", "47.71Z", "47.72A", "47.72B"]),
     ("bijouteries", "Bijouteries et horlogeries", ["47.77Z", "95.25Z"]),
     ("equipement-maison", "Meubles, bricolage et équipement de la maison", ["47.52A", "47.52B", "47.53Z", "47.54Z", "47.59A", "47.59B"]),
-    ("vente-distance", "Vente à distance et e-commerce", ["47.91A", "47.91B", "47.99A", "47.99B"]),
+    ("vente-distance", "Vente à distance et e-commerce", ["47.91A", "47.91B"]),
+    ("vente-domicile", "Vente à domicile", ["47.99A"]),
     ("pompes-funebres", "Pompes funèbres", ["96.03Z"]),
     ("salles-sport-clubs", "Salles de sport et clubs sportifs", ["93.11Z", "93.12Z", "93.13Z", "93.19Z"]),
     # ── Culture, médias, impression ──────────────────────────────────────────
@@ -118,8 +125,8 @@ METIERS = [
     # ── Agriculture et industrie ─────────────────────────────────────────────
     ("agriculteurs-eleveurs", "Agriculteurs et éleveurs", ["01.11Z", "01.13Z", "01.19Z", "01.24Z", "01.25Z", "01.28Z", "01.30Z", "01.41Z", "01.42Z", "01.43Z", "01.45Z", "01.46Z", "01.47Z", "01.49Z", "01.50Z", "01.61Z", "01.62Z"]),
     ("viticulture", "Viticulteurs et vinification", ["01.21Z", "11.02A", "11.02B"]),
-    ("mecanique-industrielle", "Mécanique industrielle, usinage et maintenance", ["25.50A", "25.50B", "25.61Z", "25.62A", "25.62B", "25.73A", "25.73B", "33.12Z", "33.13Z", "33.14Z", "33.17Z", "33.19Z", "33.20B", "33.20C", "33.20D"]),
-    ("metallerie-chaudronnerie", "Métallerie et chaudronnerie", ["25.11Z", "25.12Z", "25.29Z", "33.11Z", "33.20A"]),
+    ("mecanique-industrielle", "Mécanique industrielle, usinage et maintenance", ["25.50A", "25.50B", "25.61Z", "25.62A", "25.62B", "25.73A", "25.73B", "33.12Z", "33.13Z", "33.14Z", "33.17Z", "33.20B", "33.20C", "33.20D"]),
+    ("metallerie-chaudronnerie", "Métallerie, chaudronnerie et charpente métallique", ["25.11Z", "25.12Z", "25.29Z", "33.11Z", "33.20A", "43.99B"]),
 ]
 
 

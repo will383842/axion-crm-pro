@@ -22,8 +22,8 @@ use Illuminate\Support\Facades\Schema;
  *
  * `tags` est une petite table (quelques milliers de lignes) : le `ADD
  * CONSTRAINT` relit la table sous verrou, en quelques millisecondes. Un verrou
- * qui ne vient pas en 30 s fait échouer la migration (et le déploiement, qui
- * le dit) au lieu de mettre la console en file.
+ * qui ne vient pas en 5 s fait échouer la migration (et le déploiement, qui
+ * le dit) au lieu de mettre la console en file derrière elle.
  */
 return new class extends Migration
 {
@@ -33,7 +33,7 @@ return new class extends Migration
             return;
         }
 
-        DB::statement("SET LOCAL lock_timeout = '30s'");
+        DB::statement("SET LOCAL lock_timeout = '5s'");
         DB::statement('ALTER TABLE tags DROP CONSTRAINT IF EXISTS tags_category_check');
         DB::statement(
             'ALTER TABLE tags ADD CONSTRAINT tags_category_check
@@ -49,7 +49,10 @@ return new class extends Migration
 
         // Retour arrière : les étiquettes rangées en `ia` reviennent en
         // `intent`, leur catégorie d'avant, sinon le CHECK restreint refuserait.
-        DB::statement("SET LOCAL lock_timeout = '30s'");
+        DB::statement("SET LOCAL lock_timeout = '5s'");
+        // Ranger n'est pas modifier : le déclencheur ne touche pas `updated_at`
+        // (même réglage que `crm:referentiels:reclasser`).
+        DB::statement("SET LOCAL app.conserver_updated_at = 'on'");
         DB::table('tags')->where('category', 'ia')->update(['category' => 'intent']);
         DB::statement('ALTER TABLE tags DROP CONSTRAINT IF EXISTS tags_category_check');
         DB::statement(

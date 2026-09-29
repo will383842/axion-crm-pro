@@ -13,7 +13,7 @@ reclassement de masse, écrans). Aucune autre liste de secteurs ne doit exister 
 | `naf_rev1_divisions.csv` | dernier repli par division rév. 1 (`NN`) | 62 |
 | `nap600_secteurs.csv` | les 650 postes de la NAP 600 (1973, format `NN.NN` sans lettre) → secteur | 650 |
 | `metiers.csv` | les 90 métiers (clé, libellé), dans l'ordre de l'écran — chantier 2 | 90 |
-| `naf_rev2_metiers.csv` | 280 sous-classes de la NAF rév. 2 → métier (les autres n'en ont pas) — chantier 2 | 280 |
+| `naf_rev2_metiers.csv` | 270 sous-classes de la NAF rév. 2 → métier (les autres n'en ont pas) — chantier 2 | 270 |
 
 ## Sources officielles (INSEE)
 
@@ -86,8 +86,12 @@ même synchro que `sector-`, `size-`, `region-` (`EtiquettesClassement`), lue pa
   de passage INSEE retient pour un code de 1993. Une fiche dont le code n'a pas pu être
   converti n'a pas de métier.
 - **Aucune invention** : une sous-classe absente de la table n'a PAS de métier, et il n'y a
-  aucun repli par groupe ou par division. Les sous-classes « fourre-tout » (74.90B, 82.99Z,
-  96.09Z, 94.99Z, 88.99B…) n'en ont volontairement aucun.
+  aucun repli par groupe ou par division.
+- **Les « autres … » et « n.c.a. »** n'ont un métier que si leur intitulé INSEE nomme le métier
+  (81.29B « autres activités de nettoyage », 62.09Z « autres activités informatiques »…).
+  Sinon aucun : 74.90B, 82.99Z, 96.09Z, 94.99Z, 88.99B, 43.29B, 43.39Z, 43.99D, 56.29B, 85.59B,
+  85.60Z, 47.19B, 47.99B, 55.90Z, 33.19Z, 66.19B. Une exception assumée : « Autres praticiens de
+  santé » (86.90F, « santé humaine non classée ailleurs »), regroupement que son libellé annonce.
 - **Limites de la NAF, écrites dans les libellés** : la NAF ne distingue pas les avocats des
   notaires (69.10Z), ni les carrossiers des garagistes (45.20A), ni les agences web des ESN
   (62.01Z) : ces métiers sont donc regroupés, et le libellé le dit.

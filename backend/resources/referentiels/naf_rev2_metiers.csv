@@ -43,7 +43,6 @@ naf_rev2,metier,libelle
 33.13Z,mecanique-industrielle,Réparation de matériels électroniques et optiques
 33.14Z,mecanique-industrielle,Réparation d'équipements électriques
 33.17Z,mecanique-industrielle,Réparation et maintenance d'autres équipements de transport
-33.19Z,mecanique-industrielle,Réparation d'autres équipements
 33.20A,metallerie-chaudronnerie,"Installation de structures métalliques, chaudronnées et de tuyauterie"
 33.20B,mecanique-industrielle,Installation de machines et équipements mécaniques
 33.20C,mecanique-industrielle,Conception d'ensemble et assemblage sur site industriel d'équipements de contrôle des processus industriels
@@ -51,7 +50,7 @@ naf_rev2,metier,libelle
 41.10A,promoteurs-marchands-biens,Promotion immobilière de logements
 41.10B,promoteurs-marchands-biens,Promotion immobilière de bureaux
 41.10C,promoteurs-marchands-biens,Promotion immobilière d'autres bâtiments
-41.10D,location-immobiliere,Supports juridiques de programmes
+41.10D,promoteurs-marchands-biens,Supports juridiques de programmes
 41.20A,maconnerie-gros-oeuvre,Construction de maisons individuelles
 41.20B,maconnerie-gros-oeuvre,Construction d'autres bâtiments
 42.11Z,travaux-publics,Construction de routes et autoroutes
@@ -71,21 +70,18 @@ naf_rev2,metier,libelle
 43.22A,plombiers-chauffagistes,Travaux d'installation d'eau et de gaz en tous locaux
 43.22B,plombiers-chauffagistes,Travaux d'installation d'équipements thermiques et de climatisation
 43.29A,platriers-isolation,Travaux d'isolation
-43.29B,finitions-batiment,Autres travaux d'installation n.c.a.
 43.31Z,platriers-isolation,Travaux de plâtrerie
 43.32A,menuisiers,Travaux de menuiserie bois et PVC
 43.32B,menuisiers,Travaux de menuiserie métallique et serrurerie
 43.32C,menuisiers,Agencement de lieux de vente
 43.33Z,carreleurs-revetements,Travaux de revêtement des sols et des murs
 43.34Z,peintres,Travaux de peinture et vitrerie
-43.39Z,finitions-batiment,Autres travaux de finition
 43.91A,couvreurs-charpentiers,Travaux de charpente
 43.91B,couvreurs-charpentiers,Travaux de couverture par éléments
 43.99A,couvreurs-charpentiers,Travaux d'étanchéification
-43.99B,finitions-batiment,Travaux de montage de structures métalliques
+43.99B,metallerie-chaudronnerie,Travaux de montage de structures métalliques
 43.99C,maconnerie-gros-oeuvre,Travaux de maçonnerie générale et gros œuvre de bâtiment
-43.99D,finitions-batiment,Autres travaux spécialisés de construction
-43.99E,finitions-batiment,Location avec opérateur de matériel de construction
+43.99E,travaux-publics,Location avec opérateur de matériel de construction
 45.11Z,commerce-automobile,Commerce de voitures et de véhicules automobiles légers
 45.19Z,commerce-automobile,Commerce d'autres véhicules automobiles
 45.20A,garages-carrosseries,Entretien et réparation de véhicules automobiles légers
@@ -112,7 +108,6 @@ naf_rev2,metier,libelle
 47.11E,grande-distribution,Magasins multi-commerces
 47.11F,grande-distribution,Hypermarchés
 47.19A,grande-distribution,Grands magasins
-47.19B,grande-distribution,Autres commerces de détail en magasin non spécialisé
 47.21Z,commerces-alimentaires,Commerce de détail de fruits et légumes en magasin spécialisé
 47.22Z,boucheries-charcuteries,Commerce de détail de viandes et de produits à base de viande en magasin spécialisé
 47.23Z,commerces-alimentaires,"Commerce de détail de poissons, crustacés et mollusques en magasin spécialisé"
@@ -137,10 +132,10 @@ naf_rev2,metier,libelle
 47.78A,opticiens,Commerces de détail d'optique
 47.91A,vente-distance,Vente à distance sur catalogue général
 47.91B,vente-distance,Vente à distance sur catalogue spécialisé
-47.99A,vente-distance,Vente à domicile
-47.99B,vente-distance,"Vente par automates et autres commerces de détail hors magasin, éventaires ou marchés n.c.a."
+47.99A,vente-domicile,Vente à domicile
 49.32Z,taxis-vtc,Transports de voyageurs par taxis
-49.39B,taxis-vtc,Autres transports routiers de voyageurs
+49.39A,autocars,Transports routiers réguliers de voyageurs
+49.39B,autocars,Autres transports routiers de voyageurs
 49.41A,transport-routier,Transports routiers de fret interurbains
 49.41B,transport-routier,Transports routiers de fret de proximité
 49.41C,transport-routier,Location de camions avec chauffeur
@@ -155,13 +150,11 @@ naf_rev2,metier,libelle
 55.10Z,hotels-hebergement,Hôtels et hébergement similaire
 55.20Z,hotels-hebergement,Hébergement touristique et autre hébergement de courte durée
 55.30Z,hotels-hebergement,Terrains de camping et parcs pour caravanes ou véhicules de loisirs
-55.90Z,hotels-hebergement,Autres hébergements
 56.10A,restaurants,Restauration traditionnelle
 56.10B,restaurants,Cafétérias et autres libres-services
 56.10C,restaurants,Restauration de type rapide
 56.21Z,traiteurs-restauration-collective,Services des traiteurs
 56.29A,traiteurs-restauration-collective,Restauration collective sous contrat
-56.29B,traiteurs-restauration-collective,Autres services de restauration n.c.a.
 56.30Z,cafes-bars,Débits de boissons
 58.11Z,edition-presse,Édition de livres
 58.13Z,edition-presse,Édition de journaux
@@ -194,10 +187,9 @@ naf_rev2,metier,libelle
 65.11Z,assurance,Assurance vie
 65.12Z,assurance,Autres assurances
 65.20Z,assurance,Réassurance
-66.12Z,gestion-patrimoine,Courtage de valeurs mobilières et de marchandises
-66.19B,gestion-patrimoine,"Autres activités auxiliaires de services financiers, hors assurance et caisses de retraite, n.c.a."
+66.12Z,gestion-financiere,Courtage de valeurs mobilières et de marchandises
 66.22Z,assurance,Activités des agents et courtiers d'assurances
-66.30Z,gestion-patrimoine,Gestion de fonds
+66.30Z,gestion-financiere,Gestion de fonds
 68.10Z,promoteurs-marchands-biens,Activités des marchands de biens immobiliers
 68.20A,location-immobiliere,Location de logements
 68.20B,location-immobiliere,Location de terrains et d'autres biens immobiliers
@@ -246,8 +238,6 @@ naf_rev2,metier,libelle
 82.30Z,evenementiel-salons,"Organisation de foires, salons professionnels et congrès"
 85.53Z,auto-ecoles,Enseignement de la conduite
 85.59A,organismes-formation,Formation continue d'adultes
-85.59B,cours-soutien-scolaire,Autres enseignements
-85.60Z,cours-soutien-scolaire,Activités de soutien à l'enseignement
 86.10Z,hopitaux-cliniques,Activités hospitalières
 86.21Z,medecins,Activité des médecins généralistes
 86.22A,medecins,Activités de radiodiagnostic et de radiothérapie

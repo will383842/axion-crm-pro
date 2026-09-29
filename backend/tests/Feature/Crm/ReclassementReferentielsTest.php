@@ -197,9 +197,10 @@ test('les etiquettes secteur, taille et region sont resynchronisees avec la fich
 
     // 52.1D → 47.11D (supermarchés) : le MÉTIER suit (chantier 2).
     expect(rcSlugs($id))->toBe(['metier-grande-distribution', 'region-84', 'sector-commerce-detail', 'size-tpe'])
-        // Les anciennes étiquettes, portées par plus personne, disparaissent.
-        ->and(DB::table('tags')->where('workspace_id', $this->espace)->where('slug', 'sector-commerce')->exists())->toBeFalse()
-        ->and(DB::table('tags')->where('workspace_id', $this->espace)->where('slug', 'size-micro')->exists())->toBeFalse()
+        // Les anciennes étiquettes, portées par plus personne, RESTENT (ordre
+        // de Will du 29/09 : rien n'est supprimé sans --supprimer-etiquettes-orphelines).
+        ->and(DB::table('tags')->where('workspace_id', $this->espace)->where('slug', 'sector-commerce')->exists())->toBeTrue()
+        ->and(DB::table('tags')->where('workspace_id', $this->espace)->where('slug', 'size-micro')->exists())->toBeTrue()
         ->and(DB::table('tags')->where('workspace_id', $this->espace)->where('slug', 'sector-commerce-detail')->value('name'))
         ->toBe('Secteur : Commerce de détail');
 });
@@ -676,7 +677,7 @@ test('B8 — l essai a blanc chiffre les etiquettes obsoletes, et l execution en
 
     Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--dry-run' => true]);
     $aBlanc = Artisan::output();
-    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--supprimer-etiquettes-orphelines' => true]);
     $reel = Artisan::output();
 
     expect(rcCompteur($aBlanc, 'etiquettes_obsoletes_a_supprimer'))->toBe(2)
@@ -779,7 +780,7 @@ function rcEspaceAvecProtegee(string $espace): array
 test('S1 — avec une fiche protegee dans l espace, le retrait vise la fiche ordinaire et pas la protegee', function () {
     $f = rcEspaceAvecProtegee($this->espace);
 
-    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--supprimer-etiquettes-orphelines' => true]);
     $reel = Artisan::output();
 
     $attendues = ['size-micro', FichesProtegees::TAGS[0]];

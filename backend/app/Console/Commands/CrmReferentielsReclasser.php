@@ -18,6 +18,7 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use stdClass;
 use Throwable;
 
@@ -52,16 +53,19 @@ use Throwable;
  * Après le dernier lot, et seulement quand la commande est allée au bout :
  *   - les étiquettes IA (`kind = llm`) encore rangées en `intent` passent dans
  *     leur catégorie `ia` — par paquets, sans en supprimer une seule ;
- *   - le MÉNAGE, sous la garde B15-008 (plafond de proportion, `--force`) :
+ *   - le MÉNAGE est COMPTÉ, jamais exécuté par défaut (ordre de Will du
+ *     2026-09-29 : « strictement interdit de purger quoi que ce soit »). Il ne
+ *     s'exécute que sur `--supprimer-etiquettes-orphelines`, sous la garde
+ *     B15-008 (plafond de proportion, `--force`), et vise :
  *       · les étiquettes `sector-`/`size-`/`metier-` qui ne correspondent plus
  *         au référentiel, dès qu'aucune fiche ne les porte ;
  *       · les étiquettes ORPHELINES : automatiques ou IA, non verrouillées,
  *         sans namespace (jamais une `src:`, jamais une gouvernée), sans règle,
  *         qu'AUCUNE fiche ni AUCUN candidat ne porte, et qu'aucune audience
- *         enregistrée ne cite. La liste est arrêtée AVANT les lots : l'essai à
- *         blanc chiffre ce que l'exécution supprimera.
- *     Une étiquette portée n'est JAMAIS supprimée : la suppression elle-même
- *     porte la condition « aucun lien », relue au moment d'écrire.
+ *         enregistrée (corbeille comprise) ne cite. La liste est arrêtée AVANT
+ *         les lots : l'essai à blanc chiffre ce que l'exécution visera.
+ *     Au moment de supprimer, TOUT est relu sous verrou, et chaque paquet
+ *     supprimé est écrit, étiquette par étiquette, dans la chaîne d'audit.
  *
  * ── CE QUI REND LA COMMANDE SÛRE SUR 4,3 M DE FICHES ──────────────────────
  *
@@ -138,7 +142,8 @@ class CrmReferentielsReclasser extends Command
                             {--accepter-audiences : Partir malgré des audiences d\'exclusion qui citent une valeur obsolète}
                             {--compteurs-seulement : N\'afficher que des nombres (journaux publics des workflows)}
                             {--force : Lever le plafond de proportion de la suppression des étiquettes obsolètes et orphelines}
-                            {--inclure-protegees : Reclasser AUSSI les fiches protégées (classement et étiquettes sector-/size-/region-/metier- seulement)}';
+                            {--inclure-protegees : Reclasser AUSSI les fiches protégées (classement et étiquettes sector-/size-/region-/metier- seulement)}
+                            {--supprimer-etiquettes-orphelines : SUPPRIMER les étiquettes inemployées (par défaut : comptées, jamais supprimées) — décision de Will, jamais automatique}';
 
     protected $description = 'Reclasse toutes les fiches (secteur, taille, nature, région, étiquettes) selon le référentiel unique.';
 
@@ -172,6 +177,21 @@ class CrmReferentielsReclasser extends Command
     /** Taille des paquets du rangement des étiquettes (table `tags`). */
     private const PAQUET_RANGEMENT = 1000;
 
+    /**
+     * Les conditions d'une étiquette supprimable, écrites UNE fois : l'inventaire,
+     * le verrouillage et le `DELETE` les relisent à l'identique. Sans alias :
+     * `tags` est nommée en toutes lettres dans les sous-requêtes.
+     */
+    private const CONDITIONS_ORPHELINE = "tags.workspace_id = ?::uuid
+        AND tags.kind IN ('auto', 'llm')
+        AND tags.is_locked = false
+        AND tags.namespace IS NULL
+        AND (tags.rules IS NULL OR tags.rules IN ('[]'::jsonb, '{}'::jsonb))
+        AND tags.slug <> ALL(?::text[])
+        AND tags.slug <> ALL(?::text[])
+        AND NOT EXISTS (SELECT 1 FROM company_tag WHERE company_tag.tag_id = tags.id)
+        AND NOT EXISTS (SELECT 1 FROM candidate_tag WHERE candidate_tag.tag_id = tags.id)";
+
     /** @var array<string, array<string, array<int|string, int>>> dimension => [avant|apres => [valeur => n]] */
     private array $repartitions = [];
 
@@ -192,6 +212,17 @@ class CrmReferentielsReclasser extends Command
 
     /** @var list<int> étiquettes orphelines, arrêtées AVANT les lots */
     private array $orphelines = [];
+
+    /** `--supprimer-etiquettes-orphelines` : sans elle, aucune étiquette n'est supprimée. */
+    private bool $supprimerOrphelines = false;
+
+    /** Raison pour laquelle le ménage demandé a été refusé (liens hors espace). */
+    private ?string $refusMenage = null;
+
+    /** La chaîne d'audit et l'opérateur, pour tracer chaque paquet supprimé. */
+    private ?AuditHashChain $audit = null;
+
+    private string $operateurCourant = '?';
 
     public function handle(AuditHashChain $audit): int
     {
@@ -214,6 +245,9 @@ class CrmReferentielsReclasser extends Command
 
         $this->reinitialiser();
         $this->inclureProtegees = (bool) $this->option('inclure-protegees');
+        $this->supprimerOrphelines = (bool) $this->option('supprimer-etiquettes-orphelines');
+        $this->audit = $audit;
+        $this->operateurCourant = $operateur;
         $this->info(sprintf(
             '%s — espace %s, lots de %d, à partir de l\'id %d%s%s.',
             $dryRun ? '[À BLANC] rien ne sera écrit' : 'Reclassement',
@@ -335,7 +369,7 @@ class CrmReferentielsReclasser extends Command
             if ($termine && $etiquettes) {
                 WorkspaceContext::run($workspaceId, function () use ($workspaceId, $dryRun): void {
                     $this->rangerEtiquettesIa($workspaceId, $dryRun);
-                    $this->etiquettesObsoletes($workspaceId, $dryRun);
+                    $this->menageEtiquettes($workspaceId, $dryRun);
                 });
             }
         } catch (Throwable $e) {
@@ -375,6 +409,11 @@ class CrmReferentielsReclasser extends Command
 
             return self::FAILURE;
         }
+        if ($this->refusMenage !== null) {
+            $this->error($this->refusMenage);
+
+            return self::FAILURE;
+        }
         if ($auditFinEchoue !== null) {
             $this->error("ÉCHEC : l'entrée d'audit de fin n'a pas pu être écrite ({$auditFinEchoue}). Les lots, eux, sont écrits ET journalisés un par un.");
 
@@ -396,6 +435,7 @@ class CrmReferentielsReclasser extends Command
         $this->tagIds = [];
         $this->tagsAlignes = [];
         $this->orphelines = [];
+        $this->refusMenage = null;
         $this->compteurs = [
             'lots' => 0,
             'fiches_lues' => 0,
@@ -414,6 +454,8 @@ class CrmReferentielsReclasser extends Command
             'etiquettes_obsoletes_supprimees' => 0,
             'etiquettes_orphelines_a_supprimer' => 0,
             'etiquettes_orphelines_supprimees' => 0,
+            'suppression_etiquettes_demandee' => 0,
+            'liens_etiquette_hors_espace' => 0,
             'etiquettes_ia_a_ranger' => 0,
             'etiquettes_ia_rangees' => 0,
             'garde_b15008_refuserait' => 0,
@@ -942,24 +984,27 @@ class CrmReferentielsReclasser extends Command
     }
 
     /**
-     * LE MÉNAGE DES ÉTIQUETTES, sous la garde B15-008 — deux ensembles :
+     * LE MÉNAGE DES ÉTIQUETTES — COMPTÉ toujours, EXÉCUTÉ seulement sur
+     * `--supprimer-etiquettes-orphelines`.
      *
-     *  1. OBSOLÈTES : les `sector-`/`size-`/`metier-` qui ne correspondent plus
-     *     à AUCUNE valeur du référentiel (`sector-it-saas`, `size-micro`…),
-     *     supprimées quand plus aucune fiche ne les porte ;
-     *  2. ORPHELINES : la liste arrêtée avant les lots (`etiquettesOrphelines`).
+     * Ordre permanent de Will (2026-09-29) : « il est strictement interdit de
+     * purger quoi que ce soit ». Par défaut, cette commande ne supprime donc
+     * AUCUNE étiquette : elle compte, pour le bilan,
      *
-     * Jamais une verrouillée, une manuelle, une `src:`. À blanc : on CHIFFRE
-     * — pour les obsolètes, celles qu'aucun lien intouchable (posé par un
-     * utilisateur, ou sur une fiche protégée) ne retiendra — et ce que dirait
-     * la garde B15-008.
+     *  1. les OBSOLÈTES : les `sector-`/`size-`/`metier-` qui ne correspondent
+     *     plus à AUCUNE valeur du référentiel (`sector-it-saas`, `size-micro`…)
+     *     et que plus aucune fiche ne porterait ;
+     *  2. les ORPHELINES : la liste arrêtée avant les lots (`etiquettesOrphelines`).
      *
-     * Hors essai à blanc, la suppression se fait par paquets de
-     * `PAQUET_RANGEMENT`, chacun dans sa transaction courte avec
-     * `lock_timeout`, et CHAQUE `DELETE` relit « aucun lien, ni fiche ni
-     * candidat » : une étiquette posée entre-temps n'est pas supprimée.
+     * (Retirer une étiquette automatique d'UNE fiche pendant les lots reste
+     * permis : c'est du classement, l'étiquette et la fiche demeurent.)
+     *
+     * Sur l'option seulement — une DÉCISION de Will, jamais un planificateur
+     * ni un workflow (garde `SuppressionEtiquettesJamaisAutomatiqueTest`) :
+     * contrôle préalable des liens hors espace, garde B15-008, puis
+     * `supprimerEtiquettes()` (verrou, relecture complète, audit par paquet).
      */
-    private function etiquettesObsoletes(string $workspaceId, bool $dryRun): void
+    private function menageEtiquettes(string $workspaceId, bool $dryRun): void
     {
         $candidates = DB::table('tags')
             ->where('workspace_id', $workspaceId)
@@ -973,7 +1018,7 @@ class CrmReferentielsReclasser extends Command
             ->whereNotIn('slug', self::slugsValides());
 
         if ($dryRun) {
-            $supprimables = (clone $candidates)->whereNotExists(function (QueryBuilder $sub): void {
+            $inemployees = (clone $candidates)->whereNotExists(function (QueryBuilder $sub): void {
                 $sub->selectRaw('1')->from('company_tag as ct')->whereColumn('ct.tag_id', 'tags.id')
                     ->where(function (QueryBuilder $q): void {
                         $q->where('ct.assigned_by', 'user')
@@ -981,16 +1026,37 @@ class CrmReferentielsReclasser extends Command
                     });
             });
         } else {
-            $supprimables = (clone $candidates)->whereNotExists(function (QueryBuilder $sub): void {
+            $inemployees = (clone $candidates)->whereNotExists(function (QueryBuilder $sub): void {
                 $sub->selectRaw('1')->from('company_tag')->whereColumn('company_tag.tag_id', 'tags.id');
             });
         }
 
-        $obsoletes = array_values(array_map(static fn (mixed $id): int => (int) $id, $supprimables->pluck('tags.id')->all()));
+        $obsoletes = array_values(array_map(static fn (mixed $id): int => (int) $id, $inemployees->pluck('tags.id')->all()));
         $orphelines = array_values(array_diff($this->orphelines, $obsoletes));
         $this->compteurs['etiquettes_obsoletes_a_supprimer'] = count($obsoletes);
         $this->compteurs['etiquettes_orphelines_a_supprimer'] = count($orphelines);
         $n = count($obsoletes) + count($orphelines);
+
+        if (! $this->supprimerOrphelines) {
+            if ($n > 0) {
+                $this->line("Étiquettes inemployées : {$n} comptée(s), AUCUNE supprimée (suppression seulement sur --supprimer-etiquettes-orphelines, décision de Will).");
+            }
+
+            return;
+        }
+        $this->compteurs['suppression_etiquettes_demandee'] = 1;
+
+        // Contrôle préalable : la suppression d'une étiquette emporte ses liens
+        // (`ON DELETE CASCADE`). Un lien rangé dans un AUTRE espace que son
+        // étiquette serait invisible aux relectures filtrées par espace — il
+        // partirait sans avoir été vu. Un seul suffit à tout arrêter.
+        $horsEspace = $this->liensHorsEspace();
+        $this->compteurs['liens_etiquette_hors_espace'] = $horsEspace;
+        if ($horsEspace > 0) {
+            $this->refusMenage = "REFUS du ménage : {$horsEspace} lien(s) fiche/candidat ↔ étiquette rangé(s) dans un autre espace que leur étiquette. Aucune étiquette supprimée.";
+
+            return;
+        }
 
         // Garde commune des commandes qui suppriment (B15-008) : un plafond de
         // proportion, qui refuse si ce « ménage » visait une grande part des
@@ -1010,7 +1076,27 @@ class CrmReferentielsReclasser extends Command
     }
 
     /**
-     * Les étiquettes ORPHELINES de l'espace, arrêtées AVANT les lots :
+     * Les liens `company_tag`/`candidate_tag` dont l'espace diffère de celui
+     * de leur étiquette. Sous le rôle applicatif, la RLS ne montre que l'espace
+     * du contexte : le contrôle n'est EXHAUSTIF que lancé par le propriétaire
+     * de la base (c'est le cas des commandes de maintenance en production).
+     */
+    private function liensHorsEspace(): int
+    {
+        $n = 0;
+        foreach (['company_tag', 'candidate_tag'] as $pivot) {
+            $n += (int) (DB::selectOne(
+                "SELECT count(*) AS n FROM {$pivot} JOIN tags ON tags.id = {$pivot}.tag_id
+                 WHERE {$pivot}.workspace_id <> tags.workspace_id",
+            )->n ?? 0);
+        }
+
+        return $n;
+    }
+
+    /**
+     * Les étiquettes ORPHELINES de l'espace, arrêtées AVANT les lots (pour que
+     * l'essai à blanc chiffre ce que l'exécution visera) :
      *
      *  - automatiques ou IA (`kind` `auto` ou `llm`) — jamais une manuelle ;
      *  - non verrouillées — jamais une étiquette du référentiel gouverné ;
@@ -1020,59 +1106,58 @@ class CrmReferentielsReclasser extends Command
      *  - hors référentiel du classement (`slugsValides`) ;
      *  - sans règle (`rules` vide) — une règle est une définition, pas un reste ;
      *  - portées par AUCUNE fiche et AUCUN candidat ;
-     *  - citées par AUCUNE audience enregistrée (champ `tags`, hors
-     *    corbeille : une audience restaurée retrouve ses étiquettes par leur
-     *    SLUG, recréées par l'automate dès qu'une fiche y correspond).
+     *  - citées par AUCUNE audience enregistrée, corbeille COMPRISE.
      *
-     * Supprimer une telle étiquette ne retire rien à personne : l'automate la
-     * recrée, sous le même slug, le jour où une fiche y correspond (les
-     * audiences visent les étiquettes par leur SLUG, pas par leur id).
+     * Ce n'est qu'une liste de CANDIDATES : au moment de supprimer, chaque
+     * condition est relue sous verrou (`supprimerEtiquettes`).
      *
      * @return list<int>
      */
     private function etiquettesOrphelines(string $workspaceId): array
     {
-        $citees = $this->slugsCitesParLesAudiences($workspaceId);
+        $ids = DB::select(
+            'SELECT id FROM tags WHERE ' . self::CONDITIONS_ORPHELINE . ' ORDER BY id',
+            $this->liaisonsOrpheline($workspaceId),
+        );
 
-        $requete = DB::table('tags')
-            ->where('workspace_id', $workspaceId)
-            ->whereIn('kind', ['auto', 'llm'])
-            ->where('is_locked', false)
-            ->whereNull('namespace')
-            // Une étiquette du RÉFÉRENTIEL (`sector-btp`, `metier-coiffeurs`…)
-            // reste, même inemployée : les lots peuvent la poser à l'instant,
-            // et la supprimer pour la recréer n'apprendrait rien. Hors
-            // référentiel, `sector-`/`size-`/`metier-` relèvent des OBSOLÈTES.
-            ->whereNotIn('slug', self::slugsValides())
-            ->where(function (QueryBuilder $q): void {
-                $q->whereNull('rules')->orWhereRaw("rules IN ('[]'::jsonb, '{}'::jsonb)");
-            })
-            ->whereNotExists(function (QueryBuilder $sub): void {
-                $sub->selectRaw('1')->from('company_tag')->whereColumn('company_tag.tag_id', 'tags.id');
-            })
-            ->whereNotExists(function (QueryBuilder $sub): void {
-                $sub->selectRaw('1')->from('candidate_tag')->whereColumn('candidate_tag.tag_id', 'tags.id');
-            });
-        if ($citees !== []) {
-            $requete->whereNotIn('slug', $citees);
-        }
-        $ids = $requete->orderBy('id')->pluck('id')->all();
+        return array_values(array_map(static fn (stdClass $l): int => (int) $l->id, $ids));
+    }
 
-        return array_values(array_map(static fn (mixed $id): int => (int) $id, $ids));
+    /**
+     * Liaisons de `CONDITIONS_ORPHELINE` : l'espace, le référentiel du
+     * classement, et les slugs cités par les audiences RELUS À L'INSTANT.
+     *
+     * @return list<string>
+     */
+    private function liaisonsOrpheline(string $workspaceId): array
+    {
+        return [
+            $workspaceId,
+            self::tableauPg(self::slugsValides()),
+            self::tableauPg($this->slugsCitesParLesAudiences($workspaceId)),
+        ];
     }
 
     /**
      * Tous les slugs qu'une audience de l'espace cite dans une condition
-     * `tags`, quel que soit le bloc (`all`, `any`, `not`) — hors corbeille.
+     * `tags`, quel que soit le bloc (`all`, `any`, `not`).
+     *
+     * ⚠️ EXCEPTION VOLONTAIRE À B10-016 (« une lecture `DB::table` ignore la
+     * corbeille ») : ici, les audiences EN CORBEILLE sont lues À DESSEIN, et la
+     * colonne `deleted_at` est nommée pour le dire. L'ordre du propriétaire est
+     * « une étiquette citée par une audience ne se supprime pas » : une
+     * audience mise à la corbeille peut être restaurée, et elle doit alors
+     * retrouver ses étiquettes. Filtrer la corbeille ici serait supprimer ce
+     * qu'elle cite.
      *
      * @return list<string>
      */
     private function slugsCitesParLesAudiences(string $workspaceId): array
     {
         $slugs = [];
-        $criteres = DB::table('email_audiences')->where('workspace_id', $workspaceId)->whereNull('deleted_at')->pluck('criteria');
-        foreach ($criteres as $brut) {
-            $c = json_decode((string) $brut, true);
+        $audiences = DB::table('email_audiences')->where('workspace_id', $workspaceId)->get(['criteria', 'deleted_at']);
+        foreach ($audiences as $audience) {
+            $c = json_decode((string) $audience->criteria, true);
             if (! is_array($c)) {
                 continue;
             }
@@ -1094,11 +1179,40 @@ class CrmReferentielsReclasser extends Command
     }
 
     /**
-     * Supprime, par paquets bornés, celles de ces étiquettes qui ne sont
-     * TOUJOURS portées par personne — et toujours pas verrouillées — au
-     * moment d'écrire. Les identifiants viennent de listes déjà filtrées
-     * (famille, `kind`, namespace) : ne sont relues ici que les conditions
-     * qu'une autre écriture a pu changer ENTRE l'inventaire et la suppression.
+     * Un tableau PostgreSQL `text[]` littéral (`{"a","b"}`), chaque valeur
+     * entre guillemets, guillemets et barres obliques échappés.
+     *
+     * @param  list<string>  $valeurs
+     */
+    private static function tableauPg(array $valeurs): string
+    {
+        return '{' . implode(',', array_map(
+            static fn (string $v): string => '"' . addcslashes($v, '"\\') . '"',
+            $valeurs,
+        )) . '}';
+    }
+
+    /**
+     * Supprime, par paquets bornés, celles de ces étiquettes qui sont
+     * TOUJOURS supprimables au moment d'écrire. Chaque paquet, dans SA
+     * transaction courte :
+     *
+     *  1. `lock_timeout` de 5 s ;
+     *  2. `SELECT … FOR UPDATE` : verrouille les étiquettes candidates qui
+     *     remplissent encore TOUTES les conditions (kind, namespace, règle,
+     *     verrou, liens, référentiel, audiences relues à l'instant). Tant que
+     *     ce verrou est tenu, personne ne peut leur poser un lien (la clé
+     *     étrangère de `company_tag`/`candidate_tag` attend le verrou) ;
+     *  3. `DELETE … RETURNING` dans une INSTRUCTION SÉPARÉE, sur la liste
+     *     verrouillée et avec les mêmes conditions : en READ COMMITTED, elle
+     *     prend une photo NEUVE, postérieure au verrou, et voit donc tout lien
+     *     validé pendant l'attente. (Dans une seule instruction, le
+     *     `NOT EXISTS` serait évalué sur la photo d'AVANT l'attente, et la
+     *     cascade `ON DELETE CASCADE` emporterait un lien posé entre-temps.)
+     *  4. une entrée de la chaîne d'audit, DANS la transaction : id, slug, nom,
+     *     catégorie, kind, espace (et couleur, description, règle, date de
+     *     création) de chaque étiquette supprimée — de quoi la recréer à
+     *     l'identique. Un audit qui échoue annule le paquet.
      *
      * @param  list<int>  $ids
      */
@@ -1108,18 +1222,48 @@ class CrmReferentielsReclasser extends Command
         foreach (array_chunk($ids, self::PAQUET_RANGEMENT) as $paquet) {
             $n += (int) DB::transaction(function () use ($workspaceId, $paquet): int {
                 DB::statement("SET LOCAL lock_timeout = '5s'");
+                $liste = '{' . implode(',', $paquet) . '}';
 
-                return DB::table('tags')
-                    ->where('workspace_id', $workspaceId)
-                    ->whereIn('id', $paquet)
-                    ->where('is_locked', false)
-                    ->whereNotExists(function (QueryBuilder $sub): void {
-                        $sub->selectRaw('1')->from('company_tag')->whereColumn('company_tag.tag_id', 'tags.id');
-                    })
-                    ->whereNotExists(function (QueryBuilder $sub): void {
-                        $sub->selectRaw('1')->from('candidate_tag')->whereColumn('candidate_tag.tag_id', 'tags.id');
-                    })
-                    ->delete();
+                $verrouillees = DB::select(
+                    'SELECT id FROM tags WHERE id = ANY(?::bigint[]) AND ' . self::CONDITIONS_ORPHELINE . ' FOR UPDATE',
+                    array_merge([$liste], $this->liaisonsOrpheline($workspaceId)),
+                );
+                if ($verrouillees === []) {
+                    return 0;
+                }
+                $liste = '{' . implode(',', array_map(static fn (stdClass $l): int => (int) $l->id, $verrouillees)) . '}';
+
+                $supprimees = DB::select(
+                    'DELETE FROM tags WHERE id = ANY(?::bigint[]) AND ' . self::CONDITIONS_ORPHELINE . '
+                     RETURNING id, slug, name, category, kind, workspace_id, color, description, rules::text AS rules, created_at',
+                    array_merge([$liste], $this->liaisonsOrpheline($workspaceId)),
+                );
+                if ($supprimees === []) {
+                    return 0;
+                }
+
+                $trace = array_map(static fn (stdClass $t): array => [
+                    'id' => (int) $t->id, 'slug' => (string) $t->slug, 'name' => (string) $t->name,
+                    'category' => (string) $t->category, 'kind' => (string) $t->kind,
+                    'workspace_id' => (string) $t->workspace_id, 'color' => $t->color,
+                    'description' => $t->description, 'rules' => $t->rules, 'created_at' => $t->created_at,
+                ], $supprimees);
+                $json = json_encode($trace, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+                if ($this->audit === null) {
+                    throw new RuntimeException('Suppression d\'étiquettes sans chaîne d\'audit : refusée.');
+                }
+                $this->audit->record([
+                    'workspace_id' => $workspaceId,
+                    'user_id' => null,
+                    'method' => 'RECLASSEMENT_ETIQUETTES_SUPPRIMEES',
+                    'path' => 'artisan crm:referentiels:reclasser --supprimer-etiquettes-orphelines — ' . $json,
+                    'status' => 200,
+                    'ip' => null,
+                    'user_agent' => 'cli ' . $this->operateurCourant,
+                    'payload_hash' => hash('sha256', $json),
+                ]);
+
+                return count($supprimees);
             });
         }
 
@@ -1368,6 +1512,7 @@ class CrmReferentielsReclasser extends Command
                 $compteurs['etiquettes_obsoletes_a_supprimer'], $compteurs['etiquettes_obsoletes_supprimees'],
                 $compteurs['etiquettes_orphelines_a_supprimer'], $compteurs['etiquettes_orphelines_supprimees'],
                 $compteurs['etiquettes_ia_a_ranger'], $compteurs['etiquettes_ia_rangees'],
+                $compteurs['suppression_etiquettes_demandee'], $compteurs['liens_etiquette_hors_espace'],
                 $compteurs['garde_b15008_refuserait']);
         }
         $this->table(['compteur', 'nombre'], array_map(

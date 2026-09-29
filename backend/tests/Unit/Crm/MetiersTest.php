@@ -91,7 +91,9 @@ test('correspondance sur des sous-classes réelles', function (string $naf, stri
     'débits de boissons' => ['56.30Z', 'cafes-bars'],
     'hôtels' => ['55.10Z', 'hotels-hebergement'],
     'taxis' => ['49.32Z', 'taxis-vtc'],
-    'VTC (autres transports routiers de voyageurs)' => ['49.39B', 'taxis-vtc'],
+    'autocars (autres transports routiers de voyageurs)' => ['49.39B', 'autocars'],
+    'vente à domicile' => ['47.99A', 'vente-domicile'],
+    'supports juridiques de programmes' => ['41.10D', 'promoteurs-marchands-biens'],
     'transport routier de fret' => ['49.41A', 'transport-routier'],
     'déménagement' => ['49.42Z', 'demenageurs'],
     'maçonnerie générale' => ['43.99C', 'maconnerie-gros-oeuvre'],
@@ -128,6 +130,14 @@ test('aucune invention : une sous-classe hors table n a PAS de métier, même si
     'autres organisations par adhésion' => ['94.99Z'],
     'action sociale sans hébergement n.c.a.' => ['88.99B'],
     'commerce de gros de boissons' => ['46.34Z'],   // division 46, dont 46.1x a un métier
+    // « autres … » / n.c.a. dont l'intitulé ne nomme pas un métier (revue du 29/09).
+    'autres commerces hors magasin n.c.a.' => ['47.99B'],   // même groupe que 47.99A (vente à domicile)
+    'autres services de restauration n.c.a.' => ['56.29B'],
+    'autres enseignements' => ['85.59B'],
+    'autres travaux d installation n.c.a.' => ['43.29B'],
+    'autres travaux de finition' => ['43.39Z'],
+    'autres commerces en magasin non spécialisé' => ['47.19B'],
+    'autres activités auxiliaires de services financiers' => ['66.19B'],
 ]);
 
 test('seul un code rév. 2 bien formé a un métier ; la casse et les espaces sont tolérés', function () {

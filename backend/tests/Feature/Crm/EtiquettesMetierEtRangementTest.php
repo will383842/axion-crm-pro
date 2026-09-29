@@ -12,6 +12,7 @@
 use App\Crm\FichesProtegees;
 use App\Crm\Taxonomy;
 use App\Models\Workspace;
+use Illuminate\Database\Connection;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -233,7 +234,7 @@ test('une etiquette metier hors referentiel est supprimee quand plus personne ne
 
     Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--dry-run' => true]);
     $aBlanc = Artisan::output();
-    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--supprimer-etiquettes-orphelines' => true]);
     $reel = Artisan::output();
 
     expect(emCompteur($aBlanc, 'etiquettes_obsoletes_a_supprimer'))->toBe(1)
@@ -334,7 +335,7 @@ test('les orphelines sont supprimees ; jamais une portee, verrouillee, manuelle,
     Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--dry-run' => true]);
     $aBlanc = Artisan::output();
     $restantesABlanc = DB::table('tags')->where('workspace_id', $this->espace)->count();
-    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--supprimer-etiquettes-orphelines' => true]);
     $reel = Artisan::output();
 
     expect(emCompteur($aBlanc, 'etiquettes_orphelines_a_supprimer'))->toBe(2)
@@ -361,7 +362,7 @@ test('une orpheline portee ou verrouillee pendant les lots n est pas supprimee',
         DB::table('tags')->where('id', $verrouillee)->update(['is_locked' => true]);
     });
 
-    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--supprimer-etiquettes-orphelines' => true]);
     $sortie = Artisan::output();
 
     expect(emCompteur($sortie, 'etiquettes_orphelines_a_supprimer'))->toBe(3)
@@ -386,7 +387,7 @@ test('une etiquette que porte un CANDIDAT n est jamais une orpheline, meme posee
     $lierCandidat($portee);
     emApresLecture(fn () => $lierCandidat($posee));
 
-    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $slugVivier]);
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $slugVivier, '--supprimer-etiquettes-orphelines' => true]);
     $sortie = Artisan::output();
 
     expect(emCompteur($sortie, 'etiquettes_orphelines_a_supprimer'))->toBe(2)
@@ -410,7 +411,7 @@ test('B15-008 : un menage massif est refuse sans --force ; avec, il part par paq
         DB::table('tags')->insert($paquet);
     }
 
-    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--supprimer-etiquettes-orphelines' => true]);
     $refus = Artisan::output();
     expect(emCompteur($refus, 'garde_b15008_refuserait'))->toBe(1)
         ->and(emCompteur($refus, 'etiquettes_orphelines_supprimees'))->toBe(0)
@@ -420,28 +421,250 @@ test('B15-008 : un menage massif est refuse sans --force ; avec, il part par paq
     $sequence = [];
     DB::listen(function (QueryExecuted $q) use (&$suppressions, &$sequence): void {
         $sql = strtolower(ltrim($q->sql));
-        if (str_starts_with($sql, 'delete from "tags"')) {
-            $suppressions[] = count($q->bindings);
+        if (str_starts_with($sql, 'delete from tags')) {
+            $suppressions[] = count(explode(',', trim((string) $q->bindings[0], '{}')));
             $sequence[] = 'suppression';
-        }
-        if (str_contains($sql, 'lock_timeout')) {
-            $sequence[] = 'verrou';
+        } elseif (str_starts_with($sql, 'select id from tags where id = any') && str_ends_with(rtrim($sql), 'for update')) {
+            $sequence[] = 'verrouillage';
+        } elseif (str_contains($sql, 'lock_timeout')) {
+            $sequence[] = 'delai';
         }
     });
-    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--force' => true]);
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--force' => true, '--supprimer-etiquettes-orphelines' => true]);
     $force = Artisan::output();
 
     expect(emCompteur($force, 'etiquettes_orphelines_supprimees'))->toBe(1200)
         ->and(DB::table('tags')->where('workspace_id', $this->espace)->where('slug', 'like', 'dept-zz%')->count())->toBe(0)
-        // 1 200 orphelines → deux paquets, aucun au-delà de 1 000 identifiants
-        // (+ une poignée de paramètres fixes : espace, kinds, verrou, src:).
-        ->and(count($suppressions))->toBe(2)
-        ->and(max($suppressions))->toBeLessThanOrEqual(1000 + 10);
-    // Chaque paquet dans SA transaction, ouverte par un `lock_timeout` : la
-    // suppression est toujours précédée d'un verrou borné, jamais d'une autre.
+        // 1 200 orphelines → deux paquets, aucun au-delà de 1 000 identifiants.
+        ->and($suppressions)->toBe([1000, 200]);
+    // Chaque paquet dans SA transaction : un `lock_timeout`, PUIS le
+    // verrouillage `FOR UPDATE`, PUIS la suppression — trois instructions.
     foreach ($sequence as $i => $evenement) {
         if ($evenement === 'suppression') {
-            expect($sequence[$i - 1] ?? null)->toBe('verrou');
+            expect($sequence[$i - 1] ?? null)->toBe('verrouillage')
+                ->and($sequence[$i - 2] ?? null)->toBe('delai');
         }
+    }
+
+    // Une entrée d'audit PAR PAQUET, qui porte de quoi recréer chaque étiquette.
+    $traces = DB::table('audit_logs')->where('workspace_id', $this->espace)
+        ->where('event_type', 'RECLASSEMENT_ETIQUETTES_SUPPRIMEES')->orderBy('id')->get();
+    expect($traces)->toHaveCount(2);
+    $restaurables = [];
+    foreach ($traces as $t) {
+        $json = substr((string) $t->path, (int) strpos((string) $t->path, '['));
+        expect(hash('sha256', $json))->toBe($t->payload_hash);
+        foreach (json_decode($json, true, 512, JSON_THROW_ON_ERROR) as $e) {
+            $restaurables[] = $e;
+        }
+    }
+    expect($restaurables)->toHaveCount(1200)
+        ->and(array_keys($restaurables[0]))->toContain('id', 'slug', 'name', 'category', 'kind', 'workspace_id')
+        ->and($restaurables[0]['workspace_id'])->toBe($this->espace)
+        ->and($restaurables[0]['slug'])->toStartWith('dept-zz')
+        ->and($restaurables[0]['category'])->toBe('geo')
+        ->and($restaurables[0]['kind'])->toBe('auto');
+});
+
+// ══ Ordre de Will (29/09) : aucune suppression sans décision explicite ═════
+
+test('PAR DEFAUT, aucune etiquette n est supprimee : obsoletes et orphelines sont seulement comptees', function () {
+    $id = emFiche($this->espace, ['naf' => '96.02A']);
+    emLier($this->espace, $id, emTag($this->espace, 'metier-ancien-zz', ['category' => 'sector']));
+    emTag($this->espace, 'dept-99', ['category' => 'geo']);
+    emTag($this->espace, 'cible-froide-zz', ['kind' => 'llm', 'category' => 'ia']);
+    $avant = DB::table('tags')->where('workspace_id', $this->espace)->pluck('slug')->all();
+
+    expect(Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]))->toBe(0);
+    $sortie = Artisan::output();
+
+    $apres = DB::table('tags')->where('workspace_id', $this->espace)->pluck('slug')->all();
+    expect(emCompteur($sortie, 'etiquettes_obsoletes_a_supprimer'))->toBe(1)
+        ->and(emCompteur($sortie, 'etiquettes_orphelines_a_supprimer'))->toBe(2)
+        ->and(emCompteur($sortie, 'etiquettes_obsoletes_supprimees'))->toBe(0)
+        ->and(emCompteur($sortie, 'etiquettes_orphelines_supprimees'))->toBe(0)
+        ->and(emCompteur($sortie, 'suppression_etiquettes_demandee'))->toBe(0)
+        ->and($sortie)->toContain('AUCUNE supprimée')
+        // Toutes les étiquettes d'avant sont encore là (des étiquettes de
+        // classement ont pu s'ajouter).
+        ->and(array_values(array_diff($avant, $apres)))->toBe([])
+        // Le RETRAIT d'une étiquette automatique d'une fiche reste permis :
+        // c'est du classement, l'étiquette elle-même demeure.
+        ->and(emMetiers($id))->toBe(['metier-coiffeurs'])
+        ->and(emExiste($this->espace, 'metier-ancien-zz'))->toBeTrue()
+        ->and(DB::table('audit_logs')->where('event_type', 'RECLASSEMENT_ETIQUETTES_SUPPRIMEES')->exists())->toBeFalse();
+});
+
+test('une audience qui cite l etiquette la retient, dans les blocs all, any et not, et meme EN CORBEILLE', function () {
+    emFiche($this->espace, ['naf' => '96.02A']);
+    foreach (['dept-81', 'dept-82', 'dept-83', 'dept-84', 'dept-85'] as $slug) {
+        emTag($this->espace, $slug, ['category' => 'geo']);
+    }
+    emAudience($this->espace, 'ZZ bloc all', ['all' => [['field' => 'tags', 'op' => 'contains_any', 'value' => ['dept-81']]]]);
+    emAudience($this->espace, 'ZZ bloc any', ['any' => [['field' => 'tags', 'op' => 'contains_any', 'value' => ['dept-82']]]]);
+    emAudience($this->espace, 'ZZ bloc not', ['not' => [['field' => 'tags', 'op' => 'contains_any', 'value' => ['dept-83']]]]);
+    emAudience($this->espace, 'ZZ en corbeille', ['all' => [['field' => 'tags', 'op' => 'contains_any', 'value' => ['dept-84']]]]);
+    DB::table('email_audiences')->where('workspace_id', $this->espace)->where('name', 'ZZ en corbeille')->update(['deleted_at' => now()]);
+    // `dept-85` : citée par personne — le TÉMOIN, qui part.
+
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--supprimer-etiquettes-orphelines' => true]);
+    $sortie = Artisan::output();
+
+    expect(emCompteur($sortie, 'etiquettes_orphelines_supprimees'))->toBe(1)
+        ->and(emExiste($this->espace, 'dept-85'))->toBeFalse();
+    foreach (['dept-81', 'dept-82', 'dept-83', 'dept-84'] as $gardee) {
+        expect(emExiste($this->espace, $gardee))->toBeTrue("supprimée malgré son audience : {$gardee}");
+    }
+});
+
+test('une audience creee PENDANT les lots retient l etiquette qu elle cite : les audiences sont relues au moment de supprimer', function () {
+    emFiche($this->espace, ['naf' => '96.02A']);
+    emTag($this->espace, 'dept-86', ['category' => 'geo']);
+    $temoin = emTag($this->espace, 'dept-87', ['category' => 'geo']);
+    emApresLecture(fn () => emAudience($this->espace, 'ZZ creee pendant', [
+        'not' => [['field' => 'tags', 'op' => 'contains_any', 'value' => ['dept-86']]],
+    ]));
+
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--supprimer-etiquettes-orphelines' => true]);
+    $sortie = Artisan::output();
+
+    // Les deux étaient orphelines à l'inventaire…
+    expect(emCompteur($sortie, 'etiquettes_orphelines_a_supprimer'))->toBe(2)
+        // … mais celle qu'une audience cite désormais reste.
+        ->and(emCompteur($sortie, 'etiquettes_orphelines_supprimees'))->toBe(1)
+        ->and(emExiste($this->espace, 'dept-86'))->toBeTrue()
+        ->and(DB::table('tags')->where('id', $temoin)->exists())->toBeFalse();
+});
+
+test('un lien range dans un autre espace que son etiquette arrete tout le menage', function () {
+    $fiche = emFiche($this->espace, ['naf' => '96.02A']);
+    $orpheline = emTag($this->espace, 'dept-88', ['category' => 'geo']);
+    $ailleurs = (string) Str::uuid();
+    Workspace::create(['id' => $ailleurs, 'slug' => 'zz-ailleurs-' . Str::random(6), 'name' => 'ZZ ailleurs']);
+    $etrangere = emTag($this->espace, 'dept-89', ['category' => 'geo']);
+    // Le lien porte l'espace d'AILLEURS, l'étiquette celui-ci.
+    emLier($ailleurs, $fiche, $etrangere);
+
+    expect(Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--supprimer-etiquettes-orphelines' => true]))->toBe(1);
+    $sortie = Artisan::output();
+
+    expect($sortie)->toContain('REFUS du ménage')
+        ->and(emCompteur($sortie, 'liens_etiquette_hors_espace'))->toBe(1)
+        ->and(emCompteur($sortie, 'etiquettes_orphelines_supprimees'))->toBe(0)
+        ->and(DB::table('tags')->where('id', $orpheline)->exists())->toBeTrue()
+        ->and(DB::table('tags')->where('id', $etrangere)->exists())->toBeTrue();
+
+    // Témoin : sans le lien fautif, la même orpheline part.
+    DB::table('company_tag')->where('workspace_id', $ailleurs)->delete();
+    expect(Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--supprimer-etiquettes-orphelines' => true]))->toBe(0)
+        ->and(DB::table('tags')->where('id', $orpheline)->exists())->toBeFalse();
+});
+
+/**
+ * LA COURSE, EN VRAI — deux connexions, deux processus.
+ *
+ * Un second processus PHP pose un lien vers l'étiquette orpheline, attend
+ * 4 s, puis valide. Entre-temps, la commande (connexion propriétaire, hors
+ * transaction de test : elle valide réellement) inventorie l'étiquette comme
+ * orpheline — le lien n'est pas encore validé — puis tente de la supprimer :
+ * son `SELECT … FOR UPDATE` ATTEND le verrou que la clé étrangère du lien tient.
+ *
+ * Quand le lien est validé, le `DELETE`, instruction SÉPARÉE, prend une photo
+ * neuve, le voit, et ne supprime rien. Un `DELETE` unique, lui, évaluerait
+ * son `NOT EXISTS` sur la photo d'AVANT l'attente : il supprimerait
+ * l'étiquette, et la cascade `ON DELETE CASCADE` emporterait le lien validé.
+ */
+test('COURSE : un lien valide pendant l attente du verrou n est jamais emporte par la cascade', function () {
+    /** @var Connection $proprio */
+    $proprio = DB::connection('pgsql_owner');
+    $espace = (string) Str::uuid();
+    $slug = 'zz-course-' . substr($espace, 0, 8);
+    $proprio->table('workspaces')->insert([
+        'id' => $espace, 'slug' => $slug, 'name' => 'ZZ course',
+        'settings' => '{}', 'cost_cap_eur' => 100, 'is_active' => true,
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $fiche = (int) $proprio->table('companies')->insertGetId([
+        'workspace_id' => $espace, 'siren' => '9' . random_int(10000000, 99999999),
+        'denomination' => 'ZZ course', 'naf' => '96.02A', 'discovery_source' => 'insee',
+        'signals' => '{}', 'metadata' => '{}', 'quality_score' => 0,
+        'relation_type' => 'prospect', 'lifecycle_stage' => 'nouveau',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $tag = (int) $proprio->table('tags')->insertGetId([
+        'workspace_id' => $espace, 'slug' => 'dept-zz-course', 'name' => 'ZZ course',
+        'category' => 'geo', 'kind' => 'auto', 'rules' => '[]', 'is_locked' => false,
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    $c = config('database.connections.pgsql_owner');
+    $script = implode("\n", [
+        '$pdo = new PDO(getenv("ZZ_DSN"), getenv("ZZ_USER"), getenv("ZZ_PASS"), [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);',
+        '$pdo->beginTransaction();',
+        '$pdo->prepare("INSERT INTO company_tag (company_id, tag_id, workspace_id, assigned_at, assigned_by) VALUES (?, ?, ?::uuid, now(), \'user\')")'
+            . '->execute([(int) getenv("ZZ_FICHE"), (int) getenv("ZZ_TAG"), getenv("ZZ_ESPACE")]);',
+        'fwrite(STDOUT, "pret\n"); fflush(STDOUT);',
+        'sleep(4);',
+        '$pdo->commit();',
+        'fwrite(STDOUT, "valide\n");',
+    ]);
+    $env = array_merge(getenv(), [
+        'ZZ_DSN' => sprintf('pgsql:host=%s;port=%s;dbname=%s', $c['host'], $c['port'], $c['database']),
+        'ZZ_USER' => (string) $c['username'], 'ZZ_PASS' => (string) $c['password'],
+        'ZZ_FICHE' => (string) $fiche, 'ZZ_TAG' => (string) $tag, 'ZZ_ESPACE' => $espace,
+    ]);
+    $tubes = [];
+    $processus = proc_open([PHP_BINARY, '-r', $script], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $tubes, null, $env);
+    expect($processus)->not->toBeFalse();
+
+    $precedente = DB::getDefaultConnection();
+    try {
+        expect(trim((string) fgets($tubes[1])))->toBe('pret');
+
+        // Combien de temps le verrouillage `FOR UPDATE` a-t-il attendu ?
+        $attente = 0.0;
+        $proprio->listen(function (QueryExecuted $q) use (&$attente): void {
+            if (str_ends_with(rtrim(strtolower($q->sql)), 'for update')) {
+                $attente = max($attente, (float) $q->time);
+            }
+        });
+        DB::setDefaultConnection('pgsql_owner');
+        $code = Artisan::call('crm:referentiels:reclasser', ['--workspace' => $slug, '--supprimer-etiquettes-orphelines' => true]);
+        $sortie = Artisan::output();
+        DB::setDefaultConnection($precedente);
+
+        $fin = trim((string) stream_get_contents($tubes[1]));
+        $erreurs = trim((string) stream_get_contents($tubes[2]));
+
+        expect($erreurs)->toBe('')
+            ->and($fin)->toBe('valide')
+            ->and($code)->toBe(0)
+            // TÉMOINS que la course a bien eu lieu : l'étiquette était orpheline
+            // à l'inventaire, et le verrouillage a ATTENDU le lien (> 0,5 s).
+            ->and(emCompteur($sortie, 'etiquettes_orphelines_a_supprimer'))->toBe(1)
+            ->and($attente)->toBeGreaterThan(500.0)
+            // L'effet : rien de supprimé, le lien validé est là.
+            ->and(emCompteur($sortie, 'etiquettes_orphelines_supprimees'))->toBe(0)
+            ->and($proprio->table('tags')->where('id', $tag)->exists())->toBeTrue()
+            ->and($proprio->table('company_tag')->where('tag_id', $tag)->where('company_id', $fiche)->exists())->toBeTrue();
+    } finally {
+        DB::setDefaultConnection($precedente);
+        foreach ($tubes as $t) {
+            if (is_resource($t)) {
+                fclose($t);
+            }
+        }
+        if (is_resource($processus)) {
+            proc_close($processus);
+        }
+        $proprio->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
+        $proprio->table('company_tag')->where('workspace_id', $espace)->delete();
+        $proprio->table('companies')->where('workspace_id', $espace)->delete();
+        $proprio->table('tags')->where('workspace_id', $espace)->delete();
+        // Cette commande a VALIDÉ des lignes de journal : elles casseraient la
+        // chaîne vérifiée par d'autres tests. Elles n'existent que pour celui-ci.
+        $proprio->table('audit_logs')->where('workspace_id', $espace)->delete();
+        $proprio->table('workspaces')->where('id', $espace)->delete();
+        $proprio->disconnect();
     }
 });

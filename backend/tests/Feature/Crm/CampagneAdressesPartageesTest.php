@@ -83,7 +83,7 @@ test('le seuil est réglable : au-dessus du nombre de fiches, l adresse part', f
 
 test('les natures écartées sont réglables : une domiciliation aussi, un groupe jamais par défaut', function () {
     DB::table('adresses_partagees')->where('workspace_id', $this->ws)->where('nature', Rapprochement::GROUPE)
-        ->update(['nature' => Rapprochement::DOMICILIATION]);
+        ->update(['nature' => Rapprochement::DOMICILIATION, 'nb_fiches' => 3]);
 
     expect(capDestinataires()['emails'])->toBe(['bureau@zz-six.example.invalid']);
 

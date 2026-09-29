@@ -98,12 +98,33 @@ function dsiVerifier(array $noeud, array &$vus, array &$defauts): void
             $defauts[] = "index {$index} lu EN ENTIER sur {$table}";
         }
     }
-    if ($type === 'Bitmap Index Scan' && ! isset($noeud['Index Cond'])) {
-        $defauts[] = "index {$index} lu EN ENTIER (bitmap)";
+    if ($type === 'Bitmap Heap Scan' && ! dsiBitmapServi((array) ($noeud['Plans'][0] ?? []))) {
+        $defauts[] = 'bitmap non servi par une condition d index sur ' . (is_string($table) ? $table : '?');
     }
     foreach ((array) ($noeud['Plans'] ?? []) as $enfant) {
         dsiVerifier((array) $enfant, $vus, $defauts);
     }
+}
+
+/**
+ * Un bitmap est-il servi par une CONDITION d'index ? `BitmapAnd` : au moins une
+ * branche (les autres ne font que restreindre) ; `BitmapOr` : toutes (une
+ * branche sans condition lirait tout). Même règle que `EffacementServiParDesIndexTest`.
+ *
+ * @param  array<string, mixed>  $noeud
+ */
+function dsiBitmapServi(array $noeud): bool
+{
+    $type = (string) ($noeud['Node Type'] ?? '');
+    if ($type === 'Bitmap Index Scan') {
+        return isset($noeud['Index Cond']);
+    }
+    $servis = array_map(static fn (mixed $e): bool => dsiBitmapServi((array) $e), (array) ($noeud['Plans'] ?? []));
+    if ($servis === []) {
+        return false;
+    }
+
+    return $type === 'BitmapOr' ? ! in_array(false, $servis, true) : in_array(true, $servis, true);
 }
 
 /**

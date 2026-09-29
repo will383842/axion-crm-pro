@@ -83,7 +83,7 @@ function ddPaires(string $ws): array
 {
     $paires = [];
     foreach (DB::table('duplicate_flags')->where('workspace_id', $ws)->orderBy('id')->get() as $d) {
-        $paires[$d->entity_a_id . '-' . $d->entity_b_id] = ['motif' => (string) $d->motif, 'auto' => (bool) $d->fusion_auto, 'traitee' => $d->reviewed_at !== null];
+        $paires[$d->entity_a_id.'-'.$d->entity_b_id] = ['motif' => (string) $d->motif, 'auto' => (bool) $d->fusion_auto, 'traitee' => $d->reviewed_at !== null];
     }
 
     return $paires;
@@ -260,4 +260,24 @@ test('les journaux publics ne montrent que des nombres (--compteurs-seulement)',
     expect($r['sortie'])->not->toContain($this->ws)
         ->and($r['sortie'])->not->toContain('ZZ ')
         ->and($r['sortie'])->not->toContain('@');
+});
+
+test('le ménage de la table dérivée a un PLAFOND : un détecteur qui se tromperait ne la viderait pas', function () {
+    // 1 500 adresses « plus partagées » : au-dessus du plancher de 1 000, et
+    // presque toute la table.
+    DB::statement("
+        INSERT INTO adresses_partagees (workspace_id, email_empreinte, nb_fiches, nature, calculee_le)
+        SELECT ?, encode(digest('zz-perimee-' || g::text, 'sha256'), 'hex'), 2, 'inconnue', now() - interval '1 day'
+        FROM generate_series(1, 1500) g
+    ", [$this->ws]);
+
+    $refus = ddDetecter($this->ws);
+    expect($refus['sortie'])->toContain('REFUS')
+        ->and(F::compteur($refus['sortie'], 'adresses_plus_partagees'))->toBe(1500)
+        ->and(DB::table('adresses_partagees')->where('workspace_id', $this->ws)->count())->toBe(1501);
+
+    // TÉMOIN : levé à la main, le ménage se fait.
+    $force = ddDetecter($this->ws, ['--force' => true]);
+    expect($force['code'])->toBe(0)
+        ->and(DB::table('adresses_partagees')->where('workspace_id', $this->ws)->count())->toBe(1);
 });

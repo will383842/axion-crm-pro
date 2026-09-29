@@ -323,7 +323,8 @@ test('REFUS — paire déjà écartée', function () {
 });
 
 test('REFUS — la paire désigne d autres fiches', function () {
-    dfRefusSansEcriture($this->ws, 'paire_inconnue', $this->garde, $this->antenne, FusionFiches::MODE_MANUEL, $this->paire);
+    // Deux fiches qui PEUVENT être fusionnées (un seul SIREN), mais pas cette paire-là.
+    dfRefusSansEcriture($this->ws, 'paire_inconnue', $this->antenne, $this->absorbee, FusionFiches::MODE_MANUEL, $this->paire);
 });
 
 test('REFUS — une fiche à la corbeille', function () {

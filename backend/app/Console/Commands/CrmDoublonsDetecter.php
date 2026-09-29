@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\RefuseUneSuppressionMassive;
 use App\Crm\Doublons\FusionFiches;
 use App\Crm\Doublons\Rapprochement;
 use App\Crm\EspaceProspection;
@@ -55,10 +56,14 @@ use Throwable;
  *    nombres, jamais un nom, une adresse ou un identifiant d'espace.
  *
  * Les adresses qui ne sont plus partagées sont retirées de la table (dérivée)
- * seulement à la fin d'un parcours COMPLET (depuis l'id 0, jusqu'au bout).
+ * seulement à la fin d'un parcours COMPLET (depuis l'id 0, jusqu'au bout), et
+ * sous le plafond de `RefuseUneSuppressionMassive` : un détecteur qui se
+ * tromperait ne viderait pas la table (`--force` pour le lever).
  */
 class CrmDoublonsDetecter extends Command
 {
+    use RefuseUneSuppressionMassive;
+
     protected $signature = 'crm:doublons:detecter
                             {--dry-run : Tout lire et tout calculer, ne RIEN écrire}
                             {--workspace= : Identifiant ou slug de l\'espace (défaut : celui de prospection:collect)}
@@ -66,7 +71,8 @@ class CrmDoublonsDetecter extends Command
                             {--depuis-id=0 : Reprendre APRÈS cette fiche (dernier id annoncé par une exécution interrompue)}
                             {--max-lots=0 : S\'arrêter après N lots (0 = jusqu\'au bout)}
                             {--pause-ms=0 : Pause entre deux lots, pour ménager la base}
-                            {--compteurs-seulement : N\'afficher que des nombres (journaux publics des workflows)}';
+                            {--compteurs-seulement : N\'afficher que des nombres (journaux publics des workflows)}
+                            {--force : Lever le plafond du ménage des adresses qui ne sont plus partagées}';
 
     protected $description = 'Détecte les adresses partagées et les paires de fiches en double (ne fusionne rien, ne supprime rien).';
 
@@ -193,8 +199,13 @@ class CrmDoublonsDetecter extends Command
             if ($termine && $depuis === 0 && $erreur === null && $debut !== '') {
                 WorkspaceContext::run($ws, function () use ($ws, $dryRun, $debut): void {
                     if (! $dryRun) {
-                        $this->compteurs['adresses_plus_partagees'] = DB::table('adresses_partagees')
-                            ->where('workspace_id', $ws)->where('calculee_le', '<', $debut)->delete();
+                        $obsoletes = DB::table('adresses_partagees')->where('workspace_id', $ws)->where('calculee_le', '<', $debut);
+                        $aRetirer = (clone $obsoletes)->count();
+                        $this->compteurs['adresses_plus_partagees'] = $aRetirer;
+                        $total = DB::table('adresses_partagees')->where('workspace_id', $ws)->count();
+                        if ($this->ecritureAutoriseeSansOperateur('adresses_partagees', $aRetirer, $total, 'retirer')) {
+                            $obsoletes->delete();
+                        }
 
                         return;
                     }

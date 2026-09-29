@@ -269,7 +269,7 @@ test('détection, fusion et annulation : chaque requête est servie par un index
         Artisan::call('crm:doublons:detecter', ['--workspace' => $ws, '--lot' => 100]);
         Artisan::call('crm:doublons:fusionner', ['--workspace' => $ws]);
     });
-    $fusion = (int) DB::table('fusions_fiches')->where('workspace_id', $ws)->value('id');
+    $fusion = (int) DB::table('fusions_fiches')->where('workspace_id', $ws)->whereNull('annulee_at')->value('id');
     expect($fusion)->toBeGreaterThan(0);
     $requetes = array_merge($requetes, dsiCapturer(fn () => WorkspaceContext::run($ws, fn () => app(FusionFiches::class)->annuler($ws, $fusion, 'test'))));
 

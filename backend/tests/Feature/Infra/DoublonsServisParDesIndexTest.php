@@ -182,6 +182,70 @@ function dsiDefauts(array $requetes, array &$vus): array
     return $defauts;
 }
 
+/**
+ * `DSI_VOLUME` fiches ordinaires, et une ligne par fiche dans chaque table que
+ * la fusion rattache — pour que le planificateur choisisse comme il le ferait
+ * en production.
+ */
+function dsiSemerVolume(string $ws): void
+{
+    DB::statement("
+        INSERT INTO companies (workspace_id, siren, denomination, discovery_source, postcode, created_at, updated_at)
+        SELECT ?, '93' || lpad(g::text, 7, '0'), 'ZZ Volume ' || g::text, 'insee', '69' || lpad((g % 900)::text, 3, '0'), now(), now()
+        FROM generate_series(1, ?) g
+    ", [$ws, DSI_VOLUME]);
+    $volume = "FROM companies c WHERE c.workspace_id = ? AND c.siren LIKE '93%'";
+    $tag = F::tag($ws, 'zz-volume');
+    $audience = (int) DB::table('email_audiences')->insertGetId(['workspace_id' => $ws, 'name' => 'ZZ Volume']);
+    $evenement = (int) DB::table('events')->insertGetId(['workspace_id' => $ws, 'external_ref' => 'zz-volume', 'nom' => 'ZZ Volume', 'type' => 'salon', 'created_at' => now(), 'updated_at' => now()]);
+    $pipeline = (int) DB::table('crm_pipelines')->insertGetId(['workspace_id' => $ws, 'name' => 'ZZ Volume', 'slug' => 'zz-volume']);
+    $etape = (int) DB::table('pipeline_stages')->insertGetId(['workspace_id' => $ws, 'pipeline_id' => $pipeline, 'slug' => 'zz-volume', 'name' => 'ZZ Volume']);
+
+    foreach ([
+        "INSERT INTO contacts (workspace_id, company_id, first_name, last_name, created_at, updated_at)
+         SELECT c.workspace_id, c.id, 'Zz', 'ZZVOLUME' || c.id::text, now(), now() {$volume}",
+        "INSERT INTO activities (workspace_id, type, kind, subject_type, subject_id, created_at)
+         SELECT c.workspace_id, 'note', 'scraped', 'company', c.id, now() {$volume}",
+        "INSERT INTO company_tag (company_id, tag_id, workspace_id, assigned_at, assigned_by)
+         SELECT c.id, {$tag}, c.workspace_id, now(), 'auto-rule' {$volume}",
+        "INSERT INTO scraper_runs (workspace_id, company_id, source, status)
+         SELECT c.workspace_id, c.id, 'zz', 'success' {$volume}",
+        "INSERT INTO audience_members (workspace_id, audience_id, company_id)
+         SELECT c.workspace_id, {$audience}, c.id {$volume}",
+        "INSERT INTO event_organizers (event_id, company_id, workspace_id, created_at)
+         SELECT {$evenement}, c.id, c.workspace_id, now() {$volume}",
+        "INSERT INTO deals (workspace_id, company_id, pipeline_id, stage_id)
+         SELECT c.workspace_id, c.id, {$pipeline}, {$etape} {$volume}",
+        "INSERT INTO federations (company_id, workspace_id, famille, niveau, pertinence, contactabilite)
+         SELECT c.id, c.workspace_id, 'ordre', 'national', 'haute', 'aucun_contact' {$volume}",
+        "INSERT INTO media (workspace_id, name, media_type, company_id)
+         SELECT c.workspace_id, 'ZZ Media ' || c.id::text, 'blog', c.id {$volume}",
+        "INSERT INTO health_practitioners (workspace_id, company_id, nom, rpps)
+         SELECT c.workspace_id, c.id, 'ZZ Praticien ' || c.id::text, '8' || lpad(c.id::text, 10, '0') {$volume}",
+        "INSERT INTO personnes (workspace_id, company_id, person_key, premiere_source, premiere_source_at, legal_basis)
+         SELECT c.workspace_id, c.id, encode(digest('zz-volume-' || c.id::text, 'sha256'), 'hex'), 'newsletter', now(), 'consent' {$volume}",
+        // Des paires DÉJÀ traitées et des fusions annulées : la file et le
+        // journal ont du volume, sans rien proposer.
+        "INSERT INTO duplicate_flags (workspace_id, entity_type, entity_a_id, entity_b_id, similarity, motif, reviewed_at, resolution)
+         SELECT c.workspace_id, 'company', c.id, c.id + 1000000000, 0.5, 'nom_cp', now(), 'keep_both' {$volume}",
+    ] as $sql) {
+        DB::statement($sql, [$ws]);
+    }
+    DB::statement("
+        INSERT INTO journalists (workspace_id, media_id, company_id, last_name)
+        SELECT m.workspace_id, m.id, m.company_id, 'ZZ Journaliste ' || m.id::text FROM media m WHERE m.workspace_id = ?
+    ", [$ws]);
+    DB::statement("
+        INSERT INTO fusions_fiches (workspace_id, flag_id, garde_id, absorbee_id, motif, mode, absorbee_supprimee_le, annulee_at)
+        SELECT d.workspace_id, d.id, d.entity_a_id, d.entity_b_id, 'nom_cp', 'manuel', now(), now()
+        FROM duplicate_flags d WHERE d.workspace_id = ? AND d.entity_b_id > 1000000000
+    ", [$ws]);
+    foreach (['companies', 'contacts', 'activities', 'company_tag', 'scraper_runs', 'audience_members', 'event_organizers',
+        'deals', 'federations', 'media', 'journalists', 'health_practitioners', 'personnes', 'duplicate_flags', 'fusions_fiches'] as $table) {
+        DB::statement("ANALYZE {$table}");
+    }
+}
+
 test('détection, fusion et annulation : chaque requête est servie par un index', function () {
     $this->mock(AuditHashChain::class)->shouldReceive('record')->andReturn(1);
     $ws = F::espace('zz-doublons-index');
@@ -194,26 +258,10 @@ test('détection, fusion et annulation : chaque requête est servie par un index
     F::contact($ws, $garde, 'Zed', 'ZZJUMEAU');
     F::contact($ws, $absorbee, 'Zed', 'ZZJUMEAU', ['email' => 'zed@zz-index.example.invalid']);
     DB::table('activities')->insert(['workspace_id' => $ws, 'type' => 'note', 'kind' => 'scraped', 'subject_type' => 'company', 'subject_id' => $absorbee, 'created_at' => now()]);
-    // Du volume, dans le MÊME espace : sans lui, un index lu pour tout
-    // l'espace coûte aussi peu que le bon, et le planificateur hésite.
-    DB::statement("
-        INSERT INTO companies (workspace_id, siren, denomination, discovery_source, postcode, created_at, updated_at)
-        SELECT ?, '93' || lpad(g::text, 7, '0'), 'ZZ Volume ' || g::text, 'insee', '69' || lpad((g % 900)::text, 3, '0'), now(), now()
-        FROM generate_series(1, ?) g
-    ", [$ws, DSI_VOLUME]);
-    DB::statement("
-        INSERT INTO contacts (workspace_id, company_id, first_name, last_name, created_at, updated_at)
-        SELECT c.workspace_id, c.id, 'Zz', 'ZZVOLUME' || c.id::text, now(), now()
-        FROM companies c WHERE c.workspace_id = ? AND c.siren LIKE '93%'
-    ", [$ws]);
-    DB::statement("
-        INSERT INTO activities (workspace_id, type, kind, subject_type, subject_id, created_at)
-        SELECT c.workspace_id, 'note', 'scraped', 'company', c.id, now()
-        FROM companies c WHERE c.workspace_id = ? AND c.siren LIKE '93%'
-    ", [$ws]);
-    DB::statement('ANALYZE companies');
-    DB::statement('ANALYZE contacts');
-    DB::statement('ANALYZE activities');
+    // Du volume, dans le MÊME espace et dans CHAQUE table touchée : sans lui,
+    // un index lu pour tout l'espace coûte aussi peu que le bon, et le
+    // planificateur hésite.
+    dsiSemerVolume($ws);
 
     $requetes = dsiCapturer(function () use ($ws): void {
         // Des lots de 100 sur 3 000 fiches : la proportion d'un lot sur la

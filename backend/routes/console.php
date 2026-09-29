@@ -442,8 +442,8 @@ Schedule::command('crm:flush-outbound')
 // Brave, avec le SEUL crédit gratuit du mois (budget de Will : zéro euro).
 // FERMÉE par défaut : le skip() saute le passage tant que
 // CRM_BRAVE_FEDERATIONS_PLANIFIEE n'est pas à true. Ouverte, elle consomme le
-// quota du mois (CRM_BRAVE_QUOTA_MENSUEL, compté en base) et s'arrête d'elle-
-// même au plafond. Une requête par seconde : ~900 requêtes, et jusqu'à trois
+// sous-quota du mois (CRM_BRAVE_QUOTA_FEDERATIONS, sous CRM_BRAVE_QUOTA_MENSUEL,
+// compté en base) et s'arrête d'elle-même au plafond. Une requête par seconde : ~900 requêtes, et jusqu'à trois
 // pages d'accueil vérifiées par fiche, tiennent dans le verrou de 4 h ; en
 // arrière-plan, pour ne pas retenir les autres tâches du planificateur.
 Schedule::command(CrmFederationsTrouverSites::SIGNATURE_PLANIFIEE)
@@ -452,3 +452,31 @@ Schedule::command(CrmFederationsTrouverSites::SIGNATURE_PLANIFIEE)
     ->onOneServer()
     ->runInBackground()
     ->skip(fn (): bool => ! filter_var(config('crm.brave.federations_planifiee', false), FILTER_VALIDATE_BOOLEAN));
+
+// Vérification des e-mails (2026-09-29) — `crm:emails:verifier`, chaque
+// DIMANCHE à 05:00 : les adresses nouvelles, et les domaines résolus il y a
+// plus de `revalider_apres_jours` jours. Aucun sondage SMTP, aucune adresse
+// supprimée ; une fiche dont la vérification n'a pas bougé n'est pas réécrite.
+//
+// FERMÉE PAR DÉFAUT : le skip() saute le passage tant que
+// CRM_EMAILS_VERIFICATION_PLANIFIEE n'est pas à true (config
+// crm.emails_verification.planifiee), et le saut se JOURNALISE — une tâche
+// retenue sans trace est indistinguable d'une tâche qui tourne. L'ouvrir
+// APRÈS une première exécution manuelle réussie (procédure dans la PR).
+// withoutOverlapping(360) : la plus longue borne admise (B17-002) ; un passage
+// hebdomadaire ne revérifie que ce qui a changé, bien en deçà.
+Schedule::command('crm:emails:verifier')
+    ->weeklyOn(0, '05:00')
+    ->withoutOverlapping(360)
+    ->onOneServer()
+    ->skip(function (): bool {
+        $ferme = ! filter_var(config('crm.emails_verification.planifiee', false), FILTER_VALIDATE_BOOLEAN);
+        if ($ferme) {
+            Log::info('[EMAILS] Vérification hebdomadaire SAUTÉE : CRM_EMAILS_VERIFICATION_PLANIFIEE n\'est pas à true.');
+        }
+
+        return $ferme;
+    })
+    ->onFailure(function (): void {
+        Log::error('[EMAILS] crm:emails:verifier (dimanche 05:00) est sortie en échec — le journal dit le lot annulé et la reprise (--source, --depuis-id).');
+    });

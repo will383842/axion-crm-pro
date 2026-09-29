@@ -25,6 +25,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Tests\Support\ResolveurDnsSimule;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -135,6 +136,9 @@ function fssVolumes(): array
 /** @return list<array<string, mixed>> */
 function fssDestinataires(): array
 {
+    // La liste ne retient que des adresses VÉRIFIÉES valides : on vérifie
+    // d'abord, avec un DNS simulé où tout domaine reçoit.
+    ResolveurDnsSimule::toutVerifier();
     $sortie = (string) tempnam(sys_get_temp_dir(), 'zz-fss-dest-');
     $GLOBALS['zz_fss_fichiers'][] = $sortie;
     Artisan::call('crm:campagne:destinataires', ['segment' => 'federations', 'sortie' => $sortie]);

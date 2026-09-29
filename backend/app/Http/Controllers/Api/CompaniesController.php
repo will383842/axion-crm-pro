@@ -134,22 +134,14 @@ class CompaniesController extends ApiController
             // (§2.10). On ne transforme la sortie QUE dans ce cas : pour les
             // autres rôles, la forme de la réponse reste rigoureusement celle
             // d'avant — un masquage ne doit pas devenir une refonte d'API.
-            $lignes = MasquageCoordonnees::requis()
-                // Le paginateur est typé `Model` : on ne présume pas de la
-                // classe concrète, on masque les colonnes si elles existent.
-                ? array_map(static function (Model $ligne): Model {
-                    $ligne->setAttribute(
-                        'email_generic',
-                        MasquageCoordonnees::email($ligne->getAttribute('email_generic')),
-                    );
-                    $ligne->setAttribute(
-                        'phone',
-                        MasquageCoordonnees::telephone($ligne->getAttribute('phone')),
-                    );
-
-                    return $ligne;
-                }, $page->items())
-                : $page->items();
+            //
+            // 🔴 Relecture de la PR #261 (réserve 3) : ce masquage ne touchait
+            // que `email_generic` et `phone`. La liste rend `signals` en entier
+            // — donc `contact_channels.emails`, `.phones` et les CLÉS de
+            // `.details` (des adresses) EN CLAIR à un compte en lecture seule,
+            // et les empreintes de vérification. La liste applique désormais
+            // EXACTEMENT le masquage de la fiche (`masquerSiRequis`).
+            $lignes = MasquageCoordonnees::masquerSiRequis($page->items());
 
             return $this->ok([
                 'data' => $lignes,

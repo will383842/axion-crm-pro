@@ -21,6 +21,11 @@ use Illuminate\Support\Str;
  * [purge] notifications     → suppression au-delà de 90 jours
  * [purge] scraper_runs      → effacement de `response_payload` + `payload_path`
  *                             au-delà de 90 jours (la ligne de run survit)
+ * [purge] email_domaines    → domaines résolus il y a plus de
+ *                             `crm.emails_verification.purger_domaines_apres_jours`
+ *                             (180 j) : un cache DNS de `crm:emails:verifier`,
+ *                             sans adresse ni personne ; une entrée périmée
+ *                             serait de toute façon redemandée au DNS.
  *
  * ══════════════════════════════════════════════════════════════════════════════
  * B15-007 — CE QUE CET EN-TÊTE ANNONÇAIT ET QUE PERSONNE N'EXÉCUTAIT.
@@ -125,6 +130,19 @@ class RetentionPurge extends Command
             'email_validations',
             fn (): Builder => DB::table('email_validations')
                 ->where('expires_at', '<', now()->subDays(7)),
+            fn (Builder $q): int => $q->delete(),
+            portee: $portee,
+            colonneEspace: null,
+        );
+
+        // `email_domaines` : GLOBALE (aucune colonne d'espace), comme
+        // `email_validations` — purgée avec la seule portée totale. Ce n'est ni
+        // un contact ni une adresse : des noms de domaine et un verdict DNS.
+        $this->purger(
+            'email_domaines resolus il y a trop longtemps',
+            'email_domaines',
+            fn (): Builder => DB::table('email_domaines')
+                ->where('resolu_le', '<', now()->subDays(max(1, (int) config('crm.emails_verification.purger_domaines_apres_jours', 180)))),
             fn (Builder $q): int => $q->delete(),
             portee: $portee,
             colonneEspace: null,

@@ -23,6 +23,7 @@ use App\Services\Scraping\GooglePlacesClient;
 use App\Services\Tags\AutoTaggerService;
 use App\Services\Triage\TriageAutoService;
 use App\Support\WaterfallSentry;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -470,6 +471,35 @@ class WaterfallOrchestrator
         }
     }
 
+    /**
+     * Les personnes dont l'étape 7 peut CHERCHER (et donc écrire) l'adresse.
+     *
+     * 🔴 Relecture E2 (vérification des e-mails, 2026-09-29). L'étape réécrit
+     * `contacts.email`. Avant, elle visait toute personne dont le statut
+     * n'était ni `valid` ni `catchall` : une adresse que `crm:emails:verifier`
+     * vient de marquer `invalid` aurait été REMPLACÉE — perdue, alors que la
+     * vérification promet qu'une adresse invalide reste lisible pour audit.
+     * Une adresse EXISTANTE n'est donc plus jamais remplacée :
+     *  - si elle a une fiche de vérification (`metadata.email_verification`) ;
+     *  - ou si la fiche d'organisation est PROTÉGÉE (organisateurs,
+     *    fédérations, GOFAB : des coordonnées importées, que Will a demandé de
+     *    ne jamais perdre).
+     * Une personne SANS adresse reste cherchée partout.
+     */
+    public static function contactsARechercher(int $companyId): Builder
+    {
+        return DB::table('contacts')
+            ->where('company_id', $companyId)
+            ->where(function ($q) {
+                $q->whereNull('email')->orWhere(function ($q2) {
+                    $q2->whereNotIn('email_status', ['valid', 'catchall'])
+                        ->whereRaw("NOT jsonb_exists(coalesce(metadata, '{}'::jsonb), 'email_verification')")
+                        ->whereRaw(FichesProtegees::conditionSql('contacts.company_id'));
+                });
+            })
+            ->whereNotNull('last_name');
+    }
+
     private function step7_email_finder(Company $company): void
     {
         $domain = $company->website ? parse_url($company->website, PHP_URL_HOST) : null;
@@ -478,14 +508,7 @@ class WaterfallOrchestrator
         }
         $domain = preg_replace('/^www\./', '', (string) $domain);
 
-        $contacts = DB::table('contacts')
-            ->where('company_id', $company->id)
-            ->where(function ($q) {
-                $q->whereNull('email')->orWhereNotIn('email_status', ['valid', 'catchall']);
-            })
-            ->whereNotNull('last_name')
-            ->limit(20)
-            ->get();
+        $contacts = self::contactsARechercher((int) $company->id)->limit(20)->get();
 
         foreach ($contacts as $c) {
             try {

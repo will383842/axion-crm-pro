@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Tests\Support\ResolveurDnsSimule;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -100,6 +101,9 @@ function fedcCanaux(string $siren): array
 /** @return list<array<string, mixed>> */
 function fedcDestinataires(array $options = [], string $segment = 'federations'): array
 {
+    // La liste ne retient que des adresses VÉRIFIÉES valides : on vérifie
+    // d'abord, avec un DNS simulé où tout domaine reçoit.
+    ResolveurDnsSimule::toutVerifier();
     $sortie = fedcFichier('');
     Artisan::call('crm:campagne:destinataires', ['segment' => $segment, 'sortie' => $sortie] + $options);
 
@@ -213,12 +217,19 @@ test('D4 — la liste de campagne dit le type d adresse et la date de verificati
         'personnes' => [['prenom' => 'Zoe', 'nom' => 'ZZVERIFIEE', 'fonction' => 'Présidente', 'email' => 'zoe@zz-verifie.example.invalid', 'email_verifie_le' => '2026-09-27', 'linkedin' => null]],
     ])]);
 
+    // L'import écrit les dates du fichier…
+    $verif = (array) json_decode((string) fedcFiche('900000601')->signals, true);
+    expect($verif['email_generic_verification']['verifie_le'] ?? null)->toBe('2026-09-28');
+
+    // … puis la liste, qui exige une vérification (`crm:emails:verifier`),
+    // porte la date de la vérification la plus RÉCENTE — celle du jour. Le
+    // TYPE, lui, reste celui du fichier.
     $lignes = collect(fedcDestinataires())->keyBy('email');
 
     expect($lignes['contact@zz-verifie.example.invalid']['nature_adresse'])->toBe('generique')
-        ->and($lignes['contact@zz-verifie.example.invalid']['domaine_verifie_le'])->toBe('2026-09-28')
+        ->and($lignes['contact@zz-verifie.example.invalid']['domaine_verifie_le'])->toBe(now()->toDateString())
         ->and($lignes['zoe@zz-verifie.example.invalid']['nature_adresse'])->toBe('nominatif')
-        ->and($lignes['zoe@zz-verifie.example.invalid']['domaine_verifie_le'])->toBe('2026-09-27');
+        ->and($lignes['zoe@zz-verifie.example.invalid']['domaine_verifie_le'])->toBe(now()->toDateString());
 });
 
 // ── Canaux typés (adresses nominatives importées, effaçables) ──────────────

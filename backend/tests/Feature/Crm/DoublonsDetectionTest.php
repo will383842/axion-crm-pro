@@ -83,7 +83,7 @@ function ddPaires(string $ws): array
 {
     $paires = [];
     foreach (DB::table('duplicate_flags')->where('workspace_id', $ws)->orderBy('id')->get() as $d) {
-        $paires[$d->entity_a_id.'-'.$d->entity_b_id] = ['motif' => (string) $d->motif, 'auto' => (bool) $d->fusion_auto, 'traitee' => $d->reviewed_at !== null];
+        $paires[$d->entity_a_id . '-' . $d->entity_b_id] = ['motif' => (string) $d->motif, 'auto' => (bool) $d->fusion_auto, 'traitee' => $d->reviewed_at !== null];
     }
 
     return $paires;

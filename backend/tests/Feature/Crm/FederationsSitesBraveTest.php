@@ -367,8 +367,11 @@ test('updated_at n est pas touche — temoin : toute autre ecriture le remet a j
         ['unsa-ameublement.test' => fsbPage('UNSA — Union nationale de l\'ameublement')],
     );
 
-    fsbLancer();
+    // Témoin AVANT la commande : son `SET LOCAL` vit jusqu'à la fin de la
+    // transaction ENGLOBANTE — celle du test ici (la commande n'ouvre qu'un
+    // point de sauvegarde), la sienne propre en production.
     DB::table('companies')->where('id', $temoin)->update(['website_status' => 'not_found']);
+    fsbLancer();
 
     expect(DB::table('companies')->where('id', $id)->value('website'))->toBe('https://unsa-ameublement.test/')
         ->and(substr((string) DB::table('companies')->where('id', $id)->value('updated_at'), 0, 19))->toBe($ancienne)

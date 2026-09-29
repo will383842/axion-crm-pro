@@ -85,9 +85,17 @@ test('sous-quota enrichissement a 0 (defaut) : find() n envoie AUCUNE requete Br
 });
 
 test('le defaut de configuration du sous-quota enrichissement est 0', function () {
-    // Le défaut LIVRÉ (`config/crm.php`, CRM_BRAVE_QUOTA_ENRICHISSEMENT absent
-    // de l'environnement de test), puis le défaut de la règle elle-même.
-    expect(config('crm.brave.quotas.enrichissement'))->toBe(0)
+    // Le défaut LIVRÉ, aux deux endroits d'où il peut venir. ⚠️ La CI copie
+    // `.env.example` en `.env` : `config()` y lit donc la valeur de ce
+    // fichier, jamais le défaut écrit dans `config/crm.php` — qui est pourtant
+    // celui de la production si la variable n'y est pas posée. Ce défaut-là
+    // se lit dans le TEXTE (mutation « défaut à 900 » survivante sinon).
+    $configuration = (string) file_get_contents(base_path('config/crm.php'));
+    $exemple = (string) file_get_contents(base_path('../.env.example'));
+    expect(preg_match_all("/env\('CRM_BRAVE_QUOTA_ENRICHISSEMENT', 0\)/", $configuration))->toBe(1)
+        ->and(preg_match_all('/^CRM_BRAVE_QUOTA_ENRICHISSEMENT=0$/m', $exemple))->toBe(1)
+        ->and(preg_match_all('/^CRM_BRAVE_QUOTA_ENRICHISSEMENT=/m', $exemple))->toBe(1)
+        ->and(config('crm.brave.quotas.enrichissement'))->toBe(0)
         ->and(config('crm.brave.quotas.federations'))->toBe(900)
         ->and(config('crm.brave.quota_mensuel'))->toBe(900);
 

@@ -1020,8 +1020,9 @@ class CrmReferentielsReclasser extends Command
      *  - hors référentiel du classement (`slugsValides`) ;
      *  - sans règle (`rules` vide) — une règle est une définition, pas un reste ;
      *  - portées par AUCUNE fiche et AUCUN candidat ;
-     *  - citées par AUCUNE audience enregistrée (champ `tags`, même en
-     *    corbeille : restaurer une audience ne doit pas la trouver vide).
+     *  - citées par AUCUNE audience enregistrée (champ `tags`, hors
+     *    corbeille : une audience restaurée retrouve ses étiquettes par leur
+     *    SLUG, recréées par l'automate dès qu'une fiche y correspond).
      *
      * Supprimer une telle étiquette ne retire rien à personne : l'automate la
      * recrée, sous le même slug, le jour où une fiche y correspond (les
@@ -1062,14 +1063,14 @@ class CrmReferentielsReclasser extends Command
 
     /**
      * Tous les slugs qu'une audience de l'espace cite dans une condition
-     * `tags`, quel que soit le bloc (`all`, `any`, `not`) — corbeille comprise.
+     * `tags`, quel que soit le bloc (`all`, `any`, `not`) — hors corbeille.
      *
      * @return list<string>
      */
     private function slugsCitesParLesAudiences(string $workspaceId): array
     {
         $slugs = [];
-        $criteres = DB::table('email_audiences')->where('workspace_id', $workspaceId)->pluck('criteria');
+        $criteres = DB::table('email_audiences')->where('workspace_id', $workspaceId)->whereNull('deleted_at')->pluck('criteria');
         foreach ($criteres as $brut) {
             $c = json_decode((string) $brut, true);
             if (! is_array($c)) {

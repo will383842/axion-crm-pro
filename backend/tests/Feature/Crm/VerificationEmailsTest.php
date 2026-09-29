@@ -285,6 +285,22 @@ test('une fiche modifiee entre la lecture et l ecriture n est pas ecrasee', func
         ->and(vemCompteur($r['sortie'], 'modifiees_entre_temps'))->toBe(1);
 });
 
+test('une ORGANISATION modifiee entre la lecture et l ecriture n est pas ecrasee', function () {
+    // Pendant la résolution du lot, un import réécrit les `signals` de A.
+    $this->dns->pendant = function (): void {
+        DB::table('companies')->where('id', $this->a)
+            ->update(['signals' => DB::raw("jsonb_set(signals, '{autre_cle}', '{\"garde\": \"import concurrent\"}'::jsonb)")]);
+    };
+
+    $r = vemVerifier(['--source' => 'entreprises']);
+
+    expect(vemSignals($this->a)['autre_cle'])->toBe(['garde' => 'import concurrent'])
+        ->and(vemSignals($this->a))->not->toHaveKey('email_generic_verification')
+        ->and(vemCompteur($r['sortie'], 'modifiees_entre_temps'))->toBe(1)
+        // Les autres fiches du lot, elles, sont écrites.
+        ->and(vemGenerique($this->b)['statut'])->toBe('valide');
+});
+
 test('a blanc : rien n est ecrit — fiches, cache, audit — et le bilan annonce ce que le reel fera', function () {
     $avant = [
         DB::table('companies')->where('workspace_id', $this->espace)->pluck('signals', 'id')->all(),
@@ -314,9 +330,9 @@ test('le journal et l ecran ne citent aucune adresse', function () {
     $r = vemVerifier();
 
     expect($r['sortie'])->not->toContain('@')
-        ->and(DB::table('audit_logs')->where('method', 'VERIFICATION_EMAILS_LOT')->count())->toBeGreaterThan(0)
-        ->and(DB::table('audit_logs')->where('method', 'VERIFICATION_EMAILS_FIN')->count())->toBe(1)
-        ->and(DB::table('audit_logs')->where('method', 'like', 'VERIFICATION_EMAILS%')->where('path', 'like', '%@%')->exists())->toBeFalse();
+        ->and(DB::table('audit_logs')->where('event_type', 'VERIFICATION_EMAILS_LOT')->count())->toBeGreaterThan(0)
+        ->and(DB::table('audit_logs')->where('event_type', 'VERIFICATION_EMAILS_FIN')->count())->toBe(1)
+        ->and(DB::table('audit_logs')->where('event_type', 'like', 'VERIFICATION_EMAILS%')->where('path', 'like', '%@%')->exists())->toBeFalse();
 });
 
 // ── Les gardes d'exploitation ───────────────────────────────────────────────

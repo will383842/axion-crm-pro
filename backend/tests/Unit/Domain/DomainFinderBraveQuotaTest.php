@@ -85,6 +85,12 @@ test('sous-quota enrichissement a 0 (defaut) : find() n envoie AUCUNE requete Br
 });
 
 test('le defaut de configuration du sous-quota enrichissement est 0', function () {
+    // Le défaut LIVRÉ (`config/crm.php`, CRM_BRAVE_QUOTA_ENRICHISSEMENT absent
+    // de l'environnement de test), puis le défaut de la règle elle-même.
+    expect(config('crm.brave.quotas.enrichissement'))->toBe(0)
+        ->and(config('crm.brave.quotas.federations'))->toBe(900)
+        ->and(config('crm.brave.quota_mensuel'))->toBe(900);
+
     $quota = new QuotaBraveEnMemoire;
     Config::set('crm.brave.quotas', []);
 

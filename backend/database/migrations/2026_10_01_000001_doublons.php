@@ -245,6 +245,17 @@ return new class extends Migration
                 END
             $fn$;
 
+            -- Un objet JSON, ou vide ; une liste JSON, ou vide (PHP écrit `[]`
+            -- pour un tableau associatif vide).
+            CREATE OR REPLACE FUNCTION public.doublons_objet(p JSONB)
+            RETURNS JSONB LANGUAGE sql IMMUTABLE SET search_path = public, pg_catalog AS $fn$
+                SELECT CASE WHEN jsonb_typeof(p) = 'object' THEN p ELSE '{}'::jsonb END
+            $fn$;
+            CREATE OR REPLACE FUNCTION public.doublons_liste(p JSONB)
+            RETURNS JSONB LANGUAGE sql IMMUTABLE SET search_path = public, pg_catalog AS $fn$
+                SELECT CASE WHEN jsonb_typeof(p) = 'array' THEN p ELSE '[]'::jsonb END
+            $fn$;
+
             -- Refus hors du contexte d'espace : la même borne que
             -- `contacts_retires_contient`.
             CREATE OR REPLACE FUNCTION public.doublons_verifier_espace(p_ws UUID)
@@ -321,15 +332,15 @@ return new class extends Migration
                 IF j IS NULL THEN
                     RAISE EXCEPTION 'doublons_fusion_introuvable';
                 END IF;
-                FOR k IN SELECT jsonb_object_keys(COALESCE(j->'champs', '{}'::jsonb)) LOOP
+                FOR k IN SELECT jsonb_object_keys(public.doublons_objet(j->'champs')) LOOP
                     IF k NOT IN ('email_generic', 'phone', 'website', 'linkedin_url', 'first_info_at') THEN
                         RAISE EXCEPTION 'doublons_colonne_refusee';
                     END IF;
                     EXECUTE format('SELECT CAST(%I AS TEXT) FROM public.companies WHERE id = $1 AND workspace_id = $2', k) INTO v USING gid, p_ws;
                     j := jsonb_set(j, ARRAY['champs', k, 'empreinte'], to_jsonb(public.doublons_empreinte(public.doublons_normaliser(k, v))));
                 END LOOP;
-                FOR i IN 0 .. COALESCE(jsonb_array_length(j->'jumeaux'), 0) - 1 LOOP
-                    FOR k IN SELECT jsonb_object_keys(COALESCE(j->'jumeaux'->i->'champs', '{}'::jsonb)) LOOP
+                FOR i IN 0 .. jsonb_array_length(public.doublons_liste(j->'jumeaux')) - 1 LOOP
+                    FOR k IN SELECT jsonb_object_keys(public.doublons_objet(j->'jumeaux'->i->'champs')) LOOP
                         IF k NOT IN ('email', 'email_status', 'phone', 'linkedin_url') THEN
                             RAISE EXCEPTION 'doublons_colonne_refusee';
                         END IF;
@@ -398,16 +409,16 @@ return new class extends Migration
                 FOR r IN SELECT ff.id, ff.journal FROM public.fusions_fiches ff WHERE ff.workspace_id = p_ws LOOP
                     j := r.journal;
                     SELECT COALESCE(jsonb_object_agg(ck, cv), '{}'::jsonb) INTO c
-                    FROM   jsonb_each(COALESCE(j->'champs', '{}'::jsonb)) AS ce(ck, cv)
+                    FROM   jsonb_each(public.doublons_objet(j->'champs')) AS ce(ck, cv)
                     WHERE  NOT (COALESCE(cv->>'empreinte', '') = ANY (h));
                     SELECT COALESCE(jsonb_agg(
                                jsonb_set(je.x, '{champs}', (
                                    SELECT COALESCE(jsonb_object_agg(jk, jv), '{}'::jsonb)
-                                   FROM   jsonb_each(COALESCE(je.x->'champs', '{}'::jsonb)) AS jc(jk, jv)
+                                   FROM   jsonb_each(public.doublons_objet(je.x->'champs')) AS jc(jk, jv)
                                    WHERE  NOT (COALESCE(jv->>'empreinte', '') = ANY (h))
                                )) ORDER BY je.o), '[]'::jsonb) INTO jj
-                    FROM   jsonb_array_elements(COALESCE(j->'jumeaux', '[]'::jsonb)) WITH ORDINALITY AS je(x, o);
-                    IF c IS DISTINCT FROM COALESCE(j->'champs', '{}'::jsonb) OR jj IS DISTINCT FROM COALESCE(j->'jumeaux', '[]'::jsonb) THEN
+                    FROM   jsonb_array_elements(public.doublons_liste(j->'jumeaux')) WITH ORDINALITY AS je(x, o);
+                    IF c IS DISTINCT FROM public.doublons_objet(j->'champs') OR jj IS DISTINCT FROM public.doublons_liste(j->'jumeaux') THEN
                         UPDATE public.fusions_fiches SET journal = jsonb_set(jsonb_set(j, '{champs}', c), '{jumeaux}', jj) WHERE id = r.id;
                         n := n + 1;
                     END IF;
@@ -455,6 +466,8 @@ return new class extends Migration
             DROP FUNCTION IF EXISTS public.doublons_inscrire_adresses(UUID, JSONB);
             DROP FUNCTION IF EXISTS public.doublons_verifier_espace(UUID);
             DROP FUNCTION IF EXISTS public.doublons_normaliser(TEXT, TEXT);
+            DROP FUNCTION IF EXISTS public.doublons_objet(JSONB);
+            DROP FUNCTION IF EXISTS public.doublons_liste(JSONB);
             DROP FUNCTION IF EXISTS public.doublons_empreinte(TEXT);
             DROP TABLE IF EXISTS public.doublons_cle;
             DROP TABLE IF EXISTS adresses_partagees;

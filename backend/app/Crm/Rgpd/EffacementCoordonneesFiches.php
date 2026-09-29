@@ -235,10 +235,11 @@ final class EffacementCoordonneesFiches
         // contexte (le rôle applicatif ne calcule pas d'empreinte).
         $espace = $workspaceId ?? WorkspaceContext::current();
         if ($espace !== null && ($email !== '' || $variantes !== [])) {
-            $r = DB::selectOne(
+            // Dans le contexte de CET espace : la fonction refuse tout autre.
+            $r = WorkspaceContext::run($espace, static fn (): mixed => DB::selectOne(
                 'SELECT public.doublons_effacer(?::uuid, ?, ?::jsonb) AS n',
                 [$espace, $email, json_encode($variantes, JSON_THROW_ON_ERROR)],
-            );
+            ));
             $bilan['adresses_partagees'] = (int) ($r->n ?? 0);
         }
 

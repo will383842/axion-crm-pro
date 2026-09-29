@@ -150,6 +150,13 @@ class ScrapingSourcesSeeder extends Seeder
             'dedup_key_pattern' => 'siren',
             'legal_note' => 'Registre Sirene (open data) pour l\'identité des organismes (codes 94.11Z, 94.12Z, 94.20Z, 94.99Z) ; coordonnées publiées pour être contactées sur leurs sites, l\'annuaire de l\'administration, le répertoire HATVP et les annuaires des ordres et confédérations. Finalité : proposer une intervention ou un partenariat, et les offres d\'Axion-IA. Intérêt légitime B2B ; information art. 14 au premier message ; opposition respectée. Fiches protégées (FichesProtegees) : ni purge, ni enrichissement automatique, ni audience par défaut.',
         ],
+        'gofab-2026' => [
+            'name' => 'Participants du salon GOFAB 2026 (Saint-Chamond, 13/10/2026)',
+            'kind' => 'import',
+            'ttl_days' => 365,
+            'dedup_key_pattern' => 'siren',
+            'legal_note' => 'Annuaire des participants (visiteurs et exposants) de la plateforme de rendez-vous d\'affaires du salon GOFAB 2026, organisé par la CCI Lyon Métropole Saint-Étienne Roanne : coordonnées professionnelles communiquées par les participants pour être contactés entre professionnels du salon. Identité des entreprises résolue par SIREN via l\'API publique recherche-entreprises (data.gouv). Finalité : rencontres d\'affaires et offres d\'Axion-IA. Intérêt légitime B2B ; information art. 14 au premier message et au plus tard un mois après la collecte ; opposition respectée. Rattachement backfill-only : aucune valeur existante n\'est remplacée.',
+        ],
         'gplaces' => [
             'name' => 'Google Places API',
             'kind' => 'api',

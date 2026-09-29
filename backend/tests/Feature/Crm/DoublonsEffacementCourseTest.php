@@ -66,42 +66,64 @@ test('un déplacement ajouté au journal PENDANT un effacement n est pas perdu',
     ));
     expect(DB::table('fusions_empreintes')->where('fusion_id', $fusion)->where('chemin', 'champs.email_generic')->exists())->toBeTrue();
 
-    // Le second processus : l'import qui pose un lien d'événement au journal.
+    // Le second processus : l'import qui pose un lien d'événement au journal,
+    // tient la ligne, et le SIGNALE par un verrou consultatif (visible dans
+    // pg_locks — un signal par la sortie standard pourrait être retardé par un
+    // tampon, et la course ne serait plus jouée).
     $c = config('database.connections.pgsql');
+    $signal = 7300260;
     $script = (string) tempnam(sys_get_temp_dir(), 'zz-course-');
-    file_put_contents($script, '<?php
-        $pdo = new PDO(' . var_export(sprintf('pgsql:host=%s;port=%s;dbname=%s', $c['host'], $c['port'], $c['database']), true) . ', '
-        . var_export((string) $c['username'], true) . ', ' . var_export((string) $c['password'], true) . ', [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-        $pdo->exec("SET app.current_workspace_id = ' . "'" . $this->ws . "'" . '");
+    $dsn = sprintf('pgsql:host=%s;port=%s;dbname=%s', $c['host'], $c['port'], $c['database']);
+    $code = <<<'PHP'
+        <?php
+        $pdo = new PDO(%s, %s, %s, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
         $pdo->beginTransaction();
-        $pdo->exec("UPDATE fusions_fiches SET journal = jsonb_set(journal, \'{deplacements,event_organizers}\', COALESCE(journal->\'deplacements\'->\'event_organizers\', \'[]\'::jsonb) || \'987654\'::jsonb) WHERE id = ' . $fusion . '");
-        fwrite(STDOUT, "VERROU\n");
-        fflush(STDOUT);
-        usleep(1500000);
+        $pdo->exec("UPDATE fusions_fiches SET journal = jsonb_set(journal, '{deplacements,event_organizers}', COALESCE(journal->'deplacements'->'event_organizers', '[]'::jsonb) || '987654'::jsonb) WHERE id = %d");
+        $pdo->query('SELECT pg_advisory_xact_lock(%d)');
+        usleep(3000000);
         $pdo->commit();
-        fwrite(STDOUT, "VALIDE\n");
-    ', );
+        echo "VALIDE";
+        PHP;
+    file_put_contents($script, sprintf($code, var_export($dsn, true), var_export((string) $c['username'], true), var_export((string) $c['password'], true), $fusion, $signal));
     $tubes = [];
     $processus = proc_open([PHP_BINARY, $script], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $tubes);
     expect($processus)->not->toBeFalse();
-    $premiere = fgets($tubes[1]);
-    expect(trim((string) $premiere))->toBe('VERROU', 'Le second processus n a pas pris le verrou : ' . stream_get_contents($tubes[2]));
 
-    // L'effacement, pendant que le second processus tient la ligne.
+    // Attendre que le second processus TIENNE la ligne : son verrou consultatif
+    // est pris juste APRÈS son UPDATE, dans la même transaction.
+    $tient = false;
+    for ($i = 0; $i < 200 && ! $tient; $i++) {
+        $tient = (int) DB::selectOne(
+            "SELECT count(*) AS n FROM pg_locks WHERE locktype = 'advisory' AND objid = ? AND granted AND pid <> pg_backend_pid()",
+            [$signal],
+        )->n > 0;
+        if (! $tient) {
+            usleep(50000);
+        }
+    }
+    expect($tient)->toBeTrue('Le second processus n a pas pris le verrou.');
+
+    // L'effacement, PENDANT que le second processus tient la ligne.
+    $avant = microtime(true);
     $bilan = WorkspaceContext::run($this->ws, fn (): mixed => DB::selectOne(
         'SELECT public.doublons_effacer(?::uuid, ?, ?::jsonb) AS n',
         [$this->ws, $email, '[]'],
     ));
+    $duree = microtime(true) - $avant;
 
     $fin = trim((string) stream_get_contents($tubes[1]));
+    $erreurs = (string) stream_get_contents($tubes[2]);
     fclose($tubes[1]);
     fclose($tubes[2]);
     proc_close($processus);
     @unlink($script);
 
     $journal = json_decode((string) DB::table('fusions_fiches')->where('id', $fusion)->value('journal'), true);
-    expect($fin)->toBe('VALIDE')
+    expect($fin)->toBe('VALIDE', 'Le second processus a échoué : ' . $erreurs)
         ->and((int) $bilan->n)->toBeGreaterThan(0)
+        // L'effacement n'a pas attendu le verrou de l'import : il ne touche
+        // plus au journal.
+        ->and($duree)->toBeLessThan(2.5)
         // L'empreinte effacée est partie…
         ->and(DB::table('fusions_empreintes')->where('fusion_id', $fusion)->where('chemin', 'champs.email_generic')->exists())->toBeFalse()
         // … et le lien posé en même temps est toujours au journal.

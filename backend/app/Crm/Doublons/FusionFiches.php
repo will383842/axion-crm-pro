@@ -387,7 +387,7 @@ final class FusionFiches
                 array_merge(array_values($valeurs), [$ws, $gardeId]),
             );
             foreach ($this->empreintesColonnes('companies', $ws, $gardeId, array_keys($valeurs)) as $col => $empreinte) {
-                $champs[$col] = ['avant' => $avants[$col], 'empreinte' => $empreinte];
+                $champs[$col] = ['avant' => $avants[$col] ?? null, 'empreinte' => $empreinte];
             }
         }
 

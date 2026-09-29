@@ -39,6 +39,7 @@ import {
   GraduationCap,
   CalendarDays,
   Landmark,
+  CopyCheck,
 } from 'lucide-react';
 import { cn, Tooltip } from '@/components/ui';
 import { WorkspaceSelector } from './WorkspaceSelector';
@@ -169,6 +170,8 @@ function sectionContacts(features: ConsoleFeatures): NavSection {
     { to: '/evenements', label: 'Événements', icon: <CalendarDays className="h-4 w-4" /> },
     // 2026-09-29 — fédérations, ordres, chambres, syndicats (chantier 3).
     { to: '/federations', label: 'Fédérations', icon: <Landmark className="h-4 w-4" /> },
+    // 2026-09-30 — chantier 5 : paires de fiches à fusionner ou à écarter.
+    { to: '/doublons', label: 'Doublons à vérifier', icon: <CopyCheck className="h-4 w-4" /> },
   );
 
   return { id: 'contacts', title: 'Contacts', items };

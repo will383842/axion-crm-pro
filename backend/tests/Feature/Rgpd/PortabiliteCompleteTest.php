@@ -869,12 +869,18 @@ test('B10-004 — COMPTE FIGE : la PII en texte libre et en JSONB echappe a l in
     // `abonnements.identifiants_externes`, toutes deux sur des tables
     // COUVERTES par l'export et l'effacement — le compte « hors de portée »
     // ci-dessous ne bouge donc pas.
+    // 42 -> 43 et 28 -> 29 le 2026-09-30 (chantier 5) : `fusions_fiches.journal`,
+    // le journal d'une fusion de fiches. Hors de portée PAR CONSTRUCTION : il ne
+    // porte que des identifiants de lignes, des noms de colonnes et l'EMPREINTE
+    // sha256 des valeurs recopiées — jamais une adresse ni un numéro, pour
+    // qu'aucune coordonnée n'y survive à un effacement
+    // (`FusionFiches` ; garde `DoublonsFusionTest` « aucune coordonnée »).
     expect($colonnes->count())->toBe(
-        42,
+        43,
         'le nombre de colonnes JSON/JSONB a changé : ré-arbitrer, puis mettre ce chiffre à jour',
     );
     expect(count($horsPortee))->toBe(
-        28,
+        29,
         'colonnes JSON/JSONB hors de portée des deux services RGPD : ' . implode(', ', $horsPortee),
     );
 });

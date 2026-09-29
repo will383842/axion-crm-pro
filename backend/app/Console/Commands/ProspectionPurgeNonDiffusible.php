@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Console\Concerns\RefuseUneSuppressionMassive;
+use App\Crm\Doublons\FusionFiches;
 use App\Crm\FichesProtegees;
 use Illuminate\Console\Command;
 use Illuminate\Database\Query\Builder;
@@ -91,6 +92,11 @@ class ProspectionPurgeNonDiffusible extends Command
     {
         $query = DB::table('companies')->whereRaw("position('[ND]' in denomination) > 0");
         FichesProtegees::exclure($query);
+        // Une fiche ABSORBÉE par une fusion reste à la corbeille, jamais
+        // supprimée en dur : sinon la fusion ne serait plus annulable (chantier
+        // 5 ; le déclencheur `companies_refuser_suppression_absorbee` ferait
+        // aussi échouer toute la purge).
+        $query->whereRaw(FusionFiches::conditionSql('companies.id'));
 
         return $query;
     }

@@ -94,6 +94,8 @@ test('correspondance sur des sous-classes réelles', function (string $naf, stri
     'autocars (autres transports routiers de voyageurs)' => ['49.39B', 'autocars'],
     'vente à domicile' => ['47.99A', 'vente-domicile'],
     'supports juridiques de programmes' => ['41.10D', 'promoteurs-marchands-biens'],
+    'EHPAD (hébergement médicalisé personnes âgées)' => ['87.10A', 'ehpad-hebergement-medicalise'],
+    'résidences autonomie (hébergement SOCIAL personnes âgées)' => ['87.30A', 'residences-autonomie'],
     'transport routier de fret' => ['49.41A', 'transport-routier'],
     'déménagement' => ['49.42Z', 'demenageurs'],
     'maçonnerie générale' => ['43.99C', 'maconnerie-gros-oeuvre'],
@@ -138,6 +140,7 @@ test('aucune invention : une sous-classe hors table n a PAS de métier, même si
     'autres travaux de finition' => ['43.39Z'],
     'autres commerces en magasin non spécialisé' => ['47.19B'],
     'autres activités auxiliaires de services financiers' => ['66.19B'],
+    'autres activités liées au sport' => ['93.19Z'],
 ]);
 
 test('seul un code rév. 2 bien formé a un métier ; la casse et les espaces sont tolérés', function () {

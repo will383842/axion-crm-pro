@@ -186,6 +186,7 @@ export const METIERS = [
   { code: "ambulances", libelle: "Ambulances" },
   { code: "hopitaux-cliniques", libelle: "Hôpitaux et cliniques" },
   { code: "ehpad-hebergement-medicalise", libelle: "EHPAD et hébergement médicalisé (âge, handicap)" },
+  { code: "residences-autonomie", libelle: "Résidences autonomie et hébergement social pour personnes âgées" },
   { code: "aide-a-domicile", libelle: "Aide à domicile" },
   { code: "creches", libelle: "Crèches et accueil de jeunes enfants" },
   { code: "veterinaires", libelle: "Vétérinaires" },

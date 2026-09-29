@@ -426,6 +426,8 @@ test('B15-008 : un menage massif est refuse sans --force ; avec, il part par paq
             $sequence[] = 'suppression';
         } elseif (str_starts_with($sql, 'select id from tags where id = any') && str_ends_with(rtrim($sql), 'for update')) {
             $sequence[] = 'verrouillage';
+        } elseif (str_starts_with($sql, 'lock table email_audiences in share mode')) {
+            $sequence[] = 'audiences';
         } elseif (str_contains($sql, 'lock_timeout')) {
             $sequence[] = 'delai';
         }
@@ -438,11 +440,13 @@ test('B15-008 : un menage massif est refuse sans --force ; avec, il part par paq
         // 1 200 orphelines → deux paquets, aucun au-delà de 1 000 identifiants.
         ->and($suppressions)->toBe([1000, 200]);
     // Chaque paquet dans SA transaction : un `lock_timeout`, PUIS le
-    // verrouillage `FOR UPDATE`, PUIS la suppression — trois instructions.
+    // verrouillage `FOR UPDATE`, PUIS le verrou SHARE des audiences (relues
+    // ensuite), PUIS la suppression.
     foreach ($sequence as $i => $evenement) {
         if ($evenement === 'suppression') {
-            expect($sequence[$i - 1] ?? null)->toBe('verrouillage')
-                ->and($sequence[$i - 2] ?? null)->toBe('delai');
+            expect($sequence[$i - 1] ?? null)->toBe('audiences')
+                ->and($sequence[$i - 2] ?? null)->toBe('verrouillage')
+                ->and($sequence[$i - 3] ?? null)->toBe('delai');
         }
     }
 
@@ -666,5 +670,139 @@ test('COURSE : un lien valide pendant l attente du verrou n est jamais emporte p
         $proprio->table('audit_logs')->where('workspace_id', $espace)->delete();
         $proprio->table('workspaces')->where('id', $espace)->delete();
         $proprio->disconnect();
+    }
+});
+
+/**
+ * SOUS LE RÔLE APPLICATIF (`pgsql_app`, RLS), comme en production dès que
+ * `CRM_DB_APP_ROLE_ENABLED=true` : un lien rangé dans l'espace B vers une
+ * étiquette de l'espace A est INVISIBLE à la commande qui travaille dans A.
+ * L'étiquette y paraît donc orpheline — la supprimer emporterait le lien par
+ * la cascade. Le contrôle des liens hors espace passe par une connexion qui
+ * voit tout ; si aucune ne voit tout, la suppression est refusée.
+ */
+function emEspacesSousRls(): array
+{
+    /** @var Connection $proprio */
+    $proprio = DB::connection('pgsql_owner');
+    $ids = [];
+    foreach (['a', 'b'] as $suffixe) {
+        $id = (string) Str::uuid();
+        $proprio->table('workspaces')->insert([
+            'id' => $id, 'slug' => 'zz-em-rls-' . $suffixe . '-' . substr($id, 0, 8), 'name' => 'ZZ RLS',
+            'settings' => '{}', 'cost_cap_eur' => 100, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $ids[$suffixe] = $id;
+    }
+    $fiche = (int) $proprio->table('companies')->insertGetId([
+        'workspace_id' => $ids['a'], 'siren' => '9' . random_int(10000000, 99999999),
+        'denomination' => 'ZZ RLS', 'naf' => '96.02A', 'discovery_source' => 'insee',
+        'signals' => '{}', 'metadata' => '{}', 'quality_score' => 0,
+        'relation_type' => 'prospect', 'lifecycle_stage' => 'nouveau',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $tag = static fn (string $slug): int => (int) $proprio->table('tags')->insertGetId([
+        'workspace_id' => $ids['a'], 'slug' => $slug, 'name' => $slug,
+        'category' => 'geo', 'kind' => 'auto', 'rules' => '[]', 'is_locked' => false,
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $orpheline = $tag('dept-zz-orpheline');
+    $liee = $tag('dept-zz-liee-ailleurs');
+    // Le lien porte l'espace B : sous la RLS, l'espace A ne le voit pas.
+    $proprio->table('company_tag')->insert([
+        'company_id' => $fiche, 'tag_id' => $liee, 'workspace_id' => $ids['b'],
+        'assigned_at' => now(), 'assigned_by' => 'user',
+    ]);
+
+    return [
+        'a' => $ids['a'], 'b' => $ids['b'], 'slug' => (string) $proprio->table('workspaces')->where('id', $ids['a'])->value('slug'),
+        'fiche' => $fiche, 'orpheline' => $orpheline, 'liee' => $liee,
+    ];
+}
+
+function emNettoyerSousRls(array $e): void
+{
+    $proprio = DB::connection('pgsql_owner');
+    $proprio->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
+    foreach ([$e['a'], $e['b']] as $id) {
+        $proprio->table('company_tag')->where('workspace_id', $id)->delete();
+    }
+    $proprio->table('companies')->where('workspace_id', $e['a'])->delete();
+    foreach ([$e['a'], $e['b']] as $id) {
+        $proprio->table('tags')->where('workspace_id', $id)->delete();
+        // Lignes de journal VALIDÉES par ce test : elles casseraient la chaîne
+        // vérifiée par d'autres tests.
+        $proprio->table('audit_logs')->where('workspace_id', $id)->delete();
+    }
+    $proprio->table('workspaces')->whereIn('id', [$e['a'], $e['b']])->delete();
+    DB::connection('pgsql_app')->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
+    DB::connection('pgsql_app')->disconnect();
+    $proprio->disconnect();
+}
+
+test('SOUS RLS (pgsql_app) : le lien range dans un autre espace est VU, et la suppression refusee ; sans lui, elle part', function () {
+    $e = emEspacesSousRls();
+    $proprio = DB::connection('pgsql_owner');
+    $precedente = DB::getDefaultConnection();
+    try {
+        DB::setDefaultConnection('pgsql_app');
+        $role = DB::selectOne('SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user');
+        expect($role->rolsuper)->toBeFalse()->and($role->rolbypassrls)->toBeFalse();
+
+        $code = Artisan::call('crm:referentiels:reclasser', ['--workspace' => $e['slug'], '--supprimer-etiquettes-orphelines' => true]);
+        $sortie = Artisan::output();
+        DB::setDefaultConnection($precedente);
+
+        expect($code)->toBe(1)
+            ->and($sortie)->toContain('REFUS du ménage')
+            // TÉMOIN : sous la RLS, l'étiquette liée ailleurs PARAÎT orpheline.
+            ->and(emCompteur($sortie, 'etiquettes_orphelines_a_supprimer'))->toBe(2)
+            ->and(emCompteur($sortie, 'liens_etiquette_hors_espace'))->toBe(1)
+            ->and($proprio->table('tags')->where('id', $e['liee'])->exists())->toBeTrue()
+            ->and($proprio->table('company_tag')->where('tag_id', $e['liee'])->exists())->toBeTrue()
+            ->and($proprio->table('tags')->where('id', $e['orpheline'])->exists())->toBeTrue();
+
+        // Témoin : sans le lien fautif, la même commande, sous le même rôle,
+        // supprime bien les orphelines (le refus venait du lien, pas du rôle).
+        $proprio->table('company_tag')->where('workspace_id', $e['b'])->delete();
+        DB::setDefaultConnection('pgsql_app');
+        $code = Artisan::call('crm:referentiels:reclasser', ['--workspace' => $e['slug'], '--supprimer-etiquettes-orphelines' => true]);
+        DB::setDefaultConnection($precedente);
+
+        expect($code)->toBe(0)
+            ->and($proprio->table('tags')->where('id', $e['orpheline'])->exists())->toBeFalse();
+    } finally {
+        DB::setDefaultConnection($precedente);
+        emNettoyerSousRls($e);
+    }
+});
+
+test('SOUS RLS, si AUCUNE connexion ne voit tous les espaces, la suppression est refusee', function () {
+    $e = emEspacesSousRls();
+    $proprio = DB::connection('pgsql_owner');
+    $precedente = DB::getDefaultConnection();
+    $owner = config('database.connections.pgsql_owner');
+    try {
+        // `pgsql_owner` pointée, pour ce test, sur le rôle applicatif : plus
+        // aucune connexion ne voit tout.
+        config(['database.connections.pgsql_owner' => config('database.connections.pgsql_app')]);
+        DB::purge('pgsql_owner');
+        DB::setDefaultConnection('pgsql_app');
+        $code = Artisan::call('crm:referentiels:reclasser', ['--workspace' => $e['slug'], '--supprimer-etiquettes-orphelines' => true]);
+        $sortie = Artisan::output();
+        DB::setDefaultConnection($precedente);
+        config(['database.connections.pgsql_owner' => $owner]);
+        DB::purge('pgsql_owner');
+
+        expect($code)->toBe(1)
+            ->and($sortie)->toContain('aucune connexion ne voit TOUS les espaces')
+            ->and(DB::connection('pgsql_owner')->table('tags')->where('id', $e['orpheline'])->exists())->toBeTrue()
+            ->and(DB::connection('pgsql_owner')->table('tags')->where('id', $e['liee'])->exists())->toBeTrue();
+    } finally {
+        DB::setDefaultConnection($precedente);
+        config(['database.connections.pgsql_owner' => $owner]);
+        DB::purge('pgsql_owner');
+        emNettoyerSousRls($e);
     }
 });

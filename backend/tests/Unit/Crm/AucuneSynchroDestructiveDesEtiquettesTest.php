@@ -18,17 +18,25 @@
  *      intermédiaire `$rel->sync()`, `detach()`, `detach(null)`,
  *      `detach($x->pluck('id'))`. AUCUN n'est permis dans `app/` ;
  *   2. toute instruction qui part de `table('company_tag'|'candidate_tag'|'tags')`
- *      et contient `->delete(`, `->forceDelete(` ou `->truncate(`, quelles que
- *      soient les fermetures (closures) qu'elle traverse ;
+ *      — alias compris (`table('company_tag as ct')`) — et contient
+ *      `->delete(`, `->forceDelete(` ou `->truncate(`, quelles que soient les
+ *      fermetures (closures) qu'elle traverse ; et `->tags()…->delete(` (la
+ *      relation, qui supprime les ÉTIQUETTES elles-mêmes) ;
  *   3. tout texte `DELETE FROM company_tag|candidate_tag|tags` (SQL brut) ;
  *   4. `Tag::…->delete(`, `Tag::destroy(`, `$tag->delete(`.
  * Les cas 2 à 4 ne sont permis QUE dans les fichiers et au nombre exact de
  * la liste `SD_PERMIS` : un ajout, ou un retrait non reporté, la fait rougir.
  *
- * Elle NE voit PAS : une requête rangée dans une variable puis supprimée plus
- * loin (`$q = DB::table('tags'); … $q->delete();`), un nom de table construit
- * dynamiquement, un `DB::statement()` dont le SQL est assemblé ailleurs. Ces
- * formes restent à la relecture humaine.
+ * Elle NE voit PAS — et ne peut pas voir sans connaître les TYPES :
+ *   - `->delete()` sur une instance de `Tag` rangée dans une variable d'un
+ *     autre nom que `$tag` (`$t = Tag::find($id); $t->delete();`,
+ *     `$etiquette->delete()`) : textuellement, rien ne distingue cet appel du
+ *     `->delete()` de n'importe quel autre modèle ;
+ *   - une requête rangée dans une variable puis supprimée plus loin
+ *     (`$q = DB::table('tags'); … $q->delete();`) ;
+ *   - un nom de table construit dynamiquement, un `DB::statement()` dont le
+ *     SQL est assemblé ailleurs.
+ * Ces formes restent à la relecture humaine.
  */
 const SD_TABLES = ['company_tag', 'candidate_tag', 'tags'];
 
@@ -113,9 +121,18 @@ function sdGestes(string $source): array
             $nom = $parenthese >= 0 ? $significatif($parenthese, 1) : -1;
             if ($parenthese >= 0 && $texte($parenthese) === '(' && $nom >= 0 && is_array($jetons[$nom])
                 && $jetons[$nom][0] === T_CONSTANT_ENCAPSED_STRING
-                && in_array(trim($jetons[$nom][1], '\'"'), SD_TABLES, true)
+                && in_array(strtolower((string) preg_replace('/\s+as\s+.*$/is', '', trim($jetons[$nom][1], '\'" '))), SD_TABLES, true)
                 && preg_match('/->\s*(delete|forceDelete|truncate)\s*\(/i', $instruction($i)) === 1) {
                 $gestes[] = 'requete';
+            }
+        }
+
+        // 2 bis. La relation : `->tags()` … `->delete(` supprime les étiquettes elles-mêmes.
+        if ($type === T_STRING && strtolower($valeur) === 'tags') {
+            $avant = $significatif($i, -1);
+            if ($avant >= 0 && is_array($jetons[$avant]) && in_array($jetons[$avant][0], [T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR], true)
+                && preg_match('/^tags\s*\(\s*\).*->\s*(delete|forceDelete)\s*\(/is', $instruction($i)) === 1) {
+                $gestes[] = 'relation';
             }
         }
 
@@ -175,6 +192,10 @@ test('la sonde reconnaît chaque contournement (témoins)', function (string $co
     'requête avec fermeture' => ["DB::table('company_tag')->where(function (\$q) { \$q->where('a', 1); })->delete();", ['requete']],
     'requête candidate_tag' => ["DB::table('candidate_tag')->whereIn('tag_id', \$ids)->delete();", ['requete']],
     'requête tags truncate' => ["DB::table('tags')->truncate();", ['requete']],
+    'requête avec alias' => ["DB::table('company_tag as ct')->where('ct.tag_id', 1)->delete();", ['requete']],
+    'requête avec alias en majuscules' => ["DB::table('tags AS t')->whereIn('t.id', \$ids)->delete();", ['requete']],
+    'relation tags()->delete()' => ['$x->tags()->delete();', ['relation']],
+    'relation tags()->where()->delete()' => ["\$company->tags()->where('kind', 'auto')->delete();", ['relation']],
     'SQL brut' => ["DB::statement('DELETE FROM tags WHERE id = 1');", ['sql']],
     'SQL brut public' => ['DB::delete("delete from public.company_tag where x");', ['sql']],
     'Tag:: delete' => ["Tag::where('slug', 'x')->delete();", ['modele']],
@@ -183,6 +204,7 @@ test('la sonde reconnaît chaque contournement (témoins)', function (string $co
     // Permis : ajouter sans retirer, lire, supprimer dans une autre table.
     'syncWithoutDetaching' => ['$c->tags()->syncWithoutDetaching($ids);', []],
     'lecture' => ["DB::table('tags')->where('slug', 'x')->first();", []],
+    'lecture de la relation' => ['$company->tags()->pluck("slug");', []],
     'autre table' => ["DB::table('scraper_runs')->whereIn('id', \$ids)->delete();", []],
 ]);
 

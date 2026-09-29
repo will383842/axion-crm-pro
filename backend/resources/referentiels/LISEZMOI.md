@@ -12,8 +12,8 @@ reclassement de masse, écrans). Aucune autre liste de secteurs ne doit exister 
 | `naf_rev1_groupes.csv` | repli par groupe rév. 1 (`NN.N`) pour les codes absents de la table officielle | 224 |
 | `naf_rev1_divisions.csv` | dernier repli par division rév. 1 (`NN`) | 62 |
 | `nap600_secteurs.csv` | les 650 postes de la NAP 600 (1973, format `NN.NN` sans lettre) → secteur | 650 |
-| `metiers.csv` | les 90 métiers (clé, libellé), dans l'ordre de l'écran — chantier 2 | 90 |
-| `naf_rev2_metiers.csv` | 270 sous-classes de la NAF rév. 2 → métier (les autres n'en ont pas) — chantier 2 | 270 |
+| `metiers.csv` | les 91 métiers (clé, libellé), dans l'ordre de l'écran — chantier 2 | 91 |
+| `naf_rev2_metiers.csv` | 269 sous-classes de la NAF rév. 2 → métier (les autres n'en ont pas) — chantier 2 | 269 |
 
 ## Sources officielles (INSEE)
 
@@ -90,8 +90,17 @@ même synchro que `sector-`, `size-`, `region-` (`EtiquettesClassement`), lue pa
 - **Les « autres … » et « n.c.a. »** n'ont un métier que si leur intitulé INSEE nomme le métier
   (81.29B « autres activités de nettoyage », 62.09Z « autres activités informatiques »…).
   Sinon aucun : 74.90B, 82.99Z, 96.09Z, 94.99Z, 88.99B, 43.29B, 43.39Z, 43.99D, 56.29B, 85.59B,
-  85.60Z, 47.19B, 47.99B, 55.90Z, 33.19Z, 66.19B. Une exception assumée : « Autres praticiens de
+  85.60Z, 47.19B, 47.99B, 55.90Z, 33.19Z, 66.19B, et 93.19Z (« autres activités liées au sport » :
+  organisateurs d'épreuves, guides, promoteurs — pas des salles ni des clubs). Une exception assumée : « Autres praticiens de
   santé » (86.90F, « santé humaine non classée ailleurs »), regroupement que son libellé annonce.
+- **Hébergement des personnes âgées** : 87.10A-C (hébergement MÉDICALISÉ : EHPAD, handicap) et
+  87.30A (hébergement SOCIAL : résidences autonomie, ex-foyers-logements) sont deux métiers
+  distincts — l'INSEE les sépare, le libellé « médicalisé » ne vaut que pour le premier.
+- **VTC** : un chauffeur VTC s'immatricule en principe en 49.32Z (« transports de voyageurs par
+  taxis »), rangée en « Taxis et VTC ». Une partie des VTC est pourtant immatriculée en 49.39B
+  (« autres transports routiers de voyageurs »), sous-classe surtout faite d'autocaristes, rangée
+  en « Autocaristes et transport routier de voyageurs ». Ces VTC-là portent donc ce second métier :
+  la NAF ne permet pas de les distinguer, et une audience « VTC » exhaustive vise les deux métiers.
 - **Limites de la NAF, écrites dans les libellés** : la NAF ne distingue pas les avocats des
   notaires (69.10Z), ni les carrossiers des garagistes (45.20A), ni les agences web des ESN
   (62.01Z) : ces métiers sont donc regroupés, et le libellé le dit.

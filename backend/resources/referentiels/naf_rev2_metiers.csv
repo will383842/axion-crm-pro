@@ -252,7 +252,7 @@ naf_rev2,metier,libelle
 87.10A,ehpad-hebergement-medicalise,Hébergement médicalisé pour personnes âgées
 87.10B,ehpad-hebergement-medicalise,Hébergement médicalisé pour enfants handicapés
 87.10C,ehpad-hebergement-medicalise,Hébergement médicalisé pour adultes handicapés et autre hébergement médicalisé
-87.30A,ehpad-hebergement-medicalise,Hébergement social pour personnes âgées
+87.30A,residences-autonomie,Hébergement social pour personnes âgées
 88.10A,aide-a-domicile,Aide à domicile
 88.91A,creches,Accueil de jeunes enfants
 90.01Z,arts-spectacle,Arts du spectacle vivant
@@ -263,7 +263,6 @@ naf_rev2,metier,libelle
 93.11Z,salles-sport-clubs,Gestion d'installations sportives
 93.12Z,salles-sport-clubs,Activités de clubs de sports
 93.13Z,salles-sport-clubs,Activités des centres de culture physique
-93.19Z,salles-sport-clubs,Autres activités liées au sport
 95.25Z,bijouteries,Réparation d'articles d'horlogerie et de bijouterie
 96.02A,coiffeurs,Coiffure
 96.02B,esthetique,Soins de beauté

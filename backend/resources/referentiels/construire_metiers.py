@@ -10,9 +10,9 @@
 #
 # Les sous-classes « autres … » / « n.c.a. » (non classées ailleurs) n'ont un métier QUE si leur
 # intitulé INSEE nomme réellement le métier (ex. 81.29B « Autres activités de NETTOYAGE n.c.a. »,
-# 62.09Z « Autres activités INFORMATIQUES », 93.19Z « Autres activités liées au SPORT »). Sinon,
+# 62.09Z « Autres activités INFORMATIQUES »). Sinon,
 # aucun métier : 74.90B, 82.99Z, 96.09Z, 94.99Z, 88.99B, 43.29B, 43.39Z, 43.99D, 56.29B, 85.59B,
-# 85.60Z, 47.19B, 47.99B, 55.90Z, 33.19Z, 66.19B (revue du 2026-09-29). Le métier « Autres
+# 85.60Z, 47.19B, 47.99B, 55.90Z, 33.19Z, 66.19B, 93.19Z (revues du 2026-09-29). Le métier « Autres
 # praticiens de santé » (86.90F) est gardé : son intitulé dit « santé humaine », et le libellé du
 # métier annonce honnêtement que c'est un regroupement.
 #
@@ -39,7 +39,8 @@ METIERS = [
     ("laboratoires-analyses", "Laboratoires d'analyses médicales", ["86.90B"]),
     ("ambulances", "Ambulances", ["86.90A"]),
     ("hopitaux-cliniques", "Hôpitaux et cliniques", ["86.10Z"]),
-    ("ehpad-hebergement-medicalise", "EHPAD et hébergement médicalisé (âge, handicap)", ["87.10A", "87.10B", "87.10C", "87.30A"]),
+    ("ehpad-hebergement-medicalise", "EHPAD et hébergement médicalisé (âge, handicap)", ["87.10A", "87.10B", "87.10C"]),
+    ("residences-autonomie", "Résidences autonomie et hébergement social pour personnes âgées", ["87.30A"]),
     ("aide-a-domicile", "Aide à domicile", ["88.10A"]),
     ("creches", "Crèches et accueil de jeunes enfants", ["88.91A"]),
     ("veterinaires", "Vétérinaires", ["75.00Z"]),
@@ -116,7 +117,7 @@ METIERS = [
     ("vente-distance", "Vente à distance et e-commerce", ["47.91A", "47.91B"]),
     ("vente-domicile", "Vente à domicile", ["47.99A"]),
     ("pompes-funebres", "Pompes funèbres", ["96.03Z"]),
-    ("salles-sport-clubs", "Salles de sport et clubs sportifs", ["93.11Z", "93.12Z", "93.13Z", "93.19Z"]),
+    ("salles-sport-clubs", "Salles de sport et clubs sportifs", ["93.11Z", "93.12Z", "93.13Z"]),
     # ── Culture, médias, impression ──────────────────────────────────────────
     ("arts-spectacle", "Arts du spectacle et création artistique", ["90.01Z", "90.02Z", "90.03A", "90.03B", "90.04Z"]),
     ("production-audiovisuelle", "Production audiovisuelle et musicale", ["59.11A", "59.11B", "59.11C", "59.12Z", "59.20Z"]),

@@ -56,16 +56,23 @@ use Throwable;
  *   - le MÉNAGE est COMPTÉ, jamais exécuté par défaut (ordre de Will du
  *     2026-09-29 : « strictement interdit de purger quoi que ce soit »). Il ne
  *     s'exécute que sur `--supprimer-etiquettes-orphelines`, sous la garde
- *     B15-008 (plafond de proportion, `--force`), et vise :
- *       · les étiquettes `sector-`/`size-`/`metier-` qui ne correspondent plus
- *         au référentiel, dès qu'aucune fiche ne les porte ;
- *       · les étiquettes ORPHELINES : automatiques ou IA, non verrouillées,
- *         sans namespace (jamais une `src:`, jamais une gouvernée), sans règle,
- *         qu'AUCUNE fiche ni AUCUN candidat ne porte, et qu'aucune audience
- *         enregistrée (corbeille comprise) ne cite. La liste est arrêtée AVANT
- *         les lots : l'essai à blanc chiffre ce que l'exécution visera.
- *     Au moment de supprimer, TOUT est relu sous verrou, et chaque paquet
- *     supprimé est écrit, étiquette par étiquette, dans la chaîne d'audit.
+ *     B15-008 (plafond de proportion, `--force`). Une étiquette n'est
+ *     supprimable que si elle remplit TOUTE la condition `CONDITIONS_ORPHELINE`
+ *     (écrite une seule fois, relue à l'identique au comptage, au verrouillage
+ *     et au `DELETE`) :
+ *       · de l'espace visé ; `kind` `auto` ou `llm` ; non verrouillée ;
+ *       · SANS namespace (jamais une `src:`, jamais une gouvernée) ;
+ *       · sans règle (`rules` vide ou NULL) ;
+ *       · hors référentiel du classement (`sector-btp`, `metier-coiffeurs`…
+ *         inemployées restent) ;
+ *       · citée par AUCUNE audience de l'espace (corbeille comprise) ;
+ *       · portée par AUCUNE fiche et AUCUN candidat.
+ *     Deux ensembles la remplissent : les OBSOLÈTES (`sector-`/`size-`/
+ *     `metier-` hors référentiel, `kind = auto`, dont les lots viennent de
+ *     retirer les derniers liens) et les ORPHELINES (arrêtées AVANT les lots,
+ *     pour que l'essai à blanc chiffre ce que l'exécution visera). Chaque
+ *     paquet supprimé est écrit, étiquette par étiquette, dans la chaîne
+ *     d'audit.
  *
  * ── CE QUI REND LA COMMANDE SÛRE SUR 4,3 M DE FICHES ──────────────────────
  *
@@ -182,15 +189,21 @@ class CrmReferentielsReclasser extends Command
      * le verrouillage et le `DELETE` les relisent à l'identique. Sans alias :
      * `tags` est nommée en toutes lettres dans les sous-requêtes.
      */
-    private const CONDITIONS_ORPHELINE = "tags.workspace_id = ?::uuid
+    private const CONDITIONS_SAUF_LIENS_FICHES = "tags.workspace_id = ?::uuid
         AND tags.kind IN ('auto', 'llm')
         AND tags.is_locked = false
         AND tags.namespace IS NULL
         AND (tags.rules IS NULL OR tags.rules IN ('[]'::jsonb, '{}'::jsonb))
         AND tags.slug <> ALL(?::text[])
         AND tags.slug <> ALL(?::text[])
-        AND NOT EXISTS (SELECT 1 FROM company_tag WHERE company_tag.tag_id = tags.id)
         AND NOT EXISTS (SELECT 1 FROM candidate_tag WHERE candidate_tag.tag_id = tags.id)";
+
+    private const CONDITIONS_ORPHELINE = self::CONDITIONS_SAUF_LIENS_FICHES . '
+        AND NOT EXISTS (SELECT 1 FROM company_tag WHERE company_tag.tag_id = tags.id)';
+
+    /** Les familles de classement dont une valeur peut devenir obsolète. */
+    private const CONDITION_OBSOLETE = "tags.kind = 'auto'
+        AND (tags.slug LIKE 'sector-%' OR tags.slug LIKE 'size-%' OR tags.slug LIKE 'metier-%')";
 
     /** @var array<string, array<string, array<int|string, int>>> dimension => [avant|apres => [valeur => n]] */
     private array $repartitions = [];
@@ -1006,32 +1019,20 @@ class CrmReferentielsReclasser extends Command
      */
     private function menageEtiquettes(string $workspaceId, bool $dryRun): void
     {
-        $candidates = DB::table('tags')
-            ->where('workspace_id', $workspaceId)
-            ->where('kind', 'auto')
-            ->where('is_locked', false)
-            ->where(function (QueryBuilder $q): void {
-                $q->where('slug', 'like', 'sector-%')
-                    ->orWhere('slug', 'like', 'size-%')
-                    ->orWhere('slug', 'like', EtiquettesClassement::PREFIXE_METIER . '%');
-            })
-            ->whereNotIn('slug', self::slugsValides());
-
-        if ($dryRun) {
-            $inemployees = (clone $candidates)->whereNotExists(function (QueryBuilder $sub): void {
-                $sub->selectRaw('1')->from('company_tag as ct')->whereColumn('ct.tag_id', 'tags.id')
-                    ->where(function (QueryBuilder $q): void {
-                        $q->where('ct.assigned_by', 'user')
-                            ->orWhereRaw('NOT (' . $this->horsProtegees('ct.company_id') . ')');
-                    });
-            });
-        } else {
-            $inemployees = (clone $candidates)->whereNotExists(function (QueryBuilder $sub): void {
-                $sub->selectRaw('1')->from('company_tag')->whereColumn('company_tag.tag_id', 'tags.id');
-            });
-        }
-
-        $obsoletes = array_values(array_map(static fn (mixed $id): int => (int) $id, $inemployees->pluck('tags.id')->all()));
+        // La condition de l'exécution (`CONDITIONS_ORPHELINE`), restreinte aux
+        // familles de classement. À blanc, les liens ne sont pas encore
+        // retirés : on compte ceux qui RESTERONT après les lots — posés par un
+        // utilisateur, ou sur une fiche protégée (hors `--inclure-protegees`).
+        $liens = $dryRun
+            ? " AND NOT EXISTS (SELECT 1 FROM company_tag WHERE company_tag.tag_id = tags.id
+                 AND (company_tag.assigned_by = 'user' OR NOT (" . $this->horsProtegees('company_tag.company_id') . ')))'
+            : ' AND NOT EXISTS (SELECT 1 FROM company_tag WHERE company_tag.tag_id = tags.id)';
+        $lignes = DB::select(
+            'SELECT id FROM tags WHERE ' . self::CONDITIONS_SAUF_LIENS_FICHES . $liens
+            . ' AND ' . self::CONDITION_OBSOLETE . ' ORDER BY id',
+            $this->liaisonsOrpheline($workspaceId),
+        );
+        $obsoletes = array_values(array_map(static fn (stdClass $l): int => (int) $l->id, $lignes));
         $orphelines = array_values(array_diff($this->orphelines, $obsoletes));
         $this->compteurs['etiquettes_obsoletes_a_supprimer'] = count($obsoletes);
         $this->compteurs['etiquettes_orphelines_a_supprimer'] = count($orphelines);
@@ -1051,6 +1052,12 @@ class CrmReferentielsReclasser extends Command
         // étiquette serait invisible aux relectures filtrées par espace — il
         // partirait sans avoir été vu. Un seul suffit à tout arrêter.
         $horsEspace = $this->liensHorsEspace();
+        if ($horsEspace === null) {
+            $this->refusMenage = 'REFUS du ménage : aucune connexion ne voit TOUS les espaces (ni la connexion par défaut, ni pgsql_owner, '
+                . 'super-utilisateur ou BYPASSRLS) — les liens rangés dans un autre espace ne peuvent pas être contrôlés. Aucune étiquette supprimée.';
+
+            return;
+        }
         $this->compteurs['liens_etiquette_hors_espace'] = $horsEspace;
         if ($horsEspace > 0) {
             $this->refusMenage = "REFUS du ménage : {$horsEspace} lien(s) fiche/candidat ↔ étiquette rangé(s) dans un autre espace que leur étiquette. Aucune étiquette supprimée.";
@@ -1077,21 +1084,41 @@ class CrmReferentielsReclasser extends Command
 
     /**
      * Les liens `company_tag`/`candidate_tag` dont l'espace diffère de celui
-     * de leur étiquette. Sous le rôle applicatif, la RLS ne montre que l'espace
-     * du contexte : le contrôle n'est EXHAUSTIF que lancé par le propriétaire
-     * de la base (c'est le cas des commandes de maintenance en production).
+     * de leur étiquette — ou null si on ne peut PAS le savoir.
+     *
+     * Ce contrôle n'a de sens que s'il voit TOUS les espaces : sous la RLS, un
+     * lien rangé ailleurs est justement invisible. Or, en production, la
+     * connexion par défaut est le rôle applicatif soumis à la RLS dès que
+     * `CRM_DB_APP_ROLE_ENABLED=true` (`config/database.php`). Le contrôle
+     * passe donc par la PREMIÈRE connexion dont le rôle voit tout
+     * (super-utilisateur ou `BYPASSRLS`) : la connexion par défaut, sinon
+     * `pgsql_owner`. Si aucune ne voit tout (ou si `pgsql_owner` est
+     * injoignable), il rend null, et la suppression est REFUSÉE.
      */
-    private function liensHorsEspace(): int
+    private function liensHorsEspace(): ?int
     {
-        $n = 0;
-        foreach (['company_tag', 'candidate_tag'] as $pivot) {
-            $n += (int) (DB::selectOne(
-                "SELECT count(*) AS n FROM {$pivot} JOIN tags ON tags.id = {$pivot}.tag_id
-                 WHERE {$pivot}.workspace_id <> tags.workspace_id",
-            )->n ?? 0);
+        foreach ([null, 'pgsql_owner'] as $nom) {
+            try {
+                $connexion = DB::connection($nom);
+                $role = $connexion->selectOne('SELECT (rolsuper OR rolbypassrls) AS voit_tout FROM pg_roles WHERE rolname = current_user');
+                if (! (bool) ($role->voit_tout ?? false)) {
+                    continue;
+                }
+                $n = 0;
+                foreach (['company_tag', 'candidate_tag'] as $pivot) {
+                    $n += (int) ($connexion->selectOne(
+                        "SELECT count(*) AS n FROM {$pivot} JOIN tags ON tags.id = {$pivot}.tag_id
+                         WHERE {$pivot}.workspace_id <> tags.workspace_id",
+                    )->n ?? 0);
+                }
+
+                return $n;
+            } catch (Throwable) {
+                continue;
+            }
         }
 
-        return $n;
+        return null;
     }
 
     /**
@@ -1200,16 +1227,19 @@ class CrmReferentielsReclasser extends Command
      *  1. `lock_timeout` de 5 s ;
      *  2. `SELECT … FOR UPDATE` : verrouille les étiquettes candidates qui
      *     remplissent encore TOUTES les conditions (kind, namespace, règle,
-     *     verrou, liens, référentiel, audiences relues à l'instant). Tant que
+     *     verrou, liens, référentiel, audiences). Tant que
      *     ce verrou est tenu, personne ne peut leur poser un lien (la clé
      *     étrangère de `company_tag`/`candidate_tag` attend le verrou) ;
-     *  3. `DELETE … RETURNING` dans une INSTRUCTION SÉPARÉE, sur la liste
+     *  3. `LOCK TABLE email_audiences IN SHARE MODE`, puis les audiences
+     *     RELUES : aucune ne peut plus apparaître ni changer avant la fin du
+     *     paquet ;
+     *  4. `DELETE … RETURNING` dans une INSTRUCTION SÉPARÉE, sur la liste
      *     verrouillée et avec les mêmes conditions : en READ COMMITTED, elle
      *     prend une photo NEUVE, postérieure au verrou, et voit donc tout lien
      *     validé pendant l'attente. (Dans une seule instruction, le
      *     `NOT EXISTS` serait évalué sur la photo d'AVANT l'attente, et la
      *     cascade `ON DELETE CASCADE` emporterait un lien posé entre-temps.)
-     *  4. une entrée de la chaîne d'audit, DANS la transaction : id, slug, nom,
+     *  5. une entrée de la chaîne d'audit, DANS la transaction : id, slug, nom,
      *     catégorie, kind, espace (et couleur, description, règle, date de
      *     création) de chaque étiquette supprimée — de quoi la recréer à
      *     l'identique. Un audit qui échoue annule le paquet.
@@ -1232,6 +1262,14 @@ class CrmReferentielsReclasser extends Command
                     return 0;
                 }
                 $liste = '{' . implode(',', array_map(static fn (stdClass $l): int => (int) $l->id, $verrouillees)) . '}';
+
+                // Les audiences : table verrouillée en SHARE jusqu'à la fin du
+                // paquet (personne ne peut en créer ni en modifier), PUIS
+                // relues par `liaisonsOrpheline()` ci-dessous. Aucune fenêtre :
+                // une audience validée avant le verrou est lue ; une audience
+                // écrite après attend la fin du paquet (quelques
+                // millisecondes, `lock_timeout` de 5 s).
+                DB::statement('LOCK TABLE email_audiences IN SHARE MODE');
 
                 $supprimees = DB::select(
                     'DELETE FROM tags WHERE id = ANY(?::bigint[]) AND ' . self::CONDITIONS_ORPHELINE . '

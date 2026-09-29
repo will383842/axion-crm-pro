@@ -237,11 +237,18 @@ final class VerificationEmail
      *    (`EligibiliteCampagne::peutRecevoir`). On consulte la liste plutôt
      *    que d'effacer une marque dans `crm:campagne:retours` : elle vaut
      *    dans n'importe quel ordre, quel que soit le chemin qui l'a remplie.
-     *    Limites assumées : un `invalid` réécrit par un outil qui n'inscrit
-     *    rien en liste (un fournisseur de vérification) reste indiscernable ;
-     *    et une plainte arrivée APRÈS un rebond dur remplace sa raison
-     *    (`ListeSuppression::raisonLaPlusGrave`) — la réversion redevient
-     *    alors possible, l'envoi restant interdit par la plainte ;
+     *    Limites assumées :
+     *      · un `invalid` réécrit par un outil qui n'inscrit rien en liste (un
+     *        fournisseur de vérification) reste indiscernable ;
+     *      · une adresse qui a rebondi ET fait l'objet d'une plainte, DANS LES
+     *        DEUX ORDRES, porte la raison `complaint` : la liste ne garde
+     *        qu'une ligne par adresse et `raisonLaPlusGrave` fait passer la
+     *        plainte devant le rebond — plainte puis rebond dur comme rebond
+     *        dur puis plainte. La réversion vers `valid` a alors lieu ; l'envoi
+     *        reste interdit par la plainte. Retenir aussi sur `complaint`
+     *        contredirait la règle (une plainte SEULE n'écrit pas
+     *        `email_status`, elle ne doit rien retenir) : les deux cas sont
+     *        indiscernables dans la liste telle qu'elle est ;
      *  - `catchall` et `role`, dégradés pendant une panne, reviennent tels
      *    quels — jamais `valid` à leur place ;
      *  - un statut vide ou `unknown` devient `valid` (posé par nous).

@@ -705,3 +705,34 @@ test('un lot qui n a rien a ecrire n ouvre ni transaction ni entree d audit', fu
         ->and(DB::table('audit_logs')->where('event_type', 'VERIFICATION_EMAILS_FIN')->count())->toBe($fins + 2)
         ->and($refait['sortie'])->toContain('Verrous tenus au plus en fin de lot : 0 (dont 0');
 });
+
+test('4e relecture — un statut NULL sur une adresse en rebond dur est ecrit, pas ecarte a chaque passage', function () {
+    // Une personne SANS statut, dont l'adresse est en rebond dur dans la liste
+    // (inscrite par un autre chemin, qui n'a pas touché cette fiche).
+    $nul = vemContact($this, $this->b, 'ZZ Statut Nul', 'nul@zz-recoit.example');
+    expect(DB::table('contacts')->where('id', $nul)->value('email_status'))->toBeNull();
+    ListeSuppression::inscrire('nul@zz-recoit.example', ListeSuppression::REBOND_DUR, 'zz-test', 'business');
+
+    $r = vemVerifier(['--source' => 'contacts']);
+
+    // Écrite (et comptée écrite), pas écartée comme « modifiée entre-temps » ;
+    // l'envoi, lui, reste interdit par la liste.
+    expect(vemCompteur($r['sortie'], 'modifiees_entre_temps'))->toBe(0)
+        ->and(DB::table('contacts')->where('id', $nul)->value('email_status'))->toBe('valid')
+        ->and(vemMeta($nul)['email_verification']['statut'])->toBe('valide')
+        ->and(EligibiliteCampagne::peutRecevoir('nul@zz-recoit.example', 'business'))->toBeFalse();
+
+    // Et un second passage ne l'écarte pas davantage.
+    expect(vemCompteur(vemVerifier(['--source' => 'contacts'])['sortie'], 'modifiees_entre_temps'))->toBe(0);
+});
+
+test('4e relecture — deux essais du temoin qui divergent sont dits tels quels, jamais « deux fois »', function () {
+    $this->dns->suiteTemoin = [ResultatDns::INDETERMINE, ResultatDns::INEXISTANT];
+
+    $r = vemVerifier();
+
+    expect($r['code'])->toBe(1)
+        ->and($r['sortie'])->toContain('pas de réponse (délai dépassé), puis réponse « ne reçoit pas de courrier »')
+        ->and($r['sortie'])->not->toContain('deux fois')
+        ->and($r['sortie'])->toContain('instable');
+});

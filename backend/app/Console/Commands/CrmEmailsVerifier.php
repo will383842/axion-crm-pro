@@ -183,13 +183,15 @@ class CrmEmailsVerifier extends Command
         // des milliers d'adresses saines à `invalide` : on le JUGE d'abord, sur
         // un domaine qui reçoit du courrier à coup sûr. Rien n'est lu ni écrit
         // avant (relecture E6).
-        $etat = $this->etatTemoin();
-        if ($etat !== self::TEMOIN_RECOIT) {
-            $this->error($etat === self::TEMOIN_INJOIGNABLE
-                ? "REFUS : le résolveur {$resolveur->nom()} n'a pas répondu (délai dépassé) pour le domaine témoin « {$this->temoin} », deux fois. "
-                    . 'Il est injoignable ou saturé : rien n’a été vérifié ni écrit. Vérifier le réseau, ou changer de résolveur (--resolveur).'
-                : "REFUS : le résolveur {$resolveur->nom()} dit que le domaine témoin « {$this->temoin} » ne reçoit pas de courrier, deux fois. "
-                    . 'Il se trompe : rien n’a été vérifié ni écrit. Changer de résolveur (--resolveur) ou de témoin (CRM_EMAILS_DOMAINE_TEMOIN).');
+        $etats = $this->etatsTemoin();
+        if ($etats !== [self::TEMOIN_RECOIT]) {
+            $this->error("REFUS : le résolveur {$resolveur->nom()}, interrogé à deux reprises sur le domaine témoin « {$this->temoin} », "
+                . self::decrireTemoin($etats) . '. Rien n’a été vérifié ni écrit. '
+                . match (true) {
+                    ! in_array(self::TEMOIN_NE_RECOIT_PAS, $etats, true) => 'Il est injoignable ou saturé : vérifier le réseau, ou changer de résolveur (--resolveur).',
+                    ! in_array(self::TEMOIN_INJOIGNABLE, $etats, true) => 'Il se trompe : changer de résolveur (--resolveur) ou de témoin (CRM_EMAILS_DOMAINE_TEMOIN).',
+                    default => 'Il est instable : changer de résolveur (--resolveur).',
+                });
 
             return self::FAILURE;
         }
@@ -257,8 +259,7 @@ class CrmEmailsVerifier extends Command
                             // le message SQL peut citer des adresses.
                             $erreur = match (true) {
                                 $e instanceof QueryException => 'SQLSTATE ' . $e->getCode(),
-                                $e->getMessage() === 'resolveur_suspect' => 'résolveur suspect : le domaine témoin ne reçoit plus de courrier selon lui',
-                                $e->getMessage() === 'resolveur_injoignable' => 'résolveur injoignable : délai dépassé sur le domaine témoin',
+                                str_starts_with($e->getMessage(), 'resolveur_suspect:') => 'résolveur suspect sur le domaine témoin : ' . substr($e->getMessage(), strlen('resolveur_suspect:')),
                                 default => get_class($e),
                             };
                             Log::error('crm:emails:verifier : lot annulé', ['source' => $src, 'apres_id' => $dernier, 'erreur' => $erreur]);
@@ -663,11 +664,13 @@ class CrmEmailsVerifier extends Command
                 $liaisons[] = $workspaceId;
                 // Relue DANS la transaction du lot (3e relecture, X3) : un rebond
                 // dur arrivé depuis la lecture interdit encore la réversion.
+                // `coalesce` : un statut NULL rendrait tout le `NOT (…)` NULL, et
+                // la fiche serait écartée à chaque passage (4e relecture).
                 $gardeRebond = '';
                 if ($avecStatut) {
                     $gardeRebond = "
-                       AND NOT (c.email_status IN ('invalid', 'disposable')
-                                AND v.statut_nouveau NOT IN ('invalid', 'disposable')
+                       AND NOT (coalesce(c.email_status, '') IN ('invalid', 'disposable')
+                                AND coalesce(v.statut_nouveau, '') NOT IN ('invalid', 'disposable')
                                 AND EXISTS (SELECT 1 FROM email_suppressions s
                                             WHERE s.scope = ? AND s.reason = ? AND s.email_hash = v.empreinte_suppression))";
                     array_push($liaisons, $this->univers, ListeSuppression::REBOND_DUR);
@@ -813,9 +816,9 @@ class CrmEmailsVerifier extends Command
         $negatifs = count(array_filter($aResoudre, static fn (string $d): bool => $resultats[$d]->recoit() === false));
         if ($negatifs > 0) {
             $this->compteurs['resolveur_rejuge']++;
-            $etat = $this->etatTemoin();
-            if ($etat !== self::TEMOIN_RECOIT) {
-                throw new \RuntimeException($etat === self::TEMOIN_INJOIGNABLE ? 'resolveur_injoignable' : 'resolveur_suspect');
+            $etats = $this->etatsTemoin();
+            if ($etats !== [self::TEMOIN_RECOIT]) {
+                throw new \RuntimeException('resolveur_suspect:' . self::decrireTemoin($etats));
             }
         }
         if (! $this->dryRun) {
@@ -849,25 +852,42 @@ class CrmEmailsVerifier extends Command
         return $rebonds;
     }
 
-    /** Le témoin reçoit-il du courrier, selon le résolveur ? (sa réponse n'est ni gardée ni enregistrée) */
     /**
      * Ce que le résolveur dit du témoin, avec UN nouvel essai avant de
      * conclure (3e relecture) : une réponse perdue ne suffit pas à juger le
-     * résolveur. La réponse n'est ni gardée ni enregistrée.
+     * résolveur. Rend `[recoit]` dès qu'un essai aboutit ; sinon les DEUX
+     * états observés, dans l'ordre (4e relecture : le message ne doit pas
+     * dire « deux fois » quand les deux essais ont divergé). Les réponses ne
+     * sont ni gardées ni enregistrées.
+     *
+     * @return list<string>
      */
-    private function etatTemoin(): string
+    private function etatsTemoin(): array
     {
-        $etat = self::TEMOIN_INJOIGNABLE;
+        $etats = [];
         for ($essai = 1; $essai <= 2; $essai++) {
             $r = $this->resolveur->resoudre([$this->temoin])[$this->temoin] ?? null;
             $recoit = $r?->recoit();
             if ($recoit === true) {
-                return self::TEMOIN_RECOIT;
+                return [self::TEMOIN_RECOIT];
             }
-            $etat = $recoit === false ? self::TEMOIN_NE_RECOIT_PAS : self::TEMOIN_INJOIGNABLE;
+            $etats[] = $recoit === false ? self::TEMOIN_NE_RECOIT_PAS : self::TEMOIN_INJOIGNABLE;
         }
 
-        return $etat;
+        return $etats;
+    }
+
+    /** @param  list<string>  $etats */
+    private static function decrireTemoin(array $etats): string
+    {
+        $dire = static fn (string $e): string => $e === self::TEMOIN_INJOIGNABLE
+            ? 'pas de réponse (délai dépassé)'
+            : 'réponse « ne reçoit pas de courrier »';
+        if (count(array_unique($etats)) === 1) {
+            return $dire($etats[0]) . ', deux fois';
+        }
+
+        return implode(', puis ', array_map($dire, $etats));
     }
 
     /**

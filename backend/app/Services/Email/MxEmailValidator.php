@@ -29,8 +29,13 @@ namespace App\Services\Email;
  */
 class MxEmailValidator
 {
-    /** Top 120 disposable / temp mail providers (port direct de la liste TS) */
-    private const DISPOSABLE_DOMAINS = [
+    /**
+     * Top 120 disposable / temp mail providers (port direct de la liste TS).
+     *
+     * Publique : `App\Crm\Emails\QualificationEmail` (commande
+     * `crm:emails:verifier`) s'appuie DESSUS — une seconde liste dériverait.
+     */
+    public const DISPOSABLE_DOMAINS = [
         '10minutemail.com', '10minutemail.net', 'guerrillamail.com', 'guerrillamail.net',
         'mailinator.com', 'temp-mail.org', 'tempmail.com', 'tempmailaddress.com',
         'throwaway.email', 'trashmail.com', 'yopmail.com', 'fakeinbox.com',
@@ -61,7 +66,8 @@ class MxEmailValidator
         'disposableaddress.com', 'disposableemailaddresses.com', 'disposableinbox.com',
     ];
 
-    private const ROLE_PREFIXES = [
+    /** Publique pour la même raison : le type générique / nominatif de `QualificationEmail`. */
+    public const ROLE_PREFIXES = [
         'abuse', 'admin', 'administrator', 'all', 'billing', 'contact', 'help',
         'info', 'mail', 'marketing', 'noreply', 'no-reply', 'postmaster', 'root',
         'sales', 'security', 'spam', 'support', 'webmaster', 'hostmaster',

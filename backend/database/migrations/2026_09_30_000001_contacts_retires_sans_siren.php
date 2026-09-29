@@ -4,7 +4,9 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
 /**
- * LE REGISTRE DES RETRAITS, POUR LES ORGANISMES SANS SIREN (2026-09-30).
+ * LE REGISTRE DES RETRAITS, POUR LES ORGANISMES SANS SIREN (2026-09-29 ;
+ * nom de fichier daté du 30 pour passer APRÈS les deux migrations `2026_09_29_*`
+ * des fédérations).
  *
  * `crm:import-federations` accepte désormais les organismes SANS SIREN
  * (unions départementales, conseils départementaux d'ordres, antennes de
@@ -44,7 +46,7 @@ return new class extends Migration
 
         DB::statement('ALTER TABLE contacts_retires ADD COLUMN IF NOT EXISTS country_code CHAR(2)');
         DB::statement('ALTER TABLE contacts_retires ADD COLUMN IF NOT EXISTS foreign_id TEXT');
-        // Nom VÉRIFIÉ LIBRE le 2026-09-30.
+        // Nom VÉRIFIÉ LIBRE le 2026-09-29.
         DB::statement(
             'CREATE UNIQUE INDEX IF NOT EXISTS contacts_retires_cle_ancre_key
              ON contacts_retires (workspace_id, country_code, foreign_id, cle_nom)

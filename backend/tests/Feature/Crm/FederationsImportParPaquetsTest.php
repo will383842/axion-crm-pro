@@ -1,7 +1,7 @@
 <?php
 
 /**
- * L'IMPORT DES FÉDÉRATIONS PAR PAQUETS (2026-09-30).
+ * L'IMPORT DES FÉDÉRATIONS PAR PAQUETS (2026-09-29).
  *
  * L'essai à blanc du 29/09 sur 35 597 lignes est mort en production sur
  * `out of shared memory` (HINT : `max_locks_per_transaction`) : dans UNE
@@ -19,6 +19,7 @@
 
 use App\Crm\FichesProtegees;
 use App\Services\Audit\AuditHashChain;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -50,6 +51,7 @@ afterEach(function () {
         @unlink($f);
     }
     DB::statement('DROP TRIGGER IF EXISTS zz_fpq_panne ON companies');
+    DB::statement('DROP TRIGGER IF EXISTS zz_fpq_panne ON federations');
     DB::statement('DROP FUNCTION IF EXISTS zz_fpq_panne()');
     $espace = $this->espace;
     DB::transaction(function () use ($espace): void {
@@ -186,7 +188,7 @@ test('un import INTERROMPU garde ses paquets valides ; relance, il reprend sans 
     // — et aucune transaction n'est restée ouverte derrière la commande.
     expect($interrompu)->toBe('fiche_introuvable_apres_ingestion')
         ->and(DB::transactionLevel())->toBe(0)
-        ->and($sortie)->toContain('INTERROMPU après 2 paquet(s)')
+        ->and($sortie)->toContain('INTERROMPU après 2 paquet(s) de fiches et 0 paquet(s) de têtes')
         ->and(fpqFiches($this->espace))->toBe(20)
         ->and(DB::table('federations')->where('workspace_id', $this->espace)->count())->toBe(20);
 
@@ -258,4 +260,42 @@ test('--paquet refuse une valeur qui n est pas un entier positif', function () {
         $code = Artisan::call('crm:import-federations', ['file' => fpqFichier([]), '--paquet' => $valeur]);
         expect($code)->toBe(1)->and(Artisan::output())->toContain('--paquet doit être un entier positif');
     }
+});
+
+test('E2 — interrompu dans la 2e passe : le message compte aussi les paquets de tetes valides ; la relance reprend', function () {
+    $lignes = fpqLignes('9707', 30);
+    // Panne simulée au lien de tête de la 15e fiche : 2e paquet de têtes
+    // (29 liens, par 10). Le 1er paquet de têtes est validé.
+    $panne = 'ZZ PAQUET ' . $lignes[14]['siren'];
+    DB::unprepared(<<<SQL
+        CREATE FUNCTION zz_fpq_panne() RETURNS trigger LANGUAGE plpgsql SET search_path = public, pg_catalog AS \$fn\$
+        BEGIN
+            IF NEW.parent_company_id IS NOT NULL
+               AND (SELECT c.denomination FROM companies c WHERE c.id = NEW.company_id) = '{$panne}' THEN
+                RAISE EXCEPTION 'zz_panne_deuxieme_passe';
+            END IF;
+            RETURN NEW;
+        END \$fn\$;
+        CREATE TRIGGER zz_fpq_panne BEFORE UPDATE ON federations FOR EACH ROW EXECUTE FUNCTION zz_fpq_panne();
+    SQL);
+
+    $interrompu = false;
+    try {
+        Artisan::call('crm:import-federations', ['file' => fpqFichier($lignes), '--paquet' => '10']);
+    } catch (QueryException $e) {
+        $interrompu = str_contains($e->getMessage(), 'zz_panne_deuxieme_passe');
+    }
+    $sortie = Artisan::output();
+    $lies = DB::table('federations')->where('workspace_id', $this->espace)->whereNotNull('parent_company_id')->count();
+
+    expect($interrompu)->toBeTrue()
+        ->and($sortie)->toContain('INTERROMPU après 3 paquet(s) de fiches et 1 paquet(s) de têtes')
+        ->and(DB::transactionLevel())->toBe(0)
+        ->and($lies)->toBe(10);
+
+    DB::statement('DROP TRIGGER zz_fpq_panne ON federations');
+    $reprise = fpqImporter($lignes, ['--paquet' => '10']);
+
+    expect(fpqCompteur($reprise['sortie'], 'tetes_liees'))->toBe(19)
+        ->and(fpqCompteur($reprise['sortie'], 'tetes_inchangees'))->toBe(10);
 });

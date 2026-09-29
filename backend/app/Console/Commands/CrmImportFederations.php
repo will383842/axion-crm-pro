@@ -47,13 +47,14 @@ use Throwable;
  *
  * ── Rattacher, jamais dupliquer ───────────────────────────────────────────
  *
- * La clé est le SIREN. Une fiche déjà présente (un organisateur d'événement,
+ * La clé est le SIREN, ou, sans SIREN, l'ancre (FR, `foreign_id`) décrite
+ * plus bas. Une fiche déjà présente (un organisateur d'événement,
  * une CCI) est RATTACHÉE : elle reçoit sa ligne `federations`, garde sa nature,
  * sa démarche (`events.participation/intervention`, `relation_type`,
  * `lifecycle_stage`) et ses étiquettes. Une fiche à la corbeille n'est pas
  * ressuscitée : la ligne est rejetée.
  *
- * ── Les organismes SANS SIREN (2026-09-30) ────────────────────────────────
+ * ── Les organismes SANS SIREN (2026-09-29) ────────────────────────────────
  *
  * Une union départementale, un conseil départemental d'ordre, une antenne
  * de confédération n'ont pas de personnalité juridique propre : pas de
@@ -69,12 +70,12 @@ use Throwable;
  * ── Idempotente ───────────────────────────────────────────────────────────
  *
  * Rejouer le même fichier ne crée rien : le funnel reconnaît le même contenu
- * (`run_id` = SIREN + empreinte de la ligne), la ligne `federations` identique
+ * (`run_id` = SIREN ou identifiant + empreinte de la ligne), la ligne `federations` identique
  * est comptée « inchangée ». Un ré-import ne touche JAMAIS la démarche de Will
  * (`partenariat`, relance, note). Une tête de réseau absente du fichier ne
  * retire pas celle qui est posée.
  *
- * ── Par PAQUETS (2026-09-30) ──────────────────────────────────────────────
+ * ── Par PAQUETS (2026-09-29) ──────────────────────────────────────────────
  *
  * L'essai à blanc du 29/09 sur 35 597 lignes est mort dans la deuxième passe
  * sur `out of shared memory` (HINT : `max_locks_per_transaction`). La cause,
@@ -150,12 +151,13 @@ class CrmImportFederations extends Command
     public const ORIGINE_SECTEUR = 'federations-2026';
 
     /**
-     * Identifiant d'un organisme SANS SIREN : un espace de noms en minuscules
-     * puis au moins un segment après « : » (`section:fo:28`,
-     * `section:cfe-cgc:2A`). Jamais neuf chiffres seuls : il ne peut pas se
-     * confondre avec un SIREN.
+     * Identifiant d'un organisme SANS SIREN : l'espace de noms `section:`
+     * SEULEMENT, puis au moins un segment (`section:fo:28`,
+     * `section:cfe-cgc:2A`). Jamais neuf chiffres seuls (pas de confusion avec
+     * un SIREN), et jamais un autre espace : une ligne `evt:…` ne peut pas se
+     * rattacher à un organisateur d'événements.
      */
-    public const MOTIF_IDENTIFIANT = '/^[a-z0-9][a-z0-9-]*(:[A-Za-z0-9-]+)+$/';
+    public const MOTIF_IDENTIFIANT = '/^section(:[A-Za-z0-9-]+)+$/';
 
     /** Longueur maximale d'un identifiant (le plus long mesuré : 65). */
     public const IDENTIFIANT_MAX = 120;
@@ -189,6 +191,9 @@ class CrmImportFederations extends Command
     private int $verrousMax = 0;
 
     private int $verrousTransactionMax = 0;
+
+    /** Paquets de la DEUXIÈME passe (têtes) validés. */
+    private int $paquetsTetes = 0;
 
     /**
      * Ce que le paquet OUVERT a compté : reporté au bilan quand il se ferme,
@@ -260,6 +265,7 @@ class CrmImportFederations extends Command
         $this->ancres = [];
         $this->verrousMax = 0;
         $this->verrousTransactionMax = 0;
+        $this->paquetsTetes = 0;
         $this->enCours = ['delta' => [], 'tetes' => [], 'ancres' => []];
 
         $interruption = null;
@@ -278,7 +284,7 @@ class CrmImportFederations extends Command
 
         // Un import INTERROMPU a pu valider des paquets : ils sont en base, et
         // la chaîne d'audit le dit aussi.
-        if (! $dryRun && ($interruption === null || $this->bilan['paquets'] > 0)) {
+        if (! $dryRun && ($interruption === null || $this->bilan['paquets'] + $this->paquetsTetes > 0)) {
             $audit->record([
                 'workspace_id' => $workspaceId,
                 'user_id' => null,
@@ -293,7 +299,7 @@ class CrmImportFederations extends Command
 
         if ($interruption !== null) {
             $this->error(
-                "INTERROMPU après {$this->bilan['paquets']} paquet(s) validé(s)"
+                "INTERROMPU après {$this->bilan['paquets']} paquet(s) de fiches et {$this->paquetsTetes} paquet(s) de têtes validé(s)"
                 . ($dryRun ? ' (à blanc : rien n\'a été écrit).' : ' : ils restent en base. Relancer le même fichier REPREND (import idempotent).'),
             );
 
@@ -440,6 +446,8 @@ class CrmImportFederations extends Command
         // nombre à blanc et en réel.
         if ($deLignes) {
             $this->bilan['paquets']++;
+        } elseif (! $dryRun) {
+            $this->paquetsTetes++;
         }
     }
 

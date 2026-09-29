@@ -117,7 +117,7 @@ test('S-a — sous axion_app, ni la cle ni la fonction d empreinte ; seulement l
     expect($oui->e)->toBeFalse();
 
     // … et la même question pour un organisme SANS SIREN, par son ancre
-    // (2026-09-30) : permise aussi, sans rien ouvrir de plus.
+    // (2026-09-29) : permise aussi, sans rien ouvrir de plus.
     $ancre = $app->selectOne('SELECT contacts_retires_contient_ancre(?::uuid, ?, ?, ?, ?) AS e', [$espace, 'FR', 'section:zz-dico:01', 'Zed', 'ZZDICO']);
     expect($ancre->e)->toBeFalse();
 });

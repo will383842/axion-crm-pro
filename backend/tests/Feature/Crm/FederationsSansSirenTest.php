@@ -1,7 +1,7 @@
 <?php
 
 /**
- * FÉDÉRATIONS SANS SIREN (2026-09-30) — `crm:import-federations` accepte les
+ * FÉDÉRATIONS SANS SIREN (2026-09-29) — `crm:import-federations` accepte les
  * organismes sans personnalité juridique propre (unions départementales,
  * conseils départementaux d'ordres, antennes de confédérations) : `"siren":
  * null` et un `identifiant` stable (`section:<réseau>:<code>`). Leur fiche
@@ -256,11 +256,14 @@ test('lignes invalides : ni SIREN ni identifiant, identifiant mal forme, tete in
         fssLigne(['identifiant' => 'section:' . str_repeat('z', 120)]),
         fssLigne(['identifiant' => 'section:zz-reseau:01', 'tete_de_reseau' => 'section:zz-reseau:01']),
         fssLigne(['identifiant' => 'section:zz-reseau:02', 'tete_de_reseau' => 'pas une ancre']),
+        // Un AUTRE espace de noms : jamais, même bien formé (S2).
+        fssLigne(['identifiant' => 'evt:zz-club-affaires']),
+        fssLigne(['identifiant' => 'section:zz-reseau:04', 'tete_de_reseau' => 'evt:zz-club-affaires']),
         fssLigne(['identifiant' => 'section:zz-reseau:03']),    // témoin
     ]);
 
-    expect(fssCompteur($r['sortie'], 'rejetees'))->toBe(7)
-        ->and($r['sortie'])->toContain('siren_ou_identifiant_manquant : 1', 'identifiant_invalide : 4', 'tete_de_reseau_invalide : 2')
+    expect(fssCompteur($r['sortie'], 'rejetees'))->toBe(9)
+        ->and($r['sortie'])->toContain('siren_ou_identifiant_manquant : 1', 'identifiant_invalide : 5', 'tete_de_reseau_invalide : 3')
         ->and(fssFiche('section:zz-reseau:03'))->not->toBeNull()
         ->and(DB::table('federations')->count())->toBe(1)
         ->and($r['sortie'])->not->toContain('ZZSECRETAIRE')
@@ -428,4 +431,77 @@ test('la question par ancre est SECURITY DEFINER, a search_path fixe, et refusee
         // Droits par défaut = EXECUTE accordé à PUBLIC : le REVOKE aurait disparu.
         ->and((bool) $f->droits_par_defaut)->toBeFalse()
         ->and((bool) $f->public_execute)->toBeFalse();
+});
+
+// ── Relecture de la PR #256 ─────────────────────────────────────────────────
+
+test('S2 — une ligne evt: ne se rattache jamais a un organisateur d evenements', function () {
+    $organisateur = (int) DB::table('companies')->insertGetId([
+        'workspace_id' => $this->espace, 'country_code' => 'FR', 'foreign_id' => 'evt:zz-club-affaires',
+        'denomination' => 'ZZ CLUB D AFFAIRES', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    $r = fssImporter([fssLigne(['identifiant' => 'evt:zz-club-affaires']), fssLigne()]);
+
+    expect($r['sortie'])->toContain('identifiant_invalide : 1')
+        ->and(DB::table('federations')->where('company_id', $organisateur)->exists())->toBeFalse()
+        ->and(DB::table('contacts')->where('company_id', $organisateur)->exists())->toBeFalse()
+        ->and(fssFiche(FSS_ID))->not->toBeNull();
+});
+
+test('S1 — les deux questions au registre ne repondent QUE dans l espace du contexte', function () {
+    $b = (string) Str::uuid();
+    DB::table('workspaces')->insert([
+        'id' => $b, 'slug' => 'zz-fss-espace-b-' . substr($b, 0, 8), 'name' => 'ZZ espace B', 'settings' => '{}',
+        'cost_cap_eur' => 100, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    // Une personne retirée d'une fiche À SIREN et d'une fiche SANS SIREN, dans B.
+    foreach ([['900000901', null, null], [null, 'FR', FSS_ID]] as [$siren, $pays, $foreign]) {
+        DB::table('contacts_retires')->insert([
+            'workspace_id' => $b, 'siren' => $siren, 'country_code' => $pays, 'foreign_id' => $foreign,
+            'cle_nom' => (string) DB::selectOne("SELECT contacts_retires_empreinte('Zed', 'ZZESPACE') AS h")->h,
+        ]);
+    }
+    $demander = static function (string $contexte) use ($b): array {
+        DB::select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $contexte]);
+        $parSiren = DB::selectOne('SELECT contacts_retires_contient(?::uuid, ?, ?, ?) AS e', [$b, '900000901', 'Zed', 'ZZESPACE'])->e;
+        $parAncre = DB::selectOne('SELECT contacts_retires_contient_ancre(?::uuid, ?, ?, ?, ?) AS e', [$b, 'FR', FSS_ID, 'Zed', 'ZZESPACE'])->e;
+        DB::select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
+
+        return [(bool) $parSiren, (bool) $parAncre];
+    };
+
+    // Sous le contexte A, la question sur B est refusée (réponse « non ») ;
+    // sous le contexte B, le registre répond — le témoin que la ligne existe.
+    expect($demander($this->espace))->toBe([false, false])
+        ->and($demander($b))->toBe([true, true]);
+});
+
+test('E1 — essai a blanc = reel quand la tete est designee par un IDENTIFIANT, a travers les paquets', function () {
+    $lignes = [];
+    // Six sections locales AVANT leur tête (section régionale) : paquets 1 et 2.
+    for ($i = 1; $i <= 6; $i++) {
+        $lignes[] = fssLigne(['identifiant' => 'section:zz-reseau:69-' . $i, 'nom' => 'ZZ LOCALE ' . $i, 'niveau' => 'local',
+            'email_generique' => null, 'personnes' => [], 'tete_de_reseau' => 'section:zz-reseau:region']);
+    }
+    $lignes[] = fssLigne(['identifiant' => 'section:zz-reseau:region', 'nom' => 'ZZ REGIONALE', 'niveau' => 'regional',
+        'email_generique' => null, 'personnes' => [], 'tete_de_reseau' => '900000950']);
+    $lignes[] = ['siren' => '900000950', 'nom' => 'ZZ NATIONALE', 'famille' => 'confederation', 'niveau' => 'national',
+        'secteurs' => ['interprofessionnel'], 'pertinence' => 'haute', 'contactabilite' => 'aucun_contact', 'personnes' => []];
+    $lignes[] = fssLigne(['identifiant' => 'section:zz-reseau:orpheline', 'nom' => 'ZZ ORPHELINE', 'email_generique' => null,
+        'personnes' => [], 'tete_de_reseau' => 'section:zz-reseau:absente']);
+
+    $fichier = fssFichier($lignes);
+    Artisan::call('crm:import-federations', ['file' => $fichier, '--paquet' => '4', '--dry-run' => true]);
+    $blanc = Artisan::output();
+    Artisan::call('crm:import-federations', ['file' => $fichier, '--paquet' => '4']);
+    $reel = Artisan::output();
+
+    preg_match_all('/^\|.*\|$/m', $blanc, $b);
+    preg_match_all('/^\|.*\|$/m', $reel, $r);
+    $region = (int) fssFiche('section:zz-reseau:region')->id;
+    expect($b[0])->toBe($r[0])
+        ->and(fssCompteur($reel, 'tetes_liees'))->toBe(7)
+        ->and(fssCompteur($reel, 'tetes_introuvables'))->toBe(1)
+        ->and(DB::table('federations')->where('parent_company_id', $region)->count())->toBe(6);
 });

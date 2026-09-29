@@ -64,7 +64,7 @@ class CrmDoublonsFusionner extends Command
 
         $annuler = $this->option('annuler');
         if ($annuler !== null && $annuler !== '') {
-            if (! is_string($annuler) || preg_match('/^[1-9]\d{0,17}$/', $annuler) !== 1) {
+            if (preg_match('/^[1-9]\d{0,17}$/', $annuler) !== 1) {
                 $this->error('--annuler attend le numéro d\'une fusion.');
 
                 return self::FAILURE;

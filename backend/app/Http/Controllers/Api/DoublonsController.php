@@ -56,9 +56,7 @@ class DoublonsController extends ApiController
 
         $parMotif = [];
         foreach ((clone $base)->groupBy('d.motif')->select('d.motif', DB::raw('count(*) AS n'))->get() as $l) {
-            if ($l instanceof stdClass) {
-                $parMotif[(string) $l->motif] = (int) $l->n;
-            }
+            $parMotif[(string) $l->motif] = (int) $l->n;
         }
         if (isset($filtres['motif'])) {
             $base->where('d.motif', $filtres['motif']);
@@ -78,9 +76,7 @@ class DoublonsController extends ApiController
         $adresses = [];
         foreach (DB::table('adresses_partagees')->where('workspace_id', $ws)->groupBy('nature')
             ->select('nature', DB::raw('count(*) AS n'))->get() as $l) {
-            if ($l instanceof stdClass) {
-                $adresses[(string) $l->nature] = (int) $l->n;
-            }
+            $adresses[(string) $l->nature] = (int) $l->n;
         }
 
         return $this->ok([

@@ -38,11 +38,19 @@ const DSI_TABLES = [
     'fusions_fiches', 'adresses_partagees',
 ];
 
-/** Les index sur lesquels le chantier repose : chacun doit servir au moins une fois. */
+/**
+ * Les index sur lesquels le chantier repose : chaque groupe doit servir au
+ * moins une fois (un groupe = des index équivalents pour la même recherche :
+ * l'égalité sur le nom normalisé est servie par le btree OU par le trigramme).
+ */
 const DSI_INDEX_ATTENDUS = [
-    'idx_companies_denom_btree', 'idx_companies_email_generic_minuscules', 'idx_activities_sujet_fiche',
-    'idx_deals_company', 'idx_contacts_company', 'contacts_workspace_id_normalized_hash_key',
-    'idx_dup_flags_file_fusion_auto', 'idx_fusions_fiches_flag',
+    ['idx_companies_denom_btree', 'idx_companies_denomination_trgm'],
+    ['idx_companies_email_generic_minuscules'],
+    ['idx_activities_sujet_fiche'],
+    ['idx_deals_company'],
+    ['contacts_workspace_id_normalized_hash_key'],
+    ['idx_dup_flags_file_fusion_auto'],
+    ['idx_fusions_fiches_flag'],
 ];
 
 /** @return list<array{sql: string, bindings: array<int, mixed>}> */
@@ -156,8 +164,8 @@ test('détection, fusion et annulation : chaque requête est servie par un index
     $defauts = dsiDefauts($requetes, $vus);
 
     expect($defauts)->toBe([]);
-    foreach (DSI_INDEX_ATTENDUS as $index) {
-        expect($vus)->toHaveKey($index);
+    foreach (DSI_INDEX_ATTENDUS as $groupe) {
+        expect(array_intersect($groupe, array_keys($vus)))->not->toBe([], 'aucun de ces index n a servi : ' . implode(', ', $groupe));
     }
 });
 

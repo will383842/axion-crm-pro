@@ -10,6 +10,7 @@ use App\Crm\Emails\QualificationEmail;
 use App\Crm\Emails\VerificationEmail;
 use App\Crm\EspaceProspection;
 use App\Services\Audit\AuditHashChain;
+use App\Support\EligibiliteCampagne;
 use App\Support\WorkspaceContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
@@ -119,12 +120,6 @@ class CrmEmailsVerifier extends Command
     /** Un domaine qui reçoit du courrier À COUP SÛR : il juge le résolveur (relecture E6). */
     private string $temoin = 'gmail.com';
 
-    /** Part de domaines « inexistants » dans un lot au-delà de laquelle le résolveur est rejugé. */
-    private float $seuilInexistants = 0.5;
-
-    /** …à partir de ce nombre de domaines résolus dans le lot. */
-    private int $seuilMinimum = 20;
-
     public function handle(AuditHashChain $audit): int
     {
         $designation = is_string($this->option('workspace')) && $this->option('workspace') !== ''
@@ -168,8 +163,6 @@ class CrmEmailsVerifier extends Command
         $this->resolveur = $resolveur;
         $this->memoireMax = max(1, (int) config('crm.emails_verification.memoire_domaines', 20000));
         $this->temoin = strtolower(trim((string) config('crm.emails_verification.domaine_temoin', 'gmail.com')));
-        $this->seuilInexistants = (float) config('crm.emails_verification.seuil_inexistants', 0.5);
-        $this->seuilMinimum = max(1, (int) config('crm.emails_verification.seuil_minimum', 20));
 
         // Un résolveur qui répondrait « n'existe pas » à tort ferait passer
         // des milliers d'adresses saines à `invalide` : on le JUGE d'abord, sur
@@ -490,13 +483,12 @@ class CrmEmailsVerifier extends Command
             }
         }
 
-        if ($this->dryRun) {
+        // Rien à écrire (lot entièrement ignoré par `--seulement-jamais-verifies`,
+        // ou déjà juste) : ni transaction, ni entrée d'audit vide.
+        if ($this->dryRun || $aEcrire === []) {
             return;
         }
         $this->ecrireDansUnLot(function () use ($workspaceId, $aEcrire): void {
-            if ($aEcrire === []) {
-                return;
-            }
             $avecGen = "CASE WHEN v.gen IS NULL THEN coalesce(c.signals, '{}'::jsonb)
                              ELSE jsonb_set(coalesce(c.signals, '{}'::jsonb), '{email_generic_verification}', v.gen, true) END";
             $liaisons = [];
@@ -585,7 +577,15 @@ class CrmEmailsVerifier extends Command
                 continue;
             }
             $statutLu = is_string($f->statut_lu) ? $f->statut_lu : null;
-            $issue = VerificationEmail::statutContact($statutLu, (string) $calculee['statut'], $avant, $adresse);
+            $issue = VerificationEmail::statutContact(
+                $statutLu,
+                (string) $calculee['statut'],
+                $avant,
+                $adresse,
+                // Rebond dur, plainte, opposition : la liste de suppression,
+                // interrogée seulement quand une réversion est en jeu.
+                static fn (): bool => ! EligibiliteCampagne::peutRecevoir($adresse, 'business'),
+            );
             $statut = $issue['statut'];
             // Ce qu'il faudra rétablir si le domaine revient (relecture E1).
             $calculee['email_status_avant'] = $issue['avant'];
@@ -617,6 +617,10 @@ class CrmEmailsVerifier extends Command
         if ($this->dryRun) {
             $this->compteurs['statuts_contacts_changes'] += count($aEcrire['avec_statut']);
 
+            return;
+        }
+        // Rien à écrire : ni transaction, ni entrée d'audit vide.
+        if ($aEcrire['avec_statut'] === [] && $aEcrire['sans_statut'] === []) {
             return;
         }
         $this->ecrireDansUnLot(function () use ($workspaceId, $aEcrire): void {
@@ -765,12 +769,15 @@ class CrmEmailsVerifier extends Command
             ];
             $this->compteurs[$indetermine ? 'domaines_indetermines' : 'domaines_resolus']++;
         }
-        // Un lot où le résolveur déclare « inexistants » une part anormale des
-        // domaines : on rejuge le résolveur sur le témoin AVANT de rien
-        // enregistrer. S'il se trompe, le lot est annulé (rien d'écrit, ni
-        // fiche ni cache) et la commande dit où reprendre.
-        $inexistants = count(array_filter($aResoudre, static fn (string $d): bool => $resultats[$d]->verdict === ResultatDns::INEXISTANT));
-        if (count($aResoudre) >= $this->seuilMinimum && $inexistants / count($aResoudre) > $this->seuilInexistants) {
+        // AUCUN verdict NÉGATIF (`inexistant`, `sans_courrier`, `mx_nul`)
+        // n'entre au cache, ni sur une fiche, sans que le résolveur ait été
+        // rejugé sur le témoin DANS CE LOT (2e relecture, E6 élargi) : pas de
+        // seuil de proportion ni de nombre — un petit lot comme un grand, et
+        // quel que soit le type de réponse négative. Coût : une question DNS
+        // par lot qui en contient. S'il se trompe, le lot est annulé (rien
+        // d'écrit, ni fiche ni cache) et la commande dit où reprendre.
+        $negatifs = count(array_filter($aResoudre, static fn (string $d): bool => $resultats[$d]->recoit() === false));
+        if ($negatifs > 0) {
             $this->compteurs['resolveur_rejuge']++;
             if (! $this->temoinRecoit()) {
                 throw new \RuntimeException('resolveur_suspect');

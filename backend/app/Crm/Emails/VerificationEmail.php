@@ -219,10 +219,23 @@ final class VerificationEmail
      * Quand le domaine revient, elle ne rétablit QUE ce qu'elle avait elle-même
      * changé, et le rétablit à sa valeur d'avant :
      *
-     *  - un `invalid` venu d'ailleurs (rebond dur de `crm:campagne:retours`,
-     *    fournisseur qui a constaté que la BOÎTE n'existe pas) n'est jamais
-     *    « posé par nous » — même si une vérification pendant une panne du
-     *    domaine a conclu `invalide` par-dessus : il ne redevient JAMAIS `valid` ;
+     *  - un `invalid` déjà là AVANT la vérification (rebond dur, fournisseur
+     *    qui a constaté que la BOÎTE n'existe pas) n'est jamais « posé par
+     *    nous » : la vérification pendant une panne ne le reprend pas à son
+     *    compte, et il ne redevient JAMAIS `valid` ;
+     *  - 🔴 l'ORDRE INVERSE (2e relecture) : la vérification pose `invalid`
+     *    pendant une panne, PUIS un rebond dur réécrit `invalid` — la même
+     *    valeur, donc indiscernable sur la fiche. Ce n'est pas la fiche qui le
+     *    dit, c'est la LISTE DE SUPPRESSION : `$interdite` (l'adresse est en
+     *    rebond dur, plainte, rebonds répétés ou opposition —
+     *    `EligibiliteCampagne::peutRecevoir`) rend la réversion impossible ;
+     *    le statut reste, et il n'est plus « à nous ». On consulte la liste
+     *    plutôt que d'effacer une marque dans `crm:campagne:retours` : la
+     *    liste est la source unique de ces faits, alimentée par TOUS les
+     *    chemins (retours de campagne, site, opposition saisie à la console),
+     *    et elle vaut dans n'importe quel ordre. Limite assumée : un `invalid`
+     *    réécrit par un outil qui n'inscrit rien en liste (un fournisseur de
+     *    vérification) après le nôtre reste indiscernable ;
      *  - `catchall` et `role`, dégradés pendant une panne, reviennent tels
      *    quels — jamais `valid` à leur place ;
      *  - un statut vide ou `unknown` devient `valid` (posé par nous).
@@ -230,9 +243,11 @@ final class VerificationEmail
      * « Posé par nous » n'est cru que si le statut ACTUEL est encore celui que
      * nous avions posé : si quelqu'un l'a changé depuis, c'est lui qui a raison.
      *
+     * @param  bool|callable(): bool  $interdite  l'adresse est-elle en suppression ou en opposition ?
+     *                                            Évaluée seulement quand une réversion est en jeu.
      * @return array{statut: ?string, avant: ?string, pose: ?string}
      */
-    public static function statutContact(?string $actuel, string $statut, mixed $ancienne, string $email): array
+    public static function statutContact(?string $actuel, string $statut, mixed $ancienne, string $email, bool|callable $interdite = false): array
     {
         $nous = self::statutDe($ancienne, $email) !== null
             && is_array($ancienne)
@@ -242,6 +257,13 @@ final class VerificationEmail
         $autres = $nous ? (is_string($ancienne['email_status_avant'] ?? null) ? $ancienne['email_status_avant'] : null) : $actuel;
 
         if ($statut === self::VALIDE) {
+            // Nous avions dégradé, mais un rebond dur, une plainte ou une
+            // opposition est arrivé depuis : on ne défait rien, et le statut
+            // n'est plus le nôtre.
+            if ($nous && in_array($actuel, ['invalid', 'disposable'], true)
+                && (is_callable($interdite) ? $interdite() : $interdite)) {
+                return ['statut' => $actuel, 'avant' => null, 'pose' => null];
+            }
             if (in_array($autres, self::STATUTS_VIDES, true)) {
                 return ['statut' => 'valid', 'avant' => $autres, 'pose' => 'valid'];
             }

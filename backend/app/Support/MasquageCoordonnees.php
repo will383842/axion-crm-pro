@@ -29,13 +29,25 @@ final class MasquageCoordonnees
     public const PERMISSION = 'contacts.view_pii';
 
     /**
-     * L'empreinte de vérification d'une adresse (`crm:emails:verifier`,
-     * `signals.email_generic_verification`, `contacts.metadata.email_verification`,
-     * `contact_channels.details`). Même salée (HMAC), elle ne sort pas pour
-     * qui ne voit les adresses que masquées : rien ne doit permettre de
-     * CONFIRMER une adresse devinée (relecture S1).
+     * Les colonnes JSON qui portent des coordonnées ou une empreinte
+     * d'adresse, à des EMPLACEMENTS CONNUS (relecture de la PR #261, S1 et
+     * réserves 3-4) — on ne balaie pas toute clé à toute profondeur :
+     *
+     *  - `signals` (organisation) : `contact_channels.emails` (adresses),
+     *    `contact_channels.phones` (numéros), `contact_channels.details`
+     *    (CLÉS = adresses ; chaque fiche porte une `empreinte`), et
+     *    `email_generic_verification.empreinte` ;
+     *  - `metadata` (personne) : `email_verification.empreinte`.
+     *
+     * L'empreinte de vérification (`crm:emails:verifier`) est retirée : même
+     * salée, elle ne doit pas permettre de CONFIRMER une adresse devinée.
      */
-    private const EMPREINTE = 'empreinte';
+    private const COLONNE_SIGNAUX = 'signals';
+
+    private const COLONNE_METADONNEES = 'metadata';
+
+    /** Clé de la fiche de vérification rendue HORS de `signals` (fiche fédération). */
+    private const CLE_VERIFICATION_GENERIQUE = 'email_generic_verification';
 
     /**
      * Colonnes qui portent une adresse e-mail sur les fiches rendues par l'API.
@@ -212,8 +224,18 @@ final class MasquageCoordonnees
         }
 
         foreach ($donnees as $cle => $valeur) {
-            if ($cle === self::EMPREINTE) {
-                unset($donnees[$cle]);
+            if ($cle === self::COLONNE_SIGNAUX) {
+                $donnees[$cle] = self::signaux($valeur);
+
+                continue;
+            }
+            if ($cle === self::COLONNE_METADONNEES) {
+                $donnees[$cle] = self::metadonnees($valeur);
+
+                continue;
+            }
+            if ($cle === self::CLE_VERIFICATION_GENERIQUE) {
+                $donnees[$cle] = self::sansEmpreinte($valeur);
 
                 continue;
             }
@@ -289,8 +311,11 @@ final class MasquageCoordonnees
                 }
             }
 
-            foreach (get_object_vars($noeud) as $propriete => $valeur) {
-                $noeud->{$propriete} = self::sansEmpreinte($valeur);
+            if (property_exists($noeud, self::COLONNE_SIGNAUX)) {
+                $noeud->{self::COLONNE_SIGNAUX} = self::signaux($noeud->{self::COLONNE_SIGNAUX});
+            }
+            if (property_exists($noeud, self::COLONNE_METADONNEES)) {
+                $noeud->{self::COLONNE_METADONNEES} = self::metadonnees($noeud->{self::COLONNE_METADONNEES});
             }
 
             return;
@@ -326,14 +351,11 @@ final class MasquageCoordonnees
         // Relations DÉJÀ chargées uniquement — `getRelations()` ne déclenche
         // aucune requête. `tags` n'a aucune colonne de coordonnée : la descente
         // y est un passage à vide, pas une erreur.
-        // Les colonnes JSON (`signals`, `metadata`) : l'empreinte de
-        // vérification d'une adresse n'en sort pas (relecture S1).
-        foreach (array_keys($attributs) as $champ) {
-            $valeur = $noeud->getAttribute($champ);
-            $nettoyee = self::sansEmpreinte($valeur);
-            if ($nettoyee !== $valeur) {
-                $noeud->setAttribute($champ, $nettoyee);
-            }
+        if (array_key_exists(self::COLONNE_SIGNAUX, $attributs)) {
+            $noeud->setAttribute(self::COLONNE_SIGNAUX, self::signaux($noeud->getAttribute(self::COLONNE_SIGNAUX)));
+        }
+        if (array_key_exists(self::COLONNE_METADONNEES, $attributs)) {
+            $noeud->setAttribute(self::COLONNE_METADONNEES, self::metadonnees($noeud->getAttribute(self::COLONNE_METADONNEES)));
         }
 
         foreach ($noeud->getRelations() as $relation) {
@@ -342,39 +364,94 @@ final class MasquageCoordonnees
     }
 
     /**
-     * Une colonne de coordonnée peut remonter autre chose qu'une chaîne (cast,
-     * donnée abîmée). `email()` et `telephone()` sont typés `?string` : sans ce
-     * passage, un entier lèverait un TypeError EN PLEINE RÉPONSE et le 500
-     * masquerait… le masquage.
+     * `signals` d'une organisation, masqué : adresses et numéros des canaux,
+     * CLÉS de `details` (des adresses), empreintes de vérification. Accepte le
+     * tableau (modèle casté) ou le texte JSON (ligne brute) et rend la même
+     * forme. Toute autre clé est rendue telle quelle.
      */
-    /**
-     * Retire, à toute profondeur, la clé `empreinte` d'un tableau — ou d'un
-     * texte JSON (colonne lue brute par `DB::table()`). Toute autre valeur
-     * est rendue telle quelle.
-     */
-    private static function sansEmpreinte(mixed $valeur, int $profondeur = 0): mixed
+    private static function signaux(mixed $valeur): mixed
     {
-        if (is_string($valeur)) {
-            if (! str_contains($valeur, '"' . self::EMPREINTE . '"')) {
-                return $valeur;
+        return self::surJson($valeur, static function (array $signals): array {
+            if (array_key_exists(self::CLE_VERIFICATION_GENERIQUE, $signals)) {
+                $signals[self::CLE_VERIFICATION_GENERIQUE] = self::sansEmpreinte($signals[self::CLE_VERIFICATION_GENERIQUE]);
             }
+            $canaux = $signals['contact_channels'] ?? null;
+            if (! is_array($canaux)) {
+                return $signals;
+            }
+            if (is_array($canaux['emails'] ?? null)) {
+                $canaux['emails'] = array_map(static fn (mixed $e): ?string => self::email(self::enTexte($e)), $canaux['emails']);
+            }
+            if (is_array($canaux['phones'] ?? null)) {
+                $canaux['phones'] = array_map(static fn (mixed $t): ?string => self::telephone(self::enTexte($t)), $canaux['phones']);
+            }
+            if (is_array($canaux['details'] ?? null)) {
+                $details = [];
+                foreach ($canaux['details'] as $adresse => $fiche) {
+                    // Deux adresses peuvent se masquer pareil (`j***@x.fr`) :
+                    // la seconde garde sa fiche sous une clé suffixée.
+                    $cle = (string) self::email((string) $adresse);
+                    $n = 2;
+                    while (array_key_exists($cle, $details)) {
+                        $cle = self::email((string) $adresse) . ' (' . $n++ . ')';
+                    }
+                    $details[$cle] = self::sansEmpreinte($fiche);
+                }
+                $canaux['details'] = $details;
+            }
+            $signals['contact_channels'] = $canaux;
+
+            return $signals;
+        });
+    }
+
+    /** `metadata` d'une personne, sans l'empreinte de sa fiche de vérification. */
+    private static function metadonnees(mixed $valeur): mixed
+    {
+        return self::surJson($valeur, static function (array $meta): array {
+            if (array_key_exists('email_verification', $meta)) {
+                $meta['email_verification'] = self::sansEmpreinte($meta['email_verification']);
+            }
+
+            return $meta;
+        });
+    }
+
+    /** Une fiche de vérification, sans son `empreinte`. */
+    private static function sansEmpreinte(mixed $fiche): mixed
+    {
+        if (is_array($fiche)) {
+            unset($fiche['empreinte']);
+        }
+
+        return $fiche;
+    }
+
+    /**
+     * Applique `$f` à un tableau, ou à un texte JSON décodé puis réencodé.
+     *
+     * @param  callable(array<array-key, mixed>): array<array-key, mixed>  $f
+     */
+    private static function surJson(mixed $valeur, callable $f): mixed
+    {
+        if (is_array($valeur)) {
+            return $f($valeur);
+        }
+        if (is_string($valeur)) {
             $decode = json_decode($valeur, true);
 
-            return is_array($decode) ? json_encode(self::sansEmpreinte($decode, $profondeur), JSON_UNESCAPED_UNICODE) : $valeur;
-        }
-        if (! is_array($valeur) || $profondeur > 12) {
-            return $valeur;
-        }
-        unset($valeur[self::EMPREINTE]);
-        foreach ($valeur as $cle => $sous) {
-            if (is_array($sous)) {
-                $valeur[$cle] = self::sansEmpreinte($sous, $profondeur + 1);
-            }
+            return is_array($decode) ? json_encode($f($decode), JSON_UNESCAPED_UNICODE) : $valeur;
         }
 
         return $valeur;
     }
 
+    /**
+     * Une colonne de coordonnée peut remonter autre chose qu'une chaîne (cast,
+     * donnée abîmée). `email()` et `telephone()` sont typés `?string` : sans ce
+     * passage, un entier lèverait un TypeError EN PLEINE RÉPONSE et le 500
+     * masquerait… le masquage.
+     */
     private static function enTexte(mixed $valeur): ?string
     {
         if ($valeur === null) {

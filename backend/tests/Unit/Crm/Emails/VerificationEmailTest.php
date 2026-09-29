@@ -110,6 +110,24 @@ test('email_status : un domaine mort degrade ; le domaine revenu retablit ce qui
     [$s, $f] = $passage('catchall', 'invalide', null);
     expect(VerificationEmail::statutContact('invalid', 'valide', $f, 'autre@zz-exemple.fr')['statut'])->toBe('invalid');
 
+    // 🔴 ORDRE INVERSE (2e relecture) : nous posons `invalid`, PUIS un rebond
+    // dur réécrit `invalid` — la même valeur, la fiche ne peut pas le voir.
+    // C'est la liste de suppression (`$interdite`) qui retient la réversion.
+    [$s, $f] = $passage(null, 'invalide', null);
+    expect($s)->toBe('invalid')->and($f['email_status_pose'])->toBe('invalid');
+    $retenu = VerificationEmail::statutContact('invalid', 'valide', $f, $email, static fn (): bool => true);
+    expect($retenu)->toBe(['statut' => 'invalid', 'avant' => null, 'pose' => null])
+        // TÉMOIN : sans rebond ni opposition, le domaine revenu rétablit.
+        ->and(VerificationEmail::statutContact('invalid', 'valide', $f, $email, static fn (): bool => false)['statut'])->toBe('valid');
+    // La liste n'est interrogée QUE lorsqu'une réversion est en jeu.
+    $interrogee = false;
+    VerificationEmail::statutContact('catchall', 'valide', null, $email, function () use (&$interrogee): bool {
+        $interrogee = true;
+
+        return true;
+    });
+    expect($interrogee)->toBeFalse();
+
     // `valide` n'écrase jamais un statut plus fin posé par un autre outil.
     expect(VerificationEmail::statutContact('catchall', 'valide', null, $email)['statut'])->toBe('catchall')
         ->and(VerificationEmail::statutContact('role', 'valide', null, $email)['statut'])->toBe('role')

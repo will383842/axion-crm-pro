@@ -529,3 +529,89 @@ test('E2 — l enrichissement ne remplace jamais une adresse verifiee, ni celle 
     DB::table('company_tag')->where('company_id', $this->b)->delete();
     expect(WaterfallOrchestrator::contactsARechercher($this->b)->pluck('id')->all())->toContain($libre);
 });
+
+// ── 2e relecture de la PR #261 ──────────────────────────────────────────────
+
+/** Joue `crm:campagne:retours` sur une ligne. */
+function vemRetour(string $type, string $email): void
+{
+    $fichier = (string) tempnam(sys_get_temp_dir(), 'zz-vem-retours-');
+    file_put_contents($fichier, json_encode(['type' => $type, 'email' => $email, 'campagne' => 'zz']) . "\n");
+    try {
+        Artisan::call('crm:campagne:retours', ['file' => $fichier]);
+    } finally {
+        @unlink($fichier);
+    }
+}
+
+test('E1 ORDRE INVERSE — invalid pose par la verification, PUIS rebond dur (meme valeur), domaine revenu : toujours invalid', function () {
+    $rebond = vemContact($this, $this->b, 'ZZ Inverse', 'inverse@zz-yoyo.example');
+    $oppose = vemContact($this, $this->b, 'ZZ Oppose', 'oppose@zz-yoyo.example');
+    // TÉMOIN : même histoire, sans rebond ni opposition.
+    $temoin = vemContact($this, $this->b, 'ZZ Temoin', 'temoin@zz-yoyo.example');
+
+    // 1. Panne du domaine : la vérification pose `invalid` (à elle).
+    $this->dns->repondre(['zz-yoyo.example' => ResultatDns::INEXISTANT]);
+    vemVerifier(['--source' => 'contacts']);
+    expect(vemMeta($rebond)['email_verification']['email_status_pose'])->toBe('invalid');
+
+    // 2. Un rebond dur réel, par la commande des retours : elle réécrit
+    //    `invalid` — LA MÊME VALEUR. Et une opposition sur l'autre adresse.
+    vemRetour('rebond_dur', 'inverse@zz-yoyo.example');
+    vemRetour('desinscription', 'oppose@zz-yoyo.example');
+    expect(DB::table('contacts')->where('id', $rebond)->value('email_status'))->toBe('invalid');
+
+    // 3. Le domaine revient.
+    $this->dns->repondre(['zz-yoyo.example' => ResultatDns::MX]);
+    DB::table('email_domaines')->update(['resolu_le' => now()->subDays(40)]);
+    vemVerifier(['--source' => 'contacts']);
+
+    expect(DB::table('contacts')->where('id', $rebond)->value('email_status'))->toBe('invalid')
+        ->and(vemMeta($rebond)['email_verification']['email_status_pose'])->toBeNull()
+        ->and(DB::table('contacts')->where('id', $oppose)->value('email_status'))->toBe('invalid')
+        // Le témoin, lui, redevient `valid` : c'est bien le rebond qui retient.
+        ->and(DB::table('contacts')->where('id', $temoin)->value('email_status'))->toBe('valid');
+});
+
+test('E6 elargi — un lot de UNE fiche dont le seul verdict est « sans courrier » rejuge le resolveur ; s il se trompe, rien n est ecrit', function () {
+    $this->dns->pendant = function (): void {
+        $this->dns->verdictTemoin = ResultatDns::INEXISTANT;
+    };
+
+    $r = vemVerifier(['--source' => 'entreprises', '--lot' => '1', '--depuis-id' => (string) ($this->muet - 1)]);
+
+    expect($r['code'])->toBe(1)
+        ->and($r['sortie'])->toContain('résolveur suspect')
+        ->and(DB::table('email_domaines')->where('domaine', 'zz-muet.example')->exists())->toBeFalse()
+        ->and(vemSignals($this->muet))->not->toHaveKey('email_generic_verification');
+});
+
+test('E6 elargi — un MX nul, seul dans son lot, rejuge aussi le resolveur', function () {
+    $nul = vemFiche($this, 'ZZ Nul', 'contact@zz-nul.example');
+    $this->dns->repondre(['zz-nul.example' => ResultatDns::MX_NUL]);
+    $this->dns->pendant = function (): void {
+        $this->dns->verdictTemoin = ResultatDns::INEXISTANT;
+    };
+
+    $r = vemVerifier(['--source' => 'entreprises', '--lot' => '1', '--depuis-id' => (string) ($nul - 1)]);
+
+    expect($r['code'])->toBe(1)
+        ->and(DB::table('email_domaines')->where('domaine', 'zz-nul.example')->exists())->toBeFalse()
+        ->and(vemSignals($nul))->not->toHaveKey('email_generic_verification');
+});
+
+test('un lot qui n a rien a ecrire n ouvre ni transaction ni entree d audit', function () {
+    vemVerifier();
+    $lots = DB::table('audit_logs')->where('event_type', 'VERIFICATION_EMAILS_LOT')->count();
+    $fins = DB::table('audit_logs')->where('event_type', 'VERIFICATION_EMAILS_FIN')->count();
+
+    $jamais = vemVerifier(['--seulement-jamais-verifies' => true]);
+    $refait = vemVerifier();
+
+    expect(vemCompteur($jamais['sortie'], 'deja_verifiees_ignorees'))->toBeGreaterThan(0)
+        ->and(vemCompteur($refait['sortie'], 'lots'))->toBeGreaterThan(0)
+        ->and(DB::table('audit_logs')->where('event_type', 'VERIFICATION_EMAILS_LOT')->count())->toBe($lots)
+        // TÉMOIN : l'entrée de FIN, elle, est toujours écrite.
+        ->and(DB::table('audit_logs')->where('event_type', 'VERIFICATION_EMAILS_FIN')->count())->toBe($fins + 2)
+        ->and($refait['sortie'])->toContain('Verrous tenus au plus en fin de lot : 0 (dont 0');
+});

@@ -24,6 +24,15 @@ uses(TestCase::class, RefreshDatabase::class);
 
 const VEMM_GENERIQUE = 'contact@zz-masque.example';
 const VEMM_PERSONNE = 'zoe.zz@zz-masque.example';
+const VEMM_CANAL = 'canal@zz-masque.example';
+const VEMM_TEL_CANAL = '+33611223344';
+const VEMM_TEL_FICHE = '+33699887766';
+
+/** @return list<string> toutes les coordonnées en clair de la fiche */
+function vemmEnClair(): array
+{
+    return [VEMM_GENERIQUE, VEMM_PERSONNE, VEMM_CANAL, VEMM_TEL_CANAL, VEMM_TEL_FICHE];
+}
 
 beforeEach(function () {
     $this->seed(PermissionsAndRolesSeeder::class);
@@ -35,8 +44,8 @@ beforeEach(function () {
     $ws = $this->workspace->id;
     $this->fiche = (int) DB::table('companies')->insertGetId([
         'workspace_id' => $ws, 'siren' => '940009901', 'entity_nature' => 'federation', 'denomination' => 'ZZ Masque',
-        'email_generic' => VEMM_GENERIQUE,
-        'signals' => json_encode(['contact_channels' => ['emails' => ['canal@zz-masque.example']]]),
+        'email_generic' => VEMM_GENERIQUE, 'phone' => VEMM_TEL_FICHE,
+        'signals' => json_encode(['contact_channels' => ['emails' => [VEMM_CANAL], 'phones' => [VEMM_TEL_CANAL]]]),
         'created_at' => now(), 'updated_at' => now(),
     ]);
     DB::table('federations')->insert([
@@ -110,5 +119,36 @@ test('un compte viewer ne recoit AUCUNE empreinte ; le proprietaire, si (temoin)
             // La vérification elle-même reste lisible (statut, motif) : seule
             // l'empreinte est retirée.
             ->and($corps)->toContain('"statut"');
+        foreach (vemmEnClair() as $clair) {
+            expect($corps)->not->toContain($clair);
+        }
     }
+});
+
+test('RESERVE 3 — la LISTE des entreprises applique le masquage de la fiche : aucune adresse ni aucun numero en clair pour un viewer', function () {
+    // TÉMOIN : le propriétaire lit tout en clair dans la liste — canaux et
+    // clés de `details` compris. Sans lui, un viewer « masqué » par une liste
+    // vide verdirait.
+    $this->actingAs(vemmCompte($this->workspace->id, 'owner'));
+    $proprietaire = (string) $this->getJson('/api/v1/companies?per_page=50')->assertOk()->getContent();
+    foreach (vemmEnClair() as $clair) {
+        if ($clair === VEMM_PERSONNE) {
+            continue; // la liste ne charge pas les personnes
+        }
+        expect($proprietaire)->toContain($clair);
+    }
+    expect($proprietaire)->toContain(VerificationEmail::empreinte(VEMM_GENERIQUE));
+
+    $this->actingAs(vemmCompte($this->workspace->id, 'viewer'));
+    $reponse = $this->getJson('/api/v1/companies?per_page=50')->assertOk();
+    $corps = (string) $reponse->getContent();
+
+    expect(collect($reponse->json('data'))->pluck('id')->all())->toContain($this->fiche);
+    foreach (vemmEnClair() as $clair) {
+        expect($corps)->not->toContain($clair);
+    }
+    expect($corps)->not->toContain('"empreinte"')
+        // Les canaux sont là, MASQUÉS (pas effacés) — clés de `details` comprises.
+        ->and($corps)->toContain('c***@zz-masque.example')
+        ->and($corps)->toContain('"statut"');
 });

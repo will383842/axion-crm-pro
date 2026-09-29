@@ -8,10 +8,12 @@
  * l'information vient de GOFAB. Fixtures FICTIVES uniquement (dépôt public).
  */
 
+use App\Crm\FichesProtegees;
 use App\Crm\Scraping\ScrapedRecord;
 use App\Crm\Scraping\ScrapedRecordIngestService;
 use App\Crm\Scraping\ScrapeIngestOutcome;
 use Database\Seeders\ScrapingSourcesSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -147,10 +149,10 @@ test('une fiche GOFAB est protegee : la base refuse sa suppression, le temoin pa
         'created_at' => now(), 'updated_at' => now(),
     ]);
 
-    expect(App\Crm\FichesProtegees::estProtegee($this->fiche))->toBeTrue()
-        ->and(App\Crm\FichesProtegees::estProtegee($temoin))->toBeFalse()
+    expect(FichesProtegees::estProtegee($this->fiche))->toBeTrue()
+        ->and(FichesProtegees::estProtegee($temoin))->toBeFalse()
         ->and(fn () => DB::transaction(fn () => DB::table('companies')->where('id', $this->fiche)->delete()))
-        ->toThrow(Illuminate\Database\QueryException::class, 'fiche_protegee');
+        ->toThrow(QueryException::class, 'fiche_protegee');
 
     DB::table('companies')->where('id', $temoin)->delete();
     expect(DB::table('companies')->where('id', $temoin)->exists())->toBeFalse()

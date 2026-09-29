@@ -9,6 +9,8 @@ use App\Crm\Emails\QualificationEmail;
 
 test('la syntaxe : une adresse ordinaire passe, les formes fautives non', function () {
     expect(QualificationEmail::syntaxeValide('contact@zz-exemple.fr'))->toBeTrue()
+        // E4 — une partie locale accentuée (RFC 6531) n'est pas une faute.
+        ->and(QualificationEmail::syntaxeValide('élodie.zz@zz-exemple.fr'))->toBeTrue()
         ->and(QualificationEmail::syntaxeValide('  Contact.Lyon+2026@ZZ-Exemple.fr '))->toBeTrue();
 
     foreach (['', 'pas-une-adresse', 'zz@', '@zz-exemple.fr', 'zz@@zz-exemple.fr', 'zz@zz-exemple..fr',

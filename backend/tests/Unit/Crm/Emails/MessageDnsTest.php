@@ -158,3 +158,27 @@ test('le resolveur : designe, sinon /etc/resolv.conf, sinon aucun ; une adresse 
         @unlink($vide);
     }
 });
+
+test('E7 — un resolveur injoignable (ICMP) ne fait pas tourner a vide jusqu au delai', function () {
+    if (PHP_OS_FAMILY !== 'Linux') {
+        $this->markTestSkipped('Le refus ICMP d’un port UDP fermé se lit ainsi sous Linux (la CI).');
+    }
+    // BOUCLE LOCALE seulement (127.0.0.1) : rien ne sort de la machine. Un
+    // port UDP libéré juste avant : personne n'écoute, le noyau répond
+    // « port injoignable » et la socket devient lisible… à chaque tour.
+    $serveur = stream_socket_server('udp://127.0.0.1:0', $code, $message, STREAM_SERVER_BIND);
+    expect($serveur)->not->toBeFalse();
+    $nom = (string) stream_socket_get_name($serveur, false);
+    fclose($serveur);
+    $port = (int) substr($nom, (int) strrpos($nom, ':') + 1);
+
+    $resolveur = new ResolveurDnsUdp('127.0.0.1:' . $port, parallele: 4, debit: 100, delaiMs: 3000, essais: 2);
+    $debut = microtime(true);
+    $resultats = $resolveur->resoudre(['zz-injoignable.example']);
+    $duree = microtime(true) - $debut;
+
+    // Sans la fermeture de la socket en erreur, chaque essai attendait son
+    // délai entier (2 × 3 s) en boucle serrée.
+    expect($resultats['zz-injoignable.example']->verdict)->toBe(ResultatDns::INDETERMINE)
+        ->and($duree)->toBeLessThan(2.0);
+});

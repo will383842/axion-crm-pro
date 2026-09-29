@@ -8,7 +8,6 @@
 
 use App\Crm\Emails\Dns\ResultatDns;
 use App\Crm\Emails\VerificationEmail;
-use App\Support\ListeSuppression;
 
 test('le verdict : syntaxe et jetable sans DNS ; le DNS decide du reste ; une panne ne conclut rien', function () {
     $mx = new ResultatDns(ResultatDns::MX, 'mx.zz-exemple.fr');
@@ -26,7 +25,7 @@ test('le verdict : syntaxe et jetable sans DNS ; le DNS decide du reste ; une pa
 });
 
 test('la campagne ne lit que la verification de CETTE commande, pour CETTE adresse', function () {
-    $fiche = ['statut' => 'valide', 'verifie_par' => VerificationEmail::SOURCE, 'empreinte' => ListeSuppression::empreinte('zz@zz-exemple.fr')];
+    $fiche = ['statut' => 'valide', 'verifie_par' => VerificationEmail::SOURCE, 'empreinte' => VerificationEmail::empreinte('zz@zz-exemple.fr')];
 
     expect(VerificationEmail::statutDe($fiche, ' ZZ@zz-exemple.fr '))->toBe('valide')
         // L'adresse a changé depuis : la vérification ne vaut plus.
@@ -62,22 +61,57 @@ test('la date : celle du DNS ; sans DNS, inchangee tant que le verdict ne bouge 
         ->and(VerificationEmail::date(null, $verdict, null, '2026-09-30'))->toBe('2026-09-30');
 });
 
-test('email_status : un domaine mort l emporte ; un domaine vivant ne ressuscite JAMAIS un rebond dur', function () {
+test('email_status : un domaine mort degrade ; le domaine revenu retablit ce qui etait AVANT, jamais davantage', function () {
     $email = 'zz@zz-exemple.fr';
-    $nous = fn (string $statut): array => ['verifie_par' => VerificationEmail::SOURCE, 'statut' => $statut, 'empreinte' => ListeSuppression::empreinte($email)];
+    // La fiche de vérification telle que la commande l'écrit après un passage.
+    $fiche = fn (string $statut, array $issue): array => [
+        'verifie_par' => VerificationEmail::SOURCE, 'statut' => $statut, 'empreinte' => VerificationEmail::empreinte($email),
+        'email_status_avant' => $issue['avant'], 'email_status_pose' => $issue['pose'],
+    ];
+    // Un passage : (statut actuel, verdict, fiche d'avant) → (nouveau statut, nouvelle fiche).
+    $passage = function (?string $actuel, string $verdict, ?array $ancienne) use ($email, $fiche): array {
+        $issue = VerificationEmail::statutContact($actuel, $verdict, $ancienne, $email);
 
-    expect(VerificationEmail::statutContact('valid', 'invalide', null, $email))->toBe('invalid')
-        ->and(VerificationEmail::statutContact('catchall', 'jetable', null, $email))->toBe('disposable')
-        ->and(VerificationEmail::statutContact(null, 'valide', null, $email))->toBe('valid')
-        ->and(VerificationEmail::statutContact('unknown', 'valide', null, $email))->toBe('valid')
-        // Un `invalid` venu d'ailleurs (rebond dur, fournisseur) reste.
-        ->and(VerificationEmail::statutContact('invalid', 'valide', null, $email))->toBe('invalid')
-        ->and(VerificationEmail::statutContact('invalid', 'valide', ['statut' => 'invalide', 'source' => 'autre'], $email))->toBe('invalid')
-        ->and(VerificationEmail::statutContact('disposable', 'valide', null, $email))->toBe('disposable')
-        // … mais un `invalid` que NOUS avions posé tombe quand le domaine revit.
-        ->and(VerificationEmail::statutContact('invalid', 'valide', $nous('invalide'), $email))->toBe('valid')
-        ->and(VerificationEmail::statutContact('disposable', 'valide', $nous('jetable'), $email))->toBe('valid')
-        // Les statuts plus fins d'un autre outil ne sont pas écrasés par « le domaine reçoit ».
-        ->and(VerificationEmail::statutContact('catchall', 'valide', null, $email))->toBe('catchall')
-        ->and(VerificationEmail::statutContact('role', 'valide', null, $email))->toBe('role');
+        return [$issue['statut'], $fiche($verdict, $issue)];
+    };
+
+    // Vide ou inconnu : `valid`, posé par nous — et défait par nous.
+    [$s, $f] = $passage(null, 'valide', null);
+    expect($s)->toBe('valid');
+    [$s, $f] = $passage($s, 'invalide', $f);
+    expect($s)->toBe('invalid');
+    [$s] = $passage($s, 'valide', $f);
+    expect($s)->toBe('valid');
+
+    // 🔴 E1 — le chemin complet : rebond dur (`invalid` posé par
+    // `crm:campagne:retours`), vérification pendant une panne du domaine,
+    // domaine revenu. Toujours `invalid`.
+    [$s, $f] = $passage('invalid', 'invalide', null);
+    expect($s)->toBe('invalid')->and($f['email_status_pose'])->toBeNull();
+    [$s] = $passage($s, 'valide', $f);
+    expect($s)->toBe('invalid');
+
+    // `catchall` et `role`, dégradés pendant une panne, reviennent TELS QUELS.
+    foreach (['catchall', 'role', 'valid'] as $autre) {
+        [$s, $f] = $passage($autre, 'invalide', null);
+        expect($s)->toBe('invalid')->and($f['email_status_avant'])->toBe($autre);
+        [$s, $f] = $passage($s, 'jetable', $f);
+        expect($s)->toBe('disposable')->and($f['email_status_avant'])->toBe($autre);
+        [$s] = $passage($s, 'valide', $f);
+        expect($s)->toBe($autre, "« {$autre} » dégradé puis rétabli");
+    }
+
+    // Quelqu'un a changé le statut APRÈS nous (un rebond dur) : il a raison.
+    [$s, $f] = $passage('catchall', 'invalide', null);
+    [$s] = $passage('invalid', 'valide', array_merge($f, ['email_status_pose' => 'disposable']));
+    expect($s)->toBe('invalid');
+
+    // Une fiche de vérification écrite pour une AUTRE adresse ne vaut rien.
+    [$s, $f] = $passage('catchall', 'invalide', null);
+    expect(VerificationEmail::statutContact('invalid', 'valide', $f, 'autre@zz-exemple.fr')['statut'])->toBe('invalid');
+
+    // `valide` n'écrase jamais un statut plus fin posé par un autre outil.
+    expect(VerificationEmail::statutContact('catchall', 'valide', null, $email)['statut'])->toBe('catchall')
+        ->and(VerificationEmail::statutContact('role', 'valide', null, $email)['statut'])->toBe('role')
+        ->and(VerificationEmail::statutContact('unknown', 'valide', null, $email)['statut'])->toBe('valid');
 });

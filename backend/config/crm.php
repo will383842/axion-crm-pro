@@ -385,6 +385,17 @@ return [
         'essais' => (int) env('CRM_EMAILS_DNS_ESSAIS', 2),
         'revalider_apres_jours' => (int) env('CRM_EMAILS_REVALIDER_APRES_JOURS', 30),
         'planifiee' => env('CRM_EMAILS_VERIFICATION_PLANIFIEE', false),
+        // Relecture E5 : domaines gardés en mémoire au plus pendant une exécution.
+        'memoire_domaines' => (int) env('CRM_EMAILS_MEMOIRE_DOMAINES', 20000),
+        // Relecture E6 : un domaine qui reçoit à coup sûr, pour juger le résolveur
+        // au démarrage, et à nouveau quand un lot a plus de `seuil_inexistants`
+        // de domaines « inexistants » (à partir de `seuil_minimum` domaines).
+        'domaine_temoin' => env('CRM_EMAILS_DOMAINE_TEMOIN', 'gmail.com'),
+        'seuil_inexistants' => (float) env('CRM_EMAILS_SEUIL_INEXISTANTS', 0.5),
+        'seuil_minimum' => (int) env('CRM_EMAILS_SEUIL_MINIMUM', 20),
+        // Relecture S2 : `retention:purge` retire les domaines résolus il y a
+        // plus de N jours (ils seraient de toute façon redemandés).
+        'purger_domaines_apres_jours' => (int) env('CRM_EMAILS_PURGER_DOMAINES_APRES_JOURS', 180),
     ],
 
 ];

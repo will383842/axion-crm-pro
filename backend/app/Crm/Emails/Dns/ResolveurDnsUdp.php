@@ -184,6 +184,19 @@ final class ResolveurDnsUdp implements ResolveurDns
                     }
                     $paquet = @stream_socket_recvfrom($socket, 65535);
                     if (! is_string($paquet) || $paquet === '') {
+                        // Lisible mais vide : une erreur de socket (un ICMP
+                        // « port injoignable » rend la socket lisible À CHAQUE
+                        // tour). La garder, c'était tourner à vide jusqu'au
+                        // délai (relecture E7) : on la ferme, et la question
+                        // compte comme une tentative perdue.
+                        fclose($socket);
+                        unset($enVol[$cle]);
+                        if ($vol['essai'] < $this->essais) {
+                            $file[] = [$vol['domaine'], $vol['essai'] + 1];
+                        } else {
+                            $reponses[$vol['domaine']] = null;
+                        }
+
                         continue;
                     }
                     try {

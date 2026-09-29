@@ -10,7 +10,6 @@ use App\Crm\Emails\QualificationEmail;
 use App\Crm\Emails\VerificationEmail;
 use App\Crm\EspaceProspection;
 use App\Services\Audit\AuditHashChain;
-use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
@@ -114,6 +113,18 @@ class CrmEmailsVerifier extends Command
 
     private ResolveurDns $resolveur;
 
+    /** Domaines gardés en mémoire au plus, le temps d'une exécution (relecture E5). */
+    private int $memoireMax = 20000;
+
+    /** Un domaine qui reçoit du courrier À COUP SÛR : il juge le résolveur (relecture E6). */
+    private string $temoin = 'gmail.com';
+
+    /** Part de domaines « inexistants » dans un lot au-delà de laquelle le résolveur est rejugé. */
+    private float $seuilInexistants = 0.5;
+
+    /** …à partir de ce nombre de domaines résolus dans le lot. */
+    private int $seuilMinimum = 20;
+
     public function handle(AuditHashChain $audit): int
     {
         $designation = is_string($this->option('workspace')) && $this->option('workspace') !== ''
@@ -155,6 +166,21 @@ class CrmEmailsVerifier extends Command
             return self::FAILURE;
         }
         $this->resolveur = $resolveur;
+        $this->memoireMax = max(1, (int) config('crm.emails_verification.memoire_domaines', 20000));
+        $this->temoin = strtolower(trim((string) config('crm.emails_verification.domaine_temoin', 'gmail.com')));
+        $this->seuilInexistants = (float) config('crm.emails_verification.seuil_inexistants', 0.5);
+        $this->seuilMinimum = max(1, (int) config('crm.emails_verification.seuil_minimum', 20));
+
+        // Un résolveur qui répondrait « n'existe pas » à tort ferait passer
+        // des milliers d'adresses saines à `invalide` : on le JUGE d'abord, sur
+        // un domaine qui reçoit du courrier à coup sûr. Rien n'est lu ni écrit
+        // avant (relecture E6).
+        if (! $this->temoinRecoit()) {
+            $this->error("REFUS : le résolveur {$resolveur->nom()} dit que le domaine témoin « {$this->temoin} » ne reçoit pas de courrier. "
+                . 'Il se trompe (ou est injoignable) : rien n’a été vérifié ni écrit. Changer de résolveur (--resolveur) ou de témoin (CRM_EMAILS_DOMAINE_TEMOIN).');
+
+            return self::FAILURE;
+        }
 
         $this->dryRun = (bool) $this->option('dry-run');
         $this->seulementJamais = (bool) $this->option('seulement-jamais-verifies');
@@ -217,7 +243,11 @@ class CrmEmailsVerifier extends Command
                             // Le lot est annulé en entier ; tout ce qui précède
                             // est acquis. Seul le code d'état part au journal :
                             // le message SQL peut citer des adresses.
-                            $erreur = $e instanceof QueryException ? 'SQLSTATE ' . $e->getCode() : get_class($e);
+                            $erreur = match (true) {
+                                $e instanceof QueryException => 'SQLSTATE ' . $e->getCode(),
+                                $e->getMessage() === 'resolveur_suspect' => 'résolveur suspect : le domaine témoin ne reçoit plus de courrier selon lui',
+                                default => get_class($e),
+                            };
                             Log::error('crm:emails:verifier : lot annulé', ['source' => $src, 'apres_id' => $dernier, 'erreur' => $erreur]);
                             $this->compteurs = $avant;
 
@@ -338,7 +368,7 @@ class CrmEmailsVerifier extends Command
             'valides', 'invalides', 'jetables', 'indeterminees',
             'motif_mx', 'motif_a', 'motif_mx_nul', 'motif_sans_courrier', 'motif_inexistant', 'motif_syntaxe', 'motif_jetable',
             'webmails', 'generiques', 'nominatives', 'partagees', 'deja_verifiees_ignorees', 'canaux_illisibles',
-            'domaines_du_cache', 'domaines_resolus', 'domaines_indetermines',
+            'domaines_du_cache', 'domaines_resolus', 'domaines_indetermines', 'memoire_dns_videe', 'resolveur_rejuge',
             'fiches_a_modifier', 'fiches_modifiees', 'contacts_a_modifier', 'contacts_modifies',
             'statuts_contacts_changes', 'modifiees_entre_temps',
         ], 0);
@@ -366,13 +396,6 @@ class CrmEmailsVerifier extends Command
     /** @return list<stdClass> */
     private function lireContacts(string $workspaceId, int $apresId, int $taille): array
     {
-        // `--seulement-jamais-verifies` : filtré dès la lecture (l'empreinte
-        // de la fiche de vérification n'est pas celle de l'adresse actuelle).
-        $jamais = $this->seulementJamais
-            ? " AND (ct.metadata -> 'email_verification' ->> 'verifie_par' IS DISTINCT FROM '" . VerificationEmail::SOURCE . "'
-                   OR ct.metadata -> 'email_verification' ->> 'empreinte' IS DISTINCT FROM encode(digest(lower(btrim(ct.email::text)), 'sha256'), 'hex'))"
-            : '';
-
         return $this->objets(DB::select(
             "SELECT ct.id, lower(btrim(ct.email::text)) AS adresse_lue, ct.email_status AS statut_lu,
                     ct.metadata -> 'email_verification' AS verif_lue,
@@ -381,9 +404,9 @@ class CrmEmailsVerifier extends Command
                     ct.metadata ->> 'domaine_verifie_le' AS verifie_le_lu
              FROM contacts ct
              WHERE ct.workspace_id = ? AND ct.id > ? AND ct.deleted_at IS NULL
-               AND ct.email IS NOT NULL AND ct.email <> ''" . $jamais . '
+               AND ct.email IS NOT NULL AND ct.email <> ''
              ORDER BY ct.id
-             LIMIT ' . $taille,
+             LIMIT " . $taille,
             [$workspaceId, $apresId],
         ));
     }
@@ -537,30 +560,36 @@ class CrmEmailsVerifier extends Command
     /** @param  list<stdClass>  $fiches */
     private function traiterContacts(string $workspaceId, array $fiches, \Closure $tracer): void
     {
-        $adresses = [];
+        // `--seulement-jamais-verifies` : l'empreinte est un HMAC à clé
+        // applicative — le filtre se fait donc ici, pas en SQL.
+        $retenues = [];
         foreach ($fiches as $f) {
-            $this->compteurs['contacts_lus']++;
-            $adresses[] = (string) $f->adresse_lue;
-        }
-        $adresses = array_values(array_unique($adresses));
-        $this->preparerDns($adresses);
-        $partage = $this->fichesParAdresse($workspaceId, $adresses);
-
-        $aEcrire = ['avec_statut' => [], 'sans_statut' => []];
-        foreach ($fiches as $f) {
-            $adresse = (string) $f->adresse_lue;
-            $avant = self::json($f->verif_lue);
-            if ($this->seulementJamais && VerificationEmail::statutDe($avant, $adresse) !== null) {
+            if ($this->seulementJamais && VerificationEmail::statutDe(self::json($f->verif_lue), (string) $f->adresse_lue) !== null) {
                 $this->compteurs['deja_verifiees_ignorees']++;
 
                 continue;
             }
+            $this->compteurs['contacts_lus']++;
+            $retenues[] = $f;
+        }
+        $adresses = array_values(array_unique(array_map(static fn (stdClass $f): string => (string) $f->adresse_lue, $retenues)));
+        $this->preparerDns($adresses);
+        $partage = $this->fichesParAdresse($workspaceId, $adresses);
+
+        $aEcrire = ['avec_statut' => [], 'sans_statut' => []];
+        foreach ($retenues as $f) {
+            $adresse = (string) $f->adresse_lue;
+            $avant = self::json($f->verif_lue);
             $calculee = $this->ficheDeVerification($adresse, $avant, $partage, is_string($f->type_lu) ? $f->type_lu : null);
             if ($calculee === null) {
                 continue;
             }
             $statutLu = is_string($f->statut_lu) ? $f->statut_lu : null;
-            $statut = VerificationEmail::statutContact($statutLu, (string) $calculee['statut'], $avant, $adresse);
+            $issue = VerificationEmail::statutContact($statutLu, (string) $calculee['statut'], $avant, $adresse);
+            $statut = $issue['statut'];
+            // Ce qu'il faudra rétablir si le domaine revient (relecture E1).
+            $calculee['email_status_avant'] = $issue['avant'];
+            $calculee['email_status_pose'] = $issue['pose'];
             $verifieLe = $calculee['domaine_verifie'] === true ? (string) $calculee['verifie_le'] : null;
             // Les clés de l'import des fédérations (#255), tenues à jour.
             $miroir = [
@@ -664,7 +693,7 @@ class CrmEmailsVerifier extends Command
             'motif' => $verdict['motif'],
             'webmail' => $webmail,
             'fiches' => $fiches,
-            'empreinte' => ListeSuppression::empreinte($adresse),
+            'empreinte' => VerificationEmail::empreinte($adresse),
         ]);
         $this->compteurs[$nouvelle['type'] === 'generique' ? 'generiques' : 'nominatives']++;
         if ($webmail) {
@@ -694,6 +723,12 @@ class CrmEmailsVerifier extends Command
      */
     private function preparerDns(array $adresses): void
     {
+        // Mémoire BORNÉE : au-delà de `memoire_domaines`, on repart à vide —
+        // le cache en base (`email_domaines`) prend le relais, sans DNS.
+        if (count($this->dns) > $this->memoireMax) {
+            $this->dns = [];
+            $this->compteurs['memoire_dns_videe']++;
+        }
         $domaines = [];
         foreach ($adresses as $a) {
             $d = QualificationEmail::domaine($a);
@@ -730,9 +765,28 @@ class CrmEmailsVerifier extends Command
             ];
             $this->compteurs[$indetermine ? 'domaines_indetermines' : 'domaines_resolus']++;
         }
+        // Un lot où le résolveur déclare « inexistants » une part anormale des
+        // domaines : on rejuge le résolveur sur le témoin AVANT de rien
+        // enregistrer. S'il se trompe, le lot est annulé (rien d'écrit, ni
+        // fiche ni cache) et la commande dit où reprendre.
+        $inexistants = count(array_filter($aResoudre, static fn (string $d): bool => $resultats[$d]->verdict === ResultatDns::INEXISTANT));
+        if (count($aResoudre) >= $this->seuilMinimum && $inexistants / count($aResoudre) > $this->seuilInexistants) {
+            $this->compteurs['resolveur_rejuge']++;
+            if (! $this->temoinRecoit()) {
+                throw new \RuntimeException('resolveur_suspect');
+            }
+        }
         if (! $this->dryRun) {
             CacheDomaines::enregistrer($resultats, $this->resolveur->nom(), $maintenant);
         }
+    }
+
+    /** Le témoin reçoit-il du courrier, selon le résolveur ? (sa réponse n'est ni gardée ni enregistrée) */
+    private function temoinRecoit(): bool
+    {
+        $r = $this->resolveur->resoudre([$this->temoin])[$this->temoin] ?? null;
+
+        return $r !== null && $r->recoit() === true;
     }
 
     /**

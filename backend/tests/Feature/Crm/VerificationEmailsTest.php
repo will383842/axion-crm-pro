@@ -11,9 +11,10 @@ use App\Crm\Emails\Dns\ResolveurDns;
 use App\Crm\Emails\Dns\ResolveurDnsInterdit;
 use App\Crm\Emails\Dns\ResultatDns;
 use App\Crm\Emails\VerificationEmail;
+use App\Crm\FichesProtegees;
 use App\Models\Workspace;
 use App\Providers\AppServiceProvider;
-use App\Support\ListeSuppression;
+use App\Services\Waterfall\WaterfallOrchestrator;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -130,7 +131,7 @@ test('chaque adresse recoit un statut, une date et un motif ; une invalide reste
     $gen = vemGenerique($this->a);
     expect($gen)->toMatchArray([
         'statut' => 'valide', 'motif' => 'mx', 'domaine_verifie' => true, 'type' => 'generique', 'webmail' => false,
-        'verifie_par' => VerificationEmail::SOURCE, 'empreinte' => ListeSuppression::empreinte('contact@zz-recoit.example'),
+        'verifie_par' => VerificationEmail::SOURCE, 'empreinte' => VerificationEmail::empreinte('contact@zz-recoit.example'),
     ])->and($gen['verifie_le'])->toBe(now()->toDateString());
 
     // Domaine sans MX mais avec une adresse : il reçoit (MX implicite).
@@ -406,4 +407,125 @@ test('la planification hebdomadaire existe, et elle est SAUTEE par defaut', func
 
     config(['crm.emails_verification.planifiee' => true]);
     expect($taches[0]->filtersPass(app()))->toBeTrue();
+});
+
+// ── Relecture de la PR #261 ─────────────────────────────────────────────────
+
+test('E1 — rebond dur, verification pendant une panne du domaine, domaine revenu : toujours invalid ; un catchall revient catchall', function () {
+    $rebond = vemContact($this, $this->b, 'ZZ Rebond Panne', 'rebond@zz-yoyo.example', ['email_status' => 'invalid']);
+    $catchall = vemContact($this, $this->b, 'ZZ Catchall', 'tout@zz-yoyo.example', ['email_status' => 'catchall']);
+
+    $this->dns->repondre(['zz-yoyo.example' => ResultatDns::INEXISTANT]);
+    vemVerifier(['--source' => 'contacts']);
+    expect(DB::table('contacts')->where('id', $rebond)->value('email_status'))->toBe('invalid')
+        ->and(vemMeta($rebond)['email_verification']['statut'])->toBe('invalide')
+        ->and(DB::table('contacts')->where('id', $catchall)->value('email_status'))->toBe('invalid')
+        ->and(vemMeta($catchall)['email_verification']['email_status_avant'])->toBe('catchall');
+
+    // Le domaine revient.
+    $this->dns->repondre(['zz-yoyo.example' => ResultatDns::MX]);
+    DB::table('email_domaines')->update(['resolu_le' => now()->subDays(40)]);
+    vemVerifier(['--source' => 'contacts']);
+
+    expect(DB::table('contacts')->where('id', $rebond)->value('email_status'))->toBe('invalid')
+        ->and(vemMeta($rebond)['email_verification']['statut'])->toBe('valide')
+        ->and(DB::table('contacts')->where('id', $catchall)->value('email_status'))->toBe('catchall');
+});
+
+test('E5 — la memoire DNS d une execution est bornee : videe, elle repasse par le cache (reel) ou le DNS (a blanc)', function () {
+    config(['crm.emails_verification.memoire_domaines' => 1]);
+
+    // À blanc (aucun cache écrit) : la mémoire vidée entre les lots fait
+    // redemander `zz-recoit.example`, porté par les fiches A et B.
+    $blanc = vemVerifier(['--dry-run' => true, '--lot' => '1', '--source' => 'entreprises']);
+    expect(vemCompteur($blanc['sortie'], 'memoire_dns_videe'))->toBeGreaterThan(0)
+        ->and(array_count_values($this->dns->demandes)['zz-recoit.example'])->toBeGreaterThan(1);
+
+    // En réel, le cache en base prend le relais : une seule question au DNS.
+    $avant = count($this->dns->demandes);
+    vemVerifier(['--lot' => '1', '--source' => 'entreprises']);
+    expect(array_count_values(array_slice($this->dns->demandes, $avant))['zz-recoit.example'] ?? 0)->toBe(1);
+});
+
+test('E6 — un resolveur qui dit que le domaine temoin n existe pas est REFUSE avant toute lecture', function () {
+    $this->dns->verdictTemoin = ResultatDns::INEXISTANT;
+
+    $r = vemVerifier();
+
+    expect($r['code'])->toBe(1)
+        ->and($r['sortie'])->toContain('REFUS')
+        ->and($this->dns->demandes)->toBe([])
+        ->and(DB::table('email_domaines')->count())->toBe(0)
+        ->and(vemMeta($this->pro))->not->toHaveKey('email_verification');
+});
+
+test('E6 — un lot aux domaines anormalement « inexistants » rejuge le resolveur ; s il se trompe, le lot est annule', function () {
+    for ($i = 1; $i <= 25; $i++) {
+        vemContact($this, $this->b, "ZZ Mort {$i}", "p{$i}@zz-disparu-{$i}.example");
+    }
+    // Le résolveur tombe en panne APRÈS le témoin du démarrage.
+    $this->dns->pendant = function (): void {
+        $this->dns->verdictTemoin = ResultatDns::INEXISTANT;
+    };
+
+    $r = vemVerifier(['--source' => 'contacts']);
+
+    expect($r['code'])->toBe(1)
+        ->and($r['sortie'])->toContain('résolveur suspect')
+        ->and($r['sortie'])->toContain('Reprendre avec : --source=contacts --depuis-id=0')
+        ->and(DB::table('email_domaines')->count())->toBe(0)
+        ->and(DB::table('contacts')->where('workspace_id', $this->espace)->whereNotNull('last_verified_at')->count())->toBe(0);
+});
+
+test('E6 — TEMOIN : des domaines vraiment morts, avec un resolveur sain, sont bien ecrits invalides', function () {
+    for ($i = 1; $i <= 25; $i++) {
+        vemContact($this, $this->b, "ZZ Mort {$i}", "p{$i}@zz-disparu-{$i}.example");
+    }
+
+    $r = vemVerifier(['--source' => 'contacts']);
+
+    expect($r['code'])->toBe(0)
+        ->and(vemCompteur($r['sortie'], 'resolveur_rejuge'))->toBe(1)
+        ->and(DB::table('contacts')->where('email', 'like', '%@zz-disparu-%')->where('email_status', 'invalid')->count())->toBe(25);
+});
+
+test('S2 — retention:purge retire les domaines resolus il y a trop longtemps, et eux seuls', function () {
+    vemVerifier();
+    DB::table('email_domaines')->where('domaine', 'zz-mort.example')->update(['resolu_le' => now()->subDays(200)]);
+    $total = DB::table('email_domaines')->count();
+
+    Artisan::call('retention:purge', ['--dry-run' => true, '--all-workspaces' => true]);
+    expect(DB::table('email_domaines')->count())->toBe($total);
+
+    Artisan::call('retention:purge', ['--all-workspaces' => true, '--force' => true]);
+    expect(DB::table('email_domaines')->where('domaine', 'zz-mort.example')->exists())->toBeFalse()
+        ->and(DB::table('email_domaines')->count())->toBe($total - 1);
+});
+
+test('E2 — l enrichissement ne remplace jamais une adresse verifiee, ni celle d une fiche protegee', function () {
+    vemVerifier(['--source' => 'contacts']);
+    // Hors protection, jamais vérifiée, invalide : l'enrichissement peut chercher.
+    $libre = vemContact($this, $this->b, 'ZZ Libre', 'libre@zz-libre.example', ['email_status' => 'invalid']);
+    // Sans adresse : toujours cherchée.
+    $sansAdresse = (int) DB::table('contacts')->insertGetId([
+        'workspace_id' => $this->espace, 'company_id' => $this->a, 'last_name' => 'ZZ Sans', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    // La fiche B devient PROTÉGÉE.
+    $tag = (int) DB::table('tags')->insertGetId([
+        'workspace_id' => $this->espace, 'slug' => FichesProtegees::TAG_FEDERATIONS, 'name' => 'ZZ',
+        'category' => 'intent', 'kind' => 'auto', 'rules' => '{}', 'is_locked' => true, 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    DB::table('company_tag')->insert(['company_id' => $this->b, 'tag_id' => $tag, 'workspace_id' => $this->espace, 'assigned_at' => now(), 'assigned_by' => 'auto-rule']);
+
+    $surA = WaterfallOrchestrator::contactsARechercher($this->a)->pluck('id')->all();
+    $surB = WaterfallOrchestrator::contactsARechercher($this->b)->pluck('id')->all();
+
+    // `hunter` (fiche A, non protégée) : `invalid` posé par la vérification → son adresse est gardée.
+    expect($surA)->toContain($sansAdresse)
+        ->and($surA)->not->toContain($this->hunter)
+        ->and($surB)->not->toContain($libre);
+
+    // TÉMOIN : la même personne, fiche NON protégée, est bien cherchée.
+    DB::table('company_tag')->where('company_id', $this->b)->delete();
+    expect(WaterfallOrchestrator::contactsARechercher($this->b)->pluck('id')->all())->toContain($libre);
 });

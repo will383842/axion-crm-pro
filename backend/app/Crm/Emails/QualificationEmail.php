@@ -95,7 +95,9 @@ final class QualificationEmail
             return false;
         }
 
-        return filter_var(substr($email, 0, $at) . '@' . $domaine, FILTER_VALIDATE_EMAIL) !== false;
+        // `FILTER_FLAG_EMAIL_UNICODE` : une partie locale accentuée
+        // (« élodie@ », RFC 6531) n'est pas une faute de syntaxe (relecture E4).
+        return filter_var(substr($email, 0, $at) . '@' . $domaine, FILTER_VALIDATE_EMAIL, FILTER_FLAG_EMAIL_UNICODE) !== false;
     }
 
     public static function estJetable(string $domaine): bool

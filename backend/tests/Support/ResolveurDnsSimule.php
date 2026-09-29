@@ -29,6 +29,19 @@ final class ResolveurDnsSimule implements ResolveurDns
      */
     public ?Closure $pendant = null;
 
+    /** Le domaine témoin des tests (installé dans la configuration par le constructeur). */
+    public const TEMOIN = 'temoin.zz-dns.example';
+
+    /**
+     * Ce que « répond » le domaine TÉMOIN (`crm.emails_verification.domaine_temoin`),
+     * sur lequel la commande juge le résolveur. Par défaut : il reçoit. Ses
+     * questions ne sont PAS notées dans `demandes` (elles jugent le résolveur,
+     * elles ne vérifient aucune adresse) ; elles sont comptées à part.
+     */
+    public string $verdictTemoin = ResultatDns::MX;
+
+    public int $questionsTemoin = 0;
+
     /**
      * @param  array<string, string>  $reponses  domaine => verdict (`ResultatDns::*`)
      * @param  list<string>  $pannes  domaines dont la résolution LÈVE (panne simulée)
@@ -37,16 +50,31 @@ final class ResolveurDnsSimule implements ResolveurDns
         private array $reponses = [],
         private string $defaut = ResultatDns::MX,
         private array $pannes = [],
-    ) {}
+    ) {
+        config(['crm.emails_verification.domaine_temoin' => self::TEMOIN]);
+    }
 
     public function resoudre(array $domaines): array
     {
+        $sortie = [];
+        if ($domaines === [self::TEMOIN]) {
+            // Le résolveur est JUGÉ, aucune adresse n'est vérifiée : ni
+            // `appels`, ni `pendant`.
+            $this->questionsTemoin++;
+
+            return [self::TEMOIN => new ResultatDns($this->verdictTemoin)];
+        }
         $this->appels[] = count($domaines);
         if ($this->pendant !== null) {
             ($this->pendant)($domaines);
         }
-        $sortie = [];
         foreach ($domaines as $d) {
+            if ($d === self::TEMOIN) {
+                $this->questionsTemoin++;
+                $sortie[$d] = new ResultatDns($this->verdictTemoin);
+
+                continue;
+            }
             $this->demandes[] = $d;
             if (in_array($d, $this->pannes, true)) {
                 throw new RuntimeException('panne DNS simulée');

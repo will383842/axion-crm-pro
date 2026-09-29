@@ -29,6 +29,15 @@ final class MasquageCoordonnees
     public const PERMISSION = 'contacts.view_pii';
 
     /**
+     * L'empreinte de vérification d'une adresse (`crm:emails:verifier`,
+     * `signals.email_generic_verification`, `contacts.metadata.email_verification`,
+     * `contact_channels.details`). Même salée (HMAC), elle ne sort pas pour
+     * qui ne voit les adresses que masquées : rien ne doit permettre de
+     * CONFIRMER une adresse devinée (relecture S1).
+     */
+    private const EMPREINTE = 'empreinte';
+
+    /**
      * Colonnes qui portent une adresse e-mail sur les fiches rendues par l'API.
      *
      * `email` : table `contacts`. `email_generic` : table `companies`. Relevé
@@ -203,6 +212,11 @@ final class MasquageCoordonnees
         }
 
         foreach ($donnees as $cle => $valeur) {
+            if ($cle === self::EMPREINTE) {
+                unset($donnees[$cle]);
+
+                continue;
+            }
             if (is_array($valeur)) {
                 $donnees[$cle] = self::masquerTableau($valeur, $profondeur + 1);
 
@@ -275,6 +289,10 @@ final class MasquageCoordonnees
                 }
             }
 
+            foreach (get_object_vars($noeud) as $propriete => $valeur) {
+                $noeud->{$propriete} = self::sansEmpreinte($valeur);
+            }
+
             return;
         }
 
@@ -308,6 +326,16 @@ final class MasquageCoordonnees
         // Relations DÉJÀ chargées uniquement — `getRelations()` ne déclenche
         // aucune requête. `tags` n'a aucune colonne de coordonnée : la descente
         // y est un passage à vide, pas une erreur.
+        // Les colonnes JSON (`signals`, `metadata`) : l'empreinte de
+        // vérification d'une adresse n'en sort pas (relecture S1).
+        foreach (array_keys($attributs) as $champ) {
+            $valeur = $noeud->getAttribute($champ);
+            $nettoyee = self::sansEmpreinte($valeur);
+            if ($nettoyee !== $valeur) {
+                $noeud->setAttribute($champ, $nettoyee);
+            }
+        }
+
         foreach ($noeud->getRelations() as $relation) {
             self::masquer($relation, $vus);
         }
@@ -319,6 +347,34 @@ final class MasquageCoordonnees
      * passage, un entier lèverait un TypeError EN PLEINE RÉPONSE et le 500
      * masquerait… le masquage.
      */
+    /**
+     * Retire, à toute profondeur, la clé `empreinte` d'un tableau — ou d'un
+     * texte JSON (colonne lue brute par `DB::table()`). Toute autre valeur
+     * est rendue telle quelle.
+     */
+    private static function sansEmpreinte(mixed $valeur, int $profondeur = 0): mixed
+    {
+        if (is_string($valeur)) {
+            if (! str_contains($valeur, '"' . self::EMPREINTE . '"')) {
+                return $valeur;
+            }
+            $decode = json_decode($valeur, true);
+
+            return is_array($decode) ? json_encode(self::sansEmpreinte($decode, $profondeur), JSON_UNESCAPED_UNICODE) : $valeur;
+        }
+        if (! is_array($valeur) || $profondeur > 12) {
+            return $valeur;
+        }
+        unset($valeur[self::EMPREINTE]);
+        foreach ($valeur as $cle => $sous) {
+            if (is_array($sous)) {
+                $valeur[$cle] = self::sansEmpreinte($sous, $profondeur + 1);
+            }
+        }
+
+        return $valeur;
+    }
+
     private static function enTexte(mixed $valeur): ?string
     {
         if ($valeur === null) {

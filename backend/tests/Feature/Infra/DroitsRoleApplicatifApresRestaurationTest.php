@@ -43,8 +43,9 @@ function drapLignes(): array
     $pdo = drapProprio()->getPdo();
     // La SEULE substitution : la variable psql `:'role'` (littéral cité).
     $requete = str_replace(":'role'", $pdo->quote(drapRole()), (string) $sql);
-    // Aucune variable psql ne doit rester non substituée.
-    expect($requete)->not->toContain(":'");
+    // Aucune variable psql (`:'nom'`) ne doit rester non substituée — le
+    // littéral `'fonction:'` de la requête n'en est pas une.
+    expect(preg_match("/:'\\w+'/", $requete))->toBe(0);
 
     $lignes = [];
     foreach (drapProprio()->select($requete) as $ligne) {

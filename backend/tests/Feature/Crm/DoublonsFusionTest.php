@@ -280,7 +280,10 @@ test('la base REFUSE de supprimer en dur une fiche absorbée ; TÉMOIN : après 
 });
 
 test('les purges écartent les fiches absorbée ET gardée au lieu d échouer', function () {
+    // Sans protection : seule la fusion en cours doit les écarter.
+    DB::table('company_tag')->where('company_id', $this->absorbee)->delete();
     dfFusionner($this->ws, $this->garde, $this->absorbee);
+    expect(FichesProtegees::estProtegee($this->garde))->toBeFalse();
     // Une fiche ordinaire sans forme juridique : la purge la supprime (témoin).
     $temoin = F::fiche($this->ws, 'ZZ Temoin purge');
 
@@ -298,6 +301,8 @@ test('les purges écartent les fiches absorbée ET gardée au lieu d échouer', 
 
 test('S4 — la purge de rétention RGPD épargne les personnes d une fiche gardée par une fusion en cours', function () {
     config(['crm.purges_enabled' => true]);
+    // Sans protection : seule la fusion en cours doit les épargner.
+    DB::table('company_tag')->where('company_id', $this->absorbee)->delete();
     dfFusionner($this->ws, $this->garde, $this->absorbee);
     DB::table('contacts')->where('workspace_id', $this->ws)->update(['created_at' => now()->subYears(4), 'legal_basis' => 'legitimate_interest_b2b']);
     // TÉMOIN : une personne d'une fiche ordinaire, aussi ancienne, est purgée.

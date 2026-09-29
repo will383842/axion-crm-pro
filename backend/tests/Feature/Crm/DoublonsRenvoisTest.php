@@ -95,6 +95,12 @@ test('un import d événement dont l organisateur a été absorbé se relie à l
     // … et un nouvel import relie la fiche restaurée, plus la gardée.
     Artisan::call('crm:import-evenements', ['file' => drvFichier([array_replace($ligne, ['external_ref' => 'zz-renvoi-2'])])]);
     expect(drvOrganisateurs('zz-renvoi-2'))->toBe([$absorbee]);
+    // Une fusion ANNULÉE ne renvoie plus rien : la fiche, remise à la
+    // corbeille à la main ensuite, n'est plus reliée du tout.
+    DB::table('companies')->where('id', $absorbee)->update(['deleted_at' => now()]);
+    Artisan::call('crm:import-evenements', ['file' => drvFichier([array_replace($ligne, ['external_ref' => 'zz-renvoi-4'])])]);
+    expect(drvOrganisateurs('zz-renvoi-4'))->toBe([])
+        ->and(F::compteur(Artisan::output(), 'organisateurs_introuvables'))->toBe(1);
 });
 
 test('TÉMOIN — une fiche mise à la corbeille SANS fusion n est jamais reliée', function () {

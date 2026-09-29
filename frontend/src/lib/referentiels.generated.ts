@@ -1,7 +1,8 @@
 /**
  * FICHIER GÉNÉRÉ — NE PAS MODIFIER À LA MAIN.
  *
- * Source : `backend/app/Crm/Taxonomy.php` (référentiel unique, chantier 1).
+ * Source : `backend/app/Crm/Taxonomy.php` (référentiel unique, chantier 1),
+ * et, pour les métiers, `backend/resources/referentiels/metiers.csv` (chantier 2).
  * Régénérer : `php artisan crm:referentiels:generer-front` (depuis `backend/`).
  * Garde : `backend/tests/Unit/Crm/ReferentielsFrontTest.php` rougit si ce
  * fichier diffère de ce que la commande produirait.
@@ -170,3 +171,102 @@ export const PARTENARIATS = [
 ] as const satisfies readonly EntreeReferentiel[];
 
 export type ClePartenariat = (typeof PARTENARIATS)[number]['code'];
+
+/** Métiers — étiquette automatique `metier-<code>` (depuis la sous-classe NAF rév. 2). */
+export const METIERS = [
+  { code: "professions-juridiques", libelle: "Avocats, notaires et professions juridiques" },
+  { code: "experts-comptables", libelle: "Experts-comptables et cabinets comptables" },
+  { code: "medecins", libelle: "Médecins généralistes et spécialistes" },
+  { code: "dentistes", libelle: "Dentistes" },
+  { code: "pharmacies", libelle: "Pharmacies" },
+  { code: "infirmiers-sages-femmes", libelle: "Infirmiers et sages-femmes" },
+  { code: "kines-reeducation", libelle: "Kinésithérapeutes, orthophonistes, podologues (rééducation)" },
+  { code: "autres-praticiens-sante", libelle: "Autres praticiens de santé (psychologues, ostéopathes…)" },
+  { code: "laboratoires-analyses", libelle: "Laboratoires d'analyses médicales" },
+  { code: "ambulances", libelle: "Ambulances" },
+  { code: "hopitaux-cliniques", libelle: "Hôpitaux et cliniques" },
+  { code: "ehpad-hebergement-medicalise", libelle: "EHPAD et hébergement des personnes âgées" },
+  { code: "aide-a-domicile", libelle: "Aide à domicile" },
+  { code: "creches", libelle: "Crèches et accueil de jeunes enfants" },
+  { code: "veterinaires", libelle: "Vétérinaires" },
+  { code: "opticiens", libelle: "Opticiens" },
+  { code: "architectes", libelle: "Architectes" },
+  { code: "geometres", libelle: "Géomètres-experts" },
+  { code: "bureaux-etudes", libelle: "Bureaux d'études, ingénierie et économistes de la construction" },
+  { code: "controle-technique", libelle: "Contrôle technique, analyses et diagnostics" },
+  { code: "agents-immobiliers", libelle: "Agents immobiliers et administrateurs de biens" },
+  { code: "promoteurs-marchands-biens", libelle: "Promoteurs immobiliers et marchands de biens" },
+  { code: "location-immobiliere", libelle: "Location et gestion de biens immobiliers (SCI…)" },
+  { code: "holdings-sieges", libelle: "Holdings et sièges sociaux" },
+  { code: "banques-credit", libelle: "Banques et établissements de crédit" },
+  { code: "assurance", libelle: "Assurance (compagnies, agents et courtiers)" },
+  { code: "gestion-patrimoine", libelle: "Gestion de patrimoine, courtage financier et gestion de fonds" },
+  { code: "garages-carrosseries", libelle: "Garages, mécanique et carrosserie" },
+  { code: "commerce-automobile", libelle: "Vente de véhicules, motos et pièces automobiles" },
+  { code: "location-vehicules", libelle: "Location de véhicules" },
+  { code: "taxis-vtc", libelle: "Taxis et VTC" },
+  { code: "transport-routier", libelle: "Transport routier de marchandises" },
+  { code: "demenageurs", libelle: "Déménageurs" },
+  { code: "logistique-messagerie", libelle: "Logistique, entreposage, messagerie et livraison" },
+  { code: "maconnerie-gros-oeuvre", libelle: "Maçonnerie, gros œuvre et construction de bâtiments" },
+  { code: "travaux-publics", libelle: "Travaux publics, terrassement et démolition" },
+  { code: "electriciens", libelle: "Électriciens" },
+  { code: "plombiers-chauffagistes", libelle: "Plombiers, chauffagistes et climatisation" },
+  { code: "menuisiers", libelle: "Menuisiers, serruriers et agenceurs" },
+  { code: "peintres", libelle: "Peintres et vitriers" },
+  { code: "platriers-isolation", libelle: "Plâtriers, plaquistes et isolation" },
+  { code: "carreleurs-revetements", libelle: "Carreleurs et revêtements de sols et murs" },
+  { code: "couvreurs-charpentiers", libelle: "Couvreurs, charpentiers et étancheurs" },
+  { code: "finitions-batiment", libelle: "Autres travaux spécialisés du bâtiment" },
+  { code: "paysagistes", libelle: "Paysagistes" },
+  { code: "nettoyage", libelle: "Nettoyage et propreté" },
+  { code: "securite-privee", libelle: "Sécurité privée" },
+  { code: "interim-recrutement", libelle: "Intérim, recrutement et placement" },
+  { code: "services-informatiques", libelle: "Services informatiques (ESN, développement, conseil)" },
+  { code: "editeurs-logiciels", libelle: "Éditeurs de logiciels" },
+  { code: "telecoms", libelle: "Opérateurs de télécommunications" },
+  { code: "agences-communication", libelle: "Agences de communication et relations publiques" },
+  { code: "agences-publicite", libelle: "Agences de publicité, régies et études de marché" },
+  { code: "conseil-gestion", libelle: "Conseil en gestion et management" },
+  { code: "design-graphisme", libelle: "Designers, graphistes et architectes d'intérieur" },
+  { code: "photographes", libelle: "Photographes" },
+  { code: "traducteurs", libelle: "Traducteurs et interprètes" },
+  { code: "evenementiel-salons", libelle: "Organisateurs de salons, foires et congrès" },
+  { code: "secretariat-domiciliation", libelle: "Secrétariat, domiciliation et centres d'appels" },
+  { code: "agents-commerciaux", libelle: "Agents commerciaux et intermédiaires du commerce" },
+  { code: "organismes-formation", libelle: "Organismes de formation continue" },
+  { code: "cours-soutien-scolaire", libelle: "Soutien scolaire, cours et autres enseignements" },
+  { code: "auto-ecoles", libelle: "Auto-écoles" },
+  { code: "coiffeurs", libelle: "Coiffeurs" },
+  { code: "esthetique", libelle: "Instituts de beauté et soins du corps" },
+  { code: "boulangeries-patisseries", libelle: "Boulangeries et pâtisseries" },
+  { code: "boucheries-charcuteries", libelle: "Boucheries et charcuteries" },
+  { code: "commerces-alimentaires", libelle: "Épiceries, primeurs, cavistes et commerces alimentaires" },
+  { code: "grande-distribution", libelle: "Supermarchés, hypermarchés et grands magasins" },
+  { code: "tabac-presse", libelle: "Tabac et presse" },
+  { code: "restaurants", libelle: "Restaurants (y compris restauration rapide)" },
+  { code: "traiteurs-restauration-collective", libelle: "Traiteurs et restauration collective" },
+  { code: "cafes-bars", libelle: "Cafés et bars" },
+  { code: "hotels-hebergement", libelle: "Hôtels, campings et hébergement touristique" },
+  { code: "agences-voyage", libelle: "Agences de voyage et voyagistes" },
+  { code: "fleuristes", libelle: "Fleuristes, jardineries et animaleries" },
+  { code: "habillement-chaussures", libelle: "Magasins d'habillement et de chaussures" },
+  { code: "bijouteries", libelle: "Bijouteries et horlogeries" },
+  { code: "equipement-maison", libelle: "Meubles, bricolage et équipement de la maison" },
+  { code: "vente-distance", libelle: "Vente à distance et e-commerce" },
+  { code: "pompes-funebres", libelle: "Pompes funèbres" },
+  { code: "salles-sport-clubs", libelle: "Salles de sport et clubs sportifs" },
+  { code: "arts-spectacle", libelle: "Arts du spectacle et création artistique" },
+  { code: "production-audiovisuelle", libelle: "Production audiovisuelle et musicale" },
+  { code: "edition-presse", libelle: "Édition et presse" },
+  { code: "imprimeries", libelle: "Imprimeries" },
+  { code: "agriculteurs-eleveurs", libelle: "Agriculteurs et éleveurs" },
+  { code: "viticulture", libelle: "Viticulteurs et vinification" },
+  { code: "mecanique-industrielle", libelle: "Mécanique industrielle, usinage et maintenance" },
+  { code: "metallerie-chaudronnerie", libelle: "Métallerie et chaudronnerie" },
+] as const satisfies readonly EntreeReferentiel[];
+
+export type CleMetier = (typeof METIERS)[number]['code'];
+
+/** Préfixe du slug de l'étiquette d'un métier : `metier-` + code. */
+export const PREFIXE_ETIQUETTE_METIER = "metier-";

@@ -36,6 +36,7 @@ import type {
   AudienceCriteria,
   EmailAudience,
 } from './AudiencesListPage';
+import { METIER_PRESETS, critereMetiers } from './metiers';
 
 // ---------------------------------------------------------------------------
 // Presets
@@ -101,6 +102,7 @@ export function AudienceBuilderPage() {
   const [sizes, setSizes] = useState<string[]>([]);
   const [sectors, setSectors] = useState<string[]>([]);
   const [natures, setNatures] = useState<string[]>([]);
+  const [metiers, setMetiers] = useState<string[]>([]);
   const [statuses, setStatuses] = useState<string[]>(['ready_for_outreach']);
   const [qualityMin, setQualityMin] = useState<number>(0);
   const [hasEmail, setHasEmail] = useState<boolean>(false);
@@ -114,6 +116,9 @@ export function AudienceBuilderPage() {
     if (sizes.length > 0)       all.push({ field: 'size_category',   op: 'in', value: sizes });
     if (sectors.length > 0)     all.push({ field: 'sector_main',     op: 'in', value: sectors });
     if (natures.length > 0)     all.push({ field: 'entity_nature',   op: 'in', value: natures });
+    // Métier : l'étiquette `metier-<code>` (chantier 2), en `contains_any`.
+    const metier = critereMetiers(metiers);
+    if (metier !== null)        all.push(metier);
     if (statuses.length > 0)    all.push({ field: 'prospection_status', op: 'in', value: statuses });
     if (qualityMin > 0)         all.push({ field: 'quality_score',   op: 'gte', value: qualityMin });
     if (hasEmail)               all.push({ field: 'has_email',       op: 'eq',  value: true });
@@ -125,7 +130,7 @@ export function AudienceBuilderPage() {
     if (tagList.length > 0) all.push({ field: 'tags', op: 'contains_any', value: tagList });
 
     return { all };
-  }, [departments, regions, sizes, sectors, natures, statuses, qualityMin, hasEmail, tagsInput]);
+  }, [departments, regions, sizes, sectors, natures, metiers, statuses, qualityMin, hasEmail, tagsInput]);
 
   // Preview live (debounced 500ms)
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
@@ -294,6 +299,21 @@ export function AudienceBuilderPage() {
             </Field>
           </Card>
 
+          {/* Métiers (chantier 2) */}
+          <Card padding="md" className="space-y-4">
+            <SectionHeading icon={<Building className="h-4 w-4" />} title="Métiers" />
+            <Field label="Métiers (depuis le code NAF de la fiche)">
+              <ChipsMultiSelect
+                options={METIER_PRESETS}
+                selected={metiers}
+                onChange={setMetiers}
+                placeholder="Tous métiers"
+                masquerCode
+                filtre="Filtrer les métiers"
+              />
+            </Field>
+          </Card>
+
           {/* Qualité */}
           <Card padding="md" className="space-y-4">
             <SectionHeading icon={<Layers className="h-4 w-4" />} title="Qualité et statut" />
@@ -431,12 +451,24 @@ function ChipsMultiSelect({
   selected,
   onChange,
   placeholder,
+  masquerCode = false,
+  filtre,
 }: {
-  options: Array<{ code: string; label: string }>;
+  options: ReadonlyArray<{ code: string; label: string }>;
   selected: string[];
   onChange: (next: string[]) => void;
   placeholder?: string;
+  /** N'afficher que le libellé (le code d'un métier n'apprend rien au lecteur). */
+  masquerCode?: boolean;
+  /** Nom accessible d'un champ qui filtre les puces par libellé (longues listes). */
+  filtre?: string;
 }) {
+  const [recherche, setRecherche] = useState('');
+  const terme = recherche.trim().toLocaleLowerCase('fr');
+  // Une puce CHOISIE reste toujours visible : on ne cache pas ce qui cible.
+  const visibles = terme === ''
+    ? options
+    : options.filter((o) => selected.includes(o.code) || o.label.toLocaleLowerCase('fr').includes(terme));
   function toggle(code: string) {
     if (selected.includes(code)) {
       onChange(selected.filter((c) => c !== code));
@@ -449,8 +481,16 @@ function ChipsMultiSelect({
       {selected.length === 0 && placeholder ? (
         <div className="text-[11px] italic text-slate-400">{placeholder}</div>
       ) : null}
+      {filtre !== undefined ? (
+        <Input
+          aria-label={filtre}
+          placeholder="ex : comptable, plombier, coiffure"
+          value={recherche}
+          onChange={(e) => setRecherche(e.target.value)}
+        />
+      ) : null}
       <div className="flex flex-wrap gap-1.5">
-        {options.map((opt) => {
+        {visibles.map((opt) => {
           const active = selected.includes(opt.code);
           return (
             <button
@@ -464,7 +504,7 @@ function ChipsMultiSelect({
                   : 'bg-slate-100 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-700',
               )}
             >
-              <span className="font-mono text-[10px] opacity-70">{opt.code}</span>
+              {masquerCode ? null : <span className="font-mono text-[10px] opacity-70">{opt.code}</span>}
               <span>{opt.label}</span>
               {active ? <X className="h-3 w-3" /> : null}
             </button>

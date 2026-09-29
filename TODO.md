@@ -74,8 +74,13 @@ prospection 3 ans) n'est tenue par aucun automatisme.
 Ce qui a été réparé : le **silence**. Le saut se journalise désormais en
 `warning` à chaque passage du planificateur. L'inaction laisse une trace datée.
 
-Ce qui reste, et qui appartient à Will : poser `CRM_PURGE_ENABLED=true` sur le
-serveur, **après** une vérification à la main en `--dry-run`.
+~~Ce qui reste, et qui appartient à Will : poser `CRM_PURGE_ENABLED=true` sur le
+serveur, **après** une vérification à la main en `--dry-run`.~~
+
+⛔ **DÉCISION DE WILL (2026-09-29) : ne PAS activer ces purges.** « Il est
+strictement interdit de purger quoi que ce soit et de perdre des contacts, sauf
+dans certains cas (doublons). » Le drapeau avait été posé à `true` sur le
+serveur ; il a été remis à `false` le 29/09. **Aucun agent ne le rallume.**
 
 ### 1.2 Le sens CRM → site ne s'ouvre pas d'un drapeau — B14-013 (S1)
 

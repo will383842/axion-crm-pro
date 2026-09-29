@@ -72,6 +72,13 @@ final class FichesProtegees
     public const TAG_FEDERATIONS = 'src:scraping-federations-2026';
 
     /**
+     * Participants du salon GOFAB 2026 (source `gofab-2026`, 2026-09-29). Will :
+     * « il ne faut surtout pas perdre ces contacts » — même régime que les
+     * organisateurs et les fédérations.
+     */
+    public const TAG_GOFAB = 'src:scraping-gofab-2026';
+
+    /**
      * ⚠️ Chaque slug ajouté ici exige une NOUVELLE migration qui réinstalle le
      * déclencheur de la base (sa liste est figée) — `FichesProtegeesTest` lit la
      * fonction installée et rougit sinon.
@@ -81,6 +88,7 @@ final class FichesProtegees
     public const TAGS = [
         self::TAG_ORGANISATEURS,
         self::TAG_FEDERATIONS,
+        self::TAG_GOFAB,
     ];
 
     /**

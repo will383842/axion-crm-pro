@@ -8,10 +8,12 @@
  * l'information vient de GOFAB. Fixtures FICTIVES uniquement (dépôt public).
  */
 
+use App\Crm\FichesProtegees;
 use App\Crm\Scraping\ScrapedRecord;
 use App\Crm\Scraping\ScrapedRecordIngestService;
 use App\Crm\Scraping\ScrapeIngestOutcome;
 use Database\Seeders\ScrapingSourcesSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -136,4 +138,29 @@ test('un contact deja present garde ses valeurs et gagne la source gofab-2026', 
         ->and($ancien->role)->toBe('Directeur production')
         ->and($ancien->phone)->toBe('+33600000952')
         ->and(DB::table('contacts')->where('company_id', $this->fiche)->count())->toBe(1);
+});
+
+test('une fiche GOFAB est protegee : la base refuse sa suppression, le temoin passe', function () {
+    $this->seed(ScrapingSourcesSeeder::class);
+    gofabIngerer(gofabLigne());
+
+    $temoin = (int) DB::table('companies')->insertGetId([
+        'workspace_id' => $this->espace, 'siren' => '900000952', 'denomination' => 'ZZ Temoin',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    expect(FichesProtegees::estProtegee($this->fiche))->toBeTrue()
+        ->and(FichesProtegees::estProtegee($temoin))->toBeFalse()
+        ->and(fn () => DB::transaction(fn () => DB::table('companies')->where('id', $this->fiche)->delete()))
+        ->toThrow(QueryException::class, 'fiche_protegee');
+
+    DB::table('companies')->where('id', $temoin)->delete();
+    expect(DB::table('companies')->where('id', $temoin)->exists())->toBeFalse()
+        ->and(DB::table('companies')->where('id', $this->fiche)->exists())->toBeTrue();
+});
+
+test('la note juridique de la source ne parle plus d echeance', function () {
+    expect((string) DB::table('scraping_sources')->where('slug', 'gofab-2026')->value('legal_note'))
+        ->not->toContain('art. 14')
+        ->toContain('FichesProtegees');
 });

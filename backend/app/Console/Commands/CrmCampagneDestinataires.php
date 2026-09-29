@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Crm\Campagnes\Segments;
 use App\Crm\Doublons\AdressesPartagees;
+use App\Crm\Emails\VerificationEmail;
 use App\Crm\Evenements\EvenementAVenir;
 use App\Crm\Federations\EtiquettesFederation;
 use App\Crm\Personnes\NatureEmail;
@@ -25,7 +26,12 @@ use Illuminate\Support\Facades\DB;
  * plusieurs contacts. On regroupe d'abord toutes ses occurrences, puis l'adresse
  * est écartée si UNE seule d'entre elles l'exige :
  *
- *  - syntaxe invalide, ou `email_status` invalid/disposable ;
+ *  - syntaxe invalide, `email_status` invalid/disposable, ou vérification
+ *    `invalide`/`jetable` (`crm:emails:verifier`) ;
+ *  - adresse NON VÉRIFIÉE : seule une adresse que `crm:emails:verifier` a
+ *    trouvée `valide` (son domaine reçoit du courrier) part en campagne. Une
+ *    adresse jamais vérifiée, ou vérifiée pour une autre valeur, est écartée
+ *    (`ecartees_non_verifiees`) — lancer la vérification d'abord ;
  *  - adresse grand public (gmail…) ou marquée personnelle : on n'écrit à une
  *    personne sur son adresse privée qu'à la main, au sujet de son rôle —
  *    jamais dans une campagne (décision D3, plan d'envoi §10) ;
@@ -118,7 +124,7 @@ class CrmCampagneDestinataires extends Command
         $famillesExclues = $avecSyndicats ? [] : Taxonomy::FEDERATION_FAMILLES_HORS_CAMPAGNE;
 
         $bilan = array_fill_keys([
-            'fiches', 'ecartees_pertinence_faible', 'ecartees_sans_classement', 'ecartees_syndicats_salaries', 'adresses_distinctes', 'destinataires', 'ecartees_invalides', 'ecartees_perso',
+            'fiches', 'ecartees_pertinence_faible', 'ecartees_sans_classement', 'ecartees_syndicats_salaries', 'adresses_distinctes', 'destinataires', 'ecartees_invalides', 'ecartees_non_verifiees', 'ecartees_perso',
             'ecartees_deja_informees', 'ecartees_opposition', 'ecartees_adresse_partagee', 'adresses_partagees', 'sans_evenement_a_venir',
         ], 0);
 
@@ -165,8 +171,16 @@ class CrmCampagneDestinataires extends Command
             $email = (string) $email;
 
             if (filter_var($email, FILTER_VALIDATE_EMAIL) === false
-                || $this->une($occurrences, fn ($o) => in_array($o['status'], ['invalid', 'disposable'], true))) {
+                || $this->une($occurrences, fn ($o) => in_array($o['status'], ['invalid', 'disposable'], true))
+                || $this->une($occurrences, fn ($o) => in_array($o['verification'], [VerificationEmail::INVALIDE, VerificationEmail::JETABLE], true))) {
                 $bilan['ecartees_invalides']++;
+
+                continue;
+            }
+            // Seule une adresse VÉRIFIÉE valide part : jamais une adresse dont
+            // on ne sait pas si son domaine reçoit du courrier.
+            if (! $this->une($occurrences, fn ($o) => $o['verification'] === VerificationEmail::VALIDE)) {
+                $bilan['ecartees_non_verifiees']++;
 
                 continue;
             }
@@ -342,9 +356,10 @@ class CrmCampagneDestinataires extends Command
      *
      * `nature_adresse` et `domaine_verifie_le` : ce que l'import en a dit
      * (`signals.email_generic_verification`, `contacts.metadata`), null si on
-     * ne le sait pas — jamais deviné.
+     * ne le sait pas — jamais deviné. `verification` : le statut posé par
+     * `crm:emails:verifier` pour CETTE adresse (`VerificationEmail::statutDe`).
      *
-     * @return list<array{crm_ref: string, email: string, type: string, nature_adresse: ?string, domaine_verifie_le: ?string, prenom: ?string, nom: ?string, fonction: ?string, status: ?string, perso: bool, deja_informe: bool}>
+     * @return list<array{crm_ref: string, email: string, type: string, nature_adresse: ?string, domaine_verifie_le: ?string, prenom: ?string, nom: ?string, fonction: ?string, status: ?string, verification: ?string, perso: bool, deja_informe: bool}>
      */
     private function adresses(string $workspaceId, \stdClass $org): array
     {
@@ -362,6 +377,7 @@ class CrmCampagneDestinataires extends Command
                 'domaine_verifie_le' => is_string($verification['verifie_le'] ?? null) ? $verification['verifie_le'] : null,
                 'prenom' => null, 'nom' => null, 'fonction' => null,
                 'status' => null,
+                'verification' => VerificationEmail::statutDe($verification, (string) $org->email_generic),
                 'perso' => false,
                 'deja_informe' => $org->first_info_at !== null,
             ];
@@ -387,6 +403,7 @@ class CrmCampagneDestinataires extends Command
                 'nom' => $c->last_name,
                 'fonction' => $c->role,
                 'status' => $c->email_status,
+                'verification' => VerificationEmail::statutDe(is_array($meta) ? ($meta['email_verification'] ?? null) : null, (string) $c->email),
                 'perso' => is_array($meta) && ($meta['email_nature'] ?? null) === 'perso',
                 'deja_informe' => $c->first_info_at !== null,
             ];

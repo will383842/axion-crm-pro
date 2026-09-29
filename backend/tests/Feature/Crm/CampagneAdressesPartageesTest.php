@@ -19,6 +19,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\DoublonsFixtures as F;
+use Tests\Support\ResolveurDnsSimule;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -45,6 +46,10 @@ beforeEach(function () {
 /** @return array{emails: list<string>, sortie: string} */
 function capDestinataires(array $options = []): array
 {
+    // Depuis #261, seule une adresse VÉRIFIÉE valide part en campagne : tout
+    // vérifier juste avant (DNS simulé), pour que rien ne soit écarté « parce
+    // que non vérifié » à la place de la raison que ces tests mesurent.
+    ResolveurDnsSimule::toutVerifier();
     $fichier = (string) tempnam(sys_get_temp_dir(), 'zz-cap-');
     try {
         Artisan::call('crm:campagne:destinataires', ['segment' => 'organisateurs-evenements', 'sortie' => $fichier] + $options);

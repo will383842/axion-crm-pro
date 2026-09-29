@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Crm\Emails\Dns\ResolveurDns;
+use App\Crm\Emails\Dns\ResolveurDnsInterdit;
 use App\Models\PersonalAccessToken;
 use App\Services\Email\EmailConfidenceService;
 use App\Services\Email\HunterEmailVerifier;
@@ -74,6 +76,17 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(MxEmailValidator::class);
         $this->app->singleton(EmailConfidenceService::class);
         $this->app->singleton(HunterEmailVerifier::class);
+
+        // ── LE DNS DE `crm:emails:verifier` : AUCUN APPEL RÉSEAU EN TEST ──────
+        //
+        // Hors test, rien n'est lié : la commande construit son résolveur UDP
+        // avec ses options et `crm.emails_verification`. En test, le résolveur
+        // lié REFUSE : un test qui oublie d'installer son résolveur simulé
+        // échoue bruyamment au lieu d'interroger un vrai DNS depuis la CI.
+        // Garde : tests/Feature/Crm/VerificationEmailsTest.php.
+        if ($this->app->environment('testing')) {
+            $this->app->bind(ResolveurDns::class, ResolveurDnsInterdit::class);
+        }
     }
 
     public function boot(): void

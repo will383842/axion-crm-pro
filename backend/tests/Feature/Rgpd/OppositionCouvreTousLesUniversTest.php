@@ -268,7 +268,13 @@ test('B15-002 — l’inventaire des points de lecture est BALAYE, jamais recopi
     // `business` (éligibilité et export). Ni l'un ni l'autre ne lit le vivier,
     // qui n'a aucune personne de la lettre — et l'effacement couvre bien la
     // table `personnes` (SiteGdprService, GdprErasureService).
+    // PR #261 (2026-09-29) : +1. `crm:emails:verifier` lit `email_suppressions`
+    // (rebond dur seul) dans l'univers de l'espace vérifié — `vivier` pour
+    // l'espace des candidats, `business` sinon — pour ne jamais ramener à
+    // `valid` une adresse qui a rebondi. Il n'écrit rien dans ces tables ; la
+    // liste elle-même est couverte par l'effacement (`ListeSuppression`).
     expect($fichiers)->toBe([
+        'app/Console/Commands/CrmEmailsVerifier.php',
         'app/Crm/Ingest/PersonnesIngestService.php',
         'app/Crm/Ingest/SiteSyncIngestService.php',
         'app/Crm/Personnes/Abonnements.php',

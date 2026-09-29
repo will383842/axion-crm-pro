@@ -24,7 +24,7 @@ uses(TestCase::class, RefreshDatabase::class);
 
 const VEMM_GENERIQUE = 'contact@zz-masque.example';
 const VEMM_PERSONNE = 'zoe.zz@zz-masque.example';
-const VEMM_CANAL = 'canal@zz-masque.example';
+const VEMM_CANAL = 'bureau@zz-masque.example';
 const VEMM_TEL_CANAL = '+33611223344';
 const VEMM_TEL_FICHE = '+33699887766';
 
@@ -150,5 +150,7 @@ test('RESERVE 3 — la LISTE des entreprises applique le masquage de la fiche : 
     expect($corps)->not->toContain('"empreinte"')
         // Les canaux sont là, MASQUÉS (pas effacés) — clés de `details` comprises.
         ->and($corps)->toContain('c***@zz-masque.example')
+        // L'adresse de CANAL (distincte de la générique) : présente, masquée.
+        ->and($corps)->toContain('b***@zz-masque.example')
         ->and($corps)->toContain('"statut"');
 });

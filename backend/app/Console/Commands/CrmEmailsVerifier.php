@@ -9,8 +9,9 @@ use App\Crm\Emails\Dns\ResultatDns;
 use App\Crm\Emails\QualificationEmail;
 use App\Crm\Emails\VerificationEmail;
 use App\Crm\EspaceProspection;
+use App\Crm\Taxonomy;
 use App\Services\Audit\AuditHashChain;
-use App\Support\EligibiliteCampagne;
+use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
@@ -94,6 +95,12 @@ class CrmEmailsVerifier extends Command
 
     private const LOT_MAX = 2000;
 
+    private const TEMOIN_RECOIT = 'recoit';
+
+    private const TEMOIN_NE_RECOIT_PAS = 'ne_recoit_pas';
+
+    private const TEMOIN_INJOIGNABLE = 'injoignable';
+
     /** @var array<string, int> */
     private array $compteurs = [];
 
@@ -105,6 +112,9 @@ class CrmEmailsVerifier extends Command
     private int $verrousTransactionMax = 0;
 
     private bool $dryRun = false;
+
+    /** L'univers de la liste de suppression (`business` | `vivier`), dérivé de l'espace vérifié. */
+    private string $univers = 'business';
 
     private bool $seulementJamais = false;
 
@@ -131,6 +141,11 @@ class CrmEmailsVerifier extends Command
 
             return self::FAILURE;
         }
+        // La liste de suppression est partagée par univers, pas par espace :
+        // l'espace du vivier lit `vivier`, tout autre espace `business`.
+        $this->univers = DB::table('workspaces')->where('id', $workspaceId)->value('slug') === Taxonomy::VIVIER_WORKSPACE_SLUG
+            ? 'vivier'
+            : 'business';
 
         $source = (string) $this->option('source');
         if ($source !== 'toutes' && ! in_array($source, self::SOURCES, true)) {
@@ -168,9 +183,13 @@ class CrmEmailsVerifier extends Command
         // des milliers d'adresses saines à `invalide` : on le JUGE d'abord, sur
         // un domaine qui reçoit du courrier à coup sûr. Rien n'est lu ni écrit
         // avant (relecture E6).
-        if (! $this->temoinRecoit()) {
-            $this->error("REFUS : le résolveur {$resolveur->nom()} dit que le domaine témoin « {$this->temoin} » ne reçoit pas de courrier. "
-                . 'Il se trompe (ou est injoignable) : rien n’a été vérifié ni écrit. Changer de résolveur (--resolveur) ou de témoin (CRM_EMAILS_DOMAINE_TEMOIN).');
+        $etat = $this->etatTemoin();
+        if ($etat !== self::TEMOIN_RECOIT) {
+            $this->error($etat === self::TEMOIN_INJOIGNABLE
+                ? "REFUS : le résolveur {$resolveur->nom()} n'a pas répondu (délai dépassé) pour le domaine témoin « {$this->temoin} », deux fois. "
+                    . 'Il est injoignable ou saturé : rien n’a été vérifié ni écrit. Vérifier le réseau, ou changer de résolveur (--resolveur).'
+                : "REFUS : le résolveur {$resolveur->nom()} dit que le domaine témoin « {$this->temoin} » ne reçoit pas de courrier, deux fois. "
+                    . 'Il se trompe : rien n’a été vérifié ni écrit. Changer de résolveur (--resolveur) ou de témoin (CRM_EMAILS_DOMAINE_TEMOIN).');
 
             return self::FAILURE;
         }
@@ -239,6 +258,7 @@ class CrmEmailsVerifier extends Command
                             $erreur = match (true) {
                                 $e instanceof QueryException => 'SQLSTATE ' . $e->getCode(),
                                 $e->getMessage() === 'resolveur_suspect' => 'résolveur suspect : le domaine témoin ne reçoit plus de courrier selon lui',
+                                $e->getMessage() === 'resolveur_injoignable' => 'résolveur injoignable : délai dépassé sur le domaine témoin',
                                 default => get_class($e),
                             };
                             Log::error('crm:emails:verifier : lot annulé', ['source' => $src, 'apres_id' => $dernier, 'erreur' => $erreur]);
@@ -565,6 +585,9 @@ class CrmEmailsVerifier extends Command
             $retenues[] = $f;
         }
         $adresses = array_values(array_unique(array_map(static fn (stdClass $f): string => (string) $f->adresse_lue, $retenues)));
+        // Les rebonds durs du lot, en UNE requête — lus avant le DNS ; l'UPDATE
+        // les relit (`NOT EXISTS`) pour fermer la course jusqu'à l'écriture.
+        $rebonds = $this->enRebondDur($adresses);
         $this->preparerDns($adresses);
         $partage = $this->fichesParAdresse($workspaceId, $adresses);
 
@@ -582,9 +605,8 @@ class CrmEmailsVerifier extends Command
                 (string) $calculee['statut'],
                 $avant,
                 $adresse,
-                // Rebond dur, plainte, opposition : la liste de suppression,
-                // interrogée seulement quand une réversion est en jeu.
-                static fn (): bool => ! EligibiliteCampagne::peutRecevoir($adresse, 'business'),
+                // Le rebond dur SEUL retient la réversion (voir `statutContact`).
+                isset($rebonds[ListeSuppression::empreinte($adresse)]),
             );
             $statut = $issue['statut'];
             // Ce qu'il faudra rétablir si le domaine revient (relecture E1).
@@ -608,6 +630,7 @@ class CrmEmailsVerifier extends Command
             $ligne = [(int) $f->id, $patch, $this->horodatage($adresse), $adresse, $statutLu];
             if ($statut !== $statutLu) {
                 $ligne[] = $statut;
+                $ligne[] = ListeSuppression::empreinte($adresse);
                 $aEcrire['avec_statut'][] = $ligne;
             } else {
                 $aEcrire['sans_statut'][] = $ligne;
@@ -632,20 +655,31 @@ class CrmEmailsVerifier extends Command
                     continue;
                 }
                 $avecStatut = $famille === 'avec_statut';
-                $gabarit = $avecStatut ? '(?::bigint, ?::jsonb, ?::timestamptz, ?::text, ?::text, ?::text)' : '(?::bigint, ?::jsonb, ?::timestamptz, ?::text, ?::text)';
+                $gabarit = $avecStatut ? '(?::bigint, ?::jsonb, ?::timestamptz, ?::text, ?::text, ?::text, ?::text)' : '(?::bigint, ?::jsonb, ?::timestamptz, ?::text, ?::text)';
                 $liaisons = [];
                 foreach ($lignes as $l) {
                     array_push($liaisons, ...$l);
                 }
                 $liaisons[] = $workspaceId;
+                // Relue DANS la transaction du lot (3e relecture, X3) : un rebond
+                // dur arrivé depuis la lecture interdit encore la réversion.
+                $gardeRebond = '';
+                if ($avecStatut) {
+                    $gardeRebond = "
+                       AND NOT (c.email_status IN ('invalid', 'disposable')
+                                AND v.statut_nouveau NOT IN ('invalid', 'disposable')
+                                AND EXISTS (SELECT 1 FROM email_suppressions s
+                                            WHERE s.scope = ? AND s.reason = ? AND s.email_hash = v.empreinte_suppression))";
+                    array_push($liaisons, $this->univers, ListeSuppression::REBOND_DUR);
+                }
                 $ecrites = DB::select(
                     "UPDATE contacts AS c
                      SET metadata = coalesce(c.metadata, '{}'::jsonb) || v.patch,
                          last_verified_at = v.verifie_a" . ($avecStatut ? ', email_status = v.statut_nouveau' : '') . '
-                     FROM (VALUES ' . implode(', ', array_fill(0, count($lignes), $gabarit)) . ') AS v(fiche_id, patch, verifie_a, adresse_attendue, statut_attendu' . ($avecStatut ? ', statut_nouveau' : '') . ')
+                     FROM (VALUES ' . implode(', ', array_fill(0, count($lignes), $gabarit)) . ') AS v(fiche_id, patch, verifie_a, adresse_attendue, statut_attendu' . ($avecStatut ? ', statut_nouveau, empreinte_suppression' : '') . ')
                      WHERE c.id = v.fiche_id AND c.workspace_id = ? AND c.deleted_at IS NULL
                        AND lower(btrim(c.email::text)) = v.adresse_attendue
-                       AND c.email_status IS NOT DISTINCT FROM v.statut_attendu
+                       AND c.email_status IS NOT DISTINCT FROM v.statut_attendu' . $gardeRebond . '
                      RETURNING c.id',
                     $liaisons,
                     false,
@@ -779,8 +813,9 @@ class CrmEmailsVerifier extends Command
         $negatifs = count(array_filter($aResoudre, static fn (string $d): bool => $resultats[$d]->recoit() === false));
         if ($negatifs > 0) {
             $this->compteurs['resolveur_rejuge']++;
-            if (! $this->temoinRecoit()) {
-                throw new \RuntimeException('resolveur_suspect');
+            $etat = $this->etatTemoin();
+            if ($etat !== self::TEMOIN_RECOIT) {
+                throw new \RuntimeException($etat === self::TEMOIN_INJOIGNABLE ? 'resolveur_injoignable' : 'resolveur_suspect');
             }
         }
         if (! $this->dryRun) {
@@ -788,12 +823,51 @@ class CrmEmailsVerifier extends Command
         }
     }
 
-    /** Le témoin reçoit-il du courrier, selon le résolveur ? (sa réponse n'est ni gardée ni enregistrée) */
-    private function temoinRecoit(): bool
+    /**
+     * Les empreintes des adresses en REBOND DUR dans la liste de suppression
+     * de l'univers, en une requête (servie par l'index unique scope + empreinte).
+     *
+     * @param  list<string>  $adresses
+     * @return array<string, true>
+     */
+    private function enRebondDur(array $adresses): array
     {
-        $r = $this->resolveur->resoudre([$this->temoin])[$this->temoin] ?? null;
+        if ($adresses === []) {
+            return [];
+        }
+        $empreintes = array_values(array_unique(array_map(static fn (string $a): string => ListeSuppression::empreinte($a), $adresses)));
+        $lignes = DB::table('email_suppressions')
+            ->where('scope', $this->univers)
+            ->where('reason', ListeSuppression::REBOND_DUR)
+            ->whereRaw('email_hash = ANY(?::text[])', ['{' . implode(',', $empreintes) . '}'])
+            ->pluck('email_hash');
+        $rebonds = [];
+        foreach ($lignes as $h) {
+            $rebonds[(string) $h] = true;
+        }
 
-        return $r !== null && $r->recoit() === true;
+        return $rebonds;
+    }
+
+    /** Le témoin reçoit-il du courrier, selon le résolveur ? (sa réponse n'est ni gardée ni enregistrée) */
+    /**
+     * Ce que le résolveur dit du témoin, avec UN nouvel essai avant de
+     * conclure (3e relecture) : une réponse perdue ne suffit pas à juger le
+     * résolveur. La réponse n'est ni gardée ni enregistrée.
+     */
+    private function etatTemoin(): string
+    {
+        $etat = self::TEMOIN_INJOIGNABLE;
+        for ($essai = 1; $essai <= 2; $essai++) {
+            $r = $this->resolveur->resoudre([$this->temoin])[$this->temoin] ?? null;
+            $recoit = $r?->recoit();
+            if ($recoit === true) {
+                return self::TEMOIN_RECOIT;
+            }
+            $etat = $recoit === false ? self::TEMOIN_NE_RECOIT_PAS : self::TEMOIN_INJOIGNABLE;
+        }
+
+        return $etat;
     }
 
     /**

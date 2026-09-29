@@ -226,16 +226,22 @@ final class VerificationEmail
      *  - 🔴 l'ORDRE INVERSE (2e relecture) : la vérification pose `invalid`
      *    pendant une panne, PUIS un rebond dur réécrit `invalid` — la même
      *    valeur, donc indiscernable sur la fiche. Ce n'est pas la fiche qui le
-     *    dit, c'est la LISTE DE SUPPRESSION : `$interdite` (l'adresse est en
-     *    rebond dur, plainte, rebonds répétés ou opposition —
-     *    `EligibiliteCampagne::peutRecevoir`) rend la réversion impossible ;
-     *    le statut reste, et il n'est plus « à nous ». On consulte la liste
-     *    plutôt que d'effacer une marque dans `crm:campagne:retours` : la
-     *    liste est la source unique de ces faits, alimentée par TOUS les
-     *    chemins (retours de campagne, site, opposition saisie à la console),
-     *    et elle vaut dans n'importe quel ordre. Limite assumée : un `invalid`
-     *    réécrit par un outil qui n'inscrit rien en liste (un fournisseur de
-     *    vérification) après le nôtre reste indiscernable ;
+     *    dit, c'est la LISTE DE SUPPRESSION : `$rebondDur` (l'adresse y figure
+     *    pour la raison `ListeSuppression::REBOND_DUR`, dans l'univers de
+     *    l'espace vérifié) rend la réversion impossible ; le statut reste, et
+     *    il n'est plus « à nous ». Le REBOND DUR SEUL (3e relecture) : c'est
+     *    le seul signal qui réécrit `email_status` (`crm:campagne:retours`).
+     *    Une désinscription, une plainte ou des rebonds mous ne touchent pas
+     *    `email_status` : ils n'ont rien à retenir ici — l'adresse redevient
+     *    `valid`, et c'est la liste de campagne qui continue de l'écarter
+     *    (`EligibiliteCampagne::peutRecevoir`). On consulte la liste plutôt
+     *    que d'effacer une marque dans `crm:campagne:retours` : elle vaut
+     *    dans n'importe quel ordre, quel que soit le chemin qui l'a remplie.
+     *    Limites assumées : un `invalid` réécrit par un outil qui n'inscrit
+     *    rien en liste (un fournisseur de vérification) reste indiscernable ;
+     *    et une plainte arrivée APRÈS un rebond dur remplace sa raison
+     *    (`ListeSuppression::raisonLaPlusGrave`) — la réversion redevient
+     *    alors possible, l'envoi restant interdit par la plainte ;
      *  - `catchall` et `role`, dégradés pendant une panne, reviennent tels
      *    quels — jamais `valid` à leur place ;
      *  - un statut vide ou `unknown` devient `valid` (posé par nous).
@@ -243,11 +249,11 @@ final class VerificationEmail
      * « Posé par nous » n'est cru que si le statut ACTUEL est encore celui que
      * nous avions posé : si quelqu'un l'a changé depuis, c'est lui qui a raison.
      *
-     * @param  bool|callable(): bool  $interdite  l'adresse est-elle en suppression ou en opposition ?
+     * @param  bool|callable(): bool  $rebondDur  l'adresse est-elle en rebond dur (liste de suppression) ?
      *                                            Évaluée seulement quand une réversion est en jeu.
      * @return array{statut: ?string, avant: ?string, pose: ?string}
      */
-    public static function statutContact(?string $actuel, string $statut, mixed $ancienne, string $email, bool|callable $interdite = false): array
+    public static function statutContact(?string $actuel, string $statut, mixed $ancienne, string $email, bool|callable $rebondDur = false): array
     {
         $nous = self::statutDe($ancienne, $email) !== null
             && is_array($ancienne)
@@ -257,11 +263,11 @@ final class VerificationEmail
         $autres = $nous ? (is_string($ancienne['email_status_avant'] ?? null) ? $ancienne['email_status_avant'] : null) : $actuel;
 
         if ($statut === self::VALIDE) {
-            // Nous avions dégradé, mais un rebond dur, une plainte ou une
-            // opposition est arrivé depuis : on ne défait rien, et le statut
-            // n'est plus le nôtre.
+            // Nous avions dégradé, mais un rebond dur est arrivé depuis (même
+            // valeur `invalid`) : on ne défait rien, et le statut n'est plus
+            // le nôtre.
             if ($nous && in_array($actuel, ['invalid', 'disposable'], true)
-                && (is_callable($interdite) ? $interdite() : $interdite)) {
+                && (is_callable($rebondDur) ? $rebondDur() : $rebondDur)) {
                 return ['statut' => $actuel, 'avant' => null, 'pose' => null];
             }
             if (in_array($autres, self::STATUTS_VIDES, true)) {

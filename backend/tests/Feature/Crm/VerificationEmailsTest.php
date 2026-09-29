@@ -1,7 +1,7 @@
 <?php
 
 /**
- * VÉRIFICATION DES E-MAILS — `crm:emails:verifier` (2026-09-30).
+ * VÉRIFICATION DES E-MAILS — `crm:emails:verifier` (2026-09-29).
  *
  * Le DNS est SIMULÉ (`Tests\Support\ResolveurDnsSimule`) : aucune requête ne
  * quitte la suite. Fixtures FICTIVES (dépôt public) : domaines `*.example`.
@@ -12,9 +12,12 @@ use App\Crm\Emails\Dns\ResolveurDnsInterdit;
 use App\Crm\Emails\Dns\ResultatDns;
 use App\Crm\Emails\VerificationEmail;
 use App\Crm\FichesProtegees;
+use App\Crm\Taxonomy;
 use App\Models\Workspace;
 use App\Providers\AppServiceProvider;
 use App\Services\Waterfall\WaterfallOrchestrator;
+use App\Support\EligibiliteCampagne;
+use App\Support\ListeSuppression;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -546,8 +549,7 @@ function vemRetour(string $type, string $email): void
 
 test('E1 ORDRE INVERSE — invalid pose par la verification, PUIS rebond dur (meme valeur), domaine revenu : toujours invalid', function () {
     $rebond = vemContact($this, $this->b, 'ZZ Inverse', 'inverse@zz-yoyo.example');
-    $oppose = vemContact($this, $this->b, 'ZZ Oppose', 'oppose@zz-yoyo.example');
-    // TÉMOIN : même histoire, sans rebond ni opposition.
+    // TÉMOIN : même histoire, sans rebond.
     $temoin = vemContact($this, $this->b, 'ZZ Temoin', 'temoin@zz-yoyo.example');
 
     // 1. Panne du domaine : la vérification pose `invalid` (à elle).
@@ -556,9 +558,8 @@ test('E1 ORDRE INVERSE — invalid pose par la verification, PUIS rebond dur (me
     expect(vemMeta($rebond)['email_verification']['email_status_pose'])->toBe('invalid');
 
     // 2. Un rebond dur réel, par la commande des retours : elle réécrit
-    //    `invalid` — LA MÊME VALEUR. Et une opposition sur l'autre adresse.
+    //    `invalid` — LA MÊME VALEUR.
     vemRetour('rebond_dur', 'inverse@zz-yoyo.example');
-    vemRetour('desinscription', 'oppose@zz-yoyo.example');
     expect(DB::table('contacts')->where('id', $rebond)->value('email_status'))->toBe('invalid');
 
     // 3. Le domaine revient.
@@ -568,9 +569,98 @@ test('E1 ORDRE INVERSE — invalid pose par la verification, PUIS rebond dur (me
 
     expect(DB::table('contacts')->where('id', $rebond)->value('email_status'))->toBe('invalid')
         ->and(vemMeta($rebond)['email_verification']['email_status_pose'])->toBeNull()
-        ->and(DB::table('contacts')->where('id', $oppose)->value('email_status'))->toBe('invalid')
         // Le témoin, lui, redevient `valid` : c'est bien le rebond qui retient.
         ->and(DB::table('contacts')->where('id', $temoin)->value('email_status'))->toBe('valid');
+});
+
+test('X1 — une desinscription ou une plainte ne retient PAS le statut (elles ne l ecrivent pas) ; elles bloquent toujours l envoi', function () {
+    $oppose = vemContact($this, $this->b, 'ZZ Oppose', 'oppose@zz-yoyo.example');
+    $plainte = vemContact($this, $this->b, 'ZZ Plainte', 'plainte@zz-yoyo.example');
+    $this->dns->repondre(['zz-yoyo.example' => ResultatDns::INEXISTANT]);
+    vemVerifier(['--source' => 'contacts']);
+    vemRetour('desinscription', 'oppose@zz-yoyo.example');
+    vemRetour('plainte', 'plainte@zz-yoyo.example');
+
+    $this->dns->repondre(['zz-yoyo.example' => ResultatDns::MX]);
+    DB::table('email_domaines')->update(['resolu_le' => now()->subDays(40)]);
+    vemVerifier(['--source' => 'contacts']);
+
+    expect(DB::table('contacts')->where('id', $oppose)->value('email_status'))->toBe('valid')
+        ->and(DB::table('contacts')->where('id', $plainte)->value('email_status'))->toBe('valid')
+        // … et l'opposition comme la plainte interdisent toujours l'envoi.
+        ->and(EligibiliteCampagne::peutRecevoir('oppose@zz-yoyo.example', 'business'))->toBeFalse()
+        ->and(EligibiliteCampagne::peutRecevoir('plainte@zz-yoyo.example', 'business'))->toBeFalse();
+});
+
+test('X3 — un rebond dur arrive ENTRE la lecture du lot et son ecriture : la reversion est quand meme refusee', function () {
+    $course = vemContact($this, $this->b, 'ZZ Course', 'course@zz-yoyo.example');
+    $this->dns->repondre(['zz-yoyo.example' => ResultatDns::INEXISTANT]);
+    vemVerifier(['--source' => 'contacts']);
+
+    $this->dns->repondre(['zz-yoyo.example' => ResultatDns::MX]);
+    DB::table('email_domaines')->update(['resolu_le' => now()->subDays(40)]);
+    // Pendant la résolution (après la lecture du lot ET de la liste), le
+    // rebond dur est inscrit — sans même toucher `email_status`.
+    $this->dns->pendant = function (): void {
+        ListeSuppression::inscrire('course@zz-yoyo.example', ListeSuppression::REBOND_DUR, 'zz-test', 'business');
+    };
+    $r = vemVerifier(['--source' => 'contacts']);
+
+    expect(DB::table('contacts')->where('id', $course)->value('email_status'))->toBe('invalid')
+        ->and(vemCompteur($r['sortie'], 'modifiees_entre_temps'))->toBe(1);
+});
+
+test('Univers — la liste de suppression lue est celle de l espace verifie (vivier), pas « business » en dur', function () {
+    $vivier = (string) DB::table('workspaces')->where('slug', Taxonomy::VIVIER_WORKSPACE_SLUG)->value('id');
+    expect($vivier)->not->toBe('');
+    $fiche = (int) DB::table('companies')->insertGetId([
+        'workspace_id' => $vivier, 'siren' => '940009977', 'denomination' => 'ZZ Vivier', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $ids = [];
+    foreach (['vivier' => 'rv@zz-vivier.example', 'business' => 'rb@zz-vivier.example'] as $scope => $email) {
+        $ids[$scope] = (int) DB::table('contacts')->insertGetId([
+            'workspace_id' => $vivier, 'company_id' => $fiche, 'last_name' => 'ZZ ' . $scope, 'email' => $email,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+    $this->dns->repondre(['zz-vivier.example' => ResultatDns::INEXISTANT]);
+    vemVerifier(['--source' => 'contacts', '--workspace' => Taxonomy::VIVIER_WORKSPACE_SLUG]);
+    expect(DB::table('contacts')->whereIn('id', $ids)->where('email_status', 'invalid')->count())->toBe(2);
+    // Chacun son univers : un rebond dans le vivier, et un rebond « business »
+    // qui ne concerne PAS cet espace.
+    ListeSuppression::inscrire('rv@zz-vivier.example', ListeSuppression::REBOND_DUR, 'zz-test', 'vivier');
+    ListeSuppression::inscrire('rb@zz-vivier.example', ListeSuppression::REBOND_DUR, 'zz-test', 'business');
+
+    $this->dns->repondre(['zz-vivier.example' => ResultatDns::MX]);
+    DB::table('email_domaines')->update(['resolu_le' => now()->subDays(40)]);
+    vemVerifier(['--source' => 'contacts', '--workspace' => Taxonomy::VIVIER_WORKSPACE_SLUG]);
+
+    expect(DB::table('contacts')->where('id', $ids['vivier'])->value('email_status'))->toBe('invalid')
+        ->and(DB::table('contacts')->where('id', $ids['business'])->value('email_status'))->toBe('valid');
+});
+
+test('E6 — le temoin a droit a un second essai avant que le resolveur soit juge', function () {
+    $this->dns->suiteTemoin = [ResultatDns::INEXISTANT];
+
+    $r = vemVerifier(['--source' => 'contacts']);
+
+    expect($r['code'])->toBe(0)
+        ->and($this->dns->questionsTemoin)->toBeGreaterThanOrEqual(2);
+});
+
+test('E6 — un temoin sans reponse (delai depasse) donne un message DISTINCT', function () {
+    $this->dns->verdictTemoin = ResultatDns::INDETERMINE;
+    $injoignable = vemVerifier();
+
+    $this->dns->verdictTemoin = ResultatDns::INEXISTANT;
+    $menteur = vemVerifier();
+
+    expect($injoignable['code'])->toBe(1)
+        ->and($injoignable['sortie'])->toContain('délai dépassé')
+        ->and($injoignable['sortie'])->not->toContain('ne reçoit pas de courrier')
+        ->and($menteur['code'])->toBe(1)
+        ->and($menteur['sortie'])->toContain('ne reçoit pas de courrier')
+        ->and($menteur['sortie'])->not->toContain('délai dépassé');
 });
 
 test('E6 elargi — un lot de UNE fiche dont le seul verdict est « sans courrier » rejuge le resolveur ; s il se trompe, rien n est ecrit', function () {

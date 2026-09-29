@@ -38,13 +38,13 @@ test('la campagne ne lit que la verification de CETTE commande, pour CETTE adres
 
 test('la fusion garde la provenance et le type de l import, et marque la verification', function () {
     $import = ['type' => 'nominatif', 'domaine_verifie' => true, 'verifie_le' => '2026-09-01', 'source' => 'federations-2026'];
-    $nouvelle = VerificationEmail::fusionner($import, ['type' => 'generique', 'domaine_verifie' => false, 'verifie_le' => '2026-09-30', 'statut' => 'invalide']);
+    $nouvelle = VerificationEmail::fusionner($import, ['type' => 'generique', 'domaine_verifie' => false, 'verifie_le' => '2026-09-29', 'statut' => 'invalide']);
 
     expect($nouvelle['source'])->toBe('federations-2026')
         ->and($nouvelle['type'])->toBe('nominatif')
         ->and($nouvelle['verifie_par'])->toBe(VerificationEmail::SOURCE)
         ->and($nouvelle['domaine_verifie'])->toBeFalse()
-        ->and($nouvelle['verifie_le'])->toBe('2026-09-30')
+        ->and($nouvelle['verifie_le'])->toBe('2026-09-29')
         ->and(VerificationEmail::change($import, $nouvelle))->toBeTrue()
         ->and(VerificationEmail::change($nouvelle, $nouvelle))->toBeFalse()
         // Sans type connu, celui de la règle.
@@ -55,10 +55,10 @@ test('la date : celle du DNS ; sans DNS, inchangee tant que le verdict ne bouge 
     $verdict = ['statut' => 'jetable', 'motif' => 'jetable'];
     $ancienne = ['verifie_par' => VerificationEmail::SOURCE, 'statut' => 'jetable', 'motif' => 'jetable', 'verifie_le' => '2026-09-01'];
 
-    expect(VerificationEmail::date($ancienne, $verdict, '2026-09-20', '2026-09-30'))->toBe('2026-09-20')
-        ->and(VerificationEmail::date($ancienne, $verdict, null, '2026-09-30'))->toBe('2026-09-01')
-        ->and(VerificationEmail::date($ancienne, ['statut' => 'invalide', 'motif' => 'syntaxe'], null, '2026-09-30'))->toBe('2026-09-30')
-        ->and(VerificationEmail::date(null, $verdict, null, '2026-09-30'))->toBe('2026-09-30');
+    expect(VerificationEmail::date($ancienne, $verdict, '2026-09-20', '2026-09-29'))->toBe('2026-09-20')
+        ->and(VerificationEmail::date($ancienne, $verdict, null, '2026-09-29'))->toBe('2026-09-01')
+        ->and(VerificationEmail::date($ancienne, ['statut' => 'invalide', 'motif' => 'syntaxe'], null, '2026-09-29'))->toBe('2026-09-29')
+        ->and(VerificationEmail::date(null, $verdict, null, '2026-09-29'))->toBe('2026-09-29');
 });
 
 test('email_status : un domaine mort degrade ; le domaine revenu retablit ce qui etait AVANT, jamais davantage', function () {

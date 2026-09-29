@@ -42,6 +42,9 @@ final class ResolveurDnsSimule implements ResolveurDns
 
     public int $questionsTemoin = 0;
 
+    /** @var list<string> réponses du témoin, jouées une à une avant `verdictTemoin` */
+    public array $suiteTemoin = [];
+
     /**
      * @param  array<string, string>  $reponses  domaine => verdict (`ResultatDns::*`)
      * @param  list<string>  $pannes  domaines dont la résolution LÈVE (panne simulée)
@@ -62,7 +65,7 @@ final class ResolveurDnsSimule implements ResolveurDns
             // `appels`, ni `pendant`.
             $this->questionsTemoin++;
 
-            return [self::TEMOIN => new ResultatDns($this->verdictTemoin)];
+            return [self::TEMOIN => new ResultatDns(array_shift($this->suiteTemoin) ?? $this->verdictTemoin)];
         }
         $this->appels[] = count($domaines);
         if ($this->pendant !== null) {

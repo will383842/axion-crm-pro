@@ -437,7 +437,7 @@ Schedule::command('crm:flush-outbound')
     ->onOneServer()
     ->skip(fn (): bool => ! filter_var(config('crm.outbound_enabled', false), FILTER_VALIDATE_BOOLEAN));
 
-// Vérification des e-mails (2026-09-30) — `crm:emails:verifier`, chaque
+// Vérification des e-mails (2026-09-29) — `crm:emails:verifier`, chaque
 // DIMANCHE à 05:00 : les adresses nouvelles, et les domaines résolus il y a
 // plus de `revalider_apres_jours` jours. Aucun sondage SMTP, aucune adresse
 // supprimée ; une fiche dont la vérification n'a pas bougé n'est pas réécrite.

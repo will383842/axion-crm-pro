@@ -474,7 +474,7 @@ class WaterfallOrchestrator
     /**
      * Les personnes dont l'étape 7 peut CHERCHER (et donc écrire) l'adresse.
      *
-     * 🔴 Relecture E2 (vérification des e-mails, 2026-09-30). L'étape réécrit
+     * 🔴 Relecture E2 (vérification des e-mails, 2026-09-29). L'étape réécrit
      * `contacts.email`. Avant, elle visait toute personne dont le statut
      * n'était ni `valid` ni `catchall` : une adresse que `crm:emails:verifier`
      * vient de marquer `invalid` aurait été REMPLACÉE — perdue, alors que la

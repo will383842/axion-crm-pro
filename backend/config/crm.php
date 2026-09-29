@@ -358,7 +358,7 @@ return [
     ],
 
     /*
-    | Vérification des e-mails — `crm:emails:verifier` (2026-09-30).
+    | Vérification des e-mails — `crm:emails:verifier` (2026-09-29).
     |
     | Syntaxe, jetables, webmails, type, partage, et « le domaine reçoit-il du
     | courrier ? » (MX, sinon A/AAAA) — JAMAIS de sondage SMTP. Résultat DNS

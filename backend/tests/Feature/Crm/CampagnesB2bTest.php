@@ -288,7 +288,7 @@ test('la liste refuse un chemin dans le depot', function () {
     expect($code)->toBe(1)->and(file_exists(base_path('zz-liste.jsonl')))->toBeFalse();
 });
 
-// ── La vérification des e-mails (crm:emails:verifier, 2026-09-30) ──────────
+// ── La vérification des e-mails (crm:emails:verifier, 2026-09-29) ──────────
 
 test('une adresse JAMAIS verifiee n est pas retenue, et le bilan le dit', function () {
     $sortie = campFichier();

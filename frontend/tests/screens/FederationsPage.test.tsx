@@ -108,6 +108,7 @@ describe('onglet Fédérations — liste', () => {
 const FICHE = {
   ...LIGNE,
   siren: '900000007',
+  identifiant: null,
   naf: '94.11Z',
   legal_form: '9220',
   effectif_range: '11',
@@ -219,5 +220,31 @@ describe('onglet Fédérations — fiche', () => {
     expect(within(bloc).getByText('b***@zz-fede.example.invalid')).toBeInTheDocument();
     expect(within(bloc).getByText(/nominative · domaine vérifié le 28\/09\/2026/)).toBeInTheDocument();
     expect(within(bloc).getByRole('link', { name: 'https://zz-fede-bis.example.invalid' })).toBeInTheDocument();
+  });
+
+  it('un organisme sans SIREN montre son identifiant ; une fiche à SIREN garde la ligne « SIREN »', async () => {
+    await renderScreen(<FederationDetailPage />, {
+      path: '/federations/$companyId',
+      url: '/federations/7',
+      handlers: [getJson('/federations/7', { ...FICHE, siren: null, identifiant: 'section:zz-reseau:69' })],
+      landingRoutes: ['/federations', '/evenements/$eventId', '/companies/$companyId'],
+    });
+
+    expect(await screen.findByText('section:zz-reseau:69')).toBeInTheDocument();
+    expect(screen.getByText('Identifiant (sans SIREN)')).toBeInTheDocument();
+    expect(screen.queryByText('SIREN')).not.toBeInTheDocument();
+  });
+
+  it('témoin : une fiche à SIREN montre son SIREN, pas d identifiant', async () => {
+    await renderScreen(<FederationDetailPage />, {
+      path: '/federations/$companyId',
+      url: '/federations/7',
+      handlers: [getJson('/federations/7', FICHE)],
+      landingRoutes: ['/federations', '/evenements/$eventId', '/companies/$companyId'],
+    });
+
+    expect(await screen.findByText('900000007')).toBeInTheDocument();
+    expect(screen.getByText('SIREN')).toBeInTheDocument();
+    expect(screen.queryByText('Identifiant (sans SIREN)')).not.toBeInTheDocument();
   });
 });

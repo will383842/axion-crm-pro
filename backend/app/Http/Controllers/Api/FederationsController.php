@@ -204,7 +204,7 @@ class FederationsController extends ApiController
         $ligne = $this->base($workspaceId)
             ->where('c.id', $companyId)
             ->first([
-                'c.id', 'c.siren', 'c.denomination', 'c.entity_nature', 'c.naf', 'c.legal_form',
+                'c.id', 'c.siren', 'c.foreign_id', 'c.denomination', 'c.entity_nature', 'c.naf', 'c.legal_form',
                 'c.effectif_range', 'c.address', 'c.postcode', 'c.city', 'c.department_code', 'c.region_code',
                 'c.sector_main', 'c.website', 'c.linkedin_url', 'c.phone', 'c.email_generic', 'c.signals',
                 'f.sigle', 'f.nom_developpe', 'f.date_creation', 'f.nb_etablissements',
@@ -466,6 +466,9 @@ class FederationsController extends ApiController
 
         $fiche = array_merge($this->resume($l, $nbAntennes, false), [
             'siren' => $l->siren,
+            // Organisme SANS SIREN (section, conseil départemental d'ordre) :
+            // son identifiant stable, clé de rattachement de l'import.
+            'identifiant' => $l->siren === null ? $l->foreign_id : null,
             'naf' => $l->naf,
             'legal_form' => $l->legal_form,
             'effectif_range' => $l->effectif_range,

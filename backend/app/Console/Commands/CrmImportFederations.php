@@ -15,6 +15,7 @@ use App\Services\Tags\AutoTaggerService;
 use App\Support\WorkspaceContext;
 use DateTimeImmutable;
 use Illuminate\Console\Command;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -46,27 +47,68 @@ use Throwable;
  *
  * ── Rattacher, jamais dupliquer ───────────────────────────────────────────
  *
- * La clé est le SIREN. Une fiche déjà présente (un organisateur d'événement,
+ * La clé est le SIREN, ou, sans SIREN, l'ancre (FR, `foreign_id`) décrite
+ * plus bas. Une fiche déjà présente (un organisateur d'événement,
  * une CCI) est RATTACHÉE : elle reçoit sa ligne `federations`, garde sa nature,
  * sa démarche (`events.participation/intervention`, `relation_type`,
  * `lifecycle_stage`) et ses étiquettes. Une fiche à la corbeille n'est pas
  * ressuscitée : la ligne est rejetée.
  *
+ * ── Les organismes SANS SIREN (2026-09-29) ────────────────────────────────
+ *
+ * Une union départementale, un conseil départemental d'ordre, une antenne
+ * de confédération n'ont pas de personnalité juridique propre : pas de
+ * SIREN, mais des coordonnées publiées. Leur ligne porte alors
+ * `"siren": null` et un `identifiant` STABLE fabriqué par le convertisseur
+ * (`section:fo:28`). La fiche s'ancre sur (`country_code` = FR,
+ * `foreign_id` = identifiant), exactement comme les organisateurs
+ * d'événements sans SIREN (#250/#251) : rattachement, dédoublonnage,
+ * `run_id`, registre des retraits et tête de réseau passent par cette ancre.
+ * Une ligne AVEC SIREN garde le comportement d'avant, à l'identique : son
+ * `identifiant` éventuel est ignoré (le SIREN reste la seule clé).
+ *
  * ── Idempotente ───────────────────────────────────────────────────────────
  *
  * Rejouer le même fichier ne crée rien : le funnel reconnaît le même contenu
- * (`run_id` = SIREN + empreinte de la ligne), la ligne `federations` identique
+ * (`run_id` = SIREN ou identifiant + empreinte de la ligne), la ligne `federations` identique
  * est comptée « inchangée ». Un ré-import ne touche JAMAIS la démarche de Will
  * (`partenariat`, relance, note). Une tête de réseau absente du fichier ne
  * retire pas celle qui est posée.
  *
+ * ── Par PAQUETS (2026-09-29) ──────────────────────────────────────────────
+ *
+ * L'essai à blanc du 29/09 sur 35 597 lignes est mort dans la deuxième passe
+ * sur `out of shared memory` (HINT : `max_locks_per_transaction`). La cause,
+ * MESURÉE en CI : chaque point de sauvegarde qui écrit (celui de la ligne,
+ * celui du funnel, ceux qu'ils emboîtent) reçoit son propre identifiant de
+ * transaction, et le VERROU de cet identifiant n'est rendu qu'à la fin de la
+ * transaction englobante — environ QUATRE par ligne (92 verrous
+ * `transactionid` pour 20 lignes, 332 pour 80), plus un par tête reliée.
+ * Dans UNE transaction, 35 597 lignes en tiennent ~142 000 : la table des
+ * verrous de la base déborde. Les verrous de relation, eux, restent bornés
+ * (~200, le nombre de tables et d'index touchés).
+ *
+ * Désormais chaque passe VALIDE par paquets (`--paquet=N`, 500 par défaut),
+ * un point de sauvegarde par ligne à l'intérieur : les verrous tenus sont
+ * bornés par la taille du paquet, pas par celle du fichier. Un paquet validé
+ * le reste ; une interruption laisse les paquets précédents en base, et
+ * relancer le même fichier REPREND (import idempotent). Le bilan dit combien
+ * de verrous un paquet a tenus au plus.
+ *
  * ── Essai à blanc ─────────────────────────────────────────────────────────
  *
- * `--dry-run` passe par le MÊME chemin que l'import réel, dans UNE transaction
- * annulée à la fin : la deuxième passe voit les fiches que la première aurait
- * créées, un contact partagé est compté une fois, et le bilan est celui que
- * l'import réel produira. `--limite=N` ne traite que les N premières lignes
- * (import par étapes : 10 fiches, puis tout).
+ * `--dry-run` passe par le MÊME chemin que l'import réel, paquet par paquet,
+ * et ANNULE chaque paquet. Ce qui en sort est dit tel quel :
+ *  - MESURÉ : la première passe, sur le vrai funnel. Limite : une ligne ne
+ *    voit pas ce qu'un paquet PRÉCÉDENT aurait créé (ancre en double dans le
+ *    fichier, personne partagée entre deux paquets) — au sein d'un paquet,
+ *    si ;
+ *  - ESTIMÉ d'après la première passe : les têtes de réseau. Les fiches de la
+ *    première passe n'existent plus (annulées) ; la deuxième passe est
+ *    SIMULÉE avec les règles de la base (tête introuvable ou à la corbeille,
+ *    tête inchangée, boucle refusée à toute profondeur, au-delà de 64 pas).
+ * `--limite=N` ne traite que les N premières lignes (import par étapes : 10
+ * fiches, puis tout).
  *
  * Aucune valeur de ligne (nom, adresse, e-mail) n'est jamais écrite dans la
  * sortie ni dans le journal : des compteurs et des motifs seulement.
@@ -78,12 +120,13 @@ class CrmImportFederations extends Command
     protected $signature = 'crm:import-federations
                             {file : Fichier JSONL, une ligne par organisme (hors dépôt)}
                             {--dry-run : Tout parcourir puis tout annuler, et afficher le bilan}
-                            {--limite= : Ne traiter que les N premières lignes (import par étapes)}';
+                            {--limite= : Ne traiter que les N premières lignes (import par étapes)}
+                            {--paquet=500 : Lignes (puis têtes) validées par transaction : borne les verrous tenus}';
 
     protected $description = 'Importe les fédérations et organisations professionnelles, et relie les têtes de réseau.';
 
     private const CLES_AUTORISEES = [
-        'siren', 'nom', 'nom_developpe', 'sigle', 'nature',
+        'siren', 'identifiant', 'nom', 'nom_developpe', 'sigle', 'nature',
         'naf', 'forme_juridique', 'effectif', 'date_creation', 'nb_etablissements',
         'adresse', 'code_postal', 'commune', 'departement', 'region',
         'famille', 'niveau', 'secteurs', 'tailles_adherents', 'certitude', 'pertinence',
@@ -107,6 +150,21 @@ class CrmImportFederations extends Command
      */
     public const ORIGINE_SECTEUR = 'federations-2026';
 
+    /**
+     * Identifiant d'un organisme SANS SIREN : l'espace de noms `section:`
+     * SEULEMENT, puis au moins un segment (`section:fo:28`,
+     * `section:cfe-cgc:2A`). Jamais neuf chiffres seuls (pas de confusion avec
+     * un SIREN), et jamais un autre espace : une ligne `evt:…` ne peut pas se
+     * rattacher à un organisateur d'événements.
+     */
+    public const MOTIF_IDENTIFIANT = '/^section(:[A-Za-z0-9-]+)+$/';
+
+    /** Longueur maximale d'un identifiant (le plus long mesuré : 65). */
+    public const IDENTIFIANT_MAX = 120;
+
+    /** Pays de l'ancre `foreign_id` : ces organismes sont français. */
+    private const PAYS = 'FR';
+
     /** Département accepté par le schéma pivot (`ScrapedRecord`). */
     private const MOTIF_DEPARTEMENT = '/^(0[1-9]|1\d|2[1-9AB]|[3-8]\d|9[0-5]|97[1-6])$/';
 
@@ -116,8 +174,34 @@ class CrmImportFederations extends Command
     /** @var array<string, int> motif => nombre */
     private array $rejets = [];
 
-    /** @var array<int, string> company_id => SIREN de la tête de réseau */
+    /** @var array<int, string> company_id => SIREN ou identifiant de la tête de réseau */
     private array $tetes = [];
+
+    /** @var array<string, int> ancre (SIREN ou identifiant) => company_id, lignes acceptées */
+    private array $ancres = [];
+
+    /**
+     * Taille d'un paquet (lignes, puis têtes, par transaction).
+     *
+     * @var positive-int
+     */
+    private int $paquet = 500;
+
+    /** Verrous tenus au plus par la session en fin de paquet, dont ceux d'identifiants de transaction. */
+    private int $verrousMax = 0;
+
+    private int $verrousTransactionMax = 0;
+
+    /** Paquets de la DEUXIÈME passe (têtes) validés. */
+    private int $paquetsTetes = 0;
+
+    /**
+     * Ce que le paquet OUVERT a compté : reporté au bilan quand il se ferme,
+     * oublié s'il est interrompu (ses écritures sont annulées avec lui).
+     *
+     * @var array{delta: array<string, int>, tetes: array<int, string>, ancres: array<string, int>}
+     */
+    private array $enCours = ['delta' => [], 'tetes' => [], 'ancres' => []];
 
     private ScrapedRecordIngestService $funnel;
 
@@ -140,6 +224,14 @@ class CrmImportFederations extends Command
         }
         $limite = $limite === null ? null : (int) $limite;
 
+        $paquet = $this->option('paquet');
+        if (filter_var($paquet, FILTER_VALIDATE_INT) === false || (int) $paquet < 1) {
+            $this->error('--paquet doit être un entier positif.');
+
+            return self::FAILURE;
+        }
+        $this->paquet = max(1, (int) $paquet);
+
         $slug = (string) config('crm.ingest.business_workspace', 'axion-ia');
         $workspaceId = DB::table('workspaces')->where('slug', $slug)->whereNull('deleted_at')->value('id');
         if ($workspaceId === null) {
@@ -160,7 +252,7 @@ class CrmImportFederations extends Command
         $dryRun = (bool) $this->option('dry-run');
 
         $this->bilan = array_fill_keys([
-            'lignes', 'rejetees',
+            'lignes', 'rejetees', 'paquets',
             'fiches_creees', 'fiches_rattachees', 'federations_mises_a_jour', 'federations_inchangees',
             'contacts_crees', 'contacts_completes', 'personnes_sans_changement', 'personnes_ecartees',
             'personnes_opposees', 'personnes_retirees_ignorees', 'emails_refuses_mx',
@@ -170,27 +262,29 @@ class CrmImportFederations extends Command
         ], 0);
         $this->rejets = [];
         $this->tetes = [];
+        $this->ancres = [];
+        $this->verrousMax = 0;
+        $this->verrousTransactionMax = 0;
+        $this->paquetsTetes = 0;
+        $this->enCours = ['delta' => [], 'tetes' => [], 'ancres' => []];
 
-        WorkspaceContext::run($workspaceId, function () use ($chemin, $workspaceId, $dryRun, $limite): void {
-            DB::beginTransaction();
-            try {
-                $this->premierePasse($chemin, $workspaceId, $limite);
-                $this->deuxiemePasse($workspaceId);
-            } catch (Throwable $e) {
-                DB::rollBack();
+        $interruption = null;
+        try {
+            WorkspaceContext::run($workspaceId, function () use ($chemin, $workspaceId, $dryRun, $limite): void {
+                $this->premierePasse($chemin, $workspaceId, $limite, $dryRun);
+                if ($dryRun) {
+                    $this->deuxiemePasseEstimee($workspaceId);
+                } else {
+                    $this->deuxiemePasse($workspaceId);
+                }
+            });
+        } catch (Throwable $e) {
+            $interruption = $e;
+        }
 
-                throw $e;
-            }
-            // À blanc : on annule APRÈS les deux passes — le bilan est celui
-            // qu'aurait produit l'import réel.
-            if ($dryRun) {
-                DB::rollBack();
-            } else {
-                DB::commit();
-            }
-        });
-
-        if (! $dryRun) {
+        // Un import INTERROMPU a pu valider des paquets : ils sont en base, et
+        // la chaîne d'audit le dit aussi.
+        if (! $dryRun && ($interruption === null || $this->bilan['paquets'] + $this->paquetsTetes > 0)) {
             $audit->record([
                 'workspace_id' => $workspaceId,
                 'user_id' => null,
@@ -201,6 +295,15 @@ class CrmImportFederations extends Command
                 'user_agent' => null,
                 'payload_hash' => hash('sha256', json_encode($this->bilan, JSON_THROW_ON_ERROR)),
             ]);
+        }
+
+        if ($interruption !== null) {
+            $this->error(
+                "INTERROMPU après {$this->bilan['paquets']} paquet(s) de fiches et {$this->paquetsTetes} paquet(s) de têtes validé(s)"
+                . ($dryRun ? ' (à blanc : rien n\'a été écrit).' : ' : ils restent en base. Relancer le même fichier REPREND (import idempotent).'),
+            );
+
+            throw $interruption;
         }
 
         // Une base qui refuse (RLS sans contexte, contrainte) ne doit JAMAIS
@@ -218,6 +321,11 @@ class CrmImportFederations extends Command
             array_keys($this->bilan),
             array_values($this->bilan),
         ));
+        $this->line("Verrous tenus au plus en fin de paquet : {$this->verrousMax} (dont {$this->verrousTransactionMax} d'identifiants de transaction), paquets de {$this->paquet}.");
+        if ($dryRun) {
+            $this->line('MESURÉ : la 1re passe (fiches, contacts, étiquettes…), paquet par paquet, chaque paquet annulé : une ligne ne voit pas ce qu\'un paquet PRÉCÉDENT aurait créé.');
+            $this->line('ESTIMÉ d\'après la 1re passe, avec les règles de la base : tetes_liees, tetes_inchangees, tetes_introuvables, tetes_refusees_cycle.');
+        }
         if ($this->rejets !== []) {
             ksort($this->rejets);
             $this->warn('Lignes rejetées, par motif :');
@@ -231,13 +339,14 @@ class CrmImportFederations extends Command
 
     // ── Première passe : les fiches ─────────────────────────────────────────
 
-    private function premierePasse(string $chemin, string $workspaceId, ?int $limite): void
+    private function premierePasse(string $chemin, string $workspaceId, ?int $limite, bool $dryRun): void
     {
         $flux = fopen($chemin, 'rb');
         if ($flux === false) {
             throw new RuntimeException('Ouverture impossible du fichier.');
         }
 
+        $dansLePaquet = 0;
         try {
             $numero = 0;
             while (($ligne = fgets($flux)) !== false) {
@@ -250,17 +359,23 @@ class CrmImportFederations extends Command
                 }
                 $this->bilan['lignes']++;
 
+                if ($dansLePaquet === 0) {
+                    DB::beginTransaction();
+                }
+                $dansLePaquet++;
+
                 try {
                     // Un point de sauvegarde par ligne : une ligne fautive est
                     // annulée seule. Ses compteurs ne sont reportés QUE si elle
-                    // aboutit.
-                    [$delta, $companyId, $tete] = DB::transaction(fn (): array => $this->importerLigne($ligne, $workspaceId));
+                    // aboutit — et que son paquet se ferme.
+                    [$delta, $companyId, $tete, $ancre] = DB::transaction(fn (): array => $this->importerLigne($ligne, $workspaceId));
                     foreach ($delta as $compteur => $n) {
-                        $this->bilan[$compteur] += $n;
+                        $this->enCours['delta'][$compteur] = ($this->enCours['delta'][$compteur] ?? 0) + $n;
                     }
                     if ($tete !== null) {
-                        $this->tetes[$companyId] = $tete;
+                        $this->enCours['tetes'][$companyId] = $tete;
                     }
+                    $this->enCours['ancres'][$ancre] = $companyId;
                 } catch (InvalidArgumentException $e) {
                     // Motif produit par ce fichier (jamais une valeur de la ligne).
                     $this->rejeter($e->getMessage(), $numero);
@@ -274,23 +389,77 @@ class CrmImportFederations extends Command
                         'sqlstate' => $e->getCode(),
                     ]);
                 }
+
+                if ($dansLePaquet >= $this->paquet) {
+                    $this->fermerPaquet($dryRun);
+                    $dansLePaquet = 0;
+                }
             }
+            if ($dansLePaquet > 0) {
+                $this->fermerPaquet($dryRun);
+            }
+        } catch (Throwable $e) {
+            // Le paquet ouvert est annulé, et ce qu'il avait compté oublié.
+            if ($dansLePaquet > 0) {
+                DB::rollBack();
+            }
+            $this->enCours = ['delta' => [], 'tetes' => [], 'ancres' => []];
+
+            throw $e;
         } finally {
             fclose($flux);
         }
     }
 
     /**
-     * @return array{0: array<string, int>, 1: int, 2: ?string} compteurs de CETTE ligne, fiche, SIREN de sa tête
+     * Ferme le paquet ouvert : relève les verrous que la session tient À CET
+     * INSTANT (le pic du paquet : ils ne sont rendus qu'à sa fin), puis valide
+     * — ou annule, à blanc — et reporte ce qu'il a compté. Aucun réglage de
+     * la base n'est touché : c'est la TAILLE du paquet qui borne les verrous.
+     */
+    private function fermerPaquet(bool $dryRun, bool $deLignes = true): void
+    {
+        $verrous = DB::selectOne(
+            "SELECT count(*) AS n, count(*) FILTER (WHERE locktype = 'transactionid') AS tx
+             FROM pg_locks WHERE pid = pg_backend_pid()",
+        );
+        $this->verrousMax = max($this->verrousMax, (int) ($verrous->n ?? 0));
+        $this->verrousTransactionMax = max($this->verrousTransactionMax, (int) ($verrous->tx ?? 0));
+
+        if ($dryRun) {
+            DB::rollBack();
+        } else {
+            DB::commit();
+        }
+
+        foreach ($this->enCours['delta'] as $compteur => $n) {
+            $this->bilan[$compteur] += $n;
+        }
+        foreach ($this->enCours['tetes'] as $companyId => $tete) {
+            $this->tetes[$companyId] = $tete;
+        }
+        foreach ($this->enCours['ancres'] as $ancre => $companyId) {
+            $this->ancres[$ancre] = $companyId;
+        }
+        $this->enCours = ['delta' => [], 'tetes' => [], 'ancres' => []];
+        // `paquets` compte ceux de la PREMIÈRE passe (les lignes) : le même
+        // nombre à blanc et en réel.
+        if ($deLignes) {
+            $this->bilan['paquets']++;
+        } elseif (! $dryRun) {
+            $this->paquetsTetes++;
+        }
+    }
+
+    /**
+     * @return array{0: array<string, int>, 1: int, 2: ?string, 3: string} compteurs de CETTE ligne, fiche, ancre de sa tête, son ancre
      */
     private function importerLigne(string $ligne, string $workspaceId): array
     {
         $l = $this->lire($ligne);
         $delta = [];
 
-        $avant = DB::table('companies')
-            ->where('workspace_id', $workspaceId)
-            ->where('siren', $l['siren'])
+        $avant = $this->parAncre($workspaceId, $l['siren'], $l['identifiant'], corbeilleComprise: true)
             ->first(['id', 'deleted_at', 'email_generic', 'phone', 'website', 'linkedin_url']);
         if ($avant !== null && $avant->deleted_at !== null) {
             // Mise à la corbeille par Will : un import ne la ressuscite pas.
@@ -307,7 +476,7 @@ class CrmImportFederations extends Command
         // `contacts_retires` (relecture sécurité R2).
         $retenues = [];
         foreach ($l['personnes'] as $p) {
-            if ($this->personneRetiree($workspaceId, $l['siren'], $p['first_name'], $p['last_name'])) {
+            if ($this->personneRetiree($workspaceId, $l['siren'], $l['identifiant'], $p['first_name'], $p['last_name'])) {
                 $delta['personnes_retirees_ignorees'] = ($delta['personnes_retirees_ignorees'] ?? 0) + 1;
 
                 continue;
@@ -335,11 +504,7 @@ class CrmImportFederations extends Command
         $delta['personnes_sans_changement'] = $outcome->personsSkipped['skipped_no_change'] ?? 0;
         $delta['personnes_ecartees'] = (int) array_sum($outcome->personsSkipped) - $delta['personnes_sans_changement'];
 
-        $fiche = DB::table('companies')
-            ->where('workspace_id', $workspaceId)
-            ->where('siren', $l['siren'])
-            ->whereNull('deleted_at')
-            ->first();
+        $fiche = $this->parAncre($workspaceId, $l['siren'], $l['identifiant'])->first();
         if ($fiche === null) {
             throw new RuntimeException('fiche_introuvable_apres_ingestion');
         }
@@ -375,7 +540,7 @@ class CrmImportFederations extends Command
             (new AutoTaggerService)->syncTags($company);
         }
 
-        return [$delta, $companyId, $l['tete_de_reseau']];
+        return [$delta, $companyId, $l['tete_de_reseau'], (string) ($l['siren'] ?? $l['identifiant'])];
     }
 
     /**
@@ -613,18 +778,47 @@ class CrmImportFederations extends Command
         }
     }
 
-    private function personneRetiree(string $workspaceId, string $siren, ?string $prenom, ?string $nom): bool
+    /**
+     * La fiche d'une ancre : le SIREN, ou (pays, `foreign_id`) pour un
+     * organisme sans SIREN — la même recherche que le funnel
+     * (`ScrapedRecordIngestService::upsertCompany`), servie par l'index unique
+     * `companies_workspace_foreign_id_unique`.
+     */
+    private function parAncre(string $workspaceId, ?string $siren, ?string $identifiant, bool $corbeilleComprise = false): Builder
+    {
+        // La corbeille n'est lue que SCIEMMENT : pour refuser d'y ressusciter
+        // une fiche (`importerLigne`), jamais pour y rattacher quoi que ce soit.
+        $requete = DB::table('companies')->where('workspace_id', $workspaceId)
+            ->when(! $corbeilleComprise, static fn (Builder $q): Builder => $q->whereNull('deleted_at'));
+        if ($siren !== null) {
+            return $requete->where('siren', $siren);
+        }
+        if ($identifiant === null) {
+            // `lire()` l'a déjà refusé : jamais une recherche sans ancre.
+            throw new InvalidArgumentException('siren_ou_identifiant_manquant');
+        }
+
+        return $requete->where('country_code', self::PAYS)->where('foreign_id', $identifiant);
+    }
+
+    private function personneRetiree(string $workspaceId, ?string $siren, ?string $identifiant, ?string $prenom, ?string $nom): bool
     {
         if ($nom === null) {
             return false;
         }
-        // `contacts_retires_contient` : la seule question que le rôle
+        // `contacts_retires_contient*` : les seules questions que le rôle
         // applicatif peut poser au registre (il n'exécute pas
-        // `contacts_retires_empreinte`, relecture S-a).
-        $ligne = DB::selectOne(
-            'SELECT contacts_retires_contient(?::uuid, ?, ?, ?) AS e',
-            [$workspaceId, $siren, $prenom, $nom],
-        );
+        // `contacts_retires_empreinte`, relecture S-a). Sans SIREN, le
+        // registre est lu par l'ancre (pays, `foreign_id`) de l'organisme.
+        $ligne = $siren !== null
+            ? DB::selectOne(
+                'SELECT contacts_retires_contient(?::uuid, ?, ?, ?) AS e',
+                [$workspaceId, $siren, $prenom, $nom],
+            )
+            : DB::selectOne(
+                'SELECT contacts_retires_contient_ancre(?::uuid, ?, ?, ?, ?) AS e',
+                [$workspaceId, self::PAYS, $identifiant, $prenom, $nom],
+            );
 
         return (bool) ($ligne->e ?? false);
     }
@@ -689,41 +883,115 @@ class CrmImportFederations extends Command
 
     // ── Deuxième passe : les têtes de réseau ────────────────────────────────
 
+    /**
+     * Les têtes, par paquets validés : chaque lien reçoit son point de
+     * sauvegarde (donc un verrou d'identifiant de transaction), rendu à la
+     * fin de SON paquet.
+     */
     private function deuxiemePasse(string $workspaceId): void
     {
-        foreach ($this->tetes as $companyId => $sirenTete) {
-            $teteId = DB::table('companies')
-                ->where('workspace_id', $workspaceId)
-                ->where('siren', $sirenTete)
-                ->whereNull('deleted_at')
-                ->value('id');
+        foreach (array_chunk($this->tetes, $this->paquet, true) as $paquet) {
+            $delta = array_fill_keys(['tetes_liees', 'tetes_inchangees', 'tetes_introuvables', 'tetes_refusees_cycle'], 0);
+            DB::beginTransaction();
+            try {
+                foreach ($paquet as $companyId => $ancreTete) {
+                    $teteId = $this->idDeTete($workspaceId, $ancreTete);
+                    if ($teteId === null) {
+                        $delta['tetes_introuvables']++;
+
+                        continue;
+                    }
+
+                    $actuelle = DB::table('federations')->where('company_id', $companyId)->value('parent_company_id');
+                    if ($actuelle !== null && (int) $actuelle === $teteId) {
+                        $delta['tetes_inchangees']++;
+
+                        continue;
+                    }
+
+                    try {
+                        // Point de sauvegarde : un cycle refusé par la base n'annule que ce lien.
+                        DB::transaction(function () use ($companyId, $teteId): void {
+                            DB::table('federations')->where('company_id', $companyId)
+                                ->update(['parent_company_id' => $teteId, 'updated_at' => now()]);
+                        });
+                        $delta['tetes_liees']++;
+                    } catch (QueryException $e) {
+                        if (! str_contains($e->getMessage(), 'federation_cycle')) {
+                            throw $e;
+                        }
+                        $delta['tetes_refusees_cycle']++;
+                    }
+                }
+                $this->enCours['delta'] = $delta;
+                $this->fermerPaquet(dryRun: false, deLignes: false);
+            } catch (Throwable $e) {
+                DB::rollBack();
+                $this->enCours = ['delta' => [], 'tetes' => [], 'ancres' => []];
+
+                throw $e;
+            }
+        }
+    }
+
+    /** La fiche vivante d'une tête : SIREN (neuf chiffres) ou identifiant, les deux seules formes que `lire()` laisse passer. */
+    private function idDeTete(string $workspaceId, string $ancreTete): ?int
+    {
+        $estSiren = preg_match('/^\d{9}$/', $ancreTete) === 1;
+        $id = $this->parAncre($workspaceId, $estSiren ? $ancreTete : null, $estSiren ? null : $ancreTete)->value('id');
+
+        return $id === null ? null : (int) $id;
+    }
+
+    /**
+     * À BLANC, les fiches de la première passe ont été annulées paquet par
+     * paquet : la deuxième passe ne peut pas être JOUÉE, elle est SIMULÉE
+     * d'après la première, avec les règles de la base :
+     *  - la tête est une fiche acceptée par la première passe, ou une fiche
+     *    vivante déjà en base (jamais à la corbeille) ; sinon introuvable ;
+     *  - le lien déjà posé est « inchangé » ;
+     *  - `federations_refuser_cycle` : on remonte les têtes de la tête ; si
+     *    l'on y retrouve la fiche, ou au-delà de 64 pas, le lien est refusé ;
+     *  - un lien accepté compte pour les suivants, dans l'ordre du fichier.
+     * Rien n'est écrit.
+     */
+    private function deuxiemePasseEstimee(string $workspaceId): void
+    {
+        /** @var array<int, int> $parents company_id => tête déjà posée */
+        $parents = [];
+        foreach (DB::table('federations')->where('workspace_id', $workspaceId)->whereNotNull('parent_company_id')
+            ->get(['company_id', 'parent_company_id']) as $f) {
+            $parents[(int) $f->company_id] = (int) $f->parent_company_id;
+        }
+
+        foreach ($this->tetes as $companyId => $ancreTete) {
+            $teteId = $this->ancres[$ancreTete] ?? $this->idDeTete($workspaceId, $ancreTete);
             if ($teteId === null) {
                 $this->bilan['tetes_introuvables']++;
 
                 continue;
             }
-            $teteId = (int) $teteId;
-
-            $actuelle = DB::table('federations')->where('company_id', $companyId)->value('parent_company_id');
-            if ($actuelle !== null && (int) $actuelle === $teteId) {
+            if (($parents[$companyId] ?? null) === $teteId) {
                 $this->bilan['tetes_inchangees']++;
 
                 continue;
             }
 
-            try {
-                // Point de sauvegarde : un cycle refusé par la base n'annule que ce lien.
-                DB::transaction(function () use ($companyId, $teteId): void {
-                    DB::table('federations')->where('company_id', $companyId)
-                        ->update(['parent_company_id' => $teteId, 'updated_at' => now()]);
-                });
-                $this->bilan['tetes_liees']++;
-            } catch (QueryException $e) {
-                if (! str_contains($e->getMessage(), 'federation_cycle')) {
-                    throw $e;
-                }
-                $this->bilan['tetes_refusees_cycle']++;
+            $cycle = $teteId === $companyId;
+            $courant = $teteId;
+            $pas = 0;
+            while (! $cycle && ($courant = $parents[$courant] ?? null) !== null) {
+                $pas++;
+                $cycle = $courant === $companyId || $pas > 64;
             }
+            if ($cycle) {
+                $this->bilan['tetes_refusees_cycle']++;
+
+                continue;
+            }
+
+            $parents[$companyId] = $teteId;
+            $this->bilan['tetes_liees']++;
         }
     }
 
@@ -746,10 +1014,21 @@ class CrmImportFederations extends Command
             throw new InvalidArgumentException('cle_inconnue');
         }
 
+        // L'ANCRE : le SIREN s'il est là (comportement d'avant, identifiant
+        // ignoré) ; sinon l'identifiant stable d'un organisme sans SIREN.
         $siren = $this->texte($brut, 'siren');
-        if ($siren === null || preg_match('/^\d{9}$/', $siren) !== 1) {
-            throw new InvalidArgumentException('siren_invalide');
+        $identifiant = $this->texte($brut, 'identifiant');
+        if ($siren !== null) {
+            if (preg_match('/^\d{9}$/', $siren) !== 1) {
+                throw new InvalidArgumentException('siren_invalide');
+            }
+            $identifiant = null;
+        } elseif ($identifiant === null) {
+            throw new InvalidArgumentException('siren_ou_identifiant_manquant');
+        } elseif (! self::identifiantValide($identifiant)) {
+            throw new InvalidArgumentException('identifiant_invalide');
         }
+        $ancre = $siren ?? $identifiant;
         $nom = $this->texte($brut, 'nom');
         if ($nom === null) {
             throw new InvalidArgumentException('champ_obligatoire_manquant');
@@ -773,7 +1052,7 @@ class CrmImportFederations extends Command
         $tailles = $this->liste($brut, 'tailles_adherents', array_keys(Taxonomy::TAILLES), 'taille_inconnue');
 
         $tete = $this->texte($brut, 'tete_de_reseau');
-        if ($tete !== null && (preg_match('/^\d{9}$/', $tete) !== 1 || $tete === $siren)) {
+        if ($tete !== null && ((preg_match('/^\d{9}$/', $tete) !== 1 && ! self::identifiantValide($tete)) || $tete === $ancre)) {
             throw new InvalidArgumentException('tete_de_reseau_invalide');
         }
 
@@ -856,6 +1135,7 @@ class CrmImportFederations extends Command
 
         return [
             'siren' => $siren,
+            'identifiant' => $identifiant,
             'nom' => $nom,
             'nom_developpe' => $this->texte($brut, 'nom_developpe'),
             'sigle' => $this->texte($brut, 'sigle'),
@@ -925,9 +1205,12 @@ class CrmImportFederations extends Command
             'schema_version' => ScrapedRecord::SCHEMA_VERSION,
             'source' => self::SOURCE,
             'status' => 'success',
+            // Sans SIREN : l'ancre (pays, `foreign_id`) des organisateurs
+            // d'événements. Avec SIREN : le message d'avant, à l'identique (le
+            // `run_id` en dépend).
             'company' => [
-                'siren' => $l['siren'],
-                'country' => 'FR',
+                ...($l['siren'] !== null ? ['siren' => $l['siren']] : ['foreign_id' => $l['identifiant']]),
+                'country' => self::PAYS,
                 'nature' => $l['nature'],
                 'fields' => $champs,
             ],
@@ -941,7 +1224,7 @@ class CrmImportFederations extends Command
         // Le MÊME contenu rejoué = le même run : le funnel le reconnaît et
         // n'écrit rien (idempotence). Un contenu corrigé = un nouveau run, qui
         // complète la fiche (backfill-only).
-        $message['run_id'] = self::SOURCE . ':' . $l['siren'] . ':'
+        $message['run_id'] = self::SOURCE . ':' . ($l['siren'] ?? $l['identifiant']) . ':'
             . substr(hash('sha256', json_encode($message, JSON_THROW_ON_ERROR)), 0, 16);
 
         return $message;
@@ -1061,6 +1344,13 @@ class CrmImportFederations extends Command
     private function lien(?string $valeur): ?string
     {
         return $valeur !== null && preg_match('#^https?://#i', $valeur) === 1 ? $valeur : null;
+    }
+
+    /** Forme d'un identifiant d'organisme sans SIREN (ancre ou tête de réseau). */
+    public static function identifiantValide(string $identifiant): bool
+    {
+        return strlen($identifiant) <= self::IDENTIFIANT_MAX
+            && preg_match(self::MOTIF_IDENTIFIANT, $identifiant) === 1;
     }
 
     private function rejeter(string $motif, int $numero): void

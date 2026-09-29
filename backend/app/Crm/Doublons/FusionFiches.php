@@ -585,12 +585,14 @@ final class FusionFiches
         }
 
         // Une valeur recopiée n'est retirée que si son EMPREINTE n'a pas bougé
-        // (personne ne l'a changée depuis).
+        // (personne ne l'a changée depuis). `COALESCE` : la condition ne dit
+        // rien de « non nul », si bien qu'aucun index PARTIEL (`… IS NOT
+        // NULL`) ne peut la servir — la ligne se lit par sa clé primaire.
         $remettre = function (string $table, string $col, int $id, mixed $v) use ($ws, &$bilan): void {
             $v = is_array($v) ? $v : [];
             $n = DB::update(
                 "UPDATE {$table} SET {$col} = ? WHERE workspace_id = ? AND id = ?
-                   AND encode(digest(CAST({$col} AS TEXT), 'sha256'), 'hex') = ?",
+                   AND encode(digest(COALESCE(CAST({$col} AS TEXT), ''), 'sha256'), 'hex') = ?",
                 [($v['avant'] ?? null) === '' ? '' : null, $ws, $id, is_string($v['empreinte'] ?? null) ? $v['empreinte'] : ''],
             );
             $bilan[$n > 0 ? 'champs_remis' : 'champs_modifies_depuis']++;

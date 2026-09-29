@@ -306,9 +306,13 @@ test('une adresse dont le domaine ne recoit rien est ecartee, meme verifiee', fu
     ResolveurDnsSimule::toutVerifier(ResultatDns::INEXISTANT);
     $sortie = campFichier();
     Artisan::call('crm:campagne:destinataires', ['segment' => 'organisateurs-evenements', 'sortie' => $sortie]);
+    $bilan = Artisan::output();
 
     expect(file($sortie, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [])->toBe([])
-        ->and(Artisan::output())->toMatch('/ecartees_invalides\s*\|\s*[3-9]\s*\|/')
+        // Les cinq adresses de l'organisateur, perso et opposée comprises :
+        // toutes INVALIDES — et pas « non vérifiées ».
+        ->and($bilan)->toMatch('/ecartees_invalides\s*\|\s*5\s*\|/')
+        ->and($bilan)->toMatch('/ecartees_non_verifiees\s*\|\s*0\s*\|/')
         ->and(DB::table('companies')->where('id', $this->club)->value('email_generic'))->toBe('bureau@zz-club.example.invalid');
 });
 

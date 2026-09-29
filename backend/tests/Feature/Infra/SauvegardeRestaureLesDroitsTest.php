@@ -632,3 +632,28 @@ test('F39-010 — le runbook de reprise appelle le script avec la declaration ex
         . 'pourquoi elle est la.',
     );
 });
+
+/**
+ * Chantier 5, R2 (4e tour) — la restauration VÉRIFIE que les clés HMAC et les
+ * colonnes d'empreintes restent FERMÉES au rôle applicatif, et ne conseille
+ * plus JAMAIS un droit accordé en masse (l'ancien remède `GRANT … ON ALL
+ * TABLES` rendait lisibles `doublons_cle`, `contacts_retires_cle` et les
+ * empreintes). La requête elle-même est exécutée par
+ * `DroitsRoleApplicatifApresRestaurationTest`.
+ */
+test('R2 — restauration et exercice sortent en erreur sur une FUITE de clés ou d empreintes', function (string $relatif) {
+    $code = invocationsDuScript(contenuScriptSauvegarde($relatif));
+
+    expect($code)->toContain('droits-role-applicatif.sql')
+        ->and($code)->toContain("grep -c '^fuite|'")
+        ->and($code)->toMatch('/if \[ "\$FUITES" -gt 0 \]; then(?:(?!\bfi\b)[\s\S])*?\bexit 7\b/');
+})->with(['infra/scripts/restore-postgres.sh', 'infra/scripts/dr-drill.sh']);
+
+test('R2 — aucun script ni runbook de restauration ne propose un droit accordé en masse', function (string $relatif) {
+    // Même dans un message ou un commentaire : c'est le lecteur qui le copierait.
+    expect(preg_match('/ON\s+ALL\s+TABLES/i', contenuScriptSauvegarde($relatif)))->toBe(
+        0,
+        "« {$relatif} » propose `… ON ALL TABLES …` : ce droit rendrait lisibles les clés HMAC et "
+        . 'les empreintes, volontairement fermées au rôle applicatif.',
+    );
+})->with(['infra/scripts/restore-postgres.sh', 'infra/scripts/dr-drill.sh', 'infra/runbooks/04-restore-dr.md']);

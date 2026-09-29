@@ -154,14 +154,23 @@ return new class extends Migration
                 fusion_id     BIGINT      NOT NULL REFERENCES fusions_fiches(id) ON DELETE CASCADE,
                 chemin        TEXT        NOT NULL,
                 empreinte     TEXT        NOT NULL,
+                -- `jumeaux.N.*` : la PERSONNE (l'homonyme gardé) dont c'est la
+                -- valeur. Sa suppression emporte ses empreintes (effacement
+                -- art. 17 par adresse, purge, suppression manuelle) : aucune
+                -- empreinte d'une personne ne survit à la personne.
+                contact_id    BIGINT      REFERENCES contacts(id) ON DELETE CASCADE,
                 CONSTRAINT fusions_empreintes_empreinte_check CHECK (empreinte ~ '^[0-9a-f]{64}$'),
                 CONSTRAINT fusions_empreintes_chemin_check CHECK (
                     chemin ~ '^champs\.(email_generic|phone|website|linkedin_url|first_info_at)$'
                     OR chemin ~ '^jumeaux\.[0-9]{1,4}\.(email|email_status|phone|linkedin_url)$'
                 ),
-                CONSTRAINT fusions_empreintes_cle UNIQUE (fusion_id, chemin)
+                CONSTRAINT fusions_empreintes_cle UNIQUE (fusion_id, chemin),
+                CONSTRAINT fusions_empreintes_personne_check CHECK ((chemin LIKE 'jumeaux.%') = (contact_id IS NOT NULL))
             )
         SQL);
+        // La cascade depuis `contacts` et l'effacement « toutes les valeurs de
+        // CETTE personne » passent par cet index.
+        DB::statement('CREATE INDEX IF NOT EXISTS idx_fusions_empreintes_personne ON fusions_empreintes (contact_id) WHERE contact_id IS NOT NULL');
         // L'effacement : « les empreintes de CETTE valeur, dans CET espace ».
         DB::statement('CREATE INDEX IF NOT EXISTS idx_fusions_empreintes_valeur ON fusions_empreintes (workspace_id, empreinte)');
         DB::statement("COMMENT ON TABLE fusions_empreintes IS 'Empreintes salees des valeurs recopiees par une fusion (pour ne les retirer que si elles n ont pas bouge). Illisibles par le role applicatif ; supprimees par l effacement.'");
@@ -377,8 +386,9 @@ return new class extends Migration
                         END IF;
                         EXECUTE format('SELECT CAST(%I AS TEXT) FROM public.contacts WHERE id = $1 AND workspace_id = $2', k)
                             INTO v USING (j->'jumeaux'->i->>'garde_contact')::BIGINT, p_ws;
-                        INSERT INTO public.fusions_empreintes (workspace_id, fusion_id, chemin, empreinte)
-                        VALUES (p_ws, p_fusion, 'jumeaux.' || i || '.' || k, public.doublons_empreinte(public.doublons_normaliser(k, v)));
+                        INSERT INTO public.fusions_empreintes (workspace_id, fusion_id, chemin, empreinte, contact_id)
+                        VALUES (p_ws, p_fusion, 'jumeaux.' || i || '.' || k, public.doublons_empreinte(public.doublons_normaliser(k, v)),
+                                (j->'jumeaux'->i->>'garde_contact')::BIGINT);
                     END LOOP;
                 END LOOP;
             END
@@ -422,15 +432,23 @@ return new class extends Migration
             $fn$;
 
             -- Art. 17 : l'adresse et les numéros effacés quittent les adresses
-            -- partagées ET les empreintes des fusions — deux DELETE indexés,
-            -- aucune relecture-réécriture du journal (qui perdrait un lien posé
-            -- en même temps par un import).
+            -- partagées ET les empreintes des fusions — DELETE indexés, aucune
+            -- relecture-réécriture du journal (qui perdrait un lien posé en même
+            -- temps par un import). Côté fusions, c'est TOUTE la personne qui
+            -- part, pas seulement les deux valeurs connues de l'appelant :
+            --  1. les personnes de l'espace à cette adresse (encore là si
+            --     l'appel précède leur suppression) ;
+            --  2. celles dont une valeur recopiée EST l'adresse ou un numéro ;
+            -- et, pour chacune, toutes ses empreintes (e-mail, statut, numéro,
+            -- LinkedIn — toute colonne `jumeaux.*`, présente ou à venir). Une
+            -- personne déjà supprimée a emporté les siennes (cascade).
             CREATE OR REPLACE FUNCTION public.doublons_effacer(p_ws UUID, p_email TEXT, p_telephones JSONB)
             RETURNS INTEGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_catalog AS $fn$
             DECLARE
-                h   TEXT[];
-                n   INTEGER := 0;
-                m   INTEGER;
+                h         TEXT[];
+                personnes BIGINT[];
+                n         INTEGER := 0;
+                m         INTEGER;
             BEGIN
                 PERFORM public.doublons_verifier_espace(p_ws);
                 SELECT array_agg(x) INTO h FROM (
@@ -447,9 +465,24 @@ return new class extends Migration
                 DELETE FROM public.adresses_partagees ap WHERE ap.workspace_id = p_ws AND ap.email_empreinte = ANY (h);
                 GET DIAGNOSTICS m = ROW_COUNT;
                 n := n + m;
+
+                SELECT array_agg(DISTINCT x) INTO personnes FROM (
+                    SELECT ct.id AS x FROM public.contacts ct
+                    WHERE  ct.workspace_id = p_ws AND COALESCE(btrim(p_email), '') <> ''
+                    AND    ct.email = lower(btrim(p_email))
+                    UNION
+                    SELECT fe_p.contact_id FROM public.fusions_empreintes fe_p
+                    WHERE  fe_p.workspace_id = p_ws AND fe_p.empreinte = ANY (h) AND fe_p.contact_id IS NOT NULL
+                ) p;
+
                 DELETE FROM public.fusions_empreintes fe WHERE fe.workspace_id = p_ws AND fe.empreinte = ANY (h);
                 GET DIAGNOSTICS m = ROW_COUNT;
                 n := n + m;
+                IF personnes IS NOT NULL THEN
+                    DELETE FROM public.fusions_empreintes fe WHERE fe.contact_id = ANY (personnes) AND fe.workspace_id = p_ws;
+                    GET DIAGNOSTICS m = ROW_COUNT;
+                    n := n + m;
+                END IF;
                 RETURN n;
             END
             $fn$;

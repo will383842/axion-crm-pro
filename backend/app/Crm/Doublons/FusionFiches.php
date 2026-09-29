@@ -7,6 +7,7 @@ use App\Services\Audit\AuditHashChain;
 use App\Support\TotalListe;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use stdClass;
 
@@ -120,6 +121,11 @@ final class FusionFiches
     /** Coordonnées d'une personne recopiées sur son homonyme de la fiche gardée. */
     private const CHAMPS_PERSONNE = ['email', 'email_status', 'phone', 'linkedin_url'];
 
+    /** Bornes de `ancresAbsorbees` : niveaux de chaîne, fiches absorbées. */
+    public const ANCRES_NIVEAUX_MAX = 16;
+
+    public const ANCRES_FICHES_MAX = 200;
+
     /** Verrous tenus au plus, mesurés juste avant la validation de chaque fusion. */
     public int $verrousMax = 0;
 
@@ -211,16 +217,24 @@ final class FusionFiches
      * en chaîne : A→B puis B→C donne A et B pour C). Une personne retirée de
      * A avant la fusion est inscrite au registre sous l'ancre de A : un import
      * par l'ancre de la fiche gardée doit la voir aussi (réserve C, #260).
-     * Servie par `idx_fusions_fiches_garde` ; bornée à 16 niveaux et 200 fiches.
+     * Servie par `idx_fusions_fiches_garde` ; bornée à 16 niveaux et 200 fiches
+     * absorbées. Borne ATTEINTE (il restait des fiches à voir) : `$tronquee`
+     * passe à vrai et un avertissement part au journal — identifiants
+     * seulement, aucune donnée personnelle —, car les ancres au-delà ne sont
+     * pas interrogées : une personne retirée d'une fiche hors borne pourrait
+     * revenir. L'appelant le compte dans son bilan.
+     *
+     * @param-out bool $tronquee
      *
      * @return list<array{siren: ?string, pays: ?string, foreign_id: ?string}>
      */
-    public static function ancresAbsorbees(string $ws, int $companyId): array
+    public static function ancresAbsorbees(string $ws, int $companyId, ?bool &$tronquee = null): array
     {
+        $tronquee = false;
         $vues = [$companyId => true];
         $aVoir = [$companyId];
         $ancres = [];
-        for ($pas = 0; $pas < 16 && $aVoir !== [] && count($vues) < 200; $pas++) {
+        for ($pas = 0; $aVoir !== []; $pas++) {
             $lignes = DB::select(
                 'SELECT absorbee_id FROM fusions_fiches WHERE garde_id = ANY(?::bigint[]) AND annulee_at IS NULL AND workspace_id = ?',
                 ['{' . implode(',', $aVoir) . '}', $ws],
@@ -231,10 +245,26 @@ final class FusionFiches
                 if (isset($vues[$id])) {
                     continue;
                 }
+                // Une fiche NON VUE au-delà d'une borne : la borne a coupé
+                // quelque chose (pas seulement « atteinte »).
+                if ($pas >= self::ANCRES_NIVEAUX_MAX || count($ancres) >= self::ANCRES_FICHES_MAX) {
+                    $tronquee = true;
+                    $aVoir = [];
+                    break;
+                }
                 $vues[$id] = true;
                 $aVoir[] = $id;
                 $ancres[] = self::ancreDe($ws, $id);
             }
+        }
+        if ($tronquee) {
+            Log::warning('crm.doublons.ancres_absorbees_tronquees', [
+                'workspace_id' => $ws,
+                'company_id' => $companyId,
+                'fiches_vues' => count($ancres),
+                'niveaux_max' => self::ANCRES_NIVEAUX_MAX,
+                'fiches_max' => self::ANCRES_FICHES_MAX,
+            ]);
         }
 
         return $ancres;

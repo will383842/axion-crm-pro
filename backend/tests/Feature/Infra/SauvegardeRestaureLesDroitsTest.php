@@ -371,7 +371,17 @@ function dumpPorteLesRoles(string $contenu): bool
  */
 function verifieLesDroitsDuRoleApplicatif(string $contenu): bool
 {
-    return str_contains(invocationsDuScript($contenu), 'has_table_privilege');
+    $code = invocationsDuScript($contenu);
+    // 2026-09-30 (chantier 5) : la requête vit dans UN fichier partagé par
+    // `restore-postgres.sh` et `dr-drill.sh`. Un script qui l'INVOQUE (ligne de
+    // code, pas un message) est jugé sur le CODE SQL de ce fichier, commentaires
+    // `--` retirés — même exigence qu'avant, au bon endroit.
+    if (str_contains($code, 'droits-role-applicatif.sql')) {
+        $sql = (string) @file_get_contents(racineDepotSauvegarde() . '/infra/scripts/droits-role-applicatif.sql');
+        $code .= "\n" . (string) preg_replace('/--[^\n]*/', '', $sql);
+    }
+
+    return str_contains($code, 'has_table_privilege');
 }
 
 test('A08-008 — TEMOIN : le banc voit les trois scripts de la chaine', function () {

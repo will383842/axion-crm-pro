@@ -260,6 +260,7 @@ class CrmImportFederations extends Command
             'natures_posees', 'secteurs_poses', 'secteurs_corriges', 'secteurs_conserves',
             'departements_ignores', 'emails_generiques_non_poses', 'coordonnees_gardees_en_canaux',
             'tetes_liees', 'tetes_inchangees', 'tetes_introuvables', 'tetes_refusees_cycle',
+            'chaines_de_fusion_tronquees',
         ], 0);
         $this->rejets = [];
         $this->tetes = [];
@@ -470,9 +471,10 @@ class CrmImportFederations extends Command
         // Les ancres à interroger EN PLUS de celle du fichier : la fiche gardée
         // (renvoi suivi), et les fiches ABSORBÉES dans la fiche visée (une
         // personne retirée de A avant A→B ne revient pas par l'ancre de B).
+        $tronquee = false;
         $ancresFusions = array_merge(
             $ancreGardee === null ? [] : [$ancreGardee],
-            $avant === null ? [] : FusionFiches::ancresAbsorbees($workspaceId, (int) $avant->id),
+            $avant === null ? [] : FusionFiches::ancresAbsorbees($workspaceId, (int) $avant->id, $tronquee),
         );
         if ($avant !== null && $avant->deleted_at !== null) {
             // Mise à la corbeille par Will : un import ne la ressuscite pas.
@@ -519,6 +521,11 @@ class CrmImportFederations extends Command
         $delta['contacts_completes'] = $outcome->contactsUpdated;
         $delta['personnes_opposees'] = $outcome->personsSkippedOptOut;
         $delta['emails_refuses_mx'] = $outcome->emailsRejectedMx;
+        // Une ligne dont la chaîne des fusions a dépassé ses bornes, ici ou
+        // dans le funnel : comptée UNE fois (journal : `ancres_absorbees_tronquees`).
+        if ($tronquee || $outcome->chainesFusionTronquees > 0) {
+            $delta['chaines_de_fusion_tronquees'] = 1;
+        }
         $delta['personnes_sans_changement'] = $outcome->personsSkipped['skipped_no_change'] ?? 0;
         $delta['personnes_ecartees'] = (int) array_sum($outcome->personsSkipped) - $delta['personnes_sans_changement'];
 

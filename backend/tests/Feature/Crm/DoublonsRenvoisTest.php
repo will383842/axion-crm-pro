@@ -203,7 +203,7 @@ test('VETO RGPD — la collecte (funnel) qui suit un renvoi n ajoute pas une per
     $outcome = app(ScrapedRecordIngestService::class)->ingest(ScrapedRecord::fromArray($message));
 
     expect($outcome->companyId)->toBe($garde)
-        ->and($outcome->personsSkipped['retiree_apres_fusion'] ?? 0)->toBe(1)
+        ->and($outcome->personsSkipped['retiree_via_fiche_absorbee'] ?? 0)->toBe(1)
         ->and(DB::table('contacts')->where('company_id', $garde)->where('last_name', 'ZZVETOTROIS')->exists())->toBeFalse()
         ->and(DB::table('contacts')->where('company_id', $garde)->where('last_name', 'ZZVETOTEMOIN')->exists())->toBeTrue();
 });
@@ -291,7 +291,7 @@ test('RÉSERVE C — la collecte par l ancre de la fiche gardée n ajoute pas un
     ]));
 
     expect($outcome->companyId)->toBe($b)
-        ->and($outcome->personsSkipped['retiree_apres_fusion'] ?? 0)->toBe(1)
+        ->and($outcome->personsSkipped['retiree_via_fiche_absorbee'] ?? 0)->toBe(1)
         ->and(DB::table('contacts')->where('company_id', $b)->where('last_name', 'ZZAVANTDEUX')->exists())->toBeFalse()
         ->and(DB::table('contacts')->where('company_id', $b)->where('last_name', 'ZZAVANTTEMOIN')->exists())->toBeTrue();
 });

@@ -152,7 +152,8 @@ final class ScrapedRecordIngestService
         // Chantier 5 — les fiches ABSORBÉES dans la fiche visée : une personne
         // retirée de l'une d'elles avant la fusion ne revient pas par l'ancre
         // de la fiche gardée (réserve C, #260).
-        $absorbees = FusionFiches::ancresAbsorbees($workspaceId, $companyId);
+        $tronquee = false;
+        $absorbees = FusionFiches::ancresAbsorbees($workspaceId, $companyId, $tronquee);
         if ($absorbees !== []) {
             $this->ancresRenvoi = array_merge($this->ancresRenvoi ?? [], $absorbees);
         }
@@ -181,7 +182,9 @@ final class ScrapedRecordIngestService
             // message OU sous celle de la fiche gardée ne revient pas.
             if ($this->ancresRenvoi !== null
                 && FusionFiches::personneRetiree($workspaceId, $this->ancresRenvoi, $person['first_name'] ?? null, $person['last_name'] ?? null)) {
-                $skipped['retiree_apres_fusion'] = ($skipped['retiree_apres_fusion'] ?? 0) + 1;
+                // Retirée de la fiche gardée OU d'une fiche absorbée — avant
+                // comme après la fusion : le motif dit par où on l'a su.
+                $skipped['retiree_via_fiche_absorbee'] = ($skipped['retiree_via_fiche_absorbee'] ?? 0) + 1;
 
                 continue;
             }
@@ -242,6 +245,7 @@ final class ScrapedRecordIngestService
             tags: $tags,
             activityId: $activityId,
             personsSkipped: $skipped,
+            chainesFusionTronquees: $tronquee ? 1 : 0,
         );
 
         $this->recordRun($record, $workspaceId, $companyId, $record->status, $outcome, $dedupKey);

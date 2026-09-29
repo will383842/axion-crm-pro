@@ -27,6 +27,7 @@
 #   3. les COMPTAGES restaurés égalent la production
 #      → une restauration « sans erreur » mais à 0 ligne reste un échec ;
 #   4. le RÔLE APPLICATIF peut lire les tables restaurées  ← ajouté 2026-08-20
+#      (et NE PEUT PAS lire les clés HMAC ni les colonnes d'empreintes — 2026-09-30)
 #      → constat A08-008 (S1) : les points 1 à 3 se jouent tous en
 #        SUPERUTILISATEUR (`psql -U axion`, mesuré `rolsuper=t rolbypassrls=t`),
 #        qui lit tout quels que soient les GRANT. Ils rendaient donc le même
@@ -63,6 +64,8 @@ SCRATCH="${SCRATCH:-/tmp/axion-crm-dr-drill}"
 # Le rôle NON-PROPRIÉTAIRE par lequel l'application se connecte (migration
 # `2026_08_14_000001_harden_workspace_isolation`). Cf. étape 5.
 ROLE_APPLICATIF="${ROLE_APPLICATIF:-axion_app}"
+# La requête des droits du rôle applicatif (étape 5), partagée avec restore-postgres.sh.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ⚠️ CONTRAT PARTAGÉ AVEC `backup-postgres.sh` ET `restore-postgres.sh`.
 # Les trois fichiers portent ces marqueurs à l'identique.
@@ -309,16 +312,16 @@ if [ "$ROLE_PRESENT" -eq 0 ]; then
     exit 6
 fi
 
-ILLISIBLES=$(docker exec "$PG_CONTENEUR" psql -U axion -d "$BASE_DRILL" -tAc "
-    SELECT count(*)
-    FROM pg_class c
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = 'public'
-      AND c.relkind IN ('r', 'p')
-      AND NOT has_table_privilege('${ROLE_APPLICATIF}', c.oid, 'SELECT')")
+# La requête est partagée avec restore-postgres.sh (`droits-role-applicatif.sql`) :
+# lecture EN ENTIER ou PAR COLONNES (`has_table_privilege`,
+# `has_any_column_privilege`), et fermeture des clés et des empreintes.
+DROITS=$(docker exec -i "$PG_CONTENEUR" psql -U axion -d "$BASE_DRILL" -tA -F '|' -v ON_ERROR_STOP=1 -v role="$ROLE_APPLICATIF" < "$SCRIPT_DIR/droits-role-applicatif.sql")
+ILLISIBLES=$(printf '%s\n' "$DROITS" | grep -c '^illisible|' || true)
+FUITES=$(printf '%s\n' "$DROITS" | grep -c '^fuite|' || true)
 
 if [ "$ILLISIBLES" -gt 0 ]; then
     echo "❌ CONSTAT A08-008 : ${ILLISIBLES} table(s) publique(s) illisibles par « ${ROLE_APPLICATIF} »." >&2
+    printf '%s\n' "$DROITS" | grep '^illisible|' | sed 's/^illisible|/     - /' >&2
     echo "   La restauration a rendu les DONNÉES mais pas les DROITS : l'application" >&2
     echo "   échouerait sur « permission denied for table … » dès la première requête." >&2
     echo "   Les comptages de l'étape 4 sont identiques et ne prouvent rien — ils ont" >&2
@@ -327,6 +330,13 @@ if [ "$ILLISIBLES" -gt 0 ]; then
     exit 6
 fi
 echo "  ✓ Aucune table illisible par le rôle applicatif (${ROLE_APPLICATIF})"
+if [ "$FUITES" -gt 0 ]; then
+    echo "❌ ${FUITES} objet(s) volontairement FERMÉ(S) au rôle « ${ROLE_APPLICATIF} » lui sont LISIBLES :" >&2
+    printf '%s\n' "$DROITS" | grep '^fuite|' | sed 's/^fuite|/     - /' >&2
+    echo "   Clés HMAC ou colonnes d'empreintes : ne jamais accorder de droits en masse." >&2
+    exit 7
+fi
+echo "  ✓ Clés et empreintes fermées au rôle applicatif (${ROLE_APPLICATIF})"
 
 # --- 6. RTO -----------------------------------------------------------------
 DUREE_TOTALE=$(( $(date +%s) - DEBUT ))

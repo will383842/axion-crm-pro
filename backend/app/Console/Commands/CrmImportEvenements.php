@@ -361,7 +361,8 @@ class CrmImportEvenements extends Command
      */
     private function organisateur(array $ancre, string $workspaceId): ?array
     {
-        $requete = DB::table('companies')->where('workspace_id', $workspaceId);
+        // Corbeille comprise, SCIEMMENT : `deleted_at` est lu pour suivre une fusion.
+        $requete = DB::table('companies')->where('workspace_id', $workspaceId)->select(['id', 'deleted_at']);
 
         $siren = $ancre['siren'] ?? null;
         $foreignId = $ancre['foreign_id'] ?? null;
@@ -377,7 +378,7 @@ class CrmImportEvenements extends Command
             throw new InvalidArgumentException('organisateur_sans_ancre');
         }
 
-        $fiche = $requete->first(['id', 'deleted_at']);
+        $fiche = $requete->first();
         if ($fiche === null) {
             return null;
         }

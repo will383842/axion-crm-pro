@@ -4,9 +4,11 @@ namespace App\Console\Commands;
 
 use App\Console\Concerns\RefuseUneSuppressionMassive;
 use App\Crm\EspaceProspection;
+use App\Crm\Etiquettes\FamillesEtiquettes;
 use App\Crm\FichesProtegees;
 use App\Crm\Referentiels\Classement;
 use App\Crm\Referentiels\EtiquettesClassement;
+use App\Crm\Referentiels\Metiers;
 use App\Crm\Taxonomy;
 use App\Services\Audit\AuditHashChain;
 use App\Support\WorkspaceContext;
@@ -16,6 +18,7 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use stdClass;
 use Throwable;
 
@@ -38,10 +41,38 @@ use Throwable;
  *   - `entity_nature` = `entreprise` pour les fiches INSEE qui n'en ont pas ;
  *   - `region_code` depuis le département ;
  *   - une chaîne vide (`''`) dans une colonne de classement devient NULL ;
- *   - les étiquettes automatiques `sector-…`, `size-…`, `region-…`
- *     RESYNCHRONISÉES avec la fiche. Jamais touchées : les étiquettes `src:`,
- *     les verrouillées (`is_locked`), les manuelles (`kind = manual` ou posées
- *     par un utilisateur).
+ *   - les étiquettes automatiques `sector-…`, `size-…`, `region-…` et, depuis
+ *     le chantier 2 (2026-09-29), `metier-…` (le métier lu dans `naf_rev2`,
+ *     `App\Crm\Referentiels\Metiers`) RESYNCHRONISÉES avec la fiche. Jamais
+ *     touchées : les étiquettes `src:`, les verrouillées (`is_locked`), les
+ *     manuelles (`kind = manual` ou posées par un utilisateur), celles de l'IA
+ *     (`kind = llm`, même si leur slug ressemble à une famille).
+ *
+ * ── LE RANGEMENT DES ÉTIQUETTES (chantier 2, 2026-09-29) ─────────────────
+ *
+ * Après le dernier lot, et seulement quand la commande est allée au bout :
+ *   - les étiquettes IA (`kind = llm`) encore rangées en `intent` passent dans
+ *     leur catégorie `ia` — par paquets, sans en supprimer une seule ;
+ *   - le MÉNAGE est COMPTÉ, jamais exécuté par défaut (ordre de Will du
+ *     2026-09-29 : « strictement interdit de purger quoi que ce soit »). Il ne
+ *     s'exécute que sur `--supprimer-etiquettes-orphelines`, sous la garde
+ *     B15-008 (plafond de proportion, `--force`). Une étiquette n'est
+ *     supprimable que si elle remplit TOUTE la condition `CONDITIONS_ORPHELINE`
+ *     (écrite une seule fois, relue à l'identique au comptage, au verrouillage
+ *     et au `DELETE`) :
+ *       · de l'espace visé ; `kind` `auto` ou `llm` ; non verrouillée ;
+ *       · SANS namespace (jamais une `src:`, jamais une gouvernée) ;
+ *       · sans règle (`rules` vide ou NULL) ;
+ *       · hors référentiel du classement (`sector-btp`, `metier-coiffeurs`…
+ *         inemployées restent) ;
+ *       · citée par AUCUNE audience de l'espace (corbeille comprise) ;
+ *       · portée par AUCUNE fiche et AUCUN candidat.
+ *     Deux ensembles la remplissent : les OBSOLÈTES (`sector-`/`size-`/
+ *     `metier-` hors référentiel, `kind = auto`, dont les lots viennent de
+ *     retirer les derniers liens) et les ORPHELINES (arrêtées AVANT les lots,
+ *     pour que l'essai à blanc chiffre ce que l'exécution visera). Chaque
+ *     paquet supprimé est écrit, étiquette par étiquette, dans la chaîne
+ *     d'audit.
  *
  * ── CE QUI REND LA COMMANDE SÛRE SUR 4,3 M DE FICHES ──────────────────────
  *
@@ -86,7 +117,7 @@ use Throwable;
  * Reclasse AUSSI les fiches protégées (organisateurs d'événements,
  * fédérations), que la commande exclut par défaut. Ce que l'option touche,
  * et RIEN d'autre : les six colonnes de classement (`COLONNES`) et les
- * étiquettes automatiques `sector-`/`size-`/`region-` — par le même `UPDATE`,
+ * étiquettes automatiques `sector-`/`size-`/`region-`/`metier-` — par le même `UPDATE`,
  * les mêmes plans d'étiquettes et les mêmes gardes que pour toute fiche.
  * Aucune ligne `contacts`, aucune coordonnée, aucune fiche : la commande n'a
  * aucune requête vers eux, avec ou sans l'option (Will, 27/09 : les contacts
@@ -114,11 +145,12 @@ class CrmReferentielsReclasser extends Command
                             {--depuis-id=0 : Reprendre APRÈS cette fiche (dernier id annoncé par une exécution interrompue)}
                             {--max-lots=0 : S\'arrêter après N lots (0 = jusqu\'au bout)}
                             {--pause-ms=0 : Pause entre deux lots, pour ménager la base}
-                            {--sans-etiquettes : Ne pas resynchroniser les étiquettes sector-/size-/region-}
+                            {--sans-etiquettes : Ne pas resynchroniser les étiquettes sector-/size-/region-/metier-, ni les ranger}
                             {--accepter-audiences : Partir malgré des audiences d\'exclusion qui citent une valeur obsolète}
                             {--compteurs-seulement : N\'afficher que des nombres (journaux publics des workflows)}
-                            {--force : Lever le plafond de proportion de la suppression des étiquettes obsolètes}
-                            {--inclure-protegees : Reclasser AUSSI les fiches protégées (classement et étiquettes sector-/size-/region- seulement)}';
+                            {--force : Lever le plafond de proportion de la suppression des étiquettes obsolètes et orphelines}
+                            {--inclure-protegees : Reclasser AUSSI les fiches protégées (classement et étiquettes sector-/size-/region-/metier- seulement)}
+                            {--supprimer-etiquettes-orphelines : SUPPRIMER les étiquettes inemployées (par défaut : comptées, jamais supprimées) — décision de Will, jamais automatique}';
 
     protected $description = 'Reclasse toutes les fiches (secteur, taille, nature, région, étiquettes) selon le référentiel unique.';
 
@@ -149,6 +181,30 @@ class CrmReferentielsReclasser extends Command
 
     private const COULEURS = ['sector' => 'violet', 'size' => 'amber', 'geo' => 'sky'];
 
+    /** Taille des paquets du rangement des étiquettes (table `tags`). */
+    private const PAQUET_RANGEMENT = 1000;
+
+    /**
+     * Les conditions d'une étiquette supprimable, écrites UNE fois : l'inventaire,
+     * le verrouillage et le `DELETE` les relisent à l'identique. Sans alias :
+     * `tags` est nommée en toutes lettres dans les sous-requêtes.
+     */
+    private const CONDITIONS_SAUF_LIENS_FICHES = "tags.workspace_id = ?::uuid
+        AND tags.kind IN ('auto', 'llm')
+        AND tags.is_locked = false
+        AND tags.namespace IS NULL
+        AND (tags.rules IS NULL OR tags.rules IN ('[]'::jsonb, '{}'::jsonb))
+        AND tags.slug <> ALL(?::text[])
+        AND tags.slug <> ALL(?::text[])
+        AND NOT EXISTS (SELECT 1 FROM candidate_tag WHERE candidate_tag.tag_id = tags.id)";
+
+    private const CONDITIONS_ORPHELINE = self::CONDITIONS_SAUF_LIENS_FICHES . '
+        AND NOT EXISTS (SELECT 1 FROM company_tag WHERE company_tag.tag_id = tags.id)';
+
+    /** Les familles de classement dont une valeur peut devenir obsolète. */
+    private const CONDITION_OBSOLETE = "tags.kind = 'auto'
+        AND (tags.slug LIKE 'sector-%' OR tags.slug LIKE 'size-%' OR tags.slug LIKE 'metier-%')";
+
     /** @var array<string, array<string, array<int|string, int>>> dimension => [avant|apres => [valeur => n]] */
     private array $repartitions = [];
 
@@ -158,7 +214,7 @@ class CrmReferentielsReclasser extends Command
     /** @var array<string, int> méthode de calcul du secteur => n */
     private array $methodes = [];
 
-    /** @var array<string, int> slug => tag_id (familles sector-/size-/region- de l'espace) */
+    /** @var array<string, int> slug => tag_id (familles sector-/size-/region-/metier- de l'espace) */
     private array $tagIds = [];
 
     /** @var array<string, true> slugs dont le nom a déjà été aligné pendant cette exécution */
@@ -166,6 +222,20 @@ class CrmReferentielsReclasser extends Command
 
     /** `--inclure-protegees` : les fiches protégées sont reclassées aussi. */
     private bool $inclureProtegees = false;
+
+    /** @var list<int> étiquettes orphelines, arrêtées AVANT les lots */
+    private array $orphelines = [];
+
+    /** `--supprimer-etiquettes-orphelines` : sans elle, aucune étiquette n'est supprimée. */
+    private bool $supprimerOrphelines = false;
+
+    /** Raison pour laquelle le ménage demandé a été refusé (liens hors espace). */
+    private ?string $refusMenage = null;
+
+    /** La chaîne d'audit et l'opérateur, pour tracer chaque paquet supprimé. */
+    private ?AuditHashChain $audit = null;
+
+    private string $operateurCourant = '?';
 
     public function handle(AuditHashChain $audit): int
     {
@@ -188,6 +258,9 @@ class CrmReferentielsReclasser extends Command
 
         $this->reinitialiser();
         $this->inclureProtegees = (bool) $this->option('inclure-protegees');
+        $this->supprimerOrphelines = (bool) $this->option('supprimer-etiquettes-orphelines');
+        $this->audit = $audit;
+        $this->operateurCourant = $operateur;
         $this->info(sprintf(
             '%s — espace %s, lots de %d, à partir de l\'id %d%s%s.',
             $dryRun ? '[À BLANC] rien ne sera écrit' : 'Reclassement',
@@ -230,6 +303,9 @@ class CrmReferentielsReclasser extends Command
                 $this->compteurs[$this->inclureProtegees ? 'fiches_protegees_incluses' : 'fiches_protegees_exclues'] = $protegees;
                 if ($etiquettes) {
                     $this->chargerTags($workspaceId);
+                    // Arrêtée AVANT toute écriture : l'essai à blanc et
+                    // l'exécution visent la même liste.
+                    $this->orphelines = $this->etiquettesOrphelines($workspaceId);
                 }
 
                 $lots = 0;
@@ -305,7 +381,8 @@ class CrmReferentielsReclasser extends Command
 
             if ($termine && $etiquettes) {
                 WorkspaceContext::run($workspaceId, function () use ($workspaceId, $dryRun): void {
-                    $this->etiquettesObsoletes($workspaceId, $dryRun);
+                    $this->rangerEtiquettesIa($workspaceId, $dryRun);
+                    $this->menageEtiquettes($workspaceId, $dryRun);
                 });
             }
         } catch (Throwable $e) {
@@ -345,6 +422,11 @@ class CrmReferentielsReclasser extends Command
 
             return self::FAILURE;
         }
+        if ($this->refusMenage !== null) {
+            $this->error($this->refusMenage);
+
+            return self::FAILURE;
+        }
         if ($auditFinEchoue !== null) {
             $this->error("ÉCHEC : l'entrée d'audit de fin n'a pas pu être écrite ({$auditFinEchoue}). Les lots, eux, sont écrits ET journalisés un par un.");
 
@@ -365,6 +447,8 @@ class CrmReferentielsReclasser extends Command
         $this->methodes = [];
         $this->tagIds = [];
         $this->tagsAlignes = [];
+        $this->orphelines = [];
+        $this->refusMenage = null;
         $this->compteurs = [
             'lots' => 0,
             'fiches_lues' => 0,
@@ -381,6 +465,12 @@ class CrmReferentielsReclasser extends Command
             'secteurs_import_conserves' => 0,
             'etiquettes_obsoletes_a_supprimer' => 0,
             'etiquettes_obsoletes_supprimees' => 0,
+            'etiquettes_orphelines_a_supprimer' => 0,
+            'etiquettes_orphelines_supprimees' => 0,
+            'suppression_etiquettes_demandee' => 0,
+            'liens_etiquette_hors_espace' => 0,
+            'etiquettes_ia_a_ranger' => 0,
+            'etiquettes_ia_rangees' => 0,
             'garde_b15008_refuserait' => 0,
             'audiences_obsoletes' => 0,
             'audiences_exclusion_obsoletes' => 0,
@@ -503,7 +593,7 @@ class CrmReferentielsReclasser extends Command
     {
         /** @var list<array{fiche: stdClass, nouveau: array<string, ?string>}> $aModifier */
         $aModifier = [];
-        /** @var array<int, array{secteur: ?string, taille: ?string, region: ?string}> $classementFinal */
+        /** @var array<int, array{secteur: ?string, taille: ?string, region: ?string, naf_rev2: ?string}> $classementFinal */
         $classementFinal = [];
 
         foreach ($fiches as $f) {
@@ -559,6 +649,7 @@ class CrmReferentielsReclasser extends Command
             $this->compter('nature', self::brut($f->entity_nature), $nouveau['entity_nature']);
             $this->compter('region', self::brut($f->region_code), $nouveau['region_code']);
             $this->compter('nomenclature', self::brut($f->naf_nomenclature), $nouveau['naf_nomenclature']);
+            $this->compter('metier', Metiers::pourNafRev2(self::brut($f->naf_rev2)), Metiers::pourNafRev2($nouveau['naf_rev2']));
 
             if ($change) {
                 $this->compteurs['fiches_a_modifier']++;
@@ -568,6 +659,7 @@ class CrmReferentielsReclasser extends Command
                 'secteur' => $nouveau['sector_main'],
                 'taille' => $nouveau['size_category'],
                 'region' => $nouveau['region_code'],
+                'naf_rev2' => $nouveau['naf_rev2'],
             ];
         }
 
@@ -679,9 +771,9 @@ class CrmReferentielsReclasser extends Command
 
     /**
      * Ce qu'il faut ajouter et retirer pour que les étiquettes des familles
-     * `sector-`, `size-`, `region-` reflètent la fiche.
+     * `sector-`, `size-`, `region-`, `metier-` reflètent la fiche.
      *
-     * @param  array<int, array{secteur: ?string, taille: ?string, region: ?string}>  $classements
+     * @param  array<int, array{secteur: ?string, taille: ?string, region: ?string, naf_rev2: ?string}>  $classements
      * @return array{ajouts: list<array{company_id: int, slug: string}>, retraits: list<array{company_id: int, tag_id: int}>}
      */
     private function planEtiquettes(array $classements): array
@@ -705,7 +797,7 @@ class CrmReferentielsReclasser extends Command
         $ajouts = [];
         $retraits = [];
         foreach ($classements as $companyId => $c) {
-            $desirees = EtiquettesClassement::desirees($c['secteur'], $c['taille'], $c['region']);
+            $desirees = EtiquettesClassement::desirees($c['secteur'], $c['taille'], $c['region'], $c['naf_rev2']);
             $presentes = [];
             foreach ($attachees[$companyId] ?? [] as $l) {
                 $slug = (string) $l->slug;
@@ -728,10 +820,14 @@ class CrmReferentielsReclasser extends Command
     /**
      * Même règle que `AutoTaggerService::syncTags()` : on ne retire que ce que
      * l'automate a posé. Jamais une étiquette manuelle, verrouillée, ni `src:`.
+     *
+     * Ni une étiquette de l'IA (`kind = llm`) : son slug est libre, et un
+     * « size-matters » proposé par le modèle n'est pas une étiquette de taille.
+     * Seule une étiquette `kind = auto` appartient aux familles tenues ici.
      */
     private static function retirable(stdClass $lien): bool
     {
-        if ((string) $lien->assigned_by === 'user' || (string) $lien->kind === 'manual') {
+        if ((string) $lien->assigned_by === 'user' || (string) $lien->kind !== 'auto') {
             return false;
         }
         if ((bool) $lien->is_locked) {
@@ -851,22 +947,27 @@ class CrmReferentielsReclasser extends Command
     {
         foreach (array_keys(Taxonomy::SECTEURS) as $cle) {
             if (EtiquettesClassement::slugSecteur($cle) === $slug) {
-                return EtiquettesClassement::desirees($cle, null, null)[$slug];
+                return EtiquettesClassement::desirees($cle, null, null, null)[$slug];
             }
         }
         foreach (array_keys(Taxonomy::TAILLES) as $cle) {
             if (EtiquettesClassement::slugTaille($cle) === $slug) {
-                return EtiquettesClassement::desirees(null, $cle, null)[$slug];
+                return EtiquettesClassement::desirees(null, $cle, null, null)[$slug];
             }
         }
         foreach (array_keys(Taxonomy::REGIONS) as $code) {
             if (EtiquettesClassement::slugRegion((string) $code) === $slug) {
-                return EtiquettesClassement::desirees(null, null, (string) $code)[$slug];
+                return EtiquettesClassement::desirees(null, null, (string) $code, null)[$slug];
+            }
+        }
+        foreach (Metiers::table() as $code => $metier) {
+            if (EtiquettesClassement::slugMetier($metier) === $slug) {
+                return EtiquettesClassement::desirees(null, null, null, $code)[$slug];
             }
         }
         // Une valeur conservée hors référentiel (région étrangère…) : même
         // nommage que l'automate, libellé brut.
-        foreach (['sector-' => 'sector', 'size-' => 'size', 'region-' => 'geo'] as $prefixe => $categorie) {
+        foreach (['sector-' => 'sector', 'size-' => 'size', 'region-' => 'geo', 'metier-' => 'sector'] as $prefixe => $categorie) {
             if (str_starts_with($slug, $prefixe)) {
                 return ['name' => $slug, 'category' => $categorie];
             }
@@ -888,50 +989,86 @@ class CrmReferentielsReclasser extends Command
         foreach (array_keys(Taxonomy::REGIONS) as $code) {
             $valides[] = EtiquettesClassement::slugRegion((string) $code);
         }
+        foreach (array_keys(Metiers::liste()) as $cle) {
+            $valides[] = EtiquettesClassement::slugMetier($cle);
+        }
 
         return $valides;
     }
 
     /**
-     * Les étiquettes `sector-`/`size-` qui ne correspondent plus à AUCUNE
-     * valeur du référentiel (`sector-it-saas`, `size-micro`…) : supprimées quand
-     * plus aucune fiche ne les porte. Jamais une verrouillée ni une manuelle.
+     * LE MÉNAGE DES ÉTIQUETTES — COMPTÉ toujours, EXÉCUTÉ seulement sur
+     * `--supprimer-etiquettes-orphelines`.
      *
-     * À blanc : on CHIFFRE celles que l'exécution supprimerait — celles
-     * qu'aucun lien intouchable (posé par un utilisateur, ou sur une fiche
-     * protégée) ne retiendra — et ce que dirait la garde B15-008.
+     * Ordre permanent de Will (2026-09-29) : « il est strictement interdit de
+     * purger quoi que ce soit ». Par défaut, cette commande ne supprime donc
+     * AUCUNE étiquette : elle compte, pour le bilan,
+     *
+     *  1. les OBSOLÈTES : les `sector-`/`size-`/`metier-` qui ne correspondent
+     *     plus à AUCUNE valeur du référentiel (`sector-it-saas`, `size-micro`…)
+     *     et que plus aucune fiche ne porterait ;
+     *  2. les ORPHELINES : la liste arrêtée avant les lots (`etiquettesOrphelines`).
+     *
+     * (Retirer une étiquette automatique d'UNE fiche pendant les lots reste
+     * permis : c'est du classement, l'étiquette et la fiche demeurent.)
+     *
+     * Sur l'option seulement — une DÉCISION de Will, jamais un planificateur
+     * ni un workflow (garde `SuppressionEtiquettesJamaisAutomatiqueTest`) :
+     * contrôle préalable des liens hors espace, garde B15-008, puis
+     * `supprimerEtiquettes()` (verrou, relecture complète, audit par paquet).
      */
-    private function etiquettesObsoletes(string $workspaceId, bool $dryRun): void
+    private function menageEtiquettes(string $workspaceId, bool $dryRun): void
     {
-        $candidates = DB::table('tags')
-            ->where('workspace_id', $workspaceId)
-            ->where('kind', 'auto')
-            ->where('is_locked', false)
-            ->where(function (QueryBuilder $q): void {
-                $q->where('slug', 'like', 'sector-%')->orWhere('slug', 'like', 'size-%');
-            })
-            ->whereNotIn('slug', self::slugsValides());
+        // La condition de l'exécution (`CONDITIONS_ORPHELINE`), restreinte aux
+        // familles de classement. À blanc, les liens ne sont pas encore
+        // retirés : on compte ceux qui RESTERONT après les lots — posés par un
+        // utilisateur, ou sur une fiche protégée (hors `--inclure-protegees`).
+        $liens = $dryRun
+            ? " AND NOT EXISTS (SELECT 1 FROM company_tag WHERE company_tag.tag_id = tags.id
+                 AND (company_tag.assigned_by = 'user' OR NOT (" . $this->horsProtegees('company_tag.company_id') . ')))'
+            : ' AND NOT EXISTS (SELECT 1 FROM company_tag WHERE company_tag.tag_id = tags.id)';
+        $lignes = DB::select(
+            'SELECT id FROM tags WHERE ' . self::CONDITIONS_SAUF_LIENS_FICHES . $liens
+            . ' AND ' . self::CONDITION_OBSOLETE . ' ORDER BY id',
+            $this->liaisonsOrpheline($workspaceId),
+        );
+        $obsoletes = array_values(array_map(static fn (stdClass $l): int => (int) $l->id, $lignes));
+        $orphelines = array_values(array_diff($this->orphelines, $obsoletes));
+        $this->compteurs['etiquettes_obsoletes_a_supprimer'] = count($obsoletes);
+        $this->compteurs['etiquettes_orphelines_a_supprimer'] = count($orphelines);
+        $n = count($obsoletes) + count($orphelines);
 
-        if ($dryRun) {
-            $supprimables = (clone $candidates)->whereNotExists(function (QueryBuilder $sub): void {
-                $sub->selectRaw('1')->from('company_tag as ct')->whereColumn('ct.tag_id', 'tags.id')
-                    ->where(function (QueryBuilder $q): void {
-                        $q->where('ct.assigned_by', 'user')
-                            ->orWhereRaw('NOT (' . $this->horsProtegees('ct.company_id') . ')');
-                    });
-            });
-        } else {
-            $supprimables = (clone $candidates)->whereNotExists(function (QueryBuilder $sub): void {
-                $sub->selectRaw('1')->from('company_tag')->whereColumn('company_tag.tag_id', 'tags.id');
-            });
+        if (! $this->supprimerOrphelines) {
+            if ($n > 0) {
+                $this->line("Étiquettes inemployées : {$n} comptée(s), AUCUNE supprimée (suppression seulement sur --supprimer-etiquettes-orphelines, décision de Will).");
+            }
+
+            return;
         }
+        $this->compteurs['suppression_etiquettes_demandee'] = 1;
 
-        $n = (clone $supprimables)->count();
-        $this->compteurs['etiquettes_obsoletes_a_supprimer'] = $n;
+        // Contrôle préalable : la suppression d'une étiquette emporte ses liens
+        // (`ON DELETE CASCADE`). Un lien rangé dans un AUTRE espace que son
+        // étiquette serait invisible aux relectures filtrées par espace — il
+        // partirait sans avoir été vu. Un seul suffit à tout arrêter.
+        $horsEspace = $this->liensHorsEspace();
+        if ($horsEspace === null) {
+            $this->refusMenage = 'REFUS du ménage : aucune connexion ne voit TOUS les espaces (ni la connexion par défaut, ni pgsql_owner, '
+                . 'super-utilisateur ou BYPASSRLS) — les liens rangés dans un autre espace ne peuvent pas être contrôlés. Aucune étiquette supprimée.';
+
+            return;
+        }
+        $this->compteurs['liens_etiquette_hors_espace'] = $horsEspace;
+        if ($horsEspace > 0) {
+            $this->refusMenage = "REFUS du ménage : {$horsEspace} lien(s) fiche/candidat ↔ étiquette rangé(s) dans un autre espace que leur étiquette. Aucune étiquette supprimée.";
+
+            return;
+        }
 
         // Garde commune des commandes qui suppriment (B15-008) : un plafond de
         // proportion, qui refuse si ce « ménage » visait une grande part des
-        // étiquettes — ce serait un détecteur qui se trompe, pas un ménage.
+        // étiquettes — ce serait un détecteur qui se trompe, pas un ménage. Elle
+        // porte sur les DEUX ensembles ensemble : c'est la même table.
         $total = (int) DB::table('tags')->where('workspace_id', $workspaceId)->count();
         $autorise = $n === 0 || $this->ecritureAutoriseeSansOperateur('tags', $n, $total, 'supprimer');
         if (! $autorise) {
@@ -941,7 +1078,270 @@ class CrmReferentielsReclasser extends Command
             return;
         }
 
-        $this->compteurs['etiquettes_obsoletes_supprimees'] = $supprimables->delete();
+        $this->compteurs['etiquettes_obsoletes_supprimees'] = $this->supprimerEtiquettes($workspaceId, $obsoletes);
+        $this->compteurs['etiquettes_orphelines_supprimees'] = $this->supprimerEtiquettes($workspaceId, $orphelines);
+    }
+
+    /**
+     * Les liens `company_tag`/`candidate_tag` dont l'espace diffère de celui
+     * de leur étiquette — ou null si on ne peut PAS le savoir.
+     *
+     * Ce contrôle n'a de sens que s'il voit TOUS les espaces : sous la RLS, un
+     * lien rangé ailleurs est justement invisible. Or, en production, la
+     * connexion par défaut est le rôle applicatif soumis à la RLS dès que
+     * `CRM_DB_APP_ROLE_ENABLED=true` (`config/database.php`). Le contrôle
+     * passe donc par la PREMIÈRE connexion dont le rôle voit tout
+     * (super-utilisateur ou `BYPASSRLS`) : la connexion par défaut, sinon
+     * `pgsql_owner`. Si aucune ne voit tout (ou si `pgsql_owner` est
+     * injoignable), il rend null, et la suppression est REFUSÉE.
+     */
+    private function liensHorsEspace(): ?int
+    {
+        foreach ([null, 'pgsql_owner'] as $nom) {
+            try {
+                $connexion = DB::connection($nom);
+                $role = $connexion->selectOne('SELECT (rolsuper OR rolbypassrls) AS voit_tout FROM pg_roles WHERE rolname = current_user');
+                if (! (bool) ($role->voit_tout ?? false)) {
+                    continue;
+                }
+                $n = 0;
+                foreach (['company_tag', 'candidate_tag'] as $pivot) {
+                    $n += (int) ($connexion->selectOne(
+                        "SELECT count(*) AS n FROM {$pivot} JOIN tags ON tags.id = {$pivot}.tag_id
+                         WHERE {$pivot}.workspace_id <> tags.workspace_id",
+                    )->n ?? 0);
+                }
+
+                return $n;
+            } catch (Throwable) {
+                continue;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Les étiquettes ORPHELINES de l'espace, arrêtées AVANT les lots (pour que
+     * l'essai à blanc chiffre ce que l'exécution visera) :
+     *
+     *  - automatiques ou IA (`kind` `auto` ou `llm`) — jamais une manuelle ;
+     *  - non verrouillées — jamais une étiquette du référentiel gouverné ;
+     *  - SANS namespace (`tags.namespace`, colonne générée) — jamais une
+     *    `src:` (même déverrouillée, cf. le stock d'avant `is_locked`), jamais
+     *    une gouvernée (`famille:`, `secteur:`…) ;
+     *  - hors référentiel du classement (`slugsValides`) ;
+     *  - sans règle (`rules` vide) — une règle est une définition, pas un reste ;
+     *  - portées par AUCUNE fiche et AUCUN candidat ;
+     *  - citées par AUCUNE audience enregistrée, corbeille COMPRISE.
+     *
+     * Ce n'est qu'une liste de CANDIDATES : au moment de supprimer, chaque
+     * condition est relue sous verrou (`supprimerEtiquettes`).
+     *
+     * @return list<int>
+     */
+    private function etiquettesOrphelines(string $workspaceId): array
+    {
+        $ids = DB::select(
+            'SELECT id FROM tags WHERE ' . self::CONDITIONS_ORPHELINE . ' ORDER BY id',
+            $this->liaisonsOrpheline($workspaceId),
+        );
+
+        return array_values(array_map(static fn (stdClass $l): int => (int) $l->id, $ids));
+    }
+
+    /**
+     * Liaisons de `CONDITIONS_ORPHELINE` : l'espace, le référentiel du
+     * classement, et les slugs cités par les audiences RELUS À L'INSTANT.
+     *
+     * @return list<string>
+     */
+    private function liaisonsOrpheline(string $workspaceId): array
+    {
+        return [
+            $workspaceId,
+            self::tableauPg(self::slugsValides()),
+            self::tableauPg($this->slugsCitesParLesAudiences($workspaceId)),
+        ];
+    }
+
+    /**
+     * Tous les slugs qu'une audience de l'espace cite dans une condition
+     * `tags`, quel que soit le bloc (`all`, `any`, `not`).
+     *
+     * ⚠️ EXCEPTION VOLONTAIRE À B10-016 (« une lecture `DB::table` ignore la
+     * corbeille ») : ici, les audiences EN CORBEILLE sont lues À DESSEIN, et la
+     * colonne `deleted_at` est nommée pour le dire. L'ordre du propriétaire est
+     * « une étiquette citée par une audience ne se supprime pas » : une
+     * audience mise à la corbeille peut être restaurée, et elle doit alors
+     * retrouver ses étiquettes. Filtrer la corbeille ici serait supprimer ce
+     * qu'elle cite.
+     *
+     * @return list<string>
+     */
+    private function slugsCitesParLesAudiences(string $workspaceId): array
+    {
+        $slugs = [];
+        $audiences = DB::table('email_audiences')->where('workspace_id', $workspaceId)->get(['criteria', 'deleted_at']);
+        foreach ($audiences as $audience) {
+            $c = json_decode((string) $audience->criteria, true);
+            if (! is_array($c)) {
+                continue;
+            }
+            foreach (['all', 'any', 'not'] as $bloc) {
+                foreach (is_array($c[$bloc] ?? null) ? $c[$bloc] : [] as $cond) {
+                    if (! is_array($cond) || ($cond['field'] ?? null) !== 'tags') {
+                        continue;
+                    }
+                    foreach (is_array($cond['value'] ?? null) ? $cond['value'] : [$cond['value'] ?? null] as $v) {
+                        if (is_string($v) && $v !== '') {
+                            $slugs[$v] = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        return array_map('strval', array_keys($slugs));
+    }
+
+    /**
+     * Un tableau PostgreSQL `text[]` littéral (`{"a","b"}`), chaque valeur
+     * entre guillemets, guillemets et barres obliques échappés.
+     *
+     * @param  list<string>  $valeurs
+     */
+    private static function tableauPg(array $valeurs): string
+    {
+        return '{' . implode(',', array_map(
+            static fn (string $v): string => '"' . addcslashes($v, '"\\') . '"',
+            $valeurs,
+        )) . '}';
+    }
+
+    /**
+     * Supprime, par paquets bornés, celles de ces étiquettes qui sont
+     * TOUJOURS supprimables au moment d'écrire. Chaque paquet, dans SA
+     * transaction courte :
+     *
+     *  1. `lock_timeout` de 5 s ;
+     *  2. `SELECT … FOR UPDATE` : verrouille les étiquettes candidates qui
+     *     remplissent encore TOUTES les conditions (kind, namespace, règle,
+     *     verrou, liens, référentiel, audiences). Tant que
+     *     ce verrou est tenu, personne ne peut leur poser un lien (la clé
+     *     étrangère de `company_tag`/`candidate_tag` attend le verrou) ;
+     *  3. `LOCK TABLE email_audiences IN SHARE MODE`, puis les audiences
+     *     RELUES : aucune ne peut plus apparaître ni changer avant la fin du
+     *     paquet ;
+     *  4. `DELETE … RETURNING` dans une INSTRUCTION SÉPARÉE, sur la liste
+     *     verrouillée et avec les mêmes conditions : en READ COMMITTED, elle
+     *     prend une photo NEUVE, postérieure au verrou, et voit donc tout lien
+     *     validé pendant l'attente. (Dans une seule instruction, le
+     *     `NOT EXISTS` serait évalué sur la photo d'AVANT l'attente, et la
+     *     cascade `ON DELETE CASCADE` emporterait un lien posé entre-temps.)
+     *  5. une entrée de la chaîne d'audit, DANS la transaction : id, slug, nom,
+     *     catégorie, kind, espace (et couleur, description, règle, date de
+     *     création) de chaque étiquette supprimée — de quoi la recréer à
+     *     l'identique. Un audit qui échoue annule le paquet.
+     *
+     * @param  list<int>  $ids
+     */
+    private function supprimerEtiquettes(string $workspaceId, array $ids): int
+    {
+        $n = 0;
+        foreach (array_chunk($ids, self::PAQUET_RANGEMENT) as $paquet) {
+            $n += (int) DB::transaction(function () use ($workspaceId, $paquet): int {
+                DB::statement("SET LOCAL lock_timeout = '5s'");
+                $liste = '{' . implode(',', $paquet) . '}';
+
+                $verrouillees = DB::select(
+                    'SELECT id FROM tags WHERE id = ANY(?::bigint[]) AND ' . self::CONDITIONS_ORPHELINE . ' FOR UPDATE',
+                    array_merge([$liste], $this->liaisonsOrpheline($workspaceId)),
+                );
+                if ($verrouillees === []) {
+                    return 0;
+                }
+                $liste = '{' . implode(',', array_map(static fn (stdClass $l): int => (int) $l->id, $verrouillees)) . '}';
+
+                // Les audiences : table verrouillée en SHARE jusqu'à la fin du
+                // paquet (personne ne peut en créer ni en modifier), PUIS
+                // relues par `liaisonsOrpheline()` ci-dessous. Aucune fenêtre :
+                // une audience validée avant le verrou est lue ; une audience
+                // écrite après attend la fin du paquet (quelques
+                // millisecondes, `lock_timeout` de 5 s).
+                DB::statement('LOCK TABLE email_audiences IN SHARE MODE');
+
+                $supprimees = DB::select(
+                    'DELETE FROM tags WHERE id = ANY(?::bigint[]) AND ' . self::CONDITIONS_ORPHELINE . '
+                     RETURNING id, slug, name, category, kind, workspace_id, color, description, rules::text AS rules, created_at',
+                    array_merge([$liste], $this->liaisonsOrpheline($workspaceId)),
+                );
+                if ($supprimees === []) {
+                    return 0;
+                }
+
+                $trace = array_map(static fn (stdClass $t): array => [
+                    'id' => (int) $t->id, 'slug' => (string) $t->slug, 'name' => (string) $t->name,
+                    'category' => (string) $t->category, 'kind' => (string) $t->kind,
+                    'workspace_id' => (string) $t->workspace_id, 'color' => $t->color,
+                    'description' => $t->description, 'rules' => $t->rules, 'created_at' => $t->created_at,
+                ], $supprimees);
+                $json = json_encode($trace, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+                if ($this->audit === null) {
+                    throw new RuntimeException('Suppression d\'étiquettes sans chaîne d\'audit : refusée.');
+                }
+                $this->audit->record([
+                    'workspace_id' => $workspaceId,
+                    'user_id' => null,
+                    'method' => 'RECLASSEMENT_ETIQUETTES_SUPPRIMEES',
+                    'path' => 'artisan crm:referentiels:reclasser --supprimer-etiquettes-orphelines — ' . $json,
+                    'status' => 200,
+                    'ip' => null,
+                    'user_agent' => 'cli ' . $this->operateurCourant,
+                    'payload_hash' => hash('sha256', $json),
+                ]);
+
+                return count($supprimees);
+            });
+        }
+
+        return $n;
+    }
+
+    /**
+     * Les étiquettes proposées par l'IA (`kind = llm`) encore rangées en
+     * `intent` passent dans leur catégorie, `ia` (règle de nommage :
+     * `FamillesEtiquettes`). Aucune n'est supprimée, aucun lien n'est touché,
+     * le NOM ne change pas. Seules celles restées dans la catégorie par
+     * défaut de l'ancien automate (`intent`) : une catégorie choisie à la main
+     * est gardée. Par paquets bornés, sans toucher `updated_at`.
+     */
+    private function rangerEtiquettesIa(string $workspaceId, bool $dryRun): void
+    {
+        $ids = array_map(static fn (mixed $id): int => (int) $id, DB::table('tags')
+            ->where('workspace_id', $workspaceId)
+            ->where('kind', 'llm')
+            ->where('is_locked', false)
+            ->where('category', 'intent')
+            ->orderBy('id')
+            ->pluck('id')
+            ->all());
+        $this->compteurs['etiquettes_ia_a_ranger'] = count($ids);
+        if ($dryRun) {
+            return;
+        }
+
+        foreach (array_chunk($ids, self::PAQUET_RANGEMENT) as $paquet) {
+            $this->compteurs['etiquettes_ia_rangees'] += (int) DB::transaction(function () use ($workspaceId, $paquet): int {
+                DB::statement("SET LOCAL lock_timeout = '5s'");
+                DB::statement("SET LOCAL app.conserver_updated_at = 'on'");
+
+                return DB::table('tags')
+                    ->where('workspace_id', $workspaceId)
+                    ->whereIn('id', $paquet)
+                    ->update(['category' => FamillesEtiquettes::CATEGORIE_IA]);
+            });
+        }
     }
 
     /**
@@ -994,7 +1394,8 @@ class CrmReferentielsReclasser extends Command
                             'sector_main' => ! in_array($v, $secteurs, true),
                             'size_category' => ! in_array($v, $tailles, true),
                             'tags' => $v === 'nature-entreprise'
-                                || ((str_starts_with($v, 'sector-') || str_starts_with($v, 'size-'))
+                                || ((str_starts_with($v, 'sector-') || str_starts_with($v, 'size-')
+                                    || str_starts_with($v, EtiquettesClassement::PREFIXE_METIER))
                                     && ! in_array($v, $slugsValides, true)),
                             default => false,
                         };
@@ -1067,6 +1468,7 @@ class CrmReferentielsReclasser extends Command
             'nature' => Taxonomy::ENTITY_NATURES,
             'region' => Taxonomy::REGIONS,
             'nomenclature' => [],
+            'metier' => Metiers::liste(),
         ];
         $titres = [
             'secteur' => 'Secteur (sector_main)',
@@ -1074,6 +1476,7 @@ class CrmReferentielsReclasser extends Command
             'nature' => 'Nature (entity_nature)',
             'region' => 'Région (region_code)',
             'nomenclature' => 'Nomenclature du code NAF (naf_nomenclature)',
+            'metier' => 'Métier (étiquette metier-, depuis naf_rev2 ; « (vide) » = pas de métier)',
         ];
         foreach ($titres as $dimension => $titre) {
             $avant = $this->repartitions[$dimension]['avant'] ?? [];
@@ -1138,12 +1541,16 @@ class CrmReferentielsReclasser extends Command
         if ($dryRun) {
             unset($compteurs['fiches_modifiees'], $compteurs['fiches_modifiees_entre_temps'],
                 $compteurs['etiquettes_ajoutees'], $compteurs['etiquettes_retirees'],
-                $compteurs['etiquettes_obsoletes_supprimees']);
+                $compteurs['etiquettes_obsoletes_supprimees'], $compteurs['etiquettes_orphelines_supprimees'],
+                $compteurs['etiquettes_ia_rangees']);
         }
         if (! $etiquettes) {
             unset($compteurs['etiquettes_a_ajouter'], $compteurs['etiquettes_a_retirer'],
                 $compteurs['etiquettes_ajoutees'], $compteurs['etiquettes_retirees'],
                 $compteurs['etiquettes_obsoletes_a_supprimer'], $compteurs['etiquettes_obsoletes_supprimees'],
+                $compteurs['etiquettes_orphelines_a_supprimer'], $compteurs['etiquettes_orphelines_supprimees'],
+                $compteurs['etiquettes_ia_a_ranger'], $compteurs['etiquettes_ia_rangees'],
+                $compteurs['suppression_etiquettes_demandee'], $compteurs['liens_etiquette_hors_espace'],
                 $compteurs['garde_b15008_refuserait']);
         }
         $this->table(['compteur', 'nombre'], array_map(

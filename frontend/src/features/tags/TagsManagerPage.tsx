@@ -27,7 +27,7 @@ import {
 // ---------------------------------------------------------------------------
 // Types & constantes
 // ---------------------------------------------------------------------------
-type TagCategory = 'geo' | 'sector' | 'size' | 'intent' | 'custom';
+type TagCategory = 'geo' | 'sector' | 'size' | 'intent' | 'custom' | 'ia';
 type TagKind = 'auto' | 'manual' | 'llm';
 
 type Tag = {
@@ -43,12 +43,21 @@ type Tag = {
   updated_at?: string;
 };
 
+// Catégories qu'on peut CHOISIR en créant un tag à la main.
 const CATEGORIES: ReadonlyArray<{ key: TagCategory; label: string; description: string }> = [
   { key: 'geo', label: 'Géographie', description: 'Région et département (auto)' },
-  { key: 'sector', label: 'Secteur', description: 'NAF mapping (auto)' },
+  { key: 'sector', label: 'Secteur et métier', description: 'Secteur et métier, depuis le code NAF (auto)' },
   { key: 'size', label: 'Taille', description: 'Effectif (auto)' },
-  { key: 'intent', label: 'Intent (LLM)', description: 'Classification IA' },
+  { key: 'intent', label: 'Provenance et intérêt', description: 'Origine de la fiche (src:) et service demandé (svc:)' },
   { key: 'custom', label: 'Custom', description: 'Tags manuels' },
+];
+
+// Catégories AFFICHÉES : les précédentes, plus celle des étiquettes proposées
+// par l'IA (chantier 2, 2026-09-29) — elles étaient mêlées à « intent ». On ne
+// crée pas une étiquette IA à la main : elle n'est pas proposée au formulaire.
+const CATEGORIES_AFFICHEES: ReadonlyArray<{ key: TagCategory; label: string; description: string }> = [
+  ...CATEGORIES,
+  { key: 'ia', label: 'Proposées par l’IA', description: 'Étiquettes suggérées par la classification IA' },
 ];
 
 type ColorName = 'slate' | 'sky' | 'violet' | 'emerald' | 'amber' | 'rose' | 'indigo';
@@ -185,7 +194,7 @@ export function TagsManagerPage() {
         <KpiCard tone="sky"     label="Total tags" value={counts.total}  sublabel="tous axes confondus" />
         <KpiCard tone="emerald" label="Auto"       value={counts.auto}   sublabel="géo, secteur, taille" />
         <KpiCard tone="violet"  label="Manuel"     value={counts.manual} sublabel="créés par l'équipe" />
-        <KpiCard tone="amber"   label="LLM"        value={counts.llm}    sublabel="intent classification IA" />
+        <KpiCard tone="amber"   label="LLM"        value={counts.llm}    sublabel="proposées par l’IA" />
       </div>
 
       {/* Body */}
@@ -208,7 +217,7 @@ export function TagsManagerPage() {
         />
       ) : (
         <div className="space-y-6">
-          {CATEGORIES.map((cat) => {
+          {CATEGORIES_AFFICHEES.map((cat) => {
             const items = tags.filter((t) => t.category === cat.key);
             if (items.length === 0) return null;
             return (

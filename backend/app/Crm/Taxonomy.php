@@ -369,8 +369,16 @@ final class Taxonomy
     ];
 
     /**
-     * Namespaces de tags GOUVERNÉS (liste fermée). Un tag hors namespace est
-     * un tag orphelin : interdit par la gouvernance.
+     * Namespaces de tags GOUVERNÉS (liste fermée).
+     *
+     * ⚠️ Ce commentaire affirmait qu'« un tag hors namespace est un tag
+     * orphelin, interdit » : c'était FAUX (audit du 2026-09-28) — l'automate
+     * pose depuis toujours `sector-btp`, `dept-38`, `nature-cci`… sans
+     * namespace. La règle réellement appliquée, et vérifiée par une garde,
+     * est celle de `App\Crm\Etiquettes\FamillesEtiquettes` (chantier 2,
+     * 2026-09-29) : toute étiquette a UNE famille — un namespace gouverné
+     * ci-dessous (`ns:valeur`), une famille automatique (`famille-valeur`),
+     * l'IA (`kind = llm`, catégorie `ia`) ou la saisie manuelle.
      *
      * Correspondance avec `tags.category` (colonne déjà contrainte) :
      *   sect:→sector · taille:→size · geo:→geo · svc:/src:→intent ·
@@ -402,8 +410,16 @@ final class Taxonomy
         'contactabilite' => 'custom',
     ];
 
-    /** @var list<string> */
-    public const TAG_CATEGORIES = ['geo', 'sector', 'size', 'intent', 'custom', 'candidate'];
+    /**
+     * Catégories d'étiquette — `tags.category` (CHECK, garde `SocleCrmTest`).
+     *
+     * `ia` (chantier 2, 2026-09-29, migration `2026_09_30_000030`) : les
+     * étiquettes proposées par l'IA (`kind = llm`), jusque-là mêlées aux
+     * étiquettes gouvernées `svc:`/`src:` dans `intent`.
+     *
+     * @var list<string>
+     */
+    public const TAG_CATEGORIES = ['geo', 'sector', 'size', 'intent', 'custom', 'candidate', 'ia'];
 
     /**
      * Slug du workspace du vivier candidats. Une fiche `candidates` ne peut

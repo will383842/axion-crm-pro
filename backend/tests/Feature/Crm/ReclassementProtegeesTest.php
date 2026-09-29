@@ -226,6 +226,8 @@ test('avec l option, la fiche protegee est classee ; contacts, coordonnees et fi
         'region-99', 'sector-it-saas', FichesProtegees::TAG_ORGANISATEURS,
         EtiquettesClassement::slugRegion('84'), EtiquettesClassement::slugSecteur($secteur),
         EtiquettesClassement::slugTaille('pme'),
+        // 82.30Z : le métier aussi (chantier 2) — c'est du classement.
+        EtiquettesClassement::slugMetier('evenementiel-salons'),
     ];
     sort($attendues);
 
@@ -359,7 +361,7 @@ test('avec l option, l essai a blanc n ecrit RIEN et annonce ce que l execution 
         // `size-micro` et `sector-transport`, hors référentiel.
         ->and(rpCompteur($aBlanc, 'etiquettes_obsoletes_a_supprimer'))->toBe(2);
 
-    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--inclure-protegees' => true]);
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--inclure-protegees' => true, '--supprimer-etiquettes-orphelines' => true]);
     $reel = Artisan::output();
 
     expect(rpCompteur($reel, 'fiches_modifiees'))->toBe(rpCompteur($aBlanc, 'fiches_a_modifier'))

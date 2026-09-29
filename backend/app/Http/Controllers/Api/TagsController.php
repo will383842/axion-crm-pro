@@ -149,7 +149,7 @@ class TagsController extends ApiController
         $data = $r->validate([
             'name' => ['sometimes', 'required', 'string', 'max:120'],
             'color' => ['sometimes', 'nullable', 'string', 'max:20'],
-            'category' => ['sometimes', 'nullable', 'string', 'in:geo,sector,size,intent,custom'],
+            'category' => ['sometimes', 'nullable', 'string', 'in:geo,sector,size,intent,custom,ia'],
             'description' => ['sometimes', 'nullable', 'string', 'max:500'],
         ]);
 

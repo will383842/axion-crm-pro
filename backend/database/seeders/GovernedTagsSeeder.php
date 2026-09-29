@@ -26,6 +26,12 @@ use Illuminate\Support\Facades\DB;
  *   - `cand-offre:` / `cand-zone:` — dérivés des offres publiées et des zones
  *                   saisies par les candidats.
  * Leur GOUVERNANCE est le namespace lui-même (contrôlé), pas la liste.
+ *
+ * ⚠️ Correction du 2026-09-29 (chantier 2) : l'auto-tagger n'a JAMAIS posé
+ * `geo:` ni `sect:`. Il pose des étiquettes AUTOMATIQUES `famille-valeur`
+ * (`dept-38`, `region-84`, `sector-btp`, `metier-…`), dont la règle est
+ * écrite et gardée dans `App\Crm\Etiquettes\FamillesEtiquettes` — avec la
+ * raison pour laquelle elles ne sont pas renommées (les audiences les citent).
  */
 class GovernedTagsSeeder extends Seeder
 {

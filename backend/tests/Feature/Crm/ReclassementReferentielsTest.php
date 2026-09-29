@@ -195,10 +195,12 @@ test('les etiquettes secteur, taille et region sont resynchronisees avec la fich
 
     Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
 
-    expect(rcSlugs($id))->toBe(['region-84', 'sector-commerce-detail', 'size-tpe'])
-        // Les anciennes étiquettes, portées par plus personne, disparaissent.
-        ->and(DB::table('tags')->where('workspace_id', $this->espace)->where('slug', 'sector-commerce')->exists())->toBeFalse()
-        ->and(DB::table('tags')->where('workspace_id', $this->espace)->where('slug', 'size-micro')->exists())->toBeFalse()
+    // 52.1D → 47.11D (supermarchés) : le MÉTIER suit (chantier 2).
+    expect(rcSlugs($id))->toBe(['metier-grande-distribution', 'region-84', 'sector-commerce-detail', 'size-tpe'])
+        // Les anciennes étiquettes, portées par plus personne, RESTENT (ordre
+        // de Will du 29/09 : rien n'est supprimé sans --supprimer-etiquettes-orphelines).
+        ->and(DB::table('tags')->where('workspace_id', $this->espace)->where('slug', 'sector-commerce')->exists())->toBeTrue()
+        ->and(DB::table('tags')->where('workspace_id', $this->espace)->where('slug', 'size-micro')->exists())->toBeTrue()
         ->and(DB::table('tags')->where('workspace_id', $this->espace)->where('slug', 'sector-commerce-detail')->value('name'))
         ->toBe('Secteur : Commerce de détail');
 });
@@ -464,8 +466,9 @@ test('sous axion_app (RLS), la commande reclasse et etiquette les fiches de son 
         expect($code)->toBe(0)
             ->and(rcCompteur($sortie, 'fiches_lues'))->toBe(1)
             ->and($proprio->table('companies')->where('id', $espaces['a']['fiche'])->value('sector_main'))->toBe('commerce_detail')
-            // Secteur et région (pas de taille : aucune donnée d'effectif).
-            ->and($proprio->table('company_tag')->where('company_id', $espaces['a']['fiche'])->count())->toBe(2)
+            // Secteur, région et métier (52.1D → 47.11D, grande distribution ;
+            // pas de taille : aucune donnée d'effectif).
+            ->and($proprio->table('company_tag')->where('company_id', $espaces['a']['fiche'])->count())->toBe(3)
             // L'autre espace : intact.
             ->and($proprio->table('companies')->where('id', $espaces['b']['fiche'])->value('sector_main'))->toBe('transport')
             ->and($proprio->table('company_tag')->where('company_id', $espaces['b']['fiche'])->count())->toBe(0);
@@ -553,7 +556,7 @@ test('B2 — TEMOIN : sans ecriture concurrente, la meme fiche est reecrite et r
     Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
 
     expect(DB::table('companies')->where('id', $id)->value('sector_main'))->toBe('commerce_detail')
-        ->and(rcSlugs($id))->toBe(['region-84', 'sector-commerce-detail']);
+        ->and(rcSlugs($id))->toBe(['metier-grande-distribution', 'region-84', 'sector-commerce-detail']);
 });
 
 test('R4 — une fiche devenue protegee entre la lecture et l ecriture n est ni reecrite ni desetiquetee', function () {
@@ -674,7 +677,7 @@ test('B8 — l essai a blanc chiffre les etiquettes obsoletes, et l execution en
 
     Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--dry-run' => true]);
     $aBlanc = Artisan::output();
-    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--supprimer-etiquettes-orphelines' => true]);
     $reel = Artisan::output();
 
     expect(rcCompteur($aBlanc, 'etiquettes_obsoletes_a_supprimer'))->toBe(2)
@@ -777,12 +780,12 @@ function rcEspaceAvecProtegee(string $espace): array
 test('S1 — avec une fiche protegee dans l espace, le retrait vise la fiche ordinaire et pas la protegee', function () {
     $f = rcEspaceAvecProtegee($this->espace);
 
-    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
+    Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug, '--supprimer-etiquettes-orphelines' => true]);
     $reel = Artisan::output();
 
     $attendues = ['size-micro', FichesProtegees::TAGS[0]];
     sort($attendues);
-    expect(rcSlugs($f['ordinaire']))->toBe(['region-84', 'sector-commerce-detail'])
+    expect(rcSlugs($f['ordinaire']))->toBe(['metier-grande-distribution', 'region-84', 'sector-commerce-detail'])
         ->and(rcCompteur($reel, 'etiquettes_retirees'))->toBe(1)
         ->and(rcCompteur($reel, 'etiquettes_obsoletes_supprimees'))->toBe(1)
         ->and(DB::table('tags')->where('workspace_id', $this->espace)->where('slug', 'sector-transport')->exists())->toBeFalse()
@@ -824,7 +827,7 @@ test('S2 — TEMOIN : la meme fiche, non protegee, recoit son etiquette', functi
 
     Artisan::call('crm:referentiels:reclasser', ['--workspace' => $this->slug]);
 
-    expect(rcSlugs($id))->toBe(['sector-numerique-telecoms']);
+    expect(rcSlugs($id))->toBe(['metier-services-informatiques', 'sector-numerique-telecoms']);
 });
 
 test('S3 — compteurs-seulement : ni valeur brute hors referentiel, ni identifiant d espace', function () {

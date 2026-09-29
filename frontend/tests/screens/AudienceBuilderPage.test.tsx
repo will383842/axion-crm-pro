@@ -203,6 +203,35 @@ describe('AudienceBuilderPage — parcours', () => {
     });
   });
 
+  it('choisir un MÉTIER vise son étiquette `metier-<code>` en contains_any (chantier 2)', async () => {
+    const user = userEvent.setup();
+    const apercu = recordPost<{ criteria: { all: Critere[] } }>('/audiences/preview', {
+      companies: 42,
+      contacts: 12,
+    });
+
+    await renderScreen(<AudienceBuilderPage />, {
+      path: PATH,
+      landingRoutes: LANDING,
+      handlers: [apercu.handler],
+    });
+
+    // Quatre-vingt-dix puces : le filtre ramène la liste à ce qu'on cherche,
+    // sans jamais cacher une puce déjà choisie.
+    await user.type(screen.getByRole('textbox', { name: 'Filtrer les métiers' }), 'coiff');
+    const coiffeurs = screen.getAllByRole('button').find((b) => b.textContent === 'Coiffeurs');
+    expect(coiffeurs).toBeDefined();
+    expect(screen.getAllByRole('button').some((b) => b.textContent === 'Pharmacies')).toBe(false);
+    await user.click(coiffeurs as HTMLElement);
+
+    await waitFor(() => {
+      const dernier = apercu.bodies[apercu.bodies.length - 1];
+      expect(dernier?.criteria.all).toEqual(
+        expect.arrayContaining([{ field: 'tags', op: 'contains_any', value: ['metier-coiffeurs'] }]),
+      );
+    }, DEBOUNCE);
+  });
+
   it('aperçu en échec : l’écran affiche le message du serveur, jamais un compte faux', async () => {
     // Le pire défaut possible ici serait d'afficher le dernier compte connu
     // après une erreur : on lancerait une campagne sur un volume imaginaire.

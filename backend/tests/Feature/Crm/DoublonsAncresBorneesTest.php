@@ -36,7 +36,7 @@ beforeEach(function () {
 function dabJournal(string $ws, array $paires): void
 {
     DB::table('fusions_fiches')->insert(array_map(static fn (array $p): array => [
-        'workspace_id' => $ws, 'garde_id' => $p[0], 'absorbee_id' => $p[1], 'motif' => 'nom_cp', 'mode' => 'manuel',
+        'workspace_id' => $ws, 'garde_id' => $p[0], 'absorbee_id' => $p[1], 'motif' => 'nom_cp', 'mode' => 'manuel', 'absorbee_supprimee_le' => now(),
     ], $paires));
 }
 

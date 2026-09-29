@@ -121,11 +121,12 @@ test('un déplacement ajouté au journal PENDANT un effacement n est pas perdu',
     $journal = json_decode((string) DB::table('fusions_fiches')->where('id', $fusion)->value('journal'), true);
     expect($fin)->toBe('VALIDE', 'Le second processus a échoué : ' . $erreurs)
         ->and((int) $bilan->n)->toBeGreaterThan(0)
-        // L'effacement n'a pas attendu le verrou de l'import : il ne touche
-        // plus au journal.
-        ->and($duree)->toBeLessThan(2.5)
-        // L'empreinte effacée est partie…
+        // Le lien posé EN MÊME TEMPS est toujours au journal (d'abord : c'est
+        // la perte que la réserve B décrit)…
+        ->and($journal['deplacements']['event_organizers'] ?? [])->toContain(987654)
+        // … l'empreinte effacée est partie…
         ->and(DB::table('fusions_empreintes')->where('fusion_id', $fusion)->where('chemin', 'champs.email_generic')->exists())->toBeFalse()
-        // … et le lien posé en même temps est toujours au journal.
-        ->and($journal['deplacements']['event_organizers'] ?? [])->toContain(987654);
+        // … et l'effacement n'a pas attendu le verrou de l'import : il ne
+        // touche plus au journal.
+        ->and($duree)->toBeLessThan(2.5);
 });

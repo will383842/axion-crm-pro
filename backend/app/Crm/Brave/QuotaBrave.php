@@ -2,76 +2,47 @@
 
 namespace App\Crm\Brave;
 
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
-
 /**
- * LE CRÉDIT GRATUIT MENSUEL DE BRAVE — compté en base, jamais dépassé.
+ * LE CRÉDIT GRATUIT MENSUEL DE BRAVE — le contrat du compteur.
  *
- * Budget de Will : ZÉRO euro. Le crédit gratuit de l'API Brave Search couvre
- * environ 1 000 requêtes par mois ; le plafond d'ici (`CRM_BRAVE_QUOTA_MENSUEL`,
- * 900 par défaut) garde une marge.
+ * Budget de Will : ZÉRO euro. Toute requête à l'API Brave Search est RÉSERVÉE
+ * ici avant d'être envoyée, et elle ne part pas si la réservation échoue.
+ * `RechercheBrave` est le SEUL émetteur de requêtes Brave du dépôt
+ * (`BraveUnSeulEmetteurTest` le garde), et il appelle `reserver()`.
  *
- * La règle : une requête est RÉSERVÉE avant d'être envoyée, par un seul
- * `INSERT … ON CONFLICT … DO UPDATE … WHERE requetes < plafond`. Si la
- * réservation échoue, la requête n'est PAS envoyée. Conséquences :
+ * Deux usages, chacun avec son sous-quota mensuel, sous un plafond GLOBAL que
+ * leur total ne dépasse jamais :
+ *  - `federations`    : `crm:federations:trouver-sites` (CRM_BRAVE_QUOTA_FEDERATIONS, 900) ;
+ *  - `enrichissement` : `DomainFinderService::find()`, donc l'enrichissement
+ *    (CRM_BRAVE_QUOTA_ENRICHISSEMENT, **0** : l'enrichissement saute Brave,
+ *    comme avant que la clé soit posée) ;
+ *  - plafond global   : CRM_BRAVE_QUOTA_MENSUEL (900).
  *
- *  - deux passages concurrents ne dépassent pas le plafond à eux deux (la
- *    ligne du mois est verrouillée par l'`UPDATE`) ;
- *  - une requête qui échoue (délai, 5xx, 429) reste comptée : Brave la
- *    décompte aussi, et « compter seulement les succès » dépasserait le
- *    crédit exactement quand l'API va mal.
- *
- * Mois civil UTC.
+ * Deux implémentations : `QuotaBraveEnBase` (production, table
+ * `brave_quota_mensuel`) et un compteur en mémoire pour les tests unitaires,
+ * qui n'ont pas de base. La RÈGLE est commune (`PlafondsBrave`).
  */
-class QuotaBrave
+interface QuotaBrave
 {
-    public const PLAFOND_PAR_DEFAUT = 900;
+    public const FEDERATIONS = 'federations';
 
-    public function plafond(): int
-    {
-        $valeur = config('crm.brave.quota_mensuel', self::PLAFOND_PAR_DEFAUT);
+    public const ENRICHISSEMENT = 'enrichissement';
 
-        return max(0, is_numeric($valeur) ? (int) $valeur : self::PLAFOND_PAR_DEFAUT);
-    }
-
-    public function consommees(): int
-    {
-        return (int) DB::table('brave_quota_mensuel')->where('mois', $this->mois())->value('requetes');
-    }
-
-    public function restantes(): int
-    {
-        return max(0, $this->plafond() - $this->consommees());
-    }
+    /** @var list<string> */
+    public const USAGES = [self::FEDERATIONS, self::ENRICHISSEMENT];
 
     /**
-     * Réserve UNE requête du mois. `false` = plafond atteint : ne pas envoyer.
+     * Réserve UNE requête du mois pour cet usage. `false` = sous-quota ou
+     * plafond global atteint (ou usage inconnu) : NE PAS envoyer.
      */
-    public function reserver(): bool
-    {
-        $plafond = $this->plafond();
-        if ($plafond < 1) {
-            return false;
-        }
+    public function reserver(string $usage): bool;
 
-        $ligne = DB::selectOne(
-            <<<'SQL'
-            INSERT INTO brave_quota_mensuel (mois, requetes, created_at, updated_at)
-            VALUES (?, 1, now(), now())
-            ON CONFLICT (mois) DO UPDATE
-                SET requetes = brave_quota_mensuel.requetes + 1, updated_at = now()
-                WHERE brave_quota_mensuel.requetes < ?
-            RETURNING requetes
-            SQL,
-            [$this->mois(), $plafond],
-        );
+    /** Requêtes du mois : pour cet usage, ou au total si `null`. */
+    public function consommees(?string $usage = null): int;
 
-        return $ligne !== null;
-    }
+    /** Plafond du mois : le sous-quota de cet usage, ou le plafond global si `null`. */
+    public function plafond(?string $usage = null): int;
 
-    private function mois(): string
-    {
-        return Carbon::now('UTC')->startOfMonth()->toDateString();
-    }
+    /** Ce que cet usage peut encore envoyer ce mois-ci (sous-quota ET plafond global). */
+    public function restantes(string $usage): int;
 }

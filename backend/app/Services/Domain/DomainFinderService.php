@@ -2,11 +2,12 @@
 
 namespace App\Services\Domain;
 
+use App\Crm\Brave\QuotaBrave;
+use App\Crm\Brave\RechercheBrave;
 use App\Models\Company;
 use App\Models\Media;
 use App\Services\Http\ProxiedHttpClient;
 use App\Services\Http\SsrfGuard;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Sentry\State\Hub;
@@ -41,9 +42,15 @@ class DomainFinderService
 
     private const GUESS_CONNECT_TIMEOUT = 2;
 
-    private const BRAVE_SEARCH_URL = 'https://api.search.brave.com/res/v1/web/search';
-
     private const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+    /**
+     * `$brave` null (le cas du conteneur : un paramètre nullable à défaut
+     * n'est plus auto-résolu depuis Laravel 11, cf. `AppServiceProvider`) :
+     * résolu à l'usage. Les tests unitaires injectent un quota factice en
+     * liant `QuotaBrave` dans le conteneur, sans base.
+     */
+    public function __construct(private readonly ?RechercheBrave $brave = null) {}
 
     /**
      * Cherche le site web officiel d'une company.
@@ -446,75 +453,45 @@ class DomainFinderService
 
     /**
      * Brave Search API — remplace l'ancien scrape DuckDuckGo (banni rapidement).
-     * Free tier : 2000 req/mois. Renvoie le 1er résultat non-blacklist.
+     * Renvoie le 1er résultat non-blacklist.
+     *
+     * 2026-09-29 — PAR `RechercheBrave`, sous l'usage `enrichissement` : la
+     * requête est RÉSERVÉE dans le quota mensuel avant de partir
+     * (`CRM_BRAVE_QUOTA_ENRICHISSEMENT`, 0 par défaut). À 0, ou sans clé,
+     * rien n'est envoyé et `find()` passe à la stratégie suivante — c'est le
+     * comportement d'avant que la clé soit posée en production. Plus de
+     * `->retry(2)` : chaque nouvel essai était une requête facturée, jusqu'à
+     * trois par fiche, que le compteur n'aurait pas vue.
      */
     private function searchBrave(string $denomination, string $ville): ?string
     {
-        $apiKey = config('services.brave.api_key');
-        if (! $apiKey) {
-            // Graceful degradation : pas de clé → skip silently
-            Log::debug('DomainFinder Brave skipped (no API key)');
+        $reponse = ($this->brave ?? app(RechercheBrave::class))
+            ->chercher(sprintf('%s %s site officiel', $denomination, $ville), QuotaBrave::ENRICHISSEMENT, 5);
+        if ($reponse['etat'] !== 'ok') {
+            // Sans clé, quota épuisé ou erreur : on passe, en silence (compteurs
+            // seulement, jamais la requête — elle porte le nom de l'entreprise).
+            Log::debug('DomainFinder Brave saute', ['etat' => $reponse['etat'], 'code' => $reponse['code']]);
 
             return null;
         }
 
-        $query = sprintf('%s %s site officiel', $denomination, $ville);
+        foreach ($reponse['urls'] as $url) {
+            $host = parse_url($url, PHP_URL_HOST);
+            if (! $host || $this->isBlacklisted($host)) {
+                continue;
+            }
+            // C19-001 — cette URL vient d'une API TIERCE (Brave). Elle est
+            // aussi « issue de la donnée » qu'un champ de la base : la
+            // liste noire ci-dessus filtre LinkedIn et les annuaires, elle
+            // ne dit rien de 169.254.169.254. La valeur rendue devient
+            // `companies.website`.
+            if (! SsrfGuard::check($url)['ok']) {
+                Log::warning('DomainFinder Brave: resultat refuse par la garde SSRF', ['url' => $url]);
 
-        try {
-            $response = Http::timeout(self::HTTP_TIMEOUT_SECONDS)
-                ->withHeaders([
-                    'X-Subscription-Token' => $apiKey,
-                    'Accept' => 'application/json',
-                ])
-                ->withOptions(SsrfGuard::redirectOptions())
-                ->retry(2, 500, function (\Throwable $e) {
-                    return $e instanceof ConnectionException;
-                })
-                ->get(self::BRAVE_SEARCH_URL, [
-                    'q' => $query,
-                    'count' => 5,
-                    'country' => 'fr',
-                    'safesearch' => 'moderate',
-                ]);
-
-            if (! $response->successful()) {
-                Log::debug('DomainFinder Brave HTTP error', ['status' => $response->status()]);
-
-                return null;
+                continue;
             }
 
-            $results = $response->json('web.results', []);
-            if (! is_array($results)) {
-                return null;
-            }
-
-            foreach ($results as $r) {
-                $url = $r['url'] ?? null;
-                if (! is_string($url)) {
-                    continue;
-                }
-                $host = parse_url($url, PHP_URL_HOST);
-                if (! $host || $this->isBlacklisted($host)) {
-                    continue;
-                }
-                // C19-001 — cette URL vient d'une API TIERCE (Brave). Elle est
-                // aussi « issue de la donnée » qu'un champ de la base : la
-                // liste noire ci-dessus filtre LinkedIn et les annuaires, elle
-                // ne dit rien de 169.254.169.254. La valeur rendue devient
-                // `companies.website`.
-                if (! SsrfGuard::check($url)['ok']) {
-                    Log::warning('DomainFinder Brave: resultat refuse par la garde SSRF', ['url' => $url]);
-
-                    continue;
-                }
-
-                return $this->canonicalize($url);
-            }
-        } catch (\Throwable $e) {
-            if (class_exists(Hub::class)) {
-                \Sentry\captureException($e);
-            }
-            Log::warning('DomainFinder Brave exception', ['error' => $e->getMessage()]);
+            return $this->canonicalize($url);
         }
 
         return null;

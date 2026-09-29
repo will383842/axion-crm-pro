@@ -246,16 +246,29 @@ return [
     /*
     | Brave Search — le crédit GRATUIT mensuel, et lui seul (Will, 2026-09-29).
     |
-    | `quota_mensuel` : plafond STRICT de requêtes par mois civil (UTC), compté
-    | en base (`brave_quota_mensuel`) et réservé AVANT chaque envoi par
-    | `crm:federations:trouver-sites`. 900 par défaut : le crédit gratuit en
-    | couvre ~1 000, la marge absorbe un écart de décompte côté Brave.
+    | `quota_mensuel` : plafond GLOBAL et STRICT de requêtes par mois civil
+    | (UTC), tous usages confondus, compté en base (`brave_quota_mensuel`) et
+    | réservé AVANT chaque envoi (`App\Crm\Brave\RechercheBrave`, seul
+    | émetteur). 900 par défaut : le crédit gratuit en couvre ~1 000, la marge
+    | absorbe un écart de décompte côté Brave.
+    |
+    | `quotas` : les sous-quotas mensuels par usage, sous ce plafond global
+    | (leur total ne le dépasse jamais) :
+    |   - `federations`    : `crm:federations:trouver-sites` (900) ;
+    |   - `enrichissement` : `DomainFinderService::find()`, donc tout
+    |     `EnrichCompanyJob` (re-scrape des archives, Google Places…). 0 par
+    |     DÉFAUT : l'enrichissement saute Brave, comme avant que la clé soit
+    |     posée en production (29/09). L'ouvrir, c'est partager le crédit.
     |
     | `federations_planifiee` : à false (défaut), le planificateur SAUTE le
     | passage mensuel. À true, il consomme le quota du mois le 3 à 05:30.
     */
     'brave' => [
         'quota_mensuel' => (int) env('CRM_BRAVE_QUOTA_MENSUEL', 900),
+        'quotas' => [
+            'federations' => (int) env('CRM_BRAVE_QUOTA_FEDERATIONS', 900),
+            'enrichissement' => (int) env('CRM_BRAVE_QUOTA_ENRICHISSEMENT', 0),
+        ],
         'federations_planifiee' => env('CRM_BRAVE_FEDERATIONS_PLANIFIEE', false),
     ],
 

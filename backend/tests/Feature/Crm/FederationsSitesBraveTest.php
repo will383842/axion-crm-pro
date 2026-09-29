@@ -23,7 +23,9 @@ use App\Console\Commands\CrmFederationsTrouverSites;
 use App\Crm\Brave\QuotaBrave;
 use App\Crm\Federations\AppartenanceSite;
 use App\Crm\FichesProtegees;
+use App\Models\Company;
 use App\Models\Workspace;
+use App\Services\Domain\DomainFinderService;
 use Illuminate\Console\Scheduling\Event as EvenementPlanifie;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -167,7 +169,7 @@ test('plafond strict : la requete N+1 n est JAMAIS envoyee, et le passage le dit
 
     expect(fsbRequetesBrave())->toHaveCount(3)
         ->and(app(QuotaBrave::class)->consommees())->toBe(3)
-        ->and(Artisan::output())->toContain('Plafond mensuel atteint (3 / 3)')
+        ->and(Artisan::output())->toContain('Plafond mensuel atteint (fédérations 3 / 900, total 3 / 3)')
         ->and(DB::table('companies')->whereIn('id', $ids)->where('website_method', 'brave-federations')->count())->toBe(3)
         ->and(DB::table('companies')->whereIn('id', $ids)->whereNull('website_method')->count())->toBe(2);
 
@@ -181,15 +183,72 @@ test('plafond strict : deja atteint par un autre passage du mois, aucune requete
     $espace = fsbEspace();
     Config::set('crm.brave.quota_mensuel', 2);
     fsbFederation($espace);
-    expect(app(QuotaBrave::class)->reserver())->toBeTrue()
-        ->and(app(QuotaBrave::class)->reserver())->toBeTrue()
-        ->and(app(QuotaBrave::class)->reserver())->toBeFalse();
+    expect(app(QuotaBrave::class)->reserver(QuotaBrave::FEDERATIONS))->toBeTrue()
+        ->and(app(QuotaBrave::class)->reserver(QuotaBrave::FEDERATIONS))->toBeTrue()
+        ->and(app(QuotaBrave::class)->reserver(QuotaBrave::FEDERATIONS))->toBeFalse();
     fsbSimuler(fn (string $q): array => []);
 
     fsbLancer();
 
     expect(fsbRequetesBrave())->toBe([])
         ->and(app(QuotaBrave::class)->consommees())->toBe(2);
+});
+
+test('sous-quota federations : il arrete le passage meme sous le plafond global', function () {
+    $espace = fsbEspace();
+    Config::set('crm.brave.quota_mensuel', 100);
+    Config::set('crm.brave.quotas.federations', 2);
+    for ($i = 0; $i < 4; $i++) {
+        fsbFederation($espace);
+    }
+    fsbSimuler(fn (string $q): array => []);
+
+    fsbLancer();
+
+    expect(fsbRequetesBrave())->toHaveCount(2)
+        ->and(app(QuotaBrave::class)->consommees(QuotaBrave::FEDERATIONS))->toBe(2)
+        ->and(Artisan::output())->toContain('Plafond mensuel atteint (fédérations 2 / 2, total 2 / 100)');
+});
+
+test('EN BASE, tous chemins confondus : enrichissement puis federations ne depassent jamais le plafond global', function () {
+    $espace = fsbEspace();
+    Config::set('crm.brave.quota_mensuel', 3);
+    Config::set('crm.brave.quotas.federations', 5);
+    Config::set('crm.brave.quotas.enrichissement', 2);
+    for ($i = 0; $i < 3; $i++) {
+        fsbFederation($espace);
+    }
+    Http::fake([
+        'api.search.brave.com/*' => Http::response(['web' => ['results' => [['url' => 'https://site-trouve.test/']]]], 200),
+        'site-trouve.test/*' => Http::response('rien', 200),
+    ]);
+    $entreprise = new Company(['denomination' => 'Zzqx Entreprise', 'city_name' => 'Nulle-Part']);
+
+    // L'enrichissement prend son sous-quota (2), la 3e fois il est refusé.
+    $finder = app(DomainFinderService::class);
+    $trouves = [$finder->find($entreprise), $finder->find($entreprise)];
+    expect(fsbRequetesBrave())->toHaveCount(2)
+        ->and($trouves)->toBe(['https://site-trouve.test/', 'https://site-trouve.test/']);
+
+    // Les fédérations n'ont plus qu'UNE requête sous le plafond global (3).
+    fsbLancer();
+    $finder->find($entreprise);
+
+    expect(fsbRequetesBrave())->toHaveCount(3)
+        ->and(app(QuotaBrave::class)->consommees())->toBe(3)
+        ->and(app(QuotaBrave::class)->consommees(QuotaBrave::ENRICHISSEMENT))->toBe(2)
+        ->and(app(QuotaBrave::class)->consommees(QuotaBrave::FEDERATIONS))->toBe(1)
+        ->and((int) DB::table('brave_quota_mensuel')->sum('requetes'))->toBe(3);
+});
+
+test('EN BASE, enrichissement a 0 (defaut) : find() n envoie rien et n ecrit aucune ligne de quota', function () {
+    Config::set('crm.brave.quotas.enrichissement', 0);
+    Http::fake();
+
+    app(DomainFinderService::class)->find(new Company(['denomination' => 'Zzqx Entreprise Zero', 'city_name' => 'Nulle-Part']));
+
+    expect(fsbRequetesBrave())->toBe([])
+        ->and(DB::table('brave_quota_mensuel')->count())->toBe(0);
 });
 
 test('une requete en echec est COMPTEE, et sa fiche reste a reprendre', function () {

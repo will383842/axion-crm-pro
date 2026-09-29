@@ -9,9 +9,13 @@ use Throwable;
 /**
  * UNE requête à l'API Brave Search — comptée AVANT d'être envoyée.
  *
- * Aucune requête ne part sans une réservation réussie dans `QuotaBrave` :
- * c'est ici, et nulle part ailleurs, que le crédit gratuit est dépensé par
- * `crm:federations:trouver-sites`.
+ * C'est le SEUL émetteur de requêtes Brave du dépôt — le passage des
+ * fédérations (`crm:federations:trouver-sites`) comme l'enrichissement
+ * (`DomainFinderService::find()`) passent par ici, chacun sous son USAGE.
+ * `BraveUnSeulEmetteurTest` garde qu'aucun autre fichier n'appelle l'API.
+ *
+ * Aucune requête ne part sans une réservation réussie dans `QuotaBrave`
+ * (sous-quota de l'usage ET plafond global). Sans clé, rien n'est réservé.
  *
  * Pas de `->retry()` : chaque nouvel essai serait une requête facturée que le
  * compteur ne verrait pas.
@@ -40,13 +44,17 @@ class RechercheBrave
     }
 
     /**
-     * `plafond` : rien n'a été envoyé. `bloque` : arrêter le passage.
+     * `sans_cle` et `plafond` : rien n'a été envoyé. `bloque` : arrêter le
+     * passage. `$usage` : l'un de `QuotaBrave::USAGES`.
      *
-     * @return array{etat: 'plafond'|'ok'|'erreur'|'bloque', urls: list<string>, code: int|null}
+     * @return array{etat: 'sans_cle'|'plafond'|'ok'|'erreur'|'bloque', urls: list<string>, code: int|null}
      */
-    public function chercher(string $requete): array
+    public function chercher(string $requete, string $usage, int $nombre = 10): array
     {
-        if (! $this->quota->reserver()) {
+        if (! $this->cleConfiguree()) {
+            return ['etat' => 'sans_cle', 'urls' => [], 'code' => null];
+        }
+        if (! $this->quota->reserver($usage)) {
             return ['etat' => 'plafond', 'urls' => [], 'code' => null];
         }
 
@@ -59,7 +67,7 @@ class RechercheBrave
                 ->withOptions(SsrfGuard::redirectOptions())
                 ->get(self::URL, [
                     'q' => $requete,
-                    'count' => 10,
+                    'count' => max(1, min(20, $nombre)),
                     'country' => 'fr',
                     'search_lang' => 'fr',
                     'safesearch' => 'moderate',

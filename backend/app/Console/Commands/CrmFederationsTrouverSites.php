@@ -20,9 +20,11 @@ use stdClass;
  * Décisions de Will (29/09) : trouver le site des organisations
  * professionnelles importées par `crm:import-federations` (fiches protégées
  * `src:scraping-federations-2026`) qui n'ont aucun contact, avec le SEUL
- * crédit gratuit mensuel de l'API Brave Search. Plafond STRICT
- * (`CRM_BRAVE_QUOTA_MENSUEL`, 900 par défaut) : `QuotaBrave` réserve chaque
- * requête avant de l'envoyer, la requête N+1 ne part jamais.
+ * crédit gratuit mensuel de l'API Brave Search. Plafond STRICT : `QuotaBrave`
+ * réserve chaque requête avant de l'envoyer, sous l'usage `federations`
+ * (`CRM_BRAVE_QUOTA_FEDERATIONS`, 900) ET sous le plafond global partagé avec
+ * l'enrichissement (`CRM_BRAVE_QUOTA_MENSUEL`, 900) ; la requête N+1 ne part
+ * jamais.
  *
  * ── QUI EST CHERCHÉ, DANS QUEL ORDRE ──────────────────────────────────────
  *
@@ -182,8 +184,8 @@ class CrmFederationsTrouverSites extends Command
                             usleep($pauseMs * 1000);
                         }
 
-                        $reponse = $brave->chercher($this->requete($fiche));
-                        if ($reponse['etat'] === 'plafond') {
+                        $reponse = $brave->chercher($this->requete($fiche), QuotaBrave::FEDERATIONS);
+                        if ($reponse['etat'] === 'plafond' || $reponse['etat'] === 'sans_cle') {
                             $arret = 'plafond';
 
                             return;
@@ -456,13 +458,13 @@ class CrmFederationsTrouverSites extends Command
             $lignes[] = [$niveau, $fiches, (int) ($ligne->avec_salaries ?? 0)];
         }
 
-        $restantes = $quota->restantes();
+        $restantes = $quota->restantes(QuotaBrave::FEDERATIONS);
         $prevues = min($total, $restantes, $limite > 0 ? $limite : PHP_INT_MAX);
 
         $this->info('[À BLANC] aucune requête Brave, aucune écriture.');
         $this->table(['niveau', 'fiches ciblées', 'dont avec salariés'], $lignes);
         $this->line("Fiches ciblées : {$total}");
-        $this->line("Quota du mois : {$quota->consommees()} / {$quota->plafond()} requêtes consommées, {$restantes} restantes");
+        $this->line('Quota du mois : ' . $this->etatQuota($quota) . ", {$restantes} restantes pour les fédérations");
         $this->line("Requêtes qu'un passage enverrait : {$prevues}");
 
         Log::info('crm.federations.trouver_sites.essai_a_blanc', [
@@ -477,7 +479,7 @@ class CrmFederationsTrouverSites extends Command
     private function bilan(QuotaBrave $quota, string $arret): void
     {
         $message = match (true) {
-            $arret === 'plafond' => "Plafond mensuel atteint ({$quota->consommees()} / {$quota->plafond()}) : arrêt, aucune requête de plus.",
+            $arret === 'plafond' => 'Plafond mensuel atteint (' . $this->etatQuota($quota) . ') : arrêt, aucune requête de plus.',
             $arret === 'limite' => 'Limite --limite atteinte : arrêt.',
             str_starts_with($arret, 'brave_http_') => 'Brave a refusé (HTTP ' . substr($arret, 11) . ') : arrêt. Vérifier la clé et le crédit du mois.',
             default => 'Plus aucune fiche à chercher.',
@@ -487,12 +489,26 @@ class CrmFederationsTrouverSites extends Command
         foreach ($this->compteurs as $nom => $valeur) {
             $this->line("  {$nom} : {$valeur}");
         }
-        $this->line("  quota_du_mois : {$quota->consommees()} / {$quota->plafond()}");
+        $this->line('  quota_du_mois : ' . $this->etatQuota($quota));
 
         Log::info('crm.federations.trouver_sites', $this->compteurs + [
             'arret' => $arret,
-            'quota_consomme' => $quota->consommees(),
-            'quota_plafond' => $quota->plafond(),
+            'quota_federations' => $quota->consommees(QuotaBrave::FEDERATIONS),
+            'quota_federations_plafond' => $quota->plafond(QuotaBrave::FEDERATIONS),
+            'quota_total' => $quota->consommees(),
+            'quota_global' => $quota->plafond(),
         ]);
+    }
+
+    /** « fédérations 12 / 900, total 15 / 900 » — des nombres seulement. */
+    private function etatQuota(QuotaBrave $quota): string
+    {
+        return sprintf(
+            'fédérations %d / %d, total %d / %d',
+            $quota->consommees(QuotaBrave::FEDERATIONS),
+            $quota->plafond(QuotaBrave::FEDERATIONS),
+            $quota->consommees(),
+            $quota->plafond(),
+        );
     }
 }

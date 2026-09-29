@@ -48,7 +48,7 @@ it('creates size and sector tags', function () {
     expect($slugs)->toContain('size-pme', 'sector-it-saas');
 });
 
-it('imports LLM classification tags as intent category', function () {
+it('imports LLM classification tags in the ia category (chantier 2)', function () {
     $c = makeTaggerCompany($this->workspace->id, [
         'signals' => ['llm_classification' => ['tags' => ['Cible chaude', 'Scale-up']]],
     ]);
@@ -56,9 +56,40 @@ it('imports LLM classification tags as intent category', function () {
     $this->service->syncTags($c);
 
     $tags = Tag::where('workspace_id', $this->workspace->id)->get();
-    $intentTags = $tags->where('category', 'intent');
-    expect($intentTags)->toHaveCount(2);
-    expect($intentTags->pluck('kind')->unique()->all())->toBe(['llm']);
+    $iaTags = $tags->where('category', 'ia');
+    expect($iaTags)->toHaveCount(2);
+    expect($iaTags->pluck('kind')->unique()->all())->toBe(['llm']);
+    // Plus aucune étiquette IA mêlée aux gouvernées `svc:`/`src:`.
+    expect($tags->where('category', 'intent'))->toHaveCount(0);
+});
+
+it('pose l etiquette metier depuis naf_rev2, et la resynchro ne la retire pas', function () {
+    $c = makeTaggerCompany($this->workspace->id, ['naf_rev2' => '69.20Z', 'sector_main' => 'comptabilite_audit']);
+
+    $this->service->syncTags($c);
+    // Deuxième passe (enrichissement suivant) : l'étiquette reste.
+    $delta = $this->service->syncTags($c->fresh());
+
+    expect($c->fresh()->tags->pluck('slug')->all())->toContain('metier-experts-comptables')
+        ->and($delta['removed'])->toBe([]);
+    $tag = Tag::where('workspace_id', $this->workspace->id)->where('slug', 'metier-experts-comptables')->first();
+    expect($tag?->category)->toBe('sector')
+        ->and($tag?->kind)->toBe('auto')
+        ->and($tag?->name)->toBe('Métier : Experts-comptables et cabinets comptables');
+});
+
+it('change de metier quand naf_rev2 change, et n en invente aucun pour une sous-classe sans metier', function () {
+    $c = makeTaggerCompany($this->workspace->id, ['naf_rev2' => '96.02A']);
+    $this->service->syncTags($c);
+    expect($c->fresh()->tags->pluck('slug')->all())->toContain('metier-coiffeurs');
+
+    $c->naf_rev2 = '74.90B';   // « activités spécialisées diverses » : pas de métier
+    $c->save();
+    $delta = $this->service->syncTags($c->fresh());
+
+    $slugs = $c->fresh()->tags->pluck('slug')->all();
+    expect($delta['removed'])->toContain('metier-coiffeurs')
+        ->and(array_values(array_filter($slugs, static fn ($s): bool => str_starts_with((string) $s, 'metier-'))))->toBe([]);
 });
 
 it('preserves manual tags on resync', function () {

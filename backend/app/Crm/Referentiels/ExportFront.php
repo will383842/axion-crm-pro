@@ -43,13 +43,18 @@ final class ExportFront
             self::liste('CERTITUDES', 'CleCertitude', Taxonomy::FEDERATION_CERTITUDES, 'Certitude du classement — `federations.certitude`.'),
             self::liste('PERTINENCES', 'ClePertinence', Taxonomy::FEDERATION_PERTINENCES, 'Pertinence — `federations.pertinence`.'),
             self::liste('PARTENARIATS', 'ClePartenariat', Taxonomy::FEDERATION_PARTENARIATS, 'Démarche « partenariat » — `federations.partenariat`.'),
+            // Métiers (chantier 2, 2026-09-29) — étiquette `metier-<code>`.
+            self::liste('METIERS', 'CleMetier', Metiers::liste(), 'Métiers — étiquette automatique `metier-<code>` (depuis la sous-classe NAF rév. 2).'),
+            "/** Préfixe du slug de l'étiquette d'un métier : `metier-` + code. */\n"
+                . 'export const PREFIXE_ETIQUETTE_METIER = ' . self::chaine(EtiquettesClassement::PREFIXE_METIER) . ";\n",
         ];
 
         return <<<'TS'
             /**
              * FICHIER GÉNÉRÉ — NE PAS MODIFIER À LA MAIN.
              *
-             * Source : `backend/app/Crm/Taxonomy.php` (référentiel unique, chantier 1).
+             * Source : `backend/app/Crm/Taxonomy.php` (référentiel unique, chantier 1),
+             * et, pour les métiers, `backend/resources/referentiels/metiers.csv` (chantier 2).
              * Régénérer : `php artisan crm:referentiels:generer-front` (depuis `backend/`).
              * Garde : `backend/tests/Unit/Crm/ReferentielsFrontTest.php` rougit si ce
              * fichier diffère de ce que la commande produirait.

@@ -226,6 +226,8 @@ test('avec l option, la fiche protegee est classee ; contacts, coordonnees et fi
         'region-99', 'sector-it-saas', FichesProtegees::TAG_ORGANISATEURS,
         EtiquettesClassement::slugRegion('84'), EtiquettesClassement::slugSecteur($secteur),
         EtiquettesClassement::slugTaille('pme'),
+        // 82.30Z : le métier aussi (chantier 2) — c'est du classement.
+        EtiquettesClassement::slugMetier('evenementiel-salons'),
     ];
     sort($attendues);
 

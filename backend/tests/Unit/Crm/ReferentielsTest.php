@@ -269,13 +269,17 @@ test('pourFiche : une fiche étrangère ne reçoit pas la région d un départem
 // ── Étiquettes ────────────────────────────────────────────────────────────
 
 test('étiquettes désirées : slugs et noms tirés du référentiel', function () {
-    $tags = EtiquettesClassement::desirees('commerce_detail', 'grand_groupe', '84');
+    $tags = EtiquettesClassement::desirees('commerce_detail', 'grand_groupe', '84', '47.11F');
 
     expect($tags)->toBe([
         'sector-commerce-detail' => ['name' => 'Secteur : Commerce de détail', 'category' => 'sector'],
         'size-grand-groupe' => ['name' => 'Taille : Grand groupe', 'category' => 'size'],
         'region-84' => ['name' => 'Région : Auvergne-Rhône-Alpes', 'category' => 'geo'],
+        'metier-grande-distribution' => ['name' => 'Métier : Supermarchés, hypermarchés et grands magasins', 'category' => 'sector'],
     ]);
+    // Une sous-classe sans métier n'en désire aucun.
+    expect(EtiquettesClassement::desirees('commerce_detail', null, null, '74.90B'))
+        ->toBe(['sector-commerce-detail' => ['name' => 'Secteur : Commerce de détail', 'category' => 'sector']]);
 });
 
 test('secteur retenu : le NAF décide, sauf quand il ne dit rien et qu un secteur valide est posé', function () {

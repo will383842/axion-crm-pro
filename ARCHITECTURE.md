@@ -45,7 +45,7 @@
 | **Scraping** | `app/Services/Scraping/`, `app/Services/Insee|Annuaire|Bodacc|Ban|FranceTravail/` | HTTP clients API officielles (PHP) + bridge BullMQ → workers Playwright (Node) |
 | **Rgpd** | `app/Services/Rgpd/`, `app/Http/Controllers/Api/RgpdRequestsController` | Erasure art.17 atomique + Portability art.20 chiffré + opt-out global |
 | **Audit** | `app/Services/Audit/AuditHashChain`, middleware `AuditHashChainLogger` | Chaîne SHA-256 append-only vérifiable |
-| **Classification** | `app/Services/Classification/ClassifierService` + `AutoTagApplier` | 4 use cases LLM séquentiels + DSL rules JSONB |
+| **Classification** | `app/Crm/Referentiels/` (secteur, taille, région, métier) + `app/Services/Tags/AutoTaggerService` + `AutoTagApplier` | Référentiel unique + étiquettes automatiques ; règles DSL JSONB (ajout seulement). `ClassifierService` (jamais appelé, et dont le `sync` aurait effacé toutes les étiquettes d'une fiche) a été supprimé au chantier 2 (2026-09-29). |
 
 ## Stratégie mocks
 

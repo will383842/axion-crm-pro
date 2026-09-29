@@ -2,6 +2,7 @@
 
 namespace App\Services\Tags;
 
+use App\Crm\Etiquettes\FamillesEtiquettes;
 use App\Crm\Federations\EtiquettesFederation;
 use App\Crm\Referentiels\EtiquettesClassement;
 use App\Crm\Taxonomy;
@@ -18,9 +19,13 @@ use Illuminate\Support\Str;
  *  - implantation-XX (category=geo, kind=auto)     — depuis signals.implantations (pays ISO2)
  *  - size-{cat}     (category=size, kind=auto)     — depuis size_category
  *  - sector-{cat}   (category=sector, kind=auto)   — depuis sector_main
+ *  - metier-{cle}   (category=sector, kind=auto)   — depuis naf_rev2 (`Metiers`)
  *  - famille:, niveau:, secteur:, taille-adherents:, pertinence:,
  *    contactabilite: (kind=auto) — depuis la ligne `federations` de la fiche
- *  - {tag}          (category=intent, kind=llm)    — depuis signals.llm_classification.tags
+ *  - {tag}          (category=ia, kind=llm)        — depuis signals.llm_classification.tags
+ *
+ * Règle de nommage : `App\Crm\Etiquettes\FamillesEtiquettes` (chaque
+ * étiquette produite ici a une famille ; garde `FamillesEtiquettesTest`).
  *
  * Crée les tags absents à la volée. Sync :
  *  - Retire les tags kind=auto sur la company qui ne matchent plus les attributs actuels
@@ -37,6 +42,7 @@ class AutoTaggerService
         'size' => 'amber',
         'intent' => 'emerald',
         'custom' => 'slate',
+        'ia' => 'indigo',
     ];
 
     /**
@@ -163,10 +169,12 @@ class AutoTaggerService
                 'assigned_by' => 'auto-rule',
             ];
         }
-        // Secteur, taille, région : la définition est PARTAGÉE avec le
+        // Secteur, taille, région, métier : la définition est PARTAGÉE avec le
         // reclassement de masse (`crm:referentiels:reclasser`) — mêmes slugs,
-        // mêmes noms, quel que soit le chemin qui les pose.
-        foreach (EtiquettesClassement::desirees($company->sector_main, $company->size_category, $company->region_code) as $slug => $spec) {
+        // mêmes noms, quel que soit le chemin qui les pose. Sans `naf_rev2`
+        // ici, la première resynchro RETIRERAIT les étiquettes `metier-` que
+        // le reclassement a posées.
+        foreach (EtiquettesClassement::desirees($company->sector_main, $company->size_category, $company->region_code, $company->naf_rev2) as $slug => $spec) {
             $tags[$slug] = $spec + ['kind' => 'auto', 'assigned_by' => 'auto-rule'];
         }
 
@@ -236,7 +244,8 @@ class AutoTaggerService
             }
         }
 
-        // Tags LLM (intent)
+        // Tags LLM — famille IA, catégorie `ia` (chantier 2 : ils étaient
+        // rangés en `intent`, mêlés aux étiquettes gouvernées `svc:`/`src:`).
         $signals = $company->signals ?? [];
         $llmTags = $signals['llm_classification']['tags'] ?? [];
         if (is_array($llmTags)) {
@@ -253,7 +262,7 @@ class AutoTaggerService
                 }
                 $tags[$slug] = [
                     'name' => $rawTag,
-                    'category' => 'intent',
+                    'category' => FamillesEtiquettes::CATEGORIE_IA,
                     'kind' => 'llm',
                     'assigned_by' => 'llm',
                 ];

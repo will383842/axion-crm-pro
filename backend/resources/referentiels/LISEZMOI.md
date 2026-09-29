@@ -12,6 +12,8 @@ reclassement de masse, écrans). Aucune autre liste de secteurs ne doit exister 
 | `naf_rev1_groupes.csv` | repli par groupe rév. 1 (`NN.N`) pour les codes absents de la table officielle | 224 |
 | `naf_rev1_divisions.csv` | dernier repli par division rév. 1 (`NN`) | 62 |
 | `nap600_secteurs.csv` | les 650 postes de la NAP 600 (1973, format `NN.NN` sans lettre) → secteur | 650 |
+| `metiers.csv` | les 90 métiers (clé, libellé), dans l'ordre de l'écran — chantier 2 | 90 |
+| `naf_rev2_metiers.csv` | 280 sous-classes de la NAF rév. 2 → métier (les autres n'en ont pas) — chantier 2 | 280 |
 
 ## Sources officielles (INSEE)
 
@@ -66,3 +68,32 @@ description de la PR #254.
 
 Le code d'origine n'est jamais réécrit : la fiche garde `naf` tel que l'INSEE l'a donné,
 et porte en plus `naf_nomenclature` et, quand la table officielle le permet, `naf_rev2`.
+
+## Métiers (chantier 2, 2026-09-29)
+
+Le **métier** est la maille fine sous le secteur : « experts-comptables », « plombiers,
+chauffagistes et climatisation », « coiffeurs »… Il n'est pas une colonne de `companies` :
+c'est l'étiquette automatique `metier-<clé>` (catégorie `sector`), posée et retirée par la
+même synchro que `sector-`, `size-`, `region-` (`EtiquettesClassement`), lue par
+`App\Crm\Referentiels\Metiers`.
+
+- **Définition** : la table `METIERS` de `construire_metiers.py` — chaque métier est la liste
+  de ses sous-classes NAF rév. 2. `python construire_metiers.py` réécrit `metiers.csv` et
+  `naf_rev2_metiers.csv` ; il refuse un code absent de `naf_rev2_secteurs.csv` (donc de la
+  liste INSEE) et une sous-classe rangée dans deux métiers.
+- **Intitulés** : recopiés de `naf_rev2_secteurs.csv` (source INSEE ci-dessus).
+- **Calcul** : depuis `companies.naf_rev2` — le code rév. 2 d'origine, ou celui que la table
+  de passage INSEE retient pour un code de 1993. Une fiche dont le code n'a pas pu être
+  converti n'a pas de métier.
+- **Aucune invention** : une sous-classe absente de la table n'a PAS de métier, et il n'y a
+  aucun repli par groupe ou par division. Les sous-classes « fourre-tout » (74.90B, 82.99Z,
+  96.09Z, 94.99Z, 88.99B…) n'en ont volontairement aucun.
+- **Limites de la NAF, écrites dans les libellés** : la NAF ne distingue pas les avocats des
+  notaires (69.10Z), ni les carrossiers des garagistes (45.20A), ni les agences web des ESN
+  (62.01Z) : ces métiers sont donc regroupés, et le libellé le dit.
+- **Couverture** : `php artisan crm:etiquettes:inventaire --naf-sans-metier` liste les
+  sous-classes les plus portées par des fiches SANS métier (nombres seulement) ; le bilan de
+  `crm:referentiels:reclasser --dry-run` donne la répartition avant/après par métier.
+
+La garde `tests/Unit/Crm/MetiersTest.php` vérifie la cohérence des deux fichiers entre eux et
+avec la NAF, et la correspondance sur des exemples réels.

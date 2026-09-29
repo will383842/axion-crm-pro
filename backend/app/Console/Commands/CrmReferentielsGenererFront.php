@@ -18,7 +18,7 @@ class CrmReferentielsGenererFront extends Command
     protected $signature = 'crm:referentiels:generer-front
                             {--verifier : Ne rien écrire ; échouer si le fichier n\'est pas à jour}';
 
-    protected $description = 'Génère la copie frontend des référentiels (secteurs, tailles, natures, régions).';
+    protected $description = 'Génère la copie frontend des référentiels (secteurs, tailles, natures, régions, fédérations, métiers).';
 
     public function handle(): int
     {

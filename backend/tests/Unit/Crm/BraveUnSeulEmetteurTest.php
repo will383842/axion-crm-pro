@@ -47,5 +47,6 @@ test('RechercheBrave reserve dans le quota AVANT d emettre, et sans retry', func
     expect($reservation)->not->toBeFalse()
         ->and($emission)->not->toBeFalse()
         ->and($reservation < $emission)->toBeTrue()
-        ->and(str_contains($source, '->retry('))->toBeFalse();
+        // Un APPEL `->retry(n, …)` ; le commentaire « pas de `->retry()` » ne compte pas.
+        ->and(preg_match('/->retry\(\s*[0-9$]/', $source))->toBe(0);
 });

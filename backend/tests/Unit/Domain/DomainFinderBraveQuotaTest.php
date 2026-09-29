@@ -132,16 +132,23 @@ test('tous chemins confondus : le total ne depasse JAMAIS le plafond global', fu
 test('plus de retry : une requete Brave en echec reseau n est envoyee qu UNE fois, et comptee', function () {
     $quota = dfbqQuota(100, ['enrichissement' => 10]);
     Http::preventStrayRequests();
-    Http::fake(['api.search.brave.com/*' => fn () => throw new ConnectionException('delai')]);
+    // Une réponse simulée qui LÈVE n'est pas consignée par `Http::recorded()` :
+    // on compte les appels du simulateur lui-même.
+    $envois = 0;
+    Http::fake(['api.search.brave.com/*' => function () use (&$envois) {
+        $envois++;
+
+        throw new ConnectionException('delai');
+    }]);
 
     // Avant : `->retry(2, 500, …ConnectionException)` — TROIS requêtes
     // facturées pour un seul `find()`.
     (new DomainFinderService)->find(dfbqEntreprise());
-    expect(dfbqRequetesBrave())->toBe(1)
+    expect($envois)->toBe(1)
         ->and($quota->consommees())->toBe(1);
 
     $etat = app(RechercheBrave::class)->chercher('requete', QuotaBrave::ENRICHISSEMENT)['etat'];
-    expect(dfbqRequetesBrave())->toBe(2)
+    expect($envois)->toBe(2)
         ->and($etat)->toBe('erreur')
         ->and($quota->consommees())->toBe(2);
 });

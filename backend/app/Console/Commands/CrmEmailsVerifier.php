@@ -143,7 +143,7 @@ class CrmEmailsVerifier extends Command
         }
         // La liste de suppression est partagée par univers, pas par espace :
         // l'espace du vivier lit `vivier`, tout autre espace `business`.
-        $this->univers = DB::table('workspaces')->where('id', $workspaceId)->value('slug') === Taxonomy::VIVIER_WORKSPACE_SLUG
+        $this->univers = DB::table('workspaces')->where('id', $workspaceId)->whereNull('deleted_at')->value('slug') === Taxonomy::VIVIER_WORKSPACE_SLUG
             ? 'vivier'
             : 'business';
 

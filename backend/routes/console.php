@@ -2,6 +2,7 @@
 
 use App\Console\Commands\AuditVerifyChain;
 use App\Console\Commands\CoverageRefreshMatrix;
+use App\Console\Commands\CrmFederationsTrouverSites;
 use App\Console\Commands\CrmSondeCleDePersonne;
 use App\Console\Commands\CrmSondeNonDiffusibles;
 use App\Console\Commands\CrmSondePersonnes;
@@ -436,6 +437,21 @@ Schedule::command('crm:flush-outbound')
     ->withoutOverlapping(10)
     ->onOneServer()
     ->skip(fn (): bool => ! filter_var(config('crm.outbound_enabled', false), FILTER_VALIDATE_BOOLEAN));
+
+// Chantier 3 (2026-09-29) — le SITE WEB des fédérations sans contact, par
+// Brave, avec le SEUL crédit gratuit du mois (budget de Will : zéro euro).
+// FERMÉE par défaut : le skip() saute le passage tant que
+// CRM_BRAVE_FEDERATIONS_PLANIFIEE n'est pas à true. Ouverte, elle consomme le
+// sous-quota du mois (CRM_BRAVE_QUOTA_FEDERATIONS, sous CRM_BRAVE_QUOTA_MENSUEL,
+// compté en base) et s'arrête d'elle-même au plafond. Une requête par seconde : ~900 requêtes, et jusqu'à trois
+// pages d'accueil vérifiées par fiche, tiennent dans le verrou de 4 h ; en
+// arrière-plan, pour ne pas retenir les autres tâches du planificateur.
+Schedule::command(CrmFederationsTrouverSites::SIGNATURE_PLANIFIEE)
+    ->monthlyOn(3, '05:30')
+    ->withoutOverlapping(240)
+    ->onOneServer()
+    ->runInBackground()
+    ->skip(fn (): bool => ! filter_var(config('crm.brave.federations_planifiee', false), FILTER_VALIDATE_BOOLEAN));
 
 // Vérification des e-mails (2026-09-29) — `crm:emails:verifier`, chaque
 // DIMANCHE à 05:00 : les adresses nouvelles, et les domaines résolus il y a

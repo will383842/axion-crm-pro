@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Crm\Brave\QuotaBrave;
+use App\Crm\Brave\QuotaBraveEnBase;
 use App\Crm\Emails\Dns\ResolveurDns;
 use App\Crm\Emails\Dns\ResolveurDnsInterdit;
 use App\Models\PersonalAccessToken;
@@ -76,6 +78,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(MxEmailValidator::class);
         $this->app->singleton(EmailConfidenceService::class);
         $this->app->singleton(HunterEmailVerifier::class);
+
+        // Le quota Brave (2026-09-29) : en base en production, factice dans les
+        // tests unitaires (`Tests\Support\QuotaBraveEnMemoire`), qui le lient
+        // eux-mêmes. Toute requête Brave le traverse (`RechercheBrave`).
+        $this->app->bind(QuotaBrave::class, QuotaBraveEnBase::class);
 
         // ── LE DNS DE `crm:emails:verifier` : AUCUN APPEL RÉSEAU EN TEST ──────
         //

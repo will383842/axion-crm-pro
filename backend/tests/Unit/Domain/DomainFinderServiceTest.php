@@ -1,9 +1,11 @@
 <?php
 
+use App\Crm\Brave\QuotaBrave;
 use App\Models\Company;
 use App\Services\Domain\DomainFinderService;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\QuotaBraveEnMemoire;
 
 it('returns signals.legal.siteweb when present', function () {
     Http::preventStrayRequests();
@@ -18,6 +20,11 @@ it('returns signals.legal.siteweb when present', function () {
 
 it('returns first non-blacklist URL from Brave Search', function () {
     Config::set('services.brave.api_key', 'fake-brave-key');
+    // Depuis le 2026-09-29, chaque requête Brave est réservée dans le quota
+    // mensuel, et l'enrichissement a un sous-quota NUL par défaut. Compteur
+    // factice en mémoire, sous-quota ouvert : pas de base en test unitaire.
+    Config::set('crm.brave.quotas.enrichissement', 10);
+    app()->instance(QuotaBrave::class, new QuotaBraveEnMemoire);
     Http::fake([
         'api.search.brave.com/res/v1/web/search*' => Http::response([
             'web' => [

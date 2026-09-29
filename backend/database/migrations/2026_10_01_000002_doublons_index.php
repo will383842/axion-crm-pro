@@ -5,10 +5,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * DOUBLONS — les deux index qui manquaient à la fusion (chantier 5).
+ * DOUBLONS — les trois index qui manquaient à la fusion (chantier 5).
  *
  * Une fusion rattache à la fiche gardée TOUT ce qui pointe vers la fiche
- * absorbée. Deux de ces recherches n'avaient aucun index :
+ * absorbée. Trois de ces recherches n'avaient aucun index :
  *
  *   idx_activities_sujet_fiche  activities (workspace_id, subject_id)
  *                               WHERE subject_type = 'company'
@@ -17,6 +17,9 @@ use Illuminate\Support\Facades\Schema;
  *                               ingestion : sans index, chaque fusion lirait
  *                               TOUTE la table ;
  *   idx_deals_company           deals (company_id)
+ *   idx_journalists_company     journalists (company_id) WHERE company_id IS NOT NULL
+ *                               — seul `journalists_workspace_idx` servait, qui lit
+ *                               tout l'espace
  *
  * Toutes les autres tables rattachées ont déjà le leur (clé primaire de
  * `company_tag` et de `federations`, `idx_contacts_company`,
@@ -38,6 +41,7 @@ return new class extends Migration
     public const INDEX = [
         'idx_activities_sujet_fiche' => "activities (workspace_id, subject_id) WHERE subject_type = 'company' AND subject_id IS NOT NULL",
         'idx_deals_company' => 'deals (company_id)',
+        'idx_journalists_company' => 'journalists (company_id) WHERE company_id IS NOT NULL',
     ];
 
     public function up(): void

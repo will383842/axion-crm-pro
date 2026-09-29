@@ -6,7 +6,10 @@
  * `companies` compte 4,34 M de lignes. La détection, la fusion et son
  * annulation émettent des requêtes REJOUÉES ici par `EXPLAIN` : aucune ne doit
  * parcourir une table (`Seq Scan`), ni lire un index EN ENTIER (sans
- * condition), sur les tables qu'elles touchent.
+ * condition), ni le lire pour TOUT L'ESPACE (condition sur `workspace_id`
+ * seul : sur la production, c'est lire 4,3 M de lignes), sur les tables
+ * qu'elles touchent. Du volume est semé pour que le planificateur choisisse
+ * comme il le ferait en vrai (même méthode que `EffacementServiParDesIndexTest`).
  *
  * ⚠️ `SET LOCAL enable_seqscan = off`, ET IL FAUT LE DIRE : la base de test
  * est minuscule, et le planificateur y préfère — à raison — un parcours. Le
@@ -35,8 +38,12 @@ uses(TestCase::class, RefreshDatabase::class);
 const DSI_TABLES = [
     'companies', 'contacts', 'activities', 'company_tag', 'scraper_runs', 'audience_members', 'event_organizers',
     'deals', 'duplicate_flags', 'federations', 'media', 'journalists', 'health_practitioners', 'personnes',
-    'fusions_fiches', 'adresses_partagees',
+    'fusions_fiches',
 ];
+// `adresses_partagees` n'y est pas : table DÉRIVÉE de quelques dizaines de
+// milliers de lignes, que le plafond du ménage compte en entier (à dessein).
+
+const DSI_VOLUME = 3000;
 
 /**
  * Les index sur lesquels le chantier repose : chaque groupe doit servir au
@@ -96,6 +103,8 @@ function dsiVerifier(array $noeud, array &$vus, array &$defauts): void
             $defauts[] = "parcours complet de {$table}";
         } elseif (in_array($type, ['Index Scan', 'Index Only Scan'], true) && ! isset($noeud['Index Cond'])) {
             $defauts[] = "index {$index} lu EN ENTIER sur {$table}";
+        } elseif (in_array($type, ['Index Scan', 'Index Only Scan'], true) && dsiEspaceSeul((string) $noeud['Index Cond'])) {
+            $defauts[] = "index {$index} lu pour TOUT L ESPACE sur {$table}";
         }
     }
     if ($type === 'Bitmap Heap Scan' && ! dsiBitmapServi((array) ($noeud['Plans'][0] ?? []))) {
@@ -104,6 +113,21 @@ function dsiVerifier(array $noeud, array &$vus, array &$defauts): void
     foreach ((array) ($noeud['Plans'] ?? []) as $enfant) {
         dsiVerifier((array) $enfant, $vus, $defauts);
     }
+}
+
+/**
+ * Une condition d'index qui ne porte QUE sur l'espace (chaque terme cite
+ * `workspace_id`) lit tout l'espace : sur la production, 4,3 M de fiches.
+ */
+function dsiEspaceSeul(string $condition): bool
+{
+    foreach (explode(' AND ', $condition) as $terme) {
+        if (! str_contains($terme, 'workspace_id')) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 /**
@@ -117,7 +141,7 @@ function dsiBitmapServi(array $noeud): bool
 {
     $type = (string) ($noeud['Node Type'] ?? '');
     if ($type === 'Bitmap Index Scan') {
-        return isset($noeud['Index Cond']);
+        return isset($noeud['Index Cond']) && ! dsiEspaceSeul((string) $noeud['Index Cond']);
     }
     $servis = array_map(static fn (mixed $e): bool => dsiBitmapServi((array) $e), (array) ($noeud['Plans'] ?? []));
     if ($servis === []) {
@@ -170,10 +194,31 @@ test('détection, fusion et annulation : chaque requête est servie par un index
     F::contact($ws, $garde, 'Zed', 'ZZJUMEAU');
     F::contact($ws, $absorbee, 'Zed', 'ZZJUMEAU', ['email' => 'zed@zz-index.example.invalid']);
     DB::table('activities')->insert(['workspace_id' => $ws, 'type' => 'note', 'kind' => 'scraped', 'subject_type' => 'company', 'subject_id' => $absorbee, 'created_at' => now()]);
+    // Du volume, dans le MÊME espace : sans lui, un index lu pour tout
+    // l'espace coûte aussi peu que le bon, et le planificateur hésite.
+    DB::statement("
+        INSERT INTO companies (workspace_id, siren, denomination, discovery_source, postcode, created_at, updated_at)
+        SELECT ?, '93' || lpad(g::text, 7, '0'), 'ZZ Volume ' || g::text, 'insee', '69' || lpad((g % 900)::text, 3, '0'), now(), now()
+        FROM generate_series(1, ?) g
+    ", [$ws, DSI_VOLUME]);
+    DB::statement("
+        INSERT INTO contacts (workspace_id, company_id, first_name, last_name, created_at, updated_at)
+        SELECT c.workspace_id, c.id, 'Zz', 'ZZVOLUME' || c.id::text, now(), now()
+        FROM companies c WHERE c.workspace_id = ? AND c.siren LIKE '93%'
+    ", [$ws]);
+    DB::statement("
+        INSERT INTO activities (workspace_id, type, kind, subject_type, subject_id, created_at)
+        SELECT c.workspace_id, 'note', 'scraped', 'company', c.id, now()
+        FROM companies c WHERE c.workspace_id = ? AND c.siren LIKE '93%'
+    ", [$ws]);
     DB::statement('ANALYZE companies');
+    DB::statement('ANALYZE contacts');
+    DB::statement('ANALYZE activities');
 
     $requetes = dsiCapturer(function () use ($ws): void {
-        Artisan::call('crm:doublons:detecter', ['--workspace' => $ws]);
+        // Des lots de 100 sur 3 000 fiches : la proportion d'un lot sur la
+        // production (5 000 sur 4,3 M) n'est pas reproductible, celle-ci s'en approche.
+        Artisan::call('crm:doublons:detecter', ['--workspace' => $ws, '--lot' => 100]);
         Artisan::call('crm:doublons:fusionner', ['--workspace' => $ws]);
     });
     $fusion = (int) DB::table('fusions_fiches')->where('workspace_id', $ws)->value('id');
@@ -188,6 +233,20 @@ test('détection, fusion et annulation : chaque requête est servie par un index
     foreach (DSI_INDEX_ATTENDUS as $groupe) {
         expect(array_intersect($groupe, array_keys($vus)))->not->toBe([], 'aucun de ces index n a servi : ' . implode(', ', $groupe));
     }
+});
+
+test('TÉMOIN — la sonde refuse un index lu pour TOUT L ESPACE', function () {
+    $ws = F::espace('zz-doublons-temoin-espace');
+    F::fiche($ws, 'ZZ Temoin', ['website' => 'https://zz-temoin.example.invalid']);
+    DB::statement('SET LOCAL enable_seqscan = off');
+    $vus = [];
+
+    $defauts = dsiDefauts([[
+        'sql' => 'select id from companies where workspace_id = ? and website = ?',
+        'bindings' => [$ws, 'https://zz-temoin.example.invalid'],
+    ]], $vus);
+
+    expect($defauts)->not->toBe([]);
 });
 
 test('TÉMOIN — la sonde refuse une recherche non indexée (le domaine du site, calculé)', function () {

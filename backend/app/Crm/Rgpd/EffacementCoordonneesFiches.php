@@ -237,7 +237,7 @@ final class EffacementCoordonneesFiches
         if ($espace !== null && ($email !== '' || $variantes !== [])) {
             $r = DB::selectOne(
                 'SELECT public.doublons_effacer(?::uuid, ?, ?::jsonb) AS n',
-                [$espace, $email, json_encode(array_values($variantes), JSON_THROW_ON_ERROR)],
+                [$espace, $email, json_encode($variantes, JSON_THROW_ON_ERROR)],
             );
             $bilan['adresses_partagees'] = (int) ($r->n ?? 0);
         }

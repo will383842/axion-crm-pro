@@ -641,7 +641,7 @@ final class FusionFiches
      * Recopie sur l'homonyme de la fiche gardée les coordonnées qu'il n'a pas.
      *
      * @param  list<array{absorbee_contact: int, garde_contact: int, champs: array<string, mixed>}>  $jumeaux
-     * @return list<array{absorbee_contact: int, garde_contact: int, champs: array<string, array{avant: ?string, empreinte: string}>}>
+     * @return list<array{absorbee_contact: int, garde_contact: int, champs: array<string, array{avant: ?string, empreinte: ?string}>}>
      */
     private function completerJumeaux(string $ws, array $jumeaux): array
     {

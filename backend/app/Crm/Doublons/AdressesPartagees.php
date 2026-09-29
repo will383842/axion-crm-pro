@@ -55,7 +55,7 @@ final class AdressesPartagees
      */
     public static function nonRevues(string $workspaceId, array $emails): int
     {
-        $r = DB::selectOne('SELECT public.doublons_adresses_non_revues(?::uuid, ?::jsonb) AS n', [$workspaceId, json_encode(array_values($emails), JSON_THROW_ON_ERROR)]);
+        $r = DB::selectOne('SELECT public.doublons_adresses_non_revues(?::uuid, ?::jsonb) AS n', [$workspaceId, json_encode($emails, JSON_THROW_ON_ERROR)]);
 
         return (int) ($r->n ?? 0);
     }

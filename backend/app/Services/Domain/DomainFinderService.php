@@ -354,6 +354,24 @@ class DomainFinderService
      */
     private function verifyCandidate(string $domain, Company $company, array $tokens): bool
     {
+        $body = $this->recupererAccueil($domain);
+
+        return $body !== null && $this->verifyBody($body, $company, $tokens);
+    }
+
+    /**
+     * La page d'accueil `https://{domaine}/`, ou null (échec, réponse non 2xx).
+     *
+     * Extraite de `verifyCandidate()` (2026-09-29) pour que
+     * `crm:federations:trouver-sites` lise le MÊME corps que `verifyBody()`
+     * et y applique sa règle plus stricte (sigle, département) sans
+     * télécharger la page deux fois. ⚠️ Aucun contrôle SSRF à l'ENTRÉE ici
+     * (cf. C19-003 plus bas) : un domaine qui ne vient pas de
+     * `candidateDomains()` doit être passé à `SsrfGuard::check()` par
+     * l'appelant AVANT.
+     */
+    public function recupererAccueil(string $domain): ?string
+    {
         try {
             $resp = Http::timeout(self::GUESS_TIMEOUT)
                 ->connectTimeout(self::GUESS_CONNECT_TIMEOUT)
@@ -363,10 +381,10 @@ class DomainFinderService
                 ->withHeaders(['User-Agent' => self::USER_AGENT])
                 ->get("https://{$domain}/");
         } catch (\Throwable $e) {
-            return false;
+            return null;
         }
 
-        return $resp->successful() && $this->verifyBody((string) $resp->body(), $company, $tokens);
+        return $resp->successful() ? (string) $resp->body() : null;
     }
 
     /**
@@ -375,7 +393,7 @@ class DomainFinderService
      *
      * @param  list<string>  $tokens
      */
-    private function verifyBody(string $rawBody, Company|Media $company, array $tokens): bool
+    public function verifyBody(string $rawBody, Company|Media $company, array $tokens): bool
     {
         $body = mb_strtolower(strip_tags($rawBody));
         if (mb_strlen($body) < 200) {
@@ -402,7 +420,7 @@ class DomainFinderService
      *
      * @return list<string>
      */
-    private function nameTokens(string $name): array
+    public function nameTokens(string $name): array
     {
         $s = $this->stripAccents(mb_strtolower($name));
         $s = preg_replace('/[^a-z0-9]+/', ' ', $s);

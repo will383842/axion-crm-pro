@@ -244,6 +244,22 @@ return [
     'purges_enabled' => env('CRM_PURGE_ENABLED', false),
 
     /*
+    | Brave Search — le crédit GRATUIT mensuel, et lui seul (Will, 2026-09-29).
+    |
+    | `quota_mensuel` : plafond STRICT de requêtes par mois civil (UTC), compté
+    | en base (`brave_quota_mensuel`) et réservé AVANT chaque envoi par
+    | `crm:federations:trouver-sites`. 900 par défaut : le crédit gratuit en
+    | couvre ~1 000, la marge absorbe un écart de décompte côté Brave.
+    |
+    | `federations_planifiee` : à false (défaut), le planificateur SAUTE le
+    | passage mensuel. À true, il consomme le quota du mois le 3 à 05:30.
+    */
+    'brave' => [
+        'quota_mensuel' => (int) env('CRM_BRAVE_QUOTA_MENSUEL', 900),
+        'federations_planifiee' => env('CRM_BRAVE_FEDERATIONS_PLANIFIEE', false),
+    ],
+
+    /*
     | L5 — mini-outbox CRM → site (convergence BIDIRECTIONNELLE des
     | consentements, plan « Synchro BIDIRECTIONNELLE »).
     |

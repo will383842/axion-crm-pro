@@ -872,9 +872,10 @@ test('B10-004 — COMPTE FIGE : la PII en texte libre et en JSONB echappe a l in
     // 42 -> 43 et 28 -> 29 le 2026-09-30 (chantier 5) : `fusions_fiches.journal`,
     // le journal d'une fusion de fiches. Hors de portée PAR CONSTRUCTION : il ne
     // porte que des identifiants de lignes, des noms de colonnes et l'EMPREINTE
-    // sha256 des valeurs recopiées — jamais une adresse ni un numéro, pour
-    // qu'aucune coordonnée n'y survive à un effacement
-    // (`FusionFiches` ; garde `DoublonsFusionTest` « aucune coordonnée »).
+    // SALÉE (HMAC, clé de la base : `doublons_empreinte`) des valeurs
+    // recopiées — jamais une adresse ni un numéro en clair (`FusionFiches` ;
+    // garde `DoublonsFusionTest` › « le journal ne garde AUCUNE coordonnée :
+    // des identifiants et des empreintes »).
     expect($colonnes->count())->toBe(
         43,
         'le nombre de colonnes JSON/JSONB a changé : ré-arbitrer, puis mettre ce chiffre à jour',

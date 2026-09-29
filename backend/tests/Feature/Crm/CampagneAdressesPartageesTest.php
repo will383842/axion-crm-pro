@@ -13,9 +13,9 @@
  * Fixtures FICTIVES (dépôt public).
  */
 
+use App\Crm\Doublons\AdressesPartagees;
 use App\Crm\Doublons\Rapprochement;
 use App\Crm\FichesProtegees;
-use App\Support\ListeSuppression;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -38,7 +38,7 @@ beforeEach(function () {
     }
     foreach ([[$this->cabinet, 3, Rapprochement::CABINET_COMPTABLE], [$this->groupe, 2, Rapprochement::GROUPE]] as [$email, $n, $nature]) {
         DB::table('adresses_partagees')->insert([
-            'workspace_id' => $this->ws, 'email_empreinte' => ListeSuppression::empreinte($email), 'nb_fiches' => $n, 'nature' => $nature,
+            'workspace_id' => $this->ws, 'email_empreinte' => AdressesPartagees::empreintes([$email])[$email], 'nb_fiches' => $n, 'nature' => $nature,
         ]);
     }
 });

@@ -31,22 +31,25 @@ use Illuminate\Support\Facades\DB;
  * homonymes restées sur la fiche absorbée, et ce qui a été recopié sur leur
  * homonyme). `crm:doublons:fusionner --annuler=<id>` le rejoue à l'envers.
  *
- * AUCUNE coordonnée dans le journal : des identifiants, des noms de colonnes,
- * et l'EMPREINTE (sha256) de chaque valeur recopiée — assez pour ne la
- * retirer que si personne ne l'a changée depuis, jamais assez pour survivre
- * à l'effacement d'une personne (art. 17).
+ * AUCUNE coordonnée en clair dans le journal : des identifiants, des noms de
+ * colonnes, et l'EMPREINTE SALÉE (`doublons_empreinte`, ci-dessous) de chaque
+ * valeur recopiée — assez pour ne la retirer que si personne ne l'a changée
+ * depuis. Sans la clé, une empreinte ne se retrouve pas en essayant des
+ * adresses connues ; avec la clé (qui vit dans la base), elle le peut : c'est
+ * une donnée pseudonymisée, pas anonyme.
  *
  * Pas de clé étrangère vers `companies` : le journal doit survivre à tout.
  *
- * ── Le verrou : une fiche absorbée ne se supprime JAMAIS en dur ────────────
+ * ── Le verrou : les deux fiches d'une fusion ne se suppriment JAMAIS en dur ─
  *
  * La fiche absorbée va à la CORBEILLE (`deleted_at`), jamais plus loin. Or
  * `prospection:purge-non-commercial` supprime physiquement toute fiche à
  * `legal_form` NULL — ce qu'est une fiche sans SIREN — et tourne dans un
  * workflow. Une fiche absorbée y passerait, et l'annulation deviendrait
- * impossible. Les deux purges l'écartent donc (`FusionFiches::conditionSql`),
+ * impossible ; la fiche GARDÉE aussi (ses personnes rattachées partiraient en
+ * cascade). Les purges écartent donc les deux (`FusionFiches::conditionSql`),
  * et ce déclencheur refuse, en dernier recours, toute suppression PHYSIQUE
- * d'une fiche absorbée par une fusion non annulée — même patron que
+ * d'une fiche absorbée OU gardée par une fusion non annulée — même patron que
  * `refuser_suppression_fiche_protegee` (`SECURITY DEFINER`, `search_path`
  * fixé, tables en `public.`, levée volontaire par
  * `SET LOCAL app.autoriser_suppression_absorbee = 'on'`, qu'aucun chemin
@@ -55,11 +58,21 @@ use Illuminate\Support\Facades\DB;
  * ── `adresses_partagees` ───────────────────────────────────────────────────
  *
  * Une ligne par adresse générique (`companies.email_generic`) portée par
- * PLUSIEURS fiches : son EMPREINTE (`ListeSuppression::empreinte`, jamais
- * l'adresse en clair — une adresse effacée au titre du RGPD ne doit pas y
- * survivre), son domaine, le nombre de fiches et sa nature probable. Table
- * DÉRIVÉE, recalculée par `crm:doublons:detecter` ; lue par
- * `crm:campagne:destinataires`.
+ * PLUSIEURS fiches : son EMPREINTE SALÉE (jamais l'adresse en clair), son
+ * domaine, le nombre de fiches et sa nature probable. Table DÉRIVÉE,
+ * recalculée par `crm:doublons:detecter` ; lue par
+ * `crm:campagne:destinataires`. L'effacement d'une personne (site et
+ * console, `EffacementCoordonneesFiches`) retire la ligne de son adresse.
+ *
+ * ── `doublons_empreinte()` : l'empreinte salée ─────────────────────────────
+ *
+ * HMAC-SHA256 avec une clé tirée au hasard par la migration, dans
+ * `doublons_cle` — même mécanisme que `contacts_retires_cle` (#255) : la clé
+ * n'est lisible par personne (REVOKE, y compris au rôle applicatif), seule la
+ * fonction `SECURITY DEFINER` la lit. Le rôle applicatif EXÉCUTE la fonction :
+ * il voit déjà les adresses en clair dans `companies`, l'empreinte ne protège
+ * pas de lui mais d'une copie de ces tables sortie de la base. Ne jamais
+ * changer la clé : toutes les empreintes deviendraient orphelines.
  *
  * RLS forcée sur les deux tables neuves, comme sur toute table d'espace.
  */
@@ -111,6 +124,7 @@ return new class extends Migration
         DB::statement("ALTER TABLE fusions_fiches ADD CONSTRAINT fusions_fiches_motif_check CHECK (motif IN ({$motifs}))");
         // Le déclencheur et les purges : « cette fiche est-elle absorbée ? »
         DB::statement('CREATE INDEX IF NOT EXISTS idx_fusions_fiches_absorbee ON fusions_fiches (absorbee_id) WHERE annulee_at IS NULL');
+        DB::statement('CREATE INDEX IF NOT EXISTS idx_fusions_fiches_garde ON fusions_fiches (garde_id) WHERE annulee_at IS NULL');
         DB::statement('CREATE INDEX IF NOT EXISTS idx_fusions_fiches_flag ON fusions_fiches (workspace_id, flag_id) WHERE flag_id IS NOT NULL');
         DB::statement("COMMENT ON TABLE fusions_fiches IS 'Journal des fusions de fiches : ce qui a bouge, pour annuler (crm:doublons:fusionner --annuler). La fiche absorbee reste a la corbeille, jamais supprimee.'");
 
@@ -163,9 +177,14 @@ return new class extends Migration
                     FROM   public.fusions_fiches ff
                     WHERE  ff.absorbee_id = OLD.id
                     AND    ff.annulee_at IS NULL
+                ) OR EXISTS (
+                    SELECT 1
+                    FROM   public.fusions_fiches fg
+                    WHERE  fg.garde_id = OLD.id
+                    AND    fg.annulee_at IS NULL
                 ) THEN
                     RAISE EXCEPTION 'fiche_absorbee : suppression refusee (company_id=%)', OLD.id
-                        USING HINT = 'Fiche absorbee par une fusion : elle reste a la corbeille pour que la fusion reste annulable (crm:doublons:fusionner --annuler).';
+                        USING HINT = 'Fiche absorbee ou gardee par une fusion : elle reste en base pour que la fusion reste annulable (crm:doublons:fusionner --annuler).';
                 END IF;
 
                 RETURN OLD;
@@ -178,6 +197,37 @@ return new class extends Migration
                 BEFORE DELETE ON public.companies
                 FOR EACH ROW EXECUTE FUNCTION public.refuser_suppression_fiche_absorbee();
         SQL);
+
+        // ── L'empreinte salée ───────────────────────────────────────────────
+        DB::unprepared(<<<'SQL'
+            CREATE TABLE IF NOT EXISTS public.doublons_cle (
+                id   SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+                cle  BYTEA    NOT NULL
+            );
+            INSERT INTO public.doublons_cle (id, cle) VALUES (1, gen_random_bytes(32)) ON CONFLICT (id) DO NOTHING;
+            REVOKE ALL ON public.doublons_cle FROM PUBLIC;
+            COMMENT ON TABLE public.doublons_cle IS 'Cle HMAC des empreintes des doublons (adresses_partagees, journal des fusions). Lue par doublons_empreinte() seulement. Ne jamais la changer ni l exporter.';
+
+            CREATE OR REPLACE FUNCTION public.doublons_empreinte(p_valeur TEXT)
+            RETURNS TEXT
+            LANGUAGE sql
+            STABLE
+            SECURITY DEFINER
+            SET search_path = public, pg_catalog
+            AS $fn$
+                SELECT encode(hmac(convert_to(coalesce(p_valeur, ''), 'UTF8'), k.cle, 'sha256'), 'hex')
+                FROM   public.doublons_cle k
+                WHERE  k.id = 1
+            $fn$;
+            REVOKE EXECUTE ON FUNCTION public.doublons_empreinte(TEXT) FROM PUBLIC;
+        SQL);
+        $roleApplicatif = (string) config('database.connections.pgsql_app.username', 'axion_app');
+        if ($roleApplicatif !== '' && DB::selectOne('SELECT 1 AS e FROM pg_roles WHERE rolname = ?', [$roleApplicatif]) !== null) {
+            $role = '"' . str_replace('"', '""', $roleApplicatif) . '"';
+            // Les privilèges par défaut du schéma lui donneraient la table.
+            DB::statement('REVOKE ALL ON public.doublons_cle FROM ' . $role);
+            DB::statement('GRANT EXECUTE ON FUNCTION public.doublons_empreinte(TEXT) TO ' . $role);
+        }
     }
 
     public function down(): void
@@ -185,6 +235,8 @@ return new class extends Migration
         DB::unprepared(<<<'SQL'
             DROP TRIGGER IF EXISTS companies_refuser_suppression_absorbee ON public.companies;
             DROP FUNCTION IF EXISTS public.refuser_suppression_fiche_absorbee();
+            DROP FUNCTION IF EXISTS public.doublons_empreinte(TEXT);
+            DROP TABLE IF EXISTS public.doublons_cle;
             DROP TABLE IF EXISTS adresses_partagees;
             DROP TABLE IF EXISTS fusions_fiches;
             DROP INDEX IF EXISTS idx_dup_flags_entite_b;

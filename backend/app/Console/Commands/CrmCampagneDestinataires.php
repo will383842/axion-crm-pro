@@ -9,7 +9,6 @@ use App\Crm\Federations\EtiquettesFederation;
 use App\Crm\Personnes\NatureEmail;
 use App\Crm\Taxonomy;
 use App\Support\EligibiliteCampagne;
-use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -157,6 +156,11 @@ class CrmCampagneDestinataires extends Command
 
         });
 
+        $empreintes = $partageesExclues === [] ? [] : WorkspaceContext::run(
+            $workspaceId,
+            fn (): array => AdressesPartagees::empreintes(array_map(static fn (int|string $e): string => (string) $e, array_keys($parAdresse))),
+        );
+
         $lignes = [];
         foreach ($parAdresse as $email => $occurrences) {
             $bilan['adresses_distinctes']++;
@@ -183,7 +187,7 @@ class CrmCampagneDestinataires extends Command
 
                 continue;
             }
-            if (isset($partageesExclues[ListeSuppression::empreinte($email)])) {
+            if (isset($partageesExclues[$empreintes[$email] ?? ''])) {
                 $bilan['ecartees_adresse_partagee']++;
 
                 continue;

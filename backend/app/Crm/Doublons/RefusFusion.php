@@ -19,6 +19,8 @@ final class RefusFusion extends RuntimeException
         'deja_traitee' => 'Cette paire a déjà été traitée (fusionnée ou écartée).',
         'paire_inconnue' => 'Cette paire ne correspond pas à la file de vérification.',
         'preuve_insuffisante' => "La preuve n'est plus certaine sur les données du moment : la paire reste dans la file de vérification.",
+        'preuve_ambigue' => 'La preuve désigne plusieurs fiches à SIREN : impossible de choisir seul, la paire reste dans la file de vérification.',
+        'homonyme_supprime_sur_la_fiche_gardee' => 'Une personne de la fiche absorbée a un homonyme SUPPRIMÉ sur la fiche gardée : elle disparaîtrait de la vue. À régler à la main.',
         'deux_federations' => 'Les deux fiches sont chacune une fédération : à rapprocher à la main.',
         'lien_de_reseau_entre_les_deux' => "L'une des deux fiches est la tête de réseau de l'autre : ce ne sont pas des doublons.",
         'personnes_homonymes_en_conflit' => 'Deux personnes homonymes, une sur chaque fiche, ont des coordonnées différentes : à régler à la main d\'abord.',

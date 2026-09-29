@@ -3,12 +3,12 @@
 namespace App\Console\Commands;
 
 use App\Console\Concerns\RefuseUneSuppressionMassive;
+use App\Crm\Doublons\AdressesPartagees;
 use App\Crm\Doublons\FusionFiches;
 use App\Crm\Doublons\Rapprochement;
 use App\Crm\EspaceProspection;
 use App\Crm\FichesProtegees;
 use App\Services\Audit\AuditHashChain;
-use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
 use Illuminate\Database\QueryException;
@@ -266,6 +266,7 @@ class CrmDoublonsDetecter extends Command
         }
         $this->compteurs['fiches_sans_siren_comparees'] = 0;
         $this->compteurs['noms_trop_repandus'] = 0;
+        $this->compteurs['preuves_ambigues'] = 0;
         foreach (array_keys(Rapprochement::MOTIFS) as $motif) {
             $this->compteurs["paires_{$motif}"] = 0;
         }
@@ -412,10 +413,11 @@ class CrmDoublonsDetecter extends Command
         }
 
         $adresses = [];
+        $empreintes = AdressesPartagees::empreintes(array_map(static fn (int|string $e): string => (string) $e, array_keys($partagees)));
         foreach ($partagees as $email => $n) {
             $email = (string) $email;
             $nature = Rapprochement::natureAdresse($email, $parAdresse[$email] ?? []);
-            $empreinte = ListeSuppression::empreinte($email);
+            $empreinte = $empreintes[$email];
             $this->empreintesVues[$empreinte] = true;
             $adresses[] = [
                 'empreinte' => $empreinte,
@@ -496,6 +498,7 @@ class CrmDoublonsDetecter extends Command
 
                 continue;
             }
+            $pairesX = [];
             foreach ($candidats as $c) {
                 $x = (object) [
                     'id' => $c->x_id, 'siren' => $c->x_siren, 'country_code' => $c->x_country_code,
@@ -518,13 +521,22 @@ class CrmDoublonsDetecter extends Command
                         ? [(int) $c->x_id, (int) $c->id, $px, $pc]
                         : [(int) $c->id, (int) $c->x_id, $pc, $px];
                 }
-                $paires[] = [
+                $pairesX[] = [
                     'garde' => $garde,
                     'absorbee' => $absorbee,
                     'motif' => $motif,
                     'auto' => Rapprochement::preuveCertaine($motif, $pg, $pa, $this->fusion->vientDUneCollecte($pa['source'])),
                 ];
             }
+            // E1 — une preuve certaine ne vaut que si elle désigne UNE seule
+            // fiche : deux fiches INSEE (SIREN différents) au même nom, même
+            // code postal et même site → aucune fusion automatique, les deux
+            // paires vont dans la file de vérification.
+            if (count(array_filter($pairesX, static fn (array $p): bool => $p['auto'])) > 1) {
+                $this->compteurs['preuves_ambigues']++;
+                $pairesX = array_map(static fn (array $p): array => ['auto' => false] + $p, $pairesX);
+            }
+            array_push($paires, ...$pairesX);
         }
 
         return $paires;

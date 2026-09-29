@@ -125,6 +125,39 @@ test('sous axion_app : détecter, fusionner, annuler — dans l espace visé seu
         }
         expect($refus)->toContain('fiche_absorbee');
 
+        // S3 — SANS contexte d'espace : le rôle applicatif ne VOIT pas la fiche
+        // (RLS), il ne la supprime donc pas ; le propriétaire, qui voit tout,
+        // est arrêté par le déclencheur (qui lit le journal en SECURITY DEFINER,
+        // sans dépendre du contexte).
+        DB::connection('pgsql_app')->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
+        expect(DB::connection('pgsql_app')->table('companies')->where('id', $a['absorbee'])->delete())->toBe(0)
+            ->and(DB::connection('pgsql_app')->table('companies')->where('id', $a['garde'])->delete())->toBe(0);
+        $refusProprio = null;
+        $owner->beginTransaction();
+        try {
+            $owner->select('SELECT set_config(?, ?, true)', ['app.current_workspace_id', '']);
+            $owner->table('companies')->where('id', $a['garde'])->delete();
+        } catch (Throwable $e) {
+            $refusProprio = $e->getMessage();
+        } finally {
+            $owner->rollBack();
+        }
+        expect($refusProprio)->toContain('fiche_absorbee')
+            ->and($owner->table('companies')->where('id', $a['absorbee'])->exists())->toBeTrue()
+            ->and($owner->table('companies')->where('id', $a['garde'])->exists())->toBeTrue();
+
+        // S1 — la clé des empreintes n'est lisible par personne d'autre que
+        // la fonction ; le rôle applicatif calcule l'empreinte, sans la clé.
+        $refusCle = null;
+        try {
+            DB::connection('pgsql_app')->select('SELECT cle FROM doublons_cle');
+        } catch (Throwable $e) {
+            $refusCle = $e->getMessage();
+        }
+        expect($refusCle)->toContain('permission denied')
+            ->and(strlen((string) DB::connection('pgsql_app')->selectOne("SELECT public.doublons_empreinte('zz') AS h")->h))->toBe(64);
+        DB::connection('pgsql_app')->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $a['id']]);
+
         $annuler = Artisan::call('crm:doublons:fusionner', ['--workspace' => $a['slug'], '--annuler' => (string) $fusion]);
         DB::setDefaultConnection($precedente);
 

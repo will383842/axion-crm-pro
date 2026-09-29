@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\Audit\AuditHashChain;
 use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -126,4 +127,20 @@ test('la paire d un autre espace : 404, jamais 403', function () {
     $this->postJson("/api/v1/doublons/{$this->paire}/ignorer")->assertNotFound();
     $this->getJson('/api/v1/doublons')->assertOk()->assertJsonPath('meta.total', 0);
     expect(DB::table('companies')->where('id', $this->absorbee)->value('deleted_at'))->toBeNull();
+});
+
+test('E1 — deux fiches INSEE pour une même fiche sans SIREN : les DEUX paires sont à l écran, aucune « certaine »', function () {
+    $this->actingAs(dapiCompte($this->ws, 'viewer'));
+    DB::table('duplicate_flags')->where('id', $this->paire)->delete();
+    $a = F::fiche($this->ws, 'ZZ Ambigu', ['postcode' => '69020', 'website' => 'https://zz-ambigu.example.invalid']);
+    $b = F::fiche($this->ws, 'ZZ Ambigu', ['postcode' => '69020', 'website' => 'https://zz-ambigu.example.invalid']);
+    $x = F::sansSiren($this->ws, 'ZZ Ambigu', ['postcode' => '69020', 'website' => 'https://zz-ambigu.example.invalid']);
+    Artisan::call('crm:doublons:detecter', ['--workspace' => $this->ws]);
+    Artisan::call('crm:doublons:fusionner', ['--workspace' => $this->ws]);
+
+    $r = $this->getJson('/api/v1/doublons?motif=' . Rapprochement::NOM_CP_SITE)->assertOk();
+
+    expect(collect($r->json('data'))->map(fn ($p): array => [$p['garde']['id'], $p['absorbee']['id'], $p['fusion_auto']])->sortBy(0)->values()->all())
+        ->toBe([[$a, $x, false], [$b, $x, false]])
+        ->and(DB::table('companies')->where('id', $x)->value('deleted_at'))->toBeNull();
 });

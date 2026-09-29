@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Crm\Doublons\FusionFiches;
 use App\Crm\Federations\EtiquettesFederation;
 use App\Crm\Referentiels\Classement;
 use App\Crm\Scraping\ScrapedRecord;
@@ -461,6 +462,7 @@ class CrmImportFederations extends Command
 
         $avant = $this->parAncre($workspaceId, $l['siren'], $l['identifiant'], corbeilleComprise: true)
             ->first(['id', 'deleted_at', 'email_generic', 'phone', 'website', 'linkedin_url']);
+        $avant = $this->suivreFusion($workspaceId, $avant, ['id', 'deleted_at', 'email_generic', 'phone', 'website', 'linkedin_url']);
         if ($avant !== null && $avant->deleted_at !== null) {
             // Mise à la corbeille par Will : un import ne la ressuscite pas.
             throw new InvalidArgumentException('fiche_a_la_corbeille');
@@ -504,8 +506,9 @@ class CrmImportFederations extends Command
         $delta['personnes_sans_changement'] = $outcome->personsSkipped['skipped_no_change'] ?? 0;
         $delta['personnes_ecartees'] = (int) array_sum($outcome->personsSkipped) - $delta['personnes_sans_changement'];
 
-        $fiche = $this->parAncre($workspaceId, $l['siren'], $l['identifiant'])->first();
-        if ($fiche === null) {
+        $fiche = $this->parAncre($workspaceId, $l['siren'], $l['identifiant'])->first()
+            ?? $this->suivreFusion($workspaceId, $this->parAncre($workspaceId, $l['siren'], $l['identifiant'], corbeilleComprise: true)->first());
+        if ($fiche === null || $fiche->deleted_at !== null) {
             throw new RuntimeException('fiche_introuvable_apres_ingestion');
         }
         $companyId = (int) $fiche->id;
@@ -939,8 +942,43 @@ class CrmImportFederations extends Command
     {
         $estSiren = preg_match('/^\d{9}$/', $ancreTete) === 1;
         $id = $this->parAncre($workspaceId, $estSiren ? $ancreTete : null, $estSiren ? null : $ancreTete)->value('id');
+        if ($id === null) {
+            // Une tête absorbée par une fusion : sa fiche gardée.
+            $fiche = $this->suivreFusion($workspaceId, $this->parAncre(
+                $workspaceId,
+                $estSiren ? $ancreTete : null,
+                $estSiren ? null : $ancreTete,
+                corbeilleComprise: true,
+            )->first(['id', 'deleted_at']), ['id', 'deleted_at']);
 
-        return $id === null ? null : (int) $id;
+            return $fiche === null || $fiche->deleted_at !== null ? null : (int) $fiche->id;
+        }
+
+        return (int) $id;
+    }
+
+    /**
+     * Chantier 5 — une fiche à la corbeille ABSORBÉE par une fusion non
+     * annulée est remplacée par sa fiche gardée (vivante) : l'import met à
+     * jour celle-ci au lieu de refuser la ligne. Une fiche mise à la corbeille
+     * par Will (sans fusion) reste telle quelle — l'import refuse toujours de
+     * la ressusciter.
+     *
+     * @param  list<string>  $colonnes
+     */
+    private function suivreFusion(string $workspaceId, ?\stdClass $fiche, array $colonnes = ['*']): ?\stdClass
+    {
+        if ($fiche === null || $fiche->deleted_at === null) {
+            return $fiche;
+        }
+        $renvoi = FusionFiches::gardeDe($workspaceId, (int) $fiche->id);
+        if ($renvoi === null) {
+            return $fiche;
+        }
+        $gardee = DB::table('companies')->where('workspace_id', $workspaceId)
+            ->where('id', $renvoi['garde'])->whereNull('deleted_at')->first($colonnes);
+
+        return $gardee instanceof \stdClass ? $gardee : $fiche;
     }
 
     /**

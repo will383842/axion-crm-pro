@@ -18,10 +18,10 @@
  * Fixtures FICTIVES (dépôt public).
  */
 
+use App\Crm\Doublons\AdressesPartagees;
 use App\Crm\Doublons\Rapprochement;
 use App\Crm\FichesProtegees;
 use App\Services\Audit\AuditHashChain;
-use App\Support\ListeSuppression;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -120,7 +120,7 @@ test('l adresse du cabinet comptable est inscrite par son EMPREINTE, avec sa nat
     $lignes = DB::table('adresses_partagees')->where('workspace_id', $this->ws)->get();
     expect($lignes)->toHaveCount(1);
     $ligne = $lignes->first();
-    expect($ligne->email_empreinte)->toBe(ListeSuppression::empreinte($this->email))
+    expect($ligne->email_empreinte)->toBe(AdressesPartagees::empreintes([$this->email])[$this->email])
         ->and($ligne->nb_fiches)->toBe(3)
         ->and($ligne->nature)->toBe(Rapprochement::CABINET_COMPTABLE)
         ->and($ligne->domaine)->toBe('zz-cabinet.example.invalid')
@@ -280,4 +280,21 @@ test('le ménage de la table dérivée a un PLAFOND : un détecteur qui se tromp
     $force = ddDetecter($this->ws, ['--force' => true]);
     expect($force['code'])->toBe(0)
         ->and(DB::table('adresses_partagees')->where('workspace_id', $this->ws)->count())->toBe(1);
+});
+
+test('E1 — une preuve qui désigne DEUX fiches INSEE n est jamais « certaine » : deux paires à vérifier', function () {
+    $a = F::fiche($this->ws, 'ZZ Ambigu', ['postcode' => '69020', 'website' => 'https://zz-ambigu.example.invalid']);
+    $b = F::fiche($this->ws, 'ZZ Ambigu', ['postcode' => '69020', 'website' => 'https://www.zz-ambigu.example.invalid']);
+    $x = F::sansSiren($this->ws, 'ZZ Ambigu', ['postcode' => '69020', 'website' => 'zz-ambigu.example.invalid']);
+
+    $blanc = ddDetecter($this->ws, ['--dry-run' => true]);
+    $r = ddDetecter($this->ws);
+
+    $paires = ddPaires($this->ws);
+    expect($paires["{$a}-{$x}"] ?? null)->toBe(['motif' => Rapprochement::NOM_CP_SITE, 'auto' => false, 'traitee' => false])
+        ->and($paires["{$b}-{$x}"] ?? null)->toBe(['motif' => Rapprochement::NOM_CP_SITE, 'auto' => false, 'traitee' => false])
+        ->and(F::compteur($r['sortie'], 'preuves_ambigues'))->toBe(1)
+        // Seule ALPHA reste certaine.
+        ->and(F::compteur($r['sortie'], 'fusions_certaines'))->toBe(1)
+        ->and(F::bilan($blanc['sortie']))->toBe(F::bilan($r['sortie']));
 });

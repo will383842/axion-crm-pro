@@ -92,8 +92,9 @@ class ProspectionPurgeNonDiffusible extends Command
     {
         $query = DB::table('companies')->whereRaw("position('[ND]' in denomination) > 0");
         FichesProtegees::exclure($query);
-        // Une fiche ABSORBÉE par une fusion reste à la corbeille, jamais
-        // supprimée en dur : sinon la fusion ne serait plus annulable (chantier
+        // Les deux fiches d'une fusion en cours (l'ABSORBÉE, à la corbeille,
+        // et la GARDÉE, qui porte ce qui a été rattaché) ne se suppriment
+        // jamais en dur : sinon la fusion ne serait plus annulable (chantier
         // 5 ; le déclencheur `companies_refuser_suppression_absorbee` ferait
         // aussi échouer toute la purge).
         $query->whereRaw(FusionFiches::conditionSql('companies.id'));

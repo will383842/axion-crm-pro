@@ -23,13 +23,37 @@ use Illuminate\Support\Facades\DB;
  * Les adresses de cabinet comptable et de domiciliation portées par au moins
  * N fiches (réglable : `crm.doublons.campagne`) sont écartées par défaut : le
  * message n'atteindrait pas le dirigeant. La liste vient de
- * `adresses_partagees` (empreintes, jamais les adresses), calculée par
+ * `adresses_partagees` (empreintes SALÉES, jamais les adresses), calculée par
  * `crm:doublons:detecter`.
  */
 final class AdressesPartagees
 {
     /**
-     * Les empreintes (`ListeSuppression::empreinte`) des adresses à écarter
+     * L'empreinte SALÉE de chaque adresse (`doublons_empreinte`, HMAC avec la
+     * clé de la base), sur l'adresse en minuscules et sans espaces autour —
+     * la même forme partout : détection, campagne, effacement.
+     *
+     * @param  list<string>  $emails
+     * @return array<string, string> adresse telle que donnée => empreinte
+     */
+    public static function empreintes(array $emails): array
+    {
+        $empreintes = [];
+        foreach (array_chunk(array_values(array_unique($emails)), 5000) as $morceau) {
+            $lignes = DB::select(
+                'SELECT v, public.doublons_empreinte(lower(btrim(v))) AS h FROM json_array_elements_text(?::json) AS v',
+                [json_encode($morceau, JSON_THROW_ON_ERROR)],
+            );
+            foreach ($lignes as $l) {
+                $empreintes[(string) $l->v] = (string) $l->h;
+            }
+        }
+
+        return $empreintes;
+    }
+
+    /**
+     * Les empreintes (`empreintes()`) des adresses à écarter
      * des campagnes. À appeler dans le contexte de l'espace.
      *
      * @return array<string, true>

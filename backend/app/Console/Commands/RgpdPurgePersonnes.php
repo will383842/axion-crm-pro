@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Console\Concerns\RefuseUneSuppressionMassive;
+use App\Crm\Doublons\FusionFiches;
 use App\Services\Audit\AuditHashChain;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
@@ -55,6 +56,9 @@ class RgpdPurgePersonnes extends Command
             $expirees = DB::table('personnes')
                 ->where('workspace_id', $workspaceId)
                 ->whereNull('contact_id')
+                // Chantier 5 — jamais une personne rattachée à une fiche
+                // absorbée ou gardée par une fusion en cours (annulable).
+                ->whereRaw(FusionFiches::conditionSql('personnes.company_id'))
                 ->whereRaw('COALESCE(derniere_interaction_at, premiere_source_at) < ?', [now()->subYears(3)])
                 ->whereNotExists(function ($q): void {
                     $q->select(DB::raw('1'))

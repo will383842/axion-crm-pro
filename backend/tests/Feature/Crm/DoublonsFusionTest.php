@@ -76,6 +76,9 @@ beforeEach(function () {
     DB::table('federations')->insert(['company_id' => $this->antenne, 'workspace_id' => $ws, 'famille' => 'ordre', 'niveau' => 'departemental', 'pertinence' => 'haute', 'contactabilite' => 'aucun_contact', 'parent_company_id' => $this->absorbee]);
 
     // Tout le reste de ce qui pointe vers une fiche.
+    $this->evenementMetier = (int) DB::table('business_events')->insertGetId([
+        'workspace_id' => $ws, 'action' => 'zz.tag', 'resource_type' => 'company', 'resource_id' => (string) $this->absorbee, 'created_at' => now(),
+    ]);
     $this->activite = (int) DB::table('activities')->insertGetId(['workspace_id' => $ws, 'type' => 'note', 'kind' => 'scraped', 'subject_type' => 'company', 'subject_id' => $this->absorbee, 'created_at' => now()]);
     $pipeline = (int) DB::table('crm_pipelines')->insertGetId(['workspace_id' => $ws, 'name' => 'ZZ Pipeline', 'slug' => 'zz-pipeline']);
     $etape = (int) DB::table('pipeline_stages')->insertGetId(['workspace_id' => $ws, 'pipeline_id' => $pipeline, 'slug' => 'zz-etape', 'name' => 'ZZ Étape']);
@@ -138,6 +141,7 @@ function dfPhoto(string $ws): string
         'health_practitioners' => ['id', 'company_id'],
         'personnes' => ['id', 'company_id'],
         'duplicate_flags' => ['id', 'reviewed_at', 'resolution'],
+        'business_events' => ['id', 'resource_type', 'resource_id'],
     ];
     foreach ($tables as $table => $colonnes) {
         $photo[$table] = DB::table($table)->where('workspace_id', $ws)->orderBy($colonnes[0])->orderBy($colonnes[1])->get($colonnes)->map(fn ($l) => (array) $l)->all();
@@ -173,6 +177,7 @@ test('la fusion rattache TOUT à la fiche gardée et met l absorbée à la corbe
         ->and(DB::table('federations')->where('company_id', $this->antenne)->value('parent_company_id'))->toBe($this->garde)
         // Tout le reste.
         ->and(DB::table('activities')->where('id', $this->activite)->value('subject_id'))->toBe($this->garde)
+        ->and(DB::table('business_events')->where('id', $this->evenementMetier)->value('resource_id'))->toBe((string) $this->garde)
         ->and(DB::table('deals')->where('id', $this->deal)->value('company_id'))->toBe($this->garde)
         ->and(DB::table('audience_members')->where('id', $this->membre)->value('company_id'))->toBe($this->garde)
         ->and(DB::table('scraper_runs')->where('id', $this->collecte)->value('company_id'))->toBe($this->garde)
@@ -195,7 +200,11 @@ test('le journal ne garde AUCUNE coordonnée : des identifiants et des empreinte
     expect($journal)->not->toContain('zz-omega.example.invalid')
         ->and($journal)->not->toContain('00 00 00 10')
         ->and($journal)->not->toContain('@')
-        ->and($journal)->toContain(hash('sha256', 'contact@zz-omega.example.invalid'));
+        // S1 — ni en clair, ni par une empreinte NON SALÉE qu'on retrouverait
+        // en essayant des adresses connues : l'empreinte est salée par la clé
+        // de la base (`doublons_empreinte`).
+        ->and($journal)->not->toContain(hash('sha256', 'contact@zz-omega.example.invalid'))
+        ->and($journal)->toContain((string) DB::selectOne("SELECT public.doublons_empreinte('contact@zz-omega.example.invalid') AS h")->h);
 });
 
 test('l annulation remet la base EXACTEMENT dans son état d avant', function () {
@@ -253,13 +262,24 @@ test('la base REFUSE de supprimer en dur une fiche absorbée ; TÉMOIN : après 
     DB::rollBack();
     expect($refus)->toContain('fiche_absorbee');
 
+    // S4 — la fiche GARDÉE non plus : elle porte les personnes rattachées.
+    $refusGarde = null;
+    DB::beginTransaction();
+    try {
+        DB::table('companies')->where('id', $this->garde)->delete();
+    } catch (QueryException $e) {
+        $refusGarde = $e->getMessage();
+    }
+    DB::rollBack();
+    expect($refusGarde)->toContain('fiche_absorbee');
+
     dfAnnuler($this->ws, $fusion);
     DB::table('company_tag')->where('company_id', $this->absorbee)->delete();
     DB::table('federations')->where('company_id', $this->antenne)->update(['parent_company_id' => null]);
     expect(DB::table('companies')->where('id', $this->absorbee)->delete())->toBe(1);
 });
 
-test('les purges écartent une fiche absorbée au lieu d échouer', function () {
+test('les purges écartent les fiches absorbée ET gardée au lieu d échouer', function () {
     dfFusionner($this->ws, $this->garde, $this->absorbee);
     // Une fiche ordinaire sans forme juridique : la purge la supprime (témoin).
     $temoin = F::fiche($this->ws, 'ZZ Temoin purge');
@@ -269,6 +289,26 @@ test('les purges écartent une fiche absorbée au lieu d échouer', function () 
     expect($code)->toBe(0)
         ->and(DB::table('companies')->where('id', $temoin)->exists())->toBeFalse()
         ->and(DB::table('companies')->where('id', $this->absorbee)->exists())->toBeTrue()
+        ->and(DB::table('contacts')->where('id', $this->jumelleAbsorbee)->exists())->toBeTrue()
+        // S4 — la fiche gardée (sans forme juridique ici) et les personnes
+        // qu'elle a reçues restent : l'annulation reste possible.
+        ->and(DB::table('companies')->where('id', $this->garde)->exists())->toBeTrue()
+        ->and(DB::table('contacts')->where('id', $this->seule)->value('company_id'))->toBe($this->garde);
+});
+
+test('S4 — la purge de rétention RGPD épargne les personnes d une fiche gardée par une fusion en cours', function () {
+    config(['crm.purges_enabled' => true]);
+    dfFusionner($this->ws, $this->garde, $this->absorbee);
+    DB::table('contacts')->where('workspace_id', $this->ws)->update(['created_at' => now()->subYears(4), 'legal_basis' => 'legitimate_interest_b2b']);
+    // TÉMOIN : une personne d'une fiche ordinaire, aussi ancienne, est purgée.
+    $ordinaire = F::fiche($this->ws, 'ZZ Ordinaire purge');
+    $temoin = F::contact($this->ws, $ordinaire, 'Zut', 'ZZTEMOINPURGE', ['created_at' => now()->subYears(4), 'legal_basis' => 'legitimate_interest_b2b']);
+
+    Artisan::call('rgpd:purge-business-prospects');
+
+    expect(DB::table('contacts')->where('id', $temoin)->exists())->toBeFalse()
+        ->and(DB::table('contacts')->where('id', $this->seule)->exists())->toBeTrue()
+        ->and(DB::table('contacts')->where('id', $this->jumelleGarde)->exists())->toBeTrue()
         ->and(DB::table('contacts')->where('id', $this->jumelleAbsorbee)->exists())->toBeTrue();
 });
 
@@ -406,4 +446,83 @@ test('GARDE DE COUVERTURE — toute clé étrangère vers companies est rattach�
     // TÉMOIN : le catalogue répond (sinon la garde serait verte sur du vide).
     expect($references)->toContain('contacts.company_id');
     expect($references)->toBe(FusionFiches::REFERENCES);
+});
+
+test('GARDE DE COUVERTURE — les références SANS clé étrangère (`*_type = company`) sont toutes connues', function () {
+    // Le catalogue ne voit pas une référence polymorphe : on balaye le code
+    // qui ÉCRIT ou LIT « <préfixe>_type = 'company' ».
+    $prefixes = [];
+    $iter = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(app_path(), FilesystemIterator::SKIP_DOTS));
+    foreach ($iter as $fichier) {
+        if (! $fichier->isFile() || $fichier->getExtension() !== 'php') {
+            continue;
+        }
+        $source = (string) file_get_contents($fichier->getPathname());
+        preg_match_all("/'(\\w+)_type'\\s*=>\\s*'company'|\\b(\\w+)_type\\s*=\\s*'company'/", $source, $m, PREG_SET_ORDER);
+        foreach ($m as $trouve) {
+            $prefixes[($trouve[1] ?? '') !== '' ? $trouve[1] : ($trouve[2] ?? '')] = true;
+        }
+    }
+    $prefixes = array_keys($prefixes);
+    sort($prefixes);
+
+    // `entity` : la file des doublons elle-même (`duplicate_flags`), qui
+    // désigne des PAIRES et n'a pas à être rattachée.
+    $connus = ['entity' => null];
+    foreach (array_keys(FusionFiches::REFERENCES_SANS_CLE) as $colonne) {
+        [$table] = explode('.', $colonne);
+        $connus[$table === 'activities' ? 'subject' : 'resource'] = $colonne;
+    }
+    $attendus = array_keys($connus);
+    sort($attendus);
+
+    // TÉMOIN : le balayage voit bien les écritures connues.
+    expect($prefixes)->toContain('subject')->toContain('resource');
+    expect($prefixes)->toBe($attendus);
+    expect(array_keys(FusionFiches::REFERENCES_SANS_CLE))->toBe(['activities.subject_id', 'business_events.resource_id']);
+});
+
+test('E3 — une personne SUPPRIMÉE de la fiche absorbée ne transmet rien et ne bloque rien', function () {
+    DB::table('contacts')->where('id', $this->jumelleAbsorbee)->update(['deleted_at' => now(), 'email' => 'autre@zz-omega.example.invalid']);
+
+    $fusion = dfFusionner($this->ws, $this->garde, $this->absorbee);
+
+    expect($fusion)->toBeGreaterThan(0)
+        ->and(DB::table('contacts')->where('id', $this->jumelleGarde)->value('email'))->toBeNull()
+        ->and(DB::table('contacts')->where('id', $this->jumelleAbsorbee)->value('company_id'))->toBe($this->absorbee);
+});
+
+test('E3 — une personne VIVANTE dont l homonyme de la fiche gardée est supprimé : fusion refusée', function () {
+    DB::table('contacts')->where('id', $this->jumelleGarde)->update(['deleted_at' => now()]);
+
+    dfRefusSansEcriture($this->ws, 'homonyme_supprime_sur_la_fiche_gardee', $this->garde, $this->absorbee);
+});
+
+test('E1/E2 — la preuve désigne DEUX fiches INSEE : aucune fusion automatique, à blanc comme en vrai', function () {
+    // X sans SIREN : même nom, même code postal, même site que A et B, deux
+    // fiches INSEE aux SIREN différents. Des paires marquées « certaines »
+    // (détection d'hier, données changées depuis) ne doivent pas partir.
+    $a = F::fiche($this->ws, 'ZZ Ambigu', ['postcode' => '69020', 'website' => 'https://zz-ambigu.example.invalid']);
+    $b = F::fiche($this->ws, 'ZZ Ambigu', ['postcode' => '69020', 'website' => 'https://www.zz-ambigu.example.invalid']);
+    $x = F::sansSiren($this->ws, 'ZZ Ambigu', ['postcode' => '69020', 'website' => 'zz-ambigu.example.invalid']);
+    DB::table('duplicate_flags')->where('id', $this->paire)->update(['fusion_auto' => false]);
+    foreach ([$a, $b] as $garde) {
+        DB::table('duplicate_flags')->insert([
+            'workspace_id' => $this->ws, 'entity_type' => 'company', 'entity_a_id' => $garde, 'entity_b_id' => $x,
+            'similarity' => 0.99, 'motif' => Rapprochement::NOM_CP_SITE, 'fusion_auto' => true,
+        ]);
+    }
+
+    Artisan::call('crm:doublons:fusionner', ['--workspace' => $this->ws, '--dry-run' => true]);
+    $blanc = Artisan::output();
+    Artisan::call('crm:doublons:fusionner', ['--workspace' => $this->ws]);
+    $reel = Artisan::output();
+
+    expect(F::bilan($blanc))->toBe(F::bilan($reel))
+        ->and(F::compteur($reel, 'fusionnees'))->toBe(0)
+        ->and(F::compteur($reel, 'refus_preuve_ambigue'))->toBe(2)
+        ->and(DB::table('companies')->where('id', $x)->value('deleted_at'))->toBeNull()
+        ->and(DB::table('duplicate_flags')->where('entity_b_id', $x)->whereNull('reviewed_at')->count())->toBe(2);
+    // TÉMOIN : une fusion MANUELLE reste possible (un humain choisit).
+    expect(dfFusionner($this->ws, $a, $x))->toBeGreaterThan(0);
 });

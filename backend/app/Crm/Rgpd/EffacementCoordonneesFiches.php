@@ -207,6 +207,7 @@ final class EffacementCoordonneesFiches
             'companies_canaux' => 0,
             'contacts_doublons_par_telephone' => 0,
             'contacts_telephone_retire' => 0,
+            'adresses_partagees' => 0,
         ];
 
         if ($email !== '') {
@@ -225,6 +226,16 @@ final class EffacementCoordonneesFiches
                     'signals' => DB::raw("signals - 'email_generic_verification'"),
                     'updated_at' => now(),
                 ]);
+
+            // Chantier 5 : l'empreinte salée de l'adresse, si elle était
+            // partagée par plusieurs fiches, part avec l'adresse (même forme
+            // que `AdressesPartagees::empreintes`).
+            $partagees = DB::table('adresses_partagees')
+                ->whereRaw('email_empreinte = public.doublons_empreinte(lower(btrim(?)))', [$email]);
+            if ($workspaceId !== null) {
+                $partagees->where('workspace_id', $workspaceId);
+            }
+            $bilan['adresses_partagees'] = $partagees->delete();
         }
 
         // Un DOUBLON de la personne (même nom, aucune adresse) qui porte l'un

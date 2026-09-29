@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Crm\Doublons\FusionFiches;
 use App\Crm\Referentiels\Classement;
 use App\Crm\Taxonomy;
 use App\Services\Audit\AuditHashChain;
@@ -85,7 +86,7 @@ class CrmImportEvenements extends Command
 
         $this->bilan = [
             'lignes' => 0, 'crees' => 0, 'mis_a_jour' => 0, 'inchanges' => 0, 'rejetes' => 0,
-            'liens_crees' => 0, 'organisateurs_introuvables' => 0, 'sans_organisateur' => 0,
+            'liens_crees' => 0, 'liens_via_une_fusion' => 0, 'organisateurs_introuvables' => 0, 'sans_organisateur' => 0,
             'notes_expurgees' => 0, 'regions_inconnues' => 0,
         ];
         $this->rejets = [];
@@ -273,18 +274,19 @@ class CrmImportEvenements extends Command
         if (! is_array($ancres)) {
             throw new InvalidArgumentException('organisateurs_invalides');
         }
+        /** @var array<int, ?int> $companyIds fiche => fusion suivie pour la trouver */
         $companyIds = [];
         foreach ($ancres as $ancre) {
             if (! is_array($ancre)) {
                 throw new InvalidArgumentException('organisateurs_invalides');
             }
-            $id = $this->organisateur($ancre, $workspaceId);
-            if ($id === null) {
+            $trouve = $this->organisateur($ancre, $workspaceId);
+            if ($trouve === null) {
                 $delta['organisateurs_introuvables'] = ($delta['organisateurs_introuvables'] ?? 0) + 1;
 
                 continue;
             }
-            $companyIds[$id] = true;
+            $companyIds[$trouve['id']] = $trouve['fusion'];
         }
 
         $existant = DB::table('events')
@@ -329,22 +331,37 @@ class CrmImportEvenements extends Command
         }
 
         $delta['liens_crees'] = 0;
-        foreach (array_keys($companyIds) as $companyId) {
-            $delta['liens_crees'] += DB::table('event_organizers')->insertOrIgnore([
+        foreach ($companyIds as $companyId => $fusion) {
+            $cree = DB::table('event_organizers')->insertOrIgnore([
                 'event_id' => $eventId,
                 'company_id' => $companyId,
                 'workspace_id' => $workspaceId,
                 'created_at' => now(),
             ]);
+            $delta['liens_crees'] += $cree;
+            // Posé sur une fiche GARDÉE en suivant l'ancre d'une fiche absorbée :
+            // inscrit au journal de la fusion, que l'annulation rend à l'absorbée.
+            if ($cree > 0 && $fusion !== null) {
+                FusionFiches::noterRattachement($workspaceId, $fusion, 'event_organizers', $eventId);
+                $delta['liens_via_une_fusion'] = ($delta['liens_via_une_fusion'] ?? 0) + 1;
+            }
         }
 
         return $delta;
     }
 
-    /** @param  array<mixed>  $ancre */
-    private function organisateur(array $ancre, string $workspaceId): ?int
+    /**
+     * L'organisateur par son ancre. Une fiche à la corbeille n'est jamais
+     * reliée — sauf si une FUSION l'a absorbée (chantier 5) : l'événement se
+     * relie alors à la fiche gardée, et le lien est inscrit au journal de la
+     * fusion (`fusion`), pour que l'annulation le défasse.
+     *
+     * @param  array<mixed>  $ancre
+     * @return array{id: int, fusion: ?int}|null
+     */
+    private function organisateur(array $ancre, string $workspaceId): ?array
     {
-        $requete = DB::table('companies')->where('workspace_id', $workspaceId)->whereNull('deleted_at');
+        $requete = DB::table('companies')->where('workspace_id', $workspaceId);
 
         $siren = $ancre['siren'] ?? null;
         $foreignId = $ancre['foreign_id'] ?? null;
@@ -360,9 +377,21 @@ class CrmImportEvenements extends Command
             throw new InvalidArgumentException('organisateur_sans_ancre');
         }
 
-        $id = $requete->value('id');
+        $fiche = $requete->first(['id', 'deleted_at']);
+        if ($fiche === null) {
+            return null;
+        }
+        if ($fiche->deleted_at === null) {
+            return ['id' => (int) $fiche->id, 'fusion' => null];
+        }
+        $renvoi = FusionFiches::gardeDe($workspaceId, (int) $fiche->id);
+        if ($renvoi === null) {
+            return null;
+        }
+        $vivante = DB::table('companies')->where('workspace_id', $workspaceId)
+            ->where('id', $renvoi['garde'])->whereNull('deleted_at')->exists();
 
-        return $id === null ? null : (int) $id;
+        return $vivante ? ['id' => $renvoi['garde'], 'fusion' => $renvoi['fusion']] : null;
     }
 
     /** @param  array<mixed>  $brut */

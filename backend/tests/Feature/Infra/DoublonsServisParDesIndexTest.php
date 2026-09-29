@@ -38,7 +38,7 @@ uses(TestCase::class, RefreshDatabase::class);
 const DSI_TABLES = [
     'companies', 'contacts', 'activities', 'company_tag', 'scraper_runs', 'audience_members', 'event_organizers',
     'deals', 'duplicate_flags', 'federations', 'media', 'journalists', 'health_practitioners', 'personnes',
-    'fusions_fiches',
+    'fusions_fiches', 'business_events',
 ];
 // `adresses_partagees` n'y est pas : table DÉRIVÉE de quelques dizaines de
 // milliers de lignes, que le plafond du ménage compte en entier (à dessein).
@@ -58,6 +58,7 @@ const DSI_INDEX_ATTENDUS = [
     ['contacts_workspace_id_normalized_hash_key'],
     ['idx_dup_flags_file_fusion_auto'],
     ['idx_fusions_fiches_flag'],
+    ['idx_business_events_resource'],
 ];
 
 /** @return list<array{sql: string, bindings: array<int, mixed>}> */
@@ -206,6 +207,8 @@ function dsiSemerVolume(string $ws): void
          SELECT c.workspace_id, c.id, 'Zz', 'ZZVOLUME' || c.id::text, now(), now() {$volume}",
         "INSERT INTO activities (workspace_id, type, kind, subject_type, subject_id, created_at)
          SELECT c.workspace_id, 'note', 'scraped', 'company', c.id, now() {$volume}",
+        "INSERT INTO business_events (workspace_id, action, resource_type, resource_id, created_at)
+         SELECT c.workspace_id, 'zz.volume', 'company', c.id::text, now() {$volume}",
         "INSERT INTO company_tag (company_id, tag_id, workspace_id, assigned_at, assigned_by)
          SELECT c.id, {$tag}, c.workspace_id, now(), 'auto-rule' {$volume}",
         "INSERT INTO scraper_runs (workspace_id, company_id, source, status)
@@ -241,7 +244,8 @@ function dsiSemerVolume(string $ws): void
         FROM duplicate_flags d WHERE d.workspace_id = ? AND d.entity_b_id > 1000000000
     ", [$ws]);
     foreach (['companies', 'contacts', 'activities', 'company_tag', 'scraper_runs', 'audience_members', 'event_organizers',
-        'deals', 'federations', 'media', 'journalists', 'health_practitioners', 'personnes', 'duplicate_flags', 'fusions_fiches'] as $table) {
+        'deals', 'federations', 'media', 'journalists', 'health_practitioners', 'personnes', 'duplicate_flags', 'fusions_fiches',
+        'business_events'] as $table) {
         DB::statement("ANALYZE {$table}");
     }
 }
@@ -258,6 +262,7 @@ test('détection, fusion et annulation : chaque requête est servie par un index
     F::contact($ws, $garde, 'Zed', 'ZZJUMEAU');
     F::contact($ws, $absorbee, 'Zed', 'ZZJUMEAU', ['email' => 'zed@zz-index.example.invalid']);
     DB::table('activities')->insert(['workspace_id' => $ws, 'type' => 'note', 'kind' => 'scraped', 'subject_type' => 'company', 'subject_id' => $absorbee, 'created_at' => now()]);
+    DB::table('business_events')->insert(['workspace_id' => $ws, 'action' => 'zz.tag', 'resource_type' => 'company', 'resource_id' => (string) $absorbee, 'created_at' => now()]);
     // Du volume, dans le MÊME espace et dans CHAQUE table touchée : sans lui,
     // un index lu pour tout l'espace coûte aussi peu que le bon, et le
     // planificateur hésite.

@@ -2,6 +2,7 @@
 
 namespace App\Crm\Scraping;
 
+use App\Crm\Doublons\FusionFiches;
 use App\Crm\Identite\CleDePersonne;
 use App\Crm\Personnes\NatureEmail;
 use App\Models\Company;
@@ -241,6 +242,17 @@ final class ScrapedRecordIngestService
                 ->where('foreign_id', $record->foreignId);
         }
         $existing = $lookup->first();
+
+        // Chantier 5 — une fiche ABSORBÉE par une fusion (corbeille) : ce que
+        // la source dit d'elle va à la fiche gardée, jamais à la corbeille.
+        if ($existing !== null && $existing->deleted_at !== null) {
+            $renvoi = FusionFiches::gardeDe($workspaceId, (int) $existing->id);
+            $gardee = $renvoi === null ? null : DB::table('companies')->where('workspace_id', $workspaceId)
+                ->where('id', $renvoi['garde'])->whereNull('deleted_at')->first();
+            if ($gardee !== null) {
+                $existing = $gardee;
+            }
+        }
 
         if ($existing === null) {
             // Fiche née de la collecte : FROIDE par définition (règle B.2).

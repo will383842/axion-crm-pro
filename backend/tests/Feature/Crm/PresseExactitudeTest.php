@@ -158,7 +158,9 @@ test('deux journalistes HOMONYMES sur une meme fiche ne deviennent jamais un seu
     // Et deux homonymes sur le MÊME média.
     $titre = pxMedia($this->espace, ['name' => 'ZZ Titre']);
     $j3 = pxJournaliste($this->espace, $titre, ['first_name' => 'Max', 'last_name' => 'ZZDOUBLE']);
-    $j4 = pxJournaliste($this->espace, $titre, ['first_name' => 'Max', 'last_name' => 'ZZDOUBLE']);
+    // (L'index `journalists_dedup_uidx` interdit deux lignes au nom IDENTIQUE
+    // sur un même média ; la casse suffit à en faire deux lignes.)
+    $j4 = pxJournaliste($this->espace, $titre, ['first_name' => 'Max', 'last_name' => 'zzdouble']);
 
     $r = pxCompteurs(pxHarmoniser()['sortie']);
 

@@ -333,7 +333,9 @@ test('porte d acces : l adresse n est posee QUE si la porte vaut email_redaction
 
 test('un journaliste OPPOSE ou EFFACE dans la console n est jamais recree : par nom et media, ou par adresse ; le temoin entre', function () {
     $media = (int) DB::table('media')->insertGetId([
-        'workspace_id' => $this->espace, 'name' => 'ZZ Quotidien fictif', 'media_type' => 'presse_quotidien',
+        // Autre type que la ligne importée : pas de rapprochement de titre, la
+        // ligne crée sa fiche ; l'opposition se lit par le NOM du média.
+        'workspace_id' => $this->espace, 'name' => 'ZZ Quotidien fictif', 'media_type' => 'presse_hebdo',
         'media_family' => 'editorial', 'source' => 'cppap', 'enrich_status' => 'pending', 'created_at' => now(), 'updated_at' => now(),
     ]);
     $ligne = static fn (array $v): array => $v + ['workspace_id' => test()->espace, 'source' => 'wikidata', 'created_at' => now(), 'updated_at' => now()];

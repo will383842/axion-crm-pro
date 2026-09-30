@@ -277,12 +277,18 @@ test('B15-002 — l’inventaire des points de lecture est BALAYE, jamais recopi
     // `opt_out` et `email_suppressions` en portée `business` SEULEMENT — la
     // même question que `EligibiliteCampagne::peutRecevoir`, posée par lot
     // (un test d'accord le garde). Il n'écrit rien dans ces tables.
+    // Harmonisation presse (2026-09-30, #264) : +1.
+    // `Presse\LienJournalisteContact` ÉCRIT l'opposition d'un journaliste en
+    // portée `business` et lit `opt_out` dans cette même portée, pour ne pas
+    // doubler une ligne (idempotence). L'effacement couvre `opt_out` comme
+    // avant (il n'efface jamais une opposition).
     expect($fichiers)->toBe([
         'app/Console/Commands/CrmEmailsVerifier.php',
         'app/Crm/Ingest/PersonnesIngestService.php',
         'app/Crm/Ingest/SiteSyncIngestService.php',
         'app/Crm/Joignabilite/Joignabilite.php',
         'app/Crm/Personnes/Abonnements.php',
+        'app/Crm/Presse/LienJournalisteContact.php',
         'app/Crm/Rgpd/SiteGdprService.php',
         'app/Crm/Scraping/ScrapedRecordIngestService.php',
         'app/Services/Dedup/DeduplicationService.php',

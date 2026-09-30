@@ -503,7 +503,16 @@ test('B10-016-PORTEE COLONNES MORTES — deux tables recoivent un deleted_at par
     sort($posantes);
     sort($sites);
 
-    expect($posantes)->toBe(['media', 'users']);
+    // 2026-09-30 (#264, relecture sécurité) : `journalists` entre dans la liste,
+    // APRÈS examen. `GdprErasureService` mettait DÉJÀ ses journalistes effacés
+    // à la corbeille (anonymisés, opposés) ; le balayage ne le voyait pas parce
+    // que la chaîne était coupée par le `;` d'une closure. Le correctif relève
+    // d'abord les journalistes visés (pour effacer leur contact lié) puis les
+    // met à jour par identifiant : le geste devient visible, il n'est pas
+    // nouveau. La lecture aveugle de `journalists` (plafond 1 ci-dessus) est la
+    // portabilité (`GdprPortabilityService`), qui DOIT rendre aussi la ligne
+    // effacée : elle n'est pas concernée par la corbeille.
+    expect($posantes)->toBe(['journalists', 'media', 'users']);
     // 216 -> 224 le 2026-09-24 : le lot L4-C a inséré huit lignes AU-DESSUS
     // (effacement de `personnes` et `abonnements`) dans GdprErasureService. Le
     // site est le même geste, sur `users` ; seule sa ligne a bougé.
@@ -513,7 +522,8 @@ test('B10-016-PORTEE COLONNES MORTES — deux tables recoivent un deleted_at par
     // opposables (4e relecture) ; même geste, seule la ligne a bougé.
     expect($sites)->toBe([
         'app/Console/Commands/ImportMediaMerge.php:197',
-        'app/Services/Rgpd/GdprErasureService.php:258',
+        'app/Services/Rgpd/GdprErasureService.php:107',
+        'app/Services/Rgpd/GdprErasureService.php:268',
     ]);
 });
 

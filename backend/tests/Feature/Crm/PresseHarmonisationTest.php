@@ -339,11 +339,15 @@ test('une personne RETIREE ne revient jamais : contact supprime, a la corbeille,
     $media = phMedia($this->espace, ['company_id' => $fiche]);
     $a = phJournaliste($this->espace, $media, ['first_name' => 'Ana', 'last_name' => 'ZZSUPPRIMEE']);
     $d = phJournaliste($this->espace, $media, ['first_name' => 'Dom', 'last_name' => 'ZZCORBEILLE']);
+    $g = phJournaliste($this->espace, $media, ['first_name' => 'Gus', 'last_name' => 'ZZAVANTRENOMMAGE']);
     phHarmoniser();
 
-    // Will supprime Ana (vraie suppression) et met Dom à la corbeille.
+    // Will supprime Ana (vraie suppression) et met Dom à la corbeille ; il
+    // corrige le nom de Gus PUIS le met à la corbeille — seule sa référence
+    // `journaliste:<id>` dit encore que c'est lui.
     DB::table('contacts')->where('external_ref', 'journaliste:' . $a)->delete();
     DB::table('contacts')->where('external_ref', 'journaliste:' . $d)->update(['deleted_at' => now()]);
+    DB::table('contacts')->where('external_ref', 'journaliste:' . $g)->update(['last_name' => 'ZZAPRESRENOMMAGE', 'deleted_at' => now()]);
     // Le déclencheur a inscrit Ana au registre (source presse-2026).
     expect(DB::table('contacts_retires')->where('company_id', $fiche)->count())->toBe(1)
         ->and(DB::table('journalists')->where('id', $a)->value('contact_id'))->toBeNull();
@@ -362,8 +366,9 @@ test('une personne RETIREE ne revient jamais : contact supprime, a la corbeille,
     expect(DB::table('contacts')->where('last_name', 'ZZSUPPRIMEE')->exists())->toBeFalse()
         ->and(DB::table('contacts')->where('last_name', 'ZZCORBEILLE')->whereNull('deleted_at')->exists())->toBeFalse()
         ->and(DB::table('contacts')->where('last_name', 'ZZREGISTRE')->exists())->toBeFalse()
+        ->and(DB::table('contacts')->where('last_name', 'ZZAVANTRENOMMAGE')->exists())->toBeFalse()
         ->and(DB::table('contacts')->where('external_ref', 'journaliste:' . $temoin)->exists())->toBeTrue()
-        ->and(phCompteur($r['sortie'], 'journalistes_retires_ignores'))->toBe(3)
+        ->and(phCompteur($r['sortie'], 'journalistes_retires_ignores'))->toBe(4)
         ->and(phCompteur($r['sortie'], 'journalistes_convertis'))->toBe(1);
 });
 

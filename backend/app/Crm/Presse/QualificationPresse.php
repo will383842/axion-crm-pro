@@ -277,17 +277,22 @@ final class QualificationPresse
      * presse (un groupe de presse qui organise des salons) ? Ses journalistes
      * y restent exclus des envois (`GardePresse::conditionContactsSql`) : on
      * le compte pour le dire.
+     *
+     * @param  list<string>  $ouverts
      */
-    public static function porteUnSegmentOuvert(int $companyId): bool
+    public static function porteUnSegmentOuvert(int $companyId, array $ouverts = Segments::OUVERTS): bool
     {
         $tags = [];
-        foreach (Segments::OUVERTS as $segment) {
+        foreach ($ouverts as $segment) {
             if ($segment !== Segments::PRESSE) {
                 $tags[] = Segments::tag($segment);
             }
         }
+        if ($tags === []) {
+            return false;
+        }
 
-        return $tags !== [] && DB::table('company_tag')->join('tags', 'tags.id', '=', 'company_tag.tag_id')
+        return DB::table('company_tag')->join('tags', 'tags.id', '=', 'company_tag.tag_id')
             ->where('company_tag.company_id', $companyId)->whereIn('tags.slug', $tags)->exists();
     }
 

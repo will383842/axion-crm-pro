@@ -183,6 +183,23 @@ final class QualificationPresse
     }
 
     /**
+     * Un AUTRE journaliste de même nom est-il déjà un contact vivant de cette
+     * fiche ? Le funnel les dédoublonnerait par nom + fiche et fusionnerait
+     * deux personnes : on ne lui envoie pas le second.
+     */
+    public static function homonymeJournaliste(int $companyId, ?string $prenom, string $nom, int $journalisteId): bool
+    {
+        return DB::table('contacts')->where('company_id', $companyId)->whereNull('deleted_at')
+            ->where('external_ref', 'like', 'journaliste:%')
+            ->where('external_ref', '<>', 'journaliste:' . $journalisteId)
+            ->whereRaw(
+                "normalized_hash = encode(digest(normalize_name(coalesce(?, '') || '_' || ?) || '_' || ?::TEXT, 'sha256'), 'hex')",
+                [$prenom, $nom, $companyId],
+            )
+            ->exists();
+    }
+
+    /**
      * Une personne de même nom a-t-elle été mise à la CORBEILLE sur cette
      * fiche ? Le funnel la retrouverait par son empreinte et la « complèterait »
      * sans la faire revenir : on ne la lui envoie pas.
